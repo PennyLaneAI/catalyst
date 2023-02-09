@@ -68,6 +68,7 @@ Catalyst
    :caption: Development
    :hidden:
 
+   dev/debugging
    dev/architecture
    modules/frontend
    modules/mlir
