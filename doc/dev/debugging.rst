@@ -10,11 +10,11 @@ The compilation process of a QJITed quantum function moves through various stage
 - **Quantum Tape**: The quantum record of variational quantum programs in a single ``qml.QNode``
 - **JAXPR**: The graph data structure maintained by `JAX <https://github.com/google/jax>`_ of the classical part for transformations
 - **MLIR**: A novel compiler framework and intermediate representation
-- **HLO (XLA) + Quantum Dialect**: The first stage inside MLIR after leaving JAXPR
+- **HLO (XLA) + Quantum Dialect**: Lowering to `HLO <https://github.com/tensorflow/mlir-hlo>`_ is the first stage inside MLIR after leaving JAXPR
 - **Builtin + Quantum Dialects**: HLO has been converted to a variety of classical dialects in MLIR
-- **Bufferized MLIR**: All tensors have been converted to memory buffer allocations at this step
-- **LLVM Dialect**: Lower the code to LLVM Dialect to target LLVMIR by providing a one-to-one mapping in MLIR
-- **QIR**: A specification for quantum programs in LLVMIR
+- **Bufferized MLIR**: All tensors have been `converted <https://mlir.llvm.org/docs/Bufferization>`_ to memory buffer allocations at this step
+- **LLVM Dialect**: Lower the code to `LLVM Dialect <https://mlir.llvm.org/docs/Dialects/LLVM/>`_ to target LLVMIR by providing a one-to-one mapping in MLIR
+- **QIR**: A `specification <https://learn.microsoft.com/en-us/azure/quantum/concepts-qir>`_ for quantum programs in LLVMIR
 
 To ensure that you have access to all the stages, the ``keep_intermediate=True`` flag must be specified in ``qjit``.
 In the following example, we also compile ahead-of-time so that there is no requirements to pass actual parameters:
