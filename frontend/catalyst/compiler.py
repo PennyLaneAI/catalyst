@@ -246,7 +246,7 @@ def compile(mlir_module, workspace, passes):
     # need to create a temporary file with the string contents
     filename = workspace + f"/{module_name}.mlir"
     with open(filename, "w") as f:
-        f.write(str(mlir_module) + "\n")
+        mlir_module.operation.print(f, print_generic_op_form=False, assume_verified=True)
 
     passes["mlir"] = filename
     mlir = filename

@@ -406,5 +406,4 @@ def custom_lower_jaxpr_to_module(
                 continue
             op.attributes["llvm.linkage"] = ir.Attribute.parse("#llvm.linkage<internal>")
 
-    ctx.module.operation.verify()
     return ctx.module, ctx.context

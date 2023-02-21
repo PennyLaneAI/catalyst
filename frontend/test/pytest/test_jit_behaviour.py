@@ -23,8 +23,6 @@ import numpy as np
 import random
 import jax
 import warnings
-import contextlib
-import io
 
 from catalyst.compilation_pipelines import CompiledFunction
 
@@ -660,7 +658,6 @@ class TestDefaultAvailableIR:
         assert "__quantum__qis" in g.qir
 
 
-@pytest.mark.xfail
 class TestAvoidVerification:
     def test_no_verification(self, capfd):
         dev1 = qml.device("lightning.qubit", wires=1)
