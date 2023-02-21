@@ -1,0 +1,3 @@
+recursive-include frontend/catalyst/bin *
+recursive-include frontend/catalyst/lib *
+recursive-include frontend/mlir_quantum *

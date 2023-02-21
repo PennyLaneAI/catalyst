@@ -1,0 +1,20 @@
+@startuml
+!include <C4/C4_Container.puml>
+
+!include common.iuml
+
+HIDE_STEREOTYPE()
+
+Person(p, "Programmer")
+System(a, "Object", $tags="data")
+Container(b1, "Algorithm A", "implementation")
+Container(b2, "Algorithm B", "implementation")
+System_Ext(c, "External project")
+
+Rel_D(p,a, "acts", "", $tags="action")
+Lay_D(a,b1)
+Rel_R(b1,b2,"object")
+Lay_D(b1,c)
+@enduml
+
+

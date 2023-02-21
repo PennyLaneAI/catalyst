@@ -1,0 +1,347 @@
+name: Check Catalyst Build
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  llvm:
+    name: LLVM Build
+    runs-on: ubuntu-22.04
+    steps:
+    - name: Checkout Catalyst repo
+      uses: actions/checkout@v3
+
+    - name: Get LLVM Version
+      id: llvm-hash
+      run: echo "llvm-hash=$(grep llvm .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
+
+    # Both the LLVM source and build folder are required for further dialect builds.
+    # Caching is significantly faster than git cloning since LLVM is such a large repository.
+
+    - name: Cache LLVM Build
+      id: cache-llvm-build
+      uses: actions/cache@v3
+      with:
+        path:  llvm-build
+        key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-build
+
+    - name: Cache LLVM Source
+      id: cache-llvm-source
+      uses: actions/cache@v3
+      with:
+        path:  mlir/llvm-project
+        key: Linux-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-source
+        enableCrossOsArchive: True
+
+    - name: Clone LLVM Submodule
+      if: |
+        steps.cache-llvm-source.outputs.cache-hit != 'true'
+      run: |
+        git submodule update --init mlir/llvm-project
+        [ $(cd mlir/llvm-project && git rev-parse HEAD) == ${{ steps.llvm-hash.outputs.llvm-hash }} ]
+
+    - name: Install Deps
+      if: steps.cache-llvm-build.outputs.cache-hit != 'true'
+      run: |
+        sudo apt update
+        sudo apt install -y python3 python3-pip cmake ninja-build clang lld
+        python3 -m pip install numpy pybind11
+
+    - name: Build LLVM
+      if: steps.cache-llvm-build.outputs.cache-hit != 'true'
+      # Note: Disable instrumentation for the mlir runtime support library,
+      #       as user programs aren't instrumented.
+      run: |
+        # echo 'target_compile_options(mlir_c_runner_utils PRIVATE "-fno-sanitize=all")' \
+        #       >> mlir/llvm-project/mlir/lib/ExecutionEngine/CMakeLists.txt
+        cmake -S mlir/llvm-project/llvm -B llvm-build -G Ninja \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DLLVM_BUILD_EXAMPLES=OFF \
+              -DLLVM_TARGETS_TO_BUILD="host" \
+              -DLLVM_ENABLE_PROJECTS="mlir" \
+              -DLLVM_ENABLE_ASSERTIONS=ON \
+              -DLLVM_INSTALL_UTILS=ON \
+              -DMLIR_ENABLE_BINDINGS_PYTHON=ON \
+              -DPython3_EXECUTABLE=/usr/bin/python3 \
+              -DPython3_NumPy_INCLUDE_DIRS=$(python3 -c "import numpy as np; print(np.get_include())") \
+              -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DLLVM_ENABLE_LLD=ON
+              # -DLLVM_USE_SANITIZER="Address;Undefined"
+        cmake --build llvm-build --target check-mlir -j$(nproc)
+
+  quantum:
+    name: Quantum Dialects Build
+    needs: llvm
+    runs-on: ubuntu-22.04
+    steps:
+    - name: Checkout Catalyst repo
+      uses: actions/checkout@v3
+
+    - name: Install Deps
+      run: |
+        sudo apt update
+        sudo apt install -y python3 python3-pip cmake ninja-build ccache clang lld
+        python3 -m pip install numpy pybind11
+
+    - name: Get LLVM Version
+      id: llvm-hash
+      run: echo "llvm-hash=$(grep llvm .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
+
+    - name: Get Cached LLVM Source
+      id: cache-llvm-source
+      uses: actions/cache@v3
+      with:
+        path: mlir/llvm-project
+        key: Linux-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-source
+        enableCrossOsArchive: True
+        fail-on-cache-miss: True
+
+    - name: Get Cached LLVM Build
+      id: cache-llvm-build
+      uses: actions/cache@v3
+      with:
+        path: llvm-build
+        key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-build
+        fail-on-cache-miss: True
+
+    - name: Cache CCache
+      id: cache-ccache
+      uses: actions/cache@v3
+      with:
+        path: .ccache
+        # TODO: revisit once actions/cache has an update feature
+        #       this will load the latest available cache and generate a new one at the end
+        key: ${{ runner.os }}-ccache-${{ github.run_id }}
+        restore-keys: ${{ runner.os }}-ccache-
+
+    - name: Build MLIR Dialects
+      run: |
+        export CCACHE_DIR=$GITHUB_WORKSPACE/.ccache
+        cmake -S mlir -B quantum-build -G Ninja \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DLLVM_ENABLE_ASSERTIONS=ON \
+              -DQUANTUM_ENABLE_BINDINGS_PYTHON=ON \
+              -DPython3_EXECUTABLE=/usr/bin/python3 \
+              -DMLIR_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir \
+              -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DLLVM_ENABLE_LLD=ON \
+              -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+              # -DLLVM_USE_SANITIZER="Address;Undefined"
+        cmake --build quantum-build --target check-dialects -j$(nproc)
+
+    - name: Upload Quantum Build Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: quantum-build
+        path: |
+          quantum-build/bin
+          quantum-build/lib/lib*.so*
+          quantum-build/python_packages/*
+        retention-days: 1
+
+  mhlo:
+    name: MHLO Dialect Build
+    needs: llvm
+    runs-on: ubuntu-22.04
+    steps:
+    - name: Checkout Catalyst repo
+      uses: actions/checkout@v3
+
+    - name: Get MHLO Version
+      id: mhlo-hash
+      run: echo "mhlo-hash=$(grep mhlo .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
+
+    - name: Cache MHLO Build
+      id: cache-mhlo
+      uses: actions/cache@v3
+      with:
+        path:  mhlo-build
+        key: ${{ runner.os }}-mhlo-${{ steps.mhlo-hash.outputs.mhlo-hash }}-default-build
+
+    - name: Get LLVM Version
+      id: llvm-hash
+      if: steps.cache-mhlo.outputs.cache-hit != 'true'
+      run: echo "llvm-hash=$(grep llvm .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
+
+    - name: Get Cached LLVM Source
+      id: cache-llvm-source
+      if: steps.cache-mhlo.outputs.cache-hit != 'true'
+      uses: actions/cache@v3
+      with:
+        path:  mlir/llvm-project
+        key: Linux-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-source
+        enableCrossOsArchive: True
+        fail-on-cache-miss: True
+
+    - name: Get Cached LLVM Build
+      id: cache-llvm-build
+      if: steps.cache-mhlo.outputs.cache-hit != 'true'
+      uses: actions/cache@v3
+      with:
+        path:  llvm-build
+        key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-build
+        fail-on-cache-miss: True
+
+    - name: Clone MHLO Submodule
+      if:  |
+        steps.cache-mhlo.outputs.cache-hit != 'true' &&
+        steps.cache-mhlo-source.outputs.cache-hit != 'true'
+      run: |
+        git submodule update --init mlir/mlir-hlo
+        [ $(cd mlir/mlir-hlo && git rev-parse HEAD) == ${{ steps.mhlo-hash.outputs.mhlo-hash }} ]
+
+    - name: Install Deps
+      if: steps.cache-mhlo.outputs.cache-hit != 'true'
+      run: |
+        sudo apt update
+        sudo apt install -y cmake ninja-build clang lld
+
+    - name: Build MHLO Dialect
+      if: steps.cache-mhlo.outputs.cache-hit != 'true'
+      run: |
+        cmake -S mlir/mlir-hlo -B mhlo-build -G Ninja \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DLLVM_ENABLE_ASSERTIONS=ON \
+              -DMLIR_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir \
+              -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DLLVM_ENABLE_LLD=ON
+              # -DLLVM_USE_SANITIZER="Address;Undefined"
+        cmake --build mhlo-build --target check-mlir-hlo -j$(nproc)
+
+  runtime:
+    name: Catalyst-Runtime
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout Catalyst repo
+        uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get -y -q install ninja-build make cmake gcc-10 g++-10 libomp-dev
+
+      - name: Install rustup with llvm-tools-preview
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          components: llvm-tools-preview
+
+      - name: Install QIR-stdlib
+        run: |
+            cd ./runtime/qir-stdlib
+            cargo build --release --verbose
+            mkdir -p ../build-qir-stdlib/include
+            cp ./target/release/libqir_stdlib.a ../build-qir-stdlib/
+            cp ./target/release/build/include/* ../build-qir-stdlib/include/
+            cargo clean
+
+      - name: Build Catalyst-Runtime
+        run: |
+          cmake -S runtime -B catalyst-runtime-build \
+                            -DCMAKE_BUILD_TYPE=Release \
+                            -DQIR_STDLIB_LIB="$(pwd)/runtime/build-qir-stdlib/" \
+                            -DQIR_STDLIB_INCLUDES="$(pwd)/runtime/build-qir-stdlib/include/" \
+                            -G Ninja
+          cmake --build catalyst-runtime-build --target rt_capi -j$(nproc)
+
+      - name: Upload Catalyst-Runtime Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: catalyst-runtime-build
+          path: |
+            catalyst-runtime-build/lib/capi/*.so
+            catalyst-runtime-build/lib/backend/*.so
+          retention-days: 1
+
+  frontend:
+    name: Frontend Tests
+    needs: [llvm, mhlo, quantum, runtime]
+    runs-on: ubuntu-22.04
+    steps:
+    - name: Checkout Catalyst repo
+      uses: actions/checkout@v3
+
+    - name: Get JAX Version
+      id: jax-version
+      run: echo "v=$(grep jax .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
+
+    - name: Install Deps
+      run: |
+        sudo apt update
+        sudo apt install -y python3 python3-pip
+        python3 -m pip install lit pytest pytest-xdist nbconvert ipykernel
+        python3 -m pip install jax==${{ steps.jax-version.outputs.v }} jaxlib==${{ steps.jax-version.outputs.v }}
+        python3 -m pip install .
+        sudo add-apt-repository -y ppa:deadsnakes/ppa
+        sudo apt install libpython3.8  # required by the XACC runtime
+
+    - name: Install PennyLane-master
+      if: ${{ github.event_name == 'push' }}
+      uses: actions/checkout@v3
+      with:
+        repository: PennyLaneAI/pennylane
+        path: pennylane
+    - if: ${{ github.event_name == 'push' }}
+      run: |
+        python3 -m pip install --upgrade ./pennylane
+
+    - name: Get LLVM Version
+      id: llvm-hash
+      run: echo "llvm-hash=$(grep llvm .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
+
+    - name: Get Cached LLVM Build
+      id: cache-llvm-build
+      uses: actions/cache@v3
+      with:
+        path:  llvm-build
+        key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-build
+        fail-on-cache-miss: True
+
+    - name: Get MHLO Version
+      id: mhlo-hash
+      run: echo "mhlo-hash=$(grep mhlo .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
+
+    - name: Get Cached MHLO Build
+      id: cache-mhlo
+      uses: actions/cache@v3
+      with:
+        path:  mhlo-build
+        key: ${{ runner.os }}-mhlo-${{ steps.mhlo-hash.outputs.mhlo-hash }}-default-build
+        fail-on-cache-miss: True
+
+    - name: Download Quantum Build Artifact
+      uses: actions/download-artifact@v3
+      with:
+        name: quantum-build
+        path: quantum-build
+
+    - name: Caching System Files Workaround
+      run: |  # TODO: revisit once actions/cache has a sudo option
+        sudo mv /usr/bin/tar /usr/bin/tar.orig
+        printf '#!/bin/sh\nexec sudo /usr/bin/tar.orig "$@"\n' | sudo tee /usr/bin/tar
+        sudo chmod +x /usr/bin/tar
+
+    - name: Download Catalyst-Runtime Artifact
+      uses: actions/download-artifact@v3
+      with:
+        name: catalyst-runtime-build
+        path: catalyst-runtime-build/lib
+
+    - name: Add Frontend Dependencies to PATH
+      run: |
+        echo "$(pwd)/llvm-build/bin" >> $GITHUB_PATH
+        echo "$(pwd)/mhlo-build/bin" >> $GITHUB_PATH
+        echo "$(pwd)/quantum-build/bin" >> $GITHUB_PATH
+        echo "PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
+        echo "RUNTIME_LIB_DIR=$(pwd)/catalyst-runtime-build/lib" >> $GITHUB_ENV
+        echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
+        chmod +x quantum-build/bin/quantum-opt  # artifact upload does not preserve permissions
+
+    - name: Run Python Lit Tests
+      run: |
+        llvm-lit -sv frontend/test/lit -j$(nproc)
+
+    - name: Run Python Pytest Tests
+      run: |
+        export ASAN_OPTIONS=detect_odr_violation=0
+        pytest frontend/test/pytest -n auto

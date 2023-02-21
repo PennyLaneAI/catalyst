@@ -1,0 +1,4 @@
+
+AddRelTag("action", $textColor=$ARROW_COLOR, $lineColor=$ARROW_COLOR, $lineStyle=DottedLine())
+AddElementTag("object", $fontColor=$ELEMENT_FONT_COLOR, $bgColor="#335DA5", $legendText="data")
+

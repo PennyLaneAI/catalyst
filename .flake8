@@ -1,0 +1,11 @@
+[flake8]
+select = ['F401']
+max-line-length = 100
+exclude = [
+  'mlir/llvm-project',
+  'mlir/mlir-hlo',
+  'python_bindings',
+  '.git',
+  '__pycache__',
+  'build',
+  ]

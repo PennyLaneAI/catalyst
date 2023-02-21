@@ -1,0 +1,462 @@
+// Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+
+//     http://www.apache.org/licenses/LICENSE-2.0
+
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// RUN: quantum-opt --convert-quantum-to-llvm --split-input-file %s | FileCheck %s
+
+////////////////////////
+// Runtime Management //
+////////////////////////
+
+// CHECK: llvm.func @__quantum__rt__initialize()
+
+// CHECK-LABEL: @init
+func.func @init() {
+
+    // CHECK: llvm.call @__quantum__rt__initialize()
+    quantum.init
+
+    return
+}
+
+// -----
+
+// CHECK: llvm.func @__quantum__rt__finalize()
+
+// CHECK-LABEL: @finalize
+func.func @finalize() {
+
+    // CHECK: llvm.call @__quantum__rt__finalize()
+    quantum.finalize
+
+    return
+}
+
+// -----
+
+///////////////////////
+// Memory Management //
+///////////////////////
+
+// CHECK: llvm.func @__quantum__rt__qubit_allocate_array(i64) -> !llvm.ptr<struct<"Array", opaque>>
+
+// CHECK-LABEL: @alloc
+func.func @alloc(%c : i64) {
+
+    // CHECK: llvm.call @__quantum__rt__qubit_allocate_array(%arg0)
+    quantum.alloc(%c) : !quantum.reg
+
+    // CHECK: [[c5:%.+]] = llvm.mlir.constant(5 : i64)
+    // CHECK: llvm.call @__quantum__rt__qubit_allocate_array([[c5]])
+    quantum.alloc(5) : !quantum.reg
+
+    return
+}
+
+// -----
+
+// CHECK: llvm.func @__quantum__rt__qubit_release_array(!llvm.ptr<struct<"Array", opaque>>)
+
+// CHECK-LABEL: @dealloc
+func.func @dealloc(%r : !quantum.reg) {
+
+    // CHECK: llvm.call @__quantum__rt__qubit_release_array(%arg0)
+    quantum.dealloc %r : !quantum.reg
+
+    return
+}
+
+// -----
+
+// CHECK: llvm.func @__quantum__rt__array_get_element_ptr_1d(!llvm.ptr<struct<"Array", opaque>>, i64) -> !llvm.ptr<i8>
+
+// CHECK-LABEL: @extract
+func.func @extract(%r : !quantum.reg, %c : i64) {
+
+    // CHECK: [[elem_ptr:%.+]] = llvm.call @__quantum__rt__array_get_element_ptr_1d(%arg0, %arg1)
+    // CHECK: [[qb_ptr:%.+]] = llvm.bitcast [[elem_ptr]]
+    // CHECK: llvm.load [[qb_ptr]] : !llvm.ptr<ptr<struct<"Qubit", opaque>>>
+    quantum.extract %r[%c] : !quantum.reg -> !quantum.bit
+
+    // CHECK: [[c5:%.+]] = llvm.mlir.constant(5 : i64)
+    // CHECK: [[elem_ptr:%.+]] = llvm.call @__quantum__rt__array_get_element_ptr_1d(%arg0, [[c5]])
+    // CHECK: [[qb_ptr:%.+]] = llvm.bitcast [[elem_ptr]]
+    // CHECK: llvm.load [[qb_ptr]] : !llvm.ptr<ptr<struct<"Qubit", opaque>>>
+    quantum.extract %r[5] : !quantum.reg -> !quantum.bit
+
+    return
+}
+
+// -----
+
+// CHECK-LABEL: @insert
+func.func @insert(%r : !quantum.reg, %q : !quantum.bit) -> !quantum.reg {
+
+    %new_r = quantum.insert %r[5], %q : !quantum.reg, !quantum.bit
+
+    // CHECK-NEXT: return %arg0
+    return %new_r : !quantum.reg
+}
+
+// -----
+
+///////////////////
+// Quantum Gates //
+///////////////////
+
+// CHECK-DAG: llvm.func @__quantum__qis__Identity(!llvm.ptr<struct<"Qubit", opaque>>)
+// CHECK-DAG: llvm.func @__quantum__qis__RX(f64, !llvm.ptr<struct<"Qubit", opaque>>)
+// CHECK-DAG: llvm.func @__quantum__qis__SWAP(!llvm.ptr<struct<"Qubit", opaque>>, !llvm.ptr<struct<"Qubit", opaque>>)
+// CHECK-DAG: llvm.func @__quantum__qis__CRot(f64, f64, f64, !llvm.ptr<struct<"Qubit", opaque>>, !llvm.ptr<struct<"Qubit", opaque>>)
+// CHECK-DAG: llvm.func @__quantum__qis__Toffoli(!llvm.ptr<struct<"Qubit", opaque>>, !llvm.ptr<struct<"Qubit", opaque>>, !llvm.ptr<struct<"Qubit", opaque>>)
+
+// CHECK-LABEL: @custom_gate
+func.func @custom_gate(%q0 : !quantum.bit, %p : f64) -> (!quantum.bit, !quantum.bit, !quantum.bit) {
+
+    // CHECK: llvm.call @__quantum__qis__Identity(%arg0)
+    %q1 = quantum.custom "Identity"() %q0 : !quantum.bit
+
+    // CHECK: llvm.call @__quantum__qis__RX(%arg1, %arg0)
+    %q2 = quantum.custom "RX"(%p) %q1 : !quantum.bit
+
+    // CHECK: llvm.call @__quantum__qis__SWAP(%arg0, %arg0)
+    %q3:2 = quantum.custom "SWAP"() %q2, %q2 : !quantum.bit, !quantum.bit
+
+    // CHECK: llvm.call @__quantum__qis__CRot(%arg1, %arg1, %arg1, %arg0, %arg0)
+    %q4:2 = quantum.custom "CRot"(%p, %p, %p) %q3#0, %q3#1 : !quantum.bit, !quantum.bit
+
+    // CHECK: llvm.call @__quantum__qis__Toffoli(%arg0, %arg0, %arg0)
+    %q5:3 = quantum.custom "Toffoli"() %q4#0, %q4#1, %q4#1 : !quantum.bit, !quantum.bit, !quantum.bit
+
+    // CHECK: [[st1:%.+]] = llvm.insertvalue %arg0
+    // CHECK: [[st2:%.+]] = llvm.insertvalue %arg0, [[st1]]
+    // CHECK: [[st3:%.+]] = llvm.insertvalue %arg0, [[st2]]
+    // CHECK: return [[st3]]
+    return %q5#0, %q5#1, %q5#2 : !quantum.bit, !quantum.bit, !quantum.bit
+}
+
+// -----
+
+// CHECK: llvm.func @__quantum__qis__MultiRZ(f64, i64, ...)
+
+// CHECK-LABEL: @multirz
+func.func @multirz(%q0 : !quantum.bit, %p : f64) -> (!quantum.bit, !quantum.bit, !quantum.bit) {
+
+    // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK: llvm.call @__quantum__qis__MultiRZ(%arg1, [[c1]], %arg0)
+    %q1 = quantum.multirz(%p) %q0 : !quantum.bit
+
+    // CHECK: [[c2:%.+]] = llvm.mlir.constant(2 : i64)
+    // CHECK: llvm.call @__quantum__qis__MultiRZ(%arg1, [[c2]], %arg0, %arg0)
+    %q2:2 = quantum.multirz(%p) %q1, %q1 : !quantum.bit, !quantum.bit
+
+    // CHECK: [[c3:%.+]] = llvm.mlir.constant(3 : i64)
+    // CHECK: llvm.call @__quantum__qis__MultiRZ(%arg1, [[c3]], %arg0, %arg0, %arg0)
+    %q3:3 = quantum.multirz(%p) %q2#0, %q2#1, %q2#1 : !quantum.bit, !quantum.bit, !quantum.bit
+
+    // CHECK: [[st1:%.+]] = llvm.insertvalue %arg0
+    // CHECK: [[st2:%.+]] = llvm.insertvalue %arg0, [[st1]]
+    // CHECK: [[st3:%.+]] = llvm.insertvalue %arg0, [[st2]]
+    // CHECK: return [[st3]]
+    return %q3#0, %q3#1, %q3#2 : !quantum.bit, !quantum.bit, !quantum.bit
+}
+
+// -----
+
+// CHECK: llvm.func @__quantum__qis__QubitUnitary(!llvm.ptr<struct<(ptr<struct<(f64, f64)>>, ptr<struct<(f64, f64)>>, i64, array<2 x i64>, array<2 x i64>)>>, i64, ...)
+
+// CHECK-LABEL: @qubit_unitary
+func.func @qubit_unitary(%q0 : !quantum.bit, %p1 : memref<2x2xcomplex<f64>>,  %p2 : memref<4x4xcomplex<f64>>) -> (!quantum.bit, !quantum.bit) {
+    // Only check the last members of the deconstructed memref struct being inserted.
+    // CHECK: [[m1:%.+]] = llvm.insertvalue %arg7
+    // CHECK: [[m2:%.+]] = llvm.insertvalue %arg14
+
+    // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK: [[c1_1:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK: [[buf1:%.+]] = llvm.alloca [[c1_1]] x !llvm.struct<(ptr<struct<(f64, f64)>>, ptr<struct<(f64, f64)>>, i64, array<2 x i64>, array<2 x i64>)>
+    // CHECK: llvm.store [[m1]], [[buf1]]
+    // CHECK: llvm.call @__quantum__qis__QubitUnitary([[buf1]], [[c1]], %arg0)
+    %q1 = quantum.unitary(%p1 : memref<2x2xcomplex<f64>>) %q0 : !quantum.bit
+
+    // CHECK: [[c2:%.+]] = llvm.mlir.constant(2 : i64)
+    // CHECK: [[c1_2:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK: [[buf2:%.+]] = llvm.alloca [[c1_2]] x !llvm.struct<(ptr<struct<(f64, f64)>>, ptr<struct<(f64, f64)>>, i64, array<2 x i64>, array<2 x i64>)>
+    // CHECK: llvm.store [[m2]], [[buf2]]
+    // CHECK: llvm.call @__quantum__qis__QubitUnitary([[buf2]], [[c2]], %arg0, %arg0)
+    %q2:2 = quantum.unitary(%p2 : memref<4x4xcomplex<f64>>) %q1, %q1 : !quantum.bit, !quantum.bit
+
+    // CHECK: [[st1:%.+]] = llvm.insertvalue %arg0
+    // CHECK: [[st2:%.+]] = llvm.insertvalue %arg0, [[st1]]
+    // CHECK: return [[st2]]
+    return %q2#0, %q2#1 : !quantum.bit, !quantum.bit
+}
+
+// -----
+
+/////////////////
+// Observables //
+/////////////////
+
+// CHECK-LABEL: @compbasis
+func.func @compbasis(%q : !quantum.bit) {
+
+    // CHECK: builtin.unrealized_conversion_cast %arg0
+    quantum.compbasis %q : !quantum.obs
+    // CHECK: builtin.unrealized_conversion_cast %arg0, %arg0
+    quantum.compbasis %q, %q : !quantum.obs
+
+    return
+}
+
+// -----
+
+// CHECK: llvm.func @__quantum__qis__NamedObs(i64, !llvm.ptr<struct<"Qubit", opaque>>) -> i64
+
+// CHECK-LABEL: @namedobs
+func.func @namedobs(%q : !quantum.bit) {
+
+    // CHECK: [[c0:%.+]] = llvm.mlir.constant(0 : i64)
+    // CHECK: llvm.call @__quantum__qis__NamedObs([[c0]], %arg0)
+    quantum.namedobs %q[0] : !quantum.obs
+    // CHECK: [[c4:%.+]] = llvm.mlir.constant(4 : i64)
+    // CHECK: llvm.call @__quantum__qis__NamedObs([[c4]], %arg0)
+    quantum.namedobs %q[4] : !quantum.obs
+
+    return
+}
+
+// -----
+
+// CHECK: llvm.func @__quantum__qis__HermitianObs(!llvm.ptr<struct<(ptr<struct<(f64, f64)>>, ptr<struct<(f64, f64)>>, i64, array<2 x i64>, array<2 x i64>)>>, i64, ...) -> i64
+
+// CHECK-LABEL: @hermitian
+func.func @hermitian(%q : !quantum.bit, %p1 : memref<2x2xcomplex<f64>>, %p2 : memref<4x4xcomplex<f64>>) {
+    // Only check the last members of the deconstructed memref struct being inserted.
+    // CHECK: [[m1:%.+]] = llvm.insertvalue %arg7
+    // CHECK: [[m2:%.+]] = llvm.insertvalue %arg14
+
+    // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK: [[c1_1:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK: [[buf1:%.+]] = llvm.alloca [[c1_1]] x !llvm.struct<(ptr<struct<(f64, f64)>>, ptr<struct<(f64, f64)>>, i64, array<2 x i64>, array<2 x i64>)>
+    // CHECK: llvm.store [[m1]], [[buf1]]
+    // CHECK: llvm.call @__quantum__qis__HermitianObs([[buf1]], [[c1]], %arg0)
+    quantum.hermitian(%p1 : memref<2x2xcomplex<f64>>) %q : !quantum.obs
+    // CHECK: [[c2:%.+]] = llvm.mlir.constant(2 : i64)
+    // CHECK: [[c1_2:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK: [[buf2:%.+]] = llvm.alloca [[c1_2]] x !llvm.struct<(ptr<struct<(f64, f64)>>, ptr<struct<(f64, f64)>>, i64, array<2 x i64>, array<2 x i64>)>
+    // CHECK: llvm.store [[m2]], [[buf2]]
+    // CHECK: llvm.call @__quantum__qis__HermitianObs([[buf2]], [[c2]], %arg0, %arg0)
+    quantum.hermitian(%p2 : memref<4x4xcomplex<f64>>) %q, %q : !quantum.obs
+
+    return
+}
+
+// -----
+
+// CHECK: llvm.func @__quantum__qis__TensorObs(i64, ...) -> i64
+
+// CHECK-LABEL: @tensor
+func.func @tensor(%obs : !quantum.obs) {
+
+    // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK: llvm.call @__quantum__qis__TensorObs([[c1]], %arg0)
+    quantum.tensor %obs : !quantum.obs
+    // CHECK: [[c3:%.+]] = llvm.mlir.constant(3 : i64)
+    // CHECK: llvm.call @__quantum__qis__TensorObs([[c3]], %arg0, %arg0, %arg0)
+    quantum.tensor %obs, %obs, %obs : !quantum.obs
+
+    return
+}
+
+// -----
+
+// CHECK: llvm.func @__quantum__qis__HamiltonianObs(!llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>, i64, ...) -> i64
+
+// CHECK-LABEL: @hamiltonian
+func.func @hamiltonian(%obs : !quantum.obs, %p1 : memref<1xf64>, %p2 : memref<3xf64>) {
+    // Only check the last members of the deconstructed memref struct being inserted.
+    // CHECK: [[v1:%.+]] = llvm.insertvalue %arg5
+    // CHECK: [[v2:%.+]] = llvm.insertvalue %arg10
+
+    // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK: [[c1_1:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK: [[buf1:%.+]] = llvm.alloca [[c1_1]] x !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>
+    // CHECK: llvm.store [[v1]], [[buf1]]
+    // CHECK: llvm.call @__quantum__qis__HamiltonianObs([[buf1]], [[c1]], %arg0)
+    quantum.hamiltonian(%p1 : memref<1xf64>) %obs : !quantum.obs
+    // CHECK: [[c3:%.+]] = llvm.mlir.constant(3 : i64)
+    // CHECK: [[c1_2:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK: [[buf2:%.+]] = llvm.alloca [[c1_2]] x !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>
+    // CHECK: llvm.store [[v2]], [[buf2]]
+    // CHECK: llvm.call @__quantum__qis__HamiltonianObs([[buf2]], [[c3]], %arg0, %arg0, %arg0)
+    quantum.hamiltonian(%p2 : memref<3xf64>) %obs, %obs, %obs : !quantum.obs
+
+    return
+}
+
+// -----
+
+//////////////////
+// Measurements //
+//////////////////
+
+// CHECK: llvm.func @__quantum__qis__Measure(!llvm.ptr<struct<"Qubit", opaque>>) -> !llvm.ptr<struct<"Result", opaque>>
+
+// CHECK-LABEL: @measure
+func.func @measure(%q : !quantum.bit) -> !quantum.bit {
+
+    // CHECK: llvm.call @__quantum__qis__Measure(%arg0)
+    %res, %new_q = quantum.measure %q : i1, !quantum.bit
+
+    // CHECK: return %arg0
+    return %new_q : !quantum.bit
+}
+
+// -----
+
+// CHECK: llvm.func @__quantum__qis__Sample(!llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>>, i64, i64, ...)
+
+// CHECK-LABEL: @sample
+func.func @sample(%q : !quantum.bit) {
+
+    %o1 = quantum.compbasis %q : !quantum.obs
+    %o2 = quantum.compbasis %q, %q : !quantum.obs
+
+    // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK: [[ptr:%.+]] = llvm.alloca [[c1]] x !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>
+    // CHECK: [[c1000:%.+]] = llvm.mlir.constant(1000 : i64)
+    // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK: llvm.call @__quantum__qis__Sample([[ptr]], [[c1000]], [[c1]], %arg0)
+    // CHECK: llvm.load [[ptr]]
+    quantum.sample %o1 {shots = 1000 : i64} : memref<1000x1xf64>
+    // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK: [[ptr:%.+]] = llvm.alloca [[c1]] x !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>
+    // CHECK: [[c2000:%.+]] = llvm.mlir.constant(2000 : i64)
+    // CHECK: [[c2:%.+]] = llvm.mlir.constant(2 : i64)
+    // CHECK: llvm.call @__quantum__qis__Sample([[ptr]], [[c2000]], [[c2]], %arg0, %arg0)
+    // CHECK: llvm.load [[ptr]]
+    quantum.sample %o2 {shots = 2000 : i64} : memref<2000x2xf64>
+
+    return
+}
+
+// -----
+
+// CHECK: llvm.func @__quantum__qis__Counts(!llvm.ptr<struct<(struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>, struct<(ptr<i64>, ptr<i64>, i64, array<1 x i64>, array<1 x i64>)>)>>, i64, i64, ...)
+
+// CHECK-LABEL: @counts
+func.func @counts(%q : !quantum.bit) {
+
+    %o1 = quantum.compbasis %q : !quantum.obs
+    %o2 = quantum.compbasis %q, %q : !quantum.obs
+
+    // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK: [[ptr:%.+]] = llvm.alloca [[c1]] x !llvm.struct<(struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>, struct<(ptr<i64>, ptr<i64>, i64, array<1 x i64>, array<1 x i64>)>
+    // CHECK: [[c1000:%.+]] = llvm.mlir.constant(1000 : i64)
+    // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK: llvm.call @__quantum__qis__Counts([[ptr]], [[c1000]], [[c1]], %arg0)
+    // CHECK: [[res:%.+]] = llvm.load [[ptr]]
+    // CHECK: llvm.extractvalue [[res]][0]
+    // CHECK: llvm.extractvalue [[res]][1]
+    quantum.counts %o1 {shots = 1000 : i64} : memref<2xf64>, memref<2xi64>
+    // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK: [[ptr:%.+]] = llvm.alloca [[c1]] x !llvm.struct<(struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>, struct<(ptr<i64>, ptr<i64>, i64, array<1 x i64>, array<1 x i64>)>
+    // CHECK: [[c2000:%.+]] = llvm.mlir.constant(2000 : i64)
+    // CHECK: [[c2:%.+]] = llvm.mlir.constant(2 : i64)
+    // CHECK: llvm.call @__quantum__qis__Counts([[ptr]], [[c2000]], [[c2]], %arg0, %arg0)
+    // CHECK: [[res:%.+]] = llvm.load [[ptr]]
+    // CHECK: llvm.extractvalue [[res]][0]
+    // CHECK: llvm.extractvalue [[res]][1]
+    quantum.counts %o2 {shots = 2000 : i64} : memref<4xf64>, memref<4xi64>
+
+    return
+}
+
+// -----
+
+// CHECK: llvm.func @__quantum__qis__Expval(i64)
+
+// CHECK-LABEL: @expval
+func.func @expval(%obs : !quantum.obs) {
+
+    // CHECK: llvm.call @__quantum__qis__Expval(%arg0)
+    quantum.expval %obs : f64
+
+    return
+}
+
+// -----
+
+// CHECK: llvm.func @__quantum__qis__Variance(i64)
+
+// CHECK-LABEL: @var
+func.func @var(%obs : !quantum.obs) {
+
+    // CHECK: llvm.call @__quantum__qis__Variance(%arg0)
+    quantum.var %obs : f64
+
+    return
+}
+
+// -----
+
+// CHECK: llvm.func @__quantum__qis__Probs(!llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>, i64, ...)
+
+// CHECK-LABEL: @probs
+func.func @probs(%q : !quantum.bit) {
+
+    %o1 = quantum.compbasis %q : !quantum.obs
+    %o2 = quantum.compbasis %q, %q, %q, %q : !quantum.obs
+
+    // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK: [[ptr:%.+]] = llvm.alloca [[c1]] x !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>
+    // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK: llvm.call @__quantum__qis__Probs([[ptr]], [[c1]], %arg0)
+    // CHECK: llvm.load [[ptr]]
+    quantum.probs %o1 : memref<2xf64>
+    // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK: [[ptr:%.+]] = llvm.alloca [[c1]] x !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>
+    // CHECK: [[c4:%.+]] = llvm.mlir.constant(4 : i64)
+    // CHECK: llvm.call @__quantum__qis__Probs([[ptr]], [[c4]], %arg0, %arg0, %arg0, %arg0)
+    // CHECK: llvm.load [[ptr]]
+    quantum.probs %o2 : memref<16xf64>
+
+    return
+}
+
+// -----
+
+// CHECK: llvm.func @__quantum__qis__State(!llvm.ptr<struct<(ptr<struct<(f64, f64)>>, ptr<struct<(f64, f64)>>, i64, array<1 x i64>, array<1 x i64>)>>, i64, ...)
+
+// CHECK-LABEL: @state
+func.func @state(%q : !quantum.bit) {
+    // CHECK: [[qb:%.+]] = builtin.unrealized_conversion_cast %arg0
+
+    %o1 = quantum.compbasis %q : !quantum.obs
+    %o2 = quantum.compbasis %q, %q, %q, %q : !quantum.obs
+
+    // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK: [[ptr:%.+]] = llvm.alloca [[c1]] x !llvm.struct<(ptr<struct<(f64, f64)>>, ptr<struct<(f64, f64)>>, i64, array<1 x i64>, array<1 x i64>)>
+    // CHECK: [[c0:%.+]] = llvm.mlir.constant(0 : i64)
+    // CHECK: llvm.call @__quantum__qis__State([[ptr]], [[c0]])
+    // CHECK: llvm.load [[ptr]]
+    quantum.state %o1 : memref<2xcomplex<f64>>
+    // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK: [[ptr:%.+]] = llvm.alloca [[c1]] x !llvm.struct<(ptr<struct<(f64, f64)>>, ptr<struct<(f64, f64)>>, i64, array<1 x i64>, array<1 x i64>)>
+    // CHECK: [[c0:%.+]] = llvm.mlir.constant(0 : i64)
+    // CHECK: llvm.call @__quantum__qis__State([[ptr]], [[c0]])
+    // CHECK: llvm.load [[ptr]]
+    quantum.state %o2 : memref<16xcomplex<f64>>
+
+    return
+}

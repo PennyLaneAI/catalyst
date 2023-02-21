@@ -1,0 +1,30 @@
+[tool.black]
+line-length = 100
+extend-exclude = '''
+(
+  frontend/catalyst/python_bindings
+  | mlir/llvm-project
+  | mlir/mlir-hlo
+  | build
+)
+'''
+
+[tool.pytest.ini_options]
+cache_dir='/tmp/.pytest_cache'
+testpaths='frontend/tests/pytest'
+
+[tool.coverage.run]
+branch = true
+source = [
+    "./frontend/catalyst/",
+]
+omit = [
+    "*/python_bindings/*",
+    "./frontend/catalyst/_version.py",
+]
+
+[tool.coverage.html]
+directory = "coverage_html_report"
+
+[tool.coverage.report]
+sort = "Cover"

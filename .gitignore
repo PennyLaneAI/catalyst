@@ -1,0 +1,24 @@
+# Build directories
+build
+debug
+__pycache__
+catalyst.egg-info
+
+# Testing directories
+.lit
+.pytest_cache
+
+# Packaging directories
+dist
+frontend/catalyst/bin
+frontend/catalyst/lib
+frontend/mlir_quantum
+
+# IDEs
+.vscode
+.idea
+
+# Documentation
+doc/_build
+doc/code/api
+.ipynb*

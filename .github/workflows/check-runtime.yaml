@@ -1,0 +1,89 @@
+name: Check Runtime Build
+
+on:
+  pull_request:
+    branches: [ main ]
+
+env:
+  OMP_NUM_THREADS: "2"
+
+jobs:
+  runtime-tests:
+    strategy:
+      matrix:
+        os: [ubuntu-22.04]
+        simulator: ['lightning', 'lightning-kokkos']
+
+    name: Runtime Tests (Linux)
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Cancel previous runs
+        uses: styfle/cancel-workflow-action@0.11.0
+        with:
+          access_token: ${{ github.token }}
+
+      - name: Checkout the repo
+        uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get -y -q install cmake ninja-build gcc-10 g++-10 clang libomp-dev
+
+      - name: Install rustup with llvm-tools-preview
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          components: llvm-tools-preview
+
+      - name: Install QIR-stdlib
+        run: |
+            cd ./runtime/qir-stdlib
+            cargo build --release --verbose
+            mkdir -p ../build-qir-stdlib/include
+            cp ./target/release/libqir_stdlib.a ../build-qir-stdlib/
+            cp ./target/release/build/include/* ../build-qir-stdlib/include/
+            cargo clean
+
+      - name: Build Runtime test suite for Lightning simulator
+        if: ${{ matrix.simulator == 'lightning' }}
+        run: |
+            cmake -S runtime -B build -DCMAKE_BUILD_TYPE=Release \
+                                      -DENABLE_LIGHTNING_KOKKOS=OFF \
+                                      -DCMAKE_CXX_COMPILER="$(which g++-10)" \
+                                      -DQIR_STDLIB_LIB="$(pwd)/runtime/build-qir-stdlib/" \
+                                      -DQIR_STDLIB_INCLUDES="$(pwd)/runtime/build-qir-stdlib/include/" \
+                                      -G Ninja
+            cmake --build build --target runner_tests -j$(nproc)
+
+      - name: Build Runtime test suite for Lightning-Kokkos simulator
+        if: ${{ matrix.simulator == 'lightning-kokkos' }}
+        run: |
+            cmake -S runtime -B build -DCMAKE_BUILD_TYPE=Release \
+                                      -DENABLE_LIGHTNING_KOKKOS=ON \
+                                      -DCMAKE_CXX_COMPILER="$(which g++-10)" \
+                                      -DQIR_STDLIB_LIB="$(pwd)/runtime/build-qir-stdlib/" \
+                                      -DQIR_STDLIB_INCLUDES="$(pwd)/runtime/build-qir-stdlib/include/" \
+                                      -G Ninja
+            cmake --build build --target runner_tests -j$(nproc)
+
+      - name: Run tests
+        run: |
+            ./build/tests/runner_tests -s
+
+      - name: Create tests report
+        run: |
+            mkdir -p ./build/tests/results
+            ./build/tests/runner_tests --reporter junit --out ./build/tests/results/tests_result.xml
+
+      - name: Build examples
+        if: ${{ matrix.simulator == 'lightning' }}
+        run: |
+          echo $(clang --version)
+          cd ./runtime/examples && make all BUILD_DIR=../../build
+
+      - name: Upload tests
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: runtime-linux-test-report
+          path: ./build/tests/results/tests_result.xml

@@ -1,0 +1,33 @@
+{%- extends "pennylane_sphinx_theme/layout.html" %}
+
+{%- block footer %}
+    {{ super() }}
+    <script type="text/javascript">
+        var downloadNote = $(".sphx-glr-download-link-note.admonition.note");
+        if (downloadNote.length >= 1) {
+            $(".download-python-link").parent().hide();
+            var oldUrl = $(".github-view-link").parent().attr("href");
+            var newUrl = oldUrl.replace(".py", "");
+            $(".github-view-link").parent().attr("href", newUrl);
+        }
+    </script>
+
+    <style>
+        .nbinput pre {
+            margin: 0px 5px 0px 5px !important;
+        }
+
+        div.nblast.container {
+          padding-bottom: 10px !important;
+        }
+
+        .nboutput {
+          padding-bottom: 0px !important;
+        }
+
+        .nboutput pre {
+          margin-top: 0px !important;
+        }
+    </style>
+{%- endblock %}
+

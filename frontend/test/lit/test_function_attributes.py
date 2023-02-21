@@ -1,0 +1,37 @@
+# Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+#     http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# RUN: %PYTHON %s | FileCheck %s
+
+from catalyst import qjit
+import pennylane as qml
+
+
+# Non-root nodes have internal linkage.
+# CHECK-DAG: func.func private @qnode{{.*}} {llvm.linkage = #llvm.linkage<internal>} {
+@qml.qnode(qml.device("lightning.qubit", wires=2))
+def qnode(x):
+    qml.RX(x, wires=0)
+    return qml.state()
+
+
+@qjit(target="mlir")
+# The entry point has no internal linkage.
+# CHECK-DAG: func.func public @jit.workload(%arg0: tensor<f64>) -> tensor<4xcomplex<f64>> {
+def workload(x: float):
+    y = x * qml.numpy.pi
+    return qnode(y)
+
+
+print(workload.mlir)

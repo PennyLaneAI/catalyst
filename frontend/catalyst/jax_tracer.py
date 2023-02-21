@@ -1,0 +1,410 @@
+# Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+#     http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import jax
+from jax.tree_util import tree_unflatten
+from jax._src.dispatch import jaxpr_replicas
+from jax.interpreters.mlir import *
+from jax.interpreters.mlir import _set_up_aliases, _module_name_regex
+from jax.interpreters.partial_eval import DynamicJaxprTracer
+
+import pennylane as qml
+from pennylane.measurements import MeasurementProcess
+from pennylane.operation import Wires
+
+import catalyst.jax_primitives as jprim
+from catalyst.jax_tape import JaxTape
+from catalyst.utils.tracing import TracingContext
+
+namedobs_map = {
+    qml.Identity: 0,
+    qml.PauliX: 1,
+    qml.PauliY: 2,
+    qml.PauliZ: 3,
+    qml.Hadamard: 4,
+}
+
+
+def get_mlir(func, *args, **kwargs):
+    # The compilation cache must be clear for each translation unit.
+    # Otherwise, MLIR functions which do not exist in the current translation unit will be assumed
+    # to exist if an equivalent python function is seen in the cache. This happens during testing or
+    # if we wanted to compile a single python function multiple times with different options.
+    jprim.mlir_fn_cache.clear()
+
+    with TracingContext():
+        jaxpr = jax.make_jaxpr(func)(*args, **kwargs)
+
+    nrep = jaxpr_replicas(jaxpr)
+    effects = [eff for eff in jaxpr.effects if eff in jax.core.ordered_effects]
+    axis_context = ReplicaAxisContext(xla.AxisEnv(nrep, (), ()))
+    name_stack = util.new_name_stack(util.wrap_name("ok", "jit"))
+    m, ctx = custom_lower_jaxpr_to_module(
+        func_name="jit." + func.__name__,
+        module_name=func.__name__,
+        jaxpr=jaxpr,
+        effects=effects,
+        platform="cpu",
+        axis_context=axis_context,
+        name_stack=name_stack,
+        donated_args=[],
+    )
+
+    return m, ctx, jaxpr
+
+
+def get_traceable_fn(qfunc, device):
+    """Generate a function suitable for jax tracing with custom quantum primitives."""
+
+    def traceable_fn(*args, **kwargs):
+        shots = device.shots
+        num_wires = len(device.wires)
+        qreg = jprim.qalloc(num_wires)
+
+        JaxTape.device = device
+        with JaxTape(do_queue=False) as tape:
+            with tape.quantum_tape:
+                out = qfunc(*args, **kwargs)
+
+            return_values = out if isinstance(out, (tuple, list)) else (out,)
+            meas_return_values = []
+            meas_ret_val_indices = []
+            non_meas_return_values = []
+            for i, ret_val in enumerate(return_values):
+                if isinstance(ret_val, MeasurementProcess):
+                    meas_return_values.append(ret_val)
+                    meas_ret_val_indices.append(i)
+                else:
+                    non_meas_return_values.append(ret_val)
+            tape.quantum_tape._measurements = meas_return_values
+
+            has_tracer_return_values = len(non_meas_return_values) > 0
+            if has_tracer_return_values:
+                tape.set_return_val(tuple(non_meas_return_values))
+
+            new_quantum_tape = JaxTape.device.expand_fn(tape.quantum_tape)
+            tape.quantum_tape = new_quantum_tape
+            tape.quantum_tape.jax_tape = tape
+
+        return_values, qreg, _ = trace_quantum_tape(
+            tape, qreg, has_tracer_return_values, meas_ret_val_indices, num_wires, shots
+        )
+
+        jprim.qdealloc(qreg)
+
+        return return_values
+
+    return traceable_fn
+
+
+def insert_to_qreg(qubit_states, qreg):
+    for wire in qubit_states.keys():
+        qreg = jprim.qinsert(qreg, wire, qubit_states[wire])
+    return qreg
+
+
+def get_qubits_from_wires(wires, qubit_states, qreg):
+    has_dynamic_wire = any(map(lambda x: isinstance(x, DynamicJaxprTracer), wires))
+    if has_dynamic_wire:
+        qreg = insert_to_qreg(qubit_states, qreg)
+    qubits = []
+    for wire in wires:
+        if wire not in qubit_states:
+            qubits.append(jprim.qextract(qreg, wire))
+        else:
+            qubits.append(qubit_states[wire])
+    return qubits
+
+
+def get_new_qubit_state_from_wires_and_qubits(wires, new_qubits, qubit_states, qreg):
+    has_dynamic_wire = any(map(lambda x: isinstance(x, DynamicJaxprTracer), wires))
+    if has_dynamic_wire:
+        qubit_states.clear()
+    for wire, new_qubit in zip(wires, new_qubits):
+        if isinstance(wire, DynamicJaxprTracer):
+            qreg = jprim.qinsert(qreg, wire, new_qubit)
+        else:
+            qubit_states[wire] = new_qubit
+
+    return qubit_states, qreg
+
+
+def trace_quantum_tape(
+    tape,
+    qreg,
+    has_tracer_return_values,
+    meas_ret_val_indices=[],
+    num_wires=None,
+    shots=None,
+):
+    qubit_states = {}
+    p = tape.get_parameter_evaluator()
+    for op in tape.quantum_tape.operations:
+        op_args = p.get_partial_return_value()
+        if op.__class__.__name__ == "MidCircuitMeasure":
+            # if mid circuit measurement, there are no parameters.
+            # send the result to the ParamEvaluator
+            _, wires = op_args
+            assert len(wires) == 1
+            qubits = get_qubits_from_wires(wires, qubit_states, qreg)
+            out, new_qubit = jprim.qmeasure(*qubits)
+            qubit_states, qreg = get_new_qubit_state_from_wires_and_qubits(
+                wires, [new_qubit], qubit_states, qreg
+            )
+            p.send_partial_input(out)
+        elif op.__class__.__name__ == "QubitUnitary":
+            matrix, wires = op_args
+            qubits = get_qubits_from_wires(wires, qubit_states, qreg)
+            new_qubits = jprim.qunitary(matrix, *qubits)
+            qubit_states, qreg = get_new_qubit_state_from_wires_and_qubits(
+                wires, new_qubits, qubit_states, qreg
+            )
+        elif op.__class__.__name__ == "Cond":
+            predicate, consts = op_args
+            qreg = insert_to_qreg(qubit_states, qreg)
+            header_and_branch_args_plus_consts = [predicate] + consts + [qreg]
+            outs = jprim.qcond(
+                op.true_jaxpr,
+                op.false_jaxpr,
+                *header_and_branch_args_plus_consts,
+            )
+            v, qreg = tree_unflatten(op.out_trees[0], outs)
+            p.send_partial_input(v)
+            # We don't know if the conditional modified any of the qubits
+            # So let's load them all...
+            qubit_states.clear()
+        elif op.__class__.__name__ == "WhileLoop":
+            cond_consts, body_consts, iter_args = op_args
+            qreg = insert_to_qreg(qubit_states, qreg)
+            iter_args_plus_consts = cond_consts + body_consts + iter_args + [qreg]
+            outs = jprim.qwhile(
+                op.cond_jaxpr,
+                op.body_jaxpr,
+                len(cond_consts),
+                len(body_consts),
+                *iter_args_plus_consts,
+            )
+            v, qreg = tree_unflatten(op.body_tree, outs)
+            p.send_partial_input(v)
+            # We don't know if the loop modified any of the qubits
+            # So let's load them all...
+            qubit_states.clear()
+        elif op.__class__.__name__ == "ForLoop":
+            loop_bounds, body_consts, iter_args = op_args
+            qreg = insert_to_qreg(qubit_states, qreg)
+            header_and_iter_args_plus_consts = loop_bounds + body_consts + iter_args + [qreg]
+            outs = jprim.qfor(op.body_jaxpr, len(body_consts), *header_and_iter_args_plus_consts)
+            v, qreg = tree_unflatten(op.body_tree, outs)
+            p.send_partial_input(v)
+            # We don't know if the loop modified any of the qubits
+            # So let's load them all...
+            qubit_states.clear()
+        else:
+            op_args, op_wires = op_args
+            qubits = get_qubits_from_wires(op_wires, qubit_states, qreg)
+            new_qubits = jprim.qinst(op.name, len(qubits), *qubits, *op_args)
+            qubit_states, qreg = get_new_qubit_state_from_wires_and_qubits(
+                op_wires, new_qubits, qubit_states, qreg
+            )
+
+    meas_return_values = []
+    if len(meas_ret_val_indices) > 0:
+        for meas in tape.quantum_tape.measurements:
+            obs, qubits = trace_observables(meas.obs, qubit_states, p, num_wires, qreg)
+            mres = trace_measurement(meas, obs, qubits, shots)
+            meas_return_values.append(mres)
+
+        assert len(meas_return_values) == len(
+            meas_ret_val_indices
+        ), "expected different number of measurements in qfunc output"
+
+    return_values = []
+    if has_tracer_return_values:
+        ret_vals = p.get_partial_return_value()
+        return_values.extend(ret_vals if isinstance(ret_vals, tuple) else (ret_vals,))
+
+    idx_offset = 0
+    for i, ret_val in zip(meas_ret_val_indices, meas_return_values):
+        # Insert measurement results into the correct position of the return tuple.
+        # The offset is needed for results that have more than one element, which shift
+        # the position of remaining measurement results.
+        idx = i + idx_offset
+        return_values[idx:idx] = ret_val
+        idx_offset += len(ret_val) - 1
+
+    if len(return_values) == 1:
+        out = return_values[0]
+    else:
+        out = tuple(return_values)
+
+    return out, qreg, qubit_states
+
+
+# TODO: remove once fixed upstream
+def trace_hamiltonian(coeffs, *nested_obs):
+    # jprim.hamiltonian cannot take a python list as input
+    # only as *args can a list be passed as an input.
+    # Instead cast it as a JAX array.
+    coeffs = jax.numpy.asarray(coeffs)
+    return jprim.hamiltonian(coeffs, *nested_obs)
+
+
+def trace_observables(obs, qubit_states, p, num_wires, qreg):
+    op_args = p.get_partial_return_value()
+    qubits = None
+    if obs is None:
+        _, wires = op_args
+        wires = wires or Wires(range(num_wires))
+        qubits = get_qubits_from_wires(wires, qubit_states, qreg)
+        jax_obs = jprim.compbasis(*qubits)
+    elif isinstance(obs, tuple(namedobs_map.keys())):
+        base = namedobs_map[type(obs)]
+        _, wires = op_args
+        qubits = get_qubits_from_wires(wires, qubit_states, qreg)
+        jax_obs = jprim.namedobs(base, qubits[0])
+    elif isinstance(obs, qml.Hermitian):
+        matrix, wires = op_args
+        qubits = get_qubits_from_wires(wires, qubit_states, qreg)
+        jax_obs = jprim.hermitian(matrix, *qubits)
+    elif isinstance(obs, qml.operation.Tensor):
+        nested_obs = [trace_observables(o, qubit_states, p, num_wires, qreg)[0] for o in obs.obs]
+        jax_obs = jprim.tensorobs(*nested_obs)
+    elif isinstance(obs, qml.Hamiltonian):
+        nested_obs = [trace_observables(o, qubit_states, p, num_wires, qreg)[0] for o in obs.ops]
+        jax_obs = trace_hamiltonian(op_args, *nested_obs)
+    else:
+        raise RuntimeError(f"unknown observable in measurement process: {obs}")
+    return jax_obs, qubits
+
+
+def trace_measurement(meas, obs, qubits, shots):
+    compbasis = obs.primitive == jprim.compbasis_p
+    if meas.return_type.value == "sample":
+        shape = (shots, len(qubits)) if compbasis else (shots,)
+        mres = (jprim.sample(obs, shots, shape),)
+    elif meas.return_type.value == "counts":
+        shape = (2 ** len(qubits),) if compbasis else (2,)
+        mres = tuple(jprim.counts(obs, shots, shape))
+    elif meas.return_type.value == "expval":
+        mres = (jprim.expval(obs, shots),)
+    elif meas.return_type.value == "var":
+        mres = (jprim.var(obs, shots),)
+    elif meas.return_type.value == "probs":
+        assert compbasis
+        shape = (2 ** len(qubits),)
+        mres = (jprim.probs(obs, shape),)
+    elif meas.return_type.value == "state":
+        assert compbasis
+        shape = (2 ** len(qubits),)
+        mres = (jprim.state(obs, shape),)
+    else:
+        raise RuntimeError(f"unknown measurement process: {meas.return_type}")
+    return mres
+
+
+def custom_lower_jaxpr_to_module(
+    func_name: str,
+    module_name: str,
+    jaxpr: jax.core.ClosedJaxpr,
+    effects: List[jax.core.Effect],
+    platform: str,
+    axis_context: AxisContext,
+    name_stack: source_info_util.NameStack,
+    donated_args: Sequence[bool],
+    replicated_args: Optional[Sequence[bool]] = None,
+    arg_shardings: Optional[Sequence[Optional[xc.OpSharding]]] = None,
+    result_shardings: Optional[Sequence[Optional[xc.OpSharding]]] = None,
+) -> Tuple[ir.Module, ir.Context]:
+    """Lowers a top-level jaxpr to an MHLO module.
+
+    Handles the quirks of the argument/return value passing conventions of the
+    runtime.
+
+    This function has been modified from its original form in the JAX project at
+    https://github.com/google/jax/blob/c4d590b1b640cc9fcfdbe91bf3fe34c47bcde917/jax/interpreters/mlir.py#L625version
+    released under the Apache License, Version 2.0, with the following copyright notice:
+
+    Copyright 2021 The JAX Authors.
+    """
+    platform = xb.canonicalize_platform(platform)
+    if not xb.is_known_platform(platform):
+        raise ValueError(f"Unknown platform {platform}")
+    input_output_aliases = None
+    in_avals = jaxpr.in_avals
+    if arg_shardings is not None:
+        in_avals = [
+            sharded_aval(in_aval, in_sharding)
+            for in_aval, in_sharding in zip(in_avals, arg_shardings)
+        ]
+    out_avals = jaxpr.out_avals
+    if result_shardings is not None:
+        out_avals = [
+            sharded_aval(out_aval, out_sharding)
+            for out_aval, out_sharding in zip(out_avals, result_shardings)
+        ]
+    platforms_with_donation = ("cuda", "rocm", "tpu")
+    if platform in platforms_with_donation:
+        input_output_aliases, donated_args = _set_up_aliases(in_avals, out_avals, donated_args)
+    if any(eff not in lowerable_effects for eff in jaxpr.effects):
+        raise ValueError(f"Cannot lower jaxpr with effects: {jaxpr.effects}")
+    if any(donated_args):
+        unused_donations = [str(a) for a, d in zip(in_avals, donated_args) if d]
+        msg = "See an explanation at https://jax.readthedocs.io/en/latest/faq.html#buffer-donation."
+        if platform not in platforms_with_donation:
+            msg = f"Donation is not implemented for {platform}.\n{msg}"
+        warnings.warn(
+            f"Some donated buffers were not usable: {', '.join(unused_donations)}.\n{msg}"
+        )
+
+    # MHLO channels need to start at 1
+    channel_iter = itertools.count(1)
+    # Create a keepalives list that will be mutated during the lowering.
+    keepalives: List[Any] = []
+    host_callbacks: List[Any] = []
+    ctx = ModuleContext(
+        None, platform, axis_context, name_stack, keepalives, channel_iter, host_callbacks
+    )
+    ctx.context.allow_unregistered_dialects = True
+    with ctx.context, ir.Location.unknown(ctx.context):
+        # register_dialect()
+        # Remove module name characters that XLA would alter. This ensures that
+        # XLA computation preserves the module name.
+        module_name = _module_name_regex.sub("_", module_name)
+        ctx.module.operation.attributes["sym_name"] = ir.StringAttr.get(module_name)
+        unlowerable_effects = {eff for eff in jaxpr.effects if eff not in lowerable_effects}
+        if unlowerable_effects:
+            raise ValueError(f"Cannot lower jaxpr with unlowerable effects: {unlowerable_effects}")
+        lower_jaxpr_to_fun(
+            ctx,
+            func_name,
+            jaxpr,
+            effects,
+            public=True,
+            create_tokens=True,
+            replace_tokens_with_dummy=True,
+            replicated_args=replicated_args,
+            arg_shardings=arg_shardings,
+            result_shardings=result_shardings,
+            input_output_aliases=input_output_aliases,
+        )
+
+        for op in ctx.module.body.operations:
+            func_name = str(op.name)
+            is_entry_point = func_name.startswith('"jit.')
+            if is_entry_point:
+                continue
+            op.attributes["llvm.linkage"] = ir.Attribute.parse("#llvm.linkage<internal>")
+
+    ctx.module.operation.verify()
+    return ctx.module, ctx.context

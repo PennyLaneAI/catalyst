@@ -1,0 +1,53 @@
+@startuml
+!include <C4/C4_Component>
+!include common.iuml
+
+HIDE_STEREOTYPE()
+HIDE_PERSON_SPRITE()
+
+System(_mlir_sys_, "circuit.mlir", $tags="object")
+
+System(_so_sys_, "circuit.so", $tags="object")
+
+Boundary(c1, "Compiler", $link="https://github.com/plantuml-stdlib/C4-PlantUML") {
+
+  Component(_nohlo_mlir_, "MHLO-to-MLIR", "mhlo-opt", "Lower MHLO dialect to other MLIR dialects")
+
+  Boundary(c2, " ", $link="https://github.com/plantuml-stdlib/C4-PlantUML") {
+
+    Component(_buff_mlir_, "Bufferization", "quantum-opt", "Bufferize scf, tensor, arith, quantum, etc.")
+
+    Component(_llvm_mlir_, "LLVM-MLIR", "quantum-opt", "Lower the code to the LLVM Dialect in MLIR")
+  }
+
+  Component(_ll_, "MLIR-to-LLVM", "mlir-translate", "Convert the MLIR to LLVM IR assembly")
+
+
+  Boundary(c3, " ", $link="https://github.com/plantuml-stdlib/C4-PlantUML") {
+
+    Component(_o_, "Compile", "llc", "Compile the LLVM code using the LLVM Static Compiler")
+
+    Component(_so_, "Link", "clang++", "Link the compiled file to the Runtime")
+  }
+}
+
+System_Ext(_catalyst_runtime_, "Catalyst-Runtime")
+
+
+Rel_R(_mlir_sys_, _nohlo_mlir_, "*.mlir", "")
+
+Rel_R(_nohlo_mlir_, _buff_mlir_, "*.nohlo.mlir", "")
+
+Rel(_buff_mlir_, _llvm_mlir_, "*.buff.mlir", "")
+
+Rel_L(_llvm_mlir_, _ll_, "*.llvm.mlir", "")
+
+Rel(_ll_, _o_, "*.ll", "")
+
+Rel(_o_, _so_, "*.o", "")
+
+Rel_R(_so_, _so_sys_, "*.so", "")
+
+Rel_U(_catalyst_runtime_, _so_, "linker", "", $tags="action")
+
+@enduml
