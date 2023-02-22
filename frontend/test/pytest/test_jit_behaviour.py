@@ -14,7 +14,7 @@
 
 import pytest
 
-from catalyst import qjit, measure, grad
+from catalyst import qjit, measure, grad, for_loop
 import pennylane as qml
 from jax import numpy as jnp
 from timeit import default_timer as timer
@@ -656,6 +656,27 @@ class TestDefaultAvailableIR:
 
         assert g.qir
         assert "__quantum__qis" in g.qir
+
+
+class TestAvoidVerification:
+    def test_no_verification(self, capfd):
+        dev1 = qml.device("lightning.qubit", wires=1)
+
+        @qml.qnode(device=dev1)
+        def circuit(x):
+            return x
+
+        def test():
+            @for_loop(0, 1, 1)
+            def loop(i):
+                circuit(1.0)
+
+            loop()
+            return
+
+        jitted_function = qjit(test)
+        capture_string = capfd.readouterr()
+        assert "does not reference a valid function" not in capture_string.err
 
 
 if __name__ == "__main__":
