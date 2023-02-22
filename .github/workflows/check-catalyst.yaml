@@ -297,7 +297,6 @@ jobs:
         python3 -m pip install lit pytest pytest-xdist nbconvert ipykernel
         python3 -m pip install jax==${{ steps.jax-version.outputs.v }} jaxlib==${{ steps.jax-version.outputs.v }}
         python3 -m pip install .
-        sudo add-apt-repository -y ppa:deadsnakes/ppa
 
     - name: Install PennyLane-master
       if: ${{ github.event_name == 'push' }}
