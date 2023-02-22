@@ -27,8 +27,8 @@ namespace Catalyst::Runtime {
  *
  * This device API contains,
  * - a set of methods to manage qubit allocations and deallocations, device shot
- *   noise, execution mode and circuit caching as well as reference values for the
- *   result data-type; these are used to implement Quantum Runtime (QR) instructions.
+ *   noise, and quantum tape recording as well as reference values for the result
+ *   data-type; these are used to implement Quantum Runtime (QR) instructions.
  *
  * - a set of methods for quantum operations, observables, measurements, and gradient
  *   of the device; these are used to implement Quantum Instruction Set (QIS) instructions.

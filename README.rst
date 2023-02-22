@@ -38,14 +38,14 @@ Requirements
 
 In order to build Catalyst from source, developers need to ensure the following pre-requisites are installed and available on the path:
 
-- The `clang <https://clang.llvm.org/>`_ compiler, `LLD <https://lld.llvm.org/>`_ linker, `CCache <https://ccache.dev/>`_ compiler cache, and `OpenMP <https://www.openmp.org/>`_
+- The `LLD <https://lld.llvm.org/>`_ linker, `CCache <https://ccache.dev/>`_ compiler cache, and `OpenMP <https://www.openmp.org/>`_
 - The `Ninja <https://ninja-build.org/>`_, `Make <https://www.gnu.org/software/make/>`_, and `CMake <https://cmake.org/download/>`_ build tools
 
 They can be installed on Debian:
 
 .. code-block:: console
 
-  sudo apt install clang lld ccache libomp-dev ninja-build make cmake
+  sudo apt install lld ccache libomp-dev ninja-build make cmake
 
 - A `Python <https://www.python.org/>`_ version 3.8 or higher
 
@@ -68,7 +68,7 @@ Once the pre-requisites are installed, start by cloning the project repository i
 
 .. code-block:: console
 
-  git clone --recurse-submodules -j8 https://github.com/PennyLaneAI/catalyst.git
+  git clone --recurse-submodules -j8 git@github.com:PennyLaneAI/catalyst.git
 
 For an existing copy of the repository without its submodules, they can also be fetched via:
 
@@ -171,8 +171,8 @@ You can also check each module test suite by using ``test-frontend``, ``test-dia
 Support
 =======
 
-- **Source Code:** https://github.com/PennylaneAI/catalyst
-- **Issue Tracker:** https://github.com/PennylaneAI/catalyst/issues
+- **Source Code:** https://github.com/PennyLaneAI/catalyst
+- **Issue Tracker:** https://github.com/PennyLaneAI/catalyst/issues
 - **PennyLane Forum:** https://discuss.pennylane.ai
 
 If you are having issues, please let us know by posting the issue on our Github issue tracker, or

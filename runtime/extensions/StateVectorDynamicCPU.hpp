@@ -262,7 +262,7 @@ class StateVectorDynamicCPU : public StateVectorCPU<PrecisionT, StateVectorDynam
     }
 
     /**
-     * @brief Release a given wire
+     * @brief Release a given wire.
      *
      * @param wire Index of the wire to be released
      */
@@ -302,6 +302,9 @@ class StateVectorDynamicCPU : public StateVectorCPU<PrecisionT, StateVectorDynam
         this->setNumQubits(this->getNumQubits() - 1);
     }
 
+    /**
+     * @brief Update the state-vector to the initial state with 0-qubit.
+     */
     void clearData()
     {
         data_.clear();
@@ -311,12 +314,18 @@ class StateVectorDynamicCPU : public StateVectorCPU<PrecisionT, StateVectorDynam
         data_.push_back(Util::ONE<PrecisionT>());
     }
 
+    /**
+     * @brief Get underlying C-style data of the state-vector.
+     */
     [[nodiscard]] auto getData() -> ComplexPrecisionT * { return data_.data(); }
 
+    /**
+     * @brief Get underlying C-style data of the state-vector.
+     */
     [[nodiscard]] auto getData() const -> const ComplexPrecisionT * { return data_.data(); }
 
     /**
-     * @brief Get underlying data vector
+     * @brief Get underlying data vector.
      */
     [[nodiscard]] auto getDataVector()
         -> std::vector<ComplexPrecisionT, Util::AlignedAllocator<ComplexPrecisionT>> &
@@ -324,6 +333,9 @@ class StateVectorDynamicCPU : public StateVectorCPU<PrecisionT, StateVectorDynam
         return data_;
     }
 
+    /**
+     * @brief Get underlying data vector.
+     */
     [[nodiscard]] auto getDataVector() const
         -> const std::vector<ComplexPrecisionT, Util::AlignedAllocator<ComplexPrecisionT>> &
     {
