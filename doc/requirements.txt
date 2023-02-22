@@ -11,7 +11,7 @@ pennylane-sphinx-theme
 nbconvert
 pygments
 breathe
-ipython==8.6.0
+ipython==8.10.0
 sphinx-automodapi
 exhale>=0.3.3
 graphviz
