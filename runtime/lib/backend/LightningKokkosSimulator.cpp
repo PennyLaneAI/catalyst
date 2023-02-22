@@ -436,72 +436,8 @@ auto LightningKokkosSimulator::Measure(QubitIdType wire) -> Result
 auto LightningKokkosSimulator::Gradient(const std::vector<size_t> &trainParams)
     -> std::vector<std::vector<double>>
 {
-    // TODO: the adjointJacobian method in Lightning-Kokkos randomly fails
-    // as such this simulator stops supporting the gradient computation until
-    // futher exploration with providing fixes for this error using serial
-    // Kokkos backend kernels.
     throw std::logic_error("Gradient not fully supported for the "
                            "PennyLane-Lightning-Kokkos simulator");
-
-    // const bool tp_empty = trainParams.empty();
-    // const size_t num_observables = this->cache_manager.getNumObservables();
-    // const size_t num_params = this->cache_manager.getNumParams();
-    // const size_t num_train_params = tp_empty ? num_params :
-    // trainParams.size(); const size_t jac_size = num_train_params *
-    // this->cache_manager.getNumObservables();
-
-    // if (!jac_size) {
-    //     return {};
-    // }
-
-    // auto &&obs_callees = this->cache_manager.getObservablesCallees();
-    // bool is_valid_measurements =
-    //     std::all_of(obs_callees.begin(), obs_callees.end(),
-    //                 [](const auto &m) { return m ==
-    //                 Lightning::Measurements::Expval; });
-    // QFailIf(!is_valid_measurements,
-    //         "Unsupported measurements to compute gradient; "
-    //         "Adjoint differentiation method only supports expectation return
-    //         type");
-
-    // // create OpsData
-    // auto &&ops_names = this->cache_manager.getOperationsNames();
-    // auto &&ops_params = this->cache_manager.getOperationsParameters();
-    // auto &&ops_wires = this->cache_manager.getOperationsWires();
-    // auto &&ops_inverses = this->cache_manager.getOperationsInverses();
-    // Pennylane::Algorithms::AdjointJacobianKokkos<double> adj;
-    // const auto ops = adj.createOpsData(ops_names, ops_params, ops_wires,
-    // ops_inverses);
-
-    // // create the vector of observables
-    // auto &&obs_keys = this->cache_manager.getObservablesKeys();
-    // std::vector<Pennylane::Algorithms::ObsDatum<double>> obs_vec;
-    // obs_vec.reserve(obs_keys.size());
-    // for (auto idx : obs_keys) {
-    //     auto &&[obs_id, wires] = this->obs_manager.getObservable(idx);
-    //     std::vector<std::string> obs_names;
-    //     obs_names.emplace_back(Lightning::lookup_obs(Lightning::simulator_observable_support,
-    //     obs_id)); std::vector<std::vector<size_t>> obs_wires;
-    //     obs_wires.emplace_back(wires);
-    //     obs_vec.emplace_back(Pennylane::Algorithms::ObsDatum<double>(obs_names,
-    //     /* param_var
-    //     */ {{}}, obs_wires));
-    // }
-
-    // std::vector<size_t> all_params;
-    // if (tp_empty) {
-    //     all_params.reserve(num_params);
-    //     for (size_t i = 0; i < num_params; i++) {
-    //         all_params.push_back(i);
-    //     }
-    // }
-
-    // std::vector<std::vector<double>> jacobian(num_observables,
-    // std::vector<double>(num_train_params, 0));
-    // adj.adjointJacobian(*this->device_sv, jacobian, obs_vec, ops, tp_empty ?
-    // all_params : trainParams, /* apply_operations */ false);
-
-    // return jacobian;
 }
 
 } // namespace Catalyst::Runtime::Simulator

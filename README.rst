@@ -171,8 +171,8 @@ You can also check each module test suite by using ``test-frontend``, ``test-dia
 Support
 =======
 
-- **Source Code:** https://github.com/PennylaneAI/catalyst
-- **Issue Tracker:** https://github.com/PennylaneAI/catalyst/issues
+- **Source Code:** https://github.com/PennyLaneAI/catalyst
+- **Issue Tracker:** https://github.com/PennyLaneAI/catalyst/issues
 - **PennyLane Forum:** https://discuss.pennylane.ai
 
 If you are having issues, please let us know by posting the issue on our Github issue tracker, or
