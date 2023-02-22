@@ -27,5 +27,5 @@ $(DIAGRAMS): _static/arch/%svg: dev/arch/%puml dev/arch/common.iuml
 	@$(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
 
 clean:
-	rm -rf doxyoutput/ api/ # For exhale
+	rm -rf doxyoutput/ api/ _build/
 	@$(SPHINXBUILD) -M clean "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)

@@ -81,10 +81,10 @@ Features
    :caption: Examples
    :hidden:
 
-   examples/magic_distillation_demo
-   examples/adaptive_circuits_demo
-   examples/tutorial_qubit_rotation
-   examples/tutorial_qft_arithmetics
+   demos/magic_distillation_demo
+   demos/adaptive_circuits_demo
+   demos/tutorial_qubit_rotation
+   demos/tutorial_qft_arithmetics
 
 .. toctree::
    :maxdepth: 1
