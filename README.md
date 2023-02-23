@@ -1,4 +1,6 @@
 <p align="center">
+
+  **bold** [link](https://something)
   <!-- Tests (GitHub actions) -->
   <a href="https://github.com/PennyLaneAI/catalyst/actions?query=workflow%3ATests">
     <img src="https://img.shields.io/github/actions/workflow/status/PennyLaneAI/catalyst/tests.yml?branch=master&style=flat-square" />
