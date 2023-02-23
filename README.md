@@ -42,7 +42,7 @@ frontends.**
 
 ## Overview
 
-Catalyst currently consists of two main components:
+Catalyst currently consists of the following components:
 
 - [**Catalyst Compiler**](https://docs.pennylane.ai/projects/catalyst/en/latest/modules/mlir.html).
   The core Catalyst compiler is built using [MLIR](https://mlir.llvm.org/), with the addition of a
