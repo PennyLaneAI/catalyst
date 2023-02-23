@@ -24,15 +24,15 @@ frontends.**
 
 ## Key Features
 
-- Compile the entire quantum-classical workflow, including the optimization loop.
+- Compile the entire quantum-classical workflow, including any optimization loops.
 
-- Use Catalyst alongside PennyLane directly from Python. Simply decorate quantum nodes and hybrid
+- Use Catalyst alongside PennyLane directly from Python. Simply decorate quantum code and hybrid
   functions with `@qjit`, leading to significant performance improvements over standard Python
   execution.
 
 - Access advanced control flow that supports both quantum and classical instructions.
 
-- Infrastructure for both quantum *and* classical optimization, allowing you to compile quantum
+- Infrastructure for both quantum *and* classical compilation, allowing you to compile quantum
   circuits that contain control flow.
 
 - Built to be end-to-end differentiable.
@@ -56,8 +56,8 @@ Catalyst currently consists of two main components:
   runtime is a C++ QIR runtime that enables the execution of Catalyst-compiled quantum programs,
   and is currently backed by state-vector simulators
   [`lightning.qubit`](https://github.com/PennyLaneAI/pennylane-lightning/) and
-  [`lightning.qubit`](https://github.com/PennyLaneAI/pennylane-lightning-kokkos/) and
-  Pennylane-Lightning-Kokkos. A complete list of the quantum instruction set supported by the
+  [`lightning.kokkkos`](https://github.com/PennyLaneAI/pennylane-lightning-kokkos/).
+  A complete list of the quantum instruction set supported by the
   runtime can be found by visiting the runtime documentation.
 
 In addition, we also provide a Python frontend for [PennyLane](https://pennylane.ai) and [JAX](https://jax.readthedocs.io):
