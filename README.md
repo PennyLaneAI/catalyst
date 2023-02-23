@@ -30,7 +30,7 @@
 </p>
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/PennyLaneAI/catalyst/readme/doc/_static/catalyst.png#gh-light-mode-only" width="700px">
+  <img src="./doc/_static/catalyst.png#gh-light-mode-only" width="700px">
     <!--
     Use a relative import for the dark mode image. When loading on PyPI, this
     will fail automatically and show nothing.
