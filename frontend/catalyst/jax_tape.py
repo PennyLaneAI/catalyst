@@ -158,12 +158,20 @@ class JaxTape:
 
 
 class EmptyObservable:
+    """Denotes an observable equivalent to a given set of wires.
+
+    This class is used only for consistency of how observables are handled.
+    """
     def __init__(self, wires):
         self.wires = wires
         self.parameters = []
 
 
 def get_insts(tape):
+    """Get instructions.
+
+    Instructions here are equivalent to operations and observables.
+    """
     yield from tape.quantum_tape.operations
 
     for meas in tape.quantum_tape.measurements:
@@ -175,6 +183,10 @@ def get_insts(tape):
 
 
 def get_observables_dependency_tree(obs):
+    """Get observable dependency tree.
+
+    Observables are flattened out in pre-order.
+    """
     if obs is None:
         yield obs
     elif isinstance(obs, tuple(jax_tracer.namedobs_map.keys())):

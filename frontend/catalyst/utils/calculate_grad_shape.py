@@ -56,6 +56,9 @@ def calculate_grad_shape(signature, indices):
     Args:
         signature: a signature.
         indices: a list of integers that correspond to parameters in signature s.
+    Returns:
+        A signature corresponding to the differentiation of ``signature`` with respect to
+        ``indices``.
     """
     grad_result_types = []
     for index in indices:

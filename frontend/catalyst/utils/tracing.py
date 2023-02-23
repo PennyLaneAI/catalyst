@@ -14,6 +14,10 @@
 
 
 class TracingContext:
+    """Utility class used for tracing.
+
+    It is used to determine whether the program is currently tracing or not.
+    """
     _is_tracing = False
 
     def __enter__(self):
