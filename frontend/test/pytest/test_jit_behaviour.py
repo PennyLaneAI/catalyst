@@ -439,7 +439,7 @@ class TestSignatureErrors:
         assert "Unsupported argument type:" in str(err.value)
 
     def test_incompatible_compiled_vs_runtime(self):
-        retval = CompiledFunction.can_promote([], [1], [1])
+        retval = CompiledFunction.can_promote([], [1])
         assert not retval
 
 

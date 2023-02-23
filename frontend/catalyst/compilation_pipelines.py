@@ -93,18 +93,17 @@ class CompiledFunction:
         self.restype = restype
 
     @staticmethod
-    def can_promote(compiled_signature, runtime_signature, *args):
+    def can_promote(compiled_signature, runtime_signature):
         len_compile = len(compiled_signature)
         len_runtime = len(runtime_signature)
         if len_compile != len_runtime:
             return False
 
-        for c_param, r_param, arg in zip(compiled_signature, runtime_signature, args):
-            assert isinstance(arg, jax.Array)
+        for c_param, r_param in zip(compiled_signature, runtime_signature):
             assert isinstance(c_param, jax.core.ShapedArray)
             assert isinstance(r_param, jax.core.ShapedArray)
-            arg_dtype = arg.dtype
-            promote_to = jax.numpy.promote_types(arg_dtype, c_param.dtype)
+            r_param_dtype = r_param.dtype
+            promote_to = jax.numpy.promote_types(r_param_dtype, c_param.dtype)
             if c_param.dtype != promote_to:
                 return False
         return True
@@ -161,11 +160,42 @@ class CompiledFunction:
             raise TypeError(f"Unsupported argument type: {arg_type}")
 
     @staticmethod
-    def get_numpy_array_from_abi_scalar_tensor(scalar_tensor):
-        is_scalar = not hasattr(scalar_tensor.contents, "shape")
-        assert is_scalar, "scalar_tensor must be scalar"
-        numpy_array = np.array(scalar_tensor.contents.aligned.contents)
-        return numpy_array
+    def zero_ranked_memref_to_numpy(ranked_memref):
+        is_scalar = not hasattr(ranked_memref, "shape")
+        assert is_scalar
+        return np.array(ranked_memref.aligned.contents)
+
+    @staticmethod
+    def ranked_memref_to_numpy(ranked_memref_ptr):
+        ranked_memref = ranked_memref_ptr.contents
+        if not hasattr(ranked_memref, "shape"):
+            return CompiledFunction.zero_ranked_memref_to_numpy(ranked_memref)
+        return np.copy(ranked_memref_to_numpy(ranked_memref_ptr))
+
+    @staticmethod
+    def ranked_memrefs_to_numpy(ranked_memrefs):
+        ranked_memref_to_numpy = CompiledFunction.ranked_memref_to_numpy
+        return [ranked_memref_to_numpy(ranked_memref) for ranked_memref in ranked_memrefs]
+
+    @staticmethod
+    def return_value_to_ranked_memrefs(return_value):
+        return_value_type = type(return_value)
+        memref_descs = [getattr(return_value, field) for field, _ in return_value_type._fields_]
+        memrefs = [ctypes.pointer(memref_desc) for memref_desc in memref_descs]
+        return memrefs
+
+    @staticmethod
+    def return_value_ptr_to_ranked_memrefs(return_value_ptr):
+        return CompiledFunction.return_value_to_ranked_memrefs(return_value_ptr.contents)
+
+    @staticmethod
+    def return_value_ptr_to_numpy(return_value_ptr):
+        ranked_memrefs = CompiledFunction.return_value_ptr_to_ranked_memrefs(return_value_ptr)
+        return_value = CompiledFunction.ranked_memrefs_to_numpy(ranked_memrefs)
+        # TODO: Handle return types correctly. Tuple, lists of 1 item (?)
+        if len(return_value) == 1:
+            return return_value[0]
+        return return_value
 
     @staticmethod
     def execute_abi(shared_object_file, func_name, restype, *py_args):
@@ -186,87 +216,56 @@ class CompiledFunction:
         function(*py_args)
         teardown()
 
-        # Check if the return value is scalar array...
-        retval = None
-        if restype:
-            # There ought to be a better way...
-            is_tuple = isinstance(restype, list) and len(restype) > 1
-            scalar = not hasattr(py_args[0].contents, "shape")
-            if is_tuple:
-                retval = []
-                struct = py_args[0].contents
-                a_struct_type = type(struct)
-                for f, _ in a_struct_type._fields_:
-                    memref = getattr(struct, f)
-                    memref_ptr = ctypes.pointer(memref)
-                    is_scalar = not hasattr(memref, "shape")
-                    if not is_scalar:
-                        retval.append(np.copy(ranked_memref_to_numpy(memref_ptr)))
-                    else:
-                        numpy_array = np.copy(
-                            CompiledFunction.get_numpy_array_from_abi_scalar_tensor(memref_ptr)
-                        )
-                        retval.append(numpy_array)
-            elif not scalar:
-                retval = np.copy(ranked_memref_to_numpy(py_args[0]))
-            else:
-                retval = np.copy(
-                    CompiledFunction.get_numpy_array_from_abi_scalar_tensor(py_args[0])
-                )
+        result = py_args[0] if restype else None
+        retval = CompiledFunction.return_value_ptr_to_numpy(result) if result else None
 
         # Unmap the shared library. This is necessary in case the function is re-compiled.
         # Without unmapping the shared library, there would be a conflict in the name of
         # the function and the previous one would succeed.
+        # Need to close after obtaining value, since the value can point to memory in the shared object.
+        # This is in the case of returning a constant, for example.
         dlclose = ctypes.CDLL(None).dlclose
         dlclose.argtypes = [ctypes.c_void_p]
         dlclose(shared_object._handle)
 
         return retval
 
-    def prepare_single_retval_for_tensor_abi(restype):
-        assert restype is not tuple
-        assert restype
-        shape = ir.RankedTensorType(restype).shape
-        element_type_mlir = ir.RankedTensorType(restype).element_type
-        element_type = mlir_type_to_numpy_type(element_type_mlir)
-        # Scalar tensor
-        if shape == []:
-            shape = element_type(0)
-            qretval_numpy = np.array(shape, dtype=element_type)
-        else:
-            qretval_numpy = np.empty(shape, dtype=element_type)
-        qretval_instance = get_ranked_memref_descriptor(qretval_numpy)
-        return qretval_instance
+    @staticmethod
+    def get_ranked_memref_descriptor_from_mlir_tensor_type(mlir_tensor_type):
+        assert mlir_tensor_type is not tuple
+        assert mlir_tensor_type
+        shape = ir.RankedTensorType(mlir_tensor_type).shape
+        mlir_element_type = ir.RankedTensorType(mlir_tensor_type).element_type
+        numpy_element_type = mlir_type_to_numpy_type(mlir_element_type)
+        array_numpy_type = np.empty(shape, dtype=numpy_element_type)
+        memref_descriptor = get_ranked_memref_descriptor(array_numpy_type)
+        return memref_descriptor
 
-    # TODO: Generalize and clean these methods
-    # This method is currently used to check the return value
-    # of the CountsOp
-    def prepare_list_for_tensor_abi(c_abi_args, restype_list):
-        fields = list()
-        for restype in restype_list:
-            mlir_data = CompiledFunction.prepare_single_retval_for_tensor_abi(restype)
-            fields.append(mlir_data)
+    def prepare_list_for_tensor_abi(mlir_tensor_types):
+        _get_rmd = CompiledFunction.get_ranked_memref_descriptor_from_mlir_tensor_type
+        return_fields_types = [_get_rmd(mlir_tensor_type) for mlir_tensor_type in mlir_tensor_types]
+        if not return_fields_types:
+            return
 
-        class RetVal(ctypes.Structure):
-            _fields_ = [("f" + str(i), type(t)) for i, t in enumerate(fields)]
+        class CompiledFunctionReturnValue(ctypes.Structure):
+            """Programmatically create a structure which holds N tensors of possibly different T base types."""
 
-        retval = RetVal()
-        retval_ptr = ctypes.pointer(retval)
-        c_abi_args.append(retval_ptr)
+            _fields_ = [("f" + str(i), type(t)) for i, t in enumerate(return_fields_types)]
+
+        return_value = CompiledFunctionReturnValue()
+        return_value_pointer = ctypes.pointer(return_value)
+        return return_value_pointer
 
     def prepare_args_for_tensor_abi(compile_time_params, restype, py_args):
         c_abi_args = list()
+        numpy_arg_buffer = list()
 
-        if isinstance(restype, list) and len(restype) > 1:
-            CompiledFunction.prepare_list_for_tensor_abi(c_abi_args, restype)
-        elif restype:
-            qretval_instance = CompiledFunction.prepare_single_retval_for_tensor_abi(restype)
-            qretval_pointer = ctypes.pointer(qretval_instance)
-            c_abi_args.append(qretval_pointer)
+        if restype:
+            return_value_pointer = CompiledFunction.prepare_list_for_tensor_abi(restype)
+            c_abi_args.append(return_value_pointer)
         len_params = len(compile_time_params)
         len_args = len(py_args)
         assert len_params == len_args, "Different number of arguments"
-        numpy_arg_buffer = list()
         for py_arg in py_args:
             numpy_arg = np.asarray(py_arg)
             numpy_arg_buffer.append(numpy_arg)
@@ -381,13 +380,6 @@ class QJIT:
         # `replace` method, so we need to get a regular Python string out of it.
         qfunc_name = str(self.mlir_module.body.operations[0].name).replace('"', "")
         restype = self.mlir_module.body.operations[0].type.results
-        if not restype:
-            restype = None
-        elif len(restype) == 1:
-            restype = restype[0]
-        else:
-            restype = restype[:]
-
         return CompiledFunction(shared_object, qfunc_name, restype)
 
     def __call__(self, *args, **kwargs):
@@ -398,7 +390,7 @@ class QJIT:
         r_sig = CompiledFunction.get_runtime_signature(*args)
         is_prev_compile = getattr(self, "compiled_function", None) is not None
         self.c_sig = getattr(self, "c_sig", None) if is_prev_compile else None
-        can_promote = not is_prev_compile or CompiledFunction.can_promote(self.c_sig, r_sig, *args)
+        can_promote = not is_prev_compile or CompiledFunction.can_promote(self.c_sig, r_sig)
         needs_compile = not is_prev_compile or not can_promote
 
         if needs_compile:
