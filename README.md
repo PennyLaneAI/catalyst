@@ -35,7 +35,7 @@
     Use a relative import for the dark mode image. When loading on PyPI, this
     will fail automatically and show nothing.
     -->
-  <img src="./doc/_static/catalyst-dark-mode.png#gh-dark-mode-only" width="700px" onerror="this.style.display='none'" alt=""/>
+  <img src="./doc/_static/catalyst-dark.png#gh-dark-mode-only" width="700px" onerror="this.style.display='none'" alt=""/>
 </p>
 
 
