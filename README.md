@@ -93,7 +93,7 @@ source](https://docs.pennylane.ai/projects/catalyst/en/latest/dev/installation.h
 
 ## Trying Catalyst with PennyLane
 
-To get started using Catalyst JIT compiler from Python, check out our [quick start
+To get started using the Catalyst JIT compiler from Python, check out our [quick start
 guide](https://docs.pennylane.ai/projects/catalyst/en/latest/dev/quick_start.html), as well as our
 various examples and tutorials in our [documentation](https://docs.pennylane.ai/projects/catalyst).
 
