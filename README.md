@@ -58,7 +58,7 @@ Catalyst currently consists of the following components:
   [`lightning.qubit`](https://github.com/PennyLaneAI/pennylane-lightning/) and
   [`lightning.kokkkos`](https://github.com/PennyLaneAI/pennylane-lightning-kokkos/). A complete
   list of the quantum instruction set supported by these runtime implementations can be found by
-  visiting the runtime documentation.
+  visiting the Catalyst documentation.
 
 In addition, we also provide a Python frontend for [PennyLane](https://pennylane.ai) and [JAX](https://jax.readthedocs.io):
 
