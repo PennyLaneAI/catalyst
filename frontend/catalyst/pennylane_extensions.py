@@ -39,6 +39,7 @@ from catalyst.utils.patching import Patcher
 from catalyst.utils.tracing import TracingContext
 
 
+# pylint: disable=too-few-public-methods
 class QFunc:
     """A device specific quantum function.
 
@@ -99,6 +100,7 @@ def qfunc(num_wires, *, shots=1000, device=None):
     return dec_no_params
 
 
+# pylint: disable=too-few-public-methods
 class Function:
     def __init__(self, fn):
         """An object that represents a compiled function.
@@ -112,24 +114,29 @@ class Function:
 
     def __call__(self, *args, **kwargs):
         jaxpr = jax.make_jaxpr(self.fn)(*args)
-        x = lambda *args: jax.core.eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *args)
-        return jprim.func_p.bind(wrap_init(x), *args, fn=self)
+
+        def _eval_jaxpr(*args):
+            return jax.core.eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *args)
+
+        return jprim.func_p.bind(wrap_init(_eval_jaxpr), *args, fn=self)
 
 
+# pylint: disable=too-few-public-methods
 class Grad:
+    """An object that specifies that a function will be differentiated.
+
+    Args:
+        fn: the function to differentiate
+        method: the method used for differentiation
+        h: the step-size value for the finite difference method
+        argnum: the argument indices which define over which arguments to differentiate
+
+    Raises:
+        AssertionError: Higher-order derivatives can only be computed with the finite difference
+                        method.
+    """
+
     def __init__(self, fn, *, method, h, argnum):
-        """An object that specifies that a function will be differentiated.
-
-        Args:
-            fn: the function to differentiate
-            method: the method used for differentiation
-            h: the step-size value for the finite difference method
-            argnum: the argument indices which define over which arguments to differentiate
-
-        Raises:
-            AssertionError: Higher-order derivatives can only be computed with the finite difference
-                            method.
-        """
         self.fn = fn
         self.__name__ = fn.__name__
         self.method = method
@@ -236,9 +243,13 @@ def grad(f, *, method=None, h=None, argnum=None):
     return Grad(f, method=method, h=h, argnum=argnum)
 
 
+# pylint: disable=too-few-public-methods
 class Cond(Operation):
+    """PennyLane's conditional operation."""
+
     num_wires = AnyWires
 
+    # pylint: disable=too-many-arguments
     def __init__(
         self, pred, consts, true_jaxpr, false_jaxpr, args_tree, out_trees, *args, **kwargs
     ):
@@ -252,6 +263,7 @@ class Cond(Operation):
         super().__init__(*args, **kwargs)
 
 
+# pylint: disable=too-few-public-methods
 class CondCallable:
     """
     Some code in this class has been adapted from the cond implementation in the JAX project at
@@ -267,6 +279,14 @@ class CondCallable:
         self.false_fn = lambda: None
 
     def otherwise(self, false_fn):
+        """Block of code to be run if the predicate evaluates to false.
+
+        Args:
+            false_fn: The code to be run in case the condition was not met.
+
+        Returns:
+            self
+        """
         assert (
             false_fn.__code__.co_argcount == 0
         ), "conditional 'False' function is not allowed to have any arguments"
@@ -274,7 +294,7 @@ class CondCallable:
         return self
 
     @staticmethod
-    def check_branches_return_types(true_jaxpr, false_jaxpr):
+    def _check_branches_return_types(true_jaxpr, false_jaxpr):
         if true_jaxpr.out_avals[:-1] != false_jaxpr.out_avals[:-1]:
             raise TypeError(
                 "Conditional branches require the same return type, got:\n"
@@ -283,7 +303,7 @@ class CondCallable:
                 "Please specify an else branch if none was specified."
             )
 
-    def call_with_quantum_ctx(self, ctx):
+    def _call_with_quantum_ctx(self, ctx):
         def new_true_fn(qreg):
             with JaxTape(do_queue=False) as tape:
                 with tape.quantum_tape:
@@ -325,7 +345,7 @@ class CondCallable:
             (new_true_fn, new_false_fn), args_tree, args_avals, "cond"
         )
 
-        CondCallable.check_branches_return_types(true_jaxpr, false_jaxpr)
+        CondCallable._check_branches_return_types(true_jaxpr, false_jaxpr)
         Cond(self.pred, consts, true_jaxpr, false_jaxpr, args_tree, out_trees)
 
         # Create tracers for any non-qreg return values (if there are any).
@@ -333,7 +353,7 @@ class CondCallable:
         a, t = tree_flatten(ret_vals)
         return ctx.jax_tape.create_tracer(t, a)
 
-    def call_with_classical_ctx(self):
+    def _call_with_classical_ctx(self):
         args, args_tree = tree_flatten([])
         args_avals = tuple(map(_abstractify, args))
 
@@ -341,7 +361,7 @@ class CondCallable:
             (self.true_fn, self.false_fn), args_tree, args_avals, "cond"
         )
 
-        CondCallable.check_branches_return_types(true_jaxpr, false_jaxpr)
+        CondCallable._check_branches_return_types(true_jaxpr, false_jaxpr)
 
         inputs = [self.pred] + consts
         ret_tree_flat = jprim.qcond(true_jaxpr, false_jaxpr, *inputs)
@@ -352,9 +372,9 @@ class CondCallable:
 
         ctx = qml.QueuingManager.active_context()
         if ctx is None:
-            return self.call_with_classical_ctx()
-        else:
-            return self.call_with_quantum_ctx(ctx)
+            return self._call_with_classical_ctx()
+
+        return self._call_with_quantum_ctx(ctx)
 
 
 def cond(pred):
@@ -440,9 +460,13 @@ def cond(pred):
     return decorator
 
 
+# pylint: disable=too-few-public-methods
 class WhileLoop(Operation):
+    """PennyLane's while loop operation."""
+
     num_wires = AnyWires
 
+    # pylint: disable=too-many-arguments
     def __init__(
         self,
         iter_args,
@@ -464,6 +488,7 @@ class WhileLoop(Operation):
         super().__init__(*args, **kwargs)
 
 
+# pylint: disable=too-few-public-methods
 class WhileCallable:
     """
     Some code in this class has been adapted from the while loop implementation in the JAX project at
@@ -499,7 +524,7 @@ class WhileCallable:
 
         return body_jaxpr, cond_jaxpr, cond_consts, body_consts, body_tree
 
-    def call_with_quantum_ctx(self, ctx, args):
+    def _call_with_quantum_ctx(self, ctx, args):
         def new_cond(*args_and_qreg):
             args = args_and_qreg[:-1]
             return self.cond_fn(*args)
@@ -541,7 +566,7 @@ class WhileCallable:
         a, t = tree_flatten(ret_vals)
         return ctx.jax_tape.create_tracer(t, a)
 
-    def call_with_classical_ctx(self, args):
+    def _call_with_classical_ctx(self, args):
         body_jaxpr, cond_jaxpr, cond_consts, body_consts, body_tree = WhileCallable._create_jaxpr(
             args, self.cond_fn, self.body_fn
         )
@@ -558,9 +583,9 @@ class WhileCallable:
 
         ctx = qml.QueuingManager.active_context()
         if ctx is not None:
-            return self.call_with_quantum_ctx(ctx, args)
-        else:
-            return self.call_with_classical_ctx(args)
+            return self._call_with_quantum_ctx(ctx, args)
+
+        return self._call_with_classical_ctx(args)
 
 
 def while_loop(cond_fn):
@@ -630,9 +655,13 @@ def while_loop(cond_fn):
     return _while_loop
 
 
+# pylint: disable=too-few-public-methods
 class ForLoop(Operation):
+    """PennyLane ForLoop Operation."""
+
     num_wires = AnyWires
 
+    # pylint: disable=too-many-arguments
     def __init__(self, loop_bounds, iter_args, body_jaxpr, body_consts, body_tree, *args, **kwargs):
         self.loop_bounds = loop_bounds
         self.iter_args = iter_args
@@ -643,6 +672,7 @@ class ForLoop(Operation):
         super().__init__(*args, **kwargs)
 
 
+# pylint: disable=too-few-public-methods
 class ForLoopCallable:
     """
     Some code in this class has been adapted from the for loop implementation in the JAX project at
@@ -668,7 +698,7 @@ class ForLoopCallable:
 
         return body_jaxpr, body_consts, body_tree
 
-    def call_with_quantum_ctx(self, ctx, *args):
+    def _call_with_quantum_ctx(self, ctx, *args):
         # Insert iteration counter into loop body arguments with the type of the lower bound.
         args = (self.lower_bound, *args)
 
@@ -710,7 +740,7 @@ class ForLoopCallable:
         a, t = tree_flatten(ret_vals)
         return ctx.jax_tape.create_tracer(t, a)
 
-    def call_with_classical_ctx(self, *args):
+    def _call_with_classical_ctx(self, *args):
         # Insert iteration counter into loop body arguments with the type of the lower bound.
         args = (self.lower_bound, *args)
 
@@ -729,8 +759,8 @@ class ForLoopCallable:
 
         ctx = qml.QueuingManager.active_context()
         if ctx is None:
-            return self.call_with_classical_ctx(*args)
-        return self.call_with_quantum_ctx(ctx, *args)
+            return self._call_with_classical_ctx(*args)
+        return self._call_with_quantum_ctx(ctx, *args)
 
 
 def for_loop(lower_bound, upper_bound, step):
@@ -807,7 +837,10 @@ def for_loop(lower_bound, upper_bound, step):
     return _for_loop
 
 
+# pylint: disable=too-few-public-methods
 class MidCircuitMeasure(Operation):
+    """Operation representing a mid-circuit measurement."""
+
     num_wires = 1
 
     def __init__(self, measurement_id, *args, **kwargs):
@@ -931,7 +964,10 @@ class QJITDevice(qml.QubitDevice):
         super().__init__(wires=wires, shots=shots)
 
     def apply(self, operations, **kwargs):
-        pass
+        """
+        Raises: RuntimeError
+        """
+        raise RuntimeError("QJIT devices cannot apply operations.")
 
     def default_expand_fn(self, circuit, max_expansion):
         """
@@ -959,10 +995,10 @@ class QJITDevice(qml.QubitDevice):
         # At the moment, bypassing decomposition for controlled gates will generally have a higher
         # success rate, as complex decomposition paths can fail to trace (c.f. PL #3521, #3522).
 
-        def _decomp_controlled_unitary(self, *args, **kwargs):
+        def _decomp_controlled_unitary(self, *args, **kwargs):  # pylint: disable=unused-argument
             return qml.QubitUnitary(qml.matrix(self), wires=self.wires)
 
-        def _decomp_controlled(self, *args, **kwargs):
+        def _decomp_controlled(self, *args, **kwargs):  # pylint: disable=unused-argument
             return qml.QubitUnitary(qml.matrix(self), wires=self.wires)
 
         with Patcher(
