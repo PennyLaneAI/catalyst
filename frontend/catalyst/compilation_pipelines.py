@@ -418,7 +418,7 @@ class QJIT:
 
         args = [jax.numpy.array(arg) for arg in args]
         r_sig = CompiledFunction.get_runtime_signature(*args)
-        is_prev_compile = getattr(self, "compiled_function", None) is not None
+        is_prev_compile = self.compiled_function is not None
         can_promote = not is_prev_compile or CompiledFunction.can_promote(self.c_sig, r_sig)
         needs_compile = not is_prev_compile or not can_promote
 
