@@ -655,7 +655,6 @@ class TestTracingQJITAnnotatedFunctions:
 
         assert np.allclose(workflow1(phi), workflow2(phi))
 
-    @pytest.mark.xfail
     def test_gradient_of_qjit_names(self):
         @qml.qnode(device=qml.device("lightning.qubit", wires=1))
         def circuit(phi):

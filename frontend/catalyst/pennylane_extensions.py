@@ -176,10 +176,10 @@ def grad(f, *, method=None, h=None, argnum=None):
     elif isinstance(argnum, int):
         argnum = [argnum]
 
-    if isinstance(f, qml.QNode):
-        return Grad(f, method=method, h=h, argnum=argnum)
-    else:
+    if isinstance(f, Grad):
         return Grad(Function(f), method=method, h=h, argnum=argnum)
+
+    return Grad(f, method=method, h=h, argnum=argnum)
 
 
 class Cond(Operation):
