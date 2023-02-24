@@ -328,7 +328,7 @@ class QJIT:
         self.mlir_module = None
         self.compiled_function = None
 
-        parameter_types = QJIT.validate_param_types(self.qfunc)
+        parameter_types = QJIT.get_compile_time_signature(self.qfunc)
         self.user_typed = False
         if parameter_types is not None:
             self.user_typed = True
@@ -370,7 +370,7 @@ class QJIT:
         return all(p.annotation is not inspect.Parameter.empty for p in parameters.values())
 
     @staticmethod
-    def validate_param_types(f: typing.Callable) -> typing.List[typing.Any]:
+    def get_compile_time_signature(f: typing.Callable) -> typing.List[typing.Any]:
         can_validate = QJIT.are_all_signature_params_annotated(f)
 
         if can_validate:
