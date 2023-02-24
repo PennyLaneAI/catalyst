@@ -56,7 +56,7 @@ Catalyst currently consists of the following components:
   Runtime](https://docs.pennylane.ai/projects/catalyst/en/latest/modules/runtime.html).
 
   The
-  runtime is a C++ QIR runtime that enables the execution of Catalyst-compiled quantum programs.
+  runtime is a C++ runtime based on QIR that enables the execution of Catalyst-compiled quantum programs.
   Currently, runtime implementations are available for the state-vector simulators
   [Lightning](https://github.com/PennyLaneAI/pennylane-lightning/) and
   [Lightning-Kokkkos](https://github.com/PennyLaneAI/pennylane-lightning-kokkos/). A complete
@@ -76,7 +76,7 @@ In addition, we also provide a Python frontend for [PennyLane](https://pennylane
 
 ## Installation
 
-Catalyst has been tested on Linux operating systems and the Python frontend is available as an
+Catalyst has been tested on Linux operating systems and the Python frontend and C++ binaries are available as an
 easy-to-install Python binary via `pip`. The only requirements to use Catalyst via Python is
 [PennyLane](https://pennylane.ai) and [Python](https://www.python.org)  3.8 or higher.
 
