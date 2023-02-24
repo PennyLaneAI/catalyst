@@ -144,10 +144,12 @@ def trace_quantum_tape(
     tape,
     qreg,
     has_tracer_return_values,
-    meas_ret_val_indices=[],
+    meas_ret_val_indices=None,
     num_wires=None,
     shots=None,
 ):
+    if meas_ret_val_indices is None:
+        meas_ret_val_indices = []
     qubit_states = {}
     p = tape.get_parameter_evaluator()
     for op in tape.quantum_tape.operations:
