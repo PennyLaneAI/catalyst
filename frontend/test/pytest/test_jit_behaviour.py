@@ -619,7 +619,7 @@ class TestTracingQJITAnnotatedFunctions:
         assert g2.mlir
 
     @pytest.mark.parametrize("phi", [(0.0), (1.0), (2.0)])
-    def test_gradient_of_qjit(self, phi):
+    def test_gradient_of_qjit_equivalence(self, phi):
         # Issue 376
         @qjit
         @qml.qnode(device=qml.device("lightning.qubit", wires=1))
@@ -633,7 +633,49 @@ class TestTracingQJITAnnotatedFunctions:
             return g(phi)
 
         assert np.allclose(qjit(grad(qjit(circuit)))(phi), qjit(grad(circuit))(phi))
+        assert np.allclose(qjit(grad(circuit))(phi), workflow(phi))
         assert np.allclose(workflow(phi), qjit(grad(circuit))(phi))
+
+    @pytest.mark.parametrize("phi", [(0.0), (1.0), (2.0)])
+    def test_gradient_of_qjit_correctness(self, phi):
+        @qml.qnode(device=qml.device("lightning.qubit", wires=1))
+        def circuit(phi):
+            qml.RX(phi, wires=0)
+            return qml.expval(qml.PauliZ(0))
+
+        @qjit
+        def workflow1(phi):
+            g = grad(circuit)
+            return g(phi)
+
+        @qjit
+        def workflow2(phi):
+            g = grad(qjit(circuit))
+            return g(phi)
+
+        assert np.allclose(workflow1(phi), workflow2(phi))
+
+    def test_gradient_of_qjit_names(self):
+        @qml.qnode(device=qml.device("lightning.qubit", wires=1))
+        def circuit(phi):
+            qml.RX(phi, wires=0)
+            return qml.expval(qml.PauliZ(0))
+
+        @qjit
+        def workflow(phi: float):
+            g = grad(circuit)
+            return g(phi)
+
+        mlir_v1 = workflow.mlir
+
+        @qjit
+        def workflow(phi: float):
+            g = grad(qjit(circuit))
+            return g(phi)
+
+        mlir_v2 = workflow.mlir
+
+        assert mlir_v1 == mlir_v2
 
 
 class TestDefaultAvailableIR:
