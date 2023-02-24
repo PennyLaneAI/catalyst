@@ -12,12 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""
+Tracing module.
+"""
+
 
 class TracingContext:
     """Utility class used for tracing.
 
     It is used to determine whether the program is currently tracing or not.
     """
+
     _is_tracing = False
 
     def __enter__(self):
@@ -29,9 +34,16 @@ class TracingContext:
 
     @staticmethod
     def is_tracing():
+        """Returns true or false depending on whether the execution is currently being
+        traced.
+        """
         return TracingContext._is_tracing
 
     @staticmethod
     def check_is_tracing(msg):
+        """Assert if the execution is currently not being traced.
+
+        Raises: RuntimeError
+        """
         if not TracingContext.is_tracing():
             raise RuntimeError(msg)
