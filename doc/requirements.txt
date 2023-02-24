@@ -17,3 +17,4 @@ exhale>=0.3.3
 graphviz
 pybind11
 m2r2
+mistune==0.8.4
