@@ -15,6 +15,10 @@
 MLIR/LLVM representations.
 """
 
+"""
+Compiler interfaces for executables.
+"""
+
 import os
 import subprocess
 
@@ -35,12 +39,14 @@ default_lib_paths = {
 
 
 def get_executable_path(project, tool):
+    """Get path to executable."""
     path = os.path.join(package_root, "bin") if INSTALLED else default_bin_paths.get(project, "")
     executable_path = os.path.join(path, tool)
     return executable_path if os.path.exists(executable_path) else tool
 
 
 def get_lib_path(project, env):
+    """Get the library path."""
     return (
         os.path.join(package_root, "lib")
         if INSTALLED
@@ -165,10 +171,12 @@ def lower_mhlo_to_linalg(filename):
     command += [filename]
     command += mhlo_lowering_pass_pipeline
 
-    with open(filename.replace(".mlir", ".nohlo.mlir"), "w") as file:
+    new_fname = filename.replace(".mlir", ".nohlo.mlir")
+
+    with open(new_fname, "w", encoding="utf-8") as file:
         subprocess.run(command, stdout=file, check=True)
 
-    return filename.replace(".mlir", ".nohlo.mlir")
+    return new_fname
 
 
 def bufferize_tensors(filename):
@@ -185,10 +193,12 @@ def bufferize_tensors(filename):
     command += [filename]
     command += bufferization_pass_pipeline
 
-    with open(filename.replace(".mlir", ".buff.mlir"), "w") as file:
+    new_fname = filename.replace(".mlir", ".buff.mlir")
+
+    with open(new_fname, "w", encoding="utf-8") as file:
         subprocess.run(command, stdout=file, check=True)
 
-    return filename.replace(".mlir", ".buff.mlir")
+    return new_fname
 
 
 def lower_all_to_llvm(filename):
@@ -205,10 +215,11 @@ def lower_all_to_llvm(filename):
     command += [filename]
     command += llvm_lowering_pass_pipeline
 
-    with open(filename.replace(".buff.mlir", ".llvm.mlir"), "w") as file:
+    new_fname = filename.replace(".buff.mlir", ".llvm.mlir")
+    with open(new_fname, "w", encoding="utf-8") as file:
         subprocess.run(command, stdout=file, check=True)
 
-    return filename.replace(".buff.mlir", ".llvm.mlir")
+    return new_fname
 
 
 def convert_mlir_to_llvmir(filename):
@@ -225,10 +236,11 @@ def convert_mlir_to_llvmir(filename):
     command += [filename]
     command += ["--mlir-to-llvmir"]
 
-    with open(filename.replace(".llvm.mlir", ".ll"), "w") as file:
+    new_fname = filename.replace(".llvm.mlir", ".ll")
+    with open(new_fname, "w", encoding="utf-8") as file:
         subprocess.run(command, stdout=file, check=True)
 
-    return filename.replace(".llvm.mlir", ".ll")
+    return new_fname
 
 
 def compile_llvmir(filename):
@@ -241,12 +253,14 @@ def compile_llvmir(filename):
     """
     assert filename[-3:] == ".ll", "input is not an llvmir file"
 
+    new_fname = filename.replace(".ll", ".o")
+
     command = [compiler]
     command += compiler_flags
     command += [filename]
-    command += ["-o", filename.replace(".ll", ".o")]
+    command += ["-o", new_fname]
     subprocess.run(command, check=True)
-    return filename.replace(".ll", ".o")
+    return new_fname
 
 
 def link_lightning_runtime(filename):
@@ -259,15 +273,17 @@ def link_lightning_runtime(filename):
     """
     assert filename[-2:] == ".o", "input is not an object file"
 
+    new_fname = filename.replace(".o", ".so")
+
     command = [linker]
     command += ["-Wno-unused-command-line-argument", "-Wno-override-module"]
     command += lightning_linker_flags
     command += runtime_libs
     command += [filename]
-    command += ["-o", filename.replace(".o", ".so")]
+    command += ["-o", new_fname]
 
     subprocess.run(command, check=True)
-    return filename.replace(".o", ".so")
+    return new_fname
 
 
 def compile(mlir_module, workspace, passes):
@@ -296,7 +312,7 @@ def compile(mlir_module, workspace, passes):
     module_name = module_name.replace('"', "")
     # need to create a temporary file with the string contents
     filename = workspace + f"/{module_name}.mlir"
-    with open(filename, "w") as f:
+    with open(filename, "w", encoding="utf-8") as f:
         mlir_module.operation.print(f, print_generic_op_form=False, assume_verified=True)
 
     passes["mlir"] = filename
@@ -312,7 +328,7 @@ def compile(mlir_module, workspace, passes):
     object_file = compile_llvmir(llvmir)
     shared_object = link_lightning_runtime(object_file)
 
-    with open(llvmir, "r") as f:
+    with open(llvmir, "r", encoding="utf-8") as f:
         _llvmir = f.read()
 
     return shared_object, _llvmir
