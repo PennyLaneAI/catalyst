@@ -12,8 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""
+Deduce the function signatures after taking their gradients with respect to some parameters.
+"""
 
-import jax
+
+from jax.core import ShapedArray
 
 
 class Signature:
@@ -30,23 +34,57 @@ class Signature:
         self.ys = ys
 
     def __repr__(self):
-        return "{} -> {}".format(self.xs, self.ys)
+        return f"{self.xs} -> {self.ys}"
 
     def get_input(self, i):
+        """Get parameter at position i.
+
+        Args:
+            i: Integer corresponding to parameter at position i.
+
+        Returns:
+            self.xs[i]: Type corresponding to parameter at position i.
+        """
         return self.xs[i]
 
     def get_inputs(self):
+        """Get all parameters.
+
+        Returns:
+            self.xs: All parameter types.
+        """
         return self.xs
 
     def get_result(self, i):
+        """Get result values at position i.
+
+        Args:
+            i: Integer corresponding to return value at position i.
+
+        Returns:
+            self.ys[i]: Type corresponding to parameter at position i.
+        """
         return self.ys[i]
 
     def get_results(self):
+        """Get all result values.
+
+        Returns:
+            self.ys: All types returned.
+        """
         return self.ys
 
     @staticmethod
     def is_tensor(x):
-        return isinstance(x, jax.core.ShapedArray)
+        """Determine whether a type `x` is a `ShapedArray`.
+
+        Args:
+            x: The type to be tested.
+
+        Returns:
+            bool: Whether the type `x` is a `ShapedArray`
+        """
+        return isinstance(x, ShapedArray)
 
 
 def calculate_grad_shape(signature, indices):
@@ -76,9 +114,7 @@ def calculate_grad_shape(signature, indices):
                     grad_res_shape.append(axis)
                 element_type = y.dtype
 
-            grad_res_type = (
-                jax.core.ShapedArray(grad_res_shape, element_type) if grad_res_shape else y
-            )
+            grad_res_type = ShapedArray(grad_res_shape, element_type) if grad_res_shape else y
             grad_result_types.append(grad_res_type)
 
     return Signature(signature.get_inputs(), grad_result_types)
