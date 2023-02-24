@@ -377,6 +377,8 @@ class QJIT:
             # Needed instead of inspect.get_annotations for Python < 3.10.
             return getattr(f, "__annotations__", {}).values()
 
+        return None
+
     def get_mlir(self, args_or_argtypes):
         with Patcher(
             (qml.QNode, "__call__", QFunc.__call__),
