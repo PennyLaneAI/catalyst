@@ -22,7 +22,6 @@ import tempfile
 import typing
 import warnings
 import functools
-from abc import ABC, abstractmethod
 
 import numpy as np
 import jax
