@@ -15,6 +15,10 @@
 of quantum operations, measurements, and observables to JAXPR.
 """
 
+"""
+Register new JAX primitives corresponding to quantum operations.
+"""
+
 import numpy as np
 
 import jax
@@ -50,20 +54,25 @@ from catalyst.utils.calculate_grad_shape import calculate_grad_shape, Signature
 #
 # qbit
 #
+# pylint: disable=too-few-public-methods,abstract-method
 class Qbit:
+    """Qbit primitive."""
+
     def __init__(self):
         self.aval = AbstractQbit()
 
 
+# pylint: disable=too-few-public-methods,abstract-method
 class AbstractQbit(jax.core.AbstractValue):
-    pass
+    """Abstract Qbit"""
 
 
+# pylint: disable=too-few-public-methods,abstract-method
 class ConcreteQbit(AbstractQbit):
-    pass
+    """Concrete Qbit."""
 
 
-def qbit_lowering(aval):
+def _qbit_lowering(aval):
     assert isinstance(aval, AbstractQbit)
     return (ir.OpaqueType.get("quantum", "bit"),)
 
@@ -71,20 +80,25 @@ def qbit_lowering(aval):
 #
 # qreg
 #
+# pylint: disable=too-few-public-methods,abstract-method
 class Qreg:
+    """Quantum register primitive."""
+
     def __init__(self):
         self.aval = AbstractQreg()
 
 
+# pylint: disable=too-few-public-methods,abstract-method
 class AbstractQreg(jax.core.AbstractValue):
-    pass
+    """Abstract quantum register."""
 
 
+# pylint: disable=too-few-public-methods,abstract-method
 class ConcreteQreg(AbstractQreg):
-    pass
+    """Concrete quantum register."""
 
 
-def qreg_lowering(aval):
+def _qreg_lowering(aval):
     assert isinstance(aval, AbstractQreg)
     return (ir.OpaqueType.get("quantum", "reg"),)
 
@@ -92,22 +106,29 @@ def qreg_lowering(aval):
 #
 # observable
 #
+# pylint: disable=too-few-public-methods,abstract-method
 class Obs:
+    """Observable JAX type primitive."""
+
     def __init__(self, num_qubits, primitive):
         self.aval = AbstractObs(num_qubits, primitive)
 
 
+# pylint: disable=too-few-public-methods,abstract-method
 class AbstractObs(jax.core.AbstractValue):
+    """Abstract observable."""
+
     def __init__(self, num_qubits=None, primitive=None):
         self.num_qubits = num_qubits
         self.primitive = primitive
 
 
+# pylint: disable=too-few-public-methods,abstract-method
 class ConcreteObs(AbstractObs):
-    pass
+    """Concrete observable."""
 
 
-def obs_lowering(aval):
+def _obs_lowering(aval):
     assert isinstance(aval, AbstractObs)
     return (ir.OpaqueType.get("quantum", "obs"),)
 
@@ -117,15 +138,15 @@ def obs_lowering(aval):
 #
 jax.core.pytype_aval_mappings[Qbit] = lambda x: x.aval
 jax.core.raise_to_shaped_mappings[AbstractQbit] = lambda aval, _: aval
-mlir.ir_type_handlers[AbstractQbit] = qbit_lowering
+mlir.ir_type_handlers[AbstractQbit] = _qbit_lowering
 
 jax.core.pytype_aval_mappings[Qreg] = lambda x: x.aval
 jax.core.raise_to_shaped_mappings[AbstractQreg] = lambda aval, _: aval
-mlir.ir_type_handlers[AbstractQreg] = qreg_lowering
+mlir.ir_type_handlers[AbstractQreg] = _qreg_lowering
 
 jax.core.pytype_aval_mappings[Obs] = lambda x: x.aval
 jax.core.raise_to_shaped_mappings[AbstractObs] = lambda aval, _: aval
-mlir.ir_type_handlers[AbstractObs] = obs_lowering
+mlir.ir_type_handlers[AbstractObs] = _obs_lowering
 
 
 ##############
@@ -179,7 +200,7 @@ def _func_symbol_lowering(ctx, fn_name, call_jaxpr):
     return symbol_name
 
 
-def _func_call_lowering(symbol_name, ctx, avals_out, *args):
+def _func_call_lowering(symbol_name, avals_out, *args):
     """Call the MLIR function symbol_name"""
     output_types = list(map(mlir.aval_to_ir_types, avals_out))
     flat_output_types = util.flatten(output_types)
@@ -190,11 +211,6 @@ def _func_call_lowering(symbol_name, ctx, avals_out, *args):
     )
     out_nodes = util.unflatten(call.results, map(len, output_types))
     return out_nodes
-
-
-@func_p.def_impl
-def _func_def_impl(ctx, *args, call_jaxpr, fn, call=True):
-    raise NotImplementedError()
 
 
 def _func_lowering(ctx, *args, call_jaxpr, fn, call=True):
@@ -216,11 +232,10 @@ def _func_lowering(ctx, *args, call_jaxpr, fn, call=True):
         mlir_fn_cache[fn] = symbol_name
 
     if not call:
-        return
+        return None
 
     out_nodes = _func_call_lowering(
         symbol_name,
-        ctx.module_context,
         ctx.avals_out,
         *args,
     )
@@ -231,19 +246,14 @@ def _func_lowering(ctx, *args, call_jaxpr, fn, call=True):
 # grad
 #
 @grad_p.def_abstract_eval
-def grad_abstract(*args, jaxpr, fn, method, h, argnum):
+# pylint: disable=unused-argument
+def _grad_abstract(*args, jaxpr, fn, method, h, argnum):
     """This function is called with abstract arguments for tracing."""
     signature = Signature(jaxpr.consts + jaxpr.in_avals, jaxpr.out_avals)
     offset = len(jaxpr.consts)
     new_argnum = [num + offset for num in argnum]
     transformed_signature = calculate_grad_shape(signature, new_argnum)
     return tuple(transformed_signature.get_results())
-
-
-@grad_p.def_impl
-def grad_impl(*args, call_jaxpr, fn, method, h, argnum):
-    """This function is called with concrete arguments for regular execution."""
-    raise NotImplementedError()
 
 
 def _grad_lowering(ctx, *args, jaxpr, fn, method, h, argnum):
@@ -288,47 +298,18 @@ def _grad_lowering(ctx, *args, jaxpr, fn, method, h, argnum):
 # qalloc
 #
 def qalloc(size):
-    """This function inserts the primitive into the jaxpr."""
+    """Bind operands to operation."""
     return qalloc_p.bind(size)
 
 
-@qalloc_p.def_impl
-def qalloc_impl(size):
-    """This function is called with concrete arguments for regular execution."""
-    raise NotImplementedError()
-
-
 @qalloc_p.def_abstract_eval
-def qalloc_abstract_eval(size):
+# pylint: disable=unused-argument
+def _qalloc_abstract_eval(size):
     """This function is called with abstract arguments for tracing."""
     return AbstractQreg()
 
 
-#
-# qdealloc
-#
-def qdealloc(qreg):
-    return qdealloc_p.bind(qreg)
-
-
-@qdealloc_p.def_impl
-def qdealloc_impl(qreg):
-    raise NotImplementedError()
-
-
-@qdealloc_p.def_abstract_eval
-def qdealloc_abstract_eval(qreg):
-    return ()
-
-
-def qdealloc_lowering(jax_ctx: mlir.LoweringRuleContext, qreg):
-    ctx = jax_ctx.module_context.context
-    ctx.allow_unregistered_dialects = True
-    DeallocOp(qreg)
-    return ()
-
-
-def qalloc_lowering(jax_ctx: mlir.LoweringRuleContext, size_value: ir.Value):
+def _qalloc_lowering(jax_ctx: mlir.LoweringRuleContext, size_value: ir.Value):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
@@ -345,27 +326,43 @@ def qalloc_lowering(jax_ctx: mlir.LoweringRuleContext, size_value: ir.Value):
 
 
 #
+# qdealloc
+#
+def qdealloc(qreg):
+    """Bind operands to operation."""
+    return qdealloc_p.bind(qreg)
+
+
+@qdealloc_p.def_abstract_eval
+# pylint: disable=unused-argument
+def _qdealloc_abstract_eval(qreg):
+    return ()
+
+
+def _qdealloc_lowering(jax_ctx: mlir.LoweringRuleContext, qreg):
+    ctx = jax_ctx.module_context.context
+    ctx.allow_unregistered_dialects = True
+    DeallocOp(qreg)
+    return ()
+
+
+#
 # qextract
 #
 def qextract(qreg, qubit_idx):
-    """This function inserts the primitive into the jaxpr."""
+    """Bind operands to operation."""
     return qextract_p.bind(qreg, qubit_idx)
 
 
-@qextract_p.def_impl
-def qextract_impl(qreg, qubit_idx):
-    """This function is called with concrete arguments for regular execution."""
-    raise NotImplementedError()
-
-
 @qextract_p.def_abstract_eval
-def qextract_abstract_eval(qreg, qubit_idx):
+# pylint: disable=unused-argument
+def _qextract_abstract_eval(qreg, qubit_idx):
     """This function is called with abstract arguments for tracing."""
     assert isinstance(qreg, AbstractQreg)
     return AbstractQbit()
 
 
-def qextract_lowering(jax_ctx: mlir.LoweringRuleContext, qreg: ir.Value, qubit_idx: ir.Value):
+def _qextract_lowering(jax_ctx: mlir.LoweringRuleContext, qreg: ir.Value, qubit_idx: ir.Value):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
@@ -389,25 +386,20 @@ def qextract_lowering(jax_ctx: mlir.LoweringRuleContext, qreg: ir.Value, qubit_i
 # qinsert
 #
 def qinsert(qreg_old, qubit_idx, qubit):
-    """This function inserts the primitive into the jaxpr."""
+    """Bind operands to operation."""
     return qinsert_p.bind(qreg_old, qubit_idx, qubit)
 
 
-@qinsert_p.def_impl
-def qinsert_impl(qreg_old, qubit_idx, qubit):
-    """This function is called with concrete arguments for regular execution."""
-    raise NotImplementedError()
-
-
 @qinsert_p.def_abstract_eval
-def qinsert_abstract_eval(qreg_old, qubit_idx, qubit):
+# pylint: disable=unused-argument
+def _qinsert_abstract_eval(qreg_old, qubit_idx, qubit):
     """This function is called with abstract arguments for tracing."""
     assert isinstance(qreg_old, AbstractQreg)
     assert isinstance(qubit, AbstractQbit)
     return AbstractQreg()
 
 
-def qinsert_lowering(
+def _qinsert_lowering(
     jax_ctx: mlir.LoweringRuleContext, qreg_old: ir.Value, qubit_idx: ir.Value, qubit: ir.Value
 ):
     ctx = jax_ctx.module_context.context
@@ -433,23 +425,20 @@ def qinsert_lowering(
 # qinst
 #
 def qinst(name, qubits_len, *qubits_or_params):
+    """Bind operands to operation."""
     return qinst_p.bind(*qubits_or_params, op=name, qubits_len=qubits_len)
 
 
-@qinst_p.def_impl
-def qinst_impl(*qubits_or_params, op=None, qubits_len=-1):
-    raise NotImplementedError()
-
-
 @qinst_p.def_abstract_eval
-def qinst_abstract_eval(*qubits_or_params, op=None, qubits_len=-1):
+# pylint: disable=unused-argument
+def _qinst_abstract_eval(*qubits_or_params, op=None, qubits_len=-1):
     for idx in range(qubits_len):
         qubit = qubits_or_params[idx]
         assert isinstance(qubit, AbstractQbit)
     return (AbstractQbit(),) * qubits_len
 
 
-def qinst_lowering(
+def _qinst_lowering(
     jax_ctx: mlir.LoweringRuleContext, *qubits_or_params: tuple, op=None, qubits_len=-1
 ):
     ctx = jax_ctx.module_context.context
@@ -497,22 +486,19 @@ def qinst_lowering(
 # qubit unitary operation
 #
 def qunitary(matrix, *qubits):
+    """Bind operands to operation."""
     return qunitary_p.bind(matrix, *qubits)
 
 
-@qunitary_p.def_impl
-def qunitary_impl(matrix, *qubits):
-    raise NotImplementedError()
-
-
 @qunitary_p.def_abstract_eval
-def qunitary_abstract_eval(matrix, *qubits):
+# pylint: disable=unused-argument
+def _qunitary_abstract_eval(matrix, *qubits):
     for q in qubits:
         assert isinstance(q, AbstractQbit)
     return (AbstractQbit(),) * len(qubits)
 
 
-def qunitary_lowering(jax_ctx: mlir.LoweringRuleContext, matrix: ir.Value, *qubits: tuple):
+def _qunitary_lowering(jax_ctx: mlir.LoweringRuleContext, matrix: ir.Value, *qubits: tuple):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
@@ -551,21 +537,18 @@ def qunitary_lowering(jax_ctx: mlir.LoweringRuleContext, matrix: ir.Value, *qubi
 # qmeasure
 #
 def qmeasure(qubit):
+    """Bind operands to operation."""
     return qmeasure_p.bind(qubit)
 
 
-@qmeasure_p.def_impl
-def qmeasure_impl(qubit):
-    raise NotImplementedError()
-
-
 @qmeasure_p.def_abstract_eval
-def qmeasure_abstract_eval(qubit):
+# pylint: disable=unused-argument
+def _qmeasure_abstract_eval(qubit):
     assert isinstance(qubit, AbstractQbit)
     return jax.core.ShapedArray((), bool), qubit
 
 
-def qmeasure_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value):
+def _qmeasure_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
@@ -586,22 +569,18 @@ def qmeasure_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value):
 # compbasis observable
 #
 def compbasis(*qubits):
+    """Bind operands to operation."""
     return compbasis_p.bind(*qubits)
 
 
-@compbasis_p.def_impl
-def compbasis_impl(*qubits):
-    raise NotImplementedError()
-
-
 @compbasis_p.def_abstract_eval
-def compbasis_abstract_eval(*qubits):
+def _compbasis_abstract_eval(*qubits):
     for qubit in qubits:
         assert isinstance(qubit, AbstractQbit)
     return AbstractObs(len(qubits), compbasis_p)
 
 
-def compbasis_lowering(jax_ctx: mlir.LoweringRuleContext, *qubits: tuple):
+def _compbasis_lowering(jax_ctx: mlir.LoweringRuleContext, *qubits: tuple):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
@@ -619,21 +598,18 @@ def compbasis_lowering(jax_ctx: mlir.LoweringRuleContext, *qubits: tuple):
 # named observable
 #
 def namedobs(type, qubit):
+    """Bind operands to operation."""
     return namedobs_p.bind(qubit, type=type)
 
 
-@namedobs_p.def_impl
-def namedobs_impl(qubit, type):
-    raise NotImplementedError()
-
-
 @namedobs_p.def_abstract_eval
-def namedobs_abstract_eval(qubit, type):
+# pylint: disable=unused-argument
+def _namedobs_abstract_eval(qubit, type):
     assert isinstance(qubit, AbstractQbit)
     return AbstractObs()
 
 
-def namedobs_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value, type: int):
+def _named_obs_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value, type: int):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
@@ -652,22 +628,19 @@ def namedobs_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value, type: 
 # hermitian observable
 #
 def hermitian(matrix, *qubits):
+    """Bind operands to operation."""
     return hermitian_p.bind(matrix, *qubits)
 
 
-@hermitian_p.def_impl
-def hermitian_impl(matrix, *qubits):
-    raise NotImplementedError()
-
-
 @hermitian_p.def_abstract_eval
-def hermitian_abstract_eval(matrix, *qubits):
+# pylint: disable=unused-argument
+def _hermitian_abstract_eval(matrix, *qubits):
     for q in qubits:
         assert isinstance(q, AbstractQbit)
     return AbstractObs()
 
 
-def hermitian_lowering(jax_ctx: mlir.LoweringRuleContext, matrix: ir.Value, *qubits: tuple):
+def _hermitian_lowering(jax_ctx: mlir.LoweringRuleContext, matrix: ir.Value, *qubits: tuple):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
@@ -680,22 +653,18 @@ def hermitian_lowering(jax_ctx: mlir.LoweringRuleContext, matrix: ir.Value, *qub
 # tensor observable
 #
 def tensorobs(*terms):
+    """Bind operands to operation."""
     return tensorobs_p.bind(*terms)
 
 
-@tensorobs_p.def_impl
-def tensorobs_impl(*terms):
-    raise NotImplementedError()
-
-
 @tensorobs_p.def_abstract_eval
-def tensorobs_abstract_eval(*terms):
+def _tensorobs_abstract_eval(*terms):
     for o in terms:
         assert isinstance(o, AbstractObs)
     return AbstractObs()
 
 
-def tensorobs_lowering(jax_ctx: mlir.LoweringRuleContext, *terms: tuple):
+def _tensor__obs_lowering(jax_ctx: mlir.LoweringRuleContext, *terms: tuple):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
@@ -708,22 +677,19 @@ def tensorobs_lowering(jax_ctx: mlir.LoweringRuleContext, *terms: tuple):
 # hamiltonian observable
 #
 def hamiltonian(coeffs, *terms):
+    """Bind operands to operation."""
     return hamiltonian_p.bind(coeffs, *terms)
 
 
-@hamiltonian_p.def_impl
-def hamiltonian_impl(coeffs, *terms):
-    raise NotImplementedError()
-
-
 @hamiltonian_p.def_abstract_eval
-def hamiltonian_abstract_eval(coeffs, *terms):
+# pylint: disable=unused-argument
+def _hamiltonian_abstract_eval(coeffs, *terms):
     for o in terms:
         assert isinstance(o, AbstractObs)
     return AbstractObs()
 
 
-def hamiltonian_lowering(jax_ctx: mlir.LoweringRuleContext, coeffs: ir.Value, *terms: tuple):
+def _hamiltonian_lowering(jax_ctx: mlir.LoweringRuleContext, coeffs: ir.Value, *terms: tuple):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
@@ -736,17 +702,13 @@ def hamiltonian_lowering(jax_ctx: mlir.LoweringRuleContext, coeffs: ir.Value, *t
 # sample measurement
 #
 def sample(obs, shots, shape):
+    """Bind operands to operation."""
     assert shots is not None, "must specify shot number for qml.sample"
     return sample_p.bind(obs, shots=shots, shape=shape)
 
 
-@sample_p.def_impl
-def sample_impl(obs, shots, shape):
-    raise NotImplementedError()
-
-
 @sample_p.def_abstract_eval
-def sample_abstract_eval(obs, shots, shape):
+def _sample_abstract_eval(obs, shots, shape):
     assert isinstance(obs, AbstractObs)
 
     if obs.primitive is compbasis_p:
@@ -757,7 +719,7 @@ def sample_abstract_eval(obs, shots, shape):
     return jax.core.ShapedArray(shape, jax.numpy.float64)
 
 
-def sample_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: int, shape: tuple):
+def _sample_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: int, shape: tuple):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
@@ -773,17 +735,14 @@ def sample_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: int
 # counts measurement
 #
 def counts(obs, shots, shape):
+    """Bind operands to operation."""
     assert shots is not None, "must specify shot number for qml.counts"
     return counts_p.bind(obs, shots=shots, shape=shape)
 
 
-@counts_p.def_impl
-def counts_impl(obs, shots, shape):
-    raise NotImplementedError()
-
-
 @counts_p.def_abstract_eval
-def counts_abstract_eval(obs, shots, shape):
+# pylint: disable=unused-argument
+def _counts_abstract_eval(obs, shots, shape):
     assert isinstance(obs, AbstractObs)
 
     if obs.primitive is compbasis_p:
@@ -796,7 +755,7 @@ def counts_abstract_eval(obs, shots, shape):
     )
 
 
-def counts_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: int, shape: tuple):
+def _counts_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: int, shape: tuple):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
@@ -813,21 +772,18 @@ def counts_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: int
 # expval measurement
 #
 def expval(obs, shots):
+    """Bind operands to operation."""
     return expval_p.bind(obs, shots=shots)
 
 
-@expval_p.def_impl
-def expval_impl(obs, shots):
-    raise NotImplementedError()
-
-
 @expval_p.def_abstract_eval
-def expval_abstract_eval(obs, shots):
+# pylint: disable=unused-argument
+def _expval_abstract_eval(obs, shots):
     assert isinstance(obs, AbstractObs)
     return jax.core.ShapedArray((), jax.numpy.float64)
 
 
-def expval_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: int):
+def _expval_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: int):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
@@ -847,21 +803,18 @@ def expval_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: int
 # var measurement
 #
 def var(obs, shots):
+    """Bind operands to operation."""
     return var_p.bind(obs, shots=shots)
 
 
-@var_p.def_impl
-def var_impl(obs, shots):
-    raise NotImplementedError()
-
-
 @var_p.def_abstract_eval
-def var_abstract_eval(obs, shots):
+# pylint: disable=unused-argument
+def _var_abstract_eval(obs, shots):
     assert isinstance(obs, AbstractObs)
     return jax.core.ShapedArray((), jax.numpy.float64)
 
 
-def var_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: int):
+def _var_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: int):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
@@ -881,16 +834,12 @@ def var_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: int):
 # probs measurement
 #
 def probs(obs, shape):
+    """Bind operands to operation."""
     return probs_p.bind(obs, shape=shape)
 
 
-@probs_p.def_impl
-def probs_impl(obs, shape):
-    raise NotImplementedError()
-
-
 @probs_p.def_abstract_eval
-def probs_abstract_eval(obs, shape):
+def _probs_abstract_eval(obs, shape):
     assert isinstance(obs, AbstractObs)
 
     if obs.primitive is compbasis_p:
@@ -901,7 +850,7 @@ def probs_abstract_eval(obs, shape):
     return jax.core.ShapedArray(shape, jax.numpy.float64)
 
 
-def probs_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shape: tuple):
+def _pr_obs_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shape: tuple):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
@@ -914,16 +863,12 @@ def probs_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shape: tupl
 # state measurement
 #
 def state(obs, shape):
+    """Bind operands to operation."""
     return state_p.bind(obs, shape=shape)
 
 
-@state_p.def_impl
-def state_impl(obs, shape):
-    raise NotImplementedError()
-
-
 @state_p.def_abstract_eval
-def state_abstract_eval(obs, shape):
+def _state_abstract_eval(obs, shape):
     assert isinstance(obs, AbstractObs)
 
     if obs.primitive is compbasis_p:
@@ -934,7 +879,7 @@ def state_abstract_eval(obs, shape):
     return jax.core.ShapedArray(shape, jax.numpy.complex128)
 
 
-def state_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shape: tuple):
+def _state_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shape: tuple):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
@@ -948,6 +893,7 @@ def state_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shape: tupl
 # qcond
 #
 def qcond(true_jaxpr, false_jaxpr, *header_and_branch_args_plus_consts):
+    """Bind operands to operation."""
     return qcond_p.bind(
         *header_and_branch_args_plus_consts,
         true_jaxpr=true_jaxpr,
@@ -956,6 +902,7 @@ def qcond(true_jaxpr, false_jaxpr, *header_and_branch_args_plus_consts):
 
 
 @qcond_p.def_abstract_eval
+# pylint: disable=unused-argument
 def _qcond_abstract_eval(*args, true_jaxpr, false_jaxpr, **kwargs):
     return true_jaxpr.out_avals
 
@@ -1020,6 +967,7 @@ def _qcond_lowering(
 # qwhile loop
 #
 def qwhile(cond_jaxpr, body_jaxpr, cond_nconsts, body_nconsts, *iter_args_plus_consts):
+    """Bind operands to operation."""
     return qwhile_p.bind(
         *iter_args_plus_consts,
         cond_jaxpr=cond_jaxpr,
@@ -1030,6 +978,7 @@ def qwhile(cond_jaxpr, body_jaxpr, cond_nconsts, body_nconsts, *iter_args_plus_c
 
 
 @qwhile_p.def_abstract_eval
+# pylint: disable=unused-argument
 def _qwhile_loop_abstract_eval(*args, cond_jaxpr, body_jaxpr, **kwargs):
     return body_jaxpr.out_avals
 
@@ -1104,13 +1053,16 @@ def _qwhile_lowering(
 #
 # qfor loop
 #
+# pylint: disable=unused-argument
 def qfor(body_jaxpr, body_nconsts, *header_and_iter_args_plus_consts):
+    """Bind operands to operation."""
     return qfor_p.bind(
         *header_and_iter_args_plus_consts, body_jaxpr=body_jaxpr, body_nconsts=body_nconsts
     )
 
 
 @qfor_p.def_abstract_eval
+# pylint: disable=unused-argument
 def _qfor_loop_abstract_eval(*args, body_jaxpr, **kwargs):
     return body_jaxpr.out_avals
 
@@ -1198,24 +1150,24 @@ def _qfor_lowering(
 #
 # registration
 #
-mlir.register_lowering(qdealloc_p, qdealloc_lowering)
-mlir.register_lowering(qalloc_p, qalloc_lowering)
-mlir.register_lowering(qextract_p, qextract_lowering)
-mlir.register_lowering(qinsert_p, qinsert_lowering)
-mlir.register_lowering(qinst_p, qinst_lowering)
-mlir.register_lowering(qunitary_p, qunitary_lowering)
-mlir.register_lowering(qmeasure_p, qmeasure_lowering)
-mlir.register_lowering(compbasis_p, compbasis_lowering)
-mlir.register_lowering(namedobs_p, namedobs_lowering)
-mlir.register_lowering(hermitian_p, hermitian_lowering)
-mlir.register_lowering(tensorobs_p, tensorobs_lowering)
-mlir.register_lowering(hamiltonian_p, hamiltonian_lowering)
-mlir.register_lowering(sample_p, sample_lowering)
-mlir.register_lowering(counts_p, counts_lowering)
-mlir.register_lowering(expval_p, expval_lowering)
-mlir.register_lowering(var_p, var_lowering)
-mlir.register_lowering(probs_p, probs_lowering)
-mlir.register_lowering(state_p, state_lowering)
+mlir.register_lowering(qdealloc_p, _qdealloc_lowering)
+mlir.register_lowering(qalloc_p, _qalloc_lowering)
+mlir.register_lowering(qextract_p, _qextract_lowering)
+mlir.register_lowering(qinsert_p, _qinsert_lowering)
+mlir.register_lowering(qinst_p, _qinst_lowering)
+mlir.register_lowering(qunitary_p, _qunitary_lowering)
+mlir.register_lowering(qmeasure_p, _qmeasure_lowering)
+mlir.register_lowering(compbasis_p, _compbasis_lowering)
+mlir.register_lowering(namedobs_p, _named_obs_lowering)
+mlir.register_lowering(hermitian_p, _hermitian_lowering)
+mlir.register_lowering(tensorobs_p, _tensor__obs_lowering)
+mlir.register_lowering(hamiltonian_p, _hamiltonian_lowering)
+mlir.register_lowering(sample_p, _sample_lowering)
+mlir.register_lowering(counts_p, _counts_lowering)
+mlir.register_lowering(expval_p, _expval_lowering)
+mlir.register_lowering(var_p, _var_lowering)
+mlir.register_lowering(probs_p, _pr_obs_lowering)
+mlir.register_lowering(state_p, _state_lowering)
 mlir.register_lowering(qcond_p, _qcond_lowering)
 mlir.register_lowering(qwhile_p, _qwhile_lowering)
 mlir.register_lowering(qfor_p, _qfor_lowering)
