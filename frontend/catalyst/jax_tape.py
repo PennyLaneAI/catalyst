@@ -16,6 +16,10 @@ that supports capturing classical computations and control flow of quantum opera
 that occur within the circuit.
 """
 
+"""
+JaxTape
+"""
+
 import jax
 from jax.interpreters.partial_eval import DynamicJaxprTrace, JaxprStackFrame, extend_jaxpr_stack
 from jax.tree_util import tree_flatten, tree_unflatten
@@ -27,6 +31,7 @@ from catalyst import jax_tracer
 from catalyst.param_evaluator import ParamEvaluator
 
 
+# pylint: disable=too-many-instance-attributes
 class JaxTape:
     """A Quantum Tape that can additionally capture classical computations and control flow
     that occur within the circuit.
@@ -98,13 +103,13 @@ class JaxTape:
                 if isinstance(op, (qml.Hermitian, qml.QubitUnitary)):
                     # Can I subscript here? Or should I pass everything?
                     return op.data[0], op.wires.tolist()
-                elif isinstance(op, qml.Hamiltonian):
+                if isinstance(op, qml.Hamiltonian):
                     return op.coeffs
-                elif op.__class__.__name__ == "Cond":
+                if op.__class__.__name__ == "Cond":
                     return op.pred, op.consts
-                elif op.__class__.__name__ == "WhileLoop":
+                if op.__class__.__name__ == "WhileLoop":
                     return op.cond_consts, op.body_consts, op.iter_args
-                elif op.__class__.__name__ == "ForLoop":
+                if op.__class__.__name__ == "ForLoop":
                     return op.loop_bounds, op.body_consts, op.iter_args
                 # Named observables and other ops fall here.
                 return op.parameters, op.wires.tolist()
@@ -151,17 +156,29 @@ class JaxTape:
         return tree_unflatten(tree, map(self.trace.new_arg, avals))
 
     def get_parameter_evaluator(self):
+        """Create an instance of a ParameterEvaluator
+
+        Returns:
+            ParamEvaluator for the current tape.
+        """
         return ParamEvaluator(self.closed_jaxpr, self.output_trees)
 
     def set_return_val(self, return_value):
+        """Set the return value for the tape.
+
+        Args:
+            return_value: The return value.
+        """
         self.return_value = return_value
 
 
+# pylint: disable=too-few-public-methods
 class EmptyObservable:
     """Denotes an observable equivalent to a given set of wires.
 
     This class is used only for consistency of how observables are handled.
     """
+
     def __init__(self, wires):
         self.wires = wires
         self.parameters = []
