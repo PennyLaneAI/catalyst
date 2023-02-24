@@ -15,6 +15,8 @@
 compiling of hybrid quantum-classical functions using Catalyst.
 """
 
+# pylint: disable=missing-module-docstring
+
 import ctypes
 import os
 import inspect
@@ -45,9 +47,11 @@ if not INSTALLED and os.path.exists(default_bindings_path):  # pragma: no cover
 
     sys.path.insert(0, default_bindings_path)
 
+# pylint: disable=wrong-import-position,wrong-import-order
 from mlir_quantum.runtime import get_ranked_memref_descriptor, ranked_memref_to_numpy
 
 # Required for JAX tracer objects as PennyLane wires.
+# pylint: disable=unnecessary-lambda
 setattr(jax.interpreters.partial_eval.DynamicJaxprTracer, "__hash__", lambda x: id(x))
 
 jax.config.update("jax_enable_x64", True)
@@ -498,6 +502,7 @@ class QJIT:
         else:
             # The temporary directory must be referenced by the wrapper class
             # in order to avoid being garbage collected
+            # pylint: disable=consider-using-with
             self.workspace = tempfile.TemporaryDirectory()
             self.workspace_name = self.workspace.name
         self.passes = {}
