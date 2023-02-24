@@ -309,6 +309,7 @@ class QJIT:
 
     def __init__(self, fn, target, keep_intermediate):
         self.qfunc = fn
+        self.c_sig = None
         functools.update_wrapper(self, fn)
         if keep_intermediate:
             dirname = fn.__name__
@@ -416,7 +417,6 @@ class QJIT:
         args = [jax.numpy.array(arg) for arg in args]
         r_sig = CompiledFunction.get_runtime_signature(*args)
         is_prev_compile = getattr(self, "compiled_function", None) is not None
-        self.c_sig = getattr(self, "c_sig", None) if is_prev_compile else None
         can_promote = not is_prev_compile or CompiledFunction.can_promote(self.c_sig, r_sig)
         needs_compile = not is_prev_compile or not can_promote
 
