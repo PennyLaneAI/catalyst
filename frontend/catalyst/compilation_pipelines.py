@@ -355,8 +355,14 @@ class QJIT:
                 self.compiled_function = self.compile()
 
     def print_stage(self, stage):  # pragma: no cover
+        """
+        Print one of the recorded stages.
+
+        Args:
+            stage: string corresponding with the name of the stage to be printed.
+        """
         if self.passes.get(stage):
-            with open(self.passes[stage], "r") as f:
+            with open(self.passes[stage], "r", encoding="utf-8") as f:
                 print(f.read())
 
     @property
@@ -381,6 +387,14 @@ class QJIT:
         return self._llvmir
 
     def get_mlir(self, *args):
+        """Trace self.qfunc
+
+        Args:
+            *args: Either the concrete values to be passed as arguments to `fn` or abstract values.
+
+        Returns:
+            An MLIR module.
+        """
         assert args is not None
         self.c_sig = CompiledFunction.get_runtime_signature(*args)
 
