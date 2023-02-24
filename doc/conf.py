@@ -109,6 +109,7 @@ extensions = [
     "sphinx.ext.viewcode",
     "sphinx_automodapi.automodapi",
     "sphinx_automodapi.smart_resolver",
+    "m2r2"
 ]
 
 intersphinx_mapping = {"https://docs.pennylane.ai/en/stable/": None}

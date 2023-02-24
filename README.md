@@ -37,33 +37,38 @@ frontends.**
 
 - Built to be end-to-end differentiable.
 
-- Support for the [`lightning.qubit`](https://github.com/PennyLaneAI/pennylane-lightning/) high
+- Support for the [Lightning](https://github.com/PennyLaneAI/pennylane-lightning/) high
   performance simulator. Additional hardware support, including GPUs and QPUs to come.
 
 ## Overview
 
 Catalyst currently consists of the following components:
 
-- [**Catalyst Compiler**](https://docs.pennylane.ai/projects/catalyst/en/latest/modules/mlir.html).
+- [Catalyst Compiler](https://docs.pennylane.ai/projects/catalyst/en/latest/modules/mlir.html).
+
   The core Catalyst compiler is built using [MLIR](https://mlir.llvm.org/), with the addition of a
   quantum dialect used to represent quantum instructions. This allows for a high-level intermediate
   representation of the classical and quantum components of the program, resulting in advantages
   during optimization. Once optimized, the compiler lowers the representation down to LLVM +
   [QIR](https://www.qir-alliance.org/), and a machine binary is produced.
 
-- [**Catalyst
-  Runtime**](https://docs.pennylane.ai/projects/catalyst/en/latest/modules/runtime.html). The
+- [Catalyst
+  Runtime](https://docs.pennylane.ai/projects/catalyst/en/latest/modules/runtime.html).
+
+  The
   runtime is a C++ QIR runtime that enables the execution of Catalyst-compiled quantum programs.
   Currently, runtime implementations are available for the state-vector simulators
-  [`lightning.qubit`](https://github.com/PennyLaneAI/pennylane-lightning/) and
-  [`lightning.kokkkos`](https://github.com/PennyLaneAI/pennylane-lightning-kokkos/). A complete
+  [Lightning](https://github.com/PennyLaneAI/pennylane-lightning/) and
+  [Lightning-Kokkkos](https://github.com/PennyLaneAI/pennylane-lightning-kokkos/). A complete
   list of the quantum instruction set supported by these runtime implementations can be found by
   visiting the Catalyst documentation.
 
 In addition, we also provide a Python frontend for [PennyLane](https://pennylane.ai) and [JAX](https://jax.readthedocs.io):
 
 - [PennyLane JAX
-  frontend](https://docs.pennylane.ai/projects/catalyst/en/latest/modules/frontend.html). A Python
+  frontend](https://docs.pennylane.ai/projects/catalyst/en/latest/modules/frontend.html).
+
+  A Python
   library that provides a `@qjit` decorator to just-in-time compile PennyLane hybrid
   quantum-classical programs. In addition, the frontend package provides Python functions for
   defining Catalyst-compatible control flow structures.
@@ -73,7 +78,7 @@ In addition, we also provide a Python frontend for [PennyLane](https://pennylane
 
 Catalyst has been tested on Linux operating systems and the Python frontend is available as an
 easy-to-install Python binary via `pip`. The only requirements to use Catalyst via Python is
-[PennyLane](https://pennylane.ai) and `Python <https://www.python.org/>`_  3.8 or higher.
+[PennyLane](https://pennylane.ai) and [Python](https://www.python.org)  3.8 or higher.
 
 Catalyst can then be installed via a single command:
 
@@ -111,7 +116,7 @@ PennyLane website for [tutorials, videos, and demonstrations](https://pennylane.
   addition, we will be building out support for hetereogeneous execution. *If you are interested in
   working on connecting a quantum device with Catalyst, please get in touch.*
 
-To figure out the details, we need your help -- please send us your use cases by starting a
+To figure out the details, we need your help — please send us your use cases by starting a
 conversation, or trying Catalyst out.
 
 ## Contributing to Catalyst
