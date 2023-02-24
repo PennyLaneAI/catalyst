@@ -57,9 +57,8 @@ Catalyst currently consists of the following components:
 
   The
   runtime is a C++ runtime based on QIR that enables the execution of Catalyst-compiled quantum programs.
-  Currently, runtime implementations are available for the state-vector simulators
-  [Lightning](https://github.com/PennyLaneAI/pennylane-lightning/) and
-  [Lightning-Kokkkos](https://github.com/PennyLaneAI/pennylane-lightning-kokkos/). A complete
+  Currently, a runtime implementation is available for the state-vector simulators
+  [Lightning](https://github.com/PennyLaneAI/pennylane-lightning/). A complete
   list of the quantum instruction set supported by these runtime implementations can be found by
   visiting the Catalyst documentation.
 
