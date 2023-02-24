@@ -161,6 +161,22 @@ class CompiledFunction:
             raise TypeError(f"Unsupported argument type: {arg_type}")
 
     @staticmethod
+    def are_all_signature_params_annotated(f: typing.Callable):
+        signature = inspect.signature(f)
+        parameters = signature.parameters
+        return all(p.annotation is not inspect.Parameter.empty for p in parameters.values())
+
+    @staticmethod
+    def get_compile_time_signature(f: typing.Callable) -> typing.List[typing.Any]:
+        can_validate = CompiledFunction.are_all_signature_params_annotated(f)
+
+        if can_validate:
+            # Needed instead of inspect.get_annotations for Python < 3.10.
+            return getattr(f, "__annotations__", {}).values()
+
+        return None
+
+    @staticmethod
     def zero_ranked_memref_to_numpy(ranked_memref):
         assert not hasattr(ranked_memref, "shape")
         return np.array(ranked_memref.aligned.contents)
@@ -329,14 +345,14 @@ class QJIT:
         self.mlir_module = None
         self.compiled_function = None
 
-        parameter_types = QJIT.get_compile_time_signature(self.qfunc)
+        parameter_types = CompiledFunction.get_compile_time_signature(self.qfunc)
         self.user_typed = False
         if parameter_types is not None:
             self.user_typed = True
             if target in ("mlir", "binary"):
-                self.mlir_module = self.get_mlir(parameter_types)
+                self.mlir_module = self.get_mlir(*parameter_types)
             if target == "binary":
-                self.compiled_function = self.compile(parameter_types)
+                self.compiled_function = self.compile()
 
     def print_stage(self, stage):  # pragma: no cover
         if self.passes.get(stage):
@@ -364,40 +380,26 @@ class QJIT:
         """
         return self._llvmir
 
-    @staticmethod
-    def are_all_signature_params_annotated(f: typing.Callable):
-        signature = inspect.signature(f)
-        parameters = signature.parameters
-        return all(p.annotation is not inspect.Parameter.empty for p in parameters.values())
+    def get_mlir(self, *args):
+        assert args is not None
+        self.c_sig = CompiledFunction.get_runtime_signature(*args)
 
-    @staticmethod
-    def get_compile_time_signature(f: typing.Callable) -> typing.List[typing.Any]:
-        can_validate = QJIT.are_all_signature_params_annotated(f)
-
-        if can_validate:
-            # Needed instead of inspect.get_annotations for Python < 3.10.
-            return getattr(f, "__annotations__", {}).values()
-
-        return None
-
-    def get_mlir(self, args_or_argtypes):
         with Patcher(
             (qml.QNode, "__call__", QFunc.__call__),
         ):
-            mlir_module, ctx, jaxpr = tracer.get_mlir(self.qfunc, *args_or_argtypes)
+            mlir_module, ctx, jaxpr = tracer.get_mlir(self.qfunc, *self.c_sig)
+
+        mod = mlir_module.operation
         self._jaxpr = jaxpr
-        self._mlir = mlir_module.operation.get_asm(
-            binary=False, print_generic_op_form=False, assume_verified=True
-        )
+        self._mlir = mod.get_asm(binary=False, print_generic_op_form=False, assume_verified=True)
 
         # Inject setup and finalize functions.
         append_modules(mlir_module, ctx)
 
         return mlir_module
 
-    def compile(self, args_or_argtypes):
-        params = [jax.api_util.shaped_abstractify(p) for p in args_or_argtypes]
-        self.c_sig = params
+    def compile(self):
+        """Compile the current MLIR module."""
 
         shared_object, self._llvmir = compiler.compile(
             self.mlir_module, self.workspace_name, self.passes
@@ -424,8 +426,8 @@ class QJIT:
             if self.user_typed:
                 msg = "Provided arguments did not match declared signature, recompilation has been triggered"
                 warnings.warn(msg, UserWarning)
-            self.mlir_module = self.get_mlir(r_sig)
-            self.compiled_function = self.compile(r_sig)
+            self.mlir_module = self.get_mlir(*r_sig)
+            self.compiled_function = self.compile()
         else:
             args = CompiledFunction.promote_arguments(self.c_sig, r_sig, *args)
 
