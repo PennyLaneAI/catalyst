@@ -12,8 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""
+Patcher module.
+"""
+
 
 class Patcher:
+    """Patcher, a class to replace object attributes.
+
+    Args:
+        patch_data: List of triples. The first element in the triple corresponds to the object
+        whose attribute is to be replaced. The second element is the attribute name. The third
+        element is the new value assigned to the attribute.
+    """
+
     def __init__(self, *patch_data):
         self.backup = {}
         self.patch_data = patch_data
