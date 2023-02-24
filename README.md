@@ -71,7 +71,7 @@ In addition, we also provide a Python frontend for [PennyLane](https://pennylane
   A Python
   library that provides a `@qjit` decorator to just-in-time compile PennyLane hybrid
   quantum-classical programs. In addition, the frontend package provides Python functions for
-  defining Catalyst-compatible control flow structures.
+  defining Catalyst-compatible control flow structures, gradient, and mid-circuit measurement.
 
 
 ## Installation
@@ -121,7 +121,7 @@ conversation, or trying Catalyst out.
 
 ## Contributing to Catalyst
 
-We welcome contributions—simply fork the Catalyst repository, and then make a [pull
+We welcome contributions — simply fork the Catalyst repository, and then make a [pull
 request](https://help.github.com/articles/about-pull-requests/) containing your contribution.
 
 We also encourage bug reports, suggestions for new features and enhancements.
