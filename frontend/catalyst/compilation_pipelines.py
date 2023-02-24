@@ -102,8 +102,7 @@ class CompiledFunction:
         for c_param, r_param in zip(compiled_signature, runtime_signature):
             assert isinstance(c_param, jax.core.ShapedArray)
             assert isinstance(r_param, jax.core.ShapedArray)
-            r_param_dtype = r_param.dtype
-            promote_to = jax.numpy.promote_types(r_param_dtype, c_param.dtype)
+            promote_to = jax.numpy.promote_types(r_param.dtype, c_param.dtype)
             if c_param.dtype != promote_to:
                 return False
         return True
@@ -161,8 +160,7 @@ class CompiledFunction:
 
     @staticmethod
     def zero_ranked_memref_to_numpy(ranked_memref):
-        is_scalar = not hasattr(ranked_memref, "shape")
-        assert is_scalar
+        assert not hasattr(ranked_memref, "shape")
         return np.array(ranked_memref.aligned.contents)
 
     @staticmethod
@@ -193,9 +191,7 @@ class CompiledFunction:
         ranked_memrefs = CompiledFunction.return_value_ptr_to_ranked_memrefs(return_value_ptr)
         return_value = CompiledFunction.ranked_memrefs_to_numpy(ranked_memrefs)
         # TODO: Handle return types correctly. Tuple, lists of 1 item (?)
-        if len(return_value) == 1:
-            return return_value[0]
-        return return_value
+        return return_value[0] if len(return_value) == 1 else return_value
 
     @staticmethod
     def execute_abi(shared_object_file, func_name, restype, *py_args):
@@ -232,8 +228,8 @@ class CompiledFunction:
 
     @staticmethod
     def get_ranked_memref_descriptor_from_mlir_tensor_type(mlir_tensor_type):
-        assert mlir_tensor_type is not tuple
         assert mlir_tensor_type
+        assert mlir_tensor_type is not tuple
         shape = ir.RankedTensorType(mlir_tensor_type).shape
         mlir_element_type = ir.RankedTensorType(mlir_tensor_type).element_type
         numpy_element_type = mlir_type_to_numpy_type(mlir_element_type)
@@ -245,7 +241,7 @@ class CompiledFunction:
         _get_rmd = CompiledFunction.get_ranked_memref_descriptor_from_mlir_tensor_type
         return_fields_types = [_get_rmd(mlir_tensor_type) for mlir_tensor_type in mlir_tensor_types]
         if not return_fields_types:
-            return
+            return None
 
         class CompiledFunctionReturnValue(ctypes.Structure):
             """Programmatically create a structure which holds N tensors of possibly different T base types."""
