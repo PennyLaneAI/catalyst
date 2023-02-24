@@ -96,14 +96,15 @@ def qfunc(num_wires, *, shots=1000, device=None):
 
 
 class Function:
-    def __init__(self, grad):
+    def __init__(self, fn):
         """An object that represents a compiled function.
 
         At the moment, it is only used to compute sensible names for higher order derivative
         functions in MLIR.
         """
-        self.fn = grad
-        self.__name__ = "grad." + grad.__name__
+        assert isinstance(fn, Grad), "Function boundaries only supported for gradients."
+        self.fn = fn
+        self.__name__ = "grad." + fn.__name__
 
     def __call__(self, *args, **kwargs):
         jaxpr = jax.make_jaxpr(self.fn)(*args)
