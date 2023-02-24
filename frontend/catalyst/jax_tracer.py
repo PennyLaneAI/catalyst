@@ -14,11 +14,17 @@
 """This module contains functions tracing and lowering JAX code to MLIR.
 """
 
+"""
+Tracing of the classical and quantum components.
+"""
+
 import jax
 from jax.tree_util import tree_unflatten
 from jax._src.dispatch import jaxpr_replicas
-from jax.interpreters.mlir import *
-from jax.interpreters.mlir import _set_up_aliases, _module_name_regex
+from jax.interpreters.mlir import List, AxisContext, source_info_util, Sequence, Optional, xc
+from jax.interpreters.mlir import Tuple, ir, ReplicaAxisContext, xla, util, xb, itertools
+from jax.interpreters.mlir import ModuleContext, lower_jaxpr_to_fun, lowerable_effects, Any
+from jax.interpreters.mlir import _set_up_aliases, _module_name_regex, sharded_aval, warnings
 from jax.interpreters.partial_eval import DynamicJaxprTracer
 
 import pennylane as qml
@@ -110,6 +116,8 @@ def get_traceable_fn(qfunc, device):
                     meas_ret_val_indices.append(i)
                 else:
                     non_meas_return_values.append(ret_val)
+
+            # pylint: disable=protected-access
             tape.quantum_tape._measurements = meas_return_values
 
             has_tracer_return_values = len(non_meas_return_values) > 0
@@ -205,6 +213,7 @@ def get_new_qubit_state_from_wires_and_qubits(wires, new_qubits, qubit_states, q
     return qubit_states, qreg
 
 
+# pylint: disable=too-many-statements,too-many-branches,too-many-arguments
 def trace_quantum_tape(
     tape,
     qreg,
@@ -241,7 +250,8 @@ def trace_quantum_tape(
             _, wires = op_args
             assert len(wires) == 1
             qubits = get_qubits_from_wires(wires, qubit_states, qreg)
-            out, new_qubit = jprim.qmeasure(*qubits)
+            qubit = qubits[0]
+            out, new_qubit = jprim.qmeasure(qubit)
             qubit_states, qreg = get_new_qubit_state_from_wires_and_qubits(
                 wires, [new_qubit], qubit_states, qreg
             )
@@ -429,6 +439,7 @@ def trace_measurement(meas, obs, qubits, shots):
     return mres
 
 
+# pylint: disable=too-many-arguments
 def custom_lower_jaxpr_to_module(
     func_name: str,
     module_name: str,
