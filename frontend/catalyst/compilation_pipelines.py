@@ -55,34 +55,52 @@ jax.config.update("jax_platform_name", "cpu")
 jax.config.update("jax_array", True)
 
 
+# pylint: disable=too-many-return-statements
 def mlir_type_to_numpy_type(t):
+    """Convert an MLIR type to a Numpy type.
+
+    Args:
+        t: an MLIR numeric type.
+    Returns:
+        A numpy type.
+    Raises:
+        TypeError
+    """
     if ir.ComplexType.isinstance(t):
         base = ir.ComplexType(t).element_type
         if ir.F64Type.isinstance(base):
             return np.complex128
-        elif ir.F32Type.isinstance(base):
+        if ir.F32Type.isinstance(base):
             return np.complex64
         raise TypeError("No known type")
-    elif ir.F64Type.isinstance(t):
+    if ir.F64Type.isinstance(t):
         return np.float64
-    elif ir.F32Type.isinstance(t):
+    if ir.F32Type.isinstance(t):
         return np.float32
-    elif ir.F16Type.isinstance(t):
+    if ir.F16Type.isinstance(t):
         return np.float16
-    elif ir.IntegerType(t).width == 1:
+    if ir.IntegerType(t).width == 1:
         return np.bool_
-    elif ir.IntegerType(t).width == 8:
+    if ir.IntegerType(t).width == 8:
         return np.int8
-    elif ir.IntegerType(t).width == 16:
+    if ir.IntegerType(t).width == 16:
         return np.int16
-    elif ir.IntegerType(t).width == 32:
+    if ir.IntegerType(t).width == 32:
         return np.int32
-    elif ir.IntegerType(t).width == 64:
+    if ir.IntegerType(t).width == 64:
         return np.int64
     raise TypeError("No known type")
 
 
 class CompiledFunction:
+    """CompiledFunction, represents a Compiled Function.
+
+    Args:
+        shared_object_file: Path to shared object containing compiled function.
+        func_name: Name of compiled function.
+        restype: List of MLIR tensor types representing the result of the compiled function.
+    """
+
     def __init__(
         self,
         shared_object_file,
@@ -96,6 +114,16 @@ class CompiledFunction:
 
     @staticmethod
     def can_promote(compiled_signature, runtime_signature):
+        """Whether arguments can be promoted.
+
+        Args:
+            compiled_signature: User supplied signature, obtain from either an annotation or a previously compiled
+            implementation of the compiled function.
+            runtime_signature: Runtime signature
+
+        Returns:
+            bool.
+        """
         len_compile = len(compiled_signature)
         len_runtime = len(runtime_signature)
         if len_compile != len_runtime:
@@ -111,13 +139,26 @@ class CompiledFunction:
 
     @staticmethod
     def promote_arguments(compiled_signature, runtime_signature, *args):
+        """Promote arguments
+
+        Promote arguments from the type specified in args to the type specified by compiled_signature.
+
+        Args:
+            compiled_signature: User supplied signature, obtain from either an annotation or a previously compiled
+            implementation of the compiled function.
+            runtime_signature: Runtime signature
+            *args: Actual arguments to the function
+
+        Returns:
+            promoted_args: Arguments after promotion.
+        """
         len_compile = len(compiled_signature)
         len_runtime = len(runtime_signature)
         assert (
             len_compile == len_runtime
         ), "Compiled function incompatible with quantity of runtime arguments"
 
-        promoted_args = list()
+        promoted_args = []
         for c_param, r_param, arg in zip(compiled_signature, runtime_signature, args):
             assert isinstance(arg, jax.Array)
             assert isinstance(c_param, jax.core.ShapedArray)
@@ -130,6 +171,18 @@ class CompiledFunction:
 
     @staticmethod
     def load_symbols(shared_object_file, func_name):
+        """Load symbols necessary for for execution of the compiled function.
+
+        Args:
+            shared_object_file: Path to shared object file
+            func_name: Name of compiled function to be executed.
+
+        Returns:
+            shared_object: In memory shared object.
+            function: function handle.
+            setup: Handle to the setup function, which initializes the device.
+            teardown: Handle to the teardown function, which tears down the device.
+        """
         shared_object = ctypes.CDLL(shared_object_file)
 
         setup = shared_object.setup
@@ -144,30 +197,52 @@ class CompiledFunction:
         function = shared_object["_mlir_ciface_" + func_name]
         # Guaranteed from _mlir_ciface specification
         function.restypes = None
-        # TODO: Compute earlier
-        # function.argyptes = Computed later
+        # Not needed, computed from the arguments.
+        # function.argyptes
 
         return shared_object, function, setup, teardown
 
     @staticmethod
     def get_runtime_signature(*args):
+        """Get signature from arguments.
+
+        Args:
+            *args: Arguments to the compiled function.
+        Returns:
+            A list of JAX shaped arrays.
+        """
         try:
-            r_sig = list()
+            r_sig = []
             for arg in args:
                 r_sig.append(jax.api_util.shaped_abstractify(arg))
             return r_sig
-        except:
+        except Exception as exc:
             arg_type = type(arg)
-            raise TypeError(f"Unsupported argument type: {arg_type}")
+            raise TypeError(f"Unsupported argument type: {arg_type}") from exc
 
     @staticmethod
     def are_all_signature_params_annotated(f: typing.Callable):
+        """Determine if all parameters are typed.
+
+        Args:
+            f: Callable, with possible annotation
+        Returns:
+            bool: Whether all parameters are annotated.
+        """
         signature = inspect.signature(f)
         parameters = signature.parameters
         return all(p.annotation is not inspect.Parameter.empty for p in parameters.values())
 
     @staticmethod
     def get_compile_time_signature(f: typing.Callable) -> typing.List[typing.Any]:
+        """Get signature from parameter annotations.
+
+        Args:
+            f: Callable, with possible annotations.
+        Returns:
+            Annotations for all parameters if possible. Otherwise, None.
+
+        """
         can_validate = CompiledFunction.are_all_signature_params_annotated(f)
 
         if can_validate:
@@ -178,59 +253,115 @@ class CompiledFunction:
 
     @staticmethod
     def zero_ranked_memref_to_numpy(ranked_memref):
+        """Cast a zero ranked memrefs to a numpy array.
+
+        Args:
+            ranked_memref: A zero ranked memref descriptor.
+        Returns:
+            A numpy array with the contents of the ranked memref descriptor.
+        """
         assert not hasattr(ranked_memref, "shape")
         return np.array(ranked_memref.aligned.contents)
 
     @staticmethod
-    def ranked_memref_to_numpy(ranked_memref_ptr):
-        ranked_memref = ranked_memref_ptr.contents
+    def ranked_memref_to_numpy(memref_desc):
+        """Cast a ranked memref to numpy array.
+
+        Args:
+            memref_desc: A descriptor of a ranked memref.
+
+        Returns:
+            A numpy array.
+        """
+        ranked_memref = memref_desc.contents
         if not hasattr(ranked_memref, "shape"):
             return CompiledFunction.zero_ranked_memref_to_numpy(ranked_memref)
-        return np.copy(ranked_memref_to_numpy(ranked_memref_ptr))
+        return np.copy(ranked_memref_to_numpy(memref_desc))
 
     @staticmethod
     def ranked_memrefs_to_numpy(ranked_memrefs):
+        """Cast the ranked memrefs to numpy
+
+        Args:
+            ranked_memrefs: a list of memrefs.
+
+        Returns:
+            A list of numpy arrays.
+        """
+        # pylint: disable=redefined-outer-name
         ranked_memref_to_numpy = CompiledFunction.ranked_memref_to_numpy
         return [ranked_memref_to_numpy(ranked_memref) for ranked_memref in ranked_memrefs]
 
     @staticmethod
     def return_value_to_ranked_memrefs(return_value):
+        """Cast the return value to a list of ranked memrefs.
+
+        Args:
+            return_value: to a return value descriptor.
+
+        Returns:
+            List of ranked memrefs.
+        """
         return_value_type = type(return_value)
+        # pylint: disable=protected-access
         memref_descs = [getattr(return_value, field) for field, _ in return_value_type._fields_]
         memrefs = [ctypes.pointer(memref_desc) for memref_desc in memref_descs]
         return memrefs
 
     @staticmethod
     def return_value_ptr_to_ranked_memrefs(return_value_ptr):
+        """Cast the return value pointer to a list of ranked memrefs.
+
+        Args:
+            return_value_ptr: pointer to a return value descriptor.
+
+        Returns:
+            List of ranked memrefs.
+        """
         return CompiledFunction.return_value_to_ranked_memrefs(return_value_ptr.contents)
 
     @staticmethod
     def return_value_ptr_to_numpy(return_value_ptr):
+        """Cast the return value pointer to a list of numpy arrays.
+
+        Args:
+            return_value_ptr: pointer to a return value descriptor.
+
+        Returns:
+            List or single numpy array.
+        """
         ranked_memrefs = CompiledFunction.return_value_ptr_to_ranked_memrefs(return_value_ptr)
         return_value = CompiledFunction.ranked_memrefs_to_numpy(ranked_memrefs)
         # TODO: Handle return types correctly. Tuple, lists of 1 item (?)
         return return_value[0] if len(return_value) == 1 else return_value
 
     @staticmethod
-    def execute_abi(shared_object_file, func_name, restype, *py_args):
+    def _exec(shared_object_file, func_name, has_return, *args):
+        """Execute the compiled function with arguments `*args`.
+
+        Args:
+            shared_object_file: Path to the shared object file containing the JIT compiled function.
+            func_name: Name of the JIT compiled function.
+            has_return: Whether the function returns a value or not.
+            *args: arguments to the function.
+
+        Returns:
+            retval: The value computed by the function or None if the function has no return value.
+        """
         shared_object, function, setup, teardown = CompiledFunction.load_symbols(
             shared_object_file, func_name
         )
 
-        params_to_setup = [
-            b"jitted-function",
-            b"-qrt",
-            b"ftqc",
-        ]
+        params_to_setup = [b"jitted-function"]
         argc = len(params_to_setup)
         array_of_char_ptrs = (ctypes.c_char_p * len(params_to_setup))()
         array_of_char_ptrs[:] = params_to_setup
 
         setup(ctypes.c_int(argc), array_of_char_ptrs)
-        function(*py_args)
+        function(*args)
         teardown()
 
-        result = py_args[0] if restype else None
+        result = args[0] if has_return else None
         retval = CompiledFunction.return_value_ptr_to_numpy(result) if result else None
 
         # Unmap the shared library. This is necessary in case the function is re-compiled.
@@ -240,12 +371,20 @@ class CompiledFunction:
         # This is in the case of returning a constant, for example.
         dlclose = ctypes.CDLL(None).dlclose
         dlclose.argtypes = [ctypes.c_void_p]
+        # pylint: disable=protected-access
         dlclose(shared_object._handle)
 
         return retval
 
     @staticmethod
     def get_ranked_memref_descriptor_from_mlir_tensor_type(mlir_tensor_type):
+        """Convert an MLIR tensor type to a memref descriptor.
+
+        Args:
+            mlir_tensor_type: An MLIR tensor type.
+        Returns:
+            A memref descriptor with empty data.
+        """
         assert mlir_tensor_type
         assert mlir_tensor_type is not tuple
         shape = ir.RankedTensorType(mlir_tensor_type).shape
@@ -255,12 +394,22 @@ class CompiledFunction:
         memref_descriptor = get_ranked_memref_descriptor(array_numpy_type)
         return memref_descriptor
 
-    def prepare_list_for_tensor_abi(mlir_tensor_types):
+    @staticmethod
+    def restype_to_memref_descs(mlir_tensor_types):
+        """Converts the return type to a compatible type for the expected ABI.
+
+        Args:
+            mlir_tensor_types: A list of MLIR tensor types which match the expected return type.
+        Returns:
+            A pointer to a CompiledFunctionReturnValue, which corresponds to a structure in which
+            fields match the expected return types.
+        """
+        error_msg = """This function must be called with a non-zero length list as an argument."""
+        assert mlir_tensor_types, error_msg
         _get_rmd = CompiledFunction.get_ranked_memref_descriptor_from_mlir_tensor_type
         return_fields_types = [_get_rmd(mlir_tensor_type) for mlir_tensor_type in mlir_tensor_types]
-        if not return_fields_types:
-            return None
 
+        # pylint: disable=too-few-public-methods
         class CompiledFunctionReturnValue(ctypes.Structure):
             """Programmatically create a structure which holds N tensors of possibly different T base types."""
 
@@ -270,18 +419,33 @@ class CompiledFunction:
         return_value_pointer = ctypes.pointer(return_value)
         return return_value_pointer
 
-    def prepare_args_for_tensor_abi(compile_time_params, restype, py_args):
-        c_abi_args = list()
-        numpy_arg_buffer = list()
+    @staticmethod
+    def args_to_memref_descs(restype, args):
+        """Convert args to memref descriptors.
+
+        Besides converting the arguments to memrefs, it also prepares the return value. To respect
+        the ABI, the return value is changed to a pointer and passed as the first parameter.
+
+        Args:
+            restype: Result type. The type of restype is a CompiledFunctionReturnValue.
+            args: The JAX arrays to be used as arguments to the function.
+
+        Returns:
+            c_abi_args: A list of memref descriptor pointers to return values and parameters.
+            numpy_arg_buffer: A list to the return values. Must be kept around until the function
+                finishes execution as the memref descriptors will point to memory locations inside
+                numpy arrays.
+
+        """
+        c_abi_args = []
+        numpy_arg_buffer = []
 
         if restype:
-            return_value_pointer = CompiledFunction.prepare_list_for_tensor_abi(restype)
+            return_value_pointer = CompiledFunction.restype_to_memref_descs(restype)
             c_abi_args.append(return_value_pointer)
-        len_params = len(compile_time_params)
-        len_args = len(py_args)
-        assert len_params == len_args, "Different number of arguments"
-        for py_arg in py_args:
-            numpy_arg = np.asarray(py_arg)
+
+        for arg in args:
+            numpy_arg = np.asarray(arg)
             numpy_arg_buffer.append(numpy_arg)
             c_abi_arg = get_ranked_memref_descriptor(numpy_arg)
             c_abi_arg_ptr = ctypes.pointer(c_abi_arg)
@@ -289,12 +453,9 @@ class CompiledFunction:
         return c_abi_args, numpy_arg_buffer
 
     def __call__(self, *args, **kwargs):
-        runtime_signature = CompiledFunction.get_runtime_signature(*args)
-        abi_args, _buffer = CompiledFunction.prepare_args_for_tensor_abi(
-            runtime_signature, self.restype, args
-        )
+        abi_args, _buffer = CompiledFunction.args_to_memref_descs(self.restype, args)
 
-        result = CompiledFunction.execute_abi(
+        result = CompiledFunction._exec(
             self.shared_object_file,
             self.func_name,
             self.restype,
@@ -304,6 +465,7 @@ class CompiledFunction:
         return result
 
 
+# pylint: disable=too-many-instance-attributes
 class QJIT:
     """Class representing a just-in-time compiled hybrid quantum-classical function.
 
