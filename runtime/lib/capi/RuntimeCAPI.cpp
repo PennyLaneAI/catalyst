@@ -176,6 +176,7 @@ void __quantum__qis__Gradient(int64_t numResults, /* results = */...)
         mrp->sizes[0] = num_train_params;
         mrp->strides[0] = 1;
     }
+    va_end(args);
 }
 
 void __quantum__qis__Gradient_params(MemRefT_int64_1d *params, int64_t numResults,
@@ -235,6 +236,7 @@ void __quantum__qis__Gradient_params(MemRefT_int64_1d *params, int64_t numResult
         mrp->sizes[0] = num_train_params;
         mrp->strides[0] = 1;
     }
+    va_end(args);
 }
 
 void __quantum__qis__Identity(QUBIT *qubit)
@@ -630,20 +632,34 @@ void __quantum__qis__Probs(MemRefT_double_1d *result, int64_t numQubits, ...)
         numQubits = __quantum__rt__num_qubits();
     }
 
+    std::vector<double> sv_probs;
+
+    if (wires.empty()) {
+        sv_probs = Catalyst::Runtime::CAPI::get_device()->Probs();
+    }
+    else {
+        sv_probs = Catalyst::Runtime::CAPI::get_device()->PartialProbs(wires);
+    }
+
     const size_t numElements = 1U << numQubits;
+
+    if (numElements != sv_probs.size()) {
+        __quantum__rt__fail_cstr("Cannot copy the probabilities to an array with different size; "
+                                 "allocation size must be '2 ** numWires'");
+    }
+
+    // TODO: memory management
     double *probs = (double *)aligned_alloc(sizeof(double), numElements * sizeof(double));
+    double *curr = probs;
+    for (size_t idx = 0; idx < numElements; idx++) {
+        *(curr++) = sv_probs[idx];
+    }
+
     result->data_allocated = probs;
     result->data_aligned = probs;
     result->offset = 0;
     result->sizes[0] = numElements;
     result->strides[0] = 1;
-
-    if (wires.empty()) {
-        Catalyst::Runtime::CAPI::get_device()->Probs(probs, numElements);
-    }
-    else {
-        Catalyst::Runtime::CAPI::get_device()->PartialProbs(probs, numElements, wires);
-    }
 }
 
 void __quantum__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, ...)
@@ -662,22 +678,32 @@ void __quantum__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, .
         numQubits = __quantum__rt__num_qubits();
     }
 
-    const size_t numElements = 1U << numQubits;
-    CplxTD *stateVec = (CplxTD *)aligned_alloc(sizeof(CplxTD), numElements * sizeof(CplxTD));
-    result->data_allocated = stateVec;
-    result->data_aligned = stateVec;
-    result->offset = 0;
-    result->sizes[0] = numElements;
-    result->strides[0] = 1;
+    std::vector<std::complex<double>> sv_state;
 
     if (wires.empty()) {
-        Catalyst::Runtime::CAPI::get_device()->State(stateVec, numElements);
+        sv_state = Catalyst::Runtime::CAPI::get_device()->State();
     }
     else {
         __quantum__rt__fail_cstr("Partial State-Vector not supported yet");
         // Catalyst::Runtime::CAPI::get_device()->PartialState(stateVec,
         // numElements, wires);
     }
+
+    const size_t numElements = sv_state.size();
+    assert(numElements == (1U << numQubits));
+
+    // TODO: memory management
+    CplxTD *stateVec = (CplxTD *)aligned_alloc(sizeof(CplxTD), numElements * sizeof(CplxTD));
+    for (size_t idx = 0; idx < numElements; idx++) {
+        stateVec[idx].real = std::real(sv_state[idx]);
+        stateVec[idx].imag = std::imag(sv_state[idx]);
+    }
+
+    result->data_allocated = stateVec;
+    result->data_aligned = stateVec;
+    result->offset = 0;
+    result->sizes[0] = numElements;
+    result->strides[0] = 1;
 }
 
 void __quantum__qis__Sample(MemRefT_double_2d *result, int64_t shots, int64_t numQubits, ...)
@@ -694,8 +720,24 @@ void __quantum__qis__Sample(MemRefT_double_2d *result, int64_t shots, int64_t nu
         numQubits = __quantum__rt__num_qubits();
     }
 
-    const size_t numElements = shots * numQubits;
+    std::vector<double> sv_samples;
+    if (wires.empty()) {
+        sv_samples = Catalyst::Runtime::CAPI::get_device()->Sample(shots);
+    }
+    else {
+        sv_samples = Catalyst::Runtime::CAPI::get_device()->PartialSample(wires, shots);
+    }
+
+    const size_t numElements = sv_samples.size();
+    assert(numElements == shots * numQubits);
+
+    // TODO: memory management
     double *samples = (double *)aligned_alloc(sizeof(double), numElements * sizeof(double));
+    double *curr = samples;
+    for (size_t idx = 0; idx < numElements; idx++) {
+        *(curr++) = sv_samples[idx];
+    }
+
     result->data_allocated = samples;
     result->data_aligned = samples;
     result->offset = 0;
@@ -703,13 +745,6 @@ void __quantum__qis__Sample(MemRefT_double_2d *result, int64_t shots, int64_t nu
     result->sizes[1] = numQubits;
     result->strides[0] = numQubits;
     result->strides[1] = 1;
-
-    if (wires.empty()) {
-        Catalyst::Runtime::CAPI::get_device()->Sample(samples, numElements, shots);
-    }
-    else {
-        Catalyst::Runtime::CAPI::get_device()->PartialSample(samples, numElements, wires, shots);
-    }
 }
 
 void __quantum__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t shots, int64_t numQubits,
@@ -727,9 +762,30 @@ void __quantum__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t shots
         numQubits = __quantum__rt__num_qubits();
     }
 
-    // eigvals
+    std::tuple<std::vector<double>, std::vector<int64_t>> sv_counts;
+
+    if (wires.empty()) {
+        sv_counts = Catalyst::Runtime::CAPI::get_device()->Counts(shots);
+    }
+    else {
+        sv_counts = Catalyst::Runtime::CAPI::get_device()->PartialCounts(wires, shots);
+    }
+
+    auto &&sv_eigvals = std::get<0>(sv_counts);
+    auto &&sv_cts = std::get<1>(sv_counts);
+
     const size_t numElements = 1U << numQubits;
+    assert(numElements == sv_eigvals.size());
+    assert(numElements == sv_cts.size());
+
+    // eigvals
+    // TODO: memory management
     double *eigvals = (double *)aligned_alloc(sizeof(double), numElements * sizeof(double));
+    double *curr = eigvals;
+    for (size_t idx = 0; idx < numElements; idx++) {
+        *(curr++) = sv_eigvals[idx];
+    }
+
     result->first.data_allocated = eigvals;
     result->first.data_aligned = eigvals;
     result->first.offset = 0;
@@ -737,19 +793,17 @@ void __quantum__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t shots
     result->first.strides[0] = 1;
 
     // counts
+    // TODO: memory management
     int64_t *counts = (int64_t *)aligned_alloc(sizeof(int64_t), numElements * sizeof(int64_t));
+    int64_t *icurr = counts;
+    for (size_t idx = 0; idx < numElements; idx++) {
+        *(icurr++) = sv_cts[idx];
+    }
+
     result->second.data_aligned = counts;
     result->second.data_allocated = counts;
     result->second.offset = 0;
     result->second.sizes[0] = numElements;
     result->second.strides[0] = 1;
-
-    if (wires.empty()) {
-        Catalyst::Runtime::CAPI::get_device()->Counts(eigvals, counts, numElements, shots);
-    }
-    else {
-        Catalyst::Runtime::CAPI::get_device()->PartialCounts(eigvals, counts, numElements, wires,
-                                                             shots);
-    }
 }
 }
