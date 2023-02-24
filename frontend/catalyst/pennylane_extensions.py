@@ -240,8 +240,9 @@ class CondCallable:
                 tape.quantum_tape = new_quantum_tape
                 tape.quantum_tape.jax_tape = tape
 
+            has_tracer_return_values = out is not None
             return_values, qreg, qubit_states = trace_quantum_tape(
-                tape, qreg, has_tracer_return_values=out is not None
+                tape, qreg, has_tracer_return_values
             )
             qreg = insert_to_qreg(qubit_states, qreg)
 
@@ -256,8 +257,9 @@ class CondCallable:
                 tape.quantum_tape = new_quantum_tape
                 tape.quantum_tape.jax_tape = tape
 
+            has_tracer_return_values = out is not None
             return_values, qreg, qubit_states = trace_quantum_tape(
-                tape, qreg, has_tracer_return_values=out is not None
+                tape, qreg, has_tracer_return_values
             )
             qreg = insert_to_qreg(qubit_states, qreg)
 
@@ -428,8 +430,9 @@ class WhileCallable:
                 tape.quantum_tape = new_quantum_tape
                 tape.quantum_tape.jax_tape = tape
 
+            has_tracer_return_values = True
             return_values, qreg, qubit_states = trace_quantum_tape(
-                tape, qreg, has_tracer_return_values=True
+                tape, qreg, has_tracer_return_values
             )
             qreg = insert_to_qreg(qubit_states, qreg)
 
@@ -556,8 +559,9 @@ class ForLoopCallable:
                 tape.quantum_tape = new_quantum_tape
                 tape.quantum_tape.jax_tape = tape
 
+            has_tracer_return_values = out is not None
             return_values, qreg, qubit_states = trace_quantum_tape(
-                tape, qreg, has_tracer_return_values=out is not None
+                tape, qreg, has_tracer_return_values
             )
             qreg = insert_to_qreg(qubit_states, qreg)
 
