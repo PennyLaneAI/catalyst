@@ -66,5 +66,5 @@ setup(
     ),
     package_dir={"": "frontend"},
     include_package_data=True,
-    **description
+    **description,
 )
