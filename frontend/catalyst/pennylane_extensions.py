@@ -16,6 +16,10 @@
 while using :func:`~.qjit`.
 """
 
+"""
+Extensions to PennyLane's operations
+"""
+
 import uuid
 import functools
 import numbers
@@ -69,8 +73,11 @@ class QFunc:
 
         traceable_fn = get_traceable_fn(self.func, device)
         jaxpr = jax.make_jaxpr(traceable_fn)(*args)
-        x = lambda *args: jax.core.eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *args)
-        wrapped = wrap_init(x)
+
+        def _eval_jaxpr(*args):
+            return jax.core.eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *args)
+
+        wrapped = wrap_init(_eval_jaxpr)
         retval = jprim.func_p.bind(wrapped, *args, fn=self)
         return retval
 
@@ -102,12 +109,16 @@ def qfunc(num_wires, *, shots=1000, device=None):
 
 # pylint: disable=too-few-public-methods
 class Function:
-    def __init__(self, fn):
-        """An object that represents a compiled function.
+    """An object that represents a compiled function.
 
-        At the moment, it is only used to compute sensible names for higher order derivative
-        functions in MLIR.
-        """
+    At the moment, it is only used to compute sensible names for higher order derivative
+    functions in MLIR.
+
+    Args:
+        fn: The function boundary.
+    """
+
+    def __init__(self, fn):
         assert isinstance(fn, Grad), "Function boundaries only supported for gradients."
         self.fn = fn
         self.__name__ = "grad." + fn.__name__
