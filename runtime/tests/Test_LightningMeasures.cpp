@@ -91,17 +91,16 @@ TEST_CASE("Measurement collapse test with 2 wires", "[lightning]")
 
     auto m = qis->Measure(Qs[0]);
 
-    CplxT_double state[4];
-    qis->State(state, 4);
+    auto &&state = qis->State();
 
     // LCOV_EXCL_START
     // This is conditional over the measurement result
     if (*m) {
-        REQUIRE(pow(std::abs(state[2].real), 2) + pow(std::abs(state[2].imag), 2) ==
+        REQUIRE(pow(std::abs(std::real(state[2])), 2) + pow(std::abs(std::imag(state[2])), 2) ==
                 Approx(1.0).margin(1e-5));
     }
     else {
-        REQUIRE(pow(std::abs(state[0].real), 2) + pow(std::abs(state[0].imag), 2) ==
+        REQUIRE(pow(std::abs(std::real(state[0])), 2) + pow(std::abs(std::imag(state[0])), 2) ==
                 Approx(1.0).margin(1e-5));
     }
     // LCOV_EXCL_STOP
@@ -546,26 +545,6 @@ TEST_CASE("Var test with numWires=4", "[lightning]")
 #endif
 }
 
-TEST_CASE("State test with incorrect numAlloc", "[lightning]")
-{
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
-    QuantumDevice *qis = dynamic_cast<QuantumDevice *>(sim.get());
-
-    // state-vector with #qubits = n
-    constexpr size_t n = 4;
-    std::vector<QubitIdType> Qs;
-    Qs.reserve(n);
-    for (size_t i = 0; i < n; i++) {
-        Qs.push_back(sim->AllocateQubit());
-    }
-
-    CplxT_double state[16];
-
-    REQUIRE_THROWS_WITH(
-        qis->State(state, 10),
-        Catch::Contains("Cannot copy the state-vector to an array with different size"));
-}
-
 TEST_CASE("State test with numWires=4", "[lightning]")
 {
     std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
@@ -584,39 +563,18 @@ TEST_CASE("State test with numWires=4", "[lightning]")
     qis->NamedOperation("Hadamard", {}, {Qs[2]}, false);
     qis->NamedOperation("PauliZ", {}, {Qs[3]}, false);
 
-    CplxT_double state[16];
-    qis->State(state, 16);
+    auto &&state = qis->State();
 
     for (int i = 0; i < 16; i++) {
         if (i == 4 || i == 6 || i == 12 || i == 14) {
-            REQUIRE(state[i].real == Approx(0.).margin(1e-5));
-            REQUIRE(state[i].imag == Approx(0.5).margin(1e-5));
+            REQUIRE(std::real(state[i]) == Approx(0.).margin(1e-5));
+            REQUIRE(std::imag(state[i]) == Approx(0.5).margin(1e-5));
         }
         else {
-            REQUIRE(state[i].real == Approx(0.).margin(1e-5));
-            REQUIRE(state[i].imag == Approx(0.).margin(1e-5));
+            REQUIRE(std::real(state[i]) == Approx(0.).margin(1e-5));
+            REQUIRE(std::imag(state[i]) == Approx(0.).margin(1e-5));
         }
     }
-}
-
-TEST_CASE("Probs test with an incorrect numAlloc", "[lightning]")
-{
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
-    QuantumDevice *qis = dynamic_cast<QuantumDevice *>(sim.get());
-
-    // state-vector with #qubits = n
-    constexpr size_t n = 4;
-    std::vector<QubitIdType> Qs;
-    Qs.reserve(n);
-    for (size_t i = 0; i < n; i++) {
-        Qs.push_back(sim->AllocateQubit());
-    }
-
-    double probs[16];
-
-    REQUIRE_THROWS_WITH(
-        qis->Probs(probs, 10),
-        Catch::Contains("Cannot copy the probabilities to an array with different size"));
 }
 
 TEST_CASE("PartialProbs test with incorrect numWires and numAlloc", "[lightning]")
@@ -632,19 +590,13 @@ TEST_CASE("PartialProbs test with incorrect numWires and numAlloc", "[lightning]
         Qs.push_back(sim->AllocateQubit());
     }
 
-    double probs[16];
-
-    REQUIRE_THROWS_WITH(qis->PartialProbs(probs, 16, {Qs[0], Qs[1], Qs[2], Qs[3], Qs[0]}),
+    REQUIRE_THROWS_WITH(qis->PartialProbs({Qs[0], Qs[1], Qs[2], Qs[3], Qs[0]}),
                         Catch::Contains("Invalid number of wires"));
 
     sim->ReleaseQubit(Qs[0]);
 
-    REQUIRE_THROWS_WITH(qis->PartialProbs(probs, 2, {Qs[0]}),
+    REQUIRE_THROWS_WITH(qis->PartialProbs({Qs[0]}),
                         Catch::Contains("Invalid given wires to measure"));
-
-    REQUIRE_THROWS_WITH(
-        qis->PartialProbs(probs, 16, {Qs[1]}),
-        Catch::Contains("Cannot copy the probabilities to an array with different size"));
 }
 
 TEST_CASE("Probs and PartialProbs tests with numWires=0-4", "[lightning]")
@@ -665,17 +617,11 @@ TEST_CASE("Probs and PartialProbs tests with numWires=0-4", "[lightning]")
     qis->NamedOperation("Hadamard", {}, {Qs[2]}, false);
     qis->NamedOperation("PauliZ", {}, {Qs[3]}, false);
 
-    double probs0[1];
-    double probs1[2];
-    double probs2[4];
-    double probs3[16];
-    double *probs4 = new double[16];
-
-    qis->PartialProbs(probs0, 1, std::vector<QubitIdType>{});
-    qis->PartialProbs(probs1, 2, std::vector<QubitIdType>{Qs[2]});
-    qis->PartialProbs(probs2, 4, std::vector<QubitIdType>{Qs[0], Qs[3]});
-    qis->PartialProbs(probs3, 16, Qs);
-    qis->Probs(probs4, 16);
+    auto &&probs0 = qis->PartialProbs(std::vector<QubitIdType>{});
+    auto &&probs1 = qis->PartialProbs(std::vector<QubitIdType>{Qs[2]});
+    auto &&probs2 = qis->PartialProbs(std::vector<QubitIdType>{Qs[0], Qs[3]});
+    auto &&probs3 = qis->PartialProbs(Qs);
+    auto &&probs4 = qis->Probs();
 
     REQUIRE(probs1[0] == Approx(0.5).margin(1e-5));
     REQUIRE(probs1[1] == Approx(0.5).margin(1e-5));
@@ -699,25 +645,6 @@ TEST_CASE("Probs and PartialProbs tests with numWires=0-4", "[lightning]")
     }
 }
 
-TEST_CASE("Sample test with an incorrect numAlloc", "[lightning]")
-{
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
-    QuantumDevice *qis = dynamic_cast<QuantumDevice *>(sim.get());
-
-    // state-vector with #qubits = n
-    constexpr size_t n = 4;
-    std::vector<QubitIdType> Qs;
-    Qs.reserve(n);
-    for (size_t i = 0; i < n; i++) {
-        Qs.push_back(sim->AllocateQubit());
-    }
-
-    double sample[16];
-
-    REQUIRE_THROWS_WITH(qis->Sample(sample, 16, 1000),
-                        Catch::Contains("Cannot copy samples to an array with different size"));
-}
-
 TEST_CASE("PartialSample test with incorrect numWires and numAlloc", "[lightning]")
 {
     std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
@@ -731,35 +658,13 @@ TEST_CASE("PartialSample test with incorrect numWires and numAlloc", "[lightning
         Qs.push_back(sim->AllocateQubit());
     }
 
-    double sample[16];
-
-    REQUIRE_THROWS_WITH(qis->PartialSample(sample, 16, {Qs[0], Qs[1], Qs[2], Qs[3], Qs[0]}, 4),
+    REQUIRE_THROWS_WITH(qis->PartialSample({Qs[0], Qs[1], Qs[2], Qs[3], Qs[0]}, 4),
                         Catch::Contains("Invalid number of wires"));
 
     sim->ReleaseQubit(Qs[0]);
 
-    REQUIRE_THROWS_WITH(qis->PartialSample(sample, 16, {Qs[0]}, 4),
+    REQUIRE_THROWS_WITH(qis->PartialSample({Qs[0]}, 4),
                         Catch::Contains("Invalid given wires to measure"));
-
-    REQUIRE_THROWS_WITH(qis->PartialSample(sample, 16, {Qs[1]}, 1000),
-                        Catch::Contains("Cannot copy samples to an array with different size"));
-}
-
-TEST_CASE("Count test with an incorrect numAlloc", "[lightning]")
-{
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
-    QuantumDevice *qis = dynamic_cast<QuantumDevice *>(sim.get());
-
-    // state-vector with #qubits = n
-    constexpr size_t n = 4;
-    std::vector<QubitIdType> Qs;
-    Qs.reserve(n);
-    for (size_t i = 0; i < n; i++) {
-        Qs.push_back(sim->AllocateQubit());
-    }
-
-    REQUIRE_THROWS_WITH(qis->Counts(nullptr, nullptr, 0, 4),
-                        Catch::Contains("Cannot copy counts to arrays with a different size"));
 }
 
 TEST_CASE("PartialCounts test with incorrect numWires and numAlloc", "[lightning]")
@@ -775,17 +680,13 @@ TEST_CASE("PartialCounts test with incorrect numWires and numAlloc", "[lightning
         Qs.push_back(sim->AllocateQubit());
     }
 
-    REQUIRE_THROWS_WITH(
-        qis->PartialCounts(nullptr, nullptr, 10, {Qs[0], Qs[1], Qs[2], Qs[3], Qs[0]}, 4),
-        Catch::Contains("Invalid number of wires"));
+    REQUIRE_THROWS_WITH(qis->PartialCounts({Qs[0], Qs[1], Qs[2], Qs[3], Qs[0]}, 4),
+                        Catch::Contains("Invalid number of wires"));
 
     sim->ReleaseQubit(Qs[0]);
 
-    REQUIRE_THROWS_WITH(qis->PartialCounts(nullptr, nullptr, 10, {Qs[0]}, 4),
+    REQUIRE_THROWS_WITH(qis->PartialCounts({Qs[0]}, 4),
                         Catch::Contains("Invalid given wires to measure"));
-
-    REQUIRE_THROWS_WITH(qis->PartialCounts(nullptr, nullptr, 10, {Qs[1]}, 1000),
-                        Catch::Contains("Cannot copy counts to arrays with a different size"));
 }
 
 #ifndef _KOKKOS
@@ -807,17 +708,12 @@ TEST_CASE("Sample and PartialSample tests with numWires=0-4 shots=100", "[lightn
     qis->NamedOperation("CNOT", {}, {Qs[0], Qs[1]}, false);
 
     size_t shots = 100;
-    double samples0[shots * 0];
-    double samples1[shots * 1];
-    double samples2[shots * 2];
-    double samples3[shots * 4];
-    double samples4[shots * 4];
 
-    qis->PartialSample(samples0, shots * 0, std::vector<QubitIdType>{}, shots);
-    qis->PartialSample(samples1, shots * 1, std::vector<QubitIdType>{Qs[2]}, shots);
-    qis->PartialSample(samples2, shots * 2, std::vector<QubitIdType>{Qs[0], Qs[3]}, shots);
-    qis->PartialSample(samples3, shots * 4, Qs, shots);
-    qis->Sample(samples4, shots * 4, shots);
+    auto &&samples0 = qis->PartialSample(std::vector<QubitIdType>{}, shots);
+    auto &&samples1 = qis->PartialSample(std::vector<QubitIdType>{Qs[2]}, shots);
+    auto &&samples2 = qis->PartialSample(std::vector<QubitIdType>{Qs[0], Qs[3]}, shots);
+    auto &&samples3 = qis->PartialSample(Qs, shots);
+    auto &&samples4 = qis->Sample(shots);
 
     for (int i = 0; i < shots * 1; i++)
         REQUIRE((samples1[i] == 0. || samples1[i] == 1.));
@@ -848,16 +744,11 @@ TEST_CASE("Counts and PartialCounts tests with numWires=0-4 shots=100", "[lightn
 
     size_t shots = 100;
 
-    double eigvals0[1], eigvals1[2], eigvals2[4], eigvals3[16];
-    int64_t counts0[1], counts1[2], counts2[4], counts3[16];
-    double *eigvals4 = new double[16];
-    int64_t *counts4 = new int64_t[16];
-
-    qis->PartialCounts(eigvals0, counts0, 1, std::vector<QubitIdType>{}, shots);
-    qis->PartialCounts(eigvals1, counts1, 2, std::vector<QubitIdType>{Qs[2]}, shots);
-    qis->PartialCounts(eigvals2, counts2, 4, std::vector<QubitIdType>{Qs[0], Qs[3]}, shots);
-    qis->PartialCounts(eigvals3, counts3, 16, Qs, shots);
-    qis->Counts(eigvals4, counts4, 16, shots);
+    auto &&[eigvals0, counts0] = qis->PartialCounts(std::vector<QubitIdType>{}, shots);
+    auto &&[eigvals1, counts1] = qis->PartialCounts(std::vector<QubitIdType>{Qs[2]}, shots);
+    auto &&[eigvals2, counts2] = qis->PartialCounts(std::vector<QubitIdType>{Qs[0], Qs[3]}, shots);
+    auto &&[eigvals3, counts3] = qis->PartialCounts(Qs, shots);
+    auto &&[eigvals4, counts4] = qis->Counts(shots);
 
     REQUIRE((eigvals1[0] == 0. && eigvals1[1] == 1.));
     REQUIRE((eigvals2[0] == 0. && eigvals2[1] == 1. && eigvals2[2] == 2. && eigvals2[3] == 3.));
@@ -875,8 +766,5 @@ TEST_CASE("Counts and PartialCounts tests with numWires=0-4 shots=100", "[lightn
     }
     REQUIRE(sum3 == shots);
     REQUIRE(sum4 == shots);
-
-    delete[] eigvals4;
-    delete[] counts4;
 }
 #endif

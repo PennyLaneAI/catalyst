@@ -74,7 +74,7 @@ struct QuantumDevice {
      *
      * @return `size_t`
      */
-    virtual auto GetNumQubits() -> size_t = 0;
+    virtual auto GetNumQubits() -> size_t const = 0;
 
     /**
      * @brief Set the number of device shots.
@@ -88,7 +88,7 @@ struct QuantumDevice {
      *
      * @return `size_t`
      */
-    virtual auto GetDeviceShots() -> size_t = 0;
+    virtual auto GetDeviceShots() -> size_t const = 0;
 
     /**
      * @brief Start recording a quantum tape if provided.
@@ -105,26 +105,19 @@ struct QuantumDevice {
      *
      * @return `Result`
      */
-    virtual auto Zero() -> Result = 0;
+    virtual auto Zero() -> Result const = 0;
 
     /**
      * @brief Result value for "One"  used in the measurement process.
      *
      * @return `Result`
      */
-    virtual auto One() -> Result = 0;
+    virtual auto One() -> Result const = 0;
 
     /**
      * @brief A helper method to print the state vector of a device.
      */
     virtual void PrintState() = 0;
-
-    /**
-     * @brief A helper method to dump the state vector of a device.
-     *
-     * @return `std::vector<std::complex<double>>`
-     */
-    virtual auto DumpState() -> std::vector<std::complex<double>> = 0;
 
     /**
      * @brief Apply a single gate to the state vector of a device with its name if this is
@@ -202,74 +195,69 @@ struct QuantumDevice {
     /**
      * @brief Compute the probabilities of each computational basis state.
      *
-     * @param probs The pointer to a pre-allocated C-style array to store results
-     * @param numAlloc The size of `probs`
+     * @return `std::vector<double>`
      */
-    virtual void Probs(double *probs, size_t numAlloc) = 0;
+    virtual auto Probs() -> std::vector<double> = 0;
 
     /**
      * @brief Compute the probabilities for a subset of the full system.
      *
-     * @param probs The pointer to a pre-allocated C-style array to store results
-     * @param numAlloc The size of `probs`
      * @param wires Wires will restrict probabilities to a subset of the full system
+     *
+     * @return `std::vector<double>`
      */
-    virtual void PartialProbs(double *probs, size_t numAlloc,
-                              const std::vector<QubitIdType> &wires) = 0;
+    virtual auto PartialProbs(const std::vector<QubitIdType> &wires) -> std::vector<double> = 0;
 
     /**
      * @brief Get the state-vector of a device.
      *
-     * @param stateVec The pointer to a pre-allocated C-style array to store results
-     * @param numAlloc The size of `stateVec`
+     * @return `std::vector<std::complex<double>>`
      */
-    virtual void State(CplxT_double *stateVec, size_t numAlloc) = 0;
+    virtual auto State() -> std::vector<std::complex<double>> = 0;
 
     /**
      * @brief Compute samples with the number of shots on the entire wires,
      * returing raw samples.
      *
-     * @param samples The pointer to a pre-allocated C-style array to store results
-     * @param numAlloc The size of `samples`
      * @param shots The number of shots
+     *
+     * @return `std::vector<double>`
      */
-    virtual void Sample(double *samples, size_t numAlloc, size_t shots) = 0;
+    virtual auto Sample(size_t shots) -> std::vector<double> = 0;
 
     /**
      * @brief Compute partial samples with the number of shots on `wires`,
      * returing raw samples.
      *
-     * @param samples The pointer to a pre-allocated C-style array to store results
-     * @param numAlloc The size of `samples`
      * @param wires Wires to compute samples on
      * @param shots The number of shots
+     *
+     * @return `std::vector<double>`
      */
-    virtual void PartialSample(double *samples, size_t numAlloc,
-                               const std::vector<QubitIdType> &wires, size_t shots) = 0;
+    virtual auto PartialSample(const std::vector<QubitIdType> &wires, size_t shots)
+        -> std::vector<double> = 0;
 
     /**
      * @brief Sample with the number of shots on the entire wires, returning the
      * number of counts for each sample.
      *
-     * @param eigvals The pointer to a pre-allocated C-style array to store eigvals
-     * @param counts The pointer to a pre-allocated C-style array to store results
-     * @param numAlloc The size of `counts` (or `eigvals`)
      * @param shots The number of shots
+     *
+     * @return `std::tuple<std::vector<double>, std::vector<int64_t>>` (eigvals, counts)
      */
-    virtual void Counts(double *eigvals, int64_t *counts, size_t numAlloc, size_t shots) = 0;
+    virtual auto Counts(size_t shots) -> std::tuple<std::vector<double>, std::vector<int64_t>> = 0;
 
     /**
      * @brief Partial sample with the number of shots on `wires`, returning the
      * number of counts for each sample.
      *
-     * @param eigvals The pointer to a pre-allocated C-style array to store eigvals
-     * @param counts The pointer to a pre-allocated C-style array to store results
-     * @param numAlloc The size of `counts` (or `eigvals`)
      * @param wires Wires to compute samples on
      * @param shots The number of shots
+     *
+     * @return `std::tuple<std::vector<double>, std::vector<int64_t>>` (eigvals, counts)
      */
-    virtual void PartialCounts(double *eigvals, int64_t *counts, size_t numAlloc,
-                               const std::vector<QubitIdType> &wires, size_t shots) = 0;
+    virtual auto PartialCounts(const std::vector<QubitIdType> &wires, size_t shots)
+        -> std::tuple<std::vector<double>, std::vector<int64_t>> = 0;
 
     /**
      * @brief A general measurement method that acts on a single wire.

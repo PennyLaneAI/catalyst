@@ -56,7 +56,7 @@ void LightningSimulator::ReleaseQubit(QubitIdType q)
     this->qubit_manager.Release(q);
 }
 
-auto LightningSimulator::GetNumQubits() -> size_t { return this->device_sv->getNumQubits(); }
+auto LightningSimulator::GetNumQubits() -> size_t const { return this->device_sv->getNumQubits(); }
 
 void LightningSimulator::StartTapeRecording()
 {
@@ -82,7 +82,7 @@ auto LightningSimulator::CacheManagerInfo()
 
 void LightningSimulator::SetDeviceShots(size_t shots) { device_shots = shots; }
 
-auto LightningSimulator::GetDeviceShots() -> size_t { return device_shots; }
+auto LightningSimulator::GetDeviceShots() -> size_t const { return device_shots; }
 
 void LightningSimulator::PrintState()
 {
@@ -101,15 +101,15 @@ void LightningSimulator::PrintState()
     cout << state[idx] << "]" << endl;
 }
 
-auto LightningSimulator::DumpState() -> VectorCplxT<double>
+auto LightningSimulator::Zero() -> Result const
 {
-    auto &&state = this->device_sv->getDataVector();
-    return VectorCplxT<double>(state.begin(), state.end());
+    return const_cast<Result>(&GLOBAL_RESULT_FALSE_CONST);
 }
 
-auto LightningSimulator::Zero() -> Result { return const_cast<Result>(&GLOBAL_RESULT_FALSE_CONST); }
-
-auto LightningSimulator::One() -> Result { return const_cast<Result>(&GLOBAL_RESULT_TRUE_CONST); }
+auto LightningSimulator::One() -> Result const
+{
+    return const_cast<Result>(&GLOBAL_RESULT_TRUE_CONST);
+}
 
 void LightningSimulator::NamedOperation(const std::string &name, const std::vector<double> &params,
                                         const std::vector<QubitIdType> &wires, bool inverse)
@@ -212,68 +212,39 @@ auto LightningSimulator::Var(ObsIdType obsKey) -> double
     return result;
 }
 
-void LightningSimulator::State(CplxT_double *stateVec, size_t numAlloc)
+auto LightningSimulator::State() -> std::vector<std::complex<double>>
 {
-    const size_t numQubits = GetNumQubits();
-
-    QFailIf((1U << numQubits) != numAlloc,
-            "Cannot copy the state-vector to an array with different size; "
-            "allocation size must be '2 ** numQubits'");
-
     auto &&state = this->device_sv->getDataVector();
-
-    // copy the original state-vector elements to stateVec[0,..., numAlloc-1]
-    for (size_t idx = 0; idx < numAlloc; idx++) {
-        stateVec[idx].real = std::real(state[idx]);
-        stateVec[idx].imag = std::imag(state[idx]);
-    }
+    return std::vector<std::complex<double>>(state.begin(), state.end());
 }
 
-void LightningSimulator::Probs(double *probs, size_t numAlloc)
+auto LightningSimulator::Probs() -> std::vector<double>
 {
-    const size_t numQubits = GetNumQubits();
-
-    QFailIf((1U << numQubits) != numAlloc,
-            "Cannot copy the probabilities to an array with different size; "
-            "allocation size must be '2 ** numQubits'");
+    // QFailIf((1U << numQubits) != numAlloc,
+    //         "Cannot copy the probabilities to an array with different size; "
+    //         "allocation size must be '2 ** numQubits'");
 
     Pennylane::Simulators::Measures m{*(this->device_sv)};
-    auto &&sv_probs = m.probs();
 
-    for (size_t idx = 0; idx < numAlloc; idx++) {
-        *(probs++) = sv_probs[idx];
-    }
+    return m.probs();
 }
 
-void LightningSimulator::PartialProbs(double *probs, size_t numAlloc,
-                                      const std::vector<QubitIdType> &wires)
+auto LightningSimulator::PartialProbs(const std::vector<QubitIdType> &wires) -> std::vector<double>
 {
     const size_t numWires = wires.size();
     const size_t numQubits = GetNumQubits();
 
     QFailIf(numWires > numQubits, "Invalid number of wires");
     QFailIf(!isValidQubits(wires), "Invalid given wires to measure");
-    QFailIf((1U << numWires) != numAlloc,
-            "Cannot copy the probabilities to an array with different size; "
-            "allocation size must be '2 ** numWires'");
 
     auto dev_wires = getDeviceWires(wires);
-
     Pennylane::Simulators::Measures m{*(this->device_sv)};
-    auto &&sv_probs = m.probs(dev_wires);
 
-    for (size_t idx = 0; idx < numAlloc; idx++) {
-        *(probs++) = sv_probs[idx];
-    }
+    return m.probs(dev_wires);
 }
 
-void LightningSimulator::Sample(double *samples, size_t numAlloc, size_t shots)
+auto LightningSimulator::Sample(size_t shots) -> std::vector<double>
 {
-    const size_t numQubits = GetNumQubits();
-
-    QFailIf((shots * numQubits) != numAlloc, "Cannot copy samples to an array with different size; "
-                                             "allocation size must be 'shots * numQubits'");
-
     // generate_samples is a member function of the Measures class.
     Pennylane::Simulators::Measures m{*(this->device_sv)};
 
@@ -284,28 +255,32 @@ void LightningSimulator::Sample(double *samples, size_t numAlloc, size_t shots)
     // the number of qubits.
     auto &&li_samples = m.generate_samples(shots);
 
+    const size_t numQubits = GetNumQubits();
+
     // The lightning samples are layed out as a single vector of size
     // shots*qubits, where each element represents a single bit. The
     // corresponding shape is (shots, qubits). Gather the desired bits
     // corresponding to the input wires into a bitstring.
+    // TODO: matrix transpose
+    std::vector<double> samples(li_samples.size());
     for (size_t shot = 0; shot < shots; shot++) {
         for (size_t wire = 0; wire < numQubits; wire++) {
             samples[shot * numQubits + wire] =
                 static_cast<double>(li_samples[shot * numQubits + wire]);
         }
     }
+
+    return samples;
 }
 
-void LightningSimulator::PartialSample(double *samples, size_t numAlloc,
-                                       const std::vector<QubitIdType> &wires, size_t shots)
+auto LightningSimulator::PartialSample(const std::vector<QubitIdType> &wires, size_t shots)
+    -> std::vector<double>
 {
     const size_t numWires = wires.size();
     const size_t numQubits = GetNumQubits();
 
     QFailIf(numWires > numQubits, "Invalid number of wires");
     QFailIf(!isValidQubits(wires), "Invalid given wires to measure");
-    QFailIf((shots * numWires) != numAlloc, "Cannot copy samples to an array with different size; "
-                                            "allocation size must be 'shots * numWires'");
 
     // get device wires
     auto &&dev_wires = getDeviceWires(wires);
@@ -324,6 +299,8 @@ void LightningSimulator::PartialSample(double *samples, size_t numAlloc,
     // shots*qubits, where each element represents a single bit. The
     // corresponding shape is (shots, qubits). Gather the desired bits
     // corresponding to the input wires into a bitstring.
+    // TODO: matrix transpose
+    std::vector<double> samples(shots * numWires);
     for (size_t shot = 0; shot < shots; shot++) {
         size_t idx = 0;
         for (auto wire : dev_wires) {
@@ -331,15 +308,13 @@ void LightningSimulator::PartialSample(double *samples, size_t numAlloc,
                 static_cast<double>(li_samples[shot * numQubits + wire]);
         }
     }
+
+    return samples;
 }
 
-void LightningSimulator::Counts(double *eigvals, int64_t *counts, size_t numAlloc, size_t shots)
+auto LightningSimulator::Counts(size_t shots)
+    -> std::tuple<std::vector<double>, std::vector<int64_t>>
 {
-    const size_t numQubits = GetNumQubits();
-
-    QFailIf((1U << numQubits) != numAlloc, "Cannot copy counts to arrays with a different size; "
-                                           "allocation size must be '2 ** numQubits'");
-
     // generate_samples is a member function of the Measures class.
     Pennylane::Simulators::Measures m{*(this->device_sv)};
 
@@ -354,10 +329,12 @@ void LightningSimulator::Counts(double *eigvals, int64_t *counts, size_t numAllo
     // computational basis bitstring. In the future, eigenvalues can also be
     // obtained from an observable, hence the bitstring integer is stored as a
     // double.
-    for (size_t i = 0; i < numAlloc; i++) {
-        eigvals[i] = i;
-        counts[i] = 0;
-    }
+    const size_t numQubits = GetNumQubits();
+    const size_t numElements = 1U << numQubits;
+    std::vector<double> eigvals(numElements);
+    std::iota(eigvals.begin(), eigvals.end(), 0);
+    eigvals.reserve(numElements);
+    std::vector<int64_t> counts(numElements);
 
     // The lightning samples are layed out as a single vector of size
     // shots*qubits, where each element represents a single bit. The
@@ -371,18 +348,18 @@ void LightningSimulator::Counts(double *eigvals, int64_t *counts, size_t numAllo
         }
         counts[basisState.to_ulong()] += 1;
     }
+
+    return {eigvals, counts};
 }
 
-void LightningSimulator::PartialCounts(double *eigvals, int64_t *counts, size_t numAlloc,
-                                       const std::vector<QubitIdType> &wires, size_t shots)
+auto LightningSimulator::PartialCounts(const std::vector<QubitIdType> &wires, size_t shots)
+    -> std::tuple<std::vector<double>, std::vector<int64_t>>
 {
     const size_t numWires = wires.size();
     const size_t numQubits = GetNumQubits();
 
     QFailIf(numWires > numQubits, "Invalid number of wires");
     QFailIf(!isValidQubits(wires), "Invalid given wires to measure");
-    QFailIf((1U << numWires) != numAlloc, "Cannot copy counts to arrays with a different size; "
-                                          "allocation size must be '2 ** numWires'");
 
     // get device wires
     auto &&dev_wires = getDeviceWires(wires);
@@ -401,10 +378,11 @@ void LightningSimulator::PartialCounts(double *eigvals, int64_t *counts, size_t 
     // computational basis bitstring. In the future, eigenvalues can also be
     // obtained from an observable, hence the bitstring integer is stored as a
     // double.
-    for (size_t i = 0; i < numAlloc; i++) {
-        eigvals[i] = i;
-        counts[i] = 0;
-    }
+    const size_t numElements = 1U << numWires;
+    std::vector<double> eigvals(numElements);
+    std::iota(eigvals.begin(), eigvals.end(), 0);
+    eigvals.reserve(numElements);
+    std::vector<int64_t> counts(numElements);
 
     // The lightning samples are layed out as a single vector of size
     // shots*qubits, where each element represents a single bit. The
@@ -418,14 +396,15 @@ void LightningSimulator::PartialCounts(double *eigvals, int64_t *counts, size_t 
         }
         counts[basisState.to_ulong()] += 1;
     }
+
+    return {eigvals, counts};
 }
 
 auto LightningSimulator::Measure(QubitIdType wire) -> Result
 {
     // get a measurement
-    double probs[2];
     std::vector<QubitIdType> wires = {reinterpret_cast<QubitIdType>(wire)};
-    this->PartialProbs(probs, 2, wires);
+    auto &&probs = this->PartialProbs(wires);
 
     std::random_device rd;
     std::mt19937 gen(rd());

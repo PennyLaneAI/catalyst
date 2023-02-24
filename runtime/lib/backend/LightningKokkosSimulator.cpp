@@ -38,7 +38,10 @@ void LightningKokkosSimulator::ReleaseQubit(QubitIdType q) { qubit_manager.Relea
 
 void LightningKokkosSimulator::ReleaseAllQubits() { this->qubit_manager.ReleaseAll(); }
 
-auto LightningKokkosSimulator::GetNumQubits() -> size_t { return this->device_sv->getNumQubits(); }
+auto LightningKokkosSimulator::GetNumQubits() -> size_t const
+{
+    return this->device_sv->getNumQubits();
+}
 
 void LightningKokkosSimulator::StartTapeRecording()
 {
@@ -64,7 +67,7 @@ auto LightningKokkosSimulator::CacheManagerInfo()
 
 void LightningKokkosSimulator::SetDeviceShots(size_t shots) { device_shots = shots; }
 
-auto LightningKokkosSimulator::GetDeviceShots() -> size_t { return device_shots; }
+auto LightningKokkosSimulator::GetDeviceShots() -> size_t const { return device_shots; }
 
 void LightningKokkosSimulator::PrintState()
 {
@@ -89,30 +92,12 @@ void LightningKokkosSimulator::PrintState()
     cout << "(" << real(elem_last_cp) << "," << imag(elem_last_cp) << ")]" << endl;
 }
 
-auto LightningKokkosSimulator::DumpState() -> VectorCplxT<double>
-{
-    const size_t num_qubits = this->device_sv->getNumQubits();
-    const size_t size = Pennylane::Util::exp2(num_qubits);
-    VectorCplxT<double> state;
-    state.reserve(size);
-
-    for (size_t idx = 0; idx < size; idx++) {
-        auto elem_subview = Kokkos::subview(this->device_sv->getData(), idx);
-        Kokkos::complex<double> elem_cp;
-        Kokkos::deep_copy(elem_cp, elem_subview);
-        double elem_cp_real = real(elem_cp);
-        double elem_cp_imag = imag(elem_cp);
-        state.emplace_back(static_cast<double>(real(elem_cp)), static_cast<double>(imag(elem_cp)));
-    }
-    return state;
-}
-
-auto LightningKokkosSimulator::Zero() -> Result
+auto LightningKokkosSimulator::Zero() -> Result const
 {
     return const_cast<Result>(&GLOBAL_RESULT_FALSE_CONST);
 }
 
-auto LightningKokkosSimulator::One() -> Result
+auto LightningKokkosSimulator::One() -> Result const
 {
     return const_cast<Result>(&GLOBAL_RESULT_TRUE_CONST);
 }
@@ -203,91 +188,71 @@ auto LightningKokkosSimulator::Var(ObsIdType obsKey) -> double
     throw std::logic_error("Variance not implemented in PennyLane-Lightning-Kokkos");
 }
 
-void LightningKokkosSimulator::State(CplxT_double *stateVec, size_t numAlloc)
+auto LightningKokkosSimulator::State() -> std::vector<std::complex<double>>
 {
-    const size_t numQubits = GetNumQubits();
+    const size_t num_qubits = this->device_sv->getNumQubits();
+    const size_t size = Pennylane::Util::exp2(num_qubits);
+    std::vector<std::complex<double>> state;
+    state.reserve(size);
 
-    QFailIf((1U << numQubits) != numAlloc,
-            "Cannot copy the state-vector to an array with different size; "
-            "allocation size must be '2 ** numQubits'");
-
-    auto &&state = this->DumpState();
-
-    // copy the original state-vector elements to stateVec[0,..., numAlloc-1]
-    for (size_t idx = 0; idx < numAlloc; idx++) {
-        stateVec[idx].real = std::real(state[idx]);
-        stateVec[idx].imag = std::imag(state[idx]);
+    for (size_t idx = 0; idx < size; idx++) {
+        auto elem_subview = Kokkos::subview(this->device_sv->getData(), idx);
+        Kokkos::complex<double> elem_cp;
+        Kokkos::deep_copy(elem_cp, elem_subview);
+        double elem_cp_real = real(elem_cp);
+        double elem_cp_imag = imag(elem_cp);
+        state.emplace_back(static_cast<double>(real(elem_cp)), static_cast<double>(imag(elem_cp)));
     }
+    return state;
 }
 
-void LightningKokkosSimulator::Probs(double *probs, size_t numAlloc)
-{
-    const size_t numQubits = GetNumQubits();
+auto LightningKokkosSimulator::Probs() -> std::vector<double> { return this->device_sv->probs(); }
 
-    QFailIf((1U << numQubits) != numAlloc,
-            "Cannot copy the probabilities to an array with different size; "
-            "allocation size must be '2 ** numQubits'");
-
-    auto &&sv_probs = this->device_sv->probs();
-
-    for (size_t idx = 0; idx < numAlloc; idx++) {
-        *(probs++) = sv_probs[idx];
-    }
-}
-
-void LightningKokkosSimulator::PartialProbs(double *probs, size_t numAlloc,
-                                            const std::vector<QubitIdType> &wires)
+auto LightningKokkosSimulator::PartialProbs(const std::vector<QubitIdType> &wires)
+    -> std::vector<double>
 {
     const size_t numWires = wires.size();
     const size_t numQubits = GetNumQubits();
 
     QFailIf(numWires > numQubits, "Invalid number of wires");
     QFailIf(!isValidQubits(wires), "Invalid given wires to measure");
-    QFailIf((1U << numWires) != numAlloc,
-            "Cannot copy the probabilities to an array with different size; "
-            "allocation size must be '2 ** numWires'");
 
     auto dev_wires = getDeviceWires(wires);
 
-    auto &&sv_probs = this->device_sv->probs(dev_wires);
-
-    for (size_t idx = 0; idx < numAlloc; idx++) {
-        *(probs++) = sv_probs[idx];
-    }
+    return this->device_sv->probs(dev_wires);
 }
 
-void LightningKokkosSimulator::Sample(double *samples, size_t numAlloc, size_t shots)
+auto LightningKokkosSimulator::Sample(size_t shots) -> std::vector<double>
 {
-    const size_t numQubits = GetNumQubits();
-
-    QFailIf((shots * numQubits) != numAlloc, "Cannot copy samples to an array with different size; "
-                                             "allocation size must be 'shots * numQubits'");
-
     // PL-Lightning-Kokkos generates samples using the alias method.
     // Reference: https://en.wikipedia.org/wiki/Inverse_transform_sampling
     auto li_samples = this->device_sv->generate_samples(shots);
+
+    const size_t numQubits = GetNumQubits();
 
     // The lightning samples are layed out as a single vector of size
     // shots*qubits, where each element represents a single bit. The
     // corresponding shape is (shots, qubits). Gather the desired bits
     // corresponding to the input wires into a bitstring.
+    // TODO: matrix transpose
+    std::vector<double> samples(li_samples.size());
     for (size_t shot = 0; shot < shots; shot++) {
         for (size_t wire = 0; wire < numQubits; wire++) {
             samples[shot * numQubits + wire] =
                 static_cast<double>(li_samples[shot * numQubits + wire]);
         }
     }
+
+    return samples;
 }
-void LightningKokkosSimulator::PartialSample(double *samples, size_t numAlloc,
-                                             const std::vector<QubitIdType> &wires, size_t shots)
+auto LightningKokkosSimulator::PartialSample(const std::vector<QubitIdType> &wires, size_t shots)
+    -> std::vector<double>
 {
     const size_t numWires = wires.size();
     const size_t numQubits = GetNumQubits();
 
     QFailIf(numWires > numQubits, "Invalid number of wires");
     QFailIf(!isValidQubits(wires), "Invalid given wires to measure");
-    QFailIf((shots * numWires) != numAlloc, "Cannot copy samples to an array with different size; "
-                                            "allocation size must be 'shots * numWires'");
 
     // get device wires
     auto &&dev_wires = getDeviceWires(wires);
@@ -300,6 +265,8 @@ void LightningKokkosSimulator::PartialSample(double *samples, size_t numAlloc,
     // shots*qubits, where each element represents a single bit. The
     // corresponding shape is (shots, qubits). Gather the desired bits
     // corresponding to the input wires into a bitstring.
+    // TODO: matrix transpose
+    std::vector<double> samples(li_samples.size());
     for (size_t shot = 0; shot < shots; shot++) {
         size_t idx = 0;
         for (auto wire : dev_wires) {
@@ -307,16 +274,12 @@ void LightningKokkosSimulator::PartialSample(double *samples, size_t numAlloc,
                 static_cast<double>(li_samples[shot * numQubits + wire]);
         }
     }
+    return samples;
 }
 
-void LightningKokkosSimulator::Counts(double *eigvals, int64_t *counts, size_t numAlloc,
-                                      size_t shots)
+auto LightningKokkosSimulator::Counts(size_t shots)
+    -> std::tuple<std::vector<double>, std::vector<int64_t>>
 {
-    const size_t numQubits = GetNumQubits();
-
-    QFailIf((1U << numQubits) != numAlloc, "Cannot copy counts to arrays with a different size; "
-                                           "allocation size must be '2 ** numQubits'");
-
     // PL-Lightning-Kokkos generates samples using the alias method.
     // Reference: https://en.wikipedia.org/wiki/Inverse_transform_sampling
     auto li_samples = this->device_sv->generate_samples(shots);
@@ -325,10 +288,12 @@ void LightningKokkosSimulator::Counts(double *eigvals, int64_t *counts, size_t n
     // computational basis bitstring. In the future, eigenvalues can also be
     // obtained from an observable, hence the bitstring integer is stored as a
     // double.
-    for (size_t i = 0; i < numAlloc; i++) {
-        eigvals[i] = i;
-        counts[i] = 0;
-    }
+    const size_t numQubits = GetNumQubits();
+    const size_t numElements = 1U << numQubits;
+    std::vector<double> eigvals(numElements);
+    std::iota(eigvals.begin(), eigvals.end(), 0);
+    eigvals.reserve(numElements);
+    std::vector<int64_t> counts(numElements);
 
     // The lightning samples are layed out as a single vector of size
     // shots*qubits, where each element represents a single bit. The
@@ -342,18 +307,18 @@ void LightningKokkosSimulator::Counts(double *eigvals, int64_t *counts, size_t n
         }
         counts[basisState.to_ulong()] += 1;
     }
+
+    return {eigvals, counts};
 }
 
-void LightningKokkosSimulator::PartialCounts(double *eigvals, int64_t *counts, size_t numAlloc,
-                                             const std::vector<QubitIdType> &wires, size_t shots)
+auto LightningKokkosSimulator::PartialCounts(const std::vector<QubitIdType> &wires, size_t shots)
+    -> std::tuple<std::vector<double>, std::vector<int64_t>>
 {
     const size_t numWires = wires.size();
     const size_t numQubits = GetNumQubits();
 
     QFailIf(numWires > numQubits, "Invalid number of wires");
     QFailIf(!isValidQubits(wires), "Invalid given wires to measure");
-    QFailIf((1U << numWires) != numAlloc, "Cannot copy counts to arrays with a different size; "
-                                          "allocation size must be '2 ** numWires'");
 
     // get device wires
     auto &&dev_wires = getDeviceWires(wires);
@@ -366,10 +331,11 @@ void LightningKokkosSimulator::PartialCounts(double *eigvals, int64_t *counts, s
     // computational basis bitstring. In the future, eigenvalues can also be
     // obtained from an observable, hence the bitstring integer is stored as a
     // double.
-    for (size_t i = 0; i < numAlloc; i++) {
-        eigvals[i] = i;
-        counts[i] = 0;
-    }
+    const size_t numElements = 1U << numQubits;
+    std::vector<double> eigvals(numElements);
+    std::iota(eigvals.begin(), eigvals.end(), 0);
+    eigvals.reserve(numElements);
+    std::vector<int64_t> counts(numElements);
 
     // The lightning samples are layed out as a single vector of size
     // shots*qubits, where each element represents a single bit. The
@@ -383,14 +349,15 @@ void LightningKokkosSimulator::PartialCounts(double *eigvals, int64_t *counts, s
         }
         counts[basisState.to_ulong()] += 1;
     }
+
+    return {eigvals, counts};
 }
 
 auto LightningKokkosSimulator::Measure(QubitIdType wire) -> Result
 {
     // get a measurement
-    double probs[2];
     std::vector<QubitIdType> wires = {reinterpret_cast<QubitIdType>(wire)};
-    this->PartialProbs(probs, 2, wires);
+    auto &&probs = this->PartialProbs(wires);
 
     std::random_device rd;
     std::mt19937 gen(rd());
@@ -400,7 +367,7 @@ auto LightningKokkosSimulator::Measure(QubitIdType wire) -> Result
 
     const size_t numQubits = GetNumQubits();
 
-    auto &&state = this->DumpState();
+    auto &&state = this->State();
 
     const auto stride = pow(2, numQubits - (1 + wire));
     const auto vec_size = pow(2, numQubits);
