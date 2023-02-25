@@ -96,14 +96,15 @@ def qfunc(num_wires, *, shots=1000, device=None):
 
 
 class Function:
-    def __init__(self, grad):
+    def __init__(self, fn):
         """An object that represents a compiled function.
 
         At the moment, it is only used to compute sensible names for higher order derivative
         functions in MLIR.
         """
-        self.fn = grad
-        self.__name__ = "grad." + grad.__name__
+        assert isinstance(fn, Grad), "Function boundaries only supported for gradients."
+        self.fn = fn
+        self.__name__ = "grad." + fn.__name__
 
     def __call__(self, *args, **kwargs):
         jaxpr = jax.make_jaxpr(self.fn)(*args)
@@ -176,10 +177,10 @@ def grad(f, *, method=None, h=None, argnum=None):
     elif isinstance(argnum, int):
         argnum = [argnum]
 
-    if isinstance(f, qml.QNode):
-        return Grad(f, method=method, h=h, argnum=argnum)
-    else:
+    if isinstance(f, Grad):
         return Grad(Function(f), method=method, h=h, argnum=argnum)
+
+    return Grad(f, method=method, h=h, argnum=argnum)
 
 
 class Cond(Operation):
@@ -239,8 +240,9 @@ class CondCallable:
                 tape.quantum_tape = new_quantum_tape
                 tape.quantum_tape.jax_tape = tape
 
+            has_tracer_return_values = out is not None
             return_values, qreg, qubit_states = trace_quantum_tape(
-                tape, qreg, has_tracer_return_values=out is not None
+                tape, qreg, has_tracer_return_values
             )
             qreg = insert_to_qreg(qubit_states, qreg)
 
@@ -255,8 +257,9 @@ class CondCallable:
                 tape.quantum_tape = new_quantum_tape
                 tape.quantum_tape.jax_tape = tape
 
+            has_tracer_return_values = out is not None
             return_values, qreg, qubit_states = trace_quantum_tape(
-                tape, qreg, has_tracer_return_values=out is not None
+                tape, qreg, has_tracer_return_values
             )
             qreg = insert_to_qreg(qubit_states, qreg)
 
@@ -427,8 +430,9 @@ class WhileCallable:
                 tape.quantum_tape = new_quantum_tape
                 tape.quantum_tape.jax_tape = tape
 
+            has_tracer_return_values = True
             return_values, qreg, qubit_states = trace_quantum_tape(
-                tape, qreg, has_tracer_return_values=True
+                tape, qreg, has_tracer_return_values
             )
             qreg = insert_to_qreg(qubit_states, qreg)
 
@@ -555,8 +559,9 @@ class ForLoopCallable:
                 tape.quantum_tape = new_quantum_tape
                 tape.quantum_tape.jax_tape = tape
 
+            has_tracer_return_values = out is not None
             return_values, qreg, qubit_states = trace_quantum_tape(
-                tape, qreg, has_tracer_return_values=out is not None
+                tape, qreg, has_tracer_return_values
             )
             qreg = insert_to_qreg(qubit_states, qreg)
 

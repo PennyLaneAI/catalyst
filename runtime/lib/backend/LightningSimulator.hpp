@@ -24,6 +24,7 @@ throw std::logic_error("StateVectorDynamicCPU.hpp: No such header file");
 #include <cstdint>
 #include <iostream>
 #include <limits>
+#include <numeric>
 #include <random>
 #include <span>
 
@@ -106,15 +107,14 @@ class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {
     auto AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType> override;
     void ReleaseQubit(QubitIdType q) override;
     void ReleaseAllQubits() override;
-    auto GetNumQubits() -> size_t override;
+    auto GetNumQubits() -> size_t const override;
     void StartTapeRecording() override;
     void StopTapeRecording() override;
     void SetDeviceShots(size_t shots) override;
-    auto GetDeviceShots() -> size_t override;
+    auto GetDeviceShots() -> size_t const override;
     void PrintState() override;
-    auto DumpState() -> VectorCplxT<double> override;
-    auto Zero() -> Result override;
-    auto One() -> Result override;
+    auto Zero() -> Result const override;
+    auto One() -> Result const override;
 
     auto CacheManagerInfo()
         -> std::tuple<size_t, size_t, size_t, std::vector<std::string>, std::vector<ObsIdType>>;
@@ -131,16 +131,15 @@ class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {
         -> ObsIdType override;
     auto Expval(ObsIdType obsKey) -> double override;
     auto Var(ObsIdType obsKey) -> double override;
-    void State(CplxT_double *stateVec, size_t numAlloc) override;
-    void Probs(double *probs, size_t numAlloc) override;
-    void PartialProbs(double *probs, size_t numAlloc,
-                      const std::vector<QubitIdType> &wires) override;
-    void Sample(double *samples, size_t numAlloc, size_t shots) override;
-    void PartialSample(double *samples, size_t numAlloc, const std::vector<QubitIdType> &wires,
-                       size_t shots) override;
-    void Counts(double *eigvals, int64_t *counts, size_t numAlloc, size_t shots) override;
-    void PartialCounts(double *eigvals, int64_t *counts, size_t numAlloc,
-                       const std::vector<QubitIdType> &wires, size_t shots) override;
+    auto State() -> std::vector<std::complex<double>> override;
+    auto Probs() -> std::vector<double> override;
+    auto PartialProbs(const std::vector<QubitIdType> &wires) -> std::vector<double> override;
+    auto Sample(size_t shots) -> std::vector<double> override;
+    auto PartialSample(const std::vector<QubitIdType> &wires, size_t shots)
+        -> std::vector<double> override;
+    auto Counts(size_t shots) -> std::tuple<std::vector<double>, std::vector<int64_t>> override;
+    auto PartialCounts(const std::vector<QubitIdType> &wires, size_t shots)
+        -> std::tuple<std::vector<double>, std::vector<int64_t>> override;
     auto Measure(QubitIdType wire) -> Result override;
     auto Gradient(const std::vector<size_t> &trainParams)
         -> std::vector<std::vector<double>> override;

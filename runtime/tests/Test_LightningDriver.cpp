@@ -35,7 +35,7 @@ TEST_CASE("lightning Basis vector", "[lightning]")
 
     sim->ReleaseQubit(q);
 
-    auto state = sim->DumpState();
+    auto state = sim->State();
     REQUIRE(state[0].real() == Approx(1.0).epsilon(1e-5));
     REQUIRE(state[0].imag() == Approx(0.0).epsilon(1e-5));
     REQUIRE(state[1].real() == Approx(0.0).epsilon(1e-5));
@@ -60,7 +60,7 @@ TEST_CASE("Qubit allocatation and deallocation", "[lightning]")
 
     REQUIRE(n == static_cast<size_t>(q) + 1);
 
-    VectorCplxT<double> state = sim->DumpState();
+    VectorCplxT<double> state = sim->State();
 
     REQUIRE(state.size() == (1ul << n));
     REQUIRE(state[0].real() == Approx(1.0).epsilon(1e-5));
@@ -80,7 +80,7 @@ TEST_CASE("Qubit allocatation and deallocation", "[lightning]")
 
         sim->ReleaseQubit(i - 1);
         sim->AllocateQubit();
-        state = sim->DumpState();
+        state = sim->State();
     }
 #else
     for (size_t i = n; i > 0; i--) {
@@ -99,7 +99,7 @@ TEST_CASE("test AllocateQubits", "[lightning]")
 
     sim->ReleaseQubit(q[0]);
 
-    auto state = sim->DumpState();
+    auto state = sim->State();
     REQUIRE(state[0].real() == Approx(1.0).epsilon(1e-5));
 }
 
@@ -156,7 +156,7 @@ TEST_CASE("QuantumDevice object test", "[lightning]")
     sim->NamedOperation("Identity", {}, {Qs[6]}, false);
     sim->NamedOperation("Identity", {}, {Qs[8]}, false);
 
-    VectorCplxT<double> out_state = sim->DumpState();
+    VectorCplxT<double> out_state = sim->State();
 
     REQUIRE(out_state[0].real() == Approx(1.0).epsilon(1e-5));
     REQUIRE(out_state[0].imag() == Approx(0.0).epsilon(1e-5));
