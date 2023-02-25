@@ -140,7 +140,7 @@ read and respect the [Code of Conduct](.github/CODE_OF_CONDUCT.md).
 
 ## Authors
 
-PennyLane is the work of [many contributors](https://github.com/PennyLaneAI/catalyst/graphs/contributors).
+Catalyst is the work of [many contributors](https://github.com/PennyLaneAI/catalyst/graphs/contributors).
 
 If you are doing research using Catalyst, please cite our GitHub repo.
 
