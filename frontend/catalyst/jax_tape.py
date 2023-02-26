@@ -11,6 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""This module contains the :class:`~.JaxTape`, a PennyLane :class:`~.QuantumTape`
+that supports capturing classical computations and control flow of quantum operations
+that occur within the circuit.
+"""
 
 import jax
 from jax.interpreters.partial_eval import DynamicJaxprTrace, JaxprStackFrame, extend_jaxpr_stack
@@ -49,10 +53,12 @@ class JaxTape:
         """
         Corresponds to the with statement that would look like:
 
-        with jax.core.new_main(DynamicJaxprTrace, dynamic=True) as main:
-            with extended_jaxpr_stack(main, frame):
-                with QuantumTape():
-                    ...tracing
+        .. code-block:: python
+
+            with jax.core.new_main(DynamicJaxprTrace, dynamic=True) as main:
+                with extended_jaxpr_stack(main, frame):
+                    with QuantumTape():
+                        ...tracing
         """
         # corresponds to `with jax.core.new_main(DynamicJaxprTrace, dynamic=True) as main:`
         self.main_cm = jax.core.new_main(DynamicJaxprTrace, dynamic=True)
@@ -72,11 +78,13 @@ class JaxTape:
     def __exit__(self, e_type, e_value, traceback):
         """
         Closes the context managers in the reverse ordering that they were opened in.
-        ie:
-        ```
-        with jax.core.new_main(DynamicJaxprTrace, dynamic=True) as main:
-            with extended_jaxpr_stack(main, frame):
-        ```
+
+        That is,
+
+        ..code-block:: python
+
+            with jax.core.new_main(DynamicJaxprTrace, dynamic=True) as main:
+                with extended_jaxpr_stack(main, frame):
         """
 
         if e_type is None:

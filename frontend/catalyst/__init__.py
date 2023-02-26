@@ -11,15 +11,19 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""
+This package contains the Catalyst Python interface.
+"""
 
 from catalyst.compiler import compile
-from catalyst.compilation_pipelines import qjit
+from catalyst.compilation_pipelines import qjit, QJIT
 from catalyst.pennylane_extensions import for_loop, while_loop, cond, measure, grad
 
 
 __all__ = (
     "compile",
     "qjit",
+    "QJIT",
     "for_loop",
     "while_loop",
     "cond",
