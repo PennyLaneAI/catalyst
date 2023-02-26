@@ -11,6 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""This module contains various functions for enabling Catalyst functionality
+(such as mid-circuit measurements and advanced control flow) from PennyLane
+while using just-in-time compilation.
+"""
 
 import uuid
 import functools
@@ -152,12 +156,33 @@ class Grad:
 
 
 def grad(f, *, method=None, h=None, argnum=None):
-    """A qjit compatible grad transformation for PennyLane.
+    """A :func:`~.qjit` compatible gradient transformation for PennyLane.
+
+    This function allows the gradient of a hybrid quantum-classical function
+    to be computed within the compiled program.
+
+    .. warning::
+
+        If parameter-shift or adjoint is specified,
+
+    .. warning::
+
+        Currently, higher-order differentiation is only supported by the
+        finite-difference method.
 
     Args:
         f (Callable): the function to differentiate
-        method (str): the method used for differentiation (any of ``["fd", "ps", "adj"]``)
-        h (float): the step-size value for the finite-difference (fd) method
+        method (str): the method used for differentiation (any of ``["fd", "ps", "adj"]``),
+            where:
+
+            - ``"fd"`` represents first-order finite-differences
+
+            - ``"ps"`` represents the two-term parameter-shift rule, supported by the Pauli
+              rotation gates.
+
+            - ``"adj"`` represents the adjoint differentiation method.
+
+        h (float): the step-size value for the finite-difference (``"fd"``) method
         argnum (int, List(int)): the argument indices to differentiate
 
     Returns:
@@ -165,6 +190,21 @@ def grad(f, *, method=None, h=None, argnum=None):
 
     Raises:
         AssertionError: Invalid method or step size parameters.
+
+    **Example**
+
+    @qjit
+    def workflow(x):
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def circuit(x):
+            qml.RX(jnp.pi * x, wires=0)
+            return qml.expval(qml.PauliY(0))
+
+        g = grad(circuit)
+        return g(x)
+
+    >>> workflow(2.0)
+    array(-3.14159265)
     """
     if method is None:
         method = "fd"
@@ -305,7 +345,7 @@ class CondCallable:
 
 
 def cond(pred):
-    """A qjit compatible decorator for if-else conditionals in PennyLane/Catalyst.
+    """A :func:`~.qjit` compatible decorator for if-else conditionals in PennyLane/Catalyst.
 
     This form of control flow is a functional version of the traditional if-else conditional. This
     means that each execution path, a 'True' branch and a 'False' branch, is provided as a separate

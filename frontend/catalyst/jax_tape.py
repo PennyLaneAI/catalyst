@@ -58,7 +58,7 @@ class JaxTape:
             with jax.core.new_main(DynamicJaxprTrace, dynamic=True) as main:
                 with extended_jaxpr_stack(main, frame):
                     with QuantumTape():
-                        ...tracing
+                        ...
         """
         # corresponds to `with jax.core.new_main(DynamicJaxprTrace, dynamic=True) as main:`
         self.main_cm = jax.core.new_main(DynamicJaxprTrace, dynamic=True)
@@ -92,7 +92,8 @@ class JaxTape:
 
             def get_params_from_op_or_m_process(op):
                 """
-                Helper function to produce relevant parameters for tracing from different classes.
+                Helper function to produce relevant parameters for tracing
+                from different classes.
                 """
                 if isinstance(op, (qml.Hermitian, qml.QubitUnitary)):
                     # Can I subscript here? Or should I pass everything?
@@ -132,15 +133,20 @@ class JaxTape:
         self.main_cm = None
 
     def eval(self, *args):
-        """Provide mid circuit measurement results and loop outcomes and get the set of circuit parameters.
-        :param args: mic-circuit measurements and loop results
-        :return: circuit parameters
+        """Provide mid circuit measurement results and loop outcomes and get
+        the set of circuit parameters.
+
+        Args:
+            list: mid-circuit measurements and loop results
+
+        Returns:
+            circuit parameters
         """
         return jax.core.eval_jaxpr(self.closed_jaxpr.jaxpr, self.closed_jaxpr.literals, *args)
 
     def create_tracer(self, tree, avals):
         """
-        Given a sample object of type "kind", return a jax tracer of
+        Given a sample object of type ``kind``, return a jax tracer of
         """
         return tree_unflatten(tree, map(self.trace.new_arg, avals))
 
