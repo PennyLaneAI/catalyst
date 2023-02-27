@@ -306,7 +306,6 @@ class QJIT:
             after the Python process ends. If ``False``, these representations
             will instead be stored in a temporary folder, which will be deleted
             as soon as the QJIT instance is deleted.
-            different stages in the optimization process.
     """
 
     def __init__(self, fn, target, keep_intermediate):
