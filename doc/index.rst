@@ -63,6 +63,7 @@ Catalyst
    dev/quick_start
    dev/development
    dev/architecture
+   dev/release_notes
 
 .. toctree::
    :maxdepth: 2
