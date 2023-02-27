@@ -347,24 +347,21 @@ class QJIT:
     @property
     def mlir(self):
         """str: returns the MLIR intermediate representation
-        of the quantum program. Only available if ``keep_intermediate`` has been
-        set to ``True``.
+        of the quantum program.
         """
         return self._mlir
 
     @property
     def jaxpr(self):
         """str: returns the JAXPR intermediate representation
-        of the quantum program. Only available if ``keep_intermediate`` has been
-        set to ``True``.
+        of the quantum program.
         """
         return self._jaxpr
 
     @property
     def qir(self):
         """str: returns the LLVM and QIR intermediate representation
-        of the quantum program. Only available if ``keep_intermediate`` has been
-        set to ``True``.
+        of the quantum program. Only available if the function was compiled to binary.
         """
         return self._llvmir
 
