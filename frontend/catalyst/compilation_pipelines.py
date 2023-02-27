@@ -482,7 +482,7 @@ def qjit(fn=None, *, target="binary", keep_intermediate=False):
     >>> circuit(0.5)  # the precompiled quantum function is called
     array(0.)
 
-    Alternatively, if argument typehints are provided, compilation
+    Alternatively, if argument type hints are provided, compilation
     can occur 'ahead of time' when the function is decorated.
 
     .. code-block:: python

@@ -13,7 +13,7 @@
 # limitations under the License.
 """This module contains various functions for enabling Catalyst functionality
 (such as mid-circuit measurements and advanced control flow) from PennyLane
-while using just-in-time compilation.
+while using :func:`~.qjit`.
 """
 
 import uuid

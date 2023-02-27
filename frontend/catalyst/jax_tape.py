@@ -137,7 +137,7 @@ class JaxTape:
         the set of circuit parameters.
 
         Args:
-            list: mid-circuit measurements and loop results
+            args (list): mid-circuit measurements and loop results.
 
         Returns:
             circuit parameters
