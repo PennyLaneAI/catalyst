@@ -305,6 +305,7 @@ class QJIT:
             :attr:`~.QJIT.mlir`, :attr:`~.QJIT.jaxpr`, and :attr:`~.QJIT.qir`, representing
             different stages in the optimization process.
     """
+
     def __init__(self, fn, target, keep_intermediate):
         self.qfunc = fn
         functools.update_wrapper(self, fn)
