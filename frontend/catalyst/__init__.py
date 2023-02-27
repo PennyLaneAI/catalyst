@@ -21,7 +21,6 @@ from catalyst.pennylane_extensions import for_loop, while_loop, cond, measure, g
 
 
 __all__ = (
-    "compile",
     "qjit",
     "QJIT",
     "for_loop",
