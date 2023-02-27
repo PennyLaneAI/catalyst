@@ -3,8 +3,6 @@ name: Wheel::Linux::x86_64
 on:
   schedule:
     - cron: "0 0 * * 0"
-  release:
-    types: [ published ]
   workflow_dispatch:
 
 jobs:
@@ -45,7 +43,6 @@ jobs:
     - name: Clone LLVM Submodule
       if: steps.cache-llvm-source.outputs.cache-hit != 'true'
       run: |
-        git config --global --add safe.directory /__w/catalyst/catalyst
         git submodule update --init mlir/llvm-project
         [ $(cd mlir/llvm-project && git rev-parse HEAD) == ${{ steps.llvm-hash.outputs.llvm-hash }} ]
 
@@ -289,7 +286,7 @@ jobs:
     - name: Download Wheel Artifact
       uses: actions/download-artifact@v3
       with:
-        name: catalyst-manylinux2014_x86_64-wheel-py-${{ matrix.python_version }}.zip
+        name: catalyst-manylinux2014_x86_64-wheel-py-3.11.zip
         path: dist
 
     - name: Set up Python ${{ matrix.python_version }}
@@ -297,33 +294,14 @@ jobs:
       with:
         python-version: ${{ matrix.python_version }}
 
-    - name: Install Python dependencies and Catalyst
+    - name: Install Python dependencies
       run: |
         python${{ matrix.python_version }} -m pip install wheel pytest pytest-xdist
+
+    - name: Install Catalyst
+      run: |
         python${{ matrix.python_version }} -m pip install $GITHUB_WORKSPACE/dist/*.whl
 
     - name: Run Python Pytest Tests
       run: |
         python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest -n auto
-
-  upload-pypi:
-    needs: catalyst-linux-wheels-x86-64
-    strategy:
-      matrix:
-        os: [ubuntu-latest]
-        python_version: ["3.8", "3.9", "3.10", "3.11"]
-
-    runs-on: ${{ matrix.os }}
-    if: ${{ github.event_name == 'release' || github.ref == 'refs/heads/main' }}
-    steps:
-      - uses: actions/download-artifact@v3
-        with:
-          name: catalyst-manylinux2014_x86_64-wheel-py-${{ matrix.python_version }}.zip
-          path: dist
-
-      - name: Upload wheels to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          user: __token__
-          password: ${{ secrets.TEST_PYPI_API_TOKEN }}
-          repository_url: https://test.pypi.org/legacy/
