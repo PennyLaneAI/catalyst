@@ -301,8 +301,11 @@ class QJIT:
         fn (Callable): the quantum function.
         target (str): the compilation target.
         keep_intermediate (bool): Whether or not to store the intermediate files throughout the
-            compilation. If ``True``, intermediate representations are available via the
-            :attr:`~.QJIT.mlir`, :attr:`~.QJIT.jaxpr`, and :attr:`~.QJIT.qir`, representing
+            compilation. If ``True``, the current working directory keeps
+            readable representations of the compiled module which remain available
+            after the Python process ends. If ``False``, these representations
+            will instead be stored in a temporary folder, which will be deleted
+            as soon as the QJIT instance is deleted.
             different stages in the optimization process.
     """
 
@@ -447,7 +450,7 @@ def qjit(fn=None, *, target="binary", keep_intermediate=False):
         and measurements, please see the :doc:`/dev/quick_start`.
 
     Args:
-        fn (Callable): the quantum function.
+        fn (Callable): the quantum or classical function.
         target (str): the compilation target.
         keep_intermediate (bool): Whether or not to store the intermediate files throughout the
             compilation. If ``True``, intermediate representations are available via the
