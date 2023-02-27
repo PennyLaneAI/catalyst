@@ -156,7 +156,7 @@ class Grad:
 
 
 def grad(f, *, method=None, h=None, argnum=None):
-    """A :func:`~.qjit` compatible gradient transformation for PennyLane.
+    """A :func:`~.qjit` compatible gradient transformation for PennyLane/Catalyst.
 
     This function allows the gradient of a hybrid quantum-classical function
     to be computed within the compiled program.
@@ -169,6 +169,13 @@ def grad(f, *, method=None, h=None, argnum=None):
 
         Currently, higher-order differentiation is only supported by the
         finite-difference method.
+
+    .. note:
+
+        Any JAX-compatible optimization library, such as  can be used
+        alongside ``grad`` for JIT-compatible optimization, such as `JAXopt
+        <https://jaxopt.github.io/stable/index.html>`_. See the
+        :doc:`/dev/quick_start` for examples.
 
     Args:
         f (Callable): the function to differentiate
@@ -193,15 +200,19 @@ def grad(f, *, method=None, h=None, argnum=None):
 
     **Example**
 
-    @qjit
-    def workflow(x):
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
-        def circuit(x):
-            qml.RX(jnp.pi * x, wires=0)
-            return qml.expval(qml.PauliY(0))
+    .. code-block:: python
 
-        g = grad(circuit)
-        return g(x)
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qjit
+        def workflow(x):
+            @qml.qnode(dev)
+            def circuit(x):
+                qml.RX(jnp.pi * x, wires=0)
+                return qml.expval(qml.PauliY(0))
+
+            g = grad(circuit)
+            return g(x)
 
     >>> workflow(2.0)
     array(-3.14159265)
@@ -373,6 +384,38 @@ def cond(pred):
 
     .. code-block:: python
 
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qjit
+        @qml.qnode(dev)
+        def circuit(x: float):
+
+            # define a conditional ansatz
+            @cond(x > 1.4)
+            def ansatz():
+                qml.RX(x, wires=0)
+                qml.Hadamard(wires=0)
+
+            @ansatz.otherwise
+            def ansatz():
+                qml.RY(x, wires=0)
+
+            # apply the conditional ansatz
+            ansatz()
+
+            return qml.expval(qml.PauliZ(0))
+
+    >>> circuit(1.4)
+    array(0.16996714)
+    >>> circuit(1.6)
+    array(0.)
+
+    The conditional function is permitted to also return values.
+    Any value that is supported by JAX JIT compilation is supported as a return
+    type. Note that this **does not** include PennyLane operations.
+
+    .. code-block:: python
+
         @cond(predicate: bool)
         def conditional_fn():
             # do something when the predicate is true
@@ -519,7 +562,30 @@ class WhileCallable:
 
 
 def while_loop(cond_fn):
-    """A qjit compatible while-loop decorator for PennyLane.
+    """A :func:`~.qjit` compatible while-loop decorator for PennyLane/Catalyst.
+
+    This decorator provides a functional version of the traditional while
+    loop, similar to ``jax.lax.while_loop``. That is, any variables that are
+    modified across iterations need to be provided as inputs and outputs to
+    the loop body function:
+
+    - Input arguments contain the value of a variable at the start of an
+      iteration
+
+    - Output arguments contain the value at the end of the iteration. The
+      outputs are then fed back as inputs to the next iteration.
+
+    The final iteration values are also returned from the
+    transformed function.
+
+    The semantics of ``while_loop`` are given by the following Python pseudo-code:
+
+    .. code-block:: python
+
+        def while_loop(cond_fun)(body_fun)(*args):
+            while cond_fun(*args):
+                args = body_fn(*args)
+            return args
 
     Args:
         cond_fn (Callable): the condition function in the while loop
@@ -531,13 +597,29 @@ def while_loop(cond_fn):
         ValueError: Called outside the tape context.
         TypeError: Invalid return type of the condition expression.
 
-    The semantics of ``while_loop`` are given by the following Python implementation:
+    **Example**
 
     .. code-block:: python
 
-        while cond_fun(args):
-            args = body_fn(args)
-        return args
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qjit
+        @qml.qnode(dev)
+        def circuit(x: float):
+
+            @while_loop(lambda x: x < 2.0)
+            def loop_rx(x):
+                # perform some work and update (some of) the arguments
+                qml.RX(x, wires=0)
+                return x ** 2
+
+            # apply the while loop
+            final_x = loop_rx(x)
+
+            return qml.expval(qml.PauliZ(0)), final_x
+
+    >>> circuit(1.6)
+    [array(-0.02919952), array(2.56)]
     """
 
     def _while_loop(body_fn):
@@ -650,14 +732,30 @@ class ForLoopCallable:
 
 
 def for_loop(lower_bound, upper_bound, step):
-    """A qjit compatible for-loop decorator for PennyLane.
+    """A :func:`~.qjit` compatible for-loop decorator for PennyLane/Catalyst.
 
-    This for-loop representation is a functional version a the traditional for-loop. That is, any
-    variables that are modified across iterations need to be provided as inputs/outputs to the loop
-    body function. Input arguments contain the value of a variable at the start of an iteration,
-    while output arguments contain the value at the end of the iteration. The outputs are then fed
-    back as inputs to the next iteration. The final iteration values are also returned from the
-    transformed function.
+    This for-loop representation is a functional version of the traditional
+    for-loop, similar to ``jax.cond.fori_loop``. That is, any variables that
+    are modified across iterations need to be provided as inputs/outputs to
+    the loop body function:
+
+    - Input arguments contain the value of a variable at the start of an
+      iteration.
+
+    - output arguments contain the value at the end of the iteration. The
+      outputs are then fed back as inputs to the next iteration.
+
+    The final iteration values are also returned from the transformed
+    function.
+
+    The semantics of ``for_loop`` are given by the following Python pseudo-code:
+
+    .. code-block:: python
+
+        def for_loop(lower_bound, upper_bound, step)(loop_fn)(*args):
+            for i in range(lower_bound, upper_bound, step):
+                args = loop_fn(i, *args)
+            return args
 
     Args:
         lower_bound (int): starting value of the iteration index
@@ -674,13 +772,31 @@ def for_loop(lower_bound, upper_bound, step):
     Raises:
         ValueError: Called outside the tape context.
 
-    The semantics of ``for_loop`` are given by the following Python implementation:
+    **Example**
+
 
     .. code-block:: python
 
-        for i in range(lower_bound, upper_bound, step):
-            args = body_fn(i, *args)
-        return args
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qjit
+        @qml.qnode(dev)
+        def circuit(n: int, x: float):
+
+            def loop_rx(i, x):
+                # perform some work and update (some of) the arguments
+                qml.RX(x, wires=0)
+
+                # update the value of x for the next iteration
+                return jnp.sin(x)
+
+            # apply the while loop
+            final_x = for_loop(0, n, 1)(loop_rx)(x)
+
+            return qml.expval(qml.PauliZ(0)), final_x
+
+    >>> circuit(7, 1.6)
+    [array(0.97926626), array(0.55395718)]
     """
 
     def _for_loop(body_fn):
@@ -698,7 +814,12 @@ class MidCircuitMeasure(Operation):
 
 
 def measure(wires):
-    """A qjit compatible mid-circuit measurement for PennyLane.
+    """A :func:`qjit` compatible mid-circuit measurement for PennyLane/Catalyst.
+
+    .. important::
+
+        The :func:`qml.measure() <pennylane.measure>` function is **not** QJIT
+        compatible and :func:`catalyst.measure` from Catalyst should be used instead.
 
     Args:
         wires (Wires): The wire of the qubit the measurement process applies to
@@ -708,6 +829,29 @@ def measure(wires):
 
     Raises:
         ValueError: Called outside the tape context.
+
+    **Example**
+
+    .. code-block:: python
+
+        dev = qml.device("lightning.qubit", wires=2)
+
+        @qjit
+        @qml.qnode(dev)
+        def circuit(x: float):
+            qml.RX(x, wires=0)
+            m1 = measure(wires=0)
+
+            qml.RX(m1 * jnp.pi, wires=1)
+            m2 = measure(wires=1)
+
+            qml.RZ(m2 * jnp.pi / 2, wires=0)
+            return qml.expval(qml.PauliZ(0)), m2
+
+    >>> circuit(0.43)
+    [array(1.), array(False)]
+    >>> circuit(0.43)
+    [array(-1.), array(True)]
     """
     measurement_id = str(uuid.uuid4())[:8]
     MidCircuitMeasure(measurement_id, wires=wires)
