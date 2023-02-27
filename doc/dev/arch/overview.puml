@@ -5,17 +5,15 @@
 
 HIDE_STEREOTYPE()
 
-Person(_user_, "Programmer", "Writes and runs a compiled quantum program")
-
 Boundary(c1, "Catalyst", $link="https://github.com/plantuml-stdlib/C4-PlantUML") {
 
-  Container(_tracer_, "Frontend", "Python, JAX, MLIR", "Python code tracer and compiler")
-  Container(_qopt_, "Quantum-Opt", "MLIR", "Quantum-specific dialects and passes")
+  Container(_tracer_, "Frontend", "PennyLane and JAX", "Python code tracer and compiler")
+  Container(_qopt_, "Core", "LLVM/MLIR", "Quantum-specific dialects, passes and tools")
 
-  Container(_catalyst_runtime_, "Catalyst-Runtime", "C++", "The QIR Runtime")
+  Container(_catalyst_runtime_, "Runtime", "C++", "The QIR Runtime backed by qir-stdlib")
 }
 
-Boundary(c2, "Simulators", $link="https://github.com/plantuml-stdlib/C4-PlantUML") {
+Boundary(c2, "Backend", $link="https://github.com/plantuml-stdlib/C4-PlantUML") {
 
   Container_Ext(_pl_lightning_kokkos_, "PennyLane-Lightning-Kokkos", "CPU/GPU")
 
@@ -23,14 +21,12 @@ Boundary(c2, "Simulators", $link="https://github.com/plantuml-stdlib/C4-PlantUML
 
 }
 
-Rel(_user_, _tracer_, "uses", "", $tags="action")
-
 Rel_R(_tracer_, _qopt_, "compiles with", "", $tags="action")
 
 Rel_R(_qopt_, _catalyst_runtime_, "links", "", $tags="action")
 
-Rel(_catalyst_runtime_, _pl_lightning_kokkos_, "calls", "", $tags="action")
+Rel(_catalyst_runtime_, _pl_lightning_kokkos_, " ", "", $tags="action")
 
-Rel(_catalyst_runtime_, _pl_lightning_, "calls", "", $tags="action")
+Rel(_catalyst_runtime_, _pl_lightning_, " ", "", $tags="action")
 
 @enduml

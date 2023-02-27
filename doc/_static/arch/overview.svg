@@ -1,17 +1,15 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" contentStyleType="text/css" height="517px" preserveAspectRatio="none" style="width:946px;height:517px;background:#FFFFFF;" version="1.1" viewBox="0 0 946 517" width="946px" zoomAndPan="magnify"><defs/><g><!--MD5=[84dda40acb3410cad7262261daba2aaf]
-cluster c1--><g id="cluster_c1"><a href="https://github.com/plantuml-stdlib/C4-PlantUML" target="_top" title="https://github.com/plantuml-stdlib/C4-PlantUML" xlink:actuate="onRequest" xlink:href="https://github.com/plantuml-stdlib/C4-PlantUML" xlink:show="new" xlink:title="https://github.com/plantuml-stdlib/C4-PlantUML" xlink:type="simple"><rect fill="none" height="154" rx="2.5" ry="2.5" style="stroke:#444444;stroke-width:1.0;stroke-dasharray:7.0,7.0;" width="803" x="7" y="204"/><text fill="#444444" font-family="sans-serif" font-size="16" font-weight="bold" lengthAdjust="spacing" textLength="72" x="372.5" y="220.8516">Catalyst</text></a></g><!--MD5=[a79645e74fdddf168a098e501fbfe8e0]
-cluster c2--><g id="cluster_c2"><a href="https://github.com/plantuml-stdlib/C4-PlantUML" target="_top" title="https://github.com/plantuml-stdlib/C4-PlantUML" xlink:actuate="onRequest" xlink:href="https://github.com/plantuml-stdlib/C4-PlantUML" xlink:show="new" xlink:title="https://github.com/plantuml-stdlib/C4-PlantUML" xlink:type="simple"><rect fill="none" height="106" rx="2.5" ry="2.5" style="stroke:#444444;stroke-width:1.0;stroke-dasharray:7.0,7.0;" width="550" x="390" y="405"/><text fill="#444444" font-family="sans-serif" font-size="16" font-weight="bold" lengthAdjust="spacing" textLength="93" x="618.5" y="421.8516">Simulators</text></a></g><!--MD5=[498392dc87f31ecf3f0f0d614f004c92]
-entity _tracer_--><g id="elem__tracer_"><rect fill="#438DD5" height="101.4844" rx="2.5" ry="2.5" style="stroke:#3C7FC0;stroke-width:0.5;" width="189" x="23.5" y="241"/><text fill="#FFFFFF" font-family="sans-serif" font-size="16" font-weight="bold" lengthAdjust="spacing" textLength="81" x="77.5" y="265.8516">Frontend</text><text fill="#FFFFFF" font-family="sans-serif" font-size="12" font-style="italic" lengthAdjust="spacing" textLength="118" x="59" y="280.7637">[Python, JAX, MLIR]</text><text fill="#FFFFFF" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="4" x="116" y="296.5889"> </text><text fill="#FFFFFF" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="161" x="37.5" y="312.8857">Python code tracer and</text><text fill="#FFFFFF" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="59" x="88.5" y="329.1826">compiler</text></g><!--MD5=[73be377c473e14cefe6f894c4b07b84a]
-entity _qopt_--><g id="elem__qopt_"><rect fill="#438DD5" height="101.4844" rx="2.5" ry="2.5" style="stroke:#3C7FC0;stroke-width:0.5;" width="206" x="346" y="241"/><text fill="#FFFFFF" font-family="sans-serif" font-size="16" font-weight="bold" lengthAdjust="spacing" textLength="121" x="388.5" y="265.8516">Quantum-Opt</text><text fill="#FFFFFF" font-family="sans-serif" font-size="12" font-style="italic" lengthAdjust="spacing" textLength="39" x="429.5" y="280.7637">[MLIR]</text><text fill="#FFFFFF" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="4" x="447" y="296.5889"> </text><text fill="#FFFFFF" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="178" x="360" y="312.8857">Quantum-specific dialects</text><text fill="#FFFFFF" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="80" x="409" y="329.1826">and passes</text></g><!--MD5=[641bd5c70ab22269a7bf319a8ec744eb]
-entity _catalyst_runtime_--><g id="elem__catalyst_runtime_"><rect fill="#438DD5" height="85.1875" rx="2.5" ry="2.5" style="stroke:#3C7FC0;stroke-width:0.5;" width="172" x="622" y="249"/><text fill="#FFFFFF" font-family="sans-serif" font-size="16" font-weight="bold" lengthAdjust="spacing" textLength="152" x="632" y="273.8516">Catalyst-Runtime</text><text fill="#FFFFFF" font-family="sans-serif" font-size="12" font-style="italic" lengthAdjust="spacing" textLength="38" x="689" y="288.7637">[C++]</text><text fill="#FFFFFF" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="4" x="706" y="304.5889"> </text><text fill="#FFFFFF" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="117" x="651.5" y="320.8857">The QIR Runtime</text></g><!--MD5=[733f99b654dc686796160d35befec8bb]
-entity _pl_lightning_kokkos_--><g id="elem__pl_lightning_kokkos_"><rect fill="#B3B3B3" height="52.5938" rx="2.5" ry="2.5" style="stroke:#A6A6A6;stroke-width:0.5;" width="277" x="406.5" y="442"/><text fill="#FFFFFF" font-family="sans-serif" font-size="16" font-weight="bold" lengthAdjust="spacing" textLength="257" x="416.5" y="466.8516">PennyLane-Lightning-Kokkos</text><text fill="#FFFFFF" font-family="sans-serif" font-size="12" font-style="italic" lengthAdjust="spacing" textLength="63" x="513.5" y="481.7637">[CPU/GPU]</text></g><!--MD5=[a155b433ad7a6dd735c06c5335c8fd0f]
-entity _pl_lightning_--><g id="elem__pl_lightning_"><rect fill="#B3B3B3" height="52.5938" rx="2.5" ry="2.5" style="stroke:#A6A6A6;stroke-width:0.5;" width="205" x="718.5" y="442"/><text fill="#FFFFFF" font-family="sans-serif" font-size="16" font-weight="bold" lengthAdjust="spacing" textLength="185" x="728.5" y="466.8516">PennyLane-Lightning</text><text fill="#FFFFFF" font-family="sans-serif" font-size="12" font-style="italic" lengthAdjust="spacing" textLength="34" x="804" y="481.7637">[CPU]</text></g><!--MD5=[0c7d597070b2b27dfbfaef3940083ee5]
-entity _user_--><g id="elem__user_"><rect fill="#08427B" height="135.5156" rx="2.5" ry="2.5" style="stroke:#073B6F;stroke-width:0.5;" width="215" x="10.5" y="7"/><image height="48" width="48" x="94" xlink:href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAIAAADYYG7QAAACD0lEQVR4Xu2YoU4EMRCGT+4j8Ai8AhaH4QHgAUjQuFMECUgMIUgwJAgMhgQsAYUiJCiQIBBY+EITsjfTdme6V24v4c8vyGbb+ZjOtN0bNcvjQXmkH83WvYBWto6PLm6v7p7uH1/w2fXD+PBycX1Pv2l3IdDm/vn7x+dXQiAubRzoURa7gRZWd0iGRIiJbOnhnfYBQZNJjNbuyY2eJG8fkDE3bbG4ep6MHUAsgYxmE3nVs6VsBWJSGccsOlFPmLIViMzLOB7pCVO2AtHJMohH7Fh6zqitQK7m0rJvAVYgGcEpe//PLdDz65sM4pF9N7ICcXDKIB5Nv6j7tD0NoSdM2QrU9Gg0ewE1LqBhHR3BBdvj2vapnidjHxD/q6vd7Pvhr31AwcY8eXMTXAKECZZJFXuEq27aLgQK5uLMohCenGGuGewOxSjBvYBqeG6B+Nqiblggdjnc+ZXDy+FNFpFzw76O3UBAROuXh6FoiAcf5g9eTvUgzy0nWg6I8cXHRUpg5bOVBCo+KDpFajOf23GgPme7RSQ+lacIENUgJ6gg1k6HjgOlqnLqip4tEuhv0hNEMXUD0clyXE3p6pZA0S2nnvTlXwLJEZWlb7cTQH1+USgTN4VhAenm/wea1OCAOmqo6fE1WCb9WSKBah+rbUWPWAmE2Rvk0ApiB45eOyNAzU8xcTvj8KvkKEoOaIYeHNA3ZuygAvFMUO0AAAAASUVORK5CYII=" y="17"/><text fill="#FFFFFF" font-family="sans-serif" font-size="16" font-weight="bold" lengthAdjust="spacing" textLength="111" x="62.5" y="79.8516">Programmer</text><text fill="#FFFFFF" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="4" x="116" y="96.6201"> </text><text fill="#FFFFFF" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="187" x="24.5" y="112.917">Writes and runs a compiled</text><text fill="#FFFFFF" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="124" x="56" y="129.2139">quantum program</text></g><!--MD5=[9e2e11dc393385653229ac48f090b27d]
-link _user_ to _tracer_--><g id="link__user___tracer_"><path d="M118,143.28 C118,171.53 118,204.09 118,231.39 " fill="none" id="_user_-to-_tracer_" style="stroke:#666666;stroke-width:1.0;stroke-dasharray:1.0,3.0;"/><polygon fill="#666666" points="118,239.31,121,231.31,115,231.31,118,239.31" style="stroke:#666666;stroke-width:1.0;"/><text fill="#666666" font-family="sans-serif" font-size="12" font-weight="bold" lengthAdjust="spacing" textLength="34" x="119" y="185.1387">uses</text></g><!--MD5=[83a0a6e93d3b85fb1ebc49cc726d8cfc]
-link _tracer_ to _qopt_--><g id="link__tracer___qopt_"><path d="M212.85,291.5 C251.4,291.5 296.24,291.5 336.43,291.5 " fill="none" id="_tracer_-to-_qopt_" style="stroke:#666666;stroke-width:1.0;stroke-dasharray:1.0,3.0;"/><polygon fill="#666666" points="344.22,291.5,336.22,288.5,336.22,294.5,344.22,291.5" style="stroke:#666666;stroke-width:1.0;"/><text fill="#666666" font-family="sans-serif" font-size="12" font-weight="bold" lengthAdjust="spacing" textLength="97" x="230.75" y="285.6387">compiles with</text></g><!--MD5=[b449c4c593e08fdb9fba0d49f1f2cfd5]
-link _qopt_ to _catalyst_runtime_--><g id="link__qopt___catalyst_runtime_"><path d="M552.48,291.5 C572.22,291.5 592.8,291.5 612.28,291.5 " fill="none" id="_qopt_-to-_catalyst_runtime_" style="stroke:#666666;stroke-width:1.0;stroke-dasharray:1.0,3.0;"/><polygon fill="#666666" points="620.23,291.5,612.23,288.5,612.23,294.5,620.23,291.5" style="stroke:#666666;stroke-width:1.0;"/><text fill="#666666" font-family="sans-serif" font-size="12" font-weight="bold" lengthAdjust="spacing" textLength="33" x="570.5" y="285.6387">links</text></g><!--MD5=[a05bb08fe0434af30af441955fb3e983]
-link _catalyst_runtime_ to _pl_lightning_kokkos_--><g id="link__catalyst_runtime___pl_lightning_kokkos_"><path d="M668.96,334.42 C640.3,365.18 601.94,406.37 575.52,434.73 " fill="none" id="_catalyst_runtime_-to-_pl_lightning_kokkos_" style="stroke:#666666;stroke-width:1.0;stroke-dasharray:1.0,3.0;"/><polygon fill="#666666" points="570.1,440.55,577.7481,436.7412,573.3578,432.6515,570.1,440.55" style="stroke:#666666;stroke-width:1.0;"/><text fill="#666666" font-family="sans-serif" font-size="12" font-weight="bold" lengthAdjust="spacing" textLength="32" x="632" y="386.1387">calls</text></g><!--MD5=[c1c15952bcd494459cc63e09749a496a]
-link _catalyst_runtime_ to _pl_lightning_--><g id="link__catalyst_runtime___pl_lightning_"><path d="M735.07,334.42 C754.76,364.92 781.08,405.67 799.38,434.01 " fill="none" id="_catalyst_runtime_-to-_pl_lightning_" style="stroke:#666666;stroke-width:1.0;stroke-dasharray:1.0,3.0;"/><polygon fill="#666666" points="803.49,440.38,801.6767,432.0306,796.6338,435.2817,803.49,440.38" style="stroke:#666666;stroke-width:1.0;"/><text fill="#666666" font-family="sans-serif" font-size="12" font-weight="bold" lengthAdjust="spacing" textLength="32" x="768" y="386.1387">calls</text></g><!--MD5=[6d1f5355d3980ba35dadb421afac942f]
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" contentStyleType="text/css" height="320px" preserveAspectRatio="none" style="width:974px;height:320px;background:#FFFFFF;" version="1.1" viewBox="0 0 974 320" width="974px" zoomAndPan="magnify"><defs/><g><!--MD5=[84dda40acb3410cad7262261daba2aaf]
+cluster c1--><g id="cluster_c1"><a href="https://github.com/plantuml-stdlib/C4-PlantUML" target="_top" title="https://github.com/plantuml-stdlib/C4-PlantUML" xlink:actuate="onRequest" xlink:href="https://github.com/plantuml-stdlib/C4-PlantUML" xlink:show="new" xlink:title="https://github.com/plantuml-stdlib/C4-PlantUML" xlink:type="simple"><rect fill="none" height="154" rx="2.5" ry="2.5" style="stroke:#444444;stroke-width:1.0;stroke-dasharray:7.0,7.0;" width="855" x="7" y="7"/><text fill="#444444" font-family="sans-serif" font-size="16" font-weight="bold" lengthAdjust="spacing" textLength="72" x="398.5" y="23.8516">Catalyst</text></a></g><!--MD5=[a79645e74fdddf168a098e501fbfe8e0]
+cluster c2--><g id="cluster_c2"><a href="https://github.com/plantuml-stdlib/C4-PlantUML" target="_top" title="https://github.com/plantuml-stdlib/C4-PlantUML" xlink:actuate="onRequest" xlink:href="https://github.com/plantuml-stdlib/C4-PlantUML" xlink:show="new" xlink:title="https://github.com/plantuml-stdlib/C4-PlantUML" xlink:type="simple"><rect fill="none" height="106" rx="2.5" ry="2.5" style="stroke:#444444;stroke-width:1.0;stroke-dasharray:7.0,7.0;" width="549" x="419" y="208"/><text fill="#444444" font-family="sans-serif" font-size="16" font-weight="bold" lengthAdjust="spacing" textLength="76" x="655.5" y="224.8516">Backend</text></a></g><!--MD5=[498392dc87f31ecf3f0f0d614f004c92]
+entity _tracer_--><g id="elem__tracer_"><rect fill="#438DD5" height="101.4844" rx="2.5" ry="2.5" style="stroke:#3C7FC0;stroke-width:0.5;" width="189" x="23.5" y="44"/><text fill="#FFFFFF" font-family="sans-serif" font-size="16" font-weight="bold" lengthAdjust="spacing" textLength="81" x="77.5" y="68.8516">Frontend</text><text fill="#FFFFFF" font-family="sans-serif" font-size="12" font-style="italic" lengthAdjust="spacing" textLength="131" x="52.5" y="83.7637">[PennyLane and JAX]</text><text fill="#FFFFFF" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="4" x="116" y="99.5889"> </text><text fill="#FFFFFF" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="161" x="37.5" y="115.8857">Python code tracer and</text><text fill="#FFFFFF" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="59" x="88.5" y="132.1826">compiler</text></g><!--MD5=[73be377c473e14cefe6f894c4b07b84a]
+entity _qopt_--><g id="elem__qopt_"><rect fill="#438DD5" height="101.4844" rx="2.5" ry="2.5" style="stroke:#3C7FC0;stroke-width:0.5;" width="210" x="346" y="44"/><text fill="#FFFFFF" font-family="sans-serif" font-size="16" font-weight="bold" lengthAdjust="spacing" textLength="42" x="430" y="68.8516">Core</text><text fill="#FFFFFF" font-family="sans-serif" font-size="12" font-style="italic" lengthAdjust="spacing" textLength="75" x="413.5" y="83.7637">[LLVM/MLIR]</text><text fill="#FFFFFF" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="4" x="449" y="99.5889"> </text><text fill="#FFFFFF" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="182" x="360" y="115.8857">Quantum-specific dialects,</text><text fill="#FFFFFF" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="118" x="392" y="132.1826">passes and tools</text></g><!--MD5=[641bd5c70ab22269a7bf319a8ec744eb]
+entity _catalyst_runtime_--><g id="elem__catalyst_runtime_"><rect fill="#438DD5" height="101.4844" rx="2.5" ry="2.5" style="stroke:#3C7FC0;stroke-width:0.5;" width="220" x="626" y="44"/><text fill="#FFFFFF" font-family="sans-serif" font-size="16" font-weight="bold" lengthAdjust="spacing" textLength="73" x="699.5" y="68.8516">Runtime</text><text fill="#FFFFFF" font-family="sans-serif" font-size="12" font-style="italic" lengthAdjust="spacing" textLength="38" x="717" y="83.7637">[C++]</text><text fill="#FFFFFF" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="4" x="734" y="99.5889"> </text><text fill="#FFFFFF" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="192" x="640" y="115.8857">The QIR Runtime backed by</text><text fill="#FFFFFF" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="59" x="706.5" y="132.1826">qir-stdlib</text></g><!--MD5=[733f99b654dc686796160d35befec8bb]
+entity _pl_lightning_kokkos_--><g id="elem__pl_lightning_kokkos_"><rect fill="#B3B3B3" height="52.5938" rx="2.5" ry="2.5" style="stroke:#A6A6A6;stroke-width:0.5;" width="277" x="435.5" y="245"/><text fill="#FFFFFF" font-family="sans-serif" font-size="16" font-weight="bold" lengthAdjust="spacing" textLength="257" x="445.5" y="269.8516">PennyLane-Lightning-Kokkos</text><text fill="#FFFFFF" font-family="sans-serif" font-size="12" font-style="italic" lengthAdjust="spacing" textLength="63" x="542.5" y="284.7637">[CPU/GPU]</text></g><!--MD5=[a155b433ad7a6dd735c06c5335c8fd0f]
+entity _pl_lightning_--><g id="elem__pl_lightning_"><rect fill="#B3B3B3" height="52.5938" rx="2.5" ry="2.5" style="stroke:#A6A6A6;stroke-width:0.5;" width="205" x="747.5" y="245"/><text fill="#FFFFFF" font-family="sans-serif" font-size="16" font-weight="bold" lengthAdjust="spacing" textLength="185" x="757.5" y="269.8516">PennyLane-Lightning</text><text fill="#FFFFFF" font-family="sans-serif" font-size="12" font-style="italic" lengthAdjust="spacing" textLength="34" x="833" y="284.7637">[CPU]</text></g><!--MD5=[83a0a6e93d3b85fb1ebc49cc726d8cfc]
+link _tracer_ to _qopt_--><g id="link__tracer___qopt_"><path d="M212.53,94.5 C251.56,94.5 297.12,94.5 337.9,94.5 " fill="none" id="_tracer_-to-_qopt_" style="stroke:#666666;stroke-width:1.0;stroke-dasharray:1.0,3.0;"/><polygon fill="#666666" points="345.99,94.5,337.99,91.5,337.99,97.5,345.99,94.5" style="stroke:#666666;stroke-width:1.0;"/><text fill="#666666" font-family="sans-serif" font-size="12" font-weight="bold" lengthAdjust="spacing" textLength="97" x="230.75" y="88.6387">compiles with</text></g><!--MD5=[b449c4c593e08fdb9fba0d49f1f2cfd5]
+link _qopt_ to _catalyst_runtime_--><g id="link__qopt___catalyst_runtime_"><path d="M556.31,94.5 C576.33,94.5 597.4,94.5 617.79,94.5 " fill="none" id="_qopt_-to-_catalyst_runtime_" style="stroke:#666666;stroke-width:1.0;stroke-dasharray:1.0,3.0;"/><polygon fill="#666666" points="625.87,94.5,617.87,91.5,617.87,97.5,625.87,94.5" style="stroke:#666666;stroke-width:1.0;"/><text fill="#666666" font-family="sans-serif" font-size="12" font-weight="bold" lengthAdjust="spacing" textLength="33" x="574.5" y="88.6387">links</text></g><!--MD5=[a05bb08fe0434af30af441955fb3e983]
+link _catalyst_runtime_ to _pl_lightning_kokkos_--><g id="link__catalyst_runtime___pl_lightning_kokkos_"><path d="M690.01,145.18 C662.13,175.3 627.38,212.83 603.22,238.93 " fill="none" id="_catalyst_runtime_-to-_pl_lightning_kokkos_" style="stroke:#666666;stroke-width:1.0;stroke-dasharray:1.0,3.0;"/><polygon fill="#666666" points="597.63,244.98,605.2688,241.1526,600.8686,237.0736,597.63,244.98" style="stroke:#666666;stroke-width:1.0;"/><text fill="#666666" font-family="sans-serif" font-size="12" font-weight="bold" lengthAdjust="spacing" textLength="4" x="660" y="189.1387"> </text></g><!--MD5=[c1c15952bcd494459cc63e09749a496a]
+link _catalyst_runtime_ to _pl_lightning_--><g id="link__catalyst_runtime___pl_lightning_"><path d="M768.36,145.18 C787.82,175.05 812.02,212.2 829,238.27 " fill="none" id="_catalyst_runtime_-to-_pl_lightning_" style="stroke:#666666;stroke-width:1.0;stroke-dasharray:1.0,3.0;"/><polygon fill="#666666" points="833.37,244.98,831.5235,236.6379,826.4936,239.909,833.37,244.98" style="stroke:#666666;stroke-width:1.0;"/><text fill="#666666" font-family="sans-serif" font-size="12" font-weight="bold" lengthAdjust="spacing" textLength="4" x="797" y="189.1387"> </text></g><!--MD5=[49f408c734279aada8f8f77da5be92fd]
 @startuml
 !include <C4/C4_Container.puml>
 
@@ -19,17 +17,17 @@ link _catalyst_runtime_ to _pl_lightning_--><g id="link__catalyst_runtime___pl_l
 
 HIDE_STEREOTYPE()
 
-Person(_user_, "Programmer", "Writes and runs a compiled quantum program")
+' Person(_user_, "Programmer", "Write a PennyLane hybrid program using QJIT")
 
 Boundary(c1, "Catalyst", $link="https://github.com/plantuml-stdlib/C4-PlantUML") {
 
-  Container(_tracer_, "Frontend", "Python, JAX, MLIR", "Python code tracer and compiler")
-  Container(_qopt_, "Quantum-Opt", "MLIR", "Quantum-specific dialects and passes")
+  Container(_tracer_, "Frontend", "PennyLane and JAX", "Python code tracer and compiler")
+  Container(_qopt_, "Core", "LLVM/MLIR", "Quantum-specific dialects, passes and tools")
 
-  Container(_catalyst_runtime_, "Catalyst-Runtime", "C++", "The QIR Runtime")
+  Container(_catalyst_runtime_, "Runtime", "C++", "The QIR Runtime backed by qir-stdlib")
 }
 
-Boundary(c2, "Simulators", $link="https://github.com/plantuml-stdlib/C4-PlantUML") {
+Boundary(c2, "Backend", $link="https://github.com/plantuml-stdlib/C4-PlantUML") {
 
   Container_Ext(_pl_lightning_kokkos_, "PennyLane-Lightning-Kokkos", "CPU/GPU")
 
@@ -37,15 +35,15 @@ Boundary(c2, "Simulators", $link="https://github.com/plantuml-stdlib/C4-PlantUML
 
 }
 
-Rel(_user_, _tracer_, "uses", "", $tags="action")
+' Rel(_user_, _tracer_, " ", "", $tags="action")
 
 Rel_R(_tracer_, _qopt_, "compiles with", "", $tags="action")
 
 Rel_R(_qopt_, _catalyst_runtime_, "links", "", $tags="action")
 
-Rel(_catalyst_runtime_, _pl_lightning_kokkos_, "calls", "", $tags="action")
+Rel(_catalyst_runtime_, _pl_lightning_kokkos_, " ", "", $tags="action")
 
-Rel(_catalyst_runtime_, _pl_lightning_, "calls", "", $tags="action")
+Rel(_catalyst_runtime_, _pl_lightning_, " ", "", $tags="action")
 
 @enduml
 
@@ -598,20 +596,18 @@ skinparam person<<object>> {
 
 
 
-
 hide stereotype
 
-rectangle "<$person>\n==Programmer\n\n Writes and runs a compiled quantum program" <<person>> as _user_ 
 
 rectangle "==Catalyst" <<boundary>> as c1 [[https://github.com/plantuml-stdlib/C4-PlantUML]] {
 
-  rectangle "==Frontend\n//<size:12>[Python, JAX, MLIR]</size>//\n\n Python code tracer and compiler" <<container>> as _tracer_ 
-  rectangle "==Quantum-Opt\n//<size:12>[MLIR]</size>//\n\n Quantum-specific dialects and passes" <<container>> as _qopt_ 
+  rectangle "==Frontend\n//<size:12>[PennyLane and JAX]</size>//\n\n Python code tracer and compiler" <<container>> as _tracer_ 
+  rectangle "==Core\n//<size:12>[LLVM/MLIR]</size>//\n\n Quantum-specific dialects, passes and tools" <<container>> as _qopt_ 
 
-  rectangle "==Catalyst-Runtime\n//<size:12>[C++]</size>//\n\n The QIR Runtime" <<container>> as _catalyst_runtime_ 
+  rectangle "==Runtime\n//<size:12>[C++]</size>//\n\n The QIR Runtime backed by qir-stdlib" <<container>> as _catalyst_runtime_ 
 }
 
-rectangle "==Simulators" <<boundary>> as c2 [[https://github.com/plantuml-stdlib/C4-PlantUML]] {
+rectangle "==Backend" <<boundary>> as c2 [[https://github.com/plantuml-stdlib/C4-PlantUML]] {
 
   rectangle "==PennyLane-Lightning-Kokkos\n//<size:12>[CPU/GPU]</size>//" <<external_container>> as _pl_lightning_kokkos_ 
 
@@ -619,23 +615,22 @@ rectangle "==Simulators" <<boundary>> as c2 [[https://github.com/plantuml-stdlib
 
 }
 
-_user_ - ->> _tracer_ <<action>> : **uses**
 
 _tracer_ -RIGHT->> _qopt_ <<action>> : **compiles with**
 
 _qopt_ -RIGHT->> _catalyst_runtime_ <<action>> : **links**
 
-_catalyst_runtime_ - ->> _pl_lightning_kokkos_ <<action>> : **calls**
+_catalyst_runtime_ - ->> _pl_lightning_kokkos_ <<action>> : ** **
 
-_catalyst_runtime_ - ->> _pl_lightning_ <<action>> : **calls**
+_catalyst_runtime_ - ->> _pl_lightning_ <<action>> : ** **
 
 @enduml
 
-PlantUML version 1.2022.12(Sun Oct 23 18:12:26 UTC 2022)
+PlantUML version 1.2022.7(Mon Aug 22 13:01:30 EDT 2022)
 (GPL source distribution)
 Java Runtime: OpenJDK Runtime Environment
 JVM: OpenJDK 64-Bit Server VM
-Default Encoding: ANSI_X3.4-1968
+Default Encoding: UTF-8
 Language: en
-Country: US
+Country: CA
 --></g></svg>
