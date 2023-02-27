@@ -298,8 +298,8 @@ class QJIT:
         the :func:`~.qjit` documentation for more details.
 
     Args:
-        fn (Callable): the quantum function.
-        target (str): the compilation target.
+        fn (Callable): the quantum or classical function
+        target (str): the compilation target
         keep_intermediate (bool): Whether or not to store the intermediate files throughout the
             compilation. If ``True``, the current working directory keeps
             readable representations of the compiled module which remain available
@@ -345,21 +345,21 @@ class QJIT:
 
     @property
     def mlir(self):
-        """str: returns the MLIR intermediate representation
+        """str: Returns the MLIR intermediate representation
         of the quantum program.
         """
         return self._mlir
 
     @property
     def jaxpr(self):
-        """str: returns the JAXPR intermediate representation
+        """str: Returns the JAXPR intermediate representation
         of the quantum program.
         """
         return self._jaxpr
 
     @property
     def qir(self):
-        """str: returns the LLVM and QIR intermediate representation
+        """str: Returns the LLVM and QIR intermediate representation
         of the quantum program. Only available if the function was compiled to binary.
         """
         return self._llvmir
@@ -446,8 +446,8 @@ def qjit(fn=None, *, target="binary", keep_intermediate=False):
         and measurements, please see the :doc:`/dev/quick_start`.
 
     Args:
-        fn (Callable): the quantum or classical function.
-        target (str): the compilation target.
+        fn (Callable): the quantum or classical function
+        target (str): the compilation target
         keep_intermediate (bool): Whether or not to store the intermediate files throughout the
             compilation. If ``True``, intermediate representations are available via the
             :attr:`~.QJIT.mlir`, :attr:`~.QJIT.jaxpr`, and :attr:`~.QJIT.qir`, representing
@@ -463,7 +463,7 @@ def qjit(fn=None, *, target="binary", keep_intermediate=False):
 
     **Example**
 
-    In just-in-time (JIT), the compilation is triggered at the call site the
+    In just-in-time (JIT) mode, the compilation is triggered at the call site the
     first time the quantum function is executed. For example, ``circuit`` is
     compiled as early as the first call.
 

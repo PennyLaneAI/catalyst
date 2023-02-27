@@ -172,20 +172,20 @@ def grad(f, *, method=None, h=None, argnum=None):
 
     .. note:
 
-        Any JAX-compatible optimization library, such as  can be used
-        alongside ``grad`` for JIT-compatible optimization, such as `JAXopt
-        <https://jaxopt.github.io/stable/index.html>`_. See the
-        :doc:`/dev/quick_start` for examples.
+        Any JAX-compatible optimization library, such as `JAXopt
+        <https://jaxopt.github.io/stable/index.html>`_, can be used
+        alongside ``grad`` for JIT-compatible variational workflows.
+        See the :doc:`/dev/quick_start` for examples.
 
     Args:
         f (Callable): the function to differentiate
-        method (str): the method used for differentiation (any of ``["fd", "ps", "adj"]``),
+        method (str): The method used for differentiation, which can be any of ``["fd", "ps", "adj"]``,
             where:
 
-            - ``"fd"`` represents first-order finite-differences
+            - ``"fd"`` represents first-order finite-differences,
 
             - ``"ps"`` represents the two-term parameter-shift rule, supported by the Pauli
-              rotation gates.
+              rotation gates,
 
             - ``"adj"`` represents the adjoint differentiation method.
 
@@ -582,7 +582,7 @@ def while_loop(cond_fn):
 
     .. code-block:: python
 
-        def while_loop(cond_fun)(body_fun)(*args):
+        def while_loop(cond_fun, body_fun, *args):
             while cond_fun(*args):
                 args = body_fn(*args)
             return args

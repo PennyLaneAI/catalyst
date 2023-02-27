@@ -112,7 +112,7 @@ class ParamEvaluator:
         Send the next argument of the original jaxpr.
 
         Args:
-            val: the next argument of the jaxpr.
+            val: the next argument of the jaxpr
         """
         flat_val, _ = tree_flatten(val)
 

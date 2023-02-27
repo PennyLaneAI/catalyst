@@ -1,5 +1,6 @@
-Python frontend
-===============
+PennyLane Python frontend
+=========================
+
 
 .. currentmodule:: catalyst
 
