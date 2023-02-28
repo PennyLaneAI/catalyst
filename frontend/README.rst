@@ -50,9 +50,9 @@ and the following modules:
     operations, measurements, and observables to JAXPR.
 
 - `jax_tape.py <https://github.com/PennyLaneAI/catalyst/tree/main/frontend/jax_tape.py>`_:
-    This module contains the:class:`~.JaxTape`, a PennyLane:class:`~.QuantumTape` that supports
-    capturing classical computations and control flow of quantum operations that occur within the
-    circuit.
+    This module contains a wrapper around the PennyLane :class:`~pennylane.QuantumTape` class that
+    supports capturing classical computations and control flow of quantum operations that occur
+    within the circuit.
 
 - `jax_tracer.py <https://github.com/PennyLaneAI/catalyst/tree/main/frontend/jax_tracer.py>`_:
     This module contains functions for tracing and lowering JAX code to MLIR.
