@@ -27,7 +27,7 @@ Boundary(c1, "Compiler", $link="https://github.com/plantuml-stdlib/C4-PlantUML")
 
     Component(_o_, "Compile", "llc", "Compile the LLVM code using the LLVM Static Compiler")
 
-    Component(_so_, "Link", "clang++", "Link the compiled file to the Runtime")
+    Component(_so_, "Link", "c99", "Link the compiled file to the Runtime")
   }
 }
 
@@ -48,6 +48,6 @@ Rel(_o_, _so_, "*.o", "")
 
 Rel_R(_so_, _so_sys_, "*.so", "")
 
-Rel_U(_catalyst_runtime_, _so_, "linker", "", $tags="action")
+Rel_U(_catalyst_runtime_, _so_, " ", "", $tags="action")
 
 @enduml

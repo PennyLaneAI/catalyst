@@ -6,32 +6,32 @@
 
 HIDE_STEREOTYPE()
 
-Person(_user1_, "Programmer", "Writes a quantum program")
-Person(_user2_, "Programmer", "Runs a compiled quantum program")
+Person(_user1_, "Programmer", "Write a PennyLane hybrid program")
+Person(_user2_, "Programmer", "Run a QJIT compiled program")
 
 System(_alg_, "circuit", "A Python function", $tags="object")
-System(_so_, "QJIT/circuit.so", "A shared Library object", $tags="object")
+System(_so_, "QJIT/circuit.so", "A shared library object", $tags="object")
 
 Boundary(_frontend_, "Frontend", "Python, JAX, MLIR", "Python code tracer and compiler") {
-  Container(_jaxtracer_, "JAX Tracer", "get_mlir", "Python code tracer")
-  Container(_mhlobld_, "MLIR Frontend", "custom_lower_jaxpr_to_module", "MLIR/HLO dialect compiler")
+  Container(_jaxtracer_, "JAX Tracer", "get-jaxpr", "Python code tracer")
+  Container(_mhlobld_, "MLIR Frontend", "jaxpr-to-mlir", "MLIR/HLO dialect compiler")
   Container(_socomp_, "LLVM Frontend", "compile", "SharedLibrary compiler")
 }
 
-Container_Ext(_qopt_, "Quantum-Opt", "MLIR", "Quantum-specific dialects and passes")
-Container_Ext(_jax_, "JAX", "Python", "")
+Container_Ext(_qopt_, "Catalyst-Core", "quantum-opt", "Catalyst MLIR dialects and passes")
 Container_Ext(_pl_core_, "PennyLane", "QML", "PennyLane QML API")
+Container_Ext(_jax_, "JAX", "Python", "")
 
-Rel(_mhlobld_,_qopt_,"compiles with","", $tags="action")
+Rel_D(_mhlobld_, _qopt_, " compiles with","", $tags="action")
 Rel_R(_alg_, _jaxtracer_, " ", "")
 Rel_R(_jaxtracer_, _mhlobld_, "jaxpr", "")
 Rel_R(_mhlobld_, _socomp_, "mlir", "")
-Rel_D(_jaxtracer_, _jax_, "uses", "", $tags="action")
 Rel_D(_jaxtracer_, _pl_core_, "uses", "", $tags="action")
+Rel_D(_jaxtracer_, _jax_, "uses", "", $tags="action")
 Rel_R(_socomp_, _so_, " ", "")
 
-Rel_D(_user1_, _alg_, "writes", "", $tags="action")
-Rel_D(_user2_, _so_, "AOT/JIT calls", "", $tags="action")
+Rel_D(_user1_, _alg_, " qjit", "", $tags="action")
+Rel_D(_user2_, _so_, " AOT/JIT calls", "", $tags="action")
 
 @enduml
 

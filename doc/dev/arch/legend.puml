@@ -16,5 +16,3 @@ Lay_D(a,b1)
 Rel_R(b1,b2,"object")
 Lay_D(b1,c)
 @enduml
-
-
