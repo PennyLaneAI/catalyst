@@ -5,7 +5,7 @@ dataclasses
 
 black[jupyter]
 clang-format==14
-flake8
+pylint
 
 pytest
 pytest-xdist

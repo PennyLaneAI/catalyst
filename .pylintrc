@@ -17,7 +17,7 @@ ignored-modules=numpy,scipy,autograd,toml,appdir,autograd.numpy,autograd.numpy.l
 # with qualified names.
 ignored-classes=numpy,scipy,autograd,toml,appdir,autograd.numpy,autograd.numpy.linalg,autograd.numpy.builtins,semantic_version,torch,tensorflow,tensorflow.contrib,tensorflow.contrib.eager,LazyLoader,networkx,networkx.dag,math,pennylane.numpy,pennylane.numpy.random,pennylane.numpy.linalg,pennylane.numpy.builtins,pennylane.operation,retworkx,kahypar
 
-ignore=pytest,test,python_bindings
+ignore=pytest,test,python_bindings,llvm-project,mlir-hlo,.git,__pycache__,build
 
 [MESSAGES CONTROL]
 
