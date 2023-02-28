@@ -188,6 +188,11 @@ func_p = jax.core.CallPrimitive("func")
 mlir_fn_cache = {}
 
 
+@func_p.def_impl
+def _func_def_impl(ctx, *args, call_jaxpr, fn, call=True):
+    raise NotImplementedError()
+
+
 def _func_symbol_lowering(ctx, fn_name, call_jaxpr):
     """Compile the JAXPR function call_jaxpr into an MLIR function."""
     if isinstance(call_jaxpr, jax.core.Jaxpr):
@@ -241,6 +246,13 @@ def _func_lowering(ctx, *args, call_jaxpr, fn, call=True):
 #
 # grad
 #
+
+
+@grad_p.def_impl
+def _grad_def_impl(ctx, *args, jaxpr, fn, method, h, argnum):
+    raise NotImplementedError()
+
+
 @grad_p.def_abstract_eval
 # pylint: disable=unused-argument
 def _grad_abstract(*args, jaxpr, fn, method, h, argnum):
@@ -293,6 +305,11 @@ def _grad_lowering(ctx, *args, jaxpr, fn, method, h, argnum):
 #
 # qalloc
 #
+@qalloc_p.def_impl
+def _qalloc_def_impl(ctx, size_value):
+    raise NotImplementedError()
+
+
 def qalloc(size):
     """Bind operands to operation."""
     return qalloc_p.bind(size)
@@ -329,6 +346,11 @@ def qdealloc(qreg):
     return qdealloc_p.bind(qreg)
 
 
+@qdealloc_p.def_impl
+def _qdealloc_def_impl(ctx, size_value):
+    raise NotImplementedError()
+
+
 @qdealloc_p.def_abstract_eval
 # pylint: disable=unused-argument
 def _qdealloc_abstract_eval(qreg):
@@ -345,6 +367,13 @@ def _qdealloc_lowering(jax_ctx: mlir.LoweringRuleContext, qreg):
 #
 # qextract
 #
+
+
+@qextract_p.def_impl
+def _qextract_def_impl(ctx, qreg, qubit_idx):
+    raise NotImplementedError()
+
+
 def qextract(qreg, qubit_idx):
     """Bind operands to operation."""
     return qextract_p.bind(qreg, qubit_idx)
@@ -381,6 +410,11 @@ def _qextract_lowering(jax_ctx: mlir.LoweringRuleContext, qreg: ir.Value, qubit_
 #
 # qinsert
 #
+@qinsert_p.def_impl
+def _qinsert_def_impl(ctx, qreg_old, qubit_idx, qubit):
+    raise NotImplementedError()
+
+
 def qinsert(qreg_old, qubit_idx, qubit):
     """Bind operands to operation."""
     return qinsert_p.bind(qreg_old, qubit_idx, qubit)
@@ -432,6 +466,11 @@ def _qinst_abstract_eval(*qubits_or_params, op=None, qubits_len=-1):
         qubit = qubits_or_params[idx]
         assert isinstance(qubit, AbstractQbit)
     return (AbstractQbit(),) * qubits_len
+
+
+@qinst_p.def_impl
+def _qinst_def_impl(ctx, *qubits_or_params, op, qubits_len):
+    raise NotImplementedError()
 
 
 def _qinst_lowering(
@@ -494,6 +533,11 @@ def _qunitary_abstract_eval(matrix, *qubits):
     return (AbstractQbit(),) * len(qubits)
 
 
+@qunitary_p.def_impl
+def _qunitary_def_impl(ctx, matrix, qubits):
+    raise NotImplementedError()
+
+
 def _qunitary_lowering(jax_ctx: mlir.LoweringRuleContext, matrix: ir.Value, *qubits: tuple):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
@@ -544,6 +588,11 @@ def _qmeasure_abstract_eval(qubit):
     return jax.core.ShapedArray((), bool), qubit
 
 
+@qmeasure_p.def_impl
+def _qmeasure_def_impl(ctx, qubit):
+    raise NotImplementedError()
+
+
 def _qmeasure_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
@@ -576,6 +625,11 @@ def _compbasis_abstract_eval(*qubits):
     return AbstractObs(len(qubits), compbasis_p)
 
 
+@compbasis_p.def_impl
+def _compbasis_def_impl(ctx, *qubits):
+    raise NotImplementedError()
+
+
 def _compbasis_lowering(jax_ctx: mlir.LoweringRuleContext, *qubits: tuple):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
@@ -593,6 +647,11 @@ def _compbasis_lowering(jax_ctx: mlir.LoweringRuleContext, *qubits: tuple):
 #
 # named observable
 #
+@compbasis_p.def_impl
+def _namedobs_def_impl(ctx, qubit, type):
+    raise NotImplementedError()
+
+
 def namedobs(type, qubit):
     """Bind operands to operation."""
     return namedobs_p.bind(qubit, type=type)
@@ -636,6 +695,11 @@ def _hermitian_abstract_eval(matrix, *qubits):
     return AbstractObs()
 
 
+@hermitian_p.def_impl
+def _hermitian_def_impl(ctx, matrix, *qubits):
+    raise NotImplementedError()
+
+
 def _hermitian_lowering(jax_ctx: mlir.LoweringRuleContext, matrix: ir.Value, *qubits: tuple):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
@@ -651,6 +715,11 @@ def _hermitian_lowering(jax_ctx: mlir.LoweringRuleContext, matrix: ir.Value, *qu
 def tensorobs(*terms):
     """Bind operands to operation."""
     return tensorobs_p.bind(*terms)
+
+
+@tensorobs_p.def_impl
+def _tensorobs_def_impl(ctx, *terms):
+    raise NotImplementedError()
 
 
 @tensorobs_p.def_abstract_eval
@@ -685,6 +754,11 @@ def _hamiltonian_abstract_eval(coeffs, *terms):
     return AbstractObs()
 
 
+@hamiltonian_p.def_impl
+def _hamiltonian_def_impl(ctx, coeffs, *terms):
+    raise NotImplementedError()
+
+
 def _hamiltonian_lowering(jax_ctx: mlir.LoweringRuleContext, coeffs: ir.Value, *terms: tuple):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
@@ -715,6 +789,11 @@ def _sample_abstract_eval(obs, shots, shape):
     return jax.core.ShapedArray(shape, jax.numpy.float64)
 
 
+@sample_p.def_impl
+def _sample_def_impl(ctx, obs, shots, shape):
+    raise NotImplementedError()
+
+
 def _sample_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: int, shape: tuple):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
@@ -734,6 +813,11 @@ def counts(obs, shots, shape):
     """Bind operands to operation."""
     assert shots is not None, "must specify shot number for qml.counts"
     return counts_p.bind(obs, shots=shots, shape=shape)
+
+
+@counts_p.def_impl
+def _counts_def_impl(ctx, obs, shots, shape):
+    raise NotImplementedError()
 
 
 @counts_p.def_abstract_eval
@@ -779,6 +863,11 @@ def _expval_abstract_eval(obs, shots):
     return jax.core.ShapedArray((), jax.numpy.float64)
 
 
+@expval_p.def_impl
+def _expval_def_impl(ctx, obs, shots):
+    raise NotImplementedError()
+
+
 def _expval_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: int):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
@@ -808,6 +897,11 @@ def var(obs, shots):
 def _var_abstract_eval(obs, shots):
     assert isinstance(obs, AbstractObs)
     return jax.core.ShapedArray((), jax.numpy.float64)
+
+
+@var_p.def_impl
+def _var_def_impl(ctx, obs, shots):
+    raise NotImplementedError()
 
 
 def _var_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: int):
@@ -846,7 +940,12 @@ def _probs_abstract_eval(obs, shape):
     return jax.core.ShapedArray(shape, jax.numpy.float64)
 
 
-def _pr_obs_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shape: tuple):
+@var_p.def_impl
+def _probs_def_impl(ctx, obs, shape):
+    raise NotImplementedError()
+
+
+def _probs_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shape: tuple):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
@@ -875,6 +974,11 @@ def _state_abstract_eval(obs, shape):
     return jax.core.ShapedArray(shape, jax.numpy.complex128)
 
 
+@state_p.def_impl
+def _state_def_impl(ctx, obs, shape):
+    raise NotImplementedError()
+
+
 def _state_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shape: tuple):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
@@ -901,6 +1005,11 @@ def qcond(true_jaxpr, false_jaxpr, *header_and_branch_args_plus_consts):
 # pylint: disable=unused-argument
 def _qcond_abstract_eval(*args, true_jaxpr, false_jaxpr, **kwargs):
     return true_jaxpr.out_avals
+
+
+@qcond_p.def_impl
+def _qcond_def_impl(ctx, pred, *branch_args_plus_consts, true_jaxpr, false_jaxpr):
+    raise NotImplementedError()
 
 
 def _qcond_lowering(
@@ -977,6 +1086,13 @@ def qwhile(cond_jaxpr, body_jaxpr, cond_nconsts, body_nconsts, *iter_args_plus_c
 # pylint: disable=unused-argument
 def _qwhile_loop_abstract_eval(*args, cond_jaxpr, body_jaxpr, **kwargs):
     return body_jaxpr.out_avals
+
+
+@qwhile_p.def_impl
+def _qwhile_def_impl(
+    ctx, *iter_args_plus_consts, cond_jaxpr, body_jaxpr, cond_nconsts, body_nconsts
+):
+    raise NotImplementedError()
 
 
 def _qwhile_lowering(
@@ -1061,6 +1177,13 @@ def qfor(body_jaxpr, body_nconsts, *header_and_iter_args_plus_consts):
 # pylint: disable=unused-argument
 def _qfor_loop_abstract_eval(*args, body_jaxpr, **kwargs):
     return body_jaxpr.out_avals
+
+
+@qfor_p.def_impl
+def _qfor_def_impl(
+    ctx, lower_bound, upper_bound, step, *iter_args_plus_consts, body_jaxpr, body_nconsts
+):
+    raise NotImplementedError()
 
 
 def _qfor_lowering(
@@ -1162,7 +1285,7 @@ mlir.register_lowering(sample_p, _sample_lowering)
 mlir.register_lowering(counts_p, _counts_lowering)
 mlir.register_lowering(expval_p, _expval_lowering)
 mlir.register_lowering(var_p, _var_lowering)
-mlir.register_lowering(probs_p, _pr_obs_lowering)
+mlir.register_lowering(probs_p, _probs_lowering)
 mlir.register_lowering(state_p, _state_lowering)
 mlir.register_lowering(qcond_p, _qcond_lowering)
 mlir.register_lowering(qwhile_p, _qwhile_lowering)
