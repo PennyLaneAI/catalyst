@@ -1,4 +1,4 @@
-PennyLane Python frontend
+PennyLane Python Frontend
 =========================
 
 
