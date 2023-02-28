@@ -3,8 +3,6 @@ name: Wheel::Linux::x86_64
 on:
   schedule:
     - cron: "0 0 * * 0"
-  release:
-    types: [ published ]
   workflow_dispatch:
 
 jobs:
@@ -42,10 +40,14 @@ jobs:
         key: Linux-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-source
         enableCrossOsArchive: True
 
+    - name: Set Ownership in Container
+      run: |
+        # To fix the git issue with the owner of the checkout dir
+        chown -R $(id -u):$(id -g) $PWD
+
     - name: Clone LLVM Submodule
       if: steps.cache-llvm-source.outputs.cache-hit != 'true'
       run: |
-        git config --global --add safe.directory /__w/catalyst/catalyst
         git submodule update --init mlir/llvm-project
         [ $(cd mlir/llvm-project && git rev-parse HEAD) == ${{ steps.llvm-hash.outputs.llvm-hash }} ]
 
@@ -53,8 +55,7 @@ jobs:
       run: |
         # Reduce wait time for repos not responding
         cat /etc/yum.conf | sed "s/\[main\]/\[main\]\ntimeout=5/g" > /etc/yum.conf
-        yum update -y && yum install -y devtoolset-11-gcc-c++ cmake ninja-build openmpi-devel
-        source /opt/rh/devtoolset-11/enable -y
+        yum update -y && yum install -y cmake ninja-build openmpi-devel
 
     - name: Build LLVM / MLIR
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
@@ -149,8 +150,7 @@ jobs:
       run: |
         # Reduce wait time for repos not responding
         cat /etc/yum.conf | sed "s/\[main\]/\[main\]\ntimeout=5/g" > /etc/yum.conf
-        yum update -y && yum install -y devtoolset-11-gcc-c++ cmake ninja-build openmpi-devel
-        source /opt/rh/devtoolset-11/enable -y
+        yum update -y && yum install -y cmake ninja-build openmpi-devel
 
     - name: Install Dependencies (Python)
       run: |
@@ -239,20 +239,21 @@ jobs:
     - name: Prepare the python package
       run: |
         echo "INSTALLED = True" > $GITHUB_WORKSPACE/frontend/catalyst/_configuration.py
-        mkdir -p $GITHUB_WORKSPACE/frontend/catalyst/bin
-        mkdir -p $GITHUB_WORKSPACE/frontend/catalyst/lib/backend/ $GITHUB_WORKSPACE/frontend/catalyst/lib/capi
         # Copy bins to frontend/catalyst/bin
+        mkdir -p $GITHUB_WORKSPACE/frontend/catalyst/bin
         cp $GITHUB_WORKSPACE/llvm-build/bin/llc $GITHUB_WORKSPACE/frontend/catalyst/bin
         cp $GITHUB_WORKSPACE/llvm-build/bin/mlir-translate $GITHUB_WORKSPACE/frontend/catalyst/bin
         cp $GITHUB_WORKSPACE/mhlo-build/bin/mlir-hlo-opt $GITHUB_WORKSPACE/frontend/catalyst/bin
         cp $GITHUB_WORKSPACE/quantum-build/bin/quantum-opt $GITHUB_WORKSPACE/frontend/catalyst/bin
         # Copy libs to frontend/catalyst/lib
+        mkdir -p $GITHUB_WORKSPACE/frontend/catalyst/lib/backend/ $GITHUB_WORKSPACE/frontend/catalyst/lib/capi
         cp $GITHUB_WORKSPACE/runtime-build/lib/backend/librt_backend.so $GITHUB_WORKSPACE/frontend/catalyst/lib/backend/
         cp $GITHUB_WORKSPACE/runtime-build/lib/capi/librt_capi.so $GITHUB_WORKSPACE/frontend/catalyst/lib/capi
         cp --dereference $GITHUB_WORKSPACE/llvm-build/lib/libmlir_float16_utils.so.* $GITHUB_WORKSPACE/frontend/catalyst/lib
         cp --dereference $GITHUB_WORKSPACE/llvm-build/lib/libmlir_c_runner_utils.so* $GITHUB_WORKSPACE/frontend/catalyst/lib
         # Copy mlir bindings to frontend/mlir_quantum
-        cp -R --dereference $GITHUB_WORKSPACE/quantum-build/python_packages/quantum/mlir_quantum $GITHUB_WORKSPACE/frontend/mlir_quantum
+        mkdir -p $GITHUB_WORKSPACE/frontend/mlir_quantum
+        cp -R --dereference $GITHUB_WORKSPACE/quantum-build/python_packages/quantum/mlir_quantum/runtime $GITHUB_WORKSPACE/frontend/mlir_quantum/runtime
         find $GITHUB_WORKSPACE/frontend -type d -name __pycache__ -exec rm -rf {} +
 
     - name: Build wheel
@@ -274,6 +275,7 @@ jobs:
         os: [ubuntu-latest]
         python_version: ["3.8", "3.9", "3.10", "3.11"]
 
+    # To check all wheels for supported python3 versions
     name: Test Wheels (Python ${{ matrix.python_version }})
     runs-on: ${{ matrix.os }}
 
@@ -297,33 +299,60 @@ jobs:
       with:
         python-version: ${{ matrix.python_version }}
 
-    - name: Install Python dependencies and Catalyst
+    - name: Install Python dependencies
       run: |
         python${{ matrix.python_version }} -m pip install wheel pytest pytest-xdist
+
+    - name: Install Catalyst
+      run: |
         python${{ matrix.python_version }} -m pip install $GITHUB_WORKSPACE/dist/*.whl
 
     - name: Run Python Pytest Tests
       run: |
         python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest -n auto
 
-  upload-pypi:
-    needs: catalyst-linux-wheels-x86-64
+  test-wheel-py-min-max:
+    needs: [catalyst-linux-wheels-x86-64]
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest]
+        python_wheel: ["3.8", "3.11"]
         python_version: ["3.8", "3.9", "3.10", "3.11"]
 
+    # To check forward and backward compatibility catalyst-py-["3.8", "3.11"]-wheel
+    # with all supported python3 versions: ["3.8", "3.9", "3.10", "3.11"]
+    name: Test py-${{ matrix.python_wheel }} Wheel with python${{ matrix.python_version }}
     runs-on: ${{ matrix.os }}
-    if: ${{ github.event_name == 'release' || github.ref == 'refs/heads/main' }}
-    steps:
-      - uses: actions/download-artifact@v3
-        with:
-          name: catalyst-manylinux2014_x86_64-wheel-py-${{ matrix.python_version }}.zip
-          path: dist
 
-      - name: Upload wheels to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          user: __token__
-          password: ${{ secrets.TEST_PYPI_API_TOKEN }}
-          repository_url: https://test.pypi.org/legacy/
+    steps:
+    - name: Cancel previous runs
+      uses: styfle/cancel-workflow-action@0.11.0
+      with:
+        access_token: ${{ github.token }}
+
+    - name: Checkout Catalyst repo
+      uses: actions/checkout@v3
+
+    - name: Download py-${{ matrix.python_wheel }} Wheel Artifact
+      uses: actions/download-artifact@v3
+      with:
+        name: catalyst-manylinux2014_x86_64-wheel-py-${{ matrix.python_wheel }}.zip
+        path: dist
+
+    - name: Set up Python ${{ matrix.python_version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python_version }}
+
+    - name: Install Python dependencies
+      run: |
+        python${{ matrix.python_version }} -m pip install wheel pytest pytest-xdist
+
+    - name: Install Catalyst
+      run: |
+        python${{ matrix.python_version }} -m pip install $GITHUB_WORKSPACE/dist/*.whl
+
+    - name: Run Python Pytest Tests
+      run: |
+        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest -n auto
