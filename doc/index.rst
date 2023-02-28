@@ -90,4 +90,5 @@ Catalyst
    :hidden:
 
    code/__init__
-   C++ API <api/library_root>
+   QuantumDevice API <api/file_runtime_include_QuantumDevice.hpp>
+   QIR C-API <api/file_runtime_include_RuntimeCAPI.h>

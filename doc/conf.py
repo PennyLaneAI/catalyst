@@ -34,7 +34,7 @@ PROJECT_SOURCE_DIR = currdir.parent
 
 # -------------------------------------------------------------------------
 CPP_SOURCE_DIRS = [
-    PROJECT_SOURCE_DIR.joinpath("mlir").joinpath("include"),
+    # PROJECT_SOURCE_DIR.joinpath("mlir").joinpath("include"),
     PROJECT_SOURCE_DIR.joinpath("runtime").joinpath("include"),
 ]
 CPP_EXCLUDE_DIRS = []
