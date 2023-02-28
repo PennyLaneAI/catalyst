@@ -74,7 +74,7 @@ struct QuantumDevice {
      *
      * @return `size_t`
      */
-    virtual auto GetNumQubits() -> size_t = 0;
+    virtual auto GetNumQubits() const -> size_t = 0;
 
     /**
      * @brief Set the number of device shots.
@@ -88,7 +88,7 @@ struct QuantumDevice {
      *
      * @return `size_t`
      */
-    virtual auto GetDeviceShots() -> size_t = 0;
+    virtual auto GetDeviceShots() const -> size_t = 0;
 
     /**
      * @brief Start recording a quantum tape if provided.
@@ -105,14 +105,14 @@ struct QuantumDevice {
      *
      * @return `Result`
      */
-    virtual auto Zero() -> Result = 0;
+    virtual auto Zero() const -> Result = 0;
 
     /**
      * @brief Result value for "One"  used in the measurement process.
      *
      * @return `Result`
      */
-    virtual auto One() -> Result = 0;
+    virtual auto One() const -> Result = 0;
 
     /**
      * @brief A helper method to print the state vector of a device.

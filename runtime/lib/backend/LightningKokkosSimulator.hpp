@@ -101,14 +101,14 @@ class LightningKokkosSimulator final : public Catalyst::Runtime::QuantumDevice {
     auto AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType> override;
     void ReleaseQubit(QubitIdType q) override;
     void ReleaseAllQubits() override;
-    auto GetNumQubits() -> size_t override;
+    auto GetNumQubits() const -> size_t override;
     void StartTapeRecording() override;
     void StopTapeRecording() override;
     void SetDeviceShots(size_t shots) override;
-    auto GetDeviceShots() -> size_t override;
+    auto GetDeviceShots() const -> size_t override;
     void PrintState() override;
-    auto Zero() -> Result override;
-    auto One() -> Result override;
+    auto Zero() const -> Result override;
+    auto One() const -> Result override;
 
     auto CacheManagerInfo()
         -> std::tuple<size_t, size_t, size_t, std::vector<std::string>, std::vector<ObsIdType>>;
