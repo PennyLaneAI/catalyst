@@ -12,6 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""
+Utility code for adding common functions to MLIR modules.
+"""
+
+# pylint: disable=no-member
 from jax.interpreters.mlir import ir
 from jaxlib.mlir.dialects._func_ops_gen import FuncOp
 

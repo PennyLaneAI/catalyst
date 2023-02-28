@@ -17,8 +17,10 @@
 import jax
 from jax.tree_util import tree_unflatten
 from jax._src.dispatch import jaxpr_replicas
-from jax.interpreters.mlir import *
-from jax.interpreters.mlir import _set_up_aliases, _module_name_regex
+from jax.interpreters.mlir import List, AxisContext, source_info_util, Sequence, Optional, xc
+from jax.interpreters.mlir import Tuple, ir, ReplicaAxisContext, xla, util, xb, itertools
+from jax.interpreters.mlir import ModuleContext, lower_jaxpr_to_fun, lowerable_effects, Any
+from jax.interpreters.mlir import _set_up_aliases, _module_name_regex, sharded_aval, warnings
 from jax.interpreters.partial_eval import DynamicJaxprTracer
 
 import pennylane as qml
@@ -39,6 +41,19 @@ namedobs_map = {
 
 
 def get_mlir(func, *args, **kwargs):
+    """Lower a Python function into an MLIR module.
+
+    Args:
+        func: python function to be lowered
+        args: arguments to ``func``
+        kwargs: keyword arguments to ``func``
+
+    Returns:
+        m: the MLIR module corresponding to ``func``
+        ctx: the MLIR context corresponding
+        jaxpr: the jaxpr corresponding to ``func``
+    """
+
     # The compilation cache must be clear for each translation unit.
     # Otherwise, MLIR functions which do not exist in the current translation unit will be assumed
     # to exist if an equivalent python function is seen in the cache. This happens during testing or
@@ -67,7 +82,15 @@ def get_mlir(func, *args, **kwargs):
 
 
 def get_traceable_fn(qfunc, device):
-    """Generate a function suitable for jax tracing with custom quantum primitives."""
+    """Generate a function suitable for jax tracing with custom quantum primitives.
+
+    Args:
+        qfunc: the quantum function to be traced
+        device: the device in which ``qfunc`` is to be run
+
+    Returns:
+        traceable_fn: a function that when called, will trace ``qfunc``
+    """
 
     def traceable_fn(*args, **kwargs):
         shots = device.shots
@@ -89,6 +112,8 @@ def get_traceable_fn(qfunc, device):
                     meas_ret_val_indices.append(i)
                 else:
                     non_meas_return_values.append(ret_val)
+
+            # pylint: disable=protected-access
             tape.quantum_tape._measurements = meas_return_values
 
             has_tracer_return_values = len(non_meas_return_values) > 0
@@ -111,12 +136,39 @@ def get_traceable_fn(qfunc, device):
 
 
 def insert_to_qreg(qubit_states, qreg):
+    """Insert known qubit states into the quantum register.
+
+    Args:
+        qubit_states: known qubit states
+        qreg: quantum register
+
+    Returns:
+        qreg: updated quantum register
+    """
     for wire in qubit_states.keys():
         qreg = jprim.qinsert(qreg, wire, qubit_states[wire])
     return qreg
 
 
 def get_qubits_from_wires(wires, qubit_states, qreg):
+    """Get qubits corresponding to wires ``wires``.
+
+    ``wires`` in this case may not be statically known. If at least one of the wires
+    is not statically known, then it is necessary to insert all current ``qubit_states``
+    in the quantum register and then query the quantum register with the statically unknown
+    wire value.
+
+    Args:
+        wires: A list containing integers or ``DynamicJaxprTracer``s. The ``DynamicJaxprTracer``s
+            correspond to wires which will be determined at run time.
+        qubit_states: A dictionary where the keys are integers representing wires and values are
+            qubit instances. ``qubit_states`` corresponds to the known assignment of each SSA qubit
+            variable to a particular wire at the current program point.
+        qreg: The current SSA value corresponding to the quantum register.
+
+    Returns:
+        The list of qubits queried.
+    """
     has_dynamic_wire = any(map(lambda x: isinstance(x, DynamicJaxprTracer), wires))
     if has_dynamic_wire:
         qreg = insert_to_qreg(qubit_states, qreg)
@@ -130,6 +182,21 @@ def get_qubits_from_wires(wires, qubit_states, qreg):
 
 
 def get_new_qubit_state_from_wires_and_qubits(wires, new_qubits, qubit_states, qreg):
+    """Udate qubit state and quantum register with new qubits corresponding to wires in ``wires``.
+
+    In the presence of any dynamic wires, it is necessary to clear the qubit states as the dynamic wire
+    may have updated any previously known position.
+
+    Args:
+        wires: A list containing integers of ``DynamicJaxprTracer``s.
+        new_qubits: A list corresponding to the new SSA qubit variables.
+        qubit_states: The current known pairing of wires and qubits at the program point in which this function is called.
+        qreg: The current quantum register at the program point in which this function is called.
+
+    Returns:
+        qubit_states: An updated qubit states.
+        qreg: An updated qreg.
+    """
     has_dynamic_wire = any(map(lambda x: isinstance(x, DynamicJaxprTracer), wires))
     if has_dynamic_wire:
         qubit_states.clear()
@@ -142,6 +209,7 @@ def get_new_qubit_state_from_wires_and_qubits(wires, new_qubits, qubit_states, q
     return qubit_states, qreg
 
 
+# pylint: disable=too-many-statements,too-many-branches,too-many-arguments
 def trace_quantum_tape(
     tape,
     qreg,
@@ -150,6 +218,22 @@ def trace_quantum_tape(
     num_wires=None,
     shots=None,
 ):
+    """Trace a quantum tape.
+
+    Args:
+        tape: the quantum tape to be traced
+        qreg: the starting quantum register
+        has_tracer_return_values: a boolean that indicates whether the quantum tape returns any
+            values
+        num_wires: the number of wires for this tape
+        shots: the number of shots for this tape
+
+    Returns:
+        out: the output of the quantum tape as a ``DynamicJaxprTracer``
+        qreg: the quantum register at the end of the quantum tape
+        qubit_states: the qubit states at the end of the quantum tape
+
+    """
     if meas_ret_val_indices is None:
         meas_ret_val_indices = []
     qubit_states = {}
@@ -162,7 +246,8 @@ def trace_quantum_tape(
             _, wires = op_args
             assert len(wires) == 1
             qubits = get_qubits_from_wires(wires, qubit_states, qreg)
-            out, new_qubit = jprim.qmeasure(*qubits)
+            qubit = qubits[0]
+            out, new_qubit = jprim.qmeasure(qubit)
             qubit_states, qreg = get_new_qubit_state_from_wires_and_qubits(
                 wires, [new_qubit], qubit_states, qreg
             )
@@ -257,6 +342,15 @@ def trace_quantum_tape(
 
 # TODO: remove once fixed upstream
 def trace_hamiltonian(coeffs, *nested_obs):
+    """Trace a hamiltonian.
+
+    Args:
+        coeffs: a list of coefficients
+        nested_obs: a list of the nested observables
+
+    Returns:
+        a hamiltonian JAX primitive used for tracing
+    """
     # jprim.hamiltonian cannot take a python list as input
     # only as *args can a list be passed as an input.
     # Instead cast it as a JAX array.
@@ -265,6 +359,19 @@ def trace_hamiltonian(coeffs, *nested_obs):
 
 
 def trace_observables(obs, qubit_states, p, num_wires, qreg):
+    """Trace observables.
+
+    Args:
+        obs: an observable
+        qubit_states: the statically known qubit state at this progam point
+        p: parameter evaluator
+        num_wires: the number of wires
+        qreg: the quantum register with the state at this program point
+
+    Returns:
+        jax_obs: a JAX primitive corresponding to the observable received as an argument
+        qubits: a list of qubits used by the observable
+    """
     op_args = p.get_partial_return_value()
     qubits = None
     if obs is None:
@@ -293,6 +400,17 @@ def trace_observables(obs, qubit_states, p, num_wires, qreg):
 
 
 def trace_measurement(meas, obs, qubits, shots):
+    """Trace measurement.
+
+    Args:
+        meas: measurement to be traced
+        obs: observables used in the measurement
+        qubits: qubits used in the measurement
+        shots: shots used in the measurement
+
+    Returns:
+        a JAX primitive corresponding to the measurement received as an argument
+    """
     compbasis = obs.primitive == jprim.compbasis_p
     if meas.return_type.value == "sample":
         shape = (shots, len(qubits)) if compbasis else (shots,)
@@ -317,6 +435,7 @@ def trace_measurement(meas, obs, qubits, shots):
     return mres
 
 
+# pylint: disable=too-many-arguments
 def custom_lower_jaxpr_to_module(
     func_name: str,
     module_name: str,

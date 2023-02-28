@@ -15,6 +15,8 @@
 This package contains the Catalyst Python interface.
 """
 
+# pylint: disable=missing-module-docstring
+
 from catalyst.compiler import compile
 from catalyst.compilation_pipelines import qjit, QJIT
 from catalyst.pennylane_extensions import for_loop, while_loop, cond, measure, grad

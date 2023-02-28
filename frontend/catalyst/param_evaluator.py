@@ -12,6 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""
+Parameter Evaluator
+"""
+
 import jax
 from jax.interpreters.partial_eval import partial_eval_jaxpr_nounits
 from jax.tree_util import tree_flatten, tree_unflatten
@@ -86,6 +90,9 @@ class ParamEvaluator:
         self.tree_index = 0
 
     def get_partial_return_value(self):
+        """
+        Get the next return value.
+        """
         tree = self.output_trees[self.tree_index]
         self.tree_index += 1
 
@@ -104,8 +111,8 @@ class ParamEvaluator:
             return_val = self.out_ordered[self.cur_index]
             self.cur_index += 1
             return return_val
-        except IndexError:
-            raise ValueError("no additional known outputs given the inputs")
+        except IndexError as exc:
+            raise ValueError("no additional known outputs given the inputs") from exc
 
     def send_partial_input(self, val):
         """

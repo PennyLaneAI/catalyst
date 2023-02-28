@@ -20,7 +20,7 @@ help:
 	@echo "  clean-all          to uninstall Catalyst and delete all temporary, cache, and build files"
 	@echo "  clean-docs         to delete all built documentation"
 	@echo "  coverage           to generate a coverage report"
-	@echo "  format [check=1]   to apply C++ and Python formatter; use with 'check=1' to check instead of modify (requires black, flake8 and clang-format)"
+	@echo "  format [check=1]   to apply C++ and Python formatter; use with 'check=1' to check instead of modify (requires black, pylint and clang-format)"
 	@echo "  format [version=?] to apply C++ and Python formatter; use with 'version={version}' to run clang-format-{version} instead of clang-format"
 
 .PHONY: all
@@ -98,7 +98,7 @@ ifdef check
 else
 	black .
 endif
-	flake8 .
+	pylint frontend
 
 .PHONY: docs clean-docs
 docs:

@@ -3,4 +3,6 @@
 #
 # INSTALLED = True
 #
+
+# pylint: disable=missing-module-docstring
 INSTALLED = False
