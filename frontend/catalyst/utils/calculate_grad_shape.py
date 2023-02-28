@@ -40,7 +40,7 @@ class Signature:
         """Get parameter at position i.
 
         Args:
-            i: Integer corresponding to parameter at position i.
+            i (int): Integer corresponding to parameter at position i.
 
         Returns:
             self.xs[i]: Type corresponding to parameter at position i.
@@ -59,7 +59,7 @@ class Signature:
         """Get result values at position i.
 
         Args:
-            i: Integer corresponding to return value at position i.
+            i (int): Integer corresponding to return value at position i.
 
         Returns:
             self.ys[i]: Type corresponding to parameter at position i.
@@ -76,13 +76,13 @@ class Signature:
 
     @staticmethod
     def is_tensor(x):
-        """Determine whether a type `x` is a `ShapedArray`.
+        """Determine whether a type ``x`` is a ``jax.core.ShapedArray``.
 
         Args:
             x: The type to be tested.
 
         Returns:
-            bool: Whether the type `x` is a `ShapedArray`
+            bool: Whether the type ``x`` is a ``jax.core.ShapedArray``
         """
         return isinstance(x, ShapedArray)
 

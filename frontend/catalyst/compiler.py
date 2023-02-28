@@ -156,7 +156,7 @@ def lower_mhlo_to_linalg(filename):
     """Translate MHLO to linalg dialect.
 
     Args:
-        filename: the path to a file were the program is stored
+        filename (str): the path to a file were the program is stored.
     Returns:
         a path to the output file
     """
@@ -179,7 +179,7 @@ def bufferize_tensors(filename):
     """Translate MHLO to linalg dialect.
 
     Args:
-        filename: the path to a file were the program is stored
+        filename (str): the path to a file were the program is stored.
     Returns:
         a path to the output file
     """
@@ -201,7 +201,7 @@ def lower_all_to_llvm(filename):
     """Translate MLIR dialects to LLVM dialect.
 
     Args:
-        filename: the path to a file were the program is stored
+        filename (str): the path to a file were the program is stored.
     Returns:
         a path to the output file
     """
@@ -222,7 +222,7 @@ def convert_mlir_to_llvmir(filename):
     """Translate LLVM dialect to LLVM IR.
 
     Args:
-        filename: the path to a file were the program is stored
+        filename (str): the path to a file were the program is stored.
     Returns:
         a path to the output file
     """
@@ -243,7 +243,7 @@ def compile_llvmir(filename):
     """Translate LLVM IR to an object file.
 
     Args:
-        filename: the path to a file were the program is stored
+        filename (str): the path to a file were the program is stored.
     Returns:
         a path to the output file
     """
@@ -263,7 +263,7 @@ def link_lightning_runtime(filename):
     """Link the object file as a shared object.
 
     Args:
-        filename: the path to a file were the object file is stored
+        filename (str): the path to a file were the object file is stored.
     Returns:
         a path to the output file
     """

@@ -111,7 +111,7 @@ class Function:
     functions in MLIR.
 
     Args:
-        fn: the function boundary
+        fn (Callable): the function boundary.
     """
 
     def __init__(self, fn):
@@ -133,10 +133,10 @@ class Grad:
     """An object that specifies that a function will be differentiated.
 
     Args:
-        fn: the function to differentiate
-        method: the method used for differentiation
-        h: the step-size value for the finite difference method
-        argnum: the argument indices which define over which arguments to differentiate
+        fn (Callable): the function to differentiate
+        method (str): the method used for differentiation
+        h (float): the step-size value for the finite difference method
+        argnum (int): the argument indices which define over which arguments to differentiate
 
     Raises:
         AssertionError: Higher-order derivatives can only be computed with the finite difference
@@ -289,7 +289,7 @@ class CondCallable:
         """Block of code to be run if the predicate evaluates to false.
 
         Args:
-            false_fn: The code to be run in case the condition was not met.
+            false_fn (Callable): The code to be run in case the condition was not met.
 
         Returns:
             self
