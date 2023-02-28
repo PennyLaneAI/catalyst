@@ -15,10 +15,6 @@
 of quantum operations, measurements, and observables to JAXPR.
 """
 
-"""
-Register new JAX primitives corresponding to quantum operations.
-"""
-
 import numpy as np
 
 import jax

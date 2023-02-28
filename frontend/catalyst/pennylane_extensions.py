@@ -16,10 +16,6 @@
 while using :func:`~.qjit`.
 """
 
-"""
-Extensions to PennyLane's operations
-"""
-
 import uuid
 import functools
 import numbers

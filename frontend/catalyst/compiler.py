@@ -15,10 +15,6 @@
 MLIR/LLVM representations.
 """
 
-"""
-Compiler interfaces for executables.
-"""
-
 import os
 import subprocess
 

@@ -14,10 +14,6 @@
 """This module contains functions tracing and lowering JAX code to MLIR.
 """
 
-"""
-Tracing of the classical and quantum components.
-"""
-
 import jax
 from jax.tree_util import tree_unflatten
 from jax._src.dispatch import jaxpr_replicas
