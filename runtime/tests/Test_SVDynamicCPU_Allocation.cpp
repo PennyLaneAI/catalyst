@@ -179,7 +179,6 @@ TEMPLATE_TEST_CASE("StateVectorDynamicCPU::allocateWire /allocation", "[StateVec
     SECTION("Test allocation/deallocation of wires for a state-vector with "
             "num_qubits=0")
     {
-        constexpr size_t num_qubits = 0;
         StateVectorDynamicCPU<PrecisionT> sv1(0);
 
         std::vector<std::complex<PrecisionT>> expected_data{{1, 0}};

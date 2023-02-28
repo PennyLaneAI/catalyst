@@ -15,13 +15,11 @@
 #include "RuntimeCAPI.h"
 #include "Types.h"
 
-#include "BaseUtils.hpp"
 #include "LightningSimulator.hpp"
 #include "QuantumDevice.hpp"
 #include "TestHelpers.hpp"
 
 #include "AdjointDiff.hpp"
-#include "BaseUtils.hpp"
 #include "StateVectorRawCPU.hpp"
 #include "Util.hpp"
 
@@ -85,7 +83,6 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
           "[Gradient]")
 {
     using Catalyst::Runtime::Simulator::Lightning::SimulatorGate;
-    const size_t numAlloc = 1;
 
     // Test qis__Gradient:
     int64_t trainParams[1] = {0};
@@ -126,8 +123,6 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
           "[Gradient]")
 {
     using Catalyst::Runtime::Simulator::Lightning::SimulatorGate;
-
-    const size_t numAlloc = 1;
 
     // Test qis__Gradient:
     int64_t trainParams[1] = {0};
@@ -341,8 +336,6 @@ TEST_CASE("Test __quantum__qis__Gradient_params and __quantum__qis__Gradient "
     const size_t num_params = 3;
     const size_t num_obs = 1;
 
-    const size_t numAlloc = num_obs * tp.size();
-
     const auto obs =
         std::make_shared<Pennylane::Simulators::NamedObs<double>>("PauliX", std::vector<size_t>{0});
     std::vector<double> jacobian(num_obs * tp.size(), 0);
@@ -494,8 +487,6 @@ TEST_CASE("Test __quantum__qis__Gradient Op=[RX,CY], Obs=[Z,Z]", "[Gradient]")
     const size_t num_obs = 2;
     std::vector<double> jacobian(num_obs * tp.size(), 0);
 
-    const size_t numAlloc = num_obs * tp.size();
-
     std::vector<std::complex<double>> cdata(1U << num_qubits);
     StateVectorRawCPU<double> psi(cdata.data(), cdata.size());
     cdata[0] = std::complex<double>{1, 0};
@@ -564,8 +555,6 @@ TEST_CASE("Test __quantum__qis__Gradient_params Op=[RX,RX,RX,CZ], Obs=[Z,Z,Z]", 
     const size_t num_params = 3;
     const size_t num_obs = 3;
     std::vector<double> jacobian(num_obs * tp.size(), 0);
-
-    const size_t numAlloc = num_obs * tp.size();
 
     std::vector<std::complex<double>> cdata(1U << num_qubits);
     StateVectorRawCPU<double> psi(cdata.data(), cdata.size());
@@ -649,8 +638,6 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     const size_t num_qubits = 3;
     const size_t num_params = 6;
     const size_t num_obs = 3;
-
-    const size_t numAlloc = num_obs * tp.size();
 
     std::vector<double> jacobian(num_obs * tp.size(), 0);
 
@@ -763,8 +750,6 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     const size_t num_qubits = 3;
     const size_t num_params = 6;
     const size_t num_obs = 1;
-
-    const size_t numAlloc = num_obs * tp.size();
 
     std::vector<double> jacobian(num_obs * tp.size(), 0);
 
@@ -884,8 +869,6 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     const size_t num_qubits = 3;
     const size_t num_params = 6;
     const size_t num_obs = 1;
-
-    const size_t numAlloc = num_obs * tp.size();
 
     std::vector<double> jacobian(num_obs * tp.size(), 0);
 

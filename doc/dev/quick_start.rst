@@ -287,7 +287,7 @@ You can specify the number of shots to be used in sample-based measurements when
 automatically use the device's ``shots`` parameter when performing measurements.
 In the following example, the number of shots is set to :math:`500` in the device instantiation.
 
-.. note:
+.. note::
     You can return any combination of measurement processes as a tuple from quantum functions.
     In addition, Catalyst allows you to return any classical values computed inside quantum functions as well.
 

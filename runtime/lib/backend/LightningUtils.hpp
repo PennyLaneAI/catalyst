@@ -19,6 +19,11 @@
 // PL-Lightning(-Kokkos) uncategorised utility header
 #include "Util.hpp"
 
+#if __has_include("StateVectorKokkos.hpp")
+// this macro is used in the C++ test suite
+#define _KOKKOS
+#endif
+
 namespace Catalyst::Runtime::Simulator::Lightning {
 enum class SimulatorGate : uint8_t {
     // 1-qubit

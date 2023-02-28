@@ -11,6 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""This module contains classes and decorators for just-in-time and ahead-of-time
+compiling of hybrid quantum-classical functions using Catalyst.
+"""
 
 import ctypes
 import os
@@ -287,6 +290,24 @@ class CompiledFunction:
 
 
 class QJIT:
+    """Class representing a just-in-time compiled hybrid quantum-classical function.
+
+    .. note::
+
+        ``QJIT`` objects are created by the :func:`~.qjit` decorator. Please see
+        the :func:`~.qjit` documentation for more details.
+
+    Args:
+        fn (Callable): the quantum or classical function
+        target (str): the compilation target
+        keep_intermediate (bool): Whether or not to store the intermediate files throughout the
+            compilation. If ``True``, the current working directory keeps
+            readable representations of the compiled module which remain available
+            after the Python process ends. If ``False``, these representations
+            will instead be stored in a temporary folder, which will be deleted
+            as soon as the QJIT instance is deleted.
+    """
+
     def __init__(self, fn, target, keep_intermediate):
         self.qfunc = fn
         functools.update_wrapper(self, fn)
@@ -324,14 +345,23 @@ class QJIT:
 
     @property
     def mlir(self):
+        """str: Returns the MLIR intermediate representation
+        of the quantum program.
+        """
         return self._mlir
 
     @property
     def jaxpr(self):
+        """str: Returns the JAXPR intermediate representation
+        of the quantum program.
+        """
         return self._jaxpr
 
     @property
     def qir(self):
+        """str: Returns the LLVM and QIR intermediate representation
+        of the quantum program. Only available if the function was compiled to binary.
+        """
         return self._llvmir
 
     @staticmethod
@@ -404,13 +434,24 @@ class QJIT:
 
 
 def qjit(fn=None, *, target="binary", keep_intermediate=False):
-    """A just-in-time decorator for Pennylane programs.
+    """A just-in-time decorator for PennyLane and JAX programs using Catalyst.
+
+    This decorator enables both just-in-time and ahead-of-time compilation,
+    depending on whether function argument type hints are provided.
+
+    .. note::
+
+        Currently, ``lightning.qubit`` is the only supported backend device
+        for Catalyst compilation. For a list of supported operations, observables,
+        and measurements, please see the :doc:`/dev/quick_start`.
 
     Args:
-        fn (Callable): the quantum function. Defaults to ``None``
-        target (str): the compilation target. Defaults to ``"binary"``
-        keep_intermediate (bool): the flag to store the intermediate files throughout the
-                                compilation. Defaults to ``False``
+        fn (Callable): the quantum or classical function
+        target (str): the compilation target
+        keep_intermediate (bool): Whether or not to store the intermediate files throughout the
+            compilation. If ``True``, intermediate representations are available via the
+            :attr:`~.QJIT.mlir`, :attr:`~.QJIT.jaxpr`, and :attr:`~.QJIT.qir`, representing
+            different stages in the optimization process.
 
     Returns:
         QJIT object.
@@ -419,6 +460,61 @@ def qjit(fn=None, *, target="binary", keep_intermediate=False):
         FileExistsError: Unable to create temporary directory
         PermissionError: Problems creating temporary directory
         OSError: Problems while creating folder for intermediate files
+
+    **Example**
+
+    In just-in-time (JIT) mode, the compilation is triggered at the call site the
+    first time the quantum function is executed. For example, ``circuit`` is
+    compiled as early as the first call.
+
+    .. code-block:: python
+
+        @qjit
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def circuit(theta):
+            qml.Hadamard(wires=0)
+            qml.RX(theta, wires=1)
+            qml.CNOT(wires=[0,1])
+            return qml.expval(qml.PauliZ(wires=1))
+
+    >>> circuit(0.5)  # the first call, compilation occurs here
+    array(0.)
+    >>> circuit(0.5)  # the precompiled quantum function is called
+    array(0.)
+
+    Alternatively, if argument type hints are provided, compilation
+    can occur 'ahead of time' when the function is decorated.
+
+    .. code-block:: python
+
+        from jax.core import ShapedArray
+
+            @qjit  # compilation happens at definition
+            @qml.qnode(qml.device("lightning.qubit", wires=2))
+            def circuit(x: complex, z: ShapedArray(shape=(3,), dtype=jnp.float64)):
+                theta = jnp.abs(x)
+                qml.RY(theta, wires=0)
+                qml.Rot(z[0], z[1], z[2], wires=0)
+                return qml.state()
+
+    >>> circuit(0.2j, jnp.array([0.3, 0.6, 0.9]))  # calls precompiled function
+    array([0.75634905-0.52801002j, 0. +0.j,
+       0.35962678+0.14074839j, 0. +0.j])
+
+    .. important::
+
+        Most decomposition logic will be equivalent to PennyLane's decomposition.
+        However, decomposition logic will differ in the following cases:
+
+        1. All :class:`qml.Controlled <pennylane.ops.op_math.Controlled>`
+           operations will decompose to :class:`qml.QubitUnitary
+           <pennylane.QubitUnitary>` operations.
+
+        2. :class:`qml.ControlledQubitUnitary
+           <pennylane.ControlledQubitUnitary>` operations will decompose to
+           :class:`qml.QubitUnitary <pennylane.QubitUnitary>` operations.
+
+        3. The list of device-supported gates employed by Catalyst is currently different than that of the ``lightning.qubit`` device, as defined by the :class:`~.pennylane_extensions.QJITDevice`.
     """
 
     if fn is not None:
