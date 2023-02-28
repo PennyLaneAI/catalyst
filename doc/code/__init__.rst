@@ -1,7 +1,5 @@
-Catalyst
-========
-
-This section contains the API documentation for the Catalyst Python interface.
+PennyLane Python frontend
+=========================
 
 
 .. currentmodule:: catalyst
@@ -9,3 +7,4 @@ This section contains the API documentation for the Catalyst Python interface.
 .. automodapi:: catalyst
     :no-heading:
     :include-all-objects:
+    :no-inheritance-diagram:

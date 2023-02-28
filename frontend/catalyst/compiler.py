@@ -11,6 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""This module contains functions for lowering, compiling, and linking
+MLIR/LLVM representations.
+"""
 
 import os
 import subprocess
@@ -226,7 +229,12 @@ def link_lightning_runtime(filename):
 
 
 def compile(mlir_module, workspace, passes):
-    """Compile a MLIR module to a shared object.
+    """Compile an MLIR module to a shared object.
+
+    .. note::
+
+        For compilation of hybrid quantum-classical PennyLane programs,
+        please see the :func:`~.qjit` decorator.
 
     Args:
         mlir_module (Module): the MLIR module

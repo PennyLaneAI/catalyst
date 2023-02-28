@@ -11,6 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""This module contains the :class:`~.JaxTape`, a PennyLane :class:`~.QuantumTape`
+that supports capturing classical computations and control flow of quantum operations
+that occur within the circuit.
+"""
 
 import jax
 from jax.interpreters.partial_eval import DynamicJaxprTrace, JaxprStackFrame, extend_jaxpr_stack
@@ -49,10 +53,12 @@ class JaxTape:
         """
         Corresponds to the with statement that would look like:
 
-        with jax.core.new_main(DynamicJaxprTrace, dynamic=True) as main:
-            with extended_jaxpr_stack(main, frame):
-                with QuantumTape():
-                    ...tracing
+        .. code-block:: python
+
+            with jax.core.new_main(DynamicJaxprTrace, dynamic=True) as main:
+                with extended_jaxpr_stack(main, frame):
+                    with QuantumTape():
+                        ...
         """
         # corresponds to `with jax.core.new_main(DynamicJaxprTrace, dynamic=True) as main:`
         self.main_cm = jax.core.new_main(DynamicJaxprTrace, dynamic=True)
@@ -72,11 +78,13 @@ class JaxTape:
     def __exit__(self, e_type, e_value, traceback):
         """
         Closes the context managers in the reverse ordering that they were opened in.
-        ie:
-        ```
-        with jax.core.new_main(DynamicJaxprTrace, dynamic=True) as main:
-            with extended_jaxpr_stack(main, frame):
-        ```
+
+        That is,
+
+        ..code-block:: python
+
+            with jax.core.new_main(DynamicJaxprTrace, dynamic=True) as main:
+                with extended_jaxpr_stack(main, frame):
         """
 
         if e_type is None:
@@ -84,7 +92,8 @@ class JaxTape:
 
             def get_params_from_op_or_m_process(op):
                 """
-                Helper function to produce relevant parameters for tracing from different classes.
+                Helper function to produce relevant parameters for tracing
+                from different classes.
                 """
                 if isinstance(op, (qml.Hermitian, qml.QubitUnitary)):
                     # Can I subscript here? Or should I pass everything?
@@ -124,15 +133,20 @@ class JaxTape:
         self.main_cm = None
 
     def eval(self, *args):
-        """Provide mid circuit measurement results and loop outcomes and get the set of circuit parameters.
-        :param args: mic-circuit measurements and loop results
-        :return: circuit parameters
+        """Provide mid circuit measurement results and loop outcomes and get
+        the set of circuit parameters.
+
+        Args:
+            args (list): mid-circuit measurements and loop results.
+
+        Returns:
+            circuit parameters
         """
         return jax.core.eval_jaxpr(self.closed_jaxpr.jaxpr, self.closed_jaxpr.literals, *args)
 
     def create_tracer(self, tree, avals):
         """
-        Given a sample object of type "kind", return a jax tracer of
+        Create JAX tracers for the given abstract arrays.
         """
         return tree_unflatten(tree, map(self.trace.new_arg, avals))
 
