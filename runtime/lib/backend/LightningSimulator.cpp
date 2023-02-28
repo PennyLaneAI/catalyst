@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "LightningSimulator.hpp"
+#include "BaseUtils.hpp"
 
 namespace Catalyst::Runtime::Simulator {
 
@@ -56,7 +57,7 @@ void LightningSimulator::ReleaseQubit(QubitIdType q)
     this->qubit_manager.Release(q);
 }
 
-auto LightningSimulator::GetNumQubits() -> size_t const { return this->device_sv->getNumQubits(); }
+auto LightningSimulator::GetNumQubits() -> size_t { return this->device_sv->getNumQubits(); }
 
 void LightningSimulator::StartTapeRecording()
 {
@@ -82,7 +83,7 @@ auto LightningSimulator::CacheManagerInfo()
 
 void LightningSimulator::SetDeviceShots(size_t shots) { device_shots = shots; }
 
-auto LightningSimulator::GetDeviceShots() -> size_t const { return device_shots; }
+auto LightningSimulator::GetDeviceShots() -> size_t { return device_shots; }
 
 void LightningSimulator::PrintState()
 {
@@ -101,15 +102,9 @@ void LightningSimulator::PrintState()
     cout << state[idx] << "]" << endl;
 }
 
-auto LightningSimulator::Zero() -> Result const
-{
-    return const_cast<Result>(&GLOBAL_RESULT_FALSE_CONST);
-}
+auto LightningSimulator::Zero() -> Result { return const_cast<Result>(&GLOBAL_RESULT_FALSE_CONST); }
 
-auto LightningSimulator::One() -> Result const
-{
-    return const_cast<Result>(&GLOBAL_RESULT_TRUE_CONST);
-}
+auto LightningSimulator::One() -> Result { return const_cast<Result>(&GLOBAL_RESULT_TRUE_CONST); }
 
 void LightningSimulator::NamedOperation(const std::string &name, const std::vector<double> &params,
                                         const std::vector<QubitIdType> &wires, bool inverse)

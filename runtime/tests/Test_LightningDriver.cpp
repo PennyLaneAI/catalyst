@@ -15,7 +15,6 @@
 #include <numeric>
 #include <string>
 
-#include "BaseUtils.hpp"
 #include "LightningUtils.hpp"
 #include "QuantumDevice.hpp"
 #include "RuntimeCAPI.h"
@@ -60,7 +59,7 @@ TEST_CASE("Qubit allocatation and deallocation", "[lightning]")
 
     REQUIRE(n == static_cast<size_t>(q) + 1);
 
-    VectorCplxT<double> state = sim->State();
+    std::vector<std::complex<double>> state = sim->State();
 
     REQUIRE(state.size() == (1ul << n));
     REQUIRE(state[0].real() == Approx(1.0).epsilon(1e-5));
@@ -156,7 +155,7 @@ TEST_CASE("QuantumDevice object test", "[lightning]")
     sim->NamedOperation("Identity", {}, {Qs[6]}, false);
     sim->NamedOperation("Identity", {}, {Qs[8]}, false);
 
-    VectorCplxT<double> out_state = sim->State();
+    std::vector<std::complex<double>> out_state = sim->State();
 
     REQUIRE(out_state[0].real() == Approx(1.0).epsilon(1e-5));
     REQUIRE(out_state[0].imag() == Approx(0.0).epsilon(1e-5));
@@ -176,7 +175,7 @@ TEST_CASE("QuantumDevice object test", "[lightning]")
 
 #ifndef _KOKKOS
     for (size_t i = 10; i < n + 10; i++) {
-        REQUIRE(i == sim->AllocateQubit());
+        REQUIRE(static_cast<QubitIdType>(i) == sim->AllocateQubit());
         // 10, 11, ..., 19
     }
 
@@ -186,7 +185,7 @@ TEST_CASE("QuantumDevice object test", "[lightning]")
     }
 
     for (size_t i = 20; i < n + 20; i++) {
-        REQUIRE(i == sim->AllocateQubit());
+        REQUIRE(static_cast<QubitIdType>(i) == sim->AllocateQubit());
         // 20, 21, ..., 29
     }
 #endif

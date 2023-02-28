@@ -17,6 +17,7 @@
 #include <map>
 
 #include "BaseUtils.hpp"
+#include "LightningUtils.hpp"
 #include "Types.h"
 
 namespace Catalyst::Runtime::Simulator {

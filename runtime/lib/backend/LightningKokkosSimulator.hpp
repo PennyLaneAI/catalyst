@@ -31,7 +31,6 @@ throw std::logic_error("StateVectorKokkos.hpp: No such header file");
 #include "AdjointDiffKokkos.hpp"
 #include "StateVectorKokkos.hpp"
 
-#include "BaseUtils.hpp"
 #include "CacheManager.hpp"
 #include "LightningUtils.hpp"
 #include "ObsManager.hpp"
@@ -45,14 +44,15 @@ class LightningKokkosSimulator final : public Catalyst::Runtime::QuantumDevice {
     static constexpr bool GLOBAL_RESULT_TRUE_CONST = true;
     static constexpr bool GLOBAL_RESULT_FALSE_CONST = false;
 
-    QubitManager<QubitIdType, size_t> qubit_manager;
-    CacheManager cache_manager;
-    bool cache_recording;
+    QubitManager<QubitIdType, size_t> qubit_manager{};
+    CacheManager cache_manager{};
+    bool cache_recording{false};
 
-    size_t device_shots;
+    size_t device_shots{0};
 
-    std::unique_ptr<Pennylane::StateVectorKokkos<double>> device_sv;
-    LightningKokkosObsManager<double> obs_manager;
+    std::unique_ptr<Pennylane::StateVectorKokkos<double>> device_sv =
+        std::make_unique<Pennylane::StateVectorKokkos<double>>(0);
+    LightningKokkosObsManager<double> obs_manager{};
 
     inline auto isValidQubit(QubitIdType wire) -> bool
     {
@@ -91,10 +91,7 @@ class LightningKokkosSimulator final : public Catalyst::Runtime::QuantumDevice {
 
   public:
     LightningKokkosSimulator(bool status = false, size_t shots = 1000)
-        : qubit_manager(QubitManager<QubitIdType, size_t>()), cache_recording(status),
-          cache_manager(CacheManager()), device_shots(shots),
-          obs_manager(LightningKokkosObsManager<double>()),
-          device_sv(std::make_unique<Pennylane::StateVectorKokkos<double>>(0))
+        : cache_recording(status), device_shots(shots)
     {
     }
     ~LightningKokkosSimulator() = default;
@@ -104,14 +101,14 @@ class LightningKokkosSimulator final : public Catalyst::Runtime::QuantumDevice {
     auto AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType> override;
     void ReleaseQubit(QubitIdType q) override;
     void ReleaseAllQubits() override;
-    auto GetNumQubits() -> size_t const override;
+    auto GetNumQubits() -> size_t override;
     void StartTapeRecording() override;
     void StopTapeRecording() override;
     void SetDeviceShots(size_t shots) override;
-    auto GetDeviceShots() -> size_t const override;
+    auto GetDeviceShots() -> size_t override;
     void PrintState() override;
-    auto Zero() -> Result const override;
-    auto One() -> Result const override;
+    auto Zero() -> Result override;
+    auto One() -> Result override;
 
     auto CacheManagerInfo()
         -> std::tuple<size_t, size_t, size_t, std::vector<std::string>, std::vector<ObsIdType>>;

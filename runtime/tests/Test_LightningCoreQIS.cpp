@@ -17,7 +17,7 @@
 #include <sstream>
 #include <string>
 
-#include "BaseUtils.hpp"
+#include "LightningUtils.hpp"
 #include "QuantumDevice.hpp"
 #include "RuntimeCAPI.h"
 
@@ -1243,11 +1243,7 @@ TEST_CASE("Test __quantum__qis__QubitUnitary with an uninitialized matrix", "[qi
     // initialize the simulator
     __quantum__rt__initialize();
 
-    QUBIT *target = __quantum__rt__qubit_allocate();              // id = 0
-    QirArray *ctrls_arr = __quantum__rt__qubit_allocate_array(1); // id = 1
-
-    QUBIT **ctrls = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
-
+    QUBIT *target = __quantum__rt__qubit_allocate(); // id = 0
     MemRefT_CplxT_double_2d *matrix = nullptr;
 
     REQUIRE_THROWS_WITH(__quantum__qis__QubitUnitary(matrix, 1, target),
@@ -1261,11 +1257,7 @@ TEST_CASE("Test __quantum__qis__QubitUnitary with invalid number of wires", "[qi
     // initialize the simulator
     __quantum__rt__initialize();
 
-    QUBIT *target = __quantum__rt__qubit_allocate();              // id = 0
-    QirArray *ctrls_arr = __quantum__rt__qubit_allocate_array(1); // id = 1
-
-    QUBIT **ctrls = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
-
+    QUBIT *target = __quantum__rt__qubit_allocate(); // id = 0
     MemRefT_CplxT_double_2d *matrix = new MemRefT_CplxT_double_2d;
 
     REQUIRE_THROWS_WITH(__quantum__qis__QubitUnitary(matrix, 3, target),
@@ -1280,12 +1272,9 @@ TEST_CASE("Test __quantum__qis__QubitUnitary with invalid matrix", "[qir_lightni
     // initialize the simulator
     __quantum__rt__initialize();
 
-    QUBIT *target = __quantum__rt__qubit_allocate();              // id = 0
-    QirArray *ctrls_arr = __quantum__rt__qubit_allocate_array(1); // id = 1
-
-    QUBIT **ctrls = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
-
+    QUBIT *target = __quantum__rt__qubit_allocate(); // id = 0
     MemRefT_CplxT_double_2d *matrix = new MemRefT_CplxT_double_2d;
+
     matrix->offset = 0;
     matrix->sizes[0] = 1;
     matrix->sizes[1] = 1;

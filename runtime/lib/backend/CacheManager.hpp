@@ -14,7 +14,7 @@
 
 #pragma once
 
-#include "BaseUtils.hpp"
+#include "LightningUtils.hpp"
 #include "ObsManager.hpp"
 #include "Types.h"
 
