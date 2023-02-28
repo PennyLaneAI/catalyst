@@ -239,20 +239,21 @@ jobs:
     - name: Prepare the python package
       run: |
         echo "INSTALLED = True" > $GITHUB_WORKSPACE/frontend/catalyst/_configuration.py
-        mkdir -p $GITHUB_WORKSPACE/frontend/catalyst/bin
-        mkdir -p $GITHUB_WORKSPACE/frontend/catalyst/lib/backend/ $GITHUB_WORKSPACE/frontend/catalyst/lib/capi
         # Copy bins to frontend/catalyst/bin
+        mkdir -p $GITHUB_WORKSPACE/frontend/catalyst/bin
         cp $GITHUB_WORKSPACE/llvm-build/bin/llc $GITHUB_WORKSPACE/frontend/catalyst/bin
         cp $GITHUB_WORKSPACE/llvm-build/bin/mlir-translate $GITHUB_WORKSPACE/frontend/catalyst/bin
         cp $GITHUB_WORKSPACE/mhlo-build/bin/mlir-hlo-opt $GITHUB_WORKSPACE/frontend/catalyst/bin
         cp $GITHUB_WORKSPACE/quantum-build/bin/quantum-opt $GITHUB_WORKSPACE/frontend/catalyst/bin
         # Copy libs to frontend/catalyst/lib
+        mkdir -p $GITHUB_WORKSPACE/frontend/catalyst/lib/backend/ $GITHUB_WORKSPACE/frontend/catalyst/lib/capi
         cp $GITHUB_WORKSPACE/runtime-build/lib/backend/librt_backend.so $GITHUB_WORKSPACE/frontend/catalyst/lib/backend/
         cp $GITHUB_WORKSPACE/runtime-build/lib/capi/librt_capi.so $GITHUB_WORKSPACE/frontend/catalyst/lib/capi
         cp --dereference $GITHUB_WORKSPACE/llvm-build/lib/libmlir_float16_utils.so.* $GITHUB_WORKSPACE/frontend/catalyst/lib
         cp --dereference $GITHUB_WORKSPACE/llvm-build/lib/libmlir_c_runner_utils.so* $GITHUB_WORKSPACE/frontend/catalyst/lib
         # Copy mlir bindings to frontend/mlir_quantum
-        cp -R --dereference $GITHUB_WORKSPACE/quantum-build/python_packages/quantum/mlir_quantum $GITHUB_WORKSPACE/frontend/mlir_quantum
+        mkdir -p $GITHUB_WORKSPACE/frontend/mlir_quantum
+        cp -R --dereference $GITHUB_WORKSPACE/quantum-build/python_packages/quantum/mlir_quantum/runtime $GITHUB_WORKSPACE/frontend/mlir_quantum/runtime
         find $GITHUB_WORKSPACE/frontend -type d -name __pycache__ -exec rm -rf {} +
 
     - name: Build wheel
@@ -310,17 +311,18 @@ jobs:
       run: |
         python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest -n auto
 
-  test-wheel-py-latest:
+  test-wheel-py-min-max:
     needs: [catalyst-linux-wheels-x86-64]
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        python_latest: ["3.11"]
+        python_wheel: ["3.8", "3.11"]
         python_version: ["3.8", "3.9", "3.10", "3.11"]
 
-    # To check the backward ABI compatibility catalyst-py-3.11-wheel with supported python3 versions
-    name: Test py-${{ matrix.python_latest }} Wheel with python${{ matrix.python_version }}
+    # To check forward and backward compatibility catalyst-py-["3.8", "3.11"]-wheel
+    # with all supported python3 versions: ["3.8", "3.9", "3.10", "3.11"]
+    name: Test py-${{ matrix.python_wheel }} Wheel with python${{ matrix.python_version }}
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -332,10 +334,10 @@ jobs:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
-    - name: Download py-${{ matrix.python_latest }} Wheel Artifact
+    - name: Download py-${{ matrix.python_wheel }} Wheel Artifact
       uses: actions/download-artifact@v3
       with:
-        name: catalyst-manylinux2014_x86_64-wheel-py-${{ matrix.python_latest }}.zip
+        name: catalyst-manylinux2014_x86_64-wheel-py-${{ matrix.python_wheel }}.zip
         path: dist
 
     - name: Set up Python ${{ matrix.python_version }}
