@@ -1,23 +1,21 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" contentStyleType="text/css" height="320px" preserveAspectRatio="none" style="width:974px;height:320px;background:#FFFFFF;" version="1.1" viewBox="0 0 974 320" width="974px" zoomAndPan="magnify"><defs/><g><!--MD5=[84dda40acb3410cad7262261daba2aaf]
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" contentStyleType="text/css" height="320px" preserveAspectRatio="none" style="width:978px;height:320px;background:#FFFFFF;" version="1.1" viewBox="0 0 978 320" width="978px" zoomAndPan="magnify"><defs/><g><!--MD5=[84dda40acb3410cad7262261daba2aaf]
 cluster c1--><g id="cluster_c1"><a href="https://github.com/plantuml-stdlib/C4-PlantUML" target="_top" title="https://github.com/plantuml-stdlib/C4-PlantUML" xlink:actuate="onRequest" xlink:href="https://github.com/plantuml-stdlib/C4-PlantUML" xlink:show="new" xlink:title="https://github.com/plantuml-stdlib/C4-PlantUML" xlink:type="simple"><rect fill="none" height="154" rx="2.5" ry="2.5" style="stroke:#444444;stroke-width:1.0;stroke-dasharray:7.0,7.0;" width="855" x="7" y="7"/><text fill="#444444" font-family="sans-serif" font-size="16" font-weight="bold" lengthAdjust="spacing" textLength="72" x="398.5" y="23.8516">Catalyst</text></a></g><!--MD5=[a79645e74fdddf168a098e501fbfe8e0]
-cluster c2--><g id="cluster_c2"><a href="https://github.com/plantuml-stdlib/C4-PlantUML" target="_top" title="https://github.com/plantuml-stdlib/C4-PlantUML" xlink:actuate="onRequest" xlink:href="https://github.com/plantuml-stdlib/C4-PlantUML" xlink:show="new" xlink:title="https://github.com/plantuml-stdlib/C4-PlantUML" xlink:type="simple"><rect fill="none" height="106" rx="2.5" ry="2.5" style="stroke:#444444;stroke-width:1.0;stroke-dasharray:7.0,7.0;" width="549" x="419" y="208"/><text fill="#444444" font-family="sans-serif" font-size="16" font-weight="bold" lengthAdjust="spacing" textLength="76" x="655.5" y="224.8516">Backend</text></a></g><!--MD5=[498392dc87f31ecf3f0f0d614f004c92]
+cluster c2--><g id="cluster_c2"><a href="https://github.com/plantuml-stdlib/C4-PlantUML" target="_top" title="https://github.com/plantuml-stdlib/C4-PlantUML" xlink:actuate="onRequest" xlink:href="https://github.com/plantuml-stdlib/C4-PlantUML" xlink:show="new" xlink:title="https://github.com/plantuml-stdlib/C4-PlantUML" xlink:type="simple"><rect fill="none" height="106" rx="2.5" ry="2.5" style="stroke:#444444;stroke-width:1.0;stroke-dasharray:7.0,7.0;" width="549" x="423" y="208"/><text fill="#444444" font-family="sans-serif" font-size="16" font-weight="bold" lengthAdjust="spacing" textLength="76" x="659.5" y="224.8516">Backend</text></a></g><!--MD5=[498392dc87f31ecf3f0f0d614f004c92]
 entity _tracer_--><g id="elem__tracer_"><rect fill="#438DD5" height="101.4844" rx="2.5" ry="2.5" style="stroke:#3C7FC0;stroke-width:0.5;" width="189" x="23.5" y="44"/><text fill="#FFFFFF" font-family="sans-serif" font-size="16" font-weight="bold" lengthAdjust="spacing" textLength="81" x="77.5" y="68.8516">Frontend</text><text fill="#FFFFFF" font-family="sans-serif" font-size="12" font-style="italic" lengthAdjust="spacing" textLength="131" x="52.5" y="83.7637">[PennyLane and JAX]</text><text fill="#FFFFFF" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="4" x="116" y="99.5889"> </text><text fill="#FFFFFF" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="161" x="37.5" y="115.8857">Python code tracer and</text><text fill="#FFFFFF" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="59" x="88.5" y="132.1826">compiler</text></g><!--MD5=[73be377c473e14cefe6f894c4b07b84a]
 entity _qopt_--><g id="elem__qopt_"><rect fill="#438DD5" height="101.4844" rx="2.5" ry="2.5" style="stroke:#3C7FC0;stroke-width:0.5;" width="210" x="346" y="44"/><text fill="#FFFFFF" font-family="sans-serif" font-size="16" font-weight="bold" lengthAdjust="spacing" textLength="42" x="430" y="68.8516">Core</text><text fill="#FFFFFF" font-family="sans-serif" font-size="12" font-style="italic" lengthAdjust="spacing" textLength="75" x="413.5" y="83.7637">[LLVM/MLIR]</text><text fill="#FFFFFF" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="4" x="449" y="99.5889"> </text><text fill="#FFFFFF" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="182" x="360" y="115.8857">Quantum-specific dialects,</text><text fill="#FFFFFF" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="118" x="392" y="132.1826">passes and tools</text></g><!--MD5=[641bd5c70ab22269a7bf319a8ec744eb]
 entity _catalyst_runtime_--><g id="elem__catalyst_runtime_"><rect fill="#438DD5" height="101.4844" rx="2.5" ry="2.5" style="stroke:#3C7FC0;stroke-width:0.5;" width="220" x="626" y="44"/><text fill="#FFFFFF" font-family="sans-serif" font-size="16" font-weight="bold" lengthAdjust="spacing" textLength="73" x="699.5" y="68.8516">Runtime</text><text fill="#FFFFFF" font-family="sans-serif" font-size="12" font-style="italic" lengthAdjust="spacing" textLength="38" x="717" y="83.7637">[C++]</text><text fill="#FFFFFF" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="4" x="734" y="99.5889"> </text><text fill="#FFFFFF" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="192" x="640" y="115.8857">The QIR Runtime backed by</text><text fill="#FFFFFF" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="59" x="706.5" y="132.1826">qir-stdlib</text></g><!--MD5=[733f99b654dc686796160d35befec8bb]
-entity _pl_lightning_kokkos_--><g id="elem__pl_lightning_kokkos_"><rect fill="#B3B3B3" height="52.5938" rx="2.5" ry="2.5" style="stroke:#A6A6A6;stroke-width:0.5;" width="277" x="435.5" y="245"/><text fill="#FFFFFF" font-family="sans-serif" font-size="16" font-weight="bold" lengthAdjust="spacing" textLength="257" x="445.5" y="269.8516">PennyLane-Lightning-Kokkos</text><text fill="#FFFFFF" font-family="sans-serif" font-size="12" font-style="italic" lengthAdjust="spacing" textLength="63" x="542.5" y="284.7637">[CPU/GPU]</text></g><!--MD5=[a155b433ad7a6dd735c06c5335c8fd0f]
-entity _pl_lightning_--><g id="elem__pl_lightning_"><rect fill="#B3B3B3" height="52.5938" rx="2.5" ry="2.5" style="stroke:#A6A6A6;stroke-width:0.5;" width="205" x="747.5" y="245"/><text fill="#FFFFFF" font-family="sans-serif" font-size="16" font-weight="bold" lengthAdjust="spacing" textLength="185" x="757.5" y="269.8516">PennyLane-Lightning</text><text fill="#FFFFFF" font-family="sans-serif" font-size="12" font-style="italic" lengthAdjust="spacing" textLength="34" x="833" y="284.7637">[CPU]</text></g><!--MD5=[83a0a6e93d3b85fb1ebc49cc726d8cfc]
+entity _pl_lightning_kokkos_--><g id="elem__pl_lightning_kokkos_"><rect fill="#B3B3B3" height="52.5938" rx="2.5" ry="2.5" style="stroke:#A6A6A6;stroke-width:0.5;" width="277" x="439.5" y="245"/><text fill="#FFFFFF" font-family="sans-serif" font-size="16" font-weight="bold" lengthAdjust="spacing" textLength="257" x="449.5" y="269.8516">PennyLane-Lightning-Kokkos</text><text fill="#FFFFFF" font-family="sans-serif" font-size="12" font-style="italic" lengthAdjust="spacing" textLength="63" x="546.5" y="284.7637">[CPU/GPU]</text></g><!--MD5=[a155b433ad7a6dd735c06c5335c8fd0f]
+entity _pl_lightning_--><g id="elem__pl_lightning_"><rect fill="#B3B3B3" height="52.5938" rx="2.5" ry="2.5" style="stroke:#A6A6A6;stroke-width:0.5;" width="205" x="751.5" y="245"/><text fill="#FFFFFF" font-family="sans-serif" font-size="16" font-weight="bold" lengthAdjust="spacing" textLength="185" x="761.5" y="269.8516">PennyLane-Lightning</text><text fill="#FFFFFF" font-family="sans-serif" font-size="12" font-style="italic" lengthAdjust="spacing" textLength="34" x="837" y="284.7637">[CPU]</text></g><!--MD5=[83a0a6e93d3b85fb1ebc49cc726d8cfc]
 link _tracer_ to _qopt_--><g id="link__tracer___qopt_"><path d="M212.53,94.5 C251.56,94.5 297.12,94.5 337.9,94.5 " fill="none" id="_tracer_-to-_qopt_" style="stroke:#666666;stroke-width:1.0;stroke-dasharray:1.0,3.0;"/><polygon fill="#666666" points="345.99,94.5,337.99,91.5,337.99,97.5,345.99,94.5" style="stroke:#666666;stroke-width:1.0;"/><text fill="#666666" font-family="sans-serif" font-size="12" font-weight="bold" lengthAdjust="spacing" textLength="97" x="230.75" y="88.6387">compiles with</text></g><!--MD5=[b449c4c593e08fdb9fba0d49f1f2cfd5]
 link _qopt_ to _catalyst_runtime_--><g id="link__qopt___catalyst_runtime_"><path d="M556.31,94.5 C576.33,94.5 597.4,94.5 617.79,94.5 " fill="none" id="_qopt_-to-_catalyst_runtime_" style="stroke:#666666;stroke-width:1.0;stroke-dasharray:1.0,3.0;"/><polygon fill="#666666" points="625.87,94.5,617.87,91.5,617.87,97.5,625.87,94.5" style="stroke:#666666;stroke-width:1.0;"/><text fill="#666666" font-family="sans-serif" font-size="12" font-weight="bold" lengthAdjust="spacing" textLength="33" x="574.5" y="88.6387">links</text></g><!--MD5=[a05bb08fe0434af30af441955fb3e983]
-link _catalyst_runtime_ to _pl_lightning_kokkos_--><g id="link__catalyst_runtime___pl_lightning_kokkos_"><path d="M690.01,145.18 C662.13,175.3 627.38,212.83 603.22,238.93 " fill="none" id="_catalyst_runtime_-to-_pl_lightning_kokkos_" style="stroke:#666666;stroke-width:1.0;stroke-dasharray:1.0,3.0;"/><polygon fill="#666666" points="597.63,244.98,605.2688,241.1526,600.8686,237.0736,597.63,244.98" style="stroke:#666666;stroke-width:1.0;"/><text fill="#666666" font-family="sans-serif" font-size="12" font-weight="bold" lengthAdjust="spacing" textLength="4" x="660" y="189.1387"> </text></g><!--MD5=[c1c15952bcd494459cc63e09749a496a]
-link _catalyst_runtime_ to _pl_lightning_--><g id="link__catalyst_runtime___pl_lightning_"><path d="M768.36,145.18 C787.82,175.05 812.02,212.2 829,238.27 " fill="none" id="_catalyst_runtime_-to-_pl_lightning_" style="stroke:#666666;stroke-width:1.0;stroke-dasharray:1.0,3.0;"/><polygon fill="#666666" points="833.37,244.98,831.5235,236.6379,826.4936,239.909,833.37,244.98" style="stroke:#666666;stroke-width:1.0;"/><text fill="#666666" font-family="sans-serif" font-size="12" font-weight="bold" lengthAdjust="spacing" textLength="4" x="797" y="189.1387"> </text></g><!--MD5=[49f408c734279aada8f8f77da5be92fd]
+link _catalyst_runtime_ to _pl_lightning_kokkos_--><g id="link__catalyst_runtime___pl_lightning_kokkos_"><path d="M691.15,145.18 C663.95,175.3 630.07,212.83 606.5,238.93 " fill="none" id="_catalyst_runtime_-to-_pl_lightning_kokkos_" style="stroke:#666666;stroke-width:1.0;stroke-dasharray:1.0,3.0;"/><polygon fill="#666666" points="601.04,244.98,608.6346,241.0657,604.1882,237.0372,601.04,244.98" style="stroke:#666666;stroke-width:1.0;"/><text fill="#666666" font-family="sans-serif" font-size="12" font-weight="bold" lengthAdjust="spacing" textLength="32" x="662" y="189.1387">calls</text></g><!--MD5=[c1c15952bcd494459cc63e09749a496a]
+link _catalyst_runtime_ to _pl_lightning_--><g id="link__catalyst_runtime___pl_lightning_"><path d="M769.5,145.18 C789.64,175.05 814.69,212.2 832.27,238.27 " fill="none" id="_catalyst_runtime_-to-_pl_lightning_" style="stroke:#666666;stroke-width:1.0;stroke-dasharray:1.0,3.0;"/><polygon fill="#666666" points="836.79,244.98,834.8032,236.6702,829.8291,240.0256,836.79,244.98" style="stroke:#666666;stroke-width:1.0;"/><text fill="#666666" font-family="sans-serif" font-size="12" font-weight="bold" lengthAdjust="spacing" textLength="32" x="799" y="189.1387">calls</text></g><!--MD5=[5faf3ca8e1f73dc62cb28b32fe5f3156]
 @startuml
 !include <C4/C4_Container.puml>
 
 !include common.iuml
 
 HIDE_STEREOTYPE()
-
-' Person(_user_, "Programmer", "Write a PennyLane hybrid program using QJIT")
 
 Boundary(c1, "Catalyst", $link="https://github.com/plantuml-stdlib/C4-PlantUML") {
 
@@ -35,15 +33,13 @@ Boundary(c2, "Backend", $link="https://github.com/plantuml-stdlib/C4-PlantUML") 
 
 }
 
-' Rel(_user_, _tracer_, " ", "", $tags="action")
-
 Rel_R(_tracer_, _qopt_, "compiles with", "", $tags="action")
 
 Rel_R(_qopt_, _catalyst_runtime_, "links", "", $tags="action")
 
-Rel(_catalyst_runtime_, _pl_lightning_kokkos_, " ", "", $tags="action")
+Rel(_catalyst_runtime_, _pl_lightning_kokkos_, "calls", "", $tags="action")
 
-Rel(_catalyst_runtime_, _pl_lightning_, " ", "", $tags="action")
+Rel(_catalyst_runtime_, _pl_lightning_, "calls", "", $tags="action")
 
 @enduml
 
@@ -598,7 +594,6 @@ skinparam person<<object>> {
 
 hide stereotype
 
-
 rectangle "==Catalyst" <<boundary>> as c1 [[https://github.com/plantuml-stdlib/C4-PlantUML]] {
 
   rectangle "==Frontend\n//<size:12>[PennyLane and JAX]</size>//\n\n Python code tracer and compiler" <<container>> as _tracer_ 
@@ -615,14 +610,13 @@ rectangle "==Backend" <<boundary>> as c2 [[https://github.com/plantuml-stdlib/C4
 
 }
 
-
 _tracer_ -RIGHT->> _qopt_ <<action>> : **compiles with**
 
 _qopt_ -RIGHT->> _catalyst_runtime_ <<action>> : **links**
 
-_catalyst_runtime_ - ->> _pl_lightning_kokkos_ <<action>> : ** **
+_catalyst_runtime_ - ->> _pl_lightning_kokkos_ <<action>> : **calls**
 
-_catalyst_runtime_ - ->> _pl_lightning_ <<action>> : ** **
+_catalyst_runtime_ - ->> _pl_lightning_ <<action>> : **calls**
 
 @enduml
 

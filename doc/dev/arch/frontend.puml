@@ -20,15 +20,17 @@ Boundary(_frontend_, "Frontend", "Python, JAX, MLIR", "Python code tracer and co
 
 Container_Ext(_qopt_, "Catalyst-Core", "quantum-opt", "Catalyst MLIR dialects and passes")
 Container_Ext(_pl_core_, "PennyLane", "QML", "PennyLane QML API")
+Container_Ext(_jax_, "JAX", "Python", "")
 
-Rel_U(_qopt_, _mhlobld_, " ","", $tags="action")
+Rel_D(_mhlobld_, _qopt_, " compiles with","", $tags="action")
 Rel_R(_alg_, _jaxtracer_, " ", "")
 Rel_R(_jaxtracer_, _mhlobld_, "jaxpr", "")
 Rel_R(_mhlobld_, _socomp_, "mlir", "")
-Rel_U( _pl_core_, _jaxtracer_, " ", "", $tags="action")
+Rel_D(_jaxtracer_, _pl_core_, "uses", "", $tags="action")
+Rel_D(_jaxtracer_, _jax_, "uses", "", $tags="action")
 Rel_R(_socomp_, _so_, " ", "")
 
-Rel_D(_user1_, _alg_, " ", "", $tags="action")
+Rel_D(_user1_, _alg_, " qjit", "", $tags="action")
 Rel_D(_user2_, _so_, " AOT/JIT calls", "", $tags="action")
 
 @enduml

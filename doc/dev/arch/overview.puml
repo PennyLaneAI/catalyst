@@ -25,8 +25,8 @@ Rel_R(_tracer_, _qopt_, "compiles with", "", $tags="action")
 
 Rel_R(_qopt_, _catalyst_runtime_, "links", "", $tags="action")
 
-Rel(_catalyst_runtime_, _pl_lightning_kokkos_, " ", "", $tags="action")
+Rel(_catalyst_runtime_, _pl_lightning_kokkos_, "calls", "", $tags="action")
 
-Rel(_catalyst_runtime_, _pl_lightning_, " ", "", $tags="action")
+Rel(_catalyst_runtime_, _pl_lightning_, "calls", "", $tags="action")
 
 @enduml
