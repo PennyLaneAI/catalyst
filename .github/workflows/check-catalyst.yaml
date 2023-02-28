@@ -52,8 +52,7 @@ jobs:
     - name: Install Deps
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
       run: |
-        sudo apt update
-        sudo apt install -y python3 python3-pip cmake ninja-build clang lld
+        sudo apt-get install -y python3 python3-pip cmake ninja-build clang lld
         python3 -m pip install numpy pybind11
 
     - name: Build LLVM
@@ -92,8 +91,7 @@ jobs:
 
     - name: Install Deps
       run: |
-        sudo apt update
-        sudo apt install -y python3 python3-pip cmake ninja-build ccache clang lld
+        sudo apt-get install -y python3 python3-pip cmake ninja-build ccache clang lld
         python3 -m pip install numpy pybind11
 
     - name: Get LLVM Version
@@ -210,8 +208,7 @@ jobs:
     - name: Install Deps
       if: steps.cache-mhlo.outputs.cache-hit != 'true'
       run: |
-        sudo apt update
-        sudo apt install -y cmake ninja-build clang lld
+        sudo apt-get install -y cmake ninja-build clang lld
 
     - name: Build MHLO Dialect
       if: steps.cache-mhlo.outputs.cache-hit != 'true'
@@ -238,7 +235,8 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get -y -q install ninja-build make cmake gcc-10 g++-10 libomp-dev
+        run: |
+          sudo apt-get -y -q install ninja-build make cmake gcc-10 g++-10 libomp-dev
 
       - name: Install rustup with llvm-tools-preview
         uses: actions-rs/toolchain@v1
@@ -292,8 +290,7 @@ jobs:
 
     - name: Install Deps
       run: |
-        sudo apt update
-        sudo apt install -y python3 python3-pip
+        sudo apt-get install -y python3 python3-pip
         python3 -m pip install lit pytest pytest-xdist nbconvert ipykernel
         python3 -m pip install jax==${{ steps.jax-version.outputs.v }} jaxlib==${{ steps.jax-version.outputs.v }}
         python3 -m pip install .
