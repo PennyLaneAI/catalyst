@@ -13,7 +13,7 @@
 # limitations under the License.
 
 """
-Utility functions, parsing, and adding them into MLIR modules.
+Utility code for adding common functions to MLIR modules.
 """
 
 # pylint: disable=no-member
