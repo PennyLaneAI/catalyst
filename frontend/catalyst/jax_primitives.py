@@ -11,6 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""This module contains JAX-compatible quantum primitives to support the lowering
+of quantum operations, measurements, and observables to JAXPR.
+"""
 
 import numpy as np
 

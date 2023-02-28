@@ -22,65 +22,52 @@ class ParamEvaluator:
     A class which can evaluate a jaxpr object one argument at a time.
 
     Suppose we have a function
-    ```python
-    def f(x, y):
-        return 5., x, x * y
-    ```
-    we would like to be able to get the first output of this function (`5.`) since it does not depend on `x` and `y`.
+
+    >>> def f(x, y):
+    ...     return 5., x, x * y
+
+    We would like to be able to get the first output of this function (``5.``)
+    since it does not depend on ``x`` and ``y``.
 
     So using this class we could do
-    ```python
-    args = [6., 2.]
-    expected_out = [5., 6., 12.]
 
-    jaxpr = jax.make_jaxpr(fn)(*args)
-    pe = ParamEvaluator(
-        jaxpr,
-        [tree_flatten(o)[1] for o in expected_out]  # note we need the output shapes (given by pytrees)
-    )
-    ```
+    >>> args = [6., 2.]
+    >>> expected_out = [5., 6., 12.]
+    >>> jaxpr = jax.make_jaxpr(fn)(*args)
+    >>> pe = ParamEvaluator(jaxpr, [tree_flatten(o)[1] for o in expected_out])
 
-    and then to get the first output do:
-    ```python
-    pe.get_partial_return_value()  # 5.
-    ```
+    (Note we need the output shapes given by pytrees.)
 
-    From there we can get the second output by providing only the `x` value
+    Then, to get the first output:
 
-    ```python
-    pe.send_partial(6.)
+    >>> pe.get_partial_return_value()
+    5.
 
-    pe.get_partial_return_value()  # 6.
-    ```
+    From there we can get the second output by providing only the ``x`` value:
+
+    >>> pe.send_partial(6.)
+    >>> pe.get_partial_return_value()
+    6.
 
     and then one more time to get the final output
 
-    ```python
-    pe.send_partial(2.)
+    >>> pe.send_partial(2.)
+    >>> pe.get_partial_return_value()
+    12.
 
-    pe.get_partial_return_value()  # 12.
-    ```
+    Note that, for a more complicated function return type,
+
+    >>> def f(x):
+    ...     return x**2, [x, x + 1], { "my_val": x ** 5 }
+
+    then the output trees would look like, in JAX notation,
+
+    .. code-block:: text
+
+        [(*,), (*, *), { "my_val": * }]
     """
 
     def __init__(self, c_jaxpr, output_trees):
-        """
-        Construct a ParamEvaluator from a closed jaxpr and a list of the expected output pytrees.
-
-        e.g:
-            if the original function is:
-
-            ```python
-                def f(x):
-                    return x**2, [x, x + 1], { "my_val": x ** 5 }
-            ```
-
-            then the output trees would look like:
-
-            ```
-            [(*,), (*, *), { "my_val": * }]  # this is a pytree-like notation
-            ```
-
-        """
         self.output_trees = output_trees
         known, self.unknown, bools, _ = partial_eval_jaxpr_nounits(
             c_jaxpr, [True] * len(c_jaxpr.in_avals), instantiate=False
@@ -108,10 +95,10 @@ class ParamEvaluator:
     def _get_partial_return_value(self):
         """
         Return the next known output value from the function. If no additional known output value exists
-        throw ValueError.
+        throw ``ValueError``.
 
-        return: the next output value of the original jaxpr.
-
+        Returns:
+            the next output value of the original jaxpr
         """
         try:
             return_val = self.out_ordered[self.cur_index]
@@ -124,9 +111,8 @@ class ParamEvaluator:
         """
         Send the next argument of the original jaxpr.
 
-        :param val: the next argument of the jaxpr.
-
-        :return: None
+        Args:
+            val: the next argument of the jaxpr
         """
         flat_val, _ = tree_flatten(val)
 
