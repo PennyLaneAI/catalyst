@@ -13,8 +13,10 @@
 // limitations under the License.
 
 #include "LightningKokkosSimulator.hpp"
+#include "BaseUtils.hpp"
 
 namespace Catalyst::Runtime::Simulator {
+
 auto LightningKokkosSimulator::AllocateQubit() -> QubitIdType
 {
     const size_t num_qubits = this->device_sv->getNumQubits();
@@ -38,7 +40,7 @@ void LightningKokkosSimulator::ReleaseQubit(QubitIdType q) { qubit_manager.Relea
 
 void LightningKokkosSimulator::ReleaseAllQubits() { this->qubit_manager.ReleaseAll(); }
 
-auto LightningKokkosSimulator::GetNumQubits() -> size_t const
+auto LightningKokkosSimulator::GetNumQubits() const -> size_t
 {
     return this->device_sv->getNumQubits();
 }
@@ -67,7 +69,7 @@ auto LightningKokkosSimulator::CacheManagerInfo()
 
 void LightningKokkosSimulator::SetDeviceShots(size_t shots) { device_shots = shots; }
 
-auto LightningKokkosSimulator::GetDeviceShots() -> size_t const { return device_shots; }
+auto LightningKokkosSimulator::GetDeviceShots() const -> size_t { return device_shots; }
 
 void LightningKokkosSimulator::PrintState()
 {
@@ -92,12 +94,12 @@ void LightningKokkosSimulator::PrintState()
     cout << "(" << real(elem_last_cp) << "," << imag(elem_last_cp) << ")]" << endl;
 }
 
-auto LightningKokkosSimulator::Zero() -> Result const
+auto LightningKokkosSimulator::Zero() const -> Result
 {
     return const_cast<Result>(&GLOBAL_RESULT_FALSE_CONST);
 }
 
-auto LightningKokkosSimulator::One() -> Result const
+auto LightningKokkosSimulator::One() const -> Result
 {
     return const_cast<Result>(&GLOBAL_RESULT_TRUE_CONST);
 }

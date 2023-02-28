@@ -14,8 +14,8 @@
 
 #include "TestHelpers.hpp"
 
-#include "BaseUtils.hpp"
 #include "CacheManager.hpp"
+#include "LightningUtils.hpp"
 #include "QuantumDevice.hpp"
 #include "RuntimeCAPI.h"
 

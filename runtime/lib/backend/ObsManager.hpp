@@ -63,7 +63,8 @@ template <typename PrecisionT> class LightningObsManager {
         -> std::shared_ptr<Pennylane::Simulators::Observable<PrecisionT>>
     {
         int64_t key_t = reinterpret_cast<int64_t>(key);
-        QFailIf(key_t >= observables_.size() || key_t < 0, "Invalid observable key");
+        QFailIf(static_cast<size_t>(key_t) >= observables_.size() || key_t < 0,
+                "Invalid observable key");
 
         return std::get<0>(observables_[key_t]);
     }
@@ -109,7 +110,7 @@ template <typename PrecisionT> class LightningObsManager {
 
         for (const auto &key : obsKeys) {
             int64_t key_t = reinterpret_cast<int64_t>(key);
-            QFailIf(key_t >= obs_size || key_t < 0, "Invalid observable key");
+            QFailIf(static_cast<size_t>(key_t) >= obs_size || key_t < 0, "Invalid observable key");
 
             auto &&[obs, type] = observables_[key_t];
 
@@ -142,7 +143,7 @@ template <typename PrecisionT> class LightningObsManager {
 
         for (auto key : obsKeys) {
             int64_t key_t = reinterpret_cast<int64_t>(key);
-            QFailIf(key_t >= obs_size || key_t < 0, "Invalid observable key");
+            QFailIf(static_cast<size_t>(key_t) >= obs_size || key_t < 0, "Invalid observable key");
 
             auto &&[obs, type] = observables_[key_t];
             auto contain_obs = std::find(hamiltonian_valid_obs_types.begin(),
@@ -187,7 +188,8 @@ template <typename PrecisionT> class LightningKokkosObsManager {
     [[nodiscard]] auto getObservable(ObsIdType key) -> std::pair<ObsId, std::vector<size_t>>
     {
         int64_t key_t = reinterpret_cast<int64_t>(key);
-        QFailIf(key_t >= observables_.size() || key_t < 0, "Invalid observable key");
+        QFailIf(static_cast<size_t>(key_t) >= observables_.size() || key_t < 0,
+                "Invalid observable key");
 
         auto &&[obs, wires] = observables_[key_t];
         return {obs, wires};

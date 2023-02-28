@@ -14,20 +14,9 @@
 
 #pragma once
 
-#include <complex>
 #include <stdexcept>
-#include <vector>
-
-#include "Types.h"
-
-#if __has_include("StateVectorKokkos.hpp")
-// this macro is used in the C++ test suite
-#define _KOKKOS
-#endif
 
 namespace Catalyst::Runtime::Simulator {
-template <typename T> using VectorCplxT = std::vector<std::complex<T>>;
-
 static void QFailIf(bool condition, const char *message)
 {
     if (condition) {
