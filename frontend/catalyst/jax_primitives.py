@@ -194,7 +194,7 @@ def _func_def_impl(ctx, *args, call_jaxpr, fn, call=True):
 
 
 def _func_symbol_lowering(ctx, fn_name, call_jaxpr):
-    """Compile the JAXPR function call_jaxpr into an MLIR function."""
+    """Create a func::FuncOp from JAXPR."""
     if isinstance(call_jaxpr, jax.core.Jaxpr):
         call_jaxpr = jax.core.ClosedJaxpr(call_jaxpr, ())
     symbol_name = mlir.lower_jaxpr_to_fun(ctx, fn_name, call_jaxpr, tuple()).name.value
@@ -202,7 +202,7 @@ def _func_symbol_lowering(ctx, fn_name, call_jaxpr):
 
 
 def _func_call_lowering(symbol_name, avals_out, *args):
-    """Call the MLIR function symbol_name"""
+    """Create a func::CallOp from JAXPR."""
     output_types = list(map(mlir.aval_to_ir_types, avals_out))
     flat_output_types = util.flatten(output_types)
     call = CallOp(
@@ -220,11 +220,11 @@ def _func_lowering(ctx, *args, call_jaxpr, fn, call=True):
     The second step is compiling a call to function fn.
 
     Args:
-      ctx: The MLIR context.
-      args: List of arguments or abstract arguments to the function
-      name: Name of the function
-      call_jaxpr: The jaxpr representation of the fn
-      fn: The function being compiled
+      ctx: the MLIR context
+      args: list of arguments or abstract arguments to the function
+      name: name of the function
+      call_jaxpr: the jaxpr representation of the fn
+      fn: the function being compiled
     """
     if fn in mlir_fn_cache:
         symbol_name = mlir_fn_cache[fn]

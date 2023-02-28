@@ -44,14 +44,14 @@ def get_mlir(func, *args, **kwargs):
     """Lower a Python function into an MLIR module.
 
     Args:
-        func: Python function to be lowered.
-        args: Arguments to ``func``.
-        kwargs: Keyword arguments to ``func``.
+        func: python function to be lowered
+        args: arguments to ``func``
+        kwargs: keyword arguments to ``func``
 
     Returns:
-        m: The MLIR module corresponding to ``func``.
-        ctx: The MLIR context corresponding.
-        jaxpr: The jaxpr corresponding to ``func``.
+        m: the MLIR module corresponding to ``func``
+        ctx: the MLIR context corresponding
+        jaxpr: the jaxpr corresponding to ``func``
     """
 
     # The compilation cache must be clear for each translation unit.
@@ -85,11 +85,11 @@ def get_traceable_fn(qfunc, device):
     """Generate a function suitable for jax tracing with custom quantum primitives.
 
     Args:
-        qfunc: The quantum function to be traced.
-        device: The device in which ``qfunc`` is to be run.
+        qfunc: the quantum function to be traced
+        device: the device in which ``qfunc`` is to be run
 
     Returns:
-        traceable_fn: A function that when called, will trace ``qfunc``.
+        traceable_fn: a function that when called, will trace ``qfunc``
     """
 
     def traceable_fn(*args, **kwargs):
@@ -139,11 +139,11 @@ def insert_to_qreg(qubit_states, qreg):
     """Insert known qubit states into the quantum register.
 
     Args:
-        qubit_states: Known qubit states.
-        qreg: Quantum register
+        qubit_states: known qubit states
+        qreg: quantum register
 
     Returns:
-        qreg: Updated quantum register.
+        qreg: updated quantum register
     """
     for wire in qubit_states.keys():
         qreg = jprim.qinsert(qreg, wire, qubit_states[wire])
@@ -221,17 +221,17 @@ def trace_quantum_tape(
     """Trace a quantum tape.
 
     Args:
-        tape: The quantum tape to be traced.
-        qreg: The starting quantum register.
-        has_tracer_return_values: A boolean that indicates whether the quantum tape returns any
-            values.
-        num_wires: The number of wires for this tape.
-        shots: The number of shots for this tape.
+        tape: the quantum tape to be traced
+        qreg: the starting quantum register
+        has_tracer_return_values: a boolean that indicates whether the quantum tape returns any
+            values
+        num_wires: the number of wires for this tape
+        shots: the number of shots for this tape
 
     Returns:
-        out: The output of the quantum tape as a ``DynamicJaxprTracer``.
-        qreg: The quantum register at the end of the quantum tape.
-        qubit_states: The qubit states at the end of the quantum tape.
+        out: the output of the quantum tape as a ``DynamicJaxprTracer``
+        qreg: the quantum register at the end of the quantum tape
+        qubit_states: the qubit states at the end of the quantum tape
 
     """
     if meas_ret_val_indices is None:
@@ -345,11 +345,11 @@ def trace_hamiltonian(coeffs, *nested_obs):
     """Trace a hamiltonian.
 
     Args:
-        coeffs: A list of coefficients.
-        nested_obs: A list of the nested observables.
+        coeffs: a list of coefficients
+        nested_obs: a list of the nested observables
 
     Returns:
-        A hamiltonian JAX primitive used for tracing.
+        a hamiltonian JAX primitive used for tracing
     """
     # jprim.hamiltonian cannot take a python list as input
     # only as *args can a list be passed as an input.
@@ -362,15 +362,15 @@ def trace_observables(obs, qubit_states, p, num_wires, qreg):
     """Trace observables.
 
     Args:
-        obs: An observable.
-        qubit_states: The statically known qubit state at this progam point.
-        p = Parameter evaluator.
-        num_wires: The number of wires.
-        qreg: The quantum register with the state at this program point.
+        obs: an observable
+        qubit_states: the statically known qubit state at this progam point
+        p: parameter evaluator
+        num_wires: the number of wires
+        qreg: the quantum register with the state at this program point
 
     Returns:
-        jax_obs: A JAX primitive corresponding to the observable received as an argument.
-        qubits: A list of qubits used by the observable.
+        jax_obs: a JAX primitive corresponding to the observable received as an argument
+        qubits: a list of qubits used by the observable
     """
     op_args = p.get_partial_return_value()
     qubits = None
@@ -403,13 +403,13 @@ def trace_measurement(meas, obs, qubits, shots):
     """Trace measurement.
 
     Args:
-        meas: Measurement to be traced.
-        obs: Observables used in the measurement.
-        qubits: Qubits used in the measurement.
-        shots: Shots used in the measurement.
+        meas: measurement to be traced
+        obs: observables used in the measurement
+        qubits: qubits used in the measurement
+        shots: shots used in the measurement
 
     Returns:
-        A JAX primitive corresponding to the measurement received as an argument.
+        a JAX primitive corresponding to the measurement received as an argument
     """
     compbasis = obs.primitive == jprim.compbasis_p
     if meas.return_type.value == "sample":

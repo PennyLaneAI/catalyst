@@ -64,9 +64,9 @@ def mlir_type_to_numpy_type(t):
     """Convert an MLIR type to a Numpy type.
 
     Args:
-        t: an MLIR numeric type.
+        t: an MLIR numeric type
     Returns:
-        A numpy type.
+        A numpy type
     Raises:
         TypeError
     """
@@ -100,9 +100,9 @@ class CompiledFunction:
     """CompiledFunction, represents a Compiled Function.
 
     Args:
-        shared_object_file: Path to shared object containing compiled function.
-        func_name: Name of compiled function.
-        restype: List of MLIR tensor types representing the result of the compiled function.
+        shared_object_file: path to shared object containing compiled function
+        func_name: name of compiled function
+        restype: list of MLIR tensor types representing the result of the compiled function
     """
 
     def __init__(
@@ -121,9 +121,9 @@ class CompiledFunction:
         """Whether arguments can be promoted.
 
         Args:
-            compiled_signature: User supplied signature, obtain from either an annotation or a previously compiled
-            implementation of the compiled function.
-            runtime_signature: Runtime signature
+            compiled_signature: user supplied signature, obtain from either an annotation or a previously compiled
+            implementation of the compiled function
+            runtime_signature: runtime signature
 
         Returns:
             bool.
@@ -148,10 +148,10 @@ class CompiledFunction:
         Promote arguments from the type specified in args to the type specified by compiled_signature.
 
         Args:
-            compiled_signature: User supplied signature, obtain from either an annotation or a previously compiled
-            implementation of the compiled function.
-            runtime_signature: Runtime signature
-            *args: Actual arguments to the function
+            compiled_signature: user supplied signature, obtain from either an annotation or a previously compiled
+            implementation of the compiled function
+            runtime_signature: runtime signature
+            *args: actual arguments to the function
 
         Returns:
             promoted_args: Arguments after promotion.
@@ -178,14 +178,14 @@ class CompiledFunction:
         """Load symbols necessary for for execution of the compiled function.
 
         Args:
-            shared_object_file: Path to shared object file
-            func_name: Name of compiled function to be executed.
+            shared_object_file: path to shared object file
+            func_name: name of compiled function to be executed
 
         Returns:
-            shared_object: In memory shared object.
-            function: function handle.
-            setup: Handle to the setup function, which initializes the device.
-            teardown: Handle to the teardown function, which tears down the device.
+            shared_object: in memory shared object
+            function: function handle
+            setup: handle to the setup function, which initializes the device
+            teardown: handle to the teardown function, which tears down the device
         """
         shared_object = ctypes.CDLL(shared_object_file)
 
@@ -211,9 +211,9 @@ class CompiledFunction:
         """Get signature from arguments.
 
         Args:
-            *args: Arguments to the compiled function.
+            *args: arguments to the compiled function
         Returns:
-            A list of JAX shaped arrays.
+            a list of JAX shaped arrays
         """
         try:
             r_sig = []
@@ -229,9 +229,9 @@ class CompiledFunction:
         """Determine if all parameters are typed.
 
         Args:
-            f: Callable, with possible annotation
+            f: callable, with possible annotation
         Returns:
-            bool: Whether all parameters are annotated.
+            bool: whether all parameters are annotated
         """
         signature = inspect.signature(f)
         parameters = signature.parameters
@@ -242,9 +242,9 @@ class CompiledFunction:
         """Get signature from parameter annotations.
 
         Args:
-            f: Callable, with possible annotations.
+            f: callable, with possible annotations
         Returns:
-            Annotations for all parameters if possible. Otherwise, None.
+            annotations for all parameters if possible
 
         """
         can_validate = CompiledFunction.are_all_signature_params_annotated(f)
@@ -260,9 +260,9 @@ class CompiledFunction:
         """Cast a zero ranked memrefs to a numpy array.
 
         Args:
-            ranked_memref: A zero ranked memref descriptor.
+            ranked_memref: a zero ranked memref descriptor
         Returns:
-            A numpy array with the contents of the ranked memref descriptor.
+            a numpy array with the contents of the ranked memref descriptor
         """
         assert not hasattr(ranked_memref, "shape")
         return np.array(ranked_memref.aligned.contents)
@@ -272,10 +272,10 @@ class CompiledFunction:
         """Cast a ranked memref to numpy array.
 
         Args:
-            memref_desc: A descriptor of a ranked memref.
+            memref_desc: a descriptor of a ranked memref
 
         Returns:
-            A numpy array.
+            a numpy array
         """
         ranked_memref = memref_desc.contents
         if not hasattr(ranked_memref, "shape"):
@@ -287,10 +287,10 @@ class CompiledFunction:
         """Cast the ranked memrefs to numpy
 
         Args:
-            ranked_memrefs: a list of memrefs.
+            ranked_memrefs: a list of memrefs
 
         Returns:
-            A list of numpy arrays.
+            a list of numpy arrays
         """
         # pylint: disable=redefined-outer-name
         ranked_memref_to_numpy = CompiledFunction.ranked_memref_to_numpy
@@ -301,10 +301,10 @@ class CompiledFunction:
         """Cast the return value to a list of ranked memrefs.
 
         Args:
-            return_value: to a return value descriptor.
+            return_value: to a return value descriptor
 
         Returns:
-            List of ranked memrefs.
+            list of ranked memrefs
         """
         return_value_type = type(return_value)
         # pylint: disable=protected-access
@@ -317,10 +317,10 @@ class CompiledFunction:
         """Cast the return value pointer to a list of ranked memrefs.
 
         Args:
-            return_value_ptr: pointer to a return value descriptor.
+            return_value_ptr: pointer to a return value descriptor
 
         Returns:
-            List of ranked memrefs.
+            list of ranked memrefs
         """
         return CompiledFunction.return_value_to_ranked_memrefs(return_value_ptr.contents)
 
@@ -329,10 +329,10 @@ class CompiledFunction:
         """Cast the return value pointer to a list of numpy arrays.
 
         Args:
-            return_value_ptr: pointer to a return value descriptor.
+            return_value_ptr: pointer to a return value descriptor
 
         Returns:
-            List or single numpy array.
+            list or single numpy array
         """
         ranked_memrefs = CompiledFunction.return_value_ptr_to_ranked_memrefs(return_value_ptr)
         return_value = CompiledFunction.ranked_memrefs_to_numpy(ranked_memrefs)
@@ -344,13 +344,13 @@ class CompiledFunction:
         """Execute the compiled function with arguments `*args`.
 
         Args:
-            shared_object_file: Path to the shared object file containing the JIT compiled function.
-            func_name: Name of the JIT compiled function.
-            has_return: Whether the function returns a value or not.
-            *args: arguments to the function.
+            shared_object_file: path to the shared object file containing the JIT compiled function
+            func_name: name of the JIT compiled function
+            has_return: whether the function returns a value or not
+            *args: arguments to the function
 
         Returns:
-            retval: The value computed by the function or None if the function has no return value.
+            retval: the value computed by the function or None if the function has no return value
         """
         shared_object, function, setup, teardown = CompiledFunction.load_symbols(
             shared_object_file, func_name
@@ -385,9 +385,9 @@ class CompiledFunction:
         """Convert an MLIR tensor type to a memref descriptor.
 
         Args:
-            mlir_tensor_type: An MLIR tensor type.
+            mlir_tensor_type: an MLIR tensor type
         Returns:
-            A memref descriptor with empty data.
+            a memref descriptor with empty data
         """
         assert mlir_tensor_type
         assert mlir_tensor_type is not tuple
@@ -403,10 +403,10 @@ class CompiledFunction:
         """Converts the return type to a compatible type for the expected ABI.
 
         Args:
-            mlir_tensor_types: A list of MLIR tensor types which match the expected return type.
+            mlir_tensor_types: a list of MLIR tensor types which match the expected return type
         Returns:
-            A pointer to a CompiledFunctionReturnValue, which corresponds to a structure in which
-            fields match the expected return types.
+            a pointer to a CompiledFunctionReturnValue, which corresponds to a structure in which
+            fields match the expected return types
         """
         error_msg = """This function must be called with a non-zero length list as an argument."""
         assert mlir_tensor_types, error_msg
@@ -431,12 +431,12 @@ class CompiledFunction:
         the ABI, the return value is changed to a pointer and passed as the first parameter.
 
         Args:
-            restype: Result type. The type of restype is a CompiledFunctionReturnValue.
-            args: The JAX arrays to be used as arguments to the function.
+            restype: the type of restype is a CompiledFunctionReturnValue
+            args: the JAX arrays to be used as arguments to the function
 
         Returns:
-            c_abi_args: A list of memref descriptor pointers to return values and parameters.
-            numpy_arg_buffer: A list to the return values. Must be kept around until the function
+            c_abi_args: a list of memref descriptor pointers to return values and parameters
+            numpy_arg_buffer: A list to the return values. It must be kept around until the function
                 finishes execution as the memref descriptors will point to memory locations inside
                 numpy arrays.
 
@@ -526,7 +526,7 @@ class QJIT:
         Print one of the recorded stages.
 
         Args:
-            stage: string corresponding with the name of the stage to be printed.
+            stage: string corresponding with the name of the stage to be printed
         """
         if self.passes.get(stage):
             with open(self.passes[stage], "r", encoding="utf-8") as f:
@@ -557,10 +557,10 @@ class QJIT:
         """Trace self.qfunc
 
         Args:
-            *args: Either the concrete values to be passed as arguments to `fn` or abstract values.
+            *args: either the concrete values to be passed as arguments to `fn` or abstract values
 
         Returns:
-            An MLIR module.
+            an MLIR module
         """
         assert args is not None
         self.c_sig = CompiledFunction.get_runtime_signature(*args)

@@ -85,10 +85,10 @@ def qfunc(num_wires, *, shots=1000, device=None):
         num_wires (int): the number of wires
         fn (Callable): the quantum function
         shots (int): How many times the circuit should be evaluated (or sampled) to estimate
-            the expectation values. Defaults to 1000
-        device (a derived class from QubitDevice): a device specification which determines
-            the valid gate set for the quantum function. Defaults to ``QJITDevice`` if not
-            specified
+            the expectation values. It defaults to 1000.
+        device (a derived class from QubitDevice): A device specification which determines
+            the valid gate set for the quantum function. It defaults to ``QJITDevice`` if not
+            specified.
 
     Returns:
         Grad: A QFunc object that denotes the the declaration of a quantum function.
@@ -111,7 +111,7 @@ class Function:
     functions in MLIR.
 
     Args:
-        fn: The function boundary.
+        fn: the function boundary
     """
 
     def __init__(self, fn):

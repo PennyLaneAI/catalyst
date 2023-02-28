@@ -156,9 +156,9 @@ def lower_mhlo_to_linalg(filename):
     """Translate MHLO to linalg dialect.
 
     Args:
-        filename: The path to a file were the program is stored.
+        filename: the path to a file were the program is stored
     Returns:
-        A path to the output file.
+        a path to the output file
     """
     assert filename[-5:] == ".mlir", "input is not an mlir file"
 
@@ -179,9 +179,9 @@ def bufferize_tensors(filename):
     """Translate MHLO to linalg dialect.
 
     Args:
-        filename: The path to a file were the program is stored.
+        filename: the path to a file were the program is stored
     Returns:
-        A path to the output file.
+        a path to the output file
     """
     assert filename[-5:] == ".mlir", "input is not an mlir file"
 
@@ -201,9 +201,9 @@ def lower_all_to_llvm(filename):
     """Translate MLIR dialects to LLVM dialect.
 
     Args:
-        filename: The path to a file were the program is stored.
+        filename: the path to a file were the program is stored
     Returns:
-        A path to the output file.
+        a path to the output file
     """
     assert filename[-10:] == ".buff.mlir", "input is not a bufferized mlir file"
 
@@ -222,9 +222,9 @@ def convert_mlir_to_llvmir(filename):
     """Translate LLVM dialect to LLVM IR.
 
     Args:
-        filename: The path to a file were the program is stored.
+        filename: the path to a file were the program is stored
     Returns:
-        A path to the output file.
+        a path to the output file
     """
     assert filename[-10:] == ".llvm.mlir", "input is not an llvm dialect mlir file"
 
@@ -243,9 +243,9 @@ def compile_llvmir(filename):
     """Translate LLVM IR to an object file.
 
     Args:
-        filename: The path to a file were the program is stored.
+        filename: the path to a file were the program is stored
     Returns:
-        A path to the output file.
+        a path to the output file
     """
     assert filename[-3:] == ".ll", "input is not an llvmir file"
 
@@ -263,9 +263,9 @@ def link_lightning_runtime(filename):
     """Link the object file as a shared object.
 
     Args:
-        filename: The path to a file were the object file is stored.
+        filename: the path to a file were the object file is stored
     Returns:
-        A path to the output file.
+        a path to the output file
     """
     assert filename[-2:] == ".o", "input is not an object file"
 
