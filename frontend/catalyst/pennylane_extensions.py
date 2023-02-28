@@ -163,7 +163,9 @@ def grad(f, *, method=None, h=None, argnum=None):
 
     .. warning::
 
-        If parameter-shift or adjoint is specified,
+        If parameter-shift or adjoint is specified, this will only be used
+        for internal _quantum_ functions. Classical components will be differentiated
+        using finite-differences.
 
     .. warning::
 
@@ -752,7 +754,7 @@ def for_loop(lower_bound, upper_bound, step):
 
     .. code-block:: python
 
-        def for_loop(lower_bound, upper_bound, step)(loop_fn)(*args):
+        def for_loop(lower_bound, upper_bound, step, loop_fn, *args):
             for i in range(lower_bound, upper_bound, step):
                 args = loop_fn(i, *args)
             return args

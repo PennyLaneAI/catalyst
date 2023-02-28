@@ -146,7 +146,7 @@ class JaxTape:
 
     def create_tracer(self, tree, avals):
         """
-        Given a sample object of type ``kind``, return a jax tracer of
+        Create JAX tracers for the given abstract arrays.
         """
         return tree_unflatten(tree, map(self.trace.new_arg, avals))
 
