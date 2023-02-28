@@ -63,6 +63,6 @@ and the following modules:
 
 - `pennylane_extensions.py <https://github.com/PennyLaneAI/catalyst/tree/main/frontend/pennylane_extensions.py>`_:
     This module contains various functions for enabling Catalyst functionality (such as mid-circuit
-    measurements, advanced control flow, and gradients) from PennyLane while using:func:`~.qjit`.
+    measurements, advanced control flow, and gradients) from PennyLane while using :func:`~.qjit`.
 
 .. frontend-end-inclusion-marker-do-not-remove
