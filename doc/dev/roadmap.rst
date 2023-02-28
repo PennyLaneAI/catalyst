@@ -1,8 +1,5 @@
-Development
-===========
-
 Roadmap
--------
+=======
 
 - **Frontend:** As we continue to build out Catalyst, the PennyLane frontend
   will likely be upstreamed into PennyLane proper, providing native JIT

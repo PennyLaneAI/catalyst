@@ -61,18 +61,18 @@ Catalyst
 
    dev/installation
    dev/quick_start
-   dev/development
-   dev/architecture
    dev/release_notes
 
 .. toctree::
    :maxdepth: 2
-   :caption: Modules
+   :caption: Development
    :hidden:
 
+   dev/architecture
    modules/frontend
    modules/mlir
    modules/runtime
+   dev/roadmap
 
 .. toctree::
    :maxdepth: 2
