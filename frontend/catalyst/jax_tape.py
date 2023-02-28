@@ -16,10 +16,6 @@ that supports capturing classical computations and control flow of quantum opera
 that occur within the circuit.
 """
 
-"""
-JaxTape
-"""
-
 import jax
 from jax.interpreters.partial_eval import DynamicJaxprTrace, JaxprStackFrame, extend_jaxpr_stack
 from jax.tree_util import tree_flatten, tree_unflatten
