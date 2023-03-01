@@ -191,6 +191,7 @@ add_module_names = False
 # built documents.
 
 import catalyst  # pylint: disable=wrong-import-position
+
 release = catalyst.__version__
 
 # The short X.Y version.
