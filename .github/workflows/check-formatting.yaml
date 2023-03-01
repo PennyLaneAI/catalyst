@@ -7,7 +7,7 @@ on:
 jobs:
   format-python:
     name: Python Formatting
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
 
     steps:
       - name: Cancel previous runs
@@ -36,7 +36,7 @@ jobs:
 
   format-cpp:
     name: C++ Formatting
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
 
     steps:
       - name: Cancel previous runs

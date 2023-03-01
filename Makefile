@@ -5,7 +5,7 @@ MK_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 MK_DIR := $(dir $(MK_ABSPATH))
 DIALECTS_BUILD_DIR := $(if $(dialects_build_dir:-=),$(dialects_build_dir),$(MK_DIR)/mlir/build)
 RT_BUILD_DIR := $(if $(runtime_build_dir:-=),$(runtime_build_dir),$(MK_DIR)/runtime/build)
-COVERAGE := --cov=catalyst --cov-report term-missing
+COVERAGE := --cov=catalyst --cov-report=term-missing --tb=native
 
 .PHONY: help
 help:
@@ -77,11 +77,14 @@ clean-all:
 	$(MAKE) -C runtime clean
 
 .PHONY: coverage coverage-frontend
-coverage: coverage-frontend
+coverage: coverage-frontend coverage-runtime
 
 coverage-frontend: | frontend
 	@echo "Generating coverage report for the frontend"
-	$(PYTHON) pytest frontend/test/pytest --tb=native -n auto $(COVERAGE)
+	$(PYTHON) pytest frontend/test/pytest -n auto $(COVERAGE)
+
+coverage-runtime:
+	$(MAKE) -C runtime coverage
 
 .PHONY: format
 format:

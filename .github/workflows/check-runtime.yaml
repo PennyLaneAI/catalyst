@@ -11,7 +11,7 @@ jobs:
   runtime-tests:
     strategy:
       matrix:
-        os: [ubuntu-22.04]
+        os: [ubuntu-latest]
         simulator: ['lightning', 'lightning-kokkos']
 
     name: Runtime Tests (Linux)
@@ -27,7 +27,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Install dependencies
-        run: sudo apt-get -y -q install cmake ninja-build gcc-10 g++-10 clang libomp-dev
+        run: sudo apt-get -y -q install cmake ninja-build gcc-10 g++-10 libomp-dev lcov
 
       - name: Install rustup with llvm-tools-preview
         uses: actions-rs/toolchain@v1
@@ -47,11 +47,13 @@ jobs:
       - name: Build Runtime test suite for Lightning simulator
         if: ${{ matrix.simulator == 'lightning' }}
         run: |
-            cmake -S runtime -B build -DCMAKE_BUILD_TYPE=Release \
+            cmake -S runtime -B build -DCMAKE_BUILD_TYPE=Debug \
                                       -DENABLE_LIGHTNING_KOKKOS=OFF \
+                                      -DCMAKE_C_COMPILER=$(which gcc-10) \
                                       -DCMAKE_CXX_COMPILER="$(which g++-10)" \
                                       -DQIR_STDLIB_LIB="$(pwd)/runtime/build-qir-stdlib/" \
                                       -DQIR_STDLIB_INCLUDES="$(pwd)/runtime/build-qir-stdlib/include/" \
+                                      -DENABLE_CODE_COVERAGE=ON \
                                       -G Ninja
             cmake --build build --target runner_tests -j$(nproc)
 
@@ -60,6 +62,7 @@ jobs:
         run: |
             cmake -S runtime -B build -DCMAKE_BUILD_TYPE=Release \
                                       -DENABLE_LIGHTNING_KOKKOS=ON \
+                                      -DCMAKE_C_COMPILER=$(which gcc-10) \
                                       -DCMAKE_CXX_COMPILER="$(which g++-10)" \
                                       -DQIR_STDLIB_LIB="$(pwd)/runtime/build-qir-stdlib/" \
                                       -DQIR_STDLIB_INCLUDES="$(pwd)/runtime/build-qir-stdlib/include/" \
@@ -70,16 +73,29 @@ jobs:
         run: |
             ./build/tests/runner_tests -s
 
-      - name: Create tests report
+      - name: Runtime Code Coverage
+        if: ${{ matrix.simulator == 'lightning' }}
         run: |
-            mkdir -p ./build/tests/results
-            ./build/tests/runner_tests --reporter junit --out ./build/tests/results/tests_result.xml
+            lcov --directory build -b ./runtime/lib --capture --output-file build/coverage.info
+            lcov --remove build/coverage.info '/usr/*' '*/_deps/*' --output-file build/coverage.info
+            mv build/coverage.info coverage-${{ github.job }}.info
+
+      - name: Upload code coverage results
+        if: ${{ matrix.simulator == 'lightning' }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: ubuntu-codecov-results-cpp
+          path: ./coverage-${{ github.job }}.info
 
       - name: Build examples
         if: ${{ matrix.simulator == 'lightning' }}
         run: |
-          echo $(clang --version)
           cd ./runtime/examples && make all BUILD_DIR=../../build
+
+      - name: Create tests report
+        run: |
+            mkdir -p ./build/tests/results
+            ./build/tests/runner_tests --reporter junit --out ./build/tests/results/tests_result.xml
 
       - name: Upload tests
         uses: actions/upload-artifact@v3
@@ -87,3 +103,23 @@ jobs:
         with:
           name: runtime-linux-test-report
           path: ./build/tests/results/tests_result.xml
+
+  upload-to-codecov-linux-cpp:
+    needs: [runtime-tests]
+    name: Upload coverage data to codecov
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Download coverage reports
+        uses: actions/download-artifact@v3
+        with:
+          name: ubuntu-codecov-results-cpp
+
+      - name: Upload to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          fail_ci_if_error: true
+          token: ${{ secrets.CODECOV_TOKEN }}
