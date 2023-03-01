@@ -13,7 +13,7 @@ env:
 jobs:
   llvm:
     name: LLVM Build
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
     - name: Cancel previous runs
       uses: styfle/cancel-workflow-action@0.11.0
@@ -82,7 +82,7 @@ jobs:
   quantum:
     name: Quantum Dialects Build
     needs: llvm
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
     - name: Cancel previous runs
       uses: styfle/cancel-workflow-action@0.11.0
@@ -155,7 +155,7 @@ jobs:
   mhlo:
     name: MHLO Dialect Build
     needs: llvm
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
     - name: Cancel previous runs
       uses: styfle/cancel-workflow-action@0.11.0
@@ -226,7 +226,7 @@ jobs:
 
   runtime:
     name: Catalyst-Runtime
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
 
     steps:
       - name: Cancel previous runs
@@ -277,7 +277,7 @@ jobs:
   frontend:
     name: Frontend Tests
     needs: [llvm, mhlo, quantum, runtime]
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
     - name: Cancel previous runs
       uses: styfle/cancel-workflow-action@0.11.0
@@ -379,7 +379,7 @@ jobs:
   upload-to-codecov-linux-python:
     needs: [frontend]
     name: Upload coverage data to codecov
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v3
