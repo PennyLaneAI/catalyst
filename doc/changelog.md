@@ -1,3 +1,7 @@
+# Release 0.2.0-dev
+
+<h3>Contributors</h3>
+
 # Release 0.1.0
 
 Initial public release.
