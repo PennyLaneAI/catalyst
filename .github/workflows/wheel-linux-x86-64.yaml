@@ -274,6 +274,7 @@ jobs:
       matrix:
         os: [ubuntu-latest]
         python_version: ["3.8", "3.9", "3.10", "3.11"]
+        container: ["quay.io/pypa/manylinux2014_x86_64", "ubuntu-20.04", "ubuntu-22.04"]
 
     # To check all wheels for supported python3 versions
     name: Test Wheels (Python ${{ matrix.python_version }})
@@ -311,7 +312,7 @@ jobs:
       run: |
         python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest -n auto
 
-  test-wheel-py-min-max:
+  test-wheels-forwards-backwards-compat:
     needs: [catalyst-linux-wheels-x86-64]
     strategy:
       fail-fast: false
