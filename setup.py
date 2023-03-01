@@ -57,7 +57,8 @@ description = {
 
 setup(
     classifiers=classifiers,
-    name="catalyst",
+    name="pennylane-catalyst",
+    provides=["catalyst"],
     version=version,
     python_requires=">=3.8",
     install_requires=requirements,
