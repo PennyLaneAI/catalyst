@@ -7,6 +7,10 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+env:
+  COVERAGE_FLAGS: "--cov=catalyst --cov-report=term-missing --cov-report=xml:./coverage.xml -p no:warnings --tb=native"
+
+
 jobs:
   llvm:
     name: LLVM Build
@@ -291,7 +295,7 @@ jobs:
     - name: Install Deps
       run: |
         sudo apt-get install -y python3 python3-pip
-        python3 -m pip install lit pytest pytest-xdist nbconvert ipykernel
+        python3 -m pip install lit pytest pytest-xdist pytest-cov nbconvert ipykernel
         python3 -m pip install jax==${{ steps.jax-version.outputs.v }} jaxlib==${{ steps.jax-version.outputs.v }}
         python3 -m pip install .
 
@@ -364,4 +368,11 @@ jobs:
     - name: Run Python Pytest Tests
       run: |
         export ASAN_OPTIONS=detect_odr_violation=0
-        pytest frontend/test/pytest -n auto
+        pytest frontend/test/pytest -n auto $COVERAGE_FLAGS
+        mv coverage.xml coverage-${{ github.job }}.xml
+
+    - name: Upload code coverage results
+      uses: actions/upload-artifact@v3
+      with:
+        name: ubuntu-codecov-results-python
+        path: ./coverage-${{ github.job }}.xml
