@@ -75,6 +75,7 @@ jobs:
 
       - name: Runtime Code Coverage
         if: ${{ matrix.simulator == 'lightning' }}
+        run: |
             lcov --directory build -b ./runtime/lib --capture --output-file build/coverage.info
             lcov --remove build/coverage.info '/usr/*' '*/_deps/*' --output-file build/coverage.info
             mv build/coverage.info coverage-${{ github.job }}.info
