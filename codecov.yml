@@ -1,0 +1,14 @@
+fixes:
+  - "main/::"
+
+ignore:
+  - "frontend/test"
+  - "frontend/mlir_quantum"
+  - "frontend/catalyst/python_bindings"
+
+codecov:
+  notify:
+    after_n_builds: 4
+
+comment:
+  after_n_builds: 4

@@ -11,7 +11,7 @@ jobs:
   runtime-tests:
     strategy:
       matrix:
-        os: [ubuntu-latest]
+        os: [ubuntu-22.04]
         simulator: ['lightning', 'lightning-kokkos']
 
     name: Runtime Tests (Linux)
@@ -107,7 +107,7 @@ jobs:
   upload-to-codecov-linux-cpp:
     needs: [runtime-tests]
     name: Upload coverage data to codecov
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     steps:
       - name: Checkout
