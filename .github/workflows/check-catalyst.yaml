@@ -10,7 +10,6 @@ on:
 env:
   COVERAGE_FLAGS: "--cov=catalyst --cov-report=term-missing --cov-report=xml:./coverage.xml -p no:warnings --tb=native"
 
-
 jobs:
   llvm:
     name: LLVM Build
