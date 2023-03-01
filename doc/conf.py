@@ -190,7 +190,7 @@ add_module_names = False
 # |version| and |release|, also used in various other places throughout the
 # built documents.
 
-import catalyst
+import catalyst  # pylint: disable=wrong-import-position
 release = catalyst.__version__
 
 # The short X.Y version.
