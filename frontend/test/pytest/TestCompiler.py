@@ -1,12 +1,12 @@
 """
-Unit tests for AbstractLinker class
+Unit tests for CompilerDriver class
 """
 
 import os
 import warnings
 import pytest
 
-from catalyst.compiler import AbstractLinker
+from catalyst.compiler import CompilerDriver
 from catalyst.utils.temp_env import TempEnv
 
 
@@ -24,36 +24,36 @@ class TestTempEnv:
         assert old_values == os.environ
 
 
-class TestAbstractLinker:
-    """Unit test for AbstractLinker class."""
+class TestCompilerDriver:
+    """Unit test for CompilerDriver class."""
 
     def test_catalyst_cc_available(self):
-        """Test that the linker resolution order contains the preferred linker and no warnings
+        """Test that the compiler resolution order contains the preferred compiler and no warnings
         are emitted"""
-        linker = "c99"
-        with TempEnv(CATALYST_CC=linker):
+        compiler = "c99"
+        with TempEnv(CATALYST_CC=compiler):
             # If a warning is emitted, raise an error.
             with warnings.catch_warnings():
                 warnings.simplefilter("error")
                 # pylint: disable=protected-access
-                linkers = AbstractLinker._lro([])
-                assert linker in linkers
+                compilers = CompilerDriver._cfo([])
+                assert compiler in compilers
 
     def test_catalyst_cc_unavailable_warning(self):
-        """Test that a warning is emitted when the preferred linker is not in PATH."""
+        """Test that a warning is emitted when the preferred compiler is not in PATH."""
         with TempEnv(CATALYST_CC="this-binary-does-not-exist"):
-            with pytest.warns(UserWarning, match="User defined linker.* is not in PATH."):
+            with pytest.warns(UserWarning, match="User defined compiler.* is not in PATH."):
                 # pylint: disable=protected-access
-                AbstractLinker._lro([])
+                CompilerDriver._cfo([])
 
-    def test_linker_failed_warning(self):
-        """Test that a warning is emitted when a linker failed."""
-        linker = "cc"
+    def test_compiler_failed_warning(self):
+        """Test that a warning is emitted when a compiler failed."""
+        compiler = "cc"
         with pytest.warns(UserWarning, match="Linker .* failed .*"):
             # pylint: disable=protected-access
-            AbstractLinker._attempt_link(linker, [""], "in.o", "out.so")
+            CompilerDriver._attempt_link(compiler, [""], "in.o", "out.so")
 
     def test_link_fail_exception(self):
-        """Test that an exception is raised when all linker possibilities are exhausted."""
+        """Test that an exception is raised when all compiler possibilities are exhausted."""
         with pytest.raises(EnvironmentError, match="Unable to link .*"):
-            AbstractLinker.link("in.o", "out.so", fallback_linkers=["this-binary-does-not-exist"])
+            CompilerDriver.link("in.o", "out.so", fallback_compilers=["this-binary-does-not-exist"])

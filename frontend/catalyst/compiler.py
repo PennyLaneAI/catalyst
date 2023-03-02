@@ -123,24 +123,21 @@ compiler_flags = [
 
 
 # pylint: disable=too-few-public-methods
-class AbstractLinker:
-    """Linker interface
-
-    In order to avoid relying on a single linker at run time and allow the user some flexibility,
-    this class defines a linker resolution order where multiple known linkers are attempted. The
-    order is defined as follows:
-
-    1. A user specified linker via the environment variable CATALYST_CC. It is expected that the
-        user provided linker is flag compatilble with gcc.
-    2. clang: May be configured to use LLD or LD. Both of which are flag compatible. Priority is
-        given to clang to maintain an LLVM toolchain through all the process.
+class CompilerDriver:
+    """Compiler Driver Interface
+    In order to avoid relying on a single compiler at run time and allow the user some flexibility,
+    this class defines a compiler resolution order where multiple known compilers are attempted.
+    The order is defined as follows:
+    1. A user specified compiler via the environment variable CATALYST_CC. It is expected that the
+        user provided compiler is flag compatilble with GCC/Clang.
+    2. clang: Priority is given to clang to maintain an LLVM toolchain through most of the process.
     3. gcc: Usually configured to link with LD.
     4. c99: Usually defaults to gcc, but no linker interface is specified.
     5. c89: Usually defaults to gcc, but no linker interface is specified.
     6. cc: Usually defaults to gcc, however POSIX states that it is deprecated.
     """
 
-    _default_fallback_linkers = ["clang", "gcc", "c99", "c89", "cc"]
+    _default_fallback_compilers = ["clang", "gcc", "c99", "c89", "cc"]
 
     @staticmethod
     def _flags():
@@ -149,7 +146,7 @@ class AbstractLinker:
         lrt_capi_path = os.path.join(lrt_lib_path, "capi")
         lrt_backend_path = os.path.join(lrt_lib_path, "backend")
 
-        linker_flags = [
+        flags = [
             "-Wno-unused-command-line-argument",
             "-Wno-override-module",
             "-shared",
@@ -169,49 +166,52 @@ class AbstractLinker:
             "-lmlir_c_runner_utils",  # required for memref.copy
         ]
 
-        return linker_flags
+        return flags
 
     @staticmethod
-    def _lro(fallback_linkers):
-        """Linker resolution order"""
-        preferred_linker = os.environ.get("CATALYST_CC", None)
-        preferred_linker_exists = AbstractLinker._exists(preferred_linker)
-        linkers = fallback_linkers
-        emit_warning = preferred_linker and not preferred_linker_exists
+    def _cfo(fallback_compilers):
+        """Compiler fallback order"""
+        preferred_compiler = os.environ.get("CATALYST_CC", None)
+        preferred_compiler_exists = CompilerDriver._exists(preferred_compiler)
+        compilers = fallback_compilers
+        emit_warning = preferred_compiler and not preferred_compiler_exists
         if emit_warning:
-            msg = f"User defined linker {preferred_linker} is not in PATH. Will attempt fallback on available linkers."
+            msg = f"User defined compiler {preferred_compiler} is not in PATH. Will attempt fallback on available compilers."
             warnings.warn(msg, UserWarning)
         else:
-            linkers = [preferred_linker] + fallback_linkers
-        return linkers
+            compilers = [preferred_compiler] + fallback_compilers
+        return compilers
 
     @staticmethod
-    def _exists(linker):
-        if not linker:
+    # pylint: disable=redefined-outer-name
+    def _exists(compiler):
+        if not compiler:
             return None
-        return shutil.which(linker)
+        return shutil.which(compiler)
 
     @staticmethod
-    def _available_linkers(fallback_linkers):
-        available_linkers = []
-        for linker in AbstractLinker._lro(fallback_linkers):
-            if AbstractLinker._exists(linker):
-                available_linkers.append(linker)
-        return available_linkers
+    def _available_compilers(fallback_compilers):
+        available_compilers = []
+        # pylint: disable=redefined-outer-name
+        for compiler in CompilerDriver._cfo(fallback_compilers):
+            if CompilerDriver._exists(compiler):
+                available_compilers.append(compiler)
+        return available_compilers
 
     @staticmethod
-    def _attempt_link(linker, flags, infile, outfile):
+    # pylint: disable=redefined-outer-name
+    def _attempt_link(compiler, flags, infile, outfile):
         try:
-            command = [linker] + flags + [infile, "-o", outfile]
+            command = [compiler] + flags + [infile, "-o", outfile]
             subprocess.run(command, check=True)
             return True
         except subprocess.CalledProcessError:
-            msg = f"Linker {linker} failed during execution of command {command}. Will attempt fallback on available linkers."
+            msg = f"Compiler {compiler} failed during execution of command {command}. Will attempt fallback on available compilers."
             warnings.warn(msg, UserWarning)
             return False
 
     @staticmethod
-    def link(infile, outfile, fallback_linkers=None):
+    def link(infile, outfile, fallback_compilers=None):
         """
         Link the infile against the necessary libraries and produce the outfile.
 
@@ -219,16 +219,17 @@ class AbstractLinker:
             infile (str): input file
             outfile (str): output file
         Raises:
-            EnvironmentError: The exception is raised when no linker succeeded.
+            EnvironmentError: The exception is raised when no compiler succeeded.
         """
-        if not fallback_linkers:
-            fallback_linkers = AbstractLinker._default_fallback_linkers
-        for linker in AbstractLinker._available_linkers(fallback_linkers):
-            flags = AbstractLinker._flags()
-            success = AbstractLinker._attempt_link(linker, flags, infile, outfile)
+        if not fallback_compilers:
+            fallback_compilers = CompilerDriver._default_fallback_compilers
+        # pylint: disable=redefined-outer-name
+        for compiler in CompilerDriver._available_compilers(fallback_compilers):
+            flags = CompilerDriver._flags()
+            success = CompilerDriver._attempt_link(compiler, flags, infile, outfile)
             if success:
                 return
-        msg = f"Unable to link {infile}. All available linker options exhausted. Please provide an available linker via $CATALYST_CC."
+        msg = f"Unable to link {infile}. All available compiler options exhausted. Please provide a compatible compiler via $CATALYST_CC."
         raise EnvironmentError(msg)
 
 
@@ -351,7 +352,7 @@ def link_lightning_runtime(filename):
 
     new_fname = filename.replace(".o", ".so")
 
-    AbstractLinker.link(filename, new_fname)
+    CompilerDriver.link(filename, new_fname)
 
     return new_fname
 
