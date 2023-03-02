@@ -146,14 +146,13 @@ Implementation checklist:
   - [x] Core problem running and measurement procedures
   - [x] Collect and record basic system information (cpu, ram, etc.)
   - [x] Collect the effective number of quantum gates (circuit depth)
-* [ ] Implement the top-level wrapper script `batchrun.py`
+* [x] Implement the top-level wrapper script `batchrun.py`
   - [x] Data collection and serialization routines
-  - [ ] Visualization
+  - [x] Visualization
     + [x] Generic visualization procedure
-    + [ ] Circuit depth visualization
+    + [x] Circuit depth visualization
 
 Guidelines coverage:
-*The marks below represent the implementation status. The data records require verification and are subject to change.*
 
 * [x] Regulat circuits (the Grover-like task with the default number of layers and varying number of qubits)
   - [x] Catalyst
@@ -168,7 +167,7 @@ Guidelines coverage:
   - [x] PennyLane / default.qubit
   - [x] PennyLane / lightning.qubit
 * [ ] Hybrid workflows
-* [ ] Variational algorithms (the VQE-like task with varying number of qubits)
+* [ ] Variational algorithms (the set of chemistry VQE tasks)
   - [x] Catalyst
   - [ ] PennyLane+jax / lightning.qubit
   - [ ] PennyLane+jax / default.qubit.jax
@@ -178,7 +177,10 @@ Guidelines coverage:
 
 Known issues:
 
-* [ ]  PennyLane+jax/default.qubit.jax implementation of Grover-like task: compilation and running times are not clearly distinguishable
-* [ ] PennyLane+jax implementation of VQE problem does not currently work
-* [ ] Altair visualization: plot legend is clipped, see https://github.com/vega/vl-convert/issues/30 The best workaround I am aware of  is to provide shorter aliases for implementations.
+* [ ] PennyLane+jax/default.qubit.jax implementation of Grover-like task:
+  compilation and running times are not clearly distinguishable.
+* [ ] PennyLane+jax implementation of the VQE problem does not currently work.
+* [x] Altair visualization: plot legend is clipped, see
+  https://github.com/vega/vl-convert/issues/30 The best workaround I am aware of
+  is to provide shorter aliases for implementations.
 
