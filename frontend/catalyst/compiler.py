@@ -185,7 +185,7 @@ class CompilerDriver:
     @staticmethod
     # pylint: disable=redefined-outer-name
     def _exists(compiler):
-        if not compiler:
+        if compiler is None:
             return None
         return shutil.which(compiler)
 
