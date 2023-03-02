@@ -35,12 +35,12 @@ def ofile(a, _, measure, problem, impl, nqubits, nlayers, diffmethod) -> Tuple[s
     if problem == "grover":
         assert diffmethod is None
         params = f"--grover-nlayers={nlayers}" if nlayers is not None else ""
-    elif problem == "vqe":
+    elif problem == "vqe" or problem == "chemvqe":
         assert nlayers is None
         assert diffmethod is not None
         params = f"--vqe-diff-method={diffmethod}"
     else:
-        raise ValueError("Unsupported problem {problem}")
+        raise ValueError(f"Unsupported problem {problem}")
     cmdline = (
         f"python3 -m catalyst_benchmark.main run "
         f"--problem={problem} "
@@ -68,6 +68,7 @@ QUBITS = {
     ("deep", "grover", "runtime"): [7],
     ("variational", "vqe", "compile"): [6, 7, 8, 9, 10, 11],
     ("variational", "vqe", "runtime"): [6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+    ("variational", "chemvqe", "runtime"): [4, 6, 8, 12],
 }
 
 MAXLAYERS = 1500
@@ -116,7 +117,11 @@ KNOWN_FAILURES = {
     ("grover", "runtime", "pennylane+jax/default.qubit.jax", None): (7, 50),
 }
 
-DIFF_METHODS = {"grover": [None], "vqe": ["finite-diff", "parameter-shift", "adjoint", "backprop"]}
+DIFF_METHODS = {
+    "grover": [None],
+    "vqe": ["finite-diff", "parameter-shift", "adjoint", "backprop"],
+    "chemvqe": ["finite-diff", "parameter-shift", "adjoint", "backprop"]
+}
 
 
 def all_configurations(a: ParsedArguments) -> Iterable[tuple]:
@@ -142,7 +147,8 @@ def all_configurations(a: ParsedArguments) -> Iterable[tuple]:
                     "regular": "grover",
                     "deep": "grover",
                     "hybrid": None,
-                    "variational": "vqe",
+                    # "variational": "vqe",
+                    "variational": "chemvqe",
                 }.get(cat, None)
 
                 if problem is None:
@@ -418,7 +424,7 @@ def plot(a: ParsedArguments) -> None:
                     )
                 )
 
-        df = DataFrame(data[("variational", "runtime", "vqe")])
+        df = DataFrame(data[("variational", "runtime", "chemvqe")])
         if len(df) > 0:
             print("Updating _img/variational_runtime.svg")
             with open("_img/variational_runtime.svg", "w") as f:
