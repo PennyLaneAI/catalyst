@@ -117,9 +117,9 @@ class TestCond:
         assert circuit(True) == 1
 
 
-class TestErrorMessages:
-    def test_control_flow_non_jit_context(self):
-        def arithc(x: int, y: int, op: int):
+class TestInterpretationConditional:
+    def test_conditional_interpreted_and_compiled(self):
+        def arithi(x: int, y: int, op: int):
             @cond(op == 0)
             def branch():
                 return x - y
@@ -130,8 +130,8 @@ class TestErrorMessages:
 
             return branch()
 
-        with pytest.raises(RuntimeError, match="Must use 'cond' inside tracing context."):
-            arithc(0, 0, 0)
+        arithc = qjit(arithi)
+        assert arithc(0, 0, 0) == arithi(0, 0, 0)
 
 
 class TestClassicalCompilation:
