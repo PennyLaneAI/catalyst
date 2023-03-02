@@ -1,0 +1,5 @@
+dataclasses-json
+py-cpuinfo
+altair
+vl-convert-python
+pandas
