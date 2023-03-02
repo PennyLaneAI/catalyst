@@ -131,7 +131,7 @@ class AbstractLinker:
     order is defined as follows:
 
     1. A user specified linker via the environment variable CATALYST_CC. It is expected that the
-        user provided linker is flag compatilble with LD.
+        user provided linker is flag compatilble with gcc.
     2. clang: May be configured to use LLD or LD. Both of which are flag compatible. Priority is
         given to clang to maintain an LLVM toolchain through all the process.
     3. gcc: Usually configured to link with LD.
