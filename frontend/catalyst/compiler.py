@@ -16,7 +16,9 @@ MLIR/LLVM representations.
 """
 
 import os
+import shutil
 import subprocess
+import warnings
 
 from catalyst._configuration import INSTALLED
 
@@ -119,37 +121,115 @@ compiler_flags = [
     "--relocation-model=pic",
 ]
 
-linker = "c99"
 
-mlir_lib_path = get_lib_path("llvm", "MLIR_LIB_DIR")
-linker_common_flags = [
-    "-shared",
-    "-rdynamic",
-    f"-L{mlir_lib_path}",
-    "-Wl,-no-as-needed",
-    f"-Wl,-rpath,{mlir_lib_path}",
-]
+# pylint: disable=too-few-public-methods
+class AbstractLinker:
+    """Linker interface
 
-common_libs = [
-    "-lpthread",
-    "-lmlir_c_runner_utils",  # required for memref.copy
-]
+    In order to avoid relying on a single linker at run time and allow the user some flexibility,
+    this class defines a linker resolution order where multiple known linkers are attempted. The
+    order is defined as follows:
 
-runtime_libs = [
-    "-lrt_backend",
-    "-lrt_capi",
-    *common_libs,
-]
+    1. A user specified linker via the environment variable CATALYST_CC. It is expected that the
+        user provided linker is flag compatilble with LD.
+    2. clang: May be configured to use LLD or LD. Both of which are flag compatible. Priority is
+        given to clang to maintain an LLVM toolchain through all the process.
+    3. gcc: Usually configured to link with LD.
+    4. c99: Usually defaults to gcc, but no linker interface is specified.
+    5. c89: Usually defaults to gcc, but no linker interface is specified.
+    6. cc: Usually defaults to gcc, however POSIX states that it is deprecated.
+    """
 
-lrt_lib_path = get_lib_path("runtime", "RUNTIME_LIB_DIR")
-lrt_capi_path = os.path.join(lrt_lib_path, "capi")
-lrt_backend_path = os.path.join(lrt_lib_path, "backend")
-lightning_linker_flags = [
-    *linker_common_flags,
-    f"-L{lrt_capi_path}",
-    f"-L{lrt_backend_path}",
-    f"-Wl,-rpath,{lrt_capi_path}:{lrt_backend_path}",
-]
+    _default_fallback_linkers = ["clang", "gcc", "c99", "c89", "cc"]
+
+    @staticmethod
+    def _flags():
+        mlir_lib_path = get_lib_path("llvm", "MLIR_LIB_DIR")
+        lrt_lib_path = get_lib_path("runtime", "RUNTIME_LIB_DIR")
+        lrt_capi_path = os.path.join(lrt_lib_path, "capi")
+        lrt_backend_path = os.path.join(lrt_lib_path, "backend")
+
+        linker_flags = [
+            "-Wno-unused-command-line-argument",
+            "-Wno-override-module",
+            "-shared",
+            "-rdynamic",
+            f"-L{mlir_lib_path}",
+            "-Wl,-no-as-needed",
+            f"-Wl,-rpath,{mlir_lib_path}",
+            f"-L{lrt_capi_path}",
+            f"-L{lrt_backend_path}",
+            f"-Wl,-rpath,{lrt_capi_path}:{lrt_backend_path}",
+            f"-L{lrt_capi_path}",
+            f"-L{lrt_backend_path}",
+            f"-Wl,-rpath,{lrt_capi_path}:{lrt_backend_path}",
+            "-lrt_backend",
+            "-lrt_capi",
+            "-lpthread",
+            "-lmlir_c_runner_utils",  # required for memref.copy
+        ]
+
+        return linker_flags
+
+    @staticmethod
+    def _lro(fallback_linkers):
+        """Linker resolution order"""
+        preferred_linker = os.environ.get("CATALYST_CC", None)
+        preferred_linker_exists = AbstractLinker._exists(preferred_linker)
+        linkers = fallback_linkers
+        emit_warning = preferred_linker and not preferred_linker_exists
+        if emit_warning:
+            msg = f"User defined linker {preferred_linker} is not in PATH. Will attempt fallback on available linkers."
+            warnings.warn(msg, UserWarning)
+        else:
+            linkers = [preferred_linker] + fallback_linkers
+        return linkers
+
+    @staticmethod
+    def _exists(linker):
+        if not linker:
+            return None
+        return shutil.which(linker)
+
+    @staticmethod
+    def _available_linkers(fallback_linkers):
+        available_linkers = []
+        for linker in AbstractLinker._lro(fallback_linkers):
+            if AbstractLinker._exists(linker):
+                available_linkers.append(linker)
+        return available_linkers
+
+    @staticmethod
+    def _attempt_link(linker, flags, infile, outfile):
+        try:
+            command = [linker] + flags + [infile, "-o", outfile]
+            subprocess.run(command, check=True)
+            return True
+        except subprocess.CalledProcessError:
+            msg = f"Linker {linker} failed during execution of command {command}. Will attempt fallback on available linkers."
+            warnings.warn(msg, UserWarning)
+            return False
+
+    @staticmethod
+    def link(infile, outfile, fallback_linkers=None):
+        """
+        Link the infile against the necessary libraries and produce the outfile.
+
+        Args:
+            infile (str): input file
+            outfile (str): output file
+        Raises:
+            EnvironmentError: The exception is raised when no linker succeeded.
+        """
+        if not fallback_linkers:
+            fallback_linkers = AbstractLinker._default_fallback_linkers
+        for linker in AbstractLinker._available_linkers(fallback_linkers):
+            flags = AbstractLinker._flags()
+            success = AbstractLinker._attempt_link(linker, flags, infile, outfile)
+            if success:
+                return
+        msg = f"Unable to link {infile}. All available linker options exhausted. Please provide an available linker via $CATALYST_CC."
+        raise EnvironmentError(msg)
 
 
 def lower_mhlo_to_linalg(filename):
@@ -271,14 +351,8 @@ def link_lightning_runtime(filename):
 
     new_fname = filename.replace(".o", ".so")
 
-    command = [linker]
-    command += ["-Wno-unused-command-line-argument", "-Wno-override-module"]
-    command += lightning_linker_flags
-    command += runtime_libs
-    command += [filename]
-    command += ["-o", new_fname]
+    AbstractLinker.link(filename, new_fname)
 
-    subprocess.run(command, check=True)
     return new_fname
 
 
