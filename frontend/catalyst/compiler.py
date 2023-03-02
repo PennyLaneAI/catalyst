@@ -169,7 +169,7 @@ class CompilerDriver:
         return flags
 
     @staticmethod
-    def _cfo(fallback_compilers):
+    def _get_compiler_fallback_order(fallback_compilers):
         """Compiler fallback order"""
         preferred_compiler = os.environ.get("CATALYST_CC", None)
         preferred_compiler_exists = CompilerDriver._exists(preferred_compiler)
@@ -189,14 +189,23 @@ class CompilerDriver:
             return None
         return shutil.which(compiler)
 
-    @staticmethod
-    def _available_compilers(fallback_compilers):
+    @classmethod
+    def _available_compilers(cls, fallback_compilers):
+        if hasattr(cls, "_compiler_fallback_order"):
+            return cls._compiler_fallback_order
+
+        if not fallback_compilers:
+            fallback_compilers = CompilerDriver._default_fallback_compilers
+
         available_compilers = []
         # pylint: disable=redefined-outer-name
-        for compiler in CompilerDriver._cfo(fallback_compilers):
+        for compiler in CompilerDriver._get_compiler_fallback_order(fallback_compilers):
             if CompilerDriver._exists(compiler):
                 available_compilers.append(compiler)
-        return available_compilers
+
+        setattr(cls, "_compiler_fallback_order", available_compilers)
+        # pylint: disable=no-member
+        return cls._compiler_fallback_order
 
     @staticmethod
     # pylint: disable=redefined-outer-name
@@ -221,8 +230,6 @@ class CompilerDriver:
         Raises:
             EnvironmentError: The exception is raised when no compiler succeeded.
         """
-        if not fallback_compilers:
-            fallback_compilers = CompilerDriver._default_fallback_compilers
         # pylint: disable=redefined-outer-name
         for compiler in CompilerDriver._available_compilers(fallback_compilers):
             flags = CompilerDriver._flags()

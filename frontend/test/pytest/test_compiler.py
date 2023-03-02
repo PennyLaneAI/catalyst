@@ -7,7 +7,7 @@ import warnings
 import pytest
 
 from catalyst.compiler import CompilerDriver
-from catalyst.utils.temp_env import TempEnv
+from temp_env import TempEnv
 
 
 # pylint: disable=too-few-public-methods
@@ -36,7 +36,7 @@ class TestCompilerDriver:
             with warnings.catch_warnings():
                 warnings.simplefilter("error")
                 # pylint: disable=protected-access
-                compilers = CompilerDriver._cfo([])
+                compilers = CompilerDriver._get_compiler_fallback_order([])
                 assert compiler in compilers
 
     def test_catalyst_cc_unavailable_warning(self):
@@ -44,12 +44,12 @@ class TestCompilerDriver:
         with TempEnv(CATALYST_CC="this-binary-does-not-exist"):
             with pytest.warns(UserWarning, match="User defined compiler.* is not in PATH."):
                 # pylint: disable=protected-access
-                CompilerDriver._cfo([])
+                CompilerDriver._get_compiler_fallback_order([])
 
     def test_compiler_failed_warning(self):
         """Test that a warning is emitted when a compiler failed."""
         compiler = "cc"
-        with pytest.warns(UserWarning, match="Linker .* failed .*"):
+        with pytest.warns(UserWarning, match="Compiler .* failed .*"):
             # pylint: disable=protected-access
             CompilerDriver._attempt_link(compiler, [""], "in.o", "out.so")
 
