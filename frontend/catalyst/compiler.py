@@ -191,12 +191,10 @@ class CompilerDriver:
 
     @staticmethod
     def _available_compilers(fallback_compilers):
-        available_compilers = []
         # pylint: disable=redefined-outer-name
         for compiler in CompilerDriver._get_compiler_fallback_order(fallback_compilers):
             if CompilerDriver._exists(compiler):
-                available_compilers.append(compiler)
-        return available_compilers
+                yield compiler
 
     @staticmethod
     # pylint: disable=redefined-outer-name
