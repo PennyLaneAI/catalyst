@@ -132,6 +132,7 @@ class TestInterpretationConditional:
 
         arithc = qjit(arithi)
         assert arithc(0, 0, 0) == arithi(0, 0, 0)
+        assert arithc(1, 0, 0) == arithi(1, 0, 0)
 
 
 class TestClassicalCompilation:
