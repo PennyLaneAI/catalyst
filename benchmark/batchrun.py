@@ -191,7 +191,7 @@ def plot(a: ParsedArguments) -> None:
     then calls Altair to present the data collected."""
     log = []
     nmissing = 0
-    data = defaultdict(lambda: defaultdict(list))
+    data = defaultdict(list)
     for config in all_configurations(a):
         ofname, _ = ofile(a, *config)
         cat, measure, problem, impl, nqubits, nlayers, diffmethod = config
@@ -203,17 +203,16 @@ def plot(a: ParsedArguments) -> None:
             log.append(str(e))
         if r is not None:
             for trial, time in enumerate(r.measurement_sec):
-                data[(cat, measure, problem)]["trial"].append(trial)
-                data[(cat, measure, problem)]["impl"].append(ALIASES[impl])
-                data[(cat, measure, problem)]["nqubits"].append(nqubits)
-                data[(cat, measure, problem)]["time"].append(time)
-                data[(cat, measure, problem)]["nlayers"].append(nlayers if nlayers else -1)
-                data[(cat, measure, problem)]["ngates"].append(
-                    r.depth_gates if r.depth_gates else -1
-                )
-                data[(cat, measure, problem)]["diffmethod"].append(
-                    diffmethod if diffmethod else "N/A"
-                )
+                data["cat"].append(cat)
+                data["measure"].append(measure)
+                data["problem"].append(problem)
+                data["trial"].append(trial)
+                data["impl"].append(ALIASES[impl])
+                data["nqubits"].append(nqubits)
+                data["time"].append(time)
+                data["nlayers"].append(nlayers if nlayers else -1)
+                data["ngates"].append(r.depth_gates if r.depth_gates else -1)
+                data["diffmethod"].append(diffmethod if diffmethod else "N/A")
     if nmissing > 0:
         print(f"There are {nmissing} data records missing", file=sys.stderr)
         if a.verbose:
@@ -290,7 +289,14 @@ def plot(a: ParsedArguments) -> None:
                 .properties(height=60)
             )
 
-        df = DataFrame(data[("regular", "compile", "grover")])
+        df_full = DataFrame(data)
+
+        def _filter(cat, measure, problem):
+            return df_full[(df_full["cat"]==cat) &
+                           (df_full["measure"]==measure) &
+                           (df_full["problem"]==problem)]
+
+        df = _filter("regular", "compile", "grover")
         if len(df) > 0:
             xaxis = alt.Axis(values=list(range(MINQUBITS, MAXQUBITS + 2, 2)))
             xscale = alt.Scale(domain=(MINQUBITS, MAXQUBITS))
@@ -317,7 +323,7 @@ def plot(a: ParsedArguments) -> None:
                     ),
                 )
 
-        df = DataFrame(data[("regular", "runtime", "grover")])
+        df = _filter("regular", "runtime", "grover")
         if len(df) > 0:
             print("Updating _img/regular_runtime.svg")
             with _open("_img/regular_runtime.svg", "w") as f:
@@ -342,7 +348,7 @@ def plot(a: ParsedArguments) -> None:
                     ),
                 )
 
-        df = DataFrame(data[("deep", "compile", "grover")])
+        df = _filter("deep", "compile", "grover")
         if len(df) > 0:
             xaxis = alt.Axis(values=list(range(0, MAXLAYERS + 100, 100)))
             xscale = alt.Scale(domain=(0, MAXLAYERS))
@@ -369,7 +375,7 @@ def plot(a: ParsedArguments) -> None:
                     ),
                 )
 
-        df = DataFrame(data[("deep", "runtime", "grover")])
+        df = _filter("deep", "runtime", "grover")
         if len(df) > 0:
             xaxis = alt.Axis(values=list(range(0, MAXLAYERS + 100, 100)))
             xscale = alt.Scale(domain=(0, MAXLAYERS))
@@ -396,30 +402,7 @@ def plot(a: ParsedArguments) -> None:
                     ),
                 )
 
-        df = DataFrame(data[("variational", "runtime", "chemvqe")])
-        if len(df) > 0:
-            print("Updating _img/variational_runtime.svg")
-            with _open("_img/variational_runtime.svg", "w") as f:
-                f.write(
-                    vlc.vegalite_to_svg(
-                        Chart(df)
-                        .transform_calculate(impl_diff="datum.impl+'('+datum.diffmethod+')'")
-                        .mark_line(point=True)
-                        .encode(
-                            x=_nqubitsEncoding(),
-                            y=timeEncoding,
-                            # color=_implEncoding(df),
-                            color="impl_diff:N",
-                            opacity=trialEncoding,
-                            strokeDash=implCLcondDash,
-                            strokeWidth=implCLcond,
-                        )
-                        .properties(title=_mktitle("Running time, Variational circuits"))
-                        .to_dict()
-                    ),
-                )
-
-        df = DataFrame(data[("variational", "compile", "vqe")])
+        df = _filter("variational", "compile", "vqe")
         if len(df) > 0:
             print("Updating _img/variational_compile.svg")
             with _open("_img/variational_compile.svg", "w") as f:
@@ -439,6 +422,38 @@ def plot(a: ParsedArguments) -> None:
                         .to_dict()
                     ),
                 )
+
+        problem = "chemvqe"
+        df_allgrad = _filter("variational", "runtime", problem)
+        for diffmethod in DIFF_METHODS[problem]:
+            df = df_allgrad[df_allgrad["diffmethod"]==diffmethod]
+            if len(df) > 0:
+                fname = f"_img/variational_runtime_{diffmethod.replace('-','')}.svg"
+                print(f"Updating {fname}")
+                with _open(fname, "w") as f:
+                    f.write(
+                        vlc.vegalite_to_svg(
+                            # alt.vconcat(
+                            Chart(df)
+                            .transform_calculate(impl_diff="datum.impl+'('+datum.diffmethod+')'")
+                            .mark_line(point=True)
+                            .encode(
+                                x=_nqubitsEncoding(),
+                                y=timeEncoding,
+                                # color=_implEncoding(df),
+                                color=_implEncoding(df),
+                                opacity=trialEncoding,
+                                strokeDash=implCLcondDash,
+                                strokeWidth=implCLcond,
+                            )
+                            .properties(title=_mktitle("Running time, Variational circuits"))
+                            .to_dict(),
+                            # _mkfooter(df, _nqubitsEncoding(), "PL/Def")
+                            # )
+                            # .configure_axisLeft(minExtent=50)
+                            # .to_dict(),
+                        ),
+                    )
 
 
 # fmt:off
