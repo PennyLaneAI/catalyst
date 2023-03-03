@@ -117,7 +117,11 @@ class TestCond:
         assert circuit(True) == 1
 
 
+# pylint: disable=too-few-public-methods
 class TestInterpretationConditional:
+    """Test that the conditional operation's execution is semantically equivalent when compiled and interpreted."""
+
+    # pylint: disable=missing-function-docstring
     def test_conditional_interpreted_and_compiled(self):
         def arithi(x: int, y: int, op: int):
             @cond(op == 0)

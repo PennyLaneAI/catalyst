@@ -278,6 +278,9 @@ class TestForLoops:
 
 
 class TestInterpretationControlFlow:
+    """Test that the loops' executions are semantically equivalent when compiled and interpreted."""
+
+    # pylint: disable=missing-function-docstring
     def test_while_loop(self):
         def muli(x: int, n: int):
             @while_loop(lambda v, _: v < n)
@@ -290,6 +293,7 @@ class TestInterpretationControlFlow:
         mulc = qjit(muli)
         assert mulc(1, 2) == muli(1, 2)
 
+    # pylint: disable=missing-function-docstring
     def test_for_loop(self):
         def muli(x: int, n: int):
             @for_loop(0, n, 1)
@@ -302,6 +306,7 @@ class TestInterpretationControlFlow:
         mulc = qjit(muli)
         assert mulc(1, 2) == muli(1, 2)
 
+    # pylint: disable=missing-function-docstring
     def test_qnode_with_while_loop(self):
         num_wires = 2
         device = qml.device("lightning.qubit", wires=num_wires)
@@ -319,6 +324,7 @@ class TestInterpretationControlFlow:
         compiled_circuit = qjit(interpreted_circuit)
         assert np.allclose(compiled_circuit(num_wires), interpreted_circuit(num_wires))
 
+    # pylint: disable=missing-function-docstring
     def test_qnode_with_for_loop(self):
         num_wires = 2
         device = qml.device("lightning.qubit", wires=num_wires)
