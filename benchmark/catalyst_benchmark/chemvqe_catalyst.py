@@ -1,6 +1,5 @@
 import pennylane as qml
 import jax.numpy as jnp
-import jax
 import catalyst
 import numpy as np
 
@@ -34,10 +33,16 @@ PROBLEMS: Dict[NQubits, ProblemInfo] = {
     16: {"molname": "H8", "basis": "STO-3G", "bond": "0.5", "qubits": 16, "gate_count": 361},
 }
 
+DMDICT = {
+    'finite-diff': 'fd',
+    'parameter-shift': 'ps',
+    'adjoint': 'adj'
+}
 
 class ProblemCVQE(Problem):
-    def __init__(self, dev, nsteps=10, **qnode_kwargs):
+    def __init__(self, dev, nsteps=10, diff_method:str='finite-diff', **qnode_kwargs):
         super().__init__(dev, **qnode_kwargs)
+        self.diff_method = DMDICT[diff_method]
         self.nsteps = nsteps
         pi = ProblemInfo.from_dict(PROBLEMS[self.nqubits])
         molname, basis, bond = pi.molname, pi.basis, pi.bond
@@ -52,7 +57,7 @@ class ProblemCVQE(Problem):
         self.excitations = self.singles + self.doubles
 
     def trial_params(self, _: int) -> Any:
-        return jnp.zeros(len(self.excitations))
+        return jnp.ones(len(self.excitations), dtype=jnp.float64)
 
 
 def workflow(p: ProblemCVQE, params):
@@ -62,19 +67,23 @@ def workflow(p: ProblemCVQE, params):
         return qml.expval(qml.Hamiltonian(np.array(p.ham.coeffs), p.ham.ops))
 
     stepsize = 0.5
-    diff = catalyst.grad(circuit, argnum=0)
+    diff = catalyst.grad(circuit, argnum=0, method=p.diff_method)
     theta = params
 
     @catalyst.for_loop(0, p.nsteps, 1)
     def loop(i, theta):
         dtheta = diff(theta)
         return theta - dtheta[0] * stepsize
-
     return loop(theta)
 
 
+SHOTS = None
+DIFFMETHOD = 'finite-diff'
+NSTEPS = 1
+
 def run_catalyst(N=6):
-    p = ProblemCVQE(dev=qml.device("lightning.qubit", wires=N), nsteps=2)
+    p = ProblemCVQE(dev=qml.device("lightning.qubit", wires=N, shots=SHOTS),
+                    nsteps=NSTEPS, diff_method=DIFFMETHOD)
     params = p.trial_params(0)
 
     @qjit

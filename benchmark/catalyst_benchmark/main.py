@@ -57,7 +57,7 @@ def parse_implementation(implementation: str) -> Tuple[str, str, Optional[str]]:
     elif len(tokens) == 2:
         device = tokens[1]
     else:
-        raise ValueError(f"Unsupported implementation: {a.implementation}")
+        raise NotImplementedError(f"Unsupported implementation: {a.implementation}")
     return framework, device, interface
 
 
@@ -76,7 +76,7 @@ def measure_compile_catalyst(a: Any) -> BenchmarkResult:
 
         t = ProblemVQE(qml.device("lightning.qubit", wires=a.nqubits))
     else:
-        raise ValueError(f"Unsupported problem {a.problem}")
+        raise NotImplementedError(f"Unsupported problem {a.problem}")
 
     weights = t.trial_params(0)
 
@@ -121,7 +121,7 @@ def measure_runtime_catalyst(a: Any) -> BenchmarkResult:
         )
 
     else:
-        raise ValueError(f"Unsupported problem {a.problem}")
+        raise NotImplementedError(f"Unsupported problem {a.problem}")
 
     weights = t.trial_params(0)
 
@@ -172,7 +172,7 @@ def measure_compile_pennylanejax(a: Any) -> BenchmarkResult:
 
         t = ProblemVQE(qml.device(device, wires=a.nqubits), interface=interface)
     else:
-        raise ValueError(f"Unsupported problem {a.problem}")
+        raise NotImplementedError(f"Unsupported problem {a.problem}")
 
     def _main(weights):
         return main(t, weights)
@@ -220,7 +220,7 @@ def measure_runtime_pennylanejax(a: Any) -> BenchmarkResult:
             return None
 
     else:
-        raise ValueError(f"Unsupported problme {a.problem}")
+        raise NotImplementedError(f"Unsupported problme {a.problem}")
 
     def _main(weights):
         return main(t, weights)
@@ -258,7 +258,7 @@ def measure_compile_pennylane(a: Any) -> BenchmarkResult:
 
         t = Problem(qml.device(device, wires=a.nqubits), a.grover_nlayers, interface=interface)
     else:
-        raise ValueError(f"Unsupported problem {a.problem}")
+        raise NotImplementedError(f"Unsupported problem {a.problem}")
 
     def _main(weights):
         return main(t, weights)
@@ -308,7 +308,7 @@ def measure_runtime_pennylane(a: Any) -> BenchmarkResult:
             return None
 
     else:
-        raise ValueError(f"Unsupported problme {a.problem}")
+        raise NotImplementedError(f"Unsupported problme {a.problem}")
 
     def _main(weights):
         return main(t, weights)
@@ -346,27 +346,35 @@ def parse_args(ap, args):
 
 
 def selfcheck(ap):
+    def _runall(cmdline_fn, atol=1e-5):
+        r1 = None
+        for m, i in REGISTRY.keys():
+            try:
+                r = REGISTRY[(m, i)](parse_args(ap, cmdline_fn(m,i)))
+                print(f"Checking {(m,i)}")
+                if r1 is None:
+                    r1 = r
+                else:
+                    assert_allclose(np.array(r1.numeric_result),
+                                    np.array(r.numeric_result),
+                                    atol=atol)
+            except NotImplementedError as e:
+                print(f"Skipping {(m,i)} due to: {e}")
+
     # fmt: off
+    _runall(lambda m, i: ["run", "-p", "chemvqe", "-m", m, "-i", i, "-n", "1",
+                          "-N", "4", "--numerical-check"])
+    _runall(lambda m, i: ["run", "-p", "grover", "-m", m, "-i", i, "-n", "1",
+                          "-N", "9", "--numerical-check"])
+
     r1 = measure_runtime_catalyst(parse_args(
         ap, ["run", "-p", "vqe", "-m", "runtime", "-i", "catalyst", "-n", "1",
              "-N", "6", "--numerical-check"]))
     r2 = measure_runtime_pennylane(parse_args(
         ap, ["run", "-p", "vqe", "-m", "runtime", "-i", "pennylane/default.qubit", "-n", "1",
              "-N", "6", "--numerical-check"]))
-    # fmt: on
     assert_allclose(np.array(r1.numeric_result), np.array(r2.numeric_result), atol=1e-3)
-
-    r1 = None
-    for m, i in REGISTRY.keys():
-        # fmt: off
-        r = REGISTRY[(m, i)](parse_args(
-            ap, ["run", "-p", "grover", "-m", m, "-i", i, "-n", "1", "-N", "9",
-                 "--numerical-check"]))
-        # fmt: on
-        if r1 is None:
-            r1 = r
-        else:
-            assert_allclose(np.array(r1.numeric_result), np.array(r.numeric_result), atol=1e-5)
+    # fmt: on
 
 
 if __name__ == "__main__":
@@ -399,7 +407,7 @@ if __name__ == "__main__":
                         help="Number of qubits")
     runcmd.add_argument("--grover-nlayers", type=int, default=None, metavar="INT",
                         help="Grover-specific: Number of layers (default - auto)")
-    runcmd.add_argument("--vqe-diff-method", type=str, default="backprop",
+    runcmd.add_argument("--vqe-diff-method", type=str, default="finite-diff",
                         help="VQE-specific: Differentiation method (default - backprop)")
     # fmt: on
 
@@ -434,7 +442,7 @@ if __name__ == "__main__":
                     r = fn(a)
             else:
                 raise ValueError(
-                    f"Unsupported combination of measure('{a.measure}') and implementation"
+                    f"Invalid combination of measure('{a.measure}') and implementation"
                     f"('{a.implementation}', deduced as '{framework}/{device}')"
                 )
 
@@ -455,4 +463,4 @@ if __name__ == "__main__":
             exit(2)
 
     else:
-        raise ValueError(f"Unsupported command {a.command}")
+        raise ValueError(f"Invalid command {a.command}")
