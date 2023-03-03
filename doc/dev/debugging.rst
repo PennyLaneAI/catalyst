@@ -2,6 +2,26 @@
 Debugging Tips
 ##############
 
+Run-time Dependencies
+=====================
+
+There are some environment variables that will affect the execution of Catalyst.
+For example, Catalyst relies on the ``PATH`` environment variable to be set, just like most other UNIX programs.
+Most of the time, Catalyst should work without special configuration of the environment, however here are some errors and warnings you might see and how to fix them.
+
+* ``Compiler clang failed during the execution of command ...``: During the linking process, Catalyst uses some well-known compilers that may be installed in your computer.
+  If for whatever reason the compiler fails to execute, this warning will be issued.
+  Please note that more attempts to link will be issued with different compilers.
+  You may be able to fix this warning by re-installing or uninstalling the faulty compiler.
+* ``Unable to link... All available compiler options exhausted ...``: Even though Catalyst has a list of compilers that may be available in your system, it is possible that no compiler successfully linked the program to the libraries shipped with Catalyst.
+  This should be a rare case, but if you ever find yourself seeing this error, you should check that one of the following compilers or interfaces are available in your ``PATH``: ``clang``, ``gcc``, ``c99``, ``c89``, ``cc``.
+  Correctly installing any of these should be sufficient.
+  Alternatively, you can also specify a preferred compiler to use during linking using the environment variable ``CATALYST_CC``.
+  For example ``CATALYST_CC=clang-14`` specifies that ``clang-14`` will be the preferred compiler to be used during the linking stage.
+* ``User defined compiler is not in path``: Following the example above, you may have installed ``clang-14`` in a different directory that is not currently on the ``PATH``.
+  Please make sure that the executable specified in ``CATALYST_CC`` is available in the ``PATH`` and is flag compatible with ``gcc`` or ``clang``.
+
+
 Compilation Steps
 =================
 
