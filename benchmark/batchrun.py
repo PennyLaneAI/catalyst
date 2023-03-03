@@ -464,9 +464,9 @@ def plot(a: ParsedArguments) -> None:
 ap = ArgumentParser(prog="batchrun.py")
 ap.add_argument("-m", "--measure", type=str, default="all",
                 help="Value to measure: compile|runtime|all, (default - 'all')")
-ap.add_argument("-c", "--category", type=str, default="regular,deep",
+ap.add_argument("-c", "--category", type=str, default="regular,deep,variational",
                 help=("Category of circutis to evaluate regular|deep|hybrid|variational|all "
-                "(default - 'regular,deep')"))
+                "(default - 'regular,deep,variational')"))
 ap.add_argument("--dry-run", default=False, action=BooleanOptionalAction,
                 help="Enable this mode to print command lines but not actually run anything")
 ap.add_argument("-a", "--actions", type=str, default="collect,plot",
