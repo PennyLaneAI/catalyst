@@ -206,8 +206,37 @@ class MLIRToLLVMDialect:
         return outfile
 
 
-translate_tool = get_executable_path("llvm", "mlir-translate")
-quantum_opt_tool = get_executable_path("quantum", "quantum-opt")
+class LLVMDialectToLLVMIR:
+    """Convert LLVM Dialect to LLVM-IR."""
+
+    _executable = get_executable_path("llvm", "mlir-translate")
+    _default_flags = ["--mlir-to-llvmir"]
+
+    @staticmethod
+    def _run(infile, outfile, executable, flags):
+        command = [executable] + flags + [infile, "-o", outfile]
+        subprocess.run(command, check=True)
+
+    @staticmethod
+    def run(infile, outfile=None, executable=None, flags=None):
+        """Run the bufferization pass.
+
+        Args:
+            infile (str): path to MLIR file to be compiled
+            outfile (str): path to output file, defaults to replacing extension in infile to .nohlo.
+            executable (str): path to executable, defaults to mlir-hlo-opt
+            flags (List[str]): flags to mlir-hlo-opt, defaults to _default_flags.
+        """
+        if not infile.endswith("llvm.mlir"):
+            raise ValueError("MHLOPass expects a PATH to file with extension .nohlo.")
+        if outfile is None:
+            outfile = infile.replace(".llvm.mlir", ".ll")
+        if executable is None:
+            executable = LLVMDialectToLLVMIR._executable
+        if flags is None:
+            flags = LLVMDialectToLLVMIR._default_flags
+        LLVMDialectToLLVMIR._run(infile, outfile, executable, flags)
+        return outfile
 
 
 compiler = get_executable_path("llvm", "llc")
@@ -362,17 +391,7 @@ def convert_mlir_to_llvmir(filename):
     Returns:
         a path to the output file
     """
-    assert filename[-10:] == ".llvm.mlir", "input is not an llvm dialect mlir file"
-
-    command = [translate_tool]
-    command += [filename]
-    command += ["--mlir-to-llvmir"]
-
-    new_fname = filename.replace(".llvm.mlir", ".ll")
-    with open(new_fname, "w", encoding="utf-8") as file:
-        subprocess.run(command, stdout=file, check=True)
-
-    return new_fname
+    return LLVMDialectToLLVMIR.run(filename)
 
 
 def compile_llvmir(filename):
