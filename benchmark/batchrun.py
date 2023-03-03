@@ -435,7 +435,7 @@ def plot(a: ParsedArguments) -> None:
                         vlc.vegalite_to_svg(
                             # alt.vconcat(
                             Chart(df)
-                            .transform_calculate(impl_diff="datum.impl+'('+datum.diffmethod+')'")
+                            # .transform_calculate(impl_diff="datum.impl+'('+datum.diffmethod+')'")
                             .mark_line(point=True)
                             .encode(
                                 x=_nqubitsEncoding(),
@@ -446,7 +446,8 @@ def plot(a: ParsedArguments) -> None:
                                 strokeDash=implCLcondDash,
                                 strokeWidth=implCLcond,
                             )
-                            .properties(title=_mktitle("Running time, Variational circuits"))
+                            .properties(title=_mktitle(
+                                f"Running time, Variational circuits ({diffmethod})"))
                             .to_dict(),
                             # _mkfooter(df, _nqubitsEncoding(), "PL/Def")
                             # )
