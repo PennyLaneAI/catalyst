@@ -239,11 +239,39 @@ class LLVMDialectToLLVMIR:
         return outfile
 
 
-compiler = get_executable_path("llvm", "llc")
-compiler_flags = [
-    "--filetype=obj",
-    "--relocation-model=pic",
-]
+class LLVMIRToObjectFile:
+    """LLVMIR To Object File."""
+    _executable = get_executable_path("llvm", "llc")
+    _default_flags = [
+        "--filetype=obj",
+        "--relocation-model=pic",
+    ]
+
+    @staticmethod
+    def _run(infile, outfile, executable, flags):
+        command = [executable] + flags + [infile, "-o", outfile]
+        subprocess.run(command, check=True)
+
+    @staticmethod
+    def run(infile, outfile=None, executable=None, flags=None):
+        """Run the bufferization pass.
+
+        Args:
+            infile (str): path to MLIR file to be compiled
+            outfile (str): path to output file, defaults to replacing extension in infile to .nohlo.
+            executable (str): path to executable, defaults to mlir-hlo-opt
+            flags (List[str]): flags to mlir-hlo-opt, defaults to _default_flags.
+        """
+        if not infile.endswith(".ll"):
+            raise ValueError("MHLOPass expects a PATH to file with extension .nohlo.")
+        if outfile is None:
+            outfile = infile.replace(".ll", ".o")
+        if executable is None:
+            executable = LLVMIRToObjectFile._executable
+        if flags is None:
+            flags = LLVMIRToObjectFile._default_flags
+        LLVMIRToObjectFile._run(infile, outfile, executable, flags)
+        return outfile
 
 
 # pylint: disable=too-few-public-methods
@@ -402,16 +430,7 @@ def compile_llvmir(filename):
     Returns:
         a path to the output file
     """
-    assert filename[-3:] == ".ll", "input is not an llvmir file"
-
-    new_fname = filename.replace(".ll", ".o")
-
-    command = [compiler]
-    command += compiler_flags
-    command += [filename]
-    command += ["-o", new_fname]
-    subprocess.run(command, check=True)
-    return new_fname
+    return LLVMIRToObjectFile.run(filename)
 
 
 def link_lightning_runtime(filename):
