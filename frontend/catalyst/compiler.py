@@ -148,36 +148,67 @@ class BufferizationPass:
         return outfile
 
 
+class MLIRToLLVMDialect:
+    """MLIR To LLVM"""
+
+    _executable = get_executable_path("quantum", "quantum-opt")
+    _default_flags = [
+        "--convert-linalg-to-loops",
+        "--convert-scf-to-cf",
+        # This pass expands memref operations that modify the metadata of a memref (sizes, offsets,
+        # stdies) into a sequence of easier to analyze constructs. In particular, this pass transforms
+        # operations into explicit sequence of operations that model the effect of this operation on the
+        # different metadata. This pass uses affine constructs to materialize these effects.
+        # Concretely, expanded-strided-metadata is used to decompose memref.subview as it has no
+        # lowering in -convert-memref-to-llvm.
+        "--expand-strided-metadata",
+        "--lower-affine",
+        "--convert-complex-to-standard",  # added for complex.exp lowering
+        "--convert-complex-to-llvm",
+        "--convert-math-to-llvm",
+        # Must be run after -convert-math-to-llvm as it marks math::powf illegal but doesn't convert it.
+        "--convert-math-to-libm",
+        "--convert-arith-to-llvm",
+        "--convert-memref-to-llvm",
+        "--convert-index-to-llvm",
+        "--convert-gradient-to-llvm",
+        "--convert-quantum-to-llvm",
+        # Remove any dead casts as the final pass expects to remove all existing casts,
+        # but only those that form a loop back to the original type.
+        "--canonicalize",
+        "--reconcile-unrealized-casts",
+    ]
+
+    @staticmethod
+    def _run(infile, outfile, executable, flags):
+        command = [executable] + flags + [infile, "-o", outfile]
+        subprocess.run(command, check=True)
+
+    @staticmethod
+    def run(infile, outfile=None, executable=None, flags=None):
+        """Run the bufferization pass.
+
+        Args:
+            infile (str): path to MLIR file to be compiled
+            outfile (str): path to output file, defaults to replacing extension in infile to .nohlo.
+            executable (str): path to executable, defaults to mlir-hlo-opt
+            flags (List[str]): flags to mlir-hlo-opt, defaults to _default_flags.
+        """
+        if not infile.endswith("buff.mlir"):
+            raise ValueError("MHLOPass expects a PATH to file with extension .nohlo.")
+        if outfile is None:
+            outfile = infile.replace(".buff.mlir", ".llvm.mlir")
+        if executable is None:
+            executable = MLIRToLLVMDialect._executable
+        if flags is None:
+            flags = MLIRToLLVMDialect._default_flags
+        MLIRToLLVMDialect._run(infile, outfile, executable, flags)
+        return outfile
+
+
 translate_tool = get_executable_path("llvm", "mlir-translate")
 quantum_opt_tool = get_executable_path("quantum", "quantum-opt")
 
-
-llvm_lowering_pass_pipeline = [
-    "--convert-linalg-to-loops",
-    "--convert-scf-to-cf",
-    # This pass expands memref operations that modify the metadata of a memref (sizes, offsets,
-    # stdies) into a sequence of easier to analyze constructs. In particular, this pass transforms
-    # operations into explicit sequence of operations that model the effect of this operation on the
-    # different metadata. This pass uses affine constructs to materialize these effects.
-    # Concretely, expanded-strided-metadata is used to decompose memref.subview as it has no
-    # lowering in -convert-memref-to-llvm.
-    "--expand-strided-metadata",
-    "--lower-affine",
-    "--convert-complex-to-standard",  # added for complex.exp lowering
-    "--convert-complex-to-llvm",
-    "--convert-math-to-llvm",
-    # Must be run after -convert-math-to-llvm as it marks math::powf illegal but doesn't convert it.
-    "--convert-math-to-libm",
-    "--convert-arith-to-llvm",
-    "--convert-memref-to-llvm",
-    "--convert-index-to-llvm",
-    "--convert-gradient-to-llvm",
-    "--convert-quantum-to-llvm",
-    # Remove any dead casts as the final pass expects to remove all existing casts,
-    # but only those that form a loop back to the original type.
-    "--canonicalize",
-    "--reconcile-unrealized-casts",
-]
 
 compiler = get_executable_path("llvm", "llc")
 compiler_flags = [
@@ -320,17 +351,7 @@ def lower_all_to_llvm(filename):
     Returns:
         a path to the output file
     """
-    assert filename[-10:] == ".buff.mlir", "input is not a bufferized mlir file"
-
-    command = [quantum_opt_tool]
-    command += [filename]
-    command += llvm_lowering_pass_pipeline
-
-    new_fname = filename.replace(".buff.mlir", ".llvm.mlir")
-    with open(new_fname, "w", encoding="utf-8") as file:
-        subprocess.run(command, stdout=file, check=True)
-
-    return new_fname
+    return MLIRToLLVMDialect.run(filename)
 
 
 def convert_mlir_to_llvmir(filename):
