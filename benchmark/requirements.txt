@@ -3,3 +3,5 @@ py-cpuinfo
 altair
 vl-convert-python
 pandas
+zstd
+dill
