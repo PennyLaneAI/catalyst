@@ -783,7 +783,7 @@ def _sample_abstract_eval(obs, shots, shape):
 
     if obs.primitive is compbasis_p:
         assert shape == (shots, obs.num_qubits)
-    else:  # pragma: no cover
+    else:
         assert shape == (shots,)
 
     return jax.core.ShapedArray(shape, jax.numpy.float64)

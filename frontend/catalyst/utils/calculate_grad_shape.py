@@ -99,7 +99,7 @@ def calculate_grad_shape(signature, indices):
         ``indices``.
     """
     grad_result_types = []
-    for index in indices:  # pragma: no cover
+    for index in indices:
         diff_arg_type = signature.get_input(index)
         diff_arg_shape = []
 

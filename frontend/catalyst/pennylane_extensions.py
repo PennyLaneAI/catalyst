@@ -520,15 +520,13 @@ class WhileCallable:
         body_jaxpr, body_consts, body_tree = _initial_style_jaxpr(
             new_body, in_tree, init_avals, "while_loop"
         )
-        if not treedef_is_leaf(cond_tree) or len(cond_jaxpr.out_avals) != 1:  # pragma: no cover
+        if not treedef_is_leaf(cond_tree) or len(cond_jaxpr.out_avals) != 1:
             msg = "cond_fun must return a boolean scalar, but got pytree {}."
             raise TypeError(msg.format(cond_tree))
         pred_aval = cond_jaxpr.out_avals[0]
         if not isinstance(
             pred_aval, ShapedArray
-        ) or pred_aval.strip_weak_type().strip_named_shape() != ShapedArray(
-            (), jnp.bool_
-        ):  # pragma: no cover
+        ) or pred_aval.strip_weak_type().strip_named_shape() != ShapedArray((), jnp.bool_):
             msg = "cond_fun must return a boolean scalar, but got output type(s) {}."
             raise TypeError(msg.format(cond_jaxpr.out_avals))
 
@@ -1008,7 +1006,7 @@ class QJITDevice(qml.QubitDevice):
         # success rate, as complex decomposition paths can fail to trace (c.f. PL #3521, #3522).
 
         def _decomp_controlled_unitary(self, *args, **kwargs):  # pylint: disable=unused-argument
-            return qml.QubitUnitary(qml.matrix(self), wires=self.wires)  # pragma: no cover
+            return qml.QubitUnitary(qml.matrix(self), wires=self.wires)
 
         def _decomp_controlled(self, *args, **kwargs):  # pylint: disable=unused-argument
             return qml.QubitUnitary(qml.matrix(self), wires=self.wires)
@@ -1017,7 +1015,7 @@ class QJITDevice(qml.QubitDevice):
             (qml.ops.ControlledQubitUnitary, "compute_decomposition", _decomp_controlled_unitary),
             (qml.ops.Controlled, "has_decomposition", lambda self: True),
             (qml.ops.Controlled, "decomposition", _decomp_controlled),
-        ):  # pragma: no cover
+        ):
             expanded_tape = super().default_expand_fn(circuit, max_expansion)
 
         self.check_validity(expanded_tape.operations, [])
