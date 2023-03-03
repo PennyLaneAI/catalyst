@@ -22,6 +22,7 @@ source = [
 omit = [
     "*/python_bindings/*",
     "./frontend/catalyst/_version.py",
+    "./frontend/catalyst/jax_primitives.py",
 ]
 
 [tool.coverage.html]

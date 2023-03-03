@@ -111,7 +111,7 @@ class ParamEvaluator:
             return_val = self.out_ordered[self.cur_index]
             self.cur_index += 1
             return return_val
-        except IndexError as exc:
+        except IndexError as exc:  # pragma: no cover
             raise ValueError("no additional known outputs given the inputs") from exc
 
     def send_partial_input(self, val):

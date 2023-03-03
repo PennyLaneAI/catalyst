@@ -102,6 +102,17 @@ TEST_CASE("test AllocateQubits", "[lightning]")
     REQUIRE(state[0].real() == Approx(1.0).epsilon(1e-5));
 }
 
+TEST_CASE("test DeviceShots", "[lightning]")
+{
+    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+
+    REQUIRE(sim->GetDeviceShots() == 1000);
+
+    sim->SetDeviceShots(500);
+
+    REQUIRE(sim->GetDeviceShots() == 500);
+}
+
 TEST_CASE("compute register tests", "[lightning]")
 {
     std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();

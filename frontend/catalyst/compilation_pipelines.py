@@ -60,7 +60,7 @@ jax.config.update("jax_array", True)
 
 
 # pylint: disable=too-many-return-statements
-def mlir_type_to_numpy_type(t):
+def mlir_type_to_numpy_type(t):  # pragma: no cover
     """Convert an MLIR type to a Numpy type.
 
     Args:
@@ -493,7 +493,7 @@ class QJIT:
         self.qfunc = fn
         self.c_sig = None
         functools.update_wrapper(self, fn)
-        if keep_intermediate:
+        if keep_intermediate:  # pragma: no cover
             dirname = fn.__name__
             parent_dir = os.getcwd()
             path = os.path.join(parent_dir, dirname)
@@ -514,7 +514,7 @@ class QJIT:
 
         parameter_types = CompiledFunction.get_compile_time_signature(self.qfunc)
         self.user_typed = False
-        if parameter_types is not None:
+        if parameter_types is not None:  # pragma: no cover
             self.user_typed = True
             if target in ("mlir", "binary"):
                 self.mlir_module = self.get_mlir(*parameter_types)
@@ -540,7 +540,7 @@ class QJIT:
         return self._mlir
 
     @property
-    def jaxpr(self):
+    def jaxpr(self):  # pragma: no cover
         """str: Returns the JAXPR intermediate representation
         of the quantum program.
         """

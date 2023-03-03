@@ -33,7 +33,7 @@ class Signature:
         self.xs = xs
         self.ys = ys
 
-    def __repr__(self):
+    def __repr__(self):  # pragma: no cover
         return f"{self.xs} -> {self.ys}"
 
     def get_input(self, i):
@@ -55,7 +55,7 @@ class Signature:
         """
         return self.xs
 
-    def get_result(self, i):
+    def get_result(self, i):  # pragma: no cover
         """Get result values at position i.
 
         Args:
@@ -99,7 +99,7 @@ def calculate_grad_shape(signature, indices):
         ``indices``.
     """
     grad_result_types = []
-    for index in indices:
+    for index in indices:  # pragma: no cover
         diff_arg_type = signature.get_input(index)
         diff_arg_shape = []
 

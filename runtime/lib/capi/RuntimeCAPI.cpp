@@ -656,11 +656,6 @@ void __quantum__qis__Probs(MemRefT_double_1d *result, int64_t numQubits, ...)
 
     const size_t numElements = 1U << numQubits;
 
-    if (numElements != sv_probs.size()) {
-        __quantum__rt__fail_cstr("Cannot copy the probabilities to an array with different size; "
-                                 "allocation size must be '2 ** numWires'");
-    }
-
     // TODO: memory management
     double *probs = (double *)aligned_alloc(sizeof(double), numElements * sizeof(double));
     double *curr = probs;

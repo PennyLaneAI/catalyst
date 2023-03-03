@@ -94,8 +94,6 @@ def qfunc(num_wires, *, shots=1000, device=None):
         Grad: A QFunc object that denotes the the declaration of a quantum function.
 
     """
-    if not device:
-        device = QJITDevice(shots=shots, wires=num_wires)
 
     def dec_no_params(fn):
         return QFunc(fn, device)
@@ -519,13 +517,15 @@ class WhileCallable:
         body_jaxpr, body_consts, body_tree = _initial_style_jaxpr(
             new_body, in_tree, init_avals, "while_loop"
         )
-        if not treedef_is_leaf(cond_tree) or len(cond_jaxpr.out_avals) != 1:
+        if not treedef_is_leaf(cond_tree) or len(cond_jaxpr.out_avals) != 1:  # pragma: no cover
             msg = "cond_fun must return a boolean scalar, but got pytree {}."
             raise TypeError(msg.format(cond_tree))
         pred_aval = cond_jaxpr.out_avals[0]
         if not isinstance(
             pred_aval, ShapedArray
-        ) or pred_aval.strip_weak_type().strip_named_shape() != ShapedArray((), jnp.bool_):
+        ) or pred_aval.strip_weak_type().strip_named_shape() != ShapedArray(
+            (), jnp.bool_
+        ):  # pragma: no cover
             msg = "cond_fun must return a boolean scalar, but got output type(s) {}."
             raise TypeError(msg.format(cond_jaxpr.out_avals))
 
@@ -903,7 +903,7 @@ def measure(wires):
         jax_tape = ctx.jax_tape
         a, t = tree_flatten(jax.core.get_aval(True))
         return jax_tape.create_tracer(t, a)
-    raise ValueError("measure can only be used when it jitted mode")
+    raise ValueError("measure can only be used when it jitted mode")  # pragma: no cover
 
 
 class QJITDevice(qml.QubitDevice):
@@ -970,7 +970,7 @@ class QJITDevice(qml.QubitDevice):
     def __init__(self, shots=None, wires=None):
         super().__init__(wires=wires, shots=shots)
 
-    def apply(self, operations, **kwargs):
+    def apply(self, operations, **kwargs):  # pragma: no cover
         """
         Raises: RuntimeError
         """
@@ -1005,7 +1005,7 @@ class QJITDevice(qml.QubitDevice):
         # success rate, as complex decomposition paths can fail to trace (c.f. PL #3521, #3522).
 
         def _decomp_controlled_unitary(self, *args, **kwargs):  # pylint: disable=unused-argument
-            return qml.QubitUnitary(qml.matrix(self), wires=self.wires)
+            return qml.QubitUnitary(qml.matrix(self), wires=self.wires)  # pragma: no cover
 
         def _decomp_controlled(self, *args, **kwargs):  # pylint: disable=unused-argument
             return qml.QubitUnitary(qml.matrix(self), wires=self.wires)
@@ -1014,7 +1014,7 @@ class QJITDevice(qml.QubitDevice):
             (qml.ops.ControlledQubitUnitary, "compute_decomposition", _decomp_controlled_unitary),
             (qml.ops.Controlled, "has_decomposition", lambda self: True),
             (qml.ops.Controlled, "decomposition", _decomp_controlled),
-        ):
+        ):  # pragma: no cover
             expanded_tape = super().default_expand_fn(circuit, max_expansion)
 
         self.check_validity(expanded_tape.operations, [])

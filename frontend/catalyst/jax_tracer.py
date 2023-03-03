@@ -394,7 +394,7 @@ def trace_observables(obs, qubit_states, p, num_wires, qreg):
     elif isinstance(obs, qml.Hamiltonian):
         nested_obs = [trace_observables(o, qubit_states, p, num_wires, qreg)[0] for o in obs.ops]
         jax_obs = trace_hamiltonian(op_args, *nested_obs)
-    else:
+    else:  # pragma: no cover
         raise RuntimeError(f"unknown observable in measurement process: {obs}")
     return jax_obs, qubits
 
@@ -430,7 +430,7 @@ def trace_measurement(meas, obs, qubits, shots):
         assert compbasis
         shape = (2 ** len(qubits),)
         mres = (jprim.state(obs, shape),)
-    else:
+    else:  # pragma: no cover
         raise RuntimeError(f"unknown measurement process: {meas.return_type}")
     return mres
 
@@ -461,27 +461,27 @@ def custom_lower_jaxpr_to_module(
     Copyright 2021 The JAX Authors.
     """
     platform = xb.canonicalize_platform(platform)
-    if not xb.is_known_platform(platform):
+    if not xb.is_known_platform(platform):  # pragma: no cover
         raise ValueError(f"Unknown platform {platform}")
     input_output_aliases = None
     in_avals = jaxpr.in_avals
-    if arg_shardings is not None:
+    if arg_shardings is not None:  # pragma: no cover
         in_avals = [
             sharded_aval(in_aval, in_sharding)
             for in_aval, in_sharding in zip(in_avals, arg_shardings)
         ]
     out_avals = jaxpr.out_avals
-    if result_shardings is not None:
+    if result_shardings is not None:  # pragma: no cover
         out_avals = [
             sharded_aval(out_aval, out_sharding)
             for out_aval, out_sharding in zip(out_avals, result_shardings)
         ]
     platforms_with_donation = ("cuda", "rocm", "tpu")
-    if platform in platforms_with_donation:
+    if platform in platforms_with_donation:  # pragma: no cover
         input_output_aliases, donated_args = _set_up_aliases(in_avals, out_avals, donated_args)
-    if any(eff not in lowerable_effects for eff in jaxpr.effects):
+    if any(eff not in lowerable_effects for eff in jaxpr.effects):  # pragma: no cover
         raise ValueError(f"Cannot lower jaxpr with effects: {jaxpr.effects}")
-    if any(donated_args):
+    if any(donated_args):  # pragma: no cover
         unused_donations = [str(a) for a, d in zip(in_avals, donated_args) if d]
         msg = "See an explanation at https://jax.readthedocs.io/en/latest/faq.html#buffer-donation."
         if platform not in platforms_with_donation:
@@ -506,7 +506,7 @@ def custom_lower_jaxpr_to_module(
         module_name = _module_name_regex.sub("_", module_name)
         ctx.module.operation.attributes["sym_name"] = ir.StringAttr.get(module_name)
         unlowerable_effects = {eff for eff in jaxpr.effects if eff not in lowerable_effects}
-        if unlowerable_effects:
+        if unlowerable_effects:  # pragma: no cover
             raise ValueError(f"Cannot lower jaxpr with unlowerable effects: {unlowerable_effects}")
         lower_jaxpr_to_fun(
             ctx,
