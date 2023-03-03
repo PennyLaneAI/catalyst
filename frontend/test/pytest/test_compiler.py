@@ -2,49 +2,33 @@
 Unit tests for CompilerDriver class
 """
 
-import os
 import warnings
 import pytest
 
 from catalyst.compiler import CompilerDriver
-from temp_env import TempEnv
-
-
-# pylint: disable=too-few-public-methods
-class TestTempEnv:
-    """Test the temporary environment class"""
-
-    # pylint: disable=missing-function-docstring
-    def test_temp_env(self):
-        old_values = os.environ
-        with TempEnv(somevar="hello"):
-            assert os.environ["somevar"]
-            for key, value in old_values.items():
-                assert os.environ[key] == value
-        assert old_values == os.environ
 
 
 class TestCompilerDriver:
     """Unit test for CompilerDriver class."""
 
-    def test_catalyst_cc_available(self):
+    def test_catalyst_cc_available(self, monkeypatch):
         """Test that the compiler resolution order contains the preferred compiler and no warnings
         are emitted"""
         compiler = "c99"
-        with TempEnv(CATALYST_CC=compiler):
-            # If a warning is emitted, raise an error.
-            with warnings.catch_warnings():
-                warnings.simplefilter("error")
-                # pylint: disable=protected-access
-                compilers = CompilerDriver._get_compiler_fallback_order([])
-                assert compiler in compilers
+        monkeypatch.setenv("CATALYST_CC", compiler)
+        # If a warning is emitted, raise an error.
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            # pylint: disable=protected-access
+            compilers = CompilerDriver._get_compiler_fallback_order([])
+            assert compiler in compilers
 
-    def test_catalyst_cc_unavailable_warning(self):
+    def test_catalyst_cc_unavailable_warning(self, monkeypatch):
         """Test that a warning is emitted when the preferred compiler is not in PATH."""
-        with TempEnv(CATALYST_CC="this-binary-does-not-exist"):
-            with pytest.warns(UserWarning, match="User defined compiler.* is not in PATH."):
-                # pylint: disable=protected-access
-                CompilerDriver._get_compiler_fallback_order([])
+        monkeypatch.setenv("CATALYST_CC", "this-binary-does-not-exist")
+        with pytest.warns(UserWarning, match="User defined compiler.* is not in PATH."):
+            # pylint: disable=protected-access
+            CompilerDriver._get_compiler_fallback_order([])
 
     def test_compiler_failed_warning(self):
         """Test that a warning is emitted when a compiler failed."""
