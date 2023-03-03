@@ -142,7 +142,6 @@ def all_configurations(a: ParsedArguments) -> Iterable[tuple]:
 
                 for diffmethod in DIFF_METHODS[problem]:
                     for nqubits in sorted(QUBITS.get((cat, problem, measure), [None])):
-                        assert nqubits is not None, f"qubits is not set for {(cat,problem,measure)}"
                         for nlayers in sorted(LAYERS.get((cat, problem, measure), [None])):
                             yield (cat, measure, problem, impl, nqubits, nlayers, diffmethod)
 
@@ -186,9 +185,8 @@ def collect(a: ParsedArguments) -> None:
             print(known_failures)
 
 
-def plot(a: ParsedArguments) -> None:
-    """Plot the figures. The function first builds a set of Pandas DataFrames,
-    then calls Altair to present the data collected."""
+def load(a: ParsedArguments) -> DataFrame:
+    """Load the benchmark data into the Pandas DataFrame"""
     log = []
     nmissing = 0
     data = defaultdict(list)
@@ -210,15 +208,22 @@ def plot(a: ParsedArguments) -> None:
                 data["impl"].append(ALIASES[impl])
                 data["nqubits"].append(nqubits)
                 data["time"].append(time)
-                data["nlayers"].append(nlayers if nlayers else -1)
-                data["ngates"].append(r.depth_gates if r.depth_gates else -1)
-                data["diffmethod"].append(diffmethod if diffmethod else "N/A")
+                data["nlayers"].append(nlayers)
+                data["ngates"].append(r.depth_gates)
+                data["diffmethod"].append(diffmethod)
     if nmissing > 0:
         print(f"There are {nmissing} data records missing", file=sys.stderr)
         if a.verbose:
             print("\n".join(log), file=sys.stderr)
         else:
             print("Pass -V to see the full list", file=sys.stderr)
+    return DataFrame(data)
+
+
+def plot(a: ParsedArguments) -> None:
+    """Plot the figures. The function first builds a set of Pandas DataFrames,
+    then calls Altair to present the data collected."""
+    df_full = load(a)
 
     with pd.option_context("display.max_rows", None, "display.max_columns", None):
         implCLcond = alt.condition("datum.impl == 'C/L'", alt.value(2), alt.value(0.7))
@@ -288,8 +293,6 @@ def plot(a: ParsedArguments) -> None:
                 )
                 .properties(height=60)
             )
-
-        df_full = DataFrame(data)
 
         def _filter(cat, measure, problem):
             return df_full[(df_full["cat"]==cat) &
@@ -474,6 +477,8 @@ ap.add_argument("-V", "--verbose", default=False, action=BooleanOptionalAction,
                 help="Print verbose messages")
 # fmt: on
 
+def load_all() -> DataFrame:
+    return load(ap.parse_args([]))
 
 if __name__ == "__main__":
     a = ap.parse_args(sys.argv[1:])
