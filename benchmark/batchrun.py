@@ -9,7 +9,7 @@ from argparse import ArgumentParser, BooleanOptionalAction, Namespace as ParsedA
 from typing import Tuple, Iterable
 from collections import defaultdict
 from copy import deepcopy
-
+from contextlib import contextmanager
 from hashlib import sha256
 
 from pandas import DataFrame
@@ -18,19 +18,77 @@ from altair import Chart
 from catalyst_benchmark.types import Sysinfo, BenchmarkResult
 from catalyst_benchmark.main import parse_implementation
 
-VERSION = 1
+# fmt:off
+FMTVERSION = 1
+""" Version of serialized representation."""
+
 SYSINFO = Sysinfo.fromOS()
 SYSHASH = sha256(str(SYSINFO).encode("utf-8")).hexdigest()[:6]
 
+CATPROBLEMS = {
+    "regular": "grover",
+    "deep": "grover",
+    "hybrid": None,
+    # "variational": "vqe",
+    "variational": "chemvqe",
+}
+
+MINQUBITS = 7
+MAXQUBITS = 29
+QUBITS = {
+    ("regular", "grover", "compile"): [MINQUBITS, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, MAXQUBITS],
+    ("regular", "grover", "runtime"): [MINQUBITS, 9, 11, 13, 15, 17],
+    ("deep", "grover", "compile"): [7],
+    ("deep", "grover", "runtime"): [7],
+    ("variational", "vqe", "compile"): [6, 7, 8, 9, 10, 11],
+    ("variational", "vqe", "runtime"): [6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+    ("variational", "chemvqe", "runtime"): [4, 6, 8, 12],
+}
+
+MAXLAYERS = 1500
+LAYERS = {
+    ("deep", "grover", "compile"):
+        [10, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200, 1300, 1400, MAXLAYERS],
+    ("deep", "grover", "runtime"):
+        [10, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200, 1300, 1400, MAXLAYERS],
+}
+
+KNOWN_FAILURES = {
+    ("grover", "compile", "pennylane+jax/default.qubit.jax", None): (7, 50),
+    ("grover", "runtime", "pennylane+jax/default.qubit.jax", None): (7, 50),
+}
+
+DIFF_METHODS = {
+    "grover": [None],
+    "vqe": ["finite-diff", "parameter-shift", "adjoint", "backprop"],
+    "chemvqe": ["finite-diff", "parameter-shift", "adjoint", "backprop"]
+}
+
+# Implementation aliases to workaround the Altair clipped legend problem
+# https://github.com/vega/vl-convert/issues/30
+ALIASES = {
+    "catalyst/lightning.qubit": "C/L",
+    "pennylane+jax/lightning.qubit": "PLjax/L",
+    "pennylane+jax/default.qubit.jax": "PLjax/Def",
+    "pennylane/default.qubit": "PL/Def",
+    "pennylane/lightning.qubit": "PL/L",
+}
+
+# Colors obtained from a Vega colorscheme.
+# Ref. https://stackoverflow.com/questions/70993559/altair-selecting-a-color-from-a-vega-color-scheme-for-plot
+COLORS = ["#e41a1c", "#377eb8", "#4daf4a", "#984ea3", "#ff7f00",
+          "#ffff33", "#a65628", "#f781bf", "#999999"]
+# fmt:on
+
 
 def ofile(a, _, measure, problem, impl, nqubits, nlayers, diffmethod) -> Tuple[str, str]:
-    """Produce the tuple of JSON file containing the configured measurement and
-    the Linux shell command which is expected to produce it"""
+    """ Produce the JSON file name containing the measurement configured and
+    the Linux shell command which is expected to produce such file. """
     impl_ = impl.replace("+", "_").replace("/", "_").replace(".", "_")
     dmfilepart = f"_{diffmethod}".replace("-", "_") if diffmethod is not None else ""
     ofname = (
         f"_benchmark/{measure}_{problem}_{impl_}{dmfilepart}_N{nqubits}_"
-        f"L{nlayers}_S{SYSHASH}_v{VERSION}/results.json"
+        f"L{nlayers}_S{SYSHASH}_v{FMTVERSION}/results.json"
     )
     if problem == "grover":
         assert diffmethod is None
@@ -54,74 +112,9 @@ def ofile(a, _, measure, problem, impl, nqubits, nlayers, diffmethod) -> Tuple[s
     return (ofname, cmdline)
 
 
-def rread(fp):
+def loadresults(fp:str) -> BenchmarkResult:
+    """ Load a serrialized benchmark result from file """
     return BenchmarkResult.from_dict(json_load(open(fp)))
-
-
-MINQUBITS = 7
-MAXQUBITS = 29
-
-QUBITS = {
-    ("regular", "grover", "compile"): [MINQUBITS, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, MAXQUBITS],
-    ("regular", "grover", "runtime"): [MINQUBITS, 9, 11, 13, 15, 17],
-    ("deep", "grover", "compile"): [7],
-    ("deep", "grover", "runtime"): [7],
-    ("variational", "vqe", "compile"): [6, 7, 8, 9, 10, 11],
-    ("variational", "vqe", "runtime"): [6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
-    ("variational", "chemvqe", "runtime"): [4, 6, 8, 12],
-}
-
-MAXLAYERS = 1500
-
-LAYERS = {
-    ("deep", "grover", "compile"): [
-        10,
-        100,
-        200,
-        300,
-        400,
-        500,
-        600,
-        700,
-        800,
-        900,
-        1000,
-        1100,
-        1200,
-        1300,
-        1400,
-        MAXLAYERS,
-    ],
-    ("deep", "grover", "runtime"): [
-        10,
-        100,
-        200,
-        300,
-        400,
-        500,
-        600,
-        700,
-        800,
-        900,
-        1000,
-        1100,
-        1200,
-        1300,
-        1400,
-        MAXLAYERS,
-    ],
-}
-
-KNOWN_FAILURES = {
-    ("grover", "compile", "pennylane+jax/default.qubit.jax", None): (7, 50),
-    ("grover", "runtime", "pennylane+jax/default.qubit.jax", None): (7, 50),
-}
-
-DIFF_METHODS = {
-    "grover": [None],
-    "vqe": ["finite-diff", "parameter-shift", "adjoint", "backprop"],
-    "chemvqe": ["finite-diff", "parameter-shift", "adjoint", "backprop"]
-}
 
 
 def all_configurations(a: ParsedArguments) -> Iterable[tuple]:
@@ -143,14 +136,7 @@ def all_configurations(a: ParsedArguments) -> Iterable[tuple]:
                 if not any([(c in a.category) for c in [cat, "all"]]):
                     continue
 
-                problem = {
-                    "regular": "grover",
-                    "deep": "grover",
-                    "hybrid": None,
-                    # "variational": "vqe",
-                    "variational": "chemvqe",
-                }.get(cat, None)
-
+                problem = CATPROBLEMS.get(cat, None)
                 if problem is None:
                     continue
 
@@ -179,7 +165,7 @@ def collect(a: ParsedArguments) -> None:
                 print(f"Skipping existing: {cmdline}")
             else:
                 if a.dry_run:
-                    print(f"(Dry-run) {cmdline}")
+                    print(f"(Dry-run) Would run: {cmdline}")
                 else:
                     (fnqubits, fnlayers) = known_failures.get(
                         (problem, measure, impl, diffmethod), (sys.maxsize, sys.maxsize)
@@ -200,31 +186,6 @@ def collect(a: ParsedArguments) -> None:
             print(known_failures)
 
 
-# Implementation aliases to workaround the Altair clipped legend problem
-# https://github.com/vega/vl-convert/issues/30
-ALIASES = {
-    "catalyst/lightning.qubit": "C/L",
-    "pennylane+jax/lightning.qubit": "PLjax/L",
-    "pennylane+jax/default.qubit.jax": "PLjax/Def",
-    "pennylane/default.qubit": "PL/Def",
-    "pennylane/lightning.qubit": "PL/L",
-}
-
-# Colors obtained from a Vega colorscheme.
-# Ref. https://stackoverflow.com/questions/70993559/altair-selecting-a-color-from-a-vega-color-scheme-for-plot
-COLORS = [
-    "#e41a1c",
-    "#377eb8",
-    "#4daf4a",
-    "#984ea3",
-    "#ff7f00",
-    "#ffff33",
-    "#a65628",
-    "#f781bf",
-    "#999999",
-]
-
-
 def plot(a: ParsedArguments) -> None:
     """Plot the figures. The function first builds a set of Pandas DataFrames,
     then calls Altair to present the data collected."""
@@ -236,7 +197,7 @@ def plot(a: ParsedArguments) -> None:
         cat, measure, problem, impl, nqubits, nlayers, diffmethod = config
         r = None
         try:
-            r = rread(ofname)
+            r = loadresults(ofname)
         except Exception as e:
             nmissing += 1
             log.append(str(e))
@@ -260,14 +221,23 @@ def plot(a: ParsedArguments) -> None:
         else:
             print("Pass -V to see the full list", file=sys.stderr)
 
-    if a.dry_run:
-        return
-
     with pd.option_context("display.max_rows", None, "display.max_columns", None):
         implCLcond = alt.condition("datum.impl == 'C/L'", alt.value(2), alt.value(0.7))
         implCLcondDash = alt.condition("datum.impl == 'C/L'", alt.value([0]), alt.value([3, 3]))
 
-        def implEncoding(df):
+        @contextmanager
+        def _open(fname: str, fmode: str):
+            if a.dry_run and "w" in fmode:
+                class DummyFile:
+                    def write(*args, **kwargs):
+                        return
+                yield DummyFile()
+                print(f"(Dry-run) Would update: {fname}")
+            else:
+                with open(fname, fmode) as f:
+                    yield f
+
+        def _implEncoding(df):
             """Calculate domain and range colors of the implementation, based on
             the actual dataset and the pre-defined palette."""
             dom, rang = zip(
@@ -323,7 +293,7 @@ def plot(a: ParsedArguments) -> None:
             xaxis = alt.Axis(values=list(range(MINQUBITS, MAXQUBITS + 2, 2)))
             xscale = alt.Scale(domain=(MINQUBITS, MAXQUBITS))
             print("Updating _img/regular_compile.svg")
-            with open("_img/regular_compile.svg", "w") as f:
+            with _open("_img/regular_compile.svg", "w") as f:
                 f.write(
                     vlc.vegalite_to_svg(
                         alt.vconcat(
@@ -332,7 +302,7 @@ def plot(a: ParsedArguments) -> None:
                             .encode(
                                 x=_nqubitsEncoding(title=None, axis=xaxis, scale=xscale),
                                 y=timeEncoding,
-                                color=implEncoding(df),
+                                color=_implEncoding(df),
                                 opacity=trialEncoding,
                                 strokeDash=implCLcondDash,
                                 strokeWidth=implCLcond,
@@ -342,13 +312,13 @@ def plot(a: ParsedArguments) -> None:
                         )
                         .configure_axisLeft(minExtent=50)
                         .to_dict()
-                    )
+                    ),
                 )
 
         df = DataFrame(data[("regular", "runtime", "grover")])
         if len(df) > 0:
             print("Updating _img/regular_runtime.svg")
-            with open("_img/regular_runtime.svg", "w") as f:
+            with _open("_img/regular_runtime.svg", "w") as f:
                 f.write(
                     vlc.vegalite_to_svg(
                         alt.vconcat(
@@ -358,7 +328,7 @@ def plot(a: ParsedArguments) -> None:
                                 x=_nqubitsEncoding(title=None),
                                 y=timeEncoding,
                                 opacity=trialEncoding,
-                                color=implEncoding(df),
+                                color=_implEncoding(df),
                                 strokeDash=implCLcondDash,
                                 strokeWidth=implCLcond,
                             )
@@ -367,7 +337,7 @@ def plot(a: ParsedArguments) -> None:
                         )
                         .configure_axisLeft(minExtent=50)
                         .to_dict()
-                    )
+                    ),
                 )
 
         df = DataFrame(data[("deep", "compile", "grover")])
@@ -375,7 +345,7 @@ def plot(a: ParsedArguments) -> None:
             xaxis = alt.Axis(values=list(range(0, MAXLAYERS + 100, 100)))
             xscale = alt.Scale(domain=(0, MAXLAYERS))
             print("Updating _img/deep_compile.svg")
-            with open("_img/deep_compile.svg", "w") as f:
+            with _open("_img/deep_compile.svg", "w") as f:
                 f.write(
                     vlc.vegalite_to_svg(
                         alt.vconcat(
@@ -384,7 +354,7 @@ def plot(a: ParsedArguments) -> None:
                             .encode(
                                 x=_nlayersEncoding(title=None, axis=xaxis, scale=xscale),
                                 y=timeEncoding,
-                                color=implEncoding(df),
+                                color=_implEncoding(df),
                                 opacity=trialEncoding,
                                 strokeDash=implCLcondDash,
                                 strokeWidth=implCLcond,
@@ -394,7 +364,7 @@ def plot(a: ParsedArguments) -> None:
                         )
                         .configure_axisLeft(minExtent=50)
                         .to_dict()
-                    )
+                    ),
                 )
 
         df = DataFrame(data[("deep", "runtime", "grover")])
@@ -402,7 +372,7 @@ def plot(a: ParsedArguments) -> None:
             xaxis = alt.Axis(values=list(range(0, MAXLAYERS + 100, 100)))
             xscale = alt.Scale(domain=(0, MAXLAYERS))
             print("Updating _img/deep_runtime.svg")
-            with open("_img/deep_runtime.svg", "w") as f:
+            with _open("_img/deep_runtime.svg", "w") as f:
                 f.write(
                     vlc.vegalite_to_svg(
                         alt.vconcat(
@@ -411,7 +381,7 @@ def plot(a: ParsedArguments) -> None:
                             .encode(
                                 x=_nlayersEncoding(title=None, axis=xaxis, scale=xscale),
                                 y=timeEncoding,
-                                color=implEncoding(df),
+                                color=_implEncoding(df),
                                 opacity=trialEncoding,
                                 strokeDash=implCLcondDash,
                                 strokeWidth=implCLcond,
@@ -421,13 +391,13 @@ def plot(a: ParsedArguments) -> None:
                         )
                         .configure_axisLeft(minExtent=50)
                         .to_dict()
-                    )
+                    ),
                 )
 
         df = DataFrame(data[("variational", "runtime", "chemvqe")])
         if len(df) > 0:
             print("Updating _img/variational_runtime.svg")
-            with open("_img/variational_runtime.svg", "w") as f:
+            with _open("_img/variational_runtime.svg", "w") as f:
                 f.write(
                     vlc.vegalite_to_svg(
                         Chart(df)
@@ -436,7 +406,7 @@ def plot(a: ParsedArguments) -> None:
                         .encode(
                             x=_nqubitsEncoding(),
                             y=timeEncoding,
-                            # color=implEncoding(df),
+                            # color=_implEncoding(df),
                             color="impl_diff:N",
                             opacity=trialEncoding,
                             strokeDash=implCLcondDash,
@@ -444,13 +414,13 @@ def plot(a: ParsedArguments) -> None:
                         )
                         .properties(title=_mktitle("Running time, Variational circuits"))
                         .to_dict()
-                    )
+                    ),
                 )
 
         df = DataFrame(data[("variational", "compile", "vqe")])
         if len(df) > 0:
             print("Updating _img/variational_compile.svg")
-            with open("_img/variational_compile.svg", "w") as f:
+            with _open("_img/variational_compile.svg", "w") as f:
                 f.write(
                     vlc.vegalite_to_svg(
                         Chart(df)
@@ -458,56 +428,33 @@ def plot(a: ParsedArguments) -> None:
                         .encode(
                             x=_nqubitsEncoding(),
                             y=timeEncoding,
-                            color=implEncoding(df),
+                            color=_implEncoding(df),
                             opacity=trialEncoding,
                             strokeDash=implCLcondDash,
                             strokeWidth=implCLcond,
                         )
                         .properties(title=_mktitle("Compilaiton time, Variational circuits"))
                         .to_dict()
-                    )
+                    ),
                 )
 
 
+# fmt:off
 ap = ArgumentParser(prog="batchrun.py")
-ap.add_argument(
-    "-m",
-    "--measure",
-    type=str,
-    default="all",
-    help="Value to measure: compile|runtime|all, (default - 'all')",
-)
-ap.add_argument(
-    "-c",
-    "--category",
-    type=str,
-    default="regular,deep",
-    help="Category of circutis to evaluate regular|deep|hybrid|variational|all (default - 'regular,deep')",
-)
-ap.add_argument(
-    "--dry-run",
-    default=False,
-    action=BooleanOptionalAction,
-    help="Enable this mode to print command lines but not actually run anything",
-)
-ap.add_argument(
-    "-a",
-    "--actions",
-    type=str,
-    default="collect,plot",
-    help="Which actions to perform (default - 'collect,plot')",
-)
-ap.add_argument(
-    "-t",
-    "--timeout-1run",
-    type=str,
-    metavar="SEC",
-    default="1000.0",
-    help="Timeout for single benchmark run (default - 1000)",
-)
-ap.add_argument(
-    "-V", "--verbose", default=False, action=BooleanOptionalAction, help="Print verbose messages"
-)
+ap.add_argument("-m", "--measure", type=str, default="all",
+                help="Value to measure: compile|runtime|all, (default - 'all')")
+ap.add_argument("-c", "--category", type=str, default="regular,deep",
+                help=("Category of circutis to evaluate regular|deep|hybrid|variational|all "
+                "(default - 'regular,deep')"))
+ap.add_argument("--dry-run", default=False, action=BooleanOptionalAction,
+                help="Enable this mode to print command lines but not actually run anything")
+ap.add_argument("-a", "--actions", type=str, default="collect,plot",
+                help="Which actions to perform (default - 'collect,plot')")
+ap.add_argument("-t", "--timeout-1run", type=str, metavar="SEC", default="1000.0",
+                help="Timeout for single benchmark run (default - 1000)")
+ap.add_argument("-V", "--verbose", default=False, action=BooleanOptionalAction,
+                help="Print verbose messages")
+# fmt: on
 
 
 if __name__ == "__main__":

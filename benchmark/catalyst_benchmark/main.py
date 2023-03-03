@@ -106,18 +106,19 @@ def measure_runtime_catalyst(a: Any) -> BenchmarkResult:
     if a.problem == "grover":
         from .grover_catalyst import ProblemC, grover_main as main
 
-        t = ProblemC(qml.device("lightning.qubit", wires=a.nqubits),
-                     a.grover_nlayers)
+        t = ProblemC(qml.device("lightning.qubit", wires=a.nqubits), a.grover_nlayers)
     elif a.problem == "vqe":
         from .vqe_catalyst import ProblemVQE, grad_descent as main
 
-        t = ProblemVQE(qml.device("lightning.qubit", wires=a.nqubits),
-                       diff_method=a.vqe_diff_method)
+        t = ProblemVQE(
+            qml.device("lightning.qubit", wires=a.nqubits), diff_method=a.vqe_diff_method
+        )
     elif a.problem == "chemvqe":
         from .chemvqe_catalyst import ProblemCVQE, workflow as main
 
-        t = ProblemCVQE(qml.device("lightning.qubit", wires=a.nqubits),
-                        diff_method=a.vqe_diff_method)
+        t = ProblemCVQE(
+            qml.device("lightning.qubit", wires=a.nqubits), diff_method=a.vqe_diff_method
+        )
 
     else:
         raise ValueError(f"Unsupported problem {a.problem}")
@@ -301,8 +302,7 @@ def measure_runtime_pennylane(a: Any) -> BenchmarkResult:
     elif a.problem == "chemvqe":
         from .chemvqe_pennylane import ProblemCVQE, workflow as main
 
-        t = ProblemCVQE(qml.device(device, wires=a.nqubits),
-                        diff_method=a.vqe_diff_method)
+        t = ProblemCVQE(qml.device(device, wires=a.nqubits), diff_method=a.vqe_diff_method)
 
         def depth(_):
             return None

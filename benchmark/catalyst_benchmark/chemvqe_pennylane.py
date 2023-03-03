@@ -22,40 +22,16 @@ class ProblemInfo:
 
 NQubits = int
 PROBLEMS: Dict[NQubits, ProblemInfo] = {
-    4: {'molname': 'HeH+',
-        'basis': '6-31G',
-        'bond': '0.5',
-        'qubits': 4,
-        'gate_count': 4},
-    6: {'molname': 'H3+',
-        'basis': 'STO-3G',
-        'bond': '0.5',
-        'qubits': 6,
-        'gate_count': 9},
-    8: {'molname': 'H4',
-        'basis': 'STO-3G',
-        'bond': '0.5',
-        'qubits': 8,
-        'gate_count': 27},
-    12: {'molname': 'HF',
-         'basis': 'STO-3G',
-         'bond': '0.5',
-         'qubits': 12,
-         'gate_count': 36},
-    14: {'molname': 'BeH2',
-         'basis': 'STO-3G',
-         'bond': '0.5',
-         'qubits': 14,
-         'gate_count': 205},
-    16: {'molname': 'H8',
-         'basis': 'STO-3G',
-         'bond': '0.5',
-         'qubits': 16,
-         'gate_count': 361}}
+    4: {"molname": "HeH+", "basis": "6-31G", "bond": "0.5", "qubits": 4, "gate_count": 4},
+    6: {"molname": "H3+", "basis": "STO-3G", "bond": "0.5", "qubits": 6, "gate_count": 9},
+    8: {"molname": "H4", "basis": "STO-3G", "bond": "0.5", "qubits": 8, "gate_count": 27},
+    12: {"molname": "HF", "basis": "STO-3G", "bond": "0.5", "qubits": 12, "gate_count": 36},
+    14: {"molname": "BeH2", "basis": "STO-3G", "bond": "0.5", "qubits": 14, "gate_count": 205},
+    16: {"molname": "H8", "basis": "STO-3G", "bond": "0.5", "qubits": 16, "gate_count": 361},
+}
 
 
 class ProblemCVQE(Problem):
-
     def __init__(self, dev, nsteps=10, **qnode_kwargs):
         super().__init__(dev, **qnode_kwargs)
         self.nsteps = nsteps
@@ -76,11 +52,9 @@ class ProblemCVQE(Problem):
 
 
 def workflow(p: ProblemCVQE, params):
-
     @qml.qnode(p.dev, **p.qnode_kwargs)
     def circuit(params):
-        AllSinglesDoubles(params, range(p.nqubits),
-                          p.hf_state, p.singles, p.doubles)
+        AllSinglesDoubles(params, range(p.nqubits), p.hf_state, p.singles, p.doubles)
         return qml.expval(p.ham)
 
     stepsize = 0.5
@@ -121,8 +95,7 @@ def run_jax_default_qubit(N=6):
     jax.config.update("jax_platform_name", "cpu")
     jax.config.update("jax_array", True)
 
-    p = ProblemCVQE(dev=qml.device("lightning.qubit", wires=N), nsteps=2,
-                    interface="jax")
+    p = ProblemCVQE(dev=qml.device("lightning.qubit", wires=N), nsteps=2, interface="jax")
 
     @jax.jit
     def _main(params):
@@ -130,4 +103,3 @@ def run_jax_default_qubit(N=6):
 
     theta = _main(p.trial_params(0))
     print(f"Resulting parameters: {theta}")
-
