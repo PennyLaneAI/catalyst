@@ -52,19 +52,52 @@ def get_lib_path(project, env):
     )
 
 
+# pylint: disable=too-few-public-methods
+class MHLOPass:
+    """MHLO Pass."""
+
+    _executable = get_executable_path("mhlo", "mlir-hlo-opt")
+    _default_flags = [
+        "--allow-unregistered-dialect",
+        "--canonicalize",
+        "--chlo-legalize-to-hlo",
+        "--mhlo-legalize-control-flow",
+        "--hlo-legalize-to-linalg",
+        "--mhlo-legalize-to-std",
+        "--convert-to-signless",
+        "--canonicalize",
+    ]
+
+    @staticmethod
+    def _run(infile, outfile, executable, flags):
+        command = [executable] + flags + [infile, "-o", outfile]
+        subprocess.run(command, check=True)
+
+    @staticmethod
+    def run(infile, outfile=None, executable=None, flags=None):
+        """Run the MHLO pass.
+
+        Args:
+            infile (str): path to MLIR file to be compiled
+            outfile (str): path to output file, defaults to replacing extension in infile to .nohlo.
+            executable (str): path to executable, defaults to mlir-hlo-opt
+            flags (List[str]): flags to mlir-hlo-opt, defaults to _default_flags.
+        """
+        if not infile.endswith(".mlir"):
+            raise ValueError("MHLOPass expects a PATH to an MLIR file.")
+        if outfile is None:
+            outfile = infile.replace(".mlir", ".nohlo.mlir")
+        if executable is None:
+            executable = MHLOPass._executable
+        if flags is None:
+            flags = MHLOPass._default_flags
+        MHLOPass._run(infile, outfile, executable, flags)
+        return outfile
+
+
 translate_tool = get_executable_path("llvm", "mlir-translate")
-mhlo_opt_tool = get_executable_path("mhlo", "mlir-hlo-opt")
 quantum_opt_tool = get_executable_path("quantum", "quantum-opt")
 
-mhlo_lowering_pass_pipeline = [
-    "--canonicalize",
-    "--chlo-legalize-to-hlo",
-    "--mhlo-legalize-control-flow",
-    "--hlo-legalize-to-linalg",
-    "--mhlo-legalize-to-std",
-    "--convert-to-signless",
-    "--canonicalize",
-]
 
 bufferization_pass_pipeline = [
     "--lower-gradients",
@@ -233,26 +266,8 @@ class CompilerDriver:
 
 
 def lower_mhlo_to_linalg(filename):
-    """Translate MHLO to linalg dialect.
-
-    Args:
-        filename (str): the path to a file were the program is stored.
-    Returns:
-        a path to the output file
-    """
-    assert filename[-5:] == ".mlir", "input is not an mlir file"
-
-    command = [mhlo_opt_tool]
-    command += ["--allow-unregistered-dialect"]
-    command += [filename]
-    command += mhlo_lowering_pass_pipeline
-
-    new_fname = filename.replace(".mlir", ".nohlo.mlir")
-
-    with open(new_fname, "w", encoding="utf-8") as file:
-        subprocess.run(command, stdout=file, check=True)
-
-    return new_fname
+    """Lower MHLO to linalg dialect."""
+    return MHLOPass.run(filename)
 
 
 def bufferize_tensors(filename):

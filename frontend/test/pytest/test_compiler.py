@@ -5,7 +5,21 @@ Unit tests for CompilerDriver class
 import warnings
 import pytest
 
+from catalyst.compiler import MHLOPass
 from catalyst.compiler import CompilerDriver
+import subprocess
+
+
+class TestMHLOPass:
+    """Unit test for MHLOPass class."""
+
+    def test_invalid_filename(self):
+        with pytest.raises(ValueError, match="MHLOPass expects a PATH to an MLIR file."):
+            MHLOPass.run("something.definitely-not-mlir")
+
+    def test_run_fails(self):
+        with pytest.raises(subprocess.CalledProcessError):
+            MHLOPass.run("non-existing.mlir")
 
 
 class TestCompilerDriver:
