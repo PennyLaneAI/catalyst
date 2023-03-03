@@ -227,8 +227,8 @@ class MLIRToLLVMDialect:
             executable (str): path to executable, defaults to mlir-hlo-opt
             flags (List[str]): flags to mlir-hlo-opt, defaults to _default_flags.
         """
-        if not infile.endswith("buff.mlir"):
-            raise ValueError("MHLOPass expects a PATH to file with extension .nohlo.")
+        if not infile.endswith(".buff.mlir"):
+            raise ValueError(f"Input file ({infile}) is not a bufferized MLIR file")
         if outfile is None:
             outfile = infile.replace(".buff.mlir", ".llvm.mlir")
         if executable is None:
@@ -239,8 +239,37 @@ class MLIRToLLVMDialect:
         return outfile
 
 
-translate_tool = get_executable_path("llvm", "mlir-translate")
-quantum_opt_tool = get_executable_path("quantum", "quantum-opt")
+class LLVMDialectToLLVMIR:
+    """Convert LLVM Dialect to LLVM-IR."""
+
+    _executable = get_executable_path("llvm", "mlir-translate")
+    _default_flags = ["--mlir-to-llvmir"]
+
+    @staticmethod
+    def _run(infile, outfile, executable, flags, options):
+        command = [executable] + flags + [infile, "-o", outfile]
+        run_writing_command(command, options)
+
+    @staticmethod
+    def run(infile, outfile=None, executable=None, flags=None, options=None):
+        """Run the bufferization pass.
+
+        Args:
+            infile (str): path to MLIR file to be compiled
+            outfile (str): path to output file, defaults to replacing extension in infile to .nohlo.
+            executable (str): path to executable, defaults to mlir-hlo-opt
+            flags (List[str]): flags to mlir-hlo-opt, defaults to _default_flags.
+        """
+        if not infile.endswith(".llvm.mlir"):
+            raise ValueError(f"Input file ({infile}) is not an LLVM dialect MLIR file")
+        if outfile is None:
+            outfile = infile.replace(".llvm.mlir", ".ll")
+        if executable is None:
+            executable = LLVMDialectToLLVMIR._executable
+        if flags is None:
+            flags = LLVMDialectToLLVMIR._default_flags
+        LLVMDialectToLLVMIR._run(infile, outfile, executable, flags, options)
+        return outfile
 
 
 quantum_compilation_pass_pipeline = [
@@ -392,6 +421,7 @@ def transform_quantum_ir(filename: str, compile_options: Optional[CompileOptions
 
     new_fname = filename.replace(".mlir", ".opt.mlir")
 
+    quantum_opt_tool = get_executable_path("quantum", "quantum-opt")
     command = [quantum_opt_tool]
     command += [filename]
     command += quantum_compilation_pass_pipeline
@@ -435,21 +465,7 @@ def convert_mlir_to_llvmir(filename: str, compile_options: Optional[CompileOptio
     Returns:
         a path to the output file
     """
-    if filename[-10:] != ".llvm.mlir":
-        raise ValueError(
-            f"Input file ({filename}) for LLVMIR conversion is not an LLVM dialect MLIR file"
-        )
-
-    new_fname = filename.replace(".llvm.mlir", ".ll")
-
-    command = [translate_tool]
-    command += [filename]
-    command += ["--mlir-to-llvmir"]
-    command += ["-o", new_fname]
-
-    run_writing_command(command, compile_options)
-
-    return new_fname
+    return LLVMDialectToLLVMIR.run(filename, options=compile_options)
 
 
 def compile_llvmir(filename: str, compile_options: Optional[CompileOptions] = None) -> str:
