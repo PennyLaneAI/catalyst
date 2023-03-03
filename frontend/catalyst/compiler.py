@@ -147,8 +147,6 @@ class CompilerDriver:
         lrt_backend_path = os.path.join(lrt_lib_path, "backend")
 
         flags = [
-            "-Wno-unused-command-line-argument",
-            "-Wno-override-module",
             "-shared",
             "-rdynamic",
             f"-L{mlir_lib_path}",
