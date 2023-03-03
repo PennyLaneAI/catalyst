@@ -189,23 +189,14 @@ class CompilerDriver:
             return None
         return shutil.which(compiler)
 
-    @classmethod
-    def _available_compilers(cls, fallback_compilers):
-        if hasattr(cls, "_compiler_fallback_order"):
-            return cls._compiler_fallback_order
-
-        if not fallback_compilers:
-            fallback_compilers = CompilerDriver._default_fallback_compilers
-
+    @staticmethod
+    def _available_compilers(fallback_compilers):
         available_compilers = []
         # pylint: disable=redefined-outer-name
         for compiler in CompilerDriver._get_compiler_fallback_order(fallback_compilers):
             if CompilerDriver._exists(compiler):
                 available_compilers.append(compiler)
-
-        setattr(cls, "_compiler_fallback_order", available_compilers)
-        # pylint: disable=no-member
-        return cls._compiler_fallback_order
+        return available_compilers
 
     @staticmethod
     # pylint: disable=redefined-outer-name
@@ -230,6 +221,8 @@ class CompilerDriver:
         Raises:
             EnvironmentError: The exception is raised when no compiler succeeded.
         """
+        if not fallback_compilers:
+            fallback_compilers = CompilerDriver._default_fallback_compilers
         # pylint: disable=redefined-outer-name
         for compiler in CompilerDriver._available_compilers(fallback_compilers):
             flags = CompilerDriver._flags()
