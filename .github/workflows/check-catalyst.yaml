@@ -493,7 +493,7 @@ jobs:
 
   upload-to-codecov-linux-python:
     needs: [frontend]
-    name: Upload coverage data to codecov
+    name: Upload coverage data to codecov (Python)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -512,7 +512,7 @@ jobs:
 
   upload-to-codecov-linux-cpp:
     needs: [runtime-tests]
-    name: Upload coverage data to codecov
+    name: Upload coverage data to codecov (C++)
     runs-on: ubuntu-latest
 
     steps:

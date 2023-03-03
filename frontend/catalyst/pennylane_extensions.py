@@ -95,6 +95,9 @@ def qfunc(num_wires, *, shots=1000, device=None):
 
     """
 
+    if not device:  # pragma: no cover
+        device = QJITDevice(shots=shots, wires=num_wires)
+
     def dec_no_params(fn):
         return QFunc(fn, device)
 
