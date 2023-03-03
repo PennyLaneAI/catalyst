@@ -48,28 +48,34 @@ class ProblemCVQE(Problem):
         self.excitations = self.singles + self.doubles
 
     def trial_params(self, _: int) -> Any:
-        return pnp.zeros(len(self.excitations))
+        return pnp.ones(len(self.excitations), dtype=pnp.float64)
 
 
 def workflow(p: ProblemCVQE, params):
     @qml.qnode(p.dev, **p.qnode_kwargs)
     def circuit(params):
         AllSinglesDoubles(params, range(p.nqubits), p.hf_state, p.singles, p.doubles)
-        return qml.expval(p.ham)
+        return qml.expval(qml.Hamiltonian(np.array(p.ham.coeffs), p.ham.ops))
 
     stepsize = 0.5
-    theta = params
     diff = qml.grad(circuit, argnum=0)
+    theta = params
 
     for i in range(p.nsteps):
-        dtheta = diff(theta)[0]
+        dtheta = diff(theta)
         theta = theta - dtheta * stepsize
 
     return theta
 
 
+SHOTS = None
+DIFFMETHOD = 'parameter-shift'
+NSTEPS = 1
+
 def run_default_qubit(N=6):
-    p = ProblemCVQE(qml.device("default.qubit", wires=N), nsteps=2)
+    p = ProblemCVQE(qml.device("default.qubit", wires=N, shots=SHOTS),
+                    nsteps=NSTEPS,
+                    diff_method=DIFFMETHOD)
 
     def _main(params):
         return workflow(p, params)
@@ -79,7 +85,8 @@ def run_default_qubit(N=6):
 
 
 def run_lightning_qubit(N=6):
-    p = ProblemCVQE(qml.device("lightning.qubit", wires=N), nsteps=2)
+    p = ProblemCVQE(qml.device("lightning.qubit", wires=N, shots=SHOTS),
+                    nsteps=NSTEPS, diff_method=DIFFMETHOD)
 
     def _main(params):
         return workflow(p, params)
@@ -95,7 +102,8 @@ def run_jax_default_qubit(N=6):
     jax.config.update("jax_platform_name", "cpu")
     jax.config.update("jax_array", True)
 
-    p = ProblemCVQE(dev=qml.device("lightning.qubit", wires=N), nsteps=2, interface="jax")
+    p = ProblemCVQE(dev=qml.device("lightning.qubit", wires=N, shots=SHOTS),
+                    nsteps=NSTEPS, interface="jax", diff_method=DIFFMETHOD)
 
     @jax.jit
     def _main(params):
