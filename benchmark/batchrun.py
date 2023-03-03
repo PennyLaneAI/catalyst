@@ -82,8 +82,8 @@ COLORS = ["#e41a1c", "#377eb8", "#4daf4a", "#984ea3", "#ff7f00",
 
 
 def ofile(a, _, measure, problem, impl, nqubits, nlayers, diffmethod) -> Tuple[str, str]:
-    """ Produce the JSON file name containing the measurement configured and
-    the Linux shell command which is expected to produce such file. """
+    """Produce the JSON file name containing the measurement configured and
+    the Linux shell command which is expected to produce such file."""
     impl_ = impl.replace("+", "_").replace("/", "_").replace(".", "_")
     dmfilepart = f"_{diffmethod}".replace("-", "_") if diffmethod is not None else ""
     ofname = (
@@ -112,8 +112,8 @@ def ofile(a, _, measure, problem, impl, nqubits, nlayers, diffmethod) -> Tuple[s
     return (ofname, cmdline)
 
 
-def loadresults(fp:str) -> BenchmarkResult:
-    """ Load a serrialized benchmark result from file """
+def loadresults(fp: str) -> BenchmarkResult:
+    """Load a serrialized benchmark result from file"""
     return BenchmarkResult.from_dict(json_load(open(fp)))
 
 
@@ -228,9 +228,11 @@ def plot(a: ParsedArguments) -> None:
         @contextmanager
         def _open(fname: str, fmode: str):
             if a.dry_run and "w" in fmode:
+
                 class DummyFile:
                     def write(*args, **kwargs):
                         return
+
                 yield DummyFile()
                 print(f"(Dry-run) Would update: {fname}")
             else:

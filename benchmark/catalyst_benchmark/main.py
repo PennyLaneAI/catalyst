@@ -346,67 +346,23 @@ def parse_args(ap, args):
 
 
 def selfcheck(ap):
-    r1 = measure_runtime_catalyst(
-        parse_args(
-            ap,
-            [
-                "run",
-                "-p",
-                "vqe",
-                "-m",
-                "runtime",
-                "-i",
-                "catalyst",
-                "-n",
-                "1",
-                "-N",
-                "6",
-                "--numerical-check",
-            ],
-        )
-    )
-    r2 = measure_runtime_pennylane(
-        parse_args(
-            ap,
-            [
-                "run",
-                "-p",
-                "vqe",
-                "-m",
-                "runtime",
-                "-i",
-                "pennylane/default.qubit",
-                "-n",
-                "1",
-                "-N",
-                "6",
-                "--numerical-check",
-            ],
-        )
-    )
+    # fmt: off
+    r1 = measure_runtime_catalyst(parse_args(
+        ap, ["run", "-p", "vqe", "-m", "runtime", "-i", "catalyst", "-n", "1",
+             "-N", "6", "--numerical-check"]))
+    r2 = measure_runtime_pennylane(parse_args(
+        ap, ["run", "-p", "vqe", "-m", "runtime", "-i", "pennylane/default.qubit", "-n", "1",
+             "-N", "6", "--numerical-check"]))
+    # fmt: on
     assert_allclose(np.array(r1.numeric_result), np.array(r2.numeric_result), atol=1e-3)
 
     r1 = None
     for m, i in REGISTRY.keys():
-        r = REGISTRY[(m, i)](
-            parse_args(
-                ap,
-                [
-                    "run",
-                    "-p",
-                    "grover",
-                    "-m",
-                    m,
-                    "-i",
-                    i,
-                    "-n",
-                    "1",
-                    "-N",
-                    "9",
-                    "--numerical-check",
-                ],
-            )
-        )
+        # fmt: off
+        r = REGISTRY[(m, i)](parse_args(
+            ap, ["run", "-p", "grover", "-m", m, "-i", i, "-n", "1", "-N", "9",
+                 "--numerical-check"]))
+        # fmt: on
         if r1 is None:
             r1 = r
         else:
@@ -414,75 +370,38 @@ def selfcheck(ap):
 
 
 if __name__ == "__main__":
+    # fmt: off
     ap = ArgumentParser(prog="python3 -m catalyst_benchmark.main")
-
     apcmds = ap.add_subparsers(help="command help", dest="command")
-    sccmd = apcmds.add_parser(
-        "selfcheck", help="Check the numeric equality of all the implementations"
-    )
-    sccmd.add_argument(
-        "--nqubits",
-        type=int,
-        default=11,
-        help="Number of qubits, should be odd and >=3 (default - 11)",
-    )
-    runcmd = apcmds.add_parser(
-        "run", help="Run the benchmark", epilog="Exit codes: 0 - success, 2 - timeout"
-    )
-    runcmd.add_argument(
-        "--timeout", type=str, metavar="SEC", default="inf", help="Timeout (default - not set)"
-    )
-    runcmd.add_argument(
-        "-p", "--problem", type=str, required=True, help="Problem to run (?|grover|vqe)"
-    )
-    runcmd.add_argument(
-        "-m", "--measure", type=str, required=True, help="Value to measure (?|compile|runtime)"
-    )
-    runcmd.add_argument(
-        "-i",
-        "--implementation",
-        type=str,
-        required=True,
-        help="Problem implementation (?|catalyst|pennylane[+jax])[/device], (default - catalyst)",
-    )
-    runcmd.add_argument(
-        "-n",
-        "--niter",
-        type=int,
-        default=10,
-        metavar="INT",
-        help="Number of measurement trials (default - 10)",
-    )
-    runcmd.add_argument(
-        "-o",
-        "--output",
-        type=str,
-        default="-",
-        metavar="FILE.json",
-        help="Output *.json filename (default - '-' meaning stdout)",
-    )
-    runcmd.add_argument(
-        "--numerical-check",
-        default=False,
-        action=BooleanOptionalAction,
-        help="Whether to do a numerical check or not",
-    )
-    runcmd.add_argument(
-        "-N", "--nqubits", type=int, default=11, metavar="INT", help="Number of qubits"
-    )
-    runcmd.add_argument(
-        "--grover-nlayers",
-        type=int,
-        default=None,
-        metavar="INT",
-        help="Grover-specific: Number of layers (default - auto)",
-    )
-    runcmd.add_argument(
-        "--vqe-diff-method",
-        type=str,
-        default="backprop",
-        help="VQE-specific: Differentiation method (default - backprop)",
-    )
+    sccmd = apcmds.add_parser("selfcheck",
+                              help="Check the numeric equality of all the implementations")
+    sccmd.add_argument("--nqubits", type=int, default=11,
+                       help="Number of qubits, should be odd and >=3 (default - 11)")
+    runcmd = apcmds.add_parser("run",
+                               help="Run the benchmark",
+                               epilog="Exit codes: 0 - success, 2 - timeout")
+    runcmd.add_argument("--timeout", type=str, metavar="SEC", default="inf",
+                        help="Timeout (default - not set)")
+    runcmd.add_argument("-p", "--problem", type=str, required=True,
+                        help="Problem to run (?|grover|vqe)")
+    runcmd.add_argument("-m", "--measure", type=str, required=True,
+                        help="Value to measure (?|compile|runtime)")
+    runcmd.add_argument("-i", "--implementation", type=str, required=True,
+                        help="Problem implementation (?|catalyst|pennylane[+jax])[/device], "
+                        "(default - catalyst)")
+    runcmd.add_argument("-n", "--niter", type=int, default=10, metavar="INT",
+                        help="Number of measurement trials (default - 10)")
+    runcmd.add_argument("-o", "--output", type=str, default="-", metavar="FILE.json",
+                        help="Output *.json filename (default - '-' meaning stdout)")
+    runcmd.add_argument("--numerical-check", default=False, action=BooleanOptionalAction,
+                        help="Whether to do a numerical check or not")
+    runcmd.add_argument("-N", "--nqubits", type=int, default=11, metavar="INT",
+                        help="Number of qubits")
+    runcmd.add_argument("--grover-nlayers", type=int, default=None, metavar="INT",
+                        help="Grover-specific: Number of layers (default - auto)")
+    runcmd.add_argument("--vqe-diff-method", type=str, default="backprop",
+                        help="VQE-specific: Differentiation method (default - backprop)")
+    # fmt: on
 
     a = parse_args(ap, sys.argv[1:])
 
