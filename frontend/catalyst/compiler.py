@@ -276,11 +276,41 @@ quantum_compilation_pass_pipeline = [
     "--lower-gradients",
 ]
 
-compiler = get_executable_path("llvm", "llc")
-compiler_flags = [
-    "--filetype=obj",
-    "--relocation-model=pic",
-]
+
+class LLVMIRToObjectFile:
+    """LLVMIR To Object File."""
+
+    _executable = get_executable_path("llvm", "llc")
+    _default_flags = [
+        "--filetype=obj",
+        "--relocation-model=pic",
+    ]
+
+    @staticmethod
+    def _run(infile, outfile, executable, flags, options):
+        command = [executable] + flags + [infile, "-o", outfile]
+        run_writing_command(command, options)
+
+    @staticmethod
+    def run(infile, outfile=None, executable=None, flags=None, options=None):
+        """Run the bufferization pass.
+
+        Args:
+            infile (str): path to MLIR file to be compiled
+            outfile (str): path to output file, defaults to replacing extension in infile to .nohlo.
+            executable (str): path to executable, defaults to mlir-hlo-opt
+            flags (List[str]): flags to mlir-hlo-opt, defaults to _default_flags.
+        """
+        if not infile.endswith(".ll"):
+            raise ValueError(f"Input file ({infile}) for compilation is not an LLVMIR file")
+        if outfile is None:
+            outfile = infile.replace(".ll", ".o")
+        if executable is None:
+            executable = LLVMIRToObjectFile._executable
+        if flags is None:
+            flags = LLVMIRToObjectFile._default_flags
+        LLVMIRToObjectFile._run(infile, outfile, executable, flags, options)
+        return outfile
 
 
 # pylint: disable=too-few-public-methods
@@ -477,19 +507,7 @@ def compile_llvmir(filename: str, compile_options: Optional[CompileOptions] = No
     Returns:
         a path to the output file
     """
-    if filename[-3:] != ".ll":
-        raise ValueError(f"Input file ({filename}) for compilation is not an LLVMIR file")
-
-    new_fname = filename.replace(".ll", ".o")
-
-    command = [compiler]
-    command += compiler_flags
-    command += [filename]
-    command += ["-o", new_fname]
-
-    run_writing_command(command, compile_options)
-
-    return new_fname
+    return LLVMIRToObjectFile.run(filename, options=compile_options)
 
 
 def link_lightning_runtime(filename: str, compile_options: Optional[CompileOptions] = None) -> str:
