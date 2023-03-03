@@ -95,31 +95,62 @@ class MHLOPass:
         return outfile
 
 
+class BufferizationPass:
+    """Bufferization Pass."""
+
+    _executable = get_executable_path("quantum", "quantum-opt")
+    _default_flags = [
+        "--lower-gradients",
+        "--gradient-bufferize",
+        "--scf-bufferize",
+        "--convert-tensor-to-linalg",  # tensor.pad
+        "--convert-elementwise-to-linalg",  # Must be run before --arith-bufferize
+        "--arith-bufferize",
+        "--empty-tensor-to-alloc-tensor",
+        "--bufferization-bufferize",
+        "--tensor-bufferize",
+        "--linalg-bufferize",
+        "--tensor-bufferize",
+        "--quantum-bufferize",
+        "--func-bufferize",
+        "--finalizing-bufferize",
+        "--buffer-hoisting",
+        # "--buffer-deallocation",
+        "--convert-bufferization-to-memref",
+        "--canonicalize",
+        "--cse",
+    ]
+
+    @staticmethod
+    def _run(infile, outfile, executable, flags):
+        command = [executable] + flags + [infile, "-o", outfile]
+        subprocess.run(command, check=True)
+
+    @staticmethod
+    def run(infile, outfile=None, executable=None, flags=None):
+        """Run the bufferization pass.
+
+        Args:
+            infile (str): path to MLIR file to be compiled
+            outfile (str): path to output file, defaults to replacing extension in infile to .nohlo.
+            executable (str): path to executable, defaults to mlir-hlo-opt
+            flags (List[str]): flags to mlir-hlo-opt, defaults to _default_flags.
+        """
+        if not infile.endswith("nohlo.mlir"):
+            raise ValueError("MHLOPass expects a PATH to file with extension .nohlo.")
+        if outfile is None:
+            outfile = infile.replace(".nohlo.mlir", ".buff.mlir")
+        if executable is None:
+            executable = BufferizationPass._executable
+        if flags is None:
+            flags = BufferizationPass._default_flags
+        BufferizationPass._run(infile, outfile, executable, flags)
+        return outfile
+
+
 translate_tool = get_executable_path("llvm", "mlir-translate")
 quantum_opt_tool = get_executable_path("quantum", "quantum-opt")
 
-
-bufferization_pass_pipeline = [
-    "--lower-gradients",
-    "--gradient-bufferize",
-    "--scf-bufferize",
-    "--convert-tensor-to-linalg",  # tensor.pad
-    "--convert-elementwise-to-linalg",  # Must be run before --arith-bufferize
-    "--arith-bufferize",
-    "--empty-tensor-to-alloc-tensor",
-    "--bufferization-bufferize",
-    "--tensor-bufferize",
-    "--linalg-bufferize",
-    "--tensor-bufferize",
-    "--quantum-bufferize",
-    "--func-bufferize",
-    "--finalizing-bufferize",
-    "--buffer-hoisting",
-    # "--buffer-deallocation",
-    "--convert-bufferization-to-memref",
-    "--canonicalize",
-    "--cse",
-]
 
 llvm_lowering_pass_pipeline = [
     "--convert-linalg-to-loops",
@@ -278,18 +309,7 @@ def bufferize_tensors(filename):
     Returns:
         a path to the output file
     """
-    assert filename[-5:] == ".mlir", "input is not an mlir file"
-
-    command = [quantum_opt_tool]
-    command += [filename]
-    command += bufferization_pass_pipeline
-
-    new_fname = filename.replace(".mlir", ".buff.mlir")
-
-    with open(new_fname, "w", encoding="utf-8") as file:
-        subprocess.run(command, stdout=file, check=True)
-
-    return new_fname
+    return BufferizationPass.run(filename)
 
 
 def lower_all_to_llvm(filename):
