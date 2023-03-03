@@ -209,21 +209,24 @@ class CompilerDriver:
             return False
 
     @staticmethod
-    def link(infile, outfile, fallback_compilers=None):
+    def link(infile, outfile, flags=None, fallback_compilers=None):
         """
         Link the infile against the necessary libraries and produce the outfile.
 
         Args:
             infile (str): input file
             outfile (str): output file
+            Optional flags (List[str]): flags to be passed down to the compiler
+            Optional fallback_compilers (List[str]): name of executables to be looked for in PATH
         Raises:
             EnvironmentError: The exception is raised when no compiler succeeded.
         """
-        if not fallback_compilers:
+        if flags is None:
+            flags = CompilerDriver._flags()
+        if fallback_compilers is None:
             fallback_compilers = CompilerDriver._default_fallback_compilers
         # pylint: disable=redefined-outer-name
         for compiler in CompilerDriver._available_compilers(fallback_compilers):
-            flags = CompilerDriver._flags()
             success = CompilerDriver._attempt_link(compiler, flags, infile, outfile)
             if success:
                 return
