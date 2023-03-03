@@ -20,6 +20,17 @@ from catalyst.compiler import (
     lower_mhlo_to_linalg,
     transform_quantum_ir,
 )
+from catalyst.compiler import MHLOPass
+from catalyst.compiler import CompilerDriver
+import subprocess
+
+
+class TestMHLOPass:
+    """Unit test for MHLOPass class."""
+
+    def test_run_fails(self):
+        with pytest.raises(subprocess.CalledProcessError):
+            MHLOPass.run("non-existing.mlir")
 
 
 class TestCompilerDriver:

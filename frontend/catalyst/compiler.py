@@ -48,11 +48,12 @@ def run_writing_command(
     command: List[str], compile_options: Optional[CompileOptions] = None
 ) -> None:
     """Run the command after optionally announcing this fact to the user"""
-    compile_options: CompileOptions = (
-        compile_options if compile_options else default_compile_options
-    )
+    if compile_options is None:
+        compile_options = default_compile_options
+
     if compile_options.verbose:
         print(f"[RUNNING] {' '.join(command)}", file=compile_options.get_logfile())
+    print(command)
     subprocess.run(command, check=True)
 
 
@@ -84,19 +85,52 @@ def get_lib_path(project, env):
     )
 
 
+# pylint: disable=too-few-public-methods
+class MHLOPass:
+    """MHLO Pass."""
+
+    _executable = get_executable_path("mhlo", "mlir-hlo-opt")
+    _default_flags = [
+        "--allow-unregistered-dialect",
+        "--canonicalize",
+        "--chlo-legalize-to-hlo",
+        "--mhlo-legalize-control-flow",
+        "--hlo-legalize-to-linalg",
+        "--mhlo-legalize-to-std",
+        "--convert-to-signless",
+        "--canonicalize",
+    ]
+
+    @staticmethod
+    def _run(infile, outfile, executable, flags, options):
+        command = [executable] + flags + [infile, "-o", outfile]
+        run_writing_command(command, options)
+
+    @staticmethod
+    def run(infile, outfile=None, executable=None, flags=None, options=None):
+        """Run the MHLO pass.
+
+        Args:
+            infile (str): path to MLIR file to be compiled
+            outfile (str): path to output file, defaults to replacing extension in infile to .nohlo.
+            executable (str): path to executable, defaults to mlir-hlo-opt
+            flags (List[str]): flags to mlir-hlo-opt, defaults to _default_flags.
+        """
+        if not infile.endswith(".mlir"):
+            raise ValueError(f"Input file ({infile}) for MHLO is not an MLIR file")
+        if outfile is None:
+            outfile = infile.replace(".mlir", ".nohlo.mlir")
+        if executable is None:
+            executable = MHLOPass._executable
+        if flags is None:
+            flags = MHLOPass._default_flags
+        MHLOPass._run(infile, outfile, executable, flags, options)
+        return outfile
+
+
 translate_tool = get_executable_path("llvm", "mlir-translate")
-mhlo_opt_tool = get_executable_path("mhlo", "mlir-hlo-opt")
 quantum_opt_tool = get_executable_path("quantum", "quantum-opt")
 
-mhlo_lowering_pass_pipeline = [
-    "--canonicalize",
-    "--chlo-legalize-to-hlo",
-    "--mhlo-legalize-control-flow",
-    "--hlo-legalize-to-linalg",
-    "--mhlo-legalize-to-std",
-    "--convert-to-signless",
-    "--canonicalize",
-]
 
 quantum_compilation_pass_pipeline = [
     "--lower-gradients",
@@ -279,29 +313,9 @@ class CompilerDriver:
         raise EnvironmentError(msg)
 
 
-def lower_mhlo_to_linalg(filename: str, compile_options: Optional[CompileOptions] = None) -> str:
-    """Translate MHLO to linalg dialect.
-
-    Args:
-        filename (str): the path to a file were the program is stored.
-        Optional compile_options (CompileOptions): generic compilation options.
-    Returns:
-        a path to the output file
-    """
-    if filename[-5:] != ".mlir":
-        raise ValueError(f"Input file ({filename}) for MHLO lowering is not an MLIR file")
-
-    new_fname = filename.replace(".mlir", ".nohlo.mlir")
-
-    command = [mhlo_opt_tool]
-    command += ["--allow-unregistered-dialect"]
-    command += [filename]
-    command += mhlo_lowering_pass_pipeline
-    command += ["-o", new_fname]
-
-    run_writing_command(command, compile_options)
-
-    return new_fname
+def lower_mhlo_to_linalg(filename: str, compile_options: Optional[CompileOptions] = None):
+    """Lower MHLO to linalg dialect."""
+    return MHLOPass.run(filename, options=compile_options)
 
 
 def transform_quantum_ir(filename: str, compile_options: Optional[CompileOptions] = None) -> str:
