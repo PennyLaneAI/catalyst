@@ -389,7 +389,7 @@ class CondCallable:
             return self.true_fn()
         if self.false_fn:
             return self.false_fn()
-        return None
+        return None # pragma: no cover
 
     def __call__(self):
         is_tracing = TracingContext.is_tracing()
