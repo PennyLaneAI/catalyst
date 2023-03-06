@@ -20,7 +20,6 @@ import os
 import sys
 import shutil
 import subprocess
-import sys
 import warnings
 from io import TextIOWrapper
 from typing import Optional, List
@@ -108,6 +107,7 @@ class Pass(abc.ABC):
         run_writing_command(command, options)
 
     @classmethod
+    # pylint: disable=too-many-arguments
     def run(cls, infile, outfile=None, executable=None, flags=None, options=None):
         """Run the MHLO pass.
 

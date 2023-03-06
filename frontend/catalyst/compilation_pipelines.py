@@ -19,10 +19,8 @@ compiling of hybrid quantum-classical functions using Catalyst.
 
 import ctypes
 import functools
-import inspect
 import os
 import tempfile
-import typing
 import warnings
 
 import jax
@@ -41,6 +39,7 @@ from catalyst.compiler import CompileOptions
 from catalyst.pennylane_extensions import QFunc
 from catalyst.utils.gen_mlir import append_modules
 from catalyst.utils.patching import Patcher
+from catalyts.utils import utils
 from catalyst.utils.tracing import TracingContext
 
 # Required for JAX tracer objects as PennyLane wires.
@@ -216,37 +215,6 @@ class CompiledFunction:
         except Exception as exc:
             arg_type = type(arg)
             raise TypeError(f"Unsupported argument type: {arg_type}") from exc
-
-    @staticmethod
-    def are_all_signature_params_annotated(f: typing.Callable):
-        """Determine if all parameters are typed.
-
-        Args:
-            f: callable, with possible annotation
-        Returns:
-            bool: whether all parameters are annotated
-        """
-        signature = inspect.signature(f)
-        parameters = signature.parameters
-        return all(p.annotation is not inspect.Parameter.empty for p in parameters.values())
-
-    @staticmethod
-    def get_compile_time_signature(f: typing.Callable) -> typing.List[typing.Any]:
-        """Get signature from parameter annotations.
-
-        Args:
-            f: callable, with possible annotations
-        Returns:
-            annotations for all parameters if possible
-
-        """
-        can_validate = CompiledFunction.are_all_signature_params_annotated(f)
-
-        if can_validate:
-            # Needed instead of inspect.get_annotations for Python < 3.10.
-            return getattr(f, "__annotations__", {}).values()
-
-        return None
 
     @staticmethod
     def zero_ranked_memref_to_numpy(ranked_memref):
@@ -477,7 +445,7 @@ class QJIT:
         self.mlir_module = None
         self.compiled_function = None
 
-        parameter_types = CompiledFunction.get_compile_time_signature(self.qfunc)
+        parameter_types = utils.get_type_annotations(self.qfunc)
         self.user_typed = False
         if parameter_types is not None:
             self.user_typed = True
