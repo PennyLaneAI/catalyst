@@ -387,9 +387,7 @@ class CondCallable:
         """Create a callable for conditionals."""
         if self.pred:
             return self.true_fn()
-        if self.false_fn:
-            return self.false_fn()
-        return None
+        return self.false_fn()
 
     def __call__(self):
         is_tracing = TracingContext.is_tracing()
