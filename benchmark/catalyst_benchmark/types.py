@@ -58,7 +58,17 @@ class Problem:
 
 @dataclass_json
 @dataclass
-class BenchmarkResult:
+class BenchmarkResultV1:
+    sysinfo: Sysinfo
+    numeric_result: Optional[List[List[float]]]
+    depth_gates: Optional[int]
+    argv: List[str]
+    prepare_sec: Optional[float]
+    measurement_sec: List[float]
+
+@dataclass_json
+@dataclass
+class BenchmarkResult(BenchmarkResultV1):
     """Common benchmark result data structure.
     Fields:
         numeric_result: Last numerical result, required primarily for
@@ -69,6 +79,7 @@ class BenchmarkResult:
                      measurements this is the compilation time. For compilation
                      time measurements this field is not used.
         measurement_sec: List of main measurement results
+        versions: Dictionary specifying versions of important Python packages
 
     Notes:
     * We do not override the __init__ in order to make automatic JSON
@@ -78,12 +89,6 @@ class BenchmarkResult:
       as a workaround.
     """
 
-    sysinfo: Sysinfo
-    numeric_result: Optional[List[List[float]]]
-    depth_gates: Optional[int]
-    argv: List[str]
-    prepare_sec: Optional[float]
-    measurement_sec: List[float]
     versions: Dict[str,str]
 
     @classmethod

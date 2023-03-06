@@ -15,7 +15,8 @@ from hashlib import sha256
 from pandas import DataFrame
 from altair import Chart
 
-from catalyst_benchmark.types import Sysinfo, BenchmarkResult, BooleanOptionalAction
+from catalyst_benchmark.types import (Sysinfo, BenchmarkResult,
+                                      BenchmarkResultV1, BooleanOptionalAction)
 from catalyst_benchmark.main import parse_implementation
 
 # fmt:off
@@ -197,10 +198,15 @@ def load(a: ParsedArguments) -> DataFrame:
         cat, measure, problem, impl, nqubits, nlayers, diffmethod = config
         r = None
         try:
-            r = loadresults(ofname)
+            r = BenchmarkResult.from_dict(json_load(open(ofname)))
         except Exception as e:
-            nmissing += 1
             log.append(str(e))
+            log.append("Trying to load V1 instead")
+            try:
+                r = BenchmarkResultV1.from_dict(json_load(open(ofname)))
+            except Exception as e:
+                nmissing += 1
+                log.append(str(e))
         if r is not None:
             for trial, time in enumerate(r.measurement_sec):
                 data["cat"].append(cat)
