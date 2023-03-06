@@ -15,6 +15,7 @@
 MLIR/LLVM representations.
 """
 
+import abc
 import os
 import sys
 import shutil
@@ -84,8 +85,49 @@ def get_lib_path(project, env):
     )
 
 
+class Pass(abc.ABC):
+    """Abstract Pass class."""
+
+    _executable = None
+    _default_flags = None
+
+    @staticmethod
+    @abc.abstractmethod
+    def get_output_filename(infile):
+        """Compute the output filename from the input filename.
+
+        Args:
+            infile (str): input file
+            outfile (str): output file
+        """
+
+    @staticmethod
+    def _run(infile, outfile, executable, flags, options):
+        command = [executable] + flags + [infile, "-o", outfile]
+        run_writing_command(command, options)
+
+    @classmethod
+    def run(cls, infile, outfile=None, executable=None, flags=None, options=None):
+        """Run the MHLO pass.
+
+        Args:
+            infile (str): path to MLIR file to be compiled
+            outfile (str): path to output file, defaults to replacing extension in infile to .nohlo.
+            executable (str): path to executable, defaults to mlir-hlo-opt
+            flags (List[str]): flags to mlir-hlo-opt, defaults to _default_flags.
+        """
+        if outfile is None:
+            outfile = cls.get_output_filename(infile)
+        if executable is None:
+            executable = cls._executable
+        if flags is None:
+            flags = cls._default_flags
+        cls._run(infile, outfile, executable, flags, options)
+        return outfile
+
+
 # pylint: disable=too-few-public-methods
-class MHLOPass:
+class MHLOPass(Pass):
     """MHLO Pass."""
 
     _executable = get_executable_path("mhlo", "mlir-hlo-opt")
@@ -101,33 +143,13 @@ class MHLOPass:
     ]
 
     @staticmethod
-    def _run(infile, outfile, executable, flags, options):
-        command = [executable] + flags + [infile, "-o", outfile]
-        run_writing_command(command, options)
-
-    @staticmethod
-    def run(infile, outfile=None, executable=None, flags=None, options=None):
-        """Run the MHLO pass.
-
-        Args:
-            infile (str): path to MLIR file to be compiled
-            outfile (str): path to output file, defaults to replacing extension in infile to .nohlo.
-            executable (str): path to executable, defaults to mlir-hlo-opt
-            flags (List[str]): flags to mlir-hlo-opt, defaults to _default_flags.
-        """
+    def get_output_filename(infile):
         if not infile.endswith(".mlir"):
             raise ValueError(f"Input file ({infile}) for MHLO is not an MLIR file")
-        if outfile is None:
-            outfile = infile.replace(".mlir", ".nohlo.mlir")
-        if executable is None:
-            executable = MHLOPass._executable
-        if flags is None:
-            flags = MHLOPass._default_flags
-        MHLOPass._run(infile, outfile, executable, flags, options)
-        return outfile
+        return infile.replace(".mlir", ".nohlo.mlir")
 
 
-class BufferizationPass:
+class BufferizationPass(Pass):
     """Bufferization Pass."""
 
     _executable = get_executable_path("quantum", "quantum-opt")
@@ -155,33 +177,14 @@ class BufferizationPass:
     ]
 
     @staticmethod
-    def _run(infile, outfile, executable, flags, options):
-        command = [executable] + flags + [infile, "-o", outfile]
-        run_writing_command(command, options)
-
-    @staticmethod
-    def run(infile, outfile=None, executable=None, flags=None, options=None):
-        """Run the bufferization pass.
-
-        Args:
-            infile (str): path to MLIR file to be compiled
-            outfile (str): path to output file, defaults to replacing extension in infile to .nohlo.
-            executable (str): path to executable, defaults to mlir-hlo-opt
-            flags (List[str]): flags to mlir-hlo-opt, defaults to _default_flags.
-        """
+    def get_output_filename(infile):
         if not infile.endswith(".opt.mlir"):
             raise ValueError(f"Input file ({infile}) for bufferization is not an MLIR file")
-        if outfile is None:
-            outfile = infile.replace(".opt.mlir", ".buff.mlir")
-        if executable is None:
-            executable = BufferizationPass._executable
-        if flags is None:
-            flags = BufferizationPass._default_flags
-        BufferizationPass._run(infile, outfile, executable, flags, options)
-        return outfile
+
+        return infile.replace(".opt.mlir", ".buff.mlir")
 
 
-class MLIRToLLVMDialect:
+class MLIRToLLVMDialect(Pass):
     """MLIR To LLVM"""
 
     _executable = get_executable_path("quantum", "quantum-opt")
@@ -213,63 +216,10 @@ class MLIRToLLVMDialect:
     ]
 
     @staticmethod
-    def _run(infile, outfile, executable, flags, options):
-        command = [executable] + flags + [infile, "-o", outfile]
-        run_writing_command(command, options)
-
-    @staticmethod
-    def run(infile, outfile=None, executable=None, flags=None, options=None):
-        """Run the bufferization pass.
-
-        Args:
-            infile (str): path to MLIR file to be compiled
-            outfile (str): path to output file, defaults to replacing extension in infile to .nohlo.
-            executable (str): path to executable, defaults to mlir-hlo-opt
-            flags (List[str]): flags to mlir-hlo-opt, defaults to _default_flags.
-        """
+    def get_output_filename(infile):
         if not infile.endswith(".buff.mlir"):
             raise ValueError(f"Input file ({infile}) is not a bufferized MLIR file")
-        if outfile is None:
-            outfile = infile.replace(".buff.mlir", ".llvm.mlir")
-        if executable is None:
-            executable = MLIRToLLVMDialect._executable
-        if flags is None:
-            flags = MLIRToLLVMDialect._default_flags
-        MLIRToLLVMDialect._run(infile, outfile, executable, flags, options)
-        return outfile
-
-
-class LLVMDialectToLLVMIR:
-    """Convert LLVM Dialect to LLVM-IR."""
-
-    _executable = get_executable_path("llvm", "mlir-translate")
-    _default_flags = ["--mlir-to-llvmir"]
-
-    @staticmethod
-    def _run(infile, outfile, executable, flags, options):
-        command = [executable] + flags + [infile, "-o", outfile]
-        run_writing_command(command, options)
-
-    @staticmethod
-    def run(infile, outfile=None, executable=None, flags=None, options=None):
-        """Run the bufferization pass.
-
-        Args:
-            infile (str): path to MLIR file to be compiled
-            outfile (str): path to output file, defaults to replacing extension in infile to .nohlo.
-            executable (str): path to executable, defaults to mlir-hlo-opt
-            flags (List[str]): flags to mlir-hlo-opt, defaults to _default_flags.
-        """
-        if not infile.endswith(".llvm.mlir"):
-            raise ValueError(f"Input file ({infile}) is not an LLVM dialect MLIR file")
-        if outfile is None:
-            outfile = infile.replace(".llvm.mlir", ".ll")
-        if executable is None:
-            executable = LLVMDialectToLLVMIR._executable
-        if flags is None:
-            flags = LLVMDialectToLLVMIR._default_flags
-        LLVMDialectToLLVMIR._run(infile, outfile, executable, flags, options)
-        return outfile
+        return infile.replace(".buff.mlir", ".llvm.mlir")
 
 
 quantum_compilation_pass_pipeline = [
@@ -277,7 +227,20 @@ quantum_compilation_pass_pipeline = [
 ]
 
 
-class LLVMIRToObjectFile:
+class LLVMDialectToLLVMIR(Pass):
+    """Convert LLVM Dialect to LLVM-IR."""
+
+    _executable = get_executable_path("llvm", "mlir-translate")
+    _default_flags = ["--mlir-to-llvmir"]
+
+    @staticmethod
+    def get_output_filename(infile):
+        if not infile.endswith(".llvm.mlir"):
+            raise ValueError(f"Input file ({infile}) is not an LLVM dialect MLIR file")
+        return infile.replace(".llvm.mlir", ".ll")
+
+
+class LLVMIRToObjectFile(Pass):
     """LLVMIR To Object File."""
 
     _executable = get_executable_path("llvm", "llc")
@@ -287,30 +250,10 @@ class LLVMIRToObjectFile:
     ]
 
     @staticmethod
-    def _run(infile, outfile, executable, flags, options):
-        command = [executable] + flags + [infile, "-o", outfile]
-        run_writing_command(command, options)
-
-    @staticmethod
-    def run(infile, outfile=None, executable=None, flags=None, options=None):
-        """Run the bufferization pass.
-
-        Args:
-            infile (str): path to MLIR file to be compiled
-            outfile (str): path to output file, defaults to replacing extension in infile to .nohlo.
-            executable (str): path to executable, defaults to mlir-hlo-opt
-            flags (List[str]): flags to mlir-hlo-opt, defaults to _default_flags.
-        """
+    def get_output_filename(infile):
         if not infile.endswith(".ll"):
             raise ValueError(f"Input file ({infile}) for compilation is not an LLVMIR file")
-        if outfile is None:
-            outfile = infile.replace(".ll", ".o")
-        if executable is None:
-            executable = LLVMIRToObjectFile._executable
-        if flags is None:
-            flags = LLVMIRToObjectFile._default_flags
-        LLVMIRToObjectFile._run(infile, outfile, executable, flags, options)
-        return outfile
+        return infile.replace(".ll", ".o")
 
 
 # pylint: disable=too-few-public-methods
