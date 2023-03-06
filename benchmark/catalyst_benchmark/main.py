@@ -2,7 +2,7 @@ import sys
 import numpy as np
 from typing import Optional, Any, Tuple
 from numpy.testing import assert_allclose
-from argparse import ArgumentParser, BooleanOptionalAction
+from argparse import ArgumentParser
 from time import time
 from os import makedirs
 from os.path import dirname
@@ -11,7 +11,7 @@ from signal import signal, SIGALRM, setitimer, ITIMER_REAL
 from contextlib import contextmanager
 from traceback import print_exception
 
-from .types import Problem, BenchmarkResult
+from .types import Problem, BenchmarkResult, BooleanOptionalAction
 
 
 @contextmanager

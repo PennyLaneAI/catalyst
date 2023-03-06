@@ -42,6 +42,7 @@ QUBITS = {
     ("deep", "grover", "runtime"): [7],
     ("variational", "vqe", "compile"): [6, 7, 8, 9, 10, 11],
     ("variational", "vqe", "runtime"): [6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+    ("variational", "chemvqe", "compile"): [4, 6, 8, 12],
     ("variational", "chemvqe", "runtime"): [4, 6, 8, 12],
 }
 
@@ -167,9 +168,10 @@ def collect(a: ParsedArguments) -> None:
                     print(f"(Dry-run) Would run: {cmdline}")
                 else:
                     (fnqubits, fnlayers) = known_failures.get(
-                        (problem, measure, impl, diffmethod), (sys.maxsize, sys.maxsize)
+                        (problem, measure, impl, diffmethod), (None, None)
                     )
-                    if (nqubits, nlayers) >= (fnqubits, fnlayers):
+                    if (nqubits or 0, nlayers or 0) >= (fnqubits or sys.maxsize,
+                                                        fnlayers or sys.maxsize):
                         print(f"Skipping as likely to fail: {cmdline}")
                     else:
                         print(f"Running: {cmdline}")

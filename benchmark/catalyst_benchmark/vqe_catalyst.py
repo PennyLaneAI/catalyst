@@ -1,20 +1,10 @@
-from typing import Any
 import catalyst
-from catalyst import qjit
-
-import pennylane.numpy as pnp
 import pennylane as qml
-import matplotlib.pyplot as plt
-
-# from pennylane._grad import grad as get_gradient
-from dataclasses import dataclass
-from pennylane import grad
-
 import numpy as np
-
 import jax.numpy as jnp
-import jax
 
+from typing import Any
+from catalyst import qjit
 from .types import Problem
 
 symbols = ["H", "H", "H"]
