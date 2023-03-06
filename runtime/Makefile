@@ -29,7 +29,6 @@ runtime:
 	@echo "build Catalyst Runtime"
 	cmake -G Ninja -B $(RT_BUILD_DIR) . \
 		-DENABLE_LIGHTNING_KOKKOS=$(if $(kokkos:-=),$(kokkos),OFF) \
-		-DLIGHTNING_GIT_TAG="master" \
 		-DCMAKE_C_COMPILER=$(C_COMPILER) \
 		-DCMAKE_CXX_COMPILER=$(CPP_COMPILER) \
 		-DQIR_STDLIB_LIB=$(QIR_STDLIB_DIR) \
@@ -57,7 +56,6 @@ coverage: | qir
 	cmake -G Ninja -B $(RT_BUILD_DIR) . \
 		-DCMAKE_BUILD_TYPE=Debug \
 		-DENABLE_LIGHTNING_KOKKOS=$(if $(kokkos:-=),$(kokkos),OFF) \
-		-DLIGHTNING_GIT_TAG="master" \
 		-DCMAKE_C_COMPILER=$(C_COMPILER) \
 		-DCMAKE_CXX_COMPILER=$(CPP_COMPILER) \
 		-DQIR_STDLIB_LIB=$(QIR_STDLIB_DIR) \
