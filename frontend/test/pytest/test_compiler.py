@@ -50,4 +50,4 @@ class TestCompilerDriver:
     def test_link_fail_exception(self):
         """Test that an exception is raised when all compiler possibilities are exhausted."""
         with pytest.raises(EnvironmentError, match="Unable to link .*"):
-            CompilerDriver.link("in.o", "out.so", fallback_compilers=["this-binary-does-not-exist"])
+            CompilerDriver.run("in.o", fallback_compilers=["this-binary-does-not-exist"])
