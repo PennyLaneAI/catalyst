@@ -188,7 +188,7 @@ def measure_compile_pennylanejax(a: Any) -> BenchmarkResult:
         from .grover_pennylane import (
             ProblemPL as Problem,
             workflow as main,
-            grover_depth as depth,
+            size,
         )
 
         t = Problem(qml.device(device, wires=a.nqubits), a.grover_nlayers, interface=interface)
@@ -196,18 +196,16 @@ def measure_compile_pennylanejax(a: Any) -> BenchmarkResult:
     elif a.problem == "vqe":
         from .vqe_pennylane import ProblemVQE, grad_descent as main
 
-        def depth(_):
+        def size(_):
             return None
 
         t = ProblemVQE(qml.device(device, wires=a.nqubits), interface=interface)
 
     # Note: Disabled due to a PennylaneJax diff. compile problem
     # elif a.problem == "chemvqe":
-    #     from .chemvqe_pennylane import ProblemCVQE, workflow as main
+    #     from .chemvqe_pennylane import ProblemCVQE, workflow as main, size
     #     t = ProblemCVQE(qml.device(device, wires=a.nqubits), interface=interface,
     #                     diff_method=a.vqe_diff_method)
-    #     def depth(_):
-    #         return None
     else:
         raise NotImplementedError(f"Unsupported problem {a.problem}")
 
@@ -228,7 +226,7 @@ def measure_compile_pennylanejax(a: Any) -> BenchmarkResult:
     r = jax_main(weights).tolist() if a.numerical_check else None
 
     return BenchmarkResult.fromMeasurements(r, a.argv, None, times,
-                                            depth=depth(t), versions=versions)
+                                            depth=size(t), versions=versions)
 
 
 def measure_runtime_pennylanejax(a: Any) -> BenchmarkResult:
@@ -247,7 +245,7 @@ def measure_runtime_pennylanejax(a: Any) -> BenchmarkResult:
         from .grover_pennylane import (
             ProblemPL as Problem,
             workflow as main,
-            grover_depth as depth,
+            size,
         )
 
         t = Problem(qml.device(device, wires=a.nqubits), a.grover_nlayers, interface=interface)
@@ -256,16 +254,14 @@ def measure_runtime_pennylanejax(a: Any) -> BenchmarkResult:
 
         t = ProblemVQE(qml.device(device, wires=a.nqubits), interface=interface)
 
-        def depth(_):
+        def size(_):
             return None
 
     # Note: Disabled due to a PennylaneJax diff. compile problem
     # elif a.problem == "chemvqe":
-    #     from .chemvqe_pennylane import ProblemCVQE, workflow as main
+    #     from .chemvqe_pennylane import ProblemCVQE, workflow as main, size
     #     t = ProblemCVQE(qml.device(device, wires=a.nqubits), interface=interface,
     #                     diff_method=a.vqe_diff_method)
-    #     def depth(_):
-    #         return None
 
     else:
         raise NotImplementedError(f"Unsupported problme {a.problem}")
@@ -290,7 +286,7 @@ def measure_runtime_pennylanejax(a: Any) -> BenchmarkResult:
         times.append(e - b)
 
     return BenchmarkResult.fromMeasurements(r.tolist(), a.argv, cmptime, times,
-                                            depth=depth(t), versions=versions)
+                                            depth=size(t), versions=versions)
 
 
 def measure_compile_pennylane(a: Any) -> BenchmarkResult:
@@ -304,7 +300,7 @@ def measure_compile_pennylane(a: Any) -> BenchmarkResult:
         from .grover_pennylane import (
             ProblemPL as Problem,
             grover_mainloop as main,
-            grover_depth as depth,
+            size,
         )
 
         t = Problem(qml.device(device, wires=a.nqubits), a.grover_nlayers, interface=interface)
@@ -327,7 +323,7 @@ def measure_compile_pennylane(a: Any) -> BenchmarkResult:
     r = qml_main(weights).tolist() if a.numerical_check else None
 
     return BenchmarkResult.fromMeasurements(r, a.argv, None, times,
-                                            depth=depth(t), versions=versions)
+                                            depth=size(t), versions=versions)
 
 
 def measure_runtime_pennylane(a: Any) -> BenchmarkResult:
@@ -341,7 +337,7 @@ def measure_runtime_pennylane(a: Any) -> BenchmarkResult:
         from .grover_pennylane import (
             ProblemPL as Problem,
             workflow as main,
-            grover_depth as depth,
+            size,
         )
 
         t = Problem(qml.device(device, wires=a.nqubits), a.grover_nlayers)
@@ -350,16 +346,13 @@ def measure_runtime_pennylane(a: Any) -> BenchmarkResult:
 
         t = ProblemVQE(qml.device(device, wires=a.nqubits), diff_method=a.vqe_diff_method)
 
-        def depth(_):
+        def size(_):
             return None
 
     elif a.problem == "chemvqe":
-        from .chemvqe_pennylane import ProblemCVQE, workflow as main
+        from .chemvqe_pennylane import ProblemCVQE, workflow as main, size
 
         t = ProblemCVQE(qml.device(device, wires=a.nqubits), diff_method=a.vqe_diff_method)
-
-        def depth(_):
-            return None
 
     else:
         raise NotImplementedError(f"Unsupported problme {a.problem}")
@@ -385,7 +378,7 @@ def measure_runtime_pennylane(a: Any) -> BenchmarkResult:
         times.append(e - b)
 
     return BenchmarkResult.fromMeasurements(r.tolist(), a.argv, preptime, times,
-                                            depth=depth(t), versions=versions)
+                                            depth=size(t), versions=versions)
 
 
 REGISTRY = {

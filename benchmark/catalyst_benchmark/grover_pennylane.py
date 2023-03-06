@@ -117,13 +117,11 @@ def workflow(t: ProblemPL, weights):
     return _main(weights)
 
 
-def grover_depth(t: ProblemPL) -> int:
-    @qml.qnode(t.dev, **t.qnode_kwargs)
+def size(p: ProblemPL) -> int:
+    @qml.qnode(p.dev, expansion_strategy='device', **p.qnode_kwargs)
     def _main(weights):
-        return grover_mainloop(t, weights)
-
-    _main.construct([t.trial_params(0)], {})
-
+        return grover_mainloop(p, weights)
+    _main.construct([p.trial_params(0)], {})
     return len(_main.tape.operations)
 
 
@@ -132,20 +130,32 @@ def run_jax_lightning_qubit(N=7):
 
     jax.config.update("jax_enable_x64", True)
 
-    t = ProblemPL(qml.device("lightning.qubit", wires=N, shots=None), 4, interface="jax")
+    p = ProblemPL(qml.device("lightning.qubit", wires=N, shots=None), 4, interface="jax")
+    print(f"Size: {size(p)}")
 
     @jax.jit
     def _main(params):
-        return workflow(t, params)
+        return workflow(p, params)
 
-    return _main(t.trial_params(0))
+    return _main(p.trial_params(0))
 
 
 def run_lightning_qubit(N=7):
-    t = ProblemPL(qml.device("lightning.qubit", wires=N, shots=None), 4, interface=None)
+    p = ProblemPL(qml.device("lightning.qubit", wires=N, shots=None), 4, interface=None)
+    print(f"Size: {size(p)}")
 
     def _main(params):
-        return workflow(t, params)
+        return workflow(p, params)
 
-    return _main(t.trial_params(0))
+    return _main(p.trial_params(0))
+
+
+def run_default_qubit(N=7):
+    p = ProblemPL(qml.device("default.qubit", wires=N, shots=None), 4, interface=None)
+    print(f"Size: {size(p)}")
+
+    def _main(params):
+        return workflow(p, params)
+
+    return _main(p.trial_params(0))
 
