@@ -20,6 +20,7 @@ import os
 import sys
 import shutil
 import subprocess
+import sys
 import warnings
 from io import TextIOWrapper
 from typing import Optional, List
@@ -222,9 +223,17 @@ class MLIRToLLVMDialect(Pass):
         return infile.replace(".buff.mlir", ".llvm.mlir")
 
 
-quantum_compilation_pass_pipeline = [
-    "--lower-gradients",
-]
+class QuantumCompilationPass(Pass):
+    """Lower gradients"""
+
+    _executable = get_executable_path("quantum", "quantum-opt")
+    _default_flags = ["--lower-gradients"]
+
+    @staticmethod
+    def get_output_filename(infile):
+        if not infile.endswith(".mlir"):
+            raise ValueError(f"Input file ({infile}) for quantum transforms is not an MLIR file")
+        return infile.replace(".mlir", ".opt.mlir")
 
 
 class LLVMDialectToLLVMIR(Pass):
@@ -397,20 +406,7 @@ def transform_quantum_ir(filename: str, compile_options: Optional[CompileOptions
     Returns:
         a path to the output file
     """
-    if filename[-5:] != ".mlir":
-        raise ValueError(f"Input file ({filename}) for quantum transforms is not an MLIR file")
-
-    new_fname = filename.replace(".mlir", ".opt.mlir")
-
-    quantum_opt_tool = get_executable_path("quantum", "quantum-opt")
-    command = [quantum_opt_tool]
-    command += [filename]
-    command += quantum_compilation_pass_pipeline
-    command += ["-o", new_fname]
-
-    run_writing_command(command, compile_options)
-
-    return new_fname
+    return QuantumCompilationPass.run(filename, options=compile_options)
 
 
 def bufferize_tensors(filename: str, compile_options: Optional[CompileOptions] = None) -> str:
@@ -449,6 +445,87 @@ def convert_mlir_to_llvmir(filename: str, compile_options: Optional[CompileOptio
     return LLVMDialectToLLVMIR.run(filename, options=compile_options)
 
 
+class Compiler:
+    """Compiles MLIR modules to shared objects."""
+
+    def __init__(self):
+        self.order = None
+
+    def run(self, mlir_module, workspace, passes=None, options=None):
+        """Compile an MLIR module to a shared object.
+
+        .. note::
+
+            For compilation of hybrid quantum-classical PennyLane programs,
+            please see the :func:`~.qjit` decorator.
+
+        Args:
+            mlir_module (Module): the MLIR module
+            workspace (str): the absolute path to the MLIR module
+            passes (List[Any]): the list of compilation passes
+
+        Returns:
+            Shared object
+        """
+
+        module_name = mlir_module.operation.attributes["sym_name"]
+        # Convert MLIR string to Python string
+        module_name = str(module_name)
+        # Remove quotations
+        module_name = module_name.replace('"', "")
+        # need to create a temporary file with the string contents
+        filename = workspace + f"/{module_name}.mlir"
+        with open(filename, "w", encoding="utf-8") as f:
+            mlir_module.operation.print(f, print_generic_op_form=False, assume_verified=True)
+
+        if passes is None:
+            passes = [
+                MHLOPass,
+                QuantumCompilationPass,
+                BufferizationPass,
+                MLIRToLLVMDialect,
+                LLVMDialectToLLVMIR,
+                LLVMIRToObjectFile,
+                CompilerDriver,
+            ]
+
+        self.order = {}
+        for _pass in passes:
+            filename = _pass.run(filename, options=options)
+            self.order[_pass] = filename
+
+        return filename
+
+    @staticmethod
+    def _get_class_from_string(_pass):
+        return getattr(sys.modules[__name__], _pass)
+
+    def _get_output_file_of(self, _pass):
+        cls = Compiler._get_class_from_string(_pass)
+        return self.order[cls]
+
+    def get_output_of(self, _pass):
+        """Get the output IR of a pass.
+        Args:
+            _pass (str): name of pass class
+
+        Returns
+            (str): output IR
+        """
+        fname = self._get_output_file_of(_pass)
+        with open(fname, "r", encoding="utf-8") as f:
+            txt = f.read()
+        return txt
+
+    def print(self, _pass):
+        """Print the output IR of pass.
+        Args:
+            _pass (str): name of pass class
+        """
+        txt = self.get_output_of(_pass)
+        print(txt)
+
+
 def compile_llvmir(filename: str, compile_options: Optional[CompileOptions] = None) -> str:
     """Translate LLVM IR to an object file.
 
@@ -471,54 +548,3 @@ def link_lightning_runtime(filename: str, compile_options: Optional[CompileOptio
         a path to the output file
     """
     return CompilerDriver.run(filename, options=compile_options)
-
-
-def compile(mlir_module, workspace, passes, compile_options: Optional[CompileOptions] = None):
-    """Compile an MLIR module to a shared object.
-
-    .. note::
-
-        For compilation of hybrid quantum-classical PennyLane programs,
-        please see the :func:`~.qjit` decorator.
-
-    Args:
-        mlir_module (Module): the MLIR module
-        workspace (str): the absolute path to the MLIR module
-        has_hlo (bool): ``True`` if the MLIR module contains HLO code. Defaults to ``False``
-        passes (List[str]): the list of compilation passes
-        Optional compile_options (CompileOptions): generic compilation options.
-
-    Returns:
-        Shared object
-        A string representation of LLVM IR.
-    """
-
-    module_name = mlir_module.operation.attributes["sym_name"]
-    # Convert MLIR string to Python string
-    module_name = str(module_name)
-    # Remove quotations
-    module_name = module_name.replace('"', "")
-    # need to create a temporary file with the string contents
-    filename = f"{workspace}/{module_name}.mlir"
-    with open(filename, "w", encoding="utf-8") as f:
-        mlir_module.operation.print(f, print_generic_op_form=False, assume_verified=True)
-
-    mlir = filename
-    passes["mlir"] = mlir
-    nohlo = lower_mhlo_to_linalg(mlir, compile_options)
-    passes["nohlo"] = nohlo
-    optimized = transform_quantum_ir(nohlo, compile_options)
-    passes["opt"] = optimized
-    buff = bufferize_tensors(optimized, compile_options)
-    passes["buff"] = buff
-    llvm_dialect = lower_all_to_llvm(buff, compile_options)
-    passes["llvm"] = llvm_dialect
-    llvmir = convert_mlir_to_llvmir(llvm_dialect, compile_options)
-    passes["ll"] = llvmir
-    object_file = compile_llvmir(llvmir, compile_options)
-    shared_object = link_lightning_runtime(object_file, compile_options)
-
-    with open(llvmir, "r", encoding="utf-8") as f:
-        _llvmir = f.read()
-
-    return shared_object, _llvmir

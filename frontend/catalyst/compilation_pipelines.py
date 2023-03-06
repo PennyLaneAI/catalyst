@@ -36,7 +36,7 @@ from mlir_quantum.runtime import (
 )
 
 import catalyst.jax_tracer as tracer
-from catalyst import compiler
+from catalyst.compiler import Compiler
 from catalyst.compiler import CompileOptions
 from catalyst.pennylane_extensions import QFunc
 from catalyst.utils.gen_mlir import append_modules
@@ -470,6 +470,7 @@ class QJIT:
             self.workspace_name = self.workspace.name
         self.compile_options = compile_options
         self.passes = {}
+        self._compiler = Compiler()
         self._jaxpr = None
         self._mlir = None
         self._llvmir = None
@@ -492,9 +493,7 @@ class QJIT:
         Args:
             stage: string corresponding with the name of the stage to be printed
         """
-        if self.passes.get(stage):
-            with open(self.passes[stage], "r", encoding="utf-8") as f:
-                print(f.read())
+        self._compiler.print(stage)
 
     @property
     def mlir(self):
@@ -545,9 +544,10 @@ class QJIT:
     def compile(self):
         """Compile the current MLIR module."""
 
-        shared_object, self._llvmir = compiler.compile(
-            self.mlir_module, self.workspace_name, self.passes, self.compile_options
+        shared_object = self._compiler.run(
+            self.mlir_module, self.workspace_name, options=self.compile_options
         )
+        self._llvmir = self._compiler.get_output_of("LLVMDialectToLLVMIR")
 
         # The function name out of MLIR has quotes around it, which we need to remove.
         # The MLIR function name is actually a derived type from string which has no
