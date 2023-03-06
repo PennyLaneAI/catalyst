@@ -90,11 +90,13 @@ def measure_compile_catalyst(a: Any) -> BenchmarkResult:
     if a.problem == "grover":
         from .grover_catalyst import ProblemC, workflow as main
 
-        t = ProblemC(qml.device("lightning.qubit", wires=a.nqubits), a.grover_nlayers)
+        t = ProblemC(qml.device("lightning.qubit", wires=a.nqubits),
+                     a.grover_nlayers, expansion_strategy='device')
     elif a.problem == "vqe":
         from .vqe_catalyst import ProblemVQE, grad_descent as main
 
-        t = ProblemVQE(qml.device("lightning.qubit", wires=a.nqubits))
+        t = ProblemVQE(qml.device("lightning.qubit", wires=a.nqubits),
+                       expansion_strategy='device')
     else:
         raise NotImplementedError(f"Unsupported problem {a.problem}")
 
@@ -191,7 +193,8 @@ def measure_compile_pennylanejax(a: Any) -> BenchmarkResult:
             size,
         )
 
-        t = Problem(qml.device(device, wires=a.nqubits), a.grover_nlayers, interface=interface)
+        t = Problem(qml.device(device, wires=a.nqubits), a.grover_nlayers,
+                    interface=interface, expansion_strategy='device')
 
     elif a.problem == "vqe":
         from .vqe_pennylane import ProblemVQE, grad_descent as main
@@ -199,7 +202,8 @@ def measure_compile_pennylanejax(a: Any) -> BenchmarkResult:
         def size(_):
             return None
 
-        t = ProblemVQE(qml.device(device, wires=a.nqubits), interface=interface)
+        t = ProblemVQE(qml.device(device, wires=a.nqubits), interface=interface,
+                       expansion_strategy='device')
 
     # Note: Disabled due to a PennylaneJax diff. compile problem
     # elif a.problem == "chemvqe":
@@ -303,7 +307,8 @@ def measure_compile_pennylane(a: Any) -> BenchmarkResult:
             size,
         )
 
-        t = Problem(qml.device(device, wires=a.nqubits), a.grover_nlayers, interface=interface)
+        t = Problem(qml.device(device, wires=a.nqubits), a.grover_nlayers,
+                    interface=interface, expansion_strategy='device')
     else:
         raise NotImplementedError(f"Unsupported problem {a.problem}")
 
