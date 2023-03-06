@@ -145,7 +145,7 @@ void __quantum__qis__Gradient(int64_t numResults, /* results = */...)
     // num_observables * num_train_params
     auto &&jacobian = Catalyst::Runtime::CAPI::get_device()->Gradient({});
 
-    const size_t num_observables = jacobian.size();
+    const auto num_observables = jacobian.size();
     if (num_observables != static_cast<size_t>(numResults)) {
         __quantum__rt__fail_cstr("Invalid number of results; "
                                  "The number of results must be equal to the "
@@ -157,7 +157,7 @@ void __quantum__qis__Gradient(int64_t numResults, /* results = */...)
         return;
     }
 
-    const size_t num_train_params = jacobian[0].size();
+    const auto num_train_params = jacobian[0].size();
 
     // extract variadic results of size num_observables
     va_list args;
@@ -166,8 +166,7 @@ void __quantum__qis__Gradient(int64_t numResults, /* results = */...)
         auto mrp = va_arg(args, ResultType *);
         assert(mrp && "the result type cannot be a null pointer");
 
-        double *jac_data =
-            (double *)aligned_alloc(sizeof(double), num_train_params * sizeof(double));
+        auto *jac_data = (double *)aligned_alloc(sizeof(double), num_train_params * sizeof(double));
         for (size_t j = 0; j < num_train_params; j++) {
             jac_data[j] = jacobian[i][j];
         }
@@ -187,15 +186,15 @@ void __quantum__qis__Gradient_params(MemRefT_int64_1d *params, int64_t numResult
     assert(numResults >= 0);
     using ResultType = MemRefT_double_1d;
 
-    if (!params || !params->sizes[0]) {
+    if (params == nullptr || !params->sizes[0]) {
         __quantum__rt__fail_cstr("Invalid number of trainable parameters");
     }
 
-    const size_t tp_size = params->sizes[0];
+    const auto tp_size = params->sizes[0];
 
     // create a vector of custom trainable parameters
     std::vector<size_t> train_params;
-    auto params_data = params->data_aligned;
+    auto *params_data = params->data_aligned;
     train_params.reserve(tp_size);
     for (size_t i = 0; i < tp_size; i++) {
         auto p = params_data[i];
@@ -218,7 +217,7 @@ void __quantum__qis__Gradient_params(MemRefT_int64_1d *params, int64_t numResult
         return;
     }
 
-    const size_t num_train_params = jacobian[0].size();
+    const auto num_train_params = jacobian[0].size();
 
     // extract variadic results of size num_observables
     va_list args;
@@ -227,8 +226,7 @@ void __quantum__qis__Gradient_params(MemRefT_int64_1d *params, int64_t numResult
         auto mrp = va_arg(args, ResultType *);
         assert(mrp && "the result type cannot be a null pointer");
 
-        double *jac_data =
-            (double *)aligned_alloc(sizeof(double), num_train_params * sizeof(double));
+        auto *jac_data = (double *)aligned_alloc(sizeof(double), num_train_params * sizeof(double));
         for (size_t j = 0; j < num_train_params; j++) {
             jac_data[j] = jacobian[i][j];
         }
@@ -482,7 +480,7 @@ void __quantum__qis__QubitUnitary(MemRefT_CplxT_double_2d *matrix, int64_t numQu
 {
     assert(numQubits >= 0);
 
-    if (!matrix) {
+    if (matrix == nullptr) {
         __quantum__rt__fail_cstr("The QubitUnitary matrix must be initialized");
     }
 
@@ -490,9 +488,9 @@ void __quantum__qis__QubitUnitary(MemRefT_CplxT_double_2d *matrix, int64_t numQu
         __quantum__rt__fail_cstr("Invalid number of wires");
     }
 
-    const size_t num_rows = matrix->sizes[0];
-    const size_t num_col = matrix->sizes[1];
-    const size_t expected_size = std::pow(2, numQubits);
+    const auto num_rows = matrix->sizes[0];
+    const auto num_col = matrix->sizes[1];
+    const auto expected_size = std::pow(2, numQubits);
 
     if (num_rows != expected_size || num_col != expected_size) {
         __quantum__rt__fail_cstr(
@@ -509,7 +507,7 @@ void __quantum__qis__QubitUnitary(MemRefT_CplxT_double_2d *matrix, int64_t numQu
     }
     va_end(args);
 
-    const size_t matrix_size = num_rows * num_col;
+    const auto matrix_size = num_rows * num_col;
     std::vector<std::complex<double>> coeffs;
     coeffs.reserve(matrix_size);
     for (size_t i = 0; i < matrix_size; i++) {
@@ -530,13 +528,13 @@ ObsIdType __quantum__qis__HermitianObs(MemRefT_CplxT_double_2d *matrix, int64_t 
 {
     assert(numQubits >= 0);
 
-    if (!matrix) {
+    if (matrix == nullptr) {
         __quantum__rt__fail_cstr("The Hermitian matrix must be initialized");
     }
 
-    const size_t num_rows = matrix->sizes[0];
-    const size_t num_col = matrix->sizes[1];
-    const size_t expected_size = std::pow(2, numQubits);
+    const auto num_rows = matrix->sizes[0];
+    const auto num_col = matrix->sizes[1];
+    const auto expected_size = std::pow(2, numQubits);
 
     if (num_rows != expected_size || num_col != expected_size) {
         __quantum__rt__fail_cstr(
@@ -556,7 +554,7 @@ ObsIdType __quantum__qis__HermitianObs(MemRefT_CplxT_double_2d *matrix, int64_t 
         __quantum__rt__fail_cstr("Invalid number of wires");
     }
 
-    const size_t matrix_size = num_rows * num_col;
+    const auto matrix_size = num_rows * num_col;
     std::vector<std::complex<double>> coeffs;
     coeffs.reserve(matrix_size);
     for (size_t i = 0; i < matrix_size; i++) {
@@ -589,12 +587,12 @@ ObsIdType __quantum__qis__HamiltonianObs(MemRefT_double_1d *coeffs, int64_t numO
 {
     assert(numObs >= 0);
 
-    if (!coeffs) {
+    if (coeffs == nullptr) {
         __quantum__rt__fail_cstr("Invalid coefficients for computing Hamiltonian; "
                                  "The coefficients list must be initialized");
     }
 
-    const size_t coeffs_size = coeffs->sizes[0];
+    const auto coeffs_size = coeffs->sizes[0];
 
     if (static_cast<size_t>(numObs) != coeffs_size) {
         __quantum__rt__fail_cstr("Invalid coefficients for computing Hamiltonian; "
@@ -654,7 +652,7 @@ void __quantum__qis__Probs(MemRefT_double_1d *result, int64_t numQubits, ...)
         sv_probs = Catalyst::Runtime::CAPI::get_device()->PartialProbs(wires);
     }
 
-    const size_t numElements = 1U << numQubits;
+    const auto numElements = 1U << numQubits;
 
     if (numElements != sv_probs.size()) {
         __quantum__rt__fail_cstr("Cannot copy the probabilities to an array with different size; "
@@ -662,8 +660,8 @@ void __quantum__qis__Probs(MemRefT_double_1d *result, int64_t numQubits, ...)
     }
 
     // TODO: memory management
-    double *probs = (double *)aligned_alloc(sizeof(double), numElements * sizeof(double));
-    double *curr = probs;
+    auto *probs = (double *)aligned_alloc(sizeof(double), numElements * sizeof(double));
+    auto *curr = probs;
     for (size_t idx = 0; idx < numElements; idx++) {
         *(curr++) = sv_probs[idx];
     }
@@ -704,7 +702,7 @@ void __quantum__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, .
         // numElements, wires);
     }
 
-    const size_t numElements = sv_state.size();
+    const auto numElements = sv_state.size();
     assert(numElements == (1U << numQubits));
 
     // TODO: memory management
@@ -746,12 +744,12 @@ void __quantum__qis__Sample(MemRefT_double_2d *result, int64_t shots, int64_t nu
         sv_samples = Catalyst::Runtime::CAPI::get_device()->PartialSample(wires, shots);
     }
 
-    const size_t numElements = sv_samples.size();
+    const auto numElements = sv_samples.size();
     assert(numElements == static_cast<size_t>(shots * numQubits));
 
     // TODO: memory management
-    double *samples = (double *)aligned_alloc(sizeof(double), numElements * sizeof(double));
-    double *curr = samples;
+    auto *samples = (double *)aligned_alloc(sizeof(double), numElements * sizeof(double));
+    auto *curr = samples;
     for (size_t idx = 0; idx < numElements; idx++) {
         *(curr++) = sv_samples[idx];
     }
@@ -795,14 +793,14 @@ void __quantum__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t shots
     auto &&sv_eigvals = std::get<0>(sv_counts);
     auto &&sv_cts = std::get<1>(sv_counts);
 
-    const size_t numElements = 1U << numQubits;
+    const auto numElements = 1U << numQubits;
     assert(numElements == sv_eigvals.size());
     assert(numElements == sv_cts.size());
 
     // eigvals
     // TODO: memory management
-    double *eigvals = (double *)aligned_alloc(sizeof(double), numElements * sizeof(double));
-    double *curr = eigvals;
+    auto *eigvals = (double *)aligned_alloc(sizeof(double), numElements * sizeof(double));
+    auto *curr = eigvals;
     for (size_t idx = 0; idx < numElements; idx++) {
         *(curr++) = sv_eigvals[idx];
     }
@@ -815,8 +813,8 @@ void __quantum__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t shots
 
     // counts
     // TODO: memory management
-    int64_t *counts = (int64_t *)aligned_alloc(sizeof(int64_t), numElements * sizeof(int64_t));
-    int64_t *icurr = counts;
+    auto *counts = (int64_t *)aligned_alloc(sizeof(int64_t), numElements * sizeof(int64_t));
+    auto *icurr = counts;
     for (size_t idx = 0; idx < numElements; idx++) {
         *(icurr++) = sv_cts[idx];
     }

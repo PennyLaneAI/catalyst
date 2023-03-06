@@ -20,6 +20,7 @@ help:
 	@echo "  test               to run the Catalyst runtime test suite"
 	@echo "  format [check=1]   to apply C++ formatter; use with 'check=1' to check instead of modify (requires clang-format)"
 	@echo "  format [version=?] to apply C++ formatter; use with 'version={version}' to run clang-format-{version} instead of clang-format"
+	@echo "  check-tidy         to build Catalyst Runtime with RUNTIME_CLANG_TIDY=ON (requires clang-tidy)"
 
 .PHONY: all
 all: qir | runtime
@@ -74,6 +75,7 @@ clean:
 	@echo "clean build files"
 	rm -rf $(RT_BUILD_DIR)
 	rm -rf cov coverage.info
+	rm -rf $(MK_DIR)/BuildTidy
 	$(MAKE) -C qir-stdlib clean
 	$(MAKE) -C examples clean
 
@@ -84,3 +86,16 @@ ifdef check
 else
 	$(PYTHON) ../bin/format.py $(if $(version:-=),--cfversion $(version)) .
 endif
+
+.PHONY: check-tidy
+check-tidy: | qir
+	@echo "build Catalyst Runtime with RUNTIME_CLANG_TIDY=ON"
+	rm -rf 
+	cmake -G Ninja -B $(MK_DIR)/BuildTidy . \
+		-DCMAKE_C_COMPILER=$(C_COMPILER) \
+		-DCMAKE_CXX_COMPILER=$(CPP_COMPILER) \
+		-DQIR_STDLIB_LIB=$(QIR_STDLIB_DIR) \
+		-DQIR_STDLIB_INCLUDES=$(QIR_STDLIB_INCLUDES_DIR) \
+		-DRUNTIME_CLANG_TIDY=ON 
+
+	cmake --build $(MK_DIR)/BuildTidy --target rt_capi -j$(if $(nprocs:-=),$(nprocs),$$(nproc))

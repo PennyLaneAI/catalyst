@@ -25,17 +25,17 @@ auto LightningSimulator::AllocateQubit() -> QubitIdType
 
 auto LightningSimulator::AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType>
 {
-    if (!num_qubits) {
+    if (num_qubits == 0U) {
         return {};
     }
 
     // at the first call when num_qubits == 0
-    if (!this->GetNumQubits()) {
+    if (this->GetNumQubits() == 0U) {
         this->device_sv = std::make_unique<Pennylane::StateVectorDynamicCPU<double>>(num_qubits);
         return this->qubit_manager.AllocateRange(0, num_qubits);
     }
 
-    std::vector<QubitIdType> result;
+    std::vector<QubitIdType> result{};
     result.reserve(num_qubits);
     for (size_t i = 0; i < num_qubits; i++) {
         result.push_back(AllocateQubit());
