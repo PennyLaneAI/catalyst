@@ -1,4 +1,4 @@
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include(FetchContent)
@@ -25,10 +25,12 @@ else()
     set(ENABLE_OPENMP ON)
     set(source_files "StateVectorDynamicCPU.cpp")
 
+    set(LIGHTNING_GIT_TAG "latest_release" CACHE STRING "GIT_TAG value to build Lightning")
+
     FetchContent_Declare(
         pennylane_lightning
         GIT_REPOSITORY https://github.com/PennyLaneAI/pennylane-lightning.git
-        GIT_TAG      latest_release
+        GIT_TAG      ${LIGHTNING_GIT_TAG}
     )
     set(CMAKE_POSITION_INDEPENDENT_CODE ON) # build with -fPIC
     set(ENABLE_KOKKOS OFF CACHE BOOL "Enable Kokkos")

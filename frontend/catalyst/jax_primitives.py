@@ -189,7 +189,7 @@ mlir_fn_cache = {}
 
 
 @func_p.def_impl
-def _func_def_impl(ctx, *args, call_jaxpr, fn, call=True):
+def _func_def_impl(ctx, *args, call_jaxpr, fn, call=True):  # pragma: no cover
     raise NotImplementedError()
 
 
@@ -249,7 +249,7 @@ def _func_lowering(ctx, *args, call_jaxpr, fn, call=True):
 
 
 @grad_p.def_impl
-def _grad_def_impl(ctx, *args, jaxpr, fn, method, h, argnum):
+def _grad_def_impl(ctx, *args, jaxpr, fn, method, h, argnum):  # pragma: no cover
     raise NotImplementedError()
 
 
@@ -306,7 +306,7 @@ def _grad_lowering(ctx, *args, jaxpr, fn, method, h, argnum):
 # qalloc
 #
 @qalloc_p.def_impl
-def _qalloc_def_impl(ctx, size_value):
+def _qalloc_def_impl(ctx, size_value):  # pragma: no cover
     raise NotImplementedError()
 
 
@@ -347,7 +347,7 @@ def qdealloc(qreg):
 
 
 @qdealloc_p.def_impl
-def _qdealloc_def_impl(ctx, size_value):
+def _qdealloc_def_impl(ctx, size_value):  # pragma: no cover
     raise NotImplementedError()
 
 
@@ -370,7 +370,7 @@ def _qdealloc_lowering(jax_ctx: mlir.LoweringRuleContext, qreg):
 
 
 @qextract_p.def_impl
-def _qextract_def_impl(ctx, qreg, qubit_idx):
+def _qextract_def_impl(ctx, qreg, qubit_idx):  # pragma: no cover
     raise NotImplementedError()
 
 
@@ -411,7 +411,7 @@ def _qextract_lowering(jax_ctx: mlir.LoweringRuleContext, qreg: ir.Value, qubit_
 # qinsert
 #
 @qinsert_p.def_impl
-def _qinsert_def_impl(ctx, qreg_old, qubit_idx, qubit):
+def _qinsert_def_impl(ctx, qreg_old, qubit_idx, qubit):  # pragma: no cover
     raise NotImplementedError()
 
 
@@ -469,7 +469,7 @@ def _qinst_abstract_eval(*qubits_or_params, op=None, qubits_len=-1):
 
 
 @qinst_p.def_impl
-def _qinst_def_impl(ctx, *qubits_or_params, op, qubits_len):
+def _qinst_def_impl(ctx, *qubits_or_params, op, qubits_len):  # pragma: no cover
     raise NotImplementedError()
 
 
@@ -534,7 +534,7 @@ def _qunitary_abstract_eval(matrix, *qubits):
 
 
 @qunitary_p.def_impl
-def _qunitary_def_impl(ctx, matrix, qubits):
+def _qunitary_def_impl(ctx, matrix, qubits):  # pragma: no cover
     raise NotImplementedError()
 
 
@@ -589,7 +589,7 @@ def _qmeasure_abstract_eval(qubit):
 
 
 @qmeasure_p.def_impl
-def _qmeasure_def_impl(ctx, qubit):
+def _qmeasure_def_impl(ctx, qubit):  # pragma: no cover
     raise NotImplementedError()
 
 
@@ -626,7 +626,7 @@ def _compbasis_abstract_eval(*qubits):
 
 
 @compbasis_p.def_impl
-def _compbasis_def_impl(ctx, *qubits):
+def _compbasis_def_impl(ctx, *qubits):  # pragma: no cover
     raise NotImplementedError()
 
 
@@ -648,7 +648,7 @@ def _compbasis_lowering(jax_ctx: mlir.LoweringRuleContext, *qubits: tuple):
 # named observable
 #
 @compbasis_p.def_impl
-def _namedobs_def_impl(ctx, qubit, type):
+def _namedobs_def_impl(ctx, qubit, type):  # pragma: no cover
     raise NotImplementedError()
 
 
@@ -696,7 +696,7 @@ def _hermitian_abstract_eval(matrix, *qubits):
 
 
 @hermitian_p.def_impl
-def _hermitian_def_impl(ctx, matrix, *qubits):
+def _hermitian_def_impl(ctx, matrix, *qubits):  # pragma: no cover
     raise NotImplementedError()
 
 
@@ -718,7 +718,7 @@ def tensorobs(*terms):
 
 
 @tensorobs_p.def_impl
-def _tensorobs_def_impl(ctx, *terms):
+def _tensorobs_def_impl(ctx, *terms):  # pragma: no cover
     raise NotImplementedError()
 
 
@@ -755,7 +755,7 @@ def _hamiltonian_abstract_eval(coeffs, *terms):
 
 
 @hamiltonian_p.def_impl
-def _hamiltonian_def_impl(ctx, coeffs, *terms):
+def _hamiltonian_def_impl(ctx, coeffs, *terms):  # pragma: no cover
     raise NotImplementedError()
 
 
@@ -790,7 +790,7 @@ def _sample_abstract_eval(obs, shots, shape):
 
 
 @sample_p.def_impl
-def _sample_def_impl(ctx, obs, shots, shape):
+def _sample_def_impl(ctx, obs, shots, shape):  # pragma: no cover
     raise NotImplementedError()
 
 
@@ -816,7 +816,7 @@ def counts(obs, shots, shape):
 
 
 @counts_p.def_impl
-def _counts_def_impl(ctx, obs, shots, shape):
+def _counts_def_impl(ctx, obs, shots, shape):  # pragma: no cover
     raise NotImplementedError()
 
 
@@ -864,7 +864,7 @@ def _expval_abstract_eval(obs, shots):
 
 
 @expval_p.def_impl
-def _expval_def_impl(ctx, obs, shots):
+def _expval_def_impl(ctx, obs, shots):  # pragma: no cover
     raise NotImplementedError()
 
 
@@ -900,7 +900,7 @@ def _var_abstract_eval(obs, shots):
 
 
 @var_p.def_impl
-def _var_def_impl(ctx, obs, shots):
+def _var_def_impl(ctx, obs, shots):  # pragma: no cover
     raise NotImplementedError()
 
 
@@ -941,7 +941,7 @@ def _probs_abstract_eval(obs, shape):
 
 
 @var_p.def_impl
-def _probs_def_impl(ctx, obs, shape):
+def _probs_def_impl(ctx, obs, shape):  # pragma: no cover
     raise NotImplementedError()
 
 
@@ -975,7 +975,7 @@ def _state_abstract_eval(obs, shape):
 
 
 @state_p.def_impl
-def _state_def_impl(ctx, obs, shape):
+def _state_def_impl(ctx, obs, shape):  # pragma: no cover
     raise NotImplementedError()
 
 
@@ -1008,7 +1008,9 @@ def _qcond_abstract_eval(*args, true_jaxpr, false_jaxpr, **kwargs):
 
 
 @qcond_p.def_impl
-def _qcond_def_impl(ctx, pred, *branch_args_plus_consts, true_jaxpr, false_jaxpr):
+def _qcond_def_impl(
+    ctx, pred, *branch_args_plus_consts, true_jaxpr, false_jaxpr
+):  # pragma: no cover
     raise NotImplementedError()
 
 
@@ -1091,7 +1093,7 @@ def _qwhile_loop_abstract_eval(*args, cond_jaxpr, body_jaxpr, **kwargs):
 @qwhile_p.def_impl
 def _qwhile_def_impl(
     ctx, *iter_args_plus_consts, cond_jaxpr, body_jaxpr, cond_nconsts, body_nconsts
-):
+):  # pragma: no cover
     raise NotImplementedError()
 
 
@@ -1182,7 +1184,7 @@ def _qfor_loop_abstract_eval(*args, body_jaxpr, **kwargs):
 @qfor_p.def_impl
 def _qfor_def_impl(
     ctx, lower_bound, upper_bound, step, *iter_args_plus_consts, body_jaxpr, body_nconsts
-):
+):  # pragma: no cover
     raise NotImplementedError()
 
 

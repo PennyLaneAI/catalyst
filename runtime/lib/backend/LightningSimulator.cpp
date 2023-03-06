@@ -221,10 +221,6 @@ auto LightningSimulator::State() -> std::vector<std::complex<double>>
 
 auto LightningSimulator::Probs() -> std::vector<double>
 {
-    // QFailIf((1U << numQubits) != numAlloc,
-    //         "Cannot copy the probabilities to an array with different size; "
-    //         "allocation size must be '2 ** numQubits'");
-
     Pennylane::Simulators::Measures m{*(this->device_sv)};
 
     return m.probs();

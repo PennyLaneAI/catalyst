@@ -224,8 +224,44 @@ jobs:
               # -DLLVM_USE_SANITIZER="Address;Undefined"
         cmake --build mhlo-build --target check-mlir-hlo -j$(nproc)
 
+  runtime-qir-stdlib:
+    name: Catalyst-Runtime (qir-stdlib)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Cancel previous runs
+        uses: styfle/cancel-workflow-action@0.11.0
+        with:
+          access_token: ${{ github.token }}
+
+      - name: Checkout Catalyst repo
+        uses: actions/checkout@v3
+
+      - name: Install rustup with llvm-tools-preview
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          components: llvm-tools-preview
+
+      - name: Install QIR-stdlib
+        run: |
+            cd ./runtime/qir-stdlib
+            cargo build --release --verbose
+            mkdir -p ../qir-stdlib-build/include
+            cp ./target/release/libqir_stdlib.a ../qir-stdlib-build/
+            cp ./target/release/build/include/* ../qir-stdlib-build/include/
+            cargo clean
+
+      - name: Upload QIR-stdlib Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: qir-stdlib-build
+          path: ./runtime/qir-stdlib-build
+          retention-days: 1
+
   runtime:
     name: Catalyst-Runtime
+    needs: runtime-qir-stdlib
     runs-on: ubuntu-latest
 
     steps:
@@ -240,29 +276,24 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get -y -q install ninja-build make cmake gcc-10 g++-10 libomp-dev
-
-      - name: Install rustup with llvm-tools-preview
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          components: llvm-tools-preview
-
-      - name: Install QIR-stdlib
+          echo "LIGHTNING_GIT_TAG_VALUE=latest_release" >> $GITHUB_ENV
+      - if: ${{ github.event_name == 'push' }}
         run: |
-            cd ./runtime/qir-stdlib
-            cargo build --release --verbose
-            mkdir -p ../build-qir-stdlib/include
-            cp ./target/release/libqir_stdlib.a ../build-qir-stdlib/
-            cp ./target/release/build/include/* ../build-qir-stdlib/include/
-            cargo clean
+          echo "LIGHTNING_GIT_TAG_VALUE=master" >> $GITHUB_ENV
+
+      - name: Download QIR-stdlib Artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: qir-stdlib-build
+          path: ./runtime/qir-stdlib-build
 
       - name: Build Catalyst-Runtime
         run: |
-          cmake -S runtime -B runtime-build \
+          cmake -S runtime -B runtime-build -G Ninja \
                             -DCMAKE_BUILD_TYPE=Release \
-                            -DQIR_STDLIB_LIB="$(pwd)/runtime/build-qir-stdlib/" \
-                            -DQIR_STDLIB_INCLUDES="$(pwd)/runtime/build-qir-stdlib/include/" \
-                            -G Ninja
+                            -DLIGHTNING_GIT_TAG=$LIGHTNING_GIT_TAG_VALUE \
+                            -DQIR_STDLIB_LIB="$(pwd)/runtime/qir-stdlib-build/" \
+                            -DQIR_STDLIB_INCLUDES="$(pwd)/runtime/qir-stdlib-build/include/"
           cmake --build runtime-build --target rt_capi -j$(nproc)
 
       - name: Upload Catalyst-Runtime Artifact
@@ -273,6 +304,95 @@ jobs:
             runtime-build/lib/capi/*.so
             runtime-build/lib/backend/*.so
           retention-days: 1
+
+  runtime-tests:
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        simulator: ['lightning', 'lightning-kokkos']
+
+    name: Runtime Tests (Linux)
+    needs: runtime-qir-stdlib
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Cancel previous runs
+        uses: styfle/cancel-workflow-action@0.11.0
+        with:
+          access_token: ${{ github.token }}
+
+      - name: Checkout the repo
+        uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get -y -q install cmake ninja-build gcc-10 g++-10 libomp-dev lcov
+          echo "LIGHTNING_GIT_TAG_VALUE=latest_release" >> $GITHUB_ENV
+      - if: ${{ github.event_name == 'push' }}
+        run: |
+          echo "LIGHTNING_GIT_TAG_VALUE=master" >> $GITHUB_ENV
+
+      - name: Download QIR-stdlib Artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: qir-stdlib-build
+          path: ./runtime/qir-stdlib-build
+
+      - name: Build Runtime test suite for Lightning simulator
+        if: ${{ matrix.simulator == 'lightning' }}
+        run: |
+            cmake -S runtime -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug \
+                                      -DENABLE_LIGHTNING_KOKKOS=OFF \
+                                      -DLIGHTNING_GIT_TAG=$LIGHTNING_GIT_TAG_VALUE \
+                                      -DQIR_STDLIB_LIB="$(pwd)/runtime/qir-stdlib-build/" \
+                                      -DQIR_STDLIB_INCLUDES="$(pwd)/runtime/qir-stdlib-build/include/" \
+                                      -DENABLE_CODE_COVERAGE=ON
+            cmake --build build --target runner_tests -j$(nproc)
+
+      - name: Build Runtime test suite for Lightning-Kokkos simulator
+        if: ${{ matrix.simulator == 'lightning-kokkos' }}
+        run: |
+            cmake -S runtime -B build -DCMAKE_BUILD_TYPE=Release \
+                                      -DENABLE_LIGHTNING_KOKKOS=ON \
+                                      -DQIR_STDLIB_LIB="$(pwd)/runtime/qir-stdlib-build/" \
+                                      -DQIR_STDLIB_INCLUDES="$(pwd)/runtime/qir-stdlib-build/include/" \
+                                      -G Ninja
+            cmake --build build --target runner_tests -j$(nproc)
+
+      - name: Run tests
+        run: |
+            ./build/tests/runner_tests -s
+
+      - name: Runtime Code Coverage
+        if: ${{ matrix.simulator == 'lightning' }}
+        run: |
+            lcov --directory build -b ./runtime/lib --capture --output-file build/coverage.info
+            lcov --remove build/coverage.info '/usr/*' '*/_deps/*' --output-file build/coverage.info
+            mv build/coverage.info coverage-${{ github.job }}.info
+
+      - name: Upload code coverage results
+        if: ${{ matrix.simulator == 'lightning' }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: ubuntu-codecov-results-cpp
+          path: ./coverage-${{ github.job }}.info
+
+      - name: Build examples
+        if: ${{ matrix.simulator == 'lightning' }}
+        run: |
+          cd ./runtime/examples && make all BUILD_DIR=../../build
+
+      - name: Create tests report
+        run: |
+            mkdir -p ./build/tests/results
+            ./build/tests/runner_tests --reporter junit --out ./build/tests/results/tests_result.xml
+
+      - name: Upload tests
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: runtime-linux-test-report
+          path: ./build/tests/results/tests_result.xml
 
   frontend:
     name: Frontend Tests
@@ -378,16 +498,30 @@ jobs:
 
   upload-to-codecov-linux-python:
     needs: [frontend]
-    name: Upload coverage data to codecov
+    name: Upload coverage data to codecov (Python)
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-
       - name: Download coverage reports
         uses: actions/download-artifact@v3
         with:
           name: ubuntu-codecov-results-python
+
+      - name: Upload to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          fail_ci_if_error: true
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+  upload-to-codecov-linux-cpp:
+    needs: [runtime-tests]
+    name: Upload coverage data to codecov (C++)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download coverage reports
+        uses: actions/download-artifact@v3
+        with:
+          name: ubuntu-codecov-results-cpp
 
       - name: Upload to Codecov
         uses: codecov/codecov-action@v3

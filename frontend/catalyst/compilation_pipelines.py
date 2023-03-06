@@ -521,7 +521,7 @@ class QJIT:
             if target == "binary":
                 self.compiled_function = self.compile()
 
-    def print_stage(self, stage):  # pragma: no cover
+    def print_stage(self, stage):
         """
         Print one of the recorded stages.
 

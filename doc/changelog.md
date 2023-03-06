@@ -15,11 +15,15 @@
 
 <h3>Bug fixes</h3>
 
+* Fixes to codecov, build-lightning, and GH actions.
+  [#34](https://github.com/PennyLaneAI/catalyst/pull/34)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
 
-Erick Ochoa Lopez
+Ali Asadi,
+Erick Ochoa Lopez.
 
 # Release 0.1.0
 
