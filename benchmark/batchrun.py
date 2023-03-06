@@ -5,7 +5,7 @@ import pandas as pd
 from os import system, makedirs
 from os.path import isfile, dirname
 from json import load as json_load
-from argparse import ArgumentParser, BooleanOptionalAction, Namespace as ParsedArguments
+from argparse import ArgumentParser, Namespace as ParsedArguments
 from typing import Tuple, Iterable
 from collections import defaultdict
 from copy import deepcopy
@@ -15,7 +15,7 @@ from hashlib import sha256
 from pandas import DataFrame
 from altair import Chart
 
-from catalyst_benchmark.types import Sysinfo, BenchmarkResult
+from catalyst_benchmark.types import Sysinfo, BenchmarkResult, BooleanOptionalAction
 from catalyst_benchmark.main import parse_implementation
 
 # fmt:off

@@ -1,11 +1,12 @@
 from dataclasses import dataclass
-from typing import List, Tuple, Optional, Any
+from typing import List, Optional, Any
 from dataclasses_json import dataclass_json
 
+from argparse import ArgumentParser, Action, SUPPRESS
 from psutil import virtual_memory
 from os import uname
 from multiprocessing import cpu_count
-from platform import processor, system
+from platform import system
 from cpuinfo import get_cpu_info
 
 
@@ -89,3 +90,45 @@ class BenchmarkResult:
         return BenchmarkResult(
             Sysinfo.fromOS(), unpack_complex(nr) if nr else None, depth, argv, prep, times
         )
+
+class BooleanOptionalAction(Action):
+    """ Backported from argparse for Python3.10 """
+    def __init__(self,
+                 option_strings,
+                 dest,
+                 default=None,
+                 type=None,
+                 choices=None,
+                 required=False,
+                 help=None,
+                 metavar=None):
+
+        _option_strings = []
+        for option_string in option_strings:
+            _option_strings.append(option_string)
+
+            if option_string.startswith('--'):
+                option_string = '--no-' + option_string[2:]
+                _option_strings.append(option_string)
+
+        if help is not None and default is not None and default is not SUPPRESS:
+            help += " (default: %(default)s)"
+
+        super().__init__(
+            option_strings=_option_strings,
+            dest=dest,
+            nargs=0,
+            default=default,
+            type=type,
+            choices=choices,
+            required=required,
+            help=help,
+            metavar=metavar)
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        if option_string in self.option_strings:
+            setattr(namespace, self.dest, not option_string.startswith('--no-'))
+
+    def format_usage(self):
+        return ' | '.join(self.option_strings)
+
