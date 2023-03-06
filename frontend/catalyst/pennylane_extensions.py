@@ -375,7 +375,7 @@ class CondCallable:
         ret_tree_flat = jprim.qcond(true_jaxpr, false_jaxpr, *inputs)
         return tree_unflatten(out_trees[0], ret_tree_flat)
 
-    def __call__(self):
+    def _call_during_trace(self):
         TracingContext.check_is_tracing("Must use 'cond' inside tracing context.")
 
         ctx = qml.QueuingManager.active_context()
@@ -383,6 +383,19 @@ class CondCallable:
             return self._call_with_classical_ctx()
 
         return self._call_with_quantum_ctx(ctx)
+
+    def _call_during_interpretation(self):
+        """Create a callable for conditionals."""
+        if self.pred:
+            return self.true_fn()
+        return self.false_fn()
+
+    def __call__(self):
+        is_tracing = TracingContext.is_tracing()
+        if is_tracing:
+            return self._call_during_trace()
+
+        return self._call_during_interpretation()
 
 
 def cond(pred):
@@ -586,7 +599,7 @@ class WhileCallable:
         )
         return tree_unflatten(body_tree, ret_tree_flat)
 
-    def __call__(self, *args):
+    def _call_during_trace(self, *args):
         TracingContext.check_is_tracing("Must use 'while_loop' inside tracing context.")
 
         ctx = qml.QueuingManager.active_context()
@@ -594,6 +607,18 @@ class WhileCallable:
             return self._call_with_quantum_ctx(ctx, args)
 
         return self._call_with_classical_ctx(args)
+
+    def _call_during_interpretation(self, *args):
+        while self.cond_fn(*args):
+            args = self.body_fn(*args)
+        return args
+
+    def __call__(self, *args):
+        is_tracing = TracingContext.is_tracing()
+        if is_tracing:
+            return self._call_during_trace(*args)
+
+        return self._call_during_interpretation(*args)
 
 
 def while_loop(cond_fn):
@@ -762,13 +787,25 @@ class ForLoopCallable:
         ret_tree_flat = jprim.qfor(body_jaxpr, len(body_consts), *inputs)
         return tree_unflatten(body_tree, ret_tree_flat)
 
-    def __call__(self, *args):
+    def _call_during_trace(self, *args):
         TracingContext.check_is_tracing("Must use 'for_loop' inside tracing context.")
 
         ctx = qml.QueuingManager.active_context()
         if ctx is None:
             return self._call_with_classical_ctx(*args)
         return self._call_with_quantum_ctx(ctx, *args)
+
+    def _call_during_interpretation(self, *args):
+        for i in range(self.lower_bound, self.upper_bound, self.step):
+            args = self.body_fn(i, *args)
+        return args
+
+    def __call__(self, *args):
+        is_tracing = TracingContext.is_tracing()
+        if is_tracing:
+            return self._call_during_trace(*args)
+
+        return self._call_during_interpretation(*args)
 
 
 def for_loop(lower_bound, upper_bound, step):

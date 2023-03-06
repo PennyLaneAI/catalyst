@@ -277,30 +277,70 @@ class TestForLoops:
         assert np.allclose(circuit(4), np.eye(2**4)[0])
 
 
-class TestErrorMessages:
-    def test_while_loop_non_jit_context(self):
-        def mulc(x: int, n: int):
-            @while_loop(lambda v: v[0] < n)
-            def loop(v):
-                return v[0] + 1, v[1] + x
+class TestInterpretationControlFlow:
+    """Test that the loops' executions are semantically equivalent when compiled and interpreted."""
 
-            counter, x_times_n = loop((0, 0))
+    # pylint: disable=missing-function-docstring
+    def test_while_loop(self):
+        def muli(x: int, n: int):
+            @while_loop(lambda v, _: v < n)
+            def loop(v, i):
+                return v + 1, i + x
+
+            counter, x_times_n = loop(0, 0)
             return x_times_n
 
-        with pytest.raises(RuntimeError, match="Must use 'while_loop' inside tracing context."):
-            mulc(1, 2)
+        mulc = qjit(muli)
+        assert mulc(1, 2) == muli(1, 2)
 
-    def test_for_loop_non_jit_context(self):
-        def mulc(x: int, n: int):
+    # pylint: disable=missing-function-docstring
+    def test_for_loop(self):
+        def muli(x: int, n: int):
             @for_loop(0, n, 1)
             def loop(i, agg):
-                return agg + x
+                return (agg + x,)
 
             x_times_n = loop(0)
             return x_times_n
 
-        with pytest.raises(RuntimeError, match="Must use 'for_loop' inside tracing context."):
-            mulc(1, 2)
+        mulc = qjit(muli)
+        assert mulc(1, 2) == muli(1, 2)
+
+    # pylint: disable=missing-function-docstring
+    def test_qnode_with_while_loop(self):
+        num_wires = 2
+        device = qml.device("lightning.qubit", wires=num_wires)
+
+        @qml.qnode(device)
+        def interpreted_circuit(n):
+            @while_loop(lambda i: i < n)
+            def loop(i):
+                qml.RX(np.pi, wires=i)
+                return (i + 1,)
+
+            loop(0)
+            return qml.state()
+
+        compiled_circuit = qjit(interpreted_circuit)
+        assert np.allclose(compiled_circuit(num_wires), interpreted_circuit(num_wires))
+
+    # pylint: disable=missing-function-docstring
+    def test_qnode_with_for_loop(self):
+        num_wires = 2
+        device = qml.device("lightning.qubit", wires=num_wires)
+
+        @qml.qnode(device)
+        def interpreted_circuit(n):
+            @for_loop(0, n, 1)
+            def loop(i):
+                qml.RX(np.pi, wires=i)
+                return ()
+
+            loop()
+            return qml.state()
+
+        compiled_circuit = qjit(interpreted_circuit)
+        assert np.allclose(compiled_circuit(num_wires), interpreted_circuit(num_wires))
 
 
 class TestClassicalCompilation:
@@ -308,11 +348,11 @@ class TestClassicalCompilation:
     def test_while_loop(self, x, n):
         @qjit
         def mulc(x: int, n: int):
-            @while_loop(lambda v: v[0] < n)
-            def loop(v):
-                return v[0] + 1, v[1] + x
+            @while_loop(lambda v, _: v < n)
+            def loop(v, i):
+                return v + 1, i + x
 
-            counter, x_times_n = loop((0, 0))
+            counter, x_times_n = loop(0, 0)
             return x_times_n
 
         assert mulc.mlir

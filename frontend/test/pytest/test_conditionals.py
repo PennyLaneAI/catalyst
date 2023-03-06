@@ -16,6 +16,7 @@ import pytest
 
 from catalyst import cond, qjit, measure
 import pennylane as qml
+import numpy as np
 
 
 class TestCondToJaxpr:
@@ -117,9 +118,13 @@ class TestCond:
         assert circuit(True) == 1
 
 
-class TestErrorMessages:
-    def test_control_flow_non_jit_context(self):
-        def arithc(x: int, y: int, op: int):
+# pylint: disable=too-few-public-methods
+class TestInterpretationConditional:
+    """Test that the conditional operation's execution is semantically equivalent when compiled and interpreted."""
+
+    # pylint: disable=missing-function-docstring
+    def test_conditional_interpreted_and_compiled(self):
+        def arithi(x: int, y: int, op: int):
             @cond(op == 0)
             def branch():
                 return x - y
@@ -130,8 +135,27 @@ class TestErrorMessages:
 
             return branch()
 
-        with pytest.raises(RuntimeError, match="Must use 'cond' inside tracing context."):
-            arithc(0, 0, 0)
+        arithc = qjit(arithi)
+        assert arithc(0, 0, 0) == arithi(0, 0, 0)
+        assert arithc(0, 0, 1) == arithi(0, 0, 1)
+
+    # pylint: disable=missing-function-docstring
+    def test_conditional_interpreted_and_compiled_single_if(self):
+        num_wires = 2
+        device = qml.device("lightning.qubit", wires=num_wires)
+
+        @qml.qnode(device)
+        def interpreted_circuit(n):
+            @cond(n == 0)
+            def branch():
+                qml.RX(np.pi, wires=0)
+
+            branch()
+            return qml.state()
+
+        compiled_circuit = qjit(interpreted_circuit)
+        assert np.allclose(compiled_circuit(0), interpreted_circuit(0))
+        assert np.allclose(compiled_circuit(1), interpreted_circuit(1))
 
 
 class TestClassicalCompilation:
