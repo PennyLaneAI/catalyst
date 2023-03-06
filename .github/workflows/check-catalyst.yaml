@@ -294,8 +294,8 @@ jobs:
                 -DCMAKE_C_COMPILER=clang \
                 -DCMAKE_CXX_COMPILER=clang++ \
                 -DLIGHTNING_GIT_TAG=$LIGHTNING_GIT_TAG_VALUE \
-                -DQIR_STDLIB_LIB="$(pwd)/runtime/build-qir-stdlib/" \
-                -DQIR_STDLIB_INCLUDES="$(pwd)/runtime/build-qir-stdlib/include/"
+                -DQIR_STDLIB_LIB="$(pwd)/runtime/qir-stdlib-build/" \
+                -DQIR_STDLIB_INCLUDES="$(pwd)/runtime/qir-stdlib-build/include/"
           cmake --build runtime-build --target rt_capi -j$(nproc)
 
       - name: Upload Catalyst-Runtime Artifact
