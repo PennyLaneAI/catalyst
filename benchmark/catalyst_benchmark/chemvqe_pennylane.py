@@ -65,6 +65,13 @@ def workflow(p: ProblemCVQE, params):
 
     return theta
 
+
+def size(p: ProblemCVQE) -> int:
+    with qml.tape.QuantumTape() as tape:
+        AllSinglesDoubles(p.trial_params(0), range(p.nqubits), p.hf_state, p.singles, p.doubles)
+    return len(qml.transforms.create_expand_fn(depth=5, device=p.dev)(tape))
+
+
 SHOTS = None
 DIFFMETHOD = 'parameter-shift'
 NSTEPS = 1
@@ -73,6 +80,7 @@ def run_default_qubit(N=6):
     p = ProblemCVQE(qml.device("default.qubit", wires=N, shots=SHOTS),
                     nsteps=NSTEPS,
                     diff_method=DIFFMETHOD)
+    print(f"Size: {size(p)}")
 
     def _main(params):
         return workflow(p, params)
@@ -84,6 +92,7 @@ def run_default_qubit(N=6):
 def run_lightning_qubit(N=6):
     p = ProblemCVQE(qml.device("lightning.qubit", wires=N, shots=SHOTS),
                     nsteps=NSTEPS, diff_method=DIFFMETHOD)
+    print(f"Size: {size(p)}")
 
     def _main(params):
         return workflow(p, params)
@@ -101,6 +110,7 @@ def run_jax_(devname, N=6):
 
     p = ProblemCVQE(dev=qml.device(devname, wires=N, shots=SHOTS),
                     nsteps=NSTEPS, interface="jax", diff_method=DIFFMETHOD)
+    print(f"Size: {size(p)}")
 
     @jax.jit
     def _main(params):
