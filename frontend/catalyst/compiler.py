@@ -256,6 +256,12 @@ class LLVMIRToObjectFile(Pass):
         return infile.replace(".ll", ".o")
 
 
+mlir_lib_path = get_lib_path("llvm", "MLIR_LIB_DIR")
+lrt_lib_path = get_lib_path("runtime", "RUNTIME_LIB_DIR")
+lrt_capi_path = os.path.join(lrt_lib_path, "capi")
+lrt_backend_path = os.path.join(lrt_lib_path, "backend")
+
+
 # pylint: disable=too-few-public-methods
 class CompilerDriver:
     """Compiler Driver Interface
@@ -273,32 +279,23 @@ class CompilerDriver:
 
     _default_fallback_compilers = ["clang", "gcc", "c99", "c89", "cc"]
 
-    @staticmethod
-    def _flags():
-        mlir_lib_path = get_lib_path("llvm", "MLIR_LIB_DIR")
-        lrt_lib_path = get_lib_path("runtime", "RUNTIME_LIB_DIR")
-        lrt_capi_path = os.path.join(lrt_lib_path, "capi")
-        lrt_backend_path = os.path.join(lrt_lib_path, "backend")
-
-        flags = [
-            "-shared",
-            "-rdynamic",
-            f"-L{mlir_lib_path}",
-            "-Wl,-no-as-needed",
-            f"-Wl,-rpath,{mlir_lib_path}",
-            f"-L{lrt_capi_path}",
-            f"-L{lrt_backend_path}",
-            f"-Wl,-rpath,{lrt_capi_path}:{lrt_backend_path}",
-            f"-L{lrt_capi_path}",
-            f"-L{lrt_backend_path}",
-            f"-Wl,-rpath,{lrt_capi_path}:{lrt_backend_path}",
-            "-lrt_backend",
-            "-lrt_capi",
-            "-lpthread",
-            "-lmlir_c_runner_utils",  # required for memref.copy
-        ]
-
-        return flags
+    _default_flags = [
+        "-shared",
+        "-rdynamic",
+        f"-L{mlir_lib_path}",
+        "-Wl,-no-as-needed",
+        f"-Wl,-rpath,{mlir_lib_path}",
+        f"-L{lrt_capi_path}",
+        f"-L{lrt_backend_path}",
+        f"-Wl,-rpath,{lrt_capi_path}:{lrt_backend_path}",
+        f"-L{lrt_capi_path}",
+        f"-L{lrt_backend_path}",
+        f"-Wl,-rpath,{lrt_capi_path}:{lrt_backend_path}",
+        "-lrt_backend",
+        "-lrt_capi",
+        "-lpthread",
+        "-lmlir_c_runner_utils",  # required for memref.copy
+    ]
 
     @staticmethod
     def _get_compiler_fallback_order(fallback_compilers):
@@ -331,12 +328,11 @@ class CompilerDriver:
     @staticmethod
     # pylint: disable=redefined-outer-name
     def _attempt_link(compiler, flags, infile, outfile, compile_options=None):
-        compile_options = compile_options if compile_options else default_compile_options
+        if compile_options is None:
+            compile_options = default_compile_options
         try:
             command = [compiler] + flags + [infile, "-o", outfile]
-            if compile_options.verbose:
-                print(f"[RUNNING] {' '.join(command)}", file=compile_options.get_logfile())
-            subprocess.run(command, check=True)
+            run_writing_command(command, compile_options)
             return True
         except subprocess.CalledProcessError:
             msg = (
@@ -347,7 +343,19 @@ class CompilerDriver:
             return False
 
     @staticmethod
-    def link(infile, outfile, flags=None, fallback_compilers=None, compile_options=None):
+    def get_output_filename(infile):
+        """Rename object file to shared object
+
+        Args:
+            infile (str): input file name
+            outfile (str): output file name
+        """
+        if not infile.endswith(".o"):
+            raise ValueError(f"Input file ({infile}) is not an object file")
+        return infile.replace(".o", ".so")
+
+    @staticmethod
+    def run(infile, outfile=None, flags=None, fallback_compilers=None, options=None):
         """
         Link the infile against the necessary libraries and produce the outfile.
 
@@ -360,17 +368,17 @@ class CompilerDriver:
         Raises:
             EnvironmentError: The exception is raised when no compiler succeeded.
         """
+        if outfile is None:
+            outfile = CompilerDriver.get_output_filename(infile)
         if flags is None:
-            flags = CompilerDriver._flags()
+            flags = CompilerDriver._default_flags
         if fallback_compilers is None:
             fallback_compilers = CompilerDriver._default_fallback_compilers
         # pylint: disable=redefined-outer-name
         for compiler in CompilerDriver._available_compilers(fallback_compilers):
-            success = CompilerDriver._attempt_link(
-                compiler, flags, infile, outfile, compile_options
-            )
+            success = CompilerDriver._attempt_link(compiler, flags, infile, outfile, options)
             if success:
-                return
+                return outfile
         msg = f"Unable to link {infile}. All available compiler options exhausted. Please provide a compatible compiler via $CATALYST_CC."
         raise EnvironmentError(msg)
 
@@ -462,14 +470,7 @@ def link_lightning_runtime(filename: str, compile_options: Optional[CompileOptio
     Returns:
         a path to the output file
     """
-    if filename[-2:] != ".o":
-        raise ValueError(f"Input file ({filename}) for linking is not an object file")
-
-    new_fname = filename.replace(".o", ".so")
-
-    CompilerDriver.link(filename, new_fname, compile_options=compile_options)
-
-    return new_fname
+    return CompilerDriver.run(filename, options=compile_options)
 
 
 def compile(mlir_module, workspace, passes, compile_options: Optional[CompileOptions] = None):
