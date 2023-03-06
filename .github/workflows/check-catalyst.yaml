@@ -285,11 +285,11 @@ jobs:
 
       - name: Build Catalyst-Runtime
         run: |
-          cmake -S runtime -B runtime-build \
+          cmake -S runtime -B runtime-build -G Ninja \
                             -DCMAKE_BUILD_TYPE=Release \
+                            -DLIGHTNING_GIT_TAG="master" \
                             -DQIR_STDLIB_LIB="$(pwd)/runtime/qir-stdlib-build/" \
-                            -DQIR_STDLIB_INCLUDES="$(pwd)/runtime/qir-stdlib-build/include/" \
-                            -G Ninja
+                            -DQIR_STDLIB_INCLUDES="$(pwd)/runtime/qir-stdlib-build/include/"
           cmake --build runtime-build --target rt_capi -j$(nproc)
 
       - name: Upload Catalyst-Runtime Artifact
@@ -332,14 +332,12 @@ jobs:
       - name: Build Runtime test suite for Lightning simulator
         if: ${{ matrix.simulator == 'lightning' }}
         run: |
-            cmake -S runtime -B build -DCMAKE_BUILD_TYPE=Debug \
+            cmake -S runtime -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug \
                                       -DENABLE_LIGHTNING_KOKKOS=OFF \
-                                      -DCMAKE_C_COMPILER=$(which gcc-10) \
-                                      -DCMAKE_CXX_COMPILER="$(which g++-10)" \
+                                      -DLIGHTNING_GIT_TAG="master" \
                                       -DQIR_STDLIB_LIB="$(pwd)/runtime/qir-stdlib-build/" \
                                       -DQIR_STDLIB_INCLUDES="$(pwd)/runtime/qir-stdlib-build/include/" \
-                                      -DENABLE_CODE_COVERAGE=ON \
-                                      -G Ninja
+                                      -DENABLE_CODE_COVERAGE=ON
             cmake --build build --target runner_tests -j$(nproc)
 
       - name: Build Runtime test suite for Lightning-Kokkos simulator
@@ -347,8 +345,6 @@ jobs:
         run: |
             cmake -S runtime -B build -DCMAKE_BUILD_TYPE=Release \
                                       -DENABLE_LIGHTNING_KOKKOS=ON \
-                                      -DCMAKE_C_COMPILER=$(which gcc-10) \
-                                      -DCMAKE_CXX_COMPILER="$(which g++-10)" \
                                       -DQIR_STDLIB_LIB="$(pwd)/runtime/qir-stdlib-build/" \
                                       -DQIR_STDLIB_INCLUDES="$(pwd)/runtime/qir-stdlib-build/include/" \
                                       -G Ninja
