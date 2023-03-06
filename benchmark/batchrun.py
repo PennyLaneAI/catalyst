@@ -56,8 +56,8 @@ LAYERS = {
 }
 
 KNOWN_FAILURES = {
-    ("grover", "compile", "pennylane+jax/default.qubit.jax", None): (7, 50),
-    ("grover", "runtime", "pennylane+jax/default.qubit.jax", None): (7, 50),
+    # ("grover", "compile", "pennylane+jax/default.qubit.jax", None): (7, 50),
+    # ("grover", "runtime", "pennylane+jax/default.qubit.jax", None): (7, 50),
 }
 
 DIFF_METHODS = {
@@ -311,8 +311,8 @@ def plot(a: ParsedArguments) -> None:
         if len(df) > 0:
             xaxis = alt.Axis(values=list(range(MINQUBITS, MAXQUBITS + 2, 2)))
             xscale = alt.Scale(domain=(MINQUBITS, MAXQUBITS))
-            print("Updating _img/regular_compile.svg")
-            with _open("_img/regular_compile.svg", "w") as f:
+            print(f"Updating _img/regular_compile_{SYSHASH}.svg")
+            with _open(f"_img/regular_compile_{SYSHASH}.svg", "w") as f:
                 f.write(
                     vlc.vegalite_to_svg(
                         alt.vconcat(
@@ -336,8 +336,8 @@ def plot(a: ParsedArguments) -> None:
 
         df = _filter("regular", "runtime", "grover")
         if len(df) > 0:
-            print("Updating _img/regular_runtime.svg")
-            with _open("_img/regular_runtime.svg", "w") as f:
+            print(f"Updating _img/regular_runtime_{SYSHASH}.svg")
+            with _open(f"_img/regular_runtime_{SYSHASH}.svg", "w") as f:
                 f.write(
                     vlc.vegalite_to_svg(
                         alt.vconcat(
@@ -363,8 +363,8 @@ def plot(a: ParsedArguments) -> None:
         if len(df) > 0:
             xaxis = alt.Axis(values=list(range(0, MAXLAYERS + 100, 100)))
             xscale = alt.Scale(domain=(0, MAXLAYERS))
-            print("Updating _img/deep_compile.svg")
-            with _open("_img/deep_compile.svg", "w") as f:
+            print(f"Updating _img/deep_compile_{SYSHASH}.svg")
+            with _open(f"_img/deep_compile_{SYSHASH}.svg", "w") as f:
                 f.write(
                     vlc.vegalite_to_svg(
                         alt.vconcat(
@@ -390,8 +390,8 @@ def plot(a: ParsedArguments) -> None:
         if len(df) > 0:
             xaxis = alt.Axis(values=list(range(0, MAXLAYERS + 100, 100)))
             xscale = alt.Scale(domain=(0, MAXLAYERS))
-            print("Updating _img/deep_runtime.svg")
-            with _open("_img/deep_runtime.svg", "w") as f:
+            print(f"Updating _img/deep_runtime_{SYSHASH}.svg")
+            with _open(f"_img/deep_runtime_{SYSHASH}.svg", "w") as f:
                 f.write(
                     vlc.vegalite_to_svg(
                         alt.vconcat(
@@ -415,8 +415,8 @@ def plot(a: ParsedArguments) -> None:
 
         df = _filter("variational", "compile", "vqe")
         if len(df) > 0:
-            print("Updating _img/variational_compile.svg")
-            with _open("_img/variational_compile.svg", "w") as f:
+            print(f"Updating _img/variational_compile_{SYSHASH}.svg")
+            with _open(f"_img/variational_compile_{SYSHASH}.svg", "w") as f:
                 f.write(
                     vlc.vegalite_to_svg(
                         Chart(df)
@@ -439,7 +439,7 @@ def plot(a: ParsedArguments) -> None:
         for diffmethod in DIFF_METHODS[problem]:
             df = df_allgrad[df_allgrad["diffmethod"]==diffmethod]
             if len(df) > 0:
-                fname = f"_img/variational_runtime_{diffmethod.replace('-','')}.svg"
+                fname = f"_img/variational_runtime_{diffmethod.replace('-','')}_{SYSHASH}.svg"
                 print(f"Updating {fname}")
                 with _open(fname, "w") as f:
                     f.write(
