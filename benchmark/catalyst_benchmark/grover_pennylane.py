@@ -49,7 +49,8 @@ class ProblemPL(Problem):
         assert len(total) == nqubits, f"{N}, {nqubits} != len({total})"
 
     def trial_params(self, i: int) -> Any:
-        return pnp.array([[pnp.pi / (i + 1) for _ in self.iqr] for _ in range(3)])
+        return pnp.array([[pnp.pi / (i + 1) for _ in self.iqr] for _ in range(3)],
+                         dtype=pnp.float64)
 
 
 def sudoku_oracle(t):
@@ -108,7 +109,7 @@ def grover_mainloop(t: ProblemPL, weights):
     return qml.state()
 
 
-def grover_main(t: ProblemPL, weights):
+def workflow(t: ProblemPL, weights):
     @qml.qnode(t.dev, **t.qnode_kwargs)
     def _main(weights):
         return grover_mainloop(t, weights)
@@ -126,7 +127,7 @@ def grover_depth(t: ProblemPL) -> int:
     return len(_main.tape.operations)
 
 
-def run_jax(N=7):
+def run_jax_lightning_qubit(N=7):
     import jax
 
     jax.config.update("jax_enable_x64", True)
@@ -135,15 +136,16 @@ def run_jax(N=7):
 
     @jax.jit
     def _main(params):
-        return grover_main(t, params)
+        return workflow(t, params)
 
     return _main(t.trial_params(0))
 
 
-def run_default(N=7):
+def run_lightning_qubit(N=7):
     t = ProblemPL(qml.device("lightning.qubit", wires=N, shots=None), 4, interface=None)
 
     def _main(params):
-        return grover_main(t, params)
+        return workflow(t, params)
 
     return _main(t.trial_params(0))
+

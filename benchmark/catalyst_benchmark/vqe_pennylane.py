@@ -77,3 +77,4 @@ def run_jax(N=6):
     theta = _main(p.trial_params(0))
 
     print(f"Final angle parameters: {theta}")
+

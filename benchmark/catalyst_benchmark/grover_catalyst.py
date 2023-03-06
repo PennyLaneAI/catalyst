@@ -23,11 +23,9 @@ class ProblemC(Problem):
     def __init__(self, dev, nlayers=None):
         super().__init__(dev)
         nqubits = self.nqubits
-
         assert (nqubits - 3) % 2 == 0
         l = list(range((nqubits - 3) // 2))
         CLAUSE_LIST = list(zip(l, l[1:] + [0]))
-        # CLAUSE_LIST = [(0,1),(0,2),(1,3),(2,3)]
         N = sudoku_nqubits(CLAUSE_LIST)
         iqr = jnp.array(list(range(N)))
         cqr = jnp.array([x + max(iqr) + 1 for x in range(len(CLAUSE_LIST))])
@@ -51,7 +49,8 @@ class ProblemC(Problem):
         assert len(total) == nqubits
 
     def trial_params(self, i: int) -> Any:
-        return jnp.array([[jnp.pi / (i + 1) for _ in self.iqr] for _ in range(3)])
+        return jnp.array([[jnp.pi / (i + 1) for _ in self.iqr] for _ in range(3)],
+                         dtype=jnp.float64)
 
 
 def sudoku_oracle(t):
@@ -104,8 +103,8 @@ def diffuser(t):
         qml.Hadamard(wires=[qubit])
 
 
-def grover_main(t, weights):
-    @qml.qnode(t.dev)
+def workflow(t: ProblemC, weights):
+    @qml.qnode(t.dev, **t.qnode_kwargs)
     def _main(weights):
         # Initialize the state
         @for_loop(0, len(t.iqr), 1)
@@ -130,11 +129,11 @@ def grover_main(t, weights):
     return _main(weights)
 
 
-def run(N=7):
+def run_catalyst(N=7):
     t = ProblemC(qml.device("lightning.qubit", wires=N), None)
 
     @qjit
-    def _x(pp):
-        return grover_main(t, pp)
+    def _main(params):
+        return workflow(t, params)
 
-    return _x(t.trial_params(0))
+    return _main(t.trial_params(0))
