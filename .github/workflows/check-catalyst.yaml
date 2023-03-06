@@ -276,6 +276,10 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get -y -q install ninja-build make cmake gcc-10 g++-10 libomp-dev
+          echo "LIGHTNING_GIT_TAG_VALUE=latest_release" >> $GITHUB_ENV
+      - if: ${{ github.event_name == 'push' }}
+        run: |
+          echo "LIGHTNING_GIT_TAG_VALUE=master" >> $GITHUB_ENV
 
       - name: Download QIR-stdlib Artifact
         uses: actions/download-artifact@v3
@@ -287,7 +291,7 @@ jobs:
         run: |
           cmake -S runtime -B runtime-build -G Ninja \
                             -DCMAKE_BUILD_TYPE=Release \
-                            -DLIGHTNING_GIT_TAG="master" \
+                            -DLIGHTNING_GIT_TAG=$LIGHTNING_GIT_TAG_VALUE \
                             -DQIR_STDLIB_LIB="$(pwd)/runtime/qir-stdlib-build/" \
                             -DQIR_STDLIB_INCLUDES="$(pwd)/runtime/qir-stdlib-build/include/"
           cmake --build runtime-build --target rt_capi -j$(nproc)
@@ -321,7 +325,12 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Install dependencies
-        run: sudo apt-get -y -q install cmake ninja-build gcc-10 g++-10 libomp-dev lcov
+        run: |
+          sudo apt-get -y -q install cmake ninja-build gcc-10 g++-10 libomp-dev lcov
+          echo "LIGHTNING_GIT_TAG_VALUE=latest_release" >> $GITHUB_ENV
+      - if: ${{ github.event_name == 'push' }}
+        run: |
+          echo "LIGHTNING_GIT_TAG_VALUE=master" >> $GITHUB_ENV
 
       - name: Download QIR-stdlib Artifact
         uses: actions/download-artifact@v3
@@ -334,7 +343,7 @@ jobs:
         run: |
             cmake -S runtime -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug \
                                       -DENABLE_LIGHTNING_KOKKOS=OFF \
-                                      -DLIGHTNING_GIT_TAG="master" \
+                                      -DLIGHTNING_GIT_TAG=$LIGHTNING_GIT_TAG_VALUE \
                                       -DQIR_STDLIB_LIB="$(pwd)/runtime/qir-stdlib-build/" \
                                       -DQIR_STDLIB_INCLUDES="$(pwd)/runtime/qir-stdlib-build/include/" \
                                       -DENABLE_CODE_COVERAGE=ON
@@ -508,3 +517,4 @@ jobs:
         with:
           fail_ci_if_error: true
           token: ${{ secrets.CODECOV_TOKEN }}
+          verbose: true
