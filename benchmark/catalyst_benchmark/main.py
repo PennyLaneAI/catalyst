@@ -9,7 +9,7 @@ from os.path import dirname
 from json import dump as json_dump, load as json_load
 from signal import signal, SIGALRM, setitimer, ITIMER_REAL
 from contextlib import contextmanager
-from traceback import print_exception
+from traceback import print_exc
 
 from .types import Problem, BenchmarkResult, BooleanOptionalAction
 
@@ -519,8 +519,8 @@ if __name__ == "__main__":
                 with open(a.output, "r") as f:
                     r3 = BenchmarkResult.from_dict(json_load(f))
                 assert np.allclose(r2.measurement_sec, r3.measurement_sec)
-        except TimeoutError as err:
-            print_exception(err)
+        except TimeoutError:
+            print_exc()
             exit(2)
 
     else:
