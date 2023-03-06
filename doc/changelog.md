@@ -4,6 +4,8 @@
 
 * Adds support for interpreting control flow operations.
   [#31](https://github.com/PennyLaneAI/catalyst/pull/31)
+* Check demos regularly in the GH action.
+  [#37](https://github.com/PennyLaneAI/catalyst/pull/37)
 
 <h3>Improvements</h3>
 
