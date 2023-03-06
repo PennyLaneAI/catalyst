@@ -496,34 +496,35 @@ jobs:
         name: ubuntu-codecov-results-python
         path: ./coverage-${{ github.job }}.xml
 
-  upload-to-codecov-linux:
-    needs: [runtime-tests, frontend]
-    name: Upload coverage data to codecov
+  upload-to-codecov-linux-python:
+    needs: [frontend]
+    name: Upload coverage data to codecov (Python)
     runs-on: ubuntu-latest
-
     steps:
-      - name: Download coverage reports (C++)
-        uses: actions/download-artifact@v3
-        with:
-          name: ubuntu-codecov-results-cpp
-
-      - name: Download coverage reports (Python)
+      - name: Download coverage reports
         uses: actions/download-artifact@v3
         with:
           name: ubuntu-codecov-results-python
 
-      - name: Upload to Codecov (Python)
+      - name: Upload to Codecov
         uses: codecov/codecov-action@v3
         with:
-          files: ./coverage-frontend.xml
           fail_ci_if_error: true
           token: ${{ secrets.CODECOV_TOKEN }}
-          verbose: true
 
-      - name: Upload to Codecov (C++)
+  upload-to-codecov-linux-cpp:
+    needs: [runtime-tests]
+    name: Upload coverage data to codecov (C++)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download coverage reports
+        uses: actions/download-artifact@v3
+        with:
+          name: ubuntu-codecov-results-cpp
+
+      - name: Upload to Codecov
         uses: codecov/codecov-action@v3
         with:
-          files: ./coverage-runtime-tests.info
           fail_ci_if_error: true
           token: ${{ secrets.CODECOV_TOKEN }}
-          verbose: true
