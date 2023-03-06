@@ -16,7 +16,9 @@ MLIR/LLVM representations.
 """
 
 import os
+import shutil
 import subprocess
+import warnings
 
 from catalyst._configuration import INSTALLED
 
@@ -119,37 +121,115 @@ compiler_flags = [
     "--relocation-model=pic",
 ]
 
-linker = "c99"
 
-mlir_lib_path = get_lib_path("llvm", "MLIR_LIB_DIR")
-linker_common_flags = [
-    "-shared",
-    "-rdynamic",
-    f"-L{mlir_lib_path}",
-    "-Wl,-no-as-needed",
-    f"-Wl,-rpath,{mlir_lib_path}",
-]
+# pylint: disable=too-few-public-methods
+class CompilerDriver:
+    """Compiler Driver Interface
+    In order to avoid relying on a single compiler at run time and allow the user some flexibility,
+    this class defines a compiler resolution order where multiple known compilers are attempted.
+    The order is defined as follows:
+    1. A user specified compiler via the environment variable CATALYST_CC. It is expected that the
+        user provided compiler is flag compatilble with GCC/Clang.
+    2. clang: Priority is given to clang to maintain an LLVM toolchain through most of the process.
+    3. gcc: Usually configured to link with LD.
+    4. c99: Usually defaults to gcc, but no linker interface is specified.
+    5. c89: Usually defaults to gcc, but no linker interface is specified.
+    6. cc: Usually defaults to gcc, however POSIX states that it is deprecated.
+    """
 
-common_libs = [
-    "-lpthread",
-    "-lmlir_c_runner_utils",  # required for memref.copy
-]
+    _default_fallback_compilers = ["clang", "gcc", "c99", "c89", "cc"]
 
-runtime_libs = [
-    "-lrt_backend",
-    "-lrt_capi",
-    *common_libs,
-]
+    @staticmethod
+    def _flags():
+        mlir_lib_path = get_lib_path("llvm", "MLIR_LIB_DIR")
+        lrt_lib_path = get_lib_path("runtime", "RUNTIME_LIB_DIR")
+        lrt_capi_path = os.path.join(lrt_lib_path, "capi")
+        lrt_backend_path = os.path.join(lrt_lib_path, "backend")
 
-lrt_lib_path = get_lib_path("runtime", "RUNTIME_LIB_DIR")
-lrt_capi_path = os.path.join(lrt_lib_path, "capi")
-lrt_backend_path = os.path.join(lrt_lib_path, "backend")
-lightning_linker_flags = [
-    *linker_common_flags,
-    f"-L{lrt_capi_path}",
-    f"-L{lrt_backend_path}",
-    f"-Wl,-rpath,{lrt_capi_path}:{lrt_backend_path}",
-]
+        flags = [
+            "-shared",
+            "-rdynamic",
+            f"-L{mlir_lib_path}",
+            "-Wl,-no-as-needed",
+            f"-Wl,-rpath,{mlir_lib_path}",
+            f"-L{lrt_capi_path}",
+            f"-L{lrt_backend_path}",
+            f"-Wl,-rpath,{lrt_capi_path}:{lrt_backend_path}",
+            f"-L{lrt_capi_path}",
+            f"-L{lrt_backend_path}",
+            f"-Wl,-rpath,{lrt_capi_path}:{lrt_backend_path}",
+            "-lrt_backend",
+            "-lrt_capi",
+            "-lpthread",
+            "-lmlir_c_runner_utils",  # required for memref.copy
+        ]
+
+        return flags
+
+    @staticmethod
+    def _get_compiler_fallback_order(fallback_compilers):
+        """Compiler fallback order"""
+        preferred_compiler = os.environ.get("CATALYST_CC", None)
+        preferred_compiler_exists = CompilerDriver._exists(preferred_compiler)
+        compilers = fallback_compilers
+        emit_warning = preferred_compiler and not preferred_compiler_exists
+        if emit_warning:
+            msg = f"User defined compiler {preferred_compiler} is not in PATH. Will attempt fallback on available compilers."
+            warnings.warn(msg, UserWarning)
+        else:
+            compilers = [preferred_compiler] + fallback_compilers
+        return compilers
+
+    @staticmethod
+    # pylint: disable=redefined-outer-name
+    def _exists(compiler):
+        if compiler is None:
+            return None
+        return shutil.which(compiler)
+
+    @staticmethod
+    def _available_compilers(fallback_compilers):
+        # pylint: disable=redefined-outer-name
+        for compiler in CompilerDriver._get_compiler_fallback_order(fallback_compilers):
+            if CompilerDriver._exists(compiler):
+                yield compiler
+
+    @staticmethod
+    # pylint: disable=redefined-outer-name
+    def _attempt_link(compiler, flags, infile, outfile):
+        try:
+            command = [compiler] + flags + [infile, "-o", outfile]
+            subprocess.run(command, check=True)
+            return True
+        except subprocess.CalledProcessError:
+            msg = f"Compiler {compiler} failed during execution of command {command}. Will attempt fallback on available compilers."
+            warnings.warn(msg, UserWarning)
+            return False
+
+    @staticmethod
+    def link(infile, outfile, flags=None, fallback_compilers=None):
+        """
+        Link the infile against the necessary libraries and produce the outfile.
+
+        Args:
+            infile (str): input file
+            outfile (str): output file
+            Optional flags (List[str]): flags to be passed down to the compiler
+            Optional fallback_compilers (List[str]): name of executables to be looked for in PATH
+        Raises:
+            EnvironmentError: The exception is raised when no compiler succeeded.
+        """
+        if flags is None:
+            flags = CompilerDriver._flags()
+        if fallback_compilers is None:
+            fallback_compilers = CompilerDriver._default_fallback_compilers
+        # pylint: disable=redefined-outer-name
+        for compiler in CompilerDriver._available_compilers(fallback_compilers):
+            success = CompilerDriver._attempt_link(compiler, flags, infile, outfile)
+            if success:
+                return
+        msg = f"Unable to link {infile}. All available compiler options exhausted. Please provide a compatible compiler via $CATALYST_CC."
+        raise EnvironmentError(msg)
 
 
 def lower_mhlo_to_linalg(filename):
@@ -271,14 +351,8 @@ def link_lightning_runtime(filename):
 
     new_fname = filename.replace(".o", ".so")
 
-    command = [linker]
-    command += ["-Wno-unused-command-line-argument", "-Wno-override-module"]
-    command += lightning_linker_flags
-    command += runtime_libs
-    command += [filename]
-    command += ["-o", new_fname]
+    CompilerDriver.link(filename, new_fname)
 
-    subprocess.run(command, check=True)
     return new_fname
 
 
