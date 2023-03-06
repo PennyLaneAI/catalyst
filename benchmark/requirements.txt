@@ -5,3 +5,4 @@ vl-convert-python
 pandas
 zstd
 dill
+psutil
