@@ -437,16 +437,19 @@ def plot(a: ParsedArguments) -> None:
         problem = "chemvqe"
         df_allgrad = _filter("variational", "runtime", problem)
         for diffmethod in DIFF_METHODS[problem]:
-            df = df_allgrad[df_allgrad["diffmethod"]==diffmethod]
+            edm = [diffmethod, diffmethod] if diffmethod not in ['adjoint', 'backprop'] else ['adjoint', 'backprop']
+            df = df_allgrad[(df_allgrad["diffmethod"]==edm[0]) | (df_allgrad["diffmethod"]==edm[1])]
+            del df['diffmethod']
             if len(df) > 0:
-                fname = f"_img/variational_runtime_{diffmethod.replace('-','')}_{SYSHASH}.svg"
+                dmtitle = '_'.join(sorted(set(edm))).replace('-','')
+                fname = f"_img/variational_runtime_{dmtitle}_{SYSHASH}.svg"
                 print(f"Updating {fname}")
                 with _open(fname, "w") as f:
                     f.write(
                         vlc.vegalite_to_svg(
                             # alt.vconcat(
                             Chart(df)
-                            # .transform_calculate(impl_diff="datum.impl+'('+datum.diffmethod+')'")
+                            # .transform_calculate(="datum.impl+'('+datum.diffmethod+')'")
                             .mark_line(point=True)
                             .encode(
                                 x=_nqubitsEncoding(),
@@ -458,7 +461,7 @@ def plot(a: ParsedArguments) -> None:
                                 strokeWidth=implCLcond,
                             )
                             .properties(title=_mktitle(
-                                f"Running time, Variational circuits ({diffmethod})"))
+                                f"Running time, Variational circuits ({dmtitle})"))
                             .to_dict(),
                             # _mkfooter(df, _nqubitsEncoding(), "PL/Def")
                             # )
