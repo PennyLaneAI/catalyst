@@ -133,7 +133,7 @@ class JaxTape:
         self.main_cm.__exit__(e_type, e_value, traceback)
         self.main_cm = None
 
-    def eval(self, *args):  # pragma: no cover
+    def eval(self, *args):
         """Provide mid circuit measurement results and loop outcomes and get
         the set of circuit parameters.
 
@@ -214,5 +214,5 @@ def get_observables_dependency_tree(obs):
         yield obs
         for o in obs.ops:
             yield from get_observables_dependency_tree(o)
-    else:  # pragma: no cover
+    else:
         raise ValueError("Unsupported observable")

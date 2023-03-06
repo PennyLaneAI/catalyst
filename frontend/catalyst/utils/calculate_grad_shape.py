@@ -33,7 +33,7 @@ class Signature:
         self.xs = xs
         self.ys = ys
 
-    def __repr__(self):  # pragma: no cover
+    def __repr__(self):
         return f"{self.xs} -> {self.ys}"
 
     def get_input(self, i):
@@ -55,7 +55,7 @@ class Signature:
         """
         return self.xs
 
-    def get_result(self, i):  # pragma: no cover
+    def get_result(self, i):
         """Get result values at position i.
 
         Args:

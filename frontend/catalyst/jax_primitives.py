@@ -54,7 +54,7 @@ from catalyst.utils.calculate_grad_shape import calculate_grad_shape, Signature
 class Qbit:
     """Qbit primitive."""
 
-    def __init__(self):  # pragma: no cover
+    def __init__(self):
         self.aval = AbstractQbit()
 
 
@@ -68,7 +68,7 @@ class ConcreteQbit(AbstractQbit):
     """Concrete Qbit."""
 
 
-def _qbit_lowering(aval):  # pragma: no cover
+def _qbit_lowering(aval):
     assert isinstance(aval, AbstractQbit)
     return (ir.OpaqueType.get("quantum", "bit"),)
 
@@ -106,7 +106,7 @@ def _qreg_lowering(aval):
 class Obs:
     """Observable JAX type primitive."""
 
-    def __init__(self, num_qubits, primitive):  # pragma: no cover
+    def __init__(self, num_qubits, primitive):
         self.aval = AbstractObs(num_qubits, primitive)
 
 
@@ -124,7 +124,7 @@ class ConcreteObs(AbstractObs):
     """Concrete observable."""
 
 
-def _obs_lowering(aval):  # pragma: no cover
+def _obs_lowering(aval):
     assert isinstance(aval, AbstractObs)
     return (ir.OpaqueType.get("quantum", "obs"),)
 
@@ -132,7 +132,7 @@ def _obs_lowering(aval):  # pragma: no cover
 #
 # registration
 #
-jax.core.pytype_aval_mappings[Qbit] = lambda x: x.aval  # pragma: no cover
+jax.core.pytype_aval_mappings[Qbit] = lambda x: x.aval
 jax.core.raise_to_shaped_mappings[AbstractQbit] = lambda aval, _: aval
 mlir.ir_type_handlers[AbstractQbit] = _qbit_lowering
 
@@ -140,7 +140,7 @@ jax.core.pytype_aval_mappings[Qreg] = lambda x: x.aval
 jax.core.raise_to_shaped_mappings[AbstractQreg] = lambda aval, _: aval
 mlir.ir_type_handlers[AbstractQreg] = _qreg_lowering
 
-jax.core.pytype_aval_mappings[Obs] = lambda x: x.aval  # pragma: no cover
+jax.core.pytype_aval_mappings[Obs] = lambda x: x.aval
 jax.core.raise_to_shaped_mappings[AbstractObs] = lambda aval, _: aval
 mlir.ir_type_handlers[AbstractObs] = _obs_lowering
 

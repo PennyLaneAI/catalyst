@@ -95,7 +95,7 @@ def qfunc(num_wires, *, shots=1000, device=None):
 
     """
 
-    if not device:  # pragma: no cover
+    if not device:
         device = QJITDevice(shots=shots, wires=num_wires)
 
     def dec_no_params(fn):
@@ -904,7 +904,7 @@ def measure(wires):
         jax_tape = ctx.jax_tape
         a, t = tree_flatten(jax.core.get_aval(True))
         return jax_tape.create_tracer(t, a)
-    raise ValueError("measure can only be used when it jitted mode")  # pragma: no cover
+    raise ValueError("measure can only be used when it jitted mode")
 
 
 class QJITDevice(qml.QubitDevice):
@@ -971,7 +971,7 @@ class QJITDevice(qml.QubitDevice):
     def __init__(self, shots=None, wires=None):
         super().__init__(wires=wires, shots=shots)
 
-    def apply(self, operations, **kwargs):  # pragma: no cover
+    def apply(self, operations, **kwargs):
         """
         Raises: RuntimeError
         """
