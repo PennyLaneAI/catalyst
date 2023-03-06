@@ -1,8 +1,8 @@
 from dataclasses import dataclass
-from typing import List, Optional, Any
+from typing import List, Optional, Any, Dict
 from dataclasses_json import dataclass_json
 
-from argparse import ArgumentParser, Action, SUPPRESS
+from argparse import Action, SUPPRESS
 from psutil import virtual_memory
 from os import uname
 from multiprocessing import cpu_count
@@ -84,11 +84,13 @@ class BenchmarkResult:
     argv: List[str]
     prepare_sec: Optional[float]
     measurement_sec: List[float]
+    versions: Dict[str,str]
 
     @classmethod
-    def fromMeasurements(cls, nr, argv, prep, times, depth=None):
+    def fromMeasurements(cls, nr, argv, prep, times, depth: Optional[int], versions: Dict[str,str]):
         return BenchmarkResult(
-            Sysinfo.fromOS(), unpack_complex(nr) if nr else None, depth, argv, prep, times
+            Sysinfo.fromOS(), unpack_complex(nr) if nr else None, depth, argv,
+            prep, times, versions
         )
 
 class BooleanOptionalAction(Action):

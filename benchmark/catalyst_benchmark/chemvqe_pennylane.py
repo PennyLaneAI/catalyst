@@ -1,6 +1,5 @@
 import pennylane.numpy as pnp
 import pennylane as qml
-import numpy as np
 
 from typing import Any, Dict
 from dataclasses import dataclass
@@ -65,7 +64,6 @@ def workflow(p: ProblemCVQE, params):
         theta = theta - dtheta * stepsize
 
     return theta
-
 
 SHOTS = None
 DIFFMETHOD = 'parameter-shift'
