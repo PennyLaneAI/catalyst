@@ -63,12 +63,13 @@ def parse_implementation(implementation: str) -> Tuple[str, str, Optional[str]]:
 
 def measure_compile_catalyst(a: Any) -> BenchmarkResult:
     import pennylane as qml
+    import jax.numpy as jnp
     from catalyst import qjit
     from jax.core import ShapedArray
 
     t: Problem
     if a.problem == "grover":
-        from .grover_catalyst import ProblemC, grover_main as main
+        from .grover_catalyst import ProblemC, workflow as main
 
         t = ProblemC(qml.device("lightning.qubit", wires=a.nqubits), a.grover_nlayers)
     elif a.problem == "vqe":
@@ -80,7 +81,7 @@ def measure_compile_catalyst(a: Any) -> BenchmarkResult:
 
     weights = t.trial_params(0)
 
-    def _main(weights: ShapedArray(weights.shape, complex)):
+    def _main(weights: ShapedArray(weights.shape, dtype=jnp.float64)):
         return main(t, weights)
 
     times = []
@@ -99,12 +100,13 @@ def measure_compile_catalyst(a: Any) -> BenchmarkResult:
 
 def measure_runtime_catalyst(a: Any) -> BenchmarkResult:
     import pennylane as qml
+    import jax.numpy as jnp
     from catalyst import qjit
     from jax.core import ShapedArray
 
     t: Problem
     if a.problem == "grover":
-        from .grover_catalyst import ProblemC, grover_main as main
+        from .grover_catalyst import ProblemC, workflow as main
 
         t = ProblemC(qml.device("lightning.qubit", wires=a.nqubits), a.grover_nlayers)
     elif a.problem == "vqe":
@@ -125,7 +127,7 @@ def measure_runtime_catalyst(a: Any) -> BenchmarkResult:
 
     weights = t.trial_params(0)
 
-    def _main(weights: ShapedArray(weights.shape, weights.dtype)):
+    def _main(weights: ShapedArray(weights.shape, dtype=jnp.float64)):
         return main(t, weights)
 
     b = time()
@@ -158,7 +160,7 @@ def measure_compile_pennylanejax(a: Any) -> BenchmarkResult:
     if a.problem == "grover":
         from .grover_pennylane import (
             ProblemPL as Problem,
-            grover_main as main,
+            workflow as main,
             grover_depth as depth,
         )
 
@@ -171,6 +173,14 @@ def measure_compile_pennylanejax(a: Any) -> BenchmarkResult:
             return None
 
         t = ProblemVQE(qml.device(device, wires=a.nqubits), interface=interface)
+
+    # Note: Disabled due to a PennylaneJax diff. compile problem
+    # elif a.problem == "chemvqe":
+    #     from .chemvqe_pennylane import ProblemCVQE, workflow as main
+    #     t = ProblemCVQE(qml.device(device, wires=a.nqubits), interface=interface,
+    #                     diff_method=a.vqe_diff_method)
+    #     def depth(_):
+    #         return None
     else:
         raise NotImplementedError(f"Unsupported problem {a.problem}")
 
@@ -206,7 +216,7 @@ def measure_runtime_pennylanejax(a: Any) -> BenchmarkResult:
     if a.problem == "grover":
         from .grover_pennylane import (
             ProblemPL as Problem,
-            grover_main as main,
+            workflow as main,
             grover_depth as depth,
         )
 
@@ -218,6 +228,14 @@ def measure_runtime_pennylanejax(a: Any) -> BenchmarkResult:
 
         def depth(_):
             return None
+
+    # Note: Disabled due to a PennylaneJax diff. compile problem
+    # elif a.problem == "chemvqe":
+    #     from .chemvqe_pennylane import ProblemCVQE, workflow as main
+    #     t = ProblemCVQE(qml.device(device, wires=a.nqubits), interface=interface,
+    #                     diff_method=a.vqe_diff_method)
+    #     def depth(_):
+    #         return None
 
     else:
         raise NotImplementedError(f"Unsupported problme {a.problem}")
@@ -233,11 +251,11 @@ def measure_runtime_pennylanejax(a: Any) -> BenchmarkResult:
 
     times: list = []
     for i in range(a.niter):
-        jax.clear_backends()
         weights = t.trial_params(i)
+        # Note: Unlike in `*_compile_pennylanejax`, we don't clean Jax caches here.
 
         b = time()
-        r = jax_main(weights)
+        r = jax_main(weights).block_until_ready()
         e = time()
         times.append(e - b)
 
@@ -286,7 +304,7 @@ def measure_runtime_pennylane(a: Any) -> BenchmarkResult:
     if a.problem == "grover":
         from .grover_pennylane import (
             ProblemPL as Problem,
-            grover_main as main,
+            workflow as main,
             grover_depth as depth,
         )
 
@@ -313,6 +331,14 @@ def measure_runtime_pennylane(a: Any) -> BenchmarkResult:
     def _main(weights):
         return main(t, weights)
 
+    # Since pure PpennyLane is an interpreter, we allow it to run 1 iteration and
+    # count it as an "extended compilation".
+    weights = t.trial_params(a.niter+1)
+    b = time()
+    _main(weights)
+    e = time()
+    preptime = e - b
+
     times: list = []
     for i in range(a.niter):
         weights = t.trial_params(i)
@@ -322,7 +348,7 @@ def measure_runtime_pennylane(a: Any) -> BenchmarkResult:
         e = time()
         times.append(e - b)
 
-    return BenchmarkResult.fromMeasurements(r.tolist(), a.argv, None, times, depth=depth(t))
+    return BenchmarkResult.fromMeasurements(r.tolist(), a.argv, preptime, times, depth=depth(t))
 
 
 REGISTRY = {

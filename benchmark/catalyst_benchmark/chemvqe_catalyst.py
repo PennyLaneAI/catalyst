@@ -55,9 +55,10 @@ class ProblemCVQE(Problem):
         self.hf_state = qml.qchem.hf_state(electrons, qubits)
         self.singles, self.doubles = qml.qchem.excitations(electrons, qubits)
         self.excitations = self.singles + self.doubles
+        self.param_dtype = jnp.float64
 
     def trial_params(self, _: int) -> Any:
-        return jnp.ones(len(self.excitations), dtype=jnp.float64)
+        return jnp.ones(len(self.excitations), dtype=self.param_dtype)
 
 
 def workflow(p: ProblemCVQE, params):

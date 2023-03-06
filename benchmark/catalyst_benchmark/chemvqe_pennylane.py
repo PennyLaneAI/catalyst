@@ -9,7 +9,6 @@ from pennylane import AllSinglesDoubles
 
 from .types import Problem
 
-
 @dataclass_json
 @dataclass
 class ProblemInfo:
@@ -55,7 +54,7 @@ def workflow(p: ProblemCVQE, params):
     @qml.qnode(p.dev, **p.qnode_kwargs)
     def circuit(params):
         AllSinglesDoubles(params, range(p.nqubits), p.hf_state, p.singles, p.doubles)
-        return qml.expval(qml.Hamiltonian(np.array(p.ham.coeffs), p.ham.ops))
+        return qml.expval(p.ham)
 
     stepsize = 0.5
     diff = qml.grad(circuit, argnum=0)
@@ -95,14 +94,14 @@ def run_lightning_qubit(N=6):
     print(f"Resulting parameters: {theta}")
 
 
-def run_jax_default_qubit(N=6):
+def run_jax_(devname, N=6):
     import jax
 
     jax.config.update("jax_enable_x64", True)
     jax.config.update("jax_platform_name", "cpu")
     jax.config.update("jax_array", True)
 
-    p = ProblemCVQE(dev=qml.device("lightning.qubit", wires=N, shots=SHOTS),
+    p = ProblemCVQE(dev=qml.device(devname, wires=N, shots=SHOTS),
                     nsteps=NSTEPS, interface="jax", diff_method=DIFFMETHOD)
 
     @jax.jit
@@ -111,3 +110,12 @@ def run_jax_default_qubit(N=6):
 
     theta = _main(p.trial_params(0))
     print(f"Resulting parameters: {theta}")
+
+
+def run_jax_default_qubit(N=6):
+    return run_jax_("default.qubit.jax", N)
+
+
+def run_jax_lightning_qubit(N=6):
+    return run_jax_("lightning.qubit", N)
+
