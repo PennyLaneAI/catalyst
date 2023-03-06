@@ -13,6 +13,21 @@ from traceback import print_exception
 
 from .types import Problem, BenchmarkResult, BooleanOptionalAction
 
+def catalyst_version() -> str:
+    import catalyst._version
+    from subprocess import check_output
+    from os.path import dirname
+
+    catalyst_version = catalyst._version.__version__
+    if "dev" in catalyst_version:
+        try:
+            commit = check_output(['git', 'rev-parse', 'HEAD'],
+                                  cwd=dirname(catalyst.__file__)).decode().strip()[:7]
+            catalyst_version += f"+g{commit}"
+        except Exception:
+            catalyst_version += "+g?"
+    return catalyst_version
+
 
 @contextmanager
 def with_alarm(timeout: float):
@@ -64,8 +79,12 @@ def parse_implementation(implementation: str) -> Tuple[str, str, Optional[str]]:
 def measure_compile_catalyst(a: Any) -> BenchmarkResult:
     import pennylane as qml
     import jax.numpy as jnp
+    import jax
     from catalyst import qjit
     from jax.core import ShapedArray
+
+    versions = {'pennylane':qml.__version__, 'jax':jax.__version__, 'catalyst':
+                catalyst_version()}
 
     t: Problem
     if a.problem == "grover":
@@ -95,14 +114,19 @@ def measure_compile_catalyst(a: Any) -> BenchmarkResult:
 
     r = jit_main(weights).tolist() if a.numerical_check else None
 
-    return BenchmarkResult.fromMeasurements(r, a.argv, prep=None, times=times)
+    return BenchmarkResult.fromMeasurements(r, a.argv, prep=None, times=times,
+                                            depth=None, versions=versions)
 
 
 def measure_runtime_catalyst(a: Any) -> BenchmarkResult:
     import pennylane as qml
+    import jax
     import jax.numpy as jnp
     from catalyst import qjit
     from jax.core import ShapedArray
+
+    versions = {'pennylane':qml.__version__, 'jax':jax.__version__, 'catalyst':
+                catalyst_version()}
 
     t: Problem
     if a.problem == "grover":
@@ -144,12 +168,15 @@ def measure_runtime_catalyst(a: Any) -> BenchmarkResult:
         e = time()
         times.append(e - b)
 
-    return BenchmarkResult.fromMeasurements(r.tolist(), a.argv, cmptime, times)
+    return BenchmarkResult.fromMeasurements(r.tolist(), a.argv, cmptime, times,
+                                            depth=None, versions=versions)
 
 
 def measure_compile_pennylanejax(a: Any) -> BenchmarkResult:
     import pennylane as qml
     import jax
+
+    versions = {'pennylane':qml.__version__, 'jax':jax.__version__}
 
     jax.config.update("jax_enable_x64", True)
     jax.config.update("jax_platform_name", "cpu")
@@ -200,12 +227,15 @@ def measure_compile_pennylanejax(a: Any) -> BenchmarkResult:
 
     r = jax_main(weights).tolist() if a.numerical_check else None
 
-    return BenchmarkResult.fromMeasurements(r, a.argv, None, times, depth=depth(t))
+    return BenchmarkResult.fromMeasurements(r, a.argv, None, times,
+                                            depth=depth(t), versions=versions)
 
 
 def measure_runtime_pennylanejax(a: Any) -> BenchmarkResult:
     import pennylane as qml
     import jax
+
+    versions = {'pennylane':qml.__version__, 'jax':jax.__version__}
 
     jax.config.update("jax_enable_x64", True)
     jax.config.update("jax_platform_name", "cpu")
@@ -259,11 +289,14 @@ def measure_runtime_pennylanejax(a: Any) -> BenchmarkResult:
         e = time()
         times.append(e - b)
 
-    return BenchmarkResult.fromMeasurements(r.tolist(), a.argv, cmptime, times, depth=depth(t))
+    return BenchmarkResult.fromMeasurements(r.tolist(), a.argv, cmptime, times,
+                                            depth=depth(t), versions=versions)
 
 
 def measure_compile_pennylane(a: Any) -> BenchmarkResult:
     import pennylane as qml
+
+    versions = {'pennylane':qml.__version__}
 
     _, device, interface = parse_implementation(a.implementation)
 
@@ -293,11 +326,14 @@ def measure_compile_pennylane(a: Any) -> BenchmarkResult:
 
     r = qml_main(weights).tolist() if a.numerical_check else None
 
-    return BenchmarkResult.fromMeasurements(r, a.argv, None, times, depth=depth(t))
+    return BenchmarkResult.fromMeasurements(r, a.argv, None, times,
+                                            depth=depth(t), versions=versions)
 
 
 def measure_runtime_pennylane(a: Any) -> BenchmarkResult:
     import pennylane as qml
+
+    versions = {'pennylane':qml.__version__}
 
     _, device, interface = parse_implementation(a.implementation)
 
@@ -348,7 +384,8 @@ def measure_runtime_pennylane(a: Any) -> BenchmarkResult:
         e = time()
         times.append(e - b)
 
-    return BenchmarkResult.fromMeasurements(r.tolist(), a.argv, preptime, times, depth=depth(t))
+    return BenchmarkResult.fromMeasurements(r.tolist(), a.argv, preptime, times,
+                                            depth=depth(t), versions=versions)
 
 
 REGISTRY = {

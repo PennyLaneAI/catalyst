@@ -1,9 +1,9 @@
+import pennylane as qml
+import pennylane.numpy as pnp
+
 from typing import List, Tuple, Optional, Any
 from dataclasses import dataclass
 from time import time
-
-import pennylane as qml
-import pennylane.numpy as pnp
 
 from .types import Problem
 
