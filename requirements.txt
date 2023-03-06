@@ -10,3 +10,4 @@ pylint
 pytest
 pytest-xdist
 pytest-cov
+nbmake
