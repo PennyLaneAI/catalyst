@@ -1,6 +1,8 @@
 on:
   pull_request:
-    types: [opened, ready_for_review]
+    types: [ready_for_review, review_requested]
+  pull_request_review:
+    types: [submitted]
 
 name: Changelog Reminder
 
