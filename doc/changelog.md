@@ -2,6 +2,9 @@
 
 <h3>New features</h3>
 
+* Adds support for interpreting control flow operations.
+  [#31](https://github.com/PennyLaneAI/catalyst/pull/31)
+
 <h3>Improvements</h3>
 
 * Adds fallback compiler drivers to increase reliability during linking phase. Also adds support for a
