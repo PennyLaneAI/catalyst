@@ -27,6 +27,7 @@ import pennylane as qml
 from pennylane.measurements import MeasurementProcess
 from pennylane.operation import Wires
 
+from catalyst.utils.gen_mlir import append_modules
 import catalyst.jax_primitives as jprim
 from catalyst.jax_tape import JaxTape
 from catalyst.utils.tracing import TracingContext
@@ -67,7 +68,7 @@ def get_mlir(func, *args, **kwargs):
     effects = [eff for eff in jaxpr.effects if eff in jax.core.ordered_effects]
     axis_context = ReplicaAxisContext(xla.AxisEnv(nrep, (), ()))
     name_stack = util.new_name_stack(util.wrap_name("ok", "jit"))
-    m, ctx = custom_lower_jaxpr_to_module(
+    module = custom_lower_jaxpr_to_module(
         func_name="jit." + func.__name__,
         module_name=func.__name__,
         jaxpr=jaxpr,
@@ -78,7 +79,7 @@ def get_mlir(func, *args, **kwargs):
         donated_args=[],
     )
 
-    return m, ctx, jaxpr
+    return module, jaxpr
 
 
 def get_traceable_fn(qfunc, device):
@@ -529,4 +530,7 @@ def custom_lower_jaxpr_to_module(
                 continue
             op.attributes["llvm.linkage"] = ir.Attribute.parse("#llvm.linkage<internal>")
 
-    return ctx.module, ctx.context
+    # Inject setup and finalize functions.
+    append_modules(ctx.module, ctx.context)
+
+    return ctx.module
