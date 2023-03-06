@@ -197,10 +197,10 @@ template <typename PrecisionT> class LightningKokkosObsManager {
 
     [[nodiscard]] auto numObservables() -> size_t { return observables_.size(); }
 
-    [[nodiscard]] auto isValidObservables(const std::vector<ObsIdType> &obsKeys,
-                                          const std::vector<ObsType> &obsTypes = {}) -> bool
+    [[nodiscard]] auto isValidObservables(const std::vector<ObsIdType> &obsKeys) -> bool
     {
-        return true;
+        return std::all_of(obsKeys.begin(), obsKeys.end(),
+                           [this](auto i) { return (this->getObservable(i) != nullptr); });
     }
 
     auto createNamedObs(ObsId obsId, const std::vector<size_t> &wires) -> ObsIdType

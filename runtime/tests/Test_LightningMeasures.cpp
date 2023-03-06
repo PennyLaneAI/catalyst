@@ -620,6 +620,8 @@ TEST_CASE("Probs and PartialProbs tests with numWires=0-4", "[lightning]")
     auto &&probs3 = qis->PartialProbs(Qs);
     auto &&probs4 = qis->Probs();
 
+    REQUIRE(probs0.size() == 1);
+    REQUIRE(probs0[0] == Approx(1.0));
     REQUIRE(probs1[0] == Approx(0.5).margin(1e-5));
     REQUIRE(probs1[1] == Approx(0.5).margin(1e-5));
     for (size_t i = 0; i < 4; i++) {
@@ -712,6 +714,7 @@ TEST_CASE("Sample and PartialSample tests with numWires=0-4 shots=100", "[lightn
     auto &&samples3 = qis->PartialSample(Qs, shots);
     auto &&samples4 = qis->Sample(shots);
 
+    REQUIRE(samples0.size() == 0);
     for (size_t i = 0; i < shots * 1; i++)
         REQUIRE((samples1[i] == 0. || samples1[i] == 1.));
     for (size_t i = 0; i < shots * 2; i++)
@@ -747,6 +750,10 @@ TEST_CASE("Counts and PartialCounts tests with numWires=0-4 shots=100", "[lightn
     auto &&[eigvals3, counts3] = qis->PartialCounts(Qs, shots);
     auto &&[eigvals4, counts4] = qis->Counts(shots);
 
+    REQUIRE(eigvals0.size() == 1);
+    REQUIRE(eigvals0[0] == 0.0);
+    REQUIRE(counts0.size() == 1);
+    REQUIRE(counts0[0] == static_cast<int64_t>(shots));
     REQUIRE((eigvals1[0] == 0. && eigvals1[1] == 1.));
     REQUIRE((eigvals2[0] == 0. && eigvals2[1] == 1. && eigvals2[2] == 2. && eigvals2[3] == 3.));
     for (size_t i = 0; i < 16; i++) {
