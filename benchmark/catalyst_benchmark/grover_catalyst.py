@@ -17,8 +17,8 @@ def grover_loops(N) -> int:
 
 
 class ProblemC(Problem):
-    def __init__(self, dev, nlayers=None):
-        super().__init__(dev)
+    def __init__(self, dev, nlayers=None, **qnode_kwargs):
+        super().__init__(dev, **qnode_kwargs)
         nqubits = self.nqubits
         assert (nqubits - 3) % 2 == 0
         l = list(range((nqubits - 3) // 2))

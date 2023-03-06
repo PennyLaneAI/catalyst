@@ -1,9 +1,8 @@
 import pennylane as qml
 import pennylane.numpy as pnp
 
-from typing import List, Tuple, Optional, Any
-from dataclasses import dataclass
-from time import time
+from typing import Any
+from copy import deepcopy
 
 from .types import Problem
 
@@ -118,7 +117,10 @@ def workflow(t: ProblemPL, weights):
 
 
 def size(p: ProblemPL) -> int:
-    @qml.qnode(p.dev, expansion_strategy='device', **p.qnode_kwargs)
+    qnode_kwargs = deepcopy(p.qnode_kwargs)
+    qnode_kwargs.update({'expansion_strategy':'device'})
+
+    @qml.qnode(p.dev, **qnode_kwargs)
     def _main(weights):
         return grover_mainloop(p, weights)
     _main.construct([p.trial_params(0)], {})
