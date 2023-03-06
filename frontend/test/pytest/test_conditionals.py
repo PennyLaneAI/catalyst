@@ -16,6 +16,7 @@ import pytest
 
 from catalyst import cond, qjit, measure
 import pennylane as qml
+import numpy as np
 
 
 class TestCondToJaxpr:
@@ -137,6 +138,24 @@ class TestInterpretationConditional:
         arithc = qjit(arithi)
         assert arithc(0, 0, 0) == arithi(0, 0, 0)
         assert arithc(0, 0, 1) == arithi(0, 0, 1)
+
+    # pylint: disable=missing-function-docstring
+    def test_conditional_interpreted_and_compiled_single_if(self):
+        num_wires = 2
+        device = qml.device("lightning.qubit", wires=num_wires)
+
+        @qml.qnode(device)
+        def interpreted_circuit(n):
+            @cond(n == 0)
+            def branch():
+                qml.RX(np.pi, wires=0)
+
+            branch()
+            return qml.state()
+
+        compiled_circuit = qjit(interpreted_circuit)
+        assert np.allclose(compiled_circuit(0), interpreted_circuit(0))
+        assert np.allclose(compiled_circuit(1), interpreted_circuit(1))
 
 
 class TestClassicalCompilation:
