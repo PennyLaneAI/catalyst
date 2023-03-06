@@ -19,9 +19,6 @@ compiling of hybrid quantum-classical functions using Catalyst.
 
 import ctypes
 import os
-import inspect
-import tempfile
-import typing
 import warnings
 import functools
 
@@ -37,7 +34,7 @@ import catalyst.jax_tracer as tracer
 from catalyst.compiler import Compiler
 from catalyst.utils.gen_mlir import append_modules
 from catalyst.utils.patching import Patcher
-import catalyst.utils.utils as utils
+from catalyst.utils import utils
 from catalyst.pennylane_extensions import QFunc
 from catalyst.utils.tracing import TracingContext
 
@@ -453,25 +450,13 @@ class QJIT:
         self.qfunc = fn
         self.c_sig = None
         functools.update_wrapper(self, fn)
-        if keep_intermediate:
-            dirname = fn.__name__
-            parent_dir = os.getcwd()
-            path = os.path.join(parent_dir, dirname)
-            os.makedirs(path, exist_ok=True)
-            self.workspace_name = path
-        else:
-            # The temporary directory must be referenced by the wrapper class
-            # in order to avoid being garbage collected
-            # pylint: disable=consider-using-with
-            self.workspace = tempfile.TemporaryDirectory()
-            self.workspace_name = self.workspace.name
         self._compiler = Compiler()
         self._jaxpr = None
         self._mlir = None
         self._llvmir = None
         self.mlir_module = None
         self.compiled_function = None
-
+        self.keep_intermediate = keep_intermediate
         parameter_types = utils.get_type_annotations(self.qfunc)
         self.user_typed = False
         if parameter_types is not None:
@@ -537,11 +522,12 @@ class QJIT:
 
         return mlir_module
 
-
     def compile(self):
         """Compile the current MLIR module."""
 
-        shared_object = self._compiler.run(self.mlir_module, self.workspace_name)
+        shared_object = self._compiler.run(
+            self.mlir_module, keep_intermediate=self.keep_intermediate
+        )
         self._llvmir = self._compiler.get_output_of("LLVMDialectToLLVMIR")
 
         # The function name out of MLIR has quotes around it, which we need to remove.

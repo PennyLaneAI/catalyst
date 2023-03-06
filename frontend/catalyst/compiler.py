@@ -20,8 +20,10 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import warnings
 
+from catalyst.utils import utils
 from catalyst._configuration import INSTALLED
 
 package_root = os.path.dirname(__file__)
@@ -332,8 +334,12 @@ class Compiler:
 
     def __init__(self):
         self.order = None
+        # The temporary directory must be referenced by the wrapper class
+        # in order to avoid being garbage collected
+        # pylint: disable=consider-using-with
+        self.workspace = tempfile.TemporaryDirectory()
 
-    def run(self, mlir_module, workspace, passes=None):
+    def run(self, mlir_module, keep_intermediate=False, passes=None):
         """Compile an MLIR module to a shared object.
 
         .. note::
@@ -343,22 +349,24 @@ class Compiler:
 
         Args:
             mlir_module (Module): the MLIR module
-            workspace (str): the absolute path to the MLIR module
             passes (List[Any]): the list of compilation passes
 
         Returns:
             Shared object
         """
-
         module_name = mlir_module.operation.attributes["sym_name"]
         # Convert MLIR string to Python string
         module_name = str(module_name)
         # Remove quotations
         module_name = module_name.replace('"', "")
-        # need to create a temporary file with the string contents
-        filename = workspace + f"/{module_name}.mlir"
-        with open(filename, "w", encoding="utf-8") as f:
-            mlir_module.operation.print(f, print_generic_op_form=False, assume_verified=True)
+
+        if keep_intermediate:
+            parent_dir = os.getcwd()
+            path = os.path.join(parent_dir, module_name)
+            os.makedirs(path, exist_ok=True)
+            workspace_name = path
+        else:
+            workspace_name = self.workspace.name
 
         if passes is None:
             passes = [
@@ -371,9 +379,16 @@ class Compiler:
             ]
 
         self.order = {}
-        for _pass in passes:
-            filename = _pass.run(filename)
-            self.order[_pass] = filename
+        with utils.pushd(workspace_name):
+            # need to create a temporary file with the string contents
+            filename = f"{module_name}.mlir"
+            with open(filename, "w", encoding="utf-8") as f:
+                mlir_module.operation.print(f, print_generic_op_form=False, assume_verified=True)
+
+            for _pass in passes:
+                output = _pass.run(filename)
+                self.order[_pass] = output
+                filename = os.path.abspath(output)
 
         return filename
 
