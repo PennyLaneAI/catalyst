@@ -78,6 +78,7 @@ dialects:
 	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects quantum-lsp-server
 	find $(DIALECTS_BUILD_DIR)/python_packages/ -type l -exec sed --in-place 's/from \._ods_common /from jaxlib.mlir.dialects._ods_common /g' {} \;
 	find $(DIALECTS_BUILD_DIR)/python_packages/ -type f -exec sed --in-place 's/from \. /from jaxlib.mlir.dialects /g' {} \;
+	patch -p0 < patches/add-constructor-for-from-elements-op.patch
 
 .PHONY: test
 test:
