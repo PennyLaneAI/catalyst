@@ -17,7 +17,7 @@
 #include <stdexcept>
 
 namespace Catalyst::Runtime::Simulator {
-static void QFailIf(bool condition, const char *message)
+static inline void QFailIf(bool condition, const char *message)
 {
     if (condition) {
         throw std::runtime_error(message);

@@ -84,7 +84,7 @@ class CacheManager {
         std::vector<size_t> wires_ul;
         wires_ul.reserve(dev_wires.size());
         std::transform(dev_wires.begin(), dev_wires.end(), std::back_inserter(wires_ul),
-                       [this](auto w) { return static_cast<size_t>(w); });
+                       [](auto w) { return static_cast<size_t>(w); });
 
         this->ops_wires_.push_back(wires_ul);
         this->ops_inverses_.push_back(inverse);
