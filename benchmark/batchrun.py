@@ -28,7 +28,8 @@ FMTVERSION = 1
 """ Version of serialized representation."""
 
 SYSINFO = Sysinfo.fromOS()
-SYSHASH = sha256(str(SYSINFO).encode("utf-8")).hexdigest()[:6]
+SYSHASH_ORIG = sha256(str(SYSINFO).encode("utf-8")).hexdigest()[:6]
+SYSHASH = SYSHASH_ORIG
 
 CATPROBLEMS = {
     "regular": "grover",
@@ -504,6 +505,8 @@ ap.add_argument("-t", "--timeout-1run", type=str, metavar="SEC", default="1000.0
                 help="Timeout for single benchmark run (default - 1000)")
 ap.add_argument("--tag", type=str, default=None,
                 help="Human-readable tag to add to the data file names")
+ap.add_argument("--force-sysinfo-hash", type=str, default=None,
+                help="Use the provided string instead of the system information hash")
 ap.add_argument("-V", "--verbose", default=False, action=BooleanOptionalAction,
                 help="Print verbose messages")
 # fmt: on
@@ -515,6 +518,12 @@ def load_all() -> DataFrame:
 
 if __name__ == "__main__":
     a = ap.parse_args(sys.argv[1:])
+
+    if a.force_sysinfo_hash:
+        SYSHASH = a.force_sysinfo_hash
+
+    if a.verbose:
+        print(f"Machine: {SYSINFO.toString()}\nHash {SYSHASH_ORIG}\nEffective {SYSHASH}")
 
     if "collect" in a.actions:
         collect(a)
