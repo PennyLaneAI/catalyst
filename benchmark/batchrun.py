@@ -88,9 +88,10 @@ def ofile(a, _, measure, problem, impl, nqubits, nlayers, diffmethod) -> Tuple[s
     the Linux shell command which is expected to produce such file."""
     impl_ = impl.replace("+", "_").replace("/", "_").replace(".", "_")
     dmfilepart = f"_{diffmethod}".replace("-", "_") if diffmethod is not None else ""
+    tag = a.tag if a.tag is not None else f"v{FMTVERSION}"
     ofname = (
         f"_benchmark/{measure}_{problem}_{impl_}{dmfilepart}_N{nqubits}_"
-        f"L{nlayers}_S{SYSHASH}_v{FMTVERSION}/results.json"
+        f"L{nlayers}_S{SYSHASH}_{tag}/results.json"
     )
     if problem == "grover":
         assert diffmethod is None
@@ -305,9 +306,12 @@ def plot(a: ParsedArguments) -> None:
             )
 
         def _filter(cat, measure, problem):
-            return df_full[(df_full["cat"]==cat) &
-                           (df_full["measure"]==measure) &
-                           (df_full["problem"]==problem)]
+            try:
+                return df_full[(df_full["cat"]==cat) &
+                               (df_full["measure"]==measure) &
+                               (df_full["problem"]==problem)]
+            except KeyError:
+                return DataFrame()
 
         df = _filter("regular", "compile", "grover")
         if len(df) > 0:
@@ -438,11 +442,15 @@ def plot(a: ParsedArguments) -> None:
 
         problem = "chemvqe"
         df_allgrad = _filter("variational", "runtime", problem)
-        # df_fd = df_allgrad[df_allgrad["diffmethod"]=="finite-diff"]
         for diffmethod in DIFF_METHODS[problem]:
-            edm = [diffmethod, diffmethod] if diffmethod not in ['adjoint', 'backprop'] else ['adjoint', 'backprop']
-            df = df_allgrad[(df_allgrad["diffmethod"]==edm[0]) | (df_allgrad["diffmethod"]==edm[1])]
-            del df['diffmethod']
+            try:
+                edm = [diffmethod, diffmethod] \
+                    if diffmethod not in ['adjoint', 'backprop'] else ['adjoint', 'backprop']
+                df = df_allgrad[(df_allgrad["diffmethod"]==edm[0]) |
+                                (df_allgrad["diffmethod"]==edm[1])]
+                del df['diffmethod']
+            except KeyError:
+                df = DataFrame()
             if len(df) > 0:
                 dmtitle = '_'.join(sorted(set(edm)))
                 fname = f"_img/variational_runtime_{dmtitle.replace('-','')}_{SYSHASH}.svg"
@@ -481,6 +489,8 @@ ap.add_argument("-a", "--actions", type=str, default="collect,plot",
                 help="Which actions to perform (default - 'collect,plot')")
 ap.add_argument("-t", "--timeout-1run", type=str, metavar="SEC", default="1000.0",
                 help="Timeout for single benchmark run (default - 1000)")
+ap.add_argument("--tag", type=str, default=None,
+                help="Human-readable tag to add to the data file names")
 ap.add_argument("-V", "--verbose", default=False, action=BooleanOptionalAction,
                 help="Print verbose messages")
 # fmt: on
