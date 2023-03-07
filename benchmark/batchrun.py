@@ -280,13 +280,15 @@ def plot(a: ParsedArguments) -> None:
         def _nlayersEncoding(title="# Layers", **kwargs):
             return alt.X("nlayers", title=title, **kwargs)
 
-        def _mktitle(s: str) -> dict:
-            return {
+        def _mktitle(s: str, align="center") -> dict:
+            t = {
                 "text": s,
                 "subtitle": SYSINFO.toString(),
                 "subtitleFontSize": 9,
-                "align": "center",
             }
+            if align:
+                t.update({"align": align})
+            return t
 
         def _mkfooter(df: DataFrame, xEncoding, ref_impl: str) -> Chart:
             df_gate = df[(df["trial"] == 0) & (df["impl"] == ref_impl)]
@@ -436,7 +438,7 @@ def plot(a: ParsedArguments) -> None:
 
         problem = "chemvqe"
         df_allgrad = _filter("variational", "runtime", problem)
-        df_fd = df_allgrad[df_allgrad["diffmethod"]=="finite-diff"]
+        # df_fd = df_allgrad[df_allgrad["diffmethod"]=="finite-diff"]
         for diffmethod in DIFF_METHODS[problem]:
             edm = [diffmethod, diffmethod] if diffmethod not in ['adjoint', 'backprop'] else ['adjoint', 'backprop']
             df = df_allgrad[(df_allgrad["diffmethod"]==edm[0]) | (df_allgrad["diffmethod"]==edm[1])]
@@ -448,22 +450,19 @@ def plot(a: ParsedArguments) -> None:
                 with _open(fname, "w") as f:
                     f.write(
                         vlc.vegalite_to_svg(
-                            alt.vconcat(
-                                Chart(df)
-                                .mark_line(point=True)
-                                .encode(
-                                    x=_nqubitsEncoding(title=None),
-                                    y=timeEncoding,
-                                    color=_implEncoding(df),
-                                    opacity=trialEncoding,
-                                    strokeDash=implCLcondDash,
-                                    strokeWidth=implCLcond,
-                                )
-                                .properties(title=_mktitle(
-                                    f"Running time, Variational circuits ({dmtitle})")),
-                                _mkfooter(df_fd, _nqubitsEncoding(), "PL/L")
+                            Chart(df)
+                            .mark_bar()
+                            .encode(
+                                x=alt.X("impl", title=None),
+                                y=timeEncoding,
+                                color=_implEncoding(df),
+                                opacity=trialEncoding,
+                                column=alt.Column("nqubits:N", title="# Qubits"),
                             )
-                            .configure_axisLeft(minExtent=50)
+                            .properties(
+                                title=_mktitle(
+                                    f"Running time, Variational circuits ({dmtitle})",
+                                    align=None))
                             .to_dict(),
                         ),
                     )
