@@ -81,6 +81,10 @@ ALIASES = {
     "pennylane/lightning.qubit": "PL/L",
 }
 
+C_L = ALIASES["catalyst/lightning.qubit"]
+PL_L = ALIASES["pennylane/lightning.qubit"]
+PLjax_L = ALIASES["pennylane+jax/lightning.qubit"]
+
 # Colors obtained from a Vega colorscheme.
 # Ref. https://stackoverflow.com/questions/70993559/altair-selecting-a-color-from-a-vega-color-scheme-for-plot
 COLORS = ["#e41a1c", "#377eb8", "#4daf4a", "#984ea3", "#ff7f00",
@@ -242,8 +246,8 @@ def plot(a: ParsedArguments) -> None:
     df_full = load(a)
 
     with pd.option_context("display.max_rows", None, "display.max_columns", None):
-        implCLcond = alt.condition("datum.impl == 'C/L'", alt.value(2), alt.value(0.7))
-        implCLcondDash = alt.condition("datum.impl == 'C/L'", alt.value([0]), alt.value([3, 3]))
+        implCLcond = alt.condition(f"datum.impl == '{C_L}'", alt.value(2), alt.value(0.7))
+        implCLcondDash = alt.condition(f"datum.impl == '{C_L}'", alt.value([0]), alt.value([3, 3]))
 
         @contextmanager
         def _open(fname: str, fmode: str):
@@ -342,7 +346,7 @@ def plot(a: ParsedArguments) -> None:
                                 strokeWidth=implCLcond,
                             )
                             .properties(title=_mktitle("Compilation time, Regular circuits")),
-                            _mkfooter(df, _nqubitsEncoding(axis=xaxis, scale=xscale), "PL/L"),
+                            _mkfooter(df, _nqubitsEncoding(axis=xaxis, scale=xscale), PL_L),
                         )
                         .configure_axisLeft(minExtent=50)
                         .to_dict()
@@ -367,7 +371,7 @@ def plot(a: ParsedArguments) -> None:
                                 strokeWidth=implCLcond,
                             )
                             .properties(title=_mktitle("Running time, Regular circuits")),
-                            _mkfooter(df, _nqubitsEncoding(), "PL/L"),
+                            _mkfooter(df, _nqubitsEncoding(), PL_L),
                         )
                         .configure_axisLeft(minExtent=50)
                         .to_dict()
@@ -394,7 +398,7 @@ def plot(a: ParsedArguments) -> None:
                                 strokeWidth=implCLcond,
                             )
                             .properties(title=_mktitle("Compilation time, Deep circuits")),
-                            _mkfooter(df, _nlayersEncoding(axis=xaxis, scale=xscale), "PLjax/L"),
+                            _mkfooter(df, _nlayersEncoding(axis=xaxis, scale=xscale), PLjax_L),
                         )
                         .configure_axisLeft(minExtent=50)
                         .to_dict()
@@ -421,7 +425,7 @@ def plot(a: ParsedArguments) -> None:
                                 strokeWidth=implCLcond,
                             )
                             .properties(title=_mktitle("Running time, Deep circuits")),
-                            _mkfooter(df, _nlayersEncoding(axis=xaxis, scale=xscale), "PL/L"),
+                            _mkfooter(df, _nlayersEncoding(axis=xaxis, scale=xscale), PL_L),
                         )
                         .configure_axisLeft(minExtent=50)
                         .to_dict()
