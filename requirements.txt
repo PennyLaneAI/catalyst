@@ -5,6 +5,7 @@ dataclasses
 
 black[jupyter]
 clang-format==14
+clang-tidy==14.0.6
 pylint
 
 pytest
