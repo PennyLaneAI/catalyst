@@ -40,7 +40,7 @@ namespace Catalyst::Runtime::Simulator {
 template <typename PrecisionT> class LightningObsManager {
   private:
     std::vector<std::pair<std::shared_ptr<Pennylane::Simulators::Observable<PrecisionT>>, ObsType>>
-        observables_;
+        observables_{};
 
     static constexpr std::array<ObsType, 2> hamiltonian_valid_obs_types = {
         ObsType::Basic,
@@ -53,28 +53,31 @@ template <typename PrecisionT> class LightningObsManager {
 
     LightningObsManager(const LightningObsManager &) = delete;
     LightningObsManager &operator=(const LightningObsManager &) = delete;
+    LightningObsManager(LightningObsManager &&) = delete;
+    LightningObsManager &operator=(LightningObsManager &&) = delete;
 
     /**
      * @brief A helper function to clear constructed observables in the program.
      */
-    void clear() { observables_.clear(); }
+    void clear() { this->observables_.clear(); }
 
     [[nodiscard]] auto getObservable(ObsIdType key)
         -> std::shared_ptr<Pennylane::Simulators::Observable<PrecisionT>>
     {
-        int64_t key_t = reinterpret_cast<int64_t>(key);
-        QFailIf(static_cast<size_t>(key_t) >= observables_.size() || key_t < 0,
+        auto key_t = reinterpret_cast<int64_t>(key);
+        QFailIf(static_cast<size_t>(key_t) >= this->observables_.size() || key_t < 0,
                 "Invalid observable key");
 
-        return std::get<0>(observables_[key_t]);
+        return std::get<0>(this->observables_[key_t]);
     }
 
-    [[nodiscard]] auto numObservables() -> size_t { return observables_.size(); }
+    [[nodiscard]] auto numObservables() -> size_t { return this->observables_.size(); }
 
     [[nodiscard]] auto isValidObservables(const std::vector<ObsIdType> &obsKeys) -> bool
     {
-        return std::all_of(obsKeys.begin(), obsKeys.end(),
-                           [this](auto i) { return (this->getObservable(i) != nullptr); });
+        return std::all_of(obsKeys.begin(), obsKeys.end(), [this](auto i) {
+            return (i >= 0 && static_cast<size_t>(i) < this->observables_.size());
+        });
     }
 
     auto createNamedObs(ObsId obsId, const std::vector<size_t> &wires) -> ObsIdType
@@ -83,36 +86,36 @@ template <typename PrecisionT> class LightningObsManager {
             std::string(Lightning::lookup_obs<Lightning::simulator_observable_support_size>(
                 Lightning::simulator_observable_support, obsId));
 
-        observables_.push_back(std::make_pair(
+        this->observables_.push_back(std::make_pair(
             std::make_shared<Pennylane::Simulators::NamedObs<PrecisionT>>(obs_str, wires),
             ObsType::Basic));
-        return static_cast<ObsIdType>(observables_.size() - 1);
+        return static_cast<ObsIdType>(this->observables_.size() - 1);
     }
 
     auto createHermitianObs(const std::vector<std::complex<PrecisionT>> &matrix,
                             const std::vector<size_t> &wires) -> ObsIdType
     {
-        observables_.push_back(
+        this->observables_.push_back(
             std::make_pair(std::make_shared<Pennylane::Simulators::HermitianObs<PrecisionT>>(
                                Pennylane::Simulators::HermitianObs<PrecisionT>{matrix, wires}),
                            ObsType::Basic));
 
-        return static_cast<ObsIdType>(observables_.size() - 1);
+        return static_cast<ObsIdType>(this->observables_.size() - 1);
     }
 
     auto createTensorProdObs(const std::vector<ObsIdType> &obsKeys) -> ObsIdType
     {
         const auto key_size = obsKeys.size();
-        const auto obs_size = observables_.size();
+        const auto obs_size = this->observables_.size();
 
         std::vector<std::shared_ptr<Pennylane::Simulators::Observable<PrecisionT>>> obs_vec;
         obs_vec.reserve(key_size);
 
         for (const auto &key : obsKeys) {
-            int64_t key_t = reinterpret_cast<int64_t>(key);
+            auto key_t = reinterpret_cast<int64_t>(key);
             QFailIf(static_cast<size_t>(key_t) >= obs_size || key_t < 0, "Invalid observable key");
 
-            auto &&[obs, type] = observables_[key_t];
+            auto &&[obs, type] = this->observables_[key_t];
 
             QFailIf(type != ObsType::Basic, "Invalid basic observable to construct TensorProd; "
                                             "NamedObs and HermitianObs are only supported");
@@ -120,7 +123,7 @@ template <typename PrecisionT> class LightningObsManager {
             obs_vec.push_back(obs);
         }
 
-        observables_.push_back(
+        this->observables_.push_back(
             std::make_pair(std::make_shared<Pennylane::Simulators::TensorProdObs<PrecisionT>>(
                                Pennylane::Simulators::TensorProdObs<PrecisionT>::create(obs_vec)),
                            ObsType::TensorProd));
@@ -132,7 +135,7 @@ template <typename PrecisionT> class LightningObsManager {
                               const std::vector<ObsIdType> &obsKeys) -> ObsIdType
     {
         const auto key_size = obsKeys.size();
-        const auto obs_size = observables_.size();
+        const auto obs_size = this->observables_.size();
 
         QFailIf(key_size != coeffs.size(),
                 "Incompatible list of observables and coefficients; "
@@ -142,10 +145,10 @@ template <typename PrecisionT> class LightningObsManager {
         obs_vec.reserve(key_size);
 
         for (auto key : obsKeys) {
-            int64_t key_t = reinterpret_cast<int64_t>(key);
+            auto key_t = reinterpret_cast<int64_t>(key);
             QFailIf(static_cast<size_t>(key_t) >= obs_size || key_t < 0, "Invalid observable key");
 
-            auto &&[obs, type] = observables_[key_t];
+            auto &&[obs, type] = this->observables_[key_t];
             auto contain_obs = std::find(hamiltonian_valid_obs_types.begin(),
                                          hamiltonian_valid_obs_types.end(), type);
 
@@ -156,7 +159,7 @@ template <typename PrecisionT> class LightningObsManager {
             obs_vec.push_back(obs);
         }
 
-        observables_.push_back(std::make_pair(
+        this->observables_.push_back(std::make_pair(
             std::make_shared<Pennylane::Simulators::Hamiltonian<PrecisionT>>(
                 Pennylane::Simulators::Hamiltonian<PrecisionT>(coeffs, std::move(obs_vec))),
             ObsType::Hamiltonian));
@@ -174,7 +177,7 @@ template <typename PrecisionT> class LightningObsManager {
  */
 template <typename PrecisionT> class LightningKokkosObsManager {
   private:
-    std::vector<std::tuple<ObsId, std::vector<size_t>>> observables_;
+    std::vector<std::tuple<ObsId, std::vector<size_t>>> observables_{};
 
   public:
     LightningKokkosObsManager() = default;
@@ -182,25 +185,28 @@ template <typename PrecisionT> class LightningKokkosObsManager {
 
     LightningKokkosObsManager(const LightningKokkosObsManager &) = delete;
     LightningKokkosObsManager &operator=(const LightningKokkosObsManager &) = delete;
+    LightningKokkosObsManager(LightningKokkosObsManager &&) = delete;
+    LightningKokkosObsManager &operator=(LightningKokkosObsManager &&) = delete;
 
-    void clear() { observables_.clear(); }
+    void clear() { this->observables_.clear(); }
 
     [[nodiscard]] auto getObservable(ObsIdType key) -> std::pair<ObsId, std::vector<size_t>>
     {
-        int64_t key_t = reinterpret_cast<int64_t>(key);
-        QFailIf(static_cast<size_t>(key_t) >= observables_.size() || key_t < 0,
+        auto key_t = reinterpret_cast<int64_t>(key);
+        QFailIf(static_cast<size_t>(key_t) >= this->observables_.size() || key_t < 0,
                 "Invalid observable key");
 
-        auto &&[obs, wires] = observables_[key_t];
+        auto &&[obs, wires] = this->observables_[key_t];
         return {obs, wires};
     }
 
-    [[nodiscard]] auto numObservables() -> size_t { return observables_.size(); }
+    [[nodiscard]] auto numObservables() -> size_t { return this->observables_.size(); }
 
-    [[nodiscard]] auto isValidObservables(const std::vector<ObsIdType> &obsKeys,
-                                          const std::vector<ObsType> &obsTypes = {}) -> bool
+    [[nodiscard]] auto isValidObservables(const std::vector<ObsIdType> &obsKeys) -> bool
     {
-        return true;
+        return std::all_of(obsKeys.begin(), obsKeys.end(), [this](auto i) {
+            return (i >= 0 && static_cast<size_t>(i) < this->observables_.size());
+        });
     }
 
     auto createNamedObs(ObsId obsId, const std::vector<size_t> &wires) -> ObsIdType
@@ -209,9 +215,9 @@ template <typename PrecisionT> class LightningKokkosObsManager {
             std::string(Lightning::lookup_obs<Lightning::simulator_observable_support_size>(
                 Lightning::simulator_observable_support, obsId));
 
-        observables_.emplace_back(obsId, wires);
+        this->observables_.emplace_back(obsId, wires);
 
-        return static_cast<ObsIdType>(observables_.size() - 1);
+        return static_cast<ObsIdType>(this->observables_.size() - 1);
     }
 };
 } // namespace Catalyst::Runtime::Simulator

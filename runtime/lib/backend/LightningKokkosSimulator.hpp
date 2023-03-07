@@ -44,6 +44,8 @@ class LightningKokkosSimulator final : public Catalyst::Runtime::QuantumDevice {
     static constexpr bool GLOBAL_RESULT_TRUE_CONST = true;
     static constexpr bool GLOBAL_RESULT_FALSE_CONST = false;
 
+    static constexpr size_t default_device_shots{1000}; // tidy: readability-magic-numbers
+
     QubitManager<QubitIdType, size_t> qubit_manager{};
     CacheManager cache_manager{};
     bool cache_recording{false};
@@ -56,7 +58,7 @@ class LightningKokkosSimulator final : public Catalyst::Runtime::QuantumDevice {
 
     inline auto isValidQubit(QubitIdType wire) -> bool
     {
-        return qubit_manager.isValidQubitId(wire);
+        return this->qubit_manager.isValidQubitId(wire);
     }
 
     inline auto isValidQubits(const std::vector<QubitIdType> &wires) -> bool
@@ -65,13 +67,13 @@ class LightningKokkosSimulator final : public Catalyst::Runtime::QuantumDevice {
                            [this](QubitIdType w) { return this->isValidQubit(w); });
     }
 
-    inline auto isValidQubits(size_t numWires, QubitIdType *wires) -> bool
+    inline auto isValidQubits(size_t numWires, const QubitIdType *wires) -> bool
     {
         return std::all_of(wires, wires + numWires,
                            [this](QubitIdType w) { return this->isValidQubit(w); });
     }
 
-    inline auto getDeviceWires(size_t numWires, QubitIdType *wires) -> std::vector<size_t>
+    inline auto getDeviceWires(size_t numWires, const QubitIdType *wires) -> std::vector<size_t>
     {
         std::vector<size_t> res;
         res.reserve(numWires);
@@ -90,25 +92,30 @@ class LightningKokkosSimulator final : public Catalyst::Runtime::QuantumDevice {
     }
 
   public:
-    LightningKokkosSimulator(bool status = false, size_t shots = 1000)
+    explicit LightningKokkosSimulator(bool status = false, size_t shots = default_device_shots)
         : cache_recording(status), device_shots(shots)
     {
     }
     ~LightningKokkosSimulator() = default;
+
+    LightningKokkosSimulator(const LightningKokkosSimulator &) = delete;
+    LightningKokkosSimulator &operator=(const LightningKokkosSimulator &) = delete;
+    LightningKokkosSimulator(LightningKokkosSimulator &&) = delete;
+    LightningKokkosSimulator &operator=(LightningKokkosSimulator &&) = delete;
 
     // RT
     auto AllocateQubit() -> QubitIdType override;
     auto AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType> override;
     void ReleaseQubit(QubitIdType q) override;
     void ReleaseAllQubits() override;
-    auto GetNumQubits() const -> size_t override;
+    [[nodiscard]] auto GetNumQubits() const -> size_t override;
     void StartTapeRecording() override;
     void StopTapeRecording() override;
     void SetDeviceShots(size_t shots) override;
-    auto GetDeviceShots() const -> size_t override;
+    [[nodiscard]] auto GetDeviceShots() const -> size_t override;
     void PrintState() override;
-    auto Zero() const -> Result override;
-    auto One() const -> Result override;
+    [[nodiscard]] auto Zero() const -> Result override;
+    [[nodiscard]] auto One() const -> Result override;
 
     auto CacheManagerInfo()
         -> std::tuple<size_t, size_t, size_t, std::vector<std::string>, std::vector<ObsIdType>>;

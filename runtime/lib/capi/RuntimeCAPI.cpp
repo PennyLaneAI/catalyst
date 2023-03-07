@@ -163,7 +163,7 @@ void __quantum__qis__Gradient(int64_t numResults, /* results = */...)
     va_list args;
     va_start(args, numResults);
     for (int64_t i = 0; i < numResults; i++) {
-        auto mrp = va_arg(args, ResultType *);
+        auto *mrp = va_arg(args, ResultType *);
         assert(mrp && "the result type cannot be a null pointer");
 
         double *jac_data =
@@ -187,7 +187,7 @@ void __quantum__qis__Gradient_params(MemRefT_int64_1d *params, int64_t numResult
     assert(numResults >= 0);
     using ResultType = MemRefT_double_1d;
 
-    if (!params || !params->sizes[0]) {
+    if (params == nullptr || !params->sizes[0]) {
         __quantum__rt__fail_cstr("Invalid number of trainable parameters");
     }
 
@@ -195,7 +195,7 @@ void __quantum__qis__Gradient_params(MemRefT_int64_1d *params, int64_t numResult
 
     // create a vector of custom trainable parameters
     std::vector<size_t> train_params;
-    auto params_data = params->data_aligned;
+    auto *params_data = params->data_aligned;
     train_params.reserve(tp_size);
     for (size_t i = 0; i < tp_size; i++) {
         auto p = params_data[i];
@@ -224,7 +224,7 @@ void __quantum__qis__Gradient_params(MemRefT_int64_1d *params, int64_t numResult
     va_list args;
     va_start(args, numResults);
     for (int64_t i = 0; i < numResults; i++) {
-        auto mrp = va_arg(args, ResultType *);
+        auto *mrp = va_arg(args, ResultType *);
         assert(mrp && "the result type cannot be a null pointer");
 
         double *jac_data =
@@ -482,7 +482,7 @@ void __quantum__qis__QubitUnitary(MemRefT_CplxT_double_2d *matrix, int64_t numQu
 {
     assert(numQubits >= 0);
 
-    if (!matrix) {
+    if (matrix == nullptr) {
         __quantum__rt__fail_cstr("The QubitUnitary matrix must be initialized");
     }
 
@@ -530,7 +530,7 @@ ObsIdType __quantum__qis__HermitianObs(MemRefT_CplxT_double_2d *matrix, int64_t 
 {
     assert(numQubits >= 0);
 
-    if (!matrix) {
+    if (matrix == nullptr) {
         __quantum__rt__fail_cstr("The Hermitian matrix must be initialized");
     }
 
@@ -589,7 +589,7 @@ ObsIdType __quantum__qis__HamiltonianObs(MemRefT_double_1d *coeffs, int64_t numO
 {
     assert(numObs >= 0);
 
-    if (!coeffs) {
+    if (coeffs == nullptr) {
         __quantum__rt__fail_cstr("Invalid coefficients for computing Hamiltonian; "
                                  "The coefficients list must be initialized");
     }
