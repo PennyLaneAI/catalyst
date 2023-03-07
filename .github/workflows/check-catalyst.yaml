@@ -65,19 +65,9 @@ jobs:
       run: |
         # echo 'target_compile_options(mlir_c_runner_utils PRIVATE "-fno-sanitize=all")' \
         #       >> mlir/llvm-project/mlir/lib/ExecutionEngine/CMakeLists.txt
-        cmake -S mlir/llvm-project/llvm -B llvm-build -G Ninja \
-              -DCMAKE_BUILD_TYPE=Release \
-              -DLLVM_BUILD_EXAMPLES=OFF \
-              -DLLVM_TARGETS_TO_BUILD="host" \
-              -DLLVM_ENABLE_PROJECTS="mlir" \
-              -DLLVM_ENABLE_ASSERTIONS=ON \
-              -DLLVM_INSTALL_UTILS=ON \
-              -DMLIR_ENABLE_BINDINGS_PYTHON=ON \
-              -DPython3_EXECUTABLE=/usr/bin/python3 \
-              -DPython3_NumPy_INCLUDE_DIRS=$(python3 -c "import numpy as np; print(np.get_include())") \
-              -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DLLVM_ENABLE_LLD=ON
-              # -DLLVM_USE_SANITIZER="Address;Undefined"
-        cmake --build llvm-build --target check-mlir -j$(nproc)
+        pushd mlir
+        llvm_build_dir=../llvm-build make llvm
+        popd
 
   quantum:
     name: Quantum Dialects Build
@@ -131,16 +121,9 @@ jobs:
     - name: Build MLIR Dialects
       run: |
         export CCACHE_DIR=$GITHUB_WORKSPACE/.ccache
-        cmake -S mlir -B quantum-build -G Ninja \
-              -DCMAKE_BUILD_TYPE=Release \
-              -DLLVM_ENABLE_ASSERTIONS=ON \
-              -DQUANTUM_ENABLE_BINDINGS_PYTHON=ON \
-              -DPython3_EXECUTABLE=/usr/bin/python3 \
-              -DMLIR_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir \
-              -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DLLVM_ENABLE_LLD=ON \
-              -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
-              # -DLLVM_USE_SANITIZER="Address;Undefined"
-        cmake --build quantum-build --target check-dialects -j$(nproc)
+        pushd mlir
+        llvm_build_dir="../llvm-build" mhlo_build_dir="../mhlo-build" dialects_build_dir="../quantum-build" make dialects
+        popd
 
     - name: Upload Quantum Build Artifact
       uses: actions/upload-artifact@v3
@@ -216,13 +199,9 @@ jobs:
     - name: Build MHLO Dialect
       if: steps.cache-mhlo.outputs.cache-hit != 'true'
       run: |
-        cmake -S mlir/mlir-hlo -B mhlo-build -G Ninja \
-              -DCMAKE_BUILD_TYPE=Release \
-              -DLLVM_ENABLE_ASSERTIONS=ON \
-              -DMLIR_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir \
-              -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DLLVM_ENABLE_LLD=ON
-              # -DLLVM_USE_SANITIZER="Address;Undefined"
-        cmake --build mhlo-build --target check-mlir-hlo -j$(nproc)
+        pushd mlir
+        llvm_build_dir="../llvm-build" mhlo_build_dir="../mhlo-build" make mhlo
+        popd
 
   runtime-qir-stdlib:
     name: Catalyst-Runtime (qir-stdlib)
