@@ -66,6 +66,7 @@ class BenchmarkResultV1:
     prepare_sec: Optional[float]
     measurement_sec: List[float]
 
+
 @dataclass_json
 @dataclass
 class BenchmarkResult(BenchmarkResultV1):
@@ -89,33 +90,37 @@ class BenchmarkResult(BenchmarkResultV1):
       as a workaround.
     """
 
-    versions: Dict[str,str]
+    versions: Dict[str, str]
 
     @classmethod
-    def fromMeasurements(cls, nr, argv, prep, times, depth: Optional[int], versions: Dict[str,str]):
+    def fromMeasurements(
+        cls, nr, argv, prep, times, depth: Optional[int], versions: Dict[str, str]
+    ):
         return BenchmarkResult(
-            Sysinfo.fromOS(), unpack_complex(nr) if nr else None, depth, argv,
-            prep, times, versions
+            Sysinfo.fromOS(), unpack_complex(nr) if nr else None, depth, argv, prep, times, versions
         )
 
-class BooleanOptionalAction(Action):
-    """ Backported from argparse for Python3.10 """
-    def __init__(self,
-                 option_strings,
-                 dest,
-                 default=None,
-                 type=None,
-                 choices=None,
-                 required=False,
-                 help=None,
-                 metavar=None):
 
+class BooleanOptionalAction(Action):
+    """Backported from argparse for Python3.10"""
+
+    def __init__(
+        self,
+        option_strings,
+        dest,
+        default=None,
+        type=None,
+        choices=None,
+        required=False,
+        help=None,
+        metavar=None,
+    ):
         _option_strings = []
         for option_string in option_strings:
             _option_strings.append(option_string)
 
-            if option_string.startswith('--'):
-                option_string = '--no-' + option_string[2:]
+            if option_string.startswith("--"):
+                option_string = "--no-" + option_string[2:]
                 _option_strings.append(option_string)
 
         if help is not None and default is not None and default is not SUPPRESS:
@@ -130,12 +135,12 @@ class BooleanOptionalAction(Action):
             choices=choices,
             required=required,
             help=help,
-            metavar=metavar)
+            metavar=metavar,
+        )
 
     def __call__(self, parser, namespace, values, option_string=None):
         if option_string in self.option_strings:
-            setattr(namespace, self.dest, not option_string.startswith('--no-'))
+            setattr(namespace, self.dest, not option_string.startswith("--no-"))
 
     def format_usage(self):
-        return ' | '.join(self.option_strings)
-
+        return " | ".join(self.option_strings)

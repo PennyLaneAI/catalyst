@@ -13,6 +13,7 @@ from traceback import print_exc
 
 from .types import Problem, BenchmarkResult, BooleanOptionalAction
 
+
 def catalyst_version() -> str:
     import catalyst._version
     from subprocess import check_output
@@ -21,8 +22,11 @@ def catalyst_version() -> str:
     catalyst_version = catalyst._version.__version__
     if "dev" in catalyst_version:
         try:
-            commit = check_output(['git', 'rev-parse', 'HEAD'],
-                                  cwd=dirname(catalyst.__file__)).decode().strip()[:7]
+            commit = (
+                check_output(["git", "rev-parse", "HEAD"], cwd=dirname(catalyst.__file__))
+                .decode()
+                .strip()[:7]
+            )
             catalyst_version += f"+g{commit}"
         except Exception:
             catalyst_version += "+g?"
@@ -83,20 +87,25 @@ def measure_compile_catalyst(a: Any) -> BenchmarkResult:
     from catalyst import qjit
     from jax.core import ShapedArray
 
-    versions = {'pennylane':qml.__version__, 'jax':jax.__version__, 'catalyst':
-                catalyst_version()}
+    versions = {
+        "pennylane": qml.__version__,
+        "jax": jax.__version__,
+        "catalyst": catalyst_version(),
+    }
 
     t: Problem
     if a.problem == "grover":
         from .grover_catalyst import ProblemC, workflow as main
 
-        t = ProblemC(qml.device("lightning.qubit", wires=a.nqubits),
-                     a.grover_nlayers, expansion_strategy='device')
+        t = ProblemC(
+            qml.device("lightning.qubit", wires=a.nqubits),
+            a.grover_nlayers,
+            expansion_strategy="device",
+        )
     elif a.problem == "vqe":
         from .vqe_catalyst import ProblemVQE, grad_descent as main
 
-        t = ProblemVQE(qml.device("lightning.qubit", wires=a.nqubits),
-                       expansion_strategy='device')
+        t = ProblemVQE(qml.device("lightning.qubit", wires=a.nqubits), expansion_strategy="device")
     else:
         raise NotImplementedError(f"Unsupported problem {a.problem}")
 
@@ -116,8 +125,9 @@ def measure_compile_catalyst(a: Any) -> BenchmarkResult:
 
     r = jit_main(weights).tolist() if a.numerical_check else None
 
-    return BenchmarkResult.fromMeasurements(r, a.argv, prep=None, times=times,
-                                            depth=None, versions=versions)
+    return BenchmarkResult.fromMeasurements(
+        r, a.argv, prep=None, times=times, depth=None, versions=versions
+    )
 
 
 def measure_runtime_catalyst(a: Any) -> BenchmarkResult:
@@ -127,8 +137,11 @@ def measure_runtime_catalyst(a: Any) -> BenchmarkResult:
     from catalyst import qjit
     from jax.core import ShapedArray
 
-    versions = {'pennylane':qml.__version__, 'jax':jax.__version__, 'catalyst':
-                catalyst_version()}
+    versions = {
+        "pennylane": qml.__version__,
+        "jax": jax.__version__,
+        "catalyst": catalyst_version(),
+    }
 
     t: Problem
     if a.problem == "grover":
@@ -170,15 +183,16 @@ def measure_runtime_catalyst(a: Any) -> BenchmarkResult:
         e = time()
         times.append(e - b)
 
-    return BenchmarkResult.fromMeasurements(r.tolist(), a.argv, cmptime, times,
-                                            depth=None, versions=versions)
+    return BenchmarkResult.fromMeasurements(
+        r.tolist(), a.argv, cmptime, times, depth=None, versions=versions
+    )
 
 
 def measure_compile_pennylanejax(a: Any) -> BenchmarkResult:
     import pennylane as qml
     import jax
 
-    versions = {'pennylane':qml.__version__, 'jax':jax.__version__}
+    versions = {"pennylane": qml.__version__, "jax": jax.__version__}
 
     jax.config.update("jax_enable_x64", True)
     jax.config.update("jax_platform_name", "cpu")
@@ -193,8 +207,12 @@ def measure_compile_pennylanejax(a: Any) -> BenchmarkResult:
             size,
         )
 
-        t = Problem(qml.device(device, wires=a.nqubits), a.grover_nlayers,
-                    interface=interface, expansion_strategy='device')
+        t = Problem(
+            qml.device(device, wires=a.nqubits),
+            a.grover_nlayers,
+            interface=interface,
+            expansion_strategy="device",
+        )
 
     elif a.problem == "vqe":
         from .vqe_pennylane import ProblemVQE, grad_descent as main
@@ -202,8 +220,9 @@ def measure_compile_pennylanejax(a: Any) -> BenchmarkResult:
         def size(_):
             return None
 
-        t = ProblemVQE(qml.device(device, wires=a.nqubits), interface=interface,
-                       expansion_strategy='device')
+        t = ProblemVQE(
+            qml.device(device, wires=a.nqubits), interface=interface, expansion_strategy="device"
+        )
 
     # Note: Disabled due to a PennylaneJax diff. compile problem
     # elif a.problem == "chemvqe":
@@ -229,15 +248,16 @@ def measure_compile_pennylanejax(a: Any) -> BenchmarkResult:
 
     r = jax_main(weights).tolist() if a.numerical_check else None
 
-    return BenchmarkResult.fromMeasurements(r, a.argv, None, times,
-                                            depth=size(t), versions=versions)
+    return BenchmarkResult.fromMeasurements(
+        r, a.argv, None, times, depth=size(t), versions=versions
+    )
 
 
 def measure_runtime_pennylanejax(a: Any) -> BenchmarkResult:
     import pennylane as qml
     import jax
 
-    versions = {'pennylane':qml.__version__, 'jax':jax.__version__}
+    versions = {"pennylane": qml.__version__, "jax": jax.__version__}
 
     jax.config.update("jax_enable_x64", True)
     jax.config.update("jax_platform_name", "cpu")
@@ -289,14 +309,15 @@ def measure_runtime_pennylanejax(a: Any) -> BenchmarkResult:
         e = time()
         times.append(e - b)
 
-    return BenchmarkResult.fromMeasurements(r.tolist(), a.argv, cmptime, times,
-                                            depth=size(t), versions=versions)
+    return BenchmarkResult.fromMeasurements(
+        r.tolist(), a.argv, cmptime, times, depth=size(t), versions=versions
+    )
 
 
 def measure_compile_pennylane(a: Any) -> BenchmarkResult:
     import pennylane as qml
 
-    versions = {'pennylane':qml.__version__}
+    versions = {"pennylane": qml.__version__}
 
     _, device, interface = parse_implementation(a.implementation)
 
@@ -307,8 +328,12 @@ def measure_compile_pennylane(a: Any) -> BenchmarkResult:
             size,
         )
 
-        t = Problem(qml.device(device, wires=a.nqubits), a.grover_nlayers,
-                    interface=interface, expansion_strategy='device')
+        t = Problem(
+            qml.device(device, wires=a.nqubits),
+            a.grover_nlayers,
+            interface=interface,
+            expansion_strategy="device",
+        )
     else:
         raise NotImplementedError(f"Unsupported problem {a.problem}")
 
@@ -327,14 +352,15 @@ def measure_compile_pennylane(a: Any) -> BenchmarkResult:
 
     r = qml_main(weights).tolist() if a.numerical_check else None
 
-    return BenchmarkResult.fromMeasurements(r, a.argv, None, times,
-                                            depth=size(t), versions=versions)
+    return BenchmarkResult.fromMeasurements(
+        r, a.argv, None, times, depth=size(t), versions=versions
+    )
 
 
 def measure_runtime_pennylane(a: Any) -> BenchmarkResult:
     import pennylane as qml
 
-    versions = {'pennylane':qml.__version__}
+    versions = {"pennylane": qml.__version__}
 
     _, device, interface = parse_implementation(a.implementation)
 
@@ -367,7 +393,7 @@ def measure_runtime_pennylane(a: Any) -> BenchmarkResult:
 
     # Since pure PpennyLane is an interpreter, we allow it to run 1 iteration and
     # count it as an "extended compilation".
-    weights = t.trial_params(a.niter+1)
+    weights = t.trial_params(a.niter + 1)
     b = time()
     _main(weights)
     e = time()
@@ -382,8 +408,9 @@ def measure_runtime_pennylane(a: Any) -> BenchmarkResult:
         e = time()
         times.append(e - b)
 
-    return BenchmarkResult.fromMeasurements(r.tolist(), a.argv, preptime, times,
-                                            depth=size(t), versions=versions)
+    return BenchmarkResult.fromMeasurements(
+        r.tolist(), a.argv, preptime, times, depth=size(t), versions=versions
+    )
 
 
 REGISTRY = {
@@ -411,14 +438,14 @@ def selfcheck(ap):
         r1 = None
         for m, i in REGISTRY.keys():
             try:
-                r = REGISTRY[(m, i)](parse_args(ap, cmdline_fn(m,i)))
+                r = REGISTRY[(m, i)](parse_args(ap, cmdline_fn(m, i)))
                 print(f"Checking {(m,i)}")
                 if r1 is None:
                     r1 = r
                 else:
-                    assert_allclose(np.array(r1.numeric_result),
-                                    np.array(r.numeric_result),
-                                    atol=atol)
+                    assert_allclose(
+                        np.array(r1.numeric_result), np.array(r.numeric_result), atol=atol
+                    )
             except NotImplementedError as e:
                 print(f"Skipping {(m,i)} due to: {e}")
 

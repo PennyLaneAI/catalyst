@@ -15,8 +15,12 @@ from hashlib import sha256
 from pandas import DataFrame
 from altair import Chart
 
-from catalyst_benchmark.types import (Sysinfo, BenchmarkResult,
-                                      BenchmarkResultV1, BooleanOptionalAction)
+from catalyst_benchmark.types import (
+    Sysinfo,
+    BenchmarkResult,
+    BenchmarkResultV1,
+    BooleanOptionalAction,
+)
 from catalyst_benchmark.main import parse_implementation
 
 # fmt:off
@@ -172,8 +176,10 @@ def collect(a: ParsedArguments) -> None:
                     (fnqubits, fnlayers) = known_failures.get(
                         (problem, measure, impl, diffmethod), (None, None)
                     )
-                    if (nqubits or 0, nlayers or 0) >= (fnqubits or sys.maxsize,
-                                                        fnlayers or sys.maxsize):
+                    if (nqubits or 0, nlayers or 0) >= (
+                        fnqubits or sys.maxsize,
+                        fnlayers or sys.maxsize,
+                    ):
                         print(f"Skipping as likely to fail: {cmdline}")
                     else:
                         print(f"Running: {cmdline}")
@@ -307,9 +313,11 @@ def plot(a: ParsedArguments) -> None:
 
         def _filter(cat, measure, problem):
             try:
-                return df_full[(df_full["cat"]==cat) &
-                               (df_full["measure"]==measure) &
-                               (df_full["problem"]==problem)]
+                return df_full[
+                    (df_full["cat"] == cat)
+                    & (df_full["measure"] == measure)
+                    & (df_full["problem"] == problem)
+                ]
             except KeyError:
                 return DataFrame()
 
@@ -444,15 +452,19 @@ def plot(a: ParsedArguments) -> None:
         df_allgrad = _filter("variational", "runtime", problem)
         for diffmethod in DIFF_METHODS[problem]:
             try:
-                edm = [diffmethod, diffmethod] \
-                    if diffmethod not in ['adjoint', 'backprop'] else ['adjoint', 'backprop']
-                df = df_allgrad[(df_allgrad["diffmethod"]==edm[0]) |
-                                (df_allgrad["diffmethod"]==edm[1])]
-                del df['diffmethod']
+                edm = (
+                    [diffmethod, diffmethod]
+                    if diffmethod not in ["adjoint", "backprop"]
+                    else ["adjoint", "backprop"]
+                )
+                df = df_allgrad[
+                    (df_allgrad["diffmethod"] == edm[0]) | (df_allgrad["diffmethod"] == edm[1])
+                ]
+                del df["diffmethod"]
             except KeyError:
                 df = DataFrame()
             if len(df) > 0:
-                dmtitle = '_'.join(sorted(set(edm)))
+                dmtitle = "_".join(sorted(set(edm)))
                 fname = f"_img/variational_runtime_{dmtitle.replace('-','')}_{SYSHASH}.svg"
                 print(f"Updating {fname}")
                 with _open(fname, "w") as f:
@@ -469,8 +481,9 @@ def plot(a: ParsedArguments) -> None:
                             )
                             .properties(
                                 title=_mktitle(
-                                    f"Running time, Variational circuits ({dmtitle})",
-                                    align=None))
+                                    f"Running time, Variational circuits ({dmtitle})", align=None
+                                )
+                            )
                             .to_dict(),
                         ),
                     )
@@ -495,8 +508,10 @@ ap.add_argument("-V", "--verbose", default=False, action=BooleanOptionalAction,
                 help="Print verbose messages")
 # fmt: on
 
+
 def load_all() -> DataFrame:
     return load(ap.parse_args([]))
+
 
 if __name__ == "__main__":
     a = ap.parse_args(sys.argv[1:])

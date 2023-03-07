@@ -48,8 +48,9 @@ class ProblemPL(Problem):
         assert len(total) == nqubits, f"{N}, {nqubits} != len({total})"
 
     def trial_params(self, i: int) -> Any:
-        return pnp.array([[pnp.pi / (i + 1) for _ in self.iqr] for _ in range(3)],
-                         dtype=pnp.float64)
+        return pnp.array(
+            [[pnp.pi / (i + 1) for _ in self.iqr] for _ in range(3)], dtype=pnp.float64
+        )
 
 
 def sudoku_oracle(t):
@@ -118,11 +119,12 @@ def workflow(t: ProblemPL, weights):
 
 def size(p: ProblemPL) -> int:
     qnode_kwargs = deepcopy(p.qnode_kwargs)
-    qnode_kwargs.update({'expansion_strategy':'device'})
+    qnode_kwargs.update({"expansion_strategy": "device"})
 
     @qml.qnode(p.dev, **qnode_kwargs)
     def _main(weights):
         return grover_mainloop(p, weights)
+
     _main.construct([p.trial_params(0)], {})
     return len(_main.tape.operations)
 
@@ -160,4 +162,3 @@ def run_default_qubit(N=7):
         return workflow(p, params)
 
     return _main(p.trial_params(0))
-

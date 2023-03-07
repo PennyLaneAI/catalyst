@@ -8,6 +8,7 @@ from pennylane import AllSinglesDoubles
 
 from .types import Problem
 
+
 @dataclass_json
 @dataclass
 class ProblemInfo:
@@ -73,13 +74,14 @@ def size(p: ProblemCVQE) -> int:
 
 
 SHOTS = None
-DIFFMETHOD = 'parameter-shift'
+DIFFMETHOD = "parameter-shift"
 NSTEPS = 1
 
+
 def run_default_qubit(N=6):
-    p = ProblemCVQE(qml.device("default.qubit", wires=N, shots=SHOTS),
-                    nsteps=NSTEPS,
-                    diff_method=DIFFMETHOD)
+    p = ProblemCVQE(
+        qml.device("default.qubit", wires=N, shots=SHOTS), nsteps=NSTEPS, diff_method=DIFFMETHOD
+    )
     print(f"Size: {size(p)}")
 
     def _main(params):
@@ -90,8 +92,9 @@ def run_default_qubit(N=6):
 
 
 def run_lightning_qubit(N=6):
-    p = ProblemCVQE(qml.device("lightning.qubit", wires=N, shots=SHOTS),
-                    nsteps=NSTEPS, diff_method=DIFFMETHOD)
+    p = ProblemCVQE(
+        qml.device("lightning.qubit", wires=N, shots=SHOTS), nsteps=NSTEPS, diff_method=DIFFMETHOD
+    )
     print(f"Size: {size(p)}")
 
     def _main(params):
@@ -108,8 +111,12 @@ def run_jax_(devname, N=6):
     jax.config.update("jax_platform_name", "cpu")
     jax.config.update("jax_array", True)
 
-    p = ProblemCVQE(dev=qml.device(devname, wires=N, shots=SHOTS),
-                    nsteps=NSTEPS, interface="jax", diff_method=DIFFMETHOD)
+    p = ProblemCVQE(
+        dev=qml.device(devname, wires=N, shots=SHOTS),
+        nsteps=NSTEPS,
+        interface="jax",
+        diff_method=DIFFMETHOD,
+    )
     print(f"Size: {size(p)}")
 
     @jax.jit
@@ -126,4 +133,3 @@ def run_jax_default_qubit(N=6):
 
 def run_jax_lightning_qubit(N=6):
     return run_jax_("lightning.qubit", N)
-
