@@ -1,4 +1,4 @@
-# Release 0.2.0-dev
+# Release 0.1.1
 
 <h3>New features</h3>
 
@@ -17,6 +17,8 @@
 
 * Fixes to codecov, build-lightning, and GH actions.
   [#34](https://github.com/PennyLaneAI/catalyst/pull/34)
+
+* Fixes the Catalyst image path in the readme to properly render on PyPI.
 
 <h3>Contributors</h3>
 
