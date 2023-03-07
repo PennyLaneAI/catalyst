@@ -33,14 +33,11 @@ PROBLEMS: Dict[NQubits, ProblemInfo] = {
     16: {"molname": "H8", "basis": "STO-3G", "bond": "0.5", "qubits": 16, "gate_count": 361},
 }
 
-DMDICT = {
-    'finite-diff': 'fd',
-    'parameter-shift': 'ps',
-    'adjoint': 'adj'
-}
+DMDICT = {"finite-diff": "fd", "parameter-shift": "ps", "adjoint": "adj"}
+
 
 class ProblemCVQE(Problem):
-    def __init__(self, dev, nsteps=10, diff_method:str='finite-diff', **qnode_kwargs):
+    def __init__(self, dev, nsteps=10, diff_method: str = "finite-diff", **qnode_kwargs):
         super().__init__(dev, **qnode_kwargs)
         self.diff_method = DMDICT[diff_method]
         self.nsteps = nsteps
@@ -75,16 +72,21 @@ def workflow(p: ProblemCVQE, params):
     def loop(i, theta):
         dtheta = diff(theta)
         return theta - dtheta[0] * stepsize
+
     return loop(theta)
 
 
 SHOTS = None
-DIFFMETHOD = 'finite-diff'
+DIFFMETHOD = "finite-diff"
 NSTEPS = 1
 
+
 def run_catalyst(N=6):
-    p = ProblemCVQE(dev=qml.device("lightning.qubit", wires=N, shots=SHOTS),
-                    nsteps=NSTEPS, diff_method=DIFFMETHOD)
+    p = ProblemCVQE(
+        dev=qml.device("lightning.qubit", wires=N, shots=SHOTS),
+        nsteps=NSTEPS,
+        diff_method=DIFFMETHOD,
+    )
     params = p.trial_params(0)
 
     @qjit

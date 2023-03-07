@@ -46,8 +46,9 @@ class ProblemC(Problem):
         assert len(total) == nqubits
 
     def trial_params(self, i: int) -> Any:
-        return jnp.array([[jnp.pi / (i + 1) for _ in self.iqr] for _ in range(3)],
-                         dtype=jnp.float64)
+        return jnp.array(
+            [[jnp.pi / (i + 1) for _ in self.iqr] for _ in range(3)], dtype=jnp.float64
+        )
 
 
 def sudoku_oracle(t):
