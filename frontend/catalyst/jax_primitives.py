@@ -25,20 +25,31 @@ from jaxlib.mlir.dialects._ods_common import get_op_results_or_values
 from jaxlib.mlir.dialects._func_ops_gen import CallOp
 from jaxlib.mlir.dialects._mhlo_ops_gen import ConstantOp, ConvertOp
 
-from catalyst.python_bindings._arith_ops_gen import IndexCastOp
-from catalyst.python_bindings._tensor_ops_gen import ExtractOp as TensorExtractOp, FromElementsOp
-from catalyst.python_bindings._scf_ops_gen import IfOp, ConditionOp, ForOp, WhileOp, YieldOp
-from catalyst.python_bindings import AllocOp, ExtractOp, InsertOp, DeallocOp
-from catalyst.python_bindings import CustomOp, MultiRZOp, QubitUnitaryOp, MeasureOp
-from catalyst.python_bindings import SampleOp, CountsOp, ExpvalOp, VarianceOp, ProbsOp, StateOp
-from catalyst.python_bindings import GradOp
-from catalyst.python_bindings import (
+import os
+from catalyst._configuration import INSTALLED
+
+default_bindings_path = os.path.join(
+    os.path.dirname(__file__), "../../mlir/build/python_packages/quantum"
+)
+if not INSTALLED and os.path.exists(default_bindings_path):  # pragma: no cover
+    import sys
+
+    sys.path.insert(0, default_bindings_path)
+
+from mlir_quantum.dialects._arith_ops_gen import IndexCastOp
+from mlir_quantum.dialects._tensor_ops_gen import ExtractOp as TensorExtractOp, FromElementsOp
+from mlir_quantum.dialects._scf_ops_gen import IfOp, ConditionOp, ForOp, WhileOp, YieldOp
+from mlir_quantum.dialects._quantum_ops_gen import AllocOp, ExtractOp, InsertOp, DeallocOp
+from mlir_quantum.dialects._quantum_ops_gen import CustomOp, MultiRZOp, QubitUnitaryOp, MeasureOp
+from mlir_quantum.dialects._quantum_ops_gen import SampleOp, CountsOp, ExpvalOp, VarianceOp, ProbsOp, StateOp
+from mlir_quantum.dialects._quantum_ops_gen import (
     ComputationalBasisOp,
     NamedObsOp,
     HermitianOp,
     TensorOp,
     HamiltonianOp,
 )
+from mlir_quantum.dialects._gradient_ops_gen import GradOp
 from catalyst.utils.calculate_grad_shape import calculate_grad_shape, Signature
 
 

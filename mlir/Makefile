@@ -57,6 +57,7 @@ mhlo: | llvm
 
 	cmake --build $(MHLO_BUILD_DIR) --target check-mlir-hlo
 
+
 .PHONY: dialects
 dialects:
 	@echo "build custom Catalyst MLIR Dialects"
@@ -75,6 +76,8 @@ dialects:
 		-DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
 	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects quantum-lsp-server
+	find $(DIALECTS_BUILD_DIR)/python_packages/ -type l -exec sed --in-place 's/from \._ods_common /from jaxlib.mlir.dialects._ods_common /g' {} \;
+	find $(DIALECTS_BUILD_DIR)/python_packages/ -type l -exec sed --in-place 's/from \. /from jaxlib.mlir.dialects /g' {} \;
 
 .PHONY: test
 test:
