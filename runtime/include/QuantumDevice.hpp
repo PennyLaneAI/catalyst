@@ -35,11 +35,13 @@ namespace Catalyst::Runtime {
  *
  */
 struct QuantumDevice {
-    QuantumDevice() = default;  // LCOV_EXCL_LINE
-    virtual ~QuantumDevice() {} // LCOV_EXCL_LINE
+    QuantumDevice() = default;          // LCOV_EXCL_LINE
+    virtual ~QuantumDevice() = default; // LCOV_EXCL_LINE
 
     QuantumDevice &operator=(const QuantumDevice &) = delete;
     QuantumDevice(const QuantumDevice &) = delete;
+    QuantumDevice(QuantumDevice &&) = delete;
+    QuantumDevice &operator=(QuantumDevice &&) = delete;
 
     /**
      * @brief Allocate a qubit.
@@ -74,7 +76,7 @@ struct QuantumDevice {
      *
      * @return `size_t`
      */
-    virtual auto GetNumQubits() const -> size_t = 0;
+    [[nodiscard]] virtual auto GetNumQubits() const -> size_t = 0;
 
     /**
      * @brief Set the number of device shots.
@@ -88,7 +90,7 @@ struct QuantumDevice {
      *
      * @return `size_t`
      */
-    virtual auto GetDeviceShots() const -> size_t = 0;
+    [[nodiscard]] virtual auto GetDeviceShots() const -> size_t = 0;
 
     /**
      * @brief Start recording a quantum tape if provided.
@@ -105,14 +107,14 @@ struct QuantumDevice {
      *
      * @return `Result`
      */
-    virtual auto Zero() const -> Result = 0;
+    [[nodiscard]] virtual auto Zero() const -> Result = 0;
 
     /**
      * @brief Result value for "One"  used in the measurement process.
      *
      * @return `Result`
      */
-    virtual auto One() const -> Result = 0;
+    [[nodiscard]] virtual auto One() const -> Result = 0;
 
     /**
      * @brief A helper method to print the state vector of a device.

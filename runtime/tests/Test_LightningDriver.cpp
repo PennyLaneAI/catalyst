@@ -61,7 +61,7 @@ TEST_CASE("Qubit allocatation and deallocation", "[lightning]")
 
     std::vector<std::complex<double>> state = sim->State();
 
-    REQUIRE(state.size() == (1ul << n));
+    REQUIRE(state.size() == (1UL << n));
     REQUIRE(state[0].real() == Approx(1.0).epsilon(1e-5));
     REQUIRE(state[0].imag() == Approx(0.0).epsilon(1e-5));
 
