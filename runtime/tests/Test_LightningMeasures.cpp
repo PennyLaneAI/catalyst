@@ -127,7 +127,7 @@ TEST_CASE("Expval(ObsT) test with invalid key for cached observables", "[lightni
     std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
     QuantumDevice *qis = dynamic_cast<QuantumDevice *>(sim.get());
 
-    REQUIRE_THROWS_WITH(qis->Expval(0), Catch::Contains("Invalid observable key"));
+    REQUIRE_THROWS_WITH(qis->Expval(0), Catch::Contains("Invalid key for cached observables"));
 }
 
 TEST_CASE("Expval(NamedObs) test with numWires=1", "[lightning]")

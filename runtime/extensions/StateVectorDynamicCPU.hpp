@@ -196,7 +196,7 @@ class StateVectorDynamicCPU : public StateVectorCPU<PrecisionT, StateVectorDynam
         // addtional bit into the index of the full state-vector at position
         // `wire`. These masks enable us to split the bits of the index `k` into
         // those above and below `wire`.
-        const size_t lower_mask = (1ul << wire) - 1;
+        const size_t lower_mask = (1UL << wire) - 1;
         const size_t upper_mask = sv_size - lower_mask - 1;
 
         // The resulting 2x2 reduced density matrix of the complement system to
@@ -207,7 +207,7 @@ class StateVectorDynamicCPU : public StateVectorCPU<PrecisionT, StateVectorDynam
             for (uint8_t j = 0; j < 2; j++) {
                 ComplexPrecisionT sum{0, 0};
                 for (size_t k = 0; k < (sv_size / 2); k++) {
-                    size_t idx_wire_0 = (/* upper_bits: */ (upper_mask & k) << 1ul) +
+                    size_t idx_wire_0 = (/* upper_bits: */ (upper_mask & k) << 1UL) +
                                         /* lower_bits: */ (lower_mask & k);
                     size_t idx_i = idx_wire_0 + (i << wire);
                     size_t idx_j = idx_wire_0 + (j << wire);
@@ -248,7 +248,7 @@ class StateVectorDynamicCPU : public StateVectorCPU<PrecisionT, StateVectorDynam
     {
         const size_t next_idx = this->getNumQubits();
         const size_t dsize = data_.size();
-        data_.resize(dsize << 1ul);
+        data_.resize(dsize << 1UL);
 
         auto src = data_.begin();
         std::advance(src, dsize - 1);
@@ -272,7 +272,7 @@ class StateVectorDynamicCPU : public StateVectorCPU<PrecisionT, StateVectorDynam
                         "Invalid wire: "
                         "The state-vector must remain pure after releasing a wire")
 
-        const size_t distance = 1ul << wire;
+        const size_t distance = 1UL << wire;
 
         auto dst = data_.begin();
 

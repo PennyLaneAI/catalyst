@@ -7,8 +7,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Compiler options
 option(ENABLE_CODE_COVERAGE "Enable code coverage" OFF)
-option(ENABLE_CLANG_TIDY "Enable Clang Tidy" OFF)
 option(ENABLE_LIGHTNING_KOKKOS "Build Lightning-Kokkos" OFF)
+option(RUNTIME_CLANG_TIDY "Enable Clang Tidy" OFF)
 
 set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
