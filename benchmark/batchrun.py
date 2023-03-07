@@ -31,6 +31,14 @@ SYSINFO = Sysinfo.fromOS()
 SYSHASH_ORIG = sha256(str(SYSINFO).encode("utf-8")).hexdigest()[:6]
 SYSHASH = SYSHASH_ORIG
 
+IMPLEMENTATIONS = [
+    "catalyst/lightning.qubit",
+    "pennylane+jax/default.qubit.jax",
+    "pennylane+jax/lightning.qubit",
+    "pennylane/default.qubit",
+    "pennylane/lightning.qubit",
+]
+
 CATPROBLEMS = {
     "regular": "grover",
     "deep": "grover",
@@ -133,13 +141,7 @@ def all_configurations(a: ParsedArguments) -> Iterable[tuple]:
     """Iterate through the configurations available."""
 
     for measure in ["compile", "runtime"]:
-        for impl in [
-            "catalyst/lightning.qubit",
-            "pennylane+jax/default.qubit.jax",
-            "pennylane+jax/lightning.qubit",
-            "pennylane/default.qubit",
-            "pennylane/lightning.qubit",
-        ]:
+        for impl in IMPLEMENTATIONS:
             framework, _, _ = parse_implementation(impl)
 
             for cat in ["regular", "deep", "hybrid", "variational"]:
@@ -469,6 +471,17 @@ def plot(a: ParsedArguments) -> None:
             except KeyError:
                 df = DataFrame()
             if len(df) > 0:
+                df = df.assign(timeout=False)
+                for nqubits in [4, 6, 8, 12]:
+                    for impl in IMPLEMENTATIONS:
+                        if len(df[(df["nqubits"]==nqubits) & (df["impl"] == ALIASES[impl])]) == 0 and \
+                           len(df[df["impl"] == ALIASES[impl]]) > 0 and \
+                           len(df[df["nqubits"] == nqubits]) > 0:
+                            df = pd.concat([df,
+                                           DataFrame([[ALIASES[impl], 9, nqubits,
+                                                      max(df[df["nqubits"]==nqubits]["time"]), True]],
+                                                      columns=["impl","trial","nqubits","time","timeout"])])
+
                 dmtitle = "_".join(sorted(set(edm)))
                 fname = f"_img/variational_runtime_{dmtitle.replace('-','')}_{SYSHASH}.svg"
                 print(f"Updating {fname}")
@@ -480,7 +493,9 @@ def plot(a: ParsedArguments) -> None:
                             .encode(
                                 x=alt.X("impl", title=None),
                                 y=timeEncoding,
-                                color=_implEncoding(df),
+                                color=alt.condition("datum.timeout",
+                                                    alt.ColorValue("Grey"), _implEncoding(df)),
+                                # color=_implEncoding(df),
                                 opacity=trialEncoding,
                                 column=alt.Column("nqubits:N", title="# Qubits"),
                             )
