@@ -416,7 +416,7 @@ jobs:
 
     - name: Install Deps
       run: |
-        sudo apt-get install -y python3 python3-pip
+        sudo apt-get install -y python3 python3-pip libomp-dev
         python3 -m pip install lit pytest pytest-xdist pytest-cov nbconvert ipykernel
         python3 -m pip install jax==${{ steps.jax-version.outputs.v }} jaxlib==${{ steps.jax-version.outputs.v }}
         python3 -m pip install .
