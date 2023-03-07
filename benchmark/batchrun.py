@@ -265,7 +265,7 @@ def plot(a: ParsedArguments) -> None:
                 with open(fname, fmode) as f:
                     yield f
 
-        def _implEncoding(df):
+        def _implEncoding(df, add_timeout=False):
             """Calculate domain and range colors of the implementation, based on
             the actual dataset and the pre-defined palette."""
             dom, rang = zip(
@@ -275,6 +275,9 @@ def plot(a: ParsedArguments) -> None:
                     if i in set(df["impl"].to_list())
                 ]
             )
+            if add_timeout:
+                dom = list(dom)+['Timeout']
+                rang = list(rang)+['grey']
             return alt.Color(
                 "impl:N",
                 title="Impl",
@@ -479,7 +482,7 @@ def plot(a: ParsedArguments) -> None:
                            len(df[df["nqubits"] == nqubits]) > 0:
                             df = pd.concat([df,
                                            DataFrame([[ALIASES[impl], 9, nqubits,
-                                                      max(df[df["nqubits"]==nqubits]["time"]), True]],
+                                                      float(a.timeout_1run) if a.timeout_1run else max(df["time"]), True]],
                                                       columns=["impl","trial","nqubits","time","timeout"])])
 
                 dmtitle = "_".join(sorted(set(edm)))
@@ -494,8 +497,8 @@ def plot(a: ParsedArguments) -> None:
                                 x=alt.X("impl", title=None),
                                 y=timeEncoding,
                                 color=alt.condition("datum.timeout",
-                                                    alt.ColorValue("Grey"), _implEncoding(df)),
-                                # color=_implEncoding(df),
+                                                    alt.ColorValue("Grey"),
+                                                    _implEncoding(df, add_timeout=any(df["timeout"]))),
                                 opacity=trialEncoding,
                                 column=alt.Column("nqubits:N", title="# Qubits"),
                             )
