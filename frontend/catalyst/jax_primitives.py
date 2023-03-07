@@ -15,6 +15,7 @@
 of quantum operations, measurements, and observables to JAXPR.
 """
 
+import os
 import numpy as np
 
 import jax
@@ -25,8 +26,8 @@ from jaxlib.mlir.dialects._ods_common import get_op_results_or_values
 from jaxlib.mlir.dialects._func_ops_gen import CallOp
 from jaxlib.mlir.dialects._mhlo_ops_gen import ConstantOp, ConvertOp
 
-import os
 from catalyst._configuration import INSTALLED
+from catalyst.utils.calculate_grad_shape import calculate_grad_shape, Signature
 
 default_bindings_path = os.path.join(
     os.path.dirname(__file__), "../../mlir/build/python_packages/quantum"
@@ -36,21 +37,40 @@ if not INSTALLED and os.path.exists(default_bindings_path):  # pragma: no cover
 
     sys.path.insert(0, default_bindings_path)
 
-from mlir_quantum.dialects._arith_ops_gen import IndexCastOp
-from mlir_quantum.dialects._tensor_ops_gen import ExtractOp as TensorExtractOp, FromElementsOp
-from mlir_quantum.dialects._scf_ops_gen import IfOp, ConditionOp, ForOp, WhileOp, YieldOp
-from mlir_quantum.dialects._quantum_ops_gen import AllocOp, ExtractOp, InsertOp, DeallocOp
-from mlir_quantum.dialects._quantum_ops_gen import CustomOp, MultiRZOp, QubitUnitaryOp, MeasureOp
-from mlir_quantum.dialects._quantum_ops_gen import SampleOp, CountsOp, ExpvalOp, VarianceOp, ProbsOp, StateOp
-from mlir_quantum.dialects._quantum_ops_gen import (
+# pylint: disable=wrong-import-position,wrong-import-order
+from mlir_quantum.dialects.arith import IndexCastOp
+
+# pylint: disable=wrong-import-position,wrong-import-order
+from mlir_quantum.dialects.tensor import ExtractOp as TensorExtractOp, FromElementsOp
+
+# pylint: disable=wrong-import-position,wrong-import-order
+from mlir_quantum.dialects.scf import IfOp, ConditionOp, ForOp, WhileOp, YieldOp
+
+# pylint: disable=wrong-import-position,wrong-import-order
+from mlir_quantum.dialects.quantum import (
+    SampleOp,
+    CountsOp,
+    ExpvalOp,
+    VarianceOp,
+    ProbsOp,
+    StateOp,
+    CustomOp,
+    MultiRZOp,
+    QubitUnitaryOp,
+    MeasureOp,
+    AllocOp,
+    ExtractOp,
+    InsertOp,
+    DeallocOp,
     ComputationalBasisOp,
     NamedObsOp,
     HermitianOp,
     TensorOp,
     HamiltonianOp,
 )
-from mlir_quantum.dialects._gradient_ops_gen import GradOp
-from catalyst.utils.calculate_grad_shape import calculate_grad_shape, Signature
+
+# pylint: disable=wrong-import-position,wrong-import-order
+from mlir_quantum.dialects.gradient import GradOp
 
 
 #########
