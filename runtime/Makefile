@@ -7,7 +7,9 @@ RT_BUILD_DIR?=$(MK_DIR)/build
 QIR_STDLIB_DIR?=$(MK_DIR)/qir-stdlib/target/release/
 QIR_STDLIB_INCLUDES_DIR?=$(MK_DIR)/qir-stdlib/target/release/build/include/
 LIGHTNING_GIT_TAG_VALUE?=latest_release
+CODE_COVERAGE?=OFF
 
+coverage: CODE_COVERAGE=ON
 
 .PHONY: help
 help:
@@ -26,6 +28,7 @@ help:
 .PHONY: all
 all: qir | runtime
 
+
 .PHONY: runtime qir
 runtime:
 	@echo "build Catalyst Runtime"
@@ -37,7 +40,7 @@ runtime:
 		-DCMAKE_CXX_COMPILER=$(CPP_COMPILER) \
 		-DQIR_STDLIB_LIB=$(QIR_STDLIB_DIR) \
 		-DQIR_STDLIB_INCLUDES=$(QIR_STDLIB_INCLUDES_DIR) \
-		-DENABLE_CODE_COVERAGE=OFF
+		-DENABLE_CODE_COVERAGE=$(CODE_COVERAGE)
 
 	cmake --build $(RT_BUILD_DIR) --target rt_capi -j$(if $(nprocs:-=),$(nprocs),$$(nproc))
 
@@ -64,7 +67,7 @@ coverage: | qir
 		-DCMAKE_CXX_COMPILER=$(CPP_COMPILER) \
 		-DQIR_STDLIB_LIB=$(QIR_STDLIB_DIR) \
 		-DQIR_STDLIB_INCLUDES=$(QIR_STDLIB_INCLUDES_DIR) \
-		-DENABLE_CODE_COVERAGE=ON
+		-DENABLE_CODE_COVERAGE=$(CODE_COVERAGE)
 
 	cmake --build $(RT_BUILD_DIR) --target runner_tests -j$(if $(nprocs:-=),$(nprocs),$$(nproc))
 	$(RT_BUILD_DIR)/tests/runner_tests
