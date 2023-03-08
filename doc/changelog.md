@@ -2,6 +2,20 @@
 
 <h3>New features</h3>
 
+<h3>Improvements</h3>
+
+<h3>Breaking changes</h3>
+
+<h3>Bug fixes</h3>
+
+<h3>Contributors</h3>
+
+This release contains contributions from (in alphabetical order):
+
+# Release 0.1.1
+
+<h3>New features</h3>
+
 * Adds support for interpreting control flow operations.
   [#31](https://github.com/PennyLaneAI/catalyst/pull/31)
 
@@ -15,8 +29,7 @@
 
 <h3>Bug fixes</h3>
 
-* Fixes to codecov, build-lightning, and GH actions.
-  [#34](https://github.com/PennyLaneAI/catalyst/pull/34)
+* Fixes the Catalyst image path in the readme to properly render on PyPI.
 
 <h3>Contributors</h3>
 
