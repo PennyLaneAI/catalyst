@@ -6,6 +6,7 @@ MK_DIR := $(dir $(MK_ABSPATH))
 RT_BUILD_DIR := $(if $(runtime_build_dir:-=),$(runtime_build_dir),$(MK_DIR)/build)
 QIR_STDLIB_DIR = $(if $(qir_stdlib_dir:-=),$(qir_stdlib_dir),"$(MK_DIR)/qir-stdlib/target/release/")
 QIR_STDLIB_INCLUDES_DIR=$(if $(qir_stdlib_include_dir:-=),$(qir_stdlib_include_dir),"$(MK_DIR)/qir-stdlib/target/release/build/include/")
+LIGHTNING_GIT_TAG_VALUE := $(if $(lightning_git_tag_value:-=),$(lightning_git_tag_value),latest_release)
 
 
 .PHONY: help
@@ -29,6 +30,8 @@ all: qir | runtime
 runtime:
 	@echo "build Catalyst Runtime"
 	cmake -G Ninja -B $(RT_BUILD_DIR) . \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DLIGHTNING_GIT_TAG=$(LIGHTNING_GIT_TAG_VALUE) \
 		-DENABLE_LIGHTNING_KOKKOS=$(if $(kokkos:-=),$(kokkos),OFF) \
 		-DCMAKE_C_COMPILER=$(C_COMPILER) \
 		-DCMAKE_CXX_COMPILER=$(CPP_COMPILER) \
