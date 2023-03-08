@@ -417,7 +417,7 @@ jobs:
     - name: Install Deps
       run: |
         sudo apt-get install -y python3 python3-pip libomp-dev
-        python3 -m pip install lit pytest pytest-xdist pytest-cov nbconvert ipykernel
+        python3 -m pip install lit pytest pytest-xdist pytest-cov nbmake nbconvert ipykernel matplotlib jaxopt
         python3 -m pip install jax==${{ steps.jax-version.outputs.v }} jaxlib==${{ steps.jax-version.outputs.v }}
         python3 -m pip install .
 
@@ -492,6 +492,11 @@ jobs:
         export ASAN_OPTIONS=detect_odr_violation=0
         pytest frontend/test/pytest -n auto $COVERAGE_FLAGS
         mv coverage.xml coverage-${{ github.job }}.xml
+
+    - name: Check Catalyst Demos
+      run: |
+        MDD_BENCHMARK_PRECISION=1 \
+        pytest demos/*.ipynb --nbmake -n auto
 
     - name: Upload code coverage results
       uses: actions/upload-artifact@v3

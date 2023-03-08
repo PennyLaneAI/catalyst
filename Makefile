@@ -47,19 +47,24 @@ dialects:
 runtime:
 	$(MAKE) -C runtime all
 
-.PHONY: test test-frontend test-dialects test-runtime
-test: test-runtime test-dialects test-frontend
+.PHONY: test test-runtime test-dialects test-frontend test-demos
+test: test-runtime test-dialects test-frontend test-demos
+
+test-runtime:
+	$(MAKE) -C runtime test
+
+test-dialects:
+	$(MAKE) -C mlir test
 
 test-frontend:
 	@echo "check the Catalyst lit and Python test suites"
 	cmake --build $(DIALECTS_BUILD_DIR) --target check-frontend
 	$(PYTHON) pytest frontend/test/pytest --tb=native -n auto
 
-test-dialects:
-	$(MAKE) -C mlir test
-
-test-runtime:
-	$(MAKE) -C runtime test
+test-demos:
+	@echo "check the Catalyst demos"
+	MDD_BENCHMARK_PRECISION=1 \
+	$(PYTHON) pytest demos/*.ipynb --nbmake -n auto
 
 .PHONY: clean clean-all
 clean:
