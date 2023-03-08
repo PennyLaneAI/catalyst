@@ -417,19 +417,15 @@ def plot(a: ParsedArguments) -> None:
             if len(df) > 0:
                 df = df.assign(timeout=False)
                 for nqubits in sorted(set(df["nqubits"])):
-                    for impl in IMPLEMENTATIONS:
-                        if (
-                            len(df[(df["nqubits"] == nqubits) & (df["impl"] == ALIASES[impl])]) == 0
-                            and len(df[df["impl"] == ALIASES[impl]]) > 0
-                            and len(df[df["nqubits"] == nqubits]) > 0
-                        ):
+                    for impl in sorted(set(df["impl"])):
+                        if len(df[(df["nqubits"] == nqubits) & (df["impl"] == impl)]) == 0:
                             df = pd.concat(
                                 [
                                     df,
                                     DataFrame(
                                         [
                                             [
-                                                ALIASES[impl],
+                                                impl,
                                                 9,
                                                 nqubits,
                                                 float(a.timeout_1run)
