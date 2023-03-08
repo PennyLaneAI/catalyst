@@ -40,7 +40,7 @@ Catalyst
     :description: Get started using Catalyst with PennyLane
 
 .. index-card::
-    :name: Source
+    :name: GitHub
     :link: https://github.com/PennyLaneAI/catalyst
     :description: View the Catalyst source code on GitHub
 
