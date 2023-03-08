@@ -1,13 +1,13 @@
 
 PYTHON := python3
-C_COMPILER := $(if $(c_compiler:-=),$(c_compiler),clang)
-CPP_COMPILER := $(if $(cpp_compiler:-=),$(cpp_compiler),clang++)
+C_COMPILER?=clang
+CPP_COMPILER?=clang++
 MK_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 MK_DIR := $(dir $(MK_ABSPATH))
-DIALECTS_BUILD_DIR := $(if $(dialects_build_dir:-=),$(dialects_build_dir),$(MK_DIR)/build)
-LLVM_BUILD_DIR := $(if $(llvm_build_dir:-=),$(llvm_build_dir),$(MK_DIR)/llvm-project/build)
-MHLO_BUILD_DIR := $(if $(mhlo_build_dir:-=),$(mhlo_build_dir),$(MK_DIR)/mlir-hlo/build)
-RT_BUILD_DIR = $(if $(runtime_build_dir:-=),$(runtime_build_dir),$(MK_DIR)/../runtime/build)
+DIALECTS_BUILD_DIR?=$(MK_DIR)/build
+LLVM_BUILD_DIR?=$(MK_DIR)/llvm-project/build
+MHLO_BUILD_DIR?=$(MK_DIR)/mlir-hlo/build
+RT_BUILD_DIR?=$(MK_DIR)/../runtime/build
 
 .PHONY: help
 help:

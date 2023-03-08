@@ -66,7 +66,7 @@ jobs:
         # echo 'target_compile_options(mlir_c_runner_utils PRIVATE "-fno-sanitize=all")' \
         #       >> mlir/llvm-project/mlir/lib/ExecutionEngine/CMakeLists.txt
         pushd mlir
-        llvm_build_dir=../llvm-build make llvm
+        LLVM_BUILD_DIR=../llvm-build make llvm
         popd
 
   quantum:
@@ -122,7 +122,7 @@ jobs:
       run: |
         export CCACHE_DIR=$GITHUB_WORKSPACE/.ccache
         pushd mlir
-        llvm_build_dir="../llvm-build" mhlo_build_dir="../mhlo-build" dialects_build_dir="../quantum-build" make dialects
+        LLVM_BUILD_DIR="../llvm-build" MHLO_BUILD_DIR="../mhlo-build" DIALECTS_BUILD_DIR="../quantum-build" make dialects
         popd
 
     - name: Upload Quantum Build Artifact
@@ -200,7 +200,7 @@ jobs:
       if: steps.cache-mhlo.outputs.cache-hit != 'true'
       run: |
         pushd mlir
-        llvm_build_dir="../llvm-build" mhlo_build_dir="../mhlo-build" make mhlo
+        LLVM_BUILD_DIR="../llvm-build" MHLO_BUILD_DIR="../mhlo-build" make mhlo
         popd
 
   runtime-qir-stdlib:
