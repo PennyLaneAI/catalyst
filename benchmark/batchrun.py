@@ -11,6 +11,7 @@ from collections import defaultdict
 from copy import deepcopy
 from contextlib import contextmanager
 from hashlib import sha256
+from itertools import chain
 
 from pandas import DataFrame
 from altair import Chart
@@ -22,6 +23,7 @@ from catalyst_benchmark.types import (
     BooleanOptionalAction,
 )
 from catalyst_benchmark.main import parse_implementation
+
 
 # fmt:off
 FMTVERSION = 1
@@ -98,8 +100,6 @@ PLjax_L = ALIASES["pennylane+jax/lightning.qubit"]
 COLORS = ["#e41a1c", "#377eb8", "#4daf4a", "#984ea3", "#ff7f00",
           "#ffff33", "#a65628", "#f781bf", "#999999"]
 # fmt:on
-
-
 def ofile(a, _, measure, problem, impl, nqubits, nlayers, diffmethod) -> Tuple[str, str]:
     """Produce the JSON file name containing the measurement configured and
     the Linux shell command which is expected to produce such file."""
@@ -276,8 +276,8 @@ def plot(a: ParsedArguments) -> None:
                 ]
             )
             if add_timeout:
-                dom = list(dom)+['Timeout']
-                rang = list(rang)+['grey']
+                dom = list(dom) + ["Timeout"]
+                rang = list(rang) + ["grey"]
             return alt.Color(
                 "impl:N",
                 title="Impl",
@@ -361,57 +361,89 @@ def plot(a: ParsedArguments) -> None:
         df = _filter("regular", "compile", "grover")
         xaxis = alt.Axis(values=list(range(MINQUBITS, MAXQUBITS + 2, 2)))
         xscale = alt.Scale(domain=(MINQUBITS, MAXQUBITS))
-        _plot_linechart(df, f"_img/regular_compile_{SYSHASH}.svg", _nqubitsEncoding,
-                        _mktitle("Compilation time, Regular circuits"), PL_L,
-                        axis=xaxis, scale=xscale)
+        _plot_linechart(
+            df,
+            f"_img/regular_compile_{SYSHASH}.svg",
+            _nqubitsEncoding,
+            _mktitle("Compilation time, Regular circuits"),
+            PL_L,
+            axis=xaxis,
+            scale=xscale,
+        )
 
         df = _filter("regular", "runtime", "grover")
-        _plot_linechart(df, f"_img/regular_runtime_{SYSHASH}.svg", _nqubitsEncoding,
-                        _mktitle("Running time, Regular circuits"), PL_L)
+        _plot_linechart(
+            df,
+            f"_img/regular_runtime_{SYSHASH}.svg",
+            _nqubitsEncoding,
+            _mktitle("Running time, Regular circuits"),
+            PL_L,
+        )
 
         df = _filter("deep", "compile", "grover")
         xaxis = alt.Axis(values=list(range(0, MAXLAYERS + 100, 100)))
         xscale = alt.Scale(domain=(0, MAXLAYERS))
-        _plot_linechart(df, f"_img/deep_compile_{SYSHASH}.svg", _nlayersEncoding,
-                        _mktitle("Compilation time, Deep circuits"), PLjax_L,
-                        axis=xaxis, scale=xscale)
+        _plot_linechart(
+            df,
+            f"_img/deep_compile_{SYSHASH}.svg",
+            _nlayersEncoding,
+            _mktitle("Compilation time, Deep circuits"),
+            PLjax_L,
+            axis=xaxis,
+            scale=xscale,
+        )
 
         df = _filter("deep", "runtime", "grover")
         xaxis = alt.Axis(values=list(range(0, MAXLAYERS + 100, 100)))
         xscale = alt.Scale(domain=(0, MAXLAYERS))
-        _plot_linechart(df, f"_img/deep_runtime_{SYSHASH}.svg", _nlayersEncoding,
-                        _mktitle("Running time, Deep circuits"), PL_L,
-                        axis=xaxis, scale=xscale)
+        _plot_linechart(
+            df,
+            f"_img/deep_runtime_{SYSHASH}.svg",
+            _nlayersEncoding,
+            _mktitle("Running time, Deep circuits"),
+            PL_L,
+            axis=xaxis,
+            scale=xscale,
+        )
 
         # Variational circuits, bar charts
         problem = "chemvqe"
         df_allgrad = _filter("variational", "runtime", problem)
-        for diffmethod in DIFF_METHODS[problem]:
-            try:
-                edm = (
-                    [diffmethod, diffmethod]
-                    if diffmethod not in ["adjoint", "backprop"]
-                    else ["adjoint", "backprop"]
-                )
-                df = df_allgrad[
-                    (df_allgrad["diffmethod"] == edm[0]) | (df_allgrad["diffmethod"] == edm[1])
-                ]
-                del df["diffmethod"]
-            except KeyError:
-                df = DataFrame()
+        dmsame = set(["adjoint", "backprop"])
+        for diffmethods in chain([set(x) for x in set(DIFF_METHODS[problem]) - dmsame], [dmsame]):
+            df = df_allgrad[
+                df_allgrad.get("diffmethod", pd.Series(float)).map(lambda m: m in diffmethods)
+            ]
             if len(df) > 0:
                 df = df.assign(timeout=False)
-                for nqubits in [4, 6, 8, 12]:
+                for nqubits in sorted(set(df["nqubits"])):
                     for impl in IMPLEMENTATIONS:
-                        if len(df[(df["nqubits"]==nqubits) & (df["impl"] == ALIASES[impl])]) == 0 and \
-                           len(df[df["impl"] == ALIASES[impl]]) > 0 and \
-                           len(df[df["nqubits"] == nqubits]) > 0:
-                            df = pd.concat([df,
-                                           DataFrame([[ALIASES[impl], 9, nqubits,
-                                                      float(a.timeout_1run) if a.timeout_1run else max(df["time"]), True]],
-                                                      columns=["impl","trial","nqubits","time","timeout"])])
+                        if (
+                            len(df[(df["nqubits"] == nqubits) & (df["impl"] == ALIASES[impl])]) == 0
+                            and len(df[df["impl"] == ALIASES[impl]]) > 0
+                            and len(df[df["nqubits"] == nqubits]) > 0
+                        ):
+                            df = pd.concat(
+                                [
+                                    df,
+                                    DataFrame(
+                                        [
+                                            [
+                                                ALIASES[impl],
+                                                9,
+                                                nqubits,
+                                                float(a.timeout_1run)
+                                                if a.timeout_1run
+                                                else max(df["time"]),
+                                                True,
+                                            ]
+                                        ],
+                                        columns=["impl", "trial", "nqubits", "time", "timeout"],
+                                    ),
+                                ]
+                            )
 
-                dmtitle = "_".join(sorted(set(edm)))
+                dmtitle = "_".join(sorted(diffmethods))
                 fname = f"_img/variational_runtime_{dmtitle.replace('-','')}_{SYSHASH}.svg"
                 print(f"Updating {fname}")
                 with _open(fname, "w") as f:
@@ -422,9 +454,11 @@ def plot(a: ParsedArguments) -> None:
                             .encode(
                                 x=alt.X("impl", title=None),
                                 y=timeEncoding,
-                                color=alt.condition("datum.timeout",
-                                                    alt.ColorValue("Grey"),
-                                                    _implEncoding(df, add_timeout=any(df["timeout"]))),
+                                color=alt.condition(
+                                    "datum.timeout",
+                                    alt.ColorValue("Grey"),
+                                    _implEncoding(df, add_timeout=any(df["timeout"])),
+                                ),
                                 opacity=trialEncoding,
                                 column=alt.Column("nqubits:N", title="# Qubits"),
                             )
