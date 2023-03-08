@@ -413,6 +413,9 @@ def cond(pred):
     'False' branch is optional. Refer to the example below to learn more about the syntax of this
     decorator.
 
+    This form of control flow can also be called from the Python interpreter without needing to use
+    :func:`~.qjit`.
+
     Args:
         pred (bool): the predicate with which to control the branch to execute
 
@@ -637,6 +640,9 @@ def while_loop(cond_fn):
     The final iteration values are also returned from the
     transformed function.
 
+    This form of control flow can also be called from the Python interpreter without needing to use
+    :func:`~.qjit`.
+
     The semantics of ``while_loop`` are given by the following Python pseudo-code:
 
     .. code-block:: python
@@ -822,6 +828,9 @@ def for_loop(lower_bound, upper_bound, step):
 
     The final iteration values are also returned from the transformed
     function.
+
+    This form of control flow can also be called from the Python interpreter without needing to use
+    :func:`~.qjit`.
 
     The semantics of ``for_loop`` are given by the following Python pseudo-code:
 
