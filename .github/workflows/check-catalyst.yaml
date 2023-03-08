@@ -321,6 +321,8 @@ jobs:
         if: ${{ matrix.simulator == 'lightning' }}
         run: |
             pushd runtime
+            C_COMPILER=$(which gcc) \
+            CXX_COMPILER=$(which g++) \
             RT_BUILD_DIR=../build \
             LIGHTNING_GIT_TAG_VALUE=$LIGHTNING_GIT_TAG_VALUE \
             QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build/" \
@@ -333,6 +335,8 @@ jobs:
         if: ${{ matrix.simulator == 'lightning-kokkos' }}
         run: |
             pushd runtime
+            C_COMPILER=$(which gcc) \
+            CXX_COMPILER=$(which g++) \
             RT_BUILD_DIR=../build \
             LIGHTNING_GIT_TAG_VALUE=$LIGHTNING_GIT_TAG_VALUE \
             QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build/" \
