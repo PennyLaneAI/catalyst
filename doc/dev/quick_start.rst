@@ -441,7 +441,7 @@ separate function. Both functions will be traced during compilation, but only on
 executed at runtime, depending of the value of a Boolean predicate. The JAX equivalent is the
 ``jax.lax.cond`` function, but this version is optimized to work with quantum programs in PennyLane.
 
-:func:`.cond` can also be interpreted without needing to compile its surrounding context.
+Note that :func:`.cond` can also be used outside of the :func:`.qjit` context for better interoperability with PennyLane.
 
 Values produced inside the scope of a conditional can be returned to the outside context, but
 the return type signature of each branch must be identical. If no values are returned, the
