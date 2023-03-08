@@ -353,7 +353,9 @@ jobs:
       - name: Build examples
         if: ${{ matrix.simulator == 'lightning' }}
         run: |
-          cd ./runtime/examples && make all BUILD_DIR=../../build
+          pushd runtime
+          CACHED_QIR=true make examples
+          popd
 
       - name: Create tests report
         run: |
