@@ -13,6 +13,7 @@ BUILD_TYPE?=Release
 
 coverage: CODE_COVERAGE=ON
 coverage: BUILD_TYPE=Debug
+test: BUILD_TYPE=Debug
 
 .PHONY: help
 help:
@@ -57,7 +58,7 @@ examples: | runtime
 	$(MAKE) -C examples all
 
 .PHONY: test
-test: | runtime
+test: | configure
 	@echo "test the Catalyst runtime test suite"
 	cmake --build $(RT_BUILD_DIR) --target runner_tests -j$(if $(nprocs:-=),$(nprocs),$$(nproc))
 	$(RT_BUILD_DIR)/tests/runner_tests

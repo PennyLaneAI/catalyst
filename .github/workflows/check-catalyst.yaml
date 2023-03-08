@@ -270,6 +270,7 @@ jobs:
         run: |
           pushd runtime
           RT_BUILD_DIR=../runtime-build \
+          LIGHTNING_GIT_TAG_VALUE=$LIGHTNING_GIT_TAG_VALUE \
           QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include" \
           QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build/" make runtime
           popd
@@ -319,24 +320,27 @@ jobs:
       - name: Build Runtime test suite for Lightning simulator
         if: ${{ matrix.simulator == 'lightning' }}
         run: |
-            cmake -S runtime -B build -G Ninja \
-                  -DCMAKE_BUILD_TYPE=Debug \
-                  -DENABLE_LIGHTNING_KOKKOS=OFF \
-                  -DLIGHTNING_GIT_TAG=$LIGHTNING_GIT_TAG_VALUE \
-                  -DQIR_STDLIB_LIB="$(pwd)/runtime/qir-stdlib-build/" \
-                  -DQIR_STDLIB_INCLUDES="$(pwd)/runtime/qir-stdlib-build/include/" \
-                  -DENABLE_CODE_COVERAGE=ON
-            cmake --build build --target runner_tests -j$(nproc)
+            pushd runtime
+            RT_BUILD_DIR=../build \
+            LIGHTNING_GIT_TAG_VALUE=$LIGHTNING_GIT_TAG_VALUE \
+            QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build/" \
+            QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include/" \
+            CODE_COVERAGE=ON \
+            make test
+            popd
 
       - name: Build Runtime test suite for Lightning-Kokkos simulator
         if: ${{ matrix.simulator == 'lightning-kokkos' }}
         run: |
-            cmake -S runtime -B build -G Ninja \
-                  -DCMAKE_BUILD_TYPE=Release \
-                  -DENABLE_LIGHTNING_KOKKOS=ON \
-                  -DQIR_STDLIB_LIB="$(pwd)/runtime/qir-stdlib-build/" \
-                  -DQIR_STDLIB_INCLUDES="$(pwd)/runtime/qir-stdlib-build/include/"
-            cmake --build build --target runner_tests -j$(nproc)
+            pushd runtime
+            RT_BUILD_DIR=../build \
+            LIGHTNING_GIT_TAG_VALUE=$LIGHTNING_GIT_TAG_VALUE \
+            QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build/" \
+            QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include/" \
+            CODE_COVERAGE=ON \
+            ENABLE_KOKKOS=ON \
+            make test
+            popd
 
       - name: Run tests
         run: |
