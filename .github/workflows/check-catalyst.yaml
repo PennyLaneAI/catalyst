@@ -325,9 +325,9 @@ jobs:
             LIGHTNING_GIT_TAG_VALUE=$LIGHTNING_GIT_TAG_VALUE \
             QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build/" \
             QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include/" \
-            CODE_COVERAGE=ON \
-            make test
+            make coverage
             popd
+            mv runtime/build/coverage.info coverage-${{ github.job }}.info
 
       - name: Build Runtime test suite for Lightning-Kokkos simulator
         if: ${{ matrix.simulator == 'lightning-kokkos' }}
@@ -341,13 +341,6 @@ jobs:
             ENABLE_KOKKOS=ON \
             make test
             popd
-
-      - name: Runtime Code Coverage
-        if: ${{ matrix.simulator == 'lightning' }}
-        run: |
-            lcov --directory build -b ./runtime/lib --capture --output-file build/coverage.info
-            lcov --remove build/coverage.info '/usr/*' '*/_deps/*' --output-file build/coverage.info
-            mv build/coverage.info coverage-${{ github.job }}.info
 
       - name: Upload code coverage results
         if: ${{ matrix.simulator == 'lightning' }}
