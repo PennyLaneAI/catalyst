@@ -420,7 +420,6 @@ def cond(pred):
         A callable decorator that wraps the 'True' branch of the conditional.
 
     Raises:
-        ValueError: Called outside the tape context.
         AssertionError: True- or False-branch functions cannot have arguments.
 
     **Example**
@@ -654,7 +653,6 @@ def while_loop(cond_fn):
         Callable: A wrapper around the while-loop function.
 
     Raises:
-        ValueError: Called outside the tape context.
         TypeError: Invalid return type of the condition expression.
 
     **Example**
@@ -845,9 +843,6 @@ def for_loop(lower_bound, upper_bound, step):
         which can be used arbitrarily inside the loop body. As the value of the index across
         iterations is handled automatically by the provided loop bounds, it must not be returned
         from the function.
-
-    Raises:
-        ValueError: Called outside the tape context.
 
     **Example**
 
