@@ -268,14 +268,11 @@ jobs:
 
       - name: Build Catalyst-Runtime
         run: |
-          cmake -S runtime -B runtime-build -G Ninja \
-                -DCMAKE_BUILD_TYPE=Release \
-                -DCMAKE_C_COMPILER=clang \
-                -DCMAKE_CXX_COMPILER=clang++ \
-                -DLIGHTNING_GIT_TAG=$LIGHTNING_GIT_TAG_VALUE \
-                -DQIR_STDLIB_LIB="$(pwd)/runtime/qir-stdlib-build/" \
-                -DQIR_STDLIB_INCLUDES="$(pwd)/runtime/qir-stdlib-build/include/"
-          cmake --build runtime-build --target rt_capi -j$(nproc)
+          pushd runtime
+          RT_BUILD_DIR=../runtime-build \
+          QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include" \
+          QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build/" make runtime
+          popd
 
       - name: Upload Catalyst-Runtime Artifact
         uses: actions/upload-artifact@v3
