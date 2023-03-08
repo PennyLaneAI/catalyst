@@ -275,7 +275,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          sudo apt-get -y -q install ninja-build make cmake gcc-10 g++-10 libomp-dev
+          sudo apt-get -y -q install ninja-build make cmake clang libomp-dev
           echo "LIGHTNING_GIT_TAG_VALUE=latest_release" >> $GITHUB_ENV
       - if: ${{ github.event_name == 'push' }}
         run: |
@@ -290,10 +290,12 @@ jobs:
       - name: Build Catalyst-Runtime
         run: |
           cmake -S runtime -B runtime-build -G Ninja \
-                            -DCMAKE_BUILD_TYPE=Release \
-                            -DLIGHTNING_GIT_TAG=$LIGHTNING_GIT_TAG_VALUE \
-                            -DQIR_STDLIB_LIB="$(pwd)/runtime/qir-stdlib-build/" \
-                            -DQIR_STDLIB_INCLUDES="$(pwd)/runtime/qir-stdlib-build/include/"
+                -DCMAKE_BUILD_TYPE=Release \
+                -DCMAKE_C_COMPILER=clang \
+                -DCMAKE_CXX_COMPILER=clang++ \
+                -DLIGHTNING_GIT_TAG=$LIGHTNING_GIT_TAG_VALUE \
+                -DQIR_STDLIB_LIB="$(pwd)/runtime/qir-stdlib-build/" \
+                -DQIR_STDLIB_INCLUDES="$(pwd)/runtime/qir-stdlib-build/include/"
           cmake --build runtime-build --target rt_capi -j$(nproc)
 
       - name: Upload Catalyst-Runtime Artifact
@@ -341,22 +343,23 @@ jobs:
       - name: Build Runtime test suite for Lightning simulator
         if: ${{ matrix.simulator == 'lightning' }}
         run: |
-            cmake -S runtime -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug \
-                                      -DENABLE_LIGHTNING_KOKKOS=OFF \
-                                      -DLIGHTNING_GIT_TAG=$LIGHTNING_GIT_TAG_VALUE \
-                                      -DQIR_STDLIB_LIB="$(pwd)/runtime/qir-stdlib-build/" \
-                                      -DQIR_STDLIB_INCLUDES="$(pwd)/runtime/qir-stdlib-build/include/" \
-                                      -DENABLE_CODE_COVERAGE=ON
+            cmake -S runtime -B build -G Ninja \
+                  -DCMAKE_BUILD_TYPE=Debug \
+                  -DENABLE_LIGHTNING_KOKKOS=OFF \
+                  -DLIGHTNING_GIT_TAG=$LIGHTNING_GIT_TAG_VALUE \
+                  -DQIR_STDLIB_LIB="$(pwd)/runtime/qir-stdlib-build/" \
+                  -DQIR_STDLIB_INCLUDES="$(pwd)/runtime/qir-stdlib-build/include/" \
+                  -DENABLE_CODE_COVERAGE=ON
             cmake --build build --target runner_tests -j$(nproc)
 
       - name: Build Runtime test suite for Lightning-Kokkos simulator
         if: ${{ matrix.simulator == 'lightning-kokkos' }}
         run: |
-            cmake -S runtime -B build -DCMAKE_BUILD_TYPE=Release \
-                                      -DENABLE_LIGHTNING_KOKKOS=ON \
-                                      -DQIR_STDLIB_LIB="$(pwd)/runtime/qir-stdlib-build/" \
-                                      -DQIR_STDLIB_INCLUDES="$(pwd)/runtime/qir-stdlib-build/include/" \
-                                      -G Ninja
+            cmake -S runtime -B build -G Ninja \
+                  -DCMAKE_BUILD_TYPE=Release \
+                  -DENABLE_LIGHTNING_KOKKOS=ON \
+                  -DQIR_STDLIB_LIB="$(pwd)/runtime/qir-stdlib-build/" \
+                  -DQIR_STDLIB_INCLUDES="$(pwd)/runtime/qir-stdlib-build/include/"
             cmake --build build --target runner_tests -j$(nproc)
 
       - name: Run tests
@@ -413,7 +416,7 @@ jobs:
 
     - name: Install Deps
       run: |
-        sudo apt-get install -y python3 python3-pip
+        sudo apt-get install -y python3 python3-pip libomp-dev
         python3 -m pip install lit pytest pytest-xdist pytest-cov nbmake nbconvert ipykernel matplotlib jaxopt
         python3 -m pip install jax==${{ steps.jax-version.outputs.v }} jaxlib==${{ steps.jax-version.outputs.v }}
         python3 -m pip install .
