@@ -354,15 +354,15 @@ jobs:
 
       - name: Create tests report
         run: |
-            mkdir -p ./build/tests/results
-            ./build/tests/runner_tests --reporter junit --out ./build/tests/results/tests_result.xml
+            mkdir -p ./runtime/build/tests/results
+            ./runtime/build/tests/runner_tests --reporter junit --out ./runtime/build/tests/results/tests_result.xml
 
       - name: Upload tests
         uses: actions/upload-artifact@v3
         if: always()
         with:
           name: runtime-linux-test-report
-          path: ./build/tests/results/tests_result.xml
+          path: ./runtime/build/tests/results/tests_result.xml
 
   frontend:
     name: Frontend Tests
