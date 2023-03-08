@@ -269,6 +269,7 @@ jobs:
       - name: Build Catalyst-Runtime
         run: |
           pushd runtime
+          CACHED_QIR=true \
           RT_BUILD_DIR=../runtime-build \
           QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include" \
           QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build/" make runtime
@@ -320,6 +321,7 @@ jobs:
         if: ${{ matrix.simulator == 'lightning' }}
         run: |
             pushd runtime
+            CACHED_QIR=true \
             C_COMPILER=$(which gcc) \
             CXX_COMPILER=$(which g++) \
             QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build/" \
@@ -332,6 +334,7 @@ jobs:
         if: ${{ matrix.simulator == 'lightning-kokkos' }}
         run: |
             pushd runtime
+            CACHED_QIR=true \
             C_COMPILER=$(which gcc) \
             CXX_COMPILER=$(which g++) \
             QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build/" \
