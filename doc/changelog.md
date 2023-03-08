@@ -10,8 +10,6 @@
 * Adds fallback compiler drivers to increase reliability during linking phase. Also adds support for a
   CATALYST_CC environment variable for manual specification of the compiler driver used for linking.
   [#30](https://github.com/PennyLaneAI/catalyst/pull/30)
-* Use Makefiles for CI/CD.
-  [#41](https://github.com/PennyLaneAI/catalyst/pull/41)
 
 <h3>Breaking changes</h3>
 
