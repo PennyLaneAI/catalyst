@@ -29,9 +29,6 @@ This release contains contributions from (in alphabetical order):
 
 <h3>Bug fixes</h3>
 
-* Fixes to codecov, build-lightning, and GH actions.
-  [#34](https://github.com/PennyLaneAI/catalyst/pull/34)
-
 * Fixes the Catalyst image path in the readme to properly render on PyPI.
 
 <h3>Contributors</h3>
