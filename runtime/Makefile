@@ -58,13 +58,13 @@ examples: | runtime
 	$(MAKE) -C examples all
 
 .PHONY: test
-test: | configure
+test: | qir configure
 	@echo "test the Catalyst runtime test suite"
 	cmake --build $(RT_BUILD_DIR) --target runner_tests -j$(if $(nprocs:-=),$(nprocs),$$(nproc))
 	$(RT_BUILD_DIR)/tests/runner_tests
 
 .PHONY: coverage
-coverage: configure | qir
+coverage: | qir configure
 	@echo "check C++ code coverage"
 
 	cmake --build $(RT_BUILD_DIR) --target runner_tests -j$(if $(nprocs:-=),$(nprocs),$$(nproc))
