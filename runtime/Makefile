@@ -31,10 +31,9 @@ help:
 .PHONY: all
 all: qir | runtime
 
-
-.PHONY: runtime qir
-runtime:
-	@echo "build Catalyst Runtime"
+.PHONY: configure
+configure:
+	@echo "Configure Catalyst Runtime"
 	cmake -G Ninja -B $(RT_BUILD_DIR) . \
 		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
 		-DLIGHTNING_GIT_TAG=$(LIGHTNING_GIT_TAG_VALUE) \
@@ -45,6 +44,9 @@ runtime:
 		-DQIR_STDLIB_INCLUDES=$(QIR_STDLIB_INCLUDES_DIR) \
 		-DENABLE_CODE_COVERAGE=$(CODE_COVERAGE)
 
+.PHONY: runtime qir
+runtime: configure
+	@echo "Build Catalyst Runtime"
 	cmake --build $(RT_BUILD_DIR) --target rt_capi -j$(if $(nprocs:-=),$(nprocs),$$(nproc))
 
 qir:
@@ -61,16 +63,8 @@ test: | runtime
 	$(RT_BUILD_DIR)/tests/runner_tests
 
 .PHONY: coverage
-coverage: | qir
+coverage: configure | qir
 	@echo "check C++ code coverage"
-	cmake -G Ninja -B $(RT_BUILD_DIR) . \
-		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
-		-DENABLE_LIGHTNING_KOKKOS=$(ENABLE_KOKKOS) \
-		-DCMAKE_C_COMPILER=$(C_COMPILER) \
-		-DCMAKE_CXX_COMPILER=$(CPP_COMPILER) \
-		-DQIR_STDLIB_LIB=$(QIR_STDLIB_DIR) \
-		-DQIR_STDLIB_INCLUDES=$(QIR_STDLIB_INCLUDES_DIR) \
-		-DENABLE_CODE_COVERAGE=$(CODE_COVERAGE)
 
 	cmake --build $(RT_BUILD_DIR) --target runner_tests -j$(if $(nprocs:-=),$(nprocs),$$(nproc))
 	$(RT_BUILD_DIR)/tests/runner_tests
