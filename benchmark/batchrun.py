@@ -410,7 +410,7 @@ def plot(a: ParsedArguments) -> None:
         problem = "chemvqe"
         df_allgrad = _filter("variational", "runtime", problem)
         dmsame = set(["adjoint", "backprop"])
-        for diffmethods in chain([set(x) for x in set(DIFF_METHODS[problem]) - dmsame], [dmsame]):
+        for diffmethods in chain([set([x]) for x in set(DIFF_METHODS[problem]) - dmsame], [dmsame]):
             df = df_allgrad[
                 df_allgrad.get("diffmethod", pd.Series(float)).map(lambda m: m in diffmethods)
             ]
