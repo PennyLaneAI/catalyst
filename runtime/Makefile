@@ -10,6 +10,7 @@ LIGHTNING_GIT_TAG_VALUE?=latest_release
 CODE_COVERAGE?=OFF
 ENABLE_KOKKOS?=OFF
 BUILD_TYPE?=Release
+CACHED_QIR?=
 
 coverage: CODE_COVERAGE=ON
 coverage: BUILD_TYPE=Debug
@@ -45,26 +46,23 @@ configure:
 		-DQIR_STDLIB_INCLUDES=$(QIR_STDLIB_INCLUDES_DIR) \
 		-DENABLE_CODE_COVERAGE=$(CODE_COVERAGE)
 
-.PHONY: runtime qir
-runtime: configure
-	@echo "Build Catalyst Runtime"
-	cmake --build $(RT_BUILD_DIR) --target rt_capi -j$(if $(nprocs:-=),$(nprocs),$$(nproc))
-
+.PHONY: qir
 qir:
 	$(MAKE) -C qir-stdlib qir
 
-.PHONY: examples
-examples: | runtime
-	$(MAKE) -C examples all
+.PHONY: runtime
+runtime: $(if $(CACHED_QIR), ,qir) configure
+	@echo "Build Catalyst Runtime"
+	cmake --build $(RT_BUILD_DIR) --target rt_capi -j$(if $(nprocs:-=),$(nprocs),$$(nproc))
 
 .PHONY: test
-test: | qir configure
+test: | $(if $(CACHED_QIR), ,qir) configure
 	@echo "test the Catalyst runtime test suite"
 	cmake --build $(RT_BUILD_DIR) --target runner_tests -j$(if $(nprocs:-=),$(nprocs),$$(nproc))
 	$(RT_BUILD_DIR)/tests/runner_tests
 
 .PHONY: coverage
-coverage: | qir configure
+coverage: | $(if $(CACHED_QIR), ,qir) configure
 	@echo "check C++ code coverage"
 
 	cmake --build $(RT_BUILD_DIR) --target runner_tests -j$(if $(nprocs:-=),$(nprocs),$$(nproc))
@@ -73,6 +71,10 @@ coverage: | qir configure
 	lcov --directory $(RT_BUILD_DIR) -b $(MK_DIR)/lib --capture --output-file $(RT_BUILD_DIR)/coverage.info
 	lcov --remove $(RT_BUILD_DIR)/coverage.info '/usr/*' '*/_deps/*' --output-file $(RT_BUILD_DIR)/coverage.info
 	genhtml $(RT_BUILD_DIR)/coverage.info --output-directory $(RT_BUILD_DIR)/cov -t "Catalyst Runtime C++ Coverage" --num-spaces 4
+
+.PHONY: examples
+examples: | runtime
+	$(MAKE) -C examples all
 
 .PHONY: clean
 clean:
