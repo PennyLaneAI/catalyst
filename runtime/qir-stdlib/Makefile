@@ -6,7 +6,7 @@ help:
 	@echo "  clean              to delete all temporary, cache, and build files"
 
 .PHONY: all
-all: stdlib
+all: qir
 
 .PHONY: qir
 qir:
