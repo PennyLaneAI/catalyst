@@ -413,6 +413,9 @@ def cond(pred):
     'False' branch is optional. Refer to the example below to learn more about the syntax of this
     decorator.
 
+    This form of control flow can also be called from the Python interpreter without needing to use
+    :func:`~.qjit`.
+
     Args:
         pred (bool): the predicate with which to control the branch to execute
 
@@ -420,7 +423,6 @@ def cond(pred):
         A callable decorator that wraps the 'True' branch of the conditional.
 
     Raises:
-        ValueError: Called outside the tape context.
         AssertionError: True- or False-branch functions cannot have arguments.
 
     **Example**
@@ -638,6 +640,9 @@ def while_loop(cond_fn):
     The final iteration values are also returned from the
     transformed function.
 
+    This form of control flow can also be called from the Python interpreter without needing to use
+    :func:`~.qjit`.
+
     The semantics of ``while_loop`` are given by the following Python pseudo-code:
 
     .. code-block:: python
@@ -654,7 +659,6 @@ def while_loop(cond_fn):
         Callable: A wrapper around the while-loop function.
 
     Raises:
-        ValueError: Called outside the tape context.
         TypeError: Invalid return type of the condition expression.
 
     **Example**
@@ -825,6 +829,9 @@ def for_loop(lower_bound, upper_bound, step):
     The final iteration values are also returned from the transformed
     function.
 
+    This form of control flow can also be called from the Python interpreter without needing to use
+    :func:`~.qjit`.
+
     The semantics of ``for_loop`` are given by the following Python pseudo-code:
 
     .. code-block:: python
@@ -845,9 +852,6 @@ def for_loop(lower_bound, upper_bound, step):
         which can be used arbitrarily inside the loop body. As the value of the index across
         iterations is handled automatically by the provided loop bounds, it must not be returned
         from the function.
-
-    Raises:
-        ValueError: Called outside the tape context.
 
     **Example**
 
