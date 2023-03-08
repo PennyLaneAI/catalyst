@@ -8,6 +8,8 @@ QIR_STDLIB_DIR?=$(MK_DIR)/qir-stdlib/target/release/
 QIR_STDLIB_INCLUDES_DIR?=$(MK_DIR)/qir-stdlib/target/release/build/include/
 LIGHTNING_GIT_TAG_VALUE?=latest_release
 CODE_COVERAGE?=OFF
+ENABLE_KOKKOS?=OFF
+BUILD_TYPE=Release
 
 coverage: CODE_COVERAGE=ON
 
@@ -35,7 +37,7 @@ runtime:
 	cmake -G Ninja -B $(RT_BUILD_DIR) . \
 		-DCMAKE_BUILD_TYPE=Release \
 		-DLIGHTNING_GIT_TAG=$(LIGHTNING_GIT_TAG_VALUE) \
-		-DENABLE_LIGHTNING_KOKKOS=$(if $(kokkos:-=),$(kokkos),OFF) \
+		-DENABLE_LIGHTNING_KOKKOS=$(ENABLE_KOKKOS) \
 		-DCMAKE_C_COMPILER=$(C_COMPILER) \
 		-DCMAKE_CXX_COMPILER=$(CPP_COMPILER) \
 		-DQIR_STDLIB_LIB=$(QIR_STDLIB_DIR) \
@@ -62,7 +64,7 @@ coverage: | qir
 	@echo "check C++ code coverage"
 	cmake -G Ninja -B $(RT_BUILD_DIR) . \
 		-DCMAKE_BUILD_TYPE=Debug \
-		-DENABLE_LIGHTNING_KOKKOS=$(if $(kokkos:-=),$(kokkos),OFF) \
+		-DENABLE_LIGHTNING_KOKKOS=$(ENABLE_KOKKOS) \
 		-DCMAKE_C_COMPILER=$(C_COMPILER) \
 		-DCMAKE_CXX_COMPILER=$(CPP_COMPILER) \
 		-DQIR_STDLIB_LIB=$(QIR_STDLIB_DIR) \
