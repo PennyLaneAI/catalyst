@@ -331,133 +331,59 @@ def plot(a: ParsedArguments) -> None:
             except KeyError:
                 return DataFrame()
 
-        df = _filter("regular", "compile", "grover")
-        if len(df) > 0:
-            xaxis = alt.Axis(values=list(range(MINQUBITS, MAXQUBITS + 2, 2)))
-            xscale = alt.Scale(domain=(MINQUBITS, MAXQUBITS))
-            print(f"Updating _img/regular_compile_{SYSHASH}.svg")
-            with _open(f"_img/regular_compile_{SYSHASH}.svg", "w") as f:
+        def _plot_linechart(df, fname, xenc, title, ref_ngates, **kwargs):
+            if len(df) == 0:
+                return
+            print(f"Updating {fname}")
+            with _open(fname, "w") as f:
                 f.write(
                     vlc.vegalite_to_svg(
                         alt.vconcat(
                             Chart(df)
                             .mark_line(point=True)
                             .encode(
-                                x=_nqubitsEncoding(title=None, axis=xaxis, scale=xscale),
+                                x=xenc(title=None, **kwargs),
                                 y=timeEncoding,
                                 color=_implEncoding(df),
                                 opacity=trialEncoding,
                                 strokeDash=implCLcondDash,
                                 strokeWidth=implCLcond,
                             )
-                            .properties(title=_mktitle("Compilation time, Regular circuits")),
-                            _mkfooter(df, _nqubitsEncoding(axis=xaxis, scale=xscale), PL_L),
+                            .properties(title=title),
+                            _mkfooter(df, xenc(**kwargs), ref_ngates),
                         )
                         .configure_axisLeft(minExtent=50)
                         .to_dict()
                     ),
                 )
+
+        # Regular and deep circuits, line charts
+        df = _filter("regular", "compile", "grover")
+        xaxis = alt.Axis(values=list(range(MINQUBITS, MAXQUBITS + 2, 2)))
+        xscale = alt.Scale(domain=(MINQUBITS, MAXQUBITS))
+        _plot_linechart(df, f"_img/regular_compile_{SYSHASH}.svg", _nqubitsEncoding,
+                        _mktitle("Compilation time, Regular circuits"), PL_L,
+                        axis=xaxis, scale=xscale)
 
         df = _filter("regular", "runtime", "grover")
-        if len(df) > 0:
-            print(f"Updating _img/regular_runtime_{SYSHASH}.svg")
-            with _open(f"_img/regular_runtime_{SYSHASH}.svg", "w") as f:
-                f.write(
-                    vlc.vegalite_to_svg(
-                        alt.vconcat(
-                            Chart(df)
-                            .mark_line(point=True)
-                            .encode(
-                                x=_nqubitsEncoding(title=None),
-                                y=timeEncoding,
-                                opacity=trialEncoding,
-                                color=_implEncoding(df),
-                                strokeDash=implCLcondDash,
-                                strokeWidth=implCLcond,
-                            )
-                            .properties(title=_mktitle("Running time, Regular circuits")),
-                            _mkfooter(df, _nqubitsEncoding(), PL_L),
-                        )
-                        .configure_axisLeft(minExtent=50)
-                        .to_dict()
-                    ),
-                )
+        _plot_linechart(df, f"_img/regular_runtime_{SYSHASH}.svg", _nqubitsEncoding,
+                        _mktitle("Running time, Regular circuits"), PL_L)
 
         df = _filter("deep", "compile", "grover")
-        if len(df) > 0:
-            xaxis = alt.Axis(values=list(range(0, MAXLAYERS + 100, 100)))
-            xscale = alt.Scale(domain=(0, MAXLAYERS))
-            print(f"Updating _img/deep_compile_{SYSHASH}.svg")
-            with _open(f"_img/deep_compile_{SYSHASH}.svg", "w") as f:
-                f.write(
-                    vlc.vegalite_to_svg(
-                        alt.vconcat(
-                            Chart(df)
-                            .mark_line(point=True)
-                            .encode(
-                                x=_nlayersEncoding(title=None, axis=xaxis, scale=xscale),
-                                y=timeEncoding,
-                                color=_implEncoding(df),
-                                opacity=trialEncoding,
-                                strokeDash=implCLcondDash,
-                                strokeWidth=implCLcond,
-                            )
-                            .properties(title=_mktitle("Compilation time, Deep circuits")),
-                            _mkfooter(df, _nlayersEncoding(axis=xaxis, scale=xscale), PLjax_L),
-                        )
-                        .configure_axisLeft(minExtent=50)
-                        .to_dict()
-                    ),
-                )
+        xaxis = alt.Axis(values=list(range(0, MAXLAYERS + 100, 100)))
+        xscale = alt.Scale(domain=(0, MAXLAYERS))
+        _plot_linechart(df, f"_img/deep_compile_{SYSHASH}.svg", _nlayersEncoding,
+                        _mktitle("Compilation time, Deep circuits"), PLjax_L,
+                        axis=xaxis, scale=xscale)
 
         df = _filter("deep", "runtime", "grover")
-        if len(df) > 0:
-            xaxis = alt.Axis(values=list(range(0, MAXLAYERS + 100, 100)))
-            xscale = alt.Scale(domain=(0, MAXLAYERS))
-            print(f"Updating _img/deep_runtime_{SYSHASH}.svg")
-            with _open(f"_img/deep_runtime_{SYSHASH}.svg", "w") as f:
-                f.write(
-                    vlc.vegalite_to_svg(
-                        alt.vconcat(
-                            Chart(df)
-                            .mark_line(point=True)
-                            .encode(
-                                x=_nlayersEncoding(title=None, axis=xaxis, scale=xscale),
-                                y=timeEncoding,
-                                color=_implEncoding(df),
-                                opacity=trialEncoding,
-                                strokeDash=implCLcondDash,
-                                strokeWidth=implCLcond,
-                            )
-                            .properties(title=_mktitle("Running time, Deep circuits")),
-                            _mkfooter(df, _nlayersEncoding(axis=xaxis, scale=xscale), PL_L),
-                        )
-                        .configure_axisLeft(minExtent=50)
-                        .to_dict()
-                    ),
-                )
+        xaxis = alt.Axis(values=list(range(0, MAXLAYERS + 100, 100)))
+        xscale = alt.Scale(domain=(0, MAXLAYERS))
+        _plot_linechart(df, f"_img/deep_runtime_{SYSHASH}.svg", _nlayersEncoding,
+                        _mktitle("Running time, Deep circuits"), PL_L,
+                        axis=xaxis, scale=xscale)
 
-        df = _filter("variational", "compile", "vqe")
-        if len(df) > 0:
-            print(f"Updating _img/variational_compile_{SYSHASH}.svg")
-            with _open(f"_img/variational_compile_{SYSHASH}.svg", "w") as f:
-                f.write(
-                    vlc.vegalite_to_svg(
-                        Chart(df)
-                        .mark_line(point=True)
-                        .encode(
-                            x=_nqubitsEncoding(),
-                            y=timeEncoding,
-                            color=_implEncoding(df),
-                            opacity=trialEncoding,
-                            strokeDash=implCLcondDash,
-                            strokeWidth=implCLcond,
-                        )
-                        .properties(title=_mktitle("Compilaiton time, Variational circuits"))
-                        .to_dict()
-                    ),
-                )
-
+        # Variational circuits, bar charts
         problem = "chemvqe"
         df_allgrad = _filter("variational", "runtime", problem)
         for diffmethod in DIFF_METHODS[problem]:
@@ -554,4 +480,4 @@ if __name__ == "__main__":
     if "plot" in a.actions:
         plot(a)
     else:
-        print("Skipping teh 'plot' action")
+        print("Skipping the 'plot' action")
