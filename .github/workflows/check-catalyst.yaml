@@ -495,6 +495,7 @@ jobs:
 
     - name: Check Catalyst Demos
       run: |
+        MDD_BENCHMARK_PRECISION=1 \
         pytest demos/*.ipynb --nbmake -n auto
 
     - name: Upload code coverage results

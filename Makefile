@@ -63,6 +63,7 @@ test-frontend:
 
 test-demos:
 	@echo "check the Catalyst demos"
+	MDD_BENCHMARK_PRECISION=1 \
 	$(PYTHON) pytest demos/*.ipynb --nbmake -n auto
 
 .PHONY: clean clean-all
