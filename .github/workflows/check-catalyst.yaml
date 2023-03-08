@@ -342,10 +342,6 @@ jobs:
             make test
             popd
 
-      - name: Run tests
-        run: |
-            ./build/tests/runner_tests -s
-
       - name: Runtime Code Coverage
         if: ${{ matrix.simulator == 'lightning' }}
         run: |
