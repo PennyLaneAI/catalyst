@@ -1,12 +1,19 @@
 PYTHON := python3
-C_COMPILER := $(if $(c_compiler:-=),$(c_compiler),clang)
-CPP_COMPILER := $(if $(cpp_compiler:-=),$(cpp_compiler),clang++)
+C_COMPILER?=clang
+CXX_COMPILER?=clang++
 MK_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 MK_DIR := $(dir $(MK_ABSPATH))
-RT_BUILD_DIR := $(if $(runtime_build_dir:-=),$(runtime_build_dir),$(MK_DIR)/build)
-QIR_STDLIB_DIR = $(if $(qir_stdlib_dir:-=),$(qir_stdlib_dir),"$(MK_DIR)/qir-stdlib/target/release/")
-QIR_STDLIB_INCLUDES_DIR=$(if $(qir_stdlib_include_dir:-=),$(qir_stdlib_include_dir),"$(MK_DIR)/qir-stdlib/target/release/build/include/")
+RT_BUILD_DIR?=$(MK_DIR)/build
+QIR_STDLIB_DIR?=$(MK_DIR)/qir-stdlib/target/release/
+QIR_STDLIB_INCLUDES_DIR?=$(MK_DIR)/qir-stdlib/target/release/build/include/
+LIGHTNING_GIT_TAG_VALUE?=latest_release
+CODE_COVERAGE?=OFF
+ENABLE_KOKKOS?=OFF
+BUILD_TYPE?=Release
 
+coverage: CODE_COVERAGE=ON
+coverage: BUILD_TYPE=Debug
+test: BUILD_TYPE=Debug
 
 .PHONY: help
 help:
@@ -23,52 +30,54 @@ help:
 	@echo "  check-tidy         to build Catalyst Runtime with RUNTIME_CLANG_TIDY=ON (requires clang-tidy)"
 
 .PHONY: all
-all: qir | runtime
+all: qir runtime
 
-.PHONY: runtime qir
-runtime:
-	@echo "build Catalyst Runtime"
+
+.PHONY: configure
+configure:
+	@echo "Configure Catalyst Runtime"
 	cmake -G Ninja -B $(RT_BUILD_DIR) . \
-		-DENABLE_LIGHTNING_KOKKOS=$(if $(kokkos:-=),$(kokkos),OFF) \
+		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
+		-DLIGHTNING_GIT_TAG=$(LIGHTNING_GIT_TAG_VALUE) \
+		-DENABLE_LIGHTNING_KOKKOS=$(ENABLE_KOKKOS) \
 		-DCMAKE_C_COMPILER=$(C_COMPILER) \
-		-DCMAKE_CXX_COMPILER=$(CPP_COMPILER) \
+		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \
 		-DQIR_STDLIB_LIB=$(QIR_STDLIB_DIR) \
 		-DQIR_STDLIB_INCLUDES=$(QIR_STDLIB_INCLUDES_DIR) \
-		-DENABLE_CODE_COVERAGE=OFF
+		-DENABLE_CODE_COVERAGE=$(CODE_COVERAGE)
 
+$(QIR_STDLIB_INCLUDES_DIR): qir-stdlib
+	$(MAKE) -C qir-stdlib all
+
+$(RT_BUILD_DIR)/lib/backend/librt_backend.so $(RT_BUILD_DIR)/lib/librt_capi.so: configure
 	cmake --build $(RT_BUILD_DIR) --target rt_capi -j$(if $(nprocs:-=),$(nprocs),$$(nproc))
 
-qir:
-	$(MAKE) -C qir-stdlib qir
+.PHONY: qir
+qir: $(QIR_STDLIB_INCLUDES_DIR)
 
-.PHONY: examples
-examples: | runtime
-	$(MAKE) -C examples all
+.PHONY: runtime
+runtime: qir $(RT_BUILD_DIR)/lib/backend/librt_backend.so $(RT_BUILD_DIR)/lib/librt_capi.so
+
+$(RT_BUILD_DIR)/tests/runner_tests: configure
+	cmake --build $(RT_BUILD_DIR) --target runner_tests -j$(if $(nprocs:-=),$(nprocs),$$(nproc))
 
 .PHONY: test
-test: | runtime
+test: $(RT_BUILD_DIR)/tests/runner_tests
 	@echo "test the Catalyst runtime test suite"
-	cmake --build $(RT_BUILD_DIR) --target runner_tests -j$(if $(nprocs:-=),$(nprocs),$$(nproc))
 	$(RT_BUILD_DIR)/tests/runner_tests
 
 .PHONY: coverage
-coverage: | qir
+coverage: $(RT_BUILD_DIR)/tests/runner_tests
 	@echo "check C++ code coverage"
-	cmake -G Ninja -B $(RT_BUILD_DIR) . \
-		-DCMAKE_BUILD_TYPE=Debug \
-		-DENABLE_LIGHTNING_KOKKOS=$(if $(kokkos:-=),$(kokkos),OFF) \
-		-DCMAKE_C_COMPILER=$(C_COMPILER) \
-		-DCMAKE_CXX_COMPILER=$(CPP_COMPILER) \
-		-DQIR_STDLIB_LIB=$(QIR_STDLIB_DIR) \
-		-DQIR_STDLIB_INCLUDES=$(QIR_STDLIB_INCLUDES_DIR) \
-		-DENABLE_CODE_COVERAGE=ON
 
-	cmake --build $(RT_BUILD_DIR) --target runner_tests -j$(if $(nprocs:-=),$(nprocs),$$(nproc))
 	$(RT_BUILD_DIR)/tests/runner_tests
-
 	lcov --directory $(RT_BUILD_DIR) -b $(MK_DIR)/lib --capture --output-file $(RT_BUILD_DIR)/coverage.info
 	lcov --remove $(RT_BUILD_DIR)/coverage.info '/usr/*' '*/_deps/*' --output-file $(RT_BUILD_DIR)/coverage.info
 	genhtml $(RT_BUILD_DIR)/coverage.info --output-directory $(RT_BUILD_DIR)/cov -t "Catalyst Runtime C++ Coverage" --num-spaces 4
+
+.PHONY: examples
+examples: runtime
+	$(MAKE) -C examples all
 
 .PHONY: clean
 clean:
@@ -93,7 +102,7 @@ check-tidy: | qir
 	rm -rf 
 	cmake -G Ninja -B $(MK_DIR)/BuildTidy . \
 		-DCMAKE_C_COMPILER=$(C_COMPILER) \
-		-DCMAKE_CXX_COMPILER=$(CPP_COMPILER) \
+		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \
 		-DQIR_STDLIB_LIB=$(QIR_STDLIB_DIR) \
 		-DQIR_STDLIB_INCLUDES=$(QIR_STDLIB_INCLUDES_DIR) \
 		-DRUNTIME_CLANG_TIDY=ON 

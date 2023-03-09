@@ -1,13 +1,13 @@
 
 PYTHON := python3
-C_COMPILER := $(if $(c_compiler:-=),$(c_compiler),clang)
-CPP_COMPILER := $(if $(cpp_compiler:-=),$(cpp_compiler),clang++)
+C_COMPILER?=clang
+CXX_COMPILER?=clang++
 MK_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 MK_DIR := $(dir $(MK_ABSPATH))
-DIALECTS_BUILD_DIR := $(if $(dialects_build_dir:-=),$(dialects_build_dir),$(MK_DIR)/build)
-LLVM_BUILD_DIR := $(if $(llvm_build_dir:-=),$(llvm_build_dir),$(MK_DIR)/llvm-project/build)
-MHLO_BUILD_DIR := $(if $(mhlo_build_dir:-=),$(mhlo_build_dir),$(MK_DIR)/mlir-hlo/build)
-RT_BUILD_DIR = $(if $(runtime_build_dir:-=),$(runtime_build_dir),$(MK_DIR)/../runtime/build)
+DIALECTS_BUILD_DIR?=$(MK_DIR)/build
+LLVM_BUILD_DIR?=$(MK_DIR)/llvm-project/build
+MHLO_BUILD_DIR?=$(MK_DIR)/mlir-hlo/build
+RT_BUILD_DIR?=$(MK_DIR)/../runtime/build
 
 .PHONY: help
 help:
@@ -37,7 +37,7 @@ llvm:
 		-DPython3_EXECUTABLE=$$(which $(PYTHON)) \
 		-DPython3_NumPy_INCLUDE_DIRS=$$($(PYTHON) -c "import numpy as np; print(np.get_include())") \
 		-DCMAKE_C_COMPILER=$(C_COMPILER) \
-		-DCMAKE_CXX_COMPILER=$(CPP_COMPILER) \
+		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \
 		-DLLVM_ENABLE_LLD=ON \
 		-DLLVM_CCACHE_BUILD=ON
 
@@ -51,7 +51,7 @@ mhlo: | llvm
 		-DLLVM_ENABLE_ASSERTIONS=ON \
 		-DMLIR_DIR=$(LLVM_BUILD_DIR)/lib/cmake/mlir \
 		-DCMAKE_C_COMPILER=$(C_COMPILER) \
-		-DCMAKE_CXX_COMPILER=$(CPP_COMPILER) \
+		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \
 		-DLLVM_ENABLE_LLD=ON \
 		-DLLVM_CCACHE_BUILD=ON
 
@@ -70,7 +70,7 @@ dialects:
 		-DRUNTIME_LIB_DIR=$(RT_BUILD_DIR)/lib \
 		-DMLIR_LIB_DIR=$(LLVM_BUILD_DIR)/lib \
 		-DCMAKE_C_COMPILER=$(C_COMPILER) \
-		-DCMAKE_CXX_COMPILER=$(CPP_COMPILER) \
+		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \
 		-DLLVM_ENABLE_LLD=ON \
 		-DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 

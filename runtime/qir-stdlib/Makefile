@@ -6,13 +6,15 @@ help:
 	@echo "  clean              to delete all temporary, cache, and build files"
 
 .PHONY: all
-all: stdlib
+all: qir
 
-.PHONY: qir
-qir:
+target:
 	@echo "build the QIR-stdlib Rust crate using cargo;"
 	@echo "this cargo requires the llvm-tools-preview rustup component"
 	cargo build --release
+
+.PHONY: qir
+qir: target
 
 .PHONY: clean
 clean:
