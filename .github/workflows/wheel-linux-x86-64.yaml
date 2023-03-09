@@ -211,9 +211,9 @@ jobs:
       run: |
         pushd runtime
         RT_BUILD_DIR=../runtime-build \
-          PYTHON=python${{ matrix.python_version }} \
-          QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include" \
-          QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build/" make runtime
+        PYTHON=python${{ matrix.python_version }} \
+        QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib/target/release/build/include" \
+        QIR_STDLIB_DIR="$(pwd)/qir-stdlib/target/release/" make runtime
         popd
 
     # Requirements:
