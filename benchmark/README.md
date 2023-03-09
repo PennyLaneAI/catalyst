@@ -40,7 +40,7 @@ Running
   $ python3 batchrun.py --measure runtime --category regular
   ```
 
-  The script runs series of measurements and saves results to the
+  The script runs a series of measurements and saves results to the
   hardcoded `./_benchmark/` folder as JSON files. The `--dry-run` flag is
   supported.
 
