@@ -10,7 +10,6 @@ LIGHTNING_GIT_TAG_VALUE?=latest_release
 CODE_COVERAGE?=OFF
 ENABLE_KOKKOS?=OFF
 BUILD_TYPE?=Release
-CACHED_QIR?=
 
 coverage: CODE_COVERAGE=ON
 coverage: BUILD_TYPE=Debug
@@ -31,7 +30,8 @@ help:
 	@echo "  check-tidy         to build Catalyst Runtime with RUNTIME_CLANG_TIDY=ON (requires clang-tidy)"
 
 .PHONY: all
-all: qir | runtime
+all: qir runtime
+
 
 .PHONY: configure
 configure:
@@ -46,34 +46,37 @@ configure:
 		-DQIR_STDLIB_INCLUDES=$(QIR_STDLIB_INCLUDES_DIR) \
 		-DENABLE_CODE_COVERAGE=$(CODE_COVERAGE)
 
-.PHONY: qir
-qir:
-	$(MAKE) -C qir-stdlib qir
+$(QIR_STDLIB_INCLUDES_DIR): qir-stdlib
+	$(MAKE) -C qir-stdlib all
 
-.PHONY: runtime
-runtime: $(if $(CACHED_QIR), ,qir) configure
-	@echo "Build Catalyst Runtime"
+$(RT_BUILD_DIR)/lib/backend/librt_backend.so $(RT_BUILD_DIR)/lib/librt_capi.so: configure
 	cmake --build $(RT_BUILD_DIR) --target rt_capi -j$(if $(nprocs:-=),$(nprocs),$$(nproc))
 
-.PHONY: test
-test: | $(if $(CACHED_QIR), ,qir) configure
-	@echo "test the Catalyst runtime test suite"
+.PHONY: qir
+qir: $(QIR_STDLIB_INCLUDES_DIR)
+
+.PHONY: runtime
+runtime: qir $(RT_BUILD_DIR)/lib/backend/librt_backend.so $(RT_BUILD_DIR)/lib/librt_capi.so
+
+$(RT_BUILD_DIR)/tests/runner_tests: configure
 	cmake --build $(RT_BUILD_DIR) --target runner_tests -j$(if $(nprocs:-=),$(nprocs),$$(nproc))
+
+.PHONY: test
+test: $(RT_BUILD_DIR)/tests/runner_tests
+	@echo "test the Catalyst runtime test suite"
 	$(RT_BUILD_DIR)/tests/runner_tests
 
 .PHONY: coverage
-coverage: | $(if $(CACHED_QIR), ,qir) configure
+coverage: $(RT_BUILD_DIR)/tests/runner_tests
 	@echo "check C++ code coverage"
 
-	cmake --build $(RT_BUILD_DIR) --target runner_tests -j$(if $(nprocs:-=),$(nprocs),$$(nproc))
 	$(RT_BUILD_DIR)/tests/runner_tests
-
 	lcov --directory $(RT_BUILD_DIR) -b $(MK_DIR)/lib --capture --output-file $(RT_BUILD_DIR)/coverage.info
 	lcov --remove $(RT_BUILD_DIR)/coverage.info '/usr/*' '*/_deps/*' --output-file $(RT_BUILD_DIR)/coverage.info
 	genhtml $(RT_BUILD_DIR)/coverage.info --output-directory $(RT_BUILD_DIR)/cov -t "Catalyst Runtime C++ Coverage" --num-spaces 4
 
 .PHONY: examples
-examples: | runtime
+examples: runtime
 	$(MAKE) -C examples all
 
 .PHONY: clean
