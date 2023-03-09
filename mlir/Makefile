@@ -8,6 +8,8 @@ DIALECTS_BUILD_DIR?=$(MK_DIR)/build
 LLVM_BUILD_DIR?=$(MK_DIR)/llvm-project/build
 MHLO_BUILD_DIR?=$(MK_DIR)/mlir-hlo/build
 RT_BUILD_DIR?=$(MK_DIR)/../runtime/build
+C_COMPILER_LAUNCHER?=ccache
+CXX_COMPILER_LAUNCHER?=ccache
 
 .PHONY: help
 help:
@@ -38,6 +40,8 @@ llvm:
 		-DPython3_NumPy_INCLUDE_DIRS=$$($(PYTHON) -c "import numpy as np; print(np.get_include())") \
 		-DCMAKE_C_COMPILER=$(C_COMPILER) \
 		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \
+		-DCMAKE_C_COMPILER_LAUNCHER=$(C_COMPILER_LAUNCHER) \
+		-DCMAKE_CXX_COMPILER_LAUNCHER=$(CXX_COMPILER_LAUNCHER) \
 		-DLLVM_ENABLE_LLD=ON
 
 	cmake --build $(LLVM_BUILD_DIR) --target check-mlir llvm-symbolizer
@@ -51,6 +55,8 @@ mhlo: | llvm
 		-DMLIR_DIR=$(LLVM_BUILD_DIR)/lib/cmake/mlir \
 		-DCMAKE_C_COMPILER=$(C_COMPILER) \
 		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \
+		-DCMAKE_C_COMPILER_LAUNCHER=$(C_COMPILER_LAUNCHER) \
+		-DCMAKE_CXX_COMPILER_LAUNCHER=$(CXX_COMPILER_LAUNCHER) \
 		-DLLVM_ENABLE_LLD=ON
 
 	cmake --build $(MHLO_BUILD_DIR) --target check-mlir-hlo
@@ -70,6 +76,8 @@ dialects:
 		-DMLIR_LIB_DIR=$(LLVM_BUILD_DIR)/lib \
 		-DCMAKE_C_COMPILER=$(C_COMPILER) \
 		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \
+		-DCMAKE_C_COMPILER_LAUNCHER=$(C_COMPILER_LAUNCHER) \
+		-DCMAKE_CXX_COMPILER_LAUNCHER=$(CXX_COMPILER_LAUNCHER) \
 		-DLLVM_ENABLE_LLD=ON
 
 	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects quantum-lsp-server

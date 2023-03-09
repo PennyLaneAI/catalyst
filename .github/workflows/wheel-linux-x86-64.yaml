@@ -95,6 +95,8 @@ jobs:
       run: |
         export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
         pushd mlir
+        C_COMPILER_LAUNCHER= \
+        CXX_COMPILER_LAUNCHER= \
         LLVM_BUILD_DIR="../llvm-build" MHLO_BUILD_DIR="../mhlo-build" make mhlo
         popd
 
@@ -194,6 +196,8 @@ jobs:
     - name: Build MLIR Python Bindings
       run: |
         pushd mlir
+        C_COMPILER_LAUNCHER= \
+        CXX_COMPILER_LAUNCHER= \
         PYTHON=python${{ matrix.python_version }} \
         LLVM_BUILD_DIR="../llvm-build" make llvm
         popd
@@ -202,6 +206,8 @@ jobs:
     - name: Build MLIR Dialects
       run: |
         pushd mlir
+        C_COMPILER_LAUNCHER= \
+        CXX_COMPILER_LAUNCHER= \
         PYTHON=python${{ matrix.python_version }} \
         LLVM_BUILD_DIR="../llvm-build" MHLO_BUILD_DIR="../mhlo-build" DIALECTS_BUILD_DIR="../quantum-build" make dialects
         popd
@@ -210,6 +216,8 @@ jobs:
     - name: Build Catalyst-Runtime
       run: |
         pushd runtime
+        C_COMPILER_LAUNCHER= \
+        CXX_COMPILER_LAUNCHER= \
         RT_BUILD_DIR=../runtime-build \
         PYTHON=python${{ matrix.python_version }} \
         QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib/target/release/build/include" \
