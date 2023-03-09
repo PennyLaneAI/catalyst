@@ -76,8 +76,8 @@ dialects:
 		-DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
 	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects quantum-lsp-server
-	find $(DIALECTS_BUILD_DIR)/python_packages/ -type l -exec sed --in-place 's/from \._ods_common /from jaxlib.mlir.dialects._ods_common /g' {} \;
-	patch -d $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum < patches/use-ir-from-jax.patch
+	patch -d $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum --follow-symlinks < patches/use-ir-from-jax.patch
+	patch -d $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/dialects --follow-symlinks < patches/use-cext-from-jax.patch
 
 .PHONY: test
 test:
