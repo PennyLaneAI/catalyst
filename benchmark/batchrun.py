@@ -233,6 +233,8 @@ def load(a: ParsedArguments) -> DataFrame:
                 data["nlayers"].append(nlayers)
                 data["ngates"].append(r.depth_gates)
                 data["diffmethod"].append(diffmethod)
+                to = float(a.timeout_1run) / len(r.measurement_sec) if a.timeout_1run else None
+                data["timeout"].append(to)
     if nmissing > 0:
         print(f"There are {nmissing} data records missing", file=sys.stderr)
         if a.verbose:
@@ -289,7 +291,10 @@ def plot(a: ParsedArguments) -> None:
             "trial", title="Trial", legend=alt.Legend(columns=1, labelLimit=240)
         )
 
-        timeEncoding = alt.Y("time", title="Time, sec", scale=alt.Scale(type="log"))
+        def _timeEncoding(mean:bool=False):
+            return alt.Y("mean(time):Q" if mean else "time:Q",
+                         title="Mean time, sec" if mean else "Time, sec",
+                         scale=alt.Scale(type="log"))
 
         def _nqubitsEncoding(title="# Qubits", **kwargs):
             return alt.X("nqubits", title=title, **kwargs)
@@ -343,7 +348,7 @@ def plot(a: ParsedArguments) -> None:
                             .mark_line(point=True)
                             .encode(
                                 x=xenc(title=None, **kwargs),
-                                y=timeEncoding,
+                                y=_timeEncoding(),
                                 color=_implEncoding(df),
                                 opacity=trialEncoding,
                                 strokeDash=implCLcondDash,
@@ -406,6 +411,31 @@ def plot(a: ParsedArguments) -> None:
             scale=xscale,
         )
 
+
+        def _add_timeouts(df):
+            for nqubits in sorted(set(df["nqubits"])):
+                for impl in sorted(set(df["impl"])):
+                    if len(df[(df["nqubits"] == nqubits) & (df["impl"] == impl)]) == 0:
+                        df = pd.concat(
+                            [
+                                df,
+                                DataFrame(
+                                    [
+                                        [
+                                            impl,
+                                            max(df["trial"]),
+                                            nqubits,
+                                            max(df[df["nqubits"] == nqubits]["timeout"]),
+                                            max(df[df["nqubits"] == nqubits]["timeout"]),
+                                        ]
+                                    ],
+                                    columns=["impl", "trial", "nqubits", "time", "timeout"],
+                                ),
+                            ]
+                        )
+            return df
+
+
         # Variational circuits, bar charts
         problem = "chemvqe"
         df_allgrad = _filter("variational", "runtime", problem)
@@ -415,47 +445,33 @@ def plot(a: ParsedArguments) -> None:
                 df_allgrad.get("diffmethod", pd.Series(float)).map(lambda m: m in diffmethods)
             ]
             if len(df) > 0:
-                df = df.assign(timeout=False)
-                for nqubits in sorted(set(df["nqubits"])):
-                    for impl in sorted(set(df["impl"])):
-                        if len(df[(df["nqubits"] == nqubits) & (df["impl"] == impl)]) == 0:
-                            df = pd.concat(
-                                [
-                                    df,
-                                    DataFrame(
-                                        [
-                                            [
-                                                impl,
-                                                9,
-                                                nqubits,
-                                                float(a.timeout_1run)
-                                                if a.timeout_1run
-                                                else max(df["time"]),
-                                                True,
-                                            ]
-                                        ],
-                                        columns=["impl", "trial", "nqubits", "time", "timeout"],
-                                    ),
-                                ]
-                            )
-
+                df = _add_timeouts(df)
                 dmtitle = "_".join(sorted(diffmethods))
                 fname = f"_img/variational_runtime_{dmtitle.replace('-','')}_{SYSHASH}.svg"
                 print(f"Updating {fname}")
                 with _open(fname, "w") as f:
                     f.write(
                         vlc.vegalite_to_svg(
-                            Chart(df)
-                            .mark_bar()
-                            .encode(
-                                x=alt.X("impl", title=None),
-                                y=timeEncoding,
-                                color=alt.condition(
-                                    "datum.timeout",
-                                    alt.ColorValue("Grey"),
-                                    _implEncoding(df, add_timeout=any(df["timeout"])),
+                            alt.layer(
+                                Chart(df)
+                                .mark_bar()
+                                .encode(
+                                    x=alt.X("impl", title=None),
+                                    y=alt.Y("mean(time):Q",
+                                            title="Mean time, sec",
+                                            scale=alt.Scale(type="log")),
+                                    color=alt.condition(
+                                        f"datum.mean_time >= {min(df['timeout'])}",
+                                        alt.ColorValue("Grey"),
+                                        _implEncoding(df, add_timeout=any(df["timeout"])),
+                                    ),
                                 ),
-                                opacity=trialEncoding,
+                                Chart().mark_errorbar(extent='stderr').encode(
+                                    x=alt.X("impl", title=None),
+                                    y="time:Q",
+                                ),
+                                data=df
+                            ).facet(
                                 column=alt.Column("nqubits:N", title="# Qubits"),
                             )
                             .properties(
@@ -468,7 +484,7 @@ def plot(a: ParsedArguments) -> None:
                     )
 
 
-# fmt:off
+# fmt: off
 ap = ArgumentParser(prog="batchrun.py")
 ap.add_argument("-m", "--measure", type=str, default="all",
                 help="Value to measure: compile|runtime|all, (default - 'all')")
