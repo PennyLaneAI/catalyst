@@ -1266,15 +1266,10 @@ def _qfor_lowering(
         loop_operands.append(p)
     loop_operands.extend(loop_args)
 
-    for_op_scf = ForOp(
-        ForOp.build_generic(
-            results=result_types,
-            operands=loop_operands,
-        )
-    )
+    for_op_scf = ForOp(loop_operands[0], loop_operands[1], loop_operands[2], iter_args=loop_args)
 
     name_stack = util.extend_name_stack(jax_ctx.module_context.name_stack, "for")
-    body_block = for_op_scf.regions[0].blocks.append(*loop_carry_types)
+    body_block = for_op_scf.body
     body_ctx = jax_ctx.module_context.replace(name_stack=xla.extend_name_stack(name_stack, "body"))
 
     with ir.InsertionPoint(body_block):
