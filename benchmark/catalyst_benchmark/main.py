@@ -10,6 +10,7 @@ from json import dump as json_dump, load as json_load
 from signal import signal, SIGALRM, setitimer, ITIMER_REAL
 from contextlib import contextmanager
 from traceback import print_exc
+from functools import partial
 
 from .types import Problem, BenchmarkResult, BooleanOptionalAction
 
@@ -106,6 +107,11 @@ def measure_compile_catalyst(a: Any) -> BenchmarkResult:
         from .vqe_catalyst import ProblemVQE, grad_descent as main
 
         t = ProblemVQE(qml.device("lightning.qubit", wires=a.nqubits), expansion_strategy="device")
+    elif a.problem == "chemvqe":
+        from .chemvqe_catalyst import ProblemCVQE, workflow as main
+
+        t = ProblemCVQE(qml.device("lightning.qubit", wires=a.nqubits),
+                       expansion_strategy="device")
     else:
         raise NotImplementedError(f"Unsupported problem {a.problem}")
 
@@ -220,15 +226,17 @@ def measure_compile_pennylanejax(a: Any) -> BenchmarkResult:
         def size(_):
             return None
 
-        t = ProblemVQE(
-            qml.device(device, wires=a.nqubits), interface=interface, expansion_strategy="device"
-        )
+        t = ProblemVQE(qml.device(device, wires=a.nqubits),
+                       grad=jax.grad,
+                       interface=interface,
+                       expansion_strategy="device")
 
-    # Note: Disabled due to a PennylaneJax diff. compile problem
-    # elif a.problem == "chemvqe":
-    #     from .chemvqe_pennylane import ProblemCVQE, workflow as main, size
-    #     t = ProblemCVQE(qml.device(device, wires=a.nqubits), interface=interface,
-    #                     diff_method=a.vqe_diff_method)
+    elif a.problem == "chemvqe":
+        from .chemvqe_pennylane import ProblemCVQE, workflow as main, size
+        t = ProblemCVQE(qml.device(device, wires=a.nqubits),
+                        grad=jax.grad,
+                        interface=interface,
+                        diff_method=a.vqe_diff_method)
     else:
         raise NotImplementedError(f"Unsupported problem {a.problem}")
 
@@ -281,11 +289,12 @@ def measure_runtime_pennylanejax(a: Any) -> BenchmarkResult:
         def size(_):
             return None
 
-    # Note: Disabled due to a PennylaneJax diff. compile problem
-    # elif a.problem == "chemvqe":
-    #     from .chemvqe_pennylane import ProblemCVQE, workflow as main, size
-    #     t = ProblemCVQE(qml.device(device, wires=a.nqubits), interface=interface,
-    #                     diff_method=a.vqe_diff_method)
+    elif a.problem == "chemvqe":
+        from .chemvqe_pennylane import ProblemCVQE, workflow as main, size
+        t = ProblemCVQE(qml.device(device, wires=a.nqubits),
+                        grad=jax.grad,
+                        interface=interface,
+                        diff_method=a.vqe_diff_method)
 
     else:
         raise NotImplementedError(f"Unsupported problme {a.problem}")
@@ -383,7 +392,9 @@ def measure_runtime_pennylane(a: Any) -> BenchmarkResult:
     elif a.problem == "chemvqe":
         from .chemvqe_pennylane import ProblemCVQE, workflow as main, size
 
-        t = ProblemCVQE(qml.device(device, wires=a.nqubits), diff_method=a.vqe_diff_method)
+        t = ProblemCVQE(qml.device(device, wires=a.nqubits),
+                        grad=partial(qml.grad, argnum=0),
+                        diff_method=a.vqe_diff_method)
 
     else:
         raise NotImplementedError(f"Unsupported problme {a.problem}")
@@ -437,9 +448,10 @@ def selfcheck(ap):
     def _runall(cmdline_fn, atol=1e-5):
         r1 = None
         for m, i in REGISTRY.keys():
+            a = parse_args(ap, cmdline_fn(m, i))
             try:
-                r = REGISTRY[(m, i)](parse_args(ap, cmdline_fn(m, i)))
-                print(f"Checking {(m,i)}")
+                r = REGISTRY[(m, i)](a)
+                print(f"Checking {(a.problem, m, i)}")
                 if r1 is None:
                     r1 = r
                 else:
@@ -447,7 +459,7 @@ def selfcheck(ap):
                         np.array(r1.numeric_result), np.array(r.numeric_result), atol=atol
                     )
             except NotImplementedError as e:
-                print(f"Skipping {(m,i)} due to: {e}")
+                print(f"Skipping {(a.problem, m, i)} due to: {e}")
 
     # fmt: off
     _runall(lambda m, i: ["run", "-p", "chemvqe", "-m", m, "-i", i, "-n", "1",

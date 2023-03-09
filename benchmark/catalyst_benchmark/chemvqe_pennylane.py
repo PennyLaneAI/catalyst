@@ -1,13 +1,14 @@
 import pennylane.numpy as pnp
 import pennylane as qml
+import numpy as np
 
 from typing import Any, Dict
 from dataclasses import dataclass
 from dataclasses_json import dataclass_json
 from pennylane import AllSinglesDoubles
+from functools import partial
 
 from .types import Problem
-
 
 @dataclass_json
 @dataclass
@@ -31,9 +32,10 @@ PROBLEMS: Dict[NQubits, ProblemInfo] = {
 
 
 class ProblemCVQE(Problem):
-    def __init__(self, dev, nsteps=10, **qnode_kwargs):
+    def __init__(self, dev, grad, nsteps=10, **qnode_kwargs):
         super().__init__(dev, **qnode_kwargs)
         self.nsteps = nsteps
+        self.grad = grad
         pi = ProblemInfo.from_dict(PROBLEMS[self.nqubits])
         molname, basis, bond = pi.molname, pi.basis, pi.bond
         data = qml.data.load("qchem", molname=molname, basis=basis, bondlength=bond)[0]
@@ -54,10 +56,10 @@ def workflow(p: ProblemCVQE, params):
     @qml.qnode(p.dev, **p.qnode_kwargs)
     def circuit(params):
         AllSinglesDoubles(params, range(p.nqubits), p.hf_state, p.singles, p.doubles)
-        return qml.expval(p.ham)
+        return qml.expval(qml.Hamiltonian(np.array(p.ham.coeffs), p.ham.ops))
 
     stepsize = 0.5
-    diff = qml.grad(circuit, argnum=0)
+    diff = p.grad(circuit)
     theta = params
 
     for i in range(p.nsteps):
@@ -80,7 +82,9 @@ NSTEPS = 1
 
 def run_default_qubit(N=6):
     p = ProblemCVQE(
-        qml.device("default.qubit", wires=N, shots=SHOTS), nsteps=NSTEPS, diff_method=DIFFMETHOD
+        qml.device("default.qubit", wires=N, shots=SHOTS),
+        grad=partial(qml.grad, argnum=0),
+        nsteps=NSTEPS, diff_method=DIFFMETHOD
     )
     print(f"Size: {size(p)}")
 
@@ -93,7 +97,10 @@ def run_default_qubit(N=6):
 
 def run_lightning_qubit(N=6):
     p = ProblemCVQE(
-        qml.device("lightning.qubit", wires=N, shots=SHOTS), nsteps=NSTEPS, diff_method=DIFFMETHOD
+        qml.device("lightning.qubit", wires=N, shots=SHOTS),
+        grad=partial(qml.grad, argnum=0),
+        nsteps=NSTEPS,
+        diff_method=DIFFMETHOD
     )
     print(f"Size: {size(p)}")
 
@@ -113,6 +120,7 @@ def run_jax_(devname, N=6):
 
     p = ProblemCVQE(
         dev=qml.device(devname, wires=N, shots=SHOTS),
+        grad=jax.grad,
         nsteps=NSTEPS,
         interface="jax",
         diff_method=DIFFMETHOD,
