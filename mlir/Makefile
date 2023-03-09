@@ -78,8 +78,8 @@ dialects:
 	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects quantum-lsp-server
 	find $(DIALECTS_BUILD_DIR)/python_packages/ -type l -exec sed --in-place 's/from \._ods_common /from jaxlib.mlir.dialects._ods_common /g' {} \;
 	find $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/dialects/ -maxdepth 1 -type f -exec sed --in-place 's/from \. /from jaxlib.mlir.dialects /g' {} \;
-	patch -p0 < patches/add-constructor-for-from-elements-op.patch
-	patch -p0 < patches/use-ir-from-jax.patch
+	patch -d $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/dialects < patches/add-constructor-for-from-elements-op.patch
+	patch -d $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum < patches/use-ir-from-jax.patch
 
 .PHONY: test
 test:
