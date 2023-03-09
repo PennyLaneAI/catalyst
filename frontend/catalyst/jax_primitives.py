@@ -1064,15 +1064,10 @@ def _qcond_lowering(
 
     pred_extracted = TensorExtractOp(ir.IntegerType.get_signless(1), pred, []).result
 
-    if_op_scf = IfOp(
-        IfOp.build_generic(
-            results=result_types,
-            operands=get_op_results_or_values([pred_extracted]),
-        )
-    )
+    if_op_scf = IfOp(pred_extracted, result_types, hasElse=True)
 
     # if block
-    if_block = if_op_scf.regions[0].blocks.append()
+    if_block = if_op_scf.then_block
     name_stack = util.extend_name_stack(jax_ctx.module_context.name_stack, "if")
     if_ctx = jax_ctx.module_context.replace(name_stack=xla.extend_name_stack(name_stack, "if"))
     with ir.InsertionPoint(if_block):
@@ -1089,7 +1084,7 @@ def _qcond_lowering(
         YieldOp([o[0] for o in out[0]])
 
     # else block
-    else_block = if_op_scf.regions[1].blocks.append()
+    else_block = if_op_scf.else_block
     name_stack = util.extend_name_stack(jax_ctx.module_context.name_stack, "else")
     else_ctx = jax_ctx.module_context.replace(name_stack=xla.extend_name_stack(name_stack, "else"))
     with ir.InsertionPoint(else_block):
