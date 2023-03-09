@@ -133,7 +133,7 @@ def measure_compile_catalyst(a: Any) -> BenchmarkResult:
     r = jit_main(weights).tolist() if a.numerical_check else None
 
     return BenchmarkResult.fromMeasurements(
-        r, a.argv, prep=None, times=times, depth=None, versions=versions
+        r, a.argv, prep=None, times=times, depth=None, versions=versions, timeout=a.timeout
     )
 
 
@@ -191,7 +191,7 @@ def measure_runtime_catalyst(a: Any) -> BenchmarkResult:
         times.append(e - b)
 
     return BenchmarkResult.fromMeasurements(
-        r.tolist(), a.argv, cmptime, times, depth=None, versions=versions
+        r.tolist(), a.argv, cmptime, times, depth=None, versions=versions, timeout=a.timeout
     )
 
 
@@ -258,7 +258,7 @@ def measure_compile_pennylanejax(a: Any) -> BenchmarkResult:
     r = jax_main(weights).tolist() if a.numerical_check else None
 
     return BenchmarkResult.fromMeasurements(
-        r, a.argv, None, times, depth=size(t), versions=versions
+        r, a.argv, None, times, depth=size(t), versions=versions, timeout=a.timeout
     )
 
 
@@ -320,7 +320,7 @@ def measure_runtime_pennylanejax(a: Any) -> BenchmarkResult:
         times.append(e - b)
 
     return BenchmarkResult.fromMeasurements(
-        r.tolist(), a.argv, cmptime, times, depth=size(t), versions=versions
+        r.tolist(), a.argv, cmptime, times, depth=size(t), versions=versions, timeout=a.timeout
     )
 
 
@@ -363,7 +363,7 @@ def measure_compile_pennylane(a: Any) -> BenchmarkResult:
     r = qml_main(weights).tolist() if a.numerical_check else None
 
     return BenchmarkResult.fromMeasurements(
-        r, a.argv, None, times, depth=size(t), versions=versions
+        r, a.argv, None, times, depth=size(t), versions=versions, timeout=a.timeout
     )
 
 
@@ -421,7 +421,7 @@ def measure_runtime_pennylane(a: Any) -> BenchmarkResult:
         times.append(e - b)
 
     return BenchmarkResult.fromMeasurements(
-        r.tolist(), a.argv, preptime, times, depth=size(t), versions=versions
+        r.tolist(), a.argv, preptime, times, depth=size(t), versions=versions, timeout=a.timeout
     )
 
 
