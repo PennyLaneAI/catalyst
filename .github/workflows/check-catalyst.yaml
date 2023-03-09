@@ -66,6 +66,8 @@ jobs:
         # echo 'target_compile_options(mlir_c_runner_utils PRIVATE "-fno-sanitize=all")' \
         #       >> mlir/llvm-project/mlir/lib/ExecutionEngine/CMakeLists.txt
         pushd mlir
+        CMAKE_C_COMPILER_LAUNCHER=ccache \
+        CMAKE_CXX_COMPILER_LAUNCHER=ccache \
         LLVM_BUILD_DIR=../llvm-build make llvm
         popd
 
@@ -122,6 +124,8 @@ jobs:
       run: |
         export CCACHE_DIR=$GITHUB_WORKSPACE/.ccache
         pushd mlir
+        CMAKE_C_COMPILER_LAUNCHER=ccache \
+        CMAKE_CXX_COMPILER_LAUNCHER=ccache \
         LLVM_BUILD_DIR="../llvm-build" MHLO_BUILD_DIR="../mhlo-build" DIALECTS_BUILD_DIR="../quantum-build" make dialects
         popd
 
@@ -200,6 +204,8 @@ jobs:
       if: steps.cache-mhlo.outputs.cache-hit != 'true'
       run: |
         pushd mlir
+        CMAKE_C_COMPILER_LAUNCHER=ccache \
+        CMAKE_CXX_COMPILER_LAUNCHER=ccache \
         LLVM_BUILD_DIR="../llvm-build" MHLO_BUILD_DIR="../mhlo-build" make mhlo
         popd
 
