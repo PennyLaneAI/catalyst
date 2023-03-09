@@ -269,7 +269,6 @@ jobs:
       - name: Build Catalyst-Runtime
         run: |
           pushd runtime
-          CACHED_QIR=true \
           RT_BUILD_DIR=../runtime-build \
           QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include" \
           QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build/" make runtime
