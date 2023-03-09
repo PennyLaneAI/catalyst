@@ -3,10 +3,6 @@ build
 debug
 __pycache__
 pennylane_catalyst.egg-info
-*mlir
-*\.ll
-*\.o
-*\.so
 
 # Testing files and directories
 .lit
