@@ -351,12 +351,6 @@ jobs:
         name: quantum-build
         path: quantum-build
 
-    - name: Caching System Files Workaround
-      run: |  # TODO: revisit once actions/cache has a sudo option
-        sudo mv /usr/bin/tar /usr/bin/tar.orig
-        printf '#!/bin/sh\nexec sudo /usr/bin/tar.orig "$@"\n' | sudo tee /usr/bin/tar
-        sudo chmod +x /usr/bin/tar
-
     - name: Download Catalyst-Runtime Artifact
       uses: actions/download-artifact@v3
       with:
