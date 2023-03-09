@@ -91,13 +91,16 @@ class BenchmarkResult(BenchmarkResultV1):
     """
 
     versions: Dict[str, str]
+    timeout_sec: Optional[float]
 
     @classmethod
     def fromMeasurements(
-        cls, nr, argv, prep, times, depth: Optional[int], versions: Dict[str, str]
+        cls, nr, argv, prep, times, depth: Optional[int], versions: Dict[str, str],
+        timeout: Optional[float]
     ):
         return BenchmarkResult(
-            Sysinfo.fromOS(), unpack_complex(nr) if nr else None, depth, argv, prep, times, versions
+            Sysinfo.fromOS(), unpack_complex(nr) if nr else None, depth, argv, prep, times,
+            versions, float(timeout)
         )
 
 
