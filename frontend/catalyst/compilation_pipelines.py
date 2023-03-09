@@ -31,24 +31,14 @@ from jax.interpreters.mlir import ir
 
 import pennylane as qml
 
+from mlir_quantum.runtime import get_ranked_memref_descriptor, ranked_memref_to_numpy
+
 import catalyst.jax_tracer as tracer
 from catalyst import compiler
 from catalyst.utils.gen_mlir import append_modules
 from catalyst.utils.patching import Patcher
 from catalyst.pennylane_extensions import QFunc
-from catalyst._configuration import INSTALLED
 from catalyst.utils.tracing import TracingContext
-
-default_bindings_path = os.path.join(
-    os.path.dirname(__file__), "../../mlir/build/python_packages/quantum"
-)
-if not INSTALLED and os.path.exists(default_bindings_path):  # pragma: no cover
-    import sys
-
-    sys.path.insert(0, default_bindings_path)
-
-# pylint: disable=wrong-import-position,wrong-import-order
-from mlir_quantum.runtime import get_ranked_memref_descriptor, ranked_memref_to_numpy
 
 # Required for JAX tracer objects as PennyLane wires.
 # pylint: disable=unnecessary-lambda

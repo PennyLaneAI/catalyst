@@ -15,38 +15,19 @@
 of quantum operations, measurements, and observables to JAXPR.
 """
 
-import os
 import numpy as np
 
 import jax
 from jax.interpreters import mlir, xla
 from jax._src import util
 from jax._src.lib.mlir import ir
-from jaxlib.mlir.dialects._ods_common import get_op_results_or_values
 from jaxlib.mlir.dialects._func_ops_gen import CallOp
 from jaxlib.mlir.dialects._mhlo_ops_gen import ConstantOp, ConvertOp
 
-from catalyst._configuration import INSTALLED
-from catalyst.utils.calculate_grad_shape import calculate_grad_shape, Signature
-
-default_bindings_path = os.path.join(
-    os.path.dirname(__file__), "../../mlir/build/python_packages/quantum"
-)
-if not INSTALLED and os.path.exists(default_bindings_path):  # pragma: no cover
-    import sys
-
-    sys.path.insert(0, default_bindings_path)
-
-# pylint: disable=wrong-import-position,wrong-import-order
 from mlir_quantum.dialects.arith import IndexCastOp
-
-# pylint: disable=wrong-import-position,wrong-import-order
 from mlir_quantum.dialects.tensor import ExtractOp as TensorExtractOp, FromElementsOp
-
-# pylint: disable=wrong-import-position,wrong-import-order
 from mlir_quantum.dialects.scf import IfOp, ConditionOp, ForOp, WhileOp, YieldOp
-
-# pylint: disable=wrong-import-position,wrong-import-order
+from mlir_quantum.dialects.gradient import GradOp
 from mlir_quantum.dialects.quantum import (
     SampleOp,
     CountsOp,
@@ -69,8 +50,7 @@ from mlir_quantum.dialects.quantum import (
     HamiltonianOp,
 )
 
-# pylint: disable=wrong-import-position,wrong-import-order
-from mlir_quantum.dialects.gradient import GradOp
+from catalyst.utils.calculate_grad_shape import calculate_grad_shape, Signature
 
 
 #########
