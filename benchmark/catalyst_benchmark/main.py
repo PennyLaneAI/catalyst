@@ -111,7 +111,8 @@ def measure_compile_catalyst(a: Any) -> BenchmarkResult:
         from .chemvqe_catalyst import ProblemCVQE, workflow as main
 
         t = ProblemCVQE(qml.device("lightning.qubit", wires=a.nqubits),
-                       expansion_strategy="device")
+                        diff_method=a.vqe_diff_method,
+                        expansion_strategy="device")
     else:
         raise NotImplementedError(f"Unsupported problem {a.problem}")
 

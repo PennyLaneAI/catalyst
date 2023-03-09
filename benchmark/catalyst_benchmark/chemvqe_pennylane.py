@@ -4,56 +4,54 @@ import numpy as np
 
 from typing import Any, Dict
 from dataclasses import dataclass
-from dataclasses_json import dataclass_json
 from pennylane import AllSinglesDoubles
 from functools import partial
 
 from .types import Problem
 
-@dataclass_json
 @dataclass
 class ProblemInfo:
-    molname: str
-    basis: str
+    name: str
     bond: float
-    qubits: int
-    gate_count: int
 
 
+# fmt:off
 NQubits = int
 PROBLEMS: Dict[NQubits, ProblemInfo] = {
-    4: {"molname": "HeH+", "basis": "6-31G", "bond": "0.5", "qubits": 4, "gate_count": 4},
-    6: {"molname": "H3+", "basis": "STO-3G", "bond": "0.5", "qubits": 6, "gate_count": 9},
-    8: {"molname": "H4", "basis": "STO-3G", "bond": "0.5", "qubits": 8, "gate_count": 27},
-    12: {"molname": "HF", "basis": "STO-3G", "bond": "0.5", "qubits": 12, "gate_count": 36},
-    14: {"molname": "BeH2", "basis": "STO-3G", "bond": "0.5", "qubits": 14, "gate_count": 205},
-    16: {"molname": "H8", "basis": "STO-3G", "bond": "0.5", "qubits": 16, "gate_count": 361},
+    4:  ProblemInfo('HeH+', 0.775),  # 4 qubit
+    6:  ProblemInfo('H3+',  0.874),  # 6 qubit
+    8:  ProblemInfo('H4',   1.00),   # 8 qubit
+    12: ProblemInfo('HF',   0.917), # 12 qubit
+    14: ProblemInfo('BeH2', 1.300), # 14 qubit
+    16: ProblemInfo('H8',   1.00),  # 16 qubit
 }
+# fmt:on
 
 
 class ProblemCVQE(Problem):
-    def __init__(self, dev, grad, nsteps=10, **qnode_kwargs):
+    def __init__(self, dev, diff_method, grad, nsteps=10, **qnode_kwargs):
         super().__init__(dev, **qnode_kwargs)
         self.nsteps = nsteps
         self.grad = grad
-        pi = ProblemInfo.from_dict(PROBLEMS[self.nqubits])
-        molname, basis, bond = pi.molname, pi.basis, pi.bond
-        data = qml.data.load("qchem", molname=molname, basis=basis, bondlength=bond)[0]
-        symbols = data.molecule.symbols
-        geometry = data.molecule.coordinates
+        self.diff_method = diff_method
+        pi = PROBLEMS[self.nqubits]
+        data = qml.data.load("qchem", molname=pi.name, basis="STO-3G", bondlength=pi.bond)[0]
         electrons = data.molecule.n_electrons
-        self.ham, qubits = qml.qchem.molecular_hamiltonian(symbols, geometry)
+        qubits =    data.molecule.n_orbitals * 2
         assert qubits == self.nqubits
+        ham =       data.hamiltonian
         self.hf_state = qml.qchem.hf_state(electrons, qubits)
         self.singles, self.doubles = qml.qchem.excitations(electrons, qubits)
         self.excitations = self.singles + self.doubles
+        self.ham = ham
+
 
     def trial_params(self, _: int) -> Any:
-        return pnp.ones(len(self.excitations), dtype=pnp.float64)
+        return pnp.zeros(len(self.excitations), dtype=pnp.float64)
 
 
 def workflow(p: ProblemCVQE, params):
-    @qml.qnode(p.dev, **p.qnode_kwargs)
+    @qml.qnode(p.dev, diff_method=p.diff_method, **p.qnode_kwargs)
     def circuit(params):
         AllSinglesDoubles(params, range(p.nqubits), p.hf_state, p.singles, p.doubles)
         return qml.expval(qml.Hamiltonian(np.array(p.ham.coeffs), p.ham.ops))
