@@ -1,5 +1,5 @@
 
-PYTHON := python3
+PYTHON?=python3
 C_COMPILER?=clang
 CXX_COMPILER?=clang++
 MK_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
@@ -34,7 +34,7 @@ llvm:
 		-DLLVM_ENABLE_PROJECTS="mlir" \
 		-DLLVM_ENABLE_ASSERTIONS=ON \
 		-DMLIR_ENABLE_BINDINGS_PYTHON=ON \
-		-DPython3_EXECUTABLE=$$(which $(PYTHON)) \
+		-DPython3_EXECUTABLE=$(PYTHON) \
 		-DPython3_NumPy_INCLUDE_DIRS=$$($(PYTHON) -c "import numpy as np; print(np.get_include())") \
 		-DCMAKE_C_COMPILER=$(C_COMPILER) \
 		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \
@@ -65,7 +65,7 @@ dialects:
 		-DCMAKE_BUILD_TYPE=Release \
 		-DLLVM_ENABLE_ASSERTIONS=ON \
 		-DQUANTUM_ENABLE_BINDINGS_PYTHON=ON \
-		-DPython3_EXECUTABLE="$$(which $(PYTHON))" \
+		-DPython3_EXECUTABLE="$(PYTHON)" \
 		-DMLIR_DIR=$(LLVM_BUILD_DIR)/lib/cmake/mlir \
 		-DMHLO_BINARY_DIR=$(MHLO_BUILD_DIR)/bin \
 		-DRUNTIME_LIB_DIR=$(RT_BUILD_DIR)/lib \
