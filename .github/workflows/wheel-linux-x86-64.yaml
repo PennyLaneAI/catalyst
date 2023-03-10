@@ -47,9 +47,11 @@ jobs:
 
     - name: Clone LLVM Submodule
       if: steps.cache-llvm-source.outputs.cache-hit != 'true'
-      run: |
-        git submodule update --init mlir/llvm-project
-        [ $(cd mlir/llvm-project && git rev-parse HEAD) == ${{ steps.llvm-hash.outputs.llvm-hash }} ]
+      uses: actions/checkout@v3
+      with:
+        repository: llvm/llvm-project
+        ref: ${{ steps.llvm-hash.outputs.llvm-hash }}
+        path: mlir/llvm-project
 
     - name: Install dependencies (CentOS)
       run: |
@@ -85,9 +87,11 @@ jobs:
     - name: Clone MHLO Submodule
       if:  |
         steps.cache-mhlo.outputs.cache-hit != 'true'
-      run: |
-        git submodule update --init mlir/mlir-hlo
-        [ $(cd mlir/mlir-hlo && git rev-parse HEAD) == ${{ steps.mhlo-hash.outputs.mhlo-hash }} ]
+      uses: actions/checkout@v3
+      with:
+        repository: tensorflow/mlir-hlo
+        ref: ${{ steps.mhlo-hash.outputs.mhlo-hash }}
+        path: mlir/mlir-hlo
 
     - name: Build MHLO Dialect
       if: steps.cache-mhlo.outputs.cache-hit != 'true'

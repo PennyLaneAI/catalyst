@@ -2,7 +2,6 @@ name: Check Catalyst Build
 
 on:
   pull_request:
-    branches: [ main ]
   push:
     branches: [ main ]
   workflow_dispatch:
@@ -11,9 +10,90 @@ env:
   COVERAGE_FLAGS: "--cov=catalyst --cov-report=term-missing --cov-report=xml:./coverage.xml -p no:warnings --tb=native"
 
 jobs:
+  runtime-qir-stdlib:
+    name: Catalyst-Runtime (qir-stdlib)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Cancel previous runs
+        uses: styfle/cancel-workflow-action@0.11.0
+        with:
+          access_token: ${{ github.token }}
+
+      - name: Checkout Catalyst repo
+        uses: actions/checkout@v3
+
+      - name: Install rustup with llvm-tools-preview
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          components: llvm-tools-preview
+
+      - name: Install QIR-stdlib
+        run: |
+            cd ./runtime/qir-stdlib
+            cargo build --release --verbose
+            mkdir -p ../qir-stdlib-build/include
+            cp ./target/release/libqir_stdlib.a ../qir-stdlib-build/
+            cp ./target/release/build/include/* ../qir-stdlib-build/include/
+            cargo clean
+
+      - name: Upload QIR-stdlib Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: qir-stdlib-build
+          path: ./runtime/qir-stdlib-build
+          retention-days: 1
+
+  runtime:
+    name: Catalyst-Runtime
+    needs: [runtime-qir-stdlib]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Cancel previous runs
+        uses: styfle/cancel-workflow-action@0.11.0
+        with:
+          access_token: ${{ github.token }}
+
+      - name: Checkout Catalyst repo
+        uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get -y -q install ninja-build make cmake clang libomp-dev
+          echo "LIGHTNING_GIT_TAG_VALUE=latest_release" >> $GITHUB_ENV
+      - if: ${{ github.event_name == 'push' }}
+        run: |
+          echo "LIGHTNING_GIT_TAG_VALUE=master" >> $GITHUB_ENV
+
+      - name: Download QIR-stdlib Artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: qir-stdlib-build
+          path: ./runtime/qir-stdlib-build
+
+      - name: Build Catalyst-Runtime
+        run: |
+          pushd runtime
+          RT_BUILD_DIR=../runtime-build \
+          QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include" \
+          QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build/" make runtime
+          popd
+
+      - name: Upload Catalyst-Runtime Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: runtime-build
+          path: |
+            runtime-build/lib/capi/*.so
+            runtime-build/lib/backend/*.so
+          retention-days: 1
+
   llvm:
     name: LLVM Build
     runs-on: ubuntu-latest
+
     steps:
     - name: Cancel previous runs
       uses: styfle/cancel-workflow-action@0.11.0
@@ -48,9 +128,11 @@ jobs:
     - name: Clone LLVM Submodule
       if: |
         steps.cache-llvm-source.outputs.cache-hit != 'true'
-      run: |
-        git submodule update --init mlir/llvm-project
-        [ $(cd mlir/llvm-project && git rev-parse HEAD) == ${{ steps.llvm-hash.outputs.llvm-hash }} ]
+      uses: actions/checkout@v3
+      with:
+        repository: llvm/llvm-project
+        ref: ${{ steps.llvm-hash.outputs.llvm-hash }}
+        path: mlir/llvm-project
 
     - name: Install Deps
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
@@ -69,10 +151,82 @@ jobs:
         LLVM_BUILD_DIR=../llvm-build make llvm
         popd
 
+  mhlo:
+    name: MHLO Dialect Build
+    needs: [llvm]
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Cancel previous runs
+      uses: styfle/cancel-workflow-action@0.11.0
+      with:
+        access_token: ${{ github.token }}
+
+    - name: Checkout Catalyst repo
+      uses: actions/checkout@v3
+
+    - name: Get MHLO Version
+      id: mhlo-hash
+      run: echo "mhlo-hash=$(grep mhlo .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
+
+    - name: Cache MHLO Build
+      id: cache-mhlo
+      uses: actions/cache@v3
+      with:
+        path:  mhlo-build
+        key: ${{ runner.os }}-mhlo-${{ steps.mhlo-hash.outputs.mhlo-hash }}-default-build
+
+    - name: Get LLVM Version
+      id: llvm-hash
+      if: steps.cache-mhlo.outputs.cache-hit != 'true'
+      run: echo "llvm-hash=$(grep llvm .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
+
+    - name: Get Cached LLVM Source
+      id: cache-llvm-source
+      if: steps.cache-mhlo.outputs.cache-hit != 'true'
+      uses: actions/cache@v3
+      with:
+        path:  mlir/llvm-project
+        key: Linux-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-source
+        enableCrossOsArchive: True
+        fail-on-cache-miss: True
+
+    - name: Get Cached LLVM Build
+      id: cache-llvm-build
+      if: steps.cache-mhlo.outputs.cache-hit != 'true'
+      uses: actions/cache@v3
+      with:
+        path:  llvm-build
+        key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-build
+        fail-on-cache-miss: True
+
+    - name: Clone MHLO Submodule
+      if:  |
+        steps.cache-mhlo.outputs.cache-hit != 'true' &&
+        steps.cache-mhlo-source.outputs.cache-hit != 'true'
+      uses: actions/checkout@v3
+      with:
+        repository: tensorflow/mlir-hlo
+        ref: ${{ steps.mhlo-hash.outputs.mhlo-hash }}
+        path: mlir/mlir-hlo
+
+    - name: Install Deps
+      if: steps.cache-mhlo.outputs.cache-hit != 'true'
+      run: |
+        sudo apt-get install -y cmake ninja-build clang lld
+
+    - name: Build MHLO Dialect
+      if: steps.cache-mhlo.outputs.cache-hit != 'true'
+      run: |
+        pushd mlir
+        LLVM_BUILD_DIR="../llvm-build" MHLO_BUILD_DIR="../mhlo-build" make mhlo
+        popd
+
   quantum:
     name: Quantum Dialects Build
-    needs: llvm
+    needs: [llvm]
     runs-on: ubuntu-latest
+
     steps:
     - name: Cancel previous runs
       uses: styfle/cancel-workflow-action@0.11.0
@@ -135,10 +289,11 @@ jobs:
           quantum-build/python_packages/*
         retention-days: 1
 
-  mhlo:
-    name: MHLO Dialect Build
-    needs: llvm
+  frontend:
+    name: Frontend Tests
+    needs: [runtime, mhlo, quantum]
     runs-on: ubuntu-latest
+
     steps:
     - name: Cancel previous runs
       uses: styfle/cancel-workflow-action@0.11.0
@@ -148,150 +303,118 @@ jobs:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
-    - name: Get MHLO Version
-      id: mhlo-hash
-      run: echo "mhlo-hash=$(grep mhlo .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
+    - name: Get JAX Version
+      id: jax-version
+      run: echo "v=$(grep jax .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
 
-    - name: Cache MHLO Build
-      id: cache-mhlo
-      uses: actions/cache@v3
+    - name: Install Deps
+      run: |
+        sudo apt-get install -y python3 python3-pip libomp-dev
+        python3 -m pip install lit pytest pytest-xdist pytest-cov nbmake nbconvert ipykernel matplotlib jaxopt
+        python3 -m pip install jax==${{ steps.jax-version.outputs.v }} jaxlib==${{ steps.jax-version.outputs.v }}
+        python3 -m pip install .
+
+    - name: Install PennyLane-master
+      if: ${{ github.event_name == 'push' }}
+      uses: actions/checkout@v3
       with:
-        path:  mhlo-build
-        key: ${{ runner.os }}-mhlo-${{ steps.mhlo-hash.outputs.mhlo-hash }}-default-build
+        repository: PennyLaneAI/pennylane
+        path: pennylane
+    - if: ${{ github.event_name == 'push' }}
+      run: |
+        python3 -m pip install --upgrade ./pennylane
 
     - name: Get LLVM Version
       id: llvm-hash
-      if: steps.cache-mhlo.outputs.cache-hit != 'true'
       run: echo "llvm-hash=$(grep llvm .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
-
-    - name: Get Cached LLVM Source
-      id: cache-llvm-source
-      if: steps.cache-mhlo.outputs.cache-hit != 'true'
-      uses: actions/cache@v3
-      with:
-        path:  mlir/llvm-project
-        key: Linux-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-source
-        enableCrossOsArchive: True
-        fail-on-cache-miss: True
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
-      if: steps.cache-mhlo.outputs.cache-hit != 'true'
       uses: actions/cache@v3
       with:
         path:  llvm-build
         key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-build
         fail-on-cache-miss: True
 
-    - name: Clone MHLO Submodule
-      if:  |
-        steps.cache-mhlo.outputs.cache-hit != 'true' &&
-        steps.cache-mhlo-source.outputs.cache-hit != 'true'
-      run: |
-        git submodule update --init mlir/mlir-hlo
-        [ $(cd mlir/mlir-hlo && git rev-parse HEAD) == ${{ steps.mhlo-hash.outputs.mhlo-hash }} ]
+    - name: Get MHLO Version
+      id: mhlo-hash
+      run: echo "mhlo-hash=$(grep mhlo .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
 
-    - name: Install Deps
-      if: steps.cache-mhlo.outputs.cache-hit != 'true'
-      run: |
-        sudo apt-get install -y cmake ninja-build clang lld
+    - name: Get Cached MHLO Build
+      id: cache-mhlo
+      uses: actions/cache@v3
+      with:
+        path:  mhlo-build
+        key: ${{ runner.os }}-mhlo-${{ steps.mhlo-hash.outputs.mhlo-hash }}-default-build
+        fail-on-cache-miss: True
 
-    - name: Build MHLO Dialect
-      if: steps.cache-mhlo.outputs.cache-hit != 'true'
-      run: |
-        pushd mlir
-        LLVM_BUILD_DIR="../llvm-build" MHLO_BUILD_DIR="../mhlo-build" make mhlo
-        popd
+    - name: Download Quantum Build Artifact
+      uses: actions/download-artifact@v3
+      with:
+        name: quantum-build
+        path: quantum-build
 
-  runtime-qir-stdlib:
-    name: Catalyst-Runtime (qir-stdlib)
+    - name: Download Catalyst-Runtime Artifact
+      uses: actions/download-artifact@v3
+      with:
+        name: runtime-build
+        path: runtime-build/lib
+
+    - name: Add Frontend Dependencies to PATH
+      run: |
+        echo "$(pwd)/llvm-build/bin" >> $GITHUB_PATH
+        echo "$(pwd)/mhlo-build/bin" >> $GITHUB_PATH
+        echo "$(pwd)/quantum-build/bin" >> $GITHUB_PATH
+        echo "PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
+        echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
+        echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
+        chmod +x quantum-build/bin/quantum-opt  # artifact upload does not preserve permissions
+
+    - name: Run Python Lit Tests
+      run: |
+        llvm-lit -sv frontend/test/lit -j$(nproc)
+
+    - name: Run Python Pytest Tests
+      run: |
+        export ASAN_OPTIONS=detect_odr_violation=0
+        pytest frontend/test/pytest -n auto $COVERAGE_FLAGS
+        mv coverage.xml coverage-${{ github.job }}.xml
+
+    - name: Check Catalyst Demos
+      run: |
+        MDD_BENCHMARK_PRECISION=1 \
+        pytest demos/*.ipynb --nbmake -n auto
+
+    - name: Upload code coverage results
+      uses: actions/upload-artifact@v3
+      with:
+        name: ubuntu-codecov-results-python
+        path: ./coverage-${{ github.job }}.xml
+
+  upload-to-codecov-linux-python:
+    name: Upload coverage data to codecov (Python)
+    needs: [frontend]
     runs-on: ubuntu-latest
 
     steps:
-      - name: Cancel previous runs
-        uses: styfle/cancel-workflow-action@0.11.0
-        with:
-          access_token: ${{ github.token }}
-
-      - name: Checkout Catalyst repo
-        uses: actions/checkout@v3
-
-      - name: Install rustup with llvm-tools-preview
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          components: llvm-tools-preview
-
-      - name: Install QIR-stdlib
-        run: |
-            cd ./runtime/qir-stdlib
-            cargo build --release --verbose
-            mkdir -p ../qir-stdlib-build/include
-            cp ./target/release/libqir_stdlib.a ../qir-stdlib-build/
-            cp ./target/release/build/include/* ../qir-stdlib-build/include/
-            cargo clean
-
-      - name: Upload QIR-stdlib Artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: qir-stdlib-build
-          path: ./runtime/qir-stdlib-build
-          retention-days: 1
-
-  runtime:
-    name: Catalyst-Runtime
-    needs: runtime-qir-stdlib
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Cancel previous runs
-        uses: styfle/cancel-workflow-action@0.11.0
-        with:
-          access_token: ${{ github.token }}
-
-      - name: Checkout Catalyst repo
-        uses: actions/checkout@v3
-
-      - name: Install dependencies
-        run: |
-          sudo apt-get -y -q install ninja-build make cmake clang libomp-dev
-          echo "LIGHTNING_GIT_TAG_VALUE=latest_release" >> $GITHUB_ENV
-      - if: ${{ github.event_name == 'push' }}
-        run: |
-          echo "LIGHTNING_GIT_TAG_VALUE=master" >> $GITHUB_ENV
-
-      - name: Download QIR-stdlib Artifact
+      - name: Download coverage reports
         uses: actions/download-artifact@v3
         with:
-          name: qir-stdlib-build
-          path: ./runtime/qir-stdlib-build
+          name: ubuntu-codecov-results-python
 
-      - name: Build Catalyst-Runtime
-        run: |
-          pushd runtime
-          RT_BUILD_DIR=../runtime-build \
-          QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include" \
-          QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build/" make runtime
-          popd
-
-      - name: Upload Catalyst-Runtime Artifact
-        uses: actions/upload-artifact@v3
+      - name: Upload to Codecov
+        uses: codecov/codecov-action@v3
         with:
-          name: runtime-build
-          path: |
-            runtime-build/lib/capi/*.so
-            runtime-build/lib/backend/*.so
-          retention-days: 1
+          fail_ci_if_error: true
+          token: ${{ secrets.CODECOV_TOKEN }}
 
   runtime-tests:
+    name: Runtime Tests (Linux)
+    needs: [runtime-qir-stdlib]
+    runs-on: ubuntu-latest
     strategy:
       matrix:
-        os: [ubuntu-latest]
         simulator: ['lightning', 'lightning-kokkos']
-
-    name: Runtime Tests (Linux)
-    needs: runtime-qir-stdlib
-    runs-on: ${{ matrix.os }}
 
     steps:
       - name: Cancel previous runs
@@ -370,132 +493,9 @@ jobs:
           name: runtime-linux-test-report
           path: ./runtime/build/tests/results/tests_result.xml
 
-  frontend:
-    name: Frontend Tests
-    needs: [llvm, mhlo, quantum, runtime]
-    runs-on: ubuntu-latest
-    steps:
-    - name: Cancel previous runs
-      uses: styfle/cancel-workflow-action@0.11.0
-      with:
-        access_token: ${{ github.token }}
-
-    - name: Checkout Catalyst repo
-      uses: actions/checkout@v3
-
-    - name: Get JAX Version
-      id: jax-version
-      run: echo "v=$(grep jax .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
-
-    - name: Install Deps
-      run: |
-        sudo apt-get install -y python3 python3-pip libomp-dev
-        python3 -m pip install lit pytest pytest-xdist pytest-cov nbmake nbconvert ipykernel matplotlib jaxopt
-        python3 -m pip install jax==${{ steps.jax-version.outputs.v }} jaxlib==${{ steps.jax-version.outputs.v }}
-        python3 -m pip install .
-
-    - name: Install PennyLane-master
-      if: ${{ github.event_name == 'push' }}
-      uses: actions/checkout@v3
-      with:
-        repository: PennyLaneAI/pennylane
-        path: pennylane
-    - if: ${{ github.event_name == 'push' }}
-      run: |
-        python3 -m pip install --upgrade ./pennylane
-
-    - name: Get LLVM Version
-      id: llvm-hash
-      run: echo "llvm-hash=$(grep llvm .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
-
-    - name: Get Cached LLVM Build
-      id: cache-llvm-build
-      uses: actions/cache@v3
-      with:
-        path:  llvm-build
-        key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-build
-        fail-on-cache-miss: True
-
-    - name: Get MHLO Version
-      id: mhlo-hash
-      run: echo "mhlo-hash=$(grep mhlo .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
-
-    - name: Get Cached MHLO Build
-      id: cache-mhlo
-      uses: actions/cache@v3
-      with:
-        path:  mhlo-build
-        key: ${{ runner.os }}-mhlo-${{ steps.mhlo-hash.outputs.mhlo-hash }}-default-build
-        fail-on-cache-miss: True
-
-    - name: Download Quantum Build Artifact
-      uses: actions/download-artifact@v3
-      with:
-        name: quantum-build
-        path: quantum-build
-
-    - name: Caching System Files Workaround
-      run: |  # TODO: revisit once actions/cache has a sudo option
-        sudo mv /usr/bin/tar /usr/bin/tar.orig
-        printf '#!/bin/sh\nexec sudo /usr/bin/tar.orig "$@"\n' | sudo tee /usr/bin/tar
-        sudo chmod +x /usr/bin/tar
-
-    - name: Download Catalyst-Runtime Artifact
-      uses: actions/download-artifact@v3
-      with:
-        name: runtime-build
-        path: runtime-build/lib
-
-    - name: Add Frontend Dependencies to PATH
-      run: |
-        echo "$(pwd)/llvm-build/bin" >> $GITHUB_PATH
-        echo "$(pwd)/mhlo-build/bin" >> $GITHUB_PATH
-        echo "$(pwd)/quantum-build/bin" >> $GITHUB_PATH
-        echo "PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
-        echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
-        echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
-        chmod +x quantum-build/bin/quantum-opt  # artifact upload does not preserve permissions
-
-    - name: Run Python Lit Tests
-      run: |
-        llvm-lit -sv frontend/test/lit -j$(nproc)
-
-    - name: Run Python Pytest Tests
-      run: |
-        export ASAN_OPTIONS=detect_odr_violation=0
-        pytest frontend/test/pytest -n auto $COVERAGE_FLAGS
-        mv coverage.xml coverage-${{ github.job }}.xml
-
-    - name: Check Catalyst Demos
-      run: |
-        MDD_BENCHMARK_PRECISION=1 \
-        pytest demos/*.ipynb --nbmake -n auto
-
-    - name: Upload code coverage results
-      uses: actions/upload-artifact@v3
-      with:
-        name: ubuntu-codecov-results-python
-        path: ./coverage-${{ github.job }}.xml
-
-  upload-to-codecov-linux-python:
-    needs: [frontend]
-    name: Upload coverage data to codecov (Python)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download coverage reports
-        uses: actions/download-artifact@v3
-        with:
-          name: ubuntu-codecov-results-python
-
-      - name: Upload to Codecov
-        uses: codecov/codecov-action@v3
-        with:
-          fail_ci_if_error: true
-          token: ${{ secrets.CODECOV_TOKEN }}
-
   upload-to-codecov-linux-cpp:
-    needs: [runtime-tests]
     name: Upload coverage data to codecov (C++)
+    needs: [runtime-tests]
     runs-on: ubuntu-latest
 
     steps:

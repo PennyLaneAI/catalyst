@@ -2,7 +2,7 @@
 build
 debug
 __pycache__
-catalyst.egg-info
+pennylane_catalyst.egg-info
 
 # Testing directories
 .lit
