@@ -94,13 +94,14 @@ jobs:
       # building with LLD is a strong requirement for mhlo
       run: |
         export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
-        pushd mlir
-        C_COMPILER_LAUNCHER= \
-        CXX_COMPILER_LAUNCHER= \
-        C_COMPILER=gcc \
-        CXX_COMPILER=g++ \
-        LLVM_BUILD_DIR="../llvm-build" MHLO_BUILD_DIR="../mhlo-build" make mhlo
-        popd
+
+        cmake -S mlir/mlir-hlo -B mhlo-build -G Ninja \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DLLVM_ENABLE_ASSERTIONS=ON \
+              -DMLIR_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir \
+              -DLLVM_ENABLE_LLD=ON
+
+        cmake --build mhlo-build --target check-mlir-hlo -j$(nproc)
 
     # Build Catalyst Runtime
     - name: Install rustup with llvm-tools-preview
@@ -197,42 +198,42 @@ jobs:
     # Build MLIR Python Bindings
     - name: Build MLIR Python Bindings
       run: |
-        pushd mlir
-        C_COMPILER_LAUNCHER= \
-        CXX_COMPILER_LAUNCHER= \
-        ENABLE_LLD=OFF \
-        C_COMPILER=gcc \
-        CXX_COMPILER=g++ \
-        PYTHON=python${{ matrix.python_version }} \
-        LLVM_BUILD_DIR="../llvm-build" make llvm
-        popd
+        cmake -S mlir/llvm-project/llvm -B llvm-build -G Ninja \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DLLVM_BUILD_EXAMPLES=OFF \
+              -DLLVM_TARGETS_TO_BUILD="host" \
+              -DLLVM_ENABLE_PROJECTS="mlir" \
+              -DLLVM_ENABLE_ASSERTIONS=ON \
+              -DLLVM_INSTALL_UTILS=ON \
+              -DMLIR_ENABLE_BINDINGS_PYTHON=ON \
+              -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
+              -DPython3_NumPy_INCLUDE_DIRS=$(python${{ matrix.python_version }} -c "import numpy as np; print(np.get_include())")
+
+        cmake --build llvm-build --target check-mlir -j$(nproc)
 
     # Build Quantum and Gradient Dialects
     - name: Build MLIR Dialects
       run: |
-        pushd mlir
-        C_COMPILER_LAUNCHER= \
-        CXX_COMPILER_LAUNCHER= \
-        ENABLE_LLD=OFF \
-        C_COMPILER=gcc \
-        CXX_COMPILER=g++ \
-        PYTHON=python${{ matrix.python_version }} \
-        LLVM_BUILD_DIR="../llvm-build" MHLO_BUILD_DIR="../mhlo-build" DIALECTS_BUILD_DIR="../quantum-build" make dialects
-        popd
+        cmake -S mlir -B quantum-build -G Ninja \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DLLVM_ENABLE_ASSERTIONS=ON \
+          -DQUANTUM_ENABLE_BINDINGS_PYTHON=ON \
+          -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
+          -DPython3_NumPy_INCLUDE_DIRS=$(python${{ matrix.python_version }} -c "import numpy as np; print(np.get_include())") \
+          -DMLIR_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir
+
+        cmake --build quantum-build --target check-dialects -j$(nproc)
 
     # Build Catalyst-Runtime
     - name: Build Catalyst-Runtime
       run: |
-        pushd runtime
-        C_COMPILER_LAUNCHER= \
-        CXX_COMPILER_LAUNCHER= \
-        C_COMPILER=gcc \
-        CXX_COMPILER=g++ \
-        RT_BUILD_DIR=../runtime-build \
-        PYTHON=python${{ matrix.python_version }} \
-        QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib/target/release/build/include" \
-        QIR_STDLIB_DIR="$(pwd)/qir-stdlib/target/release/" make runtime
-        popd
+        cmake -S runtime -B runtime-build -G Ninja \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DPYTHON_INCLUDE_DIRS=$(which python${{ matrix.python_version }}) \
+          -DQIR_STDLIB_LIB=$GITHUB_WORKSPACE/runtime/qir-stdlib/target/release \
+          -DQIR_STDLIB_INCLUDES=$GITHUB_WORKSPACE/runtime/qir-stdlib/target/release/build/include
+
+        cmake --build runtime-build --target rt_capi -j$(nproc)
 
     # Requirements:
     - name: Prepare the python package
