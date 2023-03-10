@@ -47,7 +47,7 @@ llvm:
 	cmake --build $(LLVM_BUILD_DIR) --target check-mlir llvm-symbolizer
 
 .PHONY: mhlo
-mhlo: | llvm
+mhlo:
 	@echo "build MLIR-HLO"
 	cmake -G Ninja -S mlir-hlo -B $(MHLO_BUILD_DIR) \
 		-DCMAKE_BUILD_TYPE=Release \
