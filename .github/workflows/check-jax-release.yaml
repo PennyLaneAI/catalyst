@@ -52,7 +52,7 @@ jobs:
 
     - name: Build LLVM
       run: |
-        make llvm
+        COMPILER_LAUNCHER="" make llvm
 
     - name: Build MLIR Dialects
       run: |
@@ -67,7 +67,7 @@ jobs:
 
     - name: Build MHLO
       run: |
-        make mhlo
+        COMPILER_LAUNCHER="" make mhlo
 
     - name: Build Frontend
       run: |
