@@ -12,6 +12,7 @@ jobs:
     name: Build/Test Catalyst against JAX
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         interop: [true, false]
 
