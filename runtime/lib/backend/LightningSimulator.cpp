@@ -35,11 +35,9 @@ auto LightningSimulator::AllocateQubits(size_t num_qubits) -> std::vector<QubitI
         return this->qubit_manager.AllocateRange(0, num_qubits);
     }
 
-    std::vector<QubitIdType> result{};
-    result.reserve(num_qubits);
-    for (size_t i = 0; i < num_qubits; i++) {
-        result.push_back(AllocateQubit());
-    }
+    std::vector<QubitIdType> result(num_qubits);
+    std::generate_n(
+        result.begin(), num_qubits; []() { return AllocateQubit(); });
     return result;
 }
 
@@ -81,9 +79,9 @@ auto LightningSimulator::CacheManagerInfo()
             this->cache_manager.getObservablesKeys()};
 }
 
-void LightningSimulator::SetDeviceShots(size_t shots) { device_shots = shots; }
+void LightningSimulator::SetDeviceShots(size_t shots) { this->device_shots = shots; }
 
-auto LightningSimulator::GetDeviceShots() const -> size_t { return device_shots; }
+auto LightningSimulator::GetDeviceShots() const -> size_t { return this->device_shots; }
 
 void LightningSimulator::PrintState()
 {
@@ -432,10 +430,10 @@ auto LightningSimulator::Measure(QubitIdType wire) -> Result
     }
 
     // get the total of the new vector (since we need to normalize)
-    double total = 0.;
-    for (size_t idx = 0; idx < vec_size; idx++) {
-        total = total + std::real(state[idx] * std::conj(state[idx]));
-    }
+    double total =
+        std::accumulate(state.begin(), state.end(), 0.0, [](double sum, std::complex<double> c) {
+            return sum + std::real(c * std::conj(c));
+        });
 
     // normalize the vector
     double norm = std::sqrt(total);

@@ -305,7 +305,6 @@ TEST_CASE("Test __quantum__qis__ CRot, IsingXY and Toffoli", "[qir_lightning_cor
     __quantum__rt__finalize();
 }
 
-#ifndef _KOKKOS
 TEST_CASE("Test __quantum__qis__ Hadamard, PauliX, IsingYY, CRX, and Expval",
           "[qir_lightning_core]")
 {
@@ -349,7 +348,6 @@ TEST_CASE("Test __quantum__qis__ Hadamard, PauliX, IsingYY, CRX, and Expval",
 
     __quantum__rt__finalize();
 }
-#endif
 
 TEST_CASE("Test __quantum__qis__ PhaseShift", "[qir_lightning_core]")
 {
@@ -945,7 +943,6 @@ TEST_CASE("Test __quantum__qis__State on the heap using malloc", "[qir_lightning
     __quantum__rt__finalize();
 }
 
-#ifndef _KOKKOS
 TEST_CASE("Test __quantum__qis__Measure with false", "[qir_lightning_core]")
 {
     // initialize the simulator
@@ -1124,6 +1121,7 @@ TEST_CASE("Test __quantum__qis__Counts with num_qubits=2 PartialCounts calling H
     delete result;
 }
 
+#ifndef _KOKKOS
 TEST_CASE("Test __quantum__qis__Sample with num_qubits=2 calling Hadamard, ControlledPhaseShift, "
           "IsingYY, and CRX quantum operations",
           "[qir_lightning_core]")
@@ -1237,6 +1235,7 @@ TEST_CASE("Test __quantum__qis__Sample with num_qubits=2 and PartialSample calli
     free(samples);
     delete result;
 }
+#endif
 
 TEST_CASE("Test __quantum__qis__QubitUnitary with an uninitialized matrix", "[qir_lightning_core]")
 {
@@ -1335,4 +1334,3 @@ TEST_CASE("Test __quantum__qis__QubitUnitary with num_qubits=2", "[qir_lightning
     delete matrix;
     __quantum__rt__finalize();
 }
-#endif

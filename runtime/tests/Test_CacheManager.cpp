@@ -81,8 +81,8 @@ TEST_CASE("Test a LightningSimulator circuit with num_qubits=2 ", "[CacheManager
     }
 
     sim->StartTapeRecording();
-    qis->NamedOperation("PauliX", {}, {Qs[0]}, false);
-    qis->NamedOperation("CNOT", {}, {Qs[0], Qs[1]}, false);
+    sim->NamedOperation("PauliX", {}, {Qs[0]}, false);
+    sim->NamedOperation("CNOT", {}, {Qs[0], Qs[1]}, false);
 
     auto &&[num_ops, num_obs, num_params, op_names, _] = qis->CacheManagerInfo();
     REQUIRE((num_ops == 2 && num_obs == 0));
@@ -107,16 +107,17 @@ TEST_CASE("Test a LightningSimulator circuit with num_qubits=4", "[CacheManager]
 
     sim->StartTapeRecording();
     Qs[0] = sim->AllocateQubit();
-    qis->NamedOperation("Hadamard", {}, {Qs[0]}, false);
+    sim->NamedOperation("Hadamard", {}, {Qs[0]}, false);
 
     Qs[1] = sim->AllocateQubit();
-    qis->NamedOperation("CRX", {0.123}, {Qs[0], Qs[1]}, false);
+    sim->NamedOperation("CRX", {0.123}, {Qs[0], Qs[1]}, false);
 
     Qs[2] = sim->AllocateQubit();
-    qis->NamedOperation("CRY", {0.456}, {Qs[0], Qs[2]}, false);
+    sim->NamedOperation("CRY", {0.456}, {Qs[0], Qs[2]}, false);
 
     Qs[3] = sim->AllocateQubit();
-    qis->NamedOperation("CRZ", {0.789}, {Qs[0], Qs[3]}, false);
+    sim->NamedOperation("CRZ", {0.789}, {Qs[0], Qs[3]}, false);
+    sim->StopTapeRecording();
 
     auto &&[num_ops, num_obs, num_params, op_names, _] = qis->CacheManagerInfo();
     REQUIRE((num_ops == 4 && num_obs == 0));
@@ -125,48 +126,6 @@ TEST_CASE("Test a LightningSimulator circuit with num_qubits=4", "[CacheManager]
     REQUIRE(op_names[1] == "CRX");
     REQUIRE(op_names[2] == "CRY");
     REQUIRE(op_names[3] == "CRZ");
-}
-
-#ifndef _KOKKOS
-TEST_CASE("Test a LightningSimulator circuit with num_qubits=4 and observables", "[CacheManager]")
-{
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
-    LightningSimulator *qis = dynamic_cast<LightningSimulator *>(sim.get());
-
-    // state-vector with #qubits = n
-    constexpr size_t n = 4;
-    std::vector<QubitIdType> Qs;
-    Qs.reserve(n);
-    for (size_t i = 0; i < n; i++) {
-        Qs[i] = sim->AllocateQubit();
-    }
-
-    sim->StartTapeRecording();
-    qis->NamedOperation("PauliX", {}, {Qs[0]}, false);
-    qis->NamedOperation("PauliY", {}, {Qs[1]}, false);
-    qis->NamedOperation("Hadamard", {}, {Qs[2]}, false);
-    qis->NamedOperation("PauliZ", {}, {Qs[3]}, false);
-
-    ObsIdType px = qis->Observable(ObsId::PauliX, {}, {Qs[1]});
-    ObsIdType pz = qis->Observable(ObsId::PauliZ, {}, {Qs[0]});
-    ObsIdType h = qis->Observable(ObsId::Hadamard, {}, {Qs[0]});
-
-    qis->Var(h);
-    qis->Var(px);
-    qis->Expval(pz);
-
-    auto &&[num_ops, num_obs, num_params, op_names, obs_keys] = qis->CacheManagerInfo();
-    REQUIRE(num_ops == 4);
-    REQUIRE(num_params == 0);
-    REQUIRE(op_names[0] == "PauliX");
-    REQUIRE(op_names[1] == "PauliY");
-    REQUIRE(op_names[2] == "Hadamard");
-    REQUIRE(op_names[3] == "PauliZ");
-
-    REQUIRE(num_obs == 3);
-    REQUIRE(obs_keys[0] == h);
-    REQUIRE(obs_keys[1] == px);
-    REQUIRE(obs_keys[2] == pz);
 }
 
 TEST_CASE("Test __quantum__qis__ circuit with observables", "[CacheManager]")
@@ -205,7 +164,7 @@ TEST_CASE("Test __quantum__qis__ circuit with observables", "[CacheManager]")
     QUBIT **qubit = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
     auto obs = __quantum__qis__NamedObs(ObsId::PauliZ, *qubit);
 
-    REQUIRE(__quantum__qis__Variance(obs) == Approx(0.0394695).margin(1e-5));
+    REQUIRE(__quantum__qis__Expval(obs) == Approx(0.9800665778).margin(1e-5));
 
     __quantum__rt__finalize();
 }
@@ -249,10 +208,54 @@ TEST_CASE("Test __quantum__qis__ circuit with observables using deactiveCacheMan
     QUBIT **qubit = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
     auto obs = __quantum__qis__NamedObs(ObsId::PauliZ, *qubit);
 
-    REQUIRE(__quantum__qis__Variance(obs) == Approx(0.0394695).margin(1e-5));
+    REQUIRE(__quantum__qis__Expval(obs) == Approx(0.9800665778).margin(1e-5));
 
     __quantum__rt__toggle_recorder(/* activate_cm */ false);
 
     __quantum__rt__finalize();
+}
+
+#ifndef _KOKKOS
+TEST_CASE("Test a LightningSimulator circuit with num_qubits=4 and observables", "[CacheManager]")
+{
+    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    LightningSimulator *qis = dynamic_cast<LightningSimulator *>(sim.get());
+
+    // state-vector with #qubits = n
+    constexpr size_t n = 4;
+    std::vector<QubitIdType> Qs;
+    Qs.reserve(n);
+    for (size_t i = 0; i < n; i++) {
+        Qs[i] = sim->AllocateQubit();
+    }
+
+    sim->StartTapeRecording();
+    sim->NamedOperation("PauliX", {}, {Qs[0]}, false);
+    sim->NamedOperation("PauliY", {}, {Qs[1]}, false);
+    sim->NamedOperation("Hadamard", {}, {Qs[2]}, false);
+    sim->NamedOperation("PauliZ", {}, {Qs[3]}, false);
+
+    ObsIdType px = sim->Observable(ObsId::PauliX, {}, {Qs[1]});
+    ObsIdType pz = sim->Observable(ObsId::PauliZ, {}, {Qs[0]});
+
+    sim->StopTapeRecording();
+
+    ObsIdType h = sim->Observable(ObsId::Hadamard, {}, {Qs[0]});
+
+    sim->Var(h);
+    sim->Var(px);
+    sim->Expval(pz);
+
+    auto &&[num_ops, num_obs, num_params, op_names, obs_keys] = qis->CacheManagerInfo();
+    REQUIRE(num_ops == 4);
+    REQUIRE(num_params == 0);
+    REQUIRE(op_names[0] == "PauliX");
+    REQUIRE(op_names[1] == "PauliY");
+    REQUIRE(op_names[2] == "Hadamard");
+    REQUIRE(op_names[3] == "PauliZ");
+
+    REQUIRE(num_obs == 2);
+    REQUIRE(obs_keys[0] == px);
+    REQUIRE(obs_keys[1] == pz);
 }
 #endif

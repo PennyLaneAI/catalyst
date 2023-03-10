@@ -21,7 +21,7 @@ auto LightningKokkosSimulator::AllocateQubit() -> QubitIdType
 {
     const size_t num_qubits = this->device_sv->getNumQubits();
     this->device_sv = std::make_unique<Pennylane::StateVectorKokkos<double>>(num_qubits + 1);
-    return qubit_manager.Allocate(num_qubits);
+    return this->qubit_manager.Allocate(num_qubits);
 }
 
 auto LightningKokkosSimulator::AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType>
@@ -36,7 +36,7 @@ auto LightningKokkosSimulator::AllocateQubits(size_t num_qubits) -> std::vector<
     return this->qubit_manager.AllocateRange(cur_num_qubits, new_num_qubits);
 }
 
-void LightningKokkosSimulator::ReleaseQubit(QubitIdType q) { qubit_manager.Release(q); }
+void LightningKokkosSimulator::ReleaseQubit(QubitIdType q) { this->qubit_manager.Release(q); }
 
 void LightningKokkosSimulator::ReleaseAllQubits() { this->qubit_manager.ReleaseAll(); }
 
@@ -67,9 +67,9 @@ auto LightningKokkosSimulator::CacheManagerInfo()
             this->cache_manager.getObservablesKeys()};
 }
 
-void LightningKokkosSimulator::SetDeviceShots(size_t shots) { device_shots = shots; }
+void LightningKokkosSimulator::SetDeviceShots(size_t shots) { this->device_shots = shots; }
 
-auto LightningKokkosSimulator::GetDeviceShots() const -> size_t { return device_shots; }
+auto LightningKokkosSimulator::GetDeviceShots() const -> size_t { return this->device_shots; }
 
 void LightningKokkosSimulator::PrintState()
 {
@@ -131,7 +131,30 @@ void LightningKokkosSimulator::NamedOperation(const std::string &name,
 void LightningKokkosSimulator::MatrixOperation(const std::vector<std::complex<double>> &matrix,
                                                const std::vector<QubitIdType> &wires, bool inverse)
 {
-    throw std::logic_error("MatrixOperation not implemented in PennyLane-Lightning-Kokkos");
+    using UnmanagedComplexHostView = Kokkos::View<Kokkos::complex<double> *, Kokkos::HostSpace,
+                                                  Kokkos::MemoryTraits<Kokkos::Unmanaged>>;
+
+    // Check the validity of number of qubits and parameters
+    QFailIf(!wires.size(), "Invalid number of qubits");
+
+    // Convert wires to device wires
+    auto &&dev_wires = getDeviceWires(wires);
+
+    std::vector<Kokkos::complex<double>> matrix_kk;
+    matrix_kk.resize(matrix.size());
+    std::transform(matrix.begin(), matrix.end(), matrix_kk.begin(),
+                   [](auto c) { return static_cast<Kokkos::complex<double>>(c); });
+
+    Kokkos::View<Kokkos::complex<double> *> gate_matrix("gate_matrix", matrix_kk.size());
+    Kokkos::deep_copy(gate_matrix, UnmanagedComplexHostView(matrix_kk.data(), matrix_kk.size()));
+
+    // Update the state-vector
+    this->device_sv->applyMultiQubitOp(gate_matrix, dev_wires, inverse);
+
+    // Update tape caching if required
+    if (this->cache_recording) {
+        this->cache_manager.addOperation("MatrixOp", {}, dev_wires, inverse);
+    }
 }
 
 auto LightningKokkosSimulator::Observable(ObsId id, const std::vector<std::complex<double>> &matrix,
@@ -333,7 +356,7 @@ auto LightningKokkosSimulator::PartialCounts(const std::vector<QubitIdType> &wir
     // computational basis bitstring. In the future, eigenvalues can also be
     // obtained from an observable, hence the bitstring integer is stored as a
     // double.
-    const size_t numElements = 1U << numQubits;
+    const size_t numElements = 1U << numWires;
     std::vector<double> eigvals(numElements);
     std::iota(eigvals.begin(), eigvals.end(), 0);
     eigvals.reserve(numElements);
@@ -390,10 +413,10 @@ auto LightningKokkosSimulator::Measure(QubitIdType wire) -> Result
     }
 
     // get the total of the new vector (since we need to normalize)
-    double total = 0.;
-    for (size_t idx = 0; idx < vec_size; idx++) {
-        total = total + std::real(state[idx] * std::conj(state[idx]));
-    }
+    double total =
+        std::accumulate(state.begin(), state.end(), 0.0, [](double sum, std::complex<double> c) {
+            return sum + std::real(c * std::conj(c));
+        });
 
     // normalize the vector
     double norm = std::sqrt(total);
