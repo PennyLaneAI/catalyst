@@ -37,33 +37,43 @@ class ProblemCVQE(Problem):
         pi = PROBLEMS[self.nqubits]
         data = qml.data.load("qchem", molname=pi.name, basis="STO-3G", bondlength=pi.bond)[0]
         electrons = data.molecule.n_electrons
-        qubits =    data.molecule.n_orbitals * 2
+        qubits = data.molecule.n_orbitals * 2
         assert qubits == self.nqubits
-        ham =       data.hamiltonian
+        ham = data.hamiltonian
         self.hf_state = qml.qchem.hf_state(electrons, qubits)
         self.singles, self.doubles = qml.qchem.excitations(electrons, qubits)
         self.excitations = self.singles + self.doubles
         self.ham = ham
+        self.qcircuit = None
+        self.qgrad = None
 
 
     def trial_params(self, _: int) -> Any:
         return pnp.zeros(len(self.excitations), dtype=pnp.float64)
 
 
-def workflow(p: ProblemCVQE, params):
-    @qml.qnode(p.dev, diff_method=p.diff_method, **p.qnode_kwargs)
-    def circuit(params):
+def qcompile(p: ProblemCVQE, weights):
+    def _circuit(params):
         AllSinglesDoubles(params, range(p.nqubits), p.hf_state, p.singles, p.doubles)
         return qml.expval(qml.Hamiltonian(np.array(p.ham.coeffs), p.ham.ops))
 
+    qcircuit = qml.QNode(_circuit, p.dev, diff_method=p.diff_method, **p.qnode_kwargs)
+    qcircuit.construct([weights], {})
+    qgrad = p.grad(qcircuit)
+    p.qcircuit = qcircuit
+    p.qgrad = qgrad
+
+
+def workflow(p: ProblemCVQE, params):
+    assert p.qcircuit is not None
+    assert p.qgrad is not None
+
     stepsize = 0.5
-    diff = p.grad(circuit)
     theta = params
 
     for i in range(p.nsteps):
-        dtheta = diff(theta)
+        dtheta = p.qgrad(theta)
         theta = theta - dtheta * stepsize
-
     return theta
 
 
@@ -87,6 +97,7 @@ def run_default_qubit(N=6):
     print(f"Size: {size(p)}")
 
     def _main(params):
+        qcompile(p, params)
         return workflow(p, params)
 
     theta = _main(p.trial_params(0))
@@ -103,6 +114,7 @@ def run_lightning_qubit(N=6):
     print(f"Size: {size(p)}")
 
     def _main(params):
+        qcompile(p, params)
         return workflow(p, params)
 
     theta = _main(p.trial_params(0))
@@ -127,6 +139,7 @@ def run_jax_(devname, N=6):
 
     @jax.jit
     def _main(params):
+        qcompile(p, params)
         return workflow(p, params)
 
     theta = _main(p.trial_params(0))

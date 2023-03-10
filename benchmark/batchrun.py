@@ -245,7 +245,7 @@ def load(a: ParsedArguments) -> DataFrame:
 
 
 def writefile(a: ParsedArguments, fname, chart):
-
+    """ Write chart to file(s) in the configured formats """
     @contextmanager
     def _open(fname: str, fmode: str):
         if a.dry_run and "w" in fmode:

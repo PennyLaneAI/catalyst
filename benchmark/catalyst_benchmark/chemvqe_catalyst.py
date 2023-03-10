@@ -42,29 +42,38 @@ class ProblemCVQE(Problem):
         electrons = data.molecule.n_electrons
         qubits = data.molecule.n_orbitals * 2
         assert qubits == self.nqubits
-        ham =  data.hamiltonian
+        ham = data.hamiltonian
         self.hf_state = qml.qchem.hf_state(electrons, qubits)
         self.singles, self.doubles = qml.qchem.excitations(electrons, qubits)
         self.excitations = self.singles + self.doubles
         self.ham = ham
+        self.qcircuit = None
+        self.qgrad = None
 
     def trial_params(self, _: int) -> Any:
         return jnp.zeros(len(self.excitations), dtype=jnp.float64)
 
 
-def workflow(p: ProblemCVQE, params):
-    @qml.qnode(p.dev, **p.qnode_kwargs)
-    def circuit(params):
+def qcompile(p: ProblemCVQE, weights):
+    def _circuit(params):
         AllSinglesDoubles(params, range(p.nqubits), p.hf_state, p.singles, p.doubles)
         return qml.expval(qml.Hamiltonian(np.array(p.ham.coeffs), p.ham.ops))
 
+    qcircuit = qml.QNode(_circuit, p.dev, **p.qnode_kwargs)
+    qcircuit.construct([weights], {})
+    qgrad = catalyst.grad(qcircuit, argnum=0, method=p.diff_method)
+    p.qcircuit = qcircuit
+    p.qgrad = qgrad
+    return p
+
+
+def workflow(p: ProblemCVQE, params):
     stepsize = 0.5
-    diff = catalyst.grad(circuit, argnum=0, method=p.diff_method)
     theta = params
 
     @catalyst.for_loop(0, p.nsteps, 1)
     def loop(i, theta):
-        dtheta = diff(theta)
+        dtheta = p.qgrad(theta)
         return theta - dtheta[0] * stepsize
 
     return loop(theta)
@@ -85,6 +94,7 @@ def run_catalyst(N=6):
 
     @qjit
     def _main(params: ShapedArray(params.shape, params.dtype)):
+        qcompile(p, params)
         return workflow(p, params)
 
     theta = _main(p.trial_params(0))
