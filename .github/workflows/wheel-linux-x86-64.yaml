@@ -258,7 +258,7 @@ jobs:
         cp -R --dereference $GITHUB_WORKSPACE/quantum-build/python_packages/quantum/mlir_quantum/runtime $GITHUB_WORKSPACE/frontend/mlir_quantum/runtime
         cp --dereference $GITHUB_WORKSPACE/quantum-build/python_packages/quantum/mlir_quantum/ir.py $GITHUB_WORKSPACE/frontend/mlir_quantum/
         for file in arith tensor scf gradient quantum _ods_common ; do \
-           cp --dereference $GITHUB_WORKSPACE/quantum-build/python_packages/quantum/mlir_quantum/dialects/*$${file}* $GITHUB_WORKSPACE/frontend/mlir_quantum/dialects ; \
+           cp --dereference $GITHUB_WORKSPACE/quantum-build/python_packages/quantum/mlir_quantum/dialects/*${file}* $GITHUB_WORKSPACE/frontend/mlir_quantum/dialects ; \
         done
         find $GITHUB_WORKSPACE/frontend -type d -name __pycache__ -exec rm -rf {} +
 
