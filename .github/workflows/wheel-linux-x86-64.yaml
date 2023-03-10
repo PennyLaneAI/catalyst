@@ -97,6 +97,8 @@ jobs:
         pushd mlir
         C_COMPILER_LAUNCHER= \
         CXX_COMPILER_LAUNCHER= \
+        C_COMPILER=gcc \
+        CXX_COMPILER=g++ \
         LLVM_BUILD_DIR="../llvm-build" MHLO_BUILD_DIR="../mhlo-build" make mhlo
         popd
 
@@ -199,6 +201,8 @@ jobs:
         C_COMPILER_LAUNCHER= \
         CXX_COMPILER_LAUNCHER= \
         ENABLE_LLD=OFF \
+        C_COMPILER=gcc \
+        CXX_COMPILER=g++ \
         PYTHON=python${{ matrix.python_version }} \
         LLVM_BUILD_DIR="../llvm-build" make llvm
         popd
@@ -210,6 +214,8 @@ jobs:
         C_COMPILER_LAUNCHER= \
         CXX_COMPILER_LAUNCHER= \
         ENABLE_LLD=OFF \
+        C_COMPILER=gcc \
+        CXX_COMPILER=g++ \
         PYTHON=python${{ matrix.python_version }} \
         LLVM_BUILD_DIR="../llvm-build" MHLO_BUILD_DIR="../mhlo-build" DIALECTS_BUILD_DIR="../quantum-build" make dialects
         popd
@@ -220,6 +226,8 @@ jobs:
         pushd runtime
         C_COMPILER_LAUNCHER= \
         CXX_COMPILER_LAUNCHER= \
+        C_COMPILER=gcc \
+        CXX_COMPILER=g++ \
         RT_BUILD_DIR=../runtime-build \
         PYTHON=python${{ matrix.python_version }} \
         QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib/target/release/build/include" \
