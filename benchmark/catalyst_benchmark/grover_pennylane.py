@@ -46,6 +46,7 @@ class ProblemPL(Problem):
 
         self.nlayers = grover_loops(N) if nlayers is None else nlayers
         assert len(total) == nqubits, f"{N}, {nqubits} != len({total})"
+        self.qcircuit = None
 
     def trial_params(self, i: int) -> Any:
         return pnp.array(
@@ -94,39 +95,35 @@ def diffuser(t):
         qml.Hadamard(wires=[qubit])
 
 
-def grover_mainloop(t: ProblemPL, weights):
-    # Initialize the state
-    for qubit in t.iqr:
-        qml.Hadamard(wires=[qubit])
-
-    for _ in range(int(t.nlayers)):
-        # Apply the oracle
-        sudoku_oracle(t)
-        # Apply the diffuser
-        diffuser(t)
-
-        qml.BasicEntanglerLayers(weights=weights, wires=t.iqr)
-    return qml.state()
-
-
-def workflow(t: ProblemPL, weights):
-    @qml.qnode(t.dev, **t.qnode_kwargs)
+def qcompile(p: ProblemPL, weights):
     def _main(weights):
-        return grover_mainloop(t, weights)
+        # Initialize the state
+        for qubit in p.iqr:
+            qml.Hadamard(wires=[qubit])
 
-    return _main(weights)
+        for _ in range(int(p.nlayers)):
+            # Apply the oracle
+            sudoku_oracle(p)
+            # Apply the diffuser
+            diffuser(p)
+
+            qml.BasicEntanglerLayers(weights=weights, wires=p.iqr)
+        return qml.state()
+
+    qcircuit = qml.QNode(_main, p.dev, **p.qnode_kwargs)
+    qcircuit.construct([weights], {})
+    p.qcircuit = qcircuit
+
+
+def workflow(p: ProblemPL, weights):
+    return p.qcircuit(weights)
 
 
 def size(p: ProblemPL) -> int:
     qnode_kwargs = deepcopy(p.qnode_kwargs)
     qnode_kwargs.update({"expansion_strategy": "device"})
-
-    @qml.qnode(p.dev, **qnode_kwargs)
-    def _main(weights):
-        return grover_mainloop(p, weights)
-
-    _main.construct([p.trial_params(0)], {})
-    return len(_main.tape.operations)
+    qcompile(p, p.trial_params(0))
+    return len(p.qcircuit.tape.operations)
 
 
 def run_jax_lightning_qubit(N=7):
@@ -139,6 +136,7 @@ def run_jax_lightning_qubit(N=7):
 
     @jax.jit
     def _main(params):
+        qcompile(p, params)
         return workflow(p, params)
 
     return _main(p.trial_params(0))
@@ -149,6 +147,7 @@ def run_lightning_qubit(N=7):
     print(f"Size: {size(p)}")
 
     def _main(params):
+        qcompile(p, params)
         return workflow(p, params)
 
     return _main(p.trial_params(0))
@@ -159,6 +158,7 @@ def run_default_qubit(N=7):
     print(f"Size: {size(p)}")
 
     def _main(params):
+        qcompile(p, params)
         return workflow(p, params)
 
     return _main(p.trial_params(0))

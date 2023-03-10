@@ -44,6 +44,7 @@ class ProblemC(Problem):
 
         self.nlayers = grover_loops(N) if nlayers is None else nlayers
         assert len(total) == nqubits
+        self.qcircuit = None
 
     def trial_params(self, i: int) -> Any:
         return jnp.array(
@@ -101,37 +102,42 @@ def diffuser(t):
         qml.Hadamard(wires=[qubit])
 
 
-def workflow(t: ProblemC, weights):
-    @qml.qnode(t.dev, **t.qnode_kwargs)
+def qcompile(p: ProblemC, weights):
     def _main(weights):
         # Initialize the state
-        @for_loop(0, len(t.iqr), 1)
+        @for_loop(0, len(p.iqr), 1)
         def loop_init(qubit):
             qml.Hadamard(wires=[qubit])
 
         loop_init()
 
-        @for_loop(0, jnp.int64(t.nlayers), 1)
+        @for_loop(0, jnp.int64(p.nlayers), 1)
         def loop(_):
             # Apply the oracle
-            sudoku_oracle(t)
+            sudoku_oracle(p)
             # Apply the diffuser
-            diffuser(t)
+            diffuser(p)
 
-            qml.BasicEntanglerLayers(weights=weights, wires=t.iqr)
-
+            qml.BasicEntanglerLayers(weights=weights, wires=p.iqr)
         loop()
-
         return qml.state()
 
-    return _main(weights)
+    qcircuit = qml.QNode(_main, p.dev, **p.qnode_kwargs)
+    # qcircuit.construct([weights], {})
+    p.qcircuit = qcircuit
+
+
+def workflow(p: ProblemC, weights):
+    return p.qcircuit(weights)
 
 
 def run_catalyst(N=7):
-    t = ProblemC(qml.device("lightning.qubit", wires=N), None)
+    p = ProblemC(qml.device("lightning.qubit", wires=N), None)
 
     @qjit
     def _main(params):
-        return workflow(t, params)
+        qcompile(p, params)
+        return workflow(p, params)
 
-    return _main(t.trial_params(0))
+    return _main(p.trial_params(0))
+
