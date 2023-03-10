@@ -3,6 +3,8 @@ name: Check Catalyst against latest JAX
 on:
   schedule:
     - cron: "30 1 1,15 * *"
+  pull_request:
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
