@@ -410,13 +410,13 @@ At this stage the compilation already happened, so the execution of ``circuit`` 
 the first call, resulting in faster initial execution. Note that implicit type promotion for most datatypes are allowed
 in the compilation as long as it doesn't lead to a loss of data.
 
-Compiling with Control-flows
+Compiling with Control Flow
 ============================
 Catalyst has support for natively compiled control flow as "first-class" components of any quantum
-program, providing a much smaller representation and compile times for large circuits, and also enabling
+program, providing a much smaller representation and compilation time for large circuits, and also enabling
 the compilation of arbitrarily parametrized circuits.
 
-**The list of Catalyst control-flows:**
+**Catalyst-provided control flow operations:**
 
 .. raw:: html
 
@@ -433,7 +433,7 @@ the compilation of arbitrarily parametrized circuits.
 
     </div>
 
-If-condition
+Conditionals
 ------------
 :func:`.cond` is a functional version of the traditional if-else conditional for Catalyst.
 This means that each execution path, a ``True`` branch and a ``False`` branch, is provided as a
