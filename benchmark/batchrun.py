@@ -334,6 +334,27 @@ def plot(a: ParsedArguments, df_full) -> None:
             except KeyError:
                 return DataFrame()
 
+
+        def _plot_trial_linechart(df, fname, xenc, title, **kwargs):
+            if len(df) == 0:
+                return
+            print(f"Updating trial linechart {fname}")
+            with _open(fname, "w") as f:
+                f.write(
+                    vlc.vegalite_to_svg(
+                        Chart(df)
+                        .mark_line(point=True)
+                        .encode(
+                            x=alt.X("trial:N", title="# Trial"),
+                            y=_timeEncoding(),
+                            color=_implEncoding(df),
+                            opacity=xenc(**kwargs),
+                        )
+                        .properties(title=title)
+                        .to_dict()
+                        )
+                    )
+
         def _plot_linechart(df, fname, xenc, title, ref_ngates=None, **kwargs):
             if len(df) == 0:
                 return
@@ -354,16 +375,16 @@ def plot(a: ParsedArguments, df_full) -> None:
                                 strokeWidth=implCLcond,
                             )
                             .properties(title=title),
-                            ] + [
+                            ] + ([
                             _mkfooter(df, xenc(**kwargs), ref_ngates),
-                            ] if ref_ngates is not None else []
+                            ] if ref_ngates is not None else [])
                         )
                         .configure_axisLeft(minExtent=50)
                         .to_dict()
                     ),
                 )
 
-        # Regular and deep circuits, line charts
+        # Regular circuits
         df = _filter("regular", "compile", "grover")
         xaxis = alt.Axis(values=list(range(MINQUBITS, MAXQUBITS + 2, 2)))
         xscale = alt.Scale(domain=(MINQUBITS, MAXQUBITS))
@@ -376,6 +397,12 @@ def plot(a: ParsedArguments, df_full) -> None:
             axis=xaxis,
             scale=xscale,
         )
+        _plot_trial_linechart(
+            df,
+            f"_img/regular_compile_trial_{SYSHASH}.svg",
+            _nqubitsEncoding,
+            _mktitle("Compilation time/trial, Regular circuits"),
+        )
 
         df = _filter("regular", "runtime", "grover")
         _plot_linechart(
@@ -385,7 +412,14 @@ def plot(a: ParsedArguments, df_full) -> None:
             _mktitle("Running time, Regular circuits"),
             PL_L,
         )
+        _plot_trial_linechart(
+            df,
+            f"_img/regular_runtime_trial_{SYSHASH}.svg",
+            _nqubitsEncoding,
+            _mktitle("Running time/trial, Regular circuits"),
+        )
 
+        # Deep circuits
         df = _filter("deep", "compile", "grover")
         xaxis = alt.Axis(values=list(range(0, MAXLAYERS + 100, 100)))
         xscale = alt.Scale(domain=(0, MAXLAYERS))
@@ -397,6 +431,12 @@ def plot(a: ParsedArguments, df_full) -> None:
             PLjax_L,
             axis=xaxis,
             scale=xscale,
+        )
+        _plot_trial_linechart(
+            df,
+            f"_img/deep_compile_trial_{SYSHASH}.svg",
+            _nlayersEncoding,
+            _mktitle("Compilation time/trial, Deep circuits"),
         )
 
         df = _filter("deep", "runtime", "grover")
@@ -411,24 +451,20 @@ def plot(a: ParsedArguments, df_full) -> None:
             axis=xaxis,
             scale=xscale,
         )
+        _plot_trial_linechart(
+            df,
+            f"_img/deep_runtime_trial_{SYSHASH}.svg",
+            _nlayersEncoding,
+            _mktitle("Running time/trial, Deep circuits"),
+        )
 
+
+        # Variational circuits
         def _diff_methods(problem) -> Iterable[Set[str]]:
             dmsame = set(["adjoint", "backprop"])
             return chain([set([x]) for x in set(DIFF_METHODS[problem]) - dmsame], [dmsame])
 
         vqeproblem = "chemvqe"
-        df = _filter("variational", "runtime", vqeproblem)
-        for dms in _diff_methods(vqeproblem):
-            df2 = df[df.get("diffmethod", pd.Series(float)).map(lambda m: m in dms)]
-            if len(df2) > 0:
-                dmtitle = "_".join(sorted(dms))
-                fname = f"_img/variational_runtime_{dmtitle.replace('-','')}_lineplot_{SYSHASH}.svg"
-                _plot_linechart(
-                    df2, fname,
-                    _nqubitsEncoding,
-                    _mktitle(f"Running time, Variational circuits ({dmtitle})"),
-                )
-
         df = _filter("variational", "compile", vqeproblem)
         for dms in _diff_methods(vqeproblem):
             df2 = df[df.get("diffmethod", pd.Series(float)).map(lambda m: m in dms)]
@@ -440,6 +476,31 @@ def plot(a: ParsedArguments, df_full) -> None:
                     _nqubitsEncoding,
                     _mktitle(f"Compile time, Variational circuits ({dmtitle})"),
                 )
+                fname = f"_img/variational_compile_trial_{dmtitle.replace('-','')}_lineplot_{SYSHASH}.svg"
+                _plot_trial_linechart(
+                    df2, fname,
+                    _nqubitsEncoding,
+                    _mktitle(f"Compile time/trial, Variational circuits ({dmtitle})"),
+                )
+
+        df = _filter("variational", "runtime", vqeproblem)
+        for dms in _diff_methods(vqeproblem):
+            df2 = df[df.get("diffmethod", pd.Series(float)).map(lambda m: m in dms)]
+            if len(df2) > 0:
+                dmtitle = "_".join(sorted(dms))
+                fname = f"_img/variational_runtime_{dmtitle.replace('-','')}_lineplot_{SYSHASH}.svg"
+                _plot_linechart(
+                    df2, fname,
+                    _nqubitsEncoding,
+                    _mktitle(f"Running time, Variational circuits ({dmtitle})"),
+                )
+                fname = f"_img/variational_runtime_trial_{dmtitle.replace('-','')}_lineplot_{SYSHASH}.svg"
+                _plot_trial_linechart(
+                    df2, fname,
+                    _nqubitsEncoding,
+                    _mktitle(f"Running time/trial, Variational circuits ({dmtitle})"),
+                )
+
 
         def _add_timeouts(df):
             for nqubits in sorted(set(df["nqubits"])):
