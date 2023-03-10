@@ -244,26 +244,35 @@ def load(a: ParsedArguments) -> DataFrame:
     return DataFrame(data)
 
 
+def writefile(a: ParsedArguments, fname, chart):
+
+    @contextmanager
+    def _open(fname: str, fmode: str):
+        if a.dry_run and "w" in fmode:
+
+            class DummyFile:
+                def write(*args, **kwargs):
+                    return
+
+            yield DummyFile()
+            print(f"(Dry-run) Would update: {fname}")
+        else:
+            print(f"Updating {fname}")
+            with open(fname, fmode) as f:
+                yield f
+
+    for ext,wf,method in [("svg","w",vlc.vegalite_to_svg),("png","wb",vlc.vegalite_to_png)]:
+        if ext in a.plot_formats:
+            with _open(f"{fname}.{ext}", wf) as f:
+                f.write(method(chart))
+
+
 def plot(a: ParsedArguments, df_full) -> None:
     """Plot the figures. The function first builds a set of Pandas DataFrames,
     then calls Altair to present the data collected."""
     with pd.option_context("display.max_rows", None, "display.max_columns", None):
         implCLcond = alt.condition(f"datum.impl == '{C_L}'", alt.value(2), alt.value(0.7))
         implCLcondDash = alt.condition(f"datum.impl == '{C_L}'", alt.value([0]), alt.value([3, 3]))
-
-        @contextmanager
-        def _open(fname: str, fmode: str):
-            if a.dry_run and "w" in fmode:
-
-                class DummyFile:
-                    def write(*args, **kwargs):
-                        return
-
-                yield DummyFile()
-                print(f"(Dry-run) Would update: {fname}")
-            else:
-                with open(fname, fmode) as f:
-                    yield f
 
         def _implEncoding(df, add_timeout=False):
             """Calculate domain and range colors of the implementation, based on
@@ -338,51 +347,43 @@ def plot(a: ParsedArguments, df_full) -> None:
         def _plot_trial_linechart(df, fname, xenc, title, **kwargs):
             if len(df) == 0:
                 return
-            print(f"Updating trial linechart {fname}")
-            with _open(fname, "w") as f:
-                f.write(
-                    vlc.vegalite_to_svg(
-                        Chart(df)
-                        .mark_line(point=True)
-                        .encode(
-                            x=alt.X("trial:N", title="# Trial"),
-                            y=_timeEncoding(),
-                            color=_implEncoding(df),
-                            opacity=xenc(**kwargs),
-                        )
-                        .properties(title=title)
-                        .to_dict()
-                        )
-                    )
+            writefile(a, fname,
+                Chart(df)
+                .mark_line(point=True)
+                .encode(
+                    x=alt.X("trial:N", title="# Trial"),
+                    y=_timeEncoding(),
+                    color=_implEncoding(df),
+                    opacity=xenc(**kwargs),
+                )
+                .properties(title=title)
+                .to_dict()
+            )
 
         def _plot_linechart(df, fname, xenc, title, ref_ngates=None, **kwargs):
             if len(df) == 0:
                 return
-            print(f"Updating linechart {fname}")
-            with _open(fname, "w") as f:
-                f.write(
-                    vlc.vegalite_to_svg(
-                        alt.vconcat(
-                            *[
-                            Chart(df)
-                            .mark_line(point=True)
-                            .encode(
-                                x=xenc(title=None, **kwargs),
-                                y=_timeEncoding(),
-                                color=_implEncoding(df),
-                                opacity=trialEncoding,
-                                strokeDash=implCLcondDash,
-                                strokeWidth=implCLcond,
-                            )
-                            .properties(title=title),
-                            ] + ([
-                            _mkfooter(df, xenc(**kwargs), ref_ngates),
-                            ] if ref_ngates is not None else [])
-                        )
-                        .configure_axisLeft(minExtent=50)
-                        .to_dict()
-                    ),
+            writefile(a, fname,
+                alt.vconcat(
+                    *[
+                    Chart(df)
+                    .mark_line(point=True)
+                    .encode(
+                        x=xenc(title=None, **kwargs),
+                        y=_timeEncoding(),
+                        color=_implEncoding(df),
+                        opacity=trialEncoding,
+                        strokeDash=implCLcondDash,
+                        strokeWidth=implCLcond,
+                    )
+                    .properties(title=title),
+                    ] + ([
+                    _mkfooter(df, xenc(**kwargs), ref_ngates),
+                    ] if ref_ngates is not None else [])
                 )
+                .configure_axisLeft(minExtent=50)
+                .to_dict()
+            )
 
         # Regular circuits
         df = _filter("regular", "compile", "grover")
@@ -390,7 +391,7 @@ def plot(a: ParsedArguments, df_full) -> None:
         xscale = alt.Scale(domain=(MINQUBITS, MAXQUBITS))
         _plot_linechart(
             df,
-            f"_img/regular_compile_{SYSHASH}.svg",
+            f"_img/regular_compile_{SYSHASH}",
             _nqubitsEncoding,
             _mktitle("Compilation time, Regular circuits"),
             PL_L,
@@ -399,7 +400,7 @@ def plot(a: ParsedArguments, df_full) -> None:
         )
         _plot_trial_linechart(
             df,
-            f"_img/regular_compile_trial_{SYSHASH}.svg",
+            f"_img/regular_compile_trial_{SYSHASH}",
             _nqubitsEncoding,
             _mktitle("Compilation time/trial, Regular circuits"),
         )
@@ -407,14 +408,14 @@ def plot(a: ParsedArguments, df_full) -> None:
         df = _filter("regular", "runtime", "grover")
         _plot_linechart(
             df,
-            f"_img/regular_runtime_{SYSHASH}.svg",
+            f"_img/regular_runtime_{SYSHASH}",
             _nqubitsEncoding,
             _mktitle("Running time, Regular circuits"),
             PL_L,
         )
         _plot_trial_linechart(
             df,
-            f"_img/regular_runtime_trial_{SYSHASH}.svg",
+            f"_img/regular_runtime_trial_{SYSHASH}",
             _nqubitsEncoding,
             _mktitle("Running time/trial, Regular circuits"),
         )
@@ -425,7 +426,7 @@ def plot(a: ParsedArguments, df_full) -> None:
         xscale = alt.Scale(domain=(0, MAXLAYERS))
         _plot_linechart(
             df,
-            f"_img/deep_compile_{SYSHASH}.svg",
+            f"_img/deep_compile_{SYSHASH}",
             _nlayersEncoding,
             _mktitle("Compilation time, Deep circuits"),
             PLjax_L,
@@ -434,7 +435,7 @@ def plot(a: ParsedArguments, df_full) -> None:
         )
         _plot_trial_linechart(
             df,
-            f"_img/deep_compile_trial_{SYSHASH}.svg",
+            f"_img/deep_compile_trial_{SYSHASH}",
             _nlayersEncoding,
             _mktitle("Compilation time/trial, Deep circuits"),
         )
@@ -444,7 +445,7 @@ def plot(a: ParsedArguments, df_full) -> None:
         xscale = alt.Scale(domain=(0, MAXLAYERS))
         _plot_linechart(
             df,
-            f"_img/deep_runtime_{SYSHASH}.svg",
+            f"_img/deep_runtime_{SYSHASH}",
             _nlayersEncoding,
             _mktitle("Running time, Deep circuits"),
             PL_L,
@@ -453,7 +454,7 @@ def plot(a: ParsedArguments, df_full) -> None:
         )
         _plot_trial_linechart(
             df,
-            f"_img/deep_runtime_trial_{SYSHASH}.svg",
+            f"_img/deep_runtime_trial_{SYSHASH}",
             _nlayersEncoding,
             _mktitle("Running time/trial, Deep circuits"),
         )
@@ -470,13 +471,13 @@ def plot(a: ParsedArguments, df_full) -> None:
             df2 = df[df.get("diffmethod", pd.Series(float)).map(lambda m: m in dms)]
             if len(df2) > 0:
                 dmtitle = "_".join(sorted(dms))
-                fname = f"_img/variational_compile_{dmtitle.replace('-','')}_lineplot_{SYSHASH}.svg"
+                fname = f"_img/variational_compile_{dmtitle.replace('-','')}_lineplot_{SYSHASH}"
                 _plot_linechart(
                     df2, fname,
                     _nqubitsEncoding,
                     _mktitle(f"Compile time, Variational circuits ({dmtitle})"),
                 )
-                fname = f"_img/variational_compile_trial_{dmtitle.replace('-','')}_lineplot_{SYSHASH}.svg"
+                fname = f"_img/variational_compile_trial_{dmtitle.replace('-','')}_lineplot_{SYSHASH}"
                 _plot_trial_linechart(
                     df2, fname,
                     _nqubitsEncoding,
@@ -488,13 +489,13 @@ def plot(a: ParsedArguments, df_full) -> None:
             df2 = df[df.get("diffmethod", pd.Series(float)).map(lambda m: m in dms)]
             if len(df2) > 0:
                 dmtitle = "_".join(sorted(dms))
-                fname = f"_img/variational_runtime_{dmtitle.replace('-','')}_lineplot_{SYSHASH}.svg"
+                fname = f"_img/variational_runtime_{dmtitle.replace('-','')}_lineplot_{SYSHASH}"
                 _plot_linechart(
                     df2, fname,
                     _nqubitsEncoding,
                     _mktitle(f"Running time, Variational circuits ({dmtitle})"),
                 )
-                fname = f"_img/variational_runtime_trial_{dmtitle.replace('-','')}_lineplot_{SYSHASH}.svg"
+                fname = f"_img/variational_runtime_trial_{dmtitle.replace('-','')}_lineplot_{SYSHASH}"
                 _plot_trial_linechart(
                     df2, fname,
                     _nqubitsEncoding,
@@ -535,41 +536,37 @@ def plot(a: ParsedArguments, df_full) -> None:
             if len(df) > 0:
                 df = _add_timeouts(df)
                 dmtitle = "_".join(sorted(diffmethods))
-                fname = f"_img/variational_runtime_{dmtitle.replace('-','')}_{SYSHASH}.svg"
-                print(f"Updating barplot {fname}")
-                with _open(fname, "w") as f:
-                    f.write(
-                        vlc.vegalite_to_svg(
-                            alt.layer(
-                                Chart(df)
-                                .mark_bar()
-                                .encode(
-                                    x=alt.X("impl", title=None),
-                                    y=alt.Y("mean(time):Q",
-                                            title="Mean time, sec",
-                                            scale=alt.Scale(type="log")),
-                                    color=alt.condition(
-                                        f"datum.mean_time >= {min(df['timeout'])}",
-                                        alt.ColorValue("Grey"),
-                                        _implEncoding(df, add_timeout=any(df["timeout"])),
-                                    ),
-                                ),
-                                Chart().mark_errorbar(extent='stderr').encode(
-                                    x=alt.X("impl", title=None),
-                                    y=alt.Y("time:Q", title=None),
-                                ),
-                                data=df
-                            ).facet(
-                                column=alt.Column("nqubits:N", title="# Qubits"),
-                            )
-                            .properties(
-                                title=_mktitle(
-                                    f"Running time, Variational circuits ({dmtitle})", align=None
-                                )
-                            )
-                            .to_dict(),
+                fname = f"_img/variational_runtime_{dmtitle.replace('-','')}_{SYSHASH}"
+                writefile(a, fname,
+                    alt.layer(
+                        Chart(df)
+                        .mark_bar()
+                        .encode(
+                            x=alt.X("impl", title=None),
+                            y=alt.Y("mean(time):Q",
+                                    title="Mean time, sec",
+                                    scale=alt.Scale(type="log")),
+                            color=alt.condition(
+                                f"datum.mean_time >= {min(df['timeout'])}",
+                                alt.ColorValue("Grey"),
+                                _implEncoding(df, add_timeout=any(df["timeout"])),
+                            ),
                         ),
+                        Chart().mark_errorbar(extent='stderr').encode(
+                            x=alt.X("impl", title=None),
+                            y=alt.Y("time:Q", title=None),
+                        ),
+                        data=df
+                    ).facet(
+                        column=alt.Column("nqubits:N", title="# Qubits"),
                     )
+                    .properties(
+                        title=_mktitle(
+                            f"Running time, Variational circuits ({dmtitle})", align=None
+                        )
+                    )
+                    .to_dict(),
+                )
 
 
 # fmt: off
@@ -589,6 +586,8 @@ ap.add_argument("--tag", type=str, default=None,
                 help="Human-readable tag to add to the data file names")
 ap.add_argument("--force-sysinfo-hash", type=str, default=None,
                 help="Use the provided string instead of the system information hash")
+ap.add_argument("--plot-formats", type=str, default="svg,png",
+                help="Which formats to use for plotting (default - 'svg,png')")
 ap.add_argument("-V", "--verbose", default=False, action=BooleanOptionalAction,
                 help="Print verbose messages")
 # fmt: on
