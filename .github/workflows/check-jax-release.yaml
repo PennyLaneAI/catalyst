@@ -1,0 +1,91 @@
+name: Check Catalyst against latest JAX
+
+on:
+  schedule:
+    - cron: "30 1 1,15 * *"
+  workflow_dispatch:
+
+jobs:
+  check-jax:
+    name: Build/Test Catalyst against JAX
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        interop: [true, false]
+
+    steps:
+    - name: Cancel previous runs
+      uses: styfle/cancel-workflow-action@0.11.0
+      with:
+        access_token: ${{ github.token }}
+
+    - name: Checkout Catalyst repo
+      uses: actions/checkout@v3
+
+    - name: Install deps
+      run: |
+        sudo apt-get install -y cmake ninja-build clang lld libomp-dev
+        python3 -m pip install -r requirements.txt
+
+    - name: Discover JAX dep hashes
+      if: matrix.interop
+      run: |
+        python3 -m pip install --upgrade jaxlib
+        python3 .github/workflows/set_dep_versions.py $(python3 -c "import jaxlib; print(jaxlib.__version__)")
+
+    - name: Get LLVM version
+      id: llvm-hash
+      run: echo "llvm-hash=$(grep llvm .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
+
+    - name: Get MHLO version
+      id: mhlo-hash
+      run: echo "mhlo-hash=$(grep mhlo .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
+
+    - name: Clone LLVM repo
+      uses: actions/checkout@v3
+      with:
+        repository: llvm/llvm-project
+        ref: ${{ steps.llvm-hash.outputs.llvm-hash }}
+        path: mlir/llvm-project
+
+    - name: Build LLVM
+      run: |
+        make llvm
+
+    - name: Build MLIR Dialects
+      run: |
+        COMPILER_LAUNCHER="" make dialects
+
+    - name: Clone MHLO repo
+      uses: actions/checkout@v3
+      with:
+        repository: tensorflow/mlir-hlo
+        ref: ${{ steps.mhlo-hash.outputs.mhlo-hash }}
+        path: mlir/mlir-hlo
+
+    - name: Build MHLO
+      run: |
+        make mhlo
+
+    - name: Build Frontend
+      run: |
+        make frontend
+        python3 -m pip install --upgrade jax jaxlib
+
+    - name: Install rustup with llvm-tools-preview
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        components: llvm-tools-preview
+
+    - name: Build Runtime
+      run: |
+        make runtime
+
+    - name: Run Frontend Test suite
+      run: |
+        make test-frontend
+
+    - name: Run Demos
+      run: |
+        make test-demos
