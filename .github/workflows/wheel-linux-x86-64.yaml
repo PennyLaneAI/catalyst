@@ -223,6 +223,10 @@ jobs:
           -DMLIR_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir
 
         cmake --build quantum-build --target check-dialects -j$(nproc)
+        patch -d quantum-build/python_packages/quantum/mlir_quantum --follow-symlinks < mlir/patches/use-ir-from-jax.patch
+        patch -d quantum-build/python_packages/quantum/mlir_quantum/dialects --follow-symlinks < mlir/patches/use-cext-from-jax.patch
+        patch -d quantum-build/python_packages/quantum/mlir_quantum/dialects --follow-symlinks < mlir/patches/remove-gradient-cext-import.patch
+        patch -d quantum-build/python_packages/quantum/mlir_quantum/dialects --follow-symlinks < mlir/patches/remove-quantum-cext-import.patch
 
     # Build Catalyst-Runtime
     - name: Build Catalyst-Runtime
@@ -252,8 +256,12 @@ jobs:
         cp --dereference $GITHUB_WORKSPACE/llvm-build/lib/libmlir_float16_utils.so.* $GITHUB_WORKSPACE/frontend/catalyst/lib
         cp --dereference $GITHUB_WORKSPACE/llvm-build/lib/libmlir_c_runner_utils.so* $GITHUB_WORKSPACE/frontend/catalyst/lib
         # Copy mlir bindings to frontend/mlir_quantum
-        mkdir -p $GITHUB_WORKSPACE/frontend/mlir_quantum
+        mkdir -p $GITHUB_WORKSPACE/frontend/mlir_quantum/dialects
         cp -R --dereference $GITHUB_WORKSPACE/quantum-build/python_packages/quantum/mlir_quantum/runtime $GITHUB_WORKSPACE/frontend/mlir_quantum/runtime
+        cp --dereference $GITHUB_WORKSPACE/quantum-build/python_packages/quantum/mlir_quantum/ir.py $GITHUB_WORKSPACE/frontend/mlir_quantum/
+        for file in arith tensor scf gradient quantum _ods_common ; do \
+           cp --dereference $GITHUB_WORKSPACE/quantum-build/python_packages/quantum/mlir_quantum/dialects/*${file}* $GITHUB_WORKSPACE/frontend/mlir_quantum/dialects ; \
+        done
         find $GITHUB_WORKSPACE/frontend -type d -name __pycache__ -exec rm -rf {} +
 
     - name: Build wheel

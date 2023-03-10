@@ -21,24 +21,35 @@ import jax
 from jax.interpreters import mlir, xla
 from jax._src import util
 from jax._src.lib.mlir import ir
-from jaxlib.mlir.dialects._ods_common import get_op_results_or_values
 from jaxlib.mlir.dialects._func_ops_gen import CallOp
 from jaxlib.mlir.dialects._mhlo_ops_gen import ConstantOp, ConvertOp
 
-from catalyst.python_bindings._arith_ops_gen import IndexCastOp
-from catalyst.python_bindings._tensor_ops_gen import ExtractOp as TensorExtractOp, FromElementsOp
-from catalyst.python_bindings._scf_ops_gen import IfOp, ConditionOp, ForOp, WhileOp, YieldOp
-from catalyst.python_bindings import AllocOp, ExtractOp, InsertOp, DeallocOp
-from catalyst.python_bindings import CustomOp, MultiRZOp, QubitUnitaryOp, MeasureOp
-from catalyst.python_bindings import SampleOp, CountsOp, ExpvalOp, VarianceOp, ProbsOp, StateOp
-from catalyst.python_bindings import GradOp
-from catalyst.python_bindings import (
+from mlir_quantum.dialects.arith import IndexCastOp
+from mlir_quantum.dialects.tensor import ExtractOp as TensorExtractOp, FromElementsOp
+from mlir_quantum.dialects.scf import IfOp, ConditionOp, ForOp, WhileOp, YieldOp
+from mlir_quantum.dialects.gradient import GradOp
+from mlir_quantum.dialects.quantum import (
+    SampleOp,
+    CountsOp,
+    ExpvalOp,
+    VarianceOp,
+    ProbsOp,
+    StateOp,
+    CustomOp,
+    MultiRZOp,
+    QubitUnitaryOp,
+    MeasureOp,
+    AllocOp,
+    ExtractOp,
+    InsertOp,
+    DeallocOp,
     ComputationalBasisOp,
     NamedObsOp,
     HermitianOp,
     TensorOp,
     HamiltonianOp,
 )
+
 from catalyst.utils.calculate_grad_shape import calculate_grad_shape, Signature
 
 
@@ -604,8 +615,11 @@ def _qmeasure_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value):
     result_type = ir.IntegerType.get_signless(1)
     result, new_qubit = MeasureOp(result_type, qubit.type, qubit).results
 
+    result_from_elements_op = ir.RankedTensorType.get((), result.type)
+    from_elements_op = FromElementsOp.build_generic([result_from_elements_op], [result])
+
     return (
-        FromElementsOp(ir.RankedTensorType.get((), result.type), [result]).results[0],
+        from_elements_op.results[0],
         new_qubit,
     )
 
@@ -881,7 +895,9 @@ def _expval_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: in
     result_type = ir.F64Type.get()
 
     mres = ExpvalOp(result_type, obs, shots=shots_attr).result
-    return FromElementsOp(ir.RankedTensorType.get((), result_type), [mres]).results
+    result_from_elements_op = ir.RankedTensorType.get((), result_type)
+    from_elements_op = FromElementsOp.build_generic([result_from_elements_op], [mres])
+    return from_elements_op.results
 
 
 #
@@ -917,7 +933,9 @@ def _var_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: int):
     result_type = ir.F64Type.get()
 
     mres = VarianceOp(result_type, obs, shots=shots_attr).result
-    return FromElementsOp(ir.RankedTensorType.get((), result_type), [mres]).results
+    result_from_elements_op = ir.RankedTensorType.get((), result_type)
+    from_elements_op = FromElementsOp.build_generic([result_from_elements_op], [mres])
+    return from_elements_op.results
 
 
 #
@@ -1026,15 +1044,10 @@ def _qcond_lowering(
 
     pred_extracted = TensorExtractOp(ir.IntegerType.get_signless(1), pred, []).result
 
-    if_op_scf = IfOp(
-        IfOp.build_generic(
-            results=result_types,
-            operands=get_op_results_or_values([pred_extracted]),
-        )
-    )
+    if_op_scf = IfOp(pred_extracted, result_types, hasElse=True)
 
     # if block
-    if_block = if_op_scf.regions[0].blocks.append()
+    if_block = if_op_scf.then_block
     name_stack = util.extend_name_stack(jax_ctx.module_context.name_stack, "if")
     if_ctx = jax_ctx.module_context.replace(name_stack=xla.extend_name_stack(name_stack, "if"))
     with ir.InsertionPoint(if_block):
@@ -1051,7 +1064,7 @@ def _qcond_lowering(
         YieldOp([o[0] for o in out[0]])
 
     # else block
-    else_block = if_op_scf.regions[1].blocks.append()
+    else_block = if_op_scf.else_block
     name_stack = util.extend_name_stack(jax_ctx.module_context.name_stack, "else")
     else_ctx = jax_ctx.module_context.replace(name_stack=xla.extend_name_stack(name_stack, "else"))
     with ir.InsertionPoint(else_block):
@@ -1233,15 +1246,10 @@ def _qfor_lowering(
         loop_operands.append(p)
     loop_operands.extend(loop_args)
 
-    for_op_scf = ForOp(
-        ForOp.build_generic(
-            results=result_types,
-            operands=loop_operands,
-        )
-    )
+    for_op_scf = ForOp(loop_operands[0], loop_operands[1], loop_operands[2], iter_args=loop_args)
 
     name_stack = util.extend_name_stack(jax_ctx.module_context.name_stack, "for")
-    body_block = for_op_scf.regions[0].blocks.append(*loop_carry_types)
+    body_block = for_op_scf.body
     body_ctx = jax_ctx.module_context.replace(name_stack=xla.extend_name_stack(name_stack, "body"))
 
     with ir.InsertionPoint(body_block):
@@ -1249,9 +1257,9 @@ def _qfor_lowering(
 
         # Convert the index type iteration variable expected by MLIR to tensor<i64> expected by JAX.
         body_args[0] = IndexCastOp(loop_index_type, body_args[0]).result
-        body_args[0] = FromElementsOp(
-            ir.RankedTensorType.get((), loop_index_type), [body_args[0]]
-        ).result
+        result_from_elements_op = ir.RankedTensorType.get((), loop_index_type)
+        from_elements_op = FromElementsOp.build_generic([result_from_elements_op], [body_args[0]])
+        body_args[0] = from_elements_op.result
 
         # recursively generate the mlir for the loop body
         out, _ = mlir.jaxpr_subcomp(
