@@ -6,7 +6,7 @@ from os import system, makedirs
 from os.path import isfile, dirname
 from json import load as json_load
 from argparse import ArgumentParser, Namespace as ParsedArguments
-from typing import Tuple, Iterable
+from typing import Tuple, Iterable, Set
 from collections import defaultdict
 from copy import deepcopy
 from contextlib import contextmanager
@@ -244,11 +244,9 @@ def load(a: ParsedArguments) -> DataFrame:
     return DataFrame(data)
 
 
-def plot(a: ParsedArguments) -> None:
+def plot(a: ParsedArguments, df_full) -> None:
     """Plot the figures. The function first builds a set of Pandas DataFrames,
     then calls Altair to present the data collected."""
-    df_full = load(a)
-
     with pd.option_context("display.max_rows", None, "display.max_columns", None):
         implCLcond = alt.condition(f"datum.impl == '{C_L}'", alt.value(2), alt.value(0.7))
         implCLcondDash = alt.condition(f"datum.impl == '{C_L}'", alt.value([0]), alt.value([3, 3]))
@@ -336,14 +334,15 @@ def plot(a: ParsedArguments) -> None:
             except KeyError:
                 return DataFrame()
 
-        def _plot_linechart(df, fname, xenc, title, ref_ngates, **kwargs):
+        def _plot_linechart(df, fname, xenc, title, ref_ngates=None, **kwargs):
             if len(df) == 0:
                 return
-            print(f"Updating {fname}")
+            print(f"Updating linechart {fname}")
             with _open(fname, "w") as f:
                 f.write(
                     vlc.vegalite_to_svg(
                         alt.vconcat(
+                            *[
                             Chart(df)
                             .mark_line(point=True)
                             .encode(
@@ -355,7 +354,9 @@ def plot(a: ParsedArguments) -> None:
                                 strokeWidth=implCLcond,
                             )
                             .properties(title=title),
+                            ] + [
                             _mkfooter(df, xenc(**kwargs), ref_ngates),
+                            ] if ref_ngates is not None else []
                         )
                         .configure_axisLeft(minExtent=50)
                         .to_dict()
@@ -411,6 +412,34 @@ def plot(a: ParsedArguments) -> None:
             scale=xscale,
         )
 
+        def _diff_methods(problem) -> Iterable[Set[str]]:
+            dmsame = set(["adjoint", "backprop"])
+            return chain([set([x]) for x in set(DIFF_METHODS[problem]) - dmsame], [dmsame])
+
+        vqeproblem = "chemvqe"
+        df = _filter("variational", "runtime", vqeproblem)
+        for dms in _diff_methods(vqeproblem):
+            df2 = df[df.get("diffmethod", pd.Series(float)).map(lambda m: m in dms)]
+            if len(df2) > 0:
+                dmtitle = "_".join(sorted(dms))
+                fname = f"_img/variational_runtime_{dmtitle.replace('-','')}_lineplot_{SYSHASH}.svg"
+                _plot_linechart(
+                    df2, fname,
+                    _nqubitsEncoding,
+                    _mktitle(f"Running time, Variational circuits ({dmtitle})"),
+                )
+
+        df = _filter("variational", "compile", vqeproblem)
+        for dms in _diff_methods(vqeproblem):
+            df2 = df[df.get("diffmethod", pd.Series(float)).map(lambda m: m in dms)]
+            if len(df2) > 0:
+                dmtitle = "_".join(sorted(dms))
+                fname = f"_img/variational_compile_{dmtitle.replace('-','')}_lineplot_{SYSHASH}.svg"
+                _plot_linechart(
+                    df2, fname,
+                    _nqubitsEncoding,
+                    _mktitle(f"Compile time, Variational circuits ({dmtitle})"),
+                )
 
         def _add_timeouts(df):
             for nqubits in sorted(set(df["nqubits"])):
@@ -437,10 +466,8 @@ def plot(a: ParsedArguments) -> None:
 
 
         # Variational circuits, bar charts
-        problem = "chemvqe"
-        df_allgrad = _filter("variational", "runtime", problem)
-        dmsame = set(["adjoint", "backprop"])
-        for diffmethods in chain([set([x]) for x in set(DIFF_METHODS[problem]) - dmsame], [dmsame]):
+        df_allgrad = _filter("variational", "runtime", vqeproblem)
+        for diffmethods in _diff_methods(vqeproblem):
             df = df_allgrad[
                 df_allgrad.get("diffmethod", pd.Series(float)).map(lambda m: m in diffmethods)
             ]
@@ -448,7 +475,7 @@ def plot(a: ParsedArguments) -> None:
                 df = _add_timeouts(df)
                 dmtitle = "_".join(sorted(diffmethods))
                 fname = f"_img/variational_runtime_{dmtitle.replace('-','')}_{SYSHASH}.svg"
-                print(f"Updating {fname}")
+                print(f"Updating barplot {fname}")
                 with _open(fname, "w") as f:
                     f.write(
                         vlc.vegalite_to_svg(
@@ -468,7 +495,7 @@ def plot(a: ParsedArguments) -> None:
                                 ),
                                 Chart().mark_errorbar(extent='stderr').encode(
                                     x=alt.X("impl", title=None),
-                                    y="time:Q",
+                                    y=alt.Y("time:Q", title=None),
                                 ),
                                 data=df
                             ).facet(
@@ -524,6 +551,6 @@ if __name__ == "__main__":
     else:
         print("Skipping the 'collect' action")
     if "plot" in a.actions:
-        plot(a)
+        plot(a, load(a))
     else:
         print("Skipping the 'plot' action")
