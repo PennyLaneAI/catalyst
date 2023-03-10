@@ -160,15 +160,15 @@ void LightningKokkosSimulator::MatrixOperation(const std::vector<std::complex<do
 auto LightningKokkosSimulator::Observable(ObsId id, const std::vector<std::complex<double>> &matrix,
                                           const std::vector<QubitIdType> &wires) -> ObsIdType
 {
-    if (id == ObsId::Hermitian) {
-        throw std::logic_error(
-            "Hermitian observable not implemented in PennyLane-Lightning-Kokkos");
-    }
-
     QFailIf(wires.size() > GetNumQubits(), "Invalid number of wires");
     QFailIf(!isValidQubits(wires), "Invalid given wires");
 
     auto &&dev_wires = getDeviceWires(wires);
+
+    if (id == ObsId::Hermitian) {
+        return this->obs_manager.createHermitianObs(matrix, dev_wires);
+    }
+
     return this->obs_manager.createNamedObs(id, dev_wires);
 }
 
@@ -185,8 +185,11 @@ auto LightningKokkosSimulator::HamiltonianObservable(const std::vector<double> &
 
 auto LightningKokkosSimulator::Expval(ObsIdType obsKey) -> double
 {
+    using UnmanagedComplexHostView = Kokkos::View<Kokkos::complex<double> *, Kokkos::HostSpace,
+                                                  Kokkos::MemoryTraits<Kokkos::Unmanaged>>;
+
     QFailIf(!this->obs_manager.isValidObservables({obsKey}), "Invalid key for cached observables");
-    auto &&[obs, wires] = this->obs_manager.getObservable(obsKey);
+    auto &&[obs, matrix, wires] = this->obs_manager.getObservable(obsKey);
 
     // update tape caching
     if (this->cache_recording) {
@@ -204,6 +207,16 @@ auto LightningKokkosSimulator::Expval(ObsIdType obsKey) -> double
     }
     else if (obs == ObsId::Hadamard) {
         return this->device_sv->getExpectationValueHadamard(wires);
+    } else if (obs == ObsId::Hermitian) {
+        std::vector<Kokkos::complex<double>> matrix_kk;
+        matrix_kk.resize(matrix.size());
+        std::transform(matrix.begin(), matrix.end(), matrix_kk.begin(),
+                    [](auto c) { return static_cast<Kokkos::complex<double>>(c); });
+
+        Kokkos::View<Kokkos::complex<double> *> hermition_matrix("hermition_matrix", matrix_kk.size());
+        Kokkos::deep_copy(hermition_matrix, UnmanagedComplexHostView(matrix_kk.data(), matrix_kk.size()));
+
+        return this->device_sv->getExpectationValueMultiQubitOp(hermition_matrix, wires);
     }
     return this->device_sv->getExpectationValueIdentity(wires);
 }

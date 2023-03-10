@@ -385,7 +385,6 @@ TEST_CASE("Test __quantum__qis__ PhaseShift", "[qir_lightning_core]")
     __quantum__rt__finalize();
 }
 
-#ifndef _KOKKOS
 TEST_CASE("Test __quantum__qis__HermitianObs with an uninitialized matrix", "[qir_lightning_core]")
 {
     // initialize the simulator
@@ -490,6 +489,7 @@ TEST_CASE("Test __quantum__qis__HermitianObs and Expval", "[qir_lightning_core]"
     __quantum__rt__finalize();
 }
 
+#ifndef _KOKKOS
 TEST_CASE("Test __quantum__qis__TensorObs with invalid number of observables",
           "[qir_lightning_core]")
 {

@@ -177,7 +177,8 @@ template <typename PrecisionT> class LightningObsManager {
  */
 template <typename PrecisionT> class LightningKokkosObsManager {
   private:
-    std::vector<std::tuple<ObsId, std::vector<size_t>>> observables_{};
+    using ObsManagerKokkosType = std::tuple<ObsId, std::vector<std::complex<PrecisionT>>, std::vector<size_t>>;
+    std::vector<ObsManagerKokkosType> observables_{};
 
   public:
     LightningKokkosObsManager() = default;
@@ -190,14 +191,13 @@ template <typename PrecisionT> class LightningKokkosObsManager {
 
     void clear() { this->observables_.clear(); }
 
-    [[nodiscard]] auto getObservable(ObsIdType key) -> std::pair<ObsId, std::vector<size_t>>
+    [[nodiscard]] auto getObservable(ObsIdType key) -> ObsManagerKokkosType
     {
         auto key_t = reinterpret_cast<int64_t>(key);
         QFailIf(static_cast<size_t>(key_t) >= this->observables_.size() || key_t < 0,
                 "Invalid observable key");
 
-        auto &&[obs, wires] = this->observables_[key_t];
-        return {obs, wires};
+        return this->observables_[key_t];
     }
 
     [[nodiscard]] auto numObservables() -> size_t { return this->observables_.size(); }
@@ -211,12 +211,14 @@ template <typename PrecisionT> class LightningKokkosObsManager {
 
     auto createNamedObs(ObsId obsId, const std::vector<size_t> &wires) -> ObsIdType
     {
-        auto obs_str =
-            std::string(Lightning::lookup_obs<Lightning::simulator_observable_support_size>(
-                Lightning::simulator_observable_support, obsId));
+        this->observables_.emplace_back(obsId, std::vector<std::complex<double>>{}, wires);
+        return static_cast<ObsIdType>(this->observables_.size() - 1);
+    }
 
-        this->observables_.emplace_back(obsId, wires);
-
+    auto createHermitianObs(const std::vector<std::complex<PrecisionT>> &matrix,
+                            const std::vector<size_t> &wires) -> ObsIdType
+    {
+        this->observables_.emplace_back(ObsId::Hermitian, matrix, wires);
         return static_cast<ObsIdType>(this->observables_.size() - 1);
     }
 };

@@ -176,17 +176,11 @@ TEST_CASE("Expval(HermitianObs) test with numWires=1", "[lightning]")
     std::vector<std::complex<double>> mat1(16, {0, 0});
     std::vector<std::complex<double>> mat2{{1.0, 0.0}, {0.0, 0.0}, {-1.0, 0.0}, {0.0, 0.0}};
 
-#ifndef _KOKKOS
     ObsIdType h1 = qis->Observable(ObsId::Hermitian, mat1, {Qs[0], Qs[1]});
     ObsIdType h2 = qis->Observable(ObsId::Hermitian, mat2, {Qs[0]});
 
     REQUIRE(qis->Expval(h1) == Approx(.0).margin(1e-5));
     REQUIRE(qis->Expval(h2) == Approx(.0).margin(1e-5));
-#else
-    REQUIRE_THROWS_WITH(
-        qis->Observable(ObsId::Hermitian, mat1, {Qs[0], Qs[1]}),
-        Catch::Contains("Hermitian observable not implemented in PennyLane-Lightning-Kokkos"));
-#endif
 }
 
 TEST_CASE("Expval(TensorProd(NamedObs)) test", "[lightning]")
@@ -283,9 +277,10 @@ TEST_CASE("Expval(TensorProd(HermitianObs))", "[lightning]")
     std::vector<std::complex<double>> mat1(16, {0, 0});
     std::vector<std::complex<double>> mat2{{1.0, 0.0}, {0.0, 0.0}, {-1.0, 0.0}, {0.0, 0.0}};
 
-#ifndef _KOKKOS
     ObsIdType h1 = qis->Observable(ObsId::Hermitian, mat1, {Qs[0], Qs[1]});
     ObsIdType h2 = qis->Observable(ObsId::Hermitian, mat2, {Qs[0]});
+
+#ifndef _KOKKOS
 
     ObsIdType tph1 = qis->TensorObservable({h1});
     ObsIdType tph2 = qis->TensorObservable({h2});
@@ -293,9 +288,8 @@ TEST_CASE("Expval(TensorProd(HermitianObs))", "[lightning]")
     REQUIRE(qis->Expval(tph1) == Approx(.0).margin(1e-5));
     REQUIRE(qis->Expval(tph2) == Approx(.0).margin(1e-5));
 #else
-    REQUIRE_THROWS_WITH(qis->Observable(ObsId::Hermitian, mat1, {Qs[0], Qs[1]}),
-                        Catch::Contains("Hermitian observable not implemented in "
-                                        "PennyLane-Lightning-Kokkos"));
+    REQUIRE_THROWS_WITH(qis->TensorObservable({h1, h2}),
+                        Catch::Contains("Tensor observable not implemented in PennyLane-Lightning-Kokkos"));
 #endif
 }
 
@@ -318,17 +312,16 @@ TEST_CASE("Expval(TensorProd(HermitianObs[]))", "[lightning]")
     std::vector<std::complex<double>> mat1(4, {1.0, 0});
     std::vector<std::complex<double>> mat2{{1.0, 0.0}, {0.0, 0.0}, {-1.0, 0.0}, {0.0, 0.0}};
 
-#ifndef _KOKKOS
     ObsIdType h1 = qis->Observable(ObsId::Hermitian, mat1, {Qs[1]});
     ObsIdType h2 = qis->Observable(ObsId::Hermitian, mat2, {Qs[0]});
 
+#ifndef _KOKKOS
     ObsIdType tp = qis->TensorObservable({h1, h2});
 
     REQUIRE(qis->Expval(tp) == Approx(.0).margin(1e-5));
 #else
-    REQUIRE_THROWS_WITH(qis->Observable(ObsId::Hermitian, mat1, {Qs[1]}),
-                        Catch::Contains("Hermitian observable not implemented in "
-                                        "PennyLane-Lightning-Kokkos"));
+    REQUIRE_THROWS_WITH(qis->TensorObservable({h1, h2}),
+                        Catch::Contains("Tensor observable not implemented in PennyLane-Lightning-Kokkos"));
 #endif
 }
 
@@ -355,16 +348,14 @@ TEST_CASE("Expval(TensorProd(Obs[]))", "[lightning]")
 
     std::vector<std::complex<double>> mat2{{1.0, 0.0}, {2.0, 0.0}, {-1.0, 0.0}, {3.0, 0.0}};
 
-#ifndef _KOKKOS
     ObsIdType h = qis->Observable(ObsId::Hermitian, mat2, {Qs[0]});
-
+#ifndef _KOKKOS
     ObsIdType tp = qis->TensorObservable({px, h, pz});
 
     REQUIRE(qis->Expval(tp) == Approx(-3.0).margin(1e-5));
 #else
-    REQUIRE_THROWS_WITH(qis->Observable(ObsId::Hermitian, mat2, {Qs[0]}),
-                        Catch::Contains("Hermitian observable not implemented in "
-                                        "PennyLane-Lightning-Kokkos"));
+    REQUIRE_THROWS_WITH(qis->TensorObservable({px, h, pz}),
+                        Catch::Contains("Tensor observable not implemented in PennyLane-Lightning-Kokkos"));
 #endif
 }
 
@@ -396,8 +387,7 @@ TEST_CASE("Expval(Hamiltonian(NamedObs[])) test", "[lightning]")
     REQUIRE(qis->Expval(hxyz) == Approx(0.2).margin(1e-5));
 #else
     REQUIRE_THROWS_WITH(qis->HamiltonianObservable({0.4, 0.8, 0.2}, {px, py, pz}),
-                        Catch::Contains("Hamiltonian observable not implemented "
-                                        "in PennyLane-Lightning-Kokkos"));
+                        Catch::Contains("Hamiltonian observable not implemented in PennyLane-Lightning-Kokkos"));
 #endif
 }
 
@@ -460,15 +450,14 @@ TEST_CASE("Expval(Hamiltonian(Hermitian[])) test", "[lightning]")
 
     std::vector<std::complex<double>> mat2{{1.0, 0.0}, {2.0, 0.0}, {-1.0, 0.0}, {3.0, 0.0}};
 
-#ifndef _KOKKOS
     ObsIdType h = qis->Observable(ObsId::Hermitian, mat2, {Qs[0]});
-
+#ifndef _KOKKOS
     ObsIdType hxhz = qis->HamiltonianObservable({0.2, 0.3, 0.6}, {px, h, pz});
 
     REQUIRE(qis->Expval(hxhz) == Approx(0.5).margin(1e-5));
 #else
-    REQUIRE_THROWS_WITH(qis->Observable(ObsId::Hermitian, mat2, {Qs[0]}),
-                        Catch::Contains("Hermitian observable not implemented in "
+    REQUIRE_THROWS_WITH(qis->HamiltonianObservable({0.2, 0.3, 0.6}, {px, h, pz}),
+                        Catch::Contains("Hamiltonian observable not implemented in "
                                         "PennyLane-Lightning-Kokkos"));
 #endif
 }
