@@ -1,10 +1,13 @@
+""" Single measurement entry point """
 import sys
-import numpy as np
+from sys import exit
 from argparse import ArgumentParser
 from os import makedirs
 from os.path import dirname
 from json import dump as json_dump, load as json_load
 from traceback import print_exc
+
+import numpy as np
 
 from catalyst_benchmark.measurements import (parse_args, selfcheck, REGISTRY, parse_implementation,
                                              BenchmarkResult, with_alarm, BooleanOptionalAction)
@@ -55,11 +58,11 @@ elif a.command == "run":
         should_exit = True
     if a.measure == "?":
         print("measurements:")
-        print("\n".join(sorted(set(["- " + x[0] for x in REGISTRY.keys()]))))
+        print("\n".join(sorted({"- " + x[0] for x in REGISTRY.keys()})))
         should_exit = True
     if a.implementation == "?":
         print("implementations:")
-        print("\n".join(sorted(set(["- " + x[1] for x in REGISTRY.keys()]))))
+        print("\n".join(sorted({"- " + x[1] for x in REGISTRY.keys()})))
         should_exit = True
     if should_exit:
         exit(1)
@@ -84,9 +87,9 @@ elif a.command == "run":
         else:
             if len(dirname(a.output)) > 0:
                 makedirs(dirname(a.output), exist_ok=True)
-            with open(a.output, "w") as f:
+            with open(a.output, "w", encoding="utf-8") as f:
                 json_dump(r2.to_dict(), f, indent=4)
-            with open(a.output, "r") as f:
+            with open(a.output, "r", encoding="utf-8") as f:
                 r3 = BenchmarkResult.from_dict(json_load(f))
             assert np.allclose(r2.measurement_sec, r3.measurement_sec)
     except TimeoutError:
@@ -95,4 +98,3 @@ elif a.command == "run":
 
 else:
     raise ValueError(f"Invalid command {a.command}")
-

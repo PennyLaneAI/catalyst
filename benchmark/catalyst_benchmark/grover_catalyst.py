@@ -1,9 +1,9 @@
-import pennylane as qml
-import jax.numpy as jnp
+""" Grover-like problem, PennyLane+Catalyst implementation """
 from typing import Any
 
+import pennylane as qml
+import jax.numpy as jnp
 from catalyst import qjit, for_loop, while_loop
-
 from .types import Problem
 
 
@@ -103,6 +103,7 @@ def diffuser(t):
 
 
 def qcompile(p: ProblemC, weights):
+    """ Compile the quantum parts of the problem """
     def _main(weights):
         # Initialize the state
         @for_loop(0, len(p.iqr), 1)
@@ -128,10 +129,12 @@ def qcompile(p: ProblemC, weights):
 
 
 def workflow(p: ProblemC, weights):
+    """ Problem workflow """
     return p.qcircuit(weights)
 
 
 def run_catalyst(N=7):
+    """ Test problem entry point """
     p = ProblemC(qml.device("lightning.qubit", wires=N), None)
 
     @qjit

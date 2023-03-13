@@ -1,7 +1,5 @@
+""" Measurement cycle management and data post-processing routines """
 import sys
-import vl_convert as vlc
-import altair as alt
-import pandas as pd
 from os import system, makedirs
 from os.path import isfile, dirname
 from json import load as json_load
@@ -10,9 +8,11 @@ from typing import Tuple, Iterable, Set, Union, Optional
 from collections import defaultdict
 from copy import deepcopy
 from hashlib import sha256
-from itertools import chain
 from functools import partial
 
+import vl_convert as vlc
+import altair as alt
+import pandas as pd
 from pandas import DataFrame
 from altair import Chart
 
@@ -142,7 +142,7 @@ def ofile(a, _, measure, problem, impl, nqubits, nlayers, diffmethod) -> Tuple[s
 
 def loadresults(fp: str) -> BenchmarkResult:
     """Load a serrialized benchmark result from file"""
-    return BenchmarkResult.from_dict(json_load(open(fp)))
+    return BenchmarkResult.from_dict(json_load(open(fp, encoding="utf-8")))
 
 
 def all_configurations(a: ParsedArguments) -> Iterable[tuple]:
@@ -221,12 +221,12 @@ def load(a: ParsedArguments) -> Tuple[DataFrame, Optional[Sysinfo]]:
         cat, measure, problem, impl, nqubits, nlayers, diffmethod = config
         r = None
         try:
-            r = BenchmarkResult.from_dict(json_load(open(ofname)))
+            r = BenchmarkResult.from_dict(json_load(open(ofname, encoding="utf-8")))
         except Exception as e:
             log.append(str(e))
             log.append("Trying to load V1 instead")
             try:
-                r = BenchmarkResultV1.from_dict(json_load(open(ofname)))
+                r = BenchmarkResultV1.from_dict(json_load(open(ofname, encoding="utf-8")))
             except Exception as e:
                 nmissing += 1
                 log.append(str(e))
@@ -266,7 +266,7 @@ def writefile(a: ParsedArguments, fname, chart) -> None:
                 print(f"(Dry-run) Would update: {fname_suffix}.{ext}")
             else:
                 print(f"Updating {fname_suffix}.{ext}")
-                with open(f"{fname_suffix}.{ext}", wf) as f:
+                with open(f"{fname_suffix}.{ext}", wf, encoding="utf-8") as f:
                     f.write(method(chart))
 
 
@@ -614,5 +614,4 @@ def load_cmdline(cmdline:Optional[Union[str,list]]=None) -> DataFrame:
 
 def load_tagged(syshash=SYSHASH, tag=f"v{FMTVERSION}") -> DataFrame:
     return load_cmdline(['-H',syshash,'--tag',tag])
-
 

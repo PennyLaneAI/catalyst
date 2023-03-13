@@ -1,14 +1,14 @@
+""" ChemVQE problem, PennyLane+Catalyst implementation """
+from typing import Any, Dict
+
 import pennylane as qml
 import jax.numpy as jnp
 import catalyst
 import numpy as np
-
-from typing import Any, Dict
 from dataclasses import dataclass
 from pennylane import AllSinglesDoubles
 from catalyst import qjit
 from jax.core import ShapedArray
-
 from .types import Problem
 
 DMALIASES = {"finite-diff": "fd", "parameter-shift": "ps", "adjoint": "adj"}
@@ -55,6 +55,7 @@ class ProblemCVQE(Problem):
 
 
 def qcompile(p: ProblemCVQE, weights):
+    """ Compile the quantum parts of the problem """
     def _circuit(params):
         AllSinglesDoubles(params, range(p.nqubits), p.hf_state, p.singles, p.doubles)
         return qml.expval(qml.Hamiltonian(np.array(p.ham.coeffs), p.ham.ops))
@@ -68,11 +69,12 @@ def qcompile(p: ProblemCVQE, weights):
 
 
 def workflow(p: ProblemCVQE, params):
+    """ Problem workflow """
     stepsize = 0.5
     theta = params
 
     @catalyst.for_loop(0, p.nsteps, 1)
-    def loop(i, theta):
+    def loop(_, theta):
         dtheta = p.qgrad(theta)
         return theta - dtheta[0] * stepsize
 
@@ -85,6 +87,7 @@ NSTEPS = 1
 
 
 def run_catalyst(N=6):
+    """ Test problem entry point """
     p = ProblemCVQE(
         dev=qml.device("lightning.qubit", wires=N, shots=SHOTS),
         nsteps=NSTEPS,

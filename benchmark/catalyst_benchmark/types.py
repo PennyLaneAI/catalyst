@@ -1,7 +1,7 @@
-from dataclasses import dataclass
+""" Benchmaring data type definitions """
 from typing import List, Optional, Any, Dict
+from dataclasses import dataclass
 from dataclasses_json import dataclass_json
-
 from argparse import Action, SUPPRESS
 from psutil import virtual_memory
 from os import uname
@@ -21,6 +21,7 @@ CPU_BRAND: Optional[str] = None
 @dataclass_json
 @dataclass(frozen=True)
 class Sysinfo:
+    """ Basic information about the system which runs the benchmark. """
     systype: str
     hostname: str
     ncpu: int
@@ -45,6 +46,7 @@ class Sysinfo:
 
 
 class Problem:
+    """ Base class for reference problem. """
     def __init__(self, dev, **qnode_kwargs):
         self.dev = dev
         self.qnode_kwargs = qnode_kwargs
@@ -59,6 +61,8 @@ class Problem:
 @dataclass_json
 @dataclass
 class BenchmarkResultV1:
+    """ Base class for the measurement results. We use this class for backward compatibility with
+    some previously collected data records. """
     sysinfo: Sysinfo
     numeric_result: Optional[List[List[float]]]
     depth_gates: Optional[int]
@@ -70,7 +74,7 @@ class BenchmarkResultV1:
 @dataclass_json
 @dataclass
 class BenchmarkResult(BenchmarkResultV1):
-    """Common benchmark result data structure.
+    """ Measurement results data structure.
     Fields:
         numeric_result: Last numerical result, required primarily for
                         self-check.

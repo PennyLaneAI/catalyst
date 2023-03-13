@@ -1,9 +1,9 @@
-import pennylane as qml
-import pennylane.numpy as pnp
-
+""" Grover-like problem, PennyLane/PennyLane+JAX implementation """
 from typing import Any
 from copy import deepcopy
 
+import pennylane as qml
+import pennylane.numpy as pnp
 from .types import Problem
 
 
@@ -96,6 +96,7 @@ def diffuser(t):
 
 
 def qcompile(p: ProblemPL, weights):
+    """ Compile the quantum parts of the problem """
     def _main(weights):
         # Initialize the state
         for qubit in p.iqr:
@@ -116,6 +117,7 @@ def qcompile(p: ProblemPL, weights):
 
 
 def workflow(p: ProblemPL, weights):
+    """ Problem workflow """
     return p.qcircuit(weights)
 
 
