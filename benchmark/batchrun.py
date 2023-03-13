@@ -1,3 +1,4 @@
+""" Measurement cycle management entry point """
 import sys
 
 from catalyst_benchmark.toplevel import AP, load, collect, plot, SYSHASH_ORIG, SYSINFO, syshash

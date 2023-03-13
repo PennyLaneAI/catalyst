@@ -1,8 +1,9 @@
+""" ChemVQE problem, PennyLane/PennyLane+JAX implementation """
+from typing import Any, Dict
+
 import pennylane.numpy as pnp
 import pennylane as qml
 import numpy as np
-
-from typing import Any, Dict
 from dataclasses import dataclass
 from pennylane import AllSinglesDoubles
 from functools import partial
@@ -53,6 +54,7 @@ class ProblemCVQE(Problem):
 
 
 def qcompile(p: ProblemCVQE, weights):
+    """ Compile the quantum parts of the problem """
     def _circuit(params):
         AllSinglesDoubles(params, range(p.nqubits), p.hf_state, p.singles, p.doubles)
         return qml.expval(qml.Hamiltonian(np.array(p.ham.coeffs), p.ham.ops))
@@ -65,6 +67,7 @@ def qcompile(p: ProblemCVQE, weights):
 
 
 def workflow(p: ProblemCVQE, params):
+    """ Problem workflow """
     assert p.qcircuit is not None
     assert p.qgrad is not None
 
@@ -89,6 +92,7 @@ NSTEPS = 1
 
 
 def run_default_qubit(N=6):
+    """ Test problem entry point """
     p = ProblemCVQE(
         qml.device("default.qubit", wires=N, shots=SHOTS),
         grad=partial(qml.grad, argnum=0),
@@ -105,6 +109,7 @@ def run_default_qubit(N=6):
 
 
 def run_lightning_qubit(N=6):
+    """ Test problem entry point """
     p = ProblemCVQE(
         qml.device("lightning.qubit", wires=N, shots=SHOTS),
         grad=partial(qml.grad, argnum=0),
@@ -122,6 +127,7 @@ def run_lightning_qubit(N=6):
 
 
 def run_jax_(devname, N=6):
+    """ Test problem entry point """
     import jax
 
     jax.config.update("jax_enable_x64", True)
@@ -147,8 +153,10 @@ def run_jax_(devname, N=6):
 
 
 def run_jax_default_qubit(N=6):
+    """ Test problem entry point """
     return run_jax_("default.qubit.jax", N)
 
 
 def run_jax_lightning_qubit(N=6):
+    """ Test problem entry point """
     return run_jax_("lightning.qubit", N)

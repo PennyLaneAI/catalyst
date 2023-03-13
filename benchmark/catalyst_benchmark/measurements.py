@@ -1,7 +1,6 @@
+""" Measurement procedures """
 import sys
-import numpy as np
 from typing import Optional, Tuple, List
-from numpy.testing import assert_allclose
 from argparse import ArgumentParser, Namespace as ParsedArguments
 from time import time
 from os import makedirs
@@ -12,6 +11,8 @@ from contextlib import contextmanager
 from traceback import print_exc
 from functools import partial
 
+import numpy as np
+from numpy.testing import assert_allclose
 from .types import Problem, BenchmarkResult, BooleanOptionalAction
 
 
@@ -507,9 +508,9 @@ if __name__ == "__main__":
             else:
                 if len(dirname(a.output)) > 0:
                     makedirs(dirname(a.output), exist_ok=True)
-                with open(a.output, "w") as f:
+                with open(a.output, "w", encoding="utf-8") as f:
                     json_dump(r2.to_dict(), f, indent=4)
-                with open(a.output, "r") as f:
+                with open(a.output, "r", encoding="utf-8") as f:
                     r3 = BenchmarkResult.from_dict(json_load(f))
                 assert np.allclose(r2.measurement_sec, r3.measurement_sec)
         except TimeoutError:
