@@ -91,7 +91,9 @@
 \bmimage{variational_compile_adjoint_lineplot}
 
 Comment: We were able to compile our VQE problem using the Default qubit device with "adjoint"
-differentiation method, but we were not able to run it (see the runtime measurement plot below).
+differentiation method, but we were not able to run it (see the runtime measurement plot below). The
+issue for both PennyLane and PennyLane+Jax were \t{QuantumFunctionError: Adjoint
+differentiation method does not support Hamiltonian observables}.
 
 \bmimage{variational_compile_backprop_lineplot}
 
