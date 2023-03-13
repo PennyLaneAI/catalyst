@@ -36,8 +36,7 @@ auto LightningSimulator::AllocateQubits(size_t num_qubits) -> std::vector<QubitI
     }
 
     std::vector<QubitIdType> result(num_qubits);
-    std::generate_n(
-        result.begin(), num_qubits; []() { return AllocateQubit(); });
+    std::generate_n(result.begin(), num_qubits, [this]() { return AllocateQubit(); });
     return result;
 }
 
@@ -147,7 +146,7 @@ void LightningSimulator::MatrixOperation(const std::vector<std::complex<double>>
 auto LightningSimulator::Observable(ObsId id, const std::vector<std::complex<double>> &matrix,
                                     const std::vector<QubitIdType> &wires) -> ObsIdType
 {
-    QFailIf(wires.size() > GetNumQubits(), "Invalid number of wires");
+    QFailIf(wires.size() > this->GetNumQubits(), "Invalid number of wires");
     QFailIf(!isValidQubits(wires), "Invalid given wires");
 
     auto &&dev_wires = getDeviceWires(wires);
@@ -173,7 +172,7 @@ auto LightningSimulator::HamiltonianObservable(const std::vector<double> &coeffs
 auto LightningSimulator::Expval(ObsIdType obsKey) -> double
 {
     QFailIf(!this->obs_manager.isValidObservables({obsKey}), "Invalid key for cached observables");
-    auto obs = this->obs_manager.getObservable(obsKey);
+    auto &&[obs, _] = this->obs_manager.getObservable(obsKey);
 
     // update tape caching
     if (this->cache_recording) {
@@ -189,7 +188,7 @@ auto LightningSimulator::Var(ObsIdType obsKey) -> double
 {
     QFailIf(!this->obs_manager.isValidObservables({obsKey}), "Invalid key for cached observables");
 
-    auto obs = this->obs_manager.getObservable(obsKey);
+    auto &&[obs, _] = this->obs_manager.getObservable(obsKey);
 
     // update tape caching
     if (this->cache_recording) {
@@ -227,7 +226,7 @@ auto LightningSimulator::Probs() -> std::vector<double>
 auto LightningSimulator::PartialProbs(const std::vector<QubitIdType> &wires) -> std::vector<double>
 {
     const size_t numWires = wires.size();
-    const size_t numQubits = GetNumQubits();
+    const size_t numQubits = this->GetNumQubits();
 
     QFailIf(numWires > numQubits, "Invalid number of wires");
     QFailIf(!isValidQubits(wires), "Invalid given wires to measure");
@@ -250,7 +249,7 @@ auto LightningSimulator::Sample(size_t shots) -> std::vector<double>
     // the number of qubits.
     auto &&li_samples = m.generate_samples(shots);
 
-    const size_t numQubits = GetNumQubits();
+    const size_t numQubits = this->GetNumQubits();
 
     // The lightning samples are layed out as a single vector of size
     // shots*qubits, where each element represents a single bit. The
@@ -272,7 +271,7 @@ auto LightningSimulator::PartialSample(const std::vector<QubitIdType> &wires, si
     -> std::vector<double>
 {
     const size_t numWires = wires.size();
-    const size_t numQubits = GetNumQubits();
+    const size_t numQubits = this->GetNumQubits();
 
     QFailIf(numWires > numQubits, "Invalid number of wires");
     QFailIf(!isValidQubits(wires), "Invalid given wires to measure");
@@ -324,7 +323,7 @@ auto LightningSimulator::Counts(size_t shots)
     // computational basis bitstring. In the future, eigenvalues can also be
     // obtained from an observable, hence the bitstring integer is stored as a
     // double.
-    const size_t numQubits = GetNumQubits();
+    const size_t numQubits = this->GetNumQubits();
     const size_t numElements = 1U << numQubits;
     std::vector<double> eigvals(numElements);
     std::iota(eigvals.begin(), eigvals.end(), 0);
@@ -351,7 +350,7 @@ auto LightningSimulator::PartialCounts(const std::vector<QubitIdType> &wires, si
     -> std::tuple<std::vector<double>, std::vector<int64_t>>
 {
     const size_t numWires = wires.size();
-    const size_t numQubits = GetNumQubits();
+    const size_t numQubits = this->GetNumQubits();
 
     QFailIf(numWires > numQubits, "Invalid number of wires");
     QFailIf(!isValidQubits(wires), "Invalid given wires to measure");
@@ -407,7 +406,7 @@ auto LightningSimulator::Measure(QubitIdType wire) -> Result
     float draw = dis(gen);
     bool mres = draw > probs[0];
 
-    const size_t numQubits = GetNumQubits();
+    const size_t numQubits = this->GetNumQubits();
 
     auto &&state = this->device_sv->getDataVector();
 
@@ -481,7 +480,7 @@ auto LightningSimulator::Gradient(const std::vector<size_t> &trainParams)
     std::vector<std::shared_ptr<Pennylane::Simulators::Observable<double>>> obs_vec;
     obs_vec.reserve(obs_keys.size());
     for (auto idx : obs_keys) {
-        obs_vec.emplace_back(this->obs_manager.getObservable(idx));
+        obs_vec.emplace_back(std::get<0>(this->obs_manager.getObservable(idx)));
     }
 
     std::vector<size_t> all_params;

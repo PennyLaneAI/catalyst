@@ -23,14 +23,37 @@
 #include "LightningUtils.hpp"
 #include "Types.h"
 
-#if __has_include("Observables.hpp")
+#if __has_include("ObservablesKokkos.hpp")
+#include "ObservablesKokkos.hpp"
+namespace Catalyst::Runtime::Simulator {
+template <typename PrecisionT>
+using ObservableClassName = Pennylane::Algorithms::ObservableKokkos<PrecisionT>;
+template <typename PrecisionT>
+using NamedObsClassName = Pennylane::Algorithms::NamedObsKokkos<PrecisionT>;
+template <typename PrecisionT>
+using HermitianObsClassName = Pennylane::Algorithms::HermitianObsKokkos<PrecisionT>;
+template <typename PrecisionT>
+using TensorProdObsClassName = Pennylane::Algorithms::TensorProdObsKokkos<PrecisionT>;
+template <typename PrecisionT>
+using HamiltonianClassName = Pennylane::Algorithms::HamiltonianKokkos<PrecisionT>;
+} // namespace Catalyst::Runtime::Simulator
+#else
 #include "Observables.hpp"
-#define LIGHTNING_OBSERVABLE_CLASS
+namespace Catalyst::Runtime::Simulator {
+template <typename PrecisionT>
+using ObservableClassName = Pennylane::Simulators::Observable<PrecisionT>;
+template <typename PrecisionT>
+using NamedObsClassName = Pennylane::Simulators::NamedObs<PrecisionT>;
+template <typename PrecisionT>
+using HermitianObsClassName = Pennylane::Simulators::HermitianObs<PrecisionT>;
+template <typename PrecisionT>
+using TensorProdObsClassName = Pennylane::Simulators::TensorProdObs<PrecisionT>;
+template <typename PrecisionT>
+using HamiltonianClassName = Pennylane::Simulators::Hamiltonian<PrecisionT>;
+} // namespace Catalyst::Runtime::Simulator
 #endif
 
 namespace Catalyst::Runtime::Simulator {
-
-#if defined(LIGHTNING_OBSERVABLE_CLASS)
 
 /**
  * @brief The LightningObsManager caches observables of a program at runtime
@@ -39,8 +62,8 @@ namespace Catalyst::Runtime::Simulator {
  */
 template <typename PrecisionT> class LightningObsManager {
   private:
-    std::vector<std::pair<std::shared_ptr<Pennylane::Simulators::Observable<PrecisionT>>, ObsType>>
-        observables_{};
+    using ObservablePairType = std::pair<std::shared_ptr<ObservableClassName<PrecisionT>>, ObsType>;
+    std::vector<ObservablePairType> observables_{};
 
     static constexpr std::array<ObsType, 2> hamiltonian_valid_obs_types = {
         ObsType::Basic,
@@ -61,54 +84,49 @@ template <typename PrecisionT> class LightningObsManager {
      */
     void clear() { this->observables_.clear(); }
 
-    [[nodiscard]] auto getObservable(ObsIdType key)
-        -> std::shared_ptr<Pennylane::Simulators::Observable<PrecisionT>>
-    {
-        auto key_t = reinterpret_cast<int64_t>(key);
-        QFailIf(static_cast<size_t>(key_t) >= this->observables_.size() || key_t < 0,
-                "Invalid observable key");
-
-        return std::get<0>(this->observables_[key_t]);
-    }
-
-    [[nodiscard]] auto numObservables() -> size_t { return this->observables_.size(); }
-
-    [[nodiscard]] auto isValidObservables(const std::vector<ObsIdType> &obsKeys) -> bool
+    [[nodiscard]] auto isValidObservables(const std::vector<ObsIdType> &obsKeys) const -> bool
     {
         return std::all_of(obsKeys.begin(), obsKeys.end(), [this](auto i) {
             return (i >= 0 && static_cast<size_t>(i) < this->observables_.size());
         });
     }
 
-    auto createNamedObs(ObsId obsId, const std::vector<size_t> &wires) -> ObsIdType
+    [[nodiscard]] auto getObservable(ObsIdType key) const -> const ObservablePairType &
     {
-        auto obs_str =
+        QFailIf(!this->isValidObservables({key}), "Invalid observable key");
+        return this->observables_[reinterpret_cast<int64_t>(key)];
+    }
+
+    [[nodiscard]] auto numObservables() const -> size_t { return this->observables_.size(); }
+
+    [[nodiscard]] auto createNamedObs(ObsId obsId, const std::vector<size_t> &wires) -> ObsIdType
+    {
+        auto &&obs_str =
             std::string(Lightning::lookup_obs<Lightning::simulator_observable_support_size>(
                 Lightning::simulator_observable_support, obsId));
 
         this->observables_.push_back(std::make_pair(
-            std::make_shared<Pennylane::Simulators::NamedObs<PrecisionT>>(obs_str, wires),
-            ObsType::Basic));
+            std::make_shared<NamedObsClassName<PrecisionT>>(obs_str, wires), ObsType::Basic));
         return static_cast<ObsIdType>(this->observables_.size() - 1);
     }
 
-    auto createHermitianObs(const std::vector<std::complex<PrecisionT>> &matrix,
-                            const std::vector<size_t> &wires) -> ObsIdType
+    [[nodiscard]] auto createHermitianObs(const std::vector<std::complex<PrecisionT>> &matrix,
+                                          const std::vector<size_t> &wires) -> ObsIdType
     {
         this->observables_.push_back(
-            std::make_pair(std::make_shared<Pennylane::Simulators::HermitianObs<PrecisionT>>(
-                               Pennylane::Simulators::HermitianObs<PrecisionT>{matrix, wires}),
+            std::make_pair(std::make_shared<HermitianObsClassName<PrecisionT>>(
+                               HermitianObsClassName<PrecisionT>{matrix, wires}),
                            ObsType::Basic));
 
         return static_cast<ObsIdType>(this->observables_.size() - 1);
     }
 
-    auto createTensorProdObs(const std::vector<ObsIdType> &obsKeys) -> ObsIdType
+    [[nodiscard]] auto createTensorProdObs(const std::vector<ObsIdType> &obsKeys) -> ObsIdType
     {
         const auto key_size = obsKeys.size();
         const auto obs_size = this->observables_.size();
 
-        std::vector<std::shared_ptr<Pennylane::Simulators::Observable<PrecisionT>>> obs_vec;
+        std::vector<std::shared_ptr<ObservableClassName<PrecisionT>>> obs_vec;
         obs_vec.reserve(key_size);
 
         for (const auto &key : obsKeys) {
@@ -124,15 +142,15 @@ template <typename PrecisionT> class LightningObsManager {
         }
 
         this->observables_.push_back(
-            std::make_pair(std::make_shared<Pennylane::Simulators::TensorProdObs<PrecisionT>>(
-                               Pennylane::Simulators::TensorProdObs<PrecisionT>::create(obs_vec)),
+            std::make_pair(std::make_shared<TensorProdObsClassName<PrecisionT>>(
+                               TensorProdObsClassName<PrecisionT>::create(obs_vec)),
                            ObsType::TensorProd));
 
         return static_cast<ObsIdType>(obs_size);
     }
 
-    auto createHamiltonianObs(const std::vector<PrecisionT> &coeffs,
-                              const std::vector<ObsIdType> &obsKeys) -> ObsIdType
+    [[nodiscard]] auto createHamiltonianObs(const std::vector<PrecisionT> &coeffs,
+                                            const std::vector<ObsIdType> &obsKeys) -> ObsIdType
     {
         const auto key_size = obsKeys.size();
         const auto obs_size = this->observables_.size();
@@ -141,7 +159,7 @@ template <typename PrecisionT> class LightningObsManager {
                 "Incompatible list of observables and coefficients; "
                 "Number of observables and number of coefficients must be equal");
 
-        std::vector<std::shared_ptr<Pennylane::Simulators::Observable<PrecisionT>>> obs_vec;
+        std::vector<std::shared_ptr<ObservableClassName<PrecisionT>>> obs_vec;
         obs_vec.reserve(key_size);
 
         for (auto key : obsKeys) {
@@ -159,67 +177,12 @@ template <typename PrecisionT> class LightningObsManager {
             obs_vec.push_back(obs);
         }
 
-        this->observables_.push_back(std::make_pair(
-            std::make_shared<Pennylane::Simulators::Hamiltonian<PrecisionT>>(
-                Pennylane::Simulators::Hamiltonian<PrecisionT>(coeffs, std::move(obs_vec))),
-            ObsType::Hamiltonian));
+        this->observables_.push_back(
+            std::make_pair(std::make_shared<HamiltonianClassName<PrecisionT>>(
+                               HamiltonianClassName<PrecisionT>(coeffs, std::move(obs_vec))),
+                           ObsType::Hamiltonian));
 
         return static_cast<ObsIdType>(obs_size);
-    }
-};
-
-#endif
-
-/**
- * @brief The LightningKokkosObsManager caches observables of a program at
- * runtime and maps each one to a const unique index (`int64_t`) in the scope of
- * the global context manager.
- */
-template <typename PrecisionT> class LightningKokkosObsManager {
-  private:
-    using ObsManagerKokkosType = std::tuple<ObsId, std::vector<std::complex<PrecisionT>>, std::vector<size_t>>;
-    std::vector<ObsManagerKokkosType> observables_{};
-
-  public:
-    LightningKokkosObsManager() = default;
-    ~LightningKokkosObsManager() = default;
-
-    LightningKokkosObsManager(const LightningKokkosObsManager &) = delete;
-    LightningKokkosObsManager &operator=(const LightningKokkosObsManager &) = delete;
-    LightningKokkosObsManager(LightningKokkosObsManager &&) = delete;
-    LightningKokkosObsManager &operator=(LightningKokkosObsManager &&) = delete;
-
-    void clear() { this->observables_.clear(); }
-
-    [[nodiscard]] auto getObservable(ObsIdType key) -> ObsManagerKokkosType
-    {
-        auto key_t = reinterpret_cast<int64_t>(key);
-        QFailIf(static_cast<size_t>(key_t) >= this->observables_.size() || key_t < 0,
-                "Invalid observable key");
-
-        return this->observables_[key_t];
-    }
-
-    [[nodiscard]] auto numObservables() -> size_t { return this->observables_.size(); }
-
-    [[nodiscard]] auto isValidObservables(const std::vector<ObsIdType> &obsKeys) -> bool
-    {
-        return std::all_of(obsKeys.begin(), obsKeys.end(), [this](auto i) {
-            return (i >= 0 && static_cast<size_t>(i) < this->observables_.size());
-        });
-    }
-
-    auto createNamedObs(ObsId obsId, const std::vector<size_t> &wires) -> ObsIdType
-    {
-        this->observables_.emplace_back(obsId, std::vector<std::complex<double>>{}, wires);
-        return static_cast<ObsIdType>(this->observables_.size() - 1);
-    }
-
-    auto createHermitianObs(const std::vector<std::complex<PrecisionT>> &matrix,
-                            const std::vector<size_t> &wires) -> ObsIdType
-    {
-        this->observables_.emplace_back(ObsId::Hermitian, matrix, wires);
-        return static_cast<ObsIdType>(this->observables_.size() - 1);
     }
 };
 } // namespace Catalyst::Runtime::Simulator

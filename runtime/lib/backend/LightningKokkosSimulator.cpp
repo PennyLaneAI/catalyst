@@ -140,13 +140,13 @@ void LightningKokkosSimulator::MatrixOperation(const std::vector<std::complex<do
     // Convert wires to device wires
     auto &&dev_wires = getDeviceWires(wires);
 
-    std::vector<Kokkos::complex<double>> matrix_kk;
-    matrix_kk.resize(matrix.size());
-    std::transform(matrix.begin(), matrix.end(), matrix_kk.begin(),
+    std::vector<Kokkos::complex<double>> matrix_kok;
+    matrix_kok.resize(matrix.size());
+    std::transform(matrix.begin(), matrix.end(), matrix_kok.begin(),
                    [](auto c) { return static_cast<Kokkos::complex<double>>(c); });
 
-    Kokkos::View<Kokkos::complex<double> *> gate_matrix("gate_matrix", matrix_kk.size());
-    Kokkos::deep_copy(gate_matrix, UnmanagedComplexHostView(matrix_kk.data(), matrix_kk.size()));
+    Kokkos::View<Kokkos::complex<double> *> gate_matrix("gate_matrix", matrix_kok.size());
+    Kokkos::deep_copy(gate_matrix, UnmanagedComplexHostView(matrix_kok.data(), matrix_kok.size()));
 
     // Update the state-vector
     this->device_sv->applyMultiQubitOp(gate_matrix, dev_wires, inverse);
@@ -160,7 +160,7 @@ void LightningKokkosSimulator::MatrixOperation(const std::vector<std::complex<do
 auto LightningKokkosSimulator::Observable(ObsId id, const std::vector<std::complex<double>> &matrix,
                                           const std::vector<QubitIdType> &wires) -> ObsIdType
 {
-    QFailIf(wires.size() > GetNumQubits(), "Invalid number of wires");
+    QFailIf(wires.size() > this->GetNumQubits(), "Invalid number of wires");
     QFailIf(!isValidQubits(wires), "Invalid given wires");
 
     auto &&dev_wires = getDeviceWires(wires);
@@ -174,13 +174,13 @@ auto LightningKokkosSimulator::Observable(ObsId id, const std::vector<std::compl
 
 auto LightningKokkosSimulator::TensorObservable(const std::vector<ObsIdType> &obs) -> ObsIdType
 {
-    throw std::logic_error("Tensor observable not implemented in PennyLane-Lightning-Kokkos");
+    return this->obs_manager.createTensorProdObs(obs);
 }
 
 auto LightningKokkosSimulator::HamiltonianObservable(const std::vector<double> &coeffs,
                                                      const std::vector<ObsIdType> &obs) -> ObsIdType
 {
-    throw std::logic_error("Hamiltonian observable not implemented in PennyLane-Lightning-Kokkos");
+    return this->obs_manager.createHamiltonianObs(coeffs, obs);
 }
 
 auto LightningKokkosSimulator::Expval(ObsIdType obsKey) -> double
@@ -189,36 +189,47 @@ auto LightningKokkosSimulator::Expval(ObsIdType obsKey) -> double
                                                   Kokkos::MemoryTraits<Kokkos::Unmanaged>>;
 
     QFailIf(!this->obs_manager.isValidObservables({obsKey}), "Invalid key for cached observables");
-    auto &&[obs, matrix, wires] = this->obs_manager.getObservable(obsKey);
 
     // update tape caching
     if (this->cache_recording) {
         cache_manager.addObservable(obsKey, Lightning::Measurements::Expval);
     }
 
-    if (obs == ObsId::PauliX) {
-        return this->device_sv->getExpectationValuePauliX(wires);
-    }
-    else if (obs == ObsId::PauliY) {
-        return this->device_sv->getExpectationValuePauliY(wires);
-    }
-    else if (obs == ObsId::PauliZ) {
-        return this->device_sv->getExpectationValuePauliZ(wires);
-    }
-    else if (obs == ObsId::Hadamard) {
-        return this->device_sv->getExpectationValueHadamard(wires);
-    } else if (obs == ObsId::Hermitian) {
-        std::vector<Kokkos::complex<double>> matrix_kk;
-        matrix_kk.resize(matrix.size());
-        std::transform(matrix.begin(), matrix.end(), matrix_kk.begin(),
-                    [](auto c) { return static_cast<Kokkos::complex<double>>(c); });
+    auto &&[obs, obs_type] = this->obs_manager.getObservable(obsKey);
 
-        Kokkos::View<Kokkos::complex<double> *> hermition_matrix("hermition_matrix", matrix_kk.size());
-        Kokkos::deep_copy(hermition_matrix, UnmanagedComplexHostView(matrix_kk.data(), matrix_kk.size()));
-
-        return this->device_sv->getExpectationValueMultiQubitOp(hermition_matrix, wires);
+    if (obs_type != ObsType::Basic) {
+        std::cerr << "Warning: Expectation value of none-basic observables not supported yet in "
+                     "PennyLane-Lightning-Kokkos; the given observable is recorded for computing "
+                     "the runtime gradient algorithm."
+                  << std::endl;
+        return std::numeric_limits<double>::max();
     }
-    return this->device_sv->getExpectationValueIdentity(wires);
+
+    auto &&obs_name = obs->getObsName();
+    size_t pos = obs_name.find_first_of("[0123456789");
+    if (pos != std::string::npos) {
+        obs_name = obs_name.substr(0, pos);
+    }
+
+    if (obs_name == "Hermitian") {
+        auto *obs_ptr = dynamic_cast<HermitianObsClassName<double> *>(obs.get());
+        auto &&obs_matrix = obs_ptr->getMatrix();
+        auto &&obs_wires = obs_ptr->getWires();
+
+        std::vector<Kokkos::complex<double>> matrix_kok;
+        matrix_kok.resize(obs_matrix.size());
+        std::transform(obs_matrix.begin(), obs_matrix.end(), matrix_kok.begin(),
+                       [](auto c) { return static_cast<Kokkos::complex<double>>(c); });
+
+        Kokkos::View<Kokkos::complex<double> *> hermitian_matrix("hermitian_matrix",
+                                                                 matrix_kok.size());
+        Kokkos::deep_copy(hermitian_matrix,
+                          UnmanagedComplexHostView(matrix_kok.data(), matrix_kok.size()));
+
+        return this->device_sv->getExpectationValueMultiQubitOp(hermitian_matrix, obs_wires);
+    }
+
+    return this->device_sv->getExpectationValue(obs_name, obs->getWires());
 }
 
 auto LightningKokkosSimulator::Var(ObsIdType obsKey) -> double
@@ -250,7 +261,7 @@ auto LightningKokkosSimulator::PartialProbs(const std::vector<QubitIdType> &wire
     -> std::vector<double>
 {
     const size_t numWires = wires.size();
-    const size_t numQubits = GetNumQubits();
+    const size_t numQubits = this->GetNumQubits();
 
     QFailIf(numWires > numQubits, "Invalid number of wires");
     QFailIf(!isValidQubits(wires), "Invalid given wires to measure");
@@ -266,7 +277,7 @@ auto LightningKokkosSimulator::Sample(size_t shots) -> std::vector<double>
     // Reference: https://en.wikipedia.org/wiki/Inverse_transform_sampling
     auto li_samples = this->device_sv->generate_samples(shots);
 
-    const size_t numQubits = GetNumQubits();
+    const size_t numQubits = this->GetNumQubits();
 
     // The lightning samples are layed out as a single vector of size
     // shots*qubits, where each element represents a single bit. The
@@ -287,7 +298,7 @@ auto LightningKokkosSimulator::PartialSample(const std::vector<QubitIdType> &wir
     -> std::vector<double>
 {
     const size_t numWires = wires.size();
-    const size_t numQubits = GetNumQubits();
+    const size_t numQubits = this->GetNumQubits();
 
     QFailIf(numWires > numQubits, "Invalid number of wires");
     QFailIf(!isValidQubits(wires), "Invalid given wires to measure");
@@ -304,7 +315,7 @@ auto LightningKokkosSimulator::PartialSample(const std::vector<QubitIdType> &wir
     // corresponding shape is (shots, qubits). Gather the desired bits
     // corresponding to the input wires into a bitstring.
     // TODO: matrix transpose
-    std::vector<double> samples(li_samples.size());
+    std::vector<double> samples(shots * numWires);
     for (size_t shot = 0; shot < shots; shot++) {
         size_t idx = 0;
         for (auto wire : dev_wires) {
@@ -326,7 +337,7 @@ auto LightningKokkosSimulator::Counts(size_t shots)
     // computational basis bitstring. In the future, eigenvalues can also be
     // obtained from an observable, hence the bitstring integer is stored as a
     // double.
-    const size_t numQubits = GetNumQubits();
+    const size_t numQubits = this->GetNumQubits();
     const size_t numElements = 1U << numQubits;
     std::vector<double> eigvals(numElements);
     std::iota(eigvals.begin(), eigvals.end(), 0);
@@ -353,7 +364,7 @@ auto LightningKokkosSimulator::PartialCounts(const std::vector<QubitIdType> &wir
     -> std::tuple<std::vector<double>, std::vector<int64_t>>
 {
     const size_t numWires = wires.size();
-    const size_t numQubits = GetNumQubits();
+    const size_t numQubits = this->GetNumQubits();
 
     QFailIf(numWires > numQubits, "Invalid number of wires");
     QFailIf(!isValidQubits(wires), "Invalid given wires to measure");
@@ -403,14 +414,22 @@ auto LightningKokkosSimulator::Measure(QubitIdType wire) -> Result
     float draw = dis(gen);
     bool mres = draw > probs[0];
 
-    const size_t numQubits = GetNumQubits();
+    const size_t num_qubits = this->GetNumQubits(); // Kokkos::View<Kokkos::complex<double> *>
 
-    auto &&state = this->State();
-
-    const auto stride = pow(2, numQubits - (1 + wire));
-    const auto vec_size = pow(2, numQubits);
+    const auto stride = pow(2, num_qubits - (1 + wire));
+    const auto vec_size = pow(2, num_qubits);
     const auto section_size = vec_size / stride;
     const auto half_section_size = section_size / 2;
+
+    std::vector<Kokkos::complex<double>> state;
+    state.reserve(vec_size);
+
+    Kokkos::complex<double> elem_cp;
+    for (size_t idx = 0; idx < vec_size; idx++) {
+        auto elem_subview = Kokkos::subview(this->device_sv->getData(), idx);
+        Kokkos::deep_copy(elem_cp, elem_subview);
+        state.emplace_back(elem_cp);
+    }
 
     // zero half the entries
     // the "half" entries depend on the stride
@@ -421,19 +440,24 @@ auto LightningKokkosSimulator::Measure(QubitIdType wire) -> Result
     for (size_t idx = 0; idx < half_section_size; idx++) {
         for (size_t ids = 0; ids < stride; ids++) {
             auto v = stride * (k + 2 * idx) + ids;
-            state[v] = {0., 0.};
+            state[v] = Kokkos::complex<double>(0.0, 0.0);
         }
     }
 
     // get the total of the new vector (since we need to normalize)
     double total =
-        std::accumulate(state.begin(), state.end(), 0.0, [](double sum, std::complex<double> c) {
-            return sum + std::real(c * std::conj(c));
+        std::accumulate(state.begin(), state.end(), 0.0, [](double sum, Kokkos::complex<double> c) {
+            return sum + real(c * conj(c));
         });
 
     // normalize the vector
     double norm = std::sqrt(total);
     std::for_each(state.begin(), state.end(), [norm](auto &elem) { elem /= norm; });
+
+    // TODO: rewrite this method using setStateVector(vectorKokkos<T>)
+    // and LinAlg Functors in the next version of PennyLane-Lightning-Kokkos
+    this->device_sv =
+        std::make_unique<Pennylane::StateVectorKokkos<double>>(state.data(), vec_size);
 
     return mres ? this->One() : this->Zero();
 }
@@ -441,8 +465,54 @@ auto LightningKokkosSimulator::Measure(QubitIdType wire) -> Result
 auto LightningKokkosSimulator::Gradient(const std::vector<size_t> &trainParams)
     -> std::vector<std::vector<double>>
 {
-    throw std::logic_error("Gradient not fully supported for the "
-                           "PennyLane-Lightning-Kokkos simulator");
+    const bool tp_empty = trainParams.empty();
+    const size_t num_observables = this->cache_manager.getNumObservables();
+    const size_t num_params = this->cache_manager.getNumParams();
+    const size_t num_train_params = tp_empty ? num_params : trainParams.size();
+    const size_t jac_size = num_train_params * this->cache_manager.getNumObservables();
+
+    if (!jac_size) {
+        return {};
+    }
+
+    auto &&obs_callees = this->cache_manager.getObservablesCallees();
+    bool is_valid_measurements =
+        std::all_of(obs_callees.begin(), obs_callees.end(),
+                    [](const auto &m) { return m == Lightning::Measurements::Expval; });
+    QFailIf(!is_valid_measurements,
+            "Unsupported measurements to compute gradient; "
+            "Adjoint differentiation method only supports expectation return type");
+
+    // Create OpsData
+    auto &&ops_names = this->cache_manager.getOperationsNames();
+    auto &&ops_params = this->cache_manager.getOperationsParameters();
+    auto &&ops_wires = this->cache_manager.getOperationsWires();
+    auto &&ops_inverses = this->cache_manager.getOperationsInverses();
+    Pennylane::Algorithms::AdjointJacobianKokkos<double> adj;
+    const auto ops = adj.createOpsData(ops_names, ops_params, ops_wires, ops_inverses);
+
+    // Create the vector of observables
+    auto &&obs_keys = this->cache_manager.getObservablesKeys();
+    std::vector<std::shared_ptr<Pennylane::Algorithms::ObservableKokkos<double>>> obs_vec;
+    obs_vec.reserve(obs_keys.size());
+    for (auto idx : obs_keys) {
+        obs_vec.emplace_back(std::get<0>(this->obs_manager.getObservable(idx)));
+    }
+
+    std::vector<size_t> all_params;
+    if (tp_empty) {
+        all_params.reserve(num_params);
+        for (size_t i = 0; i < num_params; i++) {
+            all_params.push_back(i);
+        }
+    }
+
+    std::vector<std::vector<double>> jacobian(num_observables,
+                                              std::vector<double>(num_train_params, 0.0));
+    adj.adjointJacobian(*this->device_sv, jacobian, obs_vec, ops,
+                        tp_empty ? all_params : trainParams, /* apply_operations */ false);
+
+    return jacobian;
 }
 
 } // namespace Catalyst::Runtime::Simulator

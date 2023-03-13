@@ -215,11 +215,14 @@ TEST_CASE("Test __quantum__qis__ circuit with observables using deactiveCacheMan
     __quantum__rt__finalize();
 }
 
-#ifndef _KOKKOS
 TEST_CASE("Test a LightningSimulator circuit with num_qubits=4 and observables", "[CacheManager]")
 {
     std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+#if defined(_KOKKOS)
+    LightningKokkosSimulator *qis = dynamic_cast<LightningKokkosSimulator *>(sim.get());
+#else
     LightningSimulator *qis = dynamic_cast<LightningSimulator *>(sim.get());
+#endif
 
     // state-vector with #qubits = n
     constexpr size_t n = 4;
@@ -238,12 +241,13 @@ TEST_CASE("Test a LightningSimulator circuit with num_qubits=4 and observables",
     ObsIdType px = sim->Observable(ObsId::PauliX, {}, {Qs[1]});
     ObsIdType pz = sim->Observable(ObsId::PauliZ, {}, {Qs[0]});
 
-    sim->StopTapeRecording();
-
     ObsIdType h = sim->Observable(ObsId::Hadamard, {}, {Qs[0]});
 
-    sim->Var(h);
-    sim->Var(px);
+#if !defined(_KOKKOS)
+    sim->Var(h);  // Kokkos doesn't support Variance
+    sim->Var(px); // Kokkos doesn't support Variance
+#endif
+
     sim->Expval(pz);
 
     auto &&[num_ops, num_obs, num_params, op_names, obs_keys] = qis->CacheManagerInfo();
@@ -254,8 +258,13 @@ TEST_CASE("Test a LightningSimulator circuit with num_qubits=4 and observables",
     REQUIRE(op_names[2] == "Hadamard");
     REQUIRE(op_names[3] == "PauliZ");
 
-    REQUIRE(num_obs == 2);
-    REQUIRE(obs_keys[0] == px);
-    REQUIRE(obs_keys[1] == pz);
-}
+#if defined(_KOKKOS)
+    REQUIRE(num_obs == 1);
+    REQUIRE(obs_keys[0] == pz);
+#else
+    REQUIRE(num_obs == 3);
+    REQUIRE(obs_keys[0] == h);
+    REQUIRE(obs_keys[1] == px);
+    REQUIRE(obs_keys[2] == pz);
 #endif
+}
