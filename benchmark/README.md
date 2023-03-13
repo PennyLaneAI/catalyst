@@ -39,12 +39,14 @@ Running
 
 1. Run the `./batchrun.py`
     ``` sh
-    $ python3 batchrun.py --tag=today -t 4000
+    $ python3 batchrun.py --tag=today -t 4000 --tag=tagname
     ```
 
-2. Adjust tag, syshash and comments by editing the `./tex/report.tex` and run the `sh/mkpdflatex.sh`
+2. Render the report by copying the `./tex/report_template.tex`, adjusting the measurement tag
+   and/or the system information hash, adding comments and finally running the `sh/mkpdflatex.sh`
    rendering script.
    ``` sh
+   $ cp ./tex/report_template.tex ./tex/report.tex
    $ vim ./tex/report.tex
    $ ./sh/mkpdflatex.sh ./tex/report.tex
    ```
