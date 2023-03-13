@@ -1,0 +1,150 @@
+\documentclass{article}
+
+% Preamble {{{
+\usepackage[a4paper, total={4in, 10in}]{geometry}
+\usepackage{graphicx}
+\usepackage[utf8]{inputenc}
+\usepackage{mdframed}
+\usepackage{hyperref}
+\usepackage{minted}
+\renewcommand{\MintedPygmentize}{pygmentize}
+\usepackage{verbatim}
+\usepackage{amsmath,amssymb}
+\usepackage{svg}
+
+\newcommand{\li}{\item}
+\newcommand{\lb}{\begin{itemize}}
+\newcommand{\lbi}{\begin{itemize}\item}
+\newcommand{\ls}{\begin{itemize}\item}
+\renewcommand{\le}{\end{itemize}}
+\renewcommand{\b}[1]{\textbf{#1}}
+\renewcommand{\t}[1]{\texttt{#1}}
+\renewcommand{\u}[2]{\href{#2}{#1}}
+\newcommand{\st}[1]{\sout{#1}}
+
+\newcommand{\SYSHASH}{628f56}
+\newcommand{\TAG}{1003}
+\newcommand{\bmimage}[1]{
+    \begin{center}
+    \includesvg[inkscapelatex=false,width=0.8\textwidth]{#1_\SYSHASH_\TAG}
+    \end{center}}
+
+\usepackage[T1]{fontenc}
+\usepackage{stix}
+% \usepackage{fontspec}
+% \setmainfont{Asana-Math}
+\usepackage{tgpagella}
+\usepackage{tgtermes}
+\usepackage{lmodern}
+
+\graphicspath{ {../_img} }
+
+% }}}
+\begin{document}
+
+\tableofcontents
+
+\section{Preambule}
+
+\begin{enumerate}
+    \item We benchmark the following problems:
+        \begin{itemize}
+            \item \t{Grover} ("regiular" circuit)
+            \item \t{Grover} ("deep" circuit)
+            \item \t{ChemVQE} (variational problem)
+        \end{itemize}
+    \item For every problem, we benchmark the follwing implementations:
+        \begin{itemize}
+            \item \t{catalyst/lighting}
+            \item \t{pennylane/*}
+            \item \t{pennylane+jax/*}
+        \end{itemize}
+    \item For every implementation, we measure \t{compilation} and \t{running} times. We follow the
+    framework authors' terminology, e.g. we define \t{PennyLane+Jax compilation} as calling the
+    \t{compile} function of the JAX function object.
+
+    \item Totally we run six different measurement procedures encoded in the
+    \href{https://github.com/XanaduAI/pennylane-mlir/blob/benchmarking-1-2/benchmark/catalyst_benchmark/main.py#L84}{Python module}.
+
+    \item For all the measurements we aim to put all the available data on the plots, thus the
+        additional "trial" dimention encoded as varying opacity.
+\end{enumerate}
+
+\pagebreak
+\section{Regular circuits}
+
+\bmimage{regular_compile}
+
+\bmimage{regular_runtime}
+
+
+\pagebreak
+\section{Deep circuits}
+
+\bmimage{deep_compile}
+
+\bmimage{deep_runtime}
+
+\pagebreak
+\section{Variational circuits (as line plots)}
+
+\bmimage{variational_compile_adjoint_lineplot}
+
+Comment: We were able to compile our VQE problem using the Default qubit device with "adjoint"
+differentiation method, but we were not able to run it (see the runtime measurement plot below).
+
+\bmimage{variational_compile_backprop_lineplot}
+
+\bmimage{variational_compile_finitediff_lineplot}
+
+\bmimage{variational_compile_parametershift_lineplot}
+
+\pagebreak
+
+\bmimage{variational_runtime_adjoint_lineplot}
+
+\bmimage{variational_runtime_backprop_lineplot}
+
+\bmimage{variational_runtime_finitediff_lineplot}
+
+\bmimage{variational_runtime_parametershift_lineplot}
+
+\pagebreak
+\section{Variational circuits (as bar charts)}
+
+\bmimage{variational_runtime_adjoint}
+
+\bmimage{variational_runtime_backprop}
+
+\bmimage{variational_runtime_finitediff}
+
+\bmimage{variational_runtime_parametershift}
+
+Comment: the \t{PLjax/Def} green bar at 12 qubits is indeed not a timeout.
+
+\pagebreak
+\section{Appendinx: Trial views}
+
+\bmimage{regular_compile_trial}
+
+\bmimage{regular_runtime_trial}
+
+\bmimage{deep_compile_trial}
+
+\bmimage{deep_runtime_trial}
+
+\bmimage{variational_compile_trial_adjoint_lineplot}
+
+\bmimage{variational_compile_trial_backprop_lineplot}
+
+\bmimage{variational_compile_trial_finitediff_lineplot}
+
+\bmimage{variational_compile_trial_parametershift_lineplot}
+
+\bmimage{variational_runtime_trial_adjoint_backprop_lineplot}
+
+\bmimage{variational_runtime_trial_finitediff_lineplot}
+
+\bmimage{variational_runtime_trial_parametershift_lineplot}
+
+\end{document}
