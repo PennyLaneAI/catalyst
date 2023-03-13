@@ -1,8 +1,8 @@
 import sys
 import numpy as np
-from typing import Optional, Any, Tuple
+from typing import Optional, Tuple, List
 from numpy.testing import assert_allclose
-from argparse import ArgumentParser
+from argparse import ArgumentParser, Namespace as ParsedArguments
 from time import time
 from os import makedirs
 from os.path import dirname
@@ -52,7 +52,7 @@ def with_alarm(timeout: float):
             signal(SIGALRM, prev)
 
 
-def printerr(*args, **kwargs):
+def printerr(*args, **kwargs) -> None:
     print(*args, **kwargs, file=sys.stderr)
 
 
@@ -81,7 +81,7 @@ def parse_implementation(implementation: str) -> Tuple[str, str, Optional[str]]:
     return framework, device, interface
 
 
-def measure_compile_catalyst(a: Any) -> BenchmarkResult:
+def measure_compile_catalyst(a: ParsedArguments) -> BenchmarkResult:
     import pennylane as qml
     import jax.numpy as jnp
     import jax
@@ -135,7 +135,7 @@ def measure_compile_catalyst(a: Any) -> BenchmarkResult:
     )
 
 
-def measure_runtime_catalyst(a: Any) -> BenchmarkResult:
+def measure_runtime_catalyst(a: ParsedArguments) -> BenchmarkResult:
     import pennylane as qml
     import jax
     import jax.numpy as jnp
@@ -189,7 +189,7 @@ def measure_runtime_catalyst(a: Any) -> BenchmarkResult:
     )
 
 
-def measure_compile_pennylanejax(a: Any) -> BenchmarkResult:
+def measure_compile_pennylanejax(a: ParsedArguments) -> BenchmarkResult:
     import pennylane as qml
     import jax
 
@@ -246,7 +246,7 @@ def measure_compile_pennylanejax(a: Any) -> BenchmarkResult:
     )
 
 
-def measure_runtime_pennylanejax(a: Any) -> BenchmarkResult:
+def measure_runtime_pennylanejax(a: ParsedArguments) -> BenchmarkResult:
     import pennylane as qml
     import jax
 
@@ -300,7 +300,7 @@ def measure_runtime_pennylanejax(a: Any) -> BenchmarkResult:
     )
 
 
-def measure_compile_pennylane(a: Any) -> BenchmarkResult:
+def measure_compile_pennylane(a: ParsedArguments) -> BenchmarkResult:
     import pennylane as qml
 
     versions = {"pennylane": qml.__version__}
@@ -343,7 +343,7 @@ def measure_compile_pennylane(a: Any) -> BenchmarkResult:
     )
 
 
-def measure_runtime_pennylane(a: Any) -> BenchmarkResult:
+def measure_runtime_pennylane(a: ParsedArguments) -> BenchmarkResult:
     import pennylane as qml
 
     versions = {"pennylane": qml.__version__}
@@ -400,13 +400,13 @@ REGISTRY = {
 }
 
 
-def parse_args(ap, args):
+def parse_args(ap:ArgumentParser, args:List[str]) -> ParsedArguments:
     a = ap.parse_args(args)
     setattr(a, "argv", args)
     return a
 
 
-def selfcheck(ap):
+def selfcheck(ap:ArgumentParser) -> None:
     def _runall(cmdline_fn, atol=1e-5):
         r1 = None
         for m, i in REGISTRY.keys():

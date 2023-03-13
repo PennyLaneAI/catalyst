@@ -10,11 +10,14 @@ Setup
 
 1. Git-clone the Catalyst repository locally and follow the regular installation
    procedure.
-2. Install the additional benchmark dependencies with Pip:
+2. Install the additional dependencies:
 
-   ``` shell
-   $ pip install --user -r benchmark/requirements.txt
-   ```
+   * Python dependencies:
+     ``` shell
+     $ pip install --user -r benchmark/requirements.txt
+     ```
+
+   * LaTeX dependencies: `texlive` package needs to be installed using the system package manager.
 
 3. Add the `benchmark` folder to the `PYTHONPATH`:
 
@@ -32,39 +35,44 @@ Setup
 Running
 -------
 
-* `./batchrun.py` is the top-level script supporting `compile` (time) and
-  `runtime` measurements for each of the four categories described in the
-  [guidelines](https://www.notion.so/xanaduai/Benchmarking-Strategy-07492f9104724f1984d09315e2e5ff0e):
+### Full cycle measurements
 
-  ```shell
-  $ python3 batchrun.py --measure runtime --category regular
-  ```
+1. Run the `./batchrun.py`
+    ``` sh
+    $ python3 batchrun.py --tag=today -t 4000
+    ```
 
-  The script runs a series of measurements and saves results to the
-  hardcoded `./_benchmark/` folder as JSON files. The `--dry-run` flag is
-  supported.
+2. Adjust tag, syshash and comments by editing the `./tex/report.tex` and run the `sh/mkpdflatex.sh`
+   rendering script.
+   ``` sh
+   $ vim ./tex/report.tex
+   $ ./sh/mkpdflatex.sh ./tex/report.tex
+   ```
+   Grab the `./tex/report.pdf`.
 
-* `catalyst_benchmark.main` runs a number of measurements of a single value in a
+### Running a single measurement
+
+* `./benchmark.py` measures a specific time value in a
   fixed configuration as specified by its command line arguemnts. The full
   command has the following structure:
 
-  ``` shell
-  python3 -m catalyst_benchmark.main run \
+  ``` sh
+  $ python3 benchmark.py run \
       -p PROBLEM -m MEASURE -i IMPLEMENTATION \
       <problem-specific-options>
   ```
 
-  Passing `?` to `-p`,`-m` or `-i` prints the list of supported parameters.
+Passing `?` to `-p`,`-m` or `-i` prints the list of supported parameters.
 
-  The `IMPLEMENTATION` field has the following format:
-  `(pennylane[+jax]|catalyst)/(device_name)`
+The `IMPLEMENTATION` field has the following format:
+`(pennylane[+jax]|catalyst)/(device_name)`
 
-  Examples:
+Examples:
 
-  ``` shell
-  $ python3 -m catalyst_benchmark.main run -p grover -m compile -i pennylane+jax/default.qubit.jax
-  $ python3 -m catalyst_benchmark.main run -p vqe -m runtime -i catalyst/lightning.qubit
-  ```
+``` shell
+$ python3 benchmark.py run -p grover -m compile -i pennylane+jax/default.qubit.jax
+$ python3 benchmark.py run -p chemvqe -m runtime -i catalyst/lightning.qubit
+```
 
 Extending
 ---------
@@ -91,48 +99,49 @@ Extending
              # Initialize the problem parameters
              return pnp.array(....) # or `jnp.array(...)`
      ```
+   * The `qcompile` function matching the following signature:
 
-   * The main algorithm function matching the following signature:
+     `def qcompile(p:Problem, params:NumpyArray) -> None`
 
-     `def algorithm(p:Problem, params:NumpyArray) -> NumpyArray`
+     The function is expected to compile the quantum parts of the problem.
 
-     where `NumpyArray` is typically a `np.array`, `pnp.array` or `jnp.array`,
-     depending on the implementation. The requirements for the algorithm
-     function are:
+   * The `workflow` function matching the following signature:
 
-     - Algorithm function is allowed to initialize arbitrary number of
-       `qml.node` with the device `p.dev` and parameters `p.qnode_kwargs`
-       whenever required.
-     - Algorithm function is expected to be compilable with `jax.jit` or `qjit`
-       as applicable.
-     - Algorithm function is expected to return a _deterministic_ numeric
-       result. The result should be the same across all the implementations.
+     `def workflow(p:Problem, params:NumpyArray) -> NumpyArray`
+
+   * Optionally, the `depth` function, calculating the depth of the problem circuits in quantum
+     gates.
+
+   Here, `NumpyArray` is typically a `np.array`, `pnp.array` or `jnp.array`,
+   depending on the implementation.
 
 
 2. Modify each of the
-   `measure_{compile,runtime}_{catalyst,pennylane,pennylanejax}` functions
+   `measurements.measure_{compile,runtime}_{catalyst,pennylane,pennylanejax}` functions
    defined in `main.py` (currently there are six functions).
    The `main.py` module generally uses the following pattern for performing the
    measurements:
 
    ```python
-   from .my_problem import MyProblem, algorithm
+   import framework
+   from .my_problem import Problem, qcompile, workflow
 
-   p = MyProblem(qml.device(...), ...)
+   p = Problem(qml.device(...), ...)
 
-   def problem(params):
+   def _main(params):
+       qcompile(p, params)
        return algorithm(p, params)
 
-   compiled_problem = compile(problem)
+   compiled_main = framework.compile(_main)
 
    for i in range(ntrials):
        params = p.trial_params(i)
 
        b = time()
-       compiled_problem(params)
+       compiled_main(params)
        e = time()
    ```
 
-3. Modify the `selfcheck` function, compare the numeric results of
+3. Modify the `measurements.selfcheck` function, compare the numeric results across the
    the implementations.
 
