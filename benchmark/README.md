@@ -39,7 +39,7 @@ Running
 
 1. Run the `./batchrun.py`
     ``` sh
-    $ python3 batchrun.py --tag=today -t 4000 --tag=tagname
+    $ python3 batchrun.py --tag=today --timeout=4000
     ```
 
 2. Render the report by copying the `./tex/report_template.tex`, adjusting the measurement tag
@@ -47,7 +47,7 @@ Running
    rendering script.
    ``` sh
    $ cp ./tex/report_template.tex ./tex/report.tex
-   $ vim ./tex/report.tex
+   $ $EDITOR ./tex/report.tex # ... edit `\SYSHASH`, `\TAG`, etc.
    $ ./sh/mkpdflatex.sh ./tex/report.tex
    ```
    Grab the `./tex/report.pdf`.

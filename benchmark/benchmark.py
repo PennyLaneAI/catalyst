@@ -13,7 +13,7 @@ from catalyst_benchmark.measurements import (parse_args, selfcheck, REGISTRY, pa
                                              BenchmarkResult, with_alarm, BooleanOptionalAction)
 
 # fmt: off
-ap = ArgumentParser(prog="python3 -m catalyst_benchmark.main")
+ap = ArgumentParser(prog="python3 benchmark.py")
 apcmds = ap.add_subparsers(help="command help", dest="command")
 sccmd = apcmds.add_parser("selfcheck",
                           help="Check the numeric equality of all the implementations")
