@@ -577,7 +577,7 @@ def plot(a: ParsedArguments, df_full: DataFrame, sysinfo=SYSINFO) -> None:
 
 
 # fmt: off
-AP = ArgumentParser(prog="batchrun.py")
+AP = ArgumentParser(prog="python3 batchrun.py")
 AP.add_argument("-m", "--measure", type=str, default="all",
                 help="Value to measure: compile|runtime|all, (default - 'all')")
 AP.add_argument("-c", "--category", type=str, default="regular,deep,variational",
