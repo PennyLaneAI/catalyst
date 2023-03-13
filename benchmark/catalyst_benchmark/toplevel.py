@@ -8,6 +8,7 @@ from typing import Tuple, Iterable, Set, Union, Optional
 from collections import defaultdict
 from copy import deepcopy
 from hashlib import sha256
+from itertools import chain
 from functools import partial
 
 import vl_convert as vlc
@@ -102,10 +103,12 @@ COLORS = ["#e41a1c", "#377eb8", "#4daf4a", "#984ea3", "#ff7f00",
 # fmt:on
 
 def tag(a) -> str:
+    """ Format the user-defined part of data file names """
     return a.tag if a.tag is not None else f"v{FMTVERSION}"
 
 
 def syshash(a) -> str:
+    """ Format the system-information part of the data file names """
     return a.force_sysinfo_hash if a.force_sysinfo_hash else SYSHASH
 
 
@@ -271,6 +274,7 @@ def writefile(a: ParsedArguments, fname, chart) -> None:
 
 
 def dfilter(cat, measure, problem, df: DataFrame) -> DataFrame:
+    """ Filter the benchmark data """
     try:
         return df[
             (df["cat"] == cat)
@@ -469,9 +473,11 @@ def plot(a: ParsedArguments, df_full: DataFrame, sysinfo=SYSINFO) -> None:
 
         # Variational circuits
         def _diff_methods(problem) -> Iterable[Set[str]]:
-            # dmsame = set(["adjoint", "backprop"])
-            # return chain([set([x]) for x in set(DIFF_METHODS[problem]) - dmsame], [dmsame])
-            return [set([x]) for x in set(DIFF_METHODS[problem])]
+            if a.plot_combine_adjoint_backprop:
+                dmsame = set(["adjoint", "backprop"])
+                return chain([set([x]) for x in set(DIFF_METHODS[problem]) - dmsame], [dmsame])
+            else:
+                return [set([x]) for x in set(DIFF_METHODS[problem])]
 
         vqeproblem = "chemvqe"
         df = _filter("variational", "compile", vqeproblem)
@@ -595,6 +601,8 @@ AP.add_argument('-H', "--force-sysinfo-hash", type=str, default=None,
                 help="Use the provided string instead of the system information hash")
 AP.add_argument("--plot-formats", type=str, default="svg",
                 help="Which formats to use for plotting ('svg[,png]', default - 'svg')")
+AP.add_argument("--plot-combine-adjoint-backprop", default=False, action=BooleanOptionalAction,
+                help="Plot adjoint and backprop diff. methods on the same plot")
 AP.add_argument("-V", "--verbose", default=False, action=BooleanOptionalAction,
                 help="Print verbose messages")
 # fmt: on
