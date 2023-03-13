@@ -39,7 +39,7 @@ Running
 
 1. Run the `./batchrun.py`
     ``` sh
-    $ python3 batchrun.py --tag=today --timeout=4000
+    $ python3 batchrun.py --tag=today --timeout-1run=4000
     ```
 
 2. Render the report by copying the `./tex/report_template.tex`, adjusting the measurement tag
