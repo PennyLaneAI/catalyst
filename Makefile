@@ -1,4 +1,4 @@
-PYTHON := python3 -m
+PYTHON?=python
 BLACKVERSIONMAJOR := $(shell black --version | head -n1 | awk '{ print $$2 }' | cut -d. -f1)
 BLACKVERSIONMINOR := $(shell black --version | head -n1 | awk '{ print $$2 }' | cut -d. -f2)
 MK_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
@@ -22,9 +22,19 @@ help:
 	@echo "  coverage           to generate a coverage report"
 	@echo "  format [check=1]   to apply C++ and Python formatter; use with 'check=1' to check instead of modify (requires black, pylint and clang-format)"
 	@echo "  format [version=?] to apply C++ and Python formatter; use with 'version={version}' to run clang-format-{version} instead of clang-format"
+	@echo "  wheels             build wheels locally"
 
 .PHONY: all
 all: runtime mlir frontend
+
+.PHONY: wheels
+wheels:
+	$(MAKE) -C mlir lld-and-mlir
+	$(MAKE) -C mlir mhlo
+	$(MAKE) -C mlir dialects
+	$(MAKE) -C runtime all
+	$(MAKE) -C mlir prepare-for-wheel
+	$(PYTHON) setup.py bdist_wheel
 
 .PHONY: frontend
 frontend:
