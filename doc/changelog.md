@@ -8,9 +8,14 @@
 
 <h3>Bug fixes</h3>
 
+* Fix memory leaks that flow back into the Python environment.
+  [#54](https://github.com/PennyLaneAI/catalyst/pull/54)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
+
+Erick Ochoa Lopez.
 
 # Release 0.1.1
 
