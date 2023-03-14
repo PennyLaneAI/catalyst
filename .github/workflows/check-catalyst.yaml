@@ -477,6 +477,7 @@ jobs:
             ./runtime/build/tests/runner_tests --reporter junit --out ./runtime/build/tests/results/tests_result.xml
 
       - name: Upload to Codecov
+        if: ${{ matrix.simulator == 'lightning' }}
         uses: codecov/codecov-action@v3
         with:
           fail_ci_if_error: true
