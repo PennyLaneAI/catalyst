@@ -42,7 +42,7 @@ def test_ewise_arctan2(x, y):
 
 
 test_ewise_arctan2(jnp.array(1.0), jnp.array(2.0))
-test_ewise_arctan2.print_stage("buff")
+test_ewise_arctan2.print_stage("BufferizationPass")
 
 # Need more time to test
 # jnp.ldexp
@@ -76,7 +76,7 @@ def test_ewise_add(x, y):
 
 
 test_ewise_add(jnp.array(1.0), jnp.array(2.0))
-test_ewise_add.print_stage("buff")
+test_ewise_add.print_stage("BufferizationPass")
 
 
 # CHECK-LABEL: test_ewise_mult
@@ -92,7 +92,7 @@ def test_ewise_mult(x, y):
 
 
 test_ewise_mult(jnp.array(1.0), jnp.array(2.0))
-test_ewise_mult.print_stage("buff")
+test_ewise_mult.print_stage("BufferizationPass")
 
 
 # CHECK-LABEL: test_ewise_div
@@ -108,7 +108,7 @@ def test_ewise_div(x, y):
 
 
 test_ewise_div(jnp.array(1.0), jnp.array(2.0))
-test_ewise_div.print_stage("buff")
+test_ewise_div.print_stage("BufferizationPass")
 
 
 # CHECK-LABEL: test_ewise_power
@@ -124,7 +124,7 @@ def test_ewise_power(x, y):
 
 
 test_ewise_power(jnp.array(1.0), jnp.array(2.0))
-test_ewise_power.print_stage("buff")
+test_ewise_power.print_stage("BufferizationPass")
 
 
 # CHECK-LABEL: test_ewise_sub
@@ -140,7 +140,7 @@ def test_ewise_sub(x, y):
 
 
 test_ewise_sub(jnp.array(1.0), jnp.array(2.0))
-test_ewise_sub.print_stage("buff")
+test_ewise_sub.print_stage("BufferizationPass")
 
 
 @qjit(keep_intermediate=True)
@@ -156,7 +156,7 @@ def test_ewise_true_div(x, y):
 
 
 test_ewise_true_div(jnp.array(1.0), jnp.array(2.0))
-test_ewise_true_div.print_stage("buff")
+test_ewise_true_div.print_stage("BufferizationPass")
 
 # Not sure why the following ops are not working
 # perhaps they rely on another function?
@@ -176,7 +176,7 @@ def test_ewise_float_power(x, y):
 
 
 test_ewise_float_power(jnp.array(1.0), jnp.array(2.0))
-test_ewise_float_power.print_stage("buff")
+test_ewise_float_power.print_stage("BufferizationPass")
 
 
 # Not sure why the following ops are not working
@@ -202,7 +202,7 @@ def test_ewise_maximum(x, y):
 
 
 test_ewise_maximum(jnp.array(1.0), jnp.array(2.0))
-test_ewise_maximum.print_stage("buff")
+test_ewise_maximum.print_stage("BufferizationPass")
 
 # Only single function support
 # * jnp.fmax
@@ -221,7 +221,7 @@ def test_ewise_minimum(x, y):
 
 
 test_ewise_minimum(jnp.array(1.0), jnp.array(2.0))
-test_ewise_minimum.print_stage("buff")
+test_ewise_minimum.print_stage("BufferizationPass")
 
 # Only single function support
 # * jnp.fmin

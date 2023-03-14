@@ -15,11 +15,15 @@
 MLIR/LLVM representations.
 """
 
+import abc
 import os
 import shutil
 import subprocess
+import sys
+import tempfile
 import warnings
 
+from catalyst.utils import utils
 from catalyst._configuration import INSTALLED
 
 package_root = os.path.dirname(__file__)
@@ -52,74 +56,164 @@ def get_lib_path(project, env):
     )
 
 
-translate_tool = get_executable_path("llvm", "mlir-translate")
-mhlo_opt_tool = get_executable_path("mhlo", "mlir-hlo-opt")
-quantum_opt_tool = get_executable_path("quantum", "quantum-opt")
+class Pass(abc.ABC):
+    """Abstract Pass class."""
 
-mhlo_lowering_pass_pipeline = [
-    "--canonicalize",
-    "--chlo-legalize-to-hlo",
-    "--mhlo-legalize-control-flow",
-    "--hlo-legalize-to-linalg",
-    "--mhlo-legalize-to-std",
-    "--convert-to-signless",
-    "--canonicalize",
-]
+    _executable = None
+    _default_flags = None
 
-bufferization_pass_pipeline = [
-    "--lower-gradients",
-    "--gradient-bufferize",
-    "--scf-bufferize",
-    "--convert-tensor-to-linalg",  # tensor.pad
-    "--convert-elementwise-to-linalg",  # Must be run before --arith-bufferize
-    "--arith-bufferize",
-    "--empty-tensor-to-alloc-tensor",
-    "--bufferization-bufferize",
-    "--tensor-bufferize",
-    "--linalg-bufferize",
-    "--tensor-bufferize",
-    "--quantum-bufferize",
-    "--func-bufferize",
-    "--finalizing-bufferize",
-    "--buffer-hoisting",
-    # "--buffer-deallocation",
-    "--convert-bufferization-to-memref",
-    "--canonicalize",
-    "--cse",
-]
+    @staticmethod
+    @abc.abstractmethod
+    def get_output_filename(infile):
+        """Compute the output filename from the input filename.
 
-llvm_lowering_pass_pipeline = [
-    "--convert-linalg-to-loops",
-    "--convert-scf-to-cf",
-    # This pass expands memref operations that modify the metadata of a memref (sizes, offsets,
-    # stdies) into a sequence of easier to analyze constructs. In particular, this pass transforms
-    # operations into explicit sequence of operations that model the effect of this operation on the
-    # different metadata. This pass uses affine constructs to materialize these effects.
-    # Concretely, expanded-strided-metadata is used to decompose memref.subview as it has no
-    # lowering in -convert-memref-to-llvm.
-    "--expand-strided-metadata",
-    "--lower-affine",
-    "--convert-complex-to-standard",  # added for complex.exp lowering
-    "--convert-complex-to-llvm",
-    "--convert-math-to-llvm",
-    # Must be run after -convert-math-to-llvm as it marks math::powf illegal but doesn't convert it.
-    "--convert-math-to-libm",
-    "--convert-arith-to-llvm",
-    "--convert-memref-to-llvm",
-    "--convert-index-to-llvm",
-    "--convert-gradient-to-llvm",
-    "--convert-quantum-to-llvm",
-    # Remove any dead casts as the final pass expects to remove all existing casts,
-    # but only those that form a loop back to the original type.
-    "--canonicalize",
-    "--reconcile-unrealized-casts",
-]
+        Args:
+            infile (str): input file
+            outfile (str): output file
+        """
 
-compiler = get_executable_path("llvm", "llc")
-compiler_flags = [
-    "--filetype=obj",
-    "--relocation-model=pic",
-]
+    @staticmethod
+    def _run(infile, outfile, executable, flags):
+        command = [executable] + flags + [infile, "-o", outfile]
+        subprocess.run(command, check=True)
+
+    @classmethod
+    def run(cls, infile, outfile=None, executable=None, flags=None):
+        """Run the MHLO pass.
+
+        Args:
+            infile (str): path to MLIR file to be compiled
+            outfile (str): path to output file, defaults to replacing extension in infile to .nohlo.
+            executable (str): path to executable, defaults to mlir-hlo-opt
+            flags (List[str]): flags to mlir-hlo-opt, defaults to _default_flags.
+        """
+        if outfile is None:
+            outfile = cls.get_output_filename(infile)
+        if executable is None:
+            executable = cls._executable
+        if flags is None:
+            flags = cls._default_flags
+        cls._run(infile, outfile, executable, flags)
+        return outfile
+
+
+# pylint: disable=too-few-public-methods
+class MHLOPass(Pass):
+    """MHLO Pass."""
+
+    _executable = get_executable_path("mhlo", "mlir-hlo-opt")
+    _default_flags = [
+        "--allow-unregistered-dialect",
+        "--canonicalize",
+        "--chlo-legalize-to-hlo",
+        "--mhlo-legalize-control-flow",
+        "--hlo-legalize-to-linalg",
+        "--mhlo-legalize-to-std",
+        "--convert-to-signless",
+        "--canonicalize",
+    ]
+
+    @staticmethod
+    def get_output_filename(infile):
+        return infile.replace(".mlir", ".nohlo.mlir")
+
+
+class BufferizationPass(Pass):
+    """Bufferization Pass."""
+
+    _executable = get_executable_path("quantum", "quantum-opt")
+    _default_flags = [
+        "--lower-gradients",
+        "--gradient-bufferize",
+        "--scf-bufferize",
+        "--convert-tensor-to-linalg",  # tensor.pad
+        "--convert-elementwise-to-linalg",  # Must be run before --arith-bufferize
+        "--arith-bufferize",
+        "--empty-tensor-to-alloc-tensor",
+        "--bufferization-bufferize",
+        "--tensor-bufferize",
+        "--linalg-bufferize",
+        "--tensor-bufferize",
+        "--quantum-bufferize",
+        "--func-bufferize",
+        "--finalizing-bufferize",
+        "--buffer-hoisting",
+        # "--buffer-deallocation",
+        "--convert-bufferization-to-memref",
+        "--canonicalize",
+        "--cse",
+    ]
+
+    @staticmethod
+    def get_output_filename(infile):
+        return infile.replace(".nohlo.mlir", ".buff.mlir")
+
+
+class MLIRToLLVMDialect(Pass):
+    """MLIR To LLVM"""
+
+    _executable = get_executable_path("quantum", "quantum-opt")
+    _default_flags = [
+        "--convert-linalg-to-loops",
+        "--convert-scf-to-cf",
+        # This pass expands memref operations that modify the metadata of a memref (sizes, offsets,
+        # stdies) into a sequence of easier to analyze constructs. In particular, this pass transforms
+        # operations into explicit sequence of operations that model the effect of this operation on the
+        # different metadata. This pass uses affine constructs to materialize these effects.
+        # Concretely, expanded-strided-metadata is used to decompose memref.subview as it has no
+        # lowering in -convert-memref-to-llvm.
+        "--expand-strided-metadata",
+        "--lower-affine",
+        "--convert-complex-to-standard",  # added for complex.exp lowering
+        "--convert-complex-to-llvm",
+        "--convert-math-to-llvm",
+        # Must be run after -convert-math-to-llvm as it marks math::powf illegal but doesn't convert it.
+        "--convert-math-to-libm",
+        "--convert-arith-to-llvm",
+        "--convert-memref-to-llvm",
+        "--convert-index-to-llvm",
+        "--convert-gradient-to-llvm",
+        "--convert-quantum-to-llvm",
+        # Remove any dead casts as the final pass expects to remove all existing casts,
+        # but only those that form a loop back to the original type.
+        "--canonicalize",
+        "--reconcile-unrealized-casts",
+    ]
+
+    @staticmethod
+    def get_output_filename(infile):
+        return infile.replace(".buff.mlir", ".llvm.mlir")
+
+
+class LLVMDialectToLLVMIR(Pass):
+    """Convert LLVM Dialect to LLVM-IR."""
+
+    _executable = get_executable_path("llvm", "mlir-translate")
+    _default_flags = ["--mlir-to-llvmir"]
+
+    @staticmethod
+    def get_output_filename(infile):
+        return infile.replace(".llvm.mlir", ".ll")
+
+
+class LLVMIRToObjectFile(Pass):
+    """LLVMIR To Object File."""
+
+    _executable = get_executable_path("llvm", "llc")
+    _default_flags = [
+        "--filetype=obj",
+        "--relocation-model=pic",
+    ]
+
+    @staticmethod
+    def get_output_filename(infile):
+        return infile.replace(".ll", ".o")
+
+
+mlir_lib_path = get_lib_path("llvm", "MLIR_LIB_DIR")
+lrt_lib_path = get_lib_path("runtime", "RUNTIME_LIB_DIR")
+lrt_capi_path = os.path.join(lrt_lib_path, "capi")
+lrt_backend_path = os.path.join(lrt_lib_path, "backend")
 
 
 # pylint: disable=too-few-public-methods
@@ -139,32 +233,23 @@ class CompilerDriver:
 
     _default_fallback_compilers = ["clang", "gcc", "c99", "c89", "cc"]
 
-    @staticmethod
-    def _flags():
-        mlir_lib_path = get_lib_path("llvm", "MLIR_LIB_DIR")
-        lrt_lib_path = get_lib_path("runtime", "RUNTIME_LIB_DIR")
-        lrt_capi_path = os.path.join(lrt_lib_path, "capi")
-        lrt_backend_path = os.path.join(lrt_lib_path, "backend")
-
-        flags = [
-            "-shared",
-            "-rdynamic",
-            f"-L{mlir_lib_path}",
-            "-Wl,-no-as-needed",
-            f"-Wl,-rpath,{mlir_lib_path}",
-            f"-L{lrt_capi_path}",
-            f"-L{lrt_backend_path}",
-            f"-Wl,-rpath,{lrt_capi_path}:{lrt_backend_path}",
-            f"-L{lrt_capi_path}",
-            f"-L{lrt_backend_path}",
-            f"-Wl,-rpath,{lrt_capi_path}:{lrt_backend_path}",
-            "-lrt_backend",
-            "-lrt_capi",
-            "-lpthread",
-            "-lmlir_c_runner_utils",  # required for memref.copy
-        ]
-
-        return flags
+    _default_flags = [
+        "-shared",
+        "-rdynamic",
+        f"-L{mlir_lib_path}",
+        "-Wl,-no-as-needed",
+        f"-Wl,-rpath,{mlir_lib_path}",
+        f"-L{lrt_capi_path}",
+        f"-L{lrt_backend_path}",
+        f"-Wl,-rpath,{lrt_capi_path}:{lrt_backend_path}",
+        f"-L{lrt_capi_path}",
+        f"-L{lrt_backend_path}",
+        f"-Wl,-rpath,{lrt_capi_path}:{lrt_backend_path}",
+        "-lrt_backend",
+        "-lrt_capi",
+        "-lpthread",
+        "-lmlir_c_runner_utils",  # required for memref.copy
+    ]
 
     @staticmethod
     def _get_compiler_fallback_order(fallback_compilers):
@@ -207,7 +292,17 @@ class CompilerDriver:
             return False
 
     @staticmethod
-    def link(infile, outfile, flags=None, fallback_compilers=None):
+    def get_output_filename(infile):
+        """Rename object file to shared object
+
+        Args:
+            infile (str): input file name
+            outfile (str): output file name
+        """
+        return infile.replace(".o", ".so")
+
+    @staticmethod
+    def run(infile, outfile=None, flags=None, fallback_compilers=None):
         """
         Link the infile against the necessary libraries and produce the outfile.
 
@@ -219,186 +314,113 @@ class CompilerDriver:
         Raises:
             EnvironmentError: The exception is raised when no compiler succeeded.
         """
+        if outfile is None:
+            outfile = CompilerDriver.get_output_filename(infile)
         if flags is None:
-            flags = CompilerDriver._flags()
+            flags = CompilerDriver._default_flags
         if fallback_compilers is None:
             fallback_compilers = CompilerDriver._default_fallback_compilers
         # pylint: disable=redefined-outer-name
         for compiler in CompilerDriver._available_compilers(fallback_compilers):
             success = CompilerDriver._attempt_link(compiler, flags, infile, outfile)
             if success:
-                return
+                return outfile
         msg = f"Unable to link {infile}. All available compiler options exhausted. Please provide a compatible compiler via $CATALYST_CC."
         raise EnvironmentError(msg)
 
 
-def lower_mhlo_to_linalg(filename):
-    """Translate MHLO to linalg dialect.
+class Compiler:
+    """Compiles MLIR modules to shared objects."""
 
-    Args:
-        filename (str): the path to a file were the program is stored.
-    Returns:
-        a path to the output file
-    """
-    assert filename[-5:] == ".mlir", "input is not an mlir file"
+    def __init__(self):
+        self.order = None
+        # The temporary directory must be referenced by the wrapper class
+        # in order to avoid being garbage collected
+        # pylint: disable=consider-using-with
+        self.workspace = tempfile.TemporaryDirectory()
 
-    command = [mhlo_opt_tool]
-    command += ["--allow-unregistered-dialect"]
-    command += [filename]
-    command += mhlo_lowering_pass_pipeline
+    def run(self, mlir_module, keep_intermediate=False, passes=None):
+        """Compile an MLIR module to a shared object.
 
-    new_fname = filename.replace(".mlir", ".nohlo.mlir")
+        .. note::
 
-    with open(new_fname, "w", encoding="utf-8") as file:
-        subprocess.run(command, stdout=file, check=True)
+            For compilation of hybrid quantum-classical PennyLane programs,
+            please see the :func:`~.qjit` decorator.
 
-    return new_fname
+        Args:
+            mlir_module (Module): the MLIR module
+            passes (List[Any]): the list of compilation passes
 
+        Returns:
+            Shared object
+        """
+        module_name = mlir_module.operation.attributes["sym_name"]
+        # Convert MLIR string to Python string
+        module_name = str(module_name)
+        # Remove quotations
+        module_name = module_name.replace('"', "")
 
-def bufferize_tensors(filename):
-    """Translate MHLO to linalg dialect.
+        if keep_intermediate:
+            parent_dir = os.getcwd()
+            path = os.path.join(parent_dir, module_name)
+            os.makedirs(path, exist_ok=True)
+            workspace_name = path
+        else:
+            workspace_name = self.workspace.name
 
-    Args:
-        filename (str): the path to a file were the program is stored.
-    Returns:
-        a path to the output file
-    """
-    assert filename[-5:] == ".mlir", "input is not an mlir file"
+        if passes is None:
+            passes = [
+                MHLOPass,
+                BufferizationPass,
+                MLIRToLLVMDialect,
+                LLVMDialectToLLVMIR,
+                LLVMIRToObjectFile,
+                CompilerDriver,
+            ]
 
-    command = [quantum_opt_tool]
-    command += [filename]
-    command += bufferization_pass_pipeline
+        self.order = {}
+        with utils.pushd(workspace_name):
+            # need to create a temporary file with the string contents
+            filename = f"{module_name}.mlir"
+            with open(filename, "w", encoding="utf-8") as f:
+                mlir_module.operation.print(f, print_generic_op_form=False, assume_verified=True)
 
-    new_fname = filename.replace(".mlir", ".buff.mlir")
+            for _pass in passes:
+                output = _pass.run(filename)
+                self.order[_pass] = output
+                filename = os.path.abspath(output)
 
-    with open(new_fname, "w", encoding="utf-8") as file:
-        subprocess.run(command, stdout=file, check=True)
+        return filename
 
-    return new_fname
+    @staticmethod
+    def _get_class_from_string(_pass):
+        return getattr(sys.modules[__name__], _pass)
 
+    def _get_output_file_of(self, _pass):
+        cls = Compiler._get_class_from_string(_pass)
+        return self.order.get(cls)
 
-def lower_all_to_llvm(filename):
-    """Translate MLIR dialects to LLVM dialect.
+    def get_output_of(self, _pass):
+        """Get the output IR of a pass.
 
-    Args:
-        filename (str): the path to a file were the program is stored.
-    Returns:
-        a path to the output file
-    """
-    assert filename[-10:] == ".buff.mlir", "input is not a bufferized mlir file"
+        Args:
+            _pass (str): name of pass class
 
-    command = [quantum_opt_tool]
-    command += [filename]
-    command += llvm_lowering_pass_pipeline
+        Returns
+            (str): output IR
+        """
+        fname = self._get_output_file_of(_pass)
+        if not fname:
+            return None
+        with open(fname, "r", encoding="utf-8") as f:
+            txt = f.read()
+        return txt
 
-    new_fname = filename.replace(".buff.mlir", ".llvm.mlir")
-    with open(new_fname, "w", encoding="utf-8") as file:
-        subprocess.run(command, stdout=file, check=True)
+    def print(self, _pass):
+        """Print the output IR of pass.
 
-    return new_fname
-
-
-def convert_mlir_to_llvmir(filename):
-    """Translate LLVM dialect to LLVM IR.
-
-    Args:
-        filename (str): the path to a file were the program is stored.
-    Returns:
-        a path to the output file
-    """
-    assert filename[-10:] == ".llvm.mlir", "input is not an llvm dialect mlir file"
-
-    command = [translate_tool]
-    command += [filename]
-    command += ["--mlir-to-llvmir"]
-
-    new_fname = filename.replace(".llvm.mlir", ".ll")
-    with open(new_fname, "w", encoding="utf-8") as file:
-        subprocess.run(command, stdout=file, check=True)
-
-    return new_fname
-
-
-def compile_llvmir(filename):
-    """Translate LLVM IR to an object file.
-
-    Args:
-        filename (str): the path to a file were the program is stored.
-    Returns:
-        a path to the output file
-    """
-    assert filename[-3:] == ".ll", "input is not an llvmir file"
-
-    new_fname = filename.replace(".ll", ".o")
-
-    command = [compiler]
-    command += compiler_flags
-    command += [filename]
-    command += ["-o", new_fname]
-    subprocess.run(command, check=True)
-    return new_fname
-
-
-def link_lightning_runtime(filename):
-    """Link the object file as a shared object.
-
-    Args:
-        filename (str): the path to a file were the object file is stored.
-    Returns:
-        a path to the output file
-    """
-    assert filename[-2:] == ".o", "input is not an object file"
-
-    new_fname = filename.replace(".o", ".so")
-
-    CompilerDriver.link(filename, new_fname)
-
-    return new_fname
-
-
-def compile(mlir_module, workspace, passes):
-    """Compile an MLIR module to a shared object.
-
-    .. note::
-
-        For compilation of hybrid quantum-classical PennyLane programs,
-        please see the :func:`~.qjit` decorator.
-
-    Args:
-        mlir_module (Module): the MLIR module
-        workspace (str): the absolute path to the MLIR module
-        has_hlo (bool): ``True`` if the MLIR module contains HLO code. Defaults to ``False``
-        passes (List[str]): the list of compilation passes
-
-    Returns:
-        Shared object
-        A string representation of LLVM IR.
-    """
-
-    module_name = mlir_module.operation.attributes["sym_name"]
-    # Convert MLIR string to Python string
-    module_name = str(module_name)
-    # Remove quotations
-    module_name = module_name.replace('"', "")
-    # need to create a temporary file with the string contents
-    filename = workspace + f"/{module_name}.mlir"
-    with open(filename, "w", encoding="utf-8") as f:
-        mlir_module.operation.print(f, print_generic_op_form=False, assume_verified=True)
-
-    passes["mlir"] = filename
-    mlir = filename
-    mlir = lower_mhlo_to_linalg(mlir)
-    passes["nohlo"] = mlir
-    buff = bufferize_tensors(mlir)
-    passes["buff"] = buff
-    llvm_dialect = lower_all_to_llvm(buff)
-    passes["llvm"] = llvm_dialect
-    llvmir = convert_mlir_to_llvmir(llvm_dialect)
-    passes["ll"] = llvmir
-    object_file = compile_llvmir(llvmir)
-    shared_object = link_lightning_runtime(object_file)
-
-    with open(llvmir, "r", encoding="utf-8") as f:
-        _llvmir = f.read()
-
-    return shared_object, _llvmir
+        Args:
+            _pass (str): name of pass class
+        """
+        txt = self.get_output_of(_pass)
+        print(txt)

@@ -18,10 +18,6 @@ compiling of hybrid quantum-classical functions using Catalyst.
 # pylint: disable=missing-module-docstring
 
 import ctypes
-import os
-import inspect
-import tempfile
-import typing
 import warnings
 import functools
 
@@ -34,9 +30,9 @@ import pennylane as qml
 from mlir_quantum.runtime import get_ranked_memref_descriptor, ranked_memref_to_numpy
 
 import catalyst.jax_tracer as tracer
-from catalyst import compiler
-from catalyst.utils.gen_mlir import append_modules
+from catalyst.compiler import Compiler
 from catalyst.utils.patching import Patcher
+from catalyst.utils import utils
 from catalyst.pennylane_extensions import QFunc
 from catalyst.utils.tracing import TracingContext
 
@@ -213,37 +209,6 @@ class CompiledFunction:
         except Exception as exc:
             arg_type = type(arg)
             raise TypeError(f"Unsupported argument type: {arg_type}") from exc
-
-    @staticmethod
-    def are_all_signature_params_annotated(f: typing.Callable):
-        """Determine if all parameters are typed.
-
-        Args:
-            f: callable, with possible annotation
-        Returns:
-            bool: whether all parameters are annotated
-        """
-        signature = inspect.signature(f)
-        parameters = signature.parameters
-        return all(p.annotation is not inspect.Parameter.empty for p in parameters.values())
-
-    @staticmethod
-    def get_compile_time_signature(f: typing.Callable) -> typing.List[typing.Any]:
-        """Get signature from parameter annotations.
-
-        Args:
-            f: callable, with possible annotations
-        Returns:
-            annotations for all parameters if possible
-
-        """
-        can_validate = CompiledFunction.are_all_signature_params_annotated(f)
-
-        if can_validate:
-            # Needed instead of inspect.get_annotations for Python < 3.10.
-            return getattr(f, "__annotations__", {}).values()
-
-        return None
 
     @staticmethod
     def zero_ranked_memref_to_numpy(ranked_memref):
@@ -479,30 +444,19 @@ class QJIT:
             as soon as the QJIT instance is deleted.
     """
 
-    def __init__(self, fn, target, keep_intermediate):
+    def __init__(self, fn, target, keep_intermediate, passes):
         self.qfunc = fn
         self.c_sig = None
         functools.update_wrapper(self, fn)
-        if keep_intermediate:
-            dirname = fn.__name__
-            parent_dir = os.getcwd()
-            path = os.path.join(parent_dir, dirname)
-            os.makedirs(path, exist_ok=True)
-            self.workspace_name = path
-        else:
-            # The temporary directory must be referenced by the wrapper class
-            # in order to avoid being garbage collected
-            # pylint: disable=consider-using-with
-            self.workspace = tempfile.TemporaryDirectory()
-            self.workspace_name = self.workspace.name
-        self.passes = {}
+        self._compiler = Compiler()
+        self.passes = passes
         self._jaxpr = None
         self._mlir = None
         self._llvmir = None
         self.mlir_module = None
         self.compiled_function = None
-
-        parameter_types = CompiledFunction.get_compile_time_signature(self.qfunc)
+        self.keep_intermediate = keep_intermediate
+        parameter_types = utils.get_type_annotations(self.qfunc)
         self.user_typed = False
         if parameter_types is not None:
             self.user_typed = True
@@ -518,9 +472,7 @@ class QJIT:
         Args:
             stage: string corresponding with the name of the stage to be printed
         """
-        if self.passes.get(stage):
-            with open(self.passes[stage], "r", encoding="utf-8") as f:
-                print(f.read())
+        self._compiler.print(stage)
 
     @property
     def mlir(self):
@@ -558,23 +510,21 @@ class QJIT:
         with Patcher(
             (qml.QNode, "__call__", QFunc.__call__),
         ):
-            mlir_module, ctx, jaxpr = tracer.get_mlir(self.qfunc, *self.c_sig)
+            mlir_module, jaxpr = tracer.get_mlir(self.qfunc, *self.c_sig)
 
         mod = mlir_module.operation
         self._jaxpr = jaxpr
         self._mlir = mod.get_asm(binary=False, print_generic_op_form=False, assume_verified=True)
-
-        # Inject setup and finalize functions.
-        append_modules(mlir_module, ctx)
 
         return mlir_module
 
     def compile(self):
         """Compile the current MLIR module."""
 
-        shared_object, self._llvmir = compiler.compile(
-            self.mlir_module, self.workspace_name, self.passes
+        shared_object = self._compiler.run(
+            self.mlir_module, keep_intermediate=self.keep_intermediate, passes=self.passes
         )
+        self._llvmir = self._compiler.get_output_of("LLVMDialectToLLVMIR")
 
         # The function name out of MLIR has quotes around it, which we need to remove.
         # The MLIR function name is actually a derived type from string which has no
@@ -605,7 +555,7 @@ class QJIT:
         return self.compiled_function(*args, **kwargs)
 
 
-def qjit(fn=None, *, target="binary", keep_intermediate=False):
+def qjit(fn=None, *, target="binary", keep_intermediate=False, passes=None):
     """A just-in-time decorator for PennyLane and JAX programs using Catalyst.
 
     This decorator enables both just-in-time and ahead-of-time compilation,
@@ -690,9 +640,9 @@ def qjit(fn=None, *, target="binary", keep_intermediate=False):
     """
 
     if fn is not None:
-        return QJIT(fn, target, keep_intermediate)
+        return QJIT(fn, target, keep_intermediate, passes)
 
     def wrap_fn(fn):
-        return QJIT(fn, target, keep_intermediate)
+        return QJIT(fn, target, keep_intermediate, passes)
 
     return wrap_fn
