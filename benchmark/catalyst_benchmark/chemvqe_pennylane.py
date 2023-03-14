@@ -12,7 +12,8 @@ from .types import Problem
 
 @dataclass
 class ProblemInfo:
-    """ ChemVQE problem specification """
+    """ChemVQE problem specification"""
+
     name: str
     bond: float
 
@@ -31,7 +32,8 @@ PROBLEMS: Dict[NQubits, ProblemInfo] = {
 
 
 class ProblemCVQE(Problem):
-    """ PennyLane implementation details of the VQE problem """
+    """PennyLane implementation details of the VQE problem"""
+
     def __init__(self, dev, diff_method, grad, nsteps=10, **qnode_kwargs):
         super().__init__(dev, **qnode_kwargs)
         self.nsteps = nsteps
@@ -50,13 +52,13 @@ class ProblemCVQE(Problem):
         self.qcircuit = None
         self.qgrad = None
 
-
     def trial_params(self, _: int) -> Any:
         return pnp.zeros(len(self.excitations), dtype=pnp.float64)
 
 
 def qcompile(p: ProblemCVQE, weights):
-    """ Compile the quantum parts of the problem """
+    """Compile the quantum parts of the problem"""
+
     def _circuit(params):
         AllSinglesDoubles(params, range(p.nqubits), p.hf_state, p.singles, p.doubles)
         return qml.expval(qml.Hamiltonian(np.array(p.ham.coeffs), p.ham.ops))
@@ -69,7 +71,7 @@ def qcompile(p: ProblemCVQE, weights):
 
 
 def workflow(p: ProblemCVQE, params):
-    """ Problem workflow """
+    """Problem workflow"""
     assert p.qcircuit is not None
     assert p.qgrad is not None
 
@@ -83,7 +85,7 @@ def workflow(p: ProblemCVQE, params):
 
 
 def size(p: ProblemCVQE) -> int:
-    """ Compute the size of the problem circuit """
+    """Compute the size of the problem circuit"""
     with qml.tape.QuantumTape() as tape:
         AllSinglesDoubles(p.trial_params(0), range(p.nqubits), p.hf_state, p.singles, p.doubles)
     return len(qml.transforms.create_expand_fn(depth=5, device=p.dev)(tape))
@@ -95,11 +97,12 @@ NSTEPS = 1
 
 
 def run_default_qubit(N=6):
-    """ Test problem entry point """
+    """Test problem entry point"""
     p = ProblemCVQE(
         qml.device("default.qubit", wires=N, shots=SHOTS),
         grad=partial(qml.grad, argnum=0),
-        nsteps=NSTEPS, diff_method=DIFFMETHOD
+        nsteps=NSTEPS,
+        diff_method=DIFFMETHOD,
     )
     print(f"Size: {size(p)}")
 
@@ -112,12 +115,12 @@ def run_default_qubit(N=6):
 
 
 def run_lightning_qubit(N=6):
-    """ Test problem entry point """
+    """Test problem entry point"""
     p = ProblemCVQE(
         qml.device("lightning.qubit", wires=N, shots=SHOTS),
         grad=partial(qml.grad, argnum=0),
         nsteps=NSTEPS,
-        diff_method=DIFFMETHOD
+        diff_method=DIFFMETHOD,
     )
     print(f"Size: {size(p)}")
 
@@ -130,7 +133,7 @@ def run_lightning_qubit(N=6):
 
 
 def run_jax_(devname, N=6):
-    """ Test problem entry point """
+    """Test problem entry point"""
     import jax
 
     jax.config.update("jax_enable_x64", True)
@@ -156,10 +159,10 @@ def run_jax_(devname, N=6):
 
 
 def run_jax_default_qubit(N=6):
-    """ Test problem entry point """
+    """Test problem entry point"""
     return run_jax_("default.qubit.jax", N)
 
 
 def run_jax_lightning_qubit(N=6):
-    """ Test problem entry point """
+    """Test problem entry point"""
     return run_jax_("lightning.qubit", N)

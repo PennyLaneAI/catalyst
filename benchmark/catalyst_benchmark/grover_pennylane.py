@@ -8,7 +8,7 @@ from .types import Problem
 
 
 def clause_nqubits(clause_list) -> int:
-    """ Problem-specific number of qubits """
+    """Problem-specific number of qubits"""
     return max(map(max, clause_list)) + 1  # type:ignore # Number of input qubits
 
 
@@ -18,7 +18,8 @@ def grover_loops(N) -> int:
 
 
 class ProblemPL(Problem):
-    """ PennyLane implementation details of the Grover problem """
+    """PennyLane implementation details of the Grover problem"""
+
     def __init__(self, dev, nlayers=None, **qnode_kwargs):
         super().__init__(dev, **qnode_kwargs)
         nqubits = self.nqubits
@@ -54,7 +55,7 @@ class ProblemPL(Problem):
 
 
 def oracle(t):
-    """A Grover oracle solving a mock combinatorial problem. """
+    """A Grover oracle solving a mock combinatorial problem."""
     clause_list = t.CLAUSE_LIST
 
     # Compute clauses
@@ -72,7 +73,7 @@ def oracle(t):
 
 
 def diffuser(t):
-    """ Diffuser part of the Grover algorithm """
+    """Diffuser part of the Grover algorithm"""
     # Apply transformation |s> -> |00..0> (H-gates)
     for qubit in t.iqr:
         qml.Hadamard(wires=[qubit])
@@ -94,7 +95,8 @@ def diffuser(t):
 
 
 def qcompile(p: ProblemPL, weights):
-    """ Compile the quantum parts of the problem """
+    """Compile the quantum parts of the problem"""
+
     def _main(weights):
         # Initialize the state
         for qubit in p.iqr:
@@ -115,12 +117,12 @@ def qcompile(p: ProblemPL, weights):
 
 
 def workflow(p: ProblemPL, weights):
-    """ Problem workflow """
+    """Problem workflow"""
     return p.qcircuit(weights)
 
 
 def size(p: ProblemPL) -> int:
-    """ Compute the size of the problem circuit """
+    """Compute the size of the problem circuit"""
     qnode_kwargs = deepcopy(p.qnode_kwargs)
     qnode_kwargs.update({"expansion_strategy": "device"})
     qcompile(p, p.trial_params(0))
@@ -128,7 +130,7 @@ def size(p: ProblemPL) -> int:
 
 
 def run_jax_lightning_qubit(N=7):
-    """ Test entry point """
+    """Test entry point"""
     import jax
 
     jax.config.update("jax_enable_x64", True)
@@ -145,7 +147,7 @@ def run_jax_lightning_qubit(N=7):
 
 
 def run_lightning_qubit(N=7):
-    """ Test entry point """
+    """Test entry point"""
     p = ProblemPL(qml.device("lightning.qubit", wires=N, shots=None), 4, interface=None)
     print(f"Size: {size(p)}")
 
@@ -157,7 +159,7 @@ def run_lightning_qubit(N=7):
 
 
 def run_default_qubit(N=7):
-    """ Test entry point """
+    """Test entry point"""
     p = ProblemPL(qml.device("default.qubit", wires=N, shots=None), 4, interface=None)
     print(f"Size: {size(p)}")
 
