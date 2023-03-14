@@ -37,10 +37,16 @@ Running
 
 ### Full cycle measurements
 
-1. Run the `./batchrun.py`
-    ``` sh
-    $ python3 batchrun.py --tag=today --timeout-1run=4000
-    ```
+1. Run the `./batchrun.py`.
+   ``` sh
+   $ python3 batchrun.py --tag=today --timeout-1run=4000
+   ```
+   - The data is collected incrementally.
+   - Data collection and post-processing operations could be separated using the `-a|--action`
+     argument. The `collect` and `plot` operations are supported.
+   - If the script is not running on the same machine that was used to collect the data, call the
+     `plot` action with the `-H|--force-sysinfo-hash` arguemnt specifying the measurement system's
+     sysinfo hash.
 
 2. Render the report by copying the `./tex/report_template.tex`, adjusting the measurement tag
    and/or the system information hash, adding comments and finally running the `sh/mkpdflatex.sh`
