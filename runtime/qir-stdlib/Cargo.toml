@@ -5,8 +5,9 @@ authors = ["Microsoft"]
 edition = "2021"
 license = "MIT"
 
-[dependencies]
-qir-stdlib = { git = "https://github.com/qir-alliance/qir-runner/", rev = "f04c90b1908a1bed7b7b21db1c2e10d84504227c" }
+[dependencies.qir-stdlib]
+git = "https://github.com/qir-alliance/qir-runner.git"
+tag = "v0.1.0"
 
 [lib]
 crate-type = ["staticlib"]
