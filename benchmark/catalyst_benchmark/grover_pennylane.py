@@ -7,7 +7,8 @@ import pennylane.numpy as pnp
 from .types import Problem
 
 
-def sudoku_nqubits(clause_list) -> int:
+def clause_nqubits(clause_list) -> int:
+    """ Problem-specific number of qubits """
     return max(map(max, clause_list)) + 1  # type:ignore # Number of input qubits
 
 
@@ -17,16 +18,14 @@ def grover_loops(N) -> int:
 
 
 class ProblemPL(Problem):
+    """ PennyLane implementation details of the Grover problem """
     def __init__(self, dev, nlayers=None, **qnode_kwargs):
         super().__init__(dev, **qnode_kwargs)
         nqubits = self.nqubits
         assert (nqubits - 3) % 2 == 0
         l = list(range((nqubits - 3) // 2))
         CLAUSE_LIST = list(zip(l, l[1:] + [0]))
-        # CLAUSE_LIST = [(0,1),(0,2),(1,3),(2,3)]
-
-        N = sudoku_nqubits(CLAUSE_LIST)
-
+        N = clause_nqubits(CLAUSE_LIST)
         iqr = list(range(N))  # Input quantum register
         cqr = [x + max(iqr) + 1 for x in range(len(CLAUSE_LIST))]  # Clause quantum register
         oqr = [x + max(cqr) + 1 for x in [0]]  # Solution qubit
@@ -54,10 +53,8 @@ class ProblemPL(Problem):
         )
 
 
-def sudoku_oracle(t):
-    """An oracle solving a simple binary-sudoku game: in 2x2 gird there should
-    be (a) no column that conain the same binary value twice and (b) no row
-    which contain the same binary value twice"""
+def oracle(t):
+    """A Grover oracle solving a mock combinatorial problem. """
     clause_list = t.CLAUSE_LIST
 
     # Compute clauses
@@ -75,6 +72,7 @@ def sudoku_oracle(t):
 
 
 def diffuser(t):
+    """ Diffuser part of the Grover algorithm """
     # Apply transformation |s> -> |00..0> (H-gates)
     for qubit in t.iqr:
         qml.Hadamard(wires=[qubit])
@@ -104,7 +102,7 @@ def qcompile(p: ProblemPL, weights):
 
         for _ in range(int(p.nlayers)):
             # Apply the oracle
-            sudoku_oracle(p)
+            oracle(p)
             # Apply the diffuser
             diffuser(p)
 
@@ -122,6 +120,7 @@ def workflow(p: ProblemPL, weights):
 
 
 def size(p: ProblemPL) -> int:
+    """ Compute the size of the problem circuit """
     qnode_kwargs = deepcopy(p.qnode_kwargs)
     qnode_kwargs.update({"expansion_strategy": "device"})
     qcompile(p, p.trial_params(0))
@@ -129,6 +128,7 @@ def size(p: ProblemPL) -> int:
 
 
 def run_jax_lightning_qubit(N=7):
+    """ Test entry point """
     import jax
 
     jax.config.update("jax_enable_x64", True)
@@ -145,6 +145,7 @@ def run_jax_lightning_qubit(N=7):
 
 
 def run_lightning_qubit(N=7):
+    """ Test entry point """
     p = ProblemPL(qml.device("lightning.qubit", wires=N, shots=None), 4, interface=None)
     print(f"Size: {size(p)}")
 
@@ -156,6 +157,7 @@ def run_lightning_qubit(N=7):
 
 
 def run_default_qubit(N=7):
+    """ Test entry point """
     p = ProblemPL(qml.device("default.qubit", wires=N, shots=None), 4, interface=None)
     print(f"Size: {size(p)}")
 

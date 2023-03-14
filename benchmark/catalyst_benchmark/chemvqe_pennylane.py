@@ -1,17 +1,18 @@
 """ ChemVQE problem, PennyLane/PennyLane+JAX implementation """
 from typing import Any, Dict
+from dataclasses import dataclass
+from functools import partial
 
 import pennylane.numpy as pnp
 import pennylane as qml
 import numpy as np
-from dataclasses import dataclass
 from pennylane import AllSinglesDoubles
-from functools import partial
-
 from .types import Problem
+
 
 @dataclass
 class ProblemInfo:
+    """ ChemVQE problem specification """
     name: str
     bond: float
 
@@ -30,6 +31,7 @@ PROBLEMS: Dict[NQubits, ProblemInfo] = {
 
 
 class ProblemCVQE(Problem):
+    """ PennyLane implementation details of the VQE problem """
     def __init__(self, dev, diff_method, grad, nsteps=10, **qnode_kwargs):
         super().__init__(dev, **qnode_kwargs)
         self.nsteps = nsteps
@@ -81,6 +83,7 @@ def workflow(p: ProblemCVQE, params):
 
 
 def size(p: ProblemCVQE) -> int:
+    """ Compute the size of the problem circuit """
     with qml.tape.QuantumTape() as tape:
         AllSinglesDoubles(p.trial_params(0), range(p.nqubits), p.hf_state, p.singles, p.doubles)
     return len(qml.transforms.create_expand_fn(depth=5, device=p.dev)(tape))

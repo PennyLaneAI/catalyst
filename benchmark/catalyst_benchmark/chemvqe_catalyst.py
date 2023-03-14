@@ -1,11 +1,11 @@
 """ ChemVQE problem, PennyLane+Catalyst implementation """
 from typing import Any, Dict
+from dataclasses import dataclass
 
 import pennylane as qml
 import jax.numpy as jnp
 import catalyst
 import numpy as np
-from dataclasses import dataclass
 from pennylane import AllSinglesDoubles
 from catalyst import qjit
 from jax.core import ShapedArray
@@ -15,6 +15,7 @@ DMALIASES = {"finite-diff": "fd", "parameter-shift": "ps", "adjoint": "adj"}
 
 @dataclass
 class ProblemInfo:
+    """ ChemVQE problem specification """
     name: str
     bond: float
 
@@ -33,6 +34,7 @@ PROBLEMS: Dict[NQubits, ProblemInfo] = {
 
 
 class ProblemCVQE(Problem):
+    """ Catalyst implementation details of the VQE problem """
     def __init__(self, dev, diff_method, nsteps=10, **qnode_kwargs):
         super().__init__(dev, **qnode_kwargs)
         self.nsteps = nsteps

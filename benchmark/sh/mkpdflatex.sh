@@ -12,7 +12,7 @@ D=$CWD/_pdflatex
 mkdir $D 2>/dev/null || true
 
 TEXminted=$(dirname "$TEX")/$(basename "$TEX" .tex).minted.tex
-trap "rm $TEXminted" 0 1 2 9
+trap "rm $TEXminted" 0 1 2 3
 
 (
 cd $(dirname "$TEX")
