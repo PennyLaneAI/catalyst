@@ -517,7 +517,7 @@ class Compiler:
 
     def _get_output_file_of(self, _pass):
         cls = Compiler._get_class_from_string(_pass)
-        return self.order[cls]
+        return self.order.get(cls)
 
     def get_output_of(self, _pass):
         """Get the output IR of a pass.
@@ -528,6 +528,8 @@ class Compiler:
             (str): output IR
         """
         fname = self._get_output_file_of(_pass)
+        if not fname:
+            return None
         with open(fname, "r", encoding="utf-8") as f:
             txt = f.read()
         return txt
