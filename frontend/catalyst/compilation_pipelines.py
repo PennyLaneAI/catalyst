@@ -289,7 +289,7 @@ class CompiledFunction:
             memref_ptr = ctypes.pointer(memref)
             numpy_array = CompiledFunction.ranked_memref_to_numpy(memref_ptr)
             numpy_arrays.append(numpy_array)
-        return numpy_arrays[0] if len(numpy_arrays) == 1 else numpy_arrays
+        return numpy_arrays[0] if len(numpy_arrays) == 1 else tuple(numpy_arrays)
 
     @staticmethod
     def _exec(shared_object_file, func_name, has_return, *args):
