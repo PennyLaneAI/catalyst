@@ -7,7 +7,8 @@ from catalyst import qjit, for_loop, while_loop
 from .types import Problem
 
 
-def sudoku_nqubits(clause_list) -> int:
+def clause_nqubits(clause_list) -> int:
+    """ Problem-specific number of qubits """
     return max(map(max, clause_list)) + 1  # type:ignore # Number of input qubits
 
 
@@ -17,13 +18,14 @@ def grover_loops(N) -> int:
 
 
 class ProblemC(Problem):
+    """ Catalyst implementation details of the Grover problem """
     def __init__(self, dev, nlayers=None, **qnode_kwargs):
         super().__init__(dev, **qnode_kwargs)
         nqubits = self.nqubits
         assert (nqubits - 3) % 2 == 0
         l = list(range((nqubits - 3) // 2))
         CLAUSE_LIST = list(zip(l, l[1:] + [0]))
-        N = sudoku_nqubits(CLAUSE_LIST)
+        N = clause_nqubits(CLAUSE_LIST)
         iqr = jnp.array(list(range(N)))
         cqr = jnp.array([x + max(iqr) + 1 for x in range(len(CLAUSE_LIST))])
         oqr = jnp.array([x + max(cqr) + 1 for x in [0]])
@@ -52,10 +54,8 @@ class ProblemC(Problem):
         )
 
 
-def sudoku_oracle(t):
-    """An oracle solving a simple binary-sudoku game: in 2x2 gird there should
-    be (a) no column that conain the same binary value twice and (b) no row
-    which contain the same binary value twice"""
+def oracle(t):
+    """A Grover oracle solving a mock combinatorial problem. """
 
     @for_loop(0, len(t.CLAUSE_LIST), 1)
     def loop1(i):
@@ -80,6 +80,7 @@ def sudoku_oracle(t):
 
 
 def diffuser(t):
+    """ Diffuser part of the Grover algorithm """
     # Apply transformation |s> -> |00..0> (H-gates)
     for qubit in t.iqr:
         qml.Hadamard(wires=[qubit])
@@ -115,7 +116,7 @@ def qcompile(p: ProblemC, weights):
         @for_loop(0, jnp.int64(p.nlayers), 1)
         def loop(_):
             # Apply the oracle
-            sudoku_oracle(p)
+            oracle(p)
             # Apply the diffuser
             diffuser(p)
 
