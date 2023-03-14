@@ -23,13 +23,22 @@ jobs:
       - name: Checkout Catalyst repo
         uses: actions/checkout@v3
 
+      - name: Cache qir-stdlib Build
+        id: cache-qir-stdlib
+        uses: actions/cache@v3
+        with:
+          path: ./runtime/qir-stdlib-build
+          key: ${{ runner.os }}-qir-stdlib-build
+
       - name: Install rustup with llvm-tools-preview
+        if: steps.cache-qir-stdlib.outputs.cache-hit != 'true'
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
           components: llvm-tools-preview
 
       - name: Install QIR-stdlib
+        if: steps.cache-qir-stdlib.outputs.cache-hit != 'true'
         run: |
             cd ./runtime/qir-stdlib
             cargo build --release --verbose
@@ -37,13 +46,6 @@ jobs:
             cp ./target/release/libqir_stdlib.a ../qir-stdlib-build/
             cp ./target/release/build/include/* ../qir-stdlib-build/include/
             cargo clean
-
-      - name: Upload QIR-stdlib Artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: qir-stdlib-build
-          path: ./runtime/qir-stdlib-build
-          retention-days: 1
 
   runtime:
     name: Catalyst-Runtime
@@ -67,11 +69,14 @@ jobs:
         run: |
           echo "LIGHTNING_GIT_TAG_VALUE=master" >> $GITHUB_ENV
 
-      - name: Download QIR-stdlib Artifact
-        uses: actions/download-artifact@v3
+      - name: Get Cached qir-stdlib Build
+        id: cache-qir-stdlib
+        uses: actions/cache@v3
         with:
-          name: qir-stdlib-build
           path: ./runtime/qir-stdlib-build
+          key: Linux-qir-stdlib-build
+          enableCrossOsArchive: True
+          fail-on-cache-miss: True
 
       - name: Build Catalyst-Runtime
         run: |
@@ -126,8 +131,7 @@ jobs:
         enableCrossOsArchive: True
 
     - name: Clone LLVM Submodule
-      if: |
-        steps.cache-llvm-source.outputs.cache-hit != 'true'
+      if: steps.cache-llvm-source.outputs.cache-hit != 'true'
       uses: actions/checkout@v3
       with:
         repository: llvm/llvm-project
