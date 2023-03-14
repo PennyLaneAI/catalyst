@@ -4,9 +4,10 @@ debug
 __pycache__
 pennylane_catalyst.egg-info
 
-# Testing directories
+# Testing files and directories
 .lit
 .pytest_cache
+_benchmark
 
 # Packaging directories
 dist
