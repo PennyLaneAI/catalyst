@@ -74,7 +74,7 @@ def parse_implementation(implementation: str) -> Tuple[str, str, Optional[str]]:
     elif len(tokens) == 2:
         device = tokens[1]
     else:
-        raise NotImplementedError(f"Unsupported implementation: {a.implementation}")
+        raise NotImplementedError(f"Unsupported implementation: {implementation}")
     return framework, device, interface
 
 
@@ -97,7 +97,7 @@ def measure_compile_catalyst(a: ParsedArguments) -> BenchmarkResult:
 
         p = Problem(
             qml.device("lightning.qubit", wires=a.nqubits),
-            a.grover_nlayers,
+            a.nlayers,
             expansion_strategy="device",
         )
     elif a.problem == "chemvqe":
@@ -106,7 +106,14 @@ def measure_compile_catalyst(a: ParsedArguments) -> BenchmarkResult:
         p = Problem(
             qml.device("lightning.qubit", wires=a.nqubits),
             diff_method=a.vqe_diff_method,
-            expansion_strategy="device")
+            expansion_strategy="device",
+        )
+    elif a.problem == "qft":
+        from .qft_catalyst import ProblemC as Problem, qcompile, workflow
+
+        p = Problem(
+            qml.device("lightning.qubit", wires=a.nqubits), a.nlayers, expansion_strategy="device"
+        )
     else:
         raise NotImplementedError(f"Unsupported problem {a.problem}")
 
@@ -149,15 +156,19 @@ def measure_runtime_catalyst(a: ParsedArguments) -> BenchmarkResult:
     if a.problem == "grover":
         from .grover_catalyst import ProblemC as Problem, qcompile, workflow
 
-        p = Problem(qml.device("lightning.qubit", wires=a.nqubits), a.grover_nlayers)
+        p = Problem(qml.device("lightning.qubit", wires=a.nqubits), a.nlayers)
 
     elif a.problem == "chemvqe":
         from .chemvqe_catalyst import ProblemCVQE as Problem, qcompile, workflow
 
-        p = Problem(
-            qml.device("lightning.qubit", wires=a.nqubits), diff_method=a.vqe_diff_method
-        )
+        p = Problem(qml.device("lightning.qubit", wires=a.nqubits), diff_method=a.vqe_diff_method)
+    elif a.problem == "qft":
+        from .qft_catalyst import ProblemC as Problem, qcompile, workflow
 
+        p = Problem(
+            qml.device("lightning.qubit", wires=a.nqubits),
+            a.nlayers,
+        )
     else:
         raise NotImplementedError(f"Unsupported problem {a.problem}")
 
@@ -203,7 +214,7 @@ def measure_compile_pennylanejax(a: ParsedArguments) -> BenchmarkResult:
 
         p = Problem(
             qml.device(device, wires=a.nqubits),
-            a.grover_nlayers,
+            a.nlayers,
             interface=interface,
             expansion_strategy="device",
         )
@@ -215,7 +226,17 @@ def measure_compile_pennylanejax(a: ParsedArguments) -> BenchmarkResult:
             qml.device(device, wires=a.nqubits),
             grad=jax.grad,
             interface=interface,
-            diff_method=a.vqe_diff_method
+            diff_method=a.vqe_diff_method,
+            expansion_strategy="device",
+        )
+    elif a.problem == "qft":
+        from .qft_pennylane import ProblemPL as Problem, qcompile, workflow, size
+
+        p = Problem(
+            qml.device(device, wires=a.nqubits),
+            interface=interface,
+            nlayers=a.nlayers,
+            expansion_strategy="device",
         )
     else:
         raise NotImplementedError(f"Unsupported problem {a.problem}")
@@ -258,7 +279,7 @@ def measure_runtime_pennylanejax(a: ParsedArguments) -> BenchmarkResult:
     if a.problem == "grover":
         from .grover_pennylane import ProblemPL as Problem, qcompile, workflow, size
 
-        p = Problem(qml.device(device, wires=a.nqubits), a.grover_nlayers, interface=interface)
+        p = Problem(qml.device(device, wires=a.nqubits), a.nlayers, interface=interface)
 
     elif a.problem == "chemvqe":
         from .chemvqe_pennylane import ProblemCVQE as Problem, qcompile, workflow, size
@@ -267,8 +288,12 @@ def measure_runtime_pennylanejax(a: ParsedArguments) -> BenchmarkResult:
             qml.device(device, wires=a.nqubits),
             grad=jax.grad,
             interface=interface,
-            diff_method=a.vqe_diff_method
+            diff_method=a.vqe_diff_method,
         )
+    elif a.problem == "qft":
+        from .qft_pennylane import ProblemPL as Problem, qcompile, workflow, size
+
+        p = Problem(qml.device(device, wires=a.nqubits), interface=interface, nlayers=a.nlayers)
 
     else:
         raise NotImplementedError(f"Unsupported problme {a.problem}")
@@ -309,7 +334,7 @@ def measure_compile_pennylane(a: ParsedArguments) -> BenchmarkResult:
 
         p = Problem(
             qml.device(device, wires=a.nqubits),
-            a.grover_nlayers,
+            a.nlayers,
             interface=interface,
             expansion_strategy="device",
         )
@@ -319,7 +344,17 @@ def measure_compile_pennylane(a: ParsedArguments) -> BenchmarkResult:
         p = Problem(
             qml.device(device, wires=a.nqubits),
             grad=partial(qml.grad, argnum=0),
-            diff_method=a.vqe_diff_method
+            diff_method=a.vqe_diff_method,
+            expansion_strategy="device",
+        )
+    elif a.problem == "qft":
+        from .qft_pennylane import ProblemPL as Problem, qcompile, workflow, size
+
+        p = Problem(
+            qml.device(device, wires=a.nqubits),
+            interface=interface,
+            nlayers=a.nlayers,
+            expansion_strategy="device",
         )
     else:
         raise NotImplementedError(f"Unsupported problem {a.problem}")
@@ -350,14 +385,22 @@ def measure_runtime_pennylane(a: ParsedArguments) -> BenchmarkResult:
     if a.problem == "grover":
         from .grover_pennylane import ProblemPL as Problem, workflow, qcompile, size
 
-        p = Problem(qml.device(device, wires=a.nqubits), a.grover_nlayers)
+        p = Problem(qml.device(device, wires=a.nqubits), a.nlayers)
     elif a.problem == "chemvqe":
         from .chemvqe_pennylane import ProblemCVQE as Problem, qcompile, workflow, size
 
         p = Problem(
             qml.device(device, wires=a.nqubits),
             grad=partial(qml.grad, argnum=0),
-            diff_method=a.vqe_diff_method
+            diff_method=a.vqe_diff_method,
+        )
+    elif a.problem == "qft":
+        from .qft_pennylane import ProblemPL as Problem, qcompile, workflow, size
+
+        p = Problem(
+            qml.device(device, wires=a.nqubits),
+            interface=interface,
+            nlayers=a.nlayers,
         )
 
     else:
@@ -397,13 +440,13 @@ REGISTRY = {
 }
 
 
-def parse_args(ap:ArgumentParser, args:List[str]) -> ParsedArguments:
+def parse_args(ap: ArgumentParser, args: List[str]) -> ParsedArguments:
     a = ap.parse_args(args)
     setattr(a, "argv", args)
     return a
 
 
-def selfcheck(ap:ArgumentParser) -> None:
+def selfcheck(ap: ArgumentParser) -> None:
     def _runall(cmdline_fn, atol=1e-5):
         r1 = None
         for m, i in REGISTRY.keys():
@@ -421,6 +464,8 @@ def selfcheck(ap:ArgumentParser) -> None:
                 print(f"Skipping {(a.problem, m, i)} due to: {e}")
 
     # fmt: off
+    _runall(lambda m, i: ["run", "-p", "qft", "-m", m, "-i", i, "-n", "1",
+                          "-N", "4", "-L", "2", "--numerical-check"])
     _runall(lambda m, i: ["run", "-p", "chemvqe", "-m", m, "-i", i, "-n", "1",
                           "-N", "4", "--numerical-check"])
     _runall(lambda m, i: ["run", "-p", "grover", "-m", m, "-i", i, "-n", "1",

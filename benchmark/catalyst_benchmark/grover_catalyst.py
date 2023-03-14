@@ -8,7 +8,7 @@ from .types import Problem
 
 
 def clause_nqubits(clause_list) -> int:
-    """ Problem-specific number of qubits """
+    """Problem-specific number of qubits"""
     return max(map(max, clause_list)) + 1  # type:ignore # Number of input qubits
 
 
@@ -18,7 +18,8 @@ def grover_loops(N) -> int:
 
 
 class ProblemC(Problem):
-    """ Catalyst implementation details of the Grover problem """
+    """Catalyst implementation details of the Grover problem"""
+
     def __init__(self, dev, nlayers=None, **qnode_kwargs):
         super().__init__(dev, **qnode_kwargs)
         nqubits = self.nqubits
@@ -55,7 +56,7 @@ class ProblemC(Problem):
 
 
 def oracle(t):
-    """A Grover oracle solving a mock combinatorial problem. """
+    """A Grover oracle solving a mock combinatorial problem."""
 
     @for_loop(0, len(t.CLAUSE_LIST), 1)
     def loop1(i):
@@ -80,7 +81,7 @@ def oracle(t):
 
 
 def diffuser(t):
-    """ Diffuser part of the Grover algorithm """
+    """Diffuser part of the Grover algorithm"""
     # Apply transformation |s> -> |00..0> (H-gates)
     for qubit in t.iqr:
         qml.Hadamard(wires=[qubit])
@@ -104,7 +105,8 @@ def diffuser(t):
 
 
 def qcompile(p: ProblemC, weights):
-    """ Compile the quantum parts of the problem """
+    """Compile the quantum parts of the problem"""
+
     def _main(weights):
         # Initialize the state
         @for_loop(0, len(p.iqr), 1)
@@ -121,6 +123,7 @@ def qcompile(p: ProblemC, weights):
             diffuser(p)
 
             qml.BasicEntanglerLayers(weights=weights, wires=p.iqr)
+
         loop()
         return qml.state()
 
@@ -130,12 +133,12 @@ def qcompile(p: ProblemC, weights):
 
 
 def workflow(p: ProblemC, weights):
-    """ Problem workflow """
+    """Problem workflow"""
     return p.qcircuit(weights)
 
 
 def run_catalyst(N=7):
-    """ Test problem entry point """
+    """Test problem entry point"""
     p = ProblemC(qml.device("lightning.qubit", wires=N), None)
 
     @qjit
@@ -144,4 +147,3 @@ def run_catalyst(N=7):
         return workflow(p, params)
 
     return _main(p.trial_params(0))
-

@@ -42,6 +42,20 @@ IMPLEMENTATIONS = [
     "pennylane/lightning.qubit",
 ]
 
+# Implementation aliases to workaround the Altair clipped legend problem
+# https://github.com/vega/vl-convert/issues/30
+ALIASES = {
+    "catalyst/lightning.qubit": "C/L",
+    "pennylane+jax/lightning.qubit": "PLjax/L",
+    "pennylane/lightning.qubit": "PL/L",
+    "pennylane+jax/default.qubit.jax": "PLjax/Def",
+    "pennylane/default.qubit": "PL/Def",
+}
+
+C_L = ALIASES["catalyst/lightning.qubit"]
+PL_L = ALIASES["pennylane/lightning.qubit"]
+PLjax_L = ALIASES["pennylane+jax/lightning.qubit"]
+
 CATPROBLEMS = {
     "regular": "grover",
     "deep": "grover",
@@ -57,6 +71,8 @@ QUBITS = {
     ("regular", "grover", "runtime"): [MINQUBITS, 9, 11, 13, 15, 17],
     ("deep", "grover", "compile"): [7],
     ("deep", "grover", "runtime"): [7],
+    ("deep", "qft", "compile"): [7],
+    ("deep", "qft", "runtime"): [7],
     ("variational", "vqe", "compile"): [6, 7, 8, 9, 10, 11],
     ("variational", "vqe", "runtime"): [6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
     ("variational", "chemvqe", "compile"): [4, 6, 8, 12],
@@ -69,6 +85,10 @@ LAYERS = {
         [10, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200, 1300, 1400, MAXLAYERS],
     ("deep", "grover", "runtime"):
         [10, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200, 1300, 1400, MAXLAYERS],
+    ("deep", "qft", "compile"):
+        [10, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200, 1300, 1400, MAXLAYERS],
+    ("deep", "qft", "runtime"):
+        [10, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200, 1300, 1400, MAXLAYERS],
 }
 
 KNOWN_FAILURES = {
@@ -78,23 +98,10 @@ KNOWN_FAILURES = {
 
 DIFF_METHODS = {
     "grover": [None],
+    "qft": [None],
     "vqe": ["finite-diff", "parameter-shift", "adjoint", "backprop"],
     "chemvqe": ["finite-diff", "parameter-shift", "adjoint", "backprop"]
 }
-
-# Implementation aliases to workaround the Altair clipped legend problem
-# https://github.com/vega/vl-convert/issues/30
-ALIASES = {
-    "catalyst/lightning.qubit": "C/L",
-    "pennylane+jax/lightning.qubit": "PLjax/L",
-    "pennylane/lightning.qubit": "PL/L",
-    "pennylane+jax/default.qubit.jax": "PLjax/Def",
-    "pennylane/default.qubit": "PL/Def",
-}
-
-C_L = ALIASES["catalyst/lightning.qubit"]
-PL_L = ALIASES["pennylane/lightning.qubit"]
-PLjax_L = ALIASES["pennylane+jax/lightning.qubit"]
 
 # Colors obtained from a Vega colorscheme.
 # Ref. https://stackoverflow.com/questions/70993559/altair-selecting-a-color-from-a-vega-color-scheme-for-plot
@@ -102,13 +109,14 @@ COLORS = ["#e41a1c", "#377eb8", "#ff7f00", "#4daf4a", "#984ea3",
           "#ffff33", "#a65628", "#f781bf", "#999999"]
 # fmt:on
 
+
 def tag(a) -> str:
-    """ Format the user-defined part of data file names """
+    """Format the user-defined part of data file names"""
     return a.tag if a.tag is not None else f"v{FMTVERSION}"
 
 
 def syshash(a) -> str:
-    """ Format the system-information part of the data file names """
+    """Format the system-information part of the data file names"""
     return a.force_sysinfo_hash if a.force_sysinfo_hash else SYSHASH
 
 
@@ -123,7 +131,10 @@ def ofile(a, _, measure, problem, impl, nqubits, nlayers, diffmethod) -> Tuple[s
     )
     if problem == "grover":
         assert diffmethod is None
-        params = f"--grover-nlayers={nlayers}" if nlayers is not None else ""
+        params = f"--nlayers={nlayers}" if nlayers is not None else ""
+    elif problem == "qft":
+        assert diffmethod is None
+        params = f"--nlayers={nlayers}" if nlayers is not None else ""
     elif problem == "vqe" or problem == "chemvqe":
         assert nlayers is None
         assert diffmethod is not None
@@ -245,8 +256,11 @@ def load(a: ParsedArguments) -> Tuple[DataFrame, Optional[Sysinfo]]:
                 data["nlayers"].append(nlayers)
                 data["ngates"].append(r.depth_gates)
                 data["diffmethod"].append(diffmethod)
-                timeout_ntrials = r.timeout_sec if hasattr(r,'timeout_sec') else (
-                    float(a.timeout_1run) if a.timeout_1run else 1e9)
+                timeout_ntrials = (
+                    r.timeout_sec
+                    if hasattr(r, "timeout_sec")
+                    else (float(a.timeout_1run) if a.timeout_1run else 1e9)
+                )
                 data["timeout"].append(timeout_ntrials / len(r.measurement_sec))
                 systems.add(r.sysinfo)
     if nmissing > 0:
@@ -255,15 +269,15 @@ def load(a: ParsedArguments) -> Tuple[DataFrame, Optional[Sysinfo]]:
             print("\n".join(log), file=sys.stderr)
         else:
             print("Pass -V to see the full list", file=sys.stderr)
-    if len(systems)>1:
+    if len(systems) > 1:
         print("Data was collected from more than one system:\n{systems}", file=sys.stderr)
-    return DataFrame(data), (list(systems)[0] if len(systems)>0 else None)
+    return DataFrame(data), (list(systems)[0] if len(systems) > 0 else None)
 
 
 def writefile(a: ParsedArguments, fname, chart) -> None:
-    """ Write chart to file(s) in the configured formats """
+    """Write chart to file(s) in the configured formats"""
     fname_suffix = f"{fname}_{syshash(a)}_{tag(a)}"
-    for ext,wf,method in [("svg","w",vlc.vegalite_to_svg),("png","wb",vlc.vegalite_to_png)]:
+    for ext, wf, method in [("svg", "w", vlc.vegalite_to_svg), ("png", "wb", vlc.vegalite_to_png)]:
         if ext in a.plot_formats:
             if a.dry_run and "w" in wf:
                 print(f"(Dry-run) Would update: {fname_suffix}.{ext}")
@@ -274,18 +288,14 @@ def writefile(a: ParsedArguments, fname, chart) -> None:
 
 
 def dfilter(cat, measure, problem, df: DataFrame) -> DataFrame:
-    """ Filter the benchmark data """
+    """Filter the benchmark data"""
     try:
-        return df[
-            (df["cat"] == cat)
-            & (df["measure"] == measure)
-            & (df["problem"] == problem)
-        ]
+        return df[(df["cat"] == cat) & (df["measure"] == measure) & (df["problem"] == problem)]
     except KeyError:
         return DataFrame()
 
 
-def plot(a: ParsedArguments, df_full: DataFrame, sysinfo=SYSINFO) -> None:
+def plot(a: ParsedArguments, df_full: DataFrame, sysinfo: Optional[Sysinfo] = None) -> None:
     """Plot the figures. The function first builds a set of Pandas DataFrames,
     then calls Altair to present the data collected."""
 
@@ -313,17 +323,19 @@ def plot(a: ParsedArguments, df_full: DataFrame, sysinfo=SYSINFO) -> None:
                 title="Impl",
                 legend=alt.Legend(columns=1, labelLimit=240),
                 scale=alt.Scale(domain=dom, range=rang),
-                **kwargs
+                **kwargs,
             )
 
         trialEncoding = alt.Opacity(
             "trial", title="Trial", legend=alt.Legend(columns=1, labelLimit=240)
         )
 
-        def _timeEncoding(mean:bool=False):
-            return alt.Y("mean(time):Q" if mean else "time:Q",
-                         title="Mean time, sec" if mean else "Time, sec",
-                         scale=alt.Scale(type="log"))
+        def _timeEncoding(mean: bool = False):
+            return alt.Y(
+                "mean(time):Q" if mean else "time:Q",
+                title="Mean time, sec" if mean else "Time, sec",
+                scale=alt.Scale(type="log"),
+            )
 
         def _nqubitsEncoding(title="Qubits", **kwargs):
             return alt.X("nqubits", title=title, **kwargs)
@@ -334,7 +346,7 @@ def plot(a: ParsedArguments, df_full: DataFrame, sysinfo=SYSINFO) -> None:
         def _mktitle(s: str, align="center") -> dict:
             t = {
                 "text": s,
-                "subtitle": sysinfo.toString(),
+                "subtitle": sysinfo.toString() if sysinfo else "Unknown system",
                 "subtitleFontSize": 9,
             }
             if align:
@@ -355,11 +367,12 @@ def plot(a: ParsedArguments, df_full: DataFrame, sysinfo=SYSINFO) -> None:
                 .properties(height=60)
             )
 
-
         def _plot_trial_linechart(df, fname, xenc, title, **kwargs):
             if len(df) == 0:
                 return
-            writefile(a, fname,
+            writefile(
+                a,
+                fname,
                 Chart(df)
                 .mark_line(point=True)
                 .encode(
@@ -369,36 +382,43 @@ def plot(a: ParsedArguments, df_full: DataFrame, sysinfo=SYSINFO) -> None:
                     opacity=xenc(**kwargs),
                 )
                 .properties(title=title)
-                .to_dict()
+                .to_dict(),
             )
 
         def _plot_linechart(df, fname, xenc, title, ref_ngates=None, **kwargs):
             if len(df) == 0:
                 return
-            writefile(a, fname,
+            writefile(
+                a,
+                fname,
                 alt.vconcat(
                     *[
-                    Chart(df)
-                    .mark_line(point=True)
-                    .encode(
-                        x=xenc(title=None, **kwargs),
-                        y=_timeEncoding(),
-                        color=_implEncoding(df),
-                        opacity=trialEncoding,
-                        strokeDash=implCLcondDash,
-                        strokeWidth=implCLcond,
+                        Chart(df)
+                        .mark_line(point=True)
+                        .encode(
+                            x=xenc(title=None, **kwargs),
+                            y=_timeEncoding(),
+                            color=_implEncoding(df),
+                            opacity=trialEncoding,
+                            strokeDash=implCLcondDash,
+                            strokeWidth=implCLcond,
+                        )
+                        .properties(title=title),
+                    ]
+                    + (
+                        [
+                            _mkfooter(df, xenc(**kwargs), ref_ngates),
+                        ]
+                        if ref_ngates is not None
+                        else []
                     )
-                    .properties(title=title),
-                    ] + ([
-                    _mkfooter(df, xenc(**kwargs), ref_ngates),
-                    ] if ref_ngates is not None else [])
                 )
                 .configure_axisLeft(minExtent=50)
-                .to_dict()
+                .to_dict(),
             )
 
         # Regular circuits
-        df = _filter("regular", "compile", "grover")
+        df = _filter("regular", "compile", CATPROBLEMS["regular"])
         xaxis = alt.Axis(values=list(range(MINQUBITS, MAXQUBITS + 2, 2)))
         xscale = alt.Scale(domain=(MINQUBITS, MAXQUBITS))
         _plot_linechart(
@@ -417,7 +437,7 @@ def plot(a: ParsedArguments, df_full: DataFrame, sysinfo=SYSINFO) -> None:
             _mktitle("Compilation time/trial, Regular circuits"),
         )
 
-        df = _filter("regular", "runtime", "grover")
+        df = _filter("regular", "runtime", CATPROBLEMS["regular"])
         _plot_linechart(
             df,
             "_img/regular_runtime",
@@ -433,7 +453,7 @@ def plot(a: ParsedArguments, df_full: DataFrame, sysinfo=SYSINFO) -> None:
         )
 
         # Deep circuits
-        df = _filter("deep", "compile", "grover")
+        df = _filter("deep", "compile", CATPROBLEMS["deep"])
         xaxis = alt.Axis(values=list(range(0, MAXLAYERS + 100, 100)))
         xscale = alt.Scale(domain=(0, MAXLAYERS))
         _plot_linechart(
@@ -452,7 +472,7 @@ def plot(a: ParsedArguments, df_full: DataFrame, sysinfo=SYSINFO) -> None:
             _mktitle("Compilation time/trial, Deep circuits"),
         )
 
-        df = _filter("deep", "runtime", "grover")
+        df = _filter("deep", "runtime", CATPROBLEMS["deep"])
         xaxis = alt.Axis(values=list(range(0, MAXLAYERS + 100, 100)))
         xscale = alt.Scale(domain=(0, MAXLAYERS))
         _plot_linechart(
@@ -471,7 +491,6 @@ def plot(a: ParsedArguments, df_full: DataFrame, sysinfo=SYSINFO) -> None:
             _mktitle("Running time/trial, Deep circuits"),
         )
 
-
         # Variational circuits
         def _diff_methods(problem) -> Iterable[Set[str]]:
             if a.plot_combine_adjoint_backprop:
@@ -480,7 +499,7 @@ def plot(a: ParsedArguments, df_full: DataFrame, sysinfo=SYSINFO) -> None:
             else:
                 return [set([x]) for x in set(DIFF_METHODS[problem])]
 
-        vqeproblem = "chemvqe"
+        vqeproblem = CATPROBLEMS["variational"]
         df = _filter("variational", "compile", vqeproblem)
         for dms in _diff_methods(vqeproblem):
             df2 = df[df.get("diffmethod", pd.Series(float)).map(lambda m: m in dms)]
@@ -488,13 +507,15 @@ def plot(a: ParsedArguments, df_full: DataFrame, sysinfo=SYSINFO) -> None:
                 dmtitle = "_".join(sorted(dms))
                 fname = f"_img/variational_compile_{dmtitle.replace('-','')}_lineplot"
                 _plot_linechart(
-                    df2, fname,
+                    df2,
+                    fname,
                     _nqubitsEncoding,
                     _mktitle(f"Compile time, Variational circuits ({dmtitle})"),
                 )
                 fname = f"_img/variational_compile_trial_{dmtitle.replace('-','')}_lineplot"
                 _plot_trial_linechart(
-                    df2, fname,
+                    df2,
+                    fname,
                     _nqubitsEncoding,
                     _mktitle(f"Compile time/trial, Variational circuits ({dmtitle})"),
                 )
@@ -506,17 +527,18 @@ def plot(a: ParsedArguments, df_full: DataFrame, sysinfo=SYSINFO) -> None:
                 dmtitle = "_".join(sorted(dms))
                 fname = f"_img/variational_runtime_{dmtitle.replace('-','')}_lineplot"
                 _plot_linechart(
-                    df2, fname,
+                    df2,
+                    fname,
                     _nqubitsEncoding,
                     _mktitle(f"Running time, Variational circuits ({dmtitle})"),
                 )
                 fname = f"_img/variational_runtime_trial_{dmtitle.replace('-','')}_lineplot"
                 _plot_trial_linechart(
-                    df2, fname,
+                    df2,
+                    fname,
                     _nqubitsEncoding,
                     _mktitle(f"Running time/trial, Variational circuits ({dmtitle})"),
                 )
-
 
         def _add_timeouts(df):
             for nqubits in sorted(set(df["nqubits"])):
@@ -551,29 +573,32 @@ def plot(a: ParsedArguments, df_full: DataFrame, sysinfo=SYSINFO) -> None:
                 df = _add_timeouts(df)
                 dmtitle = "_".join(sorted(diffmethods))
                 fname = f"_img/variational_runtime_{dmtitle.replace('-','')}"
-                writefile(a, fname,
+                writefile(
+                    a,
+                    fname,
                     alt.layer(
                         Chart(df)
                         .mark_bar()
                         .encode(
-                            x=alt.X("impl", title=None,
-                                    sort=list(ALIASES.values())),
-                            y=alt.Y("mean(time):Q",
-                                    title="Mean time, sec",
-                                    scale=alt.Scale(type="log")),
+                            x=alt.X("impl", title=None, sort=list(ALIASES.values())),
+                            y=alt.Y(
+                                "mean(time):Q", title="Mean time, sec", scale=alt.Scale(type="log")
+                            ),
                             color=alt.condition(
                                 f"datum.mean_time >= {min(df_full['timeout'])}",
                                 alt.ColorValue("Grey"),
                                 _implEncoding(df, add_timeout=any(df_full["timeout"])),
                             ),
                         ),
-                        Chart().mark_errorbar(extent='stderr').encode(
-                            x=alt.X("impl", title=None,
-                                    sort=list(ALIASES.values())),
+                        Chart()
+                        .mark_errorbar(extent="stderr")
+                        .encode(
+                            x=alt.X("impl", title=None, sort=list(ALIASES.values())),
                             y=alt.Y("time:Q", title="Mean time, sec"),
                         ),
-                        data=df
-                    ).facet(
+                        data=df,
+                    )
+                    .facet(
                         column=alt.Column("nqubits:N", title="Qubits"),
                     )
                     .properties(
@@ -610,8 +635,9 @@ AP.add_argument("-V", "--verbose", default=False, action=BooleanOptionalAction,
                 help="Print verbose messages")
 # fmt: on
 
-def load_cmdline(cmdline:Optional[Union[str,list]]=None) -> DataFrame:
-    """ Loads all the dataframe """
+
+def load_cmdline(cmdline: Optional[Union[str, list]] = None) -> DataFrame:
+    """Loads all the dataframe"""
     if isinstance(cmdline, str):
         arglist = cmdline.split()
     elif isinstance(cmdline, list):
@@ -624,5 +650,4 @@ def load_cmdline(cmdline:Optional[Union[str,list]]=None) -> DataFrame:
 
 
 def load_tagged(syshash=SYSHASH, tag=f"v{FMTVERSION}") -> DataFrame:
-    return load_cmdline(['-H',syshash,'--tag',tag])
-
+    return load_cmdline(["-H", syshash, "--tag", tag])

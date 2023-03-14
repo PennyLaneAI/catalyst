@@ -13,9 +13,11 @@ from .types import Problem
 
 DMALIASES = {"finite-diff": "fd", "parameter-shift": "ps", "adjoint": "adj"}
 
+
 @dataclass
 class ProblemInfo:
-    """ ChemVQE problem specification """
+    """ChemVQE problem specification"""
+
     name: str
     bond: float
 
@@ -34,7 +36,8 @@ PROBLEMS: Dict[NQubits, ProblemInfo] = {
 
 
 class ProblemCVQE(Problem):
-    """ Catalyst implementation details of the VQE problem """
+    """Catalyst implementation details of the VQE problem"""
+
     def __init__(self, dev, diff_method, nsteps=10, **qnode_kwargs):
         super().__init__(dev, **qnode_kwargs)
         self.nsteps = nsteps
@@ -57,7 +60,8 @@ class ProblemCVQE(Problem):
 
 
 def qcompile(p: ProblemCVQE, weights):
-    """ Compile the quantum parts of the problem """
+    """Compile the quantum parts of the problem"""
+
     def _circuit(params):
         AllSinglesDoubles(params, range(p.nqubits), p.hf_state, p.singles, p.doubles)
         return qml.expval(qml.Hamiltonian(np.array(p.ham.coeffs), p.ham.ops))
@@ -71,7 +75,7 @@ def qcompile(p: ProblemCVQE, weights):
 
 
 def workflow(p: ProblemCVQE, params):
-    """ Problem workflow """
+    """Problem workflow"""
     stepsize = 0.5
     theta = params
 
@@ -89,7 +93,7 @@ NSTEPS = 1
 
 
 def run_catalyst(N=6):
-    """ Test problem entry point """
+    """Test problem entry point"""
     p = ProblemCVQE(
         dev=qml.device("lightning.qubit", wires=N, shots=SHOTS),
         nsteps=NSTEPS,

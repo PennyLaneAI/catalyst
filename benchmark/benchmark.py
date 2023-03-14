@@ -10,8 +10,14 @@ from traceback import print_exc
 import numpy as np
 
 from catalyst_benchmark.types import BooleanOptionalAction
-from catalyst_benchmark.measurements import (parse_args, selfcheck, REGISTRY, parse_implementation,
-                                             BenchmarkResult, with_alarm)
+from catalyst_benchmark.measurements import (
+    parse_args,
+    selfcheck,
+    REGISTRY,
+    parse_implementation,
+    BenchmarkResult,
+    with_alarm,
+)
 
 # fmt: off
 ap = ArgumentParser(prog="python3 benchmark.py")
@@ -40,8 +46,8 @@ runcmd.add_argument("--numerical-check", default=False, action=BooleanOptionalAc
                     help="Whether to do a numerical check or not")
 runcmd.add_argument("-N", "--nqubits", type=int, default=11, metavar="INT",
                     help="Number of qubits")
-runcmd.add_argument("--grover-nlayers", type=int, default=None, metavar="INT",
-                    help="Grover-specific: Number of layers (default - auto)")
+runcmd.add_argument("-L","--nlayers", type=int, default=None, metavar="INT",
+                    help="Number of layers, problem-specific (default - auto)")
 runcmd.add_argument("--vqe-diff-method", type=str, default="finite-diff",
                     help="VQE-specific: Differentiation method (default - backprop)")
 # fmt: on

@@ -21,7 +21,8 @@ CPU_BRAND: Optional[str] = None
 @dataclass_json
 @dataclass(frozen=True)
 class Sysinfo:
-    """ Basic information about the system which runs the benchmark. """
+    """Basic information about the system which runs the benchmark."""
+
     systype: str
     hostname: str
     ncpu: int
@@ -46,7 +47,8 @@ class Sysinfo:
 
 
 class Problem:
-    """ Base class for reference problem. """
+    """Base class for reference problem."""
+
     def __init__(self, dev, **qnode_kwargs):
         self.dev = dev
         self.qnode_kwargs = qnode_kwargs
@@ -61,8 +63,9 @@ class Problem:
 @dataclass_json
 @dataclass
 class BenchmarkResultV1:
-    """ Base class for the measurement results. We use this class for backward compatibility with
-    some previously collected data records. """
+    """Base class for the measurement results. We use this class for backward compatibility with
+    some previously collected data records."""
+
     sysinfo: Sysinfo
     numeric_result: Optional[List[List[float]]]
     depth_gates: Optional[int]
@@ -74,7 +77,7 @@ class BenchmarkResultV1:
 @dataclass_json
 @dataclass
 class BenchmarkResult(BenchmarkResultV1):
-    """ Measurement results data structure.
+    """Measurement results data structure.
     Fields:
         numeric_result: Last numerical result, required primarily for
                         self-check.
@@ -99,12 +102,24 @@ class BenchmarkResult(BenchmarkResultV1):
 
     @classmethod
     def fromMeasurements(
-        cls, nr, argv, prep, times, depth: Optional[int], versions: Dict[str, str],
-        timeout: Optional[float]
+        cls,
+        nr,
+        argv,
+        prep,
+        times,
+        depth: Optional[int],
+        versions: Dict[str, str],
+        timeout: Optional[float],
     ):
         return BenchmarkResult(
-            Sysinfo.fromOS(), unpack_complex(nr) if nr else None, depth, argv, prep, times,
-            versions, float(timeout)
+            Sysinfo.fromOS(),
+            unpack_complex(nr) if nr else None,
+            depth,
+            argv,
+            prep,
+            times,
+            versions,
+            float(timeout),
         )
 
 
