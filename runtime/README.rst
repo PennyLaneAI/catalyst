@@ -67,7 +67,7 @@ The following table shows the available devices along with supported features:
      - ``Identity``, ``PauliX``, ``PauliY``, ``PauliZ``, ``Hadamard``, ``Hermitian``, ``Hamiltonian``, Tensor Product of Observables
    * - Expectation Value
      - All observables
-     - Basic observables (``Identity``, ``PauliX``, ``PauliY``, ``PauliZ``, ``Hadamard``, ``Hermitian``)
+     - All observables
    * - Variance
      - ``Identity``, ``PauliX``, ``PauliY``, ``PauliZ``
      - Not supported
