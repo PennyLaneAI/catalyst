@@ -8,8 +8,8 @@ quantum programs, and is currently backed by state-vector simulators
 `PennyLane-Lightning <https://github.com/PennyLaneAI/pennylane-lightning>`_
 and `Pennylane-Lightning-Kokkos <https://github.com/PennyLaneAI/pennylane-lightning-kokkos>`_.
 
-The runtime employs the ``QuantumDevice`` public API that enables the extension of backend quantum devices.
-This API accommodates two collections of abstract methods as follows:
+The runtime employs the `QuantumDevice <https://docs.pennylane.ai/projects/catalyst/en/stable/api/structCatalyst_1_1Runtime_1_1QuantumDevice.html#exhale-struct-structcatalyst-1-1runtime-1-1quantumdevice>`_
+public API that enables the extension of backend quantum devices. This API accommodates two collections of abstract methods as follows:
 
 - The Qubit management, device shot noise, and quantum tape recording methods are utilized for the implementation of Quantum Runtime (QR) instructions.
 
