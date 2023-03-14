@@ -8,7 +8,8 @@
 
 <h3>Bug fixes</h3>
 
-* Fix memory leaks that flow back into the Python environment.
+* Fix memory leaks from data that flows back into the Python environment.
+
   [#54](https://github.com/PennyLaneAI/catalyst/pull/54)
 
 <h3>Contributors</h3>
