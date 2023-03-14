@@ -7,5 +7,4 @@ configure_lit_site_cfg(
 
 add_lit_testsuite(check-frontend "Run the frontend tests"
     .  # the frontend tests are located in the same directory as the config file
-    DEPENDS ${DIALECT_TESTS_DEPEND}
 )

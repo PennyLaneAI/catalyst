@@ -18,7 +18,8 @@ BUILD_TYPE?=Release
 
 coverage: CODE_COVERAGE=ON
 coverage: BUILD_TYPE=Debug
-test: BUILD_TYPE=Debug
+test: CODE_COVERAGE=OFF
+test: BUILD_TYPE=Release
 
 .PHONY: help
 help:
@@ -104,12 +105,12 @@ endif
 .PHONY: check-tidy
 check-tidy: | qir
 	@echo "build Catalyst Runtime with RUNTIME_CLANG_TIDY=ON"
-	rm -rf 
 	cmake -G Ninja -B $(MK_DIR)/BuildTidy . \
+		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
 		-DCMAKE_C_COMPILER=$(C_COMPILER) \
 		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \
 		-DQIR_STDLIB_LIB=$(QIR_STDLIB_DIR) \
 		-DQIR_STDLIB_INCLUDES=$(QIR_STDLIB_INCLUDES_DIR) \
-		-DRUNTIME_CLANG_TIDY=ON 
+		-DRUNTIME_CLANG_TIDY=ON
 
 	cmake --build $(MK_DIR)/BuildTidy --target rt_capi -j$(if $(nprocs:-=),$(nprocs),$$(nproc))

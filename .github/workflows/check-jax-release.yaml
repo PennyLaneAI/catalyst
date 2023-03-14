@@ -83,9 +83,13 @@ jobs:
       run: |
         make runtime
 
-    - name: Run Frontend Test suite
+    - name: Run Frontend LIT suite
       run: |
-        make test-frontend
+        make lit
+
+    - name: Run Frontend PyTest suite
+      run: |
+        make pytest
 
     - name: Run Demos
       run: |
