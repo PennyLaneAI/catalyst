@@ -417,12 +417,14 @@ class QJIT:
         compile_options (Optional[CompileOptions]): Common compilation options
     """
 
-    def __init__(self, fn, target, keep_intermediate, compile_options=None):
+    #pylint: disable=too-many-arguments
+    def __init__(self, fn, target, keep_intermediate, passes, compile_options=None):
         self.qfunc = fn
         self.c_sig = None
         functools.update_wrapper(self, fn)
         self.compile_options = compile_options
         self._compiler = Compiler()
+        self.passes = passes
         self._jaxpr = None
         self._mlir = None
         self._llvmir = None
@@ -494,7 +496,10 @@ class QJIT:
         """Compile the current MLIR module."""
 
         shared_object = self._compiler.run(
-            self.mlir_module, keep_intermediate=self.keep_intermediate, options=self.compile_options
+            self.mlir_module,
+            keep_intermediate=self.keep_intermediate,
+            passes=self.passes,
+            options=self.compile_options,
         )
         self._llvmir = self._compiler.get_output_of("LLVMDialectToLLVMIR")
 
@@ -533,7 +538,9 @@ class QJIT:
         return self.compiled_function(*args, **kwargs)
 
 
-def qjit(fn=None, *, target="binary", keep_intermediate=False, verbose=False, logfile=None):
+def qjit(
+    fn=None, *, target="binary", keep_intermediate=False, verbose=False, logfile=None, passes=None
+):
     """A just-in-time decorator for PennyLane and JAX programs using Catalyst.
 
     This decorator enables both just-in-time and ahead-of-time compilation,
@@ -621,9 +628,9 @@ def qjit(fn=None, *, target="binary", keep_intermediate=False, verbose=False, lo
     """
 
     if fn is not None:
-        return QJIT(fn, target, keep_intermediate, CompileOptions(verbose, logfile))
+        return QJIT(fn, target, keep_intermediate, passes, CompileOptions(verbose, logfile))
 
     def wrap_fn(fn):
-        return QJIT(fn, target, keep_intermediate, CompileOptions(verbose, logfile))
+        return QJIT(fn, target, keep_intermediate, passes, CompileOptions(verbose, logfile))
 
     return wrap_fn
