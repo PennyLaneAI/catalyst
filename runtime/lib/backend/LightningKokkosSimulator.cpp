@@ -186,7 +186,6 @@ auto LightningKokkosSimulator::HamiltonianObservable(const std::vector<double> &
 // TODO: remove this kernel after merging the expval(const ObservableKokkos<T> &ob)
 // in PennyLane-Lightning-Kokkos
 template <class Precision> struct getRealOfComplexInnerProductFunctor {
-
     Kokkos::View<Kokkos::complex<Precision> *> sv1;
     Kokkos::View<Kokkos::complex<Precision> *> sv2;
 
@@ -209,7 +208,6 @@ inline auto getRealOfComplexInnerProduct(Kokkos::View<Kokkos::complex<Precision>
                                          Kokkos::View<Kokkos::complex<Precision> *> sv2_vec)
     -> Precision
 {
-
     assert(sv1_vec.size() == sv2_vec.size());
     Precision inner = 0;
     Kokkos::parallel_reduce(
