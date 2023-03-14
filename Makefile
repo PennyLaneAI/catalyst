@@ -71,13 +71,13 @@ test-demos:
 .PHONY: clean clean-all
 clean:
 	@echo "uninstall catalyst and delete all temporary and cache files"
-	$(PYTHON) pip uninstall -y catalyst
+	$(PYTHON) pip uninstall -y pennylane-catalyst
 	rm -rf dist __pycache__
 	rm -rf .coverage coverage_html_report
 
 clean-all:
 	@echo "uninstall catalyst and delete all temporary, cache files"
-	$(PYTHON) pip uninstall -y catalyst
+	$(PYTHON) pip uninstall -y pennylane-catalyst
 	rm -rf dist __pycache__
 	rm -rf .coverage coverage_html_report/
 	$(MAKE) -C mlir clean
