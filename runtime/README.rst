@@ -3,35 +3,95 @@
 Catalyst Runtime
 ################
 
-The Catalyst Runtime is a C++ QIR runtime that enables the execution of Catalyst-compiled quantum programs, and is currently
-backed by state-vector simulators `PennyLane-Lightning <https://github.com/PennyLaneAI/pennylane-lightning>`_
+The Catalyst Runtime is a C++ QIR runtime that enables the execution of Catalyst-compiled
+quantum programs, and is currently backed by state-vector simulators
+`PennyLane-Lightning <https://github.com/PennyLaneAI/pennylane-lightning>`_
 and `Pennylane-Lightning-Kokkos <https://github.com/PennyLaneAI/pennylane-lightning-kokkos>`_.
-A complete list of the quantum instruction set supported by the runtime can be found in
+
+The runtime employs the ``QuantumDevice`` public API that enables the extension of backend quantum devices.
+This API accommodates two collections of abstract methods as follows:
+
+- The Qubit management, device shot noise, and quantum tape recording methods are utilized for the implementation of Quantum Runtime (QR) instructions.
+
+- The quantum operations, observables, measurements, and gradient methods are used to implement Quantum Instruction Set (QIS) instructions.
+
+A complete list of instructions supported by the runtime can be found in
 `RuntimeCAPI.h <https://github.com/PennyLaneAI/catalyst/tree/main/runtime/include/RuntimeCAPI.h>`_.
 
+Contents
+========
 
 The directory is structured as follows:
 
-- `include <https://github.com/PennyLaneAI/catalyst/tree/main/runtime/include>`_ : This contains the public header files including the runtime driver interface (for backend devices) and the runtime C-API (for QIR programs).
-- `extensions <https://github.com/PennyLaneAI/catalyst/tree/main/runtime/extensions>`_ : A collection of extensions for backend simulators to fit into the `QIR programming model <https://github.com/qir-alliance/qir-spec/blob/main/specification/v0.1/4_Quantum_Runtime.md#qubits>`_. The `StateVectorDynamicCPU <https://github.com/PennyLaneAI/catalyst/tree/main/runtime/extensions/StateVectorDynamicCPU.hpp>`_ class extends the state-vector class of `Pennylane-Lightning <https://github.com/PennyLaneAI/pennylane-lightning>`_ providing dynamic allocation and deallocation of qubits.
-- `lib <https://github.com/PennyLaneAI/catalyst/tree/main/runtime/lib>`_ : The core modules of the runtime are structured into ``lib/capi`` and ``lib/backend``. `lib/capi <https://github.com/PennyLaneAI/catalyst/tree/main/runtime/lib/capi>`_  contains the source of the bridge between QIR instructions in LLVM-IR and C++ backends. `lib/backend <https://github.com/PennyLaneAI/catalyst/tree/main/runtime/lib/backend>`_ contains implementations of the ``QuantumDevice`` API for backend simulators.
-- `tests <https://github.com/PennyLaneAI/catalyst/tree/main/runtime/tests>`_ : A collection of C++ tests for modules and methods in the runtime.
+- `include <https://github.com/PennyLaneAI/catalyst/tree/main/runtime/include>`_:
+    This contains the public header files of the runtime including the ``QuantumDevice`` API
+    for backend quantum devices and the runtime CAPI.
+
+- `extensions <https://github.com/PennyLaneAI/catalyst/tree/main/runtime/extensions>`_:
+    A collection of extensions for backend simulators to fit into the
+    `QIR programming model <https://github.com/qir-alliance/qir-spec/blob/main/specification/v0.1/4_Quantum_Runtime.md#qubits>`_.
+    The `StateVectorDynamicCPU <https://github.com/PennyLaneAI/catalyst/tree/main/runtime/extensions/StateVectorDynamicCPU.hpp>`_
+    class extends the state-vector class of `Pennylane-Lightning <https://github.com/PennyLaneAI/pennylane-lightning>`_ providing
+    dynamic allocation and deallocation of qubits.
+
+- `lib <https://github.com/PennyLaneAI/catalyst/tree/main/runtime/lib>`_:
+    The core modules of the runtime are structured into ``lib/capi`` and ``lib/backend``.
+    `lib/capi <https://github.com/PennyLaneAI/catalyst/tree/main/runtime/lib/capi>`_  contains the source of the bridge between
+    QIR instructions in LLVM-IR and C++ backends. `lib/backend <https://github.com/PennyLaneAI/catalyst/tree/main/runtime/lib/backend>`_
+    contains implementations of the ``QuantumDevice`` API for backend simulators.
+
+- `tests <https://github.com/PennyLaneAI/catalyst/tree/main/runtime/tests>`_:
+    A collection of C++ tests for modules and methods in the runtime.
+
+Backend Devices
+===============
+
+A new device can be added to the list of supported ones in the runtime by implementing the quantum device API.
+The following table shows the runtime official backend devices along with supported features:
+
+.. list-table::
+   :widths: 25 25 25
+   :header-rows: 0
+
+   * - **Features**
+     - **PennyLane-Lightning**
+     - **PennyLane-Lightning-Kokkos**
+   * - Qubit Management
+     - Dynamic allocation/deallocation
+     - Static allocation/deallocation
+   * - Gate Operations
+     - `Lightning operations <https://github.com/PennyLaneAI/pennylane-lightning/blob/master/pennylane_lightning/src/gates/GateOperation.hpp>`_
+     - `Lightning operations <https://github.com/PennyLaneAI/pennylane-lightning/blob/master/pennylane_lightning/src/gates/GateOperation.hpp>`_
+   * - Quantum Observables
+     - ``Identity``, ``PauliX``, ``PauliY``, ``PauliZ``, ``Hadamard``, ``Hermitian``, ``Hamiltonian``, Tensor Product of Observables
+     - ``Identity``, ``PauliX``, ``PauliY``, ``PauliZ``, ``Hadamard``, ``Hermitian``, ``Hamiltonian``, Tensor Product of Observables
+   * - Expectation Value
+     - All observables
+     - Basic observables (``Identity``, ``PauliX``, ``PauliY``, ``PauliZ``, ``Hadamard``, ``Hermitian``)
+   * - Variance
+     - ``Identity``, ``PauliX``, ``PauliY``, ``PauliZ``
+     - Not supported
+   * - Finite Shots (``Sample``)
+     - Only for the computational basis on the supplied qubits
+     - Only for the computational basis on the supplied qubits
+   * - Probabilities
+     - Only for the computational basis on the supplied qubits
+     - Only for the computational basis on the supplied qubits
+   * - Mid-Circuit Measurement
+     - Only for the computational basis on the supplied qubit
+     - Only for the computational basis on the supplied qubit
+   * - Gradients
+     - The Adjoint-Jacobian method supporting all observables
+     - The Adjoint-Jacobian method supporting all observables
 
 Requirements
 ============
 
-To build the runtime from source, it is required to have an up to date version of a C/C++ compiler such as gcc, clang, or MSVC and the static library of
-``stdlib`` from `qir-runner <https://github.com/qir-alliance/qir-runner/tree/main/stdlib>`_.
+To build the runtime from source, it is required to have an up to date version of a C/C++ compiler such as gcc, clang, or MSVC
+and the static library of ``stdlib`` from `qir-runner <https://github.com/qir-alliance/qir-runner/tree/main/stdlib>`_.
 
-The ``make runtime`` command uses ``clang`` and ``clang++`` as the default C and C++ compilers. You can use ``c_compiler`` and ``cpp_compiler`` make
-options to change the default behavior.
-
-.. code-block:: console
-
-    make runtime c_compiler=$(which gcc) cpp_compiler=$(which g++)
-
-The runtime leverages the ``stdlib`` Rust package for the QIR standard runtime instructions.
-To build this package from source, the `Rust <https://www.rust-lang.org/tools/install>`_ toolchain installed via ``rustup`` is also required.
+The runtime leverages the ``stdlib`` Rust package for the QIR standard runtime instructions. To build this package from source,
+the `Rust <https://www.rust-lang.org/tools/install>`_ toolchain installed via ``rustup`` is also required.
 
 Installation
 ============
@@ -42,7 +102,7 @@ in the serial mode or run:
 
 .. code-block:: console
 
-    make runtime kokkos=ON
+    ENABLE_KOKKOS=ON make runtime
 
 Lightning-Kokkos provides support for other Kokkos backends including OpenMP, HIP and CUDA.
 Please refer to `the installation guideline <https://github.com/PennyLaneAI/pennylane-lightning-kokkos#installation>`_ for the requirements.
@@ -65,7 +125,7 @@ And use CMake flags ``-DQIR_STDLIB_LIB`` and ``-DQIR_STDLIB_INCLUDES`` to respec
 
 .. code-block:: console
 
-    make runtime qir_stdlib_dir=$(pwd)/qir-stdlib/target/release qir_stdlib_include_dir=$(pwd)/qir-stdlib/target/release/build/include
+    QIR_STDLIB_DIR=$(pwd)/qir-stdlib/target/release QIR_STDLIB_INCLUDES_DIR=$(pwd)/qir-stdlib/target/release/build/include make runtime
 
 To check the runtime test suite:
 
