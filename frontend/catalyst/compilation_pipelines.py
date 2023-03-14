@@ -417,7 +417,7 @@ class QJIT:
         compile_options (Optional[CompileOptions]): Common compilation options
     """
 
-    #pylint: disable=too-many-arguments
+    # pylint: disable=too-many-arguments
     def __init__(self, fn, target, keep_intermediate, passes, compile_options=None):
         self.qfunc = fn
         self.c_sig = None
