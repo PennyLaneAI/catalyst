@@ -274,44 +274,6 @@ class CompiledFunction:
         return np.copy(ranked_memref_to_numpy(memref_desc))
 
     @staticmethod
-    def ranked_memrefs_to_numpy(ranked_memrefs):
-        """Cast the ranked memrefs to numpy
-
-        Args:
-            ranked_memrefs: a list of memrefs
-
-        Returns:
-            a list of numpy arrays
-        """
-        # pylint: disable=redefined-outer-name
-        ranked_memref_to_numpy = CompiledFunction.ranked_memref_to_numpy
-        return [ranked_memref_to_numpy(ranked_memref) for ranked_memref in ranked_memrefs]
-
-    @staticmethod
-    def return_value_to_ranked_memrefs(return_value):
-        """Cast the return value to a list of ranked memrefs.
-
-        Args:
-            return_value: to a return value descriptor
-
-        Returns:
-            list of ranked memrefs
-        """
-        return [ctypes.pointer(memref) for memref in return_value]
-
-    @staticmethod
-    def return_value_ptr_to_ranked_memrefs(return_value_ptr):
-        """Cast the return value pointer to a list of ranked memrefs.
-
-        Args:
-            return_value_ptr: pointer to a return value descriptor
-
-        Returns:
-            list of ranked memrefs
-        """
-        return CompiledFunction.return_value_to_ranked_memrefs(return_value_ptr.contents)
-
-    @staticmethod
     def return_value_ptr_to_numpy(return_value_ptr):
         """Cast the return value pointer to a list of numpy arrays.
 
@@ -321,10 +283,13 @@ class CompiledFunction:
         Returns:
             list or single numpy array
         """
-        ranked_memrefs = CompiledFunction.return_value_ptr_to_ranked_memrefs(return_value_ptr)
-        return_value = CompiledFunction.ranked_memrefs_to_numpy(ranked_memrefs)
-        # TODO: Handle return types correctly. Tuple, lists of 1 item (?)
-        return return_value[0] if len(return_value) == 1 else return_value
+        return_value = return_value_ptr.contents
+        numpy_arrays = []
+        for memref in return_value:
+            memref_ptr = ctypes.pointer(memref)
+            numpy_array = CompiledFunction.ranked_memref_to_numpy(memref_ptr)
+            numpy_arrays.append(numpy_array)
+        return numpy_arrays[0] if len(numpy_arrays) == 1 else numpy_arrays
 
     @staticmethod
     def _exec(shared_object_file, func_name, has_return, *args):
