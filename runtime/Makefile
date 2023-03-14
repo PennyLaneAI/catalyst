@@ -100,7 +100,6 @@ endif
 .PHONY: check-tidy
 check-tidy: | qir
 	@echo "build Catalyst Runtime with RUNTIME_CLANG_TIDY=ON"
-	rm -rf
 	cmake -G Ninja -B $(MK_DIR)/BuildTidy . \
 		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
 		-DCMAKE_C_COMPILER=$(C_COMPILER) \
