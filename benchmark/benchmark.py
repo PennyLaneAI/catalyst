@@ -9,8 +9,9 @@ from traceback import print_exc
 
 import numpy as np
 
+from catalyst_benchmark.types import BooleanOptionalAction
 from catalyst_benchmark.measurements import (parse_args, selfcheck, REGISTRY, parse_implementation,
-                                             BenchmarkResult, with_alarm, BooleanOptionalAction)
+                                             BenchmarkResult, with_alarm)
 
 # fmt: off
 ap = ArgumentParser(prog="python3 benchmark.py")
