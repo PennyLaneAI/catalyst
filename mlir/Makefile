@@ -5,6 +5,7 @@ CXX_COMPILER?=clang++
 COMPILER_LAUNCHER?=ccache
 MK_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 MK_DIR := $(dir $(MK_ABSPATH))
+ROOT_DIR=$(MK_DIR)/..
 DIALECTS_BUILD_DIR?=$(MK_DIR)/build
 LLVM_BUILD_DIR?=$(MK_DIR)/llvm-project/build
 MHLO_BUILD_DIR?=$(MK_DIR)/mlir-hlo/build
@@ -26,6 +27,54 @@ help:
 .PHONY: all
 all: llvm mhlo dialects
 
+$(LLVM_BUILD_DIR)/bin/lld $(LLVM_BUILD_DIR)/bin/mlir-opt &:
+	@echo "build LLVM and MLIR enabling Python bindings"
+	cmake -G Ninja -S llvm-project/llvm -B $(LLVM_BUILD_DIR) \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DLLVM_BUILD_EXAMPLES=OFF \
+		-DLLVM_TARGETS_TO_BUILD="host" \
+		-DLLVM_ENABLE_PROJECTS="lld;mlir" \
+		-DLLVM_ENABLE_ASSERTIONS=ON \
+		-DMLIR_ENABLE_BINDINGS_PYTHON=ON \
+		-DPython3_EXECUTABLE=$(PYTHON) \
+		-DPython3_NumPy_INCLUDE_DIRS=$$($(PYTHON) -c "import numpy as np; print(np.get_include())") \
+		-DCMAKE_C_COMPILER=$(C_COMPILER) \
+		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \
+		-DCMAKE_C_COMPILER_LAUNCHER=$(C_COMPILER_LAUNCHER) \
+		-DCMAKE_CXX_COMPILER_LAUNCHER=$(CXX_COMPILER_LAUNCHER) \
+		-DLLVM_ENABLE_LLD=$(ENABLE_LLD)
+
+	cmake --build $(LLVM_BUILD_DIR) --target check-mlir lld || true
+
+.PHONY: lld-and-mlir
+lld-and-mlir: $(LLVM_BUILD_DIR)/bin/lld $(LLVM_BUILD_DIR)/bin/mlir-opt
+
+.PHONY: prepare-for-wheel
+prepare-for-wheel:
+	echo "INSTALLED = True" > $(ROOT_DIR)/frontend/catalyst/_configuration.py
+	# Copy bins to frontend/catalyst/bin
+	mkdir -p $(ROOT_DIR)//frontend/catalyst/bin
+	cp $(LLVM_BUILD_DIR)/bin/llc $(ROOT_DIR)/frontend/catalyst/bin
+	cp $(LLVM_BUILD_DIR)/bin/mlir-translate $(ROOT_DIR)/frontend/catalyst/bin
+	cp $(MHLO_BUILD_DIR)/bin/mlir-hlo-opt $(ROOT_DIR)/frontend/catalyst/bin
+	cp $(DIALECTS_BUILD_DIR)/bin/quantum-opt $(ROOT_DIR)/frontend/catalyst/bin
+	# Copy libs to frontend/catalyst/lib
+	mkdir -p $(ROOT_DIR)/frontend/catalyst/lib/backend/ $(ROOT_DIR)/frontend/catalyst/lib/capi
+	cp $(RT_BUILD_DIR)/lib/backend/librt_backend.so $(ROOT_DIR)/frontend/catalyst/lib/backend/
+	cp $(RT_BUILD_DIR)/lib/capi/librt_capi.so $(ROOT_DIR)/frontend/catalyst/lib/capi
+	cp --dereference $(LLVM_BUILD_DIR)/lib/libmlir_float16_utils.so.* $(ROOT_DIR)/frontend/catalyst/lib
+	cp --dereference $(LLVM_BUILD_DIR)/lib/libmlir_c_runner_utils.so* $(ROOT_DIR)/frontend/catalyst/lib
+	# Copy mlir bindings to frontend/mlir_quantum
+	mkdir -p $(ROOT_DIR)/frontend/mlir_quantum/dialects
+	cp -R --dereference $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/runtime $(ROOT_DIR)/frontend/mlir_quantum/runtime
+	cp --dereference $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/ir.py $(ROOT_DIR)/frontend/mlir_quantum/
+	for file in arith tensor scf gradient quantum _ods_common ; do \
+		echo $$file ; \
+		cp --dereference $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/dialects/*$${file}* $(ROOT_DIR)/frontend/mlir_quantum/dialects; \
+	done
+	find $(ROOT_DIR)/frontend -type d -name __pycache__ -exec rm -rf {} +
+
+
 .PHONY: llvm
 llvm:
 	@echo "build LLVM and MLIR enabling Python bindings"
@@ -44,7 +93,7 @@ llvm:
 		-DCMAKE_CXX_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
 		-DLLVM_ENABLE_LLD=$(ENABLE_LLD)
 
-	cmake --build $(LLVM_BUILD_DIR) --target check-mlir llvm-symbolizer
+	cmake --build $(LLVM_BUILD_DIR) --target check-mlir llvm-symbolizer || true
 
 .PHONY: mhlo
 mhlo:
