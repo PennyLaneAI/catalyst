@@ -18,7 +18,6 @@ compiling of hybrid quantum-classical functions using Catalyst.
 # pylint: disable=missing-module-docstring
 
 import ctypes
-import os
 import warnings
 import functools
 
