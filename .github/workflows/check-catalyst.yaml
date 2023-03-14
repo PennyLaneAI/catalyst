@@ -428,10 +428,12 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get -y -q install cmake ninja-build gcc-10 g++-10 libomp-dev lcov
-          echo "LIGHTNING_GIT_TAG_VALUE=latest_release" >> $GITHUB_ENV
+          echo "LIGHTNING_TAG_VALUE=latest_release" >> $GITHUB_ENV
+          echo "LIGHTNING_KOKKOS_TAG_VALUE=v0.29.1" >> $GITHUB_ENV
       - if: ${{ github.event_name == 'push' }}
         run: |
-          echo "LIGHTNING_GIT_TAG_VALUE=master" >> $GITHUB_ENV
+          echo "LIGHTNING_TAG_VALUE=master" >> $GITHUB_ENV
+          echo "LIGHTNING_KOKKOS_TAG_VALUE=main" >> $GITHUB_ENV
 
       - name: Download QIR-stdlib Artifact
         uses: actions/download-artifact@v3
@@ -447,6 +449,7 @@ jobs:
             CXX_COMPILER=$(which g++) \
             QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build/" \
             QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include/" \
+            LIGHTNING_GIT_TAG_VALUE=$LIGHTNING_TAG_VALUE \
             make coverage
             popd
             mv runtime/build/coverage.info coverage-${{ github.job }}.info
@@ -459,6 +462,7 @@ jobs:
             CXX_COMPILER=$(which g++) \
             QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build/" \
             QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include/" \
+            LIGHTNING_GIT_TAG_VALUE=$LIGHTNING_KOKKOS_TAG_VALUE \
             ENABLE_KOKKOS=ON \
             make test
             popd
