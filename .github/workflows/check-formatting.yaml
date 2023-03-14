@@ -6,7 +6,7 @@ on:
 
 jobs:
   format-python:
-    name: Python Formatting
+    name: Python Formatting & Linting
     runs-on: ubuntu-latest
 
     steps:

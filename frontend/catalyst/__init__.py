@@ -17,9 +17,6 @@ This package contains the Catalyst Python interface.
 
 
 from catalyst._version import __version__
-from catalyst.compiler import compile
-from catalyst.compilation_pipelines import qjit, QJIT
-from catalyst.pennylane_extensions import for_loop, while_loop, cond, measure, grad
 from catalyst._configuration import INSTALLED
 
 if not INSTALLED:
@@ -32,6 +29,15 @@ if not INSTALLED:
         import sys
 
         sys.path.insert(0, default_bindings_path)
+
+from catalyst.compilation_pipelines import qjit, QJIT  # pylint: disable=wrong-import-position
+from catalyst.pennylane_extensions import (  # pylint: disable=wrong-import-position
+    for_loop,
+    while_loop,
+    cond,
+    measure,
+    grad,
+)
 
 
 __all__ = (
