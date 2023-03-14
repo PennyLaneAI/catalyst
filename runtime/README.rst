@@ -9,7 +9,7 @@ quantum programs, and is currently backed by state-vector simulators
 and `Pennylane-Lightning-Kokkos <https://github.com/PennyLaneAI/pennylane-lightning-kokkos>`_.
 
 The runtime employs the `QuantumDevice <https://docs.pennylane.ai/projects/catalyst/en/stable/api/structCatalyst_1_1Runtime_1_1QuantumDevice.html#exhale-struct-structcatalyst-1-1runtime-1-1quantumdevice>`_
-public API that enables the extension of backend quantum devices. This API accommodates two collections of abstract methods as follows:
+public interface to support an extensible list of backend devices. This interface comprises two collections of abstract methods:
 
 - The Qubit management, device shot noise, and quantum tape recording methods are utilized for the implementation of Quantum Runtime (QR) instructions.
 
@@ -36,8 +36,8 @@ The directory is structured as follows:
 
 - `lib <https://github.com/PennyLaneAI/catalyst/tree/main/runtime/lib>`_:
     The core modules of the runtime are structured into ``lib/capi`` and ``lib/backend``.
-    `lib/capi <https://github.com/PennyLaneAI/catalyst/tree/main/runtime/lib/capi>`_  contains the source of the bridge between
-    QIR instructions in LLVM-IR and C++ backends. `lib/backend <https://github.com/PennyLaneAI/catalyst/tree/main/runtime/lib/backend>`_
+    `lib/capi <https://github.com/PennyLaneAI/catalyst/tree/main/runtime/lib/capi>`_  implements the bridge between
+    QIR instructions in LLVM-IR and C++ device backends. `lib/backend <https://github.com/PennyLaneAI/catalyst/tree/main/runtime/lib/backend>`_
     contains implementations of the ``QuantumDevice`` API for backend simulators.
 
 - `tests <https://github.com/PennyLaneAI/catalyst/tree/main/runtime/tests>`_:
@@ -46,8 +46,8 @@ The directory is structured as follows:
 Backend Devices
 ===============
 
-A new device can be added to the list of supported ones in the runtime by implementing the quantum device API.
-The following table shows the runtime official backend devices along with supported features:
+New device backends for the runtime can be realized by implementing the quantum device interface.
+The following table shows the available devices along with supported features:
 
 .. list-table::
    :widths: 25 25 25
@@ -87,7 +87,7 @@ The following table shows the runtime official backend devices along with suppor
 Requirements
 ============
 
-To build the runtime from source, it is required to have an up to date version of a C/C++ compiler such as gcc, clang, or MSVC
+To build the runtime from source, it is required to have an up to date version of a C/C++ compiler such as gcc or clang
 and the static library of ``stdlib`` from `qir-runner <https://github.com/qir-alliance/qir-runner/tree/main/stdlib>`_.
 
 The runtime leverages the ``stdlib`` Rust package for the QIR standard runtime instructions. To build this package from source,
