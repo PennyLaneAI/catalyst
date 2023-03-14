@@ -284,12 +284,13 @@ class CompiledFunction:
             list or single numpy array
         """
         return_value = return_value_ptr.contents
-        numpy_arrays = []
+        jax_arrays = []
         for memref in return_value:
             memref_ptr = ctypes.pointer(memref)
             numpy_array = CompiledFunction.ranked_memref_to_numpy(memref_ptr)
-            numpy_arrays.append(numpy_array)
-        return numpy_arrays[0] if len(numpy_arrays) == 1 else tuple(numpy_arrays)
+            jax_array = jax.numpy.asarray(numpy_array)
+            jax_arrays.append(jax_array)
+        return jax_arrays[0] if len(jax_arrays) == 1 else tuple(jax_arrays)
 
     @staticmethod
     def _exec(shared_object_file, func_name, has_return, *args):

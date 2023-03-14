@@ -304,7 +304,7 @@ class TestInterpretationControlFlow:
             return x_times_n
 
         mulc = qjit(muli)
-        assert mulc(1, 2) == muli(1, 2)
+        assert np.allclose(mulc(1, 2), muli(1, 2))
 
     # pylint: disable=missing-function-docstring
     def test_qnode_with_while_loop(self):
