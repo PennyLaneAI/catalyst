@@ -297,11 +297,7 @@ class CompiledFunction:
         Returns:
             list of ranked memrefs
         """
-        return_value_type = type(return_value)
-        # pylint: disable=protected-access
-        memref_descs = [getattr(return_value, field) for field, _ in return_value_type._fields_]
-        memrefs = [ctypes.pointer(memref_desc) for memref_desc in memref_descs]
-        return memrefs
+        return [ctypes.pointer(memref) for memref in return_value]
 
     @staticmethod
     def return_value_ptr_to_ranked_memrefs(return_value_ptr):
@@ -365,11 +361,7 @@ class CompiledFunction:
 
         if has_return:
             raw_return = args[0].contents
-            raw_return_type = type(raw_return)
-            # pylint: disable=protected-access
-            for field, _ in raw_return_type._fields_:
-                memref = getattr(raw_return, field)
-
+            for memref in raw_return:
                 is_constant = memref.allocated == 0xDEADBEEF
                 if is_constant:
                     continue
@@ -431,6 +423,11 @@ class CompiledFunction:
             """Programmatically create a structure which holds N tensors of possibly different T base types."""
 
             _fields_ = [("f" + str(i), type(t)) for i, t in enumerate(return_fields_types)]
+
+            def __iter__(self):
+                for f, _ in CompiledFunctionReturnValue._fields_:
+                    memref = getattr(self, f)
+                    yield memref
 
         return_value = CompiledFunctionReturnValue()
         return_value_pointer = ctypes.pointer(return_value)
