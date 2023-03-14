@@ -3,16 +3,16 @@ Unit tests for CompilerDriver class
 """
 
 import warnings
+import subprocess
 import pytest
 
 from catalyst.compiler import MHLOPass
 from catalyst.compiler import CompilerDriver
-import subprocess
 
 
 class TestMHLOPass:
     """Unit test for MHLOPass class."""
-
+    # pylint: disable=too-few-public-methods,missing-function-docstring
     def test_run_fails(self):
         with pytest.raises(subprocess.CalledProcessError):
             MHLOPass.run("non-existing.mlir")
