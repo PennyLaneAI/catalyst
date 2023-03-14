@@ -437,11 +437,14 @@ jobs:
         run: |
           echo "LIGHTNING_GIT_TAG_VALUE=master" >> $GITHUB_ENV
 
-      - name: Download QIR-stdlib Artifact
-        uses: actions/download-artifact@v3
+      - name: Get Cached qir-stdlib Build
+        id: cache-qir-stdlib
+        uses: actions/cache@v3
         with:
-          name: qir-stdlib-build
           path: ./runtime/qir-stdlib-build
+          key: Linux-qir-stdlib-build
+          enableCrossOsArchive: True
+          fail-on-cache-miss: True
 
       - name: Build Runtime test suite for Lightning simulator
         if: ${{ matrix.simulator == 'lightning' }}
