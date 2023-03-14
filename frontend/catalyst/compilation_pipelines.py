@@ -444,11 +444,12 @@ class QJIT:
             as soon as the QJIT instance is deleted.
     """
 
-    def __init__(self, fn, target, keep_intermediate):
+    def __init__(self, fn, target, keep_intermediate, passes):
         self.qfunc = fn
         self.c_sig = None
         functools.update_wrapper(self, fn)
         self._compiler = Compiler()
+        self.passes = passes
         self._jaxpr = None
         self._mlir = None
         self._llvmir = None
@@ -521,7 +522,7 @@ class QJIT:
         """Compile the current MLIR module."""
 
         shared_object = self._compiler.run(
-            self.mlir_module, keep_intermediate=self.keep_intermediate
+            self.mlir_module, keep_intermediate=self.keep_intermediate, passes=self.passes
         )
         self._llvmir = self._compiler.get_output_of("LLVMDialectToLLVMIR")
 
@@ -554,7 +555,7 @@ class QJIT:
         return self.compiled_function(*args, **kwargs)
 
 
-def qjit(fn=None, *, target="binary", keep_intermediate=False):
+def qjit(fn=None, *, target="binary", keep_intermediate=False, passes=None):
     """A just-in-time decorator for PennyLane and JAX programs using Catalyst.
 
     This decorator enables both just-in-time and ahead-of-time compilation,
@@ -639,9 +640,9 @@ def qjit(fn=None, *, target="binary", keep_intermediate=False):
     """
 
     if fn is not None:
-        return QJIT(fn, target, keep_intermediate)
+        return QJIT(fn, target, keep_intermediate, passes)
 
     def wrap_fn(fn):
-        return QJIT(fn, target, keep_intermediate)
+        return QJIT(fn, target, keep_intermediate, passes)
 
     return wrap_fn
