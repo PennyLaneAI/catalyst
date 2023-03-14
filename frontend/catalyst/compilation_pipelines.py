@@ -193,6 +193,11 @@ class CompiledFunction:
         function.restypes = None
         # Not needed, computed from the arguments.
         # function.argyptes
+
+        # free, as defined in stdlib.h
+        # free is not defined in the shared object, however
+        # it is declared and we can use this declaration to
+        # get a handle to it.
         free = shared_object.free
 
         return shared_object, function, setup, teardown, free
