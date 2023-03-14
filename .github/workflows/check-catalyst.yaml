@@ -389,28 +389,11 @@ jobs:
         MDD_BENCHMARK_PRECISION=1 \
         pytest demos/*.ipynb --nbmake -n auto
 
-    - name: Upload code coverage results
-      uses: actions/upload-artifact@v3
+    - name: Upload to Codecov
+      uses: codecov/codecov-action@v3
       with:
-        name: ubuntu-codecov-results-python
-        path: ./coverage-${{ github.job }}.xml
-
-  upload-to-codecov-linux-python:
-    name: Upload coverage data to codecov (Python)
-    needs: [frontend]
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Download coverage reports
-        uses: actions/download-artifact@v3
-        with:
-          name: ubuntu-codecov-results-python
-
-      - name: Upload to Codecov
-        uses: codecov/codecov-action@v3
-        with:
-          fail_ci_if_error: true
-          token: ${{ secrets.CODECOV_TOKEN }}
+        fail_ci_if_error: true
+        token: ${{ secrets.CODECOV_TOKEN }}
 
   runtime-tests:
     name: Runtime Tests (Linux)
@@ -492,24 +475,6 @@ jobs:
         run: |
             mkdir -p ./runtime/build/tests/results
             ./runtime/build/tests/runner_tests --reporter junit --out ./runtime/build/tests/results/tests_result.xml
-
-      - name: Upload tests
-        uses: actions/upload-artifact@v3
-        if: always()
-        with:
-          name: runtime-linux-test-report
-          path: ./runtime/build/tests/results/tests_result.xml
-
-  upload-to-codecov-linux-cpp:
-    name: Upload coverage data to codecov (C++)
-    needs: [runtime-tests]
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Download coverage reports
-        uses: actions/download-artifact@v3
-        with:
-          name: ubuntu-codecov-results-cpp
 
       - name: Upload to Codecov
         uses: codecov/codecov-action@v3
