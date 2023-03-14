@@ -79,7 +79,15 @@ class Mock(MagicMock):
         return MagicMock()
 
 
-MOCK_MODULES = ["mlir_quantum.runtime"]
+MOCK_MODULES = [
+    "mlir_quantum.runtime",
+    "mlir_quantum.dialects",
+    "mlir_quantum.dialects.arith",
+    "mlir_quantum.dialects.tensor",
+    "mlir_quantum.dialects.scf",
+    "mlir_quantum.dialects.quantum",
+    "mlir_quantum.dialects.gradient",
+]
 
 mock = Mock()
 for mod_name in MOCK_MODULES:

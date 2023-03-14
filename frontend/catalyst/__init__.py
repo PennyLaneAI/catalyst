@@ -15,12 +15,23 @@
 This package contains the Catalyst Python interface.
 """
 
-# pylint: disable=missing-module-docstring
 
 from catalyst._version import __version__
 from catalyst.compiler import compile
 from catalyst.compilation_pipelines import qjit, QJIT
 from catalyst.pennylane_extensions import for_loop, while_loop, cond, measure, grad
+from catalyst._configuration import INSTALLED
+
+if not INSTALLED:
+    import os
+
+    default_bindings_path = os.path.join(
+        os.path.dirname(__file__), "../../mlir/build/python_packages/quantum"
+    )
+    if os.path.exists(default_bindings_path):  # pragma: no cover
+        import sys
+
+        sys.path.insert(0, default_bindings_path)
 
 
 __all__ = (
