@@ -1,7 +1,7 @@
 \documentclass{article}
 
 % Preamble {{{
-\usepackage[a4paper, total={4in, 10in}]{geometry}
+\usepackage[a4paper, left=1.5in]{geometry}
 \usepackage{graphicx}
 \usepackage[utf8]{inputenc}
 \usepackage{mdframed}
@@ -26,7 +26,7 @@
 \newcommand{\TAG}{1003}
 \newcommand{\bmimage}[1]{
     \begin{center}
-    \includesvg[inkscapelatex=false,width=0.8\textwidth]{#1_\SYSHASH_\TAG}
+    \includesvg[inkscapelatex=false]{#1_\SYSHASH_\TAG}
     \end{center}}
 
 \usepackage[T1]{fontenc}

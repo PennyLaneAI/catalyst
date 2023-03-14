@@ -87,9 +87,9 @@ DIFF_METHODS = {
 ALIASES = {
     "catalyst/lightning.qubit": "C/L",
     "pennylane+jax/lightning.qubit": "PLjax/L",
+    "pennylane/lightning.qubit": "PL/L",
     "pennylane+jax/default.qubit.jax": "PLjax/Def",
     "pennylane/default.qubit": "PL/Def",
-    "pennylane/lightning.qubit": "PL/L",
 }
 
 C_L = ALIASES["catalyst/lightning.qubit"]
@@ -98,7 +98,7 @@ PLjax_L = ALIASES["pennylane+jax/lightning.qubit"]
 
 # Colors obtained from a Vega colorscheme.
 # Ref. https://stackoverflow.com/questions/70993559/altair-selecting-a-color-from-a-vega-color-scheme-for-plot
-COLORS = ["#e41a1c", "#377eb8", "#4daf4a", "#984ea3", "#ff7f00",
+COLORS = ["#e41a1c", "#377eb8", "#ff7f00", "#4daf4a", "#984ea3",
           "#ffff33", "#a65628", "#f781bf", "#999999"]
 # fmt:on
 
@@ -295,7 +295,7 @@ def plot(a: ParsedArguments, df_full: DataFrame, sysinfo=SYSINFO) -> None:
         implCLcond = alt.condition(f"datum.impl == '{C_L}'", alt.value(2), alt.value(0.7))
         implCLcondDash = alt.condition(f"datum.impl == '{C_L}'", alt.value([0]), alt.value([3, 3]))
 
-        def _implEncoding(df, add_timeout=False):
+        def _implEncoding(df, add_timeout=False, **kwargs):
             """Calculate domain and range colors of the implementation, based on
             the actual dataset and the pre-defined palette."""
             dom, rang = zip(
@@ -313,6 +313,7 @@ def plot(a: ParsedArguments, df_full: DataFrame, sysinfo=SYSINFO) -> None:
                 title="Impl",
                 legend=alt.Legend(columns=1, labelLimit=240),
                 scale=alt.Scale(domain=dom, range=rang),
+                **kwargs
             )
 
         trialEncoding = alt.Opacity(
@@ -555,7 +556,8 @@ def plot(a: ParsedArguments, df_full: DataFrame, sysinfo=SYSINFO) -> None:
                         Chart(df)
                         .mark_bar()
                         .encode(
-                            x=alt.X("impl", title=None),
+                            x=alt.X("impl", title=None,
+                                    sort=list(ALIASES.values())),
                             y=alt.Y("mean(time):Q",
                                     title="Mean time, sec",
                                     scale=alt.Scale(type="log")),
@@ -566,8 +568,9 @@ def plot(a: ParsedArguments, df_full: DataFrame, sysinfo=SYSINFO) -> None:
                             ),
                         ),
                         Chart().mark_errorbar(extent='stderr').encode(
-                            x=alt.X("impl", title=None),
-                            y=alt.Y("time:Q", title=None),
+                            x=alt.X("impl", title=None,
+                                    sort=list(ALIASES.values())),
+                            y=alt.Y("time:Q", title="Mean time, sec"),
                         ),
                         data=df
                     ).facet(
