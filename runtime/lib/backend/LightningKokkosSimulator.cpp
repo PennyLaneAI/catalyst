@@ -183,6 +183,40 @@ auto LightningKokkosSimulator::HamiltonianObservable(const std::vector<double> &
     return this->obs_manager.createHamiltonianObs(coeffs, obs);
 }
 
+// TODO: remove this kernel after merging the expval(const ObservableKokkos<T> &ob)
+// in PennyLane-Lightning-Kokkos
+template <class Precision> struct getRealOfComplexInnerProductFunctor {
+
+    Kokkos::View<Kokkos::complex<Precision> *> sv1;
+    Kokkos::View<Kokkos::complex<Precision> *> sv2;
+
+    getRealOfComplexInnerProductFunctor(Kokkos::View<Kokkos::complex<Precision> *> sv1_,
+                                        Kokkos::View<Kokkos::complex<Precision> *> sv2_)
+    {
+        sv1 = sv1_;
+        sv2 = sv2_;
+    }
+
+    KOKKOS_INLINE_FUNCTION
+    void operator()(const std::size_t k, Precision &inner) const
+    {
+        inner += real(conj(sv1[k]) * sv2[k]);
+    }
+};
+
+template <class Precision>
+inline auto getRealOfComplexInnerProduct(Kokkos::View<Kokkos::complex<Precision> *> sv1_vec,
+                                         Kokkos::View<Kokkos::complex<Precision> *> sv2_vec)
+    -> Precision
+{
+
+    assert(sv1_vec.size() == sv2_vec.size());
+    Precision inner = 0;
+    Kokkos::parallel_reduce(
+        sv1_vec.size(), getRealOfComplexInnerProductFunctor<Precision>(sv1_vec, sv2_vec), inner);
+    return inner;
+}
+
 auto LightningKokkosSimulator::Expval(ObsIdType obsKey) -> double
 {
     using UnmanagedComplexHostView = Kokkos::View<Kokkos::complex<double> *, Kokkos::HostSpace,
@@ -195,41 +229,12 @@ auto LightningKokkosSimulator::Expval(ObsIdType obsKey) -> double
         cache_manager.addObservable(obsKey, Lightning::Measurements::Expval);
     }
 
-    auto &&[obs, obs_type] = this->obs_manager.getObservable(obsKey);
+    auto &&obs = this->obs_manager.getObservable(obsKey);
 
-    if (obs_type != ObsType::Basic) {
-        std::cerr << "Warning: Expectation value of none-basic observables not supported yet in "
-                     "PennyLane-Lightning-Kokkos; the given observable is recorded for computing "
-                     "the runtime gradient algorithm."
-                  << std::endl;
-        return std::numeric_limits<double>::max();
-    }
-
-    auto &&obs_name = obs->getObsName();
-    size_t pos = obs_name.find_first_of("[0123456789");
-    if (pos != std::string::npos) {
-        obs_name = obs_name.substr(0, pos);
-    }
-
-    if (obs_name == "Hermitian") {
-        auto *obs_ptr = dynamic_cast<HermitianObsClassName<double> *>(obs.get());
-        auto &&obs_matrix = obs_ptr->getMatrix();
-        auto &&obs_wires = obs_ptr->getWires();
-
-        std::vector<Kokkos::complex<double>> matrix_kok;
-        matrix_kok.resize(obs_matrix.size());
-        std::transform(obs_matrix.begin(), obs_matrix.end(), matrix_kok.begin(),
-                       [](auto c) { return static_cast<Kokkos::complex<double>>(c); });
-
-        Kokkos::View<Kokkos::complex<double> *> hermitian_matrix("hermitian_matrix",
-                                                                 matrix_kok.size());
-        Kokkos::deep_copy(hermitian_matrix,
-                          UnmanagedComplexHostView(matrix_kok.data(), matrix_kok.size()));
-
-        return this->device_sv->getExpectationValueMultiQubitOp(hermitian_matrix, obs_wires);
-    }
-
-    return this->device_sv->getExpectationValue(obs_name, obs->getWires());
+    Pennylane::StateVectorKokkos<double> original_sv(this->device_sv->getNumQubits());
+    original_sv.DeviceToDevice(this->device_sv->getData());
+    obs->applyInPlace(original_sv);
+    return getRealOfComplexInnerProduct<double>(this->device_sv->getData(), original_sv.getData());
 }
 
 auto LightningKokkosSimulator::Var(ObsIdType obsKey) -> double
@@ -496,7 +501,7 @@ auto LightningKokkosSimulator::Gradient(const std::vector<size_t> &trainParams)
     std::vector<std::shared_ptr<Pennylane::Algorithms::ObservableKokkos<double>>> obs_vec;
     obs_vec.reserve(obs_keys.size());
     for (auto idx : obs_keys) {
-        obs_vec.emplace_back(std::get<0>(this->obs_manager.getObservable(idx)));
+        obs_vec.emplace_back(this->obs_manager.getObservable(idx));
     }
 
     std::vector<size_t> all_params;

@@ -84,6 +84,12 @@ template <typename PrecisionT> class LightningObsManager {
      */
     void clear() { this->observables_.clear(); }
 
+    /**
+     * @brief Check the validity of observable keys.
+     *
+     * @param obsKeys The vector of observable keys
+     * @return bool
+     */
     [[nodiscard]] auto isValidObservables(const std::vector<ObsIdType> &obsKeys) const -> bool
     {
         return std::all_of(obsKeys.begin(), obsKeys.end(), [this](auto i) {
@@ -91,14 +97,33 @@ template <typename PrecisionT> class LightningObsManager {
         });
     }
 
-    [[nodiscard]] auto getObservable(ObsIdType key) const -> const ObservablePairType &
+    /**
+     * @brief Get the constructed observable instance.
+     *
+     * @param key The observable key
+     * @return std::shared_ptr<ObservableClassName<PrecisionT>
+     */
+    [[nodiscard]] auto getObservable(ObsIdType key)
+        -> std::shared_ptr<ObservableClassName<PrecisionT>>
     {
         QFailIf(!this->isValidObservables({key}), "Invalid observable key");
-        return this->observables_[reinterpret_cast<int64_t>(key)];
+        return std::get<0>(this->observables_[reinterpret_cast<int64_t>(key)]);
     }
 
+    /**
+     * @brief Get the number of observables.
+     *
+     * @return size_t
+     */
     [[nodiscard]] auto numObservables() const -> size_t { return this->observables_.size(); }
 
+    /**
+     * @brief Create and cache a new NamedObs instance.
+     *
+     * @param obsId The named observable id of type ObsId
+     * @param wires The vector of wires the observable acts on
+     * @return ObsIdType
+     */
     [[nodiscard]] auto createNamedObs(ObsId obsId, const std::vector<size_t> &wires) -> ObsIdType
     {
         auto &&obs_str =
@@ -110,6 +135,13 @@ template <typename PrecisionT> class LightningObsManager {
         return static_cast<ObsIdType>(this->observables_.size() - 1);
     }
 
+    /**
+     * @brief Create and cache a new HermitianObs instance.
+     *
+     * @param matrix The row-wise Hermitian matrix
+     * @param wires The vector of wires the observable acts on
+     * @return ObsIdType
+     */
     [[nodiscard]] auto createHermitianObs(const std::vector<std::complex<PrecisionT>> &matrix,
                                           const std::vector<size_t> &wires) -> ObsIdType
     {
@@ -121,6 +153,12 @@ template <typename PrecisionT> class LightningObsManager {
         return static_cast<ObsIdType>(this->observables_.size() - 1);
     }
 
+    /**
+     * @brief Create and cache a new TensorProd instance.
+     *
+     * @param obsKeys The vector of observable keys
+     * @return ObsIdType
+     */
     [[nodiscard]] auto createTensorProdObs(const std::vector<ObsIdType> &obsKeys) -> ObsIdType
     {
         const auto key_size = obsKeys.size();
@@ -149,6 +187,13 @@ template <typename PrecisionT> class LightningObsManager {
         return static_cast<ObsIdType>(obs_size);
     }
 
+    /**
+     * @brief Create and cache a new HamiltonianObs instance.
+     *
+     * @param coeffs The vector of coefficients
+     * @param obsKeys The vector of observable keys
+     * @return ObsIdType
+     */
     [[nodiscard]] auto createHamiltonianObs(const std::vector<PrecisionT> &coeffs,
                                             const std::vector<ObsIdType> &obsKeys) -> ObsIdType
     {

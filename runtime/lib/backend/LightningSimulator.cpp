@@ -172,7 +172,7 @@ auto LightningSimulator::HamiltonianObservable(const std::vector<double> &coeffs
 auto LightningSimulator::Expval(ObsIdType obsKey) -> double
 {
     QFailIf(!this->obs_manager.isValidObservables({obsKey}), "Invalid key for cached observables");
-    auto &&[obs, _] = this->obs_manager.getObservable(obsKey);
+    auto &&obs = this->obs_manager.getObservable(obsKey);
 
     // update tape caching
     if (this->cache_recording) {
@@ -188,7 +188,7 @@ auto LightningSimulator::Var(ObsIdType obsKey) -> double
 {
     QFailIf(!this->obs_manager.isValidObservables({obsKey}), "Invalid key for cached observables");
 
-    auto &&[obs, _] = this->obs_manager.getObservable(obsKey);
+    auto &&obs = this->obs_manager.getObservable(obsKey);
 
     // update tape caching
     if (this->cache_recording) {
@@ -480,7 +480,7 @@ auto LightningSimulator::Gradient(const std::vector<size_t> &trainParams)
     std::vector<std::shared_ptr<Pennylane::Simulators::Observable<double>>> obs_vec;
     obs_vec.reserve(obs_keys.size());
     for (auto idx : obs_keys) {
-        obs_vec.emplace_back(std::get<0>(this->obs_manager.getObservable(idx)));
+        obs_vec.emplace_back(this->obs_manager.getObservable(idx));
     }
 
     std::vector<size_t> all_params;

@@ -541,12 +541,7 @@ TEST_CASE("Test __quantum__qis__TensorProdObs and Expval", "[qir_lightning_core]
 
     REQUIRE(obs_t == 2);
 
-#if defined(_KOKKOS)
-    constexpr double dbl_max = std::numeric_limits<double>::max();
-    REQUIRE(__quantum__qis__Expval(obs_t) == Approx(dbl_max).margin(1e-5));
-#else
     REQUIRE(__quantum__qis__Expval(obs_t) == Approx(1.5864438048).margin(1e-5));
-#endif
 
     free(state);
     delete result;
@@ -635,12 +630,7 @@ TEST_CASE("Test __quantum__qis__HamiltonianObs(h, x) and Expval", "[qir_lightnin
 
     REQUIRE(obs_hamiltonian == 2);
 
-#if defined(_KOKKOS)
-    constexpr double dbl_max = std::numeric_limits<double>::max();
-    REQUIRE(__quantum__qis__Expval(obs_hamiltonian) == Approx(dbl_max).margin(1e-5));
-#else
     REQUIRE(__quantum__qis__Expval(obs_hamiltonian) == Approx(1.1938250042).margin(1e-5));
-#endif
 
     free(state);
     delete result;
@@ -700,12 +690,7 @@ TEST_CASE("Test __quantum__qis__HamiltonianObs(t) and Expval", "[qir_lightning_c
 
     REQUIRE(obs_hamiltonian == 3);
 
-#if defined(_KOKKOS)
-    constexpr double dbl_max = std::numeric_limits<double>::max();
-    REQUIRE(__quantum__qis__Expval(obs_hamiltonian) == Approx(dbl_max).margin(1e-5));
-#else
     REQUIRE(__quantum__qis__Expval(obs_hamiltonian) == Approx(0.6345775219).margin(1e-5));
-#endif
 
     free(state);
     delete result;

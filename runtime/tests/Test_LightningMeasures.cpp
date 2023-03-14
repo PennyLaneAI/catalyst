@@ -188,16 +188,9 @@ TEST_CASE("Expval(TensorProd(NamedObs)) test", "[lightning]")
     ObsIdType tpy = sim->TensorObservable({py});
     ObsIdType tpz = sim->TensorObservable({pz});
 
-#if !defined(_KOKKOS)
     REQUIRE(sim->Expval(tpx) == Approx(1.0).margin(1e-5));
     REQUIRE(sim->Expval(tpy) == Approx(.0).margin(1e-5));
     REQUIRE(sim->Expval(tpz) == Approx(-1.0).margin(1e-5));
-#else
-    constexpr double dbl_max = std::numeric_limits<double>::max();
-    REQUIRE(sim->Expval(tpx) == Approx(dbl_max).margin(1e-5));
-    REQUIRE(sim->Expval(tpy) == Approx(dbl_max).margin(1e-5));
-    REQUIRE(sim->Expval(tpz) == Approx(dbl_max).margin(1e-5));
-#endif
 }
 
 TEST_CASE("Expval(TensorProd(NamedObs[])) test", "[lightning]")
@@ -226,14 +219,8 @@ TEST_CASE("Expval(TensorProd(NamedObs[])) test", "[lightning]")
     REQUIRE_THROWS_WITH(sim->TensorObservable({px, py, pz}),
                         Catch::Contains("All wires in observables must be disjoint."));
 
-#if !defined(_KOKKOS)
     REQUIRE(sim->Expval(tpxy) == Approx(0.0).margin(1e-5));
     REQUIRE(sim->Expval(tpxz) == Approx(-1.0).margin(1e-5));
-#else
-    constexpr double dbl_max = std::numeric_limits<double>::max();
-    REQUIRE(sim->Expval(tpxy) == Approx(dbl_max).margin(1e-5));
-    REQUIRE(sim->Expval(tpxz) == Approx(dbl_max).margin(1e-5));
-#endif
 }
 
 TEST_CASE("Expval(TensorProd(HermitianObs))", "[lightning]")
@@ -259,14 +246,8 @@ TEST_CASE("Expval(TensorProd(HermitianObs))", "[lightning]")
     ObsIdType tph1 = sim->TensorObservable({h1});
     ObsIdType tph2 = sim->TensorObservable({h2});
 
-#if !defined(_KOKKOS)
     REQUIRE(sim->Expval(tph1) == Approx(.0).margin(1e-5));
     REQUIRE(sim->Expval(tph2) == Approx(.0).margin(1e-5));
-#else
-    constexpr double dbl_max = std::numeric_limits<double>::max();
-    REQUIRE(sim->Expval(tph1) == Approx(dbl_max).margin(1e-5));
-    REQUIRE(sim->Expval(tph2) == Approx(dbl_max).margin(1e-5));
-#endif
 }
 
 TEST_CASE("Expval(TensorProd(HermitianObs[]))", "[lightning]")
@@ -291,12 +272,7 @@ TEST_CASE("Expval(TensorProd(HermitianObs[]))", "[lightning]")
     ObsIdType h2 = sim->Observable(ObsId::Hermitian, mat2, {Qs[0]});
     ObsIdType tp = sim->TensorObservable({h1, h2});
 
-#if !defined(_KOKKOS)
     REQUIRE(sim->Expval(tp) == Approx(.0).margin(1e-5));
-#else
-    constexpr double dbl_max = std::numeric_limits<double>::max();
-    REQUIRE(sim->Expval(tp) == Approx(dbl_max).margin(1e-5));
-#endif
 }
 
 TEST_CASE("Expval(TensorProd(Obs[]))", "[lightning]")
@@ -324,12 +300,7 @@ TEST_CASE("Expval(TensorProd(Obs[]))", "[lightning]")
     ObsIdType h = sim->Observable(ObsId::Hermitian, mat2, {Qs[0]});
     ObsIdType tp = sim->TensorObservable({px, h, pz});
 
-#if !defined(_KOKKOS)
     REQUIRE(sim->Expval(tp) == Approx(-3.0).margin(1e-5));
-#else
-    constexpr double dbl_max = std::numeric_limits<double>::max();
-    REQUIRE(sim->Expval(tp) == Approx(dbl_max).margin(1e-5));
-#endif
 }
 
 TEST_CASE("Expval(Hamiltonian(NamedObs[])) test", "[lightning]")
@@ -354,12 +325,7 @@ TEST_CASE("Expval(Hamiltonian(NamedObs[])) test", "[lightning]")
     ObsIdType pz = sim->Observable(ObsId::PauliZ, {}, {Qs[1]});
     ObsIdType hxyz = sim->HamiltonianObservable({0.4, 0.8, 0.2}, {px, py, pz});
 
-#if !defined(_KOKKOS)
     REQUIRE(sim->Expval(hxyz) == Approx(0.2).margin(1e-5));
-#else
-    constexpr double dbl_max = std::numeric_limits<double>::max();
-    REQUIRE(sim->Expval(hxyz) == Approx(dbl_max).margin(1e-5));
-#endif
 }
 
 TEST_CASE("Expval(Hamiltonian(TensorObs[])) test", "[lightning]")
@@ -386,12 +352,7 @@ TEST_CASE("Expval(Hamiltonian(TensorObs[])) test", "[lightning]")
     ObsIdType tpxz = sim->TensorObservable({px, pz});
     ObsIdType hxyz = sim->HamiltonianObservable({0.2, 0.6}, {tpxy, tpxz});
 
-#if !defined(_KOKKOS)
     REQUIRE(sim->Expval(hxyz) == Approx(-.6).margin(1e-5));
-#else
-    constexpr double dbl_max = std::numeric_limits<double>::max();
-    REQUIRE(sim->Expval(hxyz) == Approx(dbl_max).margin(1e-5));
-#endif
 }
 
 TEST_CASE("Expval(Hamiltonian(Hermitian[])) test", "[lightning]")
@@ -418,12 +379,7 @@ TEST_CASE("Expval(Hamiltonian(Hermitian[])) test", "[lightning]")
     ObsIdType h = sim->Observable(ObsId::Hermitian, mat2, {Qs[0]});
     ObsIdType hxhz = sim->HamiltonianObservable({0.2, 0.3, 0.6}, {px, h, pz});
 
-#if !defined(_KOKKOS)
     REQUIRE(sim->Expval(hxhz) == Approx(0.5).margin(1e-5));
-#else
-    constexpr double dbl_max = std::numeric_limits<double>::max();
-    REQUIRE(sim->Expval(hxhz) == Approx(dbl_max).margin(1e-5));
-#endif
 }
 
 TEST_CASE("Expval(Hamiltonian({TensorProd, Hermitian}[])) test", "[lightning]")
@@ -451,12 +407,7 @@ TEST_CASE("Expval(Hamiltonian({TensorProd, Hermitian}[])) test", "[lightning]")
     ObsIdType h = sim->Observable(ObsId::Hermitian, mat2, {Qs[0]});
     ObsIdType hhtp = sim->HamiltonianObservable({0.5, 0.3}, {h, tp});
 
-#if !defined(_KOKKOS)
     REQUIRE(sim->Expval(hhtp) == Approx(1.2).margin(1e-5));
-#else
-    constexpr double dbl_max = std::numeric_limits<double>::max();
-    REQUIRE(sim->Expval(hhtp) == Approx(dbl_max).margin(1e-5));
-#endif
 }
 
 TEST_CASE("Var test with numWires=4", "[lightning]")
