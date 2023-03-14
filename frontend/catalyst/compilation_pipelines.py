@@ -193,8 +193,9 @@ class CompiledFunction:
         function.restypes = None
         # Not needed, computed from the arguments.
         # function.argyptes
+        free = shared_object.free
 
-        return shared_object, function, setup, teardown
+        return shared_object, function, setup, teardown, free
 
     @staticmethod
     def get_runtime_signature(*args):
@@ -342,9 +343,13 @@ class CompiledFunction:
         Returns:
             retval: the value computed by the function or None if the function has no return value
         """
-        shared_object, function, setup, teardown = CompiledFunction.load_symbols(
+        shared_object, function, setup, teardown, free = CompiledFunction.load_symbols(
             shared_object_file, func_name
         )
+
+        numpy_managed_memory = set()
+        for arg in args[1:]:
+            numpy_managed_memory.add(arg.contents.allocated)
 
         params_to_setup = [b"jitted-function"]
         argc = len(params_to_setup)
@@ -357,6 +362,24 @@ class CompiledFunction:
 
         result = args[0] if has_return else None
         retval = CompiledFunction.return_value_ptr_to_numpy(result) if result else None
+
+        if has_return:
+            raw_return = args[0].contents
+            raw_return_type = type(raw_return)
+            # pylint: disable=protected-access
+            for field, _ in raw_return_type._fields_:
+                memref = getattr(raw_return, field)
+
+                is_constant = memref.allocated == 0xDEADBEEF
+                if is_constant:
+                    continue
+
+                if memref.allocated in numpy_managed_memory:
+                    continue
+
+                pointer_type = ctypes.POINTER(ctypes.c_int)
+                pointer_to_free = ctypes.cast(memref.allocated, pointer_type)
+                free(pointer_to_free)
 
         # Unmap the shared library. This is necessary in case the function is re-compiled.
         # Without unmapping the shared library, there would be a conflict in the name of
