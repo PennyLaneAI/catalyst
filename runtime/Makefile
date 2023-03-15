@@ -6,14 +6,20 @@ MK_DIR := $(dir $(MK_ABSPATH))
 RT_BUILD_DIR?=$(MK_DIR)/build
 QIR_STDLIB_DIR?=$(MK_DIR)/qir-stdlib/target/release/
 QIR_STDLIB_INCLUDES_DIR?=$(MK_DIR)/qir-stdlib/target/release/build/include/
-LIGHTNING_GIT_TAG_VALUE?=latest_release
-CODE_COVERAGE?=OFF
 ENABLE_KOKKOS?=OFF
+ifeq ($(ENABLE_KOKKOS),OFF)
+	LIGHTNING_GIT_TAG_VALUE?=latest_release
+else
+	# TODO: Update this after the latest_release tag is added to Lightning-Kokkos
+	LIGHTNING_GIT_TAG_VALUE?=v0.29.1
+endif
+CODE_COVERAGE?=OFF
 BUILD_TYPE?=Release
 
 coverage: CODE_COVERAGE=ON
 coverage: BUILD_TYPE=Debug
-test: BUILD_TYPE=Debug
+test: CODE_COVERAGE=OFF
+test: BUILD_TYPE=Release
 
 .PHONY: help
 help:
@@ -99,12 +105,12 @@ endif
 .PHONY: check-tidy
 check-tidy: | qir
 	@echo "build Catalyst Runtime with RUNTIME_CLANG_TIDY=ON"
-	rm -rf 
 	cmake -G Ninja -B $(MK_DIR)/BuildTidy . \
+		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
 		-DCMAKE_C_COMPILER=$(C_COMPILER) \
 		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \
 		-DQIR_STDLIB_LIB=$(QIR_STDLIB_DIR) \
 		-DQIR_STDLIB_INCLUDES=$(QIR_STDLIB_INCLUDES_DIR) \
-		-DRUNTIME_CLANG_TIDY=ON 
+		-DRUNTIME_CLANG_TIDY=ON
 
 	cmake --build $(MK_DIR)/BuildTidy --target rt_capi -j$(if $(nprocs:-=),$(nprocs),$$(nproc))

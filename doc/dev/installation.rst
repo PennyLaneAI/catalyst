@@ -181,5 +181,5 @@ To check Catalyst modules and the compiler test suites in Catalyst:
 
   make test
 
-You can also check each module test suite by using ``test-frontend``,
+You can also check each module test suite by using the ``test-frontend``,
 ``test-dialects``, and ``test-runtime`` Make targets.

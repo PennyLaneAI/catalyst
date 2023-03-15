@@ -40,7 +40,8 @@ set(common_tests_src    Test_QubitManager.cpp
                         Test_LightningDriver.cpp
                         Test_LightningGateSet.cpp
                         Test_LightningCoreQIS.cpp
-                        Test_LightningMeasures.cpp)
+                        Test_LightningMeasures.cpp
+                        Test_LightningGradient.cpp)
 
 if(ENABLE_CODE_COVERAGE)
     set(cov_helper_src  coverage_helper.cpp)
@@ -55,8 +56,7 @@ else()
     target_sources(runner_tests PRIVATE ${common_tests_src}
                                     ${cov_helper_src}
                                     Test_SVDynamicCPU_Core.cpp
-                                    Test_SVDynamicCPU_Allocation.cpp
-                                    Test_LightningGradient.cpp)
+                                    Test_SVDynamicCPU_Allocation.cpp)
 endif()
 
 if(PLKOKKOS_ENABLE_OPENMP)

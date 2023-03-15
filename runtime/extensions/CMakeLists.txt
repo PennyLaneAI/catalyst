@@ -6,10 +6,12 @@ include(FetchContent)
 if(ENABLE_LIGHTNING_KOKKOS)
     set(CMAKE_CXX_EXTENSIONS OFF)
 
+    set(LIGHTNING_GIT_TAG "main" CACHE STRING "GIT_TAG value to build Lightning-Kokkos")
+
     FetchContent_Declare(
         pennylane_lightning_kokkos
         GIT_REPOSITORY https://github.com/PennyLaneAI/pennylane-lightning-kokkos.git
-        GIT_TAG      v0.27.0
+        GIT_TAG        ${LIGHTNING_GIT_TAG}
     )
     set(Kokkos_ENABLE_OPENMP OFF CACHE BOOL "Build Lightning-Kokkos using OpenMP kernels")
     set(Kokkos_ENABLE_THREADS OFF CACHE BOOL "Build Lightning-Kokkos using Threads kernels")
@@ -25,7 +27,7 @@ else()
     set(ENABLE_OPENMP ON)
     set(source_files "StateVectorDynamicCPU.cpp")
 
-    set(LIGHTNING_GIT_TAG "latest_release" CACHE STRING "GIT_TAG value to build Lightning")
+    set(LIGHTNING_GIT_TAG "master" CACHE STRING "GIT_TAG value to build Lightning")
 
     FetchContent_Declare(
         pennylane_lightning

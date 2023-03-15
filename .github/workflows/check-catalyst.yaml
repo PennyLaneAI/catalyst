@@ -23,13 +23,22 @@ jobs:
       - name: Checkout Catalyst repo
         uses: actions/checkout@v3
 
+      - name: Cache qir-stdlib Build
+        id: cache-qir-stdlib
+        uses: actions/cache@v3
+        with:
+          path: ./runtime/qir-stdlib-build
+          key: ${{ runner.os }}-qir-stdlib-build
+
       - name: Install rustup with llvm-tools-preview
+        if: steps.cache-qir-stdlib.outputs.cache-hit != 'true'
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
           components: llvm-tools-preview
 
       - name: Install QIR-stdlib
+        if: steps.cache-qir-stdlib.outputs.cache-hit != 'true'
         run: |
             cd ./runtime/qir-stdlib
             cargo build --release --verbose
@@ -37,13 +46,6 @@ jobs:
             cp ./target/release/libqir_stdlib.a ../qir-stdlib-build/
             cp ./target/release/build/include/* ../qir-stdlib-build/include/
             cargo clean
-
-      - name: Upload QIR-stdlib Artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: qir-stdlib-build
-          path: ./runtime/qir-stdlib-build
-          retention-days: 1
 
   runtime:
     name: Catalyst-Runtime
@@ -67,11 +69,13 @@ jobs:
         run: |
           echo "LIGHTNING_GIT_TAG_VALUE=master" >> $GITHUB_ENV
 
-      - name: Download QIR-stdlib Artifact
-        uses: actions/download-artifact@v3
+      - name: Get Cached qir-stdlib Build
+        id: cache-qir-stdlib
+        uses: actions/cache@v3
         with:
-          name: qir-stdlib-build
           path: ./runtime/qir-stdlib-build
+          key: Linux-qir-stdlib-build
+          fail-on-cache-miss: True
 
       - name: Build Catalyst-Runtime
         run: |
@@ -126,8 +130,7 @@ jobs:
         enableCrossOsArchive: True
 
     - name: Clone LLVM Submodule
-      if: |
-        steps.cache-llvm-source.outputs.cache-hit != 'true'
+      if: steps.cache-llvm-source.outputs.cache-hit != 'true'
       uses: actions/checkout@v3
       with:
         repository: llvm/llvm-project
@@ -385,28 +388,11 @@ jobs:
         MDD_BENCHMARK_PRECISION=1 \
         pytest demos/*.ipynb --nbmake -n auto
 
-    - name: Upload code coverage results
-      uses: actions/upload-artifact@v3
+    - name: Upload to Codecov
+      uses: codecov/codecov-action@v3
       with:
-        name: ubuntu-codecov-results-python
-        path: ./coverage-${{ github.job }}.xml
-
-  upload-to-codecov-linux-python:
-    name: Upload coverage data to codecov (Python)
-    needs: [frontend]
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Download coverage reports
-        uses: actions/download-artifact@v3
-        with:
-          name: ubuntu-codecov-results-python
-
-      - name: Upload to Codecov
-        uses: codecov/codecov-action@v3
-        with:
-          fail_ci_if_error: true
-          token: ${{ secrets.CODECOV_TOKEN }}
+        fail_ci_if_error: true
+        token: ${{ secrets.CODECOV_TOKEN }}
 
   runtime-tests:
     name: Runtime Tests (Linux)
@@ -428,16 +414,21 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get -y -q install cmake ninja-build gcc-10 g++-10 libomp-dev lcov
-          echo "LIGHTNING_GIT_TAG_VALUE=latest_release" >> $GITHUB_ENV
+          echo "LIGHTNING_TAG_VALUE=latest_release" >> $GITHUB_ENV
+          # TODO: Update this after the latest_release tag is added to Lightning-Kokkos
+          echo "LIGHTNING_KOKKOS_TAG_VALUE=v0.29.1" >> $GITHUB_ENV
       - if: ${{ github.event_name == 'push' }}
         run: |
-          echo "LIGHTNING_GIT_TAG_VALUE=master" >> $GITHUB_ENV
+          echo "LIGHTNING_TAG_VALUE=master" >> $GITHUB_ENV
+          echo "LIGHTNING_KOKKOS_TAG_VALUE=main" >> $GITHUB_ENV
 
-      - name: Download QIR-stdlib Artifact
-        uses: actions/download-artifact@v3
+      - name: Get Cached qir-stdlib Build
+        id: cache-qir-stdlib
+        uses: actions/cache@v3
         with:
-          name: qir-stdlib-build
           path: ./runtime/qir-stdlib-build
+          key: Linux-qir-stdlib-build
+          fail-on-cache-miss: True
 
       - name: Build Runtime test suite for Lightning simulator
         if: ${{ matrix.simulator == 'lightning' }}
@@ -447,6 +438,7 @@ jobs:
             CXX_COMPILER=$(which g++) \
             QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build/" \
             QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include/" \
+            LIGHTNING_GIT_TAG_VALUE=$LIGHTNING_TAG_VALUE \
             make coverage
             popd
             mv runtime/build/coverage.info coverage-${{ github.job }}.info
@@ -459,6 +451,7 @@ jobs:
             CXX_COMPILER=$(which g++) \
             QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build/" \
             QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include/" \
+            LIGHTNING_GIT_TAG_VALUE=$LIGHTNING_KOKKOS_TAG_VALUE \
             ENABLE_KOKKOS=ON \
             make test
             popd
@@ -486,25 +479,8 @@ jobs:
             mkdir -p ./runtime/build/tests/results
             ./runtime/build/tests/runner_tests --reporter junit --out ./runtime/build/tests/results/tests_result.xml
 
-      - name: Upload tests
-        uses: actions/upload-artifact@v3
-        if: always()
-        with:
-          name: runtime-linux-test-report
-          path: ./runtime/build/tests/results/tests_result.xml
-
-  upload-to-codecov-linux-cpp:
-    name: Upload coverage data to codecov (C++)
-    needs: [runtime-tests]
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Download coverage reports
-        uses: actions/download-artifact@v3
-        with:
-          name: ubuntu-codecov-results-cpp
-
       - name: Upload to Codecov
+        if: ${{ matrix.simulator == 'lightning' }}
         uses: codecov/codecov-action@v3
         with:
           fail_ci_if_error: true

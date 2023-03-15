@@ -47,18 +47,20 @@ dialects:
 runtime:
 	$(MAKE) -C runtime all
 
-.PHONY: test test-runtime test-dialects test-frontend test-demos
-test: test-runtime test-dialects test-frontend test-demos
+.PHONY: test test-runtime test-frontend lit pytest test-demos
+test: test-runtime test-frontend test-demos
 
 test-runtime:
 	$(MAKE) -C runtime test
 
-test-dialects:
-	$(MAKE) -C mlir test
+test-frontend: lit pytest
 
-test-frontend:
-	@echo "check the Catalyst lit and Python test suites"
+lit:
+	@echo "check the Catalyst lit test suite"
 	cmake --build $(DIALECTS_BUILD_DIR) --target check-frontend
+
+pytest:
+	@echo "check the Catalyst PyTest suite"
 	$(PYTHON) pytest frontend/test/pytest --tb=native -n auto
 
 test-demos:
@@ -69,13 +71,13 @@ test-demos:
 .PHONY: clean clean-all
 clean:
 	@echo "uninstall catalyst and delete all temporary and cache files"
-	$(PYTHON) pip uninstall -y catalyst
+	$(PYTHON) pip uninstall -y pennylane-catalyst
 	rm -rf dist __pycache__
 	rm -rf .coverage coverage_html_report
 
 clean-all:
 	@echo "uninstall catalyst and delete all temporary, cache files"
-	$(PYTHON) pip uninstall -y catalyst
+	$(PYTHON) pip uninstall -y pennylane-catalyst
 	rm -rf dist __pycache__
 	rm -rf .coverage coverage_html_report/
 	$(MAKE) -C mlir clean
