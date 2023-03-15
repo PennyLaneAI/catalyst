@@ -66,14 +66,14 @@ The following table shows the available devices along with supported features:
      - ``Identity``, ``PauliX``, ``PauliY``, ``PauliZ``, ``Hadamard``, ``Hermitian``, ``Hamiltonian``, and Tensor Product of Observables
      - ``Identity``, ``PauliX``, ``PauliY``, ``PauliZ``, ``Hadamard``, ``Hermitian``, ``Hamiltonian``, and Tensor Product of Observables
    * - Expectation Value
-     - All observables; Not supported finite-shots
-     - All observables; Not supported finite-shots
+     - All observables; Finite-shots not supported
+     - All observables; Finite-shots not supported
    * - Variance
-     - Only for ``Identity``, ``PauliX``, ``PauliY``, ``PauliZ``, and ``Hadamard``; Not supported finite-shots
+     - Only for ``Identity``, ``PauliX``, ``PauliY``, ``PauliZ``, and ``Hadamard``; Finite-shots not supported
      - Not supported
    * - Probability
-     - Only for the computational basis on the supplied qubits; Not supported finite-shots
-     - Only for the computational basis on the supplied qubits; Not supported finite-shots
+     - Only for the computational basis on the supplied qubits; Finite-shots not supported
+     - Only for the computational basis on the supplied qubits; Finite-shots not supported
    * - Sampling
      - Only for the computational basis on the supplied qubits
      - Only for the computational basis on the supplied qubits
@@ -81,8 +81,8 @@ The following table shows the available devices along with supported features:
      - Only for the computational basis on the supplied qubit
      - Only for the computational basis on the supplied qubit
    * - Gradient
-     - The Adjoint-Jacobian method supporting all observables
-     - The Adjoint-Jacobian method supporting all observables
+     - The Adjoint-Jacobian method for expectation values on all observables
+     - The Adjoint-Jacobian method for expectation values on all observables
 
 Requirements
 ============
