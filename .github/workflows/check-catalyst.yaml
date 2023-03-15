@@ -383,7 +383,7 @@ jobs:
     - name: Check Catalyst Demos
       run: |
         MDD_BENCHMARK_PRECISION=1 \
-        pytest demos/*.ipynb --nbmake -n auto
+        pytest demos --nbmake -n auto
 
     - name: Upload code coverage results
       uses: actions/upload-artifact@v3
