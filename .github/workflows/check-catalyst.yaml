@@ -386,7 +386,7 @@ jobs:
     - name: Check Catalyst Demos
       run: |
         MDD_BENCHMARK_PRECISION=1 \
-        pytest demos/*.ipynb --nbmake -n auto
+        pytest demos --nbmake -n auto
 
     - name: Upload to Codecov
       uses: codecov/codecov-action@v3
