@@ -75,7 +75,6 @@ jobs:
         with:
           path: ./runtime/qir-stdlib-build
           key: Linux-qir-stdlib-build
-          enableCrossOsArchive: True
           fail-on-cache-miss: True
 
       - name: Build Catalyst-Runtime
@@ -426,7 +425,6 @@ jobs:
         with:
           path: ./runtime/qir-stdlib-build
           key: Linux-qir-stdlib-build
-          enableCrossOsArchive: True
           fail-on-cache-miss: True
 
       - name: Build Runtime test suite for Lightning simulator

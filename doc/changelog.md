@@ -4,6 +4,9 @@
 
 <h3>Improvements</h3>
 
+* Build the runtime against qir-stdlib v0.1.0.
+  [#58](https://github.com/PennyLaneAI/catalyst/pull/58)
+
 <h3>Breaking changes</h3>
 
 <h3>Bug fixes</h3>
@@ -16,6 +19,7 @@
 
 This release contains contributions from (in alphabetical order):
 
+Ali Asadi,
 Erick Ochoa Lopez.
 
 # Release 0.1.1
