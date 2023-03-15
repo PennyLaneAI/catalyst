@@ -41,6 +41,7 @@ int main(int argc, char **argv)
     registry.insert<mlir::tensor::TensorDialect>();
     registry.insert<mlir::linalg::LinalgDialect>();
     registry.insert<mlir::index::IndexDialect>();
+    registry.insert<mlir::bufferization::BufferizationDialect>();
     registry.insert<catalyst::quantum::QuantumDialect>();
     registry.insert<catalyst::gradient::GradientDialect>();
     // Add the following to include *all* MLIR Core dialects, or selectively
