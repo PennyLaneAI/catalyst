@@ -457,6 +457,13 @@ jobs:
             make test
             popd
 
+      - name: Upload code coverage results
+        if: ${{ matrix.simulator == 'lightning' }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: ubuntu-codecov-results-cpp
+          path: ./coverage-${{ github.job }}.info
+
       - name: Build examples
         if: ${{ matrix.simulator == 'lightning' }}
         run: |
