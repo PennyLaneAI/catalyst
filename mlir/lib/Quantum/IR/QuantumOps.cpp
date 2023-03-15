@@ -29,6 +29,15 @@ using namespace catalyst::quantum;
 #include "Quantum/IR/QuantumOps.cpp.inc"
 
 //===----------------------------------------------------------------------===//
+// Quantum op interfaces.
+//===----------------------------------------------------------------------===//
+
+Optional<Operation *> AllocOp::buildDealloc(OpBuilder &builder, Value alloc)
+{
+    return builder.create<DeallocOp>(alloc.getLoc(), alloc).getOperation();
+}
+
+//===----------------------------------------------------------------------===//
 // Quantum op canonicalizers.
 //===----------------------------------------------------------------------===//
 

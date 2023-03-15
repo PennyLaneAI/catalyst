@@ -82,7 +82,7 @@ bufferization_pass_pipeline = [
     "--func-bufferize",
     "--finalizing-bufferize",
     "--buffer-hoisting",
-    # "--buffer-deallocation",
+    "--buffer-deallocation",
     "--convert-bufferization-to-memref",
     "--canonicalize",
     "--cse",
