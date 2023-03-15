@@ -399,6 +399,7 @@ jobs:
     needs: [runtime-qir-stdlib]
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         simulator: ['lightning', 'lightning-kokkos']
 
