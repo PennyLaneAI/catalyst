@@ -63,24 +63,24 @@ The following table shows the available devices along with supported features:
      - `Lightning operations <https://github.com/PennyLaneAI/pennylane-lightning/blob/master/pennylane_lightning/src/gates/GateOperation.hpp>`_
      - `Lightning operations <https://github.com/PennyLaneAI/pennylane-lightning/blob/master/pennylane_lightning/src/gates/GateOperation.hpp>`_
    * - Quantum Observables
-     - ``Identity``, ``PauliX``, ``PauliY``, ``PauliZ``, ``Hadamard``, ``Hermitian``, ``Hamiltonian``, Tensor Product of Observables
-     - ``Identity``, ``PauliX``, ``PauliY``, ``PauliZ``, ``Hadamard``, ``Hermitian``, ``Hamiltonian``, Tensor Product of Observables
+     - ``Identity``, ``PauliX``, ``PauliY``, ``PauliZ``, ``Hadamard``, ``Hermitian``, ``Hamiltonian``, and Tensor Product of Observables
+     - ``Identity``, ``PauliX``, ``PauliY``, ``PauliZ``, ``Hadamard``, ``Hermitian``, ``Hamiltonian``, and Tensor Product of Observables
    * - Expectation Value
-     - All observables
-     - All observables
+     - All observables; Not supported finite-shots
+     - All observables; Not supported finite-shots
    * - Variance
-     - ``Identity``, ``PauliX``, ``PauliY``, ``PauliZ``
+     - Only for ``Identity``, ``PauliX``, ``PauliY``, ``PauliZ``, and ``Hadamard``; Not supported finite-shots
      - Not supported
+   * - Probability
+     - Only for the computational basis on the supplied qubits; Not supported finite-shots
+     - Only for the computational basis on the supplied qubits; Not supported finite-shots
    * - Sampling
-     - Only for the computational basis on the supplied qubits
-     - Only for the computational basis on the supplied qubits
-   * - Probabilities
      - Only for the computational basis on the supplied qubits
      - Only for the computational basis on the supplied qubits
    * - Mid-Circuit Measurement
      - Only for the computational basis on the supplied qubit
      - Only for the computational basis on the supplied qubit
-   * - Gradients
+   * - Gradient
      - The Adjoint-Jacobian method supporting all observables
      - The Adjoint-Jacobian method supporting all observables
 
