@@ -194,7 +194,13 @@ class CompiledFunction:
         # Not needed, computed from the arguments.
         # function.argyptes
 
-        return shared_object, function, setup, teardown
+        # free, as defined in stdlib.h
+        # free is not defined in the shared object, however
+        # it is declared and we can use this declaration to
+        # get a handle to it.
+        free = shared_object.free
+
+        return shared_object, function, setup, teardown, free
 
     @staticmethod
     def get_runtime_signature(*args):
@@ -273,48 +279,6 @@ class CompiledFunction:
         return np.copy(ranked_memref_to_numpy(memref_desc))
 
     @staticmethod
-    def ranked_memrefs_to_numpy(ranked_memrefs):
-        """Cast the ranked memrefs to numpy
-
-        Args:
-            ranked_memrefs: a list of memrefs
-
-        Returns:
-            a list of numpy arrays
-        """
-        # pylint: disable=redefined-outer-name
-        ranked_memref_to_numpy = CompiledFunction.ranked_memref_to_numpy
-        return [ranked_memref_to_numpy(ranked_memref) for ranked_memref in ranked_memrefs]
-
-    @staticmethod
-    def return_value_to_ranked_memrefs(return_value):
-        """Cast the return value to a list of ranked memrefs.
-
-        Args:
-            return_value: to a return value descriptor
-
-        Returns:
-            list of ranked memrefs
-        """
-        return_value_type = type(return_value)
-        # pylint: disable=protected-access
-        memref_descs = [getattr(return_value, field) for field, _ in return_value_type._fields_]
-        memrefs = [ctypes.pointer(memref_desc) for memref_desc in memref_descs]
-        return memrefs
-
-    @staticmethod
-    def return_value_ptr_to_ranked_memrefs(return_value_ptr):
-        """Cast the return value pointer to a list of ranked memrefs.
-
-        Args:
-            return_value_ptr: pointer to a return value descriptor
-
-        Returns:
-            list of ranked memrefs
-        """
-        return CompiledFunction.return_value_to_ranked_memrefs(return_value_ptr.contents)
-
-    @staticmethod
     def return_value_ptr_to_numpy(return_value_ptr):
         """Cast the return value pointer to a list of numpy arrays.
 
@@ -324,10 +288,14 @@ class CompiledFunction:
         Returns:
             list or single numpy array
         """
-        ranked_memrefs = CompiledFunction.return_value_ptr_to_ranked_memrefs(return_value_ptr)
-        return_value = CompiledFunction.ranked_memrefs_to_numpy(ranked_memrefs)
-        # TODO: Handle return types correctly. Tuple, lists of 1 item (?)
-        return return_value[0] if len(return_value) == 1 else return_value
+        return_value = return_value_ptr.contents
+        jax_arrays = []
+        for memref in return_value:
+            memref_ptr = ctypes.pointer(memref)
+            numpy_array = CompiledFunction.ranked_memref_to_numpy(memref_ptr)
+            jax_array = jax.numpy.asarray(numpy_array)
+            jax_arrays.append(jax_array)
+        return jax_arrays[0] if len(jax_arrays) == 1 else tuple(jax_arrays)
 
     @staticmethod
     def _exec(shared_object_file, func_name, has_return, *args):
@@ -342,9 +310,13 @@ class CompiledFunction:
         Returns:
             retval: the value computed by the function or None if the function has no return value
         """
-        shared_object, function, setup, teardown = CompiledFunction.load_symbols(
+        shared_object, function, setup, teardown, free = CompiledFunction.load_symbols(
             shared_object_file, func_name
         )
+
+        numpy_managed_memory = set()
+        for arg in args[1:]:
+            numpy_managed_memory.add(arg.contents.allocated)
 
         params_to_setup = [b"jitted-function"]
         argc = len(params_to_setup)
@@ -357,6 +329,20 @@ class CompiledFunction:
 
         result = args[0] if has_return else None
         retval = CompiledFunction.return_value_ptr_to_numpy(result) if result else None
+
+        if has_return:
+            raw_return = args[0].contents
+            for memref in raw_return:
+                is_constant = memref.allocated == 0xDEADBEEF
+                if is_constant:
+                    continue
+
+                if memref.allocated in numpy_managed_memory:
+                    continue
+
+                pointer_type = ctypes.POINTER(ctypes.c_int)
+                pointer_to_free = ctypes.cast(memref.allocated, pointer_type)
+                free(pointer_to_free)
 
         # Unmap the shared library. This is necessary in case the function is re-compiled.
         # Without unmapping the shared library, there would be a conflict in the name of
@@ -408,6 +394,11 @@ class CompiledFunction:
             """Programmatically create a structure which holds N tensors of possibly different T base types."""
 
             _fields_ = [("f" + str(i), type(t)) for i, t in enumerate(return_fields_types)]
+
+            def __iter__(self):
+                for f, _ in CompiledFunctionReturnValue._fields_:
+                    memref = getattr(self, f)
+                    yield memref
 
         return_value = CompiledFunctionReturnValue()
         return_value_pointer = ctypes.pointer(return_value)
