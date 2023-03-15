@@ -12,19 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "RuntimeCAPI.h"
-#include "Types.h"
-
-#include "LightningSimulator.hpp"
+#include "LightningUtils.hpp"
 #include "QuantumDevice.hpp"
-#include "TestHelpers.hpp"
+#include "RuntimeCAPI.h"
 
-#include "AdjointDiff.hpp"
-#include "StateVectorRawCPU.hpp"
-#include "Util.hpp"
-
-using namespace Pennylane;
-using namespace Pennylane::Algorithms;
+#include <catch2/catch.hpp>
 
 using namespace Catalyst::Runtime;
 
@@ -49,8 +41,6 @@ TEST_CASE("Test __quantum__qis__Gradient_params with numAlloc=0", "[Gradient]")
 
 TEST_CASE("Test __quantum__qis__Gradient_params for zero number of obs", "[Gradient]")
 {
-    using Catalyst::Runtime::Simulator::Lightning::SimulatorGate;
-
     // Test qis__Gradient:
     int64_t trainParams[1] = {0};
     MemRefT_double_1d *results = new MemRefT_double_1d();
@@ -82,8 +72,6 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
           "with invalid results",
           "[Gradient]")
 {
-    using Catalyst::Runtime::Simulator::Lightning::SimulatorGate;
-
     // Test qis__Gradient:
     int64_t trainParams[1] = {0};
     MemRefT_double_1d *results = new MemRefT_double_1d();
@@ -122,8 +110,6 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
           "with Var",
           "[Gradient]")
 {
-    using Catalyst::Runtime::Simulator::Lightning::SimulatorGate;
-
     // Test qis__Gradient:
     int64_t trainParams[1] = {0};
     MemRefT_double_1d *results = new MemRefT_double_1d();
@@ -143,6 +129,10 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
 
     auto obs = __quantum__qis__NamedObs(ObsId::PauliZ, q);
 
+#if defined(_KOKKOS)
+    REQUIRE_THROWS_WITH(__quantum__qis__Variance(obs),
+                        Catch::Contains("Variance not implemented in PennyLane-Lightning-Kokkos"));
+#else
     __quantum__qis__Variance(obs);
 
     REQUIRE_THROWS_WITH(__quantum__qis__Gradient(1, results),
@@ -150,6 +140,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
 
     REQUIRE_THROWS_WITH(__quantum__qis__Gradient_params(tp, 1, results),
                         Catch::Contains("Unsupported measurements to compute gradient"));
+#endif
 
     __quantum__rt__toggle_recorder(/* activate_cm */ false);
 
@@ -162,48 +153,6 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
           "Op=RX, Obs=Z",
           "[Gradient]")
 {
-    using Catalyst::Runtime::Simulator::Lightning::SimulatorGate;
-
-    constexpr size_t num_qubits = 1;
-    constexpr size_t num_params = 1;
-    constexpr size_t num_obs = 1;
-
-    const std::vector<size_t> tp{0};
-    const size_t numAlloc = num_obs * tp.size();
-
-    const auto obs =
-        std::make_shared<Pennylane::Simulators::NamedObs<double>>("PauliZ", std::vector<size_t>{0});
-    std::vector<double> jacobian(numAlloc, 0);
-
-    auto ops = OpsData<double>({"RX"}, {{-M_PI / 7}}, {{0}}, {false});
-
-    std::vector<std::complex<double>> cdata(1U << num_qubits);
-    cdata[0] = std::complex<double>{1, 0};
-
-    StateVectorRawCPU<double> psi(cdata.data(), cdata.size());
-
-    JacobianData<double> tape{num_params, psi.getLength(), psi.getData(), {obs}, ops, tp};
-
-    adjointJacobian(std::span{jacobian}, tape, true);
-
-    // AdjointJacobianKokkos<double> adj;
-
-    // auto obs = ObsDatum<double>({"PauliZ"}, {{}}, {{0}});
-
-    // std::vector<std::vector<double>> jacobian(
-    //     num_obs, std::vector<double>(num_params, 0));
-
-    // StateVectorKokkos<double> psi(num_qubits);
-
-    // auto ops = adj.createOpsData({"RX"}, {{-M_PI / 7}}, {{0}}, {false});
-
-    // TODO: the adjoint jacobian in Lightning-Kokkos randomly fails
-    // when -- Kokkos Devices: SERIAL, Kokkos Backends: SERIAL
-    // adj.adjointJacobian(psi, jacobian, {obs}, ops, tp, true);
-
-    CAPTURE(jacobian);
-    CHECK(-sin(-M_PI / 7) == Approx(jacobian[0]));
-
     // Test qis__Gradient:
     int64_t trainParams[1] = {0};
     MemRefT_double_1d *result = new MemRefT_double_1d();
@@ -213,9 +162,6 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     tp_memref->data_allocated = trainParams;
     tp_memref->sizes[0] = 1;
     tp_memref->strides[0] = 0;
-
-    // double *result = new double[numAlloc];
-    // double *result_tp = new double[numAlloc];
 
     __quantum__rt__initialize();
 
@@ -235,8 +181,8 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
 
     __quantum__rt__toggle_recorder(/* activate_cm */ false);
 
-    CHECK(jacobian[0] == Approx(result_tp->data_aligned[0]));
-    CHECK(jacobian[0] == Approx(result->data_aligned[0]));
+    CHECK(-sin(-M_PI / 7) == Approx(result_tp->data_aligned[0]));
+    CHECK(-sin(-M_PI / 7) == Approx(result->data_aligned[0]));
 
     __quantum__rt__finalize();
     delete result_tp;
@@ -248,34 +194,6 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
           "Op=RX, Obs=Hermitian",
           "[Gradient]")
 {
-    using Catalyst::Runtime::Simulator::Lightning::SimulatorGate;
-
-    constexpr size_t num_qubits = 1;
-    constexpr size_t num_params = 1;
-    constexpr size_t num_obs = 1;
-
-    const std::vector<size_t> tp{0};
-    const size_t numAlloc = num_obs * tp.size();
-
-    const std::vector<std::complex<double>> matrix{{1.0, 0.0}, {0.0, 0.0}, {2.0, 0.0}, {0.0, 0.0}};
-    const auto obs = std::make_shared<Pennylane::Simulators::HermitianObs<double>>(
-        Pennylane::Simulators::HermitianObs<double>{matrix, std::vector<size_t>{0}});
-    std::vector<double> jacobian(numAlloc, 0);
-
-    auto ops = OpsData<double>({"RX"}, {{-M_PI / 7}}, {{0}}, {false});
-
-    std::vector<std::complex<double>> cdata(1U << num_qubits);
-    cdata[0] = std::complex<double>{1, 0};
-
-    StateVectorRawCPU<double> psi(cdata.data(), cdata.size());
-
-    JacobianData<double> tape{num_params, psi.getLength(), psi.getData(), {obs}, ops, tp};
-
-    adjointJacobian(std::span{jacobian}, tape, true);
-
-    CAPTURE(jacobian);
-    CHECK(jacobian[0] == Approx(0.2169418696));
-
     // Test qis__Gradient:
     int64_t trainParams[1] = {0};
     MemRefT_double_1d *result = new MemRefT_double_1d();
@@ -314,8 +232,9 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
 
     __quantum__rt__toggle_recorder(/* activate_cm */ false);
 
-    CHECK(jacobian[0] == Approx(result_tp->data_aligned[0]));
-    CHECK(jacobian[0] == Approx(result->data_aligned[0]));
+    const double expected{0.2169418696};
+    CHECK(expected == Approx(result_tp->data_aligned[0]));
+    CHECK(expected == Approx(result->data_aligned[0]));
 
     __quantum__rt__finalize();
     delete result_tp;
@@ -328,33 +247,9 @@ TEST_CASE("Test __quantum__qis__Gradient_params and __quantum__qis__Gradient "
           "Op=RY, Obs=X",
           "[Gradient]")
 {
-    using Catalyst::Runtime::Simulator::Lightning::SimulatorGate;
-
-    std::vector<double> param{-M_PI / 7, M_PI / 5, 2 * M_PI / 3};
-    std::vector<size_t> tp{0};
-    const size_t num_qubits = 1;
-    const size_t num_params = 3;
-    const size_t num_obs = 1;
-
-    const auto obs =
-        std::make_shared<Pennylane::Simulators::NamedObs<double>>("PauliX", std::vector<size_t>{0});
-    std::vector<double> jacobian(num_obs * tp.size(), 0);
+    const std::vector<double> param{-M_PI / 7, M_PI / 5, 2 * M_PI / 3};
 
     for (const auto &p : param) {
-        auto ops = OpsData<double>({"RY"}, {{p}}, {{0}}, {false});
-
-        std::vector<std::complex<double>> cdata(1U << num_qubits);
-        cdata[0] = std::complex<double>{1, 0};
-
-        StateVectorRawCPU<double> psi(cdata.data(), cdata.size());
-
-        JacobianData<double> tape{num_params, psi.getLength(), psi.getData(), {obs}, ops, tp};
-
-        adjointJacobian(std::span{jacobian}, tape, true);
-
-        CAPTURE(jacobian);
-        CHECK(cos(p) == Approx(jacobian[0]).margin(1e-5));
-
         // Test qis__Gradient:
         int64_t trainParams[1] = {0};
         MemRefT_double_1d *result = new MemRefT_double_1d();
@@ -383,8 +278,8 @@ TEST_CASE("Test __quantum__qis__Gradient_params and __quantum__qis__Gradient "
 
         __quantum__rt__toggle_recorder(/* activate_cm */ false);
 
-        CHECK(jacobian[0] == Approx(result_tp->data_aligned[0]).margin(1e-5));
-        CHECK(jacobian[0] == Approx(result->data_aligned[0]).margin(1e-5));
+        CHECK(cos(p) == Approx(result_tp->data_aligned[0]).margin(1e-5));
+        CHECK(cos(p) == Approx(result->data_aligned[0]).margin(1e-5));
 
         __quantum__rt__finalize();
         delete result_tp;
@@ -397,37 +292,12 @@ TEST_CASE("Test __quantum__qis__Gradient_params Op=[Hadamard,RZ,RY,RZ,S,T,ParamS
           "Obs=[X]",
           "[Gradient]")
 {
-    using Catalyst::Runtime::Simulator::Lightning::SimulatorGate;
-
-    std::vector<double> param{0.3, 0.7, 0.4};
-    std::vector<size_t> tp{0, 1, 2};
-    const size_t num_qubits = 2;
-    const size_t num_params = 3;
-    const size_t num_obs = 1;
-
-    const size_t numAlloc = num_obs * tp.size();
-
-    std::vector<double> jacobian(numAlloc, 0);
-
-    std::vector<std::complex<double>> cdata(1U << num_qubits);
-    StateVectorRawCPU<double> psi(cdata.data(), cdata.size());
-    cdata[0] = std::complex<double>{1, 0};
-
-    const auto obs =
-        std::make_shared<Pennylane::Simulators::NamedObs<double>>("PauliX", std::vector<size_t>{0});
-
-    auto ops = OpsData<double>(
-        {"Hadamard", "RZ", "RY", "RZ", "S", "T"}, {{}, {param[0]}, {param[1]}, {param[2]}, {}, {}},
-        {{0}, {0}, {0}, {0}, {0}, {0}}, {false, false, false, false, false, false});
-
-    JacobianData<double> tape{num_params, psi.getLength(), psi.getData(), {obs}, ops, tp};
-
-    adjointJacobian(std::span{jacobian}, tape, true);
-
-    CAPTURE(jacobian);
-    CHECK(-0.1496908292 == Approx(jacobian[0]).margin(1e-5));
-    CHECK(0.5703010745 == Approx(jacobian[1]).margin(1e-5));
-    CHECK(-0.0008403297 == Approx(jacobian[2]).margin(1e-5));
+    const std::vector<double> param{0.3, 0.7, 0.4};
+    const std::vector<double> expected{
+        -0.1496908292,
+        0.5703010745,
+        -0.0008403297,
+    };
 
     // Test qis__Gradient:
     int64_t trainParams[3] = {0, 1, 2};
@@ -463,13 +333,13 @@ TEST_CASE("Test __quantum__qis__Gradient_params Op=[Hadamard,RZ,RY,RZ,S,T,ParamS
 
     __quantum__rt__toggle_recorder(/* activate_cm */ false);
 
-    CHECK(jacobian[0] == Approx(result_tp->data_aligned[0]).margin(1e-5));
-    CHECK(jacobian[1] == Approx(result_tp->data_aligned[1]).margin(1e-5));
-    CHECK(jacobian[2] == Approx(result_tp->data_aligned[2]).margin(1e-5));
+    CHECK(expected[0] == Approx(result_tp->data_aligned[0]).margin(1e-5));
+    CHECK(expected[1] == Approx(result_tp->data_aligned[1]).margin(1e-5));
+    CHECK(expected[2] == Approx(result_tp->data_aligned[2]).margin(1e-5));
 
-    CHECK(jacobian[0] == Approx(result->data_aligned[0]).margin(1e-5));
-    CHECK(jacobian[1] == Approx(result->data_aligned[1]).margin(1e-5));
-    CHECK(jacobian[2] == Approx(result->data_aligned[2]).margin(1e-5));
+    CHECK(expected[0] == Approx(result->data_aligned[0]).margin(1e-5));
+    CHECK(expected[1] == Approx(result->data_aligned[1]).margin(1e-5));
+    CHECK(expected[2] == Approx(result->data_aligned[2]).margin(1e-5));
 
     __quantum__rt__finalize();
     delete result;
@@ -479,33 +349,6 @@ TEST_CASE("Test __quantum__qis__Gradient_params Op=[Hadamard,RZ,RY,RZ,S,T,ParamS
 
 TEST_CASE("Test __quantum__qis__Gradient Op=[RX,CY], Obs=[Z,Z]", "[Gradient]")
 {
-    using Catalyst::Runtime::Simulator::Lightning::SimulatorGate;
-
-    std::vector<size_t> tp{0};
-    const size_t num_qubits = 2;
-    const size_t num_params = 1;
-    const size_t num_obs = 2;
-    std::vector<double> jacobian(num_obs * tp.size(), 0);
-
-    std::vector<std::complex<double>> cdata(1U << num_qubits);
-    StateVectorRawCPU<double> psi(cdata.data(), cdata.size());
-    cdata[0] = std::complex<double>{1, 0};
-
-    const auto obs1 =
-        std::make_shared<Pennylane::Simulators::NamedObs<double>>("PauliZ", std::vector<size_t>{0});
-    const auto obs2 =
-        std::make_shared<Pennylane::Simulators::NamedObs<double>>("PauliZ", std::vector<size_t>{1});
-
-    auto ops = OpsData<double>({"RX", "CY"}, {{-M_PI / 7}, {}}, {{0}, {0, 1}}, {false, false});
-
-    JacobianData<double> tape{num_params, psi.getLength(), psi.getData(), {obs1, obs2}, ops, tp};
-
-    adjointJacobian(std::span{jacobian}, tape, true);
-
-    CAPTURE(jacobian);
-    CHECK(-sin(-M_PI / 7) == Approx(jacobian[0]).margin(1e-5));
-    CHECK(0.4338837391 == Approx(jacobian[1 * num_obs - 1]).margin(1e-5));
-
     // Test qis__Gradient:
     int64_t trainParams[1] = {0};
     MemRefT_double_1d *result0 = new MemRefT_double_1d();
@@ -536,8 +379,9 @@ TEST_CASE("Test __quantum__qis__Gradient Op=[RX,CY], Obs=[Z,Z]", "[Gradient]")
 
     __quantum__rt__toggle_recorder(/* activate_cm */ false);
 
-    CHECK(jacobian[0] == Approx(result0->data_aligned[0]).margin(1e-5));
-    CHECK(jacobian[1 * num_obs - 1] == Approx(result1->data_aligned[0]).margin(1e-5));
+    const std::vector<double> expected{-sin(-M_PI / 7), 0.4338837391};
+    CHECK(expected[0] == Approx(result0->data_aligned[0]).margin(1e-5));
+    CHECK(expected[1] == Approx(result1->data_aligned[0]).margin(1e-5));
 
     __quantum__rt__finalize();
     delete result0;
@@ -547,38 +391,8 @@ TEST_CASE("Test __quantum__qis__Gradient Op=[RX,CY], Obs=[Z,Z]", "[Gradient]")
 
 TEST_CASE("Test __quantum__qis__Gradient_params Op=[RX,RX,RX,CZ], Obs=[Z,Z,Z]", "[Gradient]")
 {
-    using Catalyst::Runtime::Simulator::Lightning::SimulatorGate;
-
-    std::vector<double> param{-M_PI / 7, M_PI / 5, 2 * M_PI / 3};
-    std::vector<size_t> tp{0, 1, 2};
-    const size_t num_qubits = 3;
-    const size_t num_params = 3;
-    const size_t num_obs = 3;
-    std::vector<double> jacobian(num_obs * tp.size(), 0);
-
-    std::vector<std::complex<double>> cdata(1U << num_qubits);
-    StateVectorRawCPU<double> psi(cdata.data(), cdata.size());
-    cdata[0] = std::complex<double>{1, 0};
-
-    const auto obs1 =
-        std::make_shared<Pennylane::Simulators::NamedObs<double>>("PauliZ", std::vector<size_t>{0});
-    const auto obs2 =
-        std::make_shared<Pennylane::Simulators::NamedObs<double>>("PauliZ", std::vector<size_t>{1});
-    const auto obs3 =
-        std::make_shared<Pennylane::Simulators::NamedObs<double>>("PauliZ", std::vector<size_t>{2});
-
-    auto ops = OpsData<double>({"RX", "RX", "RX", "CZ"}, {{param[0]}, {param[1]}, {param[2]}, {}},
-                               {{0}, {1}, {2}, {0, 2}}, {false, false, false, false});
-
-    JacobianData<double> tape{num_params, psi.getLength(), psi.getData(), {obs1, obs2, obs3}, ops,
-                              tp};
-
-    adjointJacobian(std::span{jacobian}, tape, true);
-
-    CAPTURE(jacobian);
-    CHECK(-sin(param[0]) == Approx(jacobian[0]).margin(1e-5));
-    CHECK(-sin(param[1]) == Approx(jacobian[1 * num_params + 1]).margin(1e-5));
-    CHECK(-sin(param[2]) == Approx(jacobian[2 * num_params + 2]).margin(1e-5));
+    const std::vector<double> param{-M_PI / 7, M_PI / 5, 2 * M_PI / 3};
+    const std::vector<double> expected{-sin(param[0]), -sin(param[1]), -sin(param[2])};
 
     // Test qis__Gradient:
     int64_t trainParams[3] = {0, 1, 2};
@@ -616,9 +430,9 @@ TEST_CASE("Test __quantum__qis__Gradient_params Op=[RX,RX,RX,CZ], Obs=[Z,Z,Z]", 
 
     __quantum__rt__toggle_recorder(/* activate_cm */ false);
 
-    CHECK(jacobian[0] == Approx(result0->data_aligned[0]).margin(1e-5));
-    CHECK(jacobian[1 * num_params + 1] == Approx(result1->data_aligned[1]).margin(1e-5));
-    CHECK(jacobian[2 * num_params + 2] == Approx(result2->data_aligned[2]).margin(1e-5));
+    CHECK(expected[0] == Approx(result0->data_aligned[0]).margin(1e-5));
+    CHECK(expected[1] == Approx(result1->data_aligned[1]).margin(1e-5));
+    CHECK(expected[2] == Approx(result2->data_aligned[2]).margin(1e-5));
 
     __quantum__rt__finalize();
     delete result0;
@@ -628,58 +442,17 @@ TEST_CASE("Test __quantum__qis__Gradient_params Op=[RX,RX,RX,CZ], Obs=[Z,Z,Z]", 
 }
 
 TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
-          "Op=Mixed, Obs=[ZZZ]",
+          "Op=Mixed, Obs=X@X@X",
           "[Gradient]")
 {
-    using Catalyst::Runtime::Simulator::Lightning::SimulatorGate;
-
-    std::vector<double> param{-M_PI / 7, M_PI / 5, 2 * M_PI / 3};
-    std::vector<size_t> tp{0, 1, 2, 3, 4, 5};
-    const size_t num_qubits = 3;
-    const size_t num_params = 6;
-    const size_t num_obs = 3;
-
-    std::vector<double> jacobian(num_obs * tp.size(), 0);
-
-    std::vector<std::complex<double>> cdata(1U << num_qubits);
-    StateVectorRawCPU<double> psi(cdata.data(), cdata.size());
-    cdata[0] = std::complex<double>{1, 0};
-
-    const auto obs1 =
-        std::make_shared<Pennylane::Simulators::NamedObs<double>>("PauliZ", std::vector<size_t>{0});
-    const auto obs2 =
-        std::make_shared<Pennylane::Simulators::NamedObs<double>>("PauliZ", std::vector<size_t>{1});
-    const auto obs3 =
-        std::make_shared<Pennylane::Simulators::NamedObs<double>>("PauliZ", std::vector<size_t>{2});
-
-    auto ops = OpsData<double>(
-        {"RZ", "RY", "RZ", "CNOT", "CNOT", "RZ", "RY", "RZ"},
-        {{param[0]}, {param[1]}, {param[2]}, {}, {}, {param[0]}, {param[1]}, {param[2]}},
-        {{0}, {0}, {0}, {0, 1}, {1, 2}, {1}, {1}, {1}},
-        {false, false, false, false, false, false, false});
-
-    JacobianData<double> tape{num_params, psi.getLength(), psi.getData(), {obs1, obs2, obs3}, ops,
-                              tp};
-
-    adjointJacobian(std::span{jacobian}, tape, true);
-
-    CAPTURE(jacobian);
-
-    // Computed with PennyLane using default.qubit.adjoint_jacobian
-    CHECK(0.0 == Approx(jacobian[0]).margin(1e-5));
-    CHECK(-0.5877852523 == Approx(jacobian[1]).margin(1e-5));
-    CHECK(-0.4755282581 == Approx(jacobian[7]).margin(1e-5));
-    CHECK(-0.4755282581 == Approx(jacobian[10]).margin(1e-5));
-    CHECK(-0.5877852523 == Approx(jacobian[13]).margin(1e-5));
+    const std::vector<double> param{-M_PI / 7, M_PI / 5, 2 * M_PI / 3};
+    const std::vector<double> expected{0.0,         -0.6742144271, 0.275139672,
+                                       0.275139672, -0.0129093062, 0.3238461564};
 
     // Test qis__Gradient:
     int64_t trainParams[6] = {0, 1, 2, 3, 4, 5};
-    MemRefT_double_1d *result0 = new MemRefT_double_1d();
-    MemRefT_double_1d *result1 = new MemRefT_double_1d();
-    MemRefT_double_1d *result2 = new MemRefT_double_1d();
-    MemRefT_double_1d *result_tp0 = new MemRefT_double_1d();
-    MemRefT_double_1d *result_tp1 = new MemRefT_double_1d();
-    MemRefT_double_1d *result_tp2 = new MemRefT_double_1d();
+    MemRefT_double_1d *result = new MemRefT_double_1d();
+    MemRefT_double_1d *result_tp = new MemRefT_double_1d();
     MemRefT_int64_1d *tp_memref = new MemRefT_int64_1d();
     tp_memref->data_aligned = trainParams;
     tp_memref->data_allocated = trainParams;
@@ -703,39 +476,36 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     __quantum__qis__RY(param[1], q1);
     __quantum__qis__RZ(param[2], q1);
 
-    auto obs_idx_0 = __quantum__qis__NamedObs(ObsId::PauliZ, q0);
-    auto obs_idx_1 = __quantum__qis__NamedObs(ObsId::PauliZ, q1);
-    auto obs_idx_2 = __quantum__qis__NamedObs(ObsId::PauliZ, q2);
+    auto obs_idx_0 = __quantum__qis__NamedObs(ObsId::PauliX, q0);
+    auto obs_idx_1 = __quantum__qis__NamedObs(ObsId::PauliX, q1);
+    auto obs_idx_2 = __quantum__qis__NamedObs(ObsId::PauliX, q2);
+    auto obs_tp = __quantum__qis__TensorObs(3, obs_idx_0, obs_idx_1, obs_idx_2);
 
-    __quantum__qis__Expval(obs_idx_0);
-    __quantum__qis__Expval(obs_idx_1);
-    __quantum__qis__Expval(obs_idx_2);
+    __quantum__qis__Expval(obs_tp);
 
-    __quantum__qis__Gradient_params(tp_memref, 3, result_tp0, result_tp1, result_tp2);
+    __quantum__qis__Gradient_params(tp_memref, 1, result_tp);
 
-    __quantum__qis__Gradient(3, result0, result1, result2);
+    __quantum__qis__Gradient(1, result);
 
     __quantum__rt__toggle_recorder(/* activate_cm */ false);
 
-    CHECK(jacobian[0] == Approx(result_tp0->data_aligned[0]).margin(1e-5));
-    CHECK(jacobian[1] == Approx(result_tp1->data_aligned[0]).margin(1e-5));
-    CHECK(jacobian[7] == Approx(result_tp1->data_aligned[2]).margin(1e-5));
-    CHECK(jacobian[10] == Approx(result_tp1->data_aligned[3]).margin(1e-5));
-    CHECK(jacobian[13] == Approx(result_tp1->data_aligned[4]).margin(1e-5));
+    CHECK(expected[0] == Approx(result_tp->data_aligned[0]).margin(1e-5));
+    CHECK(expected[1] == Approx(result_tp->data_aligned[1]).margin(1e-5));
+    CHECK(expected[2] == Approx(result_tp->data_aligned[2]).margin(1e-5));
+    CHECK(expected[3] == Approx(result_tp->data_aligned[3]).margin(1e-5));
+    CHECK(expected[4] == Approx(result_tp->data_aligned[4]).margin(1e-5));
+    CHECK(expected[5] == Approx(result_tp->data_aligned[5]).margin(1e-5));
 
-    CHECK(jacobian[0] == Approx(result0->data_aligned[0]).margin(1e-5));
-    CHECK(jacobian[1] == Approx(result1->data_aligned[0]).margin(1e-5));
-    CHECK(jacobian[7] == Approx(result1->data_aligned[2]).margin(1e-5));
-    CHECK(jacobian[10] == Approx(result1->data_aligned[3]).margin(1e-5));
-    CHECK(jacobian[13] == Approx(result1->data_aligned[4]).margin(1e-5));
+    CHECK(expected[0] == Approx(result->data_aligned[0]).margin(1e-5));
+    CHECK(expected[1] == Approx(result->data_aligned[1]).margin(1e-5));
+    CHECK(expected[2] == Approx(result->data_aligned[2]).margin(1e-5));
+    CHECK(expected[3] == Approx(result->data_aligned[3]).margin(1e-5));
+    CHECK(expected[4] == Approx(result->data_aligned[4]).margin(1e-5));
+    CHECK(expected[5] == Approx(result->data_aligned[5]).margin(1e-5));
 
     __quantum__rt__finalize();
-    delete result0;
-    delete result1;
-    delete result2;
-    delete result_tp0;
-    delete result_tp1;
-    delete result_tp2;
+    delete result;
+    delete result_tp;
     delete tp_memref;
 }
 
@@ -743,57 +513,8 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
           "Op=Mixed, Obs=Z@Z@Z",
           "[Gradient]")
 {
-    using Catalyst::Runtime::Simulator::Lightning::SimulatorGate;
-
-    std::vector<double> param{-M_PI / 7, M_PI / 5, 2 * M_PI / 3};
-    std::vector<size_t> tp{0, 1, 2, 3, 4, 5};
-    const size_t num_qubits = 3;
-    const size_t num_params = 6;
-    const size_t num_obs = 1;
-
-    std::vector<double> jacobian(num_obs * tp.size(), 0);
-
-    std::vector<std::complex<double>> cdata(1U << num_qubits);
-    StateVectorRawCPU<double> psi(cdata.data(), cdata.size());
-    cdata[0] = std::complex<double>{1, 0};
-
-    const auto obs1 =
-        std::make_shared<Pennylane::Simulators::NamedObs<double>>("PauliZ", std::vector<size_t>{0});
-    const auto obs2 =
-        std::make_shared<Pennylane::Simulators::NamedObs<double>>("PauliZ", std::vector<size_t>{1});
-    const auto obs3 =
-        std::make_shared<Pennylane::Simulators::NamedObs<double>>("PauliZ", std::vector<size_t>{2});
-
-    const auto obs4 = Pennylane::Simulators::TensorProdObs<double>::create({obs1, obs2, obs3});
-
-    auto ops =
-        OpsData<double>({"RZ", "RY", "RZ", "CNOT", "CNOT", "RZ", "RY", "RZ", "CRY", "CRZ"},
-                        {{param[0]},
-                         {param[1]},
-                         {param[2]},
-                         {},
-                         {},
-                         {param[0]},
-                         {param[1]},
-                         {param[2]},
-                         {param[0]},
-                         {param[1]}},
-                        {{0}, {0}, {0}, {0, 1}, {1, 2}, {1}, {1}, {1}, {0, 1}, {0, 2}},
-                        {false, false, false, false, false, false, false, false, false, false});
-
-    JacobianData<double> tape{num_params, psi.getLength(), psi.getData(), {obs4}, ops, tp};
-
-    adjointJacobian(std::span{jacobian}, tape, true);
-
-    CAPTURE(jacobian);
-
-    // Computed with PennyLane using default.qubit.adjoint_jacobian
-    CHECK(0.0 == Approx(jacobian[0]).margin(1e-5));
-    CHECK(-0.414506421 == Approx(jacobian[1]).margin(1e-5));
-    CHECK(0.0 == Approx(jacobian[2]).margin(1e-5));
-    CHECK(0.0 == Approx(jacobian[3]).margin(1e-5));
-    CHECK(-0.4643270456 == Approx(jacobian[4]).margin(1e-5));
-    CHECK(0.0210905264 == Approx(jacobian[5]).margin(1e-5));
+    const std::vector<double> param{-M_PI / 7, M_PI / 5, 2 * M_PI / 3};
+    const std::vector<double> expected{0.0, -0.414506421, 0.0, 0.0, -0.4643270456, 0.0210905264};
 
     // Test qis__Gradient:
     int64_t trainParams[6] = {0, 1, 2, 3, 4, 5};
@@ -837,19 +558,19 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
 
     __quantum__rt__toggle_recorder(/* activate_cm */ false);
 
-    CHECK(jacobian[0] == Approx(result_tp->data_aligned[0]).margin(1e-5));
-    CHECK(jacobian[1] == Approx(result_tp->data_aligned[1]).margin(1e-5));
-    CHECK(jacobian[2] == Approx(result_tp->data_aligned[2]).margin(1e-5));
-    CHECK(jacobian[3] == Approx(result_tp->data_aligned[3]).margin(1e-5));
-    CHECK(jacobian[4] == Approx(result_tp->data_aligned[4]).margin(1e-5));
-    CHECK(jacobian[5] == Approx(result_tp->data_aligned[5]).margin(1e-5));
+    CHECK(expected[0] == Approx(result_tp->data_aligned[0]).margin(1e-5));
+    CHECK(expected[1] == Approx(result_tp->data_aligned[1]).margin(1e-5));
+    CHECK(expected[2] == Approx(result_tp->data_aligned[2]).margin(1e-5));
+    CHECK(expected[3] == Approx(result_tp->data_aligned[3]).margin(1e-5));
+    CHECK(expected[4] == Approx(result_tp->data_aligned[4]).margin(1e-5));
+    CHECK(expected[5] == Approx(result_tp->data_aligned[5]).margin(1e-5));
 
-    CHECK(jacobian[0] == Approx(result->data_aligned[0]).margin(1e-5));
-    CHECK(jacobian[1] == Approx(result->data_aligned[1]).margin(1e-5));
-    CHECK(jacobian[2] == Approx(result->data_aligned[2]).margin(1e-5));
-    CHECK(jacobian[3] == Approx(result->data_aligned[3]).margin(1e-5));
-    CHECK(jacobian[4] == Approx(result->data_aligned[4]).margin(1e-5));
-    CHECK(jacobian[5] == Approx(result->data_aligned[5]).margin(1e-5));
+    CHECK(expected[0] == Approx(result->data_aligned[0]).margin(1e-5));
+    CHECK(expected[1] == Approx(result->data_aligned[1]).margin(1e-5));
+    CHECK(expected[2] == Approx(result->data_aligned[2]).margin(1e-5));
+    CHECK(expected[3] == Approx(result->data_aligned[3]).margin(1e-5));
+    CHECK(expected[4] == Approx(result->data_aligned[4]).margin(1e-5));
+    CHECK(expected[5] == Approx(result->data_aligned[5]).margin(1e-5));
 
     __quantum__rt__finalize();
     delete result;
@@ -862,50 +583,8 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
           "Obs=Hamiltonian([Z@Z, H], {0.2, 0.6})",
           "[Gradient]")
 {
-    using Catalyst::Runtime::Simulator::Lightning::SimulatorGate;
-
-    std::vector<double> param{-M_PI / 7, M_PI / 5, 2 * M_PI / 3};
-    std::vector<size_t> tp{0, 1, 2, 3, 4, 5};
-    const size_t num_qubits = 3;
-    const size_t num_params = 6;
-    const size_t num_obs = 1;
-
-    std::vector<double> jacobian(num_obs * tp.size(), 0);
-
-    std::vector<std::complex<double>> cdata(1U << num_qubits);
-    StateVectorRawCPU<double> psi(cdata.data(), cdata.size());
-    cdata[0] = std::complex<double>{1, 0};
-
-    auto obs1 =
-        std::make_shared<Pennylane::Simulators::NamedObs<double>>("PauliZ", std::vector<size_t>{0});
-    auto obs2 =
-        std::make_shared<Pennylane::Simulators::NamedObs<double>>("PauliZ", std::vector<size_t>{1});
-    auto obs3 = std::make_shared<Pennylane::Simulators::TensorProdObs<double>>(
-        Pennylane::Simulators::TensorProdObs<double>::create({obs1, obs2}));
-    auto obs4 = std::make_shared<Pennylane::Simulators::NamedObs<double>>("Hadamard",
-                                                                          std::vector<size_t>{2});
-
-    auto obs5 = Pennylane::Simulators::Hamiltonian<double>::create({0.2, 0.6}, {obs3, obs4});
-
-    auto ops = OpsData<double>(
-        {"RZ", "RY", "RZ", "CNOT", "CNOT", "RZ", "RY", "RZ"},
-        {{param[0]}, {param[1]}, {param[2]}, {}, {}, {param[0]}, {param[1]}, {param[2]}},
-        {{0}, {0}, {0}, {0, 1}, {1, 2}, {1}, {1}, {1}},
-        {false, false, false, false, false, false, false, false});
-
-    JacobianData<double> tape{num_params, psi.getLength(), psi.getData(), {obs5}, ops, tp};
-
-    adjointJacobian(std::span{jacobian}, tape, true);
-
-    CAPTURE(jacobian);
-
-    // Computed with PennyLane using default.qubit.adjoint_jacobian
-    CHECK(0.0 == Approx(jacobian[0]).margin(1e-5));
-    CHECK(-0.2493761627 == Approx(jacobian[1]).margin(1e-5));
-    CHECK(0.0 == Approx(jacobian[2]).margin(1e-5));
-    CHECK(0.0 == Approx(jacobian[3]).margin(1e-5));
-    CHECK(-0.1175570505 == Approx(jacobian[4]).margin(1e-5));
-    CHECK(0.0 == Approx(jacobian[5]).margin(1e-5));
+    const std::vector<double> param{-M_PI / 7, M_PI / 5, 2 * M_PI / 3};
+    const std::vector<double> expected{0.0, -0.2493761627, 0.0, 0.0, -0.1175570505, 0.0};
 
     // Test qis__Gradient:
     int64_t trainParams[6] = {0, 1, 2, 3, 4, 5};
@@ -956,19 +635,19 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
 
     __quantum__rt__toggle_recorder(/* activate_cm */ false);
 
-    CHECK(jacobian[0] == Approx(result_tp->data_aligned[0]).margin(1e-5));
-    CHECK(jacobian[1] == Approx(result_tp->data_aligned[1]).margin(1e-5));
-    CHECK(jacobian[2] == Approx(result_tp->data_aligned[2]).margin(1e-5));
-    CHECK(jacobian[3] == Approx(result_tp->data_aligned[3]).margin(1e-5));
-    CHECK(jacobian[4] == Approx(result_tp->data_aligned[4]).margin(1e-5));
-    CHECK(jacobian[5] == Approx(result_tp->data_aligned[5]).margin(1e-5));
+    CHECK(expected[0] == Approx(result_tp->data_aligned[0]).margin(1e-5));
+    CHECK(expected[1] == Approx(result_tp->data_aligned[1]).margin(1e-5));
+    CHECK(expected[2] == Approx(result_tp->data_aligned[2]).margin(1e-5));
+    CHECK(expected[3] == Approx(result_tp->data_aligned[3]).margin(1e-5));
+    CHECK(expected[4] == Approx(result_tp->data_aligned[4]).margin(1e-5));
+    CHECK(expected[5] == Approx(result_tp->data_aligned[5]).margin(1e-5));
 
-    CHECK(jacobian[0] == Approx(result->data_aligned[0]).margin(1e-5));
-    CHECK(jacobian[1] == Approx(result->data_aligned[1]).margin(1e-5));
-    CHECK(jacobian[2] == Approx(result->data_aligned[2]).margin(1e-5));
-    CHECK(jacobian[3] == Approx(result->data_aligned[3]).margin(1e-5));
-    CHECK(jacobian[4] == Approx(result->data_aligned[4]).margin(1e-5));
-    CHECK(jacobian[5] == Approx(result->data_aligned[5]).margin(1e-5));
+    CHECK(expected[0] == Approx(result->data_aligned[0]).margin(1e-5));
+    CHECK(expected[1] == Approx(result->data_aligned[1]).margin(1e-5));
+    CHECK(expected[2] == Approx(result->data_aligned[2]).margin(1e-5));
+    CHECK(expected[3] == Approx(result->data_aligned[3]).margin(1e-5));
+    CHECK(expected[4] == Approx(result->data_aligned[4]).margin(1e-5));
+    CHECK(expected[5] == Approx(result->data_aligned[5]).margin(1e-5));
 
     __quantum__rt__finalize();
     delete coeffs;
@@ -981,34 +660,6 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
           "for a nontrivial qubits map in the qubit-manager Op=RX, Obs=Hermitian",
           "[Gradient]")
 {
-    using Catalyst::Runtime::Simulator::Lightning::SimulatorGate;
-
-    constexpr size_t num_qubits = 2;
-    constexpr size_t num_params = 1;
-    constexpr size_t num_obs = 1;
-
-    const std::vector<size_t> tp{0};
-    const size_t numAlloc = num_obs * tp.size();
-
-    const std::vector<std::complex<double>> matrix{{1.0, 0.0}, {0.0, 0.0}, {2.0, 0.0}, {0.0, 0.0}};
-    const auto obs = std::make_shared<Pennylane::Simulators::HermitianObs<double>>(
-        Pennylane::Simulators::HermitianObs<double>{matrix, std::vector<size_t>{0}});
-    std::vector<double> jacobian(numAlloc, 0);
-
-    auto ops = OpsData<double>({"RX"}, {{-M_PI / 7}}, {{0}}, {false});
-
-    std::vector<std::complex<double>> cdata(1U << num_qubits);
-    cdata[0] = std::complex<double>{1, 0};
-
-    StateVectorRawCPU<double> psi(cdata.data(), cdata.size());
-
-    JacobianData<double> tape{num_params, psi.getLength(), psi.getData(), {obs}, ops, tp};
-
-    adjointJacobian(std::span{jacobian}, tape, true);
-
-    CAPTURE(jacobian);
-    CHECK(jacobian[0] == Approx(0.2169418696));
-
     // Test qis__Gradient:
     int64_t trainParams[1] = {0};
     MemRefT_double_1d *result = new MemRefT_double_1d();
@@ -1057,8 +708,9 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
 
     __quantum__rt__toggle_recorder(/* activate_cm */ false);
 
-    CHECK(jacobian[0] == Approx(result_tp->data_aligned[0]));
-    CHECK(jacobian[0] == Approx(result->data_aligned[0]));
+    const double expected{0.2169418696};
+    CHECK(expected == Approx(result_tp->data_aligned[0]));
+    CHECK(expected == Approx(result->data_aligned[0]));
 
     __quantum__rt__finalize();
     delete result_tp;

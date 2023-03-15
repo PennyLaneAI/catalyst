@@ -6,9 +6,14 @@ MK_DIR := $(dir $(MK_ABSPATH))
 RT_BUILD_DIR?=$(MK_DIR)/build
 QIR_STDLIB_DIR?=$(MK_DIR)/qir-stdlib/target/release/
 QIR_STDLIB_INCLUDES_DIR?=$(MK_DIR)/qir-stdlib/target/release/build/include/
-LIGHTNING_GIT_TAG_VALUE?=latest_release
-CODE_COVERAGE?=OFF
 ENABLE_KOKKOS?=OFF
+ifeq ($(ENABLE_KOKKOS),OFF)
+	LIGHTNING_GIT_TAG_VALUE?=latest_release
+else
+	# TODO: Update this after the latest_release tag is added to Lightning-Kokkos
+	LIGHTNING_GIT_TAG_VALUE?=v0.29.1
+endif
+CODE_COVERAGE?=OFF
 BUILD_TYPE?=Release
 
 coverage: CODE_COVERAGE=ON

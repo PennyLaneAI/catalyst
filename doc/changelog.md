@@ -2,6 +2,9 @@
 
 <h3>New features</h3>
 
+* Bring feature parity to the Lightning-Kokkos backend simulator.
+  [#55](https://github.com/PennyLaneAI/catalyst/pull/55)
+
 <h3>Improvements</h3>
 
 * Build the runtime against qir-stdlib v0.1.0.
@@ -13,7 +16,6 @@
 
 * Fix memory leaks from data that flows back into the Python environment.
   [#54](https://github.com/PennyLaneAI/catalyst/pull/54)
-
 
 <h3>Contributors</h3>
 
