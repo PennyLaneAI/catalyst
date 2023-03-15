@@ -71,7 +71,7 @@ The following table shows the available devices along with supported features:
    * - Variance
      - ``Identity``, ``PauliX``, ``PauliY``, ``PauliZ``
      - Not supported
-   * - Finite Shots (``Sample``)
+   * - Sampling
      - Only for the computational basis on the supplied qubits
      - Only for the computational basis on the supplied qubits
    * - Probabilities
