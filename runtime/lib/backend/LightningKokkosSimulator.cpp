@@ -183,7 +183,7 @@ auto LightningKokkosSimulator::HamiltonianObservable(const std::vector<double> &
     return this->obs_manager.createHamiltonianObs(coeffs, obs);
 }
 
-// TODO: remove this kernel after merging the expval(const ObservableKokkos<T> &ob)
+// TODO: remove this kernel after merging expval(const ObservableKokkos<T> &ob)
 // in PennyLane-Lightning-Kokkos
 template <class Precision> struct getRealOfComplexInnerProductFunctor {
     Kokkos::View<Kokkos::complex<Precision> *> sv1;
@@ -417,7 +417,7 @@ auto LightningKokkosSimulator::Measure(QubitIdType wire) -> Result
     float draw = dis(gen);
     bool mres = draw > probs[0];
 
-    const size_t num_qubits = this->GetNumQubits(); // Kokkos::View<Kokkos::complex<double> *>
+    const size_t num_qubits = this->GetNumQubits();
 
     const auto stride = pow(2, num_qubits - (1 + wire));
     const auto vec_size = pow(2, num_qubits);
