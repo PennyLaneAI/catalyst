@@ -82,6 +82,8 @@ bufferization_pass_pipeline = [
     "--func-bufferize",
     "--finalizing-bufferize",
     "--buffer-hoisting",
+    "--buffer-loop-hoisting",
+    "--promote-buffers-to-stack",
     "--buffer-deallocation",
     "--convert-bufferization-to-memref",
     "--canonicalize",
