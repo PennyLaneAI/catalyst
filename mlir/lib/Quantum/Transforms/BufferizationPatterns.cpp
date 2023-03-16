@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "Quantum/IR/QuantumOps.h"
@@ -77,8 +78,12 @@ struct BufferizeStateOp : public OpConversionPattern<StateOp> {
     LogicalResult matchAndRewrite(StateOp op, OpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
-        auto resultType = getTypeConverter()->convertType(op.getType());
-        rewriter.replaceOpWithNewOp<StateOp>(op, resultType, adaptor.getObs());
+
+        MemRefType resultType = getTypeConverter()->convertType(op.getType()).cast<MemRefType>();
+        Location loc = op.getLoc();
+        auto allocOp = rewriter.create<memref::AllocOp>(loc, resultType);
+        rewriter.replaceOpWithNewOp<StateOp>(op, TypeRange{resultType},
+                                             ValueRange{adaptor.getObs(), allocOp->getResult(0)});
         return success();
     }
 };
