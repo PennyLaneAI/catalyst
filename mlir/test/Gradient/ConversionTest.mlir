@@ -24,8 +24,8 @@ func.func private @circuit(%arg0: f32) -> (f64, memref<?xf64>)
 // CHECK-DAG:   llvm.func @__quantum__rt__toggle_recorder(i1)
 // CHECK-DAG:   llvm.func @__quantum__qis__Gradient(i64, ...)
 
-// CHECK-LABEL: func.func @adjoint(%arg0: f32) {{.+}} {
-func.func @adjoint(%arg0: f32) -> (memref<?xf64>, memref<?xf64>) {
+// CHECK-LABEL: func.func @adjoint(%arg0: f32, %arg1: index) {{.+}} {
+func.func @adjoint(%arg0: f32, %arg1 : index) -> (memref<?xf64>, memref<?xf64>) {
     // CHECK-DAG:   [[T:%.+]] = llvm.mlir.constant(true) : i1
     // CHECK-DAG:   [[F:%.+]] = llvm.mlir.constant(false) : i1
 

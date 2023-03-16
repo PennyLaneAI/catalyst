@@ -67,12 +67,13 @@ def GradOp : Gradient_Op<"grad", [DeclareOpInterfaceMethods<CallOpInterface>,
     }];
 }
 
-def AdjointOp : Gradient_Op<"adjoint", []> {
+def AdjointOp : Gradient_Op<"adjoint", [AttrSizedOperandSegments]> {
     let summary = "Perform quantum AD using the adjoint method on a device.";
 
     let arguments = (ins
         FlatSymbolRefAttr:$callee,
-        Variadic<AnyType>:$operands
+        Variadic<AnyType>:$args,
+        Optional<Index>:$gradSize
     );
 
     let results = (outs
@@ -84,7 +85,7 @@ def AdjointOp : Gradient_Op<"adjoint", []> {
     );
 
     let assemblyFormat = [{
-        $callee `(` $operands `)` attr-dict `:` functional-type(operands, results)
+        $callee `(` $args `)` ( `size` `(` $gradSize^ `)` )? attr-dict `:` functional-type($args, results)
     }];
 }
 

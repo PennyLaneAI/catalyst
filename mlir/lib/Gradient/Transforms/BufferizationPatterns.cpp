@@ -33,7 +33,7 @@ class BufferizeAdjointOp : public OpConversionPattern<AdjointOp> {
         if (failed(getTypeConverter()->convertTypes(op.getResultTypes(), resTypes)))
             return failure();
         rewriter.replaceOpWithNewOp<AdjointOp>(op, resTypes, op.getCalleeAttr(),
-                                               adaptor.getOperands());
+                                               adaptor.getOperands(), adaptor.getGradSize());
         return success();
     }
 };
