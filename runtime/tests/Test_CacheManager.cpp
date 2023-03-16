@@ -148,6 +148,9 @@ TEST_CASE("Test __quantum__qis__ circuit with observables", "[CacheManager]")
     __quantum__qis__CRX(0.4, target, *ctrls);
 
     MemRefT_CplxT_double_1d *result = new MemRefT_CplxT_double_1d;
+    CplxT_double *buffer = new CplxT_double[8];
+    result->data_aligned = buffer;
+    result->data_allocated = buffer;
     __quantum__qis__State(result, 0);
     CplxT_double *state = result->data_allocated;
 
@@ -170,6 +173,9 @@ TEST_CASE("Test __quantum__qis__ circuit with observables", "[CacheManager]")
     delete result;
 
     __quantum__rt__finalize();
+
+    delete result;
+    delete[] buffer;
 }
 
 TEST_CASE("Test __quantum__qis__ circuit with observables using deactiveCacheManager",
@@ -195,6 +201,9 @@ TEST_CASE("Test __quantum__qis__ circuit with observables using deactiveCacheMan
     __quantum__qis__CRX(0.4, target, *ctrls);
 
     MemRefT_CplxT_double_1d *result = new MemRefT_CplxT_double_1d;
+    CplxT_double *buffer = new CplxT_double[8];
+    result->data_aligned = buffer;
+    result->data_allocated = buffer;
     __quantum__qis__State(result, 0);
     CplxT_double *state = result->data_allocated;
 
@@ -219,6 +228,9 @@ TEST_CASE("Test __quantum__qis__ circuit with observables using deactiveCacheMan
     delete result;
 
     __quantum__rt__finalize();
+
+    delete result;
+    delete[] buffer;
 }
 
 TEST_CASE("Test a LightningSimulator circuit with num_qubits=4 and observables", "[CacheManager]")
