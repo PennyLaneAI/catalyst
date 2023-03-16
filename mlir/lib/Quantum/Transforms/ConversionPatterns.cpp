@@ -488,6 +488,14 @@ template <typename T> class SampleBasedPattern : public OpConversionPattern<T> {
         if constexpr (std::is_same_v<T, SampleOp>) {
             rewriter.create<LLVM::StoreOp>(loc, adaptor.getInData(), structPtr);
         }
+        else if constexpr (std::is_same_v<T, CountsOp>) {
+            auto aStruct = rewriter.create<LLVM::UndefOp>(loc, structType);
+            auto bStruct =
+                rewriter.create<LLVM::InsertValueOp>(loc, aStruct, adaptor.getInEigvals(), 0);
+            auto cStruct =
+                rewriter.create<LLVM::InsertValueOp>(loc, bStruct, adaptor.getInCounts(), 1);
+            rewriter.create<LLVM::StoreOp>(loc, cStruct, structPtr);
+        }
 
         rewriter.create<LLVM::CallOp>(loc, fnDecl, args);
 
