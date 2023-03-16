@@ -727,20 +727,11 @@ void __quantum__qis__Sample(MemRefT_double_2d *result, int64_t shots, int64_t nu
     const size_t numElements = sv_samples.size();
     assert(numElements == static_cast<size_t>(shots * numQubits));
 
-    // TODO: memory management
-    double *samples = (double *)aligned_alloc(sizeof(double), numElements * sizeof(double));
+    double *samples = result->data_aligned;
     double *curr = samples;
     for (size_t idx = 0; idx < numElements; idx++) {
         *(curr++) = sv_samples[idx];
     }
-
-    result->data_allocated = samples;
-    result->data_aligned = samples;
-    result->offset = 0;
-    result->sizes[0] = shots;
-    result->sizes[1] = numQubits;
-    result->strides[0] = numQubits;
-    result->strides[1] = 1;
 }
 
 void __quantum__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t shots, int64_t numQubits,

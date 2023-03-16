@@ -1152,6 +1152,9 @@ TEST_CASE("Test __quantum__qis__Sample with num_qubits=2 calling Hadamard, Contr
     constexpr size_t shots = 1000;
 
     MemRefT_double_2d *result = new MemRefT_double_2d;
+    double *buffer = new double[shots * n];
+    result->data_aligned = buffer;
+    result->data_allocated = buffer;
     __quantum__qis__Sample(result, shots, 0);
     double *samples = result->data_allocated;
 
@@ -1191,8 +1194,8 @@ TEST_CASE("Test __quantum__qis__Sample with num_qubits=2 calling Hadamard, Contr
 
     __quantum__rt__finalize();
 
-    free(samples);
     delete result;
+    delete[] buffer;
 }
 
 TEST_CASE("Test __quantum__qis__Sample with num_qubits=2 and PartialSample calling Hadamard, "
@@ -1220,6 +1223,9 @@ TEST_CASE("Test __quantum__qis__Sample with num_qubits=2 and PartialSample calli
     constexpr size_t shots = 1000;
 
     MemRefT_double_2d *result = new MemRefT_double_2d;
+    double *buffer = new double[shots * n];
+    result->data_aligned = buffer;
+    result->data_allocated = buffer;
     __quantum__qis__Sample(result, shots, 1, ctrls[0]);
     double *samples = result->data_allocated;
 
@@ -1246,7 +1252,7 @@ TEST_CASE("Test __quantum__qis__Sample with num_qubits=2 and PartialSample calli
 #endif
     __quantum__rt__finalize();
 
-    free(samples);
+    delete[] buffer;
     delete result;
 }
 
