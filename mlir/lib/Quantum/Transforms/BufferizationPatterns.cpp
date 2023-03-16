@@ -65,9 +65,11 @@ struct BufferizeSampleOp : public OpConversionPattern<SampleOp> {
     LogicalResult matchAndRewrite(SampleOp op, OpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
-        auto resultType = getTypeConverter()->convertType(op.getType());
+        MemRefType resultType = getTypeConverter()->convertType(op.getType()).cast<MemRefType>();
+        Location loc = op.getLoc();
+        auto allocOp = rewriter.create<memref::AllocOp>(loc, resultType);
         rewriter.replaceOpWithNewOp<SampleOp>(op, resultType, adaptor.getObs(),
-                                              adaptor.getShotsAttr());
+                                              allocOp->getResult(0), adaptor.getShotsAttr());
         return success();
     }
 };

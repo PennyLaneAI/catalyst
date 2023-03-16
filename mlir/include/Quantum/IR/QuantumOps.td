@@ -437,6 +437,12 @@ def SampleOp : Measurement_Op<"sample"> {
 
     let arguments = (ins
         ObservableType:$obs,
+        Optional<
+           AnyTypeOf<[
+            MemRefRankOf<[F64], [1]>,
+            MemRefRankOf<[F64], [2]>
+           ]>
+        >:$in_data,
         I64Attr:$shots
     );
 
@@ -448,7 +454,7 @@ def SampleOp : Measurement_Op<"sample"> {
     );
 
     let assemblyFormat = [{
-        $obs attr-dict `:` type(results)
+        $obs ( `in` `(` $in_data^ `:` type($in_data) `)` )? attr-dict `:` type(results)
     }];
 
     let hasVerifier = 1;
