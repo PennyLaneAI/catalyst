@@ -23,20 +23,20 @@ import pennylane as qml
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=1))
 def circuit(n: int):
-    # CHECK: "scf.while"({{%[a-zA-Z0-9_]+}}, {{%[a-zA-Z0-9_]+}}, {{%[a-zA-Z0-9_]+}})
-    # CHECK: [[a1p:%[a-zA-Z0-9_]+]] = mhlo.convert %arg1
-    # CHECK: [[ct:%[a-zA-Z0-9_]+]] = mhlo.compare  LT, [[a1p]], %arg2,  SIGNED
-    # CHECK: [[cond:%[a-zA-Z0-9_]+]] = tensor.extract [[ct]]
-    # CHECK: "scf.condition"([[cond]], %arg1, %arg2, %arg3)
+    # CHECK:   "scf.while"({{%[a-zA-Z0-9_]+}}, {{%[a-zA-Z0-9_]+}}, {{%[a-zA-Z0-9_]+}})
+    # CHECK:   [[a1p:%[a-zA-Z0-9_]+]] = mhlo.convert %arg1
+    # CHECK:   [[ct:%[a-zA-Z0-9_]+]] = mhlo.compare  LT, [[a1p]], %arg2,  SIGNED
+    # CHECK:   [[cond:%[a-zA-Z0-9_]+]] = tensor.extract [[ct]]
+    # CHECK:   "scf.condition"([[cond]], %arg1, %arg2, %arg3)
     @while_loop(lambda v: v[0] < v[1])
-    # CHECK: ^bb0([[v0:%[a-zA-Z0-9_]+]]: tensor<i64>, [[v1:%[a-zA-Z0-9_]+]]: tensor<i64>, [[array0:%[a-zA-Z0-9_]+]]: !quantum.reg):
+    # CHECK:   ^bb0([[v0:%[a-zA-Z0-9_]+]]: tensor<i64>, [[v1:%[a-zA-Z0-9_]+]]: tensor<i64>, [[array0:%[a-zA-Z0-9_]+]]: !quantum.reg):
     def loop(v):
-        # CHECK: [[v0p:%[a-zA-Z0-9_]+]] = mhlo.add [[v0]]
-        # CHECK: [[q0:%[a-zA-Z0-9_]+]] = "quantum.extract"(%arg3, {{%[a-zA-Z0-9_]+}})
-        # CHECK: [[q1:%[a-zA-Z0-9_]]] = "quantum.custom"([[q0]]) {gate_name = "PauliX"
+        # CHECK:   [[v0p:%[a-zA-Z0-9_]+]] = mhlo.add [[v0]]
+        # CHECK:   [[q0:%[a-zA-Z0-9_]+]] = "quantum.extract"(%arg3, {{%[a-zA-Z0-9_]+}})
+        # CHECK:   [[q1:%[a-zA-Z0-9_]]] = "quantum.custom"([[q0]]) {gate_name = "PauliX"
         qml.PauliX(wires=0)
-        # CHECK: [[array1:%[a-zA-Z0-9_]+]] = "quantum.insert"(%arg3, {{%[a-zA-Z0-9_]+}}, [[q1]])
-        # CHECK: "scf.yield"([[v0p]], [[v1]], [[array1]])
+        # CHECK:   [[array1:%[a-zA-Z0-9_]+]] = "quantum.insert"(%arg3, {{%[a-zA-Z0-9_]+}}, [[q1]])
+        # CHECK:   "scf.yield"([[v0p]], [[v1]], [[array1]])
         return v[0] + 1, v[1]
 
     out = loop((0, n))
@@ -52,23 +52,25 @@ print(circuit.mlir)
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=1))
 def circuit_outer_scope_reference(n: int):
-    # CHECK: [[array0:%[a-zA-Z0-9_]+]] = "quantum.alloc"
-    # CHECK: "scf.while"({{%[a-zA-Z0-9_]+}}, {{%[a-zA-Z0-9_]+}})
-    # CHECK: [[a1p:%[a-zA-Z0-9_]+]] = mhlo.convert %arg1
-    # CHECK: [[ct:%[a-zA-Z0-9_]+]] = mhlo.compare  LT, [[a1p]], [[c1]],  SIGNED
-    # CHECK: [[cond:%[a-zA-Z0-9_]+]] = tensor.extract [[ct]]
-    # CHECK: "scf.condition"([[cond]], %arg1, %arg2)
+    # CHECK:   [[array0:%[a-zA-Z0-9_]+]] = "quantum.alloc"
+    # CHECK:   "scf.while"({{%[a-zA-Z0-9_]+}}, {{%[a-zA-Z0-9_]+}})
+    # CHECK:   [[a1p:%[a-zA-Z0-9_]+]] = mhlo.convert %arg1
+    # CHECK:   [[ct:%[a-zA-Z0-9_]+]] = mhlo.compare  LT, [[a1p]], [[c1]],  SIGNED
+    # CHECK:   [[cond:%[a-zA-Z0-9_]+]] = tensor.extract [[ct]]
+    # CHECK:   "scf.condition"([[cond]], %arg1, %arg2)
     @while_loop(lambda i: i < n)
-    # CHECK: ^bb0([[v0:%[a-zA-Z0-9_]+]]: tensor<i64>, [[array_inner:%[a-zA-Z0-9_]+]]: !quantum.reg):
+    # CHECK:   ^bb0([[v0:%[a-zA-Z0-9_]+]]: tensor<i64>, [[array_inner:%[a-zA-Z0-9_]+]]: !quantum.reg):
     def loop(i):
-        # CHECK: [[v0p:%[a-zA-Z0-9_]]] = mhlo.add [[v0]]
-        # CHECK: [[q0:%[a-zA-Z0-9_]+]] = "quantum.extract"([[array_inner]], {{%[a-zA-Z0-9_]+}})
-        # CHECK: [[q1:%[a-zA-Z0-9_]]] = "quantum.custom"([[q0]]) {gate_name = "PauliX"
-        # CHECK: [[array_inner_2:%[a-zA-Z0-9_]+]] = "quantum.insert"([[array_inner]], {{%[a-zA-Z0-9_]+}}, [[q1]])
+        # CHECK:   [[v0p:%[a-zA-Z0-9_]]] = mhlo.add [[v0]]
+        # CHECK:   [[q0:%[a-zA-Z0-9_]+]] = "quantum.extract"([[array_inner]], {{%[a-zA-Z0-9_]+}})
+        # CHECK:   [[q1:%[a-zA-Z0-9_]]] = "quantum.custom"([[q0]]) {gate_name = "PauliX"
+        # CHECK:   [[array_inner_2:%[a-zA-Z0-9_]+]] = "quantum.insert"([[array_inner]], {{%[a-zA-Z0-9_]+}}, [[q1]])
         qml.PauliX(wires=0)
-        # CHECK: "scf.yield"([[v0p]], [[array_inner_2]])
+        # CHECK:   "scf.yield"([[v0p]], [[array_inner_2]])
         return i + 1
 
+    # CHECK:   "quantum.dealloc"([[array0]])
+    # CHECK:   return
     return loop(0)
 
 
@@ -102,6 +104,8 @@ def circuit_multiple_args(n: int):
         return (v[0] + inc, v[1]), inc
 
     out = loop((0, n), 1)
+    # CHECK:   "quantum.dealloc"([[R0]])
+    # CHECK:   return
     return out[0]
 
 

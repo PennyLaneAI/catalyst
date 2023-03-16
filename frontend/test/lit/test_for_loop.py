@@ -50,6 +50,8 @@ def loop_circuit(n: int, inc: float):
         return phi + inc
 
     loop_fn(0.0)
+    # CHECK:       "quantum.dealloc"([[qreg]])
+    # CHECK:       return
     return qml.state()
 
 

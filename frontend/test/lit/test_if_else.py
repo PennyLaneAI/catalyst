@@ -23,28 +23,30 @@ import pennylane as qml
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=1))
 def circuit(n: int):
-    # CHECK-DAG: [[qreg_0:%[a-zA-Z0-9_]+]] = "quantum.alloc"
-    # CHECK-DAG: [[c5:%[a-zA-Z0-9_]+]] = mhlo.constant dense<5> : tensor<i64>
-    # CHECK: [[b_t:%[a-zA-Z0-9_]+]] = mhlo.compare  LE, %arg0, [[c5]], SIGNED : (tensor<i64>, tensor<i64>) -> tensor<i1>
-    # CHECK: [[b:%[a-zA-Z0-9_]+]] = tensor.extract [[b_t]][] : tensor<i1>
+    # CHECK-DAG:   [[qreg_0:%[a-zA-Z0-9_]+]] = "quantum.alloc"
+    # CHECK-DAG:   [[c5:%[a-zA-Z0-9_]+]] = mhlo.constant dense<5> : tensor<i64>
+    # CHECK:       [[b_t:%[a-zA-Z0-9_]+]] = mhlo.compare  LE, %arg0, [[c5]], SIGNED : (tensor<i64>, tensor<i64>) -> tensor<i1>
+    # CHECK:       [[b:%[a-zA-Z0-9_]+]] = tensor.extract [[b_t]][] : tensor<i1>
     @cond(n <= 5)
-    # CHECK: "scf.if"([[b]])
+    # CHECK:       "scf.if"([[b]])
     def cond_fn():
-        # CHECK-DAG: [[q0:%[a-zA-Z0-9_]+]] = "quantum.extract"
-        # CHECK-DAG: [[q1:%[a-zA-Z0-9_]+]] = "quantum.custom"([[q0]]) {gate_name = "PauliX"
-        # CHECK-DAG: [[qreg_1:%[a-zA-Z0-9_]+]] = "quantum.insert"([[qreg_0]], {{%[a-zA-Z0-9_]+}}, [[q1]])
-        # CHECK: "scf.yield"(%arg0, [[qreg_1]])
+        # CHECK-DAG:   [[q0:%[a-zA-Z0-9_]+]] = "quantum.extract"
+        # CHECK-DAG:   [[q1:%[a-zA-Z0-9_]+]] = "quantum.custom"([[q0]]) {gate_name = "PauliX"
+        # CHECK-DAG:   [[qreg_1:%[a-zA-Z0-9_]+]] = "quantum.insert"([[qreg_0]], {{%[a-zA-Z0-9_]+}}, [[q1]])
+        # CHECK:       "scf.yield"(%arg0, [[qreg_1]])
         qml.PauliX(wires=0)
         return n
 
     @cond_fn.otherwise
     def otherwise():
-        # CHECK: [[r0:%[a-zA-Z0-9_a-z]+]] = mhlo.multiply %arg0, %arg0
-        # CHECK: [[r1:%[a-zA-Z0-9_a-z]+]] = mhlo.multiply %arg0, [[r0]]
-        # CHECK: "scf.yield"([[r1]], [[qreg_0]])
+        # CHECK:       [[r0:%[a-zA-Z0-9_a-z]+]] = mhlo.multiply %arg0, %arg0
+        # CHECK:       [[r1:%[a-zA-Z0-9_a-z]+]] = mhlo.multiply %arg0, [[r0]]
+        # CHECK:       "scf.yield"([[r1]], [[qreg_0]])
         return n**3
 
     out = cond_fn()
+    # CHECK:       "quantum.dealloc"([[qreg_0]])
+    # CHECK:       return
     return out
 
 
