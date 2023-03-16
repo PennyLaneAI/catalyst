@@ -305,7 +305,6 @@ TEST_CASE("Test __quantum__qis__ CRot, IsingXY and Toffoli", "[qir_lightning_cor
     __quantum__rt__finalize();
 }
 
-#ifndef _KOKKOS
 TEST_CASE("Test __quantum__qis__ Hadamard, PauliX, IsingYY, CRX, and Expval",
           "[qir_lightning_core]")
 {
@@ -349,7 +348,6 @@ TEST_CASE("Test __quantum__qis__ Hadamard, PauliX, IsingYY, CRX, and Expval",
 
     __quantum__rt__finalize();
 }
-#endif
 
 TEST_CASE("Test __quantum__qis__ PhaseShift", "[qir_lightning_core]")
 {
@@ -387,7 +385,6 @@ TEST_CASE("Test __quantum__qis__ PhaseShift", "[qir_lightning_core]")
     __quantum__rt__finalize();
 }
 
-#ifndef _KOKKOS
 TEST_CASE("Test __quantum__qis__HermitianObs with an uninitialized matrix", "[qir_lightning_core]")
 {
     // initialize the simulator
@@ -540,10 +537,10 @@ TEST_CASE("Test __quantum__qis__TensorProdObs and Expval", "[qir_lightning_core]
     h_matrix->strides[0] = 1;
 
     auto obs_h = __quantum__qis__HermitianObs(h_matrix, 1, *ctrls);
-
     auto obs_t = __quantum__qis__TensorObs(2, obs_h, obs_x);
 
     REQUIRE(obs_t == 2);
+
     REQUIRE(__quantum__qis__Expval(obs_t) == Approx(1.5864438048).margin(1e-5));
 
     free(state);
@@ -632,6 +629,7 @@ TEST_CASE("Test __quantum__qis__HamiltonianObs(h, x) and Expval", "[qir_lightnin
     auto obs_hamiltonian = __quantum__qis__HamiltonianObs(coeffs, 2, obs_h, obs_x);
 
     REQUIRE(obs_hamiltonian == 2);
+
     REQUIRE(__quantum__qis__Expval(obs_hamiltonian) == Approx(1.1938250042).margin(1e-5));
 
     free(state);
@@ -678,7 +676,6 @@ TEST_CASE("Test __quantum__qis__HamiltonianObs(t) and Expval", "[qir_lightning_c
     h_matrix->strides[0] = 1;
 
     auto obs_h = __quantum__qis__HermitianObs(h_matrix, 1, *ctrls);
-
     auto obs_t = __quantum__qis__TensorObs(2, obs_h, obs_x);
 
     double coeffs_data[1] = {0.4};
@@ -692,6 +689,7 @@ TEST_CASE("Test __quantum__qis__HamiltonianObs(t) and Expval", "[qir_lightning_c
     auto obs_hamiltonian = __quantum__qis__HamiltonianObs(coeffs, 1, obs_t);
 
     REQUIRE(obs_hamiltonian == 3);
+
     REQUIRE(__quantum__qis__Expval(obs_hamiltonian) == Approx(0.6345775219).margin(1e-5));
 
     free(state);
@@ -783,53 +781,12 @@ TEST_CASE("Test __quantum__qis__ Hadamard, ControlledPhaseShift, IsingYY, CRX, a
     // qml.var(qml.PauliZ(wires=1))
     auto obs = __quantum__qis__NamedObs(ObsId::PauliZ, *ctrls);
 
+#if defined(_KOKKOS)
+    REQUIRE_THROWS_WITH(__quantum__qis__Variance(obs),
+                        Catch::Contains("Variance not implemented in PennyLane-Lightning-Kokkos"));
+#else
     REQUIRE(__quantum__qis__Variance(obs) == Approx(0.0394695).margin(1e-5));
-
-    free(state);
-    delete result;
-
-    __quantum__rt__finalize();
-}
-
-TEST_CASE("Test __quantum__qis__ Hadamard, ControlledPhaseShift, IsingYgitY, "
-          "CRX, and Var_arr",
-          "[qir_lightning_core]")
-{
-    // initialize the simulator
-    __quantum__rt__initialize();
-
-    QUBIT *target = __quantum__rt__qubit_allocate();              // id = 0
-    QirArray *ctrls_arr = __quantum__rt__qubit_allocate_array(1); // id = 1
-
-    QUBIT **ctrls = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
-
-    // qml.Hadamard(wires=0)
-    __quantum__qis__Hadamard(target);
-    // qml.ControlledPhaseShift(0.6, wires=[0,1])
-    __quantum__qis__ControlledPhaseShift(0.6, target, *ctrls);
-    // qml.IsingYY(0.2, wires=[0, 1])
-    __quantum__qis__IsingYY(0.2, target, *ctrls);
-    // qml.CRX(0.4, wires=[1,0])
-    __quantum__qis__CRX(0.4, target, *ctrls);
-
-    MemRefT_CplxT_double_1d *result = new MemRefT_CplxT_double_1d;
-    __quantum__qis__State(result, 0);
-    CplxT_double *state = result->data_allocated;
-
-    REQUIRE((state[0].real == Approx(0.70357419).margin(1e-5) &&
-             state[0].imag == Approx(0.0).margin(1e-5)));
-    REQUIRE((state[1].real == Approx(0.0).margin(1e-5) &&
-             state[1].imag == Approx(-0.0705929).margin(1e-5)));
-    REQUIRE((state[2].real == Approx(0.70357419).margin(1e-5) &&
-             state[2].imag == Approx(0).margin(1e-5)));
-    REQUIRE((state[3].real == Approx(0.0).margin(1e-5) &&
-             state[3].imag == Approx(-0.0705929).margin(1e-5)));
-
-    // qml.var(qml.PauliZ(wires=1))
-    QUBIT **qubit = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
-    auto obs = __quantum__qis__NamedObs(ObsId::Hadamard, *qubit);
-
-    REQUIRE(__quantum__qis__Variance(obs) == Approx(0.5197347515).margin(1e-5));
+#endif
 
     free(state);
     delete result;
@@ -902,7 +859,6 @@ TEST_CASE("Test __quantum__qis__ Hadamard, PauliX, IsingYY, CRX, and partial Pro
 
     __quantum__rt__finalize();
 }
-#endif
 
 TEST_CASE("Test __quantum__qis__State on the heap using malloc", "[qir_lightning_core]")
 {
@@ -945,7 +901,6 @@ TEST_CASE("Test __quantum__qis__State on the heap using malloc", "[qir_lightning
     __quantum__rt__finalize();
 }
 
-#ifndef _KOKKOS
 TEST_CASE("Test __quantum__qis__Measure with false", "[qir_lightning_core]")
 {
     // initialize the simulator
@@ -1179,7 +1134,12 @@ TEST_CASE("Test __quantum__qis__Sample with num_qubits=2 calling Hadamard, Contr
     QUBIT **qubit = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
     auto obs = __quantum__qis__NamedObs(ObsId::PauliZ, *qubit);
 
+#if defined(_KOKKOS)
+    REQUIRE_THROWS_WITH(__quantum__qis__Variance(obs),
+                        Catch::Contains("Variance not implemented in PennyLane-Lightning-Kokkos"));
+#else
     REQUIRE(__quantum__qis__Variance(obs) == Approx(0.0394695).margin(1e-5));
+#endif
 
     __quantum__rt__finalize();
 
@@ -1230,8 +1190,12 @@ TEST_CASE("Test __quantum__qis__Sample with num_qubits=2 and PartialSample calli
     QUBIT **qubit = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
     auto obs = __quantum__qis__NamedObs(ObsId::PauliZ, *qubit);
 
+#if defined(_KOKKOS)
+    REQUIRE_THROWS_WITH(__quantum__qis__Variance(obs),
+                        Catch::Contains("Variance not implemented in PennyLane-Lightning-Kokkos"));
+#else
     REQUIRE(__quantum__qis__Variance(obs) == Approx(0.0394695).margin(1e-5));
-
+#endif
     __quantum__rt__finalize();
 
     free(samples);
@@ -1335,4 +1299,3 @@ TEST_CASE("Test __quantum__qis__QubitUnitary with num_qubits=2", "[qir_lightning
     delete matrix;
     __quantum__rt__finalize();
 }
-#endif

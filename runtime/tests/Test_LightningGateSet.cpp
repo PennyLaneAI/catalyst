@@ -241,33 +241,17 @@ TEST_CASE("MIX Gate test R(X,Y,Z) num_qubits=1,4", "[lightning]")
 
     // state-vector with #qubit = n
     constexpr size_t n = 4;
-    std::vector<QubitIdType> Qs;
-    Qs.reserve(n);
+    std::vector<QubitIdType> Qs = sim->AllocateQubits(n);
 
-    Qs[0] = sim->AllocateQubit();
     sim->NamedOperation("PauliX", {}, {Qs[0]}, false);
 
-    std::vector<std::complex<double>> out_state = sim->State();
-
-    REQUIRE(out_state.at(0) == std::complex<double>{0, 0});
-    REQUIRE(out_state.at(1) == std::complex<double>{1, 0});
-
-    Qs[1] = sim->AllocateQubit();
     sim->NamedOperation("RX", {0.123}, {Qs[1]}, false);
-
-    Qs[2] = sim->AllocateQubit();
     sim->NamedOperation("RY", {0.456}, {Qs[2]}, false);
-
-    Qs[3] = sim->AllocateQubit();
     sim->NamedOperation("RZ", {0.789}, {Qs[3]}, false);
 
-    out_state = sim->State();
+    const auto &&out_state = sim->State();
 
     // calculated by pennylane,
-#if defined(_KOKKOS)
-    REQUIRE(out_state[0].real() == Approx(0.9231888531).epsilon(1e-5));
-    REQUIRE(out_state[0].imag() == Approx(-0.3843466424).epsilon(1e-5));
-#else
     REQUIRE(out_state.at(0) == std::complex<double>{0, 0});
 
     REQUIRE(out_state.at(1) == std::complex<double>{0, 0});
@@ -295,7 +279,6 @@ TEST_CASE("MIX Gate test R(X,Y,Z) num_qubits=1,4", "[lightning]")
     REQUIRE(out_state[14].real() == Approx(-0.005339369573836912).epsilon(1e-5));
     REQUIRE(out_state[14].imag() == Approx(-0.012825002038956146).epsilon(1e-5));
     REQUIRE(out_state.at(15) == std::complex<double>{0, 0});
-#endif
 }
 
 TEST_CASE("test PhaseShift num_qubits=2", "[lightning]")
@@ -385,34 +368,16 @@ TEST_CASE("MIX Gate test CR(X, Y, Z) num_qubits=1,4", "[lightning]")
 
     // state-vector with #qubit = n
     constexpr size_t n = 4;
-    std::vector<QubitIdType> Qs;
-    Qs.reserve(n);
+    std::vector<QubitIdType> Qs = sim->AllocateQubits(n);
 
-    Qs[0] = sim->AllocateQubit();
     sim->NamedOperation("Hadamard", {}, {Qs[0]}, false);
-
-    std::vector<std::complex<double>> out_state = sim->State();
-
-    REQUIRE(out_state[0].real() == Approx(0.7071067811865475).epsilon(1e-5));
-    REQUIRE(out_state[0].imag() == Approx(0).epsilon(1e-5));
-    REQUIRE(out_state[1].real() == Approx(0.7071067811865475).epsilon(1e-5));
-    REQUIRE(out_state[1].imag() == Approx(0).epsilon(1e-5));
-
-    Qs[1] = sim->AllocateQubit();
     sim->NamedOperation("CRX", {0.123}, {Qs[0], Qs[1]}, false);
-
-    Qs[2] = sim->AllocateQubit();
     sim->NamedOperation("CRY", {0.456}, {Qs[0], Qs[2]}, false);
-
-    Qs[3] = sim->AllocateQubit();
     sim->NamedOperation("CRZ", {0.789}, {Qs[0], Qs[3]}, false);
 
-    out_state = sim->State();
+    const auto &&out_state = sim->State();
 
     // calculated by pennylane,
-#if defined(_KOKKOS)
-    REQUIRE(out_state.at(0) == std::complex<double>{1, 0});
-#else
     REQUIRE(out_state[0].real() == Approx(0.7071067811865475).epsilon(1e-5));
     REQUIRE(out_state[0].imag() == Approx(0).epsilon(1e-5));
     REQUIRE(out_state.at(1) == std::complex<double>{0, 0});
@@ -438,7 +403,6 @@ TEST_CASE("MIX Gate test CR(X, Y, Z) num_qubits=1,4", "[lightning]")
     REQUIRE(out_state[14].real() == Approx(-0.0037755044329212074).epsilon(1e-5));
     REQUIRE(out_state[14].imag() == Approx(-0.009068645910477189).epsilon(1e-5));
     REQUIRE(out_state.at(15) == std::complex<double>{0, 0});
-#endif
 }
 
 TEST_CASE("CRot", "[lightning]")
@@ -576,7 +540,6 @@ TEST_CASE("MultiRZ test", "[lightning]")
     REQUIRE(out_state[2].imag() == Approx(0).epsilon(1e-5));
 }
 
-#ifndef _KOKKOS
 TEST_CASE("MatrixOperation test with 2-qubit", "[lightning]")
 {
     std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
@@ -772,4 +735,3 @@ TEST_CASE("MatrixOperation test with 4-qubit", "[lightning]")
     REQUIRE(out_state[14].real() == Approx(0.0756372).epsilon(1e-5));
     REQUIRE(out_state[14].imag() == Approx(-0.226334).epsilon(1e-5));
 }
-#endif

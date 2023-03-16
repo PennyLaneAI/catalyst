@@ -54,7 +54,7 @@ class LightningKokkosSimulator final : public Catalyst::Runtime::QuantumDevice {
 
     std::unique_ptr<Pennylane::StateVectorKokkos<double>> device_sv =
         std::make_unique<Pennylane::StateVectorKokkos<double>>(0);
-    LightningKokkosObsManager<double> obs_manager{};
+    LightningObsManager<double> obs_manager{};
 
     inline auto isValidQubit(QubitIdType wire) -> bool
     {

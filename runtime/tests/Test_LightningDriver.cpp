@@ -73,7 +73,7 @@ TEST_CASE("Qubit allocatation and deallocation", "[lightning]")
     REQUIRE(sum.real() == Approx(0.0).epsilon(1e-5));
     REQUIRE(sum.imag() == Approx(0.0).epsilon(1e-5));
 
-#ifndef _KOKKOS
+#if !defined(_KOKKOS)
     for (size_t i = n; i > 0; i--) {
         REQUIRE(state.size() == sz);
 
@@ -184,7 +184,7 @@ TEST_CASE("QuantumDevice object test", "[lightning]")
         // 0, 1, 2, ..., 9
     }
 
-#ifndef _KOKKOS
+#if !defined(_KOKKOS)
     for (size_t i = 10; i < n + 10; i++) {
         REQUIRE(static_cast<QubitIdType>(i) == sim->AllocateQubit());
         // 10, 11, ..., 19
