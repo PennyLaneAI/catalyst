@@ -111,11 +111,14 @@ struct BufferizeCountsOp : public OpConversionPattern<CountsOp> {
     LogicalResult matchAndRewrite(CountsOp op, OpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
-        auto resultType0 = getTypeConverter()->convertType(op.getType(0));
-        auto resultType1 = getTypeConverter()->convertType(op.getType(1));
+        Location loc = op.getLoc();
+        MemRefType resultType0 = getTypeConverter()->convertType(op.getType(0)).cast<MemRefType>();
+        MemRefType resultType1 = getTypeConverter()->convertType(op.getType(1)).cast<MemRefType>();
+        auto alloc0 = rewriter.create<memref::AllocOp>(loc, resultType0)->getResult(0);
+        auto alloc1 = rewriter.create<memref::AllocOp>(loc, resultType1)->getResult(0);
         SmallVector<Type, 2> resultType = {resultType0, resultType1};
-        rewriter.replaceOpWithNewOp<CountsOp>(op, resultType, adaptor.getObs(),
-                                              adaptor.getShotsAttr());
+        rewriter.replaceOpWithNewOp<CountsOp>(op, TypeRange{resultType}, adaptor.getObs(), alloc0,
+                                              alloc1, adaptor.getShotsAttr());
         return success();
     }
 };
