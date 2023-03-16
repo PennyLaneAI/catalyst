@@ -97,16 +97,17 @@ KNOWN_FAILURES = {
 }
 
 DIFF_METHODS = {
-    "grover": [None],
-    "qft": [None],
-    "vqe": ["finite-diff", "parameter-shift", "adjoint", "backprop"],
-    "chemvqe": ["finite-diff", "parameter-shift", "adjoint", "backprop"]
+    ("chemvqe","compile"): ["finite-diff", "parameter-shift", "adjoint", "backprop"],
+    ("chemvqe","runtime"): ["finite-diff", "parameter-shift", "adjoint", "backprop"]
 }
 
 # Colors obtained from a Vega colorscheme.
 # Ref. https://stackoverflow.com/questions/70993559/altair-selecting-a-color-from-a-vega-color-scheme-for-plot
 COLORS = ["#e41a1c", "#377eb8", "#ff7f00", "#4daf4a", "#984ea3",
           "#ffff33", "#a65628", "#f781bf", "#999999"]
+
+MEASUREMENTS = ["compile", "runtime", "compile-circuit"]
+
 # fmt:on
 
 
@@ -123,10 +124,11 @@ def syshash(a) -> str:
 def ofile(a, _, measure, problem, impl, nqubits, nlayers, diffmethod) -> Tuple[str, str]:
     """Produce the JSON file name containing the measurement configured and
     the Linux shell command which is expected to produce such file."""
+    measure_ = measure.replace("-","")
     impl_ = impl.replace("+", "_").replace("/", "_").replace(".", "_")
     dmfilepart = f"_{diffmethod}".replace("-", "_") if diffmethod is not None else ""
     ofname = (
-        f"_benchmark/{measure}_{problem}_{impl_}{dmfilepart}_N{nqubits}_"
+        f"_benchmark/{measure_}_{problem}_{impl_}{dmfilepart}_N{nqubits}_"
         f"L{nlayers}_S{syshash(a)}_{tag(a)}/results.json"
     )
     if problem == "grover":
@@ -162,21 +164,21 @@ def loadresults(fp: str) -> BenchmarkResult:
 def all_configurations(a: ParsedArguments) -> Iterable[tuple]:
     """Iterate through the configurations available."""
 
-    for measure in ["compile", "runtime"]:
+    for measure in MEASUREMENTS:
         for impl in IMPLEMENTATIONS:
             framework, _, _ = parse_implementation(impl)
 
             for cat in ["regular", "deep", "hybrid", "variational"]:
-                if not any([(c in a.measure) for c in [measure, "all"]]):
+                if not any([(m in a.measure.split(',')) for m in [measure, "all"]]):
                     continue
-                if not any([(c in a.category) for c in [cat, "all"]]):
+                if not any([(c in a.category.split(',')) for c in [cat, "all"]]):
                     continue
 
                 problem = CATPROBLEMS.get(cat, None)
                 if problem is None:
                     continue
 
-                for diffmethod in DIFF_METHODS[problem]:
+                for diffmethod in DIFF_METHODS.get((problem, measure),[None]):
                     for nqubits in sorted(QUBITS.get((cat, problem, measure), [None])):
                         for nlayers in sorted(LAYERS.get((cat, problem, measure), [None])):
                             yield (cat, measure, problem, impl, nqubits, nlayers, diffmethod)
@@ -196,11 +198,14 @@ def collect(a: ParsedArguments) -> None:
             if len(odname) > 0 and not a.dry_run:
                 makedirs(odname, exist_ok=True)
             cmdline += f" 2>&1 | tee {odname}/output.log"
+            pdesc = f"{problem}[{nqubits},{nlayers}]"
+            hint = f"{measure: <15} {impl: <32} {cat: <15} {pdesc: <20}"
+            message = hint if not a.verbose else cmdline
             if isfile(ofname):
-                print(f"Skipping existing: {cmdline}")
+                print(f"{message} [EXISTS]")
             else:
                 if a.dry_run:
-                    print(f"(Dry-run) Would run: {cmdline}")
+                    print(f"{message} [DRYRUN]")
                 else:
                     (fnqubits, fnlayers) = known_failures.get(
                         (problem, measure, impl, diffmethod), (None, None)
@@ -209,15 +214,18 @@ def collect(a: ParsedArguments) -> None:
                         fnqubits or sys.maxsize,
                         fnlayers or sys.maxsize,
                     ):
-                        print(f"Skipping as likely to fail: {cmdline}")
+                        print(f"{message} [WOULDFAIL]")
                     else:
-                        print(f"Running: {cmdline}")
+                        print(f"{message}", end='', flush=True)
                         system(cmdline)
                         if not isfile(ofname):
                             known_failures[(problem, measure, impl, diffmethod)] = (
                                 nqubits,
                                 nlayers,
                             )
+                            print(" [FAIL]")
+                        else:
+                            print(" [OK]")
     finally:
         if str(known_failures) != str(KNOWN_FAILURES):
             print("Suggestion:\nKNOWN_FAILURES =")
@@ -270,7 +278,8 @@ def load(a: ParsedArguments) -> Tuple[DataFrame, Optional[Sysinfo]]:
         else:
             print("Pass -V to see the full list", file=sys.stderr)
     if len(systems) > 1:
-        print("Data was collected from more than one system:\n{systems}", file=sys.stderr)
+        systems_str = '\n'.join([str(s) for s in systems])
+        print(f"Data was collected from more than one system:\n{systems_str}", file=sys.stderr)
     return DataFrame(data), (list(systems)[0] if len(systems) > 0 else None)
 
 
@@ -492,14 +501,15 @@ def plot(a: ParsedArguments, df_full: DataFrame, sysinfo: Optional[Sysinfo] = No
         )
 
         # Variational circuits
+        vqeproblem = CATPROBLEMS["variational"]
+        vqemeasure = "compile"
         def _diff_methods(problem) -> Iterable[Set[str]]:
             if a.plot_combine_adjoint_backprop:
                 dmsame = set(["adjoint", "backprop"])
-                return chain([set([x]) for x in set(DIFF_METHODS[problem]) - dmsame], [dmsame])
+                return chain([set([x]) for x in set(DIFF_METHODS[(problem, vqemeasure)]) - dmsame], [dmsame])
             else:
-                return [set([x]) for x in set(DIFF_METHODS[problem])]
+                return [set([x]) for x in set(DIFF_METHODS[(problem, vqemeasure)])]
 
-        vqeproblem = CATPROBLEMS["variational"]
         df = _filter("variational", "compile", vqeproblem)
         for dms in _diff_methods(vqeproblem):
             df2 = df[df.get("diffmethod", pd.Series(float)).map(lambda m: m in dms)]
