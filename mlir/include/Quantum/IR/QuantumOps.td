@@ -642,7 +642,8 @@ def StateOp : Measurement_Op<"state"> {
     }];
 
     let arguments = (ins
-        ObservableType:$obs
+        ObservableType:$obs,
+        Optional<MemRefRankOf<[Complex<F64>], [1]>>:$state_in
     );
 
     let results = (outs
@@ -652,7 +653,7 @@ def StateOp : Measurement_Op<"state"> {
     );
 
     let assemblyFormat = [{
-        $obs attr-dict `:` type(results)
+        $obs ( `in` `(` $state_in^ `:` type($state_in) `)` )? attr-dict `:` type(results)
     }];
 
     let hasVerifier = 1;
