@@ -603,7 +603,8 @@ def ProbsOp : Measurement_Op<"probs"> {
     }];
 
     let arguments = (ins
-        ObservableType:$obs
+        ObservableType:$obs,
+        Optional<MemRefRankOf<[F64], [1]>>:$state_in
     );
 
     let results = (outs
@@ -613,7 +614,7 @@ def ProbsOp : Measurement_Op<"probs"> {
     );
 
     let assemblyFormat = [{
-        $obs attr-dict `:` type(results)
+        $obs ( `in` `(` $state_in^ `:` type($state_in) `)` )? attr-dict `:` type(results)
     }];
 
     let hasVerifier = 1;
