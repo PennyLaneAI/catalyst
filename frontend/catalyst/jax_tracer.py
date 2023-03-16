@@ -124,7 +124,7 @@ def get_traceable_fn(qfunc, device):
             tape.quantum_tape = new_quantum_tape
             tape.quantum_tape.jax_tape = tape
 
-        return_values, qreg, _ = trace_quantum_tape(
+        return_values, _, _ = trace_quantum_tape(
             tape, qreg, has_tracer_return_values, meas_ret_val_indices, num_wires, shots
         )
 

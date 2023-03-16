@@ -17,6 +17,7 @@
 
 include "mlir/IR/OpBase.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
+include "mlir/Dialect/Bufferization/IR/AllocationOpInterface.td"
 
 include "Quantum/IR/QuantumDialect.td"
 
@@ -61,7 +62,7 @@ def FinalizeOp : Quantum_Op<"finalize"> {
 
 class Memory_Op<string mnemonic, list<Trait> traits = []> : Quantum_Op<mnemonic, traits>;
 
-def AllocOp : Memory_Op<"alloc"> {
+def AllocOp : Memory_Op<"alloc", [DeclareOpInterfaceMethods<AllocationOpInterface, ["buildDealloc"]>]> {
     let summary = "Allocate n qubits into a quantum register.";
     let description = [{
     }];

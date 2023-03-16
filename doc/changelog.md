@@ -17,6 +17,14 @@
 * Fix memory leaks from data that flows back into the Python environment.
   [#54](https://github.com/PennyLaneAI/catalyst/pull/54)
 
+* Fix memory leaks resulting from partial bufferization at the MLIR level. This fix makes the
+  necessary changes to reintroduce the ``-buffer-deallocation`` pass into the MLIR pass pipeline.
+  The pass guarantees that all allocations contained within a function (that is allocations that are
+  not returned from a function) are also deallocated.
+
+  This fixes a large majority of leaks in many typical quantum functions.
+  [#61](https://github.com/PennyLaneAI/catalyst/pull/61)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
