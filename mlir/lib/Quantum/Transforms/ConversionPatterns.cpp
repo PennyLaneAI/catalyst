@@ -485,6 +485,10 @@ template <typename T> class SampleBasedPattern : public OpConversionPattern<T> {
         SmallVector<Value> args = {structPtr, numShots, numQubits};
         args.insert(args.end(), qubits.begin(), qubits.end());
 
+        if constexpr (std::is_same_v<T, SampleOp>) {
+            rewriter.create<LLVM::StoreOp>(loc, adaptor.getInData(), structPtr);
+        }
+
         rewriter.create<LLVM::CallOp>(loc, fnDecl, args);
 
         return structPtr;
