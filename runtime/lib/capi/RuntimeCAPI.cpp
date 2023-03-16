@@ -656,18 +656,11 @@ void __quantum__qis__Probs(MemRefT_double_1d *result, int64_t numQubits, ...)
 
     const size_t numElements = 1U << numQubits;
 
-    // TODO: memory management
-    double *probs = (double *)aligned_alloc(sizeof(double), numElements * sizeof(double));
+    double *probs = result->data_aligned;
     double *curr = probs;
     for (size_t idx = 0; idx < numElements; idx++) {
         *(curr++) = sv_probs[idx];
     }
-
-    result->data_allocated = probs;
-    result->data_aligned = probs;
-    result->offset = 0;
-    result->sizes[0] = numElements;
-    result->strides[0] = 1;
 }
 
 void __quantum__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, ...)

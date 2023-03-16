@@ -854,14 +854,17 @@ TEST_CASE("Test __quantum__qis__ Hadamard, PauliX, IsingYY, CRX, and Probs", "[q
 
     // double probs[2];
     MemRefT_double_1d *result = new MemRefT_double_1d;
+    double *buffer = new double[8];
+    result->data_aligned = buffer;
+    result->data_allocated = buffer;
     __quantum__qis__Probs(result, 0);
     double *probs = result->data_allocated;
 
     CHECK((probs[0] + probs[2]) == Approx(0.9900332889).margin(1e-5));
     CHECK((probs[1] + probs[3]) == Approx(0.0099667111).margin(1e-5));
 
-    free(probs);
     delete result;
+    delete[] buffer;
 
     __quantum__rt__finalize();
 }
@@ -887,14 +890,17 @@ TEST_CASE("Test __quantum__qis__ Hadamard, PauliX, IsingYY, CRX, and partial Pro
     __quantum__qis__CRX(0.4, *ctrls, target);
 
     MemRefT_double_1d *result = new MemRefT_double_1d;
+    double *buffer = new double[8];
+    result->data_aligned = buffer;
+    result->data_allocated = buffer;
     __quantum__qis__Probs(result, 1, ctrls[0]);
     double *probs = result->data_allocated;
 
     CHECK(probs[0] == Approx(0.9900332889).margin(1e-5));
     CHECK(probs[1] == Approx(0.0099667111).margin(1e-5));
 
-    free(probs);
     delete result;
+    delete[] buffer;
 
     __quantum__rt__finalize();
 }
