@@ -770,30 +770,18 @@ void __quantum__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t shots
 
     // eigvals
     // TODO: memory management
-    double *eigvals = (double *)aligned_alloc(sizeof(double), numElements * sizeof(double));
+    double *eigvals = (double *)result->first.data_aligned;
     double *curr = eigvals;
     for (size_t idx = 0; idx < numElements; idx++) {
         *(curr++) = sv_eigvals[idx];
     }
 
-    result->first.data_allocated = eigvals;
-    result->first.data_aligned = eigvals;
-    result->first.offset = 0;
-    result->first.sizes[0] = numElements;
-    result->first.strides[0] = 1;
-
     // counts
     // TODO: memory management
-    int64_t *counts = (int64_t *)aligned_alloc(sizeof(int64_t), numElements * sizeof(int64_t));
+    int64_t *counts = (int64_t *)result->second.data_aligned;
     int64_t *icurr = counts;
     for (size_t idx = 0; idx < numElements; idx++) {
         *(icurr++) = sv_cts[idx];
     }
-
-    result->second.data_aligned = counts;
-    result->second.data_allocated = counts;
-    result->second.offset = 0;
-    result->second.sizes[0] = numElements;
-    result->second.strides[0] = 1;
 }
 }

@@ -1066,6 +1066,12 @@ TEST_CASE("Test __quantum__qis__Counts with num_qubits=2 calling Hadamard, Contr
     constexpr size_t shots = 1000;
 
     PairT_MemRefT_double_int64_1d *result = new PairT_MemRefT_double_int64_1d();
+    double *buffer_eigenvalues = new double[4];
+    long *buffer_counts = new long[4];
+    result->first.data_aligned = buffer_eigenvalues;
+    result->first.data_allocated = buffer_eigenvalues;
+    result->second.data_aligned = buffer_counts;
+    result->second.data_allocated = buffer_counts;
     __quantum__qis__Counts(result, shots, 0);
     int64_t *counts = result->second.data_allocated;
     double *eigvals = result->first.data_allocated;
@@ -1082,9 +1088,8 @@ TEST_CASE("Test __quantum__qis__Counts with num_qubits=2 calling Hadamard, Contr
 
     __quantum__rt__finalize();
 
-    free(counts);
-    free(eigvals);
-
+    delete[] buffer_eigenvalues;
+    delete[] buffer_counts;
     delete result;
 }
 
@@ -1112,6 +1117,12 @@ TEST_CASE("Test __quantum__qis__Counts with num_qubits=2 PartialCounts calling H
     constexpr size_t shots = 1000;
 
     PairT_MemRefT_double_int64_1d *result = new PairT_MemRefT_double_int64_1d();
+    double *buffer_eigenvalues = new double[4];
+    long *buffer_counts = new long[4];
+    result->first.data_aligned = buffer_eigenvalues;
+    result->first.data_allocated = buffer_eigenvalues;
+    result->second.data_aligned = buffer_counts;
+    result->second.data_allocated = buffer_counts;
     __quantum__qis__Counts(result, shots, 1, ctrls[0]);
     int64_t *counts = result->second.data_allocated;
     double *eigvals = result->first.data_allocated;
@@ -1121,9 +1132,8 @@ TEST_CASE("Test __quantum__qis__Counts with num_qubits=2 PartialCounts calling H
 
     __quantum__rt__finalize();
 
-    free(counts);
-    free(eigvals);
-
+    delete[] buffer_eigenvalues;
+    delete[] buffer_counts;
     delete result;
 }
 
