@@ -29,7 +29,8 @@ func.func @sample(%q0: !quantum.bit, %q1: !quantum.bit) {
 
 func.func @probs(%q0: !quantum.bit, %q1: !quantum.bit) {
     %obs = quantum.compbasis %q0, %q1 : !quantum.obs
-    // CHECK: quantum.probs {{.*}} : memref<4xf64>
+    // CHECK: [[alloc:%.+]] = memref.alloc() : memref<4xf64>
+    // CHECK: quantum.probs {{.*}} in([[alloc]] : memref<4xf64>) : memref<4xf64>
     %probs = quantum.probs %obs : tensor<4xf64>
     func.return
 }

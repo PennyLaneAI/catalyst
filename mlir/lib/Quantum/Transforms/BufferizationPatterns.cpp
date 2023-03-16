@@ -94,8 +94,11 @@ struct BufferizeProbsOp : public OpConversionPattern<ProbsOp> {
     LogicalResult matchAndRewrite(ProbsOp op, OpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
-        auto resultType = getTypeConverter()->convertType(op.getType());
-        rewriter.replaceOpWithNewOp<ProbsOp>(op, resultType, adaptor.getObs());
+        MemRefType resultType = getTypeConverter()->convertType(op.getType()).cast<MemRefType>();
+        Location loc = op.getLoc();
+        auto allocOp = rewriter.create<memref::AllocOp>(loc, resultType);
+        rewriter.replaceOpWithNewOp<ProbsOp>(op, TypeRange{resultType},
+                                             ValueRange{adaptor.getObs(), allocOp->getResult(0)});
         return success();
     }
 };
