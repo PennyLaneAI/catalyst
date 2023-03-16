@@ -29,10 +29,10 @@ TEST_CASE("Simple allocation and release of one qubit", "[QubitManager]")
 {
     QubitManager qm = QubitManager();
     QubitIdType idx = qm.Allocate(0);
-    REQUIRE(qm.isValidQubitId(idx));
+    CHECK(qm.isValidQubitId(idx));
 
     qm.Release(idx);
-    REQUIRE(!qm.isValidQubitId(idx));
+    CHECK(!qm.isValidQubitId(idx));
 }
 
 TEST_CASE("Allocation and reallocation of one qubit multiple times", "[QubitManager]")
@@ -40,11 +40,11 @@ TEST_CASE("Allocation and reallocation of one qubit multiple times", "[QubitMana
     QubitManager qm = QubitManager();
 
     QubitIdType q = qm.Allocate(0);
-    REQUIRE(q == 0);
+    CHECK(q == 0);
     qm.Release(q);
     QubitIdType q0 = qm.Allocate(0);
-    REQUIRE(q0 == 1);
-    REQUIRE(qm.getDeviceId(q0) == 0);
+    CHECK(q0 == 1);
+    CHECK(qm.getDeviceId(q0) == 0);
     qm.Release(q0);
 }
 
@@ -56,9 +56,9 @@ TEST_CASE("Allocation and reallocation of two qubit", "[QubitManager]")
 
     qm.Release(idx0);
 
-    REQUIRE((!qm.isValidQubitId(idx0) && qm.isValidQubitId(idx1)));
+    CHECK((!qm.isValidQubitId(idx0) && qm.isValidQubitId(idx1)));
 
-    REQUIRE(qm.getDeviceId(idx1) == 0);
+    CHECK(qm.getDeviceId(idx1) == 0);
 
     REQUIRE_THROWS_WITH(qm.getDeviceId(idx0), Catch::Contains("Invalid device qubit"));
 }
@@ -74,15 +74,15 @@ TEST_CASE("multiple release of qubits", "[QubitManager]")
 
     qm.Release(idx2);
 
-    REQUIRE(idx3 == 3);
-    REQUIRE(!qm.isValidQubitId(idx2));
-    REQUIRE(qm.getDeviceId(idx3) == 2);
+    CHECK(idx3 == 3);
+    CHECK(!qm.isValidQubitId(idx2));
+    CHECK(qm.getDeviceId(idx3) == 2);
 
     qm.Release(idx0);
 
-    REQUIRE(!qm.isValidQubitId(idx0));
-    REQUIRE(qm.getDeviceId(idx3) == 1);
-    REQUIRE(qm.getDeviceId(idx1) == 0);
+    CHECK(!qm.isValidQubitId(idx0));
+    CHECK(qm.getDeviceId(idx3) == 1);
+    CHECK(qm.getDeviceId(idx1) == 0);
 
     QubitIdType idx4 = qm.Allocate(2);
     QubitIdType idx5 = qm.Allocate(3);
@@ -90,11 +90,11 @@ TEST_CASE("multiple release of qubits", "[QubitManager]")
 
     qm.Release(idx5);
 
-    REQUIRE(idx4 == 4);
-    REQUIRE(!qm.isValidQubitId(idx5));
-    REQUIRE(qm.isValidQubitId(idx4));
-    REQUIRE(qm.getDeviceId(idx4) == 2);
-    REQUIRE(qm.getDeviceId(idx6) == 3);
+    CHECK(idx4 == 4);
+    CHECK(!qm.isValidQubitId(idx5));
+    CHECK(qm.isValidQubitId(idx4));
+    CHECK(qm.getDeviceId(idx4) == 2);
+    CHECK(qm.getDeviceId(idx6) == 3);
 }
 
 TEST_CASE("Test isFreeQubitId for a vector of wires", "[QubitManager]")
@@ -116,13 +116,13 @@ TEST_CASE("Test isFreeQubitId for a vector of wires", "[QubitManager]")
     qm.Release(idx5);
     qm.Release(idx3);
 
-    REQUIRE(qm.getDeviceId(idx1) == 0);
-    REQUIRE(qm.getDeviceId(idx4) == 1);
-    REQUIRE(qm.getDeviceId(idx6) == 2);
+    CHECK(qm.getDeviceId(idx1) == 0);
+    CHECK(qm.getDeviceId(idx4) == 1);
+    CHECK(qm.getDeviceId(idx6) == 2);
 
-    REQUIRE(!qm.isValidQubitId({idx0, idx1, idx2}));
-    REQUIRE(qm.isValidQubitId({idx1, idx1, idx4}));
-    REQUIRE(!qm.isValidQubitId({idx0, idx5, idx6, idx2}));
+    CHECK(!qm.isValidQubitId({idx0, idx1, idx2}));
+    CHECK(qm.isValidQubitId({idx1, idx1, idx4}));
+    CHECK(!qm.isValidQubitId({idx0, idx5, idx6, idx2}));
 }
 
 TEST_CASE("Test getSimulatorId for a vector of wires", "[QubitManager]")
@@ -144,9 +144,9 @@ TEST_CASE("Test getSimulatorId for a vector of wires", "[QubitManager]")
     qm.Release(idx5);
     qm.Release(idx3);
 
-    REQUIRE(qm.getSimulatorId(0) == idx1);
-    REQUIRE(qm.getSimulatorId(1) == idx4);
-    REQUIRE(qm.getSimulatorId(2) == idx6);
+    CHECK(qm.getSimulatorId(0) == idx1);
+    CHECK(qm.getSimulatorId(1) == idx4);
+    CHECK(qm.getSimulatorId(2) == idx6);
 
     REQUIRE_THROWS_WITH(qm.getSimulatorId(3), Catch::Contains("Invalid simulator qubit"));
 }

@@ -6,6 +6,9 @@ MK_DIR := $(dir $(MK_ABSPATH))
 RT_BUILD_DIR?=$(MK_DIR)/build
 QIR_STDLIB_DIR?=$(MK_DIR)/qir-stdlib/target/release/
 QIR_STDLIB_INCLUDES_DIR?=$(MK_DIR)/qir-stdlib/target/release/build/include/
+CODE_COVERAGE?=OFF
+BUILD_TYPE?=Release
+ENABLE_AVX_KERNELS?=ON
 ENABLE_KOKKOS?=OFF
 ifeq ($(ENABLE_KOKKOS),OFF)
 	LIGHTNING_GIT_TAG_VALUE?=latest_release
@@ -13,8 +16,6 @@ else
 	# TODO: Update this after the latest_release tag is added to Lightning-Kokkos
 	LIGHTNING_GIT_TAG_VALUE?=v0.29.1
 endif
-CODE_COVERAGE?=OFF
-BUILD_TYPE?=Release
 
 coverage: CODE_COVERAGE=ON
 coverage: BUILD_TYPE=Debug
@@ -45,6 +46,7 @@ configure:
 	cmake -G Ninja -B $(RT_BUILD_DIR) . \
 		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
 		-DLIGHTNING_GIT_TAG=$(LIGHTNING_GIT_TAG_VALUE) \
+		-DENABLE_GATE_DISPATCHER=$(ENABLE_AVX_KERNELS) \
 		-DENABLE_LIGHTNING_KOKKOS=$(ENABLE_KOKKOS) \
 		-DCMAKE_C_COMPILER=$(C_COMPILER) \
 		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \

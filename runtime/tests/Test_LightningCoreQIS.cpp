@@ -38,7 +38,7 @@ TEST_CASE("Qubits: allocate, release, dump", "[qir_lightning_core]")
 
     QirString *qstr = __quantum__rt__qubit_to_string(q);
 
-    REQUIRE(__quantum__rt__string_equal(qstr, zero_str));
+    CHECK(__quantum__rt__string_equal(qstr, zero_str));
 
     __quantum__rt__string_update_reference_count(qstr, -1);
 
@@ -46,15 +46,15 @@ TEST_CASE("Qubits: allocate, release, dump", "[qir_lightning_core]")
 
     QirArray *qs = __quantum__rt__qubit_allocate_array(3);
 
-    REQUIRE(__quantum__rt__array_get_size_1d(qs) == 3);
+    CHECK(__quantum__rt__array_get_size_1d(qs) == 3);
 
     QUBIT *first = *reinterpret_cast<QUBIT **>(__quantum__rt__array_get_element_ptr_1d(qs, 0));
     qstr = __quantum__rt__qubit_to_string(first);
-    REQUIRE(__quantum__rt__string_equal(qstr, one_str));
+    CHECK(__quantum__rt__string_equal(qstr, one_str));
 
     QUBIT *last = *reinterpret_cast<QUBIT **>(__quantum__rt__array_get_element_ptr_1d(qs, 2));
     qstr = __quantum__rt__qubit_to_string(last);
-    REQUIRE(__quantum__rt__string_equal(qstr, three_str));
+    CHECK(__quantum__rt__string_equal(qstr, three_str));
 
     __quantum__rt__string_update_reference_count(qstr, -1);
 
@@ -84,7 +84,7 @@ TEST_CASE("Test lightning__core__qis methods", "[qir_lightning_core]")
 
     __quantum__rt__finalize();
 
-    REQUIRE(true); // if the __quantum__qis__ operations can be called
+    CHECK(true); // if the __quantum__qis__ operations can be called
 }
 
 TEST_CASE("Test __quantum__rt__initialize multiple times", "[qir_lightning_core]")
@@ -113,7 +113,7 @@ TEST_CASE("Test __quantum__rt__print_state", "[qir_lightning_core]")
     std::cout.rdbuf(prevcoutbuf);
 
     std::string result = buffer.str();
-    REQUIRE(!result.compare(expected));
+    CHECK(!result.compare(expected));
 
     __quantum__rt__finalize();
 }
@@ -132,6 +132,7 @@ TEST_CASE("Test __quantum__qis__State with wires", "[qir_lightning_core]")
                         Catch::Contains("Partial State-Vector not supported yet"));
 
     delete result;
+
     __quantum__rt__finalize();
 }
 
@@ -150,10 +151,10 @@ TEST_CASE("Test __quantum__qis__Identity", "[qir_lightning_core]")
     __quantum__qis__State(result, 0);
     CplxT_double *state = result->data_allocated;
 
-    REQUIRE(state[0].real == Approx(1.0).margin(1e-5));
-    REQUIRE(state[0].imag == Approx(0.0).margin(1e-5));
-    REQUIRE(state[1].real == Approx(0.0).margin(1e-5));
-    REQUIRE(state[1].imag == Approx(0.0).margin(1e-5));
+    CHECK(state[0].real == Approx(1.0).margin(1e-5));
+    CHECK(state[0].imag == Approx(0.0).margin(1e-5));
+    CHECK(state[1].real == Approx(0.0).margin(1e-5));
+    CHECK(state[1].imag == Approx(0.0).margin(1e-5));
 
     free(state);
     delete result;
@@ -176,10 +177,8 @@ TEST_CASE("Test __quantum__qis__PauliX", "[qir_lightning_core]")
     __quantum__qis__State(result, 0);
     CplxT_double *state = result->data_allocated;
 
-    REQUIRE(
-        (state[0].real == Approx(0.0).margin(1e-5) && state[0].imag == Approx(0.0).margin(1e-5)));
-    REQUIRE(
-        (state[2].real == Approx(1.0).margin(1e-5) && state[2].imag == Approx(0.0).margin(1e-5)));
+    CHECK((state[0].real == Approx(0.0).margin(1e-5) && state[0].imag == Approx(0.0).margin(1e-5)));
+    CHECK((state[2].real == Approx(1.0).margin(1e-5) && state[2].imag == Approx(0.0).margin(1e-5)));
 
     free(state);
     delete result;
@@ -203,13 +202,14 @@ TEST_CASE("Test __quantum__qis__ PauliY and Rot", "[qir_lightning_core]")
     __quantum__qis__State(result, 0);
     CplxT_double *state = result->data_allocated;
 
-    REQUIRE((state[0].real == Approx(0.0873321925).margin(1e-5) &&
-             state[0].imag == Approx(-0.2823212367).margin(1e-5)));
-    REQUIRE((state[2].real == Approx(-0.0953745058).margin(1e-5) &&
-             state[2].imag == Approx(0.9505637859).margin(1e-5)));
+    CHECK((state[0].real == Approx(0.0873321925).margin(1e-5) &&
+           state[0].imag == Approx(-0.2823212367).margin(1e-5)));
+    CHECK((state[2].real == Approx(-0.0953745058).margin(1e-5) &&
+           state[2].imag == Approx(0.9505637859).margin(1e-5)));
 
     free(state);
     delete result;
+
     __quantum__rt__finalize();
 }
 
@@ -227,7 +227,7 @@ TEST_CASE("Test __quantum__qis__Measure", "[qir_lightning_core]")
     Result m = __quantum__qis__Measure(wire0);
 
     Result one = __quantum__rt__result_get_one();
-    REQUIRE(*m == *one);
+    CHECK(*m == *one);
 
     __quantum__rt__finalize();
 }
@@ -253,14 +253,14 @@ TEST_CASE("Test __quantum__qis__ Hadamard, PauliZ, IsingXX, IsingZZ, and SWAP",
     __quantum__qis__State(result, 0);
     CplxT_double *state = result->data_allocated;
 
-    REQUIRE((state[0].real == Approx(0.6817017748).margin(1e-5) &&
-             state[0].imag == Approx(-0.1740670409).margin(1e-5)));
-    REQUIRE((state[1].real == Approx(-0.6817017748).margin(1e-5) &&
-             state[1].imag == Approx(-0.1740670409).margin(1e-5)));
-    REQUIRE((state[2].real == Approx(-0.0174649595).margin(1e-5) &&
-             state[2].imag == Approx(0.068398324).margin(1e-5)));
-    REQUIRE((state[3].real == Approx(-0.0174649595).margin(1e-5) &&
-             state[3].imag == Approx(-0.068398324).margin(1e-5)));
+    CHECK((state[0].real == Approx(0.6817017748).margin(1e-5) &&
+           state[0].imag == Approx(-0.1740670409).margin(1e-5)));
+    CHECK((state[1].real == Approx(-0.6817017748).margin(1e-5) &&
+           state[1].imag == Approx(-0.1740670409).margin(1e-5)));
+    CHECK((state[2].real == Approx(-0.0174649595).margin(1e-5) &&
+           state[2].imag == Approx(0.068398324).margin(1e-5)));
+    CHECK((state[3].real == Approx(-0.0174649595).margin(1e-5) &&
+           state[3].imag == Approx(-0.068398324).margin(1e-5)));
 
     free(state);
     delete result;
@@ -290,14 +290,12 @@ TEST_CASE("Test __quantum__qis__ CRot, IsingXY and Toffoli", "[qir_lightning_cor
     __quantum__qis__State(result, 0);
     CplxT_double *state = result->data_allocated;
 
-    REQUIRE((state[0].real == Approx(0.70710678).margin(1e-5) &&
-             state[0].imag == Approx(0.0).margin(1e-5)));
-    REQUIRE(
-        (state[1].real == Approx(0.0).margin(1e-5) && state[1].imag == Approx(0.0).margin(1e-5)));
-    REQUIRE((state[2].real == Approx(-0.7035741926).margin(1e-5) &&
-             state[2].imag == Approx(0.0).margin(1e-5)));
-    REQUIRE(
-        (state[3].real == Approx(0.0).margin(1e-5) && state[3].imag == Approx(0.0).margin(1e-5)));
+    CHECK((state[0].real == Approx(0.70710678).margin(1e-5) &&
+           state[0].imag == Approx(0.0).margin(1e-5)));
+    CHECK((state[1].real == Approx(0.0).margin(1e-5) && state[1].imag == Approx(0.0).margin(1e-5)));
+    CHECK((state[2].real == Approx(-0.7035741926).margin(1e-5) &&
+           state[2].imag == Approx(0.0).margin(1e-5)));
+    CHECK((state[3].real == Approx(0.0).margin(1e-5) && state[3].imag == Approx(0.0).margin(1e-5)));
 
     free(state);
     delete result;
@@ -329,19 +327,19 @@ TEST_CASE("Test __quantum__qis__ Hadamard, PauliX, IsingYY, CRX, and Expval",
     __quantum__qis__State(result, 0);
     CplxT_double *state = result->data_allocated;
 
-    REQUIRE((state[0].real == Approx(0.70357419).margin(1e-5) &&
-             state[0].imag == Approx(0.0).margin(1e-5)));
-    REQUIRE((state[1].real == Approx(0.01402464).margin(1e-5) &&
-             state[1].imag == Approx(-0.06918573).margin(1e-5)));
-    REQUIRE((state[2].real == Approx(0.70357419).margin(1e-5) &&
-             state[2].imag == Approx(0).margin(1e-5)));
-    REQUIRE((state[3].real == Approx(-0.01402464).margin(1e-5) &&
-             state[3].imag == Approx(0.06918573).margin(1e-5)));
+    CHECK((state[0].real == Approx(0.70357419).margin(1e-5) &&
+           state[0].imag == Approx(0.0).margin(1e-5)));
+    CHECK((state[1].real == Approx(0.01402464).margin(1e-5) &&
+           state[1].imag == Approx(-0.06918573).margin(1e-5)));
+    CHECK((state[2].real == Approx(0.70357419).margin(1e-5) &&
+           state[2].imag == Approx(0).margin(1e-5)));
+    CHECK((state[3].real == Approx(-0.01402464).margin(1e-5) &&
+           state[3].imag == Approx(0.06918573).margin(1e-5)));
 
     // qml.expval(qml.Hadamard(wires=1))
     auto obs = __quantum__qis__NamedObs(ObsId::Hadamard, *ctrls);
 
-    REQUIRE(__quantum__qis__Expval(obs) == Approx(0.69301172).margin(1e-5));
+    CHECK(__quantum__qis__Expval(obs) == Approx(0.69301172).margin(1e-5));
 
     free(state);
     delete result;
@@ -370,14 +368,14 @@ TEST_CASE("Test __quantum__qis__ PhaseShift", "[qir_lightning_core]")
     __quantum__qis__State(result, 0);
     CplxT_double *state = result->data_allocated;
 
-    REQUIRE((state[0].real == Approx(0.7057699753).margin(1e-5) &&
-             state[0].imag == Approx(0.0).margin(1e-5)));
-    REQUIRE((state[1].real == Approx(0.0).margin(1e-5) &&
-             state[1].imag == Approx(-0.04345966).margin(1e-5)));
-    REQUIRE((state[2].real == Approx(0.63365519).margin(1e-5) &&
-             state[2].imag == Approx(0.31079312).margin(1e-5)));
-    REQUIRE((state[3].real == Approx(0.01913791).margin(1e-5) &&
-             state[3].imag == Approx(-0.039019).margin(1e-5)));
+    CHECK((state[0].real == Approx(0.7057699753).margin(1e-5) &&
+           state[0].imag == Approx(0.0).margin(1e-5)));
+    CHECK((state[1].real == Approx(0.0).margin(1e-5) &&
+           state[1].imag == Approx(-0.04345966).margin(1e-5)));
+    CHECK((state[2].real == Approx(0.63365519).margin(1e-5) &&
+           state[2].imag == Approx(0.31079312).margin(1e-5)));
+    CHECK((state[3].real == Approx(0.01913791).margin(1e-5) &&
+           state[3].imag == Approx(-0.039019).margin(1e-5)));
 
     free(state);
     delete result;
@@ -453,14 +451,14 @@ TEST_CASE("Test __quantum__qis__HermitianObs and Expval", "[qir_lightning_core]"
     __quantum__qis__State(result, 0);
     CplxT_double *state = result->data_allocated;
 
-    REQUIRE((state[0].real == Approx(0.70357419).margin(1e-5) &&
-             state[0].imag == Approx(0.0).margin(1e-5)));
-    REQUIRE((state[1].real == Approx(0.01402464).margin(1e-5) &&
-             state[1].imag == Approx(-0.06918573).margin(1e-5)));
-    REQUIRE((state[2].real == Approx(0.70357419).margin(1e-5) &&
-             state[2].imag == Approx(0).margin(1e-5)));
-    REQUIRE((state[3].real == Approx(-0.01402464).margin(1e-5) &&
-             state[3].imag == Approx(0.06918573).margin(1e-5)));
+    CHECK((state[0].real == Approx(0.70357419).margin(1e-5) &&
+           state[0].imag == Approx(0.0).margin(1e-5)));
+    CHECK((state[1].real == Approx(0.01402464).margin(1e-5) &&
+           state[1].imag == Approx(-0.06918573).margin(1e-5)));
+    CHECK((state[2].real == Approx(0.70357419).margin(1e-5) &&
+           state[2].imag == Approx(0).margin(1e-5)));
+    CHECK((state[3].real == Approx(-0.01402464).margin(1e-5) &&
+           state[3].imag == Approx(0.06918573).margin(1e-5)));
 
     // qml.Hermitan(qml.Hermitian({non-zero-matrix}, wires=[0,1]))
 
@@ -479,8 +477,8 @@ TEST_CASE("Test __quantum__qis__HermitianObs and Expval", "[qir_lightning_core]"
 
     auto obs_h = __quantum__qis__HermitianObs(h_matrix, 1, *ctrls);
 
-    REQUIRE(obs_h == 1);
-    REQUIRE(__quantum__qis__Expval(obs_h) == Approx(0.9900332889).margin(1e-5));
+    CHECK(obs_h == 1);
+    CHECK(__quantum__qis__Expval(obs_h) == Approx(0.9900332889).margin(1e-5));
 
     free(state);
     delete result;
@@ -539,9 +537,9 @@ TEST_CASE("Test __quantum__qis__TensorProdObs and Expval", "[qir_lightning_core]
     auto obs_h = __quantum__qis__HermitianObs(h_matrix, 1, *ctrls);
     auto obs_t = __quantum__qis__TensorObs(2, obs_h, obs_x);
 
-    REQUIRE(obs_t == 2);
+    CHECK(obs_t == 2);
 
-    REQUIRE(__quantum__qis__Expval(obs_t) == Approx(1.5864438048).margin(1e-5));
+    CHECK(__quantum__qis__Expval(obs_t) == Approx(1.5864438048).margin(1e-5));
 
     free(state);
     delete result;
@@ -578,6 +576,7 @@ TEST_CASE("Test __quantum__qis__HamiltonianObs with invalid number of coefficien
                         Catch::Contains("Invalid coefficients for computing Hamiltonian"));
 
     delete coeffs;
+
     __quantum__rt__finalize();
 }
 
@@ -628,9 +627,9 @@ TEST_CASE("Test __quantum__qis__HamiltonianObs(h, x) and Expval", "[qir_lightnin
 
     auto obs_hamiltonian = __quantum__qis__HamiltonianObs(coeffs, 2, obs_h, obs_x);
 
-    REQUIRE(obs_hamiltonian == 2);
+    CHECK(obs_hamiltonian == 2);
 
-    REQUIRE(__quantum__qis__Expval(obs_hamiltonian) == Approx(1.1938250042).margin(1e-5));
+    CHECK(__quantum__qis__Expval(obs_hamiltonian) == Approx(1.1938250042).margin(1e-5));
 
     free(state);
     delete result;
@@ -688,9 +687,9 @@ TEST_CASE("Test __quantum__qis__HamiltonianObs(t) and Expval", "[qir_lightning_c
 
     auto obs_hamiltonian = __quantum__qis__HamiltonianObs(coeffs, 1, obs_t);
 
-    REQUIRE(obs_hamiltonian == 3);
+    CHECK(obs_hamiltonian == 3);
 
-    REQUIRE(__quantum__qis__Expval(obs_hamiltonian) == Approx(0.6345775219).margin(1e-5));
+    CHECK(__quantum__qis__Expval(obs_hamiltonian) == Approx(0.6345775219).margin(1e-5));
 
     free(state);
     delete result;
@@ -724,20 +723,20 @@ TEST_CASE("Test __quantum__qis__ Hadamard, PauliX, IsingYY, CRX, and Expval_arr"
     __quantum__qis__State(result, 0);
     CplxT_double *state = result->data_allocated;
 
-    REQUIRE((state[0].real == Approx(0.70357419).margin(1e-5) &&
-             state[0].imag == Approx(0.0).margin(1e-5)));
-    REQUIRE((state[1].real == Approx(0.01402464).margin(1e-5) &&
-             state[1].imag == Approx(-0.06918573).margin(1e-5)));
-    REQUIRE((state[2].real == Approx(0.70357419).margin(1e-5) &&
-             state[2].imag == Approx(0).margin(1e-5)));
-    REQUIRE((state[3].real == Approx(-0.01402464).margin(1e-5) &&
-             state[3].imag == Approx(0.06918573).margin(1e-5)));
+    CHECK((state[0].real == Approx(0.70357419).margin(1e-5) &&
+           state[0].imag == Approx(0.0).margin(1e-5)));
+    CHECK((state[1].real == Approx(0.01402464).margin(1e-5) &&
+           state[1].imag == Approx(-0.06918573).margin(1e-5)));
+    CHECK((state[2].real == Approx(0.70357419).margin(1e-5) &&
+           state[2].imag == Approx(0).margin(1e-5)));
+    CHECK((state[3].real == Approx(-0.01402464).margin(1e-5) &&
+           state[3].imag == Approx(0.06918573).margin(1e-5)));
 
     // qml.expval(qml.Hadamard(wires=1))
     QUBIT **qubit = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
     auto obs = __quantum__qis__NamedObs(ObsId::Hadamard, *qubit);
 
-    REQUIRE(__quantum__qis__Expval(obs) == Approx(0.69301172).margin(1e-5));
+    CHECK(__quantum__qis__Expval(obs) == Approx(0.69301172).margin(1e-5));
 
     free(state);
     delete result;
@@ -769,14 +768,14 @@ TEST_CASE("Test __quantum__qis__ Hadamard, ControlledPhaseShift, IsingYY, CRX, a
     __quantum__qis__State(result, 0);
     CplxT_double *state = result->data_allocated;
 
-    REQUIRE((state[0].real == Approx(0.70357419).margin(1e-5) &&
-             state[0].imag == Approx(0.0).margin(1e-5)));
-    REQUIRE((state[1].real == Approx(0.0).margin(1e-5) &&
-             state[1].imag == Approx(-0.0705929).margin(1e-5)));
-    REQUIRE((state[2].real == Approx(0.70357419).margin(1e-5) &&
-             state[2].imag == Approx(0).margin(1e-5)));
-    REQUIRE((state[3].real == Approx(0.0).margin(1e-5) &&
-             state[3].imag == Approx(-0.0705929).margin(1e-5)));
+    CHECK((state[0].real == Approx(0.70357419).margin(1e-5) &&
+           state[0].imag == Approx(0.0).margin(1e-5)));
+    CHECK((state[1].real == Approx(0.0).margin(1e-5) &&
+           state[1].imag == Approx(-0.0705929).margin(1e-5)));
+    CHECK((state[2].real == Approx(0.70357419).margin(1e-5) &&
+           state[2].imag == Approx(0).margin(1e-5)));
+    CHECK((state[3].real == Approx(0.0).margin(1e-5) &&
+           state[3].imag == Approx(-0.0705929).margin(1e-5)));
 
     // qml.var(qml.PauliZ(wires=1))
     auto obs = __quantum__qis__NamedObs(ObsId::PauliZ, *ctrls);
@@ -785,7 +784,7 @@ TEST_CASE("Test __quantum__qis__ Hadamard, ControlledPhaseShift, IsingYY, CRX, a
     REQUIRE_THROWS_WITH(__quantum__qis__Variance(obs),
                         Catch::Contains("Variance not implemented in PennyLane-Lightning-Kokkos"));
 #else
-    REQUIRE(__quantum__qis__Variance(obs) == Approx(0.0394695).margin(1e-5));
+    CHECK(__quantum__qis__Variance(obs) == Approx(0.0394695).margin(1e-5));
 #endif
 
     free(state);
@@ -818,8 +817,8 @@ TEST_CASE("Test __quantum__qis__ Hadamard, PauliX, IsingYY, CRX, and Probs", "[q
     __quantum__qis__Probs(result, 0);
     double *probs = result->data_allocated;
 
-    REQUIRE((probs[0] + probs[2]) == Approx(0.9900332889).margin(1e-5));
-    REQUIRE((probs[1] + probs[3]) == Approx(0.0099667111).margin(1e-5));
+    CHECK((probs[0] + probs[2]) == Approx(0.9900332889).margin(1e-5));
+    CHECK((probs[1] + probs[3]) == Approx(0.0099667111).margin(1e-5));
 
     free(probs);
     delete result;
@@ -851,8 +850,8 @@ TEST_CASE("Test __quantum__qis__ Hadamard, PauliX, IsingYY, CRX, and partial Pro
     __quantum__qis__Probs(result, 1, ctrls[0]);
     double *probs = result->data_allocated;
 
-    REQUIRE(probs[0] == Approx(0.9900332889).margin(1e-5));
-    REQUIRE(probs[1] == Approx(0.0099667111).margin(1e-5));
+    CHECK(probs[0] == Approx(0.9900332889).margin(1e-5));
+    CHECK(probs[1] == Approx(0.0099667111).margin(1e-5));
 
     free(probs);
     delete result;
@@ -883,17 +882,17 @@ TEST_CASE("Test __quantum__qis__State on the heap using malloc", "[qir_lightning
     __quantum__qis__State(result, 0);
     CplxT_double *stateVec = result->data_allocated;
 
-    REQUIRE(stateVec[0].real == Approx(0.7035741926).margin(1e-5));
-    REQUIRE(stateVec[0].imag == 0.0);
+    CHECK(stateVec[0].real == Approx(0.7035741926).margin(1e-5));
+    CHECK(stateVec[0].imag == 0.0);
 
-    REQUIRE(stateVec[1].real == 0.0);
-    REQUIRE(stateVec[1].imag == Approx(-0.070592886).margin(1e-5));
+    CHECK(stateVec[1].real == 0.0);
+    CHECK(stateVec[1].imag == Approx(-0.070592886).margin(1e-5));
 
-    REQUIRE(stateVec[2].real == Approx(0.7035741926).margin(1e-5));
-    REQUIRE(stateVec[2].imag == 0.0);
+    CHECK(stateVec[2].real == Approx(0.7035741926).margin(1e-5));
+    CHECK(stateVec[2].imag == 0.0);
 
-    REQUIRE(stateVec[3].real == 0.0);
-    REQUIRE(stateVec[3].imag == Approx(-0.070592886).margin(1e-5));
+    CHECK(stateVec[3].real == 0.0);
+    CHECK(stateVec[3].imag == Approx(-0.070592886).margin(1e-5));
 
     free(stateVec);
     delete result;
@@ -914,7 +913,7 @@ TEST_CASE("Test __quantum__qis__Measure with false", "[qir_lightning_core]")
     Result mres = __quantum__qis__Measure(target);
 
     Result zero = __quantum__rt__result_get_zero();
-    REQUIRE(__quantum__rt__result_equal(mres, zero));
+    CHECK(__quantum__rt__result_equal(mres, zero));
 
     __quantum__rt__finalize();
 }
@@ -932,7 +931,7 @@ TEST_CASE("Test __quantum__qis__Measure with true", "[qir_lightning_core]")
     Result mres = __quantum__qis__Measure(target);
 
     Result one = __quantum__rt__result_get_one();
-    REQUIRE(__quantum__rt__result_equal(mres, one));
+    CHECK(__quantum__rt__result_equal(mres, one));
 
     __quantum__rt__finalize();
 }
@@ -955,8 +954,8 @@ TEST_CASE("Test __quantum__qis__MultiRZ", "[qir_lightning_core]")
 
     Result zero = __quantum__rt__result_get_zero();
     Result one = __quantum__rt__result_get_one();
-    REQUIRE(__quantum__rt__result_equal(q0_m, zero));
-    REQUIRE(__quantum__rt__result_equal(q1_m, one));
+    CHECK(__quantum__rt__result_equal(q0_m, zero));
+    CHECK(__quantum__rt__result_equal(q1_m, one));
 
     __quantum__rt__finalize();
 }
@@ -981,15 +980,15 @@ TEST_CASE("Test __quantum__qis__CSWAP ", "[qir_lightning_core]")
     // Test via rt__result_to_string
     QirString *zero_str = __quantum__rt__result_to_string(zero);
     QirString *q1_m_str = __quantum__rt__result_to_string(q1_m);
-    REQUIRE(__quantum__rt__string_equal(zero_str, q1_m_str));
+    CHECK(__quantum__rt__string_equal(zero_str, q1_m_str));
 
     QirString *one_str = __quantum__rt__result_to_string(one);
     QirString *q2_m_str = __quantum__rt__result_to_string(q2_m);
-    REQUIRE(__quantum__rt__string_equal(one_str, q2_m_str));
+    CHECK(__quantum__rt__string_equal(one_str, q2_m_str));
 
     // Test via rt__result_equal
-    REQUIRE(__quantum__rt__result_equal(q1_m, zero));
-    REQUIRE(__quantum__rt__result_equal(q2_m, one));
+    CHECK(__quantum__rt__result_equal(q1_m, zero));
+    CHECK(__quantum__rt__result_equal(q2_m, one));
 
     __quantum__rt__finalize();
 }
@@ -1023,14 +1022,14 @@ TEST_CASE("Test __quantum__qis__Counts with num_qubits=2 calling Hadamard, Contr
     double *eigvals = result->first.data_allocated;
 
     for (int i = 0; i < 4; i++) {
-        REQUIRE(eigvals[i] == (double)i);
+        CHECK(eigvals[i] == (double)i);
     }
 
     size_t sum = 0;
     for (int i = 0; i < 4; i++) {
         sum += counts[i];
     }
-    REQUIRE(sum == shots);
+    CHECK(sum == shots);
 
     __quantum__rt__finalize();
 
@@ -1068,8 +1067,8 @@ TEST_CASE("Test __quantum__qis__Counts with num_qubits=2 PartialCounts calling H
     int64_t *counts = result->second.data_allocated;
     double *eigvals = result->first.data_allocated;
 
-    REQUIRE(counts[0] + counts[1] == shots);
-    REQUIRE(eigvals[0] + 1 == eigvals[1]);
+    CHECK(counts[0] + counts[1] == shots);
+    CHECK(eigvals[0] + 1 == eigvals[1]);
 
     __quantum__rt__finalize();
 
@@ -1117,7 +1116,7 @@ TEST_CASE("Test __quantum__qis__Sample with num_qubits=2 calling Hadamard, Contr
         }
     }
 
-    REQUIRE(counts0[0] + counts0[1] == shots);
+    CHECK(counts0[0] + counts0[1] == shots);
 
     size_t counts1[2] = {0, 0};
     for (size_t idx = 1; idx < shots * n; idx += n) {
@@ -1129,7 +1128,7 @@ TEST_CASE("Test __quantum__qis__Sample with num_qubits=2 calling Hadamard, Contr
         }
     }
 
-    REQUIRE(counts1[0] + counts1[1] == shots);
+    CHECK(counts1[0] + counts1[1] == shots);
 
     QUBIT **qubit = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
     auto obs = __quantum__qis__NamedObs(ObsId::PauliZ, *qubit);
@@ -1138,7 +1137,7 @@ TEST_CASE("Test __quantum__qis__Sample with num_qubits=2 calling Hadamard, Contr
     REQUIRE_THROWS_WITH(__quantum__qis__Variance(obs),
                         Catch::Contains("Variance not implemented in PennyLane-Lightning-Kokkos"));
 #else
-    REQUIRE(__quantum__qis__Variance(obs) == Approx(0.0394695).margin(1e-5));
+    CHECK(__quantum__qis__Variance(obs) == Approx(0.0394695).margin(1e-5));
 #endif
 
     __quantum__rt__finalize();
@@ -1185,7 +1184,7 @@ TEST_CASE("Test __quantum__qis__Sample with num_qubits=2 and PartialSample calli
         }
     }
 
-    REQUIRE(counts0[0] + counts0[1] == shots);
+    CHECK(counts0[0] + counts0[1] == shots);
 
     QUBIT **qubit = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
     auto obs = __quantum__qis__NamedObs(ObsId::PauliZ, *qubit);
@@ -1194,7 +1193,7 @@ TEST_CASE("Test __quantum__qis__Sample with num_qubits=2 and PartialSample calli
     REQUIRE_THROWS_WITH(__quantum__qis__Variance(obs),
                         Catch::Contains("Variance not implemented in PennyLane-Lightning-Kokkos"));
 #else
-    REQUIRE(__quantum__qis__Variance(obs) == Approx(0.0394695).margin(1e-5));
+    CHECK(__quantum__qis__Variance(obs) == Approx(0.0394695).margin(1e-5));
 #endif
     __quantum__rt__finalize();
 
@@ -1228,6 +1227,7 @@ TEST_CASE("Test __quantum__qis__QubitUnitary with invalid number of wires", "[qi
                         Catch::Contains("Invalid number of wires"));
 
     delete matrix;
+
     __quantum__rt__finalize();
 }
 
@@ -1248,6 +1248,7 @@ TEST_CASE("Test __quantum__qis__QubitUnitary with invalid matrix", "[qir_lightni
                         Catch::Contains("Invalid given QubitUnitary matrix"));
 
     delete matrix;
+
     __quantum__rt__finalize();
 }
 
@@ -1285,17 +1286,18 @@ TEST_CASE("Test __quantum__qis__QubitUnitary with num_qubits=2", "[qir_lightning
     __quantum__qis__State(result, 0);
     CplxT_double *state = result->data_allocated;
 
-    REQUIRE(state[0].real == Approx(-0.474432).margin(1e-5));
-    REQUIRE(state[0].imag == Approx(-0.44579).margin(1e-5));
-    REQUIRE(state[1].real == Approx(-0.105256).margin(1e-5));
-    REQUIRE(state[1].imag == Approx(0.255159).margin(1e-5));
-    REQUIRE(state[2].real == Approx(-0.168031).margin(1e-5));
-    REQUIRE(state[2].imag == Approx(0.218977).margin(1e-5));
-    REQUIRE(state[3].real == Approx(-0.623553).margin(1e-5));
-    REQUIRE(state[3].imag == Approx(-0.187075).margin(1e-5));
+    CHECK(state[0].real == Approx(-0.474432).margin(1e-5));
+    CHECK(state[0].imag == Approx(-0.44579).margin(1e-5));
+    CHECK(state[1].real == Approx(-0.105256).margin(1e-5));
+    CHECK(state[1].imag == Approx(0.255159).margin(1e-5));
+    CHECK(state[2].real == Approx(-0.168031).margin(1e-5));
+    CHECK(state[2].imag == Approx(0.218977).margin(1e-5));
+    CHECK(state[3].real == Approx(-0.623553).margin(1e-5));
+    CHECK(state[3].imag == Approx(-0.187075).margin(1e-5));
 
     free(state);
     delete result;
     delete matrix;
+
     __quantum__rt__finalize();
 }

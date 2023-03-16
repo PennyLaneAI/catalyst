@@ -35,14 +35,14 @@ TEST_CASE("lightning Basis vector", "[lightning]")
     sim->ReleaseQubit(q);
 
     auto state = sim->State();
-    REQUIRE(state[0].real() == Approx(1.0).epsilon(1e-5));
-    REQUIRE(state[0].imag() == Approx(0.0).epsilon(1e-5));
-    REQUIRE(state[1].real() == Approx(0.0).epsilon(1e-5));
-    REQUIRE(state[1].imag() == Approx(0.0).epsilon(1e-5));
-    REQUIRE(state[2].real() == Approx(0.0).epsilon(1e-5));
-    REQUIRE(state[2].imag() == Approx(0.0).epsilon(1e-5));
-    REQUIRE(state[3].real() == Approx(0.0).epsilon(1e-5));
-    REQUIRE(state[3].imag() == Approx(0.0).epsilon(1e-5));
+    CHECK(state[0].real() == Approx(1.0).epsilon(1e-5));
+    CHECK(state[0].imag() == Approx(0.0).epsilon(1e-5));
+    CHECK(state[1].real() == Approx(0.0).epsilon(1e-5));
+    CHECK(state[1].imag() == Approx(0.0).epsilon(1e-5));
+    CHECK(state[2].real() == Approx(0.0).epsilon(1e-5));
+    CHECK(state[2].imag() == Approx(0.0).epsilon(1e-5));
+    CHECK(state[3].real() == Approx(0.0).epsilon(1e-5));
+    CHECK(state[3].imag() == Approx(0.0).epsilon(1e-5));
 }
 
 TEST_CASE("Qubit allocatation and deallocation", "[lightning]")
@@ -57,25 +57,25 @@ TEST_CASE("Qubit allocatation and deallocation", "[lightning]")
         q = sim->AllocateQubit();
     }
 
-    REQUIRE(n == static_cast<size_t>(q) + 1);
+    CHECK(n == static_cast<size_t>(q) + 1);
 
     std::vector<std::complex<double>> state = sim->State();
 
-    REQUIRE(state.size() == (1UL << n));
-    REQUIRE(state[0].real() == Approx(1.0).epsilon(1e-5));
-    REQUIRE(state[0].imag() == Approx(0.0).epsilon(1e-5));
+    CHECK(state.size() == (1UL << n));
+    CHECK(state[0].real() == Approx(1.0).epsilon(1e-5));
+    CHECK(state[0].imag() == Approx(0.0).epsilon(1e-5));
 
     std::complex<double> sum{0, 0};
     for (size_t i = 1; i < sz; i++) {
         sum += state[i];
     }
 
-    REQUIRE(sum.real() == Approx(0.0).epsilon(1e-5));
-    REQUIRE(sum.imag() == Approx(0.0).epsilon(1e-5));
+    CHECK(sum.real() == Approx(0.0).epsilon(1e-5));
+    CHECK(sum.imag() == Approx(0.0).epsilon(1e-5));
 
 #if !defined(_KOKKOS)
     for (size_t i = n; i > 0; i--) {
-        REQUIRE(state.size() == sz);
+        CHECK(state.size() == sz);
 
         sim->ReleaseQubit(i - 1);
         sim->AllocateQubit();
@@ -92,25 +92,25 @@ TEST_CASE("test AllocateQubits", "[lightning]")
 {
     std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
 
-    REQUIRE(sim->AllocateQubits(0).size() == 0);
+    CHECK(sim->AllocateQubits(0).size() == 0);
 
     auto &&q = sim->AllocateQubits(2);
 
     sim->ReleaseQubit(q[0]);
 
     auto state = sim->State();
-    REQUIRE(state[0].real() == Approx(1.0).epsilon(1e-5));
+    CHECK(state[0].real() == Approx(1.0).epsilon(1e-5));
 }
 
 TEST_CASE("test DeviceShots", "[lightning]")
 {
     std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
 
-    REQUIRE(sim->GetDeviceShots() == 1000);
+    CHECK(sim->GetDeviceShots() == 1000);
 
     sim->SetDeviceShots(500);
 
-    REQUIRE(sim->GetDeviceShots() == 500);
+    CHECK(sim->GetDeviceShots() == 500);
 }
 
 TEST_CASE("compute register tests", "[lightning]")
@@ -137,7 +137,7 @@ TEST_CASE("compute register tests", "[lightning]")
     std::iota(Qs_expected.begin(), Qs_expected.end(), static_cast<QubitIdType>(0));
 
     for (size_t i = 0; i < new_n; i++) {
-        REQUIRE(Qs_expected[i] == Qs[i]);
+        CHECK(Qs_expected[i] == Qs[i]);
     }
 }
 
@@ -168,16 +168,16 @@ TEST_CASE("QuantumDevice object test", "[lightning]")
 
     std::vector<std::complex<double>> out_state = sim->State();
 
-    REQUIRE(out_state[0].real() == Approx(1.0).epsilon(1e-5));
-    REQUIRE(out_state[0].imag() == Approx(0.0).epsilon(1e-5));
+    CHECK(out_state[0].real() == Approx(1.0).epsilon(1e-5));
+    CHECK(out_state[0].imag() == Approx(0.0).epsilon(1e-5));
 
     std::complex<double> sum{0, 0};
     for (size_t i = 1; i < out_state.size(); i++) {
         sum += out_state[i];
     }
 
-    REQUIRE(sum.real() == Approx(0.0).epsilon(1e-5));
-    REQUIRE(sum.imag() == Approx(0.0).epsilon(1e-5));
+    CHECK(sum.real() == Approx(0.0).epsilon(1e-5));
+    CHECK(sum.imag() == Approx(0.0).epsilon(1e-5));
 
     for (size_t i = 0; i < n; i++) {
         sim->ReleaseQubit(static_cast<QubitIdType>(i));
@@ -186,7 +186,7 @@ TEST_CASE("QuantumDevice object test", "[lightning]")
 
 #if !defined(_KOKKOS)
     for (size_t i = 10; i < n + 10; i++) {
-        REQUIRE(static_cast<QubitIdType>(i) == sim->AllocateQubit());
+        CHECK(static_cast<QubitIdType>(i) == sim->AllocateQubit());
         // 10, 11, ..., 19
     }
 
@@ -196,7 +196,7 @@ TEST_CASE("QuantumDevice object test", "[lightning]")
     }
 
     for (size_t i = 20; i < n + 20; i++) {
-        REQUIRE(static_cast<QubitIdType>(i) == sim->AllocateQubit());
+        CHECK(static_cast<QubitIdType>(i) == sim->AllocateQubit());
         // 20, 21, ..., 29
     }
 #endif

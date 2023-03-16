@@ -36,35 +36,35 @@ TEMPLATE_TEST_CASE("StateVectorDynamicCPU::StateVectorDynamicCPU", "[StateVector
 {
     using PrecisionT = TestType;
 
-    SECTION("StateVectorDynamicCPU") { REQUIRE(!std::is_constructible_v<StateVectorDynamicCPU<>>); }
+    SECTION("StateVectorDynamicCPU") { CHECK(!std::is_constructible_v<StateVectorDynamicCPU<>>); }
     SECTION("StateVectorDynamicCPU<TestType>")
     {
-        REQUIRE(!std::is_constructible_v<StateVectorDynamicCPU<TestType>>);
+        CHECK(!std::is_constructible_v<StateVectorDynamicCPU<TestType>>);
     }
     SECTION("StateVectorDynamicCPU<TestType> {size_t}")
     {
-        REQUIRE(std::is_constructible_v<StateVectorDynamicCPU<TestType>, size_t>);
+        CHECK(std::is_constructible_v<StateVectorDynamicCPU<TestType>, size_t>);
         const size_t num_qubits = 4;
         StateVectorDynamicCPU<PrecisionT> sv(num_qubits);
 
-        REQUIRE(sv.getNumQubits() == 4);
-        REQUIRE(sv.getLength() == 16);
-        REQUIRE(sv.getDataVector().size() == 16);
+        CHECK(sv.getNumQubits() == 4);
+        CHECK(sv.getLength() == 16);
+        CHECK(sv.getDataVector().size() == 16);
     }
     SECTION("StateVectorDynamicCPU<TestType> {const "
             "StateVectorRawCPU<TestType>&}")
     {
-        REQUIRE(std::is_constructible_v<StateVectorDynamicCPU<TestType>,
-                                        const StateVectorRawCPU<TestType> &>);
+        CHECK(std::is_constructible_v<StateVectorDynamicCPU<TestType>,
+                                      const StateVectorRawCPU<TestType> &>);
     }
     SECTION("StateVectorDynamicCPU<TestType> {const "
             "StateVectorDynamicCPU<TestType>&}")
     {
-        REQUIRE(std::is_copy_constructible_v<StateVectorDynamicCPU<TestType>>);
+        CHECK(std::is_copy_constructible_v<StateVectorDynamicCPU<TestType>>);
     }
     SECTION("StateVectorDynamicCPU<TestType> {StateVectorDynamicCPU<TestType>&&}")
     {
-        REQUIRE(std::is_move_constructible_v<StateVectorDynamicCPU<TestType>>);
+        CHECK(std::is_move_constructible_v<StateVectorDynamicCPU<TestType>>);
     }
     SECTION("Aligned 256bit statevector")
     {
@@ -72,15 +72,15 @@ TEMPLATE_TEST_CASE("StateVectorDynamicCPU::StateVectorDynamicCPU", "[StateVector
         StateVectorDynamicCPU<PrecisionT> sv(4, Threading::SingleThread, memory_model);
         /* Even when we allocate 256 bit aligend memory, it is possible that the
          * alignment happens to be 512 bit */
-        REQUIRE(((getMemoryModel(sv.getDataVector().data()) == CPUMemoryModel::Aligned256) ||
-                 (getMemoryModel(sv.getDataVector().data()) == CPUMemoryModel::Aligned512)));
+        CHECK(((getMemoryModel(sv.getDataVector().data()) == CPUMemoryModel::Aligned256) ||
+               (getMemoryModel(sv.getDataVector().data()) == CPUMemoryModel::Aligned512)));
     }
 
     SECTION("Aligned 512bit statevector")
     {
         const auto memory_model = CPUMemoryModel::Aligned512;
         StateVectorDynamicCPU<PrecisionT> sv(4, Threading::SingleThread, memory_model);
-        REQUIRE((getMemoryModel(sv.getDataVector().data()) == CPUMemoryModel::Aligned512));
+        CHECK((getMemoryModel(sv.getDataVector().data()) == CPUMemoryModel::Aligned512));
     }
 }
 
@@ -134,7 +134,7 @@ TEMPLATE_TEST_CASE("StateVectorDynamicCPU::applyMatrix with a pointer", "[StateV
             sv1.applyMatrix(m, wires);
             Gates::GateImplementationsPI::applyMultiQubitOp<PrecisionT>(sv2.getData(), num_qubits,
                                                                         m.data(), wires, false);
-            REQUIRE(sv1.getDataVector() == approx(sv2.getDataVector()).margin(PrecisionT{1e-5}));
+            CHECK(sv1.getDataVector() == approx(sv2.getDataVector()).margin(PrecisionT{1e-5}));
         }
     }
 }
@@ -169,7 +169,7 @@ TEMPLATE_TEST_CASE("StateVectorDynamicCPU::applyOperations", "[StateVectorDynami
         sv2.applyOperation("PauliX", {0}, false);
         sv2.applyOperation("PauliY", {1}, false);
 
-        REQUIRE(sv1.getDataVector() == approx(sv2.getDataVector()));
+        CHECK(sv1.getDataVector() == approx(sv2.getDataVector()));
     }
 
     SECTION("Test invalid arguments with params")
@@ -198,6 +198,6 @@ TEMPLATE_TEST_CASE("StateVectorDynamicCPU::applyOperations", "[StateVectorDynami
         sv2.applyOperation("RX", {0}, false, {0.1});
         sv2.applyOperation("RY", {1}, false, {0.2});
 
-        REQUIRE(sv1.getDataVector() == approx(sv2.getDataVector()));
+        CHECK(sv1.getDataVector() == approx(sv2.getDataVector()));
     }
 }
