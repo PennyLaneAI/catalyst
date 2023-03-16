@@ -674,8 +674,6 @@ void __quantum__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, .
 {
     assert(numQubits >= 0);
 
-    using CplxTD = CplxT_double;
-
     va_list args;
     va_start(args, numQubits);
     std::vector<QubitIdType> wires(numQubits);
@@ -702,18 +700,10 @@ void __quantum__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, .
     const size_t numElements = sv_state.size();
     assert(numElements == (1U << numQubits));
 
-    // TODO: memory management
-    CplxTD *stateVec = (CplxTD *)aligned_alloc(sizeof(CplxTD), numElements * sizeof(CplxTD));
     for (size_t idx = 0; idx < numElements; idx++) {
-        stateVec[idx].real = std::real(sv_state[idx]);
-        stateVec[idx].imag = std::imag(sv_state[idx]);
+        result->data_aligned[idx].real = std::real(sv_state[idx]);
+        result->data_aligned[idx].imag = std::imag(sv_state[idx]);
     }
-
-    result->data_allocated = stateVec;
-    result->data_aligned = stateVec;
-    result->offset = 0;
-    result->sizes[0] = numElements;
-    result->strides[0] = 1;
 }
 
 void __quantum__qis__Sample(MemRefT_double_2d *result, int64_t shots, int64_t numQubits, ...)
