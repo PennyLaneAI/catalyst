@@ -423,13 +423,15 @@ func.func @probs(%q : !quantum.bit) {
     // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
     // CHECK: llvm.call @__quantum__qis__Probs([[ptr]], [[c1]], %arg0)
     // CHECK: llvm.load [[ptr]]
-    quantum.probs %o1 : memref<2xf64>
+    %alloc1 = memref.alloc() : memref<2xf64>
+    quantum.probs %o1 in(%alloc1 : memref<2xf64>) : memref<2xf64>
     // CHECK: [[c1:%.+]] = llvm.mlir.constant(1 : i64)
     // CHECK: [[ptr:%.+]] = llvm.alloca [[c1]] x !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>
     // CHECK: [[c4:%.+]] = llvm.mlir.constant(4 : i64)
     // CHECK: llvm.call @__quantum__qis__Probs([[ptr]], [[c4]], %arg0, %arg0, %arg0, %arg0)
     // CHECK: llvm.load [[ptr]]
-    quantum.probs %o2 : memref<16xf64>
+    %alloc2 = memref.alloc() : memref<16xf64>
+    quantum.probs %o2 in(%alloc2 : memref<16xf64>) : memref<16xf64>
 
     return
 }

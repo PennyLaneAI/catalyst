@@ -612,10 +612,7 @@ template <typename T> struct StateBasedPattern : public OpConversionPattern<T> {
         Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
         Value structPtr =
             rewriter.create<LLVM::AllocaOp>(loc, LLVM::LLVMPointerType::get(vectorType), c1);
-
-        if constexpr (std::is_same_v<T, StateOp>) {
-            rewriter.create<LLVM::StoreOp>(loc, adaptor.getStateIn(), structPtr);
-        }
+        rewriter.create<LLVM::StoreOp>(loc, adaptor.getStateIn(), structPtr);
 
         // For now obtain the qubit values from an unrealized cast created by the
         // ComputationalBasisOp lowering. Improve this once the runtime interface changes to
