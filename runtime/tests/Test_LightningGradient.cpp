@@ -42,11 +42,11 @@ TEST_CASE("Test __quantum__qis__Gradient_params with numAlloc=0", "[Gradient]")
 TEST_CASE("Test __quantum__qis__Gradient_params for zero number of obs", "[Gradient]")
 {
     // Test qis__Gradient:
-    int64_t trainParams[1] = {0};
+    std::vector<int64_t> trainParams{0};
     MemRefT_double_1d *results = new MemRefT_double_1d();
     MemRefT_int64_1d *tp = new MemRefT_int64_1d();
-    tp->data_aligned = trainParams;
-    tp->data_allocated = trainParams;
+    tp->data_aligned = trainParams.data();
+    tp->data_allocated = trainParams.data();
     tp->sizes[0] = 1;
     tp->strides[0] = 0;
 
@@ -74,11 +74,11 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
           "[Gradient]")
 {
     // Test qis__Gradient:
-    int64_t trainParams[1] = {0};
+    std::vector<int64_t> trainParams{0};
     MemRefT_double_1d *results = new MemRefT_double_1d();
     MemRefT_int64_1d *tp = new MemRefT_int64_1d();
-    tp->data_aligned = trainParams;
-    tp->data_allocated = trainParams;
+    tp->data_aligned = trainParams.data();
+    tp->data_allocated = trainParams.data();
     tp->sizes[0] = 1;
     tp->strides[0] = 0;
 
@@ -113,11 +113,11 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
           "[Gradient]")
 {
     // Test qis__Gradient:
-    int64_t trainParams[1] = {0};
+    std::vector<int64_t> trainParams{0};
     MemRefT_double_1d *results = new MemRefT_double_1d();
     MemRefT_int64_1d *tp = new MemRefT_int64_1d();
-    tp->data_aligned = trainParams;
-    tp->data_allocated = trainParams;
+    tp->data_aligned = trainParams.data();
+    tp->data_allocated = trainParams.data();
     tp->sizes[0] = 1;
     tp->strides[0] = 0;
 
@@ -157,19 +157,19 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
           "[Gradient]")
 {
     // Test qis__Gradient:
-    int64_t trainParams[1] = {0};
+    std::vector<int64_t> trainParams{0};
     MemRefT_double_1d *result = new MemRefT_double_1d();
-    double *buffer = new double[1];
+    size_t J = trainParams.size();
+    double *buffer = new double[J];
     result->data_aligned = buffer;
     result->data_allocated = buffer;
     MemRefT_double_1d *result_tp = new MemRefT_double_1d();
-    size_t J = 1;
     double *buffer_tp = new double[J];
     result_tp->data_aligned = buffer_tp;
     result_tp->data_allocated = buffer_tp;
     MemRefT_int64_1d *tp_memref = new MemRefT_int64_1d();
-    tp_memref->data_aligned = trainParams;
-    tp_memref->data_allocated = trainParams;
+    tp_memref->data_aligned = trainParams.data();
+    tp_memref->data_allocated = trainParams.data();
     tp_memref->sizes[0] = 1;
     tp_memref->strides[0] = 0;
 
@@ -208,19 +208,19 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
           "[Gradient]")
 {
     // Test qis__Gradient:
-    int64_t trainParams[1] = {0};
+    std::vector<int64_t> trainParams{0};
     MemRefT_double_1d *result = new MemRefT_double_1d();
-    double *buffer = new double[8];
+    size_t J = trainParams.size();
+    double *buffer = new double[J];
     result->data_aligned = buffer;
     result->data_allocated = buffer;
     MemRefT_double_1d *result_tp = new MemRefT_double_1d();
-    size_t J = 1;
     double *buffer_tp = new double[J];
     result_tp->data_aligned = buffer_tp;
     result_tp->data_allocated = buffer_tp;
     MemRefT_int64_1d *tp_memref = new MemRefT_int64_1d();
-    tp_memref->data_aligned = trainParams;
-    tp_memref->data_allocated = trainParams;
+    tp_memref->data_aligned = trainParams.data();
+    tp_memref->data_allocated = trainParams.data();
     tp_memref->sizes[0] = 1;
     tp_memref->strides[0] = 0;
 
@@ -272,9 +272,9 @@ TEST_CASE("Test __quantum__qis__Gradient_params and __quantum__qis__Gradient "
 {
     const std::vector<double> param{-M_PI / 7, M_PI / 5, 2 * M_PI / 3};
 
-    int64_t trainParams[1] = {0};
+    std::vector<int64_t> trainParams{0};
     MemRefT_double_1d *result = new MemRefT_double_1d();
-    size_t J = param.size() * 1;
+    size_t J = param.size() * trainParams.size();
     double *buffer = new double[J];
     result->data_aligned = buffer;
     result->data_allocated = buffer;
@@ -283,8 +283,8 @@ TEST_CASE("Test __quantum__qis__Gradient_params and __quantum__qis__Gradient "
     result_tp->data_aligned = buffer_tp;
     result_tp->data_allocated = buffer_tp;
     MemRefT_int64_1d *tp_memref = new MemRefT_int64_1d();
-    tp_memref->data_aligned = trainParams;
-    tp_memref->data_allocated = trainParams;
+    tp_memref->data_aligned = trainParams.data();
+    tp_memref->data_allocated = trainParams.data();
     tp_memref->sizes[0] = 1;
     tp_memref->strides[0] = 0;
 
@@ -334,19 +334,19 @@ TEST_CASE("Test __quantum__qis__Gradient_params Op=[Hadamard,RZ,RY,RZ,S,T,ParamS
     };
 
     // Test qis__Gradient:
-    int64_t trainParams[3] = {0, 1, 2};
+    std::vector<int64_t> trainParams{0, 1, 2};
     MemRefT_double_1d *result = new MemRefT_double_1d();
+    size_t J = param.size() * trainParams.size();
     double *buffer = new double[3];
     result->data_aligned = buffer;
     result->data_allocated = buffer;
     MemRefT_double_1d *result_tp = new MemRefT_double_1d();
-    size_t J = expected.size() * 3;
     double *buffer_tp = new double[J];
     result_tp->data_aligned = buffer_tp;
     result_tp->data_allocated = buffer_tp;
     MemRefT_int64_1d *tp_memref = new MemRefT_int64_1d();
-    tp_memref->data_aligned = trainParams;
-    tp_memref->data_allocated = trainParams;
+    tp_memref->data_aligned = trainParams.data();
+    tp_memref->data_allocated = trainParams.data();
     tp_memref->sizes[0] = 3;
     tp_memref->strides[0] = 0;
 
@@ -394,18 +394,20 @@ TEST_CASE("Test __quantum__qis__Gradient_params Op=[Hadamard,RZ,RY,RZ,S,T,ParamS
 TEST_CASE("Test __quantum__qis__Gradient Op=[RX,CY], Obs=[Z,Z]", "[Gradient]")
 {
     // Test qis__Gradient:
-    int64_t trainParams[1] = {0};
+    std::vector<int64_t> trainParams{0};
+    const std::vector<double> expected{-sin(-M_PI / 7), 0.4338837391};
     MemRefT_double_1d *result0 = new MemRefT_double_1d();
-    double *buffer0 = new double[4];
+    size_t J = trainParams.size() * expected.size();
+    double *buffer0 = new double[J];
     result0->data_aligned = buffer0;
     result0->data_allocated = buffer0;
     MemRefT_double_1d *result1 = new MemRefT_double_1d();
-    double *buffer1 = new double[4];
+    double *buffer1 = new double[J];
     result1->data_aligned = buffer1;
     result1->data_allocated = buffer1;
     MemRefT_int64_1d *tp_memref = new MemRefT_int64_1d();
-    tp_memref->data_aligned = trainParams;
-    tp_memref->data_allocated = trainParams;
+    tp_memref->data_aligned = trainParams.data();
+    tp_memref->data_allocated = trainParams.data();
     tp_memref->sizes[0] = 1;
     tp_memref->strides[0] = 0;
 
@@ -429,7 +431,6 @@ TEST_CASE("Test __quantum__qis__Gradient Op=[RX,CY], Obs=[Z,Z]", "[Gradient]")
 
     __quantum__rt__toggle_recorder(/* activate_cm */ false);
 
-    const std::vector<double> expected{-sin(-M_PI / 7), 0.4338837391};
     CHECK(expected[0] == Approx(result0->data_aligned[0]).margin(1e-5));
     CHECK(expected[1] == Approx(result1->data_aligned[0]).margin(1e-5));
 
@@ -448,9 +449,9 @@ TEST_CASE("Test __quantum__qis__Gradient_params Op=[RX,RX,RX,CZ], Obs=[Z,Z,Z]", 
     const std::vector<double> expected{-sin(param[0]), -sin(param[1]), -sin(param[2])};
 
     // Test qis__Gradient:
-    int64_t trainParams[3] = {0, 1, 2};
+    std::vector<int64_t> trainParams{0, 1, 2};
     MemRefT_double_1d *result0 = new MemRefT_double_1d();
-    size_t J = expected.size() * 3;
+    size_t J = param.size() * trainParams.size();
     double *buffer0 = new double[J];
     result0->data_aligned = buffer0;
     result0->data_allocated = buffer0;
@@ -463,8 +464,8 @@ TEST_CASE("Test __quantum__qis__Gradient_params Op=[RX,RX,RX,CZ], Obs=[Z,Z,Z]", 
     result2->data_aligned = buffer2;
     result2->data_allocated = buffer2;
     MemRefT_int64_1d *tp_memref = new MemRefT_int64_1d();
-    tp_memref->data_aligned = trainParams;
-    tp_memref->data_allocated = trainParams;
+    tp_memref->data_aligned = trainParams.data();
+    tp_memref->data_allocated = trainParams.data();
     tp_memref->sizes[0] = 3;
     tp_memref->strides[0] = 0;
 
@@ -517,9 +518,9 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
                                        0.275139672, -0.0129093062, 0.3238461564};
 
     // Test qis__Gradient:
-    int64_t trainParams[6] = {0, 1, 2, 3, 4, 5};
+    std::vector<int64_t> trainParams{0, 1, 2, 3, 4, 5};
     MemRefT_double_1d *result = new MemRefT_double_1d();
-    size_t J = expected.size() * 6;
+    size_t J = param.size() * trainParams.size();
     double *buffer = new double[J];
     result->data_aligned = buffer;
     result->data_allocated = buffer;
@@ -528,8 +529,8 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     result_tp->data_aligned = buffer_tp;
     result_tp->data_allocated = buffer_tp;
     MemRefT_int64_1d *tp_memref = new MemRefT_int64_1d();
-    tp_memref->data_aligned = trainParams;
-    tp_memref->data_allocated = trainParams;
+    tp_memref->data_aligned = trainParams.data();
+    tp_memref->data_allocated = trainParams.data();
     tp_memref->sizes[0] = 6;
     tp_memref->strides[0] = 0;
 
@@ -594,9 +595,9 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     const std::vector<double> expected{0.0, -0.414506421, 0.0, 0.0, -0.4643270456, 0.0210905264};
 
     // Test qis__Gradient:
-    int64_t trainParams[6] = {0, 1, 2, 3, 4, 5};
+    std::vector<int64_t> trainParams{0, 1, 2, 3, 4, 5};
     MemRefT_double_1d *result = new MemRefT_double_1d();
-    size_t J = expected.size() * 6;
+    size_t J = expected.size() * trainParams.size();
     double *buffer = new double[J];
     result->data_aligned = buffer;
     result->data_allocated = buffer;
@@ -605,8 +606,8 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     result_tp->data_aligned = buffer_tp;
     result_tp->data_allocated = buffer_tp;
     MemRefT_int64_1d *tp_memref = new MemRefT_int64_1d();
-    tp_memref->data_aligned = trainParams;
-    tp_memref->data_allocated = trainParams;
+    tp_memref->data_aligned = trainParams.data();
+    tp_memref->data_allocated = trainParams.data();
     tp_memref->sizes[0] = 6;
     tp_memref->strides[0] = 0;
 
@@ -674,9 +675,9 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     const std::vector<double> expected{0.0, -0.2493761627, 0.0, 0.0, -0.1175570505, 0.0};
 
     // Test qis__Gradient:
-    int64_t trainParams[6] = {0, 1, 2, 3, 4, 5};
+    std::vector<int64_t> trainParams{0, 1, 2, 3, 4, 5};
     MemRefT_double_1d *result = new MemRefT_double_1d();
-    size_t J = expected.size() * 6;
+    size_t J = param.size() * trainParams.size();
     double *buffer = new double[J];
     result->data_aligned = buffer;
     result->data_allocated = buffer;
@@ -685,8 +686,8 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     result_tp->data_aligned = buffer_tp;
     result_tp->data_allocated = buffer_tp;
     MemRefT_int64_1d *tp_memref = new MemRefT_int64_1d();
-    tp_memref->data_aligned = trainParams;
-    tp_memref->data_allocated = trainParams;
+    tp_memref->data_aligned = trainParams.data();
+    tp_memref->data_allocated = trainParams.data();
     tp_memref->sizes[0] = 6;
     tp_memref->strides[0] = 0;
 
@@ -758,9 +759,9 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
           "[Gradient]")
 {
     // Test qis__Gradient:
-    int64_t trainParams[1] = {0};
+    std::vector<int64_t> trainParams{0};
     MemRefT_double_1d *result = new MemRefT_double_1d();
-    size_t J = 1;
+    size_t J = 9 * trainParams.size();
     double *buffer = new double[J];
     result->data_aligned = buffer;
     result->data_allocated = buffer;
@@ -769,8 +770,8 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     result_tp->data_aligned = buffer_tp;
     result_tp->data_allocated = buffer_tp;
     MemRefT_int64_1d *tp_memref = new MemRefT_int64_1d();
-    tp_memref->data_aligned = trainParams;
-    tp_memref->data_allocated = trainParams;
+    tp_memref->data_aligned = trainParams.data();
+    tp_memref->data_allocated = trainParams.data();
     tp_memref->sizes[0] = 1;
     tp_memref->strides[0] = 0;
 
