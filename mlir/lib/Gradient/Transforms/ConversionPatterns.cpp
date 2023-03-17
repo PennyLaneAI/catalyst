@@ -103,8 +103,10 @@ struct AdjointOpPattern : public OpConversionPattern<AdjointOp> {
             rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(op.getNumResults()));
         SmallVector<Value> args = {numResults};
         for (unsigned i = 0; i < op.getNumResults(); i++) {
-            args.push_back(
-                rewriter.create<LLVM::AllocaOp>(loc, LLVM::LLVMPointerType::get(vectorType), c1));
+            auto newArg =
+                rewriter.create<LLVM::AllocaOp>(loc, LLVM::LLVMPointerType::get(vectorType), c1);
+            rewriter.create<LLVM::StoreOp>(loc, adaptor.getDataIn()[i], newArg);
+            args.push_back(newArg);
         }
 
         SmallVector<Value> gradients;

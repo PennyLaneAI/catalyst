@@ -29,7 +29,7 @@ func.func @adjoint(%arg0: f32, %arg1 : index) -> (memref<?xf64>, memref<?xf64>) 
     // CHECK-DAG:   [[T:%.+]] = llvm.mlir.constant(true) : i1
     // CHECK-DAG:   [[F:%.+]] = llvm.mlir.constant(false) : i1
 
-    // CHECK:       llvm.call @__quantum__rt__toggle_recorder(%0) : (i1) -> ()
+    // CHECK:       llvm.call @__quantum__rt__toggle_recorder([[T]]) : (i1) -> ()
     // CHECK:       [[QREG:%.+]] = call @circuit.nodealloc(%arg0)
     // CHECK:       llvm.call @__quantum__rt__toggle_recorder([[F]])
 
@@ -42,7 +42,9 @@ func.func @adjoint(%arg0: f32, %arg1 : index) -> (memref<?xf64>, memref<?xf64>) 
     // CHECK:       quantum.dealloc [[QREG]]
     // CHECK:       llvm.load [[GRAD1]]
     // CHECK:       llvm.load [[GRAD2]]
-    %grad:2 = gradient.adjoint @circuit.nodealloc(%arg0) : (f32) -> (memref<?xf64>, memref<?xf64>)
+    %alloc0 = memref.alloc(%arg1) : memref<?xf64>
+    %alloc1 = memref.alloc(%arg1) : memref<?xf64>
+    %grad:2 = gradient.adjoint @circuit.nodealloc(%arg0) size(%arg1) in(%alloc0, %alloc1 : memref<?xf64>, memref<?xf64>) : (f32) -> (memref<?xf64>, memref<?xf64>)
 
     return %grad#0, %grad#1 : memref<?xf64>, memref<?xf64>
 }
