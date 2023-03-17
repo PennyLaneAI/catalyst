@@ -146,6 +146,24 @@ def run_jax_default_qubit(N=7, L=10):
     return _main(p.trial_params(0))
 
 
+def profile_jax_default_qubit(N=7, L=10):
+    """Test entry point"""
+    import jax
+
+    jax.config.update("jax_enable_x64", True)
+
+    p = ProblemPL(qml.device("default.qubit", wires=N, shots=None), L, interface="jax")
+    print(f"Size: {size(p)}")
+
+    @jax.jit
+    def _main(params):
+        qcompile(p, params)
+        return workflow(p, params)
+
+    with jax.profiler.trace("/tmp/jax-trace", create_perfetto_link=True):
+        jax.make_jaxpr(_main)(p.trial_params(0))
+
+
 def run_jax_lightning_qubit(N=7):
     """Test entry point"""
     import jax

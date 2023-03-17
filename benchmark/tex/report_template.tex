@@ -48,46 +48,73 @@
 \section{Preambule}
 
 \begin{enumerate}
-    \item We benchmark the following problems:
+    \item We use the following problems for the benchmark:
         \begin{itemize}
-            \item \t{Grover} ("regiular" circuit)
-            \item \t{Grover} ("deep" circuit)
-            \item \t{ChemVQE} (variational problem)
+            \item \t{Grover} - The grover-like problem parametrized by the \textbf{number of qubits} and the
+                \textbf{number of layers}.
+            \item \t{QFT-Hybrid} - The QFT-like problem called in a classical loop, parametrized by
+                the \textbf{number of qubits} and the \textbf{number of quantum layers}.
+            \item \t{ChemVQE} - VQE-like problem, for which the quantum gradient is called in a
+                classical loop. Parametrized by the \textbf{number of qubits} and the
+                \textbf{differentiation method} name.
         \end{itemize}
-    \item For every problem, we benchmark the follwing implementations:
+    \item For each problem, we vary the number of qubits, the number of layers, both
+        number of qubits and the differentiation method (if applicable).
+    \item For every problem, we try the following implementations:
         \begin{itemize}
             \item \t{catalyst/lighting}
-            \item \t{pennylane/*}
-            \item \t{pennylane+jax/*}
+            \item \t{pennylane/default.qubit}
+            \item \t{pennylane/lightning}
+            \item \t{pennylane+jax/default.qubit}
+            \item \t{pennylane+jax/lightning}
         \end{itemize}
     \item For every implementation, we measure \t{compilation} and \t{running} times. We follow the
     framework authors' terminology, e.g. we define \t{PennyLane+Jax compilation} as calling the
     \t{compile} function of the JAX function object.
 
-    \item Totally we run six different measurement procedures encoded in the
+    \item Totally we run a number of different measurement procedures, as encoded in the
     \href{https://github.com/XanaduAI/pennylane-mlir/blob/benchmarking-1-2/benchmark/catalyst_benchmark/main.py#L84}{Python module}.
 
-    \item For all the measurements we aim to put all the available data on the plots, thus the
-        additional "trial" dimention encoded as varying opacity.
+    \item For all the measurements we aim to put all the available data on the plots.
 \end{enumerate}
 
 \pagebreak
-\section{Regular circuits}
+\section{Grover-like problem}
 
-\bmimage{regular_compile}
+\subsection{Varying number of qubits}
 
-\bmimage{regular_runtime}
+\bmimage{regular_grover_compile}
 
-
-\pagebreak
-\section{Deep circuits}
-
-\bmimage{deep_compile}
-
-\bmimage{deep_runtime}
+\bmimage{regular_grover_runtime}
 
 \pagebreak
-\section{Variational circuits (as line plots)}
+\subsection{Varying number of layers}
+
+\bmimage{deep_grover_compile}
+
+\bmimage{deep_grover_runtime}
+
+\section{Hybrid-QFT problem}
+
+\subsection{Varying number of qubits}
+
+\bmimage{regular_qfth_compile}
+
+\bmimage{regular_qfth_runtime}
+
+\pagebreak
+\subsection{Varying number of layers}
+
+\bmimage{deep_qfth_compile}
+
+\bmimage{deep_qfth_runtime}
+
+\pagebreak
+\section{VQE-like problem}
+
+\subsection{Varying number of qubit and gradient methods}
+
+\subsubsection{As line-charts}
 
 \bmimage{variational_compile_adjoint_lineplot}
 
@@ -108,7 +135,7 @@
 \bmimage{variational_runtime_parametershift_lineplot}
 
 \pagebreak
-\section{Variational circuits (as bar charts)}
+\subsubsection{As bar-charts}
 
 \bmimage{variational_runtime_adjoint}
 
@@ -121,13 +148,26 @@
 \pagebreak
 \section{Appendinx: Trial views}
 
-\bmimage{regular_compile_trial}
+\subsection{Grover-like problem}
+\bmimage{regular_grover_compile_trial}
 
-\bmimage{regular_runtime_trial}
+\bmimage{regular_grover_runtime_trial}
 
-\bmimage{deep_compile_trial}
+\bmimage{deep_grover_compile_trial}
 
-\bmimage{deep_runtime_trial}
+\bmimage{deep_grover_runtime_trial}
+
+\subsection{Hybrid-QFT problem}
+
+\bmimage{regular_qfth_compile_trial}
+
+\bmimage{regular_qfth_runtime_trial}
+
+\bmimage{deep_qfth_compile_trial}
+
+\bmimage{deep_qfth_runtime_trial}
+
+\subsection{VQE-like problem}
 
 \bmimage{variational_compile_trial_adjoint_lineplot}
 

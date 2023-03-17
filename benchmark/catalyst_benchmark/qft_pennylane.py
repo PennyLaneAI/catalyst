@@ -86,3 +86,17 @@ def run_lightning_qubit(N=6):
     params = p.trial_params(0)
     result = _main(params)
     print(f"Result: {result}")
+
+
+def run_default_qubit(N=6):
+    """Test problem entry point"""
+
+    p = ProblemPL(dev=qml.device("default.qubit", wires=N, shots=SHOTS))
+
+    def _main(params):
+        qcompile(p, params)
+        return workflow(p, params)
+
+    params = p.trial_params(0)
+    result = _main(params)
+    print(f"Result: {result}")

@@ -57,20 +57,21 @@ PL_L = ALIASES["pennylane/lightning.qubit"]
 PLjax_L = ALIASES["pennylane+jax/lightning.qubit"]
 
 CATPROBLEMS = {
-    "regular": "grover",
-    "deep": "grover",
-    "hybrid": None,
-    # "variational": "vqe",
-    "variational": "chemvqe",
+    "regular": ["grover","qfth"],
+    "deep": ["grover","qfth"],
+    # "hybrid": [None],
+    "variational": ["chemvqe"],
 }
 
-MINQUBITS = 7
-MAXQUBITS = 29
 QUBITS = {
-    ("regular", "grover", "compile"): [MINQUBITS, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, MAXQUBITS],
-    ("regular", "grover", "runtime"): [MINQUBITS, 9, 11, 13, 15, 17],
+    ("regular", "grover", "compile"): [7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29],
+    ("regular", "grover", "runtime"): [7, 9, 11, 13, 15, 17],
+    ("regular", "qfth", "compile"): [1, 2, 3, 4, 5, 6, 7],
+    ("regular", "qfth", "runtime"): [1, 2, 3, 4, 5, 6, 7],
     ("deep", "grover", "compile"): [7],
     ("deep", "grover", "runtime"): [7],
+    ("deep", "qfth", "compile"): [7],
+    ("deep", "qfth", "runtime"): [7],
     ("deep", "qft", "compile"): [7],
     ("deep", "qft", "runtime"): [7],
     ("variational", "vqe", "compile"): [6, 7, 8, 9, 10, 11],
@@ -85,6 +86,10 @@ LAYERS = {
         [10, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200, 1300, 1400, MAXLAYERS],
     ("deep", "grover", "runtime"):
         [10, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200, 1300, 1400, MAXLAYERS],
+    ("deep", "qfth", "compile"):
+        [1, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, MAXLAYERS//10],
+    ("deep", "qfth", "runtime"):
+        [1, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, MAXLAYERS//10],
     ("deep", "qft", "compile"):
         [10, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200, 1300, 1400, MAXLAYERS],
     ("deep", "qft", "runtime"):
@@ -106,7 +111,7 @@ DIFF_METHODS = {
 COLORS = ["#e41a1c", "#377eb8", "#ff7f00", "#4daf4a", "#984ea3",
           "#ffff33", "#a65628", "#f781bf", "#999999"]
 
-MEASUREMENTS = ["compile", "runtime", "compile-circuit"]
+MEASUREMENTS = ["compile", "runtime"]
 
 # fmt:on
 
@@ -124,7 +129,7 @@ def syshash(a) -> str:
 def ofile(a, _, measure, problem, impl, nqubits, nlayers, diffmethod) -> Tuple[str, str]:
     """Produce the JSON file name containing the measurement configured and
     the Linux shell command which is expected to produce such file."""
-    measure_ = measure.replace("-","")
+    measure_ = measure.replace("-", "")
     impl_ = impl.replace("+", "_").replace("/", "_").replace(".", "_")
     dmfilepart = f"_{diffmethod}".replace("-", "_") if diffmethod is not None else ""
     ofname = (
@@ -134,7 +139,7 @@ def ofile(a, _, measure, problem, impl, nqubits, nlayers, diffmethod) -> Tuple[s
     if problem == "grover":
         assert diffmethod is None
         params = f"--nlayers={nlayers}" if nlayers is not None else ""
-    elif problem == "qft":
+    elif problem == "qft" or problem == "qfth":
         assert diffmethod is None
         params = f"--nlayers={nlayers}" if nlayers is not None else ""
     elif problem == "vqe" or problem == "chemvqe":
@@ -169,19 +174,21 @@ def all_configurations(a: ParsedArguments) -> Iterable[tuple]:
             framework, _, _ = parse_implementation(impl)
 
             for cat in ["regular", "deep", "hybrid", "variational"]:
-                if not any([(m in a.measure.split(',')) for m in [measure, "all"]]):
+                if not any([(m in a.measure.split(",")) for m in [measure, "all"]]):
                     continue
-                if not any([(c in a.category.split(',')) for c in [cat, "all"]]):
-                    continue
-
-                problem = CATPROBLEMS.get(cat, None)
-                if problem is None:
+                if not any([(c in a.category.split(",")) for c in [cat, "all"]]):
                     continue
 
-                for diffmethod in DIFF_METHODS.get((problem, measure),[None]):
-                    for nqubits in sorted(QUBITS.get((cat, problem, measure), [None])):
-                        for nlayers in sorted(LAYERS.get((cat, problem, measure), [None])):
-                            yield (cat, measure, problem, impl, nqubits, nlayers, diffmethod)
+                for problem in CATPROBLEMS.get(cat, [None]):
+                    if problem is None:
+                        continue
+                    if not any([(p in a.problems.split(",")) for p in [problem, "all"]]):
+                        continue
+
+                    for diffmethod in DIFF_METHODS.get((problem, measure), [None]):
+                        for nqubits in sorted(QUBITS.get((cat, problem, measure), [None])):
+                            for nlayers in sorted(LAYERS.get((cat, problem, measure), [None])):
+                                yield (cat, measure, problem, impl, nqubits, nlayers, diffmethod)
 
 
 def collect(a: ParsedArguments) -> None:
@@ -216,7 +223,7 @@ def collect(a: ParsedArguments) -> None:
                     ):
                         print(f"{message} [WOULDFAIL]")
                     else:
-                        print(f"{message}", end='', flush=True)
+                        print(f"{message}", end="", flush=True)
                         system(cmdline)
                         if not isfile(ofname):
                             known_failures[(problem, measure, impl, diffmethod)] = (
@@ -278,7 +285,7 @@ def load(a: ParsedArguments) -> Tuple[DataFrame, Optional[Sysinfo]]:
         else:
             print("Pass -V to see the full list", file=sys.stderr)
     if len(systems) > 1:
-        systems_str = '\n'.join([str(s) for s in systems])
+        systems_str = "\n".join([str(s) for s in systems])
         print(f"Data was collected from more than one system:\n{systems_str}", file=sys.stderr)
     return DataFrame(data), (list(systems)[0] if len(systems) > 0 else None)
 
@@ -427,86 +434,99 @@ def plot(a: ParsedArguments, df_full: DataFrame, sysinfo: Optional[Sysinfo] = No
             )
 
         # Regular circuits
-        df = _filter("regular", "compile", CATPROBLEMS["regular"])
-        xaxis = alt.Axis(values=list(range(MINQUBITS, MAXQUBITS + 2, 2)))
-        xscale = alt.Scale(domain=(MINQUBITS, MAXQUBITS))
-        _plot_linechart(
-            df,
-            "_img/regular_compile",
-            _nqubitsEncoding,
-            _mktitle("Compilation time, Regular circuits"),
-            PL_L,
-            axis=xaxis,
-            scale=xscale,
-        )
-        _plot_trial_linechart(
-            df,
-            "_img/regular_compile_trial",
-            _nqubitsEncoding,
-            _mktitle("Compilation time/trial, Regular circuits"),
-        )
+        for problem in CATPROBLEMS["regular"]:
+            df = _filter("regular", "compile", problem)
+            nq = QUBITS[("regular", problem, "compile")]
+            xmin = min(nq)
+            xmax = max(nq)
+            step = nq[1] - nq[0]
+            xaxis = alt.Axis(values=list(range(xmin, xmax + step, step)))
+            xscale = alt.Scale(domain=(xmin, xmax))
+            _plot_linechart(
+                df,
+                f"_img/regular_{problem}_compile",
+                _nqubitsEncoding,
+                _mktitle("Compilation time, Regular circuits"),
+                PL_L,
+                axis=xaxis,
+                scale=xscale,
+            )
+            _plot_trial_linechart(
+                df,
+                f"_img/regular_{problem}_compile_trial",
+                _nqubitsEncoding,
+                _mktitle("Compilation time/trial, Regular circuits"),
+            )
 
-        df = _filter("regular", "runtime", CATPROBLEMS["regular"])
-        _plot_linechart(
-            df,
-            "_img/regular_runtime",
-            _nqubitsEncoding,
-            _mktitle("Running time, Regular circuits"),
-            PL_L,
-        )
-        _plot_trial_linechart(
-            df,
-            "_img/regular_runtime_trial",
-            _nqubitsEncoding,
-            _mktitle("Running time/trial, Regular circuits"),
-        )
+            df = _filter("regular", "runtime", problem)
+            _plot_linechart(
+                df,
+                f"_img/regular_{problem}_runtime",
+                _nqubitsEncoding,
+                _mktitle("Running time, Regular circuits"),
+                PL_L,
+            )
+            _plot_trial_linechart(
+                df,
+                f"_img/regular_{problem}_runtime_trial",
+                _nqubitsEncoding,
+                _mktitle("Running time/trial, Regular circuits"),
+            )
 
         # Deep circuits
-        df = _filter("deep", "compile", CATPROBLEMS["deep"])
-        xaxis = alt.Axis(values=list(range(0, MAXLAYERS + 100, 100)))
-        xscale = alt.Scale(domain=(0, MAXLAYERS))
-        _plot_linechart(
-            df,
-            "_img/deep_compile",
-            _nlayersEncoding,
-            _mktitle("Compilation time, Deep circuits"),
-            PLjax_L,
-            axis=xaxis,
-            scale=xscale,
-        )
-        _plot_trial_linechart(
-            df,
-            "_img/deep_compile_trial",
-            _nlayersEncoding,
-            _mktitle("Compilation time/trial, Deep circuits"),
-        )
+        for problem in CATPROBLEMS["deep"]:
+            df = _filter("deep", "compile", problem)
+            nl = LAYERS[("deep", problem, "compile")]
+            xmin = min(nl)
+            xmax = max(nl)
+            step = nl[1] - nl[0]
+            xaxis = alt.Axis(values=list(range(xmin, xmax + step, step)))
+            xscale = alt.Scale(domain=(xmin, xmax))
+            _plot_linechart(
+                df,
+                f"_img/deep_{problem}_compile",
+                _nlayersEncoding,
+                _mktitle("Compilation time, Deep circuits"),
+                PLjax_L,
+                axis=xaxis,
+                scale=xscale,
+            )
+            _plot_trial_linechart(
+                df,
+                f"_img/deep_{problem}_compile_trial",
+                _nlayersEncoding,
+                _mktitle("Compilation time/trial, Deep circuits"),
+            )
 
-        df = _filter("deep", "runtime", CATPROBLEMS["deep"])
-        xaxis = alt.Axis(values=list(range(0, MAXLAYERS + 100, 100)))
-        xscale = alt.Scale(domain=(0, MAXLAYERS))
-        _plot_linechart(
-            df,
-            "_img/deep_runtime",
-            _nlayersEncoding,
-            _mktitle("Running time, Deep circuits"),
-            PL_L,
-            axis=xaxis,
-            scale=xscale,
-        )
-        _plot_trial_linechart(
-            df,
-            "_img/deep_runtime_trial",
-            _nlayersEncoding,
-            _mktitle("Running time/trial, Deep circuits"),
-        )
+            df = _filter("deep", "runtime", problem)
+            xaxis = alt.Axis(values=list(range(xmin, xmax + step, step)))
+            xscale = alt.Scale(domain=(xmin, xmax))
+            _plot_linechart(
+                df,
+                f"_img/deep_{problem}_runtime",
+                _nlayersEncoding,
+                _mktitle("Running time, Deep circuits"),
+                PL_L,
+                axis=xaxis,
+                scale=xscale,
+            )
+            _plot_trial_linechart(
+                df,
+                f"_img/deep_{problem}_runtime_trial",
+                _nlayersEncoding,
+                _mktitle("Running time/trial, Deep circuits"),
+            )
 
         # Variational circuits
-        vqeproblem = CATPROBLEMS["variational"]
+        vqeproblem = CATPROBLEMS["variational"][0]
         vqemeasure = "compile"
+
         def _diff_methods(problem) -> Iterable[Set[str]]:
             if a.plot_combine_adjoint_backprop:
                 dmsame = set(["adjoint", "backprop"])
-                return chain([set([x]) for x in set(DIFF_METHODS[(problem, vqemeasure)]) - dmsame], [dmsame])
+                return chain(
+                    [set([x]) for x in set(DIFF_METHODS[(problem, vqemeasure)]) - dmsame], [dmsame]
+                )
             else:
                 return [set([x]) for x in set(DIFF_METHODS[(problem, vqemeasure)])]
 
@@ -627,6 +647,9 @@ AP.add_argument("-m", "--measure", type=str, default="all",
 AP.add_argument("-c", "--category", type=str, default="regular,deep,variational",
                 help=("Category of circutis to evaluate regular|deep|hybrid|variational|all "
                 "(default - 'regular,deep,variational')"))
+AP.add_argument("-p", "--problems", type=str, default="all",
+                help=("Problems to evaluate: [(grover|chemvqe|qfth|all),] "
+                "(default - 'all')"))
 AP.add_argument("--dry-run", default=False, action=BooleanOptionalAction,
                 help="Enable this mode to print command lines but not actually run anything")
 AP.add_argument("-a", "--actions", type=str, default="collect,plot",
