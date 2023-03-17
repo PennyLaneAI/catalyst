@@ -65,11 +65,9 @@ jobs:
         run: |
           sudo apt-get -y -q install ninja-build make cmake clang libomp-dev
           echo "LIGHTNING_GIT_TAG_VALUE=latest_release" >> $GITHUB_ENV
-          echo "ENABLE_AVX_KERNELS=OFF" >> $GITHUB_ENV # faster build experience
       - if: ${{ github.event_name == 'push' }}
         run: |
           echo "LIGHTNING_GIT_TAG_VALUE=master" >> $GITHUB_ENV
-          echo "ENABLE_AVX_KERNELS=ON" >> $GITHUB_ENV
 
       - name: Get Cached qir-stdlib Build
         id: cache-qir-stdlib
