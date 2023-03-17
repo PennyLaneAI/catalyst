@@ -90,7 +90,7 @@ struct AdjointOpPattern : public OpConversionPattern<AdjointOp> {
         Value c_false = rewriter.create<LLVM::ConstantOp>(
             loc, rewriter.getIntegerAttr(IntegerType::get(ctx, 1), 0));
         rewriter.create<LLVM::CallOp>(loc, cacheFnDecl, c_true);
-        Value qreg = rewriter.create<func::CallOp>(loc, callee, op.getOperands()).getResult(0);
+        Value qreg = rewriter.create<func::CallOp>(loc, callee, op.getArgs()).getResult(0);
         if (!qreg.getType().isa<catalyst::quantum::QuregType>())
             return callee.emitOpError("qfunc must return quantum register");
         rewriter.create<LLVM::CallOp>(loc, cacheFnDecl, c_false);
