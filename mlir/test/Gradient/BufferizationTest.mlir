@@ -22,7 +22,8 @@ func.func private @circuit(%arg0: f64)
 
 func.func @adjoint(%arg0: f64, %arg1: index) -> tensor<?xf64> {
 
-    // CHECK:   gradient.adjoint @circuit(%arg0) size(%arg1) : (f64) -> memref<?xf64>
+    // CHECK:        [[alloc:%.+]] = memref.alloc(%arg1) : memref<?xf64>
+    // CHECK-NEXT:   gradient.adjoint @circuit(%arg0) size(%arg1) in([[alloc]] : memref<?xf64>) : (f64) -> memref<?xf64>
     %grad = gradient.adjoint @circuit(%arg0) size(%arg1) : (f64) -> tensor<?xf64>
 
     return %grad : tensor<?xf64>

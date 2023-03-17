@@ -43,7 +43,7 @@ class BufferizeAdjointOp : public OpConversionPattern<AdjointOp> {
             memrefValues.push_back(memrefValue);
         }
         rewriter.replaceOpWithNewOp<AdjointOp>(op, resTypes, op.getCalleeAttr(), adaptor.getArgs(),
-                                               adaptor.getGradSize());
+                                               adaptor.getGradSize(), memrefValues);
         return success();
     }
 };
