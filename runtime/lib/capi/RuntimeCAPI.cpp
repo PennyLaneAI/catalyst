@@ -220,17 +220,10 @@ void __quantum__qis__Gradient_params(MemRefT_int64_1d *params, int64_t numResult
         auto *mrp = va_arg(args, ResultType *);
         assert(mrp && "the result type cannot be a null pointer");
 
-        double *jac_data =
-            (double *)aligned_alloc(sizeof(double), num_train_params * sizeof(double));
+        double *jac_data = (double *)mrp->data_aligned;
         for (size_t j = 0; j < num_train_params; j++) {
             jac_data[j] = jacobian[i][j];
         }
-
-        mrp->data_aligned = jac_data;
-        mrp->data_aligned = jac_data;
-        mrp->offset = 0;
-        mrp->sizes[0] = num_train_params;
-        mrp->strides[0] = 1;
     }
     va_end(args);
 }
