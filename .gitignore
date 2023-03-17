@@ -7,7 +7,6 @@ pennylane_catalyst.egg-info
 # Testing files and directories
 .lit
 .pytest_cache
-_benchmark
 
 # Packaging directories
 dist
