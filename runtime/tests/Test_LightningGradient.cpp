@@ -159,6 +159,9 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     // Test qis__Gradient:
     int64_t trainParams[1] = {0};
     MemRefT_double_1d *result = new MemRefT_double_1d();
+    double *buffer = new double[1];
+    result->data_aligned = buffer;
+    result->data_allocated = buffer;
     MemRefT_double_1d *result_tp = new MemRefT_double_1d();
     MemRefT_int64_1d *tp_memref = new MemRefT_int64_1d();
     tp_memref->data_aligned = trainParams;
@@ -188,6 +191,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     CHECK(-sin(-M_PI / 7) == Approx(result->data_aligned[0]));
 
     delete result_tp;
+    delete[] buffer;
     delete result;
     delete tp_memref;
 
@@ -201,6 +205,9 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     // Test qis__Gradient:
     int64_t trainParams[1] = {0};
     MemRefT_double_1d *result = new MemRefT_double_1d();
+    double *buffer = new double[8];
+    result->data_aligned = buffer;
+    result->data_allocated = buffer;
     MemRefT_double_1d *result_tp = new MemRefT_double_1d();
     MemRefT_int64_1d *tp_memref = new MemRefT_int64_1d();
     tp_memref->data_aligned = trainParams;
@@ -242,6 +249,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
 
     delete result_tp;
     delete result;
+    delete[] buffer;
     delete tp_memref;
     delete h_matrix;
 
@@ -256,6 +264,9 @@ TEST_CASE("Test __quantum__qis__Gradient_params and __quantum__qis__Gradient "
 
     int64_t trainParams[1] = {0};
     MemRefT_double_1d *result = new MemRefT_double_1d();
+    double *buffer = new double[1];
+    result->data_aligned = buffer;
+    result->data_allocated = buffer;
     MemRefT_double_1d *result_tp = new MemRefT_double_1d();
     MemRefT_int64_1d *tp_memref = new MemRefT_int64_1d();
     tp_memref->data_aligned = trainParams;
@@ -290,6 +301,7 @@ TEST_CASE("Test __quantum__qis__Gradient_params and __quantum__qis__Gradient "
         __quantum__rt__finalize();
     }
 
+    delete[] buffer;
     delete result_tp;
     delete result;
     delete tp_memref;
@@ -309,6 +321,9 @@ TEST_CASE("Test __quantum__qis__Gradient_params Op=[Hadamard,RZ,RY,RZ,S,T,ParamS
     // Test qis__Gradient:
     int64_t trainParams[3] = {0, 1, 2};
     MemRefT_double_1d *result = new MemRefT_double_1d();
+    double *buffer = new double[3];
+    result->data_aligned = buffer;
+    result->data_allocated = buffer;
     MemRefT_double_1d *result_tp = new MemRefT_double_1d();
     MemRefT_int64_1d *tp_memref = new MemRefT_int64_1d();
     tp_memref->data_aligned = trainParams;
@@ -348,6 +363,7 @@ TEST_CASE("Test __quantum__qis__Gradient_params Op=[Hadamard,RZ,RY,RZ,S,T,ParamS
     CHECK(expected[1] == Approx(result->data_aligned[1]).margin(1e-5));
     CHECK(expected[2] == Approx(result->data_aligned[2]).margin(1e-5));
 
+    delete[] buffer;
     delete result;
     delete result_tp;
     delete tp_memref;
@@ -360,7 +376,13 @@ TEST_CASE("Test __quantum__qis__Gradient Op=[RX,CY], Obs=[Z,Z]", "[Gradient]")
     // Test qis__Gradient:
     int64_t trainParams[1] = {0};
     MemRefT_double_1d *result0 = new MemRefT_double_1d();
+    double *buffer0 = new double[4];
+    result0->data_aligned = buffer0;
+    result0->data_allocated = buffer0;
     MemRefT_double_1d *result1 = new MemRefT_double_1d();
+    double *buffer1 = new double[4];
+    result1->data_aligned = buffer1;
+    result1->data_allocated = buffer1;
     MemRefT_int64_1d *tp_memref = new MemRefT_int64_1d();
     tp_memref->data_aligned = trainParams;
     tp_memref->data_allocated = trainParams;
@@ -392,7 +414,9 @@ TEST_CASE("Test __quantum__qis__Gradient Op=[RX,CY], Obs=[Z,Z]", "[Gradient]")
     CHECK(expected[1] == Approx(result1->data_aligned[0]).margin(1e-5));
 
     delete result0;
+    delete[] buffer0;
     delete result1;
+    delete[] buffer1;
     delete tp_memref;
 
     __quantum__rt__finalize();
@@ -462,6 +486,10 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     // Test qis__Gradient:
     int64_t trainParams[6] = {0, 1, 2, 3, 4, 5};
     MemRefT_double_1d *result = new MemRefT_double_1d();
+    size_t J = expected.size() * 6;
+    double *buffer = new double[J];
+    result->data_aligned = buffer;
+    result->data_allocated = buffer;
     MemRefT_double_1d *result_tp = new MemRefT_double_1d();
     MemRefT_int64_1d *tp_memref = new MemRefT_int64_1d();
     tp_memref->data_aligned = trainParams;
@@ -514,6 +542,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     CHECK(expected[5] == Approx(result->data_aligned[5]).margin(1e-5));
 
     delete result;
+    delete[] buffer;
     delete result_tp;
     delete tp_memref;
 
@@ -530,6 +559,10 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     // Test qis__Gradient:
     int64_t trainParams[6] = {0, 1, 2, 3, 4, 5};
     MemRefT_double_1d *result = new MemRefT_double_1d();
+    size_t J = expected.size();
+    double *buffer = new double[J * 6];
+    result->data_aligned = buffer;
+    result->data_allocated = buffer;
     MemRefT_double_1d *result_tp = new MemRefT_double_1d();
     MemRefT_int64_1d *tp_memref = new MemRefT_int64_1d();
     tp_memref->data_aligned = trainParams;
@@ -601,6 +634,10 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     // Test qis__Gradient:
     int64_t trainParams[6] = {0, 1, 2, 3, 4, 5};
     MemRefT_double_1d *result = new MemRefT_double_1d();
+    size_t J = expected.size();
+    double *buffer = new double[J * 6];
+    result->data_aligned = buffer;
+    result->data_allocated = buffer;
     MemRefT_double_1d *result_tp = new MemRefT_double_1d();
     MemRefT_int64_1d *tp_memref = new MemRefT_int64_1d();
     tp_memref->data_aligned = trainParams;
@@ -661,6 +698,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     CHECK(expected[4] == Approx(result->data_aligned[4]).margin(1e-5));
     CHECK(expected[5] == Approx(result->data_aligned[5]).margin(1e-5));
 
+    delete[] buffer;
     delete coeffs;
     delete result;
     delete result_tp;
@@ -676,6 +714,10 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     // Test qis__Gradient:
     int64_t trainParams[1] = {0};
     MemRefT_double_1d *result = new MemRefT_double_1d();
+    size_t J = 1;
+    double *buffer = new double[J];
+    result->data_aligned = buffer;
+    result->data_allocated = buffer;
     MemRefT_double_1d *result_tp = new MemRefT_double_1d();
     MemRefT_int64_1d *tp_memref = new MemRefT_int64_1d();
     tp_memref->data_aligned = trainParams;
@@ -725,6 +767,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     CHECK(expected == Approx(result_tp->data_aligned[0]));
     CHECK(expected == Approx(result->data_aligned[0]));
 
+    delete[] buffer;
     delete result_tp;
     delete result;
     delete tp_memref;

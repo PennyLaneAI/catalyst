@@ -169,13 +169,9 @@ TEST_CASE("Test __quantum__qis__ circuit with observables", "[CacheManager]")
 
     CHECK(__quantum__qis__Expval(obs) == Approx(0.9800665778).margin(1e-5));
 
-    free(state);
-    delete result;
-
-    __quantum__rt__finalize();
-
     delete result;
     delete[] buffer;
+    __quantum__rt__finalize();
 }
 
 TEST_CASE("Test __quantum__qis__ circuit with observables using deactiveCacheManager",
@@ -223,9 +219,6 @@ TEST_CASE("Test __quantum__qis__ circuit with observables using deactiveCacheMan
     CHECK(__quantum__qis__Expval(obs) == Approx(0.9800665778).margin(1e-5));
 
     __quantum__rt__toggle_recorder(/* activate_cm */ false);
-
-    free(state);
-    delete result;
 
     __quantum__rt__finalize();
 
