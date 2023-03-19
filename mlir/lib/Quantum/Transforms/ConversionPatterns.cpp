@@ -644,12 +644,7 @@ template <typename T> struct StateBasedPattern : public OpConversionPattern<T> {
         }
 
         rewriter.create<LLVM::CallOp>(loc, fnDecl, args);
-        if constexpr (std::is_same_v<T, ProbsOp>) {
-            rewriter.replaceOpWithNewOp<LLVM::LoadOp>(op, structPtr);
-        }
-        else {
-            rewriter.eraseOp(op);
-        }
+        rewriter.eraseOp(op);
 
         return success();
     }

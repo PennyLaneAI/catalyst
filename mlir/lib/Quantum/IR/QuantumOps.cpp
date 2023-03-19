@@ -211,6 +211,10 @@ LogicalResult ProbsOp::verify()
         return emitOpError("only computational basis observables are supported");
     }
 
+    if (!getProbabilities()) {
+        return success();
+    }
+
     size_t dim = std::pow(2, numQubits);
     if (failed(verifyTensorResult(getProbabilities().getType().cast<ShapedType>(), dim))) {
         return emitOpError("return tensor must have static length equal to 2^(number of qubits)");

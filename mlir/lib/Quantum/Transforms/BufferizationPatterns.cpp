@@ -97,11 +97,12 @@ struct BufferizeProbsOp : public OpConversionPattern<ProbsOp> {
     LogicalResult matchAndRewrite(ProbsOp op, OpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
-        MemRefType resultType = getTypeConverter()->convertType(op.getType()).cast<MemRefType>();
+        Type tensorType = op.getType(0);
+        MemRefType resultType = getTypeConverter()->convertType(tensorType).cast<MemRefType>();
         Location loc = op.getLoc();
-        auto allocOp = rewriter.create<memref::AllocOp>(loc, resultType);
-        rewriter.replaceOpWithNewOp<ProbsOp>(op, TypeRange{resultType},
-                                             ValueRange{adaptor.getObs(), allocOp->getResult(0)});
+        auto allocOp = rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType);
+        Value allocVal = allocOp->getResult(0);
+        rewriter.create<ProbsOp>(loc, TypeRange{}, ValueRange{adaptor.getObs(), allocVal});
         return success();
     }
 };
@@ -145,7 +146,7 @@ void populateBufferizationLegality(TypeConverter &typeConverter, ConversionTarge
     target.addDynamicallyLegalOp<StateOp>(
         [&](StateOp op) { return !op.getResultType() || typeConverter.isLegal(op.getType(0)); });
     target.addDynamicallyLegalOp<ProbsOp>(
-        [&](ProbsOp op) { return typeConverter.isLegal(op.getType()); });
+        [&](ProbsOp op) { return !op.getResultType() || typeConverter.isLegal(op.getType(0)); });
     target.addDynamicallyLegalOp<CountsOp>([&](CountsOp op) {
         return typeConverter.isLegal(op.getType(0)) and typeConverter.isLegal(op.getType(1));
     });

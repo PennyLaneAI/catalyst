@@ -620,13 +620,18 @@ def ProbsOp : Measurement_Op<"probs"> {
     );
 
     let results = (outs
-        AnyTypeOf<[
-            1DTensorOf<[F64]>, MemRefRankOf<[F64], [1]>
-        ]>:$probabilities
+        Optional<1DTensorOf<[F64]>>:$probabilities
     );
 
     let assemblyFormat = [{
-        $obs ( `in` `(` $state_in^ `:` type($state_in) `)` )? attr-dict `:` type(results)
+        $obs ( `in` `(` $state_in^ `:` type($state_in) `)` )? attr-dict ( `:` type($probabilities)^ )?
+    }];
+
+    let extraClassDeclaration = [{
+      llvm::Optional<mlir::Type> getResultType() {
+        if (getResultTypes().empty()) return std::nullopt;
+        return getResultTypes()[0];
+      }
     }];
 
     let hasVerifier = 1;
