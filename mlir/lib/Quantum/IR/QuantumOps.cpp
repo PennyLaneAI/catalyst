@@ -192,6 +192,10 @@ LogicalResult CountsOp::verify()
         return emitOpError("cannot determine the number of eigenvalues for general observable");
     }
 
+    if (!getEigvals() && !getCounts()) {
+        return success();
+    }
+
     if (failed(verifyTensorResult(getEigvals().getType(), numEigvals)) ||
         failed(verifyTensorResult(getCounts().getType(), numEigvals))) {
         return emitOpError("number of eigenvalues or counts did not match observable");

@@ -533,26 +533,19 @@ struct CountsOpPattern : public SampleBasedPattern<CountsOp> {
     LogicalResult matchAndRewrite(CountsOp op, CountsOpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
-        Location loc = op.getLoc();
         MLIRContext *ctx = getContext();
         TypeConverter *conv = getTypeConverter();
 
-        assert(op.getEigvals().getType().isa<MemRefType>() &&
-               "counts must return memrefs before lowering");
-        assert(op.getCounts().getType().isa<MemRefType>() &&
-               "counts must return memrefs before lowering");
+        assert(!op.getEigvals() && "eigvals must be unset.");
+        assert(!op.getCounts() && "counts must be unset.");
 
         Type vector1Type = conv->convertType(MemRefType::get({UNKNOWN}, Float64Type::get(ctx)));
         Type vector2Type = conv->convertType(MemRefType::get({UNKNOWN}, IntegerType::get(ctx, 64)));
         Type structType = LLVM::LLVMStructType::getLiteral(ctx, {vector1Type, vector2Type});
 
         StringRef qirName = "__quantum__qis__Counts";
-        Value structPtr = performRewrite(rewriter, structType, qirName, op, adaptor);
-
-        Value structVal = rewriter.create<LLVM::LoadOp>(loc, structPtr);
-        Value result1 = rewriter.create<LLVM::ExtractValueOp>(loc, vector1Type, structVal, 0);
-        Value result2 = rewriter.create<LLVM::ExtractValueOp>(loc, vector2Type, structVal, 1);
-        rewriter.replaceOp(op, {result1, result2});
+        performRewrite(rewriter, structType, qirName, op, adaptor);
+        rewriter.eraseOp(op);
 
         return success();
     }

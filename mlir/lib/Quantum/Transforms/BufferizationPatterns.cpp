@@ -114,13 +114,19 @@ struct BufferizeCountsOp : public OpConversionPattern<CountsOp> {
                                   ConversionPatternRewriter &rewriter) const override
     {
         Location loc = op.getLoc();
-        MemRefType resultType0 = getTypeConverter()->convertType(op.getType(0)).cast<MemRefType>();
-        MemRefType resultType1 = getTypeConverter()->convertType(op.getType(1)).cast<MemRefType>();
-        auto alloc0 = rewriter.create<memref::AllocOp>(loc, resultType0)->getResult(0);
-        auto alloc1 = rewriter.create<memref::AllocOp>(loc, resultType1)->getResult(0);
-        SmallVector<Type, 2> resultType = {resultType0, resultType1};
-        rewriter.replaceOpWithNewOp<CountsOp>(op, TypeRange{resultType}, adaptor.getObs(), alloc0,
-                                              alloc1, adaptor.getShotsAttr());
+        Type tensorType0 = op.getType(0);
+        Type tensorType1 = op.getType(1);
+        MemRefType resultType0 = getTypeConverter()->convertType(tensorType0).cast<MemRefType>();
+        MemRefType resultType1 = getTypeConverter()->convertType(tensorType1).cast<MemRefType>();
+        auto allocOp0 = rewriter.create<memref::AllocOp>(loc, resultType0);
+        auto allocOp1 = rewriter.create<memref::AllocOp>(loc, resultType1);
+        Value allocVal0 = allocOp0->getResult(0);
+        Value allocVal1 = allocOp1->getResult(0);
+        op.replaceAllUsesWith(ValueRange{allocVal0, allocVal1});
+        rewriter.create<CountsOp>(loc, TypeRange{}, adaptor.getObs(), allocVal0, allocVal1,
+                                  adaptor.getShotsAttr());
+
+        rewriter.eraseOp(op);
         return success();
     }
 };
