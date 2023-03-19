@@ -21,6 +21,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Support/LogicalResult.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
 
 //===----------------------------------------------------------------------===//

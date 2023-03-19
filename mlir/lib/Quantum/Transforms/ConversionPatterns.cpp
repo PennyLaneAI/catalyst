@@ -597,9 +597,6 @@ template <typename T> struct StateBasedPattern : public OpConversionPattern<T> {
         MLIRContext *ctx = this->getContext();
         TypeConverter *conv = this->getTypeConverter();
 
-        assert(op.getType().template isa<MemRefType>() &&
-               "probs/state must return memref before lowering");
-
         Type vectorType;
         StringRef qirName;
         if constexpr (std::is_same_v<T, ProbsOp>) {
@@ -647,7 +644,12 @@ template <typename T> struct StateBasedPattern : public OpConversionPattern<T> {
         }
 
         rewriter.create<LLVM::CallOp>(loc, fnDecl, args);
-        rewriter.replaceOpWithNewOp<LLVM::LoadOp>(op, structPtr);
+        if constexpr (std::is_same_v<T, ProbsOp>) {
+            rewriter.replaceOpWithNewOp<LLVM::LoadOp>(op, structPtr);
+        }
+        else {
+            rewriter.eraseOp(op);
+        }
 
         return success();
     }

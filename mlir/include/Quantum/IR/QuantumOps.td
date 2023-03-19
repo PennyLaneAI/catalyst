@@ -660,13 +660,18 @@ def StateOp : Measurement_Op<"state"> {
     );
 
     let results = (outs
-        AnyTypeOf<[
-            1DTensorOf<[Complex<F64>]>, MemRefRankOf<[Complex<F64>], [1]>
-        ]>:$state
+        Optional<1DTensorOf<[Complex<F64>]>> :$state
     );
 
+    let extraClassDeclaration = [{
+      llvm::Optional<mlir::Type> getResultType() {
+        if (getResultTypes().empty()) return std::nullopt;
+        return getResultTypes()[0];
+      }
+    }];
+
     let assemblyFormat = [{
-        $obs ( `in` `(` $state_in^ `:` type($state_in) `)` )? attr-dict `:` type(results)
+        $obs ( `in` `(` $state_in^ `:` type($state_in) `)` )? attr-dict ( `:` type($state)^ )?
     }];
 
     let hasVerifier = 1;
