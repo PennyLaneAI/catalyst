@@ -48,7 +48,7 @@ func.func @probs(%q0: !quantum.bit, %q1: !quantum.bit) {
 func.func @state(%q0: !quantum.bit, %q1: !quantum.bit) {
     %obs = quantum.compbasis %q0, %q1 : !quantum.obs
     // CHECK: [[alloc:%.+]] = memref.alloc() : memref<4xcomplex<f64>>
-    // CHECK-NEXT: quantum.state {{.*}} in([[alloc]] : memref<4xcomplex<f64>>)
+    // CHECK: quantum.state {{.*}} in([[alloc]] : memref<4xcomplex<f64>>)
     %state = quantum.state %obs : tensor<4xcomplex<f64>>
     func.return
 }

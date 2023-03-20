@@ -69,8 +69,8 @@ struct BufferizeSampleOp : public OpConversionPattern<SampleOp> {
         Type tensorType = op.getType(0);
         MemRefType resultType = getTypeConverter()->convertType(tensorType).cast<MemRefType>();
         Location loc = op.getLoc();
-        auto allocOp = rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType);
-        Value allocVal = allocOp->getResult(0);
+        Value allocVal = rewriter.create<memref::AllocOp>(loc, resultType);
+	rewriter.replaceOpWithNewOp<bufferization::ToTensorOp>(op, allocVal);
         rewriter.create<SampleOp>(loc, TypeRange{}, ValueRange{adaptor.getObs(), allocVal},
                                   op->getAttrs());
         return success();
@@ -87,8 +87,8 @@ struct BufferizeStateOp : public OpConversionPattern<StateOp> {
         Type tensorType = op.getType(0);
         MemRefType resultType = getTypeConverter()->convertType(tensorType).cast<MemRefType>();
         Location loc = op.getLoc();
-        auto allocOp = rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType);
-        Value allocVal = allocOp->getResult(0);
+        Value allocVal = rewriter.create<memref::AllocOp>(loc, resultType);
+	rewriter.replaceOpWithNewOp<bufferization::ToTensorOp>(op, allocVal);
         rewriter.create<StateOp>(loc, TypeRange{}, ValueRange{adaptor.getObs(), allocVal});
         return success();
     }
@@ -103,8 +103,8 @@ struct BufferizeProbsOp : public OpConversionPattern<ProbsOp> {
         Type tensorType = op.getType(0);
         MemRefType resultType = getTypeConverter()->convertType(tensorType).cast<MemRefType>();
         Location loc = op.getLoc();
-        auto allocOp = rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType);
-        Value allocVal = allocOp->getResult(0);
+        Value allocVal = rewriter.create<memref::AllocOp>(loc, resultType);
+	rewriter.replaceOpWithNewOp<bufferization::ToTensorOp>(op, allocVal);
         rewriter.create<ProbsOp>(loc, TypeRange{}, ValueRange{adaptor.getObs(), allocVal});
         return success();
     }
@@ -121,10 +121,8 @@ struct BufferizeCountsOp : public OpConversionPattern<CountsOp> {
         Type tensorType1 = op.getType(1);
         MemRefType resultType0 = getTypeConverter()->convertType(tensorType0).cast<MemRefType>();
         MemRefType resultType1 = getTypeConverter()->convertType(tensorType1).cast<MemRefType>();
-        auto allocOp0 = rewriter.create<memref::AllocOp>(loc, resultType0);
-        auto allocOp1 = rewriter.create<memref::AllocOp>(loc, resultType1);
-        Value allocVal0 = allocOp0->getResult(0);
-        Value allocVal1 = allocOp1->getResult(0);
+        Value allocVal0 = rewriter.create<memref::AllocOp>(loc, resultType0);
+        Value allocVal1 = rewriter.create<memref::AllocOp>(loc, resultType1);
         Value tensorVal0 = rewriter.create<bufferization::ToTensorOp>(loc, tensorType0, allocVal0);
         Value tensorVal1 = rewriter.create<bufferization::ToTensorOp>(loc, tensorType1, allocVal1);
         op.replaceAllUsesWith(ValueRange{tensorVal0, tensorVal1});
