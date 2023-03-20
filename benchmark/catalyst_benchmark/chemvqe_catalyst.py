@@ -61,6 +61,7 @@ class ProblemCVQE(Problem):
 
 def qcompile_hybrid(p: ProblemCVQE, weights):
     """Compile the quantum parts of the problem"""
+
     def _circuit(params):
         AllSinglesDoubles(params, range(p.nqubits), p.hf_state, p.singles, p.doubles)
         return qml.expval(qml.Hamiltonian(np.array(p.ham.coeffs), p.ham.ops))

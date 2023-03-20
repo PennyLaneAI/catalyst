@@ -433,7 +433,7 @@ def plot(a: ParsedArguments, df_full: DataFrame, sysinfo: Optional[Sysinfo] = No
 
         # Regular circuits
         for problem in CATPROBLEMS["regular"]:
-            problem_tag = problem.replace('-','')
+            problem_tag = problem.replace("-", "")
             df = _filter("regular", "compile", problem)
             nq = QUBITS[("regular", problem, "compile")]
             xmin = min(nq)
@@ -474,7 +474,7 @@ def plot(a: ParsedArguments, df_full: DataFrame, sysinfo: Optional[Sysinfo] = No
 
         # Deep circuits
         for problem in CATPROBLEMS["deep"]:
-            problem_tag = problem.replace('-','')
+            problem_tag = problem.replace("-", "")
             df = _filter("deep", "compile", problem)
             nl = LAYERS[("deep", problem, "compile")]
             xmin = min(nl)
@@ -671,11 +671,7 @@ def plot(a: ParsedArguments, df_full: DataFrame, sysinfo: Optional[Sysinfo] = No
                 .facet(
                     column=alt.Column("nqubits:N", title="Qubits"),
                 )
-                .properties(
-                    title=_mktitle(
-                        f"Running time, ChemVQE (Hybrid)", align=None
-                    )
-                )
+                .properties(title=_mktitle(f"Running time, ChemVQE (Hybrid)", align=None))
                 .to_dict(),
             )
 
