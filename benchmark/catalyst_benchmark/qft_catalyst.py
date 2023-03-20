@@ -3,8 +3,8 @@ from dataclasses import dataclass
 
 import pennylane as qml
 import jax.numpy as jnp
-from catalyst import qjit, for_loop
 from jax.core import ShapedArray
+from catalyst import qjit, for_loop
 from .types import Problem
 
 

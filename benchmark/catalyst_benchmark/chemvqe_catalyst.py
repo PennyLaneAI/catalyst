@@ -6,11 +6,12 @@ from dataclasses import dataclass
 
 import pennylane as qml
 import jax.numpy as jnp
-import catalyst
 import numpy as np
 from pennylane import AllSinglesDoubles
-from catalyst import qjit
 from jax.core import ShapedArray
+
+import catalyst
+from catalyst import qjit
 from .types import Problem
 
 DMALIASES = {"finite-diff": "fd", "parameter-shift": "ps", "adjoint": "adj"}
