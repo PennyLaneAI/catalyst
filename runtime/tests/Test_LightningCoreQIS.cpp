@@ -30,7 +30,22 @@ MemRefT_CplxT_double_1d getState(size_t buffer_len)
     return result;
 }
 
-void freeState(MemRefT_CplxT_double_1d &result) { delete result.data_allocated; }
+void freeState(MemRefT_CplxT_double_1d &result) { delete[] result.data_allocated; }
+
+PairT_MemRefT_double_int64_1d getCounts(size_t buffer_len)
+{
+    double *buff_e = new double[buffer_len];
+    long *buff_c = new long[buffer_len];
+    PairT_MemRefT_double_int64_1d result = {{buff_e, buff_e, 0, {buffer_len}, {1}},
+                                            {buff_c, buff_c, 0, {buffer_len}, {1}}};
+    return result;
+}
+
+void freeCounts(PairT_MemRefT_double_int64_1d &result)
+{
+    delete[] result.first.data_allocated;
+    delete[] result.second.data_allocated;
+}
 
 using namespace Catalyst::Runtime;
 
@@ -1000,16 +1015,10 @@ TEST_CASE("Test __quantum__qis__Counts with num_qubits=2 calling Hadamard, Contr
 
     constexpr size_t shots = 1000;
 
-    PairT_MemRefT_double_int64_1d *result = new PairT_MemRefT_double_int64_1d();
-    double *buffer_eigenvalues = new double[4];
-    long *buffer_counts = new long[4];
-    result->first.data_aligned = buffer_eigenvalues;
-    result->first.data_allocated = buffer_eigenvalues;
-    result->second.data_aligned = buffer_counts;
-    result->second.data_allocated = buffer_counts;
-    __quantum__qis__Counts(result, shots, 0);
-    int64_t *counts = result->second.data_allocated;
-    double *eigvals = result->first.data_allocated;
+    PairT_MemRefT_double_int64_1d result = getCounts(4);
+    __quantum__qis__Counts(&result, shots, 0);
+    int64_t *counts = result.second.data_allocated;
+    double *eigvals = result.first.data_allocated;
 
     for (int i = 0; i < 4; i++) {
         CHECK(eigvals[i] == (double)i);
@@ -1021,11 +1030,8 @@ TEST_CASE("Test __quantum__qis__Counts with num_qubits=2 calling Hadamard, Contr
     }
     CHECK(sum == shots);
 
+    freeCounts(result);
     __quantum__rt__finalize();
-
-    delete[] buffer_eigenvalues;
-    delete[] buffer_counts;
-    delete result;
 }
 
 TEST_CASE("Test __quantum__qis__Counts with num_qubits=2 PartialCounts calling Hadamard, "
@@ -1051,25 +1057,17 @@ TEST_CASE("Test __quantum__qis__Counts with num_qubits=2 PartialCounts calling H
 
     constexpr size_t shots = 1000;
 
-    PairT_MemRefT_double_int64_1d *result = new PairT_MemRefT_double_int64_1d();
-    double *buffer_eigenvalues = new double[4];
-    long *buffer_counts = new long[4];
-    result->first.data_aligned = buffer_eigenvalues;
-    result->first.data_allocated = buffer_eigenvalues;
-    result->second.data_aligned = buffer_counts;
-    result->second.data_allocated = buffer_counts;
-    __quantum__qis__Counts(result, shots, 1, ctrls[0]);
-    int64_t *counts = result->second.data_allocated;
-    double *eigvals = result->first.data_allocated;
+    PairT_MemRefT_double_int64_1d result = getCounts(4);
+    __quantum__qis__Counts(&result, shots, 1, ctrls[0]);
+    int64_t *counts = result.second.data_allocated;
+    double *eigvals = result.first.data_allocated;
 
     CHECK(counts[0] + counts[1] == shots);
     CHECK(eigvals[0] + 1 == eigvals[1]);
 
     __quantum__rt__finalize();
 
-    delete[] buffer_eigenvalues;
-    delete[] buffer_counts;
-    delete result;
+    freeCounts(result);
 }
 
 TEST_CASE("Test __quantum__qis__Sample with num_qubits=2 calling Hadamard, ControlledPhaseShift, "
