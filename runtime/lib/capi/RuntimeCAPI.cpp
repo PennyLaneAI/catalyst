@@ -141,7 +141,7 @@ QirString *__quantum__rt__result_to_string(RESULT *result)
 void __quantum__qis__Gradient(int64_t numResults, /* results = */...)
 {
     assert(numResults >= 0);
-    using ResultType = MemRefT_double_1d;
+    using ResultType = MemRefT<double, 1>;
 
     // num_observables * num_train_params
     auto &&jacobian = Catalyst::Runtime::CAPI::get_device()->Gradient({});
@@ -158,15 +158,13 @@ void __quantum__qis__Gradient(int64_t numResults, /* results = */...)
         return;
     }
 
-    const size_t num_train_params = jacobian[0].size();
-
     // extract variadic results of size num_observables
     va_list args;
     va_start(args, numResults);
     for (int64_t i = 0; i < numResults; i++) {
         auto *mrp = va_arg(args, ResultType *);
         assert(mrp && "the result type cannot be a null pointer");
-        memcpy(mrp->data_aligned, jacobian[i].data(), num_train_params * sizeof(double));
+        memref_copy<double, 1>(mrp, jacobian[i].data());
     }
     va_end(args);
 }
@@ -175,7 +173,7 @@ void __quantum__qis__Gradient_params(MemRefT_int64_1d *params, int64_t numResult
                                      /* results = */...)
 {
     assert(numResults >= 0);
-    using ResultType = MemRefT_double_1d;
+    using ResultType = MemRefT<double, 1>;
 
     if (params == nullptr || !params->sizes[0]) {
         __quantum__rt__fail_cstr("Invalid number of trainable parameters");
@@ -208,15 +206,13 @@ void __quantum__qis__Gradient_params(MemRefT_int64_1d *params, int64_t numResult
         return;
     }
 
-    const size_t num_train_params = jacobian[0].size();
-
     // extract variadic results of size num_observables
     va_list args;
     va_start(args, numResults);
     for (int64_t i = 0; i < numResults; i++) {
         auto *mrp = va_arg(args, ResultType *);
         assert(mrp && "the result type cannot be a null pointer");
-        memcpy(mrp->data_aligned, jacobian[i].data(), num_train_params * sizeof(double));
+        memref_copy<double, 1>(mrp, jacobian[i].data());
     }
     va_end(args);
 }
@@ -610,6 +606,7 @@ double __quantum__qis__Variance(ObsIdType obsKey)
 
 void __quantum__qis__Probs(MemRefT_double_1d *result, int64_t numQubits, ...)
 {
+    MemRefT<double, 1> *result_p = (MemRefT<double, 1> *)result;
     assert(numQubits >= 0);
 
     va_list args;
@@ -633,13 +630,13 @@ void __quantum__qis__Probs(MemRefT_double_1d *result, int64_t numQubits, ...)
         sv_probs = Catalyst::Runtime::CAPI::get_device()->PartialProbs(wires);
     }
 
-    const size_t numElements = 1U << numQubits;
-    memcpy(result->data_aligned, sv_probs.data(), numElements * sizeof(double));
+    memref_copy<double, 1>(result_p, sv_probs.data());
 }
 
 void __quantum__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, ...)
 {
     assert(numQubits >= 0);
+    MemRefT<std::complex<double>, 1> *result_p = (MemRefT<std::complex<double>, 1> *)result;
 
     va_list args;
     va_start(args, numQubits);
@@ -664,15 +661,15 @@ void __quantum__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, .
         // numElements, wires);
     }
 
-    const size_t numElements = sv_state.size();
     assert(numElements == (1U << numQubits));
-    memcpy(result->data_aligned, sv_state.data(), numElements * sizeof(std::complex<double>));
+    memref_copy<std::complex<double>, 1>(result_p, sv_state.data());
 }
 
 void __quantum__qis__Sample(MemRefT_double_2d *result, int64_t shots, int64_t numQubits, ...)
 {
     assert(shots >= 0);
     assert(numQubits >= 0);
+    MemRefT<double, 2> *result_p = (MemRefT<double, 2> *)result;
 
     va_list args;
     va_start(args, numQubits);
@@ -694,9 +691,7 @@ void __quantum__qis__Sample(MemRefT_double_2d *result, int64_t shots, int64_t nu
         sv_samples = Catalyst::Runtime::CAPI::get_device()->PartialSample(wires, shots);
     }
 
-    const size_t numElements = sv_samples.size();
-    assert(numElements == static_cast<size_t>(shots * numQubits));
-    memcpy(result->data_aligned, sv_samples.data(), numElements * sizeof(double));
+    memref_copy<double, 2>(result_p, sv_samples.data());
 }
 
 void __quantum__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t shots, int64_t numQubits,
@@ -704,6 +699,8 @@ void __quantum__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t shots
 {
     assert(shots >= 0);
     assert(numQubits >= 0);
+    MemRefT<double, 1> *result_eigvals_p = (MemRefT<double, 1> *)(&result->first);
+    MemRefT<int64_t, 1> *result_counts_p = (MemRefT<int64_t, 1> *)(&result->second);
 
     va_list args;
     va_start(args, numQubits);
@@ -729,10 +726,7 @@ void __quantum__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t shots
     auto &&sv_eigvals = std::get<0>(sv_counts);
     auto &&sv_cts = std::get<1>(sv_counts);
 
-    const size_t numElements = 1U << numQubits;
-    assert(numElements == sv_eigvals.size());
-    assert(numElements == sv_cts.size());
-    memcpy(result->first.data_aligned, sv_eigvals.data(), numElements * sizeof(double));
-    memcpy(result->second.data_aligned, sv_cts.data(), numElements * sizeof(int64_t));
+    memref_copy<double, 1>(result_eigvals_p, sv_eigvals.data());
+    memref_copy<int64_t, 1>(result_counts_p, sv_cts.data());
 }
 }

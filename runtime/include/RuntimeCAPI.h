@@ -21,6 +21,24 @@
 #include "qir_stdlib.h"
 
 #ifdef __cplusplus
+
+template <typename T, size_t R> struct MemRefT {
+    T *data_allocated;
+    T *data_aligned;
+    size_t offset;
+    size_t sizes[R];
+    size_t strides[R];
+};
+
+template <typename T, size_t R> void memref_copy(MemRefT<T, R> *memref, T *buffer)
+{
+    size_t how_many_elements = 1;
+    for (size_t i = 0; i < R; i++) {
+        how_many_elements *= memref->sizes[i];
+    }
+    memcpy(memref->data_aligned, buffer, sizeof(T) * how_many_elements);
+}
+
 extern "C" {
 #endif
 
