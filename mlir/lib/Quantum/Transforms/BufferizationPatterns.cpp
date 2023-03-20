@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Transforms/DialectConversion.h"
 
@@ -124,18 +125,20 @@ struct BufferizeCountsOp : public OpConversionPattern<CountsOp> {
         auto allocOp1 = rewriter.create<memref::AllocOp>(loc, resultType1);
         Value allocVal0 = allocOp0->getResult(0);
         Value allocVal1 = allocOp1->getResult(0);
-        op.replaceAllUsesWith(ValueRange{allocVal0, allocVal1});
-        auto countsOp = rewriter.create<CountsOp>(loc, TypeRange{},
-			ValueRange{adaptor.getObs(), allocVal0, allocVal1},
-                        op->getAttrs());
+        Value tensorVal0 = rewriter.create<bufferization::ToTensorOp>(loc, tensorType0, allocVal0);
+        Value tensorVal1 = rewriter.create<bufferization::ToTensorOp>(loc, tensorType1, allocVal1);
+        op.replaceAllUsesWith(ValueRange{tensorVal0, tensorVal1});
+        auto countsOp = rewriter.create<CountsOp>(
+            loc, TypeRange{}, ValueRange{adaptor.getObs(), allocVal0, allocVal1}, op->getAttrs());
 
-	static const char *const resultSegmentAttrName = "result_segment_sizes";
-	auto resultSegmentAttrVal = rewriter.getDenseI32ArrayAttr({0, 0});
-	countsOp->setAttr(resultSegmentAttrName, resultSegmentAttrVal);
-	static const char *const operandSegmentAttrName = "operand_segment_sizes";
-	auto operandSegmentAttrVal = rewriter.getDenseI32ArrayAttr({1, 1, 1});
-	countsOp->setAttr(operandSegmentAttrName, operandSegmentAttrVal);
+        static const char *const resultSegmentAttrName = "result_segment_sizes";
+        auto resultSegmentAttrVal = rewriter.getDenseI32ArrayAttr({0, 0});
+        countsOp->setAttr(resultSegmentAttrName, resultSegmentAttrVal);
+        static const char *const operandSegmentAttrName = "operand_segment_sizes";
+        auto operandSegmentAttrVal = rewriter.getDenseI32ArrayAttr({1, 1, 1});
+        countsOp->setAttr(operandSegmentAttrName, operandSegmentAttrVal);
         rewriter.eraseOp(op);
+
         return success();
     }
 };
@@ -163,7 +166,8 @@ void populateBufferizationLegality(TypeConverter &typeConverter, ConversionTarge
     target.addDynamicallyLegalOp<ProbsOp>(
         [&](ProbsOp op) { return !op.getResultType() || typeConverter.isLegal(op.getType(0)); });
     target.addDynamicallyLegalOp<CountsOp>([&](CountsOp op) {
-	if (!op.getResultType()) return true;
+        if (!op.getResultType())
+            return true;
         return typeConverter.isLegal(op.getType(0)) and typeConverter.isLegal(op.getType(1));
     });
 }
