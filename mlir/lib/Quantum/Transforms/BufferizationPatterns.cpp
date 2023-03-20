@@ -83,7 +83,6 @@ struct BufferizeStateOp : public OpConversionPattern<StateOp> {
     LogicalResult matchAndRewrite(StateOp op, OpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
-
         Type tensorType = op.getType(0);
         MemRefType resultType = getTypeConverter()->convertType(tensorType).cast<MemRefType>();
         Location loc = op.getLoc();
