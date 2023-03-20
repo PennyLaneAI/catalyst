@@ -38,7 +38,7 @@ declare %Array* @__quantum__rt__qubit_allocate_array(i64)
 
 declare void @__quantum__qis__Probs(%struct.MemRefT*, i64)
 
-declare i8* @malloc(i64)
+declare i8* @aligned_alloc(i64, i64)
 
 declare i32 @printf(i8*, ...)
 
@@ -66,21 +66,32 @@ define i32 @main() {
   call void @__quantum__qis__Hadamard(%Qubit* %4, i8 0)
   call void @__quantum__qis__RY(%Qubit* %4, double 0.7, i8 0)
 
+  ; Allocate buffers
+  %buffer_allocated = call i8* @aligned_alloc(i64 8, i64 32)
+  %buffer_cast = bitcast i8* %buffer_allocated to double*
+
+  ; Insert buffers into result structure
+  %t0 = insertvalue %struct.MemRefT undef, double* %buffer_cast, 0
+  %t1 = insertvalue %struct.MemRefT %t0, double* %buffer_cast, 1
+  %t2 = insertvalue %struct.MemRefT %t1, i64 0, 2
+  %t3 = insertvalue %struct.MemRefT %t2, i64 2, 3, 0
+  %memref = insertvalue %struct.MemRefT %t3, i64 1, 4, 0
+  %memref_ptr = alloca %struct.MemRefT, i64 1, align 8
+  store %struct.MemRefT %memref, %struct.MemRefT* %memref_ptr, align 8
+
   ; Apply the measurement process (probability)
-  %5 = call i8* @malloc(i64 40)
-  %6 = bitcast i8* %5 to %struct.MemRefT*
-  call void @__quantum__qis__Probs(%struct.MemRefT* %6, i64 0)
+  call void @__quantum__qis__Probs(%struct.MemRefT* %memref_ptr, i64 0)
 
   ; Print results
-  %7 = getelementptr %struct.MemRefT, %struct.MemRefT* %6, i32 0, i32 0
-  %8 = load double*, double** %7, align 8
-  call void @print_probs_at(double* %8, i64 0)
-  call void @print_probs_at(double* %8, i64 1)
-  call void @print_probs_at(double* %8, i64 2)
-  call void @print_probs_at(double* %8, i64 3)
+  %5 = getelementptr %struct.MemRefT, %struct.MemRefT* %memref_ptr, i32 0, i32 0
+  %6 = load double*, double** %5, align 8
+  call void @print_probs_at(double* %6, i64 0)
+  call void @print_probs_at(double* %6, i64 1)
+  call void @print_probs_at(double* %6, i64 2)
+  call void @print_probs_at(double* %6, i64 3)
 
   ; Close the context and free memory
-  call void @free(i8* %5)
+  call void @free(i8* %buffer_allocated)
   call void @__quantum__rt__finalize()
   ret i32 0
 }
