@@ -1096,12 +1096,10 @@ TEST_CASE("Test __quantum__qis__Sample with num_qubits=2 calling Hadamard, Contr
     constexpr size_t n = 2;
     constexpr size_t shots = 1000;
 
-    MemRefT_double_2d *result = new MemRefT_double_2d;
     double *buffer = new double[shots * n];
-    result->data_aligned = buffer;
-    result->data_allocated = buffer;
-    __quantum__qis__Sample(result, shots, 0);
-    double *samples = result->data_allocated;
+    MemRefT_double_2d result = {buffer, buffer, 0, {shots, n}, {n, 1}};
+    __quantum__qis__Sample(&result, shots, 0);
+    double *samples = result.data_allocated;
 
     size_t counts0[2] = {0, 0};
     for (size_t idx = 0; idx < shots * n; idx += n) {
@@ -1139,7 +1137,6 @@ TEST_CASE("Test __quantum__qis__Sample with num_qubits=2 calling Hadamard, Contr
 
     __quantum__rt__finalize();
 
-    delete result;
     delete[] buffer;
 }
 
@@ -1167,12 +1164,10 @@ TEST_CASE("Test __quantum__qis__Sample with num_qubits=2 and PartialSample calli
     constexpr size_t n = 1;
     constexpr size_t shots = 1000;
 
-    MemRefT_double_2d *result = new MemRefT_double_2d;
     double *buffer = new double[shots * n];
-    result->data_aligned = buffer;
-    result->data_allocated = buffer;
-    __quantum__qis__Sample(result, shots, 1, ctrls[0]);
-    double *samples = result->data_allocated;
+    MemRefT_double_2d result = {buffer, buffer, 0, {shots, n}, {n, 1}};
+    __quantum__qis__Sample(&result, shots, 0);
+    double *samples = result.data_allocated;
 
     size_t counts0[2] = {0, 0};
     for (size_t idx = 0; idx < shots * n; idx += n) {
@@ -1198,7 +1193,6 @@ TEST_CASE("Test __quantum__qis__Sample with num_qubits=2 and PartialSample calli
     __quantum__rt__finalize();
 
     delete[] buffer;
-    delete result;
 }
 
 TEST_CASE("Test __quantum__qis__QubitUnitary with an uninitialized matrix", "[qir_lightning_core]")
