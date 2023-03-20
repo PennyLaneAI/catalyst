@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Transforms/DialectConversion.h"
 
@@ -37,13 +38,21 @@ class BufferizeAdjointOp : public OpConversionPattern<AdjointOp> {
         Location loc = op.getLoc();
         Value gradSize = op.getGradSize();
         SmallVector<Value> memrefValues;
+        SmallVector<Value> tensorValues;
+        int i = 0;
         for (Type resType : resTypes) {
             MemRefType memrefType = resType.cast<MemRefType>();
             Value memrefValue = rewriter.create<memref::AllocOp>(loc, memrefType, gradSize);
+            Value tensorValue = rewriter.create<bufferization::ToTensorOp>(
+                loc, op.getResultTypes()[i++], memrefValue);
             memrefValues.push_back(memrefValue);
+            tensorValues.push_back(tensorValue);
         }
-        rewriter.replaceOpWithNewOp<AdjointOp>(op, resTypes, op.getCalleeAttr(), adaptor.getArgs(),
-                                               adaptor.getGradSize(), memrefValues);
+
+        op.replaceAllUsesWith(tensorValues);
+        rewriter.create<AdjointOp>(loc, TypeRange{}, op.getCalleeAttr(), adaptor.getArgs(),
+                                   adaptor.getGradSize(), memrefValues);
+        rewriter.eraseOp(op);
         return success();
     }
 };

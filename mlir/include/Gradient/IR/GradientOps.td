@@ -81,7 +81,6 @@ def AdjointOp : Gradient_Op<"adjoint", [AttrSizedOperandSegments]> {
         Variadic<AnyTypeOf<[
             AnyFloat,
             RankedTensorOf<[AnyFloat]>,
-            MemRefOf<[AnyFloat]>
         ]>>
     );
 

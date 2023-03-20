@@ -99,22 +99,19 @@ struct AdjointOpPattern : public OpConversionPattern<AdjointOp> {
         // arguments to the C function, although in this case as a variadic argument list to allow
         // for a varying number of results in a single signature.
         Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
-        Value numResults =
-            rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(op.getNumResults()));
+        Value numResults = rewriter.create<LLVM::ConstantOp>(
+            loc, rewriter.getI64IntegerAttr(op.getDataIn().size()));
         SmallVector<Value> args = {numResults};
-        for (unsigned i = 0; i < op.getNumResults(); i++) {
+        for (Value memref : adaptor.getDataIn()) {
             auto newArg =
                 rewriter.create<LLVM::AllocaOp>(loc, LLVM::LLVMPointerType::get(vectorType), c1);
-            rewriter.create<LLVM::StoreOp>(loc, adaptor.getDataIn()[i], newArg);
+            rewriter.create<LLVM::StoreOp>(loc, memref, newArg);
             args.push_back(newArg);
         }
 
         SmallVector<Value> gradients;
         rewriter.create<LLVM::CallOp>(loc, gradFnDecl, args);
         rewriter.create<catalyst::quantum::DeallocOp>(loc, qreg);
-        for (Value structPtr : ArrayRef<Value>(args).drop_front()) {
-            gradients.push_back(rewriter.create<LLVM::LoadOp>(loc, structPtr));
-        }
         rewriter.replaceOp(op, gradients);
 
         return success();

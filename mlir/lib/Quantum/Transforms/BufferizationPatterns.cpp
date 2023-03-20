@@ -70,7 +70,7 @@ struct BufferizeSampleOp : public OpConversionPattern<SampleOp> {
         MemRefType resultType = getTypeConverter()->convertType(tensorType).cast<MemRefType>();
         Location loc = op.getLoc();
         Value allocVal = rewriter.create<memref::AllocOp>(loc, resultType);
-	rewriter.replaceOpWithNewOp<bufferization::ToTensorOp>(op, allocVal);
+        rewriter.replaceOpWithNewOp<bufferization::ToTensorOp>(op, allocVal);
         rewriter.create<SampleOp>(loc, TypeRange{}, ValueRange{adaptor.getObs(), allocVal},
                                   op->getAttrs());
         return success();
@@ -88,7 +88,7 @@ struct BufferizeStateOp : public OpConversionPattern<StateOp> {
         MemRefType resultType = getTypeConverter()->convertType(tensorType).cast<MemRefType>();
         Location loc = op.getLoc();
         Value allocVal = rewriter.create<memref::AllocOp>(loc, resultType);
-	rewriter.replaceOpWithNewOp<bufferization::ToTensorOp>(op, allocVal);
+        rewriter.replaceOpWithNewOp<bufferization::ToTensorOp>(op, allocVal);
         rewriter.create<StateOp>(loc, TypeRange{}, ValueRange{adaptor.getObs(), allocVal});
         return success();
     }
@@ -104,7 +104,7 @@ struct BufferizeProbsOp : public OpConversionPattern<ProbsOp> {
         MemRefType resultType = getTypeConverter()->convertType(tensorType).cast<MemRefType>();
         Location loc = op.getLoc();
         Value allocVal = rewriter.create<memref::AllocOp>(loc, resultType);
-	rewriter.replaceOpWithNewOp<bufferization::ToTensorOp>(op, allocVal);
+        rewriter.replaceOpWithNewOp<bufferization::ToTensorOp>(op, allocVal);
         rewriter.create<ProbsOp>(loc, TypeRange{}, ValueRange{adaptor.getObs(), allocVal});
         return success();
     }
