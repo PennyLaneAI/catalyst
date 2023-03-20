@@ -1,11 +1,13 @@
 """ ChemVQE problem, PennyLane+Catalyst implementation """
 from copy import deepcopy
+from dataclasses import dataclass
 
 import pennylane as qml
 import pennylane.numpy as pnp
 from .types import Problem
 
 
+@dataclass
 class ProblemPL(Problem):
     """Catalyst implementation details of the VQE problem"""
 

@@ -31,6 +31,7 @@ PROBLEMS: Dict[NQubits, ProblemInfo] = {
 # fmt:on
 
 
+@dataclass
 class ProblemCVQE(Problem):
     """PennyLane implementation details of the VQE problem"""
 

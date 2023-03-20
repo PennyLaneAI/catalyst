@@ -1,6 +1,7 @@
 """ Grover-like problem, PennyLane/PennyLane+JAX implementation """
 from typing import Any
 from copy import deepcopy
+from dataclasses import dataclass
 
 import pennylane as qml
 import pennylane.numpy as pnp
@@ -17,6 +18,7 @@ def grover_loops(N) -> int:
     return int(pnp.floor(pnp.pi / 4 * pnp.sqrt((2**N) / 1) - 0.5))
 
 
+@dataclass
 class ProblemPL(Problem):
     """PennyLane implementation details of the Grover problem"""
 

@@ -46,6 +46,7 @@ class Sysinfo:
         return f"Host: {self.systype} / {self.ram_gb}GB RAM / {self.ncpu} Cores / {self.cpu_brand}"
 
 
+@dataclass
 class Problem:
     """Base class for reference problem."""
 

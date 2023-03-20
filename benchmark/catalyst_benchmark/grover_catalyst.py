@@ -1,5 +1,6 @@
 """ Grover-like problem, PennyLane+Catalyst implementation """
 from typing import Any
+from dataclasses import dataclass
 
 import pennylane as qml
 import jax.numpy as jnp
@@ -17,6 +18,7 @@ def grover_loops(N) -> int:
     return int(jnp.floor(jnp.pi / 4 * jnp.sqrt((2**N) / 1) - 0.5))
 
 
+@dataclass
 class ProblemC(Problem):
     """Catalyst implementation details of the Grover problem"""
 
