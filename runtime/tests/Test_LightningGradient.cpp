@@ -243,7 +243,7 @@ TEST_CASE("Test __quantum__qis__Gradient_params and __quantum__qis__Gradient "
     const std::vector<double> param{-M_PI / 7, M_PI / 5, 2 * M_PI / 3};
 
     std::vector<int64_t> trainParams{0};
-    size_t J = param.size() * trainParams.size();
+    size_t J = trainParams.size();
     double *buffer = new double[J];
     MemRefT_double_1d result = {buffer, buffer, 0, {J}, {1}};
     double *buffer_tp = new double[J];
@@ -295,7 +295,7 @@ TEST_CASE("Test __quantum__qis__Gradient_params Op=[Hadamard,RZ,RY,RZ,S,T,ParamS
 
     // Test qis__Gradient:
     std::vector<int64_t> trainParams{0, 1, 2};
-    size_t J = param.size() * trainParams.size();
+    size_t J = trainParams.size();
     double *buffer = new double[J];
     MemRefT_double_1d result = {buffer, buffer, 0, {J}, {1}};
     double *buffer_tp = new double[J];
@@ -346,7 +346,7 @@ TEST_CASE("Test __quantum__qis__Gradient Op=[RX,CY], Obs=[Z,Z]", "[Gradient]")
     // Test qis__Gradient:
     std::vector<int64_t> trainParams{0};
     const std::vector<double> expected{-sin(-M_PI / 7), 0.4338837391};
-    size_t J = trainParams.size() * expected.size();
+    size_t J = trainParams.size();
     double *buffer0 = new double[J];
     MemRefT_double_1d result0 = {buffer0, buffer0, 0, {J}, {1}};
     double *buffer1 = new double[J];
@@ -387,7 +387,7 @@ TEST_CASE("Test __quantum__qis__Gradient_params Op=[RX,RX,RX,CZ], Obs=[Z,Z,Z]", 
 
     // Test qis__Gradient:
     std::vector<int64_t> trainParams{0, 1, 2};
-    size_t J = param.size() * trainParams.size();
+    size_t J = trainParams.size();
     double *buffer0 = new double[J];
     MemRefT_double_1d result0 = {buffer0, buffer0, 0, {J}, {1}};
     double *buffer1 = new double[J];
@@ -442,7 +442,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
 
     // Test qis__Gradient:
     std::vector<int64_t> trainParams{0, 1, 2, 3, 4, 5};
-    size_t J = param.size() * trainParams.size();
+    size_t J = trainParams.size();
     double *buffer = new double[J];
     MemRefT_double_1d result = {buffer, buffer, 0, {J}, {1}};
     double *buffer_tp = new double[J];
@@ -508,11 +508,12 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
 
     // Test qis__Gradient:
     std::vector<int64_t> trainParams{0, 1, 2, 3, 4, 5};
-    size_t J = expected.size() * trainParams.size();
+    size_t J = 8;
     double *buffer = new double[J];
     MemRefT_double_1d result = {buffer, buffer, 0, {J}, {1}};
-    double *buffer_tp = new double[J];
-    MemRefT_double_1d result_tp = {buffer_tp, buffer_tp, 0, {J}, {1}};
+    size_t J_tp = trainParams.size();
+    double *buffer_tp = new double[J_tp];
+    MemRefT_double_1d result_tp = {buffer_tp, buffer_tp, 0, {J_tp}, {1}};
     int64_t *buffer_tp_memref = trainParams.data();
     MemRefT_int64_1d tp_memref = {buffer_tp_memref, buffer_tp_memref, 0, {trainParams.size()}, {0}};
 
@@ -577,7 +578,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
 
     // Test qis__Gradient:
     std::vector<int64_t> trainParams{0, 1, 2, 3, 4, 5};
-    size_t J = param.size() * trainParams.size();
+    size_t J = trainParams.size();
     double *buffer = new double[J];
     MemRefT_double_1d result = {buffer, buffer, 0, {J}, {1}};
     double *buffer_tp = new double[J];
@@ -644,7 +645,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
 {
     // Test qis__Gradient:
     std::vector<int64_t> trainParams{0};
-    size_t J = 9 * trainParams.size();
+    size_t J = trainParams.size();
     double *buffer = new double[J];
     MemRefT_double_1d result = {buffer, buffer, 0, {J}, {1}};
     double *buffer_tp = new double[J];

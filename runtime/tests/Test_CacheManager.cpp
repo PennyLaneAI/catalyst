@@ -147,7 +147,7 @@ TEST_CASE("Test __quantum__qis__ circuit with observables", "[CacheManager]")
     // qml.CRX(0.4, wires=[1,0])
     __quantum__qis__CRX(0.4, target, *ctrls);
 
-    size_t buffer_len = 8;
+    size_t buffer_len = 4;
     CplxT_double *buffer = new CplxT_double[buffer_len];
     MemRefT_CplxT_double_1d result = {buffer, buffer, 0, {buffer_len}, {1}};
     __quantum__qis__State(&result, 0);
@@ -194,7 +194,7 @@ TEST_CASE("Test __quantum__qis__ circuit with observables using deactiveCacheMan
     // qml.CRX(0.4, wires=[1,0])
     __quantum__qis__CRX(0.4, target, *ctrls);
 
-    size_t buffer_len = 8;
+    size_t buffer_len = 4;
     CplxT_double *buffer = new CplxT_double[buffer_len];
     MemRefT_CplxT_double_1d result = {buffer, buffer, 0, {buffer_len}, {1}};
     __quantum__qis__State(&result, 0);
