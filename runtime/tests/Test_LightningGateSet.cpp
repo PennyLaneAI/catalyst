@@ -51,14 +51,14 @@ TEST_CASE("Identity Gate tests", "[lightning]")
 
     std::vector<std::complex<double>> out_state = sim->State();
 
-    REQUIRE(out_state.at(0) == std::complex<double>{1, 0});
+    CHECK(out_state.at(0) == std::complex<double>{1, 0});
 
     std::complex<double> sum{0, 0};
     for (size_t i = 1; i < out_state.size(); i++) {
         sum += out_state[i];
     }
 
-    REQUIRE(sum == std::complex<double>{0, 0});
+    CHECK(sum == std::complex<double>{0, 0});
 }
 
 TEST_CASE("PauliX Gate tests num_qubits=1", "[lightning]")
@@ -78,8 +78,8 @@ TEST_CASE("PauliX Gate tests num_qubits=1", "[lightning]")
 
     std::vector<std::complex<double>> out_state = sim->State();
 
-    REQUIRE(out_state.at(0) == std::complex<double>{0, 0});
-    REQUIRE(out_state.at(1) == std::complex<double>{1, 0});
+    CHECK(out_state.at(0) == std::complex<double>{0, 0});
+    CHECK(out_state.at(1) == std::complex<double>{1, 0});
 }
 
 // 1-qubit operations
@@ -106,14 +106,14 @@ TEST_CASE("PauliX Gate tests num_qubits=3", "[lightning]")
 
     std::vector<std::complex<double>> out_state = sim->State();
 
-    REQUIRE(out_state.at(0) == std::complex<double>{1, 0});
+    CHECK(out_state.at(0) == std::complex<double>{1, 0});
 
     std::complex<double> sum{0, 0};
     for (size_t i = 1; i < out_state.size(); i++) {
         sum += out_state[i];
     }
 
-    REQUIRE(sum == std::complex<double>{0, 0});
+    CHECK(sum == std::complex<double>{0, 0});
 }
 
 TEST_CASE("PauliY Gate tests num_qubits=1", "[lightning]")
@@ -133,8 +133,8 @@ TEST_CASE("PauliY Gate tests num_qubits=1", "[lightning]")
 
     std::vector<std::complex<double>> out_state = sim->State();
 
-    REQUIRE(out_state.at(0) == std::complex<double>{0, 0});
-    REQUIRE(out_state.at(1) == std::complex<double>{0, 1});
+    CHECK(out_state.at(0) == std::complex<double>{0, 0});
+    CHECK(out_state.at(1) == std::complex<double>{0, 1});
 }
 
 TEST_CASE("PauliY Gate tests num_qubits=2", "[lightning]")
@@ -155,10 +155,10 @@ TEST_CASE("PauliY Gate tests num_qubits=2", "[lightning]")
 
     std::vector<std::complex<double>> out_state = sim->State();
 
-    REQUIRE(out_state.at(0) == std::complex<double>{0, 0});
-    REQUIRE(out_state.at(1) == std::complex<double>{0, 0});
-    REQUIRE(out_state.at(2) == std::complex<double>{0, 0});
-    REQUIRE(out_state.at(3) == std::complex<double>{-1, 0});
+    CHECK(out_state.at(0) == std::complex<double>{0, 0});
+    CHECK(out_state.at(1) == std::complex<double>{0, 0});
+    CHECK(out_state.at(2) == std::complex<double>{0, 0});
+    CHECK(out_state.at(3) == std::complex<double>{-1, 0});
 }
 
 TEST_CASE("PauliZ Gate tests num_qubits=2", "[lightning]")
@@ -179,10 +179,10 @@ TEST_CASE("PauliZ Gate tests num_qubits=2", "[lightning]")
 
     std::vector<std::complex<double>> out_state = sim->State();
 
-    REQUIRE(out_state.at(0) == std::complex<double>{0, 0});
-    REQUIRE(out_state.at(1) == std::complex<double>{0, 0});
-    REQUIRE(out_state.at(2) == std::complex<double>{0, 1});
-    REQUIRE(out_state.at(3) == std::complex<double>{0, 0});
+    CHECK(out_state.at(0) == std::complex<double>{0, 0});
+    CHECK(out_state.at(1) == std::complex<double>{0, 0});
+    CHECK(out_state.at(2) == std::complex<double>{0, 1});
+    CHECK(out_state.at(3) == std::complex<double>{0, 0});
 }
 
 TEST_CASE("Hadamard Gate tests num_qubits=2", "[lightning]")
@@ -203,11 +203,11 @@ TEST_CASE("Hadamard Gate tests num_qubits=2", "[lightning]")
 
     std::vector<std::complex<double>> out_state = sim->State();
 
-    REQUIRE(out_state[0].real() == Approx(0.5).epsilon(1e-5));
-    REQUIRE(out_state[0].imag() == Approx(0).epsilon(1e-5));
-    REQUIRE(out_state.at(1) == out_state.at(0));
-    REQUIRE(out_state.at(2) == out_state.at(0));
-    REQUIRE(out_state.at(3) == out_state.at(0));
+    CHECK(out_state[0].real() == Approx(0.5).epsilon(1e-5));
+    CHECK(out_state[0].imag() == Approx(0).epsilon(1e-5));
+    CHECK(out_state.at(1) == out_state.at(0));
+    CHECK(out_state.at(2) == out_state.at(0));
+    CHECK(out_state.at(3) == out_state.at(0));
 }
 
 TEST_CASE("Hadamard Gate tests num_qubits=3", "[lightning]")
@@ -228,11 +228,11 @@ TEST_CASE("Hadamard Gate tests num_qubits=3", "[lightning]")
 
     std::vector<std::complex<double>> out_state = sim->State();
 
-    REQUIRE(out_state[0].real() == Approx(0.5).epsilon(1e-5));
-    REQUIRE(out_state[0].imag() == Approx(0).epsilon(1e-5));
-    REQUIRE(out_state.at(1) == out_state.at(0));
-    REQUIRE(out_state.at(2) == out_state.at(0));
-    REQUIRE(out_state.at(3) == out_state.at(0));
+    CHECK(out_state[0].real() == Approx(0.5).epsilon(1e-5));
+    CHECK(out_state[0].imag() == Approx(0).epsilon(1e-5));
+    CHECK(out_state.at(1) == out_state.at(0));
+    CHECK(out_state.at(2) == out_state.at(0));
+    CHECK(out_state.at(3) == out_state.at(0));
 }
 
 TEST_CASE("MIX Gate test R(X,Y,Z) num_qubits=1,4", "[lightning]")
@@ -252,33 +252,33 @@ TEST_CASE("MIX Gate test R(X,Y,Z) num_qubits=1,4", "[lightning]")
     const auto &&out_state = sim->State();
 
     // calculated by pennylane,
-    REQUIRE(out_state.at(0) == std::complex<double>{0, 0});
+    CHECK(out_state.at(0) == std::complex<double>{0, 0});
 
-    REQUIRE(out_state.at(1) == std::complex<double>{0, 0});
-    REQUIRE(out_state.at(2) == std::complex<double>{0, 0});
-    REQUIRE(out_state.at(3) == std::complex<double>{0, 0});
+    CHECK(out_state.at(1) == std::complex<double>{0, 0});
+    CHECK(out_state.at(2) == std::complex<double>{0, 0});
+    CHECK(out_state.at(3) == std::complex<double>{0, 0});
 
-    REQUIRE(out_state.at(4) == std::complex<double>{0, 0});
-    REQUIRE(out_state.at(5) == std::complex<double>{0, 0});
-    REQUIRE(out_state.at(6) == std::complex<double>{0, 0});
-    REQUIRE(out_state.at(7) == std::complex<double>{0, 0});
+    CHECK(out_state.at(4) == std::complex<double>{0, 0});
+    CHECK(out_state.at(5) == std::complex<double>{0, 0});
+    CHECK(out_state.at(6) == std::complex<double>{0, 0});
+    CHECK(out_state.at(7) == std::complex<double>{0, 0});
 
-    REQUIRE(out_state[8].real() == Approx(0.8975969498074641).epsilon(1e-5));
-    REQUIRE(out_state[8].imag() == Approx(-0.3736920921192206).epsilon(1e-5));
+    CHECK(out_state[8].real() == Approx(0.8975969498074641).epsilon(1e-5));
+    CHECK(out_state[8].imag() == Approx(-0.3736920921192206).epsilon(1e-5));
 
-    REQUIRE(out_state.at(9) == std::complex<double>{0, 0});
-    REQUIRE(out_state[10].real() == Approx(0.20827363966052723).epsilon(1e-5));
-    REQUIRE(out_state[10].imag() == Approx(-0.08670953277495183).epsilon(1e-5));
+    CHECK(out_state.at(9) == std::complex<double>{0, 0});
+    CHECK(out_state[10].real() == Approx(0.20827363966052723).epsilon(1e-5));
+    CHECK(out_state[10].imag() == Approx(-0.08670953277495183).epsilon(1e-5));
 
-    REQUIRE(out_state.at(11) == std::complex<double>{0, 0});
+    CHECK(out_state.at(11) == std::complex<double>{0, 0});
 
-    REQUIRE(out_state[12].real() == Approx(-0.023011082205037697).epsilon(1e-5));
-    REQUIRE(out_state[12].imag() == Approx(-0.055271914055973925).epsilon(1e-5));
+    CHECK(out_state[12].real() == Approx(-0.023011082205037697).epsilon(1e-5));
+    CHECK(out_state[12].imag() == Approx(-0.055271914055973925).epsilon(1e-5));
 
-    REQUIRE(out_state.at(13) == std::complex<double>{0, 0});
-    REQUIRE(out_state[14].real() == Approx(-0.005339369573836912).epsilon(1e-5));
-    REQUIRE(out_state[14].imag() == Approx(-0.012825002038956146).epsilon(1e-5));
-    REQUIRE(out_state.at(15) == std::complex<double>{0, 0});
+    CHECK(out_state.at(13) == std::complex<double>{0, 0});
+    CHECK(out_state[14].real() == Approx(-0.005339369573836912).epsilon(1e-5));
+    CHECK(out_state[14].imag() == Approx(-0.012825002038956146).epsilon(1e-5));
+    CHECK(out_state.at(15) == std::complex<double>{0, 0});
 }
 
 TEST_CASE("test PhaseShift num_qubits=2", "[lightning]")
@@ -300,17 +300,17 @@ TEST_CASE("test PhaseShift num_qubits=2", "[lightning]")
     std::vector<std::complex<double>> out_state = sim->State();
 
     // calculated by pennylane,
-    REQUIRE(out_state[0].real() == Approx(0.7057699753).epsilon(1e-5));
-    REQUIRE(out_state[0].imag() == Approx(0).epsilon(1e-5));
+    CHECK(out_state[0].real() == Approx(0.7057699753).epsilon(1e-5));
+    CHECK(out_state[0].imag() == Approx(0).epsilon(1e-5));
 
-    REQUIRE(out_state[1].real() == Approx(0).epsilon(1e-5));
-    REQUIRE(out_state[1].imag() == Approx(-0.04345966).epsilon(1e-5));
+    CHECK(out_state[1].real() == Approx(0).epsilon(1e-5));
+    CHECK(out_state[1].imag() == Approx(-0.04345966).epsilon(1e-5));
 
-    REQUIRE(out_state[2].real() == Approx(0.63365519).epsilon(1e-5));
-    REQUIRE(out_state[2].imag() == Approx(0.31079312).epsilon(1e-5));
+    CHECK(out_state[2].real() == Approx(0.63365519).epsilon(1e-5));
+    CHECK(out_state[2].imag() == Approx(0.31079312).epsilon(1e-5));
 
-    REQUIRE(out_state[3].real() == Approx(0.01913791).epsilon(1e-5));
-    REQUIRE(out_state[3].imag() == Approx(-0.039019).epsilon(1e-5));
+    CHECK(out_state[3].real() == Approx(0.01913791).epsilon(1e-5));
+    CHECK(out_state[3].imag() == Approx(-0.039019).epsilon(1e-5));
 }
 
 // 2-qubit operations
@@ -332,10 +332,10 @@ TEST_CASE("CNOT Gate tests num_qubits=2 [0,1]", "[lightning]")
 
     std::vector<std::complex<double>> out_state = sim->State();
 
-    REQUIRE(out_state.at(0) == std::complex<double>{0, 0});
-    REQUIRE(out_state.at(1) == std::complex<double>{0, 0});
-    REQUIRE(out_state.at(2) == std::complex<double>{0, 0});
-    REQUIRE(out_state.at(3) == std::complex<double>{1, 0});
+    CHECK(out_state.at(0) == std::complex<double>{0, 0});
+    CHECK(out_state.at(1) == std::complex<double>{0, 0});
+    CHECK(out_state.at(2) == std::complex<double>{0, 0});
+    CHECK(out_state.at(3) == std::complex<double>{1, 0});
 }
 
 TEST_CASE("CNOT Gate tests num_qubits=2 [1,0]", "[lightning]")
@@ -356,10 +356,10 @@ TEST_CASE("CNOT Gate tests num_qubits=2 [1,0]", "[lightning]")
 
     std::vector<std::complex<double>> out_state = sim->State();
 
-    REQUIRE(out_state.at(0) == std::complex<double>{0, 0});
-    REQUIRE(out_state.at(1) == std::complex<double>{0, 0});
-    REQUIRE(out_state.at(2) == std::complex<double>{1, 0});
-    REQUIRE(out_state.at(3) == std::complex<double>{0, 0});
+    CHECK(out_state.at(0) == std::complex<double>{0, 0});
+    CHECK(out_state.at(1) == std::complex<double>{0, 0});
+    CHECK(out_state.at(2) == std::complex<double>{1, 0});
+    CHECK(out_state.at(3) == std::complex<double>{0, 0});
 }
 
 TEST_CASE("MIX Gate test CR(X, Y, Z) num_qubits=1,4", "[lightning]")
@@ -378,31 +378,31 @@ TEST_CASE("MIX Gate test CR(X, Y, Z) num_qubits=1,4", "[lightning]")
     const auto &&out_state = sim->State();
 
     // calculated by pennylane,
-    REQUIRE(out_state[0].real() == Approx(0.7071067811865475).epsilon(1e-5));
-    REQUIRE(out_state[0].imag() == Approx(0).epsilon(1e-5));
-    REQUIRE(out_state.at(1) == std::complex<double>{0, 0});
-    REQUIRE(out_state.at(2) == std::complex<double>{0, 0});
-    REQUIRE(out_state.at(3) == std::complex<double>{0, 0});
+    CHECK(out_state[0].real() == Approx(0.7071067811865475).epsilon(1e-5));
+    CHECK(out_state[0].imag() == Approx(0).epsilon(1e-5));
+    CHECK(out_state.at(1) == std::complex<double>{0, 0});
+    CHECK(out_state.at(2) == std::complex<double>{0, 0});
+    CHECK(out_state.at(3) == std::complex<double>{0, 0});
 
-    REQUIRE(out_state.at(4) == std::complex<double>{0, 0});
-    REQUIRE(out_state.at(5) == std::complex<double>{0, 0});
-    REQUIRE(out_state.at(6) == std::complex<double>{0, 0});
-    REQUIRE(out_state.at(7) == std::complex<double>{0, 0});
+    CHECK(out_state.at(4) == std::complex<double>{0, 0});
+    CHECK(out_state.at(5) == std::complex<double>{0, 0});
+    CHECK(out_state.at(6) == std::complex<double>{0, 0});
+    CHECK(out_state.at(7) == std::complex<double>{0, 0});
 
-    REQUIRE(out_state[8].real() == Approx(0.6346968899812189).epsilon(1e-5));
-    REQUIRE(out_state[8].imag() == Approx(-0.2642402124132889).epsilon(1e-5));
+    CHECK(out_state[8].real() == Approx(0.6346968899812189).epsilon(1e-5));
+    CHECK(out_state[8].imag() == Approx(-0.2642402124132889).epsilon(1e-5));
 
-    REQUIRE(out_state.at(9) == std::complex<double>{0, 0});
-    REQUIRE(out_state[10].real() == Approx(0.14727170294636227).epsilon(1e-5));
-    REQUIRE(out_state[10].imag() == Approx(-0.061312898618685635).epsilon(1e-5));
-    REQUIRE(out_state.at(11) == std::complex<double>{0, 0});
+    CHECK(out_state.at(9) == std::complex<double>{0, 0});
+    CHECK(out_state[10].real() == Approx(0.14727170294636227).epsilon(1e-5));
+    CHECK(out_state[10].imag() == Approx(-0.061312898618685635).epsilon(1e-5));
+    CHECK(out_state.at(11) == std::complex<double>{0, 0});
 
-    REQUIRE(out_state[12].real() == Approx(-0.016271292269623247).epsilon(1e-5));
-    REQUIRE(out_state[12].imag() == Approx(-0.03908314523813921).epsilon(1e-5));
-    REQUIRE(out_state.at(13) == std::complex<double>{0, 0});
-    REQUIRE(out_state[14].real() == Approx(-0.0037755044329212074).epsilon(1e-5));
-    REQUIRE(out_state[14].imag() == Approx(-0.009068645910477189).epsilon(1e-5));
-    REQUIRE(out_state.at(15) == std::complex<double>{0, 0});
+    CHECK(out_state[12].real() == Approx(-0.016271292269623247).epsilon(1e-5));
+    CHECK(out_state[12].imag() == Approx(-0.03908314523813921).epsilon(1e-5));
+    CHECK(out_state.at(13) == std::complex<double>{0, 0});
+    CHECK(out_state[14].real() == Approx(-0.0037755044329212074).epsilon(1e-5));
+    CHECK(out_state[14].imag() == Approx(-0.009068645910477189).epsilon(1e-5));
+    CHECK(out_state.at(15) == std::complex<double>{0, 0});
 }
 
 TEST_CASE("CRot", "[lightning]")
@@ -422,14 +422,14 @@ TEST_CASE("CRot", "[lightning]")
     sim->NamedOperation("CRot", {M_PI, M_PI_2, 0.5}, {Qs[0], Qs[1]}, false);
     std::vector<std::complex<double>> out_state = sim->State();
 
-    REQUIRE(out_state[0].real() == Approx(0.7071067812).epsilon(1e-5));
-    REQUIRE(out_state[0].imag() == Approx(0).epsilon(1e-5));
-    REQUIRE(out_state[1].real() == Approx(0).epsilon(1e-5));
-    REQUIRE(out_state[1].imag() == Approx(0).epsilon(1e-5));
-    REQUIRE(out_state[2].real() == Approx(-0.1237019796).epsilon(1e-5));
-    REQUIRE(out_state[2].imag() == Approx(-0.4844562109).epsilon(1e-5));
-    REQUIRE(out_state[3].real() == Approx(0.1237019796).epsilon(1e-5));
-    REQUIRE(out_state[3].imag() == Approx(-0.4844562109).epsilon(1e-5));
+    CHECK(out_state[0].real() == Approx(0.7071067812).epsilon(1e-5));
+    CHECK(out_state[0].imag() == Approx(0).epsilon(1e-5));
+    CHECK(out_state[1].real() == Approx(0).epsilon(1e-5));
+    CHECK(out_state[1].imag() == Approx(0).epsilon(1e-5));
+    CHECK(out_state[2].real() == Approx(-0.1237019796).epsilon(1e-5));
+    CHECK(out_state[2].imag() == Approx(-0.4844562109).epsilon(1e-5));
+    CHECK(out_state[3].real() == Approx(0.1237019796).epsilon(1e-5));
+    CHECK(out_state[3].imag() == Approx(-0.4844562109).epsilon(1e-5));
 }
 
 TEST_CASE("CSWAP test", "[lightning]")
@@ -450,8 +450,8 @@ TEST_CASE("CSWAP test", "[lightning]")
     sim->NamedOperation("CSWAP", {}, {Qs[0], Qs[1], Qs[2]}, false);
     std::vector<std::complex<double>> out_state = sim->State();
 
-    REQUIRE(out_state[5].real() == Approx(-1).epsilon(1e-5));
-    REQUIRE(out_state[5].imag() == Approx(0).epsilon(1e-5));
+    CHECK(out_state[5].real() == Approx(-1).epsilon(1e-5));
+    CHECK(out_state[5].imag() == Approx(0).epsilon(1e-5));
 }
 
 TEST_CASE("IsingXY Gate tests num_qubits=2 [1,0]", "[lightning]")
@@ -474,14 +474,14 @@ TEST_CASE("IsingXY Gate tests num_qubits=2 [1,0]", "[lightning]")
 
     std::vector<std::complex<double>> out_state = sim->State();
 
-    REQUIRE(out_state[0].real() == Approx(0.70710678).epsilon(1e-5));
-    REQUIRE(out_state[0].imag() == Approx(0).epsilon(1e-5));
-    REQUIRE(out_state[1].real() == Approx(-0.70357419).epsilon(1e-5));
-    REQUIRE(out_state[1].imag() == Approx(0).epsilon(1e-5));
-    REQUIRE(out_state[2].real() == Approx(0).epsilon(1e-5));
-    REQUIRE(out_state[2].imag() == Approx(-0.07059289).epsilon(1e-5));
-    REQUIRE(out_state[3].real() == Approx(0).epsilon(1e-5));
-    REQUIRE(out_state[3].imag() == Approx(0).epsilon(1e-5));
+    CHECK(out_state[0].real() == Approx(0.70710678).epsilon(1e-5));
+    CHECK(out_state[0].imag() == Approx(0).epsilon(1e-5));
+    CHECK(out_state[1].real() == Approx(-0.70357419).epsilon(1e-5));
+    CHECK(out_state[1].imag() == Approx(0).epsilon(1e-5));
+    CHECK(out_state[2].real() == Approx(0).epsilon(1e-5));
+    CHECK(out_state[2].imag() == Approx(-0.07059289).epsilon(1e-5));
+    CHECK(out_state[3].real() == Approx(0).epsilon(1e-5));
+    CHECK(out_state[3].imag() == Approx(0).epsilon(1e-5));
 }
 
 TEST_CASE("Toffoli test", "[lightning]")
@@ -503,16 +503,16 @@ TEST_CASE("Toffoli test", "[lightning]")
 
     std::vector<std::complex<double>> out_state = sim->State();
 
-    REQUIRE(out_state.at(0) == std::complex<double>{0, 0});
-    REQUIRE(out_state.at(1) == std::complex<double>{0, 0});
-    REQUIRE(out_state[2].real() == Approx(0.70710678).epsilon(1e-5));
-    REQUIRE(out_state[2].imag() == Approx(0).epsilon(1e-5));
-    REQUIRE(out_state.at(3) == std::complex<double>{0, 0});
-    REQUIRE(out_state.at(4) == std::complex<double>{0, 0});
-    REQUIRE(out_state.at(5) == std::complex<double>{0, 0});
-    REQUIRE(out_state.at(6) == std::complex<double>{0, 0});
-    REQUIRE(out_state[7].real() == Approx(0.70710678).epsilon(1e-5));
-    REQUIRE(out_state[7].imag() == Approx(0).epsilon(1e-5));
+    CHECK(out_state.at(0) == std::complex<double>{0, 0});
+    CHECK(out_state.at(1) == std::complex<double>{0, 0});
+    CHECK(out_state[2].real() == Approx(0.70710678).epsilon(1e-5));
+    CHECK(out_state[2].imag() == Approx(0).epsilon(1e-5));
+    CHECK(out_state.at(3) == std::complex<double>{0, 0});
+    CHECK(out_state.at(4) == std::complex<double>{0, 0});
+    CHECK(out_state.at(5) == std::complex<double>{0, 0});
+    CHECK(out_state.at(6) == std::complex<double>{0, 0});
+    CHECK(out_state[7].real() == Approx(0.70710678).epsilon(1e-5));
+    CHECK(out_state[7].imag() == Approx(0).epsilon(1e-5));
 }
 
 TEST_CASE("MultiRZ test", "[lightning]")
@@ -536,8 +536,8 @@ TEST_CASE("MultiRZ test", "[lightning]")
     sim->NamedOperation("Hadamard", {}, {Qs[1]}, false);
     std::vector<std::complex<double>> out_state = sim->State();
 
-    REQUIRE(out_state[2].real() == Approx(-1).epsilon(1e-5));
-    REQUIRE(out_state[2].imag() == Approx(0).epsilon(1e-5));
+    CHECK(out_state[2].real() == Approx(-1).epsilon(1e-5));
+    CHECK(out_state[2].imag() == Approx(0).epsilon(1e-5));
 }
 
 TEST_CASE("MatrixOperation test with 2-qubit", "[lightning]")
@@ -567,17 +567,17 @@ TEST_CASE("MatrixOperation test with 2-qubit", "[lightning]")
 
     std::vector<std::complex<double>> out_state = sim->State();
 
-    REQUIRE(out_state[0].real() == Approx(-0.474432).epsilon(1e-5));
-    REQUIRE(out_state[0].imag() == Approx(-0.44579).epsilon(1e-5));
+    CHECK(out_state[0].real() == Approx(-0.474432).epsilon(1e-5));
+    CHECK(out_state[0].imag() == Approx(-0.44579).epsilon(1e-5));
 
-    REQUIRE(out_state[1].real() == Approx(-0.105256).epsilon(1e-5));
-    REQUIRE(out_state[1].imag() == Approx(0.255159).epsilon(1e-5));
+    CHECK(out_state[1].real() == Approx(-0.105256).epsilon(1e-5));
+    CHECK(out_state[1].imag() == Approx(0.255159).epsilon(1e-5));
 
-    REQUIRE(out_state[2].real() == Approx(-0.168031).epsilon(1e-5));
-    REQUIRE(out_state[2].imag() == Approx(0.218977).epsilon(1e-5));
+    CHECK(out_state[2].real() == Approx(-0.168031).epsilon(1e-5));
+    CHECK(out_state[2].imag() == Approx(0.218977).epsilon(1e-5));
 
-    REQUIRE(out_state[3].real() == Approx(-0.623553).epsilon(1e-5));
-    REQUIRE(out_state[3].imag() == Approx(-0.187075).epsilon(1e-5));
+    CHECK(out_state[3].real() == Approx(-0.623553).epsilon(1e-5));
+    CHECK(out_state[3].imag() == Approx(-0.187075).epsilon(1e-5));
 }
 
 TEST_CASE("MatrixOperation test with 3-qubit", "[lightning]")
@@ -611,14 +611,14 @@ TEST_CASE("MatrixOperation test with 3-qubit", "[lightning]")
 
     std::vector<std::complex<double>> out_state = sim->State();
 
-    REQUIRE(out_state[0].real() == Approx(0.349135).epsilon(1e-5));
-    REQUIRE(out_state[0].imag() == Approx(0.180548).epsilon(1e-5));
-    REQUIRE(out_state[2].real() == Approx(0.0456405).epsilon(1e-5));
-    REQUIRE(out_state[2].imag() == Approx(0.145498).epsilon(1e-5));
-    REQUIRE(out_state[4].real() == Approx(0.281214).epsilon(1e-5));
-    REQUIRE(out_state[4].imag() == Approx(0.158554).epsilon(1e-5));
-    REQUIRE(out_state[6].real() == Approx(0.376493).epsilon(1e-5));
-    REQUIRE(out_state[6].imag() == Approx(0.162104).epsilon(1e-5));
+    CHECK(out_state[0].real() == Approx(0.349135).epsilon(1e-5));
+    CHECK(out_state[0].imag() == Approx(0.180548).epsilon(1e-5));
+    CHECK(out_state[2].real() == Approx(0.0456405).epsilon(1e-5));
+    CHECK(out_state[2].imag() == Approx(0.145498).epsilon(1e-5));
+    CHECK(out_state[4].real() == Approx(0.281214).epsilon(1e-5));
+    CHECK(out_state[4].imag() == Approx(0.158554).epsilon(1e-5));
+    CHECK(out_state[6].real() == Approx(0.376493).epsilon(1e-5));
+    CHECK(out_state[6].imag() == Approx(0.162104).epsilon(1e-5));
 }
 
 TEST_CASE("MatrixOperation test with 4-qubit", "[lightning]")
@@ -711,27 +711,27 @@ TEST_CASE("MatrixOperation test with 4-qubit", "[lightning]")
 
     std::vector<std::complex<double>> out_state = sim->State();
 
-    REQUIRE(out_state[0].real() == Approx(-0.141499).epsilon(1e-5));
-    REQUIRE(out_state[0].imag() == Approx(-0.230993).epsilon(1e-5));
+    CHECK(out_state[0].real() == Approx(-0.141499).epsilon(1e-5));
+    CHECK(out_state[0].imag() == Approx(-0.230993).epsilon(1e-5));
 
-    REQUIRE(out_state[2].real() == Approx(0.135423).epsilon(1e-5));
-    REQUIRE(out_state[2].imag() == Approx(-0.235563).epsilon(1e-5));
+    CHECK(out_state[2].real() == Approx(0.135423).epsilon(1e-5));
+    CHECK(out_state[2].imag() == Approx(-0.235563).epsilon(1e-5));
 
-    REQUIRE(out_state[4].real() == Approx(0.299458).epsilon(1e-5));
-    REQUIRE(out_state[4].imag() == Approx(0.218321).epsilon(1e-5));
+    CHECK(out_state[4].real() == Approx(0.299458).epsilon(1e-5));
+    CHECK(out_state[4].imag() == Approx(0.218321).epsilon(1e-5));
 
-    REQUIRE(out_state[6].real() == Approx(0.0264869).epsilon(1e-5));
-    REQUIRE(out_state[6].imag() == Approx(-0.154913).epsilon(1e-5));
+    CHECK(out_state[6].real() == Approx(0.0264869).epsilon(1e-5));
+    CHECK(out_state[6].imag() == Approx(-0.154913).epsilon(1e-5));
 
-    REQUIRE(out_state[8].real() == Approx(-0.186607).epsilon(1e-5));
-    REQUIRE(out_state[8].imag() == Approx(0.188884).epsilon(1e-5));
+    CHECK(out_state[8].real() == Approx(-0.186607).epsilon(1e-5));
+    CHECK(out_state[8].imag() == Approx(0.188884).epsilon(1e-5));
 
-    REQUIRE(out_state[10].real() == Approx(-0.271843).epsilon(1e-5));
-    REQUIRE(out_state[10].imag() == Approx(-0.281136).epsilon(1e-5));
+    CHECK(out_state[10].real() == Approx(-0.271843).epsilon(1e-5));
+    CHECK(out_state[10].imag() == Approx(-0.281136).epsilon(1e-5));
 
-    REQUIRE(out_state[12].real() == Approx(-0.560499).epsilon(1e-5));
-    REQUIRE(out_state[12].imag() == Approx(-0.310176).epsilon(1e-5));
+    CHECK(out_state[12].real() == Approx(-0.560499).epsilon(1e-5));
+    CHECK(out_state[12].imag() == Approx(-0.310176).epsilon(1e-5));
 
-    REQUIRE(out_state[14].real() == Approx(0.0756372).epsilon(1e-5));
-    REQUIRE(out_state[14].imag() == Approx(-0.226334).epsilon(1e-5));
+    CHECK(out_state[14].real() == Approx(0.0756372).epsilon(1e-5));
+    CHECK(out_state[14].imag() == Approx(-0.226334).epsilon(1e-5));
 }

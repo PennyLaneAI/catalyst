@@ -6,6 +6,8 @@ MK_DIR := $(dir $(MK_ABSPATH))
 RT_BUILD_DIR?=$(MK_DIR)/build
 QIR_STDLIB_DIR?=$(MK_DIR)/qir-stdlib/target/release/
 QIR_STDLIB_INCLUDES_DIR?=$(MK_DIR)/qir-stdlib/target/release/build/include/
+CODE_COVERAGE?=OFF
+BUILD_TYPE?=Release
 ENABLE_KOKKOS?=OFF
 ifeq ($(ENABLE_KOKKOS),OFF)
 	LIGHTNING_GIT_TAG_VALUE?=latest_release
@@ -13,8 +15,6 @@ else
 	# TODO: Update this after the latest_release tag is added to Lightning-Kokkos
 	LIGHTNING_GIT_TAG_VALUE?=v0.29.1
 endif
-CODE_COVERAGE?=OFF
-BUILD_TYPE?=Release
 
 coverage: CODE_COVERAGE=ON
 coverage: BUILD_TYPE=Debug
@@ -52,14 +52,14 @@ configure:
 		-DQIR_STDLIB_INCLUDES=$(QIR_STDLIB_INCLUDES_DIR) \
 		-DENABLE_CODE_COVERAGE=$(CODE_COVERAGE)
 
-$(QIR_STDLIB_INCLUDES_DIR): qir-stdlib
+$(QIR_STDLIB_DIR)/libqir_stdlib.a $(QIR_STDLIB_INCLUDES_DIR)/qir_stdlib.h:
 	$(MAKE) -C qir-stdlib all
 
 $(RT_BUILD_DIR)/lib/backend/librt_backend.so $(RT_BUILD_DIR)/lib/librt_capi.so: configure
 	cmake --build $(RT_BUILD_DIR) --target rt_capi -j$(if $(nprocs:-=),$(nprocs),$$(nproc))
 
 .PHONY: qir
-qir: $(QIR_STDLIB_INCLUDES_DIR)
+qir: $(QIR_STDLIB_DIR)/libqir_stdlib.a $(QIR_STDLIB_INCLUDES_DIR)/qir_stdlib.h
 
 .PHONY: runtime
 runtime: qir $(RT_BUILD_DIR)/lib/backend/librt_backend.so $(RT_BUILD_DIR)/lib/librt_capi.so

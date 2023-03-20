@@ -34,8 +34,8 @@ TEST_CASE("Test the constructor with a naive example", "[CacheManager]")
 {
     CacheManager cm = CacheManager();
 
-    REQUIRE(cm.getNumOperations() == 0);
-    REQUIRE(cm.getNumObservables() == 0);
+    CHECK(cm.getNumOperations() == 0);
+    CHECK(cm.getNumObservables() == 0);
 }
 
 TEST_CASE("Test addOperation with a naive example", "[CacheManager]")
@@ -44,8 +44,8 @@ TEST_CASE("Test addOperation with a naive example", "[CacheManager]")
 
     cm.addOperation("H", {0}, {0}, false);
 
-    REQUIRE(cm.getNumOperations() == 1);
-    REQUIRE(cm.getNumObservables() == 0);
+    CHECK(cm.getNumOperations() == 1);
+    CHECK(cm.getNumObservables() == 0);
 }
 
 TEST_CASE("Test addOperations with a naive example", "[CacheManager]")
@@ -57,8 +57,8 @@ TEST_CASE("Test addOperations with a naive example", "[CacheManager]")
     cm.addOperation("H", {0}, {0}, false);
     cm.addOperation("H", {0}, {0}, false);
 
-    REQUIRE(cm.getNumOperations() == 4);
-    REQUIRE(cm.getNumObservables() == 0);
+    CHECK(cm.getNumOperations() == 4);
+    CHECK(cm.getNumObservables() == 0);
 }
 
 TEST_CASE("Test a LightningSimulator circuit with num_qubits=2 ", "[CacheManager]")
@@ -85,10 +85,10 @@ TEST_CASE("Test a LightningSimulator circuit with num_qubits=2 ", "[CacheManager
     sim->NamedOperation("CNOT", {}, {Qs[0], Qs[1]}, false);
 
     auto &&[num_ops, num_obs, num_params, op_names, _] = qis->CacheManagerInfo();
-    REQUIRE((num_ops == 2 && num_obs == 0));
-    REQUIRE(num_params == 0);
-    REQUIRE(op_names[0] == "PauliX");
-    REQUIRE(op_names[1] == "CNOT");
+    CHECK((num_ops == 2 && num_obs == 0));
+    CHECK(num_params == 0);
+    CHECK(op_names[0] == "PauliX");
+    CHECK(op_names[1] == "CNOT");
 }
 
 TEST_CASE("Test a LightningSimulator circuit with num_qubits=4", "[CacheManager]")
@@ -120,12 +120,12 @@ TEST_CASE("Test a LightningSimulator circuit with num_qubits=4", "[CacheManager]
     sim->StopTapeRecording();
 
     auto &&[num_ops, num_obs, num_params, op_names, _] = qis->CacheManagerInfo();
-    REQUIRE((num_ops == 4 && num_obs == 0));
-    REQUIRE(num_params == 3);
-    REQUIRE(op_names[0] == "Hadamard");
-    REQUIRE(op_names[1] == "CRX");
-    REQUIRE(op_names[2] == "CRY");
-    REQUIRE(op_names[3] == "CRZ");
+    CHECK((num_ops == 4 && num_obs == 0));
+    CHECK(num_params == 3);
+    CHECK(op_names[0] == "Hadamard");
+    CHECK(op_names[1] == "CRX");
+    CHECK(op_names[2] == "CRY");
+    CHECK(op_names[3] == "CRZ");
 }
 
 TEST_CASE("Test __quantum__qis__ circuit with observables", "[CacheManager]")
@@ -151,20 +151,23 @@ TEST_CASE("Test __quantum__qis__ circuit with observables", "[CacheManager]")
     __quantum__qis__State(result, 0);
     CplxT_double *state = result->data_allocated;
 
-    REQUIRE((state[0].real == Approx(0.70357419).margin(1e-5) &&
-             state[0].imag == Approx(0.0).margin(1e-5)));
-    REQUIRE((state[1].real == Approx(0.0).margin(1e-5) &&
-             state[1].imag == Approx(-0.0705929).margin(1e-5)));
-    REQUIRE((state[2].real == Approx(0.70357419).margin(1e-5) &&
-             state[2].imag == Approx(0).margin(1e-5)));
-    REQUIRE((state[3].real == Approx(0.0).margin(1e-5) &&
-             state[3].imag == Approx(-0.0705929).margin(1e-5)));
+    CHECK((state[0].real == Approx(0.70357419).margin(1e-5) &&
+           state[0].imag == Approx(0.0).margin(1e-5)));
+    CHECK((state[1].real == Approx(0.0).margin(1e-5) &&
+           state[1].imag == Approx(-0.0705929).margin(1e-5)));
+    CHECK((state[2].real == Approx(0.70357419).margin(1e-5) &&
+           state[2].imag == Approx(0).margin(1e-5)));
+    CHECK((state[3].real == Approx(0.0).margin(1e-5) &&
+           state[3].imag == Approx(-0.0705929).margin(1e-5)));
 
     // qml.var(qml.PauliZ(wires=1))
     QUBIT **qubit = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
     auto obs = __quantum__qis__NamedObs(ObsId::PauliZ, *qubit);
 
-    REQUIRE(__quantum__qis__Expval(obs) == Approx(0.9800665778).margin(1e-5));
+    CHECK(__quantum__qis__Expval(obs) == Approx(0.9800665778).margin(1e-5));
+
+    free(state);
+    delete result;
 
     __quantum__rt__finalize();
 }
@@ -195,22 +198,25 @@ TEST_CASE("Test __quantum__qis__ circuit with observables using deactiveCacheMan
     __quantum__qis__State(result, 0);
     CplxT_double *state = result->data_allocated;
 
-    REQUIRE((state[0].real == Approx(0.70357419).margin(1e-5) &&
-             state[0].imag == Approx(0.0).margin(1e-5)));
-    REQUIRE((state[1].real == Approx(0.0).margin(1e-5) &&
-             state[1].imag == Approx(-0.0705929).margin(1e-5)));
-    REQUIRE((state[2].real == Approx(0.70357419).margin(1e-5) &&
-             state[2].imag == Approx(0).margin(1e-5)));
-    REQUIRE((state[3].real == Approx(0.0).margin(1e-5) &&
-             state[3].imag == Approx(-0.0705929).margin(1e-5)));
+    CHECK((state[0].real == Approx(0.70357419).margin(1e-5) &&
+           state[0].imag == Approx(0.0).margin(1e-5)));
+    CHECK((state[1].real == Approx(0.0).margin(1e-5) &&
+           state[1].imag == Approx(-0.0705929).margin(1e-5)));
+    CHECK((state[2].real == Approx(0.70357419).margin(1e-5) &&
+           state[2].imag == Approx(0).margin(1e-5)));
+    CHECK((state[3].real == Approx(0.0).margin(1e-5) &&
+           state[3].imag == Approx(-0.0705929).margin(1e-5)));
 
     // qml.var(qml.PauliZ(wires=1))
     QUBIT **qubit = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
     auto obs = __quantum__qis__NamedObs(ObsId::PauliZ, *qubit);
 
-    REQUIRE(__quantum__qis__Expval(obs) == Approx(0.9800665778).margin(1e-5));
+    CHECK(__quantum__qis__Expval(obs) == Approx(0.9800665778).margin(1e-5));
 
     __quantum__rt__toggle_recorder(/* activate_cm */ false);
+
+    free(state);
+    delete result;
 
     __quantum__rt__finalize();
 }
@@ -251,20 +257,20 @@ TEST_CASE("Test a LightningSimulator circuit with num_qubits=4 and observables",
     sim->Expval(pz);
 
     auto &&[num_ops, num_obs, num_params, op_names, obs_keys] = qis->CacheManagerInfo();
-    REQUIRE(num_ops == 4);
-    REQUIRE(num_params == 0);
-    REQUIRE(op_names[0] == "PauliX");
-    REQUIRE(op_names[1] == "PauliY");
-    REQUIRE(op_names[2] == "Hadamard");
-    REQUIRE(op_names[3] == "PauliZ");
+    CHECK(num_ops == 4);
+    CHECK(num_params == 0);
+    CHECK(op_names[0] == "PauliX");
+    CHECK(op_names[1] == "PauliY");
+    CHECK(op_names[2] == "Hadamard");
+    CHECK(op_names[3] == "PauliZ");
 
 #if defined(_KOKKOS)
-    REQUIRE(num_obs == 1);
-    REQUIRE(obs_keys[0] == pz);
+    CHECK(num_obs == 1);
+    CHECK(obs_keys[0] == pz);
 #else
-    REQUIRE(num_obs == 3);
-    REQUIRE(obs_keys[0] == h);
-    REQUIRE(obs_keys[1] == px);
-    REQUIRE(obs_keys[2] == pz);
+    CHECK(num_obs == 3);
+    CHECK(obs_keys[0] == h);
+    CHECK(obs_keys[1] == px);
+    CHECK(obs_keys[2] == pz);
 #endif
 }

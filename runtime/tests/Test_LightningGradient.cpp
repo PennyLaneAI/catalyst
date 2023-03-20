@@ -63,9 +63,10 @@ TEST_CASE("Test __quantum__qis__Gradient_params for zero number of obs", "[Gradi
 
     __quantum__rt__toggle_recorder(/* activate_cm */ false);
 
-    __quantum__rt__finalize();
     delete results;
     delete tp;
+
+    __quantum__rt__finalize();
 }
 
 TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
@@ -101,9 +102,10 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
 
     __quantum__rt__toggle_recorder(/* activate_cm */ false);
 
-    __quantum__rt__finalize();
     delete results;
     delete tp;
+
+    __quantum__rt__finalize();
 }
 
 TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
@@ -144,9 +146,10 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
 
     __quantum__rt__toggle_recorder(/* activate_cm */ false);
 
-    __quantum__rt__finalize();
     delete results;
     delete tp;
+
+    __quantum__rt__finalize();
 }
 
 TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
@@ -184,10 +187,11 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     CHECK(-sin(-M_PI / 7) == Approx(result_tp->data_aligned[0]));
     CHECK(-sin(-M_PI / 7) == Approx(result->data_aligned[0]));
 
-    __quantum__rt__finalize();
     delete result_tp;
     delete result;
     delete tp_memref;
+
+    __quantum__rt__finalize();
 }
 
 TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
@@ -236,11 +240,12 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     CHECK(expected == Approx(result_tp->data_aligned[0]));
     CHECK(expected == Approx(result->data_aligned[0]));
 
-    __quantum__rt__finalize();
     delete result_tp;
     delete result;
     delete tp_memref;
     delete h_matrix;
+
+    __quantum__rt__finalize();
 }
 
 TEST_CASE("Test __quantum__qis__Gradient_params and __quantum__qis__Gradient "
@@ -249,16 +254,17 @@ TEST_CASE("Test __quantum__qis__Gradient_params and __quantum__qis__Gradient "
 {
     const std::vector<double> param{-M_PI / 7, M_PI / 5, 2 * M_PI / 3};
 
+    int64_t trainParams[1] = {0};
+    MemRefT_double_1d *result = new MemRefT_double_1d();
+    MemRefT_double_1d *result_tp = new MemRefT_double_1d();
+    MemRefT_int64_1d *tp_memref = new MemRefT_int64_1d();
+    tp_memref->data_aligned = trainParams;
+    tp_memref->data_allocated = trainParams;
+    tp_memref->sizes[0] = 1;
+    tp_memref->strides[0] = 0;
+
     for (const auto &p : param) {
         // Test qis__Gradient:
-        int64_t trainParams[1] = {0};
-        MemRefT_double_1d *result = new MemRefT_double_1d();
-        MemRefT_double_1d *result_tp = new MemRefT_double_1d();
-        MemRefT_int64_1d *tp_memref = new MemRefT_int64_1d();
-        tp_memref->data_aligned = trainParams;
-        tp_memref->data_allocated = trainParams;
-        tp_memref->sizes[0] = 1;
-        tp_memref->strides[0] = 0;
 
         __quantum__rt__initialize();
 
@@ -282,10 +288,11 @@ TEST_CASE("Test __quantum__qis__Gradient_params and __quantum__qis__Gradient "
         CHECK(cos(p) == Approx(result->data_aligned[0]).margin(1e-5));
 
         __quantum__rt__finalize();
-        delete result_tp;
-        delete result;
-        delete tp_memref;
     }
+
+    delete result_tp;
+    delete result;
+    delete tp_memref;
 }
 
 TEST_CASE("Test __quantum__qis__Gradient_params Op=[Hadamard,RZ,RY,RZ,S,T,ParamShift], "
@@ -341,10 +348,11 @@ TEST_CASE("Test __quantum__qis__Gradient_params Op=[Hadamard,RZ,RY,RZ,S,T,ParamS
     CHECK(expected[1] == Approx(result->data_aligned[1]).margin(1e-5));
     CHECK(expected[2] == Approx(result->data_aligned[2]).margin(1e-5));
 
-    __quantum__rt__finalize();
     delete result;
     delete result_tp;
     delete tp_memref;
+
+    __quantum__rt__finalize();
 }
 
 TEST_CASE("Test __quantum__qis__Gradient Op=[RX,CY], Obs=[Z,Z]", "[Gradient]")
@@ -383,10 +391,11 @@ TEST_CASE("Test __quantum__qis__Gradient Op=[RX,CY], Obs=[Z,Z]", "[Gradient]")
     CHECK(expected[0] == Approx(result0->data_aligned[0]).margin(1e-5));
     CHECK(expected[1] == Approx(result1->data_aligned[0]).margin(1e-5));
 
-    __quantum__rt__finalize();
     delete result0;
     delete result1;
     delete tp_memref;
+
+    __quantum__rt__finalize();
 }
 
 TEST_CASE("Test __quantum__qis__Gradient_params Op=[RX,RX,RX,CZ], Obs=[Z,Z,Z]", "[Gradient]")
@@ -434,11 +443,12 @@ TEST_CASE("Test __quantum__qis__Gradient_params Op=[RX,RX,RX,CZ], Obs=[Z,Z,Z]", 
     CHECK(expected[1] == Approx(result1->data_aligned[1]).margin(1e-5));
     CHECK(expected[2] == Approx(result2->data_aligned[2]).margin(1e-5));
 
-    __quantum__rt__finalize();
     delete result0;
     delete result1;
     delete result2;
     delete tp_memref;
+
+    __quantum__rt__finalize();
 }
 
 TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
@@ -503,10 +513,11 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     CHECK(expected[4] == Approx(result->data_aligned[4]).margin(1e-5));
     CHECK(expected[5] == Approx(result->data_aligned[5]).margin(1e-5));
 
-    __quantum__rt__finalize();
     delete result;
     delete result_tp;
     delete tp_memref;
+
+    __quantum__rt__finalize();
 }
 
 TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
@@ -572,10 +583,11 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     CHECK(expected[4] == Approx(result->data_aligned[4]).margin(1e-5));
     CHECK(expected[5] == Approx(result->data_aligned[5]).margin(1e-5));
 
-    __quantum__rt__finalize();
     delete result;
     delete result_tp;
     delete tp_memref;
+
+    __quantum__rt__finalize();
 }
 
 TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
@@ -649,11 +661,12 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     CHECK(expected[4] == Approx(result->data_aligned[4]).margin(1e-5));
     CHECK(expected[5] == Approx(result->data_aligned[5]).margin(1e-5));
 
-    __quantum__rt__finalize();
     delete coeffs;
     delete result;
     delete result_tp;
     delete tp_memref;
+
+    __quantum__rt__finalize();
 }
 
 TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
@@ -682,7 +695,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
 
     QirString *expected_str = __quantum__rt__int_to_string(2);
 
-    REQUIRE(__quantum__rt__string_equal(qstr, expected_str));
+    CHECK(__quantum__rt__string_equal(qstr, expected_str));
 
     __quantum__rt__toggle_recorder(/* activate_cm */ true);
 
@@ -712,9 +725,10 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     CHECK(expected == Approx(result_tp->data_aligned[0]));
     CHECK(expected == Approx(result->data_aligned[0]));
 
-    __quantum__rt__finalize();
     delete result_tp;
     delete result;
     delete tp_memref;
     delete h_matrix;
+
+    __quantum__rt__finalize();
 }

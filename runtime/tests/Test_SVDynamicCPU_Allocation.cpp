@@ -43,9 +43,9 @@ TEMPLATE_TEST_CASE("StateVectorDynamicCPU::getSubsystemPurity /allocation",
 
         sv1.applyOperations({"RX", "RY"}, {{0}, {1}}, {false, false}, {{0.1}, {0.2}});
 
-        REQUIRE(sv1.getSubsystemPurity(0) == approx(std::complex<PrecisionT>{1, 0}));
-        REQUIRE(sv1.getSubsystemPurity(1) == approx(std::complex<PrecisionT>{1, 0}));
-        REQUIRE(sv1.getSubsystemPurity(2) == approx(std::complex<PrecisionT>{1, 0}));
+        CHECK(sv1.getSubsystemPurity(0) == approx(std::complex<PrecisionT>{1, 0}));
+        CHECK(sv1.getSubsystemPurity(1) == approx(std::complex<PrecisionT>{1, 0}));
+        CHECK(sv1.getSubsystemPurity(2) == approx(std::complex<PrecisionT>{1, 0}));
     }
 
     SECTION("Test checkSubsystemPurity for a state-vector with RX-RY")
@@ -54,8 +54,8 @@ TEMPLATE_TEST_CASE("StateVectorDynamicCPU::getSubsystemPurity /allocation",
         StateVectorDynamicCPU<PrecisionT> sv1(num_qubits);
 
         sv1.applyOperations({"RX", "RY"}, {{0}, {1}}, {false, false}, {{0.1}, {0.2}});
-        REQUIRE((sv1.checkSubsystemPurity(0) && sv1.checkSubsystemPurity(1)));
-        REQUIRE(sv1.checkSubsystemPurity(2));
+        CHECK((sv1.checkSubsystemPurity(0) && sv1.checkSubsystemPurity(1)));
+        CHECK(sv1.checkSubsystemPurity(2));
     }
 
     SECTION("Test getSubsystemPurity for a state-vector with CNOT-RY")
@@ -65,9 +65,9 @@ TEMPLATE_TEST_CASE("StateVectorDynamicCPU::getSubsystemPurity /allocation",
 
         sv1.applyOperations({"CNOT", "RY"}, {{0, 1}, {1}}, {false, false}, {{}, {0.2}});
 
-        REQUIRE(sv1.getSubsystemPurity(0) == approx(std::complex<PrecisionT>{1, 0}));
-        REQUIRE(sv1.getSubsystemPurity(1) == approx(std::complex<PrecisionT>{1, 0}));
-        REQUIRE(sv1.checkSubsystemPurity(2));
+        CHECK(sv1.getSubsystemPurity(0) == approx(std::complex<PrecisionT>{1, 0}));
+        CHECK(sv1.getSubsystemPurity(1) == approx(std::complex<PrecisionT>{1, 0}));
+        CHECK(sv1.checkSubsystemPurity(2));
     }
 
     SECTION("Test getSubsystemPurity for a custom state-vector")
@@ -80,8 +80,8 @@ TEMPLATE_TEST_CASE("StateVectorDynamicCPU::getSubsystemPurity /allocation",
 
         sv1.updateData(data);
 
-        REQUIRE(sv1.getSubsystemPurity(0) != approx(std::complex<PrecisionT>{1, 0}));
-        REQUIRE(sv1.getSubsystemPurity(1) != approx(std::complex<PrecisionT>{1, 0}));
+        CHECK(sv1.getSubsystemPurity(0) != approx(std::complex<PrecisionT>{1, 0}));
+        CHECK(sv1.getSubsystemPurity(1) != approx(std::complex<PrecisionT>{1, 0}));
     }
 }
 
@@ -97,7 +97,7 @@ TEMPLATE_TEST_CASE("StateVectorDynamicCPU::allocateWire /allocation", "[StateVec
         size_t new_idx = sv1.allocateWire();
         sv1.releaseWire(new_idx);
 
-        REQUIRE((sv1.getNumQubits() == num_qubits && new_idx == num_qubits));
+        CHECK((sv1.getNumQubits() == num_qubits && new_idx == num_qubits));
 
         REQUIRE_NOTHROW(
             sv1.applyOperations({"PauliX", "PauliY"}, {{new_idx + 1}, {1}}, {false, false}));
@@ -117,7 +117,7 @@ TEMPLATE_TEST_CASE("StateVectorDynamicCPU::allocateWire /allocation", "[StateVec
         sv1.allocateWire();
         sv1.allocateWire();
 
-        REQUIRE(sv1.getNumQubits() == 10);
+        CHECK(sv1.getNumQubits() == 10);
     }
 
     SECTION("Test the validity of the shranked state vector in the second half")
@@ -130,7 +130,7 @@ TEMPLATE_TEST_CASE("StateVectorDynamicCPU::allocateWire /allocation", "[StateVec
 
         sv1.releaseWire(0);
 
-        REQUIRE(sv1.getNumQubits() == 3);
+        CHECK(sv1.getNumQubits() == 3);
     }
 
     SECTION("Test allocation/deallocation of a customed state-vector")
@@ -140,20 +140,20 @@ TEMPLATE_TEST_CASE("StateVectorDynamicCPU::allocateWire /allocation", "[StateVec
 
         std::vector<std::complex<PrecisionT>> expected_data{{1.0, 0.0}, {0.0, 0.0}};
 
-        REQUIRE(sv1.getDataVector() == approx(expected_data));
+        CHECK(sv1.getDataVector() == approx(expected_data));
 
         sv1.applyOperation("Hadamard", {idx_0}, false, {});
         expected_data[0] = std::complex<PrecisionT>(0.707107, 0);
         expected_data[1] = std::complex<PrecisionT>(0.707107, 0);
 
-        REQUIRE(sv1.getDataVector() == approx(expected_data));
+        CHECK(sv1.getDataVector() == approx(expected_data));
 
         sv1.allocateWire();
 
         std::vector<std::complex<PrecisionT>> expected_data_n2{
             {0.707107, 0}, {0.0, 0.0}, {0.707107, 0}, {0.0, 0.0}};
 
-        REQUIRE(sv1.getDataVector() == approx(expected_data_n2));
+        CHECK(sv1.getDataVector() == approx(expected_data_n2));
 
         sv1.allocateWire();
 
@@ -161,19 +161,19 @@ TEMPLATE_TEST_CASE("StateVectorDynamicCPU::allocateWire /allocation", "[StateVec
             {0.707107, 0}, {0.0, 0.0}, {0.0, 0.0}, {0.0, 0.0},
             {0.707107, 0}, {0.0, 0.0}, {0.0, 0.0}, {0.0, 0.0}};
 
-        REQUIRE(sv1.getDataVector() == approx(expected_data_n3));
+        CHECK(sv1.getDataVector() == approx(expected_data_n3));
 
         sv1.releaseWire(0);
 
-        REQUIRE(sv1.getDataVector() == approx(expected_data_n2));
+        CHECK(sv1.getDataVector() == approx(expected_data_n2));
 
         sv1.releaseWire(0);
 
-        REQUIRE(sv1.getDataVector() == approx(expected_data));
+        CHECK(sv1.getDataVector() == approx(expected_data));
 
         sv1.releaseWire(0);
 
-        REQUIRE(sv1.getDataVector()[0] == approx(std::complex<PrecisionT>(1.0, 0.0)));
+        CHECK(sv1.getDataVector()[0] == approx(std::complex<PrecisionT>(1.0, 0.0)));
     }
 
     SECTION("Test allocation/deallocation of wires for a state-vector with "
@@ -182,12 +182,12 @@ TEMPLATE_TEST_CASE("StateVectorDynamicCPU::allocateWire /allocation", "[StateVec
         StateVectorDynamicCPU<PrecisionT> sv1(0);
 
         std::vector<std::complex<PrecisionT>> expected_data{{1, 0}};
-        REQUIRE(sv1.getDataVector() == approx(expected_data));
+        CHECK(sv1.getDataVector() == approx(expected_data));
 
         size_t idx_0 = sv1.allocateWire();
 
         expected_data.push_back({0, 0});
-        REQUIRE(sv1.getDataVector() == approx(expected_data));
+        CHECK(sv1.getDataVector() == approx(expected_data));
 
         sv1.applyOperation("Hadamard", {idx_0}, false, {});
 
@@ -197,7 +197,7 @@ TEMPLATE_TEST_CASE("StateVectorDynamicCPU::allocateWire /allocation", "[StateVec
         sv1.applyOperation("RX", {new_idx}, false, {0.3});
 
         sv1.releaseWire(0);
-        REQUIRE(sv1.getDataVector() == approx(sv2.getDataVector()));
+        CHECK(sv1.getDataVector() == approx(sv2.getDataVector()));
     }
 
     SECTION("Test allocation/deallocation of wires for a state-vector with "
@@ -213,7 +213,7 @@ TEMPLATE_TEST_CASE("StateVectorDynamicCPU::allocateWire /allocation", "[StateVec
         sv1.applyOperation("RX", {new_idx}, false, {0.3});
 
         sv1.releaseWire(0);
-        REQUIRE(sv1.getDataVector() == approx(sv2.getDataVector()));
+        CHECK(sv1.getDataVector() == approx(sv2.getDataVector()));
     }
 
     SECTION("Test allocation/deallocation of wires for a state-vector with "
@@ -230,7 +230,7 @@ TEMPLATE_TEST_CASE("StateVectorDynamicCPU::allocateWire /allocation", "[StateVec
 
         sv1.releaseWire(0);
 
-        REQUIRE(sv1.getDataVector() == approx(sv2.getDataVector()));
+        CHECK(sv1.getDataVector() == approx(sv2.getDataVector()));
     }
 
     SECTION("Test allocation/deallocation of wires for a state-vector with "
@@ -245,7 +245,7 @@ TEMPLATE_TEST_CASE("StateVectorDynamicCPU::allocateWire /allocation", "[StateVec
         sv2.applyOperations({"RX", "SWAP"}, {{0}, {0, 1}}, {false, false}, {{0.4}, {}});
 
         sv1.releaseWire(1);
-        REQUIRE(sv1.getDataVector() == approx(sv2.getDataVector()));
+        CHECK(sv1.getDataVector() == approx(sv2.getDataVector()));
     }
 
     SECTION("Test allocation/deallocation of wires for a state-vector with "
@@ -267,6 +267,6 @@ TEMPLATE_TEST_CASE("StateVectorDynamicCPU::allocateWire /allocation", "[StateVec
         sv1.releaseWire(1);
         sv1.releaseWire(1);
 
-        REQUIRE(sv1.getDataVector() == approx(result));
+        CHECK(sv1.getDataVector() == approx(result));
     }
 }
