@@ -15,6 +15,7 @@
 #include <cassert>
 #include <cstdarg>
 #include <cstdlib>
+#include <cstring>
 #include <ctime>
 
 #include <bitset>
@@ -165,11 +166,7 @@ void __quantum__qis__Gradient(int64_t numResults, /* results = */...)
     for (int64_t i = 0; i < numResults; i++) {
         auto *mrp = va_arg(args, ResultType *);
         assert(mrp && "the result type cannot be a null pointer");
-
-        double *jac_data = (double *)mrp->data_aligned;
-        for (size_t j = 0; j < num_train_params; j++) {
-            jac_data[j] = jacobian[i][j];
-        }
+        memcpy(mrp->data_aligned, jacobian[i].data(), num_train_params * sizeof(double));
     }
     va_end(args);
 }
@@ -219,11 +216,7 @@ void __quantum__qis__Gradient_params(MemRefT_int64_1d *params, int64_t numResult
     for (int64_t i = 0; i < numResults; i++) {
         auto *mrp = va_arg(args, ResultType *);
         assert(mrp && "the result type cannot be a null pointer");
-
-        double *jac_data = (double *)mrp->data_aligned;
-        for (size_t j = 0; j < num_train_params; j++) {
-            jac_data[j] = jacobian[i][j];
-        }
+        memcpy(mrp->data_aligned, jacobian[i].data(), num_train_params * sizeof(double));
     }
     va_end(args);
 }
@@ -641,12 +634,7 @@ void __quantum__qis__Probs(MemRefT_double_1d *result, int64_t numQubits, ...)
     }
 
     const size_t numElements = 1U << numQubits;
-
-    double *probs = result->data_aligned;
-    double *curr = probs;
-    for (size_t idx = 0; idx < numElements; idx++) {
-        *(curr++) = sv_probs[idx];
-    }
+    memcpy(result->data_aligned, sv_probs.data(), numElements * sizeof(double));
 }
 
 void __quantum__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, ...)
@@ -678,11 +666,7 @@ void __quantum__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, .
 
     const size_t numElements = sv_state.size();
     assert(numElements == (1U << numQubits));
-
-    for (size_t idx = 0; idx < numElements; idx++) {
-        result->data_aligned[idx].real = std::real(sv_state[idx]);
-        result->data_aligned[idx].imag = std::imag(sv_state[idx]);
-    }
+    memcpy(result->data_aligned, sv_state.data(), numElements * sizeof(std::complex<double>));
 }
 
 void __quantum__qis__Sample(MemRefT_double_2d *result, int64_t shots, int64_t numQubits, ...)
@@ -712,12 +696,7 @@ void __quantum__qis__Sample(MemRefT_double_2d *result, int64_t shots, int64_t nu
 
     const size_t numElements = sv_samples.size();
     assert(numElements == static_cast<size_t>(shots * numQubits));
-
-    double *samples = result->data_aligned;
-    double *curr = samples;
-    for (size_t idx = 0; idx < numElements; idx++) {
-        *(curr++) = sv_samples[idx];
-    }
+    memcpy(result->data_aligned, sv_samples.data(), numElements * sizeof(double));
 }
 
 void __quantum__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t shots, int64_t numQubits,
@@ -753,21 +732,7 @@ void __quantum__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t shots
     const size_t numElements = 1U << numQubits;
     assert(numElements == sv_eigvals.size());
     assert(numElements == sv_cts.size());
-
-    // eigvals
-    // TODO: memory management
-    double *eigvals = (double *)result->first.data_aligned;
-    double *curr = eigvals;
-    for (size_t idx = 0; idx < numElements; idx++) {
-        *(curr++) = sv_eigvals[idx];
-    }
-
-    // counts
-    // TODO: memory management
-    int64_t *counts = (int64_t *)result->second.data_aligned;
-    int64_t *icurr = counts;
-    for (size_t idx = 0; idx < numElements; idx++) {
-        *(icurr++) = sv_cts[idx];
-    }
+    memcpy(result->first.data_aligned, sv_eigvals.data(), numElements * sizeof(double));
+    memcpy(result->second.data_aligned, sv_cts.data(), numElements * sizeof(int64_t));
 }
 }
