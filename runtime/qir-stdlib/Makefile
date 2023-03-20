@@ -8,13 +8,11 @@ help:
 .PHONY: all
 all: qir
 
-target:
+.PHONY: qir
+qir:
 	@echo "build the QIR-stdlib Rust crate using cargo;"
 	@echo "this cargo requires the llvm-tools-preview rustup component"
 	cargo build --release
-
-.PHONY: qir
-qir: target
 
 .PHONY: clean
 clean:
