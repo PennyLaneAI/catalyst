@@ -52,7 +52,7 @@ configure:
 		-DQIR_STDLIB_INCLUDES=$(QIR_STDLIB_INCLUDES_DIR) \
 		-DENABLE_CODE_COVERAGE=$(CODE_COVERAGE)
 
-$(QIR_STDLIB_DIR)/libqir_stdlib.a $(QIR_STDLIB_INCLUDES_DIR)/qir_stdlib.h: qir-stdlib
+$(QIR_STDLIB_DIR)/libqir_stdlib.a $(QIR_STDLIB_INCLUDES_DIR)/qir_stdlib.h:
 	$(MAKE) -C qir-stdlib all
 
 $(RT_BUILD_DIR)/lib/backend/librt_backend.so $(RT_BUILD_DIR)/lib/librt_capi.so: configure
