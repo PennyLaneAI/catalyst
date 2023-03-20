@@ -147,12 +147,11 @@ TEST_CASE("Test __quantum__qis__ circuit with observables", "[CacheManager]")
     // qml.CRX(0.4, wires=[1,0])
     __quantum__qis__CRX(0.4, target, *ctrls);
 
-    MemRefT_CplxT_double_1d *result = new MemRefT_CplxT_double_1d;
-    CplxT_double *buffer = new CplxT_double[8];
-    result->data_aligned = buffer;
-    result->data_allocated = buffer;
-    __quantum__qis__State(result, 0);
-    CplxT_double *state = result->data_allocated;
+    size_t buffer_len = 8;
+    CplxT_double *buffer = new CplxT_double[buffer_len];
+    MemRefT_CplxT_double_1d result = {buffer, buffer, 0, {buffer_len}, {1}};
+    __quantum__qis__State(&result, 0);
+    CplxT_double *state = result.data_allocated;
 
     CHECK((state[0].real == Approx(0.70357419).margin(1e-5) &&
            state[0].imag == Approx(0.0).margin(1e-5)));
@@ -169,7 +168,6 @@ TEST_CASE("Test __quantum__qis__ circuit with observables", "[CacheManager]")
 
     CHECK(__quantum__qis__Expval(obs) == Approx(0.9800665778).margin(1e-5));
 
-    delete result;
     delete[] buffer;
     __quantum__rt__finalize();
 }
@@ -196,12 +194,11 @@ TEST_CASE("Test __quantum__qis__ circuit with observables using deactiveCacheMan
     // qml.CRX(0.4, wires=[1,0])
     __quantum__qis__CRX(0.4, target, *ctrls);
 
-    MemRefT_CplxT_double_1d *result = new MemRefT_CplxT_double_1d;
-    CplxT_double *buffer = new CplxT_double[8];
-    result->data_aligned = buffer;
-    result->data_allocated = buffer;
-    __quantum__qis__State(result, 0);
-    CplxT_double *state = result->data_allocated;
+    size_t buffer_len = 8;
+    CplxT_double *buffer = new CplxT_double[buffer_len];
+    MemRefT_CplxT_double_1d result = {buffer, buffer, 0, {buffer_len}, {1}};
+    __quantum__qis__State(&result, 0);
+    CplxT_double *state = result.data_allocated;
 
     CHECK((state[0].real == Approx(0.70357419).margin(1e-5) &&
            state[0].imag == Approx(0.0).margin(1e-5)));
@@ -222,7 +219,6 @@ TEST_CASE("Test __quantum__qis__ circuit with observables using deactiveCacheMan
 
     __quantum__rt__finalize();
 
-    delete result;
     delete[] buffer;
 }
 
