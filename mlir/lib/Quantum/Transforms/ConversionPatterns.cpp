@@ -512,16 +512,14 @@ struct SampleOpPattern : public SampleBasedPattern<SampleOp> {
         MLIRContext *ctx = getContext();
         TypeConverter *conv = getTypeConverter();
 
-        assert(op.getSamples().getType().isa<MemRefType>() &&
-               "sample must return memref before lowering");
+        assert(!op.getSamples() && "sample must be unset.");
 
         Type matrixType =
             conv->convertType(MemRefType::get({UNKNOWN, UNKNOWN}, Float64Type::get(ctx)));
 
         StringRef qirName = "__quantum__qis__Sample";
-        Value structPtr = performRewrite(rewriter, matrixType, qirName, op, adaptor);
-
-        rewriter.replaceOpWithNewOp<LLVM::LoadOp>(op, structPtr);
+        performRewrite(rewriter, matrixType, qirName, op, adaptor);
+        rewriter.eraseOp(op);
 
         return success();
     }

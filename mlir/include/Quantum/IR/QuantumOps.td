@@ -447,14 +447,23 @@ def SampleOp : Measurement_Op<"sample"> {
     );
 
     let results = (outs
-        AnyTypeOf<[
-            1DTensorOf<[F64]>, MemRefRankOf<[F64], [1]>,
-            2DTensorOf<[F64]>, MemRefRankOf<[F64], [2]>
-        ]>:$samples
+        Optional<
+            AnyTypeOf<[
+                1DTensorOf<[F64]>,
+                2DTensorOf<[F64]>
+            ]>
+        >:$samples
     );
 
     let assemblyFormat = [{
-        $obs ( `in` `(` $in_data^ `:` type($in_data) `)` )? attr-dict `:` type(results)
+        $obs ( `in` `(` $in_data^ `:` type($in_data) `)` )? attr-dict ( `:` type($samples)^ )?
+    }];
+
+    let extraClassDeclaration = [{
+      llvm::Optional<mlir::Type> getResultType() {
+        if (getResultTypes().empty()) return std::nullopt;
+        return getResultTypes()[0];
+      }
     }];
 
     let hasVerifier = 1;

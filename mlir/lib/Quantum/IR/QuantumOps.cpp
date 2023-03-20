@@ -157,14 +157,20 @@ LogicalResult SampleOp::verify()
         return emitOpError("observable must be locally defined");
     }
 
+    Type toVerify = getSamples() ? getSamples().getType() : getInData().getType();
+    if (!((bool)getSamples() ^ (bool)getInData())) {
+        return emitOpError("either a tensor must be returned or a memref must"
+                           "be an input");
+    }
+
     if (getObs().getDefiningOp<ComputationalBasisOp>() &&
-        failed(verifyTensorResult(getSamples().getType(), getShots(), numQubits))) {
+        failed(verifyTensorResult(toVerify, getShots(), numQubits))) {
         // In the computational basis, Pennylane adds a second dimension for the number of qubits.
         return emitOpError("return tensor must have 2D static shape equal to "
                            "(number of shots, number of qubits in observable)");
     }
     else if (!getObs().getDefiningOp<ComputationalBasisOp>() &&
-             failed(verifyTensorResult(getSamples().getType(), getShots()))) {
+             failed(verifyTensorResult(toVerify, getShots()))) {
         // For any given observables, Pennylane always returns a 1D tensor.
         return emitOpError("return tensor must have 1D static shape equal to (number of shots)");
     }

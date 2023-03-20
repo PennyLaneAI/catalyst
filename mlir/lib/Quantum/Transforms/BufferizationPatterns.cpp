@@ -65,11 +65,13 @@ struct BufferizeSampleOp : public OpConversionPattern<SampleOp> {
     LogicalResult matchAndRewrite(SampleOp op, OpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
-        MemRefType resultType = getTypeConverter()->convertType(op.getType()).cast<MemRefType>();
+        Type tensorType = op.getType(0);
+        MemRefType resultType = getTypeConverter()->convertType(tensorType).cast<MemRefType>();
         Location loc = op.getLoc();
-        auto allocOp = rewriter.create<memref::AllocOp>(loc, resultType);
-        rewriter.replaceOpWithNewOp<SampleOp>(op, resultType, adaptor.getObs(),
-                                              allocOp->getResult(0), adaptor.getShotsAttr());
+        auto allocOp = rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType);
+        Value allocVal = allocOp->getResult(0);
+        rewriter.create<SampleOp>(loc, TypeRange{}, adaptor.getObs(), allocVal,
+                                  adaptor.getShotsAttr());
         return success();
     }
 };
@@ -148,7 +150,7 @@ void populateBufferizationLegality(TypeConverter &typeConverter, ConversionTarge
     target.addDynamicallyLegalOp<HamiltonianOp>(
         [&](HamiltonianOp op) { return typeConverter.isLegal(op.getCoeffs().getType()); });
     target.addDynamicallyLegalOp<SampleOp>(
-        [&](SampleOp op) { return typeConverter.isLegal(op.getType()); });
+        [&](SampleOp op) { return !op.getResultType() || typeConverter.isLegal(op.getType(0)); });
     target.addDynamicallyLegalOp<StateOp>(
         [&](StateOp op) { return !op.getResultType() || typeConverter.isLegal(op.getType(0)); });
     target.addDynamicallyLegalOp<ProbsOp>(
