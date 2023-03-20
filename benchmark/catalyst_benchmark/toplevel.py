@@ -23,8 +23,6 @@ from catalyst_benchmark.types import (
     BenchmarkResultV1,
     BooleanOptionalAction,
 )
-from catalyst_benchmark.measurements import parse_implementation
-
 
 # fmt:off
 FMTVERSION = 1
@@ -120,7 +118,9 @@ def syshash(a) -> str:
     return a.force_sysinfo_hash if a.force_sysinfo_hash else SYSHASH
 
 
-def ofile(a, _, measure, problem, impl, nqubits, nlayers, diffmethod) -> Tuple[str, str]:
+def ofile(  # pylint: disable=too-many-arguments
+    a, _, measure, problem, impl, nqubits, nlayers, diffmethod
+) -> Tuple[str, str]:
     """Produce the JSON file name containing the measurement configured and
     the Linux shell command which is expected to produce such file."""
     measure_ = measure.replace("-", "")
@@ -136,7 +136,7 @@ def ofile(a, _, measure, problem, impl, nqubits, nlayers, diffmethod) -> Tuple[s
     elif problem == "qft":
         assert diffmethod is None
         params = f"--nlayers={nlayers}" if nlayers is not None else ""
-    elif problem == "vqe" or problem == "chemvqe":
+    elif problem in ["vqe", "chemvqe"]:
         assert nlayers is None
         assert diffmethod is not None
         params = f"--vqe-diff-method={diffmethod}"
@@ -161,26 +161,25 @@ def ofile(a, _, measure, problem, impl, nqubits, nlayers, diffmethod) -> Tuple[s
 
 def loadresults(fp: str) -> BenchmarkResult:
     """Load a serrialized benchmark result from file"""
+    # pylint: disable=no-member
     return BenchmarkResult.from_dict(json_load(open(fp, encoding="utf-8")))
 
 
 def all_configurations(a: ParsedArguments) -> Iterable[tuple]:
     """Iterate through the configurations available."""
-
+    # pylint: disable=too-many-nested-blocks
     for measure in MEASUREMENTS:
         for impl in IMPLEMENTATIONS:
-            framework, _, _ = parse_implementation(impl)
-
             for cat in ["regular", "deep", "hybrid", "variational"]:
-                if not any([(m in a.measure.split(",")) for m in [measure, "all"]]):
+                if not any((m in a.measure.split(",")) for m in [measure, "all"]):
                     continue
-                if not any([(c in a.category.split(",")) for c in [cat, "all"]]):
+                if not any((c in a.category.split(",")) for c in [cat, "all"]):
                     continue
 
                 for problem in CATPROBLEMS.get(cat, [None]):
                     if problem is None:
                         continue
-                    if not any([(p in a.problems.split(",")) for p in [problem, "all"]]):
+                    if not any((p in a.problems.split(",")) for p in [problem, "all"]):
                         continue
 
                     for diffmethod in DIFF_METHODS.get((problem, measure), [None]):
@@ -193,6 +192,7 @@ def collect(a: ParsedArguments) -> None:
     """Run the selected configurations and check for results. Avoid trying
     larger configurations if smaller configurations failed. In the end, print
     the `known_failures` dictionary suggestion."""
+    # pylint: disable=too-many-nested-blocks
     known_failures = deepcopy(KNOWN_FAILURES)
     try:
         for config in all_configurations(a):
@@ -239,24 +239,27 @@ def collect(a: ParsedArguments) -> None:
 
 def load(a: ParsedArguments) -> Tuple[DataFrame, Optional[Sysinfo]]:
     """Load the benchmark data into the Pandas DataFrame"""
+    # pylint: disable=broad-exception-caught
     log = []
     nmissing = 0
     systems = set()
     data = defaultdict(list)
     for config in all_configurations(a):
+        # pylint: disable=no-member
         ofname, _ = ofile(a, *config)
         cat, measure, problem, impl, nqubits, nlayers, diffmethod = config
         r = None
-        try:
-            r = BenchmarkResult.from_dict(json_load(open(ofname, encoding="utf-8")))
-        except Exception as e:
-            log.append(str(e))
-            log.append("Trying to load V1 instead")
+        with open(ofname, encoding="utf-8") as f:
             try:
-                r = BenchmarkResultV1.from_dict(json_load(open(ofname, encoding="utf-8")))
-            except Exception as e:
-                nmissing += 1
-                log.append(str(e))
+                r = BenchmarkResult.from_dict(json_load(f))
+            except Exception as e1:
+                log.append(str(e1))
+                log.append("Trying to load V1 instead")
+                try:
+                    r = BenchmarkResultV1.from_dict(json_load(f))
+                except Exception as e2:
+                    nmissing += 1
+                    log.append(str(e2))
         if r is not None:
             for trial, time in enumerate(r.measurement_sec):
                 data["cat"].append(cat)
@@ -290,6 +293,7 @@ def load(a: ParsedArguments) -> Tuple[DataFrame, Optional[Sysinfo]]:
 
 def writefile(a: ParsedArguments, fname, chart) -> None:
     """Write chart to file(s) in the configured formats"""
+    # pylint: disable=no-member; `vlc` DOES HAVE `vegalite_to_{svg,png}`
     fname_suffix = f"{fname}_{syshash(a)}_{tag(a)}"
     for ext, wf, method in [("svg", "w", vlc.vegalite_to_svg), ("png", "wb", vlc.vegalite_to_png)]:
         if ext in a.plot_formats:
@@ -312,6 +316,7 @@ def dfilter(cat, measure, problem, df: DataFrame) -> DataFrame:
 def plot(a: ParsedArguments, df_full: DataFrame, sysinfo: Optional[Sysinfo] = None) -> None:
     """Plot the figures. The function first builds a set of Pandas DataFrames,
     then calls Altair to present the data collected."""
+    # pylint: disable=too-many-statements
 
     _filter = partial(dfilter, df=df_full)
 
@@ -527,11 +532,11 @@ def plot(a: ParsedArguments, df_full: DataFrame, sysinfo: Optional[Sysinfo] = No
                 return chain(
                     [set([x]) for x in set(DIFF_METHODS[(problem, vqemeasure)]) - dmsame], [dmsame]
                 )
-            else:
-                return [set([x]) for x in set(DIFF_METHODS[(problem, vqemeasure)])]
+            return [set([x]) for x in set(DIFF_METHODS[(problem, vqemeasure)])]
 
         df = _filter("variational", "compile", vqeproblem)
         for dms in _diff_methods(vqeproblem):
+            # pylint: disable=cell-var-from-loop
             df2 = df[df.get("diffmethod", pd.Series(float)).map(lambda m: m in dms)]
             if len(df2) > 0:
                 dmtitle = "_".join(sorted(dms))
@@ -552,6 +557,7 @@ def plot(a: ParsedArguments, df_full: DataFrame, sysinfo: Optional[Sysinfo] = No
 
         df = _filter("variational", "runtime", vqeproblem)
         for dms in _diff_methods(vqeproblem):
+            # pylint: disable=cell-var-from-loop
             df2 = df[df.get("diffmethod", pd.Series(float)).map(lambda m: m in dms)]
             if len(df2) > 0:
                 dmtitle = "_".join(sorted(dms))
@@ -596,6 +602,7 @@ def plot(a: ParsedArguments, df_full: DataFrame, sysinfo: Optional[Sysinfo] = No
         # Variational circuits, bar charts
         df_allgrad = _filter("variational", "runtime", vqeproblem)
         for diffmethods in _diff_methods(vqeproblem):
+            # pylint: disable=cell-var-from-loop
             df = df_allgrad[
                 df_allgrad.get("diffmethod", pd.Series(float)).map(lambda m: m in diffmethods)
             ]
@@ -642,7 +649,7 @@ def plot(a: ParsedArguments, df_full: DataFrame, sysinfo: Optional[Sysinfo] = No
         df = _filter("regular", "runtime", "chemvqe-hybrid")
         if len(df) > 0:
             df = _add_timeouts(df)
-            fname = f"_img/regular_chemvqehbrid_runtime_barchart"
+            fname = "_img/regular_chemvqehbrid_runtime_barchart"
             writefile(
                 a,
                 fname,
@@ -671,7 +678,7 @@ def plot(a: ParsedArguments, df_full: DataFrame, sysinfo: Optional[Sysinfo] = No
                 .facet(
                     column=alt.Column("nqubits:N", title="Qubits"),
                 )
-                .properties(title=_mktitle(f"Running time, ChemVQE (Hybrid)", align=None))
+                .properties(title=_mktitle("Running time, ChemVQE (Hybrid)", align=None))
                 .to_dict(),
             )
 
@@ -706,7 +713,7 @@ AP.add_argument("-V", "--verbose", default=False, action=BooleanOptionalAction,
 
 
 def load_cmdline(cmdline: Optional[Union[str, list]] = None) -> DataFrame:
-    """Loads all the dataframe"""
+    """Loads the dataframe from the filesystem."""
     if isinstance(cmdline, str):
         arglist = cmdline.split()
     elif isinstance(cmdline, list):
@@ -718,5 +725,7 @@ def load_cmdline(cmdline: Optional[Union[str, list]] = None) -> DataFrame:
     return load(AP.parse_args(arglist))
 
 
-def load_tagged(syshash=SYSHASH, tag=f"v{FMTVERSION}") -> DataFrame:
-    return load_cmdline(["-H", syshash, "--tag", tag])
+def load_tagged(force_syshash=SYSHASH, force_tag=f"v{FMTVERSION}") -> DataFrame:
+    """Load the data from the filesystem. Take into account the records having the given
+    tag/sysinfo."""
+    return load_cmdline(["-H", force_syshash, "--tag", force_tag])

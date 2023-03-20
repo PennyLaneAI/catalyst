@@ -1,4 +1,6 @@
 """ ChemVQE problem, PennyLane+Catalyst implementation """
+# pylint: disable=too-many-instance-attributes
+# pylint: disable=no-value-for-parameter; It happens when we use Catalyst control-flow
 from typing import Any, Dict
 from dataclasses import dataclass
 

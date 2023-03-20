@@ -1,4 +1,6 @@
 """ Grover-like problem, PennyLane/PennyLane+JAX implementation """
+# pylint: disable=import-outside-toplevel
+# pylint: disable=too-many-instance-attributes
 from typing import Any
 from copy import deepcopy
 from dataclasses import dataclass

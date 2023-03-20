@@ -17,14 +17,15 @@ class ProblemC(Problem):
         self.nlayers = nlayers if nlayers else 1
         self.qcircuit = None
 
-    def trial_params(self, n: int):
-        return jnp.array([1.0 / (2.0 * (1 + n) * jnp.pi)], dtype=jnp.float64)
+    def trial_params(self, i: int):
+        return jnp.array([1.0 / (2.0 * (1 + i) * jnp.pi)], dtype=jnp.float64)
 
 
 def qcompile(p: ProblemC, params):
     """Compile the quantum parts of the problem"""
 
     def _circuit(params: ShapedArray(params.shape, dtype=jnp.complex64)):
+        # pylint: disable=no-value-for-parameter
         N = p.nqubits
         L = p.nlayers
 

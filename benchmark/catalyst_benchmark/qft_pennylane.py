@@ -16,8 +16,8 @@ class ProblemPL(Problem):
         self.qcircuit = None
         self.nlayers = nlayers if nlayers else 1
 
-    def trial_params(self, n: int):
-        return pnp.array([1.0 / (2.0 * (1 + n) * pnp.pi)], dtype=pnp.float64)
+    def trial_params(self, i: int):
+        return pnp.array([1.0 / (2.0 * (1 + i) * pnp.pi)], dtype=pnp.float64)
 
 
 def qcompile(p: ProblemPL, params):
@@ -60,7 +60,7 @@ SHOTS = None
 def run_jax_lightning_qubit(N=6):
     """Test problem entry point"""
 
-    import jax
+    import jax  # pylint: disable=import-outside-toplevel
 
     jax.config.update("jax_enable_x64", True)
 

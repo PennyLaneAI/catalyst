@@ -1,4 +1,6 @@
 """ ChemVQE problem, PennyLane/PennyLane+JAX implementation """
+# pylint: disable=import-outside-toplevel
+# pylint: disable=too-many-instance-attributes
 from typing import Any, Dict
 from dataclasses import dataclass
 from functools import partial
@@ -84,7 +86,7 @@ def workflow(p: ProblemCVQE, params):
     stepsize = 0.5
     theta = params
 
-    for i in range(p.nsteps):
+    for _ in range(p.nsteps):
         dtheta = p.qgrad(theta)
         theta = theta - dtheta * stepsize
     return theta
@@ -97,7 +99,7 @@ def workflow_hybrid(p: ProblemCVQE, params):
     stepsize = 0.5
     theta = params
 
-    for i in range(p.nsteps):
+    for _ in range(p.nsteps):
         dtheta = p.qcircuit(theta)
         theta = theta - pnp.mean(dtheta) * stepsize
     return theta

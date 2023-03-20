@@ -1,4 +1,5 @@
 """ Grover-like problem, PennyLane+Catalyst implementation """
+# pylint: disable=too-many-instance-attributes
 from typing import Any
 from dataclasses import dataclass
 
@@ -59,6 +60,7 @@ class ProblemC(Problem):
 
 def oracle(t):
     """A Grover oracle solving a mock combinatorial problem."""
+    # pylint: disable=no-value-for-parameter
 
     @for_loop(0, len(t.CLAUSE_LIST), 1)
     def loop1(i):
@@ -106,8 +108,9 @@ def diffuser(t):
         qml.Hadamard(wires=[qubit])
 
 
-def qcompile(p: ProblemC, weights):
+def qcompile(p: ProblemC, _):
     """Compile the quantum parts of the problem"""
+    # pylint: disable=no-value-for-parameter
 
     def _main(weights):
         # Initialize the state

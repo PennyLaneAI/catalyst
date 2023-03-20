@@ -1,4 +1,8 @@
 """ Measurement procedures """
+# pylint: disable=import-outside-toplevel
+# pylint: disable=redefined-outer-name
+# pylint: disable=consider-using-dict-items
+# pylint: disable=consider-iterating-dictionary
 import sys
 from typing import Optional, Tuple, List
 from argparse import ArgumentParser, Namespace as ParsedArguments
@@ -9,33 +13,35 @@ from functools import partial
 
 import numpy as np
 from numpy.testing import assert_allclose
-from .types import Problem, BenchmarkResult
+from .types import BenchmarkResult
 
 
 def catalyst_version() -> str:
+    """Determine the catalyst version"""
     import catalyst._version
     from subprocess import check_output
     from os.path import dirname
 
-    catalyst_version = catalyst._version.__version__
-    if "dev" in catalyst_version:
+    verstring = catalyst._version.__version__  # pylint: disable=protected-access
+    if "dev" in verstring:
         try:
             commit = (
                 check_output(["git", "rev-parse", "HEAD"], cwd=dirname(catalyst.__file__))
                 .decode()
                 .strip()[:7]
             )
-            catalyst_version += f"+g{commit}"
-        except Exception:
-            catalyst_version += "+g?"
-    return catalyst_version
+            verstring += f"+g{commit}"
+        except Exception:  # pylint: disable=broad-exception-caught
+            verstring += "+g?"
+    return verstring
 
 
 @contextmanager
 def with_alarm(timeout: float):
+    """Set POSIX alarm"""
     prev = None
     try:
-        if timeout > 0 and timeout < float("inf"):
+        if 0 < timeout < float("inf"):
 
             def _handler(signum, frame):
                 raise TimeoutError()
@@ -50,10 +56,12 @@ def with_alarm(timeout: float):
 
 
 def printerr(*args, **kwargs) -> None:
+    """Print arguments to the stderr"""
     print(*args, **kwargs, file=sys.stderr)
 
 
 def parse_implementation(implementation: str) -> Tuple[str, str, Optional[str]]:
+    """Parse the implementation parameter, expect the "framework[+jax]/device" syntax."""
     tokens = implementation.split("/")
     assert len(tokens) > 0
     framework = tokens[0]
@@ -79,6 +87,7 @@ def parse_implementation(implementation: str) -> Tuple[str, str, Optional[str]]:
 
 
 def measure_compile_catalyst(a: ParsedArguments) -> BenchmarkResult:
+    """Catalyst compilation time measurement procedure"""
     import pennylane as qml
     import jax.numpy as jnp
     import jax
@@ -152,6 +161,7 @@ def measure_compile_catalyst(a: ParsedArguments) -> BenchmarkResult:
 
 
 def measure_runtime_catalyst(a: ParsedArguments) -> BenchmarkResult:
+    """Catalyst running time measurement procedure"""
     import pennylane as qml
     import jax
     import jax.numpy as jnp
@@ -218,6 +228,7 @@ def measure_runtime_catalyst(a: ParsedArguments) -> BenchmarkResult:
 
 
 def measure_compile_pennylanejax(a: ParsedArguments) -> BenchmarkResult:
+    """PennyLane/Jax compilation time measurement procedure"""
     import pennylane as qml
     import jax
 
@@ -300,6 +311,7 @@ def measure_compile_pennylanejax(a: ParsedArguments) -> BenchmarkResult:
 
 
 def measure_runtime_pennylanejax(a: ParsedArguments) -> BenchmarkResult:
+    """Pennylane/Jax running time measurement procedure"""
     import pennylane as qml
     import jax
 
@@ -372,6 +384,7 @@ def measure_runtime_pennylanejax(a: ParsedArguments) -> BenchmarkResult:
 
 
 def measure_compile_pennylane(a: ParsedArguments) -> BenchmarkResult:
+    """PennyLane compilation time measurement procedure"""
     import pennylane as qml
 
     versions = {"pennylane": qml.__version__}
@@ -439,6 +452,7 @@ def measure_compile_pennylane(a: ParsedArguments) -> BenchmarkResult:
 
 
 def measure_runtime_pennylane(a: ParsedArguments) -> BenchmarkResult:
+    """PennyLanem running time measurement procedure"""
     import pennylane as qml
 
     versions = {"pennylane": qml.__version__}
@@ -516,19 +530,22 @@ REGISTRY = {
 
 
 def parse_args(ap: ArgumentParser, args: List[str]) -> ParsedArguments:
+    """Parse arguments and save the original command line"""
     a = ap.parse_args(args)
     setattr(a, "argv", args)
     return a
 
 
 def selfcheck(ap: ArgumentParser) -> None:
+    """Self-check routine"""
+
     def _runall(cmdline_fn, atol=1e-5):
         r1 = None
-        for m, i in REGISTRY.keys():
-            a = parse_args(ap, cmdline_fn(m, i))
+        for m_i in REGISTRY.keys():
+            a = parse_args(ap, cmdline_fn(*m_i))
             try:
-                r = REGISTRY[(m, i)](a)
-                print(f"Checking {(a.problem, m, i)}")
+                r = REGISTRY[m_i](a)
+                print(f"Checking {(a.problem, m_i)}")
                 if r1 is None:
                     r1 = r
                 else:
@@ -536,7 +553,7 @@ def selfcheck(ap: ArgumentParser) -> None:
                         np.array(r1.numeric_result), np.array(r.numeric_result), atol=atol
                     )
             except NotImplementedError as e:
-                print(f"Skipping {(a.problem, m, i)} due to: {e}")
+                print(f"Skipping {(a.problem, m_i)} due to: {e}")
 
     # fmt: off
     _runall(lambda m, i: ["run", "-p", "chemvqe-hybrid", "-m", m, "-i", i, "-n", "1",

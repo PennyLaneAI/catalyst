@@ -1,16 +1,18 @@
 """ Benchmaring data type definitions """
 from typing import List, Optional, Any, Dict
-from dataclasses import dataclass
-from dataclasses_json import dataclass_json
-from argparse import Action, SUPPRESS
-from psutil import virtual_memory
 from os import uname
 from multiprocessing import cpu_count
 from platform import system
+from argparse import Action, SUPPRESS
+
+from dataclasses import dataclass
+from dataclasses_json import dataclass_json
+from psutil import virtual_memory
 from cpuinfo import get_cpu_info
 
 
 def unpack_complex(l: List[complex]) -> List[List[float]]:
+    """Convert a list of complex to a JSON-serializable list of lists of floats."""
     return [[complex(x).real, complex(x).imag] for x in l]
 
 
@@ -31,7 +33,8 @@ class Sysinfo:
 
     @classmethod
     def fromOS(cls) -> "Sysinfo":
-        global CPU_BRAND
+        """Collects the information about the current system"""
+        global CPU_BRAND  # pylint: disable=global-statement
         if CPU_BRAND is None:
             CPU_BRAND = get_cpu_info()["brand_raw"]
         return Sysinfo(
@@ -43,6 +46,7 @@ class Sysinfo:
         )
 
     def toString(self):
+        """Return the string representation"""
         return f"Host: {self.systype} / {self.ram_gb}GB RAM / {self.ncpu} Cores / {self.cpu_brand}"
 
 
@@ -111,7 +115,8 @@ class BenchmarkResult(BenchmarkResultV1):
         depth: Optional[int],
         versions: Dict[str, str],
         timeout: Optional[float],
-    ):
+    ):  # pylint: disable=too-many-arguments
+        """Format the measurement results"""
         return BenchmarkResult(
             Sysinfo.fromOS(),
             unpack_complex(nr) if nr else None,
@@ -137,7 +142,8 @@ class BooleanOptionalAction(Action):
         required=False,
         help=None,
         metavar=None,
-    ):
+    ):  # pylint: disable=too-many-arguments
+        """A constructor"""
         _option_strings = []
         for option_string in option_strings:
             _option_strings.append(option_string)
