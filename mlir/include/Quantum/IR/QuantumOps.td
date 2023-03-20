@@ -516,6 +516,13 @@ def CountsOp : Measurement_Op<"counts", [AttrSizedOperandSegments, AttrSizedResu
         $obs ( `in` `(` $in_eigvals^ $in_counts `:` type($in_eigvals) type($in_counts) `)` )? attr-dict ( `:` type($eigvals)^ `,` type($counts) )?
     }];
 
+    let extraClassDeclaration = [{
+      llvm::Optional<mlir::Type> getResultType() {
+        if (getResultTypes().empty()) return std::nullopt;
+        return getResultTypes()[0];
+      }
+    }];
+
     let hasVerifier = 1;
 }
 

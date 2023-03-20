@@ -18,6 +18,14 @@
 // Measurements //
 //////////////////
 
+func.func @counts(%q0: !quantum.bit, %q1: !quantum.bit) {
+    %obs = quantum.compbasis %q0, %q1 : !quantum.obs
+    %samples:2 = quantum.counts %obs {shots=2} : tensor<4xf64>, tensor<4xi64>
+    func.return
+}
+
+// -----
+
 func.func @sample(%q0: !quantum.bit, %q1: !quantum.bit) {
     %obs = quantum.compbasis %q0, %q1 : !quantum.obs
     // CHECK: quantum.sample {{.*}} : memref<1000x2xf64>

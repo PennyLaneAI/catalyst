@@ -70,8 +70,8 @@ struct BufferizeSampleOp : public OpConversionPattern<SampleOp> {
         Location loc = op.getLoc();
         auto allocOp = rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType);
         Value allocVal = allocOp->getResult(0);
-        rewriter.create<SampleOp>(loc, TypeRange{}, adaptor.getObs(), allocVal,
-                                  adaptor.getShotsAttr());
+        rewriter.create<SampleOp>(loc, TypeRange{}, ValueRange{adaptor.getObs(), allocVal},
+                                  op->getAttrs());
         return success();
     }
 };
@@ -125,9 +125,16 @@ struct BufferizeCountsOp : public OpConversionPattern<CountsOp> {
         Value allocVal0 = allocOp0->getResult(0);
         Value allocVal1 = allocOp1->getResult(0);
         op.replaceAllUsesWith(ValueRange{allocVal0, allocVal1});
-        rewriter.create<CountsOp>(loc, TypeRange{}, adaptor.getObs(), allocVal0, allocVal1,
-                                  adaptor.getShotsAttr());
+        auto countsOp = rewriter.create<CountsOp>(loc, TypeRange{},
+			ValueRange{adaptor.getObs(), allocVal0, allocVal1},
+                        op->getAttrs());
 
+	static const char *const resultSegmentAttrName = "result_segment_sizes";
+	auto resultSegmentAttrVal = rewriter.getDenseI32ArrayAttr({0, 0});
+	countsOp->setAttr(resultSegmentAttrName, resultSegmentAttrVal);
+	static const char *const operandSegmentAttrName = "operand_segment_sizes";
+	auto operandSegmentAttrVal = rewriter.getDenseI32ArrayAttr({1, 1, 1});
+	countsOp->setAttr(operandSegmentAttrName, operandSegmentAttrVal);
         rewriter.eraseOp(op);
         return success();
     }
@@ -156,6 +163,7 @@ void populateBufferizationLegality(TypeConverter &typeConverter, ConversionTarge
     target.addDynamicallyLegalOp<ProbsOp>(
         [&](ProbsOp op) { return !op.getResultType() || typeConverter.isLegal(op.getType(0)); });
     target.addDynamicallyLegalOp<CountsOp>([&](CountsOp op) {
+	if (!op.getResultType()) return true;
         return typeConverter.isLegal(op.getType(0)) and typeConverter.isLegal(op.getType(1));
     });
 }
