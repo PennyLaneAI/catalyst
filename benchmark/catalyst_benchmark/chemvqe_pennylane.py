@@ -56,7 +56,7 @@ class ProblemCVQE(Problem):
         return pnp.zeros(len(self.excitations), dtype=pnp.float64)
 
 
-def qcompile(p: ProblemCVQE, weights):
+def qcompile_hybrid(p: ProblemCVQE, weights):
     """Compile the quantum parts of the problem"""
 
     def _circuit(params):
@@ -65,8 +65,13 @@ def qcompile(p: ProblemCVQE, weights):
 
     qcircuit = qml.QNode(_circuit, p.dev, diff_method=p.diff_method, **p.qnode_kwargs)
     qcircuit.construct([weights], {})
-    qgrad = p.grad(qcircuit)
     p.qcircuit = qcircuit
+
+
+def qcompile(p: ProblemCVQE, weights):
+    """Compile the quantum parts of the problem"""
+    qcompile_hybrid(p, weights)
+    qgrad = p.grad(p.qcircuit)
     p.qgrad = qgrad
 
 
@@ -81,6 +86,19 @@ def workflow(p: ProblemCVQE, params):
     for i in range(p.nsteps):
         dtheta = p.qgrad(theta)
         theta = theta - dtheta * stepsize
+    return theta
+
+
+def workflow_hybrid(p: ProblemCVQE, params):
+    """Problem workflow"""
+    assert p.qcircuit is not None
+
+    stepsize = 0.5
+    theta = params
+
+    for i in range(p.nsteps):
+        dtheta = p.qcircuit(theta)
+        theta = theta - pnp.mean(dtheta) * stepsize
     return theta
 
 
@@ -107,8 +125,8 @@ def run_default_qubit(N=6):
     print(f"Size: {size(p)}")
 
     def _main(params):
-        qcompile(p, params)
-        return workflow(p, params)
+        qcompile_hybrid(p, params)
+        return workflow_hybrid(p, params)
 
     theta = _main(p.trial_params(0))
     print(f"Resulting parameters: {theta}")
@@ -151,8 +169,8 @@ def run_jax_(devname, N=6):
 
     @jax.jit
     def _main(params):
-        qcompile(p, params)
-        return workflow(p, params)
+        qcompile_hybrid(p, params)
+        return workflow_hybrid(p, params)
 
     theta = _main(p.trial_params(0))
     print(f"Resulting parameters: {theta}")

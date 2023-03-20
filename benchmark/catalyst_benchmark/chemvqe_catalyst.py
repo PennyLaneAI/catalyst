@@ -59,17 +59,21 @@ class ProblemCVQE(Problem):
         return jnp.zeros(len(self.excitations), dtype=jnp.float64)
 
 
-def qcompile(p: ProblemCVQE, weights):
+def qcompile_hybrid(p: ProblemCVQE, weights):
     """Compile the quantum parts of the problem"""
-
     def _circuit(params):
         AllSinglesDoubles(params, range(p.nqubits), p.hf_state, p.singles, p.doubles)
         return qml.expval(qml.Hamiltonian(np.array(p.ham.coeffs), p.ham.ops))
 
     qcircuit = qml.QNode(_circuit, p.dev, **p.qnode_kwargs)
     qcircuit.construct([weights], {})
-    qgrad = catalyst.grad(qcircuit, argnum=0, method=p.diff_method)
     p.qcircuit = qcircuit
+
+
+def qcompile(p: ProblemCVQE, weights):
+    """Compile the quantum parts of the problem"""
+    qcompile_hybrid(p, weights)
+    qgrad = catalyst.grad(p.qcircuit, argnum=0, method=p.diff_method)
     p.qgrad = qgrad
     return p
 
@@ -83,6 +87,19 @@ def workflow(p: ProblemCVQE, params):
     def loop(_, theta):
         dtheta = p.qgrad(theta)
         return theta - dtheta[0] * stepsize
+
+    return loop(theta)
+
+
+def workflow_hybrid(p: ProblemCVQE, params):
+    """Problem workflow"""
+    stepsize = 0.5
+    theta = params
+
+    @catalyst.for_loop(0, p.nsteps, 1)
+    def loop(_, theta):
+        state = p.qcircuit(theta)[0]
+        return theta - jnp.mean(state) * stepsize
 
     return loop(theta)
 

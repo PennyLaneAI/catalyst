@@ -57,8 +57,8 @@ PL_L = ALIASES["pennylane/lightning.qubit"]
 PLjax_L = ALIASES["pennylane+jax/lightning.qubit"]
 
 CATPROBLEMS = {
-    "regular": ["grover","qfth"],
-    "deep": ["grover","qfth"],
+    "regular": ["grover", "chemvqe-hybrid"],
+    "deep": ["grover"],
     # "hybrid": [None],
     "variational": ["chemvqe"],
 }
@@ -66,12 +66,10 @@ CATPROBLEMS = {
 QUBITS = {
     ("regular", "grover", "compile"): [7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29],
     ("regular", "grover", "runtime"): [7, 9, 11, 13, 15, 17],
-    ("regular", "qfth", "compile"): [1, 2, 3, 4, 5, 6, 7],
-    ("regular", "qfth", "runtime"): [1, 2, 3, 4, 5, 6, 7],
+    ("regular", "chemvqe-hybrid", "compile"): [4, 6, 8, 12],
+    ("regular", "chemvqe-hybrid", "runtime"): [4, 6, 8, 12],
     ("deep", "grover", "compile"): [7],
     ("deep", "grover", "runtime"): [7],
-    ("deep", "qfth", "compile"): [7],
-    ("deep", "qfth", "runtime"): [7],
     ("deep", "qft", "compile"): [7],
     ("deep", "qft", "runtime"): [7],
     ("variational", "vqe", "compile"): [6, 7, 8, 9, 10, 11],
@@ -86,10 +84,6 @@ LAYERS = {
         [10, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200, 1300, 1400, MAXLAYERS],
     ("deep", "grover", "runtime"):
         [10, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200, 1300, 1400, MAXLAYERS],
-    ("deep", "qfth", "compile"):
-        [1, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, MAXLAYERS//10],
-    ("deep", "qfth", "runtime"):
-        [1, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, MAXLAYERS//10],
     ("deep", "qft", "compile"):
         [10, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200, 1300, 1400, MAXLAYERS],
     ("deep", "qft", "runtime"):
@@ -139,13 +133,17 @@ def ofile(a, _, measure, problem, impl, nqubits, nlayers, diffmethod) -> Tuple[s
     if problem == "grover":
         assert diffmethod is None
         params = f"--nlayers={nlayers}" if nlayers is not None else ""
-    elif problem == "qft" or problem == "qfth":
+    elif problem == "qft":
         assert diffmethod is None
         params = f"--nlayers={nlayers}" if nlayers is not None else ""
     elif problem == "vqe" or problem == "chemvqe":
         assert nlayers is None
         assert diffmethod is not None
         params = f"--vqe-diff-method={diffmethod}"
+    elif problem == "chemvqe-hybrid":
+        assert nlayers is None
+        assert diffmethod is None
+        params = ""
     else:
         raise ValueError(f"Unsupported problem {problem}")
     cmdline = (
@@ -206,7 +204,7 @@ def collect(a: ParsedArguments) -> None:
                 makedirs(odname, exist_ok=True)
             cmdline += f" 2>&1 | tee {odname}/output.log"
             pdesc = f"{problem}[{nqubits},{nlayers}]"
-            hint = f"{measure: <15} {impl: <32} {cat: <15} {pdesc: <20}"
+            hint = f"{measure: <15} {impl: <32} {cat: <15} {pdesc: <30}"
             message = hint if not a.verbose else cmdline
             if isfile(ofname):
                 print(f"{message} [EXISTS]")
@@ -435,6 +433,7 @@ def plot(a: ParsedArguments, df_full: DataFrame, sysinfo: Optional[Sysinfo] = No
 
         # Regular circuits
         for problem in CATPROBLEMS["regular"]:
+            problem_tag = problem.replace('-','')
             df = _filter("regular", "compile", problem)
             nq = QUBITS[("regular", problem, "compile")]
             xmin = min(nq)
@@ -444,7 +443,7 @@ def plot(a: ParsedArguments, df_full: DataFrame, sysinfo: Optional[Sysinfo] = No
             xscale = alt.Scale(domain=(xmin, xmax))
             _plot_linechart(
                 df,
-                f"_img/regular_{problem}_compile",
+                f"_img/regular_{problem_tag}_compile",
                 _nqubitsEncoding,
                 _mktitle("Compilation time, Regular circuits"),
                 PL_L,
@@ -453,7 +452,7 @@ def plot(a: ParsedArguments, df_full: DataFrame, sysinfo: Optional[Sysinfo] = No
             )
             _plot_trial_linechart(
                 df,
-                f"_img/regular_{problem}_compile_trial",
+                f"_img/regular_{problem_tag}_compile_trial",
                 _nqubitsEncoding,
                 _mktitle("Compilation time/trial, Regular circuits"),
             )
@@ -461,20 +460,21 @@ def plot(a: ParsedArguments, df_full: DataFrame, sysinfo: Optional[Sysinfo] = No
             df = _filter("regular", "runtime", problem)
             _plot_linechart(
                 df,
-                f"_img/regular_{problem}_runtime",
+                f"_img/regular_{problem_tag}_runtime",
                 _nqubitsEncoding,
                 _mktitle("Running time, Regular circuits"),
                 PL_L,
             )
             _plot_trial_linechart(
                 df,
-                f"_img/regular_{problem}_runtime_trial",
+                f"_img/regular_{problem_tag}_runtime_trial",
                 _nqubitsEncoding,
                 _mktitle("Running time/trial, Regular circuits"),
             )
 
         # Deep circuits
         for problem in CATPROBLEMS["deep"]:
+            problem_tag = problem.replace('-','')
             df = _filter("deep", "compile", problem)
             nl = LAYERS[("deep", problem, "compile")]
             xmin = min(nl)
@@ -484,7 +484,7 @@ def plot(a: ParsedArguments, df_full: DataFrame, sysinfo: Optional[Sysinfo] = No
             xscale = alt.Scale(domain=(xmin, xmax))
             _plot_linechart(
                 df,
-                f"_img/deep_{problem}_compile",
+                f"_img/deep_{problem_tag}_compile",
                 _nlayersEncoding,
                 _mktitle("Compilation time, Deep circuits"),
                 PLjax_L,
@@ -493,7 +493,7 @@ def plot(a: ParsedArguments, df_full: DataFrame, sysinfo: Optional[Sysinfo] = No
             )
             _plot_trial_linechart(
                 df,
-                f"_img/deep_{problem}_compile_trial",
+                f"_img/deep_{problem_tag}_compile_trial",
                 _nlayersEncoding,
                 _mktitle("Compilation time/trial, Deep circuits"),
             )
@@ -503,7 +503,7 @@ def plot(a: ParsedArguments, df_full: DataFrame, sysinfo: Optional[Sysinfo] = No
             xscale = alt.Scale(domain=(xmin, xmax))
             _plot_linechart(
                 df,
-                f"_img/deep_{problem}_runtime",
+                f"_img/deep_{problem_tag}_runtime",
                 _nlayersEncoding,
                 _mktitle("Running time, Deep circuits"),
                 PL_L,
@@ -512,7 +512,7 @@ def plot(a: ParsedArguments, df_full: DataFrame, sysinfo: Optional[Sysinfo] = No
             )
             _plot_trial_linechart(
                 df,
-                f"_img/deep_{problem}_runtime_trial",
+                f"_img/deep_{problem_tag}_runtime_trial",
                 _nlayersEncoding,
                 _mktitle("Running time/trial, Deep circuits"),
             )
@@ -639,6 +639,46 @@ def plot(a: ParsedArguments, df_full: DataFrame, sysinfo: Optional[Sysinfo] = No
                     .to_dict(),
                 )
 
+        df = _filter("regular", "runtime", "chemvqe-hybrid")
+        if len(df) > 0:
+            df = _add_timeouts(df)
+            fname = f"_img/regular_chemvqehbrid_runtime_barchart"
+            writefile(
+                a,
+                fname,
+                alt.layer(
+                    Chart(df)
+                    .mark_bar()
+                    .encode(
+                        x=alt.X("impl", title=None, sort=list(ALIASES.values())),
+                        y=alt.Y(
+                            "mean(time):Q", title="Mean time, sec", scale=alt.Scale(type="log")
+                        ),
+                        color=alt.condition(
+                            f"datum.mean_time >= {min(df_full['timeout'])}",
+                            alt.ColorValue("Grey"),
+                            _implEncoding(df, add_timeout=any(df_full["timeout"])),
+                        ),
+                    ),
+                    Chart()
+                    .mark_errorbar(extent="stderr")
+                    .encode(
+                        x=alt.X("impl", title=None, sort=list(ALIASES.values())),
+                        y=alt.Y("time:Q", title="Mean time, sec"),
+                    ),
+                    data=df,
+                )
+                .facet(
+                    column=alt.Column("nqubits:N", title="Qubits"),
+                )
+                .properties(
+                    title=_mktitle(
+                        f"Running time, ChemVQE (Hybrid)", align=None
+                    )
+                )
+                .to_dict(),
+            )
+
 
 # fmt: off
 AP = ArgumentParser(prog="python3 batchrun.py")
@@ -648,7 +688,7 @@ AP.add_argument("-c", "--category", type=str, default="regular,deep,variational"
                 help=("Category of circutis to evaluate regular|deep|hybrid|variational|all "
                 "(default - 'regular,deep,variational')"))
 AP.add_argument("-p", "--problems", type=str, default="all",
-                help=("Problems to evaluate: [(grover|chemvqe|qfth|all),] "
+                help=("Problems to evaluate: [(grover|chemvqe|chemvqe-hybrid|all),] "
                 "(default - 'all')"))
 AP.add_argument("--dry-run", default=False, action=BooleanOptionalAction,
                 help="Enable this mode to print command lines but not actually run anything")
