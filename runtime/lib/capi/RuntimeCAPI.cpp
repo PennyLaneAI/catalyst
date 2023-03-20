@@ -158,13 +158,15 @@ void __quantum__qis__Gradient(int64_t numResults, /* results = */...)
         return;
     }
 
+    const size_t num_train_params = jacobian[0].size();
+
     // extract variadic results of size num_observables
     va_list args;
     va_start(args, numResults);
     for (int64_t i = 0; i < numResults; i++) {
         auto *mrp = va_arg(args, ResultType *);
         assert(mrp && "the result type cannot be a null pointer");
-        memref_copy<double, 1>(mrp, jacobian[i].data());
+        memref_copy<double, 1>(mrp, jacobian[i].data(), num_train_params * sizeof(double));
     }
     va_end(args);
 }
@@ -206,13 +208,15 @@ void __quantum__qis__Gradient_params(MemRefT_int64_1d *params, int64_t numResult
         return;
     }
 
+    const size_t num_train_params = jacobian[0].size();
+
     // extract variadic results of size num_observables
     va_list args;
     va_start(args, numResults);
     for (int64_t i = 0; i < numResults; i++) {
         auto *mrp = va_arg(args, ResultType *);
         assert(mrp && "the result type cannot be a null pointer");
-        memref_copy<double, 1>(mrp, jacobian[i].data());
+        memref_copy<double, 1>(mrp, jacobian[i].data(), num_train_params * sizeof(double));
     }
     va_end(args);
 }
@@ -630,7 +634,8 @@ void __quantum__qis__Probs(MemRefT_double_1d *result, int64_t numQubits, ...)
         sv_probs = Catalyst::Runtime::CAPI::get_device()->PartialProbs(wires);
     }
 
-    memref_copy<double, 1>(result_p, sv_probs.data());
+    const size_t numElements = 1U << numQubits;
+    memref_copy<double, 1>(result_p, sv_probs.data(), numElements * sizeof(double));
 }
 
 void __quantum__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, ...)
@@ -661,8 +666,11 @@ void __quantum__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, .
         // numElements, wires);
     }
 
+    // Divide by two because sv_state is a vector of doubles.
+    const size_t numElements = sv_state.size();
     assert(numElements == (1U << numQubits));
-    memref_copy<std::complex<double>, 1>(result_p, sv_state.data());
+    memref_copy<std::complex<double>, 1>(result_p, sv_state.data(),
+                                         numElements * sizeof(std::complex<double>));
 }
 
 void __quantum__qis__Sample(MemRefT_double_2d *result, int64_t shots, int64_t numQubits, ...)
@@ -691,7 +699,8 @@ void __quantum__qis__Sample(MemRefT_double_2d *result, int64_t shots, int64_t nu
         sv_samples = Catalyst::Runtime::CAPI::get_device()->PartialSample(wires, shots);
     }
 
-    memref_copy<double, 2>(result_p, sv_samples.data());
+    const size_t numElements = sv_samples.size();
+    memref_copy<double, 2>(result_p, sv_samples.data(), numElements * sizeof(double));
 }
 
 void __quantum__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t shots, int64_t numQubits,
@@ -726,7 +735,9 @@ void __quantum__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t shots
     auto &&sv_eigvals = std::get<0>(sv_counts);
     auto &&sv_cts = std::get<1>(sv_counts);
 
-    memref_copy<double, 1>(result_eigvals_p, sv_eigvals.data());
-    memref_copy<int64_t, 1>(result_counts_p, sv_cts.data());
+    const size_t numEigvals = sv_eigvals.size();
+    const size_t numCounts = sv_cts.size();
+    memref_copy<double, 1>(result_eigvals_p, sv_eigvals.data(), numEigvals * sizeof(double));
+    memref_copy<int64_t, 1>(result_counts_p, sv_cts.data(), numCounts * sizeof(int64_t));
 }
 }

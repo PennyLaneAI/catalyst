@@ -19,6 +19,8 @@
 #include "Types.h"
 
 #include "qir_stdlib.h"
+#include <cassert>
+#include <cstdio>
 
 #ifdef __cplusplus
 
@@ -30,13 +32,14 @@ template <typename T, size_t R> struct MemRefT {
     size_t strides[R];
 };
 
-template <typename T, size_t R> void memref_copy(MemRefT<T, R> *memref, T *buffer)
+template <typename T, size_t R> void memref_copy(MemRefT<T, R> *memref, T *buffer, size_t bytes)
 {
     size_t how_many_elements = 1;
     for (size_t i = 0; i < R; i++) {
         how_many_elements *= memref->sizes[i];
     }
-    memcpy(memref->data_aligned, buffer, sizeof(T) * how_many_elements);
+    assert(bytes == (sizeof(T) * how_many_elements) && "data sizes must agree.");
+    memcpy(memref->data_aligned, buffer, bytes);
 }
 
 extern "C" {
