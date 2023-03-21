@@ -206,7 +206,8 @@ LogicalResult CountsOp::verify()
         return emitOpError("cannot have counts and in-counts at the same time");
     }
 
-    Type eigvalsToVerify = getEigvals() ? (Type)getEigvals().getType() : (Type)getInEigvals().getType();
+    Type eigvalsToVerify =
+        getEigvals() ? (Type)getEigvals().getType() : (Type)getInEigvals().getType();
     Type countsToVerify = getCounts() ? (Type)getCounts().getType() : (Type)getInCounts().getType();
 
     if (failed(verifyTensorResult(eigvalsToVerify, numEigvals)) ||
@@ -228,12 +229,14 @@ LogicalResult ProbsOp::verify()
         return emitOpError("only computational basis observables are supported");
     }
 
-    if (!getProbabilities()) {
-        return success();
+    if (!(bool)getProbabilities() ^ (bool)getStateIn()) {
+        return emitOpError("cannot have probabilities and in-probabilities at the same time");
     }
 
+    Type toVerify =
+        getProbabilities() ? (Type)getProbabilities().getType() : (Type)getStateIn().getType();
     size_t dim = std::pow(2, numQubits);
-    if (failed(verifyTensorResult(getProbabilities().getType().cast<ShapedType>(), dim))) {
+    if (failed(verifyTensorResult(toVerify.cast<ShapedType>(), dim))) {
         return emitOpError("return tensor must have static length equal to 2^(number of qubits)");
     }
 
