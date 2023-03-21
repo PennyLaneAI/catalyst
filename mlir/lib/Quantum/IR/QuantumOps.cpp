@@ -254,12 +254,13 @@ LogicalResult StateOp::verify()
         return emitOpError("only computational basis observables are supported");
     }
 
-    if (!getState()) {
-        return success();
+    if (!(bool)getState() ^ (bool)getStateIn()) {
+        return emitOpError("cannot have state-out and state-in at the same time");
     }
 
+    Type toVerify = getState() ? (Type)getState().getType() : (Type)getStateIn().getType();
     size_t dim = std::pow(2, numQubits);
-    if (failed(verifyTensorResult(getState().getType().cast<ShapedType>(), dim))) {
+    if (failed(verifyTensorResult(toVerify.cast<ShapedType>(), dim))) {
         return emitOpError("return tensor must have static length equal to 2^(number of qubits)");
     }
 

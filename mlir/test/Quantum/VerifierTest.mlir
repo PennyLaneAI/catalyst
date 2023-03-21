@@ -297,13 +297,28 @@ func.func @probs2(%q0 : !quantum.bit, %q1 : !quantum.bit) {
 
 // -----
 
-func.func @state(%q0 : !quantum.bit, %q1 : !quantum.bit) {
+func.func @state1(%q0 : !quantum.bit, %q1 : !quantum.bit) {
     %obs = quantum.compbasis %q0, %q1 : !quantum.obs
 
     // expected-error@+1 {{return tensor must have static length equal to 2^(number of qubits)}}
     %err = quantum.state %obs : tensor<?xcomplex<f64>>
 
     %state = quantum.state %obs : tensor<4xcomplex<f64>>
+
+    return
+}
+
+// -----
+
+func.func @state2(%q0 : !quantum.bit, %q1 : !quantum.bit) {
+    %obs = quantum.compbasis %q0, %q1 : !quantum.obs
+
+    %alloc1 = memref.alloc() : memref<2xcomplex<f64>>
+    // expected-error@+1 {{return tensor must have static length equal to 2^(number of qubits)}}
+    quantum.state %obs in(%alloc1 : memref<2xcomplex<f64>>)
+
+    %alloc2 = memref.alloc() : memref<4xcomplex<f64>>
+    quantum.state %obs in(%alloc2 : memref<4xcomplex<f64>>)
 
     return
 }
