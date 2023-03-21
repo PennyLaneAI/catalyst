@@ -131,6 +131,7 @@ class BenchmarkResult(BenchmarkResultV1):
 
 class BooleanOptionalAction(Action):
     """Backported from argparse for Python3.10"""
+    # pylint: disable=too-many-arguments
 
     def __init__(
         self,
@@ -142,7 +143,7 @@ class BooleanOptionalAction(Action):
         required=False,
         help=None,
         metavar=None,
-    ):  # pylint: disable=too-many-arguments
+    ):
         """A constructor"""
         _option_strings = []
         for option_string in option_strings:
