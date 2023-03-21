@@ -800,9 +800,13 @@ class ForLoopCallable:
         return self._call_with_quantum_ctx(ctx, *args)
 
     def _call_during_interpretation(self, *args):
+        fn_res = args if len(args) > 1 else args[0] if len(args) == 1 else None
+
         for i in range(self.lower_bound, self.upper_bound, self.step):
-            args = self.body_fn(i, *args)
-        return args
+            fn_res = self.body_fn(i, *args)
+            args = fn_res if len(args) > 1 else (fn_res,) if len(args) == 1 else ()
+
+        return fn_res
 
     def __call__(self, *args):
         is_tracing = TracingContext.is_tracing()

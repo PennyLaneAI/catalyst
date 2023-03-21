@@ -428,5 +428,47 @@ class TestClassicalCompilation:
         assert mulc(x, n) == muli(x, n)
 
 
+class TestResultStructureInterpreted:
+    """Test that interpreted loops preserve the (tuple) structure of arguments/results:
+    - no arguments: return None
+    - scalar argument: return scalar
+    - single tuple argument: return tuple of same size (tested for 0-, 1-, 2-length tuples)
+    - multiple arguments: return tuple preserving individual argument structure
+    """
+
+    def test_no_args(self):
+        """Test result structure with no arguments."""
+
+        def loop(_):
+            pass
+
+        assert for_loop(0, 0, 1)(loop)() is None
+        assert for_loop(0, 1, 1)(loop)() is None
+        assert for_loop(0, 2, 1)(loop)() is None
+
+    @pytest.mark.parametrize("x", [1, (), (1,), (1, 1)])
+    def test_one_arg(self, x):
+        """Test result structure with one argument."""
+
+        def loop(_, x):
+            return x
+
+        assert for_loop(0, 0, 1)(loop)(x) == x
+        assert for_loop(0, 1, 1)(loop)(x) == x
+        assert for_loop(0, 2, 1)(loop)(x) == x
+
+    @pytest.mark.parametrize("x", [1, (), (1,), (1, 1)])
+    @pytest.mark.parametrize("y", [1, (), (1,), (1, 1)])
+    def test_two_arg(self, x, y):
+        """Test result structure with two arguments."""
+
+        def loop(_, x, y):
+            return x, y
+
+        assert for_loop(0, 0, 1)(loop)(x, y) == (x, y)
+        assert for_loop(0, 1, 1)(loop)(x, y) == (x, y)
+        assert for_loop(0, 2, 1)(loop)(x, y) == (x, y)
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
