@@ -15,7 +15,6 @@
 #include <cassert>
 #include <cstdarg>
 #include <cstdlib>
-#include <cstring>
 #include <ctime>
 
 #include <bitset>
@@ -142,7 +141,7 @@ QirString *__quantum__rt__result_to_string(RESULT *result)
 void __quantum__qis__Gradient(int64_t numResults, /* results = */...)
 {
     assert(numResults >= 0);
-    using ResultType = MemRefT<double, 1>;
+    using ResultType = MemRefT_double_1d;
 
     // num_observables * num_train_params
     auto &&jacobian = Catalyst::Runtime::CAPI::get_device()->Gradient({});
@@ -165,8 +164,8 @@ void __quantum__qis__Gradient(int64_t numResults, /* results = */...)
     for (int64_t i = 0; i < numResults; i++) {
         auto *mrp = va_arg(args, ResultType *);
         assert(mrp && "the result type cannot be a null pointer");
-        MemRefT<double, 1> descriptor = {
-            jacobian[i].data(), jacobian[i].data(), 0, {jacobian[i].size()}, {1}};
+        double *buffer = jacobian[i].data();
+        ResultType descriptor = {buffer, buffer, 0, {jacobian[i].size()}, {1}};
         UnrankedMemRefType<char> source = {1, &descriptor};
         UnrankedMemRefType<char> destination = {1, mrp};
         memrefCopy(sizeof(double), &source, &destination);
@@ -178,7 +177,7 @@ void __quantum__qis__Gradient_params(MemRefT_int64_1d *params, int64_t numResult
                                      /* results = */...)
 {
     assert(numResults >= 0);
-    using ResultType = MemRefT<double, 1>;
+    using ResultType = MemRefT_double_1d;
 
     if (params == nullptr || !params->sizes[0]) {
         __quantum__rt__fail_cstr("Invalid number of trainable parameters");
@@ -217,8 +216,8 @@ void __quantum__qis__Gradient_params(MemRefT_int64_1d *params, int64_t numResult
     for (int64_t i = 0; i < numResults; i++) {
         auto *mrp = va_arg(args, ResultType *);
         assert(mrp && "the result type cannot be a null pointer");
-        MemRefT<double, 1> descriptor = {
-            jacobian[i].data(), jacobian[i].data(), 0, {jacobian[i].size()}, {1}};
+        double *buffer = jacobian[i].data();
+        ResultType descriptor = {buffer, buffer, 0, {jacobian[i].size()}, {1}};
         UnrankedMemRefType<char> source = {1, &descriptor};
         UnrankedMemRefType<char> destination = {1, mrp};
         memrefCopy(sizeof(double), &source, &destination);
@@ -615,7 +614,6 @@ double __quantum__qis__Variance(ObsIdType obsKey)
 
 void __quantum__qis__Probs(MemRefT_double_1d *result, int64_t numQubits, ...)
 {
-    MemRefT<double, 1> *result_p = (MemRefT<double, 1> *)result;
     assert(numQubits >= 0);
 
     va_list args;
@@ -640,16 +638,16 @@ void __quantum__qis__Probs(MemRefT_double_1d *result, int64_t numQubits, ...)
     }
 
     const size_t numElements = 1U << numQubits;
-    MemRefT<double, 1> descriptor = {sv_probs.data(), sv_probs.data(), 0, {numElements}, {1}};
+    double *buffer = sv_probs.data();
+    MemRefT_double_1d descriptor = {buffer, buffer, 0, {numElements}, {1}};
     UnrankedMemRefType<char> source = {1, &descriptor};
-    UnrankedMemRefType<char> destination = {1, result_p};
+    UnrankedMemRefType<char> destination = {1, result};
     memrefCopy(sizeof(double), &source, &destination);
 }
 
 void __quantum__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, ...)
 {
     assert(numQubits >= 0);
-    MemRefT<std::complex<double>, 1> *result_p = (MemRefT<std::complex<double>, 1> *)result;
 
     va_list args;
     va_start(args, numQubits);
@@ -674,13 +672,12 @@ void __quantum__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, .
         // numElements, wires);
     }
 
-    // Divide by two because sv_state is a vector of doubles.
     const size_t numElements = sv_state.size();
     assert(numElements == (1U << numQubits));
-    MemRefT<std::complex<double>, 1> descriptor = {
-        sv_state.data(), sv_state.data(), 0, {numElements}, {1}};
+    CplxT_double *buffer = (CplxT_double *)sv_state.data();
+    MemRefT_CplxT_double_1d descriptor = {buffer, buffer, 0, {numElements}, {1}};
     UnrankedMemRefType<char> source = {1, &descriptor};
-    UnrankedMemRefType<char> destination = {1, result_p};
+    UnrankedMemRefType<char> destination = {1, result};
     memrefCopy(sizeof(std::complex<double>), &source, &destination);
 }
 
@@ -711,8 +708,8 @@ void __quantum__qis__Sample(MemRefT_double_2d *result, int64_t shots, int64_t nu
 
     size_t _shots = static_cast<size_t>(shots);
     size_t _numQubits = static_cast<size_t>(numQubits);
-    MemRefT<double, 2> descriptor = {
-        sv_samples.data(), sv_samples.data(), 0, {_shots, _numQubits}, {_numQubits, 1}};
+    double *buffer = sv_samples.data();
+    MemRefT_double_2d descriptor = {buffer, buffer, 0, {_shots, _numQubits}, {_numQubits, 1}};
     UnrankedMemRefType<char> source = {2, &descriptor};
     UnrankedMemRefType<char> destination = {2, result};
     memrefCopy(sizeof(double), &source, &destination);
@@ -723,8 +720,6 @@ void __quantum__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t shots
 {
     assert(shots >= 0);
     assert(numQubits >= 0);
-    MemRefT<double, 1> *result_eigvals_p = (MemRefT<double, 1> *)(&result->first);
-    MemRefT<int64_t, 1> *result_counts_p = (MemRefT<int64_t, 1> *)(&result->second);
 
     va_list args;
     va_start(args, numQubits);
@@ -753,15 +748,16 @@ void __quantum__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t shots
     const size_t numEigvals = sv_eigvals.size();
     const size_t numCounts = sv_cts.size();
 
-    MemRefT<double, 1> descriptor_eigvals = {
-        sv_eigvals.data(), sv_eigvals.data(), 0, {numEigvals}, {1}};
+    double *buffer_eigvals = sv_eigvals.data();
+    MemRefT_double_1d descriptor_eigvals = {buffer_eigvals, buffer_eigvals, 0, {numEigvals}, {1}};
     UnrankedMemRefType<char> source_eigvals = {1, &descriptor_eigvals};
-    UnrankedMemRefType<char> destination_eigvals = {1, result_eigvals_p};
+    UnrankedMemRefType<char> destination_eigvals = {1, &result->first};
     memrefCopy(sizeof(double), &source_eigvals, &destination_eigvals);
 
-    MemRefT<int64_t, 1> descriptor_counts = {sv_cts.data(), sv_cts.data(), 0, {numCounts}, {1}};
+    int64_t *buffer_counts = sv_cts.data();
+    MemRefT_int64_1d descriptor_counts = {buffer_counts, buffer_counts, 0, {numCounts}, {1}};
     UnrankedMemRefType<char> source_counts = {1, &descriptor_counts};
-    UnrankedMemRefType<char> destination_counts = {1, result_counts_p};
+    UnrankedMemRefType<char> destination_counts = {1, &result->second};
     memrefCopy(sizeof(int64_t), &source_counts, &destination_counts);
 }
 }

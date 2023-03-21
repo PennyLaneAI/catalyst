@@ -19,20 +19,8 @@
 #include "Types.h"
 
 #include "qir_stdlib.h"
-#include <cassert>
-#include <cstdio>
-#include <cstring>
 
 #ifdef __cplusplus
-
-template <typename T, size_t R> struct MemRefT {
-    T *data_allocated;
-    T *data_aligned;
-    size_t offset;
-    size_t sizes[R];
-    size_t strides[R];
-};
-
 extern "C" {
 #endif
 

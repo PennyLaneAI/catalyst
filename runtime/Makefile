@@ -23,8 +23,6 @@ coverage: BUILD_TYPE=Debug
 test: CODE_COVERAGE=OFF
 test: BUILD_TYPE?=Release
 
-export LLVM_BUILD_DIR
-
 .PHONY: help
 help:
 	@echo "Please use \`make <target>' where <target> is one of"
