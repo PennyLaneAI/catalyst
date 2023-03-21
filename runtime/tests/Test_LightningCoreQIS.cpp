@@ -1164,7 +1164,7 @@ TEST_CASE("Test __quantum__qis__Sample with num_qubits=2 and PartialSample calli
 
     double *buffer = new double[shots * n];
     MemRefT_double_2d result = {buffer, buffer, 0, {shots, n}, {n, 1}};
-    __quantum__qis__Sample(&result, shots, 0);
+    __quantum__qis__Sample(&result, shots, 1, ctrls[0]);
     double *samples = result.data_allocated;
 
     size_t counts0[2] = {0, 0};
