@@ -113,6 +113,9 @@ class Function:
 
     Args:
         fn (Callable): the function boundary.
+
+    Raises:
+        AssertionError: Invalid function type.
     """
 
     def __init__(self, fn):
@@ -140,8 +143,8 @@ class Grad:
         argnum (int): the argument indices which define over which arguments to differentiate
 
     Raises:
-        AssertionError: Higher-order derivatives can only be computed with the finite difference
-                        method.
+        ValueError: Higher-order derivatives can only be computed with the finite difference
+                    method.
     """
 
     def __init__(self, fn, *, method, h, argnum):
@@ -151,9 +154,8 @@ class Grad:
         self.h = h
         self.argnum = argnum
         if self.method != "fd":
-            assert isinstance(
-                self.fn, qml.QNode
-            ), "Only finite difference can compute higher order derivatives."
+            if not isinstance(self.fn, qml.QNode):
+                raise ValueError("Only finite difference can compute higher order derivatives.")
 
     def __call__(self, *args, **kwargs):
         """Specifies that an actual call to the differentiated function.
@@ -213,7 +215,7 @@ def grad(f, *, method=None, h=None, argnum=None):
         Grad: A Grad object that denotes the derivative of a function.
 
     Raises:
-        AssertionError: Invalid method or step size parameters.
+        ValueError: Invalid method or step size parameters.
 
     **Example**
 
@@ -234,12 +236,16 @@ def grad(f, *, method=None, h=None, argnum=None):
     >>> workflow(2.0)
     array(-3.14159265)
     """
+    methods = {"fd", "ps", "adj"}
     if method is None:
         method = "fd"
-    assert method in {"fd", "ps", "adj"}, "invalid differentiation method"
+    if method not in methods:
+        raise ValueError(f"Invalid differentiation method '{mehthod}'. "
+                         f"Supported methods are: {' '.join(sorted(methods))}")
     if method == "fd" and h is None:
         h = 1e-7
-    assert h is None or isinstance(h, numbers.Number), "invalid h value"
+    if not (h is None or isinstance(h, numbers.Number)):
+        raise ValueError(f"Invalid h value ({h}). None or number was excpected.")
     if argnum is None:
         argnum = [0]
     elif isinstance(argnum, int):

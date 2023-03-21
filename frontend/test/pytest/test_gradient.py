@@ -499,7 +499,7 @@ def test_assert_no_higher_order_without_ps(method):
         qml.RX(x, wires=0)
         return qml.expval(qml.PauliY(0))
 
-    with pytest.raises(AssertionError) as e_info:
+    with pytest.raises(ValueError) as e_info:
 
         @qjit()
         def workflow(x: float):

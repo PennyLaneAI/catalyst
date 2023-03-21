@@ -242,7 +242,8 @@ def lower_mhlo_to_linalg(filename):
     Returns:
         a path to the output file
     """
-    assert filename[-5:] == ".mlir", "input is not an mlir file"
+    if filename.split(os.extsep)[-1] != "mlir":
+        raise ValueError(f"Input file ({filename}) is not a MLIR file")
 
     command = [mhlo_opt_tool]
     command += ["--allow-unregistered-dialect"]
@@ -265,7 +266,8 @@ def bufferize_tensors(filename):
     Returns:
         a path to the output file
     """
-    assert filename[-5:] == ".mlir", "input is not an mlir file"
+    if filename.split(os.extsep)[-1] != "mlir":
+        raise ValueError(f"Input file ({filename}) is not a MLIR file")
 
     command = [quantum_opt_tool]
     command += [filename]
@@ -287,7 +289,8 @@ def lower_all_to_llvm(filename):
     Returns:
         a path to the output file
     """
-    assert filename[-10:] == ".buff.mlir", "input is not a bufferized mlir file"
+    if filename.split(os.extsep)[-2:] != ["buff","mlir"]:
+        raise ValueError(f"Input file ({filename}) is not a bufferized MLIR file")
 
     command = [quantum_opt_tool]
     command += [filename]
@@ -308,7 +311,8 @@ def convert_mlir_to_llvmir(filename):
     Returns:
         a path to the output file
     """
-    assert filename[-10:] == ".llvm.mlir", "input is not an llvm dialect mlir file"
+    if filename.split(os.extsep)[-2:] != ["llvm","mlir"]:
+        raise ValueError(f"Input file ({filename}) is not an LLVM dialect MLIR file")
 
     command = [translate_tool]
     command += [filename]
@@ -329,7 +333,8 @@ def compile_llvmir(filename):
     Returns:
         a path to the output file
     """
-    assert filename[-3:] == ".ll", "input is not an llvmir file"
+    if filename.split(os.extsep)[-1] != "ll":
+        raise ValueError(f"Input file ({filename}) is not an LLVMIR file")
 
     new_fname = filename.replace(".ll", ".o")
 
@@ -349,7 +354,8 @@ def link_lightning_runtime(filename):
     Returns:
         a path to the output file
     """
-    assert filename[-2:] == ".o", "input is not an object file"
+    if filename.split(os.extsep)[-1] != "o":
+        raise ValueError(f"Input file ({filename}) is not an object file")
 
     new_fname = filename.replace(".o", ".so")
 
@@ -383,7 +389,7 @@ def compile(mlir_module, workspace, passes):
     # Remove quotations
     module_name = module_name.replace('"', "")
     # need to create a temporary file with the string contents
-    filename = workspace + f"/{module_name}.mlir"
+    filename = f"{workspace}/{module_name}.mlir"
     with open(filename, "w", encoding="utf-8") as f:
         mlir_module.operation.print(f, print_generic_op_form=False, assume_verified=True)
 
