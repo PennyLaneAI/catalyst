@@ -28,6 +28,7 @@
 #include "QuantumDevice.hpp"
 
 #include "RuntimeCAPI.h"
+#include "mlir/ExecutionEngine/CRunnerUtils.h"
 
 namespace Catalyst::Runtime::CAPI {
 
@@ -158,15 +159,17 @@ void __quantum__qis__Gradient(int64_t numResults, /* results = */...)
         return;
     }
 
-    const size_t num_train_params = jacobian[0].size();
-
     // extract variadic results of size num_observables
     va_list args;
     va_start(args, numResults);
     for (int64_t i = 0; i < numResults; i++) {
         auto *mrp = va_arg(args, ResultType *);
         assert(mrp && "the result type cannot be a null pointer");
-        memref_copy<double, 1>(mrp, jacobian[i].data(), num_train_params * sizeof(double));
+        MemRefT<double, 1> descriptor = {
+            jacobian[i].data(), jacobian[i].data(), 0, {jacobian[i].size()}, {1}};
+        UnrankedMemRefType<char> source = {1, &descriptor};
+        UnrankedMemRefType<char> destination = {1, mrp};
+        memrefCopy(sizeof(double), &source, &destination);
     }
     va_end(args);
 }
@@ -208,15 +211,17 @@ void __quantum__qis__Gradient_params(MemRefT_int64_1d *params, int64_t numResult
         return;
     }
 
-    const size_t num_train_params = jacobian[0].size();
-
     // extract variadic results of size num_observables
     va_list args;
     va_start(args, numResults);
     for (int64_t i = 0; i < numResults; i++) {
         auto *mrp = va_arg(args, ResultType *);
         assert(mrp && "the result type cannot be a null pointer");
-        memref_copy<double, 1>(mrp, jacobian[i].data(), num_train_params * sizeof(double));
+        MemRefT<double, 1> descriptor = {
+            jacobian[i].data(), jacobian[i].data(), 0, {jacobian[i].size()}, {1}};
+        UnrankedMemRefType<char> source = {1, &descriptor};
+        UnrankedMemRefType<char> destination = {1, mrp};
+        memrefCopy(sizeof(double), &source, &destination);
     }
     va_end(args);
 }
@@ -635,7 +640,10 @@ void __quantum__qis__Probs(MemRefT_double_1d *result, int64_t numQubits, ...)
     }
 
     const size_t numElements = 1U << numQubits;
-    memref_copy<double, 1>(result_p, sv_probs.data(), numElements * sizeof(double));
+    MemRefT<double, 1> descriptor = {sv_probs.data(), sv_probs.data(), 0, {numElements}, {1}};
+    UnrankedMemRefType<char> source = {1, &descriptor};
+    UnrankedMemRefType<char> destination = {1, result_p};
+    memrefCopy(sizeof(double), &source, &destination);
 }
 
 void __quantum__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, ...)
@@ -669,15 +677,17 @@ void __quantum__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, .
     // Divide by two because sv_state is a vector of doubles.
     const size_t numElements = sv_state.size();
     assert(numElements == (1U << numQubits));
-    memref_copy<std::complex<double>, 1>(result_p, sv_state.data(),
-                                         numElements * sizeof(std::complex<double>));
+    MemRefT<std::complex<double>, 1> descriptor = {
+        sv_state.data(), sv_state.data(), 0, {numElements}, {1}};
+    UnrankedMemRefType<char> source = {1, &descriptor};
+    UnrankedMemRefType<char> destination = {1, result_p};
+    memrefCopy(sizeof(std::complex<double>), &source, &destination);
 }
 
 void __quantum__qis__Sample(MemRefT_double_2d *result, int64_t shots, int64_t numQubits, ...)
 {
     assert(shots >= 0);
     assert(numQubits >= 0);
-    MemRefT<double, 2> *result_p = (MemRefT<double, 2> *)result;
 
     va_list args;
     va_start(args, numQubits);
@@ -699,8 +709,13 @@ void __quantum__qis__Sample(MemRefT_double_2d *result, int64_t shots, int64_t nu
         sv_samples = Catalyst::Runtime::CAPI::get_device()->PartialSample(wires, shots);
     }
 
-    const size_t numElements = sv_samples.size();
-    memref_copy<double, 2>(result_p, sv_samples.data(), numElements * sizeof(double));
+    size_t _shots = static_cast<size_t>(shots);
+    size_t _numQubits = static_cast<size_t>(numQubits);
+    MemRefT<double, 2> descriptor = {
+        sv_samples.data(), sv_samples.data(), 0, {_shots, _numQubits}, {_numQubits, 1}};
+    UnrankedMemRefType<char> source = {2, &descriptor};
+    UnrankedMemRefType<char> destination = {2, result};
+    memrefCopy(sizeof(double), &source, &destination);
 }
 
 void __quantum__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t shots, int64_t numQubits,
@@ -737,7 +752,16 @@ void __quantum__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t shots
 
     const size_t numEigvals = sv_eigvals.size();
     const size_t numCounts = sv_cts.size();
-    memref_copy<double, 1>(result_eigvals_p, sv_eigvals.data(), numEigvals * sizeof(double));
-    memref_copy<int64_t, 1>(result_counts_p, sv_cts.data(), numCounts * sizeof(int64_t));
+
+    MemRefT<double, 1> descriptor_eigvals = {
+        sv_eigvals.data(), sv_eigvals.data(), 0, {numEigvals}, {1}};
+    UnrankedMemRefType<char> source_eigvals = {1, &descriptor_eigvals};
+    UnrankedMemRefType<char> destination_eigvals = {1, result_eigvals_p};
+    memrefCopy(sizeof(double), &source_eigvals, &destination_eigvals);
+
+    MemRefT<int64_t, 1> descriptor_counts = {sv_cts.data(), sv_cts.data(), 0, {numCounts}, {1}};
+    UnrankedMemRefType<char> source_counts = {1, &descriptor_counts};
+    UnrankedMemRefType<char> destination_counts = {1, result_counts_p};
+    memrefCopy(sizeof(int64_t), &source_counts, &destination_counts);
 }
 }

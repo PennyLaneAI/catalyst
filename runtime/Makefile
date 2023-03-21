@@ -8,6 +8,8 @@ QIR_STDLIB_DIR?=$(MK_DIR)/qir-stdlib/target/release/
 QIR_STDLIB_INCLUDES_DIR?=$(MK_DIR)/qir-stdlib/target/release/build/include/
 CODE_COVERAGE?=OFF
 BUILD_TYPE?=Release
+LLVM_BUILD_DIR?=$(MK_DIR)/../mlir/llvm-project/build
+LLVM_SRC_DIR?=$(MK_DIR)/../mlir/llvm-project
 ENABLE_KOKKOS?=OFF
 ifeq ($(ENABLE_KOKKOS),OFF)
 	LIGHTNING_GIT_TAG_VALUE?=latest_release
@@ -20,6 +22,8 @@ coverage: CODE_COVERAGE=ON
 coverage: BUILD_TYPE=Debug
 test: CODE_COVERAGE=OFF
 test: BUILD_TYPE?=Release
+
+export LLVM_BUILD_DIR
 
 .PHONY: help
 help:
@@ -50,7 +54,10 @@ configure:
 		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \
 		-DQIR_STDLIB_LIB=$(QIR_STDLIB_DIR) \
 		-DQIR_STDLIB_INCLUDES=$(QIR_STDLIB_INCLUDES_DIR) \
-		-DENABLE_CODE_COVERAGE=$(CODE_COVERAGE)
+		-DENABLE_CODE_COVERAGE=$(CODE_COVERAGE) \
+		-DLLVM_BUILD_DIR=$(LLVM_BUILD_DIR) \
+		-DLLVM_SRC_DIR=$(LLVM_SRC_DIR) \
+		-DENABLE_WARNINGS=OFF
 
 $(QIR_STDLIB_DIR)/libqir_stdlib.a $(QIR_STDLIB_INCLUDES_DIR)/qir_stdlib.h:
 	$(MAKE) -C qir-stdlib all
