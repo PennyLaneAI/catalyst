@@ -289,7 +289,7 @@ def lower_all_to_llvm(filename):
     Returns:
         a path to the output file
     """
-    if filename.split(os.extsep)[-2:] != ["buff","mlir"]:
+    if filename.split(os.extsep)[-2:] != ["buff", "mlir"]:
         raise ValueError(f"Input file ({filename}) is not a bufferized MLIR file")
 
     command = [quantum_opt_tool]
@@ -311,7 +311,7 @@ def convert_mlir_to_llvmir(filename):
     Returns:
         a path to the output file
     """
-    if filename.split(os.extsep)[-2:] != ["llvm","mlir"]:
+    if filename.split(os.extsep)[-2:] != ["llvm", "mlir"]:
         raise ValueError(f"Input file ({filename}) is not an LLVM dialect MLIR file")
 
     command = [translate_tool]
