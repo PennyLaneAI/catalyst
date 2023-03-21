@@ -21,6 +21,7 @@
 #include "qir_stdlib.h"
 #include <cassert>
 #include <cstdio>
+#include <cstring>
 
 #ifdef __cplusplus
 
@@ -32,7 +33,8 @@ template <typename T, size_t R> struct MemRefT {
     size_t strides[R];
 };
 
-template <typename T, size_t R> void memref_copy(MemRefT<T, R> *memref, T *buffer, size_t bytes)
+template <typename T, size_t R>
+void memref_copy_fast(MemRefT<T, R> *memref, T *buffer, size_t bytes)
 {
     size_t how_many_elements = 1;
     for (size_t i = 0; i < R; i++) {
@@ -40,6 +42,63 @@ template <typename T, size_t R> void memref_copy(MemRefT<T, R> *memref, T *buffe
     }
     assert(bytes == (sizeof(T) * how_many_elements) && "data sizes must agree.");
     memcpy(memref->data_aligned, buffer, bytes);
+}
+
+template <typename T, size_t R>
+void memref_copy_slow(MemRefT<T, R> *memref, T *buffer, __attribute__((unused)) size_t bytes)
+{
+    char *dst = (char *)memref->data_aligned;
+    char *src = (char *)buffer;
+    long writeIndex = 0;
+    long readIndex = 0;
+    size_t totalWritten = 0;
+
+    size_t *indices = static_cast<size_t *>(alloca(sizeof(size_t) * R));
+    size_t *dstStrides = static_cast<size_t *>(alloca(sizeof(size_t) * R));
+    // Initialize index and scale strides.
+    for (size_t rankp = 0; rankp < R; ++rankp) {
+        indices[rankp] = 0;
+        dstStrides[rankp] = memref->strides[rankp] * sizeof(T);
+    }
+
+    for (;;) {
+        memcpy(dst + writeIndex, src + readIndex, sizeof(T));
+        totalWritten += sizeof(T);
+        assert(totalWritten <= bytes && "wrote more than needed");
+        // Advance index and read position.
+        for (int64_t axis = R - 1; axis >= 0; --axis) {
+            // Advance at current axis.
+            size_t newIndex = ++indices[axis];
+            readIndex += sizeof(T);
+            writeIndex += dstStrides[axis];
+            // If this is a valid index, we have our next index, so continue copying.
+            if (memref->sizes[axis] != newIndex)
+                break;
+            // We reached the end of this axis. If this is axis 0, we are done.
+            if (axis == 0)
+                return;
+            // Else, reset to 0 and undo the advancement of the linear index that
+            // this axis had. Then continue with the axis one outer.
+            indices[axis] = 0;
+            readIndex -= sizeof(T);
+            writeIndex -= memref->sizes[axis] * dstStrides[axis];
+        }
+    }
+}
+
+template <typename T, size_t R> void memref_copy(MemRefT<T, R> *memref, T *buffer, size_t bytes)
+{
+    bool can_use_fast_path = 0 == R || 1 == memref->strides[0];
+    for (size_t i = 1; i < R && can_use_fast_path; i++) {
+        can_use_fast_path &= memref->strides[i] == memref->sizes[i - 1];
+    }
+
+    if (can_use_fast_path) {
+        memref_copy_fast(memref, buffer, bytes);
+        return;
+    }
+
+    memref_copy_slow(memref, buffer, bytes);
 }
 
 extern "C" {
