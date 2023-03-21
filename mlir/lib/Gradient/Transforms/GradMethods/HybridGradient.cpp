@@ -148,7 +148,7 @@ static Value combineGradients(PatternRewriter &rewriter, Location loc, Value cla
 /// Generate an mlir function to compute the full gradient of a quantum function.
 ///
 /// With the parameter-shift method (and certain other methods) the gradient of a quantum function
-/// is computed as two sperate parts: the gradient of the classical pre-processing function for
+/// is computed as two separate parts: the gradient of the classical pre-processing function for
 /// gate parameters, termed "classical Jacobian", and the purely "quantum gradient" of a
 /// differentiable output of a circuit. The two components can be combined to form the gradient of
 /// the entire quantum function via tensor contraction along the gate parameter dimension.

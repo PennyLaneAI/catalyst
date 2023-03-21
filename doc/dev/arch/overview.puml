@@ -7,26 +7,46 @@ HIDE_STEREOTYPE()
 
 Boundary(c1, "Catalyst", $link="https://github.com/plantuml-stdlib/C4-PlantUML") {
 
-  Container(_tracer_, "Frontend", "PennyLane and JAX", "Python code tracer and compiler")
-  Container(_qopt_, "Core", "LLVM/MLIR", "Quantum-specific dialects, passes and tools")
+  Container(_tracer_, "Frontend", "PennyLane / JAX", "Python code tracer and compiler")
 
-  Container(_catalyst_runtime_, "Runtime", "C++", "The QIR Runtime backed by qir-stdlib")
+  Container(_qopt_, "Core", "LLVM / MLIR", "Quantum-specific dialects, passes and tools")
+
+  Container(_catalyst_runtime_, "Runtime", "C / C++", "The QIR Runtime backed by qir-stdlib")
 }
 
-Boundary(c2, "Backend", $link="https://github.com/plantuml-stdlib/C4-PlantUML") {
+Boundary(c2, "Backends", $link="https://github.com/plantuml-stdlib/C4-PlantUML") {
 
-  Container_Ext(_pl_lightning_kokkos_, "PennyLane-Lightning-Kokkos", "CPU/GPU")
+  Container_Ext(_pl_lightning_, "Lightning", "CPU")
 
-  Container_Ext(_pl_lightning_, "PennyLane-Lightning", "CPU")
+  Container_Ext(_pl_lightning_kokkos_, "Lightning-Kokkos", "CPU/GPU")
 
+  Container_Ext(_pl_lightning_gpu, "Lightning-GPU", "GPU")
+
+  Container_Ext(_openqasm, "OpenQASM", "Text")
+
+  Container_Ext(_aws_braket, "AWS Braket", "Cloud")
 }
 
 Rel_R(_tracer_, _qopt_, "compiles with", "", $tags="action")
 
-Rel_R(_qopt_, _catalyst_runtime_, "links", "", $tags="action")
+Rel_R(_qopt_, _catalyst_runtime_, "links against", "", $tags="action")
+
+Rel(_catalyst_runtime_, _pl_lightning_, "calls", "", $tags="action")
+
+_pl_lightning_ -[hidden]> _pl_lightning_kokkos_
 
 Rel(_catalyst_runtime_, _pl_lightning_kokkos_, "calls", "", $tags="action")
 
-Rel(_catalyst_runtime_, _pl_lightning_, "calls", "", $tags="action")
+_pl_lightning_kokkos_ -[hidden]> _pl_lightning_gpu
+
+Rel(_catalyst_runtime_, _pl_lightning_gpu, "calls", "", $tags="action")
+
+_pl_lightning_gpu -[hidden]> _openqasm
+
+Rel(_catalyst_runtime_, _openqasm, "calls", "", $tags="action")
+
+Rel(_catalyst_runtime_, _aws_braket, "calls", "", $tags="action")
+
+Rel_R(_openqasm, _aws_braket, "send", "", $tags="action")
 
 @enduml
