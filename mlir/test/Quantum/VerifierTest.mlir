@@ -252,6 +252,23 @@ func.func @counts2(%q0 : !quantum.bit, %q1 : !quantum.bit) {
 
 // -----
 
+func.func @counts3(%q0 : !quantum.bit, %q1 : !quantum.bit) {
+    %obs = quantum.namedobs %q0[1] : !quantum.obs
+
+    %in_eigvals_1 = memref.alloc() : memref<4xf64>
+    %in_counts_1 = memref.alloc() : memref<4xi64>
+    // expected-error@+1 {{number of eigenvalues or counts did not match observable}}
+    quantum.counts %obs in(%in_eigvals_1 %in_counts_1 : memref<4xf64> memref<4xi64>) { shots=1000 } 
+
+    %in_eigvals_2 = memref.alloc() : memref<2xf64>
+    %in_counts_2 = memref.alloc() : memref<2xi64>
+    quantum.counts %obs in(%in_eigvals_2 %in_counts_2 : memref<2xf64> memref<2xi64>) { shots=1000 } 
+
+    return
+}
+
+// -----
+
 func.func @probs(%q0 : !quantum.bit, %q1 : !quantum.bit) {
     %obs = quantum.compbasis %q0, %q1 : !quantum.obs
 

@@ -198,12 +198,19 @@ LogicalResult CountsOp::verify()
         return emitOpError("cannot determine the number of eigenvalues for general observable");
     }
 
-    if (!getEigvals() && !getCounts()) {
-        return success();
+    if (!(bool)getEigvals() ^ (bool)getInEigvals()) {
+        return emitOpError("cannot have eigvals and in-eigvals at the same time");
     }
 
-    if (failed(verifyTensorResult(getEigvals().getType(), numEigvals)) ||
-        failed(verifyTensorResult(getCounts().getType(), numEigvals))) {
+    if (!(bool)getCounts() ^ (bool)getInCounts()) {
+        return emitOpError("cannot have counts and in-counts at the same time");
+    }
+
+    Type eigvalsToVerify = getEigvals() ? (Type)getEigvals().getType() : (Type)getInEigvals().getType();
+    Type countsToVerify = getCounts() ? (Type)getCounts().getType() : (Type)getInCounts().getType();
+
+    if (failed(verifyTensorResult(eigvalsToVerify, numEigvals)) ||
+        failed(verifyTensorResult(countsToVerify, numEigvals))) {
         return emitOpError("number of eigenvalues or counts did not match observable");
     }
 
