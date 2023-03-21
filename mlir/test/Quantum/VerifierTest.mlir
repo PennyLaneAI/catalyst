@@ -197,6 +197,35 @@ func.func @sample2(%q : !quantum.bit) {
 
 // -----
 
+func.func @sample3(%q : !quantum.bit) {
+    %obs = quantum.compbasis %q : !quantum.obs
+
+    %alloc0 = memref.alloc() : memref<1000xf64>
+    // expected-error@+1 {{return tensor must have 2D static shape equal to (number of shots, number of qubits in observable)}}
+    quantum.sample %obs in(%alloc0 : memref<1000xf64>) { shots = 1000 }
+
+    %alloc1 = memref.alloc() : memref<1000x1xf64>
+    quantum.sample %obs in(%alloc1 : memref<1000x1xf64>) { shots = 1000 }
+
+    return
+}
+
+// -----
+
+func.func @sample4(%q : !quantum.bit) {
+    %obs = quantum.compbasis %q : !quantum.obs
+
+    %alloc = memref.alloc() : memref<1000xf64>
+    // expected-error@+1 {{cannot name an operation with no results}}
+    %err = quantum.sample %obs { shots=1000 } in (%alloc : memref<1000xf64>) : tensor<1000xf64>
+
+    %samples = quantum.sample %obs { shots=1000 } : tensor<1000x1xf64>
+
+    return
+}
+
+// -----
+
 func.func @counts1(%q0 : !quantum.bit, %q1 : !quantum.bit) {
     %obs = quantum.namedobs %q0[1] : !quantum.obs
 
