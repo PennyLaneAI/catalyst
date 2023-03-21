@@ -241,7 +241,7 @@ def grad(f, *, method=None, h=None, argnum=None):
         method = "fd"
     if method not in methods:
         raise ValueError(
-            f"Invalid differentiation method '{mehthod}'. "
+            f"Invalid differentiation method '{method}'. "
             f"Supported methods are: {' '.join(sorted(methods))}"
         )
     if method == "fd" and h is None:
