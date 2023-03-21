@@ -165,9 +165,13 @@ void __quantum__qis__Gradient(int64_t numResults, /* results = */...)
         auto *mrp = va_arg(args, ResultType *);
         assert(mrp && "the result type cannot be a null pointer");
         double *buffer = jacobian[i].data();
-        ResultType descriptor = {buffer, buffer, 0, {jacobian[i].size()}, {1}};
+        size_t buffer_len = jacobian[i].size();
+        ResultType descriptor = {buffer, buffer, 0, {buffer_len}, {1}};
         UnrankedMemRefType<char> source = {1, &descriptor};
         UnrankedMemRefType<char> destination = {1, mrp};
+        DynamicMemRefType temp(destination);
+        assert(std::count_if(temp.begin(), temp.end(), [](auto a) { return true; }) >= buffer_len &&
+               "not enough capacity");
         memrefCopy(sizeof(double), &source, &destination);
     }
     va_end(args);
@@ -217,9 +221,13 @@ void __quantum__qis__Gradient_params(MemRefT_int64_1d *params, int64_t numResult
         auto *mrp = va_arg(args, ResultType *);
         assert(mrp && "the result type cannot be a null pointer");
         double *buffer = jacobian[i].data();
-        ResultType descriptor = {buffer, buffer, 0, {jacobian[i].size()}, {1}};
+        size_t buffer_len = jacobian[i].size();
+        ResultType descriptor = {buffer, buffer, 0, {buffer_len}, {1}};
         UnrankedMemRefType<char> source = {1, &descriptor};
         UnrankedMemRefType<char> destination = {1, mrp};
+        DynamicMemRefType temp(destination);
+        assert(std::count_if(temp.begin(), temp.end(), [](auto a) { return true; }) >= buffer_len &&
+               "not enough capacity");
         memrefCopy(sizeof(double), &source, &destination);
     }
     va_end(args);
@@ -639,9 +647,14 @@ void __quantum__qis__Probs(MemRefT_double_1d *result, int64_t numQubits, ...)
 
     const size_t numElements = 1U << numQubits;
     double *buffer = sv_probs.data();
-    MemRefT_double_1d descriptor = {buffer, buffer, 0, {numElements}, {1}};
+    size_t buffer_len = sv_probs.size();
+    assert(numElements == buffer_len && "mismatch of device and expected buffer length");
+    MemRefT_double_1d descriptor = {buffer, buffer, 0, {buffer_len}, {1}};
     UnrankedMemRefType<char> source = {1, &descriptor};
     UnrankedMemRefType<char> destination = {1, result};
+    DynamicMemRefType temp(destination);
+    assert(std::count_if(temp.begin(), temp.end(), [](auto a) { return true; }) >= buffer_len &&
+           "not enough capacity");
     memrefCopy(sizeof(double), &source, &destination);
 }
 
@@ -675,9 +688,14 @@ void __quantum__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, .
     const size_t numElements = sv_state.size();
     assert(numElements == (1U << numQubits));
     CplxT_double *buffer = (CplxT_double *)sv_state.data();
-    MemRefT_CplxT_double_1d descriptor = {buffer, buffer, 0, {numElements}, {1}};
+    size_t buffer_len = sv_state.size();
+    assert(buffer_len == numElements);
+    MemRefT_CplxT_double_1d descriptor = {buffer, buffer, 0, {buffer_len}, {1}};
     UnrankedMemRefType<char> source = {1, &descriptor};
     UnrankedMemRefType<char> destination = {1, result};
+    DynamicMemRefType temp(destination);
+    assert(std::count_if(temp.begin(), temp.end(), [](auto a) { return true; }) >= buffer_len &&
+           "not enough capacity");
     memrefCopy(sizeof(std::complex<double>), &source, &destination);
 }
 
@@ -709,9 +727,13 @@ void __quantum__qis__Sample(MemRefT_double_2d *result, int64_t shots, int64_t nu
     size_t _shots = static_cast<size_t>(shots);
     size_t _numQubits = static_cast<size_t>(numQubits);
     double *buffer = sv_samples.data();
+    size_t buffer_len = sv_samples.size();
     MemRefT_double_2d descriptor = {buffer, buffer, 0, {_shots, _numQubits}, {_numQubits, 1}};
     UnrankedMemRefType<char> source = {2, &descriptor};
     UnrankedMemRefType<char> destination = {2, result};
+    DynamicMemRefType temp(destination);
+    assert(std::count_if(temp.begin(), temp.end(), [](auto a) { return true; }) >= buffer_len &&
+           "not enough capacity");
     memrefCopy(sizeof(double), &source, &destination);
 }
 
@@ -747,17 +769,26 @@ void __quantum__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t shots
 
     const size_t numEigvals = sv_eigvals.size();
     const size_t numCounts = sv_cts.size();
+    assert(numEigvals == numCounts);
 
     double *buffer_eigvals = sv_eigvals.data();
     MemRefT_double_1d descriptor_eigvals = {buffer_eigvals, buffer_eigvals, 0, {numEigvals}, {1}};
     UnrankedMemRefType<char> source_eigvals = {1, &descriptor_eigvals};
     UnrankedMemRefType<char> destination_eigvals = {1, &result->first};
+    DynamicMemRefType temp_eigvals(destination_eigvals);
+    assert(std::count_if(temp_eigvals.begin(), temp_eigvals.end(), [](auto a) { return true; }) >=
+               numEigvals &&
+           "not enough capacity");
     memrefCopy(sizeof(double), &source_eigvals, &destination_eigvals);
 
     int64_t *buffer_counts = sv_cts.data();
     MemRefT_int64_1d descriptor_counts = {buffer_counts, buffer_counts, 0, {numCounts}, {1}};
     UnrankedMemRefType<char> source_counts = {1, &descriptor_counts};
     UnrankedMemRefType<char> destination_counts = {1, &result->second};
+    DynamicMemRefType temp_counts(destination_counts);
+    assert(std::count_if(temp_counts.begin(), temp_counts.end(), [](auto a) { return true; }) >=
+               numCounts &&
+           "not enough capacity");
     memrefCopy(sizeof(int64_t), &source_counts, &destination_counts);
 }
 }
