@@ -3,8 +3,7 @@ BLACKVERSIONMAJOR := $(shell black --version | head -n1 | awk '{ print $$2 }' | 
 BLACKVERSIONMINOR := $(shell black --version | head -n1 | awk '{ print $$2 }' | cut -d. -f2)
 MK_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 MK_DIR := $(dir $(MK_ABSPATH))
-DIALECTS_BUILD_DIR := $(if $(dialects_build_dir:-=),$(dialects_build_dir),$(MK_DIR)/mlir/build)
-RT_BUILD_DIR := $(if $(runtime_build_dir:-=),$(runtime_build_dir),$(MK_DIR)/runtime/build)
+DIALECTS_BUILD_DIR ?= $(MK_DIR)/mlir/build
 COVERAGE := --cov=catalyst --cov-report=term-missing --tb=native
 
 .PHONY: help
