@@ -167,7 +167,7 @@ class Grad:
         jaxpr = jax.make_jaxpr(self.fn)(*args)
         if len(jaxpr.eqns) != 1:
             raise TypeError("Grad is not well defined for non-single Jax equations")
-        if not (jaxpr.eqns[0].primitive == jprim.func_p):
+        if jaxpr.eqns[0].primitive != jprim.func_p:
             raise TypeError("Attempting to differentiate something other than a function")
         return jprim.grad_p.bind(
             *args, jaxpr=jaxpr, fn=self, method=self.method, h=self.h, argnum=self.argnum
@@ -305,8 +305,8 @@ class CondCallable:
         Returns:
             self
         """
-        if not (false_fn.__code__.co_argcount == 0):
-            raise TypeError(f"Conditional 'False' function is not allowed to have any arguments")
+        if false_fn.__code__.co_argcount != 0:
+            raise TypeError("Conditional 'False' function is not allowed to have any arguments")
         self.false_fn = false_fn
         return self
 
@@ -484,7 +484,7 @@ def cond(pred):
     """
 
     def decorator(true_fn):
-        if not (true_fn.__code__.co_argcount == 0):
+        if true_fn.__code__.co_argcount != 0:
             raise TypeError("Conditional 'True' function is not allowed to have any arguments")
         return CondCallable(pred, true_fn)
 
