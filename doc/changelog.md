@@ -10,6 +10,9 @@
 * Build the runtime against qir-stdlib v0.1.0.
   [#58](https://github.com/PennyLaneAI/catalyst/pull/58)
 
+* Replace input-checking assertions with exceptions.
+  [#14](https://github.com/PennyLaneAI/catalyst/pull/67)
+
 <h3>Breaking changes</h3>
 
 <h3>Bug fixes</h3>
