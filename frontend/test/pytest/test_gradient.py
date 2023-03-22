@@ -499,7 +499,7 @@ def test_assert_no_higher_order_without_ps(method):
         qml.RX(x, wires=0)
         return qml.expval(qml.PauliY(0))
 
-    with pytest.raises(ValueError) as e_info:
+    with pytest.raises(ValueError, match="higher order derivatives"):
 
         @qjit()
         def workflow(x: float):
@@ -510,7 +510,7 @@ def test_assert_no_higher_order_without_ps(method):
 
 
 def test_assert_no_non_func_gradients():
-    with pytest.raises(TypeError) as e_info:
+    with pytest.raises(TypeError, match="something other than a function"):
 
         @qjit()
         def workflow():
@@ -521,7 +521,7 @@ def test_assert_no_non_func_gradients():
 
 
 def test_assert_no_non_single_expression_gradients():
-    with pytest.raises(TypeError) as e_info:
+    with pytest.raises(TypeError, match="is not well defined for non-single Jax equations"):
 
         @qjit()
         def workflow():
