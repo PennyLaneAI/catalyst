@@ -119,7 +119,9 @@ class Function:
     """
 
     def __init__(self, fn):
-        assert isinstance(fn, Grad), "Function boundaries only supported for gradients."
+        assert isinstance(
+            fn, Grad
+        ), "Function boundaries only supported for gradients."  # What does boundaries mean?
         self.fn = fn
         self.__name__ = "grad." + fn.__name__
 
@@ -163,10 +165,10 @@ class Grad:
             args: the arguments to the differentiated function
         """
         jaxpr = jax.make_jaxpr(self.fn)(*args)
-        assert len(jaxpr.eqns) == 1, "Grad is not well defined"
-        assert (
-            jaxpr.eqns[0].primitive == jprim.func_p
-        ), "Attempting to differentiate something other than a function"
+        if len(jaxpr.eqns) != 1:
+            raise TypeError("Grad is not well defined for non-single Jax equations")
+        if not (jaxpr.eqns[0].primitive == jprim.func_p):
+            raise TypeError("Attempting to differentiate something other than a function")
         return jprim.grad_p.bind(
             *args, jaxpr=jaxpr, fn=self, method=self.method, h=self.h, argnum=self.argnum
         )
@@ -303,9 +305,8 @@ class CondCallable:
         Returns:
             self
         """
-        assert (
-            false_fn.__code__.co_argcount == 0
-        ), "conditional 'False' function is not allowed to have any arguments"
+        if not (false_fn.__code__.co_argcount == 0):
+            raise TypeError(f"Conditional 'False' function is not allowed to have any arguments")
         self.false_fn = false_fn
         return self
 
@@ -483,9 +484,8 @@ def cond(pred):
     """
 
     def decorator(true_fn):
-        assert (
-            true_fn.__code__.co_argcount == 0
-        ), "conditional 'True' function is not allowed to have any arguments"
+        if not (true_fn.__code__.co_argcount == 0):
+            raise TypeError("Conditional 'True' function is not allowed to have any arguments")
         return CondCallable(pred, true_fn)
 
     return decorator
