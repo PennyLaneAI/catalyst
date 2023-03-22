@@ -509,6 +509,28 @@ def test_assert_no_higher_order_without_ps(method):
             return i(x)
 
 
+def test_assert_no_non_func_gradients():
+    with pytest.raises(TypeError) as e_info:
+
+        @qjit()
+        def workflow():
+            def _f(x):
+                return x + x
+
+            return grad(_f, method="fd")(1.0)
+
+
+def test_assert_no_non_single_expression_gradients():
+    with pytest.raises(TypeError) as e_info:
+
+        @qjit()
+        def workflow():
+            def _f(x):
+                return x
+
+            return grad(_f, method="fd")(1.0)
+
+
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
 def test_finite_diff_higher_order(inp):
     def f(x):

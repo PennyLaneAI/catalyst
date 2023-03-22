@@ -231,6 +231,21 @@ class TestClassicalCompilation:
 
         assert arithi(x, y, op1, op2) == arithc(x, y, op1, op2)
 
+    def test_no_true_false_parameters(self):
+        with pytest.raises(TypeError):
+
+            @qjit
+            def arithc():
+                @cond(True)
+                def branch(xxx):
+                    return 1
+
+                @branch.otherwise
+                def branch(yyy):
+                    return 0
+
+                return branch()
+
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])

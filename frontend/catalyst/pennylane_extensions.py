@@ -166,9 +166,14 @@ class Grad:
         """
         jaxpr = jax.make_jaxpr(self.fn)(*args)
         if len(jaxpr.eqns) != 1:
-            raise TypeError("Grad is not well defined for non-single Jax equations")
+            raise TypeError(
+                f"Grad is not well defined for non-single Jax equations " f"(got {len(jaxpr.eqns)})"
+            )
         if jaxpr.eqns[0].primitive != jprim.func_p:
-            raise TypeError("Attempting to differentiate something other than a function")
+            raise TypeError(
+                f"Attempting to differentiate something other than a function "
+                f"(got {jaxpr.eqns[0].primitive})"
+            )
         return jprim.grad_p.bind(
             *args, jaxpr=jaxpr, fn=self, method=self.method, h=self.h, argnum=self.argnum
         )
