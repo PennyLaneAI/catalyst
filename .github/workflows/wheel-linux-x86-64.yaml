@@ -239,10 +239,7 @@ jobs:
           -DCMAKE_BUILD_TYPE=Release \
           -DPYTHON_INCLUDE_DIRS=$(which python${{ matrix.python_version }}) \
           -DQIR_STDLIB_LIB=$GITHUB_WORKSPACE/runtime/qir-stdlib/target/release \
-          -DQIR_STDLIB_INCLUDES=$GITHUB_WORKSPACE/runtime/qir-stdlib/target/release/build/include \
-          -DLLVM_BUILD_DIR=$(pwd)/llvm-build \
-          -DLLVM_SRC_DIR=$(pwd)/mlir/llvm-project \
-          -DENABLE_WARNINGS=OFF
+          -DQIR_STDLIB_INCLUDES=$GITHUB_WORKSPACE/runtime/qir-stdlib/target/release/build/include
 
         cmake --build runtime-build --target rt_capi -j$(nproc)
 
