@@ -163,9 +163,12 @@ void __quantum__qis__Gradient(int64_t numResults, /* results = */...)
     va_list args;
     va_start(args, numResults);
     for (int64_t i = 0; i < numResults; i++) {
-        auto *mrp = va_arg(args, ResultType *);
+        MemRefT<double, 1> *mrp = va_arg(args, ResultType *);
+        double *buffer = jacobian[i].data();
+        size_t buffer_len = jacobian[i].size();
+        MemRefT<double, 1> src = {buffer, buffer, 0, {buffer_len}, {1}};
         assert(mrp && "the result type cannot be a null pointer");
-        memref_copy<double, 1>(mrp, jacobian[i].data(), num_train_params * sizeof(double));
+        memref_copy<double, 1>(mrp, &src, num_train_params * sizeof(double));
     }
     va_end(args);
 }
@@ -213,9 +216,12 @@ void __quantum__qis__Gradient_params(MemRefT_int64_1d *params, int64_t numResult
     va_list args;
     va_start(args, numResults);
     for (int64_t i = 0; i < numResults; i++) {
-        auto *mrp = va_arg(args, ResultType *);
+        MemRefT<double, 1> *mrp = va_arg(args, ResultType *);
         assert(mrp && "the result type cannot be a null pointer");
-        memref_copy<double, 1>(mrp, jacobian[i].data(), num_train_params * sizeof(double));
+        double *buffer = jacobian[i].data();
+        size_t buffer_len = jacobian[i].size();
+        MemRefT<double, 1> src = {buffer, buffer, 0, {buffer_len}, {1}};
+        memref_copy<double, 1>(mrp, &src, num_train_params * sizeof(double));
     }
     va_end(args);
 }
@@ -634,7 +640,10 @@ void __quantum__qis__Probs(MemRefT_double_1d *result, int64_t numQubits, ...)
     }
 
     const size_t numElements = 1U << numQubits;
-    memref_copy<double, 1>(result_p, sv_probs.data(), numElements * sizeof(double));
+    double *buffer = sv_probs.data();
+    size_t buffer_len = sv_probs.size();
+    MemRefT<double, 1> src = {buffer, buffer, 0, {buffer_len}, {1}};
+    memref_copy<double, 1>(result_p, &src, numElements * sizeof(double));
 }
 
 void __quantum__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, ...)
@@ -667,20 +676,24 @@ void __quantum__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, .
 
     const size_t numElements = sv_state.size();
     assert(numElements == (1U << numQubits));
-    memref_copy<std::complex<double>, 1>(result_p, sv_state.data(),
+    std::complex<double> *buffer = sv_state.data();
+    size_t buffer_len = sv_state.size();
+    MemRefT<std::complex<double>, 1> src = {buffer, buffer, 0, {buffer_len}, {1}};
+    memref_copy<std::complex<double>, 1>(result_p, &src,
                                          numElements * sizeof(std::complex<double>));
 }
 
-void __quantum__qis__Sample(MemRefT_double_2d *result, int64_t shots, int64_t numQubits, ...)
+void __quantum__qis__Sample(MemRefT_double_2d *result, size_t shots, size_t numQubits, ...)
 {
-    assert(shots >= 0);
-    assert(numQubits >= 0);
+    // Very unlikely, but if this were the case, then we would encounter an infinite
+    // loop ahead.
+    assert(numQubits != SIZE_MAX);
     MemRefT<double, 2> *result_p = (MemRefT<double, 2> *)result;
 
     va_list args;
     va_start(args, numQubits);
     std::vector<QubitIdType> wires(numQubits);
-    for (int64_t i = 0; i < numQubits; i++) {
+    for (size_t i = 0; i < numQubits; i++) {
         wires[i] = va_arg(args, QubitIdType);
     }
     va_end(args);
@@ -698,7 +711,9 @@ void __quantum__qis__Sample(MemRefT_double_2d *result, int64_t shots, int64_t nu
     }
 
     const size_t numElements = sv_samples.size();
-    memref_copy<double, 2>(result_p, sv_samples.data(), numElements * sizeof(double));
+    double *buffer = sv_samples.data();
+    MemRefT<double, 2> src = {buffer, buffer, 0, {shots, numQubits}, {numQubits, 1}};
+    memref_copy<double, 2>(result_p, &src, numElements * sizeof(double));
 }
 
 void __quantum__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t shots, int64_t numQubits,
@@ -734,8 +749,12 @@ void __quantum__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t shots
     auto &&sv_cts = std::get<1>(sv_counts);
 
     const size_t numEigvals = sv_eigvals.size();
+    double *buffer_eigvals = sv_eigvals.data();
+    MemRefT<double, 1> srcEigvals = {buffer_eigvals, buffer_eigvals, 0, {numEigvals}, {1}};
+    memref_copy<double, 1>(result_eigvals_p, &srcEigvals, numEigvals * sizeof(double));
+    int64_t *buffer_counts = sv_cts.data();
     const size_t numCounts = sv_cts.size();
-    memref_copy<double, 1>(result_eigvals_p, sv_eigvals.data(), numEigvals * sizeof(double));
-    memref_copy<int64_t, 1>(result_counts_p, sv_cts.data(), numCounts * sizeof(int64_t));
+    MemRefT<int64_t, 1> srcCounts = {buffer_counts, buffer_counts, 0, {numCounts}, {1}};
+    memref_copy<int64_t, 1>(result_counts_p, &srcCounts, numCounts * sizeof(int64_t));
 }
 }

@@ -18,9 +18,9 @@
 
 #include "Types.h"
 
+#include "qir_stdlib.h"
 #include <cassert>
 #include <cstring>
-#include "qir_stdlib.h"
 
 #ifdef __cplusplus
 
@@ -33,35 +33,45 @@ template <typename T, size_t R> struct MemRefT {
 };
 
 template <typename T, size_t R>
-void memref_copy_fast(MemRefT<T, R> *memref, T *buffer, size_t bytes)
+void memref_copy_fast(MemRefT<T, R> *dst, MemRefT<T, R> *src, size_t bytes)
 {
     size_t how_many_elements = 1;
     for (size_t i = 0; i < R; i++) {
-        how_many_elements *= memref->sizes[i];
+        how_many_elements *= src->sizes[i];
     }
     assert(bytes == (sizeof(T) * how_many_elements) && "data sizes must agree.");
-    memcpy(memref->data_aligned, buffer, bytes);
+    memcpy(dst->data_aligned, src->data_aligned, bytes);
 }
 
 template <typename T, size_t R>
-void memref_copy_slow(MemRefT<T, R> *memref, T *buffer, __attribute__((unused)) size_t bytes)
+void memref_copy_slow(MemRefT<T, R> *dst, MemRefT<T, R> *src, __attribute__((unused)) size_t bytes)
 {
-    char *dst = (char *)memref->data_aligned;
-    char *src = (char *)buffer;
-    long writeIndex = 0;
-    long readIndex = 0;
-    size_t totalWritten = 0;
+    // Unlikely, but might encounter issues in the loop.
+    static_assert(R != SIZE_MAX);
+    char *srcPtr = (char *)src->data_allocated + dst->offset * sizeof(T);
+    char *dstPtr = (char *)dst->data_allocated + dst->offset * sizeof(T);
+
+    // Handle empty shapes -> nothing to copy.
+    for (size_t rankp = 0; rankp < R; ++rankp)
+        if (src->sizes[rankp] == 0)
+            return;
 
     size_t *indices = static_cast<size_t *>(alloca(sizeof(size_t) * R));
+    size_t *srcStrides = static_cast<size_t *>(alloca(sizeof(size_t) * R));
     size_t *dstStrides = static_cast<size_t *>(alloca(sizeof(size_t) * R));
+
     // Initialize index and scale strides.
     for (size_t rankp = 0; rankp < R; ++rankp) {
         indices[rankp] = 0;
-        dstStrides[rankp] = memref->strides[rankp] * sizeof(T);
+        srcStrides[rankp] = src->strides[rankp] * sizeof(T);
+        dstStrides[rankp] = dst->strides[rankp] * sizeof(T);
     }
 
+    long writeIndex = 0;
+    long readIndex = 0;
+    size_t totalWritten = 0;
     for (;;) {
-        memcpy(dst + writeIndex, src + readIndex, sizeof(T));
+        memcpy(dstPtr + writeIndex, srcPtr + readIndex, sizeof(T));
         totalWritten += sizeof(T);
         assert(totalWritten <= bytes && "wrote more than needed");
         // Advance index and read position.
@@ -71,7 +81,7 @@ void memref_copy_slow(MemRefT<T, R> *memref, T *buffer, __attribute__((unused)) 
             readIndex += sizeof(T);
             writeIndex += dstStrides[axis];
             // If this is a valid index, we have our next index, so continue copying.
-            if (memref->sizes[axis] != newIndex)
+            if (src->sizes[axis] != newIndex)
                 break;
             // We reached the end of this axis. If this is axis 0, we are done.
             if (axis == 0)
@@ -79,13 +89,14 @@ void memref_copy_slow(MemRefT<T, R> *memref, T *buffer, __attribute__((unused)) 
             // Else, reset to 0 and undo the advancement of the linear index that
             // this axis had. Then continue with the axis one outer.
             indices[axis] = 0;
-            readIndex -= sizeof(T);
-            writeIndex -= memref->sizes[axis] * dstStrides[axis];
+            readIndex -= src->sizes[axis] * srcStrides[axis];
+            writeIndex -= dst->sizes[axis] * dstStrides[axis];
         }
     }
 }
 
-template <typename T, size_t R> void memref_copy(MemRefT<T, R> *memref, T *buffer, size_t bytes)
+template <typename T, size_t R>
+void memref_copy(MemRefT<T, R> *memref, MemRefT<T, R> *buffer, size_t bytes)
 {
     bool can_use_fast_path = 0 == R || 1 == memref->strides[0];
     for (size_t i = 1; i < R && can_use_fast_path; i++) {
@@ -173,7 +184,7 @@ double __quantum__qis__Expval(ObsIdType);
 double __quantum__qis__Variance(ObsIdType);
 void __quantum__qis__Probs(MemRefT_double_1d *, int64_t numQubits,
                            /*qubits*/...);
-void __quantum__qis__Sample(MemRefT_double_2d *, int64_t shots, int64_t numQubits,
+void __quantum__qis__Sample(MemRefT_double_2d *, size_t shots, size_t numQubits,
                             /*qubits*/...);
 void __quantum__qis__Counts(PairT_MemRefT_double_int64_1d *, int64_t shots, int64_t numQubits,
                             /*qubits*/...);
