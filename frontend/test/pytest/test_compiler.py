@@ -45,7 +45,7 @@ class TestCompilerDriver:
         compiler = "cc"
         with pytest.warns(UserWarning, match="Compiler .* failed .*"):
             # pylint: disable=protected-access
-            CompilerDriver._attempt_link(compiler, [""], "in.o", "out.so")
+            CompilerDriver._attempt_link(compiler, [""], "in.o", "out.so", None)
 
     def test_link_fail_exception(self):
         """Test that an exception is raised when all compiler possibilities are exhausted."""

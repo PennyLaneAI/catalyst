@@ -15,14 +15,49 @@
 MLIR/LLVM representations.
 """
 
+import io
 import os
+import sys
 import shutil
 import subprocess
 import warnings
+from io import TextIOWrapper
+from typing import Optional, List
+from dataclasses import dataclass
+from functools import partial
 
 from catalyst._configuration import INSTALLED
 
 package_root = os.path.dirname(__file__)
+
+
+@dataclass
+class CompileOptions:
+    """ Common compile options """
+    verbosity: int
+    logfile: Optional[TextIOWrapper] = None # stdout/stderr or a file
+
+    def get_logfile(self) -> TextIOWrapper:
+        return self.logfile if self.logfile else sys.stderr
+
+default_compile_options:CompileOptions = CompileOptions(0, None)
+
+
+def run_writing_command(command:List[str],
+                        ofile:Optional[str],
+                        compile_options:Optional[CompileOptions] = None) -> None:
+    compile_options: CompileOptions = compile_options if compile_options else default_compile_options
+    runner = partial(subprocess.run, command, check=True)
+    if ofile is not None:
+        if compile_options.verbosity > 0:
+            print(f"[RUNNING] {' '.join(command)} > {ofile}", file=compile_options.get_logfile())
+        with open(ofile, "w", encoding="utf-8") as file:
+            runner(stdout=file)
+    else:
+        if compile_options.verbosity > 0:
+            print(f"[RUNNING] {' '.join(command)}", file=compile_options.get_logfile())
+        runner()
+
 
 default_bin_paths = {
     "llvm": os.path.join(package_root, "../../mlir/llvm-project/build/bin"),
@@ -202,18 +237,22 @@ class CompilerDriver:
 
     @staticmethod
     # pylint: disable=redefined-outer-name
-    def _attempt_link(compiler, flags, infile, outfile):
+    def _attempt_link(compiler, flags, infile, outfile, compile_options):
+        compile_options = compile_options if compile_options else default_compile_options
         try:
             command = [compiler] + flags + [infile, "-o", outfile]
+            if compile_options.verbosity > 0:
+                print(f"[RUNNING] {' '.join(command)}", file=compile_options.logfile)
             subprocess.run(command, check=True)
             return True
         except subprocess.CalledProcessError:
-            msg = f"Compiler {compiler} failed during execution of command {command}. Will attempt fallback on available compilers."
+            msg = (f"Compiler {compiler} failed during execution of command {command}. "
+                  "Will attempt fallback on available compilers.")
             warnings.warn(msg, UserWarning)
             return False
 
     @staticmethod
-    def link(infile, outfile, flags=None, fallback_compilers=None):
+    def link(infile, outfile, flags=None, fallback_compilers=None, compile_options=None):
         """
         Link the infile against the necessary libraries and produce the outfile.
 
@@ -231,14 +270,14 @@ class CompilerDriver:
             fallback_compilers = CompilerDriver._default_fallback_compilers
         # pylint: disable=redefined-outer-name
         for compiler in CompilerDriver._available_compilers(fallback_compilers):
-            success = CompilerDriver._attempt_link(compiler, flags, infile, outfile)
+            success = CompilerDriver._attempt_link(compiler, flags, infile, outfile, compile_options)
             if success:
                 return
         msg = f"Unable to link {infile}. All available compiler options exhausted. Please provide a compatible compiler via $CATALYST_CC."
         raise EnvironmentError(msg)
 
 
-def lower_mhlo_to_linalg(filename):
+def lower_mhlo_to_linalg(filename: str, compile_options: Optional[CompileOptions] = None) -> str:
     """Translate MHLO to linalg dialect.
 
     Args:
@@ -256,13 +295,12 @@ def lower_mhlo_to_linalg(filename):
 
     new_fname = filename.replace(".mlir", ".nohlo.mlir")
 
-    with open(new_fname, "w", encoding="utf-8") as file:
-        subprocess.run(command, stdout=file, check=True)
+    run_writing_command(command, new_fname, compile_options)
 
     return new_fname
 
 
-def transform_quantum_ir(filename):
+def transform_quantum_ir(filename: str, compile_options: Optional[CompileOptions] = None) -> str:
     """Runs quantum optimizations and transformations, as well gradient transforms, on the hybrid
     IR.
 
@@ -280,13 +318,14 @@ def transform_quantum_ir(filename):
 
     new_fname = filename.replace(".mlir", ".opt.mlir")
 
-    with open(new_fname, "w", encoding="utf-8") as file:
-        subprocess.run(command, stdout=file, check=True)
+    run_writing_command(command, new_fname, compile_options)
 
     return new_fname
 
 
-def bufferize_tensors(filename):
+# def bufferize_tensors(filename):
+# =======
+def bufferize_tensors(filename: str, compile_options: Optional[CompileOptions] = None) -> str:
     """Translate MHLO to linalg dialect.
 
     Args:
@@ -303,13 +342,12 @@ def bufferize_tensors(filename):
 
     new_fname = filename.replace(".mlir", ".buff.mlir")
 
-    with open(new_fname, "w", encoding="utf-8") as file:
-        subprocess.run(command, stdout=file, check=True)
+    run_writing_command(command, new_fname, compile_options)
 
     return new_fname
 
 
-def lower_all_to_llvm(filename):
+def lower_all_to_llvm(filename: str, compile_options:Optional[CompileOptions] = None) -> str:
     """Translate MLIR dialects to LLVM dialect.
 
     Args:
@@ -325,13 +363,13 @@ def lower_all_to_llvm(filename):
     command += llvm_lowering_pass_pipeline
 
     new_fname = filename.replace(".buff.mlir", ".llvm.mlir")
-    with open(new_fname, "w", encoding="utf-8") as file:
-        subprocess.run(command, stdout=file, check=True)
+
+    run_writing_command(command, new_fname, compile_options)
 
     return new_fname
 
 
-def convert_mlir_to_llvmir(filename):
+def convert_mlir_to_llvmir(filename: str, compile_options:Optional[CompileOptions] = None) -> str:
     """Translate LLVM dialect to LLVM IR.
 
     Args:
@@ -349,13 +387,13 @@ def convert_mlir_to_llvmir(filename):
     command += ["--mlir-to-llvmir"]
 
     new_fname = filename.replace(".llvm.mlir", ".ll")
-    with open(new_fname, "w", encoding="utf-8") as file:
-        subprocess.run(command, stdout=file, check=True)
+
+    run_writing_command(command, new_fname, compile_options)
 
     return new_fname
 
 
-def compile_llvmir(filename):
+def compile_llvmir(filename: str, compile_options:Optional[CompileOptions] = None) -> str:
     """Translate LLVM IR to an object file.
 
     Args:
@@ -372,11 +410,13 @@ def compile_llvmir(filename):
     command += compiler_flags
     command += [filename]
     command += ["-o", new_fname]
-    subprocess.run(command, check=True)
+
+    run_writing_command(command, None, compile_options)
+
     return new_fname
 
 
-def link_lightning_runtime(filename):
+def link_lightning_runtime(filename: str, compile_options:Optional[CompileOptions] = None) -> str:
     """Link the object file as a shared object.
 
     Args:
@@ -389,12 +429,12 @@ def link_lightning_runtime(filename):
 
     new_fname = filename.replace(".o", ".so")
 
-    CompilerDriver.link(filename, new_fname)
+    CompilerDriver.link(filename, new_fname, compile_options=compile_options)
 
     return new_fname
 
 
-def compile(mlir_module, workspace, passes):
+def compile(mlir_module, workspace, passes, compile_options:Optional[CompileOptions] = None):
     """Compile an MLIR module to a shared object.
 
     .. note::
@@ -425,18 +465,18 @@ def compile(mlir_module, workspace, passes):
 
     mlir = filename
     passes["mlir"] = mlir
-    nohlo = lower_mhlo_to_linalg(mlir)
+    nohlo = lower_mhlo_to_linalg(mlir, compile_options)
     passes["nohlo"] = nohlo
-    optimized = transform_quantum_ir(nohlo)
+    optimized = transform_quantum_ir(nohlo, compile_options)
     passes["opt"] = optimized
-    buff = bufferize_tensors(optimized)
+    buff = bufferize_tensors(optimized, compile_options)
     passes["buff"] = buff
-    llvm_dialect = lower_all_to_llvm(buff)
+    llvm_dialect = lower_all_to_llvm(buff, compile_options)
     passes["llvm"] = llvm_dialect
-    llvmir = convert_mlir_to_llvmir(llvm_dialect)
+    llvmir = convert_mlir_to_llvmir(llvm_dialect, compile_options)
     passes["ll"] = llvmir
-    object_file = compile_llvmir(llvmir)
-    shared_object = link_lightning_runtime(object_file)
+    object_file = compile_llvmir(llvmir, compile_options)
+    shared_object = link_lightning_runtime(object_file, compile_options)
 
     with open(llvmir, "r", encoding="utf-8") as f:
         _llvmir = f.read()
