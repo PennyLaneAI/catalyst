@@ -232,16 +232,17 @@ class TestClassicalCompilation:
         assert arithi(x, y, op1, op2) == arithc(x, y, op1, op2)
 
     def test_no_true_false_parameters(self):
+        """Test non-empty parameter detection in conditionals"""
         with pytest.raises(TypeError):
 
             @qjit
             def arithc():
                 @cond(True)
-                def branch(xxx):
+                def branch(_):
                     return 1
 
                 @branch.otherwise
-                def branch(yyy):
+                def branch(_):
                     return 0
 
                 return branch()
