@@ -33,7 +33,8 @@
 This release contains contributions from (in alphabetical order):
 
 Ali Asadi,
-Erick Ochoa Lopez.
+Erick Ochoa Lopez,
+Sergei Mironov.
 
 # Release 0.1.1
 
