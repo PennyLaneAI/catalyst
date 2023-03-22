@@ -495,6 +495,8 @@ def test_adjoint_grad_range_change(inp):
 
 @pytest.mark.parametrize("method", [("ps"), ("adj")])
 def test_assert_no_higher_order_without_ps(method):
+    """Test input validation for gradients"""
+
     def f(x):
         qml.RX(x, wires=0)
         return qml.expval(qml.PauliY(0))
@@ -510,6 +512,7 @@ def test_assert_no_higher_order_without_ps(method):
 
 
 def test_assert_no_non_func_gradients():
+    """Test input validation for gradients"""
     with pytest.raises(TypeError, match="something other than a function"):
 
         @qjit()
@@ -521,6 +524,7 @@ def test_assert_no_non_func_gradients():
 
 
 def test_assert_no_non_single_expression_gradients():
+    """Test input validation for gradients"""
     with pytest.raises(TypeError, match="is not well defined for non-single Jax equations"):
 
         @qjit()
