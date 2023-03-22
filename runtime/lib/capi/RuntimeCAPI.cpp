@@ -27,7 +27,6 @@
 #include "QuantumDevice.hpp"
 
 #include "RuntimeCAPI.h"
-#include "mlir/ExecutionEngine/CRunnerUtils.h"
 
 namespace Catalyst::Runtime::CAPI {
 
@@ -141,7 +140,7 @@ QirString *__quantum__rt__result_to_string(RESULT *result)
 void __quantum__qis__Gradient(int64_t numResults, /* results = */...)
 {
     assert(numResults >= 0);
-    using ResultType = MemRefT_double_1d;
+    using ResultType = MemRefT<double, 1>;
 
     // num_observables * num_train_params
     auto &&jacobian = Catalyst::Runtime::CAPI::get_device()->Gradient({});
@@ -158,21 +157,15 @@ void __quantum__qis__Gradient(int64_t numResults, /* results = */...)
         return;
     }
 
+    const size_t num_train_params = jacobian[0].size();
+
     // extract variadic results of size num_observables
     va_list args;
     va_start(args, numResults);
     for (int64_t i = 0; i < numResults; i++) {
         auto *mrp = va_arg(args, ResultType *);
         assert(mrp && "the result type cannot be a null pointer");
-        double *buffer = jacobian[i].data();
-        size_t buffer_len = jacobian[i].size();
-        ResultType descriptor = {buffer, buffer, 0, {buffer_len}, {1}};
-        UnrankedMemRefType<char> source = {1, &descriptor};
-        UnrankedMemRefType<char> destination = {1, mrp};
-        DynamicMemRefType temp(destination);
-        assert(std::count_if(temp.begin(), temp.end(), [](auto a) { return true; }) >= buffer_len &&
-               "not enough capacity");
-        memrefCopy(sizeof(double), &source, &destination);
+        memref_copy<double, 1>(mrp, jacobian[i].data(), num_train_params * sizeof(double));
     }
     va_end(args);
 }
@@ -181,7 +174,7 @@ void __quantum__qis__Gradient_params(MemRefT_int64_1d *params, int64_t numResult
                                      /* results = */...)
 {
     assert(numResults >= 0);
-    using ResultType = MemRefT_double_1d;
+    using ResultType = MemRefT<double, 1>;
 
     if (params == nullptr || !params->sizes[0]) {
         __quantum__rt__fail_cstr("Invalid number of trainable parameters");
@@ -214,21 +207,15 @@ void __quantum__qis__Gradient_params(MemRefT_int64_1d *params, int64_t numResult
         return;
     }
 
+    const size_t num_train_params = jacobian[0].size();
+
     // extract variadic results of size num_observables
     va_list args;
     va_start(args, numResults);
     for (int64_t i = 0; i < numResults; i++) {
         auto *mrp = va_arg(args, ResultType *);
         assert(mrp && "the result type cannot be a null pointer");
-        double *buffer = jacobian[i].data();
-        size_t buffer_len = jacobian[i].size();
-        ResultType descriptor = {buffer, buffer, 0, {buffer_len}, {1}};
-        UnrankedMemRefType<char> source = {1, &descriptor};
-        UnrankedMemRefType<char> destination = {1, mrp};
-        DynamicMemRefType temp(destination);
-        assert(std::count_if(temp.begin(), temp.end(), [](auto a) { return true; }) >= buffer_len &&
-               "not enough capacity");
-        memrefCopy(sizeof(double), &source, &destination);
+        memref_copy<double, 1>(mrp, jacobian[i].data(), num_train_params * sizeof(double));
     }
     va_end(args);
 }
@@ -623,6 +610,7 @@ double __quantum__qis__Variance(ObsIdType obsKey)
 void __quantum__qis__Probs(MemRefT_double_1d *result, int64_t numQubits, ...)
 {
     assert(numQubits >= 0);
+    MemRefT<double, 1> *result_p = (MemRefT<double, 1> *)result;
 
     va_list args;
     va_start(args, numQubits);
@@ -646,21 +634,13 @@ void __quantum__qis__Probs(MemRefT_double_1d *result, int64_t numQubits, ...)
     }
 
     const size_t numElements = 1U << numQubits;
-    double *buffer = sv_probs.data();
-    size_t buffer_len = sv_probs.size();
-    assert(numElements == buffer_len && "mismatch of device and expected buffer length");
-    MemRefT_double_1d descriptor = {buffer, buffer, 0, {buffer_len}, {1}};
-    UnrankedMemRefType<char> source = {1, &descriptor};
-    UnrankedMemRefType<char> destination = {1, result};
-    DynamicMemRefType temp(destination);
-    assert(std::count_if(temp.begin(), temp.end(), [](auto a) { return true; }) >= buffer_len &&
-           "not enough capacity");
-    memrefCopy(sizeof(double), &source, &destination);
+    memref_copy<double, 1>(result_p, sv_probs.data(), numElements * sizeof(double));
 }
 
 void __quantum__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, ...)
 {
     assert(numQubits >= 0);
+    MemRefT<std::complex<double>, 1> *result_p = (MemRefT<std::complex<double>, 1> *)result;
 
     va_list args;
     va_start(args, numQubits);
@@ -687,22 +667,15 @@ void __quantum__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, .
 
     const size_t numElements = sv_state.size();
     assert(numElements == (1U << numQubits));
-    CplxT_double *buffer = (CplxT_double *)sv_state.data();
-    size_t buffer_len = sv_state.size();
-    assert(buffer_len == numElements);
-    MemRefT_CplxT_double_1d descriptor = {buffer, buffer, 0, {buffer_len}, {1}};
-    UnrankedMemRefType<char> source = {1, &descriptor};
-    UnrankedMemRefType<char> destination = {1, result};
-    DynamicMemRefType temp(destination);
-    assert(std::count_if(temp.begin(), temp.end(), [](auto a) { return true; }) >= buffer_len &&
-           "not enough capacity");
-    memrefCopy(sizeof(std::complex<double>), &source, &destination);
+    memref_copy<std::complex<double>, 1>(result_p, sv_state.data(),
+                                         numElements * sizeof(std::complex<double>));
 }
 
 void __quantum__qis__Sample(MemRefT_double_2d *result, int64_t shots, int64_t numQubits, ...)
 {
     assert(shots >= 0);
     assert(numQubits >= 0);
+    MemRefT<double, 2> *result_p = (MemRefT<double, 2> *)result;
 
     va_list args;
     va_start(args, numQubits);
@@ -724,17 +697,8 @@ void __quantum__qis__Sample(MemRefT_double_2d *result, int64_t shots, int64_t nu
         sv_samples = Catalyst::Runtime::CAPI::get_device()->PartialSample(wires, shots);
     }
 
-    size_t _shots = static_cast<size_t>(shots);
-    size_t _numQubits = static_cast<size_t>(numQubits);
-    double *buffer = sv_samples.data();
-    size_t buffer_len = sv_samples.size();
-    MemRefT_double_2d descriptor = {buffer, buffer, 0, {_shots, _numQubits}, {_numQubits, 1}};
-    UnrankedMemRefType<char> source = {2, &descriptor};
-    UnrankedMemRefType<char> destination = {2, result};
-    DynamicMemRefType temp(destination);
-    assert(std::count_if(temp.begin(), temp.end(), [](auto a) { return true; }) >= buffer_len &&
-           "not enough capacity");
-    memrefCopy(sizeof(double), &source, &destination);
+    const size_t numElements = sv_samples.size();
+    memref_copy<double, 2>(result_p, sv_samples.data(), numElements * sizeof(double));
 }
 
 void __quantum__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t shots, int64_t numQubits,
@@ -742,6 +706,8 @@ void __quantum__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t shots
 {
     assert(shots >= 0);
     assert(numQubits >= 0);
+    MemRefT<double, 1> *result_eigvals_p = (MemRefT<double, 1> *)&result->first;
+    MemRefT<int64_t, 1> *result_counts_p = (MemRefT<int64_t, 1> *)&result->second;
 
     va_list args;
     va_start(args, numQubits);
@@ -769,26 +735,7 @@ void __quantum__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t shots
 
     const size_t numEigvals = sv_eigvals.size();
     const size_t numCounts = sv_cts.size();
-    assert(numEigvals == numCounts);
-
-    double *buffer_eigvals = sv_eigvals.data();
-    MemRefT_double_1d descriptor_eigvals = {buffer_eigvals, buffer_eigvals, 0, {numEigvals}, {1}};
-    UnrankedMemRefType<char> source_eigvals = {1, &descriptor_eigvals};
-    UnrankedMemRefType<char> destination_eigvals = {1, &result->first};
-    DynamicMemRefType temp_eigvals(destination_eigvals);
-    assert(std::count_if(temp_eigvals.begin(), temp_eigvals.end(), [](auto a) { return true; }) >=
-               numEigvals &&
-           "not enough capacity");
-    memrefCopy(sizeof(double), &source_eigvals, &destination_eigvals);
-
-    int64_t *buffer_counts = sv_cts.data();
-    MemRefT_int64_1d descriptor_counts = {buffer_counts, buffer_counts, 0, {numCounts}, {1}};
-    UnrankedMemRefType<char> source_counts = {1, &descriptor_counts};
-    UnrankedMemRefType<char> destination_counts = {1, &result->second};
-    DynamicMemRefType temp_counts(destination_counts);
-    assert(std::count_if(temp_counts.begin(), temp_counts.end(), [](auto a) { return true; }) >=
-               numCounts &&
-           "not enough capacity");
-    memrefCopy(sizeof(int64_t), &source_counts, &destination_counts);
+    memref_copy<double, 1>(result_eigvals_p, sv_eigvals.data(), numEigvals * sizeof(double));
+    memref_copy<int64_t, 1>(result_counts_p, sv_cts.data(), numCounts * sizeof(int64_t));
 }
 }

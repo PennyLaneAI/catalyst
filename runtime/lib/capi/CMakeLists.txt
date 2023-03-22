@@ -40,11 +40,8 @@ target_link_libraries(rt_capi ${CMAKE_DL_LIBS}
                                 "-L${CMAKE_BINARY_DIR}/lib/backend"
                                 -lrt_backend)
 
-include_directories(${LLVM_SRC_DIR}/mlir/include/)
-
 # link to qir_stdlib
 target_link_libraries(rt_capi "-L${QIR_STDLIB_LIB}"
-	                      "-L${LLVM_BUILD_DIR}/lib/"
                                 "-Wl,--whole-archive"
                                 qir_stdlib
                                 "-Wl,--no-whole-archive"

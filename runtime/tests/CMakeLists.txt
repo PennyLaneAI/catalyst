@@ -31,12 +31,8 @@ target_include_directories(runner_tests PRIVATE
             ${pennylane_lightning_SOURCE_DIR}/pennylane_lightning/src/tests)
 endif()
 
-link_directories(${LLVM_BUILD_DIR}/lib)
-
 target_link_libraries(runner_tests PRIVATE  catalyst_qir_runtime
                                             lightning_dynamic
-					    "-Wl,--rpath,${LLVM_BUILD_DIR}/lib"
-					    mlir_c_runner_utils
                                             Catch2::Catch2)
 
 set(common_tests_src    Test_QubitManager.cpp

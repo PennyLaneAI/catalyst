@@ -1159,7 +1159,7 @@ TEST_CASE("Test __quantum__qis__Sample with num_qubits=2 and PartialSample calli
     // qml.CRX(0.4, wires=[1,0])
     __quantum__qis__CRX(0.4, target, *ctrls);
 
-    constexpr size_t n = 2;
+    constexpr size_t n = 1;
     constexpr size_t shots = 1000;
 
     double *buffer = new double[shots * n];
