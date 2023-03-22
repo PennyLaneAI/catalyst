@@ -49,7 +49,7 @@ jobs:
 
   runtime:
     name: Catalyst-Runtime
-    needs: [runtime-qir-stdlib, llvm]
+    needs: [runtime-qir-stdlib]
     runs-on: ubuntu-latest
 
     steps:
@@ -77,35 +77,12 @@ jobs:
           key: Linux-qir-stdlib-build
           fail-on-cache-miss: True
 
-      - name: Get LLVM Version
-        id: llvm-hash
-        if: steps.cache-mhlo.outputs.cache-hit != 'true'
-        run: echo "llvm-hash=$(grep llvm .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
-
-      - name: Get Cached LLVM Source
-        id: cache-llvm-source
-        uses: actions/cache@v3
-        with:
-          path:  mlir/llvm-project
-          key: Linux-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-source
-          enableCrossOsArchive: True
-          fail-on-cache-miss: True
-
-      - name: Get Cached LLVM Build
-        id: cache-llvm-build
-        uses: actions/cache@v3
-        with:
-          path:  llvm-build
-          key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-build
-          fail-on-cache-miss: True
-
       - name: Build Catalyst-Runtime
         run: |
           pushd runtime
           RT_BUILD_DIR=../runtime-build \
           QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include" \
-          QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build/" \
-          LLVM_BUILD_DIR=../llvm-build make runtime
+          QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build/" make runtime
           popd
 
       - name: Upload Catalyst-Runtime Artifact
@@ -419,7 +396,7 @@ jobs:
 
   runtime-tests:
     name: Runtime Tests (Linux)
-    needs: [runtime-qir-stdlib, llvm]
+    needs: [runtime-qir-stdlib]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -454,28 +431,6 @@ jobs:
           key: Linux-qir-stdlib-build
           fail-on-cache-miss: True
 
-      - name: Get LLVM Version
-        id: llvm-hash
-        if: steps.cache-mhlo.outputs.cache-hit != 'true'
-        run: echo "llvm-hash=$(grep llvm .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
-
-      - name: Get Cached LLVM Source
-        id: cache-llvm-source
-        uses: actions/cache@v3
-        with:
-          path:  mlir/llvm-project
-          key: Linux-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-source
-          enableCrossOsArchive: True
-          fail-on-cache-miss: True
-
-      - name: Get Cached LLVM Build
-        id: cache-llvm-build
-        uses: actions/cache@v3
-        with:
-          path:  llvm-build
-          key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-build
-          fail-on-cache-miss: True
-
       - name: Build Runtime test suite for Lightning simulator
         if: ${{ matrix.simulator == 'lightning' }}
         run: |
@@ -485,7 +440,6 @@ jobs:
             QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build/" \
             QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include/" \
             LIGHTNING_GIT_TAG_VALUE=$LIGHTNING_TAG_VALUE \
-            LLVM_BUILD_DIR=$(pwd)/../llvm-build \
             make coverage
             popd
             mv runtime/build/coverage.info coverage-${{ github.job }}.info
@@ -500,7 +454,6 @@ jobs:
             QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include/" \
             LIGHTNING_GIT_TAG_VALUE=$LIGHTNING_KOKKOS_TAG_VALUE \
             ENABLE_KOKKOS=ON \
-            LLVM_BUILD_DIR=$(pwd)/../llvm-build \
             make test
             popd
 
@@ -519,7 +472,6 @@ jobs:
           CXX_COMPILER=$(which g++) \
           QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build/" \
           QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include/" \
-          LLVM_BUILD_DIR=$(pwd)/../llvm-build \
           make examples
           popd
 

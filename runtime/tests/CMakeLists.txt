@@ -33,12 +33,10 @@ endif()
 
 link_directories(${LLVM_BUILD_DIR}/lib)
 
-include_directories(${LLVM_SRC_DIR}/mlir/include/)
-target_link_libraries(runner_tests PRIVATE  "-L${LLVM_BUILD_DIR}/lib/"
+target_link_libraries(runner_tests PRIVATE  catalyst_qir_runtime
+                                            lightning_dynamic
 					    "-Wl,--rpath,${LLVM_BUILD_DIR}/lib"
 					    mlir_c_runner_utils
-	                                    catalyst_qir_runtime
-                                            lightning_dynamic
                                             Catch2::Catch2)
 
 set(common_tests_src    Test_QubitManager.cpp
