@@ -1,15 +1,16 @@
 """ Measurement cycle management and data post-processing routines """
 import sys
-from os import system, makedirs
-from os.path import isfile, dirname
+from os import makedirs
+from os.path import isfile, dirname, join
 from json import load as json_load
 from argparse import ArgumentParser, Namespace as ParsedArguments
-from typing import Tuple, Iterable, Set, Union, Optional
+from typing import List, Tuple, Iterable, Set, Union, Optional
 from collections import defaultdict
 from copy import deepcopy
 from hashlib import sha256
 from itertools import chain
 from functools import partial
+from subprocess import run as subprocess_run
 
 import vl_convert as vlc
 import altair as alt
@@ -120,7 +121,7 @@ def syshash(a) -> str:
 
 def ofile(  # pylint: disable=too-many-arguments
     a, _, measure, problem, impl, nqubits, nlayers, diffmethod
-) -> Tuple[str, str]:
+) -> Tuple[str, List[str]]:
     """Produce the JSON file name containing the measurement configured and
     the Linux shell command which is expected to produce such file."""
     measure_ = measure.replace("-", "")
@@ -132,30 +133,29 @@ def ofile(  # pylint: disable=too-many-arguments
     )
     if problem == "grover":
         assert diffmethod is None
-        params = f"--nlayers={nlayers}" if nlayers is not None else ""
+        params = [f"--nlayers={nlayers}"] if nlayers is not None else []
     elif problem == "qft":
         assert diffmethod is None
-        params = f"--nlayers={nlayers}" if nlayers is not None else ""
+        params = [f"--nlayers={nlayers}"] if nlayers is not None else []
     elif problem in ["vqe", "chemvqe"]:
         assert nlayers is None
         assert diffmethod is not None
-        params = f"--vqe-diff-method={diffmethod}"
+        params = [f"--vqe-diff-method={diffmethod}"]
     elif problem == "chemvqe-hybrid":
         assert nlayers is None
         assert diffmethod is None
-        params = ""
+        params = []
     else:
         raise ValueError(f"Unsupported problem {problem}")
-    cmdline = (
-        f"python3 benchmark.py run "
-        f"--problem={problem} "
-        f"--measure={measure} "
-        f"--implementation={impl} "
-        f"--nqubits={nqubits} "
-        f"--output={ofname} "
-        f"--timeout={a.timeout_1run} "
-        f"{params}"
-    )
+    cmdline = [
+        "python3", "benchmark.py", "run",
+        f"--problem={problem}",
+        f"--measure={measure}",
+        f"--implementation={impl}",
+        f"--nqubits={nqubits}",
+        f"--output={ofname}",
+        f"--timeout={a.timeout_1run}",
+    ] + params
     return (ofname, cmdline)
 
 
@@ -202,10 +202,9 @@ def collect(a: ParsedArguments) -> None:
             (cat, measure, problem, impl, nqubits, nlayers, diffmethod) = config
             if len(odname) > 0 and not a.dry_run:
                 makedirs(odname, exist_ok=True)
-            cmdline += f" 2>&1 | tee {odname}/output.log"
             pdesc = f"{problem}[{nqubits},{nlayers}]"
             hint = f"{measure: <15} {impl: <32} {cat: <15} {pdesc: <30}"
-            message = hint if not a.verbose else cmdline
+            message = hint if not a.verbose else ' '.join(cmdline)
             if isfile(ofname):
                 print(f"{message} [EXISTS]")
             else:
@@ -222,15 +221,21 @@ def collect(a: ParsedArguments) -> None:
                         print(f"{message} [WOULDFAIL]")
                     else:
                         print(f"{message}", end="", flush=True)
-                        system(cmdline)
-                        if not isfile(ofname):
+
+                        logfname = join(odname,"output.log")
+                        try:
+                            with open(logfname, "w", encoding="utf-8") as logfile:
+                                subprocess_run(cmdline, stdout=logfile, stderr=logfile, check=False)
+                        except KeyboardInterrupt:
+                            input("\nPress Ctrl+C once again to terminate the script.")
+                        if isfile(ofname):
+                            print(" [OK]")
+                        else:
                             known_failures[(problem, measure, impl, diffmethod)] = (
                                 nqubits,
                                 nlayers,
                             )
-                            print(" [FAIL]")
-                        else:
-                            print(" [OK]")
+                            print(f" [FAIL] (LOG: {logfname} )")
     finally:
         if str(known_failures) != str(KNOWN_FAILURES):
             print("Suggestion:\nKNOWN_FAILURES =")
@@ -249,17 +254,18 @@ def load(a: ParsedArguments) -> Tuple[DataFrame, Optional[Sysinfo]]:
         ofname, _ = ofile(a, *config)
         cat, measure, problem, impl, nqubits, nlayers, diffmethod = config
         r = None
-        with open(ofname, encoding="utf-8") as f:
-            try:
+        try:
+            with open(ofname, encoding="utf-8") as f:
                 r = BenchmarkResult.from_dict(json_load(f))
-            except Exception as e1:
-                log.append(str(e1))
-                log.append("Trying to load V1 instead")
-                try:
+        except Exception as e1:
+            log.append(str(e1))
+            log.append("Trying to load V1 instead")
+            try:
+                with open(ofname, encoding="utf-8") as f:
                     r = BenchmarkResultV1.from_dict(json_load(f))
-                except Exception as e2:
-                    nmissing += 1
-                    log.append(str(e2))
+            except Exception as e2:
+                nmissing += 1
+                log.append(str(e2))
         if r is not None:
             for trial, time in enumerate(r.measurement_sec):
                 data["cat"].append(cat)
