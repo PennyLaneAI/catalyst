@@ -5,7 +5,15 @@ Unit tests for CompilerDriver class
 import warnings
 import pytest
 
-from catalyst.compiler import CompilerDriver
+from catalyst.compiler import (
+    CompilerDriver,
+    lower_mhlo_to_linalg,
+    bufferize_tensors,
+    lower_all_to_llvm,
+    convert_mlir_to_llvmir,
+    compile_llvmir,
+    link_lightning_runtime,
+)
 
 
 class TestCompilerDriver:
@@ -41,3 +49,33 @@ class TestCompilerDriver:
         """Test that an exception is raised when all compiler possibilities are exhausted."""
         with pytest.raises(EnvironmentError, match="Unable to link .*"):
             CompilerDriver.link("in.o", "out.so", fallback_compilers=["this-binary-does-not-exist"])
+
+    def test_lower_mhlo_input_validation(self):
+        """Test if the function detects wrong extensions"""
+        with pytest.raises(ValueError, match="is not a MLIR file"):
+            lower_mhlo_to_linalg("file-name.nomlir")
+
+    def test_bufferize_tensors(self):
+        """Test if the function detects wrong extensions"""
+        with pytest.raises(ValueError, match="is not a MLIR file"):
+            bufferize_tensors("file-name.nomlir")
+
+    def test_lower_all_to_llvm_input_validation(self):
+        """Test if the function detects wrong extensions"""
+        with pytest.raises(ValueError, match="is not a bufferized MLIR file"):
+            lower_all_to_llvm("file-name.nobuff.mlir")
+
+    def test_convert_mlir_to_llvmir_input_validation(self):
+        """Test if the function detects wrong extensions"""
+        with pytest.raises(ValueError, match="is not an LLVM dialect MLIR file"):
+            convert_mlir_to_llvmir("file-name.nollvm.mlir")
+
+    def test_compile_llvmir_input_validation(self):
+        """Test if the function detects wrong extensions"""
+        with pytest.raises(ValueError, match="is not an LLVMIR file"):
+            compile_llvmir("file-name.noll")
+
+    def test_link_lightning_runtime_input_validation(self):
+        """Test if the function detects wrong extensions"""
+        with pytest.raises(ValueError, match="is not an object file"):
+            link_lightning_runtime("file-name.noo")
