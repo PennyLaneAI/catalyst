@@ -31,7 +31,7 @@ def catalyst_version() -> str:
                 .strip()[:7]
             )
             verstring += f"+g{commit}"
-        except Exception:  # pylint: disable=broad-exception-caught
+        except Exception:  # pylint: disable=broad-excep,broad-exception-caught
             verstring += "+g?"
     return verstring
 
@@ -100,7 +100,7 @@ def measure_compile_catalyst(a: ParsedArguments) -> BenchmarkResult:
         "catalyst": catalyst_version(),
     }
 
-    p: Problem
+    p: Problem  # pylint: disable=used-before-assignment
     if a.problem == "grover":
         from .grover_catalyst import ProblemC as Problem, qcompile, workflow
 
@@ -174,7 +174,7 @@ def measure_runtime_catalyst(a: ParsedArguments) -> BenchmarkResult:
         "catalyst": catalyst_version(),
     }
 
-    p: Problem
+    p: Problem  # pylint: disable=used-before-assignment
     if a.problem == "grover":
         from .grover_catalyst import ProblemC as Problem, qcompile, workflow
 
@@ -240,6 +240,7 @@ def measure_compile_pennylanejax(a: ParsedArguments) -> BenchmarkResult:
 
     _, device, interface = parse_implementation(a.implementation)
 
+    p: Problem  # pylint: disable=used-before-assignment
     if a.problem == "grover":
         from .grover_pennylane import ProblemPL as Problem, qcompile, workflow, size
 
@@ -323,6 +324,7 @@ def measure_runtime_pennylanejax(a: ParsedArguments) -> BenchmarkResult:
 
     _, device, interface = parse_implementation(a.implementation)
 
+    p: Problem  # pylint: disable=used-before-assignment
     if a.problem == "grover":
         from .grover_pennylane import ProblemPL as Problem, qcompile, workflow, size
 
@@ -391,6 +393,7 @@ def measure_compile_pennylane(a: ParsedArguments) -> BenchmarkResult:
 
     _, device, interface = parse_implementation(a.implementation)
 
+    p: Problem  # pylint: disable=used-before-assignment
     if a.problem == "grover":
         from .grover_pennylane import ProblemPL as Problem, qcompile, workflow, size
 
@@ -459,6 +462,7 @@ def measure_runtime_pennylane(a: ParsedArguments) -> BenchmarkResult:
 
     _, device, interface = parse_implementation(a.implementation)
 
+    p: Problem  # pylint: disable=used-before-assignment
     if a.problem == "grover":
         from .grover_pennylane import ProblemPL as Problem, workflow, qcompile, size
 

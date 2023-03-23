@@ -148,7 +148,9 @@ def ofile(  # pylint: disable=too-many-arguments
     else:
         raise ValueError(f"Unsupported problem {problem}")
     cmdline = [
-        "python3", "benchmark.py", "run",
+        "python3",
+        "benchmark.py",
+        "run",
         f"--problem={problem}",
         f"--measure={measure}",
         f"--implementation={impl}",
@@ -204,7 +206,7 @@ def collect(a: ParsedArguments) -> None:
                 makedirs(odname, exist_ok=True)
             pdesc = f"{problem}[{nqubits},{nlayers}]"
             hint = f"{measure: <15} {impl: <32} {cat: <15} {pdesc: <30}"
-            message = hint if not a.verbose else ' '.join(cmdline)
+            message = hint if not a.verbose else " ".join(cmdline)
             if isfile(ofname):
                 print(f"{message} [EXISTS]")
             else:
@@ -222,7 +224,7 @@ def collect(a: ParsedArguments) -> None:
                     else:
                         print(f"{message}", end="", flush=True)
 
-                        logfname = join(odname,"output.log")
+                        logfname = join(odname, "output.log")
                         try:
                             with open(logfname, "w", encoding="utf-8") as logfile:
                                 subprocess_run(cmdline, stdout=logfile, stderr=logfile, check=False)
@@ -244,7 +246,7 @@ def collect(a: ParsedArguments) -> None:
 
 def load(a: ParsedArguments) -> Tuple[DataFrame, Optional[Sysinfo]]:
     """Load the benchmark data into the Pandas DataFrame"""
-    # pylint: disable=broad-exception-caught
+    # pylint: disable=broad-except,broad-exception-caught
     log = []
     nmissing = 0
     systems = set()

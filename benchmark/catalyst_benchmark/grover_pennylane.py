@@ -164,7 +164,7 @@ def profile_jax_default_qubit(N=7, L=10):
         qcompile(p, params)
         return workflow(p, params)
 
-    with jax.profiler.trace("/tmp/jax-trace", create_perfetto_link=True):
+    with jax.profiler.trace("_jax-trace", create_perfetto_link=True):
         jax.make_jaxpr(_main)(p.trial_params(0))
 
 

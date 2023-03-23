@@ -131,6 +131,7 @@ class BenchmarkResult(BenchmarkResultV1):
 
 class BooleanOptionalAction(Action):
     """Backported from argparse for Python3.10"""
+
     # pylint: disable=too-many-arguments
 
     def __init__(
@@ -173,4 +174,5 @@ class BooleanOptionalAction(Action):
             setattr(namespace, self.dest, not option_string.startswith("--no-"))
 
     def format_usage(self):
+        """Format the usage string"""
         return " | ".join(self.option_strings)
