@@ -26,13 +26,11 @@ def catalyst_version() -> str:
     verstring = catalyst._version.__version__
     if "dev" in verstring:
         try:
-            commit = (
-                check_output(
-                    ["git", "rev-parse", "HEAD"], cwd=dirname(catalyst.__file__)
-                )
+            commit = (  # nosec: B607
+                check_output(["git", "rev-parse", "HEAD"], cwd=dirname(catalyst.__file__))
                 .decode()
                 .strip()[:7]
-            )  # nosec: B607
+            )
             verstring += f"+g{commit}"
         except Exception:
             verstring += "+g?"
