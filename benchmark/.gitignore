@@ -1,4 +1,4 @@
-_benchmark
-_img
+_*
+!__init__.py
 svg-inkscape
 datasets
