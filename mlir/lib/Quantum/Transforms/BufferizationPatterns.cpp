@@ -85,8 +85,7 @@ struct BufferizeStateOp : public OpConversionPattern<StateOp> {
         Type tensorType = op.getType(0);
         MemRefType resultType = getTypeConverter()->convertType(tensorType).cast<MemRefType>();
         Location loc = op.getLoc();
-        Value allocVal = rewriter.create<memref::AllocOp>(loc, resultType);
-        rewriter.replaceOpWithNewOp<bufferization::ToTensorOp>(op, allocVal);
+        Value allocVal = rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType);
         rewriter.create<StateOp>(loc, TypeRange{}, ValueRange{adaptor.getObs(), allocVal});
         return success();
     }
