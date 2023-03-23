@@ -190,6 +190,7 @@ def all_configurations(a: ParsedArguments) -> Iterable[tuple]:
                                 yield (cat, measure, problem, impl, nqubits, nlayers, diffmethod)
 
 
+# flake8: noqa
 def collect(a: ParsedArguments) -> None:  # noqa
     """Run the selected configurations and check for results. Avoid trying
     larger configurations if smaller configurations failed. In the end, print
