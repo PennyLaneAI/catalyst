@@ -44,19 +44,11 @@ default_compile_options:CompileOptions = CompileOptions(0, None)
 
 
 def run_writing_command(command:List[str],
-                        ofile:Optional[str],
                         compile_options:Optional[CompileOptions] = None) -> None:
     compile_options: CompileOptions = compile_options if compile_options else default_compile_options
-    runner = partial(subprocess.run, command, check=True)
-    if ofile is not None:
-        if compile_options.verbosity > 0:
-            print(f"[RUNNING] {' '.join(command)} > {ofile}", file=compile_options.get_logfile())
-        with open(ofile, "w", encoding="utf-8") as file:
-            runner(stdout=file)
-    else:
-        if compile_options.verbosity > 0:
-            print(f"[RUNNING] {' '.join(command)}", file=compile_options.get_logfile())
-        runner()
+    if compile_options.verbosity > 0:
+        print(f"[RUNNING] {' '.join(command)}", file=compile_options.get_logfile())
+    subprocess.run(command, check=True)
 
 
 default_bin_paths = {
@@ -237,7 +229,7 @@ class CompilerDriver:
 
     @staticmethod
     # pylint: disable=redefined-outer-name
-    def _attempt_link(compiler, flags, infile, outfile, compile_options):
+    def _attempt_link(compiler, flags, infile, outfile, compile_options=None):
         compile_options = compile_options if compile_options else default_compile_options
         try:
             command = [compiler] + flags + [infile, "-o", outfile]
@@ -288,14 +280,15 @@ def lower_mhlo_to_linalg(filename: str, compile_options: Optional[CompileOptions
     if filename[-5:] != ".mlir":
         raise ValueError(f"Input file ({filename}) for MHLO lowering is not an MLIR file")
 
+    new_fname = filename.replace(".mlir", ".nohlo.mlir")
+
     command = [mhlo_opt_tool]
     command += ["--allow-unregistered-dialect"]
     command += [filename]
     command += mhlo_lowering_pass_pipeline
+    command += ["-o", new_fname]
 
-    new_fname = filename.replace(".mlir", ".nohlo.mlir")
-
-    run_writing_command(command, new_fname, compile_options)
+    run_writing_command(command, compile_options)
 
     return new_fname
 
@@ -336,13 +329,14 @@ def bufferize_tensors(filename: str, compile_options: Optional[CompileOptions] =
     if filename[-5:] != ".mlir":
         raise ValueError(f"Input file ({filename}) for bufferization is not an MLIR file")
 
+    new_fname = filename.replace(".mlir", ".buff.mlir")
+
     command = [quantum_opt_tool]
     command += [filename]
     command += bufferization_pass_pipeline
+    command += ["-o", new_fname]
 
-    new_fname = filename.replace(".mlir", ".buff.mlir")
-
-    run_writing_command(command, new_fname, compile_options)
+    run_writing_command(command, compile_options)
 
     return new_fname
 
@@ -358,13 +352,14 @@ def lower_all_to_llvm(filename: str, compile_options:Optional[CompileOptions] = 
     if filename[-10:] != ".buff.mlir":
         raise ValueError(f"Input file ({filename}) for LLVM lowering is not a bufferized MLIR file")
 
+    new_fname = filename.replace(".buff.mlir", ".llvm.mlir")
+
     command = [quantum_opt_tool]
     command += [filename]
     command += llvm_lowering_pass_pipeline
+    command += ["-o", new_fname]
 
-    new_fname = filename.replace(".buff.mlir", ".llvm.mlir")
-
-    run_writing_command(command, new_fname, compile_options)
+    run_writing_command(command, compile_options)
 
     return new_fname
 
@@ -382,13 +377,14 @@ def convert_mlir_to_llvmir(filename: str, compile_options:Optional[CompileOption
             f"Input file ({filename}) for LLVMIR conversion is not an LLVM dialect MLIR file"
         )
 
+    new_fname = filename.replace(".llvm.mlir", ".ll")
+
     command = [translate_tool]
     command += [filename]
     command += ["--mlir-to-llvmir"]
+    command += ["-o", new_fname]
 
-    new_fname = filename.replace(".llvm.mlir", ".ll")
-
-    run_writing_command(command, new_fname, compile_options)
+    run_writing_command(command, compile_options)
 
     return new_fname
 
@@ -411,7 +407,7 @@ def compile_llvmir(filename: str, compile_options:Optional[CompileOptions] = Non
     command += [filename]
     command += ["-o", new_fname]
 
-    run_writing_command(command, None, compile_options)
+    run_writing_command(command, compile_options)
 
     return new_fname
 
