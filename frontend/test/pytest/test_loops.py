@@ -477,7 +477,7 @@ class TestInterpretationControlFlow:
             @while_loop(lambda i: i < n)
             def loop(i):
                 qml.RX(np.pi, wires=i)
-                return (i + 1,)
+                return i + 1
 
             loop(0)
             return qml.state()
@@ -512,8 +512,8 @@ class TestResultStructureInterpreted:
     - multiple arguments: return tuple preserving individual argument structure
     """
 
-    def test_no_args(self):
-        """Test result structure with no arguments."""
+    def test_for_loop_no_args(self):
+        """Test for loop result structure with no arguments."""
 
         def loop(_):
             pass
@@ -523,8 +523,8 @@ class TestResultStructureInterpreted:
         assert for_loop(0, 2, 1)(loop)() is None
 
     @pytest.mark.parametrize("x", [1, (), (1,), (1, 1)])
-    def test_one_arg(self, x):
-        """Test result structure with one argument."""
+    def test_for_loop_one_arg(self, x):
+        """Test for loop result structure with one argument."""
 
         def loop(_, x):
             return x
@@ -535,8 +535,8 @@ class TestResultStructureInterpreted:
 
     @pytest.mark.parametrize("x", [1, (), (1,), (1, 1)])
     @pytest.mark.parametrize("y", [1, (), (1,), (1, 1)])
-    def test_two_arg(self, x, y):
-        """Test result structure with two arguments."""
+    def test_for_loop_two_arg(self, x, y):
+        """Test for loop result structure with two arguments."""
 
         def loop(_, x, y):
             return x, y
@@ -544,6 +544,73 @@ class TestResultStructureInterpreted:
         assert for_loop(0, 0, 1)(loop)(x, y) == (x, y)
         assert for_loop(0, 1, 1)(loop)(x, y) == (x, y)
         assert for_loop(0, 2, 1)(loop)(x, y) == (x, y)
+
+    def test_while_loop_no_args(self):
+        """Test while loop result structure with no arguments."""
+
+        def loop():
+            pass
+
+        assert while_loop(lambda: False)(loop)() is None
+
+    def test_while_loop_one_scalar(self):
+        """Test while loop result structure with one scalar."""
+
+        def loop(x):
+            return x + 1
+
+        assert while_loop(lambda x: x < 1)(loop)(1) == 1
+        assert while_loop(lambda x: x < 2)(loop)(1) == 2
+        assert while_loop(lambda x: x < 3)(loop)(1) == 3
+
+    def test_while_loop_two_scalars(self):
+        """Test while loop result structure with two scalars."""
+
+        def loop(x, y):
+            return x, y + 1
+
+        assert while_loop(lambda _, y: y < 1)(loop)(1, 1) == (1, 1)
+        assert while_loop(lambda _, y: y < 2)(loop)(1, 1) == (1, 2)
+        assert while_loop(lambda _, y: y < 3)(loop)(1, 1) == (1, 3)
+
+    def test_while_loop_one_empty_tuple(self):
+        """Test while loop result structure with one empty tuple."""
+
+        def loop(x):
+            return x
+
+        assert while_loop(lambda _: False)(loop)(()) == ()
+
+    def test_while_loop_two_empty_tuples(self):
+        """Test while loop result structure with two empty tuples."""
+
+        def loop(x, y):
+            return x, y
+
+        assert while_loop(lambda *_: False)(loop)((), ()) == ((), ())
+
+    @pytest.mark.parametrize("x", [(1,), (1, 1)])
+    def test_while_loop_one_tuple(self, x):
+        """Test while loop result structure with one tuple."""
+
+        def loop(x):
+            return (x[0] + 1,) + x[1:]
+
+        assert while_loop(lambda x: x[0] < 1)(loop)(x) == (x[0] + 0,) + x[1:]
+        assert while_loop(lambda x: x[0] < 2)(loop)(x) == (x[0] + 1,) + x[1:]
+        assert while_loop(lambda x: x[0] < 3)(loop)(x) == (x[0] + 2,) + x[1:]
+
+    @pytest.mark.parametrize("x", [(1,), (1, 1)])
+    @pytest.mark.parametrize("y", [(1,), (1, 1)])
+    def test_while_loop_two_tuples(self, x, y):
+        """Test while loop result structure with two tuples."""
+
+        def loop(x, y):
+            return x, (y[0] + 1,) + y[1:]
+
+        assert while_loop(lambda _, y: y[0] < 1)(loop)(x, y) == (x, (y[0] + 0,) + y[1:])
+        assert while_loop(lambda _, y: y[0] < 2)(loop)(x, y) == (x, (y[0] + 1,) + y[1:])
+        assert while_loop(lambda _, y: y[0] < 3)(loop)(x, y) == (x, (y[0] + 2,) + y[1:])
 
 
 if __name__ == "__main__":

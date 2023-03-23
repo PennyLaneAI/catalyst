@@ -611,9 +611,13 @@ class WhileCallable:
         return self._call_with_classical_ctx(args)
 
     def _call_during_interpretation(self, *args):
+        fn_res = args if len(args) > 1 else args[0] if len(args) == 1 else None
+
         while self.cond_fn(*args):
-            args = self.body_fn(*args)
-        return args
+            fn_res = self.body_fn(*args)
+            args = fn_res if len(args) > 1 else (fn_res,) if len(args) == 1 else ()
+
+        return fn_res
 
     def __call__(self, *args):
         is_tracing = TracingContext.is_tracing()
