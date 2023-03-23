@@ -16,6 +16,8 @@
 Tracing module.
 """
 
+from catalyst.utils.exceptions import CompileError
+
 
 class TracingContext:
     """Utility class used for tracing.
@@ -43,7 +45,7 @@ class TracingContext:
     def check_is_tracing(msg):
         """Assert if the execution is currently not being traced.
 
-        Raises: RuntimeError
+        Raises: CompileError
         """
         if not TracingContext.is_tracing():
-            raise RuntimeError(msg)
+            raise CompileError(msg)

@@ -14,11 +14,20 @@
 
 import pytest
 
-from catalyst import qjit, grad, cond, for_loop
 import pennylane as qml
 import numpy as np
 from jax import numpy as jnp
 import jax
+
+from catalyst import qjit, grad, cond, for_loop, CompileError
+
+
+def test_grad_outside_qjit():
+    def f(x: float):
+        return x
+
+    with pytest.raises(CompileError, match="can only be used from within @qjit"):
+        grad(f)(1.0)
 
 
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
