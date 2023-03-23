@@ -37,6 +37,7 @@ from catalyst.jax_tape import JaxTape
 from catalyst.jax_tracer import trace_quantum_tape, insert_to_qreg, get_traceable_fn
 from catalyst.utils.patching import Patcher
 from catalyst.utils.tracing import TracingContext
+from catalyst.utils.exceptions import CompileError
 
 
 # pylint: disable=too-few-public-methods
@@ -59,7 +60,7 @@ class QFunc:
     def __call__(self, *args, **kwargs):
         if isinstance(self, qml.QNode):
             if self.device.short_name != "lightning.qubit":
-                raise TypeError(
+                raise CompileError(
                     "Only the lightning.qubit device is supported for compilation at the moment."
                 )
             device = QJITDevice(self.device.shots, self.device.wires)
@@ -160,6 +161,10 @@ class Grad:
         Args:
             args: the arguments to the differentiated function
         """
+        TracingContext.check_is_tracing(
+            "catalyst.grad can only be used from within @qjit decorated code."
+        )
+
         jaxpr = jax.make_jaxpr(self.fn)(*args)
         assert len(jaxpr.eqns) == 1, "Grad is not well defined"
         assert (
@@ -945,15 +950,19 @@ def measure(wires):
     >>> circuit(0.43)
     [array(-1.), array(True)]
     """
+    TracingContext.check_is_tracing(
+        "catalyst.measure can only be used from within @qjit decorated code."
+    )
+
+    ctx = qml.QueuingManager.active_context()
+    if ctx is None:
+        raise CompileError("catalyst.measure can only be used from within a qml.qnode.")
+
     measurement_id = str(uuid.uuid4())[:8]
     MidCircuitMeasure(measurement_id, wires=wires)
 
-    ctx = qml.QueuingManager.active_context()
-    if hasattr(ctx, "jax_tape"):
-        jax_tape = ctx.jax_tape
-        a, t = tree_flatten(jax.core.get_aval(True))
-        return jax_tape.create_tracer(t, a)
-    raise ValueError("measure can only be used when it jitted mode")
+    a, t = tree_flatten(jax.core.get_aval(True))
+    return ctx.jax_tape.create_tracer(t, a)
 
 
 class QJITDevice(qml.QubitDevice):
@@ -1045,7 +1054,7 @@ class QJITDevice(qml.QubitDevice):
         """
         # Ensure catalyst.measure is used instead of qml.measure.
         if any(isinstance(op, MidMeasureMP) for op in circuit.operations):
-            raise TypeError("Must use 'measure' from Catalyst instead of PennyLane.")
+            raise CompileError("Must use 'measure' from Catalyst instead of PennyLane.")
 
         # Fallback for controlled gates that won't decompose successfully.
         # Doing so before rather than after decomposition is generally a trade-off. For low
