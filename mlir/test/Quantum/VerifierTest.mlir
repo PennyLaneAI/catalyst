@@ -337,6 +337,18 @@ func.func @probs2(%q0 : !quantum.bit, %q1 : !quantum.bit) {
 
 // -----
 
+func.func @probs3(%q0 : !quantum.bit, %q1 : !quantum.bit) {
+    %obs = quantum.compbasis %q0, %q1 : !quantum.obs
+
+    %in_probs1 = memref.alloc() : memref<4xf64>
+    // expected-error@+1 {{cannot have probabilities and in-probabilities}}
+    quantum.probs %obs in(%in_probs1 : memref<4xf64>) : tensor<4xf64>
+
+    return
+}
+
+// -----
+
 func.func @state1(%q0 : !quantum.bit, %q1 : !quantum.bit) {
     %obs = quantum.compbasis %q0, %q1 : !quantum.obs
 
