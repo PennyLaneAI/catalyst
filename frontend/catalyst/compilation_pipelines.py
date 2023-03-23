@@ -602,7 +602,8 @@ class QJIT:
 def qjit(fn=None, *,
          target="binary",
          keep_intermediate=False,
-         compile_options:Optional[CompileOptions]=None):
+         verbosity=0,
+         logfile=None):
     """A just-in-time decorator for PennyLane and JAX programs using Catalyst.
 
     This decorator enables both just-in-time and ahead-of-time compilation,
@@ -621,6 +622,9 @@ def qjit(fn=None, *,
             compilation. If ``True``, intermediate representations are available via the
             :attr:`~.QJIT.mlir`, :attr:`~.QJIT.jaxpr`, and :attr:`~.QJIT.qir`, representing
             different stages in the optimization process.
+        verbosity (int): Verbosity level (0 - disabled, >0 - enabled)
+        logfile (Optional[TextIOWrapper]): File object to write verose messages to (default -
+            sys.stderr).
 
     Returns:
         QJIT object.
@@ -687,9 +691,9 @@ def qjit(fn=None, *,
     """
 
     if fn is not None:
-        return QJIT(fn, target, keep_intermediate, compile_options)
+        return QJIT(fn, target, keep_intermediate, CompileOptions(verbosity, logfile))
 
     def wrap_fn(fn):
-        return QJIT(fn, target, keep_intermediate, compile_options)
+        return QJIT(fn, target, keep_intermediate, CompileOptions(verbosity, logfile))
 
     return wrap_fn
