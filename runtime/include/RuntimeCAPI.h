@@ -49,11 +49,6 @@ void memref_copy_slow(MemRefT<T, R> *dst, MemRefT<T, R> *src, __attribute__((unu
     char *srcPtr = (char *)src->data_allocated + dst->offset * sizeof(T);
     char *dstPtr = (char *)dst->data_allocated + dst->offset * sizeof(T);
 
-    // Handle empty shapes -> nothing to copy.
-    for (size_t rankp = 0; rankp < R; ++rankp)
-        if (src->sizes[rankp] == 0)
-            return;
-
     size_t *indices = static_cast<size_t *>(alloca(sizeof(size_t) * R));
     size_t *srcStrides = static_cast<size_t *>(alloca(sizeof(size_t) * R));
     size_t *dstStrides = static_cast<size_t *>(alloca(sizeof(size_t) * R));
