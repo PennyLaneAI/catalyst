@@ -85,8 +85,8 @@ $ python3 benchmark.py run -p chemvqe -m runtime -i catalyst/lightning.qubit
 Extending
 ---------
 
-1. In order to add a new problem, one typically needs to provide its `Catalyst`
-   and `Pennylane` implementations as separate files. Each implementation should
+1. In order to add a new problem, one typically needs to provide its `Catalyst` and `Pennylane`
+   implementations as separate files in the `test_cases` subfolder. Each implementation should
    export the following global entities:
 
    * A subclass of the `Problem` class with the `trial_params` method:
@@ -132,7 +132,7 @@ Extending
 
    ```python
    import framework
-   from .my_problem import Problem, qcompile, workflow
+   from .test_cases.my_problem import Problem, qcompile, workflow
 
    p = Problem(qml.device(...), ...)
 
