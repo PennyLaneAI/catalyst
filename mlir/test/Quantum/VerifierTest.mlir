@@ -283,6 +283,32 @@ func.func @counts3(%q0 : !quantum.bit, %q1 : !quantum.bit) {
 
 // -----
 
+func.func @counts4(%q0 : !quantum.bit, %q1 : !quantum.bit) {
+    %obs = quantum.namedobs %q0[1] : !quantum.obs
+
+    %in_eigvals = memref.alloc() : memref<2xf64>
+    %in_counts = memref.alloc() : memref<2xi64>
+    // expected-error@+1 {{op cannot have eigvals and in-eigvals at the same time}}
+    %err:2 = quantum.counts %obs in(%in_eigvals : memref<2xf64>, %in_counts : memref<2xi64>) { shots=1000 } : tensor<2xf64>, tensor<2xi64>
+
+    return
+}
+
+// -----
+
+func.func @counts5(%q0 : !quantum.bit, %q1 : !quantum.bit) {
+    %obs = quantum.namedobs %q0[1] : !quantum.obs
+
+    %in_eigvals = memref.alloc() : memref<2xf64>
+    %in_counts = memref.alloc() : memref<2xi64>
+    // expected-error@+1 {{op cannot have eigvals and in-eigvals at the same time}}
+    quantum.counts %obs in(%in_eigvals : memref<2xf64>, %in_counts : memref<2xi64>) { shots=1000 } : tensor<2xf64>, tensor<2xi64>
+
+    return
+}
+
+// -----
+
 func.func @probs1(%q0 : !quantum.bit, %q1 : !quantum.bit) {
     %obs = quantum.compbasis %q0, %q1 : !quantum.obs
 
