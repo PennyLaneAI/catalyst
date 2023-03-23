@@ -18,11 +18,12 @@ from .types import BenchmarkResult
 
 def catalyst_version() -> str:
     """Determine the catalyst version"""
+    # pylint: disable=broad-except,broad-exception-caught,protected-access
     import catalyst._version
     from subprocess import check_output
     from os.path import dirname
 
-    verstring = catalyst._version.__version__  # pylint: disable=protected-access
+    verstring = catalyst._version.__version__
     if "dev" in verstring:
         try:
             commit = (
@@ -31,7 +32,7 @@ def catalyst_version() -> str:
                 .strip()[:7]
             )
             verstring += f"+g{commit}"
-        except Exception:  # pylint: disable=broad-excep,broad-exception-caught
+        except Exception:
             verstring += "+g?"
     return verstring
 
