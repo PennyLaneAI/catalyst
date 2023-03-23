@@ -4,7 +4,6 @@
 from typing import Any
 from copy import deepcopy
 from dataclasses import dataclass
-from tempfile import mkdtemp
 
 import pennylane as qml
 import pennylane.numpy as pnp
