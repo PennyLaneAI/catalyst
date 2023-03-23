@@ -119,20 +119,15 @@ struct BufferizeCountsOp : public OpConversionPattern<CountsOp> {
         MemRefType resultType1 = getTypeConverter()->convertType(tensorType1).cast<MemRefType>();
         Value allocVal0 = rewriter.create<memref::AllocOp>(loc, resultType0);
         Value allocVal1 = rewriter.create<memref::AllocOp>(loc, resultType1);
-        Value tensorVal0 = rewriter.create<bufferization::ToTensorOp>(loc, tensorType0, allocVal0);
-        Value tensorVal1 = rewriter.create<bufferization::ToTensorOp>(loc, tensorType1, allocVal1);
-        op.replaceAllUsesWith(ValueRange{tensorVal0, tensorVal1});
+        rewriter.replaceOp(op, ValueRange{allocVal0, allocVal1});
         auto countsOp = rewriter.create<CountsOp>(
             loc, TypeRange{}, ValueRange{adaptor.getObs(), allocVal0, allocVal1}, op->getAttrs());
-
         static const char *const resultSegmentAttrName = "result_segment_sizes";
         auto resultSegmentAttrVal = rewriter.getDenseI32ArrayAttr({0, 0});
         countsOp->setAttr(resultSegmentAttrName, resultSegmentAttrVal);
         static const char *const operandSegmentAttrName = "operand_segment_sizes";
         auto operandSegmentAttrVal = rewriter.getDenseI32ArrayAttr({1, 1, 1});
         countsOp->setAttr(operandSegmentAttrName, operandSegmentAttrVal);
-        rewriter.eraseOp(op);
-
         return success();
     }
 };
