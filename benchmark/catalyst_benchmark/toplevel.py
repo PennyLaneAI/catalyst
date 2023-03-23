@@ -194,7 +194,7 @@ def collect(a: ParsedArguments) -> None:
     """Run the selected configurations and check for results. Avoid trying
     larger configurations if smaller configurations failed. In the end, print
     the `known_failures` dictionary suggestion."""
-    # pylint: disable=too-many-nested-blocks
+    # pylint: disable=too-many-nested-blocks,too-many-branches,broad-except
     known_failures = deepcopy(KNOWN_FAILURES)
     try:
         for config in all_configurations(a):
