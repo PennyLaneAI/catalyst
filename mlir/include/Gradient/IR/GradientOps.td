@@ -72,8 +72,8 @@ def AdjointOp : Gradient_Op<"adjoint", [AttrSizedOperandSegments]> {
 
     let arguments = (ins
         FlatSymbolRefAttr:$callee,
+        Index:$gradSize,
         Variadic<AnyType>:$args,
-        Optional<Index>:$gradSize,
         Variadic<AnyMemRef>:$data_in
     );
 
@@ -85,7 +85,10 @@ def AdjointOp : Gradient_Op<"adjoint", [AttrSizedOperandSegments]> {
     );
 
     let assemblyFormat = [{
-        $callee `(` $args `)` ( `size` `(` $gradSize^ `)` )? ( `in` `(` $data_in^ `:` type($data_in) `)` )? attr-dict `:` functional-type($args, results)
+        $callee `(` $args `)`
+        `size` `(` $gradSize `)`
+        ( `in` `(` $data_in^ `:` type($data_in) `)` )?
+        attr-dict `:` functional-type($args, results)
     }];
 }
 

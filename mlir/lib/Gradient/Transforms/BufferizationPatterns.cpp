@@ -50,8 +50,8 @@ class BufferizeAdjointOp : public OpConversionPattern<AdjointOp> {
         }
 
         op.replaceAllUsesWith(tensorValues);
-        rewriter.create<AdjointOp>(loc, TypeRange{}, op.getCalleeAttr(), adaptor.getArgs(),
-                                   adaptor.getGradSize(), memrefValues);
+        rewriter.create<AdjointOp>(loc, TypeRange{}, op.getCalleeAttr(), adaptor.getGradSize(),
+                                   adaptor.getArgs(), memrefValues);
         rewriter.eraseOp(op);
         return success();
     }
