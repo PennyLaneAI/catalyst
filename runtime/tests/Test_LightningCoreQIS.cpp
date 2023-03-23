@@ -30,6 +30,14 @@ MemRefT_CplxT_double_1d getState(size_t buffer_len)
     return result;
 }
 
+MemRefT_CplxT_double_1d getStridedState(size_t buffer_len, size_t stride)
+{
+    size_t strided_buffer_len = stride * buffer_len;
+    CplxT_double *buffer = new CplxT_double[strided_buffer_len];
+    MemRefT_CplxT_double_1d result = {buffer, buffer, 0, {strided_buffer_len}, {stride}};
+    return result;
+}
+
 void freeState(MemRefT_CplxT_double_1d &result) { delete[] result.data_allocated; }
 
 PairT_MemRefT_double_int64_1d getCounts(size_t buffer_len)
@@ -231,6 +239,30 @@ TEST_CASE("Test __quantum__qis__ PauliY and Rot", "[qir_lightning_core]")
     __quantum__rt__finalize();
 }
 
+TEST_CASE("Test __quantum__qis__ PauliY and Rot with strided array", "[qir_lightning_core]")
+{
+    // initialize the simulator
+    __quantum__rt__initialize();
+
+    QUBIT *wire0 = __quantum__rt__qubit_allocate();
+
+    __quantum__rt__qubit_allocate();
+
+    __quantum__qis__PauliY(wire0);
+    __quantum__qis__Rot(0.4, 0.6, -0.2, wire0);
+
+    MemRefT_CplxT_double_1d result = getStridedState(4, 2);
+    __quantum__qis__State(&result, 0);
+    CplxT_double *state = result.data_allocated;
+
+    CHECK((state[0].real == Approx(0.0873321925).margin(1e-5) &&
+           state[0].imag == Approx(-0.2823212367).margin(1e-5)));
+    CHECK((state[4].real == Approx(-0.0953745058).margin(1e-5) &&
+           state[4].imag == Approx(0.9505637859).margin(1e-5)));
+
+    freeState(result);
+    __quantum__rt__finalize();
+}
 TEST_CASE("Test __quantum__qis__Measure", "[qir_lightning_core]")
 {
     // initialize the simulator
