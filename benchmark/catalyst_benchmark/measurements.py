@@ -29,10 +29,10 @@ def catalyst_version() -> str:
             commit = (
                 check_output(
                     ["git", "rev-parse", "HEAD"], cwd=dirname(catalyst.__file__)
-                )  # nosec: B607
+                )
                 .decode()
                 .strip()[:7]
-            )
+            )  # nosec: B607
             verstring += f"+g{commit}"
         except Exception:
             verstring += "+g?"
