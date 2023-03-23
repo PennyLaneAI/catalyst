@@ -1,6 +1,7 @@
 PYTHON := python3
 C_COMPILER?=clang
 CXX_COMPILER?=clang++
+COMPILER_LAUNCHER?=ccache
 MK_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 MK_DIR := $(dir $(MK_ABSPATH))
 RT_BUILD_DIR?=$(MK_DIR)/build
@@ -48,9 +49,12 @@ configure:
 		-DENABLE_LIGHTNING_KOKKOS=$(ENABLE_KOKKOS) \
 		-DCMAKE_C_COMPILER=$(C_COMPILER) \
 		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \
+		-DCMAKE_C_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
+		-DCMAKE_CXX_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
 		-DQIR_STDLIB_LIB=$(QIR_STDLIB_DIR) \
 		-DQIR_STDLIB_INCLUDES=$(QIR_STDLIB_INCLUDES_DIR) \
 		-DENABLE_CODE_COVERAGE=$(CODE_COVERAGE)
+
 
 $(QIR_STDLIB_DIR)/libqir_stdlib.a $(QIR_STDLIB_INCLUDES_DIR)/qir_stdlib.h:
 	$(MAKE) -C qir-stdlib all
@@ -64,7 +68,7 @@ qir: $(QIR_STDLIB_DIR)/libqir_stdlib.a $(QIR_STDLIB_INCLUDES_DIR)/qir_stdlib.h
 .PHONY: runtime
 runtime: qir $(RT_BUILD_DIR)/lib/backend/librt_backend.so $(RT_BUILD_DIR)/lib/librt_capi.so
 
-$(RT_BUILD_DIR)/tests/runner_tests: configure
+$(RT_BUILD_DIR)/tests/runner_tests: runtime
 	cmake --build $(RT_BUILD_DIR) --target runner_tests -j$(if $(nprocs:-=),$(nprocs),$$(nproc))
 
 .PHONY: test

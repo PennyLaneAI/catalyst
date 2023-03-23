@@ -265,6 +265,7 @@ jobs:
         key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-build
         fail-on-cache-miss: True
 
+    # TODO: it doesn't have any use case here! Remove it?
     - name: Cache CCache
       id: cache-ccache
       uses: actions/cache@v3
