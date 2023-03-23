@@ -11,7 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" Measurement cycle management and data post-processing routines """
+""" This file defines certain high-level routines, such as the data collection cycle, data loading
+and the plotting. Measurement ranges and scales are all defined here as global dictionaries. """
 import sys
 from os import makedirs
 from os.path import isfile, dirname, join
