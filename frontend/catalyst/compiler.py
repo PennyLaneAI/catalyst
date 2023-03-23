@@ -33,19 +33,24 @@ package_root = os.path.dirname(__file__)
 
 @dataclass
 class CompileOptions:
-    """ Common compile options """
+    """Common compile options"""
+
     verbosity: int
-    logfile: Optional[TextIOWrapper] = None # stdout/stderr or a file
+    logfile: Optional[TextIOWrapper] = None  # stdout/stderr or a file
 
     def get_logfile(self) -> TextIOWrapper:
         return self.logfile if self.logfile else sys.stderr
 
-default_compile_options:CompileOptions = CompileOptions(0, None)
+
+default_compile_options: CompileOptions = CompileOptions(0, None)
 
 
-def run_writing_command(command:List[str],
-                        compile_options:Optional[CompileOptions] = None) -> None:
-    compile_options: CompileOptions = compile_options if compile_options else default_compile_options
+def run_writing_command(
+    command: List[str], compile_options: Optional[CompileOptions] = None
+) -> None:
+    compile_options: CompileOptions = (
+        compile_options if compile_options else default_compile_options
+    )
     if compile_options.verbosity > 0:
         print(f"[RUNNING] {' '.join(command)}", file=compile_options.get_logfile())
     subprocess.run(command, check=True)
@@ -238,8 +243,10 @@ class CompilerDriver:
             subprocess.run(command, check=True)
             return True
         except subprocess.CalledProcessError:
-            msg = (f"Compiler {compiler} failed during execution of command {command}. "
-                  "Will attempt fallback on available compilers.")
+            msg = (
+                f"Compiler {compiler} failed during execution of command {command}. "
+                "Will attempt fallback on available compilers."
+            )
             warnings.warn(msg, UserWarning)
             return False
 
@@ -262,7 +269,9 @@ class CompilerDriver:
             fallback_compilers = CompilerDriver._default_fallback_compilers
         # pylint: disable=redefined-outer-name
         for compiler in CompilerDriver._available_compilers(fallback_compilers):
-            success = CompilerDriver._attempt_link(compiler, flags, infile, outfile, compile_options)
+            success = CompilerDriver._attempt_link(
+                compiler, flags, infile, outfile, compile_options
+            )
             if success:
                 return
         msg = f"Unable to link {infile}. All available compiler options exhausted. Please provide a compatible compiler via $CATALYST_CC."
@@ -341,7 +350,7 @@ def bufferize_tensors(filename: str, compile_options: Optional[CompileOptions] =
     return new_fname
 
 
-def lower_all_to_llvm(filename: str, compile_options:Optional[CompileOptions] = None) -> str:
+def lower_all_to_llvm(filename: str, compile_options: Optional[CompileOptions] = None) -> str:
     """Translate MLIR dialects to LLVM dialect.
 
     Args:
@@ -364,7 +373,7 @@ def lower_all_to_llvm(filename: str, compile_options:Optional[CompileOptions] = 
     return new_fname
 
 
-def convert_mlir_to_llvmir(filename: str, compile_options:Optional[CompileOptions] = None) -> str:
+def convert_mlir_to_llvmir(filename: str, compile_options: Optional[CompileOptions] = None) -> str:
     """Translate LLVM dialect to LLVM IR.
 
     Args:
@@ -389,7 +398,7 @@ def convert_mlir_to_llvmir(filename: str, compile_options:Optional[CompileOption
     return new_fname
 
 
-def compile_llvmir(filename: str, compile_options:Optional[CompileOptions] = None) -> str:
+def compile_llvmir(filename: str, compile_options: Optional[CompileOptions] = None) -> str:
     """Translate LLVM IR to an object file.
 
     Args:
@@ -412,7 +421,7 @@ def compile_llvmir(filename: str, compile_options:Optional[CompileOptions] = Non
     return new_fname
 
 
-def link_lightning_runtime(filename: str, compile_options:Optional[CompileOptions] = None) -> str:
+def link_lightning_runtime(filename: str, compile_options: Optional[CompileOptions] = None) -> str:
     """Link the object file as a shared object.
 
     Args:
@@ -430,7 +439,7 @@ def link_lightning_runtime(filename: str, compile_options:Optional[CompileOption
     return new_fname
 
 
-def compile(mlir_module, workspace, passes, compile_options:Optional[CompileOptions] = None):
+def compile(mlir_module, workspace, passes, compile_options: Optional[CompileOptions] = None):
     """Compile an MLIR module to a shared object.
 
     .. note::
