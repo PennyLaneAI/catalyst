@@ -69,7 +69,7 @@ void memref_copy_slow(MemRefT<T, R> *dst, MemRefT<T, R> *src, __attribute__((unu
 
     long writeIndex = 0;
     long readIndex = 0;
-    size_t totalWritten = 0;
+    __attribute__((unused)) size_t totalWritten = 0;
     for (;;) {
         memcpy(dstPtr + writeIndex, srcPtr + readIndex, sizeof(T));
         totalWritten += sizeof(T);
