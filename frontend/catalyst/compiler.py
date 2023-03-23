@@ -15,7 +15,6 @@
 MLIR/LLVM representations.
 """
 
-import io
 import os
 import sys
 import shutil
@@ -24,7 +23,6 @@ import warnings
 from io import TextIOWrapper
 from typing import Optional, List
 from dataclasses import dataclass
-from functools import partial
 
 from catalyst._configuration import INSTALLED
 
@@ -39,6 +37,7 @@ class CompileOptions:
     logfile: Optional[TextIOWrapper] = None  # stdout/stderr or a file
 
     def get_logfile(self) -> TextIOWrapper:
+        """Get the effective file object, as configured"""
         return self.logfile if self.logfile else sys.stderr
 
 
@@ -48,6 +47,7 @@ default_compile_options: CompileOptions = CompileOptions(0, None)
 def run_writing_command(
     command: List[str], compile_options: Optional[CompileOptions] = None
 ) -> None:
+    """Run the command after optionally announcing this fact to the user"""
     compile_options: CompileOptions = (
         compile_options if compile_options else default_compile_options
     )
