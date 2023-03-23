@@ -374,3 +374,15 @@ func.func @state2(%q0 : !quantum.bit, %q1 : !quantum.bit) {
 
     return
 }
+
+// -----
+
+func.func @state3(%q0 : !quantum.bit, %q1 : !quantum.bit) {
+    %obs = quantum.compbasis %q0, %q1 : !quantum.obs
+
+    %alloc1 = memref.alloc() : memref<4xcomplex<f64>>
+    // expected-error@+1 {{cannot have state-out and state-in}}
+    quantum.state %obs in(%alloc1 : memref<4xcomplex<f64>>) : tensor<4xcomplex<f64>>
+
+    return
+}
