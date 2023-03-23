@@ -226,6 +226,20 @@ func.func @sample4(%q : !quantum.bit) {
 
 // -----
 
+func.func @sample5(%q : !quantum.bit) {
+    %obs = quantum.compbasis %q : !quantum.obs
+
+    %alloc = memref.alloc() : memref<1000xf64>
+    // expected-error@+1 {{either a tensor must be returned or a memref must be an input}}
+    quantum.sample %obs in (%alloc : memref<1000xf64>) { shots=1000 } : tensor<1000xf64>
+
+    %samples = quantum.sample %obs { shots=1000 } : tensor<1000x1xf64>
+
+    return
+}
+
+// -----
+
 func.func @counts1(%q0 : !quantum.bit, %q1 : !quantum.bit) {
     %obs = quantum.namedobs %q0[1] : !quantum.obs
 

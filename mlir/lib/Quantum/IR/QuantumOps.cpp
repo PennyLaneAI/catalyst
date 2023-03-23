@@ -159,7 +159,7 @@ LogicalResult SampleOp::verify()
 
     Type toVerify = getSamples() ? getSamples().getType() : getInData().getType();
     if (!((bool)getSamples() ^ (bool)getInData())) {
-        return emitOpError("either a tensor must be returned or a memref must"
+        return emitOpError("either a tensor must be returned or a memref must "
                            "be an input");
     }
 
