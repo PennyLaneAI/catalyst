@@ -159,8 +159,7 @@ LogicalResult SampleOp::verify()
 
     Type toVerify = getSamples() ? getSamples().getType() : getInData().getType();
     if (!((bool)getSamples() ^ (bool)getInData())) {
-        return emitOpError("either a tensor must be returned or a memref must "
-                           "be an input");
+        return emitOpError("either tensors must be returned or memrefs must be used as inputs");
     }
 
     if (getObs().getDefiningOp<ComputationalBasisOp>() &&
@@ -198,12 +197,11 @@ LogicalResult CountsOp::verify()
         return emitOpError("cannot determine the number of eigenvalues for general observable");
     }
 
-    if (!(bool)getEigvals() ^ (bool)getInEigvals()) {
-        return emitOpError("cannot have eigvals and in-eigvals at the same time");
-    }
-
-    if (!(bool)getCounts() ^ (bool)getInCounts()) {
-        return emitOpError("cannot have counts and in-counts at the same time");
+    bool xor_eigvals = (bool)getEigvals() ^ (bool)getInEigvals();
+    bool xor_counts = (bool)getCounts() ^ (bool)getInCounts();
+    bool is_valid = xor_eigvals && xor_counts;
+    if (!is_valid) {
+        return emitOpError("either tensors must be returned or memrefs must be used as inputs");
     }
 
     Type eigvalsToVerify =
@@ -230,7 +228,7 @@ LogicalResult ProbsOp::verify()
     }
 
     if (!(bool)getProbabilities() ^ (bool)getStateIn()) {
-        return emitOpError("cannot have probabilities and in-probabilities at the same time");
+        return emitOpError("either tensors must be returned or memrefs must be used as inputs");
     }
 
     Type toVerify =
@@ -255,7 +253,7 @@ LogicalResult StateOp::verify()
     }
 
     if (!(bool)getState() ^ (bool)getStateIn()) {
-        return emitOpError("cannot have state-out and state-in at the same time");
+        return emitOpError("either tensors must be returned or memrefs must be used as inputs");
     }
 
     Type toVerify = getState() ? (Type)getState().getType() : (Type)getStateIn().getType();

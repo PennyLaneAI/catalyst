@@ -230,7 +230,7 @@ func.func @sample5(%q : !quantum.bit) {
     %obs = quantum.compbasis %q : !quantum.obs
 
     %alloc = memref.alloc() : memref<1000xf64>
-    // expected-error@+1 {{either a tensor must be returned or a memref must be an input}}
+    // expected-error@+1 {{either tensors must be returned or memrefs must be used as inputs}}
     quantum.sample %obs in (%alloc : memref<1000xf64>) { shots=1000 } : tensor<1000xf64>
 
     %samples = quantum.sample %obs { shots=1000 } : tensor<1000x1xf64>
@@ -288,7 +288,7 @@ func.func @counts4(%q0 : !quantum.bit, %q1 : !quantum.bit) {
 
     %in_eigvals = memref.alloc() : memref<2xf64>
     %in_counts = memref.alloc() : memref<2xi64>
-    // expected-error@+1 {{op cannot have eigvals and in-eigvals at the same time}}
+    // expected-error@+1 {{either tensors must be returned or memrefs must be used as inputs}}
     %err:2 = quantum.counts %obs in(%in_eigvals : memref<2xf64>, %in_counts : memref<2xi64>) { shots=1000 } : tensor<2xf64>, tensor<2xi64>
 
     return
@@ -301,7 +301,7 @@ func.func @counts5(%q0 : !quantum.bit, %q1 : !quantum.bit) {
 
     %in_eigvals = memref.alloc() : memref<2xf64>
     %in_counts = memref.alloc() : memref<2xi64>
-    // expected-error@+1 {{op cannot have eigvals and in-eigvals at the same time}}
+    // expected-error@+1 {{either tensors must be returned or memrefs must be used as inputs}}
     quantum.counts %obs in(%in_eigvals : memref<2xf64>, %in_counts : memref<2xi64>) { shots=1000 } : tensor<2xf64>, tensor<2xi64>
 
     return
@@ -341,7 +341,7 @@ func.func @probs3(%q0 : !quantum.bit, %q1 : !quantum.bit) {
     %obs = quantum.compbasis %q0, %q1 : !quantum.obs
 
     %in_probs1 = memref.alloc() : memref<4xf64>
-    // expected-error@+1 {{cannot have probabilities and in-probabilities}}
+    // expected-error@+1 {{either tensors must be returned or memrefs must be used as inputs}}
     quantum.probs %obs in(%in_probs1 : memref<4xf64>) : tensor<4xf64>
 
     return
@@ -381,7 +381,7 @@ func.func @state3(%q0 : !quantum.bit, %q1 : !quantum.bit) {
     %obs = quantum.compbasis %q0, %q1 : !quantum.obs
 
     %alloc1 = memref.alloc() : memref<4xcomplex<f64>>
-    // expected-error@+1 {{cannot have state-out and state-in}}
+    // expected-error@+1 {{either tensors must be returned or memrefs must be used as inputs}}
     quantum.state %obs in(%alloc1 : memref<4xcomplex<f64>>) : tensor<4xcomplex<f64>>
 
     return
