@@ -464,6 +464,10 @@ def SampleOp : Measurement_Op<"sample"> {
         if (getResultTypes().empty()) return std::nullopt;
         return getResultTypes()[0];
       }
+
+      bool isBufferized() {
+        return !getResultType();
+      }
     }];
 
     let hasVerifier = 1;
@@ -522,6 +526,10 @@ def CountsOp : Measurement_Op<"counts", [AttrSizedOperandSegments, AttrSizedResu
       llvm::Optional<mlir::Type> getResultType() {
         if (getResultTypes().empty()) return std::nullopt;
         return getResultTypes()[0];
+      }
+
+      bool isBufferized() {
+        return !getResultType();
       }
     }];
 
@@ -642,6 +650,10 @@ def ProbsOp : Measurement_Op<"probs"> {
         if (getResultTypes().empty()) return std::nullopt;
         return getResultTypes()[0];
       }
+
+      bool isBufferized() {
+        return !getResultType();
+      }
     }];
 
     let hasVerifier = 1;
@@ -682,6 +694,10 @@ def StateOp : Measurement_Op<"state"> {
       llvm::Optional<mlir::Type> getResultType() {
         if (getResultTypes().empty()) return std::nullopt;
         return getResultTypes()[0];
+      }
+
+      bool isBufferized() {
+        return !getResultType();
       }
     }];
 

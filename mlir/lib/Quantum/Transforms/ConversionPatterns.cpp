@@ -512,7 +512,8 @@ struct SampleOpPattern : public SampleBasedPattern<SampleOp> {
         MLIRContext *ctx = getContext();
         TypeConverter *conv = getTypeConverter();
 
-        assert(!op.getSamples() && "sample must be unset.");
+        if (!op.isBufferized())
+            return op.emitOpError("op must be bufferized before lowering to LLVM");
 
         Type matrixType =
             conv->convertType(MemRefType::get({UNKNOWN, UNKNOWN}, Float64Type::get(ctx)));
@@ -534,8 +535,8 @@ struct CountsOpPattern : public SampleBasedPattern<CountsOp> {
         MLIRContext *ctx = getContext();
         TypeConverter *conv = getTypeConverter();
 
-        assert(!op.getEigvals() && "eigvals must be unset.");
-        assert(!op.getCounts() && "counts must be unset.");
+        if (!op.isBufferized())
+            return op.emitOpError("op must be bufferized before lowering to LLVM");
 
         Type vector1Type = conv->convertType(MemRefType::get({UNKNOWN}, Float64Type::get(ctx)));
         Type vector2Type = conv->convertType(MemRefType::get({UNKNOWN}, IntegerType::get(ctx, 64)));
@@ -588,7 +589,8 @@ template <typename T> struct StateBasedPattern : public OpConversionPattern<T> {
         MLIRContext *ctx = this->getContext();
         TypeConverter *conv = this->getTypeConverter();
 
-        assert(!op.getResults().size() && "state-out/prob-out must be unset");
+        if (!op.isBufferized())
+            return op.emitOpError("op must be bufferized before lowering to LLVM");
 
         Type vectorType;
         StringRef qirName;
