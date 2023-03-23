@@ -9,7 +9,7 @@ import pennylane.numpy as pnp
 import pennylane as qml
 import numpy as np
 from pennylane import AllSinglesDoubles
-from .types import Problem
+from catalyst_benchmark.types import Problem
 
 
 @dataclass

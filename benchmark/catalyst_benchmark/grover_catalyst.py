@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import pennylane as qml
 import jax.numpy as jnp
 from catalyst import qjit, for_loop, while_loop
-from .types import Problem
+from catalyst_benchmark.types import Problem
 
 
 def clause_nqubits(clause_list) -> int:

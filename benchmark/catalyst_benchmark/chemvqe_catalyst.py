@@ -12,7 +12,7 @@ from jax.core import ShapedArray
 
 import catalyst
 from catalyst import qjit
-from .types import Problem
+from catalyst_benchmark.types import Problem
 
 DMALIASES = {"finite-diff": "fd", "parameter-shift": "ps", "adjoint": "adj"}
 

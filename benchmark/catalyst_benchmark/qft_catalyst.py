@@ -5,7 +5,7 @@ import pennylane as qml
 import jax.numpy as jnp
 from jax.core import ShapedArray
 from catalyst import qjit, for_loop
-from .types import Problem
+from catalyst_benchmark.types import Problem
 
 
 @dataclass

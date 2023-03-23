@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 import pennylane as qml
 import pennylane.numpy as pnp
-from .types import Problem
+from catalyst_benchmark.types import Problem
 
 
 @dataclass
