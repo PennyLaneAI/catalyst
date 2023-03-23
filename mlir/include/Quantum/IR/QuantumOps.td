@@ -513,7 +513,9 @@ def CountsOp : Measurement_Op<"counts", [AttrSizedOperandSegments, AttrSizedResu
     );
 
     let assemblyFormat = [{
-        $obs ( `in` `(` $in_eigvals^ $in_counts `:` type($in_eigvals) type($in_counts) `)` )? attr-dict ( `:` type($eigvals)^ `,` type($counts) )?
+        $obs
+        ( `in` `(` $in_eigvals^ `:` type($in_eigvals) `,` $in_counts `:` type($in_counts) `)` )?
+        attr-dict ( `:` type($eigvals)^ `,` type($counts) )?
     }];
 
     let extraClassDeclaration = [{
