@@ -63,7 +63,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          sudo apt-get -y -q install ninja-build make cmake clang libomp-dev
+          sudo apt-get -y -q install ninja-build make cmake ccache clang libomp-dev
           echo "LIGHTNING_GIT_TAG_VALUE=latest_release" >> $GITHUB_ENV
       - if: ${{ github.event_name == 'push' }}
         run: |
@@ -415,7 +415,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          sudo apt-get -y -q install cmake ninja-build gcc-10 g++-10 libomp-dev lcov
+          sudo apt-get -y -q install cmake ninja-build ccache libomp-dev lcov
           echo "LIGHTNING_TAG_VALUE=latest_release" >> $GITHUB_ENV
           # TODO: Update this after the latest_release tag is added to Lightning-Kokkos
           echo "LIGHTNING_KOKKOS_TAG_VALUE=v0.29.1" >> $GITHUB_ENV
