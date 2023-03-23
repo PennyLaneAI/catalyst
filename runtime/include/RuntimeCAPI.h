@@ -46,8 +46,6 @@ void memref_copy_fast(MemRefT<T, R> *dst, MemRefT<T, R> *src, size_t bytes)
 template <typename T, size_t R>
 void memref_copy_slow(MemRefT<T, R> *dst, MemRefT<T, R> *src, __attribute__((unused)) size_t bytes)
 {
-    // Unlikely, but might encounter issues in the loop.
-    static_assert(R != SIZE_MAX);
     char *srcPtr = (char *)src->data_allocated + dst->offset * sizeof(T);
     char *dstPtr = (char *)dst->data_allocated + dst->offset * sizeof(T);
 
@@ -184,7 +182,7 @@ double __quantum__qis__Expval(ObsIdType);
 double __quantum__qis__Variance(ObsIdType);
 void __quantum__qis__Probs(MemRefT_double_1d *, int64_t numQubits,
                            /*qubits*/...);
-void __quantum__qis__Sample(MemRefT_double_2d *, size_t shots, size_t numQubits,
+void __quantum__qis__Sample(MemRefT_double_2d *, int64_t shots, int64_t numQubits,
                             /*qubits*/...);
 void __quantum__qis__Counts(PairT_MemRefT_double_int64_1d *, int64_t shots, int64_t numQubits,
                             /*qubits*/...);

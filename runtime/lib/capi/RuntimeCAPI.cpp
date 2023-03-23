@@ -683,17 +683,16 @@ void __quantum__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, .
                                          numElements * sizeof(std::complex<double>));
 }
 
-void __quantum__qis__Sample(MemRefT_double_2d *result, size_t shots, size_t numQubits, ...)
+void __quantum__qis__Sample(MemRefT_double_2d *result, int64_t shots, int64_t numQubits, ...)
 {
-    // Very unlikely, but if this were the case, then we would encounter an infinite
-    // loop ahead.
-    assert(numQubits != SIZE_MAX);
+    assert(shots >= 0);
+    assert(numQubits >= 0);
     MemRefT<double, 2> *result_p = (MemRefT<double, 2> *)result;
 
     va_list args;
     va_start(args, numQubits);
     std::vector<QubitIdType> wires(numQubits);
-    for (size_t i = 0; i < numQubits; i++) {
+    for (int64_t i = 0; i < numQubits; i++) {
         wires[i] = va_arg(args, QubitIdType);
     }
     va_end(args);
@@ -712,7 +711,9 @@ void __quantum__qis__Sample(MemRefT_double_2d *result, size_t shots, size_t numQ
 
     const size_t numElements = sv_samples.size();
     double *buffer = sv_samples.data();
-    MemRefT<double, 2> src = {buffer, buffer, 0, {shots, numQubits}, {numQubits, 1}};
+    size_t _shots = static_cast<size_t>(shots);
+    size_t _numQubits = static_cast<size_t>(numQubits);
+    MemRefT<double, 2> src = {buffer, buffer, 0, {_shots, _numQubits}, {_numQubits, 1}};
     memref_copy<double, 2>(result_p, &src, numElements * sizeof(double));
 }
 
