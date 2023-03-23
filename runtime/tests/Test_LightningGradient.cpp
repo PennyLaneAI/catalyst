@@ -131,10 +131,6 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
 
     auto obs = __quantum__qis__NamedObs(ObsId::PauliZ, q);
 
-#if defined(_KOKKOS)
-    REQUIRE_THROWS_WITH(__quantum__qis__Variance(obs),
-                        Catch::Contains("Variance not implemented in PennyLane-Lightning-Kokkos"));
-#else
     __quantum__qis__Variance(obs);
 
     REQUIRE_THROWS_WITH(__quantum__qis__Gradient(1, results),
@@ -142,7 +138,6 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
 
     REQUIRE_THROWS_WITH(__quantum__qis__Gradient_params(tp, 1, results),
                         Catch::Contains("Unsupported measurements to compute gradient"));
-#endif
 
     __quantum__rt__toggle_recorder(/* activate_cm */ false);
 

@@ -410,7 +410,7 @@ TEST_CASE("Expval(Hamiltonian({TensorProd, Hermitian}[])) test", "[lightning]")
     CHECK(sim->Expval(hhtp) == Approx(1.2).margin(1e-5));
 }
 
-TEST_CASE("Var test with numWires=4", "[lightning]")
+TEST_CASE("Var(NamedObs) test with numWires=4", "[lightning]")
 {
     std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
 
@@ -431,15 +431,283 @@ TEST_CASE("Var test with numWires=4", "[lightning]")
     ObsIdType py = sim->Observable(ObsId::PauliY, {}, {Qs[0]});
     ObsIdType pz = sim->Observable(ObsId::PauliZ, {}, {Qs[3]});
 
-#if !defined(_KOKKOS)
     CHECK(sim->Var(px) == Approx(.0).margin(1e-5));
     CHECK(sim->Var(py) == Approx(1.0).margin(1e-5));
     CHECK(sim->Var(pz) == Approx(.0).margin(1e-5));
-#else
-    REQUIRE_THROWS_WITH(sim->Var(px),
-                        Catch::Contains("Variance not implemented in PennyLane-Lightning-Kokkos"));
-#endif
 }
+
+// TODO: Remove this after the next release of PennyLane-Lightning
+#if defined(_KOKKOS)
+
+TEST_CASE("Var(HermitianObs) test with numWires=1", "[lightning]")
+{
+    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+
+    // state-vector with #qubits = n
+    constexpr size_t n = 2;
+    std::vector<QubitIdType> Qs;
+    Qs.reserve(n);
+    for (size_t i = 0; i < n; i++) {
+        Qs.push_back(sim->AllocateQubit());
+    }
+
+    sim->NamedOperation("Hadamard", {}, {Qs[0]}, false);
+    sim->NamedOperation("PauliY", {}, {Qs[1]}, false);
+
+    std::vector<std::complex<double>> mat1(16, {0, 0});
+    std::vector<std::complex<double>> mat2{{1.0, 0.0}, {0.0, 0.0}, {-1.0, 0.0}, {0.0, 0.0}};
+
+    ObsIdType h1 = sim->Observable(ObsId::Hermitian, mat1, {Qs[0], Qs[1]});
+    ObsIdType h2 = sim->Observable(ObsId::Hermitian, mat2, {Qs[0]});
+
+    CHECK(sim->Var(h1) == Approx(.0).margin(1e-5));
+    CHECK(sim->Var(h2) == Approx(1.0).margin(1e-5));
+}
+
+TEST_CASE("Var(TensorProd(NamedObs)) test", "[lightning]")
+{
+    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+
+    // state-vector with #qubits = n
+    constexpr size_t n = 4;
+    std::vector<QubitIdType> Qs;
+    Qs.reserve(n);
+    for (size_t i = 0; i < n; i++) {
+        Qs.push_back(sim->AllocateQubit());
+    }
+
+    sim->NamedOperation("PauliX", {}, {Qs[0]}, false);
+    sim->NamedOperation("PauliY", {}, {Qs[1]}, false);
+    sim->NamedOperation("Hadamard", {}, {Qs[2]}, false);
+    sim->NamedOperation("PauliZ", {}, {Qs[3]}, false);
+
+    ObsIdType px = sim->Observable(ObsId::PauliX, {}, {Qs[2]});
+    ObsIdType py = sim->Observable(ObsId::PauliY, {}, {Qs[1]});
+    ObsIdType pz = sim->Observable(ObsId::PauliZ, {}, {Qs[1]});
+    ObsIdType tpx = sim->TensorObservable({px});
+    ObsIdType tpy = sim->TensorObservable({py});
+    ObsIdType tpz = sim->TensorObservable({pz});
+
+    CHECK(sim->Var(tpx) == Approx(.0).margin(1e-5));
+    CHECK(sim->Var(tpy) == Approx(1.0).margin(1e-5));
+    CHECK(sim->Var(tpz) == Approx(.0).margin(1e-5));
+}
+
+TEST_CASE("Var(TensorProd(NamedObs[])) test", "[lightning]")
+{
+    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+
+    // state-vector with #qubits = n
+    constexpr size_t n = 4;
+    std::vector<QubitIdType> Qs;
+    Qs.reserve(n);
+    for (size_t i = 0; i < n; i++) {
+        Qs.push_back(sim->AllocateQubit());
+    }
+
+    sim->NamedOperation("PauliX", {}, {Qs[0]}, false);
+    sim->NamedOperation("PauliY", {}, {Qs[1]}, false);
+    sim->NamedOperation("Hadamard", {}, {Qs[2]}, false);
+    sim->NamedOperation("PauliZ", {}, {Qs[3]}, false);
+
+    ObsIdType px = sim->Observable(ObsId::PauliX, {}, {Qs[2]});
+    ObsIdType py = sim->Observable(ObsId::PauliY, {}, {Qs[1]});
+    ObsIdType pz = sim->Observable(ObsId::PauliZ, {}, {Qs[1]});
+    ObsIdType tpxy = sim->TensorObservable({px, py});
+    ObsIdType tpxz = sim->TensorObservable({px, pz});
+
+    CHECK(sim->Var(tpxy) == Approx(1.0).margin(1e-5));
+    CHECK(sim->Var(tpxz) == Approx(0.0).margin(1e-5));
+}
+
+TEST_CASE("Var(TensorProd(HermitianObs))", "[lightning]")
+{
+    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+
+    // state-vector with #qubits = n
+    constexpr size_t n = 2;
+    std::vector<QubitIdType> Qs;
+    Qs.reserve(n);
+    for (size_t i = 0; i < n; i++) {
+        Qs.push_back(sim->AllocateQubit());
+    }
+
+    sim->NamedOperation("Hadamard", {}, {Qs[0]}, false);
+    sim->NamedOperation("PauliY", {}, {Qs[1]}, false);
+
+    std::vector<std::complex<double>> mat1(16, {0, 0});
+    std::vector<std::complex<double>> mat2{{1.0, 0.0}, {0.0, 0.0}, {-1.0, 0.0}, {0.0, 0.0}};
+
+    ObsIdType h1 = sim->Observable(ObsId::Hermitian, mat1, {Qs[0], Qs[1]});
+    ObsIdType h2 = sim->Observable(ObsId::Hermitian, mat2, {Qs[0]});
+    ObsIdType tph1 = sim->TensorObservable({h1});
+    ObsIdType tph2 = sim->TensorObservable({h2});
+
+    CHECK(sim->Var(tph1) == Approx(.0).margin(1e-5));
+    CHECK(sim->Var(tph2) == Approx(1.0).margin(1e-5));
+}
+
+TEST_CASE("Var(TensorProd(HermitianObs[]))", "[lightning]")
+{
+    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+
+    // state-vector with #qubits = n
+    constexpr size_t n = 2;
+    std::vector<QubitIdType> Qs;
+    Qs.reserve(n);
+    for (size_t i = 0; i < n; i++) {
+        Qs.push_back(sim->AllocateQubit());
+    }
+
+    sim->NamedOperation("Hadamard", {}, {Qs[0]}, false);
+    sim->NamedOperation("PauliY", {}, {Qs[1]}, false);
+
+    std::vector<std::complex<double>> mat1(4, {1.0, 0});
+    std::vector<std::complex<double>> mat2{{1.0, 0.0}, {0.0, 0.0}, {-1.0, 0.0}, {0.0, 0.0}};
+
+    ObsIdType h1 = sim->Observable(ObsId::Hermitian, mat1, {Qs[1]});
+    ObsIdType h2 = sim->Observable(ObsId::Hermitian, mat2, {Qs[0]});
+    ObsIdType tp = sim->TensorObservable({h1, h2});
+
+    CHECK(sim->Var(tp) == Approx(2.0).margin(1e-5));
+}
+
+TEST_CASE("Var(TensorProd(Obs[]))", "[lightning]")
+{
+    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+
+    // state-vector with #qubits = n
+    constexpr size_t n = 4;
+    std::vector<QubitIdType> Qs;
+    Qs.reserve(n);
+    for (size_t i = 0; i < n; i++) {
+        Qs.push_back(sim->AllocateQubit());
+    }
+
+    sim->NamedOperation("PauliX", {}, {Qs[0]}, false);
+    sim->NamedOperation("PauliY", {}, {Qs[1]}, false);
+    sim->NamedOperation("Hadamard", {}, {Qs[2]}, false);
+    sim->NamedOperation("PauliZ", {}, {Qs[3]}, false);
+
+    ObsIdType px = sim->Observable(ObsId::PauliX, {}, {Qs[2]});
+    ObsIdType pz = sim->Observable(ObsId::PauliZ, {}, {Qs[1]});
+
+    std::vector<std::complex<double>> mat2{{1.0, 0.0}, {2.0, 0.0}, {-1.0, 0.0}, {3.0, 0.0}};
+
+    ObsIdType h = sim->Observable(ObsId::Hermitian, mat2, {Qs[0]});
+    ObsIdType tp = sim->TensorObservable({px, h, pz});
+
+    CHECK(sim->Var(tp) == Approx(4.0).margin(1e-5));
+}
+
+TEST_CASE("Var(Hamiltonian(NamedObs[])) test", "[lightning]")
+{
+    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+
+    // state-vector with #qubits = n
+    constexpr size_t n = 4;
+    std::vector<QubitIdType> Qs;
+    Qs.reserve(n);
+    for (size_t i = 0; i < n; i++) {
+        Qs.push_back(sim->AllocateQubit());
+    }
+
+    sim->NamedOperation("PauliX", {}, {Qs[0]}, false);
+    sim->NamedOperation("PauliY", {}, {Qs[1]}, false);
+    sim->NamedOperation("Hadamard", {}, {Qs[2]}, false);
+    sim->NamedOperation("PauliZ", {}, {Qs[3]}, false);
+
+    ObsIdType px = sim->Observable(ObsId::PauliX, {}, {Qs[2]});
+    ObsIdType py = sim->Observable(ObsId::PauliY, {}, {Qs[1]});
+    ObsIdType pz = sim->Observable(ObsId::PauliZ, {}, {Qs[1]});
+    ObsIdType hxyz = sim->HamiltonianObservable({0.4, 0.8, 0.2}, {px, py, pz});
+
+    CHECK(sim->Var(hxyz) == Approx(0.64).margin(1e-5));
+}
+
+TEST_CASE("Var(Hamiltonian(TensorObs[])) test", "[lightning]")
+{
+    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+
+    // state-vector with #qubits = n
+    constexpr size_t n = 4;
+    std::vector<QubitIdType> Qs;
+    Qs.reserve(n);
+    for (size_t i = 0; i < n; i++) {
+        Qs.push_back(sim->AllocateQubit());
+    }
+
+    sim->NamedOperation("PauliX", {}, {Qs[0]}, false);
+    sim->NamedOperation("PauliY", {}, {Qs[1]}, false);
+    sim->NamedOperation("Hadamard", {}, {Qs[2]}, false);
+    sim->NamedOperation("PauliZ", {}, {Qs[3]}, false);
+
+    ObsIdType px = sim->Observable(ObsId::PauliX, {}, {Qs[2]});
+    ObsIdType py = sim->Observable(ObsId::PauliY, {}, {Qs[1]});
+    ObsIdType pz = sim->Observable(ObsId::PauliZ, {}, {Qs[1]});
+    ObsIdType tpxy = sim->TensorObservable({px, py});
+    ObsIdType tpxz = sim->TensorObservable({px, pz});
+    ObsIdType hxyz = sim->HamiltonianObservable({0.2, 0.6}, {tpxy, tpxz});
+
+    CHECK(sim->Var(hxyz) == Approx(0.04).margin(1e-5));
+}
+
+TEST_CASE("Var(Hamiltonian(Hermitian[])) test", "[lightning]")
+{
+    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+
+    // state-vector with #qubits = n
+    constexpr size_t n = 4;
+    std::vector<QubitIdType> Qs;
+    Qs.reserve(n);
+    for (size_t i = 0; i < n; i++) {
+        Qs.push_back(sim->AllocateQubit());
+    }
+
+    sim->NamedOperation("PauliX", {}, {Qs[0]}, false);
+    sim->NamedOperation("PauliY", {}, {Qs[1]}, false);
+    sim->NamedOperation("Hadamard", {}, {Qs[2]}, false);
+    sim->NamedOperation("PauliZ", {}, {Qs[3]}, false);
+
+    ObsIdType px = sim->Observable(ObsId::PauliX, {}, {Qs[2]});
+    ObsIdType pz = sim->Observable(ObsId::PauliZ, {}, {Qs[1]});
+
+    std::vector<std::complex<double>> mat2{{1.0, 0.0}, {2.0, 0.0}, {-1.0, 0.0}, {3.0, 0.0}};
+    ObsIdType h = sim->Observable(ObsId::Hermitian, mat2, {Qs[0]});
+    ObsIdType hxhz = sim->HamiltonianObservable({0.2, 0.3, 0.6}, {px, h, pz});
+
+    CHECK(sim->Var(hxhz) == Approx(0.36).margin(1e-5));
+}
+
+TEST_CASE("Var(Hamiltonian({TensorProd, Hermitian}[])) test", "[lightning]")
+{
+    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+
+    // state-vector with #qubits = n
+    constexpr size_t n = 4;
+    std::vector<QubitIdType> Qs;
+    Qs.reserve(n);
+    for (size_t i = 0; i < n; i++) {
+        Qs.push_back(sim->AllocateQubit());
+    }
+
+    sim->NamedOperation("PauliX", {}, {Qs[0]}, false);
+    sim->NamedOperation("PauliY", {}, {Qs[1]}, false);
+    sim->NamedOperation("Hadamard", {}, {Qs[2]}, false);
+    sim->NamedOperation("PauliZ", {}, {Qs[3]}, false);
+
+    ObsIdType px = sim->Observable(ObsId::PauliX, {}, {Qs[2]});
+    ObsIdType pz = sim->Observable(ObsId::PauliZ, {}, {Qs[1]});
+    ObsIdType tp = sim->TensorObservable({px, pz});
+
+    std::vector<std::complex<double>> mat2{{1.0, 0.0}, {2.0, 0.0}, {-1.0, 0.0}, {3.0, 0.0}};
+    ObsIdType h = sim->Observable(ObsId::Hermitian, mat2, {Qs[0]});
+    ObsIdType hhtp = sim->HamiltonianObservable({0.5, 0.3}, {h, tp});
+
+    CHECK(sim->Var(hhtp) == Approx(1.0).margin(1e-5));
+}
+
+#endif
 
 TEST_CASE("State test with numWires=4", "[lightning]")
 {

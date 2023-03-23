@@ -229,15 +229,25 @@ auto LightningKokkosSimulator::Expval(ObsIdType obsKey) -> double
 
     auto &&obs = this->obs_manager.getObservable(obsKey);
 
-    Pennylane::StateVectorKokkos<double> original_sv(this->device_sv->getNumQubits());
-    original_sv.DeviceToDevice(this->device_sv->getData());
-    obs->applyInPlace(original_sv);
-    return getRealOfComplexInnerProduct<double>(this->device_sv->getData(), original_sv.getData());
+    Pennylane::Simulators::MeasuresKokkos m{*(this->device_sv)};
+
+    return m.expval(*obs);
 }
 
 auto LightningKokkosSimulator::Var(ObsIdType obsKey) -> double
 {
-    throw std::logic_error("Variance not implemented in PennyLane-Lightning-Kokkos");
+    QFailIf(!this->obs_manager.isValidObservables({obsKey}), "Invalid key for cached observables");
+
+    // update tape caching
+    if (this->cache_recording) {
+        this->cache_manager.addObservable(obsKey, Lightning::Measurements::Var);
+    }
+
+    auto &&obs = this->obs_manager.getObservable(obsKey);
+
+    Pennylane::Simulators::MeasuresKokkos m{*(this->device_sv)};
+
+    return m.var(*obs);
 }
 
 auto LightningKokkosSimulator::State() -> std::vector<std::complex<double>>
@@ -258,7 +268,11 @@ auto LightningKokkosSimulator::State() -> std::vector<std::complex<double>>
     return state;
 }
 
-auto LightningKokkosSimulator::Probs() -> std::vector<double> { return this->device_sv->probs(); }
+auto LightningKokkosSimulator::Probs() -> std::vector<double>
+{
+    Pennylane::Simulators::MeasuresKokkos m{*(this->device_sv)};
+    return m.probs();
+}
 
 auto LightningKokkosSimulator::PartialProbs(const std::vector<QubitIdType> &wires)
     -> std::vector<double>
@@ -271,14 +285,16 @@ auto LightningKokkosSimulator::PartialProbs(const std::vector<QubitIdType> &wire
 
     auto dev_wires = getDeviceWires(wires);
 
-    return this->device_sv->probs(dev_wires);
+    Pennylane::Simulators::MeasuresKokkos m{*(this->device_sv)};
+    return m.probs(dev_wires);
 }
 
 auto LightningKokkosSimulator::Sample(size_t shots) -> std::vector<double>
 {
+    Pennylane::Simulators::MeasuresKokkos m{*(this->device_sv)};
     // PL-Lightning-Kokkos generates samples using the alias method.
     // Reference: https://en.wikipedia.org/wiki/Inverse_transform_sampling
-    auto li_samples = this->device_sv->generate_samples(shots);
+    auto li_samples = m.generate_samples(shots);
 
     const size_t numQubits = this->GetNumQubits();
 
@@ -309,9 +325,10 @@ auto LightningKokkosSimulator::PartialSample(const std::vector<QubitIdType> &wir
     // get device wires
     auto &&dev_wires = getDeviceWires(wires);
 
+    Pennylane::Simulators::MeasuresKokkos m{*(this->device_sv)};
     // PL-Lightning-Kokkos generates samples using the alias method.
     // Reference: https://en.wikipedia.org/wiki/Inverse_transform_sampling
-    auto li_samples = this->device_sv->generate_samples(shots);
+    auto li_samples = m.generate_samples(shots);
 
     // The lightning samples are layed out as a single vector of size
     // shots*qubits, where each element represents a single bit. The
@@ -332,9 +349,10 @@ auto LightningKokkosSimulator::PartialSample(const std::vector<QubitIdType> &wir
 auto LightningKokkosSimulator::Counts(size_t shots)
     -> std::tuple<std::vector<double>, std::vector<int64_t>>
 {
+    Pennylane::Simulators::MeasuresKokkos m{*(this->device_sv)};
     // PL-Lightning-Kokkos generates samples using the alias method.
     // Reference: https://en.wikipedia.org/wiki/Inverse_transform_sampling
-    auto li_samples = this->device_sv->generate_samples(shots);
+    auto li_samples = m.generate_samples(shots);
 
     // Fill the eigenvalues with the integer representation of the corresponding
     // computational basis bitstring. In the future, eigenvalues can also be
@@ -375,9 +393,10 @@ auto LightningKokkosSimulator::PartialCounts(const std::vector<QubitIdType> &wir
     // get device wires
     auto &&dev_wires = getDeviceWires(wires);
 
+    Pennylane::Simulators::MeasuresKokkos m{*(this->device_sv)};
     // PL-Lightning-Kokkos generates samples using the alias method.
     // Reference: https://en.wikipedia.org/wiki/Inverse_transform_sampling
-    auto li_samples = this->device_sv->generate_samples(shots);
+    auto li_samples = m.generate_samples(shots);
 
     // Fill the eigenvalues with the integer representation of the corresponding
     // computational basis bitstring. In the future, eigenvalues can also be
@@ -496,7 +515,7 @@ auto LightningKokkosSimulator::Gradient(const std::vector<size_t> &trainParams)
 
     // Create the vector of observables
     auto &&obs_keys = this->cache_manager.getObservablesKeys();
-    std::vector<std::shared_ptr<Pennylane::Algorithms::ObservableKokkos<double>>> obs_vec;
+    std::vector<std::shared_ptr<Pennylane::Simulators::ObservableKokkos<double>>> obs_vec;
     obs_vec.reserve(obs_keys.size());
     for (auto idx : obs_keys) {
         obs_vec.emplace_back(this->obs_manager.getObservable(idx));

@@ -27,15 +27,15 @@
 #include "ObservablesKokkos.hpp"
 namespace Catalyst::Runtime::Simulator {
 template <typename PrecisionT>
-using ObservableClassName = Pennylane::Algorithms::ObservableKokkos<PrecisionT>;
+using ObservableClassName = Pennylane::Simulators::ObservableKokkos<PrecisionT>;
 template <typename PrecisionT>
-using NamedObsClassName = Pennylane::Algorithms::NamedObsKokkos<PrecisionT>;
+using NamedObsClassName = Pennylane::Simulators::NamedObsKokkos<PrecisionT>;
 template <typename PrecisionT>
-using HermitianObsClassName = Pennylane::Algorithms::HermitianObsKokkos<PrecisionT>;
+using HermitianObsClassName = Pennylane::Simulators::HermitianObsKokkos<PrecisionT>;
 template <typename PrecisionT>
-using TensorProdObsClassName = Pennylane::Algorithms::TensorProdObsKokkos<PrecisionT>;
+using TensorProdObsClassName = Pennylane::Simulators::TensorProdObsKokkos<PrecisionT>;
 template <typename PrecisionT>
-using HamiltonianClassName = Pennylane::Algorithms::HamiltonianKokkos<PrecisionT>;
+using HamiltonianClassName = Pennylane::Simulators::HamiltonianKokkos<PrecisionT>;
 } // namespace Catalyst::Runtime::Simulator
 #else
 #include "Observables.hpp"
