@@ -109,10 +109,9 @@ struct AdjointOpPattern : public OpConversionPattern<AdjointOp> {
             args.push_back(newArg);
         }
 
-        SmallVector<Value> gradients;
         rewriter.create<LLVM::CallOp>(loc, gradFnDecl, args);
         rewriter.create<catalyst::quantum::DeallocOp>(loc, qreg);
-        rewriter.replaceOp(op, gradients);
+        rewriter.eraseOp(op);
 
         return success();
     }
