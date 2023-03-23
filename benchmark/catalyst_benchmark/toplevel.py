@@ -238,8 +238,8 @@ def collect(a: ParsedArguments) -> None:  # noqa
                                 nlayers,
                             )
                             print(f" [FAIL] (LOG: {logfname} )")
-    finally:  # noqa
-        if str(known_failures) != str(KNOWN_FAILURES):
+    finally:
+        if str(known_failures) != str(KNOWN_FAILURES):  # noqa
             print("Suggestion:\nKNOWN_FAILURES =")
             print(known_failures)
 
