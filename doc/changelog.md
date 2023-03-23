@@ -10,7 +10,7 @@
 * Build the runtime against qir-stdlib v0.1.0.
   [#58](https://github.com/PennyLaneAI/catalyst/pull/58)
 
-* Remove runtime's memory allocations.
+* Lift heap allocations for quantum op results from the runtime into the MLIR compiler core. This allows all memref buffers to be memory managed in MLIR using the [MLIR bufferization infrastructure](https://mlir.llvm.org/docs/Bufferization/).
   [#63](https://github.com/PennyLaneAI/catalyst/pull/63)
 
 <h3>Breaking changes</h3>
