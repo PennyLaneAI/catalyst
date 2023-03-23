@@ -26,7 +26,7 @@ def catalyst_version() -> str:
     verstring = catalyst._version.__version__
     if "dev" in verstring:
         try:
-            commit = (  # nosec B607
+            commit = (  # nosec
                 check_output(["git", "rev-parse", "HEAD"], cwd=dirname(catalyst.__file__))
                 .decode()
                 .strip()[:7]
