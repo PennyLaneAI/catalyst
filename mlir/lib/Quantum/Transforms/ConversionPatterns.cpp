@@ -588,6 +588,8 @@ template <typename T> struct StateBasedPattern : public OpConversionPattern<T> {
         MLIRContext *ctx = this->getContext();
         TypeConverter *conv = this->getTypeConverter();
 
+        assert(!op.getResults().size() && "state-out/prob-out must be unset");
+
         Type vectorType;
         StringRef qirName;
         if constexpr (std::is_same_v<T, ProbsOp>) {
