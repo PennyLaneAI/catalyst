@@ -243,7 +243,7 @@ TEST_CASE("Test copy to strided array", "[qir_lightning_core]")
     double *buffer_strided = new double[buffer_strided_len];
     MemRefT<double, 2> dst = {
         buffer_strided, buffer_strided, 0, {buffer_strided_len / 2, 2}, {4, 2}};
-    memref_copy_slow<double, 2>(&dst, &src, buffer_len * sizeof(double));
+    memref_copy<double, 2>(&dst, &src, buffer_len * sizeof(double));
     CHECK(buffer_strided[0] == buffer[0]);
     CHECK(buffer_strided[2] == buffer[1]);
     CHECK(buffer_strided[4] == buffer[2]);

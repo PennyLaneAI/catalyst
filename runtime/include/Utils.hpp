@@ -11,18 +11,7 @@ template <typename T, size_t R> struct MemRefT {
 };
 
 template <typename T, size_t R>
-void memref_copy_fast(MemRefT<T, R> *dst, MemRefT<T, R> *src, size_t bytes)
-{
-    size_t how_many_elements = 1;
-    for (size_t i = 0; i < R; i++) {
-        how_many_elements *= src->sizes[i];
-    }
-    assert(bytes == (sizeof(T) * how_many_elements) && "data sizes must agree.");
-    memcpy(dst->data_aligned, src->data_aligned, bytes);
-}
-
-template <typename T, size_t R>
-void memref_copy_slow(MemRefT<T, R> *dst, MemRefT<T, R> *src, __attribute__((unused)) size_t bytes)
+void memref_copy(MemRefT<T, R> *dst, MemRefT<T, R> *src, __attribute__((unused)) size_t bytes)
 {
     char *srcPtr = (char *)src->data_allocated + dst->offset * sizeof(T);
     char *dstPtr = (char *)dst->data_allocated + dst->offset * sizeof(T);
@@ -64,23 +53,4 @@ void memref_copy_slow(MemRefT<T, R> *dst, MemRefT<T, R> *src, __attribute__((unu
             writeIndex -= dst->sizes[axis] * dstStrides[axis];
         }
     }
-}
-
-template <typename T, size_t R>
-void memref_copy(MemRefT<T, R> *memref, MemRefT<T, R> *buffer, size_t bytes)
-{
-    bool can_use_fast_path = 0 == R || 1 == memref->strides[0];
-    size_t bytes_dst = 1 * memref->strides[0];
-    for (size_t i = 1; i < R && can_use_fast_path; i++) {
-        bytes_dst += memref->strides[i] * memref->sizes[i - 1];
-    }
-
-    can_use_fast_path &= bytes_dst == bytes;
-
-    if (can_use_fast_path) {
-        memref_copy_fast(memref, buffer, bytes);
-        return;
-    }
-
-    memref_copy_slow(memref, buffer, bytes);
 }
