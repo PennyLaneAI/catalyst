@@ -156,8 +156,7 @@ class Grad:
         self.h = h
         self.argnum = argnum
         if self.method != "fd":
-            if not isinstance(self.fn, qml.QNode):
-                raise ValueError("Only finite difference can compute higher order derivatives.")
+            raise ValueError("Only finite difference can compute higher order derivatives.")
 
     def __call__(self, *args, **kwargs):
         """Specifies that an actual call to the differentiated function.
