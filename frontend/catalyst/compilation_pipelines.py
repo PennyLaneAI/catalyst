@@ -543,7 +543,6 @@ class QJIT:
         Returns:
             an MLIR module
         """
-        assert args is not None  # Always True?
         self.c_sig = CompiledFunction.get_runtime_signature(*args)
 
         with Patcher(
