@@ -24,8 +24,8 @@
 #include <ostream>
 #include <string>
 
+#include "MemRefUtils.hpp"
 #include "QuantumDevice.hpp"
-#include "Utils.hpp"
 
 #include "RuntimeCAPI.h"
 
