@@ -13,10 +13,10 @@
 # limitations under the License.
 
 import pytest
-
-from catalyst import qjit, measure
-import pennylane as qml
 import jax.numpy as jnp
+import pennylane as qml
+
+from catalyst import qjit, measure, CompileError
 
 
 @qjit()
@@ -50,7 +50,7 @@ def test_unsupported_device():
     def func():
         return qml.probs()
 
-    with pytest.raises(TypeError, match="Only the lightning.qubit device is supported"):
+    with pytest.raises(CompileError, match="Only the lightning.qubit device is supported"):
         qjit(func)
 
 

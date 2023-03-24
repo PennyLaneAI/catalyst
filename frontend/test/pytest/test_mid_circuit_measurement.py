@@ -13,63 +13,10 @@
 # limitations under the License.
 
 import pytest
-
-from catalyst import qjit, measure
-import pennylane as qml
 import jax.numpy as jnp
-import jax
+import pennylane as qml
 
-from catalyst.jax_tracer import get_traceable_fn
-
-
-class TestMidCircuitMeasurementsToJax:
-    def test_simple_mid_circuit_measurement(self):
-        expected = """{ lambda ; a:f64[]. let
-    b:AbstractQreg() = qalloc 2
-    c:AbstractQbit() = qextract b 0
-    d:AbstractQbit() = qinst[op=RX qubits_len=1] c a
-    e:bool[] f:AbstractQbit() = qmeasure d
-    _:AbstractQbit() = qinst[op=RY qubits_len=1] f e
-    g:AbstractQbit() = qextract b 1
-    h:bool[] _:AbstractQbit() = qmeasure g
-     = qdealloc b
-  in (h,) }"""
-
-        def circuit(x):
-            qml.RX(x, wires=0)
-            m = measure(wires=0)
-            qml.RY(m, wires=0)
-            return measure(wires=1)
-
-        device = qml.device("lightning.qubit", wires=2, shots=1)
-        traceable_fn = get_traceable_fn(circuit, device)
-
-        assert expected == str(jax.make_jaxpr(traceable_fn)(1.0))
-
-    def test_multiply_mid_circuit_measurement(self):
-        expected = """{ lambda ; a:f64[]. let
-    b:AbstractQreg() = qalloc 2
-    c:AbstractQbit() = qextract b 0
-    d:AbstractQbit() = qinst[op=RX qubits_len=1] c a
-    e:bool[] f:AbstractQbit() = qmeasure d
-    g:f64[] = convert_element_type[new_dtype=float64 weak_type=True] e
-    h:f64[] = mul 2.0 g
-    _:AbstractQbit() = qinst[op=RY qubits_len=1] f h
-    i:AbstractQbit() = qextract b 1
-    j:bool[] _:AbstractQbit() = qmeasure i
-     = qdealloc b
-  in (j,) }"""
-
-        def circuit(x):
-            qml.RX(x, wires=0)
-            m = measure(wires=0)
-            qml.RY(2.0 * m, wires=0)
-            return measure(wires=1)
-
-        device = qml.device("lightning.qubit", wires=2, shots=1)
-        traceable_fn = get_traceable_fn(circuit, device)
-
-        assert expected == str(jax.make_jaxpr(traceable_fn)(1.0))
+from catalyst import qjit, measure, CompileError
 
 
 class TestMidCircuitMeasurement:
@@ -77,8 +24,22 @@ class TestMidCircuitMeasurement:
         def circuit():
             return qml.measure(0)
 
-        with pytest.raises(TypeError, match="Must use 'measure' from Catalyst"):
+        with pytest.raises(CompileError, match="Must use 'measure' from Catalyst"):
             qjit(qml.qnode(qml.device("lightning.qubit", wires=1))(circuit))()
+
+    def test_measure_outside_qjit(self):
+        def circuit():
+            return measure(0)
+
+        with pytest.raises(CompileError, match="can only be used from within @qjit"):
+            circuit()
+
+    def test_measure_outside_qnode(self):
+        def circuit():
+            return measure(0)
+
+        with pytest.raises(CompileError, match="can only be used from within a qml.qnode"):
+            qjit(circuit)()
 
     def test_basic(self):
         @qjit()

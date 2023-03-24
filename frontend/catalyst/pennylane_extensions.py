@@ -37,6 +37,7 @@ from catalyst.jax_tape import JaxTape
 from catalyst.jax_tracer import trace_quantum_tape, insert_to_qreg, get_traceable_fn
 from catalyst.utils.patching import Patcher
 from catalyst.utils.tracing import TracingContext
+from catalyst.utils.exceptions import CompileError
 
 
 # pylint: disable=too-few-public-methods
@@ -59,7 +60,7 @@ class QFunc:
     def __call__(self, *args, **kwargs):
         if isinstance(self, qml.QNode):
             if self.device.short_name != "lightning.qubit":
-                raise TypeError(
+                raise CompileError(
                     "Only the lightning.qubit device is supported for compilation at the moment."
                 )
             device = QJITDevice(self.device.shots, self.device.wires)
@@ -113,6 +114,9 @@ class Function:
 
     Args:
         fn (Callable): the function boundary.
+
+    Raises:
+        AssertionError: Invalid function type.
     """
 
     def __init__(self, fn):
@@ -140,8 +144,8 @@ class Grad:
         argnum (int): the argument indices which define over which arguments to differentiate
 
     Raises:
-        AssertionError: Higher-order derivatives can only be computed with the finite difference
-                        method.
+        ValueError: Higher-order derivatives can only be computed with the finite difference
+                    method.
     """
 
     def __init__(self, fn, *, method, h, argnum):
@@ -150,21 +154,26 @@ class Grad:
         self.method = method
         self.h = h
         self.argnum = argnum
-        if self.method != "fd":
-            assert isinstance(
-                self.fn, qml.QNode
-            ), "Only finite difference can compute higher order derivatives."
+        if self.method != "fd" and not isinstance(self.fn, qml.QNode):
+            raise ValueError("Only finite difference can compute higher order derivatives.")
 
     def __call__(self, *args, **kwargs):
         """Specifies that an actual call to the differentiated function.
         Args:
             args: the arguments to the differentiated function
         """
+        TracingContext.check_is_tracing(
+            "catalyst.grad can only be used from within @qjit decorated code."
+        )
+
         jaxpr = jax.make_jaxpr(self.fn)(*args)
-        assert len(jaxpr.eqns) == 1, "Grad is not well defined"
-        assert (
-            jaxpr.eqns[0].primitive == jprim.func_p
-        ), "Attempting to differentiate something other than a function"
+        if len(jaxpr.eqns) != 1:
+            raise TypeError("catalyst.grad can only be used on QNodes and other grad calls")
+        if jaxpr.eqns[0].primitive != jprim.func_p:
+            raise TypeError(
+                f"Attempting to differentiate something other than a function "
+                f"(got {jaxpr.eqns[0].primitive})"
+            )
         return jprim.grad_p.bind(
             *args, jaxpr=jaxpr, fn=self, method=self.method, h=self.h, argnum=self.argnum
         )
@@ -213,7 +222,7 @@ def grad(f, *, method=None, h=None, argnum=None):
         Grad: A Grad object that denotes the derivative of a function.
 
     Raises:
-        AssertionError: Invalid method or step size parameters.
+        ValueError: Invalid method or step size parameters.
 
     **Example**
 
@@ -234,12 +243,18 @@ def grad(f, *, method=None, h=None, argnum=None):
     >>> workflow(2.0)
     array(-3.14159265)
     """
+    methods = {"fd", "ps", "adj"}
     if method is None:
         method = "fd"
-    assert method in {"fd", "ps", "adj"}, "invalid differentiation method"
+    if method not in methods:
+        raise ValueError(
+            f"Invalid differentiation method '{method}'. "
+            f"Supported methods are: {' '.join(sorted(methods))}"
+        )
     if method == "fd" and h is None:
         h = 1e-7
-    assert h is None or isinstance(h, numbers.Number), "invalid h value"
+    if not (h is None or isinstance(h, numbers.Number)):
+        raise ValueError(f"Invalid h value ({h}). None or number was excpected.")
     if argnum is None:
         argnum = [0]
     elif isinstance(argnum, int):
@@ -295,9 +310,8 @@ class CondCallable:
         Returns:
             self
         """
-        assert (
-            false_fn.__code__.co_argcount == 0
-        ), "conditional 'False' function is not allowed to have any arguments"
+        if false_fn.__code__.co_argcount != 0:
+            raise TypeError("Conditional 'False' function is not allowed to have any arguments")
         self.false_fn = false_fn
         return self
 
@@ -475,9 +489,8 @@ def cond(pred):
     """
 
     def decorator(true_fn):
-        assert (
-            true_fn.__code__.co_argcount == 0
-        ), "conditional 'True' function is not allowed to have any arguments"
+        if true_fn.__code__.co_argcount != 0:
+            raise TypeError("Conditional 'True' function is not allowed to have any arguments")
         return CondCallable(pred, true_fn)
 
     return decorator
@@ -611,9 +624,13 @@ class WhileCallable:
         return self._call_with_classical_ctx(args)
 
     def _call_during_interpretation(self, *args):
+        fn_res = args if len(args) > 1 else args[0] if len(args) == 1 else None
+
         while self.cond_fn(*args):
-            args = self.body_fn(*args)
-        return args
+            fn_res = self.body_fn(*args)
+            args = fn_res if len(args) > 1 else (fn_res,) if len(args) == 1 else ()
+
+        return fn_res
 
     def __call__(self, *args):
         is_tracing = TracingContext.is_tracing()
@@ -800,9 +817,13 @@ class ForLoopCallable:
         return self._call_with_quantum_ctx(ctx, *args)
 
     def _call_during_interpretation(self, *args):
+        fn_res = args if len(args) > 1 else args[0] if len(args) == 1 else None
+
         for i in range(self.lower_bound, self.upper_bound, self.step):
-            args = self.body_fn(i, *args)
-        return args
+            fn_res = self.body_fn(i, *args)
+            args = fn_res if len(args) > 1 else (fn_res,) if len(args) == 1 else ()
+
+        return fn_res
 
     def __call__(self, *args):
         is_tracing = TracingContext.is_tracing()
@@ -937,15 +958,19 @@ def measure(wires):
     >>> circuit(0.43)
     [array(-1.), array(True)]
     """
+    TracingContext.check_is_tracing(
+        "catalyst.measure can only be used from within @qjit decorated code."
+    )
+
+    ctx = qml.QueuingManager.active_context()
+    if ctx is None:
+        raise CompileError("catalyst.measure can only be used from within a qml.qnode.")
+
     measurement_id = str(uuid.uuid4())[:8]
     MidCircuitMeasure(measurement_id, wires=wires)
 
-    ctx = qml.QueuingManager.active_context()
-    if hasattr(ctx, "jax_tape"):
-        jax_tape = ctx.jax_tape
-        a, t = tree_flatten(jax.core.get_aval(True))
-        return jax_tape.create_tracer(t, a)
-    raise ValueError("measure can only be used when it jitted mode")
+    a, t = tree_flatten(jax.core.get_aval(True))
+    return ctx.jax_tape.create_tracer(t, a)
 
 
 class QJITDevice(qml.QubitDevice):
@@ -1037,7 +1062,7 @@ class QJITDevice(qml.QubitDevice):
         """
         # Ensure catalyst.measure is used instead of qml.measure.
         if any(isinstance(op, MidMeasureMP) for op in circuit.operations):
-            raise TypeError("Must use 'measure' from Catalyst instead of PennyLane.")
+            raise CompileError("Must use 'measure' from Catalyst instead of PennyLane.")
 
         # Fallback for controlled gates that won't decompose successfully.
         # Doing so before rather than after decomposition is generally a trade-off. For low
