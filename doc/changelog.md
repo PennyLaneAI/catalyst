@@ -5,6 +5,10 @@
 * Bring feature parity to the Lightning-Kokkos backend simulator.
   [#55](https://github.com/PennyLaneAI/catalyst/pull/55)
 
+* Add the variance measurement support for all observables and update the expectation
+  value method using the native Kokkos kernel for the Lightning-Kokkos device.
+  [#70](https://github.com/PennyLaneAI/catalyst/pull/70)
+
 <h3>Improvements</h3>
 
 * Build the runtime against qir-stdlib v0.1.0.
