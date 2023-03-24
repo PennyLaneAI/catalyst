@@ -31,7 +31,7 @@ package_root = os.path.dirname(__file__)
 
 @dataclass
 class CompileOptions:
-    """Common compile options"""
+    """Generic compilation options"""
 
     verbosity: int
     logfile: Optional[TextIOWrapper] = None  # stdout/stderr or a file
@@ -260,6 +260,7 @@ class CompilerDriver:
             outfile (str): output file
             Optional flags (List[str]): flags to be passed down to the compiler
             Optional fallback_compilers (List[str]): name of executables to be looked for in PATH
+            Optional compile_options (CompileOptions): generic compilation options.
         Raises:
             EnvironmentError: The exception is raised when no compiler succeeded.
         """
@@ -283,6 +284,7 @@ def lower_mhlo_to_linalg(filename: str, compile_options: Optional[CompileOptions
 
     Args:
         filename (str): the path to a file were the program is stored.
+        Optional compile_options (CompileOptions): generic compilation options.
     Returns:
         a path to the output file
     """
@@ -332,6 +334,7 @@ def bufferize_tensors(filename: str, compile_options: Optional[CompileOptions] =
 
     Args:
         filename (str): the path to a file were the program is stored.
+        Optional compile_options (CompileOptions): generic compilation options.
     Returns:
         a path to the output file
     """
@@ -355,6 +358,7 @@ def lower_all_to_llvm(filename: str, compile_options: Optional[CompileOptions] =
 
     Args:
         filename (str): the path to a file were the program is stored.
+        Optional compile_options (CompileOptions): generic compilation options.
     Returns:
         a path to the output file
     """
@@ -378,6 +382,7 @@ def convert_mlir_to_llvmir(filename: str, compile_options: Optional[CompileOptio
 
     Args:
         filename (str): the path to a file were the program is stored.
+        Optional compile_options (CompileOptions): generic compilation options.
     Returns:
         a path to the output file
     """
@@ -403,6 +408,7 @@ def compile_llvmir(filename: str, compile_options: Optional[CompileOptions] = No
 
     Args:
         filename (str): the path to a file were the program is stored.
+        Optional compile_options (CompileOptions): generic compilation options.
     Returns:
         a path to the output file
     """
@@ -426,6 +432,7 @@ def link_lightning_runtime(filename: str, compile_options: Optional[CompileOptio
 
     Args:
         filename (str): the path to a file were the object file is stored.
+        Optional compile_options (CompileOptions): generic compilation options.
     Returns:
         a path to the output file
     """
@@ -452,6 +459,7 @@ def compile(mlir_module, workspace, passes, compile_options: Optional[CompileOpt
         workspace (str): the absolute path to the MLIR module
         has_hlo (bool): ``True`` if the MLIR module contains HLO code. Defaults to ``False``
         passes (List[str]): the list of compilation passes
+        Optional compile_options (CompileOptions): generic compilation options.
 
     Returns:
         Shared object
