@@ -70,7 +70,7 @@ template <typename T, size_t R>
 void memref_copy(MemRefT<T, R> *memref, MemRefT<T, R> *buffer, size_t bytes)
 {
     bool can_use_fast_path = 0 == R || 1 == memref->strides[0];
-    size_t bytes_dst = 1;
+    size_t bytes_dst = 1 * memref->strides[0];
     for (size_t i = 1; i < R && can_use_fast_path; i++) {
         bytes_dst += memref->strides[i] * memref->sizes[i - 1];
     }
