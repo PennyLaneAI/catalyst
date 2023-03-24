@@ -312,7 +312,7 @@ def convert_mlir_to_llvmir(filename):
         a path to the output file
     """
     if filename[-10:] != ".llvm.mlir":
-        raise ValueError(f"Input file ({filename}) is not an LLVM dialect MLIR file")
+        raise ValueError(f"Input file ({filename}) for LLVMIR conversion is not an LLVM dialect MLIR file")
 
     command = [translate_tool]
     command += [filename]
@@ -355,7 +355,7 @@ def link_lightning_runtime(filename):
         a path to the output file
     """
     if filename[-2:] != ".o":
-        raise ValueError(f"Input file ({filename}) is not an object file")
+        raise ValueError(f"Input file ({filename}) for linking is not an object file")
 
     new_fname = filename.replace(".o", ".so")
 
