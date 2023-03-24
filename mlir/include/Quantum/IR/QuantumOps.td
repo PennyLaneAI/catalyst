@@ -636,13 +636,8 @@ def ProbsOp : Measurement_Op<"probs"> {
     }];
 
     let extraClassDeclaration = [{
-      llvm::Optional<mlir::Type> getResultType() {
-        if (getResultTypes().empty()) return std::nullopt;
-        return getResultTypes()[0];
-      }
-
       bool isBufferized() {
-        return !getResultType();
+        return getResultTypes().empty();
       }
     }];
 
@@ -681,13 +676,8 @@ def StateOp : Measurement_Op<"state"> {
     );
 
     let extraClassDeclaration = [{
-      llvm::Optional<mlir::Type> getResultType() {
-        if (getResultTypes().empty()) return std::nullopt;
-        return getResultTypes()[0];
-      }
-
       bool isBufferized() {
-        return !getResultType();
+        return getResultTypes().empty();
       }
     }];
 
