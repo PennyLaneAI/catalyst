@@ -267,7 +267,7 @@ def bufferize_tensors(filename):
         a path to the output file
     """
     if filename.split(os.extsep)[-1] != "mlir":
-        raise ValueError(f"Input file ({filename}) is not a MLIR file")
+        raise ValueError(f"Input file ({filename}) for bufferization is not an MLIR file")
 
     command = [quantum_opt_tool]
     command += [filename]
