@@ -141,17 +141,10 @@ void populateBufferizationLegality(TypeConverter &typeConverter, ConversionTarge
         [&](HermitianOp op) { return typeConverter.isLegal(op.getMatrix().getType()); });
     target.addDynamicallyLegalOp<HamiltonianOp>(
         [&](HamiltonianOp op) { return typeConverter.isLegal(op.getCoeffs().getType()); });
-    target.addDynamicallyLegalOp<SampleOp>(
-        [&](SampleOp op) { return !op.getResultType() || typeConverter.isLegal(op.getType(0)); });
-    target.addDynamicallyLegalOp<StateOp>(
-        [&](StateOp op) { return !op.getResultType() || typeConverter.isLegal(op.getType(0)); });
-    target.addDynamicallyLegalOp<ProbsOp>(
-        [&](ProbsOp op) { return !op.getResultType() || typeConverter.isLegal(op.getType(0)); });
-    target.addDynamicallyLegalOp<CountsOp>([&](CountsOp op) {
-        if (!op.getResultType())
-            return true;
-        return typeConverter.isLegal(op.getType(0)) and typeConverter.isLegal(op.getType(1));
-    });
+    target.addDynamicallyLegalOp<SampleOp>([&](SampleOp op) { return op.isBufferized(); });
+    target.addDynamicallyLegalOp<StateOp>([&](StateOp op) { return op.isBufferized(); });
+    target.addDynamicallyLegalOp<ProbsOp>([&](ProbsOp op) { return op.isBufferized(); });
+    target.addDynamicallyLegalOp<CountsOp>([&](CountsOp op) { return op.isBufferized(); });
 }
 
 void populateBufferizationPatterns(TypeConverter &typeConverter, RewritePatternSet &patterns)
