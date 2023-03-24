@@ -164,12 +164,12 @@ void __quantum__qis__Gradient(int64_t numResults, /* results = */...)
     va_list args;
     va_start(args, numResults);
     for (int64_t i = 0; i < numResults; i++) {
-        MemRefT<double, 1> *mrp = va_arg(args, ResultType *);
+        MemRefT<double, 1> *memref = va_arg(args, ResultType *);
         double *buffer = jacobian[i].data();
         size_t buffer_len = jacobian[i].size();
         MemRefT<double, 1> src = {buffer, buffer, 0, {buffer_len}, {1}};
-        assert(mrp && "the result type cannot be a null pointer");
-        memref_copy<double, 1>(mrp, &src, num_train_params * sizeof(double));
+        assert(memref && "the result type cannot be a null pointer");
+        memref_copy<double, 1>(memref, &src, num_train_params * sizeof(double));
     }
     va_end(args);
 }
@@ -217,12 +217,12 @@ void __quantum__qis__Gradient_params(MemRefT_int64_1d *params, int64_t numResult
     va_list args;
     va_start(args, numResults);
     for (int64_t i = 0; i < numResults; i++) {
-        MemRefT<double, 1> *mrp = va_arg(args, ResultType *);
-        assert(mrp && "the result type cannot be a null pointer");
+        MemRefT<double, 1> *memref = va_arg(args, ResultType *);
+        assert(memref && "the result type cannot be a null pointer");
         double *buffer = jacobian[i].data();
         size_t buffer_len = jacobian[i].size();
         MemRefT<double, 1> src = {buffer, buffer, 0, {buffer_len}, {1}};
-        memref_copy<double, 1>(mrp, &src, num_train_params * sizeof(double));
+        memref_copy<double, 1>(memref, &src, num_train_params * sizeof(double));
     }
     va_end(args);
 }
