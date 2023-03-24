@@ -166,7 +166,7 @@ class Grad:
         jaxpr = jax.make_jaxpr(self.fn)(*args)
         if len(jaxpr.eqns) != 1:
             raise TypeError(
-                f"Grad is not well defined for non-single Jax equations (got {len(jaxpr.eqns)})"
+                f"catalyst.grad can only be used on QNodes and other grad calls"
             )
         if jaxpr.eqns[0].primitive != jprim.func_p:
             raise TypeError(
