@@ -52,12 +52,12 @@ class TestCompilerDriver:
 
     def test_lower_mhlo_input_validation(self):
         """Test if the function detects wrong extensions"""
-        with pytest.raises(ValueError, match="is not a MLIR file"):
+        with pytest.raises(ValueError, match="is not an MLIR file"):
             lower_mhlo_to_linalg("file-name.nomlir")
 
     def test_bufferize_tensors(self):
         """Test if the function detects wrong extensions"""
-        with pytest.raises(ValueError, match="is not a MLIR file"):
+        with pytest.raises(ValueError, match="is not an MLIR file"):
             bufferize_tensors("file-name.nomlir")
 
     def test_lower_all_to_llvm_input_validation(self):

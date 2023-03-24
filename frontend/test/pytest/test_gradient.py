@@ -525,7 +525,7 @@ def test_assert_no_non_func_gradients():
 
 def test_assert_no_non_single_expression_gradients():
     """Test input validation for gradients"""
-    with pytest.raises(TypeError, match="is not well defined for non-single Jax equations"):
+    with pytest.raises(TypeError, match="can only be used on QNodes"):
 
         @qjit()
         def workflow():
