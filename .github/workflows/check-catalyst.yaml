@@ -81,6 +81,7 @@ jobs:
         run: |
           pushd runtime
           RT_BUILD_DIR=../runtime-build \
+          COMPILER_LAUNCHER="" \
           QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include" \
           QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build/" make runtime
           popd
@@ -414,7 +415,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          sudo apt-get -y -q install cmake ninja-build gcc-10 g++-10 libomp-dev lcov
+          sudo apt-get -y -q install cmake ninja-build libomp-dev lcov
           echo "LIGHTNING_TAG_VALUE=latest_release" >> $GITHUB_ENV
           # TODO: Update this after the latest_release tag is added to Lightning-Kokkos
           echo "LIGHTNING_KOKKOS_TAG_VALUE=v0.29.1" >> $GITHUB_ENV
@@ -437,6 +438,7 @@ jobs:
             pushd runtime
             C_COMPILER=$(which gcc) \
             CXX_COMPILER=$(which g++) \
+            COMPILER_LAUNCHER="" \
             QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build/" \
             QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include/" \
             LIGHTNING_GIT_TAG_VALUE=$LIGHTNING_TAG_VALUE \
@@ -450,6 +452,7 @@ jobs:
             pushd runtime
             C_COMPILER=$(which gcc) \
             CXX_COMPILER=$(which g++) \
+            COMPILER_LAUNCHER="" \
             QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build/" \
             QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include/" \
             LIGHTNING_GIT_TAG_VALUE=$LIGHTNING_KOKKOS_TAG_VALUE \
@@ -470,6 +473,7 @@ jobs:
           pushd runtime
           C_COMPILER=$(which gcc) \
           CXX_COMPILER=$(which g++) \
+          COMPILER_LAUNCHER="" \
           QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build/" \
           QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include/" \
           make examples
