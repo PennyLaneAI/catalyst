@@ -13,8 +13,8 @@ ENABLE_KOKKOS?=OFF
 ifeq ($(ENABLE_KOKKOS),OFF)
 	LIGHTNING_GIT_TAG_VALUE?=latest_release
 else
-	# TODO: Update this after the latest_release tag is added to Lightning-Kokkos
-	LIGHTNING_GIT_TAG_VALUE?=v0.29.1
+	# TODO: Update this to latest_release for the v0.30.0 release
+	LIGHTNING_GIT_TAG_VALUE?=main
 endif
 
 coverage: CODE_COVERAGE=ON

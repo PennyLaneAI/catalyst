@@ -417,8 +417,8 @@ jobs:
         run: |
           sudo apt-get -y -q install cmake ninja-build libomp-dev lcov
           echo "LIGHTNING_TAG_VALUE=latest_release" >> $GITHUB_ENV
-          # TODO: Update this after the latest_release tag is added to Lightning-Kokkos
-          echo "LIGHTNING_KOKKOS_TAG_VALUE=v0.29.1" >> $GITHUB_ENV
+          # TODO: Update this to latest_release for the v0.30.0 release
+          echo "LIGHTNING_KOKKOS_TAG_VALUE=main" >> $GITHUB_ENV
       - if: ${{ github.event_name == 'push' }}
         run: |
           echo "LIGHTNING_TAG_VALUE=master" >> $GITHUB_ENV

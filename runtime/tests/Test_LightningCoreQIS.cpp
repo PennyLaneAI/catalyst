@@ -780,12 +780,7 @@ TEST_CASE("Test __quantum__qis__ Hadamard, ControlledPhaseShift, IsingYY, CRX, a
     // qml.var(qml.PauliZ(wires=1))
     auto obs = __quantum__qis__NamedObs(ObsId::PauliZ, *ctrls);
 
-#if defined(_KOKKOS)
-    REQUIRE_THROWS_WITH(__quantum__qis__Variance(obs),
-                        Catch::Contains("Variance not implemented in PennyLane-Lightning-Kokkos"));
-#else
     CHECK(__quantum__qis__Variance(obs) == Approx(0.0394695).margin(1e-5));
-#endif
 
     free(state);
     delete result;
@@ -1133,12 +1128,7 @@ TEST_CASE("Test __quantum__qis__Sample with num_qubits=2 calling Hadamard, Contr
     QUBIT **qubit = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
     auto obs = __quantum__qis__NamedObs(ObsId::PauliZ, *qubit);
 
-#if defined(_KOKKOS)
-    REQUIRE_THROWS_WITH(__quantum__qis__Variance(obs),
-                        Catch::Contains("Variance not implemented in PennyLane-Lightning-Kokkos"));
-#else
     CHECK(__quantum__qis__Variance(obs) == Approx(0.0394695).margin(1e-5));
-#endif
 
     __quantum__rt__finalize();
 
@@ -1189,12 +1179,8 @@ TEST_CASE("Test __quantum__qis__Sample with num_qubits=2 and PartialSample calli
     QUBIT **qubit = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
     auto obs = __quantum__qis__NamedObs(ObsId::PauliZ, *qubit);
 
-#if defined(_KOKKOS)
-    REQUIRE_THROWS_WITH(__quantum__qis__Variance(obs),
-                        Catch::Contains("Variance not implemented in PennyLane-Lightning-Kokkos"));
-#else
     CHECK(__quantum__qis__Variance(obs) == Approx(0.0394695).margin(1e-5));
-#endif
+
     __quantum__rt__finalize();
 
     free(samples);

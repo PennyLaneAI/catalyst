@@ -29,6 +29,7 @@ throw std::logic_error("StateVectorKokkos.hpp: No such header file");
 #include <stdexcept>
 
 #include "AdjointDiffKokkos.hpp"
+#include "MeasuresKokkos.hpp"
 #include "StateVectorKokkos.hpp"
 
 #include "CacheManager.hpp"

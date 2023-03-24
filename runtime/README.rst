@@ -70,7 +70,7 @@ The following table shows the available devices along with supported features:
      - All observables; Finite-shots not supported
    * - Variance
      - Only for ``Identity``, ``PauliX``, ``PauliY``, ``PauliZ``, and ``Hadamard``; Finite-shots not supported
-     - Not supported
+     - All observables; Finite-shots not supported
    * - Probability
      - Only for the computational basis on the supplied qubits; Finite-shots not supported
      - Only for the computational basis on the supplied qubits; Finite-shots not supported
