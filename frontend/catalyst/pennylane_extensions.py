@@ -119,9 +119,7 @@ class Function:
     """
 
     def __init__(self, fn):
-        assert isinstance(
-            fn, Grad
-        ), "Function boundaries only supported for gradients."  # What does boundaries mean?
+        assert isinstance(fn, Grad), "Function boundaries only supported for gradients."
         self.fn = fn
         self.__name__ = "grad." + fn.__name__
 
