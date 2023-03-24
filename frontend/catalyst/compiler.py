@@ -334,7 +334,7 @@ def compile_llvmir(filename):
         a path to the output file
     """
     if filename[-3:] != ".ll":
-        raise ValueError(f"Input file ({filename}) is not an LLVMIR file")
+        raise ValueError(f"Input file ({filename}) for compilation is not an LLVMIR file")
 
     new_fname = filename.replace(".ll", ".o")
 
