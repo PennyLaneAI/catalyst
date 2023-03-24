@@ -242,7 +242,7 @@ def lower_mhlo_to_linalg(filename):
     Returns:
         a path to the output file
     """
-    if filename.split(os.extsep)[-1] != "mlir":
+    if filename[-5:] != ".mlir":
         raise ValueError(f"Input file ({filename}) for MHLO lowering is not an MLIR file")
 
     command = [mhlo_opt_tool]
@@ -266,7 +266,7 @@ def bufferize_tensors(filename):
     Returns:
         a path to the output file
     """
-    if filename.split(os.extsep)[-1] != "mlir":
+    if filename[-5:] != ".mlir":
         raise ValueError(f"Input file ({filename}) for bufferization is not an MLIR file")
 
     command = [quantum_opt_tool]
@@ -289,7 +289,7 @@ def lower_all_to_llvm(filename):
     Returns:
         a path to the output file
     """
-    if filename.split(os.extsep)[-2:] != ["buff", "mlir"]:
+    if filename[-10:] != ".buff.mlir":
         raise ValueError(f"Input file ({filename}) is not a bufferized MLIR file")
 
     command = [quantum_opt_tool]
@@ -311,7 +311,7 @@ def convert_mlir_to_llvmir(filename):
     Returns:
         a path to the output file
     """
-    if filename.split(os.extsep)[-2:] != ["llvm", "mlir"]:
+    if filename[-10:] != ".llvm.mlir":
         raise ValueError(f"Input file ({filename}) is not an LLVM dialect MLIR file")
 
     command = [translate_tool]
@@ -333,7 +333,7 @@ def compile_llvmir(filename):
     Returns:
         a path to the output file
     """
-    if filename.split(os.extsep)[-1] != "ll":
+    if filename[-3:] != ".ll":
         raise ValueError(f"Input file ({filename}) is not an LLVMIR file")
 
     new_fname = filename.replace(".ll", ".o")
@@ -354,7 +354,7 @@ def link_lightning_runtime(filename):
     Returns:
         a path to the output file
     """
-    if filename.split(os.extsep)[-1] != "o":
+    if filename[-2:] != ".o":
         raise ValueError(f"Input file ({filename}) is not an object file")
 
     new_fname = filename.replace(".o", ".so")
