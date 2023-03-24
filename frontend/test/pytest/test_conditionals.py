@@ -233,21 +233,7 @@ class TestClassicalCompilation:
 
     def test_no_true_false_parameters(self):
         """Test non-empty parameter detection in conditionals"""
-        with pytest.raises(TypeError):
-
-            @qjit
-            def arithc1():
-                @cond(True)
-                def branch():
-                    return 1
-
-                @branch.otherwise
-                def branch(_):
-                    return 0
-
-                return branch()
-
-        with pytest.raises(TypeError):
+        with pytest.raises(TypeError, match="Conditional 'True'"):
 
             @qjit
             def arithc2():
@@ -257,6 +243,20 @@ class TestClassicalCompilation:
 
                 @branch.otherwise
                 def branch():
+                    return 0
+
+                return branch()
+
+        with pytest.raises(TypeError, match="Conditional 'False'"):
+
+            @qjit
+            def arithc1():
+                @cond(True)
+                def branch():
+                    return 1
+
+                @branch.otherwise
+                def branch(_):
                     return 0
 
                 return branch()
