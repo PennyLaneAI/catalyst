@@ -10,6 +10,9 @@
 * Build the runtime against qir-stdlib v0.1.0.
   [#58](https://github.com/PennyLaneAI/catalyst/pull/58)
 
+* Replace input-checking assertions with exceptions.
+  [#67](https://github.com/PennyLaneAI/catalyst/pull/67)
+
 * Lift heap allocations for quantum op results from the runtime into the MLIR compiler core. This
   allows all memref buffers to be memory managed in MLIR using the
   [MLIR bufferization infrastructure](https://mlir.llvm.org/docs/Bufferization/).
@@ -35,7 +38,8 @@
 This release contains contributions from (in alphabetical order):
 
 Ali Asadi,
-Erick Ochoa Lopez.
+Erick Ochoa Lopez,
+Sergei Mironov.
 
 # Release 0.1.1
 

@@ -231,6 +231,36 @@ class TestClassicalCompilation:
 
         assert arithi(x, y, op1, op2) == arithc(x, y, op1, op2)
 
+    def test_no_true_false_parameters(self):
+        """Test non-empty parameter detection in conditionals"""
+        with pytest.raises(TypeError, match="Conditional 'True'"):
+
+            @qjit
+            def arithc2():
+                @cond(True)
+                def branch(_):
+                    return 1
+
+                @branch.otherwise
+                def branch():
+                    return 0
+
+                return branch()
+
+        with pytest.raises(TypeError, match="Conditional 'False'"):
+
+            @qjit
+            def arithc1():
+                @cond(True)
+                def branch():
+                    return 1
+
+                @branch.otherwise
+                def branch(_):
+                    return 0
+
+                return branch()
+
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])

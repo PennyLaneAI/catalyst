@@ -38,6 +38,7 @@ from catalyst.pennylane_extensions import (  # pylint: disable=wrong-import-posi
     measure,
     grad,
 )
+from catalyst.utils.exceptions import CompileError  # pylint: disable=wrong-import-position
 
 
 __all__ = (
@@ -48,4 +49,5 @@ __all__ = (
     "cond",
     "measure",
     "grad",
+    "CompileError",
 )
