@@ -163,7 +163,7 @@ class Grad:
         """
         jaxpr = jax.make_jaxpr(self.fn)(*args)
         if len(jaxpr.eqns) != 1:
-            raise TypeError(f"catalyst.grad can only be used on QNodes and other grad calls")
+            raise TypeError("catalyst.grad can only be used on QNodes and other grad calls")
         if jaxpr.eqns[0].primitive != jprim.func_p:
             raise TypeError(
                 f"Attempting to differentiate something other than a function "
