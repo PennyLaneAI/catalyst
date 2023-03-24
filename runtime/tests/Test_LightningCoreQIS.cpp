@@ -31,14 +31,6 @@ MemRefT_CplxT_double_1d getState(size_t buffer_len)
     return result;
 }
 
-MemRefT_CplxT_double_1d getStridedState(size_t buffer_len, size_t stride)
-{
-    size_t strided_buffer_len = stride * buffer_len;
-    CplxT_double *buffer = new CplxT_double[strided_buffer_len];
-    MemRefT_CplxT_double_1d result = {buffer, buffer, 0, {strided_buffer_len}, {stride}};
-    return result;
-}
-
 void freeState(MemRefT_CplxT_double_1d &result) { delete[] result.data_allocated; }
 
 PairT_MemRefT_double_int64_1d getCounts(size_t buffer_len)
@@ -263,6 +255,7 @@ TEST_CASE("Test copy to strided array", "[qir_lightning_core]")
 
     delete[] buffer_strided;
 }
+
 TEST_CASE("Test __quantum__qis__Measure", "[qir_lightning_core]")
 {
     // initialize the simulator
