@@ -504,11 +504,13 @@ def test_adjoint_grad_range_change(inp):
 
 @pytest.mark.parametrize("method", [("ps"), ("adj")])
 def test_assert_no_higher_order_without_ps(method):
+    """Test input validation for gradients"""
+
     def f(x):
         qml.RX(x, wires=0)
         return qml.expval(qml.PauliY(0))
 
-    with pytest.raises(AssertionError) as e_info:
+    with pytest.raises(ValueError, match="higher order derivatives"):
 
         @qjit()
         def workflow(x: float):
@@ -516,6 +518,30 @@ def test_assert_no_higher_order_without_ps(method):
             h = grad(g, method=method)
             i = grad(h, method=method)
             return i(x)
+
+
+def test_assert_no_non_func_gradients():
+    """Test input validation for gradients"""
+    with pytest.raises(TypeError, match="something other than a function"):
+
+        @qjit()
+        def workflow():
+            def _f(x):
+                return x + x
+
+            return grad(_f, method="fd")(1.0)
+
+
+def test_assert_no_non_single_expression_gradients():
+    """Test input validation for gradients"""
+    with pytest.raises(TypeError, match="can only be used on QNodes"):
+
+        @qjit()
+        def workflow():
+            def _f(x):
+                return x
+
+            return grad(_f, method="fd")(1.0)
 
 
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])

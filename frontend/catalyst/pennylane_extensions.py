@@ -114,6 +114,9 @@ class Function:
 
     Args:
         fn (Callable): the function boundary.
+
+    Raises:
+        AssertionError: Invalid function type.
     """
 
     def __init__(self, fn):
@@ -141,8 +144,8 @@ class Grad:
         argnum (int): the argument indices which define over which arguments to differentiate
 
     Raises:
-        AssertionError: Higher-order derivatives can only be computed with the finite difference
-                        method.
+        ValueError: Higher-order derivatives can only be computed with the finite difference
+                    method.
     """
 
     def __init__(self, fn, *, method, h, argnum):
@@ -151,10 +154,8 @@ class Grad:
         self.method = method
         self.h = h
         self.argnum = argnum
-        if self.method != "fd":
-            assert isinstance(
-                self.fn, qml.QNode
-            ), "Only finite difference can compute higher order derivatives."
+        if self.method != "fd" and not isinstance(self.fn, qml.QNode):
+            raise ValueError("Only finite difference can compute higher order derivatives.")
 
     def __call__(self, *args, **kwargs):
         """Specifies that an actual call to the differentiated function.
@@ -166,10 +167,13 @@ class Grad:
         )
 
         jaxpr = jax.make_jaxpr(self.fn)(*args)
-        assert len(jaxpr.eqns) == 1, "Grad is not well defined"
-        assert (
-            jaxpr.eqns[0].primitive == jprim.func_p
-        ), "Attempting to differentiate something other than a function"
+        if len(jaxpr.eqns) != 1:
+            raise TypeError("catalyst.grad can only be used on QNodes and other grad calls")
+        if jaxpr.eqns[0].primitive != jprim.func_p:
+            raise TypeError(
+                f"Attempting to differentiate something other than a function "
+                f"(got {jaxpr.eqns[0].primitive})"
+            )
         return jprim.grad_p.bind(
             *args, jaxpr=jaxpr, fn=self, method=self.method, h=self.h, argnum=self.argnum
         )
@@ -218,7 +222,7 @@ def grad(f, *, method=None, h=None, argnum=None):
         Grad: A Grad object that denotes the derivative of a function.
 
     Raises:
-        AssertionError: Invalid method or step size parameters.
+        ValueError: Invalid method or step size parameters.
 
     **Example**
 
@@ -239,12 +243,18 @@ def grad(f, *, method=None, h=None, argnum=None):
     >>> workflow(2.0)
     array(-3.14159265)
     """
+    methods = {"fd", "ps", "adj"}
     if method is None:
         method = "fd"
-    assert method in {"fd", "ps", "adj"}, "invalid differentiation method"
+    if method not in methods:
+        raise ValueError(
+            f"Invalid differentiation method '{method}'. "
+            f"Supported methods are: {' '.join(sorted(methods))}"
+        )
     if method == "fd" and h is None:
         h = 1e-7
-    assert h is None or isinstance(h, numbers.Number), "invalid h value"
+    if not (h is None or isinstance(h, numbers.Number)):
+        raise ValueError(f"Invalid h value ({h}). None or number was excpected.")
     if argnum is None:
         argnum = [0]
     elif isinstance(argnum, int):
@@ -300,9 +310,8 @@ class CondCallable:
         Returns:
             self
         """
-        assert (
-            false_fn.__code__.co_argcount == 0
-        ), "conditional 'False' function is not allowed to have any arguments"
+        if false_fn.__code__.co_argcount != 0:
+            raise TypeError("Conditional 'False' function is not allowed to have any arguments")
         self.false_fn = false_fn
         return self
 
@@ -480,9 +489,8 @@ def cond(pred):
     """
 
     def decorator(true_fn):
-        assert (
-            true_fn.__code__.co_argcount == 0
-        ), "conditional 'True' function is not allowed to have any arguments"
+        if true_fn.__code__.co_argcount != 0:
+            raise TypeError("Conditional 'True' function is not allowed to have any arguments")
         return CondCallable(pred, true_fn)
 
     return decorator
