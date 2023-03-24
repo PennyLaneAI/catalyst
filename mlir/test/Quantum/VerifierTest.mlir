@@ -287,7 +287,7 @@ func.func @counts4(%q0 : !quantum.bit, %q1 : !quantum.bit) {
     %in_eigvals = memref.alloc() : memref<2xf64>
     %in_counts = memref.alloc() : memref<2xi64>
     // expected-error@+1 {{either tensors must be returned or memrefs must be used as inputs}}
-    %err:2 = quantum.counts %obs in(%in_eigvals : memref<2xf64>, %in_counts : memref<2xi64>) { shots=1000 } : tensor<2xf64>, tensor<2xi64>
+    quantum.counts %obs { shots=1000 }
 
     return
 }
