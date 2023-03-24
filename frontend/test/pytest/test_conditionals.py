@@ -236,13 +236,27 @@ class TestClassicalCompilation:
         with pytest.raises(TypeError):
 
             @qjit
-            def arithc():
+            def arithc1():
+                @cond(True)
+                def branch():
+                    return 1
+
+                @branch.otherwise
+                def branch(_):
+                    return 0
+
+                return branch()
+
+        with pytest.raises(TypeError):
+
+            @qjit
+            def arithc2():
                 @cond(True)
                 def branch(_):
                     return 1
 
                 @branch.otherwise
-                def branch(_):
+                def branch():
                     return 0
 
                 return branch()
