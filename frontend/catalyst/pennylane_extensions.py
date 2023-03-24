@@ -155,7 +155,7 @@ class Grad:
         self.method = method
         self.h = h
         self.argnum = argnum
-        if self.method != "fd":
+        if self.method != "fd" and not isinstance(self.fn, qml.QNode):
             raise ValueError("Only finite difference can compute higher order derivatives.")
 
     def __call__(self, *args, **kwargs):
