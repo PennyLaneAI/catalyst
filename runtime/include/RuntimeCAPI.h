@@ -71,7 +71,7 @@ void memref_copy_slow(MemRefT<T, R> *dst, MemRefT<T, R> *src, __attribute__((unu
         for (int64_t axis = R - 1; axis >= 0; --axis) {
             // Advance at current axis.
             size_t newIndex = ++indices[axis];
-            readIndex += sizeof(T);
+            readIndex += srcStrides[axis];
             writeIndex += dstStrides[axis];
             // If this is a valid index, we have our next index, so continue copying.
             if (src->sizes[axis] != newIndex)
@@ -92,9 +92,12 @@ template <typename T, size_t R>
 void memref_copy(MemRefT<T, R> *memref, MemRefT<T, R> *buffer, size_t bytes)
 {
     bool can_use_fast_path = 0 == R || 1 == memref->strides[0];
+    size_t bytes_dst = 1;
     for (size_t i = 1; i < R && can_use_fast_path; i++) {
-        can_use_fast_path &= memref->strides[i] == memref->sizes[i - 1];
+        bytes_dst += memref->strides[i] * memref->sizes[i - 1];
     }
+
+    can_use_fast_path &= bytes_dst == bytes;
 
     if (can_use_fast_path) {
         memref_copy_fast(memref, buffer, bytes);

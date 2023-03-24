@@ -239,29 +239,28 @@ TEST_CASE("Test __quantum__qis__ PauliY and Rot", "[qir_lightning_core]")
     __quantum__rt__finalize();
 }
 
-TEST_CASE("Test __quantum__qis__ PauliY and Rot with strided array", "[qir_lightning_core]")
+TEST_CASE("Test copy to strided array", "[qir_lightning_core]")
 {
-    // initialize the simulator
-    __quantum__rt__initialize();
+    std::vector<double> data = {1, 2, 3, 4, 5, 6, 7, 8};
+    size_t buffer_len = data.size();
+    double *buffer = data.data();
+    MemRefT<double, 2> src = {buffer, buffer, 0, {buffer_len / 2, 2}, {2, 1}};
 
-    QUBIT *wire0 = __quantum__rt__qubit_allocate();
+    size_t buffer_strided_len = buffer_len * 2;
+    double *buffer_strided = new double[buffer_strided_len];
+    MemRefT<double, 2> dst = {
+        buffer_strided, buffer_strided, 0, {buffer_strided_len / 2, 2}, {4, 2}};
+    memref_copy_slow<double, 2>(&dst, &src, buffer_len * sizeof(double));
+    CHECK(buffer_strided[0] == buffer[0]);
+    CHECK(buffer_strided[2] == buffer[1]);
+    CHECK(buffer_strided[4] == buffer[2]);
+    CHECK(buffer_strided[6] == buffer[3]);
+    CHECK(buffer_strided[8] == buffer[4]);
+    CHECK(buffer_strided[10] == buffer[5]);
+    CHECK(buffer_strided[12] == buffer[6]);
+    CHECK(buffer_strided[14] == buffer[7]);
 
-    __quantum__rt__qubit_allocate();
-
-    __quantum__qis__PauliY(wire0);
-    __quantum__qis__Rot(0.4, 0.6, -0.2, wire0);
-
-    MemRefT_CplxT_double_1d result = getStridedState(4, 2);
-    __quantum__qis__State(&result, 0);
-    CplxT_double *state = result.data_allocated;
-
-    CHECK((state[0].real == Approx(0.0873321925).margin(1e-5) &&
-           state[0].imag == Approx(-0.2823212367).margin(1e-5)));
-    CHECK((state[4].real == Approx(-0.0953745058).margin(1e-5) &&
-           state[4].imag == Approx(0.9505637859).margin(1e-5)));
-
-    freeState(result);
-    __quantum__rt__finalize();
+    delete[] buffer_strided;
 }
 TEST_CASE("Test __quantum__qis__Measure", "[qir_lightning_core]")
 {
