@@ -42,13 +42,12 @@ TEST_CASE("Test __quantum__qis__Gradient_params with numAlloc=0", "[Gradient]")
 TEST_CASE("Test __quantum__qis__Gradient_params for zero number of obs", "[Gradient]")
 {
     // Test qis__Gradient:
-    int64_t trainParams[1] = {0};
-    MemRefT_double_1d *results = new MemRefT_double_1d();
-    MemRefT_int64_1d *tp = new MemRefT_int64_1d();
-    tp->data_aligned = trainParams;
-    tp->data_allocated = trainParams;
-    tp->sizes[0] = 1;
-    tp->strides[0] = 0;
+    std::vector<int64_t> trainParams{0};
+    size_t J = 1;
+    double *buffer = new double[J];
+    MemRefT_double_1d results = {buffer, buffer, 0, {J}, {1}};
+    int64_t *buffer_tp = trainParams.data();
+    MemRefT_int64_1d tp = {buffer_tp, buffer_tp, 0, {trainParams.size()}, {1}};
 
     __quantum__rt__initialize();
 
@@ -59,14 +58,12 @@ TEST_CASE("Test __quantum__qis__Gradient_params for zero number of obs", "[Gradi
     __quantum__qis__S(q);
     __quantum__qis__T(q);
 
-    REQUIRE_NOTHROW(__quantum__qis__Gradient_params(tp, 0, results));
+    REQUIRE_NOTHROW(__quantum__qis__Gradient_params(&tp, 0, &results));
 
     __quantum__rt__toggle_recorder(/* activate_cm */ false);
 
-    delete results;
-    delete tp;
-
     __quantum__rt__finalize();
+    delete[] buffer;
 }
 
 TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
@@ -74,13 +71,12 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
           "[Gradient]")
 {
     // Test qis__Gradient:
-    int64_t trainParams[1] = {0};
-    MemRefT_double_1d *results = new MemRefT_double_1d();
-    MemRefT_int64_1d *tp = new MemRefT_int64_1d();
-    tp->data_aligned = trainParams;
-    tp->data_allocated = trainParams;
-    tp->sizes[0] = 1;
-    tp->strides[0] = 0;
+    std::vector<int64_t> trainParams{0};
+    size_t J = 1;
+    double *buffer = new double[J];
+    MemRefT_double_1d results = {buffer, buffer, 0, {J}, {0}};
+    int64_t *buffer_tp = trainParams.data();
+    MemRefT_int64_1d tp = {buffer_tp, buffer_tp, 0, {trainParams.size()}, {0}};
 
     __quantum__rt__initialize();
 
@@ -94,18 +90,16 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
 
     __quantum__qis__Expval(obs);
 
-    REQUIRE_THROWS_WITH(__quantum__qis__Gradient(2, results),
+    REQUIRE_THROWS_WITH(__quantum__qis__Gradient(2, &results),
                         Catch::Contains("Invalid number of results"));
 
-    REQUIRE_THROWS_WITH(__quantum__qis__Gradient_params(tp, 2, results),
+    REQUIRE_THROWS_WITH(__quantum__qis__Gradient_params(&tp, 2, &results),
                         Catch::Contains("Invalid number of results"));
 
     __quantum__rt__toggle_recorder(/* activate_cm */ false);
 
-    delete results;
-    delete tp;
-
     __quantum__rt__finalize();
+    delete[] buffer;
 }
 
 TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
@@ -113,13 +107,12 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
           "[Gradient]")
 {
     // Test qis__Gradient:
-    int64_t trainParams[1] = {0};
-    MemRefT_double_1d *results = new MemRefT_double_1d();
-    MemRefT_int64_1d *tp = new MemRefT_int64_1d();
-    tp->data_aligned = trainParams;
-    tp->data_allocated = trainParams;
-    tp->sizes[0] = 1;
-    tp->strides[0] = 0;
+    std::vector<int64_t> trainParams{0};
+    size_t J = 1;
+    double *buffer = new double[J];
+    MemRefT_double_1d results = {buffer, buffer, 0, {J}, {1}};
+    int64_t *buffer_tp = trainParams.data();
+    MemRefT_int64_1d tp = {buffer_tp, buffer_tp, 0, {trainParams.size()}, {1}};
 
     __quantum__rt__initialize();
 
@@ -133,18 +126,16 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
 
     __quantum__qis__Variance(obs);
 
-    REQUIRE_THROWS_WITH(__quantum__qis__Gradient(1, results),
+    REQUIRE_THROWS_WITH(__quantum__qis__Gradient(1, &results),
                         Catch::Contains("Unsupported measurements to compute gradient"));
 
-    REQUIRE_THROWS_WITH(__quantum__qis__Gradient_params(tp, 1, results),
+    REQUIRE_THROWS_WITH(__quantum__qis__Gradient_params(&tp, 1, &results),
                         Catch::Contains("Unsupported measurements to compute gradient"));
 
     __quantum__rt__toggle_recorder(/* activate_cm */ false);
 
-    delete results;
-    delete tp;
-
     __quantum__rt__finalize();
+    delete[] buffer;
 }
 
 TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
@@ -152,14 +143,14 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
           "[Gradient]")
 {
     // Test qis__Gradient:
-    int64_t trainParams[1] = {0};
-    MemRefT_double_1d *result = new MemRefT_double_1d();
-    MemRefT_double_1d *result_tp = new MemRefT_double_1d();
-    MemRefT_int64_1d *tp_memref = new MemRefT_int64_1d();
-    tp_memref->data_aligned = trainParams;
-    tp_memref->data_allocated = trainParams;
-    tp_memref->sizes[0] = 1;
-    tp_memref->strides[0] = 0;
+    std::vector<int64_t> trainParams{0};
+    size_t J = trainParams.size();
+    double *buffer = new double[J];
+    MemRefT_double_1d result = {buffer, buffer, 0, {J}, {1}};
+    double *buffer_tp = new double[J];
+    MemRefT_double_1d result_tp = {buffer_tp, buffer_tp, 0, {J}, {1}};
+    int64_t *buffer_memref = trainParams.data();
+    MemRefT_int64_1d tp_memref = {buffer_memref, buffer_memref, 0, {trainParams.size()}, {1}};
 
     __quantum__rt__initialize();
 
@@ -173,18 +164,17 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
 
     __quantum__qis__Expval(obs_idx_0);
 
-    __quantum__qis__Gradient_params(tp_memref, 1, result_tp);
+    __quantum__qis__Gradient_params(&tp_memref, 1, &result_tp);
 
-    __quantum__qis__Gradient(1, result);
+    __quantum__qis__Gradient(1, &result);
 
     __quantum__rt__toggle_recorder(/* activate_cm */ false);
 
-    CHECK(-sin(-M_PI / 7) == Approx(result_tp->data_aligned[0]));
-    CHECK(-sin(-M_PI / 7) == Approx(result->data_aligned[0]));
+    CHECK(-sin(-M_PI / 7) == Approx(result_tp.data_aligned[0]));
+    CHECK(-sin(-M_PI / 7) == Approx(result.data_aligned[0]));
 
-    delete result_tp;
-    delete result;
-    delete tp_memref;
+    delete[] buffer;
+    delete[] buffer_tp;
 
     __quantum__rt__finalize();
 }
@@ -194,14 +184,14 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
           "[Gradient]")
 {
     // Test qis__Gradient:
-    int64_t trainParams[1] = {0};
-    MemRefT_double_1d *result = new MemRefT_double_1d();
-    MemRefT_double_1d *result_tp = new MemRefT_double_1d();
-    MemRefT_int64_1d *tp_memref = new MemRefT_int64_1d();
-    tp_memref->data_aligned = trainParams;
-    tp_memref->data_allocated = trainParams;
-    tp_memref->sizes[0] = 1;
-    tp_memref->strides[0] = 0;
+    std::vector<int64_t> trainParams{0};
+    size_t J = trainParams.size();
+    double *buffer = new double[J];
+    MemRefT_double_1d result = {buffer, buffer, 0, {J}, {1}};
+    double *buffer_tp = new double[J];
+    MemRefT_double_1d result_tp = {buffer_tp, buffer_tp, 0, {J}, {1}};
+    int64_t *buffer_tp_memref = trainParams.data();
+    MemRefT_int64_1d tp_memref = {buffer_tp_memref, buffer_tp_memref, 0, {trainParams.size()}, {1}};
 
     __quantum__rt__initialize();
 
@@ -225,22 +215,20 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
 
     __quantum__qis__Expval(obs_h);
 
-    __quantum__qis__Gradient_params(tp_memref, 1, result_tp);
+    __quantum__qis__Gradient_params(&tp_memref, 1, &result_tp);
 
-    __quantum__qis__Gradient(1, result);
+    __quantum__qis__Gradient(1, &result);
 
     __quantum__rt__toggle_recorder(/* activate_cm */ false);
 
     const double expected{0.2169418696};
-    CHECK(expected == Approx(result_tp->data_aligned[0]));
-    CHECK(expected == Approx(result->data_aligned[0]));
-
-    delete result_tp;
-    delete result;
-    delete tp_memref;
-    delete h_matrix;
+    CHECK(expected == Approx(result_tp.data_aligned[0]));
+    CHECK(expected == Approx(result.data_aligned[0]));
 
     __quantum__rt__finalize();
+    delete[] buffer;
+    delete[] buffer_tp;
+    delete h_matrix;
 }
 
 TEST_CASE("Test __quantum__qis__Gradient_params and __quantum__qis__Gradient "
@@ -249,14 +237,14 @@ TEST_CASE("Test __quantum__qis__Gradient_params and __quantum__qis__Gradient "
 {
     const std::vector<double> param{-M_PI / 7, M_PI / 5, 2 * M_PI / 3};
 
-    int64_t trainParams[1] = {0};
-    MemRefT_double_1d *result = new MemRefT_double_1d();
-    MemRefT_double_1d *result_tp = new MemRefT_double_1d();
-    MemRefT_int64_1d *tp_memref = new MemRefT_int64_1d();
-    tp_memref->data_aligned = trainParams;
-    tp_memref->data_allocated = trainParams;
-    tp_memref->sizes[0] = 1;
-    tp_memref->strides[0] = 0;
+    std::vector<int64_t> trainParams{0};
+    size_t J = trainParams.size();
+    double *buffer = new double[J];
+    MemRefT_double_1d result = {buffer, buffer, 0, {J}, {1}};
+    double *buffer_tp = new double[J];
+    MemRefT_double_1d result_tp = {buffer_tp, buffer_tp, 0, {J}, {1}};
+    int64_t *buffer_tp_memref = trainParams.data();
+    MemRefT_int64_1d tp_memref = {buffer_tp_memref, buffer_tp_memref, 0, {trainParams.size()}, {1}};
 
     for (const auto &p : param) {
         // Test qis__Gradient:
@@ -273,21 +261,20 @@ TEST_CASE("Test __quantum__qis__Gradient_params and __quantum__qis__Gradient "
 
         __quantum__qis__Expval(obs_idx_0);
 
-        __quantum__qis__Gradient_params(tp_memref, 1, result_tp);
+        __quantum__qis__Gradient_params(&tp_memref, 1, &result_tp);
 
-        __quantum__qis__Gradient(1, result);
+        __quantum__qis__Gradient(1, &result);
 
         __quantum__rt__toggle_recorder(/* activate_cm */ false);
 
-        CHECK(cos(p) == Approx(result_tp->data_aligned[0]).margin(1e-5));
-        CHECK(cos(p) == Approx(result->data_aligned[0]).margin(1e-5));
+        CHECK(cos(p) == Approx(result_tp.data_aligned[0]).margin(1e-5));
+        CHECK(cos(p) == Approx(result.data_aligned[0]).margin(1e-5));
 
         __quantum__rt__finalize();
     }
 
-    delete result_tp;
-    delete result;
-    delete tp_memref;
+    delete[] buffer;
+    delete[] buffer_tp;
 }
 
 TEST_CASE("Test __quantum__qis__Gradient_params Op=[Hadamard,RZ,RY,RZ,S,T,ParamShift], "
@@ -302,14 +289,14 @@ TEST_CASE("Test __quantum__qis__Gradient_params Op=[Hadamard,RZ,RY,RZ,S,T,ParamS
     };
 
     // Test qis__Gradient:
-    int64_t trainParams[3] = {0, 1, 2};
-    MemRefT_double_1d *result = new MemRefT_double_1d();
-    MemRefT_double_1d *result_tp = new MemRefT_double_1d();
-    MemRefT_int64_1d *tp_memref = new MemRefT_int64_1d();
-    tp_memref->data_aligned = trainParams;
-    tp_memref->data_allocated = trainParams;
-    tp_memref->sizes[0] = 3;
-    tp_memref->strides[0] = 0;
+    std::vector<int64_t> trainParams{0, 1, 2};
+    size_t J = trainParams.size();
+    double *buffer = new double[J];
+    MemRefT_double_1d result = {buffer, buffer, 0, {J}, {1}};
+    double *buffer_tp = new double[J];
+    MemRefT_double_1d result_tp = {buffer_tp, buffer_tp, 0, {J}, {1}};
+    int64_t *buffer_tp_memref = trainParams.data();
+    MemRefT_int64_1d tp_memref = {buffer_tp_memref, buffer_tp_memref, 0, {trainParams.size()}, {1}};
 
     __quantum__rt__initialize();
 
@@ -329,23 +316,22 @@ TEST_CASE("Test __quantum__qis__Gradient_params Op=[Hadamard,RZ,RY,RZ,S,T,ParamS
 
     __quantum__qis__Expval(obs_idx_0);
 
-    __quantum__qis__Gradient_params(tp_memref, 1, result_tp);
+    __quantum__qis__Gradient_params(&tp_memref, 1, &result_tp);
 
-    __quantum__qis__Gradient(1, result);
+    __quantum__qis__Gradient(1, &result);
 
     __quantum__rt__toggle_recorder(/* activate_cm */ false);
 
-    CHECK(expected[0] == Approx(result_tp->data_aligned[0]).margin(1e-5));
-    CHECK(expected[1] == Approx(result_tp->data_aligned[1]).margin(1e-5));
-    CHECK(expected[2] == Approx(result_tp->data_aligned[2]).margin(1e-5));
+    CHECK(expected[0] == Approx(result_tp.data_aligned[0]).margin(1e-5));
+    CHECK(expected[1] == Approx(result_tp.data_aligned[1]).margin(1e-5));
+    CHECK(expected[2] == Approx(result_tp.data_aligned[2]).margin(1e-5));
 
-    CHECK(expected[0] == Approx(result->data_aligned[0]).margin(1e-5));
-    CHECK(expected[1] == Approx(result->data_aligned[1]).margin(1e-5));
-    CHECK(expected[2] == Approx(result->data_aligned[2]).margin(1e-5));
+    CHECK(expected[0] == Approx(result.data_aligned[0]).margin(1e-5));
+    CHECK(expected[1] == Approx(result.data_aligned[1]).margin(1e-5));
+    CHECK(expected[2] == Approx(result.data_aligned[2]).margin(1e-5));
 
-    delete result;
-    delete result_tp;
-    delete tp_memref;
+    delete[] buffer;
+    delete[] buffer_tp;
 
     __quantum__rt__finalize();
 }
@@ -353,14 +339,13 @@ TEST_CASE("Test __quantum__qis__Gradient_params Op=[Hadamard,RZ,RY,RZ,S,T,ParamS
 TEST_CASE("Test __quantum__qis__Gradient Op=[RX,CY], Obs=[Z,Z]", "[Gradient]")
 {
     // Test qis__Gradient:
-    int64_t trainParams[1] = {0};
-    MemRefT_double_1d *result0 = new MemRefT_double_1d();
-    MemRefT_double_1d *result1 = new MemRefT_double_1d();
-    MemRefT_int64_1d *tp_memref = new MemRefT_int64_1d();
-    tp_memref->data_aligned = trainParams;
-    tp_memref->data_allocated = trainParams;
-    tp_memref->sizes[0] = 1;
-    tp_memref->strides[0] = 0;
+    std::vector<int64_t> trainParams{0};
+    const std::vector<double> expected{-sin(-M_PI / 7), 0.4338837391};
+    size_t J = trainParams.size();
+    double *buffer0 = new double[J];
+    MemRefT_double_1d result0 = {buffer0, buffer0, 0, {J}, {1}};
+    double *buffer1 = new double[J];
+    MemRefT_double_1d result1 = {buffer1, buffer1, 0, {J}, {1}};
 
     __quantum__rt__initialize();
 
@@ -378,19 +363,16 @@ TEST_CASE("Test __quantum__qis__Gradient Op=[RX,CY], Obs=[Z,Z]", "[Gradient]")
     __quantum__qis__Expval(obs_idx_0);
     __quantum__qis__Expval(obs_idx_1);
 
-    __quantum__qis__Gradient(2, result0, result1);
+    __quantum__qis__Gradient(2, &result0, &result1);
 
     __quantum__rt__toggle_recorder(/* activate_cm */ false);
 
-    const std::vector<double> expected{-sin(-M_PI / 7), 0.4338837391};
-    CHECK(expected[0] == Approx(result0->data_aligned[0]).margin(1e-5));
-    CHECK(expected[1] == Approx(result1->data_aligned[0]).margin(1e-5));
-
-    delete result0;
-    delete result1;
-    delete tp_memref;
+    CHECK(expected[0] == Approx(result0.data_aligned[0]).margin(1e-5));
+    CHECK(expected[1] == Approx(result1.data_aligned[0]).margin(1e-5));
 
     __quantum__rt__finalize();
+    delete[] buffer0;
+    delete[] buffer1;
 }
 
 TEST_CASE("Test __quantum__qis__Gradient_params Op=[RX,RX,RX,CZ], Obs=[Z,Z,Z]", "[Gradient]")
@@ -399,15 +381,16 @@ TEST_CASE("Test __quantum__qis__Gradient_params Op=[RX,RX,RX,CZ], Obs=[Z,Z,Z]", 
     const std::vector<double> expected{-sin(param[0]), -sin(param[1]), -sin(param[2])};
 
     // Test qis__Gradient:
-    int64_t trainParams[3] = {0, 1, 2};
-    MemRefT_double_1d *result0 = new MemRefT_double_1d();
-    MemRefT_double_1d *result1 = new MemRefT_double_1d();
-    MemRefT_double_1d *result2 = new MemRefT_double_1d();
-    MemRefT_int64_1d *tp_memref = new MemRefT_int64_1d();
-    tp_memref->data_aligned = trainParams;
-    tp_memref->data_allocated = trainParams;
-    tp_memref->sizes[0] = 3;
-    tp_memref->strides[0] = 0;
+    std::vector<int64_t> trainParams{0, 1, 2};
+    size_t J = trainParams.size();
+    double *buffer0 = new double[J];
+    MemRefT_double_1d result0 = {buffer0, buffer0, 0, {J}, {1}};
+    double *buffer1 = new double[J];
+    MemRefT_double_1d result1 = {buffer1, buffer1, 0, {J}, {1}};
+    double *buffer2 = new double[J];
+    MemRefT_double_1d result2 = {buffer2, buffer2, 0, {J}, {1}};
+    int64_t *buffer_tp_memref = trainParams.data();
+    MemRefT_int64_1d tp_memref = {buffer_tp_memref, buffer_tp_memref, 0, {trainParams.size()}, {1}};
 
     __quantum__rt__initialize();
 
@@ -430,19 +413,17 @@ TEST_CASE("Test __quantum__qis__Gradient_params Op=[RX,RX,RX,CZ], Obs=[Z,Z,Z]", 
     __quantum__qis__Expval(obs_idx_1);
     __quantum__qis__Expval(obs_idx_2);
 
-    __quantum__qis__Gradient_params(tp_memref, 3, result0, result1, result2);
+    __quantum__qis__Gradient_params(&tp_memref, 3, &result0, &result1, &result2);
 
     __quantum__rt__toggle_recorder(/* activate_cm */ false);
 
-    CHECK(expected[0] == Approx(result0->data_aligned[0]).margin(1e-5));
-    CHECK(expected[1] == Approx(result1->data_aligned[1]).margin(1e-5));
-    CHECK(expected[2] == Approx(result2->data_aligned[2]).margin(1e-5));
+    CHECK(expected[0] == Approx(result0.data_aligned[0]).margin(1e-5));
+    CHECK(expected[1] == Approx(result1.data_aligned[1]).margin(1e-5));
+    CHECK(expected[2] == Approx(result2.data_aligned[2]).margin(1e-5));
 
-    delete result0;
-    delete result1;
-    delete result2;
-    delete tp_memref;
-
+    delete[] buffer0;
+    delete[] buffer1;
+    delete[] buffer2;
     __quantum__rt__finalize();
 }
 
@@ -455,14 +436,14 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
                                        0.275139672, -0.0129093062, 0.3238461564};
 
     // Test qis__Gradient:
-    int64_t trainParams[6] = {0, 1, 2, 3, 4, 5};
-    MemRefT_double_1d *result = new MemRefT_double_1d();
-    MemRefT_double_1d *result_tp = new MemRefT_double_1d();
-    MemRefT_int64_1d *tp_memref = new MemRefT_int64_1d();
-    tp_memref->data_aligned = trainParams;
-    tp_memref->data_allocated = trainParams;
-    tp_memref->sizes[0] = 6;
-    tp_memref->strides[0] = 0;
+    std::vector<int64_t> trainParams{0, 1, 2, 3, 4, 5};
+    size_t J = trainParams.size();
+    double *buffer = new double[J];
+    MemRefT_double_1d result = {buffer, buffer, 0, {J}, {1}};
+    double *buffer_tp = new double[J];
+    MemRefT_double_1d result_tp = {buffer_tp, buffer_tp, 0, {J}, {1}};
+    int64_t *buffer_tp_memref = trainParams.data();
+    MemRefT_int64_1d tp_memref = {buffer_tp_memref, buffer_tp_memref, 0, {trainParams.size()}, {1}};
 
     __quantum__rt__initialize();
 
@@ -488,31 +469,29 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
 
     __quantum__qis__Expval(obs_tp);
 
-    __quantum__qis__Gradient_params(tp_memref, 1, result_tp);
+    __quantum__qis__Gradient_params(&tp_memref, 1, &result_tp);
 
-    __quantum__qis__Gradient(1, result);
+    __quantum__qis__Gradient(1, &result);
 
     __quantum__rt__toggle_recorder(/* activate_cm */ false);
 
-    CHECK(expected[0] == Approx(result_tp->data_aligned[0]).margin(1e-5));
-    CHECK(expected[1] == Approx(result_tp->data_aligned[1]).margin(1e-5));
-    CHECK(expected[2] == Approx(result_tp->data_aligned[2]).margin(1e-5));
-    CHECK(expected[3] == Approx(result_tp->data_aligned[3]).margin(1e-5));
-    CHECK(expected[4] == Approx(result_tp->data_aligned[4]).margin(1e-5));
-    CHECK(expected[5] == Approx(result_tp->data_aligned[5]).margin(1e-5));
+    CHECK(expected[0] == Approx(result_tp.data_aligned[0]).margin(1e-5));
+    CHECK(expected[1] == Approx(result_tp.data_aligned[1]).margin(1e-5));
+    CHECK(expected[2] == Approx(result_tp.data_aligned[2]).margin(1e-5));
+    CHECK(expected[3] == Approx(result_tp.data_aligned[3]).margin(1e-5));
+    CHECK(expected[4] == Approx(result_tp.data_aligned[4]).margin(1e-5));
+    CHECK(expected[5] == Approx(result_tp.data_aligned[5]).margin(1e-5));
 
-    CHECK(expected[0] == Approx(result->data_aligned[0]).margin(1e-5));
-    CHECK(expected[1] == Approx(result->data_aligned[1]).margin(1e-5));
-    CHECK(expected[2] == Approx(result->data_aligned[2]).margin(1e-5));
-    CHECK(expected[3] == Approx(result->data_aligned[3]).margin(1e-5));
-    CHECK(expected[4] == Approx(result->data_aligned[4]).margin(1e-5));
-    CHECK(expected[5] == Approx(result->data_aligned[5]).margin(1e-5));
-
-    delete result;
-    delete result_tp;
-    delete tp_memref;
+    CHECK(expected[0] == Approx(result.data_aligned[0]).margin(1e-5));
+    CHECK(expected[1] == Approx(result.data_aligned[1]).margin(1e-5));
+    CHECK(expected[2] == Approx(result.data_aligned[2]).margin(1e-5));
+    CHECK(expected[3] == Approx(result.data_aligned[3]).margin(1e-5));
+    CHECK(expected[4] == Approx(result.data_aligned[4]).margin(1e-5));
+    CHECK(expected[5] == Approx(result.data_aligned[5]).margin(1e-5));
 
     __quantum__rt__finalize();
+    delete[] buffer;
+    delete[] buffer_tp;
 }
 
 TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
@@ -523,14 +502,15 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     const std::vector<double> expected{0.0, -0.414506421, 0.0, 0.0, -0.4643270456, 0.0210905264};
 
     // Test qis__Gradient:
-    int64_t trainParams[6] = {0, 1, 2, 3, 4, 5};
-    MemRefT_double_1d *result = new MemRefT_double_1d();
-    MemRefT_double_1d *result_tp = new MemRefT_double_1d();
-    MemRefT_int64_1d *tp_memref = new MemRefT_int64_1d();
-    tp_memref->data_aligned = trainParams;
-    tp_memref->data_allocated = trainParams;
-    tp_memref->sizes[0] = 6;
-    tp_memref->strides[0] = 0;
+    std::vector<int64_t> trainParams{0, 1, 2, 3, 4, 5};
+    size_t J = 8;
+    double *buffer = new double[J];
+    MemRefT_double_1d result = {buffer, buffer, 0, {J}, {1}};
+    size_t J_tp = trainParams.size();
+    double *buffer_tp = new double[J_tp];
+    MemRefT_double_1d result_tp = {buffer_tp, buffer_tp, 0, {J_tp}, {1}};
+    int64_t *buffer_tp_memref = trainParams.data();
+    MemRefT_int64_1d tp_memref = {buffer_tp_memref, buffer_tp_memref, 0, {trainParams.size()}, {0}};
 
     __quantum__rt__initialize();
 
@@ -558,31 +538,29 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
 
     __quantum__qis__Expval(obs_tensor);
 
-    __quantum__qis__Gradient_params(tp_memref, 1, result_tp);
+    __quantum__qis__Gradient_params(&tp_memref, 1, &result_tp);
 
-    __quantum__qis__Gradient(1, result);
+    __quantum__qis__Gradient(1, &result);
 
     __quantum__rt__toggle_recorder(/* activate_cm */ false);
 
-    CHECK(expected[0] == Approx(result_tp->data_aligned[0]).margin(1e-5));
-    CHECK(expected[1] == Approx(result_tp->data_aligned[1]).margin(1e-5));
-    CHECK(expected[2] == Approx(result_tp->data_aligned[2]).margin(1e-5));
-    CHECK(expected[3] == Approx(result_tp->data_aligned[3]).margin(1e-5));
-    CHECK(expected[4] == Approx(result_tp->data_aligned[4]).margin(1e-5));
-    CHECK(expected[5] == Approx(result_tp->data_aligned[5]).margin(1e-5));
+    CHECK(expected[0] == Approx(result_tp.data_aligned[0]).margin(1e-5));
+    CHECK(expected[1] == Approx(result_tp.data_aligned[1]).margin(1e-5));
+    CHECK(expected[2] == Approx(result_tp.data_aligned[2]).margin(1e-5));
+    CHECK(expected[3] == Approx(result_tp.data_aligned[3]).margin(1e-5));
+    CHECK(expected[4] == Approx(result_tp.data_aligned[4]).margin(1e-5));
+    CHECK(expected[5] == Approx(result_tp.data_aligned[5]).margin(1e-5));
 
-    CHECK(expected[0] == Approx(result->data_aligned[0]).margin(1e-5));
-    CHECK(expected[1] == Approx(result->data_aligned[1]).margin(1e-5));
-    CHECK(expected[2] == Approx(result->data_aligned[2]).margin(1e-5));
-    CHECK(expected[3] == Approx(result->data_aligned[3]).margin(1e-5));
-    CHECK(expected[4] == Approx(result->data_aligned[4]).margin(1e-5));
-    CHECK(expected[5] == Approx(result->data_aligned[5]).margin(1e-5));
-
-    delete result;
-    delete result_tp;
-    delete tp_memref;
+    CHECK(expected[0] == Approx(result.data_aligned[0]).margin(1e-5));
+    CHECK(expected[1] == Approx(result.data_aligned[1]).margin(1e-5));
+    CHECK(expected[2] == Approx(result.data_aligned[2]).margin(1e-5));
+    CHECK(expected[3] == Approx(result.data_aligned[3]).margin(1e-5));
+    CHECK(expected[4] == Approx(result.data_aligned[4]).margin(1e-5));
+    CHECK(expected[5] == Approx(result.data_aligned[5]).margin(1e-5));
 
     __quantum__rt__finalize();
+    delete[] buffer;
+    delete[] buffer_tp;
 }
 
 TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
@@ -594,14 +572,14 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     const std::vector<double> expected{0.0, -0.2493761627, 0.0, 0.0, -0.1175570505, 0.0};
 
     // Test qis__Gradient:
-    int64_t trainParams[6] = {0, 1, 2, 3, 4, 5};
-    MemRefT_double_1d *result = new MemRefT_double_1d();
-    MemRefT_double_1d *result_tp = new MemRefT_double_1d();
-    MemRefT_int64_1d *tp_memref = new MemRefT_int64_1d();
-    tp_memref->data_aligned = trainParams;
-    tp_memref->data_allocated = trainParams;
-    tp_memref->sizes[0] = 6;
-    tp_memref->strides[0] = 0;
+    std::vector<int64_t> trainParams{0, 1, 2, 3, 4, 5};
+    size_t J = trainParams.size();
+    double *buffer = new double[J];
+    MemRefT_double_1d result = {buffer, buffer, 0, {J}, {1}};
+    double *buffer_tp = new double[J];
+    MemRefT_double_1d result_tp = {buffer_tp, buffer_tp, 0, {J}, {1}};
+    int64_t *buffer_tp_memref = trainParams.data();
+    MemRefT_int64_1d tp_memref = {buffer_tp_memref, buffer_tp_memref, 0, {trainParams.size()}, {1}};
 
     __quantum__rt__initialize();
 
@@ -621,46 +599,38 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     __quantum__qis__RZ(param[2], q1);
 
     double coeffs_data[2] = {0.2, 0.6};
-    MemRefT_double_1d *coeffs = new MemRefT_double_1d;
-    coeffs->data_allocated = coeffs_data;
-    coeffs->data_aligned = coeffs_data;
-    coeffs->offset = 0;
-    coeffs->sizes[0] = 2;
-    coeffs->strides[0] = 1;
+    MemRefT_double_1d coeffs = {coeffs_data, coeffs_data, 0, {2}, {1}};
 
     auto obs_idx_0 = __quantum__qis__NamedObs(ObsId::PauliZ, q0);
     auto obs_idx_1 = __quantum__qis__NamedObs(ObsId::PauliZ, q1);
     auto obs_idx_2 = __quantum__qis__NamedObs(ObsId::Hadamard, q2);
     auto obs_tensor = __quantum__qis__TensorObs(2, obs_idx_0, obs_idx_1);
-    auto obs_hamiltonian = __quantum__qis__HamiltonianObs(coeffs, 2, obs_tensor, obs_idx_2);
+    auto obs_hamiltonian = __quantum__qis__HamiltonianObs(&coeffs, 2, obs_tensor, obs_idx_2);
 
     __quantum__qis__Expval(obs_hamiltonian);
 
-    __quantum__qis__Gradient_params(tp_memref, 1, result_tp);
+    __quantum__qis__Gradient_params(&tp_memref, 1, &result_tp);
 
-    __quantum__qis__Gradient(1, result);
+    __quantum__qis__Gradient(1, &result);
 
     __quantum__rt__toggle_recorder(/* activate_cm */ false);
 
-    CHECK(expected[0] == Approx(result_tp->data_aligned[0]).margin(1e-5));
-    CHECK(expected[1] == Approx(result_tp->data_aligned[1]).margin(1e-5));
-    CHECK(expected[2] == Approx(result_tp->data_aligned[2]).margin(1e-5));
-    CHECK(expected[3] == Approx(result_tp->data_aligned[3]).margin(1e-5));
-    CHECK(expected[4] == Approx(result_tp->data_aligned[4]).margin(1e-5));
-    CHECK(expected[5] == Approx(result_tp->data_aligned[5]).margin(1e-5));
+    CHECK(expected[0] == Approx(result_tp.data_aligned[0]).margin(1e-5));
+    CHECK(expected[1] == Approx(result_tp.data_aligned[1]).margin(1e-5));
+    CHECK(expected[2] == Approx(result_tp.data_aligned[2]).margin(1e-5));
+    CHECK(expected[3] == Approx(result_tp.data_aligned[3]).margin(1e-5));
+    CHECK(expected[4] == Approx(result_tp.data_aligned[4]).margin(1e-5));
+    CHECK(expected[5] == Approx(result_tp.data_aligned[5]).margin(1e-5));
 
-    CHECK(expected[0] == Approx(result->data_aligned[0]).margin(1e-5));
-    CHECK(expected[1] == Approx(result->data_aligned[1]).margin(1e-5));
-    CHECK(expected[2] == Approx(result->data_aligned[2]).margin(1e-5));
-    CHECK(expected[3] == Approx(result->data_aligned[3]).margin(1e-5));
-    CHECK(expected[4] == Approx(result->data_aligned[4]).margin(1e-5));
-    CHECK(expected[5] == Approx(result->data_aligned[5]).margin(1e-5));
+    CHECK(expected[0] == Approx(result.data_aligned[0]).margin(1e-5));
+    CHECK(expected[1] == Approx(result.data_aligned[1]).margin(1e-5));
+    CHECK(expected[2] == Approx(result.data_aligned[2]).margin(1e-5));
+    CHECK(expected[3] == Approx(result.data_aligned[3]).margin(1e-5));
+    CHECK(expected[4] == Approx(result.data_aligned[4]).margin(1e-5));
+    CHECK(expected[5] == Approx(result.data_aligned[5]).margin(1e-5));
 
-    delete coeffs;
-    delete result;
-    delete result_tp;
-    delete tp_memref;
-
+    delete[] buffer;
+    delete[] buffer_tp;
     __quantum__rt__finalize();
 }
 
@@ -669,14 +639,14 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
           "[Gradient]")
 {
     // Test qis__Gradient:
-    int64_t trainParams[1] = {0};
-    MemRefT_double_1d *result = new MemRefT_double_1d();
-    MemRefT_double_1d *result_tp = new MemRefT_double_1d();
-    MemRefT_int64_1d *tp_memref = new MemRefT_int64_1d();
-    tp_memref->data_aligned = trainParams;
-    tp_memref->data_allocated = trainParams;
-    tp_memref->sizes[0] = 1;
-    tp_memref->strides[0] = 0;
+    std::vector<int64_t> trainParams{0};
+    size_t J = trainParams.size();
+    double *buffer = new double[J];
+    MemRefT_double_1d result = {buffer, buffer, 0, {J}, {1}};
+    double *buffer_tp = new double[J];
+    MemRefT_double_1d result_tp = {buffer_tp, buffer_tp, 0, {J}, {1}};
+    int64_t *buffer_tp_memref = trainParams.data();
+    MemRefT_int64_1d tp_memref = {buffer_tp_memref, buffer_tp_memref, 0, {1}, {1}};
 
     __quantum__rt__initialize();
 
@@ -710,19 +680,18 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
 
     __quantum__qis__Expval(obs_h);
 
-    __quantum__qis__Gradient_params(tp_memref, 1, result_tp);
+    __quantum__qis__Gradient_params(&tp_memref, 1, &result_tp);
 
-    __quantum__qis__Gradient(1, result);
+    __quantum__qis__Gradient(1, &result);
 
     __quantum__rt__toggle_recorder(/* activate_cm */ false);
 
     const double expected{0.2169418696};
-    CHECK(expected == Approx(result_tp->data_aligned[0]));
-    CHECK(expected == Approx(result->data_aligned[0]));
+    CHECK(expected == Approx(result_tp.data_aligned[0]));
+    CHECK(expected == Approx(result.data_aligned[0]));
 
-    delete result_tp;
-    delete result;
-    delete tp_memref;
+    delete[] buffer;
+    delete[] buffer_tp;
     delete h_matrix;
 
     __quantum__rt__finalize();

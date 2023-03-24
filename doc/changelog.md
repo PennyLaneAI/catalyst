@@ -17,6 +17,10 @@
 * Replace input-checking assertions with exceptions.
   [#67](https://github.com/PennyLaneAI/catalyst/pull/67)
 
+* Lift heap allocations for quantum op results from the runtime into the MLIR compiler core. This
+  allows all memref buffers to be memory managed in MLIR using the
+  [MLIR bufferization infrastructure](https://mlir.llvm.org/docs/Bufferization/).
+  [#63](https://github.com/PennyLaneAI/catalyst/pull/63)
 
 <h3>Breaking changes</h3>
 

@@ -90,7 +90,7 @@ struct AdjointOpPattern : public OpConversionPattern<AdjointOp> {
         Value c_false = rewriter.create<LLVM::ConstantOp>(
             loc, rewriter.getIntegerAttr(IntegerType::get(ctx, 1), 0));
         rewriter.create<LLVM::CallOp>(loc, cacheFnDecl, c_true);
-        Value qreg = rewriter.create<func::CallOp>(loc, callee, op.getOperands()).getResult(0);
+        Value qreg = rewriter.create<func::CallOp>(loc, callee, op.getArgs()).getResult(0);
         if (!qreg.getType().isa<catalyst::quantum::QuregType>())
             return callee.emitOpError("qfunc must return quantum register");
         rewriter.create<LLVM::CallOp>(loc, cacheFnDecl, c_false);
@@ -99,21 +99,19 @@ struct AdjointOpPattern : public OpConversionPattern<AdjointOp> {
         // arguments to the C function, although in this case as a variadic argument list to allow
         // for a varying number of results in a single signature.
         Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
-        Value numResults =
-            rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(op.getNumResults()));
+        Value numResults = rewriter.create<LLVM::ConstantOp>(
+            loc, rewriter.getI64IntegerAttr(op.getDataIn().size()));
         SmallVector<Value> args = {numResults};
-        for (unsigned i = 0; i < op.getNumResults(); i++) {
-            args.push_back(
-                rewriter.create<LLVM::AllocaOp>(loc, LLVM::LLVMPointerType::get(vectorType), c1));
+        for (Value memref : adaptor.getDataIn()) {
+            auto newArg =
+                rewriter.create<LLVM::AllocaOp>(loc, LLVM::LLVMPointerType::get(vectorType), c1);
+            rewriter.create<LLVM::StoreOp>(loc, memref, newArg);
+            args.push_back(newArg);
         }
 
-        SmallVector<Value> gradients;
         rewriter.create<LLVM::CallOp>(loc, gradFnDecl, args);
         rewriter.create<catalyst::quantum::DeallocOp>(loc, qreg);
-        for (Value structPtr : ArrayRef<Value>(args).drop_front()) {
-            gradients.push_back(rewriter.create<LLVM::LoadOp>(loc, structPtr));
-        }
-        rewriter.replaceOp(op, gradients);
+        rewriter.eraseOp(op);
 
         return success();
     }

@@ -24,6 +24,7 @@
 #include <ostream>
 #include <string>
 
+#include "MemRefUtils.hpp"
 #include "QuantumDevice.hpp"
 
 #include "RuntimeCAPI.h"
@@ -140,7 +141,7 @@ QirString *__quantum__rt__result_to_string(RESULT *result)
 void __quantum__qis__Gradient(int64_t numResults, /* results = */...)
 {
     assert(numResults >= 0);
-    using ResultType = MemRefT_double_1d;
+    using ResultType = MemRefT<double, 1>;
 
     // num_observables * num_train_params
     auto &&jacobian = Catalyst::Runtime::CAPI::get_device()->Gradient({});
@@ -163,20 +164,12 @@ void __quantum__qis__Gradient(int64_t numResults, /* results = */...)
     va_list args;
     va_start(args, numResults);
     for (int64_t i = 0; i < numResults; i++) {
-        auto *mrp = va_arg(args, ResultType *);
-        assert(mrp && "the result type cannot be a null pointer");
-
-        double *jac_data =
-            (double *)aligned_alloc(sizeof(double), num_train_params * sizeof(double));
-        for (size_t j = 0; j < num_train_params; j++) {
-            jac_data[j] = jacobian[i][j];
-        }
-
-        mrp->data_aligned = jac_data;
-        mrp->data_allocated = jac_data;
-        mrp->offset = 0;
-        mrp->sizes[0] = num_train_params;
-        mrp->strides[0] = 1;
+        MemRefT<double, 1> *memref = va_arg(args, ResultType *);
+        double *buffer = jacobian[i].data();
+        size_t buffer_len = jacobian[i].size();
+        MemRefT<double, 1> src = {buffer, buffer, 0, {buffer_len}, {1}};
+        assert(memref && "the result type cannot be a null pointer");
+        memref_copy<double, 1>(memref, &src, num_train_params * sizeof(double));
     }
     va_end(args);
 }
@@ -185,7 +178,7 @@ void __quantum__qis__Gradient_params(MemRefT_int64_1d *params, int64_t numResult
                                      /* results = */...)
 {
     assert(numResults >= 0);
-    using ResultType = MemRefT_double_1d;
+    using ResultType = MemRefT<double, 1>;
 
     if (params == nullptr || !params->sizes[0]) {
         __quantum__rt__fail_cstr("Invalid number of trainable parameters");
@@ -224,20 +217,12 @@ void __quantum__qis__Gradient_params(MemRefT_int64_1d *params, int64_t numResult
     va_list args;
     va_start(args, numResults);
     for (int64_t i = 0; i < numResults; i++) {
-        auto *mrp = va_arg(args, ResultType *);
-        assert(mrp && "the result type cannot be a null pointer");
-
-        double *jac_data =
-            (double *)aligned_alloc(sizeof(double), num_train_params * sizeof(double));
-        for (size_t j = 0; j < num_train_params; j++) {
-            jac_data[j] = jacobian[i][j];
-        }
-
-        mrp->data_aligned = jac_data;
-        mrp->data_aligned = jac_data;
-        mrp->offset = 0;
-        mrp->sizes[0] = num_train_params;
-        mrp->strides[0] = 1;
+        MemRefT<double, 1> *memref = va_arg(args, ResultType *);
+        assert(memref && "the result type cannot be a null pointer");
+        double *buffer = jacobian[i].data();
+        size_t buffer_len = jacobian[i].size();
+        MemRefT<double, 1> src = {buffer, buffer, 0, {buffer_len}, {1}};
+        memref_copy<double, 1>(memref, &src, num_train_params * sizeof(double));
     }
     va_end(args);
 }
@@ -632,6 +617,7 @@ double __quantum__qis__Variance(ObsIdType obsKey)
 void __quantum__qis__Probs(MemRefT_double_1d *result, int64_t numQubits, ...)
 {
     assert(numQubits >= 0);
+    MemRefT<double, 1> *result_p = (MemRefT<double, 1> *)result;
 
     va_list args;
     va_start(args, numQubits);
@@ -655,26 +641,16 @@ void __quantum__qis__Probs(MemRefT_double_1d *result, int64_t numQubits, ...)
     }
 
     const size_t numElements = 1U << numQubits;
-
-    // TODO: memory management
-    double *probs = (double *)aligned_alloc(sizeof(double), numElements * sizeof(double));
-    double *curr = probs;
-    for (size_t idx = 0; idx < numElements; idx++) {
-        *(curr++) = sv_probs[idx];
-    }
-
-    result->data_allocated = probs;
-    result->data_aligned = probs;
-    result->offset = 0;
-    result->sizes[0] = numElements;
-    result->strides[0] = 1;
+    double *buffer = sv_probs.data();
+    size_t buffer_len = sv_probs.size();
+    MemRefT<double, 1> src = {buffer, buffer, 0, {buffer_len}, {1}};
+    memref_copy<double, 1>(result_p, &src, numElements * sizeof(double));
 }
 
 void __quantum__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, ...)
 {
     assert(numQubits >= 0);
-
-    using CplxTD = CplxT_double;
+    MemRefT<std::complex<double>, 1> *result_p = (MemRefT<std::complex<double>, 1> *)result;
 
     va_list args;
     va_start(args, numQubits);
@@ -701,25 +677,18 @@ void __quantum__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, .
 
     const size_t numElements = sv_state.size();
     assert(numElements == (1U << numQubits));
-
-    // TODO: memory management
-    CplxTD *stateVec = (CplxTD *)aligned_alloc(sizeof(CplxTD), numElements * sizeof(CplxTD));
-    for (size_t idx = 0; idx < numElements; idx++) {
-        stateVec[idx].real = std::real(sv_state[idx]);
-        stateVec[idx].imag = std::imag(sv_state[idx]);
-    }
-
-    result->data_allocated = stateVec;
-    result->data_aligned = stateVec;
-    result->offset = 0;
-    result->sizes[0] = numElements;
-    result->strides[0] = 1;
+    std::complex<double> *buffer = sv_state.data();
+    size_t buffer_len = sv_state.size();
+    MemRefT<std::complex<double>, 1> src = {buffer, buffer, 0, {buffer_len}, {1}};
+    memref_copy<std::complex<double>, 1>(result_p, &src,
+                                         numElements * sizeof(std::complex<double>));
 }
 
 void __quantum__qis__Sample(MemRefT_double_2d *result, int64_t shots, int64_t numQubits, ...)
 {
     assert(shots >= 0);
     assert(numQubits >= 0);
+    MemRefT<double, 2> *result_p = (MemRefT<double, 2> *)result;
 
     va_list args;
     va_start(args, numQubits);
@@ -742,22 +711,11 @@ void __quantum__qis__Sample(MemRefT_double_2d *result, int64_t shots, int64_t nu
     }
 
     const size_t numElements = sv_samples.size();
-    assert(numElements == static_cast<size_t>(shots * numQubits));
-
-    // TODO: memory management
-    double *samples = (double *)aligned_alloc(sizeof(double), numElements * sizeof(double));
-    double *curr = samples;
-    for (size_t idx = 0; idx < numElements; idx++) {
-        *(curr++) = sv_samples[idx];
-    }
-
-    result->data_allocated = samples;
-    result->data_aligned = samples;
-    result->offset = 0;
-    result->sizes[0] = shots;
-    result->sizes[1] = numQubits;
-    result->strides[0] = numQubits;
-    result->strides[1] = 1;
+    double *buffer = sv_samples.data();
+    size_t _shots = static_cast<size_t>(shots);
+    size_t _numQubits = static_cast<size_t>(numQubits);
+    MemRefT<double, 2> src = {buffer, buffer, 0, {_shots, _numQubits}, {_numQubits, 1}};
+    memref_copy<double, 2>(result_p, &src, numElements * sizeof(double));
 }
 
 void __quantum__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t shots, int64_t numQubits,
@@ -765,6 +723,8 @@ void __quantum__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t shots
 {
     assert(shots >= 0);
     assert(numQubits >= 0);
+    MemRefT<double, 1> *result_eigvals_p = (MemRefT<double, 1> *)&result->first;
+    MemRefT<int64_t, 1> *result_counts_p = (MemRefT<int64_t, 1> *)&result->second;
 
     va_list args;
     va_start(args, numQubits);
@@ -790,36 +750,13 @@ void __quantum__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t shots
     auto &&sv_eigvals = std::get<0>(sv_counts);
     auto &&sv_cts = std::get<1>(sv_counts);
 
-    const size_t numElements = 1U << numQubits;
-    assert(numElements == sv_eigvals.size());
-    assert(numElements == sv_cts.size());
-
-    // eigvals
-    // TODO: memory management
-    double *eigvals = (double *)aligned_alloc(sizeof(double), numElements * sizeof(double));
-    double *curr = eigvals;
-    for (size_t idx = 0; idx < numElements; idx++) {
-        *(curr++) = sv_eigvals[idx];
-    }
-
-    result->first.data_allocated = eigvals;
-    result->first.data_aligned = eigvals;
-    result->first.offset = 0;
-    result->first.sizes[0] = numElements;
-    result->first.strides[0] = 1;
-
-    // counts
-    // TODO: memory management
-    int64_t *counts = (int64_t *)aligned_alloc(sizeof(int64_t), numElements * sizeof(int64_t));
-    int64_t *icurr = counts;
-    for (size_t idx = 0; idx < numElements; idx++) {
-        *(icurr++) = sv_cts[idx];
-    }
-
-    result->second.data_aligned = counts;
-    result->second.data_allocated = counts;
-    result->second.offset = 0;
-    result->second.sizes[0] = numElements;
-    result->second.strides[0] = 1;
+    const size_t numEigvals = sv_eigvals.size();
+    double *buffer_eigvals = sv_eigvals.data();
+    MemRefT<double, 1> srcEigvals = {buffer_eigvals, buffer_eigvals, 0, {numEigvals}, {1}};
+    memref_copy<double, 1>(result_eigvals_p, &srcEigvals, numEigvals * sizeof(double));
+    int64_t *buffer_counts = sv_cts.data();
+    const size_t numCounts = sv_cts.size();
+    MemRefT<int64_t, 1> srcCounts = {buffer_counts, buffer_counts, 0, {numCounts}, {1}};
+    memref_copy<int64_t, 1>(result_counts_p, &srcCounts, numCounts * sizeof(int64_t));
 }
 }

@@ -485,6 +485,18 @@ template <typename T> class SampleBasedPattern : public OpConversionPattern<T> {
         SmallVector<Value> args = {structPtr, numShots, numQubits};
         args.insert(args.end(), qubits.begin(), qubits.end());
 
+        if constexpr (std::is_same_v<T, SampleOp>) {
+            rewriter.create<LLVM::StoreOp>(loc, adaptor.getInData(), structPtr);
+        }
+        else if constexpr (std::is_same_v<T, CountsOp>) {
+            auto aStruct = rewriter.create<LLVM::UndefOp>(loc, structType);
+            auto bStruct =
+                rewriter.create<LLVM::InsertValueOp>(loc, aStruct, adaptor.getInEigvals(), 0);
+            auto cStruct =
+                rewriter.create<LLVM::InsertValueOp>(loc, bStruct, adaptor.getInCounts(), 1);
+            rewriter.create<LLVM::StoreOp>(loc, cStruct, structPtr);
+        }
+
         rewriter.create<LLVM::CallOp>(loc, fnDecl, args);
 
         return structPtr;
@@ -500,16 +512,15 @@ struct SampleOpPattern : public SampleBasedPattern<SampleOp> {
         MLIRContext *ctx = getContext();
         TypeConverter *conv = getTypeConverter();
 
-        assert(op.getSamples().getType().isa<MemRefType>() &&
-               "sample must return memref before lowering");
+        if (!op.isBufferized())
+            return op.emitOpError("op must be bufferized before lowering to LLVM");
 
         Type matrixType =
             conv->convertType(MemRefType::get({UNKNOWN, UNKNOWN}, Float64Type::get(ctx)));
 
         StringRef qirName = "__quantum__qis__Sample";
-        Value structPtr = performRewrite(rewriter, matrixType, qirName, op, adaptor);
-
-        rewriter.replaceOpWithNewOp<LLVM::LoadOp>(op, structPtr);
+        performRewrite(rewriter, matrixType, qirName, op, adaptor);
+        rewriter.eraseOp(op);
 
         return success();
     }
@@ -521,26 +532,19 @@ struct CountsOpPattern : public SampleBasedPattern<CountsOp> {
     LogicalResult matchAndRewrite(CountsOp op, CountsOpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
-        Location loc = op.getLoc();
         MLIRContext *ctx = getContext();
         TypeConverter *conv = getTypeConverter();
 
-        assert(op.getEigvals().getType().isa<MemRefType>() &&
-               "counts must return memrefs before lowering");
-        assert(op.getCounts().getType().isa<MemRefType>() &&
-               "counts must return memrefs before lowering");
+        if (!op.isBufferized())
+            return op.emitOpError("op must be bufferized before lowering to LLVM");
 
         Type vector1Type = conv->convertType(MemRefType::get({UNKNOWN}, Float64Type::get(ctx)));
         Type vector2Type = conv->convertType(MemRefType::get({UNKNOWN}, IntegerType::get(ctx, 64)));
         Type structType = LLVM::LLVMStructType::getLiteral(ctx, {vector1Type, vector2Type});
 
         StringRef qirName = "__quantum__qis__Counts";
-        Value structPtr = performRewrite(rewriter, structType, qirName, op, adaptor);
-
-        Value structVal = rewriter.create<LLVM::LoadOp>(loc, structPtr);
-        Value result1 = rewriter.create<LLVM::ExtractValueOp>(loc, vector1Type, structVal, 0);
-        Value result2 = rewriter.create<LLVM::ExtractValueOp>(loc, vector2Type, structVal, 1);
-        rewriter.replaceOp(op, {result1, result2});
+        performRewrite(rewriter, structType, qirName, op, adaptor);
+        rewriter.eraseOp(op);
 
         return success();
     }
@@ -585,8 +589,8 @@ template <typename T> struct StateBasedPattern : public OpConversionPattern<T> {
         MLIRContext *ctx = this->getContext();
         TypeConverter *conv = this->getTypeConverter();
 
-        assert(op.getType().template isa<MemRefType>() &&
-               "probs/state must return memref before lowering");
+        if (!op.isBufferized())
+            return op.emitOpError("op must be bufferized before lowering to LLVM");
 
         Type vectorType;
         StringRef qirName;
@@ -612,6 +616,7 @@ template <typename T> struct StateBasedPattern : public OpConversionPattern<T> {
         Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
         Value structPtr =
             rewriter.create<LLVM::AllocaOp>(loc, LLVM::LLVMPointerType::get(vectorType), c1);
+        rewriter.create<LLVM::StoreOp>(loc, adaptor.getStateIn(), structPtr);
 
         // For now obtain the qubit values from an unrealized cast created by the
         // ComputationalBasisOp lowering. Improve this once the runtime interface changes to
@@ -634,7 +639,7 @@ template <typename T> struct StateBasedPattern : public OpConversionPattern<T> {
         }
 
         rewriter.create<LLVM::CallOp>(loc, fnDecl, args);
-        rewriter.replaceOpWithNewOp<LLVM::LoadOp>(op, structPtr);
+        rewriter.eraseOp(op);
 
         return success();
     }

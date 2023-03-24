@@ -148,8 +148,8 @@ func::FuncOp AdjointLowering::genQGradFunction(PatternRewriter &rewriter, Locati
         rewriter.setInsertionPointToStart(qGradFn.addEntryBlock());
 
         AdjointOp qGradOp = rewriter.create<AdjointOp>(
-            loc, computeQGradTypes(callee), unallocFn.getName(),
-            qGradFn.getArguments().drop_back()); // device has no use for the gradient size value
+            loc, computeQGradTypes(callee), unallocFn.getName(), qGradFn.getArguments().back(),
+            qGradFn.getArguments().drop_back(), ValueRange{});
 
         rewriter.create<func::ReturnOp>(loc, qGradOp.getResults());
     }

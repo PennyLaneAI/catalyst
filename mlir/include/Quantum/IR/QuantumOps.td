@@ -437,24 +437,38 @@ def SampleOp : Measurement_Op<"sample"> {
 
     let arguments = (ins
         ObservableType:$obs,
+        Optional<
+           AnyTypeOf<[
+            MemRefRankOf<[F64], [1]>,
+            MemRefRankOf<[F64], [2]>
+           ]>
+        >:$in_data,
         I64Attr:$shots
     );
 
     let results = (outs
-        AnyTypeOf<[
-            1DTensorOf<[F64]>, MemRefRankOf<[F64], [1]>,
-            2DTensorOf<[F64]>, MemRefRankOf<[F64], [2]>
-        ]>:$samples
+        Optional<
+            AnyTypeOf<[
+                1DTensorOf<[F64]>,
+                2DTensorOf<[F64]>
+            ]>
+        >:$samples
     );
 
     let assemblyFormat = [{
-        $obs attr-dict `:` type(results)
+        $obs ( `in` `(` $in_data^ `:` type($in_data) `)` )? attr-dict ( `:` type($samples)^ )?
+    }];
+
+    let extraClassDeclaration = [{
+      bool isBufferized() {
+        return getResultTypes().empty();
+      }
     }];
 
     let hasVerifier = 1;
 }
 
-def CountsOp : Measurement_Op<"counts"> {
+def CountsOp : Measurement_Op<"counts", [AttrSizedOperandSegments, AttrSizedResultSegments]> {
     let summary = "Compute sample counts for the given observable for the current state";
     let description = [{
         The `quantum.counts` operation represents the measurement process of sampling eigenvalues
@@ -487,20 +501,26 @@ def CountsOp : Measurement_Op<"counts"> {
 
     let arguments = (ins
         ObservableType:$obs,
+        Optional<MemRefRankOf<[F64], [1]>>:$in_eigvals,
+        Optional<MemRefRankOf<[I64], [1]>>:$in_counts,
         I64Attr:$shots
     );
 
     let results = (outs
-        AnyTypeOf<[
-            1DTensorOf<[F64]>, MemRefRankOf<[F64], [1]>
-        ]>:$eigvals,
-        AnyTypeOf<[
-            1DTensorOf<[I64]>, MemRefRankOf<[I64], [1]>
-        ]>:$counts
+        Optional<1DTensorOf<[F64]>>:$eigvals,
+        Optional<1DTensorOf<[I64]>>:$counts
     );
 
     let assemblyFormat = [{
-        $obs attr-dict `:` type(results)
+        $obs
+        ( `in` `(` $in_eigvals^ `:` type($in_eigvals) `,` $in_counts `:` type($in_counts) `)` )?
+        attr-dict ( `:` type($eigvals)^ `,` type($counts) )?
+    }];
+
+    let extraClassDeclaration = [{
+      bool isBufferized() {
+        return getResultTypes().empty();
+      }
     }];
 
     let hasVerifier = 1;
@@ -603,17 +623,22 @@ def ProbsOp : Measurement_Op<"probs"> {
     }];
 
     let arguments = (ins
-        ObservableType:$obs
+        ObservableType:$obs,
+        Optional<MemRefRankOf<[F64], [1]>>:$state_in
     );
 
     let results = (outs
-        AnyTypeOf<[
-            1DTensorOf<[F64]>, MemRefRankOf<[F64], [1]>
-        ]>:$probabilities
+        Optional<1DTensorOf<[F64]>>:$probabilities
     );
 
     let assemblyFormat = [{
-        $obs attr-dict `:` type(results)
+        $obs ( `in` `(` $state_in^ `:` type($state_in) `)` )? attr-dict ( `:` type($probabilities)^ )?
+    }];
+
+    let extraClassDeclaration = [{
+      bool isBufferized() {
+        return getResultTypes().empty();
+      }
     }];
 
     let hasVerifier = 1;
@@ -642,17 +667,22 @@ def StateOp : Measurement_Op<"state"> {
     }];
 
     let arguments = (ins
-        ObservableType:$obs
+        ObservableType:$obs,
+        Optional<MemRefRankOf<[Complex<F64>], [1]>>:$state_in
     );
 
     let results = (outs
-        AnyTypeOf<[
-            1DTensorOf<[Complex<F64>]>, MemRefRankOf<[Complex<F64>], [1]>
-        ]>:$state
+        Optional<1DTensorOf<[Complex<F64>]>> :$state
     );
 
+    let extraClassDeclaration = [{
+      bool isBufferized() {
+        return getResultTypes().empty();
+      }
+    }];
+
     let assemblyFormat = [{
-        $obs attr-dict `:` type(results)
+        $obs ( `in` `(` $state_in^ `:` type($state_in) `)` )? attr-dict ( `:` type($state)^ )?
     }];
 
     let hasVerifier = 1;

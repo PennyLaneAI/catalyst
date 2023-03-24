@@ -54,6 +54,7 @@ target_include_directories(rt_capi PUBLIC .
                                         ${CMAKE_CURRENT_SOURCE_DIR}
                                         ${QIR_STDLIB_INCLUDES}
                                         ${runtime_includes}
+                                        ${capi_utils_includes}
                                         ${backend_includes}
                                         ${extensions_includes})
 

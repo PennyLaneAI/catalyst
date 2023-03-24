@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "Gradient/IR/GradientOps.h"
@@ -32,8 +33,19 @@ class BufferizeAdjointOp : public OpConversionPattern<AdjointOp> {
         SmallVector<Type> resTypes;
         if (failed(getTypeConverter()->convertTypes(op.getResultTypes(), resTypes)))
             return failure();
-        rewriter.replaceOpWithNewOp<AdjointOp>(op, resTypes, op.getCalleeAttr(),
-                                               adaptor.getOperands());
+
+        Location loc = op.getLoc();
+        Value gradSize = op.getGradSize();
+        SmallVector<Value> memrefValues;
+        for (Type resType : resTypes) {
+            MemRefType memrefType = resType.cast<MemRefType>();
+            Value memrefValue = rewriter.create<memref::AllocOp>(loc, memrefType, gradSize);
+            memrefValues.push_back(memrefValue);
+        }
+
+        rewriter.create<AdjointOp>(loc, TypeRange{}, op.getCalleeAttr(), adaptor.getGradSize(),
+                                   adaptor.getArgs(), memrefValues);
+        rewriter.replaceOp(op, memrefValues);
         return success();
     }
 };

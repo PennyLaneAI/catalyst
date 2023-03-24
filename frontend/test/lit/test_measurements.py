@@ -84,7 +84,7 @@ def counts1(x: float, y: float):
     qml.RZ(0.1, wires=0)
 
     # CHECK: [[obs:%.+]] = "quantum.namedobs"([[q0]]) {type = 3 : i8}
-    # CHECK: "quantum.counts"([[obs]]) {shots = 1000 : i64} {{.+}} -> (tensor<2xf64>, tensor<2xi64>)
+    # CHECK: "quantum.counts"([[obs]]) {{.*}}shots = 1000 : i64{{.*}} : (!quantum.obs) -> (tensor<2xf64>, tensor<2xi64>)
     return qml.counts(qml.PauliZ(0))
 
 
@@ -104,7 +104,7 @@ def counts2(x: float, y: float):
     # CHECK: [[obs1:%.+]] = "quantum.namedobs"([[q1]]) {type = 1 : i8}
     # CHECK: [[obs2:%.+]] = "quantum.namedobs"([[q0]]) {type = 0 : i8}
     # CHECK: [[obs3:%.+]] = "quantum.tensor"([[obs1]], [[obs2]])
-    # CHECK: "quantum.counts"([[obs3]]) {shots = 1000 : i64} {{.+}} -> (tensor<2xf64>, tensor<2xi64>)
+    # CHECK: "quantum.counts"([[obs3]]) {{.*}}shots = 1000 : i64{{.*}} : (!quantum.obs) -> (tensor<2xf64>, tensor<2xi64>)
     return qml.counts(qml.PauliX(1) @ qml.Identity(0))
 
 
@@ -122,7 +122,7 @@ def counts3(x: float, y: float):
     qml.RZ(0.1, wires=0)
 
     # CHECK: [[obs:%.+]] = "quantum.compbasis"([[q0]], [[q1]])
-    # CHECK: "quantum.counts"([[obs]]) {shots = 1000 : i64} {{.+}} -> (tensor<4xf64>, tensor<4xi64>)
+    # CHECK: "quantum.counts"([[obs]]) {{.*}}shots = 1000 : i64{{.*}} : (!quantum.obs) -> (tensor<4xf64>, tensor<4xi64>)
     return qml.counts()
 
 

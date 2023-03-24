@@ -18,10 +18,35 @@
 #include <string>
 
 #include "LightningUtils.hpp"
+#include "MemRefUtils.hpp"
 #include "QuantumDevice.hpp"
 #include "RuntimeCAPI.h"
 
 #include <catch2/catch.hpp>
+
+MemRefT_CplxT_double_1d getState(size_t buffer_len)
+{
+    CplxT_double *buffer = new CplxT_double[buffer_len];
+    MemRefT_CplxT_double_1d result = {buffer, buffer, 0, {buffer_len}, {1}};
+    return result;
+}
+
+void freeState(MemRefT_CplxT_double_1d &result) { delete[] result.data_allocated; }
+
+PairT_MemRefT_double_int64_1d getCounts(size_t buffer_len)
+{
+    double *buff_e = new double[buffer_len];
+    long *buff_c = new long[buffer_len];
+    PairT_MemRefT_double_int64_1d result = {{buff_e, buff_e, 0, {buffer_len}, {1}},
+                                            {buff_c, buff_c, 0, {buffer_len}, {1}}};
+    return result;
+}
+
+void freeCounts(PairT_MemRefT_double_int64_1d &result)
+{
+    delete[] result.first.data_allocated;
+    delete[] result.second.data_allocated;
+}
 
 using namespace Catalyst::Runtime;
 
@@ -127,12 +152,12 @@ TEST_CASE("Test __quantum__qis__State with wires", "[qir_lightning_core]")
 
     __quantum__rt__qubit_allocate();
 
-    MemRefT_CplxT_double_1d *result = new MemRefT_CplxT_double_1d;
-    REQUIRE_THROWS_WITH(__quantum__qis__State(result, 1, wire0),
+    MemRefT_CplxT_double_1d result = getState(8);
+
+    REQUIRE_THROWS_WITH(__quantum__qis__State(&result, 1, wire0),
                         Catch::Contains("Partial State-Vector not supported yet"));
 
-    delete result;
-
+    freeState(result);
     __quantum__rt__finalize();
 }
 
@@ -147,18 +172,16 @@ TEST_CASE("Test __quantum__qis__Identity", "[qir_lightning_core]")
 
     __quantum__qis__Identity(wire0);
 
-    MemRefT_CplxT_double_1d *result = new MemRefT_CplxT_double_1d;
-    __quantum__qis__State(result, 0);
-    CplxT_double *state = result->data_allocated;
+    MemRefT_CplxT_double_1d result = getState(4);
+    __quantum__qis__State(&result, 0);
+    CplxT_double *state = result.data_allocated;
 
     CHECK(state[0].real == Approx(1.0).margin(1e-5));
     CHECK(state[0].imag == Approx(0.0).margin(1e-5));
     CHECK(state[1].real == Approx(0.0).margin(1e-5));
     CHECK(state[1].imag == Approx(0.0).margin(1e-5));
 
-    free(state);
-    delete result;
-
+    freeState(result);
     __quantum__rt__finalize();
 }
 
@@ -173,16 +196,14 @@ TEST_CASE("Test __quantum__qis__PauliX", "[qir_lightning_core]")
 
     __quantum__qis__PauliX(wire0);
 
-    MemRefT_CplxT_double_1d *result = new MemRefT_CplxT_double_1d;
-    __quantum__qis__State(result, 0);
-    CplxT_double *state = result->data_allocated;
+    MemRefT_CplxT_double_1d result = getState(4);
+    __quantum__qis__State(&result, 0);
+    CplxT_double *state = result.data_allocated;
 
     CHECK((state[0].real == Approx(0.0).margin(1e-5) && state[0].imag == Approx(0.0).margin(1e-5)));
     CHECK((state[2].real == Approx(1.0).margin(1e-5) && state[2].imag == Approx(0.0).margin(1e-5)));
 
-    free(state);
-    delete result;
-
+    freeState(result);
     __quantum__rt__finalize();
 }
 
@@ -198,19 +219,41 @@ TEST_CASE("Test __quantum__qis__ PauliY and Rot", "[qir_lightning_core]")
     __quantum__qis__PauliY(wire0);
     __quantum__qis__Rot(0.4, 0.6, -0.2, wire0);
 
-    MemRefT_CplxT_double_1d *result = new MemRefT_CplxT_double_1d;
-    __quantum__qis__State(result, 0);
-    CplxT_double *state = result->data_allocated;
+    MemRefT_CplxT_double_1d result = getState(4);
+    __quantum__qis__State(&result, 0);
+    CplxT_double *state = result.data_allocated;
 
     CHECK((state[0].real == Approx(0.0873321925).margin(1e-5) &&
            state[0].imag == Approx(-0.2823212367).margin(1e-5)));
     CHECK((state[2].real == Approx(-0.0953745058).margin(1e-5) &&
            state[2].imag == Approx(0.9505637859).margin(1e-5)));
 
-    free(state);
-    delete result;
-
+    freeState(result);
     __quantum__rt__finalize();
+}
+
+TEST_CASE("Test copy to strided array", "[qir_lightning_core]")
+{
+    std::vector<double> data = {1, 2, 3, 4, 5, 6, 7, 8};
+    size_t buffer_len = data.size();
+    double *buffer = data.data();
+    MemRefT<double, 2> src = {buffer, buffer, 0, {buffer_len / 2, 2}, {2, 1}};
+
+    size_t buffer_strided_len = buffer_len * 2;
+    double *buffer_strided = new double[buffer_strided_len];
+    MemRefT<double, 2> dst = {
+        buffer_strided, buffer_strided, 0, {buffer_strided_len / 2, 2}, {4, 2}};
+    memref_copy<double, 2>(&dst, &src, buffer_len * sizeof(double));
+    CHECK(buffer_strided[0] == buffer[0]);
+    CHECK(buffer_strided[2] == buffer[1]);
+    CHECK(buffer_strided[4] == buffer[2]);
+    CHECK(buffer_strided[6] == buffer[3]);
+    CHECK(buffer_strided[8] == buffer[4]);
+    CHECK(buffer_strided[10] == buffer[5]);
+    CHECK(buffer_strided[12] == buffer[6]);
+    CHECK(buffer_strided[14] == buffer[7]);
+
+    delete[] buffer_strided;
 }
 
 TEST_CASE("Test __quantum__qis__Measure", "[qir_lightning_core]")
@@ -249,9 +292,9 @@ TEST_CASE("Test __quantum__qis__ Hadamard, PauliZ, IsingXX, IsingZZ, and SWAP",
     __quantum__qis__IsingZZ(0.5, *ctrls, target);
     __quantum__qis__SWAP(*ctrls, target);
 
-    MemRefT_CplxT_double_1d *result = new MemRefT_CplxT_double_1d;
-    __quantum__qis__State(result, 0);
-    CplxT_double *state = result->data_allocated;
+    MemRefT_CplxT_double_1d result = getState(4);
+    __quantum__qis__State(&result, 0);
+    CplxT_double *state = result.data_allocated;
 
     CHECK((state[0].real == Approx(0.6817017748).margin(1e-5) &&
            state[0].imag == Approx(-0.1740670409).margin(1e-5)));
@@ -262,9 +305,7 @@ TEST_CASE("Test __quantum__qis__ Hadamard, PauliZ, IsingXX, IsingZZ, and SWAP",
     CHECK((state[3].real == Approx(-0.0174649595).margin(1e-5) &&
            state[3].imag == Approx(-0.068398324).margin(1e-5)));
 
-    free(state);
-    delete result;
-
+    freeState(result);
     __quantum__rt__finalize();
 }
 
@@ -286,9 +327,9 @@ TEST_CASE("Test __quantum__qis__ CRot, IsingXY and Toffoli", "[qir_lightning_cor
     __quantum__qis__SWAP(*ctrls_0, target);
     __quantum__qis__Toffoli(*ctrls_0, *ctrls_1, target);
 
-    MemRefT_CplxT_double_1d *result = new MemRefT_CplxT_double_1d;
-    __quantum__qis__State(result, 0);
-    CplxT_double *state = result->data_allocated;
+    MemRefT_CplxT_double_1d result = getState(8);
+    __quantum__qis__State(&result, 0);
+    CplxT_double *state = result.data_allocated;
 
     CHECK((state[0].real == Approx(0.70710678).margin(1e-5) &&
            state[0].imag == Approx(0.0).margin(1e-5)));
@@ -297,9 +338,7 @@ TEST_CASE("Test __quantum__qis__ CRot, IsingXY and Toffoli", "[qir_lightning_cor
            state[2].imag == Approx(0.0).margin(1e-5)));
     CHECK((state[3].real == Approx(0.0).margin(1e-5) && state[3].imag == Approx(0.0).margin(1e-5)));
 
-    free(state);
-    delete result;
-
+    freeState(result);
     __quantum__rt__finalize();
 }
 
@@ -323,9 +362,9 @@ TEST_CASE("Test __quantum__qis__ Hadamard, PauliX, IsingYY, CRX, and Expval",
     // qml.CRX(0.4, wires=[1,0])
     __quantum__qis__CRX(0.4, *ctrls, target);
 
-    MemRefT_CplxT_double_1d *result = new MemRefT_CplxT_double_1d;
-    __quantum__qis__State(result, 0);
-    CplxT_double *state = result->data_allocated;
+    MemRefT_CplxT_double_1d result = getState(4);
+    __quantum__qis__State(&result, 0);
+    CplxT_double *state = result.data_allocated;
 
     CHECK((state[0].real == Approx(0.70357419).margin(1e-5) &&
            state[0].imag == Approx(0.0).margin(1e-5)));
@@ -341,9 +380,7 @@ TEST_CASE("Test __quantum__qis__ Hadamard, PauliX, IsingYY, CRX, and Expval",
 
     CHECK(__quantum__qis__Expval(obs) == Approx(0.69301172).margin(1e-5));
 
-    free(state);
-    delete result;
-
+    freeState(result);
     __quantum__rt__finalize();
 }
 
@@ -364,9 +401,9 @@ TEST_CASE("Test __quantum__qis__ PhaseShift", "[qir_lightning_core]")
     // qml.PhaseShift(0.456, wires=0)
     __quantum__qis__PhaseShift(0.456, target);
 
-    MemRefT_CplxT_double_1d *result = new MemRefT_CplxT_double_1d;
-    __quantum__qis__State(result, 0);
-    CplxT_double *state = result->data_allocated;
+    MemRefT_CplxT_double_1d result = getState(4);
+    __quantum__qis__State(&result, 0);
+    CplxT_double *state = result.data_allocated;
 
     CHECK((state[0].real == Approx(0.7057699753).margin(1e-5) &&
            state[0].imag == Approx(0.0).margin(1e-5)));
@@ -377,9 +414,7 @@ TEST_CASE("Test __quantum__qis__ PhaseShift", "[qir_lightning_core]")
     CHECK((state[3].real == Approx(0.01913791).margin(1e-5) &&
            state[3].imag == Approx(-0.039019).margin(1e-5)));
 
-    free(state);
-    delete result;
-
+    freeState(result);
     __quantum__rt__finalize();
 }
 
@@ -447,9 +482,9 @@ TEST_CASE("Test __quantum__qis__HermitianObs and Expval", "[qir_lightning_core]"
     // qml.CRX(0.4, wires=[1,0])
     __quantum__qis__CRX(0.4, *ctrls, target);
 
-    MemRefT_CplxT_double_1d *result = new MemRefT_CplxT_double_1d;
-    __quantum__qis__State(result, 0);
-    CplxT_double *state = result->data_allocated;
+    MemRefT_CplxT_double_1d result = getState(4);
+    __quantum__qis__State(&result, 0);
+    CplxT_double *state = result.data_allocated;
 
     CHECK((state[0].real == Approx(0.70357419).margin(1e-5) &&
            state[0].imag == Approx(0.0).margin(1e-5)));
@@ -480,8 +515,7 @@ TEST_CASE("Test __quantum__qis__HermitianObs and Expval", "[qir_lightning_core]"
     CHECK(obs_h == 1);
     CHECK(__quantum__qis__Expval(obs_h) == Approx(0.9900332889).margin(1e-5));
 
-    free(state);
-    delete result;
+    freeState(result);
     delete h_matrix;
 
     __quantum__rt__finalize();
@@ -518,9 +552,8 @@ TEST_CASE("Test __quantum__qis__TensorProdObs and Expval", "[qir_lightning_core]
     // qml.CRX(0.4, wires=[1,0])
     __quantum__qis__CRX(0.3, *ctrls, target);
 
-    MemRefT_CplxT_double_1d *result = new MemRefT_CplxT_double_1d;
-    __quantum__qis__State(result, 0);
-    CplxT_double *state = result->data_allocated;
+    MemRefT_CplxT_double_1d result = getState(4);
+    __quantum__qis__State(&result, 0);
 
     auto obs_x = __quantum__qis__NamedObs(ObsId::PauliX, target);
 
@@ -541,8 +574,7 @@ TEST_CASE("Test __quantum__qis__TensorProdObs and Expval", "[qir_lightning_core]
 
     CHECK(__quantum__qis__Expval(obs_t) == Approx(1.5864438048).margin(1e-5));
 
-    free(state);
-    delete result;
+    freeState(result);
     delete h_matrix;
 
     __quantum__rt__finalize();
@@ -599,9 +631,8 @@ TEST_CASE("Test __quantum__qis__HamiltonianObs(h, x) and Expval", "[qir_lightnin
     // qml.CRX(0.4, wires=[1,0])
     __quantum__qis__CRX(0.3, *ctrls, target);
 
-    MemRefT_CplxT_double_1d *result = new MemRefT_CplxT_double_1d;
-    __quantum__qis__State(result, 0);
-    CplxT_double *state = result->data_allocated;
+    MemRefT_CplxT_double_1d result = getState(4);
+    __quantum__qis__State(&result, 0);
 
     auto obs_x = __quantum__qis__NamedObs(ObsId::PauliX, target);
 
@@ -631,8 +662,7 @@ TEST_CASE("Test __quantum__qis__HamiltonianObs(h, x) and Expval", "[qir_lightnin
 
     CHECK(__quantum__qis__Expval(obs_hamiltonian) == Approx(1.1938250042).margin(1e-5));
 
-    free(state);
-    delete result;
+    freeState(result);
     delete h_matrix;
     delete coeffs;
 
@@ -658,9 +688,8 @@ TEST_CASE("Test __quantum__qis__HamiltonianObs(t) and Expval", "[qir_lightning_c
     // qml.CRX(0.4, wires=[1,0])
     __quantum__qis__CRX(0.3, *ctrls, target);
 
-    MemRefT_CplxT_double_1d *result = new MemRefT_CplxT_double_1d;
-    __quantum__qis__State(result, 0);
-    CplxT_double *state = result->data_allocated;
+    MemRefT_CplxT_double_1d result = getState(4);
+    __quantum__qis__State(&result, 0);
 
     auto obs_x = __quantum__qis__NamedObs(ObsId::PauliX, target);
 
@@ -691,8 +720,7 @@ TEST_CASE("Test __quantum__qis__HamiltonianObs(t) and Expval", "[qir_lightning_c
 
     CHECK(__quantum__qis__Expval(obs_hamiltonian) == Approx(0.6345775219).margin(1e-5));
 
-    free(state);
-    delete result;
+    freeState(result);
     delete h_matrix;
     delete coeffs;
 
@@ -719,9 +747,9 @@ TEST_CASE("Test __quantum__qis__ Hadamard, PauliX, IsingYY, CRX, and Expval_arr"
     // qml.CRX(0.4, wires=[1,0])
     __quantum__qis__CRX(0.4, *ctrls, target);
 
-    MemRefT_CplxT_double_1d *result = new MemRefT_CplxT_double_1d;
-    __quantum__qis__State(result, 0);
-    CplxT_double *state = result->data_allocated;
+    MemRefT_CplxT_double_1d result = getState(4);
+    __quantum__qis__State(&result, 0);
+    CplxT_double *state = result.data_allocated;
 
     CHECK((state[0].real == Approx(0.70357419).margin(1e-5) &&
            state[0].imag == Approx(0.0).margin(1e-5)));
@@ -738,8 +766,7 @@ TEST_CASE("Test __quantum__qis__ Hadamard, PauliX, IsingYY, CRX, and Expval_arr"
 
     CHECK(__quantum__qis__Expval(obs) == Approx(0.69301172).margin(1e-5));
 
-    free(state);
-    delete result;
+    freeState(result);
 
     __quantum__rt__finalize();
 }
@@ -764,9 +791,9 @@ TEST_CASE("Test __quantum__qis__ Hadamard, ControlledPhaseShift, IsingYY, CRX, a
     // qml.CRX(0.4, wires=[1,0])
     __quantum__qis__CRX(0.4, target, *ctrls);
 
-    MemRefT_CplxT_double_1d *result = new MemRefT_CplxT_double_1d;
-    __quantum__qis__State(result, 0);
-    CplxT_double *state = result->data_allocated;
+    MemRefT_CplxT_double_1d result = getState(4);
+    __quantum__qis__State(&result, 0);
+    CplxT_double *state = result.data_allocated;
 
     CHECK((state[0].real == Approx(0.70357419).margin(1e-5) &&
            state[0].imag == Approx(0.0).margin(1e-5)));
@@ -782,9 +809,7 @@ TEST_CASE("Test __quantum__qis__ Hadamard, ControlledPhaseShift, IsingYY, CRX, a
 
     CHECK(__quantum__qis__Variance(obs) == Approx(0.0394695).margin(1e-5));
 
-    free(state);
-    delete result;
-
+    freeState(result);
     __quantum__rt__finalize();
 }
 
@@ -807,16 +832,16 @@ TEST_CASE("Test __quantum__qis__ Hadamard, PauliX, IsingYY, CRX, and Probs", "[q
     // qml.CRX(0.4, wires=[1,0])
     __quantum__qis__CRX(0.4, *ctrls, target);
 
-    // double probs[2];
-    MemRefT_double_1d *result = new MemRefT_double_1d;
-    __quantum__qis__Probs(result, 0);
-    double *probs = result->data_allocated;
+    size_t buffer_len = 4;
+    double *buffer = new double[buffer_len];
+    MemRefT_double_1d result = {buffer, buffer, 0, {buffer_len}, {1}};
+    __quantum__qis__Probs(&result, 0);
+    double *probs = result.data_allocated;
 
     CHECK((probs[0] + probs[2]) == Approx(0.9900332889).margin(1e-5));
     CHECK((probs[1] + probs[3]) == Approx(0.0099667111).margin(1e-5));
 
-    free(probs);
-    delete result;
+    delete[] buffer;
 
     __quantum__rt__finalize();
 }
@@ -841,15 +866,16 @@ TEST_CASE("Test __quantum__qis__ Hadamard, PauliX, IsingYY, CRX, and partial Pro
     // qml.CRX(0.4, wires=[1,0])
     __quantum__qis__CRX(0.4, *ctrls, target);
 
-    MemRefT_double_1d *result = new MemRefT_double_1d;
-    __quantum__qis__Probs(result, 1, ctrls[0]);
-    double *probs = result->data_allocated;
+    size_t buffer_len = 2;
+    double *buffer = new double[buffer_len];
+    MemRefT_double_1d result = {buffer, buffer, 0, {buffer_len}, {1}};
+    __quantum__qis__Probs(&result, 1, ctrls[0]);
+    double *probs = result.data_allocated;
 
     CHECK(probs[0] == Approx(0.9900332889).margin(1e-5));
     CHECK(probs[1] == Approx(0.0099667111).margin(1e-5));
 
-    free(probs);
-    delete result;
+    delete[] buffer;
 
     __quantum__rt__finalize();
 }
@@ -873,9 +899,9 @@ TEST_CASE("Test __quantum__qis__State on the heap using malloc", "[qir_lightning
     // qml.CRX(0.4, wires=[1,0])
     __quantum__qis__CRX(0.4, target, *ctrls);
 
-    MemRefT_CplxT_double_1d *result = new MemRefT_CplxT_double_1d;
-    __quantum__qis__State(result, 0);
-    CplxT_double *stateVec = result->data_allocated;
+    MemRefT_CplxT_double_1d result = getState(4);
+    __quantum__qis__State(&result, 0);
+    CplxT_double *stateVec = result.data_allocated;
 
     CHECK(stateVec[0].real == Approx(0.7035741926).margin(1e-5));
     CHECK(stateVec[0].imag == 0.0);
@@ -889,9 +915,7 @@ TEST_CASE("Test __quantum__qis__State on the heap using malloc", "[qir_lightning
     CHECK(stateVec[3].real == 0.0);
     CHECK(stateVec[3].imag == Approx(-0.070592886).margin(1e-5));
 
-    free(stateVec);
-    delete result;
-
+    freeState(result);
     __quantum__rt__finalize();
 }
 
@@ -1011,10 +1035,10 @@ TEST_CASE("Test __quantum__qis__Counts with num_qubits=2 calling Hadamard, Contr
 
     constexpr size_t shots = 1000;
 
-    PairT_MemRefT_double_int64_1d *result = new PairT_MemRefT_double_int64_1d();
-    __quantum__qis__Counts(result, shots, 0);
-    int64_t *counts = result->second.data_allocated;
-    double *eigvals = result->first.data_allocated;
+    PairT_MemRefT_double_int64_1d result = getCounts(4);
+    __quantum__qis__Counts(&result, shots, 0);
+    int64_t *counts = result.second.data_allocated;
+    double *eigvals = result.first.data_allocated;
 
     for (int i = 0; i < 4; i++) {
         CHECK(eigvals[i] == (double)i);
@@ -1026,12 +1050,8 @@ TEST_CASE("Test __quantum__qis__Counts with num_qubits=2 calling Hadamard, Contr
     }
     CHECK(sum == shots);
 
+    freeCounts(result);
     __quantum__rt__finalize();
-
-    free(counts);
-    free(eigvals);
-
-    delete result;
 }
 
 TEST_CASE("Test __quantum__qis__Counts with num_qubits=2 PartialCounts calling Hadamard, "
@@ -1057,20 +1077,17 @@ TEST_CASE("Test __quantum__qis__Counts with num_qubits=2 PartialCounts calling H
 
     constexpr size_t shots = 1000;
 
-    PairT_MemRefT_double_int64_1d *result = new PairT_MemRefT_double_int64_1d();
-    __quantum__qis__Counts(result, shots, 1, ctrls[0]);
-    int64_t *counts = result->second.data_allocated;
-    double *eigvals = result->first.data_allocated;
+    PairT_MemRefT_double_int64_1d result = getCounts(2);
+    __quantum__qis__Counts(&result, shots, 1, ctrls[0]);
+    int64_t *counts = result.second.data_allocated;
+    double *eigvals = result.first.data_allocated;
 
     CHECK(counts[0] + counts[1] == shots);
     CHECK(eigvals[0] + 1 == eigvals[1]);
 
     __quantum__rt__finalize();
 
-    free(counts);
-    free(eigvals);
-
-    delete result;
+    freeCounts(result);
 }
 
 TEST_CASE("Test __quantum__qis__Sample with num_qubits=2 calling Hadamard, ControlledPhaseShift, "
@@ -1097,9 +1114,10 @@ TEST_CASE("Test __quantum__qis__Sample with num_qubits=2 calling Hadamard, Contr
     constexpr size_t n = 2;
     constexpr size_t shots = 1000;
 
-    MemRefT_double_2d *result = new MemRefT_double_2d;
-    __quantum__qis__Sample(result, shots, 0);
-    double *samples = result->data_allocated;
+    double *buffer = new double[shots * n];
+    MemRefT_double_2d result = {buffer, buffer, 0, {shots, n}, {n, 1}};
+    __quantum__qis__Sample(&result, shots, 0);
+    double *samples = result.data_allocated;
 
     size_t counts0[2] = {0, 0};
     for (size_t idx = 0; idx < shots * n; idx += n) {
@@ -1132,8 +1150,7 @@ TEST_CASE("Test __quantum__qis__Sample with num_qubits=2 calling Hadamard, Contr
 
     __quantum__rt__finalize();
 
-    free(samples);
-    delete result;
+    delete[] buffer;
 }
 
 TEST_CASE("Test __quantum__qis__Sample with num_qubits=2 and PartialSample calling Hadamard, "
@@ -1160,9 +1177,10 @@ TEST_CASE("Test __quantum__qis__Sample with num_qubits=2 and PartialSample calli
     constexpr size_t n = 1;
     constexpr size_t shots = 1000;
 
-    MemRefT_double_2d *result = new MemRefT_double_2d;
-    __quantum__qis__Sample(result, shots, 1, ctrls[0]);
-    double *samples = result->data_allocated;
+    double *buffer = new double[shots * n];
+    MemRefT_double_2d result = {buffer, buffer, 0, {shots, n}, {n, 1}};
+    __quantum__qis__Sample(&result, shots, 1, ctrls[0]);
+    double *samples = result.data_allocated;
 
     size_t counts0[2] = {0, 0};
     for (size_t idx = 0; idx < shots * n; idx += n) {
@@ -1183,8 +1201,7 @@ TEST_CASE("Test __quantum__qis__Sample with num_qubits=2 and PartialSample calli
 
     __quantum__rt__finalize();
 
-    free(samples);
-    delete result;
+    delete[] buffer;
 }
 
 TEST_CASE("Test __quantum__qis__QubitUnitary with an uninitialized matrix", "[qir_lightning_core]")
@@ -1268,9 +1285,9 @@ TEST_CASE("Test __quantum__qis__QubitUnitary with num_qubits=2", "[qir_lightning
 
     __quantum__qis__QubitUnitary(matrix, 1, target);
 
-    MemRefT_CplxT_double_1d *result = new MemRefT_CplxT_double_1d;
-    __quantum__qis__State(result, 0);
-    CplxT_double *state = result->data_allocated;
+    MemRefT_CplxT_double_1d result = getState(4);
+    __quantum__qis__State(&result, 0);
+    CplxT_double *state = result.data_allocated;
 
     CHECK(state[0].real == Approx(-0.474432).margin(1e-5));
     CHECK(state[0].imag == Approx(-0.44579).margin(1e-5));
@@ -1281,8 +1298,7 @@ TEST_CASE("Test __quantum__qis__QubitUnitary with num_qubits=2", "[qir_lightning
     CHECK(state[3].real == Approx(-0.623553).margin(1e-5));
     CHECK(state[3].imag == Approx(-0.187075).margin(1e-5));
 
-    free(state);
-    delete result;
+    freeState(result);
     delete matrix;
 
     __quantum__rt__finalize();

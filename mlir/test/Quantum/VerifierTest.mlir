@@ -197,6 +197,46 @@ func.func @sample2(%q : !quantum.bit) {
 
 // -----
 
+func.func @sample3(%q : !quantum.bit) {
+    %obs = quantum.compbasis %q : !quantum.obs
+
+    %alloc0 = memref.alloc() : memref<1000xf64>
+    // expected-error@+1 {{return tensor must have 2D static shape equal to (number of shots, number of qubits in observable)}}
+    quantum.sample %obs in(%alloc0 : memref<1000xf64>) { shots = 1000 }
+
+    %alloc1 = memref.alloc() : memref<1000x1xf64>
+    quantum.sample %obs in(%alloc1 : memref<1000x1xf64>) { shots = 1000 }
+
+    return
+}
+
+// -----
+
+func.func @sample4(%q : !quantum.bit) {
+    %obs = quantum.compbasis %q : !quantum.obs
+
+    %alloc = memref.alloc() : memref<1000xf64>
+    // expected-error@+1 {{either tensors must be returned or memrefs must be used as inputs}}
+    quantum.sample %obs in (%alloc : memref<1000xf64>) { shots=1000 } : tensor<1000xf64>
+
+    %samples = quantum.sample %obs { shots=1000 } : tensor<1000x1xf64>
+
+    return
+}
+
+// -----
+
+func.func @sample5(%q : !quantum.bit) {
+    %obs = quantum.compbasis %q : !quantum.obs
+
+    // expected-error@+1 {{either tensors must be returned or memrefs must be used as inputs}}
+    quantum.sample %obs { shots=1000 }
+
+    return
+}
+
+// -----
+
 func.func @counts1(%q0 : !quantum.bit, %q1 : !quantum.bit) {
     %obs = quantum.namedobs %q0[1] : !quantum.obs
 
@@ -223,7 +263,48 @@ func.func @counts2(%q0 : !quantum.bit, %q1 : !quantum.bit) {
 
 // -----
 
-func.func @probs(%q0 : !quantum.bit, %q1 : !quantum.bit) {
+func.func @counts3(%q0 : !quantum.bit, %q1 : !quantum.bit) {
+    %obs = quantum.namedobs %q0[1] : !quantum.obs
+
+    %in_eigvals_1 = memref.alloc() : memref<4xf64>
+    %in_counts_1 = memref.alloc() : memref<4xi64>
+    // expected-error@+1 {{number of eigenvalues or counts did not match observable}}
+    quantum.counts %obs in(%in_eigvals_1 : memref<4xf64>, %in_counts_1 : memref<4xi64>) { shots=1000 }
+
+    %in_eigvals_2 = memref.alloc() : memref<2xf64>
+    %in_counts_2 = memref.alloc() : memref<2xi64>
+    quantum.counts %obs in(%in_eigvals_2 : memref<2xf64>, %in_counts_2 : memref<2xi64>) { shots=1000 }
+
+    return
+}
+
+// -----
+
+func.func @counts4(%q0 : !quantum.bit, %q1 : !quantum.bit) {
+    %obs = quantum.namedobs %q0[1] : !quantum.obs
+
+    // expected-error@+1 {{either tensors must be returned or memrefs must be used as inputs}}
+    quantum.counts %obs { shots=1000 }
+
+    return
+}
+
+// -----
+
+func.func @counts5(%q0 : !quantum.bit, %q1 : !quantum.bit) {
+    %obs = quantum.namedobs %q0[1] : !quantum.obs
+
+    %in_eigvals = memref.alloc() : memref<2xf64>
+    %in_counts = memref.alloc() : memref<2xi64>
+    // expected-error@+1 {{either tensors must be returned or memrefs must be used as inputs}}
+    quantum.counts %obs in(%in_eigvals : memref<2xf64>, %in_counts : memref<2xi64>) { shots=1000 } : tensor<2xf64>, tensor<2xi64>
+
+    return
+}
+
+// -----
+
+func.func @probs1(%q0 : !quantum.bit, %q1 : !quantum.bit) {
     %obs = quantum.compbasis %q0, %q1 : !quantum.obs
 
     // expected-error@+1 {{return tensor must have static length equal to 2^(number of qubits)}}
@@ -236,13 +317,89 @@ func.func @probs(%q0 : !quantum.bit, %q1 : !quantum.bit) {
 
 // -----
 
-func.func @state(%q0 : !quantum.bit, %q1 : !quantum.bit) {
+func.func @probs2(%q0 : !quantum.bit, %q1 : !quantum.bit) {
+    %obs = quantum.compbasis %q0, %q1 : !quantum.obs
+
+    %in_probs1 = memref.alloc() : memref<2xf64>
+    // expected-error@+1 {{return tensor must have static length equal to 2^(number of qubits)}}
+    quantum.probs %obs in(%in_probs1 : memref<2xf64>)
+
+    %in_probs2 = memref.alloc() : memref<4xf64>
+    quantum.probs %obs in(%in_probs2 : memref<4xf64>)
+
+    return
+}
+
+// -----
+
+func.func @probs3(%q0 : !quantum.bit, %q1 : !quantum.bit) {
+    %obs = quantum.compbasis %q0, %q1 : !quantum.obs
+
+    %in_probs1 = memref.alloc() : memref<4xf64>
+    // expected-error@+1 {{either tensors must be returned or memrefs must be used as inputs}}
+    quantum.probs %obs in(%in_probs1 : memref<4xf64>) : tensor<4xf64>
+
+    return
+}
+
+// -----
+
+func.func @probs4(%q0 : !quantum.bit, %q1 : !quantum.bit) {
+    %obs = quantum.compbasis %q0, %q1 : !quantum.obs
+
+    // expected-error@+1 {{either tensors must be returned or memrefs must be used as inputs}}
+    quantum.probs %obs
+
+    return
+}
+
+// -----
+
+func.func @state1(%q0 : !quantum.bit, %q1 : !quantum.bit) {
     %obs = quantum.compbasis %q0, %q1 : !quantum.obs
 
     // expected-error@+1 {{return tensor must have static length equal to 2^(number of qubits)}}
     %err = quantum.state %obs : tensor<?xcomplex<f64>>
 
     %state = quantum.state %obs : tensor<4xcomplex<f64>>
+
+    return
+}
+
+// -----
+
+func.func @state2(%q0 : !quantum.bit, %q1 : !quantum.bit) {
+    %obs = quantum.compbasis %q0, %q1 : !quantum.obs
+
+    %alloc1 = memref.alloc() : memref<2xcomplex<f64>>
+    // expected-error@+1 {{return tensor must have static length equal to 2^(number of qubits)}}
+    quantum.state %obs in(%alloc1 : memref<2xcomplex<f64>>)
+
+    %alloc2 = memref.alloc() : memref<4xcomplex<f64>>
+    quantum.state %obs in(%alloc2 : memref<4xcomplex<f64>>)
+
+    return
+}
+
+// -----
+
+func.func @state3(%q0 : !quantum.bit, %q1 : !quantum.bit) {
+    %obs = quantum.compbasis %q0, %q1 : !quantum.obs
+
+    %alloc1 = memref.alloc() : memref<4xcomplex<f64>>
+    // expected-error@+1 {{either tensors must be returned or memrefs must be used as inputs}}
+    quantum.state %obs in(%alloc1 : memref<4xcomplex<f64>>) : tensor<4xcomplex<f64>>
+
+    return
+}
+
+// -----
+
+func.func @state3(%q0 : !quantum.bit, %q1 : !quantum.bit) {
+    %obs = quantum.compbasis %q0, %q1 : !quantum.obs
+
+    // expected-error@+1 {{either tensors must be returned or memrefs must be used as inputs}}
+    quantum.state %obs
 
     return
 }

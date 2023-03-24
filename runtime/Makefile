@@ -20,7 +20,7 @@ endif
 coverage: CODE_COVERAGE=ON
 coverage: BUILD_TYPE=Debug
 test: CODE_COVERAGE=OFF
-test: BUILD_TYPE=Release
+test: BUILD_TYPE?=Release
 
 .PHONY: help
 help:

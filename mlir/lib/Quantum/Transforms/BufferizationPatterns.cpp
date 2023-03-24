@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "Quantum/IR/QuantumOps.h"
@@ -64,9 +65,12 @@ struct BufferizeSampleOp : public OpConversionPattern<SampleOp> {
     LogicalResult matchAndRewrite(SampleOp op, OpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
-        auto resultType = getTypeConverter()->convertType(op.getType());
-        rewriter.replaceOpWithNewOp<SampleOp>(op, resultType, adaptor.getObs(),
-                                              adaptor.getShotsAttr());
+        Type tensorType = op.getType(0);
+        MemRefType resultType = getTypeConverter()->convertType(tensorType).cast<MemRefType>();
+        Location loc = op.getLoc();
+        Value allocVal = rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType);
+        rewriter.create<SampleOp>(loc, TypeRange{}, ValueRange{adaptor.getObs(), allocVal},
+                                  op->getAttrs());
         return success();
     }
 };
@@ -77,8 +81,11 @@ struct BufferizeStateOp : public OpConversionPattern<StateOp> {
     LogicalResult matchAndRewrite(StateOp op, OpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
-        auto resultType = getTypeConverter()->convertType(op.getType());
-        rewriter.replaceOpWithNewOp<StateOp>(op, resultType, adaptor.getObs());
+        Type tensorType = op.getType(0);
+        MemRefType resultType = getTypeConverter()->convertType(tensorType).cast<MemRefType>();
+        Location loc = op.getLoc();
+        Value allocVal = rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType);
+        rewriter.create<StateOp>(loc, TypeRange{}, ValueRange{adaptor.getObs(), allocVal});
         return success();
     }
 };
@@ -89,8 +96,11 @@ struct BufferizeProbsOp : public OpConversionPattern<ProbsOp> {
     LogicalResult matchAndRewrite(ProbsOp op, OpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
-        auto resultType = getTypeConverter()->convertType(op.getType());
-        rewriter.replaceOpWithNewOp<ProbsOp>(op, resultType, adaptor.getObs());
+        Type tensorType = op.getType(0);
+        MemRefType resultType = getTypeConverter()->convertType(tensorType).cast<MemRefType>();
+        Location loc = op.getLoc();
+        Value allocVal = rewriter.replaceOpWithNewOp<memref::AllocOp>(op, resultType);
+        rewriter.create<ProbsOp>(loc, TypeRange{}, ValueRange{adaptor.getObs(), allocVal});
         return success();
     }
 };
@@ -101,11 +111,16 @@ struct BufferizeCountsOp : public OpConversionPattern<CountsOp> {
     LogicalResult matchAndRewrite(CountsOp op, OpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
-        auto resultType0 = getTypeConverter()->convertType(op.getType(0));
-        auto resultType1 = getTypeConverter()->convertType(op.getType(1));
-        SmallVector<Type, 2> resultType = {resultType0, resultType1};
-        rewriter.replaceOpWithNewOp<CountsOp>(op, resultType, adaptor.getObs(),
-                                              adaptor.getShotsAttr());
+        Location loc = op.getLoc();
+        Type tensorType0 = op.getType(0);
+        Type tensorType1 = op.getType(1);
+        MemRefType resultType0 = getTypeConverter()->convertType(tensorType0).cast<MemRefType>();
+        MemRefType resultType1 = getTypeConverter()->convertType(tensorType1).cast<MemRefType>();
+        Value allocVal0 = rewriter.create<memref::AllocOp>(loc, resultType0);
+        Value allocVal1 = rewriter.create<memref::AllocOp>(loc, resultType1);
+        rewriter.replaceOp(op, ValueRange{allocVal0, allocVal1});
+        rewriter.create<CountsOp>(loc, nullptr, nullptr, adaptor.getObs(), allocVal0, allocVal1,
+                                  adaptor.getShotsAttr());
         return success();
     }
 };
@@ -126,15 +141,10 @@ void populateBufferizationLegality(TypeConverter &typeConverter, ConversionTarge
         [&](HermitianOp op) { return typeConverter.isLegal(op.getMatrix().getType()); });
     target.addDynamicallyLegalOp<HamiltonianOp>(
         [&](HamiltonianOp op) { return typeConverter.isLegal(op.getCoeffs().getType()); });
-    target.addDynamicallyLegalOp<SampleOp>(
-        [&](SampleOp op) { return typeConverter.isLegal(op.getType()); });
-    target.addDynamicallyLegalOp<StateOp>(
-        [&](StateOp op) { return typeConverter.isLegal(op.getType()); });
-    target.addDynamicallyLegalOp<ProbsOp>(
-        [&](ProbsOp op) { return typeConverter.isLegal(op.getType()); });
-    target.addDynamicallyLegalOp<CountsOp>([&](CountsOp op) {
-        return typeConverter.isLegal(op.getType(0)) and typeConverter.isLegal(op.getType(1));
-    });
+    target.addDynamicallyLegalOp<SampleOp>([&](SampleOp op) { return op.isBufferized(); });
+    target.addDynamicallyLegalOp<StateOp>([&](StateOp op) { return op.isBufferized(); });
+    target.addDynamicallyLegalOp<ProbsOp>([&](ProbsOp op) { return op.isBufferized(); });
+    target.addDynamicallyLegalOp<CountsOp>([&](CountsOp op) { return op.isBufferized(); });
 }
 
 void populateBufferizationPatterns(TypeConverter &typeConverter, RewritePatternSet &patterns)

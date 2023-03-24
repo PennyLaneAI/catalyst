@@ -157,14 +157,19 @@ LogicalResult SampleOp::verify()
         return emitOpError("observable must be locally defined");
     }
 
+    if (!((bool)getSamples() ^ (bool)getInData())) {
+        return emitOpError("either tensors must be returned or memrefs must be used as inputs");
+    }
+
+    Type toVerify = getSamples() ? getSamples().getType() : getInData().getType();
     if (getObs().getDefiningOp<ComputationalBasisOp>() &&
-        failed(verifyTensorResult(getSamples().getType(), getShots(), numQubits))) {
+        failed(verifyTensorResult(toVerify, getShots(), numQubits))) {
         // In the computational basis, Pennylane adds a second dimension for the number of qubits.
         return emitOpError("return tensor must have 2D static shape equal to "
                            "(number of shots, number of qubits in observable)");
     }
     else if (!getObs().getDefiningOp<ComputationalBasisOp>() &&
-             failed(verifyTensorResult(getSamples().getType(), getShots()))) {
+             failed(verifyTensorResult(toVerify, getShots()))) {
         // For any given observables, Pennylane always returns a 1D tensor.
         return emitOpError("return tensor must have 1D static shape equal to (number of shots)");
     }
@@ -192,8 +197,19 @@ LogicalResult CountsOp::verify()
         return emitOpError("cannot determine the number of eigenvalues for general observable");
     }
 
-    if (failed(verifyTensorResult(getEigvals().getType(), numEigvals)) ||
-        failed(verifyTensorResult(getCounts().getType(), numEigvals))) {
+    bool xor_eigvals = (bool)getEigvals() ^ (bool)getInEigvals();
+    bool xor_counts = (bool)getCounts() ^ (bool)getInCounts();
+    bool is_valid = xor_eigvals && xor_counts;
+    if (!is_valid) {
+        return emitOpError("either tensors must be returned or memrefs must be used as inputs");
+    }
+
+    Type eigvalsToVerify =
+        getEigvals() ? (Type)getEigvals().getType() : (Type)getInEigvals().getType();
+    Type countsToVerify = getCounts() ? (Type)getCounts().getType() : (Type)getInCounts().getType();
+
+    if (failed(verifyTensorResult(eigvalsToVerify, numEigvals)) ||
+        failed(verifyTensorResult(countsToVerify, numEigvals))) {
         return emitOpError("number of eigenvalues or counts did not match observable");
     }
 
@@ -211,8 +227,14 @@ LogicalResult ProbsOp::verify()
         return emitOpError("only computational basis observables are supported");
     }
 
+    if (!(bool)getProbabilities() ^ (bool)getStateIn()) {
+        return emitOpError("either tensors must be returned or memrefs must be used as inputs");
+    }
+
+    Type toVerify =
+        getProbabilities() ? (Type)getProbabilities().getType() : (Type)getStateIn().getType();
     size_t dim = std::pow(2, numQubits);
-    if (failed(verifyTensorResult(getProbabilities().getType().cast<ShapedType>(), dim))) {
+    if (failed(verifyTensorResult(toVerify.cast<ShapedType>(), dim))) {
         return emitOpError("return tensor must have static length equal to 2^(number of qubits)");
     }
 
@@ -230,8 +252,13 @@ LogicalResult StateOp::verify()
         return emitOpError("only computational basis observables are supported");
     }
 
+    if (!(bool)getState() ^ (bool)getStateIn()) {
+        return emitOpError("either tensors must be returned or memrefs must be used as inputs");
+    }
+
+    Type toVerify = getState() ? (Type)getState().getType() : (Type)getStateIn().getType();
     size_t dim = std::pow(2, numQubits);
-    if (failed(verifyTensorResult(getState().getType().cast<ShapedType>(), dim))) {
+    if (failed(verifyTensorResult(toVerify.cast<ShapedType>(), dim))) {
         return emitOpError("return tensor must have static length equal to 2^(number of qubits)");
     }
 

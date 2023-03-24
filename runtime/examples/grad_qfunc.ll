@@ -24,7 +24,7 @@ target triple = "x86_64-pc-linux-gnu"
 
 @.str = private constant [15 x i8] c"grad[%d] = %f\0A\00", align 1
 
-declare i8* @malloc(i64)
+declare i8* @aligned_alloc(i64, i64)
 
 declare i32 @printf(i8*, ...)
 
@@ -90,28 +90,36 @@ define i32 @main() {
   ; Call a quantum circuit
   %5 = call double @circuit(%Qubit* %4)
 
-  ; Call the gradient instruction
-  %6 = call i8* @malloc(i64 40)
-  %7 = bitcast i8* %6 to %struct.MemRefT*
+  ; Allocate the buffer enough for two qubits
+  %buffer_allocated = call i8* @aligned_alloc(i64 8, i64 16)
+  %buffer_cast = bitcast i8* %buffer_allocated to double*
 
-  call void (i64, ...) @__quantum__qis__Gradient(i64 1, %struct.MemRefT* %7)
+  ; Insert buffers into result structure
+  %t0 = insertvalue %struct.MemRefT undef, double* %buffer_cast, 0
+  %t1 = insertvalue %struct.MemRefT %t0, double* %buffer_cast, 1
+  %t2 = insertvalue %struct.MemRefT %t1, i64 0, 2
+  %t3 = insertvalue %struct.MemRefT %t2, i64 2, 3, 0
+  %memref = insertvalue %struct.MemRefT %t3, i64 1, 4, 0
+  %memref_ptr = alloca %struct.MemRefT, i64 1, align 8
+  store %struct.MemRefT %memref, %struct.MemRefT* %memref_ptr, align 8
 
-  %8 = getelementptr %struct.MemRefT, %struct.MemRefT* %7, i32 0, i32 0
-  %9 = load double*, double** %8, align 8
+  ; Call the Gradient function
+  call void (i64, ...) @__quantum__qis__Gradient(i64 1, %struct.MemRefT* %memref_ptr)
+
 
   ; Deactivate the recorder
   call void @__quantum__rt__toggle_recorder(i8 0)
 
   ; Print results
-  call void @print_jacobian_at(double* %9, i64 0)
-  call void @print_jacobian_at(double* %9, i64 1)
-  call void @print_jacobian_at(double* %9, i64 2)
+  call void @print_jacobian_at(double* %buffer_cast, i64 0)
+  call void @print_jacobian_at(double* %buffer_cast, i64 1)
+  call void @print_jacobian_at(double* %buffer_cast, i64 2)
 
   ; Print the updated state-vector
   call void @__quantum__rt__print_state()
 
   ; Close the context and free memory
-  call void @free(i8* %6)
+  call void @free(i8* %buffer_allocated)
   call void @__quantum__rt__finalize()
   ret i32 0
 }
