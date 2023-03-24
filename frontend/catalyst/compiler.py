@@ -290,7 +290,7 @@ def lower_all_to_llvm(filename):
         a path to the output file
     """
     if filename[-10:] != ".buff.mlir":
-        raise ValueError(f"Input file ({filename}) is not a bufferized MLIR file")
+        raise ValueError(f"Input file ({filename}) for LLVM lowering is not a bufferized MLIR file")
 
     command = [quantum_opt_tool]
     command += [filename]
