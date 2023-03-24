@@ -473,6 +473,7 @@ jobs:
           pushd runtime
           C_COMPILER=$(which gcc) \
           CXX_COMPILER=$(which g++) \
+          COMPILER_LAUNCHER="" \
           QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build/" \
           QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include/" \
           make examples
