@@ -157,11 +157,11 @@ LogicalResult SampleOp::verify()
         return emitOpError("observable must be locally defined");
     }
 
-    Type toVerify = getSamples() ? getSamples().getType() : getInData().getType();
     if (!((bool)getSamples() ^ (bool)getInData())) {
         return emitOpError("either tensors must be returned or memrefs must be used as inputs");
     }
 
+    Type toVerify = getSamples() ? getSamples().getType() : getInData().getType();
     if (getObs().getDefiningOp<ComputationalBasisOp>() &&
         failed(verifyTensorResult(toVerify, getShots(), numQubits))) {
         // In the computational basis, Pennylane adds a second dimension for the number of qubits.
