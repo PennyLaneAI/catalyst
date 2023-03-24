@@ -20,6 +20,7 @@
 #include "LightningUtils.hpp"
 #include "QuantumDevice.hpp"
 #include "RuntimeCAPI.h"
+#include "Utils.hpp"
 
 #include <catch2/catch.hpp>
 

@@ -25,6 +25,7 @@
 #include <string>
 
 #include "QuantumDevice.hpp"
+#include "Utils.hpp"
 
 #include "RuntimeCAPI.h"
 
