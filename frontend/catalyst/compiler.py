@@ -243,7 +243,7 @@ def lower_mhlo_to_linalg(filename):
         a path to the output file
     """
     if filename.split(os.extsep)[-1] != "mlir":
-        raise ValueError(f"Input file ({filename}) is not a MLIR file")
+        raise ValueError(f"Input file ({filename}) for MHLO lowering is not an MLIR file")
 
     command = [mhlo_opt_tool]
     command += ["--allow-unregistered-dialect"]
