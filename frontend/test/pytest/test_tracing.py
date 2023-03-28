@@ -12,11 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import jax.numpy as jnp
+import numpy as np
+import pennylane as qml
 import pytest
 
-import pennylane as qml
-from catalyst import qjit, measure, cond, while_loop
-import numpy as np
+from catalyst import cond, measure, qjit, while_loop
 
 
 class TestTracing:
@@ -89,6 +90,21 @@ class TestTracing:
         n_iter, state = circuit()
         assert n_iter > 0
         assert np.allclose(np.abs(state), [1, 0])
+
+
+def test_complex_dialect():
+    """Test that we can use functions that turn into complex dialect operations in MLIR."""
+
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    def circuit():
+        return qml.state()
+
+    @qjit
+    def workflow():
+        x = circuit()[0]
+        return jnp.sum(x).real
+
+    assert workflow() == 1.0
 
 
 if __name__ == "__main__":
