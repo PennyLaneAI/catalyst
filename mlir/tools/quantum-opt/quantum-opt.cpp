@@ -33,21 +33,9 @@ int main(int argc, char **argv)
     mlir::registerPass(catalyst::createQuantumConversionPass);
 
     mlir::DialectRegistry registry;
-    registry.insert<mlir::func::FuncDialect>();
-    registry.insert<mlir::arith::ArithDialect>();
-    registry.insert<mlir::scf::SCFDialect>();
-    registry.insert<mlir::LLVM::LLVMDialect>();
-    registry.insert<mlir::memref::MemRefDialect>();
-    registry.insert<mlir::tensor::TensorDialect>();
-    registry.insert<mlir::linalg::LinalgDialect>();
-    registry.insert<mlir::index::IndexDialect>();
-    registry.insert<mlir::bufferization::BufferizationDialect>();
+    mlir::registerAllDialects(registry);
     registry.insert<catalyst::quantum::QuantumDialect>();
     registry.insert<catalyst::gradient::GradientDialect>();
-    // Add the following to include *all* MLIR Core dialects, or selectively
-    // include what you need like above. You only need to register dialects that
-    // will be *parsed* by the tool, not the one generated
-    // registerAllDialects(registry);
 
     return mlir::asMainReturnCode(
         mlir::MlirOptMain(argc, argv, "Quantum optimizer driver\n", registry));
