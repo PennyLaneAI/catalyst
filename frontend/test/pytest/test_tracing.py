@@ -12,11 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import jax
+import numpy as np
+import pennylane as qml
 import pytest
 
-import pennylane as qml
-from catalyst import qjit, measure, cond, while_loop
-import numpy as np
+from catalyst import cond, measure, qjit, while_loop
 
 
 class TestTracing:
@@ -89,6 +90,16 @@ class TestTracing:
         n_iter, state = circuit()
         assert n_iter > 0
         assert np.allclose(np.abs(state), [1, 0])
+
+    def test_tracing_through_qjit(self):
+        """Check for useful error message when JAX is used to trace through a qjit function."""
+
+        @qjit
+        def func(x):
+            return x**2
+
+        with pytest.raises(ValueError, match="Cannot use JAX to trace through a qjit"):
+            jax.grad(func)(2.0)
 
 
 if __name__ == "__main__":

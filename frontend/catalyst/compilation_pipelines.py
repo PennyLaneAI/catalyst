@@ -18,26 +18,24 @@ compiling of hybrid quantum-classical functions using Catalyst.
 # pylint: disable=missing-module-docstring
 
 import ctypes
-import os
+import functools
 import inspect
+import os
 import tempfile
 import typing
 import warnings
-import functools
 
-import numpy as np
 import jax
-from jax.interpreters.mlir import ir
-
+import numpy as np
 import pennylane as qml
-
+from jax.interpreters.mlir import ir
 from mlir_quantum.runtime import get_ranked_memref_descriptor, ranked_memref_to_numpy
 
 import catalyst.jax_tracer as tracer
 from catalyst import compiler
+from catalyst.pennylane_extensions import QFunc
 from catalyst.utils.gen_mlir import append_modules
 from catalyst.utils.patching import Patcher
-from catalyst.pennylane_extensions import QFunc
 from catalyst.utils.tracing import TracingContext
 
 # Required for JAX tracer objects as PennyLane wires.
@@ -576,6 +574,12 @@ class QJIT:
     def __call__(self, *args, **kwargs):
         if TracingContext.is_tracing():
             return self.qfunc(*args, **kwargs)
+
+        if any(isinstance(arg, jax.core.Tracer) for arg in args):
+            raise ValueError(
+                "Cannot use JAX to trace through a qjit compiled function. If you attempted "
+                "to use jax.jit or jax.grad, please use their equivalent from Catalyst."
+            )
 
         args = [jax.numpy.array(arg) for arg in args]
         r_sig = CompiledFunction.get_runtime_signature(*args)
