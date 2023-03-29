@@ -16,28 +16,32 @@
 while using :func:`~.qjit`.
 """
 
-import uuid
 import functools
 import numbers
+import uuid
 
 import jax
 import jax.numpy as jnp
-from jax import ShapedArray
-from jax.tree_util import tree_flatten, tree_unflatten, treedef_is_leaf
-from jax.linear_util import wrap_init
-from jax._src.lax.control_flow import _initial_style_jaxpr, _initial_style_jaxprs_with_common_consts
-from jax._src.lax.lax import _abstractify
-
+import numpy as np
 import pennylane as qml
-from pennylane.operation import Operation, Wires, AnyWires
+from jax import ShapedArray
+from jax._src.lax.control_flow import (
+    _initial_style_jaxpr,
+    _initial_style_jaxprs_with_common_consts,
+)
+from jax._src.lax.lax import _abstractify
+from jax.linear_util import wrap_init
+from jax.tree_util import tree_flatten, tree_unflatten, treedef_is_leaf
 from pennylane.measurements import MidMeasureMP
+from pennylane.operation import AnyWires, Operation, Wires
 
 import catalyst.jax_primitives as jprim
+from catalyst.jax_primitives import expval_p, probs_p
 from catalyst.jax_tape import JaxTape
-from catalyst.jax_tracer import trace_quantum_tape, insert_to_qreg, get_traceable_fn
+from catalyst.jax_tracer import get_traceable_fn, insert_to_qreg, trace_quantum_tape
+from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import Patcher
 from catalyst.utils.tracing import TracingContext
-from catalyst.utils.exceptions import CompileError
 
 
 # pylint: disable=too-few-public-methods
@@ -169,11 +173,31 @@ class Grad:
         jaxpr = jax.make_jaxpr(self.fn)(*args)
         if len(jaxpr.eqns) != 1:
             raise TypeError("catalyst.grad can only be used on QNodes and other grad calls")
+
         if jaxpr.eqns[0].primitive != jprim.func_p:
             raise TypeError(
                 f"Attempting to differentiate something other than a function "
                 f"(got {jaxpr.eqns[0].primitive})"
             )
+
+        if self.method != "fd":
+            qnode_jaxpr = jaxpr.eqns[0].params["call_jaxpr"]
+            return_ops = []
+            for res in qnode_jaxpr.outvars:
+                return_ops.append(
+                    next(eq.primitive for eq in reversed(qnode_jaxpr.eqns) if res in eq.outvars)
+                )
+
+            if self.method == "ps" and any(prim not in [expval_p, probs_p] for prim in return_ops):
+                raise TypeError(
+                    "The parameter-shift method can only be used for QNodes "
+                    "which return either qml.expval or qml.probs."
+                )
+            elif self.method == "adj" and any(prim not in [expval_p] for prim in return_ops):
+                raise TypeError(
+                    "The adjoint method can only be used for QNodes which return qml.expval."
+                )
+
         return jprim.grad_p.bind(
             *args, jaxpr=jaxpr, fn=self, method=self.method, h=self.h, argnum=self.argnum
         )

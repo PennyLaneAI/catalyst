@@ -12,14 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import pytest
-
-import pennylane as qml
-import numpy as np
-from jax import numpy as jnp
 import jax
+import numpy as np
+import pennylane as qml
+import pytest
+from jax import numpy as jnp
 
-from catalyst import qjit, grad, cond, for_loop, CompileError
+from catalyst import CompileError, cond, for_loop, grad, qjit
 
 
 def test_grad_outside_qjit():
@@ -28,6 +27,42 @@ def test_grad_outside_qjit():
 
     with pytest.raises(CompileError, match="can only be used from within @qjit"):
         grad(f)(1.0)
+
+
+def test_param_shift_on_non_expval():
+    """Check for an error message when parameter-shift is used on QNodes that return anything but
+    qml.expval or qml.probs.
+    """
+
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    def func(p):
+        x = qml.expval(qml.PauliZ(0))
+        y = p**2
+        return x, y
+
+    def workflow(p: float):
+        return grad(func, method="ps")(p)
+
+    with pytest.raises(TypeError, match="The parameter-shift method can only be used"):
+        qjit(workflow)
+
+
+def test_adjoint_on_non_expval():
+    """Check for an error message when parameter-shift is used on QNodes that return anything but
+    qml.expval or qml.probs.
+    """
+
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    def func(p):
+        x = qml.expval(qml.PauliZ(0))
+        y = p**2
+        return x, y
+
+    def workflow(p: float):
+        return grad(func, method="adj")(p)
+
+    with pytest.raises(TypeError, match="The adjoint method can only be used"):
+        qjit(workflow)
 
 
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
@@ -348,6 +383,22 @@ def test_ps_qft(inp):
         return h(x, y, z)
 
     assert np.allclose(compiled(inp, 2, 2), interpreted(inp, 2, 2))
+
+
+@pytest.mark.xfail(reason="https://github.com/PennyLaneAI/catalyst/issues/73")
+def test_ps_probs():
+    """Check that the parameter-shift method works for qml.probs."""
+
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    def func(p):
+        qml.RY(p, wires=0)
+        return qml.probs(wires=0)
+
+    @qjit
+    def workflow(p: float):
+        return grad(func, method="ps")(p)
+
+    assert np.allclose(workflow(0.5), [0.93879128, 0.06120872])
 
 
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
