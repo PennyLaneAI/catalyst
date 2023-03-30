@@ -182,9 +182,9 @@ class Grad:
             qnode_jaxpr = jaxpr.eqns[0].params["call_jaxpr"]
             return_ops = []
             for res in qnode_jaxpr.outvars:
-                return_ops.append(
-                    next(eq.primitive for eq in reversed(qnode_jaxpr.eqns) if res in eq.outvars)
-                )
+                for eq in reversed(qnode_jaxpr.eqns):
+                    if res in eq.outvars:
+                        return_ops.append(eq.primitive)
 
             if self.method == "ps" and any(prim not in [expval_p, probs_p] for prim in return_ops):
                 raise TypeError(
