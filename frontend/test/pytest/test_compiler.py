@@ -3,16 +3,18 @@ Unit tests for CompilerDriver class
 """
 
 import warnings
+
 import pytest
 
 from catalyst.compiler import (
     CompilerDriver,
-    lower_mhlo_to_linalg,
     bufferize_tensors,
-    lower_all_to_llvm,
-    convert_mlir_to_llvmir,
     compile_llvmir,
+    convert_mlir_to_llvmir,
     link_lightning_runtime,
+    lower_all_to_llvm,
+    lower_mhlo_to_linalg,
+    transform_quantum_ir,
 )
 
 
@@ -55,7 +57,12 @@ class TestCompilerDriver:
         with pytest.raises(ValueError, match="is not an MLIR file"):
             lower_mhlo_to_linalg("file-name.nomlir")
 
-    def test_bufferize_tensors(self):
+    def test_quantum_compilation_input_validation(self):
+        """Test if the function detects wrong extensions"""
+        with pytest.raises(ValueError, match="is not an MLIR file"):
+            transform_quantum_ir("file-name.nomlir")
+
+    def test_bufferize_tensors_input_validation(self):
         """Test if the function detects wrong extensions"""
         with pytest.raises(ValueError, match="is not an MLIR file"):
             bufferize_tensors("file-name.nomlir")

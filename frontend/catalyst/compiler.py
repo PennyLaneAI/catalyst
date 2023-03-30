@@ -66,8 +66,12 @@ mhlo_lowering_pass_pipeline = [
     "--canonicalize",
 ]
 
-bufferization_pass_pipeline = [
+quantum_compilation_pass_pipeline = [
     "--lower-gradients",
+]
+
+bufferization_pass_pipeline = [
+    "--inline",
     "--gradient-bufferize",
     "--scf-bufferize",
     "--convert-tensor-to-linalg",  # tensor.pad
@@ -258,6 +262,30 @@ def lower_mhlo_to_linalg(filename):
     return new_fname
 
 
+def transform_quantum_ir(filename):
+    """Runs quantum optimizations and transformations, as well gradient transforms, on the hybrid
+    IR.
+
+    Args:
+        filename (str): the path to a file where the program is stored.
+    Returns:
+        a path to the output file
+    """
+    if filename[-5:] != ".mlir":
+        raise ValueError(f"Input file ({filename}) for quantum transforms is not an MLIR file")
+
+    command = [quantum_opt_tool]
+    command += [filename]
+    command += quantum_compilation_pass_pipeline
+
+    new_fname = filename.replace(".mlir", ".opt.mlir")
+
+    with open(new_fname, "w", encoding="utf-8") as file:
+        subprocess.run(command, stdout=file, check=True)
+
+    return new_fname
+
+
 def bufferize_tensors(filename):
     """Translate MHLO to linalg dialect.
 
@@ -395,11 +423,13 @@ def compile(mlir_module, workspace, passes):
     with open(filename, "w", encoding="utf-8") as f:
         mlir_module.operation.print(f, print_generic_op_form=False, assume_verified=True)
 
-    passes["mlir"] = filename
     mlir = filename
-    mlir = lower_mhlo_to_linalg(mlir)
-    passes["nohlo"] = mlir
-    buff = bufferize_tensors(mlir)
+    passes["mlir"] = mlir
+    nohlo = lower_mhlo_to_linalg(mlir)
+    passes["nohlo"] = nohlo
+    optimized = transform_quantum_ir(nohlo)
+    passes["opt"] = optimized
+    buff = bufferize_tensors(optimized)
     passes["buff"] = buff
     llvm_dialect = lower_all_to_llvm(buff)
     passes["llvm"] = llvm_dialect
