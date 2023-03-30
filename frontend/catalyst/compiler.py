@@ -267,7 +267,7 @@ def transform_quantum_ir(filename):
     IR.
 
     Args:
-        filename (str): the path to a file were the program is stored.
+        filename (str): the path to a file where the program is stored.
     Returns:
         a path to the output file
     """
@@ -424,7 +424,7 @@ def compile(mlir_module, workspace, passes):
         mlir_module.operation.print(f, print_generic_op_form=False, assume_verified=True)
 
     mlir = filename
-    passes["mlir"] = filename
+    passes["mlir"] = mlir
     nohlo = lower_mhlo_to_linalg(mlir)
     passes["nohlo"] = nohlo
     optimized = transform_quantum_ir(nohlo)

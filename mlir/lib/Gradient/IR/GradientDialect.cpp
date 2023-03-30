@@ -23,7 +23,7 @@ using namespace catalyst::gradient;
 #include "Gradient/IR/GradientOpsDialect.cpp.inc"
 
 //===----------------------------------------------------------------------===//
-// Complex Dialect Interfaces
+// Gradient Dialect Interfaces
 //===----------------------------------------------------------------------===//
 
 namespace {
