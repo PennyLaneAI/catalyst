@@ -215,8 +215,8 @@ def grad(f, *, method=None, h=None, argnum=None):
 
     .. warning::
 
-        Currently, higher-order differentiation is only supported by the
-        finite-difference method.
+        Currently, higher-order differentiation or differentiation of non-QNode functions
+        is only supported by the finite-difference method.
 
     .. note:
 
