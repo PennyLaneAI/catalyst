@@ -571,28 +571,17 @@ def test_assert_no_higher_order_without_ps(method):
             return i(x)
 
 
-def test_assert_no_non_func_gradients():
-    """Test input validation for gradients"""
-    with pytest.raises(TypeError, match="something other than a function"):
+def test_finite_diff_arbitrary_functions():
+    """Test gradients on non-qnode functions."""
 
-        @qjit()
-        def workflow():
-            def _f(x):
-                return x + x
+    @qjit
+    def workflow(x):
+        def _f(x):
+            return 2 * x
 
-            return grad(_f, method="fd")(1.0)
+        return grad(_f, method="fd")(x)
 
-
-def test_assert_no_non_single_expression_gradients():
-    """Test input validation for gradients"""
-    with pytest.raises(TypeError, match="can only be used on QNodes"):
-
-        @qjit()
-        def workflow():
-            def _f(x):
-                return x
-
-            return grad(_f, method="fd")(1.0)
+    assert workflow(0.0) == 2.0
 
 
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])

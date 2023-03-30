@@ -22,7 +22,6 @@ import uuid
 
 import jax
 import jax.numpy as jnp
-import numpy as np
 import pennylane as qml
 from jax import ShapedArray
 from jax._src.lax.control_flow import (
@@ -35,6 +34,7 @@ from jax.tree_util import tree_flatten, tree_unflatten, treedef_is_leaf
 from pennylane.measurements import MidMeasureMP
 from pennylane.operation import AnyWires, Operation, Wires
 
+import catalyst
 import catalyst.jax_primitives as jprim
 from catalyst.jax_primitives import expval_p, probs_p
 from catalyst.jax_tape import JaxTape
@@ -124,9 +124,8 @@ class Function:
     """
 
     def __init__(self, fn):
-        assert isinstance(fn, Grad), "Function boundaries only supported for gradients."
         self.fn = fn
-        self.__name__ = "grad." + fn.__name__
+        self.__name__ = fn.__name__
 
     def __call__(self, *args, **kwargs):
         jaxpr = jax.make_jaxpr(self.fn)(*args)
@@ -148,18 +147,21 @@ class Grad:
         argnum (int): the argument indices which define over which arguments to differentiate
 
     Raises:
-        ValueError: Higher-order derivatives can only be computed with the finite difference
-                    method.
+        ValueError: Higher-order derivatives and derivatives of arbitrary functions can only be
+                    computed with the finite difference method.
     """
 
     def __init__(self, fn, *, method, h, argnum):
         self.fn = fn
-        self.__name__ = fn.__name__
+        self.__name__ = f"grad.{fn.__name__}"
         self.method = method
         self.h = h
         self.argnum = argnum
         if self.method != "fd" and not isinstance(self.fn, qml.QNode):
-            raise ValueError("Only finite difference can compute higher order derivatives.")
+            raise ValueError(
+                "Only finite difference can compute higher order derivatives "
+                "or gradients of arbitrary functions."
+            )
 
     def __call__(self, *args, **kwargs):
         """Specifies that an actual call to the differentiated function.
@@ -171,14 +173,10 @@ class Grad:
         )
 
         jaxpr = jax.make_jaxpr(self.fn)(*args)
-        if len(jaxpr.eqns) != 1:
-            raise TypeError("catalyst.grad can only be used on QNodes and other grad calls")
-
-        if jaxpr.eqns[0].primitive != jprim.func_p:
-            raise TypeError(
-                f"Attempting to differentiate something other than a function "
-                f"(got {jaxpr.eqns[0].primitive})"
-            )
+        assert len(jaxpr.eqns) == 1, "Expected jaxpr consisting of a single function call."
+        assert (
+            jaxpr.eqns[0].primitive == jprim.func_p
+        ), "Expected jaxpr consisting of a single function call."
 
         if self.method != "fd":
             qnode_jaxpr = jaxpr.eqns[0].params["call_jaxpr"]
@@ -193,7 +191,7 @@ class Grad:
                     "The parameter-shift method can only be used for QNodes "
                     "which return either qml.expval or qml.probs."
                 )
-            elif self.method == "adj" and any(prim not in [expval_p] for prim in return_ops):
+            if self.method == "adj" and any(prim not in [expval_p] for prim in return_ops):
                 raise TypeError(
                     "The adjoint method can only be used for QNodes which return qml.expval."
                 )
@@ -284,10 +282,14 @@ def grad(f, *, method=None, h=None, argnum=None):
     elif isinstance(argnum, int):
         argnum = [argnum]
 
-    if isinstance(f, Grad):
-        return Grad(Function(f), method=method, h=h, argnum=argnum)
+    if isinstance(f, catalyst.compilation_pipelines.QJIT):
+        # Don't generate an extra function when the circuit is already qjitted.
+        f = f.qfunc
 
-    return Grad(f, method=method, h=h, argnum=argnum)
+    if isinstance(f, qml.QNode):
+        return Grad(f, method=method, h=h, argnum=argnum)
+
+    return Grad(Function(f), method=method, h=h, argnum=argnum)
 
 
 # pylint: disable=too-few-public-methods
