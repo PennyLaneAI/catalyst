@@ -28,7 +28,7 @@ all: runtime mlir frontend
 .PHONY: frontend
 frontend:
 	@echo "install Catalyst Frontend"
-	$(PYTHON) pip install -e . --user --no-use-pep517
+	$(PYTHON) pip install -e . --no-use-pep517
 
 .PHONY: mlir llvm mhlo dialects runtime
 mlir:

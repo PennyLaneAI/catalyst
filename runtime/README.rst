@@ -88,7 +88,7 @@ Requirements
 ============
 
 To build the runtime from source, it is required to have an up to date version of a C/C++ compiler such as gcc or clang
-and the static library of ``stdlib`` from `qir-runner <https://github.com/qir-alliance/qir-runner/tree/main/stdlib>`_.
+with support for the C++20 standard library and the static library of ``stdlib`` from `qir-runner <https://github.com/qir-alliance/qir-runner/tree/main/stdlib>`_.
 
 The runtime leverages the ``stdlib`` Rust package for the QIR standard runtime instructions. To build this package from source,
 the `Rust <https://www.rust-lang.org/tools/install>`_ toolchain installed via ``rustup`` is also required.
