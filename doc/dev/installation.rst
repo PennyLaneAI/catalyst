@@ -103,7 +103,8 @@ Runtime
 """""""
 
 By default, the runtime is backed by `PennyLane-Lightning
-<https://github.com/PennyLaneAI/pennylane-lightning>`_ and leverages the `QIR
+<https://github.com/PennyLaneAI/pennylane-lightning>`_
+requiring the use of C++20 standard library headers, and leverages the `QIR
 standard library <https://github.com/qir-alliance/qir-runner>`_. Assuming
 ``libomp-dev`` and the ``llvm-tools-preview`` Rustup component are available,
 you can build ``qir-stdlib`` and the runtime from the top level directory:

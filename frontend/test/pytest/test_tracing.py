@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import jax
+import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
 import pytest
@@ -100,6 +101,21 @@ class TestTracing:
 
         with pytest.raises(ValueError, match="Cannot use JAX to trace through a qjit"):
             jax.grad(func)(2.0)
+
+
+def test_complex_dialect():
+    """Test that we can use functions that turn into complex dialect operations in MLIR."""
+
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    def circuit():
+        return qml.state()
+
+    @qjit
+    def workflow():
+        x = circuit()[0]
+        return jnp.sum(x).real
+
+    assert workflow() == 1.0
 
 
 if __name__ == "__main__":

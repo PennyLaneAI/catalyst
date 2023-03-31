@@ -556,7 +556,6 @@ template <typename T> struct StatsBasedPattern : public OpConversionPattern<T> {
     LogicalResult matchAndRewrite(T op, typename T::Adaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
-        Location loc = op.getLoc();
         MLIRContext *ctx = this->getContext();
         TypeConverter *conv = this->getTypeConverter();
 

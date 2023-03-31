@@ -26,6 +26,9 @@
   [MLIR bufferization infrastructure](https://mlir.llvm.org/docs/Bufferization/).
   [#63](https://github.com/PennyLaneAI/catalyst/pull/63)
 
+* Perform function inlining to improve optimizations and memory management within the compiler.
+  [#72](https://github.com/PennyLaneAI/catalyst/pull/72)
+
 <h3>Breaking changes</h3>
 
 <h3>Bug fixes</h3>
