@@ -147,7 +147,7 @@ class Grad:
         argnum (int): the argument indices which define over which arguments to differentiate
 
     Raises:
-        ValueError: Higher-order derivatives and derivatives of arbitrary functions can only be
+        ValueError: Higher-order derivatives and derivatives of non-QNode functions can only be
                     computed with the finite difference method.
     """
 
@@ -160,7 +160,7 @@ class Grad:
         if self.method != "fd" and not isinstance(self.fn, qml.QNode):
             raise ValueError(
                 "Only finite difference can compute higher order derivatives "
-                "or gradients of arbitrary functions."
+                "or gradients of non-QNode functions."
             )
 
     def __call__(self, *args, **kwargs):
@@ -185,6 +185,7 @@ class Grad:
                 for eq in reversed(qnode_jaxpr.eqns):
                     if res in eq.outvars:
                         return_ops.append(eq.primitive)
+                        break
 
             if self.method == "ps" and any(prim not in [expval_p, probs_p] for prim in return_ops):
                 raise TypeError(
