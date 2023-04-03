@@ -47,10 +47,33 @@ static auto get_device() -> std::unique_ptr<Catalyst::Runtime::QuantumDevice> &
     return GLOBAL_DEVICE_PTR;
 }
 
+class MemoryManager {
+    std::unordered_set<void *> _impl;
+
+  public:
+    MemoryManager();
+    ~MemoryManager();
+    void insert(void *ptr);
+    void erase(void *ptr);
+};
+
+MemoryManager::MemoryManager() { _impl.reserve(1028); }
+
+MemoryManager::~MemoryManager()
+{
+    for (auto allocation : _impl) {
+        free(allocation);
+    }
+}
+
+void MemoryManager::insert(void *ptr) { _impl.insert(ptr); }
+
+void MemoryManager::erase(void *ptr) { _impl.erase(ptr); }
+
 /**
  * @brief Global memory allocation set.
  */
-static std::unique_ptr<std::unordered_set<void *>> GLOBAL_ALLOCATIONS = nullptr;
+static std::unique_ptr<MemoryManager> GLOBAL_ALLOCATIONS = nullptr;
 
 } // namespace Catalyst::Runtime::CAPI
 
@@ -85,17 +108,14 @@ void __quantum__rt__initialize()
     }
 
     Catalyst::Runtime::CAPI::GLOBAL_DEVICE_PTR = Catalyst::Runtime::CreateQuantumDevice();
-    Catalyst::Runtime::CAPI::GLOBAL_ALLOCATIONS = std::make_unique<std::unordered_set<void *>>();
-    Catalyst::Runtime::CAPI::GLOBAL_ALLOCATIONS->reserve(1024);
+    Catalyst::Runtime::CAPI::GLOBAL_ALLOCATIONS =
+        std::make_unique<Catalyst::Runtime::CAPI::MemoryManager>();
     assert(Catalyst::Runtime::CAPI::get_device() != nullptr);
 }
 
 void __quantum__rt__finalize()
 {
     Catalyst::Runtime::CAPI::GLOBAL_DEVICE_PTR.reset(nullptr);
-    for (auto allocation : *Catalyst::Runtime::CAPI::GLOBAL_ALLOCATIONS) {
-        free(allocation);
-    }
     Catalyst::Runtime::CAPI::GLOBAL_ALLOCATIONS.reset(nullptr);
     assert(Catalyst::Runtime::CAPI::get_device() == nullptr);
 }
