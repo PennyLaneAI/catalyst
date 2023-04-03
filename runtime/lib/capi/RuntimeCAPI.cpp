@@ -50,6 +50,15 @@ static auto get_device() -> std::unique_ptr<Catalyst::Runtime::QuantumDevice> &
 
 extern "C" {
 
+void *_mlir_memref_to_llvm_alloc(size_t size) { return malloc(size); }
+
+void *_mlir_memref_to_llvm_aligned_alloc(size_t alignment, size_t size)
+{
+    return aligned_alloc(alignment, size);
+}
+
+void _mlir_memref_to_llvm_free(void *ptr) { free(ptr); }
+
 void __quantum__rt__fail_cstr(const char *cstr) { throw std::runtime_error(cstr); }
 
 void __quantum__rt__initialize()
