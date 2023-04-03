@@ -54,5 +54,5 @@ __all__ = (
     "measure",
     "grad",
     "CompileError",
-    "CompileOptions"
+    "CompileOptions",
 )
