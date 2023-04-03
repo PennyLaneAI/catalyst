@@ -195,13 +195,7 @@ class CompiledFunction:
         # Not needed, computed from the arguments.
         # function.argyptes
 
-        # free, as defined in stdlib.h
-        # free is not defined in the shared object, however
-        # it is declared and we can use this declaration to
-        # get a handle to it.
-        free = shared_object.free
-
-        return shared_object, function, setup, teardown, free
+        return shared_object, function, setup, teardown
 
     @staticmethod
     def get_runtime_signature(*args):
@@ -311,7 +305,7 @@ class CompiledFunction:
         Returns:
             retval: the value computed by the function or None if the function has no return value
         """
-        shared_object, function, setup, teardown, free = CompiledFunction.load_symbols(
+        shared_object, function, setup, teardown = CompiledFunction.load_symbols(
             shared_object_file, func_name
         )
 
