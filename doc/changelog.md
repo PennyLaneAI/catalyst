@@ -43,6 +43,9 @@
   This fixes a large majority of leaks in many typical quantum functions.
   [#61](https://github.com/PennyLaneAI/catalyst/pull/61)
 
+* Fix returning complex scalars from the compiled function.
+  [#77](https://github.com/PennyLaneAI/catalyst/pull/77)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
