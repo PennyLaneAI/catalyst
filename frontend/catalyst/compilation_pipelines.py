@@ -598,7 +598,7 @@ class QJIT:
         return self.compiled_function(*args, **kwargs)
 
 
-def qjit(fn=None, *, target="binary", keep_intermediate=False, verbosity=0, logfile=None):
+def qjit(fn=None, *, target="binary", keep_intermediate=False, verbose=False, logfile=None):
     """A just-in-time decorator for PennyLane and JAX programs using Catalyst.
 
     This decorator enables both just-in-time and ahead-of-time compilation,
@@ -686,9 +686,9 @@ def qjit(fn=None, *, target="binary", keep_intermediate=False, verbosity=0, logf
     """
 
     if fn is not None:
-        return QJIT(fn, target, keep_intermediate, CompileOptions(verbosity, logfile))
+        return QJIT(fn, target, keep_intermediate, CompileOptions(verbose, logfile))
 
     def wrap_fn(fn):
-        return QJIT(fn, target, keep_intermediate, CompileOptions(verbosity, logfile))
+        return QJIT(fn, target, keep_intermediate, CompileOptions(verbose, logfile))
 
     return wrap_fn

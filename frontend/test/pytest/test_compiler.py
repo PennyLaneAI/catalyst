@@ -6,6 +6,8 @@ import warnings
 
 import pytest
 
+import pennylane as qml
+from catalyst import qjit
 from catalyst.compiler import (
     CompilerDriver,
     CompileOptions,
@@ -88,3 +90,15 @@ class TestCompilerDriver:
         """Test if the function detects wrong extensions"""
         with pytest.raises(ValueError, match="is not an object file"):
             link_lightning_runtime("file-name.noo")
+
+    @pytest.mark.parametrize("verbose", [True, False])
+    def test_verbose_compilation(self, verbose, capsys):
+        @qjit(verbose=verbose)
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def workflow():
+            qml.X(wires=1)
+            return qml.state()
+
+        workflow()
+        stderr = "\n".join(capsys.readouterr())
+        assert ("[RUNNING]" in stderr) if verbose else ("[RUNNING]" not in stderr)
