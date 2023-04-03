@@ -9,6 +9,10 @@
   value method using the native Kokkos kernel for the Lightning-Kokkos device.
   [#70](https://github.com/PennyLaneAI/catalyst/pull/70)
 
+* Allow `catalyst.grad` to be used on any traceable function (within a qjit context).
+  This means the operation is no longer resticted to acting on `qml.qnode`s only.
+  [#75](https://github.com/PennyLaneAI/catalyst/pull/75)
+
 <h3>Improvements</h3>
 
 * Build the runtime against qir-stdlib v0.1.0.
@@ -51,6 +55,7 @@
 This release contains contributions from (in alphabetical order):
 
 Ali Asadi,
+David Ittah,
 Erick Ochoa Lopez,
 Sergei Mironov.
 
