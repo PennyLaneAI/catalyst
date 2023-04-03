@@ -328,8 +328,6 @@ def transform_quantum_ir(filename: str, compile_options: Optional[CompileOptions
     return new_fname
 
 
-# def bufferize_tensors(filename):
-# =======
 def bufferize_tensors(filename: str, compile_options: Optional[CompileOptions] = None) -> str:
     """Translate MHLO to linalg dialect.
 

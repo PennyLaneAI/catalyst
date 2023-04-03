@@ -8,6 +8,7 @@ import pytest
 
 from catalyst.compiler import (
     CompilerDriver,
+    CompileOptions,
     bufferize_tensors,
     compile_llvmir,
     convert_mlir_to_llvmir,
@@ -40,12 +41,13 @@ class TestCompilerDriver:
             # pylint: disable=protected-access
             CompilerDriver._get_compiler_fallback_order([])
 
-    def test_compiler_failed_warning(self):
+    @pytest.mark.parametrize("verbose", [True, False])
+    def test_compiler_failed_warning(self, verbose):
         """Test that a warning is emitted when a compiler failed."""
         compiler = "cc"
         with pytest.warns(UserWarning, match="Compiler .* failed .*"):
             # pylint: disable=protected-access
-            CompilerDriver._attempt_link(compiler, [""], "in.o", "out.so", None)
+            CompilerDriver._attempt_link(compiler, [""], "in.o", "out.so", CompileOptions(verbose))
 
     def test_link_fail_exception(self):
         """Test that an exception is raised when all compiler possibilities are exhausted."""
