@@ -49,6 +49,7 @@
 This release contains contributions from (in alphabetical order):
 
 Ali Asadi,
+David Ittah,
 Erick Ochoa Lopez,
 Sergei Mironov.
 
