@@ -93,6 +93,8 @@ class TestCompilerDriver:
 
     @pytest.mark.parametrize("verbose", [True, False])
     def test_verbose_compilation(self, verbose, capsys):
+        """Test verbose compilation mode"""
+
         @qjit(verbose=verbose)
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def workflow():
