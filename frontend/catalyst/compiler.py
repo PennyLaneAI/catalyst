@@ -316,13 +316,14 @@ def transform_quantum_ir(filename: str, compile_options: Optional[CompileOptions
     if filename[-5:] != ".mlir":
         raise ValueError(f"Input file ({filename}) for quantum transforms is not an MLIR file")
 
+    new_fname = filename.replace(".mlir", ".opt.mlir")
+
     command = [quantum_opt_tool]
     command += [filename]
     command += quantum_compilation_pass_pipeline
+    command += ["-o", new_fname]
 
-    new_fname = filename.replace(".mlir", ".opt.mlir")
-
-    run_writing_command(command, new_fname, compile_options)
+    run_writing_command(command, compile_options)
 
     return new_fname
 
