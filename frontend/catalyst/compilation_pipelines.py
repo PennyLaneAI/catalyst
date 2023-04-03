@@ -31,7 +31,7 @@ from jax.interpreters.mlir import ir
 
 import pennylane as qml
 
-from mlir_quantum.runtime import get_ranked_memref_descriptor, ranked_memref_to_numpy
+from mlir_quantum.runtime import get_ranked_memref_descriptor, ranked_memref_to_numpy, to_numpy
 
 import catalyst.jax_tracer as tracer
 from catalyst import compiler
@@ -262,7 +262,7 @@ class CompiledFunction:
             a numpy array with the contents of the ranked memref descriptor
         """
         assert not hasattr(ranked_memref, "shape")
-        return np.array(ranked_memref.aligned.contents)
+        return to_numpy(np.array(ranked_memref.aligned.contents))
 
     @staticmethod
     def ranked_memref_to_numpy(memref_desc):
