@@ -93,6 +93,9 @@ void __quantum__rt__initialize()
 void __quantum__rt__finalize()
 {
     Catalyst::Runtime::CAPI::GLOBAL_DEVICE_PTR.reset(nullptr);
+    for (auto allocation : *Catalyst::Runtime::CAPI::GLOBAL_ALLOCATIONS) {
+        free(allocation);
+    }
     Catalyst::Runtime::CAPI::GLOBAL_ALLOCATIONS.reset(nullptr);
     assert(Catalyst::Runtime::CAPI::get_device() == nullptr);
 }

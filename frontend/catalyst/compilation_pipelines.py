@@ -326,24 +326,12 @@ class CompiledFunction:
 
         setup(ctypes.c_int(argc), array_of_char_ptrs)
         function(*args)
-        teardown()
 
         result = args[0] if has_return else None
         retval = CompiledFunction.return_value_ptr_to_numpy(result) if result else None
 
-        if has_return:
-            raw_return = args[0].contents
-            for memref in raw_return:
-                is_constant = memref.allocated == 0xDEADBEEF
-                if is_constant:
-                    continue
-
-                if memref.allocated in numpy_managed_memory:
-                    continue
-
-                pointer_type = ctypes.POINTER(ctypes.c_int)
-                pointer_to_free = ctypes.cast(memref.allocated, pointer_type)
-                free(pointer_to_free)
+        # Teardown has to be made after the return valued has been copied.
+        teardown()
 
         # Unmap the shared library. This is necessary in case the function is re-compiled.
         # Without unmapping the shared library, there would be a conflict in the name of
