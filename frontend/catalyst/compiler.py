@@ -33,7 +33,7 @@ package_root = os.path.dirname(__file__)
 class CompileOptions:
     """Generic compilation options"""
 
-    verbosity: int
+    verbose: bool
     logfile: Optional[TextIOWrapper] = None  # stdout/stderr or a file
 
     def get_logfile(self) -> TextIOWrapper:
@@ -51,7 +51,7 @@ def run_writing_command(
     compile_options: CompileOptions = (
         compile_options if compile_options else default_compile_options
     )
-    if compile_options.verbosity > 0:
+    if compile_options.verbose:
         print(f"[RUNNING] {' '.join(command)}", file=compile_options.get_logfile())
     subprocess.run(command, check=True)
 
@@ -238,7 +238,7 @@ class CompilerDriver:
         compile_options = compile_options if compile_options else default_compile_options
         try:
             command = [compiler] + flags + [infile, "-o", outfile]
-            if compile_options.verbosity > 0:
+            if compile_options.verbose:
                 print(f"[RUNNING] {' '.join(command)}", file=compile_options.logfile)
             subprocess.run(command, check=True)
             return True
