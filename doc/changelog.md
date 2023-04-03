@@ -25,6 +25,9 @@
 * Perform function inlining to improve optimizations and memory management within the compiler.
   [#72](https://github.com/PennyLaneAI/catalyst/pull/72)
 
+* Add an option to print verbose messages explaining the compilation process
+  [#68](https://github.com/PennyLaneAI/catalyst/pull/68)
+
 <h3>Breaking changes</h3>
 
 <h3>Bug fixes</h3>
