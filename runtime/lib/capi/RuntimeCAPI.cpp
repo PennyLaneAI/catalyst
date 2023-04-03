@@ -23,6 +23,7 @@
 #include <iostream>
 #include <ostream>
 #include <string>
+#include <unordered_set>
 
 #include "MemRefUtils.hpp"
 #include "QuantumDevice.hpp"
@@ -46,18 +47,34 @@ static auto get_device() -> std::unique_ptr<Catalyst::Runtime::QuantumDevice> &
     return GLOBAL_DEVICE_PTR;
 }
 
+/**
+ * @brief Global memory allocation set.
+ */
+static std::unique_ptr<std::unordered_set<void *>> GLOBAL_ALLOCATIONS = nullptr;
+
 } // namespace Catalyst::Runtime::CAPI
 
 extern "C" {
 
-void *_mlir_memref_to_llvm_alloc(size_t size) { return malloc(size); }
+void *_mlir_memref_to_llvm_alloc(size_t size)
+{
+    void *ptr = malloc(size);
+    Catalyst::Runtime::CAPI::GLOBAL_ALLOCATIONS->insert(ptr);
+    return ptr;
+}
 
 void *_mlir_memref_to_llvm_aligned_alloc(size_t alignment, size_t size)
 {
-    return aligned_alloc(alignment, size);
+    void *ptr = aligned_alloc(alignment, size);
+    Catalyst::Runtime::CAPI::GLOBAL_ALLOCATIONS->insert(ptr);
+    return ptr;
 }
 
-void _mlir_memref_to_llvm_free(void *ptr) { free(ptr); }
+void _mlir_memref_to_llvm_free(void *ptr)
+{
+    Catalyst::Runtime::CAPI::GLOBAL_ALLOCATIONS->erase(ptr);
+    free(ptr);
+}
 
 void __quantum__rt__fail_cstr(const char *cstr) { throw std::runtime_error(cstr); }
 
@@ -68,12 +85,15 @@ void __quantum__rt__initialize()
     }
 
     Catalyst::Runtime::CAPI::GLOBAL_DEVICE_PTR = Catalyst::Runtime::CreateQuantumDevice();
+    Catalyst::Runtime::CAPI::GLOBAL_ALLOCATIONS = std::make_unique<std::unordered_set<void *>>();
+    Catalyst::Runtime::CAPI::GLOBAL_ALLOCATIONS->reserve(1024);
     assert(Catalyst::Runtime::CAPI::get_device() != nullptr);
 }
 
 void __quantum__rt__finalize()
 {
     Catalyst::Runtime::CAPI::GLOBAL_DEVICE_PTR.reset(nullptr);
+    Catalyst::Runtime::CAPI::GLOBAL_ALLOCATIONS.reset(nullptr);
     assert(Catalyst::Runtime::CAPI::get_device() == nullptr);
 }
 
