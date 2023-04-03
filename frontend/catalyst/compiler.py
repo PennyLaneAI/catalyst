@@ -239,7 +239,7 @@ class CompilerDriver:
         try:
             command = [compiler] + flags + [infile, "-o", outfile]
             if compile_options.verbose:
-                print(f"[RUNNING] {' '.join(command)}", file=compile_options.logfile)
+                print(f"[RUNNING] {' '.join(command)}", file=compile_options.get_logfile())
             subprocess.run(command, check=True)
             return True
         except subprocess.CalledProcessError:

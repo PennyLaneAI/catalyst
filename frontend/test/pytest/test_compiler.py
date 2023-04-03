@@ -2,6 +2,7 @@
 Unit tests for CompilerDriver class
 """
 
+import sys
 import warnings
 
 import pytest
@@ -91,16 +92,17 @@ class TestCompilerDriver:
         with pytest.raises(ValueError, match="is not an object file"):
             link_lightning_runtime("file-name.noo")
 
-    @pytest.mark.parametrize("verbose", [True, False])
-    def test_verbose_compilation(self, verbose, capsys):
+    @pytest.mark.parametrize("verbose,logfile", [(True, "stdout"), (True, "stderr"), (False, None)])
+    def test_verbose_compilation(self, verbose, logfile, capsys):
         """Test verbose compilation mode"""
 
-        @qjit(verbose=verbose)
+        @qjit(verbose=verbose, logfile=getattr(sys, logfile) if logfile else None)
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def workflow():
             qml.X(wires=1)
             return qml.state()
 
         workflow()
-        stderr = "\n".join(capsys.readouterr())
-        assert ("[RUNNING]" in stderr) if verbose else ("[RUNNING]" not in stderr)
+        capture_result = capsys.readouterr()
+        capture = capture_result.out + capture_result.err
+        assert ("[RUNNING]" in capture) if verbose else ("[RUNNING]" not in capture)
