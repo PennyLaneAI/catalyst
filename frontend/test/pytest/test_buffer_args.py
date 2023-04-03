@@ -78,6 +78,14 @@ class TestReturnValues:
         result2 = order2(data_in)
         assert jnp.allclose(result1[0], result2[1]) and jnp.allclose(result1[1], result2[0])
 
+    @pytest.mark.parametrize("dtype", [(jnp.complex128), (jnp.complex64)])
+    def test_complex(self, dtype):
+        @qjit
+        def f():
+            return jnp.array(0, dtype=dtype)
+
+        assert jnp.allclose(f(), complex(0, 0))
+
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
