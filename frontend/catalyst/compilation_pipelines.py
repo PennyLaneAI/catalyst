@@ -29,10 +29,15 @@ import jax
 import numpy as np
 import pennylane as qml
 from jax.interpreters.mlir import ir
-from mlir_quantum.runtime import get_ranked_memref_descriptor, ranked_memref_to_numpy
+from mlir_quantum.runtime import (
+    get_ranked_memref_descriptor,
+    ranked_memref_to_numpy,
+    to_numpy,
+)
 
 import catalyst.jax_tracer as tracer
 from catalyst import compiler
+from catalyst.compiler import CompileOptions
 from catalyst.pennylane_extensions import QFunc
 from catalyst.utils.gen_mlir import append_modules
 from catalyst.utils.patching import Patcher
@@ -259,7 +264,7 @@ class CompiledFunction:
             a numpy array with the contents of the ranked memref descriptor
         """
         assert not hasattr(ranked_memref, "shape")
-        return np.array(ranked_memref.aligned.contents)
+        return to_numpy(np.array(ranked_memref.aligned.contents))
 
     @staticmethod
     def ranked_memref_to_numpy(memref_desc):
@@ -466,9 +471,10 @@ class QJIT:
             after the Python process ends. If ``False``, these representations
             will instead be stored in a temporary folder, which will be deleted
             as soon as the QJIT instance is deleted.
+        compile_options (Optional[CompileOptions]): Common compilation options
     """
 
-    def __init__(self, fn, target, keep_intermediate):
+    def __init__(self, fn, target, keep_intermediate, compile_options=None):
         self.qfunc = fn
         self.c_sig = None
         functools.update_wrapper(self, fn)
@@ -484,6 +490,7 @@ class QJIT:
             # pylint: disable=consider-using-with
             self.workspace = tempfile.TemporaryDirectory()
             self.workspace_name = self.workspace.name
+        self.compile_options = compile_options
         self.passes = {}
         self._jaxpr = None
         self._mlir = None
@@ -561,7 +568,7 @@ class QJIT:
         """Compile the current MLIR module."""
 
         shared_object, self._llvmir = compiler.compile(
-            self.mlir_module, self.workspace_name, self.passes
+            self.mlir_module, self.workspace_name, self.passes, self.compile_options
         )
 
         # The function name out of MLIR has quotes around it, which we need to remove.
@@ -599,7 +606,7 @@ class QJIT:
         return self.compiled_function(*args, **kwargs)
 
 
-def qjit(fn=None, *, target="binary", keep_intermediate=False):
+def qjit(fn=None, *, target="binary", keep_intermediate=False, verbose=False, logfile=None):
     """A just-in-time decorator for PennyLane and JAX programs using Catalyst.
 
     This decorator enables both just-in-time and ahead-of-time compilation,
@@ -618,6 +625,9 @@ def qjit(fn=None, *, target="binary", keep_intermediate=False):
             compilation. If ``True``, intermediate representations are available via the
             :attr:`~.QJIT.mlir`, :attr:`~.QJIT.jaxpr`, and :attr:`~.QJIT.qir`, representing
             different stages in the optimization process.
+        verbosity (int): Verbosity level (0 - disabled, >0 - enabled)
+        logfile (Optional[TextIOWrapper]): File object to write verose messages to (default -
+            sys.stderr).
 
     Returns:
         QJIT object.
@@ -684,9 +694,9 @@ def qjit(fn=None, *, target="binary", keep_intermediate=False):
     """
 
     if fn is not None:
-        return QJIT(fn, target, keep_intermediate)
+        return QJIT(fn, target, keep_intermediate, CompileOptions(verbose, logfile))
 
     def wrap_fn(fn):
-        return QJIT(fn, target, keep_intermediate)
+        return QJIT(fn, target, keep_intermediate, CompileOptions(verbose, logfile))
 
     return wrap_fn

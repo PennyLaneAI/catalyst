@@ -2,12 +2,16 @@
 Unit tests for CompilerDriver class
 """
 
+import sys
 import warnings
 
 import pytest
 
+import pennylane as qml
+from catalyst import qjit
 from catalyst.compiler import (
     CompilerDriver,
+    CompileOptions,
     bufferize_tensors,
     compile_llvmir,
     convert_mlir_to_llvmir,
@@ -40,12 +44,13 @@ class TestCompilerDriver:
             # pylint: disable=protected-access
             CompilerDriver._get_compiler_fallback_order([])
 
-    def test_compiler_failed_warning(self):
+    @pytest.mark.parametrize("verbose", [True, False])
+    def test_compiler_failed_warning(self, verbose):
         """Test that a warning is emitted when a compiler failed."""
         compiler = "cc"
         with pytest.warns(UserWarning, match="Compiler .* failed .*"):
             # pylint: disable=protected-access
-            CompilerDriver._attempt_link(compiler, [""], "in.o", "out.so")
+            CompilerDriver._attempt_link(compiler, [""], "in.o", "out.so", CompileOptions(verbose))
 
     def test_link_fail_exception(self):
         """Test that an exception is raised when all compiler possibilities are exhausted."""
@@ -86,3 +91,18 @@ class TestCompilerDriver:
         """Test if the function detects wrong extensions"""
         with pytest.raises(ValueError, match="is not an object file"):
             link_lightning_runtime("file-name.noo")
+
+    @pytest.mark.parametrize("verbose,logfile", [(True, "stdout"), (True, "stderr"), (False, None)])
+    def test_verbose_compilation(self, verbose, logfile, capsys):
+        """Test verbose compilation mode"""
+
+        @qjit(verbose=verbose, logfile=getattr(sys, logfile) if logfile else None)
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def workflow():
+            qml.X(wires=1)
+            return qml.state()
+
+        workflow()
+        capture_result = capsys.readouterr()
+        capture = capture_result.out + capture_result.err
+        assert ("[RUNNING]" in capture) if verbose else ("[RUNNING]" not in capture)

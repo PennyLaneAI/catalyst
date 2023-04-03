@@ -29,6 +29,9 @@
 * Perform function inlining to improve optimizations and memory management within the compiler.
   [#72](https://github.com/PennyLaneAI/catalyst/pull/72)
 
+* Add an option to print verbose messages explaining the compilation process
+  [#68](https://github.com/PennyLaneAI/catalyst/pull/68)
+
 <h3>Breaking changes</h3>
 
 <h3>Bug fixes</h3>
@@ -43,6 +46,9 @@
 
   This fixes a large majority of leaks in many typical quantum functions.
   [#61](https://github.com/PennyLaneAI/catalyst/pull/61)
+
+* Fix returning complex scalars from the compiled function.
+  [#77](https://github.com/PennyLaneAI/catalyst/pull/77)
 
 <h3>Contributors</h3>
 
