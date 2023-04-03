@@ -182,7 +182,7 @@ class Grad:
             qnode_jaxpr = jaxpr.eqns[0].params["call_jaxpr"]
             return_ops = []
             for res in qnode_jaxpr.outvars:
-                for eq in reversed(qnode_jaxpr.eqns):
+                for eq in reversed(qnode_jaxpr.eqns):  # pragma: no branch
                     if res in eq.outvars:
                         return_ops.append(eq.primitive)
                         break
