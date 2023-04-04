@@ -309,10 +309,6 @@ class CompiledFunction:
             shared_object_file, func_name
         )
 
-        numpy_managed_memory = set()
-        for arg in args[1:]:
-            numpy_managed_memory.add(arg.contents.allocated)
-
         params_to_setup = [b"jitted-function"]
         argc = len(params_to_setup)
         array_of_char_ptrs = (ctypes.c_char_p * len(params_to_setup))()
