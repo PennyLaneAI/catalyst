@@ -50,6 +50,11 @@
 * Fix returning complex scalars from the compiled function.
   [#77](https://github.com/PennyLaneAI/catalyst/pull/77)
 
+* Eliminate all memory leaks by tracking memory allocations at runtime. The memory allocations
+  which are still alive when the compiled function terminates, will be freed in the
+  finalization / teardown function.
+  [#78](https://github.com/PennyLaneAI/catalyst/pull/78)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):

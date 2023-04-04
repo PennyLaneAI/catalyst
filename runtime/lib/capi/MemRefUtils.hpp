@@ -2,6 +2,12 @@
 #include <cassert>
 #include <cstring>
 
+extern "C" {
+void *_mlir_memref_to_llvm_alloc(size_t size);
+void *_mlir_memref_to_llvm_aligned_alloc(size_t alignment, size_t size);
+void _mlir_memref_to_llvm_free(void *ptr);
+}
+
 template <typename T, size_t R> struct MemRefT {
     T *data_allocated;
     T *data_aligned;

@@ -256,6 +256,34 @@ TEST_CASE("Test copy to strided array", "[qir_lightning_core]")
     delete[] buffer_strided;
 }
 
+TEST_CASE("Test memref alloc", "[qir_lightning_core]")
+{
+    __quantum__rt__initialize();
+    int *a = (int *)_mlir_memref_to_llvm_alloc(sizeof(int));
+    CHECK(a != NULL);
+    *a = 1;
+    __quantum__rt__finalize();
+}
+
+TEST_CASE("Test memref aligned alloc", "[qir_lightning_core]")
+{
+    __quantum__rt__initialize();
+    int *a = (int *)_mlir_memref_to_llvm_aligned_alloc(sizeof(int), sizeof(int));
+    CHECK(a != NULL);
+    *a = 1;
+    __quantum__rt__finalize();
+}
+
+TEST_CASE("Test memref free", "[qir_lightning_core]")
+{
+    __quantum__rt__initialize();
+    int *a = (int *)_mlir_memref_to_llvm_alloc(sizeof(int));
+    CHECK(a != NULL);
+    *a = 1;
+    _mlir_memref_to_llvm_free(a);
+    __quantum__rt__finalize();
+}
+
 TEST_CASE("Test __quantum__qis__Measure", "[qir_lightning_core]")
 {
     // initialize the simulator
