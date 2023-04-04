@@ -16,12 +16,14 @@ This release contains contributions from (in alphabetical order):
 
 <h3>New features</h3>
 
-* Add an option to print verbose messages explaining the compilation process
+* Add an option to print verbose messages explaining the compilation process.
+
   [#68](https://github.com/PennyLaneAI/catalyst/pull/68)
 
-* Allow `catalyst.grad` to be used on any traceable function (within a qjit context).
-  This means the operation is no longer resticted to acting on `qml.qnode`s only.
+* Allow ``catalyst.grad`` to be used on any traceable function (within a qjit context).
+  This means the operation is no longer resticted to acting on ``qml.qnode``s only.
   [#75](https://github.com/PennyLaneAI/catalyst/pull/75)
+
 
 <h3>Improvements</h3>
 
