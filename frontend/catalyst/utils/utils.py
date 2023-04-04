@@ -15,8 +15,6 @@
 """Utility functions."""
 
 import inspect
-import os
-import contextlib
 import typing
 
 
@@ -34,14 +32,3 @@ def get_type_annotations(func: typing.Callable):
         return getattr(func, "__annotations__", {}).values()
 
     return None
-
-
-@contextlib.contextmanager
-def pushd(new_dir):
-    """Push a new working directory."""
-    cwd = os.getcwd()
-    os.chdir(new_dir)
-    try:
-        yield
-    finally:
-        os.chdir(cwd)

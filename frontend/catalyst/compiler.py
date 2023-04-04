@@ -26,7 +26,6 @@ from io import TextIOWrapper
 from typing import Optional, List
 from dataclasses import dataclass
 
-from catalyst.utils import utils
 from catalyst._configuration import INSTALLED
 
 package_root = os.path.dirname(__file__)
@@ -36,15 +35,15 @@ package_root = os.path.dirname(__file__)
 class CompileOptions:
     """Generic compilation options"""
 
-    verbose: bool
-    logfile: Optional[TextIOWrapper] = None  # stdout/stderr or a file
+    verbose: bool = False
+    logfile: Optional[TextIOWrapper] = sys.stderr
 
     def get_logfile(self) -> TextIOWrapper:
         """Get the effective file object, as configured"""
-        return self.logfile if self.logfile else sys.stderr
+        return self.logfile
 
 
-default_compile_options: CompileOptions = CompileOptions(False, None)
+default_compile_options: CompileOptions = CompileOptions()
 
 
 def run_writing_command(
@@ -80,11 +79,9 @@ def get_executable_path(project, tool):
 
 def get_lib_path(project, env):
     """Get the library path."""
-    return (
-        os.path.join(package_root, "lib")
-        if INSTALLED
-        else os.getenv(env, default_lib_paths.get(project, ""))
-    )
+    if INSTALLED:
+        return os.path.join(package_root, "lib")
+    return os.getenv(env, default_lib_paths.get(project, ""))
 
 
 class Pass(abc.ABC):
@@ -111,13 +108,14 @@ class Pass(abc.ABC):
     @classmethod
     # pylint: disable=too-many-arguments
     def run(cls, infile, outfile=None, executable=None, flags=None, options=None):
-        """Run the MHLO pass.
+        """Run the pass.
 
         Args:
             infile (str): path to MLIR file to be compiled
             outfile (str): path to output file, defaults to replacing extension in infile to .nohlo.
             executable (str): path to executable, defaults to mlir-hlo-opt
             flags (List[str]): flags to mlir-hlo-opt, defaults to _default_flags.
+            options (CompileOptions): compile options.
         """
         if outfile is None:
             outfile = cls.get_output_filename(infile)
@@ -427,7 +425,7 @@ class Compiler:
             parent_dir = os.getcwd()
             path = os.path.join(parent_dir, module_name)
             os.makedirs(path, exist_ok=True)
-            workspace_name = path
+            workspace_name = os.path.abspath(path)
         else:
             workspace_name = self.workspace.name
 
@@ -443,16 +441,15 @@ class Compiler:
             ]
 
         self.order = {}
-        with utils.pushd(workspace_name):
-            # need to create a temporary file with the string contents
-            filename = f"{module_name}.mlir"
-            with open(filename, "w", encoding="utf-8") as f:
-                mlir_module.operation.print(f, print_generic_op_form=False, assume_verified=True)
 
-            for _pass in passes:
-                output = _pass.run(filename, options=options)
-                self.order[_pass] = output
-                filename = os.path.abspath(output)
+        filename = f"{workspace_name}/{module_name}.mlir"
+        with open(filename, "w", encoding="utf-8") as f:
+            mlir_module.operation.print(f, print_generic_op_form=False, assume_verified=True)
+
+        for _pass in passes:
+            output = _pass.run(filename, options=options)
+            self.order[_pass] = output
+            filename = os.path.abspath(output)
 
         return filename
 
@@ -473,8 +470,8 @@ class Compiler:
             (str): output IR
         """
         fname = self._get_output_file_of(_pass)
-        if not fname:
-            return None
+        if fname is None:
+            raise ValueError(f"Output for pass {_pass} not found.")
         with open(fname, "r", encoding="utf-8") as f:
             txt = f.read()
         return txt
