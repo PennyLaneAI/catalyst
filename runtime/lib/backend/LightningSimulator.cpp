@@ -410,7 +410,8 @@ auto LightningSimulator::Measure(QubitIdType wire) -> Result
 
     auto &&state = this->device_sv->getDataVector();
 
-    const auto stride = pow(2, numQubits - (1 + wire));
+    auto &&dev_wires = getDeviceWires(wires);
+    const auto stride = pow(2, numQubits - (1 + dev_wires[0]));
     const auto vec_size = pow(2, numQubits);
     const auto section_size = vec_size / stride;
     const auto half_section_size = section_size / 2;
