@@ -19,8 +19,8 @@ from catalyst.compiler import LLVMDialectToLLVMIR
 from catalyst.compiler import LLVMIRToObjectFile
 
 
-class TestCompilerDriver:
-    """Unit test for CompilerDriver class."""
+class TestCompilerOptions:
+    """Unit test for Compiler class."""
 
     def test_catalyst_cc_available(self, monkeypatch):
         """Test that the compiler resolution order contains the preferred compiler and no warnings
@@ -34,6 +34,28 @@ class TestCompilerDriver:
             compilers = CompilerDriver._get_compiler_fallback_order([])
             assert compiler in compilers
 
+    @pytest.mark.parametrize("logfile", [("stdout"), ("stderr"), (None)])
+    def test_verbose_compilation(self, logfile, capsys):
+        """Test verbose compilation mode"""
+
+        if logfile is not None:
+            logfile = getattr(sys, logfile)
+
+        verbose = logfile is not None
+
+        @qjit(verbose=verbose, logfile=logfile)
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def workflow():
+            qml.X(wires=1)
+            return qml.state()
+
+        workflow()
+        capture_result = capsys.readouterr()
+        capture = capture_result.out + capture_result.err
+        assert ("[RUNNING]" in capture) if verbose else ("[RUNNING]" not in capture)
+
+
+class TestCompilerWarnings:
     def test_catalyst_cc_unavailable_warning(self, monkeypatch):
         """Test that a warning is emitted when the preferred compiler is not in PATH."""
         monkeypatch.setenv("CATALYST_CC", "this-binary-does-not-exist")
@@ -47,6 +69,8 @@ class TestCompilerDriver:
         with pytest.warns(UserWarning, match="Compiler .* failed .*"):
             CompilerDriver._attempt_link("cc", [""], "in.o", "out.so", None)
 
+
+class TestCompilerErrors:
     def test_link_fail_exception(self):
         """Test that an exception is raised when all compiler possibilities are exhausted."""
         with pytest.raises(EnvironmentError, match="Unable to link .*"):
@@ -87,17 +111,19 @@ class TestCompilerDriver:
         with pytest.raises(ValueError, match="is not an object file"):
             CompilerDriver.run("file-name.noo")
 
-    @pytest.mark.parametrize("verbose,logfile", [(True, "stdout"), (True, "stderr"), (False, None)])
-    def test_verbose_compilation(self, verbose, logfile, capsys):
-        """Test verbose compilation mode"""
 
-        @qjit(verbose=verbose, logfile=getattr(sys, logfile) if logfile else None)
+class TestCompilerState:
+    def test_print_stages(self):
+        @qjit(keep_intermediate=True)
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def workflow():
             qml.X(wires=1)
             return qml.state()
 
-        workflow()
-        capture_result = capsys.readouterr()
-        capture = capture_result.out + capture_result.err
-        assert ("[RUNNING]" in capture) if verbose else ("[RUNNING]" not in capture)
+        # The test here is just that these files exist
+        # and can therefore be printed.
+        workflow.print_stage("MHLOPass")
+        workflow.print_stage("QuantumCompilationPass")
+        workflow.print_stage("BufferizationPass")
+        workflow.print_stage("MLIRToLLVMDialect")
+        workflow.print_stage("LLVMDialectToLLVMIR")
