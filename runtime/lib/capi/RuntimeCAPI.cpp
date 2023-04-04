@@ -57,7 +57,7 @@ class MemoryManager {
     void erase(void *ptr);
 };
 
-MemoryManager::MemoryManager() { _impl.reserve(1028); }
+MemoryManager::MemoryManager() { _impl.reserve(1024); }
 
 MemoryManager::~MemoryManager()
 {
