@@ -44,7 +44,7 @@ class CompileOptions:
         return self.logfile if self.logfile else sys.stderr
 
 
-default_compile_options: CompileOptions = CompileOptions(0, None)
+default_compile_options: CompileOptions = CompileOptions(False, None)
 
 
 def run_writing_command(
@@ -338,12 +338,10 @@ class CompilerDriver:
 
     @staticmethod
     # pylint: disable=redefined-outer-name
-    def _attempt_link(compiler, flags, infile, outfile, compile_options=None):
-        if compile_options is None:
-            compile_options = default_compile_options
+    def _attempt_link(compiler, flags, infile, outfile, options):
         try:
             command = [compiler] + flags + [infile, "-o", outfile]
-            run_writing_command(command, compile_options)
+            run_writing_command(command, options)
             return True
         except subprocess.CalledProcessError:
             msg = (
@@ -392,59 +390,6 @@ class CompilerDriver:
                 return outfile
         msg = f"Unable to link {infile}. All available compiler options exhausted. Please provide a compatible compiler via $CATALYST_CC."
         raise EnvironmentError(msg)
-
-
-def lower_mhlo_to_linalg(filename: str, compile_options: Optional[CompileOptions] = None):
-    """Lower MHLO to linalg dialect."""
-    return MHLOPass.run(filename, options=compile_options)
-
-
-def transform_quantum_ir(filename: str, compile_options: Optional[CompileOptions] = None) -> str:
-    """Runs quantum optimizations and transformations, as well gradient transforms, on the hybrid
-    IR.
-
-    Args:
-        filename (str): the path to a file where the program is stored.
-    Returns:
-        a path to the output file
-    """
-    return QuantumCompilationPass.run(filename, options=compile_options)
-
-
-def bufferize_tensors(filename: str, compile_options: Optional[CompileOptions] = None) -> str:
-    """Translate MHLO to linalg dialect.
-
-    Args:
-        filename (str): the path to a file were the program is stored.
-        Optional compile_options (CompileOptions): generic compilation options.
-    Returns:
-        a path to the output file
-    """
-    return BufferizationPass.run(filename, options=compile_options)
-
-
-def lower_all_to_llvm(filename: str, compile_options: Optional[CompileOptions] = None) -> str:
-    """Translate MLIR dialects to LLVM dialect.
-
-    Args:
-        filename (str): the path to a file were the program is stored.
-        Optional compile_options (CompileOptions): generic compilation options.
-    Returns:
-        a path to the output file
-    """
-    return MLIRToLLVMDialect.run(filename, options=compile_options)
-
-
-def convert_mlir_to_llvmir(filename: str, compile_options: Optional[CompileOptions] = None) -> str:
-    """Translate LLVM dialect to LLVM IR.
-
-    Args:
-        filename (str): the path to a file were the program is stored.
-        Optional compile_options (CompileOptions): generic compilation options.
-    Returns:
-        a path to the output file
-    """
-    return LLVMDialectToLLVMIR.run(filename, options=compile_options)
 
 
 class Compiler:
@@ -541,27 +486,3 @@ class Compiler:
         """
         txt = self.get_output_of(_pass)
         print(txt)
-
-
-def compile_llvmir(filename: str, compile_options: Optional[CompileOptions] = None) -> str:
-    """Translate LLVM IR to an object file.
-
-    Args:
-        filename (str): the path to a file were the program is stored.
-        Optional compile_options (CompileOptions): generic compilation options.
-    Returns:
-        a path to the output file
-    """
-    return LLVMIRToObjectFile.run(filename, options=compile_options)
-
-
-def link_lightning_runtime(filename: str, compile_options: Optional[CompileOptions] = None) -> str:
-    """Link the object file as a shared object.
-
-    Args:
-        filename (str): the path to a file were the object file is stored.
-        Optional compile_options (CompileOptions): generic compilation options.
-    Returns:
-        a path to the output file
-    """
-    return CompilerDriver.run(filename, options=compile_options)
