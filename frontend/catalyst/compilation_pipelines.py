@@ -18,27 +18,29 @@ compiling of hybrid quantum-classical functions using Catalyst.
 # pylint: disable=missing-module-docstring
 
 import ctypes
-import os
+import functools
 import inspect
+import os
 import tempfile
 import typing
 import warnings
-import functools
 
-import numpy as np
 import jax
-from jax.interpreters.mlir import ir
-
+import numpy as np
 import pennylane as qml
-
-from mlir_quantum.runtime import get_ranked_memref_descriptor, ranked_memref_to_numpy, to_numpy
+from jax.interpreters.mlir import ir
+from mlir_quantum.runtime import (
+    get_ranked_memref_descriptor,
+    ranked_memref_to_numpy,
+    to_numpy,
+)
 
 import catalyst.jax_tracer as tracer
 from catalyst import compiler
 from catalyst.compiler import CompileOptions
+from catalyst.pennylane_extensions import QFunc
 from catalyst.utils.gen_mlir import append_modules
 from catalyst.utils.patching import Patcher
-from catalyst.pennylane_extensions import QFunc
 from catalyst.utils.tracing import TracingContext
 
 # Required for JAX tracer objects as PennyLane wires.
@@ -195,13 +197,7 @@ class CompiledFunction:
         # Not needed, computed from the arguments.
         # function.argyptes
 
-        # free, as defined in stdlib.h
-        # free is not defined in the shared object, however
-        # it is declared and we can use this declaration to
-        # get a handle to it.
-        free = shared_object.free
-
-        return shared_object, function, setup, teardown, free
+        return shared_object, function, setup, teardown
 
     @staticmethod
     def get_runtime_signature(*args):
@@ -311,13 +307,9 @@ class CompiledFunction:
         Returns:
             retval: the value computed by the function or None if the function has no return value
         """
-        shared_object, function, setup, teardown, free = CompiledFunction.load_symbols(
+        shared_object, function, setup, teardown = CompiledFunction.load_symbols(
             shared_object_file, func_name
         )
-
-        numpy_managed_memory = set()
-        for arg in args[1:]:
-            numpy_managed_memory.add(arg.contents.allocated)
 
         params_to_setup = [b"jitted-function"]
         argc = len(params_to_setup)
@@ -326,24 +318,12 @@ class CompiledFunction:
 
         setup(ctypes.c_int(argc), array_of_char_ptrs)
         function(*args)
-        teardown()
 
         result = args[0] if has_return else None
         retval = CompiledFunction.return_value_ptr_to_numpy(result) if result else None
 
-        if has_return:
-            raw_return = args[0].contents
-            for memref in raw_return:
-                is_constant = memref.allocated == 0xDEADBEEF
-                if is_constant:
-                    continue
-
-                if memref.allocated in numpy_managed_memory:
-                    continue
-
-                pointer_type = ctypes.POINTER(ctypes.c_int)
-                pointer_to_free = ctypes.cast(memref.allocated, pointer_type)
-                free(pointer_to_free)
+        # Teardown has to be made after the return valued has been copied.
+        teardown()
 
         # Unmap the shared library. This is necessary in case the function is re-compiled.
         # Without unmapping the shared library, there would be a conflict in the name of
@@ -579,6 +559,12 @@ class QJIT:
     def __call__(self, *args, **kwargs):
         if TracingContext.is_tracing():
             return self.qfunc(*args, **kwargs)
+
+        if any(isinstance(arg, jax.core.Tracer) for arg in args):
+            raise ValueError(
+                "Cannot use JAX to trace through a qjit compiled function. If you attempted "
+                "to use jax.jit or jax.grad, please use their equivalent from Catalyst."
+            )
 
         args = [jax.numpy.array(arg) for arg in args]
         r_sig = CompiledFunction.get_runtime_signature(*args)

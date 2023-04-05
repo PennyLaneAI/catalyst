@@ -26,6 +26,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 
 #include "MemRefUtils.hpp"
 #include "QuantumDevice.hpp"
@@ -94,9 +95,57 @@ std::unique_ptr<QuantumDevice> RegisterQuantumDevice(std::string device, size_t 
     return nullptr;
 }
 
+class MemoryManager {
+    std::unordered_set<void *> _impl;
+
+  public:
+    MemoryManager();
+    ~MemoryManager();
+    void insert(void *ptr);
+    void erase(void *ptr);
+};
+
+MemoryManager::MemoryManager() { _impl.reserve(1024); }
+
+MemoryManager::~MemoryManager()
+{
+    for (auto allocation : _impl) {
+        free(allocation);
+    }
+}
+
+void MemoryManager::insert(void *ptr) { _impl.insert(ptr); }
+
+void MemoryManager::erase(void *ptr) { _impl.erase(ptr); }
+
+/**
+ * @brief Global memory allocation set.
+ */
+static std::unique_ptr<MemoryManager> GLOBAL_ALLOCATIONS = nullptr;
+
 } // namespace Catalyst::Runtime::CAPI
 
 extern "C" {
+
+void *_mlir_memref_to_llvm_alloc(size_t size)
+{
+    void *ptr = malloc(size);
+    Catalyst::Runtime::CAPI::GLOBAL_ALLOCATIONS->insert(ptr);
+    return ptr;
+}
+
+void *_mlir_memref_to_llvm_aligned_alloc(size_t alignment, size_t size)
+{
+    void *ptr = aligned_alloc(alignment, size);
+    Catalyst::Runtime::CAPI::GLOBAL_ALLOCATIONS->insert(ptr);
+    return ptr;
+}
+
+void _mlir_memref_to_llvm_free(void *ptr)
+{
+    Catalyst::Runtime::CAPI::GLOBAL_ALLOCATIONS->erase(ptr);
+    free(ptr);
+}
 
 void __quantum__rt__fail_cstr(const char *cstr) { throw std::runtime_error(cstr); }
 
@@ -106,15 +155,17 @@ void __quantum__rt__initialize()
         __quantum__rt__fail_cstr("Invalid initialization of the global simulator");
     }
 
-    // Set the backend device
-    __quantum__rt__device(0, nullptr);
+    __quantum__rt__device(nullptr, nullptr);
 
+    Catalyst::Runtime::CAPI::GLOBAL_ALLOCATIONS =
+        std::make_unique<Catalyst::Runtime::CAPI::MemoryManager>();
     assert(Catalyst::Runtime::CAPI::get_device() != nullptr);
 }
 
 void __quantum__rt__finalize()
 {
     Catalyst::Runtime::CAPI::GLOBAL_DEVICE_PTR.reset(nullptr);
+    Catalyst::Runtime::CAPI::GLOBAL_ALLOCATIONS.reset(nullptr);
     assert(Catalyst::Runtime::CAPI::get_device() == nullptr);
 }
 

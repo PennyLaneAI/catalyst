@@ -16,28 +16,32 @@
 while using :func:`~.qjit`.
 """
 
-import uuid
 import functools
 import numbers
+import uuid
 
 import jax
 import jax.numpy as jnp
-from jax import ShapedArray
-from jax.tree_util import tree_flatten, tree_unflatten, treedef_is_leaf
-from jax.linear_util import wrap_init
-from jax._src.lax.control_flow import _initial_style_jaxpr, _initial_style_jaxprs_with_common_consts
-from jax._src.lax.lax import _abstractify
-
 import pennylane as qml
-from pennylane.operation import Operation, Wires, AnyWires
+from jax import ShapedArray
+from jax._src.lax.control_flow import (
+    _initial_style_jaxpr,
+    _initial_style_jaxprs_with_common_consts,
+)
+from jax._src.lax.lax import _abstractify
+from jax.linear_util import wrap_init
+from jax.tree_util import tree_flatten, tree_unflatten, treedef_is_leaf
 from pennylane.measurements import MidMeasureMP
+from pennylane.operation import AnyWires, Operation, Wires
 
+import catalyst
 import catalyst.jax_primitives as jprim
+from catalyst.jax_primitives import expval_p, probs_p
 from catalyst.jax_tape import JaxTape
-from catalyst.jax_tracer import trace_quantum_tape, insert_to_qreg, get_traceable_fn
+from catalyst.jax_tracer import get_traceable_fn, insert_to_qreg, trace_quantum_tape
+from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import Patcher
 from catalyst.utils.tracing import TracingContext
-from catalyst.utils.exceptions import CompileError
 
 
 # pylint: disable=too-few-public-methods
@@ -120,9 +124,8 @@ class Function:
     """
 
     def __init__(self, fn):
-        assert isinstance(fn, Grad), "Function boundaries only supported for gradients."
         self.fn = fn
-        self.__name__ = "grad." + fn.__name__
+        self.__name__ = fn.__name__
 
     def __call__(self, *args, **kwargs):
         jaxpr = jax.make_jaxpr(self.fn)(*args)
@@ -144,18 +147,21 @@ class Grad:
         argnum (int): the argument indices which define over which arguments to differentiate
 
     Raises:
-        ValueError: Higher-order derivatives can only be computed with the finite difference
-                    method.
+        ValueError: Higher-order derivatives and derivatives of non-QNode functions can only be
+                    computed with the finite difference method.
     """
 
     def __init__(self, fn, *, method, h, argnum):
         self.fn = fn
-        self.__name__ = fn.__name__
+        self.__name__ = f"grad.{fn.__name__}"
         self.method = method
         self.h = h
         self.argnum = argnum
         if self.method != "fd" and not isinstance(self.fn, qml.QNode):
-            raise ValueError("Only finite difference can compute higher order derivatives.")
+            raise ValueError(
+                "Only finite difference can compute higher order derivatives "
+                "or gradients of non-QNode functions."
+            )
 
     def __call__(self, *args, **kwargs):
         """Specifies that an actual call to the differentiated function.
@@ -167,13 +173,30 @@ class Grad:
         )
 
         jaxpr = jax.make_jaxpr(self.fn)(*args)
-        if len(jaxpr.eqns) != 1:
-            raise TypeError("catalyst.grad can only be used on QNodes and other grad calls")
-        if jaxpr.eqns[0].primitive != jprim.func_p:
-            raise TypeError(
-                f"Attempting to differentiate something other than a function "
-                f"(got {jaxpr.eqns[0].primitive})"
-            )
+        assert len(jaxpr.eqns) == 1, "Expected jaxpr consisting of a single function call."
+        assert (
+            jaxpr.eqns[0].primitive == jprim.func_p
+        ), "Expected jaxpr consisting of a single function call."
+
+        if self.method != "fd":
+            qnode_jaxpr = jaxpr.eqns[0].params["call_jaxpr"]
+            return_ops = []
+            for res in qnode_jaxpr.outvars:
+                for eq in reversed(qnode_jaxpr.eqns):  # pragma: no branch
+                    if res in eq.outvars:
+                        return_ops.append(eq.primitive)
+                        break
+
+            if self.method == "ps" and any(prim not in [expval_p, probs_p] for prim in return_ops):
+                raise TypeError(
+                    "The parameter-shift method can only be used for QNodes "
+                    "which return either qml.expval or qml.probs."
+                )
+            if self.method == "adj" and any(prim not in [expval_p] for prim in return_ops):
+                raise TypeError(
+                    "The adjoint method can only be used for QNodes which return qml.expval."
+                )
+
         return jprim.grad_p.bind(
             *args, jaxpr=jaxpr, fn=self, method=self.method, h=self.h, argnum=self.argnum
         )
@@ -193,8 +216,8 @@ def grad(f, *, method=None, h=None, argnum=None):
 
     .. warning::
 
-        Currently, higher-order differentiation is only supported by the
-        finite-difference method.
+        Currently, higher-order differentiation or differentiation of non-QNode functions
+        is only supported by the finite-difference method.
 
     .. note:
 
@@ -260,10 +283,14 @@ def grad(f, *, method=None, h=None, argnum=None):
     elif isinstance(argnum, int):
         argnum = [argnum]
 
-    if isinstance(f, Grad):
-        return Grad(Function(f), method=method, h=h, argnum=argnum)
+    if isinstance(f, catalyst.compilation_pipelines.QJIT):
+        # Don't generate an extra function when the circuit is already qjitted.
+        f = f.qfunc
 
-    return Grad(f, method=method, h=h, argnum=argnum)
+    if isinstance(f, qml.QNode):
+        return Grad(f, method=method, h=h, argnum=argnum)
+
+    return Grad(Function(f), method=method, h=h, argnum=argnum)
 
 
 # pylint: disable=too-few-public-methods
