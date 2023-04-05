@@ -371,16 +371,16 @@ jobs:
         pytest frontend/test/pytest -n auto $COVERAGE_FLAGS
         mv coverage.xml coverage-${{ github.job }}.xml
 
-    - name: Check Catalyst Demos
-      run: |
-        MDD_BENCHMARK_PRECISION=1 \
-        pytest demos --nbmake -n auto
-
     - name: Upload to Codecov
       uses: codecov/codecov-action@v3
       with:
         fail_ci_if_error: true
         token: ${{ secrets.CODECOV_TOKEN }}
+
+    - name: Check Catalyst Demos
+      run: |
+        MDD_BENCHMARK_PRECISION=1 \
+        pytest demos --nbmake -n auto
 
   runtime-tests:
     name: Runtime Tests (Linux)
@@ -450,6 +450,13 @@ jobs:
           name: ubuntu-codecov-results-cpp
           path: ./coverage-${{ github.job }}.info
 
+      - name: Upload to Codecov
+        if: ${{ matrix.simulator == 'lightning' }}
+        uses: codecov/codecov-action@v3
+        with:
+          fail_ci_if_error: true
+          token: ${{ secrets.CODECOV_TOKEN }}
+
       - name: Build examples
         if: ${{ matrix.simulator == 'lightning' }}
         run: |
@@ -466,10 +473,3 @@ jobs:
         run: |
             mkdir -p ./runtime/build/tests/results
             ./runtime/build/tests/runner_tests --reporter junit --out ./runtime/build/tests/results/tests_result.xml
-
-      - name: Upload to Codecov
-        if: ${{ matrix.simulator == 'lightning' }}
-        uses: codecov/codecov-action@v3
-        with:
-          fail_ci_if_error: true
-          token: ${{ secrets.CODECOV_TOKEN }}
