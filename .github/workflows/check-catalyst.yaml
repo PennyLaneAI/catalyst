@@ -65,9 +65,6 @@ jobs:
         run: |
           sudo apt-get -y -q install ninja-build make cmake clang libomp-dev
           echo "LIGHTNING_GIT_TAG_VALUE=latest_release" >> $GITHUB_ENV
-      - if: ${{ github.event_name == 'push' }}
-        run: |
-          echo "LIGHTNING_GIT_TAG_VALUE=master" >> $GITHUB_ENV
 
       - name: Get Cached qir-stdlib Build
         id: cache-qir-stdlib
@@ -318,16 +315,6 @@ jobs:
         python3 -m pip install jax==${{ steps.jax-version.outputs.v }} jaxlib==${{ steps.jax-version.outputs.v }}
         python3 -m pip install .
 
-    - name: Install PennyLane-master
-      if: ${{ github.event_name == 'push' }}
-      uses: actions/checkout@v3
-      with:
-        repository: PennyLaneAI/pennylane
-        path: pennylane
-    - if: ${{ github.event_name == 'push' }}
-      run: |
-        python3 -m pip install --upgrade ./pennylane
-
     - name: Get LLVM Version
       id: llvm-hash
       run: echo "llvm-hash=$(grep llvm .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
@@ -418,10 +405,6 @@ jobs:
           sudo apt-get -y -q install cmake ninja-build libomp-dev lcov
           echo "LIGHTNING_TAG_VALUE=latest_release" >> $GITHUB_ENV
           # TODO: Update this to latest_release for the v0.30.0 release
-          echo "LIGHTNING_KOKKOS_TAG_VALUE=main" >> $GITHUB_ENV
-      - if: ${{ github.event_name == 'push' }}
-        run: |
-          echo "LIGHTNING_TAG_VALUE=master" >> $GITHUB_ENV
           echo "LIGHTNING_KOKKOS_TAG_VALUE=main" >> $GITHUB_ENV
 
       - name: Get Cached qir-stdlib Build
