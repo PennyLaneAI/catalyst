@@ -8,7 +8,7 @@
 
 <h3>Bug fixes</h3>
 
-* Fix error in logical to concrete qubit mapping during measurements.
+* Fix a bug in the mapping from logical to concrete qubits for mid-circuit measurements.
   [#80](https://github.com/PennyLaneAI/catalyst/pull/80)
 
 <h3>Contributors</h3>
