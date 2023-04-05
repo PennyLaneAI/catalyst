@@ -45,6 +45,7 @@ struct GradientConversionPass
         registry.insert<LLVM::LLVMDialect>();
         registry.insert<func::FuncDialect>();
         registry.insert<catalyst::quantum::QuantumDialect>();
+        registry.insert<mlir::gml_st::GmlStDialect>();
     }
 
     void runOnOperation() final
@@ -59,6 +60,7 @@ struct GradientConversionPass
         target.addIllegalDialect<GradientDialect>();
         target.addLegalDialect<catalyst::quantum::QuantumDialect>();
         target.addLegalDialect<func::FuncDialect>();
+        target.addLegalDialect<mlir::gml_st::GmlStDialect>();
 
         if (failed(applyPartialConversion(getOperation(), target, std::move(patterns)))) {
             signalPassFailure();

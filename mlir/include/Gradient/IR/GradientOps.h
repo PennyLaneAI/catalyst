@@ -22,3 +22,4 @@
 
 #define GET_OP_CLASSES
 #include "Gradient/IR/GradientOps.h.inc"
+#include "gml_st/IR/gml_st_ops.h"

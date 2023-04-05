@@ -17,3 +17,5 @@
 #include "mlir/IR/Dialect.h"
 
 #include "Gradient/IR/GradientOpsDialect.h.inc"
+
+#include "gml_st/IR/gml_st_ops.h"

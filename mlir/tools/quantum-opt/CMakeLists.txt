@@ -8,6 +8,9 @@ set(LIBS
     quantum-transforms
     MLIRGradient
     gradient-transforms
+    GmlStDialect
+    GmlStPasses
+GmlStDialect;GmlStTilingInterface;GmlStTilingInterfaceImpl;GmlStBufferizableOpInterface;GmlStPasses;GmlStTransforms;GmlStTestPasses;MLIRGmlStUtils;LmhloStructuredInterface;LmhloDialect;LmhloPasses;LmhloGPUDialect;MLIRHLOAnalysis;MLIRHLOTestAnalysis;MLIRBufferTransforms;MLIRHLOGPUTransforms;HloOpsCommon;MhloDialect;MhloRegisterDialects;MhloPasses;MhloToThloConversion;MhloToLhloConversion;MhloToMemrefConversion;MhloToArithmeticConversion;MhloToStandard;ChloPasses;MhloToLinalg;MhloShapeOpsToStandard;MhloToStablehlo;StablehloToMhlo;MhloScatterUtils;MhloTypeConversion;HloToLinalgUtils;StablehloBase;StablehloBroadcastUtils;ChloOps;StablehloRegister;StablehloAssemblyFormat;StablehloTypeInference;StablehloOps;VhloOps;StablehloTypeConversion;StablehloPasses;THLODialect;ThloPasses;ThloBufferizableOpInterface;MLIRMhloUtils
 )
 
 add_llvm_executable(quantum-opt quantum-opt.cpp)

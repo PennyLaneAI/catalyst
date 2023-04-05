@@ -18,6 +18,11 @@
 #include "mlir/InitAllPasses.h"
 #include "mlir/Tools/mlir-opt/MlirOptMain.h"
 
+#include "thlo/IR/thlo_ops.h"
+#include "gml_st/IR/gml_st_ops.h"
+#include "gml_st/transforms/passes.h"
+#include "mlir-hlo/Transforms/passes.h"
+
 #include "Gradient/IR/GradientDialect.h"
 #include "Gradient/Transforms/Passes.h"
 #include "Quantum/IR/QuantumDialect.h"
@@ -31,11 +36,16 @@ int main(int argc, char **argv)
     mlir::registerPass(catalyst::createGradientConversionPass);
     mlir::registerPass(catalyst::createQuantumBufferizationPass);
     mlir::registerPass(catalyst::createQuantumConversionPass);
+    mlir::registerPass(mlir::hlo::createOneShotBufferizePass);
+    mlir::registerPass(mlir::hlo::createOneShotBufferizePass);
+    mlir::registerPass(mlir::gml_st::createGmlStToScfPass);
 
     mlir::DialectRegistry registry;
     mlir::registerAllDialects(registry);
     registry.insert<catalyst::quantum::QuantumDialect>();
     registry.insert<catalyst::gradient::GradientDialect>();
+    registry.insert<mlir::gml_st::GmlStDialect>();
+    registry.insert<mlir::thlo::THLODialect>();
 
     return mlir::asMainReturnCode(
         mlir::MlirOptMain(argc, argv, "Quantum optimizer driver\n", registry));

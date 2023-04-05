@@ -59,6 +59,7 @@ struct GradientLoweringPass : public OperationPass<ModuleOp> {
         registry.insert<tensor::TensorDialect>();
         registry.insert<memref::MemRefDialect>();
         registry.insert<bufferization::BufferizationDialect>();
+        registry.insert<mlir::gml_st::GmlStDialect>();
     }
 
     void runOnOperation() final

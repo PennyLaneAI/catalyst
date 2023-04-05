@@ -91,6 +91,9 @@ quantum_opt_tool = get_executable_path("quantum", "quantum-opt")
 mhlo_lowering_pass_pipeline = [
     "--canonicalize",
     "--chlo-legalize-to-hlo",
+       "--hlo-canonicalize-scatter",
+       "--legalize-mhlo-to-thlo",
+       "--scalarize",
     "--mhlo-legalize-control-flow",
     "--hlo-legalize-to-linalg",
     "--mhlo-legalize-to-std",
@@ -105,6 +108,8 @@ quantum_compilation_pass_pipeline = [
 bufferization_pass_pipeline = [
     "--inline",
     "--gradient-bufferize",
+       "--hlo-one-shot-bufferize",
+       "--gml-st-to-scf",
     "--scf-bufferize",
     "--convert-tensor-to-linalg",  # tensor.pad
     "--convert-elementwise-to-linalg",  # Must be run before --arith-bufferize

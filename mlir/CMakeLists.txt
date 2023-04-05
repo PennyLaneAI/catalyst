@@ -13,8 +13,10 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_STANDARD 17 CACHE STRING "C++ standard to conform to")
 
 find_package(MLIR REQUIRED CONFIG)
+find_package(MHLO REQUIRED CONFIG)
 
 message(STATUS "Using MLIRConfig.cmake in: ${MLIR_DIR}")
+message(STATUS "Using MHLOConfig.cmake in: ${MHLO_DIR}")
 message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
 
 # Required so as not to always use the cached option from the mlir build.
@@ -38,9 +40,13 @@ endif()
 
 include_directories(${LLVM_INCLUDE_DIRS}
                     ${MLIR_INCLUDE_DIRS}
+                    ${MHLO_INCLUDE_DIRS}
+                    ${MHLO_INCLUDE_DIRS}/..
+                    ${PROJECT_SOURCE_DIR}/mlir-hlo
                     ${PROJECT_SOURCE_DIR}/include
                     ${PROJECT_BINARY_DIR}/include)
-link_directories(${LLVM_BUILD_LIBRARY_DIR})
+link_directories(${LLVM_BUILD_LIBRARY_DIR}
+                 ${MHLO_BUILD_LIBRARY_DIR})
 add_definitions(${LLVM_DEFINITIONS})
 
 add_subdirectory(include)

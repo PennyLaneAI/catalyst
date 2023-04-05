@@ -41,6 +41,7 @@ struct GradientBufferizationPass
     {
         registry.insert<bufferization::BufferizationDialect>();
         registry.insert<memref::MemRefDialect>();
+        registry.insert<mlir::gml_st::GmlStDialect>();
     }
 
     void runOnOperation() final
@@ -58,6 +59,8 @@ struct GradientBufferizationPass
         // Gradient ops which return arrays need to be marked illegal when the type is a tensor.
         target.addDynamicallyLegalOp<AdjointOp>(
             [&](AdjointOp op) { return typeConverter.isLegal(op); });
+
+        target.addLegalDialect<mlir::gml_st::GmlStDialect>();
 
         if (failed(applyPartialConversion(getOperation(), target, std::move(patterns)))) {
             signalPassFailure();
