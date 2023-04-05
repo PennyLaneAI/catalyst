@@ -80,7 +80,7 @@ def get_executable_path(project, tool):
 def get_lib_path(project, env):
     """Get the library path."""
     if INSTALLED:
-        return os.path.join(package_root, "lib")
+        return os.path.join(package_root, "lib")  # pragma: no cover
     return os.getenv(env, default_lib_paths.get(project, ""))
 
 
@@ -291,15 +291,11 @@ class CompilerDriver:
     _default_flags = [
         "-shared",
         "-rdynamic",
-        f"-L{mlir_lib_path}",
         "-Wl,-no-as-needed",
-        f"-Wl,-rpath,{mlir_lib_path}",
+        f"-Wl,-rpath,{lrt_capi_path}:{lrt_backend_path}:{mlir_lib_path}",
+        f"-L{mlir_lib_path}",
         f"-L{lrt_capi_path}",
         f"-L{lrt_backend_path}",
-        f"-Wl,-rpath,{lrt_capi_path}:{lrt_backend_path}",
-        f"-L{lrt_capi_path}",
-        f"-L{lrt_backend_path}",
-        f"-Wl,-rpath,{lrt_capi_path}:{lrt_backend_path}",
         "-lrt_backend",
         "-lrt_capi",
         "-lpthread",
@@ -469,9 +465,10 @@ class Compiler:
         Returns
             (str): output IR
         """
-        fname = self._get_output_file_of(_pass)
-        if fname is None:
-            raise ValueError(f"Output for pass {_pass} not found.")
+        try:
+            fname = self._get_output_file_of(_pass)
+        except AttributeError as e:
+            raise ValueError(f"Output for pass {_pass} not found.") from e
         with open(fname, "r", encoding="utf-8") as f:
             txt = f.read()
         return txt

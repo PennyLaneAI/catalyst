@@ -447,7 +447,7 @@ class QJIT:
         Args:
             stage: string corresponding with the name of the stage to be printed
         """
-        self._compiler.print(stage)
+        self._compiler.print(stage)  # pragma: nocover
 
     @property
     def mlir(self):

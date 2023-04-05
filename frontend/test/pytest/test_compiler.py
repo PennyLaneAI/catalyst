@@ -2,14 +2,14 @@
 Unit tests for CompilerDriver class
 """
 
+import os
 import sys
 import warnings
-import subprocess
 import pytest
 
 import pennylane as qml
 from catalyst import qjit
-from catalyst.compiler import CompileOptions
+from catalyst.compiler import Compiler
 from catalyst.compiler import CompilerDriver
 from catalyst.compiler import MHLOPass
 from catalyst.compiler import QuantumCompilationPass
@@ -17,6 +17,7 @@ from catalyst.compiler import BufferizationPass
 from catalyst.compiler import MLIRToLLVMDialect
 from catalyst.compiler import LLVMDialectToLLVMIR
 from catalyst.compiler import LLVMIRToObjectFile
+from catalyst.jax_tracer import get_mlir
 
 
 class TestCompilerOptions:
@@ -56,6 +57,8 @@ class TestCompilerOptions:
 
 
 class TestCompilerWarnings:
+    """Test compiler's warning messages."""
+
     def test_catalyst_cc_unavailable_warning(self, monkeypatch):
         """Test that a warning is emitted when the preferred compiler is not in PATH."""
         monkeypatch.setenv("CATALYST_CC", "this-binary-does-not-exist")
@@ -63,14 +66,16 @@ class TestCompilerWarnings:
             # pylint: disable=protected-access
             CompilerDriver._get_compiler_fallback_order([])
 
-    @pytest.mark.parametrize("verbose", [True, False])
-    def test_compiler_failed_warning(self, verbose):
+    def test_compiler_failed_warning(self):
         """Test that a warning is emitted when a compiler failed."""
         with pytest.warns(UserWarning, match="Compiler .* failed .*"):
+            # pylint: disable=protected-access
             CompilerDriver._attempt_link("cc", [""], "in.o", "out.so", None)
 
 
 class TestCompilerErrors:
+    """Test compiler's error messages."""
+
     def test_link_fail_exception(self):
         """Test that an exception is raised when all compiler possibilities are exhausted."""
         with pytest.raises(EnvironmentError, match="Unable to link .*"):
@@ -111,19 +116,68 @@ class TestCompilerErrors:
         with pytest.raises(ValueError, match="is not an object file"):
             CompilerDriver.run("file-name.noo")
 
+    def test_attempts_to_get_inexistent_intermediate_file(self):
+        """Test for error raised if user request intermediate file that doesn't exist."""
+        compiler = Compiler()
+        with pytest.raises(ValueError, match="pass .* not found."):
+            compiler.get_output_of("inexistent-file")
 
+
+# pylint: disable=too-few-public-methods
 class TestCompilerState:
+    """Test states that the compiler can reach."""
+
     def test_print_stages(self):
-        @qjit(keep_intermediate=True)
+        """Test that after compiling the intermediate files exist."""
+
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def workflow():
             qml.X(wires=1)
             return qml.state()
 
-        # The test here is just that these files exist
-        # and can therefore be printed.
-        workflow.print_stage("MHLOPass")
-        workflow.print_stage("QuantumCompilationPass")
-        workflow.print_stage("BufferizationPass")
-        workflow.print_stage("MLIRToLLVMDialect")
-        workflow.print_stage("LLVMDialectToLLVMIR")
+        mlir_module, _ = get_mlir(workflow)
+        compiler = Compiler()
+        compiler.run(mlir_module)
+        compiler.get_output_of("MHLOPass")
+        compiler.get_output_of("QuantumCompilationPass")
+        compiler.get_output_of("BufferizationPass")
+        compiler.get_output_of("MLIRToLLVMDialect")
+        compiler.get_output_of("LLVMDialectToLLVMIR")
+
+    def test_workspace_keep_intermediate(self):
+        """Test cwd's has been modified with folder containing intermediate results"""
+
+        @qjit
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def workflow():
+            qml.X(wires=1)
+            return qml.state()
+
+        mlir_module, _ = get_mlir(workflow)
+        # This means that we are not running any pass.
+        passes = []
+        identity_compiler = Compiler()
+        identity_compiler.run(mlir_module, keep_intermediate=True, passes=passes)
+        directory = os.path.join(os.getcwd(), workflow.__name__)
+        assert os.path.exists(directory)
+        files = os.listdir(directory)
+        # The directory is non-empty. Should at least contain the original .mlir file
+        assert files
+
+    def test_workspace_temporary(self):
+        """Test temporary directory has been modified with folder containing intermediate results"""
+
+        @qjit
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def workflow():
+            qml.X(wires=1)
+            return qml.state()
+
+        mlir_module, _ = get_mlir(workflow)
+        # This means that we are not running any pass.
+        passes = []
+        identity_compiler = Compiler()
+        identity_compiler.run(mlir_module, passes=passes)
+        files = os.listdir(identity_compiler.workspace.name)
+        # The directory is non-empty. Should at least contain the original .mlir file
+        assert files
