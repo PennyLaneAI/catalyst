@@ -20,6 +20,26 @@ from jax import numpy as jnp
 
 from catalyst import CompileError, cond, for_loop, grad, qjit
 
+import catalyst.utils.calculate_grad_shape as infer
+
+
+class TestGradShape:
+    """Unit tests for the calculate_grad_shape module."""
+
+    @pytest.mark.parametrize("sig", [infer.Signature([int], [int])])
+    def test_repr(self, sig):
+        """Sanity check to make sure that we have a human readable representation."""
+        assert str(sig) == "[<class 'int'>] -> [<class 'int'>]"
+
+    def test_deduction(self):
+        """Test case from https://github.com/PennyLaneAI/catalyst/issues/83"""
+        params = [jax.core.ShapedArray([], float)]
+        returns = [jax.core.ShapedArray([2], float), jax.core.ShapedArray([], float)]
+        in_signature = infer.Signature(params, returns)
+        observed_output = infer.calculate_grad_shape(in_signature, [0])
+        expected_output = infer.Signature(params, returns)
+        assert observed_output == expected_output
+
 
 def test_grad_outside_qjit():
     def f(x: float):
