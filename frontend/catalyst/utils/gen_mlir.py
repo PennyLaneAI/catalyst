@@ -29,6 +29,7 @@ def gen_setup(ctx, runtime="lightning.qubit"):
     """
     txt = """
 func.func @setup() -> () {
+    "quantum.device"() {specs = ["backend", "lightning.qubit"]} : () -> ()
     "quantum.init"() : () -> ()
     return
 }

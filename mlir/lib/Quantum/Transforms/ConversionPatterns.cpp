@@ -117,14 +117,13 @@ struct DeviceOpPattern : public OpConversionPattern<DeviceOp> {
             LLVM::LLVMFuncOp fnDecl =
                 ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
 
-
             for (size_t i = 0; i < args.size() - 1; i += 2) {
                 auto spec = args[i].cast<StringAttr>().getValue().str();
                 auto value = args[i + 1].cast<StringAttr>().getValue().str();
 
                 SmallVector<Value> operands = {
-                    getGlobalString(loc, rewriter, spec,
-                                    StringRef(spec.c_str(), spec.length() + 1), mod),
+                    getGlobalString(loc, rewriter, spec, StringRef(spec.c_str(), spec.length() + 1),
+                                    mod),
                     getGlobalString(loc, rewriter, spec + "_" + value,
                                     StringRef(value.c_str(), value.length() + 1), mod)};
 

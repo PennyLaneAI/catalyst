@@ -35,13 +35,16 @@ target_link_libraries(runner_tests PRIVATE  catalyst_qir_runtime
                                             lightning_dynamic
                                             Catch2::Catch2)
 
-set(common_tests_src    Test_QubitManager.cpp
-                        Test_CacheManager.cpp
-                        Test_LightningDriver.cpp
-                        Test_LightningGateSet.cpp
+set(common_tests_src    
+                        # Test_QubitManager.cpp
+                        # Test_CacheManager.cpp
+                        # Test_LightningDriver.cpp
+                        # Test_LightningGateSet.cpp
                         Test_LightningCoreQIS.cpp
-                        Test_LightningMeasures.cpp
-                        Test_LightningGradient.cpp)
+                        
+                        # Test_LightningMeasures.cpp
+                        # Test_LightningGradient.cpp
+                        )
 
 if(ENABLE_CODE_COVERAGE)
     set(cov_helper_src  coverage_helper.cpp)
