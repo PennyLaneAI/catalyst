@@ -438,7 +438,9 @@ auto LightningKokkosSimulator::Measure(QubitIdType wire) -> Result
 
     const size_t num_qubits = this->GetNumQubits();
 
-    const auto stride = pow(2, num_qubits - (1 + wire));
+    auto &&dev_wires = this->getDeviceWires(wires);
+    const auto stride = pow(2, num_qubits - (1 + dev_wires[0]));
+    assert(std::finite(stride));
     const auto vec_size = pow(2, num_qubits);
     const auto section_size = vec_size / stride;
     const auto half_section_size = section_size / 2;

@@ -91,6 +91,33 @@ TEST_CASE("Measurement collapse test with 2 wires", "[lightning]")
     // LCOV_EXCL_STOP
 }
 
+TEST_CASE("Measurement collapse concrete logical qubit difference", "[lightning]")
+{
+    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+
+    constexpr size_t n = 1;
+    // The first time an array is allocated, logical and concrete qubits
+    // are the same.
+    std::vector<QubitIdType> Qs = sim->AllocateQubits(n);
+    sim->ReleaseAllQubits();
+
+    // Now in this the concrete qubits are shifted by n.
+    Qs = sim->AllocateQubits(n);
+
+    sim->NamedOperation("Hadamard", {}, {Qs[0]}, false);
+    sim->Measure(Qs[0]);
+    auto &&state = sim->State();
+
+    // LCOV_EXCL_START
+    bool is_zero = pow(std::abs(std::real(state[0])), 2) + pow(std::abs(std::imag(state[0])), 2) ==
+                   Approx(1.0).margin(1e-5);
+    bool is_one = pow(std::abs(std::real(state[1])), 2) + pow(std::abs(std::imag(state[1])), 2) ==
+                  Approx(1.0).margin(1e-5);
+    bool is_valid = is_zero ^ is_one;
+    CHECK(is_valid);
+    // LCOV_EXCL_STOP
+}
+
 TEST_CASE("Mid-circuit measurement naive test", "[lightning]")
 {
     std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
