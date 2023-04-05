@@ -66,6 +66,7 @@ mhlo:
 .PHONY: dialects
 dialects:
 	@echo "build custom Catalyst MLIR Dialects"
+	find $(MHLO_BUILD_DIR)
 	cmake -G Ninja -S . -B $(DIALECTS_BUILD_DIR) \
 		-DCMAKE_BUILD_TYPE=Release \
 		-DLLVM_ENABLE_ASSERTIONS=ON \
