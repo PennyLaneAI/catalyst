@@ -123,9 +123,9 @@ struct DeviceOpPattern : public OpConversionPattern<DeviceOp> {
                 auto value = args[i + 1].cast<StringAttr>().getValue().str();
 
                 SmallVector<Value> operands = {
-                    getGlobalString(loc, rewriter, "device_" + spec,
+                    getGlobalString(loc, rewriter, spec,
                                     StringRef(spec.c_str(), spec.length() + 1), mod),
-                    getGlobalString(loc, rewriter, "device_" + spec + "_value",
+                    getGlobalString(loc, rewriter, spec + "_" + value,
                                     StringRef(value.c_str(), value.length() + 1), mod)};
 
                 rewriter.create<LLVM::CallOp>(loc, fnDecl, operands);

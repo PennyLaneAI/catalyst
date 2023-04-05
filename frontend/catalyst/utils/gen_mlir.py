@@ -21,7 +21,7 @@ from jax.interpreters.mlir import ir
 from jaxlib.mlir.dialects._func_ops_gen import FuncOp
 
 
-def gen_setup(ctx):
+def gen_setup(ctx, runtime="lightning.qubit"):
     """
     This function returns an MLIR module with the "setup" function. The setup
     function is a function that needs to be called before calling a
