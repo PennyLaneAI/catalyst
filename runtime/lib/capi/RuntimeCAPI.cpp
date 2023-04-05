@@ -20,14 +20,25 @@
 #include <bitset>
 #include <stdexcept>
 
+#include <functional>
 #include <iostream>
 #include <ostream>
 #include <string>
+#include <string_view>
+#include <unordered_map>
 
 #include "MemRefUtils.hpp"
 #include "QuantumDevice.hpp"
 
 #include "RuntimeCAPI.h"
+
+#if __has_include("StateVectorCPU.hpp")
+#include "LightningSimulator.hpp"
+#endif
+
+#if __has_include("StateVectorKokkos.hpp")
+#include "LightningKokkosSimulator.hpp"
+#endif
 
 namespace Catalyst::Runtime::CAPI {
 
@@ -46,6 +57,43 @@ static auto get_device() -> std::unique_ptr<Catalyst::Runtime::QuantumDevice> &
     return GLOBAL_DEVICE_PTR;
 }
 
+/**
+ * @brief Register a quantum device.
+ *
+ * @param deviec The name from the list of registered backend devices `Runtime::Simulator::Devices`
+ * @param shots The number of finite-shots; the default is 1000
+ *
+ * @return std::unique_ptr<QuantumDevice>
+ */
+std::unique_ptr<QuantumDevice> RegisterQuantumDevice(std::string device, size_t shots)
+{
+    // TODO: remove this and use `QuantumDeviceMap` after removing `CreateQuantumDevice`
+    using DeviceInitializer = std::function<std::unique_ptr<QuantumDevice>(bool, size_t)>;
+    static const std::unordered_map<std::string_view, DeviceInitializer> device_map{
+#ifdef __device_lightning
+        {"lightning.qubit",
+         [](bool tape_recording, size_t shots) {
+             return std::make_unique<Catalyst::Runtime::Simulator::LightningSimulator>(
+                 tape_recording, shots);
+         }},
+#endif
+#ifdef __device_lightning_kokkos
+        {"lightning.kokkos",
+         [](bool tape_recording, size_t shots) {
+             return std::make_unique<Catalyst::Runtime::Simulator::LightningKokkosSimulator>(
+                 tape_recording, shots);
+         }},
+#endif
+    };
+
+    auto iter = device_map.find(device);
+    if (iter != device_map.end()) {
+        return iter->second(false, shots);
+    }
+
+    return nullptr;
+}
+
 } // namespace Catalyst::Runtime::CAPI
 
 extern "C" {
@@ -58,7 +106,9 @@ void __quantum__rt__initialize()
         __quantum__rt__fail_cstr("Invalid initialization of the global simulator");
     }
 
-    Catalyst::Runtime::CAPI::GLOBAL_DEVICE_PTR = Catalyst::Runtime::CreateQuantumDevice();
+    // Set the backend device
+    __quantum__rt__device(0, nullptr);
+
     assert(Catalyst::Runtime::CAPI::get_device() != nullptr);
 }
 
@@ -66,6 +116,24 @@ void __quantum__rt__finalize()
 {
     Catalyst::Runtime::CAPI::GLOBAL_DEVICE_PTR.reset(nullptr);
     assert(Catalyst::Runtime::CAPI::get_device() == nullptr);
+}
+
+void __quantum__rt__device(int8_t *spec, int8_t *value)
+{
+    if (!spec || !value) {
+        // Register the default backend device (PennyLane-Lightning)
+        Catalyst::Runtime::CAPI::GLOBAL_DEVICE_PTR = Catalyst::Runtime::CreateQuantumDevice();
+        return;
+    }
+
+    const std::vector<std::string_view> args{reinterpret_cast<char *>(spec),
+                                             reinterpret_cast<char *>(value)};
+
+    std::cerr << args[0] << " = " << args[1] << std::endl;
+
+    // TODO: register a custom backend device
+    Catalyst::Runtime::CAPI::GLOBAL_DEVICE_PTR =
+        Catalyst::Runtime::CAPI::RegisterQuantumDevice("lightning.qubit", 1000);
 }
 
 void __quantum__rt__toggle_recorder(bool activate_cm)

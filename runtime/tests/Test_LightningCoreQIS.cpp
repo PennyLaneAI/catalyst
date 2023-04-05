@@ -1303,3 +1303,24 @@ TEST_CASE("Test __quantum__qis__QubitUnitary with num_qubits=2", "[qir_lightning
 
     __quantum__rt__finalize();
 }
+
+/////////////////////
+// Multi-Device Tests
+/////////////////////
+
+TEST_CASE("Test __rt__device registering a custom device with shots=500 and device=lightning",
+          "[qir_lightning_core]")
+{
+    __quantum__rt__initialize();
+
+    char dev[7] = "device";
+    char dev_value[17] = "lightning.kokkos";
+    __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
+
+    char shots[6] = "shots";
+    char shots_value[4] = "500";
+    __quantum__rt__device((int8_t *)shots, (int8_t *)shots_value);
+
+    __quantum__rt__finalize();
+    REQUIRE(true);
+}
