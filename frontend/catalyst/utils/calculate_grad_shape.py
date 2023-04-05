@@ -111,7 +111,7 @@ def calculate_grad_shape(signature, indices):
                 diff_arg_shape.append(axis)
 
         for y in signature.get_results():
-            grad_res_shape = diff_arg_shape
+            grad_res_shape = diff_arg_shape.copy()
             if Signature.is_tensor(y):
                 for axis in y.shape:
                     grad_res_shape.append(axis)
