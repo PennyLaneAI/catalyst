@@ -44,6 +44,34 @@ func.func @finalize() {
 
 // -----
 
+// CHECK-LABEL: @device
+func.func @device() {
+
+    quantum.device
+
+    quantum.device {}
+
+
+    // CHECK: [[c1:%.+]] = llvm.mlir.constant(0 : index) : i64
+    // CHECK: [[d0:%.+]] = llvm.mlir.addressof @device_backend : !llvm.ptr<array<8 x i8>>
+    // CHECK: [[d1:%.+]] = llvm.getelementptr [[d0]][[[c1]], [[c1]]] : (!llvm.ptr<array<8 x i8>>, i64, i64) -> !llvm.ptr<i8>
+
+    // CHECK: [[c0:%.+]] = llvm.mlir.constant(0 : index) : i64
+    // CHECK: [[b0:%.+]] = llvm.mlir.addressof @device_backend_value : !llvm.ptr<array<10 x i8>>
+    // CHECK: [[b1:%.+]] = llvm.getelementptr [[b0]][[[c0]], [[c0]]] : (!llvm.ptr<array<10 x i8>>, i64, i64) -> !llvm.ptr<i8>
+
+    // CHECK: llvm.call @__quantum__rt__device([[d1]], [[b1]]) : (!llvm.ptr<i8>, !llvm.ptr<i8>) -> ()
+    quantum.device {specs = ["backend", "lightning"]}
+
+    quantum.device {specs = ["backend", "lightning.kokkos"]}
+
+    // quantum.device {specs = ["shots", "2000"]}
+
+    return
+}
+
+// -----
+
 ///////////////////////
 // Memory Management //
 ///////////////////////

@@ -46,6 +46,26 @@ LLVM::LLVMFuncOp ensureFunctionDeclaration(PatternRewriter &rewriter, Operation 
     return cast<LLVM::LLVMFuncOp>(fnDecl);
 }
 
+Value getGlobalString(Location loc, OpBuilder &rewriter, StringRef key, StringRef value,
+                      ModuleOp mod)
+{
+    LLVM::GlobalOp glb = mod.lookupSymbol<LLVM::GlobalOp>(key);
+    if (!glb) {
+        OpBuilder::InsertionGuard insertGuard(rewriter);
+        rewriter.setInsertionPointToStart(mod.getBody());
+        glb = rewriter.create<LLVM::GlobalOp>(
+            loc, LLVM::LLVMArrayType::get(IntegerType::get(rewriter.getContext(), 8), value.size()),
+            true, LLVM::Linkage::Internal, key, rewriter.getStringAttr(value));
+    }
+
+    auto idx =
+        rewriter.create<LLVM::ConstantOp>(loc, IntegerType::get(rewriter.getContext(), 64),
+                                          rewriter.getIntegerAttr(rewriter.getIndexType(), 0));
+    return rewriter.create<LLVM::GEPOp>(
+        loc, LLVM::LLVMPointerType::get(IntegerType::get(rewriter.getContext(), 8)),
+        rewriter.create<LLVM::AddressOfOp>(loc, glb), ArrayRef<Value>({idx, idx}));
+}
+
 ////////////////////////
 // Runtime Management //
 ////////////////////////
@@ -71,6 +91,48 @@ template <typename T> struct RTBasedPattern : public OpConversionPattern<T> {
         LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
 
         rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, ValueRange{});
+
+        return success();
+    }
+};
+
+struct DeviceOpPattern : public OpConversionPattern<DeviceOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(DeviceOp op, DeviceOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        Location loc = op.getLoc();
+        MLIRContext *ctx = this->getContext();
+        ModuleOp mod = op->getParentOfType<ModuleOp>();
+
+        auto specs = op.getSpecs(); // maybe {} for using the default backend device
+        if (specs && !specs->empty()) {
+            const auto args = specs.value();
+            StringRef qirName = "__quantum__rt__device"; // (int8_t *, int8_t *) -> void
+
+            Type intPtrType = LLVM::LLVMPointerType::get(IntegerType::get(ctx, 8));
+            Type qirSignature =
+                LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), {intPtrType, intPtrType});
+            LLVM::LLVMFuncOp fnDecl =
+                ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+
+
+            for (size_t i = 0; i < args.size() - 1; i += 2) {
+                auto spec = args[i].cast<StringAttr>().getValue().str();
+                auto value = args[i + 1].cast<StringAttr>().getValue().str();
+
+                SmallVector<Value> operands = {
+                    getGlobalString(loc, rewriter, "device_" + spec,
+                                    StringRef(spec.c_str(), spec.length() + 1), mod),
+                    getGlobalString(loc, rewriter, "device_" + spec + "_value",
+                                    StringRef(value.c_str(), value.length() + 1), mod)};
+
+                rewriter.create<LLVM::CallOp>(loc, fnDecl, operands);
+            }
+        }
+
+        rewriter.eraseOp(op);
 
         return success();
     }
