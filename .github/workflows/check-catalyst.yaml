@@ -6,12 +6,9 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
-env:
-  COVERAGE_FLAGS: "--cov=catalyst --cov-report=term-missing --cov-report=xml:./coverage.xml -p no:warnings --tb=native"
-
 jobs:
-  runtime-qir-stdlib:
-    name: Catalyst-Runtime (qir-stdlib)
+  qir-stdlib:
+    name: QIR-stdlib Build
     runs-on: ubuntu-latest
 
     steps:
@@ -27,7 +24,7 @@ jobs:
         id: cache-qir-stdlib
         uses: actions/cache@v3
         with:
-          path: ./runtime/qir-stdlib-build
+          path: qir-stdlib-build
           key: ${{ runner.os }}-qir-stdlib-build
 
       - name: Install rustup with llvm-tools-preview
@@ -40,16 +37,14 @@ jobs:
       - name: Install QIR-stdlib
         if: steps.cache-qir-stdlib.outputs.cache-hit != 'true'
         run: |
-            cd ./runtime/qir-stdlib
-            cargo build --release --verbose
-            mkdir -p ../qir-stdlib-build/include
-            cp ./target/release/libqir_stdlib.a ../qir-stdlib-build/
-            cp ./target/release/build/include/* ../qir-stdlib-build/include/
-            cargo clean
+            make qir
+            mkdir -p qir-stdlib-build/include
+            cp runtime/qir-stdlib/target/release/libqir_stdlib.a qir-stdlib-build/
+            cp runtime/qir-stdlib/target/release/build/include/* qir-stdlib-build/include/
 
   runtime:
-    name: Catalyst-Runtime
-    needs: [runtime-qir-stdlib]
+    name: Catalyst-Runtime Build
+    needs: [qir-stdlib]
     runs-on: ubuntu-latest
 
     steps:
@@ -65,26 +60,22 @@ jobs:
         run: |
           sudo apt-get -y -q install ninja-build make cmake clang libomp-dev
           echo "LIGHTNING_GIT_TAG_VALUE=latest_release" >> $GITHUB_ENV
-      - if: ${{ github.event_name == 'push' }}
-        run: |
-          echo "LIGHTNING_GIT_TAG_VALUE=master" >> $GITHUB_ENV
 
       - name: Get Cached qir-stdlib Build
         id: cache-qir-stdlib
         uses: actions/cache@v3
         with:
-          path: ./runtime/qir-stdlib-build
+          path: qir-stdlib-build
           key: Linux-qir-stdlib-build
           fail-on-cache-miss: True
 
       - name: Build Catalyst-Runtime
         run: |
-          pushd runtime
-          RT_BUILD_DIR=../runtime-build \
           COMPILER_LAUNCHER="" \
+          RT_BUILD_DIR="$(pwd)/runtime-build" \
+          QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build" \
           QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include" \
-          QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build/" make runtime
-          popd
+          make runtime
 
       - name: Upload Catalyst-Runtime Artifact
         uses: actions/upload-artifact@v3
@@ -119,14 +110,14 @@ jobs:
       id: cache-llvm-build
       uses: actions/cache@v3
       with:
-        path:  llvm-build
+        path: llvm-build
         key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-build
 
     - name: Cache LLVM Source
       id: cache-llvm-source
       uses: actions/cache@v3
       with:
-        path:  mlir/llvm-project
+        path: mlir/llvm-project
         key: Linux-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-source
         enableCrossOsArchive: True
 
@@ -151,9 +142,8 @@ jobs:
       run: |
         # echo 'target_compile_options(mlir_c_runner_utils PRIVATE "-fno-sanitize=all")' \
         #       >> mlir/llvm-project/mlir/lib/ExecutionEngine/CMakeLists.txt
-        pushd mlir
-        LLVM_BUILD_DIR=../llvm-build make llvm
-        popd
+        LLVM_BUILD_DIR="$(pwd)/llvm-build" \
+        make llvm
 
   mhlo:
     name: MHLO Dialect Build
@@ -177,7 +167,7 @@ jobs:
       id: cache-mhlo
       uses: actions/cache@v3
       with:
-        path:  mhlo-build
+        path: mhlo-build
         key: ${{ runner.os }}-mhlo-${{ steps.mhlo-hash.outputs.mhlo-hash }}-default-build
 
     - name: Get LLVM Version
@@ -190,7 +180,7 @@ jobs:
       if: steps.cache-mhlo.outputs.cache-hit != 'true'
       uses: actions/cache@v3
       with:
-        path:  mlir/llvm-project
+        path: mlir/llvm-project
         key: Linux-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-source
         enableCrossOsArchive: True
         fail-on-cache-miss: True
@@ -200,12 +190,12 @@ jobs:
       if: steps.cache-mhlo.outputs.cache-hit != 'true'
       uses: actions/cache@v3
       with:
-        path:  llvm-build
+        path: llvm-build
         key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-build
         fail-on-cache-miss: True
 
     - name: Clone MHLO Submodule
-      if:  |
+      if: |
         steps.cache-mhlo.outputs.cache-hit != 'true' &&
         steps.cache-mhlo-source.outputs.cache-hit != 'true'
       uses: actions/checkout@v3
@@ -222,9 +212,9 @@ jobs:
     - name: Build MHLO Dialect
       if: steps.cache-mhlo.outputs.cache-hit != 'true'
       run: |
-        pushd mlir
-        LLVM_BUILD_DIR="../llvm-build" MHLO_BUILD_DIR="../mhlo-build" make mhlo
-        popd
+        LLVM_BUILD_DIR="$(pwd)/llvm-build" \
+        MHLO_BUILD_DIR="$(pwd)/mhlo-build" \
+        make mhlo
 
   quantum:
     name: Quantum Dialects Build
@@ -278,10 +268,11 @@ jobs:
 
     - name: Build MLIR Dialects
       run: |
-        export CCACHE_DIR=$GITHUB_WORKSPACE/.ccache
-        pushd mlir
-        LLVM_BUILD_DIR="../llvm-build" MHLO_BUILD_DIR="../mhlo-build" DIALECTS_BUILD_DIR="../quantum-build" make dialects
-        popd
+        CCACHE_DIR="$(pwd)/.ccache" \
+        LLVM_BUILD_DIR="$(pwd)/llvm-build" \
+        MHLO_BUILD_DIR="$(pwd)/mhlo-build" \
+        DIALECTS_BUILD_DIR="$(pwd)/quantum-build" \
+        make dialects
 
     - name: Upload Quantum Build Artifact
       uses: actions/upload-artifact@v3
@@ -293,7 +284,7 @@ jobs:
           quantum-build/python_packages/*
         retention-days: 1
 
-  frontend:
+  frontend-tests:
     name: Frontend Tests
     needs: [runtime, mhlo, quantum]
     runs-on: ubuntu-latest
@@ -307,26 +298,11 @@ jobs:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
-    - name: Get JAX Version
-      id: jax-version
-      run: echo "v=$(grep jax .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
-
     - name: Install Deps
       run: |
         sudo apt-get install -y python3 python3-pip libomp-dev
-        python3 -m pip install lit pytest pytest-xdist pytest-cov nbmake nbconvert ipykernel matplotlib jaxopt
-        python3 -m pip install jax==${{ steps.jax-version.outputs.v }} jaxlib==${{ steps.jax-version.outputs.v }}
+        python3 -m pip install -r requirements.txt
         python3 -m pip install .
-
-    - name: Install PennyLane-master
-      if: ${{ github.event_name == 'push' }}
-      uses: actions/checkout@v3
-      with:
-        repository: PennyLaneAI/pennylane
-        path: pennylane
-    - if: ${{ github.event_name == 'push' }}
-      run: |
-        python3 -m pip install --upgrade ./pennylane
 
     - name: Get LLVM Version
       id: llvm-hash
@@ -336,7 +312,7 @@ jobs:
       id: cache-llvm-build
       uses: actions/cache@v3
       with:
-        path:  llvm-build
+        path: llvm-build
         key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-build
         fail-on-cache-miss: True
 
@@ -348,7 +324,7 @@ jobs:
       id: cache-mhlo
       uses: actions/cache@v3
       with:
-        path:  mhlo-build
+        path: mhlo-build
         key: ${{ runner.os }}-mhlo-${{ steps.mhlo-hash.outputs.mhlo-hash }}-default-build
         fail-on-cache-miss: True
 
@@ -380,14 +356,10 @@ jobs:
 
     - name: Run Python Pytest Tests
       run: |
-        export ASAN_OPTIONS=detect_odr_violation=0
-        pytest frontend/test/pytest -n auto $COVERAGE_FLAGS
+        # export ASAN_OPTIONS=detect_odr_violation=0
+        COVERAGE_REPORT="xml:coverage.xml -p no:warnings" \
+        make coverage-frontend
         mv coverage.xml coverage-${{ github.job }}.xml
-
-    - name: Check Catalyst Demos
-      run: |
-        MDD_BENCHMARK_PRECISION=1 \
-        pytest demos --nbmake -n auto
 
     - name: Upload to Codecov
       uses: codecov/codecov-action@v3
@@ -395,9 +367,14 @@ jobs:
         fail_ci_if_error: true
         token: ${{ secrets.CODECOV_TOKEN }}
 
+    - name: Check Catalyst Demos
+      run: |
+        MDD_BENCHMARK_PRECISION=1 \
+        pytest demos --nbmake -n auto
+
   runtime-tests:
     name: Runtime Tests (Linux)
-    needs: [runtime-qir-stdlib]
+    needs: [qir-stdlib]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -419,70 +396,38 @@ jobs:
           echo "LIGHTNING_TAG_VALUE=latest_release" >> $GITHUB_ENV
           # TODO: Update this to latest_release for the v0.30.0 release
           echo "LIGHTNING_KOKKOS_TAG_VALUE=main" >> $GITHUB_ENV
-      - if: ${{ github.event_name == 'push' }}
-        run: |
-          echo "LIGHTNING_TAG_VALUE=master" >> $GITHUB_ENV
-          echo "LIGHTNING_KOKKOS_TAG_VALUE=main" >> $GITHUB_ENV
 
       - name: Get Cached qir-stdlib Build
         id: cache-qir-stdlib
         uses: actions/cache@v3
         with:
-          path: ./runtime/qir-stdlib-build
+          path: qir-stdlib-build
           key: Linux-qir-stdlib-build
           fail-on-cache-miss: True
 
       - name: Build Runtime test suite for Lightning simulator
         if: ${{ matrix.simulator == 'lightning' }}
         run: |
-            pushd runtime
             C_COMPILER=$(which gcc) \
             CXX_COMPILER=$(which g++) \
             COMPILER_LAUNCHER="" \
-            QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build/" \
-            QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include/" \
+            QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build" \
+            QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include" \
             LIGHTNING_GIT_TAG_VALUE=$LIGHTNING_TAG_VALUE \
-            make coverage
-            popd
+            make coverage-runtime
             mv runtime/build/coverage.info coverage-${{ github.job }}.info
 
       - name: Build Runtime test suite for Lightning-Kokkos simulator
         if: ${{ matrix.simulator == 'lightning-kokkos' }}
         run: |
-            pushd runtime
             C_COMPILER=$(which gcc) \
             CXX_COMPILER=$(which g++) \
             COMPILER_LAUNCHER="" \
-            QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build/" \
-            QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include/" \
+            QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build" \
+            QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include" \
             LIGHTNING_GIT_TAG_VALUE=$LIGHTNING_KOKKOS_TAG_VALUE \
             ENABLE_KOKKOS=ON \
-            make test
-            popd
-
-      - name: Upload code coverage results
-        if: ${{ matrix.simulator == 'lightning' }}
-        uses: actions/upload-artifact@v3
-        with:
-          name: ubuntu-codecov-results-cpp
-          path: ./coverage-${{ github.job }}.info
-
-      - name: Build examples
-        if: ${{ matrix.simulator == 'lightning' }}
-        run: |
-          pushd runtime
-          C_COMPILER=$(which gcc) \
-          CXX_COMPILER=$(which g++) \
-          COMPILER_LAUNCHER="" \
-          QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build/" \
-          QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include/" \
-          make examples
-          popd
-
-      - name: Create tests report
-        run: |
-            mkdir -p ./runtime/build/tests/results
-            ./runtime/build/tests/runner_tests --reporter junit --out ./runtime/build/tests/results/tests_result.xml
+            make test-runtime
 
       - name: Upload to Codecov
         if: ${{ matrix.simulator == 'lightning' }}
@@ -490,3 +435,13 @@ jobs:
         with:
           fail_ci_if_error: true
           token: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Build examples
+        if: ${{ matrix.simulator == 'lightning' }}
+        run: |
+          C_COMPILER=$(which gcc) \
+          CXX_COMPILER=$(which g++) \
+          COMPILER_LAUNCHER="" \
+          QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build" \
+          QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include" \
+          make examples-runtime

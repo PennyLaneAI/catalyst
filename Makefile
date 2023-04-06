@@ -1,10 +1,12 @@
 PYTHON := python3 -m
-BLACKVERSIONMAJOR := $(shell black --version | head -n1 | awk '{ print $$2 }' | cut -d. -f1)
-BLACKVERSIONMINOR := $(shell black --version | head -n1 | awk '{ print $$2 }' | cut -d. -f2)
+BLACKVERSIONMAJOR := $(shell black --version 2> /dev/null | head -n1 | awk '{ print $$2 }' | cut -d. -f1)
+BLACKVERSIONMAJOR := $(if $(BLACKVERSIONMAJOR),$(BLACKVERSIONMAJOR),0)
+BLACKVERSIONMINOR := $(shell black --version 2> /dev/null | head -n1 | awk '{ print $$2 }' | cut -d. -f2)
+BLACKVERSIONMINOR := $(if $(BLACKVERSIONMINOR),$(BLACKVERSIONMINOR),0)
 MK_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 MK_DIR := $(dir $(MK_ABSPATH))
 DIALECTS_BUILD_DIR ?= $(MK_DIR)/mlir/build
-COVERAGE := --cov=catalyst --cov-report=term-missing --tb=native
+COVERAGE_REPORT ?= term-missing
 
 .PHONY: help
 help:
@@ -30,7 +32,7 @@ frontend:
 	@echo "install Catalyst Frontend"
 	$(PYTHON) pip install -e . --no-use-pep517
 
-.PHONY: mlir llvm mhlo dialects runtime
+.PHONY: mlir llvm mhlo dialects runtime qir
 mlir:
 	$(MAKE) -C mlir all
 
@@ -45,6 +47,9 @@ dialects:
 
 runtime:
 	$(MAKE) -C runtime all
+
+qir:
+	$(MAKE) -C runtime qir
 
 .PHONY: test test-runtime test-frontend lit pytest test-demos
 test: test-runtime test-frontend test-demos
@@ -82,15 +87,19 @@ clean-all:
 	$(MAKE) -C mlir clean
 	$(MAKE) -C runtime clean
 
-.PHONY: coverage coverage-frontend
+.PHONY: coverage coverage-frontend coverage-runtime
 coverage: coverage-frontend coverage-runtime
 
 coverage-frontend: | frontend
 	@echo "Generating coverage report for the frontend"
-	$(PYTHON) pytest frontend/test/pytest -n auto $(COVERAGE)
+	$(PYTHON) pytest frontend/test/pytest -n auto --cov=catalyst --tb=native --cov-report=$(COVERAGE_REPORT)
 
 coverage-runtime:
 	$(MAKE) -C runtime coverage
+
+.PHONY: examples-runtime
+examples-runtime:
+	$(MAKE) -C runtime examples
 
 .PHONY: format
 format:
