@@ -3,6 +3,7 @@ name: Check stable/stable/stable Compatibility
 on:
   push:
     branches: [ main ]
+  pull_request:
   workflow_dispatch:
 
 jobs:
