@@ -110,14 +110,14 @@ jobs:
       id: cache-llvm-build
       uses: actions/cache@v3
       with:
-        path:  llvm-build
+        path: llvm-build
         key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-build
 
     - name: Cache LLVM Source
       id: cache-llvm-source
       uses: actions/cache@v3
       with:
-        path:  mlir/llvm-project
+        path: mlir/llvm-project
         key: Linux-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-source
         enableCrossOsArchive: True
 
@@ -167,7 +167,7 @@ jobs:
       id: cache-mhlo
       uses: actions/cache@v3
       with:
-        path:  mhlo-build
+        path: mhlo-build
         key: ${{ runner.os }}-mhlo-${{ steps.mhlo-hash.outputs.mhlo-hash }}-default-build
 
     - name: Get LLVM Version
@@ -195,7 +195,7 @@ jobs:
         fail-on-cache-miss: True
 
     - name: Clone MHLO Submodule
-      if:  |
+      if: |
         steps.cache-mhlo.outputs.cache-hit != 'true' &&
         steps.cache-mhlo-source.outputs.cache-hit != 'true'
       uses: actions/checkout@v3
@@ -312,7 +312,7 @@ jobs:
       id: cache-llvm-build
       uses: actions/cache@v3
       with:
-        path:  llvm-build
+        path: llvm-build
         key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-build
         fail-on-cache-miss: True
 
@@ -324,7 +324,7 @@ jobs:
       id: cache-mhlo
       uses: actions/cache@v3
       with:
-        path:  mhlo-build
+        path: mhlo-build
         key: ${{ runner.os }}-mhlo-${{ steps.mhlo-hash.outputs.mhlo-hash }}-default-build
         fail-on-cache-miss: True
 
