@@ -104,7 +104,12 @@ class Driver final {
         assert(get_memory_manager() == nullptr);
     };
 
-    void set_device_name(std::string_view name) noexcept { this->_name = name; }
+    void set_device_name(std::string_view name) noexcept
+    {
+        if (name != "best") {
+            this->_name = name;
+        }
+    }
 
     void set_device_shots(size_t shots) noexcept { this->_shots = shots; }
 

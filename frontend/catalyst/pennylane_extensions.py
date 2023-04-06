@@ -63,10 +63,10 @@ class QFunc:
 
     def __call__(self, *args, **kwargs):
         if isinstance(self, qml.QNode):
-            if self.device.short_name != "lightning.qubit":
-                raise CompileError(
-                    "Only the lightning.qubit device is supported for compilation at the moment."
-                )
+            # if self.device.short_name != "lightning.qubit":
+            #     raise CompileError(
+            #         "Only the lightning.qubit device is supported for compilation at the moment."
+            #     )
             device = QJITDevice(self.device.shots, self.device.wires)
         else:
             # Allow QFunc to still be used by itself for internal testing.
