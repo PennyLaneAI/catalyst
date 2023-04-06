@@ -1,20 +1,22 @@
-name: Check PennyLane Compatibility
+name: Check PennyLane/Lightning Compatibility
 
 on:
-  push:
-    branches: [ main ]
-  workflow_dispatch:
+  workflow_call:
+    inputs:
+      catalyst:
+        required: true
+        type: string
+      pennylane:
+        required: true
+        type: string
+      lightning:
+        required: true
+        type: string
 
 jobs:
-  check-matrix:
-    name: Build Compatibility Matrix against PL/Lightning
+  check-config:
+    name: Build Catalyst/PL/Lightning Configuration
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        catalyst: ['latest']
-        pennylane: ['latest']
-        lightning: ['latest']
 
     steps:
     - name: Cancel previous runs
@@ -24,7 +26,7 @@ jobs:
 
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
-    - if: ${{ matrix.catalyst == 'release' }}
+    - if: ${{ inputs.catalyst == 'release' }}
       run: |
         git checkout $(git tag | sort -V | tail -1)
 
@@ -71,7 +73,7 @@ jobs:
 
 
     - name: Build Lightning Runtime (latest)
-      if: ${{ matrix.lightning == 'latest' }}
+      if: ${{ inputs.lightning == 'latest' }}
       run: |
         COMPILER_LAUNCHER="" \
         RT_BUILD_DIR="$(pwd)/runtime-build" \
@@ -81,7 +83,7 @@ jobs:
         make runtime
 
     - name: Build Lightning Runtime (release)
-      if: ${{ matrix.lightning == 'release' }}
+      if: ${{ inputs.lightning == 'release' }}
       run: |
         COMPILER_LAUNCHER="" \
         RT_BUILD_DIR="$(pwd)/runtime-build" \
@@ -102,17 +104,17 @@ jobs:
 
 
     - name: Install PennyLane (latest)
-      if: ${{ matrix.pennylane == 'latest' }}
+      if: ${{ inputs.pennylane == 'latest' }}
       uses: actions/checkout@v3
       with:
         repository: PennyLaneAI/pennylane
         path: pennylane
-    - if: ${{ matrix.pennylane == 'latest' }}
+    - if: ${{ inputs.pennylane == 'latest' }}
       run: |
         pip install --upgrade ./pennylane
 
     - name: Install PennyLane (release)
-      if: ${{ matrix.pennylane == 'release' }}
+      if: ${{ inputs.pennylane == 'release' }}
       run: |
         pip install --upgrade pennylane
 

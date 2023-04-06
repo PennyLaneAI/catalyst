@@ -1,0 +1,14 @@
+name: Check stable/stable/stable Compatibility
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-config:
+    uses: PennylaneAI/catalyst/.github/workflows/check-pl-compat.yaml@main
+    with:
+      catalyst: stable
+      pennylane: stable
+      lightning: stable
