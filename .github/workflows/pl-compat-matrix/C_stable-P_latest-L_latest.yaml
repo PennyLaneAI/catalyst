@@ -1,0 +1,135 @@
+name: Check PennyLane Compatibility
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  check-matrix:
+    name: Build Compatibility Matrix against PL/Lightning
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        catalyst: ['stable']
+        pennylane: ['latest']
+        lightning: ['latest']
+
+    steps:
+    - name: Cancel previous runs
+      uses: styfle/cancel-workflow-action@0.11.0
+      with:
+        access_token: ${{ github.token }}
+
+    - name: Checkout Catalyst repo
+      uses: actions/checkout@v3
+    - if: ${{ matrix.catalyst == 'release' }}
+      run: |
+        git checkout $(git tag | sort -V | tail -1)
+
+    - name: Get LLVM version
+      id: llvm-hash
+      run: echo "llvm-hash=$(grep llvm .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
+
+    - name: Get MHLO version
+      id: mhlo-hash
+      run: echo "mhlo-hash=$(grep mhlo .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
+
+    - name: Install deps
+      run: |
+        sudo apt-get install -y cmake ninja-build ccache clang lld libomp-dev
+        python3 -m pip install -r requirements.txt
+
+    - name: Get Catalyst Build Dependencies (latest)
+      uses: actions/cache@v3
+      with:
+        path: qir-stdlib-build
+        key: Linux-qir-stdlib-build
+        fail-on-cache-miss: True
+    - uses: actions/cache@v3
+      with:
+        path: mlir/llvm-project
+        key: Linux-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-source
+        enableCrossOsArchive: True
+        fail-on-cache-miss: True
+    - uses: actions/cache@v3
+      with:
+        path: llvm-build
+        key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-build
+        fail-on-cache-miss: True
+    - uses: actions/cache@v3
+      with:
+        path: mhlo-build
+        key: ${{ runner.os }}-mhlo-${{ steps.mhlo-hash.outputs.mhlo-hash }}-default-build
+        fail-on-cache-miss: True
+    - uses: actions/cache@v3
+      with:
+        path: .ccache
+        key: ${{ runner.os }}-ccache-${{ github.run_id }}
+        restore-keys: ${{ runner.os }}-ccache-
+
+
+    - name: Build Lightning Runtime (latest)
+      if: ${{ matrix.lightning == 'latest' }}
+      run: |
+        COMPILER_LAUNCHER="" \
+        RT_BUILD_DIR="$(pwd)/runtime-build" \
+        QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build" \
+        QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include" \
+        LIGHTNING_GIT_TAG_VALUE=master \
+        make runtime
+
+    - name: Build Lightning Runtime (release)
+      if: ${{ matrix.lightning == 'release' }}
+      run: |
+        COMPILER_LAUNCHER="" \
+        RT_BUILD_DIR="$(pwd)/runtime-build" \
+        QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build" \
+        QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include" \
+        LIGHTNING_GIT_TAG_VALUE=latest_release \
+        make runtime
+
+
+    - name: Install Catalyst
+      run: |
+        CCACHE_DIR="$(pwd)/.ccache" \
+        LLVM_BUILD_DIR="$(pwd)/llvm-build" \
+        MHLO_BUILD_DIR="$(pwd)/mhlo-build" \
+        DIALECTS_BUILD_DIR="$(pwd)/quantum-build" \
+        make dialects
+        pip install --upgrade .
+
+
+    - name: Install PennyLane (latest)
+      if: ${{ matrix.pennylane == 'latest' }}
+      uses: actions/checkout@v3
+      with:
+        repository: PennyLaneAI/pennylane
+        path: pennylane
+    - if: ${{ matrix.pennylane == 'latest' }}
+      run: |
+        pip install --upgrade ./pennylane
+
+    - name: Install PennyLane (release)
+      if: ${{ matrix.pennylane == 'release' }}
+      run: |
+        pip install --upgrade pennylane
+
+
+    - name: Add Frontend Dependencies to PATH
+      run: |
+        echo "$(pwd)/llvm-build/bin" >> $GITHUB_PATH
+        echo "$(pwd)/mhlo-build/bin" >> $GITHUB_PATH
+        echo "$(pwd)/quantum-build/bin" >> $GITHUB_PATH
+        echo "PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
+        echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
+        echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
+
+    - name: Run Frontend Tests
+      run: |
+        make pytest
+
+    - name: Run Demos
+      run: |
+        make test-demos

@@ -12,9 +12,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        catalyst: ['latest', 'release']
-        pennylane: ['latest', 'release']
-        lightning: ['latest', 'release']
+        catalyst: ['latest']
+        pennylane: ['latest']
+        lightning: ['latest']
 
     steps:
     - name: Cancel previous runs
