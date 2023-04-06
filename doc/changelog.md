@@ -8,9 +8,17 @@
 
 <h3>Bug fixes</h3>
 
+* Fix a bug in the mapping from logical to concrete qubits for mid-circuit measurements.
+  [#80](https://github.com/PennyLaneAI/catalyst/pull/80)
+
+* Fix a bug in the way gradient result type is inferred.
+  [#84](https://github.com/PennyLaneAI/catalyst/pull/84)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
+
+Erick Ochoa Lopez
 
 # Release 0.1.2
 
