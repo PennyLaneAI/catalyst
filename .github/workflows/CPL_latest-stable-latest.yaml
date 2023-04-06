@@ -1,4 +1,4 @@
-name: Check latest/stable/latest Compatibility
+name: Check CPL latest/stable/latest
 
 on:
   push:
@@ -8,7 +8,8 @@ on:
 
 jobs:
   build-config:
-    uses: PennylaneAI/catalyst/.github/workflows/check-pl-compat.yaml@main
+    name: CPL latest/stable/latest
+    uses: ./.github/workflows/check-pl-compat.yaml
     with:
       catalyst: latest
       pennylane: stable
