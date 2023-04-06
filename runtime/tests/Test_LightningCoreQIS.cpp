@@ -117,11 +117,11 @@ TEST_CASE("Test lightning__core__qis methods", "[qir_lightning_core]")
 TEST_CASE("Test __quantum__rt__initialize multiple times", "[qir_lightning_core]")
 {
     // initialize the simulator
-    __quantum__rt__device(nullptr, nullptr);    
+    __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
 
     REQUIRE_THROWS_WITH(__quantum__rt__initialize(),
-                        Catch::Contains("Invalid initialization of the global simulator"));
+                        Catch::Contains("Invalid initialization of the global device"));
 
     __quantum__rt__finalize();
 }
@@ -1381,17 +1381,10 @@ TEST_CASE("Test __quantum__qis__QubitUnitary with num_qubits=2", "[qir_lightning
     __quantum__rt__finalize();
 }
 
-/////////////////////
-// Multi-Device Tests
-/////////////////////
-
 TEST_CASE("Test __rt__device registering a custom device with shots=500 and device=lightning",
           "[qir_lightning_core]")
 {
-    __quantum__rt__device(nullptr, nullptr);
-    __quantum__rt__initialize();
-
-    char dev[7] = "device";
+    char dev[8] = "backend";
     char dev_value[17] = "lightning.kokkos";
     __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
 
@@ -1399,6 +1392,9 @@ TEST_CASE("Test __rt__device registering a custom device with shots=500 and devi
     char shots_value[4] = "500";
     __quantum__rt__device((int8_t *)shots, (int8_t *)shots_value);
 
+    char dev2[7] = "device";
+    REQUIRE_THROWS_WITH(__quantum__rt__device((int8_t *)dev2, (int8_t *)dev_value),
+                        Catch::Contains("Invalid device specification"));
+
     __quantum__rt__finalize();
-    REQUIRE(true);
 }

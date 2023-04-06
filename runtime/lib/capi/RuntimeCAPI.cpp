@@ -71,25 +71,23 @@ void __quantum__rt__initialize()
     }
 
     if (Catalyst::Runtime::CAPI::DRIVER->get_device()) {
-        __quantum__rt__fail_cstr("Invalid initialization of the global simulator");
+        __quantum__rt__fail_cstr("Invalid initialization of the global device");
     }
 
-    Catalyst::Runtime::CAPI::DRIVER->init_device();
+    if (!Catalyst::Runtime::CAPI::DRIVER->init_device()) {
+        __quantum__rt__fail_cstr("Failed initialization of the global device");
+    }
 
     assert(Catalyst::Runtime::CAPI::DRIVER->get_device() != nullptr);
     assert(Catalyst::Runtime::CAPI::DRIVER->get_memory_manager() != nullptr);
 }
 
-void __quantum__rt__finalize()
-{
-    Catalyst::Runtime::CAPI::DRIVER.reset(nullptr);
-}
+void __quantum__rt__finalize() { Catalyst::Runtime::CAPI::DRIVER.reset(nullptr); }
 
 void __quantum__rt__device(int8_t *spec, int8_t *value)
 {
     if (!Catalyst::Runtime::CAPI::DRIVER) {
-        Catalyst::Runtime::CAPI::DRIVER = 
-            std::make_unique<Catalyst::Runtime::CAPI::Driver>();
+        Catalyst::Runtime::CAPI::DRIVER = std::make_unique<Catalyst::Runtime::CAPI::Driver>();
     }
 
     // TODO: after removing the default device in Driver...
@@ -104,7 +102,20 @@ void __quantum__rt__device(int8_t *spec, int8_t *value)
     std::cerr << args[0] << " = " << args[1] << std::endl;
 
     if (args[0] == "backend") {
-        Catalyst::Runtime::CAPI::DRIVER->set_device_name(std::string(args[1]));
+        Catalyst::Runtime::CAPI::DRIVER->set_device_name(args[1]);
+    }
+    else if (args[0] == "shots") {
+        try {
+            Catalyst::Runtime::CAPI::DRIVER->set_device_shots(
+                static_cast<size_t>(std::stoul(std::string(args[1]))));
+        }
+        catch (std::exception &) {
+            __quantum__rt__fail_cstr("Invalid argument for the device specification (shots)");
+        }
+    }
+    else {
+        __quantum__rt__fail_cstr(
+            "Invalid device specification; 'backend' and 'shots' are only supported.");
     }
 }
 
@@ -122,7 +133,8 @@ void __quantum__rt__print_state() { Catalyst::Runtime::CAPI::DRIVER->get_device(
 
 QUBIT *__quantum__rt__qubit_allocate()
 {
-    return reinterpret_cast<QUBIT *>(Catalyst::Runtime::CAPI::DRIVER->get_device()->AllocateQubit());
+    return reinterpret_cast<QUBIT *>(
+        Catalyst::Runtime::CAPI::DRIVER->get_device()->AllocateQubit());
 }
 
 QirArray *__quantum__rt__qubit_allocate_array(int64_t num_qubits)
@@ -130,7 +142,8 @@ QirArray *__quantum__rt__qubit_allocate_array(int64_t num_qubits)
     assert(num_qubits >= 0);
 
     QirArray *qubit_array = __quantum__rt__array_create_1d(sizeof(QubitIdType), num_qubits);
-    const auto &&qubit_vector = Catalyst::Runtime::CAPI::DRIVER->get_device()->AllocateQubits(num_qubits);
+    const auto &&qubit_vector =
+        Catalyst::Runtime::CAPI::DRIVER->get_device()->AllocateQubits(num_qubits);
     for (int64_t idx = 0; idx < num_qubits; idx++) {
         *reinterpret_cast<QUBIT **>(__quantum__rt__array_get_element_ptr_1d(qubit_array, idx)) =
             reinterpret_cast<QUBIT *>(qubit_vector[idx]);
@@ -167,9 +180,15 @@ QirString *__quantum__rt__qubit_to_string(QUBIT *qubit)
 
 bool __quantum__rt__result_equal(RESULT *r0, RESULT *r1) { return (r0 == r1) || (*r0 == *r1); }
 
-RESULT *__quantum__rt__result_get_one() { return Catalyst::Runtime::CAPI::DRIVER->get_device()->One(); }
+RESULT *__quantum__rt__result_get_one()
+{
+    return Catalyst::Runtime::CAPI::DRIVER->get_device()->One();
+}
 
-RESULT *__quantum__rt__result_get_zero() { return Catalyst::Runtime::CAPI::DRIVER->get_device()->Zero(); }
+RESULT *__quantum__rt__result_get_zero()
+{
+    return Catalyst::Runtime::CAPI::DRIVER->get_device()->Zero();
+}
 
 QirString *__quantum__rt__result_to_string(RESULT *result)
 {
@@ -190,7 +209,7 @@ void __quantum__qis__Gradient(int64_t numResults, /* results = */...)
     if (num_observables != static_cast<size_t>(numResults)) {
         __quantum__rt__fail_cstr("Invalid number of results; "
                                  "The number of results must be equal to the "
-                                 "number of cached observables");
+                                 "number of cached observables.");
     }
 
     // for zero number of observables
@@ -243,7 +262,7 @@ void __quantum__qis__Gradient_params(MemRefT_int64_1d *params, int64_t numResult
     if (num_observables != static_cast<size_t>(numResults)) {
         __quantum__rt__fail_cstr("Invalid number of results; "
                                  "The number of results must be equal to the "
-                                 "number of cached observables");
+                                 "number of cached observables.");
     }
 
     // for zero number of observables
@@ -269,86 +288,86 @@ void __quantum__qis__Gradient_params(MemRefT_int64_1d *params, int64_t numResult
 
 void __quantum__qis__Identity(QUBIT *qubit)
 {
-    Catalyst::Runtime::CAPI::DRIVER->get_device()->NamedOperation("Identity", {},
-                                                          {reinterpret_cast<QubitIdType>(qubit)},
-                                                          /* inverse = */ false);
+    Catalyst::Runtime::CAPI::DRIVER->get_device()->NamedOperation(
+        "Identity", {}, {reinterpret_cast<QubitIdType>(qubit)},
+        /* inverse = */ false);
 }
 
 void __quantum__qis__PauliX(QUBIT *qubit)
 {
-    Catalyst::Runtime::CAPI::DRIVER->get_device()->NamedOperation("PauliX", {},
-                                                          {reinterpret_cast<QubitIdType>(qubit)},
-                                                          /* inverse = */ false);
+    Catalyst::Runtime::CAPI::DRIVER->get_device()->NamedOperation(
+        "PauliX", {}, {reinterpret_cast<QubitIdType>(qubit)},
+        /* inverse = */ false);
 }
 
 void __quantum__qis__PauliY(QUBIT *qubit)
 {
-    Catalyst::Runtime::CAPI::DRIVER->get_device()->NamedOperation("PauliY", {},
-                                                          {reinterpret_cast<QubitIdType>(qubit)},
-                                                          /* inverse = */ false);
+    Catalyst::Runtime::CAPI::DRIVER->get_device()->NamedOperation(
+        "PauliY", {}, {reinterpret_cast<QubitIdType>(qubit)},
+        /* inverse = */ false);
 }
 
 void __quantum__qis__PauliZ(QUBIT *qubit)
 {
-    Catalyst::Runtime::CAPI::DRIVER->get_device()->NamedOperation("PauliZ", {},
-                                                          {reinterpret_cast<QubitIdType>(qubit)},
-                                                          /* inverse = */ false);
+    Catalyst::Runtime::CAPI::DRIVER->get_device()->NamedOperation(
+        "PauliZ", {}, {reinterpret_cast<QubitIdType>(qubit)},
+        /* inverse = */ false);
 }
 
 void __quantum__qis__Hadamard(QUBIT *qubit)
 {
-    Catalyst::Runtime::CAPI::DRIVER->get_device()->NamedOperation("Hadamard", {},
-                                                          {reinterpret_cast<QubitIdType>(qubit)},
-                                                          /* inverse = */ false);
+    Catalyst::Runtime::CAPI::DRIVER->get_device()->NamedOperation(
+        "Hadamard", {}, {reinterpret_cast<QubitIdType>(qubit)},
+        /* inverse = */ false);
 }
 
 void __quantum__qis__S(QUBIT *qubit)
 {
-    Catalyst::Runtime::CAPI::DRIVER->get_device()->NamedOperation("S", {},
-                                                          {reinterpret_cast<QubitIdType>(qubit)},
-                                                          /* inverse = */ false);
+    Catalyst::Runtime::CAPI::DRIVER->get_device()->NamedOperation(
+        "S", {}, {reinterpret_cast<QubitIdType>(qubit)},
+        /* inverse = */ false);
 }
 
 void __quantum__qis__T(QUBIT *qubit)
 {
-    Catalyst::Runtime::CAPI::DRIVER->get_device()->NamedOperation("T", {},
-                                                          {reinterpret_cast<QubitIdType>(qubit)},
-                                                          /* inverse = */ false);
+    Catalyst::Runtime::CAPI::DRIVER->get_device()->NamedOperation(
+        "T", {}, {reinterpret_cast<QubitIdType>(qubit)},
+        /* inverse = */ false);
 }
 
 void __quantum__qis__PhaseShift(double theta, QUBIT *qubit)
 {
-    Catalyst::Runtime::CAPI::DRIVER->get_device()->NamedOperation("PhaseShift", {theta},
-                                                          {reinterpret_cast<QubitIdType>(qubit)},
-                                                          /* inverse = */ false);
+    Catalyst::Runtime::CAPI::DRIVER->get_device()->NamedOperation(
+        "PhaseShift", {theta}, {reinterpret_cast<QubitIdType>(qubit)},
+        /* inverse = */ false);
 }
 
 void __quantum__qis__RX(double theta, QUBIT *qubit)
 {
-    Catalyst::Runtime::CAPI::DRIVER->get_device()->NamedOperation("RX", {theta},
-                                                          {reinterpret_cast<QubitIdType>(qubit)},
-                                                          /* inverse = */ false);
+    Catalyst::Runtime::CAPI::DRIVER->get_device()->NamedOperation(
+        "RX", {theta}, {reinterpret_cast<QubitIdType>(qubit)},
+        /* inverse = */ false);
 }
 
 void __quantum__qis__RY(double theta, QUBIT *qubit)
 {
-    Catalyst::Runtime::CAPI::DRIVER->get_device()->NamedOperation("RY", {theta},
-                                                          {reinterpret_cast<QubitIdType>(qubit)},
-                                                          /* inverse = */ false);
+    Catalyst::Runtime::CAPI::DRIVER->get_device()->NamedOperation(
+        "RY", {theta}, {reinterpret_cast<QubitIdType>(qubit)},
+        /* inverse = */ false);
 }
 
 void __quantum__qis__RZ(double theta, QUBIT *qubit)
 {
-    Catalyst::Runtime::CAPI::DRIVER->get_device()->NamedOperation("RZ", {theta},
-                                                          {reinterpret_cast<QubitIdType>(qubit)},
-                                                          /* inverse = */ false);
+    Catalyst::Runtime::CAPI::DRIVER->get_device()->NamedOperation(
+        "RZ", {theta}, {reinterpret_cast<QubitIdType>(qubit)},
+        /* inverse = */ false);
 }
 
 void __quantum__qis__Rot(double phi, double theta, double omega, QUBIT *qubit)
 {
-    Catalyst::Runtime::CAPI::DRIVER->get_device()->NamedOperation("Rot", {phi, theta, omega},
-                                                          {reinterpret_cast<QubitIdType>(qubit)},
-                                                          /* inverse = */ false);
+    Catalyst::Runtime::CAPI::DRIVER->get_device()->NamedOperation(
+        "Rot", {phi, theta, omega}, {reinterpret_cast<QubitIdType>(qubit)},
+        /* inverse = */ false);
 }
 
 void __quantum__qis__CNOT(QUBIT *control, QUBIT *target)
@@ -470,20 +489,20 @@ void __quantum__qis__CRot(double phi, double theta, double omega, QUBIT *control
 
 void __quantum__qis__CSWAP(QUBIT *control, QUBIT *aswap, QUBIT *bswap)
 {
-    Catalyst::Runtime::CAPI::DRIVER->get_device()->NamedOperation("CSWAP", {},
-                                                          {reinterpret_cast<QubitIdType>(control),
-                                                           reinterpret_cast<QubitIdType>(aswap),
-                                                           reinterpret_cast<QubitIdType>(bswap)},
-                                                          /* inverse = */ false);
+    Catalyst::Runtime::CAPI::DRIVER->get_device()->NamedOperation(
+        "CSWAP", {},
+        {reinterpret_cast<QubitIdType>(control), reinterpret_cast<QubitIdType>(aswap),
+         reinterpret_cast<QubitIdType>(bswap)},
+        /* inverse = */ false);
 }
 
 void __quantum__qis__Toffoli(QUBIT *wire0, QUBIT *wire1, QUBIT *wire2)
 {
-    Catalyst::Runtime::CAPI::DRIVER->get_device()->NamedOperation("Toffoli", {},
-                                                          {reinterpret_cast<QubitIdType>(wire0),
-                                                           reinterpret_cast<QubitIdType>(wire1),
-                                                           reinterpret_cast<QubitIdType>(wire2)},
-                                                          /* inverse = */ false);
+    Catalyst::Runtime::CAPI::DRIVER->get_device()->NamedOperation(
+        "Toffoli", {},
+        {reinterpret_cast<QubitIdType>(wire0), reinterpret_cast<QubitIdType>(wire1),
+         reinterpret_cast<QubitIdType>(wire2)},
+        /* inverse = */ false);
 }
 
 void __quantum__qis__MultiRZ(double theta, int64_t numQubits, ...)
@@ -499,7 +518,7 @@ void __quantum__qis__MultiRZ(double theta, int64_t numQubits, ...)
     va_end(args);
 
     Catalyst::Runtime::CAPI::DRIVER->get_device()->NamedOperation("MultiRZ", {theta}, wires,
-                                                          /* inverse = */ false);
+                                                                  /* inverse = */ false);
 }
 
 void __quantum__qis__QubitUnitary(MemRefT_CplxT_double_2d *matrix, int64_t numQubits,
@@ -522,7 +541,7 @@ void __quantum__qis__QubitUnitary(MemRefT_CplxT_double_2d *matrix, int64_t numQu
     if (num_rows != expected_size || num_col != expected_size) {
         __quantum__rt__fail_cstr(
             "Invalid given QubitUnitary matrix; "
-            "The size of the matrix must be pow(2, numWires) * pow(2, numWires)");
+            "The size of the matrix must be pow(2, numWires) * pow(2, numWires).");
     }
 
     va_list args;
@@ -542,13 +561,13 @@ void __quantum__qis__QubitUnitary(MemRefT_CplxT_double_2d *matrix, int64_t numQu
     }
 
     return Catalyst::Runtime::CAPI::DRIVER->get_device()->MatrixOperation(coeffs, wires,
-                                                                  /*inverse*/ false);
+                                                                          /*inverse*/ false);
 }
 
 ObsIdType __quantum__qis__NamedObs(int64_t obsId, QUBIT *wire)
 {
-    return Catalyst::Runtime::CAPI::DRIVER->get_device()->Observable(static_cast<ObsId>(obsId), {},
-                                                             {reinterpret_cast<QubitIdType>(wire)});
+    return Catalyst::Runtime::CAPI::DRIVER->get_device()->Observable(
+        static_cast<ObsId>(obsId), {}, {reinterpret_cast<QubitIdType>(wire)});
 }
 
 ObsIdType __quantum__qis__HermitianObs(MemRefT_CplxT_double_2d *matrix, int64_t numQubits, ...)
@@ -566,7 +585,7 @@ ObsIdType __quantum__qis__HermitianObs(MemRefT_CplxT_double_2d *matrix, int64_t 
     if (num_rows != expected_size || num_col != expected_size) {
         __quantum__rt__fail_cstr(
             "Invalid given Hermitian matrix; "
-            "The size of the matrix must be pow(2, numWires) * pow(2, numWires)");
+            "The size of the matrix must be pow(2, numWires) * pow(2, numWires).");
     }
 
     va_list args;
@@ -588,7 +607,8 @@ ObsIdType __quantum__qis__HermitianObs(MemRefT_CplxT_double_2d *matrix, int64_t 
         coeffs.emplace_back(matrix->data_aligned[i].real, matrix->data_aligned[i].imag);
     }
 
-    return Catalyst::Runtime::CAPI::DRIVER->get_device()->Observable(ObsId::Hermitian, coeffs, wires);
+    return Catalyst::Runtime::CAPI::DRIVER->get_device()->Observable(ObsId::Hermitian, coeffs,
+                                                                     wires);
 }
 
 ObsIdType __quantum__qis__TensorObs(int64_t numObs, /*obsKeys*/...)
@@ -616,14 +636,14 @@ ObsIdType __quantum__qis__HamiltonianObs(MemRefT_double_1d *coeffs, int64_t numO
 
     if (coeffs == nullptr) {
         __quantum__rt__fail_cstr("Invalid coefficients for computing Hamiltonian; "
-                                 "The coefficients list must be initialized");
+                                 "The coefficients list must be initialized.");
     }
 
     const size_t coeffs_size = coeffs->sizes[0];
 
     if (static_cast<size_t>(numObs) != coeffs_size) {
         __quantum__rt__fail_cstr("Invalid coefficients for computing Hamiltonian; "
-                                 "The number of coefficients and observables must be equal");
+                                 "The number of coefficients and observables must be equal.");
     }
 
     va_list args;
@@ -636,12 +656,14 @@ ObsIdType __quantum__qis__HamiltonianObs(MemRefT_double_1d *coeffs, int64_t numO
     va_end(args);
 
     std::vector<double> coeffs_vec(coeffs->data_aligned, coeffs->data_aligned + coeffs_size);
-    return Catalyst::Runtime::CAPI::DRIVER->get_device()->HamiltonianObservable(coeffs_vec, obsKeys);
+    return Catalyst::Runtime::CAPI::DRIVER->get_device()->HamiltonianObservable(coeffs_vec,
+                                                                                obsKeys);
 }
 
 RESULT *__quantum__qis__Measure(QUBIT *wire)
 {
-    return Catalyst::Runtime::CAPI::DRIVER->get_device()->Measure(reinterpret_cast<QubitIdType>(wire));
+    return Catalyst::Runtime::CAPI::DRIVER->get_device()->Measure(
+        reinterpret_cast<QubitIdType>(wire));
 }
 
 double __quantum__qis__Expval(ObsIdType obsKey)
