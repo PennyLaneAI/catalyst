@@ -1,4 +1,4 @@
-name: Wheel::Linux::x86_64
+name: Build Catalyst Wheel on Linux (x86_64)
 
 on:
   schedule:
