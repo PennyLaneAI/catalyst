@@ -1,8 +1,8 @@
 name: Check CPL latest/latest/latest
 
 on:
-  push:
-    branches: [ main ]
+  schedule:
+    - chron: "20 10 * * 1-5"
   workflow_dispatch:
 
 jobs:
