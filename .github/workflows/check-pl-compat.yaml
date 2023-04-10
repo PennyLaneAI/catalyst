@@ -15,7 +15,7 @@ on:
 
 jobs:
   check-config:
-    name: Build Catalyst/PL/Lightning Configuration
+    name: Build Configuration
     runs-on: ubuntu-latest
 
     steps:
@@ -26,7 +26,7 @@ jobs:
 
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
-    - if: ${{ inputs.catalyst == 'release' }}
+    - if: ${{ inputs.catalyst == 'stable' }}
       run: |
         git checkout $(git tag | sort -V | tail -1)
 
@@ -72,6 +72,16 @@ jobs:
         restore-keys: ${{ runner.os }}-ccache-
 
 
+    - name: Install Catalyst (latest/stable)
+      run: |
+        CCACHE_DIR="$(pwd)/.ccache" \
+        LLVM_BUILD_DIR="$(pwd)/llvm-build" \
+        MHLO_BUILD_DIR="$(pwd)/mhlo-build" \
+        DIALECTS_BUILD_DIR="$(pwd)/quantum-build" \
+        make dialects
+        pip install --upgrade .
+
+
     - name: Build Lightning Runtime (latest)
       if: ${{ inputs.lightning == 'latest' }}
       run: |
@@ -82,8 +92,8 @@ jobs:
         LIGHTNING_GIT_TAG_VALUE=master \
         make runtime
 
-    - name: Build Lightning Runtime (release)
-      if: ${{ inputs.lightning == 'release' }}
+    - name: Build Lightning Runtime (stable)
+      if: ${{ inputs.lightning == 'stable' }}
       run: |
         COMPILER_LAUNCHER="" \
         RT_BUILD_DIR="$(pwd)/runtime-build" \
@@ -91,16 +101,6 @@ jobs:
         QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include" \
         LIGHTNING_GIT_TAG_VALUE=latest_release \
         make runtime
-
-
-    - name: Install Catalyst
-      run: |
-        CCACHE_DIR="$(pwd)/.ccache" \
-        LLVM_BUILD_DIR="$(pwd)/llvm-build" \
-        MHLO_BUILD_DIR="$(pwd)/mhlo-build" \
-        DIALECTS_BUILD_DIR="$(pwd)/quantum-build" \
-        make dialects
-        pip install --upgrade .
 
 
     - name: Install PennyLane (latest)
@@ -113,8 +113,8 @@ jobs:
       run: |
         pip install --upgrade ./pennylane
 
-    - name: Install PennyLane (release)
-      if: ${{ inputs.pennylane == 'release' }}
+    - name: Install PennyLane (stable)
+      if: ${{ inputs.pennylane == 'stable' }}
       run: |
         pip install --upgrade pennylane
 
