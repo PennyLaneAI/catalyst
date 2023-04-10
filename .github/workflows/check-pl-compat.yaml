@@ -1,20 +1,22 @@
-name: Check PennyLane Compatibility
+name: Check PennyLane/Lightning Compatibility
 
 on:
-  push:
-    branches: [ main ]
-  workflow_dispatch:
+  workflow_call:
+    inputs:
+      catalyst:
+        required: true
+        type: string
+      pennylane:
+        required: true
+        type: string
+      lightning:
+        required: true
+        type: string
 
 jobs:
-  check-matrix:
-    name: Build Compatibility Matrix against PL/Lightning
+  check-config:
+    name: Build Configuration
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        catalyst: ['latest', 'release']
-        pennylane: ['latest', 'release']
-        lightning: ['latest', 'release']
 
     steps:
     - name: Cancel previous runs
@@ -24,7 +26,7 @@ jobs:
 
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
-    - if: ${{ matrix.catalyst == 'release' }}
+    - if: ${{ inputs.catalyst == 'stable' }}
       run: |
         git checkout $(git tag | sort -V | tail -1)
 
@@ -70,28 +72,7 @@ jobs:
         restore-keys: ${{ runner.os }}-ccache-
 
 
-    - name: Build Lightning Runtime (latest)
-      if: ${{ matrix.lightning == 'latest' }}
-      run: |
-        COMPILER_LAUNCHER="" \
-        RT_BUILD_DIR="$(pwd)/runtime-build" \
-        QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build" \
-        QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include" \
-        LIGHTNING_GIT_TAG_VALUE=master \
-        make runtime
-
-    - name: Build Lightning Runtime (release)
-      if: ${{ matrix.lightning == 'release' }}
-      run: |
-        COMPILER_LAUNCHER="" \
-        RT_BUILD_DIR="$(pwd)/runtime-build" \
-        QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build" \
-        QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include" \
-        LIGHTNING_GIT_TAG_VALUE=latest_release \
-        make runtime
-
-
-    - name: Install Catalyst
+    - name: Install Catalyst (latest/stable)
       run: |
         CCACHE_DIR="$(pwd)/.ccache" \
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
@@ -101,18 +82,39 @@ jobs:
         pip install --upgrade .
 
 
+    - name: Build Lightning Runtime (latest)
+      if: ${{ inputs.lightning == 'latest' }}
+      run: |
+        COMPILER_LAUNCHER="" \
+        RT_BUILD_DIR="$(pwd)/runtime-build" \
+        QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build" \
+        QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include" \
+        LIGHTNING_GIT_TAG_VALUE=master \
+        make runtime
+
+    - name: Build Lightning Runtime (stable)
+      if: ${{ inputs.lightning == 'stable' }}
+      run: |
+        COMPILER_LAUNCHER="" \
+        RT_BUILD_DIR="$(pwd)/runtime-build" \
+        QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build" \
+        QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include" \
+        LIGHTNING_GIT_TAG_VALUE=latest_release \
+        make runtime
+
+
     - name: Install PennyLane (latest)
-      if: ${{ matrix.pennylane == 'latest' }}
+      if: ${{ inputs.pennylane == 'latest' }}
       uses: actions/checkout@v3
       with:
         repository: PennyLaneAI/pennylane
         path: pennylane
-    - if: ${{ matrix.pennylane == 'latest' }}
+    - if: ${{ inputs.pennylane == 'latest' }}
       run: |
         pip install --upgrade ./pennylane
 
-    - name: Install PennyLane (release)
-      if: ${{ matrix.pennylane == 'release' }}
+    - name: Install PennyLane (stable)
+      if: ${{ inputs.pennylane == 'stable' }}
       run: |
         pip install --upgrade pennylane
 
