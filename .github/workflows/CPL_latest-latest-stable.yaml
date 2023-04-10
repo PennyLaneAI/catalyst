@@ -2,7 +2,7 @@ name: Check CPL latest/latest/stable
 
 on:
   schedule:
-    - chron: "20 10 * * 1-5"
+    - cron: "20 10 * * 1-5"
   workflow_dispatch:
 
 jobs:
