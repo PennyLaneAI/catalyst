@@ -24,9 +24,6 @@
 extern "C" {
 #endif
 
-// Device type
-typedef intptr_t DeviceIdType;
-
 // Qubit, Result and Observable types
 struct QUBIT;
 typedef intptr_t QubitIdType;

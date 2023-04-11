@@ -54,7 +54,6 @@ class MemoryManager final {
 class Driver final {
   private:
     using DeviceInitializer = std::function<std::unique_ptr<QuantumDevice>(bool, size_t)>;
-    // TODO: remove this and use `QuantumDeviceMap` after removing `CreateQuantumDevice`
     std::unordered_map<std::string_view, DeviceInitializer> _device_map{
 #ifdef __device_lightning
         {"lightning.qubit",

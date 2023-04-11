@@ -40,7 +40,6 @@ set(common_tests_src    Test_QubitManager.cpp
                         Test_LightningDriver.cpp
                         Test_LightningGateSet.cpp
                         Test_LightningCoreQIS.cpp
-                        # Test_LightningCoreQIS_Kokkos.cpp
                         Test_LightningMeasures.cpp
                         Test_LightningGradient.cpp)
 
