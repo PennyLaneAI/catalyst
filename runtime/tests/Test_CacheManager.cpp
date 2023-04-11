@@ -247,14 +247,14 @@ TEST_CASE("Test a LightningSimulator circuit with num_qubits=4 and observables",
     sim->NamedOperation("Hadamard", {}, {Qs[2]}, false);
     sim->NamedOperation("PauliZ", {}, {Qs[3]}, false);
 
-    ObsIdType px = sim->Observable(ObsId::PauliX, {}, {Qs[1]});
     ObsIdType pz = sim->Observable(ObsId::PauliZ, {}, {Qs[0]});
 
+#if !defined(_KOKKOS)
+    ObsIdType px = sim->Observable(ObsId::PauliX, {}, {Qs[1]});
     ObsIdType h = sim->Observable(ObsId::Hadamard, {}, {Qs[0]});
 
-#if !defined(_KOKKOS)
-    sim->Var(h);  // Kokkos doesn't support Variance
     sim->Var(px); // Kokkos doesn't support Variance
+    sim->Var(h);  // Kokkos doesn't support Variance
 #endif
 
     sim->Expval(pz);

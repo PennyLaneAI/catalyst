@@ -32,7 +32,7 @@ target_include_directories(runner_tests PRIVATE
 endif()
 
 target_link_libraries(runner_tests PRIVATE  catalyst_qir_runtime
-                                            lightning_dynamic
+                                            lightnings_interface
                                             Catch2::Catch2)
 
 set(common_tests_src    Test_QubitManager.cpp

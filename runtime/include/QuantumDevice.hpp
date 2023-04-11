@@ -283,12 +283,4 @@ struct QuantumDevice {
     virtual auto Gradient(const std::vector<size_t> &trainParams)
         -> std::vector<std::vector<double>> = 0;
 };
-
-/**
- * Create a pointer of type `QuantumDevice` for an implementation of this device API.
- *
- * @return std::unique_ptr<QuantumDevice>
- */
-std::unique_ptr<QuantumDevice> CreateQuantumDevice();
-
 } // namespace Catalyst::Runtime

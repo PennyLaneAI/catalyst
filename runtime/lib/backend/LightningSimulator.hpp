@@ -37,10 +37,10 @@ throw std::logic_error("StateVectorDynamicCPU.hpp: No such header file");
 #include "StateVectorDynamicCPU.hpp"
 
 #include "CacheManager.hpp"
-#include "LightningUtils.hpp"
-#include "ObsManager.hpp"
+#include "LightningObsManager.hpp"
 #include "QuantumDevice.hpp"
 #include "QubitManager.hpp"
+#include "Utils.hpp"
 
 namespace Catalyst::Runtime::Simulator {
 class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {

@@ -3,49 +3,27 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include(FetchContent)
 
-if(ENABLE_LIGHTNING_KOKKOS)
-    set(CMAKE_CXX_EXTENSIONS OFF)
+set(LIGHTNING_GIT_TAG "main" CACHE STRING "GIT_TAG value to build Lightning-Kokkos")
+set(source_files "StateVectorDynamicCPU.cpp")
+FetchContent_Declare(
+    pennylane_lightning
+    GIT_REPOSITORY https://github.com/PennyLaneAI/pennylane-lightning.git
+    GIT_TAG      ${LIGHTNING_GIT_TAG}
+)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON) # build with -fPIC
+set(ENABLE_KOKKOS OFF CACHE BOOL "Enable Kokkos")
 
-    set(LIGHTNING_GIT_TAG "main" CACHE STRING "GIT_TAG value to build Lightning-Kokkos")
+FetchContent_Declare(
+    pennylane_lightning_kokkos
+    GIT_REPOSITORY https://github.com/PennyLaneAI/pennylane-lightning-kokkos.git
+    GIT_TAG        multidev/fix_buildw_lightning_new
+)
 
-    FetchContent_Declare(
-        pennylane_lightning_kokkos
-        GIT_REPOSITORY https://github.com/PennyLaneAI/pennylane-lightning-kokkos.git
-        GIT_TAG        ${LIGHTNING_GIT_TAG}
-    )
-    set(Kokkos_ENABLE_OPENMP OFF CACHE BOOL "Build Lightning-Kokkos using OpenMP kernels")
-    set(Kokkos_ENABLE_THREADS OFF CACHE BOOL "Build Lightning-Kokkos using Threads kernels")
-    FetchContent_MakeAvailable(pennylane_lightning_kokkos)
+FetchContent_MakeAvailable(pennylane_lightning pennylane_lightning_kokkos)
 
-    add_library(lightning_dynamic INTERFACE)
+add_library(lightnings_interface INTERFACE)
 
-    target_link_libraries(lightning_dynamic INTERFACE
-                                lightning_kokkos_algorithms
-                                lightning_kokkos_simulator
-                                lightning_kokkos_utils)
-else()
-    set(ENABLE_OPENMP ON)
-    set(source_files "StateVectorDynamicCPU.cpp")
+target_link_libraries(lightnings_interface INTERFACE pennylane_lightning pennylane_lightning_kokkos)
 
-    set(LIGHTNING_GIT_TAG "master" CACHE STRING "GIT_TAG value to build Lightning")
+target_include_directories(lightnings_interface INTERFACE .)
 
-    FetchContent_Declare(
-        pennylane_lightning
-        GIT_REPOSITORY https://github.com/PennyLaneAI/pennylane-lightning.git
-        GIT_TAG      ${LIGHTNING_GIT_TAG}
-    )
-    set(CMAKE_POSITION_INDEPENDENT_CODE ON) # build with -fPIC
-    set(ENABLE_KOKKOS OFF CACHE BOOL "Enable Kokkos")
-
-    FetchContent_MakeAvailable(pennylane_lightning)
-
-    add_library(lightning_dynamic INTERFACE ${source_files})
-
-    target_link_libraries(lightning_dynamic INTERFACE
-                                lightning_algorithms
-                                lightning_gates
-                                lightning_simulator
-                                lightning_utils)
-endif()
-
-target_include_directories(lightning_dynamic INTERFACE .)

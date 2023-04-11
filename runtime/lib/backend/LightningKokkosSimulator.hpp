@@ -35,10 +35,10 @@ throw std::logic_error("StateVectorKokkos.hpp: No such header file");
 #include "StateVectorKokkos.hpp"
 
 #include "CacheManager.hpp"
-#include "LightningUtils.hpp"
-#include "ObsManager.hpp"
+#include "LightningKokkosObsManager.hpp"
 #include "QuantumDevice.hpp"
 #include "QubitManager.hpp"
+#include "Utils.hpp"
 
 namespace Catalyst::Runtime::Simulator {
 class LightningKokkosSimulator final : public Catalyst::Runtime::QuantumDevice {
@@ -57,7 +57,7 @@ class LightningKokkosSimulator final : public Catalyst::Runtime::QuantumDevice {
 
     std::unique_ptr<Pennylane::StateVectorKokkos<double>> device_sv =
         std::make_unique<Pennylane::StateVectorKokkos<double>>(0);
-    LightningObsManager<double> obs_manager{};
+    LightningKokkosObsManager<double> obs_manager{};
 
     inline auto isValidQubit(QubitIdType wire) -> bool
     {

@@ -13,7 +13,6 @@
 // limitations under the License.
 
 #include "LightningSimulator.hpp"
-#include "BaseUtils.hpp"
 
 namespace Catalyst::Runtime::Simulator {
 
@@ -517,10 +516,3 @@ auto LightningSimulator::Gradient(const std::vector<size_t> &trainParams)
 }
 
 } // namespace Catalyst::Runtime::Simulator
-
-namespace Catalyst::Runtime {
-auto CreateQuantumDevice() -> std::unique_ptr<QuantumDevice>
-{
-    return std::make_unique<Simulator::LightningSimulator>();
-}
-} // namespace Catalyst::Runtime

@@ -19,39 +19,10 @@
 #include <tuple>
 #include <utility>
 
-#include "BaseUtils.hpp"
-#include "LightningUtils.hpp"
 #include "Types.h"
+#include "Utils.hpp"
 
-#if __has_include("ObservablesKokkos.hpp")
-#include "ObservablesKokkos.hpp"
-namespace Catalyst::Runtime::Simulator {
-template <typename PrecisionT>
-using ObservableClassName = Pennylane::Simulators::ObservableKokkos<PrecisionT>;
-template <typename PrecisionT>
-using NamedObsClassName = Pennylane::Simulators::NamedObsKokkos<PrecisionT>;
-template <typename PrecisionT>
-using HermitianObsClassName = Pennylane::Simulators::HermitianObsKokkos<PrecisionT>;
-template <typename PrecisionT>
-using TensorProdObsClassName = Pennylane::Simulators::TensorProdObsKokkos<PrecisionT>;
-template <typename PrecisionT>
-using HamiltonianClassName = Pennylane::Simulators::HamiltonianKokkos<PrecisionT>;
-} // namespace Catalyst::Runtime::Simulator
-#else
 #include "Observables.hpp"
-namespace Catalyst::Runtime::Simulator {
-template <typename PrecisionT>
-using ObservableClassName = Pennylane::Simulators::Observable<PrecisionT>;
-template <typename PrecisionT>
-using NamedObsClassName = Pennylane::Simulators::NamedObs<PrecisionT>;
-template <typename PrecisionT>
-using HermitianObsClassName = Pennylane::Simulators::HermitianObs<PrecisionT>;
-template <typename PrecisionT>
-using TensorProdObsClassName = Pennylane::Simulators::TensorProdObs<PrecisionT>;
-template <typename PrecisionT>
-using HamiltonianClassName = Pennylane::Simulators::Hamiltonian<PrecisionT>;
-} // namespace Catalyst::Runtime::Simulator
-#endif
 
 namespace Catalyst::Runtime::Simulator {
 
@@ -62,7 +33,13 @@ namespace Catalyst::Runtime::Simulator {
  */
 template <typename PrecisionT> class LightningObsManager {
   private:
-    using ObservablePairType = std::pair<std::shared_ptr<ObservableClassName<PrecisionT>>, ObsType>;
+    using ObservableClassName = Pennylane::Simulators::Observable<PrecisionT>;
+    using NamedObsClassName = Pennylane::Simulators::NamedObs<PrecisionT>;
+    using HermitianObsClassName = Pennylane::Simulators::HermitianObs<PrecisionT>;
+    using TensorProdObsClassName = Pennylane::Simulators::TensorProdObs<PrecisionT>;
+    using HamiltonianClassName = Pennylane::Simulators::Hamiltonian<PrecisionT>;
+
+    using ObservablePairType = std::pair<std::shared_ptr<ObservableClassName>, ObsType>;
     std::vector<ObservablePairType> observables_{};
 
     static constexpr std::array<ObsType, 2> hamiltonian_valid_obs_types = {
@@ -101,10 +78,9 @@ template <typename PrecisionT> class LightningObsManager {
      * @brief Get the constructed observable instance.
      *
      * @param key The observable key
-     * @return std::shared_ptr<ObservableClassName<PrecisionT>
+     * @return std::shared_ptr<ObservableClassName>
      */
-    [[nodiscard]] auto getObservable(ObsIdType key)
-        -> std::shared_ptr<ObservableClassName<PrecisionT>>
+    [[nodiscard]] auto getObservable(ObsIdType key) -> std::shared_ptr<ObservableClassName>
     {
         QFailIf(!this->isValidObservables({key}), "Invalid observable key");
         return std::get<0>(this->observables_[reinterpret_cast<int64_t>(key)]);
@@ -130,8 +106,8 @@ template <typename PrecisionT> class LightningObsManager {
             std::string(Lightning::lookup_obs<Lightning::simulator_observable_support_size>(
                 Lightning::simulator_observable_support, obsId));
 
-        this->observables_.push_back(std::make_pair(
-            std::make_shared<NamedObsClassName<PrecisionT>>(obs_str, wires), ObsType::Basic));
+        this->observables_.push_back(
+            std::make_pair(std::make_shared<NamedObsClassName>(obs_str, wires), ObsType::Basic));
         return static_cast<ObsIdType>(this->observables_.size() - 1);
     }
 
@@ -145,10 +121,9 @@ template <typename PrecisionT> class LightningObsManager {
     [[nodiscard]] auto createHermitianObs(const std::vector<std::complex<PrecisionT>> &matrix,
                                           const std::vector<size_t> &wires) -> ObsIdType
     {
-        this->observables_.push_back(
-            std::make_pair(std::make_shared<HermitianObsClassName<PrecisionT>>(
-                               HermitianObsClassName<PrecisionT>{matrix, wires}),
-                           ObsType::Basic));
+        this->observables_.push_back(std::make_pair(
+            std::make_shared<HermitianObsClassName>(HermitianObsClassName{matrix, wires}),
+            ObsType::Basic));
 
         return static_cast<ObsIdType>(this->observables_.size() - 1);
     }
@@ -164,7 +139,7 @@ template <typename PrecisionT> class LightningObsManager {
         const auto key_size = obsKeys.size();
         const auto obs_size = this->observables_.size();
 
-        std::vector<std::shared_ptr<ObservableClassName<PrecisionT>>> obs_vec;
+        std::vector<std::shared_ptr<ObservableClassName>> obs_vec;
         obs_vec.reserve(key_size);
 
         for (const auto &key : obsKeys) {
@@ -179,10 +154,9 @@ template <typename PrecisionT> class LightningObsManager {
             obs_vec.push_back(obs);
         }
 
-        this->observables_.push_back(
-            std::make_pair(std::make_shared<TensorProdObsClassName<PrecisionT>>(
-                               TensorProdObsClassName<PrecisionT>::create(obs_vec)),
-                           ObsType::TensorProd));
+        this->observables_.push_back(std::make_pair(
+            std::make_shared<TensorProdObsClassName>(TensorProdObsClassName::create(obs_vec)),
+            ObsType::TensorProd));
 
         return static_cast<ObsIdType>(obs_size);
     }
@@ -204,7 +178,7 @@ template <typename PrecisionT> class LightningObsManager {
                 "Incompatible list of observables and coefficients; "
                 "Number of observables and number of coefficients must be equal");
 
-        std::vector<std::shared_ptr<ObservableClassName<PrecisionT>>> obs_vec;
+        std::vector<std::shared_ptr<ObservableClassName>> obs_vec;
         obs_vec.reserve(key_size);
 
         for (auto key : obsKeys) {
@@ -223,8 +197,8 @@ template <typename PrecisionT> class LightningObsManager {
         }
 
         this->observables_.push_back(
-            std::make_pair(std::make_shared<HamiltonianClassName<PrecisionT>>(
-                               HamiltonianClassName<PrecisionT>(coeffs, std::move(obs_vec))),
+            std::make_pair(std::make_shared<HamiltonianClassName>(
+                               HamiltonianClassName(coeffs, std::move(obs_vec))),
                            ObsType::Hamiltonian));
 
         return static_cast<ObsIdType>(obs_size);
