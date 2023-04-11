@@ -110,15 +110,15 @@ class Driver final {
         return false;
     }
 
-    [[nodiscard]] auto get_device() -> std::unique_ptr<Catalyst::Runtime::QuantumDevice> &
+    [[nodiscard]] auto get_device() const
+        -> const std::unique_ptr<Catalyst::Runtime::QuantumDevice> &
     {
         return _driver_ptr;
     }
 
-    [[nodiscard]] auto get_memory_manager() -> std::unique_ptr<MemoryManager> &
+    [[nodiscard]] auto get_memory_manager() const -> const std::unique_ptr<MemoryManager> &
     {
         return _driver_mm_ptr;
     }
 };
-
 } // namespace Catalyst::Runtime::CAPI
