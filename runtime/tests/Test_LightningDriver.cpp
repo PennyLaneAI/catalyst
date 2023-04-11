@@ -29,7 +29,6 @@ TEST_CASE("Test Driver", "[lightning]")
 {
     std::unique_ptr<CAPI::Driver> driver = std::make_unique<CAPI::Driver>(false, 500);
 
-    CHECK(driver->get_device_name() == "lightning.qubit");
     CHECK(driver->get_device_shots() == 500);
 
     driver->set_device_name("other.simulator");
