@@ -215,7 +215,7 @@ struct QuantumDevice {
      *
      * @return `std::vector<std::complex<double>>`
      */
-    virtual auto State() -> std::vector<std::complex<double>> = 0;
+    virtual auto State() -> std::complex<double>* = 0;
 
     /**
      * @brief Compute samples with the number of shots on the entire wires,

@@ -210,10 +210,10 @@ auto LightningSimulator::Var(ObsIdType obsKey) -> double
     return result;
 }
 
-auto LightningSimulator::State() -> std::vector<std::complex<double>>
+auto LightningSimulator::State() -> std::complex<double>*
 {
     auto &&state = this->device_sv->getDataVector();
-    return std::vector<std::complex<double>>(state.begin(), state.end());
+    return state.data();
 }
 
 auto LightningSimulator::Probs() -> std::vector<double>

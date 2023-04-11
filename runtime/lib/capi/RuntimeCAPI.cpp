@@ -716,7 +716,7 @@ void __quantum__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, .
         numQubits = __quantum__rt__num_qubits();
     }
 
-    std::vector<std::complex<double>> sv_state;
+    std::complex<double>* sv_state = NULL;
 
     if (wires.empty()) {
         sv_state = Catalyst::Runtime::CAPI::get_device()->State();
@@ -727,13 +727,10 @@ void __quantum__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, .
         // numElements, wires);
     }
 
-    const size_t numElements = sv_state.size();
-    assert(numElements == (1U << numQubits));
-    std::complex<double> *buffer = sv_state.data();
-    size_t buffer_len = sv_state.size();
-    MemRefT<std::complex<double>, 1> src = {buffer, buffer, 0, {buffer_len}, {1}};
+    size_t buffer_len = 1U << numQubits;
+    MemRefT<std::complex<double>, 1> src = {sv_state, sv_state, 0, {buffer_len}, {1}};
     memref_copy<std::complex<double>, 1>(result_p, &src,
-                                         numElements * sizeof(std::complex<double>));
+                                         1U << numQubits * sizeof(std::complex<double>));
 }
 
 void __quantum__qis__Sample(MemRefT_double_2d *result, int64_t shots, int64_t numQubits, ...)

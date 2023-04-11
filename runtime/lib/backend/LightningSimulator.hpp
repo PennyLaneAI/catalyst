@@ -135,7 +135,7 @@ class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {
         -> ObsIdType override;
     auto Expval(ObsIdType obsKey) -> double override;
     auto Var(ObsIdType obsKey) -> double override;
-    auto State() -> std::vector<std::complex<double>> override;
+    auto State() -> std::complex<double>* override;
     auto Probs() -> std::vector<double> override;
     auto PartialProbs(const std::vector<QubitIdType> &wires) -> std::vector<double> override;
     auto Sample(size_t shots) -> std::vector<double> override;
