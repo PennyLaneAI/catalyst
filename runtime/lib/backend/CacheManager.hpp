@@ -14,6 +14,9 @@
 
 #pragma once
 
+#include <string>
+#include <vector>
+
 #include "Types.h"
 #include "Utils.hpp"
 

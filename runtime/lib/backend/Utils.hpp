@@ -15,6 +15,9 @@
 #pragma once
 
 #include <stdexcept>
+#include <array>
+#include <tuple>
+#include <string_view>
 
 #include "Types.h"
 

@@ -15,19 +15,22 @@
 #include <numeric>
 #include <string>
 
-#include "LightningUtils.hpp"
+#include "Utils.hpp"
 #include "QuantumDevice.hpp"
 #include "RuntimeCAPI.h"
+
+#include "LightningSimulator.hpp"
+#include "LightningKokkosSimulator.hpp"
 
 #include <catch2/catch.hpp>
 
 using namespace Catalyst::Runtime;
 using namespace Catalyst::Runtime::Simulator;
 
-TEST_CASE("lightning Basis vector", "[lightning]")
+TEMPLATE_TEST_CASE("lightning Basis vector", "[Driver]", LightningSimulator, LightningKokkosSimulator)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
-
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
+    
     QubitIdType q = sim->AllocateQubit();
     q = sim->AllocateQubit();
     q = sim->AllocateQubit();
@@ -45,9 +48,9 @@ TEST_CASE("lightning Basis vector", "[lightning]")
     CHECK(state[3].imag() == Approx(0.0).epsilon(1e-5));
 }
 
-TEST_CASE("Qubit allocatation and deallocation", "[lightning]")
+TEMPLATE_TEST_CASE("Qubit allocatation and deallocation", "[Driver]", LightningSimulator)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     constexpr size_t n = 1;
     constexpr size_t sz = (1UL << n);
@@ -73,7 +76,6 @@ TEST_CASE("Qubit allocatation and deallocation", "[lightning]")
     CHECK(sum.real() == Approx(0.0).epsilon(1e-5));
     CHECK(sum.imag() == Approx(0.0).epsilon(1e-5));
 
-#if !defined(_KOKKOS)
     for (size_t i = n; i > 0; i--) {
         CHECK(state.size() == sz);
 
@@ -81,17 +83,45 @@ TEST_CASE("Qubit allocatation and deallocation", "[lightning]")
         sim->AllocateQubit();
         state = sim->State();
     }
-#else
+}
+
+TEMPLATE_TEST_CASE("Qubit allocatation and deallocation [lightning.kokkos]", "[Driver]", LightningKokkosSimulator)
+{
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
+
+    constexpr size_t n = 1;
+    constexpr size_t sz = (1UL << n);
+
+    QubitIdType q;
+    for (size_t i = 0; i < n; i++) {
+        q = sim->AllocateQubit();
+    }
+
+    CHECK(n == static_cast<size_t>(q) + 1);
+
+    std::vector<std::complex<double>> state = sim->State();
+
+    CHECK(state.size() == (1UL << n));
+    CHECK(state[0].real() == Approx(1.0).epsilon(1e-5));
+    CHECK(state[0].imag() == Approx(0.0).epsilon(1e-5));
+
+    std::complex<double> sum{0, 0};
+    for (size_t i = 1; i < sz; i++) {
+        sum += state[i];
+    }
+
+    CHECK(sum.real() == Approx(0.0).epsilon(1e-5));
+    CHECK(sum.imag() == Approx(0.0).epsilon(1e-5));
+
     for (size_t i = n; i > 0; i--) {
         sim->ReleaseQubit(i - 1);
     }
-#endif
 }
 
-TEST_CASE("test AllocateQubits", "[lightning]")
+TEMPLATE_TEST_CASE("test AllocateQubits", "[Driver]", LightningSimulator, LightningKokkosSimulator)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
-
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
+    
     CHECK(sim->AllocateQubits(0).size() == 0);
 
     auto &&q = sim->AllocateQubits(2);
@@ -102,10 +132,10 @@ TEST_CASE("test AllocateQubits", "[lightning]")
     CHECK(state[0].real() == Approx(1.0).epsilon(1e-5));
 }
 
-TEST_CASE("test DeviceShots", "[lightning]")
+TEMPLATE_TEST_CASE("test DeviceShots", "[Driver]", LightningSimulator, LightningKokkosSimulator)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
-
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
+    
     CHECK(sim->GetDeviceShots() == 1000);
 
     sim->SetDeviceShots(500);
@@ -113,10 +143,10 @@ TEST_CASE("test DeviceShots", "[lightning]")
     CHECK(sim->GetDeviceShots() == 500);
 }
 
-TEST_CASE("compute register tests", "[lightning]")
+TEMPLATE_TEST_CASE("compute register tests", "[Driver]", LightningSimulator, LightningKokkosSimulator)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
-
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
+    
     constexpr size_t n = 10;
     std::vector<QubitIdType> Qs;
     Qs.reserve(n);
@@ -141,16 +171,16 @@ TEST_CASE("compute register tests", "[lightning]")
     }
 }
 
-TEST_CASE("Check an unsupported operation", "[lightning]")
+TEMPLATE_TEST_CASE("Check an unsupported operation", "[Driver]", LightningSimulator, LightningKokkosSimulator)
 {
     REQUIRE_THROWS_WITH(
         Lightning::lookup_gates(Lightning::simulator_gate_info, "UnsupportedGateName"),
         Catch::Contains("The given operation is not supported by the simulator"));
 }
 
-TEST_CASE("QuantumDevice object test", "[lightning]")
+TEMPLATE_TEST_CASE("QuantumDevice object test [lightning.qubit]", "[Driver]", LightningSimulator)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 10;
@@ -184,7 +214,6 @@ TEST_CASE("QuantumDevice object test", "[lightning]")
         // 0, 1, 2, ..., 9
     }
 
-#if !defined(_KOKKOS)
     for (size_t i = 10; i < n + 10; i++) {
         CHECK(static_cast<QubitIdType>(i) == sim->AllocateQubit());
         // 10, 11, ..., 19
@@ -199,5 +228,4 @@ TEST_CASE("QuantumDevice object test", "[lightning]")
         CHECK(static_cast<QubitIdType>(i) == sim->AllocateQubit());
         // 20, 21, ..., 29
     }
-#endif
 }

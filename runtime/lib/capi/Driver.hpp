@@ -23,13 +23,8 @@
 
 #include "QuantumDevice.hpp"
 
-#if __has_include("StateVectorCPU.hpp")
 #include "LightningSimulator.hpp"
-#endif
-
-#if __has_include("StateVectorKokkos.hpp")
 #include "LightningKokkosSimulator.hpp"
-#endif
 
 namespace Catalyst::Runtime::CAPI {
 
@@ -54,22 +49,17 @@ class MemoryManager final {
 class Driver final {
   private:
     using DeviceInitializer = std::function<std::unique_ptr<QuantumDevice>(bool, size_t)>;
-    // TODO: remove this and use `QuantumDeviceMap` after removing `CreateQuantumDevice`
     std::unordered_map<std::string_view, DeviceInitializer> _device_map{
-#ifdef __device_lightning
         {"lightning.qubit",
          [](bool tape_recording, size_t shots) {
              return std::make_unique<Catalyst::Runtime::Simulator::LightningSimulator>(
                  tape_recording, shots);
          }},
-#endif
-#ifdef __device_lightning_kokkos
         {"lightning.kokkos",
          [](bool tape_recording, size_t shots) {
              return std::make_unique<Catalyst::Runtime::Simulator::LightningKokkosSimulator>(
                  tape_recording, shots);
          }},
-#endif
     };
 
     // Device Info
@@ -86,13 +76,6 @@ class Driver final {
         : _tape_recording(status), _shots(shots)
     {
         _driver_mm_ptr = std::make_unique<MemoryManager>();
-
-// TODO: remove this defualt...
-#ifdef __device_lightning
-        _name = "lightning.qubit";
-#else
-        _name = "lightning.kokkos";
-#endif
     };
 
     ~Driver()

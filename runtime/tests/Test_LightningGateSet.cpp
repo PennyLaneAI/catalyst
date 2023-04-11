@@ -14,26 +14,23 @@
 
 #include <cmath>
 
-#include "LightningUtils.hpp"
+#include "Utils.hpp"
 #include "QuantumDevice.hpp"
 #include "RuntimeCAPI.h"
 
 #include <catch2/catch.hpp>
 
-#if defined(_KOKKOS)
-#include "LightningKokkosSimulator.hpp"
-#else
 #include "LightningSimulator.hpp"
-#endif
+#include "LightningKokkosSimulator.hpp"
 
 using namespace Pennylane;
 
 using namespace Catalyst::Runtime;
 using namespace Catalyst::Runtime::Simulator;
 
-TEST_CASE("Identity Gate tests", "[lightning]")
+TEMPLATE_TEST_CASE("Identity Gate tests", "[GateSet]", LightningSimulator, LightningKokkosSimulator)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 10;
@@ -61,9 +58,9 @@ TEST_CASE("Identity Gate tests", "[lightning]")
     CHECK(sum == std::complex<double>{0, 0});
 }
 
-TEST_CASE("PauliX Gate tests num_qubits=1", "[lightning]")
+TEMPLATE_TEST_CASE("PauliX Gate tests num_qubits=1", "[GateSet]", LightningSimulator, LightningKokkosSimulator)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 1;
@@ -83,9 +80,9 @@ TEST_CASE("PauliX Gate tests num_qubits=1", "[lightning]")
 }
 
 // 1-qubit operations
-TEST_CASE("PauliX Gate tests num_qubits=3", "[lightning]")
+TEMPLATE_TEST_CASE("PauliX Gate tests num_qubits=3", "[GateSet]", LightningSimulator, LightningKokkosSimulator)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 3;
@@ -116,9 +113,9 @@ TEST_CASE("PauliX Gate tests num_qubits=3", "[lightning]")
     CHECK(sum == std::complex<double>{0, 0});
 }
 
-TEST_CASE("PauliY Gate tests num_qubits=1", "[lightning]")
+TEMPLATE_TEST_CASE("PauliY Gate tests num_qubits=1", "[GateSet]", LightningSimulator, LightningKokkosSimulator)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 1;
@@ -137,9 +134,9 @@ TEST_CASE("PauliY Gate tests num_qubits=1", "[lightning]")
     CHECK(out_state.at(1) == std::complex<double>{0, 1});
 }
 
-TEST_CASE("PauliY Gate tests num_qubits=2", "[lightning]")
+TEMPLATE_TEST_CASE("PauliY Gate tests num_qubits=2", "[GateSet]", LightningSimulator, LightningKokkosSimulator)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 2;
@@ -161,9 +158,9 @@ TEST_CASE("PauliY Gate tests num_qubits=2", "[lightning]")
     CHECK(out_state.at(3) == std::complex<double>{-1, 0});
 }
 
-TEST_CASE("PauliZ Gate tests num_qubits=2", "[lightning]")
+TEMPLATE_TEST_CASE("PauliZ Gate tests num_qubits=2", "[GateSet]", LightningSimulator, LightningKokkosSimulator)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 2;
@@ -185,9 +182,9 @@ TEST_CASE("PauliZ Gate tests num_qubits=2", "[lightning]")
     CHECK(out_state.at(3) == std::complex<double>{0, 0});
 }
 
-TEST_CASE("Hadamard Gate tests num_qubits=2", "[lightning]")
+TEMPLATE_TEST_CASE("Hadamard Gate tests num_qubits=2", "[GateSet]", LightningSimulator, LightningKokkosSimulator)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 2;
@@ -210,9 +207,9 @@ TEST_CASE("Hadamard Gate tests num_qubits=2", "[lightning]")
     CHECK(out_state.at(3) == out_state.at(0));
 }
 
-TEST_CASE("Hadamard Gate tests num_qubits=3", "[lightning]")
+TEMPLATE_TEST_CASE("Hadamard Gate tests num_qubits=3", "[GateSet]", LightningSimulator, LightningKokkosSimulator)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 2;
@@ -235,9 +232,9 @@ TEST_CASE("Hadamard Gate tests num_qubits=3", "[lightning]")
     CHECK(out_state.at(3) == out_state.at(0));
 }
 
-TEST_CASE("MIX Gate test R(X,Y,Z) num_qubits=1,4", "[lightning]")
+TEMPLATE_TEST_CASE("MIX Gate test R(X,Y,Z) num_qubits=1,4", "[GateSet]", LightningSimulator, LightningKokkosSimulator)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubit = n
     constexpr size_t n = 4;
@@ -281,9 +278,9 @@ TEST_CASE("MIX Gate test R(X,Y,Z) num_qubits=1,4", "[lightning]")
     CHECK(out_state.at(15) == std::complex<double>{0, 0});
 }
 
-TEST_CASE("test PhaseShift num_qubits=2", "[lightning]")
+TEMPLATE_TEST_CASE("test PhaseShift num_qubits=2", "[GateSet]", LightningSimulator, LightningKokkosSimulator)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubit = n
     constexpr size_t n = 2;
@@ -314,9 +311,9 @@ TEST_CASE("test PhaseShift num_qubits=2", "[lightning]")
 }
 
 // 2-qubit operations
-TEST_CASE("CNOT Gate tests num_qubits=2 [0,1]", "[lightning]")
+TEMPLATE_TEST_CASE("CNOT Gate tests num_qubits=2 [0,1]", "[GateSet]", LightningSimulator, LightningKokkosSimulator)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 2;
@@ -338,9 +335,9 @@ TEST_CASE("CNOT Gate tests num_qubits=2 [0,1]", "[lightning]")
     CHECK(out_state.at(3) == std::complex<double>{1, 0});
 }
 
-TEST_CASE("CNOT Gate tests num_qubits=2 [1,0]", "[lightning]")
+TEMPLATE_TEST_CASE("CNOT Gate tests num_qubits=2 [1,0]", "[GateSet]", LightningSimulator, LightningKokkosSimulator)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 2;
@@ -362,9 +359,9 @@ TEST_CASE("CNOT Gate tests num_qubits=2 [1,0]", "[lightning]")
     CHECK(out_state.at(3) == std::complex<double>{0, 0});
 }
 
-TEST_CASE("MIX Gate test CR(X, Y, Z) num_qubits=1,4", "[lightning]")
+TEMPLATE_TEST_CASE("MIX Gate test CR(X, Y, Z) num_qubits=1,4", "[GateSet]", LightningSimulator, LightningKokkosSimulator)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubit = n
     constexpr size_t n = 4;
@@ -405,9 +402,9 @@ TEST_CASE("MIX Gate test CR(X, Y, Z) num_qubits=1,4", "[lightning]")
     CHECK(out_state.at(15) == std::complex<double>{0, 0});
 }
 
-TEST_CASE("CRot", "[lightning]")
+TEMPLATE_TEST_CASE("CRot", "[GateSet]", LightningSimulator, LightningKokkosSimulator)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 2;
@@ -432,9 +429,9 @@ TEST_CASE("CRot", "[lightning]")
     CHECK(out_state[3].imag() == Approx(-0.4844562109).epsilon(1e-5));
 }
 
-TEST_CASE("CSWAP test", "[lightning]")
+TEMPLATE_TEST_CASE("CSWAP test", "[GateSet]", LightningSimulator, LightningKokkosSimulator)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 3;
@@ -454,9 +451,9 @@ TEST_CASE("CSWAP test", "[lightning]")
     CHECK(out_state[5].imag() == Approx(0).epsilon(1e-5));
 }
 
-TEST_CASE("IsingXY Gate tests num_qubits=2 [1,0]", "[lightning]")
+TEMPLATE_TEST_CASE("IsingXY Gate tests num_qubits=2 [1,0]", "[GateSet]", LightningSimulator, LightningKokkosSimulator)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 2;
@@ -484,9 +481,9 @@ TEST_CASE("IsingXY Gate tests num_qubits=2 [1,0]", "[lightning]")
     CHECK(out_state[3].imag() == Approx(0).epsilon(1e-5));
 }
 
-TEST_CASE("Toffoli test", "[lightning]")
+TEMPLATE_TEST_CASE("Toffoli test", "[GateSet]", LightningSimulator, LightningKokkosSimulator)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 3;
@@ -515,9 +512,9 @@ TEST_CASE("Toffoli test", "[lightning]")
     CHECK(out_state[7].imag() == Approx(0).epsilon(1e-5));
 }
 
-TEST_CASE("MultiRZ test", "[lightning]")
+TEMPLATE_TEST_CASE("MultiRZ test", "[GateSet]", LightningSimulator, LightningKokkosSimulator)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 2;
@@ -540,9 +537,9 @@ TEST_CASE("MultiRZ test", "[lightning]")
     CHECK(out_state[2].imag() == Approx(0).epsilon(1e-5));
 }
 
-TEST_CASE("MatrixOperation test with 2-qubit", "[lightning]")
+TEMPLATE_TEST_CASE("MatrixOperation test with 2-qubit", "[GateSet]", LightningSimulator, LightningKokkosSimulator)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 2;
@@ -580,9 +577,9 @@ TEST_CASE("MatrixOperation test with 2-qubit", "[lightning]")
     CHECK(out_state[3].imag() == Approx(-0.187075).epsilon(1e-5));
 }
 
-TEST_CASE("MatrixOperation test with 3-qubit", "[lightning]")
+TEMPLATE_TEST_CASE("MatrixOperation test with 3-qubit", "[GateSet]", LightningSimulator, LightningKokkosSimulator)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 3;
@@ -621,19 +618,13 @@ TEST_CASE("MatrixOperation test with 3-qubit", "[lightning]")
     CHECK(out_state[6].imag() == Approx(0.162104).epsilon(1e-5));
 }
 
-TEST_CASE("MatrixOperation test with 4-qubit", "[lightning]")
+TEMPLATE_TEST_CASE("MatrixOperation test with 4-qubit", "[GateSet]", LightningSimulator)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubit = n
     constexpr size_t n = 4;
-    std::vector<QubitIdType> Qs;
-    Qs.reserve(n);
-
-    Qs[0] = sim->AllocateQubit();
-    Qs[1] = sim->AllocateQubit();
-    Qs[2] = sim->AllocateQubit();
-    Qs[3] = sim->AllocateQubit();
+    std::vector<QubitIdType> Qs = sim->AllocateQubits(n);
 
     sim->NamedOperation("Hadamard", {}, {Qs[0]}, false);
     sim->NamedOperation("CRX", {0.123}, {Qs[0], Qs[1]}, false);

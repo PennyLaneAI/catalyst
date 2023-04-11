@@ -14,16 +14,13 @@
 
 #include "TestHelpers.hpp"
 
+#include "Utils.hpp"
 #include "CacheManager.hpp"
-#include "LightningUtils.hpp"
 #include "QuantumDevice.hpp"
 #include "RuntimeCAPI.h"
 
-#if defined(_KOKKOS)
-#include "LightningKokkosSimulator.hpp"
-#else
 #include "LightningSimulator.hpp"
-#endif
+#include "LightningKokkosSimulator.hpp"
 
 #include <catch2/catch.hpp>
 
@@ -61,15 +58,9 @@ TEST_CASE("Test addOperations with a naive example", "[CacheManager]")
     CHECK(cm.getNumObservables() == 0);
 }
 
-TEST_CASE("Test a LightningSimulator circuit with num_qubits=2 ", "[CacheManager]")
+TEMPLATE_TEST_CASE("Test a LightningSimulator circuit with num_qubits=2 ", "[CacheManager]", LightningSimulator, LightningKokkosSimulator)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
-
-#if defined(_KOKKOS)
-    LightningKokkosSimulator *qis = dynamic_cast<LightningKokkosSimulator *>(sim.get());
-#else
-    LightningSimulator *qis = dynamic_cast<LightningSimulator *>(sim.get());
-#endif
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 2;
@@ -84,22 +75,17 @@ TEST_CASE("Test a LightningSimulator circuit with num_qubits=2 ", "[CacheManager
     sim->NamedOperation("PauliX", {}, {Qs[0]}, false);
     sim->NamedOperation("CNOT", {}, {Qs[0], Qs[1]}, false);
 
-    auto &&[num_ops, num_obs, num_params, op_names, _] = qis->CacheManagerInfo();
+    auto &&[num_ops, num_obs, num_params, op_names, _] = sim->CacheManagerInfo();
     CHECK((num_ops == 2 && num_obs == 0));
     CHECK(num_params == 0);
     CHECK(op_names[0] == "PauliX");
     CHECK(op_names[1] == "CNOT");
 }
 
-TEST_CASE("Test a LightningSimulator circuit with num_qubits=4", "[CacheManager]")
+TEMPLATE_TEST_CASE("Test a LightningSimulator circuit with num_qubits=4", "[CacheManager]", LightningSimulator, LightningKokkosSimulator)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
-#if defined(_KOKKOS)
-    LightningKokkosSimulator *qis = dynamic_cast<LightningKokkosSimulator *>(sim.get());
-#else
-    LightningSimulator *qis = dynamic_cast<LightningSimulator *>(sim.get());
-#endif
-
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
+ 
     // state-vector with #qubit = n
     constexpr size_t n = 4;
     std::vector<QubitIdType> Qs;
@@ -119,7 +105,7 @@ TEST_CASE("Test a LightningSimulator circuit with num_qubits=4", "[CacheManager]
     sim->NamedOperation("CRZ", {0.789}, {Qs[0], Qs[3]}, false);
     sim->StopTapeRecording();
 
-    auto &&[num_ops, num_obs, num_params, op_names, _] = qis->CacheManagerInfo();
+    auto &&[num_ops, num_obs, num_params, op_names, _] = sim->CacheManagerInfo();
     CHECK((num_ops == 4 && num_obs == 0));
     CHECK(num_params == 3);
     CHECK(op_names[0] == "Hadamard");
@@ -130,8 +116,18 @@ TEST_CASE("Test a LightningSimulator circuit with num_qubits=4", "[CacheManager]
 
 TEST_CASE("Test __quantum__qis__ circuit with observables", "[CacheManager]")
 {
-    // initialize the simulator
-    __quantum__rt__device(nullptr, nullptr);
+    char dev[8] = "backend";
+
+    SECTION("lightning.qubit") {
+        char dev_value[17] = "lightning.qubit";
+        __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
+    }
+
+    SECTION("lightning.kokkos") {
+        char dev_value[17] = "lightning.kokkos";
+        __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
+    }
+
     __quantum__rt__initialize();
 
     QUBIT *target = __quantum__rt__qubit_allocate();              // id = 0
@@ -176,8 +172,18 @@ TEST_CASE("Test __quantum__qis__ circuit with observables", "[CacheManager]")
 TEST_CASE("Test __quantum__qis__ circuit with observables using deactiveCacheManager",
           "[CacheManager]")
 {
-    // initialize the simulator
-    __quantum__rt__device(nullptr, nullptr);
+    char dev[8] = "backend";
+
+    SECTION("lightning.qubit") {
+        char dev_value[17] = "lightning.qubit";
+        __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
+    }
+
+    SECTION("lightning.kokkos") {
+        char dev_value[17] = "lightning.kokkos";
+        __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
+    }
+
     __quantum__rt__initialize();
 
     QUBIT *target = __quantum__rt__qubit_allocate();              // id = 0
@@ -224,15 +230,10 @@ TEST_CASE("Test __quantum__qis__ circuit with observables using deactiveCacheMan
     delete[] buffer;
 }
 
-TEST_CASE("Test a LightningSimulator circuit with num_qubits=4 and observables", "[CacheManager]")
+TEMPLATE_TEST_CASE("Test a LightningSimulator circuit with num_qubits=4 and observables", "[CacheManager]", LightningSimulator, LightningKokkosSimulator)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
-#if defined(_KOKKOS)
-    LightningKokkosSimulator *qis = dynamic_cast<LightningKokkosSimulator *>(sim.get());
-#else
-    LightningSimulator *qis = dynamic_cast<LightningSimulator *>(sim.get());
-#endif
-
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
+ 
     // state-vector with #qubits = n
     constexpr size_t n = 4;
     std::vector<QubitIdType> Qs;
@@ -249,17 +250,14 @@ TEST_CASE("Test a LightningSimulator circuit with num_qubits=4 and observables",
 
     ObsIdType pz = sim->Observable(ObsId::PauliZ, {}, {Qs[0]});
 
-#if !defined(_KOKKOS)
     ObsIdType px = sim->Observable(ObsId::PauliX, {}, {Qs[1]});
     ObsIdType h = sim->Observable(ObsId::Hadamard, {}, {Qs[0]});
 
-    sim->Var(px); // Kokkos doesn't support Variance
-    sim->Var(h);  // Kokkos doesn't support Variance
-#endif
-
+    sim->Var(h);
+    sim->Var(px);
     sim->Expval(pz);
 
-    auto &&[num_ops, num_obs, num_params, op_names, obs_keys] = qis->CacheManagerInfo();
+    auto &&[num_ops, num_obs, num_params, op_names, obs_keys] = sim->CacheManagerInfo();
     CHECK(num_ops == 4);
     CHECK(num_params == 0);
     CHECK(op_names[0] == "PauliX");
@@ -267,13 +265,8 @@ TEST_CASE("Test a LightningSimulator circuit with num_qubits=4 and observables",
     CHECK(op_names[2] == "Hadamard");
     CHECK(op_names[3] == "PauliZ");
 
-#if defined(_KOKKOS)
-    CHECK(num_obs == 1);
-    CHECK(obs_keys[0] == pz);
-#else
     CHECK(num_obs == 3);
     CHECK(obs_keys[0] == h);
     CHECK(obs_keys[1] == px);
     CHECK(obs_keys[2] == pz);
-#endif
 }

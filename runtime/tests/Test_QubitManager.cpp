@@ -16,7 +16,7 @@
 
 #include "RuntimeCAPI.h"
 
-#include "LightningUtils.hpp"
+#include "Utils.hpp"
 #include "QuantumDevice.hpp"
 #include "QubitManager.hpp"
 

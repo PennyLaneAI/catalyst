@@ -94,16 +94,12 @@ void __quantum__rt__device(int8_t *spec, int8_t *value)
         Catalyst::Runtime::CAPI::DRIVER = std::make_unique<Catalyst::Runtime::CAPI::Driver>();
     }
 
-    // TODO: after removing the default device in Driver...
     if (!spec || !value) {
-        return;
+        __quantum__rt__fail_cstr("Invalid device specification");
     }
 
     const std::vector<std::string_view> args{reinterpret_cast<char *>(spec),
                                              reinterpret_cast<char *>(value)};
-
-    // TODO: debugging print
-    std::cerr << args[0] << " = " << args[1] << std::endl;
 
     if (args[0] == "backend") {
         Catalyst::Runtime::CAPI::DRIVER->set_device_name(args[1]);

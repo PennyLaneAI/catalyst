@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "LightningUtils.hpp"
+#include "Utils.hpp"
 #include "QuantumDevice.hpp"
 #include "RuntimeCAPI.h"
 
@@ -22,7 +22,18 @@ using namespace Catalyst::Runtime;
 
 TEST_CASE("Test __quantum__qis__Gradient with numAlloc=0", "[Gradient]")
 {
-    __quantum__rt__device(nullptr, nullptr);
+    char dev[8] = "backend";
+
+    SECTION("lightning.qubit") {
+        char dev_value[17] = "lightning.qubit";
+        __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
+    }
+
+    SECTION("lightning.kokkos") {
+        char dev_value[17] = "lightning.kokkos";
+        __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
+    }
+
     __quantum__rt__initialize();
 
     REQUIRE_NOTHROW(__quantum__qis__Gradient(0, nullptr));
@@ -32,7 +43,18 @@ TEST_CASE("Test __quantum__qis__Gradient with numAlloc=0", "[Gradient]")
 
 TEST_CASE("Test __quantum__qis__Gradient_params with numAlloc=0", "[Gradient]")
 {
-    __quantum__rt__device(nullptr, nullptr);
+    char dev[8] = "backend";
+
+    SECTION("lightning.qubit") {
+        char dev_value[17] = "lightning.qubit";
+        __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
+    }
+
+    SECTION("lightning.kokkos") {
+        char dev_value[17] = "lightning.kokkos";
+        __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
+    }
+
     __quantum__rt__initialize();
 
     REQUIRE_THROWS_WITH(__quantum__qis__Gradient_params(nullptr, 0, nullptr),
@@ -43,7 +65,6 @@ TEST_CASE("Test __quantum__qis__Gradient_params with numAlloc=0", "[Gradient]")
 
 TEST_CASE("Test __quantum__qis__Gradient_params for zero number of obs", "[Gradient]")
 {
-    // Test qis__Gradient:
     std::vector<int64_t> trainParams{0};
     size_t J = 1;
     double *buffer = new double[J];
@@ -51,7 +72,18 @@ TEST_CASE("Test __quantum__qis__Gradient_params for zero number of obs", "[Gradi
     int64_t *buffer_tp = trainParams.data();
     MemRefT_int64_1d tp = {buffer_tp, buffer_tp, 0, {trainParams.size()}, {1}};
 
-    __quantum__rt__device(nullptr, nullptr);
+    char dev[8] = "backend";
+
+    SECTION("lightning.qubit") {
+        char dev_value[17] = "lightning.qubit";
+        __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
+    }
+
+    SECTION("lightning.kokkos") {
+        char dev_value[17] = "lightning.kokkos";
+        __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
+    }
+
     __quantum__rt__initialize();
 
     QUBIT *q = __quantum__rt__qubit_allocate();
@@ -73,7 +105,6 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
           "with invalid results",
           "[Gradient]")
 {
-    // Test qis__Gradient:
     std::vector<int64_t> trainParams{0};
     size_t J = 1;
     double *buffer = new double[J];
@@ -81,7 +112,18 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     int64_t *buffer_tp = trainParams.data();
     MemRefT_int64_1d tp = {buffer_tp, buffer_tp, 0, {trainParams.size()}, {0}};
 
-    __quantum__rt__device(nullptr, nullptr);
+    char dev[8] = "backend";
+
+    SECTION("lightning.qubit") {
+        char dev_value[17] = "lightning.qubit";
+        __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
+    }
+
+    SECTION("lightning.kokkos") {
+        char dev_value[17] = "lightning.kokkos";
+        __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
+    }
+
     __quantum__rt__initialize();
 
     QUBIT *q = __quantum__rt__qubit_allocate();
@@ -110,7 +152,6 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
           "with Var",
           "[Gradient]")
 {
-    // Test qis__Gradient:
     std::vector<int64_t> trainParams{0};
     size_t J = 1;
     double *buffer = new double[J];
@@ -118,7 +159,18 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     int64_t *buffer_tp = trainParams.data();
     MemRefT_int64_1d tp = {buffer_tp, buffer_tp, 0, {trainParams.size()}, {1}};
 
-    __quantum__rt__device(nullptr, nullptr);
+    char dev[8] = "backend";
+
+    SECTION("lightning.qubit") {
+        char dev_value[17] = "lightning.qubit";
+        __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
+    }
+
+    SECTION("lightning.kokkos") {
+        char dev_value[17] = "lightning.kokkos";
+        __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
+    }
+
     __quantum__rt__initialize();
 
     QUBIT *q = __quantum__rt__qubit_allocate();
@@ -147,7 +199,6 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
           "Op=RX, Obs=Z",
           "[Gradient]")
 {
-    // Test qis__Gradient:
     std::vector<int64_t> trainParams{0};
     size_t J = trainParams.size();
     double *buffer = new double[J];
@@ -157,7 +208,18 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     int64_t *buffer_memref = trainParams.data();
     MemRefT_int64_1d tp_memref = {buffer_memref, buffer_memref, 0, {trainParams.size()}, {1}};
 
-    __quantum__rt__device(nullptr, nullptr);
+    char dev[8] = "backend";
+
+    SECTION("lightning.qubit") {
+        char dev_value[17] = "lightning.qubit";
+        __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
+    }
+
+    SECTION("lightning.kokkos") {
+        char dev_value[17] = "lightning.kokkos";
+        __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
+    }
+
     __quantum__rt__initialize();
 
     QUBIT *q = __quantum__rt__qubit_allocate();
@@ -189,7 +251,6 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
           "Op=RX, Obs=Hermitian",
           "[Gradient]")
 {
-    // Test qis__Gradient:
     std::vector<int64_t> trainParams{0};
     size_t J = trainParams.size();
     double *buffer = new double[J];
@@ -199,7 +260,18 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     int64_t *buffer_tp_memref = trainParams.data();
     MemRefT_int64_1d tp_memref = {buffer_tp_memref, buffer_tp_memref, 0, {trainParams.size()}, {1}};
 
-    __quantum__rt__device(nullptr, nullptr);
+    char dev[8] = "backend";
+
+    SECTION("lightning.qubit") {
+        char dev_value[17] = "lightning.qubit";
+        __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
+    }
+
+    SECTION("lightning.kokkos") {
+        char dev_value[17] = "lightning.kokkos";
+        __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
+    }
+
     __quantum__rt__initialize();
 
     QUBIT *q = __quantum__rt__qubit_allocate();
@@ -239,7 +311,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
 }
 
 TEST_CASE("Test __quantum__qis__Gradient_params and __quantum__qis__Gradient "
-          "Op=RY, Obs=X",
+          "Op=RY, Obs=X [lightning.qubit]",
           "[Gradient]")
 {
     const std::vector<double> param{-M_PI / 7, M_PI / 5, 2 * M_PI / 3};
@@ -254,9 +326,58 @@ TEST_CASE("Test __quantum__qis__Gradient_params and __quantum__qis__Gradient "
     MemRefT_int64_1d tp_memref = {buffer_tp_memref, buffer_tp_memref, 0, {trainParams.size()}, {1}};
 
     for (const auto &p : param) {
-        // Test qis__Gradient:
+        char dev[8] = "backend";
+        char dev_value[17] = "lightning.qubit";
+        __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
 
-        __quantum__rt__device(nullptr, nullptr);
+        __quantum__rt__initialize();
+
+        QUBIT *q = __quantum__rt__qubit_allocate();
+
+        __quantum__rt__toggle_recorder(/* activate_cm */ true);
+
+        __quantum__qis__RY(p, q);
+
+        auto obs_idx_0 = __quantum__qis__NamedObs(ObsId::PauliX, q);
+
+        __quantum__qis__Expval(obs_idx_0);
+
+        __quantum__qis__Gradient_params(&tp_memref, 1, &result_tp);
+
+        __quantum__qis__Gradient(1, &result);
+
+        __quantum__rt__toggle_recorder(/* activate_cm */ false);
+
+        CHECK(cos(p) == Approx(result_tp.data_aligned[0]).margin(1e-5));
+        CHECK(cos(p) == Approx(result.data_aligned[0]).margin(1e-5));
+
+        __quantum__rt__finalize();
+    }
+
+    delete[] buffer;
+    delete[] buffer_tp;
+}
+
+TEST_CASE("Test __quantum__qis__Gradient_params and __quantum__qis__Gradient "
+          "Op=RY, Obs=X [lightning.kokkos]",
+          "[Gradient]")
+{
+    const std::vector<double> param{-M_PI / 7, M_PI / 5, 2 * M_PI / 3};
+
+    std::vector<int64_t> trainParams{0};
+    size_t J = trainParams.size();
+    double *buffer = new double[J];
+    MemRefT_double_1d result = {buffer, buffer, 0, {J}, {1}};
+    double *buffer_tp = new double[J];
+    MemRefT_double_1d result_tp = {buffer_tp, buffer_tp, 0, {J}, {1}};
+    int64_t *buffer_tp_memref = trainParams.data();
+    MemRefT_int64_1d tp_memref = {buffer_tp_memref, buffer_tp_memref, 0, {trainParams.size()}, {1}};
+
+    for (const auto &p : param) {
+        char dev[8] = "backend";
+        char dev_value[17] = "lightning.kokkos";
+        __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
+
         __quantum__rt__initialize();
 
         QUBIT *q = __quantum__rt__qubit_allocate();
@@ -296,7 +417,6 @@ TEST_CASE("Test __quantum__qis__Gradient_params Op=[Hadamard,RZ,RY,RZ,S,T,ParamS
         -0.0008403297,
     };
 
-    // Test qis__Gradient:
     std::vector<int64_t> trainParams{0, 1, 2};
     size_t J = trainParams.size();
     double *buffer = new double[J];
@@ -306,7 +426,18 @@ TEST_CASE("Test __quantum__qis__Gradient_params Op=[Hadamard,RZ,RY,RZ,S,T,ParamS
     int64_t *buffer_tp_memref = trainParams.data();
     MemRefT_int64_1d tp_memref = {buffer_tp_memref, buffer_tp_memref, 0, {trainParams.size()}, {1}};
 
-    __quantum__rt__device(nullptr, nullptr);
+    char dev[8] = "backend";
+
+    SECTION("lightning.qubit") {
+        char dev_value[17] = "lightning.qubit";
+        __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
+    }
+
+    SECTION("lightning.kokkos") {
+        char dev_value[17] = "lightning.kokkos";
+        __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
+    }
+
     __quantum__rt__initialize();
 
     QUBIT *q0 = __quantum__rt__qubit_allocate();
@@ -347,7 +478,6 @@ TEST_CASE("Test __quantum__qis__Gradient_params Op=[Hadamard,RZ,RY,RZ,S,T,ParamS
 
 TEST_CASE("Test __quantum__qis__Gradient Op=[RX,CY], Obs=[Z,Z]", "[Gradient]")
 {
-    // Test qis__Gradient:
     std::vector<int64_t> trainParams{0};
     const std::vector<double> expected{-sin(-M_PI / 7), 0.4338837391};
     size_t J = trainParams.size();
@@ -356,7 +486,18 @@ TEST_CASE("Test __quantum__qis__Gradient Op=[RX,CY], Obs=[Z,Z]", "[Gradient]")
     double *buffer1 = new double[J];
     MemRefT_double_1d result1 = {buffer1, buffer1, 0, {J}, {1}};
 
-    __quantum__rt__device(nullptr, nullptr);
+    char dev[8] = "backend";
+
+    SECTION("lightning.qubit") {
+        char dev_value[17] = "lightning.qubit";
+        __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
+    }
+
+    SECTION("lightning.kokkos") {
+        char dev_value[17] = "lightning.kokkos";
+        __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
+    }
+
     __quantum__rt__initialize();
 
     QUBIT *q0 = __quantum__rt__qubit_allocate();
@@ -390,7 +531,6 @@ TEST_CASE("Test __quantum__qis__Gradient_params Op=[RX,RX,RX,CZ], Obs=[Z,Z,Z]", 
     const std::vector<double> param{-M_PI / 7, M_PI / 5, 2 * M_PI / 3};
     const std::vector<double> expected{-sin(param[0]), -sin(param[1]), -sin(param[2])};
 
-    // Test qis__Gradient:
     std::vector<int64_t> trainParams{0, 1, 2};
     size_t J = trainParams.size();
     double *buffer0 = new double[J];
@@ -402,7 +542,18 @@ TEST_CASE("Test __quantum__qis__Gradient_params Op=[RX,RX,RX,CZ], Obs=[Z,Z,Z]", 
     int64_t *buffer_tp_memref = trainParams.data();
     MemRefT_int64_1d tp_memref = {buffer_tp_memref, buffer_tp_memref, 0, {trainParams.size()}, {1}};
 
-    __quantum__rt__device(nullptr, nullptr);
+    char dev[8] = "backend";
+
+    SECTION("lightning.qubit") {
+        char dev_value[17] = "lightning.qubit";
+        __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
+    }
+
+    SECTION("lightning.kokkos") {
+        char dev_value[17] = "lightning.kokkos";
+        __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
+    }
+
     __quantum__rt__initialize();
 
     QUBIT *q0 = __quantum__rt__qubit_allocate();
@@ -446,7 +597,6 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     const std::vector<double> expected{0.0,         -0.6742144271, 0.275139672,
                                        0.275139672, -0.0129093062, 0.3238461564};
 
-    // Test qis__Gradient:
     std::vector<int64_t> trainParams{0, 1, 2, 3, 4, 5};
     size_t J = trainParams.size();
     double *buffer = new double[J];
@@ -456,7 +606,18 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     int64_t *buffer_tp_memref = trainParams.data();
     MemRefT_int64_1d tp_memref = {buffer_tp_memref, buffer_tp_memref, 0, {trainParams.size()}, {1}};
 
-    __quantum__rt__device(nullptr, nullptr);
+    char dev[8] = "backend";
+
+    SECTION("lightning.qubit") {
+        char dev_value[17] = "lightning.qubit";
+        __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
+    }
+
+    SECTION("lightning.kokkos") {
+        char dev_value[17] = "lightning.kokkos";
+        __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
+    }
+
     __quantum__rt__initialize();
 
     QUBIT *q0 = __quantum__rt__qubit_allocate();
@@ -513,7 +674,6 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     const std::vector<double> param{-M_PI / 7, M_PI / 5, 2 * M_PI / 3};
     const std::vector<double> expected{0.0, -0.414506421, 0.0, 0.0, -0.4643270456, 0.0210905264};
 
-    // Test qis__Gradient:
     std::vector<int64_t> trainParams{0, 1, 2, 3, 4, 5};
     size_t J = 8;
     double *buffer = new double[J];
@@ -524,7 +684,18 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     int64_t *buffer_tp_memref = trainParams.data();
     MemRefT_int64_1d tp_memref = {buffer_tp_memref, buffer_tp_memref, 0, {trainParams.size()}, {0}};
 
-    __quantum__rt__device(nullptr, nullptr);
+    char dev[8] = "backend";
+
+    SECTION("lightning.qubit") {
+        char dev_value[17] = "lightning.qubit";
+        __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
+    }
+
+    SECTION("lightning.kokkos") {
+        char dev_value[17] = "lightning.kokkos";
+        __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
+    }
+
     __quantum__rt__initialize();
 
     QUBIT *q0 = __quantum__rt__qubit_allocate();
@@ -584,7 +755,6 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     const std::vector<double> param{-M_PI / 7, M_PI / 5, 2 * M_PI / 3};
     const std::vector<double> expected{0.0, -0.2493761627, 0.0, 0.0, -0.1175570505, 0.0};
 
-    // Test qis__Gradient:
     std::vector<int64_t> trainParams{0, 1, 2, 3, 4, 5};
     size_t J = trainParams.size();
     double *buffer = new double[J];
@@ -594,7 +764,18 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     int64_t *buffer_tp_memref = trainParams.data();
     MemRefT_int64_1d tp_memref = {buffer_tp_memref, buffer_tp_memref, 0, {trainParams.size()}, {1}};
 
-    __quantum__rt__device(nullptr, nullptr);
+    char dev[8] = "backend";
+
+    SECTION("lightning.qubit") {
+        char dev_value[17] = "lightning.qubit";
+        __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
+    }
+
+    SECTION("lightning.kokkos") {
+        char dev_value[17] = "lightning.kokkos";
+        __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
+    }
+
     __quantum__rt__initialize();
 
     QUBIT *q0 = __quantum__rt__qubit_allocate();
@@ -652,7 +833,6 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
           "for a nontrivial qubits map in the qubit-manager Op=RX, Obs=Hermitian",
           "[Gradient]")
 {
-    // Test qis__Gradient:
     std::vector<int64_t> trainParams{0};
     size_t J = trainParams.size();
     double *buffer = new double[J];
@@ -662,7 +842,18 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     int64_t *buffer_tp_memref = trainParams.data();
     MemRefT_int64_1d tp_memref = {buffer_tp_memref, buffer_tp_memref, 0, {1}, {1}};
 
-    __quantum__rt__device(nullptr, nullptr);
+    char dev[8] = "backend";
+
+    SECTION("lightning.qubit") {
+        char dev_value[17] = "lightning.qubit";
+        __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
+    }
+
+    SECTION("lightning.kokkos") {
+        char dev_value[17] = "lightning.kokkos";
+        __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
+    }
+
     __quantum__rt__initialize();
 
     QirArray *qubit_arr = __quantum__rt__qubit_allocate_array(2);
