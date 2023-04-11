@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "Utils.hpp"
 #include "QuantumDevice.hpp"
 #include "RuntimeCAPI.h"
+#include "Utils.hpp"
 
 #include <catch2/catch.hpp>
 
@@ -24,12 +24,14 @@ TEST_CASE("Test __quantum__qis__Gradient with numAlloc=0", "[Gradient]")
 {
     char dev[8] = "backend";
 
-    SECTION("lightning.qubit") {
+    SECTION("lightning.qubit")
+    {
         char dev_value[17] = "lightning.qubit";
         __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
     }
 
-    SECTION("lightning.kokkos") {
+    SECTION("lightning.kokkos")
+    {
         char dev_value[17] = "lightning.kokkos";
         __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
     }
@@ -45,12 +47,14 @@ TEST_CASE("Test __quantum__qis__Gradient_params with numAlloc=0", "[Gradient]")
 {
     char dev[8] = "backend";
 
-    SECTION("lightning.qubit") {
+    SECTION("lightning.qubit")
+    {
         char dev_value[17] = "lightning.qubit";
         __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
     }
 
-    SECTION("lightning.kokkos") {
+    SECTION("lightning.kokkos")
+    {
         char dev_value[17] = "lightning.kokkos";
         __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
     }
@@ -74,12 +78,14 @@ TEST_CASE("Test __quantum__qis__Gradient_params for zero number of obs", "[Gradi
 
     char dev[8] = "backend";
 
-    SECTION("lightning.qubit") {
+    SECTION("lightning.qubit")
+    {
         char dev_value[17] = "lightning.qubit";
         __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
     }
 
-    SECTION("lightning.kokkos") {
+    SECTION("lightning.kokkos")
+    {
         char dev_value[17] = "lightning.kokkos";
         __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
     }
@@ -114,12 +120,14 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
 
     char dev[8] = "backend";
 
-    SECTION("lightning.qubit") {
+    SECTION("lightning.qubit")
+    {
         char dev_value[17] = "lightning.qubit";
         __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
     }
 
-    SECTION("lightning.kokkos") {
+    SECTION("lightning.kokkos")
+    {
         char dev_value[17] = "lightning.kokkos";
         __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
     }
@@ -161,12 +169,14 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
 
     char dev[8] = "backend";
 
-    SECTION("lightning.qubit") {
+    SECTION("lightning.qubit")
+    {
         char dev_value[17] = "lightning.qubit";
         __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
     }
 
-    SECTION("lightning.kokkos") {
+    SECTION("lightning.kokkos")
+    {
         char dev_value[17] = "lightning.kokkos";
         __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
     }
@@ -210,12 +220,14 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
 
     char dev[8] = "backend";
 
-    SECTION("lightning.qubit") {
+    SECTION("lightning.qubit")
+    {
         char dev_value[17] = "lightning.qubit";
         __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
     }
 
-    SECTION("lightning.kokkos") {
+    SECTION("lightning.kokkos")
+    {
         char dev_value[17] = "lightning.kokkos";
         __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
     }
@@ -262,12 +274,14 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
 
     char dev[8] = "backend";
 
-    SECTION("lightning.qubit") {
+    SECTION("lightning.qubit")
+    {
         char dev_value[17] = "lightning.qubit";
         __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
     }
 
-    SECTION("lightning.kokkos") {
+    SECTION("lightning.kokkos")
+    {
         char dev_value[17] = "lightning.kokkos";
         __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
     }
@@ -428,12 +442,14 @@ TEST_CASE("Test __quantum__qis__Gradient_params Op=[Hadamard,RZ,RY,RZ,S,T,ParamS
 
     char dev[8] = "backend";
 
-    SECTION("lightning.qubit") {
+    SECTION("lightning.qubit")
+    {
         char dev_value[17] = "lightning.qubit";
         __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
     }
 
-    SECTION("lightning.kokkos") {
+    SECTION("lightning.kokkos")
+    {
         char dev_value[17] = "lightning.kokkos";
         __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
     }
@@ -488,12 +504,14 @@ TEST_CASE("Test __quantum__qis__Gradient Op=[RX,CY], Obs=[Z,Z]", "[Gradient]")
 
     char dev[8] = "backend";
 
-    SECTION("lightning.qubit") {
+    SECTION("lightning.qubit")
+    {
         char dev_value[17] = "lightning.qubit";
         __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
     }
 
-    SECTION("lightning.kokkos") {
+    SECTION("lightning.kokkos")
+    {
         char dev_value[17] = "lightning.kokkos";
         __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
     }
@@ -544,12 +562,14 @@ TEST_CASE("Test __quantum__qis__Gradient_params Op=[RX,RX,RX,CZ], Obs=[Z,Z,Z]", 
 
     char dev[8] = "backend";
 
-    SECTION("lightning.qubit") {
+    SECTION("lightning.qubit")
+    {
         char dev_value[17] = "lightning.qubit";
         __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
     }
 
-    SECTION("lightning.kokkos") {
+    SECTION("lightning.kokkos")
+    {
         char dev_value[17] = "lightning.kokkos";
         __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
     }
@@ -608,12 +628,14 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
 
     char dev[8] = "backend";
 
-    SECTION("lightning.qubit") {
+    SECTION("lightning.qubit")
+    {
         char dev_value[17] = "lightning.qubit";
         __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
     }
 
-    SECTION("lightning.kokkos") {
+    SECTION("lightning.kokkos")
+    {
         char dev_value[17] = "lightning.kokkos";
         __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
     }
@@ -686,12 +708,14 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
 
     char dev[8] = "backend";
 
-    SECTION("lightning.qubit") {
+    SECTION("lightning.qubit")
+    {
         char dev_value[17] = "lightning.qubit";
         __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
     }
 
-    SECTION("lightning.kokkos") {
+    SECTION("lightning.kokkos")
+    {
         char dev_value[17] = "lightning.kokkos";
         __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
     }
@@ -766,12 +790,14 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
 
     char dev[8] = "backend";
 
-    SECTION("lightning.qubit") {
+    SECTION("lightning.qubit")
+    {
         char dev_value[17] = "lightning.qubit";
         __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
     }
 
-    SECTION("lightning.kokkos") {
+    SECTION("lightning.kokkos")
+    {
         char dev_value[17] = "lightning.kokkos";
         __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
     }
@@ -844,12 +870,14 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
 
     char dev[8] = "backend";
 
-    SECTION("lightning.qubit") {
+    SECTION("lightning.qubit")
+    {
         char dev_value[17] = "lightning.qubit";
         __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
     }
 
-    SECTION("lightning.kokkos") {
+    SECTION("lightning.kokkos")
+    {
         char dev_value[17] = "lightning.kokkos";
         __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
     }

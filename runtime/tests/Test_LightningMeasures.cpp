@@ -17,19 +17,20 @@
 #include "RuntimeCAPI.h"
 #include "Types.h"
 
-#include "Utils.hpp"
 #include "CacheManager.hpp"
 #include "QuantumDevice.hpp"
+#include "Utils.hpp"
 
-#include "LightningSimulator.hpp"
 #include "LightningKokkosSimulator.hpp"
+#include "LightningSimulator.hpp"
 
 #include <catch2/catch.hpp>
 
 using namespace Catalyst::Runtime;
 using namespace Catalyst::Runtime::Simulator;
 
-TEMPLATE_TEST_CASE("NameObs test with invalid number of wires", "[Measures]", LightningSimulator, LightningKokkosSimulator)
+TEMPLATE_TEST_CASE("NameObs test with invalid number of wires", "[Measures]", LightningSimulator,
+                   LightningKokkosSimulator)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -37,7 +38,8 @@ TEMPLATE_TEST_CASE("NameObs test with invalid number of wires", "[Measures]", Li
                         Catch::Contains("Invalid number of wires"));
 }
 
-TEMPLATE_TEST_CASE("NameObs test with invalid given wires for NamedObs", "[Measures]", LightningSimulator, LightningKokkosSimulator)
+TEMPLATE_TEST_CASE("NameObs test with invalid given wires for NamedObs", "[Measures]",
+                   LightningSimulator, LightningKokkosSimulator)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -47,7 +49,8 @@ TEMPLATE_TEST_CASE("NameObs test with invalid given wires for NamedObs", "[Measu
                         Catch::Contains("Invalid given wires"));
 }
 
-TEMPLATE_TEST_CASE("HermitianObs test with invalid number of wires", "[Measures]", LightningSimulator, LightningKokkosSimulator)
+TEMPLATE_TEST_CASE("HermitianObs test with invalid number of wires", "[Measures]",
+                   LightningSimulator, LightningKokkosSimulator)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -55,7 +58,8 @@ TEMPLATE_TEST_CASE("HermitianObs test with invalid number of wires", "[Measures]
                         Catch::Contains("Invalid number of wires"));
 }
 
-TEMPLATE_TEST_CASE("HermitianObs test with invalid given wires for HermitianObs", "[Measures]", LightningSimulator, LightningKokkosSimulator)
+TEMPLATE_TEST_CASE("HermitianObs test with invalid given wires for HermitianObs", "[Measures]",
+                   LightningSimulator, LightningKokkosSimulator)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
     sim->AllocateQubit();
@@ -64,14 +68,16 @@ TEMPLATE_TEST_CASE("HermitianObs test with invalid given wires for HermitianObs"
                         Catch::Contains("Invalid given wires"));
 }
 
-TEMPLATE_TEST_CASE("Check an unsupported observable", "[Measures]", LightningSimulator, LightningKokkosSimulator)
+TEMPLATE_TEST_CASE("Check an unsupported observable", "[Measures]", LightningSimulator,
+                   LightningKokkosSimulator)
 {
     REQUIRE_THROWS_WITH(Lightning::lookup_obs<Lightning::simulator_observable_support_size>(
                             Lightning::simulator_observable_support, static_cast<ObsId>(10)),
                         Catch::Contains("The given observable is not supported by the simulator"));
 }
 
-TEMPLATE_TEST_CASE("Measurement collapse test with 2 wires", "[Measures]", LightningSimulator, LightningKokkosSimulator)
+TEMPLATE_TEST_CASE("Measurement collapse test with 2 wires", "[Measures]", LightningSimulator,
+                   LightningKokkosSimulator)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -95,7 +101,8 @@ TEMPLATE_TEST_CASE("Measurement collapse test with 2 wires", "[Measures]", Light
     // LCOV_EXCL_STOP
 }
 
-TEMPLATE_TEST_CASE("Measurement collapse concrete logical qubit difference", "[Measures]", LightningSimulator, LightningKokkosSimulator)
+TEMPLATE_TEST_CASE("Measurement collapse concrete logical qubit difference", "[Measures]",
+                   LightningSimulator, LightningKokkosSimulator)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -122,7 +129,8 @@ TEMPLATE_TEST_CASE("Measurement collapse concrete logical qubit difference", "[M
     // LCOV_EXCL_STOP
 }
 
-TEMPLATE_TEST_CASE("Mid-circuit measurement naive test", "[Measures]", LightningSimulator, LightningKokkosSimulator)
+TEMPLATE_TEST_CASE("Mid-circuit measurement naive test", "[Measures]", LightningSimulator,
+                   LightningKokkosSimulator)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -137,14 +145,16 @@ TEMPLATE_TEST_CASE("Mid-circuit measurement naive test", "[Measures]", Lightning
     CHECK(*m);
 }
 
-TEMPLATE_TEST_CASE("Expval(ObsT) test with invalid key for cached observables", "[Measures]", LightningSimulator, LightningKokkosSimulator)
+TEMPLATE_TEST_CASE("Expval(ObsT) test with invalid key for cached observables", "[Measures]",
+                   LightningSimulator, LightningKokkosSimulator)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     REQUIRE_THROWS_WITH(sim->Expval(0), Catch::Contains("Invalid key for cached observables"));
 }
 
-TEMPLATE_TEST_CASE("Expval(NamedObs) test with numWires=1", "[Measures]", LightningSimulator, LightningKokkosSimulator)
+TEMPLATE_TEST_CASE("Expval(NamedObs) test with numWires=1", "[Measures]", LightningSimulator,
+                   LightningKokkosSimulator)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -170,7 +180,8 @@ TEMPLATE_TEST_CASE("Expval(NamedObs) test with numWires=1", "[Measures]", Lightn
     CHECK(sim->Expval(pz) == Approx(-1.0).margin(1e-5));
 }
 
-TEMPLATE_TEST_CASE("Expval(HermitianObs) test with numWires=1", "[Measures]", LightningSimulator, LightningKokkosSimulator)
+TEMPLATE_TEST_CASE("Expval(HermitianObs) test with numWires=1", "[Measures]", LightningSimulator,
+                   LightningKokkosSimulator)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -195,7 +206,8 @@ TEMPLATE_TEST_CASE("Expval(HermitianObs) test with numWires=1", "[Measures]", Li
     CHECK(sim->Expval(h2) == Approx(.0).margin(1e-5));
 }
 
-TEMPLATE_TEST_CASE("Expval(TensorProd(NamedObs)) test", "[Measures]", LightningSimulator, LightningKokkosSimulator)
+TEMPLATE_TEST_CASE("Expval(TensorProd(NamedObs)) test", "[Measures]", LightningSimulator,
+                   LightningKokkosSimulator)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -224,7 +236,8 @@ TEMPLATE_TEST_CASE("Expval(TensorProd(NamedObs)) test", "[Measures]", LightningS
     CHECK(sim->Expval(tpz) == Approx(-1.0).margin(1e-5));
 }
 
-TEMPLATE_TEST_CASE("Expval(TensorProd(NamedObs[])) test", "[Measures]", LightningSimulator, LightningKokkosSimulator)
+TEMPLATE_TEST_CASE("Expval(TensorProd(NamedObs[])) test", "[Measures]", LightningSimulator,
+                   LightningKokkosSimulator)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -254,7 +267,8 @@ TEMPLATE_TEST_CASE("Expval(TensorProd(NamedObs[])) test", "[Measures]", Lightnin
     CHECK(sim->Expval(tpxz) == Approx(-1.0).margin(1e-5));
 }
 
-TEMPLATE_TEST_CASE("Expval(TensorProd(HermitianObs))", "[Measures]", LightningSimulator, LightningKokkosSimulator)
+TEMPLATE_TEST_CASE("Expval(TensorProd(HermitianObs))", "[Measures]", LightningSimulator,
+                   LightningKokkosSimulator)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -281,7 +295,8 @@ TEMPLATE_TEST_CASE("Expval(TensorProd(HermitianObs))", "[Measures]", LightningSi
     CHECK(sim->Expval(tph2) == Approx(.0).margin(1e-5));
 }
 
-TEMPLATE_TEST_CASE("Expval(TensorProd(HermitianObs[]))", "[Measures]", LightningSimulator, LightningKokkosSimulator)
+TEMPLATE_TEST_CASE("Expval(TensorProd(HermitianObs[]))", "[Measures]", LightningSimulator,
+                   LightningKokkosSimulator)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -306,7 +321,8 @@ TEMPLATE_TEST_CASE("Expval(TensorProd(HermitianObs[]))", "[Measures]", Lightning
     CHECK(sim->Expval(tp) == Approx(.0).margin(1e-5));
 }
 
-TEMPLATE_TEST_CASE("Expval(TensorProd(Obs[]))", "[Measures]", LightningSimulator, LightningKokkosSimulator)
+TEMPLATE_TEST_CASE("Expval(TensorProd(Obs[]))", "[Measures]", LightningSimulator,
+                   LightningKokkosSimulator)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -334,7 +350,8 @@ TEMPLATE_TEST_CASE("Expval(TensorProd(Obs[]))", "[Measures]", LightningSimulator
     CHECK(sim->Expval(tp) == Approx(-3.0).margin(1e-5));
 }
 
-TEMPLATE_TEST_CASE("Expval(Hamiltonian(NamedObs[])) test", "[Measures]", LightningSimulator, LightningKokkosSimulator)
+TEMPLATE_TEST_CASE("Expval(Hamiltonian(NamedObs[])) test", "[Measures]", LightningSimulator,
+                   LightningKokkosSimulator)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -359,7 +376,8 @@ TEMPLATE_TEST_CASE("Expval(Hamiltonian(NamedObs[])) test", "[Measures]", Lightni
     CHECK(sim->Expval(hxyz) == Approx(0.2).margin(1e-5));
 }
 
-TEMPLATE_TEST_CASE("Expval(Hamiltonian(TensorObs[])) test", "[Measures]", LightningSimulator, LightningKokkosSimulator)
+TEMPLATE_TEST_CASE("Expval(Hamiltonian(TensorObs[])) test", "[Measures]", LightningSimulator,
+                   LightningKokkosSimulator)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -386,7 +404,8 @@ TEMPLATE_TEST_CASE("Expval(Hamiltonian(TensorObs[])) test", "[Measures]", Lightn
     CHECK(sim->Expval(hxyz) == Approx(-.6).margin(1e-5));
 }
 
-TEMPLATE_TEST_CASE("Expval(Hamiltonian(Hermitian[])) test", "[Measures]", LightningSimulator, LightningKokkosSimulator)
+TEMPLATE_TEST_CASE("Expval(Hamiltonian(Hermitian[])) test", "[Measures]", LightningSimulator,
+                   LightningKokkosSimulator)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -413,7 +432,8 @@ TEMPLATE_TEST_CASE("Expval(Hamiltonian(Hermitian[])) test", "[Measures]", Lightn
     CHECK(sim->Expval(hxhz) == Approx(0.5).margin(1e-5));
 }
 
-TEMPLATE_TEST_CASE("Expval(Hamiltonian({TensorProd, Hermitian}[])) test", "[Measures]", LightningSimulator, LightningKokkosSimulator)
+TEMPLATE_TEST_CASE("Expval(Hamiltonian({TensorProd, Hermitian}[])) test", "[Measures]",
+                   LightningSimulator, LightningKokkosSimulator)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -441,7 +461,8 @@ TEMPLATE_TEST_CASE("Expval(Hamiltonian({TensorProd, Hermitian}[])) test", "[Meas
     CHECK(sim->Expval(hhtp) == Approx(1.2).margin(1e-5));
 }
 
-TEMPLATE_TEST_CASE("Var(NamedObs) test with numWires=4", "[Measures]", LightningSimulator, LightningKokkosSimulator)
+TEMPLATE_TEST_CASE("Var(NamedObs) test with numWires=4", "[Measures]", LightningSimulator,
+                   LightningKokkosSimulator)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -708,7 +729,8 @@ TEMPLATE_TEST_CASE("Var(Hamiltonian(Hermitian[])) test", "[Measures]", Lightning
     CHECK(sim->Var(hxhz) == Approx(0.36).margin(1e-5));
 }
 
-TEMPLATE_TEST_CASE("Var(Hamiltonian({TensorProd, Hermitian}[])) test", "[Measures]", LightningKokkosSimulator)
+TEMPLATE_TEST_CASE("Var(Hamiltonian({TensorProd, Hermitian}[])) test", "[Measures]",
+                   LightningKokkosSimulator)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -736,7 +758,8 @@ TEMPLATE_TEST_CASE("Var(Hamiltonian({TensorProd, Hermitian}[])) test", "[Measure
     CHECK(sim->Var(hhtp) == Approx(1.0).margin(1e-5));
 }
 
-TEMPLATE_TEST_CASE("State test with numWires=4", "[Measures]", LightningSimulator, LightningKokkosSimulator)
+TEMPLATE_TEST_CASE("State test with numWires=4", "[Measures]", LightningSimulator,
+                   LightningKokkosSimulator)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -763,7 +786,8 @@ TEMPLATE_TEST_CASE("State test with numWires=4", "[Measures]", LightningSimulato
     }
 }
 
-TEMPLATE_TEST_CASE("PartialProbs test with incorrect numWires and numAlloc", "[Measures]", LightningSimulator, LightningKokkosSimulator)
+TEMPLATE_TEST_CASE("PartialProbs test with incorrect numWires and numAlloc", "[Measures]",
+                   LightningSimulator, LightningKokkosSimulator)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -784,7 +808,8 @@ TEMPLATE_TEST_CASE("PartialProbs test with incorrect numWires and numAlloc", "[M
                         Catch::Contains("Invalid given wires to measure"));
 }
 
-TEMPLATE_TEST_CASE("Probs and PartialProbs tests with numWires=0-4", "[Measures]", LightningSimulator, LightningKokkosSimulator)
+TEMPLATE_TEST_CASE("Probs and PartialProbs tests with numWires=0-4", "[Measures]",
+                   LightningSimulator, LightningKokkosSimulator)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -831,7 +856,8 @@ TEMPLATE_TEST_CASE("Probs and PartialProbs tests with numWires=0-4", "[Measures]
     }
 }
 
-TEMPLATE_TEST_CASE("PartialSample test with incorrect numWires and numAlloc", "[Measures]", LightningSimulator, LightningKokkosSimulator)
+TEMPLATE_TEST_CASE("PartialSample test with incorrect numWires and numAlloc", "[Measures]",
+                   LightningSimulator, LightningKokkosSimulator)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -852,7 +878,8 @@ TEMPLATE_TEST_CASE("PartialSample test with incorrect numWires and numAlloc", "[
                         Catch::Contains("Invalid given wires to measure"));
 }
 
-TEMPLATE_TEST_CASE("PartialCounts test with incorrect numWires and numAlloc", "[Measures]", LightningSimulator, LightningKokkosSimulator)
+TEMPLATE_TEST_CASE("PartialCounts test with incorrect numWires and numAlloc", "[Measures]",
+                   LightningSimulator, LightningKokkosSimulator)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -873,7 +900,8 @@ TEMPLATE_TEST_CASE("PartialCounts test with incorrect numWires and numAlloc", "[
                         Catch::Contains("Invalid given wires to measure"));
 }
 
-TEMPLATE_TEST_CASE("Sample and PartialSample tests with numWires=0-4 shots=100", "[Measures]", LightningSimulator, LightningKokkosSimulator)
+TEMPLATE_TEST_CASE("Sample and PartialSample tests with numWires=0-4 shots=100", "[Measures]",
+                   LightningSimulator, LightningKokkosSimulator)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -908,7 +936,8 @@ TEMPLATE_TEST_CASE("Sample and PartialSample tests with numWires=0-4 shots=100",
         CHECK((samples4[i] == 0. || samples4[i] == 1.));
 }
 
-TEMPLATE_TEST_CASE("Counts and PartialCounts tests with numWires=0-4 shots=100", "[Measures]", LightningSimulator, LightningKokkosSimulator)
+TEMPLATE_TEST_CASE("Counts and PartialCounts tests with numWires=0-4 shots=100", "[Measures]",
+                   LightningSimulator, LightningKokkosSimulator)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 

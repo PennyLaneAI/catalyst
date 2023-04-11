@@ -16,9 +16,9 @@
 
 #include "RuntimeCAPI.h"
 
-#include "Utils.hpp"
 #include "QuantumDevice.hpp"
 #include "QubitManager.hpp"
+#include "Utils.hpp"
 
 #include <catch2/catch.hpp>
 

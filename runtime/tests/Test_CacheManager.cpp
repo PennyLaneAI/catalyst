@@ -14,13 +14,13 @@
 
 #include "TestHelpers.hpp"
 
-#include "Utils.hpp"
 #include "CacheManager.hpp"
 #include "QuantumDevice.hpp"
 #include "RuntimeCAPI.h"
+#include "Utils.hpp"
 
-#include "LightningSimulator.hpp"
 #include "LightningKokkosSimulator.hpp"
+#include "LightningSimulator.hpp"
 
 #include <catch2/catch.hpp>
 
@@ -58,7 +58,8 @@ TEST_CASE("Test addOperations with a naive example", "[CacheManager]")
     CHECK(cm.getNumObservables() == 0);
 }
 
-TEMPLATE_TEST_CASE("Test a LightningSimulator circuit with num_qubits=2 ", "[CacheManager]", LightningSimulator, LightningKokkosSimulator)
+TEMPLATE_TEST_CASE("Test a LightningSimulator circuit with num_qubits=2 ", "[CacheManager]",
+                   LightningSimulator, LightningKokkosSimulator)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -82,10 +83,11 @@ TEMPLATE_TEST_CASE("Test a LightningSimulator circuit with num_qubits=2 ", "[Cac
     CHECK(op_names[1] == "CNOT");
 }
 
-TEMPLATE_TEST_CASE("Test a LightningSimulator circuit with num_qubits=4", "[CacheManager]", LightningSimulator, LightningKokkosSimulator)
+TEMPLATE_TEST_CASE("Test a LightningSimulator circuit with num_qubits=4", "[CacheManager]",
+                   LightningSimulator, LightningKokkosSimulator)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
- 
+
     // state-vector with #qubit = n
     constexpr size_t n = 4;
     std::vector<QubitIdType> Qs;
@@ -118,12 +120,14 @@ TEST_CASE("Test __quantum__qis__ circuit with observables", "[CacheManager]")
 {
     char dev[8] = "backend";
 
-    SECTION("lightning.qubit") {
+    SECTION("lightning.qubit")
+    {
         char dev_value[17] = "lightning.qubit";
         __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
     }
 
-    SECTION("lightning.kokkos") {
+    SECTION("lightning.kokkos")
+    {
         char dev_value[17] = "lightning.kokkos";
         __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
     }
@@ -174,12 +178,14 @@ TEST_CASE("Test __quantum__qis__ circuit with observables using deactiveCacheMan
 {
     char dev[8] = "backend";
 
-    SECTION("lightning.qubit") {
+    SECTION("lightning.qubit")
+    {
         char dev_value[17] = "lightning.qubit";
         __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
     }
 
-    SECTION("lightning.kokkos") {
+    SECTION("lightning.kokkos")
+    {
         char dev_value[17] = "lightning.kokkos";
         __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
     }
@@ -230,10 +236,11 @@ TEST_CASE("Test __quantum__qis__ circuit with observables using deactiveCacheMan
     delete[] buffer;
 }
 
-TEMPLATE_TEST_CASE("Test a LightningSimulator circuit with num_qubits=4 and observables", "[CacheManager]", LightningSimulator, LightningKokkosSimulator)
+TEMPLATE_TEST_CASE("Test a LightningSimulator circuit with num_qubits=4 and observables",
+                   "[CacheManager]", LightningSimulator, LightningKokkosSimulator)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
- 
+
     // state-vector with #qubits = n
     constexpr size_t n = 4;
     std::vector<QubitIdType> Qs;

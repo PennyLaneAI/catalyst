@@ -15,22 +15,23 @@
 #include <numeric>
 #include <string>
 
-#include "Utils.hpp"
 #include "QuantumDevice.hpp"
 #include "RuntimeCAPI.h"
+#include "Utils.hpp"
 
-#include "LightningSimulator.hpp"
 #include "LightningKokkosSimulator.hpp"
+#include "LightningSimulator.hpp"
 
 #include <catch2/catch.hpp>
 
 using namespace Catalyst::Runtime;
 using namespace Catalyst::Runtime::Simulator;
 
-TEMPLATE_TEST_CASE("lightning Basis vector", "[Driver]", LightningSimulator, LightningKokkosSimulator)
+TEMPLATE_TEST_CASE("lightning Basis vector", "[Driver]", LightningSimulator,
+                   LightningKokkosSimulator)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
-    
+
     QubitIdType q = sim->AllocateQubit();
     q = sim->AllocateQubit();
     q = sim->AllocateQubit();
@@ -85,7 +86,8 @@ TEMPLATE_TEST_CASE("Qubit allocatation and deallocation", "[Driver]", LightningS
     }
 }
 
-TEMPLATE_TEST_CASE("Qubit allocatation and deallocation [lightning.kokkos]", "[Driver]", LightningKokkosSimulator)
+TEMPLATE_TEST_CASE("Qubit allocatation and deallocation [lightning.kokkos]", "[Driver]",
+                   LightningKokkosSimulator)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -121,7 +123,7 @@ TEMPLATE_TEST_CASE("Qubit allocatation and deallocation [lightning.kokkos]", "[D
 TEMPLATE_TEST_CASE("test AllocateQubits", "[Driver]", LightningSimulator, LightningKokkosSimulator)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
-    
+
     CHECK(sim->AllocateQubits(0).size() == 0);
 
     auto &&q = sim->AllocateQubits(2);
@@ -135,7 +137,7 @@ TEMPLATE_TEST_CASE("test AllocateQubits", "[Driver]", LightningSimulator, Lightn
 TEMPLATE_TEST_CASE("test DeviceShots", "[Driver]", LightningSimulator, LightningKokkosSimulator)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
-    
+
     CHECK(sim->GetDeviceShots() == 1000);
 
     sim->SetDeviceShots(500);
@@ -143,10 +145,11 @@ TEMPLATE_TEST_CASE("test DeviceShots", "[Driver]", LightningSimulator, Lightning
     CHECK(sim->GetDeviceShots() == 500);
 }
 
-TEMPLATE_TEST_CASE("compute register tests", "[Driver]", LightningSimulator, LightningKokkosSimulator)
+TEMPLATE_TEST_CASE("compute register tests", "[Driver]", LightningSimulator,
+                   LightningKokkosSimulator)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
-    
+
     constexpr size_t n = 10;
     std::vector<QubitIdType> Qs;
     Qs.reserve(n);
@@ -171,7 +174,8 @@ TEMPLATE_TEST_CASE("compute register tests", "[Driver]", LightningSimulator, Lig
     }
 }
 
-TEMPLATE_TEST_CASE("Check an unsupported operation", "[Driver]", LightningSimulator, LightningKokkosSimulator)
+TEMPLATE_TEST_CASE("Check an unsupported operation", "[Driver]", LightningSimulator,
+                   LightningKokkosSimulator)
 {
     REQUIRE_THROWS_WITH(
         Lightning::lookup_gates(Lightning::simulator_gate_info, "UnsupportedGateName"),

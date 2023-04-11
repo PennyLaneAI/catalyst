@@ -14,10 +14,10 @@
 
 #pragma once
 
-#include <stdexcept>
 #include <array>
-#include <tuple>
+#include <stdexcept>
 #include <string_view>
+#include <tuple>
 
 #include "Types.h"
 

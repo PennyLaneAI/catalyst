@@ -23,8 +23,8 @@
 
 #include "QuantumDevice.hpp"
 
-#include "LightningSimulator.hpp"
 #include "LightningKokkosSimulator.hpp"
+#include "LightningSimulator.hpp"
 
 namespace Catalyst::Runtime::CAPI {
 
