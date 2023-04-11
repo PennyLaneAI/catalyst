@@ -75,7 +75,7 @@ void __quantum__rt__initialize()
     }
 
     if (!Catalyst::Runtime::CAPI::DRIVER->init_device()) {
-        // To get the error message in Python
+        // TODO: remove this after fixing the issue with propagating runtime error messages
         std::cerr << "Failed initialization of the global device, "
                   << Catalyst::Runtime::CAPI::DRIVER->get_device_name() << std::endl;
 
@@ -94,16 +94,13 @@ void __quantum__rt__device(int8_t *spec, int8_t *value)
         Catalyst::Runtime::CAPI::DRIVER = std::make_unique<Catalyst::Runtime::CAPI::Driver>();
     }
 
-    // TODO: after removing the default device in Driver...
     if (!spec || !value) {
+        // default simulator
         return;
     }
 
     const std::vector<std::string_view> args{reinterpret_cast<char *>(spec),
                                              reinterpret_cast<char *>(value)};
-
-    // TODO: debugging print
-    std::cerr << args[0] << " = " << args[1] << std::endl;
 
     if (args[0] == "backend") {
         Catalyst::Runtime::CAPI::DRIVER->set_device_name(args[1]);

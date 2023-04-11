@@ -84,8 +84,6 @@ class Driver final {
     explicit Driver(bool status = false, size_t shots = 1000)
         : _tape_recording(status), _shots(shots)
     {
-        _driver_mm_ptr = std::make_unique<MemoryManager>();
-
 // TODO: remove this defualt...
 #ifdef __device_lightning
         _name = "lightning.qubit";
@@ -121,6 +119,7 @@ class Driver final {
         auto iter = _device_map.find(this->_name);
         if (iter != _device_map.end()) {
             this->_driver_ptr = iter->second(_tape_recording, _shots);
+            this->_driver_mm_ptr = std::make_unique<MemoryManager>();
             return true;
         }
         return false;

@@ -452,7 +452,7 @@ class QJIT:
         compile_options (Optional[CompileOptions]): Common compilation options
     """
 
-    def __init__(self, fn, target, keep_intermediate, compile_options=None, runtime=None):
+    def __init__(self, fn, target, keep_intermediate, compile_options=None):
         self.qfunc = fn
         self.c_sig = None
         functools.update_wrapper(self, fn)
@@ -475,7 +475,7 @@ class QJIT:
         self._llvmir = None
         self.mlir_module = None
         self.compiled_function = None
-        self.runtime = runtime
+        self.runtime = fn.device.short_name if isinstance(fn, qml.QNode) else "best"
 
         parameter_types = CompiledFunction.get_compile_time_signature(self.qfunc)
         self.user_typed = False
@@ -672,19 +672,10 @@ def qjit(fn=None, *, target="binary", keep_intermediate=False, verbose=False, lo
             :class:`~.pennylane_extensions.QJITDevice`.
     """
 
-    if isinstance(fn, qml.QNode):
-        runtime = fn.device.short_name
-    else:
-        runtime = "best"
-
     if fn is not None:
-        return QJIT(
-            fn, target, keep_intermediate, CompileOptions(verbose, logfile), runtime=runtime
-        )
+        return QJIT(fn, target, keep_intermediate, CompileOptions(verbose, logfile))
 
     def wrap_fn(fn):
-        return QJIT(
-            fn, target, keep_intermediate, CompileOptions(verbose, logfile), runtime=runtime
-        )
+        return QJIT(fn, target, keep_intermediate, CompileOptions(verbose, logfile))
 
     return wrap_fn
