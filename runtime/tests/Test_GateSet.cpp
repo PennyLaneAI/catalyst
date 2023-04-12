@@ -18,17 +18,14 @@
 #include "RuntimeCAPI.h"
 #include "Utils.hpp"
 
-#include <catch2/catch.hpp>
-
-#include "LightningKokkosSimulator.hpp"
-#include "LightningSimulator.hpp"
+#include "TestUtils.hpp"
 
 using namespace Pennylane;
 
 using namespace Catalyst::Runtime;
 using namespace Catalyst::Runtime::Simulator;
 
-TEMPLATE_TEST_CASE("Identity Gate tests", "[GateSet]", LightningSimulator, LightningKokkosSimulator)
+TEMPLATE_LIST_TEST_CASE("Identity Gate tests", "[GateSet]", SimTypes)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -58,8 +55,7 @@ TEMPLATE_TEST_CASE("Identity Gate tests", "[GateSet]", LightningSimulator, Light
     CHECK(sum == std::complex<double>{0, 0});
 }
 
-TEMPLATE_TEST_CASE("PauliX Gate tests num_qubits=1", "[GateSet]", LightningSimulator,
-                   LightningKokkosSimulator)
+TEMPLATE_LIST_TEST_CASE("PauliX Gate tests num_qubits=1", "[GateSet]", SimTypes)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -81,8 +77,7 @@ TEMPLATE_TEST_CASE("PauliX Gate tests num_qubits=1", "[GateSet]", LightningSimul
 }
 
 // 1-qubit operations
-TEMPLATE_TEST_CASE("PauliX Gate tests num_qubits=3", "[GateSet]", LightningSimulator,
-                   LightningKokkosSimulator)
+TEMPLATE_LIST_TEST_CASE("PauliX Gate tests num_qubits=3", "[GateSet]", SimTypes)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -115,8 +110,7 @@ TEMPLATE_TEST_CASE("PauliX Gate tests num_qubits=3", "[GateSet]", LightningSimul
     CHECK(sum == std::complex<double>{0, 0});
 }
 
-TEMPLATE_TEST_CASE("PauliY Gate tests num_qubits=1", "[GateSet]", LightningSimulator,
-                   LightningKokkosSimulator)
+TEMPLATE_LIST_TEST_CASE("PauliY Gate tests num_qubits=1", "[GateSet]", SimTypes)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -137,8 +131,7 @@ TEMPLATE_TEST_CASE("PauliY Gate tests num_qubits=1", "[GateSet]", LightningSimul
     CHECK(out_state.at(1) == std::complex<double>{0, 1});
 }
 
-TEMPLATE_TEST_CASE("PauliY Gate tests num_qubits=2", "[GateSet]", LightningSimulator,
-                   LightningKokkosSimulator)
+TEMPLATE_LIST_TEST_CASE("PauliY Gate tests num_qubits=2", "[GateSet]", SimTypes)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -162,8 +155,7 @@ TEMPLATE_TEST_CASE("PauliY Gate tests num_qubits=2", "[GateSet]", LightningSimul
     CHECK(out_state.at(3) == std::complex<double>{-1, 0});
 }
 
-TEMPLATE_TEST_CASE("PauliZ Gate tests num_qubits=2", "[GateSet]", LightningSimulator,
-                   LightningKokkosSimulator)
+TEMPLATE_LIST_TEST_CASE("PauliZ Gate tests num_qubits=2", "[GateSet]", SimTypes)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -187,8 +179,7 @@ TEMPLATE_TEST_CASE("PauliZ Gate tests num_qubits=2", "[GateSet]", LightningSimul
     CHECK(out_state.at(3) == std::complex<double>{0, 0});
 }
 
-TEMPLATE_TEST_CASE("Hadamard Gate tests num_qubits=2", "[GateSet]", LightningSimulator,
-                   LightningKokkosSimulator)
+TEMPLATE_LIST_TEST_CASE("Hadamard Gate tests num_qubits=2", "[GateSet]", SimTypes)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -213,8 +204,7 @@ TEMPLATE_TEST_CASE("Hadamard Gate tests num_qubits=2", "[GateSet]", LightningSim
     CHECK(out_state.at(3) == out_state.at(0));
 }
 
-TEMPLATE_TEST_CASE("Hadamard Gate tests num_qubits=3", "[GateSet]", LightningSimulator,
-                   LightningKokkosSimulator)
+TEMPLATE_LIST_TEST_CASE("Hadamard Gate tests num_qubits=3", "[GateSet]", SimTypes)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -239,8 +229,7 @@ TEMPLATE_TEST_CASE("Hadamard Gate tests num_qubits=3", "[GateSet]", LightningSim
     CHECK(out_state.at(3) == out_state.at(0));
 }
 
-TEMPLATE_TEST_CASE("MIX Gate test R(X,Y,Z) num_qubits=1,4", "[GateSet]", LightningSimulator,
-                   LightningKokkosSimulator)
+TEMPLATE_LIST_TEST_CASE("MIX Gate test R(X,Y,Z) num_qubits=1,4", "[GateSet]", SimTypes)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -286,8 +275,7 @@ TEMPLATE_TEST_CASE("MIX Gate test R(X,Y,Z) num_qubits=1,4", "[GateSet]", Lightni
     CHECK(out_state.at(15) == std::complex<double>{0, 0});
 }
 
-TEMPLATE_TEST_CASE("test PhaseShift num_qubits=2", "[GateSet]", LightningSimulator,
-                   LightningKokkosSimulator)
+TEMPLATE_LIST_TEST_CASE("test PhaseShift num_qubits=2", "[GateSet]", SimTypes)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -320,8 +308,7 @@ TEMPLATE_TEST_CASE("test PhaseShift num_qubits=2", "[GateSet]", LightningSimulat
 }
 
 // 2-qubit operations
-TEMPLATE_TEST_CASE("CNOT Gate tests num_qubits=2 [0,1]", "[GateSet]", LightningSimulator,
-                   LightningKokkosSimulator)
+TEMPLATE_LIST_TEST_CASE("CNOT Gate tests num_qubits=2 [0,1]", "[GateSet]", SimTypes)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -345,8 +332,7 @@ TEMPLATE_TEST_CASE("CNOT Gate tests num_qubits=2 [0,1]", "[GateSet]", LightningS
     CHECK(out_state.at(3) == std::complex<double>{1, 0});
 }
 
-TEMPLATE_TEST_CASE("CNOT Gate tests num_qubits=2 [1,0]", "[GateSet]", LightningSimulator,
-                   LightningKokkosSimulator)
+TEMPLATE_LIST_TEST_CASE("CNOT Gate tests num_qubits=2 [1,0]", "[GateSet]", SimTypes)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -370,8 +356,7 @@ TEMPLATE_TEST_CASE("CNOT Gate tests num_qubits=2 [1,0]", "[GateSet]", LightningS
     CHECK(out_state.at(3) == std::complex<double>{0, 0});
 }
 
-TEMPLATE_TEST_CASE("MIX Gate test CR(X, Y, Z) num_qubits=1,4", "[GateSet]", LightningSimulator,
-                   LightningKokkosSimulator)
+TEMPLATE_LIST_TEST_CASE("MIX Gate test CR(X, Y, Z) num_qubits=1,4", "[GateSet]", SimTypes)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -414,7 +399,7 @@ TEMPLATE_TEST_CASE("MIX Gate test CR(X, Y, Z) num_qubits=1,4", "[GateSet]", Ligh
     CHECK(out_state.at(15) == std::complex<double>{0, 0});
 }
 
-TEMPLATE_TEST_CASE("CRot", "[GateSet]", LightningSimulator, LightningKokkosSimulator)
+TEMPLATE_LIST_TEST_CASE("CRot", "[GateSet]", SimTypes)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -441,7 +426,7 @@ TEMPLATE_TEST_CASE("CRot", "[GateSet]", LightningSimulator, LightningKokkosSimul
     CHECK(out_state[3].imag() == Approx(-0.4844562109).epsilon(1e-5));
 }
 
-TEMPLATE_TEST_CASE("CSWAP test", "[GateSet]", LightningSimulator, LightningKokkosSimulator)
+TEMPLATE_LIST_TEST_CASE("CSWAP test", "[GateSet]", SimTypes)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -463,8 +448,7 @@ TEMPLATE_TEST_CASE("CSWAP test", "[GateSet]", LightningSimulator, LightningKokko
     CHECK(out_state[5].imag() == Approx(0).epsilon(1e-5));
 }
 
-TEMPLATE_TEST_CASE("IsingXY Gate tests num_qubits=2 [1,0]", "[GateSet]", LightningSimulator,
-                   LightningKokkosSimulator)
+TEMPLATE_LIST_TEST_CASE("IsingXY Gate tests num_qubits=2 [1,0]", "[GateSet]", SimTypes)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -494,7 +478,7 @@ TEMPLATE_TEST_CASE("IsingXY Gate tests num_qubits=2 [1,0]", "[GateSet]", Lightni
     CHECK(out_state[3].imag() == Approx(0).epsilon(1e-5));
 }
 
-TEMPLATE_TEST_CASE("Toffoli test", "[GateSet]", LightningSimulator, LightningKokkosSimulator)
+TEMPLATE_LIST_TEST_CASE("Toffoli test", "[GateSet]", SimTypes)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -525,7 +509,7 @@ TEMPLATE_TEST_CASE("Toffoli test", "[GateSet]", LightningSimulator, LightningKok
     CHECK(out_state[7].imag() == Approx(0).epsilon(1e-5));
 }
 
-TEMPLATE_TEST_CASE("MultiRZ test", "[GateSet]", LightningSimulator, LightningKokkosSimulator)
+TEMPLATE_LIST_TEST_CASE("MultiRZ test", "[GateSet]", SimTypes)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -550,8 +534,7 @@ TEMPLATE_TEST_CASE("MultiRZ test", "[GateSet]", LightningSimulator, LightningKok
     CHECK(out_state[2].imag() == Approx(0).epsilon(1e-5));
 }
 
-TEMPLATE_TEST_CASE("MatrixOperation test with 2-qubit", "[GateSet]", LightningSimulator,
-                   LightningKokkosSimulator)
+TEMPLATE_LIST_TEST_CASE("MatrixOperation test with 2-qubit", "[GateSet]", SimTypes)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -591,8 +574,7 @@ TEMPLATE_TEST_CASE("MatrixOperation test with 2-qubit", "[GateSet]", LightningSi
     CHECK(out_state[3].imag() == Approx(-0.187075).epsilon(1e-5));
 }
 
-TEMPLATE_TEST_CASE("MatrixOperation test with 3-qubit", "[GateSet]", LightningSimulator,
-                   LightningKokkosSimulator)
+TEMPLATE_LIST_TEST_CASE("MatrixOperation test with 3-qubit", "[GateSet]", SimTypes)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 

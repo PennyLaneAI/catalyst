@@ -46,15 +46,15 @@ auto LightningKokkosSimulator::GetNumQubits() const -> size_t
 
 void LightningKokkosSimulator::StartTapeRecording()
 {
-    QFailIf(this->cache_recording, "Cannot re-activate the cache manager");
-    this->cache_recording = true;
+    QFailIf(this->tape_recording, "Cannot re-activate the cache manager");
+    this->tape_recording = true;
     this->cache_manager.Reset();
 }
 
 void LightningKokkosSimulator::StopTapeRecording()
 {
-    if (this->cache_recording) {
-        this->cache_recording = false;
+    if (this->tape_recording) {
+        this->tape_recording = false;
     }
 }
 
@@ -122,7 +122,7 @@ void LightningKokkosSimulator::NamedOperation(const std::string &name,
     this->device_sv->applyOperation(name, dev_wires, inverse, params);
 
     // Update tape caching if required
-    if (this->cache_recording) {
+    if (this->tape_recording) {
         this->cache_manager.addOperation(name, params, dev_wires, inverse);
     }
 }
@@ -151,7 +151,7 @@ void LightningKokkosSimulator::MatrixOperation(const std::vector<std::complex<do
     this->device_sv->applyMultiQubitOp(gate_matrix, dev_wires, inverse);
 
     // Update tape caching if required
-    if (this->cache_recording) {
+    if (this->tape_recording) {
         this->cache_manager.addOperation("MatrixOp", {}, dev_wires, inverse);
     }
 }
@@ -219,7 +219,7 @@ auto LightningKokkosSimulator::Expval(ObsIdType obsKey) -> double
     QFailIf(!this->obs_manager.isValidObservables({obsKey}), "Invalid key for cached observables");
 
     // update tape caching
-    if (this->cache_recording) {
+    if (this->tape_recording) {
         cache_manager.addObservable(obsKey, Lightning::Measurements::Expval);
     }
 
@@ -235,7 +235,7 @@ auto LightningKokkosSimulator::Var(ObsIdType obsKey) -> double
     QFailIf(!this->obs_manager.isValidObservables({obsKey}), "Invalid key for cached observables");
 
     // update tape caching
-    if (this->cache_recording) {
+    if (this->tape_recording) {
         this->cache_manager.addObservable(obsKey, Lightning::Measurements::Var);
     }
 

@@ -36,7 +36,7 @@ namespace Catalyst::Runtime::CAPI {
 /**
  * @brief Global quantum device unique pointer.
  */
-static std::unique_ptr<Driver> DRIVER = nullptr;
+thread_local static std::unique_ptr<Driver> DRIVER = nullptr;
 
 } // namespace Catalyst::Runtime::CAPI
 
@@ -91,7 +91,12 @@ void __quantum__rt__finalize() { Catalyst::Runtime::CAPI::DRIVER.reset(nullptr);
 void __quantum__rt__device(int8_t *spec, int8_t *value)
 {
     if (!Catalyst::Runtime::CAPI::DRIVER) {
-        Catalyst::Runtime::CAPI::DRIVER = std::make_unique<Catalyst::Runtime::CAPI::Driver>();
+        constexpr std::string_view default_device_name{"lightning.qubit"};
+        constexpr size_t default_device_shots{1000}; // tidy: readability-magic-numbers
+        constexpr bool default_tape_recording_status{false};
+
+        Catalyst::Runtime::CAPI::DRIVER = std::make_unique<Catalyst::Runtime::CAPI::Driver>(
+            default_device_name, default_tape_recording_status, default_device_shots);
     }
 
     if (!spec || !value) {

@@ -24,6 +24,8 @@ target triple = "x86_64-pc-linux-gnu"
 %struct.MemRefT = type { %struct.CplxT*, %struct.CplxT*, i64, [1 x i64], [1 x i64] }
 
 @.str = private constant [19 x i8] c"(a, b) = (%f, %f)\0A\00", align 1
+@backend = private constant [8 x i8] c"backend\00"
+@backend_default = private constant [8 x i8] c"default\00"
 
 declare void @__quantum__rt__device(i8*, i8*)
 
@@ -52,7 +54,7 @@ declare void @free(i8*)
 
 define i32 @main() {
   ; Initialize quantum runtime
-  call void @__quantum__rt__device(i8* null, i8* null)
+  call void @__quantum__rt__device(i8* getelementptr ([8 x i8], [8 x i8]* @backend, i64 0, i64 0), i8* getelementptr ([8 x i8], [8 x i8]* @backend_default, i64 0, i64 0))
   call void @__quantum__rt__initialize()
 
   ; Allocate 2 qubits

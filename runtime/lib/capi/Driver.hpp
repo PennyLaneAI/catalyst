@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#pragma once
+
 #include <cassert>
 
 #include <functional>
@@ -23,8 +25,13 @@
 
 #include "QuantumDevice.hpp"
 
-#include "LightningKokkosSimulator.hpp"
+// device: lightning.qubit
 #include "LightningSimulator.hpp"
+
+#if __has_include("StateVectorKokkos.hpp")
+// device: lightning.kokkos
+#include "LightningKokkosSimulator.hpp"
+#endif
 
 namespace Catalyst::Runtime::CAPI {
 
@@ -55,11 +62,6 @@ class Driver final {
              return std::make_unique<Catalyst::Runtime::Simulator::LightningSimulator>(
                  tape_recording, shots);
          }},
-        {"lightning.kokkos",
-         [](bool tape_recording, size_t shots) {
-             return std::make_unique<Catalyst::Runtime::Simulator::LightningKokkosSimulator>(
-                 tape_recording, shots);
-         }},
     };
 
     // Device Info
@@ -72,8 +74,16 @@ class Driver final {
     std::unique_ptr<MemoryManager> _driver_mm_ptr = nullptr;
 
   public:
-    explicit Driver(bool status = false, size_t shots = 1000)
-        : _tape_recording(status), _shots(shots) {};
+    explicit Driver(std::string_view default_device, bool status, size_t shots)
+        : _name(default_device), _tape_recording(status), _shots(shots)
+    {
+#ifdef __device_lightning_kokkos
+        _device_map.emplace("lightning.kokkos", [](bool tape_recording, size_t shots) {
+            return std::make_unique<Catalyst::Runtime::Simulator::LightningKokkosSimulator>(
+                tape_recording, shots);
+        });
+#endif
+    };
 
     ~Driver()
     {
@@ -86,7 +96,7 @@ class Driver final {
 
     void set_device_name(std::string_view name) noexcept
     {
-        if (name != "best") {
+        if (name != "default") {
             this->_name = name;
         }
     }

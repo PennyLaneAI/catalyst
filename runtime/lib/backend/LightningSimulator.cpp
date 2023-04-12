@@ -57,15 +57,15 @@ auto LightningSimulator::GetNumQubits() const -> size_t { return this->device_sv
 
 void LightningSimulator::StartTapeRecording()
 {
-    QFailIf(this->cache_recording, "Cannot re-activate the cache manager");
-    this->cache_recording = true;
+    QFailIf(this->tape_recording, "Cannot re-activate the cache manager");
+    this->tape_recording = true;
     this->cache_manager.Reset();
 }
 
 void LightningSimulator::StopTapeRecording()
 {
-    if (this->cache_recording) {
-        this->cache_recording = false;
+    if (this->tape_recording) {
+        this->tape_recording = false;
     }
 }
 
@@ -126,7 +126,7 @@ void LightningSimulator::NamedOperation(const std::string &name, const std::vect
     this->device_sv->applyOperation(name, dev_wires, inverse, params);
 
     // Update tape caching if required
-    if (this->cache_recording) {
+    if (this->tape_recording) {
         this->cache_manager.addOperation(name, params, dev_wires, inverse);
     }
 }
@@ -174,7 +174,7 @@ auto LightningSimulator::Expval(ObsIdType obsKey) -> double
     auto &&obs = this->obs_manager.getObservable(obsKey);
 
     // update tape caching
-    if (this->cache_recording) {
+    if (this->tape_recording) {
         this->cache_manager.addObservable(obsKey, Lightning::Measurements::Expval);
     }
 
@@ -190,7 +190,7 @@ auto LightningSimulator::Var(ObsIdType obsKey) -> double
     auto &&obs = this->obs_manager.getObservable(obsKey);
 
     // update tape caching
-    if (this->cache_recording) {
+    if (this->tape_recording) {
         this->cache_manager.addObservable(obsKey, Lightning::Measurements::Var);
     }
 

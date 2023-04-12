@@ -1,16 +1,19 @@
 if(RUNTIME_CLANG_TIDY)
-if(NOT DEFINED CLANG_TIDY_BINARY)
-    set(CLANG_TIDY_BINARY clang-tidy)
-endif()
-message(STATUS "Using CLANG_TIDY_BINARY=${CLANG_TIDY_BINARY}")
-set(CMAKE_CXX_CLANG_TIDY ${CLANG_TIDY_BINARY};
+    if(NOT DEFINED CLANG_TIDY_BINARY)
+        set(CLANG_TIDY_BINARY clang-tidy)
+    endif()
+    message(STATUS "Using CLANG_TIDY_BINARY=${CLANG_TIDY_BINARY}")
+    set(CMAKE_CXX_CLANG_TIDY ${CLANG_TIDY_BINARY};
                          -extra-arg=-std=c++20;
                          --use-color;
-)
+    )
 endif()
 
-set(source_files LightningSimulator.cpp
-                LightningKokkosSimulator.cpp)
+list(APPEND source_files LightningSimulator.cpp)
+
+if(ENABLE_LIGHTNING_KOKKOS)
+    list(APPEND source_files LightningKokkosSimulator.cpp)
+endif()
 
 add_library(rt_backend SHARED ${source_files})
 

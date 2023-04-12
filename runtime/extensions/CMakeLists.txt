@@ -12,18 +12,21 @@ FetchContent_Declare(
 )
 set(CMAKE_POSITION_INDEPENDENT_CODE ON) # build with -fPIC
 set(ENABLE_KOKKOS OFF CACHE BOOL "Enable Kokkos")
-
-FetchContent_Declare(
-    pennylane_lightning_kokkos
-    GIT_REPOSITORY https://github.com/PennyLaneAI/pennylane-lightning-kokkos.git
-    GIT_TAG        multidev/fix_buildw_lightning_new
-)
-
-FetchContent_MakeAvailable(pennylane_lightning pennylane_lightning_kokkos)
+FetchContent_MakeAvailable(pennylane_lightning)
 
 add_library(lightnings_interface INTERFACE)
 
-target_link_libraries(lightnings_interface INTERFACE pennylane_lightning pennylane_lightning_kokkos)
-
+target_link_libraries(lightnings_interface INTERFACE pennylane_lightning)
 target_include_directories(lightnings_interface INTERFACE .)
 
+if(ENABLE_LIGHTNING_KOKKOS)
+    FetchContent_Declare(
+        pennylane_lightning_kokkos
+        GIT_REPOSITORY https://github.com/PennyLaneAI/pennylane-lightning-kokkos.git
+        GIT_TAG        multidev/fix_buildw_lightning_new # TODO: Update this after merging PR #49 (lightning.kokkos)
+    )
+
+    FetchContent_MakeAvailable(pennylane_lightning_kokkos)
+    
+    target_link_libraries(lightnings_interface INTERFACE pennylane_lightning_kokkos)
+endif()

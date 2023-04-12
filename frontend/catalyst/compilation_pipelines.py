@@ -475,7 +475,7 @@ class QJIT:
         self._llvmir = None
         self.mlir_module = None
         self.compiled_function = None
-        self.runtime = fn.device.short_name if isinstance(fn, qml.QNode) else "best"
+        self.device_name = fn.device.short_name if isinstance(fn, qml.QNode) else "default"
 
         parameter_types = CompiledFunction.get_compile_time_signature(self.qfunc)
         self.user_typed = False
@@ -539,7 +539,7 @@ class QJIT:
         self._mlir = mod.get_asm(binary=False, print_generic_op_form=False, assume_verified=True)
 
         # Inject setup and finalize functions.
-        append_modules(mlir_module, self.runtime, ctx)
+        append_modules(mlir_module, self.device_name, ctx)
 
         return mlir_module
 
