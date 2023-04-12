@@ -109,6 +109,7 @@ bufferization_pass_pipeline = [
     "--inline",
     "--gradient-bufferize",
        "--hlo-one-shot-bufferize",
+       "--allow-unknown-ops",
        "--gml-st-to-scf",
     "--scf-bufferize",
     "--convert-tensor-to-linalg",  # tensor.pad

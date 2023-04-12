@@ -17,6 +17,7 @@
 #include "mlir/InitAllDialects.h"
 #include "mlir/InitAllPasses.h"
 #include "mlir/Tools/mlir-opt/MlirOptMain.h"
+#include "mlir/Dialect/Bufferization/Transforms/Passes.h"
 
 #include "thlo/IR/thlo_ops.h"
 #include "gml_st/IR/gml_st_ops.h"
@@ -37,7 +38,17 @@ int main(int argc, char **argv)
     mlir::registerPass(catalyst::createQuantumBufferizationPass);
     mlir::registerPass(catalyst::createQuantumConversionPass);
     mlir::registerPass(mlir::hlo::createOneShotBufferizePass);
-    mlir::registerPass(mlir::hlo::createOneShotBufferizePass);
+    mlir::registerPass([=]() {
+        mlir::bufferization::OneShotBufferizationOptions opts;
+        opts.allowUnknownOps = true;
+        opts.allowReturnAllocs = true;
+        opts.bufferizeFunctionBoundaries = true;
+        opts.functionBoundaryTypeConversion =
+            mlir::bufferization::LayoutMapOption::IdentityLayoutMap;
+        opts.createDeallocs = false;
+        opts.bufferAlignment = 64;
+        return mlir::bufferization::createOneShotBufferizePass(opts);
+    });
     mlir::registerPass(mlir::gml_st::createGmlStToScfPass);
 
     mlir::DialectRegistry registry;
