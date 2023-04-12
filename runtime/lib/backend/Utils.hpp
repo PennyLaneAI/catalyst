@@ -21,11 +21,6 @@
 
 #include "Types.h"
 
-// #if __has_include("StateVectorKokkos.hpp")
-// // this macro is used in the C++ test suite
-// #define _KOKKOS
-// #endif
-
 namespace Catalyst::Runtime::Simulator {
 static inline void QFailIf(bool condition, const char *message)
 {

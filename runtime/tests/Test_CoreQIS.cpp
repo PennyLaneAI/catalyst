@@ -1454,5 +1454,8 @@ TEST_CASE("Test __rt__device registering a custom device with shots=500 and devi
     REQUIRE_THROWS_WITH(__quantum__rt__initialize(),
                         Catch::Contains("Failed initialization of the global device"));
 
+    REQUIRE_THROWS_WITH(__quantum__rt__device(nullptr, nullptr),
+                        Catch::Contains("Invalid device specification"));
+
     __quantum__rt__finalize();
 }

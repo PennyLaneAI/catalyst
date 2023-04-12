@@ -587,6 +587,7 @@ TEMPLATE_LIST_TEST_CASE("MatrixOperation test with 3-qubit", "[GateSet]", SimTyp
         Qs[i] = sim->AllocateQubit();
     }
 
+    sim->StartTapeRecording();
     sim->NamedOperation("Hadamard", {}, {Qs[0]}, false);
     sim->NamedOperation("Toffoli", {}, {Qs[0], Qs[1], Qs[2]}, false);
 
@@ -602,6 +603,7 @@ TEMPLATE_LIST_TEST_CASE("MatrixOperation test with 3-qubit", "[GateSet]", SimTyp
         {0.327486634260, 0.130699704247}, {0.299805387808, 0.150417378569},
     };
     sim->MatrixOperation(matrix, wires, false);
+    sim->StopTapeRecording();
 
     std::vector<std::complex<double>> out_state = sim->State();
 

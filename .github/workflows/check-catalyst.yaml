@@ -394,8 +394,6 @@ jobs:
         run: |
           sudo apt-get -y -q install cmake ninja-build libomp-dev lcov
           echo "LIGHTNING_TAG_VALUE=latest_release" >> $GITHUB_ENV
-          # TODO: Update this to latest_release for the v0.30.0 release
-          echo "LIGHTNING_KOKKOS_TAG_VALUE=main" >> $GITHUB_ENV
 
       - name: Get Cached qir-stdlib Build
         id: cache-qir-stdlib
@@ -425,7 +423,7 @@ jobs:
             COMPILER_LAUNCHER="" \
             QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build" \
             QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include" \
-            LIGHTNING_GIT_TAG_VALUE=$LIGHTNING_KOKKOS_TAG_VALUE \
+            LIGHTNING_GIT_TAG_VALUE=$LIGHTNING_TAG_VALUE \
             ENABLE_LIGHTNING_KOKKOS=ON \
             make test-runtime
 
