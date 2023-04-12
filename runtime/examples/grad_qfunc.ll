@@ -30,6 +30,8 @@ declare i32 @printf(i8*, ...)
 
 declare void @free(i8*)
 
+declare void @__quantum__rt__device(i8*, i8*)
+
 declare void @__quantum__rt__initialize()
 
 declare void @__quantum__rt__finalize()
@@ -76,6 +78,7 @@ define double @circuit(%Qubit* %0) {
 
 define i32 @main() {
   ; Initialize quantum runtime
+  call void @__quantum__rt__device(i8* null, i8* null)
   call void @__quantum__rt__initialize()
 
   ; Allocate 2 qubits
