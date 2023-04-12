@@ -75,7 +75,7 @@ void __quantum__rt__initialize()
     }
 
     if (!Catalyst::Runtime::CAPI::DRIVER->init_device()) {
-        // To get the error message in Python
+        // TODO: remove this after fixing the issue with propagating runtime error messages
         std::cerr << "Failed initialization of the global device, "
                   << Catalyst::Runtime::CAPI::DRIVER->get_device_name() << std::endl;
 

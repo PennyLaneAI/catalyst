@@ -1912,5 +1912,14 @@ TEST_CASE("Test __rt__device registering a custom device with shots=500 and devi
     REQUIRE_THROWS_WITH(__quantum__rt__device((int8_t *)dev2, (int8_t *)dev_value),
                         Catch::Contains("Invalid device specification"));
 
+    REQUIRE_THROWS_WITH(__quantum__rt__device((int8_t *)shots, (int8_t *)dev_value),
+                        Catch::Contains("Invalid argument for the device specification (shots)"));
+
+    char dev_value2[17] = "other.sumulator";
+    __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value2);
+
+    REQUIRE_THROWS_WITH(__quantum__rt__initialize(),
+                        Catch::Contains("Failed initialization of the global device"));
+
     __quantum__rt__finalize();
 }

@@ -59,7 +59,7 @@ def FinalizeOp : Quantum_Op<"finalize"> {
 }
 
 def DeviceOp : Quantum_Op<"device"> {
-    let summary = "Set the device specifications in the runtime.";
+    let summary = "Set device specifications in the runtime.";
 
     let arguments = (ins
         OptionalAttr<StrArrayAttr>:$specs

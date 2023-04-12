@@ -51,7 +51,7 @@ Value getGlobalString(Location loc, OpBuilder &rewriter, StringRef key, StringRe
 {
     LLVM::GlobalOp glb = mod.lookupSymbol<LLVM::GlobalOp>(key);
     if (!glb) {
-        OpBuilder::InsertionGuard insertGuard(rewriter);
+        OpBuilder::InsertionGuard guard(rewriter); // to reset the insertion point
         rewriter.setInsertionPointToStart(mod.getBody());
         glb = rewriter.create<LLVM::GlobalOp>(
             loc, LLVM::LLVMArrayType::get(IntegerType::get(rewriter.getContext(), 8), value.size()),

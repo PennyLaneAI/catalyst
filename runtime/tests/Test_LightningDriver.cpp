@@ -18,6 +18,7 @@
 #include "QuantumDevice.hpp"
 #include "RuntimeCAPI.h"
 #include "Utils.hpp"
+#include "Driver.hpp"
 
 #include "LightningKokkosSimulator.hpp"
 #include "LightningSimulator.hpp"
@@ -26,6 +27,19 @@
 
 using namespace Catalyst::Runtime;
 using namespace Catalyst::Runtime::Simulator;
+
+TEST_CASE("Test Driver", "[Driver]")
+{
+    std::unique_ptr<CAPI::Driver> driver = std::make_unique<CAPI::Driver>(false, 500);
+
+    CHECK(driver->get_device_shots() == 500);
+
+    driver->set_device_name("other.simulator");
+    CHECK(driver->get_device_name() == "other.simulator");
+    CHECK(driver->init_device() == false);
+    CHECK(driver->get_device() == nullptr);
+    CHECK(driver->get_memory_manager() == nullptr);
+}
 
 TEMPLATE_TEST_CASE("lightning Basis vector", "[Driver]", LightningSimulator,
                    LightningKokkosSimulator)
