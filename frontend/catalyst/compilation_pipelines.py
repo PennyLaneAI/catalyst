@@ -63,7 +63,6 @@ def get_type_annotations(func: typing.Callable):
     return None
 
 
-# pylint: disable=too-many-return-statements
 def mlir_type_to_numpy_type(t):
     """Convert an MLIR type to a Numpy type.
 
