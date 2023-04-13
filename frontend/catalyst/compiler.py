@@ -77,11 +77,11 @@ def get_executable_path(project, tool):
     return executable_path if os.path.exists(executable_path) else tool
 
 
-def get_lib_path(project, env):
+def get_lib_path(project, env_var):
     """Get the library path."""
     if INSTALLED:
         return os.path.join(package_root, "lib")  # pragma: no cover
-    return os.getenv(env, default_lib_paths.get(project, ""))
+    return os.getenv(env_var, default_lib_paths.get(project, ""))
 
 
 class Pass(abc.ABC):
