@@ -423,7 +423,6 @@ def test_qft():
     assert np.allclose(interpreted_fn(params), jitted_fn(params))
 
 
-@pytest.mark.xfail
 def test_commuting_evolution():
     n_wires = 2
     device = qml.device("lightning.qubit", wires=n_wires)
@@ -574,7 +573,7 @@ def test_quantum_montecarlo():
     N = 2**n
     target_wires = range(m + 1)
     estimation_wires = range(m + 1, n + m + 1)
-    device = qml.device("lightning.qubit", wires=(n + m + 1))
+    device = qml.device("lightning.qubit", n + m + 1)
 
     def circuit():
         qml.templates.QuantumMonteCarlo(

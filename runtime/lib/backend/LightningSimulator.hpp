@@ -18,6 +18,8 @@
 throw std::logic_error("StateVectorDynamicCPU.hpp: No such header file");
 #endif
 
+#define __device_lightning
+
 #include <bitset>
 #include <cassert>
 #include <cmath>

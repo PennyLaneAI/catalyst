@@ -16,7 +16,7 @@ import pytest
 import jax.numpy as jnp
 import pennylane as qml
 
-from catalyst import qjit, measure, CompileError
+from catalyst import qjit, measure
 
 
 @qjit()
@@ -43,15 +43,6 @@ def workflow1(n: int):
 )
 def test_variable_capture(workflow, _in, _out):
     assert workflow(_in) == _out
-
-
-def test_unsupported_device():
-    @qml.qnode(qml.device("default.qubit", wires=2))
-    def func():
-        return qml.probs()
-
-    with pytest.raises(CompileError, match="Only the lightning.qubit device is supported"):
-        qjit(func)
 
 
 if __name__ == "__main__":

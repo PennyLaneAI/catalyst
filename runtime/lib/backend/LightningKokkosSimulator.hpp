@@ -18,6 +18,8 @@
 throw std::logic_error("StateVectorKokkos.hpp: No such header file");
 #endif
 
+#define __device_lightning_kokkos
+
 #include <bitset>
 #include <cassert>
 #include <cmath>

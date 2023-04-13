@@ -131,6 +131,7 @@ TEST_CASE("Test a LightningSimulator circuit with num_qubits=4", "[CacheManager]
 TEST_CASE("Test __quantum__qis__ circuit with observables", "[CacheManager]")
 {
     // initialize the simulator
+    __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
 
     QUBIT *target = __quantum__rt__qubit_allocate();              // id = 0
@@ -176,6 +177,7 @@ TEST_CASE("Test __quantum__qis__ circuit with observables using deactiveCacheMan
           "[CacheManager]")
 {
     // initialize the simulator
+    __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
 
     QUBIT *target = __quantum__rt__qubit_allocate();              // id = 0
