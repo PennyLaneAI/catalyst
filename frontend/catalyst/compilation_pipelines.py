@@ -57,30 +57,33 @@ def mlir_type_to_numpy_type(t):
     Raises:
         TypeError
     """
+    retval = None
     if ir.ComplexType.isinstance(t):
         base = ir.ComplexType(t).element_type
         if ir.F64Type.isinstance(base):
-            return np.complex128
+            retval = np.complex128
         if ir.F32Type.isinstance(base):
-            return np.complex64
+            retval = np.complex64
+    elif ir.F64Type.isinstance(t):
+        retval = np.float64
+    elif ir.F32Type.isinstance(t):
+        retval = np.float32
+    elif ir.F16Type.isinstance(t):
+        retval = np.float16
+    elif ir.IntegerType(t).width == 1:
+        retval = np.bool_
+    elif ir.IntegerType(t).width == 8:
+        retval = np.int8
+    elif ir.IntegerType(t).width == 16:
+        retval = np.int16
+    elif ir.IntegerType(t).width == 32:
+        retval = np.int32
+    elif ir.IntegerType(t).width == 64:
+        retval = np.int64
+
+    if retval is None:
         raise TypeError("No known type")
-    if ir.F64Type.isinstance(t):
-        return np.float64
-    if ir.F32Type.isinstance(t):
-        return np.float32
-    if ir.F16Type.isinstance(t):
-        return np.float16
-    if ir.IntegerType(t).width == 1:
-        return np.bool_
-    if ir.IntegerType(t).width == 8:
-        return np.int8
-    if ir.IntegerType(t).width == 16:
-        return np.int16
-    if ir.IntegerType(t).width == 32:
-        return np.int32
-    if ir.IntegerType(t).width == 64:
-        return np.int64
-    raise TypeError("No known type")
+    return retval
 
 
 class CompiledFunction:
