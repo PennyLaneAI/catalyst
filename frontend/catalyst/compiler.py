@@ -267,12 +267,6 @@ class LLVMIRToObjectFile(PassPipeline):
         return infile.replace(".ll", ".o")
 
 
-mlir_lib_path = get_lib_path("llvm", "MLIR_LIB_DIR")
-lrt_lib_path = get_lib_path("runtime", "RUNTIME_LIB_DIR")
-lrt_capi_path = os.path.join(lrt_lib_path, "capi")
-lrt_backend_path = os.path.join(lrt_lib_path, "backend")
-
-
 # pylint: disable=too-few-public-methods
 class CompilerDriver:
     """Compiler Driver Interface
@@ -290,19 +284,35 @@ class CompilerDriver:
 
     _default_fallback_compilers = ["clang", "gcc", "c99", "c89", "cc"]
 
-    _default_flags = [
-        "-shared",
-        "-rdynamic",
-        "-Wl,-no-as-needed",
-        f"-Wl,-rpath,{lrt_capi_path}:{lrt_backend_path}:{mlir_lib_path}",
-        f"-L{mlir_lib_path}",
-        f"-L{lrt_capi_path}",
-        f"-L{lrt_backend_path}",
-        "-lrt_backend",
-        "-lrt_capi",
-        "-lpthread",
-        "-lmlir_c_runner_utils",  # required for memref.copy
-    ]
+    @staticmethod
+    def get_default_flags():
+        """Re-compute the path where the libraries exist.
+
+        The use case for this is if someone is in a python jupyter notebook and
+        needs to change the environment mid computation.
+        Returns
+            (List[str]): The default flag list.
+        """
+        mlir_lib_path = get_lib_path("llvm", "MLIR_LIB_DIR")
+        lrt_lib_path = get_lib_path("runtime", "RUNTIME_LIB_DIR")
+        lrt_capi_path = os.path.join(lrt_lib_path, "capi")
+        lrt_backend_path = os.path.join(lrt_lib_path, "backend")
+
+        default_flags = [
+            "-shared",
+            "-rdynamic",
+            "-Wl,-no-as-needed",
+            f"-Wl,-rpath,{lrt_capi_path}:{lrt_backend_path}:{mlir_lib_path}",
+            f"-L{mlir_lib_path}",
+            f"-L{lrt_capi_path}",
+            f"-L{lrt_backend_path}",
+            "-lrt_backend",
+            "-lrt_capi",
+            "-lpthread",
+            "-lmlir_c_runner_utils",  # required for memref.copy
+        ]
+
+        return default_flags
 
     @staticmethod
     def _get_compiler_fallback_order(fallback_compilers):
@@ -376,7 +386,7 @@ class CompilerDriver:
         if outfile is None:
             outfile = CompilerDriver.get_output_filename(infile)
         if flags is None:
-            flags = CompilerDriver._default_flags
+            flags = CompilerDriver.get_default_flags()
         if fallback_compilers is None:
             fallback_compilers = CompilerDriver._default_fallback_compilers
         for compiler in CompilerDriver._available_compilers(fallback_compilers):
