@@ -87,8 +87,8 @@ def get_lib_path(project, env_var):
 class PassPipeline(abc.ABC):
     """Abstract PassPipeline class."""
 
-    _executable = None
-    _default_flags = None
+    _executable : Optional[str] = None
+    _default_flags : Optional[list[str]] = None
 
     @staticmethod
     @abc.abstractmethod
