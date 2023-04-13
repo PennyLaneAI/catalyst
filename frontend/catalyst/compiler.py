@@ -131,7 +131,7 @@ class PassPipeline(abc.ABC):
 
 # pylint: disable=too-few-public-methods
 class MHLOPass(PassPipeline):
-    """MHLO Pass."""
+    """Pass pipeline to convert (M)HLO dialects to standard MLIR dialects."""
 
     _executable = get_executable_path("mhlo", "mlir-hlo-opt")
     _default_flags = [
@@ -153,7 +153,7 @@ class MHLOPass(PassPipeline):
 
 
 class BufferizationPass(PassPipeline):
-    """Bufferization Pass."""
+    """Pass pipeline that bufferizes MLIR dialects."""
 
     _executable = get_executable_path("quantum", "quantum-opt")
     _default_flags = [
@@ -188,7 +188,7 @@ class BufferizationPass(PassPipeline):
 
 
 class MLIRToLLVMDialect(PassPipeline):
-    """MLIR To LLVM"""
+    """Pass pipeline to lower MLIR dialects to LLVM dialect."""
 
     _executable = get_executable_path("quantum", "quantum-opt")
     _default_flags = [
@@ -226,7 +226,7 @@ class MLIRToLLVMDialect(PassPipeline):
 
 
 class QuantumCompilationPass(PassPipeline):
-    """Lower gradients"""
+    """Pass pipeline to lower gradients."""
 
     _executable = get_executable_path("quantum", "quantum-opt")
     _default_flags = ["--lower-gradients"]
