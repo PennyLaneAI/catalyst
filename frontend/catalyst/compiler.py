@@ -84,8 +84,8 @@ def get_lib_path(project, env_var):
     return os.getenv(env_var, default_lib_paths.get(project, ""))
 
 
-class Pass(abc.ABC):
-    """Abstract Pass class."""
+class PassPipeline(abc.ABC):
+    """Abstract PassPipeline class."""
 
     _executable = None
     _default_flags = None
@@ -128,7 +128,7 @@ class Pass(abc.ABC):
 
 
 # pylint: disable=too-few-public-methods
-class MHLOPass(Pass):
+class MHLOPass(PassPipeline):
     """MHLO Pass."""
 
     _executable = get_executable_path("mhlo", "mlir-hlo-opt")
@@ -150,7 +150,7 @@ class MHLOPass(Pass):
         return infile.replace(".mlir", ".nohlo.mlir")
 
 
-class BufferizationPass(Pass):
+class BufferizationPass(PassPipeline):
     """Bufferization Pass."""
 
     _executable = get_executable_path("quantum", "quantum-opt")
@@ -185,7 +185,7 @@ class BufferizationPass(Pass):
         return infile.replace(".opt.mlir", ".buff.mlir")
 
 
-class MLIRToLLVMDialect(Pass):
+class MLIRToLLVMDialect(PassPipeline):
     """MLIR To LLVM"""
 
     _executable = get_executable_path("quantum", "quantum-opt")
@@ -223,7 +223,7 @@ class MLIRToLLVMDialect(Pass):
         return infile.replace(".buff.mlir", ".llvm.mlir")
 
 
-class QuantumCompilationPass(Pass):
+class QuantumCompilationPass(PassPipeline):
     """Lower gradients"""
 
     _executable = get_executable_path("quantum", "quantum-opt")
@@ -236,7 +236,7 @@ class QuantumCompilationPass(Pass):
         return infile.replace(".mlir", ".opt.mlir")
 
 
-class LLVMDialectToLLVMIR(Pass):
+class LLVMDialectToLLVMIR(PassPipeline):
     """Convert LLVM Dialect to LLVM-IR."""
 
     _executable = get_executable_path("llvm", "mlir-translate")
@@ -249,7 +249,7 @@ class LLVMDialectToLLVMIR(Pass):
         return infile.replace(".llvm.mlir", ".ll")
 
 
-class LLVMIRToObjectFile(Pass):
+class LLVMIRToObjectFile(PassPipeline):
     """LLVMIR To Object File."""
 
     _executable = get_executable_path("llvm", "llc")
