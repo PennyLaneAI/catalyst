@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <cassert>
 #include <cstdarg>
 #include <cstdlib>
 #include <ctime>
@@ -24,6 +23,7 @@
 #include <memory>
 #include <ostream>
 
+#include "Exception.hpp"
 #include "QuantumDevice.hpp"
 
 #include "Driver.hpp"
@@ -62,16 +62,16 @@ void _mlir_memref_to_llvm_free(void *ptr)
     free(ptr);
 }
 
-void __quantum__rt__fail_cstr(const char *cstr) { throw std::runtime_error(cstr); }
+void __quantum__rt__fail_cstr(const char *cstr) { RT_FAIL(cstr); }
 
 void __quantum__rt__initialize()
 {
     if (!Catalyst::Runtime::CAPI::DRIVER) {
-        __quantum__rt__fail_cstr("Initialization before defining the device");
+        RT_FAIL("Initialization before defining the device");
     }
 
     if (Catalyst::Runtime::CAPI::DRIVER->get_device()) {
-        __quantum__rt__fail_cstr("Invalid initialization of the global device");
+        RT_FAIL("Invalid initialization of the global device");
     }
 
     if (!Catalyst::Runtime::CAPI::DRIVER->init_device()) {
@@ -79,11 +79,11 @@ void __quantum__rt__initialize()
         std::cerr << "Failed initialization of the global device, "
                   << Catalyst::Runtime::CAPI::DRIVER->get_device_name() << std::endl;
 
-        __quantum__rt__fail_cstr("Failed initialization of the global device");
+        RT_FAIL("Failed initialization of the global device");
     }
 
-    assert(Catalyst::Runtime::CAPI::DRIVER->get_device() != nullptr);
-    assert(Catalyst::Runtime::CAPI::DRIVER->get_memory_manager() != nullptr);
+    RT_ASSERT(Catalyst::Runtime::CAPI::DRIVER->get_device() != nullptr);
+    RT_ASSERT(Catalyst::Runtime::CAPI::DRIVER->get_memory_manager() != nullptr);
 }
 
 void __quantum__rt__finalize() { Catalyst::Runtime::CAPI::DRIVER.reset(nullptr); }
@@ -111,12 +111,11 @@ void __quantum__rt__device(int8_t *spec, int8_t *value)
                 static_cast<size_t>(std::stoul(std::string(args[1]))));
         }
         catch (std::exception &) {
-            __quantum__rt__fail_cstr("Invalid argument for the device specification (shots)");
+            RT_FAIL("Invalid argument for the device specification (shots)");
         }
     }
     else {
-        __quantum__rt__fail_cstr(
-            "Invalid device specification; 'backend' and 'shots' are only supported.");
+        RT_FAIL("Invalid device specification; 'backend' and 'shots' are only supported.");
     }
 }
 
@@ -140,7 +139,7 @@ QUBIT *__quantum__rt__qubit_allocate()
 
 QirArray *__quantum__rt__qubit_allocate_array(int64_t num_qubits)
 {
-    assert(num_qubits >= 0);
+    RT_ASSERT(num_qubits >= 0);
 
     QirArray *qubit_array = __quantum__rt__array_create_1d(sizeof(QubitIdType), num_qubits);
     const auto &&qubit_vector =
@@ -200,7 +199,7 @@ QirString *__quantum__rt__result_to_string(RESULT *result)
 
 void __quantum__qis__Gradient(int64_t numResults, /* results = */...)
 {
-    assert(numResults >= 0);
+    RT_ASSERT(numResults >= 0);
     using ResultType = MemRefT<double, 1>;
 
     // num_observables * num_train_params
@@ -208,9 +207,9 @@ void __quantum__qis__Gradient(int64_t numResults, /* results = */...)
 
     const size_t num_observables = jacobian.size();
     if (num_observables != static_cast<size_t>(numResults)) {
-        __quantum__rt__fail_cstr("Invalid number of results; "
-                                 "The number of results must be equal to the "
-                                 "number of cached observables.");
+        RT_FAIL("Invalid number of results; "
+                "The number of results must be equal to the "
+                "number of cached observables.");
     }
 
     // for zero number of observables
@@ -228,7 +227,7 @@ void __quantum__qis__Gradient(int64_t numResults, /* results = */...)
         double *buffer = jacobian[i].data();
         size_t buffer_len = jacobian[i].size();
         MemRefT<double, 1> src = {buffer, buffer, 0, {buffer_len}, {1}};
-        assert(memref && "the result type cannot be a null pointer");
+        RT_FAIL_IF(!memref, "the result type cannot be a null pointer");
         memref_copy<double, 1>(memref, &src, num_train_params * sizeof(double));
     }
     va_end(args);
@@ -237,11 +236,11 @@ void __quantum__qis__Gradient(int64_t numResults, /* results = */...)
 void __quantum__qis__Gradient_params(MemRefT_int64_1d *params, int64_t numResults,
                                      /* results = */...)
 {
-    assert(numResults >= 0);
+    RT_ASSERT(numResults >= 0);
     using ResultType = MemRefT<double, 1>;
 
     if (params == nullptr || !params->sizes[0]) {
-        __quantum__rt__fail_cstr("Invalid number of trainable parameters");
+        RT_FAIL("Invalid number of trainable parameters");
     }
 
     const size_t tp_size = params->sizes[0];
@@ -252,7 +251,7 @@ void __quantum__qis__Gradient_params(MemRefT_int64_1d *params, int64_t numResult
     train_params.reserve(tp_size);
     for (size_t i = 0; i < tp_size; i++) {
         auto p = params_data[i];
-        assert(p >= 0 && "trainable parameter cannot be a negative integer");
+        RT_FAIL_IF(p < 0, "trainable parameter cannot be a negative integer");
         train_params.push_back(p);
     }
 
@@ -261,9 +260,9 @@ void __quantum__qis__Gradient_params(MemRefT_int64_1d *params, int64_t numResult
 
     const size_t num_observables = jacobian.size();
     if (num_observables != static_cast<size_t>(numResults)) {
-        __quantum__rt__fail_cstr("Invalid number of results; "
-                                 "The number of results must be equal to the "
-                                 "number of cached observables.");
+        RT_FAIL("Invalid number of results; "
+                "The number of results must be equal to the "
+                "number of cached observables.");
     }
 
     // for zero number of observables
@@ -278,7 +277,7 @@ void __quantum__qis__Gradient_params(MemRefT_int64_1d *params, int64_t numResult
     va_start(args, numResults);
     for (int64_t i = 0; i < numResults; i++) {
         MemRefT<double, 1> *memref = va_arg(args, ResultType *);
-        assert(memref && "the result type cannot be a null pointer");
+        RT_FAIL_IF(!memref, "the result type cannot be a null pointer");
         double *buffer = jacobian[i].data();
         size_t buffer_len = jacobian[i].size();
         MemRefT<double, 1> src = {buffer, buffer, 0, {buffer_len}, {1}};
@@ -508,7 +507,7 @@ void __quantum__qis__Toffoli(QUBIT *wire0, QUBIT *wire1, QUBIT *wire2)
 
 void __quantum__qis__MultiRZ(double theta, int64_t numQubits, ...)
 {
-    assert(numQubits >= 0);
+    RT_ASSERT(numQubits >= 0);
 
     va_list args;
     va_start(args, numQubits);
@@ -525,14 +524,14 @@ void __quantum__qis__MultiRZ(double theta, int64_t numQubits, ...)
 void __quantum__qis__QubitUnitary(MemRefT_CplxT_double_2d *matrix, int64_t numQubits,
                                   /*qubits*/...)
 {
-    assert(numQubits >= 0);
+    RT_ASSERT(numQubits >= 0);
 
     if (matrix == nullptr) {
-        __quantum__rt__fail_cstr("The QubitUnitary matrix must be initialized");
+        RT_FAIL("The QubitUnitary matrix must be initialized");
     }
 
     if (numQubits > __quantum__rt__num_qubits()) {
-        __quantum__rt__fail_cstr("Invalid number of wires");
+        RT_FAIL("Invalid number of wires");
     }
 
     const size_t num_rows = matrix->sizes[0];
@@ -540,9 +539,8 @@ void __quantum__qis__QubitUnitary(MemRefT_CplxT_double_2d *matrix, int64_t numQu
     const size_t expected_size = std::pow(2, numQubits);
 
     if (num_rows != expected_size || num_col != expected_size) {
-        __quantum__rt__fail_cstr(
-            "Invalid given QubitUnitary matrix; "
-            "The size of the matrix must be pow(2, numWires) * pow(2, numWires).");
+        RT_FAIL("Invalid given QubitUnitary matrix; "
+                "The size of the matrix must be pow(2, numWires) * pow(2, numWires).");
     }
 
     va_list args;
@@ -573,10 +571,10 @@ ObsIdType __quantum__qis__NamedObs(int64_t obsId, QUBIT *wire)
 
 ObsIdType __quantum__qis__HermitianObs(MemRefT_CplxT_double_2d *matrix, int64_t numQubits, ...)
 {
-    assert(numQubits >= 0);
+    RT_ASSERT(numQubits >= 0);
 
     if (matrix == nullptr) {
-        __quantum__rt__fail_cstr("The Hermitian matrix must be initialized");
+        RT_FAIL("The Hermitian matrix must be initialized");
     }
 
     const size_t num_rows = matrix->sizes[0];
@@ -584,9 +582,8 @@ ObsIdType __quantum__qis__HermitianObs(MemRefT_CplxT_double_2d *matrix, int64_t 
     const size_t expected_size = std::pow(2, numQubits);
 
     if (num_rows != expected_size || num_col != expected_size) {
-        __quantum__rt__fail_cstr(
-            "Invalid given Hermitian matrix; "
-            "The size of the matrix must be pow(2, numWires) * pow(2, numWires).");
+        RT_FAIL("Invalid given Hermitian matrix; "
+                "The size of the matrix must be pow(2, numWires) * pow(2, numWires).");
     }
 
     va_list args;
@@ -598,7 +595,7 @@ ObsIdType __quantum__qis__HermitianObs(MemRefT_CplxT_double_2d *matrix, int64_t 
     va_end(args);
 
     if (numQubits > __quantum__rt__num_qubits()) {
-        __quantum__rt__fail_cstr("Invalid number of wires");
+        RT_FAIL("Invalid number of wires");
     }
 
     const size_t matrix_size = num_rows * num_col;
@@ -615,7 +612,7 @@ ObsIdType __quantum__qis__HermitianObs(MemRefT_CplxT_double_2d *matrix, int64_t 
 ObsIdType __quantum__qis__TensorObs(int64_t numObs, /*obsKeys*/...)
 {
     if (numObs < 1) {
-        __quantum__rt__fail_cstr("Invalid number of observables to create TensorProdObs");
+        RT_FAIL("Invalid number of observables to create TensorProdObs");
     }
 
     va_list args;
@@ -633,18 +630,18 @@ ObsIdType __quantum__qis__TensorObs(int64_t numObs, /*obsKeys*/...)
 ObsIdType __quantum__qis__HamiltonianObs(MemRefT_double_1d *coeffs, int64_t numObs,
                                          /*obsKeys*/...)
 {
-    assert(numObs >= 0);
+    RT_ASSERT(numObs >= 0);
 
     if (coeffs == nullptr) {
-        __quantum__rt__fail_cstr("Invalid coefficients for computing Hamiltonian; "
-                                 "The coefficients list must be initialized.");
+        RT_FAIL("Invalid coefficients for computing Hamiltonian; "
+                "The coefficients list must be initialized.");
     }
 
     const size_t coeffs_size = coeffs->sizes[0];
 
     if (static_cast<size_t>(numObs) != coeffs_size) {
-        __quantum__rt__fail_cstr("Invalid coefficients for computing Hamiltonian; "
-                                 "The number of coefficients and observables must be equal.");
+        RT_FAIL("Invalid coefficients for computing Hamiltonian; "
+                "The number of coefficients and observables must be equal.");
     }
 
     va_list args;
@@ -679,7 +676,7 @@ double __quantum__qis__Variance(ObsIdType obsKey)
 
 void __quantum__qis__Probs(MemRefT_double_1d *result, int64_t numQubits, ...)
 {
-    assert(numQubits >= 0);
+    RT_ASSERT(numQubits >= 0);
     MemRefT<double, 1> *result_p = (MemRefT<double, 1> *)result;
 
     va_list args;
@@ -712,7 +709,7 @@ void __quantum__qis__Probs(MemRefT_double_1d *result, int64_t numQubits, ...)
 
 void __quantum__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, ...)
 {
-    assert(numQubits >= 0);
+    RT_ASSERT(numQubits >= 0);
     MemRefT<std::complex<double>, 1> *result_p = (MemRefT<std::complex<double>, 1> *)result;
 
     va_list args;
@@ -733,13 +730,13 @@ void __quantum__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, .
         sv_state = Catalyst::Runtime::CAPI::DRIVER->get_device()->State();
     }
     else {
-        __quantum__rt__fail_cstr("Partial State-Vector not supported yet");
+        RT_FAIL("Partial State-Vector not supported yet");
         // Catalyst::Runtime::CAPI::DRIVER->get_device()->PartialState(stateVec,
         // numElements, wires);
     }
 
     const size_t numElements = sv_state.size();
-    assert(numElements == (1U << numQubits));
+    RT_ASSERT(numElements == (1U << numQubits));
     std::complex<double> *buffer = sv_state.data();
     size_t buffer_len = sv_state.size();
     MemRefT<std::complex<double>, 1> src = {buffer, buffer, 0, {buffer_len}, {1}};
@@ -749,8 +746,8 @@ void __quantum__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, .
 
 void __quantum__qis__Sample(MemRefT_double_2d *result, int64_t shots, int64_t numQubits, ...)
 {
-    assert(shots >= 0);
-    assert(numQubits >= 0);
+    RT_ASSERT(shots >= 0);
+    RT_ASSERT(numQubits >= 0);
     MemRefT<double, 2> *result_p = (MemRefT<double, 2> *)result;
 
     va_list args;
@@ -784,8 +781,8 @@ void __quantum__qis__Sample(MemRefT_double_2d *result, int64_t shots, int64_t nu
 void __quantum__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t shots, int64_t numQubits,
                             ...)
 {
-    assert(shots >= 0);
-    assert(numQubits >= 0);
+    RT_ASSERT(shots >= 0);
+    RT_ASSERT(numQubits >= 0);
     MemRefT<double, 1> *result_eigvals_p = (MemRefT<double, 1> *)&result->first;
     MemRefT<int64_t, 1> *result_counts_p = (MemRefT<int64_t, 1> *)&result->second;
 
