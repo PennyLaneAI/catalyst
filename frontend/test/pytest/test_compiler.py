@@ -145,7 +145,7 @@ class TestCompilerState:
             qml.X(wires=1)
             return qml.state()
 
-        mlir_module, _ = get_mlir(workflow)
+        mlir_module, _, _ = get_mlir(workflow)
         compiler = Compiler()
         compiler.run(mlir_module)
         compiler.get_output_of("MHLOPass")
@@ -163,7 +163,7 @@ class TestCompilerState:
             qml.X(wires=1)
             return qml.state()
 
-        mlir_module, _ = get_mlir(workflow)
+        mlir_module, _, _ = get_mlir(workflow)
         # This means that we are not running any pass.
         passes = []
         identity_compiler = Compiler()
@@ -183,7 +183,7 @@ class TestCompilerState:
             qml.X(wires=1)
             return qml.state()
 
-        mlir_module, _ = get_mlir(workflow)
+        mlir_module, _, _ = get_mlir(workflow)
         # This means that we are not running any pass.
         passes = []
         identity_compiler = Compiler()

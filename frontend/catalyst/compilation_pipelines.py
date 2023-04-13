@@ -31,6 +31,7 @@ from mlir_quantum.runtime import (
     to_numpy,
 )
 
+from catalyst.utils.gen_mlir import append_modules
 import catalyst.jax_tracer as tracer
 from catalyst.compiler import Compiler
 from catalyst.compiler import CompileOptions
@@ -501,8 +502,10 @@ class QJIT:
         with Patcher(
             (qml.QNode, "__call__", QFunc.__call__),
         ):
-            mlir_module, jaxpr = tracer.get_mlir(self.qfunc, *self.c_sig)
+            mlir_module, ctx, jaxpr = tracer.get_mlir(self.qfunc, *self.c_sig)
 
+        # Inject setup and finalize functions.
+        append_modules(mlir_module, ctx)
         mod = mlir_module.operation
         self._jaxpr = jaxpr
         self._mlir = mod.get_asm(binary=False, print_generic_op_form=False, assume_verified=True)
