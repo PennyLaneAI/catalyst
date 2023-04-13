@@ -4,6 +4,10 @@
 
 <h3>Improvements</h3>
 
+* Improve interface for adding and re-using flags to quantum-opt commands.
+  These are called pipelines, as they contain multiple passes.
+  [#38](https://github.com/PennyLaneAI/catalyst/pull/38)
+
 <h3>Breaking changes</h3>
 
 <h3>Bug fixes</h3>
