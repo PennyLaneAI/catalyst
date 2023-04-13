@@ -392,7 +392,7 @@ class Compiler:
     """Compiles MLIR modules to shared objects."""
 
     def __init__(self):
-        self.order = None
+        self.pass_pipeline_output = None
         # The temporary directory must be referenced by the wrapper class
         # in order to avoid being garbage collected
         # pylint: disable=consider-using-with
@@ -438,7 +438,7 @@ class Compiler:
                 CompilerDriver,
             ]
 
-        self.order = {}
+        self.pass_pipeline_output = {}
 
         filename = f"{workspace_name}/{module_name}.mlir"
         with open(filename, "w", encoding="utf-8") as f:
@@ -446,7 +446,7 @@ class Compiler:
 
         for _pass in passes:
             output = _pass.run(filename, options=options)
-            self.order[_pass] = output
+            self.pass_pipeline_output[_pass] = output
             filename = os.path.abspath(output)
 
         return filename
@@ -457,7 +457,7 @@ class Compiler:
 
     def _get_output_file_of(self, _pass):
         cls = Compiler._get_class_from_string(_pass)
-        return self.order.get(cls)
+        return self.pass_pipeline_output.get(cls)
 
     def get_output_of(self, _pass):
         """Get the output IR of a pass.
