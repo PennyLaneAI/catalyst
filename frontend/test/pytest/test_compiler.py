@@ -80,6 +80,7 @@ class TestCompilerErrors:
     def test_no_executable(self):
         """Test that executable was set from a custom PassPipeline."""
 
+        # pylint: disable=missing-class-docstring
         class CustomClassWithNoExecutable(PassPipeline):
             _default_flags = ["some-command-but-it-is-actually-a-flag"]
 
@@ -165,9 +166,9 @@ class TestCompilerState:
 
         mlir_module, _, _ = get_mlir(workflow)
         # This means that we are not running any pass.
-        passes = []
+        pipelines = []
         identity_compiler = Compiler()
-        identity_compiler.run(mlir_module, keep_intermediate=True, passes=passes)
+        identity_compiler.run(mlir_module, keep_intermediate=True, pipelines=pipelines)
         directory = os.path.join(os.getcwd(), workflow.__name__)
         assert os.path.exists(directory)
         files = os.listdir(directory)
@@ -185,9 +186,9 @@ class TestCompilerState:
 
         mlir_module, _, _ = get_mlir(workflow)
         # This means that we are not running any pass.
-        passes = []
+        pipelines = []
         identity_compiler = Compiler()
-        identity_compiler.run(mlir_module, passes=passes)
+        identity_compiler.run(mlir_module, pipelines=pipelines)
         files = os.listdir(identity_compiler.workspace.name)
         # The directory is non-empty. Should at least contain the original .mlir file
         assert files

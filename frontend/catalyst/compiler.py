@@ -407,7 +407,7 @@ class Compiler:
         # pylint: disable=consider-using-with
         self.workspace = tempfile.TemporaryDirectory()
 
-    def run(self, mlir_module, keep_intermediate=False, passes=None, options=None):
+    def run(self, mlir_module, keep_intermediate=False, pipelines=None, options=None):
         """Compile an MLIR module to a shared object.
 
         .. note::
@@ -417,7 +417,7 @@ class Compiler:
 
         Args:
             mlir_module (Module): the MLIR module
-            passes (List[Any]): the list of compilation passes
+            pipelines (List[Any]): the list of compilation pipelines
 
         Returns:
             Shared object
@@ -436,8 +436,8 @@ class Compiler:
         else:
             workspace_name = self.workspace.name
 
-        if passes is None:
-            passes = [
+        if pipelines is None:
+            pipelines = [
                 MHLOPass,
                 QuantumCompilationPass,
                 BufferizationPass,
@@ -453,41 +453,41 @@ class Compiler:
         with open(filename, "w", encoding="utf-8") as f:
             mlir_module.operation.print(f, print_generic_op_form=False, assume_verified=True)
 
-        for _pass in passes:
-            output = _pass.run(filename, options=options)
-            self.pass_pipeline_output[_pass] = output
+        for pipeline in pipelines:
+            output = pipeline.run(filename, options=options)
+            self.pass_pipeline_output[pipeline] = output
             filename = os.path.abspath(output)
 
         return filename
 
     @staticmethod
-    def _get_class_from_string(_pass):
-        return getattr(sys.modules[__name__], _pass)
+    def _get_class_from_string(pipeline):
+        return getattr(sys.modules[__name__], pipeline)
 
-    def _get_output_file_of(self, _pass):
-        cls = Compiler._get_class_from_string(_pass)
+    def _get_output_file_of(self, pipeline):
+        cls = Compiler._get_class_from_string(pipeline)
         return self.pass_pipeline_output.get(cls)
 
-    def get_output_of(self, _pass):
-        """Get the output IR of a pass.
+    def get_output_of(self, pipeline):
+        """Get the output IR of a pipeline.
         Args:
-            _pass (str): name of pass class
+            pipeline (str): name of pass class
 
         Returns
             (str): output IR
         """
         try:
-            fname = self._get_output_file_of(_pass)
+            fname = self._get_output_file_of(pipeline)
         except AttributeError as e:
-            raise ValueError(f"Output for pass {_pass} not found.") from e
+            raise ValueError(f"Output for pass {pipeline} not found.") from e
         with open(fname, "r", encoding="utf-8") as f:
             txt = f.read()
         return txt
 
-    def print(self, _pass):
+    def print(self, pipeline):
         """Print the output IR of pass.
         Args:
-            _pass (str): name of pass class
+            pipeline (str): name of pass class
         """
-        txt = self.get_output_of(_pass)
+        txt = self.get_output_of(pipeline)
         print(txt)

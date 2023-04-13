@@ -432,17 +432,20 @@ class QJIT:
             after the Python process ends. If ``False``, these representations
             will instead be stored in a temporary folder, which will be deleted
             as soon as the QJIT instance is deleted.
+        pipelines (Optional(List[AnyType]): A list of pipelines to be executed. The elements of
+            the list are asked to implement a run method which takes the output of the previous run
+            as an input to the next element, and so on.
         compile_options (Optional[CompileOptions]): Common compilation options
     """
 
     # pylint: disable=too-many-arguments
-    def __init__(self, fn, target, keep_intermediate, passes, compile_options=None):
+    def __init__(self, fn, target, keep_intermediate, pipelines, compile_options=None):
         self.qfunc = fn
         self.c_sig = None
         functools.update_wrapper(self, fn)
         self.compile_options = compile_options
         self._compiler = Compiler()
-        self.passes = passes
+        self.pipelines = pipelines
         self._jaxpr = None
         self._mlir = None
         self._llvmir = None
@@ -518,7 +521,7 @@ class QJIT:
         shared_object = self._compiler.run(
             self.mlir_module,
             keep_intermediate=self.keep_intermediate,
-            passes=self.passes,
+            pipelines=self.pipelines,
             options=self.compile_options,
         )
         self._llvmir = self._compiler.get_output_of("LLVMDialectToLLVMIR")
@@ -559,7 +562,13 @@ class QJIT:
 
 
 def qjit(
-    fn=None, *, target="binary", keep_intermediate=False, verbose=False, logfile=None, passes=None
+    fn=None,
+    *,
+    target="binary",
+    keep_intermediate=False,
+    verbose=False,
+    logfile=None,
+    pipelines=None,
 ):
     """A just-in-time decorator for PennyLane and JAX programs using Catalyst.
 
@@ -582,6 +591,9 @@ def qjit(
         verbosity (int): Verbosity level (0 - disabled, >0 - enabled)
         logfile (Optional[TextIOWrapper]): File object to write verose messages to (default -
             sys.stderr).
+        pipelines (Optional(List[AnyType]): A list of pipelines to be executed. The elements of
+            the list are asked to implement a run method which takes the output of the previous run
+            as an input to the next element, and so on.
 
     Returns:
         QJIT object.
@@ -648,9 +660,9 @@ def qjit(
     """
 
     if fn is not None:
-        return QJIT(fn, target, keep_intermediate, passes, CompileOptions(verbose, logfile))
+        return QJIT(fn, target, keep_intermediate, pipelines, CompileOptions(verbose, logfile))
 
     def wrap_fn(fn):
-        return QJIT(fn, target, keep_intermediate, passes, CompileOptions(verbose, logfile))
+        return QJIT(fn, target, keep_intermediate, pipelines, CompileOptions(verbose, logfile))
 
     return wrap_fn
