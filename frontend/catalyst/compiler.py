@@ -379,7 +379,6 @@ class CompilerDriver:
             flags = CompilerDriver._default_flags
         if fallback_compilers is None:
             fallback_compilers = CompilerDriver._default_fallback_compilers
-        # pylint: disable=redefined-outer-name
         for compiler in CompilerDriver._available_compilers(fallback_compilers):
             success = CompilerDriver._attempt_link(compiler, flags, infile, outfile, options)
             if success:
