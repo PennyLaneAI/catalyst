@@ -18,6 +18,8 @@ compiling of hybrid quantum-classical functions using Catalyst.
 import ctypes
 import functools
 import warnings
+import inspect
+import typing
 
 import jax
 import numpy as np
@@ -34,7 +36,6 @@ from catalyst.compiler import Compiler
 from catalyst.compiler import CompileOptions
 from catalyst.pennylane_extensions import QFunc
 from catalyst.utils.patching import Patcher
-from catalyst.utils import utils
 from catalyst.utils.tracing import TracingContext
 
 # Required for JAX tracer objects as PennyLane wires.
@@ -44,6 +45,22 @@ setattr(jax.interpreters.partial_eval.DynamicJaxprTracer, "__hash__", lambda x: 
 jax.config.update("jax_enable_x64", True)
 jax.config.update("jax_platform_name", "cpu")
 jax.config.update("jax_array", True)
+
+
+def are_params_annotated(f: typing.Callable):
+    """Return true if all parameters are typed-annotated."""
+    signature = inspect.signature(f)
+    parameters = signature.parameters
+    return all(p.annotation is not inspect.Parameter.empty for p in parameters.values())
+
+
+def get_type_annotations(func: typing.Callable):
+    """Get all type annotations if all parameters are typed-annotated."""
+    params_are_annotated = are_params_annotated(func)
+    if params_are_annotated:
+        return getattr(func, "__annotations__", {}).values()
+
+    return None
 
 
 # pylint: disable=too-many-return-statements
@@ -432,7 +449,7 @@ class QJIT:
         self.mlir_module = None
         self.compiled_function = None
         self.keep_intermediate = keep_intermediate
-        parameter_types = utils.get_type_annotations(self.qfunc)
+        parameter_types = get_type_annotations(self.qfunc)
         self.user_typed = False
         if parameter_types is not None:
             self.user_typed = True
