@@ -294,18 +294,18 @@ class CompilerDriver:
             (List[str]): The default flag list.
         """
         mlir_lib_path = get_lib_path("llvm", "MLIR_LIB_DIR")
-        lrt_lib_path = get_lib_path("runtime", "RUNTIME_LIB_DIR")
-        lrt_capi_path = os.path.join(lrt_lib_path, "capi")
-        lrt_backend_path = os.path.join(lrt_lib_path, "backend")
+        rt_lib_path = get_lib_path("runtime", "RUNTIME_LIB_DIR")
+        rt_capi_path = os.path.join(rt_lib_path, "capi")
+        rt_backend_path = os.path.join(rt_lib_path, "backend")
 
         default_flags = [
             "-shared",
             "-rdynamic",
             "-Wl,-no-as-needed",
-            f"-Wl,-rpath,{lrt_capi_path}:{lrt_backend_path}:{mlir_lib_path}",
+            f"-Wl,-rpath,{rt_capi_path}:{rt_backend_path}:{mlir_lib_path}",
             f"-L{mlir_lib_path}",
-            f"-L{lrt_capi_path}",
-            f"-L{lrt_backend_path}",
+            f"-L{rt_capi_path}",
+            f"-L{rt_backend_path}",
             "-lrt_backend",
             "-lrt_capi",
             "-lpthread",
