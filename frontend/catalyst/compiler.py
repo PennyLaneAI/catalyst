@@ -112,15 +112,17 @@ class PassPipeline(abc.ABC):
 
         Args:
             infile (str): path to MLIR file to be compiled
-            outfile (str): path to output file, defaults to replacing extension in infile to .nohlo.
+            outfile (str): path to output file, defaults to replacing extension in infile to .nohlo
             executable (str): path to executable, defaults to mlir-hlo-opt
-            flags (List[str]): flags to mlir-hlo-opt, defaults to _default_flags.
-            options (CompileOptions): compile options.
+            flags (List[str]): flags to mlir-hlo-opt, defaults to _default_flags
+            options (CompileOptions): compile options
         """
         if outfile is None:
             outfile = cls.get_output_filename(infile)
         if executable is None:
             executable = cls._executable
+        if executable is None:
+            raise ValueError("Executable not specified.")
         if flags is None:
             flags = cls._default_flags
         cls._run(infile, outfile, executable, flags, options)

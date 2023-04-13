@@ -9,6 +9,7 @@ import pytest
 
 import pennylane as qml
 from catalyst import qjit
+from catalyst.compiler import PassPipeline
 from catalyst.compiler import Compiler
 from catalyst.compiler import CompilerDriver
 from catalyst.compiler import MHLOPass
@@ -75,6 +76,15 @@ class TestCompilerWarnings:
 
 class TestCompilerErrors:
     """Test compiler's error messages."""
+
+    def test_no_executable(self):
+        """Test that executable was set from a custom PassPipeline."""
+
+        class CustomClassWithNoExecutable(PassPipeline):
+            _default_flags = ["some-command-but-it-is-actually-a-flag"]
+
+        with pytest.raises(ValueError, match="Executable not specified."):
+            CustomClassWithNoExecutable.run("some-filename")
 
     def test_link_fail_exception(self):
         """Test that an exception is raised when all compiler possibilities are exhausted."""
