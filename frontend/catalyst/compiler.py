@@ -43,7 +43,7 @@ class CompileOptions:
         return self.logfile
 
 
-default_compile_options: CompileOptions = CompileOptions()
+default_compile_options = CompileOptions()
 
 
 def run_writing_command(
