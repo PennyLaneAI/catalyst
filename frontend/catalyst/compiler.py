@@ -41,10 +41,6 @@ class CompileOptions:
     keep_intermediate: Optional[bool] = False
     pipelines: Optional[List[Any]] = None
 
-    def get_logfile(self) -> TextIOWrapper:
-        """Get the effective file object, as configured"""
-        return self.logfile
-
 
 def run_writing_command(
     command: List[str], compile_options: Optional[CompileOptions] = None
@@ -54,7 +50,7 @@ def run_writing_command(
         compile_options = CompileOptions()
 
     if compile_options.verbose:
-        print(f"[RUNNING] {' '.join(command)}", file=compile_options.get_logfile())
+        print(f"[RUNNING] {' '.join(command)}", file=compile_options.logfile)
     subprocess.run(command, check=True)
 
 
