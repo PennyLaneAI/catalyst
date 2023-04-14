@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <cassert>
-
 #include <functional>
 #include <memory>
 #include <string>
@@ -21,6 +19,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
+#include "Exception.hpp"
 #include "QuantumDevice.hpp"
 
 #if __has_include("StateVectorCPU.hpp")
@@ -97,8 +96,8 @@ class Driver final {
         _driver_ptr.reset(nullptr);
         _driver_mm_ptr.reset(nullptr);
 
-        assert(get_device() == nullptr);
-        assert(get_memory_manager() == nullptr);
+        RT_ASSERT(get_device() == nullptr);
+        RT_ASSERT(get_memory_manager() == nullptr);
     };
 
     void set_device_name(std::string_view name) noexcept

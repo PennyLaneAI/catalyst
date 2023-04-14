@@ -14,8 +14,9 @@
 
 #pragma once
 
-#include <cassert>
 #include <cstring>
+
+#include <Exception.hpp>
 
 extern "C" {
 void *_mlir_memref_to_llvm_alloc(size_t size);
@@ -54,7 +55,7 @@ void memref_copy(MemRefT<T, R> *dst, MemRefT<T, R> *src, __attribute__((unused))
     for (;;) {
         memcpy(dstPtr + writeIndex, srcPtr + readIndex, sizeof(T));
         totalWritten += sizeof(T);
-        assert(totalWritten <= bytes && "wrote more than needed");
+        RT_FAIL_IF(totalWritten > bytes, "wrote more than needed");
         // Advance index and read position.
         for (int64_t axis = R - 1; axis >= 0; --axis) {
             // Advance at current axis.

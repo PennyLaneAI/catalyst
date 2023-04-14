@@ -50,6 +50,13 @@ void freeCounts(PairT_MemRefT_double_int64_1d &result)
 
 using namespace Catalyst::Runtime;
 
+TEST_CASE("Test __quantum__rt__fail_cstr", "[qir_lightning_core]")
+{
+    REQUIRE_THROWS_WITH(
+        __quantum__rt__fail_cstr("Test!"),
+        Catch::Contains("[Function:__quantum__rt__fail_cstr] Error in Catalyst Runtime: Test!"));
+}
+
 TEST_CASE("Qubits: allocate, release, dump", "[qir_lightning_core]")
 {
     // initialize the simulator
@@ -121,7 +128,8 @@ TEST_CASE("Test __quantum__rt__initialize multiple times", "[qir_lightning_core]
     __quantum__rt__initialize();
 
     REQUIRE_THROWS_WITH(__quantum__rt__initialize(),
-                        Catch::Contains("Invalid initialization of the global device"));
+                        Catch::Contains("[Function:__quantum__rt__initialize] Error in Catalyst "
+                                        "Runtime: Invalid initialization of the global device"));
 
     __quantum__rt__finalize();
 }
@@ -166,7 +174,8 @@ TEST_CASE("Test __quantum__qis__State with wires", "[qir_lightning_core]")
     MemRefT_CplxT_double_1d result = getState(8);
 
     REQUIRE_THROWS_WITH(__quantum__qis__State(&result, 1, wire0),
-                        Catch::Contains("Partial State-Vector not supported yet"));
+                        Catch::Contains("[Function:__quantum__qis__State] Error in Catalyst "
+                                        "Runtime: Partial State-Vector not supported yet"));
 
     freeState(result);
     __quantum__rt__finalize();
@@ -475,8 +484,10 @@ TEST_CASE("Test __quantum__qis__HermitianObs with an uninitialized matrix", "[qi
     __quantum__rt__initialize();
 
     MemRefT_CplxT_double_2d *matrix = nullptr;
-    REQUIRE_THROWS_WITH(__quantum__qis__HermitianObs(matrix, 0),
-                        Catch::Contains("The Hermitian matrix must be initialized"));
+    REQUIRE_THROWS_WITH(
+        __quantum__qis__HermitianObs(matrix, 0),
+        Catch::Contains("[Function:__quantum__qis__HermitianObs] Error in Catalyst Runtime: The "
+                        "Hermitian matrix must be initialized"));
 
     delete matrix;
     __quantum__rt__finalize();
@@ -582,8 +593,10 @@ TEST_CASE("Test __quantum__qis__TensorObs with invalid number of observables",
     __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
 
-    REQUIRE_THROWS_WITH(__quantum__qis__TensorObs(0),
-                        Catch::Contains("Invalid number of observables to create TensorProdObs"));
+    REQUIRE_THROWS_WITH(
+        __quantum__qis__TensorObs(0),
+        Catch::Contains("[Function:__quantum__qis__TensorObs] Error in Catalyst Runtime: Invalid "
+                        "number of observables to create TensorProdObs"));
 
     __quantum__rt__finalize();
 }
@@ -662,8 +675,11 @@ TEST_CASE("Test __quantum__qis__HamiltonianObs with invalid number of coefficien
     coeffs->sizes[0] = 2;
     coeffs->strides[0] = 1;
 
-    REQUIRE_THROWS_WITH(__quantum__qis__HamiltonianObs(coeffs, 0),
-                        Catch::Contains("Invalid coefficients for computing Hamiltonian"));
+    REQUIRE_THROWS_WITH(
+        __quantum__qis__HamiltonianObs(coeffs, 0),
+        Catch::Contains(
+            "[Function:__quantum__qis__HamiltonianObs] Error in Catalyst Runtime: Invalid "
+            "coefficients for computing Hamiltonian"));
 
     delete coeffs;
 
@@ -1287,7 +1303,8 @@ TEST_CASE("Test __quantum__qis__QubitUnitary with an uninitialized matrix", "[qi
     MemRefT_CplxT_double_2d *matrix = nullptr;
 
     REQUIRE_THROWS_WITH(__quantum__qis__QubitUnitary(matrix, 1, target),
-                        Catch::Contains("The QubitUnitary matrix must be initialized"));
+                        Catch::Contains("[Function:__quantum__qis__QubitUnitary] Error in Catalyst "
+                                        "Runtime: The QubitUnitary matrix must be initialized"));
 
     __quantum__rt__finalize();
 }
@@ -1394,7 +1411,8 @@ TEST_CASE("Test __rt__device registering a custom device with shots=500 and devi
 
     char dev2[7] = "device";
     REQUIRE_THROWS_WITH(__quantum__rt__device((int8_t *)dev2, (int8_t *)dev_value),
-                        Catch::Contains("Invalid device specification"));
+                        Catch::Contains("[Function:__quantum__rt__device] Error in Catalyst "
+                                        "Runtime: Invalid device specification"));
 
     REQUIRE_THROWS_WITH(__quantum__rt__device((int8_t *)shots, (int8_t *)dev_value),
                         Catch::Contains("Invalid argument for the device specification (shots)"));
