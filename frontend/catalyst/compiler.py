@@ -95,8 +95,12 @@ class PassPipeline(abc.ABC):
     def get_output_filename(infile):
         """Compute the output filename from the input filename.
 
+        Derived classes are expected to implement this method.
+
         Args:
             infile (str): input file
+        Returns:
+            outfile (str): output file
         """
 
     @staticmethod
