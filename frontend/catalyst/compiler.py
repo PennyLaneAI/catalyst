@@ -491,5 +491,4 @@ class Compiler:
         Args:
             pipeline (str): name of pass class
         """
-        txt = self.get_output_of(pipeline)
-        print(txt)  # pragma: no cover
+        print(self.get_output_of(pipeline)) # pragma: no cover
