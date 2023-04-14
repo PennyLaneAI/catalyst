@@ -33,11 +33,15 @@ namespace Catalyst::Runtime::Simulator {
  */
 template <typename PrecisionT> class LightningKokkosObsManager {
   private:
-    using ObservableClassName = Pennylane::LKokkos::Simulators::ObservableKokkos<PrecisionT>;
-    using NamedObsClassName = Pennylane::LKokkos::Simulators::NamedObsKokkos<PrecisionT>;
-    using HermitianObsClassName = Pennylane::LKokkos::Simulators::HermitianObsKokkos<PrecisionT>;
-    using TensorProdObsClassName = Pennylane::LKokkos::Simulators::TensorProdObsKokkos<PrecisionT>;
-    using HamiltonianClassName = Pennylane::LKokkos::Simulators::HamiltonianKokkos<PrecisionT>;
+    using ObservableClassName =
+        Pennylane::Lightning::Kokkos::Simulators::ObservableKokkos<PrecisionT>;
+    using NamedObsClassName = Pennylane::Lightning::Kokkos::Simulators::NamedObsKokkos<PrecisionT>;
+    using HermitianObsClassName =
+        Pennylane::Lightning::Kokkos::Simulators::HermitianObsKokkos<PrecisionT>;
+    using TensorProdObsClassName =
+        Pennylane::Lightning::Kokkos::Simulators::TensorProdObsKokkos<PrecisionT>;
+    using HamiltonianClassName =
+        Pennylane::Lightning::Kokkos::Simulators::HamiltonianKokkos<PrecisionT>;
 
     using ObservablePairType = std::pair<std::shared_ptr<ObservableClassName>, ObsType>;
     std::vector<ObservablePairType> observables_{};
