@@ -95,10 +95,12 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     __quantum__qis__Expval(obs);
 
     REQUIRE_THROWS_WITH(__quantum__qis__Gradient(2, &results),
-                        Catch::Contains("Invalid number of results"));
+                        Catch::Contains("[Function:__quantum__qis__Gradient] Error in Catalyst "
+                                        "Runtime: Invalid number of results"));
 
     REQUIRE_THROWS_WITH(__quantum__qis__Gradient_params(&tp, 2, &results),
-                        Catch::Contains("Invalid number of results"));
+                        Catch::Contains("[Function:__quantum__qis__Gradient_params] Error in "
+                                        "Catalyst Runtime: Invalid number of results"));
 
     __quantum__rt__toggle_recorder(/* activate_cm */ false);
 
