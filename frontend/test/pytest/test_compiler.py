@@ -6,6 +6,7 @@ import os
 import sys
 import warnings
 import pytest
+import tempfile
 
 import pennylane as qml
 from catalyst import qjit
@@ -91,9 +92,7 @@ class TestCompilerErrors:
     def test_link_fail_exception(self):
         """Test that an exception is raised when all compiler possibilities are exhausted."""
         with pytest.raises(EnvironmentError, match="Unable to link .*"):
-            CompilerDriver.run(
-                "in.o", CompileOptions(), fallback_compilers=["this-binary-does-not-exist"]
-            )
+            CompilerDriver.run("in.o", CompileOptions(), fallback_compilers=["c99"])
 
     def test_lower_mhlo_input_validation(self):
         """Test if the function detects wrong extensions"""
@@ -197,3 +196,94 @@ class TestCompilerState:
         files = os.listdir(identity_compiler.workspace.name)
         # The directory is non-empty. Should at least contain the original .mlir file
         assert files
+
+    def test_pass_with_output_name(self):
+        # pylint: disable=missing-class-docstring
+        class PassWithNoFlags(PassPipeline):
+            _executable = "c99"
+            _default_flags = []
+
+        workspace = tempfile.TemporaryDirectory()
+        filename = workspace.name + "a.c"
+        outfilename = workspace.name + "a.out"
+        with open(filename, "w", encoding="utf-8") as f:
+            print("int main() {}", file=f)
+
+        PassWithNoFlags.run(filename, CompileOptions(), outfile=outfilename)
+
+        assert os.path.exists(outfilename)
+
+    def test_pass_with_different_executable(self):
+        # pylint: disable=missing-class-docstring
+        class C99(PassPipeline):
+            _executable = "c99"
+            _default_flags = []
+
+            @staticmethod
+            def get_output_filename(infile):
+                return infile.replace(".c", ".out")
+
+        workspace = tempfile.TemporaryDirectory()
+        filename = workspace.name + "a.c"
+        expected_outfilename = workspace.name + "a.out"
+        with open(filename, "w", encoding="utf-8") as f:
+            print("int main() {}", file=f)
+
+        observed_outfilename = C99.run(filename, CompileOptions(), executable="c89")
+
+        assert observed_outfilename == expected_outfilename
+        assert os.path.exists(observed_outfilename)
+
+    def test_pass_with_flags(self):
+        # pylint: disable=missing-class-docstring
+        class C99(PassPipeline):
+            _executable = "c99"
+            _default_flags = []
+
+            @staticmethod
+            def get_output_filename(infile):
+                return infile.replace(".c", ".o")
+
+        workspace = tempfile.TemporaryDirectory()
+        filename = workspace.name + "a.c"
+        expected_outfilename = workspace.name + "a.o"
+        with open(filename, "w", encoding="utf-8") as f:
+            print("int main() {}", file=f)
+
+        observed_outfilename = C99.run(filename, CompileOptions(), flags=["-c"])
+
+        assert observed_outfilename == expected_outfilename
+        assert os.path.exists(observed_outfilename)
+
+    def test_compiler_driver_with_output_name(self):
+        workspace = tempfile.TemporaryDirectory()
+        filename = workspace.name + "a.c"
+        outfilename = workspace.name + "a.out"
+        with open(filename, "w", encoding="utf-8") as f:
+            print("int main() {}", file=f)
+
+        CompilerDriver.run(filename, CompileOptions(), outfile=outfilename)
+
+        assert os.path.exists(outfilename)
+
+    def test_compiler_driver_with_flags(self):
+        # pylint: disable=missing-class-docstring
+        class C99(PassPipeline):
+            _executable = "c99"
+            _default_flags = ["-c"]
+
+            @staticmethod
+            def get_output_filename(infile):
+                return infile.replace(".c", ".o")
+
+        workspace = tempfile.TemporaryDirectory()
+        filename = workspace.name + "a.c"
+        with open(filename, "w", encoding="utf-8") as f:
+            print("int main() {}", file=f)
+
+        object_file = C99.run(filename, CompileOptions())
+        expected_outfilename = workspace.name + "a.so"
+        observed_outfilename = CompilerDriver.run(object_file, CompileOptions(), flags=[])
+
+        assert observed_outfilename == expected_outfilename
+        assert os.path.exists(observed_outfilename)

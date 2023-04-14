@@ -79,7 +79,7 @@ def mlir_type_to_numpy_type(t):
         base = ir.ComplexType(t).element_type
         if ir.F64Type.isinstance(base):
             retval = np.complex128
-        elif ir.F32Type.isinstance(base):
+        else:
             retval = np.complex64
     elif ir.F64Type.isinstance(t):
         retval = np.float64
@@ -95,7 +95,7 @@ def mlir_type_to_numpy_type(t):
             retval = np.int16
         elif int_t.width == 32:
             retval = np.int32
-        elif int_t.width == 64:
+        else:
             retval = np.int64
 
     if retval is None:
@@ -444,8 +444,7 @@ class QJIT:
         self.user_typed = False
         if parameter_types is not None:
             self.user_typed = True
-            if self.compile_options.target in ("mlir", "binary"):
-                self.mlir_module = self.get_mlir(*parameter_types)
+            self.mlir_module = self.get_mlir(*parameter_types)
             if self.compile_options.target == "binary":
                 self.compiled_function = self.compile()
 
