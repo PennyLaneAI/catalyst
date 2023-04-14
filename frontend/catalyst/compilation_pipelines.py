@@ -79,27 +79,27 @@ def mlir_type_to_numpy_type(t):
         base = ir.ComplexType(t).element_type
         if ir.F64Type.isinstance(base):
             retval = np.complex128
-        if ir.F32Type.isinstance(base):
+        elif ir.F32Type.isinstance(base):
             retval = np.complex64
     elif ir.F64Type.isinstance(t):
         retval = np.float64
     elif ir.F32Type.isinstance(t):
         retval = np.float32
-    elif ir.F16Type.isinstance(t):
-        retval = np.float16
-    elif ir.IntegerType(t).width == 1:
-        retval = np.bool_
-    elif ir.IntegerType(t).width == 8:
-        retval = np.int8
-    elif ir.IntegerType(t).width == 16:
-        retval = np.int16
-    elif ir.IntegerType(t).width == 32:
-        retval = np.int32
-    elif ir.IntegerType(t).width == 64:
-        retval = np.int64
+    elif ir.IntegerType.isinstance(t):
+        int_t = ir.IntegerType(t)
+        if int_t.width == 1:
+            retval = np.bool_
+        elif int_t.width == 8:
+            retval = np.int8
+        elif int_t.width == 16:
+            retval = np.int16
+        elif int_t.width == 32:
+            retval = np.int32
+        elif int_t.width == 64:
+            retval = np.int64
 
     if retval is None:
-        raise TypeError("No known type")
+        raise TypeError("Requested return type is unavailable.")
     return retval
 
 
@@ -507,17 +507,25 @@ class QJIT:
     def compile(self):
         """Compile the current MLIR module."""
 
+        # This will make a check before sending it to the compiler that the return type
+        # is actually available in most systems. f16 needs a special symbol and linking
+        # will fail if it is not available.
+        restype = self.mlir_module.body.operations[0].type.results
+        for res in restype:
+            baseType = ir.RankedTensorType(res).element_type
+            mlir_type_to_numpy_type(baseType)
+
         shared_object = self._compiler.run(
             self.mlir_module,
             options=self.compile_options,
         )
+
         self._llvmir = self._compiler.get_output_of("LLVMDialectToLLVMIR")
 
         # The function name out of MLIR has quotes around it, which we need to remove.
         # The MLIR function name is actually a derived type from string which has no
         # `replace` method, so we need to get a regular Python string out of it.
         qfunc_name = str(self.mlir_module.body.operations[0].name).replace('"', "")
-        restype = self.mlir_module.body.operations[0].type.results
         return CompiledFunction(shared_object, qfunc_name, restype)
 
     def __call__(self, *args, **kwargs):

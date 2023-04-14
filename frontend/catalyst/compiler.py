@@ -494,4 +494,4 @@ class Compiler:
             pipeline (str): name of pass class
         """
         txt = self.get_output_of(pipeline)
-        print(txt)
+        print(txt)  # pragma: no cover
