@@ -83,9 +83,12 @@ class TestReturnValues:
         [(jnp.complex128), (jnp.complex64), (jnp.float32), (jnp.int8), (jnp.int16), (jnp.int32)],
     )
     def test_return_complex_scalar(self, dtype):
-        """Complex scalars (and float16)* take a different path when being returned from the
+        """Complex scalars take a different path when being returned from the
         compiled function. See `ranked_memref_to_numpy` and `to_numpy` in
         llvm-project/mlir/python/mlir/runtime/np_to_memref.py.
+
+        Also test that we can return all these types if specifically requested by the user in the
+        compiled function itself.
         """
 
         @qjit
@@ -97,6 +100,7 @@ class TestReturnValues:
 
     @pytest.mark.parametrize("dtype", [(jnp.float16)])
     def test_types_which_are_unhandled(self, dtype):
+        """Test that there's a nice error message when a function returns an f16."""
         with pytest.raises(TypeError, match="Requested return type is unavailable."):
 
             @qjit
