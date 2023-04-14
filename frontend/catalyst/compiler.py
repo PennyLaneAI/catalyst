@@ -95,7 +95,9 @@ class PassPipeline(abc.ABC):
     def get_output_filename(infile):
         """Compute the output filename from the input filename.
 
-        Derived classes are expected to implement this method.
+        .. note:
+
+                Derived classes are expected to implement this method.
 
         Args:
             infile (str): input file
@@ -419,10 +421,10 @@ class Compiler:
             please see the :func:`~.qjit` decorator.
 
         Args:
-            compile_options (Optional[CompileOptions]): Common compilation options
+            compile_options (Optional[CompileOptions]): common compilation options
 
         Returns:
-            Shared object
+            (str): filename of shared object
         """
 
         module_name = mlir_module.operation.attributes["sym_name"]

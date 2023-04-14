@@ -425,10 +425,9 @@ class QJIT:
 
     Args:
         fn (Callable): the quantum or classical function
-        compile_options (Optional[CompileOptions]): Common compilation options
+        compile_options (Optional[CompileOptions]): common compilation options
     """
 
-    # pylint: disable=too-many-arguments
     def __init__(self, fn, compile_options):
         self.qfunc = fn
         self.c_sig = None
