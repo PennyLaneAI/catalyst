@@ -23,7 +23,7 @@ import subprocess
 import tempfile
 import warnings
 from io import TextIOWrapper
-from typing import Optional, List
+from typing import Optional, List, Any
 from dataclasses import dataclass
 
 from catalyst._configuration import INSTALLED
@@ -35,15 +35,15 @@ package_root = os.path.dirname(__file__)
 class CompileOptions:
     """Generic compilation options"""
 
-    verbose: bool = False
+    verbose: Optional[bool] = False
     logfile: Optional[TextIOWrapper] = sys.stderr
+    target: Optional[str] = "binary"
+    keep_intermediate: Optional[bool] = False
+    pipelines: Optional[List[Any]] = None
 
     def get_logfile(self) -> TextIOWrapper:
         """Get the effective file object, as configured"""
         return self.logfile
-
-
-default_compile_options = CompileOptions()
 
 
 def run_writing_command(
@@ -51,7 +51,7 @@ def run_writing_command(
 ) -> None:
     """Run the command after optionally announcing this fact to the user"""
     if compile_options is None:
-        compile_options = default_compile_options
+        compile_options = CompileOptions()
 
     if compile_options.verbose:
         print(f"[RUNNING] {' '.join(command)}", file=compile_options.get_logfile())
@@ -410,7 +410,7 @@ class Compiler:
         # pylint: disable=consider-using-with
         self.workspace = tempfile.TemporaryDirectory()
 
-    def run(self, mlir_module, keep_intermediate=False, pipelines=None, options=None):
+    def run(self, mlir_module, options):
         """Compile an MLIR module to a shared object.
 
         .. note::
@@ -419,19 +419,19 @@ class Compiler:
             please see the :func:`~.qjit` decorator.
 
         Args:
-            mlir_module (Module): the MLIR module
-            pipelines (List[Any]): the list of compilation pipelines
+            compile_options (Optional[CompileOptions]): Common compilation options
 
         Returns:
             Shared object
         """
+
         module_name = mlir_module.operation.attributes["sym_name"]
         # Convert MLIR string to Python string
         module_name = str(module_name)
         # Remove quotations
         module_name = module_name.replace('"', "")
 
-        if keep_intermediate:
+        if options.keep_intermediate:
             parent_dir = os.getcwd()
             path = os.path.join(parent_dir, module_name)
             os.makedirs(path, exist_ok=True)
@@ -439,6 +439,7 @@ class Compiler:
         else:
             workspace_name = self.workspace.name
 
+        pipelines = options.pipelines
         if pipelines is None:
             pipelines = [
                 MHLOPass,

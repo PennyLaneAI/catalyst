@@ -425,41 +425,29 @@ class QJIT:
 
     Args:
         fn (Callable): the quantum or classical function
-        target (str): the compilation target
-        keep_intermediate (bool): Whether or not to store the intermediate files throughout the
-            compilation. If ``True``, the current working directory keeps
-            readable representations of the compiled module which remain available
-            after the Python process ends. If ``False``, these representations
-            will instead be stored in a temporary folder, which will be deleted
-            as soon as the QJIT instance is deleted.
-        pipelines (Optional(List[AnyType]): A list of pipelines to be executed. The elements of
-            the list are asked to implement a run method which takes the output of the previous run
-            as an input to the next element, and so on.
         compile_options (Optional[CompileOptions]): Common compilation options
     """
 
     # pylint: disable=too-many-arguments
-    def __init__(self, fn, target, keep_intermediate, pipelines, compile_options=None):
+    def __init__(self, fn, compile_options):
         self.qfunc = fn
         self.c_sig = None
         functools.update_wrapper(self, fn)
         self.compile_options = compile_options
         self._compiler = Compiler()
-        self.pipelines = pipelines
         self._jaxpr = None
         self._mlir = None
         self._llvmir = None
         self.mlir_module = None
         self.compiled_function = None
-        self.keep_intermediate = keep_intermediate
         parameter_types = get_type_annotations(self.qfunc)
         self.runtime = fn.device.short_name if isinstance(fn, qml.QNode) else "best"
         self.user_typed = False
         if parameter_types is not None:
             self.user_typed = True
-            if target in ("mlir", "binary"):
+            if self.compile_options.target in ("mlir", "binary"):
                 self.mlir_module = self.get_mlir(*parameter_types)
-            if target == "binary":
+            if self.compile_options.target == "binary":
                 self.compiled_function = self.compile()
 
     def print_stage(self, stage):
@@ -521,8 +509,6 @@ class QJIT:
 
         shared_object = self._compiler.run(
             self.mlir_module,
-            keep_intermediate=self.keep_intermediate,
-            pipelines=self.pipelines,
             options=self.compile_options,
         )
         self._llvmir = self._compiler.get_output_of("LLVMDialectToLLVMIR")
@@ -661,9 +647,9 @@ def qjit(
     """
 
     if fn is not None:
-        return QJIT(fn, target, keep_intermediate, pipelines, CompileOptions(verbose, logfile))
+        return QJIT(fn, CompileOptions(verbose, logfile, target, keep_intermediate, pipelines))
 
     def wrap_fn(fn):
-        return QJIT(fn, target, keep_intermediate, pipelines, CompileOptions(verbose, logfile))
+        return QJIT(fn, CompileOptions(verbose, logfile, target, keep_intermediate, pipelines))
 
     return wrap_fn

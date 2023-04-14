@@ -12,6 +12,7 @@ from catalyst import qjit
 from catalyst.compiler import PassPipeline
 from catalyst.compiler import Compiler
 from catalyst.compiler import CompilerDriver
+from catalyst.compiler import CompileOptions
 from catalyst.compiler import MHLOPass
 from catalyst.compiler import QuantumCompilationPass
 from catalyst.compiler import BufferizationPass
@@ -148,7 +149,7 @@ class TestCompilerState:
 
         mlir_module, _, _ = get_mlir(workflow)
         compiler = Compiler()
-        compiler.run(mlir_module)
+        compiler.run(mlir_module, CompileOptions())
         compiler.get_output_of("MHLOPass")
         compiler.get_output_of("QuantumCompilationPass")
         compiler.get_output_of("BufferizationPass")
@@ -168,7 +169,8 @@ class TestCompilerState:
         # This means that we are not running any pass.
         pipelines = []
         identity_compiler = Compiler()
-        identity_compiler.run(mlir_module, keep_intermediate=True, pipelines=pipelines)
+        options = CompileOptions(keep_intermediate=True, pipelines=pipelines)
+        identity_compiler.run(mlir_module, options)
         directory = os.path.join(os.getcwd(), workflow.__name__)
         assert os.path.exists(directory)
         files = os.listdir(directory)
@@ -188,7 +190,8 @@ class TestCompilerState:
         # This means that we are not running any pass.
         pipelines = []
         identity_compiler = Compiler()
-        identity_compiler.run(mlir_module, pipelines=pipelines)
+        options = CompileOptions(pipelines=pipelines)
+        identity_compiler.run(mlir_module, options)
         files = os.listdir(identity_compiler.workspace.name)
         # The directory is non-empty. Should at least contain the original .mlir file
         assert files
