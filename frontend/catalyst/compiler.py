@@ -42,7 +42,9 @@ class CompileOptions:
     pipelines: Optional[List[Any]] = None
 
 
-def run_writing_command(command: List[str], compile_options: CompileOptions) -> None:
+def run_writing_command(
+    command: List[str], compile_options: Optional[CompileOptions] = None
+) -> None:
     """Run the command after optionally announcing this fact to the user"""
     if compile_options is None:
         compile_options = CompileOptions()
@@ -106,15 +108,15 @@ class PassPipeline(abc.ABC):
 
     @classmethod
     # pylint: disable=too-many-arguments
-    def run(cls, infile, options, outfile=None, executable=None, flags=None):
+    def run(cls, infile, outfile=None, executable=None, flags=None, options=None):
         """Run the pass.
 
         Args:
             infile (str): path to MLIR file to be compiled
-            options (CompileOptions): compile options
             outfile (str): path to output file, defaults to replacing extension in infile to .nohlo
             executable (str): path to executable, defaults to mlir-hlo-opt
             flags (List[str]): flags to mlir-hlo-opt, defaults to _default_flags
+            options (CompileOptions): compile options
         """
         if outfile is None:
             outfile = cls.get_output_filename(infile)
@@ -369,7 +371,7 @@ class CompilerDriver:
         return infile.replace(".o", ".so")
 
     @staticmethod
-    def run(infile, options, outfile=None, flags=None, fallback_compilers=None):
+    def run(infile, outfile=None, flags=None, fallback_compilers=None, options=None):
         """
         Link the infile against the necessary libraries and produce the outfile.
 
@@ -454,7 +456,7 @@ class Compiler:
             mlir_module.operation.print(f, print_generic_op_form=False, assume_verified=True)
 
         for pipeline in pipelines:
-            output = pipeline.run(filename, options)
+            output = pipeline.run(filename, options=options)
             self.pass_pipeline_output[pipeline] = output
             filename = os.path.abspath(output)
 

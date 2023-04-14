@@ -87,47 +87,47 @@ class TestCompilerErrors:
             _default_flags = ["some-command-but-it-is-actually-a-flag"]
 
         with pytest.raises(ValueError, match="Executable not specified."):
-            CustomClassWithNoExecutable.run("some-filename", CompileOptions())
+            CustomClassWithNoExecutable.run("some-filename")
 
     def test_link_fail_exception(self):
         """Test that an exception is raised when all compiler possibilities are exhausted."""
         with pytest.raises(EnvironmentError, match="Unable to link .*"):
-            CompilerDriver.run("in.o", CompileOptions(), fallback_compilers=["c99"])
+            CompilerDriver.run("in.o", fallback_compilers=["c99"])
 
     def test_lower_mhlo_input_validation(self):
         """Test if the function detects wrong extensions"""
         with pytest.raises(ValueError, match="is not an MLIR file"):
-            MHLOPass.run("file-name.nomlir", CompileOptions())
+            MHLOPass.run("file-name.nomlir")
 
     def test_quantum_compilation_input_validation(self):
         """Test if the function detects wrong extensions"""
         with pytest.raises(ValueError, match="is not an MLIR file"):
-            QuantumCompilationPass.run("file-name.nomlir", CompileOptions())
+            QuantumCompilationPass.run("file-name.nomlir")
 
     def test_bufferize_tensors_input_validation(self):
         """Test if the function detects wrong extensions"""
         with pytest.raises(ValueError, match="is not an MLIR file"):
-            BufferizationPass.run("file-name.nomlir", CompileOptions())
+            BufferizationPass.run("file-name.nomlir")
 
     def test_lower_all_to_llvm_input_validation(self):
         """Test if the function detects wrong extensions"""
         with pytest.raises(ValueError, match="is not a bufferized MLIR file"):
-            MLIRToLLVMDialect.run("file-name.nobuff.mlir", CompileOptions())
+            MLIRToLLVMDialect.run("file-name.nobuff.mlir")
 
     def test_convert_mlir_to_llvmir_input_validation(self):
         """Test if the function detects wrong extensions"""
         with pytest.raises(ValueError, match="is not an LLVM dialect MLIR file"):
-            LLVMDialectToLLVMIR.run("file-name.nollvm.mlir", CompileOptions())
+            LLVMDialectToLLVMIR.run("file-name.nollvm.mlir")
 
     def test_compile_llvmir_input_validation(self):
         """Test if the function detects wrong extensions"""
         with pytest.raises(ValueError, match="is not an LLVMIR file"):
-            LLVMIRToObjectFile.run("file-name.noll", CompileOptions())
+            LLVMIRToObjectFile.run("file-name.noll")
 
     def test_link_lightning_runtime_input_validation(self):
         """Test if the function detects wrong extensions"""
         with pytest.raises(ValueError, match="is not an object file"):
-            CompilerDriver.run("file-name.noo", CompileOptions())
+            CompilerDriver.run("file-name.noo")
 
     def test_attempts_to_get_inexistent_intermediate_file(self):
         """Test for error raised if user request intermediate file that doesn't exist."""
