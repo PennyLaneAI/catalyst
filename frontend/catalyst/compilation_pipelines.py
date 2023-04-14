@@ -17,11 +17,12 @@ compiling of hybrid quantum-classical functions using Catalyst.
 
 import ctypes
 import functools
-import warnings
 import inspect
 import typing
+import warnings
 
 import jax
+import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
 from jax.interpreters.mlir import ir
@@ -31,11 +32,11 @@ from mlir_quantum.runtime import (
     to_numpy,
 )
 
-from catalyst.utils.gen_mlir import inject_functions
+import catalyst
 import catalyst.jax_tracer as tracer
-from catalyst.compiler import Compiler
-from catalyst.compiler import CompileOptions
+from catalyst.compiler import CompileOptions, Compiler
 from catalyst.pennylane_extensions import QFunc
+from catalyst.utils.gen_mlir import inject_functions
 from catalyst.utils.patching import Patcher
 from catalyst.utils.tracing import TracingContext
 
@@ -530,10 +531,11 @@ class QJIT:
             return self.qfunc(*args, **kwargs)
 
         if any(isinstance(arg, jax.core.Tracer) for arg in args):
-            raise ValueError(
-                "Cannot use JAX to trace through a qjit compiled function. If you attempted "
-                "to use jax.jit or jax.grad, please use their equivalent from Catalyst."
-            )
+            # Only compile a derivative version of the compiled function when needed.
+            if not hasattr(self, "jaxed_qjit"):
+                self.jaxed_qjit = JAX_QJIT(self)
+
+            return self.jaxed_qjit(*args, **kwargs)
 
         args = [jax.numpy.array(arg) for arg in args]
         r_sig = CompiledFunction.get_runtime_signature(*args)
@@ -551,6 +553,69 @@ class QJIT:
             args = CompiledFunction.promote_arguments(self.c_sig, r_sig, *args)
 
         return self.compiled_function(*args, **kwargs)
+
+
+class JAX_QJIT:
+    """Wrapper class around :class:`~.QJIT` that enables compatibility with JAX transformations.
+
+    The primary mechanism through which this is effected is by wrapping the invocation of the QJIT
+    object inside a JAX ``pure_callback``. Additionally, a custom JVP is defined in order to support
+    JAX-based differentiation, which is itself a ``pure_callback`` around a second QJIT object which
+    invokes :func:`~.grad` on the original function. Using this class thus incurs additional
+    compilation time.
+
+    Args:
+        qjit (QJIT): the compiled quantum function object to wrap
+    """
+
+    def __init__(self, qjit):
+        @functools.wraps(qjit, assigned=("__annotations__",), updated=())
+        def deriv_wrapper(*args, **kwargs):
+            all_args = list(range(len(args)))
+            return catalyst.grad(qjit, argnum=all_args)(*args, **kwargs)
+
+        deriv_wrapper.__name__ = "deriv." + qjit.__name__
+
+        self.qjit = qjit
+        self.deriv_qjit = QJIT(deriv_wrapper, qjit.compile_options)
+
+        @jax.custom_jvp
+        def jaxed_qjit(*args, **kwargs):
+            results = self.wrap_callback(qjit, *args, **kwargs)
+            if len(results) == 1:
+                results = results[0]
+            return results
+
+        jaxed_qjit.defjvp(self.compute_jvp)
+
+        self.jaxed_qjit = jaxed_qjit
+
+    @staticmethod
+    def wrap_callback(qjit, *args, **kwargs):
+        return jax.pure_callback(qjit, qjit.jaxpr.out_avals, *args, vectorized=False, **kwargs)
+
+    def compute_jvp(self, primals, tangents):
+        results = self.wrap_callback(self.qjit, *primals)
+        derivatives = self.wrap_callback(self.deriv_qjit, *primals)
+
+        jvps = [jnp.zeros_like(results[res_idx]) for res_idx in range(len(results))]
+        for arg_idx in range(len(primals)):
+            for res_idx in range(len(results)):
+                deriv_idx = arg_idx * len(results) + res_idx
+                jvp = jnp.tensordot(
+                    jnp.transpose(derivatives[deriv_idx]), tangents[arg_idx], axes=([-1], [0])
+                )
+                jvps[res_idx] = jvps[res_idx] + jvp
+
+        if len(results) == 1:
+            results = results[0]
+        if len(jvps) == 1:
+            jvps = jvps[0]
+
+        return results, jvps
+
+    def __call__(self, *args, **kwargs):
+        return self.jaxed_qjit(*args, **kwargs)
 
 
 def qjit(
@@ -581,7 +646,7 @@ def qjit(
             :attr:`~.QJIT.mlir`, :attr:`~.QJIT.jaxpr`, and :attr:`~.QJIT.qir`, representing
             different stages in the optimization process.
         verbosity (int): Verbosity level (0 - disabled, >0 - enabled)
-        logfile (Optional[TextIOWrapper]): File object to write verose messages to (default -
+        logfile (Optional[TextIOWrapper]): File object to write verbose messages to (default -
             sys.stderr).
         pipelines (Optional(List[AnyType]): A list of pipelines to be executed. The elements of
             the list are asked to implement a run method which takes the output of the previous run
