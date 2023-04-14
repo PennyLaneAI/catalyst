@@ -97,7 +97,6 @@ class PassPipeline(abc.ABC):
 
         Args:
             infile (str): input file
-            outfile (str): output file
         """
 
     @staticmethod
