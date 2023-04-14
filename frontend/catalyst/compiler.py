@@ -489,4 +489,4 @@ class Compiler:
         Args:
             pipeline (str): name of pass class
         """
-        print(self.get_output_of(pipeline)) # pragma: no cover
+        print(self.get_output_of(pipeline))  # pragma: no cover
