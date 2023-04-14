@@ -84,6 +84,7 @@ class TestCompilerErrors:
 
         # pylint: disable=missing-class-docstring
         class CustomClassWithNoExecutable(PassPipeline):
+            # pylint: disable=too-few-public-methods
             _default_flags = ["some-command-but-it-is-actually-a-flag"]
 
         with pytest.raises(ValueError, match="Executable not specified."):
@@ -228,6 +229,7 @@ class TestCompilerState:
 
             @staticmethod
             def get_output_filename(infile):
+                # pylint: disable=missing-function-docstring
                 return infile.replace(".c", ".out")
 
         with tempfile.TemporaryDirectory() as workspace:
@@ -251,6 +253,7 @@ class TestCompilerState:
 
             @staticmethod
             def get_output_filename(infile):
+                # pylint: disable=missing-function-docstring
                 return infile.replace(".c", ".o")
 
         with tempfile.TemporaryDirectory() as workspace:
@@ -286,6 +289,7 @@ class TestCompilerState:
 
             @staticmethod
             def get_output_filename(infile):
+                # pylint: disable=missing-function-docstring
                 return infile.replace(".c", ".o")
 
         with tempfile.TemporaryDirectory() as workspace:
