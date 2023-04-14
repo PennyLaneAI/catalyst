@@ -16,6 +16,7 @@
 
 #include <exception>
 #include <iostream>
+
 #include <sstream>
 #include <string>
 #include <type_traits>
@@ -79,6 +80,11 @@ class RuntimeException : public std::exception {
     std::stringstream sstream;
     sstream << "[" << file_name << "][Line:" << line << "][Function:" << function_name
             << "] Error in Catalyst Runtime: " << message;
+
+    // TODO: This should be removed after runtime error
+    // messages can propagate in the frontend.
+    std::cerr << sstream.str() << std::endl;
+
     throw RuntimeException(sstream.str());
 } // LCOV_EXCL_LINE
 

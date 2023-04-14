@@ -22,7 +22,7 @@
 
 This release contains contributions from (in alphabetical order):
 
-Erick Ochoa Lopez
+Ali Asadi, Erick Ochoa Lopez
 
 # Release 0.1.2
 
