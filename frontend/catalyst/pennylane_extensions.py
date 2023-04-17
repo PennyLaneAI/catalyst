@@ -149,7 +149,7 @@ class Grad:
 
     def __init__(self, fn, *, method, h, argnum):
         self.fn = fn
-        self.__name__ = f"grad.{fn.__name__}"
+        self.__name__ = f"grad_{fn.__name__}"
         self.method = method
         self.h = h
         self.argnum = argnum

@@ -20,11 +20,13 @@ import os
 import sys
 import shutil
 import subprocess
+import sysconfig
 import tempfile
 import warnings
 from io import TextIOWrapper
 from typing import Optional, List, Any
 from dataclasses import dataclass
+from jinja2 import Template
 
 from catalyst._configuration import INSTALLED
 
@@ -268,6 +270,60 @@ class LLVMIRToObjectFile(PassPipeline):
         return infile.replace(".ll", ".o")
 
 
+class WrapperToCatchExceptions(PassPipeline):
+    """Create a wrapper around the generated function to catch runtime exceptions."""
+
+    def __init__(self, params, name):
+        self.params = params
+        self.name = name
+
+    _include = sysconfig.get_paths()["include"]
+    _executable = "clang++"
+    _default_flags = ["-fPIC", "-x", "c++", f"-I{_include}"]
+
+    @staticmethod
+    def get_output_filename(infile):
+        # Technically we are just using this to get the whole path
+        if not infile.endswith(".mlir"):
+            raise ValueError("Input is not an MLIR file.")
+        return infile.replace(".mlir", ".wrap.o")
+
+    def run(self, infile, outfile=None, flags=None, options=None):
+        template = """
+#define PY_SSIZE_T_CLEAN
+#include <Python.h>
+#include <stdexcept>
+#include <stdarg.h>
+
+extern "C" {
+  extern void _mlir_ciface_{{name}} ({% for variable in range(variables) %}void*{% if not loop.last %}, {% endif %}{% endfor %});
+  void wrapper_mlir_ciface_{{name}} ({% for variable in range(variables) %}void*{% if not loop.last %}, {% endif %}{% endfor %});
+}
+
+void wrapper_mlir_ciface_{{name}} ({% for variable in range(variables) %}void *arg{{variable}}{% if not loop.last %}, {% endif %}{% endfor %}) {
+  try {
+    _mlir_ciface_{{name}} ({% for variable in range(variables) %}arg{{variable}}{% if not loop.last %}, {% endif %}{% endfor %});
+  } catch (const std::exception &ex) {
+    PyErr_SetString(PyExc_RuntimeError, ex.what());
+  } catch (const std::logic_error &le) {
+    PyErr_SetString(PyExc_RuntimeError, le.what());
+  } catch (const std::range_error &re) {
+    PyErr_SetString(PyExc_RuntimeError, re.what());
+  }
+}
+        """
+        data = {"variables": self.params, "name": self.name}
+        j2_template = Template(template)
+        cooked_template = j2_template.render(data)
+        exe = WrapperToCatchExceptions._executable
+        flags = WrapperToCatchExceptions._default_flags
+        outfile = WrapperToCatchExceptions.get_output_filename(infile)
+        command = [exe] + flags + ["-c", "-o", outfile, "-"]
+        with subprocess.Popen(command, stdin=subprocess.PIPE) as pipe:
+            pipe.communicate(input=bytes(cooked_template, "UTF-8"))
+        return outfile
+
+
 # pylint: disable=too-few-public-methods
 class CompilerDriver:
     """Compiler Driver Interface
@@ -284,6 +340,9 @@ class CompilerDriver:
     """
 
     _default_fallback_compilers = ["clang", "gcc", "c99", "c89", "cc"]
+
+    def __init__(self, wrapper_object):
+        self.wrapper_object = wrapper_object
 
     @staticmethod
     def get_default_flags():
@@ -343,11 +402,10 @@ class CompilerDriver:
             if CompilerDriver._exists(compiler):
                 yield compiler
 
-    @staticmethod
-    # pylint: disable=redefined-outer-name
-    def _attempt_link(compiler, flags, infile, outfile, options):
+    # pylint: disable=redefined-outer-name,too-many-arguments
+    def _attempt_link(self, compiler, flags, infile, outfile, options):
         try:
-            command = [compiler] + flags + [infile, "-o", outfile]
+            command = [compiler] + flags + [infile, self.wrapper_object, "-o", outfile]
             run_writing_command(command, options)
             return True
         except subprocess.CalledProcessError:
@@ -370,8 +428,8 @@ class CompilerDriver:
             raise ValueError(f"Input file ({infile}) is not an object file")
         return infile.replace(".o", ".so")
 
-    @staticmethod
-    def run(infile, outfile=None, flags=None, fallback_compilers=None, options=None):
+    # pylint: disable=too-many-arguments
+    def run(self, infile, outfile=None, flags=None, fallback_compilers=None, options=None):
         """
         Link the infile against the necessary libraries and produce the outfile.
 
@@ -391,7 +449,7 @@ class CompilerDriver:
         if fallback_compilers is None:
             fallback_compilers = CompilerDriver._default_fallback_compilers
         for compiler in CompilerDriver._available_compilers(fallback_compilers):
-            success = CompilerDriver._attempt_link(compiler, flags, infile, outfile, options)
+            success = self._attempt_link(compiler, flags, infile, outfile, options)
             if success:
                 return outfile
         msg = f"Unable to link {infile}. All available compiler options exhausted. Please provide a compatible compiler via $CATALYST_CC."
@@ -429,6 +487,11 @@ class Compiler:
         # Remove quotations
         module_name = module_name.replace('"', "")
 
+        restype = mlir_module.body.operations[0].type.results
+        argtype = mlir_module.body.operations[0].type.inputs
+        parameters_to_wrapper = len(restype + argtype)
+        name = str(mlir_module.body.operations[0].name).replace('"', "")
+
         if options.keep_intermediate:
             parent_dir = os.getcwd()
             path = os.path.join(parent_dir, module_name)
@@ -436,6 +499,14 @@ class Compiler:
             workspace_name = os.path.abspath(path)
         else:
             workspace_name = self.workspace.name
+
+        filename = f"{workspace_name}/{module_name}.mlir"
+        with open(filename, "w", encoding="utf-8") as f:
+            mlir_module.operation.print(f, print_generic_op_form=False, assume_verified=True)
+
+        # This needs to happen after the creation of the workspace
+        wrapper = WrapperToCatchExceptions(parameters_to_wrapper, name)
+        wrapper_object = wrapper.run(filename)
 
         pipelines = options.pipelines
         if pipelines is None:
@@ -446,14 +517,10 @@ class Compiler:
                 MLIRToLLVMDialect,
                 LLVMDialectToLLVMIR,
                 LLVMIRToObjectFile,
-                CompilerDriver,
+                CompilerDriver(wrapper_object),
             ]
 
         self.pass_pipeline_output = {}
-
-        filename = f"{workspace_name}/{module_name}.mlir"
-        with open(filename, "w", encoding="utf-8") as f:
-            mlir_module.operation.print(f, print_generic_op_form=False, assume_verified=True)
 
         for pipeline in pipelines:
             output = pipeline.run(filename, options=options)

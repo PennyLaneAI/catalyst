@@ -68,7 +68,7 @@ def get_mlir(func, *args, **kwargs):
     axis_context = ReplicaAxisContext(xla.AxisEnv(nrep, (), ()))
     name_stack = util.new_name_stack(util.wrap_name("ok", "jit"))
     module, context = custom_lower_jaxpr_to_module(
-        func_name="jit." + func.__name__,
+        func_name="jit_" + func.__name__,
         module_name=func.__name__,
         jaxpr=jaxpr,
         effects=effects,

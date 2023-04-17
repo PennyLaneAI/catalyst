@@ -82,32 +82,32 @@ def test_tensor_accept(type):
 
 # The compiled quantum function should accept
 # * JAX tensors of type int8
-# CHECK-LABEL: jit.jax_untyped(%arg0: tensor<1xi8>)
-# CHECK-LABEL: jit.jax_typed(%arg0: tensor<1xi8>)
+# CHECK-LABEL: jit_jax_untyped(%arg0: tensor<1xi8>)
+# CHECK-LABEL: jit_jax_typed(%arg0: tensor<1xi8>)
 test_tensor_accept(jnp.int8)
 # * JAX tensors of type int16
-# CHECK-LABEL: jit.jax_untyped(%arg0: tensor<1xi16>)
-# CHECK-LABEL: jit.jax_typed(%arg0: tensor<1xi16>)
+# CHECK-LABEL: jit_jax_untyped(%arg0: tensor<1xi16>)
+# CHECK-LABEL: jit_jax_typed(%arg0: tensor<1xi16>)
 test_tensor_accept(jnp.int16)
 # * JAX tensors of type int32
-# CHECK-LABEL: jit.jax_untyped(%arg0: tensor<1xi32>)
-# CHECK-LABEL: jit.jax_typed(%arg0: tensor<1xi32>)
+# CHECK-LABEL: jit_jax_untyped(%arg0: tensor<1xi32>)
+# CHECK-LABEL: jit_jax_typed(%arg0: tensor<1xi32>)
 test_tensor_accept(jnp.int32)
 # * JAX tensors of type float32
-# CHECK-LABEL: jit.jax_untyped(%arg0: tensor<1xf32>)
-# CHECK-LABEL: jit.jax_typed(%arg0: tensor<1xf32>)
+# CHECK-LABEL: jit_jax_untyped(%arg0: tensor<1xf32>)
+# CHECK-LABEL: jit_jax_typed(%arg0: tensor<1xf32>)
 test_tensor_accept(jnp.float32)
 # * JAX tensors of type float64
-# CHECK-LABEL: jit.jax_untyped(%arg0: tensor<1xf64>)
-# CHECK-LABEL: jit.jax_typed(%arg0: tensor<1xf64>)
+# CHECK-LABEL: jit_jax_untyped(%arg0: tensor<1xf64>)
+# CHECK-LABEL: jit_jax_typed(%arg0: tensor<1xf64>)
 test_tensor_accept(jnp.float64)
 # * JAX tensors of type complex64
-# CHECK-LABEL: jit.jax_untyped(%arg0: tensor<1xcomplex<f32>>)
-# CHECK-LABEL: jit.jax_typed(%arg0: tensor<1xcomplex<f32>>)
+# CHECK-LABEL: jit_jax_untyped(%arg0: tensor<1xcomplex<f32>>)
+# CHECK-LABEL: jit_jax_typed(%arg0: tensor<1xcomplex<f32>>)
 test_tensor_accept(jnp.complex64)
 # * JAX tensors of type complex128
-# CHECK-LABEL: jit.jax_untyped(%arg0: tensor<1xcomplex<f64>>)
-# CHECK-LABEL: jit.jax_typed(%arg0: tensor<1xcomplex<f64>>)
+# CHECK-LABEL: jit_jax_untyped(%arg0: tensor<1xcomplex<f64>>)
+# CHECK-LABEL: jit_jax_typed(%arg0: tensor<1xcomplex<f64>>)
 test_tensor_accept(jnp.complex128)
 
 
@@ -160,18 +160,18 @@ def test_python_accept(type):
 
 # The compiled function should accept
 # * python booleans
-# CHECK-LABEL: jit.jax_untyped(%arg0: tensor<i1>)
-# CHECK-LABEL: jit.jax_typed(%arg0: tensor<i1>)
+# CHECK-LABEL: jit_jax_untyped(%arg0: tensor<i1>)
+# CHECK-LABEL: jit_jax_typed(%arg0: tensor<i1>)
 test_python_accept(bool)
 # * python integers
-# CHECK-LABEL: jit.jax_untyped(%arg0: tensor<i64>)
-# CHECK-LABEL: jit.jax_typed(%arg0: tensor<i64>)
+# CHECK-LABEL: jit_jax_untyped(%arg0: tensor<i64>)
+# CHECK-LABEL: jit_jax_typed(%arg0: tensor<i64>)
 test_python_accept(int)
 # * python floats
-# CHECK-LABEL: jit.jax_untyped(%arg0: tensor<f64>)
-# CHECK-LABEL: jit.jax_typed(%arg0: tensor<f64>)
+# CHECK-LABEL: jit_jax_untyped(%arg0: tensor<f64>)
+# CHECK-LABEL: jit_jax_typed(%arg0: tensor<f64>)
 test_python_accept(float)
 # * python complex
-# CHECK-LABEL: jit.jax_untyped(%arg0: tensor<complex<f64>>)
-# CHECK-LABEL: jit.jax_typed(%arg0: tensor<complex<f64>>)
+# CHECK-LABEL: jit_jax_untyped(%arg0: tensor<complex<f64>>)
+# CHECK-LABEL: jit_jax_typed(%arg0: tensor<complex<f64>>)
 test_python_accept(complex)

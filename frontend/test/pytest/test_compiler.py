@@ -73,7 +73,7 @@ class TestCompilerWarnings:
         """Test that a warning is emitted when a compiler failed."""
         with pytest.warns(UserWarning, match="Compiler .* failed .*"):
             # pylint: disable=protected-access
-            CompilerDriver._attempt_link("cc", [""], "in.o", "out.so", None)
+            CompilerDriver("")._attempt_link("cc", [""], "in.o", "out.so", None)
 
 
 class TestCompilerErrors:
@@ -94,7 +94,7 @@ class TestCompilerErrors:
         """Test that an exception is raised when all compiler possibilities are exhausted."""
         with pytest.raises(EnvironmentError, match="Unable to link .*"):
             with pytest.warns(UserWarning, match="Compiler c99"):
-                CompilerDriver.run("in.o", fallback_compilers=["c99"])
+                CompilerDriver("").run("in.o", fallback_compilers=["c99"])
 
     def test_lower_mhlo_input_validation(self):
         """Test if the function detects wrong extensions"""
@@ -129,7 +129,7 @@ class TestCompilerErrors:
     def test_link_lightning_runtime_input_validation(self):
         """Test if the function detects wrong extensions"""
         with pytest.raises(ValueError, match="is not an object file"):
-            CompilerDriver.run("file-name.noo")
+            CompilerDriver("foo.o").run("file-name.noo")
 
     def test_attempts_to_get_inexistent_intermediate_file(self):
         """Test for error raised if user request intermediate file that doesn't exist."""
@@ -276,7 +276,7 @@ class TestCompilerState:
             with open(filename, "w", encoding="utf-8") as f:
                 print("int main() {}", file=f)
 
-            CompilerDriver.run(filename, outfile=outfilename)
+            CompilerDriver("").run(filename, outfile=outfilename)
 
             assert os.path.exists(outfilename)
 
@@ -300,7 +300,7 @@ class TestCompilerState:
 
             object_file = C99.run(filename)
             expected_outfilename = workspace + "a.so"
-            observed_outfilename = CompilerDriver.run(object_file, flags=[])
+            observed_outfilename = CompilerDriver("").run(object_file, flags=[])
 
             assert observed_outfilename == expected_outfilename
             assert os.path.exists(observed_outfilename)

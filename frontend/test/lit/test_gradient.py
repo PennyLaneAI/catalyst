@@ -20,7 +20,7 @@ import jax
 import numpy as np
 
 
-# CHECK-LABEL: public @jit.grad_default
+# CHECK-LABEL: public @jit_grad_default
 @qjit(target="mlir")
 def grad_default(x: float):
     @qml.qnode(qml.device("lightning.qubit", wires=1))
@@ -36,7 +36,7 @@ def grad_default(x: float):
 print(grad_default.mlir)
 
 
-# CHECK-LABEL: public @jit.override_method
+# CHECK-LABEL: public @jit_override_method
 @qjit(target="mlir")
 def override_method(x: float):
     @qml.qnode(qml.device("lightning.qubit", wires=1))
@@ -52,7 +52,7 @@ def override_method(x: float):
 print(override_method.mlir)
 
 
-# CHECK-LABEL: public @jit.override_h
+# CHECK-LABEL: public @jit_override_h
 @qjit(target="mlir")
 def override_h(x: float):
     @qml.qnode(qml.device("lightning.qubit", wires=1))
@@ -68,7 +68,7 @@ def override_h(x: float):
 print(override_h.mlir)
 
 
-# CHECK-LABEL: public @jit.override_diff_arg
+# CHECK-LABEL: public @jit_override_diff_arg
 @qjit(target="mlir")
 def override_diff_arg(x: float):
     @qml.qnode(qml.device("lightning.qubit", wires=1))
@@ -84,7 +84,7 @@ def override_diff_arg(x: float):
 print(override_diff_arg.mlir)
 
 
-# CHECK-LABEL: public @jit.second_grad
+# CHECK-LABEL: public @jit_second_grad
 @qjit(target="mlir")
 def second_grad(x: float):
     @qml.qnode(qml.device("lightning.qubit", wires=1))
@@ -92,9 +92,9 @@ def second_grad(x: float):
         qml.RX(x, wires=0)
         return qml.expval(qml.PauliY(0))
 
-    # CHECK: "gradient.grad"({{%[0-9]+}}) {callee = @grad.f, diffArgIndices = dense<0> : tensor<1xi64>, finiteDiffParam = 9.9999999999999995E-8 : f64, method = "fd"} : (tensor<f64>) -> tensor<f64>
+    # CHECK: "gradient.grad"({{%[0-9]+}}) {callee = @grad_f, diffArgIndices = dense<0> : tensor<1xi64>, finiteDiffParam = 9.9999999999999995E-8 : f64, method = "fd"} : (tensor<f64>) -> tensor<f64>
     g = grad(f)
-    # CHECK-LABEL: private @grad.f
+    # CHECK-LABEL: private @grad_f
     h = grad(g)
     return h(jax.numpy.pi)
 
@@ -102,7 +102,7 @@ def second_grad(x: float):
 print(second_grad.mlir)
 
 
-# CHECK-LABEL: public @jit.grad_range_change
+# CHECK-LABEL: public @jit_grad_range_change
 @qjit(target="mlir")
 def grad_range_change():
     @qml.qnode(qml.device("lightning.qubit", wires=1))
@@ -119,7 +119,7 @@ def grad_range_change():
 print(grad_range_change.mlir)
 
 
-# CHECK-LABEL: public @jit.grad_hoist_constant(%arg0
+# CHECK-LABEL: public @jit_grad_hoist_constant(%arg0
 @qjit(target="mlir")
 def grad_hoist_constant(params: jax.core.ShapedArray([2], float)):
     @qml.qnode(qml.device("lightning.qubit", wires=3))

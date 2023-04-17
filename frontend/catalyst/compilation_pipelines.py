@@ -194,7 +194,7 @@ class CompiledFunction:
             setup: handle to the setup function, which initializes the device
             teardown: handle to the teardown function, which tears down the device
         """
-        shared_object = ctypes.CDLL(shared_object_file)
+        shared_object = ctypes.PyDLL(shared_object_file)
 
         setup = shared_object.setup
         setup.argtypes = [ctypes.c_int, ctypes.POINTER(ctypes.c_char_p)]
@@ -205,7 +205,7 @@ class CompiledFunction:
         teardown.restypes = None
 
         # We are calling the c-interface
-        function = shared_object["_mlir_ciface_" + func_name]
+        function = shared_object["wrapper_mlir_ciface_" + func_name]
         # Guaranteed from _mlir_ciface specification
         function.restypes = None
         # Not needed, computed from the arguments.
@@ -290,6 +290,7 @@ class CompiledFunction:
         Returns:
             retval: the value computed by the function or None if the function has no return value
         """
+
         shared_object, function, setup, teardown = CompiledFunction.load_symbols(
             shared_object_file, func_name
         )
@@ -301,10 +302,8 @@ class CompiledFunction:
 
         setup(ctypes.c_int(argc), array_of_char_ptrs)
         function(*args)
-
         result = args[0] if has_return else None
         retval = CompiledFunction.return_value_ptr_to_numpy(result) if result else None
-
         # Teardown has to be made after the return valued has been copied.
         teardown()
 
