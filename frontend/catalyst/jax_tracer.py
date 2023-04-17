@@ -67,7 +67,7 @@ def get_mlir(func, *args, **kwargs):
     effects = [eff for eff in jaxpr.effects if eff in jax.core.ordered_effects]
     axis_context = ReplicaAxisContext(xla.AxisEnv(nrep, (), ()))
     name_stack = util.new_name_stack(util.wrap_name("ok", "jit"))
-    m, ctx = custom_lower_jaxpr_to_module(
+    module, context = custom_lower_jaxpr_to_module(
         func_name="jit." + func.__name__,
         module_name=func.__name__,
         jaxpr=jaxpr,
@@ -78,7 +78,7 @@ def get_mlir(func, *args, **kwargs):
         donated_args=[],
     )
 
-    return m, ctx, jaxpr
+    return module, context, jaxpr
 
 
 def get_traceable_fn(qfunc, device):

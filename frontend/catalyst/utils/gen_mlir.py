@@ -53,7 +53,7 @@ func.func @teardown () -> () {
     return ir.Module.parse(txt, ctx)
 
 
-def append_modules(module, runtime, ctx):
+def inject_functions(module, runtime, ctx):
     """
     This function appends functions to the input module.
     """
