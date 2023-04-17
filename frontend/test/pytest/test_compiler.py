@@ -93,7 +93,8 @@ class TestCompilerErrors:
     def test_link_fail_exception(self):
         """Test that an exception is raised when all compiler possibilities are exhausted."""
         with pytest.raises(EnvironmentError, match="Unable to link .*"):
-            CompilerDriver.run("in.o", fallback_compilers=["c99"])
+            with pytest.warns(UserWarning, match="Compiler c99"):
+                CompilerDriver.run("in.o", fallback_compilers=["c99"])
 
     def test_lower_mhlo_input_validation(self):
         """Test if the function detects wrong extensions"""
