@@ -249,7 +249,7 @@ func::FuncOp genFullGradFunctionWithBackprop(PatternRewriter &rewriter, Location
         DenseIntElementsAttr diffArgIndicesAttr = gradOp.getDiffArgIndices().value_or(nullptr);
         
         // Using enzyme backpropagation in order to get the classical jacobians
-        BackpropOp jacOp = rewriter.create<BackpropOp>(loc, resTypes, "backprop", argMapFn.getName(), callArgs, diffArgIndicesAttr, nullptr);
+        BackpropOp jacOp = rewriter.create<BackpropOp>(loc, resTypes, argMapFn.getName(), callArgs, diffArgIndicesAttr, nullptr);
         ValueRange classicalJacobians = jacOp.getResults();
 
         ValueRange quantumGradients =
