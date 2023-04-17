@@ -208,5 +208,70 @@ func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc, GradOp
     return fullGradFn;
 }
 
+/// Generate an mlir function to compute the full gradient of a quantum function.
+///
+/// With the parameter-shift method (and certain other methods) the gradient of a quantum function
+/// is computed as two sperate parts: the gradient of the classical pre-processing function for
+/// gate parameters, termed "classical Jacobian", and the purely "quantum gradient" of a
+/// differentiable output of a circuit. The two components can be combined to form the gradient of
+/// the entire quantum function via tensor contraction along the gate parameter dimension.
+///
+func::FuncOp genFullGradFunctionWithBackprop(PatternRewriter &rewriter, Location loc, GradOp gradOp,
+                                            func::FuncOp paramCountFn, func::FuncOp argMapFn,
+                                            func::FuncOp qGradFn, StringRef method)
+{
+    // Define the properties of the full gradient function.
+    const std::vector<size_t> &diffArgIndices = gradOp.compDiffArgIndices();
+    std::stringstream uniquer;
+    std::copy(diffArgIndices.begin(), diffArgIndices.end(), std::ostream_iterator<int>(uniquer));
+    std::string fnName = gradOp.getCallee().str() + ".fullgrad" + uniquer.str() + method.str();
+    FunctionType fnType =
+        rewriter.getFunctionType(gradOp.getOperandTypes(), gradOp.getResultTypes());
+    StringAttr visibility = rewriter.getStringAttr("private");
+
+    func::FuncOp fullGradFn =
+        SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(gradOp, rewriter.getStringAttr(fnName));
+    if (!fullGradFn) {
+        PatternRewriter::InsertionGuard insertGuard(rewriter);
+        rewriter.setInsertionPointAfter(qGradFn);
+
+        fullGradFn = rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility);
+        Block *entryBlock = fullGradFn.addEntryBlock();
+        rewriter.setInsertionPointToStart(entryBlock);
+
+        // Collect arguments and invoke the classical jacobian and quantum gradient functions.
+        std::vector<Value> callArgs(fullGradFn.getArguments().begin(),
+                                    fullGradFn.getArguments().end());
+        Value numParams = rewriter.create<func::CallOp>(loc, paramCountFn, callArgs).getResult(0);
+        callArgs.push_back(numParams);
+
+        std::vector<Type> resTypes = computeResultTypes(argMapFn, diffArgIndices);
+        DenseIntElementsAttr diffArgIndicesAttr = gradOp.getDiffArgIndices().value_or(nullptr);
+        
+        // Using enzyme backpropagation in order to get the classical jacobians
+        BackpropOp jacOp = rewriter.create<BackpropOp>(loc, resTypes, "backprop", argMapFn.getName(), callArgs, diffArgIndicesAttr, nullptr);
+        ValueRange classicalJacobians = jacOp.getResults();
+
+        ValueRange quantumGradients =
+            rewriter.create<func::CallOp>(loc, qGradFn, callArgs).getResults();
+
+        // Compute the hybrid gradients via tensor contraction.
+        std::vector<Value> hybridGradients;
+        hybridGradients.reserve(quantumGradients.size() * classicalJacobians.size());
+        size_t idx = 0;
+        for (Value classicalJacobian : classicalJacobians) {
+            for (Value quantumGradient : quantumGradients) {
+                bool isResultScalar = !gradOp.getResult(idx++).getType().isa<TensorType>();
+                hybridGradients.push_back(combineGradients(
+                    rewriter, loc, classicalJacobian, quantumGradient, numParams, isResultScalar));
+            }
+        }
+
+        rewriter.create<func::ReturnOp>(loc, hybridGradients);
+    }
+
+    return fullGradFn;
+}
+
 } // namespace gradient
 } // namespace catalyst
