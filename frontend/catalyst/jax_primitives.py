@@ -308,12 +308,7 @@ def _grad_lowering(ctx, *args, jaxpr, fn, method, h, argnum):
     method_attr = ir.StringAttr.get(method)
     method_str = str(method_attr).replace('"', "")
 
-    if str(method_str) == "adj":
-        grad_attr = ir.StringAttr.get("recorder")
-        val_attr = ir.StringAttr.get("start")
-        DeviceOp(specs=ir.ArrayAttr.get([grad_attr, val_attr]))
-
-    results = GradOp(
+    return GradOp(
         flat_output_types,
         method_attr,
         ir.FlatSymbolRefAttr.get(symbol_name),
@@ -321,13 +316,6 @@ def _grad_lowering(ctx, *args, jaxpr, fn, method, h, argnum):
         diffArgIndices=diffArgIndices,
         finiteDiffParam=finiteDiffParam,
     ).results
-
-    if str(method_str) == "adj":
-        grad_attr = ir.StringAttr.get("recorder")
-        val_attr = ir.StringAttr.get("stop")
-        DeviceOp(specs=ir.ArrayAttr.get([grad_attr, val_attr]))
-
-    return results
 
 
 #

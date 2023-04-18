@@ -24,6 +24,8 @@
 
 #include "TestUtils.hpp"
 
+using namespace Catalyst::Runtime;
+
 MemRefT_CplxT_double_1d getState(size_t buffer_len)
 {
     CplxT_double *buffer = new CplxT_double[buffer_len];
@@ -48,7 +50,12 @@ void freeCounts(PairT_MemRefT_double_int64_1d &result)
     delete[] result.second.data_allocated;
 }
 
-using namespace Catalyst::Runtime;
+TEST_CASE("Test __quantum__rt__fail_cstr", "[qir_lightning_core]")
+{
+    REQUIRE_THROWS_WITH(
+        __quantum__rt__fail_cstr("Test!"),
+        Catch::Contains("[Function:__quantum__rt__fail_cstr] Error in Catalyst Runtime: Test!"));
+}
 
 TEST_CASE("Qubits: allocate, release, dump", "[CoreQIS]")
 {
@@ -1415,14 +1422,6 @@ TEST_CASE("Test __rt__device registering a custom device with shots=500 and devi
     char dev_value[17] = "lightning.qubit";
     __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
 
-    char shots[6] = "shots";
-    char shots_value[4] = "500";
-    __quantum__rt__device((int8_t *)shots, (int8_t *)shots_value);
-
-    char recorder[9] = "recorder";
-    char start[6] = "start";
-    __quantum__rt__device((int8_t *)recorder, (int8_t *)start);
-
     char dev2[7] = "device";
     char dev2_value[15] = "backend.other";
     REQUIRE_THROWS_WITH(__quantum__rt__device((int8_t *)dev2, (int8_t *)dev_value),
@@ -1431,9 +1430,6 @@ TEST_CASE("Test __rt__device registering a custom device with shots=500 and devi
 
     REQUIRE_THROWS_WITH(__quantum__rt__device((int8_t *)dev, (int8_t *)dev2_value),
                         Catch::Contains("Failed initialization of the backend device"));
-
-    REQUIRE_THROWS_WITH(__quantum__rt__device((int8_t *)shots, (int8_t *)dev_value),
-                        Catch::Contains("Invalid argument for the device specification (shots)"));
 
     REQUIRE_THROWS_WITH(__quantum__rt__device(nullptr, nullptr),
                         Catch::Contains("Invalid device specification"));

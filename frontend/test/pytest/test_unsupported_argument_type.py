@@ -19,10 +19,10 @@ import pennylane as qml
 import jax
 
 
-def test_strings_aot():
+def test_strings_aot(backend):
     # Due to limitations in the frontend, we can only test qjit with scalar floats.
     @qjit()
-    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    @qml.qnode(qml.device(backend, wires=2))
     def foo(x: float, y: float):
         val = jax.numpy.arctan2(x, y)
         qml.RZ(val, wires=0)
@@ -32,10 +32,10 @@ def test_strings_aot():
         foo("hello", "world")
 
 
-def test_strings_jit():
+def test_strings_jit(backend):
     # Due to limitations in the frontend, we can only test qjit with scalar floats.
     @qjit()
-    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    @qml.qnode(qml.device(backend, wires=2))
     def bar(x, y):
         val = jax.numpy.arctan2(x, y)
         qml.RZ(val, wires=0)

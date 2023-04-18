@@ -15,7 +15,7 @@
 #include <numeric>
 #include <string>
 
-#include "Driver.hpp"
+#include "ExecutionContext.hpp"
 #include "QuantumDevice.hpp"
 #include "RuntimeCAPI.h"
 #include "Utils.hpp"
@@ -27,14 +27,13 @@ using namespace Catalyst::Runtime::Simulator;
 
 TEST_CASE("Test Driver", "[Driver]")
 {
-    std::unique_ptr<CAPI::Driver> driver = std::make_unique<CAPI::Driver>("default", false, 500);
+    std::unique_ptr<ExecutionContext> driver = std::make_unique<ExecutionContext>("default");
 
     // check the scope of memory-manager
     CHECK(driver->getMemoryManager() != nullptr);
 
     // check device default specs
     CHECK(driver->getDeviceName() == "default");
-    CHECK(driver->getDeviceShots() == 500);
     CHECK(driver->getDeviceRecorderStatus() == false);
 
     // check device specs update

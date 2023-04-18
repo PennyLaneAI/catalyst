@@ -18,6 +18,7 @@ from catalyst import qjit
 import pennylane as qml
 import numpy as np
 
+
 def test_no_parameters(backend):
     def circuit():
         qml.Identity(wires=0)

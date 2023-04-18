@@ -203,10 +203,6 @@ TEST_CASE("Test __quantum__qis__ circuit with observables using deactiveCacheMan
           "[CacheManager]")
 {
 
-    const std::string recorder("recorder");
-    const std::string start("start");
-    const std::string stop("stop");
-
     __quantum__rt__initialize();
     for (const auto &[key, val] : getDevices()) {
         __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
@@ -216,7 +212,7 @@ TEST_CASE("Test __quantum__qis__ circuit with observables using deactiveCacheMan
 
         QUBIT **ctrls = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
 
-        __quantum__rt__device((int8_t *)recorder.c_str(), (int8_t *)start.c_str());
+        __quantum__rt__toggle_recorder(/* activate_cm */ true);
 
         // qml.Hadamard(wires=0)
         __quantum__qis__Hadamard(target);
@@ -248,7 +244,7 @@ TEST_CASE("Test __quantum__qis__ circuit with observables using deactiveCacheMan
 
         CHECK(__quantum__qis__Expval(obs) == Approx(0.9800665778).margin(1e-5));
 
-        __quantum__rt__device((int8_t *)recorder.c_str(), (int8_t *)stop.c_str());
+        __quantum__rt__toggle_recorder(/* activate_cm */ false);
 
         delete[] buffer;
     }

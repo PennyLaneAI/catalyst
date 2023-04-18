@@ -19,9 +19,9 @@ import pennylane as qml
 import numpy as np
 
 
-def test_sample_on_1qbit():
+def test_sample_on_1qbit(backend):
     @qjit()
-    @qml.qnode(qml.device("lightning.qubit", wires=1, shots=1000))
+    @qml.qnode(qml.device(backend, wires=1, shots=1000))
     def sample_1qbit(x: float):
         qml.RX(x, wires=0)
         return qml.sample()
@@ -35,9 +35,9 @@ def test_sample_on_1qbit():
     assert np.array_equal(observed, expected)
 
 
-def test_sample_on_2qbits():
+def test_sample_on_2qbits(backend):
     @qjit()
-    @qml.qnode(qml.device("lightning.qubit", wires=2, shots=1000))
+    @qml.qnode(qml.device(backend, wires=2, shots=1000))
     def sample_2qbits(x: float):
         qml.RX(x, wires=0)
         qml.RY(x, wires=1)
@@ -51,9 +51,9 @@ def test_sample_on_2qbits():
     assert np.array_equal(observed, expected)
 
 
-def test_count_on_1qbit():
+def test_count_on_1qbit(backend):
     @qjit()
-    @qml.qnode(qml.device("lightning.qubit", wires=1, shots=1000))
+    @qml.qnode(qml.device(backend, wires=1, shots=1000))
     def counts_1qbit(x: float):
         qml.RX(x, wires=0)
         return qml.counts()
@@ -67,9 +67,9 @@ def test_count_on_1qbit():
     assert np.array_equal(observed, expected)
 
 
-def test_count_on_2qbits():
+def test_count_on_2qbits(backend):
     @qjit()
-    @qml.qnode(qml.device("lightning.qubit", wires=2, shots=1000))
+    @qml.qnode(qml.device(backend, wires=2, shots=1000))
     def counts_2qbit(x: float):
         qml.RX(x, wires=0)
         qml.RY(x, wires=1)
@@ -85,9 +85,9 @@ def test_count_on_2qbits():
 
 
 class TestExpval:
-    def test_named(self):
+    def test_named(self, backend):
         @qjit()
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qml.qnode(qml.device(backend, wires=1))
         def expval1(x: float):
             qml.RX(x, wires=0)
             return qml.expval(qml.PauliZ(0))
@@ -100,9 +100,9 @@ class TestExpval:
         observed = expval1(np.pi)
         assert np.isclose(observed, expected)
 
-    def test_hermitian_1(self):
+    def test_hermitian_1(self, backend):
         @qjit()
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qml.qnode(qml.device(backend, wires=1))
         def expval2(x: float):
             qml.RY(x, wires=0)
             A = np.array(
@@ -118,9 +118,9 @@ class TestExpval:
         observed = expval2(np.pi / 2)
         assert np.isclose(observed, expected)
 
-    def test_hermitian_2(self):
+    def test_hermitian_2(self, backend):
         @qjit()
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qml.qnode(qml.device(backend, wires=2))
         def expval3(x: float):
             qml.RX(x, wires=1)
             B = np.array(
@@ -141,9 +141,9 @@ class TestExpval:
         observed = expval3(np.pi)
         assert np.isclose(observed, expected)
 
-    def test_tensor_1(self):
+    def test_tensor_1(self, backend):
         @qjit()
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qml.qnode(qml.device(backend, wires=2))
         def expval4(x: float, y: float):
             qml.RX(x, wires=0)
             qml.RX(y, wires=1)
@@ -158,9 +158,9 @@ class TestExpval:
         observed = expval4(np.pi / 2, np.pi / 2)
         assert np.isclose(observed, expected)
 
-    def test_tensor_2(self):
+    def test_tensor_2(self, backend):
         @qjit()
-        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        @qml.qnode(qml.device(backend, wires=3))
         def expval5(x: float, y: float):
             qml.RX(x, wires=0)
             qml.RX(y, wires=1)
@@ -179,9 +179,9 @@ class TestExpval:
         observed = expval5(np.pi / 2, np.pi / 2)
         assert np.isclose(observed, expected)
 
-    def test_hamiltonian_1(self):
+    def test_hamiltonian_1(self, backend):
         @qjit()
-        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        @qml.qnode(qml.device(backend, wires=3))
         def expval6(x: float, y: float):
             qml.RX(x, wires=0)
             qml.RY(y, wires=1)
@@ -200,9 +200,9 @@ class TestExpval:
         observed = expval6(0.5, 0.8)
         assert np.isclose(observed, expected)
 
-    def test_hamiltonian_2(self):
+    def test_hamiltonian_2(self, backend):
         @qjit()
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qml.qnode(qml.device(backend, wires=2))
         def expval6(x: float):
             qml.RX(x, wires=0)
 
@@ -229,9 +229,9 @@ class TestExpval:
 
 
 class TestVar:
-    def test_rx(self):
+    def test_rx(self, backend):
         @qjit()
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qml.qnode(qml.device(backend, wires=1))
         def var1(x: float):
             qml.RX(x, wires=0)
             return qml.var(qml.PauliZ(0))
@@ -242,9 +242,9 @@ class TestVar:
         observed = var1(np.pi)
         assert np.isclose(observed, expected)
 
-    def test_hadamard(self):
+    def test_hadamard(self, backend):
         @qjit()
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qml.qnode(qml.device(backend, wires=1))
         def var2(x: float):
             qml.Hadamard(wires=0)
             return qml.var(qml.PauliZ(0))
@@ -256,9 +256,9 @@ class TestVar:
         assert np.isclose(observed, expected)
 
 
-def test_state():
+def test_state(backend):
     @qjit()
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    @qml.qnode(qml.device(backend, wires=1))
     def state(x: float):
         qml.RX(x, wires=0)
         return qml.state()
@@ -268,9 +268,9 @@ def test_state():
     assert np.array_equal(observed, expected)
 
 
-def test_multiple_return_values():
+def test_multiple_return_values(backend):
     @qjit()
-    @qml.qnode(qml.device("lightning.qubit", wires=2, shots=100))
+    @qml.qnode(qml.device(backend, wires=2, shots=100))
     def all_measurements(x):
         qml.RY(x, wires=0)
         return (

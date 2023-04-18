@@ -30,7 +30,7 @@
 #include "LightningKokkosSimulator.hpp"
 #endif
 
-namespace Catalyst::Runtime::CAPI {
+namespace Catalyst::Runtime {
 
 class MemoryManager final {
   private:
@@ -50,40 +50,37 @@ class MemoryManager final {
     void erase(void *ptr) { _impl.erase(ptr); }
 };
 
-class Driver final {
+class ExecutionContext final {
   private:
-    using DeviceInitializer = std::function<std::unique_ptr<QuantumDevice>(bool, size_t)>;
+    using DeviceInitializer = std::function<std::unique_ptr<QuantumDevice>(bool)>;
     std::unordered_map<std::string_view, DeviceInitializer> _device_map{
         {"lightning.qubit",
-         [](bool tape_recording, size_t shots) {
-             return std::make_unique<Catalyst::Runtime::Simulator::LightningSimulator>(
-                 tape_recording, shots);
+         [](bool tape_recording) {
+             return std::make_unique<Simulator::LightningSimulator>(tape_recording);
          }},
     };
 
-    // Device Info
+    // Device specifications
     std::string _name;
     bool _tape_recording;
-    size_t _shots;
 
-    // Driver pointers
-    std::unique_ptr<Catalyst::Runtime::QuantumDevice> _driver_ptr = nullptr;
+    // ExecutionContext pointers
+    std::unique_ptr<QuantumDevice> _driver_ptr = nullptr;
     std::unique_ptr<MemoryManager> _driver_mm_ptr = nullptr;
 
   public:
-    explicit Driver(std::string_view default_device, bool status, size_t shots)
-        : _name(default_device), _tape_recording(status), _shots(shots)
+    explicit ExecutionContext(std::string_view default_device = "lightning.qubit")
+        : _name(default_device), _tape_recording(false)
     {
 #ifdef __device_lightning_kokkos
-        _device_map.emplace("lightning.kokkos", [](bool tape_recording, size_t shots) {
-            return std::make_unique<Catalyst::Runtime::Simulator::LightningKokkosSimulator>(
-                tape_recording, shots);
+        _device_map.emplace("lightning.kokkos", [](bool tape_recording) {
+            return std::make_unique<Simulator::LightningKokkosSimulator>(tape_recording);
         });
 #endif
         this->_driver_mm_ptr = std::make_unique<MemoryManager>();
     };
 
-    ~Driver()
+    ~ExecutionContext()
     {
         _driver_ptr.reset(nullptr);
         _driver_mm_ptr.reset(nullptr);
@@ -99,13 +96,9 @@ class Driver final {
         }
     }
 
-    void setDeviceShots(size_t shots) noexcept { this->_shots = shots; }
-
     void toggleDeviceRecorder(bool status) noexcept { this->_tape_recording = status; }
 
     [[nodiscard]] auto getDeviceName() const -> std::string_view { return this->_name; }
-
-    [[nodiscard]] auto getDeviceShots() const -> size_t { return this->_shots; }
 
     [[nodiscard]] auto getDeviceRecorderStatus() const -> bool { return this->_tape_recording; }
 
@@ -115,14 +108,13 @@ class Driver final {
 
         auto iter = _device_map.find(this->_name);
         if (iter != _device_map.end()) {
-            this->_driver_ptr = iter->second(_tape_recording, _shots);
+            this->_driver_ptr = iter->second(_tape_recording);
             return true;
         }
         return false;
     }
 
-    [[nodiscard]] auto getDevice() const
-        -> const std::unique_ptr<Catalyst::Runtime::QuantumDevice> &
+    [[nodiscard]] auto getDevice() const -> const std::unique_ptr<QuantumDevice> &
     {
         return _driver_ptr;
     }
@@ -132,4 +124,4 @@ class Driver final {
         return _driver_mm_ptr;
     }
 };
-} // namespace Catalyst::Runtime::CAPI
+} // namespace Catalyst::Runtime

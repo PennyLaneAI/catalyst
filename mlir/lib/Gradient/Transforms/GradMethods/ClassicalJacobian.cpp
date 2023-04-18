@@ -139,10 +139,7 @@ func::FuncOp genArgMapFunction(PatternRewriter &rewriter, Location loc, func::Fu
         Value cOne = rewriter.create<index::ConstantOp>(loc, 1);
 
         // Erase redundant device specifications
-        argMapFn.walk([&](quantum::DeviceOp device) {
-            PatternRewriter::InsertionGuard insertGuard(rewriter);
-            rewriter.eraseOp(device);
-        });
+        argMapFn.walk([&](quantum::DeviceOp device) { rewriter.eraseOp(device); });
 
         // Insert gate parameters into the params buffer.
         argMapFn.walk([&](quantum::CustomOp gate) {

@@ -22,9 +22,9 @@ from catalyst import cond, measure, qjit, while_loop
 
 
 class TestTracing:
-    def test_fixed_tracing(self):
+    def test_fixed_tracing(self, backend):
         @qjit()
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qml.qnode(qml.device(backend, wires=1))
         def circuit():
             m = measure(wires=0)
             qml.RX(m + 0.0, wires=0)
@@ -32,7 +32,7 @@ class TestTracing:
 
         assert not circuit()
 
-    def test_cond_inside_while_loop(self):
+    def test_cond_inside_while_loop(self, backend):
         def reset_measure(wires):
             """
             measure a wire and then reset it back to the |0> state
@@ -49,7 +49,7 @@ class TestTracing:
             return m
 
         @qjit()
-        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        @qml.qnode(qml.device(backend, wires=3))
         def circuit(n):
             @while_loop(lambda i: i < n)
             def loop(i):
@@ -67,18 +67,18 @@ class TestTracing:
 
         circuit(5)
 
-    def test_discarded_measurements(self):
+    def test_discarded_measurements(self, backend):
         @qjit()
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qml.qnode(qml.device(backend, wires=2))
         def circuit():
             qml.state()
             return
 
         assert circuit() is None
 
-    def test_mixed_result_types(self):
+    def test_mixed_result_types(self, backend):
         @qjit()
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qml.qnode(qml.device(backend, wires=1))
         def circuit():
             @while_loop(lambda _, repeat: repeat)
             def repeat_until_false(i, _):
@@ -103,10 +103,10 @@ class TestTracing:
             jax.grad(func)(2.0)
 
 
-def test_complex_dialect():
+def test_complex_dialect(backend):
     """Test that we can use functions that turn into complex dialect operations in MLIR."""
 
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    @qml.qnode(qml.device(backend, wires=1))
     def circuit():
         return qml.state()
 

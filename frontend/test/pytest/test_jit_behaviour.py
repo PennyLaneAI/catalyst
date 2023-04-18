@@ -350,9 +350,9 @@ class TestTypePromotion:
 
 
 class TestCallsiteCompileVsFunctionDefinitionCompile:
-    def test_equivalence(self):
-        f_jit = f_jit_builder()
-        f_aot = f_aot_builder()
+    def test_equivalence(self, backend):
+        f_jit = f_jit_builder(backend)
+        f_aot = f_aot_builder(backend)
         f_jit(0.0)
         assert f_jit.mlir == f_aot.mlir
 
@@ -383,7 +383,7 @@ class TestCaching:
             return measure(wires=0)
 
         compile_and_run_start = timer()
-        f_jit = f_jit_builder()
+        f_jit = f_jit_builder(backend)
         f_jit(0.0)
         compile_and_run_end = timer()
         compile_and_run_time = compile_and_run_end - compile_and_run_start
@@ -395,34 +395,34 @@ class TestCaching:
 
 
 class TestModes:
-    def test_ftqc_mode(self):
-        f_aot = f_aot_builder()
+    def test_ftqc_mode(self, backend):
+        f_aot = f_aot_builder(backend)
         assert not f_aot(0.0)
         assert f_aot(pi)
 
 
 class TestShots:
     # Shots influences on the sample instruction
-    def test_shots_in_decorator_in_sample(self):
+    def test_shots_in_decorator_in_sample(self, backend):
         max_shots = 500
         max_wires = 9
         for x in range(1, 5):
             shots = random.randint(1, max_shots)
             wires = random.randint(1, max_wires)
             expected_shape = (shots, wires)
-            f_aot = fsample_aot_builder(wires, shots)
+            f_aot = fsample_aot_builder(backend, wires=wires, shots=shots)
             observed_val = f_aot(0.0)
             observed_shape = jnp.shape(observed_val)
             assert expected_shape == observed_shape
 
-    def test_shots_in_callsite_in_sample(self):
+    def test_shots_in_callsite_in_sample(self, backend):
         max_shots = 500
         max_wires = 9
         for x in range(1, 5):
             shots = random.randint(1, max_shots)
             wires = random.randint(1, max_wires)
             expected_shape = (shots, wires)
-            f_aot = fsample_aot_builder(wires)
+            f_aot = fsample_aot_builder(backend, wires=wires)
             observed_val = f_aot(0.0, shots=shots)
             observed_shape = jnp.shape(observed_val)
             # We are failing this test because of the type system.

@@ -21,15 +21,6 @@
 
 #include "Types.h"
 
-namespace Catalyst::Runtime::Simulator {
-static inline void QFailIf(bool condition, const char *message)
-{
-    if (condition) {
-        throw std::runtime_error(message);
-    }
-}
-} // namespace Catalyst::Runtime::Simulator
-
 namespace Catalyst::Runtime::Simulator::Lightning {
 enum class SimulatorGate : uint8_t {
     // 1-qubit
