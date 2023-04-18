@@ -571,8 +571,10 @@ class JAX_QJIT:
     def __init__(self, qjit):
         @functools.wraps(qjit, assigned=("__annotations__",), updated=())
         def deriv_wrapper(*args, **kwargs):
-            all_args = list(range(len(args)))
-            return catalyst.grad(qjit, argnum=all_args)(*args, **kwargs)
+            # Only consider differentiable arguments (i.e. of type floating point).
+            all_diff_args = [i for i in range(len(args)) if args[i].dtype.kind == "f"]
+
+            return catalyst.grad(qjit, argnum=all_diff_args)(*args, **kwargs)
 
         deriv_wrapper.__name__ = "deriv." + qjit.__name__
 
@@ -600,6 +602,10 @@ class JAX_QJIT:
 
         jvps = [jnp.zeros_like(results[res_idx]) for res_idx in range(len(results))]
         for arg_idx in range(len(primals)):
+            # Skip arguments which are not differentiable.
+            if primals[arg_idx].dtype.kind != "f":
+                assert jnp.allclose(jnp.sum(tangents[arg_idx]), 0.0)
+                continue
             for res_idx in range(len(results)):
                 deriv_idx = arg_idx * len(results) + res_idx
                 jvp = jnp.tensordot(
