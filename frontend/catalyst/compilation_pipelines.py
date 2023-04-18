@@ -530,13 +530,6 @@ class QJIT:
         if TracingContext.is_tracing():
             return self.qfunc(*args, **kwargs)
 
-        if any(isinstance(arg, jax.core.Tracer) for arg in args):
-            # Only compile a derivative version of the compiled function when needed.
-            if not hasattr(self, "jaxed_qjit"):
-                self.jaxed_qjit = JAX_QJIT(self)
-
-            return self.jaxed_qjit(*args, **kwargs)
-
         args = [jax.numpy.array(arg) for arg in args]
         r_sig = CompiledFunction.get_runtime_signature(*args)
         is_prev_compile = self.compiled_function is not None
@@ -551,6 +544,13 @@ class QJIT:
             self.compiled_function = self.compile()
         else:
             args = CompiledFunction.promote_arguments(self.c_sig, r_sig, *args)
+
+        if any(isinstance(arg, jax.core.Tracer) for arg in args):
+            # Only compile a derivative version of the compiled function when needed.
+            if not hasattr(self, "jaxed_qjit"):
+                self.jaxed_qjit = JAX_QJIT(self)
+
+            return self.jaxed_qjit(*args, **kwargs)
 
         return self.compiled_function(*args, **kwargs)
 
