@@ -16,6 +16,7 @@
 
 #include <map>
 
+#include "Exception.hpp"
 #include "Types.h"
 #include "Utils.hpp"
 
@@ -42,7 +43,7 @@ class QubitManager {
     [[nodiscard]] inline OIter _remove_simulator_qubit_id(SimQubitIdType s_idx)
     {
         const auto &&s_idx_iter = this->qubits_map.find(s_idx);
-        QFailIf(s_idx_iter == this->qubits_map.end(), "Invalid simulator qubit index");
+        RT_FAIL_IF(s_idx_iter == this->qubits_map.end(), "Invalid simulator qubit index");
 
         return this->qubits_map.erase(s_idx_iter);
     }
@@ -88,7 +89,7 @@ class QubitManager {
 
     [[nodiscard]] auto getDeviceId(SimQubitIdType s_idx) -> DevQubitIdType
     {
-        QFailIf(!isValidQubitId(s_idx), "Invalid device qubit index");
+        RT_FAIL_IF(!isValidQubitId(s_idx), "Invalid device qubit index");
 
         return this->qubits_map[s_idx];
     }
@@ -108,7 +109,7 @@ class QubitManager {
         auto s_idx = std::find_if(this->qubits_map.begin(), this->qubits_map.end(),
                                   [&d_idx](auto &&p) { return p.second == d_idx; });
 
-        QFailIf(s_idx == this->qubits_map.end(), "Invalid simulator qubit index");
+        RT_FAIL_IF(s_idx == this->qubits_map.end(), "Invalid simulator qubit index");
 
         return s_idx->first;
     }

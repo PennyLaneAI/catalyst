@@ -41,7 +41,7 @@ lightning = qml.device("lightning.qubit", wires=3)
 class CustomDeviceWithoutSupport(qml.QubitDevice):
     name = "Device without support for RXX gate."
     short_name = "dummy.device"
-    backend_device = "default"
+    backend = "default"
     pennylane_requires = "0.1.0"
     version = "0.0.1"
     author = "CV quantum"

@@ -57,7 +57,7 @@ auto LightningSimulator::GetNumQubits() const -> size_t { return this->device_sv
 
 void LightningSimulator::StartTapeRecording()
 {
-    QFailIf(this->tape_recording, "Cannot re-activate the cache manager");
+    RT_FAIL_IF(this->tape_recording, "Cannot re-activate the cache manager");
     this->tape_recording = true;
     this->cache_manager.Reset();
 }
@@ -116,8 +116,8 @@ void LightningSimulator::NamedOperation(const std::string &name, const std::vect
         Lightning::lookup_gates(Lightning::simulator_gate_info, name);
 
     // Check the validity of number of qubits and parameters
-    QFailIf((!wires.size() && wires.size() != op_num_wires), "Invalid number of qubits");
-    QFailIf(params.size() != op_num_params, "Invalid number of parameters");
+    RT_FAIL_IF((!wires.size() && wires.size() != op_num_wires), "Invalid number of qubits");
+    RT_FAIL_IF(params.size() != op_num_params, "Invalid number of parameters");
 
     // Convert wires to device wires
     auto &&dev_wires = getDeviceWires(wires);
@@ -145,8 +145,8 @@ void LightningSimulator::MatrixOperation(const std::vector<std::complex<double>>
 auto LightningSimulator::Observable(ObsId id, const std::vector<std::complex<double>> &matrix,
                                     const std::vector<QubitIdType> &wires) -> ObsIdType
 {
-    QFailIf(wires.size() > this->GetNumQubits(), "Invalid number of wires");
-    QFailIf(!isValidQubits(wires), "Invalid given wires");
+    RT_FAIL_IF(wires.size() > this->GetNumQubits(), "Invalid number of wires");
+    RT_FAIL_IF(!isValidQubits(wires), "Invalid given wires");
 
     auto &&dev_wires = getDeviceWires(wires);
 
@@ -170,7 +170,8 @@ auto LightningSimulator::HamiltonianObservable(const std::vector<double> &coeffs
 
 auto LightningSimulator::Expval(ObsIdType obsKey) -> double
 {
-    QFailIf(!this->obs_manager.isValidObservables({obsKey}), "Invalid key for cached observables");
+    RT_FAIL_IF(!this->obs_manager.isValidObservables({obsKey}),
+               "Invalid key for cached observables");
     auto &&obs = this->obs_manager.getObservable(obsKey);
 
     // update tape caching
@@ -185,7 +186,8 @@ auto LightningSimulator::Expval(ObsIdType obsKey) -> double
 
 auto LightningSimulator::Var(ObsIdType obsKey) -> double
 {
-    QFailIf(!this->obs_manager.isValidObservables({obsKey}), "Invalid key for cached observables");
+    RT_FAIL_IF(!this->obs_manager.isValidObservables({obsKey}),
+               "Invalid key for cached observables");
 
     auto &&obs = this->obs_manager.getObservable(obsKey);
 
@@ -227,8 +229,8 @@ auto LightningSimulator::PartialProbs(const std::vector<QubitIdType> &wires) -> 
     const size_t numWires = wires.size();
     const size_t numQubits = this->GetNumQubits();
 
-    QFailIf(numWires > numQubits, "Invalid number of wires");
-    QFailIf(!isValidQubits(wires), "Invalid given wires to measure");
+    RT_FAIL_IF(numWires > numQubits, "Invalid number of wires");
+    RT_FAIL_IF(!isValidQubits(wires), "Invalid given wires to measure");
 
     auto dev_wires = getDeviceWires(wires);
     Pennylane::Simulators::Measures m{*(this->device_sv)};
@@ -272,8 +274,8 @@ auto LightningSimulator::PartialSample(const std::vector<QubitIdType> &wires, si
     const size_t numWires = wires.size();
     const size_t numQubits = this->GetNumQubits();
 
-    QFailIf(numWires > numQubits, "Invalid number of wires");
-    QFailIf(!isValidQubits(wires), "Invalid given wires to measure");
+    RT_FAIL_IF(numWires > numQubits, "Invalid number of wires");
+    RT_FAIL_IF(!isValidQubits(wires), "Invalid given wires to measure");
 
     // get device wires
     auto &&dev_wires = getDeviceWires(wires);
@@ -351,8 +353,8 @@ auto LightningSimulator::PartialCounts(const std::vector<QubitIdType> &wires, si
     const size_t numWires = wires.size();
     const size_t numQubits = this->GetNumQubits();
 
-    QFailIf(numWires > numQubits, "Invalid number of wires");
-    QFailIf(!isValidQubits(wires), "Invalid given wires to measure");
+    RT_FAIL_IF(numWires > numQubits, "Invalid number of wires");
+    RT_FAIL_IF(!isValidQubits(wires), "Invalid given wires to measure");
 
     // get device wires
     auto &&dev_wires = getDeviceWires(wires);
@@ -460,9 +462,9 @@ auto LightningSimulator::Gradient(const std::vector<size_t> &trainParams)
     bool is_valid_measurements =
         std::all_of(obs_callees.begin(), obs_callees.end(),
                     [](const auto &m) { return m == Lightning::Measurements::Expval; });
-    QFailIf(!is_valid_measurements,
-            "Unsupported measurements to compute gradient; "
-            "Adjoint differentiation method only supports expectation return type");
+    RT_FAIL_IF(!is_valid_measurements,
+               "Unsupported measurements to compute gradient; "
+               "Adjoint differentiation method only supports expectation return type");
 
     auto &&state = this->device_sv->getDataVector();
 
@@ -506,7 +508,7 @@ auto LightningSimulator::Gradient(const std::vector<size_t> &trainParams)
     std::vector<std::vector<double>> results(num_observables);
     auto begin_loc_iter = jacobian_t.begin();
     for (size_t obs_idx = 0; obs_idx < num_observables; obs_idx++) {
-        assert(begin_loc_iter != jacobian_t.end());
+        RT_ASSERT(begin_loc_iter != jacobian_t.end());
         results[obs_idx].insert(results[obs_idx].begin(), begin_loc_iter,
                                 begin_loc_iter + num_train_params);
         begin_loc_iter += num_train_params;

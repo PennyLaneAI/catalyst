@@ -46,7 +46,7 @@ auto LightningKokkosSimulator::GetNumQubits() const -> size_t
 
 void LightningKokkosSimulator::StartTapeRecording()
 {
-    QFailIf(this->tape_recording, "Cannot re-activate the cache manager");
+    RT_FAIL_IF(this->tape_recording, "Cannot re-activate the cache manager");
     this->tape_recording = true;
     this->cache_manager.Reset();
 }
@@ -112,8 +112,8 @@ void LightningKokkosSimulator::NamedOperation(const std::string &name,
         Lightning::lookup_gates(Lightning::simulator_gate_info, name);
 
     // Check the validity of number of qubits and parameters
-    QFailIf((!wires.size() && wires.size() != op_num_wires), "Invalid number of qubits");
-    QFailIf(params.size() != op_num_params, "Invalid number of parameters");
+    RT_FAIL_IF((!wires.size() && wires.size() != op_num_wires), "Invalid number of qubits");
+    RT_FAIL_IF(params.size() != op_num_params, "Invalid number of parameters");
 
     // Convert wires to device wires
     auto &&dev_wires = getDeviceWires(wires);
@@ -134,7 +134,7 @@ void LightningKokkosSimulator::MatrixOperation(const std::vector<std::complex<do
                                                     ::Kokkos::MemoryTraits<Kokkos::Unmanaged>>;
 
     // Check the validity of number of qubits and parameters
-    QFailIf(!wires.size(), "Invalid number of qubits");
+    RT_FAIL_IF(!wires.size(), "Invalid number of qubits");
 
     // Convert wires to device wires
     auto &&dev_wires = getDeviceWires(wires);
@@ -160,8 +160,8 @@ void LightningKokkosSimulator::MatrixOperation(const std::vector<std::complex<do
 auto LightningKokkosSimulator::Observable(ObsId id, const std::vector<std::complex<double>> &matrix,
                                           const std::vector<QubitIdType> &wires) -> ObsIdType
 {
-    QFailIf(wires.size() > this->GetNumQubits(), "Invalid number of wires");
-    QFailIf(!isValidQubits(wires), "Invalid given wires");
+    RT_FAIL_IF(wires.size() > this->GetNumQubits(), "Invalid number of wires");
+    RT_FAIL_IF(!isValidQubits(wires), "Invalid given wires");
 
     auto &&dev_wires = getDeviceWires(wires);
 
@@ -208,7 +208,7 @@ inline auto getRealOfComplexInnerProduct(Kokkos::View<Kokkos::complex<Precision>
                                          ::Kokkos::View<Kokkos::complex<Precision> *> sv2_vec)
     -> Precision
 {
-    assert(sv1_vec.size() == sv2_vec.size());
+    RT_ASSERT(sv1_vec.size() == sv2_vec.size());
     Precision inner = 0;
     ::Kokkos::parallel_reduce(
         sv1_vec.size(), getRealOfComplexInnerProductFunctor<Precision>(sv1_vec, sv2_vec), inner);
@@ -217,7 +217,8 @@ inline auto getRealOfComplexInnerProduct(Kokkos::View<Kokkos::complex<Precision>
 
 auto LightningKokkosSimulator::Expval(ObsIdType obsKey) -> double
 {
-    QFailIf(!this->obs_manager.isValidObservables({obsKey}), "Invalid key for cached observables");
+    RT_FAIL_IF(!this->obs_manager.isValidObservables({obsKey}),
+               "Invalid key for cached observables");
 
     // update tape caching
     if (this->tape_recording) {
@@ -233,7 +234,8 @@ auto LightningKokkosSimulator::Expval(ObsIdType obsKey) -> double
 
 auto LightningKokkosSimulator::Var(ObsIdType obsKey) -> double
 {
-    QFailIf(!this->obs_manager.isValidObservables({obsKey}), "Invalid key for cached observables");
+    RT_FAIL_IF(!this->obs_manager.isValidObservables({obsKey}),
+               "Invalid key for cached observables");
 
     // update tape caching
     if (this->tape_recording) {
@@ -275,8 +277,8 @@ auto LightningKokkosSimulator::PartialProbs(const std::vector<QubitIdType> &wire
     const size_t numWires = wires.size();
     const size_t numQubits = this->GetNumQubits();
 
-    QFailIf(numWires > numQubits, "Invalid number of wires");
-    QFailIf(!isValidQubits(wires), "Invalid given wires to measure");
+    RT_FAIL_IF(numWires > numQubits, "Invalid number of wires");
+    RT_FAIL_IF(!isValidQubits(wires), "Invalid given wires to measure");
 
     auto dev_wires = getDeviceWires(wires);
 
@@ -314,8 +316,8 @@ auto LightningKokkosSimulator::PartialSample(const std::vector<QubitIdType> &wir
     const size_t numWires = wires.size();
     const size_t numQubits = this->GetNumQubits();
 
-    QFailIf(numWires > numQubits, "Invalid number of wires");
-    QFailIf(!isValidQubits(wires), "Invalid given wires to measure");
+    RT_FAIL_IF(numWires > numQubits, "Invalid number of wires");
+    RT_FAIL_IF(!isValidQubits(wires), "Invalid given wires to measure");
 
     // get device wires
     auto &&dev_wires = getDeviceWires(wires);
@@ -382,8 +384,8 @@ auto LightningKokkosSimulator::PartialCounts(const std::vector<QubitIdType> &wir
     const size_t numWires = wires.size();
     const size_t numQubits = this->GetNumQubits();
 
-    QFailIf(numWires > numQubits, "Invalid number of wires");
-    QFailIf(!isValidQubits(wires), "Invalid given wires to measure");
+    RT_FAIL_IF(numWires > numQubits, "Invalid number of wires");
+    RT_FAIL_IF(!isValidQubits(wires), "Invalid given wires to measure");
 
     // get device wires
     auto &&dev_wires = getDeviceWires(wires);
@@ -496,9 +498,9 @@ auto LightningKokkosSimulator::Gradient(const std::vector<size_t> &trainParams)
     bool is_valid_measurements =
         std::all_of(obs_callees.begin(), obs_callees.end(),
                     [](const auto &m) { return m == Lightning::Measurements::Expval; });
-    QFailIf(!is_valid_measurements,
-            "Unsupported measurements to compute gradient; "
-            "Adjoint differentiation method only supports expectation return type");
+    RT_FAIL_IF(!is_valid_measurements,
+               "Unsupported measurements to compute gradient; "
+               "Adjoint differentiation method only supports expectation return type");
 
     // Create OpsData
     auto &&ops_names = this->cache_manager.getOperationsNames();

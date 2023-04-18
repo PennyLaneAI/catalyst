@@ -4,6 +4,14 @@
 
 <h3>Improvements</h3>
 
+* Improving error handling by throwing descriptive and unified expressions for runtime
+  errors and assertions.
+  [#92](https://github.com/PennyLaneAI/catalyst/pull/92)
+
+* Improve interface for adding and re-using flags to quantum-opt commands.
+  These are called pipelines, as they contain multiple passes.
+  [#38](https://github.com/PennyLaneAI/catalyst/pull/38)
+
 <h3>Breaking changes</h3>
 
 <h3>Bug fixes</h3>
@@ -18,6 +26,7 @@
 
 This release contains contributions from (in alphabetical order):
 
+Ali Asadi,
 Erick Ochoa Lopez
 
 # Release 0.1.2

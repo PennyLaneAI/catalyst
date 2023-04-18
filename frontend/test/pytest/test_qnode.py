@@ -50,7 +50,10 @@ def test_unsupported_device():
     def func():
         return qml.probs()
 
-    with pytest.raises(CompileError, match="devices are supported for compilation at the moment."):
+    with pytest.raises(
+        CompileError,
+        match="The default.qubit.autograd device is not supported for compilation at the moment.",
+    ):
         qjit(func)
 
 

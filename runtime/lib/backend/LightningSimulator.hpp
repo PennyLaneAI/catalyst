@@ -21,7 +21,6 @@ throw std::logic_error("StateVectorDynamicCPU.hpp: No such header file");
 #define __device_lightning
 
 #include <bitset>
-#include <cassert>
 #include <cmath>
 #include <cstdint>
 #include <iostream>
@@ -37,6 +36,7 @@ throw std::logic_error("StateVectorDynamicCPU.hpp: No such header file");
 #include "StateVectorDynamicCPU.hpp"
 
 #include "CacheManager.hpp"
+#include "Exception.hpp"
 #include "LightningObsManager.hpp"
 #include "QuantumDevice.hpp"
 #include "QubitManager.hpp"

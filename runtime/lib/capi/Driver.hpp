@@ -12,10 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#pragma once
-
-#include <cassert>
-
 #include <functional>
 #include <memory>
 #include <string>
@@ -23,6 +19,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
+#include "Exception.hpp"
 #include "QuantumDevice.hpp"
 
 // device: lightning.qubit
@@ -91,8 +88,8 @@ class Driver final {
         _driver_ptr.reset(nullptr);
         _driver_mm_ptr.reset(nullptr);
 
-        assert(getDevice() == nullptr);
-        assert(getMemoryManager() == nullptr);
+        RT_ASSERT(getDevice() == nullptr);
+        RT_ASSERT(getMemoryManager() == nullptr);
     };
 
     void setDeviceName(std::string_view name) noexcept

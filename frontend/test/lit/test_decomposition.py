@@ -31,7 +31,7 @@ def get_custom_device_without(num_wires, discards):
     class CustomDevice(qml.QubitDevice):
         name = "Device without some operations"
         short_name = "dummy.device"
-        backend_device = "default"
+        backend = "default"
         pennylane_requires = "0.1.0"
         version = "0.0.1"
         author = "CV quantum"
