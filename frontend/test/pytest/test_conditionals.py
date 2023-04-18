@@ -51,6 +51,8 @@ class TestCondToJaxpr:
 
 class TestCond:
     def test_simple_cond(self, backend):
+        """Test simple condition."""
+
         @qjit()
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(n):
@@ -73,6 +75,8 @@ class TestCond:
         assert circuit(6) == 36
 
     def test_qubit_manipulation_cond(self, backend):
+        """Test qubit manipulation cond."""
+
         @qjit()
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(x):
@@ -88,6 +92,8 @@ class TestCond:
         assert circuit(6) == True
 
     def test_branch_return_mismatch(self, backend):
+        """Test branch return mismatch."""
+
         def circuit():
             @cond(True)
             def cond_fn():
@@ -99,6 +105,8 @@ class TestCond:
             qjit(qml.qnode(qml.device(backend, wires=1))(circuit))
 
     def test_identical_branch_names(self, backend):
+        """Test identical branch names."""
+
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(pred: bool):
@@ -141,6 +149,8 @@ class TestInterpretationConditional:
 
     # pylint: disable=missing-function-docstring
     def test_conditional_interpreted_and_compiled_single_if(self, backend):
+        """Test conditional interpreted and compiled single if."""
+
         num_wires = 2
         device = qml.device(backend, wires=num_wires)
 

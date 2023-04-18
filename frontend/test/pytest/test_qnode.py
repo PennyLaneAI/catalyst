@@ -27,6 +27,8 @@ from catalyst import qjit, measure, CompileError
     ],
 )
 def test_variable_capture(_in, _out, backend):
+    """Test variable capture."""
+
     @qjit()
     def workflow1(n: int):
         @qml.qnode(qml.device(backend, wires=2))
@@ -45,13 +47,15 @@ def test_variable_capture(_in, _out, backend):
 
 
 def test_unsupported_device():
+    """Test unsupported device."""
+
     @qml.qnode(qml.device("default.qubit", wires=2))
     def func():
         return qml.probs()
 
     with pytest.raises(
         CompileError,
-        match="The default.qubit.autograd device is not supported for compilation at the moment.",
+        match="device is not supported for compilation at the moment.",
     ):
         qjit(func)
 

@@ -87,6 +87,8 @@ def test_adjoint_on_non_expval(backend):
 
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
 def test_finite_diff(inp, backend):
+    """Test finite diff."""
+
     def f(x):
         qml.RX(x, wires=0)
         return qml.expval(qml.PauliY(0))
@@ -108,6 +110,8 @@ def test_finite_diff(inp, backend):
 
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
 def test_finite_diff_mul(inp, backend):
+    """Test finite diff with mul."""
+
     def f(x):
         qml.RX(3 * x, wires=0)
         return qml.expval(qml.PauliY(0))
@@ -129,6 +133,8 @@ def test_finite_diff_mul(inp, backend):
 
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
 def test_finite_diff_in_loop(inp, backend):
+    """Test finite diff in loop."""
+
     @qml.qnode(qml.device(backend, wires=1))
     def f(x):
         qml.RX(3 * x, wires=0)
@@ -154,6 +160,8 @@ def test_finite_diff_in_loop(inp, backend):
 
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
 def test_adj(inp, backend):
+    """Test the adjoint method."""
+
     def f(x):
         qml.RX(x, wires=0)
         return qml.expval(qml.PauliY(0))
@@ -175,6 +183,8 @@ def test_adj(inp, backend):
 
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
 def test_adj_mult(inp, backend):
+    """Test the adjoint method with mult."""
+
     def f(x):
         qml.RX(x * 2, wires=0)
         return qml.expval(qml.PauliY(0))
@@ -196,6 +206,8 @@ def test_adj_mult(inp, backend):
 
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
 def test_adj_in_loop(inp, backend):
+    """Test the adjoint method in loop."""
+
     @qml.qnode(qml.device(backend, wires=1))
     def f(x):
         qml.RX(3 * x, wires=0)
@@ -221,6 +233,8 @@ def test_adj_in_loop(inp, backend):
 
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
 def test_ps(inp, backend):
+    """Test the ps method."""
+
     def f(x):
         qml.RX(x * 2, wires=0)
         return qml.expval(qml.PauliY(0))
@@ -242,6 +256,8 @@ def test_ps(inp, backend):
 
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
 def test_ps_conditionals(inp, backend):
+    """Test the ps method and conditionals."""
+
     def f_compiled(x, y):
         @cond(y > 1.5)
         def true_path():
@@ -279,6 +295,8 @@ def test_ps_conditionals(inp, backend):
 
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
 def test_ps_for_loops(inp, backend):
+    """Test the ps method with for loops."""
+
     def f_compiled(x, y):
         @for_loop(0, y, 1)
         def loop_fn(i):
@@ -312,6 +330,8 @@ def test_ps_for_loops(inp, backend):
 
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
 def test_ps_for_loops_entangled(inp, backend):
+    """Test the ps method with for loops and entangled."""
+
     def f_compiled(x, y, z):
         qml.RX(x, wires=0)
         qml.Hadamard(wires=0)
@@ -350,6 +370,8 @@ def test_ps_for_loops_entangled(inp, backend):
 
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
 def test_ps_qft(inp, backend):
+    """Test the ps method in QFT."""
+
     def qft_compiled(x, n, z):
         # Input state: equal superposition
         @for_loop(0, n, 1)
@@ -421,6 +443,8 @@ def test_ps_probs(backend):
 
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
 def test_finite_diff_h(inp, backend):
+    """Test finite diff."""
+
     def f(x):
         qml.RX(x, wires=0)
         return qml.expval(qml.PauliY(0))
@@ -442,6 +466,8 @@ def test_finite_diff_h(inp, backend):
 
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
 def test_finite_diff_argnum(inp, backend):
+    """Test finite diff."""
+
     def f2(x, y):
         qml.RX(x**y, wires=0)
         return qml.expval(qml.PauliY(0))
@@ -463,6 +489,8 @@ def test_finite_diff_argnum(inp, backend):
 
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
 def test_finite_diff_argnum_list(inp, backend):
+    """Test finite diff."""
+
     def f2(x, y):
         qml.RX(x**y, wires=0)
         return qml.expval(qml.PauliY(0))
@@ -488,6 +516,8 @@ def test_finite_diff_argnum_list(inp, backend):
 
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
 def test_finite_grad_range_change(inp, backend):
+    """Test finite diff."""
+
     def f2(x, y):
         qml.RX(x**y, wires=0)
         return qml.expval(qml.PauliY(0))
@@ -509,6 +539,8 @@ def test_finite_grad_range_change(inp, backend):
 
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
 def test_ps_grad_range_change(inp, backend):
+    """Test param shift."""
+
     def f2(x, y):
         qml.RX(x**y, wires=0)
         return qml.expval(qml.PauliY(0))
@@ -530,6 +562,8 @@ def test_ps_grad_range_change(inp, backend):
 
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
 def test_ps_tensorinp(inp, backend):
+    """Test param shift."""
+
     def f2(x, y):
         qml.RX(x[0] ** y, wires=0)
         return qml.expval(qml.PauliY(0))
@@ -552,6 +586,8 @@ def test_ps_tensorinp(inp, backend):
 
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
 def test_adjoint_grad_range_change(inp, backend):
+    """Test adjoint."""
+
     def f2(x, y):
         qml.RX(x**y, wires=0)
         return qml.expval(qml.PauliY(0))
@@ -604,6 +640,8 @@ def test_finite_diff_arbitrary_functions():
 
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
 def test_finite_diff_higher_order(inp, backend):
+    """Test finite diff."""
+
     def f(x):
         qml.RX(x, wires=0)
         return qml.expval(qml.PauliY(0))
@@ -627,6 +665,8 @@ def test_finite_diff_higher_order(inp, backend):
 
 @pytest.mark.parametrize("inp", [([1.0, 2.0])])
 def test_jax_consts(inp, backend):
+    """Test jax consts."""
+
     def circuit(params):
         qml.CRX(params[0], wires=[0, 1])
         qml.CRX(params[0], wires=[0, 2])

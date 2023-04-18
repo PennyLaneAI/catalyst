@@ -47,6 +47,8 @@ def g(arg0: int, arg1: int, arg2: int):
     ],
 )
 def test_buffer_args(f, params, backend):
+    """Test buffer args."""
+
     device = qml.device(backend, wires=1)
     interpreted_fn = qml.QNode(f, device)
     jitted_fn = qjit(interpreted_fn)
@@ -55,6 +57,8 @@ def test_buffer_args(f, params, backend):
 
 class TestReturnValues:
     def test_return_values(self, backend):
+        """Test return values."""
+
         @qml.qnode(qml.device(backend, wires=3))
         def circuit(params):
             qml.SingleExcitation(params[0], wires=[0, 1])
