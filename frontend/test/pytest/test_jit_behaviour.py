@@ -27,9 +27,9 @@ import warnings
 from catalyst.compilation_pipelines import CompiledFunction
 
 
-def f_aot_builder(wires=1, shots=1000):
+def f_aot_builder(backend, wires=1, shots=1000):
     @qjit()
-    @qml.qnode(qml.device("lightning.qubit", wires=wires, shots=shots))
+    @qml.qnode(qml.device(backend, wires=wires, shots=shots))
     def f(x: float):
         qml.RY(x, wires=0)
         return measure(wires=0)
@@ -37,9 +37,9 @@ def f_aot_builder(wires=1, shots=1000):
     return f
 
 
-def f_jit_builder(wires=1, shots=1000):
+def f_jit_builder(backend, wires=1, shots=1000):
     @qjit()
-    @qml.qnode(qml.device("lightning.qubit", wires=wires, shots=shots))
+    @qml.qnode(qml.device(backend, wires=wires, shots=shots))
     def f(x):
         qml.RY(x, wires=0)
         return measure(wires=0)
@@ -47,9 +47,9 @@ def f_jit_builder(wires=1, shots=1000):
     return f
 
 
-def fsample_aot_builder(wires=1, shots=1000):
+def fsample_aot_builder(backend, wires=1, shots=1000):
     @qjit()
-    @qml.qnode(qml.device("lightning.qubit", wires=wires, shots=shots))
+    @qml.qnode(qml.device(backend, wires=wires, shots=shots))
     def f(x: float):
         qml.RY(x, wires=0)
         return qml.sample()
@@ -58,10 +58,10 @@ def fsample_aot_builder(wires=1, shots=1000):
 
 
 class TestDifferentPrecisions:
-    def test_different_precisions(self):
+    def test_different_precisions(self, backend):
         def builder(_in):
             @qjit
-            @qml.qnode(qml.device("lightning.qubit", wires=1))
+            @qml.qnode(qml.device(backend, wires=1))
             def f(x):
                 qml.RX(x, wires=0)
                 return qml.state()
@@ -92,9 +92,9 @@ class TestJittedWithOneTypeRunWithAnother:
             (jnp.int8, jnp.uint8),
         ],
     )
-    def test_recompile_when_unsupported_argument(self, from_type, to_type):
+    def test_recompile_when_unsupported_argument(self, from_type, to_type, backend):
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qml.qnode(qml.device(backend, wires=1))
         def f(x):
             qml.RX(x.astype(float), wires=0)
             return qml.state()
@@ -115,13 +115,13 @@ class TestJittedWithOneTypeRunWithAnother:
             (jnp.uint8),
         ],
     )
-    def test_signless(self, type):
+    def test_signless(self, type, backend):
         with warnings.catch_warnings():
             # Treat warnings as an error.
             warnings.simplefilter("error")
 
             @qjit
-            @qml.qnode(qml.device("lightning.qubit", wires=1))
+            @qml.qnode(qml.device(backend, wires=1))
             def f(x):
                 qml.RX(jnp.real(x), wires=0)
                 return qml.state()
@@ -143,9 +143,9 @@ class TestJittedWithOneTypeRunWithAnother:
             (jnp.uint8),
         ],
     )
-    def test_recompile_warning(self, to_type):
+    def test_recompile_warning(self, to_type, backend):
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qml.qnode(qml.device(backend, wires=1))
         def f(x: jax.core.ShapedArray([], jnp.int8)):
             qml.RX(x.astype(float), wires=0)
             return qml.state()
@@ -169,9 +169,9 @@ class TestJittedWithOneTypeRunWithAnother:
             (float, complex),
         ],
     )
-    def test_recompile_python_types(self, from_type, to_type):
+    def test_recompile_python_types(self, from_type, to_type, backend):
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qml.qnode(qml.device(backend, wires=1))
         def f(x):
             qml.RX(x.astype(float), wires=0)
             return qml.state()
@@ -197,9 +197,9 @@ class TestJittedWithOneTypeRunWithAnother:
             (jnp.uint8),
         ],
     )
-    def test_recompile_no_warning(self, to_type):
+    def test_recompile_no_warning(self, to_type, backend):
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qml.qnode(qml.device(backend, wires=1))
         def f(x):
             qml.RX(x.astype(float), wires=0)
             return qml.state()
@@ -232,9 +232,9 @@ class TestTypePromotion:
             (jnp.uint8, 1),
         ],
     )
-    def test_promote_to_double(self, promote_from, val):
+    def test_promote_to_double(self, promote_from, val, backend):
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qml.qnode(qml.device(backend, wires=1))
         def f(x):
             qml.RX(x, wires=0)
             return qml.state()
@@ -257,9 +257,9 @@ class TestTypePromotion:
             (complex, float),
         ],
     )
-    def test_promotion_python_types(self, from_type, to_type):
+    def test_promotion_python_types(self, from_type, to_type, backend):
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qml.qnode(qml.device(backend, wires=1))
         def f(x):
             qml.RX(x.astype(float), wires=0)
             return qml.state()
@@ -282,9 +282,9 @@ class TestTypePromotion:
             (jnp.uint8),
         ],
     )
-    def test_promote_to_int(self, promote_from):
+    def test_promote_to_int(self, promote_from, backend):
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qml.qnode(qml.device(backend, wires=1))
         def f(x):
             qml.RX(x.astype(float), wires=0)
             return qml.state()
@@ -304,9 +304,9 @@ class TestTypePromotion:
             (jnp.uint8),
         ],
     )
-    def test_promote_unsigned(self, promote_from):
+    def test_promote_unsigned(self, promote_from, backend):
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qml.qnode(qml.device(backend, wires=1))
         def f(x):
             qml.RX(x.astype(float), wires=0)
             return qml.state()
@@ -334,9 +334,9 @@ class TestTypePromotion:
             (jnp.uint8),
         ],
     )
-    def test_promote_complex(self, promote_from):
+    def test_promote_complex(self, promote_from, backend):
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qml.qnode(qml.device(backend, wires=1))
         def f(x):
             qml.RX(x.real, wires=0)
             return qml.state()
@@ -358,15 +358,15 @@ class TestCallsiteCompileVsFunctionDefinitionCompile:
 
 
 class TestDecorator:
-    def test_function_is_cached(self):
+    def test_function_is_cached(self, backend):
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qml.qnode(qml.device(backend, wires=1))
         def f_no_parenthesis(x):
             qml.RY(x, wires=0)
             return measure(wires=0)
 
         @qjit()
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qml.qnode(qml.device(backend, wires=1))
         def f_parenthesis(x):
             qml.RY(x, wires=0)
             return measure(wires=0)
@@ -375,9 +375,9 @@ class TestDecorator:
 
 
 class TestCaching:
-    def test_function_is_cached(self):
+    def test_function_is_cached(self, backend):
         @qjit()
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qml.qnode(qml.device(backend, wires=1))
         def f_jit(x):
             qml.RY(x, wires=0)
             return measure(wires=0)
@@ -463,9 +463,9 @@ class TestArraysInHamiltonian:
             (jnp.array([0.4, 0.7])),
         ],
     )
-    def test_array_repr_from_context(self, coeffs):
+    def test_array_repr_from_context(self, coeffs, backend):
         @qjit(target="mlir")
-        @qml.qnode(qml.device("lightning.qubit", wires=6))
+        @qml.qnode(qml.device(backend, wires=6))
         def f():
             qml.Hadamard(wires=0)
             qml.CNOT(wires=[0, 1])
@@ -480,9 +480,9 @@ class TestArraysInHamiltonian:
             (jnp.array([0.4, 0.7])),
         ],
     )
-    def test_array_repr_as_parameter(self, coeffs):
+    def test_array_repr_as_parameter(self, coeffs, backend):
         @qjit(target="mlir")
-        @qml.qnode(qml.device("lightning.qubit", wires=6))
+        @qml.qnode(qml.device(backend, wires=6))
         def f(coeffs):
             qml.Hadamard(wires=0)
             qml.CNOT(wires=[0, 1])
@@ -499,9 +499,9 @@ class TestArraysInHamiltonian:
             (list),
         ],
     )
-    def test_array_repr_built_in(self, repr):
+    def test_array_repr_built_in(self, repr, backend):
         @qjit(target="mlir")
-        @qml.qnode(qml.device("lightning.qubit", wires=6))
+        @qml.qnode(qml.device(backend, wires=6))
         def f():
             qml.Hadamard(wires=0)
             qml.CNOT(wires=[0, 1])
@@ -530,9 +530,9 @@ class TestArraysInHermitian:
             (list),
         ],
     )
-    def test_array_repr_from_context(self, matrix, repr):
+    def test_array_repr_from_context(self, matrix, repr, backend):
         @qjit(target="mlir")
-        @qml.qnode(qml.device("lightning.qubit", wires=6))
+        @qml.qnode(qml.device(backend, wires=6))
         def f(x: float):
             qml.RX(x, wires=0)
             hermitian = qml.Hermitian(repr(matrix), wires=[0, 1])
@@ -548,9 +548,9 @@ class TestArraysInHermitian:
             (list),
         ],
     )
-    def test_array_repr_as_parameter(self, matrix, repr):
+    def test_array_repr_as_parameter(self, matrix, repr, backend):
         @qjit(target="mlir")
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qml.qnode(qml.device(backend, wires=2))
         def f(matrix):
             qml.RX(jnp.pi, wires=0)
             hermitian = qml.Hermitian(matrix, wires=[0, 1])
@@ -566,9 +566,9 @@ class TestArraysInHermitian:
             (list),
         ],
     )
-    def test_array_repr_built_in(self, repr):
+    def test_array_repr_built_in(self, repr, backend):
         @qjit(target="mlir")
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qml.qnode(qml.device(backend, wires=2))
         def f(x: float):
             qml.RX(x, wires=0)
             matrix = repr(
@@ -600,8 +600,8 @@ class TestTracingQJITAnnotatedFunctions:
         assert g.mlir
         assert g() == 2
 
-    def test_quantum_context(self):
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+    def test_quantum_context(self, backend):
+        @qml.qnode(qml.device(backend, wires=1))
         def f(x: float):
             qml.RX(x, wires=0)
             return qml.state()
@@ -619,10 +619,10 @@ class TestTracingQJITAnnotatedFunctions:
         assert g2.mlir
 
     @pytest.mark.parametrize("phi", [(0.0), (1.0), (2.0)])
-    def test_gradient_of_qjit_equivalence(self, phi):
+    def test_gradient_of_qjit_equivalence(self, phi, backend):
         # Issue 376
         @qjit
-        @qml.qnode(device=qml.device("lightning.qubit", wires=1))
+        @qml.qnode(device=qml.device(backend, wires=1))
         def circuit(phi):
             qml.RX(phi, wires=0)
             return qml.expval(qml.PauliZ(0))
@@ -637,8 +637,8 @@ class TestTracingQJITAnnotatedFunctions:
         assert np.allclose(workflow(phi), qjit(grad(circuit))(phi))
 
     @pytest.mark.parametrize("phi", [(0.0), (1.0), (2.0)])
-    def test_gradient_of_qjit_correctness(self, phi):
-        @qml.qnode(device=qml.device("lightning.qubit", wires=1))
+    def test_gradient_of_qjit_correctness(self, phi, backend):
+        @qml.qnode(device=qml.device(backend, wires=1))
         def circuit(phi):
             qml.RX(phi, wires=0)
             return qml.expval(qml.PauliZ(0))
@@ -655,8 +655,8 @@ class TestTracingQJITAnnotatedFunctions:
 
         assert np.allclose(workflow1(phi), workflow2(phi))
 
-    def test_gradient_of_qjit_names(self):
-        @qml.qnode(device=qml.device("lightning.qubit", wires=1))
+    def test_gradient_of_qjit_names(self, backend):
+        @qml.qnode(device=qml.device(backend, wires=1))
         def circuit(phi):
             qml.RX(phi, wires=0)
             return qml.expval(qml.PauliZ(0))
@@ -686,8 +686,8 @@ class TestDefaultAvailableIR:
 
         assert f.mlir
 
-    def test_qir(self):
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+    def test_qir(self, backend):
+        @qml.qnode(qml.device(backend, wires=1))
         def f(x: float):
             qml.RX(x, wires=0)
             return qml.state()
@@ -701,8 +701,8 @@ class TestDefaultAvailableIR:
 
 
 class TestAvoidVerification:
-    def test_no_verification(self, capfd):
-        dev1 = qml.device("lightning.qubit", wires=1)
+    def test_no_verification(self, capfd, backend):
+        dev1 = qml.device(backend, wires=1)
 
         @qml.qnode(device=dev1)
         def circuit(x):

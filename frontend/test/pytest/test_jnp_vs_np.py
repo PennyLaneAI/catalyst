@@ -30,9 +30,9 @@ def circuit_np():
     return qml.expval(qml.PauliZ(0))
 
 
-def test_variable_wires():
-    jitted_fn_jnp = qjit()(qml.qnode(qml.device("lightning.qubit", wires=1))(circuit_jnp))
-    jitted_fn_np = qjit()(qml.qnode(qml.device("lightning.qubit", wires=1))(circuit_np))
+def test_variable_wires(backend):
+    jitted_fn_jnp = qjit()(qml.qnode(qml.device(backend, wires=1))(circuit_jnp))
+    jitted_fn_np = qjit()(qml.qnode(qml.device(backend, wires=1))(circuit_np))
     assert np.isclose(jitted_fn_jnp(), jitted_fn_np())
 
 

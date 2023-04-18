@@ -50,9 +50,9 @@ class TestCondToJaxpr:
 
 
 class TestCond:
-    def test_simple_cond(self):
+    def test_simple_cond(self, backend):
         @qjit()
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qml.qnode(qml.device(backend, wires=1))
         def circuit(n):
             @cond(n > 4)
             def cond_fn():
@@ -72,9 +72,9 @@ class TestCond:
         assert circuit(5) == 25
         assert circuit(6) == 36
 
-    def test_qubit_manipulation_cond(self):
+    def test_qubit_manipulation_cond(self, backend):
         @qjit()
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qml.qnode(qml.device(backend, wires=1))
         def circuit(x):
             @cond(x > 4)
             def cond_fn():
@@ -87,7 +87,7 @@ class TestCond:
         assert circuit(3) == False
         assert circuit(6) == True
 
-    def test_branch_return_mismatch(self):
+    def test_branch_return_mismatch(self, backend):
         def circuit():
             @cond(True)
             def cond_fn():
@@ -96,11 +96,11 @@ class TestCond:
             return cond_fn()
 
         with pytest.raises(TypeError, match="Conditional branches require the same return type"):
-            qjit(qml.qnode(qml.device("lightning.qubit", wires=1))(circuit))
+            qjit(qml.qnode(qml.device(backend, wires=1))(circuit))
 
-    def test_identical_branch_names(self):
+    def test_identical_branch_names(self, backend):
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qml.qnode(qml.device(backend, wires=1))
         def circuit(pred: bool):
             @cond(pred)
             def conditional_flip():
@@ -140,9 +140,9 @@ class TestInterpretationConditional:
         assert arithc(0, 0, 1) == arithi(0, 0, 1)
 
     # pylint: disable=missing-function-docstring
-    def test_conditional_interpreted_and_compiled_single_if(self):
+    def test_conditional_interpreted_and_compiled_single_if(self, backend):
         num_wires = 2
-        device = qml.device("lightning.qubit", wires=num_wires)
+        device = qml.device(backend, wires=num_wires)
 
         @qml.qnode(device)
         def interpreted_circuit(n):

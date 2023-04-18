@@ -46,16 +46,16 @@ def g(arg0: int, arg1: int, arg2: int):
         (g, [1, 1, 1]),
     ],
 )
-def test_buffer_args(f, params):
-    device = qml.device("lightning.qubit", wires=1)
+def test_buffer_args(f, params, backend):
+    device = qml.device(backend, wires=1)
     interpreted_fn = qml.QNode(f, device)
     jitted_fn = qjit(interpreted_fn)
     assert jnp.allclose(interpreted_fn(*params), jitted_fn(*params))
 
 
 class TestReturnValues:
-    def test_return_values(self):
-        @qml.qnode(qml.device("lightning.qubit", wires=3))
+    def test_return_values(self, backend):
+        @qml.qnode(qml.device(backend, wires=3))
         def circuit(params):
             qml.SingleExcitation(params[0], wires=[0, 1])
             qml.SingleExcitation(params[1], wires=[0, 2])
