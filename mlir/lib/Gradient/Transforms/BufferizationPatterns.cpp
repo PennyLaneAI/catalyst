@@ -63,16 +63,16 @@ class BufferizeBackpropOp : public OpConversionPattern<BackpropOp> {
             return failure();
 
         Location loc = op.getLoc();
-        Value gradSize = op.getGradSize();
+        DenseIntElementsAttr diffArgIndices = op.getDiffArgIndices().value_or(nullptr);
+
         SmallVector<Value> memrefValues;
         for (Type resType : resTypes) {
             MemRefType memrefType = resType.cast<MemRefType>();
-            Value memrefValue = rewriter.create<memref::AllocOp>(loc, memrefType, gradSize);
+            Value memrefValue = rewriter.create<memref::AllocOp>(loc, memrefType);
             memrefValues.push_back(memrefValue);
         }
 
-        rewriter.create<BackpropOp>(loc, TypeRange{}, op.getCalleeAttr(), adaptor.getGradSize(),
-                                   adaptor.getOperands(), memrefValues);
+        rewriter.create<BackpropOp>(loc, TypeRange{}, op.getCalleeAttr(), diffArgIndices, adaptor.getArgs(), memrefValues);
         rewriter.replaceOp(op, memrefValues);
         return success();
     }
@@ -85,7 +85,7 @@ namespace gradient {
 
 void populateBufferizationPatterns(TypeConverter &typeConverter, RewritePatternSet &patterns)
 {
-    // patterns.add<BufferizeBackpropOp>(typeConverter, patterns.getContext());
+    patterns.add<BufferizeBackpropOp>(typeConverter, patterns.getContext());
     patterns.add<BufferizeAdjointOp>(typeConverter, patterns.getContext());
 }
 
