@@ -92,14 +92,13 @@ def AdjointOp : Gradient_Op<"adjoint", [AttrSizedOperandSegments]> {
     }];
 }
 
-def BackpropOp : Gradient_Op<"backprop", [AttrSizedOperandSegments]> {
-    let summary = "Perform classical AD using Enzyme AD.";
+def BackpropOp : Gradient_Op<"backprop", [SameVariadicOperandSize]> {
+    let summary = "Perform classic automatic differentiation using Enzyme AD.";
 
     let arguments = (ins
         FlatSymbolRefAttr:$callee,
-        Index:$gradSize,
-        Variadic<AnyType>:$args,
-        Variadic<AnyMemRef>:$data_in
+        Variadic<AnyType>:$operands,
+        OptionalAttr<AnyIntElementsAttr>:$diffArgIndices
     );
 
     let results = (outs
@@ -110,12 +109,11 @@ def BackpropOp : Gradient_Op<"backprop", [AttrSizedOperandSegments]> {
     );
 
     let assemblyFormat = [{
-        $callee `(` $args `)`
-        `size` `(` $gradSize `)`
-        ( `in` `(` $data_in^ `:` type($data_in) `)` )?
-        attr-dict `:` functional-type($args, results)
+        `backprop` $callee `(` $operands `)` attr-dict `:` functional-type($operands, results)
     }];
 }
+
+
 
 
 #endif // GRADIENT_OPS

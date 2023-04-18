@@ -117,77 +117,77 @@ struct AdjointOpPattern : public OpConversionPattern<AdjointOp> {
     }
 };
 
-struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
-    using OpConversionPattern::OpConversionPattern;
+// struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
+//     using OpConversionPattern::OpConversionPattern;
 
-    LogicalResult matchAndRewrite(BackpropOp op, BackpropOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
-        Location loc = op.getLoc();
-        MLIRContext *ctx = getContext();
-        TypeConverter *conv = getTypeConverter();
+//     LogicalResult matchAndRewrite(BackpropOp op, BackpropOpAdaptor adaptor,
+//                                   ConversionPatternRewriter &rewriter) const override
+//     {
+//         Location loc = op.getLoc();
+//         MLIRContext *ctx = getContext();
+//         TypeConverter *conv = getTypeConverter();
 
-        Type vectorType = conv->convertType(MemRefType::get({UNKNOWN}, Float64Type::get(ctx)));
+//         Type vectorType = conv->convertType(MemRefType::get({UNKNOWN}, Float64Type::get(ctx)));
 
-        for (Type type : op.getResultTypes()) {
-            if (!type.isa<MemRefType>())
-                return op.emitOpError("must be bufferized before lowering");
+//         for (Type type : op.getResultTypes()) {
+//             if (!type.isa<MemRefType>())
+//                 return op.emitOpError("must be bufferized before lowering");
 
-            // Currently only expval gradients are supported by the runtime,
-            // leading to tensor<?xf64> return values.
-            if (type.dyn_cast<MemRefType>() != MemRefType::get({UNKNOWN}, Float64Type::get(ctx)))
-                return op.emitOpError("adjoint can only return MemRef<?xf64> or tuple thereof");
-        }
+//             // Currently only expval gradients are supported by the runtime,
+//             // leading to tensor<?xf64> return values.
+//             if (type.dyn_cast<MemRefType>() != MemRefType::get({UNKNOWN}, Float64Type::get(ctx)))
+//                 return op.emitOpError("adjoint can only return MemRef<?xf64> or tuple thereof");
+//         }
 
-        // The callee of the adjoint op must return as a single result the quantum register.
-        func::FuncOp callee =
-            SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
-        assert(callee && callee.getNumResults() == 1 && "invalid qfunc symbol in adjoint op");
+//         // The callee of the adjoint op must return as a single result the quantum register.
+//         func::FuncOp callee =
+//             SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
+//         assert(callee && callee.getNumResults() == 1 && "invalid qfunc symbol in adjoint op");
 
-        StringRef cacheFnName = "__quantum__rt__toggle_recorder";
-        StringRef gradFnName = "__quantum__qis__Gradient";
-        Type cacheFnSignature =
-            LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), IntegerType::get(ctx, 1));
-        Type gradFnSignature = LLVM::LLVMFunctionType::get(
-            LLVM::LLVMVoidType::get(ctx), IntegerType::get(ctx, 64), /*isVarArg=*/true);
+//         StringRef cacheFnName = "__quantum__rt__toggle_recorder";
+//         StringRef gradFnName = "__quantum__qis__Gradient";
+//         Type cacheFnSignature =
+//             LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), IntegerType::get(ctx, 1));
+//         Type gradFnSignature = LLVM::LLVMFunctionType::get(
+//             LLVM::LLVMVoidType::get(ctx), IntegerType::get(ctx, 64), /*isVarArg=*/true);
 
-        LLVM::LLVMFuncOp cacheFnDecl =
-            ensureFunctionDeclaration(rewriter, op, cacheFnName, cacheFnSignature);
-        LLVM::LLVMFuncOp gradFnDecl =
-            ensureFunctionDeclaration(rewriter, op, gradFnName, gradFnSignature);
+//         LLVM::LLVMFuncOp cacheFnDecl =
+//             ensureFunctionDeclaration(rewriter, op, cacheFnName, cacheFnSignature);
+//         LLVM::LLVMFuncOp gradFnDecl =
+//             ensureFunctionDeclaration(rewriter, op, gradFnName, gradFnSignature);
 
-        // Run the forward pass and cache the circuit.
-        Value c_true = rewriter.create<LLVM::ConstantOp>(
-            loc, rewriter.getIntegerAttr(IntegerType::get(ctx, 1), 1));
-        Value c_false = rewriter.create<LLVM::ConstantOp>(
-            loc, rewriter.getIntegerAttr(IntegerType::get(ctx, 1), 0));
-        rewriter.create<LLVM::CallOp>(loc, cacheFnDecl, c_true);
-        Value qreg = rewriter.create<func::CallOp>(loc, callee, op.getArgs()).getResult(0);
-        if (!qreg.getType().isa<catalyst::quantum::QuregType>())
-            return callee.emitOpError("qfunc must return quantum register");
-        rewriter.create<LLVM::CallOp>(loc, cacheFnDecl, c_false);
+//         // Run the forward pass and cache the circuit.
+//         Value c_true = rewriter.create<LLVM::ConstantOp>(
+//             loc, rewriter.getIntegerAttr(IntegerType::get(ctx, 1), 1));
+//         Value c_false = rewriter.create<LLVM::ConstantOp>(
+//             loc, rewriter.getIntegerAttr(IntegerType::get(ctx, 1), 0));
+//         rewriter.create<LLVM::CallOp>(loc, cacheFnDecl, c_true);
+//         Value qreg = rewriter.create<func::CallOp>(loc, callee, op.getArgs()).getResult(0);
+//         if (!qreg.getType().isa<catalyst::quantum::QuregType>())
+//             return callee.emitOpError("qfunc must return quantum register");
+//         rewriter.create<LLVM::CallOp>(loc, cacheFnDecl, c_false);
 
-        // We follow the C ABI convention of passing result memrefs as struct pointers in the
-        // arguments to the C function, although in this case as a variadic argument list to allow
-        // for a varying number of results in a single signature.
-        Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
-        Value numResults = rewriter.create<LLVM::ConstantOp>(
-            loc, rewriter.getI64IntegerAttr(op.getDataIn().size()));
-        SmallVector<Value> args = {numResults};
-        for (Value memref : adaptor.getDataIn()) {
-            auto newArg =
-                rewriter.create<LLVM::AllocaOp>(loc, LLVM::LLVMPointerType::get(vectorType), c1);
-            rewriter.create<LLVM::StoreOp>(loc, memref, newArg);
-            args.push_back(newArg);
-        }
+//         // We follow the C ABI convention of passing result memrefs as struct pointers in the
+//         // arguments to the C function, although in this case as a variadic argument list to allow
+//         // for a varying number of results in a single signature.
+//         Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
+//         Value numResults = rewriter.create<LLVM::ConstantOp>(
+//             loc, rewriter.getI64IntegerAttr(op.getDataIn().size()));
+//         SmallVector<Value> args = {numResults};
+//         for (Value memref : adaptor.getDataIn()) {
+//             auto newArg =
+//                 rewriter.create<LLVM::AllocaOp>(loc, LLVM::LLVMPointerType::get(vectorType), c1);
+//             rewriter.create<LLVM::StoreOp>(loc, memref, newArg);
+//             args.push_back(newArg);
+//         }
 
-        rewriter.create<LLVM::CallOp>(loc, gradFnDecl, args);
-        rewriter.create<catalyst::quantum::DeallocOp>(loc, qreg);
-        rewriter.eraseOp(op);
+//         rewriter.create<LLVM::CallOp>(loc, gradFnDecl, args);
+//         rewriter.create<catalyst::quantum::DeallocOp>(loc, qreg);
+//         rewriter.eraseOp(op);
 
-        return success();
-    }
-};
+//         return success();
+//     }
+// };
 
 } // namespace
 
@@ -196,7 +196,7 @@ namespace gradient {
 
 void populateConversionPatterns(TypeConverter &typeConverter, RewritePatternSet &patterns)
 {
-    patterns.add<BackpropOpPattern>(typeConverter, patterns.getContext());
+    // patterns.add<BackpropOpPattern>(typeConverter, patterns.getContext());
     patterns.add<AdjointOpPattern>(typeConverter, patterns.getContext());
 }
 
