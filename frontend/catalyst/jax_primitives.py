@@ -305,12 +305,9 @@ def _grad_lowering(ctx, *args, jaxpr, fn, method, h, argnum):
     constants = [ConstantOp(ir.DenseElementsAttr.get(const)).results for const in jaxpr.consts]
     args_and_consts = constants + list(args)
 
-    method_attr = ir.StringAttr.get(method)
-    method_str = str(method_attr).replace('"', "")
-
     return GradOp(
         flat_output_types,
-        method_attr,
+        ir.StringAttr.get(method),
         ir.FlatSymbolRefAttr.get(symbol_name),
         mlir.flatten_lowering_ir_args(args_and_consts),
         diffArgIndices=diffArgIndices,
