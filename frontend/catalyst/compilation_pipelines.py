@@ -431,6 +431,7 @@ class QJIT:
 
     def __init__(self, fn, compile_options):
         self.qfunc = fn
+        self.jaxed_qfunc = None
         self.c_sig = None
         functools.update_wrapper(self, fn)
         self.compile_options = compile_options
@@ -547,10 +548,10 @@ class QJIT:
 
         if any(isinstance(arg, jax.core.Tracer) for arg in args):
             # Only compile a derivative version of the compiled function when needed.
-            if not hasattr(self, "jaxed_qjit"):
-                self.jaxed_qjit = JAX_QJIT(self)
+            if self.jaxed_qfunc is None:
+                self.jaxed_qfunc = JAX_QJIT(self)
 
-            return self.jaxed_qjit(*args, **kwargs)
+            return self.jaxed_qfunc(*args, **kwargs)
 
         return self.compiled_function(*args, **kwargs)
 
@@ -565,45 +566,47 @@ class JAX_QJIT:
     compilation time.
 
     Args:
-        qjit (QJIT): the compiled quantum function object to wrap
+        qfunc (QJIT): the compiled quantum function object to wrap
     """
 
-    def __init__(self, qjit):
-        @functools.wraps(qjit, assigned=("__annotations__",), updated=())
+    def __init__(self, qfunc):
+        @functools.wraps(qfunc, assigned=("__annotations__",), updated=())
         def deriv_wrapper(*args, **kwargs):
             # Only consider differentiable arguments (i.e. of type floating point).
             all_diff_args = [i for i in range(len(args)) if args[i].dtype.kind == "f"]
 
-            return catalyst.grad(qjit, argnum=all_diff_args)(*args, **kwargs)
+            return catalyst.grad(qfunc, argnum=all_diff_args)(*args, **kwargs)
 
-        deriv_wrapper.__name__ = "deriv." + qjit.__name__
+        deriv_wrapper.__name__ = "deriv." + qfunc.__name__
 
-        self.qjit = qjit
-        self.deriv_qjit = QJIT(deriv_wrapper, qjit.compile_options)
+        self.qfunc = qfunc
+        self.deriv_qfunc = QJIT(deriv_wrapper, qfunc.compile_options)
 
         @jax.custom_jvp
-        def jaxed_qjit(*args, **kwargs):
-            results = self.wrap_callback(qjit, *args, **kwargs)
+        def jaxed_qfunc(*args, **kwargs):
+            results = self.wrap_callback(qfunc, *args, **kwargs)
             if len(results) == 1:
                 results = results[0]
             return results
 
-        jaxed_qjit.defjvp(self.compute_jvp)
+        jaxed_qfunc.defjvp(self.compute_jvp)
 
-        self.jaxed_qjit = jaxed_qjit
+        self.jaxed_qfunc = jaxed_qfunc
 
     @staticmethod
-    def wrap_callback(qjit, *args, **kwargs):
-        return jax.pure_callback(qjit, qjit.jaxpr.out_avals, *args, vectorized=False, **kwargs)
+    def wrap_callback(qfunc, *args, **kwargs):
+        """Wrap a QJIT function inside a jax host callback."""
+        return jax.pure_callback(qfunc, qfunc.jaxpr.out_avals, *args, vectorized=False, **kwargs)
 
     def compute_jvp(self, primals, tangents):
-        results = self.wrap_callback(self.qjit, *primals)
-        derivatives = self.wrap_callback(self.deriv_qjit, *primals)
+        """Compute the set of results and JVPs for a QJIT function."""
+        results = self.wrap_callback(self.qfunc, *primals)
+        derivatives = self.wrap_callback(self.deriv_qfunc, *primals)
 
         jvps = [jnp.zeros_like(results[res_idx]) for res_idx in range(len(results))]
-        for arg_idx in range(len(primals)):
+        for arg_idx, primal in enumerate(primals):
             # Skip arguments which are not differentiable.
-            if primals[arg_idx].dtype.kind != "f":
+            if primal.dtype.kind != "f":
                 assert jnp.allclose(jnp.sum(tangents[arg_idx]), 0.0)
                 continue
             for res_idx in range(len(results)):
@@ -621,7 +624,7 @@ class JAX_QJIT:
         return results, jvps
 
     def __call__(self, *args, **kwargs):
-        return self.jaxed_qjit(*args, **kwargs)
+        return self.jaxed_qfunc(*args, **kwargs)
 
 
 def qjit(
