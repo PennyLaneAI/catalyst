@@ -58,8 +58,8 @@ define void @print_probs_at(double* %0, i64 %1) {
 
 define i32 @main() {
   ; Initialize quantum runtime
-  call void @__quantum__rt__device(i8* getelementptr ([8 x i8], [8 x i8]* @backend, i64 0, i64 0), i8* getelementptr ([8 x i8], [8 x i8]* @backend_default, i64 0, i64 0))
   call void @__quantum__rt__initialize()
+  call void @__quantum__rt__device(i8* getelementptr ([8 x i8], [8 x i8]* @backend, i64 0, i64 0), i8* getelementptr ([8 x i8], [8 x i8]* @backend_default, i64 0, i64 0))
 
   ; Allocate 2 qubits
   %1 = call %Array* @__quantum__rt__qubit_allocate_array(i64 2)

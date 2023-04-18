@@ -22,27 +22,25 @@ using namespace Catalyst::Runtime;
 
 TEST_CASE("Test __quantum__qis__Gradient with numAlloc=0", "[Gradient]")
 {
+    __quantum__rt__initialize();
     for (const auto &[key, val] : getDevices()) {
         __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
-        __quantum__rt__initialize();
 
         REQUIRE_NOTHROW(__quantum__qis__Gradient(0, nullptr));
-
-        __quantum__rt__finalize();
     }
+    __quantum__rt__finalize();
 }
 
 TEST_CASE("Test __quantum__qis__Gradient_params with numAlloc=0", "[Gradient]")
 {
+    __quantum__rt__initialize();
     for (const auto &[key, val] : getDevices()) {
         __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
-        __quantum__rt__initialize();
 
         REQUIRE_THROWS_WITH(__quantum__qis__Gradient_params(nullptr, 0, nullptr),
                             Catch::Contains("Invalid number of trainable parameters"));
-
-        __quantum__rt__finalize();
     }
+    __quantum__rt__finalize();
 }
 
 TEST_CASE("Test __quantum__qis__Gradient_params for zero number of obs", "[Gradient]")
@@ -54,23 +52,26 @@ TEST_CASE("Test __quantum__qis__Gradient_params for zero number of obs", "[Gradi
     int64_t *buffer_tp = trainParams.data();
     MemRefT_int64_1d tp = {buffer_tp, buffer_tp, 0, {trainParams.size()}, {1}};
 
+    const std::string recorder("recorder");
+    const std::string start("start");
+    const std::string stop("stop");
+
+    __quantum__rt__initialize();
     for (const auto &[key, val] : getDevices()) {
         __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
-        __quantum__rt__initialize();
 
         QUBIT *q = __quantum__rt__qubit_allocate();
 
-        __quantum__rt__toggle_recorder(/* activate_cm */ true);
+        __quantum__rt__device((int8_t *)recorder.c_str(), (int8_t *)start.c_str());
 
         __quantum__qis__S(q);
         __quantum__qis__T(q);
 
         REQUIRE_NOTHROW(__quantum__qis__Gradient_params(&tp, 0, &results));
 
-        __quantum__rt__toggle_recorder(/* activate_cm */ false);
-
-        __quantum__rt__finalize();
+        __quantum__rt__device((int8_t *)recorder.c_str(), (int8_t *)stop.c_str());
     }
+    __quantum__rt__finalize();
     delete[] buffer;
 }
 
@@ -85,13 +86,17 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     int64_t *buffer_tp = trainParams.data();
     MemRefT_int64_1d tp = {buffer_tp, buffer_tp, 0, {trainParams.size()}, {0}};
 
+    const std::string recorder("recorder");
+    const std::string start("start");
+    const std::string stop("stop");
+
+    __quantum__rt__initialize();
     for (const auto &[key, val] : getDevices()) {
         __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
-        __quantum__rt__initialize();
 
         QUBIT *q = __quantum__rt__qubit_allocate();
 
-        __quantum__rt__toggle_recorder(/* activate_cm */ true);
+        __quantum__rt__device((int8_t *)recorder.c_str(), (int8_t *)start.c_str());
 
         __quantum__qis__RX(-M_PI / 7, q);
 
@@ -105,11 +110,9 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
         REQUIRE_THROWS_WITH(__quantum__qis__Gradient_params(&tp, 2, &results),
                             Catch::Contains("Invalid number of results"));
 
-        __quantum__rt__toggle_recorder(/* activate_cm */ false);
-
-        __quantum__rt__finalize();
+        __quantum__rt__device((int8_t *)recorder.c_str(), (int8_t *)stop.c_str());
     }
-
+    __quantum__rt__finalize();
     delete[] buffer;
 }
 
@@ -124,13 +127,17 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     int64_t *buffer_tp = trainParams.data();
     MemRefT_int64_1d tp = {buffer_tp, buffer_tp, 0, {trainParams.size()}, {1}};
 
+    const std::string recorder("recorder");
+    const std::string start("start");
+    const std::string stop("stop");
+
     for (const auto &[key, val] : getDevices()) {
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
         __quantum__rt__initialize();
+        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
 
         QUBIT *q = __quantum__rt__qubit_allocate();
 
-        __quantum__rt__toggle_recorder(/* activate_cm */ true);
+        __quantum__rt__device((int8_t *)recorder.c_str(), (int8_t *)start.c_str());
 
         __quantum__qis__RX(-M_PI / 7, q);
 
@@ -144,7 +151,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
         REQUIRE_THROWS_WITH(__quantum__qis__Gradient_params(&tp, 1, &results),
                             Catch::Contains("Unsupported measurements to compute gradient"));
 
-        __quantum__rt__toggle_recorder(/* activate_cm */ false);
+        __quantum__rt__device((int8_t *)recorder.c_str(), (int8_t *)stop.c_str());
 
         __quantum__rt__finalize();
     }
@@ -165,13 +172,17 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     int64_t *buffer_memref = trainParams.data();
     MemRefT_int64_1d tp_memref = {buffer_memref, buffer_memref, 0, {trainParams.size()}, {1}};
 
+    const std::string recorder("recorder");
+    const std::string start("start");
+    const std::string stop("stop");
+
     for (const auto &[key, val] : getDevices()) {
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
         __quantum__rt__initialize();
+        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
 
         QUBIT *q = __quantum__rt__qubit_allocate();
 
-        __quantum__rt__toggle_recorder(/* activate_cm */ true);
+        __quantum__rt__device((int8_t *)recorder.c_str(), (int8_t *)start.c_str());
 
         __quantum__qis__RX(-M_PI / 7, q);
 
@@ -183,7 +194,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
 
         __quantum__qis__Gradient(1, &result);
 
-        __quantum__rt__toggle_recorder(/* activate_cm */ false);
+        __quantum__rt__device((int8_t *)recorder.c_str(), (int8_t *)stop.c_str());
 
         CHECK(-sin(-M_PI / 7) == Approx(result_tp.data_aligned[0]));
         CHECK(-sin(-M_PI / 7) == Approx(result.data_aligned[0]));
@@ -208,13 +219,17 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     int64_t *buffer_tp_memref = trainParams.data();
     MemRefT_int64_1d tp_memref = {buffer_tp_memref, buffer_tp_memref, 0, {trainParams.size()}, {1}};
 
+    const std::string recorder("recorder");
+    const std::string start("start");
+    const std::string stop("stop");
+
     for (const auto &[key, val] : getDevices()) {
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
         __quantum__rt__initialize();
+        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
 
         QUBIT *q = __quantum__rt__qubit_allocate();
 
-        __quantum__rt__toggle_recorder(/* activate_cm */ true);
+        __quantum__rt__device((int8_t *)recorder.c_str(), (int8_t *)start.c_str());
 
         __quantum__qis__RX(-M_PI / 7, q);
 
@@ -236,7 +251,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
 
         __quantum__qis__Gradient(1, &result);
 
-        __quantum__rt__toggle_recorder(/* activate_cm */ false);
+        __quantum__rt__device((int8_t *)recorder.c_str(), (int8_t *)stop.c_str());
 
         const double expected{0.2169418696};
         CHECK(expected == Approx(result_tp.data_aligned[0]));
@@ -265,17 +280,19 @@ TEST_CASE("Test __quantum__qis__Gradient_params and __quantum__qis__Gradient "
     int64_t *buffer_tp_memref = trainParams.data();
     MemRefT_int64_1d tp_memref = {buffer_tp_memref, buffer_tp_memref, 0, {trainParams.size()}, {1}};
 
-    char dev[8] = "backend";
-    char dev_value[17] = "lightning.qubit";
+    const std::string dev("backend");
+    const std::string dev_value("lightning.qubit");
+    const std::string recorder("recorder");
+    const std::string start("start");
+    const std::string stop("stop");
 
     for (const auto &p : param) {
-        __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
-
         __quantum__rt__initialize();
+        __quantum__rt__device((int8_t *)dev.c_str(), (int8_t *)dev_value.c_str());
 
         QUBIT *q = __quantum__rt__qubit_allocate();
 
-        __quantum__rt__toggle_recorder(/* activate_cm */ true);
+        __quantum__rt__device((int8_t *)recorder.c_str(), (int8_t *)start.c_str());
 
         __quantum__qis__RY(p, q);
 
@@ -287,7 +304,7 @@ TEST_CASE("Test __quantum__qis__Gradient_params and __quantum__qis__Gradient "
 
         __quantum__qis__Gradient(1, &result);
 
-        __quantum__rt__toggle_recorder(/* activate_cm */ false);
+        __quantum__rt__device((int8_t *)recorder.c_str(), (int8_t *)stop.c_str());
 
         CHECK(cos(p) == Approx(result_tp.data_aligned[0]).margin(1e-5));
         CHECK(cos(p) == Approx(result.data_aligned[0]).margin(1e-5));
@@ -319,14 +336,18 @@ TEST_CASE("Test __quantum__qis__Gradient_params Op=[Hadamard,RZ,RY,RZ,S,T,ParamS
     int64_t *buffer_tp_memref = trainParams.data();
     MemRefT_int64_1d tp_memref = {buffer_tp_memref, buffer_tp_memref, 0, {trainParams.size()}, {1}};
 
+    const std::string recorder("recorder");
+    const std::string start("start");
+    const std::string stop("stop");
+
+    __quantum__rt__initialize();
     for (const auto &[key, val] : getDevices()) {
         __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
-        __quantum__rt__initialize();
 
         QUBIT *q0 = __quantum__rt__qubit_allocate();
         __quantum__rt__qubit_allocate();
 
-        __quantum__rt__toggle_recorder(/* activate_cm */ true);
+        __quantum__rt__device((int8_t *)recorder.c_str(), (int8_t *)start.c_str());
 
         __quantum__qis__Hadamard(q0);
         __quantum__qis__RZ(param[0], q0);
@@ -343,7 +364,7 @@ TEST_CASE("Test __quantum__qis__Gradient_params Op=[Hadamard,RZ,RY,RZ,S,T,ParamS
 
         __quantum__qis__Gradient(1, &result);
 
-        __quantum__rt__toggle_recorder(/* activate_cm */ false);
+        __quantum__rt__device((int8_t *)recorder.c_str(), (int8_t *)stop.c_str());
 
         CHECK(expected[0] == Approx(result_tp.data_aligned[0]).margin(1e-5));
         CHECK(expected[1] == Approx(result_tp.data_aligned[1]).margin(1e-5));
@@ -352,9 +373,8 @@ TEST_CASE("Test __quantum__qis__Gradient_params Op=[Hadamard,RZ,RY,RZ,S,T,ParamS
         CHECK(expected[0] == Approx(result.data_aligned[0]).margin(1e-5));
         CHECK(expected[1] == Approx(result.data_aligned[1]).margin(1e-5));
         CHECK(expected[2] == Approx(result.data_aligned[2]).margin(1e-5));
-
-        __quantum__rt__finalize();
     }
+    __quantum__rt__finalize();
 
     delete[] buffer;
     delete[] buffer_tp;
@@ -370,14 +390,18 @@ TEST_CASE("Test __quantum__qis__Gradient Op=[RX,CY], Obs=[Z,Z]", "[Gradient]")
     double *buffer1 = new double[J];
     MemRefT_double_1d result1 = {buffer1, buffer1, 0, {J}, {1}};
 
+    const std::string recorder("recorder");
+    const std::string start("start");
+    const std::string stop("stop");
+
     for (const auto &[key, val] : getDevices()) {
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
         __quantum__rt__initialize();
+        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
 
         QUBIT *q0 = __quantum__rt__qubit_allocate();
         QUBIT *q1 = __quantum__rt__qubit_allocate();
 
-        __quantum__rt__toggle_recorder(/* activate_cm */ true);
+        __quantum__rt__device((int8_t *)recorder.c_str(), (int8_t *)start.c_str());
 
         __quantum__qis__RX(-M_PI / 7, q0);
         __quantum__qis__CY(q0, q1);
@@ -390,7 +414,7 @@ TEST_CASE("Test __quantum__qis__Gradient Op=[RX,CY], Obs=[Z,Z]", "[Gradient]")
 
         __quantum__qis__Gradient(2, &result0, &result1);
 
-        __quantum__rt__toggle_recorder(/* activate_cm */ false);
+        __quantum__rt__device((int8_t *)recorder.c_str(), (int8_t *)stop.c_str());
 
         CHECK(expected[0] == Approx(result0.data_aligned[0]).margin(1e-5));
         CHECK(expected[1] == Approx(result1.data_aligned[0]).margin(1e-5));
@@ -418,15 +442,19 @@ TEST_CASE("Test __quantum__qis__Gradient_params Op=[RX,RX,RX,CZ], Obs=[Z,Z,Z]", 
     int64_t *buffer_tp_memref = trainParams.data();
     MemRefT_int64_1d tp_memref = {buffer_tp_memref, buffer_tp_memref, 0, {trainParams.size()}, {1}};
 
+    const std::string recorder("recorder");
+    const std::string start("start");
+    const std::string stop("stop");
+
     for (const auto &[key, val] : getDevices()) {
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
         __quantum__rt__initialize();
+        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
 
         QUBIT *q0 = __quantum__rt__qubit_allocate();
         QUBIT *q1 = __quantum__rt__qubit_allocate();
         QUBIT *q2 = __quantum__rt__qubit_allocate();
 
-        __quantum__rt__toggle_recorder(/* activate_cm */ true);
+        __quantum__rt__device((int8_t *)recorder.c_str(), (int8_t *)start.c_str());
 
         __quantum__qis__RX(param[0], q0);
         __quantum__qis__RX(param[1], q1);
@@ -443,7 +471,7 @@ TEST_CASE("Test __quantum__qis__Gradient_params Op=[RX,RX,RX,CZ], Obs=[Z,Z,Z]", 
 
         __quantum__qis__Gradient_params(&tp_memref, 3, &result0, &result1, &result2);
 
-        __quantum__rt__toggle_recorder(/* activate_cm */ false);
+        __quantum__rt__device((int8_t *)recorder.c_str(), (int8_t *)stop.c_str());
 
         CHECK(expected[0] == Approx(result0.data_aligned[0]).margin(1e-5));
         CHECK(expected[1] == Approx(result1.data_aligned[1]).margin(1e-5));
@@ -474,15 +502,19 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     int64_t *buffer_tp_memref = trainParams.data();
     MemRefT_int64_1d tp_memref = {buffer_tp_memref, buffer_tp_memref, 0, {trainParams.size()}, {1}};
 
+    const std::string recorder("recorder");
+    const std::string start("start");
+    const std::string stop("stop");
+
     for (const auto &[key, val] : getDevices()) {
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
         __quantum__rt__initialize();
+        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
 
         QUBIT *q0 = __quantum__rt__qubit_allocate();
         QUBIT *q1 = __quantum__rt__qubit_allocate();
         QUBIT *q2 = __quantum__rt__qubit_allocate();
 
-        __quantum__rt__toggle_recorder(/* activate_cm */ true);
+        __quantum__rt__device((int8_t *)recorder.c_str(), (int8_t *)start.c_str());
 
         __quantum__qis__RZ(param[0], q0);
         __quantum__qis__RY(param[1], q0);
@@ -504,7 +536,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
 
         __quantum__qis__Gradient(1, &result);
 
-        __quantum__rt__toggle_recorder(/* activate_cm */ false);
+        __quantum__rt__device((int8_t *)recorder.c_str(), (int8_t *)stop.c_str());
 
         CHECK(expected[0] == Approx(result_tp.data_aligned[0]).margin(1e-5));
         CHECK(expected[1] == Approx(result_tp.data_aligned[1]).margin(1e-5));
@@ -544,15 +576,19 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     int64_t *buffer_tp_memref = trainParams.data();
     MemRefT_int64_1d tp_memref = {buffer_tp_memref, buffer_tp_memref, 0, {trainParams.size()}, {0}};
 
+    const std::string recorder("recorder");
+    const std::string start("start");
+    const std::string stop("stop");
+
     for (const auto &[key, val] : getDevices()) {
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
         __quantum__rt__initialize();
+        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
 
         QUBIT *q0 = __quantum__rt__qubit_allocate();
         QUBIT *q1 = __quantum__rt__qubit_allocate();
         QUBIT *q2 = __quantum__rt__qubit_allocate();
 
-        __quantum__rt__toggle_recorder(/* activate_cm */ true);
+        __quantum__rt__device((int8_t *)recorder.c_str(), (int8_t *)start.c_str());
 
         __quantum__qis__RZ(param[0], q0);
         __quantum__qis__RY(param[1], q0);
@@ -576,7 +612,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
 
         __quantum__qis__Gradient(1, &result);
 
-        __quantum__rt__toggle_recorder(/* activate_cm */ false);
+        __quantum__rt__device((int8_t *)recorder.c_str(), (int8_t *)stop.c_str());
 
         CHECK(expected[0] == Approx(result_tp.data_aligned[0]).margin(1e-5));
         CHECK(expected[1] == Approx(result_tp.data_aligned[1]).margin(1e-5));
@@ -616,15 +652,19 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     int64_t *buffer_tp_memref = trainParams.data();
     MemRefT_int64_1d tp_memref = {buffer_tp_memref, buffer_tp_memref, 0, {trainParams.size()}, {1}};
 
+    const std::string recorder("recorder");
+    const std::string start("start");
+    const std::string stop("stop");
+
     for (const auto &[key, val] : getDevices()) {
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
         __quantum__rt__initialize();
+        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
 
         QUBIT *q0 = __quantum__rt__qubit_allocate();
         QUBIT *q1 = __quantum__rt__qubit_allocate();
         QUBIT *q2 = __quantum__rt__qubit_allocate();
 
-        __quantum__rt__toggle_recorder(/* activate_cm */ true);
+        __quantum__rt__device((int8_t *)recorder.c_str(), (int8_t *)start.c_str());
 
         __quantum__qis__RZ(param[0], q0);
         __quantum__qis__RY(param[1], q0);
@@ -650,7 +690,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
 
         __quantum__qis__Gradient(1, &result);
 
-        __quantum__rt__toggle_recorder(/* activate_cm */ false);
+        __quantum__rt__device((int8_t *)recorder.c_str(), (int8_t *)stop.c_str());
 
         CHECK(expected[0] == Approx(result_tp.data_aligned[0]).margin(1e-5));
         CHECK(expected[1] == Approx(result_tp.data_aligned[1]).margin(1e-5));
@@ -686,9 +726,13 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     int64_t *buffer_tp_memref = trainParams.data();
     MemRefT_int64_1d tp_memref = {buffer_tp_memref, buffer_tp_memref, 0, {1}, {1}};
 
+    const std::string recorder("recorder");
+    const std::string start("start");
+    const std::string stop("stop");
+
     for (const auto &[key, val] : getDevices()) {
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
         __quantum__rt__initialize();
+        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
 
         QirArray *qubit_arr = __quantum__rt__qubit_allocate_array(2);
 
@@ -702,7 +746,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
 
         CHECK(__quantum__rt__string_equal(qstr, expected_str));
 
-        __quantum__rt__toggle_recorder(/* activate_cm */ true);
+        __quantum__rt__device((int8_t *)recorder.c_str(), (int8_t *)start.c_str());
 
         __quantum__qis__RX(-M_PI / 7, q);
 
@@ -724,7 +768,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
 
         __quantum__qis__Gradient(1, &result);
 
-        __quantum__rt__toggle_recorder(/* activate_cm */ false);
+        __quantum__rt__device((int8_t *)recorder.c_str(), (int8_t *)stop.c_str());
 
         const double expected{0.2169418696};
         CHECK(expected == Approx(result_tp.data_aligned[0]));

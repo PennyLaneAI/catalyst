@@ -27,15 +27,23 @@ using namespace Catalyst::Runtime::Simulator;
 
 TEST_CASE("Test Driver", "[Driver]")
 {
-    std::unique_ptr<CAPI::Driver> driver = std::make_unique<CAPI::Driver>("best", false, 500);
+    std::unique_ptr<CAPI::Driver> driver = std::make_unique<CAPI::Driver>("default", false, 500);
 
-    CHECK(driver->get_device_shots() == 500);
+    // check the scope of memory-manager
+    CHECK(driver->getMemoryManager() != nullptr);
 
-    driver->set_device_name("other.simulator");
-    CHECK(driver->get_device_name() == "other.simulator");
-    CHECK(driver->init_device() == false);
-    CHECK(driver->get_device() == nullptr);
-    CHECK(driver->get_memory_manager() == nullptr);
+    // check device default specs
+    CHECK(driver->getDeviceName() == "default");
+    CHECK(driver->getDeviceShots() == 500);
+    CHECK(driver->getDeviceRecorderStatus() == false);
+
+    // check device specs update
+    driver->setDeviceName("other.simulator");
+    driver->toggleDeviceRecorder(true);
+    CHECK(driver->getDeviceName() == "other.simulator");
+    CHECK(driver->initDevice() == false);
+    CHECK(driver->getDevice() == nullptr);
+    CHECK(driver->getDeviceRecorderStatus() == true);
 }
 
 TEMPLATE_LIST_TEST_CASE("lightning Basis vector", "[Driver]", SimTypes)

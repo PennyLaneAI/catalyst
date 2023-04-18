@@ -21,17 +21,11 @@
 func.func private @circuit.nodealloc(%arg0: f32) -> (!quantum.reg)
 func.func private @circuit(%arg0: f32) -> (f64, memref<?xf64>)
 
-// CHECK-DAG:   llvm.func @__quantum__rt__toggle_recorder(i1)
 // CHECK-DAG:   llvm.func @__quantum__qis__Gradient(i64, ...)
 
 // CHECK-LABEL: func.func @adjoint(%arg0: f32, %arg1: index) {{.+}} {
 func.func @adjoint(%arg0: f32, %arg1 : index) -> (memref<?xf64>, memref<?xf64>) {
-    // CHECK-DAG:   [[T:%.+]] = llvm.mlir.constant(true) : i1
-    // CHECK-DAG:   [[F:%.+]] = llvm.mlir.constant(false) : i1
-
-    // CHECK:       llvm.call @__quantum__rt__toggle_recorder([[T]]) : (i1) -> ()
     // CHECK:       [[QREG:%.+]] = call @circuit.nodealloc(%arg0)
-    // CHECK:       llvm.call @__quantum__rt__toggle_recorder([[F]])
 
     // CHECK-DAG:   [[C1:%.+]] = llvm.mlir.constant(1 : i64) : i64
     // CHECK-DAG:   [[C2:%.+]] = llvm.mlir.constant(2 : i64) : i64

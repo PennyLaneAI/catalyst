@@ -39,6 +39,7 @@ from mlir_quantum.dialects.quantum import (
     MultiRZOp,
     QubitUnitaryOp,
     MeasureOp,
+    DeviceOp,
     AllocOp,
     ExtractOp,
     InsertOp,
@@ -160,6 +161,8 @@ mlir.ir_type_handlers[AbstractObs] = _obs_lowering
 # Primitives #
 ##############
 
+qdevice_p = jax.core.Primitive("qdevice")
+qdevice_p.multiple_results = True
 qalloc_p = jax.core.Primitive("qalloc")
 qdealloc_p = jax.core.Primitive("qdealloc")
 qdealloc_p.multiple_results = True
@@ -257,8 +260,6 @@ def _func_lowering(ctx, *args, call_jaxpr, fn, call=True):
 #
 # grad
 #
-
-
 @grad_p.def_impl
 def _grad_def_impl(ctx, *args, jaxpr, fn, method, h, argnum):  # pragma: no cover
     raise NotImplementedError()
@@ -303,14 +304,62 @@ def _grad_lowering(ctx, *args, jaxpr, fn, method, h, argnum):
     flat_output_types = util.flatten(output_types)
     constants = [ConstantOp(ir.DenseElementsAttr.get(const)).results for const in jaxpr.consts]
     args_and_consts = constants + list(args)
-    return GradOp(
+
+    method_attr = ir.StringAttr.get(method)
+    method_str = str(method_attr).replace('"', "")
+
+    if str(method_str) == "adj":
+        grad_attr = ir.StringAttr.get("recorder")
+        val_attr = ir.StringAttr.get("start")
+        DeviceOp(specs=ir.ArrayAttr.get([grad_attr, val_attr]))
+
+    results = GradOp(
         flat_output_types,
-        ir.StringAttr.get(method),
+        method_attr,
         ir.FlatSymbolRefAttr.get(symbol_name),
         mlir.flatten_lowering_ir_args(args_and_consts),
         diffArgIndices=diffArgIndices,
         finiteDiffParam=finiteDiffParam,
     ).results
+
+    if str(method_str) == "adj":
+        grad_attr = ir.StringAttr.get("recorder")
+        val_attr = ir.StringAttr.get("stop")
+        DeviceOp(specs=ir.ArrayAttr.get([grad_attr, val_attr]))
+
+    return results
+
+
+#
+# qdevice
+#
+def qdevice(spec, name):
+    """Bind operands to operation."""
+    return qdevice_p.bind(key=spec, val=name)
+
+
+@qdevice_p.def_impl
+def _qdevice_def_impl(ctx, key, val):  # pragma: no cover
+    raise NotImplementedError()
+
+
+@qdevice_p.def_abstract_eval
+# pylint: disable=unused-argument
+def _qdevice_abstract_eval(key=None, val=None):
+    return ()
+
+
+def _qdevice_lowering(jax_ctx: mlir.LoweringRuleContext, key, val):
+    ctx = jax_ctx.module_context.context
+    ctx.allow_unregistered_dialects = True
+
+    backend_attr = ir.StringAttr.get(key)
+    backend_val = "default" if val == "qjit.device" else val
+    val_attr = ir.StringAttr.get(backend_val)
+
+    DeviceOp(specs=ir.ArrayAttr.get([backend_attr, val_attr]))
+
+    return ()
 
 
 #
@@ -378,8 +427,6 @@ def _qdealloc_lowering(jax_ctx: mlir.LoweringRuleContext, qreg):
 #
 # qextract
 #
-
-
 @qextract_p.def_impl
 def _qextract_def_impl(ctx, qreg, qubit_idx):  # pragma: no cover
     raise NotImplementedError()
@@ -1279,8 +1326,9 @@ def _qfor_lowering(
 #
 # registration
 #
-mlir.register_lowering(qdealloc_p, _qdealloc_lowering)
+mlir.register_lowering(qdevice_p, _qdevice_lowering)
 mlir.register_lowering(qalloc_p, _qalloc_lowering)
+mlir.register_lowering(qdealloc_p, _qdealloc_lowering)
 mlir.register_lowering(qextract_p, _qextract_lowering)
 mlir.register_lowering(qinsert_p, _qinsert_lowering)
 mlir.register_lowering(qinst_p, _qinst_lowering)

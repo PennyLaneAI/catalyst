@@ -70,7 +70,7 @@ class QFunc:
                 raise CompileError(
                     f"Only the {QFunc.RUNTIME_DEVICES} devices are supported for compilation at the moment."
                 )
-            device = QJITDevice(self.device.shots, self.device.wires)
+            device = QJITDevice(self.device.shots, self.device.wires, self.device.short_name)
         else:
             # Allow QFunc to still be used by itself for internal testing.
             device = self.device
@@ -1018,6 +1018,7 @@ class QJITDevice(qml.QubitDevice):
 
     name = "QJIT device"
     short_name = "qjit.device"
+    backend = ""
     pennylane_requires = "0.1.0"
     version = "0.0.1"
     author = ""
@@ -1064,7 +1065,8 @@ class QJITDevice(qml.QubitDevice):
         "Hamiltonian",
     ]
 
-    def __init__(self, shots=None, wires=None):
+    def __init__(self, shots=None, wires=None, backend=None):
+        self.backend = backend if backend else "default"
         super().__init__(wires=wires, shots=shots)
 
     def apply(self, operations, **kwargs):

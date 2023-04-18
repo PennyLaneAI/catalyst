@@ -72,28 +72,19 @@ struct AdjointOpPattern : public OpConversionPattern<AdjointOp> {
             SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
         assert(callee && callee.getNumResults() == 1 && "invalid qfunc symbol in adjoint op");
 
-        StringRef cacheFnName = "__quantum__rt__toggle_recorder";
         StringRef gradFnName = "__quantum__qis__Gradient";
         Type cacheFnSignature =
             LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), IntegerType::get(ctx, 1));
         Type gradFnSignature = LLVM::LLVMFunctionType::get(
             LLVM::LLVMVoidType::get(ctx), IntegerType::get(ctx, 64), /*isVarArg=*/true);
 
-        LLVM::LLVMFuncOp cacheFnDecl =
-            ensureFunctionDeclaration(rewriter, op, cacheFnName, cacheFnSignature);
         LLVM::LLVMFuncOp gradFnDecl =
             ensureFunctionDeclaration(rewriter, op, gradFnName, gradFnSignature);
 
         // Run the forward pass and cache the circuit.
-        Value c_true = rewriter.create<LLVM::ConstantOp>(
-            loc, rewriter.getIntegerAttr(IntegerType::get(ctx, 1), 1));
-        Value c_false = rewriter.create<LLVM::ConstantOp>(
-            loc, rewriter.getIntegerAttr(IntegerType::get(ctx, 1), 0));
-        rewriter.create<LLVM::CallOp>(loc, cacheFnDecl, c_true);
         Value qreg = rewriter.create<func::CallOp>(loc, callee, op.getArgs()).getResult(0);
         if (!qreg.getType().isa<catalyst::quantum::QuregType>())
             return callee.emitOpError("qfunc must return quantum register");
-        rewriter.create<LLVM::CallOp>(loc, cacheFnDecl, c_false);
 
         // We follow the C ABI convention of passing result memrefs as struct pointers in the
         // arguments to the C function, although in this case as a variadic argument list to allow

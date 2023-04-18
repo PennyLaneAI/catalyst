@@ -95,6 +95,10 @@ def get_traceable_fn(qfunc, device):
     def traceable_fn(*args, **kwargs):
         shots = device.shots
         num_wires = len(device.wires)
+
+        spec: str = "backend"
+        jprim.qdevice(spec, device.backend)
+
         qreg = jprim.qalloc(num_wires)
 
         JaxTape.device = device

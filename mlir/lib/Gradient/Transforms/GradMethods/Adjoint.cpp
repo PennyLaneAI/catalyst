@@ -118,6 +118,11 @@ func::FuncOp AdjointLowering::discardAndReturnReg(PatternRewriter &rewriter, Loc
             rewriter.setInsertionPoint(returnOp);
             returnOp->setOperands(localDeallocs.front().getOperand());
         });
+        // Let's erase redundent device specifications
+        unallocFn.walk([&](quantum::DeviceOp device) {
+            PatternRewriter::InsertionGuard insertGuard(rewriter);
+            rewriter.eraseOp(device);
+        });
         // Let's erase the deallocation
         unallocFn.walk([&](quantum::DeallocOp deallocOp) { deallocOp.erase(); });
     }

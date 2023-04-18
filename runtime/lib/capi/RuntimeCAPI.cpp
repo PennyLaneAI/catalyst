@@ -45,20 +45,20 @@ extern "C" {
 void *_mlir_memref_to_llvm_alloc(size_t size)
 {
     void *ptr = malloc(size);
-    Catalyst::Runtime::CAPI::DRIVER->get_memory_manager()->insert(ptr);
+    Catalyst::Runtime::CAPI::DRIVER->getMemoryManager()->insert(ptr);
     return ptr;
 }
 
 void *_mlir_memref_to_llvm_aligned_alloc(size_t alignment, size_t size)
 {
     void *ptr = aligned_alloc(alignment, size);
-    Catalyst::Runtime::CAPI::DRIVER->get_memory_manager()->insert(ptr);
+    Catalyst::Runtime::CAPI::DRIVER->getMemoryManager()->insert(ptr);
     return ptr;
 }
 
 void _mlir_memref_to_llvm_free(void *ptr)
 {
-    Catalyst::Runtime::CAPI::DRIVER->get_memory_manager()->erase(ptr);
+    Catalyst::Runtime::CAPI::DRIVER->getMemoryManager()->erase(ptr);
     free(ptr);
 }
 
@@ -66,89 +66,89 @@ void __quantum__rt__fail_cstr(const char *cstr) { throw std::runtime_error(cstr)
 
 void __quantum__rt__initialize()
 {
-    if (!Catalyst::Runtime::CAPI::DRIVER) {
-        __quantum__rt__fail_cstr("Initialization before defining the device");
-    }
+    constexpr std::string_view default_device_name{"lightning.qubit"};
+    constexpr size_t default_device_shots{1000}; // tidy: readability-magic-numbers
+    constexpr bool default_tape_recording_status{false};
 
-    if (Catalyst::Runtime::CAPI::DRIVER->get_device()) {
-        __quantum__rt__fail_cstr("Invalid initialization of the global device");
-    }
-
-    if (!Catalyst::Runtime::CAPI::DRIVER->init_device()) {
-        // TODO: remove this after fixing the issue with propagating runtime error messages
-        std::cerr << "Failed initialization of the global device, "
-                  << Catalyst::Runtime::CAPI::DRIVER->get_device_name() << std::endl;
-
-        __quantum__rt__fail_cstr("Failed initialization of the global device");
-    }
-
-    assert(Catalyst::Runtime::CAPI::DRIVER->get_device() != nullptr);
-    assert(Catalyst::Runtime::CAPI::DRIVER->get_memory_manager() != nullptr);
+    Catalyst::Runtime::CAPI::DRIVER = std::make_unique<Catalyst::Runtime::CAPI::Driver>(
+        default_device_name, default_tape_recording_status, default_device_shots);
 }
 
 void __quantum__rt__finalize() { Catalyst::Runtime::CAPI::DRIVER.reset(nullptr); }
 
 void __quantum__rt__device(int8_t *spec, int8_t *value)
 {
-    if (!Catalyst::Runtime::CAPI::DRIVER) {
-        constexpr std::string_view default_device_name{"lightning.qubit"};
-        constexpr size_t default_device_shots{1000}; // tidy: readability-magic-numbers
-        constexpr bool default_tape_recording_status{false};
-
-        Catalyst::Runtime::CAPI::DRIVER = std::make_unique<Catalyst::Runtime::CAPI::Driver>(
-            default_device_name, default_tape_recording_status, default_device_shots);
-    }
-
     if (!spec || !value) {
         __quantum__rt__fail_cstr("Invalid device specification");
+    }
+
+    if (!Catalyst::Runtime::CAPI::DRIVER) {
+        __quantum__rt__fail_cstr("Invalid use of the global driver before initialization");
     }
 
     const std::vector<std::string_view> args{reinterpret_cast<char *>(spec),
                                              reinterpret_cast<char *>(value)};
 
     if (args[0] == "backend") {
-        Catalyst::Runtime::CAPI::DRIVER->set_device_name(args[1]);
+        Catalyst::Runtime::CAPI::DRIVER->setDeviceName(args[1]);
+
+        if (!Catalyst::Runtime::CAPI::DRIVER->initDevice()) {
+            __quantum__rt__fail_cstr("Failed initialization of the backend device");
+        }
     }
     else if (args[0] == "shots") {
         try {
-            Catalyst::Runtime::CAPI::DRIVER->set_device_shots(
+            Catalyst::Runtime::CAPI::DRIVER->setDeviceShots(
                 static_cast<size_t>(std::stoul(std::string(args[1]))));
         }
         catch (std::exception &) {
             __quantum__rt__fail_cstr("Invalid argument for the device specification (shots)");
         }
     }
+    else if (args[0] == "recorder") {
+        const auto status_str = std::string(args[1]);
+        if (Catalyst::Runtime::CAPI::DRIVER->getDevice()) {
+            if (status_str == "start") {
+                Catalyst::Runtime::CAPI::DRIVER->getDevice()->StartTapeRecording();
+            }
+            else {
+                Catalyst::Runtime::CAPI::DRIVER->getDevice()->StopTapeRecording();
+            }
+            return;
+        }
+
+        try {
+            Catalyst::Runtime::CAPI::DRIVER->toggleDeviceRecorder(status_str == "start");
+        }
+        catch (std::exception &) {
+            __quantum__rt__fail_cstr("Invalid argument for the device specification (recorder)");
+        }
+    }
     else {
-        __quantum__rt__fail_cstr(
-            "Invalid device specification; 'backend' and 'shots' are only supported.");
+        __quantum__rt__fail_cstr("Invalid device specification; 'backend', 'shots', and 'recorder' "
+                                 "are currently supported.");
     }
 }
 
-void __quantum__rt__toggle_recorder(bool activate_cm)
-{
-    if (activate_cm) {
-        Catalyst::Runtime::CAPI::DRIVER->get_device()->StartTapeRecording();
-    }
-    else {
-        Catalyst::Runtime::CAPI::DRIVER->get_device()->StopTapeRecording();
-    }
-}
-
-void __quantum__rt__print_state() { Catalyst::Runtime::CAPI::DRIVER->get_device()->PrintState(); }
+void __quantum__rt__print_state() { Catalyst::Runtime::CAPI::DRIVER->getDevice()->PrintState(); }
 
 QUBIT *__quantum__rt__qubit_allocate()
 {
-    return reinterpret_cast<QUBIT *>(
-        Catalyst::Runtime::CAPI::DRIVER->get_device()->AllocateQubit());
+    assert(Catalyst::Runtime::CAPI::DRIVER->getDevice() != nullptr);
+    assert(Catalyst::Runtime::CAPI::DRIVER->getMemoryManager() != nullptr);
+
+    return reinterpret_cast<QUBIT *>(Catalyst::Runtime::CAPI::DRIVER->getDevice()->AllocateQubit());
 }
 
 QirArray *__quantum__rt__qubit_allocate_array(int64_t num_qubits)
 {
+    assert(Catalyst::Runtime::CAPI::DRIVER->getDevice() != nullptr);
+    assert(Catalyst::Runtime::CAPI::DRIVER->getMemoryManager() != nullptr);
     assert(num_qubits >= 0);
 
     QirArray *qubit_array = __quantum__rt__array_create_1d(sizeof(QubitIdType), num_qubits);
     const auto &&qubit_vector =
-        Catalyst::Runtime::CAPI::DRIVER->get_device()->AllocateQubits(num_qubits);
+        Catalyst::Runtime::CAPI::DRIVER->getDevice()->AllocateQubits(num_qubits);
     for (int64_t idx = 0; idx < num_qubits; idx++) {
         *reinterpret_cast<QUBIT **>(__quantum__rt__array_get_element_ptr_1d(qubit_array, idx)) =
             reinterpret_cast<QUBIT *>(qubit_vector[idx]);
@@ -158,7 +158,7 @@ QirArray *__quantum__rt__qubit_allocate_array(int64_t num_qubits)
 
 void __quantum__rt__qubit_release(QUBIT *qubit)
 {
-    return Catalyst::Runtime::CAPI::DRIVER->get_device()->ReleaseQubit(
+    return Catalyst::Runtime::CAPI::DRIVER->getDevice()->ReleaseQubit(
         reinterpret_cast<QubitIdType>(qubit));
 }
 
@@ -169,12 +169,12 @@ void __quantum__rt__qubit_release_array(QirArray *qubit_array)
     // The behavior is undefined if the reference count becomes < 0
     __quantum__rt__array_update_reference_count(qubit_array, -1);
 
-    Catalyst::Runtime::CAPI::DRIVER->get_device()->ReleaseAllQubits();
+    Catalyst::Runtime::CAPI::DRIVER->getDevice()->ReleaseAllQubits();
 }
 
 int64_t __quantum__rt__num_qubits()
 {
-    return static_cast<int64_t>(Catalyst::Runtime::CAPI::DRIVER->get_device()->GetNumQubits());
+    return static_cast<int64_t>(Catalyst::Runtime::CAPI::DRIVER->getDevice()->GetNumQubits());
 }
 
 QirString *__quantum__rt__qubit_to_string(QUBIT *qubit)
@@ -187,12 +187,12 @@ bool __quantum__rt__result_equal(RESULT *r0, RESULT *r1) { return (r0 == r1) || 
 
 RESULT *__quantum__rt__result_get_one()
 {
-    return Catalyst::Runtime::CAPI::DRIVER->get_device()->One();
+    return Catalyst::Runtime::CAPI::DRIVER->getDevice()->One();
 }
 
 RESULT *__quantum__rt__result_get_zero()
 {
-    return Catalyst::Runtime::CAPI::DRIVER->get_device()->Zero();
+    return Catalyst::Runtime::CAPI::DRIVER->getDevice()->Zero();
 }
 
 QirString *__quantum__rt__result_to_string(RESULT *result)
@@ -208,7 +208,7 @@ void __quantum__qis__Gradient(int64_t numResults, /* results = */...)
     using ResultType = MemRefT<double, 1>;
 
     // num_observables * num_train_params
-    auto &&jacobian = Catalyst::Runtime::CAPI::DRIVER->get_device()->Gradient({});
+    auto &&jacobian = Catalyst::Runtime::CAPI::DRIVER->getDevice()->Gradient({});
 
     const size_t num_observables = jacobian.size();
     if (num_observables != static_cast<size_t>(numResults)) {
@@ -261,7 +261,7 @@ void __quantum__qis__Gradient_params(MemRefT_int64_1d *params, int64_t numResult
     }
 
     // num_observables * num_train_params
-    auto &&jacobian = Catalyst::Runtime::CAPI::DRIVER->get_device()->Gradient(train_params);
+    auto &&jacobian = Catalyst::Runtime::CAPI::DRIVER->getDevice()->Gradient(train_params);
 
     const size_t num_observables = jacobian.size();
     if (num_observables != static_cast<size_t>(numResults)) {
@@ -293,91 +293,91 @@ void __quantum__qis__Gradient_params(MemRefT_int64_1d *params, int64_t numResult
 
 void __quantum__qis__Identity(QUBIT *qubit)
 {
-    Catalyst::Runtime::CAPI::DRIVER->get_device()->NamedOperation(
+    Catalyst::Runtime::CAPI::DRIVER->getDevice()->NamedOperation(
         "Identity", {}, {reinterpret_cast<QubitIdType>(qubit)},
         /* inverse = */ false);
 }
 
 void __quantum__qis__PauliX(QUBIT *qubit)
 {
-    Catalyst::Runtime::CAPI::DRIVER->get_device()->NamedOperation(
+    Catalyst::Runtime::CAPI::DRIVER->getDevice()->NamedOperation(
         "PauliX", {}, {reinterpret_cast<QubitIdType>(qubit)},
         /* inverse = */ false);
 }
 
 void __quantum__qis__PauliY(QUBIT *qubit)
 {
-    Catalyst::Runtime::CAPI::DRIVER->get_device()->NamedOperation(
+    Catalyst::Runtime::CAPI::DRIVER->getDevice()->NamedOperation(
         "PauliY", {}, {reinterpret_cast<QubitIdType>(qubit)},
         /* inverse = */ false);
 }
 
 void __quantum__qis__PauliZ(QUBIT *qubit)
 {
-    Catalyst::Runtime::CAPI::DRIVER->get_device()->NamedOperation(
+    Catalyst::Runtime::CAPI::DRIVER->getDevice()->NamedOperation(
         "PauliZ", {}, {reinterpret_cast<QubitIdType>(qubit)},
         /* inverse = */ false);
 }
 
 void __quantum__qis__Hadamard(QUBIT *qubit)
 {
-    Catalyst::Runtime::CAPI::DRIVER->get_device()->NamedOperation(
+    Catalyst::Runtime::CAPI::DRIVER->getDevice()->NamedOperation(
         "Hadamard", {}, {reinterpret_cast<QubitIdType>(qubit)},
         /* inverse = */ false);
 }
 
 void __quantum__qis__S(QUBIT *qubit)
 {
-    Catalyst::Runtime::CAPI::DRIVER->get_device()->NamedOperation(
+    Catalyst::Runtime::CAPI::DRIVER->getDevice()->NamedOperation(
         "S", {}, {reinterpret_cast<QubitIdType>(qubit)},
         /* inverse = */ false);
 }
 
 void __quantum__qis__T(QUBIT *qubit)
 {
-    Catalyst::Runtime::CAPI::DRIVER->get_device()->NamedOperation(
+    Catalyst::Runtime::CAPI::DRIVER->getDevice()->NamedOperation(
         "T", {}, {reinterpret_cast<QubitIdType>(qubit)},
         /* inverse = */ false);
 }
 
 void __quantum__qis__PhaseShift(double theta, QUBIT *qubit)
 {
-    Catalyst::Runtime::CAPI::DRIVER->get_device()->NamedOperation(
+    Catalyst::Runtime::CAPI::DRIVER->getDevice()->NamedOperation(
         "PhaseShift", {theta}, {reinterpret_cast<QubitIdType>(qubit)},
         /* inverse = */ false);
 }
 
 void __quantum__qis__RX(double theta, QUBIT *qubit)
 {
-    Catalyst::Runtime::CAPI::DRIVER->get_device()->NamedOperation(
+    Catalyst::Runtime::CAPI::DRIVER->getDevice()->NamedOperation(
         "RX", {theta}, {reinterpret_cast<QubitIdType>(qubit)},
         /* inverse = */ false);
 }
 
 void __quantum__qis__RY(double theta, QUBIT *qubit)
 {
-    Catalyst::Runtime::CAPI::DRIVER->get_device()->NamedOperation(
+    Catalyst::Runtime::CAPI::DRIVER->getDevice()->NamedOperation(
         "RY", {theta}, {reinterpret_cast<QubitIdType>(qubit)},
         /* inverse = */ false);
 }
 
 void __quantum__qis__RZ(double theta, QUBIT *qubit)
 {
-    Catalyst::Runtime::CAPI::DRIVER->get_device()->NamedOperation(
+    Catalyst::Runtime::CAPI::DRIVER->getDevice()->NamedOperation(
         "RZ", {theta}, {reinterpret_cast<QubitIdType>(qubit)},
         /* inverse = */ false);
 }
 
 void __quantum__qis__Rot(double phi, double theta, double omega, QUBIT *qubit)
 {
-    Catalyst::Runtime::CAPI::DRIVER->get_device()->NamedOperation(
+    Catalyst::Runtime::CAPI::DRIVER->getDevice()->NamedOperation(
         "Rot", {phi, theta, omega}, {reinterpret_cast<QubitIdType>(qubit)},
         /* inverse = */ false);
 }
 
 void __quantum__qis__CNOT(QUBIT *control, QUBIT *target)
 {
-    Catalyst::Runtime::CAPI::DRIVER->get_device()->NamedOperation(
+    Catalyst::Runtime::CAPI::DRIVER->getDevice()->NamedOperation(
         "CNOT", {},
         {/* control = */ reinterpret_cast<QubitIdType>(control),
          /* target = */ reinterpret_cast<QubitIdType>(target)},
@@ -386,7 +386,7 @@ void __quantum__qis__CNOT(QUBIT *control, QUBIT *target)
 
 void __quantum__qis__CY(QUBIT *control, QUBIT *target)
 {
-    Catalyst::Runtime::CAPI::DRIVER->get_device()->NamedOperation(
+    Catalyst::Runtime::CAPI::DRIVER->getDevice()->NamedOperation(
         "CY", {},
         {/* control = */ reinterpret_cast<QubitIdType>(control),
          /* target = */ reinterpret_cast<QubitIdType>(target)},
@@ -395,7 +395,7 @@ void __quantum__qis__CY(QUBIT *control, QUBIT *target)
 
 void __quantum__qis__CZ(QUBIT *control, QUBIT *target)
 {
-    Catalyst::Runtime::CAPI::DRIVER->get_device()->NamedOperation(
+    Catalyst::Runtime::CAPI::DRIVER->getDevice()->NamedOperation(
         "CZ", {},
         {/* control = */ reinterpret_cast<QubitIdType>(control),
          /* target = */ reinterpret_cast<QubitIdType>(target)},
@@ -404,7 +404,7 @@ void __quantum__qis__CZ(QUBIT *control, QUBIT *target)
 
 void __quantum__qis__SWAP(QUBIT *control, QUBIT *target)
 {
-    Catalyst::Runtime::CAPI::DRIVER->get_device()->NamedOperation(
+    Catalyst::Runtime::CAPI::DRIVER->getDevice()->NamedOperation(
         "SWAP", {},
         {/* control = */ reinterpret_cast<QubitIdType>(control),
          /* target = */ reinterpret_cast<QubitIdType>(target)},
@@ -413,7 +413,7 @@ void __quantum__qis__SWAP(QUBIT *control, QUBIT *target)
 
 void __quantum__qis__IsingXX(double theta, QUBIT *control, QUBIT *target)
 {
-    Catalyst::Runtime::CAPI::DRIVER->get_device()->NamedOperation(
+    Catalyst::Runtime::CAPI::DRIVER->getDevice()->NamedOperation(
         "IsingXX", {theta},
         {/* control = */ reinterpret_cast<QubitIdType>(control),
          /* target = */ reinterpret_cast<QubitIdType>(target)},
@@ -422,7 +422,7 @@ void __quantum__qis__IsingXX(double theta, QUBIT *control, QUBIT *target)
 
 void __quantum__qis__IsingYY(double theta, QUBIT *control, QUBIT *target)
 {
-    Catalyst::Runtime::CAPI::DRIVER->get_device()->NamedOperation(
+    Catalyst::Runtime::CAPI::DRIVER->getDevice()->NamedOperation(
         "IsingYY", {theta},
         {/* control = */ reinterpret_cast<QubitIdType>(control),
          /* target = */ reinterpret_cast<QubitIdType>(target)},
@@ -431,7 +431,7 @@ void __quantum__qis__IsingYY(double theta, QUBIT *control, QUBIT *target)
 
 void __quantum__qis__IsingXY(double theta, QUBIT *control, QUBIT *target)
 {
-    Catalyst::Runtime::CAPI::DRIVER->get_device()->NamedOperation(
+    Catalyst::Runtime::CAPI::DRIVER->getDevice()->NamedOperation(
         "IsingXY", {theta},
         {/* control = */ reinterpret_cast<QubitIdType>(control),
          /* target = */ reinterpret_cast<QubitIdType>(target)},
@@ -440,7 +440,7 @@ void __quantum__qis__IsingXY(double theta, QUBIT *control, QUBIT *target)
 
 void __quantum__qis__IsingZZ(double theta, QUBIT *control, QUBIT *target)
 {
-    Catalyst::Runtime::CAPI::DRIVER->get_device()->NamedOperation(
+    Catalyst::Runtime::CAPI::DRIVER->getDevice()->NamedOperation(
         "IsingZZ", {theta},
         {/* control = */ reinterpret_cast<QubitIdType>(control),
          /* target = */ reinterpret_cast<QubitIdType>(target)},
@@ -449,7 +449,7 @@ void __quantum__qis__IsingZZ(double theta, QUBIT *control, QUBIT *target)
 
 void __quantum__qis__ControlledPhaseShift(double theta, QUBIT *control, QUBIT *target)
 {
-    Catalyst::Runtime::CAPI::DRIVER->get_device()->NamedOperation(
+    Catalyst::Runtime::CAPI::DRIVER->getDevice()->NamedOperation(
         "ControlledPhaseShift", {theta},
         {/* control = */ reinterpret_cast<QubitIdType>(control),
          /* target = */ reinterpret_cast<QubitIdType>(target)},
@@ -458,7 +458,7 @@ void __quantum__qis__ControlledPhaseShift(double theta, QUBIT *control, QUBIT *t
 
 void __quantum__qis__CRX(double theta, QUBIT *control, QUBIT *target)
 {
-    Catalyst::Runtime::CAPI::DRIVER->get_device()->NamedOperation(
+    Catalyst::Runtime::CAPI::DRIVER->getDevice()->NamedOperation(
         "CRX", {theta},
         {/* control = */ reinterpret_cast<QubitIdType>(control),
          /* target = */ reinterpret_cast<QubitIdType>(target)},
@@ -467,7 +467,7 @@ void __quantum__qis__CRX(double theta, QUBIT *control, QUBIT *target)
 
 void __quantum__qis__CRY(double theta, QUBIT *control, QUBIT *target)
 {
-    Catalyst::Runtime::CAPI::DRIVER->get_device()->NamedOperation(
+    Catalyst::Runtime::CAPI::DRIVER->getDevice()->NamedOperation(
         "CRY", {theta},
         {/* control = */ reinterpret_cast<QubitIdType>(control),
          /* target = */ reinterpret_cast<QubitIdType>(target)},
@@ -476,7 +476,7 @@ void __quantum__qis__CRY(double theta, QUBIT *control, QUBIT *target)
 
 void __quantum__qis__CRZ(double theta, QUBIT *control, QUBIT *target)
 {
-    Catalyst::Runtime::CAPI::DRIVER->get_device()->NamedOperation(
+    Catalyst::Runtime::CAPI::DRIVER->getDevice()->NamedOperation(
         "CRZ", {theta},
         {/* control = */ reinterpret_cast<QubitIdType>(control),
          /* target = */ reinterpret_cast<QubitIdType>(target)},
@@ -485,7 +485,7 @@ void __quantum__qis__CRZ(double theta, QUBIT *control, QUBIT *target)
 
 void __quantum__qis__CRot(double phi, double theta, double omega, QUBIT *control, QUBIT *target)
 {
-    Catalyst::Runtime::CAPI::DRIVER->get_device()->NamedOperation(
+    Catalyst::Runtime::CAPI::DRIVER->getDevice()->NamedOperation(
         "CRot", {phi, theta, omega},
         {/* control = */ reinterpret_cast<QubitIdType>(control),
          /* target = */ reinterpret_cast<QubitIdType>(target)},
@@ -494,7 +494,7 @@ void __quantum__qis__CRot(double phi, double theta, double omega, QUBIT *control
 
 void __quantum__qis__CSWAP(QUBIT *control, QUBIT *aswap, QUBIT *bswap)
 {
-    Catalyst::Runtime::CAPI::DRIVER->get_device()->NamedOperation(
+    Catalyst::Runtime::CAPI::DRIVER->getDevice()->NamedOperation(
         "CSWAP", {},
         {reinterpret_cast<QubitIdType>(control), reinterpret_cast<QubitIdType>(aswap),
          reinterpret_cast<QubitIdType>(bswap)},
@@ -503,7 +503,7 @@ void __quantum__qis__CSWAP(QUBIT *control, QUBIT *aswap, QUBIT *bswap)
 
 void __quantum__qis__Toffoli(QUBIT *wire0, QUBIT *wire1, QUBIT *wire2)
 {
-    Catalyst::Runtime::CAPI::DRIVER->get_device()->NamedOperation(
+    Catalyst::Runtime::CAPI::DRIVER->getDevice()->NamedOperation(
         "Toffoli", {},
         {reinterpret_cast<QubitIdType>(wire0), reinterpret_cast<QubitIdType>(wire1),
          reinterpret_cast<QubitIdType>(wire2)},
@@ -522,8 +522,8 @@ void __quantum__qis__MultiRZ(double theta, int64_t numQubits, ...)
     }
     va_end(args);
 
-    Catalyst::Runtime::CAPI::DRIVER->get_device()->NamedOperation("MultiRZ", {theta}, wires,
-                                                                  /* inverse = */ false);
+    Catalyst::Runtime::CAPI::DRIVER->getDevice()->NamedOperation("MultiRZ", {theta}, wires,
+                                                                 /* inverse = */ false);
 }
 
 void __quantum__qis__QubitUnitary(MemRefT_CplxT_double_2d *matrix, int64_t numQubits,
@@ -565,13 +565,13 @@ void __quantum__qis__QubitUnitary(MemRefT_CplxT_double_2d *matrix, int64_t numQu
         coeffs.emplace_back(matrix->data_aligned[i].real, matrix->data_aligned[i].imag);
     }
 
-    return Catalyst::Runtime::CAPI::DRIVER->get_device()->MatrixOperation(coeffs, wires,
-                                                                          /*inverse*/ false);
+    return Catalyst::Runtime::CAPI::DRIVER->getDevice()->MatrixOperation(coeffs, wires,
+                                                                         /*inverse*/ false);
 }
 
 ObsIdType __quantum__qis__NamedObs(int64_t obsId, QUBIT *wire)
 {
-    return Catalyst::Runtime::CAPI::DRIVER->get_device()->Observable(
+    return Catalyst::Runtime::CAPI::DRIVER->getDevice()->Observable(
         static_cast<ObsId>(obsId), {}, {reinterpret_cast<QubitIdType>(wire)});
 }
 
@@ -612,8 +612,8 @@ ObsIdType __quantum__qis__HermitianObs(MemRefT_CplxT_double_2d *matrix, int64_t 
         coeffs.emplace_back(matrix->data_aligned[i].real, matrix->data_aligned[i].imag);
     }
 
-    return Catalyst::Runtime::CAPI::DRIVER->get_device()->Observable(ObsId::Hermitian, coeffs,
-                                                                     wires);
+    return Catalyst::Runtime::CAPI::DRIVER->getDevice()->Observable(ObsId::Hermitian, coeffs,
+                                                                    wires);
 }
 
 ObsIdType __quantum__qis__TensorObs(int64_t numObs, /*obsKeys*/...)
@@ -631,7 +631,7 @@ ObsIdType __quantum__qis__TensorObs(int64_t numObs, /*obsKeys*/...)
     }
     va_end(args);
 
-    return Catalyst::Runtime::CAPI::DRIVER->get_device()->TensorObservable(obsKeys);
+    return Catalyst::Runtime::CAPI::DRIVER->getDevice()->TensorObservable(obsKeys);
 }
 
 ObsIdType __quantum__qis__HamiltonianObs(MemRefT_double_1d *coeffs, int64_t numObs,
@@ -661,24 +661,23 @@ ObsIdType __quantum__qis__HamiltonianObs(MemRefT_double_1d *coeffs, int64_t numO
     va_end(args);
 
     std::vector<double> coeffs_vec(coeffs->data_aligned, coeffs->data_aligned + coeffs_size);
-    return Catalyst::Runtime::CAPI::DRIVER->get_device()->HamiltonianObservable(coeffs_vec,
-                                                                                obsKeys);
+    return Catalyst::Runtime::CAPI::DRIVER->getDevice()->HamiltonianObservable(coeffs_vec, obsKeys);
 }
 
 RESULT *__quantum__qis__Measure(QUBIT *wire)
 {
-    return Catalyst::Runtime::CAPI::DRIVER->get_device()->Measure(
+    return Catalyst::Runtime::CAPI::DRIVER->getDevice()->Measure(
         reinterpret_cast<QubitIdType>(wire));
 }
 
 double __quantum__qis__Expval(ObsIdType obsKey)
 {
-    return Catalyst::Runtime::CAPI::DRIVER->get_device()->Expval(obsKey);
+    return Catalyst::Runtime::CAPI::DRIVER->getDevice()->Expval(obsKey);
 }
 
 double __quantum__qis__Variance(ObsIdType obsKey)
 {
-    return Catalyst::Runtime::CAPI::DRIVER->get_device()->Var(obsKey);
+    return Catalyst::Runtime::CAPI::DRIVER->getDevice()->Var(obsKey);
 }
 
 void __quantum__qis__Probs(MemRefT_double_1d *result, int64_t numQubits, ...)
@@ -701,10 +700,10 @@ void __quantum__qis__Probs(MemRefT_double_1d *result, int64_t numQubits, ...)
     std::vector<double> sv_probs;
 
     if (wires.empty()) {
-        sv_probs = Catalyst::Runtime::CAPI::DRIVER->get_device()->Probs();
+        sv_probs = Catalyst::Runtime::CAPI::DRIVER->getDevice()->Probs();
     }
     else {
-        sv_probs = Catalyst::Runtime::CAPI::DRIVER->get_device()->PartialProbs(wires);
+        sv_probs = Catalyst::Runtime::CAPI::DRIVER->getDevice()->PartialProbs(wires);
     }
 
     const size_t numElements = 1U << numQubits;
@@ -734,11 +733,11 @@ void __quantum__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, .
     std::vector<std::complex<double>> sv_state;
 
     if (wires.empty()) {
-        sv_state = Catalyst::Runtime::CAPI::DRIVER->get_device()->State();
+        sv_state = Catalyst::Runtime::CAPI::DRIVER->getDevice()->State();
     }
     else {
         __quantum__rt__fail_cstr("Partial State-Vector not supported yet");
-        // Catalyst::Runtime::CAPI::DRIVER->get_device()->PartialState(stateVec,
+        // Catalyst::Runtime::CAPI::DRIVER->getDevice()->PartialState(stateVec,
         // numElements, wires);
     }
 
@@ -771,10 +770,10 @@ void __quantum__qis__Sample(MemRefT_double_2d *result, int64_t shots, int64_t nu
 
     std::vector<double> sv_samples;
     if (wires.empty()) {
-        sv_samples = Catalyst::Runtime::CAPI::DRIVER->get_device()->Sample(shots);
+        sv_samples = Catalyst::Runtime::CAPI::DRIVER->getDevice()->Sample(shots);
     }
     else {
-        sv_samples = Catalyst::Runtime::CAPI::DRIVER->get_device()->PartialSample(wires, shots);
+        sv_samples = Catalyst::Runtime::CAPI::DRIVER->getDevice()->PartialSample(wires, shots);
     }
 
     const size_t numElements = sv_samples.size();
@@ -808,10 +807,10 @@ void __quantum__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t shots
     std::tuple<std::vector<double>, std::vector<int64_t>> sv_counts;
 
     if (wires.empty()) {
-        sv_counts = Catalyst::Runtime::CAPI::DRIVER->get_device()->Counts(shots);
+        sv_counts = Catalyst::Runtime::CAPI::DRIVER->getDevice()->Counts(shots);
     }
     else {
-        sv_counts = Catalyst::Runtime::CAPI::DRIVER->get_device()->PartialCounts(wires, shots);
+        sv_counts = Catalyst::Runtime::CAPI::DRIVER->getDevice()->PartialCounts(wires, shots);
     }
 
     auto &&sv_eigvals = std::get<0>(sv_counts);

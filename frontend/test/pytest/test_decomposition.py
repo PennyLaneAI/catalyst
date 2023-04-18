@@ -31,6 +31,7 @@ copy.discard("S")
 class CustomDevice(qml.QubitDevice):
     name = "Device without MultiControlledX, Rot, and S gates"
     short_name = "dummy.device"
+    backend = "default"
     pennylane_requires = "0.1.0"
     version = "0.0.1"
     author = "CV quantum"

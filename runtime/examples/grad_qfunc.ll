@@ -25,6 +25,9 @@ target triple = "x86_64-pc-linux-gnu"
 @.str = private constant [15 x i8] c"grad[%d] = %f\0A\00", align 1
 @backend = private constant [8 x i8] c"backend\00"
 @backend_default = private constant [8 x i8] c"default\00"
+@recorder = private constant [9 x i8] c"recorder\00"
+@start = private constant [6 x i8] c"start\00"
+@stop = private constant [5 x i8] c"stop\00"
 
 declare i8* @aligned_alloc(i64, i64)
 
@@ -39,8 +42,6 @@ declare void @__quantum__rt__initialize()
 declare void @__quantum__rt__finalize()
 
 declare void @__quantum__rt__print_state()
-
-declare void @__quantum__rt__toggle_recorder(i8)
 
 declare i8* @__quantum__rt__array_get_element_ptr_1d(%Array*, i64)
 
@@ -80,8 +81,8 @@ define double @circuit(%Qubit* %0) {
 
 define i32 @main() {
   ; Initialize quantum runtime
-  call void @__quantum__rt__device(i8* getelementptr ([8 x i8], [8 x i8]* @backend, i64 0, i64 0), i8* getelementptr ([8 x i8], [8 x i8]* @backend_default, i64 0, i64 0))
   call void @__quantum__rt__initialize()
+  call void @__quantum__rt__device(i8* getelementptr ([8 x i8], [8 x i8]* @backend, i64 0, i64 0), i8* getelementptr ([8 x i8], [8 x i8]* @backend_default, i64 0, i64 0))
 
   ; Allocate 2 qubits
   %1 = call %Array* @__quantum__rt__qubit_allocate_array(i64 2)
@@ -90,7 +91,7 @@ define i32 @main() {
   %4 = load %Qubit*, %Qubit** %3, align 8
 
   ; Activate the recorder
-  call void @__quantum__rt__toggle_recorder(i8 1)
+  call void @__quantum__rt__device(i8* getelementptr ([9 x i8], [9 x i8]* @recorder, i64 0, i64 0), i8* getelementptr ([6 x i8], [6 x i8]* @start, i64 0, i64 0))
 
   ; Call a quantum circuit
   %5 = call double @circuit(%Qubit* %4)
@@ -111,9 +112,8 @@ define i32 @main() {
   ; Call the Gradient function
   call void (i64, ...) @__quantum__qis__Gradient(i64 1, %struct.MemRefT* %memref_ptr)
 
-
   ; Deactivate the recorder
-  call void @__quantum__rt__toggle_recorder(i8 0)
+  call void @__quantum__rt__device(i8* getelementptr ([9 x i8], [9 x i8]* @recorder, i64 0, i64 0), i8* getelementptr ([5 x i8], [5 x i8]* @stop, i64 0, i64 0))
 
   ; Print results
   call void @print_jacobian_at(double* %buffer_cast, i64 0)

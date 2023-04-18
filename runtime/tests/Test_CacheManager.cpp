@@ -155,9 +155,9 @@ TEMPLATE_LIST_TEST_CASE("Test a LightningSimulator circuit with num_qubits=4 and
 
 TEST_CASE("Test __quantum__qis__ circuit with observables", "[CacheManager]")
 {
+    __quantum__rt__initialize();
     for (const auto &[key, val] : getDevices()) {
         __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
-        __quantum__rt__initialize();
 
         QUBIT *target = __quantum__rt__qubit_allocate();              // id = 0
         QirArray *ctrls_arr = __quantum__rt__qubit_allocate_array(1); // id = 1
@@ -195,23 +195,28 @@ TEST_CASE("Test __quantum__qis__ circuit with observables", "[CacheManager]")
         CHECK(__quantum__qis__Expval(obs) == Approx(0.9800665778).margin(1e-5));
 
         delete[] buffer;
-        __quantum__rt__finalize();
     }
+    __quantum__rt__finalize();
 }
 
 TEST_CASE("Test __quantum__qis__ circuit with observables using deactiveCacheManager",
           "[CacheManager]")
 {
+
+    const std::string recorder("recorder");
+    const std::string start("start");
+    const std::string stop("stop");
+
+    __quantum__rt__initialize();
     for (const auto &[key, val] : getDevices()) {
         __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
-        __quantum__rt__initialize();
 
         QUBIT *target = __quantum__rt__qubit_allocate();              // id = 0
         QirArray *ctrls_arr = __quantum__rt__qubit_allocate_array(1); // id = 1
 
         QUBIT **ctrls = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
 
-        __quantum__rt__toggle_recorder(/* activate_cm */ true);
+        __quantum__rt__device((int8_t *)recorder.c_str(), (int8_t *)start.c_str());
 
         // qml.Hadamard(wires=0)
         __quantum__qis__Hadamard(target);
@@ -243,10 +248,9 @@ TEST_CASE("Test __quantum__qis__ circuit with observables using deactiveCacheMan
 
         CHECK(__quantum__qis__Expval(obs) == Approx(0.9800665778).margin(1e-5));
 
-        __quantum__rt__toggle_recorder(/* activate_cm */ false);
-
-        __quantum__rt__finalize();
+        __quantum__rt__device((int8_t *)recorder.c_str(), (int8_t *)stop.c_str());
 
         delete[] buffer;
     }
+    __quantum__rt__finalize();
 }

@@ -29,7 +29,6 @@ void __quantum__rt__fail_cstr(const char *);
 void __quantum__rt__initialize();
 void __quantum__rt__device(int8_t *, int8_t *);
 void __quantum__rt__finalize();
-void __quantum__rt__toggle_recorder(bool);
 void __quantum__rt__print_state();
 
 QUBIT *__quantum__rt__qubit_allocate();

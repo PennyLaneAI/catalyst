@@ -83,6 +83,7 @@ class Driver final {
                 tape_recording, shots);
         });
 #endif
+        this->_driver_mm_ptr = std::make_unique<MemoryManager>();
     };
 
     ~Driver()
@@ -90,41 +91,46 @@ class Driver final {
         _driver_ptr.reset(nullptr);
         _driver_mm_ptr.reset(nullptr);
 
-        assert(get_device() == nullptr);
-        assert(get_memory_manager() == nullptr);
+        assert(getDevice() == nullptr);
+        assert(getMemoryManager() == nullptr);
     };
 
-    void set_device_name(std::string_view name) noexcept
+    void setDeviceName(std::string_view name) noexcept
     {
         if (name != "default") {
             this->_name = name;
         }
     }
 
-    void set_device_shots(size_t shots) noexcept { this->_shots = shots; }
+    void setDeviceShots(size_t shots) noexcept { this->_shots = shots; }
 
-    [[nodiscard]] auto get_device_name() const -> std::string_view { return _name; }
+    void toggleDeviceRecorder(bool status) noexcept { this->_tape_recording = status; }
 
-    [[nodiscard]] auto get_device_shots() const -> size_t { return _shots; }
+    [[nodiscard]] auto getDeviceName() const -> std::string_view { return this->_name; }
 
-    [[nodiscard]] bool init_device() noexcept
+    [[nodiscard]] auto getDeviceShots() const -> size_t { return this->_shots; }
+
+    [[nodiscard]] auto getDeviceRecorderStatus() const -> bool { return this->_tape_recording; }
+
+    [[nodiscard]] bool initDevice() noexcept
     {
+        this->_driver_ptr.reset(nullptr);
+
         auto iter = _device_map.find(this->_name);
         if (iter != _device_map.end()) {
             this->_driver_ptr = iter->second(_tape_recording, _shots);
-            this->_driver_mm_ptr = std::make_unique<MemoryManager>();
             return true;
         }
         return false;
     }
 
-    [[nodiscard]] auto get_device() const
+    [[nodiscard]] auto getDevice() const
         -> const std::unique_ptr<Catalyst::Runtime::QuantumDevice> &
     {
         return _driver_ptr;
     }
 
-    [[nodiscard]] auto get_memory_manager() const -> const std::unique_ptr<MemoryManager> &
+    [[nodiscard]] auto getMemoryManager() const -> const std::unique_ptr<MemoryManager> &
     {
         return _driver_mm_ptr;
     }

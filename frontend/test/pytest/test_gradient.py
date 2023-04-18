@@ -203,7 +203,6 @@ def test_adj_in_loop(inp):
         return qml.expval(qml.PauliY(0))
 
     @qjit()
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
     def compiled_grad_default(params, ntrials):
         diff = grad(f, argnum=0, method="adj")
 

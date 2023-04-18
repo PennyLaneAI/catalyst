@@ -52,9 +52,9 @@ using namespace Catalyst::Runtime;
 
 TEST_CASE("Qubits: allocate, release, dump", "[CoreQIS]")
 {
+    __quantum__rt__initialize();
     for (const auto &[key, val] : getDevices()) {
         __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
-        __quantum__rt__initialize();
 
         QUBIT *q = __quantum__rt__qubit_allocate();
 
@@ -88,16 +88,15 @@ TEST_CASE("Qubits: allocate, release, dump", "[CoreQIS]")
 
         __quantum__rt__qubit_release_array(qs); // The `qs` is a dangling pointer from now on.
         __quantum__rt__array_update_reference_count(copy, -1);
-
-        __quantum__rt__finalize();
     }
+    __quantum__rt__finalize();
 }
 
 TEST_CASE("Test lightning__core__qis methods", "[CoreQIS]")
 {
+    __quantum__rt__initialize();
     for (const auto &[key, val] : getDevices()) {
         __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
-        __quantum__rt__initialize();
 
         constexpr double angle = 0.42;
 
@@ -111,36 +110,16 @@ TEST_CASE("Test lightning__core__qis methods", "[CoreQIS]")
         // The `ctrls` is a dangling pointer from now on.
         __quantum__rt__qubit_release_array(reg);
 
-        __quantum__rt__finalize();
-
         CHECK(true); // if the __quantum__qis__ operations can be called
     }
-}
-
-TEST_CASE("Test __quantum__rt__initialize multiple times", "[CoreQIS]")
-{
-    for (const auto &[key, val] : getDevices()) {
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
-        __quantum__rt__initialize();
-
-        REQUIRE_THROWS_WITH(__quantum__rt__initialize(),
-                            Catch::Contains("Invalid initialization of the global device"));
-
-        __quantum__rt__finalize();
-    }
-}
-
-TEST_CASE("Test __quantum__rt__initialize before defining the device", "[CoreQIS]")
-{
-    REQUIRE_THROWS_WITH(__quantum__rt__initialize(),
-                        Catch::Contains("Initialization before defining the device"));
+    __quantum__rt__finalize();
 }
 
 TEST_CASE("Test __quantum__rt__print_state", "[CoreQIS]")
 {
+    __quantum__rt__initialize();
     for (const auto &[key, val] : getDevices()) {
         __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
-        __quantum__rt__initialize();
 
         __quantum__rt__qubit_allocate_array(2);
 
@@ -153,16 +132,15 @@ TEST_CASE("Test __quantum__rt__print_state", "[CoreQIS]")
 
         std::string result = buffer.str();
         CHECK(!result.compare(expected));
-
-        __quantum__rt__finalize();
     }
+    __quantum__rt__finalize();
 }
 
 TEST_CASE("Test __quantum__qis__State with wires", "[CoreQIS]")
 {
+    __quantum__rt__initialize();
     for (const auto &[key, val] : getDevices()) {
         __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
-        __quantum__rt__initialize();
 
         QUBIT *wire0 = __quantum__rt__qubit_allocate();
 
@@ -174,15 +152,15 @@ TEST_CASE("Test __quantum__qis__State with wires", "[CoreQIS]")
                             Catch::Contains("Partial State-Vector not supported yet"));
 
         freeState(result);
-        __quantum__rt__finalize();
     }
+    __quantum__rt__finalize();
 }
 
 TEST_CASE("Test __quantum__qis__Identity", "[CoreQIS]")
 {
     for (const auto &[key, val] : getDevices()) {
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
         __quantum__rt__initialize();
+        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
 
         QUBIT *wire0 = __quantum__rt__qubit_allocate();
 
@@ -207,8 +185,8 @@ TEST_CASE("Test __quantum__qis__Identity", "[CoreQIS]")
 TEST_CASE("Test __quantum__qis__PauliX", "[CoreQIS]")
 {
     for (const auto &[key, val] : getDevices()) {
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
         __quantum__rt__initialize();
+        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
 
         QUBIT *wire0 = __quantum__rt__qubit_allocate();
 
@@ -233,8 +211,8 @@ TEST_CASE("Test __quantum__qis__PauliX", "[CoreQIS]")
 TEST_CASE("Test __quantum__qis__ PauliY and Rot", "[CoreQIS]")
 {
     for (const auto &[key, val] : getDevices()) {
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
         __quantum__rt__initialize();
+        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
 
         QUBIT *wire0 = __quantum__rt__qubit_allocate();
 
@@ -283,46 +261,37 @@ TEST_CASE("Test copy to strided array", "[CoreQIS]")
 
 TEST_CASE("Test memref alloc", "[CoreQIS]")
 {
-    for (const auto &[key, val] : getDevices()) {
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
-        __quantum__rt__initialize();
-        int *a = (int *)_mlir_memref_to_llvm_alloc(sizeof(int));
-        CHECK(a != NULL);
-        *a = 1;
-        __quantum__rt__finalize();
-    }
+    __quantum__rt__initialize();
+    int *a = (int *)_mlir_memref_to_llvm_alloc(sizeof(int));
+    CHECK(a != NULL);
+    *a = 1;
+    __quantum__rt__finalize();
 }
 
 TEST_CASE("Test memref aligned alloc", "[CoreQIS]")
 {
-    for (const auto &[key, val] : getDevices()) {
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
-        __quantum__rt__initialize();
-        int *a = (int *)_mlir_memref_to_llvm_aligned_alloc(sizeof(int), sizeof(int));
-        CHECK(a != NULL);
-        *a = 1;
-        __quantum__rt__finalize();
-    }
+    __quantum__rt__initialize();
+    int *a = (int *)_mlir_memref_to_llvm_aligned_alloc(sizeof(int), sizeof(int));
+    CHECK(a != NULL);
+    *a = 1;
+    __quantum__rt__finalize();
 }
 
 TEST_CASE("Test memref free", "[CoreQIS]")
 {
-    for (const auto &[key, val] : getDevices()) {
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
-        __quantum__rt__initialize();
-        int *a = (int *)_mlir_memref_to_llvm_alloc(sizeof(int));
-        CHECK(a != NULL);
-        *a = 1;
-        _mlir_memref_to_llvm_free(a);
-        __quantum__rt__finalize();
-    }
+    __quantum__rt__initialize();
+    int *a = (int *)_mlir_memref_to_llvm_alloc(sizeof(int));
+    CHECK(a != NULL);
+    *a = 1;
+    _mlir_memref_to_llvm_free(a);
+    __quantum__rt__finalize();
 }
 
 TEST_CASE("Test __quantum__qis__Measure", "[CoreQIS]")
 {
     for (const auto &[key, val] : getDevices()) {
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
         __quantum__rt__initialize();
+        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
 
         QUBIT *wire0 = __quantum__rt__qubit_allocate();
 
@@ -342,8 +311,8 @@ TEST_CASE("Test __quantum__qis__Measure", "[CoreQIS]")
 TEST_CASE("Test __quantum__qis__ Hadamard, PauliZ, IsingXX, IsingZZ, and SWAP", "[CoreQIS]")
 {
     for (const auto &[key, val] : getDevices()) {
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
         __quantum__rt__initialize();
+        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
 
         QUBIT *target = __quantum__rt__qubit_allocate();
         QirArray *ctrls_arr = __quantum__rt__qubit_allocate_array(1);
@@ -376,9 +345,9 @@ TEST_CASE("Test __quantum__qis__ Hadamard, PauliZ, IsingXX, IsingZZ, and SWAP", 
 
 TEST_CASE("Test __quantum__qis__ CRot, IsingXY and Toffoli", "[CoreQIS]")
 {
+    __quantum__rt__initialize();
     for (const auto &[key, val] : getDevices()) {
         __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
-        __quantum__rt__initialize();
 
         QUBIT *target = __quantum__rt__qubit_allocate();
         QirArray *ctrls_arr = __quantum__rt__qubit_allocate_array(2);
@@ -407,15 +376,15 @@ TEST_CASE("Test __quantum__qis__ CRot, IsingXY and Toffoli", "[CoreQIS]")
                state[3].imag == Approx(0.0).margin(1e-5)));
 
         freeState(result);
-        __quantum__rt__finalize();
     }
+    __quantum__rt__finalize();
 }
 
 TEST_CASE("Test __quantum__qis__ Hadamard, PauliX, IsingYY, CRX, and Expval", "[CoreQIS]")
 {
     for (const auto &[key, val] : getDevices()) {
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
         __quantum__rt__initialize();
+        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
 
         QUBIT *target = __quantum__rt__qubit_allocate();
         QirArray *ctrls_arr = __quantum__rt__qubit_allocate_array(1);
@@ -457,8 +426,8 @@ TEST_CASE("Test __quantum__qis__ Hadamard, PauliX, IsingYY, CRX, and Expval", "[
 TEST_CASE("Test __quantum__qis__ PhaseShift", "[CoreQIS]")
 {
     for (const auto &[key, val] : getDevices()) {
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
         __quantum__rt__initialize();
+        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
 
         QUBIT *target = __quantum__rt__qubit_allocate();
         QirArray *ctrls_arr = __quantum__rt__qubit_allocate_array(1);
@@ -493,8 +462,8 @@ TEST_CASE("Test __quantum__qis__ PhaseShift", "[CoreQIS]")
 TEST_CASE("Test __quantum__qis__HermitianObs with an uninitialized matrix", "[CoreQIS]")
 {
     for (const auto &[key, val] : getDevices()) {
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
         __quantum__rt__initialize();
+        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
 
         MemRefT_CplxT_double_2d *matrix = nullptr;
         REQUIRE_THROWS_WITH(__quantum__qis__HermitianObs(matrix, 0),
@@ -508,8 +477,8 @@ TEST_CASE("Test __quantum__qis__HermitianObs with an uninitialized matrix", "[Co
 TEST_CASE("Test __quantum__qis__HermitianObs with invalid Hermitian matrix", "[CoreQIS]")
 {
     for (const auto &[key, val] : getDevices()) {
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
         __quantum__rt__initialize();
+        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
 
         MemRefT_CplxT_double_2d *matrix = new MemRefT_CplxT_double_2d;
         REQUIRE_THROWS_WITH(__quantum__qis__HermitianObs(matrix, 0),
@@ -523,8 +492,8 @@ TEST_CASE("Test __quantum__qis__HermitianObs with invalid Hermitian matrix", "[C
 TEST_CASE("Test __quantum__qis__HermitianObs with invalid number of wires", "[CoreQIS]")
 {
     for (const auto &[key, val] : getDevices()) {
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
         __quantum__rt__initialize();
+        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
 
         QUBIT *target = __quantum__rt__qubit_allocate();
 
@@ -544,8 +513,8 @@ TEST_CASE("Test __quantum__qis__HermitianObs with invalid number of wires", "[Co
 TEST_CASE("Test __quantum__qis__HermitianObs and Expval", "[CoreQIS]")
 {
     for (const auto &[key, val] : getDevices()) {
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
         __quantum__rt__initialize();
+        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
 
         QUBIT *target = __quantum__rt__qubit_allocate();
         QirArray *ctrls_arr = __quantum__rt__qubit_allocate_array(1);
@@ -604,8 +573,8 @@ TEST_CASE("Test __quantum__qis__HermitianObs and Expval", "[CoreQIS]")
 TEST_CASE("Test __quantum__qis__TensorObs with invalid number of observables", "[CoreQIS]")
 {
     for (const auto &[key, val] : getDevices()) {
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
         __quantum__rt__initialize();
+        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
 
         REQUIRE_THROWS_WITH(
             __quantum__qis__TensorObs(0),
@@ -618,8 +587,8 @@ TEST_CASE("Test __quantum__qis__TensorObs with invalid number of observables", "
 TEST_CASE("Test __quantum__qis__TensorProdObs and Expval", "[CoreQIS]")
 {
     for (const auto &[key, val] : getDevices()) {
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
         __quantum__rt__initialize();
+        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
 
         QUBIT *target = __quantum__rt__qubit_allocate();
         QirArray *ctrls_arr = __quantum__rt__qubit_allocate_array(1);
@@ -667,8 +636,8 @@ TEST_CASE("Test __quantum__qis__TensorProdObs and Expval", "[CoreQIS]")
 TEST_CASE("Test __quantum__qis__HamiltonianObs with invalid coefficients", "[CoreQIS]")
 {
     for (const auto &[key, val] : getDevices()) {
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
         __quantum__rt__initialize();
+        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
 
         MemRefT_double_1d *coeffs = nullptr;
 
@@ -683,8 +652,8 @@ TEST_CASE("Test __quantum__qis__HamiltonianObs with invalid number of coefficien
           "[CoreQIS]")
 {
     for (const auto &[key, val] : getDevices()) {
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
         __quantum__rt__initialize();
+        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
 
         MemRefT_double_1d *coeffs = new MemRefT_double_1d;
         coeffs->offset = 0;
@@ -703,8 +672,8 @@ TEST_CASE("Test __quantum__qis__HamiltonianObs with invalid number of coefficien
 TEST_CASE("Test __quantum__qis__HamiltonianObs(h, x) and Expval", "[CoreQIS]")
 {
     for (const auto &[key, val] : getDevices()) {
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
         __quantum__rt__initialize();
+        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
 
         QUBIT *target = __quantum__rt__qubit_allocate();
         QirArray *ctrls_arr = __quantum__rt__qubit_allocate_array(1);
@@ -762,8 +731,8 @@ TEST_CASE("Test __quantum__qis__HamiltonianObs(h, x) and Expval", "[CoreQIS]")
 TEST_CASE("Test __quantum__qis__HamiltonianObs(t) and Expval", "[CoreQIS]")
 {
     for (const auto &[key, val] : getDevices()) {
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
         __quantum__rt__initialize();
+        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
 
         QUBIT *target = __quantum__rt__qubit_allocate();
         QirArray *ctrls_arr = __quantum__rt__qubit_allocate_array(1);
@@ -822,8 +791,8 @@ TEST_CASE("Test __quantum__qis__HamiltonianObs(t) and Expval", "[CoreQIS]")
 TEST_CASE("Test __quantum__qis__ Hadamard, PauliX, IsingYY, CRX, and Expval_arr", "[CoreQIS]")
 {
     for (const auto &[key, val] : getDevices()) {
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
         __quantum__rt__initialize();
+        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
 
         QUBIT *target = __quantum__rt__qubit_allocate();
         QirArray *ctrls_arr = __quantum__rt__qubit_allocate_array(1);
@@ -868,8 +837,8 @@ TEST_CASE("Test __quantum__qis__ Hadamard, ControlledPhaseShift, IsingYY, CRX, a
           "[CoreQIS]")
 {
     for (const auto &[key, val] : getDevices()) {
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
         __quantum__rt__initialize();
+        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
 
         QUBIT *target = __quantum__rt__qubit_allocate();              // id = 0
         QirArray *ctrls_arr = __quantum__rt__qubit_allocate_array(1); // id = 1
@@ -911,8 +880,8 @@ TEST_CASE("Test __quantum__qis__ Hadamard, ControlledPhaseShift, IsingYY, CRX, a
 TEST_CASE("Test __quantum__qis__ Hadamard, PauliX, IsingYY, CRX, and Probs", "[CoreQIS]")
 {
     for (const auto &[key, val] : getDevices()) {
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
         __quantum__rt__initialize();
+        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
 
         QUBIT *target = __quantum__rt__qubit_allocate();
         QirArray *ctrls_arr = __quantum__rt__qubit_allocate_array(1);
@@ -946,8 +915,8 @@ TEST_CASE("Test __quantum__qis__ Hadamard, PauliX, IsingYY, CRX, and Probs", "[C
 TEST_CASE("Test __quantum__qis__ Hadamard, PauliX, IsingYY, CRX, and partial Probs", "[CoreQIS]")
 {
     for (const auto &[key, val] : getDevices()) {
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
         __quantum__rt__initialize();
+        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
 
         QUBIT *target = __quantum__rt__qubit_allocate();
         QirArray *ctrls_arr = __quantum__rt__qubit_allocate_array(1);
@@ -981,8 +950,8 @@ TEST_CASE("Test __quantum__qis__ Hadamard, PauliX, IsingYY, CRX, and partial Pro
 TEST_CASE("Test __quantum__qis__State on the heap using malloc", "[CoreQIS]")
 {
     for (const auto &[key, val] : getDevices()) {
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
         __quantum__rt__initialize();
+        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
 
         QUBIT *target = __quantum__rt__qubit_allocate();
         QirArray *ctrls_arr = __quantum__rt__qubit_allocate_array(1);
@@ -1022,8 +991,8 @@ TEST_CASE("Test __quantum__qis__State on the heap using malloc", "[CoreQIS]")
 TEST_CASE("Test __quantum__qis__Measure with false", "[CoreQIS]")
 {
     for (const auto &[key, val] : getDevices()) {
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
         __quantum__rt__initialize();
+        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
 
         QUBIT *target = __quantum__rt__qubit_allocate(); // id = 0
 
@@ -1042,8 +1011,8 @@ TEST_CASE("Test __quantum__qis__Measure with false", "[CoreQIS]")
 TEST_CASE("Test __quantum__qis__Measure with true", "[CoreQIS]")
 {
     for (const auto &[key, val] : getDevices()) {
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
         __quantum__rt__initialize();
+        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
 
         QUBIT *target = __quantum__rt__qubit_allocate(); // id = 0
 
@@ -1062,8 +1031,8 @@ TEST_CASE("Test __quantum__qis__Measure with true", "[CoreQIS]")
 TEST_CASE("Test __quantum__qis__MultiRZ", "[CoreQIS]")
 {
     for (const auto &[key, val] : getDevices()) {
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
         __quantum__rt__initialize();
+        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
 
         QUBIT *q0 = __quantum__rt__qubit_allocate();
         QUBIT *q1 = __quantum__rt__qubit_allocate();
@@ -1089,8 +1058,8 @@ TEST_CASE("Test __quantum__qis__MultiRZ", "[CoreQIS]")
 TEST_CASE("Test __quantum__qis__CSWAP ", "[CoreQIS]")
 {
     for (const auto &[key, val] : getDevices()) {
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
         __quantum__rt__initialize();
+        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
 
         QUBIT *q0 = __quantum__rt__qubit_allocate();
         QUBIT *q1 = __quantum__rt__qubit_allocate();
@@ -1127,8 +1096,8 @@ TEST_CASE("Test __quantum__qis__Counts with num_qubits=2 calling Hadamard, Contr
           "[CoreQIS]")
 {
     for (const auto &[key, val] : getDevices()) {
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
         __quantum__rt__initialize();
+        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
 
         QUBIT *target = __quantum__rt__qubit_allocate();              // id = 0
         QirArray *ctrls_arr = __quantum__rt__qubit_allocate_array(1); // id = 1
@@ -1171,8 +1140,8 @@ TEST_CASE("Test __quantum__qis__Counts with num_qubits=2 PartialCounts calling H
           "[CoreQIS]")
 {
     for (const auto &[key, val] : getDevices()) {
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
         __quantum__rt__initialize();
+        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
 
         QUBIT *target = __quantum__rt__qubit_allocate();              // id = 0
         QirArray *ctrls_arr = __quantum__rt__qubit_allocate_array(1); // id = 1
@@ -1209,8 +1178,8 @@ TEST_CASE("Test __quantum__qis__Sample with num_qubits=2 calling Hadamard, Contr
           "[CoreQIS]")
 {
     for (const auto &[key, val] : getDevices()) {
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
         __quantum__rt__initialize();
+        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
 
         QUBIT *target = __quantum__rt__qubit_allocate();              // id = 0
         QirArray *ctrls_arr = __quantum__rt__qubit_allocate_array(1); // id = 1
@@ -1274,8 +1243,8 @@ TEST_CASE("Test __quantum__qis__Sample with num_qubits=2 and PartialSample calli
           "[CoreQIS]")
 {
     for (const auto &[key, val] : getDevices()) {
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
         __quantum__rt__initialize();
+        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
 
         QUBIT *target = __quantum__rt__qubit_allocate();              // id = 0
         QirArray *ctrls_arr = __quantum__rt__qubit_allocate_array(1); // id = 1
@@ -1325,8 +1294,8 @@ TEST_CASE("Test __quantum__qis__Sample with num_qubits=2 and PartialSample calli
 TEST_CASE("Test __quantum__qis__QubitUnitary with an uninitialized matrix", "[CoreQIS]")
 {
     for (const auto &[key, val] : getDevices()) {
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
         __quantum__rt__initialize();
+        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
 
         QUBIT *target = __quantum__rt__qubit_allocate(); // id = 0
         MemRefT_CplxT_double_2d *matrix = nullptr;
@@ -1341,8 +1310,8 @@ TEST_CASE("Test __quantum__qis__QubitUnitary with an uninitialized matrix", "[Co
 TEST_CASE("Test __quantum__qis__QubitUnitary with invalid number of wires", "[CoreQIS]")
 {
     for (const auto &[key, val] : getDevices()) {
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
         __quantum__rt__initialize();
+        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
 
         QUBIT *target = __quantum__rt__qubit_allocate(); // id = 0
         MemRefT_CplxT_double_2d *matrix = new MemRefT_CplxT_double_2d;
@@ -1359,8 +1328,8 @@ TEST_CASE("Test __quantum__qis__QubitUnitary with invalid number of wires", "[Co
 TEST_CASE("Test __quantum__qis__QubitUnitary with invalid matrix", "[CoreQIS]")
 {
     for (const auto &[key, val] : getDevices()) {
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
         __quantum__rt__initialize();
+        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
 
         QUBIT *target = __quantum__rt__qubit_allocate(); // id = 0
         MemRefT_CplxT_double_2d *matrix = new MemRefT_CplxT_double_2d;
@@ -1381,9 +1350,9 @@ TEST_CASE("Test __quantum__qis__QubitUnitary with invalid matrix", "[CoreQIS]")
 
 TEST_CASE("Test __quantum__qis__QubitUnitary with num_qubits=2", "[CoreQIS]")
 {
+    __quantum__rt__initialize();
     for (const auto &[key, val] : getDevices()) {
         __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
-        __quantum__rt__initialize();
 
         QUBIT *target = __quantum__rt__qubit_allocate();              // id = 0
         QirArray *ctrls_arr = __quantum__rt__qubit_allocate_array(1); // id = 1
@@ -1425,37 +1394,43 @@ TEST_CASE("Test __quantum__qis__QubitUnitary with num_qubits=2", "[CoreQIS]")
 
         freeState(result);
         delete matrix;
-
-        __quantum__rt__finalize();
     }
+    __quantum__rt__finalize();
 }
 
 TEST_CASE("Test __rt__device registering a custom device with shots=500 and device=lightning",
           "[CoreQIS]")
 {
+    __quantum__rt__initialize();
+
     char dev[8] = "backend";
-    char dev_value[17] = "lightning.kokkos";
+    char dev_value[17] = "lightning.qubit";
     __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
 
     char shots[6] = "shots";
     char shots_value[4] = "500";
     __quantum__rt__device((int8_t *)shots, (int8_t *)shots_value);
 
+    char recorder[9] = "recorder";
+    char start[6] = "start";
+    __quantum__rt__device((int8_t *)recorder, (int8_t *)start);
+
     char dev2[7] = "device";
+    char dev2_value[15] = "backend.other";
     REQUIRE_THROWS_WITH(__quantum__rt__device((int8_t *)dev2, (int8_t *)dev_value),
                         Catch::Contains("Invalid device specification"));
 
+    REQUIRE_THROWS_WITH(__quantum__rt__device((int8_t *)dev, (int8_t *)dev2_value),
+                        Catch::Contains("Failed initialization of the backend device"));
+
     REQUIRE_THROWS_WITH(__quantum__rt__device((int8_t *)shots, (int8_t *)dev_value),
                         Catch::Contains("Invalid argument for the device specification (shots)"));
-
-    char dev_value2[17] = "other.sumulator";
-    __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value2);
-
-    REQUIRE_THROWS_WITH(__quantum__rt__initialize(),
-                        Catch::Contains("Failed initialization of the global device"));
 
     REQUIRE_THROWS_WITH(__quantum__rt__device(nullptr, nullptr),
                         Catch::Contains("Invalid device specification"));
 
     __quantum__rt__finalize();
+
+    REQUIRE_THROWS_WITH(__quantum__rt__device((int8_t *)dev, (int8_t *)dev_value),
+                        Catch::Contains("Invalid use of the global driver before initialization"));
 }
