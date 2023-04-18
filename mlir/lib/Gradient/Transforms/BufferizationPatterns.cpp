@@ -51,32 +51,32 @@ class BufferizeAdjointOp : public OpConversionPattern<AdjointOp> {
 };
 
 
-// class BufferizeBackpropOp : public OpConversionPattern<BackpropOp> {
-//   public:
-//     using OpConversionPattern::OpConversionPattern;
+class BufferizeBackpropOp : public OpConversionPattern<BackpropOp> {
+  public:
+    using OpConversionPattern::OpConversionPattern;
 
-//     LogicalResult matchAndRewrite(BackpropOp op, OpAdaptor adaptor,
-//                                   ConversionPatternRewriter &rewriter) const override
-//     {
-//         SmallVector<Type> resTypes;
-//         if (failed(getTypeConverter()->convertTypes(op.getResultTypes(), resTypes)))
-//             return failure();
+    LogicalResult matchAndRewrite(BackpropOp op, OpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        SmallVector<Type> resTypes;
+        if (failed(getTypeConverter()->convertTypes(op.getResultTypes(), resTypes)))
+            return failure();
 
-//         Location loc = op.getLoc();
-//         Value gradSize = op.getGradSize();
-//         SmallVector<Value> memrefValues;
-//         for (Type resType : resTypes) {
-//             MemRefType memrefType = resType.cast<MemRefType>();
-//             Value memrefValue = rewriter.create<memref::AllocOp>(loc, memrefType, gradSize);
-//             memrefValues.push_back(memrefValue);
-//         }
+        Location loc = op.getLoc();
+        Value gradSize = op.getGradSize();
+        SmallVector<Value> memrefValues;
+        for (Type resType : resTypes) {
+            MemRefType memrefType = resType.cast<MemRefType>();
+            Value memrefValue = rewriter.create<memref::AllocOp>(loc, memrefType, gradSize);
+            memrefValues.push_back(memrefValue);
+        }
 
-//         rewriter.create<BackpropOp>(loc, TypeRange{}, op.getCalleeAttr(), adaptor.getGradSize(),
-//                                    adaptor.getArgs(), memrefValues);
-//         rewriter.replaceOp(op, memrefValues);
-//         return success();
-//     }
-// };
+        rewriter.create<BackpropOp>(loc, TypeRange{}, op.getCalleeAttr(), adaptor.getGradSize(),
+                                   adaptor.getOperands(), memrefValues);
+        rewriter.replaceOp(op, memrefValues);
+        return success();
+    }
+};
 
 } // namespace
 
