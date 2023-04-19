@@ -270,7 +270,7 @@ class LLVMIRToObjectFile(PassPipeline):
         return infile.replace(".ll", ".o")
 
 
-class WrapperToCatchExceptions(PassPipeline):
+class WrapperToCatchExceptions:
     """Create a wrapper around the generated function to catch runtime exceptions."""
 
     def __init__(self, params, name):
@@ -283,12 +283,14 @@ class WrapperToCatchExceptions(PassPipeline):
 
     @staticmethod
     def get_output_filename(infile):
+        """Get a name for the wrapper object file."""
         # Technically we are just using this to get the whole path
         if not infile.endswith(".mlir"):
             raise ValueError("Input is not an MLIR file.")
         return infile.replace(".mlir", ".wrap.o")
 
     def run(self, infile, outfile=None, flags=None, options=None):
+        """Compile code to generate a wrapper around the user's program."""
         template = """
 #define PY_SSIZE_T_CLEAN
 #include <Python.h>
@@ -319,6 +321,7 @@ void wrapper_mlir_ciface_{{name}} ({% for variable in range(variables) %}void *a
         flags = WrapperToCatchExceptions._default_flags
         outfile = WrapperToCatchExceptions.get_output_filename(infile)
         command = [exe] + flags + ["-c", "-o", outfile, "-"]
+        run_writing_command(command, options)
         with subprocess.Popen(command, stdin=subprocess.PIPE) as pipe:
             pipe.communicate(input=bytes(cooked_template, "UTF-8"))
         return outfile
@@ -506,7 +509,7 @@ class Compiler:
 
         # This needs to happen after the creation of the workspace
         wrapper = WrapperToCatchExceptions(parameters_to_wrapper, name)
-        wrapper_object = wrapper.run(filename)
+        wrapper_object = wrapper.run(filename, options=options)
 
         pipelines = options.pipelines
         if pipelines is None:
