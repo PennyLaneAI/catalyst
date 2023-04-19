@@ -12,6 +12,9 @@
   These are called pipelines, as they contain multiple passes.
   [#38](https://github.com/PennyLaneAI/catalyst/pull/38)
 
+* Catch runtime errors from C++ and translate them to Python runtime exceptions.
+  [#97](https://github.com/PennyLaneAI/catalyst/pull/97)
+
 <h3>Breaking changes</h3>
 
 <h3>Bug fixes</h3>
