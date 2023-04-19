@@ -582,7 +582,7 @@ class JAX_QJIT:
 
             return catalyst.grad(qfunc, argnum=all_diff_args)(*args, **kwargs)
 
-        deriv_wrapper.__name__ = "deriv." + qfunc.__name__
+        deriv_wrapper.__name__ = "deriv_" + qfunc.__name__
         deriv_wrapper.__annotations__ = annotations
         deriv_wrapper.__signature__ = signature
 
