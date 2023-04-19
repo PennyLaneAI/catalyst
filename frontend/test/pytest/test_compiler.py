@@ -141,15 +141,23 @@ class TestCompilerErrors:
             WrapperToCatchExceptions.get_output_filename("not-an-mlir-file.txt")
 
     def test_runtime_error(self):
+        """Test that an exception is emitted when the runtime raises a C++ exception."""
+
         class CompileCXXException:
+            """Class that overrides the program to be compiled."""
+
             _executable = "clang++"
             _default_flags = ["-shared", "-fPIC", "-x", "c++"]
 
             @staticmethod
             def get_output_filename(infile):
+                """Get the name of the output file based on the input file."""
                 return infile.replace(".mlir", ".o")
 
+            # pylint: disable=unused-argument
+            @staticmethod
             def run(infile, **kwargs):
+                """Run the compilation step."""
                 contents = """
 #include <stdexcept>
 #include <stdarg.h>
@@ -171,8 +179,8 @@ void _mlir_ciface_jit_cpp_exception_test() {
                 flags = CompileCXXException._default_flags
                 outfile = CompileCXXException.get_output_filename(infile)
                 command = [exe] + flags + ["-o", outfile, "-"]
-                pipe = subprocess.Popen(command, stdin=subprocess.PIPE)
-                pipe.communicate(input=bytes(contents, "UTF-8"))
+                with subprocess.Popen(command, stdin=subprocess.PIPE) as pipe:
+                    pipe.communicate(input=bytes(contents, "UTF-8"))
                 return outfile
 
         with tempfile.TemporaryDirectory() as workspace:
@@ -183,6 +191,7 @@ void _mlir_ciface_jit_cpp_exception_test() {
                 pipelines=[CompileCXXException, CompilerDriver([wrapper_object])],
             )
             def cpp_exception_test():
+                """A function that will be overwritten by CompileCXXException."""
                 return None
 
             with pytest.raises(RuntimeError, match="Hello world"):
