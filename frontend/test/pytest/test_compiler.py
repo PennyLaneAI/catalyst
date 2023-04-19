@@ -20,6 +20,7 @@ from catalyst.compiler import BufferizationPass
 from catalyst.compiler import MLIRToLLVMDialect
 from catalyst.compiler import LLVMDialectToLLVMIR
 from catalyst.compiler import LLVMIRToObjectFile
+from catalyst.compiler import WrapperToCatchExceptions
 from catalyst.jax_tracer import get_mlir
 
 
@@ -129,13 +130,17 @@ class TestCompilerErrors:
     def test_link_lightning_runtime_input_validation(self):
         """Test if the function detects wrong extensions"""
         with pytest.raises(ValueError, match="is not an object file"):
-            CompilerDriver("foo.o").run("file-name.noo")
+            CompilerDriver("").run("file-name.noo")
 
     def test_attempts_to_get_inexistent_intermediate_file(self):
         """Test for error raised if user request intermediate file that doesn't exist."""
         compiler = Compiler()
         with pytest.raises(ValueError, match="pass .* not found."):
             compiler.get_output_of("inexistent-file")
+
+    def test_error_incorrect_wrapper_filename(self):
+        with pytest.raises(ValueError, match="Input is not an MLIR file."):
+            WrapperToCatchExceptions.get_output_filename("not-an-mlir-file.txt")
 
 
 # pylint: disable=too-few-public-methods
