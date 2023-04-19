@@ -317,10 +317,8 @@ void wrapper_mlir_ciface_{{name}} ({% for variable in range(variables) %}void *a
         data = {"variables": self.params, "name": self.name}
         j2_template = Template(template)
         cooked_template = j2_template.render(data)
-        exe = WrapperToCatchExceptions._executable
-        flags = WrapperToCatchExceptions._default_flags
-        outfile = WrapperToCatchExceptions.get_output_filename(infile)
-        command = [exe] + flags + ["-c", "-o", outfile, "-"]
+        outfile = self.get_output_filename(infile)
+        command = [self._executable] + self._default_flags + ["-c", "-o", outfile, "-"]
         run_writing_command(command, options)
         with subprocess.Popen(command, stdin=subprocess.PIPE) as pipe:
             pipe.communicate(input=bytes(cooked_template, "UTF-8"))
