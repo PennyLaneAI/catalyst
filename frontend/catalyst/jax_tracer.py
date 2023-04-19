@@ -524,7 +524,7 @@ def custom_lower_jaxpr_to_module(
 
         for op in ctx.module.body.operations:
             func_name = str(op.name)
-            is_entry_point = func_name.startswith('"jit.')
+            is_entry_point = func_name.startswith('"jit_')
             if is_entry_point:
                 continue
             op.attributes["llvm.linkage"] = ir.Attribute.parse("#llvm.linkage<internal>")
