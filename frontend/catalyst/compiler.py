@@ -344,8 +344,10 @@ class CompilerDriver:
 
     _default_fallback_compilers = ["clang", "gcc", "c99", "c89", "cc"]
 
-    def __init__(self, wrapper_object):
-        self.wrapper_object = wrapper_object
+    def __init__(self, additional_arg=None):
+        if additional_arg is None:
+            additional_arg = []
+        self.additional_arg = additional_arg
 
     @staticmethod
     def get_default_flags():
@@ -405,10 +407,10 @@ class CompilerDriver:
             if CompilerDriver._exists(compiler):
                 yield compiler
 
-    # pylint: disable=redefined-outer-name,too-many-arguments
-    def _attempt_link(self, compiler, flags, infile, outfile, options):
+    @staticmethod
+    def _attempt_link(compiler, flags, infile, outfile, options):
         try:
-            command = [compiler] + flags + [infile, self.wrapper_object, "-o", outfile]
+            command = [compiler] + flags + [infile, "-o", outfile]
             run_writing_command(command, options)
             return True
         except subprocess.CalledProcessError:
@@ -449,6 +451,7 @@ class CompilerDriver:
             outfile = CompilerDriver.get_output_filename(infile)
         if flags is None:
             flags = CompilerDriver.get_default_flags()
+        flags += self.additional_arg
         if fallback_compilers is None:
             fallback_compilers = CompilerDriver._default_fallback_compilers
         for compiler in CompilerDriver._available_compilers(fallback_compilers):
@@ -520,7 +523,7 @@ class Compiler:
                 MLIRToLLVMDialect,
                 LLVMDialectToLLVMIR,
                 LLVMIRToObjectFile,
-                CompilerDriver(wrapper_object),
+                CompilerDriver([wrapper_object]),
             ]
 
         self.pass_pipeline_output = {}
