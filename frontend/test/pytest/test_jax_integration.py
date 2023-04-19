@@ -168,6 +168,27 @@ class TestJAXGrad:
         assert jnp.allclose(result[0], jnp.array([-0.6027582, -0.00797699, -0.03839391]))
         assert jnp.allclose(result[1], jnp.array([0.0, -0.05759086]))
 
+    def test_without_precompilation(self):
+        """Test a function without type hints (pre-compilation) using jax.grad on top of qjit."""
+
+        @qjit
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def circuit(x, y):
+            qml.RX(jnp.pi * x[0], wires=0)
+            qml.RY(x[1] ** 2, wires=0)
+            qml.RX(y[1] * x[2], wires=0)
+            return qml.probs(wires=0), qml.expval(qml.PauliZ(0))
+
+        @partial(jax.grad, argnums=[0, 1])
+        def cost_fn(x, y):
+            result = circuit(x, y)
+            return jnp.sum(jnp.cos(result[0]) ** 2) + jnp.sin(result[1]) ** 2
+
+        result = cost_fn(jnp.array([0.1, 0.2, 0.3]), jnp.array([0.1, 0.2]))
+        assert len(result) == 2
+        assert jnp.allclose(result[0], jnp.array([-0.6027582, -0.00797699, -0.03839391]))
+        assert jnp.allclose(result[1], jnp.array([0.0, -0.05759086]))
+
     def test_non_differentiable_arguments(self):
         """Test a circuit with non-differentiable arguments using jax.grad on top of qjit."""
 

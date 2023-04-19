@@ -570,7 +570,12 @@ class JAX_QJIT:
     """
 
     def __init__(self, qfunc):
-        @functools.wraps(qfunc, assigned=("__annotations__",), updated=())
+        annotations = {}
+        signature = inspect.signature(qfunc)
+        for idx, (arg_name, param) in enumerate(signature.parameters.items()):
+            param._annotation = qfunc.c_sig[idx]
+            annotations[arg_name] = param._annotation
+
         def deriv_wrapper(*args, **kwargs):
             # Only consider differentiable arguments (i.e. of type floating point).
             all_diff_args = [i for i in range(len(args)) if args[i].dtype.kind == "f"]
@@ -578,6 +583,8 @@ class JAX_QJIT:
             return catalyst.grad(qfunc, argnum=all_diff_args)(*args, **kwargs)
 
         deriv_wrapper.__name__ = "deriv." + qfunc.__name__
+        deriv_wrapper.__annotations__ = annotations
+        deriv_wrapper.__signature__ = signature
 
         self.qfunc = qfunc
         self.deriv_qfunc = QJIT(deriv_wrapper, qfunc.compile_options)
