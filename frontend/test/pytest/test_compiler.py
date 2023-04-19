@@ -5,6 +5,7 @@ Unit tests for CompilerDriver class
 import os
 import sys
 import warnings
+import subprocess
 import tempfile
 import pytest
 
@@ -134,16 +135,58 @@ class TestCompilerErrors:
         with pytest.raises(ValueError, match="is not an object file"):
             CompilerDriver().run("file-name.noo")
 
-    def test_attempts_to_get_inexistent_intermediate_file(self):
-        """Test for error raised if user request intermediate file that doesn't exist."""
-        compiler = Compiler()
-        with pytest.raises(ValueError, match="pass .* not found."):
-            compiler.get_output_of("inexistent-file")
-
     def test_error_incorrect_wrapper_filename(self):
         """Test that error is raised if wrapper does not receive an mlir file."""
         with pytest.raises(ValueError, match="Input is not an MLIR file."):
             WrapperToCatchExceptions.get_output_filename("not-an-mlir-file.txt")
+
+    def test_runtime_error(self):
+        class CompileCXXException:
+            _executable = "clang++"
+            _default_flags = ["-shared", "-fPIC", "-x", "c++"]
+
+            @staticmethod
+            def get_output_filename(infile):
+                return infile.replace(".mlir", ".o")
+
+            def run(infile, **kwargs):
+                contents = """
+#include <stdexcept>
+#include <stdarg.h>
+
+extern "C" {
+  void _mlir_ciface_jit_cpp_exception_test();
+  void setup(int, char**);
+  void teardown();
+}
+
+void setup(int argc, char** argv) {}
+void teardown() {}
+
+void _mlir_ciface_jit_cpp_exception_test() {
+  throw std::runtime_error("Hello world");
+}
+             """
+                exe = CompileCXXException._executable
+                flags = CompileCXXException._default_flags
+                outfile = CompileCXXException.get_output_filename(infile)
+                command = [exe] + flags + ["-o", outfile, "-"]
+                pipe = subprocess.Popen(command, stdin=subprocess.PIPE)
+                pipe.communicate(input=bytes(contents, "UTF-8"))
+                return outfile
+
+        with tempfile.TemporaryDirectory() as workspace:
+            wrapper = WrapperToCatchExceptions(0, "jit_cpp_exception_test")
+            wrapper_object = wrapper.run(workspace + "/foo.mlir")
+
+            @qjit(
+                pipelines=[CompileCXXException, CompilerDriver([wrapper_object])],
+            )
+            def cpp_exception_test():
+                return None
+
+            with pytest.raises(RuntimeError, match="Hello world"):
+                cpp_exception_test()
 
 
 # pylint: disable=too-few-public-methods
@@ -187,6 +230,11 @@ class TestCompilerState:
         files = os.listdir(directory)
         # The directory is non-empty. Should at least contain the original .mlir file
         assert files
+
+    def test_attempts_to_get_inexistent_intermediate_file(self):
+        """Test that None is returned if output requested is non-existent."""
+        compiler = Compiler()
+        assert None == compiler.get_output_of("inexistent-file")
 
     def test_workspace_temporary(self):
         """Test temporary directory has been modified with folder containing intermediate results"""

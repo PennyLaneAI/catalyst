@@ -551,8 +551,10 @@ class Compiler:
         """
         try:
             fname = self._get_output_file_of(pipeline)
-        except AttributeError as e:
-            raise ValueError(f"Output for pass {pipeline} not found.") from e
+        except AttributeError:
+            return None
+        if fname is None:
+            return None
         with open(fname, "r", encoding="utf-8") as f:
             txt = f.read()
         return txt
