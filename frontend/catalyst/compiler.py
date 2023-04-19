@@ -289,7 +289,7 @@ class WrapperToCatchExceptions:
             raise ValueError("Input is not an MLIR file.")
         return infile.replace(".mlir", ".wrap.o")
 
-    def run(self, infile, outfile=None, flags=None, options=None):
+    def run(self, infile, outfile=None, options=None):
         """Compile code to generate a wrapper around the user's program."""
         template = """
 #define PY_SSIZE_T_CLEAN

@@ -94,7 +94,9 @@ class TestCompilerErrors:
     def test_link_fail_exception(self):
         """Test that an exception is raised when all compiler possibilities are exhausted."""
         with pytest.raises(EnvironmentError, match="Unable to link .*"):
-            with pytest.warns(UserWarning, match="Compiler c99 failed during the execution of command"):
+            with pytest.warns(
+                UserWarning, match="Compiler c99 failed during the execution of command"
+            ):
                 CompilerDriver().run("in.o", fallback_compilers=["c99"])
 
     def test_lower_mhlo_input_validation(self):
@@ -139,6 +141,7 @@ class TestCompilerErrors:
             compiler.get_output_of("inexistent-file")
 
     def test_error_incorrect_wrapper_filename(self):
+        """Test that error is raised if wrapper does not receive an mlir file."""
         with pytest.raises(ValueError, match="Input is not an MLIR file."):
             WrapperToCatchExceptions.get_output_filename("not-an-mlir-file.txt")
 
