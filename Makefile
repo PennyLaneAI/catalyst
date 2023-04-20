@@ -90,7 +90,7 @@ clean-all:
 .PHONY: coverage coverage-frontend coverage-runtime
 coverage: coverage-frontend coverage-runtime
 
-coverage-frontend: | frontend
+coverage-frontend:
 	@echo "Generating coverage report for the frontend"
 	$(PYTHON) pytest frontend/test/pytest -n auto --cov=catalyst --tb=native --cov-report=$(COVERAGE_REPORT)
 
