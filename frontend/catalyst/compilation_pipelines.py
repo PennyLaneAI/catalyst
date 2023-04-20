@@ -594,15 +594,20 @@ class JAX_QJIT:
 
             return catalyst.grad(self.qfunc, argnum=all_diff_args)(*args, **kwargs)
 
+        # Here we define the signature for the new QJIT object explicitly, rather than relying on
+        # functools.wrap, in order to guarantee compilation is triggered on instantiation.
+        # The signature of the original QJIT object is guaranteed to be defined by now, located
+        # in QJIT.c_sig, however we don't update the original function with these annotations.
         annotations = {}
+        updated_params = []
         signature = inspect.signature(self.qfunc)
         for idx, (arg_name, param) in enumerate(signature.parameters.items()):
-            param._annotation = self.qfunc.c_sig[idx]
-            annotations[arg_name] = param._annotation
+            annotations[arg_name] = self.qfunc.c_sig[idx]
+            updated_params.append(param.replace(annotation=annotations[arg_name]))
 
         deriv_wrapper.__name__ = "deriv_" + self.qfunc.__name__
         deriv_wrapper.__annotations__ = annotations
-        deriv_wrapper.__signature__ = signature
+        deriv_wrapper.__signature__ = signature.replace(parameters=updated_params)
 
         self._deriv_qfunc = QJIT(deriv_wrapper, self.qfunc.compile_options)
         return self._deriv_qfunc
