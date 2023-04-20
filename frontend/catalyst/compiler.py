@@ -26,7 +26,6 @@ import warnings
 from io import TextIOWrapper
 from typing import Optional, List, Any
 from dataclasses import dataclass
-from jinja2 import Template
 
 from catalyst._configuration import INSTALLED
 
@@ -291,37 +290,39 @@ class WrapperToCatchExceptions:
 
     def run(self, infile, outfile=None, options=None):
         """Compile code to generate a wrapper around the user's program."""
-        template = """
+        name = self.name
+        params = [f"void* arg{x}" for x in range(self.params)]
+        args = [f"arg{x}" for x in range(self.params)]
+        params_string = ", ".join(params)
+        args_string = ", ".join(args)
+        template = f"""
 #define PY_SSIZE_T_CLEAN
 #include <Python.h>
 #include <stdexcept>
 #include <stdarg.h>
 
-extern "C" {
-  extern void _mlir_ciface_{{name}} ({% for variable in range(variables) %}void*{% if not loop.last %}, {% endif %}{% endfor %});
-  void wrapper_mlir_ciface_{{name}} ({% for variable in range(variables) %}void*{% if not loop.last %}, {% endif %}{% endfor %});
-}
+extern "C" {{
+  extern void _mlir_ciface_{name} ({ params_string });
+  void wrapper_mlir_ciface_{name} ({ params_string });
+}}
 
-void wrapper_mlir_ciface_{{name}} ({% for variable in range(variables) %}void *arg{{variable}}{% if not loop.last %}, {% endif %}{% endfor %}) {
-  try {
-    _mlir_ciface_{{name}} ({% for variable in range(variables) %}arg{{variable}}{% if not loop.last %}, {% endif %}{% endfor %});
-  } catch (const std::exception &ex) {
+void wrapper_mlir_ciface_{name} ({ params_string }) {{
+  try {{
+    _mlir_ciface_{name} ({ args_string });
+  }} catch (const std::exception &ex) {{
     PyErr_SetString(PyExc_RuntimeError, ex.what());
-  } catch (const std::logic_error &le) {
+  }} catch (const std::logic_error &le) {{
     PyErr_SetString(PyExc_RuntimeError, le.what());
-  } catch (const std::range_error &re) {
+  }} catch (const std::range_error &re) {{
     PyErr_SetString(PyExc_RuntimeError, re.what());
-  }
-}
+  }}
+}}
         """
-        data = {"variables": self.params, "name": self.name}
-        j2_template = Template(template)
-        cooked_template = j2_template.render(data)
         outfile = self.get_output_filename(infile)
         command = [self._executable] + self._default_flags + ["-c", "-o", outfile, "-"]
         run_writing_command(command, options)
         with subprocess.Popen(command, stdin=subprocess.PIPE) as pipe:
-            pipe.communicate(input=bytes(cooked_template, "UTF-8"))
+            pipe.communicate(input=bytes(template, "UTF-8"))
         return outfile
 
 
