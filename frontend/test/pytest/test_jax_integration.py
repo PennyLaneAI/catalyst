@@ -21,7 +21,7 @@ import jax.numpy as jnp
 import pennylane as qml
 import pytest
 
-from catalyst import qjit
+from catalyst import measure, qjit
 
 
 class TestJAXJIT:
@@ -102,6 +102,26 @@ class TestJAXJIT:
 
         result = cost_fn(jnp.array([0.1, 0.2, 0.3]), jnp.array([0.1, 0.2]))
         assert jnp.allclose(result, 1.9656349516612208)
+
+    def test_multiple_calls(self):
+        """Test a jax.jit function which repeatedly calls a qjit function."""
+
+        @qjit
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def circuit(x):
+            qml.RY(x, wires=0)
+            return jnp.asarray(measure(0), dtype=float)  # float required for derivative definition
+
+        @jax.jit
+        def cost_fn(x, y):
+            m1 = circuit(x)
+            m2 = circuit(y)
+            return m1 == m2
+
+        result1 = cost_fn(0.0, 0.0)
+        result2 = cost_fn(0.0, jnp.pi)
+        assert result1 == True
+        assert result2 == False
 
 
 class TestJAXGrad:
