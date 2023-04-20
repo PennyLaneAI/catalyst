@@ -570,25 +570,6 @@ class JAX_QJIT:
     """
 
     def __init__(self, qfunc):
-        annotations = {}
-        signature = inspect.signature(qfunc)
-        for idx, (arg_name, param) in enumerate(signature.parameters.items()):
-            param._annotation = qfunc.c_sig[idx]
-            annotations[arg_name] = param._annotation
-
-        def deriv_wrapper(*args, **kwargs):
-            # Only consider differentiable arguments (i.e. of type floating point).
-            all_diff_args = [i for i in range(len(args)) if args[i].dtype.kind == "f"]
-
-            return catalyst.grad(qfunc, argnum=all_diff_args)(*args, **kwargs)
-
-        deriv_wrapper.__name__ = "deriv_" + qfunc.__name__
-        deriv_wrapper.__annotations__ = annotations
-        deriv_wrapper.__signature__ = signature
-
-        self.qfunc = qfunc
-        self.deriv_qfunc = QJIT(deriv_wrapper, qfunc.compile_options)
-
         @jax.custom_jvp
         def jaxed_qfunc(*args, **kwargs):
             results = self.wrap_callback(qfunc, *args, **kwargs)
@@ -596,9 +577,35 @@ class JAX_QJIT:
                 results = results[0]
             return results
 
+        self.qfunc = qfunc
+        self.jaxed_qfunc = jaxed_qfunc
+        self._deriv_qfunc = None  # compiled on demand
         jaxed_qfunc.defjvp(self.compute_jvp)
 
-        self.jaxed_qfunc = jaxed_qfunc
+    @property
+    def deriv_qfunc(self):
+        """Compile a function computing the derivate of the wrapped QJIT function."""
+        if self._deriv_qfunc is not None:
+            return self._deriv_qfunc
+
+        def deriv_wrapper(*args, **kwargs):
+            # Only consider differentiable arguments (i.e. of type floating point).
+            all_diff_args = [i for i in range(len(args)) if args[i].dtype.kind == "f"]
+
+            return catalyst.grad(self.qfunc, argnum=all_diff_args)(*args, **kwargs)
+
+        annotations = {}
+        signature = inspect.signature(self.qfunc)
+        for idx, (arg_name, param) in enumerate(signature.parameters.items()):
+            param._annotation = self.qfunc.c_sig[idx]
+            annotations[arg_name] = param._annotation
+
+        deriv_wrapper.__name__ = "deriv_" + self.qfunc.__name__
+        deriv_wrapper.__annotations__ = annotations
+        deriv_wrapper.__signature__ = signature
+
+        self._deriv_qfunc = QJIT(deriv_wrapper, self.qfunc.compile_options)
+        return self._deriv_qfunc
 
     @staticmethod
     def wrap_callback(qfunc, *args, **kwargs):
@@ -618,8 +625,9 @@ class JAX_QJIT:
                 continue
             for res_idx in range(len(results)):
                 deriv_idx = arg_idx * len(results) + res_idx
+                num_axes = 0 if tangents[arg_idx].ndim == 0 else 1
                 jvp = jnp.tensordot(
-                    jnp.transpose(derivatives[deriv_idx]), tangents[arg_idx], axes=([-1], [0])
+                    jnp.transpose(derivatives[deriv_idx]), tangents[arg_idx], axes=num_axes
                 )
                 jvps[res_idx] = jvps[res_idx] + jvp
 

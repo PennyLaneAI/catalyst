@@ -110,7 +110,7 @@ class TestJAXJIT:
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def circuit(x):
             qml.RY(x, wires=0)
-            return jnp.asarray(measure(0), dtype=float)  # float required for derivative definition
+            return measure(0)
 
         @jax.jit
         def cost_fn(x, y):
@@ -227,6 +227,26 @@ class TestJAXGrad:
 
         result = cost_fn(jnp.array([0.1, 0.2, 0.3]), 3)
         assert jnp.allclose(result, jnp.array([-1.34682245, -0.00432698, -1.2855136]))
+
+    def test_multiple_calls(self):
+        """Test a jax.jit function which repeatedly calls a qjit function."""
+
+        @qjit
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def circuit(x):
+            qml.RY(x, wires=0)
+            return jnp.asarray(measure(0), dtype=float)
+
+        @jax.grad
+        def cost_fn(x, y):
+            m1 = circuit(x)
+            m2 = circuit(y)
+            return m1 + m2
+
+        result1 = cost_fn(0.0, 0.0)
+        result2 = cost_fn(0.0, jnp.pi)
+        assert jnp.allclose(result1, 0.0)
+        assert jnp.allclose(result2, 0.0)
 
 
 if __name__ == "__main__":
