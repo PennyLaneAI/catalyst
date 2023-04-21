@@ -2,12 +2,52 @@
 
 <h3>New features</h3>
 
-* Support for JAX transformations on top of ``catalyst.qjit``.
+* Catalyst programs can now be used inside of a larger JAX workflow which uses JIT compilation,
+  automatic differentiation, and other JAX transforms.
   [#96](https://github.com/PennyLaneAI/catalyst/pull/96)
 
-  Now supported:
-   * jitting with JAX
-   * first-order differentiation in both forward and reverse mode
+  Note that generally Catalyst should be used to JIT the entire workflow, but sometimes users may
+  wish to delegate only the quantum part of their workflow to Catalyst and let JAX handle the rest
+  (for example due to missing a feature or compatibility issue in Catalyst).
+
+  Examples of newly supported workflows:
+
+   * JIT compilation with JAX:
+
+     ```py
+     @qjit
+     @qml.qnode(dev)
+     def circuit(x):
+         qml.RX(jnp.pi * x[0], wires=0)
+         qml.RY(x[1] ** 2, wires=0)
+         qml.RX(x[1] * x[2], wires=0)
+         return qml.probs(wires=0)
+
+     @jax.jit
+     def cost_fn(weights):
+         x = jnp.sin(weights)
+         return jnp.sum(jnp.cos(circuit(x)) ** 2)
+
+     cost_fn(jnp.array([0.1, 0.2, 0.3]))
+     ```
+
+   * Automatic differentiation with JAX, both in forward and reverse mode, but to first-order only:
+
+     ```py
+     @qjit
+     @qml.qnode(dev)
+     def circuit(x):
+         qml.RX(jnp.pi * x[0], wires=0)
+         qml.RY(x[1] ** 2, wires=0)
+         qml.RX(x[1] * x[2], wires=0)
+         return qml.probs(wires=0)
+
+     def cost_fn(weights):
+         x = jnp.sin(weights)
+         return jnp.sum(jnp.cos(circuit(x)) ** 2)
+
+     jax.grad(cost_fn)(jnp.array([0.1, 0.2, 0.3]))
+     ```
 
 <h3>Improvements</h3>
 
