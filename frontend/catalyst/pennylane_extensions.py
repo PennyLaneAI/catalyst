@@ -311,6 +311,74 @@ def grad(f, *, method=None, h=None, argnum=None):
     return Grad(Function(f), method=method, h=h, argnum=argnum)
 
 
+# pylint: disable=too-few-public-methods
+class JVP:
+
+    def __init__(self, fn, *, method, h, argnum):
+        self.fn = fn
+        self.__name__ = f"jvp.{fn.__name__}"
+        self.method = method
+        self.h = h
+        self.argnum = argnum
+        if self.method != "fd" and not isinstance(self.fn, qml.QNode):
+            raise ValueError(
+                "Only finite difference can compute higher order derivatives "
+                "or gradients of non-QNode functions."
+            )
+
+    def __call__(self, *args, **kwargs):
+        """Specifies that an actual call to the differentiated function.
+        Args:
+            args: the arguments to the differentiated function
+        """
+        TracingContext.check_is_tracing(
+            "catalyst.jvp can only be used from within @qjit decorated code."
+        )
+
+        jaxpr = jax.make_jaxpr(self.fn)(*args)
+
+        if len(jaxpr.eqns) != 1:
+            raise TypeError(f"Expected one-element jaxpr, got {len(jaxpr.eqns)} elements.")
+
+        if jaxpr.eqns[0].primitive != jprim.func_p:
+            raise TypeError(f"Expected jaxpr consisting of a single function call, got "
+                            f"{jaxpr.eqns[0].primitive.name}.")
+
+        return jprim.jvp_p.bind(
+            *args, jaxpr=jaxpr, fn=self, method=self.method, h=self.h, argnum=self.argnum
+        )
+
+
+def jvp(f, *, method=None, h=None, argnum=None):
+    methods = {"fd", "ps", "adj"}
+    if method is None:
+        method = "fd"
+    if method not in methods:
+        raise ValueError(
+            f"Invalid differentiation method '{method}'. "
+            f"Supported methods are: {' '.join(sorted(methods))}"
+        )
+    if method == "fd" and h is None:
+        h = 1e-7
+    if not (h is None or isinstance(h, numbers.Number)):
+        raise ValueError(f"Invalid h value ({h}). None or number was excpected.")
+    if argnum is None:
+        argnum = [0]
+    elif isinstance(argnum, int):
+        argnum = [argnum]
+
+    if isinstance(f, catalyst.compilation_pipelines.QJIT):
+        # Don't generate an extra function when the circuit is already qjitted.
+        f = f.qfunc
+
+    if isinstance(f, qml.QNode):
+        return JVP(f, method=method, h=h, argnum=argnum)
+
+    return JVP(Function(f), method=method, h=h, argnum=argnum)
+
+
+
+# pylint: disable=too-few-public-methods
 class Cond(Operation):
     """PennyLane's conditional operation."""
 

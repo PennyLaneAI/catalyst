@@ -188,6 +188,9 @@ qfor_p.multiple_results = True
 grad_p = jax.core.Primitive("grad")
 grad_p.multiple_results = True
 func_p = jax.core.CallPrimitive("func")
+grad_p.multiple_results = True
+jvp_p = jax.core.Primitive("jvp")
+jvp_p.multiple_results = True
 
 #
 # func
@@ -305,6 +308,37 @@ def _grad_lowering(ctx, *args, jaxpr, fn, method, h, argnum):
         diffArgIndices=diffArgIndices,
         finiteDiffParam=finiteDiffParam,
     ).results
+
+#
+# vjp/jvp
+#
+
+
+@jvp_p.def_impl
+def _jvp_def_impl(ctx, *args, jaxpr, fn, method, h, argnum):  # pragma: no cover
+    raise NotImplementedError()
+
+
+@jvp_p.def_abstract_eval
+# pylint: disable=unused-argument
+def _jvp_abstract(*args, jaxpr, fn, method, h, argnum):
+    """This function is called with abstract arguments for tracing."""
+    raise NotImplementedError()
+
+
+def _jvp_lowering(ctx, *args, jaxpr, fn, method, h, argnum):
+    """Lowering function to jvp.
+    Args:
+        ctx: the MLIR context
+        args: the points in the function in which we are to calculate the derivative
+        jaxpr: the jaxpr representation of the grad op
+        fn: the function to be differentiated
+        method: the method used for differentiation
+        h: the difference for finite difference. May be None when fn is not finite difference.
+        argnum: argument indices which define over which arguments to
+            differentiate.
+    """
+    return NotImplementedError()
 
 
 #
@@ -1321,3 +1355,4 @@ mlir.register_lowering(qwhile_p, _qwhile_lowering)
 mlir.register_lowering(qfor_p, _qfor_lowering)
 mlir.register_lowering(grad_p, _grad_lowering)
 mlir.register_lowering(func_p, _func_lowering)
+mlir.register_lowering(jvp_p, _jvp_lowering)
