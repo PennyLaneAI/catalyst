@@ -229,7 +229,7 @@ class TestJAXGrad:
         assert jnp.allclose(result, jnp.array([-1.34682245, -0.00432698, -1.2855136]))
 
     def test_multiple_calls(self):
-        """Test a jax.jit function which repeatedly calls a qjit function."""
+        """Test a jax.grad function which repeatedly calls a qjit function."""
 
         @qjit
         @qml.qnode(qml.device("lightning.qubit", wires=1))
@@ -247,6 +247,26 @@ class TestJAXGrad:
         result2 = cost_fn(0.0, jnp.pi)
         assert jnp.allclose(result1, 0.0)
         assert jnp.allclose(result2, 0.0)
+
+    def test_efficient_Jacobian(self):
+        """Test a jax.grad function does not compute Jacobians for arguments not in argnum."""
+
+        @qjit
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def circuit(x: float, y: float):
+            qml.RX(x, wires=0)
+            qml.RY(y, wires=0)
+            return qml.expval(qml.PauliZ(0))
+
+        @partial(jax.grad, argnums=0)
+        def cost_fn(x, y):
+            return circuit(x, y)
+
+        assert jnp.allclose(cost_fn(0.1, 0.2), -0.09784339500725572)
+
+        assert len(circuit.jaxed_qfunc.deriv_qfuncs) == 1
+        assert "0" in circuit.jaxed_qfunc.deriv_qfuncs
+        assert len(circuit.jaxed_qfunc.deriv_qfuncs["0"].jaxpr.out_avals) == 1
 
 
 if __name__ == "__main__":

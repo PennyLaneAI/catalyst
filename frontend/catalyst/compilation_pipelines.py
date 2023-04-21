@@ -578,21 +578,21 @@ class JAX_QJIT:
             return results
 
         self.qfunc = qfunc
+        self.deriv_qfuncs = {}
         self.jaxed_qfunc = jaxed_qfunc
-        self._deriv_qfunc = None  # compiled on demand
         jaxed_qfunc.defjvp(self.compute_jvp)
 
-    @property
-    def deriv_qfunc(self):
-        """Compile a function computing the derivate of the wrapped QJIT function."""
-        if self._deriv_qfunc is not None:
-            return self._deriv_qfunc
+    @staticmethod
+    def wrap_callback(qfunc, *args, **kwargs):
+        """Wrap a QJIT function inside a jax host callback."""
+        return jax.pure_callback(qfunc, qfunc.jaxpr.out_avals, *args, vectorized=False, **kwargs)
 
-        def deriv_wrapper(*args, **kwargs):
-            # Only consider differentiable arguments (i.e. of type floating point).
-            all_diff_args = [i for i in range(len(args)) if args[i].dtype.kind == "f"]
+    def get_derivative_qfunc(self, argnums):
+        """Compile a function computing the derivate of the wrapped QJIT with the given argnums."""
 
-            return catalyst.grad(self.qfunc, argnum=all_diff_args)(*args, **kwargs)
+        argnum_key = "".join(str(idx) for idx in argnums)
+        if argnum_key in self.deriv_qfuncs:
+            return self.deriv_qfuncs[argnum_key]
 
         # Here we define the signature for the new QJIT object explicitly, rather than relying on
         # functools.wrap, in order to guarantee compilation is triggered on instantiation.
@@ -605,35 +605,39 @@ class JAX_QJIT:
             annotations[arg_name] = self.qfunc.c_sig[idx]
             updated_params.append(param.replace(annotation=annotations[arg_name]))
 
+        def deriv_wrapper(*args, **kwargs):
+            return catalyst.grad(self.qfunc, argnum=argnums)(*args, **kwargs)
+
         deriv_wrapper.__name__ = "deriv_" + self.qfunc.__name__
         deriv_wrapper.__annotations__ = annotations
         deriv_wrapper.__signature__ = signature.replace(parameters=updated_params)
 
-        self._deriv_qfunc = QJIT(deriv_wrapper, self.qfunc.compile_options)
-        return self._deriv_qfunc
-
-    @staticmethod
-    def wrap_callback(qfunc, *args, **kwargs):
-        """Wrap a QJIT function inside a jax host callback."""
-        return jax.pure_callback(qfunc, qfunc.jaxpr.out_avals, *args, vectorized=False, **kwargs)
+        self.deriv_qfuncs[argnum_key] = QJIT(deriv_wrapper, self.qfunc.compile_options)
+        return self.deriv_qfuncs[argnum_key]
 
     def compute_jvp(self, primals, tangents):
         """Compute the set of results and JVPs for a QJIT function."""
+
+        # Optimization: Do not compute Jacobians for arguments which do not participate in
+        #               differentiation.
+        # TODO: replace with symbolic zero support
+        argnums = []
+        for idx, tangent in enumerate(tangents):
+            if qml.math.is_abstract(tangent, like="jax") or jnp.any(jnp.atleast_1d(tangent) != 0.0):
+                argnums.append(idx)
+
         results = self.wrap_callback(self.qfunc, *primals)
-        derivatives = self.wrap_callback(self.deriv_qfunc, *primals)
+        derivatives = self.wrap_callback(self.get_derivative_qfunc(argnums), *primals)
 
         jvps = [jnp.zeros_like(results[res_idx]) for res_idx in range(len(results))]
-        for arg_idx, primal in enumerate(primals):
-            # Skip arguments which are not differentiable.
-            if primal.dtype.kind != "f":
-                assert jnp.allclose(jnp.sum(tangents[arg_idx]), 0.0)
+        for arg_idx, tangent in enumerate(tangents):
+            # Skip JVP for arguments which do not participate in differentiation.
+            if arg_idx not in argnums:
                 continue
             for res_idx in range(len(results)):
                 deriv_idx = arg_idx * len(results) + res_idx
-                num_axes = 0 if tangents[arg_idx].ndim == 0 else 1
-                jvp = jnp.tensordot(
-                    jnp.transpose(derivatives[deriv_idx]), tangents[arg_idx], axes=num_axes
-                )
+                num_axes = 0 if tangent.ndim == 0 else 1
+                jvp = jnp.tensordot(jnp.transpose(derivatives[deriv_idx]), tangent, axes=num_axes)
                 jvps[res_idx] = jvps[res_idx] + jvp
 
         if len(results) == 1:
