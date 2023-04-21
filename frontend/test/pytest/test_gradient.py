@@ -12,15 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Test built-in differentiation support in Catalyst."""
+
 import jax
 import numpy as np
 import pennylane as qml
 import pytest
 from jax import numpy as jnp
 
-from catalyst import CompileError, cond, for_loop, grad, qjit
-
 import catalyst.utils.calculate_grad_shape as infer
+from catalyst import CompileError, cond, for_loop, grad, qjit
 
 
 class TestGradShape:
@@ -649,6 +650,43 @@ def test_jax_consts(inp):
         return h(params)
 
     assert np.allclose(compile_grad(jnp.array(inp)), interpret_grad(inp))
+
+
+def test_non_float_arg():
+    """Test a function which attempts to differentiate non-floating point arguments."""
+
+    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    def circuit(x: complex, y: float):
+        qml.RX(jnp.real(x), wires=0)
+        qml.RY(y, wires=0)
+        return qml.expval(qml.PauliZ(0))
+
+    @qjit
+    def cost_fn(x, y):
+        return grad(circuit)(x, y)
+
+    with pytest.raises(
+        TypeError, match="only supports differentiation on floating-point arguments"
+    ):
+        cost_fn(1j, 2.0)
+
+
+def test_non_float_res():
+    """Test a function which attempts to differentiate non-floating point results."""
+
+    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    def circuit(x: float, y: float):
+        qml.RX(x, wires=0)
+        qml.RY(y, wires=0)
+        return qml.expval(qml.PauliZ(0))
+
+    @qjit
+    @grad
+    def cost_fn(x, y):
+        return 1j * circuit(x, y)
+
+    with pytest.raises(TypeError, match="only supports differentiation on floating-point results"):
+        cost_fn(1.0, 2.0)
 
 
 if __name__ == "__main__":

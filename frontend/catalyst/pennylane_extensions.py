@@ -142,7 +142,7 @@ class Grad:
         fn (Callable): the function to differentiate
         method (str): the method used for differentiation
         h (float): the step-size value for the finite difference method
-        argnum (int): the argument indices which define over which arguments to differentiate
+        argnum (list[int]): the argument indices which define over which arguments to differentiate
 
     Raises:
         ValueError: Higher-order derivatives and derivatives of non-QNode functions can only be
@@ -175,6 +175,19 @@ class Grad:
         assert (
             jaxpr.eqns[0].primitive == jprim.func_p
         ), "Expected jaxpr consisting of a single function call."
+
+        for pos, arg in enumerate(jaxpr.in_avals):
+            if arg.dtype.kind != "f" and pos in self.argnum:
+                raise TypeError(
+                    "Catalyst.grad only supports differentiation on floating-point "
+                    f"arguments, got '{arg.dtype}' at position {pos}."
+                )
+        for pos, res in enumerate(jaxpr.out_avals):
+            if res.dtype.kind != "f":
+                raise TypeError(
+                    "Catalyst.grad only supports differentiation on floating-point "
+                    f"results, got '{res.dtype}' at position {pos}."
+                )
 
         if self.method != "fd":
             qnode_jaxpr = jaxpr.eqns[0].params["call_jaxpr"]
