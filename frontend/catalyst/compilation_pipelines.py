@@ -588,7 +588,7 @@ class JAX_QJIT:
         return jax.pure_callback(qfunc, qfunc.jaxpr.out_avals, *args, vectorized=False, **kwargs)
 
     def get_derivative_qfunc(self, argnums):
-        """Compile a function computing the derivate of the wrapped QJIT with the given argnums."""
+        """Compile a function computing the derivative of the wrapped QJIT for the given argnums."""
 
         argnum_key = "".join(str(idx) for idx in argnums)
         if argnum_key in self.deriv_qfuncs:
