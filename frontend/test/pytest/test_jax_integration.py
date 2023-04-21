@@ -124,7 +124,7 @@ class TestJAXJIT:
         assert result2 == False
 
 
-class TestJAXGrad:
+class TestJAXAD:
     """Test QJIT compatibility with JAX differentiation."""
 
     def test_simple_circuit(self):
@@ -187,6 +187,35 @@ class TestJAXGrad:
         assert len(result) == 2
         assert jnp.allclose(result[0], jnp.array([-0.6027582, -0.00797699, -0.03839391]))
         assert jnp.allclose(result[1], jnp.array([0.0, -0.05759086]))
+
+    def test_jacobian(self):
+        """Test a circuit with vector return type using jax.jacobian on top of qjit."""
+
+        @qjit
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def circuit(x: jax.ShapedArray((3,), dtype=float), y: jax.ShapedArray((2,), dtype=float)):
+            qml.RX(jnp.pi * x[0], wires=0)
+            qml.RY(x[1] ** 2, wires=0)
+            qml.RX(y[1] * x[2], wires=0)
+            return qml.probs(wires=0)
+
+        @partial(jax.jacobian, argnums=[0, 1])
+        def cost_fn(x, y):
+            result = circuit(x, y)
+            return jnp.cos(result) ** 2
+
+        result = cost_fn(jnp.array([0.1, 0.2, 0.3]), jnp.array([0.1, 0.2]))
+        assert len(result) == 2
+        assert jnp.allclose(
+            result[0],
+            jnp.array(
+                [
+                    [5.37094965e-01, 7.10799603e-03, 3.42113553e-02],
+                    [-4.00958470e-02, -5.30634506e-04, -2.55398646e-03],
+                ]
+            ),
+        )
+        assert jnp.allclose(result[1], jnp.array([[0.0, 0.05131703], [0.0, -0.00383098]]))
 
     def test_without_precompilation(self):
         """Test a function without type hints (pre-compilation) using jax.grad on top of qjit."""
