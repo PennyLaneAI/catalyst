@@ -330,7 +330,7 @@ def _jvp_abstract(*args, jaxpr, fn, method, h, argnum):
     return tuple(transformed_signature.get_results())
 
 
-def _jvp_lowering(ctx, *args, jaxpr, fn, method, h, argnum, tangent):
+def _jvp_lowering(ctx, *args, jaxpr, fn, method, h, argnum):
     mlir_ctx = ctx.module_context.context
     finiteDiffParam = None
     if h:

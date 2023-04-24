@@ -124,9 +124,9 @@ def JVPOp : Gradient_Op<"jvp", [DeclareOpInterfaceMethods<CallOpInterface>,
     let summary = "Compute the jvp of a function.";
 
     let arguments = (ins
-        Variadic<AnyType>:$operands,
         StrAttr:$method,
         FlatSymbolRefAttr:$callee,
+        Variadic<AnyType>:$operands,
         OptionalAttr<AnyIntElementsAttr>:$diffArgIndices,
         OptionalAttr<Builtin_FloatAttr>:$finiteDiffParam
     );

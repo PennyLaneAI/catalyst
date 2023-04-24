@@ -347,7 +347,6 @@ class JVP:
 
         return jprim.jvp_p.bind(
             *args, jaxpr=jaxpr, fn=self, method=self.method, h=self.h, argnum=self.argnum,
-            tangent=self.tangent
         )
 
 
@@ -373,10 +372,8 @@ def jvp(f, tangent, *, method=None, h=None, argnum=None):
         # Don't generate an extra function when the circuit is already qjitted.
         f = f.qfunc
 
-    if isinstance(f, qml.QNode):
-        return JVP(f, tangent=tangent, method=method, h=h, argnum=argnum)
-
-    return JVP(Function(f), tangent=tangent, method=method, h=h, argnum=argnum)
+    return JVP(f if isinstance(f, qml.QNode) else Function(f),
+               tangent=tangent, method=method, h=h, argnum=argnum)
 
 
 
