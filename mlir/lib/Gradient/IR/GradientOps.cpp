@@ -28,7 +28,7 @@ using namespace mlir;
 using namespace catalyst::gradient;
 
 //===----------------------------------------------------------------------===//
-// CallOpInterface
+// GradOp, CallOpInterface
 //===----------------------------------------------------------------------===//
 
 CallInterfaceCallable GradOp::getCallableForCallee() { return getCalleeAttr(); }
@@ -36,7 +36,7 @@ CallInterfaceCallable GradOp::getCallableForCallee() { return getCalleeAttr(); }
 Operation::operand_range GradOp::getArgOperands() { return getOperands(); }
 
 //===----------------------------------------------------------------------===//
-// SymbolUserOpInterface
+// GradOp, SymbolUserOpInterface
 //===----------------------------------------------------------------------===//
 
 LogicalResult GradOp::verifySymbolUses(SymbolTableCollection &symbolTable)
@@ -116,3 +116,44 @@ std::vector<uint64_t> GradOp::compDiffArgIndices()
     }
     return diffArgIndices;
 }
+
+//===----------------------------------------------------------------------===//
+// JVPp, CallOpInterface
+//===----------------------------------------------------------------------===//
+
+CallInterfaceCallable JVPOp::getCallableForCallee() { return getCalleeAttr(); }
+
+Operation::operand_range JVPOp::getArgOperands() { return getOperands(); }
+
+//===----------------------------------------------------------------------===//
+// JVPp, SymbolUserOpInterface
+//===----------------------------------------------------------------------===//
+
+LogicalResult JVPOp::verifySymbolUses(SymbolTableCollection &symbolTable)
+{
+    return success();
+}
+
+//===----------------------------------------------------------------------===//
+// JVPOp Extra methods
+//===----------------------------------------------------------------------===//
+
+LogicalResult JVPOp::verify()
+{
+    StringRef method = this->getMethod();
+    if (method != "fd" && method != "ps" && method != "adj")
+        return emitOpError("got invalid differentiation method: ") << method;
+    return success();
+}
+
+std::vector<uint64_t> JVPOp::compDiffArgIndices()
+{
+    // By default only the first argument is differentiated, otherwise gather indices.
+    std::vector<size_t> diffArgIndices{0};
+    if (getDiffArgIndices().has_value()) {
+        auto range = getDiffArgIndicesAttr().getValues<size_t>();
+        diffArgIndices = std::vector<size_t>(range.begin(), range.end());
+    }
+    return diffArgIndices;
+}
+

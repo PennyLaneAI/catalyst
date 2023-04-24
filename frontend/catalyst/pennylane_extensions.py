@@ -314,12 +314,13 @@ def grad(f, *, method=None, h=None, argnum=None):
 # pylint: disable=too-few-public-methods
 class JVP:
 
-    def __init__(self, fn, *, method, h, argnum):
+    def __init__(self, fn, tangent, *, method, h, argnum):
         self.fn = fn
         self.__name__ = f"jvp.{fn.__name__}"
         self.method = method
         self.h = h
         self.argnum = argnum
+        self.tangent = tangent
         if self.method != "fd" and not isinstance(self.fn, qml.QNode):
             raise ValueError(
                 "Only finite difference can compute higher order derivatives "
@@ -345,11 +346,12 @@ class JVP:
                             f"{jaxpr.eqns[0].primitive.name}.")
 
         return jprim.jvp_p.bind(
-            *args, jaxpr=jaxpr, fn=self, method=self.method, h=self.h, argnum=self.argnum
+            *args, jaxpr=jaxpr, fn=self, method=self.method, h=self.h, argnum=self.argnum,
+            tangent=self.tangent
         )
 
 
-def jvp(f, *, method=None, h=None, argnum=None):
+def jvp(f, tangent, *, method=None, h=None, argnum=None):
     methods = {"fd", "ps", "adj"}
     if method is None:
         method = "fd"
@@ -372,9 +374,9 @@ def jvp(f, *, method=None, h=None, argnum=None):
         f = f.qfunc
 
     if isinstance(f, qml.QNode):
-        return JVP(f, method=method, h=h, argnum=argnum)
+        return JVP(f, tangent=tangent, method=method, h=h, argnum=argnum)
 
-    return JVP(Function(f), method=method, h=h, argnum=argnum)
+    return JVP(Function(f), tangent=tangent, method=method, h=h, argnum=argnum)
 
 
 

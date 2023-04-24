@@ -119,6 +119,28 @@ def BackpropOp : Gradient_Op<"backprop", [AttrSizedOperandSegments]> {
 }
 
 
+def JVPOp : Gradient_Op<"jvp", [DeclareOpInterfaceMethods<CallOpInterface>,
+        DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
+    let summary = "Compute the jvp of a function.";
 
+    let arguments = (ins
+        Variadic<AnyType>:$operands,
+        StrAttr:$method,
+        FlatSymbolRefAttr:$callee,
+        OptionalAttr<AnyIntElementsAttr>:$diffArgIndices,
+        OptionalAttr<Builtin_FloatAttr>:$finiteDiffParam
+    );
+    let results = (outs Variadic<AnyTypeOf<[AnyFloat, RankedTensorOf<[AnyFloat]>]>>);
+
+    let hasVerifier = 1;
+
+    let assemblyFormat = [{
+        $method $callee `(` $operands `)` attr-dict `:` functional-type($operands, results)
+    }];
+
+    let extraClassDeclaration = [{
+        std::vector<size_t> compDiffArgIndices();
+    }];
+}
 
 #endif // GRADIENT_OPS

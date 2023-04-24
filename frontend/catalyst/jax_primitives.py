@@ -25,7 +25,7 @@ from jax.interpreters import mlir, xla
 from jaxlib.mlir.dialects._func_ops_gen import CallOp
 from jaxlib.mlir.dialects._mhlo_ops_gen import ConstantOp, ConvertOp
 from mlir_quantum.dialects.arith import IndexCastOp
-from mlir_quantum.dialects.gradient import GradOp
+from mlir_quantum.dialects.gradient import GradOp, JVPOp
 from mlir_quantum.dialects.quantum import (
     AllocOp,
     ComputationalBasisOp,
@@ -323,22 +323,38 @@ def _jvp_def_impl(ctx, *args, jaxpr, fn, method, h, argnum):  # pragma: no cover
 # pylint: disable=unused-argument
 def _jvp_abstract(*args, jaxpr, fn, method, h, argnum):
     """This function is called with abstract arguments for tracing."""
-    raise NotImplementedError()
+    signature = Signature(jaxpr.consts + jaxpr.in_avals, jaxpr.out_avals)
+    offset = len(jaxpr.consts)
+    new_argnum = [num + offset for num in argnum]
+    transformed_signature = calculate_grad_shape(signature, new_argnum)
+    return tuple(transformed_signature.get_results())
 
 
-def _jvp_lowering(ctx, *args, jaxpr, fn, method, h, argnum):
-    """Lowering function to jvp.
-    Args:
-        ctx: the MLIR context
-        args: the points in the function in which we are to calculate the derivative
-        jaxpr: the jaxpr representation of the grad op
-        fn: the function to be differentiated
-        method: the method used for differentiation
-        h: the difference for finite difference. May be None when fn is not finite difference.
-        argnum: argument indices which define over which arguments to
-            differentiate.
-    """
-    return NotImplementedError()
+def _jvp_lowering(ctx, *args, jaxpr, fn, method, h, argnum, tangent):
+    mlir_ctx = ctx.module_context.context
+    finiteDiffParam = None
+    if h:
+        f64 = ir.F64Type.get(mlir_ctx)
+        finiteDiffParam = ir.FloatAttr.get(f64, h)
+    offset = len(jaxpr.consts)
+    new_argnum = [num + offset for num in argnum]
+    argnum_numpy = np.array(new_argnum)
+    diffArgIndices = ir.DenseIntElementsAttr.get(argnum_numpy)
+
+    _func_lowering(ctx, *args, call_jaxpr=jaxpr.eqns[0].params["call_jaxpr"], fn=fn.fn, call=False)
+    symbol_name = mlir_fn_cache[fn.fn]
+    output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
+    flat_output_types = util.flatten(output_types)
+    constants = [ConstantOp(ir.DenseElementsAttr.get(const)).results for const in jaxpr.consts]
+    args_and_consts = constants + list(args)
+    return JVPOp(
+        flat_output_types,
+        ir.StringAttr.get(method),
+        ir.FlatSymbolRefAttr.get(symbol_name),
+        mlir.flatten_lowering_ir_args(args_and_consts),
+        diffArgIndices=diffArgIndices,
+        finiteDiffParam=finiteDiffParam,
+    ).results
 
 
 #
