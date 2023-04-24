@@ -19,7 +19,7 @@ import pennylane as qml
 
 
 # CHECK-NOT: Verification failed
-# CHECK-LABEL: @jit.circuit
+# CHECK-LABEL: @jit_circuit
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=1))
 def circuit(n: int):
@@ -47,7 +47,7 @@ print(circuit.mlir)
 
 
 # CHECK-NOT: Verification failed
-# CHECK-LABEL: func.func public @jit.circuit_outer_scope_reference
+# CHECK-LABEL: func.func public @jit_circuit_outer_scope_reference
 # CHECK-SAME: ([[c1:%[a-zA-Z0-9_]+]]
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=1))
@@ -78,7 +78,7 @@ print(circuit_outer_scope_reference.mlir)
 
 
 # CHECK-NOT: Verification failed
-# CHECK-LABEL: public @jit.circuit_multiple_args
+# CHECK-LABEL: public @jit_circuit_multiple_args
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=1))
 def circuit_multiple_args(n: int):

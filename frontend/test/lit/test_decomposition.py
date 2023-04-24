@@ -52,7 +52,7 @@ def test_decompose_multicontrolledx():
 
     @qjit(target="mlir")
     @qfunc(5, device=dev)
-    # CHECK-LABEL: public @jit.decompose_multicontrolled_x1
+    # CHECK-LABEL: public @jit_decompose_multicontrolled_x1
     def decompose_multicontrolled_x1(theta: float):
         qml.RX(theta, wires=[0])
         # CHECK-NOT: name = "MultiControlledX"
@@ -78,7 +78,7 @@ def test_decompose_multicontrolledx_in_conditional():
 
     @qjit(target="mlir")
     @qfunc(5, device=dev)
-    # CHECK-LABEL: @jit.decompose_multicontrolled_x2
+    # CHECK-LABEL: @jit_decompose_multicontrolled_x2
     def decompose_multicontrolled_x2(theta: float, n: int):
         qml.RX(theta, wires=[0])
 
@@ -110,7 +110,7 @@ def test_decompose_multicontrolledx_in_while_loop():
 
     @qjit(target="mlir")
     @qfunc(5, device=dev)
-    # CHECK-LABEL: @jit.decompose_multicontrolled_x3
+    # CHECK-LABEL: @jit_decompose_multicontrolled_x3
     def decompose_multicontrolled_x3(theta: float, n: int):
         qml.RX(theta, wires=[0])
 
@@ -142,7 +142,7 @@ def test_decompose_multicontrolledx_in_for_loop():
 
     @qjit(target="mlir")
     @qfunc(5, device=dev)
-    # CHECK-LABEL: @jit.decompose_multicontrolled_x4
+    # CHECK-LABEL: @jit_decompose_multicontrolled_x4
     def decompose_multicontrolled_x4(theta: float, n: int):
         qml.RX(theta, wires=[0])
 
@@ -173,7 +173,7 @@ def test_decompose_rot():
 
     @qjit(target="mlir")
     @qfunc(1, device=dev)
-    # CHECK-LABEL: public @jit.decompose_rot
+    # CHECK-LABEL: public @jit_decompose_rot
     def decompose_rot(phi: float, theta: float, omega: float):
         # CHECK-NOT: name = "Rot"
         # CHECK: [[phi:%.+]] = tensor.extract %arg0[] : tensor<f64>
@@ -202,7 +202,7 @@ def test_decompose_s():
 
     @qjit(target="mlir")
     @qfunc(1, device=dev)
-    # CHECK-LABEL: public @jit.decompose_s
+    # CHECK-LABEL: public @jit_decompose_s
     def decompose_s():
         # CHECK-NOT: name="S"
         # CHECK: [[pi_div_2_t:%.+]] = mhlo.constant dense<1.57079{{.+}}> : tensor<f64>
@@ -225,7 +225,7 @@ def test_decompose_qubitunitary():
 
     @qjit(target="mlir")
     @qfunc(1, device=dev)
-    # CHECK-LABEL: public @jit.decompose_qubit_unitary
+    # CHECK-LABEL: public @jit_decompose_qubit_unitary
     def decompose_qubit_unitary(U: jax.core.ShapedArray([2, 2], float)):
         # CHECK-NOT: name = "QubitUnitary"
         # CHECK: name = "Rot"
@@ -244,7 +244,7 @@ def test_decompose_singleexcitationplus():
 
     @qjit(target="mlir")
     @qfunc(2, device=dev)
-    # CHECK-LABEL: public @jit.decompose_singleexcitationplus
+    # CHECK-LABEL: public @jit_decompose_singleexcitationplus
     def decompose_singleexcitationplus(theta: float):
         # CHECK-NOT: name = "SingleExcitationPlus"
         # CHECK: [[a_scalar_tensor_float_2:%.+]] = mhlo.constant dense<2.{{[0]+}}e+00>

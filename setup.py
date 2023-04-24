@@ -13,8 +13,8 @@
 # limitations under the License.
 
 from os import path
-
 from setuptools import setup, find_namespace_packages
+from pybind11.setup_helpers import intree_extensions
 
 with open(path.join("frontend", "catalyst", "_version.py")) as f:
     version = f.readlines()[-1].split()[-1].strip("\"'")
@@ -54,6 +54,11 @@ description = {
     "license": "Apache License 2.0",
 }
 
+intree_extension_list = intree_extensions(["frontend/catalyst/utils/wrapper.cc"])
+for ext in intree_extension_list:
+    ext._add_ldflags(["-lffi"])  # pylint: disable=protected-access
+ext_modules = intree_extension_list
+
 
 setup(
     classifiers=classifiers,
@@ -68,5 +73,6 @@ setup(
     ),
     package_dir={"": "frontend"},
     include_package_data=True,
+    ext_modules=ext_modules,
     **description,
 )

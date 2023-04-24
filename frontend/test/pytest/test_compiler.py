@@ -6,6 +6,7 @@ import os
 import sys
 import warnings
 import tempfile
+import subprocess
 import pytest
 
 import pennylane as qml
@@ -136,6 +137,56 @@ class TestCompilerErrors:
         compiler = Compiler()
         with pytest.raises(ValueError, match="pass .* not found."):
             compiler.get_output_of("inexistent-file")
+
+    def test_runtime_error(self):
+        """Test that an exception is emitted when the runtime raises a C++ exception."""
+
+        class CompileCXXException:
+            """Class that overrides the program to be compiled."""
+
+            _executable = "clang++"
+            _default_flags = ["-shared", "-fPIC", "-x", "c++"]
+
+            @staticmethod
+            def get_output_filename(infile):
+                """Get the name of the output file based on the input file."""
+                return infile.replace(".mlir", ".o")
+
+            # pylint: disable=unused-argument
+            @staticmethod
+            def run(infile, **kwargs):
+                """Run the compilation step."""
+                contents = """
+#include <stdexcept>
+#include <stdarg.h>
+extern "C" {
+  void _catalyst_pyface_jit_cpp_exception_test(void*, void*);
+  void setup(int, char**);
+  void teardown();
+}
+void setup(int argc, char** argv) {}
+void teardown() {}
+void _catalyst_pyface_jit_cpp_exception_test(void*, void*) {
+  throw std::runtime_error("Hello world");
+}
+                """
+                exe = CompileCXXException._executable
+                flags = CompileCXXException._default_flags
+                outfile = CompileCXXException.get_output_filename(infile)
+                command = [exe] + flags + ["-o", outfile, "-"]
+                with subprocess.Popen(command, stdin=subprocess.PIPE) as pipe:
+                    pipe.communicate(input=bytes(contents, "UTF-8"))
+                return outfile
+
+        @qjit(
+            pipelines=[CompileCXXException, CompilerDriver],
+        )
+        def cpp_exception_test():
+            """A function that will be overwritten by CompileCXXException."""
+            return None
+
+        with pytest.raises(RuntimeError, match="Hello world"):
+            cpp_exception_test()
 
 
 # pylint: disable=too-few-public-methods
