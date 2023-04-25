@@ -16,7 +16,7 @@ RUN chmod 0440 /etc/sudoers.d/$USERNAME
 # Image specific instructions: Ensure developer requirements are met.
 # Catalyst will be installed from source from within the running container.
 
-RUN apt-get update && apt-get install -y --no-install-recommends git curl \
+RUN apt-get update && apt-get install -y --no-install-recommends git curl patch \
       make ninja-build clang lld ccache libomp-dev \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
