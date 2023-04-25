@@ -209,7 +209,7 @@ class MLIRToLLVMDialect(PassPipeline):
         # Must be run after -convert-math-to-llvm as it marks math::powf illegal but doesn't convert it.
         "--convert-math-to-libm",
         "--convert-arith-to-llvm",
-        "--convert-memref-to-llvm",
+        "--convert-memref-to-llvm=use-generic-functions",
         "--convert-index-to-llvm",
         "--convert-gradient-to-llvm",
         "--convert-quantum-to-llvm",
