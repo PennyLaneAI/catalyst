@@ -1,0 +1,33 @@
+{
+    "name": "CatalystDev",
+    "build": {
+        "dockerfile": "Dockerfile"
+    },
+    "postCreateCommand": "/bin/bash ./.devcontainer/dev/post-install.sh",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-python.python",
+                "ms-python.vscode-pylance",
+                "ms-python.pylint",
+                "ms-python.isort",
+                "ms-toolsai.jupyter",
+                "ms-vscode.cpptools",
+                "twxs.cmake",
+                "llvm-vs-code-extensions.vscode-mlir",
+                "revng.llvm-ir",
+                "colejcummins.llvm-syntax-highlighting"
+            ],
+            "settings": {
+                "editor.formatOnSave": true,
+                "files.trimTrailingWhitespace": true,
+                "files.insertFinalNewline": true,
+                "files.trimFinalNewlines": true,
+                "python.formatting.provider": "black",
+                "python.linting.pylintEnabled": true,
+                "python.linting.enabled": true,
+                "C_Cpp.default.cppStandard": "c++20"
+            }
+        }
+    }
+}
