@@ -76,7 +76,9 @@ TEST_CASE("Measurement collapse test with 2 wires", "[lightning]")
 
     sim->NamedOperation("Hadamard", {}, {Qs[0]}, false);
     auto m = sim->Measure(Qs[0]);
-    auto &&state = sim->State();
+
+    std::vector<std::complex<double>> state(1U << n);
+    sim->State(std::span{state.data(), state.size()});
 
     // LCOV_EXCL_START
     // This is conditional over the measurement result
@@ -106,7 +108,9 @@ TEST_CASE("Measurement collapse concrete logical qubit difference", "[lightning]
 
     sim->NamedOperation("Hadamard", {}, {Qs[0]}, false);
     sim->Measure(Qs[0]);
-    auto &&state = sim->State();
+
+    std::vector<std::complex<double>> state(1U << n);
+    sim->State(std::span{state.data(), state.size()});
 
     // LCOV_EXCL_START
     bool is_zero = pow(std::abs(std::real(state[0])), 2) + pow(std::abs(std::imag(state[0])), 2) ==
@@ -749,7 +753,8 @@ TEST_CASE("State test with numWires=4", "[lightning]")
     sim->NamedOperation("Hadamard", {}, {Qs[2]}, false);
     sim->NamedOperation("PauliZ", {}, {Qs[3]}, false);
 
-    auto &&state = sim->State();
+    std::vector<std::complex<double>> state(1U << n);
+    sim->State(std::span{state.data(), state.size()});
 
     for (size_t i = 0; i < 16; i++) {
         if (i == 4 || i == 6 || i == 12 || i == 14) {
@@ -775,12 +780,14 @@ TEST_CASE("PartialProbs test with incorrect numWires and numAlloc", "[lightning]
         Qs.push_back(sim->AllocateQubit());
     }
 
-    REQUIRE_THROWS_WITH(sim->PartialProbs({Qs[0], Qs[1], Qs[2], Qs[3], Qs[0]}),
+    std::vector<double> probs(1);
+
+    REQUIRE_THROWS_WITH(sim->PartialProbs(std::span{probs}, {Qs[0], Qs[1], Qs[2], Qs[3], Qs[0]}),
                         Catch::Contains("Invalid number of wires"));
 
     sim->ReleaseQubit(Qs[0]);
 
-    REQUIRE_THROWS_WITH(sim->PartialProbs({Qs[0]}),
+    REQUIRE_THROWS_WITH(sim->PartialProbs(std::span{probs}, {Qs[0]}),
                         Catch::Contains("Invalid given wires to measure"));
 }
 
@@ -801,11 +808,17 @@ TEST_CASE("Probs and PartialProbs tests with numWires=0-4", "[lightning]")
     sim->NamedOperation("Hadamard", {}, {Qs[2]}, false);
     sim->NamedOperation("PauliZ", {}, {Qs[3]}, false);
 
-    auto &&probs0 = sim->PartialProbs(std::vector<QubitIdType>{});
-    auto &&probs1 = sim->PartialProbs(std::vector<QubitIdType>{Qs[2]});
-    auto &&probs2 = sim->PartialProbs(std::vector<QubitIdType>{Qs[0], Qs[3]});
-    auto &&probs3 = sim->PartialProbs(Qs);
-    auto &&probs4 = sim->Probs();
+    std::vector<double> probs0(1);
+    std::vector<double> probs1(2);
+    std::vector<double> probs2(4);
+    std::vector<double> probs3(16);
+    std::vector<double> probs4(16);
+
+    sim->PartialProbs(std::span{probs0}, std::vector<QubitIdType>{});
+    sim->PartialProbs(std::span{probs1}, std::vector<QubitIdType>{Qs[2]});
+    sim->PartialProbs(std::span{probs2}, std::vector<QubitIdType>{Qs[0], Qs[3]});
+    sim->PartialProbs(std::span{probs3}, Qs);
+    sim->Probs(std::span{probs4});
 
     CHECK(probs0.size() == 1);
     CHECK(probs0[0] == Approx(1.0));
@@ -843,12 +856,15 @@ TEST_CASE("PartialSample test with incorrect numWires and numAlloc", "[lightning
         Qs.push_back(sim->AllocateQubit());
     }
 
-    REQUIRE_THROWS_WITH(sim->PartialSample({Qs[0], Qs[1], Qs[2], Qs[3], Qs[0]}, 4),
-                        Catch::Contains("Invalid number of wires"));
+    std::vector<double> samples(1);
+
+    REQUIRE_THROWS_WITH(
+        sim->PartialSample(std::span{samples}, {Qs[0], Qs[1], Qs[2], Qs[3], Qs[0]}, 4),
+        Catch::Contains("Invalid number of wires"));
 
     sim->ReleaseQubit(Qs[0]);
 
-    REQUIRE_THROWS_WITH(sim->PartialSample({Qs[0]}, 4),
+    REQUIRE_THROWS_WITH(sim->PartialSample(std::span{samples}, {Qs[0]}, 4),
                         Catch::Contains("Invalid given wires to measure"));
 }
 
@@ -864,12 +880,16 @@ TEST_CASE("PartialCounts test with incorrect numWires and numAlloc", "[lightning
         Qs.push_back(sim->AllocateQubit());
     }
 
-    REQUIRE_THROWS_WITH(sim->PartialCounts({Qs[0], Qs[1], Qs[2], Qs[3], Qs[0]}, 4),
+    std::vector<double> eigvals(1);
+    std::vector<int64_t> counts(1);
+
+    REQUIRE_THROWS_WITH(sim->PartialCounts(std::span{eigvals}, std::span{counts},
+                                           {Qs[0], Qs[1], Qs[2], Qs[3], Qs[0]}, 4),
                         Catch::Contains("Invalid number of wires"));
 
     sim->ReleaseQubit(Qs[0]);
 
-    REQUIRE_THROWS_WITH(sim->PartialCounts({Qs[0]}, 4),
+    REQUIRE_THROWS_WITH(sim->PartialCounts(std::span{eigvals}, std::span{counts}, {Qs[0]}, 4),
                         Catch::Contains("Invalid given wires to measure"));
 }
 
@@ -891,11 +911,17 @@ TEST_CASE("Sample and PartialSample tests with numWires=0-4 shots=100", "[lightn
 
     size_t shots = 100;
 
-    auto &&samples0 = sim->PartialSample(std::vector<QubitIdType>{}, shots);
-    auto &&samples1 = sim->PartialSample(std::vector<QubitIdType>{Qs[2]}, shots);
-    auto &&samples2 = sim->PartialSample(std::vector<QubitIdType>{Qs[0], Qs[3]}, shots);
-    auto &&samples3 = sim->PartialSample(Qs, shots);
-    auto &&samples4 = sim->Sample(shots);
+    std::vector<double> samples0(0);
+    std::vector<double> samples1(shots * 1);
+    std::vector<double> samples2(shots * 2);
+    std::vector<double> samples3(shots * 4);
+    std::vector<double> samples4(shots * 4);
+
+    sim->PartialSample(std::span{samples0}, std::vector<QubitIdType>{}, shots);
+    sim->PartialSample(std::span{samples1}, std::vector<QubitIdType>{Qs[2]}, shots);
+    sim->PartialSample(std::span{samples2}, std::vector<QubitIdType>{Qs[0], Qs[3]}, shots);
+    sim->PartialSample(std::span{samples3}, Qs, shots);
+    sim->Sample(std::span{samples4}, shots);
 
     CHECK(samples0.size() == 0);
     for (size_t i = 0; i < shots * 1; i++)
@@ -922,11 +948,25 @@ TEST_CASE("Counts and PartialCounts tests with numWires=0-4 shots=100", "[lightn
 
     size_t shots = 100;
 
-    auto &&[eigvals0, counts0] = sim->PartialCounts(std::vector<QubitIdType>{}, shots);
-    auto &&[eigvals1, counts1] = sim->PartialCounts(std::vector<QubitIdType>{Qs[2]}, shots);
-    auto &&[eigvals2, counts2] = sim->PartialCounts(std::vector<QubitIdType>{Qs[0], Qs[3]}, shots);
-    auto &&[eigvals3, counts3] = sim->PartialCounts(Qs, shots);
-    auto &&[eigvals4, counts4] = sim->Counts(shots);
+    std::vector<double> eigvals0(1);
+    std::vector<double> eigvals1(2);
+    std::vector<double> eigvals2(4);
+    std::vector<double> eigvals3(16);
+    std::vector<double> eigvals4(16);
+
+    std::vector<int64_t> counts0(1);
+    std::vector<int64_t> counts1(2);
+    std::vector<int64_t> counts2(4);
+    std::vector<int64_t> counts3(16);
+    std::vector<int64_t> counts4(16);
+
+    sim->PartialCounts(std::span{eigvals0}, std::span{counts0}, std::vector<QubitIdType>{}, shots);
+    sim->PartialCounts(std::span{eigvals1}, std::span{counts1}, std::vector<QubitIdType>{Qs[2]},
+                       shots);
+    sim->PartialCounts(std::span{eigvals2}, std::span{counts2},
+                       std::vector<QubitIdType>{Qs[0], Qs[3]}, shots);
+    sim->PartialCounts(std::span{eigvals3}, std::span{counts3}, Qs, shots);
+    sim->Counts(std::span{eigvals4}, std::span{counts4}, shots);
 
     CHECK(eigvals0.size() == 1);
     CHECK(eigvals0[0] == 0.0);

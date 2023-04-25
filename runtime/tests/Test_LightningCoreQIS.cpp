@@ -1123,8 +1123,8 @@ TEST_CASE("Test __quantum__qis__Counts with num_qubits=2 calling Hadamard, Contr
 
     PairT_MemRefT_double_int64_1d result = getCounts(4);
     __quantum__qis__Counts(&result, shots, 0);
-    int64_t *counts = result.second.data_allocated;
     double *eigvals = result.first.data_allocated;
+    int64_t *counts = result.second.data_allocated;
 
     for (int i = 0; i < 4; i++) {
         CHECK(eigvals[i] == (double)i);
@@ -1166,8 +1166,8 @@ TEST_CASE("Test __quantum__qis__Counts with num_qubits=2 PartialCounts calling H
 
     PairT_MemRefT_double_int64_1d result = getCounts(2);
     __quantum__qis__Counts(&result, shots, 1, ctrls[0]);
-    int64_t *counts = result.second.data_allocated;
     double *eigvals = result.first.data_allocated;
+    int64_t *counts = result.second.data_allocated;
 
     CHECK(counts[0] + counts[1] == shots);
     CHECK(eigvals[0] + 1 == eigvals[1]);

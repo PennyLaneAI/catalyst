@@ -18,6 +18,8 @@
 #include <memory>
 #include <vector>
 
+#include <span> // --std=c++20
+
 #include "Types.h"
 
 namespace Catalyst::Runtime {
@@ -197,69 +199,76 @@ struct QuantumDevice {
     /**
      * @brief Compute the probabilities of each computational basis state.
      *
-     * @return `std::vector<double>`
+     * @param probs Pointer to the first element of a pre-allocated contiguous
+     * sequence of `double`s in the form of `std::span<double>` representing probs
      */
-    virtual auto Probs() -> std::vector<double> = 0;
+    virtual void Probs(std::span<double> probs) = 0;
 
     /**
      * @brief Compute the probabilities for a subset of the full system.
      *
+     * @param probs Pointer to the first element of a pre-allocated contiguous
+     * sequence of `double`s in the form of `std::span<double>` representing partial-probs
      * @param wires Wires will restrict probabilities to a subset of the full system
-     *
-     * @return `std::vector<double>`
      */
-    virtual auto PartialProbs(const std::vector<QubitIdType> &wires) -> std::vector<double> = 0;
+    virtual void PartialProbs(std::span<double> probs, const std::vector<QubitIdType> &wires) = 0;
 
     /**
      * @brief Get the state-vector of a device.
      *
-     * @return `std::vector<std::complex<double>>`
+     * @param state Pointer to the first element of a pre-allocated contiguous
+     * sequence of complex numbers in the form of `std::span<std::complex<double>>`
+     * representing the state vector
      */
-    virtual auto State() -> std::vector<std::complex<double>> = 0;
+    virtual void State(std::span<std::complex<double>> state) = 0;
 
     /**
      * @brief Compute samples with the number of shots on the entire wires,
      * returing raw samples.
      *
+     * @param samples Pointer to the first element of a pre-allocated contiguous
+     * sequence of `double`s in the form of `std::span<double>` representing samples
      * @param shots The number of shots
-     *
-     * @return `std::vector<double>`
      */
-    virtual auto Sample(size_t shots) -> std::vector<double> = 0;
+    virtual void Sample(std::span<double> samples, size_t shots) = 0;
 
     /**
      * @brief Compute partial samples with the number of shots on `wires`,
      * returing raw samples.
      *
+     * @param samples Pointer to the first element of a pre-allocated contiguous
+     * sequence of `double`s in the form of `std::span<double>` representing partial-samples
      * @param wires Wires to compute samples on
      * @param shots The number of shots
-     *
-     * @return `std::vector<double>`
      */
-    virtual auto PartialSample(const std::vector<QubitIdType> &wires, size_t shots)
-        -> std::vector<double> = 0;
+    virtual void PartialSample(std::span<double> samples, const std::vector<QubitIdType> &wires,
+                               size_t shots) = 0;
 
     /**
      * @brief Sample with the number of shots on the entire wires, returning the
      * number of counts for each sample.
      *
+     * @param eigvals Pointer to the first element of a pre-allocated contiguous
+     * sequence of `double`s in the form of `std::span<double>` representing eigvals
+     * @param counts Pointer to the first element of a pre-allocated contiguous
+     * sequence of `int64_t`s in the form of `std::span<int64_t>` representing counts
      * @param shots The number of shots
-     *
-     * @return `std::tuple<std::vector<double>, std::vector<int64_t>>` (eigvals, counts)
      */
-    virtual auto Counts(size_t shots) -> std::tuple<std::vector<double>, std::vector<int64_t>> = 0;
+    virtual void Counts(std::span<double> eigvals, std::span<int64_t> counts, size_t shots) = 0;
 
     /**
      * @brief Partial sample with the number of shots on `wires`, returning the
      * number of counts for each sample.
      *
+     * @param eigvals Pointer to the first element of a pre-allocated contiguous
+     * sequence of `double`s in the form of `std::span<double>` representing partial-eigvals
+     * @param counts Pointer to the first element of a pre-allocated contiguous
+     * sequence of `int64_t`s in the form of `std::span<int64_t>` representing partial-counts
      * @param wires Wires to compute samples on
      * @param shots The number of shots
-     *
-     * @return `std::tuple<std::vector<double>, std::vector<int64_t>>` (eigvals, counts)
      */
-    virtual auto PartialCounts(const std::vector<QubitIdType> &wires, size_t shots)
-        -> std::tuple<std::vector<double>, std::vector<int64_t>> = 0;
+    virtual void PartialCounts(std::span<double> eigvals, std::span<int64_t> counts,
+                               const std::vector<QubitIdType> &wires, size_t shots) = 0;
 
     /**
      * @brief A general measurement method that acts on a single wire.

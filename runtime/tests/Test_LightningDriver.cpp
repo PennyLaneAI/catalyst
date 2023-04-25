@@ -48,7 +48,9 @@ TEST_CASE("lightning Basis vector", "[lightning]")
 
     sim->ReleaseQubit(q);
 
-    auto state = sim->State();
+    std::vector<std::complex<double>> state(1U << sim->GetNumQubits());
+    sim->State(std::span{state});
+
     CHECK(state[0].real() == Approx(1.0).epsilon(1e-5));
     CHECK(state[0].imag() == Approx(0.0).epsilon(1e-5));
     CHECK(state[1].real() == Approx(0.0).epsilon(1e-5));
@@ -73,7 +75,8 @@ TEST_CASE("Qubit allocatation and deallocation", "[lightning]")
 
     CHECK(n == static_cast<size_t>(q) + 1);
 
-    std::vector<std::complex<double>> state = sim->State();
+    std::vector<std::complex<double>> state(1U << sim->GetNumQubits());
+    sim->State(std::span{state});
 
     CHECK(state.size() == (1UL << n));
     CHECK(state[0].real() == Approx(1.0).epsilon(1e-5));
@@ -93,7 +96,8 @@ TEST_CASE("Qubit allocatation and deallocation", "[lightning]")
 
         sim->ReleaseQubit(i - 1);
         sim->AllocateQubit();
-        state = sim->State();
+        std::vector<std::complex<double>> state(1U << sim->GetNumQubits());
+        sim->State(std::span{state});
     }
 #else
     for (size_t i = n; i > 0; i--) {
@@ -112,7 +116,8 @@ TEST_CASE("test AllocateQubits", "[lightning]")
 
     sim->ReleaseQubit(q[0]);
 
-    auto state = sim->State();
+    std::vector<std::complex<double>> state(1U << sim->GetNumQubits());
+    sim->State(std::span{state});
     CHECK(state[0].real() == Approx(1.0).epsilon(1e-5));
 }
 
@@ -180,7 +185,8 @@ TEST_CASE("QuantumDevice object test", "[lightning]")
     sim->NamedOperation("Identity", {}, {Qs[6]}, false);
     sim->NamedOperation("Identity", {}, {Qs[8]}, false);
 
-    std::vector<std::complex<double>> out_state = sim->State();
+    std::vector<std::complex<double>> out_state(1U << sim->GetNumQubits());
+    sim->State(std::span{out_state});
 
     CHECK(out_state[0].real() == Approx(1.0).epsilon(1e-5));
     CHECK(out_state[0].imag() == Approx(0.0).epsilon(1e-5));

@@ -27,7 +27,6 @@ throw std::logic_error("StateVectorDynamicCPU.hpp: No such header file");
 #include <limits>
 #include <numeric>
 #include <random>
-#include <span>
 
 #include "AdjointDiff.hpp"
 #include "JacobianTape.hpp"
@@ -137,15 +136,15 @@ class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {
         -> ObsIdType override;
     auto Expval(ObsIdType obsKey) -> double override;
     auto Var(ObsIdType obsKey) -> double override;
-    auto State() -> std::vector<std::complex<double>> override;
-    auto Probs() -> std::vector<double> override;
-    auto PartialProbs(const std::vector<QubitIdType> &wires) -> std::vector<double> override;
-    auto Sample(size_t shots) -> std::vector<double> override;
-    auto PartialSample(const std::vector<QubitIdType> &wires, size_t shots)
-        -> std::vector<double> override;
-    auto Counts(size_t shots) -> std::tuple<std::vector<double>, std::vector<int64_t>> override;
-    auto PartialCounts(const std::vector<QubitIdType> &wires, size_t shots)
-        -> std::tuple<std::vector<double>, std::vector<int64_t>> override;
+    void State(std::span<std::complex<double>> state) override;
+    void Probs(std::span<double> probs) override;
+    void PartialProbs(std::span<double> probs, const std::vector<QubitIdType> &wires) override;
+    void Sample(std::span<double> samples, size_t shots) override;
+    void PartialSample(std::span<double> samples, const std::vector<QubitIdType> &wires,
+                       size_t shots) override;
+    void Counts(std::span<double> eigvals, std::span<int64_t> counts, size_t shots) override;
+    void PartialCounts(std::span<double> eigvals, std::span<int64_t> counts,
+                       const std::vector<QubitIdType> &wires, size_t shots) override;
     auto Measure(QubitIdType wire) -> Result override;
     auto Gradient(const std::vector<size_t> &trainParams)
         -> std::vector<std::vector<double>> override;

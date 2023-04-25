@@ -691,20 +691,16 @@ void __quantum__qis__Probs(MemRefT_double_1d *result, int64_t numQubits, ...)
         numQubits = __quantum__rt__num_qubits();
     }
 
-    std::vector<double> sv_probs;
-
     if (wires.empty()) {
-        sv_probs = Catalyst::Runtime::CAPI::DRIVER->get_device()->Probs();
+        Catalyst::Runtime::CAPI::DRIVER->get_device()->Probs(
+            std::span{result_p->data_allocated, result_p->sizes[0]});
     }
     else {
-        sv_probs = Catalyst::Runtime::CAPI::DRIVER->get_device()->PartialProbs(wires);
+        Catalyst::Runtime::CAPI::DRIVER->get_device()->PartialProbs(
+            std::span{result_p->data_allocated, result_p->sizes[0]}, wires);
     }
 
-    const size_t numElements = 1U << numQubits;
-    double *buffer = sv_probs.data();
-    size_t buffer_len = sv_probs.size();
-    MemRefT<double, 1> src = {buffer, buffer, 0, {buffer_len}, {1}};
-    memref_copy<double, 1>(result_p, &src, numElements * sizeof(double));
+    result_p->data_aligned = result_p->data_allocated;
 }
 
 void __quantum__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, ...)
@@ -724,24 +720,16 @@ void __quantum__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, .
         numQubits = __quantum__rt__num_qubits();
     }
 
-    std::vector<std::complex<double>> sv_state;
-
     if (wires.empty()) {
-        sv_state = Catalyst::Runtime::CAPI::DRIVER->get_device()->State();
+        Catalyst::Runtime::CAPI::DRIVER->get_device()->State(
+            std::span{result_p->data_allocated, result_p->sizes[0]});
+        result_p->data_aligned = result_p->data_allocated;
     }
     else {
         RT_FAIL("Partial State-Vector not supported yet");
         // Catalyst::Runtime::CAPI::DRIVER->get_device()->PartialState(stateVec,
         // numElements, wires);
     }
-
-    const size_t numElements = sv_state.size();
-    RT_ASSERT(numElements == (1U << numQubits));
-    std::complex<double> *buffer = sv_state.data();
-    size_t buffer_len = sv_state.size();
-    MemRefT<std::complex<double>, 1> src = {buffer, buffer, 0, {buffer_len}, {1}};
-    memref_copy<std::complex<double>, 1>(result_p, &src,
-                                         numElements * sizeof(std::complex<double>));
 }
 
 void __quantum__qis__Sample(MemRefT_double_2d *result, int64_t shots, int64_t numQubits, ...)
@@ -762,20 +750,18 @@ void __quantum__qis__Sample(MemRefT_double_2d *result, int64_t shots, int64_t nu
         numQubits = __quantum__rt__num_qubits();
     }
 
-    std::vector<double> sv_samples;
+    // std::vector<double> sv_samples;
     if (wires.empty()) {
-        sv_samples = Catalyst::Runtime::CAPI::DRIVER->get_device()->Sample(shots);
+        Catalyst::Runtime::CAPI::DRIVER->get_device()->Sample(
+            std::span{result_p->data_allocated, result_p->sizes[0] * result_p->sizes[1]}, shots);
     }
     else {
-        sv_samples = Catalyst::Runtime::CAPI::DRIVER->get_device()->PartialSample(wires, shots);
+        Catalyst::Runtime::CAPI::DRIVER->get_device()->PartialSample(
+            std::span{result_p->data_allocated, result_p->sizes[0] * result_p->sizes[1]}, wires,
+            shots);
     }
 
-    const size_t numElements = sv_samples.size();
-    double *buffer = sv_samples.data();
-    size_t _shots = static_cast<size_t>(shots);
-    size_t _numQubits = static_cast<size_t>(numQubits);
-    MemRefT<double, 2> src = {buffer, buffer, 0, {_shots, _numQubits}, {_numQubits, 1}};
-    memref_copy<double, 2>(result_p, &src, numElements * sizeof(double));
+    result_p->data_aligned = result_p->data_allocated;
 }
 
 void __quantum__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t shots, int64_t numQubits,
@@ -801,22 +787,17 @@ void __quantum__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t shots
     std::tuple<std::vector<double>, std::vector<int64_t>> sv_counts;
 
     if (wires.empty()) {
-        sv_counts = Catalyst::Runtime::CAPI::DRIVER->get_device()->Counts(shots);
+        Catalyst::Runtime::CAPI::DRIVER->get_device()->Counts(
+            std::span{result_eigvals_p->data_allocated, result_eigvals_p->sizes[0]},
+            std::span{result_counts_p->data_allocated, result_counts_p->sizes[0]}, shots);
     }
     else {
-        sv_counts = Catalyst::Runtime::CAPI::DRIVER->get_device()->PartialCounts(wires, shots);
+        Catalyst::Runtime::CAPI::DRIVER->get_device()->PartialCounts(
+            std::span{result_eigvals_p->data_allocated, result_eigvals_p->sizes[0]},
+            std::span{result_counts_p->data_allocated, result_counts_p->sizes[0]}, wires, shots);
     }
 
-    auto &&sv_eigvals = std::get<0>(sv_counts);
-    auto &&sv_cts = std::get<1>(sv_counts);
-
-    const size_t numEigvals = sv_eigvals.size();
-    double *buffer_eigvals = sv_eigvals.data();
-    MemRefT<double, 1> srcEigvals = {buffer_eigvals, buffer_eigvals, 0, {numEigvals}, {1}};
-    memref_copy<double, 1>(result_eigvals_p, &srcEigvals, numEigvals * sizeof(double));
-    int64_t *buffer_counts = sv_cts.data();
-    const size_t numCounts = sv_cts.size();
-    MemRefT<int64_t, 1> srcCounts = {buffer_counts, buffer_counts, 0, {numCounts}, {1}};
-    memref_copy<int64_t, 1>(result_counts_p, &srcCounts, numCounts * sizeof(int64_t));
+    result_eigvals_p->data_aligned = result_eigvals_p->data_allocated;
+    result_counts_p->data_aligned = result_counts_p->data_allocated;
 }
 }
