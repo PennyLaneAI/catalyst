@@ -29,6 +29,9 @@ from mlir_quantum.runtime import (
     get_ranked_memref_descriptor,
     ranked_memref_to_numpy,
     to_numpy,
+    as_ctype,
+    make_nd_memref_descriptor,
+    make_zero_d_memref_descriptor,
 )
 
 from catalyst.utils.gen_mlir import inject_functions
@@ -334,8 +337,12 @@ class CompiledFunction:
         shape = ir.RankedTensorType(mlir_tensor_type).shape
         mlir_element_type = ir.RankedTensorType(mlir_tensor_type).element_type
         numpy_element_type = mlir_type_to_numpy_type(mlir_element_type)
-        array_numpy_type = np.empty(shape, dtype=numpy_element_type)
-        memref_descriptor = get_ranked_memref_descriptor(array_numpy_type)
+        ctp = as_ctype(numpy_element_type)
+        if shape:
+            memref_descriptor = make_nd_memref_descriptor(len(shape), ctp)()
+        else:
+            memref_descriptor = make_zero_d_memref_descriptor(ctp)()
+
         return memref_descriptor
 
     @staticmethod
