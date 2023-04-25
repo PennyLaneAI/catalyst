@@ -320,11 +320,18 @@ class CondCallable:
     """
 
     def __init__(self, pred, true_fn):
-        self.pred = pred
-        self.true_fn = true_fn
-        self.false_fn = lambda: None
+        self.preds = [pred]
+        self.branch_fns = [true_fn]
+        self.otherwise_fn = lambda: None
 
-    def otherwise(self, false_fn):
+    def else_if(self, pred):
+        def add_branch(branch_fn):
+            self.preds.append(pred)
+            self.branch_fns.append(branch_fn)
+            return self
+        return add_branch
+
+    def otherwise(self, otherwise_fn):
         """Block of code to be run if the predicate evaluates to false.
 
         Args:
@@ -333,22 +340,28 @@ class CondCallable:
         Returns:
             self
         """
-        if false_fn.__code__.co_argcount != 0:
+        if otherwise_fn.__code__.co_argcount != 0:
             raise TypeError("Conditional 'False' function is not allowed to have any arguments")
-        self.false_fn = false_fn
+        self.otherwise_fn = otherwise_fn
         return self
 
     @staticmethod
-    def _check_branches_return_types(true_jaxpr, false_jaxpr):
-        if true_jaxpr.out_avals[:-1] != false_jaxpr.out_avals[:-1]:
-            raise TypeError(
-                "Conditional branches require the same return type, got:\n"
-                f" - True branch: {true_jaxpr.out_avals[:-1]}\n"
-                f" - False branch: {false_jaxpr.out_avals[:-1]}\n"
-                "Please specify an else branch if none was specified."
-            )
+    def _check_branches_return_types(branch_jaxprs):
+        # TODO(pengmai): Revisit best error handling for this case.
+        # if () return A; else if () return B; else return C
+        # if type(A) != type(B) != type(C), what should be returned? All branches? Or just first conflict?
+        expected = branch_jaxprs[0].out_avals[:-1]
+        for jaxpr in branch_jaxprs[1:]:
+            if expected != jaxpr.out_avals[:-1]:
+                raise TypeError(
+                    "Conditional branches require the same return type, got:\n"
+                    f" - True branch: {expected}\n"
+                    f" - False branch: {jaxpr.out_avals[:-1]}\n"
+                    "Please specify an else branch if none was specified."
+                )
 
     def _call_with_quantum_ctx(self, ctx):
+        # TODO(pengmai): Make sure to update this
         def new_true_fn(qreg):
             with JaxTape(do_queue=False) as tape:
                 with tape.quantum_tape:
@@ -402,14 +415,14 @@ class CondCallable:
         args, args_tree = tree_flatten([])
         args_avals = tuple(map(_abstractify, args))
 
-        (true_jaxpr, false_jaxpr), consts, out_trees = _initial_style_jaxprs_with_common_consts(
-            (self.true_fn, self.false_fn), args_tree, args_avals, "cond"
+        branch_jaxprs, consts, out_trees = _initial_style_jaxprs_with_common_consts(
+            tuple(self.branch_fns) + (self.otherwise_fn,), args_tree, args_avals, "cond"
         )
 
-        CondCallable._check_branches_return_types(true_jaxpr, false_jaxpr)
+        CondCallable._check_branches_return_types(branch_jaxprs)
 
-        inputs = [self.pred] + consts
-        ret_tree_flat = jprim.qcond(true_jaxpr, false_jaxpr, *inputs)
+        inputs = self.preds + consts
+        ret_tree_flat = jprim.qcond(branch_jaxprs, *inputs)
         return tree_unflatten(out_trees[0], ret_tree_flat)
 
     def _call_during_trace(self):
@@ -423,9 +436,10 @@ class CondCallable:
 
     def _call_during_interpretation(self):
         """Create a callable for conditionals."""
-        if self.pred:
-            return self.true_fn()
-        return self.false_fn()
+        for pred, branch_fn in zip(self.preds, self.branch_fns):
+            if pred:
+                return branch_fn()
+        return self.otherwise_fn()
 
     def __call__(self):
         is_tracing = TracingContext.is_tracing()
