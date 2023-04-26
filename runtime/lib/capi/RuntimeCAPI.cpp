@@ -699,8 +699,6 @@ void __quantum__qis__Probs(MemRefT_double_1d *result, int64_t numQubits, ...)
         Catalyst::Runtime::CAPI::DRIVER->get_device()->PartialProbs(
             std::span{result_p->data_allocated, result_p->sizes[0]}, wires);
     }
-
-    result_p->data_aligned = result_p->data_allocated;
 }
 
 void __quantum__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, ...)
@@ -723,7 +721,6 @@ void __quantum__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, .
     if (wires.empty()) {
         Catalyst::Runtime::CAPI::DRIVER->get_device()->State(
             std::span{result_p->data_allocated, result_p->sizes[0]});
-        result_p->data_aligned = result_p->data_allocated;
     }
     else {
         RT_FAIL("Partial State-Vector not supported yet");
@@ -760,8 +757,6 @@ void __quantum__qis__Sample(MemRefT_double_2d *result, int64_t shots, int64_t nu
             std::span{result_p->data_allocated, result_p->sizes[0] * result_p->sizes[1]}, wires,
             shots);
     }
-
-    result_p->data_aligned = result_p->data_allocated;
 }
 
 void __quantum__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t shots, int64_t numQubits,
@@ -796,8 +791,5 @@ void __quantum__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t shots
             std::span{result_eigvals_p->data_allocated, result_eigvals_p->sizes[0]},
             std::span{result_counts_p->data_allocated, result_counts_p->sizes[0]}, wires, shots);
     }
-
-    result_eigvals_p->data_aligned = result_eigvals_p->data_allocated;
-    result_counts_p->data_aligned = result_counts_p->data_allocated;
 }
 }
