@@ -296,13 +296,10 @@ class Cond(Operation):
     num_wires = AnyWires
 
     # pylint: disable=too-many-arguments
-    def __init__(
-        self, pred, consts, true_jaxpr, false_jaxpr, args_tree, out_trees, *args, **kwargs
-    ):
-        self.pred = pred
+    def __init__(self, preds, consts, branch_jaxprs, args_tree, out_trees, *args, **kwargs):
+        self.preds = preds
         self.consts = consts
-        self.true_jaxpr = true_jaxpr
-        self.false_jaxpr = false_jaxpr
+        self.branch_jaxprs = branch_jaxprs
         self.args_tree = args_tree
         self.out_trees = out_trees
         kwargs["wires"] = Wires(Cond.num_wires)
@@ -325,11 +322,16 @@ class CondCallable:
         self.otherwise_fn = lambda: None
 
     def else_if(self, pred):
-        def add_branch(branch_fn):
+        def decorator(branch_fn):
+            if branch_fn.__code__.co_argcount != 0:
+                raise TypeError(
+                    "Conditional 'else if' function is not allowed to have any arguments"
+                )
             self.preds.append(pred)
             self.branch_fns.append(branch_fn)
             return self
-        return add_branch
+
+        return decorator
 
     def otherwise(self, otherwise_fn):
         """Block of code to be run if the predicate evaluates to false.
@@ -347,67 +349,52 @@ class CondCallable:
 
     @staticmethod
     def _check_branches_return_types(branch_jaxprs):
-        # TODO(pengmai): Revisit best error handling for this case.
-        # if () return A; else if () return B; else return C
-        # if type(A) != type(B) != type(C), what should be returned? All branches? Or just first conflict?
         expected = branch_jaxprs[0].out_avals[:-1]
-        for jaxpr in branch_jaxprs[1:]:
+        for i, jaxpr in list(enumerate(branch_jaxprs))[1:]:
             if expected != jaxpr.out_avals[:-1]:
                 raise TypeError(
-                    "Conditional branches require the same return type, got:\n"
-                    f" - True branch: {expected}\n"
-                    f" - False branch: {jaxpr.out_avals[:-1]}\n"
+                    "Conditional branches all require the same return type, got:\n"
+                    f" - Branch at index 0: {expected}\n"
+                    f" - Branch at index {i}: {jaxpr.out_avals[:-1]}\n"
                     "Please specify an else branch if none was specified."
                 )
 
     def _call_with_quantum_ctx(self, ctx):
-        # TODO(pengmai): Make sure to update this
-        def new_true_fn(qreg):
-            with JaxTape(do_queue=False) as tape:
-                with tape.quantum_tape:
-                    out = self.true_fn()
-                tape.set_return_val(out)
-                new_quantum_tape = JaxTape.device.expand_fn(tape.quantum_tape)
-                tape.quantum_tape = new_quantum_tape
-                tape.quantum_tape.jax_tape = tape
+        def new_branch_fn(branch_fn):
+            def callback(qreg):
+                with JaxTape(do_queue=False) as tape:
+                    with tape.quantum_tape:
+                        out = branch_fn()
+                    tape.set_return_val(out)
+                    new_quantum_tape = JaxTape.device.expand_fn(tape.quantum_tape)
+                    tape.quantum_tape = new_quantum_tape
+                    tape.quantum_tape.jax_tape = tape
 
-            has_tracer_return_values = out is not None
-            return_values, qreg, qubit_states = trace_quantum_tape(
-                tape, qreg, has_tracer_return_values
-            )
-            qreg = insert_to_qreg(qubit_states, qreg)
+                has_tracer_return_values = out is not None
+                return_values, qreg, qubit_states = trace_quantum_tape(
+                    tape, qreg, has_tracer_return_values
+                )
+                qreg = insert_to_qreg(qubit_states, qreg)
 
-            return return_values, qreg
+                return return_values, qreg
 
-        def new_false_fn(qreg):
-            with JaxTape(do_queue=False) as tape:
-                with tape.quantum_tape:
-                    out = self.false_fn()
-                tape.set_return_val(out)
-                new_quantum_tape = JaxTape.device.expand_fn(tape.quantum_tape)
-                tape.quantum_tape = new_quantum_tape
-                tape.quantum_tape.jax_tape = tape
-
-            has_tracer_return_values = out is not None
-            return_values, qreg, qubit_states = trace_quantum_tape(
-                tape, qreg, has_tracer_return_values
-            )
-            qreg = insert_to_qreg(qubit_states, qreg)
-
-            return return_values, qreg
+            return callback
 
         args, args_tree = tree_flatten((jprim.Qreg(),))
         args_avals = tuple(map(_abstractify, args))
-
-        (true_jaxpr, false_jaxpr), consts, out_trees = _initial_style_jaxprs_with_common_consts(
-            (new_true_fn, new_false_fn), args_tree, args_avals, "cond"
+        branch_fns = self.branch_fns + [self.otherwise_fn]
+        branch_jaxprs, consts, out_trees = _initial_style_jaxprs_with_common_consts(
+            tuple(new_branch_fn(branch_fn) for branch_fn in branch_fns),
+            args_tree,
+            args_avals,
+            "cond",
         )
 
-        CondCallable._check_branches_return_types(true_jaxpr, false_jaxpr)
-        Cond(self.pred, consts, true_jaxpr, false_jaxpr, args_tree, out_trees)
+        CondCallable._check_branches_return_types(branch_jaxprs)
+        Cond(self.preds, consts, branch_jaxprs, args_tree, out_trees)
 
         # Create tracers for any non-qreg return values (if there are any).
-        ret_vals, _ = tree_unflatten(out_trees[0], true_jaxpr.out_avals)
+        ret_vals, _ = tree_unflatten(out_trees[0], branch_jaxprs[0].out_avals)
         a, t = tree_flatten(ret_vals)
         return ctx.jax_tape.create_tracer(t, a)
 
