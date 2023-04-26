@@ -27,6 +27,15 @@
                 "python.linting.pylintEnabled": true,
                 "python.linting.enabled": true,
                 "C_Cpp.default.cppStandard": "c++20",
+                "C_Cpp.default.includePath": [
+                    "${containerWorkspaceFolder}/mlir/include",
+                    "${containerWorkspaceFolder}/mlir/lib/**",
+                    "${containerWorkspaceFolder}/mlir/build/include",
+                    "${containerWorkspaceFolder}/mlir/llvm-project/mlir/include",
+                    "${containerWorkspaceFolder}/mlir/llvm-project/build/tools/mlir/include",
+                    "${containerWorkspaceFolder}/mlir/llvm-project/llvm/include",
+                    "${containerWorkspaceFolder}/mlir/llvm-project/build/include"
+                ],
                 "mlir.server_path": "${containerWorkspaceFolder}/mlir/build/bin/quantum-lsp-server"
             }
         }
