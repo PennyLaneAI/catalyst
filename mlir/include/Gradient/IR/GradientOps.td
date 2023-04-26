@@ -126,16 +126,19 @@ def JVPOp : Gradient_Op<"jvp", [DeclareOpInterfaceMethods<CallOpInterface>,
     let arguments = (ins
         StrAttr:$method,
         FlatSymbolRefAttr:$callee,
-        Variadic<AnyType>:$operands,
+        Variadic<AnyType>:$params_and_tangents,
         OptionalAttr<AnyIntElementsAttr>:$diffArgIndices,
         OptionalAttr<Builtin_FloatAttr>:$finiteDiffParam
     );
-    let results = (outs Variadic<AnyTypeOf<[AnyFloat, RankedTensorOf<[AnyFloat]>]>>);
+
+    let results = (outs
+        Variadic<AnyTypeOf<[AnyFloat, RankedTensorOf<[AnyFloat]>]>>
+    );
 
     let hasVerifier = 1;
 
     let assemblyFormat = [{
-        $method $callee `(` $operands `)` attr-dict `:` functional-type($operands, results)
+        $method $callee `(` $params_and_tangents `:` type($params_and_tangents) `)` attr-dict `:` type(results)
     }];
 
     let extraClassDeclaration = [{
