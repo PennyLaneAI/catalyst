@@ -24,12 +24,7 @@ class TestCondToJaxpr:
         expected = """{ lambda ; a:i64[]. let
     b:bool[] = eq a 5
     c:i64[] = qcond[
-      false_jaxpr={ lambda ; d_:i64[] e:i64[]. let
-          f:i64[] = integer_pow[y=3] e
-        in (f,) }
-      true_jaxpr={ lambda ; g:i64[] h_:i64[]. let
-          i:i64[] = integer_pow[y=2] g
-        in (i,) }
+      branch_jaxprs=[{ lambda ; a:i64[] b_:i64[]. let c:i64[] = integer_pow[y=2] a in (c,) }, { lambda ; a_:i64[] b:i64[]. let c:i64[] = integer_pow[y=3] b in (c,) }]
     ] b a a
   in (c,) }"""
 
@@ -72,6 +67,55 @@ class TestCond:
         assert circuit(5) == 25
         assert circuit(6) == 36
 
+    def test_cond_one_else_if(self):
+        @qjit()
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def circuit(x):
+            @cond(x > 2.7)
+            def multiply():
+                return x * 4
+
+            @multiply.else_if(x > 1.4)
+            def multiply():
+                return x * 2
+
+            @multiply.otherwise
+            def multiply():
+                return x
+
+            return multiply()
+
+        assert circuit(4) == 16
+        assert circuit(2) == 4
+        assert circuit(1) == 1
+
+    def test_cond_many_else_if(self):
+        @qjit()
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def circuit(x):
+            @cond(x > 4.8)
+            def multiply():
+                return x * 8
+
+            @multiply.else_if(x > 2.7)
+            def multiply():
+                return x * 4
+
+            @multiply.else_if(x > 1.4)
+            def multiply():
+                return x * 2
+
+            @multiply.otherwise
+            def multiply():
+                return x
+
+            return multiply()
+
+        assert circuit(5) == 40
+        assert circuit(3) == 12
+        assert circuit(2) == 4
+        assert circuit(-3) == -3
+
     def test_qubit_manipulation_cond(self):
         @qjit()
         @qml.qnode(qml.device("lightning.qubit", wires=1))
@@ -95,7 +139,26 @@ class TestCond:
 
             return cond_fn()
 
-        with pytest.raises(TypeError, match="Conditional branches require the same return type"):
+        with pytest.raises(
+            TypeError, match="Conditional branches all require the same return type"
+        ):
+            qjit(qml.qnode(qml.device("lightning.qubit", wires=1))(circuit))
+
+    def test_branch_multi_return_mismatch(self):
+        def circuit():
+            @cond(True)
+            def cond_fn():
+                return measure(wires=0)
+
+            @cond_fn.else_if(False)
+            def cond_fn():
+                return measure(wires=0)
+
+            return cond_fn()
+
+        with pytest.raises(
+            TypeError, match="Conditional branches all require the same return type"
+        ):
             qjit(qml.qnode(qml.device("lightning.qubit", wires=1))(circuit))
 
     def test_identical_branch_names(self):
