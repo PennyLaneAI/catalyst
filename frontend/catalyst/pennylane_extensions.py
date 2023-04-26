@@ -322,6 +322,17 @@ class CondCallable:
         self.otherwise_fn = lambda: None
 
     def else_if(self, pred):
+        """
+        Block of code to be run if this predicate evaluates to true, skipping all subsequent
+        conditional blocks.
+
+        Args:
+            pred (bool): The predicate that will determine if this branch is executed.
+
+        Returns:
+            A callable decorator that wraps this 'else if' branch of the conditional and returns self.
+        """
+
         def decorator(branch_fn):
             if branch_fn.__code__.co_argcount != 0:
                 raise TypeError(
@@ -440,28 +451,29 @@ def cond(pred):
     """A :func:`~.qjit` compatible decorator for if-else conditionals in PennyLane/Catalyst.
 
     This form of control flow is a functional version of the traditional if-else conditional. This
-    means that each execution path, a 'True' branch and a 'False' branch, is provided as a separate
-    function. Both functions will be traced during compilation, but only one of them the will be
-    executed at runtime, depending of the value of a Boolean predicate. The JAX equivalent is the
-    ``jax.lax.cond`` function, but this version is optimized to work with quantum programs in
-    PennyLane.
+    means that each execution path, a 'if' branch, any 'else if' branches, and a final 'otherwise'
+    branch, is provided as a separate function. All functions will be traced during compilation,
+    but only one of them the will be executed at runtime, depending of the value of one or more
+    Boolean predicates. The JAX equivalent is the ``jax.lax.cond`` function, but this version is
+    optimized to work with quantum programs in PennyLane. This version also supports an 'else if'
+    construct which the JAX version does not.
 
     Values produced inside the scope of a conditional can be returned to the outside context, but
     the return type signature of each branch must be identical. If no values are returned, the
-    'False' branch is optional. Refer to the example below to learn more about the syntax of this
-    decorator.
+    'otherwise' branch is optional. Refer to the example below to learn more about the syntax of
+    this decorator.
 
     This form of control flow can also be called from the Python interpreter without needing to use
     :func:`~.qjit`.
 
     Args:
-        pred (bool): the predicate with which to control the branch to execute
+        pred (bool): the first predicate with which to control the branch to execute
 
     Returns:
-        A callable decorator that wraps the 'True' branch of the conditional.
+        A callable decorator that wraps the first 'if' branch of the conditional.
 
     Raises:
-        AssertionError: True- or False-branch functions cannot have arguments.
+        AssertionError: Branch functions cannot have arguments.
 
     **Example**
 
