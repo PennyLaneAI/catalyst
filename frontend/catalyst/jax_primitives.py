@@ -16,6 +16,8 @@ of quantum operations, measurements, and observables to JAXPR.
 """
 
 from typing import List
+from dataclasses import dataclass
+import numpy as np
 
 import jax
 import numpy as np
@@ -256,22 +258,30 @@ def _func_lowering(ctx, *args, call_jaxpr, fn, call=True):
 #
 # grad
 #
+
+@dataclass
+class GradParams:
+    method:str
+    h:float
+    argnum:List[int]
+
+
 @grad_p.def_impl
-def _grad_def_impl(ctx, *args, jaxpr, fn, method, h, argnum):  # pragma: no cover
+def _grad_def_impl(ctx, *args, jaxpr, fn, grad_params):  # pragma: no cover
     raise NotImplementedError()
 
 
 @grad_p.def_abstract_eval
-def _grad_abstract(*args, jaxpr, fn, method, h, argnum):
+def _grad_abstract(*args, jaxpr, fn, grad_params):
     """This function is called with abstract arguments for tracing."""
     signature = Signature(jaxpr.consts + jaxpr.in_avals, jaxpr.out_avals)
     offset = len(jaxpr.consts)
-    new_argnum = [num + offset for num in argnum]
+    new_argnum = [num + offset for num in grad_params.argnum]
     transformed_signature = calculate_grad_shape(signature, new_argnum)
     return tuple(transformed_signature.get_results())
 
 
-def _grad_lowering(ctx, *args, jaxpr, fn, method, h, argnum):
+def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     """Lowering function to gradient.
     Args:
         ctx: the MLIR context
@@ -283,6 +293,7 @@ def _grad_lowering(ctx, *args, jaxpr, fn, method, h, argnum):
         argnum: argument indices which define over which arguments to
             differentiate.
     """
+    method, h, argnum = grad_params.method, grad_params.h, grad_params.argnum
     mlir_ctx = ctx.module_context.context
     finiteDiffParam = None
     if h:
@@ -313,7 +324,6 @@ def _grad_lowering(ctx, *args, jaxpr, fn, method, h, argnum):
 # vjp/jvp
 #
 
-
 @jvp_p.def_impl
 def _jvp_def_impl(ctx, *args, jaxpr, fn, method, h, argnum):  # pragma: no cover
     raise NotImplementedError()
@@ -330,7 +340,7 @@ def _jvp_abstract(*args, jaxpr, fn, method, h, argnum):
     return tuple(transformed_signature.get_results())
 
 
-def _jvp_lowering(ctx, *args, jaxpr, fn, method, h, argnum):
+def _jvp_lowering(ctx, params, tangents, jaxpr, fn, method, h, argnum):
     mlir_ctx = ctx.module_context.context
     finiteDiffParam = None
     if h:

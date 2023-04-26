@@ -19,6 +19,7 @@ while using :func:`~.qjit`.
 import functools
 import numbers
 import uuid
+from typing import Any, Optional, List, Callable, Union
 
 import jax
 import jax.numpy as jnp
@@ -33,10 +34,11 @@ from jax.linear_util import wrap_init
 from jax.tree_util import tree_flatten, tree_unflatten, treedef_is_leaf
 from pennylane.measurements import MidMeasureMP
 from pennylane.operation import AnyWires, Operation, Wires
+from pennylane import QNode
 
 import catalyst
 import catalyst.jax_primitives as jprim
-from catalyst.jax_primitives import expval_p, probs_p
+from catalyst.jax_primitives import expval_p, probs_p, GradParams
 from catalyst.jax_tape import JaxTape
 from catalyst.jax_tracer import get_traceable_fn, insert_to_qreg, trace_quantum_tape
 from catalyst.utils.exceptions import CompileError
@@ -142,11 +144,95 @@ class Function:
         return jprim.func_p.bind(wrap_init(_eval_jaxpr), *args, fn=self)
 
 
+Differentiable = Union[Function, QNode]
+DifferentiableLike = Union[Differentiable, Callable, "catalyst.compilation_pipelines.QJIT"]
+Jaxpr = Any
+
+def _bless_differentiable(f:DifferentiableLike) -> Differentiable:
+    """Narrows down the set of the supported differentiable objects. """
+    if isinstance(f, (Function, QNode)):
+        return f
+    elif isinstance(f, catalyst.compilation_pipelines.QJIT):
+        return f.qfunc
+    elif isinstance(f, Callable): # Keep at the bottom
+        return Function(f)
+    else:
+        raise TypeError(f"Non-differentiable function passed: {type(f)}")
+
+
+def _make_jaxpr_differentiable(f:Differentiable, grad_params:GradParams, *args) -> Jaxpr:
+    """Gets the jaxpr of a differentiable function. Perform the required additional checks. """
+    TracingContext.check_is_tracing(
+        "catalyst.grad can only be used from within @qjit decorated code."
+    )
+    method = grad_params.method
+    jaxpr = jax.make_jaxpr(f)(*args)
+    assert len(jaxpr.eqns) == 1, "Expected jaxpr consisting of a single function call."
+    assert (
+        jaxpr.eqns[0].primitive == jprim.func_p
+    ), "Expected jaxpr consisting of a single function call."
+
+    for pos, arg in enumerate(jaxpr.in_avals):
+        if arg.dtype.kind != "f" and pos in self.argnum:
+            raise TypeError(
+                "Catalyst.grad only supports differentiation on floating-point "
+                f"arguments, got '{arg.dtype}' at position {pos}."
+            )
+    for pos, res in enumerate(jaxpr.out_avals):
+        if res.dtype.kind != "f":
+            raise TypeError(
+                "Catalyst.grad only supports differentiation on floating-point "
+                f"results, got '{res.dtype}' at position {pos}."
+            )
+
+    if method != "fd":
+        qnode_jaxpr = jaxpr.eqns[0].params["call_jaxpr"]
+        return_ops = []
+        for res in qnode_jaxpr.outvars:
+            for eq in reversed(qnode_jaxpr.eqns):  # pragma: no branch
+                if res in eq.outvars:
+                    return_ops.append(eq.primitive)
+                    break
+
+        if method == "ps" and any(prim not in [expval_p, probs_p] for prim in return_ops):
+            raise TypeError(
+                "The parameter-shift method can only be used for QNodes "
+                "which return either qml.expval or qml.probs."
+            )
+        if method == "adj" and any(prim not in [expval_p] for prim in return_ops):
+            raise TypeError(
+                "The adjoint method can only be used for QNodes which return qml.expval."
+            )
+    return jaxpr
+
+
+def _check_grad_params(method:str,
+                       h:Optional[float],
+                       argnum:Optional[Union[int,List[int]]]) -> GradParams:
+    methods = {"fd", "ps", "adj"}
+    if method is None:
+        method = "fd"
+    if method not in methods:
+        raise ValueError(
+            f"Invalid differentiation method '{method}'. "
+            f"Supported methods are: {' '.join(sorted(methods))}"
+        )
+    if method == "fd" and h is None:
+        h = 1e-7
+    if not (h is None or isinstance(h, numbers.Number)):
+        raise ValueError(f"Invalid h value ({h}). None or number was excpected.")
+    if argnum is None:
+        argnum = [0]
+    elif isinstance(argnum, int):
+        argnum = [argnum]
+    return GradParams(method, h, argnum)
+
+
 class Grad:
     """An object that specifies that a function will be differentiated.
 
     Args:
-        fn (Callable): the function to differentiate
+        fn (Differentiable): the function to differentiate
         method (str): the method used for differentiation
         h (float): the step-size value for the finite difference method
         argnum (list[int]): the argument indices which define over which arguments to differentiate
@@ -154,15 +240,14 @@ class Grad:
     Raises:
         ValueError: Higher-order derivatives and derivatives of non-QNode functions can only be
                     computed with the finite difference method.
+        TypeError: Non-differentiable object was passed as `fn` argument.
     """
 
-    def __init__(self, fn, *, method, h, argnum):
+    def __init__(self, fn:Differentiable, *, grad_params:GradParams):
         self.fn = fn
         self.__name__ = f"grad.{fn.__name__}"
-        self.method = method
-        self.h = h
-        self.argnum = argnum
-        if self.method != "fd" and not isinstance(self.fn, qml.QNode):
+        self.grad_params = grad_params
+        if self.grad_params.method != "fd" and not isinstance(self.fn, qml.QNode):
             raise ValueError(
                 "Only finite difference can compute higher order derivatives "
                 "or gradients of non-QNode functions."
@@ -177,50 +262,13 @@ class Grad:
             "catalyst.grad can only be used from within @qjit decorated code."
         )
 
-        jaxpr = jax.make_jaxpr(self.fn)(*args)
-        assert len(jaxpr.eqns) == 1, "Expected jaxpr consisting of a single function call."
-        assert (
-            jaxpr.eqns[0].primitive == jprim.func_p
-        ), "Expected jaxpr consisting of a single function call."
-
-        for pos, arg in enumerate(jaxpr.in_avals):
-            if arg.dtype.kind != "f" and pos in self.argnum:
-                raise TypeError(
-                    "Catalyst.grad only supports differentiation on floating-point "
-                    f"arguments, got '{arg.dtype}' at position {pos}."
-                )
-        for pos, res in enumerate(jaxpr.out_avals):
-            if res.dtype.kind != "f":
-                raise TypeError(
-                    "Catalyst.grad only supports differentiation on floating-point "
-                    f"results, got '{res.dtype}' at position {pos}."
-                )
-
-        if self.method != "fd":
-            qnode_jaxpr = jaxpr.eqns[0].params["call_jaxpr"]
-            return_ops = []
-            for res in qnode_jaxpr.outvars:
-                for eq in reversed(qnode_jaxpr.eqns):  # pragma: no branch
-                    if res in eq.outvars:
-                        return_ops.append(eq.primitive)
-                        break
-
-            if self.method == "ps" and any(prim not in [expval_p, probs_p] for prim in return_ops):
-                raise TypeError(
-                    "The parameter-shift method can only be used for QNodes "
-                    "which return either qml.expval or qml.probs."
-                )
-            if self.method == "adj" and any(prim not in [expval_p] for prim in return_ops):
-                raise TypeError(
-                    "The adjoint method can only be used for QNodes which return qml.expval."
-                )
-
+        jaxpr = _make_jaxpr_differentiable(self.fn, self.grad_params, *args)
         return jprim.grad_p.bind(
-            *args, jaxpr=jaxpr, fn=self, method=self.method, h=self.h, argnum=self.argnum
+            *args, jaxpr=jaxpr, fn=self, grad_params=self.grad_params
         )
 
 
-def grad(f, *, method=None, h=None, argnum=None):
+def grad(f:DifferentiableLike, *, method=None, h=None, argnum=None):
     """A :func:`~.qjit` compatible gradient transformation for PennyLane/Catalyst.
 
     This function allows the gradient of a hybrid quantum-classical function
@@ -245,9 +293,9 @@ def grad(f, *, method=None, h=None, argnum=None):
         See the :doc:`/dev/quick_start` for examples.
 
     Args:
-        f (Callable): the function to differentiate
-        method (str): The method used for differentiation, which can be any of
-                      ``["fd", "ps", "adj"]``, where:
+        f (DifferentiableLike): a function or a functor to differentiate
+        method (str): The method used for differentiation, which can be any of ``["fd", "ps", "adj"]``,
+            where:
 
             - ``"fd"`` represents first-order finite-differences,
 
@@ -284,97 +332,13 @@ def grad(f, *, method=None, h=None, argnum=None):
     >>> workflow(2.0)
     array(-3.14159265)
     """
-    methods = {"fd", "ps", "adj"}
-    if method is None:
-        method = "fd"
-    if method not in methods:
-        raise ValueError(
-            f"Invalid differentiation method '{method}'. "
-            f"Supported methods are: {' '.join(sorted(methods))}"
-        )
-    if method == "fd" and h is None:
-        h = 1e-7
-    if not (h is None or isinstance(h, numbers.Number)):
-        raise ValueError(f"Invalid h value ({h}). None or number was excpected.")
-    if argnum is None:
-        argnum = [0]
-    elif isinstance(argnum, int):
-        argnum = [argnum]
-
-    if isinstance(f, catalyst.compilation_pipelines.QJIT):
-        # Don't generate an extra function when the circuit is already qjitted.
-        f = f.qfunc
-
-    if isinstance(f, qml.QNode):
-        return Grad(f, method=method, h=h, argnum=argnum)
-
-    return Grad(Function(f), method=method, h=h, argnum=argnum)
+    return Grad(_bless_differentiable(f), grad_params=_check_grad_params(method, h, argnum))
 
 
-# pylint: disable=too-few-public-methods
-class JVP:
-
-    def __init__(self, fn, tangent, *, method, h, argnum):
-        self.fn = fn
-        self.__name__ = f"jvp.{fn.__name__}"
-        self.method = method
-        self.h = h
-        self.argnum = argnum
-        self.tangent = tangent
-        if self.method != "fd" and not isinstance(self.fn, qml.QNode):
-            raise ValueError(
-                "Only finite difference can compute higher order derivatives "
-                "or gradients of non-QNode functions."
-            )
-
-    def __call__(self, *args, **kwargs):
-        """Specifies that an actual call to the differentiated function.
-        Args:
-            args: the arguments to the differentiated function
-        """
-        TracingContext.check_is_tracing(
-            "catalyst.jvp can only be used from within @qjit decorated code."
-        )
-
-        jaxpr = jax.make_jaxpr(self.fn)(*args)
-
-        if len(jaxpr.eqns) != 1:
-            raise TypeError(f"Expected one-element jaxpr, got {len(jaxpr.eqns)} elements.")
-
-        if jaxpr.eqns[0].primitive != jprim.func_p:
-            raise TypeError(f"Expected jaxpr consisting of a single function call, got "
-                            f"{jaxpr.eqns[0].primitive.name}.")
-
-        return jprim.jvp_p.bind(
-            *args, jaxpr=jaxpr, fn=self, method=self.method, h=self.h, argnum=self.argnum,
-        )
-
-
-def jvp(f, tangent, *, method=None, h=None, argnum=None):
-    methods = {"fd", "ps", "adj"}
-    if method is None:
-        method = "fd"
-    if method not in methods:
-        raise ValueError(
-            f"Invalid differentiation method '{method}'. "
-            f"Supported methods are: {' '.join(sorted(methods))}"
-        )
-    if method == "fd" and h is None:
-        h = 1e-7
-    if not (h is None or isinstance(h, numbers.Number)):
-        raise ValueError(f"Invalid h value ({h}). None or number was excpected.")
-    if argnum is None:
-        argnum = [0]
-    elif isinstance(argnum, int):
-        argnum = [argnum]
-
-    if isinstance(f, catalyst.compilation_pipelines.QJIT):
-        # Don't generate an extra function when the circuit is already qjitted.
-        f = f.qfunc
-
-    return JVP(f if isinstance(f, qml.QNode) else Function(f),
-               tangent=tangent, method=method, h=h, argnum=argnum)
-
+def jvp(f:DifferentiableLike, params, tangent, *, method=None, h=None, argnum=None):
+    grad_params = _check_grad_params(method, h, argnum)
+    jaxpr = _make_jaxpr_differentiable(f, grad_params, *params)
+    return jprim.jvp_p.bind(jaxpr=jaxpr, params=params, tangents=tangents, grad_params=grad_params)
 
 
 # pylint: disable=too-few-public-methods
