@@ -325,13 +325,13 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
 #
 
 @jvp_p.def_impl
-def _jvp_def_impl(ctx, *args, jaxpr, fn, method, h, argnum):  # pragma: no cover
+def _jvp_def_impl(ctx, *args, jaxpr, fn, grad_params):  # pragma: no cover
     raise NotImplementedError()
 
 
 @jvp_p.def_abstract_eval
 # pylint: disable=unused-argument
-def _jvp_abstract(*args, jaxpr, fn, method, h, argnum):
+def _jvp_abstract(*args, jaxpr, fn, grad_params):
     """This function is called with abstract arguments for tracing."""
     signature = Signature(jaxpr.consts + jaxpr.in_avals, jaxpr.out_avals)
     offset = len(jaxpr.consts)
@@ -340,16 +340,10 @@ def _jvp_abstract(*args, jaxpr, fn, method, h, argnum):
     return tuple(transformed_signature.get_results())
 
 
-def _jvp_lowering(ctx, params, tangents, jaxpr, fn, method, h, argnum):
+def _jvp_lowering(ctx, params, tangents, jaxpr, fn, grad_params):
+    method, h, argnum = grad_params.method, grad_params.h, grad_params.argnum
     mlir_ctx = ctx.module_context.context
-    finiteDiffParam = None
-    if h:
-        f64 = ir.F64Type.get(mlir_ctx)
-        finiteDiffParam = ir.FloatAttr.get(f64, h)
-    offset = len(jaxpr.consts)
-    new_argnum = [num + offset for num in argnum]
-    argnum_numpy = np.array(new_argnum)
-    diffArgIndices = ir.DenseIntElementsAttr.get(argnum_numpy)
+    new_argnum = np.array([len(jaxpr.consts) + num for num in argnum])
 
     _func_lowering(ctx, *args, call_jaxpr=jaxpr.eqns[0].params["call_jaxpr"], fn=fn.fn, call=False)
     symbol_name = mlir_fn_cache[fn.fn]
@@ -362,8 +356,8 @@ def _jvp_lowering(ctx, params, tangents, jaxpr, fn, method, h, argnum):
         ir.StringAttr.get(method),
         ir.FlatSymbolRefAttr.get(symbol_name),
         mlir.flatten_lowering_ir_args(args_and_consts),
-        diffArgIndices=diffArgIndices,
-        finiteDiffParam=finiteDiffParam,
+        diffArgIndices=ir.DenseIntElementsAttr.get(new_argnum),
+        finiteDiffParam=ir.FloatAttr.get(ir.F64Type.get(mlir_ctx), h) if h else None,
     ).results
 
 
