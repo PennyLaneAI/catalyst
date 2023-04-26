@@ -26,7 +26,8 @@
                 "python.formatting.provider": "black",
                 "python.linting.pylintEnabled": true,
                 "python.linting.enabled": true,
-                "C_Cpp.default.cppStandard": "c++20"
+                "C_Cpp.default.cppStandard": "c++20",
+                "mlir.server_path": "${containerWorkspaceFolder}/mlir/build/bin/quantum-lsp-server"
             }
         }
     }
