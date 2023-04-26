@@ -80,17 +80,11 @@ void LightningKokkosSimulator::PrintState()
     size_t idx = 0;
     cout << "*** State-Vector of Size " << size << " ***" << endl;
     cout << "[";
+    auto &&state = this->State();
     for (; idx < size - 1; idx++) {
-        auto elem_subview = Kokkos::subview(this->device_sv->getData(), idx);
-        Kokkos::complex<double> elem_cp;
-        Kokkos::deep_copy(elem_cp, elem_subview);
-
-        cout << "(" << real(elem_cp) << "," << imag(elem_cp) << "), ";
+        cout << state[idx] << ", ";
     }
-    auto elem_last_subview = Kokkos::subview(this->device_sv->getData(), idx);
-    Kokkos::complex<double> elem_last_cp;
-    Kokkos::deep_copy(elem_last_cp, elem_last_subview);
-    cout << "(" << real(elem_last_cp) << "," << imag(elem_last_cp) << ")]" << endl;
+    cout << state[idx] << "]" << endl;
 }
 
 auto LightningKokkosSimulator::Zero() const -> Result
@@ -255,17 +249,16 @@ auto LightningKokkosSimulator::State() -> std::vector<std::complex<double>>
 {
     const size_t num_qubits = this->device_sv->getNumQubits();
     const size_t size = Pennylane::Util::exp2(num_qubits);
-    std::vector<std::complex<double>> state;
-    state.reserve(size);
 
-    for (size_t idx = 0; idx < size; idx++) {
-        auto elem_subview = Kokkos::subview(this->device_sv->getData(), idx);
-        Kokkos::complex<double> elem_cp;
-        Kokkos::deep_copy(elem_cp, elem_subview);
-        double elem_cp_real = real(elem_cp);
-        double elem_cp_imag = imag(elem_cp);
-        state.emplace_back(static_cast<double>(real(elem_cp)), static_cast<double>(imag(elem_cp)));
-    }
+    std::vector<std::complex<double>> state(size);
+    auto *state_kptr = reinterpret_cast<Kokkos::complex<double> *>(state.data());
+
+    // copy data from device to host
+    auto device_data = this->device_sv->getData(); // Kokkos::View<Kokkos::complex<double> *>
+    Kokkos::deep_copy(Kokkos::View<Kokkos::complex<double> *, Kokkos::HostSpace,
+                                   Kokkos::MemoryTraits<Kokkos::Unmanaged>>(state_kptr, size),
+                      device_data);
+
     return state;
 }
 
@@ -445,15 +438,13 @@ auto LightningKokkosSimulator::Measure(QubitIdType wire) -> Result
     const auto section_size = vec_size / stride;
     const auto half_section_size = section_size / 2;
 
-    std::vector<Kokkos::complex<double>> state;
-    state.reserve(vec_size);
+    std::vector<Kokkos::complex<double>> state(vec_size);
 
-    Kokkos::complex<double> elem_cp;
-    for (size_t idx = 0; idx < vec_size; idx++) {
-        auto elem_subview = Kokkos::subview(this->device_sv->getData(), idx);
-        Kokkos::deep_copy(elem_cp, elem_subview);
-        state.emplace_back(elem_cp);
-    }
+    // copy data from device to host
+    auto device_data = this->device_sv->getData();
+    Kokkos::deep_copy(Kokkos::View<Kokkos::complex<double> *, Kokkos::HostSpace,
+                                   Kokkos::MemoryTraits<Kokkos::Unmanaged>>(state.data(), vec_size),
+                      device_data);
 
     // zero half the entries
     // the "half" entries depend on the stride
