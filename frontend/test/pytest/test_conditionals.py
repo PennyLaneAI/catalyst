@@ -70,7 +70,7 @@ class TestCond:
     def test_cond_one_else_if(self):
         """Test a cond with one else_if branch"""
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def circuit(x):
             @cond(x > 2.7)
