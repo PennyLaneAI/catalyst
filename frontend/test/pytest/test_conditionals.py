@@ -68,48 +68,52 @@ class TestCond:
         assert circuit(6) == 36
 
     def test_cond_one_else_if(self):
+        """Test a cond with one else_if branch"""
+
         @qjit()
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def circuit(x):
             @cond(x > 2.7)
-            def multiply():
+            def cond_fn():
                 return x * 4
 
-            @multiply.else_if(x > 1.4)
-            def multiply():
+            @cond_fn.else_if(x > 1.4)
+            def cond_elif():
                 return x * 2
 
-            @multiply.otherwise
-            def multiply():
+            @cond_fn.otherwise
+            def cond_else():
                 return x
 
-            return multiply()
+            return cond_fn()
 
         assert circuit(4) == 16
         assert circuit(2) == 4
         assert circuit(1) == 1
 
     def test_cond_many_else_if(self):
+        """Test a cond with multiple else_if branches"""
+
         @qjit()
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def circuit(x):
             @cond(x > 4.8)
-            def multiply():
+            def cond_fn():
                 return x * 8
 
-            @multiply.else_if(x > 2.7)
-            def multiply():
+            @cond_fn.else_if(x > 2.7)
+            def cond_elif():
                 return x * 4
 
-            @multiply.else_if(x > 1.4)
-            def multiply():
+            @cond_fn.else_if(x > 1.4)
+            def cond_elif2():
                 return x * 2
 
-            @multiply.otherwise
-            def multiply():
+            @cond_fn.otherwise
+            def cond_else():
                 return x
 
-            return multiply()
+            return cond_fn()
 
         assert circuit(5) == 40
         assert circuit(3) == 12
@@ -132,6 +136,11 @@ class TestCond:
         assert circuit(6) == True
 
     def test_branch_return_mismatch(self):
+        """
+        Test that an exception is raised when the true branch returns a value without an else
+        branch
+        """
+
         def circuit():
             @cond(True)
             def cond_fn():
@@ -145,13 +154,19 @@ class TestCond:
             qjit(qml.qnode(qml.device("lightning.qubit", wires=1))(circuit))
 
     def test_branch_multi_return_mismatch(self):
+        """Test that an exception is raised when the return types of all branches do not match"""
+
         def circuit():
             @cond(True)
             def cond_fn():
                 return measure(wires=0)
 
             @cond_fn.else_if(False)
-            def cond_fn():
+            def cond_elif():
+                return 0
+
+            @cond_fn.otherwise
+            def cond_else():
                 return measure(wires=0)
 
             return cond_fn()
