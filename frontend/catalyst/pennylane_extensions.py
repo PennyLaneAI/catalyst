@@ -414,7 +414,7 @@ class CondCallable:
         args_avals = tuple(map(_abstractify, args))
 
         branch_jaxprs, consts, out_trees = _initial_style_jaxprs_with_common_consts(
-            tuple(self.branch_fns) + (self.otherwise_fn,), args_tree, args_avals, "cond"
+            (*self.branch_fns, self.otherwise_fn), args_tree, args_avals, "cond"
         )
 
         CondCallable._check_branches_return_types(branch_jaxprs)
