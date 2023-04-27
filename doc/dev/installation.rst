@@ -13,31 +13,46 @@ simply run the following ``pip`` command:
 
 Pre-built packages for Windows and MacOS are not yet available, and comptability with those
 platforms is untested and cannot be guaranteed. If you are using one of these platforms, please
-try out our Docker and Dev Container images described in the :ref:`next section<Dev Containers>`.
+try out our Docker and Dev Container images described in the `next section <#dev-containers>`_.
 
 If you wish to contribute to Catalyst or develop against our runtime or compiler, instructions for
-building from source are also included :ref:`further down<Building from source>`.
+building from source are also included `further down <#building-from-source>`_.
 
 Dev Containers
 --------------
 
 
 Try out Catalyst in self-contained, ready-to-go environments called
-`Dev Containers <https://code.visualstudio.com/docs/devcontainers/containers>`:
+`Dev Containers <https://code.visualstudio.com/docs/devcontainers/containers>`_:
 
-[![Try Catalyst in Dev Container](https://img.shields.io/static/v1?label=Dev%20Container&message=Launch&color=blue&logo=visualstudiocode&style=flat-square)](https://vscode.dev/redirect?url=vscode://ms-vscode-remote.remote-containers/cloneInVolume?url=https://github.com/PennyLaneAI/catalyst)
+.. image:: https://img.shields.io/static/v1?label=Dev%20Container&message=Launch&color=blue&logo=visualstudiocode&style=flat-square
+  :alt: Try Catalyst in Dev Container
+  :target: https://vscode.dev/redirect?url=vscode://ms-vscode-remote.remote-containers/cloneInVolume?url=https://github.com/PennyLaneAI/catalyst
+  :align: center
 
-You will need an existing installation of `Docker <https://www.docker.com/>` and
-`VS Code <https://code.visualstudio.com/>`. If desired, the Docker images can also
-be used in a standalone fashion:
+| You will need an existing installation of `Docker <https://www.docker.com/>`_,
+  `VS Code <https://code.visualstudio.com/>`_, and the VS Code
+  `Dev Containers <https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers>`_
+  extension.
 
-`Docker: User Installation <https://github.com/PennyLaneAI/catalyst/blob/main/.devcontainer/Dockerfile>`
-`Docker: Developer Installation <https://github.com/PennyLaneAI/catalyst/blob/main/.devcontainer/dev/Dockerfile>`
+If desired, the Docker images can also be used in a standalone fashion:
+
+| `Docker: User Installation <https://github.com/PennyLaneAI/catalyst/blob/main/.devcontainer/Dockerfile>`_
+| `Docker: Developer Installation <https://github.com/PennyLaneAI/catalyst/blob/main/.devcontainer/dev/Dockerfile>`_
 
 The user image provides an officially supported enviroment and automatically installs the latest
 release of Catalyst. The developer image only provides the right enviroment to build Catalyst from
 source, and requires launching the post-install script at ``.devcontainer/dev/post-install.sh``
-from whithin the running container.
+from whithin the root of the running container.
+
+.. note::
+  Due to `a bug <https://github.com/microsoft/vscode-remote-release/issues/8412>`_ in the Dev
+  Containers extension, clicking on the "Launch" badge will not prompt for a choice between the User
+  and Dev containers. Instead, the User container is automatically chosen.
+
+  As a workaround, you can clone the `Catalyst repository <https://github.com/PennyLaneAI/catalyst>`_
+  first, open it as a VS Code Workspace, and then reopen the Workspace in a Dev Container via the
+  ``Reopen in Container`` command.
 
 Building from source
 --------------------
