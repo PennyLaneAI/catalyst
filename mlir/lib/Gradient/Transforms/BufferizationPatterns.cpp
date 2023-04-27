@@ -14,6 +14,7 @@
 
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Transforms/DialectConversion.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 
 #include "Gradient/IR/GradientOps.h"
 #include "Gradient/Transforms/Passes.h"
@@ -63,16 +64,34 @@ class BufferizeBackpropOp : public OpConversionPattern<BackpropOp> {
             return failure();
 
         Location loc = op.getLoc();
+
         DenseIntElementsAttr diffArgIndices = op.getDiffArgIndices().value_or(nullptr);
 
+        Value gradSize = op.getGradSize();
+        ValueRange args = op.getArgs();
+
         SmallVector<Value> memrefValues;
-        for (Type resType : resTypes) {
+        size_t resSize = resTypes.size();
+        int argsSize = args.size();
+        int m = argsSize / resSize;
+
+        for (size_t i=0; i<resSize; i++) {
+            Type resType = resTypes[i];
+            std::vector<Value> dynamicDimSizes;
+            
+            int argPos = i % m;
+
+            int idx = args[argPos].getType().cast<RankedTensorType>().getDynamicDimIndex(0);
+
+            dynamicDimSizes.push_back(rewriter.create<tensor::DimOp>(loc, args[0], idx));
+            dynamicDimSizes.push_back(gradSize);
+
             MemRefType memrefType = resType.cast<MemRefType>();
-            Value memrefValue = rewriter.create<memref::AllocOp>(loc, memrefType);
+            Value memrefValue = rewriter.create<memref::AllocOp>(loc, memrefType, dynamicDimSizes);
             memrefValues.push_back(memrefValue);
         }
 
-        rewriter.create<BackpropOp>(loc, TypeRange{}, op.getCalleeAttr(), diffArgIndices, adaptor.getArgs(), memrefValues);
+        rewriter.create<BackpropOp>(loc, TypeRange{}, op.getCalleeAttr(), adaptor.getGradSize(), adaptor.getArgs(), memrefValues, diffArgIndices);
         rewriter.replaceOp(op, memrefValues);
         return success();
     }
