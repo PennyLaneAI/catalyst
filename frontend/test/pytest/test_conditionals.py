@@ -204,6 +204,25 @@ class TestCond:
         ):
             qjit(qml.qnode(qml.device("lightning.qubit", wires=1))(circuit))
 
+    def test_branch_with_arg(self):
+        """Test that an exception is raised when an 'else if' branch function contains an arg"""
+
+        def circuit(pred: bool):
+            @cond(pred)
+            def cond_fn():
+                qml.PauliX(0)
+
+            @cond_fn.else_if(pred)
+            def cond_elif(x):
+                qml.PauliX(x)
+
+            return measure(wires=0)
+
+        with pytest.raises(
+            TypeError, match="Conditional 'else if' function is not allowed to have any arguments"
+        ):
+            qjit(qml.qnode(qml.device("lightning.qubit", wires=1))(circuit))
+
     def test_identical_branch_names(self):
         @qjit
         @qml.qnode(qml.device("lightning.qubit", wires=1))
