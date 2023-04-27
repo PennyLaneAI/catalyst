@@ -330,7 +330,8 @@ class CondCallable:
             pred (bool): The predicate that will determine if this branch is executed.
 
         Returns:
-            A callable decorator that wraps this 'else if' branch of the conditional and returns self.
+            A callable decorator that wraps this 'else if' branch of the conditional and returns
+            self.
         """
 
         def decorator(branch_fn):

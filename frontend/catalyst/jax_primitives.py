@@ -1039,6 +1039,8 @@ def _qcond_lowering(
 
     # recursively lower if-else chains to nested IfOps
     def emit_branches(preds, branch_jaxprs, ip):
+        # ip is an MLIR InsertionPoint. This allows recursive calls to emit their Operations inside
+        # the 'else' blocks of preceding IfOps.
         with ip:
             pred_extracted = TensorExtractOp(ir.IntegerType.get_signless(1), preds[0], []).result
             if_op_scf = IfOp(pred_extracted, result_types, hasElse=True)

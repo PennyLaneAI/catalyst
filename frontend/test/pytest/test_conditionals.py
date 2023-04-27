@@ -94,7 +94,7 @@ class TestCond:
     def test_cond_many_else_if(self):
         """Test a cond with multiple else_if branches"""
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def circuit(x):
             @cond(x > 4.8)
@@ -118,6 +118,34 @@ class TestCond:
         assert circuit(5) == 40
         assert circuit(3) == 12
         assert circuit(2) == 4
+        assert circuit(-3) == -3
+
+    def test_cond_else_if_classical(self):
+        """Test a cond with multiple else_if branches using the classical compilation path."""
+
+        @qjit
+        def circuit(x):
+            @cond(x > 4.8)
+            def cond_fn():
+                return x * 16
+
+            @cond_fn.else_if(x > 2.7)
+            def cond_elif():
+                return x * 8
+
+            @cond_fn.else_if(x > 1.4)
+            def cond_elif2():
+                return x * 4
+
+            @cond_fn.otherwise
+            def cond_else():
+                return x
+
+            return cond_fn()
+
+        assert circuit(5) == 80
+        assert circuit(3) == 24
+        assert circuit(2) == 8
         assert circuit(-3) == -3
 
     def test_qubit_manipulation_cond(self):
