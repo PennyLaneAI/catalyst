@@ -102,6 +102,20 @@ jobs:
         LIGHTNING_GIT_TAG_VALUE=latest_release \
         make runtime
 
+    - name: Install PennyLane-Lightning (latest)
+      if: ${{ inputs.lightning == 'latest' }}
+      uses: actions/checkout@v3
+      with:
+        repository: PennyLaneAI/pennylane-lightning
+        path: pennylane-lightning
+    - if: ${{ inputs.lightning == 'latest' }}
+      run: |
+        pip install --upgrade ./pennylane-lightning
+
+    - name: Install PennyLane-Lightning (stable)
+      if: ${{ inputs.lightning == 'stable' }}
+      run: |
+        pip install --upgrade pennylane-lightning
 
     - name: Install PennyLane (latest)
       if: ${{ inputs.pennylane == 'latest' }}
