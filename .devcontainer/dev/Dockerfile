@@ -13,19 +13,24 @@ RUN apt-get update && apt-get install -y --no-install-recommends sudo \
 RUN echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME
 RUN chmod 0440 /etc/sudoers.d/$USERNAME
 
-# Image specific instructions: Ensure developer requirements are met.
-# Catalyst will be installed from source from within the running container.
+## Image specific instructions: Ensure developer requirements are met.       ##
+## Catalyst will be installed from source from within the running container. ##
 
+# Install the required C++ build toolchain and git.
 RUN apt-get update && apt-get install -y --no-install-recommends git curl patch \
       make ninja-build clang lld ccache libomp-dev \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 USER $USERNAME
 
-RUN pip install --no-cache-dir cmake
-RUN curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-RUN "${HOME}/.cargo/bin/rustup" component add llvm-tools-preview
+# Install a recent version of CMake not yet available via apt.
+RUN pip install --no-cache-dir "cmake>=3.20"
+# Install Python kernel for use with Jupyter Notebooks.
 RUN pip install --no-cache-dir ipykernel
 
+# Install the Rust toolchain for use with LLVM.
+ENV PATH="/home/${USERNAME}/.cargo/bin:${PATH}"
+RUN curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+RUN rustup component add llvm-tools-preview
+
 ENV SHELL /bin/bash
-ENV PATH="${HOME}/.cargo/bin:${PATH}"

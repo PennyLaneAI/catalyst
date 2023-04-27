@@ -13,14 +13,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends sudo \
 RUN echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME
 RUN chmod 0440 /etc/sudoers.d/$USERNAME
 
-# Image specific instructions: Install Catalyst straight from PyPI.
+## Image specific instructions: Install Catalyst straight from PyPI. ##
 
+# Install git.
 RUN apt-get update && apt-get install -y --no-install-recommends git \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 USER $USERNAME
 
+# Install Python kernel for use with Jupyter Notebooks.
 RUN pip install --no-cache-dir ipykernel
+
 RUN pip install --no-cache-dir pennylane-catalyst
 
 ENV SHELL /bin/bash
