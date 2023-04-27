@@ -451,7 +451,7 @@ def cond(pred):
     """A :func:`~.qjit` compatible decorator for if-else conditionals in PennyLane/Catalyst.
 
     This form of control flow is a functional version of the traditional if-else conditional. This
-    means that each execution path, a 'if' branch, any 'else if' branches, and a final 'otherwise'
+    means that each execution path, an 'if' branch, any 'else if' branches, and a final 'otherwise'
     branch, is provided as a separate function. All functions will be traced during compilation,
     but only one of them the will be executed at runtime, depending of the value of one or more
     Boolean predicates. The JAX equivalent is the ``jax.lax.cond`` function, but this version is
