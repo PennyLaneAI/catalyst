@@ -2,6 +2,9 @@
 
 <h3>New features</h3>
 
+* Add support for `else if` chains for `@cond` conditionals
+  [#104](https://github.com/PennyLaneAI/catalyst/pull/104)
+
 <h3>Improvements</h3>
 
 * Improving error handling by throwing descriptive and unified expressions for runtime
@@ -28,6 +31,7 @@ This release contains contributions from (in alphabetical order):
 
 Ali Asadi,
 Erick Ochoa Lopez
+Mai Jacob Peng
 
 # Release 0.1.2
 

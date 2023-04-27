@@ -1010,77 +1010,89 @@ def _state_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shape: tup
 #
 # qcond
 #
-def qcond(true_jaxpr, false_jaxpr, *header_and_branch_args_plus_consts):
+def qcond(branch_jaxprs, *header_and_branch_args_plus_consts):
     """Bind operands to operation."""
-    return qcond_p.bind(
-        *header_and_branch_args_plus_consts,
-        true_jaxpr=true_jaxpr,
-        false_jaxpr=false_jaxpr,
-    )
+    return qcond_p.bind(*header_and_branch_args_plus_consts, branch_jaxprs=branch_jaxprs)
 
 
 @qcond_p.def_abstract_eval
 # pylint: disable=unused-argument
-def _qcond_abstract_eval(*args, true_jaxpr, false_jaxpr, **kwargs):
-    return true_jaxpr.out_avals
+def _qcond_abstract_eval(*args, branch_jaxprs, **kwargs):
+    return branch_jaxprs[0].out_avals
 
 
 @qcond_p.def_impl
-def _qcond_def_impl(
-    ctx, pred, *branch_args_plus_consts, true_jaxpr, false_jaxpr
-):  # pragma: no cover
+def _qcond_def_impl(ctx, *preds_and_branch_args_plus_consts, branch_jaxprs):  # pragma: no cover
     raise NotImplementedError()
 
 
 def _qcond_lowering(
     jax_ctx: mlir.LoweringRuleContext,
-    pred: ir.Value,
-    *branch_args_plus_consts: tuple,
-    true_jaxpr: jax.core.ClosedJaxpr,
-    false_jaxpr: jax.core.ClosedJaxpr,
+    *preds_and_branch_args_plus_consts: tuple,
+    branch_jaxprs: list[jax.core.ClosedJaxpr],
 ):
     result_types = [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_out]
+    num_preds = len(branch_jaxprs) - 1
+    preds = preds_and_branch_args_plus_consts[:num_preds]
+    branch_args_plus_consts = preds_and_branch_args_plus_consts[num_preds:]
     flat_args_plus_consts = mlir.flatten_lowering_ir_args(branch_args_plus_consts)
 
-    pred_extracted = TensorExtractOp(ir.IntegerType.get_signless(1), pred, []).result
+    # recursively lower if-else chains to nested IfOps
+    def emit_branches(preds, branch_jaxprs, ip):
+        # ip is an MLIR InsertionPoint. This allows recursive calls to emit their Operations inside
+        # the 'else' blocks of preceding IfOps.
+        with ip:
+            pred_extracted = TensorExtractOp(ir.IntegerType.get_signless(1), preds[0], []).result
+            if_op_scf = IfOp(pred_extracted, result_types, hasElse=True)
+            true_jaxpr = branch_jaxprs[0]
+            if_block = if_op_scf.then_block
 
-    if_op_scf = IfOp(pred_extracted, result_types, hasElse=True)
+            # if block
+            name_stack = util.extend_name_stack(jax_ctx.module_context.name_stack, "if")
+            if_ctx = jax_ctx.module_context.replace(
+                name_stack=xla.extend_name_stack(name_stack, "if")
+            )
+            with ir.InsertionPoint(if_block):
+                # recursively generate the mlir for the if block
+                out = mlir.jaxpr_subcomp(
+                    if_ctx,
+                    true_jaxpr.jaxpr,
+                    mlir.TokenSet(),
+                    [mlir.ir_constants(c) for c in true_jaxpr.consts],
+                    *([a] for a in flat_args_plus_consts),  # fn expects [a1], [a2], [a3] format
+                    dim_var_values=jax_ctx.dim_var_values,
+                )
 
-    # if block
-    if_block = if_op_scf.then_block
-    name_stack = util.extend_name_stack(jax_ctx.module_context.name_stack, "if")
-    if_ctx = jax_ctx.module_context.replace(name_stack=xla.extend_name_stack(name_stack, "if"))
-    with ir.InsertionPoint(if_block):
-        # recursively generate the mlir for the if block
-        out = mlir.jaxpr_subcomp(
-            if_ctx,
-            true_jaxpr.jaxpr,
-            mlir.TokenSet(),
-            [mlir.ir_constants(c) for c in true_jaxpr.consts],
-            *([a] for a in flat_args_plus_consts),  # fn expects [a1], [a2], [a3] format
-            dim_var_values=jax_ctx.dim_var_values,
-        )
+                YieldOp([o[0] for o in out[0]])
 
-        YieldOp([o[0] for o in out[0]])
+            # else block
+            name_stack = util.extend_name_stack(jax_ctx.module_context.name_stack, "else")
+            else_ctx = jax_ctx.module_context.replace(
+                name_stack=xla.extend_name_stack(name_stack, "else")
+            )
+            else_block = if_op_scf.else_block
+            if len(preds) == 1:
+                # Base case: reached the otherwise block
+                otherwise_jaxpr = branch_jaxprs[-1]
+                with ir.InsertionPoint(else_block):
+                    out = mlir.jaxpr_subcomp(
+                        else_ctx,
+                        otherwise_jaxpr.jaxpr,
+                        mlir.TokenSet(),
+                        [mlir.ir_constants(c) for c in otherwise_jaxpr.consts],
+                        *([a] for a in flat_args_plus_consts),
+                        dim_var_values=jax_ctx.dim_var_values,
+                    )
 
-    # else block
-    else_block = if_op_scf.else_block
-    name_stack = util.extend_name_stack(jax_ctx.module_context.name_stack, "else")
-    else_ctx = jax_ctx.module_context.replace(name_stack=xla.extend_name_stack(name_stack, "else"))
-    with ir.InsertionPoint(else_block):
-        # recursively generate the mlir for the else block
-        out = mlir.jaxpr_subcomp(
-            else_ctx,
-            false_jaxpr.jaxpr,
-            mlir.TokenSet(),
-            [mlir.ir_constants(c) for c in false_jaxpr.consts],
-            *([a] for a in flat_args_plus_consts),  # fn expects [a1], [a2], [a3] format
-            dim_var_values=jax_ctx.dim_var_values,
-        )
+                    YieldOp([o[0] for o in out[0]])
+            else:
+                with ir.InsertionPoint(else_block) as else_ip:
+                    child_if_op = emit_branches(preds[1:], branch_jaxprs[1:], else_ip)
+                    YieldOp(child_if_op.results)
+            return if_op_scf
 
-        YieldOp([o[0] for o in out[0]])
-
-    return if_op_scf.results
+    head_if_op = emit_branches(preds, branch_jaxprs, jax_ctx.module_context.ip.current)
+    return head_if_op.results
 
 
 #
