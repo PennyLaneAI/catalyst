@@ -335,10 +335,16 @@ def grad(f:DifferentiableLike, *, method=None, h=None, argnum=None):
     return Grad(_bless_differentiable(f), grad_params=_check_grad_params(method, h, argnum))
 
 
-def jvp(f:DifferentiableLike, params, tangent, *, method=None, h=None, argnum=None):
+def jvp(f, params, tangents, *, method=None, h=None, argnum=None):
+    """
+    Args:
+        f(DifferentiableLike): Function-like object to calculate JVP for
+    """
+    fn:Differentiable = _bless_differentiable(f)
     grad_params = _check_grad_params(method, h, argnum)
-    jaxpr = _make_jaxpr_differentiable(f, grad_params, *params)
-    return jprim.jvp_p.bind(jaxpr=jaxpr, params=params, tangents=tangents, grad_params=grad_params)
+    jaxpr = _make_jaxpr_differentiable(fn, grad_params, *params)
+    results = jprim.jvp_p.bind(*(params + tangents), jaxpr=jaxpr, fn=fn, grad_params=grad_params)
+    return (results[0:len(params)], results[len(params):])
 
 
 # pylint: disable=too-few-public-methods

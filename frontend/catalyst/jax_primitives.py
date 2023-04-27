@@ -15,7 +15,7 @@
 of quantum operations, measurements, and observables to JAXPR.
 """
 
-from typing import List
+from typing import List, Dict
 from dataclasses import dataclass
 import numpy as np
 
@@ -24,6 +24,7 @@ import numpy as np
 from jax._src import util
 from jax._src.lib.mlir import ir
 from jax.interpreters import mlir, xla
+from jax.core import ShapedArray
 from jaxlib.mlir.dialects._func_ops_gen import CallOp
 from jaxlib.mlir.dialects._mhlo_ops_gen import ConstantOp, ConvertOp
 from mlir_quantum.dialects.arith import IndexCastOp
@@ -54,7 +55,11 @@ from mlir_quantum.dialects.scf import ConditionOp, ForOp, IfOp, WhileOp, YieldOp
 from mlir_quantum.dialects.tensor import ExtractOp as TensorExtractOp
 from mlir_quantum.dialects.tensor import FromElementsOp
 
+<<<<<<< HEAD
 from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
+=======
+from catalyst.utils.calculate_shape import calculate_grad_shape, Signature
+>>>>>>> 22eb0159 ([WIP] Draft jvp lowering pass; Fix jvp parameters passing)
 
 # pylint: disable=unused-argument,too-many-lines
 
@@ -197,7 +202,7 @@ jvp_p.multiple_results = True
 #
 # func
 #
-mlir_fn_cache = {}
+mlir_fn_cache:Dict["catalyst.pennylane_extensions.Function",str] = {}
 
 
 @func_p.def_impl
@@ -261,6 +266,7 @@ def _func_lowering(ctx, *args, call_jaxpr, fn, call=True):
 
 @dataclass
 class GradParams:
+    """ Common gradient parameters"""
     method:str
     h:float
     argnum:List[int]
@@ -287,7 +293,7 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
         ctx: the MLIR context
         args: the points in the function in which we are to calculate the derivative
         jaxpr: the jaxpr representation of the grad op
-        fn: the function to be differentiated
+        fn(Grad): the function to be differentiated
         method: the method used for differentiation
         h: the difference for finite difference. May be None when fn is not finite difference.
         argnum: argument indices which define over which arguments to
@@ -333,29 +339,38 @@ def _jvp_def_impl(ctx, *args, jaxpr, fn, grad_params):  # pragma: no cover
 # pylint: disable=unused-argument
 def _jvp_abstract(*args, jaxpr, fn, grad_params):
     """This function is called with abstract arguments for tracing."""
-    signature = Signature(jaxpr.consts + jaxpr.in_avals, jaxpr.out_avals)
-    offset = len(jaxpr.consts)
-    new_argnum = [num + offset for num in argnum]
-    transformed_signature = calculate_grad_shape(signature, new_argnum)
-    return tuple(transformed_signature.get_results())
+    return jaxpr.out_avals + jaxpr.out_avals
 
 
-def _jvp_lowering(ctx, params, tangents, jaxpr, fn, grad_params):
+def _jvp_lowering(ctx, *args, jaxpr, fn, grad_params):
+    """
+    Args:
+        ctx
+        jaxpr
+        fn(catalyst.pennylane_extensions.Function): The Function to calculate JVP for.
+        params
+        tangents
+        grad_params(GradParams)
+    Returns:
+        MLIR results
+    """
+    args = list(args)
     method, h, argnum = grad_params.method, grad_params.h, grad_params.argnum
     mlir_ctx = ctx.module_context.context
     new_argnum = np.array([len(jaxpr.consts) + num for num in argnum])
 
-    _func_lowering(ctx, *args, call_jaxpr=jaxpr.eqns[0].params["call_jaxpr"], fn=fn.fn, call=False)
-    symbol_name = mlir_fn_cache[fn.fn]
+    _func_lowering(ctx, *(args[:len(args)//2]), call_jaxpr=jaxpr.eqns[0].params["call_jaxpr"], fn=fn, call=False)
+    symbol_name = mlir_fn_cache[fn]
+
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
     constants = [ConstantOp(ir.DenseElementsAttr.get(const)).results for const in jaxpr.consts]
-    args_and_consts = constants + list(args)
+    consts_and_params_and_tangents = constants + args
     return JVPOp(
         flat_output_types,
         ir.StringAttr.get(method),
         ir.FlatSymbolRefAttr.get(symbol_name),
-        mlir.flatten_lowering_ir_args(args_and_consts),
+        mlir.flatten_lowering_ir_args(consts_and_params_and_tangents),
         diffArgIndices=ir.DenseIntElementsAttr.get(new_argnum),
         finiteDiffParam=ir.FloatAttr.get(ir.F64Type.get(mlir_ctx), h) if h else None,
     ).results
@@ -574,6 +589,8 @@ def _qinst_lowering(
     for p in params:
         if ir.RankedTensorType.isinstance(p.type) and ir.RankedTensorType(p.type).shape == []:
             baseType = ir.RankedTensorType(p.type).element_type
+        else:
+            assert False, f"{p.type}"
 
         if not ir.F64Type.isinstance(baseType):
             baseType = ir.F64Type.get()

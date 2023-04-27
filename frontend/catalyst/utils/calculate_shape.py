@@ -17,6 +17,7 @@ Deduce the function signatures after taking their gradients with respect to some
 """
 
 
+from typing import Any, List
 from jax.core import ShapedArray
 
 
@@ -25,8 +26,8 @@ class Signature:
     type deduction during abstract evaluation.
 
     Args:
-        xs: the domain of the function
-        ys: the range of the function
+        xs(List[Union[Any,ShapedArray]]): the domain of the function
+        ys(List[Union[Any,ShapedArray]]): the range of the function
     """
 
     def __init__(self, xs, ys):
@@ -90,13 +91,13 @@ class Signature:
         return self.xs == other.xs and self.ys == other.ys
 
 
-def calculate_grad_shape(signature, indices):
+def calculate_grad_shape(signature, indices) -> Signature:
     """calculate_grad_shape: Given a signature and a list of indices over which arguments
     to differentiate, deduce the new signature.
 
     Args:
-        signature: a signature.
-        indices: a list of integers that correspond to parameters in signature s.
+        signature(Signature): a signature.
+        indices(List[int]): a list of integers that correspond to parameters in signature s.
     Returns:
         A signature corresponding to the differentiation of ``signature`` with respect to
         ``indices``.
@@ -121,3 +122,4 @@ def calculate_grad_shape(signature, indices):
             grad_result_types.append(grad_res_type)
 
     return Signature(signature.get_inputs(), grad_result_types)
+
