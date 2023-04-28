@@ -130,7 +130,8 @@ class CompiledFunction:
         """Whether arguments can be promoted.
 
         Args:
-            compiled_signature: user supplied signature, obtain from either an annotation or a previously compiled
+            compiled_signature: user supplied signature, obtain from either an annotation or a
+                                previously compiled
             implementation of the compiled function
             runtime_signature: runtime signature
 
@@ -152,12 +153,12 @@ class CompiledFunction:
 
     @staticmethod
     def promote_arguments(compiled_signature, runtime_signature, *args):
-        """Promote arguments
-
-        Promote arguments from the type specified in args to the type specified by compiled_signature.
+        """Promote arguments from the type specified in args to the type specified by
+           compiled_signature.
 
         Args:
-            compiled_signature: user supplied signature, obtain from either an annotation or a previously compiled
+            compiled_signature: user supplied signature, obtain from either an annotation or a
+                                previously compiled
             implementation of the compiled function
             runtime_signature: runtime signature
             *args: actual arguments to the function
@@ -313,8 +314,8 @@ class CompiledFunction:
         # Unmap the shared library. This is necessary in case the function is re-compiled.
         # Without unmapping the shared library, there would be a conflict in the name of
         # the function and the previous one would succeed.
-        # Need to close after obtaining value, since the value can point to memory in the shared object.
-        # This is in the case of returning a constant, for example.
+        # Need to close after obtaining value, since the value can point to memory in the shared
+        # object. This is in the case of returning a constant, for example.
         dlclose = ctypes.CDLL(None).dlclose
         dlclose.argtypes = [ctypes.c_void_p]
         # pylint: disable=protected-access
@@ -360,7 +361,7 @@ class CompiledFunction:
         return_fields_types = [_get_rmd(mlir_tensor_type) for mlir_tensor_type in mlir_tensor_types]
 
         class CompiledFunctionReturnValue(ctypes.Structure):
-            """Programmatically create a structure which holds N tensors of possibly different T base types."""
+            """Programmatically create a structure which holds tensors of varying base types."""
 
             _fields_ = [("f" + str(i), type(t)) for i, t in enumerate(return_fields_types)]
 
@@ -551,7 +552,7 @@ class QJIT:
 
         if needs_compile:
             if self.user_typed:
-                msg = "Provided arguments did not match declared signature, recompilation has been triggered"
+                msg = "Provided arguments did not match declared signature, recompiling..."
                 warnings.warn(msg, UserWarning)
             self.mlir_module = self.get_mlir(*r_sig)
             self.compiled_function = self.compile()

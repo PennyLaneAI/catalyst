@@ -43,6 +43,8 @@ from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import Patcher
 from catalyst.utils.tracing import TracingContext
 
+# pylint: disable=too-many-lines
+
 
 class QFunc:
     """A device specific quantum function.
@@ -221,8 +223,8 @@ def grad(f, *, method=None, h=None, argnum=None):
 
     Args:
         f (Callable): the function to differentiate
-        method (str): The method used for differentiation, which can be any of ``["fd", "ps", "adj"]``,
-            where:
+        method (str): The method used for differentiation, which can be any of
+                      ``["fd", "ps", "adj"]``, where:
 
             - ``"fd"`` represents first-order finite-differences,
 
@@ -557,9 +559,9 @@ class WhileLoop(Operation):
 
 class WhileCallable:
     """
-    Some code in this class has been adapted from the while loop implementation in the JAX project at
-    https://github.com/google/jax/blob/jax-v0.4.1/jax/_src/lax/control_flow/loops.py
-    released under the Apache License, Version 2.0, with the following copyright notice:
+    Some code in this class has been adapted from the while loop implementation in the JAX project
+    at https://github.com/google/jax/blob/jax-v0.4.1/jax/_src/lax/control_flow/loops.py released
+    under the Apache License, Version 2.0, with the following copyright notice:
 
     Copyright 2021 The JAX Authors.
     """

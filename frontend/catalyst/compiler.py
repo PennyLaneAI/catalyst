@@ -195,9 +195,10 @@ class MLIRToLLVMDialect(PassPipeline):
         "--convert-linalg-to-loops",
         "--convert-scf-to-cf",
         # This pass expands memref operations that modify the metadata of a memref (sizes, offsets,
-        # stdies) into a sequence of easier to analyze constructs. In particular, this pass transforms
-        # operations into explicit sequence of operations that model the effect of this operation on the
-        # different metadata. This pass uses affine constructs to materialize these effects.
+        # strides) into a sequence of easier to analyze constructs. In particular, this pass
+        # transforms operations into explicit sequence of operations that model the effect of this
+        # operation on the different metadata. This pass uses affine constructs to materialize these
+        # effects.
         # Concretely, expanded-strided-metadata is used to decompose memref.subview as it has no
         # lowering in -convert-memref-to-llvm.
         "--expand-strided-metadata",
@@ -205,7 +206,7 @@ class MLIRToLLVMDialect(PassPipeline):
         "--convert-complex-to-standard",  # added for complex.exp lowering
         "--convert-complex-to-llvm",
         "--convert-math-to-llvm",
-        # Must be run after -convert-math-to-llvm as it marks math::powf illegal but doesn't convert it.
+        # Run after -convert-math-to-llvm as it marks math::powf illegal without converting it.
         "--convert-math-to-libm",
         "--convert-arith-to-llvm",
         "--convert-memref-to-llvm=use-generic-functions",
@@ -321,7 +322,7 @@ class CompilerDriver:
         compilers = fallback_compilers
         emit_warning = preferred_compiler and not preferred_compiler_exists
         if emit_warning:
-            msg = f"User defined compiler {preferred_compiler} is not in PATH. Will attempt fallback on available compilers."
+            msg = f"User defined compiler {preferred_compiler} is not in PATH. Using fallback ..."
             warnings.warn(msg, UserWarning)
         else:
             compilers = [preferred_compiler] + fallback_compilers
@@ -389,7 +390,8 @@ class CompilerDriver:
             success = CompilerDriver._attempt_link(compiler, flags, infile, outfile, options)
             if success:
                 return outfile
-        msg = f"Unable to link {infile}. All available compiler options exhausted. Please provide a compatible compiler via $CATALYST_CC."
+        msg = f"Unable to link {infile}. All available compiler options exhausted. "
+        msg += "Please provide a compatible compiler via $CATALYST_CC."
         raise EnvironmentError(msg)
 
 

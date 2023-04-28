@@ -51,7 +51,7 @@ from mlir_quantum.dialects.tensor import FromElementsOp
 
 from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
 
-# pylint: disable=unused-argument
+# pylint: disable=unused-argument,too-many-lines
 
 #########
 # Types #
@@ -650,23 +650,23 @@ def _compbasis_lowering(jax_ctx: mlir.LoweringRuleContext, *qubits: tuple):
 #
 # named observable
 #
-@compbasis_p.def_impl
-def _namedobs_def_impl(ctx, qubit, type):  # pragma: no cover
+def namedobs(kind, qubit):
+    """Bind operands to operation."""
+    return namedobs_p.bind(qubit, kind=kind)
+
+
+@namedobs_p.def_impl
+def _namedobs_def_impl(qubit, kind):  # pragma: no cover
     raise NotImplementedError()
 
 
-def namedobs(type, qubit):
-    """Bind operands to operation."""
-    return namedobs_p.bind(qubit, type=type)
-
-
 @namedobs_p.def_abstract_eval
-def _namedobs_abstract_eval(qubit, type):
+def _namedobs_abstract_eval(qubit, kind):
     assert isinstance(qubit, AbstractQbit)
     return AbstractObs()
 
 
-def _named_obs_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value, type: int):
+def _named_obs_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value, kind: int):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
@@ -675,7 +675,7 @@ def _named_obs_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value, type
     assert ir.OpaqueType(qubit.type).data == "bit"
 
     i8_type = ir.IntegerType.get_signless(8, ctx)
-    obsId = ir.IntegerAttr.get(i8_type, type)
+    obsId = ir.IntegerAttr.get(i8_type, kind)
     result_type = ir.OpaqueType.get("quantum", "obs", ctx)
 
     return NamedObsOp(result_type, qubit, obsId).results
