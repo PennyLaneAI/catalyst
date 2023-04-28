@@ -5,6 +5,7 @@ file(GLOB SRC
     quantum_bufferize.cpp
     ConversionPatterns.cpp
     quantum_to_llvm.cpp
+    emit_catalyst_pyface.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
