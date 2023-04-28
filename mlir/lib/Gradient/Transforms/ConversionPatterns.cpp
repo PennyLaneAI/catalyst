@@ -415,11 +415,6 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
         for (Type type : op.getResultTypes()) {
             if (!type.isa<MemRefType>())
                 return op.emitOpError("must be bufferized before lowering");
-
-            // Currently only expval gradients are supported by the runtime,
-            // leading to tensor<?xf64> return values.
-            if (type.dyn_cast<MemRefType>() != MemRefType::get({UNKNOWN}, Float64Type::get(ctx)))
-                return op.emitOpError("adjoint can only return MemRef<?xf64> or tuple thereof");
         }
 
         // The callee of the adjoint op must return as a single result the quantum register.
@@ -439,34 +434,6 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
         LLVM::LLVMFuncOp gradFnDecl =
             ensureFunctionDeclaration(rewriter, op, gradFnName, gradFnSignature);
 
-        // Run the forward pass and cache the circuit.
-        Value c_true = rewriter.create<LLVM::ConstantOp>(
-            loc, rewriter.getIntegerAttr(IntegerType::get(ctx, 1), 1));
-        Value c_false = rewriter.create<LLVM::ConstantOp>(
-            loc, rewriter.getIntegerAttr(IntegerType::get(ctx, 1), 0));
-        rewriter.create<LLVM::CallOp>(loc, cacheFnDecl, c_true);
-        Value qreg = rewriter.create<func::CallOp>(loc, callee, op.getArgs()).getResult(0);
-        if (!qreg.getType().isa<catalyst::quantum::QuregType>())
-            return callee.emitOpError("qfunc must return quantum register");
-        rewriter.create<LLVM::CallOp>(loc, cacheFnDecl, c_false);
-
-        // We follow the C ABI convention of passing result memrefs as struct pointers in the
-        // arguments to the C function, although in this case as a variadic argument list to allow
-        // for a varying number of results in a single signature.
-        Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
-        Value numResults = rewriter.create<LLVM::ConstantOp>(
-            loc, rewriter.getI64IntegerAttr(op.getDataIn().size()));
-        SmallVector<Value> args = {numResults};
-        for (Value memref : adaptor.getDataIn()) {
-            auto newArg =
-                rewriter.create<LLVM::AllocaOp>(loc, LLVM::LLVMPointerType::get(vectorType), c1);
-            rewriter.create<LLVM::StoreOp>(loc, memref, newArg);
-            args.push_back(newArg);
-        }
-
-        rewriter.create<LLVM::CallOp>(loc, gradFnDecl, args);
-        rewriter.create<catalyst::quantum::DeallocOp>(loc, qreg);
-        rewriter.eraseOp(op);
 
         return success();
     }
