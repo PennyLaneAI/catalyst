@@ -10,14 +10,14 @@ extension-pkg-whitelist=numpy,scipy,autograd,toml,appdir,autograd.numpy,autograd
 # (useful for modules/projects where namespaces are manipulated during runtime
 # and thus existing member attributes cannot be deduced by static analysis. It
 # supports qualified module names, as well as Unix pattern matching.
-ignored-modules=numpy,scipy,autograd,toml,appdir,autograd.numpy,autograd.numpy.linalg,autograd.numpy.builtins,semantic_version,torch,tensorflow,tensorflow.contrib,tensorflow.contrib.eager,LazyLoader,networkx,networkx.dag,math,pennylane.numpy,jaxlib.mlir.ir
+ignored-modules=numpy,scipy,autograd,toml,appdir,autograd.numpy,autograd.numpy.linalg,autograd.numpy.builtins,semantic_version,torch,tensorflow,tensorflow.contrib,tensorflow.contrib.eager,LazyLoader,networkx,networkx.dag,math,pennylane.numpy,pennylane.ops,jaxlib.mlir.ir
 
 # List of classes names for which member attributes should not be checked
 # (useful for classes with attributes dynamically set). This supports can work
 # with qualified names.
 ignored-classes=numpy,scipy,autograd,toml,appdir,autograd.numpy,autograd.numpy.linalg,autograd.numpy.builtins,semantic_version,torch,tensorflow,tensorflow.contrib,tensorflow.contrib.eager,LazyLoader,networkx,networkx.dag,math,pennylane.numpy,pennylane.numpy.random,pennylane.numpy.linalg,pennylane.numpy.builtins,pennylane.operation,retworkx,kahypar
 
-ignore=pytest,test,llvm-project,mlir-hlo,.git,__pycache__,build
+ignore=test,llvm-project,mlir-hlo,.git,__pycache__,build,doc
 
 [MESSAGES CONTROL]
 

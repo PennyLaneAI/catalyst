@@ -1070,7 +1070,7 @@ class QJITDevice(qml.QubitDevice):
         """
         raise RuntimeError("QJIT devices cannot apply operations.")
 
-    def default_expand_fn(self, circuit, max_expansion):
+    def default_expand_fn(self, circuit, max_expansion=10):
         """
         Most decomposition logic will be equivalent to PennyLane's decomposition.
         However, decomposition logic will differ in the following cases:
