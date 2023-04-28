@@ -29,6 +29,10 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/IR/PatternMatch.h"
+#include "Gradient/IR/GradientOps.h"
+
 #include "Gradient/IR/GradientOps.h"
 #include "Gradient/Transforms/Passes.h"
 #include "Gradient/Transforms/Patterns.h"
@@ -40,12 +44,56 @@ using namespace catalyst::gradient;
 namespace catalyst {
 namespace gradient {
 
+struct JVPLoweringPattern : public OpRewritePattern<JVPOp> {
+    using OpRewritePattern<JVPOp>::OpRewritePattern;
+
+    LogicalResult match(JVPOp op) const override;
+    void rewrite(JVPOp op, PatternRewriter &rewriter) const override;
+};
+
+LogicalResult JVPLoweringPattern::match(JVPOp op) const
+{
+    llvm::errs() << "matched JVP op\n";
+    return success();
+}
+
+void JVPLoweringPattern::rewrite(JVPOp op, PatternRewriter &rewriter) const
+{
+    Location loc = op.getLoc();
+    llvm::errs() << "replacing JVP op\n";
+
+    /* func::FuncOp callee = */
+    /*     SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr()); */
+
+    /* auto gradOp = rewriter.create<GradOp>(loc, */
+    /*   op.getResultTypes(), */
+    /*   op.getMethod(), */
+    /*   op.getCallee(), */
+    /*   op.getOperands(), */
+    /*   op.getDiffArgIndices().value(), */
+    /*   op.getFiniteDiffParam().value() */
+    /*   ); */
+
+    rewriter.replaceOpWithNewOp<GradOp>(op, 
+      op.getResultTypes(),
+      op.getMethod(),
+      op.getCallee(),
+      op.getOperands(),
+      op.getDiffArgIndices().value(),
+      op.getFiniteDiffParam().value()
+    );
+
+    llvm::errs() << "replaced JVP\n";
+}
+
+
+
 struct JVPLoweringPass
     : public PassWrapper<JVPLoweringPass, OperationPass<ModuleOp>> {
 
     JVPLoweringPass() {}
 
-    StringRef getArgument() const override { return "jvp-lowering"; }
+    StringRef getArgument() const override { return "lower-jvp-vjp"; }
 
     StringRef getDescription() const override { return "Lower JVP operations to grad operations."; }
 
@@ -57,7 +105,18 @@ struct JVPLoweringPass
 
     void runOnOperation() final
     {
-        llvm::errs() << "JVP lowering is called?\n";
+        llvm::errs() << "JVP lowering called\n";
+
+        ModuleOp op = getOperation();
+
+        RewritePatternSet patterns(&getContext());
+        patterns.add<JVPLoweringPattern>(patterns.getContext(), 1);
+
+        if (failed(applyPatternsAndFoldGreedily(op, std::move(patterns)))) {
+            llvm::errs() << "JVP lowering failed\n";
+            return signalPassFailure();
+        }
+        llvm::errs() << "JVP lowering succeeded\n";
     }
 };
 
