@@ -23,8 +23,7 @@
 using namespace mlir;
 using namespace catalyst::quantum;
 
-namespace catalyst {
-namespace quantum {
+namespace {
 
 static size_t countCallsites(LLVM::LLVMFuncOp op)
 {
@@ -138,6 +137,11 @@ static void wrapResultsAndArgsInTwoStructs(LLVM::LLVMFuncOp op, PatternRewriter 
 
     rewriter.create<LLVM::ReturnOp>(loc, call.getResults());
 }
+
+} // namespace
+
+namespace catalyst {
+namespace quantum {
 
 struct EmitCatalystPyInterfaceTransform : public OpRewritePattern<LLVM::LLVMFuncOp> {
     using OpRewritePattern<LLVM::LLVMFuncOp>::OpRewritePattern;
