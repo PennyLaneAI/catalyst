@@ -17,14 +17,14 @@ MLIR/LLVM representations.
 
 import abc
 import os
-import sys
 import shutil
 import subprocess
+import sys
 import tempfile
 import warnings
-from io import TextIOWrapper
-from typing import Optional, List, Any
 from dataclasses import dataclass
+from io import TextIOWrapper
+from typing import Any, List, Optional
 
 from catalyst._configuration import INSTALLED
 
@@ -468,7 +468,7 @@ class Compiler:
 
     def _get_output_file_of(self, pipeline):
         cls = Compiler._get_class_from_string(pipeline)
-        return self.pass_pipeline_output.get(cls)
+        return self.pass_pipeline_output[cls]
 
     def get_output_of(self, pipeline):
         """Get the output IR of a pipeline.
@@ -480,7 +480,7 @@ class Compiler:
         """
         try:
             fname = self._get_output_file_of(pipeline)
-        except AttributeError as e:
+        except (KeyError, AttributeError) as e:
             raise ValueError(f"Output for pass {pipeline} not found.") from e
         with open(fname, "r", encoding="utf-8") as f:
             txt = f.read()
