@@ -25,19 +25,9 @@ using namespace catalyst::quantum;
 
 namespace {
 
-static size_t countCallsites(LLVM::LLVMFuncOp op)
-{
-    size_t count = 0;
-    op.walk([&](LLVM::CallOp callOp) { count++; });
-    return count;
-}
-
-static bool hasSingleCallsite(LLVM::LLVMFuncOp op) { return 1 == countCallsites(op); }
-
 static Optional<LLVM::LLVMFuncOp> getCallee(LLVM::LLVMFuncOp op)
 {
-    if (!hasSingleCallsite(op))
-        return std::nullopt;
+    size_t counter = 0;
     Optional<LLVM::LLVMFuncOp> callee = std::nullopt;
     op.walk([&](LLVM::CallOp callOp) {
         auto calleeAttr = callOp.getCalleeAttr();
@@ -45,9 +35,10 @@ static Optional<LLVM::LLVMFuncOp> getCallee(LLVM::LLVMFuncOp op)
         if (!calleeAttr)
             return;
 
+        counter++;
         callee = SymbolTable::lookupNearestSymbolFrom<LLVM::LLVMFuncOp>(op, calleeAttr);
     });
-    return callee;
+    return counter == 1 ? callee : std::nullopt;
 }
 
 static bool hasCWrapperAttribute(LLVM::LLVMFuncOp op)
@@ -233,7 +224,6 @@ struct EmitCatalystPyInterfacePass
         }
     }
 };
-
 
 std::unique_ptr<Pass> createEmitCatalystPyInterfacePass()
 {
