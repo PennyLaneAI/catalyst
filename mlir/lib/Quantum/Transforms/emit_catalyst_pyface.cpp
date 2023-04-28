@@ -167,10 +167,6 @@ static void wrapResultsAndArgsInTwoStructs(LLVM::LLVMFuncOp op, PatternRewriter 
     rewriter.create<LLVM::ReturnOp>(loc, call.getResults());
 }
 
-} // namespace
-
-namespace catalyst {
-
 struct EmitCatalystPyInterfaceTransform : public OpRewritePattern<LLVM::LLVMFuncOp> {
     using OpRewritePattern<LLVM::LLVMFuncOp>::OpRewritePattern;
 
@@ -196,6 +192,10 @@ void EmitCatalystPyInterfaceTransform::rewrite(LLVM::LLVMFuncOp op, PatternRewri
     rewriter.updateRootInPlace(op, [&] { op.setSymName(newName); });
     wrapResultsAndArgsInTwoStructs(op, rewriter, functionNameWithoutPrefix);
 }
+
+} // namespace
+
+namespace catalyst {
 
 struct EmitCatalystPyInterfacePass
     : public PassWrapper<EmitCatalystPyInterfacePass, OperationPass<ModuleOp>> {
