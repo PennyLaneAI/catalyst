@@ -76,21 +76,15 @@ void LightningKokkosSimulator::PrintState()
     using std::endl;
 
     const size_t num_qubits = this->device_sv->getNumQubits();
-    const size_t size = Pennylane::Util::exp2(num_qubits);
+    const size_t size = Pennylane::Lightning_Kokkos::Util::exp2(num_qubits);
     size_t idx = 0;
     cout << "*** State-Vector of Size " << size << " ***" << endl;
     cout << "[";
+    auto &&state = this->State();
     for (; idx < size - 1; idx++) {
-        auto elem_subview = Kokkos::subview(this->device_sv->getData(), idx);
-        Kokkos::complex<double> elem_cp;
-        Kokkos::deep_copy(elem_cp, elem_subview);
-
-        cout << "(" << real(elem_cp) << "," << imag(elem_cp) << "), ";
+        cout << state[idx] << ", ";
     }
-    auto elem_last_subview = Kokkos::subview(this->device_sv->getData(), idx);
-    Kokkos::complex<double> elem_last_cp;
-    Kokkos::deep_copy(elem_last_cp, elem_last_subview);
-    cout << "(" << real(elem_last_cp) << "," << imag(elem_last_cp) << ")]" << endl;
+    cout << state[idx] << "]" << endl;
 }
 
 auto LightningKokkosSimulator::Zero() const -> Result
@@ -229,7 +223,7 @@ auto LightningKokkosSimulator::Expval(ObsIdType obsKey) -> double
 
     auto &&obs = this->obs_manager.getObservable(obsKey);
 
-    Pennylane::Simulators::MeasuresKokkos m{*(this->device_sv)};
+    Pennylane::Lightning_Kokkos::Simulators::MeasuresKokkos m{*(this->device_sv)};
 
     return m.expval(*obs);
 }
@@ -246,7 +240,7 @@ auto LightningKokkosSimulator::Var(ObsIdType obsKey) -> double
 
     auto &&obs = this->obs_manager.getObservable(obsKey);
 
-    Pennylane::Simulators::MeasuresKokkos m{*(this->device_sv)};
+    Pennylane::Lightning_Kokkos::Simulators::MeasuresKokkos m{*(this->device_sv)};
 
     return m.var(*obs);
 }
@@ -254,24 +248,23 @@ auto LightningKokkosSimulator::Var(ObsIdType obsKey) -> double
 auto LightningKokkosSimulator::State() -> std::vector<std::complex<double>>
 {
     const size_t num_qubits = this->device_sv->getNumQubits();
-    const size_t size = Pennylane::Util::exp2(num_qubits);
-    std::vector<std::complex<double>> state;
-    state.reserve(size);
+    const size_t size = Pennylane::Lightning_Kokkos::Util::exp2(num_qubits);
 
-    for (size_t idx = 0; idx < size; idx++) {
-        auto elem_subview = Kokkos::subview(this->device_sv->getData(), idx);
-        Kokkos::complex<double> elem_cp;
-        Kokkos::deep_copy(elem_cp, elem_subview);
-        double elem_cp_real = real(elem_cp);
-        double elem_cp_imag = imag(elem_cp);
-        state.emplace_back(static_cast<double>(real(elem_cp)), static_cast<double>(imag(elem_cp)));
-    }
+    std::vector<std::complex<double>> state(size);
+    auto *state_kptr = reinterpret_cast<Kokkos::complex<double> *>(state.data());
+
+    // copy data from device to host
+    auto device_data = this->device_sv->getData(); // Kokkos::View<Kokkos::complex<double> *>
+    Kokkos::deep_copy(Kokkos::View<Kokkos::complex<double> *, Kokkos::HostSpace,
+                                   Kokkos::MemoryTraits<Kokkos::Unmanaged>>(state_kptr, size),
+                      device_data);
+
     return state;
 }
 
 auto LightningKokkosSimulator::Probs() -> std::vector<double>
 {
-    Pennylane::Simulators::MeasuresKokkos m{*(this->device_sv)};
+    Pennylane::Lightning_Kokkos::Simulators::MeasuresKokkos m{*(this->device_sv)};
     return m.probs();
 }
 
@@ -286,13 +279,13 @@ auto LightningKokkosSimulator::PartialProbs(const std::vector<QubitIdType> &wire
 
     auto dev_wires = getDeviceWires(wires);
 
-    Pennylane::Simulators::MeasuresKokkos m{*(this->device_sv)};
+    Pennylane::Lightning_Kokkos::Simulators::MeasuresKokkos m{*(this->device_sv)};
     return m.probs(dev_wires);
 }
 
 auto LightningKokkosSimulator::Sample(size_t shots) -> std::vector<double>
 {
-    Pennylane::Simulators::MeasuresKokkos m{*(this->device_sv)};
+    Pennylane::Lightning_Kokkos::Simulators::MeasuresKokkos m{*(this->device_sv)};
     // PL-Lightning-Kokkos generates samples using the alias method.
     // Reference: https://en.wikipedia.org/wiki/Inverse_transform_sampling
     auto li_samples = m.generate_samples(shots);
@@ -326,7 +319,7 @@ auto LightningKokkosSimulator::PartialSample(const std::vector<QubitIdType> &wir
     // get device wires
     auto &&dev_wires = getDeviceWires(wires);
 
-    Pennylane::Simulators::MeasuresKokkos m{*(this->device_sv)};
+    Pennylane::Lightning_Kokkos::Simulators::MeasuresKokkos m{*(this->device_sv)};
     // PL-Lightning-Kokkos generates samples using the alias method.
     // Reference: https://en.wikipedia.org/wiki/Inverse_transform_sampling
     auto li_samples = m.generate_samples(shots);
@@ -350,7 +343,7 @@ auto LightningKokkosSimulator::PartialSample(const std::vector<QubitIdType> &wir
 auto LightningKokkosSimulator::Counts(size_t shots)
     -> std::tuple<std::vector<double>, std::vector<int64_t>>
 {
-    Pennylane::Simulators::MeasuresKokkos m{*(this->device_sv)};
+    Pennylane::Lightning_Kokkos::Simulators::MeasuresKokkos m{*(this->device_sv)};
     // PL-Lightning-Kokkos generates samples using the alias method.
     // Reference: https://en.wikipedia.org/wiki/Inverse_transform_sampling
     auto li_samples = m.generate_samples(shots);
@@ -394,7 +387,7 @@ auto LightningKokkosSimulator::PartialCounts(const std::vector<QubitIdType> &wir
     // get device wires
     auto &&dev_wires = getDeviceWires(wires);
 
-    Pennylane::Simulators::MeasuresKokkos m{*(this->device_sv)};
+    Pennylane::Lightning_Kokkos::Simulators::MeasuresKokkos m{*(this->device_sv)};
     // PL-Lightning-Kokkos generates samples using the alias method.
     // Reference: https://en.wikipedia.org/wiki/Inverse_transform_sampling
     auto li_samples = m.generate_samples(shots);
@@ -445,15 +438,13 @@ auto LightningKokkosSimulator::Measure(QubitIdType wire) -> Result
     const auto section_size = vec_size / stride;
     const auto half_section_size = section_size / 2;
 
-    std::vector<Kokkos::complex<double>> state;
-    state.reserve(vec_size);
+    std::vector<Kokkos::complex<double>> state(vec_size);
 
-    Kokkos::complex<double> elem_cp;
-    for (size_t idx = 0; idx < vec_size; idx++) {
-        auto elem_subview = Kokkos::subview(this->device_sv->getData(), idx);
-        Kokkos::deep_copy(elem_cp, elem_subview);
-        state.emplace_back(elem_cp);
-    }
+    // copy data from device to host
+    auto device_data = this->device_sv->getData();
+    Kokkos::deep_copy(Kokkos::View<Kokkos::complex<double> *, Kokkos::HostSpace,
+                                   Kokkos::MemoryTraits<Kokkos::Unmanaged>>(state.data(), vec_size),
+                      device_data);
 
     // zero half the entries
     // the "half" entries depend on the stride
@@ -512,12 +503,13 @@ auto LightningKokkosSimulator::Gradient(const std::vector<size_t> &trainParams)
     auto &&ops_params = this->cache_manager.getOperationsParameters();
     auto &&ops_wires = this->cache_manager.getOperationsWires();
     auto &&ops_inverses = this->cache_manager.getOperationsInverses();
-    Pennylane::Algorithms::AdjointJacobianKokkos<double> adj;
+    Pennylane::Lightning_Kokkos::Algorithms::AdjointJacobianKokkos<double> adj;
     const auto ops = adj.createOpsData(ops_names, ops_params, ops_wires, ops_inverses);
 
     // Create the vector of observables
     auto &&obs_keys = this->cache_manager.getObservablesKeys();
-    std::vector<std::shared_ptr<Pennylane::Simulators::ObservableKokkos<double>>> obs_vec;
+    std::vector<std::shared_ptr<Pennylane::Lightning_Kokkos::Simulators::ObservableKokkos<double>>>
+        obs_vec;
     obs_vec.reserve(obs_keys.size());
     for (auto idx : obs_keys) {
         obs_vec.emplace_back(this->obs_manager.getObservable(idx));

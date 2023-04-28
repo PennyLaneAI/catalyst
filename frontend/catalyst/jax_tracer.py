@@ -260,12 +260,11 @@ def trace_quantum_tape(
                 wires, new_qubits, qubit_states, qreg
             )
         elif op.__class__.__name__ == "Cond":
-            predicate, consts = op_args
+            predicates, consts = op_args
             qreg = insert_to_qreg(qubit_states, qreg)
-            header_and_branch_args_plus_consts = [predicate] + consts + [qreg]
+            header_and_branch_args_plus_consts = predicates + consts + [qreg]
             outs = jprim.qcond(
-                op.true_jaxpr,
-                op.false_jaxpr,
+                op.branch_jaxprs,
                 *header_and_branch_args_plus_consts,
             )
             v, qreg = tree_unflatten(op.out_trees[0], outs)
