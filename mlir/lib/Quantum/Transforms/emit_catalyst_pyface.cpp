@@ -33,7 +33,7 @@ static size_t countCallsites(LLVM::LLVMFuncOp op)
     return count;
 }
 
-static bool callsiteHasAttribute(LLVM::LLVMFuncOp op)
+static bool callsiteHasCWrapperAttribute(LLVM::LLVMFuncOp op)
 {
     bool retval = false;
     ModuleOp moduleOp = cast<ModuleOp>(op->getParentOp());
@@ -79,7 +79,7 @@ LogicalResult EmitCatalystPyInterfaceTransform::match(LLVM::LLVMFuncOp op) const
         return failure();
 
     // The only call must contain the emitCWrapper attribute
-    bool hasAttribute = callsiteHasAttribute(op);
+    bool hasAttribute = callsiteHasCWrapperAttribute(op);
 
     return hasAttribute ? success() : failure();
 }
