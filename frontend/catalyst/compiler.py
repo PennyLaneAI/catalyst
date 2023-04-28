@@ -130,7 +130,6 @@ class PassPipeline(abc.ABC):
         return outfile
 
 
-# pylint: disable=too-few-public-methods
 class MHLOPass(PassPipeline):
     """Pass pipeline to convert (M)HLO dialects to standard MLIR dialects."""
 
@@ -268,7 +267,6 @@ class LLVMIRToObjectFile(PassPipeline):
         return infile.replace(".ll", ".o")
 
 
-# pylint: disable=too-few-public-methods
 class CompilerDriver:
     """Compiler Driver Interface
     In order to avoid relying on a single compiler at run time and allow the user some flexibility,
@@ -330,7 +328,6 @@ class CompilerDriver:
         return compilers
 
     @staticmethod
-    # pylint: disable=redefined-outer-name
     def _exists(compiler):
         if compiler is None:
             return None
@@ -338,13 +335,11 @@ class CompilerDriver:
 
     @staticmethod
     def _available_compilers(fallback_compilers):
-        # pylint: disable=redefined-outer-name
         for compiler in CompilerDriver._get_compiler_fallback_order(fallback_compilers):
             if CompilerDriver._exists(compiler):
                 yield compiler
 
     @staticmethod
-    # pylint: disable=redefined-outer-name
     def _attempt_link(compiler, flags, infile, outfile, options):
         try:
             command = [compiler] + flags + [infile, "-o", outfile]
@@ -405,8 +400,7 @@ class Compiler:
         self.pass_pipeline_output = None
         # The temporary directory must be referenced by the wrapper class
         # in order to avoid being garbage collected
-        # pylint: disable=consider-using-with
-        self.workspace = tempfile.TemporaryDirectory()
+        self.workspace = tempfile.TemporaryDirectory()  # pylint: disable=consider-using-with
 
     def run(self, mlir_module, options):
         """Compile an MLIR module to a shared object.

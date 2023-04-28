@@ -12,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import numpy as np
+import pennylane as qml
 import pytest
 
-from catalyst import cond, qjit, measure
-import pennylane as qml
-import numpy as np
+from catalyst import cond, measure, qjit
 
 
 class TestCondToJaxpr:
@@ -243,7 +243,6 @@ class TestCond:
         assert circuit(True) == 1
 
 
-# pylint: disable=too-few-public-methods
 class TestInterpretationConditional:
     """Test that the conditional operation's execution is semantically equivalent when compiled and interpreted."""
 

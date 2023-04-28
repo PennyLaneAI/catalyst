@@ -44,7 +44,6 @@ from catalyst.utils.patching import Patcher
 from catalyst.utils.tracing import TracingContext
 
 
-# pylint: disable=too-few-public-methods
 class QFunc:
     """A device specific quantum function.
 
@@ -105,7 +104,6 @@ def qfunc(num_wires, *, shots=1000, device=None):
     return dec_no_params
 
 
-# pylint: disable=too-few-public-methods
 class Function:
     """An object that represents a compiled function.
 
@@ -132,7 +130,6 @@ class Function:
         return jprim.func_p.bind(wrap_init(_eval_jaxpr), *args, fn=self)
 
 
-# pylint: disable=too-few-public-methods
 class Grad:
     """An object that specifies that a function will be differentiated.
 
@@ -289,7 +286,6 @@ def grad(f, *, method=None, h=None, argnum=None):
     return Grad(Function(f), method=method, h=h, argnum=argnum)
 
 
-# pylint: disable=too-few-public-methods
 class Cond(Operation):
     """PennyLane's conditional operation."""
 
@@ -306,7 +302,6 @@ class Cond(Operation):
         super().__init__(*args, **kwargs)
 
 
-# pylint: disable=too-few-public-methods
 class CondCallable:
     """
     Some code in this class has been adapted from the cond implementation in the JAX project at
@@ -533,7 +528,6 @@ def cond(pred):
     return decorator
 
 
-# pylint: disable=too-few-public-methods
 class WhileLoop(Operation):
     """PennyLane's while loop operation."""
 
@@ -561,7 +555,6 @@ class WhileLoop(Operation):
         super().__init__(*args, **kwargs)
 
 
-# pylint: disable=too-few-public-methods
 class WhileCallable:
     """
     Some code in this class has been adapted from the while loop implementation in the JAX project at
@@ -746,7 +739,6 @@ def while_loop(cond_fn):
     return _while_loop
 
 
-# pylint: disable=too-few-public-methods
 class ForLoop(Operation):
     """PennyLane ForLoop Operation."""
 
@@ -763,7 +755,6 @@ class ForLoop(Operation):
         super().__init__(*args, **kwargs)
 
 
-# pylint: disable=too-few-public-methods
 class ForLoopCallable:
     """
     Some code in this class has been adapted from the for loop implementation in the JAX project at
@@ -944,7 +935,6 @@ def for_loop(lower_bound, upper_bound, step):
     return _for_loop
 
 
-# pylint: disable=too-few-public-methods
 class MidCircuitMeasure(Operation):
     """Operation representing a mid-circuit measurement."""
 
@@ -1108,10 +1098,10 @@ class QJITDevice(qml.QubitDevice):
         # At the moment, bypassing decomposition for controlled gates will generally have a higher
         # success rate, as complex decomposition paths can fail to trace (c.f. PL #3521, #3522).
 
-        def _decomp_controlled_unitary(self, *args, **kwargs):  # pylint: disable=unused-argument
+        def _decomp_controlled_unitary(self, *_args, **_kwargs):
             return qml.QubitUnitary(qml.matrix(self), wires=self.wires)
 
-        def _decomp_controlled(self, *args, **kwargs):  # pylint: disable=unused-argument
+        def _decomp_controlled(self, *_args, **_kwargs):
             return qml.QubitUnitary(qml.matrix(self), wires=self.wires)
 
         with Patcher(

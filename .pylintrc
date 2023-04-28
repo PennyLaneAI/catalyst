@@ -17,14 +17,14 @@ ignored-modules=numpy,scipy,autograd,toml,appdir,autograd.numpy,autograd.numpy.l
 # with qualified names.
 ignored-classes=numpy,scipy,autograd,toml,appdir,autograd.numpy,autograd.numpy.linalg,autograd.numpy.builtins,semantic_version,torch,tensorflow,tensorflow.contrib,tensorflow.contrib.eager,LazyLoader,networkx,networkx.dag,math,pennylane.numpy,pennylane.numpy.random,pennylane.numpy.linalg,pennylane.numpy.builtins,pennylane.operation,retworkx,kahypar
 
-ignore=pytest,test,python_bindings,llvm-project,mlir-hlo,.git,__pycache__,build
+ignore=pytest,test,llvm-project,mlir-hlo,.git,__pycache__,build
 
 [MESSAGES CONTROL]
 
 # Enable the message, report, category or checker with the given id(s). You can
 # either give multiple identifier separated by comma (,) or put this option
 # multiple time.
-#enable=
+enable=useless-suppression
 
 # Disable the message, report, category or checker with the given id(s). You
 # can either give multiple identifier separated by comma (,) or put this option
@@ -32,7 +32,7 @@ ignore=pytest,test,python_bindings,llvm-project,mlir-hlo,.git,__pycache__,build
 # it should appear only once).
 # Cyclical import checks are disabled for now as they are frequently used in
 # the code base, but this can be removed in the future once cycles are resolved.
-disable=line-too-long,invalid-name,too-many-lines,redefined-builtin,too-many-locals,duplicate-code,cyclic-import,import-error,bad-option-value
+disable=too-few-public-methods,line-too-long,invalid-name,too-many-lines,redefined-builtin,too-many-locals,duplicate-code,cyclic-import,import-error,bad-option-value
 
 [MISCELLANEOUS]
 

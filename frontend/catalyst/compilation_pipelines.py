@@ -17,28 +17,27 @@ compiling of hybrid quantum-classical functions using Catalyst.
 
 import ctypes
 import functools
-import warnings
 import inspect
 import typing
+import warnings
 
 import jax
 import numpy as np
 import pennylane as qml
 from jax.interpreters.mlir import ir
 from mlir_quantum.runtime import (
-    get_ranked_memref_descriptor,
-    ranked_memref_to_numpy,
-    to_numpy,
     as_ctype,
+    get_ranked_memref_descriptor,
     make_nd_memref_descriptor,
     make_zero_d_memref_descriptor,
+    ranked_memref_to_numpy,
+    to_numpy,
 )
 
-from catalyst.utils.gen_mlir import inject_functions
 import catalyst.jax_tracer as tracer
-from catalyst.compiler import Compiler
-from catalyst.compiler import CompileOptions
+from catalyst.compiler import CompileOptions, Compiler
 from catalyst.pennylane_extensions import QFunc
+from catalyst.utils.gen_mlir import inject_functions
 from catalyst.utils.patching import Patcher
 from catalyst.utils.tracing import TracingContext
 
@@ -360,7 +359,6 @@ class CompiledFunction:
         _get_rmd = CompiledFunction.get_ranked_memref_descriptor_from_mlir_tensor_type
         return_fields_types = [_get_rmd(mlir_tensor_type) for mlir_tensor_type in mlir_tensor_types]
 
-        # pylint: disable=too-few-public-methods
         class CompiledFunctionReturnValue(ctypes.Structure):
             """Programmatically create a structure which holds N tensors of possibly different T base types."""
 

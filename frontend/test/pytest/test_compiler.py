@@ -4,22 +4,25 @@ Unit tests for CompilerDriver class
 
 import os
 import sys
-import warnings
 import tempfile
-import pytest
+import warnings
 
 import pennylane as qml
+import pytest
+
 from catalyst import qjit
-from catalyst.compiler import PassPipeline
-from catalyst.compiler import Compiler
-from catalyst.compiler import CompilerDriver
-from catalyst.compiler import CompileOptions
-from catalyst.compiler import MHLOPass
-from catalyst.compiler import QuantumCompilationPass
-from catalyst.compiler import BufferizationPass
-from catalyst.compiler import MLIRToLLVMDialect
-from catalyst.compiler import LLVMDialectToLLVMIR
-from catalyst.compiler import LLVMIRToObjectFile
+from catalyst.compiler import (
+    BufferizationPass,
+    CompileOptions,
+    Compiler,
+    CompilerDriver,
+    LLVMDialectToLLVMIR,
+    LLVMIRToObjectFile,
+    MHLOPass,
+    MLIRToLLVMDialect,
+    PassPipeline,
+    QuantumCompilationPass,
+)
 from catalyst.jax_tracer import get_mlir
 
 
@@ -82,9 +85,9 @@ class TestCompilerErrors:
     def test_no_executable(self):
         """Test that executable was set from a custom PassPipeline."""
 
-        # pylint: disable=missing-class-docstring
         class CustomClassWithNoExecutable(PassPipeline):
-            # pylint: disable=too-few-public-methods
+            """Custom pipeline with missing executable."""
+
             _default_flags = ["some-command-but-it-is-actually-a-flag"]
 
         with pytest.raises(ValueError, match="Executable not specified."):
@@ -137,7 +140,6 @@ class TestCompilerErrors:
             compiler.get_output_of("inexistent-file")
 
 
-# pylint: disable=too-few-public-methods
 class TestCompilerState:
     """Test states that the compiler can reach."""
 

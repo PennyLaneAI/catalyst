@@ -15,43 +15,41 @@
 of quantum operations, measurements, and observables to JAXPR.
 """
 
-import numpy as np
-
 import jax
-from jax.interpreters import mlir, xla
+import numpy as np
 from jax._src import util
 from jax._src.lib.mlir import ir
+from jax.interpreters import mlir, xla
 from jaxlib.mlir.dialects._func_ops_gen import CallOp
 from jaxlib.mlir.dialects._mhlo_ops_gen import ConstantOp, ConvertOp
-
 from mlir_quantum.dialects.arith import IndexCastOp
-from mlir_quantum.dialects.tensor import ExtractOp as TensorExtractOp, FromElementsOp
-from mlir_quantum.dialects.scf import IfOp, ConditionOp, ForOp, WhileOp, YieldOp
 from mlir_quantum.dialects.gradient import GradOp
 from mlir_quantum.dialects.quantum import (
-    SampleOp,
-    CountsOp,
-    ExpvalOp,
-    VarianceOp,
-    ProbsOp,
-    StateOp,
-    CustomOp,
-    MultiRZOp,
-    QubitUnitaryOp,
-    MeasureOp,
     AllocOp,
-    ExtractOp,
-    InsertOp,
-    DeallocOp,
     ComputationalBasisOp,
-    NamedObsOp,
-    HermitianOp,
-    TensorOp,
+    CountsOp,
+    CustomOp,
+    DeallocOp,
+    ExpvalOp,
+    ExtractOp,
     HamiltonianOp,
+    HermitianOp,
+    InsertOp,
+    MeasureOp,
+    MultiRZOp,
+    NamedObsOp,
+    ProbsOp,
+    QubitUnitaryOp,
+    SampleOp,
+    StateOp,
+    TensorOp,
+    VarianceOp,
 )
+from mlir_quantum.dialects.scf import ConditionOp, ForOp, IfOp, WhileOp, YieldOp
+from mlir_quantum.dialects.tensor import ExtractOp as TensorExtractOp
+from mlir_quantum.dialects.tensor import FromElementsOp
 
-from catalyst.utils.calculate_grad_shape import calculate_grad_shape, Signature
-
+from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
 
 #########
 # Types #
@@ -61,7 +59,7 @@ from catalyst.utils.calculate_grad_shape import calculate_grad_shape, Signature
 #
 # qbit
 #
-# pylint: disable=too-few-public-methods,abstract-method
+# pylint: abstract-method
 class Qbit:
     """Qbit primitive."""
 
@@ -69,12 +67,12 @@ class Qbit:
         self.aval = AbstractQbit()
 
 
-# pylint: disable=too-few-public-methods,abstract-method
+# pylint: abstract-method
 class AbstractQbit(jax.core.AbstractValue):
     """Abstract Qbit"""
 
 
-# pylint: disable=too-few-public-methods,abstract-method
+# pylint: abstract-method
 class ConcreteQbit(AbstractQbit):
     """Concrete Qbit."""
 
@@ -87,7 +85,7 @@ def _qbit_lowering(aval):
 #
 # qreg
 #
-# pylint: disable=too-few-public-methods,abstract-method
+# pylint: abstract-method
 class Qreg:
     """Quantum register primitive."""
 
@@ -95,12 +93,12 @@ class Qreg:
         self.aval = AbstractQreg()
 
 
-# pylint: disable=too-few-public-methods,abstract-method
+# pylint: abstract-method
 class AbstractQreg(jax.core.AbstractValue):
     """Abstract quantum register."""
 
 
-# pylint: disable=too-few-public-methods,abstract-method
+# pylint: abstract-method
 class ConcreteQreg(AbstractQreg):
     """Concrete quantum register."""
 
@@ -113,7 +111,7 @@ def _qreg_lowering(aval):
 #
 # observable
 #
-# pylint: disable=too-few-public-methods,abstract-method
+# pylint: abstract-method
 class Obs:
     """Observable JAX type primitive."""
 
@@ -121,7 +119,7 @@ class Obs:
         self.aval = AbstractObs(num_qubits, primitive)
 
 
-# pylint: disable=too-few-public-methods,abstract-method
+# pylint: abstract-method
 class AbstractObs(jax.core.AbstractValue):
     """Abstract observable."""
 
@@ -130,7 +128,7 @@ class AbstractObs(jax.core.AbstractValue):
         self.primitive = primitive
 
 
-# pylint: disable=too-few-public-methods,abstract-method
+# pylint: abstract-method
 class ConcreteObs(AbstractObs):
     """Concrete observable."""
 
@@ -593,7 +591,6 @@ def qmeasure(qubit):
 
 
 @qmeasure_p.def_abstract_eval
-# pylint: disable=unused-argument
 def _qmeasure_abstract_eval(qubit):
     assert isinstance(qubit, AbstractQbit)
     return jax.core.ShapedArray((), bool), qubit
@@ -1192,7 +1189,6 @@ def _qwhile_lowering(
 #
 # qfor loop
 #
-# pylint: disable=unused-argument
 def qfor(body_jaxpr, body_nconsts, *header_and_iter_args_plus_consts):
     """Bind operands to operation."""
     return qfor_p.bind(
