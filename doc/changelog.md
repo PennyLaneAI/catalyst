@@ -25,6 +25,9 @@
 * Fix a bug in the way gradient result type is inferred.
   [#84](https://github.com/PennyLaneAI/catalyst/pull/84)
 
+* Fix a memory regression and reduce memory footprint by removing unnecessary temporary buffers.
+  [#100](https://github.com/PennyLaneAI/catalyst/pull/100)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
