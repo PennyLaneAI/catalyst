@@ -131,313 +131,313 @@ struct AdjointOpPattern : public OpConversionPattern<AdjointOp> {
 };
 
 
-/// Generate an mlir function to wrap an existing function into a return-by-pointer style function.
-///
-/// .
-///
-func::FuncOp genEnzymeWrapperFunction(PatternRewriter &rewriter, Location loc, GradOp gradOp,
-                                      func::FuncOp argMapFn)
-{
-    MLIRContext *ctx = rewriter.getContext();
-    LLVMTypeConverter llvmTypeConverter(ctx);
-    bufferization::BufferizeTypeConverter buffTypeConverter;
+// /// Generate an mlir function to wrap an existing function into a return-by-pointer style function.
+// ///
+// /// .
+// ///
+// func::FuncOp genEnzymeWrapperFunction(PatternRewriter &rewriter, Location loc, GradOp gradOp,
+//                                       func::FuncOp argMapFn)
+// {
+//     MLIRContext *ctx = rewriter.getContext();
+//     LLVMTypeConverter llvmTypeConverter(ctx);
+//     bufferization::BufferizeTypeConverter buffTypeConverter;
 
-    // Define the properties of the enzyme wrapper function.
-    std::string fnName = gradOp.getCallee().str() + ".enzyme_wrapper";
-    SmallVector<Type> argTypes(argMapFn.getArgumentTypes().begin(),
-                               argMapFn.getArgumentTypes().end());
-    argTypes.insert(argTypes.end(), argMapFn.getResultTypes().begin(),
-                    argMapFn.getResultTypes().end());
+//     // Define the properties of the enzyme wrapper function.
+//     std::string fnName = gradOp.getCallee().str() + ".enzyme_wrapper";
+//     SmallVector<Type> argTypes(argMapFn.getArgumentTypes().begin(),
+//                                argMapFn.getArgumentTypes().end());
+//     argTypes.insert(argTypes.end(), argMapFn.getResultTypes().begin(),
+//                     argMapFn.getResultTypes().end());
 
-    SmallVector<Type> originalArgTypes, bufferizedArgTypes;
-    for (auto argTypeIt = argTypes.begin(); argTypeIt < argTypes.end() - argMapFn.getNumResults();
-         argTypeIt++) {
-        originalArgTypes.push_back(*argTypeIt);
-        if (argTypeIt->isa<TensorType>()) {
-            Type buffArgType = buffTypeConverter.convertType(*argTypeIt);
-            bufferizedArgTypes.push_back(buffArgType);
-            Type llvmArgType = llvmTypeConverter.convertType(buffArgType);
-            if (!llvmArgType)
-                emitError(loc, "Could not convert argmap argument to LLVM type: ") << buffArgType;
-            *argTypeIt = LLVM::LLVMPointerType::get(llvmArgType);
-        }
-        else {
-            bufferizedArgTypes.push_back(*argTypeIt);
-        }
-    }
-    SmallVector<Type> bufferizedResultTypes, llvmResultTypes;
-    for (auto resTypeIt = argTypes.begin() + argMapFn.getNumArguments(); resTypeIt < argTypes.end();
-         resTypeIt++) {
-        Type buffResType = buffTypeConverter.convertType(*resTypeIt);
-        bufferizedResultTypes.push_back(buffResType);
-        Type llvmResType = llvmTypeConverter.convertType(buffResType);
-        if (!llvmResType)
-            emitError(loc, "Could not convert argmap result to LLVM type: ") << buffResType;
-        llvmResultTypes.push_back(llvmResType);
-        *resTypeIt = LLVM::LLVMPointerType::get(llvmResType);
-    }
+//     SmallVector<Type> originalArgTypes, bufferizedArgTypes;
+//     for (auto argTypeIt = argTypes.begin(); argTypeIt < argTypes.end() - argMapFn.getNumResults();
+//          argTypeIt++) {
+//         originalArgTypes.push_back(*argTypeIt);
+//         if (argTypeIt->isa<TensorType>()) {
+//             Type buffArgType = buffTypeConverter.convertType(*argTypeIt);
+//             bufferizedArgTypes.push_back(buffArgType);
+//             Type llvmArgType = llvmTypeConverter.convertType(buffArgType);
+//             if (!llvmArgType)
+//                 emitError(loc, "Could not convert argmap argument to LLVM type: ") << buffArgType;
+//             *argTypeIt = LLVM::LLVMPointerType::get(llvmArgType);
+//         }
+//         else {
+//             bufferizedArgTypes.push_back(*argTypeIt);
+//         }
+//     }
+//     SmallVector<Type> bufferizedResultTypes, llvmResultTypes;
+//     for (auto resTypeIt = argTypes.begin() + argMapFn.getNumArguments(); resTypeIt < argTypes.end();
+//          resTypeIt++) {
+//         Type buffResType = buffTypeConverter.convertType(*resTypeIt);
+//         bufferizedResultTypes.push_back(buffResType);
+//         Type llvmResType = llvmTypeConverter.convertType(buffResType);
+//         if (!llvmResType)
+//             emitError(loc, "Could not convert argmap result to LLVM type: ") << buffResType;
+//         llvmResultTypes.push_back(llvmResType);
+//         *resTypeIt = LLVM::LLVMPointerType::get(llvmResType);
+//     }
 
-    FunctionType fnType = rewriter.getFunctionType(argTypes, {});
-    StringAttr visibility = rewriter.getStringAttr("private");
+//     FunctionType fnType = rewriter.getFunctionType(argTypes, {});
+//     StringAttr visibility = rewriter.getStringAttr("private");
 
-    func::FuncOp enzymeFn =
-        SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(gradOp, rewriter.getStringAttr(fnName));
-    if (!enzymeFn) {
-        PatternRewriter::InsertionGuard insertGuard(rewriter);
-        rewriter.setInsertionPointAfter(argMapFn);
+//     func::FuncOp enzymeFn =
+//         SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(gradOp, rewriter.getStringAttr(fnName));
+//     if (!enzymeFn) {
+//         PatternRewriter::InsertionGuard insertGuard(rewriter);
+//         rewriter.setInsertionPointAfter(argMapFn);
 
-        enzymeFn = rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility);
-        Block *entryBlock = enzymeFn.addEntryBlock();
-        rewriter.setInsertionPointToStart(entryBlock);
+//         enzymeFn = rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility);
+//         Block *entryBlock = enzymeFn.addEntryBlock();
+//         rewriter.setInsertionPointToStart(entryBlock);
 
-        SmallVector<Value> callArgs(enzymeFn.getArguments().begin(),
-                                    enzymeFn.getArguments().end() - argMapFn.getNumResults());
-        for (auto [arg, buffType] : llvm::zip(callArgs, bufferizedArgTypes)) {
-            if (arg.getType().isa<LLVM::LLVMPointerType>()) {
-                Value memrefStruct = rewriter.create<LLVM::LoadOp>(loc, arg);
-                Value memref =
-                    rewriter.create<UnrealizedConversionCastOp>(loc, buffType, memrefStruct)
-                        .getResult(0);
-                arg = rewriter.create<bufferization::ToTensorOp>(loc, memref);
-            }
-        }
-        ValueRange results = rewriter.create<func::CallOp>(loc, argMapFn, callArgs).getResults();
+//         SmallVector<Value> callArgs(enzymeFn.getArguments().begin(),
+//                                     enzymeFn.getArguments().end() - argMapFn.getNumResults());
+//         for (auto [arg, buffType] : llvm::zip(callArgs, bufferizedArgTypes)) {
+//             if (arg.getType().isa<LLVM::LLVMPointerType>()) {
+//                 Value memrefStruct = rewriter.create<LLVM::LoadOp>(loc, arg);
+//                 Value memref =
+//                     rewriter.create<UnrealizedConversionCastOp>(loc, buffType, memrefStruct)
+//                         .getResult(0);
+//                 arg = rewriter.create<bufferization::ToTensorOp>(loc, memref);
+//             }
+//         }
+//         ValueRange results = rewriter.create<func::CallOp>(loc, argMapFn, callArgs).getResults();
 
-        ValueRange resArgs = enzymeFn.getArguments().drop_front(argMapFn.getNumArguments());
+//         ValueRange resArgs = enzymeFn.getArguments().drop_front(argMapFn.getNumArguments());
 
-        SmallVector<Value> tensorFreeResults;
-        for (auto [result, memrefType] : llvm::zip(results, bufferizedResultTypes)) {
-            if (result.getType().isa<TensorType>())
-                result = rewriter.create<bufferization::ToMemrefOp>(loc, memrefType, result);
-            tensorFreeResults.push_back(result);
-        }
+//         SmallVector<Value> tensorFreeResults;
+//         for (auto [result, memrefType] : llvm::zip(results, bufferizedResultTypes)) {
+//             if (result.getType().isa<TensorType>())
+//                 result = rewriter.create<bufferization::ToMemrefOp>(loc, memrefType, result);
+//             tensorFreeResults.push_back(result);
+//         }
 
-        ValueRange llvmResults =
-            rewriter.create<UnrealizedConversionCastOp>(loc, llvmResultTypes, tensorFreeResults)
-                .getResults();
-        for (auto [result, resArg] : llvm::zip(llvmResults, resArgs)) {
-            rewriter.create<LLVM::StoreOp>(loc, result, resArg);
-        }
+//         ValueRange llvmResults =
+//             rewriter.create<UnrealizedConversionCastOp>(loc, llvmResultTypes, tensorFreeResults)
+//                 .getResults();
+//         for (auto [result, resArg] : llvm::zip(llvmResults, resArgs)) {
+//             rewriter.create<LLVM::StoreOp>(loc, result, resArg);
+//         }
 
-        rewriter.create<func::ReturnOp>(loc);
-    }
+//         rewriter.create<func::ReturnOp>(loc);
+//     }
 
-    return enzymeFn;
-}
+//     return enzymeFn;
+// }
 
-/// Generate an mlir function to compute the classical Jacobian via Enzyme.
-///
-/// .
-///
-func::FuncOp genBackpropFunction(PatternRewriter &rewriter, Location loc, gradient::GradOp gradOp,
-                                 func::FuncOp callee, func::FuncOp wrapper)
-{
-    MLIRContext *ctx = rewriter.getContext();
-    LLVMTypeConverter llvmTypeConverter(ctx);
-    bufferization::BufferizeTypeConverter buffTypeConverter;
+// /// Generate an mlir function to compute the classical Jacobian via Enzyme.
+// ///
+// /// .
+// ///
+// func::FuncOp genBackpropFunction(PatternRewriter &rewriter, Location loc, gradient::GradOp gradOp,
+//                                  func::FuncOp callee, func::FuncOp wrapper)
+// {
+//     MLIRContext *ctx = rewriter.getContext();
+//     LLVMTypeConverter llvmTypeConverter(ctx);
+//     bufferization::BufferizeTypeConverter buffTypeConverter;
 
-    // Declare the special Enzyme autodiff function.
-    std::string autodiffFnName = "__enzymne_autodiff";
-    LLVM::LLVMFuncOp autodiffFn = SymbolTable::lookupNearestSymbolFrom<LLVM::LLVMFuncOp>(
-        wrapper, rewriter.getStringAttr(autodiffFnName));
-    if (!autodiffFn) {
-        PatternRewriter::InsertionGuard insertGuard(rewriter);
-        rewriter.setInsertionPointToStart(wrapper->getParentOfType<mlir::ModuleOp>().getBody());
+//     // Declare the special Enzyme autodiff function.
+//     std::string autodiffFnName = "__enzymne_autodiff";
+//     LLVM::LLVMFuncOp autodiffFn = SymbolTable::lookupNearestSymbolFrom<LLVM::LLVMFuncOp>(
+//         wrapper, rewriter.getStringAttr(autodiffFnName));
+//     if (!autodiffFn) {
+//         PatternRewriter::InsertionGuard insertGuard(rewriter);
+//         rewriter.setInsertionPointToStart(wrapper->getParentOfType<mlir::ModuleOp>().getBody());
 
-        LLVM::LLVMFunctionType fnType =
-            LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), {}, /*isVarArg=*/true);
+//         LLVM::LLVMFunctionType fnType =
+//             LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), {}, /*isVarArg=*/true);
 
-        autodiffFn = rewriter.create<LLVM::LLVMFuncOp>(loc, autodiffFnName, fnType);
-    }
+//         autodiffFn = rewriter.create<LLVM::LLVMFuncOp>(loc, autodiffFnName, fnType);
+//     }
 
-    // Define the properties of the classical Jacobian function.
-    std::string fnName = wrapper.getName().str() + ".backprop";
-    TypeRange argTypes = callee.getArgumentTypes();
-    std::vector<Type> resTypes = computeResultTypes(callee, gradOp.compDiffArgIndices());
-    // Drop the last dimension as we only compute the gradient (not Jacobian) for now.
-    for (Type &type : resTypes) {
-        if (auto tensorType = type.dyn_cast<TensorType>()) {
-            type = RankedTensorType::get(tensorType.getShape().drop_back(),
-                                         tensorType.getElementType());
-        }
-    }
-    FunctionType fnType = rewriter.getFunctionType(argTypes, resTypes);
-    StringAttr visibility = rewriter.getStringAttr("private");
+//     // Define the properties of the classical Jacobian function.
+//     std::string fnName = wrapper.getName().str() + ".backprop";
+//     TypeRange argTypes = callee.getArgumentTypes();
+//     std::vector<Type> resTypes = computeResultTypes(callee, gradOp.compDiffArgIndices());
+//     // Drop the last dimension as we only compute the gradient (not Jacobian) for now.
+//     for (Type &type : resTypes) {
+//         if (auto tensorType = type.dyn_cast<TensorType>()) {
+//             type = RankedTensorType::get(tensorType.getShape().drop_back(),
+//                                          tensorType.getElementType());
+//         }
+//     }
+//     FunctionType fnType = rewriter.getFunctionType(argTypes, resTypes);
+//     StringAttr visibility = rewriter.getStringAttr("private");
 
-    size_t numResultArgs = wrapper.getNumArguments() - callee.getNumArguments();
+//     size_t numResultArgs = wrapper.getNumArguments() - callee.getNumArguments();
 
-    func::FuncOp gradFn =
-        SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(wrapper, rewriter.getStringAttr(fnName));
-    if (!gradFn) {
-        PatternRewriter::InsertionGuard insertGuard(rewriter);
-        rewriter.setInsertionPointAfter(wrapper);
+//     func::FuncOp gradFn =
+//         SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(wrapper, rewriter.getStringAttr(fnName));
+//     if (!gradFn) {
+//         PatternRewriter::InsertionGuard insertGuard(rewriter);
+//         rewriter.setInsertionPointAfter(wrapper);
 
-        gradFn = rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility);
-        Block *entryBlock = gradFn.addEntryBlock();
-        rewriter.setInsertionPointToStart(entryBlock);
+//         gradFn = rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility);
+//         Block *entryBlock = gradFn.addEntryBlock();
+//         rewriter.setInsertionPointToStart(entryBlock);
 
-        FunctionType wrapperType = wrapper.getFunctionType();
-        Value wrapperValue =
-            rewriter.create<func::ConstantOp>(loc, wrapperType, wrapper.getName()).getResult();
-        Type wrapperPtrType = llvmTypeConverter.convertType(wrapperType);
-        Value wrapperPtr =
-            rewriter.create<UnrealizedConversionCastOp>(loc, wrapperPtrType, wrapperValue)
-                .getResult(0);
+//         FunctionType wrapperType = wrapper.getFunctionType();
+//         Value wrapperValue =
+//             rewriter.create<func::ConstantOp>(loc, wrapperType, wrapper.getName()).getResult();
+//         Type wrapperPtrType = llvmTypeConverter.convertType(wrapperType);
+//         Value wrapperPtr =
+//             rewriter.create<UnrealizedConversionCastOp>(loc, wrapperPtrType, wrapperValue)
+//                 .getResult(0);
 
-        SmallVector<Value> callArgs = {wrapperPtr};
-        SmallVector<Value> gradients;
-        // SmallVector<Type> gradientTypes;
+//         SmallVector<Value> callArgs = {wrapperPtr};
+//         SmallVector<Value> gradients;
+//         // SmallVector<Type> gradientTypes;
 
-        // Handle callee arguments and their shadows.
-        ValueRange gradFnArgs = gradFn.getArguments();
-        for (auto [arg, targetType] :
-             llvm::zip(gradFnArgs, wrapper.getArgumentTypes().drop_back(numResultArgs))) {
+//         // Handle callee arguments and their shadows.
+//         ValueRange gradFnArgs = gradFn.getArguments();
+//         for (auto [arg, targetType] :
+//              llvm::zip(gradFnArgs, wrapper.getArgumentTypes().drop_back(numResultArgs))) {
 
-            Value shadow;
-            if (auto tensorType = arg.getType().dyn_cast<TensorType>()) {
-                // Assume we're dealing with our own converted pointer types for now.
-                assert(targetType.isa<LLVM::LLVMPointerType>());
-                Type structType = targetType.cast<LLVM::LLVMPointerType>().getElementType();
+//             Value shadow;
+//             if (auto tensorType = arg.getType().dyn_cast<TensorType>()) {
+//                 // Assume we're dealing with our own converted pointer types for now.
+//                 assert(targetType.isa<LLVM::LLVMPointerType>());
+//                 Type structType = targetType.cast<LLVM::LLVMPointerType>().getElementType();
 
-                Value memref = rewriter.create<bufferization::ToMemrefOp>(
-                    loc, buffTypeConverter.convertType(tensorType), arg);
-                Value memrefStruct =
-                    rewriter.create<UnrealizedConversionCastOp>(loc, structType, memref)
-                        .getResult(0);
-                Value c1 = rewriter.create<arith::ConstantIntOp>(loc, 1, 64);
-                Value structPtr = rewriter.create<LLVM::AllocaOp>(loc, targetType, c1);
-                rewriter.create<LLVM::StoreOp>(loc, memrefStruct, structPtr);
-                arg = structPtr;
+//                 Value memref = rewriter.create<bufferization::ToMemrefOp>(
+//                     loc, buffTypeConverter.convertType(tensorType), arg);
+//                 Value memrefStruct =
+//                     rewriter.create<UnrealizedConversionCastOp>(loc, structType, memref)
+//                         .getResult(0);
+//                 Value c1 = rewriter.create<arith::ConstantIntOp>(loc, 1, 64);
+//                 Value structPtr = rewriter.create<LLVM::AllocaOp>(loc, targetType, c1);
+//                 rewriter.create<LLVM::StoreOp>(loc, memrefStruct, structPtr);
+//                 arg = structPtr;
 
-                // Also generate it's shadow.
-                Value shadowMemref =
-                    rewriter.create<memref::AllocOp>(loc, memref.getType().cast<MemRefType>());
-                Value shadowStruct =
-                    rewriter.create<UnrealizedConversionCastOp>(loc, structType, shadowMemref)
-                        .getResult(0);
-                Value shadowPtr = rewriter.create<LLVM::AllocaOp>(loc, targetType, c1);
-                rewriter.create<LLVM::StoreOp>(loc, shadowStruct, shadowPtr);
-                shadow = shadowPtr;
-                gradients.push_back(shadow);
-                // gradientTypes.push_back(shadowMemref.getType());
-            }
-            else {
-                Type llvmArgType = llvmTypeConverter.convertType(arg.getType());
-                if (!llvmArgType)
-                    emitError(loc, "Could not convert argmap argument to LLVM type: ")
-                        << arg.getType();
-                if (llvmArgType != arg.getType()) {
-                    arg = rewriter.create<UnrealizedConversionCastOp>(loc, llvmArgType, arg)
-                              .getResult(0);
-                }
-            }
+//                 // Also generate it's shadow.
+//                 Value shadowMemref =
+//                     rewriter.create<memref::AllocOp>(loc, memref.getType().cast<MemRefType>());
+//                 Value shadowStruct =
+//                     rewriter.create<UnrealizedConversionCastOp>(loc, structType, shadowMemref)
+//                         .getResult(0);
+//                 Value shadowPtr = rewriter.create<LLVM::AllocaOp>(loc, targetType, c1);
+//                 rewriter.create<LLVM::StoreOp>(loc, shadowStruct, shadowPtr);
+//                 shadow = shadowPtr;
+//                 gradients.push_back(shadow);
+//                 // gradientTypes.push_back(shadowMemref.getType());
+//             }
+//             else {
+//                 Type llvmArgType = llvmTypeConverter.convertType(arg.getType());
+//                 if (!llvmArgType)
+//                     emitError(loc, "Could not convert argmap argument to LLVM type: ")
+//                         << arg.getType();
+//                 if (llvmArgType != arg.getType()) {
+//                     arg = rewriter.create<UnrealizedConversionCastOp>(loc, llvmArgType, arg)
+//                               .getResult(0);
+//                 }
+//             }
 
-            callArgs.push_back(arg);
-            if (shadow) {
-                callArgs.push_back(shadow);
-            }
-        }
+//             callArgs.push_back(arg);
+//             if (shadow) {
+//                 callArgs.push_back(shadow);
+//             }
+//         }
 
-        // Handle callee results and their shadows.
-        Value memrefSize = gradFn.getArguments().back();
-        TypeRange calleeResTypes = callee.getResultTypes();
-        for (auto [resType, targetType] :
-             llvm::zip(calleeResTypes, wrapper.getArgumentTypes().take_back(numResultArgs))) {
+//         // Handle callee results and their shadows.
+//         Value memrefSize = gradFn.getArguments().back();
+//         TypeRange calleeResTypes = callee.getResultTypes();
+//         for (auto [resType, targetType] :
+//              llvm::zip(calleeResTypes, wrapper.getArgumentTypes().take_back(numResultArgs))) {
 
-            Value c1 = rewriter.create<arith::ConstantIntOp>(loc, 1, 64);
-            Value resArg = rewriter.create<LLVM::AllocaOp>(loc, targetType, c1);
-            Value shadow;
-            if (auto tensorType = resType.dyn_cast<TensorType>()) {
-                // Result tensors are always converted into pointer struct types.
-                assert(targetType.isa<LLVM::LLVMPointerType>());
-                Type structType = targetType.cast<LLVM::LLVMPointerType>().getElementType();
+//             Value c1 = rewriter.create<arith::ConstantIntOp>(loc, 1, 64);
+//             Value resArg = rewriter.create<LLVM::AllocaOp>(loc, targetType, c1);
+//             Value shadow;
+//             if (auto tensorType = resType.dyn_cast<TensorType>()) {
+//                 // Result tensors are always converted into pointer struct types.
+//                 assert(targetType.isa<LLVM::LLVMPointerType>());
+//                 Type structType = targetType.cast<LLVM::LLVMPointerType>().getElementType();
 
-                // Also generate it's shadow.
-                MemRefType memrefType =
-                    buffTypeConverter.convertType(tensorType).cast<MemRefType>();
-                Value shadowMemref = rewriter.create<memref::AllocOp>(loc, memrefType, memrefSize);
+//                 // Also generate it's shadow.
+//                 MemRefType memrefType =
+//                     buffTypeConverter.convertType(tensorType).cast<MemRefType>();
+//                 Value shadowMemref = rewriter.create<memref::AllocOp>(loc, memrefType, memrefSize);
 
-                // One-hot initialize the tangent vector.
-                Value c0 = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-                SmallVector<Value> indices(memrefType.getRank(), c0);
-                Value c1_f = rewriter.create<arith::ConstantOp>(
-                    loc, rewriter.getFloatAttr(memrefType.getElementType(), 1.0));
-                rewriter.create<memref::StoreOp>(loc, c1_f, shadowMemref, indices);
+//                 // One-hot initialize the tangent vector.
+//                 Value c0 = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+//                 SmallVector<Value> indices(memrefType.getRank(), c0);
+//                 Value c1_f = rewriter.create<arith::ConstantOp>(
+//                     loc, rewriter.getFloatAttr(memrefType.getElementType(), 1.0));
+//                 rewriter.create<memref::StoreOp>(loc, c1_f, shadowMemref, indices);
 
-                Value shadowStruct =
-                    rewriter.create<UnrealizedConversionCastOp>(loc, structType, shadowMemref)
-                        .getResult(0);
-                Value shadowPtr = rewriter.create<LLVM::AllocaOp>(loc, targetType, c1);
-                rewriter.create<LLVM::StoreOp>(loc, shadowStruct, shadowPtr);
-                shadow = shadowPtr;
-            }
+//                 Value shadowStruct =
+//                     rewriter.create<UnrealizedConversionCastOp>(loc, structType, shadowMemref)
+//                         .getResult(0);
+//                 Value shadowPtr = rewriter.create<LLVM::AllocaOp>(loc, targetType, c1);
+//                 rewriter.create<LLVM::StoreOp>(loc, shadowStruct, shadowPtr);
+//                 shadow = shadowPtr;
+//             }
 
-            callArgs.push_back(resArg);
-            if (shadow) {
-                callArgs.push_back(shadow);
-            }
-        }
+//             callArgs.push_back(resArg);
+//             if (shadow) {
+//                 callArgs.push_back(shadow);
+//             }
+//         }
 
-        rewriter.create<LLVM::CallOp>(loc, autodiffFn, callArgs);
+//         rewriter.create<LLVM::CallOp>(loc, autodiffFn, callArgs);
 
-        SmallVector<Value> returnValues;
-        for (auto [structPtr, targetType] : llvm::zip(gradients, gradFn.getResultTypes())) {
-            // Assume result gradients are always tensors for now.
-            assert(targetType.isa<TensorType>());
-            Type targetMemrefType = buffTypeConverter.convertType(targetType);
+//         SmallVector<Value> returnValues;
+//         for (auto [structPtr, targetType] : llvm::zip(gradients, gradFn.getResultTypes())) {
+//             // Assume result gradients are always tensors for now.
+//             assert(targetType.isa<TensorType>());
+//             Type targetMemrefType = buffTypeConverter.convertType(targetType);
 
-            Value memrefStruct = rewriter.create<LLVM::LoadOp>(loc, structPtr);
-            Value memref =
-                rewriter.create<UnrealizedConversionCastOp>(loc, targetMemrefType, memrefStruct)
-                    .getResult(0);
-            // Value castedMemref = rewriter.create<memref::CastOp>(loc, targetMemrefType, memref);
-            Value tensor = rewriter.create<bufferization::ToTensorOp>(loc, memref);
-            returnValues.push_back(tensor);
-        }
-        rewriter.create<func::ReturnOp>(loc, returnValues);
-    }
+//             Value memrefStruct = rewriter.create<LLVM::LoadOp>(loc, structPtr);
+//             Value memref =
+//                 rewriter.create<UnrealizedConversionCastOp>(loc, targetMemrefType, memrefStruct)
+//                     .getResult(0);
+//             // Value castedMemref = rewriter.create<memref::CastOp>(loc, targetMemrefType, memref);
+//             Value tensor = rewriter.create<bufferization::ToTensorOp>(loc, memref);
+//             returnValues.push_back(tensor);
+//         }
+//         rewriter.create<func::ReturnOp>(loc, returnValues);
+//     }
 
-    return gradFn;
-}
+//     return gradFn;
+// }
 
-struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
-    using OpConversionPattern::OpConversionPattern;
+// struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
+//     using OpConversionPattern::OpConversionPattern;
 
-    LogicalResult matchAndRewrite(BackpropOp op, BackpropOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
-        Location loc = op.getLoc();
-        MLIRContext *ctx = getContext();
-        TypeConverter *conv = getTypeConverter();
+//     LogicalResult matchAndRewrite(BackpropOp op, BackpropOpAdaptor adaptor,
+//                                   ConversionPatternRewriter &rewriter) const override
+//     {
+//         Location loc = op.getLoc();
+//         MLIRContext *ctx = getContext();
+//         TypeConverter *conv = getTypeConverter();
 
-        Type vectorType = conv->convertType(MemRefType::get({UNKNOWN}, Float64Type::get(ctx)));
+//         Type vectorType = conv->convertType(MemRefType::get({UNKNOWN}, Float64Type::get(ctx)));
 
-        for (Type type : op.getResultTypes()) {
-            if (!type.isa<MemRefType>())
-                return op.emitOpError("must be bufferized before lowering");
-        }
+//         for (Type type : op.getResultTypes()) {
+//             if (!type.isa<MemRefType>())
+//                 return op.emitOpError("must be bufferized before lowering");
+//         }
 
-        // The callee of the adjoint op must return as a single result the quantum register.
-        func::FuncOp callee =
-            SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
-        assert(callee && callee.getNumResults() == 1 && "invalid qfunc symbol in adjoint op");
+//         // The callee of the adjoint op must return as a single result the quantum register.
+//         func::FuncOp callee =
+//             SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
+//         assert(callee && callee.getNumResults() == 1 && "invalid qfunc symbol in adjoint op");
 
-        StringRef cacheFnName = "__quantum__rt__toggle_recorder";
-        StringRef gradFnName = "__quantum__qis__Gradient";
-        Type cacheFnSignature =
-            LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), IntegerType::get(ctx, 1));
-        Type gradFnSignature = LLVM::LLVMFunctionType::get(
-            LLVM::LLVMVoidType::get(ctx), IntegerType::get(ctx, 64), /*isVarArg=*/true);
+//         StringRef cacheFnName = "__quantum__rt__toggle_recorder";
+//         StringRef gradFnName = "__quantum__qis__Gradient";
+//         Type cacheFnSignature =
+//             LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), IntegerType::get(ctx, 1));
+//         Type gradFnSignature = LLVM::LLVMFunctionType::get(
+//             LLVM::LLVMVoidType::get(ctx), IntegerType::get(ctx, 64), /*isVarArg=*/true);
 
-        LLVM::LLVMFuncOp cacheFnDecl =
-            ensureFunctionDeclaration(rewriter, op, cacheFnName, cacheFnSignature);
-        LLVM::LLVMFuncOp gradFnDecl =
-            ensureFunctionDeclaration(rewriter, op, gradFnName, gradFnSignature);
+//         LLVM::LLVMFuncOp cacheFnDecl =
+//             ensureFunctionDeclaration(rewriter, op, cacheFnName, cacheFnSignature);
+//         LLVM::LLVMFuncOp gradFnDecl =
+//             ensureFunctionDeclaration(rewriter, op, gradFnName, gradFnSignature);
 
 
-        return success();
-    }
-};
+//         return success();
+//     }
+// };
 
 } // namespace
 
