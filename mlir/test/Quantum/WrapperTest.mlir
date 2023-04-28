@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --wrapper-for-wrapper --split-input-file %s | FileCheck %s
+// RUN: quantum-opt --emit-catalyst-py-interface --split-input-file %s | FileCheck %s
 
 llvm.func @foo() -> () attributes {llvm.emit_c_interface} 
 

@@ -51,14 +51,14 @@ static bool callsiteHasAttribute(LLVM::LLVMFuncOp op)
     return retval;
 }
 
-struct WrapperForWrapperTransform : public OpRewritePattern<LLVM::LLVMFuncOp> {
+struct EmitCatalystPyInterfaceTransform : public OpRewritePattern<LLVM::LLVMFuncOp> {
     using OpRewritePattern<LLVM::LLVMFuncOp>::OpRewritePattern;
 
     LogicalResult match(LLVM::LLVMFuncOp op) const override;
     void rewrite(LLVM::LLVMFuncOp op, PatternRewriter &rewriter) const override;
 };
 
-LogicalResult WrapperForWrapperTransform::match(LLVM::LLVMFuncOp op) const
+LogicalResult EmitCatalystPyInterfaceTransform::match(LLVM::LLVMFuncOp op) const
 {
     std::string _mlir_ciface = "_mlir_ciface_";
     size_t _mlir_ciface_len = _mlir_ciface.length();
@@ -172,7 +172,7 @@ static void wrapResultsAndArgsInTwoStructs(LLVM::LLVMFuncOp op, PatternRewriter 
     rewriter.create<LLVM::ReturnOp>(loc, call.getResults());
 }
 
-void WrapperForWrapperTransform::rewrite(LLVM::LLVMFuncOp op, PatternRewriter &rewriter) const
+void EmitCatalystPyInterfaceTransform::rewrite(LLVM::LLVMFuncOp op, PatternRewriter &rewriter) const
 {
     // Find substr after _mlir_ciface_
     std::string _mlir_ciface = "_mlir_ciface_";
@@ -186,12 +186,16 @@ void WrapperForWrapperTransform::rewrite(LLVM::LLVMFuncOp op, PatternRewriter &r
     wrapResultsAndArgsInTwoStructs(op, rewriter, functionNameWithoutPrefix);
 }
 
-struct WrapperForWrapperPass : public PassWrapper<WrapperForWrapperPass, OperationPass<ModuleOp>> {
-    WrapperForWrapperPass() {}
+struct EmitCatalystPyInterfacePass
+    : public PassWrapper<EmitCatalystPyInterfacePass, OperationPass<ModuleOp>> {
+    EmitCatalystPyInterfacePass() {}
 
-    StringRef getArgument() const override { return "wrapper-for-wrapper"; }
+    StringRef getArgument() const override { return "emit-catalyst-py-interface"; }
 
-    StringRef getDescription() const override { return "Wrapper around wrapper"; }
+    StringRef getDescription() const override
+    {
+        return "Emit catalyst python's default interface.";
+    }
 
     void getDependentDialects(DialectRegistry &registry) const override
     {
@@ -202,7 +206,7 @@ struct WrapperForWrapperPass : public PassWrapper<WrapperForWrapperPass, Operati
     {
         MLIRContext *context = &getContext();
         RewritePatternSet patterns(context);
-        patterns.add<WrapperForWrapperTransform>(context);
+        patterns.add<EmitCatalystPyInterfaceTransform>(context);
 
         if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
             signalPassFailure();
@@ -212,9 +216,9 @@ struct WrapperForWrapperPass : public PassWrapper<WrapperForWrapperPass, Operati
 
 } // namespace quantum
 
-std::unique_ptr<Pass> createWrapperForWrapperPass()
+std::unique_ptr<Pass> createEmitCatalystPyInterfacePass()
 {
-    return std::make_unique<quantum::WrapperForWrapperPass>();
+    return std::make_unique<quantum::EmitCatalystPyInterfacePass>();
 }
 
 } // namespace catalyst
