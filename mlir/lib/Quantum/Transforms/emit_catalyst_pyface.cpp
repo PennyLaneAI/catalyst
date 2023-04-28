@@ -122,8 +122,8 @@ convertFunctionTypeCatalystWrapper(PatternRewriter &rewriter, LLVM::LLVMFunction
         // for uniformity in Python and in the unwrapping.
         inputType = LLVM::LLVMStructType::getLiteral(rewriter.getContext(), inputType);
     }
-    if (auto structType = inputType.dyn_cast<LLVM::LLVMStructType>()) {
-        inputType = LLVM::LLVMPointerType::get(structType);
+    if (inputType.isa<LLVM::LLVMStructType>()) {
+        inputType = LLVM::LLVMPointerType::get(inputType);
     }
     transformedInputs.push_back(inputType);
 
