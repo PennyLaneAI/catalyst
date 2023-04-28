@@ -25,7 +25,7 @@ using namespace catalyst::quantum;
 
 namespace {
 
-static Optional<LLVM::LLVMFuncOp> getCallee(LLVM::LLVMFuncOp op)
+Optional<LLVM::LLVMFuncOp> getCallee(LLVM::LLVMFuncOp op)
 {
     size_t counter = 0;
     Optional<LLVM::LLVMFuncOp> callee = std::nullopt;
@@ -41,12 +41,12 @@ static Optional<LLVM::LLVMFuncOp> getCallee(LLVM::LLVMFuncOp op)
     return counter == 1 ? callee : std::nullopt;
 }
 
-static bool hasCWrapperAttribute(LLVM::LLVMFuncOp op)
+bool hasCWrapperAttribute(LLVM::LLVMFuncOp op)
 {
     return (bool)(op->getAttrOfType<UnitAttr>(LLVM::LLVMDialect::getEmitCWrapperAttrName()));
 }
 
-static bool hasCalleeCWrapperAttribute(LLVM::LLVMFuncOp op)
+bool hasCalleeCWrapperAttribute(LLVM::LLVMFuncOp op)
 {
     Optional<LLVM::LLVMFuncOp> callee = getCallee(op);
     if (!callee)
@@ -54,7 +54,7 @@ static bool hasCalleeCWrapperAttribute(LLVM::LLVMFuncOp op)
     return hasCWrapperAttribute(callee.value());
 }
 
-static bool matchesNamingConvention(LLVM::LLVMFuncOp op)
+bool matchesNamingConvention(LLVM::LLVMFuncOp op)
 {
     std::string _mlir_ciface = "_mlir_ciface_";
     size_t _mlir_ciface_len = _mlir_ciface.length();
@@ -69,7 +69,7 @@ static bool matchesNamingConvention(LLVM::LLVMFuncOp op)
     return nameMatches;
 }
 
-static bool isFunctionMLIRCWrapper(LLVM::LLVMFuncOp op)
+bool isFunctionMLIRCWrapper(LLVM::LLVMFuncOp op)
 {
     if (!matchesNamingConvention(op))
         return false;
@@ -78,21 +78,21 @@ static bool isFunctionMLIRCWrapper(LLVM::LLVMFuncOp op)
     return true;
 }
 
-static bool functionHasReturns(LLVM::LLVMFuncOp op)
+bool functionHasReturns(LLVM::LLVMFuncOp op)
 {
     auto functionType = op.getFunctionType();
     return !functionType.getReturnType().isa<LLVM::LLVMVoidType>();
 }
 
-static bool functionHasInputs(LLVM::LLVMFuncOp op)
+bool functionHasInputs(LLVM::LLVMFuncOp op)
 {
     auto functionType = op.getFunctionType();
     return !(functionType.getParams().empty());
 }
 
-static LLVM::LLVMFunctionType
-convertFunctionTypeCatalystWrapper(PatternRewriter &rewriter, LLVM::LLVMFunctionType functionType,
-                                   bool hasReturns, bool hasInputs)
+LLVM::LLVMFunctionType convertFunctionTypeCatalystWrapper(PatternRewriter &rewriter,
+                                                          LLVM::LLVMFunctionType functionType,
+                                                          bool hasReturns, bool hasInputs)
 {
     SmallVector<Type, 2> transformedInputs;
 
@@ -122,8 +122,8 @@ convertFunctionTypeCatalystWrapper(PatternRewriter &rewriter, LLVM::LLVMFunction
     return LLVM::LLVMFunctionType::get(voidType, transformedInputs);
 }
 
-static void wrapResultsAndArgsInTwoStructs(LLVM::LLVMFuncOp op, PatternRewriter &rewriter,
-                                           std::string nameWithoutPrefix)
+void wrapResultsAndArgsInTwoStructs(LLVM::LLVMFuncOp op, PatternRewriter &rewriter,
+                                    std::string nameWithoutPrefix)
 {
     // Guaranteed by match
     LLVM::LLVMFuncOp callee = getCallee(op).value();
