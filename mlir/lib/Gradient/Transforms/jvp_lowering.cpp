@@ -14,6 +14,7 @@
 
 #include <memory>
 #include <vector>
+#include <algorithm>
 
 #include "llvm/Support/Errc.h"
 
@@ -56,14 +57,27 @@ LogicalResult JVPLoweringPattern::match(JVPOp op) const
     llvm::errs() << "matched JVP op\n";
     return success();
 }
+/* ::mlir::OpTrait::VariadicResults e; */
 
 void JVPLoweringPattern::rewrite(JVPOp op, PatternRewriter &rewriter) const
 {
     Location loc = op.getLoc();
     llvm::errs() << "replacing JVP op\n";
 
-    /* func::FuncOp callee = */
-    /*     SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr()); */
+    size_t op_halfsize = (op.operand_end() - op.operand_begin()) / 2;
+    auto func_operands = OperandRange(op.operand_begin(), op.operand_begin() + op_halfsize);
+    auto tang_operands = OperandRange(op.operand_begin() + op_halfsize, op.operand_end());
+
+    auto res_halfsize = (op.result_type_end() - op.result_type_begin()) / 2;
+    auto func_result_types = ValueTypeRange<ResultRange>(op.result_type_begin(), op.result_type_begin() + res_halfsize);
+
+    std::string fnName = op.getCallee().str();
+    FunctionType fnType = rewriter.getFunctionType(op.getOperandTypes(), func_result_types);
+    StringAttr visibility = rewriter.getStringAttr("private");
+    auto funcOp = rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility);
+    auto fcallOp = rewriter.create<func::CallOp>(loc, funcOp, func_operands);
+
+    llvm::errs() << "calling " << fnName << " \n";
 
     /* auto gradOp = rewriter.create<GradOp>(loc, */
     /*   op.getResultTypes(), */
@@ -74,19 +88,32 @@ void JVPLoweringPattern::rewrite(JVPOp op, PatternRewriter &rewriter) const
     /*   op.getFiniteDiffParam().value() */
     /*   ); */
 
-    rewriter.replaceOpWithNewOp<GradOp>(op, 
-      op.getResultTypes(),
-      op.getMethod(),
-      op.getCallee(),
-      op.getOperands(),
-      op.getDiffArgIndices().value(),
-      op.getFiniteDiffParam().value()
-    );
+    /* auto res_type_size = op.result_type_end() - op.result_type_begin(); */
+    /* auto res_type_range = ValueTypeRange<ResultRange>(op.result_type_begin(), op.result_type_begin()+res_type_size/2); */
+    /* /1* llvm::errs() << "replaced JVP op_size: " << op_size << "\n"; *1/ */
+    /* auto gradOp = rewriter.create<GradOp>( */
+    /*   loc, */
+    /*   op.getResultTypes(), */
+    /*   op.getMethod(), */
+    /*   op.getCallee(), */
+    /*   op_range, */
+    /*   /1* op.getOperands(), *1/ */
+    /*   op.getDiffArgIndices().value(), */
+    /*   op.getFiniteDiffParam().value() */
+    /* ); */
+
+    std::vector<Value> mock_results;
+    mock_results.reserve(2*fcallOp.getResults().size());
+    mock_results.insert(mock_results.end(), fcallOp.getResults().begin(), fcallOp.getResults().end());
+    mock_results.insert(mock_results.end(), fcallOp.getResults().begin(), fcallOp.getResults().end());
+
+    llvm::errs() << "fcallOp.result.size(): " << fcallOp.getResults().size() << "\n";
+    llvm::errs() << "mock_results.size(): " << mock_results.size() << "\n";
+
+    rewriter.replaceOp(op, mock_results);
 
     llvm::errs() << "replaced JVP\n";
 }
-
-
 
 struct JVPLoweringPass
     : public PassWrapper<JVPLoweringPass, OperationPass<ModuleOp>> {
