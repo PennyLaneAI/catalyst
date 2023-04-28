@@ -179,7 +179,6 @@ static void wrapResultsAndArgsInTwoStructs(LLVM::LLVMFuncOp op, PatternRewriter 
 } // namespace
 
 namespace catalyst {
-namespace quantum {
 
 struct EmitCatalystPyInterfaceTransform : public OpRewritePattern<LLVM::LLVMFuncOp> {
     using OpRewritePattern<LLVM::LLVMFuncOp>::OpRewritePattern;
@@ -235,11 +234,10 @@ struct EmitCatalystPyInterfacePass
     }
 };
 
-} // namespace quantum
 
 std::unique_ptr<Pass> createEmitCatalystPyInterfacePass()
 {
-    return std::make_unique<quantum::EmitCatalystPyInterfacePass>();
+    return std::make_unique<EmitCatalystPyInterfacePass>();
 }
 
 } // namespace catalyst
