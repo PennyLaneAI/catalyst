@@ -124,7 +124,6 @@ namespace gradient {
 
 void populateConversionPatterns(TypeConverter &typeConverter, RewritePatternSet &patterns)
 {
-    // patterns.add<BackpropOpPattern>(typeConverter, patterns.getContext());
     patterns.add<AdjointOpPattern>(typeConverter, patterns.getContext());
 }
 
