@@ -30,7 +30,11 @@ if not INSTALLED:
 
         sys.path.insert(0, default_bindings_path)
 
-from catalyst.compilation_pipelines import qjit, QJIT  # pylint: disable=wrong-import-position
+from catalyst.compilation_pipelines import (  # pylint: disable=wrong-import-position
+    qjit,
+    QJIT,
+    CompileOptions,
+)
 from catalyst.pennylane_extensions import (  # pylint: disable=wrong-import-position
     for_loop,
     while_loop,
@@ -50,4 +54,5 @@ __all__ = (
     "measure",
     "grad",
     "CompileError",
+    "CompileOptions",
 )

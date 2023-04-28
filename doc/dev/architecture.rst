@@ -40,7 +40,8 @@ Compiler Workflow
 ^^^^^^^^^^^^^^^^^
 
 To understand the workflow and tools being used in the Compiler class, we
-present the following diagram.
+present the following diagram. Please note that individual passes are selected
+at runtime and may be configured by the user, but this is the default pipeline.
 
 |br|
 

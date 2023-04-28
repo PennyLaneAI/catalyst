@@ -50,9 +50,17 @@ void freeCounts(PairT_MemRefT_double_int64_1d &result)
 
 using namespace Catalyst::Runtime;
 
+TEST_CASE("Test __quantum__rt__fail_cstr", "[qir_lightning_core]")
+{
+    REQUIRE_THROWS_WITH(
+        __quantum__rt__fail_cstr("Test!"),
+        Catch::Contains("[Function:__quantum__rt__fail_cstr] Error in Catalyst Runtime: Test!"));
+}
+
 TEST_CASE("Qubits: allocate, release, dump", "[qir_lightning_core]")
 {
     // initialize the simulator
+    __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
 
     QUBIT *q = __quantum__rt__qubit_allocate();
@@ -94,6 +102,7 @@ TEST_CASE("Qubits: allocate, release, dump", "[qir_lightning_core]")
 TEST_CASE("Test lightning__core__qis methods", "[qir_lightning_core]")
 {
     // initialize the simulator
+    __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
 
     constexpr double angle = 0.42;
@@ -115,17 +124,26 @@ TEST_CASE("Test lightning__core__qis methods", "[qir_lightning_core]")
 TEST_CASE("Test __quantum__rt__initialize multiple times", "[qir_lightning_core]")
 {
     // initialize the simulator
+    __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
 
     REQUIRE_THROWS_WITH(__quantum__rt__initialize(),
-                        Catch::Contains("Invalid initialization of the global simulator"));
+                        Catch::Contains("[Function:__quantum__rt__initialize] Error in Catalyst "
+                                        "Runtime: Invalid initialization of the global device"));
 
     __quantum__rt__finalize();
+}
+
+TEST_CASE("Test __quantum__rt__initialize before defining the device", "[qir_lightning_core]")
+{
+    REQUIRE_THROWS_WITH(__quantum__rt__initialize(),
+                        Catch::Contains("Initialization before defining the device"));
 }
 
 TEST_CASE("Test __quantum__rt__print_state", "[qir_lightning_core]")
 {
     // initialize the simulator
+    __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
 
     __quantum__rt__qubit_allocate_array(2);
@@ -146,6 +164,7 @@ TEST_CASE("Test __quantum__rt__print_state", "[qir_lightning_core]")
 TEST_CASE("Test __quantum__qis__State with wires", "[qir_lightning_core]")
 {
     // initialize the simulator
+    __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
 
     QUBIT *wire0 = __quantum__rt__qubit_allocate();
@@ -155,7 +174,8 @@ TEST_CASE("Test __quantum__qis__State with wires", "[qir_lightning_core]")
     MemRefT_CplxT_double_1d result = getState(8);
 
     REQUIRE_THROWS_WITH(__quantum__qis__State(&result, 1, wire0),
-                        Catch::Contains("Partial State-Vector not supported yet"));
+                        Catch::Contains("[Function:__quantum__qis__State] Error in Catalyst "
+                                        "Runtime: Partial State-Vector not supported yet"));
 
     freeState(result);
     __quantum__rt__finalize();
@@ -164,6 +184,7 @@ TEST_CASE("Test __quantum__qis__State with wires", "[qir_lightning_core]")
 TEST_CASE("Test __quantum__qis__Identity", "[qir_lightning_core]")
 {
     // initialize the simulator
+    __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
 
     QUBIT *wire0 = __quantum__rt__qubit_allocate();
@@ -188,6 +209,7 @@ TEST_CASE("Test __quantum__qis__Identity", "[qir_lightning_core]")
 TEST_CASE("Test __quantum__qis__PauliX", "[qir_lightning_core]")
 {
     // initialize the simulator
+    __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
 
     QUBIT *wire0 = __quantum__rt__qubit_allocate();
@@ -210,6 +232,7 @@ TEST_CASE("Test __quantum__qis__PauliX", "[qir_lightning_core]")
 TEST_CASE("Test __quantum__qis__ PauliY and Rot", "[qir_lightning_core]")
 {
     // initialize the simulator
+    __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
 
     QUBIT *wire0 = __quantum__rt__qubit_allocate();
@@ -256,9 +279,41 @@ TEST_CASE("Test copy to strided array", "[qir_lightning_core]")
     delete[] buffer_strided;
 }
 
+TEST_CASE("Test memref alloc", "[qir_lightning_core]")
+{
+    __quantum__rt__device(nullptr, nullptr);
+    __quantum__rt__initialize();
+    int *a = (int *)_mlir_memref_to_llvm_alloc(sizeof(int));
+    CHECK(a != NULL);
+    *a = 1;
+    __quantum__rt__finalize();
+}
+
+TEST_CASE("Test memref aligned alloc", "[qir_lightning_core]")
+{
+    __quantum__rt__device(nullptr, nullptr);
+    __quantum__rt__initialize();
+    int *a = (int *)_mlir_memref_to_llvm_aligned_alloc(sizeof(int), sizeof(int));
+    CHECK(a != NULL);
+    *a = 1;
+    __quantum__rt__finalize();
+}
+
+TEST_CASE("Test memref free", "[qir_lightning_core]")
+{
+    __quantum__rt__device(nullptr, nullptr);
+    __quantum__rt__initialize();
+    int *a = (int *)_mlir_memref_to_llvm_alloc(sizeof(int));
+    CHECK(a != NULL);
+    *a = 1;
+    _mlir_memref_to_llvm_free(a);
+    __quantum__rt__finalize();
+}
+
 TEST_CASE("Test __quantum__qis__Measure", "[qir_lightning_core]")
 {
     // initialize the simulator
+    __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
 
     QUBIT *wire0 = __quantum__rt__qubit_allocate();
@@ -279,6 +334,7 @@ TEST_CASE("Test __quantum__qis__ Hadamard, PauliZ, IsingXX, IsingZZ, and SWAP",
           "[qir_lightning_core]")
 {
     // initialize the simulator
+    __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
 
     QUBIT *target = __quantum__rt__qubit_allocate();
@@ -312,6 +368,7 @@ TEST_CASE("Test __quantum__qis__ Hadamard, PauliZ, IsingXX, IsingZZ, and SWAP",
 TEST_CASE("Test __quantum__qis__ CRot, IsingXY and Toffoli", "[qir_lightning_core]")
 {
     // initialize the simulator
+    __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
 
     QUBIT *target = __quantum__rt__qubit_allocate();
@@ -346,6 +403,7 @@ TEST_CASE("Test __quantum__qis__ Hadamard, PauliX, IsingYY, CRX, and Expval",
           "[qir_lightning_core]")
 {
     // initialize the simulator
+    __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
 
     QUBIT *target = __quantum__rt__qubit_allocate();
@@ -387,6 +445,7 @@ TEST_CASE("Test __quantum__qis__ Hadamard, PauliX, IsingYY, CRX, and Expval",
 TEST_CASE("Test __quantum__qis__ PhaseShift", "[qir_lightning_core]")
 {
     // initialize the simulator
+    __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
 
     QUBIT *target = __quantum__rt__qubit_allocate();
@@ -421,11 +480,14 @@ TEST_CASE("Test __quantum__qis__ PhaseShift", "[qir_lightning_core]")
 TEST_CASE("Test __quantum__qis__HermitianObs with an uninitialized matrix", "[qir_lightning_core]")
 {
     // initialize the simulator
+    __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
 
     MemRefT_CplxT_double_2d *matrix = nullptr;
-    REQUIRE_THROWS_WITH(__quantum__qis__HermitianObs(matrix, 0),
-                        Catch::Contains("The Hermitian matrix must be initialized"));
+    REQUIRE_THROWS_WITH(
+        __quantum__qis__HermitianObs(matrix, 0),
+        Catch::Contains("[Function:__quantum__qis__HermitianObs] Error in Catalyst Runtime: The "
+                        "Hermitian matrix must be initialized"));
 
     delete matrix;
     __quantum__rt__finalize();
@@ -434,6 +496,7 @@ TEST_CASE("Test __quantum__qis__HermitianObs with an uninitialized matrix", "[qi
 TEST_CASE("Test __quantum__qis__HermitianObs with invalid Hermitian matrix", "[qir_lightning_core]")
 {
     // initialize the simulator
+    __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
 
     MemRefT_CplxT_double_2d *matrix = new MemRefT_CplxT_double_2d;
@@ -447,6 +510,7 @@ TEST_CASE("Test __quantum__qis__HermitianObs with invalid Hermitian matrix", "[q
 TEST_CASE("Test __quantum__qis__HermitianObs with invalid number of wires", "[qir_lightning_core]")
 {
     // initialize the simulator
+    __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
 
     QUBIT *target = __quantum__rt__qubit_allocate();
@@ -466,6 +530,7 @@ TEST_CASE("Test __quantum__qis__HermitianObs with invalid number of wires", "[qi
 TEST_CASE("Test __quantum__qis__HermitianObs and Expval", "[qir_lightning_core]")
 {
     // initialize the simulator
+    __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
 
     QUBIT *target = __quantum__rt__qubit_allocate();
@@ -525,10 +590,13 @@ TEST_CASE("Test __quantum__qis__TensorObs with invalid number of observables",
           "[qir_lightning_core]")
 {
     // initialize the simulator
+    __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
 
-    REQUIRE_THROWS_WITH(__quantum__qis__TensorObs(0),
-                        Catch::Contains("Invalid number of observables to create TensorProdObs"));
+    REQUIRE_THROWS_WITH(
+        __quantum__qis__TensorObs(0),
+        Catch::Contains("[Function:__quantum__qis__TensorObs] Error in Catalyst Runtime: Invalid "
+                        "number of observables to create TensorProdObs"));
 
     __quantum__rt__finalize();
 }
@@ -536,6 +604,7 @@ TEST_CASE("Test __quantum__qis__TensorObs with invalid number of observables",
 TEST_CASE("Test __quantum__qis__TensorProdObs and Expval", "[qir_lightning_core]")
 {
     // initialize the simulator
+    __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
 
     QUBIT *target = __quantum__rt__qubit_allocate();
@@ -583,6 +652,7 @@ TEST_CASE("Test __quantum__qis__TensorProdObs and Expval", "[qir_lightning_core]
 TEST_CASE("Test __quantum__qis__HamiltonianObs with invalid coefficients", "[qir_lightning_core]")
 {
     // initialize the simulator
+    __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
 
     MemRefT_double_1d *coeffs = nullptr;
@@ -597,6 +667,7 @@ TEST_CASE("Test __quantum__qis__HamiltonianObs with invalid number of coefficien
           "[qir_lightning_core]")
 {
     // initialize the simulator
+    __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
 
     MemRefT_double_1d *coeffs = new MemRefT_double_1d;
@@ -604,8 +675,11 @@ TEST_CASE("Test __quantum__qis__HamiltonianObs with invalid number of coefficien
     coeffs->sizes[0] = 2;
     coeffs->strides[0] = 1;
 
-    REQUIRE_THROWS_WITH(__quantum__qis__HamiltonianObs(coeffs, 0),
-                        Catch::Contains("Invalid coefficients for computing Hamiltonian"));
+    REQUIRE_THROWS_WITH(
+        __quantum__qis__HamiltonianObs(coeffs, 0),
+        Catch::Contains(
+            "[Function:__quantum__qis__HamiltonianObs] Error in Catalyst Runtime: Invalid "
+            "coefficients for computing Hamiltonian"));
 
     delete coeffs;
 
@@ -615,6 +689,7 @@ TEST_CASE("Test __quantum__qis__HamiltonianObs with invalid number of coefficien
 TEST_CASE("Test __quantum__qis__HamiltonianObs(h, x) and Expval", "[qir_lightning_core]")
 {
     // initialize the simulator
+    __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
 
     QUBIT *target = __quantum__rt__qubit_allocate();
@@ -672,6 +747,7 @@ TEST_CASE("Test __quantum__qis__HamiltonianObs(h, x) and Expval", "[qir_lightnin
 TEST_CASE("Test __quantum__qis__HamiltonianObs(t) and Expval", "[qir_lightning_core]")
 {
     // initialize the simulator
+    __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
 
     QUBIT *target = __quantum__rt__qubit_allocate();
@@ -731,6 +807,7 @@ TEST_CASE("Test __quantum__qis__ Hadamard, PauliX, IsingYY, CRX, and Expval_arr"
           "[qir_lightning_core]")
 {
     // initialize the simulator
+    __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
 
     QUBIT *target = __quantum__rt__qubit_allocate();
@@ -775,6 +852,7 @@ TEST_CASE("Test __quantum__qis__ Hadamard, ControlledPhaseShift, IsingYY, CRX, a
           "[qir_lightning_core]")
 {
     // initialize the simulator
+    __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
 
     QUBIT *target = __quantum__rt__qubit_allocate();              // id = 0
@@ -816,6 +894,7 @@ TEST_CASE("Test __quantum__qis__ Hadamard, ControlledPhaseShift, IsingYY, CRX, a
 TEST_CASE("Test __quantum__qis__ Hadamard, PauliX, IsingYY, CRX, and Probs", "[qir_lightning_core]")
 {
     // initialize the simulator
+    __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
 
     QUBIT *target = __quantum__rt__qubit_allocate();
@@ -850,6 +929,7 @@ TEST_CASE("Test __quantum__qis__ Hadamard, PauliX, IsingYY, CRX, and partial Pro
           "[qir_lightning_core]")
 {
     // initialize the simulator
+    __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
 
     QUBIT *target = __quantum__rt__qubit_allocate();
@@ -883,6 +963,7 @@ TEST_CASE("Test __quantum__qis__ Hadamard, PauliX, IsingYY, CRX, and partial Pro
 TEST_CASE("Test __quantum__qis__State on the heap using malloc", "[qir_lightning_core]")
 {
     // initialize the simulator
+    __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
 
     QUBIT *target = __quantum__rt__qubit_allocate();
@@ -922,6 +1003,7 @@ TEST_CASE("Test __quantum__qis__State on the heap using malloc", "[qir_lightning
 TEST_CASE("Test __quantum__qis__Measure with false", "[qir_lightning_core]")
 {
     // initialize the simulator
+    __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
 
     QUBIT *target = __quantum__rt__qubit_allocate(); // id = 0
@@ -940,6 +1022,7 @@ TEST_CASE("Test __quantum__qis__Measure with false", "[qir_lightning_core]")
 TEST_CASE("Test __quantum__qis__Measure with true", "[qir_lightning_core]")
 {
     // initialize the simulator
+    __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
 
     QUBIT *target = __quantum__rt__qubit_allocate(); // id = 0
@@ -957,6 +1040,7 @@ TEST_CASE("Test __quantum__qis__Measure with true", "[qir_lightning_core]")
 
 TEST_CASE("Test __quantum__qis__MultiRZ", "[qir_lightning_core]")
 {
+    __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
 
     QUBIT *q0 = __quantum__rt__qubit_allocate();
@@ -981,6 +1065,7 @@ TEST_CASE("Test __quantum__qis__MultiRZ", "[qir_lightning_core]")
 
 TEST_CASE("Test __quantum__qis__CSWAP ", "[qir_lightning_core]")
 {
+    __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
 
     QUBIT *q0 = __quantum__rt__qubit_allocate();
@@ -1017,6 +1102,7 @@ TEST_CASE("Test __quantum__qis__Counts with num_qubits=2 calling Hadamard, Contr
           "[qir_lightning_core]")
 {
     // initialize the simulator
+    __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
 
     QUBIT *target = __quantum__rt__qubit_allocate();              // id = 0
@@ -1059,6 +1145,7 @@ TEST_CASE("Test __quantum__qis__Counts with num_qubits=2 PartialCounts calling H
           "[qir_lightning_core]")
 {
     // initialize the simulator
+    __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
 
     QUBIT *target = __quantum__rt__qubit_allocate();              // id = 0
@@ -1095,6 +1182,7 @@ TEST_CASE("Test __quantum__qis__Sample with num_qubits=2 calling Hadamard, Contr
           "[qir_lightning_core]")
 {
     // initialize the simulator
+    __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
 
     QUBIT *target = __quantum__rt__qubit_allocate();              // id = 0
@@ -1158,6 +1246,7 @@ TEST_CASE("Test __quantum__qis__Sample with num_qubits=2 and PartialSample calli
           "[qir_lightning_core]")
 {
     // initialize the simulator
+    __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
 
     QUBIT *target = __quantum__rt__qubit_allocate();              // id = 0
@@ -1207,13 +1296,15 @@ TEST_CASE("Test __quantum__qis__Sample with num_qubits=2 and PartialSample calli
 TEST_CASE("Test __quantum__qis__QubitUnitary with an uninitialized matrix", "[qir_lightning_core]")
 {
     // initialize the simulator
+    __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
 
     QUBIT *target = __quantum__rt__qubit_allocate(); // id = 0
     MemRefT_CplxT_double_2d *matrix = nullptr;
 
     REQUIRE_THROWS_WITH(__quantum__qis__QubitUnitary(matrix, 1, target),
-                        Catch::Contains("The QubitUnitary matrix must be initialized"));
+                        Catch::Contains("[Function:__quantum__qis__QubitUnitary] Error in Catalyst "
+                                        "Runtime: The QubitUnitary matrix must be initialized"));
 
     __quantum__rt__finalize();
 }
@@ -1221,6 +1312,7 @@ TEST_CASE("Test __quantum__qis__QubitUnitary with an uninitialized matrix", "[qi
 TEST_CASE("Test __quantum__qis__QubitUnitary with invalid number of wires", "[qir_lightning_core]")
 {
     // initialize the simulator
+    __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
 
     QUBIT *target = __quantum__rt__qubit_allocate(); // id = 0
@@ -1237,6 +1329,7 @@ TEST_CASE("Test __quantum__qis__QubitUnitary with invalid number of wires", "[qi
 TEST_CASE("Test __quantum__qis__QubitUnitary with invalid matrix", "[qir_lightning_core]")
 {
     // initialize the simulator
+    __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
 
     QUBIT *target = __quantum__rt__qubit_allocate(); // id = 0
@@ -1258,6 +1351,7 @@ TEST_CASE("Test __quantum__qis__QubitUnitary with invalid matrix", "[qir_lightni
 TEST_CASE("Test __quantum__qis__QubitUnitary with num_qubits=2", "[qir_lightning_core]")
 {
     // initialize the simulator
+    __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
 
     QUBIT *target = __quantum__rt__qubit_allocate();              // id = 0
@@ -1300,6 +1394,34 @@ TEST_CASE("Test __quantum__qis__QubitUnitary with num_qubits=2", "[qir_lightning
 
     freeState(result);
     delete matrix;
+
+    __quantum__rt__finalize();
+}
+
+TEST_CASE("Test __rt__device registering a custom device with shots=500 and device=lightning",
+          "[qir_lightning_core]")
+{
+    char dev[8] = "backend";
+    char dev_value[17] = "lightning.kokkos";
+    __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
+
+    char shots[6] = "shots";
+    char shots_value[4] = "500";
+    __quantum__rt__device((int8_t *)shots, (int8_t *)shots_value);
+
+    char dev2[7] = "device";
+    REQUIRE_THROWS_WITH(__quantum__rt__device((int8_t *)dev2, (int8_t *)dev_value),
+                        Catch::Contains("[Function:__quantum__rt__device] Error in Catalyst "
+                                        "Runtime: Invalid device specification"));
+
+    REQUIRE_THROWS_WITH(__quantum__rt__device((int8_t *)shots, (int8_t *)dev_value),
+                        Catch::Contains("Invalid argument for the device specification (shots)"));
+
+    char dev_value2[17] = "other.sumulator";
+    __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value2);
+
+    REQUIRE_THROWS_WITH(__quantum__rt__initialize(),
+                        Catch::Contains("Failed initialization of the global device"));
 
     __quantum__rt__finalize();
 }

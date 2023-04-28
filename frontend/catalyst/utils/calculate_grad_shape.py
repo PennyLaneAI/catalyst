@@ -86,6 +86,9 @@ class Signature:
         """
         return isinstance(x, ShapedArray)
 
+    def __eq__(self, other):
+        return self.xs == other.xs and self.ys == other.ys
+
 
 def calculate_grad_shape(signature, indices):
     """calculate_grad_shape: Given a signature and a list of indices over which arguments
@@ -108,7 +111,7 @@ def calculate_grad_shape(signature, indices):
                 diff_arg_shape.append(axis)
 
         for y in signature.get_results():
-            grad_res_shape = diff_arg_shape
+            grad_res_shape = diff_arg_shape.copy()
             if Signature.is_tensor(y):
                 for axis in y.shape:
                     grad_res_shape.append(axis)

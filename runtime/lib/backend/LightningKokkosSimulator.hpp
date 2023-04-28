@@ -18,8 +18,9 @@
 throw std::logic_error("StateVectorKokkos.hpp: No such header file");
 #endif
 
+#define __device_lightning_kokkos
+
 #include <bitset>
-#include <cassert>
 #include <cmath>
 #include <cstdint>
 #include <iostream>
@@ -33,6 +34,7 @@ throw std::logic_error("StateVectorKokkos.hpp: No such header file");
 #include "StateVectorKokkos.hpp"
 
 #include "CacheManager.hpp"
+#include "Exception.hpp"
 #include "LightningUtils.hpp"
 #include "ObsManager.hpp"
 #include "QuantumDevice.hpp"

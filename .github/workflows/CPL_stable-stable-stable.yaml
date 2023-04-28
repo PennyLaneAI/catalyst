@@ -1,0 +1,15 @@
+name: Check CPL stable/stable/stable
+
+on:
+  schedule:
+    - cron: "20 10 * * 1-5"
+  workflow_dispatch:
+
+jobs:
+  build-config:
+    name: CPL stable/stable/stable
+    uses: ./.github/workflows/check-pl-compat.yaml
+    with:
+      catalyst: stable
+      pennylane: stable
+      lightning: stable

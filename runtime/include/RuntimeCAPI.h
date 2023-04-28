@@ -25,8 +25,9 @@ extern "C" {
 #endif
 
 // Quantum Runtime Instructions
-void __quantum__rt__fail_cstr(const char *cstr);
+void __quantum__rt__fail_cstr(const char *);
 void __quantum__rt__initialize();
+void __quantum__rt__device(int8_t *, int8_t *);
 void __quantum__rt__finalize();
 void __quantum__rt__toggle_recorder(bool);
 void __quantum__rt__print_state();
@@ -75,34 +76,27 @@ void __quantum__qis__CRot(double, double, double, QUBIT *, QUBIT *);
 void __quantum__qis__CSWAP(QUBIT *, QUBIT *, QUBIT *);
 void __quantum__qis__Toffoli(QUBIT *, QUBIT *, QUBIT *);
 
-void __quantum__qis__MultiRZ(double, int64_t numQubits, /*qubits*/...);
+void __quantum__qis__MultiRZ(double, int64_t, /*qubits*/...);
 
 // Struct pointer arguments for these instructions represent real arguments,
 // as passing structs by value is too unreliable / compiler dependant.
-void __quantum__qis__QubitUnitary(MemRefT_CplxT_double_2d *, int64_t numQubits, /*qubits*/...);
+void __quantum__qis__QubitUnitary(MemRefT_CplxT_double_2d *, int64_t, /*qubits*/...);
 
 ObsIdType __quantum__qis__NamedObs(int64_t, QUBIT *);
-ObsIdType __quantum__qis__HermitianObs(MemRefT_CplxT_double_2d *, int64_t numQubits,
-                                       /*qubits*/...);
-ObsIdType __quantum__qis__TensorObs(int64_t numObs, /*obsKeys*/...);
-ObsIdType __quantum__qis__HamiltonianObs(MemRefT_double_1d *, int64_t numObs,
-                                         /*obsKeys*/...);
+ObsIdType __quantum__qis__HermitianObs(MemRefT_CplxT_double_2d *, int64_t, /*qubits*/...);
+ObsIdType __quantum__qis__TensorObs(int64_t, /*obsKeys*/...);
+ObsIdType __quantum__qis__HamiltonianObs(MemRefT_double_1d *, int64_t, /*obsKeys*/...);
 
 // Struct pointers arguments here represent return values.
 RESULT *__quantum__qis__Measure(QUBIT *);
 double __quantum__qis__Expval(ObsIdType);
 double __quantum__qis__Variance(ObsIdType);
-void __quantum__qis__Probs(MemRefT_double_1d *, int64_t numQubits,
-                           /*qubits*/...);
-void __quantum__qis__Sample(MemRefT_double_2d *, int64_t shots, int64_t numQubits,
-                            /*qubits*/...);
-void __quantum__qis__Counts(PairT_MemRefT_double_int64_1d *, int64_t shots, int64_t numQubits,
-                            /*qubits*/...);
-void __quantum__qis__State(MemRefT_CplxT_double_1d *, int64_t numQubits,
-                           /*qubits*/...);
-void __quantum__qis__Gradient(int64_t numResults, /*results*/...);
-void __quantum__qis__Gradient_params(MemRefT_int64_1d *, int64_t numResults,
-                                     /*results*/...);
+void __quantum__qis__Probs(MemRefT_double_1d *, int64_t, /*qubits*/...);
+void __quantum__qis__Sample(MemRefT_double_2d *, int64_t, int64_t, /*qubits*/...);
+void __quantum__qis__Counts(PairT_MemRefT_double_int64_1d *, int64_t, int64_t, /*qubits*/...);
+void __quantum__qis__State(MemRefT_CplxT_double_1d *, int64_t, /*qubits*/...);
+void __quantum__qis__Gradient(int64_t, /*results*/...);
+void __quantum__qis__Gradient_params(MemRefT_int64_1d *, int64_t, /*results*/...);
 
 #ifdef __cplusplus
 } // extern "C"

@@ -58,6 +58,18 @@ def FinalizeOp : Quantum_Op<"finalize"> {
     }];
 }
 
+def DeviceOp : Quantum_Op<"device"> {
+    let summary = "Set device specifications in the runtime.";
+
+    let arguments = (ins
+        OptionalAttr<StrArrayAttr>:$specs
+    );
+
+    let assemblyFormat = [{
+      $specs attr-dict
+    }];
+}
+
 // -----
 
 class Memory_Op<string mnemonic, list<Trait> traits = []> : Quantum_Op<mnemonic, traits>;

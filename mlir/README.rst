@@ -38,7 +38,7 @@ directory structure generally follows the recommended practices from the upstrea
     transformation passes and rewrite patterns. Some of the transformations include dialect
     bufferizations, dialect conversions, gradient methods, and optimizations.
 
-- `python <https://github.com/PennyLaneAI/catalyst/tree/main/mlir/extensions>`_:
+- `python <https://github.com/PennyLaneAI/catalyst/tree/main/mlir/python>`_:
     MLIR Python bindings for the quantum and gradient dialects.
 
 - `test <https://github.com/PennyLaneAI/catalyst/tree/main/mlir/test>`_:

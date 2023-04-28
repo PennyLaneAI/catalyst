@@ -1,4 +1,4 @@
-name: Wheel::Linux::x86_64
+name: Build Catalyst Wheel on Linux (x86_64)
 
 on:
   schedule:
@@ -158,7 +158,7 @@ jobs:
 
     - name: Install Dependencies (Python)
       run: |
-        python${{ matrix.python_version }} -m pip install wheel numpy pybind11 PyYAML dataclasses
+        python${{ matrix.python_version }} -m pip install wheel numpy pybind11 PyYAML
 
     - name: Get LLVM Version
       id: llvm-hash

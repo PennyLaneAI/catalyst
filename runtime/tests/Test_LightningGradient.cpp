@@ -22,6 +22,7 @@ using namespace Catalyst::Runtime;
 
 TEST_CASE("Test __quantum__qis__Gradient with numAlloc=0", "[Gradient]")
 {
+    __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
 
     REQUIRE_NOTHROW(__quantum__qis__Gradient(0, nullptr));
@@ -31,6 +32,7 @@ TEST_CASE("Test __quantum__qis__Gradient with numAlloc=0", "[Gradient]")
 
 TEST_CASE("Test __quantum__qis__Gradient_params with numAlloc=0", "[Gradient]")
 {
+    __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
 
     REQUIRE_THROWS_WITH(__quantum__qis__Gradient_params(nullptr, 0, nullptr),
@@ -49,6 +51,7 @@ TEST_CASE("Test __quantum__qis__Gradient_params for zero number of obs", "[Gradi
     int64_t *buffer_tp = trainParams.data();
     MemRefT_int64_1d tp = {buffer_tp, buffer_tp, 0, {trainParams.size()}, {1}};
 
+    __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
 
     QUBIT *q = __quantum__rt__qubit_allocate();
@@ -78,6 +81,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     int64_t *buffer_tp = trainParams.data();
     MemRefT_int64_1d tp = {buffer_tp, buffer_tp, 0, {trainParams.size()}, {0}};
 
+    __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
 
     QUBIT *q = __quantum__rt__qubit_allocate();
@@ -91,10 +95,12 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     __quantum__qis__Expval(obs);
 
     REQUIRE_THROWS_WITH(__quantum__qis__Gradient(2, &results),
-                        Catch::Contains("Invalid number of results"));
+                        Catch::Contains("[Function:__quantum__qis__Gradient] Error in Catalyst "
+                                        "Runtime: Invalid number of results"));
 
     REQUIRE_THROWS_WITH(__quantum__qis__Gradient_params(&tp, 2, &results),
-                        Catch::Contains("Invalid number of results"));
+                        Catch::Contains("[Function:__quantum__qis__Gradient_params] Error in "
+                                        "Catalyst Runtime: Invalid number of results"));
 
     __quantum__rt__toggle_recorder(/* activate_cm */ false);
 
@@ -114,6 +120,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     int64_t *buffer_tp = trainParams.data();
     MemRefT_int64_1d tp = {buffer_tp, buffer_tp, 0, {trainParams.size()}, {1}};
 
+    __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
 
     QUBIT *q = __quantum__rt__qubit_allocate();
@@ -152,6 +159,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     int64_t *buffer_memref = trainParams.data();
     MemRefT_int64_1d tp_memref = {buffer_memref, buffer_memref, 0, {trainParams.size()}, {1}};
 
+    __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
 
     QUBIT *q = __quantum__rt__qubit_allocate();
@@ -193,6 +201,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     int64_t *buffer_tp_memref = trainParams.data();
     MemRefT_int64_1d tp_memref = {buffer_tp_memref, buffer_tp_memref, 0, {trainParams.size()}, {1}};
 
+    __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
 
     QUBIT *q = __quantum__rt__qubit_allocate();
@@ -249,6 +258,7 @@ TEST_CASE("Test __quantum__qis__Gradient_params and __quantum__qis__Gradient "
     for (const auto &p : param) {
         // Test qis__Gradient:
 
+        __quantum__rt__device(nullptr, nullptr);
         __quantum__rt__initialize();
 
         QUBIT *q = __quantum__rt__qubit_allocate();
@@ -298,6 +308,7 @@ TEST_CASE("Test __quantum__qis__Gradient_params Op=[Hadamard,RZ,RY,RZ,S,T,ParamS
     int64_t *buffer_tp_memref = trainParams.data();
     MemRefT_int64_1d tp_memref = {buffer_tp_memref, buffer_tp_memref, 0, {trainParams.size()}, {1}};
 
+    __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
 
     QUBIT *q0 = __quantum__rt__qubit_allocate();
@@ -347,6 +358,7 @@ TEST_CASE("Test __quantum__qis__Gradient Op=[RX,CY], Obs=[Z,Z]", "[Gradient]")
     double *buffer1 = new double[J];
     MemRefT_double_1d result1 = {buffer1, buffer1, 0, {J}, {1}};
 
+    __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
 
     QUBIT *q0 = __quantum__rt__qubit_allocate();
@@ -392,6 +404,7 @@ TEST_CASE("Test __quantum__qis__Gradient_params Op=[RX,RX,RX,CZ], Obs=[Z,Z,Z]", 
     int64_t *buffer_tp_memref = trainParams.data();
     MemRefT_int64_1d tp_memref = {buffer_tp_memref, buffer_tp_memref, 0, {trainParams.size()}, {1}};
 
+    __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
 
     QUBIT *q0 = __quantum__rt__qubit_allocate();
@@ -445,6 +458,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     int64_t *buffer_tp_memref = trainParams.data();
     MemRefT_int64_1d tp_memref = {buffer_tp_memref, buffer_tp_memref, 0, {trainParams.size()}, {1}};
 
+    __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
 
     QUBIT *q0 = __quantum__rt__qubit_allocate();
@@ -512,6 +526,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     int64_t *buffer_tp_memref = trainParams.data();
     MemRefT_int64_1d tp_memref = {buffer_tp_memref, buffer_tp_memref, 0, {trainParams.size()}, {0}};
 
+    __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
 
     QUBIT *q0 = __quantum__rt__qubit_allocate();
@@ -581,6 +596,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     int64_t *buffer_tp_memref = trainParams.data();
     MemRefT_int64_1d tp_memref = {buffer_tp_memref, buffer_tp_memref, 0, {trainParams.size()}, {1}};
 
+    __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
 
     QUBIT *q0 = __quantum__rt__qubit_allocate();
@@ -648,6 +664,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     int64_t *buffer_tp_memref = trainParams.data();
     MemRefT_int64_1d tp_memref = {buffer_tp_memref, buffer_tp_memref, 0, {1}, {1}};
 
+    __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
 
     QirArray *qubit_arr = __quantum__rt__qubit_allocate_array(2);
