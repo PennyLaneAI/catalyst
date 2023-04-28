@@ -57,7 +57,6 @@ LogicalResult JVPLoweringPattern::match(JVPOp op) const
     llvm::errs() << "matched JVP op\n";
     return success();
 }
-/* ::mlir::OpTrait::VariadicResults e; */
 
 void JVPLoweringPattern::rewrite(JVPOp op, PatternRewriter &rewriter) const
 {
@@ -91,19 +90,25 @@ void JVPLoweringPattern::rewrite(JVPOp op, PatternRewriter &rewriter) const
     /* auto res_type_size = op.result_type_end() - op.result_type_begin(); */
     /* auto res_type_range = ValueTypeRange<ResultRange>(op.result_type_begin(), op.result_type_begin()+res_type_size/2); */
     /* /1* llvm::errs() << "replaced JVP op_size: " << op_size << "\n"; *1/ */
-    /* auto gradOp = rewriter.create<GradOp>( */
-    /*   loc, */
-    /*   op.getResultTypes(), */
-    /*   op.getMethod(), */
-    /*   op.getCallee(), */
-    /*   op_range, */
-    /*   /1* op.getOperands(), *1/ */
-    /*   op.getDiffArgIndices().value(), */
-    /*   op.getFiniteDiffParam().value() */
-    /* ); */
+
+    auto gradOp = rewriter.create<GradOp>(
+      loc,
+      op.getResultTypes(),
+      op.getMethod(),
+      op.getCallee(),
+      func_operands,
+      op.getDiffArgIndices().value(),
+      op.getFiniteDiffParam().value()
+    );
+
+    for(auto t: tang_operands) {
+      for(auto j: gradOp.getResults()) {
+        llvm::errs() << "emitting a tensordot" << "\n";
+      }
+    }
 
     std::vector<Value> mock_results;
-    mock_results.reserve(2*fcallOp.getResults().size());
+    mock_results.reserve(2 * fcallOp.getResults().size());
     mock_results.insert(mock_results.end(), fcallOp.getResults().begin(), fcallOp.getResults().end());
     mock_results.insert(mock_results.end(), fcallOp.getResults().begin(), fcallOp.getResults().end());
 
