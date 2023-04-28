@@ -25,6 +25,8 @@ from catalyst.compiler import (
 )
 from catalyst.jax_tracer import get_mlir
 
+# pylint: disable=missing-function-docstring
+
 
 class TestCompilerOptions:
     """Unit test for Compiler class."""
@@ -203,8 +205,9 @@ class TestCompilerState:
     def test_pass_with_output_name(self):
         """Test for making sure that outfile in arguments works"""
 
-        # pylint: disable=missing-class-docstring
         class PassWithNoFlags(PassPipeline):
+            """Pass pipeline without any flags."""
+
             _executable = "c99"
             _default_flags = []
 
@@ -224,14 +227,14 @@ class TestCompilerState:
         It might be best in the future to remove this functionality and instead
         guarantee it from the start."""
 
-        # pylint: disable=missing-class-docstring
         class C99(PassPipeline):
+            """Pass pipeline using custom executable."""
+
             _executable = "c99"
             _default_flags = []
 
             @staticmethod
             def get_output_filename(infile):
-                # pylint: disable=missing-function-docstring
                 return infile.replace(".c", ".out")
 
         with tempfile.TemporaryDirectory() as workspace:
@@ -248,14 +251,14 @@ class TestCompilerState:
     def test_pass_with_flags(self):
         """Test with non-default flags."""
 
-        # pylint: disable=missing-class-docstring
         class C99(PassPipeline):
+            """Simple pass pipeline."""
+
             _executable = "c99"
             _default_flags = []
 
             @staticmethod
             def get_output_filename(infile):
-                # pylint: disable=missing-function-docstring
                 return infile.replace(".c", ".o")
 
         with tempfile.TemporaryDirectory() as workspace:
@@ -284,14 +287,14 @@ class TestCompilerState:
     def test_compiler_driver_with_flags(self):
         """Test with non-default flags."""
 
-        # pylint: disable=missing-class-docstring
         class C99(PassPipeline):
+            """Pass pipeline with custom flags."""
+
             _executable = "c99"
             _default_flags = ["-c"]
 
             @staticmethod
             def get_output_filename(infile):
-                # pylint: disable=missing-function-docstring
                 return infile.replace(".c", ".o")
 
         with tempfile.TemporaryDirectory() as workspace:
