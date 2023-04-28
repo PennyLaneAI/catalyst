@@ -32,36 +32,71 @@ static size_t countCallsites(LLVM::LLVMFuncOp op)
     return count;
 }
 
-static bool callsiteHasCWrapperAttribute(LLVM::LLVMFuncOp op)
+static bool hasSingleCallsite(LLVM::LLVMFuncOp op) { return 1 == countCallsites(op); }
+
+static Optional<LLVM::LLVMFuncOp> getCallee(LLVM::LLVMFuncOp op)
 {
-    bool retval = false;
-    ModuleOp moduleOp = cast<ModuleOp>(op->getParentOp());
-    if (!moduleOp)
-        return retval;
+    if (!hasSingleCallsite(op))
+        return std::nullopt;
+    Optional<LLVM::LLVMFuncOp> callee = std::nullopt;
     op.walk([&](LLVM::CallOp callOp) {
-        auto callee = callOp.getCallee();
-        if (callee) {
-            auto stringRef = callee.value().data();
-            Operation *fnDecl = moduleOp.lookupSymbol<LLVM::LLVMFuncOp>(stringRef);
-            retval = (bool)(fnDecl->getAttrOfType<UnitAttr>(
-                LLVM::LLVMDialect::getEmitCWrapperAttrName()));
-        }
+        auto calleeAttr = callOp.getCalleeAttr();
+        // calleeAttr is optional in case of function pointers.
+        if (!calleeAttr)
+            return;
+
+        callee = SymbolTable::lookupNearestSymbolFrom<LLVM::LLVMFuncOp>(op, calleeAttr);
     });
-    return retval;
+    return callee;
+}
+
+static bool hasCWrapperAttribute(LLVM::LLVMFuncOp op)
+{
+    return (bool)(op->getAttrOfType<UnitAttr>(LLVM::LLVMDialect::getEmitCWrapperAttrName()));
+}
+
+static bool hasCalleeCWrapperAttribute(LLVM::LLVMFuncOp op)
+{
+    Optional<LLVM::LLVMFuncOp> callee = getCallee(op);
+    if (!callee)
+        return false;
+    return hasCWrapperAttribute(callee.value());
+}
+
+static bool matchesNamingConvention(LLVM::LLVMFuncOp op)
+{
+    std::string _mlir_ciface = "_mlir_ciface_";
+    size_t _mlir_ciface_len = _mlir_ciface.length();
+    auto symName = op.getSymName();
+    const char *symNameStr = symName.data();
+    size_t symNameLength = strlen(symNameStr);
+    // Filter based on name.
+    if (symNameLength <= _mlir_ciface_len)
+        return false;
+
+    bool nameMatches = 0 == strncmp(symNameStr, _mlir_ciface.c_str(), _mlir_ciface_len);
+    return nameMatches;
+}
+
+static bool isFunctionMLIRCWrapper(LLVM::LLVMFuncOp op)
+{
+    if (!matchesNamingConvention(op))
+        return false;
+    if (!hasCalleeCWrapperAttribute(op))
+        return false;
+    return true;
 }
 
 static bool functionHasReturns(LLVM::LLVMFuncOp op)
 {
-    bool result = false;
-    op.walk([&](LLVM::CallOp callOp) { result = (bool)callOp.getResult(); });
-    return result;
+    auto functionType = op.getFunctionType();
+    return !functionType.getReturnType().isa<LLVM::LLVMVoidType>();
 }
 
 static bool functionHasInputs(LLVM::LLVMFuncOp op)
 {
-    bool result = false;
-    op.walk([&](LLVM::CallOp callOp) { result = !callOp.getOperandTypes().empty(); });
-    return result;
+    auto functionType = op.getFunctionType();
+    return !(functionType.getParams().empty());
 }
 
 static LLVM::LLVMFunctionType
@@ -99,8 +134,11 @@ convertFunctionTypeCatalystWrapper(PatternRewriter &rewriter, LLVM::LLVMFunction
 static void wrapResultsAndArgsInTwoStructs(LLVM::LLVMFuncOp op, PatternRewriter &rewriter,
                                            std::string nameWithoutPrefix)
 {
-    bool hasReturns = functionHasReturns(op);
-    bool hasInputs = functionHasInputs(op);
+    // Guaranteed by match
+    LLVM::LLVMFuncOp callee = getCallee(op).value();
+    bool hasReturns = functionHasReturns(callee);
+    bool hasInputs = functionHasInputs(callee);
+
     LLVM::LLVMFunctionType functionType = op.getFunctionType();
     LLVM::LLVMFunctionType wrapperFuncType =
         convertFunctionTypeCatalystWrapper(rewriter, functionType, hasReturns, hasInputs);
@@ -152,28 +190,7 @@ struct EmitCatalystPyInterfaceTransform : public OpRewritePattern<LLVM::LLVMFunc
 
 LogicalResult EmitCatalystPyInterfaceTransform::match(LLVM::LLVMFuncOp op) const
 {
-    std::string _mlir_ciface = "_mlir_ciface_";
-    size_t _mlir_ciface_len = _mlir_ciface.length();
-    auto symName = op.getSymName();
-    const char *symNameStr = symName.data();
-    size_t symNameLength = strlen(symNameStr);
-    // Filter based on name.
-    if (symNameLength <= _mlir_ciface_len)
-        return failure();
-
-    bool nameMatches = 0 == strncmp(symNameStr, _mlir_ciface.c_str(), _mlir_ciface_len);
-    if (!nameMatches)
-        return failure();
-
-    // Function must only contain a single function call.
-    size_t callsites = countCallsites(op);
-    if (callsites != 1)
-        return failure();
-
-    // The only call must contain the emitCWrapper attribute
-    bool hasAttribute = callsiteHasCWrapperAttribute(op);
-
-    return hasAttribute ? success() : failure();
+    return isFunctionMLIRCWrapper(op) ? success() : failure();
 }
 
 void EmitCatalystPyInterfaceTransform::rewrite(LLVM::LLVMFuncOp op, PatternRewriter &rewriter) const
