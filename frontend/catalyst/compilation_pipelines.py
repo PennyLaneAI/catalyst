@@ -524,7 +524,10 @@ class QJIT:
             options=self.compile_options,
         )
 
-        self._llvmir = self._compiler.get_output_of("LLVMDialectToLLVMIR")
+        try:
+            self._llvmir = self._compiler.get_output_of("LLVMDialectToLLVMIR")
+        except ValueError:
+            pass
 
         # The function name out of MLIR has quotes around it, which we need to remove.
         # The MLIR function name is actually a derived type from string which has no
