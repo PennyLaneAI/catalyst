@@ -104,9 +104,9 @@ convertFunctionTypeCatalystWrapper(PatternRewriter &rewriter, LLVM::LLVMFunction
 {
     SmallVector<Type, 2> transformedInputs;
 
-    Type ptr = LLVM::LLVMPointerType::get(rewriter.getContext());
+    Type ptrType = LLVM::LLVMPointerType::get(rewriter.getContext());
     auto inputs = functionType.getParams();
-    Type resultType = hasReturns ? inputs.front() : ptr;
+    Type resultType = hasReturns ? inputs.front() : ptrType;
     transformedInputs.push_back(resultType);
 
     if (hasReturns) {
@@ -114,7 +114,7 @@ convertFunctionTypeCatalystWrapper(PatternRewriter &rewriter, LLVM::LLVMFunction
     }
 
     LLVMTypeConverter typeConverter(rewriter.getContext());
-    Type inputType = hasInputs ? typeConverter.packFunctionResults(inputs) : ptr;
+    Type inputType = hasInputs ? typeConverter.packFunctionResults(inputs) : ptrType;
     bool noChange = inputs.size() == 1;
     if (noChange) {
         // Still wrap the pointer into a struct
