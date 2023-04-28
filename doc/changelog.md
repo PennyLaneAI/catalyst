@@ -12,6 +12,9 @@
   These are called pipelines, as they contain multiple passes.
   [#38](https://github.com/PennyLaneAI/catalyst/pull/38)
 
+* Improve python compatibility by providing a stable signature for user generated functions.
+  [#106](https://github.com/PennyLaneAI/catalyst/pull/106)
+
 <h3>Breaking changes</h3>
 
 <h3>Bug fixes</h3>
