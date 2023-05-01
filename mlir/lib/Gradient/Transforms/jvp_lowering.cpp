@@ -102,8 +102,13 @@ void JVPLoweringPattern::rewrite(JVPOp op, PatternRewriter &rewriter) const
     );
 
     for(auto t: tang_operands) {
-      for(auto j: gradOp.getResults()) {
+      for(auto g: gradOp.getResults()) {
+        auto tt = t.getType().cast<mlir::TensorType>();
+        auto gt = g.getType().cast<mlir::TensorType>();
+
         llvm::errs() << "emitting a tensordot" << "\n";
+        llvm::errs() << "grad_output_type " << gt << "\n";
+        llvm::errs() << "tang_type " << tt << "\n";
       }
     }
 
