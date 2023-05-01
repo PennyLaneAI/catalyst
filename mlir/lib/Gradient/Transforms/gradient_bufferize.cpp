@@ -58,6 +58,9 @@ struct GradientBufferizationPass
         // Gradient ops which return arrays need to be marked illegal when the type is a tensor.
         target.addDynamicallyLegalOp<AdjointOp>(
             [&](AdjointOp op) { return typeConverter.isLegal(op); });
+        
+        target.addDynamicallyLegalOp<BackpropOp>(
+            [&](BackpropOp op) { return typeConverter.isLegal(op); });
 
         if (failed(applyPartialConversion(getOperation(), target, std::move(patterns)))) {
             signalPassFailure();

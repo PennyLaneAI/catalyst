@@ -104,8 +104,8 @@ namespace gradient {
 
 void populateBufferizationPatterns(TypeConverter &typeConverter, RewritePatternSet &patterns)
 {
-    patterns.add<BufferizeBackpropOp>(typeConverter, patterns.getContext());
     patterns.add<BufferizeAdjointOp>(typeConverter, patterns.getContext());
+    patterns.add<BufferizeBackpropOp>(typeConverter, patterns.getContext());
 }
 
 } // namespace gradient
