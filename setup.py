@@ -54,11 +54,7 @@ description = {
     "license": "Apache License 2.0",
 }
 
-intree_extension_list = intree_extensions(["frontend/catalyst/utils/wrapper.cc"])
-for ext in intree_extension_list:
-    ext._add_ldflags(["-lffi"])  # pylint: disable=protected-access
-ext_modules = intree_extension_list
-
+ext_modules = intree_extensions(["frontend/catalyst/utils/wrapper.cc"])
 
 setup(
     classifiers=classifiers,
