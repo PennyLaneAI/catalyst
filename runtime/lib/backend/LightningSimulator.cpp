@@ -211,21 +211,30 @@ auto LightningSimulator::Var(ObsIdType obsKey) -> double
     return result;
 }
 
-auto LightningSimulator::State() -> std::vector<std::complex<double>>
+void LightningSimulator::State(MemRefView<std::complex<double>, 1> &state)
 {
-    auto &&state = this->device_sv->getDataVector();
-    return std::vector<std::complex<double>>(state.begin(), state.end());
+    RT_ASSERT(!state.empty());
+    auto &&dv_state = this->device_sv->getDataVector();
+    RT_FAIL_IF(state.size() != dv_state.size(), "Invalid size for the pre-allocated state vector");
+
+    std::move(dv_state.begin(), dv_state.end(), state.begin());
 }
 
-auto LightningSimulator::Probs() -> std::vector<double>
+void LightningSimulator::Probs(MemRefView<double, 1> &probs)
 {
+    RT_ASSERT(!probs.empty());
     Pennylane::Simulators::Measures m{*(this->device_sv)};
+    auto &&dv_probs = m.probs();
 
-    return m.probs();
+    RT_FAIL_IF(probs.size() != dv_probs.size(), "Invalid size for the pre-allocated probabilities");
+
+    std::move(dv_probs.begin(), dv_probs.end(), probs.begin());
 }
 
-auto LightningSimulator::PartialProbs(const std::vector<QubitIdType> &wires) -> std::vector<double>
+void LightningSimulator::PartialProbs(MemRefView<double, 1> &probs,
+                                      const std::vector<QubitIdType> &wires)
 {
+    RT_ASSERT(!probs.empty());
     const size_t numWires = wires.size();
     const size_t numQubits = this->GetNumQubits();
 
@@ -234,12 +243,17 @@ auto LightningSimulator::PartialProbs(const std::vector<QubitIdType> &wires) -> 
 
     auto dev_wires = getDeviceWires(wires);
     Pennylane::Simulators::Measures m{*(this->device_sv)};
+    auto &&dv_probs = m.probs(dev_wires);
 
-    return m.probs(dev_wires);
+    RT_FAIL_IF(probs.size() != dv_probs.size(),
+               "Invalid size for the pre-allocated partial-probabilities");
+
+    std::move(dv_probs.begin(), dv_probs.end(), probs.begin());
 }
 
-auto LightningSimulator::Sample(size_t shots) -> std::vector<double>
+void LightningSimulator::Sample(MemRefView<double, 2> &samples, size_t shots)
 {
+    RT_ASSERT(!samples.empty())
     // generate_samples is a member function of the Measures class.
     Pennylane::Simulators::Measures m{*(this->device_sv)};
 
@@ -250,6 +264,8 @@ auto LightningSimulator::Sample(size_t shots) -> std::vector<double>
     // the number of qubits.
     auto &&li_samples = m.generate_samples(shots);
 
+    RT_FAIL_IF(samples.size() != li_samples.size(), "Invalid size for the pre-allocated samples");
+
     const size_t numQubits = this->GetNumQubits();
 
     // The lightning samples are layed out as a single vector of size
@@ -257,25 +273,28 @@ auto LightningSimulator::Sample(size_t shots) -> std::vector<double>
     // corresponding shape is (shots, qubits). Gather the desired bits
     // corresponding to the input wires into a bitstring.
     // TODO: matrix transpose
-    std::vector<double> samples(li_samples.size());
+    std::vector<double> samples_vec(li_samples.size());
     for (size_t shot = 0; shot < shots; shot++) {
         for (size_t wire = 0; wire < numQubits; wire++) {
-            samples[shot * numQubits + wire] =
+            samples_vec[shot * numQubits + wire] =
                 static_cast<double>(li_samples[shot * numQubits + wire]);
         }
     }
-
-    return samples;
+    MemRefT<double, 2> src{
+        samples_vec.data(), samples_vec.data(), 0, {shots, numQubits}, {numQubits, 1}};
+    samples.clone(src);
 }
 
-auto LightningSimulator::PartialSample(const std::vector<QubitIdType> &wires, size_t shots)
-    -> std::vector<double>
+void LightningSimulator::PartialSample(MemRefView<double, 2> &samples,
+                                       const std::vector<QubitIdType> &wires, size_t shots)
 {
     const size_t numWires = wires.size();
     const size_t numQubits = this->GetNumQubits();
 
     RT_FAIL_IF(numWires > numQubits, "Invalid number of wires");
     RT_FAIL_IF(!isValidQubits(wires), "Invalid given wires to measure");
+    RT_FAIL_IF(samples.size() != shots * numWires,
+               "Invalid size for the pre-allocated partial-samples");
 
     // get device wires
     auto &&dev_wires = getDeviceWires(wires);
@@ -295,21 +314,29 @@ auto LightningSimulator::PartialSample(const std::vector<QubitIdType> &wires, si
     // corresponding shape is (shots, qubits). Gather the desired bits
     // corresponding to the input wires into a bitstring.
     // TODO: matrix transpose
-    std::vector<double> samples(shots * numWires);
+    std::vector<double> samples_vec(shots * numWires);
     for (size_t shot = 0; shot < shots; shot++) {
         size_t idx = 0;
         for (auto wire : dev_wires) {
-            samples[shot * numWires + idx++] =
+            samples_vec[shot * numWires + idx++] =
                 static_cast<double>(li_samples[shot * numQubits + wire]);
         }
     }
 
-    return samples;
+    MemRefT<double, 2> src{
+        samples_vec.data(), samples_vec.data(), 0, {shots, numWires}, {numWires, 1}};
+    samples.clone(src);
 }
 
-auto LightningSimulator::Counts(size_t shots)
-    -> std::tuple<std::vector<double>, std::vector<int64_t>>
+void LightningSimulator::Counts(MemRefView<double, 1> &eigvals, MemRefView<int64_t, 1> &counts,
+                                size_t shots)
 {
+    const size_t numQubits = this->GetNumQubits();
+    const size_t numElements = 1U << numQubits;
+
+    RT_FAIL_IF(eigvals.size() != numElements, "Invalid size for the pre-allocated eigvals");
+    RT_FAIL_IF(counts.size() != numElements, "Invalid size for the pre-allocated counts");
+
     // generate_samples is a member function of the Measures class.
     Pennylane::Simulators::Measures m{*(this->device_sv)};
 
@@ -324,12 +351,8 @@ auto LightningSimulator::Counts(size_t shots)
     // computational basis bitstring. In the future, eigenvalues can also be
     // obtained from an observable, hence the bitstring integer is stored as a
     // double.
-    const size_t numQubits = this->GetNumQubits();
-    const size_t numElements = 1U << numQubits;
-    std::vector<double> eigvals(numElements);
     std::iota(eigvals.begin(), eigvals.end(), 0);
-    eigvals.reserve(numElements);
-    std::vector<int64_t> counts(numElements);
+    std::fill(counts.begin(), counts.end(), 0);
 
     // The lightning samples are layed out as a single vector of size
     // shots*qubits, where each element represents a single bit. The
@@ -341,20 +364,22 @@ auto LightningSimulator::Counts(size_t shots)
         for (size_t wire = 0; wire < numQubits; wire++) {
             basisState[idx++] = li_samples[shot * numQubits + wire];
         }
-        counts[basisState.to_ulong()] += 1;
+        counts(static_cast<size_t>(basisState.to_ulong())) += 1;
     }
-
-    return {eigvals, counts};
 }
 
-auto LightningSimulator::PartialCounts(const std::vector<QubitIdType> &wires, size_t shots)
-    -> std::tuple<std::vector<double>, std::vector<int64_t>>
+void LightningSimulator::PartialCounts(MemRefView<double, 1> &eigvals,
+                                       MemRefView<int64_t, 1> &counts,
+                                       const std::vector<QubitIdType> &wires, size_t shots)
 {
     const size_t numWires = wires.size();
     const size_t numQubits = this->GetNumQubits();
+    const size_t numElements = 1U << numWires;
 
     RT_FAIL_IF(numWires > numQubits, "Invalid number of wires");
     RT_FAIL_IF(!isValidQubits(wires), "Invalid given wires to measure");
+    RT_FAIL_IF(eigvals.size() != numElements, "Invalid size for the pre-allocated partial-eigvals");
+    RT_FAIL_IF(counts.size() != numElements, "Invalid size for the pre-allocated partial-counts");
 
     // get device wires
     auto &&dev_wires = getDeviceWires(wires);
@@ -373,11 +398,8 @@ auto LightningSimulator::PartialCounts(const std::vector<QubitIdType> &wires, si
     // computational basis bitstring. In the future, eigenvalues can also be
     // obtained from an observable, hence the bitstring integer is stored as a
     // double.
-    const size_t numElements = 1U << numWires;
-    std::vector<double> eigvals(numElements);
     std::iota(eigvals.begin(), eigvals.end(), 0);
-    eigvals.reserve(numElements);
-    std::vector<int64_t> counts(numElements);
+    std::fill(counts.begin(), counts.end(), 0);
 
     // The lightning samples are layed out as a single vector of size
     // shots*qubits, where each element represents a single bit. The
@@ -389,17 +411,22 @@ auto LightningSimulator::PartialCounts(const std::vector<QubitIdType> &wires, si
         for (auto wire : dev_wires) {
             basisState[idx++] = li_samples[shot * numQubits + wire];
         }
-        counts[basisState.to_ulong()] += 1;
+        counts(static_cast<size_t>(basisState.to_ulong())) += 1;
     }
-
-    return {eigvals, counts};
 }
 
 auto LightningSimulator::Measure(QubitIdType wire) -> Result
 {
     // get a measurement
     std::vector<QubitIdType> wires = {reinterpret_cast<QubitIdType>(wire)};
-    auto &&probs = this->PartialProbs(wires);
+
+    std::vector<double> probs(1U << wires.size());
+
+    {
+        MemRefT<double, 1> buffer(probs.data(), probs.data(), 0, {probs.size()}, {1});
+        MemRefView<double, 1> buffer_view(&buffer, probs.size());
+        this->PartialProbs(buffer_view, wires);
+    }
 
     std::random_device rd;
     std::mt19937 gen(rd());

@@ -261,12 +261,22 @@ TEST_CASE("Test copy to strided array", "[qir_lightning_core]")
     size_t buffer_len = data.size();
     double *buffer = data.data();
     MemRefT<double, 2> src = {buffer, buffer, 0, {buffer_len / 2, 2}, {2, 1}};
+    MemRefView<double, 2> src_view(&src, buffer_len);
+    CHECK(src_view(0, 0) == buffer[0]);
+    CHECK(src_view(0, 1) == buffer[1]);
+    CHECK(src_view(1, 0) == buffer[2]);
+    CHECK(src_view(1, 1) == buffer[3]);
+    CHECK(src_view(2, 0) == buffer[4]);
+    CHECK(src_view(2, 1) == buffer[5]);
+    CHECK(src_view(3, 0) == buffer[6]);
+    CHECK(src_view(3, 1) == buffer[7]);
 
     size_t buffer_strided_len = buffer_len * 2;
     double *buffer_strided = new double[buffer_strided_len];
     MemRefT<double, 2> dst = {
         buffer_strided, buffer_strided, 0, {buffer_strided_len / 2, 2}, {4, 2}};
-    memref_copy<double, 2>(&dst, &src, buffer_len * sizeof(double));
+    MemRefView<double, 2> dst_view(&dst, buffer_strided_len);
+    dst_view.clone(src);
     CHECK(buffer_strided[0] == buffer[0]);
     CHECK(buffer_strided[2] == buffer[1]);
     CHECK(buffer_strided[4] == buffer[2]);
@@ -275,6 +285,22 @@ TEST_CASE("Test copy to strided array", "[qir_lightning_core]")
     CHECK(buffer_strided[10] == buffer[5]);
     CHECK(buffer_strided[12] == buffer[6]);
     CHECK(buffer_strided[14] == buffer[7]);
+
+    CHECK(src_view(0, 0) == dst_view(0, 0));
+    CHECK(src_view(0, 1) == dst_view(0, 1));
+    CHECK(src_view(1, 0) == dst_view(1, 0));
+    CHECK(src_view(1, 1) == dst_view(1, 1));
+    CHECK(src_view(2, 0) == dst_view(2, 0));
+    CHECK(src_view(2, 1) == dst_view(2, 1));
+    CHECK(src_view(3, 0) == dst_view(3, 0));
+    CHECK(src_view(3, 1) == dst_view(3, 1));
+
+    REQUIRE_THROWS_WITH(
+        dst_view(4, 1),
+        Catch::Contains("[Function:operator()] Error in Catalyst Runtime: Assertion: loc < tsize"));
+    REQUIRE_THROWS_WITH(dst_view(3, 2),
+                        Catch::Contains("[Function:operator()] Error in Catalyst Runtime: "
+                                        "Assertion: indices[axis] < buffer->sizes[axis]"));
 
     delete[] buffer_strided;
 }
@@ -1123,8 +1149,8 @@ TEST_CASE("Test __quantum__qis__Counts with num_qubits=2 calling Hadamard, Contr
 
     PairT_MemRefT_double_int64_1d result = getCounts(4);
     __quantum__qis__Counts(&result, shots, 0);
-    int64_t *counts = result.second.data_allocated;
     double *eigvals = result.first.data_allocated;
+    int64_t *counts = result.second.data_allocated;
 
     for (int i = 0; i < 4; i++) {
         CHECK(eigvals[i] == (double)i);
@@ -1166,8 +1192,8 @@ TEST_CASE("Test __quantum__qis__Counts with num_qubits=2 PartialCounts calling H
 
     PairT_MemRefT_double_int64_1d result = getCounts(2);
     __quantum__qis__Counts(&result, shots, 1, ctrls[0]);
-    int64_t *counts = result.second.data_allocated;
     double *eigvals = result.first.data_allocated;
+    int64_t *counts = result.second.data_allocated;
 
     CHECK(counts[0] + counts[1] == shots);
     CHECK(eigvals[0] + 1 == eigvals[1]);

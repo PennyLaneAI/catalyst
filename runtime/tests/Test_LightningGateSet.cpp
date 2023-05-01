@@ -49,7 +49,11 @@ TEST_CASE("Identity Gate tests", "[lightning]")
     sim->NamedOperation("Identity", {}, {Qs[6]}, false);
     sim->NamedOperation("Identity", {}, {Qs[8]}, false);
 
-    std::vector<std::complex<double>> out_state = sim->State();
+    std::vector<std::complex<double>> out_state(1U << sim->GetNumQubits());
+    MemRefT<std::complex<double>, 1> buffer{
+        out_state.data(), out_state.data(), 0, {out_state.size()}, {1}};
+    MemRefView<std::complex<double>, 1> view(&buffer, out_state.size());
+    sim->State(view);
 
     CHECK(out_state.at(0) == std::complex<double>{1, 0});
 
@@ -76,7 +80,11 @@ TEST_CASE("PauliX Gate tests num_qubits=1", "[lightning]")
 
     sim->NamedOperation("PauliX", {}, {Qs[0]}, false);
 
-    std::vector<std::complex<double>> out_state = sim->State();
+    std::vector<std::complex<double>> out_state(1U << sim->GetNumQubits());
+    MemRefT<std::complex<double>, 1> buffer{
+        out_state.data(), out_state.data(), 0, {out_state.size()}, {1}};
+    MemRefView<std::complex<double>, 1> view(&buffer, out_state.size());
+    sim->State(view);
 
     CHECK(out_state.at(0) == std::complex<double>{0, 0});
     CHECK(out_state.at(1) == std::complex<double>{1, 0});
@@ -104,7 +112,11 @@ TEST_CASE("PauliX Gate tests num_qubits=3", "[lightning]")
     sim->NamedOperation("PauliX", {}, {Qs[1]}, false);
     sim->NamedOperation("PauliX", {}, {Qs[0]}, false);
 
-    std::vector<std::complex<double>> out_state = sim->State();
+    std::vector<std::complex<double>> out_state(1U << sim->GetNumQubits());
+    MemRefT<std::complex<double>, 1> buffer{
+        out_state.data(), out_state.data(), 0, {out_state.size()}, {1}};
+    MemRefView<std::complex<double>, 1> view(&buffer, out_state.size());
+    sim->State(view);
 
     CHECK(out_state.at(0) == std::complex<double>{1, 0});
 
@@ -131,7 +143,11 @@ TEST_CASE("PauliY Gate tests num_qubits=1", "[lightning]")
 
     sim->NamedOperation("PauliY", {}, {Qs[0]}, false);
 
-    std::vector<std::complex<double>> out_state = sim->State();
+    std::vector<std::complex<double>> out_state(1U << sim->GetNumQubits());
+    MemRefT<std::complex<double>, 1> buffer{
+        out_state.data(), out_state.data(), 0, {out_state.size()}, {1}};
+    MemRefView<std::complex<double>, 1> view(&buffer, out_state.size());
+    sim->State(view);
 
     CHECK(out_state.at(0) == std::complex<double>{0, 0});
     CHECK(out_state.at(1) == std::complex<double>{0, 1});
@@ -153,7 +169,11 @@ TEST_CASE("PauliY Gate tests num_qubits=2", "[lightning]")
     sim->NamedOperation("PauliY", {}, {Qs[0]}, false);
     sim->NamedOperation("PauliY", {}, {Qs[1]}, false);
 
-    std::vector<std::complex<double>> out_state = sim->State();
+    std::vector<std::complex<double>> out_state(1U << sim->GetNumQubits());
+    MemRefT<std::complex<double>, 1> buffer{
+        out_state.data(), out_state.data(), 0, {out_state.size()}, {1}};
+    MemRefView<std::complex<double>, 1> view(&buffer, out_state.size());
+    sim->State(view);
 
     CHECK(out_state.at(0) == std::complex<double>{0, 0});
     CHECK(out_state.at(1) == std::complex<double>{0, 0});
@@ -177,7 +197,11 @@ TEST_CASE("PauliZ Gate tests num_qubits=2", "[lightning]")
     sim->NamedOperation("PauliY", {}, {Qs[0]}, false);
     sim->NamedOperation("PauliZ", {}, {Qs[1]}, false);
 
-    std::vector<std::complex<double>> out_state = sim->State();
+    std::vector<std::complex<double>> out_state(1U << sim->GetNumQubits());
+    MemRefT<std::complex<double>, 1> buffer{
+        out_state.data(), out_state.data(), 0, {out_state.size()}, {1}};
+    MemRefView<std::complex<double>, 1> view(&buffer, out_state.size());
+    sim->State(view);
 
     CHECK(out_state.at(0) == std::complex<double>{0, 0});
     CHECK(out_state.at(1) == std::complex<double>{0, 0});
@@ -201,7 +225,11 @@ TEST_CASE("Hadamard Gate tests num_qubits=2", "[lightning]")
     sim->NamedOperation("Hadamard", {}, {Qs[0]}, false);
     sim->NamedOperation("Hadamard", {}, {Qs[1]}, false);
 
-    std::vector<std::complex<double>> out_state = sim->State();
+    std::vector<std::complex<double>> out_state(1U << sim->GetNumQubits());
+    MemRefT<std::complex<double>, 1> buffer{
+        out_state.data(), out_state.data(), 0, {out_state.size()}, {1}};
+    MemRefView<std::complex<double>, 1> view(&buffer, out_state.size());
+    sim->State(view);
 
     CHECK(out_state[0].real() == Approx(0.5).epsilon(1e-5));
     CHECK(out_state[0].imag() == Approx(0).epsilon(1e-5));
@@ -226,7 +254,11 @@ TEST_CASE("Hadamard Gate tests num_qubits=3", "[lightning]")
     sim->NamedOperation("Hadamard", {}, {Qs[0]}, false);
     sim->NamedOperation("Hadamard", {}, {Qs[1]}, false);
 
-    std::vector<std::complex<double>> out_state = sim->State();
+    std::vector<std::complex<double>> out_state(1U << sim->GetNumQubits());
+    MemRefT<std::complex<double>, 1> buffer{
+        out_state.data(), out_state.data(), 0, {out_state.size()}, {1}};
+    MemRefView<std::complex<double>, 1> view(&buffer, out_state.size());
+    sim->State(view);
 
     CHECK(out_state[0].real() == Approx(0.5).epsilon(1e-5));
     CHECK(out_state[0].imag() == Approx(0).epsilon(1e-5));
@@ -249,7 +281,11 @@ TEST_CASE("MIX Gate test R(X,Y,Z) num_qubits=1,4", "[lightning]")
     sim->NamedOperation("RY", {0.456}, {Qs[2]}, false);
     sim->NamedOperation("RZ", {0.789}, {Qs[3]}, false);
 
-    const auto &&out_state = sim->State();
+    std::vector<std::complex<double>> out_state(1U << sim->GetNumQubits());
+    MemRefT<std::complex<double>, 1> buffer{
+        out_state.data(), out_state.data(), 0, {out_state.size()}, {1}};
+    MemRefView<std::complex<double>, 1> view(&buffer, out_state.size());
+    sim->State(view);
 
     // calculated by pennylane,
     CHECK(out_state.at(0) == std::complex<double>{0, 0});
@@ -297,7 +333,11 @@ TEST_CASE("test PhaseShift num_qubits=2", "[lightning]")
     sim->NamedOperation("RX", {0.123}, {Qs[1]}, false);
     sim->NamedOperation("PhaseShift", {0.456}, {Qs[0]}, false);
 
-    std::vector<std::complex<double>> out_state = sim->State();
+    std::vector<std::complex<double>> out_state(1U << sim->GetNumQubits());
+    MemRefT<std::complex<double>, 1> buffer{
+        out_state.data(), out_state.data(), 0, {out_state.size()}, {1}};
+    MemRefView<std::complex<double>, 1> view(&buffer, out_state.size());
+    sim->State(view);
 
     // calculated by pennylane,
     CHECK(out_state[0].real() == Approx(0.7057699753).epsilon(1e-5));
@@ -330,7 +370,11 @@ TEST_CASE("CNOT Gate tests num_qubits=2 [0,1]", "[lightning]")
     sim->NamedOperation("PauliX", {}, {Qs[0]}, false);
     sim->NamedOperation("CNOT", {}, {Qs[0], Qs[1]}, false);
 
-    std::vector<std::complex<double>> out_state = sim->State();
+    std::vector<std::complex<double>> out_state(1U << sim->GetNumQubits());
+    MemRefT<std::complex<double>, 1> buffer{
+        out_state.data(), out_state.data(), 0, {out_state.size()}, {1}};
+    MemRefView<std::complex<double>, 1> view(&buffer, out_state.size());
+    sim->State(view);
 
     CHECK(out_state.at(0) == std::complex<double>{0, 0});
     CHECK(out_state.at(1) == std::complex<double>{0, 0});
@@ -354,7 +398,11 @@ TEST_CASE("CNOT Gate tests num_qubits=2 [1,0]", "[lightning]")
     sim->NamedOperation("PauliX", {}, {Qs[0]}, false);
     sim->NamedOperation("CNOT", {}, {Qs[1], Qs[0]}, false);
 
-    std::vector<std::complex<double>> out_state = sim->State();
+    std::vector<std::complex<double>> out_state(1U << sim->GetNumQubits());
+    MemRefT<std::complex<double>, 1> buffer{
+        out_state.data(), out_state.data(), 0, {out_state.size()}, {1}};
+    MemRefView<std::complex<double>, 1> view(&buffer, out_state.size());
+    sim->State(view);
 
     CHECK(out_state.at(0) == std::complex<double>{0, 0});
     CHECK(out_state.at(1) == std::complex<double>{0, 0});
@@ -375,7 +423,11 @@ TEST_CASE("MIX Gate test CR(X, Y, Z) num_qubits=1,4", "[lightning]")
     sim->NamedOperation("CRY", {0.456}, {Qs[0], Qs[2]}, false);
     sim->NamedOperation("CRZ", {0.789}, {Qs[0], Qs[3]}, false);
 
-    const auto &&out_state = sim->State();
+    std::vector<std::complex<double>> out_state(1U << sim->GetNumQubits());
+    MemRefT<std::complex<double>, 1> buffer{
+        out_state.data(), out_state.data(), 0, {out_state.size()}, {1}};
+    MemRefView<std::complex<double>, 1> view(&buffer, out_state.size());
+    sim->State(view);
 
     // calculated by pennylane,
     CHECK(out_state[0].real() == Approx(0.7071067811865475).epsilon(1e-5));
@@ -420,7 +472,11 @@ TEST_CASE("CRot", "[lightning]")
 
     sim->NamedOperation("Hadamard", {}, {Qs[0]}, false);
     sim->NamedOperation("CRot", {M_PI, M_PI_2, 0.5}, {Qs[0], Qs[1]}, false);
-    std::vector<std::complex<double>> out_state = sim->State();
+    std::vector<std::complex<double>> out_state(1U << sim->GetNumQubits());
+    MemRefT<std::complex<double>, 1> buffer{
+        out_state.data(), out_state.data(), 0, {out_state.size()}, {1}};
+    MemRefView<std::complex<double>, 1> view(&buffer, out_state.size());
+    sim->State(view);
 
     CHECK(out_state[0].real() == Approx(0.7071067812).epsilon(1e-5));
     CHECK(out_state[0].imag() == Approx(0).epsilon(1e-5));
@@ -448,7 +504,11 @@ TEST_CASE("CSWAP test", "[lightning]")
     sim->NamedOperation("RX", {M_PI}, {Qs[0]}, false);
     sim->NamedOperation("RX", {M_PI}, {Qs[1]}, false);
     sim->NamedOperation("CSWAP", {}, {Qs[0], Qs[1], Qs[2]}, false);
-    std::vector<std::complex<double>> out_state = sim->State();
+    std::vector<std::complex<double>> out_state(1U << sim->GetNumQubits());
+    MemRefT<std::complex<double>, 1> buffer{
+        out_state.data(), out_state.data(), 0, {out_state.size()}, {1}};
+    MemRefView<std::complex<double>, 1> view(&buffer, out_state.size());
+    sim->State(view);
 
     CHECK(out_state[5].real() == Approx(-1).epsilon(1e-5));
     CHECK(out_state[5].imag() == Approx(0).epsilon(1e-5));
@@ -472,7 +532,11 @@ TEST_CASE("IsingXY Gate tests num_qubits=2 [1,0]", "[lightning]")
     sim->NamedOperation("IsingXY", {0.2}, {Qs[1], Qs[0]}, false);
     sim->NamedOperation("SWAP", {}, {Qs[0], Qs[1]}, false);
 
-    std::vector<std::complex<double>> out_state = sim->State();
+    std::vector<std::complex<double>> out_state(1U << sim->GetNumQubits());
+    MemRefT<std::complex<double>, 1> buffer{
+        out_state.data(), out_state.data(), 0, {out_state.size()}, {1}};
+    MemRefView<std::complex<double>, 1> view(&buffer, out_state.size());
+    sim->State(view);
 
     CHECK(out_state[0].real() == Approx(0.70710678).epsilon(1e-5));
     CHECK(out_state[0].imag() == Approx(0).epsilon(1e-5));
@@ -501,7 +565,11 @@ TEST_CASE("Toffoli test", "[lightning]")
     sim->NamedOperation("PauliX", {}, {Qs[1]}, false);
     sim->NamedOperation("Toffoli", {}, {Qs[0], Qs[1], Qs[2]}, false);
 
-    std::vector<std::complex<double>> out_state = sim->State();
+    std::vector<std::complex<double>> out_state(1U << sim->GetNumQubits());
+    MemRefT<std::complex<double>, 1> buffer{
+        out_state.data(), out_state.data(), 0, {out_state.size()}, {1}};
+    MemRefView<std::complex<double>, 1> view(&buffer, out_state.size());
+    sim->State(view);
 
     CHECK(out_state.at(0) == std::complex<double>{0, 0});
     CHECK(out_state.at(1) == std::complex<double>{0, 0});
@@ -534,7 +602,11 @@ TEST_CASE("MultiRZ test", "[lightning]")
     sim->NamedOperation("MultiRZ", {M_PI}, {Qs[0], Qs[1]}, false);
     sim->NamedOperation("Hadamard", {}, {Qs[0]}, false);
     sim->NamedOperation("Hadamard", {}, {Qs[1]}, false);
-    std::vector<std::complex<double>> out_state = sim->State();
+    std::vector<std::complex<double>> out_state(1U << sim->GetNumQubits());
+    MemRefT<std::complex<double>, 1> buffer{
+        out_state.data(), out_state.data(), 0, {out_state.size()}, {1}};
+    MemRefView<std::complex<double>, 1> view(&buffer, out_state.size());
+    sim->State(view);
 
     CHECK(out_state[2].real() == Approx(-1).epsilon(1e-5));
     CHECK(out_state[2].imag() == Approx(0).epsilon(1e-5));
@@ -565,7 +637,11 @@ TEST_CASE("MatrixOperation test with 2-qubit", "[lightning]")
     };
     sim->MatrixOperation(matrix, wires, false);
 
-    std::vector<std::complex<double>> out_state = sim->State();
+    std::vector<std::complex<double>> out_state(1U << sim->GetNumQubits());
+    MemRefT<std::complex<double>, 1> buffer{
+        out_state.data(), out_state.data(), 0, {out_state.size()}, {1}};
+    MemRefView<std::complex<double>, 1> view(&buffer, out_state.size());
+    sim->State(view);
 
     CHECK(out_state[0].real() == Approx(-0.474432).epsilon(1e-5));
     CHECK(out_state[0].imag() == Approx(-0.44579).epsilon(1e-5));
@@ -609,7 +685,11 @@ TEST_CASE("MatrixOperation test with 3-qubit", "[lightning]")
     };
     sim->MatrixOperation(matrix, wires, false);
 
-    std::vector<std::complex<double>> out_state = sim->State();
+    std::vector<std::complex<double>> out_state(1U << sim->GetNumQubits());
+    MemRefT<std::complex<double>, 1> buffer{
+        out_state.data(), out_state.data(), 0, {out_state.size()}, {1}};
+    MemRefView<std::complex<double>, 1> view(&buffer, out_state.size());
+    sim->State(view);
 
     CHECK(out_state[0].real() == Approx(0.349135).epsilon(1e-5));
     CHECK(out_state[0].imag() == Approx(0.180548).epsilon(1e-5));
@@ -709,7 +789,11 @@ TEST_CASE("MatrixOperation test with 4-qubit", "[lightning]")
     };
     sim->MatrixOperation(matrix, wires, false);
 
-    std::vector<std::complex<double>> out_state = sim->State();
+    std::vector<std::complex<double>> out_state(1U << sim->GetNumQubits());
+    MemRefT<std::complex<double>, 1> buffer{
+        out_state.data(), out_state.data(), 0, {out_state.size()}, {1}};
+    MemRefView<std::complex<double>, 1> view(&buffer, out_state.size());
+    sim->State(view);
 
     CHECK(out_state[0].real() == Approx(-0.141499).epsilon(1e-5));
     CHECK(out_state[0].imag() == Approx(-0.230993).epsilon(1e-5));

@@ -18,6 +18,7 @@
 #include <memory>
 #include <vector>
 
+#include "MemRefUtils.hpp"
 #include "Types.h"
 
 namespace Catalyst::Runtime {
@@ -195,71 +196,70 @@ struct QuantumDevice {
     virtual auto Var(ObsIdType obsKey) -> double = 0;
 
     /**
-     * @brief Compute the probabilities of each computational basis state.
+     * @brief Get the state-vector of a device.
      *
-     * @return `std::vector<double>`
+     * @param state The pre-allocated `MemRefView<complex<double>, 1>`
      */
-    virtual auto Probs() -> std::vector<double> = 0;
+    virtual void State(MemRefView<std::complex<double>, 1> &state) = 0;
+
+    /**
+     * @brief Compute the probabilities of each computational basis state.
+
+     * @param probs The pre-allocated `MemRefView<double, 1>`
+     */
+    virtual void Probs(MemRefView<double, 1> &probs) = 0;
 
     /**
      * @brief Compute the probabilities for a subset of the full system.
      *
+     * @param probs The pre-allocated `MemRefView<double, 1>`
      * @param wires Wires will restrict probabilities to a subset of the full system
-     *
-     * @return `std::vector<double>`
      */
-    virtual auto PartialProbs(const std::vector<QubitIdType> &wires) -> std::vector<double> = 0;
-
-    /**
-     * @brief Get the state-vector of a device.
-     *
-     * @return `std::vector<std::complex<double>>`
-     */
-    virtual auto State() -> std::vector<std::complex<double>> = 0;
+    virtual void PartialProbs(MemRefView<double, 1> &probs,
+                              const std::vector<QubitIdType> &wires) = 0;
 
     /**
      * @brief Compute samples with the number of shots on the entire wires,
      * returing raw samples.
      *
+     * @param samples The pre-allocated `MemRefView<double, 2>`
      * @param shots The number of shots
-     *
-     * @return `std::vector<double>`
      */
-    virtual auto Sample(size_t shots) -> std::vector<double> = 0;
+    virtual void Sample(MemRefView<double, 2> &samples, size_t shots) = 0;
 
     /**
      * @brief Compute partial samples with the number of shots on `wires`,
      * returing raw samples.
      *
+     * @param samples The pre-allocated `MemRefView<double, 2>`
      * @param wires Wires to compute samples on
      * @param shots The number of shots
-     *
-     * @return `std::vector<double>`
      */
-    virtual auto PartialSample(const std::vector<QubitIdType> &wires, size_t shots)
-        -> std::vector<double> = 0;
+    virtual void PartialSample(MemRefView<double, 2> &samples,
+                               const std::vector<QubitIdType> &wires, size_t shots) = 0;
 
     /**
      * @brief Sample with the number of shots on the entire wires, returning the
      * number of counts for each sample.
      *
+     * @param eigvals The pre-allocated `MemRefView<double, 1>`
+     * @param counts The pre-allocated `MemRefView<int64_t, 1>`
      * @param shots The number of shots
-     *
-     * @return `std::tuple<std::vector<double>, std::vector<int64_t>>` (eigvals, counts)
      */
-    virtual auto Counts(size_t shots) -> std::tuple<std::vector<double>, std::vector<int64_t>> = 0;
+    virtual void Counts(MemRefView<double, 1> &eigvals, MemRefView<int64_t, 1> &counts,
+                        size_t shots) = 0;
 
     /**
      * @brief Partial sample with the number of shots on `wires`, returning the
      * number of counts for each sample.
      *
+     * @param eigvals The pre-allocated `MemRefView<double, 1>`
+     * @param counts The pre-allocated `MemRefView<int64_t, 1>`
      * @param wires Wires to compute samples on
      * @param shots The number of shots
-     *
-     * @return `std::tuple<std::vector<double>, std::vector<int64_t>>` (eigvals, counts)
      */
-    virtual auto PartialCounts(const std::vector<QubitIdType> &wires, size_t shots)
-        -> std::tuple<std::vector<double>, std::vector<int64_t>> = 0;
+    virtual void PartialCounts(MemRefView<double, 1> &eigvals, MemRefView<int64_t, 1> &counts,
+                               const std::vector<QubitIdType> &wires, size_t shots) = 0;
 
     /**
      * @brief A general measurement method that acts on a single wire.
