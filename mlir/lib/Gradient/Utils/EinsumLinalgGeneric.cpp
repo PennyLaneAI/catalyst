@@ -50,12 +50,12 @@ llvm::SmallVector<mlir::Value> einsumLinalgGeneric(
 
   auto attrs = ({
     SmallVector<utils::IteratorType, 4> out;
-    SmallSetVector<int64_t, 4> u;
-    u.set_union(a_axis);
-    u.set_union(b_axis);
+    SmallSetVector<int64_t, 4> ua(a_axis.begin(), a_axis.end());
+    SmallSetVector<int64_t, 4> ub(b_axis.begin(), b_axis.end());
     for (const auto a : all_dims) {
       out.push_back(
-        u.contains(a) ? utils::IteratorType::reduction : utils::IteratorType::parallel
+        (ua.contains(a) && ub.contains(a)) ?
+          utils::IteratorType::reduction : utils::IteratorType::parallel
       );
     }
     out;
