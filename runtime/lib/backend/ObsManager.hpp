@@ -19,7 +19,7 @@
 #include <tuple>
 #include <utility>
 
-#include "BaseUtils.hpp"
+#include "Exception.hpp"
 #include "LightningUtils.hpp"
 #include "Types.h"
 
@@ -27,15 +27,17 @@
 #include "ObservablesKokkos.hpp"
 namespace Catalyst::Runtime::Simulator {
 template <typename PrecisionT>
-using ObservableClassName = Pennylane::Simulators::ObservableKokkos<PrecisionT>;
+using ObservableClassName = Pennylane::Lightning_Kokkos::Simulators::ObservableKokkos<PrecisionT>;
 template <typename PrecisionT>
-using NamedObsClassName = Pennylane::Simulators::NamedObsKokkos<PrecisionT>;
+using NamedObsClassName = Pennylane::Lightning_Kokkos::Simulators::NamedObsKokkos<PrecisionT>;
 template <typename PrecisionT>
-using HermitianObsClassName = Pennylane::Simulators::HermitianObsKokkos<PrecisionT>;
+using HermitianObsClassName =
+    Pennylane::Lightning_Kokkos::Simulators::HermitianObsKokkos<PrecisionT>;
 template <typename PrecisionT>
-using TensorProdObsClassName = Pennylane::Simulators::TensorProdObsKokkos<PrecisionT>;
+using TensorProdObsClassName =
+    Pennylane::Lightning_Kokkos::Simulators::TensorProdObsKokkos<PrecisionT>;
 template <typename PrecisionT>
-using HamiltonianClassName = Pennylane::Simulators::HamiltonianKokkos<PrecisionT>;
+using HamiltonianClassName = Pennylane::Lightning_Kokkos::Simulators::HamiltonianKokkos<PrecisionT>;
 } // namespace Catalyst::Runtime::Simulator
 #else
 #include "Observables.hpp"
@@ -106,7 +108,7 @@ template <typename PrecisionT> class LightningObsManager {
     [[nodiscard]] auto getObservable(ObsIdType key)
         -> std::shared_ptr<ObservableClassName<PrecisionT>>
     {
-        QFailIf(!this->isValidObservables({key}), "Invalid observable key");
+        RT_FAIL_IF(!this->isValidObservables({key}), "Invalid observable key");
         return std::get<0>(this->observables_[reinterpret_cast<int64_t>(key)]);
     }
 
@@ -169,12 +171,13 @@ template <typename PrecisionT> class LightningObsManager {
 
         for (const auto &key : obsKeys) {
             auto key_t = reinterpret_cast<int64_t>(key);
-            QFailIf(static_cast<size_t>(key_t) >= obs_size || key_t < 0, "Invalid observable key");
+            RT_FAIL_IF(static_cast<size_t>(key_t) >= obs_size || key_t < 0,
+                       "Invalid observable key");
 
             auto &&[obs, type] = this->observables_[key_t];
 
-            QFailIf(type != ObsType::Basic, "Invalid basic observable to construct TensorProd; "
-                                            "NamedObs and HermitianObs are only supported");
+            RT_FAIL_IF(type != ObsType::Basic, "Invalid basic observable to construct TensorProd; "
+                                               "NamedObs and HermitianObs are only supported");
 
             obs_vec.push_back(obs);
         }
@@ -200,24 +203,25 @@ template <typename PrecisionT> class LightningObsManager {
         const auto key_size = obsKeys.size();
         const auto obs_size = this->observables_.size();
 
-        QFailIf(key_size != coeffs.size(),
-                "Incompatible list of observables and coefficients; "
-                "Number of observables and number of coefficients must be equal");
+        RT_FAIL_IF(key_size != coeffs.size(),
+                   "Incompatible list of observables and coefficients; "
+                   "Number of observables and number of coefficients must be equal");
 
         std::vector<std::shared_ptr<ObservableClassName<PrecisionT>>> obs_vec;
         obs_vec.reserve(key_size);
 
         for (auto key : obsKeys) {
             auto key_t = reinterpret_cast<int64_t>(key);
-            QFailIf(static_cast<size_t>(key_t) >= obs_size || key_t < 0, "Invalid observable key");
+            RT_FAIL_IF(static_cast<size_t>(key_t) >= obs_size || key_t < 0,
+                       "Invalid observable key");
 
             auto &&[obs, type] = this->observables_[key_t];
             auto contain_obs = std::find(hamiltonian_valid_obs_types.begin(),
                                          hamiltonian_valid_obs_types.end(), type);
 
-            QFailIf(contain_obs == hamiltonian_valid_obs_types.end(),
-                    "Invalid observable to construct Hamiltonian; "
-                    "NamedObs, HermitianObs and TensorProdObs are only supported");
+            RT_FAIL_IF(contain_obs == hamiltonian_valid_obs_types.end(),
+                       "Invalid observable to construct Hamiltonian; "
+                       "NamedObs, HermitianObs and TensorProdObs are only supported");
 
             obs_vec.push_back(obs);
         }

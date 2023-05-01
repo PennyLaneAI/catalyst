@@ -78,6 +78,36 @@ class TestReturnValues:
         result2 = order2(data_in)
         assert jnp.allclose(result1[0], result2[1]) and jnp.allclose(result1[1], result2[0])
 
+    @pytest.mark.parametrize(
+        "dtype",
+        [(jnp.complex128), (jnp.complex64), (jnp.float32), (jnp.int8), (jnp.int16), (jnp.int32)],
+    )
+    def test_return_complex_scalar(self, dtype):
+        """Complex scalars take a different path when being returned from the
+        compiled function. See `ranked_memref_to_numpy` and `to_numpy` in
+        llvm-project/mlir/python/mlir/runtime/np_to_memref.py.
+
+        Also test that we can return all these types if specifically requested by the user in the
+        compiled function itself.
+        """
+
+        @qjit
+        # pylint: disable=missing-function-docstring
+        def return_scalar():
+            return jnp.array(0, dtype=dtype)
+
+        assert jnp.allclose(return_scalar(), complex(0, 0))
+
+    @pytest.mark.parametrize("dtype", [(jnp.float16)])
+    def test_types_which_are_unhandled(self, dtype):
+        """Test that there's a nice error message when a function returns an f16."""
+        with pytest.raises(TypeError, match="Requested return type is unavailable."):
+
+            @qjit
+            # pylint: disable=missing-function-docstring
+            def return_scalar():
+                return jnp.array(0, dtype=dtype)
+
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])

@@ -17,11 +17,13 @@
 #include "Types.h"
 
 // PL-Lightning(-Kokkos) uncategorised utility header
-#include "Util.hpp"
 
 #if __has_include("StateVectorKokkos.hpp")
 // this macro is used in the C++ test suite
 #define _KOKKOS
+#include "UtilKokkos.hpp"
+#else
+#include "Util.hpp"
 #endif
 
 namespace Catalyst::Runtime::Simulator::Lightning {

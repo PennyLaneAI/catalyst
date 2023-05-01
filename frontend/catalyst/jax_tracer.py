@@ -67,7 +67,7 @@ def get_mlir(func, *args, **kwargs):
     effects = [eff for eff in jaxpr.effects if eff in jax.core.ordered_effects]
     axis_context = ReplicaAxisContext(xla.AxisEnv(nrep, (), ()))
     name_stack = util.new_name_stack(util.wrap_name("ok", "jit"))
-    m, ctx = custom_lower_jaxpr_to_module(
+    module, context = custom_lower_jaxpr_to_module(
         func_name="jit." + func.__name__,
         module_name=func.__name__,
         jaxpr=jaxpr,
@@ -78,7 +78,7 @@ def get_mlir(func, *args, **kwargs):
         donated_args=[],
     )
 
-    return m, ctx, jaxpr
+    return module, context, jaxpr
 
 
 def get_traceable_fn(qfunc, device):
@@ -260,12 +260,11 @@ def trace_quantum_tape(
                 wires, new_qubits, qubit_states, qreg
             )
         elif op.__class__.__name__ == "Cond":
-            predicate, consts = op_args
+            predicates, consts = op_args
             qreg = insert_to_qreg(qubit_states, qreg)
-            header_and_branch_args_plus_consts = [predicate] + consts + [qreg]
+            header_and_branch_args_plus_consts = predicates + consts + [qreg]
             outs = jprim.qcond(
-                op.true_jaxpr,
-                op.false_jaxpr,
+                op.branch_jaxprs,
                 *header_and_branch_args_plus_consts,
             )
             v, qreg = tree_unflatten(op.out_trees[0], outs)

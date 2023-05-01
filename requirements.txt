@@ -1,14 +1,13 @@
 numpy
 pybind11>=2.8.0
 PyYAML
-dataclasses
-jaxopt
 
 black[jupyter]
 clang-format==14.*
 clang-tidy==14.*
 pylint
 
+lit
 pytest
 pytest-xdist
 pytest-cov

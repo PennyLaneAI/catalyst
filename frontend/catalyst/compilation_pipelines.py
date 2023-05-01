@@ -15,29 +15,31 @@
 compiling of hybrid quantum-classical functions using Catalyst.
 """
 
-# pylint: disable=missing-module-docstring
-
 import ctypes
-import os
-import inspect
-import tempfile
-import typing
-import warnings
 import functools
+import warnings
+import inspect
+import typing
 
-import numpy as np
 import jax
-from jax.interpreters.mlir import ir
-
+import numpy as np
 import pennylane as qml
+from jax.interpreters.mlir import ir
+from mlir_quantum.runtime import (
+    get_ranked_memref_descriptor,
+    ranked_memref_to_numpy,
+    to_numpy,
+    as_ctype,
+    make_nd_memref_descriptor,
+    make_zero_d_memref_descriptor,
+)
 
-from mlir_quantum.runtime import get_ranked_memref_descriptor, ranked_memref_to_numpy
-
+from catalyst.utils.gen_mlir import inject_functions
 import catalyst.jax_tracer as tracer
-from catalyst import compiler
-from catalyst.utils.gen_mlir import append_modules
-from catalyst.utils.patching import Patcher
+from catalyst.compiler import Compiler
+from catalyst.compiler import CompileOptions
 from catalyst.pennylane_extensions import QFunc
+from catalyst.utils.patching import Patcher
 from catalyst.utils.tracing import TracingContext
 
 # Required for JAX tracer objects as PennyLane wires.
@@ -49,7 +51,22 @@ jax.config.update("jax_platform_name", "cpu")
 jax.config.update("jax_array", True)
 
 
-# pylint: disable=too-many-return-statements
+def are_params_annotated(f: typing.Callable):
+    """Return true if all parameters are typed-annotated."""
+    signature = inspect.signature(f)
+    parameters = signature.parameters
+    return all(p.annotation is not inspect.Parameter.empty for p in parameters.values())
+
+
+def get_type_annotations(func: typing.Callable):
+    """Get all type annotations if all parameters are typed-annotated."""
+    params_are_annotated = are_params_annotated(func)
+    if params_are_annotated:
+        return getattr(func, "__annotations__", {}).values()
+
+    return None
+
+
 def mlir_type_to_numpy_type(t):
     """Convert an MLIR type to a Numpy type.
 
@@ -60,30 +77,33 @@ def mlir_type_to_numpy_type(t):
     Raises:
         TypeError
     """
+    retval = None
     if ir.ComplexType.isinstance(t):
         base = ir.ComplexType(t).element_type
         if ir.F64Type.isinstance(base):
-            return np.complex128
-        if ir.F32Type.isinstance(base):
-            return np.complex64
-        raise TypeError("No known type")
-    if ir.F64Type.isinstance(t):
-        return np.float64
-    if ir.F32Type.isinstance(t):
-        return np.float32
-    if ir.F16Type.isinstance(t):
-        return np.float16
-    if ir.IntegerType(t).width == 1:
-        return np.bool_
-    if ir.IntegerType(t).width == 8:
-        return np.int8
-    if ir.IntegerType(t).width == 16:
-        return np.int16
-    if ir.IntegerType(t).width == 32:
-        return np.int32
-    if ir.IntegerType(t).width == 64:
-        return np.int64
-    raise TypeError("No known type")
+            retval = np.complex128
+        else:
+            retval = np.complex64
+    elif ir.F64Type.isinstance(t):
+        retval = np.float64
+    elif ir.F32Type.isinstance(t):
+        retval = np.float32
+    elif ir.IntegerType.isinstance(t):
+        int_t = ir.IntegerType(t)
+        if int_t.width == 1:
+            retval = np.bool_
+        elif int_t.width == 8:
+            retval = np.int8
+        elif int_t.width == 16:
+            retval = np.int16
+        elif int_t.width == 32:
+            retval = np.int32
+        else:
+            retval = np.int64
+
+    if retval is None:
+        raise TypeError("Requested return type is unavailable.")
+    return retval
 
 
 class CompiledFunction:
@@ -194,13 +214,7 @@ class CompiledFunction:
         # Not needed, computed from the arguments.
         # function.argyptes
 
-        # free, as defined in stdlib.h
-        # free is not defined in the shared object, however
-        # it is declared and we can use this declaration to
-        # get a handle to it.
-        free = shared_object.free
-
-        return shared_object, function, setup, teardown, free
+        return shared_object, function, setup, teardown
 
     @staticmethod
     def get_runtime_signature(*args):
@@ -221,37 +235,6 @@ class CompiledFunction:
             raise TypeError(f"Unsupported argument type: {arg_type}") from exc
 
     @staticmethod
-    def are_all_signature_params_annotated(f: typing.Callable):
-        """Determine if all parameters are typed.
-
-        Args:
-            f: callable, with possible annotation
-        Returns:
-            bool: whether all parameters are annotated
-        """
-        signature = inspect.signature(f)
-        parameters = signature.parameters
-        return all(p.annotation is not inspect.Parameter.empty for p in parameters.values())
-
-    @staticmethod
-    def get_compile_time_signature(f: typing.Callable) -> typing.List[typing.Any]:
-        """Get signature from parameter annotations.
-
-        Args:
-            f: callable, with possible annotations
-        Returns:
-            annotations for all parameters if possible
-
-        """
-        can_validate = CompiledFunction.are_all_signature_params_annotated(f)
-
-        if can_validate:
-            # Needed instead of inspect.get_annotations for Python < 3.10.
-            return getattr(f, "__annotations__", {}).values()
-
-        return None
-
-    @staticmethod
     def zero_ranked_memref_to_numpy(ranked_memref):
         """Cast a zero ranked memrefs to a numpy array.
 
@@ -261,7 +244,7 @@ class CompiledFunction:
             a numpy array with the contents of the ranked memref descriptor
         """
         assert not hasattr(ranked_memref, "shape")
-        return np.array(ranked_memref.aligned.contents)
+        return to_numpy(np.array(ranked_memref.aligned.contents))
 
     @staticmethod
     def ranked_memref_to_numpy(memref_desc):
@@ -310,13 +293,9 @@ class CompiledFunction:
         Returns:
             retval: the value computed by the function or None if the function has no return value
         """
-        shared_object, function, setup, teardown, free = CompiledFunction.load_symbols(
+        shared_object, function, setup, teardown = CompiledFunction.load_symbols(
             shared_object_file, func_name
         )
-
-        numpy_managed_memory = set()
-        for arg in args[1:]:
-            numpy_managed_memory.add(arg.contents.allocated)
 
         params_to_setup = [b"jitted-function"]
         argc = len(params_to_setup)
@@ -325,24 +304,12 @@ class CompiledFunction:
 
         setup(ctypes.c_int(argc), array_of_char_ptrs)
         function(*args)
-        teardown()
 
         result = args[0] if has_return else None
         retval = CompiledFunction.return_value_ptr_to_numpy(result) if result else None
 
-        if has_return:
-            raw_return = args[0].contents
-            for memref in raw_return:
-                is_constant = memref.allocated == 0xDEADBEEF
-                if is_constant:
-                    continue
-
-                if memref.allocated in numpy_managed_memory:
-                    continue
-
-                pointer_type = ctypes.POINTER(ctypes.c_int)
-                pointer_to_free = ctypes.cast(memref.allocated, pointer_type)
-                free(pointer_to_free)
+        # Teardown has to be made after the return valued has been copied.
+        teardown()
 
         # Unmap the shared library. This is necessary in case the function is re-compiled.
         # Without unmapping the shared library, there would be a conflict in the name of
@@ -370,8 +337,12 @@ class CompiledFunction:
         shape = ir.RankedTensorType(mlir_tensor_type).shape
         mlir_element_type = ir.RankedTensorType(mlir_tensor_type).element_type
         numpy_element_type = mlir_type_to_numpy_type(mlir_element_type)
-        array_numpy_type = np.empty(shape, dtype=numpy_element_type)
-        memref_descriptor = get_ranked_memref_descriptor(array_numpy_type)
+        ctp = as_ctype(numpy_element_type)
+        if shape:
+            memref_descriptor = make_nd_memref_descriptor(len(shape), ctp)()
+        else:
+            memref_descriptor = make_zero_d_memref_descriptor(ctp)()
+
         return memref_descriptor
 
     @staticmethod
@@ -461,45 +432,27 @@ class QJIT:
 
     Args:
         fn (Callable): the quantum or classical function
-        target (str): the compilation target
-        keep_intermediate (bool): Whether or not to store the intermediate files throughout the
-            compilation. If ``True``, the current working directory keeps
-            readable representations of the compiled module which remain available
-            after the Python process ends. If ``False``, these representations
-            will instead be stored in a temporary folder, which will be deleted
-            as soon as the QJIT instance is deleted.
+        compile_options (Optional[CompileOptions]): common compilation options
     """
 
-    def __init__(self, fn, target, keep_intermediate):
+    def __init__(self, fn, compile_options):
         self.qfunc = fn
         self.c_sig = None
         functools.update_wrapper(self, fn)
-        if keep_intermediate:
-            dirname = fn.__name__
-            parent_dir = os.getcwd()
-            path = os.path.join(parent_dir, dirname)
-            os.makedirs(path, exist_ok=True)
-            self.workspace_name = path
-        else:
-            # The temporary directory must be referenced by the wrapper class
-            # in order to avoid being garbage collected
-            # pylint: disable=consider-using-with
-            self.workspace = tempfile.TemporaryDirectory()
-            self.workspace_name = self.workspace.name
-        self.passes = {}
+        self.compile_options = compile_options
+        self._compiler = Compiler()
         self._jaxpr = None
         self._mlir = None
         self._llvmir = None
         self.mlir_module = None
         self.compiled_function = None
-
-        parameter_types = CompiledFunction.get_compile_time_signature(self.qfunc)
+        parameter_types = get_type_annotations(self.qfunc)
+        self.runtime = fn.device.short_name if isinstance(fn, qml.QNode) else "best"
         self.user_typed = False
         if parameter_types is not None:
             self.user_typed = True
-            if target in ("mlir", "binary"):
-                self.mlir_module = self.get_mlir(*parameter_types)
-            if target == "binary":
+            self.mlir_module = self.get_mlir(*parameter_types)
+            if self.compile_options.target == "binary":
                 self.compiled_function = self.compile()
 
     def print_stage(self, stage):
@@ -509,9 +462,7 @@ class QJIT:
         Args:
             stage: string corresponding with the name of the stage to be printed
         """
-        if self.passes.get(stage):
-            with open(self.passes[stage], "r", encoding="utf-8") as f:
-                print(f.read())
+        self._compiler.print(stage)  # pragma: nocover
 
     @property
     def mlir(self):
@@ -550,32 +501,46 @@ class QJIT:
         ):
             mlir_module, ctx, jaxpr = tracer.get_mlir(self.qfunc, *self.c_sig)
 
+        inject_functions(mlir_module, self.runtime, ctx)
         mod = mlir_module.operation
         self._jaxpr = jaxpr
         self._mlir = mod.get_asm(binary=False, print_generic_op_form=False, assume_verified=True)
-
-        # Inject setup and finalize functions.
-        append_modules(mlir_module, ctx)
 
         return mlir_module
 
     def compile(self):
         """Compile the current MLIR module."""
 
-        shared_object, self._llvmir = compiler.compile(
-            self.mlir_module, self.workspace_name, self.passes
+        # This will make a check before sending it to the compiler that the return type
+        # is actually available in most systems. f16 needs a special symbol and linking
+        # will fail if it is not available.
+        restype = self.mlir_module.body.operations[0].type.results
+        for res in restype:
+            baseType = ir.RankedTensorType(res).element_type
+            mlir_type_to_numpy_type(baseType)
+
+        shared_object = self._compiler.run(
+            self.mlir_module,
+            options=self.compile_options,
         )
+
+        self._llvmir = self._compiler.get_output_of("LLVMDialectToLLVMIR")
 
         # The function name out of MLIR has quotes around it, which we need to remove.
         # The MLIR function name is actually a derived type from string which has no
         # `replace` method, so we need to get a regular Python string out of it.
         qfunc_name = str(self.mlir_module.body.operations[0].name).replace('"', "")
-        restype = self.mlir_module.body.operations[0].type.results
         return CompiledFunction(shared_object, qfunc_name, restype)
 
     def __call__(self, *args, **kwargs):
         if TracingContext.is_tracing():
             return self.qfunc(*args, **kwargs)
+
+        if any(isinstance(arg, jax.core.Tracer) for arg in args):
+            raise ValueError(
+                "Cannot use JAX to trace through a qjit compiled function. If you attempted "
+                "to use jax.jit or jax.grad, please use their equivalent from Catalyst."
+            )
 
         args = [jax.numpy.array(arg) for arg in args]
         r_sig = CompiledFunction.get_runtime_signature(*args)
@@ -595,7 +560,15 @@ class QJIT:
         return self.compiled_function(*args, **kwargs)
 
 
-def qjit(fn=None, *, target="binary", keep_intermediate=False):
+def qjit(
+    fn=None,
+    *,
+    target="binary",
+    keep_intermediate=False,
+    verbose=False,
+    logfile=None,
+    pipelines=None,
+):
     """A just-in-time decorator for PennyLane and JAX programs using Catalyst.
 
     This decorator enables both just-in-time and ahead-of-time compilation,
@@ -614,6 +587,12 @@ def qjit(fn=None, *, target="binary", keep_intermediate=False):
             compilation. If ``True``, intermediate representations are available via the
             :attr:`~.QJIT.mlir`, :attr:`~.QJIT.jaxpr`, and :attr:`~.QJIT.qir`, representing
             different stages in the optimization process.
+        verbosity (int): Verbosity level (0 - disabled, >0 - enabled)
+        logfile (Optional[TextIOWrapper]): File object to write verose messages to (default -
+            sys.stderr).
+        pipelines (Optional(List[AnyType]): A list of pipelines to be executed. The elements of
+            the list are asked to implement a run method which takes the output of the previous run
+            as an input to the next element, and so on.
 
     Returns:
         QJIT object.
@@ -680,9 +659,9 @@ def qjit(fn=None, *, target="binary", keep_intermediate=False):
     """
 
     if fn is not None:
-        return QJIT(fn, target, keep_intermediate)
+        return QJIT(fn, CompileOptions(verbose, logfile, target, keep_intermediate, pipelines))
 
     def wrap_fn(fn):
-        return QJIT(fn, target, keep_intermediate)
+        return QJIT(fn, CompileOptions(verbose, logfile, target, keep_intermediate, pipelines))
 
     return wrap_fn

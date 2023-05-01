@@ -16,28 +16,32 @@
 while using :func:`~.qjit`.
 """
 
-import uuid
 import functools
 import numbers
+import uuid
 
 import jax
 import jax.numpy as jnp
-from jax import ShapedArray
-from jax.tree_util import tree_flatten, tree_unflatten, treedef_is_leaf
-from jax.linear_util import wrap_init
-from jax._src.lax.control_flow import _initial_style_jaxpr, _initial_style_jaxprs_with_common_consts
-from jax._src.lax.lax import _abstractify
-
 import pennylane as qml
-from pennylane.operation import Operation, Wires, AnyWires
+from jax import ShapedArray
+from jax._src.lax.control_flow import (
+    _initial_style_jaxpr,
+    _initial_style_jaxprs_with_common_consts,
+)
+from jax._src.lax.lax import _abstractify
+from jax.linear_util import wrap_init
+from jax.tree_util import tree_flatten, tree_unflatten, treedef_is_leaf
 from pennylane.measurements import MidMeasureMP
+from pennylane.operation import AnyWires, Operation, Wires
 
+import catalyst
 import catalyst.jax_primitives as jprim
+from catalyst.jax_primitives import expval_p, probs_p
 from catalyst.jax_tape import JaxTape
-from catalyst.jax_tracer import trace_quantum_tape, insert_to_qreg, get_traceable_fn
+from catalyst.jax_tracer import get_traceable_fn, insert_to_qreg, trace_quantum_tape
+from catalyst.utils.exceptions import CompileError
 from catalyst.utils.patching import Patcher
 from catalyst.utils.tracing import TracingContext
-from catalyst.utils.exceptions import CompileError
 
 
 # pylint: disable=too-few-public-methods
@@ -59,10 +63,6 @@ class QFunc:
 
     def __call__(self, *args, **kwargs):
         if isinstance(self, qml.QNode):
-            if self.device.short_name != "lightning.qubit":
-                raise CompileError(
-                    "Only the lightning.qubit device is supported for compilation at the moment."
-                )
             device = QJITDevice(self.device.shots, self.device.wires)
         else:
             # Allow QFunc to still be used by itself for internal testing.
@@ -120,9 +120,8 @@ class Function:
     """
 
     def __init__(self, fn):
-        assert isinstance(fn, Grad), "Function boundaries only supported for gradients."
         self.fn = fn
-        self.__name__ = "grad." + fn.__name__
+        self.__name__ = fn.__name__
 
     def __call__(self, *args, **kwargs):
         jaxpr = jax.make_jaxpr(self.fn)(*args)
@@ -144,18 +143,21 @@ class Grad:
         argnum (int): the argument indices which define over which arguments to differentiate
 
     Raises:
-        ValueError: Higher-order derivatives can only be computed with the finite difference
-                    method.
+        ValueError: Higher-order derivatives and derivatives of non-QNode functions can only be
+                    computed with the finite difference method.
     """
 
     def __init__(self, fn, *, method, h, argnum):
         self.fn = fn
-        self.__name__ = fn.__name__
+        self.__name__ = f"grad.{fn.__name__}"
         self.method = method
         self.h = h
         self.argnum = argnum
         if self.method != "fd" and not isinstance(self.fn, qml.QNode):
-            raise ValueError("Only finite difference can compute higher order derivatives.")
+            raise ValueError(
+                "Only finite difference can compute higher order derivatives "
+                "or gradients of non-QNode functions."
+            )
 
     def __call__(self, *args, **kwargs):
         """Specifies that an actual call to the differentiated function.
@@ -167,13 +169,30 @@ class Grad:
         )
 
         jaxpr = jax.make_jaxpr(self.fn)(*args)
-        if len(jaxpr.eqns) != 1:
-            raise TypeError("catalyst.grad can only be used on QNodes and other grad calls")
-        if jaxpr.eqns[0].primitive != jprim.func_p:
-            raise TypeError(
-                f"Attempting to differentiate something other than a function "
-                f"(got {jaxpr.eqns[0].primitive})"
-            )
+        assert len(jaxpr.eqns) == 1, "Expected jaxpr consisting of a single function call."
+        assert (
+            jaxpr.eqns[0].primitive == jprim.func_p
+        ), "Expected jaxpr consisting of a single function call."
+
+        if self.method != "fd":
+            qnode_jaxpr = jaxpr.eqns[0].params["call_jaxpr"]
+            return_ops = []
+            for res in qnode_jaxpr.outvars:
+                for eq in reversed(qnode_jaxpr.eqns):  # pragma: no branch
+                    if res in eq.outvars:
+                        return_ops.append(eq.primitive)
+                        break
+
+            if self.method == "ps" and any(prim not in [expval_p, probs_p] for prim in return_ops):
+                raise TypeError(
+                    "The parameter-shift method can only be used for QNodes "
+                    "which return either qml.expval or qml.probs."
+                )
+            if self.method == "adj" and any(prim not in [expval_p] for prim in return_ops):
+                raise TypeError(
+                    "The adjoint method can only be used for QNodes which return qml.expval."
+                )
+
         return jprim.grad_p.bind(
             *args, jaxpr=jaxpr, fn=self, method=self.method, h=self.h, argnum=self.argnum
         )
@@ -193,8 +212,8 @@ def grad(f, *, method=None, h=None, argnum=None):
 
     .. warning::
 
-        Currently, higher-order differentiation is only supported by the
-        finite-difference method.
+        Currently, higher-order differentiation or differentiation of non-QNode functions
+        is only supported by the finite-difference method.
 
     .. note:
 
@@ -260,10 +279,14 @@ def grad(f, *, method=None, h=None, argnum=None):
     elif isinstance(argnum, int):
         argnum = [argnum]
 
-    if isinstance(f, Grad):
-        return Grad(Function(f), method=method, h=h, argnum=argnum)
+    if isinstance(f, catalyst.compilation_pipelines.QJIT):
+        # Don't generate an extra function when the circuit is already qjitted.
+        f = f.qfunc
 
-    return Grad(f, method=method, h=h, argnum=argnum)
+    if isinstance(f, qml.QNode):
+        return Grad(f, method=method, h=h, argnum=argnum)
+
+    return Grad(Function(f), method=method, h=h, argnum=argnum)
 
 
 # pylint: disable=too-few-public-methods
@@ -273,13 +296,10 @@ class Cond(Operation):
     num_wires = AnyWires
 
     # pylint: disable=too-many-arguments
-    def __init__(
-        self, pred, consts, true_jaxpr, false_jaxpr, args_tree, out_trees, *args, **kwargs
-    ):
-        self.pred = pred
+    def __init__(self, preds, consts, branch_jaxprs, args_tree, out_trees, *args, **kwargs):
+        self.preds = preds
         self.consts = consts
-        self.true_jaxpr = true_jaxpr
-        self.false_jaxpr = false_jaxpr
+        self.branch_jaxprs = branch_jaxprs
         self.args_tree = args_tree
         self.out_trees = out_trees
         kwargs["wires"] = Wires(Cond.num_wires)
@@ -297,11 +317,35 @@ class CondCallable:
     """
 
     def __init__(self, pred, true_fn):
-        self.pred = pred
-        self.true_fn = true_fn
-        self.false_fn = lambda: None
+        self.preds = [pred]
+        self.branch_fns = [true_fn]
+        self.otherwise_fn = lambda: None
 
-    def otherwise(self, false_fn):
+    def else_if(self, pred):
+        """
+        Block of code to be run if this predicate evaluates to true, skipping all subsequent
+        conditional blocks.
+
+        Args:
+            pred (bool): The predicate that will determine if this branch is executed.
+
+        Returns:
+            A callable decorator that wraps this 'else if' branch of the conditional and returns
+            self.
+        """
+
+        def decorator(branch_fn):
+            if branch_fn.__code__.co_argcount != 0:
+                raise TypeError(
+                    "Conditional 'else if' function is not allowed to have any arguments"
+                )
+            self.preds.append(pred)
+            self.branch_fns.append(branch_fn)
+            return self
+
+        return decorator
+
+    def otherwise(self, otherwise_fn):
         """Block of code to be run if the predicate evaluates to false.
 
         Args:
@@ -310,68 +354,59 @@ class CondCallable:
         Returns:
             self
         """
-        if false_fn.__code__.co_argcount != 0:
+        if otherwise_fn.__code__.co_argcount != 0:
             raise TypeError("Conditional 'False' function is not allowed to have any arguments")
-        self.false_fn = false_fn
+        self.otherwise_fn = otherwise_fn
         return self
 
     @staticmethod
-    def _check_branches_return_types(true_jaxpr, false_jaxpr):
-        if true_jaxpr.out_avals[:-1] != false_jaxpr.out_avals[:-1]:
-            raise TypeError(
-                "Conditional branches require the same return type, got:\n"
-                f" - True branch: {true_jaxpr.out_avals[:-1]}\n"
-                f" - False branch: {false_jaxpr.out_avals[:-1]}\n"
-                "Please specify an else branch if none was specified."
-            )
+    def _check_branches_return_types(branch_jaxprs):
+        expected = branch_jaxprs[0].out_avals[:-1]
+        for i, jaxpr in list(enumerate(branch_jaxprs))[1:]:
+            if expected != jaxpr.out_avals[:-1]:
+                raise TypeError(
+                    "Conditional branches all require the same return type, got:\n"
+                    f" - Branch at index 0: {expected}\n"
+                    f" - Branch at index {i}: {jaxpr.out_avals[:-1]}\n"
+                    "Please specify an else branch if none was specified."
+                )
 
     def _call_with_quantum_ctx(self, ctx):
-        def new_true_fn(qreg):
-            with JaxTape(do_queue=False) as tape:
-                with tape.quantum_tape:
-                    out = self.true_fn()
-                tape.set_return_val(out)
-                new_quantum_tape = JaxTape.device.expand_fn(tape.quantum_tape)
-                tape.quantum_tape = new_quantum_tape
-                tape.quantum_tape.jax_tape = tape
+        def new_branch_fn(branch_fn):
+            def callback(qreg):
+                with JaxTape(do_queue=False) as tape:
+                    with tape.quantum_tape:
+                        out = branch_fn()
+                    tape.set_return_val(out)
+                    new_quantum_tape = JaxTape.device.expand_fn(tape.quantum_tape)
+                    tape.quantum_tape = new_quantum_tape
+                    tape.quantum_tape.jax_tape = tape
 
-            has_tracer_return_values = out is not None
-            return_values, qreg, qubit_states = trace_quantum_tape(
-                tape, qreg, has_tracer_return_values
-            )
-            qreg = insert_to_qreg(qubit_states, qreg)
+                has_tracer_return_values = out is not None
+                return_values, qreg, qubit_states = trace_quantum_tape(
+                    tape, qreg, has_tracer_return_values
+                )
+                qreg = insert_to_qreg(qubit_states, qreg)
 
-            return return_values, qreg
+                return return_values, qreg
 
-        def new_false_fn(qreg):
-            with JaxTape(do_queue=False) as tape:
-                with tape.quantum_tape:
-                    out = self.false_fn()
-                tape.set_return_val(out)
-                new_quantum_tape = JaxTape.device.expand_fn(tape.quantum_tape)
-                tape.quantum_tape = new_quantum_tape
-                tape.quantum_tape.jax_tape = tape
-
-            has_tracer_return_values = out is not None
-            return_values, qreg, qubit_states = trace_quantum_tape(
-                tape, qreg, has_tracer_return_values
-            )
-            qreg = insert_to_qreg(qubit_states, qreg)
-
-            return return_values, qreg
+            return callback
 
         args, args_tree = tree_flatten((jprim.Qreg(),))
         args_avals = tuple(map(_abstractify, args))
-
-        (true_jaxpr, false_jaxpr), consts, out_trees = _initial_style_jaxprs_with_common_consts(
-            (new_true_fn, new_false_fn), args_tree, args_avals, "cond"
+        branch_fns = self.branch_fns + [self.otherwise_fn]
+        branch_jaxprs, consts, out_trees = _initial_style_jaxprs_with_common_consts(
+            tuple(new_branch_fn(branch_fn) for branch_fn in branch_fns),
+            args_tree,
+            args_avals,
+            "cond",
         )
 
-        CondCallable._check_branches_return_types(true_jaxpr, false_jaxpr)
-        Cond(self.pred, consts, true_jaxpr, false_jaxpr, args_tree, out_trees)
+        CondCallable._check_branches_return_types(branch_jaxprs)
+        Cond(self.preds, consts, branch_jaxprs, args_tree, out_trees)
 
         # Create tracers for any non-qreg return values (if there are any).
-        ret_vals, _ = tree_unflatten(out_trees[0], true_jaxpr.out_avals)
+        ret_vals, _ = tree_unflatten(out_trees[0], branch_jaxprs[0].out_avals)
         a, t = tree_flatten(ret_vals)
         return ctx.jax_tape.create_tracer(t, a)
 
@@ -379,14 +414,14 @@ class CondCallable:
         args, args_tree = tree_flatten([])
         args_avals = tuple(map(_abstractify, args))
 
-        (true_jaxpr, false_jaxpr), consts, out_trees = _initial_style_jaxprs_with_common_consts(
-            (self.true_fn, self.false_fn), args_tree, args_avals, "cond"
+        branch_jaxprs, consts, out_trees = _initial_style_jaxprs_with_common_consts(
+            (*self.branch_fns, self.otherwise_fn), args_tree, args_avals, "cond"
         )
 
-        CondCallable._check_branches_return_types(true_jaxpr, false_jaxpr)
+        CondCallable._check_branches_return_types(branch_jaxprs)
 
-        inputs = [self.pred] + consts
-        ret_tree_flat = jprim.qcond(true_jaxpr, false_jaxpr, *inputs)
+        inputs = self.preds + consts
+        ret_tree_flat = jprim.qcond(branch_jaxprs, *inputs)
         return tree_unflatten(out_trees[0], ret_tree_flat)
 
     def _call_during_trace(self):
@@ -400,9 +435,10 @@ class CondCallable:
 
     def _call_during_interpretation(self):
         """Create a callable for conditionals."""
-        if self.pred:
-            return self.true_fn()
-        return self.false_fn()
+        for pred, branch_fn in zip(self.preds, self.branch_fns):
+            if pred:
+                return branch_fn()
+        return self.otherwise_fn()
 
     def __call__(self):
         is_tracing = TracingContext.is_tracing()
@@ -416,28 +452,29 @@ def cond(pred):
     """A :func:`~.qjit` compatible decorator for if-else conditionals in PennyLane/Catalyst.
 
     This form of control flow is a functional version of the traditional if-else conditional. This
-    means that each execution path, a 'True' branch and a 'False' branch, is provided as a separate
-    function. Both functions will be traced during compilation, but only one of them the will be
-    executed at runtime, depending of the value of a Boolean predicate. The JAX equivalent is the
-    ``jax.lax.cond`` function, but this version is optimized to work with quantum programs in
-    PennyLane.
+    means that each execution path, an 'if' branch, any 'else if' branches, and a final 'otherwise'
+    branch, is provided as a separate function. All functions will be traced during compilation,
+    but only one of them the will be executed at runtime, depending of the value of one or more
+    Boolean predicates. The JAX equivalent is the ``jax.lax.cond`` function, but this version is
+    optimized to work with quantum programs in PennyLane. This version also supports an 'else if'
+    construct which the JAX version does not.
 
     Values produced inside the scope of a conditional can be returned to the outside context, but
     the return type signature of each branch must be identical. If no values are returned, the
-    'False' branch is optional. Refer to the example below to learn more about the syntax of this
-    decorator.
+    'otherwise' branch is optional. Refer to the example below to learn more about the syntax of
+    this decorator.
 
     This form of control flow can also be called from the Python interpreter without needing to use
     :func:`~.qjit`.
 
     Args:
-        pred (bool): the predicate with which to control the branch to execute
+        pred (bool): the first predicate with which to control the branch to execute
 
     Returns:
-        A callable decorator that wraps the 'True' branch of the conditional.
+        A callable decorator that wraps the first 'if' branch of the conditional.
 
     Raises:
-        AssertionError: True- or False-branch functions cannot have arguments.
+        AssertionError: Branch functions cannot have arguments.
 
     **Example**
 

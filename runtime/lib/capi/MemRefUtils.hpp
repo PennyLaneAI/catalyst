@@ -1,6 +1,28 @@
+// Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+
+//     http://www.apache.org/licenses/LICENSE-2.0
+
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #pragma once
-#include <cassert>
+
 #include <cstring>
+
+#include <Exception.hpp>
+
+extern "C" {
+void *_mlir_memref_to_llvm_alloc(size_t size);
+void *_mlir_memref_to_llvm_aligned_alloc(size_t alignment, size_t size);
+void _mlir_memref_to_llvm_free(void *ptr);
+}
 
 template <typename T, size_t R> struct MemRefT {
     T *data_allocated;
@@ -33,7 +55,7 @@ void memref_copy(MemRefT<T, R> *dst, MemRefT<T, R> *src, __attribute__((unused))
     for (;;) {
         memcpy(dstPtr + writeIndex, srcPtr + readIndex, sizeof(T));
         totalWritten += sizeof(T);
-        assert(totalWritten <= bytes && "wrote more than needed");
+        RT_FAIL_IF(totalWritten > bytes, "wrote more than needed");
         // Advance index and read position.
         for (int64_t axis = R - 1; axis >= 0; --axis) {
             // Advance at current axis.

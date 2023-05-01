@@ -15,6 +15,8 @@ Boundary(c1, "Compiler", $link="https://github.com/plantuml-stdlib/C4-PlantUML")
 
   Boundary(c2, " ", $link="https://github.com/plantuml-stdlib/C4-PlantUML") {
 
+    Component(_opt_mlir_, "Gradient-to-Quantum", "quantum-opt", "Lower Gradient dialect to Quantum dialect..")
+
     Component(_buff_mlir_, "Bufferization", "quantum-opt", "Bufferize scf, tensor, arith, quantum, etc.")
 
     Component(_llvm_mlir_, "LLVM-MLIR", "quantum-opt", "Lower the code to the LLVM Dialect in MLIR")
@@ -27,7 +29,7 @@ Boundary(c1, "Compiler", $link="https://github.com/plantuml-stdlib/C4-PlantUML")
 
     Component(_o_, "Compile", "llc", "Compile the LLVM code using the LLVM Static Compiler")
 
-    Component(_so_, "Link", "c99", "Link the compiled file to the Runtime")
+    Component(_so_, "Link", "Compiler available in system", "Link the compiled file to the Runtime")
   }
 }
 
@@ -36,9 +38,11 @@ System_Ext(_catalyst_runtime_, "Catalyst-Runtime")
 
 Rel_R(_mlir_sys_, _nohlo_mlir_, "*.mlir", "")
 
-Rel_R(_nohlo_mlir_, _buff_mlir_, "*.nohlo.mlir", "")
+Rel_R(_nohlo_mlir_, _opt_mlir_, "*.nohlo.mlir", "")
 
-Rel(_buff_mlir_, _llvm_mlir_, "*.buff.mlir", "")
+Rel_D(_opt_mlir_, _buff_mlir_, "*.opt.mlir", "")
+
+Rel_D(_buff_mlir_, _llvm_mlir_, "*.buff.mlir", "")
 
 Rel_L(_llvm_mlir_, _ll_, "*.llvm.mlir", "")
 

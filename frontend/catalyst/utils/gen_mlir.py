@@ -21,18 +21,20 @@ from jax.interpreters.mlir import ir
 from jaxlib.mlir.dialects._func_ops_gen import FuncOp
 
 
-def gen_setup(ctx):
+def gen_setup(runtime, ctx):
     """
     This function returns an MLIR module with the "setup" function. The setup
     function is a function that needs to be called before calling a
     JIT-compiled function. It initializes the global device context in the runtime.
     """
     txt = """
-func.func @setup() -> () {
+func.func @setup() -> () {{
+    "quantum.device"() {{ specs = ["backend", "{runtime}"] }} : () -> ()
     "quantum.init"() : () -> ()
     return
-}
+}}
 """
+    txt = txt.format(runtime=runtime)
     return ir.Module.parse(txt, ctx)
 
 
@@ -51,14 +53,14 @@ func.func @teardown () -> () {
     return ir.Module.parse(txt, ctx)
 
 
-def append_modules(module, ctx):
+def inject_functions(module, runtime, ctx):
     """
     This function appends functions to the input module.
     """
     # Add C interface for the quantum function.
     module.body.operations[0].attributes["llvm.emit_c_interface"] = ir.UnitAttr.get(context=ctx)
 
-    setup_module = gen_setup(ctx)
+    setup_module = gen_setup(runtime, ctx)
     setup_func = setup_module.body.operations[0]
     module.body.append(setup_func)
 

@@ -24,6 +24,8 @@ target triple = "x86_64-pc-linux-gnu"
 
 @.str = private constant [16 x i8] c"probs[%d] = %f\0A\00", align 1
 
+declare void @__quantum__rt__device(i8*, i8*)
+
 declare void @__quantum__rt__initialize()
 
 declare void @__quantum__rt__finalize()
@@ -54,6 +56,7 @@ define void @print_probs_at(double* %0, i64 %1) {
 
 define i32 @main() {
   ; Initialize quantum runtime
+  call void @__quantum__rt__device(i8* null, i8* null)
   call void @__quantum__rt__initialize()
 
   ; Allocate 2 qubits
