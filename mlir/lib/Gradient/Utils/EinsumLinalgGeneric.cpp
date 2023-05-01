@@ -12,14 +12,6 @@ using namespace llvm;
 
 namespace catalyst {
 
-Value getEmptyTensor(
-  OpBuilder& ob,
-  Location loc,
-  ShapedType type)
-{
-  return ob.create<tensor::EmptyOp>(loc, type.getShape(), type.getElementType());
-}
-
 llvm::SmallVector<mlir::Value> einsumLinalgGeneric(
   OpBuilder& ob,
   Location loc,
