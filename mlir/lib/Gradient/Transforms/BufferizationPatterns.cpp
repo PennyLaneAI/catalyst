@@ -11,7 +11,8 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
+#include "llvm/Support/raw_ostream.h"
+#include "iostream"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -73,16 +74,18 @@ class BufferizeBackpropOp : public OpConversionPattern<BackpropOp> {
         size_t resSize = resTypes.size();
         int argsSize = args.size();
         int m = argsSize / resSize;
-
         for (size_t i = 0; i < resSize; i++) {
             Type resType = resTypes[i];
             std::vector<Value> dynamicDimSizes;
 
             int argPos = i % m;
+            Type argType = args[argPos].getType();
 
-            int idx = args[argPos].getType().cast<RankedTensorType>().getDynamicDimIndex(0);
-
-            dynamicDimSizes.push_back(rewriter.create<tensor::DimOp>(loc, args[0], idx));
+            if (argType.isa<TensorType>()){
+                auto dim = argType.cast<RankedTensorType>().getDynamicDimIndex(0);
+                dynamicDimSizes.push_back(rewriter.create<tensor::DimOp>(loc, args[argPos], dim));
+            }
+            
             dynamicDimSizes.push_back(gradSize);
 
             MemRefType memrefType = resType.cast<MemRefType>();
