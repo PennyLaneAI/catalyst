@@ -11,11 +11,11 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-#include "llvm/Support/raw_ostream.h"
 #include "iostream"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Transforms/DialectConversion.h"
+#include "llvm/Support/raw_ostream.h"
 
 #include "Gradient/IR/GradientOps.h"
 #include "Gradient/Transforms/Passes.h"
@@ -81,11 +81,11 @@ class BufferizeBackpropOp : public OpConversionPattern<BackpropOp> {
             int argPos = i % m;
             Type argType = args[argPos].getType();
 
-            if (argType.isa<TensorType>()){
+            if (argType.isa<TensorType>()) {
                 auto dim = argType.cast<RankedTensorType>().getDynamicDimIndex(0);
                 dynamicDimSizes.push_back(rewriter.create<tensor::DimOp>(loc, args[argPos], dim));
             }
-            
+
             dynamicDimSizes.push_back(gradSize);
 
             MemRefType memrefType = resType.cast<MemRefType>();
