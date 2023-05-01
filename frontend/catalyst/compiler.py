@@ -213,6 +213,7 @@ class MLIRToLLVMDialect(PassPipeline):
         "--convert-index-to-llvm",
         "--convert-gradient-to-llvm",
         "--convert-quantum-to-llvm",
+        "--emit-catalyst-py-interface",
         # Remove any dead casts as the final pass expects to remove all existing casts,
         # but only those that form a loop back to the original type.
         "--canonicalize",
