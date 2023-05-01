@@ -65,7 +65,7 @@ define i32 @main() {
   %3 = bitcast i8* %2 to %Qubit**
   %4 = load %Qubit*, %Qubit** %3, align 8
 
-  ; Apply quantum operations73
+  ; Apply quantum operations
   call void @__quantum__qis__Hadamard(%Qubit* %4, i8 0)
   call void @__quantum__qis__RY(%Qubit* %4, double 0.7, i8 0)
 

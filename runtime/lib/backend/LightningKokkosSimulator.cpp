@@ -460,7 +460,7 @@ auto LightningKokkosSimulator::Measure(QubitIdType wire) -> Result
     std::vector<double> probs(1U << wires.size());
 
     {
-        MemRefT<double, 1> buffer(probs.data(), probs.data(), 0, {probs.size()}, {1});
+        MemRefT<double, 1> buffer{probs.data(), probs.data(), 0, {probs.size()}, {1}};
         MemRefView<double, 1> buffer_view(&buffer, probs.size());
         this->PartialProbs(buffer_view, wires);
     }

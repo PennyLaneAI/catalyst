@@ -88,7 +88,6 @@ template <typename T, size_t R> class MemRefView {
 
     void clone(const MemRefT<T, R> &src)
     {
-        // TODO: rewrite this method...
         char *srcPtr = (char *)src.data_allocated + src.offset * sizeof(T);
         char *dstPtr = (char *)buffer->data_allocated + buffer->offset * sizeof(T);
 
@@ -140,6 +139,11 @@ template <typename T, size_t R> class MemRefView {
         static_assert(sizeof...(idxs) == R,
                       "[Class: MemRefView] Error in Catalyst Runtime: Wrong number of indices");
         size_t indices[] = {static_cast<size_t>(idxs)...};
+
+        if (R == 0) {
+            // 0-rank memref
+            return buffer->data_allocated[buffer->offset];
+        }
 
         size_t loc = buffer->offset;
         for (uint64_t axis = 0; axis < R; axis++) {
