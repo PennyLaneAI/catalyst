@@ -13,8 +13,8 @@
 // limitations under the License.
 
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Transforms/DialectConversion.h"
 
 #include "Gradient/IR/GradientOps.h"
 #include "Gradient/Transforms/Passes.h"
@@ -51,7 +51,6 @@ class BufferizeAdjointOp : public OpConversionPattern<AdjointOp> {
     }
 };
 
-
 class BufferizeBackpropOp : public OpConversionPattern<BackpropOp> {
   public:
     using OpConversionPattern::OpConversionPattern;
@@ -75,10 +74,10 @@ class BufferizeBackpropOp : public OpConversionPattern<BackpropOp> {
         int argsSize = args.size();
         int m = argsSize / resSize;
 
-        for (size_t i=0; i<resSize; i++) {
+        for (size_t i = 0; i < resSize; i++) {
             Type resType = resTypes[i];
             std::vector<Value> dynamicDimSizes;
-            
+
             int argPos = i % m;
 
             int idx = args[argPos].getType().cast<RankedTensorType>().getDynamicDimIndex(0);
@@ -91,7 +90,8 @@ class BufferizeBackpropOp : public OpConversionPattern<BackpropOp> {
             memrefValues.push_back(memrefValue);
         }
 
-        rewriter.create<BackpropOp>(loc, TypeRange{}, op.getCalleeAttr(), adaptor.getGradSize(), adaptor.getArgs(), memrefValues, diffArgIndices);
+        rewriter.create<BackpropOp>(loc, TypeRange{}, op.getCalleeAttr(), adaptor.getGradSize(),
+                                    adaptor.getArgs(), memrefValues, diffArgIndices);
         rewriter.replaceOp(op, memrefValues);
         return success();
     }
