@@ -12,7 +12,7 @@ using namespace llvm;
 
 namespace catalyst {
 
-llvm::SmallVector<mlir::Value> einsumLinalgGeneric(
+Value einsumLinalgGeneric(
   OpBuilder& ob,
   Location loc,
   ArrayRef<size_t> a_axis,
@@ -25,20 +25,20 @@ llvm::SmallVector<mlir::Value> einsumLinalgGeneric(
   auto ta = a.getType().cast<TensorType>();
   auto tb = b.getType().cast<TensorType>();
   assert(ta.getElementType() == tb.getElementType() && "element types should match");
+
+  auto axis_dims = ({
+    std::map<size_t, size_t> out;
+    for(size_t i=0; i<ta.getShape().size(); i++) out[a_axis[i]] = ta.getShape()[i];
+    for(size_t i=0; i<tb.getShape().size(); i++) out[b_axis[i]] = tb.getShape()[i];
+    out;
+  });
+
   std::vector<int64_t> _r;
   auto tr = ta.cloneWith(({
-      for(auto i : r_axis) _r.push_back(int64_t(i));
+      for(auto i : r_axis) _r.push_back(axis_dims[i]);
       ArrayRef<int64_t> x(_r);
       x;
     }), ta.getElementType());
-
-  auto all_dims = ({
-    SmallSetVector<size_t,4> out;
-    out.insert(a_axis.begin(), a_axis.end());
-    out.insert(b_axis.begin(), b_axis.end());
-    out.insert(r_axis.begin(), r_axis.end());
-    out;
-  });
 
   auto maps = ({
     SmallVector<AffineMap> out;
@@ -48,7 +48,7 @@ llvm::SmallVector<mlir::Value> einsumLinalgGeneric(
         aexprs.push_back(getAffineDimExpr(a, ob.getContext()));
       }
       assert(aexprs.size()>0 && "affine expression set should be non-empty");
-      out.push_back(AffineMap::get(all_dims.size(), 0, aexprs, ob.getContext()));
+      out.push_back(AffineMap::get(axis_dims.size(), 0, aexprs, ob.getContext()));
     };
     out;
   });
@@ -57,9 +57,9 @@ llvm::SmallVector<mlir::Value> einsumLinalgGeneric(
     SmallVector<utils::IteratorType, 4> out;
     SmallSetVector<size_t, 4> ua(a_axis.begin(), a_axis.end());
     SmallSetVector<size_t, 4> ub(b_axis.begin(), b_axis.end());
-    for (const auto a : all_dims) {
+    for (const auto a : axis_dims) {
       out.push_back(
-        (ua.contains(a) && ub.contains(a)) ?
+        (ua.contains(a.first) && ub.contains(a.first)) ?
           utils::IteratorType::reduction : utils::IteratorType::parallel
       );
     }
@@ -80,7 +80,8 @@ llvm::SmallVector<mlir::Value> einsumLinalgGeneric(
     },
     nattrs);
 
-  return genOp.getResults();
+  assert(genOp.getResults().size() == 1);
+  return genOp.getResults()[0];
 }
 
 

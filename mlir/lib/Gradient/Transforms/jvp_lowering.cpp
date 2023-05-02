@@ -78,6 +78,8 @@ LogicalResult JVPLoweringPattern::match(JVPOp op) const
 
 void JVPLoweringPattern::rewrite(JVPOp op, PatternRewriter &rewriter) const
 {
+    MLIRContext *ctx = getContext();
+
     Location loc = op.getLoc();
     llvm::errs() << "replacing JVP op\n";
 
@@ -122,8 +124,8 @@ void JVPLoweringPattern::rewrite(JVPOp op, PatternRewriter &rewriter) const
       op.getMethod(),
       op.getCallee(),
       func_operands,
-      op.getDiffArgIndices().value(),
-      op.getFiniteDiffParam().value()
+      op.getDiffArgIndicesAttr(),
+      op.getFiniteDiffParamAttr()
     );
 
     auto _tovec = [](auto x) -> std::vector<int64_t> {
@@ -131,7 +133,9 @@ void JVPLoweringPattern::rewrite(JVPOp op, PatternRewriter &rewriter) const
         return out;
     };
 
+    std::vector<Value> einsum_results;
     for(size_t ntang = 0; ntang < tang_operands.size(); ntang++) {
+      Optional<Value> acc;
       for(size_t nparam = 0; nparam < func_operands.size(); nparam++) {
         auto jac = grad_op.getResults()[nparam];
         auto tang = tang_operands[ntang];
@@ -178,18 +182,36 @@ void JVPLoweringPattern::rewrite(JVPOp op, PatternRewriter &rewriter) const
         auto res = einsumLinalgGeneric(rewriter, loc,
           jac_axis_names, tang_axis_names, jvp_axis_names,
           jac, tang);
+
+        llvm::errs() << "jvp result type " << res.getType() << "\n";
+
+        if(!acc.has_value()) {
+          acc = res;
+        }
+        else {
+          assert(acc.value().getType() == res.getType());
+
+          auto add_op = rewriter.create<linalg::ElemwiseBinaryOp>(
+            loc,
+            res.getType(), ValueRange({acc.value(), res}), acc.value(),
+            linalg::BinaryFnAttr::get(ctx, linalg::BinaryFn::add),
+            linalg::TypeFnAttr::get(ctx,linalg::TypeFn::cast_signed)
+            );
+          acc = add_op.getResultTensors()[0];
+        }
       }
+      assert(acc.has_value());
+      einsum_results.push_back(acc.value());
     }
 
-    std::vector<Value> mock_results;
-    mock_results.reserve(2 * fcall_op.getResults().size());
-    mock_results.insert(mock_results.end(), fcall_op.getResults().begin(), fcall_op.getResults().end());
-    mock_results.insert(mock_results.end(), fcall_op.getResults().begin(), fcall_op.getResults().end());
+    auto results = ({
+      std::vector<Value> out;
+      out.insert(out.end(), fcall_op.getResults().begin(), fcall_op.getResults().end());
+      out.insert(out.end(), einsum_results.begin(), einsum_results.end());
+      out;
+    });
 
-    llvm::errs() << "fcall_op.result.size(): " << fcall_op.getResults().size() << "\n";
-    llvm::errs() << "mock_results.size(): " << mock_results.size() << "\n";
-
-    rewriter.replaceOp(op, mock_results);
+    rewriter.replaceOp(op, results);
 
     llvm::errs() << "replaced JVP\n";
 }
