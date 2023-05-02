@@ -471,10 +471,9 @@ auto LightningSimulator::Measure(QubitIdType wire) -> Result
 }
 
 // Gradient
-auto LightningSimulator::Gradient(const std::vector<size_t> &trainParams)
-    -> std::vector<std::vector<double>>
+void LightningSimulator::Gradient(std::vector<MemRefView<double, 1>> &gradients,
+                                  const std::vector<size_t> &trainParams)
 {
-
     const bool tp_empty = trainParams.empty();
     const size_t num_observables = this->cache_manager.getNumObservables();
     const size_t num_params = this->cache_manager.getNumParams();
@@ -482,8 +481,10 @@ auto LightningSimulator::Gradient(const std::vector<size_t> &trainParams)
     const size_t jac_size = num_train_params * this->cache_manager.getNumObservables();
 
     if (!jac_size) {
-        return {};
+        return;
     }
+
+    RT_FAIL_IF(gradients.size() != num_observables, "Invalid number of pre-allocated gradients");
 
     auto &&obs_callees = this->cache_manager.getObservablesCallees();
     bool is_valid_measurements =
@@ -532,16 +533,15 @@ auto LightningSimulator::Gradient(const std::vector<size_t> &trainParams)
     std::vector<double> jacobian_t =
         Pennylane::Util::Transpose(jacobian, num_train_params, num_observables);
 
-    std::vector<std::vector<double>> results(num_observables);
+    std::vector<double> cur_buffer(num_train_params);
     auto begin_loc_iter = jacobian_t.begin();
     for (size_t obs_idx = 0; obs_idx < num_observables; obs_idx++) {
         RT_ASSERT(begin_loc_iter != jacobian_t.end());
-        results[obs_idx].insert(results[obs_idx].begin(), begin_loc_iter,
-                                begin_loc_iter + num_train_params);
+        RT_ASSERT(num_train_params <= gradients[obs_idx].size());
+        std::move(begin_loc_iter, begin_loc_iter + num_train_params, cur_buffer.begin());
+        std::move(cur_buffer.begin(), cur_buffer.end(), gradients[obs_idx].begin());
         begin_loc_iter += num_train_params;
     }
-
-    return results;
 }
 
 } // namespace Catalyst::Runtime::Simulator

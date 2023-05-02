@@ -146,7 +146,7 @@ class LightningKokkosSimulator final : public Catalyst::Runtime::QuantumDevice {
     void PartialCounts(MemRefView<double, 1> &eigvals, MemRefView<int64_t, 1> &counts,
                        const std::vector<QubitIdType> &wires, size_t shots) override;
     auto Measure(QubitIdType wire) -> Result override;
-    auto Gradient(const std::vector<size_t> &trainParams)
-        -> std::vector<std::vector<double>> override;
+    void Gradient(std::vector<MemRefView<double, 1>> &gradients,
+                  const std::vector<size_t> &trainParams) override;
 };
 } // namespace Catalyst::Runtime::Simulator

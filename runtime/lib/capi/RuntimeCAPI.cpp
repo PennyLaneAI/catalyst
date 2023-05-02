@@ -202,38 +202,27 @@ void __quantum__qis__Gradient(int64_t numResults, /* results = */...)
     RT_ASSERT(numResults >= 0);
     using ResultType = MemRefT<double, 1>;
 
-    // num_observables * num_train_params
-    auto &&jacobian = Catalyst::Runtime::CAPI::DRIVER->get_device()->Gradient({});
-
-    const size_t num_observables = jacobian.size();
-    if (num_observables != static_cast<size_t>(numResults)) {
-        RT_FAIL("Invalid number of results; "
-                "The number of results must be equal to the "
-                "number of cached observables.");
-    }
-
-    // for zero number of observables
-    if (jacobian.empty()) {
-        return;
-    }
-
-    const size_t num_train_params = jacobian[0].size();
-
-    // extract variadic results of size num_observables
+    std::vector<ResultType *> mem_ptrs;
+    mem_ptrs.reserve(numResults);
     va_list args;
     va_start(args, numResults);
     for (int64_t i = 0; i < numResults; i++) {
-        MemRefT<double, 1> *memref = va_arg(args, ResultType *);
-        double *buffer = jacobian[i].data();
-        size_t buffer_len = jacobian[i].size();
-        MemRefT<double, 1> src = {buffer, buffer, 0, {buffer_len}, {1}};
-        RT_FAIL_IF(!memref, "the result type cannot be a null pointer");
-        memref_copy<double, 1>(memref, &src, num_train_params * sizeof(double));
+        mem_ptrs.push_back(va_arg(args, ResultType *));
     }
     va_end(args);
+
+    std::vector<MemRefView<double, 1>> mem_views;
+    mem_views.reserve(numResults);
+    for (auto *mr : mem_ptrs) {
+        mem_views.emplace_back(mr, mr->sizes[0]);
+    }
+
+    // num_observables * num_train_params
+    Catalyst::Runtime::CAPI::DRIVER->get_device()->Gradient(mem_views, {});
 }
 
-void __quantum__qis__Gradient_params(MemRefT_int64_1d *params, int64_t numResults,
+void __quantum__qis__Gradient_params([[maybe_unused]] MemRefT_int64_1d *params,
+                                     [[maybe_unused]] int64_t numResults,
                                      /* results = */...)
 {
     RT_ASSERT(numResults >= 0);
@@ -255,35 +244,23 @@ void __quantum__qis__Gradient_params(MemRefT_int64_1d *params, int64_t numResult
         train_params.push_back(p);
     }
 
-    // num_observables * num_train_params
-    auto &&jacobian = Catalyst::Runtime::CAPI::DRIVER->get_device()->Gradient(train_params);
-
-    const size_t num_observables = jacobian.size();
-    if (num_observables != static_cast<size_t>(numResults)) {
-        RT_FAIL("Invalid number of results; "
-                "The number of results must be equal to the "
-                "number of cached observables.");
-    }
-
-    // for zero number of observables
-    if (jacobian.empty()) {
-        return;
-    }
-
-    const size_t num_train_params = jacobian[0].size();
-
-    // extract variadic results of size num_observables
+    std::vector<ResultType *> mem_ptrs;
+    mem_ptrs.reserve(numResults);
     va_list args;
     va_start(args, numResults);
     for (int64_t i = 0; i < numResults; i++) {
-        MemRefT<double, 1> *memref = va_arg(args, ResultType *);
-        RT_FAIL_IF(!memref, "the result type cannot be a null pointer");
-        double *buffer = jacobian[i].data();
-        size_t buffer_len = jacobian[i].size();
-        MemRefT<double, 1> src = {buffer, buffer, 0, {buffer_len}, {1}};
-        memref_copy<double, 1>(memref, &src, num_train_params * sizeof(double));
+        mem_ptrs.push_back(va_arg(args, ResultType *));
     }
     va_end(args);
+
+    std::vector<MemRefView<double, 1>> mem_views;
+    mem_views.reserve(numResults);
+    for (auto *mr : mem_ptrs) {
+        mem_views.emplace_back(mr, mr->sizes[0]);
+    }
+
+    // num_observables * num_train_params
+    Catalyst::Runtime::CAPI::DRIVER->get_device()->Gradient(mem_views, train_params);
 }
 
 void __quantum__qis__Identity(QUBIT *qubit)

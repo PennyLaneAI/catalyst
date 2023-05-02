@@ -263,13 +263,18 @@ void LightningKokkosSimulator::State(MemRefView<std::complex<double>, 1> &state)
     const size_t size = Pennylane::Lightning_Kokkos::Util::exp2(num_qubits);
     RT_FAIL_IF(state.size() != size, "Invalid size for the pre-allocated state vector");
 
-    auto *state_kptr = reinterpret_cast<Kokkos::complex<double> *>(state.get().data_allocated);
+    // create a temporary buffer to copy the underlying state-vector to
+    std::vector<std::complex<double>> buffer(size);
+    auto *state_kptr = reinterpret_cast<Kokkos::complex<double> *>(buffer.data());
 
     // copy data from device to host
-    auto device_data = this->device_sv->getData(); // Kokkos::View<Kokkos::complex<double> *>
+    auto device_data = this->device_sv->getData();
     Kokkos::deep_copy(Kokkos::View<Kokkos::complex<double> *, Kokkos::HostSpace,
                                    Kokkos::MemoryTraits<Kokkos::Unmanaged>>(state_kptr, size),
                       device_data);
+
+    // move data to state leveraging MemRefIter
+    std::move(buffer.begin(), buffer.end(), state.begin());
 }
 
 void LightningKokkosSimulator::Probs(MemRefView<double, 1> &probs)
@@ -518,8 +523,8 @@ auto LightningKokkosSimulator::Measure(QubitIdType wire) -> Result
     return mres ? this->One() : this->Zero();
 }
 
-auto LightningKokkosSimulator::Gradient(const std::vector<size_t> &trainParams)
-    -> std::vector<std::vector<double>>
+void LightningKokkosSimulator::Gradient(std::vector<MemRefView<double, 1>> &gradients,
+                                        const std::vector<size_t> &trainParams)
 {
     const bool tp_empty = trainParams.empty();
     const size_t num_observables = this->cache_manager.getNumObservables();
@@ -528,8 +533,10 @@ auto LightningKokkosSimulator::Gradient(const std::vector<size_t> &trainParams)
     const size_t jac_size = num_train_params * this->cache_manager.getNumObservables();
 
     if (!jac_size) {
-        return {};
+        return;
     }
+
+    RT_FAIL_IF(gradients.size() != num_observables, "Invalid number of pre-allocated gradients");
 
     auto &&obs_callees = this->cache_manager.getObservablesCallees();
     bool is_valid_measurements =
@@ -569,7 +576,12 @@ auto LightningKokkosSimulator::Gradient(const std::vector<size_t> &trainParams)
     adj.adjointJacobian(*this->device_sv, jacobian, obs_vec, ops,
                         tp_empty ? all_params : trainParams, /* apply_operations */ false);
 
-    return jacobian;
+    // return jacobian;
+    auto grad_iter = gradients.begin();
+    for (auto jac_iter = jacobian.begin(); jac_iter != jacobian.end(); jac_iter++, grad_iter++) {
+        RT_ASSERT(num_train_params <= grad_iter->size());
+        std::move(jac_iter->begin(), jac_iter->end(), grad_iter->begin());
+    }
 }
 
 } // namespace Catalyst::Runtime::Simulator

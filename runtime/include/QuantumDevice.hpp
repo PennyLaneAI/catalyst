@@ -275,13 +275,14 @@ struct QuantumDevice {
      * `Catalyst::Runtime::Simulator::CacheManager`, for a specific set of trainable
      * parameters.
      *
+     * @param gradients The vector of pre-allocated `MemRefView<double, 1>*`
+     * to store gradients resutls for the list of cached observables.
      * @param trainParams The vector of trainable parameters; if none, all parameters
      * would be assumed trainable
      *
-     * @return `std::vector<std::vector<double>>` A vector of jacobians for each observables
      */
-    virtual auto Gradient(const std::vector<size_t> &trainParams)
-        -> std::vector<std::vector<double>> = 0;
+    virtual void Gradient(std::vector<MemRefView<double, 1>> &gradients,
+                          const std::vector<size_t> &trainParams) = 0;
 };
 
 /**
