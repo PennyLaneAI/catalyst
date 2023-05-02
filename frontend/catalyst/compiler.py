@@ -84,7 +84,7 @@ class PassPipeline(abc.ABC):
     """Abstract PassPipeline class."""
 
     _executable: Optional[str] = None
-    _default_flags: Optional[list[str]] = None
+    _default_flags: Optional[List[str]] = None
 
     @staticmethod
     @abc.abstractmethod
