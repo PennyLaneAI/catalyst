@@ -79,6 +79,8 @@ following pre-requisites are installed and available on the path:
 
 - `Python <https://www.python.org/>`_ 3.8 or higher for the Python frontend.
 
+- ``pip`` must be version 22.3 or higher.
+
 They can be installed on Debian/Ubuntu via:
 
 .. code-block:: console
