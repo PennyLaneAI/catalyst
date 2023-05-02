@@ -10,6 +10,10 @@ extend-exclude = '''
 )
 '''
 
+[build-system]
+requires = ["setuptools>=42", "wheel", "pybind11~=2.10.1"]
+build-backend = "setuptools.build_meta"
+
 [tool.pytest.ini_options]
 cache_dir='/tmp/.pytest_cache'
 testpaths='frontend/tests/pytest'
