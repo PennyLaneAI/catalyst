@@ -369,7 +369,6 @@ jobs:
 
     - name: Check Catalyst Demos
       run: |
-        pip install -r demos/requirements.txt
         MDD_BENCHMARK_PRECISION=1 \
         pytest demos --nbmake -n auto
 
