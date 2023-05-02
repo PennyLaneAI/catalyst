@@ -42,10 +42,10 @@ func.func @backprop(%arg0: f64, %arg1: index) {
 
 ///
 
-// func.func private @circuit3(%arg0: tensor<?xf64>)
+func.func private @circuit3(%arg0: tensor<?x2xf64>)
 
-// func.func @backprop2(%arg0: tensor<?xf64>, %arg1: index) {
+func.func @backprop2(%arg0: tensor<?x2xf64>, %arg1: index) {
 
-//     %grad = gradient.backprop @circuit3(%arg0) size(%arg1) : (tensor<?xf64>) -> tensor<?xf64>
-//     return
-// }
+    %grad = gradient.backprop @circuit3(%arg0) size(%arg1) : (tensor<?x2xf64>) -> tensor<?x?xf64>
+    return
+}

@@ -82,8 +82,15 @@ class BufferizeBackpropOp : public OpConversionPattern<BackpropOp> {
             Type argType = args[argPos].getType();
 
             if (argType.isa<TensorType>()) {
-                auto dim = argType.cast<RankedTensorType>().getDynamicDimIndex(0);
-                dynamicDimSizes.push_back(rewriter.create<tensor::DimOp>(loc, args[argPos], dim));
+                RankedTensorType rankedArg = argType.cast<RankedTensorType>();
+                int numDynDim = rankedArg.getNumDynamicDims();
+
+                for (int i = 0; i < numDynDim; i++)
+                {
+                    auto dim = rankedArg.getDynamicDimIndex(i);
+                    dynamicDimSizes.push_back(rewriter.create<tensor::DimOp>(loc, args[argPos], dim));
+                }
+
             }
 
             dynamicDimSizes.push_back(gradSize);
