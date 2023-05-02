@@ -34,6 +34,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "Gradient/IR/GradientOps.h"
 #include "Gradient/Utils/EinsumLinalgGeneric.h"
+#include "Gradient/Utils/GradientShape.h"
 
 #include "Gradient/IR/GradientOps.h"
 #include "Gradient/Transforms/Passes.h"
@@ -42,6 +43,22 @@
 
 using namespace mlir;
 using namespace catalyst::gradient;
+
+namespace llvm {
+
+  template<class T>
+  raw_ostream& operator<<(raw_ostream& oss, const std::vector<T> &v) {
+    oss << "[";
+    bool first = true;
+    for(auto i : v) {
+      oss << (first ? "" : ", ") << i;
+      first = false;
+    }
+    oss << "]";
+    return oss;
+  }
+};
+
 
 namespace catalyst {
 namespace gradient {
@@ -71,14 +88,21 @@ void JVPLoweringPattern::rewrite(JVPOp op, PatternRewriter &rewriter) const
     auto res_halfsize = (op.result_type_end() - op.result_type_begin()) / 2;
     auto func_result_types = ValueTypeRange<ResultRange>(op.result_type_begin(), op.result_type_begin() + res_halfsize);
 
-    std::string fnName = op.getCallee().str();
-    FunctionType fnType = rewriter.getFunctionType(op.getOperandTypes(), func_result_types);
-    StringAttr visibility = rewriter.getStringAttr("private");
-    auto funcOp = rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility);
-    auto fcallOp = rewriter.create<func::CallOp>(loc, funcOp, func_operands);
+    auto func_op = rewriter.create<func::FuncOp>(loc,
+      op.getCallee().str(),
+      rewriter.getFunctionType(op.getOperandTypes(), func_result_types),
+      rewriter.getStringAttr("private"));
 
-    llvm::errs() << "calling " << fnName << " \n";
+    auto fcall_op = rewriter.create<func::CallOp>(loc, func_op, func_operands);
 
+    auto grad_result_types = computeResultTypes(func_op,
+      GradOp::compDiffArgIndices(op.getDiffArgIndices()));
+
+    llvm::errs() << func_op.getSymName() << " grad result type: " << grad_result_types << " \n";
+
+    assert(grad_result_types.size() == func_operands.size());
+
+    /* llvm::errs() << "calling " << fnName << " \n"; */
     /* auto gradOp = rewriter.create<GradOp>(loc, */
     /*   op.getResultTypes(), */
     /*   op.getMethod(), */
@@ -92,9 +116,9 @@ void JVPLoweringPattern::rewrite(JVPOp op, PatternRewriter &rewriter) const
     /* auto res_type_range = ValueTypeRange<ResultRange>(op.result_type_begin(), op.result_type_begin()+res_type_size/2); */
     /* /1* llvm::errs() << "replaced JVP op_size: " << op_size << "\n"; *1/ */
 
-    auto gradOp = rewriter.create<GradOp>(
+    auto grad_op = rewriter.create<GradOp>(
       loc,
-      op.getResultTypes(),
+      grad_result_types,
       op.getMethod(),
       op.getCallee(),
       func_operands,
@@ -102,27 +126,67 @@ void JVPLoweringPattern::rewrite(JVPOp op, PatternRewriter &rewriter) const
       op.getFiniteDiffParam().value()
     );
 
-    for(auto t: tang_operands) {
-      for(auto g: gradOp.getResults()) {
+    auto _tovec = [](auto x) -> std::vector<int64_t> {
+        std::vector<int64_t> out(x.begin(), x.end());
+        return out;
+    };
 
-        auto tt = t.getType().cast<mlir::TensorType>();
-        auto gt = g.getType().cast<mlir::TensorType>();
+    for(size_t ntang = 0; ntang < tang_operands.size(); ntang++) {
+      for(size_t nparam = 0; nparam < func_operands.size(); nparam++) {
+        auto jac = grad_op.getResults()[nparam];
+        auto tang = tang_operands[ntang];
+        auto param = func_operands[nparam];
 
-        llvm::errs() << "emitting a tensordot" << "\n";
-        llvm::errs() << "grad_output_type " << gt << "\n";
-        llvm::errs() << "tang_type " << tt << "\n";
+        auto sjac = _tovec(jac.getType().cast<mlir::TensorType>().getShape());
+        auto sparam = _tovec(param.getType().cast<mlir::TensorType>().getShape());
+        auto stang = _tovec(tang.getType().cast<mlir::TensorType>().getShape());
 
-        /* auto res = einsumLinalgGeneric(rewriter, loc, */
-        /*   {}, {}, {}); */
+        auto sjac_param = ({
+          std::vector<int64_t> out(sjac.begin(), sjac.begin()+std::min(sjac.size(),sparam.size()));
+          out;
+        });
+
+        llvm::errs() << "jac_type " << sjac << "\n";
+        llvm::errs() << "param_type " << sparam << "\n";
+        llvm::errs() << "tang_type " << stang << "\n";
+
+        assert(sparam == stang && "Parameter and tanget shapes don't match");
+        assert(sjac_param == sparam && "Jacobian shape doesn't start from parameter shape");
+
+        auto jac_axis_names = ({
+          std::vector<size_t> out;
+          for(size_t i=0; i<sjac.size(); i++) out.push_back(i);
+          out;
+        });
+        auto tang_axis_names = ({
+          std::vector<size_t> out;
+          for(size_t i=0; i<stang.size(); i++) out.push_back(i);
+          out;
+        });
+        auto jvp_axis_names = ({
+          std::vector<size_t> out;
+          for(size_t i=0; i<sjac.size()-sparam.size(); i++) out.push_back(i+tang_axis_names.size());
+          out;
+        });
+
+        llvm::errs() << "jac_axis " << jac_axis_names << "\n";
+        llvm::errs() << "tang_axis " << tang_axis_names << "\n";
+        llvm::errs() << "jvp_axis " << jvp_axis_names << "\n";
+
+        /* tjac.getShape(); */
+
+        auto res = einsumLinalgGeneric(rewriter, loc,
+          jac_axis_names, tang_axis_names, jvp_axis_names,
+          jac, tang);
       }
     }
 
     std::vector<Value> mock_results;
-    mock_results.reserve(2 * fcallOp.getResults().size());
-    mock_results.insert(mock_results.end(), fcallOp.getResults().begin(), fcallOp.getResults().end());
-    mock_results.insert(mock_results.end(), fcallOp.getResults().begin(), fcallOp.getResults().end());
+    mock_results.reserve(2 * fcall_op.getResults().size());
+    mock_results.insert(mock_results.end(), fcall_op.getResults().begin(), fcall_op.getResults().end());
+    mock_results.insert(mock_results.end(), fcall_op.getResults().begin(), fcall_op.getResults().end());
 
-    llvm::errs() << "fcallOp.result.size(): " << fcallOp.getResults().size() << "\n";
+    llvm::errs() << "fcall_op.result.size(): " << fcall_op.getResults().size() << "\n";
     llvm::errs() << "mock_results.size(): " << mock_results.size() << "\n";
 
     rewriter.replaceOp(op, mock_results);

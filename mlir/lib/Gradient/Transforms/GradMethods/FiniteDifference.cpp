@@ -36,7 +36,7 @@ LogicalResult FiniteDiffLowering::match(GradOp op) const
 void FiniteDiffLowering::rewrite(GradOp op, PatternRewriter &rewriter) const
 {
     Location loc = op.getLoc();
-    const std::vector<size_t> &diffArgIndices = op.compDiffArgIndices();
+    const std::vector<size_t> &diffArgIndices = GradOp::compDiffArgIndices(op.getDiffArgIndices());
     std::stringstream uniquer;
     std::copy(diffArgIndices.begin(), diffArgIndices.end(), std::ostream_iterator<int>(uniquer));
     std::string fnName = op.getCallee().str() + ".finitediff" + uniquer.str();

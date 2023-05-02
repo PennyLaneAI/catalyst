@@ -22,9 +22,9 @@ namespace catalyst {
 llvm::SmallVector<mlir::Value> einsumLinalgGeneric(
   mlir::OpBuilder& ob,
   mlir::Location loc,
-  llvm::ArrayRef<int64_t> a_axis,
-  llvm::ArrayRef<int64_t> b_axis,
-  llvm::ArrayRef<int64_t> r_axis,
+  llvm::ArrayRef<size_t> a_axis,
+  llvm::ArrayRef<size_t> b_axis,
+  llvm::ArrayRef<size_t> r_axis,
   mlir::Value a,
   mlir::Value b);
 

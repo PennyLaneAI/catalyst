@@ -15,9 +15,9 @@ namespace catalyst {
 llvm::SmallVector<mlir::Value> einsumLinalgGeneric(
   OpBuilder& ob,
   Location loc,
-  ArrayRef<int64_t> a_axis,
-  ArrayRef<int64_t> b_axis,
-  ArrayRef<int64_t> r_axis,
+  ArrayRef<size_t> a_axis,
+  ArrayRef<size_t> b_axis,
+  ArrayRef<size_t> r_axis,
   Value a,
   Value b
   )
@@ -25,10 +25,15 @@ llvm::SmallVector<mlir::Value> einsumLinalgGeneric(
   auto ta = a.getType().cast<TensorType>();
   auto tb = b.getType().cast<TensorType>();
   assert(ta.getElementType() == tb.getElementType() && "element types should match");
-  auto tr = ta.cloneWith(r_axis, ta.getElementType());
+  std::vector<int64_t> _r;
+  auto tr = ta.cloneWith(({
+      for(auto i : r_axis) _r.push_back(int64_t(i));
+      ArrayRef<int64_t> x(_r);
+      x;
+    }), ta.getElementType());
 
   auto all_dims = ({
-    SmallSetVector<int64_t,4> out;
+    SmallSetVector<size_t,4> out;
     out.insert(a_axis.begin(), a_axis.end());
     out.insert(b_axis.begin(), b_axis.end());
     out.insert(r_axis.begin(), r_axis.end());
@@ -50,8 +55,8 @@ llvm::SmallVector<mlir::Value> einsumLinalgGeneric(
 
   auto attrs = ({
     SmallVector<utils::IteratorType, 4> out;
-    SmallSetVector<int64_t, 4> ua(a_axis.begin(), a_axis.end());
-    SmallSetVector<int64_t, 4> ub(b_axis.begin(), b_axis.end());
+    SmallSetVector<size_t, 4> ua(a_axis.begin(), a_axis.end());
+    SmallSetVector<size_t, 4> ub(b_axis.begin(), b_axis.end());
     for (const auto a : all_dims) {
       out.push_back(
         (ua.contains(a) && ub.contains(a)) ?

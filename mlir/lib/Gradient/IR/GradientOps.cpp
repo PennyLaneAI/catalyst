@@ -60,7 +60,7 @@ LogicalResult GradOp::verifySymbolUses(SymbolTableCollection &symbolTable)
                    << " for operand number " << i;
 
     // Only differentiation on real numbers is supported.
-    const std::vector<size_t> &diffArgIndices = compDiffArgIndices();
+    const std::vector<size_t> &diffArgIndices = compDiffArgIndices(getDiffArgIndices());
     for (size_t idx : diffArgIndices) {
         Type diffArgBaseType = fnArgs[idx].getType();
         if (auto tensorType = diffArgBaseType.dyn_cast<TensorType>())
@@ -106,12 +106,12 @@ LogicalResult GradOp::verify()
     return success();
 }
 
-std::vector<uint64_t> GradOp::compDiffArgIndices()
+std::vector<size_t> GradOp::compDiffArgIndices(Optional<DenseIntElementsAttr> indices)
 {
     // By default only the first argument is differentiated, otherwise gather indices.
     std::vector<size_t> diffArgIndices{0};
-    if (getDiffArgIndices().has_value()) {
-        auto range = getDiffArgIndicesAttr().getValues<size_t>();
+    if (indices.has_value()) {
+        auto range = indices.value().getValues<size_t>();
         diffArgIndices = std::vector<size_t>(range.begin(), range.end());
     }
     return diffArgIndices;
@@ -145,15 +145,3 @@ LogicalResult JVPOp::verify()
         return emitOpError("got invalid differentiation method: ") << method;
     return success();
 }
-
-std::vector<uint64_t> JVPOp::compDiffArgIndices()
-{
-    // By default only the first argument is differentiated, otherwise gather indices.
-    std::vector<size_t> diffArgIndices{0};
-    if (getDiffArgIndices().has_value()) {
-        auto range = getDiffArgIndicesAttr().getValues<size_t>();
-        diffArgIndices = std::vector<size_t>(range.begin(), range.end());
-    }
-    return diffArgIndices;
-}
-

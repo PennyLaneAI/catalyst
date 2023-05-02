@@ -63,7 +63,8 @@ def GradOp : Gradient_Op<"grad", [DeclareOpInterfaceMethods<CallOpInterface>,
     }];
 
     let extraClassDeclaration = [{
-        std::vector<size_t> compDiffArgIndices();
+        static std::vector<size_t> compDiffArgIndices(
+            llvm::Optional<mlir::DenseIntElementsAttr> indices);
     }];
 }
 
@@ -139,10 +140,6 @@ def JVPOp : Gradient_Op<"jvp", [DeclareOpInterfaceMethods<CallOpInterface>,
 
     let assemblyFormat = [{
         $method $callee `(` $params_and_tangents `:` type($params_and_tangents) `)` attr-dict `:` type(results)
-    }];
-
-    let extraClassDeclaration = [{
-        std::vector<size_t> compDiffArgIndices();
     }];
 }
 
