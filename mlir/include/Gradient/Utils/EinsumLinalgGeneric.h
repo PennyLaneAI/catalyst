@@ -26,8 +26,10 @@ llvm::SmallVector<mlir::Value> einsumLinalgGeneric(
   llvm::ArrayRef<int64_t> b_axis,
   llvm::ArrayRef<int64_t> r_axis,
   mlir::Value a,
-  mlir::Value b
-  );
+  mlir::Value b);
+
+
+
 
 }
 

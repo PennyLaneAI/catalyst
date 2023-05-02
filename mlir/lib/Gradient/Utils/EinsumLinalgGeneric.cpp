@@ -66,7 +66,7 @@ llvm::SmallVector<mlir::Value> einsumLinalgGeneric(
   SmallVector<NamedAttribute> nattrs = {};
   auto genOp = ob.create<linalg::GenericOp>(
     loc, tr, operands, r, maps, attrs,
-    [&](OpBuilder& ob2, Location loc2, ValueRange args) {
+    [](OpBuilder& ob2, Location loc2, ValueRange args) {
       ob2.create<linalg::YieldOp>(loc2,
         Value(
           ob2.create<arith::AddFOp>(loc2, args[2],

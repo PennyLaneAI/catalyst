@@ -452,7 +452,7 @@ class Compiler:
         if pipelines is None:
             pipelines = [
                 MHLOPass,
-                JVPLoweringPass,
+                # JVPLoweringPass,
                 QuantumCompilationPass,
                 BufferizationPass,
                 MLIRToLLVMDialect,

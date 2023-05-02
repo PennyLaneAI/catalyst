@@ -33,6 +33,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/PatternMatch.h"
 #include "Gradient/IR/GradientOps.h"
+#include "Gradient/Utils/EinsumLinalgGeneric.h"
 
 #include "Gradient/IR/GradientOps.h"
 #include "Gradient/Transforms/Passes.h"
@@ -103,12 +104,16 @@ void JVPLoweringPattern::rewrite(JVPOp op, PatternRewriter &rewriter) const
 
     for(auto t: tang_operands) {
       for(auto g: gradOp.getResults()) {
+
         auto tt = t.getType().cast<mlir::TensorType>();
         auto gt = g.getType().cast<mlir::TensorType>();
 
         llvm::errs() << "emitting a tensordot" << "\n";
         llvm::errs() << "grad_output_type " << gt << "\n";
         llvm::errs() << "tang_type " << tt << "\n";
+
+        /* auto res = einsumLinalgGeneric(rewriter, loc, */
+        /*   {}, {}, {}); */
       }
     }
 
