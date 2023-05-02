@@ -72,8 +72,11 @@ class BufferizeBackpropOp : public OpConversionPattern<BackpropOp> {
 
         SmallVector<Value> memrefValues;
         size_t resSize = resTypes.size();
+
         int argsSize = args.size();
+
         int m = argsSize / resSize;
+
         for (size_t i = 0; i < resSize; i++) {
             Type resType = resTypes[i];
             std::vector<Value> dynamicDimSizes;
@@ -85,12 +88,11 @@ class BufferizeBackpropOp : public OpConversionPattern<BackpropOp> {
                 RankedTensorType rankedArg = argType.cast<RankedTensorType>();
                 int numDynDim = rankedArg.getNumDynamicDims();
 
-                for (int i = 0; i < numDynDim; i++)
-                {
+                for (int i = 0; i < numDynDim; i++) {
                     auto dim = rankedArg.getDynamicDimIndex(i);
-                    dynamicDimSizes.push_back(rewriter.create<tensor::DimOp>(loc, args[argPos], dim));
+                    dynamicDimSizes.push_back(
+                        rewriter.create<tensor::DimOp>(loc, args[argPos], dim));
                 }
-
             }
 
             dynamicDimSizes.push_back(gradSize);

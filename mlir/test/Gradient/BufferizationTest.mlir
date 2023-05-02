@@ -46,6 +46,8 @@ func.func private @circuit3(%arg0: tensor<?x2xf64>)
 
 func.func @backprop2(%arg0: tensor<?x2xf64>, %arg1: index) {
 
+    // CHECK:   [[alloc:%.+]] = memref.alloc(%dim, %arg1) : memref<?x?xf64>
+    // CHECK:   gradient.backprop @circuit3(%0) size(%arg1) in(%alloc : memref<?x?xf64>) : (memref<?x2xf64>) -> ()
     %grad = gradient.backprop @circuit3(%arg0) size(%arg1) : (tensor<?x2xf64>) -> tensor<?x?xf64>
     return
 }
