@@ -54,7 +54,7 @@ description = {
     "license": "Apache License 2.0",
 }
 
-ext_modules = intree_extensions(["frontend/catalyst/utils/wrapper.cc"])
+ext_modules = intree_extensions(["frontend/catalyst/utils/wrapper.cpp"])
 
 setup(
     classifiers=classifiers,
