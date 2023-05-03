@@ -10,13 +10,13 @@ void wrap(py::object func, py::tuple py_args)
         throw std::invalid_argument("Invalid number of arguments.");
     }
 
-    typedef void (*f_ptr_t)(void *, void *);
-    f_ptr_t f_ptr = *((f_ptr_t *)ctypes.attr("addressof")(func).cast<size_t>());
+    using f_ptr_t = void (*)(void *, void *);
+    f_ptr_t f_ptr = *reinterpret_cast<f_ptr_t *>(ctypes.attr("addressof")(func).cast<size_t>());
 
     auto value0 = py_args.attr("__getitem__")(0);
-    void *value0_ptr = *reinterpret_cast<void**>(ctypes.attr("addressof")(value0).cast<size_t>());
+    void *value0_ptr = *reinterpret_cast<void **>(ctypes.attr("addressof")(value0).cast<size_t>());
     auto value1 = py_args.attr("__getitem__")(1);
-    void *value1_ptr = *reinterpret_cast<void**>(ctypes.attr("addressof")(value1).cast<size_t>());
+    void *value1_ptr = *reinterpret_cast<void **>(ctypes.attr("addressof")(value1).cast<size_t>());
 
     f_ptr(value0_ptr, value1_ptr);
 }
