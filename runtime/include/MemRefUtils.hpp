@@ -56,7 +56,7 @@ template <typename T, size_t R> class MemRefView {
                                   "MemRefs; 1-dim MemRefs are iterable.");
             loc = buffer->offset + buffer->strides[0] * _idx;
         }
-        pointer operator->() const { return &buffer->data_allocated[loc]; }
+        pointer operator->() const { return &buffer->data_aligned[loc]; }
         reference operator*() const { return buffer->data_allocated[loc]; }
         MemRefIter &operator++()
         {
