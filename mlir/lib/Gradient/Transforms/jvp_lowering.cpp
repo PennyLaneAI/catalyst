@@ -83,40 +83,39 @@ void JVPLoweringPattern::rewrite(JVPOp op, PatternRewriter &rewriter) const
     Location loc = op.getLoc();
     llvm::errs() << "replacing JVP op\n";
 
-    size_t op_halfsize = (op.operand_end() - op.operand_begin()) / 2;
-    auto func_operands = OperandRange(op.operand_begin(), op.operand_begin() + op_halfsize);
-    auto tang_operands = OperandRange(op.operand_begin() + op_halfsize, op.operand_end());
+    auto func_diff_operand_indices = GradOp::compDiffArgIndices(op.getDiffArgIndices());
+    llvm::errs() << "func_diff_operand_indices: " << func_diff_operand_indices << " \n";
+    llvm::errs() << "jvp_num_operands " << op.getOperands().size() << " \n";
+    assert(func_diff_operand_indices.size() <= op.getOperands().size()/2);
+
+    size_t func_operands_size = op.getOperands().size() - func_diff_operand_indices.size();
+    size_t tang_operands_size = func_diff_operand_indices.size();
+
+    auto func_operands = OperandRange(op.operand_begin(), op.operand_begin() + func_operands_size);
+    auto tang_operands = OperandRange(op.operand_begin() + tang_operands_size, op.operand_end());
+
+    for(auto idx: func_diff_operand_indices) {
+      assert(idx < func_operands.size() && "all diffArgIndices reference valid arguments");
+    }
 
     auto res_halfsize = (op.result_type_end() - op.result_type_begin()) / 2;
+    auto func_operand_types = ({
+      std::vector<Type> out;
+      for(auto o: func_operands) out.push_back(o.getType());
+      out;
+    });
     auto func_result_types = ValueTypeRange<ResultRange>(op.result_type_begin(), op.result_type_begin() + res_halfsize);
 
-    auto func_op = rewriter.create<func::FuncOp>(loc,
-      op.getCallee().str(),
-      rewriter.getFunctionType(op.getOperandTypes(), func_result_types),
-      rewriter.getStringAttr("private"));
+    auto func_op = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
 
-    auto fcall_op = rewriter.create<func::CallOp>(loc, func_op, func_operands);
+    auto grad_result_types = computeResultTypes(func_op, func_diff_operand_indices);
+    llvm::errs() << "grad_result_types: " << grad_result_types << " \n";
+    assert(grad_result_types.size() == func_diff_operand_indices.size()*func_result_types.size() &&
+      "GradOp does't seem to return a tuple of Jacobians");
 
-    auto grad_result_types = computeResultTypes(func_op,
-      GradOp::compDiffArgIndices(op.getDiffArgIndices()));
+    auto fcall_op =
+      rewriter.create<func::CallOp>(loc, func_op, func_operands);
 
-    llvm::errs() << func_op.getSymName() << " grad result type: " << grad_result_types << " \n";
-
-    assert(grad_result_types.size() == func_operands.size());
-
-    /* llvm::errs() << "calling " << fnName << " \n"; */
-    /* auto gradOp = rewriter.create<GradOp>(loc, */
-    /*   op.getResultTypes(), */
-    /*   op.getMethod(), */
-    /*   op.getCallee(), */
-    /*   op.getOperands(), */
-    /*   op.getDiffArgIndices().value(), */
-    /*   op.getFiniteDiffParam().value() */
-    /*   ); */
-
-    /* auto res_type_size = op.result_type_end() - op.result_type_begin(); */
-    /* auto res_type_range = ValueTypeRange<ResultRange>(op.result_type_begin(), op.result_type_begin()+res_type_size/2); */
-    /* /1* llvm::errs() << "replaced JVP op_size: " << op_size << "\n"; *1/ */
 
     auto grad_op = rewriter.create<GradOp>(
       loc,
@@ -134,12 +133,12 @@ void JVPLoweringPattern::rewrite(JVPOp op, PatternRewriter &rewriter) const
     };
 
     std::vector<Value> einsum_results;
-    for(size_t ntang = 0; ntang < tang_operands.size(); ntang++) {
+    for(size_t nout = 0; nout < func_result_types.size(); nout++) {
       Optional<Value> acc;
-      for(size_t nparam = 0; nparam < func_operands.size(); nparam++) {
-        auto jac = grad_op.getResults()[nparam];
-        auto tang = tang_operands[ntang];
-        auto param = func_operands[nparam];
+      for(size_t nparam = 0; nparam < func_diff_operand_indices.size(); nparam++) {
+        auto jac = grad_op.getResults()[nparam*func_diff_operand_indices.size() + nout];
+        auto tang = tang_operands[nparam];
+        auto param = func_operands[func_diff_operand_indices[nparam]];
 
         auto sjac = _tovec(jac.getType().cast<mlir::TensorType>().getShape());
         auto sparam = _tovec(param.getType().cast<mlir::TensorType>().getShape());
@@ -155,7 +154,7 @@ void JVPLoweringPattern::rewrite(JVPOp op, PatternRewriter &rewriter) const
         llvm::errs() << "tang_type " << stang << "\n";
 
         assert(sparam == stang && "Parameter and tanget shapes don't match");
-        assert(sjac_param == sparam && "Jacobian shape doesn't start from parameter shape");
+        assert(sjac_param == sparam && "Jacobian shape doesn't contain the parameter shape as a prefix");
 
         auto jac_axis_names = ({
           std::vector<size_t> out;

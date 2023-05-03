@@ -33,12 +33,13 @@ Value einsumLinalgGeneric(
     out;
   });
 
-  std::vector<int64_t> _r;
-  auto tr = ta.cloneWith(({
-      for(auto i : r_axis) _r.push_back(axis_dims[i]);
-      ArrayRef<int64_t> x(_r);
-      x;
-    }), ta.getElementType());
+  auto r_shape = ({
+    std::vector<int64_t> out;
+    for(auto i : r_axis) out.push_back(axis_dims[i]);
+    out;
+  });
+
+  auto tr = ta.cloneWith(ArrayRef<int64_t>(r_shape), ta.getElementType());
 
   auto maps = ({
     SmallVector<AffineMap> out;
