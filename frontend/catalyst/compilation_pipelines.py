@@ -35,6 +35,7 @@ from mlir_quantum.runtime import (
 )
 
 from catalyst.utils.gen_mlir import inject_functions
+from catalyst.utils.c_template import get_template, mlir_type_to_numpy_type
 import catalyst.jax_tracer as tracer
 from catalyst.compiler import Compiler
 from catalyst.compiler import CompileOptions
@@ -65,45 +66,6 @@ def get_type_annotations(func: typing.Callable):
         return getattr(func, "__annotations__", {}).values()
 
     return None
-
-
-def mlir_type_to_numpy_type(t):
-    """Convert an MLIR type to a Numpy type.
-
-    Args:
-        t: an MLIR numeric type
-    Returns:
-        A numpy type
-    Raises:
-        TypeError
-    """
-    retval = None
-    if ir.ComplexType.isinstance(t):
-        base = ir.ComplexType(t).element_type
-        if ir.F64Type.isinstance(base):
-            retval = np.complex128
-        else:
-            retval = np.complex64
-    elif ir.F64Type.isinstance(t):
-        retval = np.float64
-    elif ir.F32Type.isinstance(t):
-        retval = np.float32
-    elif ir.IntegerType.isinstance(t):
-        int_t = ir.IntegerType(t)
-        if int_t.width == 1:
-            retval = np.bool_
-        elif int_t.width == 8:
-            retval = np.int8
-        elif int_t.width == 16:
-            retval = np.int16
-        elif int_t.width == 32:
-            retval = np.int32
-        else:
-            retval = np.int64
-
-    if retval is None:
-        raise TypeError("Requested return type is unavailable.")
-    return retval
 
 
 class CompiledFunction:
@@ -429,6 +391,9 @@ class CompiledFunction:
 
     def __call__(self, *args, **kwargs):
         abi_args, _buffer = CompiledFunction.args_to_memref_descs(self.restype, args)
+
+        if kwargs.get("ciface") is not None:
+            return get_template(self.func_name, self.restype, *_buffer)
 
         result = CompiledFunction._exec(
             self.shared_object_file,
