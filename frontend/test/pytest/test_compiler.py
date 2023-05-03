@@ -144,7 +144,7 @@ class TestCompilerErrors:
         class CompileCXXException:
             """Class that overrides the program to be compiled."""
 
-            _executable = "clang++"
+            _executable = "cc"
             _default_flags = ["-shared", "-fPIC", "-x", "c++"]
 
             @staticmethod
@@ -158,7 +158,6 @@ class TestCompilerErrors:
                 """Run the compilation step."""
                 contents = """
 #include <stdexcept>
-#include <stdarg.h>
 extern "C" {
   void _catalyst_pyface_jit_cpp_exception_test(void*, void*);
   void setup(int, char**);
