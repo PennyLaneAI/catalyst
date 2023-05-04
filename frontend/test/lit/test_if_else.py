@@ -19,7 +19,7 @@ import pennylane as qml
 
 
 # CHECK-NOT: Verification failed
-# CHECK-LABEL: public @jit.circuit
+# CHECK-LABEL: public @jit_circuit
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=1))
 def circuit(n: int):
