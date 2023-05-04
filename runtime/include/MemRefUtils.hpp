@@ -32,6 +32,18 @@ template <typename T, size_t R> struct MemRefT {
     size_t strides[R];
 };
 
+/**
+ * A multi-dimensional view for MemRef<T, R> types.
+ *
+ * @tparam T The underlying data type
+ * @tparam R The Rank (R >= 0)
+ *
+ * @note A forward iterator is implemented in this view for traversing over the entire
+ * elements of MemRef types rank-by-rank starting from the last dimension (R-1). For example,
+ * The MemRefView iterator for MemRef<T, 2> starts from index (0, 0) and traverses elements
+ * in the following order:
+ * (0, 0), ..., (0, sizes[1]-1), (1, 0), ..., (1, sizes[1]-1), ... (sizes[0]-1, sizes[1]-1).
+ */
 template <typename T, size_t R> class MemRefView {
   private:
     const MemRefT<T, R> *buffer;
@@ -41,7 +53,8 @@ template <typename T, size_t R> class MemRefView {
     class MemRefIter {
       private:
         const MemRefT<T, R> *buffer;
-        size_t loc; // physical index
+        int64_t loc; // physical index
+        size_t indices[R] = {0};
 
       public:
         using iterator_category = std::forward_iterator_tag;
@@ -50,34 +63,60 @@ template <typename T, size_t R> class MemRefView {
         using pointer = T *;
         using reference = T &;
 
-        MemRefIter(const MemRefT<T, R> *_buffer, size_t _idx = 0) : buffer(_buffer)
+        MemRefIter(const MemRefT<T, R> *_buffer, int64_t begin_idx)
+            : buffer(_buffer), loc(begin_idx)
         {
-            static_assert(R == 1, "[Class: MemRefIter] Error in Catalyst Runtime: Non-Iterable "
-                                  "MemRefs; 1-dim MemRefs are iterable.");
-            loc = buffer->offset + buffer->strides[0] * _idx;
         }
         pointer operator->() const { return &buffer->data_aligned[loc]; }
-        reference operator*() const { return buffer->data_allocated[loc]; }
+        reference operator*() const { return buffer->data_aligned[loc]; }
         MemRefIter &operator++()
         {
-            loc += buffer->strides[0];
+            int64_t next_axis = -1;
+            for (int64_t i = R - 1; i >= 0; --i) {
+                if (indices[i]++ < buffer->sizes[i] - 1) {
+                    next_axis = i;
+                    break;
+                }
+                if (!i) {
+                    break;
+                }
+                indices[i] = 0;
+                loc -= (buffer->sizes[i] - 1) * buffer->strides[i];
+            }
+
+            loc = next_axis == -1 ? -1 : loc + buffer->strides[next_axis];
             return *this;
         }
         MemRefIter operator++(int)
         {
             auto tmp = *this;
-            loc += buffer->strides[0];
+            int64_t next_axis = -1;
+            for (int64_t i = R - 1; i >= 0; --i) {
+                if (indices[i]++ < buffer->sizes[i] - 1) {
+                    next_axis = i;
+                    break;
+                }
+                if (!i) {
+                    break;
+                }
+                indices[i] = 0;
+                loc -= (buffer->sizes[i] - 1) * buffer->strides[i];
+            }
+
+            loc = next_axis == -1 ? -1 : loc + buffer->strides[next_axis];
             return tmp;
         }
-        bool operator==(const MemRefIter &other)
+        bool operator==(const MemRefIter &other) const
         {
             return (loc == other.loc && buffer == other.buffer);
         }
-        bool operator!=(const MemRefIter &other) { return !(*this == other); }
+        bool operator!=(const MemRefIter &other) const { return !(*this == other); }
     };
 
     explicit MemRefView(const MemRefT<T, R> *_buffer, size_t _size) : buffer(_buffer), tsize(_size)
     {
+        RT_FAIL_IF(!buffer, "[Class: MemRefView] Error in Catalyst Runtime: Cannot create a view "
+                            "for uninitialized MemRefT<T, R>");
     }
 
     [[nodiscard]] auto get() const -> const MemRefT<T, R> & { return *buffer; }
@@ -85,54 +124,6 @@ template <typename T, size_t R> class MemRefView {
     [[nodiscard]] auto empty() const -> bool { return tsize == 0; }
 
     [[nodiscard]] auto size() const -> size_t { return tsize; }
-
-    void clone(const MemRefT<T, R> &src)
-    {
-        char *srcPtr = (char *)src.data_allocated + src.offset * sizeof(T);
-        char *dstPtr = (char *)buffer->data_allocated + buffer->offset * sizeof(T);
-
-        size_t *indices = static_cast<size_t *>(alloca(sizeof(size_t) * R));
-        size_t *srcStrides = static_cast<size_t *>(alloca(sizeof(size_t) * R));
-        size_t *dstStrides = static_cast<size_t *>(alloca(sizeof(size_t) * R));
-
-        // Initialize index and scale strides.
-        for (size_t rankp = 0; rankp < R; ++rankp) {
-            indices[rankp] = 0;
-            srcStrides[rankp] = src.strides[rankp] * sizeof(T);
-            dstStrides[rankp] = buffer->strides[rankp] * sizeof(T);
-        }
-
-        const size_t bytes = tsize * sizeof(T);
-        long writeIndex = 0;
-        long readIndex = 0;
-        [[maybe_unused]] size_t totalWritten = 0;
-
-        for (;;) {
-            memcpy(dstPtr + writeIndex, srcPtr + readIndex, sizeof(T));
-            totalWritten += sizeof(T);
-            RT_FAIL_IF(totalWritten > bytes, "[Class: MemRefView] Assertion: totalWritten > bytes");
-            // Advance index and read position.
-            for (int64_t axis = R - 1; axis >= 0; --axis) {
-                // Advance at current axis.
-                size_t newIndex = ++indices[axis];
-                readIndex += srcStrides[axis];
-                writeIndex += dstStrides[axis];
-                // If this is a valid index, we have our next index, so continue copying.
-                if (src.sizes[axis] != newIndex)
-                    break;
-                // We reached the end of this axis. If this is axis 0, we are done.
-                if (axis == 0)
-                    return;
-                // Else, reset to 0 and undo the advancement of the linear index that
-                // this axis had. Then continue with the axis one outer.
-                indices[axis] = 0;
-                readIndex -= src.sizes[axis] * srcStrides[axis];
-                writeIndex -= buffer->sizes[axis] * dstStrides[axis];
-            }
-        }
-    }
-
-    void clone(const MemRefView<T, R> &src) { clone(src.get()); }
 
     template <typename... I> T &operator()(I... idxs) const
     {
@@ -142,20 +133,18 @@ template <typename T, size_t R> class MemRefView {
 
         if (R == 0) {
             // 0-rank memref
-            return buffer->data_allocated[buffer->offset];
+            return buffer->data_aligned[buffer->offset];
         }
 
         size_t loc = buffer->offset;
-        for (uint64_t axis = 0; axis < R; axis++) {
+        for (size_t axis = 0; axis < R; axis++) {
             RT_ASSERT(indices[axis] < buffer->sizes[axis]);
             loc += indices[axis] * buffer->strides[axis];
         }
-        RT_ASSERT(loc < tsize);
-        return buffer->data_allocated[loc];
+        return buffer->data_aligned[loc];
     }
 
-    // 1-dim forward iterator methods
-    MemRefIter begin() { return MemRefIter{buffer}; }
+    MemRefIter begin() { return MemRefIter{buffer, static_cast<int64_t>(buffer->offset)}; }
 
-    MemRefIter end() { return MemRefIter{buffer, buffer->sizes[0]}; }
+    MemRefIter end() { return MemRefIter{buffer, -1}; }
 };

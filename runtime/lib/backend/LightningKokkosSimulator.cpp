@@ -311,6 +311,7 @@ void LightningKokkosSimulator::PartialProbs(MemRefView<double, 1> &probs,
 void LightningKokkosSimulator::Sample(MemRefView<double, 2> &samples, size_t shots)
 {
     RT_ASSERT(!samples.empty())
+
     Pennylane::Lightning_Kokkos::Simulators::MeasuresKokkos m{*(this->device_sv)};
 
     // PL-Lightning-Kokkos generates samples using the alias method.
@@ -325,17 +326,12 @@ void LightningKokkosSimulator::Sample(MemRefView<double, 2> &samples, size_t sho
     // shots*qubits, where each element represents a single bit. The
     // corresponding shape is (shots, qubits). Gather the desired bits
     // corresponding to the input wires into a bitstring.
-    // TODO: matrix transpose
-    std::vector<double> samples_vec(li_samples.size());
+    auto samplesIter = samples.begin();
     for (size_t shot = 0; shot < shots; shot++) {
         for (size_t wire = 0; wire < numQubits; wire++) {
-            samples_vec[shot * numQubits + wire] =
-                static_cast<double>(li_samples[shot * numQubits + wire]);
+            *(samplesIter++) = static_cast<double>(li_samples[shot * numQubits + wire]);
         }
     }
-    MemRefT<double, 2> src{
-        samples_vec.data(), samples_vec.data(), 0, {shots, numQubits}, {numQubits, 1}};
-    samples.clone(src);
 }
 void LightningKokkosSimulator::PartialSample(MemRefView<double, 2> &samples,
                                              const std::vector<QubitIdType> &wires, size_t shots)
@@ -362,18 +358,13 @@ void LightningKokkosSimulator::PartialSample(MemRefView<double, 2> &samples,
     // shots*qubits, where each element represents a single bit. The
     // corresponding shape is (shots, qubits). Gather the desired bits
     // corresponding to the input wires into a bitstring.
-    // TODO: matrix transpose
-    std::vector<double> samples_vec(shots * numWires);
+    auto samplesIter = samples.begin();
     for (size_t shot = 0; shot < shots; shot++) {
         size_t idx = 0;
         for (auto wire : dev_wires) {
-            samples_vec[shot * numWires + idx++] =
-                static_cast<double>(li_samples[shot * numQubits + wire]);
+            *(samplesIter++) = static_cast<double>(li_samples[shot * numQubits + wire]);
         }
     }
-    MemRefT<double, 2> src{
-        samples_vec.data(), samples_vec.data(), 0, {shots, numWires}, {numWires, 1}};
-    samples.clone(src);
 }
 
 void LightningKokkosSimulator::Counts(MemRefView<double, 1> &eigvals,

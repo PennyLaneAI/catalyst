@@ -274,9 +274,13 @@ TEST_CASE("Test copy to strided array", "[qir_lightning_core]")
     size_t buffer_strided_len = buffer_len * 2;
     double *buffer_strided = new double[buffer_strided_len];
     MemRefT<double, 2> dst = {
-        buffer_strided, buffer_strided, 0, {buffer_strided_len / 2, 2}, {4, 2}};
+        buffer_strided, buffer_strided, 0, {buffer_strided_len / 4, 2}, {4, 2}};
     MemRefView<double, 2> dst_view(&dst, buffer_strided_len);
-    dst_view.clone(src);
+    for (auto iterD = dst_view.begin(), iterS = src_view.begin(); iterD != dst_view.end();
+         iterS++, iterD++) {
+        *iterD = *iterS;
+    }
+
     CHECK(buffer_strided[0] == buffer[0]);
     CHECK(buffer_strided[2] == buffer[1]);
     CHECK(buffer_strided[4] == buffer[2]);
@@ -295,9 +299,9 @@ TEST_CASE("Test copy to strided array", "[qir_lightning_core]")
     CHECK(src_view(3, 0) == dst_view(3, 0));
     CHECK(src_view(3, 1) == dst_view(3, 1));
 
-    REQUIRE_THROWS_WITH(
-        dst_view(4, 1),
-        Catch::Contains("[Function:operator()] Error in Catalyst Runtime: Assertion: loc < tsize"));
+    REQUIRE_THROWS_WITH(dst_view(4, 1),
+                        Catch::Contains("[Function:operator()] Error in Catalyst Runtime: "
+                                        "Assertion: indices[axis] < buffer->sizes[axis]"));
     REQUIRE_THROWS_WITH(dst_view(3, 2),
                         Catch::Contains("[Function:operator()] Error in Catalyst Runtime: "
                                         "Assertion: indices[axis] < buffer->sizes[axis]"));
