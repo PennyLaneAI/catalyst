@@ -31,12 +31,15 @@
 * Fix a memory regression and reduce memory footprint by removing unnecessary temporary buffers.
   [#100](https://github.com/PennyLaneAI/catalyst/pull/100)
 
+* Fix extra buffer copies in the runtime.
+  [#109](https://github.com/PennyLaneAI/catalyst/pull/109)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
 
 Ali Asadi,
-Erick Ochoa Lopez
+Erick Ochoa Lopez,
 Mai Jacob Peng
 
 # Release 0.1.2
