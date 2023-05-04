@@ -64,8 +64,6 @@ class BufferizeBackpropOp : public OpConversionPattern<BackpropOp> {
 
         Location loc = op.getLoc();
 
-        DenseIntElementsAttr diffArgIndices = op.getDiffArgIndices().value_or(nullptr);
-
         Value gradSize = op.getGradSize();
         ValueRange args = op.getArgs();
 
@@ -74,13 +72,14 @@ class BufferizeBackpropOp : public OpConversionPattern<BackpropOp> {
 
         int argsSize = args.size();
 
-        int m = argsSize / resSize;
+        int divResSizeArgSize = resSize / argsSize;
 
         for (size_t i = 0; i < resSize; i++) {
             Type resType = resTypes[i];
             std::vector<Value> dynamicDimSizes;
 
-            int argPos = i % m;
+            int argPos = i % divResSizeArgSize;
+
             Type argType = args[argPos].getType();
 
             if (argType.isa<TensorType>()) {
@@ -88,7 +87,7 @@ class BufferizeBackpropOp : public OpConversionPattern<BackpropOp> {
                 int numDynDim = rankedArg.getNumDynamicDims();
 
                 for (int i = 0; i < numDynDim; i++) {
-                    auto dim = rankedArg.getDynamicDimIndex(i);
+                    int dim = rankedArg.getDynamicDimIndex(i);
                     dynamicDimSizes.push_back(
                         rewriter.create<tensor::DimOp>(loc, args[argPos], dim));
                 }
@@ -102,7 +101,7 @@ class BufferizeBackpropOp : public OpConversionPattern<BackpropOp> {
         }
 
         rewriter.create<BackpropOp>(loc, TypeRange{}, op.getCalleeAttr(), adaptor.getGradSize(),
-                                    adaptor.getArgs(), memrefValues, diffArgIndices);
+                                    adaptor.getDiffArgIndices(), adaptor.getArgs(), memrefValues);
         rewriter.replaceOp(op, memrefValues);
         return success();
     }

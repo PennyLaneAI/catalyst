@@ -98,9 +98,9 @@ def BackpropOp : Gradient_Op<"backprop", [AttrSizedOperandSegments]> {
     let arguments = (ins
         FlatSymbolRefAttr:$callee,
         Index:$gradSize,
+        AnyIntElementsAttr:$diffArgIndices,
         Variadic<AnyType>:$args,
-        Variadic<AnyMemRef>:$data_in,
-        OptionalAttr<AnyIntElementsAttr>:$diffArgIndices
+        Variadic<AnyMemRef>:$data_in
     );
 
     let results = (outs
@@ -112,6 +112,7 @@ def BackpropOp : Gradient_Op<"backprop", [AttrSizedOperandSegments]> {
 
     let assemblyFormat = [{
         $callee `(` $args `)`
+        `argnums` `(` $diffArgIndices `)`
         `size` `(` $gradSize `)`
         ( `in` `(` $data_in^ `:` type($data_in) `)` )?
         attr-dict `:` functional-type($args, results)

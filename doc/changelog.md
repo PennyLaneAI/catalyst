@@ -2,6 +2,9 @@
 
 <h3>New features</h3>
 
+* Add a Backprop operation with Bufferiation
+  [#107](https://github.com/PennyLaneAI/catalyst/pull/107)
+
 * Add support for `else if` chains for `@cond` conditionals
   [#104](https://github.com/PennyLaneAI/catalyst/pull/104)
 
@@ -36,8 +39,10 @@
 This release contains contributions from (in alphabetical order):
 
 Ali Asadi,
-Erick Ochoa Lopez
-Mai Jacob Peng
+David Ittah,
+Erick Ochoa Lopez,
+Romain Moyard,
+Mai Jacob Peng.
 
 # Release 0.1.2
 
