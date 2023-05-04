@@ -72,6 +72,7 @@ template <typename T, size_t R> class MemRefView {
         MemRefIter &operator++()
         {
             int64_t next_axis = -1;
+            int64_t idx;
             for (int64_t i = R; i > 0; --i) {
                 idx = i - 1;
                 if (indices[idx]++ < buffer->sizes[idx] - 1) {
@@ -89,16 +90,15 @@ template <typename T, size_t R> class MemRefView {
         {
             auto tmp = *this;
             int64_t next_axis = -1;
-            for (int64_t i = R - 1; i >= 0; --i) {
-                if (indices[i]++ < buffer->sizes[i] - 1) {
-                    next_axis = i;
+            int64_t idx;
+            for (int64_t i = R; i > 0; --i) {
+                idx = i - 1;
+                if (indices[idx]++ < buffer->sizes[idx] - 1) {
+                    next_axis = idx;
                     break;
                 }
-                if (!i) {
-                    break;
-                }
-                indices[i] = 0;
-                loc -= (buffer->sizes[i] - 1) * buffer->strides[i];
+                indices[idx] = 0;
+                loc -= (buffer->sizes[idx] - 1) * buffer->strides[idx];
             }
 
             loc = next_axis == -1 ? -1 : loc + buffer->strides[next_axis];
@@ -128,11 +128,6 @@ template <typename T, size_t R> class MemRefView {
         static_assert(sizeof...(idxs) == R,
                       "[Class: MemRefView] Error in Catalyst Runtime: Wrong number of indices");
         size_t indices[] = {static_cast<size_t>(idxs)...};
-
-        if (R == 0) {
-            // 0-rank memref
-            return buffer->data_aligned[buffer->offset];
-        }
 
         size_t loc = buffer->offset;
         for (size_t axis = 0; axis < R; axis++) {
