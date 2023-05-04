@@ -83,12 +83,12 @@ def compile_circuit_with_device(device):
     print(f.mlir)
 
 
-# CHECK-LABEL: public @jit.f
+# CHECK-LABEL: public @jit_f
 # CHECK-NOT: RXX
 # CHECK: multirz
 # CHECK-NOT: RXX
 compile_circuit_with_device(devMultiRZ)
-# CHECK-LABEL: public @jit.f
+# CHECK-LABEL: public @jit_f
 # CHECK-NOT: multirz
 # CHECK: RXX
 # CHECK-NOT: multirz
