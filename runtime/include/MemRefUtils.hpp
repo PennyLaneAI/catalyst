@@ -72,16 +72,14 @@ template <typename T, size_t R> class MemRefView {
         MemRefIter &operator++()
         {
             int64_t next_axis = -1;
-            for (int64_t i = R - 1; i >= 0; --i) {
-                if (indices[i]++ < buffer->sizes[i] - 1) {
-                    next_axis = i;
+            for (int64_t i = R; i > 0; --i) {
+                idx = i - 1;
+                if (indices[idx]++ < buffer->sizes[idx] - 1) {
+                    next_axis = idx;
                     break;
                 }
-                if (!i) {
-                    break;
-                }
-                indices[i] = 0;
-                loc -= (buffer->sizes[i] - 1) * buffer->strides[i];
+                indices[idx] = 0;
+                loc -= (buffer->sizes[idx] - 1) * buffer->strides[idx];
             }
 
             loc = next_axis == -1 ? -1 : loc + buffer->strides[next_axis];
