@@ -19,7 +19,7 @@ import pennylane as qml
 import numpy as np
 
 
-# CHECK-LABEL: public @jit.circuit
+# CHECK-LABEL: public @jit_circuit
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=5))
 def circuit(x: float):
@@ -37,7 +37,7 @@ def circuit(x: float):
 print(circuit.mlir)
 
 
-# CHECK-LABEL: public @jit.circuit
+# CHECK-LABEL: public @jit_circuit
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=3))
 def circuit():
