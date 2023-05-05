@@ -67,7 +67,12 @@ Value einsumLinalgGeneric(
     out;
   });
 
-  Value r = ob.create<tensor::EmptyOp>(loc, tr.getShape(), tr.getElementType());
+  Value r = ({
+    Value empty = ob.create<tensor::EmptyOp>(loc, tr.getShape(), tr.getElementType());
+    Value zero = ob.create<arith::ConstantOp>(loc, ob.getF64FloatAttr(0.0));
+    ob.create<linalg::FillOp>(loc, zero, empty).getResult(0);
+  });
+
   SmallVector<Value> operands = {a,b};
   SmallVector<NamedAttribute> nattrs = {};
   auto genOp = ob.create<linalg::GenericOp>(
