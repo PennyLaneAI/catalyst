@@ -101,7 +101,7 @@ define i32 @main() {
   %t0 = insertvalue %struct.MemRefT undef, double* %buffer_cast, 0
   %t1 = insertvalue %struct.MemRefT %t0, double* %buffer_cast, 1
   %t2 = insertvalue %struct.MemRefT %t1, i64 0, 2
-  %t3 = insertvalue %struct.MemRefT %t2, i64 2, 3, 0
+  %t3 = insertvalue %struct.MemRefT %t2, i64 3, 3, 0
   %memref = insertvalue %struct.MemRefT %t3, i64 1, 4, 0
   %memref_ptr = alloca %struct.MemRefT, i64 1, align 8
   store %struct.MemRefT %memref, %struct.MemRefT* %memref_ptr, align 8
