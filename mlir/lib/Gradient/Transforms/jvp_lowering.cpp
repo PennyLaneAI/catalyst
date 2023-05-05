@@ -63,7 +63,13 @@ namespace llvm {
 namespace catalyst {
 namespace gradient {
 
-struct JVPLoweringPattern : public OpRewritePattern<JVPOp> {
+template<class T>
+std::vector<int64_t> _tovec(const T& x)
+{
+    return std::vector<int64_t>(x.begin(), x.end());
+};
+
+struct JVPLoweringPattern : public OpRewritePattern<JVPOp> { /*{{{*/
     using OpRewritePattern<JVPOp>::OpRewritePattern;
 
     LogicalResult match(JVPOp op) const override;
@@ -81,7 +87,7 @@ void JVPLoweringPattern::rewrite(JVPOp op, PatternRewriter &rewriter) const
     MLIRContext *ctx = getContext();
 
     Location loc = op.getLoc();
-    llvm::errs() << "replacing JVP op\n";
+    llvm::errs() << "replacing VJP op\n";
 
     auto func_diff_operand_indices = GradOp::compDiffArgIndices(op.getDiffArgIndices());
     llvm::errs() << "func_diff_operand_indices: " << func_diff_operand_indices << " \n";
@@ -126,11 +132,6 @@ void JVPLoweringPattern::rewrite(JVPOp op, PatternRewriter &rewriter) const
       op.getDiffArgIndicesAttr(),
       op.getFiniteDiffParamAttr()
     );
-
-    auto _tovec = [](auto x) -> std::vector<int64_t> {
-        std::vector<int64_t> out(x.begin(), x.end());
-        return out;
-    };
 
     std::vector<Value> einsum_results;
     for(size_t nout = 0; nout < func_result_types.size(); nout++) {
@@ -214,6 +215,154 @@ void JVPLoweringPattern::rewrite(JVPOp op, PatternRewriter &rewriter) const
 
     llvm::errs() << "replaced JVP\n";
 }
+/*}}}*/
+
+struct VJPLoweringPattern : public OpRewritePattern<VJPOp> { /*{{{*/
+    using OpRewritePattern<VJPOp>::OpRewritePattern;
+
+    LogicalResult match(VJPOp op) const override;
+    void rewrite(VJPOp op, PatternRewriter &rewriter) const override;
+};
+
+LogicalResult VJPLoweringPattern::match(VJPOp op) const
+{
+    llvm::errs() << "matched VJP op\n";
+    return success();
+}
+
+void VJPLoweringPattern::rewrite(VJPOp op, PatternRewriter &rewriter) const
+{
+    MLIRContext *ctx = getContext();
+
+    Location loc = op.getLoc();
+    llvm::errs() << "replacing VJP op\n";
+
+    auto func_diff_operand_indices = GradOp::compDiffArgIndices(op.getDiffArgIndices());
+    llvm::errs() << "func_diff_operand_indices: " << func_diff_operand_indices << " \n";
+    llvm::errs() << "vjp_num_operands " << op.getOperands().size() << " \n";
+    assert(func_diff_operand_indices.size() <= op.getOperands().size()/2);
+
+    auto func_op = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
+
+    size_t func_operands_size = func_op.getFunctionType().getNumInputs();
+    size_t cotang_operands_size = op.getOperands().size() - func_operands_size;
+    assert(func_op.getFunctionType().getNumResults() == cotang_operands_size &&
+        "the number of function results doesn't match the number of cotangent arguments");
+
+    auto func_operands = OperandRange(op.operand_begin(), op.operand_begin() + func_operands_size);
+    auto cotang_operands = OperandRange(op.operand_begin() + cotang_operands_size, op.operand_end());
+
+    for(auto idx: func_diff_operand_indices) {
+      assert(idx < func_operands.size() && "all diffArgIndices reference valid arguments");
+    }
+
+    auto func_operand_types = ({
+      std::vector<Type> out;
+      for(auto o: func_operands) out.push_back(o.getType());
+      out;
+    });
+    auto func_result_types = func_op.getResultTypes();
+
+    auto grad_result_types = computeResultTypes(func_op, func_diff_operand_indices);
+    llvm::errs() << "grad_result_types: " << grad_result_types << " \n";
+    assert(grad_result_types.size() == func_diff_operand_indices.size()*func_result_types.size() &&
+      "GradOp does't seem to return a tuple of Jacobians");
+
+    auto fcall_op =
+      rewriter.create<func::CallOp>(loc, func_op, func_operands);
+
+    auto grad_op = rewriter.create<GradOp>(
+      loc,
+      grad_result_types,
+      op.getMethod(),
+      op.getCallee(),
+      func_operands,
+      op.getDiffArgIndicesAttr(),
+      op.getFiniteDiffParamAttr()
+    );
+
+    std::vector<Value> einsum_results;
+    for(size_t nout = 0; nout < func_result_types.size(); nout++) {
+      Optional<Value> acc;
+      for(size_t nparam = 0; nparam < func_diff_operand_indices.size(); nparam++) {
+        auto jac = grad_op.getResults()[nparam*func_diff_operand_indices.size() + nout];
+        auto param = func_operands[func_diff_operand_indices[nparam]];
+        auto cotang = cotang_operands[nout];
+
+        auto sjac = _tovec(jac.getType().cast<mlir::TensorType>().getShape());
+        auto sparam = _tovec(param.getType().cast<mlir::TensorType>().getShape());
+        auto scotang = _tovec(cotang.getType().cast<mlir::TensorType>().getShape());
+
+        auto sjac_cotang = ({
+          std::vector<int64_t> out(sjac.begin()+sparam.size(), sjac.end());
+          out;
+        });
+
+        llvm::errs() << "jac_type " << sjac << "\n";
+        llvm::errs() << "param_type " << sparam << "\n";
+        llvm::errs() << "cotang_type " << scotang << "\n";
+
+        assert(sjac_cotang == scotang && "Jacobian shape doesn't contain the cotang shape as a suffix");
+
+        auto jac_axis_names = ({
+          std::vector<size_t> out;
+          for(size_t i=0; i<sjac.size(); i++) out.push_back(i);
+          out;
+        });
+        auto cotang_axis_names = ({
+          std::vector<size_t> out;
+          for(size_t i=sjac.size()-scotang.size(); i<sjac.size(); i++) out.push_back(i);
+          out;
+        });
+        auto vjp_axis_names = ({
+          std::vector<size_t> out;
+          for(size_t i=0; i<sjac.size()-scotang.size(); i++) out.push_back(i);
+          out;
+        });
+
+        llvm::errs() << "jac_axis " << jac_axis_names << "\n";
+        llvm::errs() << "cotang_axis " << cotang_axis_names << "\n";
+        llvm::errs() << "vjp_axis " << vjp_axis_names << "\n";
+
+        auto res = einsumLinalgGeneric(rewriter, loc,
+          cotang_axis_names, jac_axis_names, vjp_axis_names,
+          cotang, jac);
+
+        llvm::errs() << "vjp result type " << res.getType() << "\n";
+
+        if(!acc.has_value()) {
+          acc = res;
+        }
+        else {
+          assert(acc.value().getType() == res.getType());
+
+          auto add_op = rewriter.create<linalg::ElemwiseBinaryOp>(
+            loc,
+            res.getType(), ValueRange({acc.value(), res}), acc.value(),
+            linalg::BinaryFnAttr::get(ctx, linalg::BinaryFn::add),
+            linalg::TypeFnAttr::get(ctx,linalg::TypeFn::cast_signed)
+            );
+          acc = add_op.getResultTensors()[0];
+        }
+      }
+      assert(acc.has_value());
+      einsum_results.push_back(acc.value());
+    }
+
+    auto results = ({
+      std::vector<Value> out;
+      out.insert(out.end(), fcall_op.getResults().begin(), fcall_op.getResults().end());
+      out.insert(out.end(), einsum_results.begin(), einsum_results.end());
+      /* out.insert(out.end(), func_operands.begin(), func_operands.end()); */
+      out;
+    });
+
+    rewriter.replaceOp(op, results);
+
+    llvm::errs() << "replaced VJP\n";
+}
+/*}}}*/
+
 
 struct JVPLoweringPass
     : public PassWrapper<JVPLoweringPass, OperationPass<ModuleOp>> {
@@ -222,28 +371,30 @@ struct JVPLoweringPass
 
     StringRef getArgument() const override { return "lower-jvp-vjp"; }
 
-    StringRef getDescription() const override { return "Lower JVP operations to grad operations."; }
+    StringRef getDescription() const override { return "Lower JVP/VJP operations down to grad operations."; }
 
     void getDependentDialects(DialectRegistry &registry) const override
     {
+        // FIXME: What about Linalg dialect?
         registry.insert<bufferization::BufferizationDialect>();
         registry.insert<memref::MemRefDialect>();
     }
 
     void runOnOperation() final
     {
-        llvm::errs() << "JVP lowering called\n";
+        llvm::errs() << "JVP_VJP lowering called\n";
 
         ModuleOp op = getOperation();
 
         RewritePatternSet patterns(&getContext());
         patterns.add<JVPLoweringPattern>(patterns.getContext(), 1);
+        patterns.add<VJPLoweringPattern>(patterns.getContext(), 1);
 
         if (failed(applyPatternsAndFoldGreedily(op, std::move(patterns)))) {
-            llvm::errs() << "JVP lowering failed\n";
+            llvm::errs() << "JVP_VJP lowering failed\n";
             return signalPassFailure();
         }
-        llvm::errs() << "JVP lowering succeeded\n";
+        llvm::errs() << "JVP_VJP lowering succeeded\n";
     }
 };
 

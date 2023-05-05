@@ -344,7 +344,20 @@ def jvp(f, params, tangents, *, method=None, h=None, argnum=None):
     grad_params = _check_grad_params(method, h, argnum)
     jaxpr = _make_jaxpr_differentiable(fn, grad_params, *params)
     results = jprim.jvp_p.bind(*(params + tangents), jaxpr=jaxpr, fn=fn, grad_params=grad_params)
-    return (results[0:len(params)], results[len(params):])
+    return [results[0:len(results)//2], results[len(results)//2:]]
+
+
+def vjp(f, params, cotangents, *, method=None, h=None, argnum=None):
+    """
+    Args:
+        f(DifferentiableLike): Function-like object to calculate VJP for
+    """
+    fn:Differentiable = _bless_differentiable(f)
+    grad_params = _check_grad_params(method, h, argnum)
+    jaxpr = _make_jaxpr_differentiable(fn, grad_params, *params)
+    # print(jaxpr)
+    results = jprim.vjp_p.bind(*(params + cotangents), jaxpr=jaxpr, fn=fn, grad_params=grad_params)
+    return [results[0:len(results)//2], results[len(results)//2:]]
 
 
 # pylint: disable=too-few-public-methods

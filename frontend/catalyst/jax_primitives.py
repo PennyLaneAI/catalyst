@@ -28,7 +28,9 @@ from jax.core import ShapedArray
 from jaxlib.mlir.dialects._func_ops_gen import CallOp
 from jaxlib.mlir.dialects._mhlo_ops_gen import ConstantOp, ConvertOp
 from mlir_quantum.dialects.arith import IndexCastOp
-from mlir_quantum.dialects.gradient import GradOp, JVPOp
+from mlir_quantum.dialects.tensor import ExtractOp as TensorExtractOp, FromElementsOp
+from mlir_quantum.dialects.scf import IfOp, ConditionOp, ForOp, WhileOp, YieldOp
+from mlir_quantum.dialects.gradient import GradOp, JVPOp, VJPOp
 from mlir_quantum.dialects.quantum import (
     AllocOp,
     ComputationalBasisOp,
@@ -55,11 +57,7 @@ from mlir_quantum.dialects.scf import ConditionOp, ForOp, IfOp, WhileOp, YieldOp
 from mlir_quantum.dialects.tensor import ExtractOp as TensorExtractOp
 from mlir_quantum.dialects.tensor import FromElementsOp
 
-<<<<<<< HEAD
 from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
-=======
-from catalyst.utils.calculate_shape import calculate_grad_shape, Signature
->>>>>>> 22eb0159 ([WIP] Draft jvp lowering pass; Fix jvp parameters passing)
 
 # pylint: disable=unused-argument,too-many-lines
 
@@ -198,6 +196,8 @@ func_p = jax.core.CallPrimitive("func")
 grad_p.multiple_results = True
 jvp_p = jax.core.Primitive("jvp")
 jvp_p.multiple_results = True
+vjp_p = jax.core.Primitive("vjp")
+vjp_p.multiple_results = True
 
 #
 # func
@@ -344,13 +344,6 @@ def _jvp_abstract(*args, jaxpr, fn, grad_params):
 
 def _jvp_lowering(ctx, *args, jaxpr, fn, grad_params):
     """
-    Args:
-        ctx
-        jaxpr
-        fn(catalyst.pennylane_extensions.Function): The Function to calculate JVP for.
-        params
-        tangents
-        grad_params(GradParams)
     Returns:
         MLIR results
     """
@@ -375,6 +368,44 @@ def _jvp_lowering(ctx, *args, jaxpr, fn, grad_params):
         finiteDiffParam=ir.FloatAttr.get(ir.F64Type.get(mlir_ctx), h) if h else None,
     ).results
 
+
+@vjp_p.def_impl
+def _vjp_def_impl(ctx, *args, jaxpr, fn, grad_params):  # pragma: no cover
+    raise NotImplementedError()
+
+
+@vjp_p.def_abstract_eval
+# pylint: disable=unused-argument
+def _vjp_abstract(*args, jaxpr, fn, grad_params):
+    """This function is called with abstract arguments for tracing."""
+    return jaxpr.out_avals + jaxpr.in_avals
+
+
+def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
+    """
+    Returns:
+        MLIR results
+    """
+    args = list(args)
+    method, h, argnum = grad_params.method, grad_params.h, grad_params.argnum
+    mlir_ctx = ctx.module_context.context
+    new_argnum = np.array([len(jaxpr.consts) + num for num in argnum])
+
+    _func_lowering(ctx, *(args[:len(args)//2]), call_jaxpr=jaxpr.eqns[0].params["call_jaxpr"], fn=fn, call=False)
+    symbol_name = mlir_fn_cache[fn]
+
+    output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
+    flat_output_types = util.flatten(output_types)
+    constants = [ConstantOp(ir.DenseElementsAttr.get(const)).results for const in jaxpr.consts]
+    consts_and_params_and_tangents = constants + args
+    return VJPOp(
+        flat_output_types,
+        ir.StringAttr.get(method),
+        ir.FlatSymbolRefAttr.get(symbol_name),
+        mlir.flatten_lowering_ir_args(consts_and_params_and_tangents),
+        diffArgIndices=ir.DenseIntElementsAttr.get(new_argnum),
+        finiteDiffParam=ir.FloatAttr.get(ir.F64Type.get(mlir_ctx), h) if h else None,
+    ).results
 
 #
 # qdevice
@@ -1393,3 +1424,4 @@ mlir.register_lowering(qfor_p, _qfor_lowering)
 mlir.register_lowering(grad_p, _grad_lowering)
 mlir.register_lowering(func_p, _func_lowering)
 mlir.register_lowering(jvp_p, _jvp_lowering)
+mlir.register_lowering(vjp_p, _vjp_lowering)

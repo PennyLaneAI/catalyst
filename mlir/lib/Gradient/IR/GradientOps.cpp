@@ -118,7 +118,7 @@ std::vector<size_t> GradOp::compDiffArgIndices(Optional<DenseIntElementsAttr> in
 }
 
 //===----------------------------------------------------------------------===//
-// JVPp, CallOpInterface
+// JVPOp, CallOpInterface
 //===----------------------------------------------------------------------===//
 
 CallInterfaceCallable JVPOp::getCallableForCallee() { return getCalleeAttr(); }
@@ -126,7 +126,7 @@ CallInterfaceCallable JVPOp::getCallableForCallee() { return getCalleeAttr(); }
 Operation::operand_range JVPOp::getArgOperands() { return getOperands(); }
 
 //===----------------------------------------------------------------------===//
-// JVPp, SymbolUserOpInterface
+// JVPOp, SymbolUserOpInterface
 //===----------------------------------------------------------------------===//
 
 LogicalResult JVPOp::verifySymbolUses(SymbolTableCollection &symbolTable)
@@ -145,3 +145,33 @@ LogicalResult JVPOp::verify()
         return emitOpError("got invalid differentiation method: ") << method;
     return success();
 }
+
+//===----------------------------------------------------------------------===//
+// VJPOp, CallOpInterface
+//===----------------------------------------------------------------------===//
+
+CallInterfaceCallable VJPOp::getCallableForCallee() { return getCalleeAttr(); }
+
+Operation::operand_range VJPOp::getArgOperands() { return getOperands(); }
+
+//===----------------------------------------------------------------------===//
+// VJPOp, SymbolUserOpInterface
+//===----------------------------------------------------------------------===//
+
+LogicalResult VJPOp::verifySymbolUses(SymbolTableCollection &symbolTable)
+{
+    return success();
+}
+
+//===----------------------------------------------------------------------===//
+// VJPOp Extra methods
+//===----------------------------------------------------------------------===//
+
+LogicalResult VJPOp::verify()
+{
+    StringRef method = this->getMethod();
+    if (method != "fd" && method != "ps" && method != "adj")
+        return emitOpError("got invalid differentiation method: ") << method;
+    return success();
+}
+
