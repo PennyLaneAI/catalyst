@@ -364,10 +364,10 @@ void VJPLoweringPattern::rewrite(VJPOp op, PatternRewriter &rewriter) const
 /*}}}*/
 
 
-struct JVPLoweringPass
-    : public PassWrapper<JVPLoweringPass, OperationPass<ModuleOp>> {
+struct VJPVJPLoweringPass
+    : public PassWrapper<VJPVJPLoweringPass, OperationPass<ModuleOp>> {
 
-    JVPLoweringPass() {}
+    VJPVJPLoweringPass() {}
 
     StringRef getArgument() const override { return "lower-jvp-vjp"; }
 
@@ -400,9 +400,9 @@ struct JVPLoweringPass
 
 } // namespace gradient
 
-std::unique_ptr<Pass> createJVPLoweringPass()
+std::unique_ptr<Pass> createJVPVJPLoweringPass()
 {
-    return std::make_unique<gradient::JVPLoweringPass>();
+    return std::make_unique<gradient::VJPVJPLoweringPass>();
 }
 
 } // namespace catalyst
