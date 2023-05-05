@@ -26,7 +26,7 @@ Currently unsupported:
 """
 
 
-# CHECK-LABEL: public @jit.function_complex
+# CHECK-LABEL: public @jit_function_complex
 # CHECK-SAME: tensor<complex<f64>>
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
@@ -41,7 +41,7 @@ def function_complex(x: complex, y: complex):
 print(function_complex.mlir)
 
 
-# CHECK-LABEL: public @jit.function_jaxnumpy_csingle
+# CHECK-LABEL: public @jit_function_jaxnumpy_csingle
 # CHECK-SAME: tensor<complex<f32>>
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
@@ -56,7 +56,7 @@ def function_jaxnumpy_csingle(x: jax.numpy.csingle, y: jax.numpy.csingle):
 print(function_jaxnumpy_csingle.mlir)
 
 
-# CHECK-LABEL: public @jit.function_jaxnumpy_cdouble
+# CHECK-LABEL: public @jit_function_jaxnumpy_cdouble
 # CHECK-SAME: tensor<complex<f64>>
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
@@ -71,7 +71,7 @@ def function_jaxnumpy_cdouble(x: jax.numpy.cdouble, y: jax.numpy.cdouble):
 print(function_jaxnumpy_cdouble.mlir)
 
 
-# CHECK-LABEL: public @jit.function_jaxnumpy_complex_
+# CHECK-LABEL: public @jit_function_jaxnumpy_complex_
 # CHECK-SAME: tensor<complex<f64>>
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
@@ -86,7 +86,7 @@ def function_jaxnumpy_complex_(x: jax.numpy.complex_, y: jax.numpy.complex_):
 print(function_jaxnumpy_complex_.mlir)
 
 
-# CHECK-LABEL: public @jit.function_jaxnumpy_complex64
+# CHECK-LABEL: public @jit_function_jaxnumpy_complex64
 # CHECK-SAME: tensor<complex<f32>>
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
@@ -101,7 +101,7 @@ def function_jaxnumpy_complex64(x: jax.numpy.complex64, y: jax.numpy.complex64):
 print(function_jaxnumpy_complex64.mlir)
 
 
-# CHECK-LABEL: public @jit.function_jaxnumpy_complex128
+# CHECK-LABEL: public @jit_function_jaxnumpy_complex128
 # CHECK-SAME: tensor<complex<f64>>
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
@@ -116,7 +116,7 @@ def function_jaxnumpy_complex128(x: jax.numpy.complex128, y: jax.numpy.complex12
 print(function_jaxnumpy_complex128.mlir)
 
 
-# CHECK-LABEL: public @jit.function_bool
+# CHECK-LABEL: public @jit_function_bool
 # CHECK-SAME: tensor<i1>
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
@@ -129,7 +129,7 @@ def function_bool(x: bool, y: bool):
 print(function_bool.mlir)
 
 
-# CHECK-LABEL: public @jit.function_int
+# CHECK-LABEL: public @jit_function_int
 # CHECK-SAME: tensor<i64>
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
@@ -142,7 +142,7 @@ def function_int(x: int, y: int):
 print(function_int.mlir)
 
 
-# CHECK-LABEL: public @jit.function_float
+# CHECK-LABEL: public @jit_function_float
 # CHECK-SAME: tensor<f64>
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
@@ -155,7 +155,7 @@ def function_float(x: float, y: float):
 print(function_float.mlir)
 
 
-# CHECK-LABEL: public @jit.function_jaxnumpy_float64
+# CHECK-LABEL: public @jit_function_jaxnumpy_float64
 # CHECK-SAME: tensor<f64>
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
@@ -168,7 +168,7 @@ def function_jaxnumpy_float64(x: jax.numpy.float64, y: jax.numpy.float64):
 print(function_jaxnumpy_float64.mlir)
 
 
-# CHECK-LABEL: public @jit.function_jaxnumpy_double
+# CHECK-LABEL: public @jit_function_jaxnumpy_double
 # CHECK-SAME: tensor<f64>
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
@@ -181,7 +181,7 @@ def function_jaxnumpy_double(x: jax.numpy.double, y: jax.numpy.double):
 print(function_jaxnumpy_double.mlir)
 
 
-# CHECK-LABEL: public @jit.function_jaxnumpy_int_
+# CHECK-LABEL: public @jit_function_jaxnumpy_int_
 # CHECK-SAME: tensor<i64>
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
@@ -194,7 +194,7 @@ def function_jaxnumpy_int_(x: jax.numpy.int_, y: jax.numpy.int_):
 print(function_jaxnumpy_int_.mlir)
 
 
-# CHECK-LABEL: public @jit.function_jaxnumpy_int64
+# CHECK-LABEL: public @jit_function_jaxnumpy_int64
 # CHECK-SAME: tensor<i64>
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
@@ -207,7 +207,7 @@ def function_jaxnumpy_int64(x: jax.numpy.int64, y: jax.numpy.int64):
 print(function_jaxnumpy_int64.mlir)
 
 
-# CHECK-LABEL: public @jit.function_scalar_tensor_bool
+# CHECK-LABEL: public @jit_function_scalar_tensor_bool
 # CHECK-SAME: tensor<i1>
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
@@ -220,7 +220,7 @@ def function_scalar_tensor_bool(x: ShapedArray([], bool), y: ShapedArray([], boo
 print(function_scalar_tensor_bool.mlir)
 
 
-# CHECK-LABEL: public @jit.function_scalar_tensor_int
+# CHECK-LABEL: public @jit_function_scalar_tensor_int
 # CHECK-SAME: tensor<i64>
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
@@ -233,7 +233,7 @@ def function_scalar_tensor_int(x: ShapedArray([], int), y: ShapedArray([], int))
 print(function_scalar_tensor_int.mlir)
 
 
-# CHECK-LABEL: public @jit.function_scalar_tensor_float
+# CHECK-LABEL: public @jit_function_scalar_tensor_float
 # CHECK-SAME: tensor<f64>
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
@@ -246,7 +246,7 @@ def function_scalar_tensor_float(x: ShapedArray([], float), y: ShapedArray([], f
 print(function_scalar_tensor_float.mlir)
 
 
-# CHECK-LABEL: public @jit.function_scalar_tensor_jaxnumpy_float64
+# CHECK-LABEL: public @jit_function_scalar_tensor_jaxnumpy_float64
 # CHECK-SAME: tensor<f64>
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
@@ -261,7 +261,7 @@ def function_scalar_tensor_jaxnumpy_float64(
 print(function_scalar_tensor_jaxnumpy_float64.mlir)
 
 
-# CHECK-LABEL: public @jit.function_scalar_tensor_jaxnumpy_double
+# CHECK-LABEL: public @jit_function_scalar_tensor_jaxnumpy_double
 # CHECK-SAME: tensor<f64>
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
@@ -276,7 +276,7 @@ def function_scalar_tensor_jaxnumpy_double(
 print(function_scalar_tensor_jaxnumpy_double.mlir)
 
 
-# CHECK-LABEL: public @jit.function_scalar_tensor_jaxnumpy_int_
+# CHECK-LABEL: public @jit_function_scalar_tensor_jaxnumpy_int_
 # CHECK-SAME: tensor<i64>
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
@@ -291,7 +291,7 @@ def function_scalar_tensor_jaxnumpy_int_(
 print(function_scalar_tensor_jaxnumpy_int_.mlir)
 
 
-# CHECK-LABEL: public @jit.function_scalar_tensor_jaxnumpy_int64
+# CHECK-LABEL: public @jit_function_scalar_tensor_jaxnumpy_int64
 # CHECK-SAME: tensor<i64>
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
@@ -306,7 +306,7 @@ def function_scalar_tensor_jaxnumpy_int64(
 print(function_scalar_tensor_jaxnumpy_int64.mlir)
 
 
-# CHECK-LABEL: public @jit.function_tensor_bool
+# CHECK-LABEL: public @jit_function_tensor_bool
 # CHECK-SAME: tensor<1xi1>
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
@@ -319,7 +319,7 @@ def function_tensor_bool(x: ShapedArray([1], bool), y: ShapedArray([1], bool)):
 print(function_tensor_bool.mlir)
 
 
-# CHECK-LABEL: public @jit.function_tensor_int
+# CHECK-LABEL: public @jit_function_tensor_int
 # CHECK-SAME: tensor<1xi64>
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
@@ -332,7 +332,7 @@ def function_tensor_int(x: ShapedArray([1], int), y: ShapedArray([1], int)):
 print(function_tensor_int.mlir)
 
 
-# CHECK-LABEL: public @jit.function_tensor_float
+# CHECK-LABEL: public @jit_function_tensor_float
 # CHECK-SAME: tensor<1xf64>
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
@@ -345,7 +345,7 @@ def function_tensor_float(x: ShapedArray([1], float), y: ShapedArray([1], float)
 print(function_tensor_float.mlir)
 
 
-# CHECK-LABEL: public @jit.function_tensor_jaxnumpy_float64
+# CHECK-LABEL: public @jit_function_tensor_jaxnumpy_float64
 # CHECK-SAME: tensor<1xf64>
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
@@ -360,7 +360,7 @@ def function_tensor_jaxnumpy_float64(
 print(function_tensor_jaxnumpy_float64.mlir)
 
 
-# CHECK-LABEL: public @jit.function_tensor_jaxnumpy_double
+# CHECK-LABEL: public @jit_function_tensor_jaxnumpy_double
 # CHECK-SAME: tensor<1xf64>
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
@@ -375,7 +375,7 @@ def function_tensor_jaxnumpy_double(
 print(function_tensor_jaxnumpy_double.mlir)
 
 
-# CHECK-LABEL: public @jit.function_tensor_jaxnumpy_int_
+# CHECK-LABEL: public @jit_function_tensor_jaxnumpy_int_
 # CHECK-SAME: tensor<1xi64>
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
@@ -390,7 +390,7 @@ def function_tensor_jaxnumpy_int_(
 print(function_tensor_jaxnumpy_int_.mlir)
 
 
-# CHECK-LABEL: public @jit.function_tensor_jaxnumpy_int64
+# CHECK-LABEL: public @jit_function_tensor_jaxnumpy_int64
 # CHECK-SAME: tensor<1xi64>
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
