@@ -16,35 +16,30 @@
 
 #include <Exception.hpp>
 
-// MemRef type definition
-template <typename T, size_t R> struct MemRefT {
-    T *data_allocated;
-    T *data_aligned;
-    size_t offset;
-    size_t sizes[R];
-    size_t strides[R];
-};
-
 /**
- * A multi-dimensional view for MemRef<T, R> types.
+ * A multi-dimensional view for MemRef-like and std::vector<T> types.
  *
  * @tparam T The underlying data type
  * @tparam R The Rank (R >= 0)
  *
  * @note A forward iterator is implemented in this view for traversing over the entire
  * elements of MemRef types rank-by-rank starting from the last dimension (R-1). For example,
- * The MemRefView iterator for MemRef<T, 2> starts from index (0, 0) and traverses elements
+ * The DataView iterator for MemRef<T, 2> starts from index (0, 0) and traverses elements
  * in the following order:
  * (0, 0), ..., (0, sizes[1]-1), (1, 0), ..., (1, sizes[1]-1), ... (sizes[0]-1, sizes[1]-1).
  */
-template <typename T, size_t R> class MemRefView {
+template <typename T, size_t R> class DataView {
   private:
-    const MemRefT<T, R> *buffer;
+    T *data_aligned;
+    size_t offset;
+    size_t sizes[R] = {0};
+    size_t strides[R] = {0};
 
   public:
-    class MemRefIter {
+    class iterator {
       private:
-        const MemRefT<T, R> *buffer;
+        const DataView<T, R> &view;
+
         int64_t loc; // physical index
         size_t indices[R] = {0};
 
@@ -55,65 +50,79 @@ template <typename T, size_t R> class MemRefView {
         using pointer = T *;                                 // LCOV_EXCL_LINE
         using reference = T &;                               // LCOV_EXCL_LINE
 
-        MemRefIter(const MemRefT<T, R> *_buffer, int64_t begin_idx)
-            : buffer(_buffer), loc(begin_idx)
-        {
-        }
-        pointer operator->() const { return &buffer->data_aligned[loc]; }
-        reference operator*() const { return buffer->data_aligned[loc]; }
-        MemRefIter &operator++()
+        iterator(const DataView<T, R> &_view, int64_t begin_idx) : view(_view), loc(begin_idx) {}
+        pointer operator->() const { return &view.data_aligned[loc]; }
+        reference operator*() const { return view.data_aligned[loc]; }
+        iterator &operator++()
         {
             int64_t next_axis = -1;
             int64_t idx;
             for (int64_t i = R; i > 0; --i) {
                 idx = i - 1;
-                if (indices[idx]++ < buffer->sizes[idx] - 1) {
+                if (indices[idx]++ < view.sizes[idx] - 1) {
                     next_axis = idx;
                     break;
                 }
                 indices[idx] = 0;
-                loc -= (buffer->sizes[idx] - 1) * buffer->strides[idx];
+                loc -= (view.sizes[idx] - 1) * view.strides[idx];
             }
 
-            loc = next_axis == -1 ? -1 : loc + buffer->strides[next_axis];
+            loc = next_axis == -1 ? -1 : loc + view.strides[next_axis];
             return *this;
         }
-        MemRefIter operator++(int)
+        iterator operator++(int)
         {
             auto tmp = *this;
             int64_t next_axis = -1;
             int64_t idx;
             for (int64_t i = R; i > 0; --i) {
                 idx = i - 1;
-                if (indices[idx]++ < buffer->sizes[idx] - 1) {
+                if (indices[idx]++ < view.sizes[idx] - 1) {
                     next_axis = idx;
                     break;
                 }
                 indices[idx] = 0;
-                loc -= (buffer->sizes[idx] - 1) * buffer->strides[idx];
+                loc -= (view.sizes[idx] - 1) * view.strides[idx];
             }
 
-            loc = next_axis == -1 ? -1 : loc + buffer->strides[next_axis];
+            loc = next_axis == -1 ? -1 : loc + view.strides[next_axis];
             return tmp;
         }
-        bool operator==(const MemRefIter &other) const
+        bool operator==(const iterator &other) const
         {
-            return (loc == other.loc && buffer == other.buffer);
+            return (loc == other.loc && view.data_aligned == other.view.data_aligned);
         }
-        bool operator!=(const MemRefIter &other) const { return !(*this == other); }
+        bool operator!=(const iterator &other) const { return !(*this == other); }
     };
 
-    explicit MemRefView(const MemRefT<T, R> *_buffer) : buffer(_buffer) {}
+    explicit DataView(std::vector<T> &buffer) : data_aligned(buffer.data()), offset(0)
+    {
+        static_assert(R == 1, "[Class: DataView] Error in Catalyst Runtime: Invalid rank for "
+                              "constructing DataView<T, 1> from std::vector<T>");
+        sizes[0] = buffer.size();
+        strides[0] = 1;
+    }
+
+    explicit DataView(T *_data_aligned, size_t _offset, size_t *_sizes, size_t *_strides)
+        : data_aligned(_data_aligned), offset(_offset)
+    {
+        if (_sizes && _strides) {
+            for (size_t i = 0; i < R; i++) {
+                sizes[i] = _sizes[i];
+                strides[i] = _strides[i];
+            }
+        } // else sizes = {0}, strides = {0}
+    }
 
     [[nodiscard]] auto size() const -> size_t
     {
-        if (!buffer) {
+        if (!data_aligned) {
             return 0;
         }
 
         size_t tsize = 1;
         for (size_t i = 0; i < R; i++) {
-            tsize *= buffer->sizes[i];
+            tsize *= sizes[i];
         }
         return tsize;
     }
@@ -121,18 +130,18 @@ template <typename T, size_t R> class MemRefView {
     template <typename... I> T &operator()(I... idxs) const
     {
         static_assert(sizeof...(idxs) == R,
-                      "[Class: MemRefView] Error in Catalyst Runtime: Wrong number of indices");
+                      "[Class: DataView] Error in Catalyst Runtime: Wrong number of indices");
         size_t indices[] = {static_cast<size_t>(idxs)...};
 
-        size_t loc = buffer->offset;
+        size_t loc = offset;
         for (size_t axis = 0; axis < R; axis++) {
-            RT_ASSERT(indices[axis] < buffer->sizes[axis]);
-            loc += indices[axis] * buffer->strides[axis];
+            RT_ASSERT(indices[axis] < sizes[axis]);
+            loc += indices[axis] * strides[axis];
         }
-        return buffer->data_aligned[loc];
+        return data_aligned[loc];
     }
 
-    MemRefIter begin() { return MemRefIter{buffer, static_cast<int64_t>(buffer->offset)}; }
+    iterator begin() { return iterator{*this, static_cast<int64_t>(offset)}; }
 
-    MemRefIter end() { return MemRefIter{buffer, -1}; }
+    iterator end() { return iterator{*this, -1}; }
 };

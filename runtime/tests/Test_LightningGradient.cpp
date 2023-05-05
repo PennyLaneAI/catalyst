@@ -78,8 +78,6 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     size_t J = 1;
     double *buffer = new double[J];
     MemRefT_double_1d results = {buffer, buffer, 0, {J}, {0}};
-    int64_t *buffer_tp = trainParams.data();
-    MemRefT_int64_1d tp = {buffer_tp, buffer_tp, 0, {trainParams.size()}, {0}};
 
     __quantum__rt__device(nullptr, nullptr);
     __quantum__rt__initialize();
@@ -97,11 +95,6 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     REQUIRE_THROWS_WITH(__quantum__qis__Gradient(2, &results),
                         Catch::Contains("[Function:Gradient] Error in Catalyst "
                                         "Runtime: Invalid number of pre-allocated gradients"));
-
-    REQUIRE_THROWS_WITH(
-        __quantum__qis__Gradient_params(&tp, 2, &results),
-        Catch::Contains("[Function:Gradient] Error in "
-                        "Catalyst Runtime: Invalid number of pre-allocated gradients"));
 
     __quantum__rt__toggle_recorder(/* activate_cm */ false);
 

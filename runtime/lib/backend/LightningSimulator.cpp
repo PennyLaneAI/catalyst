@@ -211,7 +211,7 @@ auto LightningSimulator::Var(ObsIdType obsKey) -> double
     return result;
 }
 
-void LightningSimulator::State(MemRefView<std::complex<double>, 1> &state)
+void LightningSimulator::State(DataView<std::complex<double>, 1> &state)
 {
     auto &&dv_state = this->device_sv->getDataVector();
     RT_FAIL_IF(state.size() != dv_state.size(), "Invalid size for the pre-allocated state vector");
@@ -219,7 +219,7 @@ void LightningSimulator::State(MemRefView<std::complex<double>, 1> &state)
     std::move(dv_state.begin(), dv_state.end(), state.begin());
 }
 
-void LightningSimulator::Probs(MemRefView<double, 1> &probs)
+void LightningSimulator::Probs(DataView<double, 1> &probs)
 {
     Pennylane::Simulators::Measures m{*(this->device_sv)};
     auto &&dv_probs = m.probs();
@@ -229,7 +229,7 @@ void LightningSimulator::Probs(MemRefView<double, 1> &probs)
     std::move(dv_probs.begin(), dv_probs.end(), probs.begin());
 }
 
-void LightningSimulator::PartialProbs(MemRefView<double, 1> &probs,
+void LightningSimulator::PartialProbs(DataView<double, 1> &probs,
                                       const std::vector<QubitIdType> &wires)
 {
     const size_t numWires = wires.size();
@@ -248,7 +248,7 @@ void LightningSimulator::PartialProbs(MemRefView<double, 1> &probs,
     std::move(dv_probs.begin(), dv_probs.end(), probs.begin());
 }
 
-void LightningSimulator::Sample(MemRefView<double, 2> &samples, size_t shots)
+void LightningSimulator::Sample(DataView<double, 2> &samples, size_t shots)
 {
     // generate_samples is a member function of the Measures class.
     Pennylane::Simulators::Measures m{*(this->device_sv)};
@@ -276,7 +276,7 @@ void LightningSimulator::Sample(MemRefView<double, 2> &samples, size_t shots)
     }
 }
 
-void LightningSimulator::PartialSample(MemRefView<double, 2> &samples,
+void LightningSimulator::PartialSample(DataView<double, 2> &samples,
                                        const std::vector<QubitIdType> &wires, size_t shots)
 {
     const size_t numWires = wires.size();
@@ -312,7 +312,7 @@ void LightningSimulator::PartialSample(MemRefView<double, 2> &samples,
     }
 }
 
-void LightningSimulator::Counts(MemRefView<double, 1> &eigvals, MemRefView<int64_t, 1> &counts,
+void LightningSimulator::Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts,
                                 size_t shots)
 {
     const size_t numQubits = this->GetNumQubits();
@@ -352,8 +352,7 @@ void LightningSimulator::Counts(MemRefView<double, 1> &eigvals, MemRefView<int64
     }
 }
 
-void LightningSimulator::PartialCounts(MemRefView<double, 1> &eigvals,
-                                       MemRefView<int64_t, 1> &counts,
+void LightningSimulator::PartialCounts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts,
                                        const std::vector<QubitIdType> &wires, size_t shots)
 {
     const size_t numWires = wires.size();
@@ -405,12 +404,8 @@ auto LightningSimulator::Measure(QubitIdType wire) -> Result
     std::vector<QubitIdType> wires = {reinterpret_cast<QubitIdType>(wire)};
 
     std::vector<double> probs(1U << wires.size());
-
-    {
-        MemRefT<double, 1> buffer{probs.data(), probs.data(), 0, {probs.size()}, {1}};
-        MemRefView<double, 1> buffer_view(&buffer);
-        this->PartialProbs(buffer_view, wires);
-    }
+    DataView<double, 1> buffer_view(probs);
+    this->PartialProbs(buffer_view, wires);
 
     std::random_device rd;
     std::mt19937 gen(rd());
@@ -455,7 +450,7 @@ auto LightningSimulator::Measure(QubitIdType wire) -> Result
 }
 
 // Gradient
-void LightningSimulator::Gradient(std::vector<MemRefView<double, 1>> &gradients,
+void LightningSimulator::Gradient(std::vector<DataView<double, 1>> &gradients,
                                   const std::vector<size_t> &trainParams)
 {
     const bool tp_empty = trainParams.empty();

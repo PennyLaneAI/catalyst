@@ -18,7 +18,7 @@
 #include <memory>
 #include <vector>
 
-#include "MemRefView.hpp"
+#include "DataView.hpp"
 #include "Types.h"
 
 namespace Catalyst::Runtime {
@@ -198,71 +198,71 @@ struct QuantumDevice {
     /**
      * @brief Get the state-vector of a device.
      *
-     * @param state The pre-allocated `MemRefView<complex<double>, 1>`
+     * @param state The pre-allocated `DataView<complex<double>, 1>`
      */
-    virtual void State(MemRefView<std::complex<double>, 1> &state) = 0;
+    virtual void State(DataView<std::complex<double>, 1> &state) = 0;
 
     /**
      * @brief Compute the probabilities of each computational basis state.
 
-     * @param probs The pre-allocated `MemRefView<double, 1>`
+     * @param probs The pre-allocated `DataView<double, 1>`
      */
-    virtual void Probs(MemRefView<double, 1> &probs) = 0;
+    virtual void Probs(DataView<double, 1> &probs) = 0;
 
     /**
      * @brief Compute the probabilities for a subset of the full system.
      *
-     * @param probs The pre-allocated `MemRefView<double, 1>`
+     * @param probs The pre-allocated `DataView<double, 1>`
      * @param wires Wires will restrict probabilities to a subset of the full system
      */
-    virtual void PartialProbs(MemRefView<double, 1> &probs,
+    virtual void PartialProbs(DataView<double, 1> &probs,
                               const std::vector<QubitIdType> &wires) = 0;
 
     /**
      * @brief Compute samples with the number of shots on the entire wires,
      * returing raw samples.
      *
-     * @param samples The pre-allocated `MemRefView<double, 2>`representing a matrix of
-     * shape `shots * numQubits`. The built-in iterator in `MemRefView<double, 2>`
+     * @param samples The pre-allocated `DataView<double, 2>`representing a matrix of
+     * shape `shots * numQubits`. The built-in iterator in `DataView<double, 2>`
      * iterates over all elements of `samples` row-wise.
      * @param shots The number of shots
      */
-    virtual void Sample(MemRefView<double, 2> &samples, size_t shots) = 0;
+    virtual void Sample(DataView<double, 2> &samples, size_t shots) = 0;
 
     /**
      * @brief Compute partial samples with the number of shots on `wires`,
      * returing raw samples.
      *
-     * @param samples The pre-allocated `MemRefView<double, 2>`representing a matrix of
-     * shape `shots * numWires`. The built-in iterator in `MemRefView<double, 2>`
+     * @param samples The pre-allocated `DataView<double, 2>`representing a matrix of
+     * shape `shots * numWires`. The built-in iterator in `DataView<double, 2>`
      * iterates over all elements of `samples` row-wise.
      * @param wires Wires to compute samples on
      * @param shots The number of shots
      */
-    virtual void PartialSample(MemRefView<double, 2> &samples,
-                               const std::vector<QubitIdType> &wires, size_t shots) = 0;
+    virtual void PartialSample(DataView<double, 2> &samples, const std::vector<QubitIdType> &wires,
+                               size_t shots) = 0;
 
     /**
      * @brief Sample with the number of shots on the entire wires, returning the
      * number of counts for each sample.
      *
-     * @param eigvals The pre-allocated `MemRefView<double, 1>`
-     * @param counts The pre-allocated `MemRefView<int64_t, 1>`
+     * @param eigvals The pre-allocated `DataView<double, 1>`
+     * @param counts The pre-allocated `DataView<int64_t, 1>`
      * @param shots The number of shots
      */
-    virtual void Counts(MemRefView<double, 1> &eigvals, MemRefView<int64_t, 1> &counts,
+    virtual void Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts,
                         size_t shots) = 0;
 
     /**
      * @brief Partial sample with the number of shots on `wires`, returning the
      * number of counts for each sample.
      *
-     * @param eigvals The pre-allocated `MemRefView<double, 1>`
-     * @param counts The pre-allocated `MemRefView<int64_t, 1>`
+     * @param eigvals The pre-allocated `DataView<double, 1>`
+     * @param counts The pre-allocated `DataView<int64_t, 1>`
      * @param wires Wires to compute samples on
      * @param shots The number of shots
      */
-    virtual void PartialCounts(MemRefView<double, 1> &eigvals, MemRefView<int64_t, 1> &counts,
+    virtual void PartialCounts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts,
                                const std::vector<QubitIdType> &wires, size_t shots) = 0;
 
     /**
@@ -279,13 +279,13 @@ struct QuantumDevice {
      * `Catalyst::Runtime::Simulator::CacheManager`, for a specific set of trainable
      * parameters.
      *
-     * @param gradients The vector of pre-allocated `MemRefView<double, 1>*`
+     * @param gradients The vector of pre-allocated `DataView<double, 1>*`
      * to store gradients resutls for the list of cached observables.
      * @param trainParams The vector of trainable parameters; if none, all parameters
      * would be assumed trainable
      *
      */
-    virtual void Gradient(std::vector<MemRefView<double, 1>> &gradients,
+    virtual void Gradient(std::vector<DataView<double, 1>> &gradients,
                           const std::vector<size_t> &trainParams) = 0;
 };
 

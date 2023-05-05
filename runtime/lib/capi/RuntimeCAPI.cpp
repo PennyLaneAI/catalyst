@@ -211,10 +211,10 @@ void __quantum__qis__Gradient(int64_t numResults, /* results = */...)
     }
     va_end(args);
 
-    std::vector<MemRefView<double, 1>> mem_views;
+    std::vector<DataView<double, 1>> mem_views;
     mem_views.reserve(numResults);
     for (auto *mr : mem_ptrs) {
-        mem_views.emplace_back(mr);
+        mem_views.emplace_back(mr->data_aligned, mr->offset, mr->sizes, mr->strides);
     }
 
     // num_observables * num_train_params
@@ -253,10 +253,10 @@ void __quantum__qis__Gradient_params([[maybe_unused]] MemRefT_int64_1d *params,
     }
     va_end(args);
 
-    std::vector<MemRefView<double, 1>> mem_views;
+    std::vector<DataView<double, 1>> mem_views;
     mem_views.reserve(numResults);
     for (auto *mr : mem_ptrs) {
-        mem_views.emplace_back(mr);
+        mem_views.emplace_back(mr->data_aligned, mr->offset, mr->sizes, mr->strides);
     }
 
     // num_observables * num_train_params
@@ -664,7 +664,8 @@ void __quantum__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, .
     }
     va_end(args);
 
-    MemRefView<std::complex<double>, 1> view(result_p);
+    DataView<std::complex<double>, 1> view(result_p->data_aligned, result_p->offset,
+                                           result_p->sizes, result_p->strides);
 
     if (wires.empty()) {
         Catalyst::Runtime::CAPI::DRIVER->get_device()->State(view);
@@ -689,7 +690,8 @@ void __quantum__qis__Probs(MemRefT_double_1d *result, int64_t numQubits, ...)
     }
     va_end(args);
 
-    MemRefView<double, 1> view(result_p);
+    DataView<double, 1> view(result_p->data_aligned, result_p->offset, result_p->sizes,
+                             result_p->strides);
 
     if (wires.empty()) {
         Catalyst::Runtime::CAPI::DRIVER->get_device()->Probs(view);
@@ -713,7 +715,8 @@ void __quantum__qis__Sample(MemRefT_double_2d *result, int64_t shots, int64_t nu
     }
     va_end(args);
 
-    MemRefView<double, 2> view(result_p);
+    DataView<double, 2> view(result_p->data_aligned, result_p->offset, result_p->sizes,
+                             result_p->strides);
 
     if (wires.empty()) {
         Catalyst::Runtime::CAPI::DRIVER->get_device()->Sample(view, shots);
@@ -739,8 +742,10 @@ void __quantum__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t shots
     }
     va_end(args);
 
-    MemRefView<double, 1> eigvals_view(result_eigvals_p);
-    MemRefView<int64_t, 1> counts_view(result_counts_p);
+    DataView<double, 1> eigvals_view(result_eigvals_p->data_aligned, result_eigvals_p->offset,
+                                     result_eigvals_p->sizes, result_eigvals_p->strides);
+    DataView<int64_t, 1> counts_view(result_counts_p->data_aligned, result_counts_p->offset,
+                                     result_counts_p->sizes, result_counts_p->strides);
 
     if (wires.empty()) {
         Catalyst::Runtime::CAPI::DRIVER->get_device()->Counts(eigvals_view, counts_view, shots);

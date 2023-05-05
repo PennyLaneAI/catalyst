@@ -49,8 +49,7 @@ TEST_CASE("lightning Basis vector", "[lightning]")
     sim->ReleaseQubit(q);
 
     std::vector<std::complex<double>> state(1U << sim->GetNumQubits());
-    MemRefT<std::complex<double>, 1> buffer{state.data(), state.data(), 0, {state.size()}, {1}};
-    MemRefView<std::complex<double>, 1> view(&buffer);
+    DataView<std::complex<double>, 1> view(state);
     sim->State(view);
 
     CHECK(view(0).real() == Approx(1.0).epsilon(1e-5));
@@ -78,8 +77,7 @@ TEST_CASE("Qubit allocatation and deallocation", "[lightning]")
     CHECK(n == static_cast<size_t>(q) + 1);
 
     std::vector<std::complex<double>> state(1U << sim->GetNumQubits());
-    MemRefT<std::complex<double>, 1> buffer{state.data(), state.data(), 0, {state.size()}, {1}};
-    MemRefView<std::complex<double>, 1> view(&buffer);
+    DataView<std::complex<double>, 1> view(state);
     sim->State(view);
 
     CHECK(state.size() == (1UL << n));
@@ -101,7 +99,7 @@ TEST_CASE("Qubit allocatation and deallocation", "[lightning]")
         sim->ReleaseQubit(i - 1);
         sim->AllocateQubit();
 
-        MemRefView<std::complex<double>, 1> view(&buffer);
+        DataView<std::complex<double>, 1> view(state);
         sim->State(view);
     }
 #else
@@ -122,8 +120,7 @@ TEST_CASE("test AllocateQubits", "[lightning]")
     sim->ReleaseQubit(q[0]);
 
     std::vector<std::complex<double>> state(1U << sim->GetNumQubits());
-    MemRefT<std::complex<double>, 1> buffer{state.data(), state.data(), 0, {state.size()}, {1}};
-    MemRefView<std::complex<double>, 1> view(&buffer);
+    DataView<std::complex<double>, 1> view(state);
     sim->State(view);
 
     CHECK(state[0].real() == Approx(1.0).epsilon(1e-5));
@@ -193,18 +190,16 @@ TEST_CASE("QuantumDevice object test", "[lightning]")
     sim->NamedOperation("Identity", {}, {Qs[6]}, false);
     sim->NamedOperation("Identity", {}, {Qs[8]}, false);
 
-    std::vector<std::complex<double>> out_state(1U << sim->GetNumQubits());
-    MemRefT<std::complex<double>, 1> buffer{
-        out_state.data(), out_state.data(), 0, {out_state.size()}, {1}};
-    MemRefView<std::complex<double>, 1> view(&buffer);
+    std::vector<std::complex<double>> state(1U << sim->GetNumQubits());
+    DataView<std::complex<double>, 1> view(state);
     sim->State(view);
 
-    CHECK(out_state[0].real() == Approx(1.0).epsilon(1e-5));
-    CHECK(out_state[0].imag() == Approx(0.0).epsilon(1e-5));
+    CHECK(state[0].real() == Approx(1.0).epsilon(1e-5));
+    CHECK(state[0].imag() == Approx(0.0).epsilon(1e-5));
 
     std::complex<double> sum{0, 0};
-    for (size_t i = 1; i < out_state.size(); i++) {
-        sum += out_state[i];
+    for (size_t i = 1; i < state.size(); i++) {
+        sum += state[i];
     }
 
     CHECK(sum.real() == Approx(0.0).epsilon(1e-5));

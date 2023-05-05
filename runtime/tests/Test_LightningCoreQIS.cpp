@@ -255,9 +255,13 @@ TEST_CASE("Test __quantum__qis__ PauliY and Rot", "[qir_lightning_core]")
     __quantum__rt__finalize();
 }
 
-TEST_CASE("Test rank=0 and empty MemRefView", "[qir_lightning_core]")
+TEST_CASE("Test rank=0 and empty DataView", "[qir_lightning_core]")
 {
-    MemRefView<double, 1> zero_rank(nullptr);
+    std::vector<double> empty_vec;
+    DataView<double, 1> zero_size(empty_vec);
+    CHECK(zero_size.size() == 0);
+
+    DataView<double, 1> zero_rank(nullptr, 0, nullptr, nullptr);
     CHECK(zero_rank.size() == 0);
 }
 
@@ -267,7 +271,7 @@ TEST_CASE("Test copy to strided array", "[qir_lightning_core]")
     size_t buffer_len = data.size();
     double *buffer = data.data();
     MemRefT<double, 2> src = {buffer, buffer, 0, {buffer_len / 2, 2}, {2, 1}};
-    MemRefView<double, 2> src_view(&src);
+    DataView<double, 2> src_view(src.data_aligned, src.offset, src.sizes, src.strides);
     CHECK(src_view(0, 0) == buffer[0]);
     CHECK(src_view(0, 1) == buffer[1]);
     CHECK(src_view(1, 0) == buffer[2]);
@@ -281,7 +285,7 @@ TEST_CASE("Test copy to strided array", "[qir_lightning_core]")
     double *buffer_strided = new double[buffer_strided_len];
     MemRefT<double, 2> dst = {
         buffer_strided, buffer_strided, 0, {buffer_strided_len / 4, 2}, {4, 2}};
-    MemRefView<double, 2> dst_view(&dst);
+    DataView<double, 2> dst_view(dst.data_aligned, dst.offset, dst.sizes, dst.strides);
     for (auto iterD = dst_view.begin(), iterS = src_view.begin(); iterD != dst_view.end();
          iterS++, iterD++) {
         *iterD = *iterS;
@@ -307,10 +311,10 @@ TEST_CASE("Test copy to strided array", "[qir_lightning_core]")
 
     REQUIRE_THROWS_WITH(dst_view(4, 1),
                         Catch::Contains("[Function:operator()] Error in Catalyst Runtime: "
-                                        "Assertion: indices[axis] < buffer->sizes[axis]"));
+                                        "Assertion: indices[axis] < sizes[axis]"));
     REQUIRE_THROWS_WITH(dst_view(3, 2),
                         Catch::Contains("[Function:operator()] Error in Catalyst Runtime: "
-                                        "Assertion: indices[axis] < buffer->sizes[axis]"));
+                                        "Assertion: indices[axis] < sizes[axis]"));
 
     delete[] buffer_strided;
 }

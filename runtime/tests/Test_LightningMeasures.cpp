@@ -19,6 +19,7 @@
 
 #include "CacheManager.hpp"
 #include "LightningUtils.hpp"
+#include "MemRefUtils.hpp"
 #include "QuantumDevice.hpp"
 
 #include <catch2/catch.hpp>
@@ -77,8 +78,7 @@ TEST_CASE("Measurement collapse test with 2 wires", "[lightning]")
     sim->NamedOperation("Hadamard", {}, {Qs[0]}, false);
     auto m = sim->Measure(Qs[0]);
     std::vector<std::complex<double>> state(1U << sim->GetNumQubits());
-    MemRefT<std::complex<double>, 1> buffer{state.data(), state.data(), 0, {state.size()}, {1}};
-    MemRefView<std::complex<double>, 1> view(&buffer);
+    DataView<std::complex<double>, 1> view(state);
     sim->State(view);
 
     // LCOV_EXCL_START
@@ -110,8 +110,7 @@ TEST_CASE("Measurement collapse concrete logical qubit difference", "[lightning]
     sim->NamedOperation("Hadamard", {}, {Qs[0]}, false);
     sim->Measure(Qs[0]);
     std::vector<std::complex<double>> state(1U << sim->GetNumQubits());
-    MemRefT<std::complex<double>, 1> buffer{state.data(), state.data(), 0, {state.size()}, {1}};
-    MemRefView<std::complex<double>, 1> view(&buffer);
+    DataView<std::complex<double>, 1> view(state);
     sim->State(view);
 
     // LCOV_EXCL_START
@@ -751,8 +750,7 @@ TEST_CASE("State test with incorrect size", "[lightning]")
     std::vector<QubitIdType> Qs = sim->AllocateQubits(n);
 
     std::vector<std::complex<double>> state(1U << (n - 1));
-    MemRefT<std::complex<double>, 1> buffer{state.data(), state.data(), 0, {state.size()}, {1}};
-    MemRefView<std::complex<double>, 1> view(&buffer);
+    DataView<std::complex<double>, 1> view(state);
     REQUIRE_THROWS_WITH(sim->State(view),
                         Catch::Contains("Invalid size for the pre-allocated state vector"));
 }
@@ -771,8 +769,7 @@ TEST_CASE("State test with numWires=4", "[lightning]")
     sim->NamedOperation("PauliZ", {}, {Qs[3]}, false);
 
     std::vector<std::complex<double>> state(1U << sim->GetNumQubits());
-    MemRefT<std::complex<double>, 1> buffer{state.data(), state.data(), 0, {state.size()}, {1}};
-    MemRefView<std::complex<double>, 1> view(&buffer);
+    DataView<std::complex<double>, 1> view(state);
     sim->State(view);
 
     for (size_t i = 0; i < 16; i++) {
@@ -800,8 +797,7 @@ TEST_CASE("PartialProbs test with incorrect numWires and numAlloc", "[lightning]
     }
 
     std::vector<double> probs_vec(1);
-    MemRefT<double, 1> probs{probs_vec.data(), probs_vec.data(), 0, {probs_vec.size()}, {1}};
-    MemRefView<double, 1> probs_view(&probs);
+    DataView<double, 1> probs_view(probs_vec);
 
     REQUIRE_THROWS_WITH(sim->PartialProbs(probs_view, {Qs[0], Qs[1], Qs[2], Qs[3], Qs[0]}),
                         Catch::Contains("Invalid number of wires"));
@@ -837,28 +833,23 @@ TEST_CASE("Probs and PartialProbs tests with numWires=0-4", "[lightning]")
     sim->NamedOperation("PauliZ", {}, {Qs[3]}, false);
 
     std::vector<double> probs0(1);
-    MemRefT<double, 1> buffer0{probs0.data(), probs0.data(), 0, {probs0.size()}, {1}};
-    MemRefView<double, 1> view0(&buffer0);
+    DataView<double, 1> view0(probs0);
     sim->PartialProbs(view0, std::vector<QubitIdType>{});
 
     std::vector<double> probs1(2);
-    MemRefT<double, 1> buffer1{probs1.data(), probs1.data(), 0, {probs1.size()}, {1}};
-    MemRefView<double, 1> view1(&buffer1);
+    DataView<double, 1> view1(probs1);
     sim->PartialProbs(view1, std::vector<QubitIdType>{Qs[2]});
 
     std::vector<double> probs2(4);
-    MemRefT<double, 1> buffer2{probs2.data(), probs2.data(), 0, {probs2.size()}, {1}};
-    MemRefView<double, 1> view2(&buffer2);
+    DataView<double, 1> view2(probs2);
     sim->PartialProbs(view2, std::vector<QubitIdType>{Qs[0], Qs[3]});
 
     std::vector<double> probs3(16);
-    MemRefT<double, 1> buffer3{probs3.data(), probs3.data(), 0, {probs3.size()}, {1}};
-    MemRefView<double, 1> view3(&buffer3);
+    DataView<double, 1> view3(probs3);
     sim->PartialProbs(view3, Qs);
 
     std::vector<double> probs4(16);
-    MemRefT<double, 1> buffer4{probs4.data(), probs4.data(), 0, {probs4.size()}, {1}};
-    MemRefView<double, 1> view4(&buffer4);
+    DataView<double, 1> view4(probs4);
     sim->Probs(view4);
 
     CHECK(probs0.size() == 1);
@@ -900,7 +891,7 @@ TEST_CASE("PartialSample test with incorrect numWires and numAlloc", "[lightning
     std::vector<double> samples_vec(1);
     MemRefT<double, 2> samples{
         samples_vec.data(), samples_vec.data(), 0, {samples_vec.size(), 1}, {1, 1}};
-    MemRefView<double, 2> view(&samples);
+    DataView<double, 2> view(samples.data_aligned, samples.offset, samples.sizes, samples.strides);
 
     REQUIRE_THROWS_WITH(sim->PartialSample(view, {Qs[0], Qs[1], Qs[2], Qs[3], Qs[0]}, 4),
                         Catch::Contains("Invalid number of wires"));
@@ -930,13 +921,10 @@ TEST_CASE("PartialCounts test with incorrect numWires and numAlloc", "[lightning
     }
 
     std::vector<double> eigvals_vec(1);
-    MemRefT<double, 1> eigvals{
-        eigvals_vec.data(), eigvals_vec.data(), 0, {eigvals_vec.size()}, {1}};
-    MemRefView<double, 1> eigvals_view(&eigvals);
+    DataView<double, 1> eigvals_view(eigvals_vec);
 
     std::vector<int64_t> counts_vec(1);
-    MemRefT<int64_t, 1> counts{counts_vec.data(), counts_vec.data(), 0, {counts_vec.size()}, {1}};
-    MemRefView<int64_t, 1> counts_view(&counts);
+    DataView<int64_t, 1> counts_view(counts_vec);
 
     REQUIRE_THROWS_WITH(
         sim->PartialCounts(eigvals_view, counts_view, {Qs[0], Qs[1], Qs[2], Qs[3], Qs[0]}, 4),
@@ -974,22 +962,22 @@ TEST_CASE("Sample and PartialSample tests with numWires=0-4 shots=100", "[lightn
 
     std::vector<double> samples1(shots * 1);
     MemRefT<double, 2> buffer1{samples1.data(), samples1.data(), 0, {shots, 1}, {1, 1}};
-    MemRefView<double, 2> view1(&buffer1);
+    DataView<double, 2> view1(buffer1.data_aligned, buffer1.offset, buffer1.sizes, buffer1.strides);
     sim->PartialSample(view1, std::vector<QubitIdType>{Qs[2]}, shots);
 
     std::vector<double> samples2(shots * 2);
     MemRefT<double, 2> buffer2{samples2.data(), samples2.data(), 0, {shots, 2}, {1, 1}};
-    MemRefView<double, 2> view2(&buffer2);
+    DataView<double, 2> view2(buffer2.data_aligned, buffer2.offset, buffer2.sizes, buffer2.strides);
     sim->PartialSample(view2, std::vector<QubitIdType>{Qs[0], Qs[3]}, shots);
 
     std::vector<double> samples3(shots * 4);
     MemRefT<double, 2> buffer3{samples3.data(), samples3.data(), 0, {shots, 4}, {1, 1}};
-    MemRefView<double, 2> view3(&buffer3);
+    DataView<double, 2> view3(buffer3.data_aligned, buffer3.offset, buffer3.sizes, buffer3.strides);
     sim->PartialSample(view3, Qs, shots);
 
     std::vector<double> samples4(shots * 4);
     MemRefT<double, 2> buffer4{samples4.data(), samples4.data(), 0, {shots, 4}, {1, 1}};
-    MemRefView<double, 2> view4(&buffer4);
+    DataView<double, 2> view4(buffer4.data_aligned, buffer4.offset, buffer4.sizes, buffer4.strides);
     sim->Sample(view4, shots);
 
     for (size_t i = 0; i < shots * 1; i++)
@@ -1017,43 +1005,33 @@ TEST_CASE("Counts and PartialCounts tests with numWires=0-4 shots=100", "[lightn
     size_t shots = 100;
 
     std::vector<double> eigvals0(1);
-    MemRefT<double, 1> ebuffer0{eigvals0.data(), eigvals0.data(), 0, {eigvals0.size()}, {1}};
-    MemRefView<double, 1> eview0(&ebuffer0);
     std::vector<int64_t> counts0(1);
-    MemRefT<int64_t, 1> cbuffer0{counts0.data(), counts0.data(), 0, {counts0.size()}, {1}};
-    MemRefView<int64_t, 1> cview0(&cbuffer0);
+    DataView<double, 1> eview0(eigvals0);
+    DataView<int64_t, 1> cview0(counts0);
     sim->PartialCounts(eview0, cview0, std::vector<QubitIdType>{}, shots);
 
     std::vector<double> eigvals1(2);
-    MemRefT<double, 1> ebuffer1{eigvals1.data(), eigvals1.data(), 0, {eigvals1.size()}, {1}};
-    MemRefView<double, 1> eview1(&ebuffer1);
     std::vector<int64_t> counts1(2);
-    MemRefT<int64_t, 1> cbuffer1{counts1.data(), counts1.data(), 0, {counts1.size()}, {1}};
-    MemRefView<int64_t, 1> cview1(&cbuffer1);
+    DataView<double, 1> eview1(eigvals1);
+    DataView<int64_t, 1> cview1(counts1);
     sim->PartialCounts(eview1, cview1, std::vector<QubitIdType>{Qs[2]}, shots);
 
     std::vector<double> eigvals2(4);
-    MemRefT<double, 1> ebuffer2{eigvals2.data(), eigvals2.data(), 0, {eigvals2.size()}, {1}};
-    MemRefView<double, 1> eview2(&ebuffer2);
     std::vector<int64_t> counts2(4);
-    MemRefT<int64_t, 1> cbuffer2{counts2.data(), counts2.data(), 0, {counts2.size()}, {1}};
-    MemRefView<int64_t, 1> cview2(&cbuffer2);
+    DataView<double, 1> eview2(eigvals2);
+    DataView<int64_t, 1> cview2(counts2);
     sim->PartialCounts(eview2, cview2, std::vector<QubitIdType>{Qs[0], Qs[3]}, shots);
 
     std::vector<double> eigvals3(16);
-    MemRefT<double, 1> ebuffer3{eigvals3.data(), eigvals3.data(), 0, {eigvals3.size()}, {1}};
-    MemRefView<double, 1> eview3(&ebuffer3);
     std::vector<int64_t> counts3(16);
-    MemRefT<int64_t, 1> cbuffer3{counts3.data(), counts3.data(), 0, {counts3.size()}, {1}};
-    MemRefView<int64_t, 1> cview3(&cbuffer3);
+    DataView<double, 1> eview3(eigvals3);
+    DataView<int64_t, 1> cview3(counts3);
     sim->PartialCounts(eview3, cview3, Qs, shots);
 
     std::vector<double> eigvals4(16);
-    MemRefT<double, 1> ebuffer4{eigvals4.data(), eigvals4.data(), 0, {eigvals4.size()}, {1}};
-    MemRefView<double, 1> eview4(&ebuffer4);
     std::vector<int64_t> counts4(16);
-    MemRefT<int64_t, 1> cbuffer4{counts4.data(), counts4.data(), 0, {counts4.size()}, {1}};
-    MemRefView<int64_t, 1> cview4(&cbuffer4);
+    DataView<double, 1> eview4(eigvals4);
+    DataView<int64_t, 1> cview4(counts4);
     sim->Counts(eview4, cview4, shots);
 
     CHECK(eigvals0.size() == 1);

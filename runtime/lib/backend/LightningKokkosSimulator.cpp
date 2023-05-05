@@ -256,7 +256,7 @@ auto LightningKokkosSimulator::Var(ObsIdType obsKey) -> double
     return m.var(*obs);
 }
 
-void LightningKokkosSimulator::State(MemRefView<std::complex<double>, 1> &state)
+void LightningKokkosSimulator::State(DataView<std::complex<double>, 1> &state)
 {
     const size_t num_qubits = this->device_sv->getNumQubits();
     const size_t size = Pennylane::Lightning_Kokkos::Util::exp2(num_qubits);
@@ -276,7 +276,7 @@ void LightningKokkosSimulator::State(MemRefView<std::complex<double>, 1> &state)
     std::move(buffer.begin(), buffer.end(), state.begin());
 }
 
-void LightningKokkosSimulator::Probs(MemRefView<double, 1> &probs)
+void LightningKokkosSimulator::Probs(DataView<double, 1> &probs)
 {
     Pennylane::Lightning_Kokkos::Simulators::MeasuresKokkos m{*(this->device_sv)};
     auto &&dv_probs = m.probs();
@@ -286,7 +286,7 @@ void LightningKokkosSimulator::Probs(MemRefView<double, 1> &probs)
     std::move(dv_probs.begin(), dv_probs.end(), probs.begin());
 }
 
-void LightningKokkosSimulator::PartialProbs(MemRefView<double, 1> &probs,
+void LightningKokkosSimulator::PartialProbs(DataView<double, 1> &probs,
                                             const std::vector<QubitIdType> &wires)
 {
     const size_t numWires = wires.size();
@@ -305,7 +305,7 @@ void LightningKokkosSimulator::PartialProbs(MemRefView<double, 1> &probs,
     std::move(dv_probs.begin(), dv_probs.end(), probs.begin());
 }
 
-void LightningKokkosSimulator::Sample(MemRefView<double, 2> &samples, size_t shots)
+void LightningKokkosSimulator::Sample(DataView<double, 2> &samples, size_t shots)
 {
     Pennylane::Lightning_Kokkos::Simulators::MeasuresKokkos m{*(this->device_sv)};
 
@@ -328,7 +328,7 @@ void LightningKokkosSimulator::Sample(MemRefView<double, 2> &samples, size_t sho
         }
     }
 }
-void LightningKokkosSimulator::PartialSample(MemRefView<double, 2> &samples,
+void LightningKokkosSimulator::PartialSample(DataView<double, 2> &samples,
                                              const std::vector<QubitIdType> &wires, size_t shots)
 {
     const size_t numWires = wires.size();
@@ -362,8 +362,8 @@ void LightningKokkosSimulator::PartialSample(MemRefView<double, 2> &samples,
     }
 }
 
-void LightningKokkosSimulator::Counts(MemRefView<double, 1> &eigvals,
-                                      MemRefView<int64_t, 1> &counts, size_t shots)
+void LightningKokkosSimulator::Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts,
+                                      size_t shots)
 {
     const size_t numQubits = this->GetNumQubits();
     const size_t numElements = 1U << numQubits;
@@ -399,8 +399,8 @@ void LightningKokkosSimulator::Counts(MemRefView<double, 1> &eigvals,
     }
 }
 
-void LightningKokkosSimulator::PartialCounts(MemRefView<double, 1> &eigvals,
-                                             MemRefView<int64_t, 1> &counts,
+void LightningKokkosSimulator::PartialCounts(DataView<double, 1> &eigvals,
+                                             DataView<int64_t, 1> &counts,
                                              const std::vector<QubitIdType> &wires, size_t shots)
 {
     const size_t numWires = wires.size();
@@ -449,12 +449,8 @@ auto LightningKokkosSimulator::Measure(QubitIdType wire) -> Result
     std::vector<QubitIdType> wires = {reinterpret_cast<QubitIdType>(wire)};
 
     std::vector<double> probs(1U << wires.size());
-
-    {
-        MemRefT<double, 1> buffer{probs.data(), probs.data(), 0, {probs.size()}, {1}};
-        MemRefView<double, 1> buffer_view(&buffer);
-        this->PartialProbs(buffer_view, wires);
-    }
+    DataView<double, 1> buffer_view(probs);
+    this->PartialProbs(buffer_view, wires);
 
     std::random_device rd;
     std::mt19937 gen(rd());
@@ -509,7 +505,7 @@ auto LightningKokkosSimulator::Measure(QubitIdType wire) -> Result
     return mres ? this->One() : this->Zero();
 }
 
-void LightningKokkosSimulator::Gradient(std::vector<MemRefView<double, 1>> &gradients,
+void LightningKokkosSimulator::Gradient(std::vector<DataView<double, 1>> &gradients,
                                         const std::vector<size_t> &trainParams)
 {
     const bool tp_empty = trainParams.empty();
