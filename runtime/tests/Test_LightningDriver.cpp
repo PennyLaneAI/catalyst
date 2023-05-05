@@ -50,7 +50,7 @@ TEST_CASE("lightning Basis vector", "[lightning]")
 
     std::vector<std::complex<double>> state(1U << sim->GetNumQubits());
     MemRefT<std::complex<double>, 1> buffer{state.data(), state.data(), 0, {state.size()}, {1}};
-    MemRefView<std::complex<double>, 1> view(&buffer, state.size());
+    MemRefView<std::complex<double>, 1> view(&buffer);
     sim->State(view);
 
     CHECK(view(0).real() == Approx(1.0).epsilon(1e-5));
@@ -79,7 +79,7 @@ TEST_CASE("Qubit allocatation and deallocation", "[lightning]")
 
     std::vector<std::complex<double>> state(1U << sim->GetNumQubits());
     MemRefT<std::complex<double>, 1> buffer{state.data(), state.data(), 0, {state.size()}, {1}};
-    MemRefView<std::complex<double>, 1> view(&buffer, state.size());
+    MemRefView<std::complex<double>, 1> view(&buffer);
     sim->State(view);
 
     CHECK(state.size() == (1UL << n));
@@ -101,7 +101,7 @@ TEST_CASE("Qubit allocatation and deallocation", "[lightning]")
         sim->ReleaseQubit(i - 1);
         sim->AllocateQubit();
 
-        MemRefView<std::complex<double>, 1> view(&buffer, state.size());
+        MemRefView<std::complex<double>, 1> view(&buffer);
         sim->State(view);
     }
 #else
@@ -123,7 +123,7 @@ TEST_CASE("test AllocateQubits", "[lightning]")
 
     std::vector<std::complex<double>> state(1U << sim->GetNumQubits());
     MemRefT<std::complex<double>, 1> buffer{state.data(), state.data(), 0, {state.size()}, {1}};
-    MemRefView<std::complex<double>, 1> view(&buffer, state.size());
+    MemRefView<std::complex<double>, 1> view(&buffer);
     sim->State(view);
 
     CHECK(state[0].real() == Approx(1.0).epsilon(1e-5));
@@ -196,7 +196,7 @@ TEST_CASE("QuantumDevice object test", "[lightning]")
     std::vector<std::complex<double>> out_state(1U << sim->GetNumQubits());
     MemRefT<std::complex<double>, 1> buffer{
         out_state.data(), out_state.data(), 0, {out_state.size()}, {1}};
-    MemRefView<std::complex<double>, 1> view(&buffer, out_state.size());
+    MemRefView<std::complex<double>, 1> view(&buffer);
     sim->State(view);
 
     CHECK(out_state[0].real() == Approx(1.0).epsilon(1e-5));

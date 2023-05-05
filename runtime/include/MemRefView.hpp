@@ -1,4 +1,4 @@
-// Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+// Copyright 2023 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,16 +14,9 @@
 
 #pragma once
 
-#include <cstring>
-
 #include <Exception.hpp>
 
-extern "C" {
-void *_mlir_memref_to_llvm_alloc(size_t size);
-void *_mlir_memref_to_llvm_aligned_alloc(size_t alignment, size_t size);
-void _mlir_memref_to_llvm_free(void *ptr);
-}
-
+// MemRef type definition
 template <typename T, size_t R> struct MemRefT {
     T *data_allocated;
     T *data_aligned;
@@ -47,7 +40,6 @@ template <typename T, size_t R> struct MemRefT {
 template <typename T, size_t R> class MemRefView {
   private:
     const MemRefT<T, R> *buffer;
-    size_t tsize; // total size
 
   public:
     class MemRefIter {
@@ -57,11 +49,11 @@ template <typename T, size_t R> class MemRefView {
         size_t indices[R] = {0};
 
       public:
-        using iterator_category = std::forward_iterator_tag;
-        using value_type = T;
-        using difference_type = std::ptrdiff_t;
-        using pointer = T *;
-        using reference = T &;
+        using iterator_category = std::forward_iterator_tag; // LCOV_EXCL_LINE
+        using value_type = T;                                // LCOV_EXCL_LINE
+        using difference_type = std::ptrdiff_t;              // LCOV_EXCL_LINE
+        using pointer = T *;                                 // LCOV_EXCL_LINE
+        using reference = T &;                               // LCOV_EXCL_LINE
 
         MemRefIter(const MemRefT<T, R> *_buffer, int64_t begin_idx)
             : buffer(_buffer), loc(begin_idx)
@@ -111,17 +103,20 @@ template <typename T, size_t R> class MemRefView {
         bool operator!=(const MemRefIter &other) const { return !(*this == other); }
     };
 
-    explicit MemRefView(const MemRefT<T, R> *_buffer, size_t _size) : buffer(_buffer), tsize(_size)
+    explicit MemRefView(const MemRefT<T, R> *_buffer) : buffer(_buffer) {}
+
+    [[nodiscard]] auto size() const -> size_t
     {
-        RT_FAIL_IF(!buffer, "[Class: MemRefView] Error in Catalyst Runtime: Cannot create a view "
-                            "for uninitialized MemRefT<T, R>");
+        if (!buffer) {
+            return 0;
+        }
+
+        size_t tsize = 1;
+        for (size_t i = 0; i < R; i++) {
+            tsize *= buffer->sizes[i];
+        }
+        return tsize;
     }
-
-    [[nodiscard]] auto get() const -> const MemRefT<T, R> & { return *buffer; }
-
-    [[nodiscard]] auto empty() const -> bool { return tsize == 0; }
-
-    [[nodiscard]] auto size() const -> size_t { return tsize; }
 
     template <typename... I> T &operator()(I... idxs) const
     {

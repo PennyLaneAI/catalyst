@@ -18,7 +18,7 @@
 #include <memory>
 #include <vector>
 
-#include "MemRefUtils.hpp"
+#include "MemRefView.hpp"
 #include "Types.h"
 
 namespace Catalyst::Runtime {
@@ -222,7 +222,9 @@ struct QuantumDevice {
      * @brief Compute samples with the number of shots on the entire wires,
      * returing raw samples.
      *
-     * @param samples The pre-allocated `MemRefView<double, 2>`
+     * @param samples The pre-allocated `MemRefView<double, 2>`representing a matrix of
+     * shape `shots * numQubits`. The built-in iterator in `MemRefView<double, 2>`
+     * iterates over all elements of `samples` row-wise.
      * @param shots The number of shots
      */
     virtual void Sample(MemRefView<double, 2> &samples, size_t shots) = 0;
@@ -231,7 +233,9 @@ struct QuantumDevice {
      * @brief Compute partial samples with the number of shots on `wires`,
      * returing raw samples.
      *
-     * @param samples The pre-allocated `MemRefView<double, 2>`
+     * @param samples The pre-allocated `MemRefView<double, 2>`representing a matrix of
+     * shape `shots * numWires`. The built-in iterator in `MemRefView<double, 2>`
+     * iterates over all elements of `samples` row-wise.
      * @param wires Wires to compute samples on
      * @param shots The number of shots
      */

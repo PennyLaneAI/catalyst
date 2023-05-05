@@ -214,7 +214,7 @@ void __quantum__qis__Gradient(int64_t numResults, /* results = */...)
     std::vector<MemRefView<double, 1>> mem_views;
     mem_views.reserve(numResults);
     for (auto *mr : mem_ptrs) {
-        mem_views.emplace_back(mr, mr->sizes[0]);
+        mem_views.emplace_back(mr);
     }
 
     // num_observables * num_train_params
@@ -256,7 +256,7 @@ void __quantum__qis__Gradient_params([[maybe_unused]] MemRefT_int64_1d *params,
     std::vector<MemRefView<double, 1>> mem_views;
     mem_views.reserve(numResults);
     for (auto *mr : mem_ptrs) {
-        mem_views.emplace_back(mr, mr->sizes[0]);
+        mem_views.emplace_back(mr);
     }
 
     // num_observables * num_train_params
@@ -664,7 +664,7 @@ void __quantum__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, .
     }
     va_end(args);
 
-    MemRefView<std::complex<double>, 1> view(result_p, result->sizes[0]);
+    MemRefView<std::complex<double>, 1> view(result_p);
 
     if (wires.empty()) {
         Catalyst::Runtime::CAPI::DRIVER->get_device()->State(view);
@@ -689,7 +689,7 @@ void __quantum__qis__Probs(MemRefT_double_1d *result, int64_t numQubits, ...)
     }
     va_end(args);
 
-    MemRefView<double, 1> view(result_p, result->sizes[0]);
+    MemRefView<double, 1> view(result_p);
 
     if (wires.empty()) {
         Catalyst::Runtime::CAPI::DRIVER->get_device()->Probs(view);
@@ -713,7 +713,7 @@ void __quantum__qis__Sample(MemRefT_double_2d *result, int64_t shots, int64_t nu
     }
     va_end(args);
 
-    MemRefView<double, 2> view(result_p, result->sizes[0] * result->sizes[1]);
+    MemRefView<double, 2> view(result_p);
 
     if (wires.empty()) {
         Catalyst::Runtime::CAPI::DRIVER->get_device()->Sample(view, shots);
@@ -739,8 +739,8 @@ void __quantum__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t shots
     }
     va_end(args);
 
-    MemRefView<double, 1> eigvals_view(result_eigvals_p, result_eigvals_p->sizes[0]);
-    MemRefView<int64_t, 1> counts_view(result_counts_p, result_counts_p->sizes[0]);
+    MemRefView<double, 1> eigvals_view(result_eigvals_p);
+    MemRefView<int64_t, 1> counts_view(result_counts_p);
 
     if (wires.empty()) {
         Catalyst::Runtime::CAPI::DRIVER->get_device()->Counts(eigvals_view, counts_view, shots);

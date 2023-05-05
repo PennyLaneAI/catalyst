@@ -2,7 +2,7 @@
 
 <h3>New features</h3>
 
-* Add support for `else if` chains for `@cond` conditionals
+* Add support for ``else if`` chains for ``@cond`` conditionals
   [#104](https://github.com/PennyLaneAI/catalyst/pull/104)
 
 <h3>Improvements</h3>
@@ -31,7 +31,10 @@
 * Fix a memory regression and reduce memory footprint by removing unnecessary temporary buffers.
   [#100](https://github.com/PennyLaneAI/catalyst/pull/100)
 
-* Fix extra buffer copies in the runtime.
+* Provide a new abstraction to the ``QuantumDevice`` interface in the runtime called ``MemRefView``.
+  C++ implementations of the interface can iterate through and directly store results into the
+  ``MemRefView`` independant of the underlying memory layout. This can eliminate redundant buffer
+  copies at the interface boundaries, which has been applied to existing devices.
   [#109](https://github.com/PennyLaneAI/catalyst/pull/109)
 
 <h3>Contributors</h3>

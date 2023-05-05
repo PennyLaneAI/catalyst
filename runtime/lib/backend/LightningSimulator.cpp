@@ -213,7 +213,6 @@ auto LightningSimulator::Var(ObsIdType obsKey) -> double
 
 void LightningSimulator::State(MemRefView<std::complex<double>, 1> &state)
 {
-    RT_ASSERT(!state.empty());
     auto &&dv_state = this->device_sv->getDataVector();
     RT_FAIL_IF(state.size() != dv_state.size(), "Invalid size for the pre-allocated state vector");
 
@@ -222,7 +221,6 @@ void LightningSimulator::State(MemRefView<std::complex<double>, 1> &state)
 
 void LightningSimulator::Probs(MemRefView<double, 1> &probs)
 {
-    RT_ASSERT(!probs.empty());
     Pennylane::Simulators::Measures m{*(this->device_sv)};
     auto &&dv_probs = m.probs();
 
@@ -234,7 +232,6 @@ void LightningSimulator::Probs(MemRefView<double, 1> &probs)
 void LightningSimulator::PartialProbs(MemRefView<double, 1> &probs,
                                       const std::vector<QubitIdType> &wires)
 {
-    RT_ASSERT(!probs.empty());
     const size_t numWires = wires.size();
     const size_t numQubits = this->GetNumQubits();
 
@@ -253,8 +250,6 @@ void LightningSimulator::PartialProbs(MemRefView<double, 1> &probs,
 
 void LightningSimulator::Sample(MemRefView<double, 2> &samples, size_t shots)
 {
-    RT_ASSERT(!samples.empty())
-
     // generate_samples is a member function of the Measures class.
     Pennylane::Simulators::Measures m{*(this->device_sv)};
 
@@ -323,8 +318,8 @@ void LightningSimulator::Counts(MemRefView<double, 1> &eigvals, MemRefView<int64
     const size_t numQubits = this->GetNumQubits();
     const size_t numElements = 1U << numQubits;
 
-    RT_FAIL_IF(eigvals.size() != numElements, "Invalid size for the pre-allocated eigvals");
-    RT_FAIL_IF(counts.size() != numElements, "Invalid size for the pre-allocated counts");
+    RT_FAIL_IF(eigvals.size() != numElements || counts.size() != numElements,
+               "Invalid size for the pre-allocated counts");
 
     // generate_samples is a member function of the Measures class.
     Pennylane::Simulators::Measures m{*(this->device_sv)};
@@ -367,8 +362,8 @@ void LightningSimulator::PartialCounts(MemRefView<double, 1> &eigvals,
 
     RT_FAIL_IF(numWires > numQubits, "Invalid number of wires");
     RT_FAIL_IF(!isValidQubits(wires), "Invalid given wires to measure");
-    RT_FAIL_IF(eigvals.size() != numElements, "Invalid size for the pre-allocated partial-eigvals");
-    RT_FAIL_IF(counts.size() != numElements, "Invalid size for the pre-allocated partial-counts");
+    RT_FAIL_IF((eigvals.size() != numElements || counts.size() != numElements),
+               "Invalid size for the pre-allocated partial-counts");
 
     // get device wires
     auto &&dev_wires = getDeviceWires(wires);
@@ -413,7 +408,7 @@ auto LightningSimulator::Measure(QubitIdType wire) -> Result
 
     {
         MemRefT<double, 1> buffer{probs.data(), probs.data(), 0, {probs.size()}, {1}};
-        MemRefView<double, 1> buffer_view(&buffer, probs.size());
+        MemRefView<double, 1> buffer_view(&buffer);
         this->PartialProbs(buffer_view, wires);
     }
 

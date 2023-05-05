@@ -258,7 +258,6 @@ auto LightningKokkosSimulator::Var(ObsIdType obsKey) -> double
 
 void LightningKokkosSimulator::State(MemRefView<std::complex<double>, 1> &state)
 {
-    RT_ASSERT(!state.empty());
     const size_t num_qubits = this->device_sv->getNumQubits();
     const size_t size = Pennylane::Lightning_Kokkos::Util::exp2(num_qubits);
     RT_FAIL_IF(state.size() != size, "Invalid size for the pre-allocated state vector");
@@ -279,7 +278,6 @@ void LightningKokkosSimulator::State(MemRefView<std::complex<double>, 1> &state)
 
 void LightningKokkosSimulator::Probs(MemRefView<double, 1> &probs)
 {
-    RT_ASSERT(!probs.empty());
     Pennylane::Lightning_Kokkos::Simulators::MeasuresKokkos m{*(this->device_sv)};
     auto &&dv_probs = m.probs();
 
@@ -291,7 +289,6 @@ void LightningKokkosSimulator::Probs(MemRefView<double, 1> &probs)
 void LightningKokkosSimulator::PartialProbs(MemRefView<double, 1> &probs,
                                             const std::vector<QubitIdType> &wires)
 {
-    RT_ASSERT(!probs.empty());
     const size_t numWires = wires.size();
     const size_t numQubits = this->GetNumQubits();
 
@@ -310,8 +307,6 @@ void LightningKokkosSimulator::PartialProbs(MemRefView<double, 1> &probs,
 
 void LightningKokkosSimulator::Sample(MemRefView<double, 2> &samples, size_t shots)
 {
-    RT_ASSERT(!samples.empty())
-
     Pennylane::Lightning_Kokkos::Simulators::MeasuresKokkos m{*(this->device_sv)};
 
     // PL-Lightning-Kokkos generates samples using the alias method.
@@ -373,8 +368,8 @@ void LightningKokkosSimulator::Counts(MemRefView<double, 1> &eigvals,
     const size_t numQubits = this->GetNumQubits();
     const size_t numElements = 1U << numQubits;
 
-    RT_FAIL_IF(eigvals.size() != numElements, "Invalid size for the pre-allocated eigvals");
-    RT_FAIL_IF(counts.size() != numElements, "Invalid size for the pre-allocated counts");
+    RT_FAIL_IF(eigvals.size() != numElements || counts.size() != numElements,
+               "Invalid size for the pre-allocated counts");
 
     // generate_samples is a member function of the MeasuresKokkos class.
     Pennylane::Lightning_Kokkos::Simulators::MeasuresKokkos m{*(this->device_sv)};
@@ -414,8 +409,8 @@ void LightningKokkosSimulator::PartialCounts(MemRefView<double, 1> &eigvals,
 
     RT_FAIL_IF(numWires > numQubits, "Invalid number of wires");
     RT_FAIL_IF(!isValidQubits(wires), "Invalid given wires to measure");
-    RT_FAIL_IF(eigvals.size() != numElements, "Invalid size for the pre-allocated partial-eigvals");
-    RT_FAIL_IF(counts.size() != numElements, "Invalid size for the pre-allocated partial-counts");
+    RT_FAIL_IF((eigvals.size() != numElements || counts.size() != numElements),
+               "Invalid size for the pre-allocated partial-counts");
 
     // get device wires
     auto &&dev_wires = getDeviceWires(wires);
@@ -457,7 +452,7 @@ auto LightningKokkosSimulator::Measure(QubitIdType wire) -> Result
 
     {
         MemRefT<double, 1> buffer{probs.data(), probs.data(), 0, {probs.size()}, {1}};
-        MemRefView<double, 1> buffer_view(&buffer, probs.size());
+        MemRefView<double, 1> buffer_view(&buffer);
         this->PartialProbs(buffer_view, wires);
     }
 
