@@ -17,10 +17,10 @@
 func.func private @func1(tensor<4xf64>) -> tensor<3x4xf64>
 
 
-// CHECK: func.func @jvptest(%arg0: tensor<4xf64>, %arg1: tensor<4xf64>) -> (tensor<3x4xf64>, tensor<3x4xf64>) attributes {llvm.emit_c_interface} {
+// CHECK: func.func @jvptest1(%arg0: tensor<4xf64>, %arg1: tensor<4xf64>) -> (tensor<3x4xf64>, tensor<3x4xf64>) attributes {llvm.emit_c_interface} {
 // CHECK:    %cst = arith.constant 0.000000e+00 : f64
-// CHECK:    %0 = call @func(%arg0) : (tensor<4xf64>) -> tensor<3x4xf64>
-// CHECK:    %1 = gradient.grad "fd" @func(%arg0) {diffArgIndices = dense<0> : tensor<1xi64>, finiteDiffParam = 9.9999999999999995E-8 : f64} : (tensor<4xf64>) -> tensor<4x3x4xf64>
+// CHECK:    %0 = call @func1(%arg0) : (tensor<4xf64>) -> tensor<3x4xf64>
+// CHECK:    %1 = gradient.grad "fd" @func1(%arg0) {diffArgIndices = dense<0> : tensor<1xi64>, finiteDiffParam = 9.9999999999999995E-8 : f64} : (tensor<4xf64>) -> tensor<4x3x4xf64>
 // CHECK:    %2 = tensor.empty() : tensor<3x4xf64>
 // CHECK:    %3 = linalg.fill ins(%cst : f64) outs(%2 : tensor<3x4xf64>) -> tensor<3x4xf64>
 // CHECK:    %4 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["reduction", "parallel", "parallel"]} ins(%1, %arg1 : tensor<4x3x4xf64>, tensor<4xf64>) outs(%3 : tensor<3x4xf64>) {
