@@ -273,21 +273,25 @@ def get_template(func_name, restype, *args):
     for idx, arg in enumerate(args):
         cvars.append(CVariable(arg, idx))
 
-    result = ResultVar(restype)
+    variables = cvars
+    types = {}
+    if restype:
+        result = ResultVar(restype)
+        variables = [result] + variables
+        types = set(type for type in result.dependencies)
 
-    args_and_res = [result] + cvars
+    variables_initialization = "".join(var.init for var in variables)
+    arg_vars = ", ".join("&" + var.name for var in variables)
+    arg_types = ", ".join(var.type.name + "*" for var in variables)
 
-    variables_initialization = "".join(var.init for var in args_and_res)
-    arg_vars = ", ".join("&" + var.name for var in args_and_res)
-    arg_types = ", ".join(var.type.name + "*" for var in args_and_res)
-
-    types = set(type for type in result.dependencies)
     types.update(set(var.type for var in cvars))
+    types = list(types)
 
-    # The result type must be at the end,
-    # Otherwise a field in the result structure
-    # might be defined afterwards resulting in a warning/error.
-    types = list(types) + [result.type]
+    if restype:
+        # The result type must be at the end,
+        # Otherwise a field in the result structure
+        # might be defined afterwards resulting in a warning/error.
+        types += [result.type]
 
     types = "".join(type.decl for type in types)
 

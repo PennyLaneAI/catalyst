@@ -132,3 +132,16 @@ class TestCProgramGeneration:
         assert "buff_0 = 4.0" in template
         assert "arg_0 = { &buff_0, &buff_0, 0 }" in template
         assert "_catalyst_ciface_jit_f(&result_val, &arg_0);" in template
+
+    def test_program_without_return_nor_arguments(self):
+        """Test program without return value nor arguments."""
+
+        @qjit(keep_intermediate=True)
+        def f():
+            """No-op function."""
+            return None
+
+        template = f(ciface=True)
+        assert "struct result_t result_val;" not in template
+        assert "buff_0" not in template
+        assert "arg_0" not in template
