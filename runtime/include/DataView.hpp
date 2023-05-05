@@ -20,7 +20,7 @@
  * A multi-dimensional view for MemRef-like and std::vector<T> types.
  *
  * @tparam T The underlying data type
- * @tparam R The Rank (R >= 0)
+ * @tparam R The Rank (R > 0)
  *
  * @note A forward iterator is implemented in this view for traversing over the entire
  * elements of MemRef types rank-by-rank starting from the last dimension (R-1). For example,
@@ -97,8 +97,7 @@ template <typename T, size_t R> class DataView {
 
     explicit DataView(std::vector<T> &buffer) : data_aligned(buffer.data()), offset(0)
     {
-        static_assert(R == 1, "[Class: DataView] Error in Catalyst Runtime: Invalid rank for "
-                              "constructing DataView<T, 1> from std::vector<T>");
+        static_assert(R == 1, "[Class: DataView] Assertion: R == 1");
         sizes[0] = buffer.size();
         strides[0] = 1;
     }
@@ -106,6 +105,7 @@ template <typename T, size_t R> class DataView {
     explicit DataView(T *_data_aligned, size_t _offset, size_t *_sizes, size_t *_strides)
         : data_aligned(_data_aligned), offset(_offset)
     {
+        static_assert(R > 0, "[Class: DataView] Assertion: R > 0");
         if (_sizes && _strides) {
             for (size_t i = 0; i < R; i++) {
                 sizes[i] = _sizes[i];
