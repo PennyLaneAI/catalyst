@@ -14,6 +14,7 @@
 
 from os import path
 from setuptools import setup, find_namespace_packages
+import numpy as np
 from pybind11.setup_helpers import intree_extensions
 
 with open(path.join("frontend", "catalyst", "_version.py")) as f:
@@ -54,15 +55,13 @@ description = {
     "license": "Apache License 2.0",
 }
 
-import numpy as np
-import os
 
-lib_path_npymath = os.path.join(np.get_include(), "..", "lib")
+lib_path_npymath = path.join(np.get_include(), "..", "lib")
 intree_extension_list = intree_extensions(["frontend/catalyst/utils/wrapper.cpp"])
 for ext in intree_extension_list:
     ext._add_ldflags(["-L", lib_path_npymath])  # pylint: disable=protected-access
-    ext._add_ldflags(["-lnpymath"])
-    ext._add_cflags(["-I", np.get_include()])
+    ext._add_ldflags(["-lnpymath"])  # pylint: disable=protected-access
+    ext._add_cflags(["-I", np.get_include()])  # pylint: disable=protected-access
 ext_modules = intree_extension_list
 
 setup(

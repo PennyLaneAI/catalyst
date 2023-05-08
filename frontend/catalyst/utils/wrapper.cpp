@@ -70,7 +70,6 @@ py::list move_returns(void *memref_array_ptr, py::object result_desc, py::object
     char *memref_array_bytes = (char *)(memref_array_ptr);
 
     for (size_t idx = 0; idx < memref_len; idx++) {
-
         unsigned int rank_i = ranks.attr("__getitem__")(idx).cast<unsigned int>();
         char *memref_i_beginning = memref_array_bytes + offset;
         offset += memref_size_based_on_rank(rank_i);
