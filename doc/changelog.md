@@ -18,6 +18,9 @@
 * Improve python compatibility by providing a stable signature for user generated functions.
   [#106](https://github.com/PennyLaneAI/catalyst/pull/106)
 
+* Handle C++ exceptions without unwinding the whole stack.
+  [#99](https://github.com/PennyLaneAI/catalyst/pull/99)
+
 <h3>Breaking changes</h3>
 
 <h3>Bug fixes</h3>
