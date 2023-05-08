@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt %s --lower-jvp-vjp | FileCheck %s
+// RUN: quantum-opt %s --lower-jvpvjp | FileCheck %s
 
 func.func private @func1(tensor<4xf64>) -> tensor<3x4xf64>
 

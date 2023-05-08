@@ -232,7 +232,7 @@ class JVPLoweringPass(PassPipeline):
     """Pass pipeline to lower gradients."""
 
     _executable = get_executable_path("quantum", "quantum-opt")
-    _default_flags = ["--lower-jvp-vjp"]
+    _default_flags = ["--lower-jvpvjp", "--debug-only=jvpvjp"]
 
     @staticmethod
     def get_output_filename(infile):
@@ -452,7 +452,7 @@ class Compiler:
         if pipelines is None:
             pipelines = [
                 MHLOPass,
-                # JVPLoweringPass,
+                JVPLoweringPass,
                 QuantumCompilationPass,
                 BufferizationPass,
                 MLIRToLLVMDialect,

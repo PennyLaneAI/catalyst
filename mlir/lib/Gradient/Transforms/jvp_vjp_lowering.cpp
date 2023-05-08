@@ -12,11 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#define DEBUG_TYPE "jvpvjp"
+
 #include <memory>
 #include <vector>
 #include <algorithm>
 
 #include "llvm/Support/Errc.h"
+#include "llvm/Support/Debug.h"
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
@@ -43,6 +46,7 @@
 
 using namespace mlir;
 using namespace catalyst::gradient;
+using llvm::dbgs;
 
 namespace llvm {
 
@@ -78,7 +82,7 @@ struct JVPLoweringPattern : public OpRewritePattern<JVPOp> { /*{{{*/
 
 LogicalResult JVPLoweringPattern::match(JVPOp op) const
 {
-    llvm::errs() << "matched JVP op\n";
+    LLVM_DEBUG(dbgs() << "matched JVP op\n");
     return success();
 }
 
@@ -87,11 +91,11 @@ void JVPLoweringPattern::rewrite(JVPOp op, PatternRewriter &rewriter) const
     MLIRContext *ctx = getContext();
 
     Location loc = op.getLoc();
-    llvm::errs() << "replacing VJP op\n";
+    LLVM_DEBUG(dbgs() << "replacing VJP op\n");
 
     auto func_diff_operand_indices = GradOp::compDiffArgIndices(op.getDiffArgIndices());
-    llvm::errs() << "func_diff_operand_indices: " << func_diff_operand_indices << " \n";
-    llvm::errs() << "jvp_num_operands " << op.getOperands().size() << " \n";
+    LLVM_DEBUG(dbgs() << "func_diff_operand_indices: " << func_diff_operand_indices << " \n");
+    LLVM_DEBUG(dbgs() << "jvp_num_operands " << op.getOperands().size() << " \n");
     assert(func_diff_operand_indices.size() <= op.getOperands().size()/2);
 
     size_t func_operands_size = op.getOperands().size() - func_diff_operand_indices.size();
@@ -115,7 +119,7 @@ void JVPLoweringPattern::rewrite(JVPOp op, PatternRewriter &rewriter) const
     auto func_op = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
 
     auto grad_result_types = computeResultTypes(func_op, func_diff_operand_indices);
-    llvm::errs() << "grad_result_types: " << grad_result_types << " \n";
+    LLVM_DEBUG(dbgs() << "grad_result_types: " << grad_result_types << " \n");
     assert(grad_result_types.size() == func_diff_operand_indices.size()*func_result_types.size() &&
       "GradOp does't seem to return a tuple of Jacobians");
 
@@ -150,9 +154,9 @@ void JVPLoweringPattern::rewrite(JVPOp op, PatternRewriter &rewriter) const
           out;
         });
 
-        llvm::errs() << "jac_type " << sjac << "\n";
-        llvm::errs() << "param_type " << sparam << "\n";
-        llvm::errs() << "tang_type " << stang << "\n";
+        LLVM_DEBUG(dbgs() << "jac_type " << sjac << "\n");
+        LLVM_DEBUG(dbgs() << "param_type " << sparam << "\n");
+        LLVM_DEBUG(dbgs() << "tang_type " << stang << "\n");
 
         assert(sparam == stang && "Parameter and tanget shapes don't match");
         assert(sjac_param == sparam && "Jacobian shape doesn't contain the parameter shape as a prefix");
@@ -173,9 +177,9 @@ void JVPLoweringPattern::rewrite(JVPOp op, PatternRewriter &rewriter) const
           out;
         });
 
-        llvm::errs() << "jac_axis " << jac_axis_names << "\n";
-        llvm::errs() << "tang_axis " << tang_axis_names << "\n";
-        llvm::errs() << "jvp_axis " << jvp_axis_names << "\n";
+        LLVM_DEBUG(dbgs() << "jac_axis " << jac_axis_names << "\n");
+        LLVM_DEBUG(dbgs() << "tang_axis " << tang_axis_names << "\n");
+        LLVM_DEBUG(dbgs() << "jvp_axis " << jvp_axis_names << "\n");
 
         /* tjac.getShape(); */
 
@@ -183,7 +187,7 @@ void JVPLoweringPattern::rewrite(JVPOp op, PatternRewriter &rewriter) const
           jac_axis_names, tang_axis_names, jvp_axis_names,
           jac, tang);
 
-        llvm::errs() << "jvp result type " << res.getType() << "\n";
+        LLVM_DEBUG(dbgs() << "jvp result type " << res.getType() << "\n");
 
         if(!acc.has_value()) {
           acc = res;
@@ -213,7 +217,7 @@ void JVPLoweringPattern::rewrite(JVPOp op, PatternRewriter &rewriter) const
 
     rewriter.replaceOp(op, results);
 
-    llvm::errs() << "replaced JVP\n";
+    LLVM_DEBUG(dbgs() << "replaced JVP\n");
 }
 /*}}}*/
 
@@ -226,7 +230,7 @@ struct VJPLoweringPattern : public OpRewritePattern<VJPOp> { /*{{{*/
 
 LogicalResult VJPLoweringPattern::match(VJPOp op) const
 {
-    llvm::errs() << "matched VJP op\n";
+    LLVM_DEBUG(dbgs() << "matched VJP op\n");
     return success();
 }
 
@@ -235,11 +239,11 @@ void VJPLoweringPattern::rewrite(VJPOp op, PatternRewriter &rewriter) const
     MLIRContext *ctx = getContext();
 
     Location loc = op.getLoc();
-    llvm::errs() << "replacing VJP op\n";
+    LLVM_DEBUG(dbgs() << "replacing VJP op\n");
 
     auto func_diff_operand_indices = GradOp::compDiffArgIndices(op.getDiffArgIndices());
-    llvm::errs() << "func_diff_operand_indices: " << func_diff_operand_indices << " \n";
-    llvm::errs() << "vjp_num_operands " << op.getOperands().size() << " \n";
+    LLVM_DEBUG(dbgs() << "func_diff_operand_indices: " << func_diff_operand_indices << " \n");
+    LLVM_DEBUG(dbgs() << "vjp_num_operands " << op.getOperands().size() << " \n");
     assert(func_diff_operand_indices.size() <= op.getOperands().size()/2);
 
     auto func_op = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
@@ -264,7 +268,7 @@ void VJPLoweringPattern::rewrite(VJPOp op, PatternRewriter &rewriter) const
     auto func_result_types = func_op.getResultTypes();
 
     auto grad_result_types = computeResultTypes(func_op, func_diff_operand_indices);
-    llvm::errs() << "grad_result_types: " << grad_result_types << " \n";
+    LLVM_DEBUG(dbgs() << "grad_result_types: " << grad_result_types << " \n");
     assert(grad_result_types.size() == func_diff_operand_indices.size()*func_result_types.size() &&
       "GradOp does't seem to return a tuple of Jacobians");
 
@@ -298,9 +302,9 @@ void VJPLoweringPattern::rewrite(VJPOp op, PatternRewriter &rewriter) const
           out;
         });
 
-        llvm::errs() << "jac_type " << sjac << "\n";
-        llvm::errs() << "param_type " << sparam << "\n";
-        llvm::errs() << "cotang_type " << scotang << "\n";
+        LLVM_DEBUG(dbgs() << "jac_type " << sjac << "\n");
+        LLVM_DEBUG(dbgs() << "param_type " << sparam << "\n");
+        LLVM_DEBUG(dbgs() << "cotang_type " << scotang << "\n");
 
         assert(sjac_cotang == scotang && "Jacobian shape doesn't contain the cotang shape as a suffix");
 
@@ -320,15 +324,15 @@ void VJPLoweringPattern::rewrite(VJPOp op, PatternRewriter &rewriter) const
           out;
         });
 
-        llvm::errs() << "jac_axis " << jac_axis_names << "\n";
-        llvm::errs() << "cotang_axis " << cotang_axis_names << "\n";
-        llvm::errs() << "vjp_axis " << vjp_axis_names << "\n";
+        LLVM_DEBUG(dbgs() << "jac_axis " << jac_axis_names << "\n");
+        LLVM_DEBUG(dbgs() << "cotang_axis " << cotang_axis_names << "\n");
+        LLVM_DEBUG(dbgs() << "vjp_axis " << vjp_axis_names << "\n");
 
         auto res = einsumLinalgGeneric(rewriter, loc,
           cotang_axis_names, jac_axis_names, vjp_axis_names,
           cotang, jac);
 
-        llvm::errs() << "vjp result type " << res.getType() << "\n";
+        LLVM_DEBUG(dbgs() << "vjp result type " << res.getType() << "\n");
 
         if(!acc.has_value()) {
           acc = res;
@@ -359,7 +363,7 @@ void VJPLoweringPattern::rewrite(VJPOp op, PatternRewriter &rewriter) const
 
     rewriter.replaceOp(op, results);
 
-    llvm::errs() << "replaced VJP\n";
+    LLVM_DEBUG(dbgs() << "replaced VJP\n");
 }
 /*}}}*/
 
@@ -369,9 +373,12 @@ struct JVPVJPLoweringPass
 
     JVPVJPLoweringPass() {}
 
-    StringRef getArgument() const override { return "lower-jvp-vjp"; }
+    StringRef getArgument() const override { return "lower-jvpvjp"; }
 
-    StringRef getDescription() const override { return "Lower JVP/VJP operations down to grad operations."; }
+    StringRef getDescription() const override
+    {
+      return "Lower JVP/VJP operations down to grad and linalg.generic operations.";
+    }
 
     void getDependentDialects(DialectRegistry &registry) const override
     {
@@ -382,8 +389,6 @@ struct JVPVJPLoweringPass
 
     void runOnOperation() final
     {
-        llvm::errs() << "JVP_VJP lowering called\n";
-
         ModuleOp op = getOperation();
 
         RewritePatternSet patterns(&getContext());
@@ -391,10 +396,8 @@ struct JVPVJPLoweringPass
         patterns.add<VJPLoweringPattern>(patterns.getContext(), 1);
 
         if (failed(applyPatternsAndFoldGreedily(op, std::move(patterns)))) {
-            llvm::errs() << "JVP_VJP lowering failed\n";
             return signalPassFailure();
         }
-        llvm::errs() << "JVP_VJP lowering succeeded\n";
     }
 };
 
