@@ -472,6 +472,7 @@ class Compiler:
             with open(fname, "r", encoding="utf-8") as f:
                 txt = f.read()
             return txt
+        return None
 
     def print(self, pipeline):
         """Print the output IR of pass.

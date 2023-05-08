@@ -408,9 +408,8 @@ class CompiledFunction:
             c_abi_ptr = ctypes.pointer(get_ranked_memref_descriptor(numpy_arg))
             c_abi_args.append(c_abi_ptr)
 
-        # pylint: disable=too-few-public-methods
         class CompiledFunctionArgValue(ctypes.Structure):
-            """Programmatically create a structure which holds N tensors of possibly different T base types."""
+            """Programmatically create a structure which holds tensors of varying base types."""
 
             _fields_ = [("f" + str(i), type(t)) for i, t in enumerate(c_abi_args)]
 
