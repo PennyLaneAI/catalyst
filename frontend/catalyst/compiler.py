@@ -400,7 +400,7 @@ class Compiler:
     """Compiles MLIR modules to shared objects."""
 
     def __init__(self):
-        self.pass_pipeline_output = None
+        self.pass_pipeline_output = {}
         # The temporary directory must be referenced by the wrapper class
         # in order to avoid being garbage collected
         self.workspace = tempfile.TemporaryDirectory()  # pylint: disable=consider-using-with
@@ -454,21 +454,10 @@ class Compiler:
 
         for pipeline in pipelines:
             output = pipeline.run(filename, options=options)
-            self.pass_pipeline_output[pipeline] = output
+            self.pass_pipeline_output[pipeline.__name__] = output
             filename = os.path.abspath(output)
 
         return filename
-
-    @staticmethod
-    def _get_class_from_string(pipeline):
-        try:
-            return getattr(sys.modules[__name__], pipeline)
-        except AttributeError as e:
-            raise ValueError(f"Output for pass {pipeline} not found.") from e
-
-    def _get_output_file_of(self, pipeline):
-        cls = Compiler._get_class_from_string(pipeline)
-        return self.pass_pipeline_output.get(cls)
 
     def get_output_of(self, pipeline):
         """Get the output IR of a pipeline.
@@ -478,13 +467,11 @@ class Compiler:
         Returns
             (str): output IR
         """
-        fname = self._get_output_file_of(pipeline)
-        try:
+        fname = self.pass_pipeline_output.get(pipeline)
+        if fname:
             with open(fname, "r", encoding="utf-8") as f:
                 txt = f.read()
             return txt
-        except TypeError:
-            return None
 
     def print(self, pipeline):
         """Print the output IR of pass.

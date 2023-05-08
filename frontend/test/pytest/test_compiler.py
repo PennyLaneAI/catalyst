@@ -138,10 +138,10 @@ class TestCompilerErrors:
             CompilerDriver.run("file-name.noo")
 
     def test_attempts_to_get_inexistent_intermediate_file(self):
-        """Test for error raised if user request intermediate file that doesn't exist."""
+        """Test return value if user request intermediate file that doesn't exist."""
         compiler = Compiler()
-        with pytest.raises(ValueError, match="pass .* not found."):
-            compiler.get_output_of("inexistent-file")
+        result = compiler.get_output_of("inexistent-file")
+        assert result is None
 
     def test_runtime_error(self):
         """Test that an exception is emitted when the runtime raises a C++ exception."""
@@ -322,6 +322,36 @@ class TestCompilerState:
             assert observed_outfilename == expected_outfilename
             assert os.path.exists(observed_outfilename)
 
+    def test_custom_compiler_pass_output(self):
+        """Test that the output of a custom compiler pass is accessible."""
+
+        class MyPass(PassPipeline):
+            """Simple pass pipeline."""
+
+            _executable = "echo"
+            _default_flags = []
+
+            @staticmethod
+            def get_output_filename(infile):
+                return infile.replace(".mlir", ".txt")
+
+            @staticmethod
+            def _run(_infile, outfile, executable, _flags, _options):
+                cmd = [executable, "hi"]
+                with open(outfile, "w", encoding="UTF-8") as f:
+                    subprocess.run(cmd, stdout=f, check=True)
+
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def workflow():
+            qml.X(wires=1)
+            return qml.state()
+
+        mlir_module, _, _ = get_mlir(workflow)
+        compiler = Compiler()
+        compiler.run(mlir_module, CompileOptions(pipelines=[MyPass]))
+        result = compiler.get_output_of("MyPass")
+        assert result == "hi\n"
+
     def test_compiler_driver_with_output_name(self):
         """Test with non-default output name."""
         with tempfile.TemporaryDirectory() as workspace:
@@ -358,3 +388,7 @@ class TestCompilerState:
 
             assert observed_outfilename == expected_outfilename
             assert os.path.exists(observed_outfilename)
+
+
+if __name__ == "__main__":
+    pytest.main(["-x", __file__])
