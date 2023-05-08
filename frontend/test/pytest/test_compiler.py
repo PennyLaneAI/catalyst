@@ -3,6 +3,7 @@ Unit tests for CompilerDriver class
 """
 
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -232,6 +233,7 @@ class TestCompilerState:
         files = os.listdir(directory)
         # The directory is non-empty. Should at least contain the original .mlir file
         assert files
+        shutil.rmtree(directory)
 
     def test_workspace_temporary(self):
         """Test temporary directory has been modified with folder containing intermediate results"""
