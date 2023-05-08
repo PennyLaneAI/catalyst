@@ -350,6 +350,28 @@ TEST_CASE("Test memref free", "[qir_lightning_core]")
     __quantum__rt__finalize();
 }
 
+TEST_CASE("Test memory transfer in rt", "[qir_lightning_core]")
+{
+    __quantum__rt__device(nullptr, nullptr);
+    __quantum__rt__initialize();
+    int *a = (int *)_mlir_memref_to_llvm_alloc(sizeof(int));
+    bool is_in_rt = _mlir_memory_transfer(a);
+    CHECK(is_in_rt);
+    __quantum__rt__finalize();
+    free(a);
+}
+
+TEST_CASE("Test memory transfer not in rt", "[qir_lightning_core]")
+{
+    __quantum__rt__device(nullptr, nullptr);
+    __quantum__rt__initialize();
+    int *a = (int *)malloc(sizeof(int));
+    bool is_in_rt = _mlir_memory_transfer(a);
+    CHECK(!is_in_rt);
+    __quantum__rt__finalize();
+    free(a);
+}
+
 TEST_CASE("Test __quantum__qis__Measure", "[qir_lightning_core]")
 {
     // initialize the simulator

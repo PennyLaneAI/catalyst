@@ -133,6 +133,18 @@ py::list move_returns(void *memref_array_ptr, py::object result_desc, py::object
         }
 
         returns.append(new_array);
+
+        // Now we insert the array into the dictionary.
+        // This is to take into account the possibility
+        // of returning more than 1 array with the same buffer.
+        // Although, it looks like it won't happen in reality.
+        PyObject *pyLong = PyLong_FromLong((size_t)memref->allocated);
+        if (!pyLong) {
+            throw std::runtime_error("PyLong_FromLong failed.");
+        }
+        numpy_arrays[pyLong] = new_array;
+
+        Py_DECREF(pyLong);
         Py_DECREF(new_array);
     }
     return returns;
