@@ -15,6 +15,8 @@
 of quantum operations, measurements, and observables to JAXPR.
 """
 
+from typing import List
+
 import jax
 import numpy as np
 from jax._src import util
@@ -1011,7 +1013,7 @@ def _qcond_def_impl(ctx, *preds_and_branch_args_plus_consts, branch_jaxprs):  # 
 def _qcond_lowering(
     jax_ctx: mlir.LoweringRuleContext,
     *preds_and_branch_args_plus_consts: tuple,
-    branch_jaxprs: list[jax.core.ClosedJaxpr],
+    branch_jaxprs: List[jax.core.ClosedJaxpr],
 ):
     result_types = [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_out]
     num_preds = len(branch_jaxprs) - 1

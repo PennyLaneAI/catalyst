@@ -84,7 +84,7 @@ class PassPipeline(abc.ABC):
     """Abstract PassPipeline class."""
 
     _executable: Optional[str] = None
-    _default_flags: Optional[list[str]] = None
+    _default_flags: Optional[List[str]] = None
 
     @staticmethod
     @abc.abstractmethod
@@ -213,6 +213,7 @@ class MLIRToLLVMDialect(PassPipeline):
         "--convert-index-to-llvm",
         "--convert-gradient-to-llvm",
         "--convert-quantum-to-llvm",
+        "--emit-catalyst-py-interface",
         # Remove any dead casts as the final pass expects to remove all existing casts,
         # but only those that form a loop back to the original type.
         "--canonicalize",
@@ -460,11 +461,14 @@ class Compiler:
 
     @staticmethod
     def _get_class_from_string(pipeline):
-        return getattr(sys.modules[__name__], pipeline)
+        try:
+            return getattr(sys.modules[__name__], pipeline)
+        except AttributeError as e:
+            raise ValueError(f"Output for pass {pipeline} not found.") from e
 
     def _get_output_file_of(self, pipeline):
         cls = Compiler._get_class_from_string(pipeline)
-        return self.pass_pipeline_output[cls]
+        return self.pass_pipeline_output.get(cls)
 
     def get_output_of(self, pipeline):
         """Get the output IR of a pipeline.
@@ -474,13 +478,13 @@ class Compiler:
         Returns
             (str): output IR
         """
+        fname = self._get_output_file_of(pipeline)
         try:
-            fname = self._get_output_file_of(pipeline)
-        except (KeyError, AttributeError) as e:
-            raise ValueError(f"Output for pass {pipeline} not found.") from e
-        with open(fname, "r", encoding="utf-8") as f:
-            txt = f.read()
-        return txt
+            with open(fname, "r", encoding="utf-8") as f:
+                txt = f.read()
+            return txt
+        except TypeError:
+            return None
 
     def print(self, pipeline):
         """Print the output IR of pass.
