@@ -282,9 +282,9 @@ void VJPLoweringPattern::rewrite(VJPOp op, PatternRewriter &rewriter) const
     );
 
     std::vector<Value> einsum_results;
-    for(size_t nout = 0; nout < func_result_types.size(); nout++) {
+    for(size_t nparam = 0; nparam < func_diff_operand_indices.size(); nparam++) {
       Optional<Value> acc;
-      for(size_t nparam = 0; nparam < func_diff_operand_indices.size(); nparam++) {
+      for(size_t nout = 0; nout < func_result_types.size(); nout++) {
         auto jac = grad_op.getResults()[nparam*func_diff_operand_indices.size() + nout];
         auto param = func_operands[func_diff_operand_indices[nparam]];
         auto cotang = cotang_operands[nout];
