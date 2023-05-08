@@ -36,7 +36,7 @@ TEST_CASE("Test Driver", "[Driver]")
     CHECK(driver->getDeviceRecorderStatus() == false);
 
     // check device specs update
-    driver->toggleDeviceRecorder(true);
+    driver->setDeviceRecorder(true);
     CHECK(driver->initDevice("default") == false);
     CHECK(driver->getDevice() == nullptr);
     CHECK(driver->getDeviceRecorderStatus() == true);

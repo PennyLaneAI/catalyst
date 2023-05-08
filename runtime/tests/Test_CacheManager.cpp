@@ -53,6 +53,20 @@ TEST_CASE("Test addOperations with a naive example", "[CacheManager]")
     CHECK(cm.getNumObservables() == 0);
 }
 
+TEMPLATE_LIST_TEST_CASE("Test edge cases of the cache manager in QuantumDevice methods",
+                        "[CacheManager]", SimTypes)
+{
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
+
+    sim->StartTapeRecording();
+    REQUIRE_THROWS_WITH(sim->StartTapeRecording(),
+                        Catch::Contains("Cannot re-activate the cache manager"));
+
+    sim->StopTapeRecording();
+    REQUIRE_THROWS_WITH(sim->StopTapeRecording(),
+                        Catch::Contains("Cannot stop an already stopped cache manager"));
+}
+
 TEMPLATE_LIST_TEST_CASE("Test a LightningSimulator circuit with num_qubits=2 ", "[CacheManager]",
                         SimTypes)
 {

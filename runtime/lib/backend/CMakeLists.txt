@@ -21,6 +21,6 @@ target_include_directories(rt_backend PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}
                                                 ${runtime_includes} 
                                                 ${extensions_includes})
 
-target_link_libraries(rt_backend PUBLIC ${CMAKE_DL_LIBS} lightnings_interface)
+target_link_libraries(rt_backend PUBLIC ${CMAKE_DL_LIBS} lightning_interfaces)
 
 set_property(TARGET rt_backend PROPERTY POSITION_INDEPENDENT_CODE ON)

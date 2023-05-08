@@ -53,9 +53,8 @@ void LightningKokkosSimulator::StartTapeRecording()
 
 void LightningKokkosSimulator::StopTapeRecording()
 {
-    if (this->tape_recording) {
-        this->tape_recording = false;
-    }
+    RT_FAIL_IF(!this->tape_recording, "Cannot stop an already stopped cache manager");
+    this->tape_recording = false;
 }
 
 auto LightningKokkosSimulator::CacheManagerInfo()

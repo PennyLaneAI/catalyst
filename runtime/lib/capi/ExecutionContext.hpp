@@ -89,7 +89,7 @@ class ExecutionContext final {
         RT_ASSERT(getMemoryManager() == nullptr);
     };
 
-    void toggleDeviceRecorder(bool status) noexcept { this->_tape_recording = status; }
+    void setDeviceRecorder(bool status) noexcept { this->_tape_recording = status; }
 
     [[nodiscard]] auto getDeviceName() const -> std::string_view { return this->_name; }
 

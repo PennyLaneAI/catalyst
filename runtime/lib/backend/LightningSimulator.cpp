@@ -64,9 +64,8 @@ void LightningSimulator::StartTapeRecording()
 
 void LightningSimulator::StopTapeRecording()
 {
-    if (this->tape_recording) {
-        this->tape_recording = false;
-    }
+    RT_FAIL_IF(!this->tape_recording, "Cannot stop an already stopped cache manager");
+    this->tape_recording = false;
 }
 
 auto LightningSimulator::CacheManagerInfo()

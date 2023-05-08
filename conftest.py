@@ -1,4 +1,6 @@
 def pytest_addoption(parser):
+    """Add pytest custom options."""
+
     parser.addoption(
         "--backend",
         action="store",
@@ -8,5 +10,7 @@ def pytest_addoption(parser):
 
 
 def pytest_generate_tests(metafunc):
+    """A pytest fixture to define custom parametrization"""
+
     if "backend" in metafunc.fixturenames:
         metafunc.parametrize("backend", [metafunc.config.getoption("--backend")])

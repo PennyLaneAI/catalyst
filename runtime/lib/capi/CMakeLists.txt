@@ -8,7 +8,7 @@ add_library(catalyst_qir_qis_obj OBJECT RuntimeCAPI.cpp)
 target_link_libraries(catalyst_qir_qis_obj ${CMAKE_DL_LIBS}
                                             "-L${CMAKE_BINARY_DIR}/lib/backend"
                                             -lrt_backend
-                                            lightnings_interface)
+                                            lightning_interfaces)
 
 # link to qir_stdlib
 target_link_libraries(catalyst_qir_qis_obj "-L${QIR_STDLIB_LIB}"
