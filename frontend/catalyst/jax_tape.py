@@ -102,7 +102,7 @@ class JaxTape:
                 if isinstance(op, qml.Hamiltonian):
                     return op.coeffs
                 if op.__class__.__name__ == "Cond":
-                    return op.pred, op.consts
+                    return op.preds, op.consts
                 if op.__class__.__name__ == "WhileLoop":
                     return op.cond_consts, op.body_consts, op.iter_args
                 if op.__class__.__name__ == "ForLoop":

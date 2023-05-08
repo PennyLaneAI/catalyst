@@ -30,7 +30,7 @@ def g(arg0: int, arg1: int, arg2: int):
 
 
 @pytest.mark.parametrize(
-    "f,params",
+    "circuit,params",
     [
         (f, [0, 0]),
         (f, [0, 1]),

@@ -68,14 +68,14 @@ define i32 @main() {
   call void @__quantum__qis__RY(%Qubit* %4, double 0.7, i8 0)
 
   ; Allocate buffers
-  %5 = call i8* @aligned_alloc(i64 8, i64 64)
+  %5 = call i8* @aligned_alloc(i64 32, i64 64)
   %buffer_cast = bitcast i8* %5 to %struct.CplxT*
 
   ; Insert buffers into result structure
   %t0 = insertvalue %struct.MemRefT undef, %struct.CplxT* %buffer_cast, 0
   %t1 = insertvalue %struct.MemRefT %t0, %struct.CplxT* %buffer_cast, 1
   %t2 = insertvalue %struct.MemRefT %t1, i64 0, 2
-  %t3 = insertvalue %struct.MemRefT %t2, i64 2, 3, 0
+  %t3 = insertvalue %struct.MemRefT %t2, i64 4, 3, 0
   %memref = insertvalue %struct.MemRefT %t3, i64 1, 4, 0
   %6= alloca %struct.MemRefT, i64 1, align 8
   store %struct.MemRefT %memref, %struct.MemRefT* %6, align 8

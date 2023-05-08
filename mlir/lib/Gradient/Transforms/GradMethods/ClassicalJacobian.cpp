@@ -92,6 +92,9 @@ func::FuncOp genParamCountFunction(PatternRewriter &rewriter, Location loc, func
             returnOp->setOperands(paramCount);
         });
 
+        // Erase redundant device specifications
+        paramCountFn.walk([&](quantum::DeviceOp device) { rewriter.eraseOp(device); });
+
         quantum::removeQuantumMeasurements(paramCountFn);
     }
 

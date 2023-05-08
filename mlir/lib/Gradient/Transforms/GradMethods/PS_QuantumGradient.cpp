@@ -297,6 +297,9 @@ func::FuncOp ParameterShiftLowering::genQGradFunction(PatternRewriter &rewriter,
         quantum::removeQuantumMeasurements(gradientFn);
     }
 
+    // Erase redundant device specifications
+    gradientFn.walk([&](quantum::DeviceOp device) { rewriter.eraseOp(device); });
+
     return gradientFn;
 }
 

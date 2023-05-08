@@ -29,6 +29,9 @@ from mlir_quantum.runtime import (
     get_ranked_memref_descriptor,
     ranked_memref_to_numpy,
     to_numpy,
+    as_ctype,
+    make_nd_memref_descriptor,
+    make_zero_d_memref_descriptor,
 )
 
 from catalyst.utils.gen_mlir import inject_functions
@@ -205,7 +208,7 @@ class CompiledFunction:
         teardown.restypes = None
 
         # We are calling the c-interface
-        function = shared_object["_mlir_ciface_" + func_name]
+        function = shared_object["_catalyst_pyface_" + func_name]
         # Guaranteed from _mlir_ciface specification
         function.restypes = None
         # Not needed, computed from the arguments.
@@ -283,7 +286,7 @@ class CompiledFunction:
 
         Args:
             shared_object_file: path to the shared object file containing the JIT compiled function
-            func_name: name of the JIT compiled function
+            func_name: name of compiled function to be executed
             has_return: whether the function returns a value or not
             *args: arguments to the function
 
@@ -334,8 +337,12 @@ class CompiledFunction:
         shape = ir.RankedTensorType(mlir_tensor_type).shape
         mlir_element_type = ir.RankedTensorType(mlir_tensor_type).element_type
         numpy_element_type = mlir_type_to_numpy_type(mlir_element_type)
-        array_numpy_type = np.empty(shape, dtype=numpy_element_type)
-        memref_descriptor = get_ranked_memref_descriptor(array_numpy_type)
+        ctp = as_ctype(numpy_element_type)
+        if shape:
+            memref_descriptor = make_nd_memref_descriptor(len(shape), ctp)()
+        else:
+            memref_descriptor = make_zero_d_memref_descriptor(ctp)()
+
         return memref_descriptor
 
     @staticmethod
@@ -386,19 +393,38 @@ class CompiledFunction:
                 numpy arrays.
 
         """
-        c_abi_args = []
         numpy_arg_buffer = []
+        return_value_pointer = ctypes.POINTER(ctypes.c_int)()  # This is the null pointer
 
         if restype:
             return_value_pointer = CompiledFunction.restype_to_memref_descs(restype)
-            c_abi_args.append(return_value_pointer)
+
+        c_abi_args = []
 
         for arg in args:
             numpy_arg = np.asarray(arg)
             numpy_arg_buffer.append(numpy_arg)
-            c_abi_arg = get_ranked_memref_descriptor(numpy_arg)
-            c_abi_arg_ptr = ctypes.pointer(c_abi_arg)
-            c_abi_args.append(c_abi_arg_ptr)
+            c_abi_ptr = ctypes.pointer(get_ranked_memref_descriptor(numpy_arg))
+            c_abi_args.append(c_abi_ptr)
+
+        # pylint: disable=too-few-public-methods
+        class CompiledFunctionArgValue(ctypes.Structure):
+            """Programmatically create a structure which holds N tensors of possibly different T base types."""
+
+            _fields_ = [("f" + str(i), type(t)) for i, t in enumerate(c_abi_args)]
+
+            def __init__(self, c_abi_args):
+                for ft_tuple, c_abi_arg in zip(CompiledFunctionArgValue._fields_, c_abi_args):
+                    f = ft_tuple[0]
+                    setattr(self, f, c_abi_arg)
+
+        arg_value_pointer = ctypes.POINTER(ctypes.c_int)()
+
+        if len(args) > 0:
+            arg_value = CompiledFunctionArgValue(c_abi_args)
+            arg_value_pointer = ctypes.pointer(arg_value)
+
+        c_abi_args = [return_value_pointer] + [arg_value_pointer]
         return c_abi_args, numpy_arg_buffer
 
     def __call__(self, *args, **kwargs):

@@ -68,7 +68,7 @@ def get_mlir(func, *args, **kwargs):
     axis_context = ReplicaAxisContext(xla.AxisEnv(nrep, (), ()))
     name_stack = util.new_name_stack(util.wrap_name("ok", "jit"))
     module, context = custom_lower_jaxpr_to_module(
-        func_name="jit." + func.__name__,
+        func_name="jit_" + func.__name__,
         module_name=func.__name__,
         jaxpr=jaxpr,
         effects=effects,
@@ -264,12 +264,11 @@ def trace_quantum_tape(
                 wires, new_qubits, qubit_states, qreg
             )
         elif op.__class__.__name__ == "Cond":
-            predicate, consts = op_args
+            predicates, consts = op_args
             qreg = insert_to_qreg(qubit_states, qreg)
-            header_and_branch_args_plus_consts = [predicate] + consts + [qreg]
+            header_and_branch_args_plus_consts = predicates + consts + [qreg]
             outs = jprim.qcond(
-                op.true_jaxpr,
-                op.false_jaxpr,
+                op.branch_jaxprs,
                 *header_and_branch_args_plus_consts,
             )
             v, qreg = tree_unflatten(op.out_trees[0], outs)
@@ -528,7 +527,7 @@ def custom_lower_jaxpr_to_module(
 
         for op in ctx.module.body.operations:
             func_name = str(op.name)
-            is_entry_point = func_name.startswith('"jit.')
+            is_entry_point = func_name.startswith('"jit_')
             if is_entry_point:
                 continue
             op.attributes["llvm.linkage"] = ir.Attribute.parse("#llvm.linkage<internal>")

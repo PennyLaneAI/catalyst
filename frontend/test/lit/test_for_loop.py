@@ -20,7 +20,7 @@ import pennylane as qml
 
 
 # CHECK-NOT: Verification failed
-# CHECK-LABEL: @jit.loop_circuit
+# CHECK-LABEL: @jit_loop_circuit
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=3))
 def loop_circuit(n: int, inc: float):

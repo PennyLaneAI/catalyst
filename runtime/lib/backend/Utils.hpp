@@ -15,11 +15,16 @@
 #pragma once
 
 #include <array>
-#include <stdexcept>
 #include <string_view>
 #include <tuple>
 
 #include "Types.h"
+
+#if __has_include("StateVectorKokkos.hpp")
+#include "UtilKokkos.hpp"
+#else
+#include "Util.hpp"
+#endif
 
 namespace Catalyst::Runtime::Simulator::Lightning {
 enum class SimulatorGate : uint8_t {

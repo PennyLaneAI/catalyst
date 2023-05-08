@@ -84,7 +84,7 @@ class PassPipeline(abc.ABC):
     """Abstract PassPipeline class."""
 
     _executable: Optional[str] = None
-    _default_flags: Optional[list[str]] = None
+    _default_flags: Optional[List[str]] = None
 
     @staticmethod
     @abc.abstractmethod
@@ -209,10 +209,11 @@ class MLIRToLLVMDialect(PassPipeline):
         # Must be run after -convert-math-to-llvm as it marks math::powf illegal but doesn't convert it.
         "--convert-math-to-libm",
         "--convert-arith-to-llvm",
-        "--convert-memref-to-llvm",
+        "--convert-memref-to-llvm=use-generic-functions",
         "--convert-index-to-llvm",
         "--convert-gradient-to-llvm",
         "--convert-quantum-to-llvm",
+        "--emit-catalyst-py-interface",
         # Remove any dead casts as the final pass expects to remove all existing casts,
         # but only those that form a loop back to the original type.
         "--canonicalize",
