@@ -1,3 +1,6 @@
+"""Setup pytest configurations."""
+
+
 def pytest_addoption(parser):
     """Add pytest custom options."""
 

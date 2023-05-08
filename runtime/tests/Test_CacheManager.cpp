@@ -201,8 +201,7 @@ TEST_CASE("Test __quantum__qis__ circuit with observables", "[CacheManager]")
                state[2].imag == Approx(0).margin(1e-5)));
         CHECK((state[3].real == Approx(0.0).margin(1e-5) &&
                state[3].imag == Approx(-0.0705929).margin(1e-5)));
-
-        // qml.var(qml.PauliZ(wires=1))
+        // qml.expval(qml.PauliZ(wires=1))
         QUBIT **qubit = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
         auto obs = __quantum__qis__NamedObs(ObsId::PauliZ, *qubit);
 
@@ -251,8 +250,7 @@ TEST_CASE("Test __quantum__qis__ circuit with observables using deactiveCacheMan
                state[2].imag == Approx(0).margin(1e-5)));
         CHECK((state[3].real == Approx(0.0).margin(1e-5) &&
                state[3].imag == Approx(-0.0705929).margin(1e-5)));
-
-        // qml.var(qml.PauliZ(wires=1))
+        // qml.expval(qml.PauliZ(wires=1))
         QUBIT **qubit = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
         auto obs = __quantum__qis__NamedObs(ObsId::PauliZ, *qubit);
 

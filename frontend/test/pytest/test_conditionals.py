@@ -151,6 +151,8 @@ class TestCond:
         assert circuit(-3) == -3
 
     def test_qubit_manipulation_cond(self, backend):
+        """Test qubit manipulation in the 'if' branch."""
+
         @qjit()
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(x):
@@ -206,7 +208,7 @@ class TestCond:
         ):
             qjit(qml.qnode(qml.device(backend, wires=1))(circuit))
 
-    def test_branch_with_arg(self, backend):
+    def test_branch_with_arg(self):
         """Test that an exception is raised when an 'else if' branch function contains an arg"""
 
         def circuit(pred: bool):
