@@ -152,9 +152,8 @@ class TestCompilerErrors:
                 """Get the name of the output file based on the input file."""
                 return infile.replace(".mlir", ".o")
 
-            # pylint: disable=unused-argument
             @staticmethod
-            def run(infile, **kwargs):
+            def run(infile, **_kwargs):
                 """Run the compilation step."""
                 contents = """
 #include <stdexcept>
