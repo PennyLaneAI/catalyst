@@ -21,6 +21,8 @@ from catalyst import qjit, measure, CompileError
 
 class TestMidCircuitMeasurement:
     def test_pl_measure(self, backend):
+        """Test PL measure."""
+
         def circuit():
             return qml.measure(0)
 
@@ -28,6 +30,8 @@ class TestMidCircuitMeasurement:
             qjit(qml.qnode(qml.device(backend, wires=1))(circuit))()
 
     def test_measure_outside_qjit(self):
+        """Test measure outside qjit."""
+
         def circuit():
             return measure(0)
 
@@ -35,6 +39,8 @@ class TestMidCircuitMeasurement:
             circuit()
 
     def test_measure_outside_qnode(self):
+        """Test measure outside qnode."""
+
         def circuit():
             return measure(0)
 
@@ -42,6 +48,8 @@ class TestMidCircuitMeasurement:
             qjit(circuit)()
 
     def test_basic(self, backend):
+        """Test measure (basic)."""
+
         @qjit()
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(x: float):
@@ -52,6 +60,8 @@ class TestMidCircuitMeasurement:
         assert circuit(jnp.pi)  # m will be equal to True if wire 0 is measured in 1 state
 
     def test_more_complex(self, backend):
+        """Test measure (more complex)."""
+
         @qjit()
         @qml.qnode(qml.device(backend, wires=2))
         def circuit(x: float):

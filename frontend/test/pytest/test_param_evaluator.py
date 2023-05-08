@@ -22,6 +22,8 @@ from catalyst.param_evaluator import ParamEvaluator
 
 class TestParamEvaluator:
     def test_basic_jax_fn(self):
+        """Test basic jax fn."""
+
         def fn(x):
             return x**2
 
@@ -38,6 +40,8 @@ class TestParamEvaluator:
         assert out == 25.0
 
     def test_constant_in_jax_fn(self):
+        """Test constant in jax fn."""
+
         def fn(x):
             return 3.0, x**2
 
@@ -54,6 +58,8 @@ class TestParamEvaluator:
         assert pe.get_partial_return_value() == 25.0
 
     def test_outputs(self):
+        """Test outputs."""
+
         def fn(x, y):
             return 3.0, x**2, 3 * x * y
 
@@ -71,6 +77,8 @@ class TestParamEvaluator:
         assert pe.get_partial_return_value() == expected_out[2]
 
     def test_out_of_order(self):
+        """Test out of order."""
+
         def fn(x):
             return x**2
 

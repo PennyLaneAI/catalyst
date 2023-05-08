@@ -1018,7 +1018,6 @@ class QJITDevice(qml.QubitDevice):
 
     name = "QJIT device"
     short_name = "qjit.device"
-    backend = ""
     pennylane_requires = "0.1.0"
     version = "0.0.1"
     author = ""

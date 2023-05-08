@@ -46,11 +46,11 @@ def g(arg0: int, arg1: int, arg2: int):
         (g, [1, 1, 1]),
     ],
 )
-def test_buffer_args(f, params, backend):
+def test_buffer_args(circuit, params, backend):
     """Test buffer args."""
 
     device = qml.device(backend, wires=1)
-    interpreted_fn = qml.QNode(f, device)
+    interpreted_fn = qml.QNode(circuit, device)
     jitted_fn = qjit(interpreted_fn)
     assert jnp.allclose(interpreted_fn(*params), jitted_fn(*params))
 

@@ -318,27 +318,27 @@ def _grad_lowering(ctx, *args, jaxpr, fn, method, h, argnum):
 #
 # qdevice
 #
-def qdevice(spec, name):
+def qdevice(spec, val):
     """Bind operands to operation."""
-    return qdevice_p.bind(key=spec, val=name)
+    return qdevice_p.bind(spec=spec, val=val)
 
 
 @qdevice_p.def_impl
-def _qdevice_def_impl(ctx, key, val):  # pragma: no cover
+def _qdevice_def_impl(ctx, spec, val):  # pragma: no cover
     raise NotImplementedError()
 
 
 @qdevice_p.def_abstract_eval
 # pylint: disable=unused-argument
-def _qdevice_abstract_eval(key=None, val=None):
+def _qdevice_abstract_eval(spec, val):
     return ()
 
 
-def _qdevice_lowering(jax_ctx: mlir.LoweringRuleContext, key, val):
+def _qdevice_lowering(jax_ctx: mlir.LoweringRuleContext, spec, val):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
-    backend_attr = ir.StringAttr.get(key)
+    backend_attr = ir.StringAttr.get(spec)
     backend_val = "default" if val == "qjit.device" else val
     val_attr = ir.StringAttr.get(backend_val)
 

@@ -28,6 +28,8 @@ from catalyst.compilation_pipelines import CompiledFunction
 
 
 def f_aot_builder(backend, wires=1, shots=1000):
+    """Test AOT builder."""
+
     @qjit()
     @qml.qnode(qml.device(backend, wires=wires, shots=shots))
     def f(x: float):
@@ -38,6 +40,8 @@ def f_aot_builder(backend, wires=1, shots=1000):
 
 
 def f_jit_builder(backend, wires=1, shots=1000):
+    """Test JIT builder."""
+
     @qjit()
     @qml.qnode(qml.device(backend, wires=wires, shots=shots))
     def f(x):
@@ -48,6 +52,8 @@ def f_jit_builder(backend, wires=1, shots=1000):
 
 
 def fsample_aot_builder(backend, wires=1, shots=1000):
+    """Test AOT builder with the sample measurement process."""
+
     @qjit()
     @qml.qnode(qml.device(backend, wires=wires, shots=shots))
     def f(x: float):
@@ -59,6 +65,8 @@ def fsample_aot_builder(backend, wires=1, shots=1000):
 
 class TestDifferentPrecisions:
     def test_different_precisions(self, backend):
+        """Test different precisions."""
+
         def builder(_in):
             @qjit
             @qml.qnode(qml.device(backend, wires=1))
@@ -93,6 +101,8 @@ class TestJittedWithOneTypeRunWithAnother:
         ],
     )
     def test_recompile_when_unsupported_argument(self, from_type, to_type, backend):
+        """Test recompile when unsupported argument."""
+
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def f(x):
@@ -116,6 +126,8 @@ class TestJittedWithOneTypeRunWithAnother:
         ],
     )
     def test_signless(self, type, backend):
+        """Test signless."""
+
         with warnings.catch_warnings():
             # Treat warnings as an error.
             warnings.simplefilter("error")
@@ -144,6 +156,8 @@ class TestJittedWithOneTypeRunWithAnother:
         ],
     )
     def test_recompile_warning(self, to_type, backend):
+        """Test recompile warning."""
+
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def f(x: jax.core.ShapedArray([], jnp.int8)):
@@ -170,6 +184,8 @@ class TestJittedWithOneTypeRunWithAnother:
         ],
     )
     def test_recompile_python_types(self, from_type, to_type, backend):
+        """Test recompile python types."""
+
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def f(x):
@@ -198,6 +214,8 @@ class TestJittedWithOneTypeRunWithAnother:
         ],
     )
     def test_recompile_no_warning(self, to_type, backend):
+        """Test recompile no warning."""
+
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def f(x):
@@ -233,6 +251,8 @@ class TestTypePromotion:
         ],
     )
     def test_promote_to_double(self, promote_from, val, backend):
+        """Test promote to double."""
+
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def f(x):
@@ -258,6 +278,8 @@ class TestTypePromotion:
         ],
     )
     def test_promotion_python_types(self, from_type, to_type, backend):
+        """Test promotion python types."""
+
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def f(x):
@@ -283,6 +305,8 @@ class TestTypePromotion:
         ],
     )
     def test_promote_to_int(self, promote_from, backend):
+        """Test promote to int."""
+
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def f(x):
@@ -305,6 +329,8 @@ class TestTypePromotion:
         ],
     )
     def test_promote_unsigned(self, promote_from, backend):
+        """Test promote to unsigned."""
+
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def f(x):
@@ -335,6 +361,8 @@ class TestTypePromotion:
         ],
     )
     def test_promote_complex(self, promote_from, backend):
+        """Test promote complex."""
+
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def f(x):
@@ -351,6 +379,8 @@ class TestTypePromotion:
 
 class TestCallsiteCompileVsFunctionDefinitionCompile:
     def test_equivalence(self, backend):
+        """Test equivalence."""
+
         f_jit = f_jit_builder(backend)
         f_aot = f_aot_builder(backend)
         f_jit(0.0)
@@ -359,6 +389,8 @@ class TestCallsiteCompileVsFunctionDefinitionCompile:
 
 class TestDecorator:
     def test_function_is_cached(self, backend):
+        """Test function is cached with decorator."""
+
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def f_no_parenthesis(x):
@@ -376,6 +408,8 @@ class TestDecorator:
 
 class TestCaching:
     def test_function_is_cached(self, backend):
+        """Test function is cached."""
+
         @qjit()
         @qml.qnode(qml.device(backend, wires=1))
         def f_jit(x):
@@ -394,16 +428,11 @@ class TestCaching:
         assert run_time < compile_and_run_time
 
 
-class TestModes:
-    def test_ftqc_mode(self, backend):
-        f_aot = f_aot_builder(backend)
-        assert not f_aot(0.0)
-        assert f_aot(pi)
-
-
 class TestShots:
     # Shots influences on the sample instruction
     def test_shots_in_decorator_in_sample(self, backend):
+        """Test shots in decorator in sample."""
+
         max_shots = 500
         max_wires = 9
         for x in range(1, 5):
@@ -416,6 +445,8 @@ class TestShots:
             assert expected_shape == observed_shape
 
     def test_shots_in_callsite_in_sample(self, backend):
+        """Test shots in callsite in sample."""
+
         max_shots = 500
         max_wires = 9
         for x in range(1, 5):
@@ -433,12 +464,16 @@ class TestShots:
 
 class TestSignatureErrors:
     def test_incompatible_argument(self):
+        """Test incompatible argument."""
+
         string = "hello world"
         with pytest.raises(TypeError) as err:
             CompiledFunction.get_runtime_signature([string])
         assert "Unsupported argument type:" in str(err.value)
 
     def test_incompatible_compiled_vs_runtime(self):
+        """Test incompatible compiled vs runtime."""
+
         retval = CompiledFunction.can_promote([], [1])
         assert not retval
 
@@ -446,6 +481,8 @@ class TestSignatureErrors:
 class TestClassicalCompilation:
     @pytest.mark.parametrize("a,b", [(1, 1)])
     def test_pure_classical_function(self, a, b):
+        """Test pure classical function."""
+
         def addi(x: int, y: int):
             return x + y
 
@@ -464,6 +501,8 @@ class TestArraysInHamiltonian:
         ],
     )
     def test_array_repr_from_context(self, coeffs, backend):
+        """Test array representation from context in Hamiltonian."""
+
         @qjit(target="mlir")
         @qml.qnode(qml.device(backend, wires=6))
         def f():
@@ -481,6 +520,8 @@ class TestArraysInHamiltonian:
         ],
     )
     def test_array_repr_as_parameter(self, coeffs, backend):
+        """Test array representation as parameter in Hamiltonian."""
+
         @qjit(target="mlir")
         @qml.qnode(qml.device(backend, wires=6))
         def f(coeffs):
@@ -500,6 +541,8 @@ class TestArraysInHamiltonian:
         ],
     )
     def test_array_repr_built_in(self, repr, backend):
+        """Test array representation built-in in Hamiltonian."""
+
         @qjit(target="mlir")
         @qml.qnode(qml.device(backend, wires=6))
         def f():
@@ -531,6 +574,8 @@ class TestArraysInHermitian:
         ],
     )
     def test_array_repr_from_context(self, matrix, repr, backend):
+        """Test array representation from context in Hermitian."""
+
         @qjit(target="mlir")
         @qml.qnode(qml.device(backend, wires=6))
         def f(x: float):
@@ -549,6 +594,8 @@ class TestArraysInHermitian:
         ],
     )
     def test_array_repr_as_parameter(self, matrix, repr, backend):
+        """Test array representation as parameter in Hermitian."""
+
         @qjit(target="mlir")
         @qml.qnode(qml.device(backend, wires=2))
         def f(matrix):
@@ -567,6 +614,8 @@ class TestArraysInHermitian:
         ],
     )
     def test_array_repr_built_in(self, repr, backend):
+        """Test array representation built-in in Hermitian."""
+
         @qjit(target="mlir")
         @qml.qnode(qml.device(backend, wires=2))
         def f(x: float):
@@ -587,6 +636,8 @@ class TestArraysInHermitian:
 
 class TestTracingQJITAnnotatedFunctions:
     def test_purely_classical_context(self):
+        """Test purely classical context."""
+
         @qjit
         def f():
             return 1
@@ -601,6 +652,8 @@ class TestTracingQJITAnnotatedFunctions:
         assert g() == 2
 
     def test_quantum_context(self, backend):
+        """Test quantum context."""
+
         @qml.qnode(qml.device(backend, wires=1))
         def f(x: float):
             qml.RX(x, wires=0)
@@ -620,6 +673,8 @@ class TestTracingQJITAnnotatedFunctions:
 
     @pytest.mark.parametrize("phi", [(0.0), (1.0), (2.0)])
     def test_gradient_of_qjit_equivalence(self, phi, backend):
+        """Test gradient of qjit equivalence."""
+
         # Issue 376
         @qjit
         @qml.qnode(device=qml.device(backend, wires=1))
@@ -638,6 +693,8 @@ class TestTracingQJITAnnotatedFunctions:
 
     @pytest.mark.parametrize("phi", [(0.0), (1.0), (2.0)])
     def test_gradient_of_qjit_correctness(self, phi, backend):
+        """Test gradient of qjit correctness."""
+
         @qml.qnode(device=qml.device(backend, wires=1))
         def circuit(phi):
             qml.RX(phi, wires=0)
@@ -656,6 +713,8 @@ class TestTracingQJITAnnotatedFunctions:
         assert np.allclose(workflow1(phi), workflow2(phi))
 
     def test_gradient_of_qjit_names(self, backend):
+        """Test gradient of qjit names."""
+
         @qml.qnode(device=qml.device(backend, wires=1))
         def circuit(phi):
             qml.RX(phi, wires=0)
@@ -680,6 +739,8 @@ class TestTracingQJITAnnotatedFunctions:
 
 class TestDefaultAvailableIR:
     def test_mlir(self):
+        """Test mlir."""
+
         @qjit
         def f():
             return 1
@@ -687,6 +748,8 @@ class TestDefaultAvailableIR:
         assert f.mlir
 
     def test_qir(self, backend):
+        """Test qir."""
+
         @qml.qnode(qml.device(backend, wires=1))
         def f(x: float):
             qml.RX(x, wires=0)
@@ -702,6 +765,8 @@ class TestDefaultAvailableIR:
 
 class TestAvoidVerification:
     def test_no_verification(self, capfd, backend):
+        """Test no verification."""
+
         dev1 = qml.device(backend, wires=1)
 
         @qml.qnode(device=dev1)

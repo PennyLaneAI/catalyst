@@ -20,6 +20,8 @@ import numpy as np
 
 
 def test_no_parameters(backend):
+    """Test no-param operations."""
+
     def circuit():
         qml.Identity(wires=0)
 
@@ -87,6 +89,8 @@ def test_no_parameters(backend):
 
 
 def test_param(backend):
+    """Test param operations."""
+
     def circuit(x: float, y: float):
         qml.Rot(x, y, x + y, wires=0)
 

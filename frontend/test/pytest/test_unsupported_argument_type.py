@@ -20,6 +20,8 @@ import jax
 
 
 def test_strings_aot(backend):
+    """Test strings AOT."""
+
     # Due to limitations in the frontend, we can only test qjit with scalar floats.
     @qjit()
     @qml.qnode(qml.device(backend, wires=2))
@@ -33,6 +35,8 @@ def test_strings_aot(backend):
 
 
 def test_strings_jit(backend):
+    """Test strings JIT."""
+
     # Due to limitations in the frontend, we can only test qjit with scalar floats.
     @qjit()
     @qml.qnode(qml.device(backend, wires=2))

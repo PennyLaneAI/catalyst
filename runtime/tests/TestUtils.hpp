@@ -12,6 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+/**
+ * @file TestUtils.hpp
+ * Helper methods for C++ Tests
+ */
 #pragma once
 
 #include <string>
@@ -22,6 +26,9 @@
 
 #include "LightningSimulator.hpp"
 
+/**
+ * A tuple of available backend devices to be tested using TEMPLATE_LIST_TEST_CASE in Catch2
+ */
 #if __has_include("StateVectorKokkos.hpp")
 #include "LightningKokkosSimulator.hpp"
 using SimTypes = std::tuple<Catalyst::Runtime::Simulator::LightningSimulator,
@@ -30,6 +37,13 @@ using SimTypes = std::tuple<Catalyst::Runtime::Simulator::LightningSimulator,
 using SimTypes = std::tuple<Catalyst::Runtime::Simulator::LightningSimulator>;
 #endif
 
+/**
+ * Get available device names in the compatible format for `__quantum__rt__device`
+ *
+ * This is a utility function used in Catch2 tests.
+ *
+ * @return `std::vector<std::pair<std::string, std::string>>`
+ */
 static inline auto getDevices() -> std::vector<std::pair<std::string, std::string>>
 {
     std::vector<std::pair<std::string, std::string>> devices{{"backend", "lightning.qubit"}};

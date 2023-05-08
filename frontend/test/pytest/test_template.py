@@ -24,6 +24,8 @@ from pennylane import numpy as pnp
 
 
 def test_amplitude_embedding(backend):
+    """Test amplitude embedding."""
+
     def amplitude_embedding(f: jax.core.ShapedArray([4], float)):
         qml.AmplitudeEmbedding(features=f, wires=range(2))
         return qml.expval(qml.PauliZ(0))
@@ -36,6 +38,8 @@ def test_amplitude_embedding(backend):
 
 
 def test_angle_embedding(backend):
+    """Test angle embedding."""
+
     def angle_embedding(f: jax.core.ShapedArray([3], int)):
         qml.AngleEmbedding(features=f, wires=[0, 1, 2], rotation="Z")
         qml.Hadamard(0)
@@ -49,6 +53,8 @@ def test_angle_embedding(backend):
 
 
 def test_basis_embedding(backend):
+    """Test basis embedding."""
+
     def basis_embedding(f: jax.core.ShapedArray([3], int)):
         qml.BasisEmbedding(features=f, wires=[0, 1, 2])
         return qml.state()
@@ -61,6 +67,8 @@ def test_basis_embedding(backend):
 
 
 def test_iqp_embedding(backend):
+    """Test iqp embedding."""
+
     def iqp_embedding(f: jax.core.ShapedArray([3], float)):
         qml.IQPEmbedding(f, wires=[0, 1, 2])
         return qml.state()
@@ -73,6 +81,8 @@ def test_iqp_embedding(backend):
 
 
 def test_qaoa_embedding(backend):
+    """Test qaoa embedding."""
+
     def qaoa_embedding(
         weights: jax.core.ShapedArray([2, 3], float), f: jax.core.ShapedArray([2], float)
     ):
@@ -87,6 +97,8 @@ def test_qaoa_embedding(backend):
 
 
 def test_random_layers(backend):
+    """Test random layers."""
+
     def randomlayers(weights: jax.core.ShapedArray([1, 3], float)):
         qml.RandomLayers(weights=weights, wires=range(2))
         return qml.state()
@@ -99,6 +111,8 @@ def test_random_layers(backend):
 
 
 def test_strongly_entangled_layers(backend):
+    """Test strongly entangled layers."""
+
     def strongly_entangled_layers(weights: jax.core.ShapedArray([2, 4, 3], float)):
         qml.StronglyEntanglingLayers(weights=weights, wires=range(4))
         return qml.state()
@@ -114,6 +128,8 @@ def test_strongly_entangled_layers(backend):
 
 
 def test_simplified_two_design(backend):
+    """Test simplified two design."""
+
     def simplified_two_design(init_weights, weights):
         qml.SimplifiedTwoDesign(initial_layer_weights=init_weights, weights=weights, wires=range(3))
         return qml.state()
@@ -128,6 +144,8 @@ def test_simplified_two_design(backend):
 
 
 def test_basic_entangler_layers(backend):
+    """Test basic entangler layers."""
+
     def basic_entangler_layers(weights):
         qml.BasicEntanglerLayers(weights=weights, wires=range(3))
         return [qml.expval(qml.PauliZ(wires=i)) for i in range(3)]
@@ -140,6 +158,8 @@ def test_basic_entangler_layers(backend):
 
 
 def test_basis_state_preparation(backend):
+    """Test basis state preparation."""
+
     def basis_state_preparation(basis_state):
         qml.BasisStatePreparation(basis_state, wires=range(4))
         return [qml.expval(qml.PauliZ(wires=i)) for i in range(4)]
@@ -152,6 +172,8 @@ def test_basis_state_preparation(backend):
 
 
 def test_mottonen_state_preparation(backend):
+    """Test mottonen state preparation."""
+
     def mottonen_state_prep(state: jax.core.ShapedArray([8], complex)):
         qml.MottonenStatePreparation(state_vector=state, wires=range(3))
         return qml.state()
@@ -176,6 +198,8 @@ def test_mottonen_state_preparation(backend):
 
 
 def test_arbitrary_state_preparation(backend):
+    """Test arbitrary state preparation."""
+
     def vqe(weights):
         qml.ArbitraryStatePreparation(weights, wires=[0, 1])
         return qml.state()
@@ -188,6 +212,8 @@ def test_arbitrary_state_preparation(backend):
 
 
 def test_all_single_doubles(backend):
+    """Test all single doubles."""
+
     electrons = 2
     qubits = 4
     hf_state = qml.qchem.hf_state(electrons, qubits)
@@ -207,6 +233,8 @@ def test_all_single_doubles(backend):
 
 
 def test_gate_fabric(backend):
+    """Test gate fabric."""
+
     symbols = ["H", "H"]
     coordinates = np.array([0.0, 0.0, -0.6614, 0.0, 0.0, 0.6614])
     H, qubits = qml.qchem.molecular_hamiltonian(symbols, coordinates)
@@ -231,6 +259,8 @@ def test_gate_fabric(backend):
 
 
 def test_uccsd(backend):
+    """Test UCCSD."""
+
     symbols = ["H", "H", "H"]
     geometry = pnp.array(
         [
@@ -260,6 +290,8 @@ def test_uccsd(backend):
 
 
 def test_kup(backend):
+    """Test KUP."""
+
     def kup(weights):
         qml.kUpCCGSD(weights, wires=[0, 1, 2, 3], k=1, delta_sz=0, init_state=[1, 1, 0, 0])
         return qml.state()
@@ -272,6 +304,8 @@ def test_kup(backend):
 
 
 def test_mps(backend):
+    """Test MPS."""
+
     def block(weights, wires):
         qml.CNOT(wires=[wires[0], wires[1]])
         qml.RY(weights[0], wires=wires[0])
@@ -292,6 +326,8 @@ def test_mps(backend):
 
 
 def test_ttn(backend):
+    """Test TTN."""
+
     def block(weights, wires):
         qml.CNOT(wires=[wires[0], wires[1]])
         qml.RY(weights[0], wires=wires[0])
@@ -312,6 +348,8 @@ def test_ttn(backend):
 
 
 def test_mera(backend):
+    """Test MERA."""
+
     def block(weights, wires):
         qml.CNOT(wires=[wires[0], wires[1]])
         qml.RY(weights[0], wires=wires[0])
@@ -332,6 +370,8 @@ def test_mera(backend):
 
 
 def test_grover(backend):
+    """Test Grover."""
+
     n_wires = 3
     wires = list(range(n_wires))
 
@@ -376,6 +416,8 @@ def test_grover(backend):
 
 
 def test_fermionic(backend):
+    """Test Fermionic."""
+
     def fermionic(weight):
         qml.FermionicSingleExcitation(weight, wires=[0, 1, 2])
         return qml.state()
@@ -388,6 +430,8 @@ def test_fermionic(backend):
 
 
 def test_fermionic_double(backend):
+    """Test Fermionic double."""
+
     def fermionic(weight):
         qml.FermionicDoubleExcitation(weight, wires1=[0, 1], wires2=[2, 3, 4])
         return qml.state()
@@ -400,6 +444,8 @@ def test_fermionic_double(backend):
 
 
 def test_permute(backend):
+    """Test Permute."""
+
     def permute():
         qml.templates.Permute([4, 2, 0, 1, 3], wires=[0, 1, 2, 3, 4])
         return qml.state()
@@ -411,6 +457,8 @@ def test_permute(backend):
 
 
 def test_qft(backend):
+    """Test QFT."""
+
     def qft(basis_state):
         qml.BasisState(basis_state, wires=range(3))
         qml.QFT(wires=range(3))
@@ -424,6 +472,8 @@ def test_qft(backend):
 
 
 def test_commuting_evolution(backend):
+    """Test CommutingEvolution."""
+
     n_wires = 2
     device = qml.device(backend, wires=n_wires)
 
@@ -442,6 +492,8 @@ def test_commuting_evolution(backend):
 
 
 def test_flip_sign(backend):
+    """Test FlipSign."""
+
     def flip_sign():
         qml.Hadamard(wires=0)
         qml.Hadamard(wires=1)
@@ -455,6 +507,8 @@ def test_flip_sign(backend):
 
 
 def test_broadcast_single(backend):
+    """Test broadcast single."""
+
     def broadcast_single(pars):
         qml.broadcast(unitary=qml.RX, pattern="single", wires=[0, 1, 2], parameters=pars)
         return qml.expval(qml.PauliZ(0))
@@ -467,6 +521,8 @@ def test_broadcast_single(backend):
 
 
 def test_broadcast_double(backend):
+    """Test broadcast double."""
+
     def broadcast_double(pars):
         qml.broadcast(unitary=qml.CRot, pattern="double", wires=[0, 1, 2, 3], parameters=pars)
         return qml.expval(qml.PauliZ(0))
@@ -479,6 +535,8 @@ def test_broadcast_double(backend):
 
 
 def test_broadcast_chain(backend):
+    """Test broadcast chain."""
+
     def broadcast_chain(pars):
         qml.broadcast(unitary=qml.CRot, pattern="chain", wires=[0, 1, 2, 3], parameters=pars)
         return qml.expval(qml.PauliZ(0))
@@ -491,6 +549,8 @@ def test_broadcast_chain(backend):
 
 
 def test_broadcast_ring(backend):
+    """Test broadcast ring."""
+
     def broadcast_ring(pars):
         qml.broadcast(unitary=qml.CRot, pattern="ring", wires=[0, 1, 2], parameters=pars)
         return qml.expval(qml.PauliZ(0))
@@ -503,6 +563,8 @@ def test_broadcast_ring(backend):
 
 
 def test_broadcast_pyramid(backend):
+    """Test broadcast pyramid."""
+
     def broadcast_pyramid(pars):
         qml.broadcast(unitary=qml.CRot, pattern="pyramid", wires=[0, 1, 2, 3], parameters=pars)
         return qml.expval(qml.PauliZ(0))
@@ -515,6 +577,8 @@ def test_broadcast_pyramid(backend):
 
 
 def test_broadcast_all_to_all(backend):
+    """Test broadcast all to all."""
+
     def broadcast_all_to_all(pars):
         qml.broadcast(unitary=qml.CRot, pattern="all_to_all", wires=[0, 1, 2, 3], parameters=pars)
         return qml.expval(qml.PauliZ(0))
@@ -527,6 +591,8 @@ def test_broadcast_all_to_all(backend):
 
 
 def test_approx_time_evoluation(backend):
+    """Test ApproxTimeEvolution."""
+
     def approx_time_evolution(time):
         coeffs = [1, 1]
         obs = [qml.PauliX(0), qml.PauliX(1)]
@@ -542,6 +608,8 @@ def test_approx_time_evoluation(backend):
 
 
 def test_quantum_phase_estimation(backend):
+    """Test QuantumPhaseEstimation."""
+
     phase = 5
     target_wires = [0]
     unitary = qml.RX(phase, wires=0).matrix()
@@ -562,6 +630,8 @@ def test_quantum_phase_estimation(backend):
 
 
 def test_quantum_montecarlo():
+    """Test QuantumMonteCarlo."""
+
     m = 5
     M = 2**m
     xmax = np.pi

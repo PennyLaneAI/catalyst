@@ -89,21 +89,18 @@ class ExecutionContext final {
         RT_ASSERT(getMemoryManager() == nullptr);
     };
 
-    void setDeviceName(std::string_view name) noexcept
-    {
-        if (name != "default") {
-            this->_name = name;
-        }
-    }
-
     void toggleDeviceRecorder(bool status) noexcept { this->_tape_recording = status; }
 
     [[nodiscard]] auto getDeviceName() const -> std::string_view { return this->_name; }
 
     [[nodiscard]] auto getDeviceRecorderStatus() const -> bool { return this->_tape_recording; }
 
-    [[nodiscard]] bool initDevice() noexcept
+    [[nodiscard]] bool initDevice(std::string_view name) noexcept
     {
+        if (name != "default") {
+            this->_name = name;
+        }
+
         this->_driver_ptr.reset(nullptr);
 
         auto iter = _device_map.find(this->_name);

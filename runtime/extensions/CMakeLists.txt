@@ -3,7 +3,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include(FetchContent)
 
-set(LIGHTNING_GIT_TAG "main" CACHE STRING "GIT_TAG value to build Lightning-Kokkos")
+set(LIGHTNING_GIT_TAG "master" CACHE STRING "GIT_TAG value to build Lightning")
 set(source_files "StateVectorDynamicCPU.cpp")
 FetchContent_Declare(
     pennylane_lightning
@@ -19,11 +19,13 @@ add_library(lightnings_interface INTERFACE)
 target_link_libraries(lightnings_interface INTERFACE pennylane_lightning)
 target_include_directories(lightnings_interface INTERFACE .)
 
+set(LIGHTNING_KOKKOS_GIT_TAG "main" CACHE STRING "GIT_TAG value to build Lightning-Kokkos")
+
 if(ENABLE_LIGHTNING_KOKKOS)
     FetchContent_Declare(
         pennylane_lightning_kokkos
         GIT_REPOSITORY https://github.com/PennyLaneAI/pennylane-lightning-kokkos.git
-        GIT_TAG        multidev/fix_buildw_lightning_new # TODO: Update this after merging PR #49 (lightning.kokkos)
+        GIT_TAG        ${LIGHTNING_KOKKOS_GIT_TAG}
     )
 
     FetchContent_MakeAvailable(pennylane_lightning_kokkos)

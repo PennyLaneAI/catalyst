@@ -25,6 +25,8 @@ class TestBasicCircuits:
 
     @pytest.mark.parametrize("args", [[np.pi, 0, 0], [np.pi, 0, 1], [np.pi, 1, 0], [np.pi, 1, 1]])
     def test_operations(self, args, backend):
+        """Test operations."""
+
         def circuit(arg0: float, arg1: int, arg2: int):
             qml.RX(arg0, wires=[arg1])
             qml.RX(arg0, wires=[arg2])
@@ -36,6 +38,8 @@ class TestBasicCircuits:
 
     @pytest.mark.parametrize("args", [[np.pi, 0, 0], [np.pi, 0, 1], [np.pi, 1, 0], [np.pi, 1, 1]])
     def test_operations_with_computation(self, args, backend):
+        """Test operations with computation."""
+
         def circuit(arg0: float, arg1: int, arg2: int):
             qml.RX(arg0, wires=[arg1])
             qml.RX(arg0, wires=[arg2 + 1])
@@ -47,6 +51,8 @@ class TestBasicCircuits:
 
     @pytest.mark.parametrize("args", [[np.pi, 0, 0], [np.pi, 0, 1], [np.pi, 1, 0], [np.pi, 1, 1]])
     def test_measurements(self, args, backend):
+        """Test measurements."""
+
         def circuit(arg0: float, w1: int, w2: int):
             qml.RX(arg0, wires=w1)
             return qml.sample(wires=w2)
@@ -57,6 +63,8 @@ class TestBasicCircuits:
 
     @pytest.mark.parametrize("args", [[np.pi, 0, 0], [np.pi, 0, 1], [np.pi, 1, 0], [np.pi, 1, 1]])
     def test_measurements_with_computation(self, args, backend):
+        """Test measurements with computation."""
+
         def circuit(arg0: float, w1: int, w2: int):
             qml.RX(arg0, wires=w1)
             return qml.sample(wires=[w2 + 1])
@@ -67,6 +75,8 @@ class TestBasicCircuits:
 
     @pytest.mark.parametrize("args", [[jnp.pi, 0, 1], [jnp.pi, 1, 0]])
     def test_observables(self, args, backend):
+        """Test observables."""
+
         def circuit(arg0: float, w1: int, w2: int):
             qml.RX(arg0, wires=w1)
             A = np.array(
@@ -85,6 +95,8 @@ class TestBasicCircuits:
 
     @pytest.mark.parametrize("args", [[jnp.pi, 0, 0]])
     def test_observables_with_computation(self, args, backend):
+        """Test observables with computation."""
+
         def circuit(arg0: float, w1: int, w2: int):
             qml.RX(arg0, wires=w1)
             A = np.array(
@@ -102,6 +114,8 @@ class TestBasicCircuits:
         assert np.allclose(result, expected)
 
     def test_reinsertion_before_dynamic_wires(self, backend):
+        """Test reinsertion before dynamic wires."""
+
         @qml.qnode(qml.device(backend, wires=7))
         def circuit(qb):
             # Without reinsertion the Rot gate would be folded away as it produces a dangling qubit.
@@ -123,6 +137,8 @@ class TestControlFlow:
         "args,expected", [([0, 0], True), ([0, 1], False), ([1, 0], False), ([1, 1], True)]
     )
     def test_conditional(self, args, expected, backend):
+        """Test conditional."""
+
         @qjit()
         @qml.qnode(qml.device(backend, wires=2))
         def circuit(x: int, y: int):
@@ -143,6 +159,8 @@ class TestControlFlow:
         "args,expected", [([0, 0], False), ([0, 1], False), ([1, 0], True), ([1, 1], True)]
     )
     def test_while_loop_with_func_arg_wires(self, args, expected, backend):
+        """Test while loop with func arg wires."""
+
         @qjit()
         @qml.qnode(qml.device(backend, wires=2))
         def circuit(n: int, m: int):
@@ -168,6 +186,8 @@ class TestControlFlow:
         ],
     )
     def test_while_loop_with_loop_arg_wires(self, args, expected, backend):
+        """Test while loop with loop arg wires."""
+
         @qjit()
         @qml.qnode(qml.device(backend, wires=5))
         def circuit(n: int, m: int):

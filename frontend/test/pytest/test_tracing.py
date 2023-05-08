@@ -23,6 +23,8 @@ from catalyst import cond, measure, qjit, while_loop
 
 class TestTracing:
     def test_fixed_tracing(self, backend):
+        """Test fixed tracing."""
+
         @qjit()
         @qml.qnode(qml.device(backend, wires=1))
         def circuit():
@@ -33,6 +35,8 @@ class TestTracing:
         assert not circuit()
 
     def test_cond_inside_while_loop(self, backend):
+        """Test cond inside while loop."""
+
         def reset_measure(wires):
             """
             measure a wire and then reset it back to the |0> state
@@ -68,6 +72,8 @@ class TestTracing:
         circuit(5)
 
     def test_discarded_measurements(self, backend):
+        """Test discarded measurements."""
+
         @qjit()
         @qml.qnode(qml.device(backend, wires=2))
         def circuit():
@@ -77,6 +83,8 @@ class TestTracing:
         assert circuit() is None
 
     def test_mixed_result_types(self, backend):
+        """Test mixed result types."""
+
         @qjit()
         @qml.qnode(qml.device(backend, wires=1))
         def circuit():

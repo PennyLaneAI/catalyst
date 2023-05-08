@@ -20,6 +20,8 @@ import numpy as np
 
 
 def test_sample_on_1qbit(backend):
+    """Test sample on 1 qubit."""
+
     @qjit()
     @qml.qnode(qml.device(backend, wires=1, shots=1000))
     def sample_1qbit(x: float):
@@ -36,6 +38,8 @@ def test_sample_on_1qbit(backend):
 
 
 def test_sample_on_2qbits(backend):
+    """Test sample on 2 qubits."""
+
     @qjit()
     @qml.qnode(qml.device(backend, wires=2, shots=1000))
     def sample_2qbits(x: float):
@@ -52,6 +56,8 @@ def test_sample_on_2qbits(backend):
 
 
 def test_count_on_1qbit(backend):
+    """Test counts on 1 qubits."""
+
     @qjit()
     @qml.qnode(qml.device(backend, wires=1, shots=1000))
     def counts_1qbit(x: float):
@@ -68,6 +74,8 @@ def test_count_on_1qbit(backend):
 
 
 def test_count_on_2qbits(backend):
+    """Test counts on 2 qubits."""
+
     @qjit()
     @qml.qnode(qml.device(backend, wires=2, shots=1000))
     def counts_2qbit(x: float):
@@ -86,6 +94,8 @@ def test_count_on_2qbits(backend):
 
 class TestExpval:
     def test_named(self, backend):
+        """Test expval for named observables."""
+
         @qjit()
         @qml.qnode(qml.device(backend, wires=1))
         def expval1(x: float):
@@ -101,6 +111,8 @@ class TestExpval:
         assert np.isclose(observed, expected)
 
     def test_hermitian_1(self, backend):
+        """Test expval for Hermitian observable."""
+
         @qjit()
         @qml.qnode(qml.device(backend, wires=1))
         def expval2(x: float):
@@ -119,6 +131,8 @@ class TestExpval:
         assert np.isclose(observed, expected)
 
     def test_hermitian_2(self, backend):
+        """Test expval for Hermitian observable."""
+
         @qjit()
         @qml.qnode(qml.device(backend, wires=2))
         def expval3(x: float):
@@ -142,6 +156,8 @@ class TestExpval:
         assert np.isclose(observed, expected)
 
     def test_tensor_1(self, backend):
+        """Test expval for Tensor observable."""
+
         @qjit()
         @qml.qnode(qml.device(backend, wires=2))
         def expval4(x: float, y: float):
@@ -159,6 +175,8 @@ class TestExpval:
         assert np.isclose(observed, expected)
 
     def test_tensor_2(self, backend):
+        """Test expval for Tensor observable."""
+
         @qjit()
         @qml.qnode(qml.device(backend, wires=3))
         def expval5(x: float, y: float):
@@ -180,6 +198,8 @@ class TestExpval:
         assert np.isclose(observed, expected)
 
     def test_hamiltonian_1(self, backend):
+        """Test expval for Hamiltonian observable."""
+
         @qjit()
         @qml.qnode(qml.device(backend, wires=3))
         def expval6(x: float, y: float):
@@ -201,6 +221,8 @@ class TestExpval:
         assert np.isclose(observed, expected)
 
     def test_hamiltonian_2(self, backend):
+        """Test expval for Hamiltonian observable."""
+
         @qjit()
         @qml.qnode(qml.device(backend, wires=2))
         def expval6(x: float):
@@ -230,6 +252,8 @@ class TestExpval:
 
 class TestVar:
     def test_rx(self, backend):
+        """Test var with RX."""
+
         @qjit()
         @qml.qnode(qml.device(backend, wires=1))
         def var1(x: float):
@@ -243,6 +267,8 @@ class TestVar:
         assert np.isclose(observed, expected)
 
     def test_hadamard(self, backend):
+        """Test var with Hadamard."""
+
         @qjit()
         @qml.qnode(qml.device(backend, wires=1))
         def var2(x: float):
@@ -257,6 +283,8 @@ class TestVar:
 
 
 def test_state(backend):
+    """Test state."""
+
     @qjit()
     @qml.qnode(qml.device(backend, wires=1))
     def state(x: float):
@@ -269,6 +297,8 @@ def test_state(backend):
 
 
 def test_multiple_return_values(backend):
+    """Test multiple return values."""
+
     @qjit()
     @qml.qnode(qml.device(backend, wires=2, shots=100))
     def all_measurements(x):

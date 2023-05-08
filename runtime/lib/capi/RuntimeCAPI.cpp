@@ -80,8 +80,7 @@ void __quantum__rt__device(int8_t *spec, int8_t *value)
                                              reinterpret_cast<char *>(value)};
 
     if (args[0] == "backend") {
-        Catalyst::Runtime::CTX->setDeviceName(args[1]);
-        RT_FAIL_IF(!Catalyst::Runtime::CTX->initDevice(),
+        RT_FAIL_IF(!Catalyst::Runtime::CTX->initDevice(args[1]),
                    "Failed initialization of the backend device");
     }
     else {
