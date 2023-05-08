@@ -56,6 +56,15 @@ void *_mlir_memref_to_llvm_aligned_alloc(size_t alignment, size_t size)
     return ptr;
 }
 
+bool _mlir_memory_transfer(void *ptr)
+{
+    if (!Catalyst::Runtime::CAPI::DRIVER->get_memory_manager()->contains(ptr)) {
+        return false;
+    }
+    Catalyst::Runtime::CAPI::DRIVER->get_memory_manager()->erase(ptr);
+    return true;
+}
+
 void _mlir_memref_to_llvm_free(void *ptr)
 {
     Catalyst::Runtime::CAPI::DRIVER->get_memory_manager()->erase(ptr);

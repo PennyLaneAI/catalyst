@@ -54,7 +54,16 @@ description = {
     "license": "Apache License 2.0",
 }
 
-ext_modules = intree_extensions(["frontend/catalyst/utils/wrapper.cpp"])
+import numpy as np
+import os
+
+lib_path_npymath = os.path.join(np.get_include(), "..", "lib")
+intree_extension_list = intree_extensions(["frontend/catalyst/utils/wrapper.cpp"])
+for ext in intree_extension_list:
+    ext._add_ldflags(["-L", lib_path_npymath])  # pylint: disable=protected-access
+    ext._add_ldflags(["-lnpymath"])
+    ext._add_cflags(["-I", np.get_include()])
+ext_modules = intree_extension_list
 
 setup(
     classifiers=classifiers,

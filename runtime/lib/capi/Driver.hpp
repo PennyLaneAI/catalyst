@@ -48,6 +48,7 @@ class MemoryManager final {
 
     void insert(void *ptr) { _impl.insert(ptr); }
     void erase(void *ptr) { _impl.erase(ptr); }
+    bool contains(void *ptr) { return _impl.contains(ptr); }
 };
 
 class Driver final {

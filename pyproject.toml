@@ -11,7 +11,7 @@ extend-exclude = '''
 '''
 
 [build-system]
-requires = ["setuptools>=62", "wheel", "pybind11>=2.7.0"]
+requires = ["setuptools>=62", "wheel", "pybind11>=2.7.0", "numpy"]
 build-backend = "setuptools.build_meta"
 
 [tool.pytest.ini_options]
