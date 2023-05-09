@@ -40,6 +40,11 @@
   copies at the interface boundaries, which has been applied to existing devices.
   [#109](https://github.com/PennyLaneAI/catalyst/pull/109)
 
+* Reduce memory utilization by transferring ownership of buffers from the runtime to Python instead
+  of copying them. This includes adding a compiler pass that copies global buffers into the heap
+  as global buffers cannot be transferred to Python.
+  [#112](https://github.com/PennyLaneAI/catalyst/pull/112)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
