@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from fnmatch import fnmatch
 from pathlib import Path
 from re import compile as re_compile
-from fnmatch import fnmatch
 
 SRCFILE_EXT = ["c", "cc", "cpp", "cxx", "cu"]
 HEADERFILE_EXT = ["h", "hh", "hpp", "hxx", "cuh"]

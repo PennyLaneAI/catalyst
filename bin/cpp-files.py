@@ -20,7 +20,6 @@ import sys
 
 from utils import get_cpp_files
 
-
 if __name__ == "__main__":
     """
     This program output a json list of all C++ source files.

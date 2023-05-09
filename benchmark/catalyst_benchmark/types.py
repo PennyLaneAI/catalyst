@@ -11,17 +11,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" Benchmaring data type definitions """
-from typing import List, Optional, Any, Dict
-from os import uname
-from multiprocessing import cpu_count
-from platform import system
-from argparse import Action, SUPPRESS
+""" Benchmarking data type definitions """
 
+from argparse import SUPPRESS, Action
 from dataclasses import dataclass
+from multiprocessing import cpu_count
+from os import uname
+from platform import system
+from typing import Any, Dict, List, Optional
+
+from cpuinfo import get_cpu_info
 from dataclasses_json import dataclass_json
 from psutil import virtual_memory
-from cpuinfo import get_cpu_info
 
 
 def unpack_complex(l: List[complex]) -> List[List[float]]:

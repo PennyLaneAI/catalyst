@@ -12,13 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """ ChemVQE problem, PennyLane+Catalyst implementation """
+
 from dataclasses import dataclass
 
-import pennylane as qml
 import jax.numpy as jnp
-from jax.core import ShapedArray
-from catalyst import qjit, for_loop
+import pennylane as qml
 from catalyst_benchmark.types import Problem
+from jax.core import ShapedArray
+
+from catalyst import for_loop, qjit
 
 
 @dataclass
