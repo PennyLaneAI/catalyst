@@ -12,17 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """ ChemVQE problem, PennyLane/PennyLane+JAX implementation """
+
 # pylint: disable=import-outside-toplevel
 # pylint: disable=too-many-instance-attributes
-from typing import Any, Dict
+
 from dataclasses import dataclass
 from functools import partial
+from typing import Any, Dict
 
-import pennylane.numpy as pnp
-import pennylane as qml
 import numpy as np
-from pennylane import AllSinglesDoubles
+import pennylane as qml
+import pennylane.numpy as pnp
 from catalyst_benchmark.types import Problem
+from pennylane import AllSinglesDoubles
 
 
 @dataclass
