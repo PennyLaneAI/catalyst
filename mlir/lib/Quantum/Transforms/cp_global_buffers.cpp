@@ -18,13 +18,11 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "llvm/Support/FormatVariadic.h"
 
 #include "Quantum/Transforms/Passes.h"
 #include "Quantum/Transforms/Patterns.h"
 
 using namespace mlir;
-using namespace catalyst::quantum;
 
 namespace {
 
@@ -179,6 +177,7 @@ struct CopyGlobalMemRefPass : public PassWrapper<CopyGlobalMemRefPass, Operation
         registry.insert<memref::MemRefDialect>();
         registry.insert<func::FuncDialect>();
         registry.insert<scf::SCFDialect>();
+        registry.insert<LLVM::LLVMDialect>();
     }
 
     void runOnOperation() final
