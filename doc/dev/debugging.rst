@@ -35,7 +35,7 @@ Below is an example of how to obtain a C program that can be linked against the 
     def identity(x):
         return x
 
-    print(circuit.get_cmain(1.0))
+    print(identity.get_cmain(1.0))
 
 Using the ``QJIT.get_cmain`` function, the following string is returned to the user:
 
