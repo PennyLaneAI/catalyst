@@ -360,6 +360,15 @@ def vjp(f, params, cotangents, *, method=None, h=None, argnum=None):
     Args:
         f(DifferentiableLike): Function-like object to calculate VJP for
     """
+    def _check(x, hint):
+        if isinstance(x, list):
+            return x
+        elif isinstance(x, tuple):
+            return list(x)
+        else:
+            raise ValueError(f"vjp '{hint}' argument must be a list or a tuple, not {type(x)}")
+    params = _check(params, 'params')
+    cotangents = _check(cotangents, 'cotangents')
     fn:Differentiable = _bless_differentiable(f)
     grad_params = _check_grad_params(method, h, argnum)
     jaxpr = _make_jaxpr_differentiable(fn, grad_params, *params)

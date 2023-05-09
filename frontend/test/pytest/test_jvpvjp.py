@@ -22,18 +22,34 @@ from typing import Union, TypeVar, Tuple, Any
 from jax import linearize as J_jvp, vjp as J_vjp
 from catalyst import CompileError, cond, for_loop, grad, qjit, jvp as C_jvp, vjp as C_vjp
 from numpy.testing import assert_allclose
+from jax.tree_util import tree_flatten, tree_unflatten
 
 
 X = TypeVar('X')
 T = TypeVar('T')
-def sum_if_tuples(x:Union[X, Tuple[Tuple[T]]]) -> Union[X, Tuple[T]]:
-    return sum(x,()) if isinstance(x, tuple) and all(isinstance(i, tuple) for i in x) else x
+def flatten_if_tuples(x:Union[X, Tuple[Union[T,Tuple[T]]]]) -> Union[X, Tuple[T]]:
+    return sum(((i if isinstance(i, tuple) else (i,)) for i in x), ()) if isinstance(x, tuple) else x
 
 
 testvec = [
+
+    (lambda x1,x2: (
+         jnp.stack([
+               3*jnp.reshape(x1,[6]) + 4*jnp.reshape(x2,[6]),
+               3*jnp.reshape(x1,[6]) + 4*jnp.reshape(x2,[6])])),
+     [jnp.zeros([3,2], dtype=float), jnp.zeros([2,3], dtype=float)],
+     [jnp.ones([3,2], dtype=float), jnp.ones([2,3], dtype=float)],
+     [jnp.ones([2,6], dtype=float)]),
+
+    (lambda x: (x, jnp.stack([1*x, 2*x, 3*x])),
+     [jnp.zeros([4], dtype=float)],
+     [jnp.ones([4], dtype=float)],
+     [jnp.ones([4], dtype=float), jnp.ones([3,4], dtype=float)]),
+
     (lambda x: jnp.stack([1*x, 2*x, 3*x]),
      [jnp.zeros([4], dtype=float)],
-     [jnp.ones([4], dtype=float)]),
+     [jnp.ones([4], dtype=float)],
+     [jnp.ones([3,4], dtype=float)]),
 
     (lambda x1,x2: (
          1*jnp.reshape(x1,[6]) + 2*jnp.reshape(x2,[6]), \
@@ -41,16 +57,14 @@ testvec = [
                3*jnp.reshape(x1,[6]) + 4*jnp.reshape(x2,[6]),
                3*jnp.reshape(x1,[6]) + 4*jnp.reshape(x2,[6])])),
      [jnp.zeros([3,2], dtype=float), jnp.zeros([2,3], dtype=float)],
-     [jnp.ones([3,2], dtype=float), jnp.ones([2,3], dtype=float)]),
-
-    (lambda x: (x, jnp.stack([1*x, 2*x, 3*x])),
-     [jnp.zeros([4], dtype=float)],
-     [jnp.ones([4], dtype=float)]),
+     [jnp.ones([3,2], dtype=float), jnp.ones([2,3], dtype=float)],
+     [jnp.ones([6], dtype=float),
+      jnp.ones([2,6], dtype=float)]),
 ]
 
 
-@pytest.mark.parametrize("f, x, t", testvec)
-def test_jvp_against_jax(f:callable, x:list, t:list):
+@pytest.mark.parametrize("f, x, t, _", testvec)
+def test_jvp_against_jax(f:callable, x:list, t:list, _):
     """ Numerically tests Catalyst's jvp against the JAX version. """
 
     @qjit
@@ -60,7 +74,30 @@ def test_jvp_against_jax(f:callable, x:list, t:list):
     @jax.jit
     def J_workflow():
         y,ft = J_jvp(f, *x)
-        return sum_if_tuples((y,ft(*t)))
+        return flatten_if_tuples((y,ft(*t)))
+
+    r1 = C_workflow()
+    r2 = J_workflow()
+    print(r1)
+    print(r2)
+
+    for a,b in zip(r1,r2):
+        assert_allclose(a, b, rtol=1e-6, atol=1e-6)
+
+
+@pytest.mark.parametrize("f, x, _, ct", testvec)
+def test_vjp_against_jax(f:callable, x:list, _, ct:list):
+    """ Numerically tests Catalyst's jvp against the JAX version. """
+
+    @qjit
+    def C_workflow():
+        return C_vjp(f, x, ct, method='fd', argnum=list(range(len(x))))
+
+    @jax.jit
+    def J_workflow():
+        y,ft = J_vjp(f, *x)
+        ct2 = tree_unflatten(tree_flatten(y)[1], ct)
+        return flatten_if_tuples((y, ft(ct2)))
 
     r1 = C_workflow()
     r2 = J_workflow()
