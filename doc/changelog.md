@@ -5,7 +5,7 @@
 * Add a Backprop operation with Bufferiation
   [#107](https://github.com/PennyLaneAI/catalyst/pull/107)
 
-* Add support for `else if` chains for `@cond` conditionals
+* Add support for ``else if`` chains for ``@cond`` conditionals
   [#104](https://github.com/PennyLaneAI/catalyst/pull/104)
 
 <h3>Improvements</h3>
@@ -21,6 +21,9 @@
 * Improve python compatibility by providing a stable signature for user generated functions.
   [#106](https://github.com/PennyLaneAI/catalyst/pull/106)
 
+* Handle C++ exceptions without unwinding the whole stack.
+  [#99](https://github.com/PennyLaneAI/catalyst/pull/99)
+
 <h3>Breaking changes</h3>
 
 <h3>Bug fixes</h3>
@@ -34,6 +37,12 @@
 * Fix a memory regression and reduce memory footprint by removing unnecessary temporary buffers.
   [#100](https://github.com/PennyLaneAI/catalyst/pull/100)
 
+* Provide a new abstraction to the ``QuantumDevice`` interface in the runtime called ``MemRefView``.
+  C++ implementations of the interface can iterate through and directly store results into the
+  ``MemRefView`` independant of the underlying memory layout. This can eliminate redundant buffer
+  copies at the interface boundaries, which has been applied to existing devices.
+  [#109](https://github.com/PennyLaneAI/catalyst/pull/109)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
@@ -42,6 +51,7 @@ Ali Asadi,
 David Ittah,
 Erick Ochoa Lopez,
 Romain Moyard,
+Erick Ochoa Lopez,
 Mai Jacob Peng.
 
 # Release 0.1.2

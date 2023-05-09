@@ -465,7 +465,10 @@ class Compiler:
 
     @staticmethod
     def _get_class_from_string(pipeline):
-        return getattr(sys.modules[__name__], pipeline)
+        try:
+            return getattr(sys.modules[__name__], pipeline)
+        except AttributeError as e:
+            raise ValueError(f"Output for pass {pipeline} not found.") from e
 
     def _get_output_file_of(self, pipeline):
         cls = Compiler._get_class_from_string(pipeline)
@@ -479,13 +482,13 @@ class Compiler:
         Returns
             (str): output IR
         """
+        fname = self._get_output_file_of(pipeline)
         try:
-            fname = self._get_output_file_of(pipeline)
-        except AttributeError as e:
-            raise ValueError(f"Output for pass {pipeline} not found.") from e
-        with open(fname, "r", encoding="utf-8") as f:
-            txt = f.read()
-        return txt
+            with open(fname, "r", encoding="utf-8") as f:
+                txt = f.read()
+            return txt
+        except TypeError:
+            return None
 
     def print(self, pipeline):
         """Print the output IR of pass.

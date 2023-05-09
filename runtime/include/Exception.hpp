@@ -81,10 +81,6 @@ class RuntimeException : public std::exception {
     sstream << "[" << file_name << "][Line:" << line << "][Function:" << function_name
             << "] Error in Catalyst Runtime: " << message;
 
-    // TODO: This should be removed after runtime error
-    // messages can propagate in the frontend.
-    std::cerr << sstream.str() << std::endl;
-
     throw RuntimeException(sstream.str());
 } // LCOV_EXCL_LINE
 
