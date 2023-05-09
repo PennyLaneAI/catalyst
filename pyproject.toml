@@ -10,6 +10,10 @@ extend-exclude = '''
 )
 '''
 
+[tool.isort]
+profile = "black"
+extend_skip_glob = ["mlir/llvm-project/*", "mlir/mlir-hlo/*", ".git/*", ".vscode/*"]
+
 [build-system]
 requires = ["setuptools>=62", "wheel", "pybind11>=2.7.0"]
 build-backend = "setuptools.build_meta"

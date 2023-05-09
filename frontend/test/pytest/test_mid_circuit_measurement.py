@@ -12,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import pytest
 import jax.numpy as jnp
 import pennylane as qml
+import pytest
 
-from catalyst import qjit, measure, CompileError
+from catalyst import CompileError, measure, qjit
 
 
 class TestMidCircuitMeasurement:

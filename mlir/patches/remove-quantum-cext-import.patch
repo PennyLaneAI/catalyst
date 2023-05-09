@@ -2,6 +2,6 @@
 +++ qquantu,py
 @@ -15,4 +15,3 @@
  """MLIR Dialect for Quantum dialect."""
- 
- from ._quantum_ops_gen import *  # noqa: F401
+
 -from .._mlir_libs._quantumDialects.quantum import *  # noqa: F401
+ from ._quantum_ops_gen import *  # noqa: F401

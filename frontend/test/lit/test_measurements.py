@@ -14,9 +14,10 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
-from catalyst import qjit
-import pennylane as qml
 import numpy as np
+import pennylane as qml
+
+from catalyst import qjit
 
 
 # CHECK-LABEL: private @sample1(

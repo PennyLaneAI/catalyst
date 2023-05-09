@@ -13,11 +13,11 @@
 # limitations under the License.
 """Test suite for loop operations in Catalyst."""
 
-import pytest
 import numpy as np
 import pennylane as qml
+import pytest
 
-from catalyst import qjit, measure, while_loop, for_loop
+from catalyst import for_loop, measure, qjit, while_loop
 
 # pylint: disable=no-value-for-parameter
 

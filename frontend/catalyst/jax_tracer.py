@@ -17,10 +17,29 @@
 import jax
 import pennylane as qml
 from jax._src.dispatch import jaxpr_replicas
-from jax.interpreters.mlir import List, AxisContext, source_info_util, Sequence, Optional, xc
-from jax.interpreters.mlir import Tuple, ir, ReplicaAxisContext, xla, util, xb, itertools
-from jax.interpreters.mlir import ModuleContext, lower_jaxpr_to_fun, lowerable_effects, Any
-from jax.interpreters.mlir import _set_up_aliases, _module_name_regex, sharded_aval, warnings
+from jax.interpreters.mlir import (
+    Any,
+    AxisContext,
+    List,
+    ModuleContext,
+    Optional,
+    ReplicaAxisContext,
+    Sequence,
+    Tuple,
+    _module_name_regex,
+    _set_up_aliases,
+    ir,
+    itertools,
+    lower_jaxpr_to_fun,
+    lowerable_effects,
+    sharded_aval,
+    source_info_util,
+    util,
+    warnings,
+    xb,
+    xc,
+    xla,
+)
 from jax.interpreters.partial_eval import DynamicJaxprTracer
 from jax.tree_util import tree_unflatten
 from pennylane.measurements import MeasurementProcess

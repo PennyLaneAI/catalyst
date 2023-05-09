@@ -13,24 +13,24 @@
 # limitations under the License.
 """ Single measurement entry point """
 import sys
-from sys import exit
 from argparse import ArgumentParser
+from json import dump as json_dump
+from json import load as json_load
 from os import makedirs
 from os.path import dirname
-from json import dump as json_dump, load as json_load
+from sys import exit
 from traceback import print_exc
 
 import numpy as np
-
-from catalyst_benchmark.types import BooleanOptionalAction
 from catalyst_benchmark.measurements import (
-    parse_args,
-    selfcheck,
     REGISTRY,
-    parse_implementation,
     BenchmarkResult,
+    parse_args,
+    parse_implementation,
+    selfcheck,
     with_alarm,
 )
+from catalyst_benchmark.types import BooleanOptionalAction
 
 # fmt: off
 ap = ArgumentParser(prog="python3 benchmark.py")
