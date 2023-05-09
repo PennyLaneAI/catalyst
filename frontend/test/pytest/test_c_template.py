@@ -151,7 +151,11 @@ class TestCProgramGeneration:
 
 
 class TestCProgramGenerationErrors:
+    """Test errors raised from the c program generation feature."""
+
     def test_raises_error_if_tracing(self):
+        """Test errors if c program generation requested during tracing."""
+
         @qjit
         def f(x: float):
             """Identity function."""
