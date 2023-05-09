@@ -23,8 +23,12 @@ size_t memref_size_based_on_rank(size_t rank)
     return allocated + aligned + offset + sizes + strides;
 }
 
-size_t *to_sizes(char *base)
+size_t *to_sizes(char *base, size_t rank)
 {
+    if (rank == 0) {
+        return NULL;
+    }
+
     size_t allocated = sizeof(void *);
     size_t aligned = sizeof(void *);
     size_t offset = sizeof(size_t);
@@ -34,6 +38,10 @@ size_t *to_sizes(char *base)
 
 size_t *to_strides(char *base, size_t rank)
 {
+    if (rank == 0) {
+        return NULL;
+    }
+
     size_t allocated = sizeof(void *);
     size_t aligned = sizeof(void *);
     size_t offset = sizeof(size_t);
@@ -49,6 +57,27 @@ void free_wrap(PyObject *capsule)
     free(allocated);
 }
 
+const npy_intp *npy_get_dimensions(char *memref, size_t rank)
+{
+    size_t *sizes = to_sizes(memref, rank);
+    const npy_intp *dims = (npy_intp *)sizes;
+    return dims;
+}
+
+const npy_intp *npy_get_strides(char *memref, size_t element_size, size_t rank)
+{
+    size_t *strides = to_strides(memref, rank);
+    for (unsigned int idx = 0; idx < rank; idx++) {
+        // memref strides are in terms of elements.
+        // numpy strides are in terms of bytes.
+        // Therefore multiply by element size.
+        strides[idx] *= (size_t)element_size;
+    }
+
+    npy_intp *npy_strides = (npy_intp *)strides;
+    return npy_strides;
+}
+
 py::list move_returns(void *memref_array_ptr, py::object result_desc, py::object transfer,
                       py::dict numpy_arrays)
 {
@@ -61,18 +90,21 @@ py::list move_returns(void *memref_array_ptr, py::object result_desc, py::object
     using f_ptr_t = bool (*)(void *);
     f_ptr_t f_transfer_ptr = *((f_ptr_t *)ctypes.attr("addressof")(transfer).cast<size_t>());
 
+    /* Data from the result description */
     auto ranks = result_desc.attr("_ranks_");
     auto etypes = result_desc.attr("_etypes_");
+    auto sizes = result_desc.attr("_sizes_");
+
     size_t memref_len = ranks.attr("__len__")().cast<size_t>();
     size_t offset = 0;
 
-    auto numpy = py::module::import("numpy");
     char *memref_array_bytes = (char *)(memref_array_ptr);
 
     for (size_t idx = 0; idx < memref_len; idx++) {
         unsigned int rank_i = ranks.attr("__getitem__")(idx).cast<unsigned int>();
         char *memref_i_beginning = memref_array_bytes + offset;
         offset += memref_size_based_on_rank(rank_i);
+
         struct memref_beginning_t *memref = (struct memref_beginning_t *)memref_i_beginning;
         bool is_in_rt_heap = f_transfer_ptr(memref->allocated);
 
@@ -89,33 +121,20 @@ py::list move_returns(void *memref_array_ptr, py::object result_desc, py::object
             continue;
         }
 
-        // This is the case where the returned tensor is managed by the runtime
-        // and we need to construct a new numpy array.
-        py::object etype_i = etypes.attr("__getitem__")(idx);
-        auto dtype = numpy.attr("dtype")(etype_i);
-        size_t element_size = dtype.attr("itemsize").cast<size_t>();
+        const npy_intp *dims = npy_get_dimensions(memref_i_beginning, rank_i);
 
+        size_t element_size = sizes.attr("__getitem__")(idx).cast<size_t>();
+        const npy_intp *strides = npy_get_strides(memref_i_beginning, element_size, rank_i);
+
+        auto etype_i = etypes.attr("__getitem__")(idx);
         PyArray_Descr *descr = PyArray_DescrFromTypeObject(etype_i.ptr());
         if (!descr) {
             throw std::runtime_error("PyArray_Descr failed.");
         }
 
-        size_t *sizes = to_sizes(memref_i_beginning);
-        const npy_intp *dims = (npy_intp *)sizes;
-
-        size_t *strides = to_strides(memref_i_beginning, rank_i);
-        for (unsigned int jdx = 0; jdx < rank_i; jdx++) {
-            // memref strides are in terms of elements.
-            // numpy strides are in terms of bytes.
-            // Therefore multiply by element size.
-            strides[jdx] *= (size_t)element_size;
-        }
-
-        npy_intp *npy_strides = (npy_intp *)strides;
-
         void *aligned = memref->aligned;
         PyObject *new_array =
-            PyArray_NewFromDescr(&PyArray_Type, descr, rank_i, dims, npy_strides, aligned, 0, NULL);
+            PyArray_NewFromDescr(&PyArray_Type, descr, rank_i, dims, strides, aligned, 0, NULL);
         if (!new_array) {
             throw std::runtime_error("PyArray_NewFromDescr failed.");
         }
@@ -142,6 +161,7 @@ py::list move_returns(void *memref_array_ptr, py::object result_desc, py::object
         if (!pyLong) {
             throw std::runtime_error("PyLong_FromLong failed.");
         }
+
         numpy_arrays[pyLong] = new_array;
 
         Py_DECREF(pyLong);

@@ -311,6 +311,14 @@ class CompiledFunction:
         return mlir_type_to_numpy_type(mlir_element_type)
 
     @staticmethod
+    def get_sizes(mlir_tensor_type):
+        """Get element type size for an MLIR tensor type."""
+        mlir_element_type = ir.RankedTensorType(mlir_tensor_type).element_type
+        numpy_type = mlir_type_to_numpy_type(mlir_element_type)
+        dtype = np.dtype(numpy_type)
+        return dtype.itemsize
+
+    @staticmethod
     def get_ranks(mlir_tensor_type):
         """Get rank for an MLIR tensor type."""
         shape = ir.RankedTensorType(mlir_tensor_type).shape
@@ -338,6 +346,10 @@ class CompiledFunction:
             CompiledFunction.get_etypes(mlir_tensor_type) for mlir_tensor_type in mlir_tensor_types
         ]
 
+        sizes = [
+            CompiledFunction.get_sizes(mlir_tensor_type) for mlir_tensor_type in mlir_tensor_types
+        ]
+
         # pylint: disable=too-few-public-methods
         class CompiledFunctionReturnValue(ctypes.Structure):
             """Programmatically create a structure which holds N tensors of possibly different T base types."""
@@ -345,6 +357,7 @@ class CompiledFunction:
             _fields_ = [("f" + str(i), type(t)) for i, t in enumerate(return_fields_types)]
             _ranks_ = ranks
             _etypes_ = etypes
+            _sizes_ = sizes
 
         return_value = CompiledFunctionReturnValue()
         return_value_pointer = ctypes.pointer(return_value)
