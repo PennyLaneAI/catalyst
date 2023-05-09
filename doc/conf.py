@@ -87,6 +87,7 @@ MOCK_MODULES = [
     "mlir_quantum.dialects.scf",
     "mlir_quantum.dialects.quantum",
     "mlir_quantum.dialects.gradient",
+    "pybind11",
 ]
 
 mock = Mock()
@@ -267,7 +268,7 @@ edit_on_github_branch = "main/doc"
 autodoc_member_order = "bysource"
 
 # inheritance_diagram graphviz attributes
-inheritance_node_attrs = dict(color="lightskyblue1", fillcolor="lightskyblue1", style="filled")
+inheritance_node_attrs = {"color": "lightskyblue1", "fillcolor": "lightskyblue1", "style": "filled"}
 
 # autodoc_default_flags = ['members']
 autosummary_generate = True

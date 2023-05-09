@@ -36,6 +36,7 @@ from mlir_quantum.runtime import (
 
 from catalyst.utils.gen_mlir import inject_functions
 from catalyst.utils.c_template import get_template, mlir_type_to_numpy_type
+from catalyst.utils import wrapper  # pylint: disable=no-name-in-module
 import catalyst.jax_tracer as tracer
 from catalyst.compiler import Compiler
 from catalyst.compiler import CompileOptions
@@ -255,6 +256,7 @@ class CompiledFunction:
         Returns:
             retval: the value computed by the function or None if the function has no return value
         """
+
         shared_object, function, setup, teardown = CompiledFunction.load_symbols(
             shared_object_file, func_name
         )
@@ -265,7 +267,7 @@ class CompiledFunction:
         array_of_char_ptrs[:] = params_to_setup
 
         setup(ctypes.c_int(argc), array_of_char_ptrs)
-        function(*args)
+        wrapper.wrap(function, args)
 
         result = args[0] if has_return else None
         retval = CompiledFunction.return_value_ptr_to_numpy(result) if result else None
