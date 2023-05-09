@@ -19,7 +19,6 @@
 //////////////////////
 
 func.func private @circuit.nodealloc(%arg0: f32) -> (!quantum.reg)
-func.func private @circuit(%arg0: f32) -> (f64, memref<?xf64>)
 
 // CHECK-DAG:   llvm.func @__quantum__rt__toggle_recorder(i1)
 // CHECK-DAG:   llvm.func @__quantum__qis__Gradient(i64, ...)
@@ -45,4 +44,18 @@ func.func @adjoint(%arg0: f32, %arg1 : index) -> (memref<?xf64>, memref<?xf64>) 
     gradient.adjoint @circuit.nodealloc(%arg0) size(%arg1) in(%alloc0, %alloc1 : memref<?xf64>, memref<?xf64>) : (f32) -> ()
 
     return %alloc0, %alloc1 : memref<?xf64>, memref<?xf64>
+}
+
+// -----
+
+func.func private @circuit(%arg0: f64) -> (!quantum.reg)
+
+// CHECK-LABEL: func.func @backkprop(%arg0: f64, %arg1: index) {{.+}} {
+func.func @backprop(%arg0: f64, %arg1 : index) -> memref<?xf64> {
+
+    %alloc0 = memref.alloc(%arg1) : memref<?xf64>
+
+    gradient.backprop @circuit(%arg0) size(%arg1) in(%alloc0 : memref<?xf64>): (f64) -> ()
+
+    return %alloc0: memref<?xf64>
 }
