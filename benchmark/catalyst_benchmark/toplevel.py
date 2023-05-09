@@ -114,8 +114,8 @@ DIFF_METHODS = {
     ("chemvqe","runtime"): ["finite-diff", "parameter-shift", "adjoint", "backprop"]
 }
 
-# Colors obtained from a Vega colorscheme.
-# Ref. https://stackoverflow.com/questions/70993559/altair-selecting-a-color-from-a-vega-color-scheme-for-plot
+# Colors obtained from a Vega colorscheme. Ref:
+# https://stackoverflow.com/questions/70993559/altair-selecting-a-color-from-a-vega-color-scheme-for-plot
 COLORS = ["#e41a1c", "#377eb8", "#ff7f00", "#4daf4a", "#984ea3",
           "#ffff33", "#a65628", "#f781bf", "#999999"]
 
@@ -213,7 +213,6 @@ def collect(a: ParsedArguments) -> None:  # noqa
     # pylint: disable=too-many-nested-blocks
     # pylint: disable=too-many-branches
     # pylint: disable=broad-except
-    # pylint: disable=complex-method
     known_failures = deepcopy(KNOWN_FAILURES)
     try:
         for config in all_configurations(a):

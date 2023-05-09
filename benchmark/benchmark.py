@@ -18,7 +18,6 @@ from json import dump as json_dump
 from json import load as json_load
 from os import makedirs
 from os.path import dirname
-from sys import exit
 from traceback import print_exc
 
 import numpy as np
@@ -85,7 +84,7 @@ elif a.command == "run":
         print("\n".join(sorted({"- " + x[1] for x in REGISTRY.keys()})))
         should_exit = True
     if should_exit:
-        exit(1)
+        sys.exit(1)
 
     framework, device, _ = parse_implementation(a.implementation)
 
@@ -114,7 +113,7 @@ elif a.command == "run":
             assert np.allclose(r2.measurement_sec, r3.measurement_sec)
     except TimeoutError:
         print_exc()
-        exit(2)
+        sys.exit(2)
 
 else:
     raise ValueError(f"Invalid command {a.command}")
