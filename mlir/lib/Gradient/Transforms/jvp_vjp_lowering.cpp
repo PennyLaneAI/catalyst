@@ -91,7 +91,7 @@ void JVPLoweringPattern::rewrite(JVPOp op, PatternRewriter &rewriter) const
     MLIRContext *ctx = getContext();
 
     Location loc = op.getLoc();
-    LLVM_DEBUG(dbgs() << "replacing VJP op\n");
+    LLVM_DEBUG(dbgs() << "replacing JVP op\n");
 
     auto func_diff_operand_indices = GradOp::compDiffArgIndices(op.getDiffArgIndices());
     LLVM_DEBUG(dbgs() << "func_diff_operand_indices: " << func_diff_operand_indices << " \n");

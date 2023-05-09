@@ -69,7 +69,7 @@ Value einsumLinalgGeneric(
 
   Value r = ({
     Value empty = ob.create<tensor::EmptyOp>(loc, tr.getShape(), tr.getElementType());
-    Value zero = ob.create<arith::ConstantOp>(loc, ob.getF64FloatAttr(0.0));
+    Value zero = ob.create<arith::ConstantOp>(loc, tr.getElementType(), ob.getF64FloatAttr(0.0));
     ob.create<linalg::FillOp>(loc, zero, empty).getResult(0);
   });
 

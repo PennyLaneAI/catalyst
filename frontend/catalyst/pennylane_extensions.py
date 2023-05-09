@@ -340,11 +340,19 @@ def jvp(f, params, tangents, *, method=None, h=None, argnum=None):
     Args:
         f(DifferentiableLike): Function-like object to calculate JVP for
     """
+    def _check(x, hint):
+        if isinstance(x, list):
+            return x
+        elif isinstance(x, tuple):
+            return list(x)
+        else:
+            raise ValueError(f"jvp '{hint}' argument must be a list or a tuple, not {type(x)}")
+    params = _check(params, 'params')
+    tangents = _check(tangents, 'tangents')
     fn:Differentiable = _bless_differentiable(f)
     grad_params = _check_grad_params(method, h, argnum)
     jaxpr = _make_jaxpr_differentiable(fn, grad_params, *params)
-    results = jprim.jvp_p.bind(*(params + tangents), jaxpr=jaxpr, fn=fn, grad_params=grad_params)
-    return [results[0:len(results)//2], results[len(results)//2:]]
+    return jprim.jvp_p.bind(*(params + tangents), jaxpr=jaxpr, fn=fn, grad_params=grad_params)
 
 
 def vjp(f, params, cotangents, *, method=None, h=None, argnum=None):
@@ -355,9 +363,7 @@ def vjp(f, params, cotangents, *, method=None, h=None, argnum=None):
     fn:Differentiable = _bless_differentiable(f)
     grad_params = _check_grad_params(method, h, argnum)
     jaxpr = _make_jaxpr_differentiable(fn, grad_params, *params)
-    # print(jaxpr)
-    results = jprim.vjp_p.bind(*(params + cotangents), jaxpr=jaxpr, fn=fn, grad_params=grad_params)
-    return [results[0:len(results)//2], results[len(results)//2:]]
+    return jprim.vjp_p.bind(*(params + cotangents), jaxpr=jaxpr, fn=fn, grad_params=grad_params)
 
 
 # pylint: disable=too-few-public-methods
