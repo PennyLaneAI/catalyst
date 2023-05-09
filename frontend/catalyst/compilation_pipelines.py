@@ -346,11 +346,6 @@ class CompiledFunction:
             _ranks_ = ranks
             _etypes_ = etypes
 
-            def __iter__(self):
-                for f, _ in CompiledFunctionReturnValue._fields_:
-                    memref = getattr(self, f)
-                    yield memref
-
         return_value = CompiledFunctionReturnValue()
         return_value_pointer = ctypes.pointer(return_value)
         return return_value_pointer
