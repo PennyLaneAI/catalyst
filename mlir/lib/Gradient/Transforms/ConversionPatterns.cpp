@@ -137,60 +137,44 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
         Location loc = op.getLoc();
         MLIRContext *ctx = getContext();
         TypeConverter *conv = getTypeConverter();
+        LLVMTypeConverter llvmTypeConverter(ctx);
 
-        // Type vectorType = conv->convertType(MemRefType::get({UNKNOWN}, Float64Type::get(ctx)));
+        Type vectorType = conv->convertType(MemRefType::get({UNKNOWN}, Float64Type::get(ctx)));
 
-        // for (Type type : op.getResultTypes()) {
-        //     if (!type.isa<MemRefType>())
-        //         return op.emitOpError("must be bufferized before lowering");
-        // }
+        for (Type type : op.getResultTypes()) {
+            if (!type.isa<MemRefType>())
+                return op.emitOpError("must be bufferized before lowering");
+        }
 
-        // // The callee of the backprop Op
-        // func::FuncOp callee =
-        //     SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
-        // assert(callee);
+        // The callee of the backprop Op
+        func::FuncOp callee =
+            SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
+        assert(callee);
 
-        // StringRef backpropFnName = "__enzyme_autodiff";
-        // Type backpropFnSignature = LLVM::LLVMFunctionType::get(
-        //     LLVM::LLVMVoidType::get(ctx), {}, /*isVarArg=*/true);
+        StringRef backpropFnName = "__enzyme_autodiff";
+        Type backpropFnSignature = LLVM::LLVMFunctionType::get(
+            LLVM::LLVMVoidType::get(ctx), {}, /*isVarArg=*/true);
 
-        // LLVM::LLVMFuncOp backpropFnDecl = ensureFunctionDeclaration(rewriter, op, backpropFnName, backpropFnSignature);
+        LLVM::LLVMFuncOp backpropFnDecl = ensureFunctionDeclaration(rewriter, op, backpropFnName, backpropFnSignature);
 
-        // SmallVector<Type> argTypes(op.getArgs().getTypes().begin(), op.getArgs().getTypes().end());
+        SmallVector<Type> argTypes(op.getArgs().getTypes().begin(), op.getArgs().getTypes().end());
 
-        // SmallVector<Type> originalArgTypes, llvmArgTypes;
-        // for (auto argTypeIt = argTypes.begin(); argTypeIt < argTypes.end();
-        //     argTypeIt++) {
-        //     originalArgTypes.push_back(*argTypeIt);
-        //     if (argTypeIt->isa<TensorType>()) {
-        //         Type buffArgType = buffTypeConverter.convertType(*argTypeIt);
-        //         bufferizedArgTypes.push_back(buffArgType);
-        //         Type llvmArgType = llvmTypeConverter.convertType(buffArgType);
-        //         if (!llvmArgType)
-        //             emitError(loc, "Could not convert argmap argument to LLVM type: ") << buffArgType;
-        //         *argTypeIt = LLVM::LLVMPointerType::get(llvmArgType);
-        //     }
-        //     else {
-        //         bufferizedArgTypes.push_back(*argTypeIt);
-        //     }
-        // }
+        // We follow the C ABI convention of passing result memrefs as struct pointers in the
+        // arguments to the C function, although in this case as a variadic argument list to allow
+        // for a varying number of results in a single signature.
+        Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
+        Value numResults = rewriter.create<LLVM::ConstantOp>(
+            loc, rewriter.getI64IntegerAttr(op.getDataIn().size()));
+        SmallVector<Value> args = {numResults};
+        for (Value memref : adaptor.getDataIn()) {
+            auto newArg =
+                rewriter.create<LLVM::AllocaOp>(loc, LLVM::LLVMPointerType::get(vectorType), c1);
+            rewriter.create<LLVM::StoreOp>(loc, memref, newArg);
+            args.push_back(newArg);
+        }
 
-        // // We follow the C ABI convention of passing result memrefs as struct pointers in the
-        // // arguments to the C function, although in this case as a variadic argument list to allow
-        // // for a varying number of results in a single signature.
-        // Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
-        // Value numResults = rewriter.create<LLVM::ConstantOp>(
-        //     loc, rewriter.getI64IntegerAttr(op.getDataIn().size()));
-        // SmallVector<Value> args = {numResults};
-        // for (Value memref : adaptor.getDataIn()) {
-        //     auto newArg =
-        //         rewriter.create<LLVM::AllocaOp>(loc, LLVM::LLVMPointerType::get(vectorType), c1);
-        //     rewriter.create<LLVM::StoreOp>(loc, memref, newArg);
-        //     args.push_back(newArg);
-        // }
-
-        // rewriter.create<LLVM::CallOp>(loc, backpropFnDecl, args);
-        // // rewriter.create<func::ReturnOp>(loc, returnValues);
+        rewriter.create<LLVM::CallOp>(loc, backpropFnDecl, args);
+        //rewriter.create<func::ReturnOp>(loc, returnValues);
 
         rewriter.eraseOp(op);
         return success();
