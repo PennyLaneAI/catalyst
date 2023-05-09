@@ -14,8 +14,11 @@
 
 """Unit tests for contents of c_template
 """
+import pytest
+
 from catalyst import qjit
 from catalyst.utils.c_template import CVariable, CType
+from catalyst.utils.exceptions import CompileError
 import numpy as np
 import pennylane as qml
 
@@ -126,7 +129,7 @@ class TestCProgramGeneration:
             qml.RX(x, wires=1)
             return qml.state(), qml.state()
 
-        template = f(4.0, ciface=True)
+        template = f.get_cmain(4.0)
         assert "main" in template
         assert "struct result_t result_val;" in template
         assert "buff_0 = 4.0" in template
@@ -141,7 +144,22 @@ class TestCProgramGeneration:
             """No-op function."""
             return None
 
-        template = f(ciface=True)
+        template = f.get_cmain()
         assert "struct result_t result_val;" not in template
         assert "buff_0" not in template
         assert "arg_0" not in template
+
+
+class TestCProgramGenerationErrors:
+    def test_raises_error_if_tracing(self):
+        @qjit
+        def f(x: float):
+            """Identity function."""
+            return x
+
+        with pytest.raises(CompileError, match="C interface cannot be generated"):
+
+            @qjit
+            def error_fn(x: float):
+                """Should raise an error as we try to generate the C template during tracing."""
+                return f.get_cmain(x)

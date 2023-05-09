@@ -389,11 +389,14 @@ class CompiledFunction:
         c_abi_args = [return_value_pointer] + [arg_value_pointer]
         return c_abi_args, numpy_arg_buffer
 
+    def get_cmain(self, *args):
+        """Get a string representing a C program that can be linked against the current shared object."""
+        _, buffer = CompiledFunction.args_to_memref_descs(self.restype, args)
+
+        return get_template(self.func_name, self.restype, *buffer)
+
     def __call__(self, *args, **kwargs):
         abi_args, _buffer = CompiledFunction.args_to_memref_descs(self.restype, args)
-
-        if kwargs.get("ciface") is not None:
-            return get_template(self.func_name, self.restype, *_buffer)
 
         result = CompiledFunction._exec(
             self.shared_object_file,
@@ -516,6 +519,48 @@ class QJIT:
         qfunc_name = str(self.mlir_module.body.operations[0].name).replace('"', "")
         return CompiledFunction(shared_object, qfunc_name, restype)
 
+    def _maybe_promote(self, function, *args):
+        """Logic to decide whether the function needs to be recompiled
+        given *args and whether *args need to be promoted.
+
+        Args:
+          function: an instance of CompiledFunction that may need recompilation
+          *args: arguments that may be promoted.
+
+        Returns:
+          function: an instance of CompiledFunction that may have been recompiled
+          *args: arguments that may have been promoted
+        """
+        args = [jax.numpy.array(arg) for arg in args]
+        r_sig = CompiledFunction.get_runtime_signature(*args)
+        is_prev_compile = function is not None
+        can_promote = not is_prev_compile or CompiledFunction.can_promote(self.c_sig, r_sig)
+        needs_compile = not is_prev_compile or not can_promote
+
+        if needs_compile:
+            if self.user_typed:
+                msg = "Provided arguments did not match declared signature, recompilation has been triggered"
+                warnings.warn(msg, UserWarning)
+            self.mlir_module = self.get_mlir(*r_sig)
+            function = self.compile()
+        else:
+            args = CompiledFunction.promote_arguments(self.c_sig, r_sig, *args)
+
+        return function, args
+
+    def get_cmain(self, *args):
+        """Return the C interface template for current arguments.
+
+        Args:
+          *args: Arguments to be used in the template.
+        Returns:
+          str: A C program that can be compiled with the current shared object.
+        """
+        msg = "C interface cannot be generated from tracing context."
+        TracingContext.check_is_not_tracing(msg)
+        function, args = self._maybe_promote(self.compiled_function, *args)
+        return function.get_cmain(*args)
+
     def __call__(self, *args, **kwargs):
         if TracingContext.is_tracing():
             return self.qfunc(*args, **kwargs)
@@ -526,21 +571,8 @@ class QJIT:
                 "to use jax.jit or jax.grad, please use their equivalent from Catalyst."
             )
 
-        args = [jax.numpy.array(arg) for arg in args]
-        r_sig = CompiledFunction.get_runtime_signature(*args)
-        is_prev_compile = self.compiled_function is not None
-        can_promote = not is_prev_compile or CompiledFunction.can_promote(self.c_sig, r_sig)
-        needs_compile = not is_prev_compile or not can_promote
-
-        if needs_compile:
-            if self.user_typed:
-                msg = "Provided arguments did not match declared signature, recompilation has been triggered"
-                warnings.warn(msg, UserWarning)
-            self.mlir_module = self.get_mlir(*r_sig)
-            self.compiled_function = self.compile()
-        else:
-            args = CompiledFunction.promote_arguments(self.c_sig, r_sig, *args)
-
+        function, args = self._maybe_promote(self.compiled_function, *args)
+        self.compiled_function = function
         return self.compiled_function(*args, **kwargs)
 
 
