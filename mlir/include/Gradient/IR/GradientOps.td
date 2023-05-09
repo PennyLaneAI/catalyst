@@ -92,4 +92,33 @@ def AdjointOp : Gradient_Op<"adjoint", [AttrSizedOperandSegments]> {
     }];
 }
 
+def BackpropOp : Gradient_Op<"backprop", [AttrSizedOperandSegments]> {
+    let summary = "Perform classic automatic differentiation using Enzyme AD.";
+
+    let arguments = (ins
+        FlatSymbolRefAttr:$callee,
+        Index:$gradSize,
+        AnyIntElementsAttr:$diffArgIndices,
+        Variadic<AnyType>:$args,
+        Variadic<AnyMemRef>:$data_in
+    );
+
+    let results = (outs
+        Variadic<AnyTypeOf<[
+            AnyFloat,
+            RankedTensorOf<[AnyFloat]>,
+        ]>>
+    );
+
+    let assemblyFormat = [{
+        $callee `(` $args `)`
+        `size` `(` $gradSize `)`
+        ( `in` `(` $data_in^ `:` type($data_in) `)` )?
+        attr-dict `:` functional-type($args, results)
+    }];
+}
+
+
+
+
 #endif // GRADIENT_OPS
