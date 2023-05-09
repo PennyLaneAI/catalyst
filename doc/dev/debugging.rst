@@ -21,6 +21,69 @@ Most of the time, Catalyst should work without special configuration of the envi
 * ``User defined compiler is not in path``: Following the example above, you may have installed ``clang-14`` in a different directory that is not currently on the ``PATH``.
   Please make sure that the executable specified in ``CATALYST_CC`` is available in the ``PATH`` and is flag compatible with ``gcc`` or ``clang``.
 
+Running without Python runtime
+==============================
+
+Sometimes, it might be useful to run the JIT compiled function without ``python``, for example in case of debugging.
+If the program succeeds without ``python``, then it is likely that the error is found in the interface between ``python`` and the JIT compiled function, or within Catalyst's ``python``'s internals.
+As a quick sanity check you might want to run the JIT compiled function without Python.
+Below is an example of how to obtain a C program that can be linked against the generated function:
+
+.. code-block:: python
+
+    @qjit(keep_intermediate=True)
+    def identity(x):
+        return x
+
+    print(circuit.get_cmain(1.0))
+
+Using the ``QJIT.get_cmain`` function, the following string is returned to the user:
+
+.. code-block:: C
+
+    #include <complex.h>
+    #include <stddef.h>
+    #include <stdint.h>
+
+    typedef int64_t int64;
+    typedef double float64;
+    typedef float float32;
+    typedef double complex complex128;
+    typedef float complex complex64;
+
+
+    struct memref_float64x0_t
+    {
+        float64* allocated;
+        float64* aligned;
+        size_t offset;
+
+    };
+    struct result_t {
+        struct memref_float64x0_t f_0;
+    };
+
+
+    extern void setup(int, char**);
+    extern void _catalyst_ciface_jit_identity(struct result_t*, struct memref_float64x0_t*);
+    extern void teardown();
+
+    int
+    main(int argc, char** argv)
+    {
+
+        struct result_t result_val;
+        float64 buff_0 = 1.0;
+        struct memref_float64x0_t arg_0 = { &buff_0, &buff_0, 0 };
+
+
+        setup(1, &argv[0]);
+        _catalyst_ciface_jit_identity(&result_val, &arg_0);
+        teardown();
+    }
+
+The user can now compile and link this program and run without ``python``.
+
 
 Compilation Steps
 =================
