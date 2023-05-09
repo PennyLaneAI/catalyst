@@ -390,7 +390,7 @@ class CompiledFunction:
         return c_abi_args, numpy_arg_buffer
 
     def get_cmain(self, *args):
-        """Get a string representing a C program that can be linked against the current shared object."""
+        """Get a string representing a C program that can be linked against the shared object."""
         _, buffer = CompiledFunction.args_to_memref_descs(self.restype, args)
 
         return get_template(self.func_name, self.restype, *buffer)
