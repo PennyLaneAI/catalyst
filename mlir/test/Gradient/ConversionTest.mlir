@@ -50,12 +50,12 @@ func.func @adjoint(%arg0: f32, %arg1 : index) -> (memref<?xf64>, memref<?xf64>) 
 
 func.func private @circuit(%arg0: f64) -> (!quantum.reg)
 
-// CHECK-LABEL: func.func @backkprop(%arg0: f64, %arg1: index) {{.+}} {
+// CHECK-LABEL: func.func @backprop(%arg0: f64, %arg1: index) {{.+}} {
 func.func @backprop(%arg0: f64, %arg1 : index) -> memref<?xf64> {
 
     %alloc0 = memref.alloc(%arg1) : memref<?xf64>
 
-    gradient.backprop @circuit(%arg0) size(%arg1) in(%alloc0 : memref<?xf64>): (f64) -> ()
+    gradient.backprop @circuit(%arg0) size(%arg1) in(%alloc0 : memref<?xf64>) {diffArgIndices=dense<0> : tensor<1xindex>} : (f64) -> ()
 
     return %alloc0: memref<?xf64>
 }
