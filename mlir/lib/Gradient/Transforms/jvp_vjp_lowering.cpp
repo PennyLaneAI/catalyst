@@ -244,7 +244,6 @@ void VJPLoweringPattern::rewrite(VJPOp op, PatternRewriter &rewriter) const
     auto func_diff_operand_indices = GradOp::compDiffArgIndices(op.getDiffArgIndices());
     LLVM_DEBUG(dbgs() << "func_diff_operand_indices: " << func_diff_operand_indices << " \n");
     LLVM_DEBUG(dbgs() << "vjp_num_operands " << op.getOperands().size() << " \n");
-    assert(func_diff_operand_indices.size() <= op.getOperands().size()/2);
 
     auto func_op = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
 
@@ -254,7 +253,7 @@ void VJPLoweringPattern::rewrite(VJPOp op, PatternRewriter &rewriter) const
         "the number of function results doesn't match the number of cotangent arguments");
 
     auto func_operands = OperandRange(op.operand_begin(), op.operand_begin() + func_operands_size);
-    auto cotang_operands = OperandRange(op.operand_begin() + cotang_operands_size, op.operand_end());
+    auto cotang_operands = OperandRange(op.operand_begin() + func_operands_size, op.operand_end());
 
     for(auto idx: func_diff_operand_indices) {
       assert(idx < func_operands.size() && "all diffArgIndices reference valid arguments");
