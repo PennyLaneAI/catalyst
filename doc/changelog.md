@@ -49,10 +49,9 @@ This release contains contributions from (in alphabetical order):
 
 Ali Asadi,
 David Ittah,
-Erick Ochoa Lopez,
+Jacob Mai Peng,
 Romain Moyard,
-Erick Ochoa Lopez,
-Mai Jacob Peng.
+Erick Ochoa Lopez.
 
 # Release 0.1.2
 
