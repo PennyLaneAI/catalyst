@@ -87,9 +87,9 @@ class Type:
 class Variable:
     """Interface for variables as needed by this template."""
 
-    def __init__(self, name, type, init):
+    def __init__(self, name, typ, init):
         self._name = name
-        self._type = type
+        self._typ = typ
         self._init = init
 
     @property
@@ -98,9 +98,9 @@ class Variable:
         return self._name
 
     @property
-    def type(self):
+    def typ(self):
         """Variable's type"""
-        return self._type
+        return self._typ
 
     @property
     def init(self):
@@ -116,18 +116,18 @@ class ResultVar(Variable):
         numpyTypes = [mlir_type_to_numpy_type(y) for y in element_types]
         dependencies = []
         for dtype, mlir_type in zip(numpyTypes, resultType):
-            type = np.dtype(dtype)
+            typ = np.dtype(dtype)
             rank = len(ir.RankedTensorType(mlir_type).shape)
-            dependencies.append(CType(type, rank))
+            dependencies.append(CType(typ, rank))
 
         type_decl = ResultVar._result_type_definition(dependencies)
-        self._dependencies = set(type for type in dependencies)
+        self._dependencies = set(typ for typ in dependencies)
 
         name = ResultVar._get_variable_name()
-        type = Type(ResultVar._get_type_name(), type_decl)
+        typ = Type(ResultVar._get_type_name(), type_decl)
         init = ResultVar._get_variable_instantiation()
 
-        super().__init__(name, type, init)
+        super().__init__(name, typ, init)
 
     @property
     def dependencies(self):
@@ -152,9 +152,9 @@ class ResultVar(Variable):
 
     @staticmethod
     def _get_variable_instantiation():
-        type = ResultVar._get_type_name()
+        typ = ResultVar._get_type_name()
         name = ResultVar._get_variable_name()
-        return f"{type} {name};"
+        return f"{typ} {name};"
 
     @staticmethod
     def _get_type_name():
@@ -171,9 +171,9 @@ class CType(Type):
     This class will be printed to a memref type.
     """
 
-    def __init__(self, type, rank):
-        name = CType._get_name(type, rank)
-        decl = CType._get_definition(name, type, rank)
+    def __init__(self, typ, rank):
+        name = CType._get_name(typ, rank)
+        decl = CType._get_definition(name, typ, rank)
         super().__init__(name, decl)
 
     @staticmethod
@@ -184,17 +184,17 @@ class CType(Type):
         return rank_n_bt_0 if rank else rank_0
 
     @staticmethod
-    def _get_name(type, rank):
-        return f"struct memref_{type}x{rank}_t"
+    def _get_name(typ, rank):
+        return f"struct memref_{typ}x{rank}_t"
 
     @staticmethod
-    def _get_definition(name, type, rank):
+    def _get_definition(name, typ, rank):
         sizes_and_strides = CType._get_template_for_sizes_and_strides(rank)
         return f"""
 {name}
 {{
-\t{type}* allocated;
-\t{type}* aligned;
+\t{typ}* allocated;
+\t{typ}* aligned;
 \tsize_t offset;
 \t{sizes_and_strides}
 }};"""
@@ -205,10 +205,10 @@ class CVariable(Variable):
 
     def __init__(self, array, arg_idx):
         rank = len(array.shape)
-        type = CType(array.dtype, rank)
+        typ = CType(array.dtype, rank)
         name = CVariable._get_variable_name(arg_idx)
         init = CVariable._get_initialization(array, arg_idx)
-        super().__init__(name, type, init)
+        super().__init__(name, typ, init)
 
     @staticmethod
     def _get_buffer_name(idx):
@@ -226,7 +226,7 @@ class CVariable(Variable):
     @staticmethod
     def _get_initialization(array, idx):
         rank = len(array.shape)
-        type = CType(array.dtype, rank)
+        typ = CType(array.dtype, rank)
         buff_name = CVariable._get_buffer_name(idx)
         var_name = CVariable._get_variable_name(idx)
         sizes = CVariable._get_sizes(array)
@@ -235,11 +235,11 @@ class CVariable(Variable):
         elements = CVariable._get_array_data(array)
         fmt_rank_bt_0 = f"""
 \t{array.dtype} {buff_name}[{buff_size}] = {{ { elements } }};
-\t{type.name} {var_name} = {{ {buff_name}, {buff_name}, 0, {{ {sizes} }}, {{ {strides} }}, }};
+\t{typ.name} {var_name} = {{ {buff_name}, {buff_name}, 0, {{ {sizes} }}, {{ {strides} }}, }};
         """
         fmt_rank_0 = f"""
 \t{array.dtype} {buff_name} = { elements };
-\t{type.name} {var_name} = {{ &{buff_name}, &{buff_name}, 0 }};
+\t{typ.name} {var_name} = {{ &{buff_name}, &{buff_name}, 0 }};
         """
         return fmt_rank_bt_0 if rank > 0 else fmt_rank_0
 
@@ -278,22 +278,22 @@ def get_template(func_name, restype, *args):
     if restype:
         result = ResultVar(restype)
         variables = [result] + variables
-        types = set(type for type in result.dependencies)
+        types = set(typ for typ in result.dependencies)
 
     variables_initialization = "".join(var.init for var in variables)
     arg_vars = ", ".join("&" + var.name for var in variables)
-    arg_types = ", ".join(var.type.name + "*" for var in variables)
+    arg_types = ", ".join(var.typ.name + "*" for var in variables)
 
-    types.update(set(var.type for var in cvars))
+    types.update(set(var.typ for var in cvars))
     types = list(types)
 
     if restype:
         # The result type must be at the end,
         # Otherwise a field in the result structure
         # might be defined afterwards resulting in a warning/error.
-        types += [result.type]
+        types += [result.typ]
 
-    types = "".join(type.decl for type in types)
+    types = "".join(typ.decl for typ in types)
 
     template = f"""
 #include <complex.h>
