@@ -126,7 +126,6 @@ void JVPLoweringPattern::rewrite(JVPOp op, PatternRewriter &rewriter) const
     auto fcall_op =
       rewriter.create<func::CallOp>(loc, func_op, func_operands);
 
-
     auto grad_op = rewriter.create<GradOp>(
       loc,
       grad_result_types,
@@ -141,7 +140,8 @@ void JVPLoweringPattern::rewrite(JVPOp op, PatternRewriter &rewriter) const
     for(size_t nout = 0; nout < func_result_types.size(); nout++) {
       Optional<Value> acc;
       for(size_t nparam = 0; nparam < func_diff_operand_indices.size(); nparam++) {
-        auto jac = grad_op.getResults()[nparam*func_diff_operand_indices.size() + nout];
+        LLVM_DEBUG(dbgs() << "iteration: nout " << nout << " nparam " << nparam  << "\n");
+        auto jac = grad_op.getResults()[nparam*func_result_types.size() + nout];
         auto tang = tang_operands[nparam];
         auto param = func_operands[func_diff_operand_indices[nparam]];
 
@@ -289,7 +289,7 @@ void VJPLoweringPattern::rewrite(VJPOp op, PatternRewriter &rewriter) const
     for(size_t nparam = 0; nparam < func_diff_operand_indices.size(); nparam++) {
       Optional<Value> acc;
       for(size_t nout = 0; nout < func_result_types.size(); nout++) {
-        auto jac = grad_op.getResults()[nparam*func_diff_operand_indices.size() + nout];
+        auto jac = grad_op.getResults()[nparam*func_result_types.size() + nout];
         auto param = func_operands[func_diff_operand_indices[nparam]];
         auto cotang = cotang_operands[nout];
 
