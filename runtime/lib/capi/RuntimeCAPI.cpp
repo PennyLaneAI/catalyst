@@ -56,6 +56,15 @@ void *_mlir_memref_to_llvm_aligned_alloc(size_t alignment, size_t size)
     return ptr;
 }
 
+bool _mlir_memory_transfer(void *ptr)
+{
+    if (!Catalyst::Runtime::CTX->getMemoryManager()->contains(ptr)) {
+        return false;
+    }
+    Catalyst::Runtime::CTX->getMemoryManager()->erase(ptr);
+    return true;
+}
+
 void _mlir_memref_to_llvm_free(void *ptr)
 {
     Catalyst::Runtime::CTX->getMemoryManager()->erase(ptr);

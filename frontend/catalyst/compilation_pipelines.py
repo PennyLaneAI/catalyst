@@ -30,8 +30,6 @@ from mlir_quantum.runtime import (
     get_ranked_memref_descriptor,
     make_nd_memref_descriptor,
     make_zero_d_memref_descriptor,
-    ranked_memref_to_numpy,
-    to_numpy,
 )
 
 import catalyst.jax_tracer as tracer
@@ -177,7 +175,9 @@ class CompiledFunction:
         # Not needed, computed from the arguments.
         # function.argyptes
 
-        return shared_object, function, setup, teardown
+        mem_transfer = shared_object["_mlir_memory_transfer"]
+
+        return shared_object, function, setup, teardown, mem_transfer
 
     @staticmethod
     def get_runtime_signature(*args):
@@ -198,53 +198,7 @@ class CompiledFunction:
             raise TypeError(f"Unsupported argument type: {arg_type}") from exc
 
     @staticmethod
-    def zero_ranked_memref_to_numpy(ranked_memref):
-        """Cast a zero ranked memrefs to a numpy array.
-
-        Args:
-            ranked_memref: a zero ranked memref descriptor
-        Returns:
-            a numpy array with the contents of the ranked memref descriptor
-        """
-        assert not hasattr(ranked_memref, "shape")
-        return to_numpy(np.array(ranked_memref.aligned.contents))
-
-    @staticmethod
-    def ranked_memref_to_numpy(memref_desc):
-        """Cast a ranked memref to numpy array.
-
-        Args:
-            memref_desc: a descriptor of a ranked memref
-
-        Returns:
-            a numpy array
-        """
-        ranked_memref = memref_desc.contents
-        if not hasattr(ranked_memref, "shape"):
-            return CompiledFunction.zero_ranked_memref_to_numpy(ranked_memref)
-        return np.copy(ranked_memref_to_numpy(memref_desc))
-
-    @staticmethod
-    def return_value_ptr_to_numpy(return_value_ptr):
-        """Cast the return value pointer to a list of numpy arrays.
-
-        Args:
-            return_value_ptr: pointer to a return value descriptor
-
-        Returns:
-            list or single numpy array
-        """
-        return_value = return_value_ptr.contents
-        jax_arrays = []
-        for memref in return_value:
-            memref_ptr = ctypes.pointer(memref)
-            numpy_array = CompiledFunction.ranked_memref_to_numpy(memref_ptr)
-            jax_array = jax.numpy.asarray(numpy_array)
-            jax_arrays.append(jax_array)
-        return jax_arrays[0] if len(jax_arrays) == 1 else tuple(jax_arrays)
-
-    @staticmethod
-    def _exec(shared_object_file, func_name, has_return, *args):
+    def _exec(shared_object_file, func_name, has_return, numpy_dict, *args):
         """Execute the compiled function with arguments `*args`.
 
         Args:
@@ -257,7 +211,7 @@ class CompiledFunction:
             retval: the value computed by the function or None if the function has no return value
         """
 
-        shared_object, function, setup, teardown = CompiledFunction.load_symbols(
+        shared_object, function, setup, teardown, mem_transfer = CompiledFunction.load_symbols(
             shared_object_file, func_name
         )
 
@@ -267,10 +221,13 @@ class CompiledFunction:
         array_of_char_ptrs[:] = params_to_setup
 
         setup(ctypes.c_int(argc), array_of_char_ptrs)
-        wrapper.wrap(function, args)
+        result_desc = type(args[0].contents) if has_return else None
 
-        result = args[0] if has_return else None
-        retval = CompiledFunction.return_value_ptr_to_numpy(result) if result else None
+        retval = wrapper.wrap(function, args, result_desc, mem_transfer, numpy_dict)
+        if len(retval) == 0:
+            retval = None
+        elif len(retval) == 1:
+            retval = retval[0]
 
         # Teardown has to be made after the return valued has been copied.
         teardown()
@@ -310,6 +267,26 @@ class CompiledFunction:
         return memref_descriptor
 
     @staticmethod
+    def get_etypes(mlir_tensor_type):
+        """Get element type for an MLIR tensor type."""
+        mlir_element_type = ir.RankedTensorType(mlir_tensor_type).element_type
+        return mlir_type_to_numpy_type(mlir_element_type)
+
+    @staticmethod
+    def get_sizes(mlir_tensor_type):
+        """Get element type size for an MLIR tensor type."""
+        mlir_element_type = ir.RankedTensorType(mlir_tensor_type).element_type
+        numpy_type = mlir_type_to_numpy_type(mlir_element_type)
+        dtype = np.dtype(numpy_type)
+        return dtype.itemsize
+
+    @staticmethod
+    def get_ranks(mlir_tensor_type):
+        """Get rank for an MLIR tensor type."""
+        shape = ir.RankedTensorType(mlir_tensor_type).shape
+        return len(shape) if shape else 0
+
+    @staticmethod
     def restype_to_memref_descs(mlir_tensor_types):
         """Converts the return type to a compatible type for the expected ABI.
 
@@ -323,16 +300,25 @@ class CompiledFunction:
         assert mlir_tensor_types, error_msg
         _get_rmd = CompiledFunction.get_ranked_memref_descriptor_from_mlir_tensor_type
         return_fields_types = [_get_rmd(mlir_tensor_type) for mlir_tensor_type in mlir_tensor_types]
+        ranks = [
+            CompiledFunction.get_ranks(mlir_tensor_type) for mlir_tensor_type in mlir_tensor_types
+        ]
+
+        etypes = [
+            CompiledFunction.get_etypes(mlir_tensor_type) for mlir_tensor_type in mlir_tensor_types
+        ]
+
+        sizes = [
+            CompiledFunction.get_sizes(mlir_tensor_type) for mlir_tensor_type in mlir_tensor_types
+        ]
 
         class CompiledFunctionReturnValue(ctypes.Structure):
             """Programmatically create a structure which holds tensors of varying base types."""
 
             _fields_ = [("f" + str(i), type(t)) for i, t in enumerate(return_fields_types)]
-
-            def __iter__(self):
-                for f, _ in CompiledFunctionReturnValue._fields_:
-                    memref = getattr(self, f)
-                    yield memref
+            _ranks_ = ranks
+            _etypes_ = etypes
+            _sizes_ = sizes
 
         return_value = CompiledFunctionReturnValue()
         return_value_pointer = ctypes.pointer(return_value)
@@ -398,10 +384,13 @@ class CompiledFunction:
     def __call__(self, *args, **kwargs):
         abi_args, _buffer = CompiledFunction.args_to_memref_descs(self.restype, args)
 
+        numpy_dict = {nparr.ctypes.data: nparr for nparr in _buffer}
+
         result = CompiledFunction._exec(
             self.shared_object_file,
             self.func_name,
             self.restype,
+            numpy_dict,
             *abi_args,
         )
 

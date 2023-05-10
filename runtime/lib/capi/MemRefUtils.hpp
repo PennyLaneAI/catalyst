@@ -19,6 +19,7 @@
 extern "C" {
 void *_mlir_memref_to_llvm_alloc(size_t size);
 void *_mlir_memref_to_llvm_aligned_alloc(size_t alignment, size_t size);
+bool _mlir_memory_transfer(void *);
 void _mlir_memref_to_llvm_free(void *ptr);
 }
 

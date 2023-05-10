@@ -177,6 +177,7 @@ class BufferizationPass(PassPipeline):
         "--convert-bufferization-to-memref",
         "--canonicalize",
         "--cse",
+        "--cp-global-memref",
     ]
 
     @staticmethod
