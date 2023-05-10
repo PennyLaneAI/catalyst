@@ -654,6 +654,15 @@ def test_assert_invalid_h_type():
             return h(x)
 
 
+def test_assert_non_differentiable():
+    with pytest.raises(TypeError, match="Non-differentiable object passed"):
+
+        @qjit()
+        def workflow(x: float):
+            h = grad("string!", method="fd")
+            return h(x)
+
+
 def test_finite_diff_arbitrary_functions():
     """Test gradients on non-qnode functions."""
 
