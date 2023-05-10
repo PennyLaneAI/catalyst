@@ -359,7 +359,6 @@ void VJPLoweringPattern::rewrite(VJPOp op, PatternRewriter &rewriter) const
 /*}}}*/
 
 struct JVPVJPLoweringPass : public PassWrapper<JVPVJPLoweringPass, OperationPass<ModuleOp>> {
-
     JVPVJPLoweringPass() {}
 
     StringRef getArgument() const override { return "lower-jvpvjp"; }

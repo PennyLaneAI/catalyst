@@ -11,20 +11,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+""" Test JVP/VJP operation lowering """
 
-from typing import Any, Tuple, TypeVar, Union
+from typing import Tuple, TypeVar, Union
 
 import jax
 import jax.numpy as jnp
-import numpy as np
-import pennylane as qml
 import pytest
 from jax import linearize as J_jvp
 from jax import vjp as J_vjp
 from jax.tree_util import tree_flatten, tree_unflatten
 from numpy.testing import assert_allclose
 
-from catalyst import CompileError, cond, for_loop, grad
 from catalyst import jvp as C_jvp
 from catalyst import qjit
 from catalyst import vjp as C_vjp
@@ -34,6 +32,7 @@ T = TypeVar("T")
 
 
 def flatten_if_tuples(x: Union[X, Tuple[Union[T, Tuple[T]]]]) -> Union[X, Tuple[T]]:
+    """Flatten first layer of Python tuples. """
     return (
         sum(((i if isinstance(i, tuple) else (i,)) for i in x), ()) if isinstance(x, tuple) else x
     )
