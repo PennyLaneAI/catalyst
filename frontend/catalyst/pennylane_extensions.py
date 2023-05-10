@@ -19,7 +19,7 @@ while using :func:`~.qjit`.
 import functools
 import numbers
 import uuid
-from typing import Any, Optional, List, Callable, Union
+from typing import Any, Callable, List, Optional, Union
 
 import jax
 import jax.numpy as jnp
@@ -32,13 +32,13 @@ from jax._src.lax.control_flow import (
 from jax._src.lax.lax import _abstractify
 from jax.linear_util import wrap_init
 from jax.tree_util import tree_flatten, tree_unflatten, treedef_is_leaf
+from pennylane import QNode
 from pennylane.measurements import MidMeasureMP
 from pennylane.operation import AnyWires, Operation, Wires
-from pennylane import QNode
 
 import catalyst
 import catalyst.jax_primitives as jprim
-from catalyst.jax_primitives import expval_p, probs_p, GradParams
+from catalyst.jax_primitives import GradParams, expval_p, probs_p
 from catalyst.jax_tape import JaxTape
 from catalyst.jax_tracer import get_traceable_fn, insert_to_qreg, trace_quantum_tape
 from catalyst.utils.exceptions import CompileError
@@ -148,20 +148,21 @@ Differentiable = Union[Function, QNode]
 DifferentiableLike = Union[Differentiable, Callable, "catalyst.compilation_pipelines.QJIT"]
 Jaxpr = Any
 
-def _bless_differentiable(f:DifferentiableLike) -> Differentiable:
-    """Narrows down the set of the supported differentiable objects. """
+
+def _bless_differentiable(f: DifferentiableLike) -> Differentiable:
+    """Narrows down the set of the supported differentiable objects."""
     if isinstance(f, (Function, QNode)):
         return f
     elif isinstance(f, catalyst.compilation_pipelines.QJIT):
         return f.qfunc
-    elif isinstance(f, Callable): # Keep at the bottom
+    elif isinstance(f, Callable):  # Keep at the bottom
         return Function(f)
     else:
         raise TypeError(f"Non-differentiable function passed: {type(f)}")
 
 
-def _make_jaxpr_differentiable(f:Differentiable, grad_params:GradParams, *args) -> Jaxpr:
-    """Gets the jaxpr of a differentiable function. Perform the required additional checks. """
+def _make_jaxpr_differentiable(f: Differentiable, grad_params: GradParams, *args) -> Jaxpr:
+    """Gets the jaxpr of a differentiable function. Perform the required additional checks."""
     TracingContext.check_is_tracing(
         "catalyst.grad can only be used from within @qjit decorated code."
     )
@@ -206,9 +207,9 @@ def _make_jaxpr_differentiable(f:Differentiable, grad_params:GradParams, *args) 
     return jaxpr
 
 
-def _check_grad_params(method:str,
-                       h:Optional[float],
-                       argnum:Optional[Union[int,List[int]]]) -> GradParams:
+def _check_grad_params(
+    method: str, h: Optional[float], argnum: Optional[Union[int, List[int]]]
+) -> GradParams:
     methods = {"fd", "ps", "adj"}
     if method is None:
         method = "fd"
@@ -243,7 +244,7 @@ class Grad:
         TypeError: Non-differentiable object was passed as `fn` argument.
     """
 
-    def __init__(self, fn:Differentiable, *, grad_params:GradParams):
+    def __init__(self, fn: Differentiable, *, grad_params: GradParams):
         self.fn = fn
         self.__name__ = f"grad.{fn.__name__}"
         self.grad_params = grad_params
@@ -268,7 +269,7 @@ class Grad:
         )
 
 
-def grad(f:DifferentiableLike, *, method=None, h=None, argnum=None):
+def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
     """A :func:`~.qjit` compatible gradient transformation for PennyLane/Catalyst.
 
     This function allows the gradient of a hybrid quantum-classical function
@@ -340,6 +341,7 @@ def jvp(f, params, tangents, *, method=None, h=None, argnum=None):
     Args:
         f(DifferentiableLike): Function-like object to calculate JVP for
     """
+
     def _check(x, hint):
         if isinstance(x, list):
             return x
@@ -347,9 +349,10 @@ def jvp(f, params, tangents, *, method=None, h=None, argnum=None):
             return list(x)
         else:
             raise ValueError(f"jvp '{hint}' argument must be a list or a tuple, not {type(x)}")
-    params = _check(params, 'params')
-    tangents = _check(tangents, 'tangents')
-    fn:Differentiable = _bless_differentiable(f)
+
+    params = _check(params, "params")
+    tangents = _check(tangents, "tangents")
+    fn: Differentiable = _bless_differentiable(f)
     grad_params = _check_grad_params(method, h, argnum)
     jaxpr = _make_jaxpr_differentiable(fn, grad_params, *params)
     return jprim.jvp_p.bind(*(params + tangents), jaxpr=jaxpr, fn=fn, grad_params=grad_params)
@@ -360,6 +363,7 @@ def vjp(f, params, cotangents, *, method=None, h=None, argnum=None):
     Args:
         f(DifferentiableLike): Function-like object to calculate VJP for
     """
+
     def _check(x, hint):
         if isinstance(x, list):
             return x
@@ -367,9 +371,10 @@ def vjp(f, params, cotangents, *, method=None, h=None, argnum=None):
             return list(x)
         else:
             raise ValueError(f"vjp '{hint}' argument must be a list or a tuple, not {type(x)}")
-    params = _check(params, 'params')
-    cotangents = _check(cotangents, 'cotangents')
-    fn:Differentiable = _bless_differentiable(f)
+
+    params = _check(params, "params")
+    cotangents = _check(cotangents, "cotangents")
+    fn: Differentiable = _bless_differentiable(f)
     grad_params = _check_grad_params(method, h, argnum)
     jaxpr = _make_jaxpr_differentiable(fn, grad_params, *params)
     return jprim.vjp_p.bind(*(params + cotangents), jaxpr=jaxpr, fn=fn, grad_params=grad_params)

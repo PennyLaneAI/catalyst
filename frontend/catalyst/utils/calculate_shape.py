@@ -18,6 +18,7 @@ Deduce the function signatures after taking their gradients with respect to some
 
 
 from typing import Any, List
+
 from jax.core import ShapedArray
 
 
@@ -122,4 +123,3 @@ def calculate_grad_shape(signature, indices) -> Signature:
             grad_result_types.append(grad_res_type)
 
     return Signature(signature.get_inputs(), grad_result_types)
-

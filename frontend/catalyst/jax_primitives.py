@@ -15,20 +15,18 @@
 of quantum operations, measurements, and observables to JAXPR.
 """
 
-from typing import List, Dict
 from dataclasses import dataclass
-import numpy as np
+from typing import Dict, List
 
 import jax
 import numpy as np
 from jax._src import util
 from jax._src.lib.mlir import ir
-from jax.interpreters import mlir, xla
 from jax.core import ShapedArray
+from jax.interpreters import mlir, xla
 from jaxlib.mlir.dialects._func_ops_gen import CallOp
 from jaxlib.mlir.dialects._mhlo_ops_gen import ConstantOp, ConvertOp
 from mlir_quantum.dialects.arith import IndexCastOp
-from mlir_quantum.dialects.tensor import ExtractOp as TensorExtractOp, FromElementsOp
 from mlir_quantum.dialects.gradient import GradOp, JVPOp, VJPOp
 from mlir_quantum.dialects.quantum import (
     AllocOp,
@@ -201,7 +199,7 @@ vjp_p.multiple_results = True
 #
 # func
 #
-mlir_fn_cache:Dict["catalyst.pennylane_extensions.Function",str] = {}
+mlir_fn_cache: Dict["catalyst.pennylane_extensions.Function", str] = {}
 
 
 @func_p.def_impl
@@ -263,12 +261,14 @@ def _func_lowering(ctx, *args, call_jaxpr, fn, call=True):
 # grad
 #
 
+
 @dataclass
 class GradParams:
-    """ Common gradient parameters"""
-    method:str
-    h:float
-    argnum:List[int]
+    """Common gradient parameters"""
+
+    method: str
+    h: float
+    argnum: List[int]
 
 
 @grad_p.def_impl
@@ -325,9 +325,11 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
         finiteDiffParam=finiteDiffParam,
     ).results
 
+
 #
 # vjp/jvp
 #
+
 
 @jvp_p.def_impl
 def _jvp_def_impl(ctx, *args, jaxpr, fn, grad_params):  # pragma: no cover
@@ -351,7 +353,13 @@ def _jvp_lowering(ctx, *args, jaxpr, fn, grad_params):
     mlir_ctx = ctx.module_context.context
     new_argnum = np.array([len(jaxpr.consts) + num for num in argnum])
 
-    _func_lowering(ctx, *(args[:len(args)//2]), call_jaxpr=jaxpr.eqns[0].params["call_jaxpr"], fn=fn, call=False)
+    _func_lowering(
+        ctx,
+        *(args[: len(args) // 2]),
+        call_jaxpr=jaxpr.eqns[0].params["call_jaxpr"],
+        fn=fn,
+        call=False,
+    )
     symbol_name = mlir_fn_cache[fn]
 
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
@@ -390,7 +398,13 @@ def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
     mlir_ctx = ctx.module_context.context
     new_argnum = np.array([len(jaxpr.consts) + num for num in argnum])
 
-    _func_lowering(ctx, *(args[:len(args)//2]), call_jaxpr=jaxpr.eqns[0].params["call_jaxpr"], fn=fn, call=False)
+    _func_lowering(
+        ctx,
+        *(args[: len(args) // 2]),
+        call_jaxpr=jaxpr.eqns[0].params["call_jaxpr"],
+        fn=fn,
+        call=False,
+    )
     symbol_name = mlir_fn_cache[fn]
 
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
@@ -405,6 +419,7 @@ def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
         diffArgIndices=ir.DenseIntElementsAttr.get(new_argnum),
         finiteDiffParam=ir.FloatAttr.get(ir.F64Type.get(mlir_ctx), h) if h else None,
     ).results
+
 
 #
 # qdevice
