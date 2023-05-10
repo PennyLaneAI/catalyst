@@ -24,6 +24,7 @@ from catalyst.compiler import (
     MLIRToLLVMDialect,
     PassPipeline,
     QuantumCompilationPass,
+    JVPLoweringPass,
 )
 from catalyst.jax_tracer import get_mlir
 
@@ -103,20 +104,13 @@ class TestCompilerErrors:
             with pytest.warns(UserWarning, match="Compiler c99"):
                 CompilerDriver.run("in.o", fallback_compilers=["c99"])
 
-    def test_lower_mhlo_input_validation(self):
+    @pytest.mark.parametrize(
+        "p", [MHLOPass, JVPLoweringPass, QuantumCompilationPass, BufferizationPass]
+    )
+    def test_mlir_input_validation(self, p):
         """Test if the function detects wrong extensions"""
         with pytest.raises(ValueError, match="is not an MLIR file"):
-            MHLOPass.run("file-name.nomlir")
-
-    def test_quantum_compilation_input_validation(self):
-        """Test if the function detects wrong extensions"""
-        with pytest.raises(ValueError, match="is not an MLIR file"):
-            QuantumCompilationPass.run("file-name.nomlir")
-
-    def test_bufferize_tensors_input_validation(self):
-        """Test if the function detects wrong extensions"""
-        with pytest.raises(ValueError, match="is not an MLIR file"):
-            BufferizationPass.run("file-name.nomlir")
+            p.run("file-name.nomlir")
 
     def test_lower_all_to_llvm_input_validation(self):
         """Test if the function detects wrong extensions"""
