@@ -14,8 +14,8 @@
 
 # RUN: %PYTHON %s
 
-from mlir_quantum.ir import *
 from mlir_quantum.dialects import gradient as gradient_d
+from mlir_quantum.ir import *
 
 with Context() as ctx:
     gradient_d.register_dialect()

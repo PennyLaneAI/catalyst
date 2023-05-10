@@ -12,20 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """ ChemVQE problem, PennyLane+Catalyst implementation """
+
 # pylint: disable=too-many-instance-attributes
 # pylint: disable=no-value-for-parameter; It happens when we use Catalyst control-flow
-from typing import Any, Dict
-from dataclasses import dataclass
 
-import pennylane as qml
+from dataclasses import dataclass
+from typing import Any, Dict
+
 import jax.numpy as jnp
 import numpy as np
-from pennylane import AllSinglesDoubles
+import pennylane as qml
+from catalyst_benchmark.types import Problem
 from jax.core import ShapedArray
+from pennylane import AllSinglesDoubles
 
 import catalyst
 from catalyst import qjit
-from catalyst_benchmark.types import Problem
 
 DMALIASES = {"finite-diff": "fd", "parameter-shift": "ps", "adjoint": "adj"}
 

@@ -14,11 +14,11 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
-from catalyst import qjit, measure
-import pennylane as qml
 import jax
+import pennylane as qml
 from jax.core import ShapedArray
 
+from catalyst import measure, qjit
 
 """
 Currently unsupported:

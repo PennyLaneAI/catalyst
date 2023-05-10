@@ -13,9 +13,13 @@
 # limitations under the License.
 
 from os import path
-from setuptools import setup, find_namespace_packages
+
 import numpy as np
 from pybind11.setup_helpers import intree_extensions
+from setuptools import (  # pylint: disable=wrong-import-order
+    find_namespace_packages,
+    setup,
+)
 
 with open(path.join("frontend", "catalyst", "_version.py")) as f:
     version = f.readlines()[-1].split()[-1].strip("\"'")

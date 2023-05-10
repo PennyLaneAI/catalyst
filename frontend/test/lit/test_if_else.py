@@ -14,8 +14,9 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
-from catalyst import cond, qjit
 import pennylane as qml
+
+from catalyst import cond, qjit
 
 
 # CHECK-NOT: Verification failed

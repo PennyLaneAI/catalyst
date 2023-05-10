@@ -14,8 +14,8 @@
 
 # RUN: %PYTHON %s
 
-from mlir_quantum.ir import *
 from mlir_quantum.dialects import quantum as quantum_d
+from mlir_quantum.ir import *
 
 with Context() as ctx:
     quantum_d.register_dialect()

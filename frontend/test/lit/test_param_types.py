@@ -14,11 +14,12 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
-from catalyst import qjit, measure
-import pennylane as qml
-from jax.core import ShapedArray
 import numpy as np
+import pennylane as qml
 from jax import numpy as jnp
+from jax.core import ShapedArray
+
+from catalyst import measure, qjit
 
 
 def tensor(val, size, dtype):
