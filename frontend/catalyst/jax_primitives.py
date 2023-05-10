@@ -22,7 +22,6 @@ import jax
 import numpy as np
 from jax._src import util
 from jax._src.lib.mlir import ir
-from jax.core import ShapedArray
 from jax.interpreters import mlir, xla
 from jaxlib.mlir.dialects._func_ops_gen import CallOp
 from jaxlib.mlir.dialects._mhlo_ops_gen import ConstantOp, ConvertOp

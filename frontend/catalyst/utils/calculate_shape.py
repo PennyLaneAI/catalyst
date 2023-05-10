@@ -17,8 +17,6 @@ Deduce the function signatures after taking their gradients with respect to some
 """
 
 
-from typing import Any, List
-
 from jax.core import ShapedArray
 
 

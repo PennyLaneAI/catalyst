@@ -151,6 +151,7 @@ Jaxpr = Any
 
 def _bless_differentiable(f: DifferentiableLike) -> Differentiable:
     """Narrows down the set of the supported differentiable objects."""
+    # pylint: disable=no-else-return
     if isinstance(f, (Function, QNode)):
         return f
     elif isinstance(f, catalyst.compilation_pipelines.QJIT):
@@ -295,7 +296,8 @@ def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
 
     Args:
         f (DifferentiableLike): a function or a functor to differentiate
-        method (str): The method used for differentiation, which can be any of ``["fd", "ps", "adj"]``,
+        method (str): The method used for differentiation, which can be any of
+                      ``["fd", "ps", "adj"]``,
             where:
 
             - ``"fd"`` represents first-order finite-differences,
