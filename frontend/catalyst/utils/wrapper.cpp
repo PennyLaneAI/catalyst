@@ -53,8 +53,7 @@ size_t *to_strides(char *base, size_t rank)
 void free_wrap(PyObject *capsule)
 {
     void *obj = PyCapsule_GetPointer(capsule, NULL);
-    void *allocated = obj;
-    free(allocated);
+    free(obj);
 }
 
 const npy_intp *npy_get_dimensions(char *memref, size_t rank)
