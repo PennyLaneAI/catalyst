@@ -32,6 +32,7 @@ from mlir_quantum.dialects.quantum import (
     CountsOp,
     CustomOp,
     DeallocOp,
+    DeviceOp,
     ExpvalOp,
     ExtractOp,
     HamiltonianOp,
