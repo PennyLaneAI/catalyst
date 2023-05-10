@@ -60,17 +60,17 @@ void setCopyWrapperAttribute(func::FuncOp op, PatternRewriter &rewriter)
     return op->setAttr("llvm.copy_memref", rewriter.getUnitAttr());
 }
 
-std::vector<func::ReturnOp> getReturnOps(func::FuncOp op)
+llvm::SmallVector<func::ReturnOp> getReturnOps(func::FuncOp op)
 {
-    std::vector<func::ReturnOp> returnOps;
+    llvm::SmallVector<func::ReturnOp> returnOps;
     op.walk([&](func::ReturnOp returnOp) { returnOps.push_back(returnOp); });
     return returnOps;
 }
 
-std::vector<Value> getReturnMemRefs(func::ReturnOp op)
+llvm::SmallVector<Value> getReturnMemRefs(func::ReturnOp op)
 {
     auto values = op.getOperands();
-    std::vector<Value> memrefs;
+    llvm::SmallVector<Value> memrefs;
     for (auto value : values) {
         Type ty = value.getType();
         if (!ty.isa<MemRefType>())
@@ -83,11 +83,11 @@ std::vector<Value> getReturnMemRefs(func::ReturnOp op)
 
 void applyCopyGlobalMemRefToReturnOp(func::ReturnOp op, PatternRewriter &rewriter)
 {
-    std::vector<Value> memrefs = getReturnMemRefs(op);
+    llvm::SmallVector<Value> memrefs = getReturnMemRefs(op);
     if (memrefs.empty())
         return;
 
-    std::vector<Value> newMemRefs;
+    llvm::SmallVector<Value> newMemRefs;
 
     LLVMTypeConverter typeConverter(rewriter.getContext());
     Type mlirIndex = rewriter.getIndexType();
@@ -127,7 +127,7 @@ void applyCopyGlobalMemRefToReturnOp(func::ReturnOp op, PatternRewriter &rewrite
 
 void applyCopyGlobalMemRefTransform(func::FuncOp op, PatternRewriter &rewriter)
 {
-    std::vector<func::ReturnOp> returnOps = getReturnOps(op);
+    llvm::SmallVector<func::ReturnOp> returnOps = getReturnOps(op);
     for (func::ReturnOp returnOp : returnOps) {
         // The insertion point will be just right before
         // the return op.
