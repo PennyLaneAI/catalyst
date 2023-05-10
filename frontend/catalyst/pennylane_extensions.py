@@ -345,6 +345,7 @@ def jvp(f, params, tangents, *, method=None, h=None, argnum=None):
     """
 
     def _check(x, hint):
+        # pylint: disable=no-else-return
         if isinstance(x, list):
             return x
         elif isinstance(x, tuple):
@@ -367,6 +368,7 @@ def vjp(f, params, cotangents, *, method=None, h=None, argnum=None):
     """
 
     def _check(x, hint):
+        # pylint: disable=no-else-return
         if isinstance(x, list):
             return x
         elif isinstance(x, tuple):
