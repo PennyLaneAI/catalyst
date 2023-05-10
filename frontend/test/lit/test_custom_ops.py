@@ -41,7 +41,6 @@ lightning = qml.device("lightning.qubit", wires=3)
 class CustomDeviceWithoutSupport(qml.QubitDevice):
     name = "Device without support for RXX gate."
     short_name = "dummy.device"
-    backend = "default"
     pennylane_requires = "0.1.0"
     version = "0.0.1"
     author = "CV quantum"
@@ -49,7 +48,8 @@ class CustomDeviceWithoutSupport(qml.QubitDevice):
     operations = lightning.operations.copy()
     observables = lightning.observables.copy()
 
-    def __init__(self, shots=None, wires=None):
+    def __init__(self, shots=None, wires=None, backend=None):
+        self.backend = backend if backend else "default"
         super().__init__(wires=wires, shots=shots)
 
     def apply(self, operations, **kwargs):

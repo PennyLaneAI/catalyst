@@ -31,7 +31,6 @@ def get_custom_device_without(num_wires, discards):
     class CustomDevice(qml.QubitDevice):
         name = "Device without some operations"
         short_name = "dummy.device"
-        backend = "default"
         pennylane_requires = "0.1.0"
         version = "0.0.1"
         author = "CV quantum"
@@ -39,7 +38,8 @@ def get_custom_device_without(num_wires, discards):
         operations = copy
         observables = discard
 
-        def __init__(self, shots=None, wires=None):
+        def __init__(self, shots=None, wires=None, backend=None):
+            self.backend = backend if backend else "default"
             super().__init__(wires=wires, shots=shots)
 
         def apply(self, operations, **kwargs):
