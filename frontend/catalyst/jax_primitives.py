@@ -70,12 +70,10 @@ class Qbit:
         self.aval = AbstractQbit()
 
 
-# pylint: disable=abstract-method
 class AbstractQbit(jax.core.AbstractValue):
     """Abstract Qbit"""
 
 
-# pylint: disable=abstract-method
 class ConcreteQbit(AbstractQbit):
     """Concrete Qbit."""
 
@@ -95,12 +93,10 @@ class Qreg:
         self.aval = AbstractQreg()
 
 
-# pylint: disable=abstract-method
 class AbstractQreg(jax.core.AbstractValue):
     """Abstract quantum register."""
 
 
-# pylint: disable=abstract-method
 class ConcreteQreg(AbstractQreg):
     """Concrete quantum register."""
 
@@ -120,7 +116,6 @@ class Obs:
         self.aval = AbstractObs(num_qubits, primitive)
 
 
-# pylint: disable=abstract-method
 class AbstractObs(jax.core.AbstractValue):
     """Abstract observable."""
 
@@ -129,7 +124,6 @@ class AbstractObs(jax.core.AbstractValue):
         self.primitive = primitive
 
 
-# pylint: disable=abstract-method
 class ConcreteObs(AbstractObs):
     """Concrete observable."""
 
