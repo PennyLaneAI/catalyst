@@ -84,6 +84,20 @@ Using the ``QJIT.get_cmain`` function, the following string is returned to the u
 
 The user can now compile and link this program and run without ``python``.
 
+Pass Pipelines
+==============
+
+A lot of the compilation steps are broken into pass pipelines.
+``PassPipeline`` is a class that specifies which binary and which flags are used for compilation.
+``PassPipeline`` can be implemented by a user if the user wants to insert new passes in between defaul ``PassPipeline``'s.
+We won't get into too much detail here, but sometimes it is useful to look at the output of a specific ``PassPipeline``.
+To do so, simply use the ``get_output_of`` method available in ``QJIT``.
+For example, if one wishes to inspect the output of the ``BufferizationPass``, simply run the following command.
+
+.. code-block:: python
+
+    circuit.get_output_of("BufferizationPass")
+
 
 Compilation Steps
 =================
@@ -155,26 +169,27 @@ via standard LLVM-MLIR tooling.
 
 .. code-block:: python
 
-    circuit.print_stage("nohlo")
+    circuit.get_output_of("MHLOPass")
 
 An important step in getting to machine code from a high-level representation is allocating memory
 for all the tensor/array objects in the program.
 
 .. code-block:: python
 
-    circuit.print_stage("buff")
+    circuit.get_output_of("BufferizationPass")
 
 The LLVM dialect can be considered the "exit point" from MLIR when using LLVM for low-level compilation:
 
 .. code-block:: python
 
-    circuit.print_stage("llvm")
+    circuit.get_output_of("MLIRToLLVMDialect")
 
 And finally some real LLVMIR adhering to the QIR specification:
 
 .. code-block:: python
 
-    circuit.print_stage("ll")
+    print(circuit.qir)
+
 
 The LLVMIR code is compiled to an object file using the LLVM static compiler and linked to the
 runtime libraries. The generated shared object is stored by the caching mechanism in Catalyst
