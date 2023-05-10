@@ -109,9 +109,11 @@ py::list move_returns(void *memref_array_ptr, py::object result_desc, py::object
 
         if (!is_in_rt_heap) {
             // This case is guaranteed by the compiler to be the following:
-            // when an input tensor is sent to as an output as well.
+            // 1. When an input tensor is sent to as an output
+	    // 2. When an output tensor is aliased with with another output tensor
+	    // and one of them has already been transferred.
             //
-            // It is guaranteed by the use of the flag --cp-global-memref
+            // The first case is guaranteed by the use of the flag --cp-global-memref
             //
             // Use the numpy_arrays dictionary which sets up the following map:
             // integer (memory address) -> py::object (numpy array)
@@ -153,9 +155,13 @@ py::list move_returns(void *memref_array_ptr, py::object result_desc, py::object
         returns.append(new_array);
 
         // Now we insert the array into the dictionary.
-        // This is to take into account the possibility
-        // of returning more than 1 array with the same buffer.
-        // Although, it looks like it won't happen in reality.
+	// This dictionary is a map of the type:
+        // integer (memory address) -> py::object (numpy array)
+	//
+	// Upon first entry into this function, it holds the numpy.arrays
+	// sent as an input to the generated function.
+	// Upon following entries it is extended with the numpy.arrays
+	// which are the output of the generated function.
         PyObject *pyLong = PyLong_FromLong((size_t)memref->allocated);
         if (!pyLong) {
             throw std::runtime_error("PyLong_FromLong failed.");
