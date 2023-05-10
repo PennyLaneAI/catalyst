@@ -30,8 +30,6 @@ from mlir_quantum.runtime import (
     get_ranked_memref_descriptor,
     make_nd_memref_descriptor,
     make_zero_d_memref_descriptor,
-    ranked_memref_to_numpy,
-    to_numpy,
 )
 
 import catalyst.jax_tracer as tracer

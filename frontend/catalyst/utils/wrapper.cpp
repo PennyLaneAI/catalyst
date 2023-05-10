@@ -116,8 +116,8 @@ py::list move_returns(void *memref_array_ptr, py::object result_desc, py::object
         if (!is_in_rt_heap) {
             // This case is guaranteed by the compiler to be the following:
             // 1. When an input tensor is sent to as an output
-	    // 2. When an output tensor is aliased with with another output tensor
-	    // and one of them has already been transferred.
+            // 2. When an output tensor is aliased with with another output tensor
+            // and one of them has already been transferred.
             //
             // The first case is guaranteed by the use of the flag --cp-global-memref
             //
@@ -161,13 +161,13 @@ py::list move_returns(void *memref_array_ptr, py::object result_desc, py::object
         returns.append(new_array);
 
         // Now we insert the array into the dictionary.
-	// This dictionary is a map of the type:
+        // This dictionary is a map of the type:
         // integer (memory address) -> py::object (numpy array)
-	//
-	// Upon first entry into this function, it holds the numpy.arrays
-	// sent as an input to the generated function.
-	// Upon following entries it is extended with the numpy.arrays
-	// which are the output of the generated function.
+        //
+        // Upon first entry into this function, it holds the numpy.arrays
+        // sent as an input to the generated function.
+        // Upon following entries it is extended with the numpy.arrays
+        // which are the output of the generated function.
         PyObject *pyLong = PyLong_FromLong((size_t)memref->allocated);
         if (!pyLong) {
             throw std::runtime_error("PyLong_FromLong failed.");
@@ -212,5 +212,7 @@ PYBIND11_MODULE(wrapper, m)
     m.def("wrap", &wrap, "A wrapper function.");
     int retval = _import_array();
     bool success = retval >= 0;
-    if (!success) { throw pybind11::import_error("Couldn't import numpy array C-API."); }
+    if (!success) {
+        throw pybind11::import_error("Couldn't import numpy array C-API.");
+    }
 }
