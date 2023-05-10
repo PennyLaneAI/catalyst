@@ -29,7 +29,6 @@ from jaxlib.mlir.dialects._func_ops_gen import CallOp
 from jaxlib.mlir.dialects._mhlo_ops_gen import ConstantOp, ConvertOp
 from mlir_quantum.dialects.arith import IndexCastOp
 from mlir_quantum.dialects.tensor import ExtractOp as TensorExtractOp, FromElementsOp
-from mlir_quantum.dialects.scf import IfOp, ConditionOp, ForOp, WhileOp, YieldOp
 from mlir_quantum.dialects.gradient import GradOp, JVPOp, VJPOp
 from mlir_quantum.dialects.quantum import (
     AllocOp,
@@ -57,7 +56,7 @@ from mlir_quantum.dialects.scf import ConditionOp, ForOp, IfOp, WhileOp, YieldOp
 from mlir_quantum.dialects.tensor import ExtractOp as TensorExtractOp
 from mlir_quantum.dialects.tensor import FromElementsOp
 
-from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
+from catalyst.utils.calculate_shape import Signature, calculate_grad_shape
 
 # pylint: disable=unused-argument,too-many-lines
 

@@ -375,7 +375,6 @@ def vjp(f, params, cotangents, *, method=None, h=None, argnum=None):
     return jprim.vjp_p.bind(*(params + cotangents), jaxpr=jaxpr, fn=fn, grad_params=grad_params)
 
 
-# pylint: disable=too-few-public-methods
 class Cond(Operation):
     """PennyLane's conditional operation."""
 
