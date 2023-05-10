@@ -268,6 +268,31 @@ class LLVMIRToObjectFile(PassPipeline):
             raise ValueError(f"Input file ({infile}) for compilation is not an LLVMIR file")
         return infile.replace(".ll", ".o")
 
+class CachedLLVMIRToObjectFile(LLVMIRToObjectFile):
+    """Uses the cached LLVM-IR from previous run.
+
+    This is more intended as a debugging tool rather than an optimization.
+    With this, it is possible to generate some LLVM-IR, keep the intermediate
+    results and then modify the LLVM-IR file and re-compile to inspect changes.
+
+    If using cached JIT-ed files, it would be more appropriate to just use the
+    generated shared object.
+    """
+
+    def __init__(self, path):
+        super().__init__()
+        self._path = path
+
+    def run(self, _infile, **_kwargs):
+        """Ignore infile and instead use the previously available .ll file
+        in path directory."""
+        import glob
+
+        # Assume extension is .ll.
+        infiles = glob.glob(self._path + "/*.ll")
+        # Assume only thre's only one file.
+        infile = infiles[0]
+        return LLVMIRToObjectFile.run(infile)
 
 class CompilerDriver:
     """Compiler Driver Interface
