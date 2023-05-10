@@ -53,11 +53,11 @@ class TestCondToJaxpr:
 class TestCond:
     """Test suite for the Cond functionality in Catalyst."""
 
-    def test_simple_cond(self):
+    def test_simple_cond(self, backend):
         """Test basic function with conditional."""
 
         @qjit()
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qml.qnode(qml.device(backend, wires=1))
         def circuit(n):
             @cond(n > 4)
             def cond_fn():
@@ -77,11 +77,11 @@ class TestCond:
         assert circuit(5) == 25
         assert circuit(6) == 36
 
-    def test_cond_one_else_if(self):
+    def test_cond_one_else_if(self, backend):
         """Test a cond with one else_if branch"""
 
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qml.qnode(qml.device(backend, wires=1))
         def circuit(x):
             @cond(x > 2.7)
             def cond_fn():
@@ -101,11 +101,11 @@ class TestCond:
         assert circuit(2) == 4
         assert circuit(1) == 1
 
-    def test_cond_many_else_if(self):
+    def test_cond_many_else_if(self, backend):
         """Test a cond with multiple else_if branches"""
 
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qml.qnode(qml.device(backend, wires=1))
         def circuit(x):
             @cond(x > 4.8)
             def cond_fn():
@@ -158,11 +158,11 @@ class TestCond:
         assert circuit(2) == 8
         assert circuit(-3) == -3
 
-    def test_qubit_manipulation_cond(self):
+    def test_qubit_manipulation_cond(self, backend):
         """Test conditional with quantum operation."""
 
         @qjit()
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qml.qnode(qml.device(backend, wires=1))
         def circuit(x):
             @cond(x > 4)
             def cond_fn():
@@ -175,7 +175,7 @@ class TestCond:
         assert circuit(3) == False
         assert circuit(6) == True
 
-    def test_branch_return_mismatch(self):
+    def test_branch_return_mismatch(self, backend):
         """
         Test that an exception is raised when the true branch returns a value without an else
         branch
@@ -191,9 +191,9 @@ class TestCond:
         with pytest.raises(
             TypeError, match="Conditional branches all require the same return type"
         ):
-            qjit(qml.qnode(qml.device("lightning.qubit", wires=1))(circuit))
+            qjit(qml.qnode(qml.device(backend, wires=1))(circuit))
 
-    def test_branch_multi_return_mismatch(self):
+    def test_branch_multi_return_mismatch(self, backend):
         """Test that an exception is raised when the return types of all branches do not match"""
 
         def circuit():
@@ -214,7 +214,7 @@ class TestCond:
         with pytest.raises(
             TypeError, match="Conditional branches all require the same return type"
         ):
-            qjit(qml.qnode(qml.device("lightning.qubit", wires=1))(circuit))
+            qjit(qml.qnode(qml.device(backend, wires=1))(circuit))
 
     def test_branch_with_arg(self):
         """Test that an exception is raised when an 'else if' branch function contains an arg"""
@@ -235,11 +235,11 @@ class TestCond:
         ):
             qjit(qml.qnode(qml.device("lightning.qubit", wires=1))(circuit))
 
-    def test_identical_branch_names(self):
+    def test_identical_branch_names(self, backend):
         """Test that branches of the conditional can carry the same function name."""
 
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qml.qnode(qml.device(backend, wires=1))
         def circuit(pred: bool):
             @cond(pred)
             def conditional_flip():
@@ -279,11 +279,11 @@ class TestInterpretationConditional:
         assert arithc(0, 0, 0) == arithi(0, 0, 0)
         assert arithc(0, 0, 1) == arithi(0, 0, 1)
 
-    def test_conditional_interpreted_and_compiled_single_if(self):
+    def test_conditional_interpreted_and_compiled_single_if(self, backend):
         """Test that a compiled and interpreted conditional with no else branch match."""
 
         num_wires = 2
-        device = qml.device("lightning.qubit", wires=num_wires)
+        device = qml.device(backend, wires=num_wires)
 
         @qml.qnode(device)
         def interpreted_circuit(n):

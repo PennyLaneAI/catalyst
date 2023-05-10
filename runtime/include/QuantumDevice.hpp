@@ -288,12 +288,4 @@ struct QuantumDevice {
     virtual void Gradient(std::vector<DataView<double, 1>> &gradients,
                           const std::vector<size_t> &trainParams) = 0;
 };
-
-/**
- * Create a pointer of type `QuantumDevice` for an implementation of this device API.
- *
- * @return std::unique_ptr<QuantumDevice>
- */
-std::unique_ptr<QuantumDevice> CreateQuantumDevice();
-
 } // namespace Catalyst::Runtime

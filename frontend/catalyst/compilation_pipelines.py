@@ -434,7 +434,6 @@ class QJIT:
         self.mlir_module = None
         self.compiled_function = None
         parameter_types = get_type_annotations(self.qfunc)
-        self.runtime = fn.device.short_name if isinstance(fn, qml.QNode) else "best"
         self.user_typed = False
         if parameter_types is not None:
             self.user_typed = True
@@ -488,7 +487,7 @@ class QJIT:
         ):
             mlir_module, ctx, jaxpr = tracer.get_mlir(self.qfunc, *self.c_sig)
 
-        inject_functions(mlir_module, self.runtime, ctx)
+        inject_functions(mlir_module, ctx)
         mod = mlir_module.operation
         self._jaxpr = jaxpr
         self._mlir = mod.get_asm(binary=False, print_generic_op_form=False, assume_verified=True)
