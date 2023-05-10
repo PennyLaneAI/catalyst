@@ -46,7 +46,7 @@ class TestCompilerOptions:
             assert compiler in compilers
 
     @pytest.mark.parametrize("logfile", [("stdout"), ("stderr"), (None)])
-    def test_verbose_compilation(self, logfile, capsys):
+    def test_verbose_compilation(self, logfile, capsys, backend):
         """Test verbose compilation mode"""
 
         if logfile is not None:
@@ -55,7 +55,7 @@ class TestCompilerOptions:
         verbose = logfile is not None
 
         @qjit(verbose=verbose, logfile=logfile)
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qml.qnode(qml.device(backend, wires=1))
         def workflow():
             qml.X(wires=1)
             return qml.state()
@@ -196,10 +196,10 @@ void _catalyst_pyface_jit_cpp_exception_test(void*, void*) {
 class TestCompilerState:
     """Test states that the compiler can reach."""
 
-    def test_print_stages(self):
+    def test_print_stages(self, backend):
         """Test that after compiling the intermediate files exist."""
 
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qml.qnode(qml.device(backend, wires=1))
         def workflow():
             qml.X(wires=1)
             return qml.state()
@@ -213,11 +213,11 @@ class TestCompilerState:
         compiler.get_output_of("MLIRToLLVMDialect")
         compiler.get_output_of("LLVMDialectToLLVMIR")
 
-    def test_workspace_keep_intermediate(self):
+    def test_workspace_keep_intermediate(self, backend):
         """Test cwd's has been modified with folder containing intermediate results"""
 
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qml.qnode(qml.device(backend, wires=1))
         def workflow():
             qml.X(wires=1)
             return qml.state()

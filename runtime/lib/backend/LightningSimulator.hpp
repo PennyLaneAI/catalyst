@@ -37,10 +37,10 @@ throw std::logic_error("StateVectorDynamicCPU.hpp: No such header file");
 
 #include "CacheManager.hpp"
 #include "Exception.hpp"
-#include "LightningUtils.hpp"
-#include "ObsManager.hpp"
+#include "LightningObsManager.hpp"
 #include "QuantumDevice.hpp"
 #include "QubitManager.hpp"
+#include "Utils.hpp"
 
 namespace Catalyst::Runtime::Simulator {
 class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {
@@ -53,7 +53,7 @@ class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {
 
     QubitManager<QubitIdType, size_t> qubit_manager{};
     CacheManager cache_manager{};
-    bool cache_recording{false};
+    bool tape_recording{false};
 
     size_t device_shots{0};
 
@@ -98,7 +98,7 @@ class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {
 
   public:
     explicit LightningSimulator(bool status = false, size_t shots = default_device_shots)
-        : cache_recording(status), device_shots(shots)
+        : tape_recording(status), device_shots(shots)
     {
     }
     ~LightningSimulator() override = default;

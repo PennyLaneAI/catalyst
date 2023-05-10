@@ -23,6 +23,8 @@ target triple = "x86_64-pc-linux-gnu"
 %struct.MemRefT = type { double*, double*, i64, [1 x i64], [1 x i64] }
 
 @.str = private constant [15 x i8] c"grad[%d] = %f\0A\00", align 1
+@backend = private constant [8 x i8] c"backend\00"
+@backend_default = private constant [8 x i8] c"default\00"
 
 declare i8* @aligned_alloc(i64, i64)
 
@@ -78,8 +80,8 @@ define double @circuit(%Qubit* %0) {
 
 define i32 @main() {
   ; Initialize quantum runtime
-  call void @__quantum__rt__device(i8* null, i8* null)
   call void @__quantum__rt__initialize()
+  call void @__quantum__rt__device(i8* getelementptr ([8 x i8], [8 x i8]* @backend, i64 0, i64 0), i8* getelementptr ([8 x i8], [8 x i8]* @backend_default, i64 0, i64 0))
 
   ; Allocate 2 qubits
   %1 = call %Array* @__quantum__rt__qubit_allocate_array(i64 2)
@@ -108,7 +110,6 @@ define i32 @main() {
 
   ; Call the Gradient function
   call void (i64, ...) @__quantum__qis__Gradient(i64 1, %struct.MemRefT* %memref_ptr)
-
 
   ; Deactivate the recorder
   call void @__quantum__rt__toggle_recorder(i8 0)

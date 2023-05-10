@@ -20,14 +20,18 @@ from catalyst import CompileError, measure, qjit
 
 
 class TestMidCircuitMeasurement:
-    def test_pl_measure(self):
+    def test_pl_measure(self, backend):
+        """Test PL measure."""
+
         def circuit():
             return qml.measure(0)
 
         with pytest.raises(CompileError, match="Must use 'measure' from Catalyst"):
-            qjit(qml.qnode(qml.device("lightning.qubit", wires=1))(circuit))()
+            qjit(qml.qnode(qml.device(backend, wires=1))(circuit))()
 
     def test_measure_outside_qjit(self):
+        """Test measure outside qjit."""
+
         def circuit():
             return measure(0)
 
@@ -35,15 +39,19 @@ class TestMidCircuitMeasurement:
             circuit()
 
     def test_measure_outside_qnode(self):
+        """Test measure outside qnode."""
+
         def circuit():
             return measure(0)
 
         with pytest.raises(CompileError, match="can only be used from within a qml.qnode"):
             qjit(circuit)()
 
-    def test_basic(self):
+    def test_basic(self, backend):
+        """Test measure (basic)."""
+
         @qjit()
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qml.qnode(qml.device(backend, wires=1))
         def circuit(x: float):
             qml.RX(x, wires=0)
             m = measure(wires=0)
@@ -51,9 +59,11 @@ class TestMidCircuitMeasurement:
 
         assert circuit(jnp.pi)  # m will be equal to True if wire 0 is measured in 1 state
 
-    def test_more_complex(self):
+    def test_more_complex(self, backend):
+        """Test measure (more complex)."""
+
         @qjit()
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qml.qnode(qml.device(backend, wires=2))
         def circuit(x: float):
             qml.RX(x, wires=0)
             m1 = measure(wires=0)

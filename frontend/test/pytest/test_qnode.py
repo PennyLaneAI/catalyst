@@ -16,33 +16,48 @@ import jax.numpy as jnp
 import pennylane as qml
 import pytest
 
-from catalyst import measure, qjit
-
-
-@qjit()
-def workflow1(n: int):
-    @qml.qnode(qml.device("lightning.qubit", wires=2))
-    def f(x: float):
-        qml.RX(n * x, wires=n)
-        return measure(wires=n)
-
-    @qml.qnode(qml.device("lightning.qubit", wires=2))
-    def g(x: float):
-        qml.RX(x, wires=1)
-        return measure(wires=1)
-
-    return jnp.array_equal(f(jnp.pi), g(jnp.pi))
+from catalyst import CompileError, measure, qjit
 
 
 @pytest.mark.parametrize(
-    "workflow,_in,_out",
+    "_in,_out",
     [
-        (workflow1, 0, False),
-        (workflow1, 1, True),
+        (0, False),
+        (1, True),
     ],
 )
-def test_variable_capture(workflow, _in, _out):
-    assert workflow(_in) == _out
+def test_variable_capture(_in, _out, backend):
+    """Test variable capture."""
+
+    @qjit()
+    def workflow1(n: int):
+        @qml.qnode(qml.device(backend, wires=2))
+        def f(x: float):
+            qml.RX(n * x, wires=n)
+            return measure(wires=n)
+
+        @qml.qnode(qml.device(backend, wires=2))
+        def g(x: float):
+            qml.RX(x, wires=1)
+            return measure(wires=1)
+
+        return jnp.array_equal(f(jnp.pi), g(jnp.pi))
+
+    assert workflow1(_in) == _out
+
+
+def test_unsupported_device():
+    """Test unsupported device."""
+
+    @qml.qnode(qml.device("default.qubit", wires=2))
+    def func():
+        return qml.probs()
+
+    with pytest.raises(
+        CompileError,
+        match="device is not supported for compilation at the moment.",
+    ):
+        qjit(func)
 
 
 if __name__ == "__main__":

@@ -49,7 +49,8 @@ class CustomDeviceWithoutSupport(qml.QubitDevice):
     operations = lightning.operations.copy()
     observables = lightning.observables.copy()
 
-    def __init__(self, shots=None, wires=None):
+    def __init__(self, shots=None, wires=None, backend=None):
+        self.backend = backend if backend else "default"
         super().__init__(wires=wires, shots=shots)
 
     def apply(self, operations, **kwargs):

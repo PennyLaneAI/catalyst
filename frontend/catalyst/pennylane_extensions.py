@@ -57,6 +57,9 @@ class QFunc:
             the valid gate set for the quantum function
     """
 
+    # The set of supported devices at runtime
+    RUNTIME_DEVICES = ("lightning.qubit", "lightning.kokkos")
+
     def __init__(self, fn, device):
         self.func = fn
         self.device = device
@@ -64,7 +67,12 @@ class QFunc:
 
     def __call__(self, *args, **kwargs):
         if isinstance(self, qml.QNode):
-            device = QJITDevice(self.device.shots, self.device.wires)
+            if self.device.short_name not in QFunc.RUNTIME_DEVICES:
+                raise CompileError(
+                    f"The {self.device.short_name} device is not "
+                    "supported for compilation at the moment."
+                )
+            device = QJITDevice(self.device.shots, self.device.wires, self.device.short_name)
         else:
             # Allow QFunc to still be used by itself for internal testing.
             device = self.device
@@ -1063,7 +1071,8 @@ class QJITDevice(qml.QubitDevice):
         "Hamiltonian",
     ]
 
-    def __init__(self, shots=None, wires=None):
+    def __init__(self, shots=None, wires=None, backend=None):
+        self.backend = backend if backend else "default"
         super().__init__(wires=wires, shots=shots)
 
     def apply(self, operations, **kwargs):

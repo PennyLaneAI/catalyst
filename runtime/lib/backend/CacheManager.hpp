@@ -14,9 +14,11 @@
 
 #pragma once
 
-#include "LightningUtils.hpp"
-#include "ObsManager.hpp"
+#include <string>
+#include <vector>
+
 #include "Types.h"
+#include "Utils.hpp"
 
 namespace Catalyst::Runtime::Simulator {
 /**
