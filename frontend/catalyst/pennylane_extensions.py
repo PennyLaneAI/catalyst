@@ -159,7 +159,7 @@ def _bless_differentiable(f: DifferentiableLike) -> Differentiable:
     elif isinstance(f, Callable):  # Keep at the bottom
         return Function(f)
     else:
-        raise TypeError(f"Non-differentiable function passed: {type(f)}")
+        raise TypeError(f"Non-differentiable object passed: {type(f)}")
 
 
 def _make_jaxpr_differentiable(f: Differentiable, grad_params: GradParams, *args) -> Jaxpr:

@@ -626,6 +626,34 @@ def test_assert_no_higher_order_without_ps(method, backend):
             return i(x)
 
 
+def test_assert_invalid_diff_method():
+    def f(x):
+        qml.RX(x, wires=0)
+        return qml.expval(qml.PauliY(0))
+
+    with pytest.raises(ValueError, match="Invalid differentiation method"):
+
+        @qjit()
+        def workflow(x: float):
+            g = qml.qnode(qml.device("lightning.qubit", wires=1))(f)
+            h = grad(g, method="non-existent method")
+            return h(x)
+
+
+def test_assert_invalid_h_type():
+    def f(x):
+        qml.RX(x, wires=0)
+        return qml.expval(qml.PauliY(0))
+
+    with pytest.raises(ValueError, match="Invalid h value"):
+
+        @qjit()
+        def workflow(x: float):
+            g = qml.qnode(qml.device("lightning.qubit", wires=1))(f)
+            h = grad(g, method="fd", h="non-integer")
+            return h(x)
+
+
 def test_finite_diff_arbitrary_functions():
     """Test gradients on non-qnode functions."""
 

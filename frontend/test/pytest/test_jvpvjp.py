@@ -126,5 +126,44 @@ def test_vjp_against_jax(f: callable, x: list, _, ct: list):
         assert_allclose(a, b, rtol=1e-6, atol=1e-6)
 
 
+@pytest.mark.parametrize("f, x, t, ct", testvec[0:1])
+def test_jvpvjp_argcheck(f: callable, x: list, t: list, ct: list):
+    """Numerically tests Catalyst's jvp against the JAX version."""
+
+    @qjit
+    def C_workflow1():
+        return C_jvp(f, list(x), t, method="fd", argnum=list(range(len(x))))
+
+    @qjit
+    def C_workflow2():
+        return C_jvp(f, tuple(x), t, method="fd", argnum=list(range(len(x))))
+
+    @qjit
+    def C_workflow3():
+        return C_vjp(f, list(x), list(ct), method="fd", argnum=list(range(len(x))))
+
+    @qjit
+    def C_workflow4():
+        return C_vjp(f, tuple(x), tuple(ct), method="fd", argnum=list(range(len(x))))
+
+    for a, b in zip(C_workflow1(), C_workflow2()):
+        assert_allclose(a, b, rtol=1e-6, atol=1e-6)
+
+    for a, b in zip(C_workflow3(), C_workflow4()):
+        assert_allclose(a, b, rtol=1e-6, atol=1e-6)
+
+    with pytest.raises(ValueError, match="argument must be a list or a tuple"):
+
+        @qjit
+        def C_workflow():
+            return C_vjp(f, 33, tuple(ct), method="fd", argnum=list(range(len(x))))
+
+    with pytest.raises(ValueError, match="argument must be a list or a tuple"):
+
+        @qjit
+        def C_workflow():
+            return C_vjp(f, 33, tuple(ct), method="fd", argnum=list(range(len(x))))
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
