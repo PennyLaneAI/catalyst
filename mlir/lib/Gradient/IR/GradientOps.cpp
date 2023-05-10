@@ -129,10 +129,7 @@ Operation::operand_range JVPOp::getArgOperands() { return getOperands(); }
 // JVPOp, SymbolUserOpInterface
 //===----------------------------------------------------------------------===//
 
-LogicalResult JVPOp::verifySymbolUses(SymbolTableCollection &symbolTable)
-{
-    return success();
-}
+LogicalResult JVPOp::verifySymbolUses(SymbolTableCollection &symbolTable) { return success(); }
 
 //===----------------------------------------------------------------------===//
 // JVPOp Extra methods
@@ -158,10 +155,7 @@ Operation::operand_range VJPOp::getArgOperands() { return getOperands(); }
 // VJPOp, SymbolUserOpInterface
 //===----------------------------------------------------------------------===//
 
-LogicalResult VJPOp::verifySymbolUses(SymbolTableCollection &symbolTable)
-{
-    return success();
-}
+LogicalResult VJPOp::verifySymbolUses(SymbolTableCollection &symbolTable) { return success(); }
 
 //===----------------------------------------------------------------------===//
 // VJPOp Extra methods
@@ -174,4 +168,3 @@ LogicalResult VJPOp::verify()
         return emitOpError("got invalid differentiation method: ") << method;
     return success();
 }
-
