@@ -12,12 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import pytest
-
-from catalyst import qjit, cond, measure, while_loop
-import pennylane as qml
 import jax.numpy as jnp
 import numpy as np
+import pennylane as qml
+import pytest
+
+from catalyst import cond, measure, qjit, while_loop
 
 
 class TestBasicCircuits:

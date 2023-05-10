@@ -17,29 +17,29 @@ compiling of hybrid quantum-classical functions using Catalyst.
 
 import ctypes
 import functools
-import warnings
 import inspect
 import typing
+import warnings
 
 import jax
 import numpy as np
 import pennylane as qml
 from jax.interpreters.mlir import ir
 from mlir_quantum.runtime import (
-    get_ranked_memref_descriptor,
-    ranked_memref_to_numpy,
-    to_numpy,
     as_ctype,
+    get_ranked_memref_descriptor,
     make_nd_memref_descriptor,
     make_zero_d_memref_descriptor,
+    ranked_memref_to_numpy,
+    to_numpy,
 )
 
-from catalyst.utils.gen_mlir import inject_functions
-from catalyst.utils import wrapper  # pylint: disable=no-name-in-module
 import catalyst.jax_tracer as tracer
-from catalyst.compiler import Compiler
-from catalyst.compiler import CompileOptions
+from catalyst.compiler import CompileOptions, Compiler
 from catalyst.pennylane_extensions import QFunc
+from catalyst.utils import wrapper  # pylint: disable=no-name-in-module
+from catalyst.utils.c_template import get_template, mlir_type_to_numpy_type
+from catalyst.utils.gen_mlir import inject_functions
 from catalyst.utils.patching import Patcher
 from catalyst.utils.tracing import TracingContext
 
@@ -68,45 +68,6 @@ def get_type_annotations(func: typing.Callable):
     return None
 
 
-def mlir_type_to_numpy_type(t):
-    """Convert an MLIR type to a Numpy type.
-
-    Args:
-        t: an MLIR numeric type
-    Returns:
-        A numpy type
-    Raises:
-        TypeError
-    """
-    retval = None
-    if ir.ComplexType.isinstance(t):
-        base = ir.ComplexType(t).element_type
-        if ir.F64Type.isinstance(base):
-            retval = np.complex128
-        else:
-            retval = np.complex64
-    elif ir.F64Type.isinstance(t):
-        retval = np.float64
-    elif ir.F32Type.isinstance(t):
-        retval = np.float32
-    elif ir.IntegerType.isinstance(t):
-        int_t = ir.IntegerType(t)
-        if int_t.width == 1:
-            retval = np.bool_
-        elif int_t.width == 8:
-            retval = np.int8
-        elif int_t.width == 16:
-            retval = np.int16
-        elif int_t.width == 32:
-            retval = np.int32
-        else:
-            retval = np.int64
-
-    if retval is None:
-        raise TypeError("Requested return type is unavailable.")
-    return retval
-
-
 class CompiledFunction:
     """CompiledFunction, represents a Compiled Function.
 
@@ -132,7 +93,8 @@ class CompiledFunction:
         """Whether arguments can be promoted.
 
         Args:
-            compiled_signature: user supplied signature, obtain from either an annotation or a previously compiled
+            compiled_signature: user supplied signature, obtain from either an annotation or a
+                                previously compiled
             implementation of the compiled function
             runtime_signature: runtime signature
 
@@ -154,12 +116,12 @@ class CompiledFunction:
 
     @staticmethod
     def promote_arguments(compiled_signature, runtime_signature, *args):
-        """Promote arguments
-
-        Promote arguments from the type specified in args to the type specified by compiled_signature.
+        """Promote arguments from the type specified in args to the type specified by
+           compiled_signature.
 
         Args:
-            compiled_signature: user supplied signature, obtain from either an annotation or a previously compiled
+            compiled_signature: user supplied signature, obtain from either an annotation or a
+                                previously compiled
             implementation of the compiled function
             runtime_signature: runtime signature
             *args: actual arguments to the function
@@ -316,8 +278,8 @@ class CompiledFunction:
         # Unmap the shared library. This is necessary in case the function is re-compiled.
         # Without unmapping the shared library, there would be a conflict in the name of
         # the function and the previous one would succeed.
-        # Need to close after obtaining value, since the value can point to memory in the shared object.
-        # This is in the case of returning a constant, for example.
+        # Need to close after obtaining value, since the value can point to memory in the shared
+        # object. This is in the case of returning a constant, for example.
         dlclose = ctypes.CDLL(None).dlclose
         dlclose.argtypes = [ctypes.c_void_p]
         # pylint: disable=protected-access
@@ -362,9 +324,8 @@ class CompiledFunction:
         _get_rmd = CompiledFunction.get_ranked_memref_descriptor_from_mlir_tensor_type
         return_fields_types = [_get_rmd(mlir_tensor_type) for mlir_tensor_type in mlir_tensor_types]
 
-        # pylint: disable=too-few-public-methods
         class CompiledFunctionReturnValue(ctypes.Structure):
-            """Programmatically create a structure which holds N tensors of possibly different T base types."""
+            """Programmatically create a structure which holds tensors of varying base types."""
 
             _fields_ = [("f" + str(i), type(t)) for i, t in enumerate(return_fields_types)]
 
@@ -409,9 +370,8 @@ class CompiledFunction:
             c_abi_ptr = ctypes.pointer(get_ranked_memref_descriptor(numpy_arg))
             c_abi_args.append(c_abi_ptr)
 
-        # pylint: disable=too-few-public-methods
         class CompiledFunctionArgValue(ctypes.Structure):
-            """Programmatically create a structure which holds N tensors of possibly different T base types."""
+            """Programmatically create a structure which holds tensors of varying base types."""
 
             _fields_ = [("f" + str(i), type(t)) for i, t in enumerate(c_abi_args)]
 
@@ -428,6 +388,12 @@ class CompiledFunction:
 
         c_abi_args = [return_value_pointer] + [arg_value_pointer]
         return c_abi_args, numpy_arg_buffer
+
+    def get_cmain(self, *args):
+        """Get a string representing a C program that can be linked against the shared object."""
+        _, buffer = CompiledFunction.args_to_memref_descs(self.restype, args)
+
+        return get_template(self.func_name, self.restype, *buffer)
 
     def __call__(self, *args, **kwargs):
         abi_args, _buffer = CompiledFunction.args_to_memref_descs(self.restype, args)
@@ -552,6 +518,49 @@ class QJIT:
         qfunc_name = str(self.mlir_module.body.operations[0].name).replace('"', "")
         return CompiledFunction(shared_object, qfunc_name, restype)
 
+    def _maybe_promote(self, function, *args):
+        """Logic to decide whether the function needs to be recompiled
+        given *args and whether *args need to be promoted.
+
+        Args:
+          function: an instance of CompiledFunction that may need recompilation
+          *args: arguments that may be promoted.
+
+        Returns:
+          function: an instance of CompiledFunction that may have been recompiled
+          *args: arguments that may have been promoted
+        """
+        args = [jax.numpy.array(arg) for arg in args]
+        r_sig = CompiledFunction.get_runtime_signature(*args)
+        is_prev_compile = self.compiled_function is not None
+        can_promote = not is_prev_compile or CompiledFunction.can_promote(self.c_sig, r_sig)
+        needs_compile = not is_prev_compile or not can_promote
+
+        if needs_compile:
+            if self.user_typed:
+                msg = "Provided arguments did not match declared signature, recompiling..."
+                warnings.warn(msg, UserWarning)
+            self.mlir_module = self.get_mlir(*r_sig)
+            function = self.compile()
+        else:
+            args = CompiledFunction.promote_arguments(self.c_sig, r_sig, *args)
+        args = [jax.numpy.array(arg) for arg in args]
+
+        return function, args
+
+    def get_cmain(self, *args):
+        """Return the C interface template for current arguments.
+
+        Args:
+          *args: Arguments to be used in the template.
+        Returns:
+          str: A C program that can be compiled with the current shared object.
+        """
+        msg = "C interface cannot be generated from tracing context."
+        TracingContext.check_is_not_tracing(msg)
+        function, args = self._maybe_promote(self.compiled_function, *args)
+        return function.get_cmain(*args)
+
     def __call__(self, *args, **kwargs):
         if TracingContext.is_tracing():
             return self.qfunc(*args, **kwargs)
@@ -562,21 +571,8 @@ class QJIT:
                 "to use jax.jit or jax.grad, please use their equivalent from Catalyst."
             )
 
-        args = [jax.numpy.array(arg) for arg in args]
-        r_sig = CompiledFunction.get_runtime_signature(*args)
-        is_prev_compile = self.compiled_function is not None
-        can_promote = not is_prev_compile or CompiledFunction.can_promote(self.c_sig, r_sig)
-        needs_compile = not is_prev_compile or not can_promote
-
-        if needs_compile:
-            if self.user_typed:
-                msg = "Provided arguments did not match declared signature, recompilation has been triggered"
-                warnings.warn(msg, UserWarning)
-            self.mlir_module = self.get_mlir(*r_sig)
-            self.compiled_function = self.compile()
-        else:
-            args = CompiledFunction.promote_arguments(self.c_sig, r_sig, *args)
-
+        function, args = self._maybe_promote(self.compiled_function, *args)
+        self.compiled_function = function
         return self.compiled_function(*args, **kwargs)
 
 

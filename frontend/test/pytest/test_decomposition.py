@@ -12,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import pytest
-
-from catalyst import qjit, measure
 import pennylane as qml
+import pytest
 from jax import numpy as jnp
+
+from catalyst import measure, qjit
 
 # This is used just for internal testing
 from catalyst.pennylane_extensions import qfunc

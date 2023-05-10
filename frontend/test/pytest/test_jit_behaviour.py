@@ -12,18 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import pytest
-
-from catalyst import qjit, measure, grad, for_loop
-import pennylane as qml
-from jax import numpy as jnp
-from timeit import default_timer as timer
-from numpy import pi
-import numpy as np
 import random
-import jax
 import warnings
+from timeit import default_timer as timer
 
+import jax
+import numpy as np
+import pennylane as qml
+import pytest
+from jax import numpy as jnp
+from numpy import pi
+
+from catalyst import for_loop, grad, measure, qjit
 from catalyst.compilation_pipelines import CompiledFunction
 
 

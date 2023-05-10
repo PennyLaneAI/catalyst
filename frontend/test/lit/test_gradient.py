@@ -14,10 +14,11 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
-from catalyst import qjit, grad
-import pennylane as qml
 import jax
 import numpy as np
+import pennylane as qml
+
+from catalyst import grad, qjit
 
 
 # CHECK-LABEL: public @jit_grad_default

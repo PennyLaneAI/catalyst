@@ -12,12 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import jax.numpy as jnp
+import numpy as np
+import pennylane as qml
 import pytest
 
 from catalyst import qjit
-import pennylane as qml
-import numpy as np
-import jax.numpy as jnp
 
 
 def circuit_jnp():

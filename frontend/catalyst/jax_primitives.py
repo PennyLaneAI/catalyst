@@ -16,44 +16,44 @@ of quantum operations, measurements, and observables to JAXPR.
 """
 
 from typing import List
-import numpy as np
 
 import jax
-from jax.interpreters import mlir, xla
+import numpy as np
 from jax._src import util
 from jax._src.lib.mlir import ir
+from jax.interpreters import mlir, xla
 from jaxlib.mlir.dialects._func_ops_gen import CallOp
 from jaxlib.mlir.dialects._mhlo_ops_gen import ConstantOp, ConvertOp
-
 from mlir_quantum.dialects.arith import IndexCastOp
-from mlir_quantum.dialects.tensor import ExtractOp as TensorExtractOp, FromElementsOp
-from mlir_quantum.dialects.scf import IfOp, ConditionOp, ForOp, WhileOp, YieldOp
 from mlir_quantum.dialects.gradient import GradOp
 from mlir_quantum.dialects.quantum import (
-    SampleOp,
-    CountsOp,
-    ExpvalOp,
-    VarianceOp,
-    ProbsOp,
-    StateOp,
-    CustomOp,
-    MultiRZOp,
-    QubitUnitaryOp,
-    MeasureOp,
-    DeviceOp,
     AllocOp,
-    ExtractOp,
-    InsertOp,
-    DeallocOp,
     ComputationalBasisOp,
-    NamedObsOp,
-    HermitianOp,
-    TensorOp,
+    CountsOp,
+    CustomOp,
+    DeallocOp,
+    ExpvalOp,
+    ExtractOp,
     HamiltonianOp,
+    HermitianOp,
+    InsertOp,
+    MeasureOp,
+    MultiRZOp,
+    NamedObsOp,
+    ProbsOp,
+    QubitUnitaryOp,
+    SampleOp,
+    StateOp,
+    TensorOp,
+    VarianceOp,
 )
+from mlir_quantum.dialects.scf import ConditionOp, ForOp, IfOp, WhileOp, YieldOp
+from mlir_quantum.dialects.tensor import ExtractOp as TensorExtractOp
+from mlir_quantum.dialects.tensor import FromElementsOp
 
-from catalyst.utils.calculate_grad_shape import calculate_grad_shape, Signature
+from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
 
+# pylint: disable=unused-argument,too-many-lines
 
 #########
 # Types #
@@ -63,7 +63,6 @@ from catalyst.utils.calculate_grad_shape import calculate_grad_shape, Signature
 #
 # qbit
 #
-# pylint: disable=too-few-public-methods,abstract-method
 class Qbit:
     """Qbit primitive."""
 
@@ -71,12 +70,10 @@ class Qbit:
         self.aval = AbstractQbit()
 
 
-# pylint: disable=too-few-public-methods,abstract-method
 class AbstractQbit(jax.core.AbstractValue):
     """Abstract Qbit"""
 
 
-# pylint: disable=too-few-public-methods,abstract-method
 class ConcreteQbit(AbstractQbit):
     """Concrete Qbit."""
 
@@ -89,7 +86,6 @@ def _qbit_lowering(aval):
 #
 # qreg
 #
-# pylint: disable=too-few-public-methods,abstract-method
 class Qreg:
     """Quantum register primitive."""
 
@@ -97,12 +93,10 @@ class Qreg:
         self.aval = AbstractQreg()
 
 
-# pylint: disable=too-few-public-methods,abstract-method
 class AbstractQreg(jax.core.AbstractValue):
     """Abstract quantum register."""
 
 
-# pylint: disable=too-few-public-methods,abstract-method
 class ConcreteQreg(AbstractQreg):
     """Concrete quantum register."""
 
@@ -115,7 +109,6 @@ def _qreg_lowering(aval):
 #
 # observable
 #
-# pylint: disable=too-few-public-methods,abstract-method
 class Obs:
     """Observable JAX type primitive."""
 
@@ -123,7 +116,6 @@ class Obs:
         self.aval = AbstractObs(num_qubits, primitive)
 
 
-# pylint: disable=too-few-public-methods,abstract-method
 class AbstractObs(jax.core.AbstractValue):
     """Abstract observable."""
 
@@ -132,7 +124,6 @@ class AbstractObs(jax.core.AbstractValue):
         self.primitive = primitive
 
 
-# pylint: disable=too-few-public-methods,abstract-method
 class ConcreteObs(AbstractObs):
     """Concrete observable."""
 
@@ -267,7 +258,6 @@ def _grad_def_impl(ctx, *args, jaxpr, fn, method, h, argnum):  # pragma: no cove
 
 
 @grad_p.def_abstract_eval
-# pylint: disable=unused-argument
 def _grad_abstract(*args, jaxpr, fn, method, h, argnum):
     """This function is called with abstract arguments for tracing."""
     signature = Signature(jaxpr.consts + jaxpr.in_avals, jaxpr.out_avals)
@@ -330,7 +320,6 @@ def _qdevice_def_impl(ctx, spec, val):  # pragma: no cover
 
 
 @qdevice_p.def_abstract_eval
-# pylint: disable=unused-argument
 def _qdevice_abstract_eval(spec, val):
     return ()
 
@@ -362,7 +351,6 @@ def qalloc(size):
 
 
 @qalloc_p.def_abstract_eval
-# pylint: disable=unused-argument
 def _qalloc_abstract_eval(size):
     """This function is called with abstract arguments for tracing."""
     return AbstractQreg()
@@ -398,7 +386,6 @@ def _qdealloc_def_impl(ctx, size_value):  # pragma: no cover
 
 
 @qdealloc_p.def_abstract_eval
-# pylint: disable=unused-argument
 def _qdealloc_abstract_eval(qreg):
     return ()
 
@@ -424,7 +411,6 @@ def qextract(qreg, qubit_idx):
 
 
 @qextract_p.def_abstract_eval
-# pylint: disable=unused-argument
 def _qextract_abstract_eval(qreg, qubit_idx):
     """This function is called with abstract arguments for tracing."""
     assert isinstance(qreg, AbstractQreg)
@@ -465,7 +451,6 @@ def qinsert(qreg_old, qubit_idx, qubit):
 
 
 @qinsert_p.def_abstract_eval
-# pylint: disable=unused-argument
 def _qinsert_abstract_eval(qreg_old, qubit_idx, qubit):
     """This function is called with abstract arguments for tracing."""
     assert isinstance(qreg_old, AbstractQreg)
@@ -504,7 +489,6 @@ def qinst(name, qubits_len, *qubits_or_params):
 
 
 @qinst_p.def_abstract_eval
-# pylint: disable=unused-argument
 def _qinst_abstract_eval(*qubits_or_params, op=None, qubits_len=-1):
     for idx in range(qubits_len):
         qubit = qubits_or_params[idx]
@@ -570,7 +554,6 @@ def qunitary(matrix, *qubits):
 
 
 @qunitary_p.def_abstract_eval
-# pylint: disable=unused-argument
 def _qunitary_abstract_eval(matrix, *qubits):
     for q in qubits:
         assert isinstance(q, AbstractQbit)
@@ -626,7 +609,6 @@ def qmeasure(qubit):
 
 
 @qmeasure_p.def_abstract_eval
-# pylint: disable=unused-argument
 def _qmeasure_abstract_eval(qubit):
     assert isinstance(qubit, AbstractQbit)
     return jax.core.ShapedArray((), bool), qubit
@@ -694,24 +676,23 @@ def _compbasis_lowering(jax_ctx: mlir.LoweringRuleContext, *qubits: tuple):
 #
 # named observable
 #
-@compbasis_p.def_impl
-def _namedobs_def_impl(ctx, qubit, type):  # pragma: no cover
+def namedobs(kind, qubit):
+    """Bind operands to operation."""
+    return namedobs_p.bind(qubit, kind=kind)
+
+
+@namedobs_p.def_impl
+def _namedobs_def_impl(qubit, kind):  # pragma: no cover
     raise NotImplementedError()
 
 
-def namedobs(type, qubit):
-    """Bind operands to operation."""
-    return namedobs_p.bind(qubit, type=type)
-
-
 @namedobs_p.def_abstract_eval
-# pylint: disable=unused-argument
-def _namedobs_abstract_eval(qubit, type):
+def _namedobs_abstract_eval(qubit, kind):
     assert isinstance(qubit, AbstractQbit)
     return AbstractObs()
 
 
-def _named_obs_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value, type: int):
+def _named_obs_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value, kind: int):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
@@ -720,7 +701,7 @@ def _named_obs_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value, type
     assert ir.OpaqueType(qubit.type).data == "bit"
 
     i8_type = ir.IntegerType.get_signless(8, ctx)
-    obsId = ir.IntegerAttr.get(i8_type, type)
+    obsId = ir.IntegerAttr.get(i8_type, kind)
     result_type = ir.OpaqueType.get("quantum", "obs", ctx)
 
     return NamedObsOp(result_type, qubit, obsId).results
@@ -735,7 +716,6 @@ def hermitian(matrix, *qubits):
 
 
 @hermitian_p.def_abstract_eval
-# pylint: disable=unused-argument
 def _hermitian_abstract_eval(matrix, *qubits):
     for q in qubits:
         assert isinstance(q, AbstractQbit)
@@ -794,7 +774,6 @@ def hamiltonian(coeffs, *terms):
 
 
 @hamiltonian_p.def_abstract_eval
-# pylint: disable=unused-argument
 def _hamiltonian_abstract_eval(coeffs, *terms):
     for o in terms:
         assert isinstance(o, AbstractObs)
@@ -868,7 +847,6 @@ def _counts_def_impl(ctx, obs, shots, shape):  # pragma: no cover
 
 
 @counts_p.def_abstract_eval
-# pylint: disable=unused-argument
 def _counts_abstract_eval(obs, shots, shape):
     assert isinstance(obs, AbstractObs)
 
@@ -904,7 +882,6 @@ def expval(obs, shots):
 
 
 @expval_p.def_abstract_eval
-# pylint: disable=unused-argument
 def _expval_abstract_eval(obs, shots):
     assert isinstance(obs, AbstractObs)
     return jax.core.ShapedArray((), jax.numpy.float64)
@@ -942,7 +919,6 @@ def var(obs, shots):
 
 
 @var_p.def_abstract_eval
-# pylint: disable=unused-argument
 def _var_abstract_eval(obs, shots):
     assert isinstance(obs, AbstractObs)
     return jax.core.ShapedArray((), jax.numpy.float64)
@@ -1049,7 +1025,6 @@ def qcond(branch_jaxprs, *header_and_branch_args_plus_consts):
 
 
 @qcond_p.def_abstract_eval
-# pylint: disable=unused-argument
 def _qcond_abstract_eval(*args, branch_jaxprs, **kwargs):
     return branch_jaxprs[0].out_avals
 
@@ -1143,7 +1118,6 @@ def qwhile(cond_jaxpr, body_jaxpr, cond_nconsts, body_nconsts, *iter_args_plus_c
 
 
 @qwhile_p.def_abstract_eval
-# pylint: disable=unused-argument
 def _qwhile_loop_abstract_eval(*args, cond_jaxpr, body_jaxpr, **kwargs):
     return body_jaxpr.out_avals
 
@@ -1225,7 +1199,6 @@ def _qwhile_lowering(
 #
 # qfor loop
 #
-# pylint: disable=unused-argument
 def qfor(body_jaxpr, body_nconsts, *header_and_iter_args_plus_consts):
     """Bind operands to operation."""
     return qfor_p.bind(
@@ -1234,7 +1207,6 @@ def qfor(body_jaxpr, body_nconsts, *header_and_iter_args_plus_consts):
 
 
 @qfor_p.def_abstract_eval
-# pylint: disable=unused-argument
 def _qfor_loop_abstract_eval(*args, body_jaxpr, **kwargs):
     return body_jaxpr.out_avals
 

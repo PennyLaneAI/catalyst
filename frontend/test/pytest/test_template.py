@@ -12,15 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import pytest
-
-from catalyst import qjit, for_loop
-import pennylane as qml
 import jax
 import jax.numpy as jnp
 import numpy as np
-from scipy.stats import norm
+import pennylane as qml
+import pytest
 from pennylane import numpy as pnp
+from scipy.stats import norm
+
+from catalyst import for_loop, qjit
 
 
 def test_amplitude_embedding(backend):

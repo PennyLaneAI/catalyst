@@ -17,14 +17,14 @@ MLIR/LLVM representations.
 
 import abc
 import os
-import sys
 import shutil
 import subprocess
+import sys
 import tempfile
 import warnings
-from io import TextIOWrapper
-from typing import Optional, List, Any
 from dataclasses import dataclass
+from io import TextIOWrapper
+from typing import Any, List, Optional
 
 from catalyst._configuration import INSTALLED
 
@@ -130,7 +130,6 @@ class PassPipeline(abc.ABC):
         return outfile
 
 
-# pylint: disable=too-few-public-methods
 class MHLOPass(PassPipeline):
     """Pass pipeline to convert (M)HLO dialects to standard MLIR dialects."""
 
@@ -196,9 +195,10 @@ class MLIRToLLVMDialect(PassPipeline):
         "--convert-linalg-to-loops",
         "--convert-scf-to-cf",
         # This pass expands memref operations that modify the metadata of a memref (sizes, offsets,
-        # stdies) into a sequence of easier to analyze constructs. In particular, this pass transforms
-        # operations into explicit sequence of operations that model the effect of this operation on the
-        # different metadata. This pass uses affine constructs to materialize these effects.
+        # strides) into a sequence of easier to analyze constructs. In particular, this pass
+        # transforms operations into explicit sequence of operations that model the effect of this
+        # operation on the different metadata. This pass uses affine constructs to materialize these
+        # effects.
         # Concretely, expanded-strided-metadata is used to decompose memref.subview as it has no
         # lowering in -convert-memref-to-llvm.
         "--expand-strided-metadata",
@@ -206,7 +206,7 @@ class MLIRToLLVMDialect(PassPipeline):
         "--convert-complex-to-standard",  # added for complex.exp lowering
         "--convert-complex-to-llvm",
         "--convert-math-to-llvm",
-        # Must be run after -convert-math-to-llvm as it marks math::powf illegal but doesn't convert it.
+        # Run after -convert-math-to-llvm as it marks math::powf illegal without converting it.
         "--convert-math-to-libm",
         "--convert-arith-to-llvm",
         "--convert-memref-to-llvm=use-generic-functions",
@@ -269,7 +269,6 @@ class LLVMIRToObjectFile(PassPipeline):
         return infile.replace(".ll", ".o")
 
 
-# pylint: disable=too-few-public-methods
 class CompilerDriver:
     """Compiler Driver Interface
     In order to avoid relying on a single compiler at run time and allow the user some flexibility,
@@ -324,14 +323,13 @@ class CompilerDriver:
         compilers = fallback_compilers
         emit_warning = preferred_compiler and not preferred_compiler_exists
         if emit_warning:
-            msg = f"User defined compiler {preferred_compiler} is not in PATH. Will attempt fallback on available compilers."
+            msg = f"User defined compiler {preferred_compiler} is not in PATH. Using fallback ..."
             warnings.warn(msg, UserWarning)
         else:
             compilers = [preferred_compiler] + fallback_compilers
         return compilers
 
     @staticmethod
-    # pylint: disable=redefined-outer-name
     def _exists(compiler):
         if compiler is None:
             return None
@@ -339,13 +337,11 @@ class CompilerDriver:
 
     @staticmethod
     def _available_compilers(fallback_compilers):
-        # pylint: disable=redefined-outer-name
         for compiler in CompilerDriver._get_compiler_fallback_order(fallback_compilers):
             if CompilerDriver._exists(compiler):
                 yield compiler
 
     @staticmethod
-    # pylint: disable=redefined-outer-name
     def _attempt_link(compiler, flags, infile, outfile, options):
         try:
             command = [compiler] + flags + [infile, "-o", outfile]
@@ -395,7 +391,8 @@ class CompilerDriver:
             success = CompilerDriver._attempt_link(compiler, flags, infile, outfile, options)
             if success:
                 return outfile
-        msg = f"Unable to link {infile}. All available compiler options exhausted. Please provide a compatible compiler via $CATALYST_CC."
+        msg = f"Unable to link {infile}. All available compiler options exhausted. "
+        msg += "Please provide a compatible compiler via $CATALYST_CC."
         raise EnvironmentError(msg)
 
 
@@ -403,11 +400,10 @@ class Compiler:
     """Compiles MLIR modules to shared objects."""
 
     def __init__(self):
-        self.pass_pipeline_output = None
+        self.pass_pipeline_output = {}
         # The temporary directory must be referenced by the wrapper class
         # in order to avoid being garbage collected
-        # pylint: disable=consider-using-with
-        self.workspace = tempfile.TemporaryDirectory()
+        self.workspace = tempfile.TemporaryDirectory()  # pylint: disable=consider-using-with
 
     def run(self, mlir_module, options):
         """Compile an MLIR module to a shared object.
@@ -458,21 +454,10 @@ class Compiler:
 
         for pipeline in pipelines:
             output = pipeline.run(filename, options=options)
-            self.pass_pipeline_output[pipeline] = output
+            self.pass_pipeline_output[pipeline.__name__] = output
             filename = os.path.abspath(output)
 
         return filename
-
-    @staticmethod
-    def _get_class_from_string(pipeline):
-        try:
-            return getattr(sys.modules[__name__], pipeline)
-        except AttributeError as e:
-            raise ValueError(f"Output for pass {pipeline} not found.") from e
-
-    def _get_output_file_of(self, pipeline):
-        cls = Compiler._get_class_from_string(pipeline)
-        return self.pass_pipeline_output.get(cls)
 
     def get_output_of(self, pipeline):
         """Get the output IR of a pipeline.
@@ -482,13 +467,12 @@ class Compiler:
         Returns
             (str): output IR
         """
-        fname = self._get_output_file_of(pipeline)
-        try:
+        fname = self.pass_pipeline_output.get(pipeline)
+        if fname:
             with open(fname, "r", encoding="utf-8") as f:
                 txt = f.read()
             return txt
-        except TypeError:
-            return None
+        return None
 
     def print(self, pipeline):
         """Print the output IR of pass.

@@ -12,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import jax
+import pennylane as qml
 import pytest
 
-from catalyst import qjit, measure
-import pennylane as qml
-import jax
+from catalyst import measure, qjit
 
 
 def test_strings_aot(backend):

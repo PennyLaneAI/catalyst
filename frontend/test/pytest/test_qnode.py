@@ -12,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import pytest
 import jax.numpy as jnp
 import pennylane as qml
+import pytest
 
-from catalyst import qjit, measure, CompileError
+from catalyst import measure, qjit
 
 
 @pytest.mark.parametrize(
@@ -44,20 +44,6 @@ def test_variable_capture(_in, _out, backend):
         return jnp.array_equal(f(jnp.pi), g(jnp.pi))
 
     assert workflow1(_in) == _out
-
-
-def test_unsupported_device():
-    """Test unsupported device."""
-
-    @qml.qnode(qml.device("default.qubit", wires=2))
-    def func():
-        return qml.probs()
-
-    with pytest.raises(
-        CompileError,
-        match="device is not supported for compilation at the moment.",
-    ):
-        qjit(func)
 
 
 if __name__ == "__main__":

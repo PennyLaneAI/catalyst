@@ -113,8 +113,10 @@ endif
 	$(MAKE) -C runtime format
 ifdef check
 	black --check --verbose .
+	isort --check --diff .
 else
 	black .
+	isort .
 endif
 	pylint frontend
 

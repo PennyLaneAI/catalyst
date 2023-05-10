@@ -12,25 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import jax.numpy as jnp
+import pennylane as qml
 import pytest
 
-from catalyst import qjit, grad
-import pennylane as qml
-import jax.numpy as jnp
+from catalyst import grad, qjit
+
+# pylint: disable=missing-function-docstring
 
 
-def f(arg0: int, arg1: int):
+def f(arg0: int, _arg1: int):
     qml.RX(arg0 * jnp.pi, wires=[0])
     return qml.state()
 
 
-def g(arg0: int, arg1: int, arg2: int):
+def g(arg0: int, _arg1: int, _arg2: int):
     qml.RX(arg0 * jnp.pi, wires=[0])
     return qml.state()
 
 
 @pytest.mark.parametrize(
-    "circuit,params",
+    "fn,params",
     [
         (f, [0, 0]),
         (f, [0, 1]),
@@ -46,20 +48,22 @@ def g(arg0: int, arg1: int, arg2: int):
         (g, [1, 1, 1]),
     ],
 )
-def test_buffer_args(circuit, params, backend):
-    """Test buffer args."""
+def test_buffer_args(fn, params):
+    """Test multiple arguments passed to compiled function."""
 
-    device = qml.device(backend, wires=1)
-    interpreted_fn = qml.QNode(circuit, device)
+    device = qml.device("lightning.qubit", wires=1)
+    interpreted_fn = qml.QNode(fn, device)
     jitted_fn = qjit(interpreted_fn)
     assert jnp.allclose(interpreted_fn(*params), jitted_fn(*params))
 
 
 class TestReturnValues:
-    def test_return_values(self, backend):
-        """Test return values."""
+    """Test return value buffers."""
 
-        @qml.qnode(qml.device(backend, wires=3))
+    def test_return_values(self):
+        """Test return values are correctly stored in return buffers."""
+
+        @qml.qnode(qml.device("lightning.qubit", wires=3))
         def circuit(params):
             qml.SingleExcitation(params[0], wires=[0, 1])
             qml.SingleExcitation(params[1], wires=[0, 2])
@@ -96,7 +100,6 @@ class TestReturnValues:
         """
 
         @qjit
-        # pylint: disable=missing-function-docstring
         def return_scalar():
             return jnp.array(0, dtype=dtype)
 
@@ -105,12 +108,12 @@ class TestReturnValues:
     @pytest.mark.parametrize("dtype", [(jnp.float16)])
     def test_types_which_are_unhandled(self, dtype):
         """Test that there's a nice error message when a function returns an f16."""
-        with pytest.raises(TypeError, match="Requested return type is unavailable."):
 
-            @qjit
-            # pylint: disable=missing-function-docstring
-            def return_scalar():
-                return jnp.array(0, dtype=dtype)
+        def return_scalar():
+            return jnp.array(0, dtype=dtype)
+
+        with pytest.raises(TypeError, match="Requested return type is unavailable."):
+            qjit(return_scalar)
 
 
 if __name__ == "__main__":

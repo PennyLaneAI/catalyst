@@ -12,12 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import jax.numpy as jnp
+import pennylane as qml
 import pytest
 
 from catalyst import qjit
-import pennylane as qml
-import jax.numpy as jnp
-
 
 ops = [
     qml.Identity(wires=0),
