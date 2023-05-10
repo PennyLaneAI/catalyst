@@ -627,6 +627,8 @@ def test_assert_no_higher_order_without_ps(method, backend):
 
 
 def test_assert_invalid_diff_method():
+    """Test invalid diff method detection"""
+
     def f(x):
         qml.RX(x, wires=0)
         return qml.expval(qml.PauliY(0))
@@ -641,6 +643,8 @@ def test_assert_invalid_diff_method():
 
 
 def test_assert_invalid_h_type():
+    """Test invalid h type detection"""
+
     def f(x):
         qml.RX(x, wires=0)
         return qml.expval(qml.PauliY(0))
@@ -655,6 +659,7 @@ def test_assert_invalid_h_type():
 
 
 def test_assert_non_differentiable():
+    """Test non-differentiable parameter detection"""
     with pytest.raises(TypeError, match="Non-differentiable object passed"):
 
         @qjit()

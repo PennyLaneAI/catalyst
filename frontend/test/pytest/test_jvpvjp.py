@@ -155,13 +155,13 @@ def test_jvpvjp_argcheck(f: callable, x: list, t: list, ct: list):
     with pytest.raises(ValueError, match="argument must be a list or a tuple"):
 
         @qjit
-        def C_workflow():
+        def C_workflow_bad1():
             return C_jvp(f, 33, tuple(t), method="fd", argnum=list(range(len(x))))
 
     with pytest.raises(ValueError, match="argument must be a list or a tuple"):
 
         @qjit
-        def C_workflow():
+        def C_workflow_bad2():
             return C_vjp(f, 33, tuple(ct), method="fd", argnum=list(range(len(x))))
 
 
