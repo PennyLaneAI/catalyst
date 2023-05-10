@@ -38,6 +38,7 @@ import catalyst.jax_tracer as tracer
 from catalyst.compiler import CompileOptions, Compiler
 from catalyst.pennylane_extensions import QFunc
 from catalyst.utils import wrapper  # pylint: disable=no-name-in-module
+from catalyst.utils.c_template import get_template, mlir_type_to_numpy_type
 from catalyst.utils.gen_mlir import inject_functions
 from catalyst.utils.patching import Patcher
 from catalyst.utils.tracing import TracingContext
@@ -65,45 +66,6 @@ def get_type_annotations(func: typing.Callable):
         return getattr(func, "__annotations__", {}).values()
 
     return None
-
-
-def mlir_type_to_numpy_type(t):
-    """Convert an MLIR type to a Numpy type.
-
-    Args:
-        t: an MLIR numeric type
-    Returns:
-        A numpy type
-    Raises:
-        TypeError
-    """
-    retval = None
-    if ir.ComplexType.isinstance(t):
-        base = ir.ComplexType(t).element_type
-        if ir.F64Type.isinstance(base):
-            retval = np.complex128
-        else:
-            retval = np.complex64
-    elif ir.F64Type.isinstance(t):
-        retval = np.float64
-    elif ir.F32Type.isinstance(t):
-        retval = np.float32
-    elif ir.IntegerType.isinstance(t):
-        int_t = ir.IntegerType(t)
-        if int_t.width == 1:
-            retval = np.bool_
-        elif int_t.width == 8:
-            retval = np.int8
-        elif int_t.width == 16:
-            retval = np.int16
-        elif int_t.width == 32:
-            retval = np.int32
-        else:
-            retval = np.int64
-
-    if retval is None:
-        raise TypeError("Requested return type is unavailable.")
-    return retval
 
 
 class CompiledFunction:
@@ -415,6 +377,12 @@ class CompiledFunction:
         c_abi_args = [return_value_pointer] + [arg_value_pointer]
         return c_abi_args, numpy_arg_buffer
 
+    def get_cmain(self, *args):
+        """Get a string representing a C program that can be linked against the shared object."""
+        _, buffer = CompiledFunction.args_to_memref_descs(self.restype, args)
+
+        return get_template(self.func_name, self.restype, *buffer)
+
     def __call__(self, *args, **kwargs):
         abi_args, _buffer = CompiledFunction.args_to_memref_descs(self.restype, args)
 
@@ -457,7 +425,6 @@ class QJIT:
         self.mlir_module = None
         self.compiled_function = None
         parameter_types = get_type_annotations(self.qfunc)
-        self.runtime = fn.device.short_name if isinstance(fn, qml.QNode) else "best"
         self.user_typed = False
         if parameter_types is not None:
             self.user_typed = True
@@ -511,7 +478,7 @@ class QJIT:
         ):
             mlir_module, ctx, jaxpr = tracer.get_mlir(self.qfunc, *self.c_sig)
 
-        inject_functions(mlir_module, self.runtime, ctx)
+        inject_functions(mlir_module, ctx)
         mod = mlir_module.operation
         self._jaxpr = jaxpr
         self._mlir = mod.get_asm(binary=False, print_generic_op_form=False, assume_verified=True)
@@ -542,16 +509,18 @@ class QJIT:
         qfunc_name = str(self.mlir_module.body.operations[0].name).replace('"', "")
         return CompiledFunction(shared_object, qfunc_name, restype)
 
-    def __call__(self, *args, **kwargs):
-        if TracingContext.is_tracing():
-            return self.qfunc(*args, **kwargs)
+    def _maybe_promote(self, function, *args):
+        """Logic to decide whether the function needs to be recompiled
+        given *args and whether *args need to be promoted.
 
-        if any(isinstance(arg, jax.core.Tracer) for arg in args):
-            raise ValueError(
-                "Cannot use JAX to trace through a qjit compiled function. If you attempted "
-                "to use jax.jit or jax.grad, please use their equivalent from Catalyst."
-            )
+        Args:
+          function: an instance of CompiledFunction that may need recompilation
+          *args: arguments that may be promoted.
 
+        Returns:
+          function: an instance of CompiledFunction that may have been recompiled
+          *args: arguments that may have been promoted
+        """
         args = [jax.numpy.array(arg) for arg in args]
         r_sig = CompiledFunction.get_runtime_signature(*args)
         is_prev_compile = self.compiled_function is not None
@@ -563,10 +532,38 @@ class QJIT:
                 msg = "Provided arguments did not match declared signature, recompiling..."
                 warnings.warn(msg, UserWarning)
             self.mlir_module = self.get_mlir(*r_sig)
-            self.compiled_function = self.compile()
+            function = self.compile()
         else:
             args = CompiledFunction.promote_arguments(self.c_sig, r_sig, *args)
+        args = [jax.numpy.array(arg) for arg in args]
 
+        return function, args
+
+    def get_cmain(self, *args):
+        """Return the C interface template for current arguments.
+
+        Args:
+          *args: Arguments to be used in the template.
+        Returns:
+          str: A C program that can be compiled with the current shared object.
+        """
+        msg = "C interface cannot be generated from tracing context."
+        TracingContext.check_is_not_tracing(msg)
+        function, args = self._maybe_promote(self.compiled_function, *args)
+        return function.get_cmain(*args)
+
+    def __call__(self, *args, **kwargs):
+        if TracingContext.is_tracing():
+            return self.qfunc(*args, **kwargs)
+
+        if any(isinstance(arg, jax.core.Tracer) for arg in args):
+            raise ValueError(
+                "Cannot use JAX to trace through a qjit compiled function. If you attempted "
+                "to use jax.jit or jax.grad, please use their equivalent from Catalyst."
+            )
+
+        function, args = self._maybe_promote(self.compiled_function, *args)
+        self.compiled_function = function
         return self.compiled_function(*args, **kwargs)
 
 

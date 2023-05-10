@@ -8,6 +8,12 @@
 * Add support for ``else if`` chains for ``@cond`` conditionals
   [#104](https://github.com/PennyLaneAI/catalyst/pull/104)
 
+* Add the end-to-end support for multiple backend devices. The compilation flag
+  ``ENABLE_LIGHTNING_KOKKOS=ON`` builds the runtime with support for PennyLane's
+  ``lightning.kokkos``. Both ``lightning.qubit`` and ``lightning.kokkos`` can be
+  chosen as available backend devices from the frontend.
+  [#89](https://github.com/PennyLaneAI/catalyst/pull/89)
+
 <h3>Improvements</h3>
 
 * Improving error handling by throwing descriptive and unified expressions for runtime

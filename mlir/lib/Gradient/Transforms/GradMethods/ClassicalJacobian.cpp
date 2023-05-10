@@ -92,6 +92,9 @@ func::FuncOp genParamCountFunction(PatternRewriter &rewriter, Location loc, func
             returnOp->setOperands(paramCount);
         });
 
+        // Erase redundant device specifications
+        paramCountFn.walk([&](quantum::DeviceOp device) { rewriter.eraseOp(device); });
+
         quantum::removeQuantumMeasurements(paramCountFn);
     }
 
@@ -137,6 +140,9 @@ func::FuncOp genArgMapFunction(PatternRewriter &rewriter, Location loc, func::Fu
         Value cZero = rewriter.create<index::ConstantOp>(loc, 0);
         rewriter.create<memref::StoreOp>(loc, cZero, paramsProcessed);
         Value cOne = rewriter.create<index::ConstantOp>(loc, 1);
+
+        // Erase redundant device specifications
+        argMapFn.walk([&](quantum::DeviceOp device) { rewriter.eraseOp(device); });
 
         // Insert gate parameters into the params buffer.
         argMapFn.walk([&](quantum::CustomOp gate) {

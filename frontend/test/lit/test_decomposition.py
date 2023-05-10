@@ -39,7 +39,8 @@ def get_custom_device_without(num_wires, discards):
         operations = copy
         observables = discard
 
-        def __init__(self, shots=None, wires=None):
+        def __init__(self, shots=None, wires=None, backend=None):
+            self.backend = backend if backend else "default"
             super().__init__(wires=wires, shots=shots)
 
         def apply(self, operations, **kwargs):

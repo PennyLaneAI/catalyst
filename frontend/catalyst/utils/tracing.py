@@ -49,3 +49,12 @@ class TracingContext:
         """
         if not TracingContext.is_tracing():
             raise CompileError(msg)
+
+    @staticmethod
+    def check_is_not_tracing(msg):
+        """Assert if the execution is currently being traced.
+
+        Raises: CompileError
+        """
+        if TracingContext.is_tracing():
+            raise CompileError(msg)
