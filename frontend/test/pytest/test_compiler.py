@@ -18,13 +18,13 @@ from catalyst.compiler import (
     CompileOptions,
     Compiler,
     CompilerDriver,
+    JVPLoweringPass,
     LLVMDialectToLLVMIR,
     LLVMIRToObjectFile,
     MHLOPass,
     MLIRToLLVMDialect,
     PassPipeline,
     QuantumCompilationPass,
-    JVPLoweringPass,
 )
 from catalyst.jax_tracer import get_mlir
 
