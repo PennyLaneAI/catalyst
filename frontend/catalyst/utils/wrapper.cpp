@@ -2,7 +2,7 @@
 #include <pybind11/pybind11.h>
 
 #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
-#define NUMPY_WARN_IF_NO_MEM_POLICY 1
+
 #include "numpy/arrayobject.h"
 
 namespace py = pybind11;
