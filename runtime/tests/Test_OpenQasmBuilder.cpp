@@ -16,7 +16,7 @@
 
 #include <catch2/catch.hpp>
 
-using namespace Catalyst::Runtime::OpenQasm;
+using namespace Catalyst::Runtime::Device::OpenQasm;
 
 TEST_CASE("Test lookup openqasm gate names from QIR -> OpenQasm map", "[openqasm]")
 {

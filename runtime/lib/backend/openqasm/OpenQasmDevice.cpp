@@ -31,10 +31,10 @@ auto OpenQasmDevice::AllocateQubits([[maybe_unused]] size_t num_qubits) -> std::
     const size_t cur_num_qubits = this->device->getNumQubits();
     const size_t new_num_qubits = cur_num_qubits + num_qubits;
     if (cur_num_qubits) {
-        this->device = std::make_unique<OpenQasmBuilder>();
+        this->device = std::make_unique<OpenQasm::OpenQasmBuilder>();
     }
 
-    this->device->Register(RegisterType::Qubit, "qubits", new_num_qubits);
+    this->device->Register(OpenQasm::RegisterType::Qubit, "qubits", new_num_qubits);
 
     return this->qubit_manager.AllocateRange(cur_num_qubits, new_num_qubits);
 }
@@ -197,7 +197,7 @@ auto OpenQasmDevice::Measure([[maybe_unused]] QubitIdType wire) -> Result
 
     auto num_qubits = this->GetNumQubits();
     if (this->device->getNumBits() != num_qubits) {
-        this->device->Register(RegisterType::Bit, "bits", num_qubits);
+        this->device->Register(OpenQasm::RegisterType::Bit, "bits", num_qubits);
     }
 
     this->device->Measure(dev_wire[0], dev_wire[0]);

@@ -16,6 +16,8 @@
 
 #define __device_openqasm_3
 
+#include <memory>
+
 #include "Exception.hpp"
 #include "QuantumDevice.hpp"
 
@@ -25,14 +27,13 @@
 
 namespace Catalyst::Runtime::Device {
 
-using namespace Catalyst::Runtime::OpenQasm;
-
 class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {
   private:
     static constexpr size_t default_device_shots{1000}; // tidy: readability-magic-numbers
 
     Simulator::QubitManager<QubitIdType, size_t> qubit_manager{};
-    std::unique_ptr<OpenQasmBuilder> device = std::make_unique<OpenQasmBuilder>();
+    std::unique_ptr<OpenQasm::OpenQasmBuilder> device =
+        std::make_unique<OpenQasm::OpenQasmBuilder>();
 
     inline auto getDeviceWires(const std::vector<QubitIdType> &wires) -> std::vector<size_t>
     {

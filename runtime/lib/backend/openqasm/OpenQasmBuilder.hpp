@@ -17,16 +17,14 @@
 #include <algorithm>
 #include <array>
 #include <iomanip>
-#include <iostream>
 #include <sstream>
 #include <string>
-#include <unordered_map>
-#include <variant>
+#include <string_view>
 #include <vector>
 
 #include "Exception.hpp"
 
-namespace Catalyst::Runtime::OpenQasm {
+namespace Catalyst::Runtime::Device::OpenQasm {
 
 enum class VariableType : uint8_t {
     Float, // = 0
@@ -67,9 +65,9 @@ constexpr auto lookup_qasm_gate_name(std::string_view gate_name) -> std::string_
 
     RT_FAIL("The given QIR gate name is not supported by the OpenQASM builder.");
 }
-} // namespace Catalyst::Runtime::OpenQasm
+} // namespace Catalyst::Runtime::Device::OpenQasm
 
-namespace Catalyst::Runtime::OpenQasm {
+namespace Catalyst::Runtime::Device::OpenQasm {
 
 /**
  * The OpenQasm variable type.
@@ -388,4 +386,4 @@ class OpenQasmBuilder {
         return oss.str();
     }
 };
-} // namespace Catalyst::Runtime::OpenQasm
+} // namespace Catalyst::Runtime::Device::OpenQasm
