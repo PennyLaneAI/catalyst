@@ -41,7 +41,9 @@ set(common_tests_src    Test_QubitManager.cpp
                         Test_LightningGateSet.cpp
                         Test_LightningCoreQIS.cpp
                         Test_LightningMeasures.cpp
-                        Test_LightningGradient.cpp)
+                        Test_LightningGradient.cpp
+                        Test_OpenQasmBuilder.cpp
+                        Test_OpenQasmDevice.cpp)
 
 if(ENABLE_CODE_COVERAGE)
     set(cov_helper_src  coverage_helper.cpp)

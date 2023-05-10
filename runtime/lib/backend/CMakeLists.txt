@@ -10,14 +10,16 @@ set(CMAKE_CXX_CLANG_TIDY ${CLANG_TIDY_BINARY};
 endif()
 
 if(ENABLE_LIGHTNING_KOKKOS)
-    set(source_files "LightningKokkosSimulator.cpp")
+    set(source_files    "LightningKokkosSimulator.cpp"
+                        "openqasm/OpenQasmDevice.cpp")
 else()
-    set(source_files "LightningSimulator.cpp")
+    set(source_files    "LightningSimulator.cpp"
+                        "openqasm/OpenQasmDevice.cpp")
 endif()
 
 add_library(rt_backend SHARED ${source_files})
 
-target_include_directories(rt_backend PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}
+target_include_directories(rt_backend PRIVATE   ${backend_includes}
                                                 ${runtime_includes} 
                                                 ${extensions_includes})
 
