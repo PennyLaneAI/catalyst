@@ -14,9 +14,10 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
-from catalyst import qjit, measure
-from pennylane.operation import Operation
 import pennylane as qml
+from pennylane.operation import Operation
+
+from catalyst import measure, qjit
 
 # This is used just for internal testing
 from catalyst.pennylane_extensions import qfunc

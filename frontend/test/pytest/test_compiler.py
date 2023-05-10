@@ -3,25 +3,31 @@ Unit tests for CompilerDriver class
 """
 
 import os
-import sys
-import warnings
-import tempfile
+import shutil
 import subprocess
-import pytest
+import sys
+import tempfile
+import warnings
 
 import pennylane as qml
+import pytest
+
 from catalyst import qjit
-from catalyst.compiler import PassPipeline
-from catalyst.compiler import Compiler
-from catalyst.compiler import CompilerDriver
-from catalyst.compiler import CompileOptions
-from catalyst.compiler import MHLOPass
-from catalyst.compiler import QuantumCompilationPass
-from catalyst.compiler import BufferizationPass
-from catalyst.compiler import MLIRToLLVMDialect
-from catalyst.compiler import LLVMDialectToLLVMIR
-from catalyst.compiler import LLVMIRToObjectFile
+from catalyst.compiler import (
+    BufferizationPass,
+    CompileOptions,
+    Compiler,
+    CompilerDriver,
+    LLVMDialectToLLVMIR,
+    LLVMIRToObjectFile,
+    MHLOPass,
+    MLIRToLLVMDialect,
+    PassPipeline,
+    QuantumCompilationPass,
+)
 from catalyst.jax_tracer import get_mlir
+
+# pylint: disable=missing-function-docstring
 
 
 class TestCompilerOptions:
@@ -83,9 +89,9 @@ class TestCompilerErrors:
     def test_no_executable(self):
         """Test that executable was set from a custom PassPipeline."""
 
-        # pylint: disable=missing-class-docstring
         class CustomClassWithNoExecutable(PassPipeline):
-            # pylint: disable=too-few-public-methods
+            """Custom pipeline with missing executable."""
+
             _default_flags = ["some-command-but-it-is-actually-a-flag"]
 
         with pytest.raises(ValueError, match="Executable not specified."):
@@ -133,10 +139,10 @@ class TestCompilerErrors:
             CompilerDriver.run("file-name.noo")
 
     def test_attempts_to_get_inexistent_intermediate_file(self):
-        """Test for error raised if user request intermediate file that doesn't exist."""
+        """Test return value if user request intermediate file that doesn't exist."""
         compiler = Compiler()
-        with pytest.raises(ValueError, match="pass .* not found."):
-            compiler.get_output_of("inexistent-file")
+        result = compiler.get_output_of("inexistent-file")
+        assert result is None
 
     def test_runtime_error(self):
         """Test that an exception is emitted when the runtime raises a C++ exception."""
@@ -187,7 +193,6 @@ void _catalyst_pyface_jit_cpp_exception_test(void*, void*) {
             cpp_exception_test()
 
 
-# pylint: disable=too-few-public-methods
 class TestCompilerState:
     """Test states that the compiler can reach."""
 
@@ -228,6 +233,7 @@ class TestCompilerState:
         files = os.listdir(directory)
         # The directory is non-empty. Should at least contain the original .mlir file
         assert files
+        shutil.rmtree(directory)
 
     def test_workspace_temporary(self):
         """Test temporary directory has been modified with folder containing intermediate results"""
@@ -251,8 +257,9 @@ class TestCompilerState:
     def test_pass_with_output_name(self):
         """Test for making sure that outfile in arguments works"""
 
-        # pylint: disable=missing-class-docstring
         class PassWithNoFlags(PassPipeline):
+            """Pass pipeline without any flags."""
+
             _executable = "c99"
             _default_flags = []
 
@@ -272,14 +279,14 @@ class TestCompilerState:
         It might be best in the future to remove this functionality and instead
         guarantee it from the start."""
 
-        # pylint: disable=missing-class-docstring
         class C99(PassPipeline):
+            """Pass pipeline using custom executable."""
+
             _executable = "c99"
             _default_flags = []
 
             @staticmethod
             def get_output_filename(infile):
-                # pylint: disable=missing-function-docstring
                 return infile.replace(".c", ".out")
 
         with tempfile.TemporaryDirectory() as workspace:
@@ -296,14 +303,14 @@ class TestCompilerState:
     def test_pass_with_flags(self):
         """Test with non-default flags."""
 
-        # pylint: disable=missing-class-docstring
         class C99(PassPipeline):
+            """Simple pass pipeline."""
+
             _executable = "c99"
             _default_flags = []
 
             @staticmethod
             def get_output_filename(infile):
-                # pylint: disable=missing-function-docstring
                 return infile.replace(".c", ".o")
 
         with tempfile.TemporaryDirectory() as workspace:
@@ -316,6 +323,36 @@ class TestCompilerState:
 
             assert observed_outfilename == expected_outfilename
             assert os.path.exists(observed_outfilename)
+
+    def test_custom_compiler_pass_output(self):
+        """Test that the output of a custom compiler pass is accessible."""
+
+        class MyPass(PassPipeline):
+            """Simple pass pipeline."""
+
+            _executable = "echo"
+            _default_flags = []
+
+            @staticmethod
+            def get_output_filename(infile):
+                return infile.replace(".mlir", ".txt")
+
+            @staticmethod
+            def _run(_infile, outfile, executable, _flags, _options):
+                cmd = [executable, "hi"]
+                with open(outfile, "w", encoding="UTF-8") as f:
+                    subprocess.run(cmd, stdout=f, check=True)
+
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def workflow():
+            qml.X(wires=1)
+            return qml.state()
+
+        mlir_module, _, _ = get_mlir(workflow)
+        compiler = Compiler()
+        compiler.run(mlir_module, CompileOptions(pipelines=[MyPass]))
+        result = compiler.get_output_of("MyPass")
+        assert result == "hi\n"
 
     def test_compiler_driver_with_output_name(self):
         """Test with non-default output name."""
@@ -332,14 +369,14 @@ class TestCompilerState:
     def test_compiler_driver_with_flags(self):
         """Test with non-default flags."""
 
-        # pylint: disable=missing-class-docstring
         class C99(PassPipeline):
+            """Pass pipeline with custom flags."""
+
             _executable = "c99"
             _default_flags = ["-c"]
 
             @staticmethod
             def get_output_filename(infile):
-                # pylint: disable=missing-function-docstring
                 return infile.replace(".c", ".o")
 
         with tempfile.TemporaryDirectory() as workspace:
@@ -353,3 +390,7 @@ class TestCompilerState:
 
             assert observed_outfilename == expected_outfilename
             assert os.path.exists(observed_outfilename)
+
+
+if __name__ == "__main__":
+    pytest.main(["-x", __file__])

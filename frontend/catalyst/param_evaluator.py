@@ -101,8 +101,8 @@ class ParamEvaluator:
 
     def _get_partial_return_value(self):
         """
-        Return the next known output value from the function. If no additional known output value exists
-        throw ``ValueError``.
+        Return the next known output value from the function. If no additional known output value
+        exists throw ``ValueError``.
 
         Returns:
             the next output value of the original jaxpr

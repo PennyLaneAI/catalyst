@@ -14,9 +14,10 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
-from catalyst import qjit, measure
-import pennylane as qml
 import jax.numpy as jnp
+import pennylane as qml
+
+from catalyst import measure, qjit
 
 
 @qjit(target="mlir")

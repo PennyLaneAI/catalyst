@@ -12,9 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import pytest
-
 import jax
+import pytest
 from jax.tree_util import tree_flatten
 
 from catalyst.param_evaluator import ParamEvaluator
