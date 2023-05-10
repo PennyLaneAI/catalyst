@@ -32,7 +32,7 @@ T = TypeVar("T")
 
 
 def flatten_if_tuples(x: Union[X, Tuple[Union[T, Tuple[T]]]]) -> Union[X, Tuple[T]]:
-    """Flatten first layer of Python tuples. """
+    """Flatten first layer of Python tuples."""
     return (
         sum(((i if isinstance(i, tuple) else (i,)) for i in x), ()) if isinstance(x, tuple) else x
     )

@@ -14,20 +14,13 @@
 
 #pragma once
 
-#include "llvm/ADT/SmallVector.h"
 #include "mlir/IR/Value.h"
+#include "llvm/ADT/SmallVector.h"
 
 namespace catalyst {
 
-mlir::Value einsumLinalgGeneric(
-  mlir::OpBuilder& ob,
-  mlir::Location loc,
-  llvm::ArrayRef<size_t> a_axis,
-  llvm::ArrayRef<size_t> b_axis,
-  llvm::ArrayRef<size_t> r_axis,
-  mlir::Value a,
-  mlir::Value b);
-
+mlir::Value einsumLinalgGeneric(mlir::OpBuilder &ob, mlir::Location loc,
+                                llvm::ArrayRef<size_t> a_axis, llvm::ArrayRef<size_t> b_axis,
+                                llvm::ArrayRef<size_t> r_axis, mlir::Value a, mlir::Value b);
 
 }
-
