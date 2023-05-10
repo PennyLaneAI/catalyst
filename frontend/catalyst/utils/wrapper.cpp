@@ -198,5 +198,7 @@ PYBIND11_MODULE(wrapper, m)
 {
     m.doc() = "wrapper module";
     m.def("wrap", &wrap, "A wrapper function.");
-    _import_array();
+    int retval = _import_array();
+    bool success = retval >= 0;
+    if (!success) { throw pybind11::import_error("Couldn't import numpy array C-API."); }
 }
