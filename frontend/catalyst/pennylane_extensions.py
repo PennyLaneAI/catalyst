@@ -69,7 +69,8 @@ class QFunc:
         if isinstance(self, qml.QNode):
             if self.device.short_name not in QFunc.RUNTIME_DEVICES:
                 raise CompileError(
-                    f"The {self.device.short_name} device is not supported for compilation at the moment."
+                    f"The {self.device.short_name} device is not "
+                    "supported for compilation at the moment."
                 )
             device = QJITDevice(self.device.shots, self.device.wires, self.device.short_name)
         else:
