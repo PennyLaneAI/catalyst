@@ -18,7 +18,6 @@ from catalyst.compiler import (
     CompileOptions,
     Compiler,
     CompilerDriver,
-    JVPLoweringPass,
     LLVMDialectToLLVMIR,
     LLVMIRToObjectFile,
     MHLOPass,
@@ -104,9 +103,7 @@ class TestCompilerErrors:
             with pytest.warns(UserWarning, match="Compiler c99"):
                 CompilerDriver.run("in.o", fallback_compilers=["c99"])
 
-    @pytest.mark.parametrize(
-        "p", [MHLOPass, JVPLoweringPass, QuantumCompilationPass, BufferizationPass]
-    )
+    @pytest.mark.parametrize("p", [MHLOPass, QuantumCompilationPass, BufferizationPass])
     def test_mlir_input_validation(self, p):
         """Test if the function detects wrong extensions"""
         with pytest.raises(ValueError, match="is not an MLIR file"):

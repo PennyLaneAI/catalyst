@@ -228,24 +228,11 @@ class MLIRToLLVMDialect(PassPipeline):
         return infile.replace(".buff.mlir", ".llvm.mlir")
 
 
-class JVPLoweringPass(PassPipeline):
-    """Pass pipeline to lower gradients."""
-
-    _executable = get_executable_path("quantum", "quantum-opt")
-    _default_flags = ["--lower-jvpvjp", "--debug-only=jvpvjp"]
-
-    @staticmethod
-    def get_output_filename(infile):
-        if not infile.endswith(".mlir"):
-            raise ValueError(f"Input file ({infile}) for quantum transforms is not an MLIR file")
-        return infile.replace(".mlir", ".novjp.mlir")
-
-
 class QuantumCompilationPass(PassPipeline):
     """Pass pipeline to lower gradients."""
 
     _executable = get_executable_path("quantum", "quantum-opt")
-    _default_flags = ["--lower-gradients"]
+    _default_flags = ["--lower-jvpvjp", "--lower-gradients"]
 
     @staticmethod
     def get_output_filename(infile):
@@ -452,7 +439,6 @@ class Compiler:
         if pipelines is None:
             pipelines = [
                 MHLOPass,
-                JVPLoweringPass,
                 QuantumCompilationPass,
                 BufferizationPass,
                 MLIRToLLVMDialect,
