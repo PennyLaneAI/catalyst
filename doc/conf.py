@@ -11,11 +11,13 @@
 #
 # All configuration values have a default; values that are commented out
 # serve to show the default.
-import sys, os, re
-from unittest.mock import MagicMock
-from pathlib import Path
-import subprocess
 import json
+import os
+import re
+import subprocess
+import sys
+from pathlib import Path
+from unittest.mock import MagicMock
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
@@ -87,6 +89,7 @@ MOCK_MODULES = [
     "mlir_quantum.dialects.scf",
     "mlir_quantum.dialects.quantum",
     "mlir_quantum.dialects.gradient",
+    "pybind11",
 ]
 
 mock = Mock()
@@ -267,7 +270,7 @@ edit_on_github_branch = "main/doc"
 autodoc_member_order = "bysource"
 
 # inheritance_diagram graphviz attributes
-inheritance_node_attrs = dict(color="lightskyblue1", fillcolor="lightskyblue1", style="filled")
+inheritance_node_attrs = {"color": "lightskyblue1", "fillcolor": "lightskyblue1", "style": "filled"}
 
 # autodoc_default_flags = ['members']
 autosummary_generate = True

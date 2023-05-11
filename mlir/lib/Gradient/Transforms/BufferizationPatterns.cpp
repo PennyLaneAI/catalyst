@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "Gradient/IR/GradientOps.h"
@@ -50,6 +51,62 @@ class BufferizeAdjointOp : public OpConversionPattern<AdjointOp> {
     }
 };
 
+class BufferizeBackpropOp : public OpConversionPattern<BackpropOp> {
+  public:
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(BackpropOp op, OpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        SmallVector<Type> resTypes;
+        if (failed(getTypeConverter()->convertTypes(op.getResultTypes(), resTypes)))
+            return failure();
+
+        Location loc = op.getLoc();
+
+        Value gradSize = op.getGradSize();
+        ValueRange args = op.getArgs();
+
+        SmallVector<Value> memrefValues;
+        size_t resSize = resTypes.size();
+
+        int argsSize = args.size();
+
+        int numCalleeResults = resSize / argsSize;
+
+        for (size_t i = 0; i < resSize; i++) {
+            Type resType = resTypes[i];
+            std::vector<Value> dynamicDimSizes;
+
+            int argPos = i % numCalleeResults;
+
+            Type argType = args[argPos].getType();
+
+            if (argType.isa<TensorType>()) {
+                RankedTensorType rankedArg = argType.cast<RankedTensorType>();
+                int numDynDim = rankedArg.getNumDynamicDims();
+
+                for (int i = 0; i < numDynDim; i++) {
+                    int dim = rankedArg.getDynamicDimIndex(i);
+                    dynamicDimSizes.push_back(
+                        rewriter.create<tensor::DimOp>(loc, args[argPos], dim));
+                }
+            }
+
+            dynamicDimSizes.push_back(gradSize);
+
+            MemRefType memrefType = resType.cast<MemRefType>();
+            Value memrefValue = rewriter.create<memref::AllocOp>(loc, memrefType, dynamicDimSizes);
+            memrefValues.push_back(memrefValue);
+        }
+
+        rewriter.create<BackpropOp>(loc, TypeRange{}, op.getCalleeAttr(), adaptor.getGradSize(),
+                                    adaptor.getDiffArgIndices(), adaptor.getArgs(), memrefValues);
+        rewriter.replaceOp(op, memrefValues);
+        return success();
+    }
+};
+
 } // namespace
 
 namespace catalyst {
@@ -58,6 +115,7 @@ namespace gradient {
 void populateBufferizationPatterns(TypeConverter &typeConverter, RewritePatternSet &patterns)
 {
     patterns.add<BufferizeAdjointOp>(typeConverter, patterns.getContext());
+    patterns.add<BufferizeBackpropOp>(typeConverter, patterns.getContext());
 }
 
 } // namespace gradient

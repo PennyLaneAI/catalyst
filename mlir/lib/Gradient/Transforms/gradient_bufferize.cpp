@@ -59,6 +59,9 @@ struct GradientBufferizationPass
         target.addDynamicallyLegalOp<AdjointOp>(
             [&](AdjointOp op) { return typeConverter.isLegal(op); });
 
+        target.addDynamicallyLegalOp<BackpropOp>(
+            [&](BackpropOp op) { return typeConverter.isLegal(op); });
+
         if (failed(applyPartialConversion(getOperation(), target, std::move(patterns)))) {
             signalPassFailure();
         }

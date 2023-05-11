@@ -14,9 +14,10 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
-from catalyst import qjit, measure
-from pennylane.operation import Operation
 import pennylane as qml
+from pennylane.operation import Operation
+
+from catalyst import measure, qjit
 
 # This is used just for internal testing
 from catalyst.pennylane_extensions import qfunc
@@ -48,7 +49,8 @@ class CustomDeviceWithoutSupport(qml.QubitDevice):
     operations = lightning.operations.copy()
     observables = lightning.observables.copy()
 
-    def __init__(self, shots=None, wires=None):
+    def __init__(self, shots=None, wires=None, backend=None):
+        self.backend = backend if backend else "default"
         super().__init__(wires=wires, shots=shots)
 
     def apply(self, operations, **kwargs):
@@ -83,12 +85,12 @@ def compile_circuit_with_device(device):
     print(f.mlir)
 
 
-# CHECK-LABEL: public @jit.f
+# CHECK-LABEL: public @jit_f
 # CHECK-NOT: RXX
 # CHECK: multirz
 # CHECK-NOT: RXX
 compile_circuit_with_device(devMultiRZ)
-# CHECK-LABEL: public @jit.f
+# CHECK-LABEL: public @jit_f
 # CHECK-NOT: multirz
 # CHECK: RXX
 # CHECK-NOT: multirz

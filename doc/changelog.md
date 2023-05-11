@@ -49,6 +49,18 @@
      jax.grad(cost_fn)(jnp.array([0.1, 0.2, 0.3]))
      ```
 
+* Add a Backprop operation with Bufferiation
+  [#107](https://github.com/PennyLaneAI/catalyst/pull/107)
+
+* Add support for ``else if`` chains for ``@cond`` conditionals
+  [#104](https://github.com/PennyLaneAI/catalyst/pull/104)
+
+* Add the end-to-end support for multiple backend devices. The compilation flag
+  ``ENABLE_LIGHTNING_KOKKOS=ON`` builds the runtime with support for PennyLane's
+  ``lightning.kokkos``. Both ``lightning.qubit`` and ``lightning.kokkos`` can be
+  chosen as available backend devices from the frontend.
+  [#89](https://github.com/PennyLaneAI/catalyst/pull/89)
+
 <h3>Improvements</h3>
 
 * Improving error handling by throwing descriptive and unified expressions for runtime
@@ -58,6 +70,12 @@
 * Improve interface for adding and re-using flags to quantum-opt commands.
   These are called pipelines, as they contain multiple passes.
   [#38](https://github.com/PennyLaneAI/catalyst/pull/38)
+
+* Improve python compatibility by providing a stable signature for user generated functions.
+  [#106](https://github.com/PennyLaneAI/catalyst/pull/106)
+
+* Handle C++ exceptions without unwinding the whole stack.
+  [#99](https://github.com/PennyLaneAI/catalyst/pull/99)
 
 <h3>Breaking changes</h3>
 
@@ -69,12 +87,31 @@
 * Fix a bug in the way gradient result type is inferred.
   [#84](https://github.com/PennyLaneAI/catalyst/pull/84)
 
+* Fix a memory regression and reduce memory footprint by removing unnecessary temporary buffers.
+  [#100](https://github.com/PennyLaneAI/catalyst/pull/100)
+
+* Provide a new abstraction to the ``QuantumDevice`` interface in the runtime called ``MemRefView``.
+  C++ implementations of the interface can iterate through and directly store results into the
+  ``MemRefView`` independant of the underlying memory layout. This can eliminate redundant buffer
+  copies at the interface boundaries, which has been applied to existing devices.
+  [#109](https://github.com/PennyLaneAI/catalyst/pull/109)
+
+* Reduce memory utilization by transferring ownership of buffers from the runtime to Python instead
+  of copying them. This includes adding a compiler pass that copies global buffers into the heap
+  as global buffers cannot be transferred to Python.
+  [#112](https://github.com/PennyLaneAI/catalyst/pull/112)
+
+* Temporary fix of use-after-free and dependency of uninitialized memory.
+  [#121](https://github.com/PennyLaneAI/catalyst/pull/121)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
 
 Ali Asadi,
 David Ittah,
+Jacob Mai Peng,
+Romain Moyard,
 Erick Ochoa Lopez.
 
 # Release 0.1.2

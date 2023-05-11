@@ -12,61 +12,71 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import pytest
-
-from catalyst import qjit, cond, measure, while_loop
-import pennylane as qml
 import jax.numpy as jnp
 import numpy as np
+import pennylane as qml
+import pytest
+
+from catalyst import cond, measure, qjit, while_loop
 
 
 class TestBasicCircuits:
     """Test gates and measurements with variable wires in basic circuits."""
 
     @pytest.mark.parametrize("args", [[np.pi, 0, 0], [np.pi, 0, 1], [np.pi, 1, 0], [np.pi, 1, 1]])
-    def test_operations(self, args):
+    def test_operations(self, args, backend):
+        """Test operations."""
+
         def circuit(arg0: float, arg1: int, arg2: int):
             qml.RX(arg0, wires=[arg1])
             qml.RX(arg0, wires=[arg2])
             return qml.state()
 
-        result = qjit(qml.qnode(qml.device("lightning.qubit", wires=3))(circuit))(*args)
+        result = qjit(qml.qnode(qml.device(backend, wires=3))(circuit))(*args)
         expected = qml.qnode(qml.device("default.qubit", wires=3))(circuit)(*args)
         assert np.allclose(result, expected)
 
     @pytest.mark.parametrize("args", [[np.pi, 0, 0], [np.pi, 0, 1], [np.pi, 1, 0], [np.pi, 1, 1]])
-    def test_operations_with_computation(self, args):
+    def test_operations_with_computation(self, args, backend):
+        """Test operations with computation."""
+
         def circuit(arg0: float, arg1: int, arg2: int):
             qml.RX(arg0, wires=[arg1])
             qml.RX(arg0, wires=[arg2 + 1])
             return qml.state()
 
-        result = qjit(qml.qnode(qml.device("lightning.qubit", wires=3))(circuit))(*args)
+        result = qjit(qml.qnode(qml.device(backend, wires=3))(circuit))(*args)
         expected = qml.qnode(qml.device("default.qubit", wires=3))(circuit)(*args)
         assert np.allclose(result, expected)
 
     @pytest.mark.parametrize("args", [[np.pi, 0, 0], [np.pi, 0, 1], [np.pi, 1, 0], [np.pi, 1, 1]])
-    def test_measurements(self, args):
+    def test_measurements(self, args, backend):
+        """Test measurements."""
+
         def circuit(arg0: float, w1: int, w2: int):
             qml.RX(arg0, wires=w1)
             return qml.sample(wires=w2)
 
-        result = qjit(qml.qnode(qml.device("lightning.qubit", wires=3, shots=10))(circuit))(*args)
+        result = qjit(qml.qnode(qml.device(backend, wires=3, shots=10))(circuit))(*args)
         expected = qml.qnode(qml.device("default.qubit", wires=3, shots=10))(circuit)(*args)
         assert np.allclose(result, expected)
 
     @pytest.mark.parametrize("args", [[np.pi, 0, 0], [np.pi, 0, 1], [np.pi, 1, 0], [np.pi, 1, 1]])
-    def test_measurements_with_computation(self, args):
+    def test_measurements_with_computation(self, args, backend):
+        """Test measurements with computation."""
+
         def circuit(arg0: float, w1: int, w2: int):
             qml.RX(arg0, wires=w1)
             return qml.sample(wires=[w2 + 1])
 
-        result = qjit(qml.qnode(qml.device("lightning.qubit", wires=3, shots=10))(circuit))(*args)
+        result = qjit(qml.qnode(qml.device(backend, wires=3, shots=10))(circuit))(*args)
         expected = qml.qnode(qml.device("default.qubit", wires=3, shots=10))(circuit)(*args)
         assert np.allclose(result, expected)
 
     @pytest.mark.parametrize("args", [[jnp.pi, 0, 1], [jnp.pi, 1, 0]])
-    def test_observables(self, args):
+    def test_observables(self, args, backend):
+        """Test observables."""
+
         def circuit(arg0: float, w1: int, w2: int):
             qml.RX(arg0, wires=w1)
             A = np.array(
@@ -79,12 +89,14 @@ class TestBasicCircuits:
             )
             return qml.expval(qml.Hermitian(A, wires=[w1, w2]))
 
-        result = qjit(qml.qnode(qml.device("lightning.qubit", wires=2))(circuit))(*args)
+        result = qjit(qml.qnode(qml.device(backend, wires=2))(circuit))(*args)
         expected = qml.qnode(qml.device("default.qubit", wires=2))(circuit)(*args)
         assert np.allclose(result, expected)
 
     @pytest.mark.parametrize("args", [[jnp.pi, 0, 0]])
-    def test_observables_with_computation(self, args):
+    def test_observables_with_computation(self, args, backend):
+        """Test observables with computation."""
+
         def circuit(arg0: float, w1: int, w2: int):
             qml.RX(arg0, wires=w1)
             A = np.array(
@@ -97,12 +109,14 @@ class TestBasicCircuits:
             )
             return qml.expval(qml.Hermitian(A, wires=[w1 + 1, w2]))
 
-        result = qjit(qml.qnode(qml.device("lightning.qubit", wires=2))(circuit))(*args)
+        result = qjit(qml.qnode(qml.device(backend, wires=2))(circuit))(*args)
         expected = qml.qnode(qml.device("default.qubit", wires=2))(circuit)(*args)
         assert np.allclose(result, expected)
 
-    def test_reinsertion_before_dynamic_wires(self):
-        @qml.qnode(qml.device("lightning.qubit", wires=7))
+    def test_reinsertion_before_dynamic_wires(self, backend):
+        """Test reinsertion before dynamic wires."""
+
+        @qml.qnode(qml.device(backend, wires=7))
         def circuit(qb):
             # Without reinsertion the Rot gate would be folded away as it produces a dangling qubit.
             qml.Rot(0.3, 0.4, 0.5, wires=0)
@@ -122,9 +136,11 @@ class TestControlFlow:
     @pytest.mark.parametrize(
         "args,expected", [([0, 0], True), ([0, 1], False), ([1, 0], False), ([1, 1], True)]
     )
-    def test_conditional(self, args, expected):
+    def test_conditional(self, args, expected, backend):
+        """Test conditional."""
+
         @qjit()
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qml.qnode(qml.device(backend, wires=2))
         def circuit(x: int, y: int):
             @cond(x > 4)
             def cond_fn():
@@ -142,9 +158,11 @@ class TestControlFlow:
     @pytest.mark.parametrize(
         "args,expected", [([0, 0], False), ([0, 1], False), ([1, 0], True), ([1, 1], True)]
     )
-    def test_while_loop_with_func_arg_wires(self, args, expected):
+    def test_while_loop_with_func_arg_wires(self, args, expected, backend):
+        """Test while loop with func arg wires."""
+
         @qjit()
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qml.qnode(qml.device(backend, wires=2))
         def circuit(n: int, m: int):
             @while_loop(lambda v: v[0] < v[1])
             def loop(v):
@@ -167,9 +185,11 @@ class TestControlFlow:
             ([3, 1], True),
         ],
     )
-    def test_while_loop_with_loop_arg_wires(self, args, expected):
+    def test_while_loop_with_loop_arg_wires(self, args, expected, backend):
+        """Test while loop with loop arg wires."""
+
         @qjit()
-        @qml.qnode(qml.device("lightning.qubit", wires=5))
+        @qml.qnode(qml.device(backend, wires=5))
         def circuit(n: int, m: int):
             qml.RX(jnp.pi, wires=0)
 

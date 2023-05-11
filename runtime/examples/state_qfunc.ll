@@ -24,6 +24,8 @@ target triple = "x86_64-pc-linux-gnu"
 %struct.MemRefT = type { %struct.CplxT*, %struct.CplxT*, i64, [1 x i64], [1 x i64] }
 
 @.str = private constant [19 x i8] c"(a, b) = (%f, %f)\0A\00", align 1
+@backend = private constant [8 x i8] c"backend\00"
+@backend_default = private constant [8 x i8] c"default\00"
 
 declare void @__quantum__rt__device(i8*, i8*)
 
@@ -52,8 +54,8 @@ declare void @free(i8*)
 
 define i32 @main() {
   ; Initialize quantum runtime
-  call void @__quantum__rt__device(i8* null, i8* null)
   call void @__quantum__rt__initialize()
+  call void @__quantum__rt__device(i8* getelementptr ([8 x i8], [8 x i8]* @backend, i64 0, i64 0), i8* getelementptr ([8 x i8], [8 x i8]* @backend_default, i64 0, i64 0))
 
   ; Allocate 2 qubits
   %1 = call %Array* @__quantum__rt__qubit_allocate_array(i64 2)
@@ -66,14 +68,14 @@ define i32 @main() {
   call void @__quantum__qis__RY(%Qubit* %4, double 0.7, i8 0)
 
   ; Allocate buffers
-  %5 = call i8* @aligned_alloc(i64 8, i64 64)
+  %5 = call i8* @aligned_alloc(i64 32, i64 64)
   %buffer_cast = bitcast i8* %5 to %struct.CplxT*
 
   ; Insert buffers into result structure
   %t0 = insertvalue %struct.MemRefT undef, %struct.CplxT* %buffer_cast, 0
   %t1 = insertvalue %struct.MemRefT %t0, %struct.CplxT* %buffer_cast, 1
   %t2 = insertvalue %struct.MemRefT %t1, i64 0, 2
-  %t3 = insertvalue %struct.MemRefT %t2, i64 2, 3, 0
+  %t3 = insertvalue %struct.MemRefT %t2, i64 4, 3, 0
   %memref = insertvalue %struct.MemRefT %t3, i64 1, 4, 0
   %6= alloca %struct.MemRefT, i64 1, align 8
   store %struct.MemRefT %memref, %struct.MemRefT* %6, align 8

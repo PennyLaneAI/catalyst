@@ -15,12 +15,14 @@
 # RUN: %PYTHON %s | FileCheck %s
 
 import subprocess
-from catalyst import qjit, for_loop
+
 import pennylane as qml
+
+from catalyst import for_loop, qjit
 
 
 # CHECK-NOT: Verification failed
-# CHECK-LABEL: @jit.loop_circuit
+# CHECK-LABEL: @jit_loop_circuit
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=3))
 def loop_circuit(n: int, inc: float):

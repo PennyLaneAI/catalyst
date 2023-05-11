@@ -17,10 +17,13 @@ that occur within the circuit.
 """
 
 import jax
-from jax.interpreters.partial_eval import DynamicJaxprTrace, JaxprStackFrame, extend_jaxpr_stack
-from jax.tree_util import tree_flatten, tree_unflatten
-
 import pennylane as qml
+from jax.interpreters.partial_eval import (
+    DynamicJaxprTrace,
+    JaxprStackFrame,
+    extend_jaxpr_stack,
+)
+from jax.tree_util import tree_flatten, tree_unflatten
 from pennylane.tape import QuantumTape
 
 from catalyst import jax_tracer
@@ -102,7 +105,7 @@ class JaxTape:
                 if isinstance(op, qml.Hamiltonian):
                     return op.coeffs
                 if op.__class__.__name__ == "Cond":
-                    return op.pred, op.consts
+                    return op.preds, op.consts
                 if op.__class__.__name__ == "WhileLoop":
                     return op.cond_consts, op.body_consts, op.iter_args
                 if op.__class__.__name__ == "ForLoop":
@@ -168,7 +171,6 @@ class JaxTape:
         self.return_value = return_value
 
 
-# pylint: disable=too-few-public-methods
 class EmptyObservable:
     """Denotes an observable equivalent to a given set of wires.
 

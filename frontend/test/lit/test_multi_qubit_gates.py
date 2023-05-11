@@ -14,12 +14,13 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
-from catalyst import qjit, measure
-import pennylane as qml
 import numpy as np
+import pennylane as qml
+
+from catalyst import measure, qjit
 
 
-# CHECK-LABEL: public @jit.circuit
+# CHECK-LABEL: public @jit_circuit
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=5))
 def circuit(x: float):
@@ -37,7 +38,7 @@ def circuit(x: float):
 print(circuit.mlir)
 
 
-# CHECK-LABEL: public @jit.circuit
+# CHECK-LABEL: public @jit_circuit
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=3))
 def circuit():

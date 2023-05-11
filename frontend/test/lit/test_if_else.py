@@ -14,12 +14,13 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
-from catalyst import cond, qjit
 import pennylane as qml
+
+from catalyst import cond, qjit
 
 
 # CHECK-NOT: Verification failed
-# CHECK-LABEL: public @jit.circuit
+# CHECK-LABEL: public @jit_circuit
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=1))
 def circuit(n: int):

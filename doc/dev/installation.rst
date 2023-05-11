@@ -2,24 +2,57 @@ Installation
 ============
 
 
-Catalyst has been tested on Linux operating systems and the Python frontend is
-available as an easy-to-install Python binary via ``pip``. The only
-requirements to use Catalyst via Python is `PennyLane
-<https://pennylane.ai>`__ and `Python <https://www.python.org/>`_  3.8 or
-higher.
-
-Catalyst can then be installed via a single command:
+Catalyst is officially supported on Linux (x86_64) platforms, and pre-built binaries are being
+distributed via the Python Package Index (PyPI) for Python versions 3.8 and higher. To install it,
+simply run the following ``pip`` command:
 
 .. code-block:: console
 
     pip install pennylane-catalyst
 
 
-We do not currently have binaries available for Windows or MacOS. If you are
-using one of these operating systems, or wish to contribute to Catalyst or
-develop against our runtime or compiler, please see the instructions below for
-building from
-source.
+Pre-built packages for Windows and MacOS are not yet available, and comptability with those
+platforms is untested and cannot be guaranteed. If you are using one of these platforms, please
+try out our Docker and Dev Container images described in the `next section <#dev-containers>`_.
+
+If you wish to contribute to Catalyst or develop against our runtime or compiler, instructions for
+building from source are also included `further down <#building-from-source>`_.
+
+Dev Containers
+--------------
+
+
+Try out Catalyst in self-contained, ready-to-go environments called
+`Dev Containers <https://code.visualstudio.com/docs/devcontainers/containers>`_:
+
+.. image:: https://img.shields.io/static/v1?label=Dev%20Container&message=Launch&color=blue&logo=visualstudiocode&style=flat-square
+  :alt: Try Catalyst in Dev Container
+  :target: https://vscode.dev/redirect?url=vscode://ms-vscode-remote.remote-containers/cloneInVolume?url=https://github.com/PennyLaneAI/catalyst
+  :align: center
+
+| You will need an existing installation of `Docker <https://www.docker.com/>`_,
+  `VS Code <https://code.visualstudio.com/>`_, and the VS Code
+  `Dev Containers <https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers>`_
+  extension.
+
+If desired, the Docker images can also be used in a standalone fashion:
+
+| `Docker: User Installation <https://github.com/PennyLaneAI/catalyst/blob/main/.devcontainer/Dockerfile>`_
+| `Docker: Developer Installation <https://github.com/PennyLaneAI/catalyst/blob/main/.devcontainer/dev/Dockerfile>`_
+
+The user image provides an officially supported enviroment and automatically installs the latest
+release of Catalyst. The developer image only provides the right enviroment to build Catalyst from
+source, and requires launching the post-install script at ``.devcontainer/dev/post-install.sh``
+from whithin the root of the running container.
+
+.. note::
+  Due to `a bug <https://github.com/microsoft/vscode-remote-release/issues/8412>`_ in the Dev
+  Containers extension, clicking on the "Launch" badge will not prompt for a choice between the User
+  and Dev containers. Instead, the User container is automatically chosen.
+
+  As a workaround, you can clone the `Catalyst repository <https://github.com/PennyLaneAI/catalyst>`_
+  first, open it as a VS Code Workspace, and then reopen the Workspace in a Dev Container via the
+  ``Reopen in Container`` command.
 
 Building from source
 --------------------
@@ -42,19 +75,25 @@ following pre-requisites are installed and available on the path:
 
 - The `Ninja <https://ninja-build.org/>`_, `Make
   <https://www.gnu.org/software/make/>`_, and `CMake
-  <https://cmake.org/download/>`_ build tools.
+  <https://cmake.org/download/>`_ (v3.20 or greater) build tools.
 
 - `Python <https://www.python.org/>`_ 3.8 or higher for the Python frontend.
 
-They can be installed on Debian:
+- ``pip`` must be version 22.3 or higher.
+
+They can be installed on Debian/Ubuntu via:
 
 .. code-block:: console
 
   sudo apt install clang lld ccache libomp-dev ninja-build make cmake
 
+.. Note::
+  If the CMake version available in your system is too old, you can also install up-to-date
+  versions of it via ``pip install cmake``.
+
 The runtime leverages the ``stdlib`` Rust package from the `qir-runner
-<https://www.qir-alliance.org/qir-runner>`_ project for the QIR standard
-runtime instructions. To build this package from source, the `Rust
+<https://www.qir-alliance.org/qir-runner>`_ project for standard
+QIR runtime instructions. To build this package from source, a `Rust
 <https://www.rust-lang.org/tools/install>`_ toolchain installed via ``rustup``
 is required. After installing ``rustup``, the ``llvm-tools-preview`` component
 needs to be installed:
@@ -63,8 +102,8 @@ needs to be installed:
 
   rustup component add llvm-tools-preview
 
-Additionally, the following Python packages for use with Catalyst's build
-scripts should be installed:
+All additional build and developer depencies are managed via the repository's ``requirements.txt``
+and can be installed as follows:
 
 .. code-block:: console
 
@@ -176,11 +215,11 @@ To make required tools in ``llvm-project/build``, ``mlir-hlo/build``, and
 Tests
 ^^^^^
 
-To check Catalyst modules and the compiler test suites in Catalyst:
+The following target runs all available test suites in Catalyst:
 
 .. code-block:: console
 
   make test
 
-You can also check each module test suite by using the ``test-frontend``,
-``test-dialects``, and ``test-runtime`` Make targets.
+You can also test each module separately by using running the ``test-frontend``,
+``test-dialects``, and ``test-runtime`` targets instead.

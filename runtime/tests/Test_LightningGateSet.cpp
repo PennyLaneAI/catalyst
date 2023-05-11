@@ -14,26 +14,20 @@
 
 #include <cmath>
 
-#include "LightningUtils.hpp"
 #include "QuantumDevice.hpp"
 #include "RuntimeCAPI.h"
+#include "Utils.hpp"
 
-#include <catch2/catch.hpp>
-
-#if defined(_KOKKOS)
-#include "LightningKokkosSimulator.hpp"
-#else
-#include "LightningSimulator.hpp"
-#endif
+#include "TestUtils.hpp"
 
 using namespace Pennylane;
 
 using namespace Catalyst::Runtime;
 using namespace Catalyst::Runtime::Simulator;
 
-TEST_CASE("Identity Gate tests", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("Identity Gate tests", "[GateSet]", SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 10;
@@ -49,21 +43,23 @@ TEST_CASE("Identity Gate tests", "[lightning]")
     sim->NamedOperation("Identity", {}, {Qs[6]}, false);
     sim->NamedOperation("Identity", {}, {Qs[8]}, false);
 
-    std::vector<std::complex<double>> out_state = sim->State();
+    std::vector<std::complex<double>> state(1U << sim->GetNumQubits());
+    DataView<std::complex<double>, 1> view(state);
+    sim->State(view);
 
-    CHECK(out_state.at(0) == std::complex<double>{1, 0});
+    CHECK(state.at(0) == std::complex<double>{1, 0});
 
     std::complex<double> sum{0, 0};
-    for (size_t i = 1; i < out_state.size(); i++) {
-        sum += out_state[i];
+    for (size_t i = 1; i < state.size(); i++) {
+        sum += state[i];
     }
 
     CHECK(sum == std::complex<double>{0, 0});
 }
 
-TEST_CASE("PauliX Gate tests num_qubits=1", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("PauliX Gate tests num_qubits=1", "[GateSet]", SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 1;
@@ -76,16 +72,18 @@ TEST_CASE("PauliX Gate tests num_qubits=1", "[lightning]")
 
     sim->NamedOperation("PauliX", {}, {Qs[0]}, false);
 
-    std::vector<std::complex<double>> out_state = sim->State();
+    std::vector<std::complex<double>> state(1U << sim->GetNumQubits());
+    DataView<std::complex<double>, 1> view(state);
+    sim->State(view);
 
-    CHECK(out_state.at(0) == std::complex<double>{0, 0});
-    CHECK(out_state.at(1) == std::complex<double>{1, 0});
+    CHECK(state.at(0) == std::complex<double>{0, 0});
+    CHECK(state.at(1) == std::complex<double>{1, 0});
 }
 
 // 1-qubit operations
-TEST_CASE("PauliX Gate tests num_qubits=3", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("PauliX Gate tests num_qubits=3", "[GateSet]", SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 3;
@@ -104,21 +102,23 @@ TEST_CASE("PauliX Gate tests num_qubits=3", "[lightning]")
     sim->NamedOperation("PauliX", {}, {Qs[1]}, false);
     sim->NamedOperation("PauliX", {}, {Qs[0]}, false);
 
-    std::vector<std::complex<double>> out_state = sim->State();
+    std::vector<std::complex<double>> state(1U << sim->GetNumQubits());
+    DataView<std::complex<double>, 1> view(state);
+    sim->State(view);
 
-    CHECK(out_state.at(0) == std::complex<double>{1, 0});
+    CHECK(state.at(0) == std::complex<double>{1, 0});
 
     std::complex<double> sum{0, 0};
-    for (size_t i = 1; i < out_state.size(); i++) {
-        sum += out_state[i];
+    for (size_t i = 1; i < state.size(); i++) {
+        sum += state[i];
     }
 
     CHECK(sum == std::complex<double>{0, 0});
 }
 
-TEST_CASE("PauliY Gate tests num_qubits=1", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("PauliY Gate tests num_qubits=1", "[GateSet]", SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 1;
@@ -131,15 +131,17 @@ TEST_CASE("PauliY Gate tests num_qubits=1", "[lightning]")
 
     sim->NamedOperation("PauliY", {}, {Qs[0]}, false);
 
-    std::vector<std::complex<double>> out_state = sim->State();
+    std::vector<std::complex<double>> state(1U << sim->GetNumQubits());
+    DataView<std::complex<double>, 1> view(state);
+    sim->State(view);
 
-    CHECK(out_state.at(0) == std::complex<double>{0, 0});
-    CHECK(out_state.at(1) == std::complex<double>{0, 1});
+    CHECK(state.at(0) == std::complex<double>{0, 0});
+    CHECK(state.at(1) == std::complex<double>{0, 1});
 }
 
-TEST_CASE("PauliY Gate tests num_qubits=2", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("PauliY Gate tests num_qubits=2", "[GateSet]", SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 2;
@@ -153,17 +155,19 @@ TEST_CASE("PauliY Gate tests num_qubits=2", "[lightning]")
     sim->NamedOperation("PauliY", {}, {Qs[0]}, false);
     sim->NamedOperation("PauliY", {}, {Qs[1]}, false);
 
-    std::vector<std::complex<double>> out_state = sim->State();
+    std::vector<std::complex<double>> state(1U << sim->GetNumQubits());
+    DataView<std::complex<double>, 1> view(state);
+    sim->State(view);
 
-    CHECK(out_state.at(0) == std::complex<double>{0, 0});
-    CHECK(out_state.at(1) == std::complex<double>{0, 0});
-    CHECK(out_state.at(2) == std::complex<double>{0, 0});
-    CHECK(out_state.at(3) == std::complex<double>{-1, 0});
+    CHECK(state.at(0) == std::complex<double>{0, 0});
+    CHECK(state.at(1) == std::complex<double>{0, 0});
+    CHECK(state.at(2) == std::complex<double>{0, 0});
+    CHECK(state.at(3) == std::complex<double>{-1, 0});
 }
 
-TEST_CASE("PauliZ Gate tests num_qubits=2", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("PauliZ Gate tests num_qubits=2", "[GateSet]", SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 2;
@@ -177,17 +181,19 @@ TEST_CASE("PauliZ Gate tests num_qubits=2", "[lightning]")
     sim->NamedOperation("PauliY", {}, {Qs[0]}, false);
     sim->NamedOperation("PauliZ", {}, {Qs[1]}, false);
 
-    std::vector<std::complex<double>> out_state = sim->State();
+    std::vector<std::complex<double>> state(1U << sim->GetNumQubits());
+    DataView<std::complex<double>, 1> view(state);
+    sim->State(view);
 
-    CHECK(out_state.at(0) == std::complex<double>{0, 0});
-    CHECK(out_state.at(1) == std::complex<double>{0, 0});
-    CHECK(out_state.at(2) == std::complex<double>{0, 1});
-    CHECK(out_state.at(3) == std::complex<double>{0, 0});
+    CHECK(state.at(0) == std::complex<double>{0, 0});
+    CHECK(state.at(1) == std::complex<double>{0, 0});
+    CHECK(state.at(2) == std::complex<double>{0, 1});
+    CHECK(state.at(3) == std::complex<double>{0, 0});
 }
 
-TEST_CASE("Hadamard Gate tests num_qubits=2", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("Hadamard Gate tests num_qubits=2", "[GateSet]", SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 2;
@@ -201,18 +207,20 @@ TEST_CASE("Hadamard Gate tests num_qubits=2", "[lightning]")
     sim->NamedOperation("Hadamard", {}, {Qs[0]}, false);
     sim->NamedOperation("Hadamard", {}, {Qs[1]}, false);
 
-    std::vector<std::complex<double>> out_state = sim->State();
+    std::vector<std::complex<double>> state(1U << sim->GetNumQubits());
+    DataView<std::complex<double>, 1> view(state);
+    sim->State(view);
 
-    CHECK(out_state[0].real() == Approx(0.5).epsilon(1e-5));
-    CHECK(out_state[0].imag() == Approx(0).epsilon(1e-5));
-    CHECK(out_state.at(1) == out_state.at(0));
-    CHECK(out_state.at(2) == out_state.at(0));
-    CHECK(out_state.at(3) == out_state.at(0));
+    CHECK(state[0].real() == Approx(0.5).epsilon(1e-5));
+    CHECK(state[0].imag() == Approx(0).epsilon(1e-5));
+    CHECK(state.at(1) == state.at(0));
+    CHECK(state.at(2) == state.at(0));
+    CHECK(state.at(3) == state.at(0));
 }
 
-TEST_CASE("Hadamard Gate tests num_qubits=3", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("Hadamard Gate tests num_qubits=3", "[GateSet]", SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 2;
@@ -226,18 +234,20 @@ TEST_CASE("Hadamard Gate tests num_qubits=3", "[lightning]")
     sim->NamedOperation("Hadamard", {}, {Qs[0]}, false);
     sim->NamedOperation("Hadamard", {}, {Qs[1]}, false);
 
-    std::vector<std::complex<double>> out_state = sim->State();
+    std::vector<std::complex<double>> state(1U << sim->GetNumQubits());
+    DataView<std::complex<double>, 1> view(state);
+    sim->State(view);
 
-    CHECK(out_state[0].real() == Approx(0.5).epsilon(1e-5));
-    CHECK(out_state[0].imag() == Approx(0).epsilon(1e-5));
-    CHECK(out_state.at(1) == out_state.at(0));
-    CHECK(out_state.at(2) == out_state.at(0));
-    CHECK(out_state.at(3) == out_state.at(0));
+    CHECK(state[0].real() == Approx(0.5).epsilon(1e-5));
+    CHECK(state[0].imag() == Approx(0).epsilon(1e-5));
+    CHECK(state.at(1) == state.at(0));
+    CHECK(state.at(2) == state.at(0));
+    CHECK(state.at(3) == state.at(0));
 }
 
-TEST_CASE("MIX Gate test R(X,Y,Z) num_qubits=1,4", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("MIX Gate test R(X,Y,Z) num_qubits=1,4", "[GateSet]", SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubit = n
     constexpr size_t n = 4;
@@ -249,41 +259,43 @@ TEST_CASE("MIX Gate test R(X,Y,Z) num_qubits=1,4", "[lightning]")
     sim->NamedOperation("RY", {0.456}, {Qs[2]}, false);
     sim->NamedOperation("RZ", {0.789}, {Qs[3]}, false);
 
-    const auto &&out_state = sim->State();
+    std::vector<std::complex<double>> state(1U << sim->GetNumQubits());
+    DataView<std::complex<double>, 1> view(state);
+    sim->State(view);
 
     // calculated by pennylane,
-    CHECK(out_state.at(0) == std::complex<double>{0, 0});
+    CHECK(state.at(0) == std::complex<double>{0, 0});
 
-    CHECK(out_state.at(1) == std::complex<double>{0, 0});
-    CHECK(out_state.at(2) == std::complex<double>{0, 0});
-    CHECK(out_state.at(3) == std::complex<double>{0, 0});
+    CHECK(state.at(1) == std::complex<double>{0, 0});
+    CHECK(state.at(2) == std::complex<double>{0, 0});
+    CHECK(state.at(3) == std::complex<double>{0, 0});
 
-    CHECK(out_state.at(4) == std::complex<double>{0, 0});
-    CHECK(out_state.at(5) == std::complex<double>{0, 0});
-    CHECK(out_state.at(6) == std::complex<double>{0, 0});
-    CHECK(out_state.at(7) == std::complex<double>{0, 0});
+    CHECK(state.at(4) == std::complex<double>{0, 0});
+    CHECK(state.at(5) == std::complex<double>{0, 0});
+    CHECK(state.at(6) == std::complex<double>{0, 0});
+    CHECK(state.at(7) == std::complex<double>{0, 0});
 
-    CHECK(out_state[8].real() == Approx(0.8975969498074641).epsilon(1e-5));
-    CHECK(out_state[8].imag() == Approx(-0.3736920921192206).epsilon(1e-5));
+    CHECK(state[8].real() == Approx(0.8975969498074641).epsilon(1e-5));
+    CHECK(state[8].imag() == Approx(-0.3736920921192206).epsilon(1e-5));
 
-    CHECK(out_state.at(9) == std::complex<double>{0, 0});
-    CHECK(out_state[10].real() == Approx(0.20827363966052723).epsilon(1e-5));
-    CHECK(out_state[10].imag() == Approx(-0.08670953277495183).epsilon(1e-5));
+    CHECK(state.at(9) == std::complex<double>{0, 0});
+    CHECK(state[10].real() == Approx(0.20827363966052723).epsilon(1e-5));
+    CHECK(state[10].imag() == Approx(-0.08670953277495183).epsilon(1e-5));
 
-    CHECK(out_state.at(11) == std::complex<double>{0, 0});
+    CHECK(state.at(11) == std::complex<double>{0, 0});
 
-    CHECK(out_state[12].real() == Approx(-0.023011082205037697).epsilon(1e-5));
-    CHECK(out_state[12].imag() == Approx(-0.055271914055973925).epsilon(1e-5));
+    CHECK(state[12].real() == Approx(-0.023011082205037697).epsilon(1e-5));
+    CHECK(state[12].imag() == Approx(-0.055271914055973925).epsilon(1e-5));
 
-    CHECK(out_state.at(13) == std::complex<double>{0, 0});
-    CHECK(out_state[14].real() == Approx(-0.005339369573836912).epsilon(1e-5));
-    CHECK(out_state[14].imag() == Approx(-0.012825002038956146).epsilon(1e-5));
-    CHECK(out_state.at(15) == std::complex<double>{0, 0});
+    CHECK(state.at(13) == std::complex<double>{0, 0});
+    CHECK(state[14].real() == Approx(-0.005339369573836912).epsilon(1e-5));
+    CHECK(state[14].imag() == Approx(-0.012825002038956146).epsilon(1e-5));
+    CHECK(state.at(15) == std::complex<double>{0, 0});
 }
 
-TEST_CASE("test PhaseShift num_qubits=2", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("test PhaseShift num_qubits=2", "[GateSet]", SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubit = n
     constexpr size_t n = 2;
@@ -297,26 +309,28 @@ TEST_CASE("test PhaseShift num_qubits=2", "[lightning]")
     sim->NamedOperation("RX", {0.123}, {Qs[1]}, false);
     sim->NamedOperation("PhaseShift", {0.456}, {Qs[0]}, false);
 
-    std::vector<std::complex<double>> out_state = sim->State();
+    std::vector<std::complex<double>> state(1U << sim->GetNumQubits());
+    DataView<std::complex<double>, 1> view(state);
+    sim->State(view);
 
     // calculated by pennylane,
-    CHECK(out_state[0].real() == Approx(0.7057699753).epsilon(1e-5));
-    CHECK(out_state[0].imag() == Approx(0).epsilon(1e-5));
+    CHECK(state[0].real() == Approx(0.7057699753).epsilon(1e-5));
+    CHECK(state[0].imag() == Approx(0).epsilon(1e-5));
 
-    CHECK(out_state[1].real() == Approx(0).epsilon(1e-5));
-    CHECK(out_state[1].imag() == Approx(-0.04345966).epsilon(1e-5));
+    CHECK(state[1].real() == Approx(0).epsilon(1e-5));
+    CHECK(state[1].imag() == Approx(-0.04345966).epsilon(1e-5));
 
-    CHECK(out_state[2].real() == Approx(0.63365519).epsilon(1e-5));
-    CHECK(out_state[2].imag() == Approx(0.31079312).epsilon(1e-5));
+    CHECK(state[2].real() == Approx(0.63365519).epsilon(1e-5));
+    CHECK(state[2].imag() == Approx(0.31079312).epsilon(1e-5));
 
-    CHECK(out_state[3].real() == Approx(0.01913791).epsilon(1e-5));
-    CHECK(out_state[3].imag() == Approx(-0.039019).epsilon(1e-5));
+    CHECK(state[3].real() == Approx(0.01913791).epsilon(1e-5));
+    CHECK(state[3].imag() == Approx(-0.039019).epsilon(1e-5));
 }
 
 // 2-qubit operations
-TEST_CASE("CNOT Gate tests num_qubits=2 [0,1]", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("CNOT Gate tests num_qubits=2 [0,1]", "[GateSet]", SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 2;
@@ -330,17 +344,19 @@ TEST_CASE("CNOT Gate tests num_qubits=2 [0,1]", "[lightning]")
     sim->NamedOperation("PauliX", {}, {Qs[0]}, false);
     sim->NamedOperation("CNOT", {}, {Qs[0], Qs[1]}, false);
 
-    std::vector<std::complex<double>> out_state = sim->State();
+    std::vector<std::complex<double>> state(1U << sim->GetNumQubits());
+    DataView<std::complex<double>, 1> view(state);
+    sim->State(view);
 
-    CHECK(out_state.at(0) == std::complex<double>{0, 0});
-    CHECK(out_state.at(1) == std::complex<double>{0, 0});
-    CHECK(out_state.at(2) == std::complex<double>{0, 0});
-    CHECK(out_state.at(3) == std::complex<double>{1, 0});
+    CHECK(state.at(0) == std::complex<double>{0, 0});
+    CHECK(state.at(1) == std::complex<double>{0, 0});
+    CHECK(state.at(2) == std::complex<double>{0, 0});
+    CHECK(state.at(3) == std::complex<double>{1, 0});
 }
 
-TEST_CASE("CNOT Gate tests num_qubits=2 [1,0]", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("CNOT Gate tests num_qubits=2 [1,0]", "[GateSet]", SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 2;
@@ -354,17 +370,19 @@ TEST_CASE("CNOT Gate tests num_qubits=2 [1,0]", "[lightning]")
     sim->NamedOperation("PauliX", {}, {Qs[0]}, false);
     sim->NamedOperation("CNOT", {}, {Qs[1], Qs[0]}, false);
 
-    std::vector<std::complex<double>> out_state = sim->State();
+    std::vector<std::complex<double>> state(1U << sim->GetNumQubits());
+    DataView<std::complex<double>, 1> view(state);
+    sim->State(view);
 
-    CHECK(out_state.at(0) == std::complex<double>{0, 0});
-    CHECK(out_state.at(1) == std::complex<double>{0, 0});
-    CHECK(out_state.at(2) == std::complex<double>{1, 0});
-    CHECK(out_state.at(3) == std::complex<double>{0, 0});
+    CHECK(state.at(0) == std::complex<double>{0, 0});
+    CHECK(state.at(1) == std::complex<double>{0, 0});
+    CHECK(state.at(2) == std::complex<double>{1, 0});
+    CHECK(state.at(3) == std::complex<double>{0, 0});
 }
 
-TEST_CASE("MIX Gate test CR(X, Y, Z) num_qubits=1,4", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("MIX Gate test CR(X, Y, Z) num_qubits=1,4", "[GateSet]", SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubit = n
     constexpr size_t n = 4;
@@ -375,39 +393,41 @@ TEST_CASE("MIX Gate test CR(X, Y, Z) num_qubits=1,4", "[lightning]")
     sim->NamedOperation("CRY", {0.456}, {Qs[0], Qs[2]}, false);
     sim->NamedOperation("CRZ", {0.789}, {Qs[0], Qs[3]}, false);
 
-    const auto &&out_state = sim->State();
+    std::vector<std::complex<double>> state(1U << sim->GetNumQubits());
+    DataView<std::complex<double>, 1> view(state);
+    sim->State(view);
 
     // calculated by pennylane,
-    CHECK(out_state[0].real() == Approx(0.7071067811865475).epsilon(1e-5));
-    CHECK(out_state[0].imag() == Approx(0).epsilon(1e-5));
-    CHECK(out_state.at(1) == std::complex<double>{0, 0});
-    CHECK(out_state.at(2) == std::complex<double>{0, 0});
-    CHECK(out_state.at(3) == std::complex<double>{0, 0});
+    CHECK(state[0].real() == Approx(0.7071067811865475).epsilon(1e-5));
+    CHECK(state[0].imag() == Approx(0).epsilon(1e-5));
+    CHECK(state.at(1) == std::complex<double>{0, 0});
+    CHECK(state.at(2) == std::complex<double>{0, 0});
+    CHECK(state.at(3) == std::complex<double>{0, 0});
 
-    CHECK(out_state.at(4) == std::complex<double>{0, 0});
-    CHECK(out_state.at(5) == std::complex<double>{0, 0});
-    CHECK(out_state.at(6) == std::complex<double>{0, 0});
-    CHECK(out_state.at(7) == std::complex<double>{0, 0});
+    CHECK(state.at(4) == std::complex<double>{0, 0});
+    CHECK(state.at(5) == std::complex<double>{0, 0});
+    CHECK(state.at(6) == std::complex<double>{0, 0});
+    CHECK(state.at(7) == std::complex<double>{0, 0});
 
-    CHECK(out_state[8].real() == Approx(0.6346968899812189).epsilon(1e-5));
-    CHECK(out_state[8].imag() == Approx(-0.2642402124132889).epsilon(1e-5));
+    CHECK(state[8].real() == Approx(0.6346968899812189).epsilon(1e-5));
+    CHECK(state[8].imag() == Approx(-0.2642402124132889).epsilon(1e-5));
 
-    CHECK(out_state.at(9) == std::complex<double>{0, 0});
-    CHECK(out_state[10].real() == Approx(0.14727170294636227).epsilon(1e-5));
-    CHECK(out_state[10].imag() == Approx(-0.061312898618685635).epsilon(1e-5));
-    CHECK(out_state.at(11) == std::complex<double>{0, 0});
+    CHECK(state.at(9) == std::complex<double>{0, 0});
+    CHECK(state[10].real() == Approx(0.14727170294636227).epsilon(1e-5));
+    CHECK(state[10].imag() == Approx(-0.061312898618685635).epsilon(1e-5));
+    CHECK(state.at(11) == std::complex<double>{0, 0});
 
-    CHECK(out_state[12].real() == Approx(-0.016271292269623247).epsilon(1e-5));
-    CHECK(out_state[12].imag() == Approx(-0.03908314523813921).epsilon(1e-5));
-    CHECK(out_state.at(13) == std::complex<double>{0, 0});
-    CHECK(out_state[14].real() == Approx(-0.0037755044329212074).epsilon(1e-5));
-    CHECK(out_state[14].imag() == Approx(-0.009068645910477189).epsilon(1e-5));
-    CHECK(out_state.at(15) == std::complex<double>{0, 0});
+    CHECK(state[12].real() == Approx(-0.016271292269623247).epsilon(1e-5));
+    CHECK(state[12].imag() == Approx(-0.03908314523813921).epsilon(1e-5));
+    CHECK(state.at(13) == std::complex<double>{0, 0});
+    CHECK(state[14].real() == Approx(-0.0037755044329212074).epsilon(1e-5));
+    CHECK(state[14].imag() == Approx(-0.009068645910477189).epsilon(1e-5));
+    CHECK(state.at(15) == std::complex<double>{0, 0});
 }
 
-TEST_CASE("CRot", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("CRot", "[GateSet]", SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 2;
@@ -420,21 +440,23 @@ TEST_CASE("CRot", "[lightning]")
 
     sim->NamedOperation("Hadamard", {}, {Qs[0]}, false);
     sim->NamedOperation("CRot", {M_PI, M_PI_2, 0.5}, {Qs[0], Qs[1]}, false);
-    std::vector<std::complex<double>> out_state = sim->State();
+    std::vector<std::complex<double>> state(1U << sim->GetNumQubits());
+    DataView<std::complex<double>, 1> view(state);
+    sim->State(view);
 
-    CHECK(out_state[0].real() == Approx(0.7071067812).epsilon(1e-5));
-    CHECK(out_state[0].imag() == Approx(0).epsilon(1e-5));
-    CHECK(out_state[1].real() == Approx(0).epsilon(1e-5));
-    CHECK(out_state[1].imag() == Approx(0).epsilon(1e-5));
-    CHECK(out_state[2].real() == Approx(-0.1237019796).epsilon(1e-5));
-    CHECK(out_state[2].imag() == Approx(-0.4844562109).epsilon(1e-5));
-    CHECK(out_state[3].real() == Approx(0.1237019796).epsilon(1e-5));
-    CHECK(out_state[3].imag() == Approx(-0.4844562109).epsilon(1e-5));
+    CHECK(state[0].real() == Approx(0.7071067812).epsilon(1e-5));
+    CHECK(state[0].imag() == Approx(0).epsilon(1e-5));
+    CHECK(state[1].real() == Approx(0).epsilon(1e-5));
+    CHECK(state[1].imag() == Approx(0).epsilon(1e-5));
+    CHECK(state[2].real() == Approx(-0.1237019796).epsilon(1e-5));
+    CHECK(state[2].imag() == Approx(-0.4844562109).epsilon(1e-5));
+    CHECK(state[3].real() == Approx(0.1237019796).epsilon(1e-5));
+    CHECK(state[3].imag() == Approx(-0.4844562109).epsilon(1e-5));
 }
 
-TEST_CASE("CSWAP test", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("CSWAP test", "[GateSet]", SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 3;
@@ -448,15 +470,17 @@ TEST_CASE("CSWAP test", "[lightning]")
     sim->NamedOperation("RX", {M_PI}, {Qs[0]}, false);
     sim->NamedOperation("RX", {M_PI}, {Qs[1]}, false);
     sim->NamedOperation("CSWAP", {}, {Qs[0], Qs[1], Qs[2]}, false);
-    std::vector<std::complex<double>> out_state = sim->State();
+    std::vector<std::complex<double>> state(1U << sim->GetNumQubits());
+    DataView<std::complex<double>, 1> view(state);
+    sim->State(view);
 
-    CHECK(out_state[5].real() == Approx(-1).epsilon(1e-5));
-    CHECK(out_state[5].imag() == Approx(0).epsilon(1e-5));
+    CHECK(state[5].real() == Approx(-1).epsilon(1e-5));
+    CHECK(state[5].imag() == Approx(0).epsilon(1e-5));
 }
 
-TEST_CASE("IsingXY Gate tests num_qubits=2 [1,0]", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("IsingXY Gate tests num_qubits=2 [1,0]", "[GateSet]", SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 2;
@@ -472,21 +496,23 @@ TEST_CASE("IsingXY Gate tests num_qubits=2 [1,0]", "[lightning]")
     sim->NamedOperation("IsingXY", {0.2}, {Qs[1], Qs[0]}, false);
     sim->NamedOperation("SWAP", {}, {Qs[0], Qs[1]}, false);
 
-    std::vector<std::complex<double>> out_state = sim->State();
+    std::vector<std::complex<double>> state(1U << sim->GetNumQubits());
+    DataView<std::complex<double>, 1> view(state);
+    sim->State(view);
 
-    CHECK(out_state[0].real() == Approx(0.70710678).epsilon(1e-5));
-    CHECK(out_state[0].imag() == Approx(0).epsilon(1e-5));
-    CHECK(out_state[1].real() == Approx(-0.70357419).epsilon(1e-5));
-    CHECK(out_state[1].imag() == Approx(0).epsilon(1e-5));
-    CHECK(out_state[2].real() == Approx(0).epsilon(1e-5));
-    CHECK(out_state[2].imag() == Approx(-0.07059289).epsilon(1e-5));
-    CHECK(out_state[3].real() == Approx(0).epsilon(1e-5));
-    CHECK(out_state[3].imag() == Approx(0).epsilon(1e-5));
+    CHECK(state[0].real() == Approx(0.70710678).epsilon(1e-5));
+    CHECK(state[0].imag() == Approx(0).epsilon(1e-5));
+    CHECK(state[1].real() == Approx(-0.70357419).epsilon(1e-5));
+    CHECK(state[1].imag() == Approx(0).epsilon(1e-5));
+    CHECK(state[2].real() == Approx(0).epsilon(1e-5));
+    CHECK(state[2].imag() == Approx(-0.07059289).epsilon(1e-5));
+    CHECK(state[3].real() == Approx(0).epsilon(1e-5));
+    CHECK(state[3].imag() == Approx(0).epsilon(1e-5));
 }
 
-TEST_CASE("Toffoli test", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("Toffoli test", "[GateSet]", SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 3;
@@ -501,23 +527,25 @@ TEST_CASE("Toffoli test", "[lightning]")
     sim->NamedOperation("PauliX", {}, {Qs[1]}, false);
     sim->NamedOperation("Toffoli", {}, {Qs[0], Qs[1], Qs[2]}, false);
 
-    std::vector<std::complex<double>> out_state = sim->State();
+    std::vector<std::complex<double>> state(1U << sim->GetNumQubits());
+    DataView<std::complex<double>, 1> view(state);
+    sim->State(view);
 
-    CHECK(out_state.at(0) == std::complex<double>{0, 0});
-    CHECK(out_state.at(1) == std::complex<double>{0, 0});
-    CHECK(out_state[2].real() == Approx(0.70710678).epsilon(1e-5));
-    CHECK(out_state[2].imag() == Approx(0).epsilon(1e-5));
-    CHECK(out_state.at(3) == std::complex<double>{0, 0});
-    CHECK(out_state.at(4) == std::complex<double>{0, 0});
-    CHECK(out_state.at(5) == std::complex<double>{0, 0});
-    CHECK(out_state.at(6) == std::complex<double>{0, 0});
-    CHECK(out_state[7].real() == Approx(0.70710678).epsilon(1e-5));
-    CHECK(out_state[7].imag() == Approx(0).epsilon(1e-5));
+    CHECK(state.at(0) == std::complex<double>{0, 0});
+    CHECK(state.at(1) == std::complex<double>{0, 0});
+    CHECK(state[2].real() == Approx(0.70710678).epsilon(1e-5));
+    CHECK(state[2].imag() == Approx(0).epsilon(1e-5));
+    CHECK(state.at(3) == std::complex<double>{0, 0});
+    CHECK(state.at(4) == std::complex<double>{0, 0});
+    CHECK(state.at(5) == std::complex<double>{0, 0});
+    CHECK(state.at(6) == std::complex<double>{0, 0});
+    CHECK(state[7].real() == Approx(0.70710678).epsilon(1e-5));
+    CHECK(state[7].imag() == Approx(0).epsilon(1e-5));
 }
 
-TEST_CASE("MultiRZ test", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("MultiRZ test", "[GateSet]", SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 2;
@@ -534,15 +562,17 @@ TEST_CASE("MultiRZ test", "[lightning]")
     sim->NamedOperation("MultiRZ", {M_PI}, {Qs[0], Qs[1]}, false);
     sim->NamedOperation("Hadamard", {}, {Qs[0]}, false);
     sim->NamedOperation("Hadamard", {}, {Qs[1]}, false);
-    std::vector<std::complex<double>> out_state = sim->State();
+    std::vector<std::complex<double>> state(1U << sim->GetNumQubits());
+    DataView<std::complex<double>, 1> view(state);
+    sim->State(view);
 
-    CHECK(out_state[2].real() == Approx(-1).epsilon(1e-5));
-    CHECK(out_state[2].imag() == Approx(0).epsilon(1e-5));
+    CHECK(state[2].real() == Approx(-1).epsilon(1e-5));
+    CHECK(state[2].imag() == Approx(0).epsilon(1e-5));
 }
 
-TEST_CASE("MatrixOperation test with 2-qubit", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("MatrixOperation test with 2-qubit", "[GateSet]", SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 2;
@@ -565,24 +595,26 @@ TEST_CASE("MatrixOperation test with 2-qubit", "[lightning]")
     };
     sim->MatrixOperation(matrix, wires, false);
 
-    std::vector<std::complex<double>> out_state = sim->State();
+    std::vector<std::complex<double>> state(1U << sim->GetNumQubits());
+    DataView<std::complex<double>, 1> view(state);
+    sim->State(view);
 
-    CHECK(out_state[0].real() == Approx(-0.474432).epsilon(1e-5));
-    CHECK(out_state[0].imag() == Approx(-0.44579).epsilon(1e-5));
+    CHECK(state[0].real() == Approx(-0.474432).epsilon(1e-5));
+    CHECK(state[0].imag() == Approx(-0.44579).epsilon(1e-5));
 
-    CHECK(out_state[1].real() == Approx(-0.105256).epsilon(1e-5));
-    CHECK(out_state[1].imag() == Approx(0.255159).epsilon(1e-5));
+    CHECK(state[1].real() == Approx(-0.105256).epsilon(1e-5));
+    CHECK(state[1].imag() == Approx(0.255159).epsilon(1e-5));
 
-    CHECK(out_state[2].real() == Approx(-0.168031).epsilon(1e-5));
-    CHECK(out_state[2].imag() == Approx(0.218977).epsilon(1e-5));
+    CHECK(state[2].real() == Approx(-0.168031).epsilon(1e-5));
+    CHECK(state[2].imag() == Approx(0.218977).epsilon(1e-5));
 
-    CHECK(out_state[3].real() == Approx(-0.623553).epsilon(1e-5));
-    CHECK(out_state[3].imag() == Approx(-0.187075).epsilon(1e-5));
+    CHECK(state[3].real() == Approx(-0.623553).epsilon(1e-5));
+    CHECK(state[3].imag() == Approx(-0.187075).epsilon(1e-5));
 }
 
-TEST_CASE("MatrixOperation test with 3-qubit", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("MatrixOperation test with 3-qubit", "[GateSet]", SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 3;
@@ -593,6 +625,7 @@ TEST_CASE("MatrixOperation test with 3-qubit", "[lightning]")
         Qs[i] = sim->AllocateQubit();
     }
 
+    sim->StartTapeRecording();
     sim->NamedOperation("Hadamard", {}, {Qs[0]}, false);
     sim->NamedOperation("Toffoli", {}, {Qs[0], Qs[1], Qs[2]}, false);
 
@@ -608,32 +641,29 @@ TEST_CASE("MatrixOperation test with 3-qubit", "[lightning]")
         {0.327486634260, 0.130699704247}, {0.299805387808, 0.150417378569},
     };
     sim->MatrixOperation(matrix, wires, false);
+    sim->StopTapeRecording();
 
-    std::vector<std::complex<double>> out_state = sim->State();
+    std::vector<std::complex<double>> state(1U << sim->GetNumQubits());
+    DataView<std::complex<double>, 1> view(state);
+    sim->State(view);
 
-    CHECK(out_state[0].real() == Approx(0.349135).epsilon(1e-5));
-    CHECK(out_state[0].imag() == Approx(0.180548).epsilon(1e-5));
-    CHECK(out_state[2].real() == Approx(0.0456405).epsilon(1e-5));
-    CHECK(out_state[2].imag() == Approx(0.145498).epsilon(1e-5));
-    CHECK(out_state[4].real() == Approx(0.281214).epsilon(1e-5));
-    CHECK(out_state[4].imag() == Approx(0.158554).epsilon(1e-5));
-    CHECK(out_state[6].real() == Approx(0.376493).epsilon(1e-5));
-    CHECK(out_state[6].imag() == Approx(0.162104).epsilon(1e-5));
+    CHECK(state[0].real() == Approx(0.349135).epsilon(1e-5));
+    CHECK(state[0].imag() == Approx(0.180548).epsilon(1e-5));
+    CHECK(state[2].real() == Approx(0.0456405).epsilon(1e-5));
+    CHECK(state[2].imag() == Approx(0.145498).epsilon(1e-5));
+    CHECK(state[4].real() == Approx(0.281214).epsilon(1e-5));
+    CHECK(state[4].imag() == Approx(0.158554).epsilon(1e-5));
+    CHECK(state[6].real() == Approx(0.376493).epsilon(1e-5));
+    CHECK(state[6].imag() == Approx(0.162104).epsilon(1e-5));
 }
 
-TEST_CASE("MatrixOperation test with 4-qubit", "[lightning]")
+TEMPLATE_TEST_CASE("MatrixOperation test with 4-qubit", "[GateSet]", LightningSimulator)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubit = n
     constexpr size_t n = 4;
-    std::vector<QubitIdType> Qs;
-    Qs.reserve(n);
-
-    Qs[0] = sim->AllocateQubit();
-    Qs[1] = sim->AllocateQubit();
-    Qs[2] = sim->AllocateQubit();
-    Qs[3] = sim->AllocateQubit();
+    std::vector<QubitIdType> Qs = sim->AllocateQubits(n);
 
     sim->NamedOperation("Hadamard", {}, {Qs[0]}, false);
     sim->NamedOperation("CRX", {0.123}, {Qs[0], Qs[1]}, false);
@@ -709,29 +739,31 @@ TEST_CASE("MatrixOperation test with 4-qubit", "[lightning]")
     };
     sim->MatrixOperation(matrix, wires, false);
 
-    std::vector<std::complex<double>> out_state = sim->State();
+    std::vector<std::complex<double>> state(1U << sim->GetNumQubits());
+    DataView<std::complex<double>, 1> view(state);
+    sim->State(view);
 
-    CHECK(out_state[0].real() == Approx(-0.141499).epsilon(1e-5));
-    CHECK(out_state[0].imag() == Approx(-0.230993).epsilon(1e-5));
+    CHECK(state[0].real() == Approx(-0.141499).epsilon(1e-5));
+    CHECK(state[0].imag() == Approx(-0.230993).epsilon(1e-5));
 
-    CHECK(out_state[2].real() == Approx(0.135423).epsilon(1e-5));
-    CHECK(out_state[2].imag() == Approx(-0.235563).epsilon(1e-5));
+    CHECK(state[2].real() == Approx(0.135423).epsilon(1e-5));
+    CHECK(state[2].imag() == Approx(-0.235563).epsilon(1e-5));
 
-    CHECK(out_state[4].real() == Approx(0.299458).epsilon(1e-5));
-    CHECK(out_state[4].imag() == Approx(0.218321).epsilon(1e-5));
+    CHECK(state[4].real() == Approx(0.299458).epsilon(1e-5));
+    CHECK(state[4].imag() == Approx(0.218321).epsilon(1e-5));
 
-    CHECK(out_state[6].real() == Approx(0.0264869).epsilon(1e-5));
-    CHECK(out_state[6].imag() == Approx(-0.154913).epsilon(1e-5));
+    CHECK(state[6].real() == Approx(0.0264869).epsilon(1e-5));
+    CHECK(state[6].imag() == Approx(-0.154913).epsilon(1e-5));
 
-    CHECK(out_state[8].real() == Approx(-0.186607).epsilon(1e-5));
-    CHECK(out_state[8].imag() == Approx(0.188884).epsilon(1e-5));
+    CHECK(state[8].real() == Approx(-0.186607).epsilon(1e-5));
+    CHECK(state[8].imag() == Approx(0.188884).epsilon(1e-5));
 
-    CHECK(out_state[10].real() == Approx(-0.271843).epsilon(1e-5));
-    CHECK(out_state[10].imag() == Approx(-0.281136).epsilon(1e-5));
+    CHECK(state[10].real() == Approx(-0.271843).epsilon(1e-5));
+    CHECK(state[10].imag() == Approx(-0.281136).epsilon(1e-5));
 
-    CHECK(out_state[12].real() == Approx(-0.560499).epsilon(1e-5));
-    CHECK(out_state[12].imag() == Approx(-0.310176).epsilon(1e-5));
+    CHECK(state[12].real() == Approx(-0.560499).epsilon(1e-5));
+    CHECK(state[12].imag() == Approx(-0.310176).epsilon(1e-5));
 
-    CHECK(out_state[14].real() == Approx(0.0756372).epsilon(1e-5));
-    CHECK(out_state[14].imag() == Approx(-0.226334).epsilon(1e-5));
+    CHECK(state[14].real() == Approx(0.0756372).epsilon(1e-5));
+    CHECK(state[14].imag() == Approx(-0.226334).epsilon(1e-5));
 }

@@ -15,15 +15,33 @@
 """
 
 import jax
-from jax.tree_util import tree_unflatten
-from jax._src.dispatch import jaxpr_replicas
-from jax.interpreters.mlir import List, AxisContext, source_info_util, Sequence, Optional, xc
-from jax.interpreters.mlir import Tuple, ir, ReplicaAxisContext, xla, util, xb, itertools
-from jax.interpreters.mlir import ModuleContext, lower_jaxpr_to_fun, lowerable_effects, Any
-from jax.interpreters.mlir import _set_up_aliases, _module_name_regex, sharded_aval, warnings
-from jax.interpreters.partial_eval import DynamicJaxprTracer
-
 import pennylane as qml
+from jax._src.dispatch import jaxpr_replicas
+from jax.interpreters.mlir import (
+    Any,
+    AxisContext,
+    List,
+    ModuleContext,
+    Optional,
+    ReplicaAxisContext,
+    Sequence,
+    Tuple,
+    _module_name_regex,
+    _set_up_aliases,
+    ir,
+    itertools,
+    lower_jaxpr_to_fun,
+    lowerable_effects,
+    sharded_aval,
+    source_info_util,
+    util,
+    warnings,
+    xb,
+    xc,
+    xla,
+)
+from jax.interpreters.partial_eval import DynamicJaxprTracer
+from jax.tree_util import tree_unflatten
 from pennylane.measurements import MeasurementProcess
 from pennylane.operation import Wires
 
@@ -68,7 +86,7 @@ def get_mlir(func, *args, **kwargs):
     axis_context = ReplicaAxisContext(xla.AxisEnv(nrep, (), ()))
     name_stack = util.new_name_stack(util.wrap_name("ok", "jit"))
     module, context = custom_lower_jaxpr_to_module(
-        func_name="jit." + func.__name__,
+        func_name="jit_" + func.__name__,
         module_name=func.__name__,
         jaxpr=jaxpr,
         effects=effects,
@@ -95,6 +113,10 @@ def get_traceable_fn(qfunc, device):
     def traceable_fn(*args, **kwargs):
         shots = device.shots
         num_wires = len(device.wires)
+
+        spec = "backend"
+        jprim.qdevice(spec, device.backend)
+
         qreg = jprim.qalloc(num_wires)
 
         JaxTape.device = device
@@ -182,15 +204,16 @@ def get_qubits_from_wires(wires, qubit_states, qreg):
 
 
 def get_new_qubit_state_from_wires_and_qubits(wires, new_qubits, qubit_states, qreg):
-    """Udate qubit state and quantum register with new qubits corresponding to wires in ``wires``.
+    """Update qubit state and quantum register with new qubits corresponding to wires in ``wires``.
 
-    In the presence of any dynamic wires, it is necessary to clear the qubit states as the dynamic wire
-    may have updated any previously known position.
+    In the presence of any dynamic wires, it is necessary to clear the qubit states as the dynamic
+    wire may have updated any previously known position.
 
     Args:
         wires: A list containing integers of ``DynamicJaxprTracer``s.
         new_qubits: A list corresponding to the new SSA qubit variables.
-        qubit_states: The current known pairing of wires and qubits at the program point in which this function is called.
+        qubit_states: The current known pairing of wires and qubits at the program point in which
+                      this function is called.
         qreg: The current quantum register at the program point in which this function is called.
 
     Returns:
@@ -260,12 +283,11 @@ def trace_quantum_tape(
                 wires, new_qubits, qubit_states, qreg
             )
         elif op.__class__.__name__ == "Cond":
-            predicate, consts = op_args
+            predicates, consts = op_args
             qreg = insert_to_qreg(qubit_states, qreg)
-            header_and_branch_args_plus_consts = [predicate] + consts + [qreg]
+            header_and_branch_args_plus_consts = predicates + consts + [qreg]
             outs = jprim.qcond(
-                op.true_jaxpr,
-                op.false_jaxpr,
+                op.branch_jaxprs,
                 *header_and_branch_args_plus_consts,
             )
             v, qreg = tree_unflatten(op.out_trees[0], outs)
@@ -524,7 +546,7 @@ def custom_lower_jaxpr_to_module(
 
         for op in ctx.module.body.operations:
             func_name = str(op.name)
-            is_entry_point = func_name.startswith('"jit.')
+            is_entry_point = func_name.startswith('"jit_')
             if is_entry_point:
                 continue
             op.attributes["llvm.linkage"] = ir.Attribute.parse("#llvm.linkage<internal>")

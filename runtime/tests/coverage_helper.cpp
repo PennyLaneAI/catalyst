@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "LightningUtils.hpp"
+#include "TestUtils.hpp"
 
 // This is a hack around analyzing CAPI and
 // simulators C++ implementation code by lcov
 #include "RuntimeCAPI.cpp"
 
-#if defined(_KOKKOS)
-#include "LightningKokkosSimulator.cpp"
-#else
 #include "LightningSimulator.cpp"
+
+#ifdef __device_lightning_kokkos
+#include "LightningKokkosSimulator.cpp"
 #endif

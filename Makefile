@@ -30,7 +30,7 @@ all: runtime mlir frontend
 .PHONY: frontend
 frontend:
 	@echo "install Catalyst Frontend"
-	$(PYTHON) pip install -e . --no-use-pep517
+	$(PYTHON) pip install -e .
 
 .PHONY: mlir llvm mhlo dialects runtime qir
 mlir:
@@ -113,8 +113,10 @@ endif
 	$(MAKE) -C runtime format
 ifdef check
 	black --check --verbose .
+	isort --check --diff .
 else
 	black .
+	isort .
 endif
 	pylint frontend
 

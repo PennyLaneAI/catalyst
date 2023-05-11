@@ -37,10 +37,10 @@ throw std::logic_error("StateVectorDynamicCPU.hpp: No such header file");
 
 #include "CacheManager.hpp"
 #include "Exception.hpp"
-#include "LightningUtils.hpp"
-#include "ObsManager.hpp"
+#include "LightningObsManager.hpp"
 #include "QuantumDevice.hpp"
 #include "QubitManager.hpp"
+#include "Utils.hpp"
 
 namespace Catalyst::Runtime::Simulator {
 class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {
@@ -53,7 +53,7 @@ class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {
 
     QubitManager<QubitIdType, size_t> qubit_manager{};
     CacheManager cache_manager{};
-    bool cache_recording{false};
+    bool tape_recording{false};
 
     size_t device_shots{0};
 
@@ -98,7 +98,7 @@ class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {
 
   public:
     explicit LightningSimulator(bool status = false, size_t shots = default_device_shots)
-        : cache_recording(status), device_shots(shots)
+        : tape_recording(status), device_shots(shots)
     {
     }
     ~LightningSimulator() override = default;
@@ -137,17 +137,17 @@ class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {
         -> ObsIdType override;
     auto Expval(ObsIdType obsKey) -> double override;
     auto Var(ObsIdType obsKey) -> double override;
-    auto State() -> std::vector<std::complex<double>> override;
-    auto Probs() -> std::vector<double> override;
-    auto PartialProbs(const std::vector<QubitIdType> &wires) -> std::vector<double> override;
-    auto Sample(size_t shots) -> std::vector<double> override;
-    auto PartialSample(const std::vector<QubitIdType> &wires, size_t shots)
-        -> std::vector<double> override;
-    auto Counts(size_t shots) -> std::tuple<std::vector<double>, std::vector<int64_t>> override;
-    auto PartialCounts(const std::vector<QubitIdType> &wires, size_t shots)
-        -> std::tuple<std::vector<double>, std::vector<int64_t>> override;
+    void State(DataView<std::complex<double>, 1> &state) override;
+    void Probs(DataView<double, 1> &probs) override;
+    void PartialProbs(DataView<double, 1> &probs, const std::vector<QubitIdType> &wires) override;
+    void Sample(DataView<double, 2> &samples, size_t shots) override;
+    void PartialSample(DataView<double, 2> &samples, const std::vector<QubitIdType> &wires,
+                       size_t shots) override;
+    void Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts, size_t shots) override;
+    void PartialCounts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts,
+                       const std::vector<QubitIdType> &wires, size_t shots) override;
     auto Measure(QubitIdType wire) -> Result override;
-    auto Gradient(const std::vector<size_t> &trainParams)
-        -> std::vector<std::vector<double>> override;
+    void Gradient(std::vector<DataView<double, 1>> &gradients,
+                  const std::vector<size_t> &trainParams) override;
 };
 } // namespace Catalyst::Runtime::Simulator

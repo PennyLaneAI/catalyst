@@ -18,6 +18,7 @@ import argparse
 import re
 import subprocess
 import sys
+
 from utils import get_cpp_files
 
 CLANG_FMT_BIN = "clang-format"
