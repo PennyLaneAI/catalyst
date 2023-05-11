@@ -66,7 +66,7 @@ lit:
 
 pytest:
 	@echo "check the Catalyst PyTest suite"
-	$(PYTHON) pytest frontend/test/pytest --tb=native --backend=$(TEST_BACKEND) -n 2
+	$(PYTHON) pytest frontend/test/pytest --tb=native --backend=$(TEST_BACKEND) -n auto
 
 test-demos:
 	@echo "check the Catalyst demos"
