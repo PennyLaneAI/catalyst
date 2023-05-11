@@ -81,6 +81,13 @@ testvec = [
 ]
 
 
+def assert_elements_allclose(a, b, **kwargs):
+    assert all(isinstance(i, tuple) for i in [a, b]), f"Some of {[type(a),type(b)]} is not a tuple"
+    assert len(a) == len(b), f"len(a) ({len(a)}) != len(b) ({type(b)})"
+    for i, j in zip(a, b):
+        assert_allclose(i, j, **kwargs)
+
+
 @pytest.mark.parametrize("f, x, t, _", testvec)
 def test_jvp_against_jax(f: callable, x: list, t: list, _):
     """Numerically tests Catalyst's jvp against the JAX version."""
@@ -96,11 +103,7 @@ def test_jvp_against_jax(f: callable, x: list, t: list, _):
 
     r1 = C_workflow()
     r2 = J_workflow()
-    print(r1)
-    print(r2)
-
-    for a, b in zip(r1, r2):
-        assert_allclose(a, b, rtol=1e-6, atol=1e-6)
+    assert_elements_allclose(r1, r2, rtol=1e-6, atol=1e-6)
 
 
 @pytest.mark.parametrize("f, x, _, ct", testvec)
@@ -119,11 +122,7 @@ def test_vjp_against_jax(f: callable, x: list, _, ct: list):
 
     r1 = C_workflow()
     r2 = J_workflow()
-    print(r1)
-    print(r2)
-
-    for a, b in zip(r1, r2):
-        assert_allclose(a, b, rtol=1e-6, atol=1e-6)
+    assert_elements_allclose(r1, r2, rtol=1e-6, atol=1e-6)
 
 
 @pytest.mark.parametrize("f, x, t, ct", testvec[0:1])
@@ -146,11 +145,8 @@ def test_jvpvjp_argcheck(f: callable, x: list, t: list, ct: list):
     def C_workflow4():
         return C_vjp(f, tuple(x), tuple(ct), method="fd", argnum=list(range(len(x))))
 
-    for a, b in zip(C_workflow1(), C_workflow2()):
-        assert_allclose(a, b, rtol=1e-6, atol=1e-6)
-
-    for a, b in zip(C_workflow3(), C_workflow4()):
-        assert_allclose(a, b, rtol=1e-6, atol=1e-6)
+    assert_elements_allclose(C_workflow1(), C_workflow2(), rtol=1e-6, atol=1e-6)
+    assert_elements_allclose(C_workflow3(), C_workflow4(), rtol=1e-6, atol=1e-6)
 
     with pytest.raises(ValueError, match="argument must be a list or a tuple"):
 
@@ -163,6 +159,65 @@ def test_jvpvjp_argcheck(f: callable, x: list, t: list, ct: list):
         @qjit
         def C_workflow_bad2():
             return C_vjp(f, 33, tuple(ct), method="fd", argnum=list(range(len(x))))
+
+
+@pytest.mark.parametrize("f, x, t, _", testvec)
+def test_jvp_against_jax_argnum0(f: callable, x: list, t: list, _):
+    """Numerically tests Catalyst's jvp against the JAX version, in case of empty or singular
+    argnum argument."""
+
+    @qjit
+    def C_workflowA():
+        return C_jvp(f, x, t[0:1], method="fd")
+
+    @qjit
+    def C_workflowB():
+        return C_jvp(f, x, t[0:1], method="fd", argnum=[0])
+
+    @jax.jit
+    def J_workflow():
+        # Emulating `argnum=[0]` in JAX
+        def _f(a):
+            return f(a, *x[1:])
+
+        y, ft = J_jvp(_f, *x[0:1])
+        return flatten_if_tuples((y, ft(*t[0:1])))
+
+    r1a = C_workflowA()
+    r1b = C_workflowB()
+    r2 = J_workflow()
+    assert_elements_allclose(r1a, r1b, rtol=1e-6, atol=1e-6)
+    assert_elements_allclose(r1a, r2, rtol=1e-6, atol=1e-6)
+
+
+@pytest.mark.parametrize("f, x, _, ct", testvec)
+def test_vjp_against_jax_argnum0(f: callable, x: list, _, ct: list):
+    """Numerically tests Catalyst's vjp against the JAX version, in case of empty or singular
+    argnum argument."""
+
+    @qjit
+    def C_workflowA():
+        return C_vjp(f, x, ct, method="fd")
+
+    @qjit
+    def C_workflowB():
+        return C_vjp(f, x, ct, method="fd", argnum=[0])
+
+    @jax.jit
+    def J_workflow():
+        # Emulating `argnum=[0]` in JAX
+        def _f(a):
+            return f(a, *x[1:])
+
+        y, ft = J_vjp(_f, *x[0:1])
+        ct2 = tree_unflatten(tree_flatten(y)[1], ct)
+        return flatten_if_tuples((y, ft(ct2)))
+
+    r1a = C_workflowA()
+    r1b = C_workflowB()
+    r2 = J_workflow()
+    assert_elements_allclose(r1a, r1b, rtol=1e-6, atol=1e-6)
+    assert_elements_allclose(r1a, r2, rtol=1e-6, atol=1e-6)
 
 
 if __name__ == "__main__":

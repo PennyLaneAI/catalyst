@@ -92,15 +92,13 @@ void JVPLoweringPattern::rewrite(JVPOp op, PatternRewriter &rewriter) const
     LLVM_DEBUG(dbgs() << "replacing JVP op\n");
 
     auto func_diff_operand_indices = GradOp::compDiffArgIndices(op.getDiffArgIndices());
-    LLVM_DEBUG(dbgs() << "func_diff_operand_indices: " << func_diff_operand_indices << " \n");
     LLVM_DEBUG(dbgs() << "jvp_num_operands " << op.getOperands().size() << " \n");
+    LLVM_DEBUG(dbgs() << "func_diff_operand_indices: " << func_diff_operand_indices << " \n");
     assert(func_diff_operand_indices.size() <= op.getOperands().size() / 2);
-
     size_t func_operands_size = op.getOperands().size() - func_diff_operand_indices.size();
-    size_t tang_operands_size = func_diff_operand_indices.size();
 
     auto func_operands = OperandRange(op.operand_begin(), op.operand_begin() + func_operands_size);
-    auto tang_operands = OperandRange(op.operand_begin() + tang_operands_size, op.operand_end());
+    auto tang_operands = OperandRange(op.operand_begin() + func_operands_size, op.operand_end());
 
     for (auto idx : func_diff_operand_indices) {
         assert(idx < func_operands.size() && "all diffArgIndices reference valid arguments");
@@ -238,8 +236,8 @@ void VJPLoweringPattern::rewrite(VJPOp op, PatternRewriter &rewriter) const
     LLVM_DEBUG(dbgs() << "replacing VJP op\n");
 
     auto func_diff_operand_indices = GradOp::compDiffArgIndices(op.getDiffArgIndices());
-    LLVM_DEBUG(dbgs() << "func_diff_operand_indices: " << func_diff_operand_indices << " \n");
     LLVM_DEBUG(dbgs() << "vjp_num_operands " << op.getOperands().size() << " \n");
+    LLVM_DEBUG(dbgs() << "func_diff_operand_indices: " << func_diff_operand_indices << " \n");
 
     auto func_op = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
 
