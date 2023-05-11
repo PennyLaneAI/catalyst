@@ -23,7 +23,7 @@ include(Catch)
 
 add_executable(runner_tests runner_main.cpp)
 
-target_include_directories(runner_tests PRIVATE 
+target_include_directories(runner_tests PRIVATE
             ${pennylane_lightning_SOURCE_DIR}/pennylane_lightning/src/tests)
 
 target_link_libraries(runner_tests PRIVATE  catalyst_qir_runtime
@@ -47,7 +47,7 @@ target_sources(runner_tests PRIVATE ${cov_helper_src}
             Test_SVDynamicCPU_Core.cpp
             Test_SVDynamicCPU_Allocation.cpp)
 
-if(PLKOKKOS_ENABLE_OPENMP)
+if(KOKKOS_ENABLE_OPENMP)
     find_package(OpenMP REQUIRED)
     target_link_libraries(runner_tests INTERFACE OpenMP::OpenMP_CXX)
 endif()
