@@ -21,12 +21,10 @@ import jax
 import jax.numpy as jnp
 import pennylane as qml
 import pytest
-from jax import grad as J_grad
 from jax import linearize as J_jvp
 from jax import vjp as J_vjp
 from jax.tree_util import tree_flatten, tree_unflatten
 from numpy.testing import assert_allclose
-from pennylane import qnode
 
 from catalyst import jvp as C_jvp
 from catalyst import qjit
@@ -67,6 +65,7 @@ def _bless_jittable(
     """Wraps quantum functions with a proper quantum decorator, known by the caller. Pure functions
     are returned as-is."""
 
+    # pylint: disable=no-else-return
     if isinstance(f, PureFunction):
         return f.f
     elif isinstance(f, QuantumFunction):
