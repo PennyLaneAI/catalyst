@@ -44,7 +44,6 @@ Value einsumLinalgGeneric(OpBuilder &ob, Location loc, ArrayRef<size_t> a_axis,
             for (const auto a : axis) {
                 aexprs.push_back(getAffineDimExpr(a, ob.getContext()));
             }
-            assert(aexprs.size() > 0 && "affine expression set should be non-empty");
             out.push_back(AffineMap::get(axis_dims.size(), 0, aexprs, ob.getContext()));
         };
         out;
