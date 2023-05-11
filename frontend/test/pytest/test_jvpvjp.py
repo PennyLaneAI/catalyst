@@ -46,7 +46,7 @@ TensorFunction = Callable[[TensorLike, ...], TensorLike]
 
 
 @dataclass
-class PureFunction:
+class ClassicalFunction:
     """Pure function that does not require any decorators."""
 
     f: TensorFunction
@@ -59,19 +59,19 @@ class QuantumFunction:
     f: TensorFunction
 
 
-def _bless_jittable(
-    quantum_decorator: Callable[[Callable], Callable], f: Union[PureFunction, QuantumFunction]
+def _ensure_jittable(
+    quantum_decorator: Callable[[Callable], Callable], f: Union[ClassicalFunction, QuantumFunction]
 ) -> Callable:
     """Wraps quantum functions with a proper quantum decorator, known by the caller. Pure functions
     are returned as-is."""
 
     # pylint: disable=no-else-return
-    if isinstance(f, PureFunction):
+    if isinstance(f, ClassicalFunction):
         return f.f
     elif isinstance(f, QuantumFunction):
         return quantum_decorator(f.f)
     else:
-        raise ValueError("Expecting either PureFunction or QuantumFunction")
+        raise ValueError("Expecting either ClassicalFunction or QuantumFunction")
 
 
 C_decorator = partial(qml.QNode, device=qml.device("lightning.qubit", wires=1))
@@ -90,17 +90,21 @@ def circuit_rx(x1, x2):
 testvec = [
     (
         # `(Scalar * Scalae) -quantum-> Scalar`
-        QuantumFunction(circuit_rx), [-0.1, 0.5], [0.1, 0.33], [0.111]),
+        QuantumFunction(circuit_rx),
+        [-0.1, 0.5],
+        [0.1, 0.33],
+        [0.111],
+    ),
     (
         # `Tensor -> Tensor`
-        PureFunction(lambda x: jnp.stack([1 * x, 2 * x, 3 * x])),
+        ClassicalFunction(lambda x: jnp.stack([1 * x, 2 * x, 3 * x])),
         [jnp.zeros([4], dtype=float)],
         [jnp.ones([4], dtype=float)],
         [jnp.ones([3, 4], dtype=float)],
     ),
     (
         # `(Tensor * Tensor) -> Tensor`
-        PureFunction(
+        ClassicalFunction(
             lambda x1, x2: (
                 jnp.stack(
                     [
@@ -116,14 +120,14 @@ testvec = [
     ),
     (
         # `Tensor -> (Tensor * Tensor)`
-        PureFunction(lambda x: (x, jnp.stack([1 * x, 2 * x, 3 * x]))),
+        ClassicalFunction(lambda x: (x, jnp.stack([1 * x, 2 * x, 3 * x]))),
         [jnp.zeros([4], dtype=float)],
         [jnp.ones([4], dtype=float)],
         [jnp.ones([4], dtype=float), jnp.ones([3, 4], dtype=float)],
     ),
     (
         # `(Tensor * Tensor) -> (Tensor * Tensor)`
-        PureFunction(
+        ClassicalFunction(
             lambda x1, x2: (
                 1 * jnp.reshape(x1, [6]) + 2 * jnp.reshape(x2, [6]),
                 jnp.stack(
@@ -155,11 +159,13 @@ def test_jvp_against_jax_full_argnum(f: callable, x: list, t: list, _):
 
     @qjit
     def C_workflow():
-        return C_jvp(_bless_jittable(C_decorator, f), x, t, method="fd", argnum=list(range(len(x))))
+        return C_jvp(
+            _ensure_jittable(C_decorator, f), x, t, method="fd", argnum=list(range(len(x)))
+        )
 
     @jax.jit
     def J_workflow():
-        y, ft = J_jvp(_bless_jittable(J_decorator, f), *x)
+        y, ft = J_jvp(_ensure_jittable(J_decorator, f), *x)
         return flatten_if_tuples((y, ft(*t)))
 
     r1 = C_workflow()
@@ -174,12 +180,12 @@ def test_vjp_against_jax_full_argnum(f: callable, x: list, _, ct: list):
     @qjit
     def C_workflow():
         return C_vjp(
-            _bless_jittable(C_decorator, f), x, ct, method="fd", argnum=list(range(len(x)))
+            _ensure_jittable(C_decorator, f), x, ct, method="fd", argnum=list(range(len(x)))
         )
 
     @jax.jit
     def J_workflow():
-        y, ft = J_vjp(_bless_jittable(J_decorator, f), *x)
+        y, ft = J_vjp(_ensure_jittable(J_decorator, f), *x)
         ct2 = tree_unflatten(tree_flatten(y)[1], ct)
         return flatten_if_tuples((y, ft(ct2)))
 
@@ -192,7 +198,7 @@ def test_jvpvjp_argument_checks():
     """Numerically tests Catalyst's jvp against the JAX version."""
 
     f, x, t, ct = testvec[0]
-    C_f = _bless_jittable(C_decorator, f)
+    C_f = _ensure_jittable(C_decorator, f)
 
     @qjit
     def C_workflow1():
@@ -231,8 +237,8 @@ def test_jvp_against_jax_argnum0(f: callable, x: list, t: list, _):
     """Numerically tests Catalyst's jvp against the JAX version, in case of empty or singular
     argnum argument."""
 
-    C_f = _bless_jittable(C_decorator, f)
-    J_f = _bless_jittable(J_decorator, f)
+    C_f = _ensure_jittable(C_decorator, f)
+    J_f = _ensure_jittable(J_decorator, f)
 
     @qjit
     def C_workflowA():
@@ -263,8 +269,8 @@ def test_vjp_against_jax_argnum0(f: callable, x: list, _, ct: list):
     """Numerically tests Catalyst's vjp against the JAX version, in case of empty or singular
     argnum argument."""
 
-    C_f = _bless_jittable(C_decorator, f)
-    J_f = _bless_jittable(J_decorator, f)
+    C_f = _ensure_jittable(C_decorator, f)
+    J_f = _ensure_jittable(J_decorator, f)
 
     @qjit
     def C_workflowA():
