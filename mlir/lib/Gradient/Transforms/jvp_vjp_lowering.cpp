@@ -71,7 +71,7 @@ template <class T> std::vector<int64_t> _tovec(const T &x)
     return std::vector<int64_t>(x.begin(), x.end());
 };
 
-struct JVPLoweringPattern : public OpRewritePattern<JVPOp> { /*{{{*/
+struct JVPLoweringPattern : public OpRewritePattern<JVPOp> {
     using OpRewritePattern<JVPOp>::OpRewritePattern;
 
     LogicalResult match(JVPOp op) const override;
@@ -213,9 +213,8 @@ void JVPLoweringPattern::rewrite(JVPOp op, PatternRewriter &rewriter) const
 
     LLVM_DEBUG(dbgs() << "replaced JVP\n");
 }
-/*}}}*/
 
-struct VJPLoweringPattern : public OpRewritePattern<VJPOp> { /*{{{*/
+struct VJPLoweringPattern : public OpRewritePattern<VJPOp> {
     using OpRewritePattern<VJPOp>::OpRewritePattern;
 
     LogicalResult match(VJPOp op) const override;
@@ -354,7 +353,6 @@ void VJPLoweringPattern::rewrite(VJPOp op, PatternRewriter &rewriter) const
 
     LLVM_DEBUG(dbgs() << "replaced VJP\n");
 }
-/*}}}*/
 
 struct JVPVJPLoweringPass : public PassWrapper<JVPVJPLoweringPass, OperationPass<ModuleOp>> {
     JVPVJPLoweringPass() {}
