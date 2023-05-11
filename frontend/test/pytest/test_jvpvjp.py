@@ -88,8 +88,18 @@ def circuit_rx(x1, x2):
 
 
 testvec = [
-    (QuantumFunction(circuit_rx), [-0.1, 0.5], [0.1, 0.33], [0.111]),
     (
+        # `(Scalar * Scalae) -quantum-> Scalar`
+        QuantumFunction(circuit_rx), [-0.1, 0.5], [0.1, 0.33], [0.111]),
+    (
+        # `Tensor -> Tensor`
+        PureFunction(lambda x: jnp.stack([1 * x, 2 * x, 3 * x])),
+        [jnp.zeros([4], dtype=float)],
+        [jnp.ones([4], dtype=float)],
+        [jnp.ones([3, 4], dtype=float)],
+    ),
+    (
+        # `(Tensor * Tensor) -> Tensor`
         PureFunction(
             lambda x1, x2: (
                 jnp.stack(
@@ -105,18 +115,14 @@ testvec = [
         [jnp.ones([2, 6], dtype=float)],
     ),
     (
+        # `Tensor -> (Tensor * Tensor)`
         PureFunction(lambda x: (x, jnp.stack([1 * x, 2 * x, 3 * x]))),
         [jnp.zeros([4], dtype=float)],
         [jnp.ones([4], dtype=float)],
         [jnp.ones([4], dtype=float), jnp.ones([3, 4], dtype=float)],
     ),
     (
-        PureFunction(lambda x: jnp.stack([1 * x, 2 * x, 3 * x])),
-        [jnp.zeros([4], dtype=float)],
-        [jnp.ones([4], dtype=float)],
-        [jnp.ones([3, 4], dtype=float)],
-    ),
-    (
+        # `(Tensor * Tensor) -> (Tensor * Tensor)`
         PureFunction(
             lambda x1, x2: (
                 1 * jnp.reshape(x1, [6]) + 2 * jnp.reshape(x2, [6]),
