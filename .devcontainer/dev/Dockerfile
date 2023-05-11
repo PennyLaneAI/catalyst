@@ -18,7 +18,7 @@ RUN chmod 0440 /etc/sudoers.d/$USERNAME
 
 # Install the required C++ build toolchain and git.
 RUN apt-get update && apt-get install -y --no-install-recommends git curl patch \
-      make ninja-build clang lld ccache libomp-dev \
+      build-essential make ninja-build clang lld ccache libomp-dev \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 USER $USERNAME

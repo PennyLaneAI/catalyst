@@ -121,8 +121,7 @@ be fetched via:
 
 .. code-block:: console
 
-  git submodule update --init mlir/llvm-project
-  git submodule update --init mlir/mlir-hlo
+  git submodule update --init --depth=1
 
 Catalyst
 ^^^^^^^^
