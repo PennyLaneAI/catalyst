@@ -707,12 +707,12 @@ def test_finite_diff_multiple_devices(inp, diff_method, backend):
     def compiled_grad_default(params, ntrials):
         d_f = grad(f, argnum=0, method=diff_method)
 
-        def fn_f(i, g):
+        def fn_f(i, g):  # pylint: unused-argument
             return d_f(params)
 
         d_g = grad(g, argnum=0, method=diff_method)
 
-        def fn_g(i, g):
+        def fn_g(i, g):  # pylint: unused-argument
             return d_g(params)
 
         d1 = for_loop(0, ntrials, 1)(fn_f)(params)[0]
