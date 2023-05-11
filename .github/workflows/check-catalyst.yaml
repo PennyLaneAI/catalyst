@@ -285,8 +285,8 @@ jobs:
           quantum-build/python_packages/*
         retention-days: 1
 
-  frontend-tests-lightning-qubit:
-    name: Frontend Tests (backend="lightning.qubit")
+  frontend-tests:
+    name: Frontend Tests
     needs: [runtime, mhlo, quantum]
     runs-on: ubuntu-latest
 
@@ -444,18 +444,18 @@ jobs:
       with:
         repository: PennyLaneAI/pennylane-lightning-kokkos
         ref: v0.30.0
+        path: pennylane-lightning-kokkos
 
-    - name: Install lightning.kokkos backend device for tests
+    - name: Install lightning.kokkos used in Python tests
       run: |
-        ls .
-        ls ..
-        cd pennylane-lightning-kokkos
+        pushd pennylane-lightning-kokkos
         python3 -m pip install -r requirements.txt
-        BACKEND="OPENMP" python3 -m pip install -e .
+        BACKEND="OPENMP" python3 -m pip install .
+        popd
 
     - name: Run Python Pytest Tests (backend=lightning.kokkos)
       run: |
-        make test-frontend backend="lightning.kokkos"
+        make pytest backend="lightning.kokkos"
 
   runtime-tests:
     name: Runtime Tests (Linux)
