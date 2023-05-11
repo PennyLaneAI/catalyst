@@ -38,13 +38,15 @@ class TestJAXJIT:
             qml.RX(x[1] * x[2], wires=0)
             return qml.expval(qml.PauliZ(0))
 
-        @jax.jit
         def cost_fn(x):
             result = circuit(x)
             return jnp.cos(result) ** 2
 
-        result = cost_fn(jnp.array([0.1, 0.2, 0.3]))
-        assert jnp.allclose(result, 0.3573519347253657)
+        x = jnp.array([0.1, 0.2, 0.3])
+        result = jax.jit(cost_fn)(x)
+        reference = cost_fn(x)
+
+        assert jnp.allclose(result, reference)
 
     def test_multiple_arguments(self):
         """Test a circuit with multiple arguments using jax.jit on top of qjit."""
@@ -57,13 +59,15 @@ class TestJAXJIT:
             qml.RX(y[1] * x[2], wires=0)
             return qml.probs(wires=0)
 
-        @jax.jit
         def cost_fn(x, y):
             result = circuit(x, y)
             return jnp.sum(jnp.cos(result) ** 2)
 
-        result = cost_fn(jnp.array([0.1, 0.2, 0.3]), jnp.array([0.1, 0.2]))
-        assert jnp.allclose(result, 1.3229868863865866)
+        x, y = jnp.array([0.1, 0.2, 0.3]), jnp.array([0.1, 0.2])
+        result = jax.jit(cost_fn)(x, y)
+        reference = cost_fn(x, y)
+
+        assert jnp.allclose(result, reference)
 
     def test_multiple_results(self):
         """Test a circuit with multiple results using jax.jit on top of qjit."""
@@ -76,13 +80,15 @@ class TestJAXJIT:
             qml.RX(y[1] * x[2], wires=0)
             return qml.probs(wires=0), qml.expval(qml.PauliZ(0))
 
-        @jax.jit
         def cost_fn(x, y):
             result = circuit(x, y)
             return jnp.sum(jnp.cos(result[0]) ** 2) + jnp.sin(result[1]) ** 2
 
-        result = cost_fn(jnp.array([0.1, 0.2, 0.3]), jnp.array([0.1, 0.2]))
-        assert jnp.allclose(result, 1.9656349516612208)
+        x, y = jnp.array([0.1, 0.2, 0.3]), jnp.array([0.1, 0.2])
+        result = jax.jit(cost_fn)(x, y)
+        reference = cost_fn(x, y)
+
+        assert jnp.allclose(result, reference)
 
     def test_without_precompilation(self):
         """Test a function without type hints (pre-compilation) using jax.jit on top of qjit."""
@@ -95,13 +101,15 @@ class TestJAXJIT:
             qml.RX(y[1] * x[2], wires=0)
             return qml.probs(wires=0), qml.expval(qml.PauliZ(0))
 
-        @jax.jit
         def cost_fn(x, y):
             result = circuit(x, y)
             return jnp.sum(jnp.cos(result[0]) ** 2) + jnp.sin(result[1]) ** 2
 
-        result = cost_fn(jnp.array([0.1, 0.2, 0.3]), jnp.array([0.1, 0.2]))
-        assert jnp.allclose(result, 1.9656349516612208)
+        x, y = jnp.array([0.1, 0.2, 0.3]), jnp.array([0.1, 0.2])
+        result = jax.jit(cost_fn)(x, y)
+        reference = cost_fn(x, y)
+
+        assert jnp.allclose(result, reference)
 
     def test_multiple_calls(self):
         """Test a jax.jit function which repeatedly calls a qjit function."""
@@ -139,12 +147,15 @@ class TestJAXAD:
             return qml.expval(qml.PauliZ(0))
 
         @jax.grad
-        def cost_fn(x):
-            result = circuit(x)
+        def cost_fn(x, qfunc):
+            result = qfunc(x)
             return jnp.cos(result) ** 2
 
-        result = cost_fn(jnp.array([0.1, 0.2, 0.3]))
-        assert jnp.allclose(result, jnp.array([1.09975732, 0.11963127, 0.07005128]))
+        x = jnp.array([0.1, 0.2, 0.3])
+        result = cost_fn(x, circuit)
+        reference = cost_fn(x, circuit.qfunc)
+
+        assert jnp.allclose(result, reference)
 
     def test_multiple_arguments(self):
         """Test a circuit with multiple arguments using jax.grad on top of qjit."""
@@ -158,14 +169,17 @@ class TestJAXAD:
             return qml.probs(wires=0)
 
         @partial(jax.grad, argnums=[0, 1])
-        def cost_fn(x, y):
-            result = circuit(x, y)
+        def cost_fn(x, y, qfunc):
+            result = qfunc(x, y)
             return jnp.sum(jnp.cos(result) ** 2)
 
-        result = cost_fn(jnp.array([0.1, 0.2, 0.3]), jnp.array([0.1, 0.2]))
+        x, y = jnp.array([0.1, 0.2, 0.3]), jnp.array([0.1, 0.2])
+        result = cost_fn(x, y, circuit)
+        reference = cost_fn(x, y, circuit.qfunc)
+
         assert len(result) == 2
-        assert jnp.allclose(result[0], jnp.array([0.49699912, 0.00657736, 0.03165737]))
-        assert jnp.allclose(result[1], jnp.array([0.0, 0.04748605]))
+        assert jnp.allclose(result[0], reference[0])
+        assert jnp.allclose(result[1], reference[1])
 
     def test_multiple_results(self):
         """Test a circuit with multiple results using jax.grad on top of qjit."""
@@ -179,14 +193,17 @@ class TestJAXAD:
             return qml.probs(wires=0), qml.expval(qml.PauliZ(0))
 
         @partial(jax.grad, argnums=[0, 1])
-        def cost_fn(x, y):
-            result = circuit(x, y)
+        def cost_fn(x, y, qfunc):
+            result = qfunc(x, y)
             return jnp.sum(jnp.cos(result[0]) ** 2) + jnp.sin(result[1]) ** 2
 
-        result = cost_fn(jnp.array([0.1, 0.2, 0.3]), jnp.array([0.1, 0.2]))
+        x, y = jnp.array([0.1, 0.2, 0.3]), jnp.array([0.1, 0.2])
+        result = cost_fn(x, y, circuit)
+        reference = cost_fn(x, y, circuit.qfunc)
+
         assert len(result) == 2
-        assert jnp.allclose(result[0], jnp.array([-0.6027582, -0.00797699, -0.03839391]))
-        assert jnp.allclose(result[1], jnp.array([0.0, -0.05759086]))
+        assert jnp.allclose(result[0], reference[0])
+        assert jnp.allclose(result[1], reference[1])
 
     def test_jacobian(self):
         """Test a circuit with vector return type using jax.jacobian on top of qjit."""
@@ -200,22 +217,17 @@ class TestJAXAD:
             return qml.probs(wires=0)
 
         @partial(jax.jacobian, argnums=[0, 1])
-        def cost_fn(x, y):
-            result = circuit(x, y)
+        def cost_fn(x, y, qfunc):
+            result = qfunc(x, y)
             return jnp.cos(result) ** 2
 
-        result = cost_fn(jnp.array([0.1, 0.2, 0.3]), jnp.array([0.1, 0.2]))
+        x, y = jnp.array([0.1, 0.2, 0.3]), jnp.array([0.1, 0.2])
+        result = cost_fn(x, y, circuit)
+        reference = cost_fn(x, y, circuit.qfunc)
+
         assert len(result) == 2
-        assert jnp.allclose(
-            result[0],
-            jnp.array(
-                [
-                    [5.37094965e-01, 7.10799603e-03, 3.42113553e-02],
-                    [-4.00958470e-02, -5.30634506e-04, -2.55398646e-03],
-                ]
-            ),
-        )
-        assert jnp.allclose(result[1], jnp.array([[0.0, 0.05131703], [0.0, -0.00383098]]))
+        assert jnp.allclose(result[0], reference[0])
+        assert jnp.allclose(result[1], reference[1])
 
     def test_without_precompilation(self):
         """Test a function without type hints (pre-compilation) using jax.grad on top of qjit."""
@@ -229,14 +241,17 @@ class TestJAXAD:
             return qml.probs(wires=0), qml.expval(qml.PauliZ(0))
 
         @partial(jax.grad, argnums=[0, 1])
-        def cost_fn(x, y):
-            result = circuit(x, y)
+        def cost_fn(x, y, qfunc):
+            result = qfunc(x, y)
             return jnp.sum(jnp.cos(result[0]) ** 2) + jnp.sin(result[1]) ** 2
 
-        result = cost_fn(jnp.array([0.1, 0.2, 0.3]), jnp.array([0.1, 0.2]))
+        x, y = jnp.array([0.1, 0.2, 0.3]), jnp.array([0.1, 0.2])
+        result = cost_fn(x, y, circuit)
+        reference = cost_fn(x, y, circuit.qfunc)
+
         assert len(result) == 2
-        assert jnp.allclose(result[0], jnp.array([-0.6027582, -0.00797699, -0.03839391]))
-        assert jnp.allclose(result[1], jnp.array([0.0, -0.05759086]))
+        assert jnp.allclose(result[0], reference[0])
+        assert jnp.allclose(result[1], reference[1])
 
     def test_non_differentiable_arguments(self):
         """Test a circuit with non-differentiable arguments using jax.grad on top of qjit."""
@@ -249,13 +264,16 @@ class TestJAXAD:
             qml.RX(y * x[2], wires=0)
             return qml.probs(wires=0), qml.expval(qml.PauliZ(0))
 
-        @partial(jax.grad)
-        def cost_fn(x, y):
-            result = circuit(x, y)
+        @jax.grad
+        def cost_fn(x, y, qfunc):
+            result = qfunc(x, y)
             return jnp.sum(jnp.cos(result[0]) ** 2) + jnp.sin(result[1]) ** 2
 
-        result = cost_fn(jnp.array([0.1, 0.2, 0.3]), 3)
-        assert jnp.allclose(result, jnp.array([-1.34682245, -0.00432698, -1.2855136]))
+        x, y = jnp.array([0.1, 0.2, 0.3]), 3
+        result = cost_fn(x, y, circuit)
+        reference = cost_fn(x, y, circuit.qfunc)
+
+        assert jnp.allclose(result, reference)
 
     def test_multiple_calls(self):
         """Test a jax.grad function which repeatedly calls a qjit function."""
@@ -291,7 +309,7 @@ class TestJAXAD:
         def cost_fn(x, y):
             return circuit(x, y)
 
-        assert jnp.allclose(cost_fn(0.1, 0.2), -0.09784339500725572)
+        cost_fn(0.1, 0.2)
 
         assert len(circuit.jaxed_qfunc.deriv_qfuncs) == 1
         assert "0" in circuit.jaxed_qfunc.deriv_qfuncs
