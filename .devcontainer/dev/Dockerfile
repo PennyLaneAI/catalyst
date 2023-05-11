@@ -1,4 +1,4 @@
-FROM python:3-slim
+FROM --platform=linux/amd64 python:3-slim
 
 # Add non-root user to the image.
 
@@ -34,3 +34,4 @@ RUN curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 RUN rustup component add llvm-tools-preview
 
 ENV SHELL /bin/bash
+ENV PATH="/home/${USERNAME}/.local/bin:${PATH}"
