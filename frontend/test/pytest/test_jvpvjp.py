@@ -182,7 +182,7 @@ def test_vjp_against_jax_full_argnum(f: callable, x: list, _, ct: list):
     assert_elements_allclose(r1, r2, rtol=1e-6, atol=1e-6)
 
 
-@pytest.mark.parametrize("f, x, t, ct", testvec[0:1])
+@pytest.mark.parametrize("f, x, t, ct", testvec)
 def test_jvpvjp_argument_checks(f: callable, x: list, t: list, ct: list):
     """Numerically tests Catalyst's jvp against the JAX version."""
 
