@@ -171,12 +171,12 @@ class BufferizationPass(PassPipeline):
         "--quantum-bufferize",
         "--func-bufferize",
         "--finalizing-bufferize",
-        "--buffer-hoisting",
+        # "--buffer-hoisting",
         "--buffer-loop-hoisting",
-        "--buffer-deallocation",
+        # "--buffer-deallocation",
         "--convert-bufferization-to-memref",
         "--canonicalize",
-        "--cse",
+        # "--cse",
         "--cp-global-memref",
     ]
 

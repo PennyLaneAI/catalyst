@@ -54,6 +54,9 @@
   as global buffers cannot be transferred to Python.
   [#112](https://github.com/PennyLaneAI/catalyst/pull/112)
 
+* Temporary fix of use-after-free and dependency of uninitialized memory.
+  [#121](https://github.com/PennyLaneAI/catalyst/pull/121)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
