@@ -439,23 +439,13 @@ jobs:
         echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
         chmod +x quantum-build/bin/quantum-opt  # artifact upload does not preserve permissions
 
-    - name: Checkout Lightning-Kokkos repository
-      uses: actions/checkout@v3
-      with:
-        repository: PennyLaneAI/pennylane-lightning-kokkos
-        ref: v0.30.0
-        path: pennylane-lightning-kokkos
-
     - name: Install lightning.kokkos used in Python tests
       run: |
-        pushd pennylane-lightning-kokkos
-        python3 -m pip install -r requirements.txt
-        BACKEND="OPENMP" python3 -m pip install .
-        popd
+        pip install PennyLane-Lightning-Kokkos
 
     - name: Run Python Pytest Tests (backend=lightning.kokkos)
       run: |
-        make pytest backend="lightning.kokkos"
+        make pytest TEST_BACKEND="lightning.kokkos"
 
   runtime-tests:
     name: Runtime Tests (Linux)
