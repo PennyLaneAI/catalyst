@@ -148,7 +148,7 @@ DifferentiableLike = Union[Differentiable, Callable, "catalyst.compilation_pipel
 Jaxpr = Any
 
 
-def _bless_differentiable(f: DifferentiableLike) -> Differentiable:
+def _ensure_differentiable(f: DifferentiableLike) -> Differentiable:
     """Narrows down the set of the supported differentiable objects."""
     if isinstance(f, (Function, QNode)):
         return f
@@ -334,7 +334,7 @@ def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
     >>> workflow(2.0)
     array(-3.14159265)
     """
-    return Grad(_bless_differentiable(f), grad_params=_check_grad_params(method, h, argnum))
+    return Grad(_ensure_differentiable(f), grad_params=_check_grad_params(method, h, argnum))
 
 
 def jvp(f, params, tangents, *, method=None, h=None, argnum=None):
@@ -393,7 +393,7 @@ def jvp(f, params, tangents, *, method=None, h=None, argnum=None):
 
     params = _check(params, "params")
     tangents = _check(tangents, "tangents")
-    fn: Differentiable = _bless_differentiable(f)
+    fn: Differentiable = _ensure_differentiable(f)
     grad_params = _check_grad_params(method, h, argnum)
     jaxpr = _make_jaxpr_differentiable(fn, grad_params, *params)
     return jprim.jvp_p.bind(*(params + tangents), jaxpr=jaxpr, fn=fn, grad_params=grad_params)
@@ -453,7 +453,7 @@ def vjp(f, params, cotangents, *, method=None, h=None, argnum=None):
 
     params = _check(params, "params")
     cotangents = _check(cotangents, "cotangents")
-    fn: Differentiable = _bless_differentiable(f)
+    fn: Differentiable = _ensure_differentiable(f)
     grad_params = _check_grad_params(method, h, argnum)
     jaxpr = _make_jaxpr_differentiable(fn, grad_params, *params)
     return jprim.vjp_p.bind(*(params + cotangents), jaxpr=jaxpr, fn=fn, grad_params=grad_params)
