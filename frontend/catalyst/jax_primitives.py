@@ -401,7 +401,6 @@ def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
     new_argnum = np.array([len(jaxpr.consts) + num for num in argnum])
 
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
-    print(output_types)
     flat_output_types = util.flatten(output_types)
     constants = [ConstantOp(ir.DenseElementsAttr.get(const)).results for const in jaxpr.consts]
     func_args = constants + args

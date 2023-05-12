@@ -365,6 +365,25 @@ def jvp(f, params, tangents, *, method=None, h=None, argnum=None):
     Raises:
         TypeError: invalid parameter types
         ValueError: invalid parameter values
+
+    **Example**
+
+    .. code-block:: python
+
+        def f(p):
+          return jnp.stack([1*p, 2*p, 3*p])
+
+        @qjit
+        def workflow(params, tangent):
+            return jvp(f, [params], [tangent])
+
+    >>> workflow(jnp.zeros([4], dtype=float), jnp.ones([4], dtype=float))
+    (Array([[0., 0., 0., 0.],
+           [0., 0., 0., 0.],
+           [0., 0., 0., 0.]], dtype=float64),
+     Array([[1., 1., 1., 1.],
+           [2., 2., 2., 2.],
+           [3., 3., 3., 3.]], dtype=float64))
     """
 
     def _check(x, hint):
@@ -405,6 +424,23 @@ def vjp(f, params, cotangents, *, method=None, h=None, argnum=None):
     Raises:
         TypeError: invalid parameter types
         ValueError: invalid parameter values
+
+    **Example**
+
+    .. code-block:: python
+
+        def f(p):
+          return jnp.stack([1*p, 2*p, 3*p])
+
+        @qjit
+        def workflow(params, cotangent):
+            return vjp(f, [params], [cotangent])
+
+    >>> workflow(jnp.zeros([4], dtype=float), jnp.ones([3,4], dtype=float))
+    (Array([[0., 0., 0., 0.],
+            [0., 0., 0., 0.],
+            [0., 0., 0., 0.]], dtype=float64),
+     Array([6., 6., 6., 6.], dtype=float64))
     """
 
     def _check(x, hint):
