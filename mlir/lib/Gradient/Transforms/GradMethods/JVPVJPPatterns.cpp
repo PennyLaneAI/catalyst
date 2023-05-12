@@ -44,6 +44,8 @@
 #include "Gradient/Transforms/Patterns.h"
 #include "Quantum/IR/QuantumOps.h"
 
+#include "JVPVJPPatterns.hpp"
+
 using namespace mlir;
 using namespace catalyst::gradient;
 using llvm::dbgs;
@@ -71,11 +73,6 @@ template <class T> std::vector<int64_t> _tovec(const T &x)
     return std::vector<int64_t>(x.begin(), x.end());
 };
 
-struct JVPLoweringPattern : public OpRewritePattern<JVPOp> {
-    using OpRewritePattern<JVPOp>::OpRewritePattern;
-
-    LogicalResult matchAndRewrite(JVPOp op, PatternRewriter &rewriter) const override;
-};
 
 LogicalResult JVPLoweringPattern::matchAndRewrite(JVPOp op, PatternRewriter &rewriter) const
 {
@@ -208,11 +205,6 @@ LogicalResult JVPLoweringPattern::matchAndRewrite(JVPOp op, PatternRewriter &rew
     return success();
 }
 
-struct VJPLoweringPattern : public OpRewritePattern<VJPOp> {
-    using OpRewritePattern<VJPOp>::OpRewritePattern;
-
-    LogicalResult matchAndRewrite(VJPOp op, PatternRewriter &rewriter) const override;
-};
 
 LogicalResult VJPLoweringPattern::matchAndRewrite(VJPOp op, PatternRewriter &rewriter) const
 {
@@ -342,42 +334,5 @@ LogicalResult VJPLoweringPattern::matchAndRewrite(VJPOp op, PatternRewriter &rew
     return success();
 }
 
-struct JVPVJPLoweringPass : public PassWrapper<JVPVJPLoweringPass, OperationPass<ModuleOp>> {
-    JVPVJPLoweringPass() {}
-
-    StringRef getArgument() const override { return "lower-jvpvjp"; }
-
-    StringRef getDescription() const override
-    {
-        return "Lower JVP/VJP operations down to grad and linalg.generic operations.";
-    }
-
-    void getDependentDialects(DialectRegistry &registry) const override
-    {
-        registry.insert<linalg::LinalgDialect>();
-        registry.insert<bufferization::BufferizationDialect>();
-        registry.insert<memref::MemRefDialect>();
-    }
-
-    void runOnOperation() final
-    {
-        ModuleOp op = getOperation();
-
-        RewritePatternSet patterns(&getContext());
-        patterns.add<JVPLoweringPattern>(patterns.getContext(), 1);
-        patterns.add<VJPLoweringPattern>(patterns.getContext(), 1);
-
-        if (failed(applyPatternsAndFoldGreedily(op, std::move(patterns)))) {
-            return signalPassFailure();
-        }
-    }
-};
-
 } // namespace gradient
-
-std::unique_ptr<Pass> createJVPVJPLoweringPass()
-{
-    return std::make_unique<gradient::JVPVJPLoweringPass>();
-}
-
 } // namespace catalyst

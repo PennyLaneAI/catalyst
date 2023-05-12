@@ -8,7 +8,7 @@ file(GLOB SRC
     gradient_lowering.cpp
     ConversionPatterns.cpp
     gradient_to_llvm.cpp
-    jvp_vjp_lowering.cpp
+    jvpvjp_lowering.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
