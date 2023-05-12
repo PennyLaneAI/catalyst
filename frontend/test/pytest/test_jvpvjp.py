@@ -87,64 +87,6 @@ def circuit_rx(x1, x2):
     return qml.expval(qml.PauliY(0))
 
 
-testvec = [
-    (
-        # `(Scalar * Scalae) -quantum-> Scalar`
-        QuantumFunction(circuit_rx),
-        [-0.1, 0.5],
-        [0.1, 0.33],
-        [0.111],
-    ),
-    (
-        # `Tensor -> Tensor`
-        ClassicalFunction(lambda x: jnp.stack([1 * x, 2 * x, 3 * x])),
-        [jnp.zeros([4], dtype=float)],
-        [jnp.ones([4], dtype=float)],
-        [jnp.ones([3, 4], dtype=float)],
-    ),
-    (
-        # `(Tensor * Tensor) -> Tensor`
-        ClassicalFunction(
-            lambda x1, x2: (
-                jnp.stack(
-                    [
-                        3 * jnp.reshape(x1, [6]) + 4 * jnp.reshape(x2, [6]),
-                        3 * jnp.reshape(x1, [6]) + 4 * jnp.reshape(x2, [6]),
-                    ]
-                )
-            )
-        ),
-        [jnp.zeros([3, 2], dtype=float), jnp.zeros([2, 3], dtype=float)],
-        [jnp.ones([3, 2], dtype=float), jnp.ones([2, 3], dtype=float)],
-        [jnp.ones([2, 6], dtype=float)],
-    ),
-    (
-        # `Tensor -> (Tensor * Tensor)`
-        ClassicalFunction(lambda x: (x, jnp.stack([1 * x, 2 * x, 3 * x]))),
-        [jnp.zeros([4], dtype=float)],
-        [jnp.ones([4], dtype=float)],
-        [jnp.ones([4], dtype=float), jnp.ones([3, 4], dtype=float)],
-    ),
-    (
-        # `(Tensor * Tensor) -> (Tensor * Tensor)`
-        ClassicalFunction(
-            lambda x1, x2: (
-                1 * jnp.reshape(x1, [6]) + 2 * jnp.reshape(x2, [6]),
-                jnp.stack(
-                    [
-                        3 * jnp.reshape(x1, [6]) + 4 * jnp.reshape(x2, [6]),
-                        3 * jnp.reshape(x1, [6]) + 4 * jnp.reshape(x2, [6]),
-                    ]
-                ),
-            )
-        ),
-        [jnp.zeros([3, 2], dtype=float), jnp.zeros([2, 3], dtype=float)],
-        [jnp.ones([3, 2], dtype=float), jnp.ones([2, 3], dtype=float)],
-        [jnp.ones([6], dtype=float), jnp.ones([2, 6], dtype=float)],
-    ),
-]
-
-
 def assert_elements_allclose(a, b, **kwargs):
     """Checks all elements of tuples, one by one, for approximate equality"""
     assert all(isinstance(i, tuple) for i in [a, b]), f"Some of {[type(a),type(b)]} is not a tuple"
@@ -153,9 +95,14 @@ def assert_elements_allclose(a, b, **kwargs):
         assert_allclose(i, j, **kwargs)
 
 
-@pytest.mark.parametrize("f, x, t, _", testvec)
-def test_jvp_against_jax_full_argnum(f: callable, x: list, t: list, _):
+def test_jvp_against_jax_full_argnum_case_S_SS():
     """Numerically tests Catalyst's jvp against the JAX version."""
+
+    f, x, t = (
+        QuantumFunction(circuit_rx),
+        [-0.1, 0.5],
+        [0.1, 0.33],
+    )
 
     @qjit
     def C_workflow():
@@ -173,9 +120,133 @@ def test_jvp_against_jax_full_argnum(f: callable, x: list, t: list, _):
     assert_elements_allclose(r1, r2, rtol=1e-6, atol=1e-6)
 
 
-@pytest.mark.parametrize("f, x, _, ct", testvec)
-def test_vjp_against_jax_full_argnum(f: callable, x: list, _, ct: list):
+def test_jvp_against_jax_full_argnum_case_T_T():
     """Numerically tests Catalyst's jvp against the JAX version."""
+
+    f, x, t = (
+        ClassicalFunction(lambda x: jnp.stack([1 * x, 2 * x, 3 * x])),
+        [jnp.zeros([4], dtype=float)],
+        [jnp.ones([4], dtype=float)],
+    )
+
+    @qjit
+    def C_workflow():
+        return C_jvp(
+            _ensure_jittable(C_decorator, f), x, t, method="fd", argnum=list(range(len(x)))
+        )
+
+    @jax.jit
+    def J_workflow():
+        y, ft = J_jvp(_ensure_jittable(J_decorator, f), *x)
+        return flatten_if_tuples((y, ft(*t)))
+
+    r1 = C_workflow()
+    r2 = J_workflow()
+    assert_elements_allclose(r1, r2, rtol=1e-6, atol=1e-6)
+
+
+def test_jvp_against_jax_full_argnum_case_TT_T():
+    """Numerically tests Catalyst's jvp against the JAX version."""
+
+    f, x, t = (
+        ClassicalFunction(
+            lambda x1, x2: (
+                jnp.stack(
+                    [
+                        3 * jnp.reshape(x1, [6]) + 4 * jnp.reshape(x2, [6]),
+                        3 * jnp.reshape(x1, [6]) + 4 * jnp.reshape(x2, [6]),
+                    ]
+                )
+            )
+        ),
+        [jnp.zeros([3, 2], dtype=float), jnp.zeros([2, 3], dtype=float)],
+        [jnp.ones([3, 2], dtype=float), jnp.ones([2, 3], dtype=float)],
+    )
+
+    @qjit
+    def C_workflow():
+        return C_jvp(
+            _ensure_jittable(C_decorator, f), x, t, method="fd", argnum=list(range(len(x)))
+        )
+
+    @jax.jit
+    def J_workflow():
+        y, ft = J_jvp(_ensure_jittable(J_decorator, f), *x)
+        return flatten_if_tuples((y, ft(*t)))
+
+    r1 = C_workflow()
+    r2 = J_workflow()
+    assert_elements_allclose(r1, r2, rtol=1e-6, atol=1e-6)
+
+
+def test_jvp_against_jax_full_argnum_case_T_TT():
+    """Numerically tests Catalyst's jvp against the JAX version."""
+
+    f, x, t = (
+        ClassicalFunction(lambda x: (x, jnp.stack([1 * x, 2 * x, 3 * x]))),
+        [jnp.zeros([4], dtype=float)],
+        [jnp.ones([4], dtype=float)],
+    )
+
+    @qjit
+    def C_workflow():
+        return C_jvp(
+            _ensure_jittable(C_decorator, f), x, t, method="fd", argnum=list(range(len(x)))
+        )
+
+    @jax.jit
+    def J_workflow():
+        y, ft = J_jvp(_ensure_jittable(J_decorator, f), *x)
+        return flatten_if_tuples((y, ft(*t)))
+
+    r1 = C_workflow()
+    r2 = J_workflow()
+    assert_elements_allclose(r1, r2, rtol=1e-6, atol=1e-6)
+
+
+def test_jvp_against_jax_full_argnum_case_TT_TT():
+    """Numerically tests Catalyst's jvp against the JAX version."""
+
+    f, x, t = (
+        ClassicalFunction(
+            lambda x1, x2: (
+                1 * jnp.reshape(x1, [6]) + 2 * jnp.reshape(x2, [6]),
+                jnp.stack(
+                    [
+                        3 * jnp.reshape(x1, [6]) + 4 * jnp.reshape(x2, [6]),
+                        3 * jnp.reshape(x1, [6]) + 4 * jnp.reshape(x2, [6]),
+                    ]
+                ),
+            )
+        ),
+        [jnp.zeros([3, 2], dtype=float), jnp.zeros([2, 3], dtype=float)],
+        [jnp.ones([3, 2], dtype=float), jnp.ones([2, 3], dtype=float)],
+    )
+
+    @qjit
+    def C_workflow():
+        return C_jvp(
+            _ensure_jittable(C_decorator, f), x, t, method="fd", argnum=list(range(len(x)))
+        )
+
+    @jax.jit
+    def J_workflow():
+        y, ft = J_jvp(_ensure_jittable(J_decorator, f), *x)
+        return flatten_if_tuples((y, ft(*t)))
+
+    r1 = C_workflow()
+    r2 = J_workflow()
+    assert_elements_allclose(r1, r2, rtol=1e-6, atol=1e-6)
+
+
+def test_vjp_against_jax_full_argnum_case_S_SS():
+    """Numerically tests Catalyst's jvp against the JAX version."""
+
+    f, x, ct = (
+        QuantumFunction(circuit_rx),
+        [-0.1, 0.5],
+        [0.111],
+    )
 
     @qjit
     def C_workflow():
@@ -191,6 +262,129 @@ def test_vjp_against_jax_full_argnum(f: callable, x: list, _, ct: list):
 
     r1 = C_workflow()
     r2 = J_workflow()
+
+
+def test_vjp_against_jax_full_argnum_case_T_T():
+    """Numerically tests Catalyst's jvp against the JAX version."""
+
+    f, x, ct = (
+        ClassicalFunction(lambda x: jnp.stack([1 * x, 2 * x, 3 * x])),
+        [jnp.zeros([4], dtype=float)],
+        [jnp.ones([3, 4], dtype=float)],
+    )
+
+    @qjit
+    def C_workflow():
+        return C_vjp(
+            _ensure_jittable(C_decorator, f), x, ct, method="fd", argnum=list(range(len(x)))
+        )
+
+    @jax.jit
+    def J_workflow():
+        y, ft = J_vjp(_ensure_jittable(J_decorator, f), *x)
+        ct2 = tree_unflatten(tree_flatten(y)[1], ct)
+        return flatten_if_tuples((y, ft(ct2)))
+
+    r1 = C_workflow()
+    r2 = J_workflow()
+    assert_elements_allclose(r1, r2, rtol=1e-6, atol=1e-6)
+    assert_elements_allclose(r1, r2, rtol=1e-6, atol=1e-6)
+
+
+def test_vjp_against_jax_full_argnum_case_TT_T():
+    """Numerically tests Catalyst's jvp against the JAX version."""
+
+    f, x, ct = (
+        ClassicalFunction(
+            lambda x1, x2: (
+                jnp.stack(
+                    [
+                        3 * jnp.reshape(x1, [6]) + 4 * jnp.reshape(x2, [6]),
+                        3 * jnp.reshape(x1, [6]) + 4 * jnp.reshape(x2, [6]),
+                    ]
+                )
+            )
+        ),
+        [jnp.zeros([3, 2], dtype=float), jnp.zeros([2, 3], dtype=float)],
+        [jnp.ones([2, 6], dtype=float)],
+    )
+
+    @qjit
+    def C_workflow():
+        return C_vjp(
+            _ensure_jittable(C_decorator, f), x, ct, method="fd", argnum=list(range(len(x)))
+        )
+
+    @jax.jit
+    def J_workflow():
+        y, ft = J_vjp(_ensure_jittable(J_decorator, f), *x)
+        ct2 = tree_unflatten(tree_flatten(y)[1], ct)
+        return flatten_if_tuples((y, ft(ct2)))
+
+    r1 = C_workflow()
+    r2 = J_workflow()
+
+
+def test_vjp_against_jax_full_argnum_case_T_TT():
+    """Numerically tests Catalyst's jvp against the JAX version."""
+
+    f, x, ct = (
+        ClassicalFunction(lambda x: (x, jnp.stack([1 * x, 2 * x, 3 * x]))),
+        [jnp.zeros([4], dtype=float)],
+        [jnp.ones([4], dtype=float), jnp.ones([3, 4], dtype=float)],
+    )
+
+    @qjit
+    def C_workflow():
+        return C_vjp(
+            _ensure_jittable(C_decorator, f), x, ct, method="fd", argnum=list(range(len(x)))
+        )
+
+    @jax.jit
+    def J_workflow():
+        y, ft = J_vjp(_ensure_jittable(J_decorator, f), *x)
+        ct2 = tree_unflatten(tree_flatten(y)[1], ct)
+        return flatten_if_tuples((y, ft(ct2)))
+
+    r1 = C_workflow()
+    r2 = J_workflow()
+    assert_elements_allclose(r1, r2, rtol=1e-6, atol=1e-6)
+
+
+def test_vjp_against_jax_full_argnum_case_TT_TT():
+    """Numerically tests Catalyst's jvp against the JAX version."""
+
+    f, x, ct = (
+        ClassicalFunction(
+            lambda x1, x2: (
+                1 * jnp.reshape(x1, [6]) + 2 * jnp.reshape(x2, [6]),
+                jnp.stack(
+                    [
+                        3 * jnp.reshape(x1, [6]) + 4 * jnp.reshape(x2, [6]),
+                        3 * jnp.reshape(x1, [6]) + 4 * jnp.reshape(x2, [6]),
+                    ]
+                ),
+            )
+        ),
+        [jnp.zeros([3, 2], dtype=float), jnp.zeros([2, 3], dtype=float)],
+        [jnp.ones([6], dtype=float), jnp.ones([2, 6], dtype=float)],
+    )
+
+    @qjit
+    def C_workflow():
+        return C_vjp(
+            _ensure_jittable(C_decorator, f), x, ct, method="fd", argnum=list(range(len(x)))
+        )
+
+    @jax.jit
+    def J_workflow():
+        y, ft = J_vjp(_ensure_jittable(J_decorator, f), *x)
+        ct2 = tree_unflatten(tree_flatten(y)[1], ct)
+        return flatten_if_tuples((y, ft(ct2)))
+
+    r1 = C_workflow()
+    r2 = J_workflow()
+    assert_elements_allclose(r1, r2, rtol=1e-6, atol=1e-6)
     assert_elements_allclose(r1, r2, rtol=1e-6, atol=1e-6)
 
 
@@ -238,10 +432,25 @@ def test_jvpvjp_argument_checks():
             return C_vjp(C_f, tuple(x), tuple(ct), method="fd", argnum=3.14)
 
 
-@pytest.mark.parametrize("f, x, t, _", testvec)
-def test_jvp_against_jax_argnum0(f: callable, x: list, t: list, _):
+def test_jvp_against_jax_argnum0_case_TT_TT():
     """Numerically tests Catalyst's jvp against the JAX version, in case of empty or singular
     argnum argument."""
+
+    f, x, t = (
+        ClassicalFunction(
+            lambda x1, x2: (
+                1 * jnp.reshape(x1, [6]) + 2 * jnp.reshape(x2, [6]),
+                jnp.stack(
+                    [
+                        3 * jnp.reshape(x1, [6]) + 4 * jnp.reshape(x2, [6]),
+                        3 * jnp.reshape(x1, [6]) + 4 * jnp.reshape(x2, [6]),
+                    ]
+                ),
+            )
+        ),
+        [jnp.zeros([3, 2], dtype=float), jnp.zeros([2, 3], dtype=float)],
+        [jnp.ones([3, 2], dtype=float), jnp.ones([2, 3], dtype=float)],
+    )
 
     C_f = _ensure_jittable(C_decorator, f)
     J_f = _ensure_jittable(J_decorator, f)
@@ -270,11 +479,25 @@ def test_jvp_against_jax_argnum0(f: callable, x: list, t: list, _):
     assert_elements_allclose(r1a, r2, rtol=1e-6, atol=1e-6)
 
 
-@pytest.mark.parametrize("f, x, _, ct", testvec)
-def test_vjp_against_jax_argnum0(f: callable, x: list, _, ct: list):
+def test_vjp_against_jax_argnum0_case_TT_TT():
     """Numerically tests Catalyst's vjp against the JAX version, in case of empty or singular
     argnum argument."""
 
+    f, x, ct = (
+        ClassicalFunction(
+            lambda x1, x2: (
+                1 * jnp.reshape(x1, [6]) + 2 * jnp.reshape(x2, [6]),
+                jnp.stack(
+                    [
+                        3 * jnp.reshape(x1, [6]) + 4 * jnp.reshape(x2, [6]),
+                        3 * jnp.reshape(x1, [6]) + 4 * jnp.reshape(x2, [6]),
+                    ]
+                ),
+            )
+        ),
+        [jnp.zeros([3, 2], dtype=float), jnp.zeros([2, 3], dtype=float)],
+        [jnp.ones([6], dtype=float), jnp.ones([2, 6], dtype=float)],
+    )
     C_f = _ensure_jittable(C_decorator, f)
     J_f = _ensure_jittable(J_decorator, f)
 
