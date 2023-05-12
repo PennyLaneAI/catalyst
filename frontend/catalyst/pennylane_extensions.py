@@ -161,9 +161,6 @@ def _bless_differentiable(f: DifferentiableLike) -> Differentiable:
 
 def _make_jaxpr_differentiable(f: Differentiable, grad_params: GradParams, *args) -> Jaxpr:
     """Gets the jaxpr of a differentiable function. Perform the required additional checks."""
-    TracingContext.check_is_tracing(
-        "catalyst.grad can only be used from within @qjit decorated code."
-    )
     method = grad_params.method
     jaxpr = jax.make_jaxpr(f)(*args)
     assert len(jaxpr.eqns) == 1, "Expected jaxpr consisting of a single function call."
@@ -266,7 +263,6 @@ class Grad:
         TracingContext.check_is_tracing(
             "catalyst.grad can only be used from within @qjit decorated code."
         )
-
         jaxpr = _make_jaxpr_differentiable(self.fn, self.grad_params, *args)
         return jprim.grad_p.bind(
             *args, jaxpr=jaxpr, fn=self, grad_params=self.grad_params
@@ -384,6 +380,9 @@ def jvp(f, params, tangents, *, method=None, h=None, argnum=None):
            [2., 2., 2., 2.],
            [3., 3., 3., 3.]], dtype=float64))
     """
+    TracingContext.check_is_tracing(
+        "catalyst.jvp can only be used from within @qjit decorated code."
+    )
 
     def _check(x, hint):
         if isinstance(x, list):
@@ -441,6 +440,9 @@ def vjp(f, params, cotangents, *, method=None, h=None, argnum=None):
             [0., 0., 0., 0.]], dtype=float64),
      Array([6., 6., 6., 6.], dtype=float64))
     """
+    TracingContext.check_is_tracing(
+        "catalyst.vjp can only be used from within @qjit decorated code."
+    )
 
     def _check(x, hint):
         if isinstance(x, list):
