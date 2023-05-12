@@ -474,9 +474,7 @@ TEMPLATE_LIST_TEST_CASE("Var(NamedObs) test with numWires=4", "[Measures]", SimT
     CHECK(sim->Var(pz) == Approx(.0).margin(1e-5));
 }
 
-// TODO: Fix the following tests after the next release of PennyLane-Lightning
-#ifdef __device_lightning_kokkos
-TEMPLATE_TEST_CASE("Var(HermitianObs) test with numWires=1", "[Measures]", LightningKokkosSimulator)
+TEMPLATE_LIST_TEST_CASE("Var(HermitianObs) test with numWires=1", "[Measures]", SimTypes)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -501,7 +499,7 @@ TEMPLATE_TEST_CASE("Var(HermitianObs) test with numWires=1", "[Measures]", Light
     CHECK(sim->Var(h2) == Approx(1.0).margin(1e-5));
 }
 
-TEMPLATE_TEST_CASE("Var(TensorProd(NamedObs)) test", "[Measures]", LightningKokkosSimulator)
+TEMPLATE_LIST_TEST_CASE("Var(TensorProd(NamedObs)) test", "[Measures]", SimTypes)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -530,7 +528,7 @@ TEMPLATE_TEST_CASE("Var(TensorProd(NamedObs)) test", "[Measures]", LightningKokk
     CHECK(sim->Var(tpz) == Approx(.0).margin(1e-5));
 }
 
-TEMPLATE_TEST_CASE("Var(TensorProd(NamedObs[])) test", "[Measures]", LightningKokkosSimulator)
+TEMPLATE_LIST_TEST_CASE("Var(TensorProd(NamedObs[])) test", "[Measures]", SimTypes)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -557,7 +555,7 @@ TEMPLATE_TEST_CASE("Var(TensorProd(NamedObs[])) test", "[Measures]", LightningKo
     CHECK(sim->Var(tpxz) == Approx(0.0).margin(1e-5));
 }
 
-TEMPLATE_TEST_CASE("Var(TensorProd(HermitianObs)) test", "[Measures]", LightningKokkosSimulator)
+TEMPLATE_LIST_TEST_CASE("Var(TensorProd(HermitianObs)) test", "[Measures]", SimTypes)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -584,7 +582,7 @@ TEMPLATE_TEST_CASE("Var(TensorProd(HermitianObs)) test", "[Measures]", Lightning
     CHECK(sim->Var(tph2) == Approx(1.0).margin(1e-5));
 }
 
-TEMPLATE_TEST_CASE("Var(TensorProd(HermitianObs[])) test", "[Measures]", LightningKokkosSimulator)
+TEMPLATE_LIST_TEST_CASE("Var(TensorProd(HermitianObs[])) test", "[Measures]", SimTypes)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -609,7 +607,7 @@ TEMPLATE_TEST_CASE("Var(TensorProd(HermitianObs[])) test", "[Measures]", Lightni
     CHECK(sim->Var(tp) == Approx(2.0).margin(1e-5));
 }
 
-TEMPLATE_TEST_CASE("Var(TensorProd(Obs[])) test", "[Measures]", LightningKokkosSimulator)
+TEMPLATE_LIST_TEST_CASE("Var(TensorProd(Obs[])) test", "[Measures]", SimTypes)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -637,7 +635,7 @@ TEMPLATE_TEST_CASE("Var(TensorProd(Obs[])) test", "[Measures]", LightningKokkosS
     CHECK(sim->Var(tp) == Approx(4.0).margin(1e-5));
 }
 
-TEMPLATE_TEST_CASE("Var(Hamiltonian(NamedObs[])) test", "[Measures]", LightningKokkosSimulator)
+TEMPLATE_LIST_TEST_CASE("Var(Hamiltonian(NamedObs[])) test", "[Measures]", SimTypes)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -662,7 +660,7 @@ TEMPLATE_TEST_CASE("Var(Hamiltonian(NamedObs[])) test", "[Measures]", LightningK
     CHECK(sim->Var(hxyz) == Approx(0.64).margin(1e-5));
 }
 
-TEMPLATE_TEST_CASE("Var(Hamiltonian(TensorObs[])) test", "[Measures]", LightningKokkosSimulator)
+TEMPLATE_LIST_TEST_CASE("Var(Hamiltonian(TensorObs[])) test", "[Measures]", SimTypes)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -689,7 +687,7 @@ TEMPLATE_TEST_CASE("Var(Hamiltonian(TensorObs[])) test", "[Measures]", Lightning
     CHECK(sim->Var(hxyz) == Approx(0.04).margin(1e-5));
 }
 
-TEMPLATE_TEST_CASE("Var(Hamiltonian(Hermitian[])) test", "[Measures]", LightningKokkosSimulator)
+TEMPLATE_LIST_TEST_CASE("Var(Hamiltonian(Hermitian[])) test", "[Measures]", SimTypes)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -716,8 +714,7 @@ TEMPLATE_TEST_CASE("Var(Hamiltonian(Hermitian[])) test", "[Measures]", Lightning
     CHECK(sim->Var(hxhz) == Approx(0.36).margin(1e-5));
 }
 
-TEMPLATE_TEST_CASE("Var(Hamiltonian({TensorProd, Hermitian}[])) test", "[Measures]",
-                   LightningKokkosSimulator)
+TEMPLATE_LIST_TEST_CASE("Var(Hamiltonian({TensorProd, Hermitian}[])) test", "[Measures]", SimTypes)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
@@ -744,7 +741,6 @@ TEMPLATE_TEST_CASE("Var(Hamiltonian({TensorProd, Hermitian}[])) test", "[Measure
 
     CHECK(sim->Var(hhtp) == Approx(1.0).margin(1e-5));
 }
-#endif
 
 TEMPLATE_LIST_TEST_CASE("State test with incorrect size", "[Measures]", SimTypes)
 {
