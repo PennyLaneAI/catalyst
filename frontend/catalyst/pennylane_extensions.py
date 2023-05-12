@@ -311,7 +311,7 @@ def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
             - ``"adj"`` represents the adjoint differentiation method.
 
         h (float): the step-size value for the finite-difference (``"fd"``) method
-        argnum Tuple[int, List[int]]: the argument indices to differentiate
+        argnum (Tuple[int, List[int]]): the argument indices to differentiate
 
     Returns:
         Grad: A Grad object that denotes the derivative of a function.
