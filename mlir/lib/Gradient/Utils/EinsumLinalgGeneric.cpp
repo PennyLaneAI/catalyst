@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "Gradient/Utils/EinsumLinalgGeneric.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -20,6 +19,8 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Location.h"
 #include "llvm/ADT/ArrayRef.h"
+
+#include "Gradient/Utils/EinsumLinalgGeneric.h"
 
 using namespace mlir;
 using namespace llvm;
