@@ -366,7 +366,7 @@ struct JVPVJPLoweringPass : public PassWrapper<JVPVJPLoweringPass, OperationPass
 
     void getDependentDialects(DialectRegistry &registry) const override
     {
-        // FIXME: What about Linalg dialect?
+        registry.insert<linalg::LinalgDialect>();
         registry.insert<bufferization::BufferizationDialect>();
         registry.insert<memref::MemRefDialect>();
     }
