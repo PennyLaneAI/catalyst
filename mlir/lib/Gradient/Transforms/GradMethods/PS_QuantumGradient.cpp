@@ -288,10 +288,10 @@ func::FuncOp ParameterShiftLowering::genQGradFunction(PatternRewriter &rewriter,
         });
 
         // Post-order traversal is required when deleting nodes during traversal.
-        gradientFn.walk<WalkOrder::PostOrder>([&](quantum::CustomOp gate) {
+        gradientFn.walk<WalkOrder::PostOrder>([&](quantum::QuantumGate gate) {
             // We are undoing the def-use chains of this gate's return values
             // so that we can safely delete it (all quantum ops must be eliminated).
-            rewriter.replaceOp(gate, gate.getInQubits());
+            rewriter.replaceOp(gate, gate.getQubitOperands());
         });
 
         quantum::removeQuantumMeasurements(gradientFn);

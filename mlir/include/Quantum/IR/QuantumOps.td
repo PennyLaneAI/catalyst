@@ -20,6 +20,7 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Dialect/Bufferization/IR/AllocationOpInterface.td"
 
 include "Quantum/IR/QuantumDialect.td"
+include "Quantum/IR/QuantumInterfaces.td"
 
 //===----------------------------------------------------------------------===//
 // Quantum dialect traits.
@@ -154,16 +155,20 @@ def InsertOp : Memory_Op<"insert", [NoMemoryEffect]> {
 
 // -----
 
-class Gate_Op<string mnemonic, list<Trait> traits = []> : Quantum_Op<mnemonic, traits # [Unitary]> {
-    let hasVerifier = 1;
+class Gate_Op<string mnemonic, list<Trait> traits = []> :
+        Quantum_Op<mnemonic, traits # [QuantumGate, Unitary]> {
 
-    let extraClassDeclaration = [{
-        mlir::LogicalResult verifyQubitNumbers() {
-            if (this->getInQubits().size() != this->getOutQubits().size())
-                return emitOpError("number of qubits in input and output must be the same");
-            return mlir::success();
+    code extraBaseClassDeclaration = [{
+        mlir::ValueRange getQubitOperands() {
+            return getInQubits();
+        }
+
+        mlir::ValueRange getQubitResults() {
+            return getOutQubits();
         }
     }];
+
+    let extraClassDeclaration = extraBaseClassDeclaration;
 }
 
 def CustomOp : Gate_Op<"custom", [NoMemoryEffect, AttrSizedOperandSegments]> {
@@ -229,6 +234,8 @@ def QubitUnitaryOp : Gate_Op<"unitary", [NoMemoryEffect]> {
     let assemblyFormat = [{
         `(` $matrix `:` type($matrix) `)` $in_qubits attr-dict `:` type($out_qubits)
     }];
+
+    let hasVerifier = 1;
 }
 
 // -----
