@@ -231,6 +231,12 @@ def test_jvpvjp_argument_checks():
         def C_workflow_bad2():
             return C_vjp(C_f, 33, tuple(ct), method="fd", argnum=list(range(len(x))))
 
+    with pytest.raises(ValueError, match="argnum should be integer or a list of integers"):
+
+        @qjit
+        def C_workflow_bad3():
+            return C_vjp(C_f, tuple(x), tuple(ct), method="fd", argnum=3.14)
+
 
 @pytest.mark.parametrize("f, x, t, _", testvec)
 def test_jvp_against_jax_argnum0(f: callable, x: list, t: list, _):

@@ -225,6 +225,12 @@ def _check_grad_params(
         argnum = [0]
     elif isinstance(argnum, int):
         argnum = [argnum]
+    elif isinstance(argnum, tuple):
+        argnum = list(argnum)
+    elif isinstance(argnum, list) and all(isinstance(i, int) for i in argnum):
+        pass
+    else:
+        raise ValueError(f"argnum should be integer or a list of integers, not {argnum}")
     return GradParams(method, h, argnum)
 
 
@@ -306,7 +312,7 @@ def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
             - ``"adj"`` represents the adjoint differentiation method.
 
         h (float): the step-size value for the finite-difference (``"fd"``) method
-        argnum (int, List(int)): the argument indices to differentiate
+        argnum Tuple[int, List[int]]: the argument indices to differentiate
 
     Returns:
         Grad: A Grad object that denotes the derivative of a function.
@@ -337,9 +343,28 @@ def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
 
 
 def jvp(f, params, tangents, *, method=None, h=None, argnum=None):
-    """
+    """A Jacobian-vector product for PennyLane/Catalyst.
+
+    This function allows the Jacobian-vector Product of a hybrid quantum-classical function to be
+    computed within the compiled program.
+
     Args:
         f(DifferentiableLike): Function-like object to calculate JVP for
+        params(List[Array]): List (or a tuble) of f's arguments specifying the point to calculate
+                             JVP at. A subset of these parameters are declared as
+                             differentiable by listing their indices in the ``argnum`` paramerer.
+        tangents(List[Array]): List (or a tuple) of tangent values to use in JVP. The list size and
+                               shapes must match the ones of differentiable params.
+        method(str): Differentiation method to use, same as in ``grad``.
+        h (float): the step-size value for the finite-difference (``"fd"``) method
+        argnum (Union[int, List[int]]): the params' indices to differentiate.
+
+    Returns (Tuple[Array]):
+        Return values of ``f`` paired with the JVP values.
+
+    Raises:
+        TypeError: invalid parameter types
+        ValueError: invalid parameter values
     """
 
     def _check(x, hint):
@@ -358,19 +383,36 @@ def jvp(f, params, tangents, *, method=None, h=None, argnum=None):
 
 
 def vjp(f, params, cotangents, *, method=None, h=None, argnum=None):
-    """
+    """A Vector-Jacobian product for PennyLane/Catalyst.
+
+    This function allows the Vector-Jacobian Product of a hybrid quantum-classical function to be
+    computed within the compiled program.
+
     Args:
-        f(DifferentiableLike): Function-like object to calculate VJP for
+        f(DifferentiableLike): Function-like object to calculate JVP for
+        params(List[Array]): List (or a tuble) of f's arguments specifying the point to calculate
+                             VJP at. A subset of these parameters are declared as
+                             differentiable by listing their indices in the ``argnum`` paramerer.
+        cotangents(List[Array]): List (or a tuple) of tangent values to use in JVP. The list size
+                                 and shapes must match the size and shape of ``f`` outputs.
+        method(str): Differentiation method to use, same as in ``grad``.
+        h (float): the step-size value for the finite-difference (``"fd"``) method
+        argnum (Union[int, List[int]]): the params' indices to differentiate.
+
+    Returns (Tuple[Array]):
+        Return values of ``f`` paired with the JVP values.
+
+    Raises:
+        TypeError: invalid parameter types
+        ValueError: invalid parameter values
     """
 
     def _check(x, hint):
-        # pylint: disable=no-else-return
         if isinstance(x, list):
             return x
         elif isinstance(x, tuple):
             return list(x)
-        else:
-            raise ValueError(f"vjp '{hint}' argument must be a list or a tuple, not {type(x)}")
+        raise ValueError(f"vjp '{hint}' argument must be a list or a tuple, not {type(x)}")
 
     params = _check(params, "params")
     cotangents = _check(cotangents, "cotangents")
