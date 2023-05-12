@@ -395,6 +395,31 @@ def var1(x: float, y: float):
 print(var1.mlir)
 
 
+# CHECK-LABEL: private @var2(
+@qjit(target="mlir")
+@qml.qnode(qml.device("lightning.qubit", wires=3))
+def var2(x: float, y: float):
+    qml.RX(x, wires=0)
+    qml.RY(y, wires=1)
+    qml.RZ(0.1, wires=2)
+
+    B = np.array(
+        [
+            [complex(1.0, 0.0), complex(2.0, 0.0), complex(1.0, 0.0), complex(2.0, 0.0)],
+            [complex(2.0, 0.0), complex(2.0, 0.0), complex(1.0, 0.0), complex(2.0, 0.0)],
+            [complex(1.0, 0.0), complex(1.0, 0.0), complex(1.0, 0.0), complex(2.0, 0.0)],
+            [complex(2.0, 0.0), complex(2.0, 0.0), complex(2.0, 0.0), complex(2.0, 0.0)],
+        ]
+    )
+
+    # CHECK: [[obs:%.+]] = "quantum.tensor"({{.+}}, {{.+}})
+    # CHECK: "quantum.var"([[obs]]) {{.+}} -> f64
+    return qml.var(qml.PauliX(1) @ qml.Hermitian(B, wires=[0, 2]))
+
+
+print(var2.mlir)
+
+
 # CHECK-LABEL: private @probs1(
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
