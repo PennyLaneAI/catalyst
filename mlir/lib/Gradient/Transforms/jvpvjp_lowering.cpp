@@ -12,10 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <algorithm>
-#include <memory>
-#include <vector>
-
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -23,7 +19,6 @@
 
 #include "Gradient/IR/GradientOps.h"
 #include "Gradient/Transforms/Passes.h"
-#include "Gradient/Transforms/Patterns.h"
 
 #include "GradMethods/JVPVJPPatterns.hpp"
 
