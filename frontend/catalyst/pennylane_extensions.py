@@ -151,15 +151,13 @@ Jaxpr = Any
 
 def _bless_differentiable(f: DifferentiableLike) -> Differentiable:
     """Narrows down the set of the supported differentiable objects."""
-    # pylint: disable=no-else-return
     if isinstance(f, (Function, QNode)):
         return f
     elif isinstance(f, catalyst.compilation_pipelines.QJIT):
         return f.qfunc
     elif isinstance(f, Callable):  # Keep at the bottom
         return Function(f)
-    else:
-        raise TypeError(f"Non-differentiable object passed: {type(f)}")
+    raise TypeError(f"Non-differentiable object passed: {type(f)}")
 
 
 def _make_jaxpr_differentiable(f: Differentiable, grad_params: GradParams, *args) -> Jaxpr:
@@ -345,13 +343,11 @@ def jvp(f, params, tangents, *, method=None, h=None, argnum=None):
     """
 
     def _check(x, hint):
-        # pylint: disable=no-else-return
         if isinstance(x, list):
             return x
         elif isinstance(x, tuple):
             return list(x)
-        else:
-            raise ValueError(f"jvp '{hint}' argument must be a list or a tuple, not {type(x)}")
+        raise ValueError(f"jvp '{hint}' argument must be a list or a tuple, not {type(x)}")
 
     params = _check(params, "params")
     tangents = _check(tangents, "tangents")
