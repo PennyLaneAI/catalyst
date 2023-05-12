@@ -26,12 +26,12 @@ from catalyst import CompileError, measure, qjit
         (1, True),
     ],
 )
-def test_variable_capture(_in, _out, backend):
-    """Test variable capture."""
+def test_variable_capture_multiple_devices(_in, _out, backend):
+    """Test variable capture using multiple backend devices."""
 
     @qjit()
-    def workflow1(n: int):
-        @qml.qnode(qml.device(backend, wires=2))
+    def workflow(n: int):
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
         def f(x: float):
             qml.RX(n * x, wires=n)
             return measure(wires=n)
@@ -43,7 +43,7 @@ def test_variable_capture(_in, _out, backend):
 
         return jnp.array_equal(f(jnp.pi), g(jnp.pi))
 
-    assert workflow1(_in) == _out
+    assert workflow(_in) == _out
 
 
 def test_unsupported_device():

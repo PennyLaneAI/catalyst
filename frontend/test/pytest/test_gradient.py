@@ -688,5 +688,41 @@ def test_jax_consts(inp, backend):
     assert np.allclose(compile_grad(jnp.array(inp)), interpret_grad(inp))
 
 
+@pytest.mark.parametrize("diff_method", ["fd", "adj", "ps"])
+@pytest.mark.parametrize("inp", [(1.0), (2.0)])
+def test_finite_diff_multiple_devices(inp, diff_method, backend):
+    """Test gradient methods using multiple backend devices."""
+
+    @qml.qnode(qml.device(backend, wires=1))
+    def f(x):
+        qml.RX(3 * x, wires=0)
+        return qml.expval(qml.PauliY(0))
+
+    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    def g(x):
+        qml.RX(3 * x, wires=0)
+        return qml.expval(qml.PauliY(0))
+
+    @qjit()
+    def compiled_grad_default(params, ntrials):
+        d_f = grad(f, argnum=0, method=diff_method)
+
+        def fn_f(_i, _g):
+            return d_f(params)
+
+        d_g = grad(g, argnum=0, method=diff_method)
+
+        def fn_g(_i, _g):
+            return d_g(params)
+
+        d1 = for_loop(0, ntrials, 1)(fn_f)(params)[0]
+        d2 = for_loop(0, ntrials, 1)(fn_g)(params)[0]
+
+        return d1, d2
+
+    result = compiled_grad_default(inp, 5)
+    assert np.allclose(result[0], result[1])
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
