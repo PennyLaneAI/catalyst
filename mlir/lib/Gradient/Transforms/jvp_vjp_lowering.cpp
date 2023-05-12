@@ -74,17 +74,10 @@ template <class T> std::vector<int64_t> _tovec(const T &x)
 struct JVPLoweringPattern : public OpRewritePattern<JVPOp> {
     using OpRewritePattern<JVPOp>::OpRewritePattern;
 
-    LogicalResult match(JVPOp op) const override;
-    void rewrite(JVPOp op, PatternRewriter &rewriter) const override;
+    LogicalResult matchAndRewrite(JVPOp op, PatternRewriter &rewriter) const override;
 };
 
-LogicalResult JVPLoweringPattern::match(JVPOp op) const
-{
-    LLVM_DEBUG(dbgs() << "matched JVP op\n");
-    return success();
-}
-
-void JVPLoweringPattern::rewrite(JVPOp op, PatternRewriter &rewriter) const
+LogicalResult JVPLoweringPattern::matchAndRewrite(JVPOp op, PatternRewriter &rewriter) const
 {
     MLIRContext *ctx = getContext();
 
@@ -212,22 +205,16 @@ void JVPLoweringPattern::rewrite(JVPOp op, PatternRewriter &rewriter) const
     rewriter.replaceOp(op, results);
 
     LLVM_DEBUG(dbgs() << "replaced JVP\n");
+    return success();
 }
 
 struct VJPLoweringPattern : public OpRewritePattern<VJPOp> {
     using OpRewritePattern<VJPOp>::OpRewritePattern;
 
-    LogicalResult match(VJPOp op) const override;
-    void rewrite(VJPOp op, PatternRewriter &rewriter) const override;
+    LogicalResult matchAndRewrite(VJPOp op, PatternRewriter &rewriter) const override;
 };
 
-LogicalResult VJPLoweringPattern::match(VJPOp op) const
-{
-    LLVM_DEBUG(dbgs() << "matched VJP op\n");
-    return success();
-}
-
-void VJPLoweringPattern::rewrite(VJPOp op, PatternRewriter &rewriter) const
+LogicalResult VJPLoweringPattern::matchAndRewrite(VJPOp op, PatternRewriter &rewriter) const
 {
     MLIRContext *ctx = getContext();
 
@@ -352,6 +339,7 @@ void VJPLoweringPattern::rewrite(VJPOp op, PatternRewriter &rewriter) const
     rewriter.replaceOp(op, results);
 
     LLVM_DEBUG(dbgs() << "replaced VJP\n");
+    return success();
 }
 
 struct JVPVJPLoweringPass : public PassWrapper<JVPVJPLoweringPass, OperationPass<ModuleOp>> {
