@@ -395,6 +395,65 @@ def var1(x: float, y: float):
 print(var1.mlir)
 
 
+# CHECK-LABEL: private @var2(
+@qjit(target="mlir")
+@qml.qnode(qml.device("lightning.qubit", wires=3))
+def var2(x: float, y: float):
+    # CHECK: [[q0:%.+]] = "quantum.custom"({{%.+}}, {{%.+}}) {gate_name = "RX"
+    qml.RX(x, wires=0)
+    # CHECK: [[q1:%.+]] = "quantum.custom"({{%.+}}, {{%.+}}) {gate_name = "RY"
+    qml.RY(y, wires=1)
+    # CHECK: [[q2:%.+]] = "quantum.custom"({{%.+}}, {{%.+}}) {gate_name = "RZ"
+    qml.RZ(0.1, wires=2)
+
+    B = np.array(
+        [
+            [complex(1.0, 0.0), complex(2.0, 0.0), complex(1.0, 0.0), complex(2.0, 0.0)],
+            [complex(2.0, 0.0), complex(2.0, 0.0), complex(1.0, 0.0), complex(2.0, 0.0)],
+            [complex(1.0, 0.0), complex(1.0, 0.0), complex(1.0, 0.0), complex(2.0, 0.0)],
+            [complex(2.0, 0.0), complex(2.0, 0.0), complex(2.0, 0.0), complex(2.0, 0.0)],
+        ]
+    )
+
+    # CHECK: [[p0:%.+]] = "quantum.namedobs"([[q1]]) {type = 1 : i8}
+    # CHECK: [[h0:%.+]] = "quantum.hermitian"({{%.+}}, [[q0]], [[q2]]) : (tensor<4x4xcomplex<f64>>, !quantum.bit, !quantum.bit) -> !quantum.obs
+    # CHECK: [[obs:%.+]] = "quantum.tensor"([[p0]], [[h0]])
+    # CHECK: "quantum.var"([[obs]]) {{.+}} -> f64
+    return qml.var(qml.PauliX(1) @ qml.Hermitian(B, wires=[0, 2]))
+
+
+print(var2.mlir)
+
+
+# CHECK-LABEL: private @var3(
+@qjit(target="mlir")
+@qml.qnode(qml.device("lightning.qubit", wires=2))
+def var3(x: float):
+    # CHECK: [[q0:%.+]] = "quantum.custom"({{%.+}}, {{%.+}}) {gate_name = "RX"
+    qml.RX(x, wires=0)
+
+    coeff = np.array([0.8, 0.2])
+    obs_matrix = np.array(
+        [
+            [0.5, 1.0j, 0.0, -3j],
+            [-1.0j, -1.1, 0.0, -0.1],
+            [0.0, 0.0, -0.9, 12.0],
+            [3j, -0.1, 12.0, 0.0],
+        ]
+    )
+
+    # CHECK: [[h0:%.+]] = "quantum.hermitian"({{%.+}}, {{%.+}}, {{%.+}}) : (tensor<4x4xcomplex<f64>>, !quantum.bit, !quantum.bit) -> !quantum.obs
+    obs = qml.Hermitian(obs_matrix, wires=[0, 1])
+
+    # CHECK: [[n0:%.+]] = "quantum.namedobs"([[q0]]) {type = 1 : i8}
+    # CHECK: [[obs:%.+]] = "quantum.hamiltonian"({{%.+}}, [[h0]], [[n0]]) : (tensor<2xf64>, !quantum.obs, !quantum.obs) -> !quantum.obs
+    # CHECK: "quantum.var"([[obs]]) {{.+}} -> f64
+    return qml.var(qml.Hamiltonian(coeff, [obs, qml.PauliX(0)]))
+
+
+print(var3.mlir)
+
+
 # CHECK-LABEL: private @probs1(
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
