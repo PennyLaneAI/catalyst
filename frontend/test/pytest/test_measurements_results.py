@@ -281,6 +281,145 @@ class TestVar:
         observed = var2(np.pi)
         assert np.isclose(observed, expected)
 
+    def test_hermitian_1(self, backend):
+        """Test variance for Hermitian observable."""
+
+        @qjit()
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit(x: float):
+            qml.RY(x, wires=0)
+            A = np.array(
+                [[complex(1.0, 0.0), complex(2.0, 0.0)], [complex(2.0, 0.0), complex(1.0, 0.0)]]
+            )
+            return qml.var(qml.Hermitian(A, wires=0))
+
+        expected = np.array(4.0)
+        observed = circuit(0.0)
+        assert np.isclose(observed, expected)
+
+        expected = np.array(0.0)
+        observed = circuit(np.pi / 2)
+        assert np.isclose(observed, expected)
+
+    def test_hermitian_2(self, backend):
+        """Test variance for Hermitian observable."""
+
+        @qjit()
+        @qml.qnode(qml.device(backend, wires=2))
+        def circuit(x: float):
+            qml.RX(x, wires=1)
+            B = np.array(
+                [
+                    [complex(1.0, 0.0), complex(2.0, 0.0), complex(1.0, 0.0), complex(2.0, 0.0)],
+                    [complex(2.0, 0.0), complex(2.0, 0.0), complex(1.0, 0.0), complex(2.0, 0.0)],
+                    [complex(1.0, 0.0), complex(1.0, 0.0), complex(1.0, 0.0), complex(2.0, 0.0)],
+                    [complex(2.0, 0.0), complex(2.0, 0.0), complex(2.0, 0.0), complex(2.0, 0.0)],
+                ]
+            )
+            return qml.var(qml.Hermitian(B, wires=[0, 1]))
+
+        expected = np.array(9.0)
+        observed = circuit(0.0)
+        assert np.isclose(observed, expected)
+
+        expected = np.array(9.0)
+        observed = circuit(np.pi)
+        assert np.isclose(observed, expected)
+
+    def test_tensor_1(self, backend):
+        """Test variance for Tensor observable."""
+
+        @qjit()
+        @qml.qnode(qml.device(backend, wires=2))
+        def circuit(x: float, y: float):
+            qml.RX(x, wires=0)
+            qml.RX(y, wires=1)
+            qml.CNOT(wires=[0, 1])
+            return qml.var(qml.PauliX(0) @ qml.PauliY(1))
+
+        expected = np.array(0.875)
+        observed = circuit(np.pi / 4, np.pi / 3)
+        assert np.isclose(observed, expected)
+
+        expected = np.array(1.0)
+        observed = circuit(np.pi / 2, np.pi / 2)
+        assert np.isclose(observed, expected)
+
+    def test_tensor_2(self, backend):
+        """Test variance for Tensor observable."""
+
+        @qjit()
+        @qml.qnode(qml.device(backend, wires=3))
+        def circuit(x: float, y: float):
+            qml.RX(x, wires=0)
+            qml.RX(y, wires=1)
+            qml.CNOT(wires=[0, 2])
+            qml.CNOT(wires=[1, 2])
+            A = np.array(
+                [[complex(1.0, 0.0), complex(2.0, 0.0)], [complex(2.0, 0.0), complex(-1.0, 0.0)]]
+            )
+            return qml.var(qml.PauliX(0) @ qml.Hadamard(1) @ qml.Hermitian(A, wires=2))
+
+        expected = np.array(4.8125)
+        observed = circuit(np.pi / 4, np.pi / 3)
+        assert np.isclose(observed, expected)
+
+        expected = np.array(4.5)
+        observed = circuit(np.pi / 2, np.pi / 2)
+        assert np.isclose(observed, expected)
+
+    def test_hamiltonian_1(self, backend):
+        """Test variance for Hamiltonian observable."""
+
+        @qjit()
+        @qml.qnode(qml.device(backend, wires=3))
+        def circuit(x: float, y: float):
+            qml.RX(x, wires=0)
+            qml.RY(y, wires=1)
+            qml.RZ(0.1, wires=2)
+
+            coeffs = np.array([0.2, -0.543])
+            obs = [qml.PauliX(0) @ qml.PauliZ(1), qml.PauliZ(0) @ qml.Hadamard(2)]
+
+            return qml.var(qml.Hamiltonian(coeffs, obs))
+
+        expected = np.array(0.26113675)
+        observed = circuit(np.pi / 4, np.pi / 3)
+        assert np.isclose(observed, expected)
+
+        expected = np.array(0.22130985)
+        observed = circuit(0.5, 0.8)
+        assert np.isclose(observed, expected)
+
+    def test_hamiltonian_2(self, backend):
+        """Test variance for Hamiltonian observable."""
+
+        @qjit()
+        @qml.qnode(qml.device(backend, wires=2))
+        def circuit(x: float):
+            qml.RX(x, wires=0)
+
+            coeff = np.array([0.8, 0.2])
+            obs_matrix = np.array(
+                [
+                    [0.5, 1.0j, 0.0, -3j],
+                    [-1.0j, -1.1, 0.0, -0.1],
+                    [0.0, 0.0, -0.9, 12.0],
+                    [3j, -0.1, 12.0, 0.0],
+                ]
+            )
+
+            obs = qml.Hermitian(obs_matrix, wires=[0, 1])
+            return qml.var(qml.Hamiltonian(coeff, [obs, qml.PauliX(0)]))
+
+        expected = np.array(2.86432098)
+        observed = circuit(np.pi / 4)
+        assert np.isclose(observed, expected)
+
+        expected = np.array(26.5936)
+        observed = circuit(np.pi / 2)
+        assert np.isclose(observed, expected)
+
 
 def test_state(backend):
     """Test state."""

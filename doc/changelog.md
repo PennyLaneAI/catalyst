@@ -14,6 +14,9 @@
   chosen as available backend devices from the frontend.
   [#89](https://github.com/PennyLaneAI/catalyst/pull/89)
 
+* Add support for ``var`` of general observables
+  [#124](https://github.com/PennyLaneAI/catalyst/pull/124)
+
 <h3>Improvements</h3>
 
 * Improving error handling by throwing descriptive and unified expressions for runtime
@@ -53,6 +56,9 @@
   of copying them. This includes adding a compiler pass that copies global buffers into the heap
   as global buffers cannot be transferred to Python.
   [#112](https://github.com/PennyLaneAI/catalyst/pull/112)
+
+* Temporary fix of use-after-free and dependency of uninitialized memory.
+  [#121](https://github.com/PennyLaneAI/catalyst/pull/121)
 
 <h3>Contributors</h3>
 
