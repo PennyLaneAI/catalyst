@@ -22,8 +22,22 @@ TEST_CASE("Test lookup openqasm gate names from QIR -> OpenQasm map", "[openqasm
 {
     // Check supported gates
     CHECK(lookup_qasm_gate_name("PauliX") == "x");
+    CHECK(lookup_qasm_gate_name("PauliY") == "y");
+    CHECK(lookup_qasm_gate_name("PauliZ") == "z");
     CHECK(lookup_qasm_gate_name("Hadamard") == "h");
+    CHECK(lookup_qasm_gate_name("S") == "s");
+    CHECK(lookup_qasm_gate_name("T") == "t");
+    CHECK(lookup_qasm_gate_name("CNOT") == "cnot");
     CHECK(lookup_qasm_gate_name("CZ") == "cz");
+    CHECK(lookup_qasm_gate_name("SWAP") == "swap");
+    CHECK(lookup_qasm_gate_name("PhaseShift") == "phaseshift");
+    CHECK(lookup_qasm_gate_name("RX") == "rx");
+    CHECK(lookup_qasm_gate_name("RY") == "ry");
+    CHECK(lookup_qasm_gate_name("RZ") == "rz");
+    CHECK(lookup_qasm_gate_name("CSWAP") == "cswap");
+    CHECK(lookup_qasm_gate_name("PSWAP") == "pswap");
+    CHECK(lookup_qasm_gate_name("ISWAP") == "iswap");
+    CHECK(lookup_qasm_gate_name("Toffoli") == "ccnot");
 
     // Check an unsupported gate
     REQUIRE_THROWS_WITH(
@@ -82,7 +96,7 @@ TEST_CASE("Test QasmRegister(type=Qubit) from OpenQasmBuilder", "[openqasm]")
 
     REQUIRE_THROWS_WITH(reg.toOpenQasm(static_cast<RegisterMode>(4), {0, 5}),
                         Catch::Contains("[Function:toOpenQasm] Error in Catalyst Runtime: "
-                                        "Unsupported OpenQasm quantum register translation mode"));
+                                        "Unsupported OpenQasm register mode"));
 }
 
 TEST_CASE("Test QasmRegister(type=Bit) from OpenQasmBuilder", "[openqasm]")
@@ -115,7 +129,7 @@ TEST_CASE("Test QasmRegister(type=Bit) from OpenQasmBuilder", "[openqasm]")
     auto reg_buggy = QasmRegister(static_cast<RegisterType>(3), "random", 5);
     REQUIRE_THROWS_WITH(reg_buggy.toOpenQasm(RegisterMode::Alloc, {}),
                         Catch::Contains("[Function:toOpenQasm] Error in Catalyst Runtime: "
-                                        "Unsupported OpenQasm quantum register translation type"));
+                                        "Unsupported OpenQasm register type"));
 
     REQUIRE_THROWS_WITH(
         reg.toOpenQasm(RegisterMode::Slice, {0, 10}),
@@ -124,7 +138,7 @@ TEST_CASE("Test QasmRegister(type=Bit) from OpenQasmBuilder", "[openqasm]")
 
     REQUIRE_THROWS_WITH(reg.toOpenQasm(static_cast<RegisterMode>(4), {0, 5}),
                         Catch::Contains("[Function:toOpenQasm] Error in Catalyst Runtime: "
-                                        "Unsupported OpenQasm quantum register translation mode"));
+                                        "Unsupported OpenQasm register mode"));
 }
 
 TEST_CASE("Test QasmGate from OpenQasmBuilder", "[openqasm]")
@@ -143,9 +157,9 @@ TEST_CASE("Test QasmGate from OpenQasmBuilder", "[openqasm]")
     CHECK(gate1.toOpenQasm(qubits) == gate1_toqasm);
 
     // Check a ctrl gate without params
-    auto gate2 = QasmGate("CY", {}, {}, {0, 2}, false);
+    auto gate2 = QasmGate("SWAP", {}, {}, {0, 2}, false);
 
-    std::string gate2_toqasm = "cy q[0], q[2];\n";
+    std::string gate2_toqasm = "swap q[0], q[2];\n";
     CHECK(gate2.toOpenQasm(qubits) == gate2_toqasm);
 
     // Check a gate with params (value)
@@ -225,6 +239,7 @@ TEST_CASE("Test OpenQasmBuilder with dumping the circuit header", "[openqasm]")
 
     CHECK(builder.toOpenQasm() == toqasm);
 
+    // Check edge cases
     builder.Register(RegisterType::Qubit, "qubits2", 3);
 
     REQUIRE_THROWS_WITH(builder.toOpenQasm(),
@@ -246,9 +261,15 @@ TEST_CASE("Test OpenQasmBuilder with invalid number of measurement results regis
     CHECK(builder.getNumQubits() == 5);
     CHECK(builder.getNumBits() == 5);
 
+    // Check edge cases
     REQUIRE_THROWS_WITH(builder.toOpenQasm(),
                         Catch::Contains("[Function:toOpenQasm] Error in Catalyst Runtime: Invalid"
                                         " number of measurement results registers"));
+
+    REQUIRE_THROWS_WITH(
+        builder.Register(static_cast<RegisterType>(3), "qubits", 5),
+        Catch::Contains(
+            "[Function:Register] Error in Catalyst Runtime: Unsupported OpenQasm register type"));
 }
 
 TEST_CASE("Test OpenQasmBuilder with dumping the circuit header, gates, and measure", "[openqasm]")
@@ -259,7 +280,7 @@ TEST_CASE("Test OpenQasmBuilder with dumping the circuit header, gates, and meas
 
     builder.Gate("PauliX", {}, {}, {0}, false);
     builder.Gate("Hadamard", {}, {}, {1}, false);
-    builder.Gate("CY", {}, {}, {0, 1}, false);
+    builder.Gate("SWAP", {}, {}, {0, 1}, false);
     builder.Gate("RZ", {0.12}, {}, {1}, false);
     builder.Gate("RX", {}, {"alpha"}, {0}, false);
 
@@ -274,7 +295,7 @@ TEST_CASE("Test OpenQasmBuilder with dumping the circuit header, gates, and meas
                          "bit[2] b;\n"
                          "x q[0];\n"
                          "h q[1];\n"
-                         "cy q[0], q[1];\n"
+                         "swap q[0], q[1];\n"
                          "rz(0.12) q[1];\n"
                          "rx(alpha) q[0];\n"
                          "b[0] = measure q[0];\n"

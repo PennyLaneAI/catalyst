@@ -22,7 +22,7 @@ auto OpenQasmDevice::AllocateQubit() -> QubitIdType
     return 0;
 }
 
-auto OpenQasmDevice::AllocateQubits([[maybe_unused]] size_t num_qubits) -> std::vector<QubitIdType>
+auto OpenQasmDevice::AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType>
 {
     if (num_qubits == 0U) {
         return {};
@@ -82,12 +82,10 @@ auto OpenQasmDevice::One() const -> Result
 
 void OpenQasmDevice::PrintCircuit() { std::cout << this->device->toOpenQasm(); }
 
-auto OpenQasmDevice::DumpCircuit() -> std::string { return this->device->toOpenQasm(); }
+auto OpenQasmDevice::Circuit() -> std::string { return this->device->toOpenQasm(); }
 
-void OpenQasmDevice::NamedOperation([[maybe_unused]] const std::string &name,
-                                    [[maybe_unused]] const std::vector<double> &params,
-                                    [[maybe_unused]] const std::vector<QubitIdType> &wires,
-                                    [[maybe_unused]] bool inverse)
+void OpenQasmDevice::NamedOperation(const std::string &name, const std::vector<double> &params,
+                                    const std::vector<QubitIdType> &wires, bool inverse)
 {
     using namespace Catalyst::Runtime::Simulator::Lightning;
 
@@ -190,7 +188,7 @@ void OpenQasmDevice::PartialCounts([[maybe_unused]] DataView<double, 1> &eigvals
     RT_FAIL("Unsupported functionality");
 }
 
-auto OpenQasmDevice::Measure([[maybe_unused]] QubitIdType wire) -> Result
+auto OpenQasmDevice::Measure(QubitIdType wire) -> Result
 {
     // Convert wire to device wire
     auto &&dev_wire = getDeviceWires({wire});

@@ -24,7 +24,7 @@ TEST_CASE("Test the OpenQasmDevice constructor", "[openqasm]")
     CHECK(device.GetNumQubits() == 0);
 
     REQUIRE_THROWS_WITH(
-        device.DumpCircuit(),
+        device.Circuit(),
         Catch::Contains(
             "[Function:toOpenQasm] Error in Catalyst Runtime: Invalid number of quantum register"));
 }
@@ -66,11 +66,11 @@ TEST_CASE("Test a simple circuit with OpenQasmDevice", "[openqasm]")
                          "x qubits[0];\n"
                          "y qubits[1];\n"
                          "z qubits[2];\n"
-                         "cx qubits[0], qubits[3];\n"
+                         "cnot qubits[0], qubits[3];\n"
                          "bits[0] = measure qubits[0];\n"
                          "bits[1] = measure qubits[1];\n"
                          "bits[3] = measure qubits[3];\n"
                          "reset qubits;\n";
 
-    CHECK(device->DumpCircuit() == toqasm);
+    CHECK(device->Circuit() == toqasm);
 }

@@ -41,23 +41,38 @@ enum class RegisterType : uint8_t {
     Bit,
 };
 
+using GateNameT = std::string_view;
+
+/**
+ * The map of supported quantum gate names by OpenQasm devices.
+ */
+constexpr std::array rt_qasm_gate_map = {
+    // (RT-GateName, Qasm-GateName)
+    std::tuple<GateNameT, GateNameT>{"PauliX", "x"},
+    std::tuple<GateNameT, GateNameT>{"PauliY", "y"},
+    std::tuple<GateNameT, GateNameT>{"PauliZ", "z"},
+    std::tuple<GateNameT, GateNameT>{"Hadamard", "h"},
+    std::tuple<GateNameT, GateNameT>{"S", "s"},
+    std::tuple<GateNameT, GateNameT>{"T", "t"},
+    std::tuple<GateNameT, GateNameT>{"CNOT", "cnot"},
+    std::tuple<GateNameT, GateNameT>{"CZ", "cz"},
+    std::tuple<GateNameT, GateNameT>{"SWAP", "swap"},
+    std::tuple<GateNameT, GateNameT>{"PhaseShift", "phaseshift"},
+    std::tuple<GateNameT, GateNameT>{"RX", "rx"},
+    std::tuple<GateNameT, GateNameT>{"RY", "ry"},
+    std::tuple<GateNameT, GateNameT>{"RZ", "rz"},
+    std::tuple<GateNameT, GateNameT>{"CSWAP", "cswap"},
+    std::tuple<GateNameT, GateNameT>{"PSWAP", "pswap"},
+    std::tuple<GateNameT, GateNameT>{"ISWAP", "iswap"},
+    std::tuple<GateNameT, GateNameT>{"Toffoli", "ccnot"},
+};
+
+/**
+ * Lookup OpenQasm gate names.
+ */
 constexpr auto lookup_qasm_gate_name(std::string_view gate_name) -> std::string_view
 {
-    using QIRGateNameT = std::string_view;
-    using QasmGateNameT = std::string_view;
-    using GateMapT = std::tuple<QIRGateNameT, QasmGateNameT>;
-
-    constexpr std::array qir_qasm_gate_map = {
-        GateMapT{"PauliX", "x"},   GateMapT{"PauliY", "y"}, GateMapT{"PauliZ", "z"},
-        GateMapT{"Hadamard", "h"}, GateMapT{"RX", "rx"},    GateMapT{"RY", "ry"},
-        GateMapT{"RZ", "rz"},      GateMapT{"CNOT", "cx"},  GateMapT{"CY", "cy"},
-        GateMapT{"CZ", "cz"},
-    };
-
-    constexpr size_t size = qir_qasm_gate_map.size();
-
-    for (size_t idx = 0; idx < size; idx++) {
-        auto &&[gate_qir, gate_qasm] = qir_qasm_gate_map[idx];
+    for (auto &&[gate_qir, gate_qasm] : rt_qasm_gate_map) {
         if (gate_qir == gate_name) {
             return gate_qasm;
         }
@@ -94,8 +109,7 @@ class QasmVariable {
         std::ostringstream oss;
         switch (this->type) {
         case VariableType::Float: {
-            oss << "input "
-                << "float " << name << ";\n";
+            oss << "input float " << name << ";\n";
             return oss.str();
         }
         default:
@@ -107,6 +121,7 @@ class QasmVariable {
 /**
  * The OpenQasm quantum register type.
  *
+ * @param type Type of the register
  * @param name Name of the register
  * @param size Size of the register
  */
@@ -153,7 +168,7 @@ class QasmRegister {
                 oss << "bit";
             }
             else {
-                RT_FAIL("Unsupported OpenQasm quantum register translation type");
+                RT_FAIL("Unsupported OpenQasm register type");
             }
             oss << "[" << this->size << "] " << this->name << ";\n";
             return oss.str();
@@ -174,7 +189,7 @@ class QasmRegister {
             return oss.str();
         }
         default:
-            RT_FAIL("Unsupported OpenQasm quantum register translation mode");
+            RT_FAIL("Unsupported OpenQasm register mode");
         }
     }
 };
@@ -183,7 +198,7 @@ class QasmRegister {
  * The OpenQasm gate type.
  *
  * @param name The name of the gate to apply from the list of supported gates
- * (`qir_qasm_gate_map`)
+ * (`rt_qasm_gate_map`)
  * @param params_val Optional list of parameter values for parametric gates
  * @param params_str Optional list of parameter names for parametric gates
  * @param wires Wires to apply gate to
@@ -252,7 +267,8 @@ class QasmGate {
 /**
  * The OpenQasm measure type.
  *
- * @param wires Wires to apply `measure` to
+ * @param bit The measurement bit result
+ * @param wire Wire to apply `measure` to
  */
 class QasmMeasure {
   private:
@@ -312,13 +328,17 @@ class OpenQasmBuilder {
 
     void Register(RegisterType type, const std::string &name, size_t size)
     {
-        if (type == RegisterType::Qubit) {
+        switch (type) {
+        case RegisterType::Qubit:
             this->qregs.emplace_back(type, name, size);
             this->num_qubits += size;
-        }
-        else if (type == RegisterType::Bit) {
+            break;
+        case RegisterType::Bit:
             this->bregs.emplace_back(type, name, size);
             this->num_bits += size;
+            break;
+        default:
+            RT_FAIL("Unsupported OpenQasm register type");
         }
     }
 
