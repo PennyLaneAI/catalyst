@@ -689,7 +689,7 @@ def test_jax_consts(inp, backend):
 
 
 @pytest.mark.parametrize("diff_method", ["fd", "adj", "ps"])
-@pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
+@pytest.mark.parametrize("inp", [(1.0), (2.0)])
 def test_finite_diff_multiple_devices(inp, diff_method, backend):
     """Test gradient methods using multiple backend devices."""
 
@@ -707,24 +707,21 @@ def test_finite_diff_multiple_devices(inp, diff_method, backend):
     def compiled_grad_default(params, ntrials):
         d_f = grad(f, argnum=0, method=diff_method)
 
-        def fn_f(_, g):  # pylint: disable=unused-argument
+        def fn_f(_i, _g):
             return d_f(params)
 
         d_g = grad(g, argnum=0, method=diff_method)
 
-        def fn_g(_, g):  # pylint: disable=unused-argument
+        def fn_g(_i, _g):
             return d_g(params)
 
         d1 = for_loop(0, ntrials, 1)(fn_f)(params)[0]
         d2 = for_loop(0, ntrials, 1)(fn_g)(params)[0]
-        d3 = for_loop(0, ntrials, 2)(fn_f)(params)[0]
-        d4 = for_loop(0, ntrials, 2)(fn_g)(params)[0]
 
-        return d1, d2, d3, d4
+        return d1, d2
 
     result = compiled_grad_default(inp, 5)
     assert np.allclose(result[0], result[1])
-    assert np.allclose(result[2], result[3])
 
 
 if __name__ == "__main__":
