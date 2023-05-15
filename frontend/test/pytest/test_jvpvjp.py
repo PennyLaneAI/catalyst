@@ -41,39 +41,6 @@ def flatten_if_tuples(x: Union[X, Tuple[Union[T, Tuple[T]]]]) -> Union[X, Tuple[
     )
 
 
-TensorLike = Any
-TensorFunction = Callable[[TensorLike, ...], TensorLike]
-
-
-@dataclass
-class ClassicalFunction:
-    """Pure function that does not require any decorators."""
-
-    f: TensorFunction
-
-
-@dataclass
-class QuantumFunction:
-    """Quantum function that does require a decorator."""
-
-    f: TensorFunction
-
-
-def _ensure_jittable(
-    quantum_decorator: Callable[[Callable], Callable], f: Union[ClassicalFunction, QuantumFunction]
-) -> Callable:
-    """Wraps quantum functions with a proper quantum decorator, known by the caller. Pure functions
-    are returned as-is."""
-
-    # pylint: disable=no-else-return
-    if isinstance(f, ClassicalFunction):
-        return f.f
-    elif isinstance(f, QuantumFunction):
-        return quantum_decorator(f.f)
-    else:
-        raise ValueError("Expecting either ClassicalFunction or QuantumFunction")
-
-
 def circuit_rx(x1, x2):
     """A test quantum function"""
     qml.RX(x1, wires=0)
@@ -100,9 +67,7 @@ def test_jvp_against_jax_full_argnum_case_S_SS():
     @qjit
     def C_workflow():
         f = qml.QNode(circuit_rx, device=qml.device("lightning.qubit", wires=1))
-        return C_jvp(
-            f, x, t, method="fd", argnum=list(range(len(x)))
-        )
+        return C_jvp(f, x, t, method="fd", argnum=list(range(len(x))))
 
     @jax.jit
     def J_workflow():
@@ -118,17 +83,17 @@ def test_jvp_against_jax_full_argnum_case_S_SS():
 def test_jvp_against_jax_full_argnum_case_T_T():
     """Numerically tests Catalyst's jvp against the JAX version."""
 
-    f, x, t = (
-        lambda x: jnp.stack([1 * x, 2 * x, 3 * x]),
+    def f(x):
+        return jnp.stack([1 * x, 2 * x, 3 * x])
+
+    x, t = (
         [jnp.zeros([4], dtype=float)],
         [jnp.ones([4], dtype=float)],
     )
 
     @qjit
     def C_workflow():
-        return C_jvp(
-            f, x, t, method="fd", argnum=list(range(len(x)))
-        )
+        return C_jvp(f, x, t, method="fd", argnum=list(range(len(x))))
 
     @jax.jit
     def J_workflow():
@@ -143,26 +108,22 @@ def test_jvp_against_jax_full_argnum_case_T_T():
 def test_jvp_against_jax_full_argnum_case_TT_T():
     """Numerically tests Catalyst's jvp against the JAX version."""
 
-    f, x, t = (
-        (
-            lambda x1, x2: (
-                jnp.stack(
-                    [
-                        3 * jnp.reshape(x1, [6]) + 4 * jnp.reshape(x2, [6]),
-                        3 * jnp.reshape(x1, [6]) + 4 * jnp.reshape(x2, [6]),
-                    ]
-                )
-            )
-        ),
+    def f(x1, x2):
+        return jnp.stack(
+            [
+                3 * jnp.reshape(x1, [6]) + 4 * jnp.reshape(x2, [6]),
+                3 * jnp.reshape(x1, [6]) + 4 * jnp.reshape(x2, [6]),
+            ]
+        )
+
+    x, t = (
         [jnp.zeros([3, 2], dtype=float), jnp.zeros([2, 3], dtype=float)],
         [jnp.ones([3, 2], dtype=float), jnp.ones([2, 3], dtype=float)],
     )
 
     @qjit
     def C_workflow():
-        return C_jvp(
-            f, x, t, method="fd", argnum=list(range(len(x)))
-        )
+        return C_jvp(f, x, t, method="fd", argnum=list(range(len(x))))
 
     @jax.jit
     def J_workflow():
@@ -177,17 +138,17 @@ def test_jvp_against_jax_full_argnum_case_TT_T():
 def test_jvp_against_jax_full_argnum_case_T_TT():
     """Numerically tests Catalyst's jvp against the JAX version."""
 
-    f, x, t = (
-        (lambda x: (x, jnp.stack([1 * x, 2 * x, 3 * x]))),
+    def f(x):
+        return (x, jnp.stack([1 * x, 2 * x, 3 * x]))
+
+    x, t = (
         [jnp.zeros([4], dtype=float)],
         [jnp.ones([4], dtype=float)],
     )
 
     @qjit
     def C_workflow():
-        return C_jvp(
-            f, x, t, method="fd", argnum=list(range(len(x)))
-        )
+        return C_jvp(f, x, t, method="fd", argnum=list(range(len(x))))
 
     @jax.jit
     def J_workflow():
@@ -202,27 +163,25 @@ def test_jvp_against_jax_full_argnum_case_T_TT():
 def test_jvp_against_jax_full_argnum_case_TT_TT():
     """Numerically tests Catalyst's jvp against the JAX version."""
 
-    f, x, t = (
-        (
-            lambda x1, x2: (
-                1 * jnp.reshape(x1, [6]) + 2 * jnp.reshape(x2, [6]),
-                jnp.stack(
-                    [
-                        3 * jnp.reshape(x1, [6]) + 4 * jnp.reshape(x2, [6]),
-                        3 * jnp.reshape(x1, [6]) + 4 * jnp.reshape(x2, [6]),
-                    ]
-                ),
-            )
-        ),
+    def f(x1, x2):
+        return (
+            1 * jnp.reshape(x1, [6]) + 2 * jnp.reshape(x2, [6]),
+            jnp.stack(
+                [
+                    3 * jnp.reshape(x1, [6]) + 4 * jnp.reshape(x2, [6]),
+                    3 * jnp.reshape(x1, [6]) + 4 * jnp.reshape(x2, [6]),
+                ]
+            ),
+        )
+
+    x, t = (
         [jnp.zeros([3, 2], dtype=float), jnp.zeros([2, 3], dtype=float)],
         [jnp.ones([3, 2], dtype=float), jnp.ones([2, 3], dtype=float)],
     )
 
     @qjit
     def C_workflow():
-        return C_jvp(
-            f, x, t, method="fd", argnum=list(range(len(x)))
-        )
+        return C_jvp(f, x, t, method="fd", argnum=list(range(len(x))))
 
     @jax.jit
     def J_workflow():
@@ -245,9 +204,7 @@ def test_vjp_against_jax_full_argnum_case_S_SS():
     @qjit
     def C_workflow():
         f = qml.QNode(circuit_rx, device=qml.device("lightning.qubit", wires=1))
-        return C_vjp(
-            f, x, ct, method="fd", argnum=list(range(len(x)))
-        )
+        return C_vjp(f, x, ct, method="fd", argnum=list(range(len(x))))
 
     @jax.jit
     def J_workflow():
@@ -263,17 +220,17 @@ def test_vjp_against_jax_full_argnum_case_S_SS():
 def test_vjp_against_jax_full_argnum_case_T_T():
     """Numerically tests Catalyst's jvp against the JAX version."""
 
-    f, x, ct = (
-        (lambda x: jnp.stack([1 * x, 2 * x, 3 * x])),
+    def f(x):
+        return jnp.stack([1 * x, 2 * x, 3 * x])
+
+    x, ct = (
         [jnp.zeros([4], dtype=float)],
         [jnp.ones([3, 4], dtype=float)],
     )
 
     @qjit
     def C_workflow():
-        return C_vjp(
-            f, x, ct, method="fd", argnum=list(range(len(x)))
-        )
+        return C_vjp(f, x, ct, method="fd", argnum=list(range(len(x))))
 
     @jax.jit
     def J_workflow():
@@ -290,26 +247,22 @@ def test_vjp_against_jax_full_argnum_case_T_T():
 def test_vjp_against_jax_full_argnum_case_TT_T():
     """Numerically tests Catalyst's jvp against the JAX version."""
 
-    f, x, ct = (
-        (
-            lambda x1, x2: (
-                jnp.stack(
-                    [
-                        3 * jnp.reshape(x1, [6]) + 4 * jnp.reshape(x2, [6]),
-                        3 * jnp.reshape(x1, [6]) + 4 * jnp.reshape(x2, [6]),
-                    ]
-                )
-            )
-        ),
+    def f(x1, x2):
+        return jnp.stack(
+            [
+                3 * jnp.reshape(x1, [6]) + 4 * jnp.reshape(x2, [6]),
+                3 * jnp.reshape(x1, [6]) + 4 * jnp.reshape(x2, [6]),
+            ]
+        )
+
+    x, ct = (
         [jnp.zeros([3, 2], dtype=float), jnp.zeros([2, 3], dtype=float)],
         [jnp.ones([2, 6], dtype=float)],
     )
 
     @qjit
     def C_workflow():
-        return C_vjp(
-            f, x, ct, method="fd", argnum=list(range(len(x)))
-        )
+        return C_vjp(f, x, ct, method="fd", argnum=list(range(len(x))))
 
     @jax.jit
     def J_workflow():
@@ -324,17 +277,17 @@ def test_vjp_against_jax_full_argnum_case_TT_T():
 def test_vjp_against_jax_full_argnum_case_T_TT():
     """Numerically tests Catalyst's jvp against the JAX version."""
 
-    f, x, ct = (
-        (lambda x: (x, jnp.stack([1 * x, 2 * x, 3 * x]))),
+    def f(x):
+        return (x, jnp.stack([1 * x, 2 * x, 3 * x]))
+
+    x, ct = (
         [jnp.zeros([4], dtype=float)],
         [jnp.ones([4], dtype=float), jnp.ones([3, 4], dtype=float)],
     )
 
     @qjit
     def C_workflow():
-        return C_vjp(
-            f, x, ct, method="fd", argnum=list(range(len(x)))
-        )
+        return C_vjp(f, x, ct, method="fd", argnum=list(range(len(x))))
 
     @jax.jit
     def J_workflow():
@@ -350,27 +303,25 @@ def test_vjp_against_jax_full_argnum_case_T_TT():
 def test_vjp_against_jax_full_argnum_case_TT_TT():
     """Numerically tests Catalyst's jvp against the JAX version."""
 
-    f, x, ct = (
-        (
-            lambda x1, x2: (
-                1 * jnp.reshape(x1, [6]) + 2 * jnp.reshape(x2, [6]),
-                jnp.stack(
-                    [
-                        3 * jnp.reshape(x1, [6]) + 4 * jnp.reshape(x2, [6]),
-                        3 * jnp.reshape(x1, [6]) + 4 * jnp.reshape(x2, [6]),
-                    ]
-                ),
-            )
-        ),
+    def f(x1, x2):
+        return (
+            1 * jnp.reshape(x1, [6]) + 2 * jnp.reshape(x2, [6]),
+            jnp.stack(
+                [
+                    3 * jnp.reshape(x1, [6]) + 4 * jnp.reshape(x2, [6]),
+                    3 * jnp.reshape(x1, [6]) + 4 * jnp.reshape(x2, [6]),
+                ]
+            ),
+        )
+
+    x, ct = (
         [jnp.zeros([3, 2], dtype=float), jnp.zeros([2, 3], dtype=float)],
         [jnp.ones([6], dtype=float), jnp.ones([2, 6], dtype=float)],
     )
 
     @qjit
     def C_workflow():
-        return C_vjp(
-            f, x, ct, method="fd", argnum=list(range(len(x)))
-        )
+        return C_vjp(f, x, ct, method="fd", argnum=list(range(len(x))))
 
     @jax.jit
     def J_workflow():
@@ -387,17 +338,15 @@ def test_vjp_against_jax_full_argnum_case_TT_TT():
 def test_jvpvjp_argument_checks():
     """Numerically tests Catalyst's jvp against the JAX version."""
 
-    f, x, t, ct = (
-        (
-            lambda x1, x2: (
-                jnp.stack(
-                    [
-                        3 * jnp.reshape(x1, [6]) + 4 * jnp.reshape(x2, [6]),
-                        3 * jnp.reshape(x1, [6]) + 4 * jnp.reshape(x2, [6]),
-                    ]
-                )
-            )
-        ),
+    def f(x1, x2):
+        return jnp.stack(
+            [
+                3 * jnp.reshape(x1, [6]) + 4 * jnp.reshape(x2, [6]),
+                3 * jnp.reshape(x1, [6]) + 4 * jnp.reshape(x2, [6]),
+            ]
+        )
+
+    x, t, ct = (
         [jnp.zeros([3, 2], dtype=float), jnp.zeros([2, 3], dtype=float)],
         [jnp.ones([3, 2], dtype=float), jnp.ones([2, 3], dtype=float)],
         [jnp.ones([2, 6], dtype=float)],
@@ -445,18 +394,18 @@ def test_jvp_against_jax_argnum0_case_TT_TT():
     """Numerically tests Catalyst's jvp against the JAX version, in case of empty or singular
     argnum argument."""
 
-    f, x, t = (
-        (
-            lambda x1, x2: (
-                1 * jnp.reshape(x1, [6]) + 2 * jnp.reshape(x2, [6]),
-                jnp.stack(
-                    [
-                        3 * jnp.reshape(x1, [6]) + 4 * jnp.reshape(x2, [6]),
-                        3 * jnp.reshape(x1, [6]) + 4 * jnp.reshape(x2, [6]),
-                    ]
-                ),
-            )
-        ),
+    def f(x1, x2):
+        return (
+            1 * jnp.reshape(x1, [6]) + 2 * jnp.reshape(x2, [6]),
+            jnp.stack(
+                [
+                    3 * jnp.reshape(x1, [6]) + 4 * jnp.reshape(x2, [6]),
+                    3 * jnp.reshape(x1, [6]) + 4 * jnp.reshape(x2, [6]),
+                ]
+            ),
+        )
+
+    x, t = (
         [jnp.zeros([3, 2], dtype=float), jnp.zeros([2, 3], dtype=float)],
         [jnp.ones([3, 2], dtype=float), jnp.ones([2, 3], dtype=float)],
     )
@@ -489,37 +438,35 @@ def test_vjp_against_jax_argnum0_case_TT_TT():
     """Numerically tests Catalyst's vjp against the JAX version, in case of empty or singular
     argnum argument."""
 
-    f, x, ct = (
-        (
-            lambda x1, x2: (
-                1 * jnp.reshape(x1, [6]) + 2 * jnp.reshape(x2, [6]),
-                jnp.stack(
-                    [
-                        3 * jnp.reshape(x1, [6]) + 4 * jnp.reshape(x2, [6]),
-                        3 * jnp.reshape(x1, [6]) + 4 * jnp.reshape(x2, [6]),
-                    ]
-                ),
-            )
-        ),
+    def f(x1, x2):
+        return (
+            1 * jnp.reshape(x1, [6]) + 2 * jnp.reshape(x2, [6]),
+            jnp.stack(
+                [
+                    3 * jnp.reshape(x1, [6]) + 4 * jnp.reshape(x2, [6]),
+                    3 * jnp.reshape(x1, [6]) + 4 * jnp.reshape(x2, [6]),
+                ]
+            ),
+        )
+
+    x, ct = (
         [jnp.zeros([3, 2], dtype=float), jnp.zeros([2, 3], dtype=float)],
         [jnp.ones([6], dtype=float), jnp.ones([2, 6], dtype=float)],
     )
-    C_f = f
-    J_f = f
 
     @qjit
     def C_workflowA():
-        return C_vjp(C_f, x, ct, method="fd")
+        return C_vjp(f, x, ct, method="fd")
 
     @qjit
     def C_workflowB():
-        return C_vjp(C_f, x, ct, method="fd", argnum=[0])
+        return C_vjp(f, x, ct, method="fd", argnum=[0])
 
     @jax.jit
     def J_workflow():
         # Emulating `argnum=[0]` in JAX
         def _f(a):
-            return J_f(a, *x[1:])
+            return f(a, *x[1:])
 
         y, ft = J_vjp(_f, *x[0:1])
         ct2 = tree_unflatten(tree_flatten(y)[1], ct)
