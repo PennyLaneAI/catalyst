@@ -27,6 +27,69 @@
 using namespace mlir;
 using namespace catalyst::gradient;
 
+// Common argument checker function
+LogicalResult verifyGradSymbolUses(
+    Operation *op,
+    OpState *op_state,
+    SymbolRefAttr callee,
+    OperandRange callee_operands,
+    const std::vector<size_t> &diff_arg_indices,
+    TypeRange result_types,
+    SymbolTableCollection &symbolTable)
+{
+    // Check that the callee attribute refers to a valid function.
+    func::FuncOp fn = symbolTable.lookupNearestSymbolFrom<func::FuncOp>(op, callee);
+    if (!fn)
+        return op_state->emitOpError("invalid function name specified: ") << callee;
+
+    // Check that the call operand types match the callee operand types.
+    OperandRange fnArgs = callee_operands;
+    FunctionType fnType = fn.getFunctionType();
+    if (fnType.getNumInputs() != fnArgs.size())
+        return op_state->emitOpError("incorrect number of operands for callee, ")
+               << "expected " << fnType.getNumInputs() << " but got " << fnArgs.size();
+
+    for (unsigned i = 0; i < fnArgs.size(); ++i)
+        if (fnArgs[i].getType() != fnType.getInput(i))
+            return op_state->emitOpError("operand type mismatch: expected operand type ")
+                   << fnType.getInput(i) << ", but provided " << fnArgs[i].getType()
+                   << " for operand number " << i;
+
+    // Only differentiation on real numbers is supported.
+    const std::vector<size_t> &diffArgIndices = diff_arg_indices;
+    for (size_t idx : diffArgIndices) {
+        Type diffArgBaseType = fnArgs[idx].getType();
+        if (auto tensorType = diffArgBaseType.dyn_cast<TensorType>())
+            diffArgBaseType = tensorType.getElementType();
+
+        if (!diffArgBaseType.isa<FloatType>())
+            return op_state->emitOpError("invalid numeric base type: callee operand at position ")
+                   << idx << " must be floating point to be differentiable";
+    }
+
+    const std::vector<Type> &expectedTypes = computeResultTypes(fn, diffArgIndices);
+
+    // Verify the number of results matches the expected gradient shape.
+    // The grad output should contain one set of results (equal in size to
+    // the number of function results) for each differentiable argument.
+    if (result_types.size() != expectedTypes.size())
+        return op_state->emitOpError("incorrect number of results in the gradient of the callee, ")
+               << "expected " << expectedTypes.size() << " results "
+               << "but got " << result_types.size();
+
+    // Verify the shape of each result. The numeric type should match the numeric type
+    // of the corresponding function result. The shape is given by grouping the differentiated
+    // argument shape with the corresponding function result shape.
+    TypeRange gradResultTypes = result_types;
+    for (unsigned i = 0; i < expectedTypes.size(); i++) {
+        if (gradResultTypes[i] != expectedTypes[i])
+            return op_state->emitOpError("invalid result type: grad result at position ")
+                   << i << " must be " << expectedTypes[i] << " but got " << gradResultTypes[i];
+    }
+    return success();
+}
+
+
 //===----------------------------------------------------------------------===//
 // GradOp, CallOpInterface
 //===----------------------------------------------------------------------===//
@@ -41,57 +104,14 @@ Operation::operand_range GradOp::getArgOperands() { return getOperands(); }
 
 LogicalResult GradOp::verifySymbolUses(SymbolTableCollection &symbolTable)
 {
-    // Check that the callee attribute refers to a valid function.
-    func::FuncOp fn = symbolTable.lookupNearestSymbolFrom<func::FuncOp>(*this, getCalleeAttr());
-    if (!fn)
-        return emitOpError("invalid function name specified: ") << getCalleeAttr();
-
-    // Check that the call operand types match the callee operand types.
-    OperandRange fnArgs = getArgOperands();
-    FunctionType fnType = fn.getFunctionType();
-    if (fnType.getNumInputs() != fnArgs.size())
-        return emitOpError("incorrect number of operands for callee, ")
-               << "expected " << fnType.getNumInputs() << " but got " << fnArgs.size();
-
-    for (unsigned i = 0; i < fnArgs.size(); ++i)
-        if (fnArgs[i].getType() != fnType.getInput(i))
-            return emitOpError("operand type mismatch: expected operand type ")
-                   << fnType.getInput(i) << ", but provided " << fnArgs[i].getType()
-                   << " for operand number " << i;
-
-    // Only differentiation on real numbers is supported.
-    const std::vector<size_t> &diffArgIndices = compDiffArgIndices(getDiffArgIndices());
-    for (size_t idx : diffArgIndices) {
-        Type diffArgBaseType = fnArgs[idx].getType();
-        if (auto tensorType = diffArgBaseType.dyn_cast<TensorType>())
-            diffArgBaseType = tensorType.getElementType();
-
-        if (!diffArgBaseType.isa<FloatType>())
-            return emitOpError("invalid numeric base type: callee operand at position ")
-                   << idx << " must be floating point to be differentiable";
-    }
-
-    const std::vector<Type> &expectedTypes = computeResultTypes(fn, diffArgIndices);
-
-    // Verify the number of results matches the expected gradient shape.
-    // The grad output should contain one set of results (equal in size to
-    // the number of function results) for each differentiable argument.
-    if (getNumResults() != expectedTypes.size())
-        return emitOpError("incorrect number of results in the gradient of the callee, ")
-               << "expected " << expectedTypes.size() << " results "
-               << "but got " << getNumResults();
-
-    // Verify the shape of each result. The numeric type should match the numeric type
-    // of the corresponding function result. The shape is given by grouping the differentiated
-    // argument shape with the corresponding function result shape.
-    TypeRange gradResultTypes = getResultTypes();
-    for (unsigned i = 0; i < expectedTypes.size(); i++) {
-        if (gradResultTypes[i] != expectedTypes[i])
-            return emitOpError("invalid result type: grad result at position ")
-                   << i << " must be " << expectedTypes[i] << " but got " << gradResultTypes[i];
-    }
-
-    return success();
+    return ::verifyGradSymbolUses(
+        this->getOperation(),
+        this,
+        this->getCalleeAttr(),
+        this->getArgOperands(),
+        this->compDiffArgIndices(this->getDiffArgIndices()),
+        this->getResultTypes(),
+        symbolTable);
 }
 
 //===----------------------------------------------------------------------===//
@@ -129,7 +149,10 @@ Operation::operand_range JVPOp::getArgOperands() { return getOperands(); }
 // JVPOp, SymbolUserOpInterface
 //===----------------------------------------------------------------------===//
 
-LogicalResult JVPOp::verifySymbolUses(SymbolTableCollection &symbolTable) { return success(); }
+LogicalResult JVPOp::verifySymbolUses(SymbolTableCollection &symbolTable)
+{
+    return success();
+}
 
 //===----------------------------------------------------------------------===//
 // JVPOp Extra methods
