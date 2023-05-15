@@ -295,7 +295,7 @@ def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
         See the :doc:`/dev/quick_start` for examples.
 
     Args:
-        f (DifferentiableLike): a function or a functor to differentiate
+        f (DifferentiableLike): a function or a function object to differentiate
         method (str): The method used for differentiation, which can be any of
                       ``["fd", "ps", "adj"]``,
             where:
