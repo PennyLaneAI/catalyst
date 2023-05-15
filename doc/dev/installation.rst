@@ -114,7 +114,7 @@ including all its submodules:
 
 .. code-block:: console
 
-  git clone --recurse-submodules -j8 https://github.com/PennyLaneAI/catalyst.git
+  git clone --recurse-submodules --shallow-submodules -j2 https://github.com/PennyLaneAI/catalyst.git
 
 For an existing copy of the repository without its submodules, they can also
 be fetched via:
