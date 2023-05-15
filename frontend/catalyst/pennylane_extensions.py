@@ -47,6 +47,7 @@ from catalyst.utils.tracing import TracingContext
 
 # pylint: disable=too-many-lines
 
+
 class QFunc:
     """A device specific quantum function.
 

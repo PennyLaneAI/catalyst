@@ -120,14 +120,18 @@ def BackpropOp : Gradient_Op<"backprop", [AttrSizedOperandSegments]> {
 }
 
 
-def JVPOp : Gradient_Op<"jvp", [DeclareOpInterfaceMethods<CallOpInterface>,
-        DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
+def JVPOp : Gradient_Op<"jvp", [
+        AttrSizedOperandSegments,
+        DeclareOpInterfaceMethods<CallOpInterface>,
+        DeclareOpInterfaceMethods<SymbolUserOpInterface>
+        ]> {
     let summary = "Compute the jvp of a function.";
 
     let arguments = (ins
         StrAttr:$method,
         FlatSymbolRefAttr:$callee,
-        Variadic<AnyType>:$params_and_tangents,
+        Variadic<AnyType>:$params,
+        Variadic<AnyType>:$tangents,
         OptionalAttr<AnyIntElementsAttr>:$diffArgIndices,
         OptionalAttr<Builtin_FloatAttr>:$finiteDiffParam
     );
@@ -139,19 +143,22 @@ def JVPOp : Gradient_Op<"jvp", [DeclareOpInterfaceMethods<CallOpInterface>,
     let hasVerifier = 1;
 
     let assemblyFormat = [{
-        $method $callee `(` $params_and_tangents `:` type($params_and_tangents) `)` attr-dict `:` type(results)
+        $method $callee `(` $params `:` type($params) `,` $tangents `:` type($tangents) `)` attr-dict `:` type(results)
     }];
 }
 
 
-def VJPOp : Gradient_Op<"vjp", [DeclareOpInterfaceMethods<CallOpInterface>,
+def VJPOp : Gradient_Op<"vjp", [
+        AttrSizedOperandSegments,
+        DeclareOpInterfaceMethods<CallOpInterface>,
         DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
     let summary = "Compute the vjp of a function.";
 
     let arguments = (ins
         StrAttr:$method,
         FlatSymbolRefAttr:$callee,
-        Variadic<AnyType>:$params_and_tangents,
+        Variadic<AnyType>:$params,
+        Variadic<AnyType>:$cotangents,
         OptionalAttr<AnyIntElementsAttr>:$diffArgIndices,
         OptionalAttr<Builtin_FloatAttr>:$finiteDiffParam
     );
@@ -163,7 +170,7 @@ def VJPOp : Gradient_Op<"vjp", [DeclareOpInterfaceMethods<CallOpInterface>,
     let hasVerifier = 1;
 
     let assemblyFormat = [{
-        $method $callee `(` $params_and_tangents `:` type($params_and_tangents) `)` attr-dict `:` type(results)
+        $method $callee `(` $params `:` type($params) `,` $cotangents `:` type($cotangents) `)` attr-dict `:` type(results)
     }];
 }
 

@@ -359,6 +359,7 @@ def _jvp_lowering(ctx, *args, jaxpr, fn, grad_params):
     consts_and_args = constants + args
     func_args = consts_and_args[: len(consts_and_args) - len(grad_params.argnum)]
     func_call_jaxpr = jaxpr.eqns[0].params["call_jaxpr"]
+    tang_args = consts_and_args[len(consts_and_args) - len(grad_params.argnum):]
 
     _func_lowering(
         ctx,
@@ -372,7 +373,8 @@ def _jvp_lowering(ctx, *args, jaxpr, fn, grad_params):
         flat_output_types,
         ir.StringAttr.get(method),
         ir.FlatSymbolRefAttr.get(mlir_fn_cache[fn]),
-        mlir.flatten_lowering_ir_args(consts_and_args),
+        mlir.flatten_lowering_ir_args(func_args),
+        mlir.flatten_lowering_ir_args(tang_args),
         diffArgIndices=ir.DenseIntElementsAttr.get(new_argnum),
         finiteDiffParam=ir.FloatAttr.get(ir.F64Type.get(mlir_ctx), h) if h else None,
     ).results
@@ -403,8 +405,10 @@ def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
     constants = [ConstantOp(ir.DenseElementsAttr.get(const)).results for const in jaxpr.consts]
-    func_args = constants + args
+    consts_and_args = constants + args
     func_call_jaxpr = jaxpr.eqns[0].params["call_jaxpr"]
+    func_args = consts_and_args[:len(consts_and_args) - len(argnum)]
+    cotang_args = consts_and_args[len(consts_and_args) - len(argnum):]
 
     _func_lowering(
         ctx,
@@ -419,6 +423,7 @@ def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
         ir.StringAttr.get(method),
         ir.FlatSymbolRefAttr.get(mlir_fn_cache[fn]),
         mlir.flatten_lowering_ir_args(func_args),
+        mlir.flatten_lowering_ir_args(cotang_args),
         diffArgIndices=ir.DenseIntElementsAttr.get(new_argnum),
         finiteDiffParam=ir.FloatAttr.get(ir.F64Type.get(mlir_ctx), h) if h else None,
     ).results
