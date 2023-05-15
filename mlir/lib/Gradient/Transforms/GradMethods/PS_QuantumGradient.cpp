@@ -247,11 +247,11 @@ func::FuncOp ParameterShiftLowering::genQGradFunction(PatternRewriter &rewriter,
                 selectorsToStore.push_back({forOp, loopLevel});
                 loopLevel++;
             }
-            else if (auto gate = dyn_cast<quantum::CustomOp>(op)) {
+            else if (auto gate = dyn_cast<quantum::DifferentiableGate>(op)) {
                 PatternRewriter::InsertionGuard insertGuard(rewriter);
                 rewriter.setInsertionPoint(gate);
 
-                size_t numParams = gate.getParams().size();
+                size_t numParams = gate.getDiffParams().size();
                 if (numParams) {
                     updateSelectorVector(rewriter, loc, selectorsToStore, selectorBuffer);
 

@@ -171,7 +171,7 @@ class Gate_Op<string mnemonic, list<Trait> traits = []> :
     let extraClassDeclaration = extraBaseClassDeclaration;
 }
 
-def CustomOp : Gate_Op<"custom", [NoMemoryEffect, AttrSizedOperandSegments]> {
+def CustomOp : Gate_Op<"custom", [NoMemoryEffect, AttrSizedOperandSegments, DifferentiableGate]> {
     let summary = "A generic quantum gate on n qubits with m floating point parameters.";
     let description = [{
     }];
@@ -189,9 +189,18 @@ def CustomOp : Gate_Op<"custom", [NoMemoryEffect, AttrSizedOperandSegments]> {
     let assemblyFormat = [{
         $gate_name `(` $params `)` $in_qubits attr-dict `:` type($out_qubits)
     }];
+
+    let extraClassDeclaration = extraBaseClassDeclaration # [{
+        mlir::ValueRange getDiffParams() {
+            return getParams();
+        }
+        size_t getDiffOperandIdx() {
+            return 0;
+        }
+    }];
 }
 
-def MultiRZOp : Gate_Op<"multirz", [NoMemoryEffect]> {
+def MultiRZOp : Gate_Op<"multirz", [NoMemoryEffect, DifferentiableGate]> {
     let summary = "Apply an arbitrary multi Z rotation";
     let description = [{
         The `quantum.multirz` operation applies an arbitrary multi Z rotation to the state-vector.
@@ -209,6 +218,15 @@ def MultiRZOp : Gate_Op<"multirz", [NoMemoryEffect]> {
 
     let assemblyFormat = [{
         `(` $theta `)` $in_qubits attr-dict `:` type($out_qubits)
+    }];
+
+    let extraClassDeclaration = extraBaseClassDeclaration # [{
+        mlir::ValueRange getDiffParams() {
+            return getODSOperands(0);
+        }
+        size_t getDiffOperandIdx() {
+            return 0;
+        }
     }];
 }
 

@@ -266,3 +266,39 @@ func.func @gradCall(%arg0: tensor<3xf64>) -> tensor<3xf64> {
     %0 = gradient.grad "ps" @simple_circuit(%arg0) : (tensor<3xf64>) -> tensor<3xf64>
     func.return %0 : tensor<3xf64>
 }
+
+// -----
+
+// CHECK-LABEL: @all_ops_circuit.pcount(%arg0: f64) ->  index
+func.func @all_ops_circuit(%arg0: f64) -> f64 {
+    // CHECK-DAG: [[c0:%[a-zA-Z0-9_]+]] = index.constant 0
+    // CHECK-DAG: [[c1:%[a-zA-Z0-9_]+]] = index.constant 1
+    // CHECK-DAG: [[count:%[a-zA-Z0-9_]+]] = memref.alloca() : memref<index>
+    // CHECK: memref.store [[c0]], [[count]]
+
+    // CHECK-NOT: quantum.
+    %r = quantum.alloc(1) : !quantum.reg
+    %idx = arith.constant 0 : i64
+    %q_0 = quantum.extract %r[%idx] : !quantum.reg -> !quantum.bit
+
+    // CHECK: [[num:%[a-zA-Z0-9_]+]] = memref.load [[count]]
+    // CHECK-NEXT: [[new:%[a-zA-Z0-9_]+]] = index.add [[num]], [[c1]]
+    // CHECK-NEXT: memref.store [[new]], [[count]]
+    // CHECK-NOT: quantum.
+    %q_1 = quantum.custom "rz"(%arg0) %q_0 : !quantum.bit
+
+    // CHECK: [[num:%[a-zA-Z0-9_]+]] = memref.load [[count]]
+    // CHECK-NEXT: [[new:%[a-zA-Z0-9_]+]] = index.add [[num]], [[c1]]
+    // CHECK-NEXT: memref.store [[new]], [[count]]
+    // CHECK-NOT: quantum.
+    %q_2:3 = quantum.multirz(%arg0) %q_0, %q_0, %q_0 : !quantum.bit, !quantum.bit, !quantum.bit
+
+    // CHECK: [[num:%[a-zA-Z0-9_]+]] = memref.load [[count]]
+    // CHECK: return [[num]]
+    func.return %arg0 : f64
+}
+
+func.func @gradCall(%arg0: f64) -> f64 {
+    %0 = gradient.grad "ps" @all_ops_circuit(%arg0) : (f64) -> f64
+    func.return %0 : f64
+}

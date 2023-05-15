@@ -50,4 +50,28 @@ def QuantumGate : OpInterface<"QuantumGate"> {
     }];
 }
 
+// TODO: Make this interface inherit from QuantumGate (available since llvm/llvm-project@83a635c).
+def DifferentiableGate : OpInterface<"DifferentiableGate"> {
+    let description = [{
+        This interface provides a generic way to interact with differentiable
+        quantum instructions. These are quantum operations with differentiable
+        gate parameters.
+    }];
+
+    let cppNamespace = "::catalyst::quantum";
+
+    let methods = [
+        InterfaceMethod<
+            "Return all operands which are considered differentiable gate parameters.",
+            "mlir::ValueRange", "getDiffParams"
+        >,
+        InterfaceMethod<
+            "Return the starting index at which to find differentiable operands in the Operation*."
+            "Differentiable gate parameter operands do not need to be stored in a single ODS "
+            "argument or be located in a particular position, but are assumed to be contiguous.",
+            "size_t", "getDiffOperandIdx"
+        >,
+    ];
+}
+
 #endif // QUANTUM_INTERFACES
