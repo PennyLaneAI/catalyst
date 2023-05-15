@@ -121,7 +121,7 @@ def BackpropOp : Gradient_Op<"backprop", [AttrSizedOperandSegments]> {
 
 
 def JVPOp : Gradient_Op<"jvp", [
-        AttrSizedOperandSegments,
+        SameVariadicOperandSize,
         DeclareOpInterfaceMethods<CallOpInterface>,
         DeclareOpInterfaceMethods<SymbolUserOpInterface>
         ]> {
