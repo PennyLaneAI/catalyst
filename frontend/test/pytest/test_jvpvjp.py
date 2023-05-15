@@ -13,9 +13,7 @@
 # limitations under the License.
 """ Test JVP/VJP operation lowering """
 
-from dataclasses import dataclass
-from functools import partial
-from typing import Any, Callable, Tuple, TypeVar, Union
+from typing import Tuple, TypeVar, Union
 
 import jax
 import jax.numpy as jnp
@@ -215,6 +213,7 @@ def test_vjp_against_jax_full_argnum_case_S_SS():
 
     r1 = C_workflow()
     r2 = J_workflow()
+    assert_elements_allclose(r1, r2, rtol=1e-6, atol=1e-6)
 
 
 def test_vjp_against_jax_full_argnum_case_T_T():
@@ -240,7 +239,6 @@ def test_vjp_against_jax_full_argnum_case_T_T():
 
     r1 = C_workflow()
     r2 = J_workflow()
-    assert_elements_allclose(r1, r2, rtol=1e-6, atol=1e-6)
     assert_elements_allclose(r1, r2, rtol=1e-6, atol=1e-6)
 
 
@@ -272,6 +270,7 @@ def test_vjp_against_jax_full_argnum_case_TT_T():
 
     r1 = C_workflow()
     r2 = J_workflow()
+    assert_elements_allclose(r1, r2, rtol=1e-6, atol=1e-6)
 
 
 def test_vjp_against_jax_full_argnum_case_T_TT():
