@@ -369,11 +369,12 @@ def _jvp_lowering(ctx, *args, jaxpr, fn, grad_params):
         call=False,
     )
 
-    assert len(flat_output_types) % 2 == 0, \
-        f"The total number of result tensors is expected to be even, not {len(flat_output_types)}"
+    assert (
+        len(flat_output_types) % 2 == 0
+    ), f"The total number of result tensors is expected to be even, not {len(flat_output_types)}"
     return JVPOp(
-        flat_output_types[:len(flat_output_types)//2],
-        flat_output_types[len(flat_output_types)//2:],
+        flat_output_types[: len(flat_output_types) // 2],
+        flat_output_types[len(flat_output_types) // 2 :],
         ir.StringAttr.get(method),
         ir.FlatSymbolRefAttr.get(mlir_fn_cache[fn]),
         mlir.flatten_lowering_ir_args(func_args),
@@ -412,8 +413,8 @@ def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
     func_call_jaxpr = jaxpr.eqns[0].params["call_jaxpr"]
     func_args = consts_and_args[: len(consts_and_args) - len(argnum)]
     cotang_args = consts_and_args[len(consts_and_args) - len(argnum) :]
-    func_result_types = flat_output_types[:len(flat_output_types) - len(argnum)]
-    vjp_result_types = flat_output_types[len(flat_output_types) - len(argnum):]
+    func_result_types = flat_output_types[: len(flat_output_types) - len(argnum)]
+    vjp_result_types = flat_output_types[len(flat_output_types) - len(argnum) :]
 
     _func_lowering(
         ctx,
