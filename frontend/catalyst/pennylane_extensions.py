@@ -397,7 +397,7 @@ def jvp(f, params, tangents, *, method=None, h=None, argnum=None):
     fn: Differentiable = _ensure_differentiable(f)
     grad_params = _check_grad_params(method, h, argnum)
     jaxpr = _make_jaxpr_differentiable(fn, grad_params, *params)
-    return jprim.jvp_p.bind(*(params + tangents), jaxpr=jaxpr, fn=fn, grad_params=grad_params)
+    return jprim.jvp_p.bind(*params, *tangents, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
 
 
 def vjp(f, params, cotangents, *, method=None, h=None, argnum=None):
@@ -457,7 +457,7 @@ def vjp(f, params, cotangents, *, method=None, h=None, argnum=None):
     fn: Differentiable = _ensure_differentiable(f)
     grad_params = _check_grad_params(method, h, argnum)
     jaxpr = _make_jaxpr_differentiable(fn, grad_params, *params)
-    return jprim.vjp_p.bind(*(params + cotangents), jaxpr=jaxpr, fn=fn, grad_params=grad_params)
+    return jprim.vjp_p.bind(*params, *cotangents, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
 
 
 class Cond(Operation):

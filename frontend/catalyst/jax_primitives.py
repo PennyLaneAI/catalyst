@@ -359,7 +359,7 @@ def _jvp_lowering(ctx, *args, jaxpr, fn, grad_params):
     consts_and_args = constants + args
     func_args = consts_and_args[: len(consts_and_args) - len(grad_params.argnum)]
     func_call_jaxpr = jaxpr.eqns[0].params["call_jaxpr"]
-    tang_args = consts_and_args[len(consts_and_args) - len(grad_params.argnum):]
+    tang_args = consts_and_args[len(consts_and_args) - len(grad_params.argnum) :]
 
     _func_lowering(
         ctx,
@@ -407,8 +407,8 @@ def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
     constants = [ConstantOp(ir.DenseElementsAttr.get(const)).results for const in jaxpr.consts]
     consts_and_args = constants + args
     func_call_jaxpr = jaxpr.eqns[0].params["call_jaxpr"]
-    func_args = consts_and_args[:len(consts_and_args) - len(argnum)]
-    cotang_args = consts_and_args[len(consts_and_args) - len(argnum):]
+    func_args = consts_and_args[: len(consts_and_args) - len(argnum)]
+    cotang_args = consts_and_args[len(consts_and_args) - len(argnum) :]
 
     _func_lowering(
         ctx,
