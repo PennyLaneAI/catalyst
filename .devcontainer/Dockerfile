@@ -1,4 +1,4 @@
-FROM python:3-slim
+FROM --platform=linux/amd64 python:3-slim
 
 # Add non-root user to the image.
 
@@ -27,3 +27,4 @@ RUN pip install --no-cache-dir ipykernel
 RUN pip install --no-cache-dir pennylane-catalyst
 
 ENV SHELL /bin/bash
+ENV PATH="/home/${USERNAME}/.local/bin:${PATH}"
