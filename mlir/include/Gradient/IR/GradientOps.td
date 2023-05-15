@@ -122,6 +122,7 @@ def BackpropOp : Gradient_Op<"backprop", [AttrSizedOperandSegments]> {
 
 def JVPOp : Gradient_Op<"jvp", [
         SameVariadicOperandSize,
+        SameVariadicResultSize,
         DeclareOpInterfaceMethods<CallOpInterface>,
         DeclareOpInterfaceMethods<SymbolUserOpInterface>
         ]> {
@@ -137,19 +138,23 @@ def JVPOp : Gradient_Op<"jvp", [
     );
 
     let results = (outs
-        Variadic<AnyTypeOf<[AnyFloat, RankedTensorOf<[AnyFloat]>]>>
+        Variadic<AnyTypeOf<[AnyFloat, RankedTensorOf<[AnyFloat]>]>>:$calleeResults,
+        Variadic<AnyTypeOf<[AnyFloat, RankedTensorOf<[AnyFloat]>]>>:$jvps
     );
 
-    let hasVerifier = 1;
-
     let assemblyFormat = [{
-        $method $callee `(` $params `:` type($params) `,` $tangents `:` type($tangents) `)` attr-dict `:` type(results)
+        $method $callee `(` $params `:` type($params) `,` $tangents `:` type($tangents) `)`
+        attr-dict `:` type($calleeResults) `,` type($jvps)
     }];
+
+
+    let hasVerifier = 1;
 }
 
 
 def VJPOp : Gradient_Op<"vjp", [
         AttrSizedOperandSegments,
+        AttrSizedResultSegments,
         DeclareOpInterfaceMethods<CallOpInterface>,
         DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
     let summary = "Compute the vjp of a function.";
@@ -164,13 +169,15 @@ def VJPOp : Gradient_Op<"vjp", [
     );
 
     let results = (outs
-        Variadic<AnyTypeOf<[AnyFloat, RankedTensorOf<[AnyFloat]>]>>
+        Variadic<AnyTypeOf<[AnyFloat, RankedTensorOf<[AnyFloat]>]>>:$calleeResults,
+        Variadic<AnyTypeOf<[AnyFloat, RankedTensorOf<[AnyFloat]>]>>:$vjps
     );
 
     let hasVerifier = 1;
 
     let assemblyFormat = [{
-        $method $callee `(` $params `:` type($params) `,` $cotangents `:` type($cotangents) `)` attr-dict `:` type(results)
+        $method $callee `(` $params `:` type($params) `,` $cotangents `:` type($cotangents) `)`
+            attr-dict `:` type($calleeResults) `,` type($vjps)
     }];
 }
 
