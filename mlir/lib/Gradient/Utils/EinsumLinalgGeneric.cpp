@@ -27,48 +27,50 @@ using namespace llvm;
 
 namespace catalyst {
 
-Value einsumLinalgGeneric(OpBuilder &ob, Location loc, ArrayRef<size_t> a_axis,
-                          ArrayRef<size_t> b_axis, ArrayRef<size_t> r_axis, Value a, Value b)
+Value einsumLinalgGeneric(OpBuilder &ob, Location loc,
+                          ArrayRef<size_t> axisCodesA, ArrayRef<size_t> axisCodesB,
+                          ArrayRef<size_t> axisCodesResult,
+                          Value a, Value b)
 {
     auto ta = a.getType().cast<TensorType>();
     auto tb = b.getType().cast<TensorType>();
     assert(ta.getElementType() == tb.getElementType() && "element types should match");
 
-    auto axis_dims = ({
+    auto axisDims = ({
         std::map<size_t, size_t> out;
         for (size_t i = 0; i < ta.getShape().size(); i++)
-            out[a_axis[i]] = ta.getShape()[i];
+            out[axisCodesA[i]] = ta.getShape()[i];
         for (size_t i = 0; i < tb.getShape().size(); i++)
-            out[b_axis[i]] = tb.getShape()[i];
+            out[axisCodesB[i]] = tb.getShape()[i];
         out;
     });
 
-    auto r_shape = ({
+    auto shapeR = ({
         std::vector<int64_t> out;
-        for (auto i : r_axis)
-            out.push_back(axis_dims[i]);
+        for (auto i : axisCodesResult)
+            out.push_back(axisDims[i]);
         out;
     });
 
-    auto tr = ta.cloneWith(ArrayRef<int64_t>(r_shape), ta.getElementType());
+    auto tr = ta.cloneWith(ArrayRef<int64_t>(shapeR), ta.getElementType());
 
     auto maps = ({
         SmallVector<AffineMap> out;
-        for (const auto axis : {a_axis, b_axis, r_axis}) {
+        for (const auto axis : {axisCodesA, axisCodesB, axisCodesResult}) {
             SmallVector<AffineExpr> aexprs;
             for (const auto a : axis) {
                 aexprs.push_back(getAffineDimExpr(a, ob.getContext()));
             }
-            out.push_back(AffineMap::get(axis_dims.size(), 0, aexprs, ob.getContext()));
+            out.push_back(AffineMap::get(axisDims.size(), 0, aexprs, ob.getContext()));
         };
         out;
     });
 
     auto attrs = ({
         SmallVector<utils::IteratorType, 4> out;
-        SmallSetVector<size_t, 4> ua(a_axis.begin(), a_axis.end());
-        SmallSetVector<size_t, 4> ub(b_axis.begin(), b_axis.end());
-        for (const auto a : axis_dims) {
+        SmallSetVector<size_t, 4> ua(axisCodesA.begin(), axisCodesA.end());
+        SmallSetVector<size_t, 4> ub(axisCodesB.begin(), axisCodesB.end());
+        for (const auto a : axisDims) {
             out.push_back((ua.contains(a.first) && ub.contains(a.first))
                               ? utils::IteratorType::reduction
                               : utils::IteratorType::parallel);
