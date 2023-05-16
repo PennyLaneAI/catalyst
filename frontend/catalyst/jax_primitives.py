@@ -649,8 +649,6 @@ def _qinst_lowering(
     for p in params:
         if ir.RankedTensorType.isinstance(p.type) and ir.RankedTensorType(p.type).shape == []:
             baseType = ir.RankedTensorType(p.type).element_type
-        else:
-            assert False, f"{p.type}"
 
         if not ir.F64Type.isinstance(baseType):
             baseType = ir.F64Type.get()
