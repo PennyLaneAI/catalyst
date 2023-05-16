@@ -66,28 +66,12 @@ func::FuncOp genEnzymeWrapperFunction(PatternRewriter &rewriter, Location loc, f
     std::string fnName = callee.getName().str() + ".enzyme_wrapper";
     SmallVector<Type> argResTypes(callee.getArgumentTypes().begin(),
                                callee.getArgumentTypes().end());
+    SmallVector<Type> originalArgTypes(callee.getArgumentTypes().begin(),
+                               callee.getArgumentTypes().end());
+
     argResTypes.insert(argResTypes.end(), callee.getResultTypes().begin(),
                     callee.getResultTypes().end());
     
-
-    // Bufferize and lower the arguments
-    SmallVector<Type> originalArgTypes, bufferizedArgTypes;
-    for (auto argTypeIt = argResTypes.begin(); argTypeIt < argResTypes.end() - callee.getNumResults();
-         argTypeIt++) {
-        originalArgTypes.push_back(*argTypeIt);
-        if (argTypeIt->isa<TensorType>()) {
-            Type buffArgType = buffTypeConverter.convertType(*argTypeIt);
-            bufferizedArgTypes.push_back(buffArgType);
-            Type llvmArgType = llvmTypeConverter.convertType(buffArgType);
-            if (!llvmArgType)
-                emitError(loc, "Could not convert argmap argument to LLVM type: ") << buffArgType;
-            *argTypeIt = LLVM::LLVMPointerType::get(llvmArgType);
-        }
-        else {
-            bufferizedArgTypes.push_back(*argTypeIt);
-        }
-    }
-
     // Bufferize and lower the results
     SmallVector<Type> bufferizedResultTypes, llvmResultTypes;
     for (auto resTypeIt = argResTypes.begin() + callee.getNumArguments(); resTypeIt < argResTypes.end();
@@ -100,7 +84,6 @@ func::FuncOp genEnzymeWrapperFunction(PatternRewriter &rewriter, Location loc, f
         llvmResultTypes.push_back(llvmResType);
         *resTypeIt = LLVM::LLVMPointerType::get(llvmResType);
     }
-
 
     // Create the wrapped operation
     FunctionType fnType = rewriter.getFunctionType(argResTypes, {});
@@ -116,17 +99,10 @@ func::FuncOp genEnzymeWrapperFunction(PatternRewriter &rewriter, Location loc, f
         Block *entryBlock = wrappedCallee.addEntryBlock();
         rewriter.setInsertionPointToStart(entryBlock);
 
+        // Get the arguments
         SmallVector<Value> callArgs(wrappedCallee.getArguments().begin(),
                                     wrappedCallee.getArguments().end() - callee.getNumResults());
-        for (auto [arg, buffType] : llvm::zip(callArgs, bufferizedArgTypes)) {
-            if (arg.getType().isa<LLVM::LLVMPointerType>()) {
-                Value memrefStruct = rewriter.create<LLVM::LoadOp>(loc, arg);
-                Value memref =
-                    rewriter.create<UnrealizedConversionCastOp>(loc, buffType, memrefStruct)
-                        .getResult(0);
-                arg = rewriter.create<bufferization::ToTensorOp>(loc, memref);
-            }
-        }
+
         // Call the callee
         ValueRange results = rewriter.create<func::CallOp>(loc, callee, callArgs).getResults();
 
