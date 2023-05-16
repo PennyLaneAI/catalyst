@@ -396,9 +396,10 @@ class OpenQasmBuilder {
         }
 
         // reset quantum registers
-        for (auto &qreg : this->qregs) {
-            oss << qreg.toOpenQasm(RegisterMode::Reset);
-        }
+        // for (auto &qreg : this->qregs) {
+        //     oss << qreg.toOpenQasm(RegisterMode::Reset);
+        // }
+        // Note. Commented as this is not support by the Braket simulator device
 
         return oss.str();
     }
