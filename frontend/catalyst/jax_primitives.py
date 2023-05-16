@@ -1209,11 +1209,13 @@ def _qwhile_lowering(
 #
 def qfor(body_jaxpr, body_nconsts, *header_and_iter_args_plus_consts):
     """Bind operands to operation."""
+    step = header_and_iter_args_plus_consts[2]
+    apply_reverse_transform = isinstance(step, int) and step < 0
     return qfor_p.bind(
         *header_and_iter_args_plus_consts,
         body_jaxpr=body_jaxpr,
         body_nconsts=body_nconsts,
-        apply_reverse_transform=True,
+        apply_reverse_transform=apply_reverse_transform,
     )
 
 

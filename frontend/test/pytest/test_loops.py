@@ -55,6 +55,7 @@ class TestLoopToJaxpr:
         expected = """\
 { lambda ; a:f64[] b:i64[]. let
     c:i64[] d:f64[] = qfor[
+      apply_reverse_transform=False
       body_jaxpr={ lambda ; e:i64[] f:i64[] g:f64[]. let
           h:i64[] = add f 1
         in (h, g) }
@@ -338,6 +339,22 @@ class TestForLoops:
 
         assert np.allclose(circuit(4), np.eye(2**4)[0])
 
+    def test_negative_step(self, backend):
+        """Test loops with a negative step size."""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit(n):
+            @for_loop(n, 0, -1)
+            def loop_fn(_):
+                qml.PauliX(0)
+
+            loop_fn()
+            return measure(0)
+
+        assert circuit(1)
+        assert not circuit(0)
+
 
 class TestClassicalCompilation:
     """Test that Catalyst loops can be used outside of quantum functions."""
@@ -434,6 +451,43 @@ class TestClassicalCompilation:
 
         assert mulc.mlir
         assert mulc(x, n) == muli(x, n)
+
+    def test_for_loop_inf(step):
+        """
+        Test for loop with a negative step size (that would produce an infinite range) iterates 0
+        times.
+        """
+
+        @qjit
+        def revc():
+            @for_loop(5, 10, -1)
+            def loop(i, agg):
+                return agg + i
+
+            return loop(27)
+
+        assert revc.mlir
+        assert revc() == 27
+
+    def test_for_loop_neg_step_expression(self):
+        """
+        Test for loop in classical function with a nontrivial expression that evaluates to a
+        negative step, but is constant w.r.t. function args.
+        """
+
+        @qjit
+        def revc(m: int):
+            y = 7
+            x = y * 7
+
+            @for_loop(m, -3, x - 51 + (y - y))
+            def loop(i, agg):
+                return agg + i
+
+            return loop(0)
+
+        assert revc.mlir
+        assert revc(7) == 15
 
 
 class TestInterpretationControlFlow:
