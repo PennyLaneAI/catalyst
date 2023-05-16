@@ -234,8 +234,7 @@ TEST_CASE("Test OpenQasmBuilder with dumping the circuit header", "[openqasm]")
     builder.Register(RegisterType::Qubit, "qubits", 5);
 
     std::string toqasm = "OPENQASM 3.0;\n"
-                         "qubit[5] qubits;\n"
-                         "reset qubits;\n";
+                         "qubit[5] qubits;\n";
 
     CHECK(builder.toOpenQasm() == toqasm);
 
@@ -299,8 +298,7 @@ TEST_CASE("Test OpenQasmBuilder with dumping the circuit header, gates, and meas
                          "rz(0.12) q[1];\n"
                          "rx(alpha) q[0];\n"
                          "b[0] = measure q[0];\n"
-                         "b[1] = measure q[1];\n"
-                         "reset q;\n";
+                         "b[1] = measure q[1];\n";
 
     CHECK(builder.toOpenQasm() == toqasm);
 }
@@ -322,8 +320,7 @@ TEST_CASE("Test OpenQasmBuilder with dumping a circuit without measurement resul
                          "x q[0];\n"
                          "h q[1];\n"
                          "measure q[0];\n"
-                         "measure q[1];\n"
-                         "reset q;\n";
+                         "measure q[1];\n";
 
     CHECK(builder.toOpenQasm() == toqasm);
 }

@@ -55,16 +55,9 @@ void OpenQasmDevice::StartTapeRecording() { RT_FAIL("Unsupported functionality")
 
 void OpenQasmDevice::StopTapeRecording() { RT_FAIL("Unsupported functionality"); }
 
-void OpenQasmDevice::SetDeviceShots([[maybe_unused]] size_t shots)
-{
-    RT_FAIL("Unsupported functionality");
-}
+void OpenQasmDevice::SetDeviceShots([[maybe_unused]] size_t shots) { this->device_shots = shots; }
 
-auto OpenQasmDevice::GetDeviceShots() const -> size_t
-{
-    RT_FAIL("Unsupported functionality");
-    return 0;
-}
+auto OpenQasmDevice::GetDeviceShots() const -> size_t { return this->device_shots; }
 
 void OpenQasmDevice::PrintState() { RT_FAIL("Unsupported functionality"); }
 
@@ -81,6 +74,12 @@ auto OpenQasmDevice::One() const -> Result
 }
 
 void OpenQasmDevice::PrintCircuit() { std::cout << this->device->toOpenQasm(); }
+
+void OpenQasmDevice::ExecuteCircuit()
+{
+    OpenQasm::BraketRunner runner{this->device->toOpenQasm()};
+    runner.runCircuit("arn:aws:braket:::device/quantum-simulator/amazon/sv1", GetDeviceShots());
+}
 
 auto OpenQasmDevice::Circuit() -> std::string { return this->device->toOpenQasm(); }
 

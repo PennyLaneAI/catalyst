@@ -15,7 +15,12 @@ if(ENABLE_LIGHTNING_KOKKOS)
     list(APPEND source_files LightningKokkosSimulator.cpp)
 endif()
 
+list(APPEND libs lightning_interfaces)
+
 if(ENABLE_OPENQASM)
+    find_package(pybind11 REQUIRED)
+
+    list(APPEND libs pybind11::embed)
     list(APPEND source_files openqasm/OpenQasmDevice.cpp)
 endif()
 
@@ -25,6 +30,6 @@ target_include_directories(rt_backend PRIVATE   ${backend_includes}
                                                 ${runtime_includes} 
                                                 ${extensions_includes})
 
-target_link_libraries(rt_backend PUBLIC ${CMAKE_DL_LIBS} lightning_interfaces)
+target_link_libraries(rt_backend PUBLIC ${CMAKE_DL_LIBS} ${libs})
 
 set_property(TARGET rt_backend PROPERTY POSITION_INDEPENDENT_CODE ON)

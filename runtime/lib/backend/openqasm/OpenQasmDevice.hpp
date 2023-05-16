@@ -23,6 +23,7 @@
 
 #include "QubitManager.hpp"
 
+#include "openqasm/BraketRunner.hpp"
 #include "openqasm/OpenQasmBuilder.hpp"
 
 namespace Catalyst::Runtime::Device {
@@ -34,6 +35,8 @@ class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {
     Simulator::QubitManager<QubitIdType, size_t> qubit_manager{};
     std::unique_ptr<OpenQasm::OpenQasmBuilder> device =
         std::make_unique<OpenQasm::OpenQasmBuilder>();
+
+    size_t device_shots{0};
 
     inline auto getDeviceWires(const std::vector<QubitIdType> &wires) -> std::vector<size_t>
     {
@@ -47,6 +50,7 @@ class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {
   public:
     explicit OpenQasmDevice([[maybe_unused]] bool status = false,
                             [[maybe_unused]] size_t shots = default_device_shots)
+        : device_shots(shots)
     {
     }
     ~OpenQasmDevice() = default;
@@ -72,6 +76,7 @@ class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {
 
     // Circuit RT
     void PrintCircuit();
+    void ExecuteCircuit();
     [[nodiscard]] auto Circuit() -> std::string;
 
     // QIS
