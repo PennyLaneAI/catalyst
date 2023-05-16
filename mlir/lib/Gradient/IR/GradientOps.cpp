@@ -168,41 +168,49 @@ Operation::operand_range JVPOp::getArgOperands() { return getOperands(); }
 LogicalResult JVPOp::verifySymbolUses(SymbolTableCollection &symbolTable)
 {
     // Check that the callee attribute refers to a valid function.
-    func::FuncOp fn = ({
-         auto callee = this->getCalleeAttr();
+    func::FuncOp callee = ({
+         auto cattr = this->getCalleeAttr();
          auto fn = symbolTable.lookupNearestSymbolFrom<func::FuncOp>(
-             this->getOperation(), callee);
+             this->getOperation(), cattr);
          if (!fn)
-             return this->emitOpError("invalid function name specified: ") << callee;
+             return this->emitOpError("invalid function name specified: ") << cattr;
          fn;
     });
 
     auto r1 = ::verifyGradInputs(
-        this, fn,
+        this, callee,
         this->getCalleeOperands(),
         GradOp::compDiffArgIndices(this->getDiffArgIndices()));
+    if (r1.failed()) {
+        return r1;
+    }
 
-    /* const std::vector<Type> &expectedTypes = computeResultTypes(fn, diff_arg_indices); */
+    if (this->getNumResults() != 2*callee.getFunctionType().getNumResults()) {
+        return this->emitOpError("invalid number of results: must be twice the number")
+               << " of callee results (" << 2*callee.getFunctionType().getNumResults() << ")"
+               << " but got " << this->getNumResults();
+    }
 
-    /* // Verify the number of results matches the expected gradient shape. */
-    /* // The grad output should contain one set of results (equal in size to */
-    /* // the number of function results) for each differentiable argument. */
-    /* if (result_types.size() != expectedTypes.size()) */
-    /*     return op_state->emitOpError("incorrect number of results in the gradient of the callee, ") */
-    /*            << "expected " << expectedTypes.size() << " results " */
-    /*            << "but got " << result_types.size(); */
+    auto jvp_types = ({
+        std::vector<Type> out;
+        for (auto s : this->getJvps()) {
+            out.push_back(s.getType());
+        }
+        out;
+    });
 
-    /* // Verify the shape of each result. The numeric type should match the numeric type */
-    /* // of the corresponding function result. The shape is given by grouping the differentiated */
-    /* // argument shape with the corresponding function result shape. */
-    /* TypeRange gradResultTypes = result_types; */
-    /* for (unsigned i = 0; i < expectedTypes.size(); i++) { */
-    /*     if (gradResultTypes[i] != expectedTypes[i]) */
-    /*         return op_state->emitOpError("invalid result type: grad result at position ") */
-    /*                << i << " must be " << expectedTypes[i] << " but got " << gradResultTypes[i]; */
-    /* } */
+    for (size_t i=0; i<callee.getFunctionType().getNumResults(); i++) {
+        auto calleeRtype = callee.getFunctionType().getResult(i);
+        auto jvpRtype = jvp_types[i];
+        if (calleeRtype != jvpRtype) {
+            return this->emitOpError("result types do not match")
+                   << " result " << i << " should match "
+                   << " was expected to match the type " << jvpRtype
+                   << " but got " << calleeRtype;
+        }
+    }
 
-    return r1;
+    return success();
 }
 
 //===----------------------------------------------------------------------===//
@@ -248,14 +256,49 @@ LogicalResult VJPOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
          fn;
     });
 
+    // Check gradient input parameters
     auto r1 = ::verifyGradInputs(
         this, callee,
         this->getCalleeOperands(),
         GradOp::compDiffArgIndices(this->getDiffArgIndices()));
+    if (r1.failed()) {
+        return r1;
+    }
 
-    /* callee.getFunctionType() */
+    auto calleeResultTypes = callee.getFunctionType().getResults();
 
-    return r1;
+    auto cotTypes = ({
+        std::vector<Type> out;
+        auto cotangOperands = OperandRange(
+            this->operand_begin() + callee.getFunctionType().getNumInputs(),
+            this->operand_end());
+        for (auto c : cotangOperands) {
+            out.push_back(c.getType());
+        }
+        out;
+    });
+
+    // Check that callee results have the same size as cotangent inputs
+    if (calleeResultTypes.size() != cotTypes.size()) {
+        return this->emitOpError(
+            "number of callee results does not match the number of cotangent arguments")
+               << " expected " << cotTypes.size()
+               << " but got " << calleeResultTypes.size();
+    }
+
+    // Check that callee results have the same types as cotangent inputs
+    for (size_t i=0; i<cotTypes.size(); i++) {
+        auto cotType = cotTypes[i];
+        auto crType = calleeResultTypes[i];
+        if (cotType != crType) {
+            return this->emitOpError("callee result type does not match the cotangent type")
+               << " callee result " << i
+               << " was expected to be of type " << cotType
+               << " but got " << crType;
+        }
+    }
+
+    return success();
 }
 
 //===----------------------------------------------------------------------===//
