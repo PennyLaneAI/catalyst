@@ -21,19 +21,19 @@ import sys
 
 import requests
 
-jax_version = sys.argv[1]
+jax_version = "0.4.10"  # sys.argv[1]
 
 url = f"https://raw.githubusercontent.com/google/jax/jaxlib-v{jax_version}/WORKSPACE"
 response = requests.get(url)
-match = re.search(r'strip_prefix = "tensorflow-([a-zA-Z0-9]*)"', response.text)
-tf_commit = match.group(1)
+match = re.search(r'strip_prefix = "xla-([a-zA-Z0-9]*)"', response.text)
+xla_commit = match.group(1)
 
-url = f"https://raw.githubusercontent.com/tensorflow/tensorflow/{tf_commit}/third_party/llvm/workspace.bzl"
+url = f"https://raw.githubusercontent.com/openxla/xla/{xla_commit}/third_party/llvm/workspace.bzl"
 response = requests.get(url)
 match = re.search(r'LLVM_COMMIT = "([a-zA-Z0-9]*)"', response.text)
 llvm_commit = match.group(1)
 
-url = f"https://api.github.com/repos/tensorflow/tensorflow/commits?sha={tf_commit}&path=tensorflow/compiler/xla/mlir_hlo&per_page=1"
+url = f"https://api.github.com/repos/openxla/xla/commits?sha={xla_commit}&path=xla/mlir_hlo&per_page=1"
 response = requests.get(url).json()
 tf_hlo_commit = response[0]["sha"]
 match = re.search(r"PiperOrigin-RevId: ([0-9]*)", response[0]["commit"]["message"])
