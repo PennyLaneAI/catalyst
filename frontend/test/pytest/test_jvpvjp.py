@@ -19,7 +19,7 @@ import jax
 import jax.numpy as jnp
 import pennylane as qml
 import pytest
-from jax import linearize as J_jvp
+from jax import linearize as J_linearize
 from jax import vjp as J_vjp
 from jax.tree_util import tree_flatten, tree_unflatten
 from numpy.testing import assert_allclose
@@ -70,7 +70,7 @@ def test_jvp_against_jax_full_argnum_case_S_SS():
     @jax.jit
     def J_workflow():
         f = qml.QNode(circuit_rx, device=qml.device("default.qubit.jax", wires=1), interface="jax")
-        y, ft = J_jvp(f, *x)
+        y, ft = J_linearize(f, *x)
         return flatten_if_tuples((y, ft(*t)))
 
     r1 = C_workflow()
@@ -95,7 +95,7 @@ def test_jvp_against_jax_full_argnum_case_T_T():
 
     @jax.jit
     def J_workflow():
-        y, ft = J_jvp(f, *x)
+        y, ft = J_linearize(f, *x)
         return flatten_if_tuples((y, ft(*t)))
 
     r1 = C_workflow()
@@ -125,7 +125,7 @@ def test_jvp_against_jax_full_argnum_case_TT_T():
 
     @jax.jit
     def J_workflow():
-        y, ft = J_jvp(f, *x)
+        y, ft = J_linearize(f, *x)
         return flatten_if_tuples((y, ft(*t)))
 
     r1 = C_workflow()
@@ -150,7 +150,7 @@ def test_jvp_against_jax_full_argnum_case_T_TT():
 
     @jax.jit
     def J_workflow():
-        y, ft = J_jvp(f, *x)
+        y, ft = J_linearize(f, *x)
         return flatten_if_tuples((y, ft(*t)))
 
     r1 = C_workflow()
@@ -183,7 +183,7 @@ def test_jvp_against_jax_full_argnum_case_TT_TT():
 
     @jax.jit
     def J_workflow():
-        y, ft = J_jvp(f, *x)
+        y, ft = J_linearize(f, *x)
         return flatten_if_tuples((y, ft(*t)))
 
     r1 = C_workflow()
@@ -423,7 +423,7 @@ def test_jvp_against_jax_argnum0_case_TT_TT():
         def _f(a):
             return f(a, *x[1:])
 
-        y, ft = J_jvp(_f, *x[0:1])
+        y, ft = J_linearize(_f, *x[0:1])
         return flatten_if_tuples((y, ft(*t[0:1])))
 
     r1a = C_workflowA()
