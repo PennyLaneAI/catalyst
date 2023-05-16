@@ -28,7 +28,7 @@ with open(".dep-versions") as f:
     jax_version = [line[4:].strip() for line in f.readlines() if "jax=" in line][0]
 
 requirements = [
-    "pennylane>=0.28",
+    "pennylane>=0.31",
     f"jax=={jax_version}",
     f"jaxlib=={jax_version}",
 ]
