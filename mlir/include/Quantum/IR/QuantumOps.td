@@ -422,9 +422,10 @@ def HamiltonianOp : Observable_Op<"hamiltonian", [Pure]> {
 
 // -----
 
-class Measurement_Op<string mnemonic, list<Trait> traits = []> : Quantum_Op<mnemonic, traits>;
+class Measurement_Op<string mnemonic, list<Trait> traits = []> :
+        Quantum_Op<mnemonic, traits # [MeasurementProcess]>;
 
-def MeasureOp : Measurement_Op<"measure"> {
+def MeasureOp : Quantum_Op<"measure"> {
     let summary = "A single-qubit projective measurement in the computational basis.";
     let description = [{
     }];

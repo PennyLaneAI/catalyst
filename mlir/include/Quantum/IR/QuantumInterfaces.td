@@ -74,4 +74,16 @@ def DifferentiableGate : OpInterface<"DifferentiableGate"> {
     ];
 }
 
+def MeasurementProcess : OpInterface<"MeasurementProcess"> {
+    let description = [{
+        This interface provides a generic way to interact with quantum measurement processes.
+        These are instructions that represent some information extraction procedure on the
+        underlying statevector. On simulators, they may be implemented by direct manipulation
+        of the statevector, but on hardware they typically turn into procedures over the quantum
+        program as a whole, usually requiring many executions of the same circuit.
+    }];
+
+    let cppNamespace = "::catalyst::quantum";
+}
+
 #endif // QUANTUM_INTERFACES
