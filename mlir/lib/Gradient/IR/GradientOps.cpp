@@ -28,6 +28,25 @@
 using namespace mlir;
 using namespace catalyst::gradient;
 
+//===----------------------------------------------------------------------===//
+// CallOpInterface
+//===----------------------------------------------------------------------===//
+
+CallInterfaceCallable GradOp::getCallableForCallee() { return getCalleeAttr(); }
+
+void GradOp::setCalleeFromCallable(CallInterfaceCallable callee)
+{
+    (*this)->setAttr("callee", callee.get<SymbolRefAttr>());
+};
+
+Operation::operand_range GradOp::getArgOperands() { return getOperands(); }
+
+//===----------------------------------------------------------------------===//
+// SymbolUserOpInterface
+//===----------------------------------------------------------------------===//
+
+LogicalResult GradOp::verifySymbolUses(SymbolTableCollection &symbolTable)
+
 // Gradient input checker
 LogicalResult verifyGradInputs(OpState *op_state, func::FuncOp callee, ValueRange callee_operands,
                                const std::vector<size_t> &diff_arg_indices)

@@ -56,7 +56,8 @@ func::FuncOp genParamCountFunction(PatternRewriter &rewriter, Location loc, func
         // First copy the original function as is, then we can replace all quantum ops by counting
         // their gate parameters instead.
         rewriter.setInsertionPointAfter(callee);
-        paramCountFn = rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility);
+        paramCountFn =
+            rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility, nullptr, nullptr);
         rewriter.cloneRegionBefore(callee.getBody(), paramCountFn.getBody(), paramCountFn.end());
 
         PatternRewriter::InsertionGuard insertGuard(rewriter);
@@ -128,7 +129,7 @@ func::FuncOp genArgMapFunction(PatternRewriter &rewriter, Location loc, func::Fu
         // First copy the original function as is, then we can replace all quantum ops by collecting
         // their gate parameters in a memory buffer instead. The size of this vector is passed as an
         // input to the new function.
-        argMapFn = rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility);
+        argMapFn = rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility, nullptr, nullptr);
         rewriter.cloneRegionBefore(callee.getBody(), argMapFn.getBody(), argMapFn.end());
         Value numParams = argMapFn.getBody().front().addArgument(rewriter.getIndexType(), loc);
 

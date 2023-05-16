@@ -100,10 +100,9 @@ func::FuncOp AdjointLowering::discardAndReturnReg(PatternRewriter &rewriter, Loc
     if (!unallocFn) {
         PatternRewriter::InsertionGuard insertGuard(rewriter);
         rewriter.setInsertionPointAfter(callee);
-
-        unallocFn = rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility);
-
-        // Clone the body.
+        unallocFn =
+            rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility, nullptr, nullptr);
+        // clone the body.
         rewriter.cloneRegionBefore(callee.getBody(), unallocFn.getBody(), unallocFn.end());
         rewriter.setInsertionPointToStart(&unallocFn.getBody().front());
 
@@ -140,7 +139,7 @@ func::FuncOp AdjointLowering::genQGradFunction(PatternRewriter &rewriter, Locati
         PatternRewriter::InsertionGuard insertGuard(rewriter);
         rewriter.setInsertionPointAfter(callee);
 
-        qGradFn = rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility);
+        qGradFn = rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility, nullptr, nullptr);
         rewriter.setInsertionPointToStart(qGradFn.addEntryBlock());
 
         AdjointOp qGradOp = rewriter.create<AdjointOp>(
