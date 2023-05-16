@@ -31,6 +31,7 @@
 #include "Gradient/Transforms/Passes.h"
 #include "Gradient/Transforms/Patterns.h"
 #include "Quantum/IR/QuantumOps.h"
+#include "GradMethods/JVPVJPPatterns.hpp"
 
 using namespace mlir;
 using namespace catalyst::gradient;
@@ -74,6 +75,8 @@ struct GradientLoweringPass : public OperationPass<ModuleOp> {
         scf::ForOp::getCanonicalizationPatterns(gradientPatterns, &getContext());
         catalyst::quantum::InsertOp::getCanonicalizationPatterns(gradientPatterns, &getContext());
         catalyst::quantum::DeallocOp::getCanonicalizationPatterns(gradientPatterns, &getContext());
+        gradientPatterns.add<JVPLoweringPattern>(gradientPatterns.getContext());
+        gradientPatterns.add<VJPLoweringPattern>(gradientPatterns.getContext());
 
         if (failed(applyPatternsAndFoldGreedily(op, std::move(gradientPatterns)))) {
             return signalPassFailure();

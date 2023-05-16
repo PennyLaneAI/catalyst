@@ -50,8 +50,8 @@ struct JVPVJPLoweringPass : public PassWrapper<JVPVJPLoweringPass, OperationPass
         ModuleOp op = getOperation();
 
         RewritePatternSet patterns(&getContext());
-        patterns.add<JVPLoweringPattern>(patterns.getContext(), 1);
-        patterns.add<VJPLoweringPattern>(patterns.getContext(), 1);
+        patterns.add<JVPLoweringPattern>(patterns.getContext());
+        patterns.add<VJPLoweringPattern>(patterns.getContext());
 
         if (failed(applyPatternsAndFoldGreedily(op, std::move(patterns)))) {
             return signalPassFailure();
