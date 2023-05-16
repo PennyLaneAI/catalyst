@@ -24,14 +24,9 @@ from jax._src.lib.mlir import ir
 from jax.interpreters import mlir, xla
 from jaxlib.mlir.dialects._func_ops_gen import CallOp
 from jaxlib.mlir.dialects._mhlo_ops_gen import ConstantOp, ConvertOp
-from mlir_quantum.dialects.arith import (
-    ConstantOp as ArithConstantOp,
-    AddIOp,
-    CeilDivSIOp,
-    IndexCastOp,
-    MulIOp,
-    SubIOp,
-)
+from mlir_quantum.dialects.arith import AddIOp, CeilDivSIOp
+from mlir_quantum.dialects.arith import ConstantOp as ArithConstantOp
+from mlir_quantum.dialects.arith import IndexCastOp, MulIOp, SubIOp
 from mlir_quantum.dialects.gradient import GradOp
 from mlir_quantum.dialects.quantum import (
     AllocOp,
@@ -1280,7 +1275,7 @@ def _qfor_lowering(
         one = ArithConstantOp(ir.IndexType.get(), 1)
         lower_val, upper_val, step_val = loop_operands
 
-        # Iterate from 0 to the number of iterations (ceildiv (start - stop), -step)
+        # Iterate from 0 to the number of iterations (ceil((start - stop) / -step))
         distance = SubIOp(lower_val, upper_val)
         negative_step = SubIOp(zero, step_val)
         num_iterations = CeilDivSIOp(distance, negative_step)
