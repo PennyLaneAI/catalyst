@@ -117,11 +117,20 @@ class TestCompilerErrors:
             with pytest.warns(UserWarning, match="Compiler c99"):
                 CompilerDriver.run("in.o", fallback_compilers=["c99"])
 
-    @pytest.mark.parametrize("p", [MHLOPass, QuantumCompilationPass, BufferizationPass])
-    def test_mlir_input_validation(self, p):
+    def test_mlir_input_validation_mhlo(self):
         """Test if the function detects wrong extensions"""
         with pytest.raises(ValueError, match="is not an MLIR file"):
-            p.run("file-name.nomlir")
+            MHLOPass.run("file-name.nomlir")
+
+    def test_mlir_input_validation_qcomp(self):
+        """Test if the function detects wrong extensions"""
+        with pytest.raises(ValueError, match="is not an MLIR file"):
+            QuantumCompilationPass.run("file-name.nomlir")
+
+    def test_mlir_input_validation_bufferization(self):
+        """Test if the function detects wrong extensions"""
+        with pytest.raises(ValueError, match="is not an MLIR file"):
+            BufferizationPass.run("file-name.nomlir")
 
     def test_lower_all_to_llvm_input_validation(self):
         """Test if the function detects wrong extensions"""
