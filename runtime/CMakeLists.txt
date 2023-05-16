@@ -7,7 +7,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Compiler options
 option(ENABLE_CODE_COVERAGE "Enable code coverage" OFF)
-option(ENABLE_LIGHTNING_KOKKOS "Build Lightning-Kokkos" OFF)
+option(ENABLE_LIGHTNING_KOKKOS "Build Lightning-Kokkos backend device" OFF)
+option(ENABLE_OPENQASM "Build OpenQasm backend device" OFF)
 option(RUNTIME_CLANG_TIDY "Enable Clang Tidy" OFF)
 
 set(CMAKE_VERBOSE_MAKEFILE ON)

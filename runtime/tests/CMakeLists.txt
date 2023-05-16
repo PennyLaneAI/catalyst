@@ -36,7 +36,15 @@ else()
     set(cov_helper_src  "")
 endif()
 
+if (ENABLE_OPENQASM)
+    set(openqasm_tests  Test_OpenQasmBuilder.cpp
+            Test_OpenQasmDevice.cpp)
+else()
+    set(openqasm_tests "")
+endif()
+
 target_sources(runner_tests PRIVATE ${cov_helper_src}
+            ${openqasm_tests}
             Test_QubitManager.cpp
             Test_CacheManager.cpp
             Test_LightningDriver.cpp
