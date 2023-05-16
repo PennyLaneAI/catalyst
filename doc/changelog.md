@@ -8,6 +8,15 @@
 * Add support for ``else if`` chains for ``@cond`` conditionals
   [#104](https://github.com/PennyLaneAI/catalyst/pull/104)
 
+* Add the end-to-end support for multiple backend devices. The compilation flag
+  ``ENABLE_LIGHTNING_KOKKOS=ON`` builds the runtime with support for PennyLane's
+  ``lightning.kokkos``. Both ``lightning.qubit`` and ``lightning.kokkos`` can be
+  chosen as available backend devices from the frontend.
+  [#89](https://github.com/PennyLaneAI/catalyst/pull/89)
+
+* Add support for ``var`` of general observables
+  [#124](https://github.com/PennyLaneAI/catalyst/pull/124)
+
 <h3>Improvements</h3>
 
 * Improving error handling by throwing descriptive and unified expressions for runtime
@@ -42,6 +51,14 @@
   ``MemRefView`` independant of the underlying memory layout. This can eliminate redundant buffer
   copies at the interface boundaries, which has been applied to existing devices.
   [#109](https://github.com/PennyLaneAI/catalyst/pull/109)
+
+* Reduce memory utilization by transferring ownership of buffers from the runtime to Python instead
+  of copying them. This includes adding a compiler pass that copies global buffers into the heap
+  as global buffers cannot be transferred to Python.
+  [#112](https://github.com/PennyLaneAI/catalyst/pull/112)
+
+* Temporary fix of use-after-free and dependency of uninitialized memory.
+  [#121](https://github.com/PennyLaneAI/catalyst/pull/121)
 
 <h3>Contributors</h3>
 

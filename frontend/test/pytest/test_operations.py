@@ -12,14 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import numpy as np
+import pennylane as qml
 import pytest
 
 from catalyst import qjit
-import pennylane as qml
-import numpy as np
 
 
-def test_no_parameters():
+def test_no_parameters(backend):
+    """Test no-param operations."""
+
     def circuit():
         qml.Identity(wires=0)
 
@@ -80,13 +82,15 @@ def test_no_parameters():
 
         return qml.state()
 
-    qjit_fn = qjit()(qml.qnode(qml.device("lightning.qubit", wires=3))(circuit))
+    qjit_fn = qjit()(qml.qnode(qml.device(backend, wires=3))(circuit))
     qml_fn = qml.qnode(qml.device("default.qubit", wires=3))(circuit)
 
     assert np.allclose(qjit_fn(), qml_fn())
 
 
-def test_param():
+def test_param(backend):
+    """Test param operations."""
+
     def circuit(x: float, y: float):
         qml.Rot(x, y, x + y, wires=0)
 
@@ -132,7 +136,7 @@ def test_param():
 
         return qml.state()
 
-    qjit_fn = qjit()(qml.qnode(qml.device("lightning.qubit", wires=4))(circuit))
+    qjit_fn = qjit()(qml.qnode(qml.device(backend, wires=4))(circuit))
     qml_fn = qml.qnode(qml.device("default.qubit", wires=4))(circuit)
 
     assert np.allclose(qjit_fn(3.14, 0.6), qml_fn(3.14, 0.6))

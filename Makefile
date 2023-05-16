@@ -7,6 +7,7 @@ MK_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 MK_DIR := $(dir $(MK_ABSPATH))
 DIALECTS_BUILD_DIR ?= $(MK_DIR)/mlir/build
 COVERAGE_REPORT ?= term-missing
+TEST_BACKEND ?= "lighting.qubit"
 
 .PHONY: help
 help:
@@ -65,7 +66,7 @@ lit:
 
 pytest:
 	@echo "check the Catalyst PyTest suite"
-	$(PYTHON) pytest frontend/test/pytest --tb=native -n auto
+	$(PYTHON) pytest frontend/test/pytest --tb=native --backend=$(TEST_BACKEND) -n auto
 
 test-demos:
 	@echo "check the Catalyst demos"
@@ -113,8 +114,10 @@ endif
 	$(MAKE) -C runtime format
 ifdef check
 	black --check --verbose .
+	isort --check --diff .
 else
 	black .
+	isort .
 endif
 	pylint frontend
 

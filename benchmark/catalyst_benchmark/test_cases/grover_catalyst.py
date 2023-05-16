@@ -12,14 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """ Grover-like problem, PennyLane+Catalyst implementation """
-# pylint: disable=too-many-instance-attributes
-from typing import Any
-from dataclasses import dataclass
 
-import pennylane as qml
+# pylint: disable=too-many-instance-attributes
+
+from dataclasses import dataclass
+from typing import Any
+
 import jax.numpy as jnp
-from catalyst import qjit, for_loop, while_loop
+import pennylane as qml
 from catalyst_benchmark.types import Problem
+
+from catalyst import for_loop, qjit, while_loop
 
 
 def clause_nqubits(clause_list) -> int:

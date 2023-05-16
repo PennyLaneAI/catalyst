@@ -11,11 +11,13 @@
 #
 # All configuration values have a default; values that are commented out
 # serve to show the default.
-import sys, os, re
-from unittest.mock import MagicMock
-from pathlib import Path
-import subprocess
 import json
+import os
+import re
+import subprocess
+import sys
+from pathlib import Path
+from unittest.mock import MagicMock
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the

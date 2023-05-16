@@ -57,16 +57,15 @@ auto LightningSimulator::GetNumQubits() const -> size_t { return this->device_sv
 
 void LightningSimulator::StartTapeRecording()
 {
-    RT_FAIL_IF(this->cache_recording, "Cannot re-activate the cache manager");
-    this->cache_recording = true;
+    RT_FAIL_IF(this->tape_recording, "Cannot re-activate the cache manager");
+    this->tape_recording = true;
     this->cache_manager.Reset();
 }
 
 void LightningSimulator::StopTapeRecording()
 {
-    if (this->cache_recording) {
-        this->cache_recording = false;
-    }
+    RT_FAIL_IF(!this->tape_recording, "Cannot stop an already stopped cache manager");
+    this->tape_recording = false;
 }
 
 auto LightningSimulator::CacheManagerInfo()
@@ -126,7 +125,7 @@ void LightningSimulator::NamedOperation(const std::string &name, const std::vect
     this->device_sv->applyOperation(name, dev_wires, inverse, params);
 
     // Update tape caching if required
-    if (this->cache_recording) {
+    if (this->tape_recording) {
         this->cache_manager.addOperation(name, params, dev_wires, inverse);
     }
 }
@@ -175,7 +174,7 @@ auto LightningSimulator::Expval(ObsIdType obsKey) -> double
     auto &&obs = this->obs_manager.getObservable(obsKey);
 
     // update tape caching
-    if (this->cache_recording) {
+    if (this->tape_recording) {
         this->cache_manager.addObservable(obsKey, Lightning::Measurements::Expval);
     }
 
@@ -188,27 +187,16 @@ auto LightningSimulator::Var(ObsIdType obsKey) -> double
 {
     RT_FAIL_IF(!this->obs_manager.isValidObservables({obsKey}),
                "Invalid key for cached observables");
-
     auto &&obs = this->obs_manager.getObservable(obsKey);
 
     // update tape caching
-    if (this->cache_recording) {
+    if (this->tape_recording) {
         this->cache_manager.addObservable(obsKey, Lightning::Measurements::Var);
     }
 
-    auto obs_str = obs->getObsName();
-    size_t found = obs_str.find_first_of("[");
-    if (found != std::string::npos) {
-        obs_str = obs_str.substr(0, found);
-    }
-
-    auto obs_wires = obs->getWires();
-
     Pennylane::Simulators::Measures m{*(this->device_sv)};
 
-    const double result = m.var(obs_str, obs_wires);
-
-    return result;
+    return m.var(*obs);
 }
 
 void LightningSimulator::State(DataView<std::complex<double>, 1> &state)
@@ -524,10 +512,3 @@ void LightningSimulator::Gradient(std::vector<DataView<double, 1>> &gradients,
 }
 
 } // namespace Catalyst::Runtime::Simulator
-
-namespace Catalyst::Runtime {
-auto CreateQuantumDevice() -> std::unique_ptr<QuantumDevice>
-{
-    return std::make_unique<Simulator::LightningSimulator>();
-}
-} // namespace Catalyst::Runtime

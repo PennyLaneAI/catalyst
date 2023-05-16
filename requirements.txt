@@ -6,6 +6,7 @@ black[jupyter]
 clang-format==14.*
 clang-tidy==14.*
 pylint
+isort
 
 lit
 pytest

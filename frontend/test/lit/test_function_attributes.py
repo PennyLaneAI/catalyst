@@ -14,8 +14,9 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
-from catalyst import qjit
 import pennylane as qml
+
+from catalyst import qjit
 
 
 # Non-root nodes have internal linkage.
