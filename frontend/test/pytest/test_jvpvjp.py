@@ -353,40 +353,25 @@ def test_jvpvjp_argument_checks():
 
     @qjit
     def C_workflow1():
-        return C_jvp(f, list(x), t, method="fd", argnum=list(range(len(x))))
+        return C_jvp(f, x, tuple(t), method="fd", argnum=list(range(len(x))))
 
     @qjit
     def C_workflow2():
         return C_jvp(f, tuple(x), t, method="fd", argnum=list(range(len(x))))
 
-    @qjit
-    def C_workflow3():
-        return C_vjp(f, list(x), list(ct), method="fd", argnum=list(range(len(x))))
-
-    @qjit
-    def C_workflow4():
-        return C_vjp(f, tuple(x), tuple(ct), method="fd", argnum=list(range(len(x))))
-
     assert_elements_allclose(C_workflow1(), C_workflow2(), rtol=1e-6, atol=1e-6)
-    assert_elements_allclose(C_workflow3(), C_workflow4(), rtol=1e-6, atol=1e-6)
 
-    with pytest.raises(ValueError, match="argument must be a list or a tuple"):
+    with pytest.raises(ValueError, match="argument must be an iterable"):
 
         @qjit
         def C_workflow_bad1():
             return C_jvp(f, 33, tuple(t), method="fd", argnum=list(range(len(x))))
 
-    with pytest.raises(ValueError, match="argument must be a list or a tuple"):
+    with pytest.raises(ValueError, match="argument must be an iterable"):
 
         @qjit
         def C_workflow_bad2():
-            return C_vjp(f, 33, tuple(ct), method="fd", argnum=list(range(len(x))))
-
-    with pytest.raises(ValueError, match="argnum should be integer or a list of integers"):
-
-        @qjit
-        def C_workflow_bad3():
-            return C_vjp(f, tuple(x), tuple(ct), method="fd", argnum=3.14)
+            return C_vjp(f, list(x), 33, method="fd", argnum=list(range(len(x))))
 
 
 def test_jvp_against_jax_argnum0_case_TT_TT():

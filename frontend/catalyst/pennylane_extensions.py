@@ -19,7 +19,7 @@ while using :func:`~.qjit`.
 import functools
 import numbers
 import uuid
-from typing import Any, Callable, List, Optional, Union
+from typing import Any, Callable, Iterable, List, Optional, Union
 
 import jax
 import jax.numpy as jnp
@@ -386,11 +386,9 @@ def jvp(f, params, tangents, *, method=None, h=None, argnum=None):
     )
 
     def _check(x, hint):
-        if isinstance(x, list):
-            return x
-        elif isinstance(x, tuple):
-            return list(x)
-        raise ValueError(f"jvp '{hint}' argument must be a list or a tuple, not {type(x)}")
+        if not isinstance(x, Iterable):
+            raise ValueError(f"vjp '{hint}' argument must be an iterable, not {type(x)}")
+        return x
 
     params = _check(params, "params")
     tangents = _check(tangents, "tangents")
@@ -446,11 +444,9 @@ def vjp(f, params, cotangents, *, method=None, h=None, argnum=None):
     )
 
     def _check(x, hint):
-        if isinstance(x, list):
-            return x
-        elif isinstance(x, tuple):
-            return list(x)
-        raise ValueError(f"vjp '{hint}' argument must be a list or a tuple, not {type(x)}")
+        if not isinstance(x, Iterable):
+            raise ValueError(f"vjp '{hint}' argument must be an iterable, not {type(x)}")
+        return x
 
     params = _check(params, "params")
     cotangents = _check(cotangents, "cotangents")
