@@ -156,8 +156,8 @@ void wrapResultsAndArgsInTwoStructs(LLVM::LLVMFuncOp op, PatternRewriter &rewrit
         Value arg = wrapperFuncOp.getArgument(1);
         Value structOfMemrefs = rewriter.create<LLVM::LoadOp>(loc, arg);
 
-        for (auto &en : llvm::enumerate(params)) {
-            Value pointer = rewriter.create<LLVM::ExtractValueOp>(loc, structOfMemrefs, en.index());
+        for (size_t idx = 0; idx < params.size(); idx++) {
+            Value pointer = rewriter.create<LLVM::ExtractValueOp>(loc, structOfMemrefs, idx);
             args.push_back(pointer);
         }
     }

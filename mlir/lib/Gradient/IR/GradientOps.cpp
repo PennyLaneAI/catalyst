@@ -33,6 +33,11 @@ using namespace catalyst::gradient;
 
 CallInterfaceCallable GradOp::getCallableForCallee() { return getCalleeAttr(); }
 
+void GradOp::setCalleeFromCallable(CallInterfaceCallable callee)
+{
+    (*this)->setAttr("callee", callee.get<SymbolRefAttr>());
+};
+
 Operation::operand_range GradOp::getArgOperands() { return getOperands(); }
 
 //===----------------------------------------------------------------------===//
