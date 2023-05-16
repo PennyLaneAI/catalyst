@@ -71,12 +71,12 @@ struct GradientLoweringPass : public OperationPass<ModuleOp> {
 
         // This is required to remove qubit values returned by if/for ops in the
         // quantum gradient function of the parameter-shift pattern.
+        gradientPatterns.add<JVPLoweringPattern>(gradientPatterns.getContext());
+        gradientPatterns.add<VJPLoweringPattern>(gradientPatterns.getContext());
         scf::IfOp::getCanonicalizationPatterns(gradientPatterns, &getContext());
         scf::ForOp::getCanonicalizationPatterns(gradientPatterns, &getContext());
         catalyst::quantum::InsertOp::getCanonicalizationPatterns(gradientPatterns, &getContext());
         catalyst::quantum::DeallocOp::getCanonicalizationPatterns(gradientPatterns, &getContext());
-        gradientPatterns.add<JVPLoweringPattern>(gradientPatterns.getContext());
-        gradientPatterns.add<VJPLoweringPattern>(gradientPatterns.getContext());
 
         if (failed(applyPatternsAndFoldGreedily(op, std::move(gradientPatterns)))) {
             return signalPassFailure();

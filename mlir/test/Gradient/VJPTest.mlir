@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt %s --lower-jvpvjp | FileCheck %s
+// RUN: quantum-opt %s --lower-gradients | FileCheck %s
 
 func.func private @func1(tensor<4xf64>) -> tensor<3x4xf64>
 func.func public @vjptest1(
@@ -23,9 +23,6 @@ func.func public @vjptest1(
 {
   // CHECK:      call @func1
   // CHECK-SAME:     : (tensor<4xf64>) -> tensor<3x4xf64>
-
-  // CHECK:      gradient.grad "fd" @func1
-  // CHECK-SAME:     : (tensor<4xf64>) -> tensor<4x3x4xf64>
 
   // CHECK:      linalg.generic
   // CHECK-SAME:     ins({{[^:]*}} : tensor<3x4xf64>, tensor<4x3x4xf64>)
@@ -55,11 +52,6 @@ func.func public @vjptest2(
 {
   // CHECK:      call @func2
   // CHECK-SAME:     : (tensor<3x2xf64>, tensor<2x3xf64>) -> (tensor<6xf64>, tensor<2x6xf64>)
-
-  // CHECK:      gradient.grad "fd" @func2
-  // CHECK-SAME:     : (tensor<3x2xf64>, tensor<2x3xf64>)
-  // CHECK-SAME:       -> (tensor<3x2x6xf64>, tensor<3x2x2x6xf64>,
-  // CHECK-SAME:           tensor<2x3x6xf64>, tensor<2x3x2x6xf64>)
 
   // CHECK:      linalg.generic
   // CHECK-SAME:     ins({{[^:]*}} : tensor<6xf64>, tensor<3x2x6xf64>)
