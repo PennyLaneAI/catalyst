@@ -149,6 +149,10 @@ def JVPOp : Gradient_Op<"jvp", [
 
 
     let hasVerifier = 1;
+
+    let extraClassDeclaration = [{
+        std::vector<mlir::Value> getCalleeOperands();
+    }];
 }
 
 
@@ -173,11 +177,15 @@ def VJPOp : Gradient_Op<"vjp", [
         Variadic<AnyTypeOf<[AnyFloat, RankedTensorOf<[AnyFloat]>]>>:$vjps
     );
 
-    let hasVerifier = 1;
-
     let assemblyFormat = [{
         $method $callee `(` $params `:` type($params) `,` $cotangents `:` type($cotangents) `)`
             attr-dict `:` type($calleeResults) `,` type($vjps)
+    }];
+
+    let hasVerifier = 1;
+
+    let extraClassDeclaration = [{
+        std::vector<mlir::Value> getCalleeOperands();
     }];
 }
 

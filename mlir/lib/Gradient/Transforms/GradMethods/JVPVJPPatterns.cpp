@@ -87,35 +87,35 @@ LogicalResult JVPLoweringPattern::matchAndRewrite(JVPOp op, PatternRewriter &rew
     assert(func_diff_operand_indices.size() <= op.getOperands().size() / 2);
     size_t func_operands_size = op.getOperands().size() - func_diff_operand_indices.size();
 
-    auto funcOperands = OperandRange(op.operand_begin(), op.operand_begin() + func_operands_size);
+    auto calleeOperands = op.getCalleeOperands();
     auto tangOperands = OperandRange(op.operand_begin() + func_operands_size, op.operand_end());
 
     for (auto idx : func_diff_operand_indices) {
-        assert(idx < funcOperands.size() && "all diffArgIndices reference valid arguments");
+        assert(idx < calleeOperands.size() && "all diffArgIndices reference valid arguments");
     }
 
     auto resHalfsize = (op.result_type_end() - op.result_type_begin()) / 2;
-    auto funcOperandsSize = ({
+    auto calleeOperandsSize = ({
         std::vector<Type> out;
-        for (auto o : funcOperands)
+        for (auto o : calleeOperands)
             out.push_back(o.getType());
         out;
     });
     auto funcResultTypes =
         ValueTypeRange<ResultRange>(op.result_type_begin(), op.result_type_begin() + resHalfsize);
 
-    auto funcOp = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
+    auto calleeOp = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
 
-    auto grad_result_types = computeResultTypes(funcOp, func_diff_operand_indices);
+    auto grad_result_types = computeResultTypes(calleeOp, func_diff_operand_indices);
     LLVM_DEBUG(dbgs() << "grad_result_types: " << grad_result_types << " \n");
     assert(grad_result_types.size() ==
                func_diff_operand_indices.size() * funcResultTypes.size() &&
            "GradOp does't seem to return a tuple of Jacobians");
 
-    auto fCallOp = rewriter.create<func::CallOp>(loc, funcOp, funcOperands);
+    auto fCallOp = rewriter.create<func::CallOp>(loc, calleeOp, calleeOperands);
 
     auto gradOp = rewriter.create<GradOp>(loc, grad_result_types, op.getMethod(), op.getCallee(),
-                                           funcOperands, op.getDiffArgIndicesAttr(),
+                                           calleeOperands, op.getDiffArgIndicesAttr(),
                                            op.getFiniteDiffParamAttr());
 
     std::vector<Value> einsumResults;
@@ -125,7 +125,7 @@ LogicalResult JVPLoweringPattern::matchAndRewrite(JVPOp op, PatternRewriter &rew
             LLVM_DEBUG(dbgs() << "iteration: nout " << nout << " nparam " << nparam << "\n");
             auto jac = gradOp.getResults()[nparam * funcResultTypes.size() + nout];
             auto tang = tangOperands[nparam];
-            auto param = funcOperands[func_diff_operand_indices[nparam]];
+            auto param = calleeOperands[func_diff_operand_indices[nparam]];
 
             auto sjac = _tovec(jac.getType().cast<mlir::TensorType>().getShape());
             auto sparam = _tovec(param.getType().cast<mlir::TensorType>().getShape());
@@ -217,38 +217,38 @@ LogicalResult VJPLoweringPattern::matchAndRewrite(VJPOp op, PatternRewriter &rew
     LLVM_DEBUG(dbgs() << "vjp_num_operands " << op.getOperands().size() << " \n");
     LLVM_DEBUG(dbgs() << "func_diff_operand_indices: " << func_diff_operand_indices << " \n");
 
-    auto funcOp = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
+    auto calleeOp = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
 
-    size_t func_operands_size = funcOp.getFunctionType().getNumInputs();
+    size_t func_operands_size = calleeOp.getFunctionType().getNumInputs();
     size_t cotang_operands_size = op.getOperands().size() - func_operands_size;
-    assert(funcOp.getFunctionType().getNumResults() == cotang_operands_size &&
+    assert(calleeOp.getFunctionType().getNumResults() == cotang_operands_size &&
            "the number of function results doesn't match the number of cotangent arguments");
 
-    auto funcOperands = OperandRange(op.operand_begin(), op.operand_begin() + func_operands_size);
+    auto calleeOperands = op.getCalleeOperands();
     auto cotang_operands = OperandRange(op.operand_begin() + func_operands_size, op.operand_end());
 
     for (auto idx : func_diff_operand_indices) {
-        assert(idx < funcOperands.size() && "all diffArgIndices reference valid arguments");
+        assert(idx < calleeOperands.size() && "all diffArgIndices reference valid arguments");
     }
 
-    auto funcOperandsSize = ({
+    auto calleeOperandsSize = ({
         std::vector<Type> out;
-        for (auto o : funcOperands)
+        for (auto o : calleeOperands)
             out.push_back(o.getType());
         out;
     });
-    auto funcResultTypes = funcOp.getResultTypes();
+    auto funcResultTypes = calleeOp.getResultTypes();
 
-    auto grad_result_types = computeResultTypes(funcOp, func_diff_operand_indices);
+    auto grad_result_types = computeResultTypes(calleeOp, func_diff_operand_indices);
     LLVM_DEBUG(dbgs() << "grad_result_types: " << grad_result_types << " \n");
     assert(grad_result_types.size() ==
                func_diff_operand_indices.size() * funcResultTypes.size() &&
            "GradOp does't seem to return a tuple of Jacobians");
 
-    auto fCallOp = rewriter.create<func::CallOp>(loc, funcOp, funcOperands);
+    auto fCallOp = rewriter.create<func::CallOp>(loc, calleeOp, calleeOperands);
 
     auto gradOp = rewriter.create<GradOp>(loc, grad_result_types, op.getMethod(), op.getCallee(),
-                                           funcOperands, op.getDiffArgIndicesAttr(),
+                                           calleeOperands, op.getDiffArgIndicesAttr(),
                                            op.getFiniteDiffParamAttr());
 
     std::vector<Value> einsumResults;
@@ -256,7 +256,7 @@ LogicalResult VJPLoweringPattern::matchAndRewrite(VJPOp op, PatternRewriter &rew
         Optional<Value> acc;
         for (size_t nout = 0; nout < funcResultTypes.size(); nout++) {
             auto jac = gradOp.getResults()[nparam * funcResultTypes.size() + nout];
-            auto param = funcOperands[func_diff_operand_indices[nparam]];
+            auto param = calleeOperands[func_diff_operand_indices[nparam]];
             auto cotang = cotang_operands[nout];
 
             auto sjac = _tovec(jac.getType().cast<mlir::TensorType>().getShape());
@@ -324,7 +324,7 @@ LogicalResult VJPLoweringPattern::matchAndRewrite(VJPOp op, PatternRewriter &rew
         std::vector<Value> out;
         out.insert(out.end(), fCallOp.getResults().begin(), fCallOp.getResults().end());
         out.insert(out.end(), einsumResults.begin(), einsumResults.end());
-        /* out.insert(out.end(), funcOperands.begin(), funcOperands.end()); */
+        /* out.insert(out.end(), calleeOperands.begin(), calleeOperands.end()); */
         out;
     });
 
