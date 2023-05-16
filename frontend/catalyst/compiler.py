@@ -204,6 +204,7 @@ class MLIRToLLVMDialect(PassPipeline):
         # lowering in -convert-memref-to-llvm.
         "--expand-strided-metadata",
         "--lower-affine",
+        "--arith-expand",
         "--convert-complex-to-standard",  # added for complex.exp lowering
         "--convert-complex-to-llvm",
         "--convert-math-to-llvm",

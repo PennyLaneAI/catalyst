@@ -24,7 +24,14 @@ from jax._src.lib.mlir import ir
 from jax.interpreters import mlir, xla
 from jaxlib.mlir.dialects._func_ops_gen import CallOp
 from jaxlib.mlir.dialects._mhlo_ops_gen import ConstantOp, ConvertOp
-from mlir_quantum.dialects.arith import IndexCastOp
+from mlir_quantum.dialects.arith import (
+    ConstantOp as ArithConstantOp,
+    AddIOp,
+    CeilDivSIOp,
+    IndexCastOp,
+    MulIOp,
+    SubIOp,
+)
 from mlir_quantum.dialects.gradient import GradOp
 from mlir_quantum.dialects.quantum import (
     AllocOp,
@@ -1203,7 +1210,10 @@ def _qwhile_lowering(
 def qfor(body_jaxpr, body_nconsts, *header_and_iter_args_plus_consts):
     """Bind operands to operation."""
     return qfor_p.bind(
-        *header_and_iter_args_plus_consts, body_jaxpr=body_jaxpr, body_nconsts=body_nconsts
+        *header_and_iter_args_plus_consts,
+        body_jaxpr=body_jaxpr,
+        body_nconsts=body_nconsts,
+        apply_reverse_transform=True,
     )
 
 
@@ -1227,6 +1237,7 @@ def _qfor_lowering(
     *iter_args_plus_consts: tuple,
     body_jaxpr: jax.core.ClosedJaxpr,
     body_nconsts: int,
+    apply_reverse_transform: bool,
 ):
     # Separate constants from iteration arguments.
     # The MLIR value provided by JAX for the iteration index is not needed
@@ -1262,6 +1273,19 @@ def _qfor_lowering(
         ).result  # tensor<i64> -> i64
         p = IndexCastOp(ir.IndexType.get(), p).result  # i64 -> index
         loop_operands.append(p)
+    if apply_reverse_transform:
+        zero = ArithConstantOp(ir.IndexType.get(), 0)
+        one = ArithConstantOp(ir.IndexType.get(), 1)
+        lower_val, upper_val, step_val = loop_operands
+
+        # Iterate from 0 to the number of iterations (ceildiv (start - stop), -step)
+        distance = SubIOp(lower_val, upper_val)
+        negative_step = SubIOp(zero, step_val)
+        num_iterations = CeilDivSIOp(distance, negative_step)
+        loop_operands[0] = zero
+        loop_operands[1] = num_iterations
+        loop_operands[2] = one
+
     loop_operands.extend(loop_args)
 
     for_op_scf = ForOp(loop_operands[0], loop_operands[1], loop_operands[2], iter_args=loop_args)
@@ -1274,6 +1298,9 @@ def _qfor_lowering(
         body_args = list(body_block.arguments)
 
         # Convert the index type iteration variable expected by MLIR to tensor<i64> expected by JAX.
+        if apply_reverse_transform:
+            # iv = start + normalized_iv * step
+            body_args[0] = AddIOp(lower_val, MulIOp(body_args[0], step_val))
         body_args[0] = IndexCastOp(loop_index_type, body_args[0]).result
         result_from_elements_op = ir.RankedTensorType.get((), loop_index_type)
         from_elements_op = FromElementsOp.build_generic([result_from_elements_op], [body_args[0]])
