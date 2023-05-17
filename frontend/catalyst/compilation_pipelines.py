@@ -89,6 +89,29 @@ class CompiledFunction:
         self.restype = restype
 
     @staticmethod
+    def can_skip_promote(compiled_signature, runtime_signature):
+        """Whether arguments can be promoted.
+
+        Args:
+            compiled_signature: user supplied signature, obtain from either an annotation or a
+                                previously compiled
+            implementation of the compiled function
+            runtime_signature: runtime signature
+
+        Returns:
+            bool.
+        """
+        len_compile = len(compiled_signature)
+        len_runtime = len(runtime_signature)
+        if len_compile != len_runtime:
+            return False
+
+        for c_param, r_param in zip(compiled_signature, runtime_signature):
+            if c_param.dtype != r_param.dtype:
+                return False
+        return True
+
+    @staticmethod
     def can_promote(compiled_signature, runtime_signature):
         """Whether arguments can be promoted.
 
@@ -522,9 +545,14 @@ class QJIT:
           function: an instance of CompiledFunction that may have been recompiled
           *args: arguments that may have been promoted
         """
-        args = [jax.numpy.asarray(arg) for arg in args]
+        bitmask = map(lambda x: not isinstance(x, jax.Array), args)
+        args = list(map(lambda arg, is_not_jax_array: jax.numpy.asarray(arg) if is_not_jax_array else arg, args, bitmask))
         r_sig = CompiledFunction.get_runtime_signature(*args)
         is_prev_compile = self.compiled_function is not None
+        can_skip_promote = is_prev_compile and CompiledFunction.can_skip_promote(self.c_sig, r_sig)
+        if can_skip_promote:
+            return function, args
+
         can_promote = not is_prev_compile or CompiledFunction.can_promote(self.c_sig, r_sig)
         needs_compile = not is_prev_compile or not can_promote
 
