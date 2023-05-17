@@ -522,7 +522,7 @@ class QJIT:
           function: an instance of CompiledFunction that may have been recompiled
           *args: arguments that may have been promoted
         """
-        args = [jax.numpy.array(arg) for arg in args]
+        args = [jax.numpy.asarray(arg) for arg in args]
         r_sig = CompiledFunction.get_runtime_signature(*args)
         is_prev_compile = self.compiled_function is not None
         can_promote = not is_prev_compile or CompiledFunction.can_promote(self.c_sig, r_sig)
@@ -536,7 +536,7 @@ class QJIT:
             function = self.compile()
         else:
             args = CompiledFunction.promote_arguments(self.c_sig, r_sig, *args)
-        args = [jax.numpy.array(arg) for arg in args]
+        args = [jax.numpy.asarray(arg) for arg in args]
 
         return function, args
 
