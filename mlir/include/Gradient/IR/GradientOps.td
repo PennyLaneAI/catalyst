@@ -143,8 +143,8 @@ def JVPOp : Gradient_Op<"jvp", [
     );
 
     let assemblyFormat = [{
-        $method $callee `(` $params `:` type($params) `,` $tangents `:` type($tangents) `)`
-        attr-dict `:` type($calleeResults) `,` type($jvps)
+        $method $callee `(` $params `)` `tangents` `(` $tangents `)`
+        attr-dict `:` functional-type(operands, results)
     }];
 
 
@@ -178,8 +178,8 @@ def VJPOp : Gradient_Op<"vjp", [
     );
 
     let assemblyFormat = [{
-        $method $callee `(` $params `:` type($params) `,` $cotangents `:` type($cotangents) `)`
-            attr-dict `:` type($calleeResults) `,` type($vjps)
+        $method $callee `(` $params `)` `cotangents` `( $cotangents `)`
+            attr-dict `:` functional-type(operands, results)
     }];
 
     let hasVerifier = 1;
