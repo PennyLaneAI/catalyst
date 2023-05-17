@@ -69,6 +69,21 @@
   it's vector-Jacobian product.
   [#98](https://github.com/PennyLaneAI/catalyst/pull/98)
 
+  An example of newly supported workflow:
+
+  ``` python
+  from catalyst import jvp
+
+  def f(p):
+    return jnp.stack([1*p, 2*p, 3*p])
+
+  @qjit
+  def workflow(params, tangent):
+      return jvp(f, [params], [tangent])
+
+  workflow(jnp.zeros([4], dtype=float), jnp.ones([4], dtype=float))
+  ```
+
 <h3>Improvements</h3>
 
 * Improving error handling by throwing descriptive and unified expressions for runtime
