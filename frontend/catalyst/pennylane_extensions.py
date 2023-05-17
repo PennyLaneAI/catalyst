@@ -900,6 +900,9 @@ def for_loop(lower_bound, upper_bound, step):
                 args = loop_fn(i, *args)
             return args
 
+    Unlike ``jax.cond.fori_loop``, the step can be negative if it is known at tracing time
+    (i.e. constant). If a non-constant negative step is used, the loop will produce no iterations.
+
     Args:
         lower_bound (int): starting value of the iteration index
         upper_bound (int): (exclusive) upper bound of the iteration index

@@ -1276,10 +1276,9 @@ def _qfor_lowering(
         one = ArithConstantOp(ir.IndexType.get(), 1)
         start_val, stop_val, step_val = loop_operands[0], loop_operands[1], loop_operands[2]
 
-        # Iterate from 0 to the number of iterations (ceil((start - stop) / -step))
-        distance = SubIOp(start_val, stop_val)
-        negative_step = SubIOp(zero, step_val)
-        num_iterations = CeilDivSIOp(distance, negative_step)
+        # Iterate from 0 to the number of iterations (ceil((stop - start) / step))
+        distance = SubIOp(stop_val, start_val)
+        num_iterations = CeilDivSIOp(distance, step_val)
         loop_operands[0] = zero
         loop_operands[1] = num_iterations
         loop_operands[2] = one
