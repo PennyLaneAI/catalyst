@@ -14,8 +14,8 @@
 
 #include "GradMethods/Adjoint.hpp"
 #include "GradMethods/FiniteDifference.hpp"
-#include "GradMethods/ParameterShift.hpp"
 #include "GradMethods/JVPVJPPatterns.hpp"
+#include "GradMethods/ParameterShift.hpp"
 
 #include "mlir/IR/PatternMatch.h"
 

@@ -34,9 +34,9 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "Gradient/IR/GradientOps.h"
+#include "Gradient/Utils/CompDiffArgIndices.h"
 #include "Gradient/Utils/EinsumLinalgGeneric.h"
 #include "Gradient/Utils/GradientShape.h"
-#include "Gradient/Utils/CompDiffArgIndices.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/PatternMatch.h"
 
@@ -74,7 +74,6 @@ template <class T> std::vector<int64_t> _tovec(const T &x)
     return std::vector<int64_t>(x.begin(), x.end());
 };
 
-
 LogicalResult JVPLoweringPattern::matchAndRewrite(JVPOp op, PatternRewriter &rewriter) const
 {
     MLIRContext *ctx = getContext();
@@ -109,15 +108,14 @@ LogicalResult JVPLoweringPattern::matchAndRewrite(JVPOp op, PatternRewriter &rew
 
     auto grad_result_types = computeResultTypes(calleeOp, func_diff_operand_indices);
     LLVM_DEBUG(dbgs() << "grad_result_types: " << grad_result_types << " \n");
-    assert(grad_result_types.size() ==
-               func_diff_operand_indices.size() * funcResultTypes.size() &&
+    assert(grad_result_types.size() == func_diff_operand_indices.size() * funcResultTypes.size() &&
            "GradOp does't seem to return a tuple of Jacobians");
 
     auto fCallOp = rewriter.create<func::CallOp>(loc, calleeOp, calleeOperands);
 
     auto gradOp = rewriter.create<GradOp>(loc, grad_result_types, op.getMethod(), op.getCallee(),
-                                           calleeOperands, op.getDiffArgIndicesAttr(),
-                                           op.getFiniteDiffParamAttr());
+                                          calleeOperands, op.getDiffArgIndicesAttr(),
+                                          op.getFiniteDiffParamAttr());
 
     std::vector<Value> einsumResults;
     for (size_t nout = 0; nout < funcResultTypes.size(); nout++) {
@@ -171,8 +169,8 @@ LogicalResult JVPLoweringPattern::matchAndRewrite(JVPOp op, PatternRewriter &rew
 
             /* tjac.getShape(); */
 
-            auto res = einsumLinalgGeneric(rewriter, loc, jacAxisNames, tangAxisNames,
-                                           jvpAxisNames, jac, tang);
+            auto res = einsumLinalgGeneric(rewriter, loc, jacAxisNames, tangAxisNames, jvpAxisNames,
+                                           jac, tang);
 
             LLVM_DEBUG(dbgs() << "jvp result type " << res.getType() << "\n");
 
@@ -205,7 +203,6 @@ LogicalResult JVPLoweringPattern::matchAndRewrite(JVPOp op, PatternRewriter &rew
     LLVM_DEBUG(dbgs() << "replaced JVP\n");
     return success();
 }
-
 
 LogicalResult VJPLoweringPattern::matchAndRewrite(VJPOp op, PatternRewriter &rewriter) const
 {
@@ -242,15 +239,14 @@ LogicalResult VJPLoweringPattern::matchAndRewrite(VJPOp op, PatternRewriter &rew
 
     auto grad_result_types = computeResultTypes(calleeOp, func_diff_operand_indices);
     LLVM_DEBUG(dbgs() << "grad_result_types: " << grad_result_types << " \n");
-    assert(grad_result_types.size() ==
-               func_diff_operand_indices.size() * funcResultTypes.size() &&
+    assert(grad_result_types.size() == func_diff_operand_indices.size() * funcResultTypes.size() &&
            "GradOp does't seem to return a tuple of Jacobians");
 
     auto fCallOp = rewriter.create<func::CallOp>(loc, calleeOp, calleeOperands);
 
     auto gradOp = rewriter.create<GradOp>(loc, grad_result_types, op.getMethod(), op.getCallee(),
-                                           calleeOperands, op.getDiffArgIndicesAttr(),
-                                           op.getFiniteDiffParamAttr());
+                                          calleeOperands, op.getDiffArgIndicesAttr(),
+                                          op.getFiniteDiffParamAttr());
 
     std::vector<Value> einsumResults;
     for (size_t nparam = 0; nparam < func_diff_operand_indices.size(); nparam++) {

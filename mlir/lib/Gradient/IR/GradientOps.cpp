@@ -19,8 +19,8 @@
 
 #include "Gradient/IR/GradientDialect.h"
 #include "Gradient/IR/GradientOps.h"
-#include "Gradient/Utils/GradientShape.h"
 #include "Gradient/Utils/CompDiffArgIndices.h"
+#include "Gradient/Utils/GradientShape.h"
 
 #define GET_OP_CLASSES
 #include "Gradient/IR/GradientOps.cpp.inc"
@@ -29,11 +29,8 @@ using namespace mlir;
 using namespace catalyst::gradient;
 
 // Gradient input checker
-LogicalResult verifyGradInputs(
-    OpState *op_state,
-    func::FuncOp callee,
-    ValueRange callee_operands,
-    const std::vector<size_t> &diff_arg_indices)
+LogicalResult verifyGradInputs(OpState *op_state, func::FuncOp callee, ValueRange callee_operands,
+                               const std::vector<size_t> &diff_arg_indices)
 {
     // Check that the call operand types match the callee operand types.
     ValueRange fnArgs = callee_operands;
@@ -63,11 +60,8 @@ LogicalResult verifyGradInputs(
 }
 
 // Gradient output checker
-LogicalResult verifyGradOutputs(
-    OpState *op_state,
-    func::FuncOp fn,
-    const std::vector<size_t> &diff_arg_indices,
-    TypeRange result_types)
+LogicalResult verifyGradOutputs(OpState *op_state, func::FuncOp fn,
+                                const std::vector<size_t> &diff_arg_indices, TypeRange result_types)
 {
     const std::vector<Type> &expectedTypes = computeResultTypes(fn, diff_arg_indices);
 
@@ -92,7 +86,6 @@ LogicalResult verifyGradOutputs(
     return success();
 }
 
-
 //===----------------------------------------------------------------------===//
 // GradOp, CallOpInterface
 //===----------------------------------------------------------------------===//
@@ -109,24 +102,19 @@ LogicalResult GradOp::verifySymbolUses(SymbolTableCollection &symbolTable)
 {
     // Check that the callee attribute refers to a valid function.
     auto fn = ({
-         auto callee = this->getCalleeAttr();
-         func::FuncOp fn = symbolTable.lookupNearestSymbolFrom<func::FuncOp>(
-             this->getOperation(), callee);
-         if (!fn)
-             return this->emitOpError("invalid function name specified: ") << callee;
-         fn;
+        auto callee = this->getCalleeAttr();
+        func::FuncOp fn =
+            symbolTable.lookupNearestSymbolFrom<func::FuncOp>(this->getOperation(), callee);
+        if (!fn)
+            return this->emitOpError("invalid function name specified: ") << callee;
+        fn;
     });
 
-    auto r1 = ::verifyGradInputs(
-        this, fn,
-        this->getArgOperands(),
-        compDiffArgIndices(this->getDiffArgIndices()));
+    auto r1 = ::verifyGradInputs(this, fn, this->getArgOperands(),
+                                 compDiffArgIndices(this->getDiffArgIndices()));
 
-    auto r2 = ::verifyGradOutputs(
-        this,
-        fn,
-        compDiffArgIndices(this->getDiffArgIndices()),
-        this->getResultTypes());
+    auto r2 = ::verifyGradOutputs(this, fn, compDiffArgIndices(this->getDiffArgIndices()),
+                                  this->getResultTypes());
 
     return success(succeeded(r1) && succeeded(r2));
 }
@@ -159,25 +147,22 @@ LogicalResult JVPOp::verifySymbolUses(SymbolTableCollection &symbolTable)
 {
     // Check that the callee attribute refers to a valid function.
     func::FuncOp callee = ({
-         auto cattr = this->getCalleeAttr();
-         auto fn = symbolTable.lookupNearestSymbolFrom<func::FuncOp>(
-             this->getOperation(), cattr);
-         if (!fn)
-             return this->emitOpError("invalid function name specified: ") << cattr;
-         fn;
+        auto cattr = this->getCalleeAttr();
+        auto fn = symbolTable.lookupNearestSymbolFrom<func::FuncOp>(this->getOperation(), cattr);
+        if (!fn)
+            return this->emitOpError("invalid function name specified: ") << cattr;
+        fn;
     });
 
-    auto r1 = ::verifyGradInputs(
-        this, callee,
-        this->getParams(),
-        compDiffArgIndices(this->getDiffArgIndices()));
+    auto r1 = ::verifyGradInputs(this, callee, this->getParams(),
+                                 compDiffArgIndices(this->getDiffArgIndices()));
     if (r1.failed()) {
         return r1;
     }
 
-    if (this->getNumResults() != 2*callee.getFunctionType().getNumResults()) {
+    if (this->getNumResults() != 2 * callee.getFunctionType().getNumResults()) {
         return this->emitOpError("invalid number of results: must be twice the number")
-               << " of callee results (" << 2*callee.getFunctionType().getNumResults() << ")"
+               << " of callee results (" << 2 * callee.getFunctionType().getNumResults() << ")"
                << " but got " << this->getNumResults();
     }
 
@@ -189,14 +174,13 @@ LogicalResult JVPOp::verifySymbolUses(SymbolTableCollection &symbolTable)
         out;
     });
 
-    for (size_t i=0; i<callee.getFunctionType().getNumResults(); i++) {
+    for (size_t i = 0; i < callee.getFunctionType().getNumResults(); i++) {
         auto calleeRtype = callee.getFunctionType().getResult(i);
         auto jvpRtype = jvp_types[i];
         if (calleeRtype != jvpRtype) {
             return this->emitOpError("result types do not match")
                    << " result " << i << " should match "
-                   << " was expected to match the type " << jvpRtype
-                   << " but got " << calleeRtype;
+                   << " was expected to match the type " << jvpRtype << " but got " << calleeRtype;
         }
     }
 
@@ -227,22 +211,21 @@ Operation::operand_range VJPOp::getArgOperands() { return getOperands(); }
 // VJPOp, SymbolUserOpInterface
 //===----------------------------------------------------------------------===//
 
-LogicalResult VJPOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
+LogicalResult VJPOp::verifySymbolUses(SymbolTableCollection &symbolTable)
+{
     // Check that the callee attribute refers to a valid function.
     auto callee = ({
-         auto cattr = this->getCalleeAttr();
-         func::FuncOp fn = symbolTable.lookupNearestSymbolFrom<func::FuncOp>(
-             this->getOperation(), cattr);
-         if (!fn)
-             return this->emitOpError("invalid function name specified: ") << cattr;
-         fn;
+        auto cattr = this->getCalleeAttr();
+        func::FuncOp fn =
+            symbolTable.lookupNearestSymbolFrom<func::FuncOp>(this->getOperation(), cattr);
+        if (!fn)
+            return this->emitOpError("invalid function name specified: ") << cattr;
+        fn;
     });
 
     // Check gradient input parameters
-    auto r1 = ::verifyGradInputs(
-        this, callee,
-        this->getParams(),
-        compDiffArgIndices(this->getDiffArgIndices()));
+    auto r1 = ::verifyGradInputs(this, callee, this->getParams(),
+                                 compDiffArgIndices(this->getDiffArgIndices()));
     if (r1.failed()) {
         return r1;
     }
@@ -252,8 +235,7 @@ LogicalResult VJPOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
     auto cotTypes = ({
         std::vector<Type> out;
         auto cotangOperands = OperandRange(
-            this->operand_begin() + callee.getFunctionType().getNumInputs(),
-            this->operand_end());
+            this->operand_begin() + callee.getFunctionType().getNumInputs(), this->operand_end());
         for (auto c : cotangOperands) {
             out.push_back(c.getType());
         }
@@ -263,20 +245,18 @@ LogicalResult VJPOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
     // Check that callee results have the same size as cotangent inputs
     if (calleeResultTypes.size() != cotTypes.size()) {
         return this->emitOpError(
-            "number of callee results does not match the number of cotangent arguments")
-               << " expected " << cotTypes.size()
-               << " but got " << calleeResultTypes.size();
+                   "number of callee results does not match the number of cotangent arguments")
+               << " expected " << cotTypes.size() << " but got " << calleeResultTypes.size();
     }
 
     // Check that callee results have the same types as cotangent inputs
-    for (size_t i=0; i<cotTypes.size(); i++) {
+    for (size_t i = 0; i < cotTypes.size(); i++) {
         auto cotType = cotTypes[i];
         auto crType = calleeResultTypes[i];
         if (cotType != crType) {
             return this->emitOpError("callee result type does not match the cotangent type")
-               << " callee result " << i
-               << " was expected to be of type " << cotType
-               << " but got " << crType;
+                   << " callee result " << i << " was expected to be of type " << cotType
+                   << " but got " << crType;
         }
     }
 

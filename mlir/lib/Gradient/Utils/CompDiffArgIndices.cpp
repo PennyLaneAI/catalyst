@@ -30,4 +30,4 @@ std::vector<size_t> compDiffArgIndices(Optional<DenseIntElementsAttr> indices)
     return diffArgIndices;
 }
 
-};
+}; // namespace catalyst

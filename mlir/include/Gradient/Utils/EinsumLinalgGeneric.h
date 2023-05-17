@@ -29,12 +29,10 @@ namespace catalyst {
 /// found e.g. in the `numpy.einsum` funciton. The items of these arrays encode axis of `a`,
 /// `b` and the `result` correspondingly. For example, the `([0,1,2,3], [2,3], [0,1])` codes would
 /// be equivalent to the following `np.einsum` format string: `"abcd,cd->ab"`.
-mlir::Value einsumLinalgGeneric(mlir::OpBuilder &builder,
-                                mlir::Location loc,
+mlir::Value einsumLinalgGeneric(mlir::OpBuilder &builder, mlir::Location loc,
                                 llvm::ArrayRef<size_t> axisCodesA,
                                 llvm::ArrayRef<size_t> axisCodesB,
-                                llvm::ArrayRef<size_t> axisCodesResult,
-                                mlir::Value a,
+                                llvm::ArrayRef<size_t> axisCodesResult, mlir::Value a,
                                 mlir::Value b);
 
-}
+} // namespace catalyst

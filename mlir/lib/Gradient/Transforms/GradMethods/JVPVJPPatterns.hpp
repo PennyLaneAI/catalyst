@@ -14,8 +14,8 @@
 
 #pragma once
 
-#include "mlir/IR/PatternMatch.h"
 #include "Gradient/IR/GradientOps.h"
+#include "mlir/IR/PatternMatch.h"
 
 namespace catalyst {
 namespace gradient {
@@ -32,6 +32,5 @@ struct VJPLoweringPattern : public mlir::OpRewritePattern<VJPOp> {
     mlir::LogicalResult matchAndRewrite(VJPOp op, mlir::PatternRewriter &rewriter) const override;
 };
 
-
-} // gradient
-} // catalyst
+} // namespace gradient
+} // namespace catalyst

@@ -27,10 +27,9 @@ using namespace llvm;
 
 namespace catalyst {
 
-Value einsumLinalgGeneric(OpBuilder &ob, Location loc,
-                          ArrayRef<size_t> axisCodesA, ArrayRef<size_t> axisCodesB,
-                          ArrayRef<size_t> axisCodesResult,
-                          Value a, Value b)
+Value einsumLinalgGeneric(OpBuilder &ob, Location loc, ArrayRef<size_t> axisCodesA,
+                          ArrayRef<size_t> axisCodesB, ArrayRef<size_t> axisCodesResult, Value a,
+                          Value b)
 {
     auto ta = a.getType().cast<TensorType>();
     auto tb = b.getType().cast<TensorType>();

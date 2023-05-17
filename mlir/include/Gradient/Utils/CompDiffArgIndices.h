@@ -16,13 +16,12 @@
 
 #include <vector>
 
-#include "llvm/ADT/Optional.h"
 #include "mlir/IR/BuiltinAttributes.h"
+#include "llvm/ADT/Optional.h"
 
 namespace catalyst {
 
 // Calculate the vector of effective gradient argument indices based on the user settings.
-std::vector<size_t> compDiffArgIndices(
-    llvm::Optional<mlir::DenseIntElementsAttr> indices);
+std::vector<size_t> compDiffArgIndices(llvm::Optional<mlir::DenseIntElementsAttr> indices);
 
-};
+}; // namespace catalyst
