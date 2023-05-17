@@ -27,11 +27,11 @@ from catalyst import measure, qjit
 class TestJAXJIT:
     """Test QJIT compatibility with JAX compilation."""
 
-    def test_simple_circuit(self):
+    def test_simple_circuit(self, backend):
         """Test a basic use case of jax.jit on top of qjit."""
 
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qml.qnode(qml.device(backend, wires=2))
         def circuit(x: jax.ShapedArray((3,), dtype=float)):
             qml.RX(jnp.pi * x[0], wires=0)
             qml.RY(x[1] ** 2, wires=0)
@@ -48,11 +48,11 @@ class TestJAXJIT:
 
         assert jnp.allclose(result, reference)
 
-    def test_multiple_arguments(self):
+    def test_multiple_arguments(self, backend):
         """Test a circuit with multiple arguments using jax.jit on top of qjit."""
 
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qml.qnode(qml.device(backend, wires=2))
         def circuit(x: jax.ShapedArray((3,), dtype=float), y: jax.ShapedArray((2,), dtype=float)):
             qml.RX(jnp.pi * x[0], wires=0)
             qml.RY(x[1] ** 2, wires=0)
@@ -69,11 +69,11 @@ class TestJAXJIT:
 
         assert jnp.allclose(result, reference)
 
-    def test_multiple_results(self):
+    def test_multiple_results(self, backend):
         """Test a circuit with multiple results using jax.jit on top of qjit."""
 
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qml.qnode(qml.device(backend, wires=2))
         def circuit(x: jax.ShapedArray((3,), dtype=float), y: jax.ShapedArray((2,), dtype=float)):
             qml.RX(jnp.pi * x[0], wires=0)
             qml.RY(x[1] ** 2, wires=0)
@@ -90,11 +90,11 @@ class TestJAXJIT:
 
         assert jnp.allclose(result, reference)
 
-    def test_without_precompilation(self):
+    def test_without_precompilation(self, backend):
         """Test a function without type hints (pre-compilation) using jax.jit on top of qjit."""
 
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qml.qnode(qml.device(backend, wires=2))
         def circuit(x, y):
             qml.RX(jnp.pi * x[0], wires=0)
             qml.RY(x[1] ** 2, wires=0)
@@ -111,11 +111,11 @@ class TestJAXJIT:
 
         assert jnp.allclose(result, reference)
 
-    def test_multiple_calls(self):
+    def test_multiple_calls(self, backend):
         """Test a jax.jit function which repeatedly calls a qjit function."""
 
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qml.qnode(qml.device(backend, wires=1))
         def circuit(x):
             qml.RY(x, wires=0)
             return measure(0)
@@ -135,11 +135,11 @@ class TestJAXJIT:
 class TestJAXAD:
     """Test QJIT compatibility with JAX differentiation."""
 
-    def test_simple_circuit(self):
+    def test_simple_circuit(self, backend):
         """Test a basic use case of jax.grad on top of qjit."""
 
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qml.qnode(qml.device(backend, wires=2))
         def circuit(x: jax.ShapedArray((3,), dtype=float)):
             qml.RX(jnp.pi * x[0], wires=0)
             qml.RY(x[1] ** 2, wires=0)
@@ -157,11 +157,11 @@ class TestJAXAD:
 
         assert jnp.allclose(result, reference)
 
-    def test_multiple_arguments(self):
+    def test_multiple_arguments(self, backend):
         """Test a circuit with multiple arguments using jax.grad on top of qjit."""
 
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qml.qnode(qml.device(backend, wires=2))
         def circuit(x: jax.ShapedArray((3,), dtype=float), y: jax.ShapedArray((2,), dtype=float)):
             qml.RX(jnp.pi * x[0], wires=0)
             qml.RY(x[1] ** 2, wires=0)
@@ -181,11 +181,11 @@ class TestJAXAD:
         assert jnp.allclose(result[0], reference[0])
         assert jnp.allclose(result[1], reference[1])
 
-    def test_multiple_results(self):
+    def test_multiple_results(self, backend):
         """Test a circuit with multiple results using jax.grad on top of qjit."""
 
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qml.qnode(qml.device(backend, wires=2))
         def circuit(x: jax.ShapedArray((3,), dtype=float), y: jax.ShapedArray((2,), dtype=float)):
             qml.RX(jnp.pi * x[0], wires=0)
             qml.RY(x[1] ** 2, wires=0)
@@ -205,11 +205,11 @@ class TestJAXAD:
         assert jnp.allclose(result[0], reference[0])
         assert jnp.allclose(result[1], reference[1])
 
-    def test_jacobian(self):
+    def test_jacobian(self, backend):
         """Test a circuit with vector return type using jax.jacobian on top of qjit."""
 
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qml.qnode(qml.device(backend, wires=2))
         def circuit(x: jax.ShapedArray((3,), dtype=float), y: jax.ShapedArray((2,), dtype=float)):
             qml.RX(jnp.pi * x[0], wires=0)
             qml.RY(x[1] ** 2, wires=0)
@@ -229,11 +229,11 @@ class TestJAXAD:
         assert jnp.allclose(result[0], reference[0])
         assert jnp.allclose(result[1], reference[1])
 
-    def test_without_precompilation(self):
+    def test_without_precompilation(self, backend):
         """Test a function without type hints (pre-compilation) using jax.grad on top of qjit."""
 
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qml.qnode(qml.device(backend, wires=2))
         def circuit(x, y):
             qml.RX(jnp.pi * x[0], wires=0)
             qml.RY(x[1] ** 2, wires=0)
@@ -253,11 +253,11 @@ class TestJAXAD:
         assert jnp.allclose(result[0], reference[0])
         assert jnp.allclose(result[1], reference[1])
 
-    def test_non_differentiable_arguments(self):
+    def test_non_differentiable_arguments(self, backend):
         """Test a circuit with non-differentiable arguments using jax.grad on top of qjit."""
 
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qml.qnode(qml.device(backend, wires=2))
         def circuit(x: jax.ShapedArray((3,), dtype=float), y: int):
             qml.RX(jnp.pi * x[0], wires=0)
             qml.RY(x[1] ** 2, wires=0)
@@ -275,11 +275,11 @@ class TestJAXAD:
 
         assert jnp.allclose(result, reference)
 
-    def test_multiple_calls(self):
+    def test_multiple_calls(self, backend):
         """Test a jax.grad function which repeatedly calls a qjit function."""
 
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qml.qnode(qml.device(backend, wires=1))
         def circuit(x):
             qml.RY(x, wires=0)
             return jnp.asarray(measure(0), dtype=float)
@@ -295,11 +295,11 @@ class TestJAXAD:
         assert jnp.allclose(result1, 0.0)
         assert jnp.allclose(result2, 0.0)
 
-    def test_efficient_Jacobian(self):
+    def test_efficient_Jacobian(self, backend):
         """Test a jax.grad function does not compute Jacobians for arguments not in argnum."""
 
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qml.qnode(qml.device(backend, wires=2))
         def circuit(x: float, y: float):
             qml.RX(x, wires=0)
             qml.RY(y, wires=0)
