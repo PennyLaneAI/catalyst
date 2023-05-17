@@ -20,7 +20,7 @@ import pennylane as qml
 import pytest
 from jax import numpy as jnp
 
-import catalyst.utils.calculate_shape as infer
+import catalyst.utils.calculate_grad_shape as infer
 from catalyst import CompileError, cond, for_loop, grad, qjit
 
 

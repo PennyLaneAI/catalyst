@@ -53,7 +53,7 @@ from mlir_quantum.dialects.scf import ConditionOp, ForOp, IfOp, WhileOp, YieldOp
 from mlir_quantum.dialects.tensor import ExtractOp as TensorExtractOp
 from mlir_quantum.dialects.tensor import FromElementsOp
 
-from catalyst.utils.calculate_shape import Signature, calculate_grad_shape
+from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
 
 # pylint: disable=unused-argument,too-many-lines
 
