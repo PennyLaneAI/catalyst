@@ -33,7 +33,6 @@ int main(int argc, char **argv)
     mlir::registerPass(catalyst::createQuantumConversionPass);
     mlir::registerPass(catalyst::createEmitCatalystPyInterfacePass);
     mlir::registerPass(catalyst::createCopyGlobalMemRefPass);
-    mlir::registerPass(catalyst::createJVPVJPLoweringPass);
 
     mlir::DialectRegistry registry;
     mlir::registerAllDialects(registry);

@@ -13,7 +13,7 @@
 # limitations under the License.
 """ Test JVP/VJP operation lowering """
 
-from typing import Tuple, TypeVar, Union
+from typing import Iterable, Tuple, TypeVar, Union
 
 import jax
 import jax.numpy as jnp
@@ -48,7 +48,9 @@ def circuit_rx(x1, x2):
 
 def assert_elements_allclose(a, b, **kwargs):
     """Checks all elements of tuples, one by one, for approximate equality"""
-    assert all(isinstance(i, tuple) for i in [a, b]), f"Some of {[type(a),type(b)]} is not a tuple"
+    assert all(
+        isinstance(i, Iterable) for i in [a, b]
+    ), f"Some of {[type(a),type(b)]} is not a tuple"
     assert len(a) == len(b), f"len(a) ({len(a)}) != len(b) ({type(b)})"
     for i, j in zip(a, b):
         assert_allclose(i, j, **kwargs)
