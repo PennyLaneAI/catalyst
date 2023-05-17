@@ -68,7 +68,7 @@ bool _mlir_memory_transfer(void *ptr)
 void _mlir_memref_to_llvm_free(void *ptr)
 {
     Catalyst::Runtime::CTX->getMemoryManager()->erase(ptr);
-    /* free(ptr); */
+    free(ptr);
 }
 
 void __quantum__rt__fail_cstr(const char *cstr) { RT_FAIL(cstr); }

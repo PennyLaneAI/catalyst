@@ -157,7 +157,7 @@ class BufferizationPass(PassPipeline):
 
     _executable = get_executable_path("quantum", "quantum-opt")
     _default_flags = [
-        # "--inline",
+        "--inline",
         "--gradient-bufferize",
         "--scf-bufferize",
         "--convert-tensor-to-linalg",  # tensor.pad
