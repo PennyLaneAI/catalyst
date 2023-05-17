@@ -232,12 +232,10 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
         // Add the pointer to the wrapped callee
         SmallVector<Value> callArgs = {wrapperPtr};
 
-        // Add the arguments
-        callArgs.insert(callArgs.end(), op.getArgs().begin(), op.getArgs().end());
-
-        // Add the arguments' results
+        // Add the arguments and their shadow
 
         for (auto arg : op.getArgs()) {
+            callArgs.push_back(arg);
             Value shadow;
             Type llvmArgType = llvmTypeConverter.convertType(arg.getType());
             if (!llvmArgType)
@@ -248,11 +246,11 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
                             .getResult(0);
             }
 
-            // Value c1 = rewriter.create<arith::ConstantIntOp>(loc, 1, 64);
-            // Value shadowPtr = rewriter.create<LLVM::AllocaOp>(loc, llvmArgType, c1);
-            // Type shadowStruct = llvmArgType.cast<LLVM::LLVMPointerType>().getElementType();
-            // rewriter.create<LLVM::StoreOp>(loc, shadowStruct, shadowPtr);
-            // shadow = shadowPtr;
+            Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
+            Value shadowPtr = rewriter.create<LLVM::AllocaOp>(loc, LLVM::LLVMPointerType::get(llvmArgType), c1);
+            Value zeroArg = rewriter.create<LLVM::ConstantOp>(loc, llvmArgType, rewriter.getZeroAttr(llvmArgType));
+            rewriter.create<LLVM::StoreOp>(loc, zeroArg, shadowPtr);
+            callArgs.push_back(shadowPtr);
         }
 
         // We follow the C ABI convention of passing result memrefs as struct pointers in the
@@ -267,6 +265,13 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
                 rewriter.create<LLVM::AllocaOp>(loc, LLVM::LLVMPointerType::get(vectorType), c1);
             rewriter.create<LLVM::StoreOp>(loc, memref, newArg);
             callArgs.push_back(newArg);
+
+            Value shadow;
+            Type newArgType = newArg.getType();
+            Value shadowPtr = rewriter.create<LLVM::AllocaOp>(loc, LLVM::LLVMPointerType::get(newArgType), c1);
+            // Value zeroArg = rewriter.create<LLVM::ConstantOp>(loc, newArgType, rewriter.getZeroAttr(newArgType));
+            // rewriter.create<LLVM::StoreOp>(loc, zeroArg, shadowPtr);
+            // callArgs.push_back(shadowPtr);
         }
 
         // Add the result's shadow
