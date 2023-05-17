@@ -162,16 +162,16 @@ LogicalResult JVPOp::verifySymbolUses(SymbolTableCollection &symbolTable)
 
     if (this->getNumResults() != 2 * callee.getFunctionType().getNumResults()) {
         return this->emitOpError(
-                  "invalid number of results: must be twice the number of callee results")
-               << " which is " << 2 * callee.getFunctionType().getNumResults()
-               << " but got " << this->getNumResults();
+                   "invalid number of results: must be twice the number of callee results")
+               << " which is " << 2 * callee.getFunctionType().getNumResults() << " but got "
+               << this->getNumResults();
     }
 
     if (this->getTangents().size() != diffArgIndices.size()) {
         return this->emitOpError(
-                  "number of tangent operands must be equal the number of diffArgIndices")
-               << " which is " << diffArgIndices.size()
-               << " but got " << this->getTangents().size();
+                   "number of tangent operands must be equal the number of diffArgIndices")
+               << " which is " << diffArgIndices.size() << " but got "
+               << this->getTangents().size();
     }
 
     auto jvp_types = ({
