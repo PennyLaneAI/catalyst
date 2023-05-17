@@ -154,16 +154,24 @@ LogicalResult JVPOp::verifySymbolUses(SymbolTableCollection &symbolTable)
         fn;
     });
 
-    auto r1 = ::verifyGradInputs(this, callee, this->getParams(),
-                                 compDiffArgIndices(this->getDiffArgIndices()));
+    auto diffArgIndices = compDiffArgIndices(this->getDiffArgIndices());
+    auto r1 = ::verifyGradInputs(this, callee, this->getParams(), diffArgIndices);
     if (r1.failed()) {
         return r1;
     }
 
     if (this->getNumResults() != 2 * callee.getFunctionType().getNumResults()) {
-        return this->emitOpError("invalid number of results: must be twice the number")
-               << " of callee results (" << 2 * callee.getFunctionType().getNumResults() << ")"
+        return this->emitOpError(
+                  "invalid number of results: must be twice the number of callee results")
+               << " which is " << 2 * callee.getFunctionType().getNumResults()
                << " but got " << this->getNumResults();
+    }
+
+    if (this->getTangents().size() != diffArgIndices.size()) {
+        return this->emitOpError(
+                  "number of tangent operands must be equal the number of diffArgIndices")
+               << " which is " << diffArgIndices.size()
+               << " but got " << this->getTangents().size();
     }
 
     auto jvp_types = ({

@@ -79,7 +79,6 @@ LogicalResult JVPLoweringPattern::matchAndRewrite(JVPOp op, PatternRewriter &rew
     MLIRContext *ctx = getContext();
 
     Location loc = op.getLoc();
-    LLVM_DEBUG(dbgs() << "replacing JVP op\n");
 
     auto func_diff_operand_indices = compDiffArgIndices(op.getDiffArgIndices());
     LLVM_DEBUG(dbgs() << "jvp_num_operands " << op.getOperands().size() << " \n");
@@ -199,8 +198,6 @@ LogicalResult JVPLoweringPattern::matchAndRewrite(JVPOp op, PatternRewriter &rew
     });
 
     rewriter.replaceOp(op, results);
-
-    LLVM_DEBUG(dbgs() << "replaced JVP\n");
     return success();
 }
 
@@ -209,7 +206,6 @@ LogicalResult VJPLoweringPattern::matchAndRewrite(VJPOp op, PatternRewriter &rew
     MLIRContext *ctx = getContext();
 
     Location loc = op.getLoc();
-    LLVM_DEBUG(dbgs() << "replacing VJP op\n");
 
     auto func_diff_operand_indices = compDiffArgIndices(op.getDiffArgIndices());
     LLVM_DEBUG(dbgs() << "vjp_num_operands " << op.getOperands().size() << " \n");
@@ -326,8 +322,6 @@ LogicalResult VJPLoweringPattern::matchAndRewrite(VJPOp op, PatternRewriter &rew
     });
 
     rewriter.replaceOp(op, results);
-
-    LLVM_DEBUG(dbgs() << "replaced VJP\n");
     return success();
 }
 
