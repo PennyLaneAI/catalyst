@@ -116,7 +116,7 @@ def BackpropOp : Gradient_Op<"backprop", [AttrSizedOperandSegments]> {
 
 
 def JVPOp : Gradient_Op<"jvp", [
-        SameVariadicOperandSize,
+        AttrSizedOperandSegments,
         SameVariadicResultSize,
         DeclareOpInterfaceMethods<CallOpInterface>,
         DeclareOpInterfaceMethods<SymbolUserOpInterface>
@@ -144,10 +144,6 @@ def JVPOp : Gradient_Op<"jvp", [
 
 
     let hasVerifier = 1;
-
-    let extraClassDeclaration = [{
-        std::vector<mlir::Value> getCalleeOperands();
-    }];
 }
 
 
@@ -178,10 +174,6 @@ def VJPOp : Gradient_Op<"vjp", [
     }];
 
     let hasVerifier = 1;
-
-    let extraClassDeclaration = [{
-        std::vector<mlir::Value> getCalleeOperands();
-    }];
 }
 
 #endif // GRADIENT_OPS

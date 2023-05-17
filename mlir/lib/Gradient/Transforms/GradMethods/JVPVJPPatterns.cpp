@@ -88,7 +88,7 @@ LogicalResult JVPLoweringPattern::matchAndRewrite(JVPOp op, PatternRewriter &rew
     assert(func_diff_operand_indices.size() <= op.getOperands().size() / 2);
     size_t func_operands_size = op.getOperands().size() - func_diff_operand_indices.size();
 
-    auto calleeOperands = op.getCalleeOperands();
+    auto calleeOperands = op.getParams();
     auto tangOperands = OperandRange(op.operand_begin() + func_operands_size, op.operand_end());
 
     for (auto idx : func_diff_operand_indices) {
@@ -225,7 +225,7 @@ LogicalResult VJPLoweringPattern::matchAndRewrite(VJPOp op, PatternRewriter &rew
     assert(calleeOp.getFunctionType().getNumResults() == cotang_operands_size &&
            "the number of function results doesn't match the number of cotangent arguments");
 
-    auto calleeOperands = op.getCalleeOperands();
+    auto calleeOperands = op.getParams();
     auto cotang_operands = OperandRange(op.operand_begin() + func_operands_size, op.operand_end());
 
     for (auto idx : func_diff_operand_indices) {

@@ -169,7 +169,7 @@ LogicalResult JVPOp::verifySymbolUses(SymbolTableCollection &symbolTable)
 
     auto r1 = ::verifyGradInputs(
         this, callee,
-        this->getCalleeOperands(),
+        this->getParams(),
         compDiffArgIndices(this->getDiffArgIndices()));
     if (r1.failed()) {
         return r1;
@@ -207,14 +207,6 @@ LogicalResult JVPOp::verifySymbolUses(SymbolTableCollection &symbolTable)
 // JVPOp Extra methods
 //===----------------------------------------------------------------------===//
 
-std::vector<mlir::Value> JVPOp::getCalleeOperands()
-{
-    auto diffArgs = compDiffArgIndices(this->getDiffArgIndices());
-    return std::vector<mlir::Value>(
-        this->operand_begin(),
-        this->operand_begin() + (this->getNumOperands() - diffArgs.size()));
-}
-
 LogicalResult JVPOp::verify()
 {
     StringRef method = this->getMethod();
@@ -249,7 +241,7 @@ LogicalResult VJPOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
     // Check gradient input parameters
     auto r1 = ::verifyGradInputs(
         this, callee,
-        this->getCalleeOperands(),
+        this->getParams(),
         compDiffArgIndices(this->getDiffArgIndices()));
     if (r1.failed()) {
         return r1;
@@ -294,13 +286,6 @@ LogicalResult VJPOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
 //===----------------------------------------------------------------------===//
 // VJPOp Extra methods
 //===----------------------------------------------------------------------===//
-
-std::vector<mlir::Value> VJPOp::getCalleeOperands()
-{
-    return std::vector<mlir::Value>(
-        this->operand_begin(),
-        this->operand_begin() + (this->getNumOperands() - this->getCalleeResults().size()));
-}
 
 LogicalResult VJPOp::verify()
 {

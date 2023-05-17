@@ -357,9 +357,9 @@ def _jvp_lowering(ctx, *args, jaxpr, fn, grad_params):
     flat_output_types = util.flatten(output_types)
     constants = [ConstantOp(ir.DenseElementsAttr.get(const)).results for const in jaxpr.consts]
     consts_and_args = constants + args
-    func_args = consts_and_args[: len(consts_and_args) - len(grad_params.argnum)]
     func_call_jaxpr = jaxpr.eqns[0].params["call_jaxpr"]
-    tang_args = consts_and_args[len(consts_and_args) - len(grad_params.argnum) :]
+    func_args = consts_and_args[: len(func_call_jaxpr.invars)]
+    tang_args = consts_and_args[len(func_call_jaxpr.invars):]
 
     _func_lowering(
         ctx,
@@ -411,8 +411,8 @@ def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
     constants = [ConstantOp(ir.DenseElementsAttr.get(const)).results for const in jaxpr.consts]
     consts_and_args = constants + args
     func_call_jaxpr = jaxpr.eqns[0].params["call_jaxpr"]
-    func_args = consts_and_args[: len(consts_and_args) - len(argnum)]
-    cotang_args = consts_and_args[len(consts_and_args) - len(argnum) :]
+    func_args = consts_and_args[: len(func_call_jaxpr.invars)]
+    cotang_args = consts_and_args[len(func_call_jaxpr.invars) :]
     func_result_types = flat_output_types[: len(flat_output_types) - len(argnum)]
     vjp_result_types = flat_output_types[len(flat_output_types) - len(argnum) :]
 
