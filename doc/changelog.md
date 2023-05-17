@@ -64,7 +64,9 @@
 * Add support for ``var`` of general observables
   [#124](https://github.com/PennyLaneAI/catalyst/pull/124)
 
-* Add support for jvp/vjp operations
+* Add support for Jacobian product operations. The function ``jvp(f, params, tangents)`` returns
+  the Jacobian-vector product of a function `f`, and the ``vjp(f, params, cotangents)`` returns
+  it's vector-Jacobian product.
   [#98](https://github.com/PennyLaneAI/catalyst/pull/98)
 
 <h3>Improvements</h3>
