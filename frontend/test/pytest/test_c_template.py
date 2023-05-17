@@ -139,7 +139,7 @@ class TestCProgramGeneration:
     def test_program_without_return_nor_arguments(self):
         """Test program without return value nor arguments."""
 
-        @qjit(keep_intermediate=True)
+        @qjit
         def f():
             """No-op function."""
             return None
