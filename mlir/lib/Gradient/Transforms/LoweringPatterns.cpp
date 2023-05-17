@@ -15,6 +15,7 @@
 #include "GradMethods/Adjoint.hpp"
 #include "GradMethods/FiniteDifference.hpp"
 #include "GradMethods/ParameterShift.hpp"
+#include "GradMethods/JVPVJPPatterns.hpp"
 
 #include "mlir/IR/PatternMatch.h"
 
@@ -34,6 +35,8 @@ void populateLoweringPatterns(RewritePatternSet &patterns, StringRef lowerOnly)
         patterns.add<ParameterShiftLowering>(patterns.getContext(), 1);
     if (lowerOnly == "" || lowerOnly == "adj")
         patterns.add<AdjointLowering>(patterns.getContext(), 1);
+    patterns.add<JVPLoweringPattern>(patterns.getContext());
+    patterns.add<VJPLoweringPattern>(patterns.getContext());
 }
 
 } // namespace gradient
