@@ -20,6 +20,7 @@ import functools
 import inspect
 import typing
 import warnings
+import time
 
 import jax
 import jax.numpy as jnp
@@ -83,10 +84,18 @@ class CompiledFunction:
         func_name,
         restype,
     ):
+
         self.shared_object_file = shared_object_file
         assert func_name  # make sure that func_name is not false-y
         self.func_name = func_name
         self.restype = restype
+        self.shared_object = None
+
+    def __del__(self):
+        if self.shared_object is not None:
+            dlclose = ctypes.CDLL(None).dlclose
+            dlclose.argtypes = [ctypes.c_void_p]
+            dlclose(self.shared_object._handle)
 
     @staticmethod
     def can_skip_promote(compiled_signature, runtime_signature):
@@ -200,7 +209,7 @@ class CompiledFunction:
         # Not needed, computed from the arguments.
         # function.argyptes
 
-        mem_transfer = shared_object["_mlir_memory_transfer"]
+        mem_transfer = shared_object._mlir_memory_transfer
 
         return shared_object, function, setup, teardown, mem_transfer
 
@@ -222,8 +231,7 @@ class CompiledFunction:
             arg_type = type(arg)
             raise TypeError(f"Unsupported argument type: {arg_type}") from exc
 
-    @staticmethod
-    def _exec(shared_object_file, func_name, has_return, numpy_dict, *args):
+    def _exec(self, has_return, numpy_dict, *args):
         """Execute the compiled function with arguments `*args`.
 
         Args:
@@ -236,36 +244,24 @@ class CompiledFunction:
             retval: the value computed by the function or None if the function has no return value
         """
 
-        shared_object, function, setup, teardown, mem_transfer = CompiledFunction.load_symbols(
-            shared_object_file, func_name
-        )
 
         params_to_setup = [b"jitted-function"]
         argc = len(params_to_setup)
         array_of_char_ptrs = (ctypes.c_char_p * len(params_to_setup))()
         array_of_char_ptrs[:] = params_to_setup
 
-        setup(ctypes.c_int(argc), array_of_char_ptrs)
+        self.setup(ctypes.c_int(argc), array_of_char_ptrs)
         result_desc = type(args[0].contents) if has_return else None
 
-        retval = wrapper.wrap(function, args, result_desc, mem_transfer, numpy_dict)
+        retval = wrapper.wrap(self.function, args, result_desc, self.mem_transfer, numpy_dict)
         if len(retval) == 0:
             retval = None
         elif len(retval) == 1:
             retval = retval[0]
 
         # Teardown has to be made after the return valued has been copied.
-        teardown()
+        self.teardown()
 
-        # Unmap the shared library. This is necessary in case the function is re-compiled.
-        # Without unmapping the shared library, there would be a conflict in the name of
-        # the function and the previous one would succeed.
-        # Need to close after obtaining value, since the value can point to memory in the shared
-        # object. This is in the case of returning a constant, for example.
-        dlclose = ctypes.CDLL(None).dlclose
-        dlclose.argtypes = [ctypes.c_void_p]
-        # pylint: disable=protected-access
-        dlclose(shared_object._handle)
 
         return retval
 
@@ -411,13 +407,18 @@ class CompiledFunction:
 
         numpy_dict = {nparr.ctypes.data: nparr for nparr in _buffer}
 
-        result = CompiledFunction._exec(
-            self.shared_object_file,
-            self.func_name,
+        if self.shared_object is None:
+            self.shared_object, self.function, self.setup, self.teardown, self.mem_transfer = CompiledFunction.load_symbols(
+                self.shared_object_file, self.func_name
+            )
+
+        result = self._exec(
             self.restype,
             numpy_dict,
             *abi_args,
         )
+
+
 
         return result
 
@@ -511,6 +512,8 @@ class QJIT:
 
     def compile(self):
         """Compile the current MLIR module."""
+        if self.compiled_function:
+            del self.compiled_function
 
         # This will make a check before sending it to the compiler that the return type
         # is actually available in most systems. f16 needs a special symbol and linking
