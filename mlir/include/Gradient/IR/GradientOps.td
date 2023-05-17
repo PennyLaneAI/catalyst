@@ -178,7 +178,7 @@ def VJPOp : Gradient_Op<"vjp", [
     );
 
     let assemblyFormat = [{
-        $method $callee `(` $params `)` `cotangents` `( $cotangents `)`
+        $method $callee `(` $params `)` `cotangents` `(` $cotangents `)`
             attr-dict `:` functional-type(operands, results)
     }];
 
