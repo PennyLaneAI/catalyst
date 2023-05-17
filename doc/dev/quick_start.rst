@@ -639,3 +639,52 @@ the value of ``value_and_grad`` argument. To optimize params iteratively, you la
 
 >>> workflow()
 array(4.94807684e-09)
+
+JAX Integration
+===============
+
+Catalyst programs can also be used inside of a larger JAX workflow which uses JIT compilation,
+automatic differentiation, and other JAX transforms.
+
+Note that generally Catalyst should be used to JIT the entire workflow, but sometimes users may
+wish to delegate only the quantum part of their workflow to Catalyst and let JAX handle the rest
+(for example due to a missing feature or compatibility issue in Catalyst).
+
+Examples of newly supported workflows:
+
+- JIT compilation with JAX:
+
+.. code-block:: python
+
+    @qjit
+    @qml.qnode(dev)
+    def circuit(x):
+        qml.RX(jnp.pi * x[0], wires=0)
+        qml.RY(x[1] ** 2, wires=0)
+        qml.RX(x[1] * x[2], wires=0)
+        return qml.probs(wires=0)
+
+    @jax.jit
+    def cost_fn(weights):
+        x = jnp.sin(weights)
+        return jnp.sum(jnp.cos(circuit(x)) ** 2)
+
+    cost_fn(jnp.array([0.1, 0.2, 0.3]))
+
+- Automatic differentiation with JAX, both in forward and reverse mode, but to first-order only:
+
+.. code-block:: python
+
+    @qjit
+    @qml.qnode(dev)
+    def circuit(x):
+        qml.RX(jnp.pi * x[0], wires=0)
+        qml.RY(x[1] ** 2, wires=0)
+        qml.RX(x[1] * x[2], wires=0)
+        return qml.probs(wires=0)
+
+    def cost_fn(weights):
+        x = jnp.sin(weights)
+        return jnp.sum(jnp.cos(circuit(x)) ** 2)
+
+    jax.grad(cost_fn)(jnp.array([0.1, 0.2, 0.3]))
