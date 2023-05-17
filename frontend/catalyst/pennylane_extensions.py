@@ -160,7 +160,7 @@ def _ensure_differentiable(f: DifferentiableLike) -> Differentiable:
     raise TypeError(f"Non-differentiable object passed: {type(f)}")
 
 
-def _make_jaxpr_differentiable(f: Differentiable, grad_params: GradParams, *args) -> Jaxpr:
+def _make_jaxpr_check_differentiable(f: Differentiable, grad_params: GradParams, *args) -> Jaxpr:
     """Gets the jaxpr of a differentiable function. Perform the required additional checks."""
     method = grad_params.method
     jaxpr = jax.make_jaxpr(f)(*args)
@@ -264,10 +264,8 @@ class Grad:
         TracingContext.check_is_tracing(
             "catalyst.grad can only be used from within @qjit decorated code."
         )
-        jaxpr = _make_jaxpr_differentiable(self.fn, self.grad_params, *args)
-        return jprim.grad_p.bind(
-            *args, jaxpr=jaxpr, fn=self, grad_params=self.grad_params
-        )
+        jaxpr = _make_jaxpr_check_differentiable(self.fn, self.grad_params, *args)
+        return jprim.grad_p.bind(*args, jaxpr=jaxpr, fn=self, grad_params=self.grad_params)
 
 
 def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
@@ -394,7 +392,7 @@ def jvp(f, params, tangents, *, method=None, h=None, argnum=None):
     tangents = _check(tangents, "tangents")
     fn: Differentiable = _ensure_differentiable(f)
     grad_params = _check_grad_params(method, h, argnum)
-    jaxpr = _make_jaxpr_differentiable(fn, grad_params, *params)
+    jaxpr = _make_jaxpr_check_differentiable(fn, grad_params, *params)
     return jprim.jvp_p.bind(*params, *tangents, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
 
 
@@ -452,7 +450,7 @@ def vjp(f, params, cotangents, *, method=None, h=None, argnum=None):
     cotangents = _check(cotangents, "cotangents")
     fn: Differentiable = _ensure_differentiable(f)
     grad_params = _check_grad_params(method, h, argnum)
-    jaxpr = _make_jaxpr_differentiable(fn, grad_params, *params)
+    jaxpr = _make_jaxpr_check_differentiable(fn, grad_params, *params)
     return jprim.vjp_p.bind(*params, *cotangents, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
 
 
