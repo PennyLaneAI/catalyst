@@ -64,6 +64,9 @@
 * Add support for ``var`` of general observables
   [#124](https://github.com/PennyLaneAI/catalyst/pull/124)
 
+* Add support for jvp/vjp operations
+  [#98](https://github.com/PennyLaneAI/catalyst/pull/98)
+
 <h3>Improvements</h3>
 
 * Improving error handling by throwing descriptive and unified expressions for runtime
@@ -113,9 +116,10 @@ This release contains contributions from (in alphabetical order):
 
 Ali Asadi,
 David Ittah,
+Erick Ochoa Lopez,
 Jacob Mai Peng,
 Romain Moyard,
-Erick Ochoa Lopez.
+Sergei Mironov.
 
 # Release 0.1.2
 
