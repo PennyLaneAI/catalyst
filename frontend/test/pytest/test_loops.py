@@ -452,7 +452,7 @@ class TestClassicalCompilation:
         assert mulc.mlir
         assert mulc(x, n) == muli(x, n)
 
-    def test_for_loop_inf(step):
+    def test_for_loop_inf(self):
         """
         Test for loop with a negative step size (that would produce an infinite range) iterates 0
         times.
