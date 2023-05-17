@@ -22,6 +22,8 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 
+#include "Gradient/Utils/CompDiffArgIndices.h"
+
 namespace catalyst {
 namespace gradient {
 
@@ -36,7 +38,7 @@ LogicalResult FiniteDiffLowering::match(GradOp op) const
 void FiniteDiffLowering::rewrite(GradOp op, PatternRewriter &rewriter) const
 {
     Location loc = op.getLoc();
-    const std::vector<size_t> &diffArgIndices = GradOp::compDiffArgIndices(op.getDiffArgIndices());
+    const std::vector<size_t> &diffArgIndices = compDiffArgIndices(op.getDiffArgIndices());
     std::stringstream uniquer;
     std::copy(diffArgIndices.begin(), diffArgIndices.end(), std::ostream_iterator<int>(uniquer));
     std::string fnName = op.getCallee().str() + ".finitediff" + uniquer.str();

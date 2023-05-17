@@ -20,6 +20,7 @@
 #include "Gradient/IR/GradientDialect.h"
 #include "Gradient/IR/GradientOps.h"
 #include "Gradient/Utils/GradientShape.h"
+#include "Gradient/Utils/CompDiffArgIndices.h"
 
 #define GET_OP_CLASSES
 #include "Gradient/IR/GradientOps.cpp.inc"
@@ -119,12 +120,12 @@ LogicalResult GradOp::verifySymbolUses(SymbolTableCollection &symbolTable)
     auto r1 = ::verifyGradInputs(
         this, fn,
         this->getArgOperands(),
-        GradOp::compDiffArgIndices(this->getDiffArgIndices()));
+        compDiffArgIndices(this->getDiffArgIndices()));
 
     auto r2 = ::verifyGradOutputs(
         this,
         fn,
-        GradOp::compDiffArgIndices(this->getDiffArgIndices()),
+        compDiffArgIndices(this->getDiffArgIndices()),
         this->getResultTypes());
 
     return success(succeeded(r1) && succeeded(r2));
@@ -140,17 +141,6 @@ LogicalResult GradOp::verify()
     if (method != "fd" && method != "ps" && method != "adj")
         return emitOpError("got invalid differentiation method: ") << method;
     return success();
-}
-
-std::vector<size_t> GradOp::compDiffArgIndices(Optional<DenseIntElementsAttr> indices)
-{
-    // By default only the first argument is differentiated, otherwise gather indices.
-    std::vector<size_t> diffArgIndices{0};
-    if (indices.has_value()) {
-        auto range = indices.value().getValues<size_t>();
-        diffArgIndices = std::vector<size_t>(range.begin(), range.end());
-    }
-    return diffArgIndices;
 }
 
 //===----------------------------------------------------------------------===//
@@ -180,7 +170,7 @@ LogicalResult JVPOp::verifySymbolUses(SymbolTableCollection &symbolTable)
     auto r1 = ::verifyGradInputs(
         this, callee,
         this->getCalleeOperands(),
-        GradOp::compDiffArgIndices(this->getDiffArgIndices()));
+        compDiffArgIndices(this->getDiffArgIndices()));
     if (r1.failed()) {
         return r1;
     }
@@ -219,7 +209,7 @@ LogicalResult JVPOp::verifySymbolUses(SymbolTableCollection &symbolTable)
 
 std::vector<mlir::Value> JVPOp::getCalleeOperands()
 {
-    auto diffArgs = GradOp::compDiffArgIndices(this->getDiffArgIndices());
+    auto diffArgs = compDiffArgIndices(this->getDiffArgIndices());
     return std::vector<mlir::Value>(
         this->operand_begin(),
         this->operand_begin() + (this->getNumOperands() - diffArgs.size()));
@@ -260,7 +250,7 @@ LogicalResult VJPOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
     auto r1 = ::verifyGradInputs(
         this, callee,
         this->getCalleeOperands(),
-        GradOp::compDiffArgIndices(this->getDiffArgIndices()));
+        compDiffArgIndices(this->getDiffArgIndices()));
     if (r1.failed()) {
         return r1;
     }

@@ -36,6 +36,7 @@
 #include "Gradient/IR/GradientOps.h"
 #include "Gradient/Utils/EinsumLinalgGeneric.h"
 #include "Gradient/Utils/GradientShape.h"
+#include "Gradient/Utils/CompDiffArgIndices.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/PatternMatch.h"
 
@@ -81,7 +82,7 @@ LogicalResult JVPLoweringPattern::matchAndRewrite(JVPOp op, PatternRewriter &rew
     Location loc = op.getLoc();
     LLVM_DEBUG(dbgs() << "replacing JVP op\n");
 
-    auto func_diff_operand_indices = GradOp::compDiffArgIndices(op.getDiffArgIndices());
+    auto func_diff_operand_indices = compDiffArgIndices(op.getDiffArgIndices());
     LLVM_DEBUG(dbgs() << "jvp_num_operands " << op.getOperands().size() << " \n");
     LLVM_DEBUG(dbgs() << "func_diff_operand_indices: " << func_diff_operand_indices << " \n");
     assert(func_diff_operand_indices.size() <= op.getOperands().size() / 2);
@@ -213,7 +214,7 @@ LogicalResult VJPLoweringPattern::matchAndRewrite(VJPOp op, PatternRewriter &rew
     Location loc = op.getLoc();
     LLVM_DEBUG(dbgs() << "replacing VJP op\n");
 
-    auto func_diff_operand_indices = GradOp::compDiffArgIndices(op.getDiffArgIndices());
+    auto func_diff_operand_indices = compDiffArgIndices(op.getDiffArgIndices());
     LLVM_DEBUG(dbgs() << "vjp_num_operands " << op.getOperands().size() << " \n");
     LLVM_DEBUG(dbgs() << "func_diff_operand_indices: " << func_diff_operand_indices << " \n");
 

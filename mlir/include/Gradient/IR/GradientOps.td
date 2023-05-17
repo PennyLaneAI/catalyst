@@ -61,11 +61,6 @@ def GradOp : Gradient_Op<"grad", [DeclareOpInterfaceMethods<CallOpInterface>,
     let assemblyFormat = [{
         $method $callee `(` $operands `)` attr-dict `:` functional-type($operands, results)
     }];
-
-    let extraClassDeclaration = [{
-        static std::vector<size_t> compDiffArgIndices(
-            llvm::Optional<mlir::DenseIntElementsAttr> indices);
-    }];
 }
 
 def AdjointOp : Gradient_Op<"adjoint", [AttrSizedOperandSegments]> {
