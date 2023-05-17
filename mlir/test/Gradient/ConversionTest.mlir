@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --convert-gradient-to-llvm --convert-memref-to-llvm --split-input-file %s | FileCheck %s
+// RUN: quantum-opt --convert-gradient-to-llvm --finalize-memref-to-llvm --split-input-file %s | FileCheck %s
 
 //////////////////////
 // Native Gradients //
