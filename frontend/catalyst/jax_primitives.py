@@ -359,7 +359,7 @@ def _jvp_lowering(ctx, *args, jaxpr, fn, grad_params):
     consts_and_args = constants + args
     func_call_jaxpr = jaxpr.eqns[0].params["call_jaxpr"]
     func_args = consts_and_args[: len(func_call_jaxpr.invars)]
-    tang_args = consts_and_args[len(func_call_jaxpr.invars):]
+    tang_args = consts_and_args[len(func_call_jaxpr.invars) :]
 
     _func_lowering(
         ctx,
