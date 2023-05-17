@@ -187,7 +187,6 @@ auto LightningSimulator::Var(ObsIdType obsKey) -> double
 {
     RT_FAIL_IF(!this->obs_manager.isValidObservables({obsKey}),
                "Invalid key for cached observables");
-
     auto &&obs = this->obs_manager.getObservable(obsKey);
 
     // update tape caching
@@ -195,19 +194,9 @@ auto LightningSimulator::Var(ObsIdType obsKey) -> double
         this->cache_manager.addObservable(obsKey, Lightning::Measurements::Var);
     }
 
-    auto obs_str = obs->getObsName();
-    size_t found = obs_str.find_first_of("[");
-    if (found != std::string::npos) {
-        obs_str = obs_str.substr(0, found);
-    }
-
-    auto obs_wires = obs->getWires();
-
     Pennylane::Simulators::Measures m{*(this->device_sv)};
 
-    const double result = m.var(obs_str, obs_wires);
-
-    return result;
+    return m.var(*obs);
 }
 
 void LightningSimulator::State(DataView<std::complex<double>, 1> &state)
