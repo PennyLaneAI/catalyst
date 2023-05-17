@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --convert-memref-to-llvm --convert-quantum-to-llvm --split-input-file %s | FileCheck %s
+// RUN: quantum-opt --finalize-memref-to-llvm --convert-quantum-to-llvm --split-input-file %s | FileCheck %s
 
 ////////////////////////
 // Runtime Management //
