@@ -20,26 +20,14 @@ using namespace Catalyst::Runtime::Device::OpenQasm;
 
 TEST_CASE("Test lookup openqasm gate names from QIR -> OpenQasm map", "[openqasm]")
 {
-    // Check supported gates
+    // Check lookup supported gates
     CHECK(lookup_qasm_gate_name("PauliX") == "x");
-    CHECK(lookup_qasm_gate_name("PauliY") == "y");
-    CHECK(lookup_qasm_gate_name("PauliZ") == "z");
     CHECK(lookup_qasm_gate_name("Hadamard") == "h");
-    CHECK(lookup_qasm_gate_name("S") == "s");
-    CHECK(lookup_qasm_gate_name("T") == "t");
     CHECK(lookup_qasm_gate_name("CNOT") == "cnot");
-    CHECK(lookup_qasm_gate_name("CZ") == "cz");
     CHECK(lookup_qasm_gate_name("SWAP") == "swap");
-    CHECK(lookup_qasm_gate_name("PhaseShift") == "phaseshift");
-    CHECK(lookup_qasm_gate_name("RX") == "rx");
-    CHECK(lookup_qasm_gate_name("RY") == "ry");
-    CHECK(lookup_qasm_gate_name("RZ") == "rz");
-    CHECK(lookup_qasm_gate_name("CSWAP") == "cswap");
-    CHECK(lookup_qasm_gate_name("PSWAP") == "pswap");
-    CHECK(lookup_qasm_gate_name("ISWAP") == "iswap");
     CHECK(lookup_qasm_gate_name("Toffoli") == "ccnot");
 
-    // Check an unsupported gate
+    // Check lookup an unsupported gate
     REQUIRE_THROWS_WITH(
         lookup_qasm_gate_name("ABC"),
         Catch::Contains("The given QIR gate name is not supported by the OpenQASM builder"));

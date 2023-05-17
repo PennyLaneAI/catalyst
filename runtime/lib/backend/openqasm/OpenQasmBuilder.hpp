@@ -80,9 +80,6 @@ constexpr auto lookup_qasm_gate_name(std::string_view gate_name) -> std::string_
 
     RT_FAIL("The given QIR gate name is not supported by the OpenQASM builder.");
 }
-} // namespace Catalyst::Runtime::Device::OpenQasm
-
-namespace Catalyst::Runtime::Device::OpenQasm {
 
 /**
  * The OpenQasm variable type.
