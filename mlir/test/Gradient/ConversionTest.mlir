@@ -35,8 +35,8 @@ func.func @adjoint(%arg0: f32, %arg1 : index) -> (memref<?xf64>, memref<?xf64>) 
 
     // CHECK-DAG:   [[C1:%.+]] = llvm.mlir.constant(1 : i64) : i64
     // CHECK-DAG:   [[C2:%.+]] = llvm.mlir.constant(2 : i64) : i64
-    // CHECK:       [[GRAD1:%.+]] = llvm.alloca [[C1]] {{.+}} -> !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>
-    // CHECK:       [[GRAD2:%.+]] = llvm.alloca [[C1]] {{.+}} -> !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>
+    // CHECK:       [[GRAD1:%.+]] = llvm.alloca [[C1]] x !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+    // CHECK:       [[GRAD2:%.+]] = llvm.alloca [[C1]] x !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
 
     // CHECK:       llvm.call @__quantum__qis__Gradient([[C2]], [[GRAD1]], [[GRAD2]])
     // CHECK:       quantum.dealloc [[QREG]]
