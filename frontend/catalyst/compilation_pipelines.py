@@ -534,9 +534,8 @@ class QJIT:
                 warnings.warn(msg, UserWarning)
             self.mlir_module = self.get_mlir(*r_sig)
             function = self.compile()
-        else:
+        elif can_promote:
             args = CompiledFunction.promote_arguments(self.c_sig, r_sig, *args)
-        args = [jax.numpy.asarray(arg) for arg in args]
 
         return function, args
 
