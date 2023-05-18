@@ -343,7 +343,7 @@ def jvp(f, params, tangents, *, method=None, h=None, argnum=None):
     computed within the compiled program.
 
     Args:
-        f (Callable): Function-like object to calculate JVP for
+        f (DifferentiableLike): Function-like object to calculate JVP for
         params (List[Array]): List (or a tuple) of the fnuction arguments specifying the point
                               to calculate JVP at. A subset of these parameters are declared as
                               differentiable by listing their indices in the ``argnum`` parameter.
