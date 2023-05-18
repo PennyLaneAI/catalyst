@@ -134,12 +134,14 @@ class TestCompilerErrors:
 
     def test_link_failure(self):
         """Test that an exception is raised when all compiler possibilities are exhausted."""
-        with tempfile.NamedTemporaryFile(suffix=".o") as f:
+        with tempfile.NamedTemporaryFile(mode="w+", encoding="utf-8", suffix=".o") as invalid_file:
+            invalid_file.write("These are invalid contents.")
+            invalid_file.flush()
             with pytest.raises(EnvironmentError, match="Unable to link .*"):
                 with pytest.warns(
-                    UserWarning, match="Compiler non-existent failed during execution"
+                    UserWarning, match="Compiler cc failed during execution"
                 ):
-                    CompilerDriver.run(f.name, fallback_compilers=["non-existent"])
+                    CompilerDriver.run(invalid_file.name, fallback_compilers=["cc"])
 
     @pytest.mark.parametrize(
         "pipeline",
