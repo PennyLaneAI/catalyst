@@ -48,7 +48,7 @@ func.func @adjoint(%arg0: f32, %arg1 : index) -> (memref<?xf64>, memref<?xf64>) 
 
 // -----
 
-func.func private @circuit(%arg0: f64) -> (f64)
+func.func private @circuit(%arg0: f64) -> (memref<?xf64>)
 
 func.func @backpropCircuit(%arg0: f64, %arg1 : index) -> memref<?xf64> {
 
