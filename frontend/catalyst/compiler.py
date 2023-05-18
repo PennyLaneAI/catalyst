@@ -28,6 +28,7 @@ from io import TextIOWrapper
 from typing import Any, List, Optional
 
 from catalyst._configuration import INSTALLED
+from catalyst.utils.exceptions import CompileError
 
 package_root = os.path.dirname(__file__)
 
@@ -127,7 +128,10 @@ class PassPipeline(abc.ABC):
             raise ValueError("Executable not specified.")
         if flags is None:
             flags = cls._default_flags
-        cls._run(infile, outfile, executable, flags, options)
+        try:
+            cls._run(infile, outfile, executable, flags, options)
+        except subprocess.CalledProcessError as e:
+            raise CompileError(f"{cls.__name__} failed.") from e
         return outfile
 
 
