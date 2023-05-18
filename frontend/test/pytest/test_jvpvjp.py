@@ -378,7 +378,7 @@ def test_jvpvjp_argument_checks():
     with pytest.raises(ValueError, match="argnum should be integer or a list of integers"):
 
         @qjit
-        def C_workflow_bad2():
+        def C_workflow_bad3():
             return C_vjp(f, x, ct, method="fd", argnum="invalid")
 
 
