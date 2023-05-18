@@ -293,7 +293,7 @@ def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
         See the :doc:`/dev/quick_start` for examples.
 
     Args:
-        f (DifferentiableLike): a function or a function object to differentiate
+        f (Callable): a function or a function object to differentiate
         method (str): The method used for differentiation, which can be any of
                       ``["fd", "ps", "adj"]``,
             where:
@@ -336,14 +336,14 @@ def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
     return Grad(_ensure_differentiable(f), grad_params=_check_grad_params(method, h, argnum))
 
 
-def jvp(f, params, tangents, *, method=None, h=None, argnum=None):
+def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=None):
     """A Jacobian-vector product for PennyLane/Catalyst.
 
     This function allows the Jacobian-vector Product of a hybrid quantum-classical function to be
     computed within the compiled program.
 
     Args:
-        f (DifferentiableLike): Function-like object to calculate JVP for
+        f (Callable): Function-like object to calculate JVP for
         params (List[Array]): List (or a tuple) of the fnuction arguments specifying the point
                               to calculate JVP at. A subset of these parameters are declared as
                               differentiable by listing their indices in the ``argnum`` parameter.
@@ -396,14 +396,14 @@ def jvp(f, params, tangents, *, method=None, h=None, argnum=None):
     return jprim.jvp_p.bind(*params, *tangents, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
 
 
-def vjp(f, params, cotangents, *, method=None, h=None, argnum=None):
+def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnum=None):
     """A Vector-Jacobian product for PennyLane/Catalyst.
 
     This function allows the Vector-Jacobian Product of a hybrid quantum-classical function to be
     computed within the compiled program.
 
     Args:
-        f(DifferentiableLike): Function-like object to calculate JVP for
+        f(Callable): Function-like object to calculate JVP for
         params(List[Array]): List (or a tuble) of f's arguments specifying the point to calculate
                              VJP at. A subset of these parameters are declared as
                              differentiable by listing their indices in the ``argnum`` paramerer.
