@@ -66,10 +66,12 @@
 
 * Add support for Jacobian product operations. The function ``jvp(f, params, tangents)`` returns
   the Jacobian-vector product of a function `f`, and the ``vjp(f, params, cotangents)`` returns
-  it's vector-Jacobian product.
+  its vector-Jacobian product.
+
   [#98](https://github.com/PennyLaneAI/catalyst/pull/98)
 
-  An example of newly supported workflow:
+  An example of a newly supported workflow:
+
 
   ``` python
   from catalyst import jvp

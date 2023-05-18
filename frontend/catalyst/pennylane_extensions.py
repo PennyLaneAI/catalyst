@@ -343,13 +343,13 @@ def jvp(f, params, tangents, *, method=None, h=None, argnum=None):
     computed within the compiled program.
 
     Args:
-        f(DifferentiableLike): Function-like object to calculate JVP for
-        params(List[Array]): List (or a tuble) of f's arguments specifying the point to calculate
+        f (Callable): Function-like object to calculate JVP for
+        params (List[Array]): List (or a tuple) of the fnuction arguments specifying the point to calculate
                              JVP at. A subset of these parameters are declared as
-                             differentiable by listing their indices in the ``argnum`` paramerer.
+                             differentiable by listing their indices in the ``argnum`` parameter.
         tangents(List[Array]): List (or a tuple) of tangent values to use in JVP. The list size and
                                shapes must match the ones of differentiable params.
-        method(str): Differentiation method to use, same as in ``grad``.
+        method(str): Differentiation method to use, same as in :func:`~.grad`.
         h (float): the step-size value for the finite-difference (``"fd"``) method
         argnum (Union[int, List[int]]): the params' indices to differentiate.
 
