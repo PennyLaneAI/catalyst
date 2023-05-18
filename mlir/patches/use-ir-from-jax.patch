@@ -1,6 +1,6 @@
 --- ir.py
 +++ ir.py
-@@ -2,5 +2,5 @@
+@@ -2,8 +2,8 @@
  #  See https://llvm.org/LICENSE.txt for license information.
  #  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
  
@@ -8,3 +8,7 @@
 -from ._mlir_libs._mlir.ir import _GlobalDebug
 +from jaxlib.mlir.ir import *
 +from jaxlib.mlir.ir import _GlobalDebug
+ 
+ 
+ # Convenience decorator for registering user-friendly Attribute builders.
+ 
