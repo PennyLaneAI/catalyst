@@ -89,13 +89,10 @@ class CompiledFunction:
         assert func_name  # make sure that func_name is not false-y
         self.func_name = func_name
         self.restype = restype
-        self.shared_object = None
+        self.shared_object, self.function, self.setup, self.teardown, self.mem_transfer = CompiledFunction.load_symbols(
+            self.shared_object_file, self.func_name
+        )
 
-    def __del__(self):
-        if self.shared_object is not None:
-            dlclose = ctypes.CDLL(None).dlclose
-            dlclose.argtypes = [ctypes.c_void_p]
-            dlclose(self.shared_object._handle)
 
     @staticmethod
     def can_skip_promote(compiled_signature, runtime_signature):
@@ -407,10 +404,6 @@ class CompiledFunction:
 
         numpy_dict = {nparr.ctypes.data: nparr for nparr in _buffer}
 
-        if self.shared_object is None:
-            self.shared_object, self.function, self.setup, self.teardown, self.mem_transfer = CompiledFunction.load_symbols(
-                self.shared_object_file, self.func_name
-            )
 
         result = self._exec(
             self.restype,
@@ -513,6 +506,9 @@ class QJIT:
     def compile(self):
         """Compile the current MLIR module."""
         if self.compiled_function:
+            dlclose = ctypes.CDLL(None).dlclose
+            dlclose.argtypes = [ctypes.c_void_p]
+            dlclose(self.compiled_function.shared_object._handle)
             del self.compiled_function
 
         # This will make a check before sending it to the compiler that the return type
@@ -534,7 +530,9 @@ class QJIT:
         # The MLIR function name is actually a derived type from string which has no
         # `replace` method, so we need to get a regular Python string out of it.
         qfunc_name = str(self.mlir_module.body.operations[0].name).replace('"', "")
-        return CompiledFunction(shared_object, qfunc_name, restype)
+        self.compiled_function = CompiledFunction(shared_object, qfunc_name, restype)
+        return self.compiled_function
+
 
     def _maybe_promote(self, function, *args):
         """Logic to decide whether the function needs to be recompiled
@@ -588,7 +586,6 @@ class QJIT:
             return self.qfunc(*args, **kwargs)
 
         function, args = self._maybe_promote(self.compiled_function, *args)
-        self.compiled_function = function
 
         if any(isinstance(arg, jax.core.Tracer) for arg in args):
             # Only compile a derivative version of the compiled function when needed.
