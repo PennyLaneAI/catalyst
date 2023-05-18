@@ -170,7 +170,7 @@ def _make_jaxpr_check_differentiable(f: Differentiable, grad_params: GradParams,
     ), "Expected jaxpr consisting of a single function call."
 
     for pos, arg in enumerate(jaxpr.in_avals):
-        if arg.dtype.kind != "f" and pos in self.argnum:
+        if arg.dtype.kind != "f" and pos in grad_params.argnum:
             raise TypeError(
                 "Catalyst.grad only supports differentiation on floating-point "
                 f"arguments, got '{arg.dtype}' at position {pos}."
