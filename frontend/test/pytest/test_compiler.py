@@ -138,9 +138,7 @@ class TestCompilerErrors:
             invalid_file.write("These are invalid contents.")
             invalid_file.flush()
             with pytest.raises(EnvironmentError, match="Unable to link .*"):
-                with pytest.warns(
-                    UserWarning, match="Compiler cc failed during execution"
-                ):
+                with pytest.warns(UserWarning, match="Compiler cc failed during execution"):
                     CompilerDriver.run(invalid_file.name, fallback_compilers=["cc"])
 
     @pytest.mark.parametrize(
