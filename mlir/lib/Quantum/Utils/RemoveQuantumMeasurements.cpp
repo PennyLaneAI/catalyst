@@ -14,6 +14,7 @@
 
 #include <deque>
 
+#include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Utils/RemoveQuantumMeasurements.h"
 
@@ -27,14 +28,7 @@ void removeQuantumMeasurements(func::FuncOp &function)
 
     // Delete measurement operations.
     std::deque<Operation *> opsToDelete;
-    function.walk<WalkOrder::PreOrder>([&](Operation *op) {
-        bool is_measurement = dyn_cast<SampleOp>(op) || dyn_cast<CountsOp>(op) ||
-                              dyn_cast<ExpvalOp>(op) || dyn_cast<VarianceOp>(op) ||
-                              dyn_cast<ProbsOp>(op) || dyn_cast<StateOp>(op);
-        if (!is_measurement)
-            return;
-        opsToDelete.push_back(op);
-    });
+    function.walk([&](MeasurementProcess op) { opsToDelete.push_back(op); });
 
     // Measurement operations are not allowed inside scf dialects.
     // This means that we can remove them.
