@@ -22,6 +22,7 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 
+#include "Gradient/Utils/CompDiffArgIndices.h"
 #include "Gradient/Utils/GradientShape.h"
 
 namespace catalyst {
@@ -157,7 +158,7 @@ func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc, GradOp
                                  func::FuncOp qGradFn, StringRef method)
 {
     // Define the properties of the full gradient function.
-    const std::vector<size_t> &diffArgIndices = gradOp.compDiffArgIndices();
+    const std::vector<size_t> &diffArgIndices = compDiffArgIndices(gradOp.getDiffArgIndices());
     std::stringstream uniquer;
     std::copy(diffArgIndices.begin(), diffArgIndices.end(), std::ostream_iterator<int>(uniquer));
     std::string fnName = gradOp.getCallee().str() + ".fullgrad" + uniquer.str() + method.str();
