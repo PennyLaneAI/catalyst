@@ -221,7 +221,7 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
 
         // Creat constants
         Value c0 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI32IntegerAttr(0));
-        Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
+        Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI32IntegerAttr(1));
 
         // Create mlir memref to llvm
         StringRef allocFnName = "_mlir_memref_to_llvm_alloc";
@@ -264,6 +264,7 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
         SmallVector<Value> callArgs = {wrapperPtr};
 
         // Add the arguments and their shadow
+        SmallVector <Value> gradients;
         for (auto [arg, llvmarg] : llvm::zip(op.getArgs(), adaptor.getArgs())) {
             auto newArg =
                 rewriter.create<LLVM::AllocaOp>(loc, LLVM::LLVMPointerType::get(vectorType), c1);
@@ -276,6 +277,7 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
                 Value zeroArg = rewriter.create<LLVM::ConstantOp>(
                     loc, llvmarg.getType(), rewriter.getZeroAttr(llvmarg.getType()));
                 rewriter.create<LLVM::StoreOp>(loc, zeroArg, shadowPtr);
+                gradients.push_back(shadowPtr);
                 callArgs.push_back(shadowPtr);
             }
             else {
@@ -318,7 +320,7 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
                 Value shadowPtr = rewriter.create<LLVM::AllocaOp>(
                     loc, LLVM::LLVMPointerType::get(vectorType), c1);
                 rewriter.create<LLVM::StoreOp>(loc, llvmarg, shadowPtr);
-
+                gradients.push_back(shadowPtr);
                 callArgs.push_back(shadowPtr);
             }
         }
@@ -357,9 +359,9 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
             Value buffer =
                 rewriter.create<LLVM::CallOp>(loc, allocFnDecl, bufferMemSize).getResult();
 
-            // Set value to 0
+            // Set value to 1
             rewriter.create<LLVM::CallOp>(loc, memsetFnDecl,
-                                          ArrayRef<Value>{buffer, c0, bufferMemSize});
+                                          ArrayRef<Value>{buffer, c1, bufferMemSize});
 
             Type llvmBaseType = conv->convertType(memrefType.getElementType());
             Value bufferCast = rewriter.create<LLVM::BitcastOp>(
@@ -375,9 +377,7 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
             callArgs.push_back(shadowPtr);
         }
 
-        auto callop = rewriter.create<LLVM::CallOp>(loc, backpropFnDecl, callArgs);
-        
-        auto results = callop.getResults();
+        rewriter.create<LLVM::CallOp>(loc, backpropFnDecl, callArgs);
         rewriter.eraseOp(op);
         return success();
     }
