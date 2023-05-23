@@ -219,6 +219,11 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
         func::FuncOp callee =
             SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
         assert(callee);
+
+        // Creat constants
+        Value c0 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI32IntegerAttr(0));
+        Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
+
         // Create mlir memref to llvm
         StringRef allocFnName = "_mlir_memref_to_llvm_alloc";
         Type allocFnSignature = LLVM::LLVMFunctionType::get(
@@ -254,8 +259,6 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
         // Add the arguments and their shadow
 
         for (auto arg : op.getArgs()) {
-            callArgs.push_back(arg);
-            Value shadow;
             Type llvmArgType = llvmTypeConverter.convertType(arg.getType());
             if (!llvmArgType)
                 emitError(loc, "Could not convert argmap argument to LLVM type: ")
@@ -265,20 +268,24 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
                             .getResult(0);
             }
 
-            Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
+            auto newArg =
+                rewriter.create<LLVM::AllocaOp>(loc, LLVM::LLVMPointerType::get(llvmArgType), c1);
+            callArgs.push_back(newArg);
+
+            // Add shadow float
             Value shadowPtr = rewriter.create<LLVM::AllocaOp>(loc, LLVM::LLVMPointerType::get(llvmArgType), c1);
             Value zeroArg = rewriter.create<LLVM::ConstantOp>(loc, llvmArgType, rewriter.getZeroAttr(llvmArgType));
             rewriter.create<LLVM::StoreOp>(loc, zeroArg, shadowPtr);
             callArgs.push_back(shadowPtr);
+
+            // Add shadow for memref
         }
 
         // We follow the C ABI convention of passing result memrefs as struct pointers in the
         // arguments to the C function, although in this case as a variadic argument list to allow
         // for a varying number of results in a single signature.
 
-        // Add the results and their sdows
-        Value c0 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI32IntegerAttr(0));
-        Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
+        // Add the results and their sdows;
 
         for (auto [memref, llvmmemref] : llvm::zip(op.getDataIn(), adaptor.getDataIn())) {
 
@@ -287,14 +294,16 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
             rewriter.create<LLVM::StoreOp>(loc, llvmmemref, newArg);
             callArgs.push_back(newArg);
 
+            // Add shadow for memref
+
             Value offset = rewriter.create<LLVM::ExtractValueOp>(loc, llvmmemref, 2);
+
             SmallVector<int64_t> vectorIndices {3, 0};
+
             Value sizeArray = rewriter.create<LLVM::ExtractValueOp>(loc, llvmmemref, vectorIndices);
+
             vectorIndices[0]=4;
-            // size_t rank = memref.getType().cast<MemRefType>().getRank();
             Value strideArray = rewriter.create<LLVM::ExtractValueOp>(loc, llvmmemref, vectorIndices);
-
-
 
             Value bufferSize = rewriter.create<LLVM::MulOp>(loc, sizeArray, strideArray);
             bufferSize = rewriter.create<LLVM::AddOp>(loc, offset, bufferSize);
@@ -307,6 +316,7 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
 
             Value buffer = rewriter.create<LLVM::CallOp>(loc, allocFnDecl, bufferMemSize).getResult();
 
+            // Set value to 0
             rewriter.create<LLVM::CallOp>(loc, memsetFnDecl, ArrayRef<Value>{buffer, c0, bufferMemSize});
 
             Type llvmBaseType = conv->convertType(memrefType.getElementType());
@@ -314,8 +324,10 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
 
             llvmmemref = rewriter.create<LLVM::InsertValueOp>(loc, llvmmemref, bufferCast, 0);
             llvmmemref = rewriter.create<LLVM::InsertValueOp>(loc, llvmmemref, bufferCast, 1);
+
             Value shadowPtr = rewriter.create<LLVM::AllocaOp>(loc, LLVM::LLVMPointerType::get(vectorType), c1);
             rewriter.create<LLVM::StoreOp>(loc, llvmmemref, shadowPtr);
+
             callArgs.push_back(shadowPtr);
         }
 
