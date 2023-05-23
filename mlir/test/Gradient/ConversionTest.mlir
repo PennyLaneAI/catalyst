@@ -58,3 +58,16 @@ func.func @backpropCircuit(%arg0: f64, %arg1 : index) -> memref<?xf64> {
 
     return %alloc0: memref<?xf64>
 }
+
+// -----
+
+func.func private @circuit(%arg0: memref<1xf64>) -> (memref<?xf64>)
+
+func.func @backpropCircuit2(%arg0: memref<1xf64>, %arg1 : index) -> memref<?xf64> {
+
+    %alloc0 = memref.alloc(%arg1) : memref<?xf64>
+
+    gradient.backprop @circuit(%arg0) size(%arg1) in(%alloc0 : memref<?xf64>) {diffArgIndices=dense<0> : tensor<1xindex>} : (memref<1xf64>) -> ()
+
+    return %alloc0: memref<?xf64>
+}
