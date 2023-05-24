@@ -20,6 +20,9 @@
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Interfaces/CallInterfaces.h"
+#include "mlir/Interfaces/InferTypeOpInterface.h"
+
+#include "Gradient/IR/GradientDialect.h"
 
 #define GET_OP_CLASSES
 #include "Gradient/IR/GradientOps.h.inc"

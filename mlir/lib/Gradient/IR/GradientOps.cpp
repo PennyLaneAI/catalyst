@@ -22,11 +22,11 @@
 #include "Gradient/Utils/CompDiffArgIndices.h"
 #include "Gradient/Utils/GradientShape.h"
 
-#define GET_OP_CLASSES
-#include "Gradient/IR/GradientOps.cpp.inc"
-
 using namespace mlir;
 using namespace catalyst::gradient;
+
+#define GET_OP_CLASSES
+#include "Gradient/IR/GradientOps.cpp.inc"
 
 // Gradient input checker
 LogicalResult verifyGradInputs(OpState *op_state, func::FuncOp callee, ValueRange callee_operands,

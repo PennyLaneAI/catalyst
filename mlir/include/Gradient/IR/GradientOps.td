@@ -16,6 +16,7 @@
 #define GRADIENT_OPS
 
 include "mlir/Interfaces/CallInterfaces.td"
+include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/IR/BuiltinAttributes.td"
 include "mlir/IR/OpBase.td"
@@ -174,6 +175,28 @@ def VJPOp : Gradient_Op<"vjp", [
     }];
 
     let hasVerifier = 1;
+}
+
+def InitVectorOp : Gradient_Op<"init_vector"> {
+    let summary = "Initialize a dynamically resizable parameter vector.";
+    let results = (outs ParameterVectorType:$vector);
+    let assemblyFormat = [{ attr-dict `:` type($vector) }];
+}
+
+def PushVectorOp : Gradient_Op<"push_vector",
+        [TypesMatchWith<"type of 'value' matches element type of 'vector'",
+                        "vector", "value",
+                        "$_self.cast<ParameterVectorType>().getElementType()">]> {
+    let summary = "Append an element to the end of a parameter vector.";
+    let arguments = (ins AnyType:$value, ParameterVectorType:$vector);
+    let assemblyFormat = [{ $value `,` $vector attr-dict `:` type($vector) }];
+}
+
+def VectorSizeOp : Gradient_Op<"vector_size"> {
+    let summary = "Get the size of a parameter vector.";
+    let arguments = (ins ParameterVectorType:$vector);
+    let results = (outs Index:$size);
+    let assemblyFormat = [{ $vector attr-dict `:` type($vector) }];
 }
 
 #endif // GRADIENT_OPS

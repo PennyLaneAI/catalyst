@@ -17,3 +17,10 @@
 #include "mlir/IR/Dialect.h"
 
 #include "Gradient/IR/GradientOpsDialect.h.inc"
+
+//===----------------------------------------------------------------------===//
+// Gradient type declarations.
+//===----------------------------------------------------------------------===//
+
+#define GET_TYPEDEF_CLASSES
+#include "Gradient/IR/GradientOpsTypes.h.inc"
