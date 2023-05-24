@@ -415,23 +415,3 @@ void populateConversionPatterns(TypeConverter &typeConverter, RewritePatternSet 
 
 } // namespace gradient
 } // namespace catalyst
-  //                            argMapFn.getArgumentTypes().end());
-  // argTypes.insert(argTypes.end(), argMapFn.getResultTypes().begin(),
-  //                 argMapFn.getResultTypes().end());
-
-// SmallVector<Type> originalArgTypes, bufferizedArgTypes;
-// for (auto argTypeIt = argTypes.begin(); argTypeIt < argTypes.end() - argMapFn.getNumResults();
-//      argTypeIt++) {
-//     originalArgTypes.push_back(*argTypeIt);
-//     if (argTypeIt->isa<TensorType>()) {
-//         Type buffArgType = buffTypeConverter.convertType(*argTypeIt);
-//         bufferizedArgTypes.push_back(buffArgType);
-//         Type llvmArgType = llvmTypeConverter.convertType(buffArgType);
-//         if (!llvmArgType)
-//             emitError(loc, "Could not convert argmap argument to LLVM type: ") << buffArgType;
-//         *argTypeIt = LLVM::LLVMPointerType::get(llvmArgType);
-//     }
-//     else {
-//         bufferizedArgTypes.push_back(*argTypeIt);
-//     }
-//
