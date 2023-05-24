@@ -7,7 +7,7 @@ MK_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 MK_DIR := $(dir $(MK_ABSPATH))
 DIALECTS_BUILD_DIR ?= $(MK_DIR)/mlir/build
 COVERAGE_REPORT ?= term-missing
-TEST_BACKEND ?= "lighting.qubit"
+TEST_BACKEND ?= "lightning.qubit"
 
 .PHONY: help
 help:

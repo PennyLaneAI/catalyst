@@ -65,7 +65,7 @@ func::FuncOp ParameterShiftLowering::genShiftFunction(PatternRewriter &rewriter,
     Type shiftVectorType = RankedTensorType::get({numShifts}, rewriter.getF64Type());
     Type selectorVectorType = RankedTensorType::get({loopDepth}, rewriter.getIndexType());
 
-    // Define the properties of the "shifted" version of the function to be differentaited.
+    // Define the properties of the "shifted" version of the function to be differentiated.
     std::string fnName = callee.getSymName().str() + ".shifted";
     std::vector<Type> fnArgTypes = callee.getArgumentTypes().vec();
     fnArgTypes.push_back(shiftVectorType);
@@ -103,15 +103,15 @@ func::FuncOp ParameterShiftLowering::genShiftFunction(PatternRewriter &rewriter,
                 Value iteration = forOp.getInductionVar();
                 selectors.push_back({iteration, selector});
             }
-            else if (auto gate = dyn_cast<quantum::CustomOp>(op)) {
-                if (gate.getParams().empty()) {
+            else if (auto gate = dyn_cast<quantum::DifferentiableGate>(op)) {
+                if (gate.getDiffParams().empty()) {
                     return;
                 }
 
                 PatternRewriter::InsertionGuard insertGuard(rewriter);
                 rewriter.setInsertionPoint(gate);
 
-                OperandRange params = gate.getParams();
+                ValueRange params = gate.getDiffParams();
                 std::vector<Value> shiftedParams;
                 shiftedParams.reserve(params.size());
 
@@ -123,7 +123,7 @@ func::FuncOp ParameterShiftLowering::genShiftFunction(PatternRewriter &rewriter,
                     shiftedParams.push_back(shiftedParam);
                 }
 
-                gate->setOperands(0, shiftedParams.size(), shiftedParams);
+                gate->setOperands(gate.getDiffOperandIdx(), shiftedParams.size(), shiftedParams);
             }
             else if (isa<scf::YieldOp>(op) && isa<scf::ForOp>(op->getParentOp())) {
                 // When we reach the end of a for loop, remove its iteration variable from the list.

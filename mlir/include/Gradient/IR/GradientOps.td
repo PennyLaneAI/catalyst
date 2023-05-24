@@ -61,10 +61,6 @@ def GradOp : Gradient_Op<"grad", [DeclareOpInterfaceMethods<CallOpInterface>,
     let assemblyFormat = [{
         $method $callee `(` $operands `)` attr-dict `:` functional-type($operands, results)
     }];
-
-    let extraClassDeclaration = [{
-        std::vector<size_t> compDiffArgIndices();
-    }];
 }
 
 def AdjointOp : Gradient_Op<"adjoint", [AttrSizedOperandSegments]> {
@@ -119,6 +115,65 @@ def BackpropOp : Gradient_Op<"backprop", [AttrSizedOperandSegments]> {
 }
 
 
+def JVPOp : Gradient_Op<"jvp", [
+        AttrSizedOperandSegments,
+        SameVariadicResultSize,
+        DeclareOpInterfaceMethods<CallOpInterface>,
+        DeclareOpInterfaceMethods<SymbolUserOpInterface>
+        ]> {
+    let summary = "Compute the jvp of a function.";
 
+    let arguments = (ins
+        StrAttr:$method,
+        FlatSymbolRefAttr:$callee,
+        Variadic<AnyType>:$params,
+        Variadic<AnyType>:$tangents,
+        OptionalAttr<AnyIntElementsAttr>:$diffArgIndices,
+        OptionalAttr<Builtin_FloatAttr>:$finiteDiffParam
+    );
+
+    let results = (outs
+        Variadic<AnyTypeOf<[AnyFloat, RankedTensorOf<[AnyFloat]>]>>:$calleeResults,
+        Variadic<AnyTypeOf<[AnyFloat, RankedTensorOf<[AnyFloat]>]>>:$jvps
+    );
+
+    let assemblyFormat = [{
+        $method $callee `(` $params `)` `tangents` `(` $tangents `)`
+        attr-dict `:` functional-type(operands, results)
+    }];
+
+
+    let hasVerifier = 1;
+}
+
+
+def VJPOp : Gradient_Op<"vjp", [
+        AttrSizedOperandSegments,
+        AttrSizedResultSegments,
+        DeclareOpInterfaceMethods<CallOpInterface>,
+        DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
+    let summary = "Compute the vjp of a function.";
+
+    let arguments = (ins
+        StrAttr:$method,
+        FlatSymbolRefAttr:$callee,
+        Variadic<AnyType>:$params,
+        Variadic<AnyType>:$cotangents,
+        OptionalAttr<AnyIntElementsAttr>:$diffArgIndices,
+        OptionalAttr<Builtin_FloatAttr>:$finiteDiffParam
+    );
+
+    let results = (outs
+        Variadic<AnyTypeOf<[AnyFloat, RankedTensorOf<[AnyFloat]>]>>:$calleeResults,
+        Variadic<AnyTypeOf<[AnyFloat, RankedTensorOf<[AnyFloat]>]>>:$vjps
+    );
+
+    let assemblyFormat = [{
+        $method $callee `(` $params `)` `cotangents` `(` $cotangents `)`
+            attr-dict `:` functional-type(operands, results)
+    }];
+
+    let hasVerifier = 1;
+}
 
 #endif // GRADIENT_OPS

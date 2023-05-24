@@ -22,6 +22,7 @@ import typing
 import warnings
 
 import jax
+import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
 from jax.interpreters.mlir import ir
@@ -32,6 +33,7 @@ from mlir_quantum.runtime import (
     make_zero_d_memref_descriptor,
 )
 
+import catalyst
 import catalyst.jax_tracer as tracer
 from catalyst.compiler import CompileOptions, Compiler
 from catalyst.pennylane_extensions import QFunc
@@ -413,6 +415,7 @@ class QJIT:
 
     def __init__(self, fn, compile_options):
         self.qfunc = fn
+        self.jaxed_qfunc = None
         self.c_sig = None
         functools.update_wrapper(self, fn)
         self.compile_options = compile_options
@@ -554,15 +557,112 @@ class QJIT:
         if TracingContext.is_tracing():
             return self.qfunc(*args, **kwargs)
 
-        if any(isinstance(arg, jax.core.Tracer) for arg in args):
-            raise ValueError(
-                "Cannot use JAX to trace through a qjit compiled function. If you attempted "
-                "to use jax.jit or jax.grad, please use their equivalent from Catalyst."
-            )
-
         function, args = self._maybe_promote(self.compiled_function, *args)
         self.compiled_function = function
+
+        if any(isinstance(arg, jax.core.Tracer) for arg in args):
+            # Only compile a derivative version of the compiled function when needed.
+            if self.jaxed_qfunc is None:
+                self.jaxed_qfunc = JAX_QJIT(self)
+
+            return self.jaxed_qfunc(*args, **kwargs)
+
         return self.compiled_function(*args, **kwargs)
+
+
+class JAX_QJIT:
+    """Wrapper class around :class:`~.QJIT` that enables compatibility with JAX transformations.
+
+    The primary mechanism through which this is effected is by wrapping the invocation of the QJIT
+    object inside a JAX ``pure_callback``. Additionally, a custom JVP is defined in order to support
+    JAX-based differentiation, which is itself a ``pure_callback`` around a second QJIT object which
+    invokes :func:`~.grad` on the original function. Using this class thus incurs additional
+    compilation time.
+
+    Args:
+        qfunc (QJIT): the compiled quantum function object to wrap
+    """
+
+    def __init__(self, qfunc):
+        @jax.custom_jvp
+        def jaxed_qfunc(*args, **kwargs):
+            results = self.wrap_callback(qfunc, *args, **kwargs)
+            if len(results) == 1:
+                results = results[0]
+            return results
+
+        self.qfunc = qfunc
+        self.deriv_qfuncs = {}
+        self.jaxed_qfunc = jaxed_qfunc
+        jaxed_qfunc.defjvp(self.compute_jvp)
+
+    @staticmethod
+    def wrap_callback(qfunc, *args, **kwargs):
+        """Wrap a QJIT function inside a jax host callback."""
+        return jax.pure_callback(qfunc, qfunc.jaxpr.out_avals, *args, vectorized=False, **kwargs)
+
+    def get_derivative_qfunc(self, argnums):
+        """Compile a function computing the derivative of the wrapped QJIT for the given argnums."""
+
+        argnum_key = "".join(str(idx) for idx in argnums)
+        if argnum_key in self.deriv_qfuncs:
+            return self.deriv_qfuncs[argnum_key]
+
+        # Here we define the signature for the new QJIT object explicitly, rather than relying on
+        # functools.wrap, in order to guarantee compilation is triggered on instantiation.
+        # The signature of the original QJIT object is guaranteed to be defined by now, located
+        # in QJIT.c_sig, however we don't update the original function with these annotations.
+        annotations = {}
+        updated_params = []
+        signature = inspect.signature(self.qfunc)
+        for idx, (arg_name, param) in enumerate(signature.parameters.items()):
+            annotations[arg_name] = self.qfunc.c_sig[idx]
+            updated_params.append(param.replace(annotation=annotations[arg_name]))
+
+        def deriv_wrapper(*args, **kwargs):
+            return catalyst.grad(self.qfunc, argnum=argnums)(*args, **kwargs)
+
+        deriv_wrapper.__name__ = "deriv_" + self.qfunc.__name__
+        deriv_wrapper.__annotations__ = annotations
+        deriv_wrapper.__signature__ = signature.replace(parameters=updated_params)
+
+        self.deriv_qfuncs[argnum_key] = QJIT(deriv_wrapper, self.qfunc.compile_options)
+        return self.deriv_qfuncs[argnum_key]
+
+    def compute_jvp(self, primals, tangents):
+        """Compute the set of results and JVPs for a QJIT function."""
+
+        # Optimization: Do not compute Jacobians for arguments which do not participate in
+        #               differentiation.
+        # TODO: replace with symbolic zero support
+        argnums = []
+        for idx, tangent in enumerate(tangents):
+            if qml.math.is_abstract(tangent, like="jax") or jnp.any(jnp.atleast_1d(tangent) != 0.0):
+                argnums.append(idx)
+
+        results = self.wrap_callback(self.qfunc, *primals)
+        derivatives = self.wrap_callback(self.get_derivative_qfunc(argnums), *primals)
+
+        jvps = [jnp.zeros_like(results[res_idx]) for res_idx in range(len(results))]
+        for arg_idx, tangent in enumerate(tangents):
+            # Skip JVP for arguments which do not participate in differentiation.
+            if arg_idx not in argnums:
+                continue
+            for res_idx in range(len(results)):
+                deriv_idx = arg_idx * len(results) + res_idx
+                num_axes = 0 if tangent.ndim == 0 else 1
+                jvp = jnp.tensordot(jnp.transpose(derivatives[deriv_idx]), tangent, axes=num_axes)
+                jvps[res_idx] = jvps[res_idx] + jvp
+
+        if len(results) == 1:
+            results = results[0]
+        if len(jvps) == 1:
+            jvps = jvps[0]
+
+        return results, jvps
+
+    def __call__(self, *args, **kwargs):
+        return self.jaxed_qfunc(*args, **kwargs)
 
 
 def qjit(
@@ -593,7 +693,7 @@ def qjit(
             :attr:`~.QJIT.mlir`, :attr:`~.QJIT.jaxpr`, and :attr:`~.QJIT.qir`, representing
             different stages in the optimization process.
         verbosity (int): Verbosity level (0 - disabled, >0 - enabled)
-        logfile (Optional[TextIOWrapper]): File object to write verose messages to (default -
+        logfile (Optional[TextIOWrapper]): File object to write verbose messages to (default -
             sys.stderr).
         pipelines (Optional(List[AnyType]): A list of pipelines to be executed. The elements of
             the list are asked to implement a run method which takes the output of the previous run
