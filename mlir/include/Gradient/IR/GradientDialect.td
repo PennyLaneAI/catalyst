@@ -51,7 +51,7 @@ class Gradient_Type<string name, string typeMnemonic, list<Trait> traits = []>
 }
 
 def ParameterVectorType : Gradient_Type<"ParameterVector", "vec"> {
-    let summary = "A dynamically resizable array.";
+    let summary = "a parameter vector (dynamically resizable array)";
     let parameters = (ins "Type":$elementType);
     let assemblyFormat = "`<` $elementType `>`";
 }

@@ -189,6 +189,36 @@ struct LowerVectorSize : public OpConversionPattern<VectorSizeOp> {
     }
 };
 
+struct LowerVectorLoadData : public OpConversionPattern<VectorLoadDataOp> {
+    using OpConversionPattern<VectorLoadDataOp>::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(VectorLoadDataOp op, OpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        FailureOr<DynVectorBuilder> dynVectorBuilder =
+            DynVectorBuilder::get(op.getLoc(), getTypeConverter(), op.getVector(), rewriter);
+        if (failed(dynVectorBuilder)) {
+            return failure();
+        }
+
+        // Ensure the result memref has the correct underlying size (which may be different than the
+        // vector's underlying memref due to the geometric reallocation).
+        Value data =
+            rewriter.create<memref::LoadOp>(op.getLoc(), dynVectorBuilder.value().dataField);
+        auto memrefType = cast<MemRefType>(data.getType());
+        Value size =
+            rewriter.create<memref::LoadOp>(op.getLoc(), dynVectorBuilder.value().sizeField);
+        Value result = rewriter.create<memref::AllocOp>(op.getLoc(), memrefType, size);
+        SmallVector<OpFoldResult> offsets{rewriter.getIndexAttr(0)}, sizes{size},
+            strides{rewriter.getIndexAttr(1)};
+        Value dataView =
+            rewriter.create<memref::SubViewOp>(op.getLoc(), data, offsets, sizes, strides);
+        rewriter.create<memref::CopyOp>(op.getLoc(), dataView, result);
+        rewriter.replaceOp(op, result);
+        return success();
+    }
+};
+
 struct GradientLoweringPass : public OperationPass<ModuleOp> {
     GradientLoweringPass() : OperationPass<ModuleOp>(TypeID::get<GradientLoweringPass>()) {}
     GradientLoweringPass(const GradientLoweringPass &other) : OperationPass<ModuleOp>(other) {}
@@ -251,18 +281,21 @@ struct GradientLoweringPass : public OperationPass<ModuleOp> {
             return signalPassFailure();
         }
 
-        RewritePatternSet gradientVectorPatterns(&getContext());
-        gradientVectorPatterns.add<LowerInitVector>(vectorTypeConverter, &getContext());
-        gradientVectorPatterns.add<LowerPushVector>(vectorTypeConverter, &getContext());
-        gradientVectorPatterns.add<LowerVectorSize>(vectorTypeConverter, &getContext());
-        ConversionTarget target(getContext());
-        target.addLegalDialect<arith::ArithDialect, memref::MemRefDialect, func::FuncDialect,
-                               scf::SCFDialect>();
-        target.addLegalOp<UnrealizedConversionCastOp>();
-        target.addIllegalOp<InitVectorOp, PushVectorOp, VectorSizeOp>();
+        if (lowerVector) {
+            RewritePatternSet gradientVectorPatterns(&getContext());
+            gradientVectorPatterns.add<LowerInitVector>(vectorTypeConverter, &getContext());
+            gradientVectorPatterns.add<LowerPushVector>(vectorTypeConverter, &getContext());
+            gradientVectorPatterns.add<LowerVectorSize>(vectorTypeConverter, &getContext());
+            gradientVectorPatterns.add<LowerVectorLoadData>(vectorTypeConverter, &getContext());
+            ConversionTarget target(getContext());
+            target.addLegalDialect<arith::ArithDialect, memref::MemRefDialect, func::FuncDialect,
+                                   scf::SCFDialect>();
+            target.addLegalOp<UnrealizedConversionCastOp>();
+            target.addIllegalOp<InitVectorOp, PushVectorOp, VectorSizeOp, VectorLoadDataOp>();
 
-        if (failed(applyPartialConversion(op, target, std::move(gradientVectorPatterns)))) {
-            return signalPassFailure();
+            if (failed(applyPartialConversion(op, target, std::move(gradientVectorPatterns)))) {
+                return signalPassFailure();
+            }
         }
     }
 
@@ -274,6 +307,10 @@ struct GradientLoweringPass : public OperationPass<ModuleOp> {
   protected:
     Option<std::string> lowerOnly{
         *this, "only", llvm::cl::desc("Restrict lowering to a specific type of gradient.")};
+
+    Option<bool> lowerVector{*this, "lower-vectors",
+                             llvm::cl::desc("Lower gradient vector operations."),
+                             llvm::cl::init(true)};
 };
 
 } // namespace gradient

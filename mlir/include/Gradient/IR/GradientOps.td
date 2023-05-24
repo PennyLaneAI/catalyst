@@ -177,13 +177,13 @@ def VJPOp : Gradient_Op<"vjp", [
     let hasVerifier = 1;
 }
 
-def InitVectorOp : Gradient_Op<"init_vector"> {
+def InitVectorOp : Gradient_Op<"vector_init"> {
     let summary = "Initialize a dynamically resizable parameter vector.";
     let results = (outs ParameterVectorType:$vector);
     let assemblyFormat = [{ attr-dict `:` type($vector) }];
 }
 
-def PushVectorOp : Gradient_Op<"push_vector",
+def PushVectorOp : Gradient_Op<"vector_push",
         [TypesMatchWith<"type of 'value' matches element type of 'vector'",
                         "vector", "value",
                         "$_self.cast<ParameterVectorType>().getElementType()">]> {
@@ -197,6 +197,20 @@ def VectorSizeOp : Gradient_Op<"vector_size"> {
     let arguments = (ins ParameterVectorType:$vector);
     let results = (outs Index:$size);
     let assemblyFormat = [{ $vector attr-dict `:` type($vector) }];
+}
+
+def VectorLoadDataOp : Gradient_Op<"vector_load_data"> {
+    let summary = "Get the underlying memref storing the data of a parameter vector.";
+    let arguments = (ins ParameterVectorType:$vector);
+    let results = (outs AnyMemRef:$data);
+    let builders = [
+        OpBuilder<(ins "mlir::Value":$vector), [{
+            ParameterVectorType vectorType = cast<ParameterVectorType>(vector.getType());
+            MemRefType memrefType = MemRefType::get({ShapedType::kDynamic}, vectorType.getElementType());
+            return build($_builder, $_state, memrefType, vector);
+        }]>
+    ];
+    let assemblyFormat = [{ $vector attr-dict `:` type($vector) `->` type($data) }];
 }
 
 #endif // GRADIENT_OPS
