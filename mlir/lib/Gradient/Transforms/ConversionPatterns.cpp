@@ -136,7 +136,9 @@ func::FuncOp genEnzymeWrapperFunction(PatternRewriter &rewriter, Location loc, f
 {
     MLIRContext *ctx = rewriter.getContext();
     LLVMTypeConverter llvmTypeConverter(ctx);
-    bufferization::BufferizeTypeConverter buffTypeConverter;
+
+    Type vectorType =
+        llvmTypeConverter.convertType(MemRefType::get({UNKNOWN}, Float64Type::get(ctx)));
 
     // Define the properties of the enzyme wrapper function.
     std::string fnName = callee.getName().str() + ".enzyme_wrapper";
@@ -152,7 +154,7 @@ func::FuncOp genEnzymeWrapperFunction(PatternRewriter &rewriter, Location loc, f
         Type llvmResType = llvmTypeConverter.convertType(*resTypeIt);
         if (!llvmResType)
             emitError(loc, "Could not convert argmap result to LLVM type: ") << *resTypeIt;
-        *resTypeIt = LLVM::LLVMPointerType::get(llvmResType);
+        *resTypeIt = LLVM::LLVMPointerType::get(vectorType);
     }
 
     ArrayRef convertedArgTypes(argResTypes.begin(), argResTypes.end() - callee.getNumArguments());
@@ -209,10 +211,10 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
     {
         Location loc = op.getLoc();
         MLIRContext *ctx = getContext();
-        TypeConverter *conv = getTypeConverter();
         LLVMTypeConverter llvmTypeConverter(ctx);
 
-        Type vectorType = conv->convertType(MemRefType::get({UNKNOWN}, Float64Type::get(ctx)));
+        Type vectorType =
+            llvmTypeConverter.convertType(MemRefType::get({UNKNOWN}, Float64Type::get(ctx)));
 
         for (Type type : op.getResultTypes()) {
             if (!type.isa<MemRefType>())
@@ -313,7 +315,7 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
             rewriter.create<LLVM::CallOp>(loc, memsetFnDecl,
                                           ArrayRef<Value>{buffer, c0, bufferMemSize});
 
-            Type llvmBaseType = conv->convertType(memrefType.getElementType());
+            Type llvmBaseType = llvmTypeConverter.convertType(memrefType.getElementType());
             Value bufferCast = rewriter.create<LLVM::BitcastOp>(
                 loc, LLVM::LLVMPointerType::get(llvmBaseType), buffer);
 
@@ -380,7 +382,7 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
             rewriter.create<LLVM::CallOp>(loc, memsetFnDecl,
                                           ArrayRef<Value>{buffer, c1, bufferMemSize});
 
-            Type llvmBaseType = conv->convertType(memrefType.getElementType());
+            Type llvmBaseType = llvmTypeConverter.convertType(memrefType.getElementType());
             Value bufferCast = rewriter.create<LLVM::BitcastOp>(
                 loc, LLVM::LLVMPointerType::get(llvmBaseType), buffer);
 
