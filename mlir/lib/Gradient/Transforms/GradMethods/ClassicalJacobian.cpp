@@ -23,6 +23,7 @@
 #include "mlir/Dialect/Index/IR/IndexOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 
+#include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Utils/RemoveQuantumMeasurements.h"
 
@@ -52,48 +53,51 @@ func::FuncOp genParamCountFunction(PatternRewriter &rewriter, Location loc, func
     func::FuncOp paramCountFn =
         SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(callee, rewriter.getStringAttr(fnName));
     if (!paramCountFn) {
-        PatternRewriter::InsertionGuard insertGuard(rewriter);
-
         // First copy the original function as is, then we can replace all quantum ops by counting
         // their gate parameters instead.
         rewriter.setInsertionPointAfter(callee);
         paramCountFn = rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility);
         rewriter.cloneRegionBefore(callee.getBody(), paramCountFn.getBody(), paramCountFn.end());
 
+        PatternRewriter::InsertionGuard insertGuard(rewriter);
+        rewriter.setInsertionPointToStart(&paramCountFn.getBody().front());
+
         // Store the counter in memory since we don't want to deal with returning the SSA value
         // for updated parameter counts from arbitrary regions/ops.
-        rewriter.setInsertionPointToStart(&paramCountFn.getBody().front());
         MemRefType paramCountType = MemRefType::get({}, rewriter.getIndexType());
         Value paramCountBuffer = rewriter.create<memref::AllocaOp>(loc, paramCountType);
         Value cZero = rewriter.create<index::ConstantOp>(loc, 0);
         rewriter.create<memref::StoreOp>(loc, cZero, paramCountBuffer);
 
-        // For each quantum gate add the number of parameters to the counter.
-        paramCountFn.walk([&](quantum::CustomOp gate) {
-            PatternRewriter::InsertionGuard insertGuard(rewriter);
-            rewriter.setInsertionPoint(gate);
+        paramCountFn.walk([&](Operation *op) {
+            // For each quantum gate add the number of parameters to the counter.
+            if (auto gate = dyn_cast<quantum::DifferentiableGate>(op)) {
+                PatternRewriter::InsertionGuard insertGuard(rewriter);
+                rewriter.setInsertionPoint(gate);
 
-            if (!gate.getParams().empty()) {
-                Value currCount = rewriter.create<memref::LoadOp>(loc, paramCountBuffer);
-                Value numParams = rewriter.create<index::ConstantOp>(loc, gate.getParams().size());
-                Value newCount = rewriter.create<index::AddOp>(loc, currCount, numParams);
-                rewriter.create<memref::StoreOp>(loc, newCount, paramCountBuffer);
+                ValueRange diffParams = gate.getDiffParams();
+                if (!diffParams.empty()) {
+                    Value currCount = rewriter.create<memref::LoadOp>(loc, paramCountBuffer);
+                    Value numParams = rewriter.create<index::ConstantOp>(loc, diffParams.size());
+                    Value newCount = rewriter.create<index::AddOp>(loc, currCount, numParams);
+                    rewriter.create<memref::StoreOp>(loc, newCount, paramCountBuffer);
+                }
+
+                rewriter.replaceOp(gate, cast<quantum::QuantumGate>(op).getQubitOperands());
             }
+            // Replace any return statements from the original function with the parameter count.
+            else if (isa<func::ReturnOp>(op)) {
+                PatternRewriter::InsertionGuard insertGuard(rewriter);
+                rewriter.setInsertionPoint(op);
 
-            rewriter.replaceOp(gate, gate.getInQubits());
+                Value paramCount = rewriter.create<memref::LoadOp>(loc, paramCountBuffer);
+                op->setOperands(paramCount);
+            }
+            // Erase redundant device specifications.
+            else if (isa<quantum::DeviceOp>(op)) {
+                rewriter.eraseOp(op);
+            }
         });
-
-        // Replace any return statements from the original function with the parameter count.
-        paramCountFn.walk([&](func::ReturnOp returnOp) {
-            PatternRewriter::InsertionGuard insertGuard(rewriter);
-            rewriter.setInsertionPoint(returnOp);
-
-            Value paramCount = rewriter.create<memref::LoadOp>(loc, paramCountBuffer);
-            returnOp->setOperands(paramCount);
-        });
-
-        // Erase redundant device specifications
-        paramCountFn.walk([&](quantum::DeviceOp device) { rewriter.eraseOp(device); });
 
         quantum::removeQuantumMeasurements(paramCountFn);
     }
@@ -121,8 +125,6 @@ func::FuncOp genArgMapFunction(PatternRewriter &rewriter, Location loc, func::Fu
     func::FuncOp argMapFn =
         SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(callee, rewriter.getStringAttr(fnName));
     if (!argMapFn) {
-        PatternRewriter::InsertionGuard insertGuard(rewriter);
-
         // First copy the original function as is, then we can replace all quantum ops by collecting
         // their gate parameters in a memory buffer instead. The size of this vector is passed as an
         // input to the new function.
@@ -130,8 +132,10 @@ func::FuncOp genArgMapFunction(PatternRewriter &rewriter, Location loc, func::Fu
         rewriter.cloneRegionBefore(callee.getBody(), argMapFn.getBody(), argMapFn.end());
         Value numParams = argMapFn.getBody().front().addArgument(rewriter.getIndexType(), loc);
 
-        // Allocate the memory for the gate parameters collected at runtime.
+        PatternRewriter::InsertionGuard insertGuard(rewriter);
         rewriter.setInsertionPointToStart(&argMapFn.getBody().front());
+
+        // Allocate the memory for the gate parameters collected at runtime.
         MemRefType paramsBufferType =
             MemRefType::get({ShapedType::kDynamic}, rewriter.getF64Type());
         Value paramsBuffer = rewriter.create<memref::AllocOp>(loc, paramsBufferType, numParams);
@@ -141,33 +145,36 @@ func::FuncOp genArgMapFunction(PatternRewriter &rewriter, Location loc, func::Fu
         rewriter.create<memref::StoreOp>(loc, cZero, paramsProcessed);
         Value cOne = rewriter.create<index::ConstantOp>(loc, 1);
 
-        // Erase redundant device specifications
-        argMapFn.walk([&](quantum::DeviceOp device) { rewriter.eraseOp(device); });
+        argMapFn.walk([&](Operation *op) {
+            // Insert gate parameters into the params buffer.
+            if (auto gate = dyn_cast<quantum::DifferentiableGate>(op)) {
+                PatternRewriter::InsertionGuard insertGuard(rewriter);
+                rewriter.setInsertionPoint(gate);
 
-        // Insert gate parameters into the params buffer.
-        argMapFn.walk([&](quantum::CustomOp gate) {
-            PatternRewriter::InsertionGuard insertGuard(rewriter);
-            rewriter.setInsertionPoint(gate);
-
-            if (!gate.getParams().empty()) {
-                Value paramIdx = rewriter.create<memref::LoadOp>(loc, paramsProcessed);
-                for (auto param : gate.getParams()) {
-                    rewriter.create<memref::StoreOp>(loc, param, paramsBuffer, paramIdx);
-                    paramIdx = rewriter.create<index::AddOp>(loc, paramIdx, cOne);
+                ValueRange diffParams = gate.getDiffParams();
+                if (!diffParams.empty()) {
+                    Value paramIdx = rewriter.create<memref::LoadOp>(loc, paramsProcessed);
+                    for (auto param : diffParams) {
+                        rewriter.create<memref::StoreOp>(loc, param, paramsBuffer, paramIdx);
+                        paramIdx = rewriter.create<index::AddOp>(loc, paramIdx, cOne);
+                    }
+                    rewriter.create<memref::StoreOp>(loc, paramIdx, paramsProcessed);
                 }
-                rewriter.create<memref::StoreOp>(loc, paramIdx, paramsProcessed);
+
+                rewriter.replaceOp(op, cast<quantum::QuantumGate>(op).getQubitOperands());
             }
+            // Replace any return statements from the original function with the params vector.
+            else if (isa<func::ReturnOp>(op)) {
+                PatternRewriter::InsertionGuard insertGuard(rewriter);
+                rewriter.setInsertionPoint(op);
 
-            rewriter.replaceOp(gate, gate.getInQubits());
-        });
-
-        // Replace any return statements from the original function with the params vector.
-        argMapFn.walk([&](func::ReturnOp returnOp) {
-            PatternRewriter::InsertionGuard insertGuard(rewriter);
-            rewriter.setInsertionPoint(returnOp);
-
-            Value paramsVector = rewriter.create<bufferization::ToTensorOp>(loc, paramsBuffer);
-            returnOp->setOperands(paramsVector);
+                Value paramsVector = rewriter.create<bufferization::ToTensorOp>(loc, paramsBuffer);
+                op->setOperands(paramsVector);
+            }
+            // Erase redundant device specifications.
+            else if (isa<quantum::DeviceOp>(op)) {
+                rewriter.eraseOp(op);
+            }
         });
 
         quantum::removeQuantumMeasurements(argMapFn);

@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Test built-in differentiation support in Catalyst."""
+
 import jax
 import numpy as np
 import pennylane as qml
@@ -624,6 +626,48 @@ def test_assert_no_higher_order_without_ps(method, backend):
             return i(x)
 
 
+def test_assert_invalid_diff_method():
+    """Test invalid diff method detection"""
+
+    def f(x):
+        qml.RX(x, wires=0)
+        return qml.expval(qml.PauliY(0))
+
+    with pytest.raises(ValueError, match="Invalid differentiation method"):
+
+        @qjit()
+        def workflow(x: float):
+            g = qml.qnode(qml.device("lightning.qubit", wires=1))(f)
+            h = grad(g, method="non-existent method")
+            return h(x)
+
+
+def test_assert_invalid_h_type():
+    """Test invalid h type detection"""
+
+    def f(x):
+        qml.RX(x, wires=0)
+        return qml.expval(qml.PauliY(0))
+
+    with pytest.raises(ValueError, match="Invalid h value"):
+
+        @qjit()
+        def workflow(x: float):
+            g = qml.qnode(qml.device("lightning.qubit", wires=1))(f)
+            h = grad(g, method="fd", h="non-integer")
+            return h(x)
+
+
+def test_assert_non_differentiable():
+    """Test non-differentiable parameter detection"""
+    with pytest.raises(TypeError, match="Non-differentiable object passed"):
+
+        @qjit()
+        def workflow(x: float):
+            h = grad("string!", method="fd")
+            return h(x)
+
+
 def test_finite_diff_arbitrary_functions():
     """Test gradients on non-qnode functions."""
 
@@ -686,6 +730,43 @@ def test_jax_consts(inp, backend):
         return h(params)
 
     assert np.allclose(compile_grad(jnp.array(inp)), interpret_grad(inp))
+
+
+def test_non_float_arg(backend):
+    """Test a function which attempts to differentiate non-floating point arguments."""
+
+    @qml.qnode(qml.device(backend, wires=2))
+    def circuit(x: complex, y: float):
+        qml.RX(jnp.real(x), wires=0)
+        qml.RY(y, wires=0)
+        return qml.expval(qml.PauliZ(0))
+
+    @qjit
+    def cost_fn(x, y):
+        return grad(circuit)(x, y)
+
+    with pytest.raises(
+        TypeError, match="only supports differentiation on floating-point arguments"
+    ):
+        cost_fn(1j, 2.0)
+
+
+def test_non_float_res(backend):
+    """Test a function which attempts to differentiate non-floating point results."""
+
+    @qml.qnode(qml.device(backend, wires=2))
+    def circuit(x: float, y: float):
+        qml.RX(x, wires=0)
+        qml.RY(y, wires=0)
+        return qml.expval(qml.PauliZ(0))
+
+    @qjit
+    @grad
+    def cost_fn(x, y):
+        return 1j * circuit(x, y)
+
+    with pytest.raises(TypeError, match="only supports differentiation on floating-point results"):
+        cost_fn(1.0, 2.0)
 
 
 @pytest.mark.parametrize("diff_method", ["fd", "adj", "ps"])

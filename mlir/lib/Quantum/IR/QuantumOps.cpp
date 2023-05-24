@@ -114,29 +114,14 @@ static LogicalResult verifyTensorResult(Type ty, int64_t length0, int64_t length
 
 // ----- gates
 
-LogicalResult CustomOp::verify() { return verifyQubitNumbers(); }
-
-LogicalResult MultiRZOp::verify()
-{
-    if (getInQubits().size() < 1) {
-        return emitOpError("must have at least 1 qubit");
-    }
-
-    return verifyQubitNumbers();
-}
-
 LogicalResult QubitUnitaryOp::verify()
 {
-    if (getInQubits().size() < 1) {
-        return emitOpError("must have at least 1 qubit");
-    }
-
     size_t dim = std::pow(2, getInQubits().size());
     if (failed(verifyTensorResult(getMatrix().getType().cast<ShapedType>(), dim, dim))) {
         return emitOpError("The Unitary matrix must be of size 2^(num_qubits) * 2^(num_qubits)");
     }
 
-    return verifyQubitNumbers();
+    return success();
 }
 
 // ----- measurements

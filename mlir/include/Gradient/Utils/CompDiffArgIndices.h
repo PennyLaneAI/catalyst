@@ -1,4 +1,4 @@
-// Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+// Copyright 2023 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,12 +14,14 @@
 
 #pragma once
 
-#include "mlir/IR/BuiltinTypes.h"
-#include "mlir/IR/Dialect.h"
-#include "mlir/IR/OpDefinition.h"
-#include "mlir/IR/OpImplementation.h"
-#include "mlir/IR/SymbolTable.h"
-#include "mlir/Interfaces/CallInterfaces.h"
+#include <vector>
 
-#define GET_OP_CLASSES
-#include "Gradient/IR/GradientOps.h.inc"
+#include "mlir/IR/BuiltinAttributes.h"
+#include "llvm/ADT/Optional.h"
+
+namespace catalyst {
+
+// Calculate the vector of effective gradient argument indices based on the user settings.
+std::vector<size_t> compDiffArgIndices(llvm::Optional<mlir::DenseIntElementsAttr> indices);
+
+}; // namespace catalyst

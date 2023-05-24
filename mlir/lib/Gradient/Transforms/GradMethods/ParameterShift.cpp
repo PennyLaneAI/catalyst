@@ -82,11 +82,11 @@ std::pair<int64_t, int64_t> ParameterShiftLowering::analyzeFunction(func::FuncOp
         if (isa<scf::ForOp>(op)) {
             loopLevel++;
         }
-        else if (auto gate = dyn_cast<quantum::CustomOp>(op)) {
-            if (gate.getParams().empty())
+        else if (auto gate = dyn_cast<quantum::DifferentiableGate>(op)) {
+            if (gate.getDiffParams().empty())
                 return;
 
-            numShifts += gate.getParams().size();
+            numShifts += gate.getDiffParams().size();
             maxLoopDepth = std::max(loopLevel, maxLoopDepth);
         }
         else if (isa<scf::YieldOp>(op) && isa<scf::ForOp>(op->getParentOp())) {

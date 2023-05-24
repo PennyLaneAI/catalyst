@@ -247,11 +247,11 @@ func::FuncOp ParameterShiftLowering::genQGradFunction(PatternRewriter &rewriter,
                 selectorsToStore.push_back({forOp, loopLevel});
                 loopLevel++;
             }
-            else if (auto gate = dyn_cast<quantum::CustomOp>(op)) {
+            else if (auto gate = dyn_cast<quantum::DifferentiableGate>(op)) {
                 PatternRewriter::InsertionGuard insertGuard(rewriter);
                 rewriter.setInsertionPoint(gate);
 
-                size_t numParams = gate.getParams().size();
+                size_t numParams = gate.getDiffParams().size();
                 if (numParams) {
                     updateSelectorVector(rewriter, loc, selectorsToStore, selectorBuffer);
 
@@ -287,18 +287,21 @@ func::FuncOp ParameterShiftLowering::genQGradFunction(PatternRewriter &rewriter,
             }
         });
 
-        // Post-order traversal is required when deleting nodes during traversal.
-        gradientFn.walk<WalkOrder::PostOrder>([&](quantum::CustomOp gate) {
-            // We are undoing the def-use chains of this gate's return values
-            // so that we can safely delete it (all quantum ops must be eliminated).
-            rewriter.replaceOp(gate, gate.getInQubits());
+        // Finally erase all quantum operations.
+        gradientFn.walk([&](Operation *op) {
+            if (auto gate = dyn_cast<quantum::QuantumGate>(op)) {
+                // We are undoing the def-use chains of this gate's return values
+                // so that we can safely delete it (all quantum ops must be eliminated).
+                rewriter.replaceOp(gate, gate.getQubitOperands());
+            }
+            else if (isa<quantum::DeviceOp>(op)) {
+                // Erase redundant device specifications.
+                rewriter.eraseOp(op);
+            }
         });
 
         quantum::removeQuantumMeasurements(gradientFn);
     }
-
-    // Erase redundant device specifications
-    gradientFn.walk([&](quantum::DeviceOp device) { rewriter.eraseOp(device); });
 
     return gradientFn;
 }
