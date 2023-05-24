@@ -266,35 +266,44 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
         // Add the arguments and their shadow on data in
         for (auto [arg, llvmarg, llvmdatain] :
              llvm::zip(op.getArgs(), adaptor.getArgs(), adaptor.getDataIn())) {
-
             auto newArg =
                 rewriter.create<LLVM::AllocaOp>(loc, LLVM::LLVMPointerType::get(vectorType), c1);
             rewriter.create<LLVM::StoreOp>(loc, llvmarg, newArg);
             callArgs.push_back(newArg);
 
             // Add shadow for memref
-            Value offset = rewriter.create<LLVM::ExtractValueOp>(loc, llvmarg, 2);
-
-            SmallVector<int64_t> vectorIndices{3, 0};
-
-            Value sizeArray = rewriter.create<LLVM::ExtractValueOp>(loc, llvmarg, vectorIndices);
-
-            vectorIndices[0] = 4;
-            Value strideArray = rewriter.create<LLVM::ExtractValueOp>(loc, llvmarg, vectorIndices);
-
-            Value bufferSize = rewriter.create<LLVM::MulOp>(loc, sizeArray, strideArray);
-            bufferSize = rewriter.create<LLVM::AddOp>(loc, offset, bufferSize);
-
             MemRefType memrefType = arg.getType().cast<MemRefType>();
+            size_t sizeShape = memrefType.getShape().size();
             size_t value = memrefType.getElementTypeBitWidth() / 8;
 
             auto memrefSize =
                 rewriter.create<LLVM::ConstantOp>(loc, IntegerType::get(ctx, 64), value);
+
+            Value bufferSize;
+
+            if (sizeShape == 0) {
+                bufferSize = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
+            }
+            else {
+                Value offset = rewriter.create<LLVM::ExtractValueOp>(loc, llvmarg, 2);
+
+                SmallVector<int64_t> vectorIndices{3, 0};
+
+                Value sizeArray =
+                    rewriter.create<LLVM::ExtractValueOp>(loc, llvmarg, vectorIndices);
+
+                vectorIndices[0] = 4;
+                Value strideArray =
+                    rewriter.create<LLVM::ExtractValueOp>(loc, llvmarg, vectorIndices);
+
+                bufferSize = rewriter.create<LLVM::MulOp>(loc, sizeArray, strideArray);
+                bufferSize = rewriter.create<LLVM::AddOp>(loc, offset, bufferSize);
+            }
+
             Value bufferMemSize = rewriter.create<LLVM::MulOp>(loc, bufferSize, memrefSize);
 
             Value buffer =
                 rewriter.create<LLVM::CallOp>(loc, allocFnDecl, bufferMemSize).getResult();
-
             // Set value to 0 (gradients)
             rewriter.create<LLVM::CallOp>(loc, memsetFnDecl,
                                           ArrayRef<Value>{buffer, c0, bufferMemSize});
@@ -364,7 +373,7 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
 
             // Set value to 1 (tangent vectors)
             rewriter.create<LLVM::CallOp>(loc, memsetFnDecl,
-                                          ArrayRef<Value>{buffer, c0, bufferMemSize});
+                                          ArrayRef<Value>{buffer, c1, bufferMemSize});
 
             Type llvmBaseType = conv->convertType(memrefType.getElementType());
             Value bufferCast = rewriter.create<LLVM::BitcastOp>(

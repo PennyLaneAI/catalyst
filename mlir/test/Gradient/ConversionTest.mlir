@@ -48,13 +48,13 @@ func.func @adjoint(%arg0: f32, %arg1 : index) -> (memref<?xf64>, memref<?xf64>) 
 
 // -----
 
-func.func private @argmap(%arg0: memref<1xf64>) -> (memref<?xf64>)
+func.func private @argmap(%arg0: memref<f64>) -> (memref<?xf64>)
 
-func.func @backpropCircuit2(%arg0: memref<1xf64>, %arg1 : index) -> memref<?xf64> {
+func.func @backpropCircuit2(%arg0: memref<f64>, %arg1 : index) -> memref<?xf64> {
 
     %alloc0 = memref.alloc(%arg1) : memref<?xf64>
 
-    gradient.backprop @argmap(%arg0) size(%arg1) in(%alloc0 : memref<?xf64>) {diffArgIndices=dense<0> : tensor<1xindex>} : (memref<1xf64>) -> ()
+    gradient.backprop @argmap(%arg0) size(%arg1) in(%alloc0 : memref<?xf64>) {diffArgIndices=dense<0> : tensor<1xindex>} : (memref<f64>) -> ()
 
     return %alloc0: memref<?xf64>
 }
