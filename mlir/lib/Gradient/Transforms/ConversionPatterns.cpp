@@ -337,7 +337,6 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
                                          callee.getResultTypes().end());
         for (auto resTypeIt = resCalleeTypes.begin(); resTypeIt < resCalleeTypes.end();
              resTypeIt++) {
-
             Type llvmResType = llvmTypeConverter.convertType(*resTypeIt);
             if (!llvmResType)
                 emitError(loc, "Could not convert argmap result to LLVM type: ") << *resTypeIt;
