@@ -142,22 +142,18 @@ func::FuncOp genEnzymeWrapperFunction(PatternRewriter &rewriter, Location loc, f
     std::string fnName = callee.getName().str() + ".enzyme_wrapper";
     SmallVector<Type> argResTypes(callee.getArgumentTypes().begin(),
                                   callee.getArgumentTypes().end());
-    SmallVector<Type> originalArgTypes(callee.getArgumentTypes().begin(),
-                                       callee.getArgumentTypes().end());
+    argResTypes.insert(argResTypes.end(), callee.getResultTypes().begin(), callee.getResultTypes().end());
+    SmallVector<Type> originalArgTypes(callee.getArgumentTypes().begin(), callee.getArgumentTypes().end());
 
-    argResTypes.insert(argResTypes.end(), callee.getResultTypes().begin(),
-                       callee.getResultTypes().end());
-
-    // Lower the results
-    for (auto resTypeIt = argResTypes.begin() + callee.getNumArguments();
-         resTypeIt < argResTypes.end(); resTypeIt++) {
-        Type buffResType = buffTypeConverter.convertType(*resTypeIt);
-        Type llvmResType = llvmTypeConverter.convertType(buffResType);
+    // Lower the args and results
+    for (auto resTypeIt = argResTypes.begin(); resTypeIt < argResTypes.end(); resTypeIt++) {
+        Type llvmResType = llvmTypeConverter.convertType(*resTypeIt);
         if (!llvmResType)
-            emitError(loc, "Could not convert argmap result to LLVM type: ") << buffResType;
+            emitError(loc, "Could not convert argmap result to LLVM type: ") << *resTypeIt;
         *resTypeIt = LLVM::LLVMPointerType::get(llvmResType);
     }
 
+    ArrayRef convertedArgTypes(argResTypes.begin(), argResTypes.end() - callee.getNumArguments());
     ArrayRef convertedResTypes(argResTypes.begin() + callee.getNumArguments(), argResTypes.end());
 
     // Create the wrapped operation
@@ -178,6 +174,15 @@ func::FuncOp genEnzymeWrapperFunction(PatternRewriter &rewriter, Location loc, f
         SmallVector<Value> callArgs(wrappedCallee.getArguments().begin(),
                                     wrappedCallee.getArguments().end() - callee.getNumResults());
 
+        for (auto [arg, convertedType] : llvm::zip(callArgs, convertedArgTypes)) {
+            if (arg.getType().isa<LLVM::LLVMPointerType>()) {
+                Value memrefStruct = rewriter.create<LLVM::LoadOp>(loc, arg);
+                Value memref =
+                    rewriter.create<UnrealizedConversionCastOp>(loc, convertedType, memrefStruct)
+                        .getResult(0);
+                arg = rewriter.create<bufferization::ToTensorOp>(loc, memref);
+            }
+        }
         // Call the callee
         ValueRange results = rewriter.create<func::CallOp>(loc, callee, callArgs).getResults();
         results = rewriter.create<UnrealizedConversionCastOp>(loc, convertedResTypes, results)
@@ -408,3 +413,23 @@ void populateConversionPatterns(TypeConverter &typeConverter, RewritePatternSet 
 
 } // namespace gradient
 } // namespace catalyst
+    //                            argMapFn.getArgumentTypes().end());
+    // argTypes.insert(argTypes.end(), argMapFn.getResultTypes().begin(),
+    //                 argMapFn.getResultTypes().end());
+
+    // SmallVector<Type> originalArgTypes, bufferizedArgTypes;
+    // for (auto argTypeIt = argTypes.begin(); argTypeIt < argTypes.end() - argMapFn.getNumResults();
+    //      argTypeIt++) {
+    //     originalArgTypes.push_back(*argTypeIt);
+    //     if (argTypeIt->isa<TensorType>()) {
+    //         Type buffArgType = buffTypeConverter.convertType(*argTypeIt);
+    //         bufferizedArgTypes.push_back(buffArgType);
+    //         Type llvmArgType = llvmTypeConverter.convertType(buffArgType);
+    //         if (!llvmArgType)
+    //             emitError(loc, "Could not convert argmap argument to LLVM type: ") << buffArgType;
+    //         *argTypeIt = LLVM::LLVMPointerType::get(llvmArgType);
+    //     }
+    //     else {
+    //         bufferizedArgTypes.push_back(*argTypeIt);
+    //     }
+    // 
