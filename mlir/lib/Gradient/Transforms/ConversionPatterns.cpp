@@ -142,8 +142,10 @@ func::FuncOp genEnzymeWrapperFunction(PatternRewriter &rewriter, Location loc, f
     std::string fnName = callee.getName().str() + ".enzyme_wrapper";
     SmallVector<Type> argResTypes(callee.getArgumentTypes().begin(),
                                   callee.getArgumentTypes().end());
-    argResTypes.insert(argResTypes.end(), callee.getResultTypes().begin(), callee.getResultTypes().end());
-    SmallVector<Type> originalArgTypes(callee.getArgumentTypes().begin(), callee.getArgumentTypes().end());
+    argResTypes.insert(argResTypes.end(), callee.getResultTypes().begin(),
+                       callee.getResultTypes().end());
+    SmallVector<Type> originalArgTypes(callee.getArgumentTypes().begin(),
+                                       callee.getArgumentTypes().end());
 
     // Lower the args and results
     for (auto resTypeIt = argResTypes.begin(); resTypeIt < argResTypes.end(); resTypeIt++) {
@@ -174,13 +176,11 @@ func::FuncOp genEnzymeWrapperFunction(PatternRewriter &rewriter, Location loc, f
         SmallVector<Value> callArgs(wrappedCallee.getArguments().begin(),
                                     wrappedCallee.getArguments().end() - callee.getNumResults());
 
-        for (auto [arg, convertedType] : llvm::zip(callArgs, convertedArgTypes)) {
+        for (auto [arg, convertedType] : llvm::zip(callArgs, originalArgTypes)) {
             if (arg.getType().isa<LLVM::LLVMPointerType>()) {
                 Value memrefStruct = rewriter.create<LLVM::LoadOp>(loc, arg);
-                Value memref =
-                    rewriter.create<UnrealizedConversionCastOp>(loc, convertedType, memrefStruct)
-                        .getResult(0);
-                arg = rewriter.create<bufferization::ToTensorOp>(loc, memref);
+                arg = rewriter.create<UnrealizedConversionCastOp>(loc, convertedType, memrefStruct)
+                          .getResult(0);
             }
         }
         // Call the callee
@@ -413,23 +413,23 @@ void populateConversionPatterns(TypeConverter &typeConverter, RewritePatternSet 
 
 } // namespace gradient
 } // namespace catalyst
-    //                            argMapFn.getArgumentTypes().end());
-    // argTypes.insert(argTypes.end(), argMapFn.getResultTypes().begin(),
-    //                 argMapFn.getResultTypes().end());
+  //                            argMapFn.getArgumentTypes().end());
+  // argTypes.insert(argTypes.end(), argMapFn.getResultTypes().begin(),
+  //                 argMapFn.getResultTypes().end());
 
-    // SmallVector<Type> originalArgTypes, bufferizedArgTypes;
-    // for (auto argTypeIt = argTypes.begin(); argTypeIt < argTypes.end() - argMapFn.getNumResults();
-    //      argTypeIt++) {
-    //     originalArgTypes.push_back(*argTypeIt);
-    //     if (argTypeIt->isa<TensorType>()) {
-    //         Type buffArgType = buffTypeConverter.convertType(*argTypeIt);
-    //         bufferizedArgTypes.push_back(buffArgType);
-    //         Type llvmArgType = llvmTypeConverter.convertType(buffArgType);
-    //         if (!llvmArgType)
-    //             emitError(loc, "Could not convert argmap argument to LLVM type: ") << buffArgType;
-    //         *argTypeIt = LLVM::LLVMPointerType::get(llvmArgType);
-    //     }
-    //     else {
-    //         bufferizedArgTypes.push_back(*argTypeIt);
-    //     }
-    // 
+// SmallVector<Type> originalArgTypes, bufferizedArgTypes;
+// for (auto argTypeIt = argTypes.begin(); argTypeIt < argTypes.end() - argMapFn.getNumResults();
+//      argTypeIt++) {
+//     originalArgTypes.push_back(*argTypeIt);
+//     if (argTypeIt->isa<TensorType>()) {
+//         Type buffArgType = buffTypeConverter.convertType(*argTypeIt);
+//         bufferizedArgTypes.push_back(buffArgType);
+//         Type llvmArgType = llvmTypeConverter.convertType(buffArgType);
+//         if (!llvmArgType)
+//             emitError(loc, "Could not convert argmap argument to LLVM type: ") << buffArgType;
+//         *argTypeIt = LLVM::LLVMPointerType::get(llvmArgType);
+//     }
+//     else {
+//         bufferizedArgTypes.push_back(*argTypeIt);
+//     }
+//
