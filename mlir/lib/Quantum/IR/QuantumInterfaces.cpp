@@ -1,4 +1,4 @@
-// Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+// Copyright 2023 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,14 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#pragma once
+#include "Quantum/IR/QuantumInterfaces.h"
 
-#include "mlir/IR/BuiltinTypes.h"
-#include "mlir/IR/Dialect.h"
-#include "mlir/IR/OpDefinition.h"
-#include "mlir/IR/OpImplementation.h"
-#include "mlir/IR/SymbolTable.h"
-#include "mlir/Interfaces/CallInterfaces.h"
+using namespace mlir;
+using namespace catalyst::quantum;
 
-#define GET_OP_CLASSES
-#include "Gradient/IR/GradientOps.h.inc"
+//===----------------------------------------------------------------------===//
+// Quantum interface definitions.
+//===----------------------------------------------------------------------===//
+
+#include "Quantum/IR/QuantumInterfaces.cpp.inc"

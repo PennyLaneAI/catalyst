@@ -64,7 +64,29 @@
 * Add support for ``var`` of general observables
   [#124](https://github.com/PennyLaneAI/catalyst/pull/124)
 
-* Add support for generating OpenQasm3 kernels from the `QuantumDevice` API in the runtime.
+* Add support for Jacobian product operations. The function ``jvp(f, params, tangents)`` returns
+  the Jacobian-vector product of a function ``f``, and the ``vjp(f, params, cotangents)`` returns
+  its vector-Jacobian product.
+
+  [#98](https://github.com/PennyLaneAI/catalyst/pull/98)
+
+  An example of a newly supported workflow:
+
+
+  ``` python
+  from catalyst import jvp
+
+  def f(p):
+    return jnp.stack([1*p, 2*p, 3*p])
+
+  @qjit
+  def workflow(params, tangent):
+      return jvp(f, [params], [tangent])
+
+  workflow(jnp.zeros([4], dtype=float), jnp.ones([4], dtype=float))
+  ```
+
+* Add support for generating OpenQasm3 kernels from the ``QuantumDevice`` API in the runtime.
   [#118](https://github.com/PennyLaneAI/catalyst/pull/118)
 
 <h3>Improvements</h3>
@@ -82,6 +104,9 @@
 
 * Handle C++ exceptions without unwinding the whole stack.
   [#99](https://github.com/PennyLaneAI/catalyst/pull/99)
+
+* Support constant negative step sizes in ``@for_loop`` loops.
+  [#129](https://github.com/PennyLaneAI/catalyst/pull/129)
 
 <h3>Breaking changes</h3>
 
@@ -116,9 +141,10 @@ This release contains contributions from (in alphabetical order):
 
 Ali Asadi,
 David Ittah,
+Erick Ochoa Lopez,
 Jacob Mai Peng,
 Romain Moyard,
-Erick Ochoa Lopez.
+Sergei Mironov.
 
 # Release 0.1.2
 
