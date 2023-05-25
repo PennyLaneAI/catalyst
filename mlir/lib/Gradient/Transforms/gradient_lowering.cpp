@@ -39,186 +39,6 @@ using namespace catalyst::gradient;
 namespace catalyst {
 namespace gradient {
 
-struct DynVectorBuilder {
-    Value dataField, sizeField, capacityField;
-    Type elementType;
-
-    static FailureOr<DynVectorBuilder> get(Location loc, TypeConverter *typeConverter,
-                                           TypedValue<ParameterVectorType> vector, OpBuilder &b)
-    {
-        SmallVector<Type> resultTypes;
-        if (failed(typeConverter->convertType(vector.getType(), resultTypes))) {
-            return failure();
-        }
-
-        auto unpacked = b.create<UnrealizedConversionCastOp>(loc, resultTypes, vector);
-        return DynVectorBuilder{.dataField = unpacked.getResult(0),
-                                .sizeField = unpacked.getResult(1),
-                                .capacityField = unpacked.getResult(2),
-                                .elementType = vector.getType().getElementType()};
-    }
-
-    FlatSymbolRefAttr getOrInsertPushFunction(Location loc, ModuleOp moduleOp, OpBuilder &b) const
-    {
-        MLIRContext *ctx = b.getContext();
-        std::string funcName = "__grad_vec_push";
-        llvm::raw_string_ostream nameStream{funcName};
-        nameStream << elementType;
-        if (moduleOp.lookupSymbol<func::FuncOp>(funcName))
-            return SymbolRefAttr::get(ctx, funcName);
-
-        OpBuilder::InsertionGuard guard(b);
-        b.setInsertionPointToStart(moduleOp.getBody());
-
-        auto pushFnType = FunctionType::get(
-            ctx, /*inputs=*/
-            {dataField.getType(), sizeField.getType(), capacityField.getType(), elementType},
-            /*outputs=*/{});
-        auto pushFn = b.create<func::FuncOp>(loc, funcName, pushFnType);
-        pushFn.setPrivate();
-
-        Block *entryBlock = pushFn.addEntryBlock();
-        b.setInsertionPointToStart(entryBlock);
-        BlockArgument elementsField = pushFn.getArgument(0);
-        BlockArgument sizeField = pushFn.getArgument(1);
-        BlockArgument capacityField = pushFn.getArgument(2);
-        BlockArgument value = pushFn.getArgument(3);
-
-        Value sizeVal = b.create<memref::LoadOp>(loc, sizeField);
-        Value capacityVal = b.create<memref::LoadOp>(loc, capacityField);
-
-        Value predicate =
-            b.create<arith::CmpIOp>(loc, arith::CmpIPredicate::eq, sizeVal, capacityVal);
-        b.create<scf::IfOp>(loc, predicate, [&](OpBuilder &thenBuilder, Location loc) {
-            Value two = thenBuilder.create<arith::ConstantIndexOp>(loc, 2);
-            Value newCapacity = thenBuilder.create<arith::MulIOp>(loc, capacityVal, two);
-            Value oldElements = thenBuilder.create<memref::LoadOp>(loc, elementsField);
-            Value newElements = thenBuilder.create<memref::ReallocOp>(
-                loc, cast<MemRefType>(oldElements.getType()), oldElements, newCapacity);
-            thenBuilder.create<memref::StoreOp>(loc, newElements, elementsField);
-            thenBuilder.create<memref::StoreOp>(loc, newCapacity, capacityField);
-            thenBuilder.create<scf::YieldOp>(loc);
-        });
-
-        Value elementsVal = b.create<memref::LoadOp>(loc, elementsField);
-        b.create<memref::StoreOp>(loc, value, elementsVal,
-                                  /*indices=*/sizeVal);
-
-        Value one = b.create<arith::ConstantIndexOp>(loc, 1);
-        Value newSize = b.create<arith::AddIOp>(loc, sizeVal, one);
-
-        b.create<memref::StoreOp>(loc, newSize, sizeField);
-        b.create<func::ReturnOp>(loc);
-        return SymbolRefAttr::get(ctx, funcName);
-    }
-
-    void emitPush(Location loc, Value value, OpBuilder &b, FlatSymbolRefAttr pushFn) const
-    {
-        b.create<func::CallOp>(loc, pushFn, /*results=*/TypeRange{},
-                               /*operands=*/ValueRange{dataField, sizeField, capacityField, value});
-    }
-};
-
-struct LowerInitVector : public OpConversionPattern<VectorInitOp> {
-    using OpConversionPattern<VectorInitOp>::OpConversionPattern;
-
-    LogicalResult matchAndRewrite(VectorInitOp op, OpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
-        SmallVector<Type> resultTypes;
-        if (failed(getTypeConverter()->convertType(op.getType(), resultTypes))) {
-            op.emitError() << "Failed to convert type " << op.getType();
-            return failure();
-        }
-        Value capacity = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 1);
-        Value initialSize = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 0);
-        auto dataType = resultTypes[0].cast<MemRefType>();
-        auto sizeType = resultTypes[1].cast<MemRefType>();
-        auto capacityType = resultTypes[2].cast<MemRefType>();
-        Value buffer = rewriter.create<memref::AllocOp>(
-            op.getLoc(), dataType.getElementType().cast<MemRefType>(),
-            /*dynamicSize=*/capacity);
-        Value bufferField = rewriter.create<memref::AllocaOp>(op.getLoc(), dataType);
-        Value sizeField = rewriter.create<memref::AllocaOp>(op.getLoc(), sizeType);
-        Value capacityField = rewriter.create<memref::AllocaOp>(op.getLoc(), capacityType);
-        rewriter.create<memref::StoreOp>(op.getLoc(), buffer, bufferField);
-        rewriter.create<memref::StoreOp>(op.getLoc(), initialSize, sizeField);
-        rewriter.create<memref::StoreOp>(op.getLoc(), capacity, capacityField);
-        rewriter.replaceOpWithNewOp<UnrealizedConversionCastOp>(
-            op, op.getType(), ValueRange{bufferField, sizeField, capacityField});
-        return success();
-    }
-};
-
-struct LowerPushVector : public OpConversionPattern<VectorPushOp> {
-    using OpConversionPattern<VectorPushOp>::OpConversionPattern;
-
-    LogicalResult matchAndRewrite(VectorPushOp op, OpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
-        FailureOr<DynVectorBuilder> dynVectorBuilder =
-            DynVectorBuilder::get(op.getLoc(), getTypeConverter(), op.getVector(), rewriter);
-        if (failed(dynVectorBuilder)) {
-            return failure();
-        }
-        auto moduleOp = op->getParentOfType<ModuleOp>();
-        FlatSymbolRefAttr pushFn =
-            dynVectorBuilder.value().getOrInsertPushFunction(op.getLoc(), moduleOp, rewriter);
-        dynVectorBuilder.value().emitPush(op.getLoc(), op.getValue(), rewriter, pushFn);
-        rewriter.eraseOp(op);
-        return success();
-    }
-};
-
-struct LowerVectorSize : public OpConversionPattern<VectorSizeOp> {
-    using OpConversionPattern<VectorSizeOp>::OpConversionPattern;
-
-    LogicalResult matchAndRewrite(VectorSizeOp op, OpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
-        FailureOr<DynVectorBuilder> dynVectorBuilder =
-            DynVectorBuilder::get(op.getLoc(), getTypeConverter(), op.getVector(), rewriter);
-        if (failed(dynVectorBuilder)) {
-            return failure();
-        }
-
-        Value size =
-            rewriter.create<memref::LoadOp>(op.getLoc(), dynVectorBuilder.value().sizeField);
-        rewriter.replaceOp(op, size);
-        return success();
-    }
-};
-
-struct LowerVectorLoadData : public OpConversionPattern<VectorLoadDataOp> {
-    using OpConversionPattern<VectorLoadDataOp>::OpConversionPattern;
-
-    LogicalResult matchAndRewrite(VectorLoadDataOp op, OpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
-        FailureOr<DynVectorBuilder> dynVectorBuilder =
-            DynVectorBuilder::get(op.getLoc(), getTypeConverter(), op.getVector(), rewriter);
-        if (failed(dynVectorBuilder)) {
-            return failure();
-        }
-
-        // Ensure the result memref has the correct underlying size (which may be different than the
-        // vector's underlying memref due to the geometric reallocation).
-        Value data =
-            rewriter.create<memref::LoadOp>(op.getLoc(), dynVectorBuilder.value().dataField);
-        auto memrefType = cast<MemRefType>(data.getType());
-        Value size =
-            rewriter.create<memref::LoadOp>(op.getLoc(), dynVectorBuilder.value().sizeField);
-        Value result = rewriter.create<memref::AllocOp>(op.getLoc(), memrefType, size);
-        SmallVector<OpFoldResult> offsets{rewriter.getIndexAttr(0)}, sizes{size},
-            strides{rewriter.getIndexAttr(1)};
-        Value dataView =
-            rewriter.create<memref::SubViewOp>(op.getLoc(), data, offsets, sizes, strides);
-        rewriter.create<memref::CopyOp>(op.getLoc(), dataView, result);
-        rewriter.replaceOp(op, result);
-        return success();
-    }
-};
-
 struct GradientLoweringPass : public OperationPass<ModuleOp> {
     GradientLoweringPass() : OperationPass<ModuleOp>(TypeID::get<GradientLoweringPass>()) {}
     GradientLoweringPass(const GradientLoweringPass &other) : OperationPass<ModuleOp>(other) {}
@@ -283,15 +103,13 @@ struct GradientLoweringPass : public OperationPass<ModuleOp> {
 
         if (lowerVector) {
             RewritePatternSet gradientVectorPatterns(&getContext());
-            gradientVectorPatterns.add<LowerInitVector>(vectorTypeConverter, &getContext());
-            gradientVectorPatterns.add<LowerPushVector>(vectorTypeConverter, &getContext());
-            gradientVectorPatterns.add<LowerVectorSize>(vectorTypeConverter, &getContext());
-            gradientVectorPatterns.add<LowerVectorLoadData>(vectorTypeConverter, &getContext());
             ConversionTarget target(getContext());
             target.addLegalDialect<arith::ArithDialect, memref::MemRefDialect, func::FuncDialect,
                                    scf::SCFDialect>();
             target.addLegalOp<UnrealizedConversionCastOp>();
             target.addIllegalOp<VectorInitOp, VectorPushOp, VectorSizeOp, VectorLoadDataOp>();
+
+            populateVectorLoweringPatterns(vectorTypeConverter, gradientVectorPatterns);
 
             if (failed(applyPartialConversion(op, target, std::move(gradientVectorPatterns)))) {
                 return signalPassFailure();
