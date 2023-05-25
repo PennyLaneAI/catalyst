@@ -20,8 +20,8 @@ func.func private @funcScalarScalar(%arg0: f64) -> f64 {
 }
 
 // CHECK-LABEL: @funcScalarScalar.fullgrad0ps(%arg0: f64) -> f64
-    // CHECK:   [[PCOUNT:%.+]] = call @funcScalarScalar.pcount(%arg0)
-    // CHECK:   [[CJAC:%.+]] = gradient.grad "fd" @funcScalarScalar.argmap(%arg0, [[PCOUNT]]) : (f64, index) -> tensor<?xf64>
+    // CHECK:   [[CJAC:%.+]] = gradient.grad "fd" @funcScalarScalar.argmap(%arg0) : (f64) -> tensor<?xf64>
+    // CHECK:   [[PCOUNT:%.+]] = tensor.dim [[CJAC]]
     // CHECK:   [[QGRAD:%.+]] = call @funcScalarScalar.qgrad(%arg0, [[PCOUNT]]) :  (f64, index) -> tensor<?xf64>
 
     // CHECK:   [[GRAD:%.+]] = tensor.generate
@@ -51,8 +51,8 @@ func.func private @funcScalarPointTensor(%arg0: f64) -> tensor<f64> {
 }
 
 // CHECK-LABEL: @funcScalarPointTensor.fullgrad0ps(%arg0: f64) -> tensor<f64>
-    // CHECK:   [[PCOUNT:%.+]] = call @funcScalarPointTensor.pcount(%arg0)
-    // CHECK:   [[CJAC:%.+]] = gradient.grad "fd" @funcScalarPointTensor.argmap(%arg0, [[PCOUNT]]) : (f64, index) -> tensor<?xf64>
+    // CHECK:   [[CJAC:%.+]] = gradient.grad "fd" @funcScalarPointTensor.argmap(%arg0) : (f64) -> tensor<?xf64>
+    // CHECK:   [[PCOUNT:%.+]] = tensor.dim [[CJAC]]
     // CHECK:   [[QGRAD:%.+]] = call @funcScalarPointTensor.qgrad(%arg0, [[PCOUNT]]) :  (f64, index) -> tensor<?xf64>
 
     // CHECK:   [[GRAD:%.+]] = tensor.generate
@@ -81,8 +81,8 @@ func.func private @funcPointTensorScalar(%arg0: tensor<f64>) -> f64 {
 }
 
 // CHECK-LABEL: @funcPointTensorScalar.fullgrad0ps(%arg0: tensor<f64>) -> f64
-    // CHECK:   [[PCOUNT:%.+]] = call @funcPointTensorScalar.pcount(%arg0)
-    // CHECK:   [[CJAC:%.+]] = gradient.grad "fd" @funcPointTensorScalar.argmap(%arg0, [[PCOUNT]]) : (tensor<f64>, index) -> tensor<?xf64>
+    // CHECK:   [[CJAC:%.+]] = gradient.grad "fd" @funcPointTensorScalar.argmap(%arg0) : (tensor<f64>) -> tensor<?xf64>
+    // CHECK:   [[PCOUNT:%.+]] = tensor.dim [[CJAC]]
     // CHECK:   [[QGRAD:%.+]] = call @funcPointTensorScalar.qgrad(%arg0, [[PCOUNT]]) :  (tensor<f64>, index) -> tensor<?xf64>
 
     // CHECK:   [[GRAD:%.+]] = tensor.generate
@@ -111,8 +111,8 @@ func.func private @funcPointTensorPointTensor(%arg0: tensor<f64>) -> tensor<f64>
 }
 
 // CHECK-LABEL: @funcPointTensorPointTensor.fullgrad0ps(%arg0: tensor<f64>) -> tensor<f64>
-    // CHECK:   [[PCOUNT:%.+]] = call @funcPointTensorPointTensor.pcount(%arg0)
-    // CHECK:   [[CJAC:%.+]] = gradient.grad "fd" @funcPointTensorPointTensor.argmap(%arg0, [[PCOUNT]]) : (tensor<f64>, index) -> tensor<?xf64>
+    // CHECK:   [[CJAC:%.+]] = gradient.grad "fd" @funcPointTensorPointTensor.argmap(%arg0) : (tensor<f64>) -> tensor<?xf64>
+    // CHECK:   [[PCOUNT:%.+]] = tensor.dim [[CJAC]]
     // CHECK:   [[QGRAD:%.+]] = call @funcPointTensorPointTensor.qgrad(%arg0, [[PCOUNT]]) :  (tensor<f64>, index) -> tensor<?xf64>
 
     // CHECK:   [[GRAD:%.+]] = tensor.generate
@@ -141,8 +141,8 @@ func.func private @funcScalarTensor(%arg0: f32) -> tensor<2x3xf64> {
 }
 
 // CHECK-LABEL: @funcScalarTensor.fullgrad0ps(%arg0: f32) -> tensor<2x3xf64>
-    // CHECK:        [[PCOUNT:%.+]] = call @funcScalarTensor.pcount(%arg0)
-    // CHECK:        [[CJAC:%.+]] = gradient.grad "fd" @funcScalarTensor.argmap(%arg0, [[PCOUNT]]) : (f32, index) -> tensor<?xf64>
+    // CHECK:        [[CJAC:%.+]] = gradient.grad "fd" @funcScalarTensor.argmap(%arg0) : (f32) -> tensor<?xf64>
+    // CHECK:        [[PCOUNT:%.+]] = tensor.dim [[CJAC]]
     // CHECK:        [[QGRAD:%.+]] = call @funcScalarTensor.qgrad(%arg0, [[PCOUNT]]) : (f32, index) -> tensor<?x2x3xf64>
 
     // CHECK:        [[GRAD:%.+]] = tensor.generate
@@ -170,8 +170,9 @@ func.func private @funcTensorScalar(%arg0: tensor<3xf64>) -> f128 {
 }
 
 // CHECK-LABEL: @funcTensorScalar.fullgrad0ps(%arg0: tensor<3xf64>) -> tensor<3xf128>
-    // CHECK:        [[PCOUNT:%.+]] = call @funcTensorScalar.pcount(%arg0)
-    // CHECK:        [[CJAC:%.+]] = gradient.grad "fd" @funcTensorScalar.argmap(%arg0, [[PCOUNT]]) : (tensor<3xf64>, index) -> tensor<3x?xf64>
+    // CHECK:        [[c1:%.+]] = arith.constant 1 : index
+    // CHECK:        [[CJAC:%.+]] = gradient.grad "fd" @funcTensorScalar.argmap(%arg0) : (tensor<3xf64>) -> tensor<3x?xf64>
+    // CHECK:        [[PCOUNT:%.+]] = tensor.dim [[CJAC]], [[c1]]
     // CHECK:        [[QGRAD:%.+]] = call @funcTensorScalar.qgrad(%arg0, [[PCOUNT]]) : (tensor<3xf64>, index) -> tensor<?xf128>
     // CHECK:        [[CJAC_e:%.+]] = arith.extf [[CJAC]] : tensor<3x?xf64> to tensor<3x?xf128>
 
@@ -201,8 +202,9 @@ func.func private @funcTensorTensor(%arg0: tensor<7x3x2x1xf64>) -> tensor<2xf32>
 }
 
 // CHECK-LABEL: @funcTensorTensor.fullgrad0ps(%arg0: tensor<7x3x2x1xf64>) -> tensor<7x3x2x1x2xf32>
-    // CHECK:        [[PCOUNT:%.+]] = call @funcTensorTensor.pcount(%arg0)
-    // CHECK:        [[CJAC:%.+]] = gradient.grad "fd" @funcTensorTensor.argmap(%arg0, [[PCOUNT]]) : (tensor<7x3x2x1xf64>, index) -> tensor<7x3x2x1x?xf64>
+    // CHECK:        [[c4:%.+]] = arith.constant 4 : index
+    // CHECK:        [[CJAC:%.+]] = gradient.grad "fd" @funcTensorTensor.argmap(%arg0) : (tensor<7x3x2x1xf64>) -> tensor<7x3x2x1x?xf64>
+    // CHECK:        [[PCOUNT:%.+]] = tensor.dim [[CJAC]], [[c4]]
     // CHECK:        [[QGRAD:%.+]] = call @funcTensorTensor.qgrad(%arg0, [[PCOUNT]]) : (tensor<7x3x2x1xf64>, index) -> tensor<?x2xf32>
     // CHECK:        [[CJAC_t:%.+]] = arith.truncf [[CJAC]] : tensor<7x3x2x1x?xf64> to tensor<7x3x2x1x?xf32>
 
@@ -231,8 +233,8 @@ func.func @funcMultiRes(%arg0: f64) -> (f64, tensor<2xf64>) {
 }
 
 // CHECK-LABEL: @funcMultiRes.fullgrad0ps(%arg0: f64) -> (f64, tensor<2xf64>)
-    // CHECK:         [[PCOUNT:%.+]] = call @funcMultiRes.pcount(%arg0)
-    // CHECK:         [[CJAC:%.+]] = gradient.grad "fd" @funcMultiRes.argmap(%arg0, [[PCOUNT]]) : (f64, index) -> tensor<?xf64>
+    // CHECK:         [[CJAC:%.+]] = gradient.grad "fd" @funcMultiRes.argmap(%arg0) : (f64) -> tensor<?xf64>
+    // CHECK:         [[PCOUNT:%.+]] = tensor.dim [[CJAC]]
     // CHECK:         [[QGRAD:%.+]]:2 = call @funcMultiRes.qgrad(%arg0, [[PCOUNT]]) : (f64, index) -> (tensor<?xf64>, tensor<?x2xf64>)
 
     // CHECK:         [[GRAD:%.+]] = tensor.generate
@@ -268,8 +270,8 @@ func.func @funcMultiArg(%arg0: f64, %arg1: tensor<2xf64>) -> f64 {
 }
 
 // CHECK-LABEL: @funcMultiArg.fullgrad0ps(%arg0: f64, %arg1: tensor<2xf64>) -> f64
-    // CHECK:       [[PCOUNT:%.+]] = call @funcMultiArg.pcount(%arg0, %arg1) : {{.+}} -> index
-    // CHECK:       [[CJAC:%.+]] = gradient.grad "fd" @funcMultiArg.argmap(%arg0, %arg1, [[PCOUNT]]) : {{.+}} -> tensor<?xf64>
+    // CHECK:       [[CJAC:%.+]] = gradient.grad "fd" @funcMultiArg.argmap(%arg0, %arg1) : {{.+}} -> tensor<?xf64>
+    // CHECK:       [[PCOUNT:%.+]] = tensor.dim [[CJAC]]
     // CHECK:       [[QGRAD:%.+]] = call @funcMultiArg.qgrad(%arg0, %arg1, [[PCOUNT]]) : {{.+}} -> tensor<?xf64>
 
     // CHECK:       [[GRAD:%.+]] = tensor.generate
@@ -285,8 +287,9 @@ func.func @funcMultiArg(%arg0: f64, %arg1: tensor<2xf64>) -> f64 {
 // }
 
 // CHECK-LABEL: @funcMultiArg.fullgrad1ps(%arg0: f64, %arg1: tensor<2xf64>) -> tensor<2xf64>
-    // CHECK:       [[PCOUNT:%.+]] = call @funcMultiArg.pcount(%arg0, %arg1) : {{.+}} -> index
-    // CHECK:       [[CJAC:%.+]] = gradient.grad "fd" @funcMultiArg.argmap(%arg0, %arg1, [[PCOUNT]]) {diffArgIndices = dense<1> : tensor<1xindex>} : {{.+}} -> tensor<2x?xf64>
+    // CHECK:        [[c1:%.+]] = arith.constant 1 : index
+    // CHECK:       [[CJAC:%.+]] = gradient.grad "fd" @funcMultiArg.argmap(%arg0, %arg1) {diffArgIndices = dense<1> : tensor<1xindex>} : {{.+}} -> tensor<2x?xf64>
+    // CHECK:       [[PCOUNT:%.+]] = tensor.dim [[CJAC]], [[c1]]
     // CHECK:       [[QGRAD:%.+]] = call @funcMultiArg.qgrad(%arg0, %arg1, [[PCOUNT]]) : {{.+}} -> tensor<?xf64>
 
     // CHECK:       [[GRAD1:%.+]] = tensor.generate
@@ -301,8 +304,8 @@ func.func @funcMultiArg(%arg0: f64, %arg1: tensor<2xf64>) -> f64 {
 // }
 
 // CHECK-LABEL: @funcMultiArg.fullgrad01ps(%arg0: f64, %arg1: tensor<2xf64>) -> (f64, tensor<2xf64>)
-    // CHECK:        [[PCOUNT:%.+]] = call @funcMultiArg.pcount(%arg0, %arg1) : {{.+}} -> index
-    // CHECK:        [[CJAC:%.+]]:2 = gradient.grad "fd" @funcMultiArg.argmap(%arg0, %arg1, [[PCOUNT]]) {diffArgIndices = dense<[0, 1]> : tensor<2xindex>} : {{.+}} -> (tensor<?xf64>, tensor<2x?xf64>)
+    // CHECK:        [[CJAC:%.+]]:2 = gradient.grad "fd" @funcMultiArg.argmap(%arg0, %arg1) {diffArgIndices = dense<[0, 1]> : tensor<2xindex>} : {{.+}} -> (tensor<?xf64>, tensor<2x?xf64>)
+    // CHECK:        [[PCOUNT:%.+]] = tensor.dim [[CJAC]]#0
     // CHECK:        [[QGRAD:%.+]] = call @funcMultiArg.qgrad(%arg0, %arg1, [[PCOUNT]]) : {{.+}} -> tensor<?xf64>
 
     // CHECK:        [[GRAD:%.+]] = tensor.generate

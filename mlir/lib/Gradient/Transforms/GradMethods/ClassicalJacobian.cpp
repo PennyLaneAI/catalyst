@@ -63,7 +63,7 @@ func::FuncOp genArgMapFunction(PatternRewriter &rewriter, Location loc, func::Fu
         // Allocate the memory for the gate parameters collected at runtime.
         auto paramVectorType =
             ParameterVectorType::get(rewriter.getContext(), rewriter.getF64Type());
-        Value paramsBuffer = rewriter.create<InitVectorOp>(loc, paramVectorType);
+        Value paramsBuffer = rewriter.create<VectorInitOp>(loc, paramVectorType);
         MemRefType paramsProcessedType = MemRefType::get({}, rewriter.getIndexType());
         Value paramsProcessed = rewriter.create<memref::AllocaOp>(loc, paramsProcessedType);
         Value cZero = rewriter.create<index::ConstantOp>(loc, 0);
@@ -80,7 +80,7 @@ func::FuncOp genArgMapFunction(PatternRewriter &rewriter, Location loc, func::Fu
                 if (!diffParams.empty()) {
                     Value paramIdx = rewriter.create<memref::LoadOp>(loc, paramsProcessed);
                     for (auto param : diffParams) {
-                        rewriter.create<PushVectorOp>(loc, param, paramsBuffer);
+                        rewriter.create<VectorPushOp>(loc, param, paramsBuffer);
                         paramIdx = rewriter.create<index::AddOp>(loc, paramIdx, cOne);
                     }
                     rewriter.create<memref::StoreOp>(loc, paramIdx, paramsProcessed);

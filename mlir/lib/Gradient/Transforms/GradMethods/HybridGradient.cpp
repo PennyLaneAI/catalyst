@@ -185,8 +185,12 @@ func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc, GradOp
                                                diffArgIndicesAttr, nullptr);
         ValueRange classicalJacobians = jacOp.getResults();
 
+        // The argmap function returns a 1-d dynamic tensor<{pcount}xf64>. If the input has tensor
+        // type, the GradOp will return a transposed Jacobian s.t. the pcount is the last
+        // dimension (tensor<{inputdim}x{pcount}xf64>).
+        int64_t rank = cast<RankedTensorType>(classicalJacobians.front().getType()).getRank();
         Value numParams =
-            rewriter.create<tensor::DimOp>(loc, classicalJacobians.front(), /*index=*/0);
+            rewriter.create<tensor::DimOp>(loc, classicalJacobians.front(), /*index=*/rank - 1);
         callArgs.push_back(numParams);
         ValueRange quantumGradients =
             rewriter.create<func::CallOp>(loc, qGradFn, callArgs).getResults();

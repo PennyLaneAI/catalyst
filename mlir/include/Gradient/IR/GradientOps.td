@@ -177,13 +177,13 @@ def VJPOp : Gradient_Op<"vjp", [
     let hasVerifier = 1;
 }
 
-def InitVectorOp : Gradient_Op<"vector_init"> {
+def VectorInitOp : Gradient_Op<"vector_init"> {
     let summary = "Initialize a dynamically resizable parameter vector.";
     let results = (outs ParameterVectorType:$vector);
     let assemblyFormat = [{ attr-dict `:` type($vector) }];
 }
 
-def PushVectorOp : Gradient_Op<"vector_push",
+def VectorPushOp : Gradient_Op<"vector_push",
         [TypesMatchWith<"type of 'value' matches element type of 'vector'",
                         "vector", "value",
                         "$_self.cast<ParameterVectorType>().getElementType()">]> {

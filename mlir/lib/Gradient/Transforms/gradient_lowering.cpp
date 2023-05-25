@@ -119,10 +119,10 @@ struct DynVectorBuilder {
     }
 };
 
-struct LowerInitVector : public OpConversionPattern<InitVectorOp> {
-    using OpConversionPattern<InitVectorOp>::OpConversionPattern;
+struct LowerInitVector : public OpConversionPattern<VectorInitOp> {
+    using OpConversionPattern<VectorInitOp>::OpConversionPattern;
 
-    LogicalResult matchAndRewrite(InitVectorOp op, OpAdaptor adaptor,
+    LogicalResult matchAndRewrite(VectorInitOp op, OpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
         SmallVector<Type> resultTypes;
@@ -150,10 +150,10 @@ struct LowerInitVector : public OpConversionPattern<InitVectorOp> {
     }
 };
 
-struct LowerPushVector : public OpConversionPattern<PushVectorOp> {
-    using OpConversionPattern<PushVectorOp>::OpConversionPattern;
+struct LowerPushVector : public OpConversionPattern<VectorPushOp> {
+    using OpConversionPattern<VectorPushOp>::OpConversionPattern;
 
-    LogicalResult matchAndRewrite(PushVectorOp op, OpAdaptor adaptor,
+    LogicalResult matchAndRewrite(VectorPushOp op, OpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
         FailureOr<DynVectorBuilder> dynVectorBuilder =
@@ -291,7 +291,7 @@ struct GradientLoweringPass : public OperationPass<ModuleOp> {
             target.addLegalDialect<arith::ArithDialect, memref::MemRefDialect, func::FuncDialect,
                                    scf::SCFDialect>();
             target.addLegalOp<UnrealizedConversionCastOp>();
-            target.addIllegalOp<InitVectorOp, PushVectorOp, VectorSizeOp, VectorLoadDataOp>();
+            target.addIllegalOp<VectorInitOp, VectorPushOp, VectorSizeOp, VectorLoadDataOp>();
 
             if (failed(applyPartialConversion(op, target, std::move(gradientVectorPatterns)))) {
                 return signalPassFailure();
