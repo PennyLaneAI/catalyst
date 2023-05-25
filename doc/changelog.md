@@ -105,6 +105,10 @@
 * Support constant negative step sizes in ``@for_loop`` loops.
   [#129](https://github.com/PennyLaneAI/catalyst/pull/129)
 
+* Reduce the number of classical invocations by counting the number of gate parameters in
+  the ``argmap`` function.
+  [#136](https://github.com/PennyLaneAI/catalyst/pull/136)
+
 <h3>Breaking changes</h3>
 
 <h3>Bug fixes</h3>

@@ -32,7 +32,7 @@
 #include "Gradient/Transforms/Passes.h"
 #include "Gradient/Transforms/Patterns.h"
 #include "Quantum/IR/QuantumOps.h"
-#include "llvm/Support/raw_ostream.h"
+
 using namespace mlir;
 using namespace catalyst::gradient;
 

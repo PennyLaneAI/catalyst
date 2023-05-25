@@ -32,6 +32,13 @@ using namespace mlir;
 
 namespace catalyst {
 namespace gradient {
+/**
+ * A utility builder that aids in lowering dynamically-resizable parameter vectors.
+ *
+ * ParameterVectors are lowered to a size, a capacity, and a memref that stores the vector data.
+ * Each component is made mutable by being stored in a rank-0 memref, such that the vector data is
+ * lowered to (memref<memref<?x{element-type}>>, memref<index>, memref<index>).
+ */
 struct DynVectorBuilder {
     Value dataField, sizeField, capacityField;
     Type elementType;
