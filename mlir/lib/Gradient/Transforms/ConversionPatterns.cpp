@@ -148,17 +148,17 @@ func::FuncOp genEnzymeWrapperFunction(PatternRewriter &rewriter, Location loc, f
                        callee.getResultTypes().end());
     SmallVector<Type> originalArgTypes(callee.getArgumentTypes().begin(),
                                        callee.getArgumentTypes().end());
-
+    SmallVector<Type> convertedTypes;
     // Lower the args and results
     for (auto resTypeIt = argResTypes.begin(); resTypeIt < argResTypes.end(); resTypeIt++) {
         Type llvmResType = llvmTypeConverter.convertType(*resTypeIt);
         if (!llvmResType)
             emitError(loc, "Could not convert argmap result to LLVM type: ") << *resTypeIt;
+        convertedTypes.push_back(llvmResType);
         *resTypeIt = LLVM::LLVMPointerType::get(vectorType);
     }
 
-    ArrayRef convertedArgTypes(argResTypes.begin(), argResTypes.end() - callee.getNumArguments());
-    ArrayRef convertedResTypes(argResTypes.begin() + callee.getNumArguments(), argResTypes.end());
+    SmallVector<Type> convertedResTypes(convertedTypes.begin() + callee.getNumArguments(), convertedTypes.end());
 
     // Create the wrapped operation
     FunctionType fnType = rewriter.getFunctionType(argResTypes, {});
@@ -178,15 +178,16 @@ func::FuncOp genEnzymeWrapperFunction(PatternRewriter &rewriter, Location loc, f
         SmallVector<Value> callArgs(wrappedCallee.getArguments().begin(),
                                     wrappedCallee.getArguments().end() - callee.getNumResults());
 
-        for (auto [arg, convertedType] : llvm::zip(callArgs, originalArgTypes)) {
-            if (arg.getType().isa<LLVM::LLVMPointerType>()) {
+        for (auto [arg, originalType] : llvm::zip(callArgs, originalArgTypes)) {
+            if (arg.getType().dyn_cast<LLVM::LLVMPointerType>()) {
                 Value memrefStruct = rewriter.create<LLVM::LoadOp>(loc, arg);
-                arg = rewriter.create<UnrealizedConversionCastOp>(loc, convertedType, memrefStruct)
+                arg = rewriter.create<UnrealizedConversionCastOp>(loc, originalType, memrefStruct)
                           .getResult(0);
             }
         }
         // Call the callee
         ValueRange results = rewriter.create<func::CallOp>(loc, callee, callArgs).getResults();
+        
         results = rewriter.create<UnrealizedConversionCastOp>(loc, convertedResTypes, results)
                       .getResults();
         ValueRange resArgs = wrappedCallee.getArguments().drop_front(callee.getNumArguments());
