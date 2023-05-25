@@ -50,10 +50,26 @@ func.func @adjoint(%arg0: f32, %arg1 : index) -> (memref<?xf64>, memref<?xf64>) 
 
 func.func private @argmap(%arg0: memref<f64>) -> (memref<?xf64>)
 
-func.func @backpropCircuit2(%arg0: memref<f64>, %arg1 : index) -> memref<?xf64> {
+// CHECK-DAG:  llvm.func @memset(!llvm.ptr, i32, i64) -> !llvm.ptr
+// CHECK-DAG:  llvm.func @__enzyme_autodiff(...)
+// CHECK-DAG:  llvm.func @_mlir_memref_to_llvm_alloc(i64) -> !llvm.ptr
+// CHECK-DAG:  func.func private @argmap(memref<f64>) -> memref<?xf64>
+// CHECK-DAG:  func.func private @argmap.enzyme_wrapper(%arg0: !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>
 
+// CHECK-LABEL: func.func @backpropArgmap(%arg0: memref<f64>, %arg1: index) -> memref<?xf64> {
+func.func @backpropArgmap(%arg0: memref<f64>, %arg1 : index) -> memref<?xf64> {
+
+    // CHECK-DAG:   [[c0:%.+]] = llvm.mlir.constant(0 : i32) : i32
+    // CHECK-DAG:   [[c1:%.+]] = llvm.mlir.constant(1 : i32) : i32
+    // CHECK:   {{.*}} = constant @argmap.enzyme_wrapper : (!llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>, !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>) -> ()
+    // CHECK:   {{.*}} = llvm.call @_mlir_memref_to_llvm_alloc({{.*}}) : (i64) -> !llvm.ptr
+    // CHECK:   {{.*}} = llvm.call @memset({{.*}}, {{.*}}, {{.*}}) : (!llvm.ptr, i32, i64) -> !llvm.ptr
+    // CHECK:   {{.*}} = call @argmap(%arg0) : (memref<f64>) -> memref<?xf64>
+    // CHECK:   {{.*}} = builtin.unrealized_conversion_cast {{.*}} : memref<?xf64> to !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>
+    // CHECK:   {{.*}} = llvm.call @_mlir_memref_to_llvm_alloc({{.*}}) : (i64) -> !llvm.ptr
+    // CHECK:   {{.*}} = llvm.call @memset({{.*}}, {{.*}}, {{.*}}) : (!llvm.ptr, i32, i64) -> !llvm.ptr
+    // CHECK:   llvm.call @__enzyme_autodiff({{.*}}, {{.*}}, {{.*}}, {{.*}}, {{.*}}) : (!llvm.ptr<func<void (ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>, ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>)>>, !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>, !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>, !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>, !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>) -> ()
     %alloc0 = memref.alloc(%arg1) : memref<?xf64>
-
     gradient.backprop @argmap(%arg0) size(%arg1) in(%alloc0 : memref<?xf64>) {diffArgIndices=dense<0> : tensor<1xindex>} : (memref<f64>) -> ()
 
     return %alloc0: memref<?xf64>
@@ -61,12 +77,28 @@ func.func @backpropCircuit2(%arg0: memref<f64>, %arg1 : index) -> memref<?xf64> 
 
 // -----
 
+// CHECK-DAG:  llvm.func @memset(!llvm.ptr, i32, i64) -> !llvm.ptr
+// CHECK-DAG:  llvm.func @__enzyme_autodiff(...)
+// CHECK-DAG:  llvm.func @_mlir_memref_to_llvm_alloc(i64) -> !llvm.ptr
+// CHECK-DAG:  func.func private @argmap(memref<1xf64>) -> memref<?xf64>
+// CHECK-DAG:  func.func private @argmap.enzyme_wrapper(%arg0: !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>
+
 func.func private @argmap(%arg0: memref<1xf64>) -> (memref<?xf64>)
 
-func.func @backpropCircuit2(%arg0: memref<1xf64>, %arg1 : index) -> memref<?xf64> {
-
+// CHECK-LABEL: func.func @backpropArgmap2(%arg0: memref<1xf64>, %arg1: index) -> memref<?xf64> {
+func.func @backpropArgmap2(%arg0: memref<1xf64>, %arg1 : index) -> memref<?xf64> {
+    
+    // CHECK-DAG:   [[c0:%.+]] = llvm.mlir.constant(0 : i32) : i32
+    // CHECK-DAG:   [[c1:%.+]] = llvm.mlir.constant(1 : i32) : i32
+    // CHECK:   {{.*}} = constant @argmap.enzyme_wrapper : (!llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>, !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>) -> ()
+    // CHECK:   {{.*}} = llvm.call @_mlir_memref_to_llvm_alloc({{.*}}) : (i64) -> !llvm.ptr
+    // CHECK:   {{.*}} = llvm.call @memset({{.*}}, {{.*}}, {{.*}}) : (!llvm.ptr, i32, i64) -> !llvm.ptr
+    // CHECK:   {{.*}} = call @argmap(%arg0) : (memref<1xf64>) -> memref<?xf64>
+    // CHECK:   {{.*}} = builtin.unrealized_conversion_cast {{.*}} : memref<?xf64> to !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>
+    // CHECK:   {{.*}} = llvm.call @_mlir_memref_to_llvm_alloc({{.*}}) : (i64) -> !llvm.ptr
+    // CHECK:   {{.*}} = llvm.call @memset({{.*}}, {{.*}}, {{.*}}) : (!llvm.ptr, i32, i64) -> !llvm.ptr
+    // CHECK:   llvm.call @__enzyme_autodiff({{.*}}, {{.*}}, {{.*}}, {{.*}}, {{.*}}) : (!llvm.ptr<func<void (ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>, ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>)>>, !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>, !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>, !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>, !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>) -> ()
     %alloc0 = memref.alloc(%arg1) : memref<?xf64>
-
     gradient.backprop @argmap(%arg0) size(%arg1) in(%alloc0 : memref<?xf64>) {diffArgIndices=dense<0> : tensor<1xindex>} : (memref<1xf64>) -> ()
 
     return %alloc0: memref<?xf64>
