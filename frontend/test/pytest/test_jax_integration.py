@@ -319,11 +319,11 @@ class TestJAXAD:
 class TestJAXVectorize:
     """Test QJIT compatibility with JAX vectorization."""
 
-    def test_simple_circuit(self):
+    def test_simple_circuit(self, backend):
         """Test a basic use case of jax.vmap on top of qjit."""
 
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        @qml.qnode(qml.device(backend, wires=2))
         def circuit(x: jax.ShapedArray((3,), dtype=float)):
             qml.RX(jnp.pi * x[0], wires=0)
             qml.RY(x[1] ** 2, wires=0)
@@ -340,7 +340,6 @@ class TestJAXVectorize:
         assert len(result) == 2
         assert jnp.allclose(result[0], cost_fn(x[0]))
         assert jnp.allclose(result[1], cost_fn(x[1]))
-
 
 
 if __name__ == "__main__":
