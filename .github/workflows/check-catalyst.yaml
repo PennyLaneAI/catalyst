@@ -485,6 +485,7 @@ jobs:
             C_COMPILER=$(which gcc) \
             CXX_COMPILER=$(which g++) \
             COMPILER_LAUNCHER="" \
+            ENABLE_OPENQASM=ON \
             QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build" \
             QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include" \
             LIGHTNING_GIT_TAG_VALUE=$LIGHTNING_TAG_VALUE \
@@ -497,6 +498,7 @@ jobs:
             C_COMPILER=$(which gcc) \
             CXX_COMPILER=$(which g++) \
             COMPILER_LAUNCHER="" \
+            ENABLE_OPENQASM=ON \
             QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build" \
             QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include" \
             LIGHTNING_GIT_TAG_VALUE=$LIGHTNING_TAG_VALUE \

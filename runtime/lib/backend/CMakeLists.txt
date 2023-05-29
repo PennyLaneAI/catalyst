@@ -15,9 +15,13 @@ if(ENABLE_LIGHTNING_KOKKOS)
     list(APPEND source_files LightningKokkosSimulator.cpp)
 endif()
 
+if(ENABLE_OPENQASM)
+    list(APPEND source_files openqasm/OpenQasmDevice.cpp)
+endif()
+
 add_library(rt_backend SHARED ${source_files})
 
-target_include_directories(rt_backend PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}
+target_include_directories(rt_backend PRIVATE   ${backend_includes}
                                                 ${runtime_includes} 
                                                 ${extensions_includes})
 
