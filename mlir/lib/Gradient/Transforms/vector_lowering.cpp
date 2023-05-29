@@ -130,7 +130,7 @@ struct LowerInitVector : public OpConversionPattern<VectorInitOp> {
             op.emitError() << "Failed to convert type " << op.getType();
             return failure();
         }
-        Value capacity = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 1);
+        Value capacity = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 32);
         Value initialSize = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 0);
         auto dataType = resultTypes[0].cast<MemRefType>();
         auto sizeType = resultTypes[1].cast<MemRefType>();
@@ -138,9 +138,9 @@ struct LowerInitVector : public OpConversionPattern<VectorInitOp> {
         Value buffer = rewriter.create<memref::AllocOp>(
             op.getLoc(), dataType.getElementType().cast<MemRefType>(),
             /*dynamicSize=*/capacity);
-        Value bufferField = rewriter.create<memref::AllocaOp>(op.getLoc(), dataType);
-        Value sizeField = rewriter.create<memref::AllocaOp>(op.getLoc(), sizeType);
-        Value capacityField = rewriter.create<memref::AllocaOp>(op.getLoc(), capacityType);
+        Value bufferField = rewriter.create<memref::AllocOp>(op.getLoc(), dataType);
+        Value sizeField = rewriter.create<memref::AllocOp>(op.getLoc(), sizeType);
+        Value capacityField = rewriter.create<memref::AllocOp>(op.getLoc(), capacityType);
         rewriter.create<memref::StoreOp>(op.getLoc(), buffer, bufferField);
         rewriter.create<memref::StoreOp>(op.getLoc(), initialSize, sizeField);
         rewriter.create<memref::StoreOp>(op.getLoc(), capacity, capacityField);
@@ -208,13 +208,11 @@ struct LowerVectorLoadData : public OpConversionPattern<VectorLoadDataOp> {
         auto memrefType = cast<MemRefType>(data.getType());
         Value size =
             rewriter.create<memref::LoadOp>(op.getLoc(), dynVectorBuilder.value().sizeField);
-        Value result = rewriter.create<memref::AllocOp>(op.getLoc(), memrefType, size);
         SmallVector<OpFoldResult> offsets{rewriter.getIndexAttr(0)}, sizes{size},
             strides{rewriter.getIndexAttr(1)};
-        Value dataView =
-            rewriter.create<memref::SubViewOp>(op.getLoc(), data, offsets, sizes, strides);
-        rewriter.create<memref::CopyOp>(op.getLoc(), dataView, result);
-        rewriter.replaceOp(op, result);
+        Value dataView = rewriter.create<memref::SubViewOp>(op.getLoc(), memrefType, data, offsets,
+                                                            sizes, strides);
+        rewriter.replaceOp(op, dataView);
         return success();
     }
 };

@@ -226,3 +226,32 @@ func.func @gradCall(%arg0: f64) -> f64 {
     %0 = gradient.grad "ps" @loop_circuit(%arg0) : (f64) -> f64
     func.return %0 : f64
 }
+
+// -----
+
+// CHECK-LABEL: @all_ops_circuit.argmap(%arg0: f64) ->  tensor<?xf64>
+func.func @all_ops_circuit(%arg0: f64) -> f64 {
+    // CHECK: [[buff:%[a-zA-Z0-9_]+]] = gradient.vector_init : <f64>
+    // CHECK-NOT: quantum.
+    %r = quantum.alloc(1) : !quantum.reg
+    %idx = arith.constant 0 : i64
+    %q_0 = quantum.extract %r[%idx] : !quantum.reg -> !quantum.bit
+
+    // CHECK: gradient.vector_push %arg0, [[buff]]
+    // CHECK-NOT: quantum.
+    %q_1 = quantum.custom "rz"(%arg0) %q_0 : !quantum.bit
+
+    // CHECK: gradient.vector_push %arg0, [[buff]]
+    // CHECK-NOT: quantum.
+    %q_2:3 = quantum.multirz(%arg0) %q_0, %q_0, %q_0 : !quantum.bit, !quantum.bit, !quantum.bit
+
+    // CHECK: [[vec:%[a-zA-Z0-9_]+]] = gradient.vector_load_data [[buff]]
+    // CHECK: [[tensor:%[a-zA-Z0-9_]+]] = bufferization.to_tensor [[vec]] : memref<?xf64>
+    // CHECK: return [[tensor]]
+    func.return %arg0 : f64
+}
+
+func.func @gradCall(%arg0: f64) -> f64 {
+    %0 = gradient.grad "ps" @all_ops_circuit(%arg0) : (f64) -> f64
+    func.return %0 : f64
+}
