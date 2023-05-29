@@ -135,6 +135,9 @@
 * Temporary fix of use-after-free and dependency of uninitialized memory.
   [#121](https://github.com/PennyLaneAI/catalyst/pull/121)
 
+* Fixes file renaming within pass pipelines.
+  [#126](https://github.com/PennyLaneAI/catalyst/pull/126)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
