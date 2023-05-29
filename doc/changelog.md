@@ -65,7 +65,7 @@
   [#124](https://github.com/PennyLaneAI/catalyst/pull/124)
 
 * Add support for Jacobian product operations. The function ``jvp(f, params, tangents)`` returns
-  the Jacobian-vector product of a function `f`, and the ``vjp(f, params, cotangents)`` returns
+  the Jacobian-vector product of a function ``f``, and the ``vjp(f, params, cotangents)`` returns
   its vector-Jacobian product.
 
   [#98](https://github.com/PennyLaneAI/catalyst/pull/98)
@@ -85,6 +85,9 @@
 
   workflow(jnp.zeros([4], dtype=float), jnp.ones([4], dtype=float))
   ```
+
+* Add support for generating OpenQasm3 kernels from the ``QuantumDevice`` API in the runtime.
+  [#118](https://github.com/PennyLaneAI/catalyst/pull/118)
 
 <h3>Improvements</h3>
 
