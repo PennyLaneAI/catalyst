@@ -31,6 +31,7 @@ from mlir_quantum.dialects.arith import AddIOp, CeilDivSIOp, IndexCastOp, MulIOp
 from mlir_quantum.dialects.gradient import GradOp, JVPOp, VJPOp
 from mlir_quantum.dialects.quantum import (
     AllocOp,
+    AdjointOp,
     ComputationalBasisOp,
     CountsOp,
     CustomOp,
@@ -197,6 +198,8 @@ jvp_p = core.Primitive("jvp")
 jvp_p.multiple_results = True
 vjp_p = core.Primitive("vjp")
 vjp_p.multiple_results = True
+adjoint_p = jax.core.Primitive("adjoint")
+adjoint_p.multiple_results = True
 
 #
 # func
@@ -1482,10 +1485,27 @@ def _qfor_lowering(
 
     return for_op_scf.results
 
+#
+# adjoint
+#
+
+@adjoint_p.def_impl
+def _adjoint_def_impl(ctx, *args):
+    raise NotImplementedError()
+
+@adjoint_p.def_abstract_eval
+def _adjoint_abstract(*args):
+    print(f"adjoint abstract called, args: {args}")
+    return []
+
+def _adjoint_lowering(ctx, *args):
+    print("adjoint lowering called")
+    return AdjointOp().results
 
 #
 # registration
 #
+
 mlir.register_lowering(qdevice_p, _qdevice_lowering)
 mlir.register_lowering(qalloc_p, _qalloc_lowering)
 mlir.register_lowering(qdealloc_p, _qdealloc_lowering)
@@ -1512,7 +1532,7 @@ mlir.register_lowering(grad_p, _grad_lowering)
 mlir.register_lowering(func_p, _func_lowering)
 mlir.register_lowering(jvp_p, _jvp_lowering)
 mlir.register_lowering(vjp_p, _vjp_lowering)
-
+mlir.register_lowering(adjoint_p, _adjoint_lowering)
 
 def _scalar_abstractify(t):
     # pylint: disable=protected-access

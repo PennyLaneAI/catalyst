@@ -38,7 +38,7 @@ from pennylane.operation import AnyWires, Operation, Wires
 
 import catalyst
 import catalyst.jax_primitives as jprim
-from catalyst.jax_primitives import GradParams, expval_p, probs_p
+from catalyst.jax_primitives import GradParams, expval_p, probs_p, adjoint_p
 from catalyst.jax_tape import JaxTape
 from catalyst.jax_tracer import get_traceable_fn, insert_to_qreg, trace_quantum_tape
 from catalyst.utils.exceptions import CompileError, DifferentiableCompileError
@@ -513,6 +513,10 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
     grad_params = _check_grad_params(method, h, argnum)
     jaxpr = _make_jaxpr_check_differentiable(fn, grad_params, *params)
     return jprim.vjp_p.bind(*params, *cotangents, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
+
+
+def adjoint():
+    return jprim.adjoint_p.bind()
 
 
 class Cond(Operation):

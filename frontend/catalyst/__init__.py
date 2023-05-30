@@ -40,6 +40,7 @@ from catalyst.pennylane_extensions import (
     measure,
     vjp,
     while_loop,
+    adjoint
 )
 from catalyst.utils.exceptions import CompileError
 

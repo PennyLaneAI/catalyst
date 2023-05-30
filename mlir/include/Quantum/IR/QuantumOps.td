@@ -750,4 +750,15 @@ def StateOp : Measurement_Op<"state"> {
     let hasVerifier = 1;
 }
 
+def AdjointOp : Op<QuantumDialect, "adjoint", []> {
+    let summary = "Calculate the adjoint of the enclosed operations";
+
+    let regions = (region SizedRegion<1>:$region);
+
+    let assemblyFormat = [{
+        attr-dict `:` $region
+    }];
+
+}
+
 #endif // QUANTUM_OPS
