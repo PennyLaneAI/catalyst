@@ -171,6 +171,25 @@ class Gate_Op<string mnemonic, list<Trait> traits = []> :
     let extraClassDeclaration = extraBaseClassDeclaration;
 }
 
+def InlinedFunction : Op<QuantumDialect, "inlinedFunction", []> {
+  let arguments = (ins
+      Variadic<AnyType>:$operands
+  );
+
+  let results = (outs
+      Variadic<AnyType>:$results
+  );
+
+  let regions = (region
+      SizedRegion<1>:$region
+  );
+
+  let assemblyFormat = [{
+    `(` $operands `)` attr-dict `:` functional-type(operands, results) $region
+  }];
+
+}
+
 def CustomOp : Gate_Op<"custom", [NoMemoryEffect, AttrSizedOperandSegments, DifferentiableGate]> {
     let summary = "A generic quantum gate on n qubits with m floating point parameters.";
     let description = [{

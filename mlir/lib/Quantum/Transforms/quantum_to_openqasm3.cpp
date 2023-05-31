@@ -37,6 +37,49 @@ bool hasDeviceAttribute(func::FuncOp op)
   return isBraketSimulator ? true : false;
 }
 
+void
+sinkQuantumOps(func::FuncOp op) {
+  // Let's do a little bit of TypeState analysis (but not really).
+  // We just need to make sure that the current quantum device is set
+  // and where it ends. All operations in the middle which do not belong
+  // to the quantum dialect can be lifted to before the quantum device selection.
+
+  bool afterQuantumDevice = false;
+  bool afterDeallocOp = false;
+  DeviceOp deviceOp;
+
+  op.walk([&](mlir::Operation *nestedOp) {
+    // We are not going to do anything unless we are past the first quantum device op.
+    bool isQuantumDeviceOp = isa<DeviceOp>(nestedOp);
+    if (isQuantumDeviceOp) deviceOp = cast<DeviceOp>(nestedOp);
+
+    afterQuantumDevice |= isQuantumDeviceOp;
+    // We are also not going to do anything to operations after the dealloc operation.
+    bool isQuantumDeallocOp = isa<DeallocOp>(nestedOp);
+    afterDeallocOp |= isQuantumDeallocOp;
+
+
+    Dialect *dialect = nestedOp->getDialect();
+    bool isOpInQuantumDialect = isa<QuantumDialect>(dialect);
+    bool isOpInFuncDialect = isa<func::FuncDialect>(dialect);
+    bool shouldLiftThisOperation = !isOpInQuantumDialect && !isOpInFuncDialect && afterQuantumDevice && !afterDeallocOp;
+    if (!shouldLiftThisOperation) return;
+
+    nestedOp->moveBefore(deviceOp);
+  });
+}
+
+void
+rewriteQuantumCircuitAsInlinedFunction(func::FuncOp op) {
+  // This operation is only valid if FuncOp has a single region and no nested ops have regions.
+  // For now, let's assume that's the case.
+  // TODO: Add checks and emit ICE we reach here and op has more than 1 nested regions.
+  sinkQuantumOps(op);
+
+
+
+}
+
 struct QuantumToOpenQASM3Transform : public OpRewritePattern<func::FuncOp> {
     using OpRewritePattern<func::FuncOp>::OpRewritePattern;
 
@@ -49,9 +92,10 @@ QuantumToOpenQASM3Transform::match(func::FuncOp op) const { return hasDeviceAttr
 
 void
 QuantumToOpenQASM3Transform::rewrite(func::FuncOp op, PatternRewriter &rewriter) const  {
+  // We are essentially going to outline the quantum portion...
   
-  op->emitRemark() << "Hello world!" ;
   StringAttr deviceAttr = StringAttr::get(op->getContext(), "catalyst.device");
+  rewriteQuantumCircuitAsInlinedFunction(op);
   op->removeAttr(deviceAttr);
 }
 
@@ -71,6 +115,7 @@ struct QuantumToOpenQasm3Pass
     void getDependentDialects(DialectRegistry &registry) const override
     {
         registry.insert<func::FuncDialect>();
+	registry.insert<QuantumDialect>();
     }
 
     void runOnOperation() final
