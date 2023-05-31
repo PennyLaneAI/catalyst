@@ -25,6 +25,18 @@ using namespace mlir;
 using namespace catalyst::quantum;
 
 namespace {
+
+bool hasDeviceAttribute(func::FuncOp op)
+{
+  StringAttr device = StringAttr::get(op->getContext(), "catalyst.device");
+  if (!op->hasAttr(device)) return false;
+
+  StringAttr deviceName = op->getAttrOfType<StringAttr>(device);
+  StringAttr braketSimulatorAttr = StringAttr::get(op->getContext(), "braket.simulator");
+  bool isBraketSimulator = 0 == deviceName.compare(braketSimulatorAttr);
+  return isBraketSimulator ? true : false;
+}
+
 struct QuantumToOpenQASM3Transform : public OpRewritePattern<func::FuncOp> {
     using OpRewritePattern<func::FuncOp>::OpRewritePattern;
 
@@ -33,11 +45,17 @@ struct QuantumToOpenQASM3Transform : public OpRewritePattern<func::FuncOp> {
 };
 
 LogicalResult
-QuantumToOpenQASM3Transform::match(func::FuncOp op) const { return failure(); }
+QuantumToOpenQASM3Transform::match(func::FuncOp op) const { return hasDeviceAttribute(op) ? success() : failure(); }
 
 void
-QuantumToOpenQASM3Transform::rewrite(func::FuncOp op, PatternRewriter &rewriter) const  {}
+QuantumToOpenQASM3Transform::rewrite(func::FuncOp op, PatternRewriter &rewriter) const  {
+  
+  op->emitRemark() << "Hello world!" ;
+  StringAttr deviceAttr = StringAttr::get(op->getContext(), "catalyst.device");
+  op->removeAttr(deviceAttr);
 }
+
+} // namespace
 
 namespace catalyst {
 namespace quantum {
