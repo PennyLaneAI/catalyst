@@ -12,12 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
-#include "mlir/Dialect/Bufferization/Transforms/Bufferize.h"
-#include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
-#include "mlir/Transforms/DialectConversion.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Passes.h"
@@ -25,6 +23,21 @@
 
 using namespace mlir;
 using namespace catalyst::quantum;
+
+namespace {
+struct QuantumToOpenQASM3Transform : public OpRewritePattern<func::FuncOp> {
+    using OpRewritePattern<func::FuncOp>::OpRewritePattern;
+
+    LogicalResult match(func::FuncOp op) const override;
+    void rewrite(func::FuncOp op, PatternRewriter &rewriter) const override;
+};
+
+LogicalResult
+QuantumToOpenQASM3Transform::match(func::FuncOp op) const { return failure(); }
+
+void
+QuantumToOpenQASM3Transform::rewrite(func::FuncOp op, PatternRewriter &rewriter) const  {}
+}
 
 namespace catalyst {
 namespace quantum {
@@ -39,10 +52,18 @@ struct QuantumToOpenQasm3Pass
 
     void getDependentDialects(DialectRegistry &registry) const override
     {
+        registry.insert<func::FuncDialect>();
     }
 
     void runOnOperation() final
     {
+        MLIRContext *context = &getContext();
+        RewritePatternSet patterns(context);
+        patterns.add<QuantumToOpenQASM3Transform>(context);
+
+        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
+            signalPassFailure();
+	}
     }
 };
 
