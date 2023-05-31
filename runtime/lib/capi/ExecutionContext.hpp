@@ -32,7 +32,7 @@
 #include "LightningKokkosSimulator.hpp"
 #endif
 
-#if __has_include("openqasm/OpenQasmDevice.hpp")
+#if __has_include("openqasm/OpenQasmDevice.hpp") && __has_include("pybind11/embed.h")
 // device: openqasm
 #include "openqasm/OpenQasmDevice.hpp"
 #include <pybind11/embed.h>

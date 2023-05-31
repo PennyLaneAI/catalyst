@@ -1500,6 +1500,7 @@ TEST_CASE("Test __rt__device registering a custom device with shots=500 and devi
                         Catch::Contains("Invalid use of the global driver before initialization"));
 }
 
+#ifdef __device_openqasm
 TEST_CASE("Test __rt__device registering the OpenQasm device", "[CoreQIS]")
 {
     __quantum__rt__initialize();
@@ -1510,3 +1511,4 @@ TEST_CASE("Test __rt__device registering the OpenQasm device", "[CoreQIS]")
 
     __quantum__rt__finalize();
 }
+#endif
