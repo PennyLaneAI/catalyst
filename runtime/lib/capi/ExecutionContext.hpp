@@ -22,12 +22,19 @@
 #include "Exception.hpp"
 #include "QuantumDevice.hpp"
 
+#if __has_include("StateVectorDynamicCPU.hpp")
 // device: lightning.qubit
 #include "LightningSimulator.hpp"
+#endif
 
 #if __has_include("StateVectorKokkos.hpp")
 // device: lightning.kokkos
 #include "LightningKokkosSimulator.hpp"
+#endif
+
+#if __has_include("openqasm/OpenQasmDevice.hpp")
+// device: openqasm
+#include "openqasm/OpenQasmDevice.hpp"
 #endif
 
 namespace Catalyst::Runtime {
@@ -53,32 +60,47 @@ class MemoryManager final {
 
 class ExecutionContext final {
   private:
-    using DeviceInitializer = std::function<std::unique_ptr<QuantumDevice>(bool)>;
+    using DeviceInitializer =
+        std::function<std::unique_ptr<QuantumDevice>(bool, size_t, std::string)>;
     std::unordered_map<std::string_view, DeviceInitializer> _device_map{
         {"lightning.qubit",
-         [](bool tape_recording) {
-             return std::make_unique<Simulator::LightningSimulator>(tape_recording);
+         [](bool tape_recording, size_t shots, [[maybe_unused]] std::string hw_name) {
+             return std::make_unique<Simulator::LightningSimulator>(tape_recording, shots);
          }},
     };
+
+    static constexpr size_t _default_device_shots{1000}; // tidy: readability-magic-numbers
 
     // Device specifications
     std::string _name;
     bool _tape_recording;
 
     // ExecutionContext pointers
-    std::unique_ptr<QuantumDevice> _driver_ptr = nullptr;
-    std::unique_ptr<MemoryManager> _driver_mm_ptr = nullptr;
+    std::unique_ptr<QuantumDevice> _driver_ptr{nullptr};
+    std::unique_ptr<MemoryManager> _driver_mm_ptr{nullptr};
+
+#ifdef __device_openqasm
+    std::unique_ptr<Device::OpenQasm::PythonInterpreterGuard> _py_guard{nullptr};
+#endif
 
   public:
     explicit ExecutionContext(std::string_view default_device = "lightning.qubit")
         : _name(default_device), _tape_recording(false)
     {
 #ifdef __device_lightning_kokkos
-        _device_map.emplace("lightning.kokkos", [](bool tape_recording) {
-            return std::make_unique<Simulator::LightningKokkosSimulator>(tape_recording);
+        _device_map.emplace("lightning.kokkos", [](bool tape_recording, size_t shots,
+                                                   [[maybe_unused]] std::string hw_name) {
+            return std::make_unique<Simulator::LightningKokkosSimulator>(tape_recording, shots);
         });
 #endif
-        this->_driver_mm_ptr = std::make_unique<MemoryManager>();
+#ifdef __device_openqasm
+        _device_map.emplace("openqasm", [](bool tape_recording, size_t shots, std::string hw_name) {
+            return std::make_unique<Device::OpenQasmDevice>(tape_recording, shots,
+                                                            std::move(hw_name));
+        });
+#endif
+
+        _driver_mm_ptr = std::make_unique<MemoryManager>();
     };
 
     ~ExecutionContext()
@@ -86,27 +108,44 @@ class ExecutionContext final {
         _driver_ptr.reset(nullptr);
         _driver_mm_ptr.reset(nullptr);
 
+#ifdef __device_openqasm
+        _py_guard.reset(nullptr);
+#endif
+
         RT_ASSERT(getDevice() == nullptr);
         RT_ASSERT(getMemoryManager() == nullptr);
     };
 
-    void setDeviceRecorder(bool status) noexcept { this->_tape_recording = status; }
+    void setDeviceRecorder(bool status) noexcept { _tape_recording = status; }
 
-    [[nodiscard]] auto getDeviceName() const -> std::string_view { return this->_name; }
+    [[nodiscard]] auto getDeviceName() const -> std::string_view { return _name; }
 
-    [[nodiscard]] auto getDeviceRecorderStatus() const -> bool { return this->_tape_recording; }
+    [[nodiscard]] auto getDeviceRecorderStatus() const -> bool { return _tape_recording; }
 
     [[nodiscard]] bool initDevice(std::string_view name) noexcept
     {
-        if (name != "default") {
-            this->_name = name;
+        std::string hw_name;
+        if (_name.find("aws::braket") != std::string::npos) {
+            hw_name = name;
+            _name = "openqasm";
+        }
+        else {
+            hw_name = "";
+            _name = name != "default" ? name : _name;
         }
 
-        this->_driver_ptr.reset(nullptr);
+        _driver_ptr.reset(nullptr);
 
-        auto iter = _device_map.find(this->_name);
+        auto iter = _device_map.find(_name);
         if (iter != _device_map.end()) {
-            this->_driver_ptr = iter->second(_tape_recording);
+            _driver_ptr = iter->second(_tape_recording, _default_device_shots, hw_name);
+
+#ifdef __device_openqasm
+            if (_name == "openqasm") {
+                _py_guard = std::make_unique<Device::OpenQasm::PythonInterpreterGuard>();
+            }
+#endif
+
             return true;
         }
         return false;

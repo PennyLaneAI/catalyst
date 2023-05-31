@@ -26,16 +26,34 @@
 
 namespace Catalyst::Runtime::Device::OpenQasm {
 
+/**
+ * Types of the OpenQasm builder and runner.
+ */
+enum class BuilderType : uint8_t {
+    Common, // = 0
+    Braket,
+};
+
+/**
+ * Supported OpenQasm variables by the builder.
+ */
 enum class VariableType : uint8_t {
     Float, // = 0
 };
 
+/**
+ * Supported OpenQasm register modes by the builder.
+ */
 enum class RegisterMode : uint8_t {
     Alloc, // = 0
     Slice,
+    Name,
     Reset,
 };
 
+/**
+ * Supported OpenQasm register types by the builder.
+ */
 enum class RegisterType : uint8_t {
     Qubit, // = 0
     Bit,
@@ -170,11 +188,6 @@ class QasmRegister {
             oss << "[" << this->size << "] " << this->name << ";\n";
             return oss.str();
         }
-        case RegisterMode::Reset: {
-            // reset name;
-            oss << "reset " << this->name << ";\n";
-            return oss.str();
-        }
         case RegisterMode::Slice: {
             // name[slice_0], ..., name[slice_n]
             RT_ASSERT(isValidSlice(slice));
@@ -183,6 +196,16 @@ class QasmRegister {
                 oss << this->name << "[" << *iter << "], ";
             }
             oss << this->name << "[" << *iter << "]";
+            return oss.str();
+        }
+        case RegisterMode::Name: {
+            // name
+            oss << this->name;
+            return oss.str();
+        }
+        case RegisterMode::Reset: {
+            // reset name;
+            oss << "reset " << this->name << ";\n";
             return oss.str();
         }
         default:
@@ -288,18 +311,22 @@ class QasmMeasure {
         return oss.str();
     }
     auto toOpenQasm(const QasmRegister &bregister, const QasmRegister &qregister,
+                    RegisterMode mode = RegisterMode::Slice,
                     [[maybe_unused]] const std::string &version = "3.0") const -> std::string
     {
         // bit = measure wire
         std::ostringstream oss;
-        oss << bregister.toOpenQasm(RegisterMode::Slice, {this->bit}) << " = measure "
-            << qregister.toOpenQasm(RegisterMode::Slice, {this->wire}) << ";\n";
+        oss << bregister.toOpenQasm(mode, {this->bit}) << " = measure "
+            << qregister.toOpenQasm(mode, {this->wire}) << ";\n";
         return oss.str();
     }
 };
 
 /**
- * The OpenQasm circuit builder.
+ * The OpenQasm circuit builder interface.
+ *
+ * @note Only one user-specified quantum register is currently supported.
+ * @note User-specified measurement results registers are supported.
  *
  * @param qregs Quantum registers
  * @param bregs Measurement results registers
@@ -307,7 +334,7 @@ class QasmMeasure {
  * @param measures Quantum measures
  */
 class OpenQasmBuilder {
-  private:
+  protected:
     std::vector<QasmVariable> vars;
     std::vector<QasmRegister> qregs;
     std::vector<QasmRegister> bregs;
@@ -318,7 +345,7 @@ class OpenQasmBuilder {
 
   public:
     explicit OpenQasmBuilder() : num_qubits(0), num_bits(0) {}
-    ~OpenQasmBuilder() = default;
+    virtual ~OpenQasmBuilder() = default;
 
     [[nodiscard]] auto getNumQubits() -> size_t { return this->num_qubits; }
     [[nodiscard]] auto getNumBits() -> size_t { return this->num_bits; }
@@ -351,7 +378,8 @@ class OpenQasmBuilder {
     }
     void Measure(size_t bit, size_t wire) { measures.emplace_back(bit, wire); }
 
-    auto toOpenQasm(size_t precision = 5, const std::string &version = "3.0") const -> std::string
+    virtual auto toOpenQasm(size_t precision = 5, const std::string &version = "3.0") const
+        -> std::string
     {
         RT_FAIL_IF(this->qregs.size() != 1, "Invalid number of quantum registers; Only one quantum "
                                             "register is currently supported.");
@@ -396,12 +424,112 @@ class OpenQasmBuilder {
         }
 
         // reset quantum registers
-        // for (auto &qreg : this->qregs) {
-        //     oss << qreg.toOpenQasm(RegisterMode::Reset);
-        // }
-        // Note. Commented as this is not support by the Braket simulator device
+        for (auto &qreg : this->qregs) {
+            oss << qreg.toOpenQasm(RegisterMode::Reset);
+        }
+
+        return oss.str();
+    }
+
+    virtual auto
+    toOpenQasmWithCustomInstructions([[maybe_unused]] const std::string &serialized_instructions,
+                                     [[maybe_unused]] size_t precision = 5,
+                                     [[maybe_unused]] const std::string &version = "3.0") const
+        -> std::string
+    {
+        RT_FAIL("Unsupported functionality");
+        return std::string{};
+    }
+};
+
+/**
+ * The Braket OpenQasm3 circuit builder derived from OpenQasmBuilder.
+ *
+ * @note Braket devices currently don't support mid-circuit measurement and partial measurement
+ * results.
+ * @note Only one user-specified quantum register is currently supported.
+ * @note User-specified measurement results registers are not currently supported.
+ */
+class BraketBuilder : public OpenQasmBuilder {
+  public:
+    using OpenQasmBuilder::OpenQasmBuilder;
+
+    auto toOpenQasm(size_t precision = 5, const std::string &version = "3.0") const
+        -> std::string override
+    {
+        RT_FAIL_IF(this->qregs.size() != 1, "Invalid number of quantum registers; Only one quantum "
+                                            "register is currently supported.");
+
+        RT_FAIL_IF(
+            !this->bregs.empty(),
+            "Invalid number of measurement results registers; User-specified measurement results "
+            "register is not currently supported.");
+
+        std::ostringstream oss;
+
+        // header
+        oss << "OPENQASM " << version << ";\n";
+
+        // variables
+        for (auto &var : this->vars) {
+            oss << var.toOpenQasm();
+        }
+
+        // quantum registers
+        oss << qregs[0].toOpenQasm(RegisterMode::Alloc, {}, version);
+
+        // measurement results registers
+        QasmRegister braket_mresults{RegisterType::Bit, "bits", qregs[0].getSize()};
+        oss << braket_mresults.toOpenQasm(RegisterMode::Alloc, {}, version);
+
+        // quantum gates assuming qregs.size() == 1
+        for (auto &gate : this->gates) {
+            oss << gate.toOpenQasm(this->qregs[0], precision, version);
+        }
+
+        // quantum measures assuming bregs[0].size() == qregs[0].size()
+        // and "mresults" isn't a user-specified register.
+        QasmMeasure braket_measure{0, 0};
+        oss << braket_measure.toOpenQasm(braket_mresults, qregs[0], RegisterMode::Name, version);
+
+        return oss.str();
+    }
+
+    auto toOpenQasmWithCustomInstructions(const std::string &serialized_instructions,
+                                          size_t precision = 5,
+                                          const std::string &version = "3.0") const
+        -> std::string override
+    {
+        RT_FAIL_IF(this->qregs.size() != 1, "Invalid number of quantum registers; Only one quantum "
+                                            "register is currently supported.");
+
+        RT_FAIL_IF(
+            !this->bregs.empty(),
+            "Invalid number of measurement results registers; User-specified measurement results "
+            "register is not currently supported.");
+
+        std::ostringstream oss;
+
+        // header
+        oss << "OPENQASM " << version << ";\n";
+
+        // variables
+        for (auto &var : this->vars) {
+            oss << var.toOpenQasm();
+        }
+
+        // quantum registers
+        oss << qregs[0].toOpenQasm(RegisterMode::Alloc, {}, version);
+
+        // quantum gates assuming qregs.size() == 1
+        for (auto &gate : this->gates) {
+            oss << gate.toOpenQasm(this->qregs[0], precision, version);
+        }
+
+        oss << serialized_instructions;
 
         return oss.str();
     }
 };
+
 } // namespace Catalyst::Runtime::Device::OpenQasm

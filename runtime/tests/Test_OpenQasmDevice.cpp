@@ -12,26 +12,43 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "MemRefUtils.hpp"
 #include "openqasm/OpenQasmDevice.hpp"
 
 #include <catch2/catch.hpp>
 
 using namespace Catalyst::Runtime::Device;
+using BType = OpenQasm::BuilderType;
+
+OpenQasm::PythonInterpreterGuard guard{};
 
 TEST_CASE("Test the OpenQasmDevice constructor", "[openqasm]")
 {
-    auto device = OpenQasmDevice();
-    CHECK(device.GetNumQubits() == 0);
+    SECTION("Common")
+    {
+        auto device = OpenQasmDevice(false, 100, "");
+        CHECK(device.GetNumQubits() == 0);
 
-    REQUIRE_THROWS_WITH(
-        device.Circuit(),
-        Catch::Contains(
-            "[Function:toOpenQasm] Error in Catalyst Runtime: Invalid number of quantum register"));
+        REQUIRE_THROWS_WITH(device.Circuit(),
+                            Catch::Contains("[Function:toOpenQasm] Error in Catalyst Runtime: "
+                                            "Invalid number of quantum register"));
+    }
+
+    SECTION("Braket SV1")
+    {
+        auto device =
+            OpenQasmDevice(false, 100, "arn:aws:braket:::device/quantum-simulator/amazon/sv1");
+        CHECK(device.GetNumQubits() == 0);
+
+        REQUIRE_THROWS_WITH(device.Circuit(),
+                            Catch::Contains("[Function:toOpenQasm] Error in Catalyst Runtime: "
+                                            "Invalid number of quantum register"));
+    }
 }
 
 TEST_CASE("Test qubits allocation OpenQasmDevice", "[openqasm]")
 {
-    std::unique_ptr<OpenQasmDevice> device = std::make_unique<OpenQasmDevice>();
+    std::unique_ptr<OpenQasmDevice> device = std::make_unique<OpenQasmDevice>(false, 100, "");
 
     constexpr size_t n = 3;
     device->AllocateQubits(1);
@@ -44,9 +61,21 @@ TEST_CASE("Test qubits allocation OpenQasmDevice", "[openqasm]")
     CHECK(wires[n - 1] == n);
 }
 
-TEST_CASE("Test the bell pair circuit", "[openqasm]")
+TEST_CASE("Test the OpenQasm runner with BuilderType::Common", "[openqasm]")
 {
-    std::unique_ptr<OpenQasmDevice> device = std::make_unique<OpenQasmDevice>();
+    std::unique_ptr<OpenQasmDevice> device = std::make_unique<OpenQasmDevice>(false, 100, "");
+
+    constexpr size_t n = 2;
+    auto wires = device->AllocateQubits(n);
+
+    REQUIRE_THROWS_WITH(
+        device->ExecuteCircuit("arn:aws:braket:::device/quantum-simulator/amazon/sv1"),
+        Catch::Contains("[Function:runCircuit] Error in Catalyst Runtime: Not implemented method"));
+}
+
+TEST_CASE("Test the bell pair circuit with BuilderType::Common", "[openqasm]")
+{
+    std::unique_ptr<OpenQasmDevice> device = std::make_unique<OpenQasmDevice>(false, 100, "");
 
     constexpr size_t n = 2;
     auto wires = device->AllocateQubits(n);
@@ -54,7 +83,6 @@ TEST_CASE("Test the bell pair circuit", "[openqasm]")
     device->NamedOperation("Hadamard", {}, {wires[0]}, false);
     device->NamedOperation("CNOT", {}, {wires[0], wires[1]}, false);
 
-    device->Measure(wires[0]);
     device->Measure(wires[1]);
 
     std::string toqasm = "OPENQASM 3.0;\n"
@@ -62,18 +90,110 @@ TEST_CASE("Test the bell pair circuit", "[openqasm]")
                          "bit[2] bits;\n"
                          "h qubits[0];\n"
                          "cnot qubits[0], qubits[1];\n"
-                         "bits[0] = measure qubits[0];\n"
-                         "bits[1] = measure qubits[1];\n";
+                         "bits[1] = measure qubits[1];\n"
+                         "reset qubits;\n";
 
     CHECK(device->Circuit() == toqasm);
-    // device->ExecuteCircuit();
 }
 
-TEST_CASE("Test a simple circuit", "[openqasm]")
+TEST_CASE("Test Probs(), Sample(), and Counts() of the bell pair circuit with BuilderType::Braket",
+          "[openqasm]")
+{
+    constexpr size_t shots{1000};
+    constexpr bool status{false};
+    std::unique_ptr<OpenQasmDevice> device = std::make_unique<OpenQasmDevice>(status, shots);
+
+    constexpr size_t n{2};
+    constexpr size_t size{1UL << n};
+    auto wires = device->AllocateQubits(n);
+
+    device->NamedOperation("Hadamard", {}, {wires[0]}, false);
+    device->NamedOperation("CNOT", {}, {wires[0], wires[1]}, false);
+
+    std::string toqasm = "OPENQASM 3.0;\n"
+                         "qubit[2] qubits;\n"
+                         "bit[2] bits;\n"
+                         "h qubits[0];\n"
+                         "cnot qubits[0], qubits[1];\n"
+                         "bits = measure qubits;\n";
+
+    CHECK(device->Circuit() == toqasm);
+
+    SECTION("Probs")
+    {
+        std::vector<double> probs(std::pow(2, n));
+        DataView<double, 1> view(probs);
+        device->Probs(view);
+
+        CHECK(probs[1] == probs[2]);
+        CHECK(probs[0] + probs[3] == Approx(1.f).margin(1e-5));
+    }
+
+    SECTION("Samples")
+    {
+        std::vector<double> samples(shots * n);
+        MemRefT<double, 2> buffer{samples.data(), samples.data(), 0, {shots, n}, {1, 1}};
+        DataView<double, 2> view(buffer.data_aligned, buffer.offset, buffer.sizes, buffer.strides);
+        device->Sample(view, shots);
+
+        for (size_t i = 0; i < shots * n; i++) {
+            CHECK((samples[i] == 0.f || samples[i] == 1.f));
+        }
+    }
+
+    SECTION("PartialSamples")
+    {
+        std::vector<double> samples(shots);
+        MemRefT<double, 2> buffer{samples.data(), samples.data(), 0, {shots, 1}, {1, 1}};
+        DataView<double, 2> view(buffer.data_aligned, buffer.offset, buffer.sizes, buffer.strides);
+        device->PartialSample(view, std::vector<QubitIdType>{0}, shots);
+
+        for (size_t i = 0; i < shots; i++) {
+            CHECK((samples[i] == 0.f || samples[i] == 1.f));
+        }
+    }
+
+    SECTION("Counts")
+    {
+        std::vector<double> eigvals(size);
+        std::vector<int64_t> counts(size);
+        DataView<double, 1> eview(eigvals);
+        DataView<int64_t, 1> cview(counts);
+        device->Counts(eview, cview, shots);
+
+        size_t sum = 0;
+        for (size_t i = 0; i < size; i++) {
+            CHECK(eigvals[i] == static_cast<double>(i));
+            sum += counts[i];
+        }
+        CHECK(sum == shots);
+    }
+
+    SECTION("PartialCounts")
+    {
+        size_t size = (1UL << 1);
+        std::vector<double> eigvals(size);
+        std::vector<int64_t> counts(size);
+        DataView<double, 1> eview(eigvals);
+        DataView<int64_t, 1> cview(counts);
+        device->PartialCounts(eview, cview, std::vector<QubitIdType>{1}, shots);
+
+        size_t sum = 0;
+        for (size_t i = 0; i < size; i++) {
+            CHECK(eigvals[i] == static_cast<double>(i));
+            sum += counts[i];
+        }
+        CHECK(sum == shots);
+    }
+}
+
+TEST_CASE("Test Probs() of a simple circuit with BuilderType::Braket", "[openqasm]")
 {
     std::unique_ptr<OpenQasmDevice> device = std::make_unique<OpenQasmDevice>();
 
-    constexpr size_t n = 5;
+    constexpr size_t shots{1000};
+    constexpr size_t n{5};
+    constexpr size_t size{1UL << n};
     auto wires = device->AllocateQubits(n);
 
     device->NamedOperation("PauliX", {}, {wires[0]}, false);
@@ -82,12 +202,6 @@ TEST_CASE("Test a simple circuit", "[openqasm]")
     device->NamedOperation("RX", {0.6}, {wires[4]}, false);
     device->NamedOperation("CNOT", {}, {wires[0], wires[3]}, false);
     device->NamedOperation("Toffoli", {}, {wires[0], wires[3], wires[4]}, false);
-
-    device->Measure(wires[0]);
-    device->Measure(wires[1]);
-    device->Measure(wires[2]);
-    device->Measure(wires[3]);
-    device->Measure(wires[4]);
 
     std::string toqasm = "OPENQASM 3.0;\n"
                          "qubit[5] qubits;\n"
@@ -98,12 +212,73 @@ TEST_CASE("Test a simple circuit", "[openqasm]")
                          "rx(0.6) qubits[4];\n"
                          "cnot qubits[0], qubits[3];\n"
                          "ccnot qubits[0], qubits[3], qubits[4];\n"
-                         "bits[0] = measure qubits[0];\n"
-                         "bits[1] = measure qubits[1];\n"
-                         "bits[2] = measure qubits[2];\n"
-                         "bits[3] = measure qubits[3];\n"
-                         "bits[4] = measure qubits[4];\n";
+                         "bits = measure qubits;\n";
 
     CHECK(device->Circuit() == toqasm);
-    device->ExecuteCircuit();
+
+    SECTION("Probs")
+    {
+        std::vector<double> probs(size);
+        DataView<double, 1> view(probs);
+        device->Probs(view);
+
+        CHECK(probs[27] + probs[26] == Approx(1.f).margin(1e-5));
+    }
+
+    SECTION("Samples")
+    {
+        std::vector<double> samples(shots * n);
+        MemRefT<double, 2> buffer{samples.data(), samples.data(), 0, {shots, n}, {1, 1}};
+        DataView<double, 2> view(buffer.data_aligned, buffer.offset, buffer.sizes, buffer.strides);
+        device->Sample(view, shots);
+
+        for (size_t i = 0; i < shots * n; i++) {
+            CHECK((samples[i] == 0.f || samples[i] == 1.f));
+        }
+    }
+
+    SECTION("PartialSamples")
+    {
+        std::vector<double> samples(shots);
+        MemRefT<double, 2> buffer{samples.data(), samples.data(), 0, {shots, 1}, {1, 1}};
+        DataView<double, 2> view(buffer.data_aligned, buffer.offset, buffer.sizes, buffer.strides);
+        device->PartialSample(view, std::vector<QubitIdType>{0}, shots);
+
+        for (size_t i = 0; i < shots; i++) {
+            CHECK((samples[i] == 0.f || samples[i] == 1.f));
+        }
+    }
+
+    SECTION("Counts")
+    {
+        std::vector<double> eigvals(size);
+        std::vector<int64_t> counts(size);
+        DataView<double, 1> eview(eigvals);
+        DataView<int64_t, 1> cview(counts);
+        device->Counts(eview, cview, shots);
+
+        size_t sum = 0;
+        for (size_t i = 0; i < size; i++) {
+            CHECK(eigvals[i] == static_cast<double>(i));
+            sum += counts[i];
+        }
+        CHECK(sum == shots);
+    }
+
+    SECTION("PartialCounts")
+    {
+        size_t size = (1UL << 1);
+        std::vector<double> eigvals(size);
+        std::vector<int64_t> counts(size);
+        DataView<double, 1> eview(eigvals);
+        DataView<int64_t, 1> cview(counts);
+        device->PartialCounts(eview, cview, std::vector<QubitIdType>{1}, shots);
+
+        size_t sum = 0;
+        for (size_t i = 0; i < size; i++) {
+            CHECK(eigvals[i] == static_cast<double>(i));
+            sum += counts[i];
+        }
+        CHECK(sum == shots);
+    }
 }

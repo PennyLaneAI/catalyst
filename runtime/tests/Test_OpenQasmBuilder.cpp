@@ -12,9 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <string>
+#include <typeinfo>
+
 #include "openqasm/OpenQasmBuilder.hpp"
 
 #include <catch2/catch.hpp>
+
+#define TYPE_INFO(x) std::string(typeid(x).name())
 
 using namespace Catalyst::Runtime::Device::OpenQasm;
 
@@ -216,13 +221,24 @@ TEST_CASE("Test QasmMeasure from OpenQasmBuilder", "[openqasm]")
     CHECK(mz2.toOpenQasm(bits, qubits) == mz2_res_toqasm);
 }
 
-TEST_CASE("Test OpenQasmBuilder with dumping the circuit header", "[openqasm]")
+TEMPLATE_TEST_CASE("Test OpenQasmBuilder with dumping the circuit header", "[openqasm]",
+                   OpenQasmBuilder, BraketBuilder)
 {
-    auto builder = OpenQasmBuilder();
+    auto builder = TestType();
     builder.Register(RegisterType::Qubit, "qubits", 5);
 
-    std::string toqasm = "OPENQASM 3.0;\n"
-                         "qubit[5] qubits;\n";
+    std::string toqasm;
+    if (TYPE_INFO(TestType) == TYPE_INFO(OpenQasmBuilder)) {
+        toqasm = "OPENQASM 3.0;\n"
+                 "qubit[5] qubits;\n"
+                 "reset qubits;\n";
+    }
+    else if (TYPE_INFO(TestType) == TYPE_INFO(BraketBuilder)) {
+        toqasm = "OPENQASM 3.0;\n"
+                 "qubit[5] qubits;\n"
+                 "bit[5] bits;\n"
+                 "bits = measure qubits;\n";
+    }
 
     CHECK(builder.toOpenQasm() == toqasm);
 
@@ -234,7 +250,8 @@ TEST_CASE("Test OpenQasmBuilder with dumping the circuit header", "[openqasm]")
                                         " number of quantum registers"));
 }
 
-TEST_CASE("Test OpenQasmBuilder with invalid number of measurement results registers", "[openqasm]")
+TEMPLATE_TEST_CASE("Test OpenQasmBuilder with invalid number of measurement results registers",
+                   "[openqasm]", OpenQasmBuilder, BraketBuilder)
 {
     auto builder = OpenQasmBuilder();
     CHECK(builder.getNumQubits() == 0);
@@ -259,9 +276,10 @@ TEST_CASE("Test OpenQasmBuilder with invalid number of measurement results regis
             "[Function:Register] Error in Catalyst Runtime: Unsupported OpenQasm register type"));
 }
 
-TEST_CASE("Test OpenQasmBuilder with dumping the circuit header, gates, and measure", "[openqasm]")
+TEMPLATE_TEST_CASE("Test OpenQasmBuilder with dumping the circuit header, gates, and measure",
+                   "[openqasm]", OpenQasmBuilder, BraketBuilder)
 {
-    auto builder = OpenQasmBuilder();
+    auto builder = TestType();
 
     builder.Register(RegisterType::Qubit, "q", 2);
 
@@ -271,29 +289,46 @@ TEST_CASE("Test OpenQasmBuilder with dumping the circuit header, gates, and meas
     builder.Gate("RZ", {0.12}, {}, {1}, false);
     builder.Gate("RX", {}, {"alpha"}, {0}, false);
 
-    builder.Register(RegisterType::Bit, "b", 2);
+    std::string toqasm;
+    if (TYPE_INFO(TestType) == TYPE_INFO(OpenQasmBuilder)) {
+        builder.Register(RegisterType::Bit, "b", 2);
 
-    builder.Measure(0, 0);
-    builder.Measure(1, 1);
+        builder.Measure(0, 0);
+        builder.Measure(1, 1);
 
-    std::string toqasm = "OPENQASM 3.0;\n"
-                         "input float alpha;\n"
-                         "qubit[2] q;\n"
-                         "bit[2] b;\n"
-                         "x q[0];\n"
-                         "h q[1];\n"
-                         "swap q[0], q[1];\n"
-                         "rz(0.12) q[1];\n"
-                         "rx(alpha) q[0];\n"
-                         "b[0] = measure q[0];\n"
-                         "b[1] = measure q[1];\n";
+        toqasm = "OPENQASM 3.0;\n"
+                 "input float alpha;\n"
+                 "qubit[2] q;\n"
+                 "bit[2] b;\n"
+                 "x q[0];\n"
+                 "h q[1];\n"
+                 "swap q[0], q[1];\n"
+                 "rz(0.12) q[1];\n"
+                 "rx(alpha) q[0];\n"
+                 "b[0] = measure q[0];\n"
+                 "b[1] = measure q[1];\n"
+                 "reset q;\n";
+    }
+    else if (TYPE_INFO(TestType) == TYPE_INFO(BraketBuilder)) {
+        toqasm = "OPENQASM 3.0;\n"
+                 "input float alpha;\n"
+                 "qubit[2] q;\n"
+                 "bit[2] bits;\n"
+                 "x q[0];\n"
+                 "h q[1];\n"
+                 "swap q[0], q[1];\n"
+                 "rz(0.12) q[1];\n"
+                 "rx(alpha) q[0];\n"
+                 "bits = measure q;\n";
+    }
 
     CHECK(builder.toOpenQasm() == toqasm);
 }
 
-TEST_CASE("Test OpenQasmBuilder with dumping a circuit without measurement results", "[openqasm]")
+TEMPLATE_TEST_CASE("Test OpenQasmBuilder with dumping a circuit without measurement results",
+                   "[openqasm]", OpenQasmBuilder, BraketBuilder)
 {
-    auto builder = OpenQasmBuilder();
+    auto builder = TestType();
 
     builder.Register(RegisterType::Qubit, "q", 2);
 
@@ -303,12 +338,62 @@ TEST_CASE("Test OpenQasmBuilder with dumping a circuit without measurement resul
     builder.Measure(0, 0);
     builder.Measure(0, 1);
 
-    std::string toqasm = "OPENQASM 3.0;\n"
-                         "qubit[2] q;\n"
-                         "x q[0];\n"
-                         "h q[1];\n"
-                         "measure q[0];\n"
-                         "measure q[1];\n";
+    std::string toqasm;
+    if (TYPE_INFO(TestType) == TYPE_INFO(OpenQasmBuilder)) {
+        toqasm = "OPENQASM 3.0;\n"
+                 "qubit[2] q;\n"
+                 "x q[0];\n"
+                 "h q[1];\n"
+                 "measure q[0];\n"
+                 "measure q[1];\n"
+                 "reset q;\n";
+    }
+    else if (TYPE_INFO(TestType) == TYPE_INFO(BraketBuilder)) {
+        toqasm = "OPENQASM 3.0;\n"
+                 "qubit[2] q;\n"
+                 "bit[2] bits;\n"
+                 "x q[0];\n"
+                 "h q[1];\n"
+                 "bits = measure q;\n";
+    }
 
     CHECK(builder.toOpenQasm() == toqasm);
+}
+
+TEMPLATE_TEST_CASE("Test OpenQasmBuilder with custom instructions", "[openqasm]", OpenQasmBuilder,
+                   BraketBuilder)
+{
+    auto builder = TestType();
+
+    builder.Register(RegisterType::Qubit, "q", 2);
+
+    builder.Gate("PauliX", {}, {}, {0}, false);
+    builder.Gate("Hadamard", {}, {}, {1}, false);
+
+    builder.Measure(0, 0);
+    builder.Measure(0, 1);
+
+    if (TYPE_INFO(TestType) == TYPE_INFO(OpenQasmBuilder)) {
+        REQUIRE_THROWS_WITH(
+            builder.toOpenQasmWithCustomInstructions(""),
+            Catch::Contains("Error in Catalyst Runtime: Unsupported functionality"));
+    }
+    else if (TYPE_INFO(TestType) == TYPE_INFO(BraketBuilder)) {
+
+        std::string toqasm = "OPENQASM 3.0;\n"
+                             "qubit[2] q;\n"
+                             "x q[0];\n"
+                             "h q[1];\n";
+
+        std::string expval_pragma_str = "#pragma braket result expectation x(q[0]) @ y([q1])\n";
+        CHECK(builder.toOpenQasmWithCustomInstructions(expval_pragma_str) ==
+              toqasm + expval_pragma_str);
+
+        std::string var_pragma_str = "#pragma braket result variance x(q[0]) @ y([q1])\n";
+        CHECK(builder.toOpenQasmWithCustomInstructions(var_pragma_str) == toqasm + var_pragma_str);
+
+        std::string state_pragma_str = "#pragma braket result state_vector\n";
+        CHECK(builder.toOpenQasmWithCustomInstructions(state_pragma_str) ==
+              toqasm + state_pragma_str);
+    }
 }
