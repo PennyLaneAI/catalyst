@@ -468,6 +468,12 @@ jobs:
         run: |
           sudo apt-get -y -q install cmake ninja-build libomp-dev lcov
 
+      - name: Install dependencies (OpenQasm device)
+        if: ${{ matrix.simulator == 'openqasm' }}
+        run: |
+          pip install numpy amazon-braket-sdk
+          echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
+
       - name: Get Cached qir-stdlib Build
         id: cache-qir-stdlib
         uses: actions/cache@v3
@@ -501,7 +507,6 @@ jobs:
       - name: Build Runtime test suite for OpenQasm device
         if: ${{ matrix.simulator == 'openqasm' }}
         run: |
-            pip install numpy amazon-braket-sdk
             C_COMPILER=$(which gcc) \
             CXX_COMPILER=$(which g++) \
             COMPILER_LAUNCHER="" \
