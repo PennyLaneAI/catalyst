@@ -27,6 +27,7 @@
 #include "mlir/Dialect/Index/IR/IndexOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 
 #include "Gradient/IR/GradientOps.h"
 #include "Gradient/Transforms/Patterns.h"
@@ -272,8 +273,8 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
         SmallVector<Value> callArgs = {wrapperPtr};
 
         // Add the arguments and their shadow on data in
-        for (auto [arg, llvmarg, llvmdatain] :
-             llvm::zip(op.getArgs(), adaptor.getArgs(), adaptor.getDataIn())) {
+        for (auto [arg, llvmarg, memrefDataIn, llvmdatain] :
+             llvm::zip(op.getArgs(), adaptor.getArgs(), op.getDataIn(), adaptor.getDataIn())) {
             auto newArg =
                 rewriter.create<LLVM::AllocaOp>(loc, LLVM::LLVMPointerType::get(vectorType), c1);
             rewriter.create<LLVM::StoreOp>(loc, llvmarg, newArg);
@@ -283,6 +284,25 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
             MemRefType memrefType = arg.getType().cast<MemRefType>();
             size_t sizeShape = memrefType.getShape().size();
             size_t value = memrefType.getElementTypeBitWidth() / 8;
+            
+            // Loop over the grad size and take subviews for the arg memref
+;
+            Value memrefData = memrefDataIn;
+
+            auto lowerBound = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+            auto step = rewriter.create<arith::ConstantIndexOp>(loc, 1);
+            auto loop = rewriter.create<scf::ForOp>(loc, lowerBound, op.getGradSize(), step, std::nullopt,
+            [&](OpBuilder &builder, Location loc, Value iv, ValueRange iterArgs) {
+                std::vector<Value> offset = {iv};
+                auto size = rewriter.create<arith::ConstantIndexOp>(loc, 1);
+                std::vector<Value> sizev = {size};
+                auto stride = rewriter.create<arith::ConstantIndexOp>(loc, 1);
+                std::vector<Value> stridev = {stride};
+                Value shadowtest = builder.create<memref::SubViewOp>(loc, memrefType, memrefData, offset, sizev, stridev).getResult();
+                Type llvmResType = llvmTypeConverter.convertType(shadowtest.getType());
+                builder.create<UnrealizedConversionCastOp>(loc, llvmResType, shadowtest);
+                rewriter.create<scf::YieldOp>(loc);
+            });
 
             auto memrefSize =
                 rewriter.create<LLVM::ConstantOp>(loc, IntegerType::get(ctx, 64), value);
@@ -348,50 +368,16 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
             rewriter.create<UnrealizedConversionCastOp>(loc, resCalleeTypes, results).getResults();
 
         // Store the results
-        for (auto [result, llvmresult] : llvm::zip(results, llvmresults)) {
+        for (auto [result, llvmresult, llvmshadowresult] : llvm::zip(results, llvmresults, adaptor.getQuantumJacobians())) {
             auto newArg =
                 rewriter.create<LLVM::AllocaOp>(loc, LLVM::LLVMPointerType::get(vectorType), c1);
             rewriter.create<LLVM::StoreOp>(loc, llvmresult, newArg);
             callArgs.push_back(newArg);
 
             // Add shadow for memref
-            Value offset = rewriter.create<LLVM::ExtractValueOp>(loc, llvmresult, 2);
-
-            SmallVector<int64_t> vectorIndices{3, 0};
-
-            Value sizeArray = rewriter.create<LLVM::ExtractValueOp>(loc, llvmresult, vectorIndices);
-
-            vectorIndices[0] = 4;
-            Value strideArray =
-                rewriter.create<LLVM::ExtractValueOp>(loc, llvmresult, vectorIndices);
-
-            Value bufferSize = rewriter.create<LLVM::MulOp>(loc, sizeArray, strideArray);
-            bufferSize = rewriter.create<LLVM::AddOp>(loc, offset, bufferSize);
-
-            MemRefType memrefType = result.getType().cast<MemRefType>();
-            size_t value = memrefType.getElementTypeBitWidth() / 8;
-
-            auto memrefSize =
-                rewriter.create<LLVM::ConstantOp>(loc, IntegerType::get(ctx, 64), value);
-            Value bufferMemSize = rewriter.create<LLVM::MulOp>(loc, bufferSize, memrefSize);
-
-            Value buffer =
-                rewriter.create<LLVM::CallOp>(loc, allocFnDecl, bufferMemSize).getResult();
-
-            // Set value to 1 (tangent vectors)
-            rewriter.create<LLVM::CallOp>(loc, memsetFnDecl,
-                                          ArrayRef<Value>{buffer, c1, bufferMemSize});
-
-            Type llvmBaseType = llvmTypeConverter.convertType(memrefType.getElementType());
-            Value bufferCast = rewriter.create<LLVM::BitcastOp>(
-                loc, LLVM::LLVMPointerType::get(llvmBaseType), buffer);
-
-            llvmresult = rewriter.create<LLVM::InsertValueOp>(loc, llvmresult, bufferCast, 0);
-            llvmresult = rewriter.create<LLVM::InsertValueOp>(loc, llvmresult, bufferCast, 1);
-
             Value shadowPtr =
                 rewriter.create<LLVM::AllocaOp>(loc, LLVM::LLVMPointerType::get(vectorType), c1);
-            rewriter.create<LLVM::StoreOp>(loc, llvmresult, shadowPtr);
+            rewriter.create<LLVM::StoreOp>(loc, llvmshadowresult, shadowPtr);
             callArgs.push_back(shadowPtr);
         }
 
