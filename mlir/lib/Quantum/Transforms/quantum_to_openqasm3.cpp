@@ -15,6 +15,7 @@
 #include <set>
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -96,9 +97,6 @@ rewriteQuantumCircuitAsInlinedFunction(PatternRewriter &rewriter, func::FuncOp o
   // TODO: Add checks and emit ICE we reach here and op has more than 1 nested regions.
   auto [deviceOp, deallocOp] = sinkQuantumOps(op);
 
-  rewriter.setInsertionPoint(deviceOp);
-
-
   // This is how I get the input values.
   std::vector<Value> arguments;
   op.walk([&](mlir::Operation *nestedOp) {
@@ -133,9 +131,27 @@ rewriteQuantumCircuitAsInlinedFunction(PatternRewriter &rewriter, func::FuncOp o
     quantumOpsWithUsesOutsideOfQuantumFunction.push_back(nestedOp);
   });
 
-  InlinedFunction inlinedFunction = rewriter.create<InlinedFunction>(deviceOp->getLoc(), TypeRange{}, arguments);
-  rewriter.createBlock(&inlinedFunction.getRegion());
+  rewriter.setInsertionPoint(deviceOp);
 
+  InlinedFunction inlinedFunction = rewriter.create<InlinedFunction>(deviceOp->getLoc(), TypeRange{}, ValueRange{});
+  Block *block = rewriter.createBlock(&inlinedFunction.getRegion());
+  rewriter.setInsertionPointToStart(block);
+  rewriter.create<arith::ConstantOp>(deviceOp->getLoc(), rewriter.getI64Type(), rewriter.getIntegerAttr(rewriter.getI64Type(), 0));
+
+
+  op.walk([&](mlir::Operation *nestedOp) {
+    Dialect *dialect = nestedOp->getDialect();
+    bool isQuantumOp = isa<QuantumDialect>(dialect);
+    if (!isQuantumOp) return;
+
+    if (isa<InlinedFunction>(nestedOp)) return;
+
+
+    nestedOp->moveAfter(&block->back());
+
+  });
+
+  inlinedFunction.emitRemark() << "Hello";
 }
 
 struct QuantumToOpenQASM3Transform : public OpRewritePattern<func::FuncOp> {
@@ -173,6 +189,7 @@ struct QuantumToOpenQasm3Pass
     void getDependentDialects(DialectRegistry &registry) const override
     {
         registry.insert<func::FuncDialect>();
+        registry.insert<arith::ArithDialect>();
 	registry.insert<QuantumDialect>();
     }
 
