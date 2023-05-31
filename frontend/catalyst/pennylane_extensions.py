@@ -515,8 +515,20 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
     return jprim.vjp_p.bind(*params, *cotangents, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
 
 
-def adjoint():
-    return jprim.adjoint_p.bind()
+class Adjoint:
+    def __init__(self, f:QFunc):
+        self.f = f
+
+    def __call__(self, *args):
+        TracingContext.check_is_tracing(
+            "catalyst.adjoint can only be used from within @qjit decorated code."
+        )
+        jaxpr = jax.make_jaxpr(self.f)(*args)
+        return jprim.adjoint_p.bind(*args, jaxpr=jaxpr, f=self.f)
+
+
+def adjoint(f:QFunc) -> Adjoint:
+    return Adjoint(f)
 
 
 class Cond(Operation):

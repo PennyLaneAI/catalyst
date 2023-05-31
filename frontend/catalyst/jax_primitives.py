@@ -16,7 +16,7 @@ of quantum operations, measurements, and observables to JAXPR.
 """
 
 from dataclasses import dataclass
-from typing import Dict, List
+from typing import Dict, List, Callable
 
 import jax
 import numpy as np
@@ -1494,13 +1494,19 @@ def _adjoint_def_impl(ctx, *args):
     raise NotImplementedError()
 
 @adjoint_p.def_abstract_eval
-def _adjoint_abstract(*args):
+def _adjoint_abstract(*args, f:Callable, jaxpr):
     print(f"adjoint abstract called, args: {args}")
-    return []
+    return jaxpr.out_avals
 
-def _adjoint_lowering(ctx, *args):
+def _adjoint_lowering(ctx, *args, f:"QFunc", jaxpr):
     print("adjoint lowering called")
-    return AdjointOp().results
+    print(jaxpr)
+    _func_lowering(ctx, *args, call_jaxpr=jaxpr.eqns[0].params["call_jaxpr"], fn=f, call=False)
+    symbol_name = mlir_fn_cache[f]
+    # output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
+    output_types = util.flatten(map(mlir.aval_to_ir_types, ctx.avals_out))
+    print(f"symbol_name: {symbol_name}")
+    return AdjointOp(output_types, args).results
 
 #
 # registration

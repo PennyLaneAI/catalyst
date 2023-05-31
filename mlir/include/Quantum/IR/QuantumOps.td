@@ -755,8 +755,16 @@ def AdjointOp : Op<QuantumDialect, "adjoint", []> {
 
     let regions = (region SizedRegion<1>:$region);
 
+    let arguments = (ins
+      Variadic<AnyTypeOf<[AnyFloat, RankedTensorOf<[AnyFloat]>]>>:$params
+    );
+
+    let results = (outs
+      Variadic<AnyTypeOf<[AnyFloat, RankedTensorOf<[AnyFloat]>]>>:$results
+    );
+
     let assemblyFormat = [{
-        attr-dict `:` $region
+        `(` $params `)` attr-dict `:` functional-type(operands, results) $region
     }];
 
 }
