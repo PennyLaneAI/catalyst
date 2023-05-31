@@ -40,6 +40,7 @@ from catalyst.compiler import (
     QuantumCompilationPass,
 )
 from catalyst.jax_tracer import get_mlir
+from catalyst.utils.exceptions import CompileError
 
 # pylint: disable=missing-function-docstring
 
@@ -111,46 +112,51 @@ class TestCompilerErrors:
         with pytest.raises(ValueError, match="Executable not specified."):
             CustomClassWithNoExecutable.run("some-filename")
 
-    def test_link_fail_exception(self):
+    @pytest.mark.parametrize(
+        "pipeline",
+        [
+            (MHLOPass),
+            (QuantumCompilationPass),
+            (BufferizationPass),
+            (MLIRToLLVMDialect),
+            (LLVMDialectToLLVMIR),
+            (LLVMIRToObjectFile),
+            # CompilerDiver is missing here because it has a different error message.
+        ],
+    )
+    def test_lower_mhlo_input_validation(self, pipeline):
+        """Test that error is raised if pass failed."""
+        with tempfile.NamedTemporaryFile(mode="w+", encoding="utf-8") as invalid_file:
+            invalid_file.write("These are invalid contents.")
+            invalid_file.flush()
+            with pytest.raises(CompileError, match=f"{pipeline.__name__} failed."):
+                pipeline.run(invalid_file.name)
+
+    def test_link_failure(self):
         """Test that an exception is raised when all compiler possibilities are exhausted."""
-        with pytest.raises(EnvironmentError, match="Unable to link .*"):
-            with pytest.warns(UserWarning, match="Compiler c99"):
-                CompilerDriver.run("in.o", fallback_compilers=["c99"])
+        with tempfile.NamedTemporaryFile(mode="w+", encoding="utf-8", suffix=".o") as invalid_file:
+            invalid_file.write("These are invalid contents.")
+            invalid_file.flush()
+            with pytest.raises(EnvironmentError, match="Unable to link .*"):
+                with pytest.warns(UserWarning, match="Compiler cc failed during execution"):
+                    CompilerDriver.run(invalid_file.name, fallback_compilers=["cc"])
 
-    def test_mlir_input_validation_mhlo(self):
-        """Test if the function detects wrong extensions"""
-        with pytest.raises(ValueError, match="is not an MLIR file"):
-            MHLOPass.run("file-name.nomlir")
-
-    def test_mlir_input_validation_qcomp(self):
-        """Test if the function detects wrong extensions"""
-        with pytest.raises(ValueError, match="is not an MLIR file"):
-            QuantumCompilationPass.run("file-name.nomlir")
-
-    def test_mlir_input_validation_bufferization(self):
-        """Test if the function detects wrong extensions"""
-        with pytest.raises(ValueError, match="is not an MLIR file"):
-            BufferizationPass.run("file-name.nomlir")
-
-    def test_lower_all_to_llvm_input_validation(self):
-        """Test if the function detects wrong extensions"""
-        with pytest.raises(ValueError, match="is not a bufferized MLIR file"):
-            MLIRToLLVMDialect.run("file-name.nobuff.mlir")
-
-    def test_convert_mlir_to_llvmir_input_validation(self):
-        """Test if the function detects wrong extensions"""
-        with pytest.raises(ValueError, match="is not an LLVM dialect MLIR file"):
-            LLVMDialectToLLVMIR.run("file-name.nollvm.mlir")
-
-    def test_compile_llvmir_input_validation(self):
-        """Test if the function detects wrong extensions"""
-        with pytest.raises(ValueError, match="is not an LLVMIR file"):
-            LLVMIRToObjectFile.run("file-name.noll")
-
-    def test_link_lightning_runtime_input_validation(self):
-        """Test if the function detects wrong extensions"""
-        with pytest.raises(ValueError, match="is not an object file"):
-            CompilerDriver.run("file-name.noo")
+    @pytest.mark.parametrize(
+        "pipeline",
+        [
+            (MHLOPass),
+            (QuantumCompilationPass),
+            (BufferizationPass),
+            (MLIRToLLVMDialect),
+            (LLVMDialectToLLVMIR),
+            (LLVMIRToObjectFile),
+            (CompilerDriver),
+        ],
+    )
+    def test_lower_file_not_found(self, pipeline):
+        """Test that exception is raised if file is not found."""
+        with pytest.raises(FileNotFoundError):
+            pipeline.run("this-file-does-not-exists.txt")
 
     def test_attempts_to_get_inexistent_intermediate_file(self):
         """Test return value if user request intermediate file that doesn't exist."""

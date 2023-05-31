@@ -77,15 +77,6 @@ auto OpenQasmDevice::Zero() const -> Result
 
 auto OpenQasmDevice::One() const -> Result { return const_cast<Result>(&GLOBAL_RESULT_TRUE_CONST); }
 
-void OpenQasmDevice::PrintCircuit() { std::cout << builder->toOpenQasm(); }
-
-void OpenQasmDevice::ExecuteCircuit(const std::string &hw_name)
-{
-    runner->runCircuit(builder->toOpenQasm(), hw_name, GetDeviceShots());
-}
-
-auto OpenQasmDevice::Circuit() -> std::string { return builder->toOpenQasm(); }
-
 void OpenQasmDevice::NamedOperation(const std::string &name, const std::vector<double> &params,
                                     const std::vector<QubitIdType> &wires, bool inverse)
 {

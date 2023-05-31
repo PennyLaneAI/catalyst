@@ -32,7 +32,7 @@
 #include "LightningKokkosSimulator.hpp"
 #endif
 
-#if __has_include("openqasm/OpenQasmDevice.hpp")
+#if __has_include("OpenQasmDevice.hpp")
 // device: openqasm
 #include "openqasm/OpenQasmDevice.hpp"
 #endif
@@ -99,7 +99,6 @@ class ExecutionContext final {
                                                             std::move(hw_name));
         });
 #endif
-
         _driver_mm_ptr = std::make_unique<MemoryManager>();
     };
 

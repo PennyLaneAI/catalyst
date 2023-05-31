@@ -61,18 +61,6 @@ TEST_CASE("Test qubits allocation OpenQasmDevice", "[openqasm]")
     CHECK(wires[n - 1] == n);
 }
 
-TEST_CASE("Test the OpenQasm runner with BuilderType::Common", "[openqasm]")
-{
-    std::unique_ptr<OpenQasmDevice> device = std::make_unique<OpenQasmDevice>(false, 100, "");
-
-    constexpr size_t n = 2;
-    auto wires = device->AllocateQubits(n);
-
-    REQUIRE_THROWS_WITH(
-        device->ExecuteCircuit("arn:aws:braket:::device/quantum-simulator/amazon/sv1"),
-        Catch::Contains("[Function:runCircuit] Error in Catalyst Runtime: Not implemented method"));
-}
-
 TEST_CASE("Test the bell pair circuit with BuilderType::Common", "[openqasm]")
 {
     std::unique_ptr<OpenQasmDevice> device = std::make_unique<OpenQasmDevice>(false, 100, "");
