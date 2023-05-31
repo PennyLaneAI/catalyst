@@ -112,9 +112,7 @@ class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {
     [[nodiscard]] auto One() const -> Result override;
 
     // Circuit RT
-    [[nodiscard]] auto Circuit() const -> std::string {
-        return builder->toOpenQasm();
-    }
+    [[nodiscard]] auto Circuit() const -> std::string { return builder->toOpenQasm(); }
 
     // QIS
     void NamedOperation(const std::string &name, const std::vector<double> &params,
