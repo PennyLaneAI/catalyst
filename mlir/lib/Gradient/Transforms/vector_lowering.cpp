@@ -40,7 +40,9 @@ namespace gradient {
  * lowered to (memref<memref<?x{element-type}>>, memref<index>, memref<index>).
  */
 struct DynVectorBuilder {
-    Value dataField, sizeField, capacityField;
+    Value dataField;
+    Value sizeField;
+    Value capacityField;
     Type elementType;
 
     static FailureOr<DynVectorBuilder> get(Location loc, TypeConverter *typeConverter,
@@ -64,8 +66,9 @@ struct DynVectorBuilder {
         std::string funcName = "__grad_vec_push";
         llvm::raw_string_ostream nameStream{funcName};
         nameStream << elementType;
-        if (moduleOp.lookupSymbol<func::FuncOp>(funcName))
+        if (moduleOp.lookupSymbol<func::FuncOp>(funcName)) {
             return SymbolRefAttr::get(ctx, funcName);
+        }
 
         OpBuilder::InsertionGuard guard(b);
         b.setInsertionPointToStart(moduleOp.getBody());

@@ -55,7 +55,6 @@ func::FuncOp genArgMapFunction(PatternRewriter &rewriter, Location loc, func::Fu
         // input to the new function.
         argMapFn = rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility);
         rewriter.cloneRegionBefore(callee.getBody(), argMapFn.getBody(), argMapFn.end());
-        // Value numParams = argMapFn.getBody().front().addArgument(rewriter.getIndexType(), loc);
 
         PatternRewriter::InsertionGuard insertGuard(rewriter);
         rewriter.setInsertionPointToStart(&argMapFn.getBody().front());
