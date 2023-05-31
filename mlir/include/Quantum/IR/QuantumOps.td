@@ -171,7 +171,7 @@ class Gate_Op<string mnemonic, list<Trait> traits = []> :
     let extraClassDeclaration = extraBaseClassDeclaration;
 }
 
-def InlinedFunction : Op<QuantumDialect, "inlinedFunction", []> {
+def InlinedFunction : Op<QuantumDialect, "inlinedFunction", [NoTerminator]> {
   let arguments = (ins
       Variadic<AnyType>:$operands
   );
@@ -187,6 +187,7 @@ def InlinedFunction : Op<QuantumDialect, "inlinedFunction", []> {
   let assemblyFormat = [{
     `(` $operands `)` attr-dict `:` functional-type(operands, results) $region
   }];
+
 
 }
 
