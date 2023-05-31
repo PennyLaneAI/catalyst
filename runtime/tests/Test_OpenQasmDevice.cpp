@@ -13,7 +13,10 @@
 // limitations under the License.
 
 #include "MemRefUtils.hpp"
+
+#include "openqasm/OpenQasmBuilder.hpp"
 #include "openqasm/OpenQasmDevice.hpp"
+#include "openqasm/OpenQasmRunner.hpp"
 
 #include <catch2/catch.hpp>
 
@@ -21,6 +24,40 @@ using namespace Catalyst::Runtime::Device;
 using BType = OpenQasm::BuilderType;
 
 OpenQasm::PythonInterpreterGuard guard{};
+
+TEST_CASE("Test OpenQasmRunner base class", "[openqasm]")
+{
+    // check the coverage support
+    OpenQasm::OpenQasmRunner runner{};
+    REQUIRE_THROWS_WITH(runner.runCircuit("", "", 0),
+                        Catch::Contains("[Function:runCircuit] Error in Catalyst Runtime: "
+                                        "Not implemented method"));
+
+    REQUIRE_THROWS_WITH(runner.Probs("", "", 0, 0),
+                        Catch::Contains("[Function:Probs] Error in Catalyst Runtime: "
+                                        "Not implemented method"));
+
+    REQUIRE_THROWS_WITH(runner.Sample("", "", 0, 0),
+                        Catch::Contains("[Function:Sample] Error in Catalyst Runtime: "
+                                        "Not implemented method"));
+}
+
+TEST_CASE("Test BraketRunner::runCircuit()", "[openqasm]")
+{
+    OpenQasm::BraketBuilder builder{};
+
+    builder.Register(OpenQasm::RegisterType::Qubit, "q", 2);
+
+    builder.Gate("Hadamard", {}, {}, {0}, false);
+    builder.Gate("CNOT", {}, {}, {0, 1}, false);
+
+    auto &&circuit = builder.toOpenQasm();
+
+    OpenQasm::BraketRunner runner{};
+    auto &&results =
+        runner.runCircuit(circuit, "arn:aws:braket:::device/quantum-simulator/amazon/sv1", 100);
+    CHECK(results.find("GateModelQuantumTaskResult") != std::string::npos);
+}
 
 TEST_CASE("Test the OpenQasmDevice constructor", "[openqasm]")
 {

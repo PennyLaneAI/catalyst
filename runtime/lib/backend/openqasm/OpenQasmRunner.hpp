@@ -47,30 +47,28 @@ struct PythonInterpreterGuard {
 /**
  * The OpenQasm circuit runner interface.
  */
-class OpenQasmRunner {
-  protected:
-    using ResultType = pybind11::list;
-
-  public:
+struct OpenQasmRunner {
     explicit OpenQasmRunner() = default;
     virtual ~OpenQasmRunner() = default;
-    virtual auto runCircuit([[maybe_unused]] const std::string &circuit,
-                            [[maybe_unused]] const std::string &hw_name,
-                            [[maybe_unused]] size_t shots) -> std::optional<ResultType>
+    [[nodiscard]] virtual auto runCircuit([[maybe_unused]] const std::string &circuit,
+                                          [[maybe_unused]] const std::string &hw_name,
+                                          [[maybe_unused]] size_t shots) const -> std::string
     {
         RT_FAIL("Not implemented method");
         return {};
     }
-    virtual auto Probs([[maybe_unused]] const std::string &circuit,
-                       [[maybe_unused]] const std::string &hw_name, [[maybe_unused]] size_t shots,
-                       [[maybe_unused]] size_t num_qubits) -> std::vector<double>
+    [[nodiscard]] virtual auto
+    Probs([[maybe_unused]] const std::string &circuit, [[maybe_unused]] const std::string &hw_name,
+          [[maybe_unused]] size_t shots, [[maybe_unused]] size_t num_qubits) const
+        -> std::vector<double>
     {
         RT_FAIL("Not implemented method");
         return {};
     }
-    virtual auto Sample([[maybe_unused]] const std::string &circuit,
-                        [[maybe_unused]] const std::string &hw_name, [[maybe_unused]] size_t shots,
-                        [[maybe_unused]] size_t num_qubits) -> std::vector<size_t>
+    [[nodiscard]] virtual auto
+    Sample([[maybe_unused]] const std::string &circuit, [[maybe_unused]] const std::string &hw_name,
+           [[maybe_unused]] size_t shots, [[maybe_unused]] size_t num_qubits) const
+        -> std::vector<size_t>
     {
         RT_FAIL("Not implemented method");
         return {};
@@ -81,9 +79,9 @@ class OpenQasmRunner {
  * The OpenQasm circuit runner to execute an OpenQasm circuit on Braket Devices backed by
  * Amazon Braket Python SDK.
  */
-class BraketRunner : public OpenQasmRunner {
-    auto runCircuit(const std::string &circuit, const std::string &device, size_t shots)
-        -> std::optional<ResultType> override
+struct BraketRunner : public OpenQasmRunner {
+    [[nodiscard]] auto runCircuit(const std::string &circuit, const std::string &device,
+                                  size_t shots) const -> std::string override
     {
         namespace py = pybind11;
         using namespace py::literals;
@@ -101,8 +99,7 @@ class BraketRunner : public OpenQasmRunner {
                   device = AwsDevice(braket_device)
                   try:
                       result = device.run(OpenQasmProgram(source=circuit), shots=int(shots)).result()
-                      measure_counts = dict(result.measurement_counts) # Counter -> dict
-                      measures = [dict(result.measurement_counts), dict(result.measurement_probabilities)]
+                      result = str(result)
                   except Exception as e:
                       msg = str(e)
               )",
@@ -111,11 +108,11 @@ class BraketRunner : public OpenQasmRunner {
         auto &&msg = locals["msg"].cast<std::string>();
         RT_FAIL_IF(!msg.empty(), msg.c_str());
 
-        return static_cast<ResultType>(locals["measures"]);
+        return locals["result"].cast<std::string>();
     }
 
-    auto Probs(const std::string &circuit, const std::string &device, size_t shots,
-               size_t num_qubits) -> std::vector<double> override
+    [[nodiscard]] auto Probs(const std::string &circuit, const std::string &device, size_t shots,
+                             size_t num_qubits) const -> std::vector<double> override
     {
         namespace py = pybind11;
         using namespace py::literals;
@@ -156,8 +153,8 @@ class BraketRunner : public OpenQasmRunner {
         return probs;
     }
 
-    auto Sample(const std::string &circuit, const std::string &device, size_t shots,
-                size_t num_qubits) -> std::vector<size_t> override
+    [[nodiscard]] auto Sample(const std::string &circuit, const std::string &device, size_t shots,
+                              size_t num_qubits) const -> std::vector<size_t> override
     {
         namespace py = pybind11;
         using namespace py::literals;

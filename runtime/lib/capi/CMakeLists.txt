@@ -4,18 +4,11 @@
 
 add_library(catalyst_qir_qis_obj OBJECT RuntimeCAPI.cpp)
 
-list(APPEND libs lightning_interfaces)
-
-if(ENABLE_OPENQASM)
-    find_package(pybind11 REQUIRED)
-    list(APPEND libs pybind11::embed)
-endif()
-
 # link to rt_backend
 target_link_libraries(catalyst_qir_qis_obj ${CMAKE_DL_LIBS}
                                             "-L${CMAKE_BINARY_DIR}/lib/backend"
                                             -lrt_backend
-                                            ${libs})
+                                            rt_interfaces)
 
 # link to qir_stdlib
 target_link_libraries(catalyst_qir_qis_obj "-L${QIR_STDLIB_LIB}"

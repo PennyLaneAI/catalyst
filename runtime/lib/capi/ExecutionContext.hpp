@@ -32,9 +32,10 @@
 #include "LightningKokkosSimulator.hpp"
 #endif
 
-#if __has_include("OpenQasmDevice.hpp")
+#if __has_include("openqasm/OpenQasmDevice.hpp")
 // device: openqasm
 #include "openqasm/OpenQasmDevice.hpp"
+#include <pybind11/embed.h>
 #endif
 
 namespace Catalyst::Runtime {
@@ -124,7 +125,7 @@ class ExecutionContext final {
     [[nodiscard]] bool initDevice(std::string_view name) noexcept
     {
         std::string hw_name;
-        if (_name.find("aws::braket") != std::string::npos) {
+        if (name.find("aws:braket") != std::string::npos) {
             hw_name = name;
             _name = "openqasm";
         }
@@ -140,8 +141,9 @@ class ExecutionContext final {
             _driver_ptr = iter->second(_tape_recording, _default_device_shots, hw_name);
 
 #ifdef __device_openqasm
-            if (_name == "openqasm") {
-                _py_guard = std::make_unique<Device::OpenQasm::PythonInterpreterGuard>();
+            if (_name == "openqasm" && !Py_IsInitialized()) {
+                _py_guard =
+                    std::make_unique<Device::OpenQasm::PythonInterpreterGuard>(); // LCOV_EXCL_LINE
             }
 #endif
 

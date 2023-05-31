@@ -85,7 +85,7 @@ coverage: $(RT_BUILD_DIR)/tests/runner_tests
 
 	$(RT_BUILD_DIR)/tests/runner_tests
 	lcov --directory $(RT_BUILD_DIR) -b $(MK_DIR)/lib --capture --output-file $(RT_BUILD_DIR)/coverage.info
-	lcov --remove $(RT_BUILD_DIR)/coverage.info '/usr/*' '*/_deps/*' --output-file $(RT_BUILD_DIR)/coverage.info
+	lcov --remove $(RT_BUILD_DIR)/coverage.info '/usr/*' '*/_deps/*' '*/envs/*' --output-file $(RT_BUILD_DIR)/coverage.info
 	genhtml $(RT_BUILD_DIR)/coverage.info --output-directory $(RT_BUILD_DIR)/cov -t "Catalyst Runtime C++ Coverage" --num-spaces 4
 
 .PHONY: examples

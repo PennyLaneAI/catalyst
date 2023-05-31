@@ -379,7 +379,6 @@ TEMPLATE_TEST_CASE("Test OpenQasmBuilder with custom instructions", "[openqasm]"
             Catch::Contains("Error in Catalyst Runtime: Unsupported functionality"));
     }
     else if (TYPE_INFO(TestType) == TYPE_INFO(BraketBuilder)) {
-
         std::string toqasm = "OPENQASM 3.0;\n"
                              "qubit[2] q;\n"
                              "x q[0];\n"

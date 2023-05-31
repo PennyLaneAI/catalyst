@@ -1499,3 +1499,14 @@ TEST_CASE("Test __rt__device registering a custom device with shots=500 and devi
     REQUIRE_THROWS_WITH(__quantum__rt__device((int8_t *)dev, (int8_t *)dev_value),
                         Catch::Contains("Invalid use of the global driver before initialization"));
 }
+
+TEST_CASE("Test __rt__device registering the OpenQasm device", "[CoreQIS]")
+{
+    __quantum__rt__initialize();
+
+    char dev[8] = "backend";
+    char dev_value[60] = "arn:aws:braket:::device/quantum-simulator/amazon/sv1";
+    __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
+
+    __quantum__rt__finalize();
+}

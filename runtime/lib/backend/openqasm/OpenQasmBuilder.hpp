@@ -513,11 +513,6 @@ class BraketBuilder : public OpenQasmBuilder {
         // header
         oss << "OPENQASM " << version << ";\n";
 
-        // variables
-        for (auto &var : this->vars) {
-            oss << var.toOpenQasm();
-        }
-
         // quantum registers
         oss << qregs[0].toOpenQasm(RegisterMode::Alloc, {}, version);
 

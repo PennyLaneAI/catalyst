@@ -21,6 +21,7 @@ set(extensions_includes "${PROJECT_SOURCE_DIR}/extensions")
 
 add_library(catalyst_qir_runtime INTERFACE)
 
+message(--\ ENABLE_OPENQASM="${ENABLE_OPENQASM}")
 message(--\ QIR_STDLIB_LIB="${QIR_STDLIB_LIB}")
 message(--\ QIR_STDLIB_INCLUDES="${QIR_STDLIB_INCLUDES}")
 
