@@ -98,11 +98,9 @@ rewriteQuantumCircuitAsInlinedFunction(PatternRewriter &rewriter, func::FuncOp o
 
   rewriter.setInsertionPoint(deviceOp);
 
-  InlinedFunction inlinedFunction = rewriter.create<InlinedFunction>(deviceOp->getLoc(), TypeRange{}, ValueRange{});
-  rewriter.createBlock(&inlinedFunction.getRegion());
 
   // This is how I get the input values.
-  std::set<mlir::Operation *> operandDefinitions;
+  std::vector<Value> arguments;
   op.walk([&](mlir::Operation *nestedOp) {
     Dialect *dialect = nestedOp->getDialect();
     bool isQuantumOp = isa<QuantumDialect>(dialect);
@@ -112,7 +110,11 @@ rewriteQuantumCircuitAsInlinedFunction(PatternRewriter &rewriter, func::FuncOp o
     {
       Value val = *i;
       mlir::Operation *definition = val.getDefiningOp();
-      operandDefinitions.insert(definition);
+      Dialect *definitionsDialect = definition->getDialect();
+      bool isQuantumOp = isa<QuantumDialect>(definitionsDialect);
+      if (isQuantumOp) continue;
+
+      arguments.push_back(val);
     }
   });
 
@@ -130,6 +132,10 @@ rewriteQuantumCircuitAsInlinedFunction(PatternRewriter &rewriter, func::FuncOp o
 
     quantumOpsWithUsesOutsideOfQuantumFunction.push_back(nestedOp);
   });
+
+  InlinedFunction inlinedFunction = rewriter.create<InlinedFunction>(deviceOp->getLoc(), TypeRange{}, arguments);
+  rewriter.createBlock(&inlinedFunction.getRegion());
+
 }
 
 struct QuantumToOpenQASM3Transform : public OpRewritePattern<func::FuncOp> {
