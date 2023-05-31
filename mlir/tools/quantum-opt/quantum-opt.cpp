@@ -30,6 +30,7 @@ int main(int argc, char **argv)
     mlir::registerPass(catalyst::createGradientLoweringPass);
     mlir::registerPass(catalyst::createGradientConversionPass);
     mlir::registerPass(catalyst::createQuantumBufferizationPass);
+    mlir::registerPass(catalyst::createQuantumToOpenQasm3Pass);
     mlir::registerPass(catalyst::createQuantumConversionPass);
     mlir::registerPass(catalyst::createEmitCatalystPyInterfacePass);
     mlir::registerPass(catalyst::createCopyGlobalMemRefPass);
