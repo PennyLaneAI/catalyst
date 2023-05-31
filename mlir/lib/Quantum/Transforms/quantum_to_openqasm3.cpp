@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <set>
+
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
@@ -37,7 +39,7 @@ bool hasDeviceAttribute(func::FuncOp op)
   return isBraketSimulator ? true : false;
 }
 
-void
+std::pair<DeviceOp, DeallocOp>
 sinkQuantumOps(func::FuncOp op) {
   // Let's do a little bit of TypeState analysis (but not really).
   // We just need to make sure that the current quantum device is set
@@ -47,6 +49,7 @@ sinkQuantumOps(func::FuncOp op) {
   bool afterQuantumDevice = false;
   bool afterDeallocOp = false;
   DeviceOp deviceOp;
+  DeallocOp deallocOp;
 
   op.walk([&](mlir::Operation *nestedOp) {
     // We are not going to do anything unless we are past the first quantum device op.
@@ -56,6 +59,7 @@ sinkQuantumOps(func::FuncOp op) {
     afterQuantumDevice |= isQuantumDeviceOp;
     // We are also not going to do anything to operations after the dealloc operation.
     bool isQuantumDeallocOp = isa<DeallocOp>(nestedOp);
+    if (isQuantumDeallocOp) deallocOp = cast<DeallocOp>(nestedOp);
     afterDeallocOp |= isQuantumDeallocOp;
 
 
@@ -67,17 +71,65 @@ sinkQuantumOps(func::FuncOp op) {
 
     nestedOp->moveBefore(deviceOp);
   });
+
+  return { deviceOp, deallocOp };
+
 }
 
+bool
+hasUsesInOperationsOutsideOfQuantumDialect(mlir::Operation *op)
+{
+  for (auto i = op->user_begin(), e = op->user_end(); i != e; ++i) {
+     auto user = *i;
+     Dialect *dialect = user->getDialect();
+     bool isUserInQuantumDialect = isa<QuantumDialect>(dialect);
+     if (!isUserInQuantumDialect) return true;
+  }
+  return false;
+}
+
+
 void
-rewriteQuantumCircuitAsInlinedFunction(func::FuncOp op) {
+rewriteQuantumCircuitAsInlinedFunction(PatternRewriter &rewriter, func::FuncOp op) {
   // This operation is only valid if FuncOp has a single region and no nested ops have regions.
   // For now, let's assume that's the case.
   // TODO: Add checks and emit ICE we reach here and op has more than 1 nested regions.
-  sinkQuantumOps(op);
+  auto [deviceOp, deallocOp] = sinkQuantumOps(op);
 
+  rewriter.setInsertionPoint(deviceOp);
 
+  InlinedFunction inlinedFunction = rewriter.create<InlinedFunction>(deviceOp->getLoc(), TypeRange{}, ValueRange{});
+  rewriter.createBlock(&inlinedFunction.getRegion());
 
+  // This is how I get the input values.
+  std::set<mlir::Operation *> operandDefinitions;
+  op.walk([&](mlir::Operation *nestedOp) {
+    Dialect *dialect = nestedOp->getDialect();
+    bool isQuantumOp = isa<QuantumDialect>(dialect);
+    if (!isQuantumOp) return;
+
+    for (auto i = nestedOp->operand_begin(), e = nestedOp->operand_end(); i != e; ++i)
+    {
+      Value val = *i;
+      mlir::Operation *definition = val.getDefiningOp();
+      operandDefinitions.insert(definition);
+    }
+  });
+
+  // This is how I get the return types.
+  // So now, we need to get all the definitions of those gate-parameters.
+  // These will be the formal parameters to the function.
+  std::vector<mlir::Operation *> quantumOpsWithUsesOutsideOfQuantumFunction;
+  op.walk([&](mlir::Operation *nestedOp) {
+    Dialect *dialect = nestedOp->getDialect();
+    bool isQuantumOp = isa<QuantumDialect>(dialect);
+    if (!isQuantumOp) return;
+
+    bool hasUses = hasUsesInOperationsOutsideOfQuantumDialect(nestedOp);
+    if (!hasUses) return;
+
+    quantumOpsWithUsesOutsideOfQuantumFunction.push_back(nestedOp);
+  });
 }
 
 struct QuantumToOpenQASM3Transform : public OpRewritePattern<func::FuncOp> {
@@ -95,7 +147,7 @@ QuantumToOpenQASM3Transform::rewrite(func::FuncOp op, PatternRewriter &rewriter)
   // We are essentially going to outline the quantum portion...
   
   StringAttr deviceAttr = StringAttr::get(op->getContext(), "catalyst.device");
-  rewriteQuantumCircuitAsInlinedFunction(op);
+  rewriteQuantumCircuitAsInlinedFunction(rewriter, op);
   op->removeAttr(deviceAttr);
 }
 
