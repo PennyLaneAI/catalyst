@@ -178,7 +178,7 @@ func::FuncOp genEnzymeWrapperFunction(PatternRewriter &rewriter, Location loc, f
                                     wrappedCallee.getArguments().end() - callee.getNumResults());
 
         for (auto [arg, originalType] : llvm::zip(callArgs, originalArgTypes)) {
-            if (arg.getType().dyn_cast<LLVM::LLVMPointerType>()) {
+            if (isa<LLVM::LLVMPointerType>(arg.getType())) {
                 Value memrefStruct = rewriter.create<LLVM::LoadOp>(loc, arg);
                 arg = rewriter.create<UnrealizedConversionCastOp>(loc, originalType, memrefStruct)
                           .getResult(0);
@@ -267,7 +267,6 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
         // Add the arguments and their shadow on data in
         for (auto [memrefArg, llvmMemrefArg, memrefDataIn, llvmDataIn] :
              llvm::zip(op.getArgs(), adaptor.getArgs(), op.getDataIn(), adaptor.getDataIn())) {
-
             // Get information about the memref arg
             MemRefType memrefArgType = memrefArg.getType().cast<MemRefType>();
             size_t sizeShape = memrefArgType.getShape().size();

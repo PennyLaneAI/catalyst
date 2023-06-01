@@ -73,13 +73,13 @@ struct GradientConversionPass
         target.addIllegalDialect<GradientDialect>();
         target.addIllegalDialect<arith::ArithDialect>();
         target.addIllegalOp<scf::ForOp>();
-        target.addLegalDialect<memref::MemRefDialect>();
 
         target.addLegalDialect<catalyst::quantum::QuantumDialect>();
         target.addLegalDialect<func::FuncDialect>();
+        target.addLegalDialect<memref::MemRefDialect>();
+        // target.addIllegalDialect<memref::MemRefDialect>();
 
         target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
-        // target.addLegalDialect<scf::SCFDialect>();
 
         if (failed(applyPartialConversion(getOperation(), target, std::move(patterns)))) {
             signalPassFailure();
