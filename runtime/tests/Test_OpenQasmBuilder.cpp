@@ -15,7 +15,7 @@
 #include <string>
 #include <typeinfo>
 
-#include "openqasm/OpenQasmBuilder.hpp"
+#include "OpenQasmBuilder.hpp"
 
 #include <catch2/catch.hpp>
 

@@ -22,19 +22,19 @@
 #include "Exception.hpp"
 #include "QuantumDevice.hpp"
 
-#if __has_include("StateVectorDynamicCPU.hpp")
+#if __has_include("LightningSimulator.hpp")
 // device: lightning.qubit
 #include "LightningSimulator.hpp"
 #endif
 
-#if __has_include("StateVectorKokkos.hpp")
+#if __has_include("LightningKokkosSimulator.hpp")
 // device: lightning.kokkos
 #include "LightningKokkosSimulator.hpp"
 #endif
 
-#if __has_include("openqasm/OpenQasmDevice.hpp") && __has_include("pybind11/embed.h")
+#if __has_include("OpenQasmDevice.hpp")
 // device: openqasm
-#include "openqasm/OpenQasmDevice.hpp"
+#include "OpenQasmDevice.hpp"
 #include <pybind11/embed.h>
 #endif
 
@@ -126,8 +126,8 @@ class ExecutionContext final {
     {
         std::string hw_name;
         if (name.find("aws:braket") != std::string::npos) {
-            hw_name = name;     // LCOV_EXCL_LINE
-            _name = "openqasm"; // LCOV_EXCL_LINE
+            hw_name = name;
+            _name = "openqasm";
         }
         else {
             hw_name = "";

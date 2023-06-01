@@ -14,9 +14,9 @@
 
 #include "MemRefUtils.hpp"
 
-#include "openqasm/OpenQasmBuilder.hpp"
-#include "openqasm/OpenQasmDevice.hpp"
-#include "openqasm/OpenQasmRunner.hpp"
+#include "OpenQasmBuilder.hpp"
+#include "OpenQasmDevice.hpp"
+#include "OpenQasmRunner.hpp"
 
 #include <catch2/catch.hpp>
 

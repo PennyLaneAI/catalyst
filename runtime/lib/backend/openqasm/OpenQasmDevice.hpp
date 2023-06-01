@@ -28,8 +28,8 @@
 #include "CacheManager.hpp"
 #include "QubitManager.hpp"
 
-#include "openqasm/OpenQasmBuilder.hpp"
-#include "openqasm/OpenQasmRunner.hpp"
+#include "OpenQasmBuilder.hpp"
+#include "OpenQasmRunner.hpp"
 
 namespace Catalyst::Runtime::Device {
 class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {
