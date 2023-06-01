@@ -187,25 +187,31 @@ def _make_jaxpr_check_differentiable(f: Differentiable, grad_params: GradParams,
                 f"results, got '{res.dtype}' at position {pos}."
             )
 
-    if method != "fd":
-        qnode_jaxpr = jaxpr.eqns[0].params["call_jaxpr"]
-        return_ops = []
-        for res in qnode_jaxpr.outvars:
-            for eq in reversed(qnode_jaxpr.eqns):  # pragma: no branch
-                if res in eq.outvars:
-                    return_ops.append(eq.primitive)
-                    break
+    _check_created_jaxpr_gradient_methods(method, jaxpr)
 
-        if method == "ps" and any(prim not in [expval_p, probs_p] for prim in return_ops):
-            raise TypeError(
-                "The parameter-shift method can only be used for QNodes "
-                "which return either qml.expval or qml.probs."
-            )
-        if method == "adj" and any(prim not in [expval_p] for prim in return_ops):
-            raise TypeError(
-                "The adjoint method can only be used for QNodes which return qml.expval."
-            )
     return jaxpr
+
+
+def _check_created_jaxpr_gradient_methods(method: str, jaxpr: Jaxpr):
+    """Additional checks for the given jaxpr of a differentiable function."""
+    if method == "fd":
+        return
+
+    qnode_jaxpr = jaxpr.eqns[0].params["call_jaxpr"]
+    return_ops = []
+    for res in qnode_jaxpr.outvars:
+        for eq in reversed(qnode_jaxpr.eqns):  # pragma: no branch
+            if res in eq.outvars:
+                return_ops.append(eq.primitive)
+                break
+
+    if method == "ps" and any(prim not in [expval_p, probs_p] for prim in return_ops):
+        raise TypeError(
+            "The parameter-shift method can only be used for QNodes "
+            "which return either qml.expval or qml.probs."
+        )
+    if method == "adj" and any(prim not in [expval_p] for prim in return_ops):
+        raise TypeError("The adjoint method can only be used for QNodes which return qml.expval.")
 
 
 def _check_grad_params(

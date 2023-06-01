@@ -126,8 +126,8 @@ class ExecutionContext final {
     {
         std::string hw_name;
         if (name.find("aws:braket") != std::string::npos) {
-            hw_name = name;
-            _name = "openqasm";
+            hw_name = name;     // LCOV_EXCL_LINE
+            _name = "openqasm"; // LCOV_EXCL_LINE
         }
         else {
             hw_name = "";

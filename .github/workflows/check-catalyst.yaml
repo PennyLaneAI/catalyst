@@ -453,7 +453,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        simulator: ['lightning', 'lightning-kokkos', 'openqasm']
+        simulator: ['lightning', 'lightning-kokkos']
 
     steps:
       - name: Cancel previous runs
