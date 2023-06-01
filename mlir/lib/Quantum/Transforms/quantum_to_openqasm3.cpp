@@ -16,6 +16,8 @@
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
+#include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -23,6 +25,9 @@
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Passes.h"
 #include "Quantum/Transforms/Patterns.h"
+
+#include "llvm/ADT/SetVector.h"
+
 
 using namespace mlir;
 using namespace catalyst::quantum;
@@ -89,69 +94,63 @@ hasUsesInOperationsOutsideOfQuantumDialect(mlir::Operation *op)
   return false;
 }
 
-
 void
 rewriteQuantumCircuitAsInlinedFunction(PatternRewriter &rewriter, func::FuncOp op) {
-  // This operation is only valid if FuncOp has a single region and no nested ops have regions.
-  // For now, let's assume that's the case.
-  // TODO: Add checks and emit ICE we reach here and op has more than 1 nested regions.
+
   auto [deviceOp, deallocOp] = sinkQuantumOps(op);
 
-  // This is how I get the input values.
-  std::vector<Value> arguments;
+  func::ReturnOp returnOp;
+  op.walk([&](func::ReturnOp op) {
+    returnOp = op;
+  });
+
+
+  Block *firstBlock = &op.getRegion().front();
+  Block *secondBlock = rewriter.createBlock(&op.getRegion());
+  Block *thirdBlock = rewriter.createBlock(&op.getRegion());
+
+  // The first block must jump to the second block
+  rewriter.setInsertionPointToEnd(firstBlock);
+  cf::BranchOp firstBlockTerminator = rewriter.create<cf::BranchOp>(op->getLoc(), secondBlock);
+  
+  // The second block must jump to the third block
+  rewriter.setInsertionPointToEnd(secondBlock);
+  cf::BranchOp secondBlockTerminator = rewriter.create<cf::BranchOp>(op->getLoc(), thirdBlock);
+
+  returnOp->moveBefore(thirdBlock, thirdBlock->end());
+
+  bool afterFirstQuantumDialectOp = false;
+  std::vector<mlir::Operation *> secondBlockOps;
+  std::vector<mlir::Operation *> thirdBlockOps;
+
   op.walk([&](mlir::Operation *nestedOp) {
     Dialect *dialect = nestedOp->getDialect();
+    bool isCFDialect = isa<mlir::cf::ControlFlowDialect>(dialect);
+    bool isFuncDialect = isa<func::FuncDialect>(dialect);
+    bool isInvalidDialect = isCFDialect || isFuncDialect;
+    if (isInvalidDialect) return;
+
     bool isQuantumOp = isa<QuantumDialect>(dialect);
-    if (!isQuantumOp) return;
+    afterFirstQuantumDialectOp |= isQuantumOp;
 
-    for (auto i = nestedOp->operand_begin(), e = nestedOp->operand_end(); i != e; ++i)
-    {
-      Value val = *i;
-      mlir::Operation *definition = val.getDefiningOp();
-      Dialect *definitionsDialect = definition->getDialect();
-      bool isQuantumOp = isa<QuantumDialect>(definitionsDialect);
-      if (isQuantumOp) continue;
+    if (!afterFirstQuantumDialectOp) return;
 
-      arguments.push_back(val);
+    if (isQuantumOp) {
+      secondBlockOps.push_back(nestedOp);
+      nestedOp->emitRemark() << "second";
+    } else {
+      thirdBlockOps.push_back(nestedOp);
+      nestedOp->emitRemark() << "third";
     }
   });
 
-  // This is how I get the return types.
-  // So now, we need to get all the definitions of those gate-parameters.
-  // These will be the formal parameters to the function.
-  std::vector<mlir::Operation *> quantumOpsWithUsesOutsideOfQuantumFunction;
-  op.walk([&](mlir::Operation *nestedOp) {
-    Dialect *dialect = nestedOp->getDialect();
-    bool isQuantumOp = isa<QuantumDialect>(dialect);
-    if (!isQuantumOp) return;
+  for (mlir::Operation *operation : secondBlockOps) {
+    operation->moveBefore(secondBlockTerminator);
+  }
 
-    bool hasUses = hasUsesInOperationsOutsideOfQuantumDialect(nestedOp);
-    if (!hasUses) return;
-
-    quantumOpsWithUsesOutsideOfQuantumFunction.push_back(nestedOp);
-  });
-
-  rewriter.setInsertionPoint(deviceOp);
-
-  InlinedFunction inlinedFunction = rewriter.create<InlinedFunction>(deviceOp->getLoc(), TypeRange{}, ValueRange{});
-  Block *block = rewriter.createBlock(&inlinedFunction.getRegion());
-  rewriter.setInsertionPointToStart(block);
-  rewriter.create<arith::ConstantOp>(deviceOp->getLoc(), rewriter.getI64Type(), rewriter.getIntegerAttr(rewriter.getI64Type(), 0));
-
-
-  op.walk([&](mlir::Operation *nestedOp) {
-    Dialect *dialect = nestedOp->getDialect();
-    bool isQuantumOp = isa<QuantumDialect>(dialect);
-    if (!isQuantumOp) return;
-
-    if (isa<InlinedFunction>(nestedOp)) return;
-
-
-    nestedOp->moveAfter(&block->back());
-
-  });
-
-  inlinedFunction.emitRemark() << "Hello";
+  for (mlir::Operation *operation : thirdBlockOps) {
+    operation->moveBefore(returnOp);
+  }
 }
 
 struct QuantumToOpenQASM3Transform : public OpRewritePattern<func::FuncOp> {
@@ -190,6 +189,7 @@ struct QuantumToOpenQasm3Pass
     {
         registry.insert<func::FuncDialect>();
         registry.insert<arith::ArithDialect>();
+        registry.insert<cf::ControlFlowDialect>();
 	registry.insert<QuantumDialect>();
     }
 
