@@ -29,7 +29,7 @@
 /**
  * A tuple of available backend devices to be tested using TEMPLATE_LIST_TEST_CASE in Catch2
  */
-#if __has_include("StateVectorKokkos.hpp")
+#if __has_include("LightningKokkosSimulator.hpp")
 #include "LightningKokkosSimulator.hpp"
 using SimTypes = std::tuple<Catalyst::Runtime::Simulator::LightningSimulator,
                             Catalyst::Runtime::Simulator::LightningKokkosSimulator>;
