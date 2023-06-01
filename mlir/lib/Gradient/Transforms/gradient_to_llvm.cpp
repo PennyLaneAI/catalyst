@@ -14,11 +14,12 @@
 
 #include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
-#include "mlir/IR/BuiltinOps.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/IR/BuiltinOps.h"
 
 #include "Gradient/IR/GradientDialect.h"
 #include "Gradient/Transforms/Passes.h"
@@ -49,6 +50,7 @@ struct GradientConversionPass
         registry.insert<catalyst::quantum::QuantumDialect>();
         registry.insert<arith::ArithDialect>();
         registry.insert<scf::SCFDialect>();
+        registry.insert<memref::MemRefDialect>();
     }
 
     void runOnOperation() final
@@ -66,6 +68,7 @@ struct GradientConversionPass
 
         target.addLegalDialect<scf::SCFDialect>();
         target.addLegalDialect<arith::ArithDialect>();
+        target.addLegalDialect<memref::MemRefDialect>();
 
         if (failed(applyPartialConversion(getOperation(), target, std::move(patterns)))) {
             signalPassFailure();

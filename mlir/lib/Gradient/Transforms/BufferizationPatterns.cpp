@@ -101,7 +101,8 @@ class BufferizeBackpropOp : public OpConversionPattern<BackpropOp> {
         }
 
         rewriter.create<BackpropOp>(loc, TypeRange{}, op.getCalleeAttr(), adaptor.getGradSize(),
-                                    adaptor.getDiffArgIndices(), adaptor.getArgs(), adaptor.getQuantumJacobians(), memrefValues);
+                                    adaptor.getDiffArgIndices(), adaptor.getArgs(),
+                                    adaptor.getQuantumJacobians(), memrefValues);
         rewriter.replaceOp(op, memrefValues);
         return success();
     }
