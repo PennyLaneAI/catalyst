@@ -16,11 +16,15 @@
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/Transforms/RegionUtils.h"
+
+
 
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Passes.h"
@@ -45,59 +49,125 @@ bool hasDeviceAttribute(func::FuncOp op)
   return isBraketSimulator ? true : false;
 }
 
-std::pair<DeviceOp, DeallocOp>
-sinkQuantumOps(func::FuncOp op) {
-  // Let's do a little bit of TypeState analysis (but not really).
-  // We just need to make sure that the current quantum device is set
-  // and where it ends. All operations in the middle which do not belong
-  // to the quantum dialect can be lifted to before the quantum device selection.
-
-  bool afterQuantumDevice = false;
-  bool afterDeallocOp = false;
-  DeviceOp deviceOp;
-  DeallocOp deallocOp;
-
-  op.walk([&](mlir::Operation *nestedOp) {
-    // We are not going to do anything unless we are past the first quantum device op.
-    bool isQuantumDeviceOp = isa<DeviceOp>(nestedOp);
-    if (isQuantumDeviceOp) deviceOp = cast<DeviceOp>(nestedOp);
-
-    afterQuantumDevice |= isQuantumDeviceOp;
-    // We are also not going to do anything to operations after the dealloc operation.
-    bool isQuantumDeallocOp = isa<DeallocOp>(nestedOp);
-    if (isQuantumDeallocOp) deallocOp = cast<DeallocOp>(nestedOp);
-    afterDeallocOp |= isQuantumDeallocOp;
-
-
-    Dialect *dialect = nestedOp->getDialect();
-    bool isOpInQuantumDialect = isa<QuantumDialect>(dialect);
-    bool isOpInFuncDialect = isa<func::FuncDialect>(dialect);
-    bool shouldLiftThisOperation = !isOpInQuantumDialect && !isOpInFuncDialect && afterQuantumDevice && !afterDeallocOp;
-    if (!shouldLiftThisOperation) return;
-
-    nestedOp->moveBefore(deviceOp);
-  });
-
-  return { deviceOp, deallocOp };
-
-}
-
 bool
-hasUsesInOperationsOutsideOfQuantumDialect(mlir::Operation *op)
+hasUsesInQuantumOperations(mlir::Operation *op)
 {
   for (auto i = op->user_begin(), e = op->user_end(); i != e; ++i) {
      auto user = *i;
      Dialect *dialect = user->getDialect();
      bool isUserInQuantumDialect = isa<QuantumDialect>(dialect);
-     if (!isUserInQuantumDialect) return true;
+     if (isUserInQuantumDialect) return true;
   }
   return false;
 }
 
-void
-rewriteQuantumCircuitAsInlinedFunction(PatternRewriter &rewriter, func::FuncOp op) {
+FailureOr<func::FuncOp>
+outlineSingleBlockRegion(RewriterBase &rewriter,
+	Location loc,
+	Region &region,
+	StringRef funcName,
+	func::CallOp *callOp) {
+  assert(!funcName.empty() && "funcName cannot be empty");
+  if (!region.hasOneBlock())
+    return failure();
 
-  auto [deviceOp, deallocOp] = sinkQuantumOps(op);
+  Block *originalBlock = &region.front();
+  Operation *originalTerminator = originalBlock->getTerminator();
+
+  // Outline before current function.
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPoint(region.getParentOfType<func::FuncOp>());
+
+  SetVector<Value> captures;
+  getUsedValuesDefinedAbove(region, captures);
+
+  ValueRange outlinedValues(captures.getArrayRef());
+  SmallVector<Type> outlinedFuncArgTypes;
+  SmallVector<Location> outlinedFuncArgLocs;
+  // Region's arguments are exactly the first block's arguments as per
+  // Region::getArguments().
+  // Func's arguments are cat(regions's arguments, captures arguments).
+  for (BlockArgument arg : region.getArguments()) {
+    outlinedFuncArgTypes.push_back(arg.getType());
+    outlinedFuncArgLocs.push_back(arg.getLoc());
+  }
+  for (Value value : outlinedValues) {
+    outlinedFuncArgTypes.push_back(value.getType());
+    outlinedFuncArgLocs.push_back(value.getLoc());
+  }
+  FunctionType outlinedFuncType =
+      FunctionType::get(rewriter.getContext(), outlinedFuncArgTypes,
+                        originalTerminator->getOperandTypes());
+  auto outlinedFunc =
+      rewriter.create<func::FuncOp>(loc, funcName, outlinedFuncType);
+  Block *outlinedFuncBody = outlinedFunc.addEntryBlock();
+
+  // Merge blocks while replacing the original block operands.
+  // Warning: `mergeBlocks` erases the original block, reconstruct it later.
+  int64_t numOriginalBlockArguments = originalBlock->getNumArguments();
+  auto outlinedFuncBlockArgs = outlinedFuncBody->getArguments();
+  {
+    OpBuilder::InsertionGuard g(rewriter);
+    rewriter.setInsertionPointToEnd(outlinedFuncBody);
+    rewriter.mergeBlocks(
+        originalBlock, outlinedFuncBody,
+        outlinedFuncBlockArgs.take_front(numOriginalBlockArguments));
+    // Explicitly set up a new ReturnOp terminator.
+    rewriter.setInsertionPointToEnd(outlinedFuncBody);
+    rewriter.create<func::ReturnOp>(loc, originalTerminator->getResultTypes(),
+                                    originalTerminator->getOperands());
+  }
+
+  // Reconstruct the block that was deleted and add a
+  // terminator(call_results).
+  Block *newBlock = rewriter.createBlock(
+      &region, region.begin(),
+      TypeRange{outlinedFuncArgTypes}.take_front(numOriginalBlockArguments),
+      ArrayRef<Location>(outlinedFuncArgLocs)
+          .take_front(numOriginalBlockArguments));
+  {
+    OpBuilder::InsertionGuard g(rewriter);
+    rewriter.setInsertionPointToEnd(newBlock);
+    SmallVector<Value> callValues;
+    llvm::append_range(callValues, newBlock->getArguments());
+    llvm::append_range(callValues, outlinedValues);
+    auto call = rewriter.create<func::CallOp>(loc, outlinedFunc, callValues);
+    if (callOp)
+      *callOp = call;
+
+    // `originalTerminator` was moved to `outlinedFuncBody` and is still valid.
+    // Clone `originalTerminator` to take the callOp results then erase it from
+    // `outlinedFuncBody`.
+    BlockAndValueMapping bvm;
+    bvm.map(originalTerminator->getOperands(), call->getResults());
+    rewriter.clone(*originalTerminator, bvm);
+    rewriter.eraseOp(originalTerminator);
+  }
+
+  // Lastly, explicit RAUW outlinedValues, only for uses within `outlinedFunc`.
+  // Clone the `arith::ConstantIndexOp` at the start of `outlinedFuncBody`.
+  for (auto it : llvm::zip(outlinedValues, outlinedFuncBlockArgs.take_back(
+                                               outlinedValues.size()))) {
+    Value orig = std::get<0>(it);
+    Value repl = std::get<1>(it);
+    {
+      OpBuilder::InsertionGuard g(rewriter);
+      rewriter.setInsertionPointToStart(outlinedFuncBody);
+      if (Operation *cst = orig.getDefiningOp<arith::ConstantIndexOp>()) {
+        BlockAndValueMapping bvm;
+        repl = rewriter.clone(*cst, bvm)->getResult(0);
+      }
+    }
+    orig.replaceUsesWithIf(repl, [&](OpOperand &opOperand) {
+      return outlinedFunc->isProperAncestor(opOperand.getOwner());
+    });
+  }
+
+  return outlinedFunc;
+}
+
+Block *
+rewriteQuantumCircuitAsInlinedFunction(PatternRewriter &rewriter, func::FuncOp op) {
 
   func::ReturnOp returnOp;
   op.walk([&](func::ReturnOp op) {
@@ -111,7 +181,7 @@ rewriteQuantumCircuitAsInlinedFunction(PatternRewriter &rewriter, func::FuncOp o
 
   // The first block must jump to the second block
   rewriter.setInsertionPointToEnd(firstBlock);
-  cf::BranchOp firstBlockTerminator = rewriter.create<cf::BranchOp>(op->getLoc(), secondBlock);
+  rewriter.create<cf::BranchOp>(op->getLoc(), secondBlock);
   
   // The second block must jump to the third block
   rewriter.setInsertionPointToEnd(secondBlock);
@@ -137,10 +207,10 @@ rewriteQuantumCircuitAsInlinedFunction(PatternRewriter &rewriter, func::FuncOp o
 
     if (isQuantumOp) {
       secondBlockOps.push_back(nestedOp);
-      nestedOp->emitRemark() << "second";
-    } else {
+    } else if (!hasUsesInQuantumOperations(nestedOp)) {
+      // If it doesn't have uses in QuantumOps, then it needs to be
+      // pushed to the third block.
       thirdBlockOps.push_back(nestedOp);
-      nestedOp->emitRemark() << "third";
     }
   });
 
@@ -151,7 +221,11 @@ rewriteQuantumCircuitAsInlinedFunction(PatternRewriter &rewriter, func::FuncOp o
   for (mlir::Operation *operation : thirdBlockOps) {
     operation->moveBefore(returnOp);
   }
+
+  return secondBlock;
 }
+
+
 
 struct QuantumToOpenQASM3Transform : public OpRewritePattern<func::FuncOp> {
     using OpRewritePattern<func::FuncOp>::OpRewritePattern;
@@ -165,11 +239,58 @@ QuantumToOpenQASM3Transform::match(func::FuncOp op) const { return hasDeviceAttr
 
 void
 QuantumToOpenQASM3Transform::rewrite(func::FuncOp op, PatternRewriter &rewriter) const  {
-  // We are essentially going to outline the quantum portion...
-  
+ 
+  // We've separated the quantum instructions into their own block.
+  Block *quantumBlock = rewriteQuantumCircuitAsInlinedFunction(rewriter, op);
+
+  // Let's get the operand's uses
+  SetVector<Value> returnValues;
+  for (mlir::Operation &currentOp: quantumBlock->getOperations())
+  {
+    bool usesOutside = currentOp.isUsedOutsideOfBlock(quantumBlock);
+    if (!usesOutside) continue;
+
+    returnValues.insert(currentOp.getResults().begin(), currentOp.getResults().end());
+  }
+
+
+  Block *firstBlock = &op.getRegion().front();
+  Block *lastBlock = &op.getRegion().back();
+  mlir::Operation &firstBlockTerminator = firstBlock->back();
+  rewriter.eraseOp(&firstBlockTerminator);
+  rewriter.setInsertionPointToEnd(firstBlock);
+  rewriter.create<cf::BranchOp>(op->getLoc(), lastBlock);
+
+  ArrayRef<Value> returnValuesVector = returnValues.getArrayRef();
+  TypeRange valueTypes = TypeRange(returnValuesVector);
+  rewriter.setInsertionPointToStart(lastBlock);
+  scf::ExecuteRegionOp executeRegionOp = rewriter.create<scf::ExecuteRegionOp>(op->getLoc(), valueTypes);
+  executeRegionOp.getRegion().emplaceBlock();
+  Block &executeRegionBlock = executeRegionOp.getRegion().front();
+  executeRegionBlock.getOperations().splice(executeRegionBlock.begin(), quantumBlock->getOperations());
+
+  executeRegionBlock.back().erase();
+  rewriter.setInsertionPointToEnd(&executeRegionBlock);
+  rewriter.create<scf::YieldOp>(op->getLoc(), returnValuesVector);
+  quantumBlock->erase();
+
+  SmallPtrSet<Operation *, 4> usesInsideQuantumBlock;
+  for (mlir::Operation &op : executeRegionBlock.getOperations()) {
+    usesInsideQuantumBlock.insert(&op);
+  }
+
+  for (auto it: llvm::zip(returnValuesVector, executeRegionOp.getResults())) {
+    Value orig = std::get<0>(it);
+    Value repl = std::get<1>(it);
+    orig.replaceAllUsesExcept(repl, usesInsideQuantumBlock);
+  }
+
+  func::CallOp callOp;
+  FailureOr<func::FuncOp> outlined = outlineSingleBlockRegion(rewriter, op->getLoc(), executeRegionOp.getRegion(), "functionName", &callOp);
+  //op.emitRemark() << *outlined;
   StringAttr deviceAttr = StringAttr::get(op->getContext(), "catalyst.device");
-  rewriteQuantumCircuitAsInlinedFunction(rewriter, op);
   op->removeAttr(deviceAttr);
+
 }
 
 } // namespace
@@ -188,8 +309,9 @@ struct QuantumToOpenQasm3Pass
     void getDependentDialects(DialectRegistry &registry) const override
     {
         registry.insert<func::FuncDialect>();
-        registry.insert<arith::ArithDialect>();
         registry.insert<cf::ControlFlowDialect>();
+        registry.insert<scf::SCFDialect>();
+        registry.insert<arith::ArithDialect>();
 	registry.insert<QuantumDialect>();
     }
 
