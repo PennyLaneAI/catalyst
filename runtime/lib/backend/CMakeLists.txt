@@ -9,10 +9,12 @@ if(RUNTIME_CLANG_TIDY)
     )
 endif()
 
-list(APPEND source_files LightningSimulator.cpp)
+if(ENABLE_LIGHTNING)
+list(APPEND source_files lightning/LightningSimulator.cpp)
+endif()
 
 if(ENABLE_LIGHTNING_KOKKOS)
-    list(APPEND source_files LightningKokkosSimulator.cpp)
+    list(APPEND source_files lightning-kokkos/LightningKokkosSimulator.cpp)
 endif()
 
 if(ENABLE_OPENQASM)

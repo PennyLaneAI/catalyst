@@ -22,12 +22,19 @@
 #include "Exception.hpp"
 #include "QuantumDevice.hpp"
 
+#if __has_include("LightningSimulator.hpp")
 // device: lightning.qubit
 #include "LightningSimulator.hpp"
+#endif
 
-#if __has_include("StateVectorKokkos.hpp")
+#if __has_include("LightningKokkosSimulator.hpp")
 // device: lightning.kokkos
 #include "LightningKokkosSimulator.hpp"
+#endif
+
+#if __has_include("OpenQasmDevice.hpp")
+// device: openqasm
+#include "OpenQasmDevice.hpp"
 #endif
 
 namespace Catalyst::Runtime {

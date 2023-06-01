@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "openqasm/OpenQasmBuilder.hpp"
+#include "OpenQasmBuilder.hpp"
 
 #include <catch2/catch.hpp>
 
