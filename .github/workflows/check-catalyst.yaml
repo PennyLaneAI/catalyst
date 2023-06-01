@@ -453,7 +453,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        simulator: ['lightning', 'lightning-kokkos']
+        simulator: ['lightning', 'lightning-kokkos', 'openqasm']
 
     steps:
       - name: Cancel previous runs
@@ -468,7 +468,14 @@ jobs:
         run: |
           sudo apt-get -y -q install cmake ninja-build libomp-dev lcov
 
-      - name: Install dependencies (OpenQasm device)
+      - name: Install awscli (OpenQasm device)
+        if: ${{ matrix.simulator == 'openqasm' }}
+        id: install-aws-cli
+        uses: unfor19/install-aws-cli-action@v1
+        with:
+          version: 2
+
+      - name: Install additional dependencies (OpenQasm device)
         if: ${{ matrix.simulator == 'openqasm' }}
         run: |
           pip install numpy amazon-braket-sdk
@@ -506,6 +513,9 @@ jobs:
 
       - name: Build Runtime test suite for OpenQasm device
         if: ${{ matrix.simulator == 'openqasm' }}
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_BRAKET_DEVICE_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_BRAKET_DEVICE_ACCESS_KEY }}
         run: |
             C_COMPILER=$(which gcc) \
             CXX_COMPILER=$(which g++) \
