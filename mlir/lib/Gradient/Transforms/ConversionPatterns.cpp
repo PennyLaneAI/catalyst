@@ -213,9 +213,6 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
         MLIRContext *ctx = getContext();
         LLVMTypeConverter llvmTypeConverter(ctx);
 
-        Type vectorType =
-            llvmTypeConverter.convertType(MemRefType::get({UNKNOWN}, Float64Type::get(ctx)));
-
         for (Type type : op.getResultTypes()) {
             if (!type.isa<MemRefType>())
                 return op.emitOpError("must be bufferized before lowering");
@@ -409,13 +406,13 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
                     for (auto [result, llvmresult, llvmshadowresult] :
                          llvm::zip(results, llvmresults, adaptor.getQuantumJacobians())) {
                         auto newArg = rewriter.create<LLVM::AllocaOp>(
-                            loc, LLVM::LLVMPointerType::get(vectorType), c1);
+                            loc, LLVM::LLVMPointerType::get(llvmresult.getType()), c1);
                         rewriter.create<LLVM::StoreOp>(loc, llvmresult, newArg);
                         callArgs.push_back(newArg);
 
                         // Add shadow for memref
                         Value shadowPtr = rewriter.create<LLVM::AllocaOp>(
-                            loc, LLVM::LLVMPointerType::get(vectorType), c1);
+                            loc, LLVM::LLVMPointerType::get(llvmshadowresult.getType()), c1);
                         rewriter.create<LLVM::StoreOp>(loc, llvmshadowresult, shadowPtr);
                         callArgs.push_back(shadowPtr);
                     }

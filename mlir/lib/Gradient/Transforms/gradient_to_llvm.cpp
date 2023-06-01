@@ -12,12 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "mlir/Conversion/ArithToLLVM/ArithToLLVM.h"
 #include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
+#include "mlir/Conversion/MemRefToLLVM/MemRefToLLVM.h"
+#include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/BuiltinOps.h"
 
@@ -60,15 +64,22 @@ struct GradientConversionPass
 
         RewritePatternSet patterns(context);
         populateConversionPatterns(typeConverter, patterns);
+        mlir::arith::populateArithToLLVMConversionPatterns(typeConverter, patterns);
+        populateSCFToControlFlowConversionPatterns(patterns);
+        // memref::populateExpandStridedMetadataPatterns(patterns);
+        // populateMemRefToLLVMConversionPatterns(typeConverter, patterns);
 
         LLVMConversionTarget target(*context);
         target.addIllegalDialect<GradientDialect>();
+        target.addIllegalDialect<arith::ArithDialect>();
+        target.addIllegalOp<scf::ForOp>();
+        target.addLegalDialect<memref::MemRefDialect>();
+
         target.addLegalDialect<catalyst::quantum::QuantumDialect>();
         target.addLegalDialect<func::FuncDialect>();
 
-        target.addLegalDialect<scf::SCFDialect>();
-        target.addLegalDialect<arith::ArithDialect>();
-        target.addLegalDialect<memref::MemRefDialect>();
+        target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
+        // target.addLegalDialect<scf::SCFDialect>();
 
         if (failed(applyPartialConversion(getOperation(), target, std::move(patterns)))) {
             signalPassFailure();
