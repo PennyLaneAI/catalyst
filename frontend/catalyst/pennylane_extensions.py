@@ -24,12 +24,12 @@ from typing import Any, Callable, Iterable, List, Optional, Union
 import jax
 import jax.numpy as jnp
 import pennylane as qml
-from jax.core import ShapedArray
 from jax._src.lax.control_flow import (
     _initial_style_jaxpr,
     _initial_style_jaxprs_with_common_consts,
 )
 from jax._src.lax.lax import _abstractify
+from jax.core import ShapedArray
 from jax.linear_util import wrap_init
 from jax.tree_util import tree_flatten, tree_unflatten, treedef_is_leaf
 from pennylane import QNode

@@ -20,13 +20,9 @@ from typing import Dict, List
 
 import jax
 import numpy as np
-from jax._src.util import wrap_name
-from jax._src import util
-from jax._src import source_info_util
+from jax._src import api_util, core, source_info_util, util
 from jax._src.lib.mlir import ir
-from jax._src import core
-from jax._src import api_util
-from jax.interpreters import mlir, xla
+from jax.interpreters import mlir
 from jaxlib.mlir.dialects._func_ops_gen import CallOp
 from jaxlib.mlir.dialects._mhlo_ops_gen import ConstantOp, ConvertOp
 from mlir_quantum.dialects.arith import AddIOp, CeilDivSIOp
@@ -991,9 +987,7 @@ def _counts_abstract_eval(obs, shots, shape):
     else:
         assert shape == (2,)
 
-    return core.ShapedArray(shape, jax.numpy.float64), core.ShapedArray(
-        shape, jax.numpy.int64
-    )
+    return core.ShapedArray(shape, jax.numpy.float64), core.ShapedArray(shape, jax.numpy.int64)
 
 
 def _counts_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: int, shape: tuple):
@@ -1192,7 +1186,7 @@ def _qcond_lowering(
             if_block = if_op_scf.then_block
 
             # if block
-            name_stack = source_info_util.extend_name_stack("if")
+            source_info_util.extend_name_stack("if")
             if_ctx = jax_ctx.module_context.replace(
                 name_stack=jax_ctx.module_context.name_stack.extend("if")
             )
@@ -1210,7 +1204,7 @@ def _qcond_lowering(
                 YieldOp([o[0] for o in out[0]])
 
             # else block
-            name_stack = source_info_util.extend_name_stack("else")
+            source_info_util.extend_name_stack("else")
             else_ctx = jax_ctx.module_context.replace(
                 name_stack=jax_ctx.module_context.name_stack.extend("else")
             )
@@ -1481,7 +1475,9 @@ mlir.register_lowering(func_p, _func_lowering)
 mlir.register_lowering(jvp_p, _jvp_lowering)
 mlir.register_lowering(vjp_p, _vjp_lowering)
 
-api_util._shaped_abstractify_handlers[type] = \
-        lambda x: core.ShapedArray([], x)
-api_util._shaped_abstractify_handlers[jax._src.numpy.lax_numpy._ScalarMeta] = \
-        lambda x: core.ShapedArray([], x)
+# pylint: disable=protected-access
+api_util._shaped_abstractify_handlers[type] = lambda x: core.ShapedArray([], x)
+# pylint: disable=protected-access
+api_util._shaped_abstractify_handlers[
+    jax._src.numpy.lax_numpy._ScalarMeta
+] = lambda x: core.ShapedArray([], x)

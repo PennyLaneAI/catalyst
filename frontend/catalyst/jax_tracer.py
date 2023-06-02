@@ -16,8 +16,9 @@
 
 import jax
 import pennylane as qml
-from jax._src.dispatch import jaxpr_replicas
 from jax._src import source_info_util
+from jax._src.dispatch import jaxpr_replicas
+from jax._src.lax.lax import xb, xla
 from jax._src.util import wrap_name
 from jax.interpreters.mlir import (
     AxisContext,
@@ -26,17 +27,9 @@ from jax.interpreters.mlir import (
     ir,
     lower_jaxpr_to_fun,
     lowerable_effects,
-    #sharded_aval,
-    #source_info_util,
-    #util,
-    #warnings,
-    #xb,
-    #xc,
-    #xla,
 )
 from jax.interpreters.partial_eval import DynamicJaxprTracer
 from jax.tree_util import tree_unflatten
-from jax._src.lax.lax import xb, xc, xla
 from pennylane.measurements import MeasurementProcess
 from pennylane.operation import Wires
 
@@ -462,9 +455,9 @@ def custom_lower_jaxpr_to_module(
     axis_context: AxisContext,
     name_stack,
     donated_args,
-    replicated_args  = None,
-    arg_shardings = None,
-    result_shardings = None,
+    replicated_args=None,
+    arg_shardings=None,
+    result_shardings=None,
 ):
     """Lowers a top-level jaxpr to an MHLO module.
 
@@ -480,14 +473,11 @@ def custom_lower_jaxpr_to_module(
     platform = xb.canonicalize_platform(platform)
     if not xb.is_known_platform(platform):
         raise ValueError(f"Unknown platform {platform}")
-    input_output_aliases = None
     in_avals = jaxpr.in_avals
     assert arg_shardings is None
-    out_avals = jaxpr.out_avals
     assert result_shardings is None
     platforms_with_donation = ("cuda", "rocm", "tpu")
-    #if platform in platforms_with_donation:
-    #    input_output_aliases, donated_args = _set_up_aliases(in_avals, out_avals, donated_args)
+    assert platform not in platforms_with_donation
     if any(eff not in lowerable_effects for eff in jaxpr.effects):
         raise ValueError(f"Cannot lower jaxpr with effects: {jaxpr.effects}")
     if any(donated_args):
@@ -525,7 +515,6 @@ def custom_lower_jaxpr_to_module(
             replicated_args=replicated_args,
             arg_shardings=arg_shardings,
             result_shardings=result_shardings,
-            #input_output_aliases=input_output_aliases,
         )
 
         for op in ctx.module.body.operations:
