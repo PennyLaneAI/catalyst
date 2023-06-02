@@ -1483,3 +1483,5 @@ mlir.register_lowering(vjp_p, _vjp_lowering)
 
 api_util._shaped_abstractify_handlers[type] = \
         lambda x: core.ShapedArray([], x)
+api_util._shaped_abstractify_handlers[jax._src.numpy.lax_numpy._ScalarMeta] = \
+        lambda x: core.ShapedArray([], x)
