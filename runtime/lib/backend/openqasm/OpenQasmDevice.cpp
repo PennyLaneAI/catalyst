@@ -68,7 +68,28 @@ void OpenQasmDevice::SetDeviceShots([[maybe_unused]] size_t shots) { device_shot
 
 auto OpenQasmDevice::GetDeviceShots() const -> size_t { return device_shots; }
 
-void OpenQasmDevice::PrintState() { RT_FAIL("Unsupported functionality"); }
+void OpenQasmDevice::PrintState()
+{
+    using std::cout;
+    using std::endl;
+
+    std::ostringstream oss;
+    oss << "#pragma braket result state_vector";
+    auto &&circuit = builder->toOpenQasmWithCustomInstructions(oss.str());
+
+    auto &&state = runner->State(circuit, concrete_device_name, device_shots, GetNumQubits());
+
+    const size_t num_qubits = GetNumQubits();
+    const size_t size = 1UL << num_qubits;
+    size_t idx = 0;
+    cout << "*** State-Vector of Size " << size << " ***" << endl;
+    cout << "[";
+
+    for (; idx < size - 1; idx++) {
+        cout << state[idx] << ", ";
+    }
+    cout << state[idx] << "]" << endl;
+}
 
 auto OpenQasmDevice::Zero() const -> Result
 {
@@ -102,44 +123,87 @@ void OpenQasmDevice::MatrixOperation(
     RT_FAIL("Unsupported functionality");
 }
 
-auto OpenQasmDevice::Observable([[maybe_unused]] ObsId id,
-                                [[maybe_unused]] const std::vector<std::complex<double>> &matrix,
-                                [[maybe_unused]] const std::vector<QubitIdType> &wires) -> ObsIdType
+auto OpenQasmDevice::Observable(ObsId id, const std::vector<std::complex<double>> &matrix,
+                                const std::vector<QubitIdType> &wires) -> ObsIdType
 {
-    RT_FAIL("Unsupported functionality");
-    return ObsIdType{};
+    RT_FAIL_IF(wires.size() > GetNumQubits(), "Invalid number of wires");
+    RT_FAIL_IF(!isValidQubits(wires), "Invalid given wires");
+
+    auto &&dev_wires = getDeviceWires(wires);
+
+    if (id == ObsId::Hermitian) {
+        return obs_manager.createHermitianObs(matrix, dev_wires);
+    }
+
+    return obs_manager.createNamedObs(id, dev_wires);
 }
 
 auto OpenQasmDevice::TensorObservable([[maybe_unused]] const std::vector<ObsIdType> &obs)
     -> ObsIdType
 {
-    RT_FAIL("Unsupported functionality");
-    return ObsIdType{};
+    return obs_manager.createTensorProdObs(obs);
 }
 
 auto OpenQasmDevice::HamiltonianObservable([[maybe_unused]] const std::vector<double> &coeffs,
                                            [[maybe_unused]] const std::vector<ObsIdType> &obs)
     -> ObsIdType
 {
-    RT_FAIL("Unsupported functionality");
-    return ObsIdType{};
+    return obs_manager.createHamiltonianObs(coeffs, obs);
 }
 
 auto OpenQasmDevice::Expval([[maybe_unused]] ObsIdType obsKey) -> double
 {
-    RT_FAIL("Unsupported functionality");
-    return double{};
+    RT_ASSERT(builder->getQubits().size());
+    RT_FAIL_IF(!obs_manager.isValidObservables({obsKey}), "Invalid key for cached observables");
+    auto &&obs = obs_manager.getObservable(obsKey);
+    RT_FAIL_IF(obs->getName() == "QasmHamiltonianObs",
+               "Unsupported observable: QasmHamiltonianObs");
+
+    std::ostringstream oss;
+    oss << "#pragma braket result expectation " << obs->toOpenQasm(builder->getQubits()[0]);
+    auto &&circuit = builder->toOpenQasmWithCustomInstructions(oss.str());
+
+    // update tape caching
+    if (tape_recording) {
+        cache_manager.addObservable(obsKey,
+                                    Catalyst::Runtime::Simulator::Lightning::Measurements::Expval);
+    }
+
+    return runner->Expval(circuit, concrete_device_name, device_shots);
 }
 
 auto OpenQasmDevice::Var([[maybe_unused]] ObsIdType obsKey) -> double
 {
-    RT_FAIL("Unsupported functionality");
-    return double{};
+    RT_ASSERT(builder->getQubits().size());
+    RT_FAIL_IF(!obs_manager.isValidObservables({obsKey}), "Invalid key for cached observables");
+    auto &&obs = obs_manager.getObservable(obsKey);
+    RT_FAIL_IF(obs->getName() == "QasmHamiltonianObs",
+               "Unsupported observable: QasmHamiltonianObs");
+
+    std::ostringstream oss;
+    oss << "#pragma braket result variance " << obs->toOpenQasm(builder->getQubits()[0]);
+    auto &&circuit = builder->toOpenQasmWithCustomInstructions(oss.str());
+
+    // update tape caching
+    if (tape_recording) {
+        cache_manager.addObservable(obsKey,
+                                    Catalyst::Runtime::Simulator::Lightning::Measurements::Var);
+    }
+
+    return runner->Var(circuit, concrete_device_name, device_shots);
 }
 
 void OpenQasmDevice::State([[maybe_unused]] DataView<std::complex<double>, 1> &state)
 {
-    RT_FAIL("Unsupported functionality");
+
+    std::ostringstream oss;
+    oss << "#pragma braket result state_vector";
+    auto &&circuit = builder->toOpenQasmWithCustomInstructions(oss.str());
+
+    auto &&dv_state = runner->State(circuit, concrete_device_name, device_shots, GetNumQubits());
+    RT_FAIL_IF(state.size() != dv_state.size(), "Invalid size for the pre-allocated state vector");
+
+    std::move(dv_state.begin(), dv_state.end(), state.begin());
 }
 
 void OpenQasmDevice::Probs(DataView<double, 1> &probs)
@@ -155,8 +219,20 @@ void OpenQasmDevice::Probs(DataView<double, 1> &probs)
 void OpenQasmDevice::PartialProbs([[maybe_unused]] DataView<double, 1> &probs,
                                   [[maybe_unused]] const std::vector<QubitIdType> &wires)
 {
-    // TODO: custom implementation...
-    RT_FAIL("Unsupported functionality");
+
+    // // get device wires
+    auto &&dev_wires = getDeviceWires(wires);
+
+    std::ostringstream oss;
+    oss << "#pragma braket result probability "
+        << builder->getQubits()[0].toOpenQasm(OpenQasm::RegisterMode::Slice, dev_wires);
+    auto &&circuit = builder->toOpenQasmWithCustomInstructions(oss.str());
+
+    auto &&dv_probs = runner->Probs(circuit, concrete_device_name, device_shots, wires.size());
+
+    RT_FAIL_IF(probs.size() != dv_probs.size(), "Invalid size for the pre-allocated probabilities");
+
+    std::move(dv_probs.begin(), dv_probs.end(), probs.begin());
 }
 
 void OpenQasmDevice::Sample(DataView<double, 2> &samples, size_t shots)
@@ -165,7 +241,7 @@ void OpenQasmDevice::Sample(DataView<double, 2> &samples, size_t shots)
         runner->Sample(builder->toOpenQasm(), concrete_device_name, device_shots, GetNumQubits());
     RT_FAIL_IF(samples.size() != li_samples.size(), "Invalid size for the pre-allocated samples");
 
-    const size_t numQubits = this->GetNumQubits();
+    const size_t numQubits = GetNumQubits();
 
     auto samplesIter = samples.begin();
     for (size_t shot = 0; shot < shots; shot++) {
@@ -179,7 +255,7 @@ void OpenQasmDevice::PartialSample(DataView<double, 2> &samples,
                                    const std::vector<QubitIdType> &wires, size_t shots)
 {
     const size_t numWires = wires.size();
-    const size_t numQubits = this->GetNumQubits();
+    const size_t numQubits = GetNumQubits();
 
     RT_FAIL_IF(numWires > numQubits, "Invalid number of wires");
     RT_FAIL_IF(!isValidQubits(wires), "Invalid given wires to measure");
@@ -203,7 +279,7 @@ void OpenQasmDevice::PartialSample(DataView<double, 2> &samples,
 void OpenQasmDevice::Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts,
                             size_t shots)
 {
-    const size_t numQubits = this->GetNumQubits();
+    const size_t numQubits = GetNumQubits();
     const size_t numElements = 1U << numQubits;
 
     RT_FAIL_IF(eigvals.size() != numElements || counts.size() != numElements,
@@ -229,7 +305,7 @@ void OpenQasmDevice::PartialCounts(DataView<double, 1> &eigvals, DataView<int64_
                                    const std::vector<QubitIdType> &wires, size_t shots)
 {
     const size_t numWires = wires.size();
-    const size_t numQubits = this->GetNumQubits();
+    const size_t numQubits = GetNumQubits();
     const size_t numElements = 1U << numWires;
 
     RT_FAIL_IF(numWires > numQubits, "Invalid number of wires");
@@ -278,6 +354,7 @@ auto OpenQasmDevice::Measure([[maybe_unused]] QubitIdType wire) -> Result
 void OpenQasmDevice::Gradient([[maybe_unused]] std::vector<DataView<double, 1>> &gradients,
                               [[maybe_unused]] const std::vector<size_t> &trainParams)
 {
+    // TODO: custom implementation
     RT_FAIL("Unsupported functionality");
 }
 

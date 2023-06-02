@@ -121,7 +121,7 @@ TEST_CASE("Test the bell pair circuit with BuilderType::Common", "[openqasm]")
     CHECK(device->Circuit() == toqasm);
 }
 
-TEST_CASE("Test Probs(), Sample(), and Counts() of the bell pair circuit with BuilderType::Braket",
+TEST_CASE("Test measurement processes, the bell pair circuit with BuilderType::Braket",
           "[openqasm]")
 {
     constexpr size_t shots{1000};
@@ -146,11 +146,20 @@ TEST_CASE("Test Probs(), Sample(), and Counts() of the bell pair circuit with Bu
 
     SECTION("Probs")
     {
-        std::vector<double> probs(std::pow(2, n));
+        std::vector<double> probs(size);
         DataView<double, 1> view(probs);
         device->Probs(view);
 
         CHECK(probs[1] == probs[2]);
+        CHECK(probs[0] + probs[3] == Approx(1.f).margin(1e-5));
+    }
+
+    SECTION("PartialProbs")
+    {
+        std::vector<double> probs(size);
+        DataView<double, 1> view(probs);
+        device->PartialProbs(view, std::vector<QubitIdType>{0, 1});
+
         CHECK(probs[0] + probs[3] == Approx(1.f).margin(1e-5));
     }
 
@@ -210,9 +219,45 @@ TEST_CASE("Test Probs(), Sample(), and Counts() of the bell pair circuit with Bu
         }
         CHECK(sum == shots);
     }
+
+    SECTION("Expval(h(1))")
+    {
+        device->SetDeviceShots(0); // to get deterministic results
+        auto obs = device->Observable(ObsId::Hadamard, {}, std::vector<QubitIdType>{1});
+        auto expval = device->Expval(obs);
+        CHECK(expval == Approx(0.0).margin(1e-5));
+    }
+
+    SECTION("Expval(x(0) @ h(1))")
+    {
+        device->SetDeviceShots(0); // to get deterministic results
+        auto obs_x = device->Observable(ObsId::PauliX, {}, std::vector<QubitIdType>{0});
+        auto obs_h = device->Observable(ObsId::Hadamard, {}, std::vector<QubitIdType>{1});
+        auto obs = device->TensorObservable({obs_x, obs_h});
+        auto expval = device->Expval(obs);
+        CHECK(expval == Approx(0.7071067812).margin(1e-5));
+    }
+
+    SECTION("Var(h(1))")
+    {
+        device->SetDeviceShots(0); // to get deterministic results
+        auto obs = device->Observable(ObsId::Hadamard, {}, std::vector<QubitIdType>{1});
+        auto expval = device->Var(obs);
+        CHECK(expval == Approx(1.0).margin(1e-5));
+    }
+
+    SECTION("Var(x(0) @ h(1))")
+    {
+        device->SetDeviceShots(0); // to get deterministic results
+        auto obs_x = device->Observable(ObsId::PauliX, {}, std::vector<QubitIdType>{0});
+        auto obs_h = device->Observable(ObsId::Hadamard, {}, std::vector<QubitIdType>{1});
+        auto obs = device->TensorObservable({obs_x, obs_h});
+        auto expval = device->Var(obs);
+        CHECK(expval == Approx(0.5).margin(1e-5));
+    }
 }
 
-TEST_CASE("Test Probs() of a simple circuit with BuilderType::Braket", "[openqasm]")
+TEST_CASE("Test measurement processes, a simple circuit with BuilderType::Braket", "[openqasm]")
 {
     std::unique_ptr<OpenQasmDevice> device = std::make_unique<OpenQasmDevice>();
 
@@ -246,6 +291,15 @@ TEST_CASE("Test Probs() of a simple circuit with BuilderType::Braket", "[openqas
         std::vector<double> probs(size);
         DataView<double, 1> view(probs);
         device->Probs(view);
+
+        CHECK(probs[27] + probs[26] == Approx(1.f).margin(1e-5));
+    }
+
+    SECTION("PartialProbs")
+    {
+        std::vector<double> probs(size);
+        DataView<double, 1> view(probs);
+        device->PartialProbs(view, std::vector<QubitIdType>{0, 1, 2, 3, 4});
 
         CHECK(probs[27] + probs[26] == Approx(1.f).margin(1e-5));
     }
@@ -305,5 +359,49 @@ TEST_CASE("Test Probs() of a simple circuit with BuilderType::Braket", "[openqas
             sum += counts[i];
         }
         CHECK(sum == shots);
+    }
+
+    SECTION("Expval(h(1))")
+    {
+        device->SetDeviceShots(0); // to get deterministic results
+        auto obs = device->Observable(ObsId::Hadamard, {}, std::vector<QubitIdType>{1});
+        auto expval = device->Expval(obs);
+        CHECK(expval == Approx(-0.7071067812).margin(1e-5));
+    }
+
+    SECTION("Expval(x(0) @ h(1))")
+    {
+        device->SetDeviceShots(0); // to get deterministic results
+        auto obs_z = device->Observable(ObsId::PauliZ, {}, std::vector<QubitIdType>{0});
+        auto obs_h = device->Observable(ObsId::Hadamard, {}, std::vector<QubitIdType>{1});
+        auto tp = device->TensorObservable({obs_z, obs_h});
+        auto expval = device->Expval(tp);
+        CHECK(expval == Approx(0.7071067812).margin(1e-5));
+
+        auto obs = device->HamiltonianObservable({0.2}, {tp});
+        REQUIRE_THROWS_WITH(device->Expval(obs),
+                            Catch::Contains("Unsupported observable: QasmHamiltonianObs"));
+    }
+
+    SECTION("Var(h(1))")
+    {
+        device->SetDeviceShots(0); // to get deterministic results
+        auto obs = device->Observable(ObsId::Hadamard, {}, std::vector<QubitIdType>{1});
+        auto expval = device->Var(obs);
+        CHECK(expval == Approx(0.5).margin(1e-5));
+    }
+
+    SECTION("Var(x(0) @ h(1))")
+    {
+        device->SetDeviceShots(0); // to get deterministic results
+        auto obs_z = device->Observable(ObsId::PauliZ, {}, std::vector<QubitIdType>{0});
+        auto obs_h = device->Observable(ObsId::Hadamard, {}, std::vector<QubitIdType>{1});
+        auto tp = device->TensorObservable({obs_z, obs_h});
+        auto expval = device->Var(tp);
+        CHECK(expval == Approx(0.5).margin(1e-5));
+
+        auto obs = device->HamiltonianObservable({0.2}, {tp});
+        REQUIRE_THROWS_WITH(device->Var(obs),
+                            Catch::Contains("Unsupported observable: QasmHamiltonianObs"));
     }
 }

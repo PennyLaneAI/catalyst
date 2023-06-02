@@ -118,14 +118,14 @@ class QasmVariable {
     }
     ~QasmVariable() = default;
 
-    [[nodiscard]] auto getType() const -> VariableType { return this->type; }
-    [[nodiscard]] auto getName() const -> std::string { return this->name; }
+    [[nodiscard]] auto getType() const -> VariableType { return type; }
+    [[nodiscard]] auto getName() const -> std::string { return name; }
 
     [[nodiscard]] auto toOpenQasm([[maybe_unused]] const std::string &version = "3.0") const
         -> std::string
     {
         std::ostringstream oss;
-        switch (this->type) {
+        switch (type) {
         case VariableType::Float: {
             oss << "input float " << name << ";\n";
             return oss.str();
@@ -156,20 +156,19 @@ class QasmRegister {
     }
     ~QasmRegister() = default;
 
-    [[nodiscard]] auto getType() const -> RegisterType { return this->type; }
-    [[nodiscard]] auto getName() const -> std::string { return this->name; }
-    [[nodiscard]] auto getSize() const -> size_t { return this->size; }
+    [[nodiscard]] auto getType() const -> RegisterType { return type; }
+    [[nodiscard]] auto getName() const -> std::string { return name; }
+    [[nodiscard]] auto getSize() const -> size_t { return size; }
 
-    void updateSize(size_t new_size) { this->size = new_size; }
-    void resetSize() { this->size = 0; }
+    void updateSize(size_t new_size) { size = new_size; }
+    void resetSize() { size = 0; }
     [[nodiscard]] auto isValidSlice(const std::vector<size_t> &slice) const -> bool
     {
         if (slice.empty()) {
             return false;
         }
 
-        return std::all_of(slice.begin(), slice.end(),
-                           [this](auto qubit) { return this->size > qubit; });
+        return std::all_of(slice.begin(), slice.end(), [this](auto qubit) { return size > qubit; });
     }
 
     [[nodiscard]] auto toOpenQasm(RegisterMode mode,
@@ -181,16 +180,16 @@ class QasmRegister {
         switch (mode) {
         case RegisterMode::Alloc: {
             // qubit[size] name;
-            if (this->type == RegisterType::Qubit) {
+            if (type == RegisterType::Qubit) {
                 oss << "qubit";
             }
-            else if (this->type == RegisterType::Bit) {
+            else if (type == RegisterType::Bit) {
                 oss << "bit";
             }
             else {
                 RT_FAIL("Unsupported OpenQasm register type");
             }
-            oss << "[" << this->size << "] " << this->name << ";\n";
+            oss << "[" << size << "] " << name << ";\n";
             return oss.str();
         }
         case RegisterMode::Slice: {
@@ -198,19 +197,19 @@ class QasmRegister {
             RT_ASSERT(isValidSlice(slice));
             auto iter = slice.begin();
             for (; iter != slice.end() - 1; iter++) {
-                oss << this->name << "[" << *iter << "], ";
+                oss << name << "[" << *iter << "], ";
             }
-            oss << this->name << "[" << *iter << "]";
+            oss << name << "[" << *iter << "]";
             return oss.str();
         }
         case RegisterMode::Name: {
             // name
-            oss << this->name;
+            oss << name;
             return oss.str();
         }
         case RegisterMode::Reset: {
             // reset name;
-            oss << "reset " << this->name << ";\n";
+            oss << "reset " << name << ";\n";
             return oss.str();
         }
         default:
@@ -253,11 +252,11 @@ class QasmGate {
     }
     ~QasmGate() = default;
 
-    [[nodiscard]] auto getName() const -> std::string { return this->name; }
-    [[nodiscard]] auto getParams() const -> std::vector<double> { return this->params_val; }
-    [[nodiscard]] auto getParamsStr() const -> std::vector<std::string> { return this->params_str; }
-    [[nodiscard]] auto getWires() const -> std::vector<size_t> { return this->wires; }
-    [[nodiscard]] auto getInverse() const -> bool { return this->inverse; }
+    [[nodiscard]] auto getName() const -> std::string { return name; }
+    [[nodiscard]] auto getParams() const -> std::vector<double> { return params_val; }
+    [[nodiscard]] auto getParamsStr() const -> std::vector<std::string> { return params_str; }
+    [[nodiscard]] auto getWires() const -> std::vector<size_t> { return wires; }
+    [[nodiscard]] auto getInverse() const -> bool { return inverse; }
 
     [[nodiscard]] auto toOpenQasm(const QasmRegister &qregister,
                                   [[maybe_unused]] size_t precision = 5,
@@ -266,19 +265,19 @@ class QasmGate {
     {
         // name(param_1, ..., param_n) qubit_1, ..., qubit_m
         std::ostringstream oss;
-        oss << this->name;
-        if (!this->params_val.empty()) {
+        oss << name;
+        if (!params_val.empty()) {
             oss << "(";
-            auto iter = this->params_val.begin();
-            for (; iter != this->params_val.end() - 1; iter++) {
+            auto iter = params_val.begin();
+            for (; iter != params_val.end() - 1; iter++) {
                 oss << std::setprecision(precision) << *iter << ", ";
             }
             oss << std::setprecision(precision) << *iter << ") ";
         }
-        else if (!this->params_str.empty()) {
+        else if (!params_str.empty()) {
             oss << "(";
-            auto iter = this->params_str.begin();
-            for (; iter != this->params_str.end() - 1; iter++) {
+            auto iter = params_str.begin();
+            for (; iter != params_str.end() - 1; iter++) {
                 oss << *iter << ", ";
             }
             oss << *iter << ") ";
@@ -286,7 +285,7 @@ class QasmGate {
         else {
             oss << " ";
         }
-        oss << qregister.toOpenQasm(RegisterMode::Slice, this->wires) << ";\n";
+        oss << qregister.toOpenQasm(RegisterMode::Slice, wires) << ";\n";
         return oss.str();
     }
 };
@@ -306,8 +305,8 @@ class QasmMeasure {
     explicit QasmMeasure(size_t _bit, size_t _wire) : bit(_bit), wire(_wire) {}
     ~QasmMeasure() = default;
 
-    [[nodiscard]] auto getBit() const -> size_t { return this->bit; }
-    [[nodiscard]] auto getWire() const -> size_t { return this->wire; }
+    [[nodiscard]] auto getBit() const -> size_t { return bit; }
+    [[nodiscard]] auto getWire() const -> size_t { return wire; }
 
     [[nodiscard]] auto toOpenQasm(const QasmRegister &qregister,
                                   [[maybe_unused]] const std::string &version = "3.0") const
@@ -315,7 +314,7 @@ class QasmMeasure {
     {
         // measure wire
         std::ostringstream oss;
-        oss << "measure " << qregister.toOpenQasm(RegisterMode::Slice, {this->wire}) << ";\n";
+        oss << "measure " << qregister.toOpenQasm(RegisterMode::Slice, {wire}) << ";\n";
         return oss.str();
     }
     [[nodiscard]] auto toOpenQasm(const QasmRegister &bregister, const QasmRegister &qregister,
@@ -325,8 +324,8 @@ class QasmMeasure {
     {
         // bit = measure wire
         std::ostringstream oss;
-        oss << bregister.toOpenQasm(mode, {this->bit}) << " = measure "
-            << qregister.toOpenQasm(mode, {this->wire}) << ";\n";
+        oss << bregister.toOpenQasm(mode, {bit}) << " = measure "
+            << qregister.toOpenQasm(mode, {wire}) << ";\n";
         return oss.str();
     }
 };
@@ -516,19 +515,20 @@ class OpenQasmBuilder {
     explicit OpenQasmBuilder() : num_qubits(0), num_bits(0) {}
     virtual ~OpenQasmBuilder() = default;
 
-    [[nodiscard]] auto getNumQubits() -> size_t { return this->num_qubits; }
-    [[nodiscard]] auto getNumBits() -> size_t { return this->num_bits; }
+    [[nodiscard]] auto getNumQubits() const -> size_t { return num_qubits; }
+    [[nodiscard]] auto getNumBits() const -> size_t { return num_bits; }
+    [[nodiscard]] auto getQubits() const -> std::vector<QasmRegister> { return qregs; }
 
     void Register(RegisterType type, const std::string &name, size_t size)
     {
         switch (type) {
         case RegisterType::Qubit:
-            this->qregs.emplace_back(type, name, size);
-            this->num_qubits += size;
+            qregs.emplace_back(type, name, size);
+            num_qubits += size;
             break;
         case RegisterType::Bit:
-            this->bregs.emplace_back(type, name, size);
-            this->num_bits += size;
+            bregs.emplace_back(type, name, size);
+            num_bits += size;
             break;
         default:
             RT_FAIL("Unsupported OpenQasm register type");
@@ -539,10 +539,10 @@ class OpenQasmBuilder {
               const std::vector<std::string> &params_str, const std::vector<size_t> &wires,
               [[maybe_unused]] bool inverse)
     {
-        this->gates.emplace_back(name, params_val, params_str, wires, inverse);
+        gates.emplace_back(name, params_val, params_str, wires, inverse);
 
         for (auto &param : params_str) {
-            this->vars.emplace_back(VariableType::Float, param);
+            vars.emplace_back(VariableType::Float, param);
         }
     }
     void Measure(size_t bit, size_t wire) { measures.emplace_back(bit, wire); }
@@ -550,10 +550,10 @@ class OpenQasmBuilder {
     [[nodiscard]] virtual auto toOpenQasm(size_t precision = 5,
                                           const std::string &version = "3.0") const -> std::string
     {
-        RT_FAIL_IF(this->qregs.size() != 1, "Invalid number of quantum registers; Only one quantum "
-                                            "register is currently supported.");
+        RT_FAIL_IF(qregs.size() != 1, "Invalid number of quantum registers; Only one quantum "
+                                      "register is currently supported.");
 
-        RT_FAIL_IF(this->bregs.size() > 1,
+        RT_FAIL_IF(bregs.size() > 1,
                    "Invalid number of measurement results registers; At most one measurement"
                    "results register is currently supported.");
 
@@ -563,37 +563,37 @@ class OpenQasmBuilder {
         oss << "OPENQASM " << version << ";\n";
 
         // variables
-        for (auto &var : this->vars) {
+        for (auto &var : vars) {
             oss << var.toOpenQasm();
         }
 
         // quantum registers
-        for (auto &qreg : this->qregs) {
+        for (auto &qreg : qregs) {
             oss << qreg.toOpenQasm(RegisterMode::Alloc);
         }
 
         // measurement results registers
-        for (auto &breg : this->bregs) {
+        for (auto &breg : bregs) {
             oss << breg.toOpenQasm(RegisterMode::Alloc);
         }
 
         // quantum gates assuming qregs.size() == 1
-        for (auto &gate : this->gates) {
-            oss << gate.toOpenQasm(this->qregs[0], precision);
+        for (auto &gate : gates) {
+            oss << gate.toOpenQasm(qregs[0], precision);
         }
 
         // quantum measures assuming qregs.size() == 1, bregs.size() <= 1
-        for (auto &m : this->measures) {
+        for (auto &m : measures) {
             if (bregs.empty()) {
-                oss << m.toOpenQasm(this->qregs[0]);
+                oss << m.toOpenQasm(qregs[0]);
             }
             else {
-                oss << m.toOpenQasm(this->bregs[0], this->qregs[0]);
+                oss << m.toOpenQasm(bregs[0], qregs[0]);
             }
         }
 
         // reset quantum registers
-        for (auto &qreg : this->qregs) {
+        for (auto &qreg : qregs) {
             oss << qreg.toOpenQasm(RegisterMode::Reset);
         }
 
@@ -626,11 +626,11 @@ class BraketBuilder : public OpenQasmBuilder {
     [[nodiscard]] auto toOpenQasm(size_t precision = 5, const std::string &version = "3.0") const
         -> std::string override
     {
-        RT_FAIL_IF(this->qregs.size() != 1, "Invalid number of quantum registers; Only one quantum "
-                                            "register is currently supported.");
+        RT_FAIL_IF(qregs.size() != 1, "Invalid number of quantum registers; Only one quantum "
+                                      "register is currently supported.");
 
         RT_FAIL_IF(
-            !this->bregs.empty(),
+            !bregs.empty(),
             "Invalid number of measurement results registers; User-specified measurement results "
             "register is not currently supported.");
 
@@ -640,7 +640,7 @@ class BraketBuilder : public OpenQasmBuilder {
         oss << "OPENQASM " << version << ";\n";
 
         // variables
-        for (auto &var : this->vars) {
+        for (auto &var : vars) {
             oss << var.toOpenQasm();
         }
 
@@ -652,8 +652,8 @@ class BraketBuilder : public OpenQasmBuilder {
         oss << braket_mresults.toOpenQasm(RegisterMode::Alloc, {}, version);
 
         // quantum gates assuming qregs.size() == 1
-        for (auto &gate : this->gates) {
-            oss << gate.toOpenQasm(this->qregs[0], precision, version);
+        for (auto &gate : gates) {
+            oss << gate.toOpenQasm(qregs[0], precision, version);
         }
 
         // quantum measures assuming bregs[0].size() == qregs[0].size()
@@ -669,11 +669,11 @@ class BraketBuilder : public OpenQasmBuilder {
                                                         const std::string &version = "3.0") const
         -> std::string override
     {
-        RT_FAIL_IF(this->qregs.size() != 1, "Invalid number of quantum registers; Only one quantum "
-                                            "register is currently supported.");
+        RT_FAIL_IF(qregs.size() != 1, "Invalid number of quantum registers; Only one quantum "
+                                      "register is currently supported.");
 
         RT_FAIL_IF(
-            !this->bregs.empty(),
+            !bregs.empty(),
             "Invalid number of measurement results registers; User-specified measurement results "
             "register is not currently supported.");
 
@@ -686,8 +686,8 @@ class BraketBuilder : public OpenQasmBuilder {
         oss << qregs[0].toOpenQasm(RegisterMode::Alloc, {}, version);
 
         // quantum gates assuming qregs.size() == 1
-        for (auto &gate : this->gates) {
-            oss << gate.toOpenQasm(this->qregs[0], precision, version);
+        for (auto &gate : gates) {
+            oss << gate.toOpenQasm(qregs[0], precision, version);
         }
 
         oss << serialized_instructions;

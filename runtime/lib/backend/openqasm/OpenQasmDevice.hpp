@@ -29,6 +29,7 @@
 #include "QubitManager.hpp"
 
 #include "OpenQasmBuilder.hpp"
+#include "OpenQasmObsManager.hpp"
 #include "OpenQasmRunner.hpp"
 
 namespace Catalyst::Runtime::Device {
@@ -48,6 +49,7 @@ class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {
     bool tape_recording{false};
 
     size_t device_shots{0};
+    OpenQasm::OpenQasmObsManager obs_manager{};
     OpenQasm::BuilderType builder_type;
     std::string concrete_device_name;
 

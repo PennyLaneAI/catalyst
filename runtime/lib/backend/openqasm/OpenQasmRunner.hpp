@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include <complex>
 #include <optional>
 #include <string>
 #include <unordered_map>
@@ -69,6 +70,37 @@ struct OpenQasmRunner {
     Sample([[maybe_unused]] const std::string &circuit, [[maybe_unused]] const std::string &hw_name,
            [[maybe_unused]] size_t shots, [[maybe_unused]] size_t num_qubits) const
         -> std::vector<size_t>
+    {
+        RT_FAIL("Not implemented method");
+        return {};
+    }
+    [[nodiscard]] virtual auto Expval([[maybe_unused]] const std::string &circuit,
+                                      [[maybe_unused]] const std::string &hw_name,
+                                      [[maybe_unused]] size_t shots) const -> double
+    {
+        RT_FAIL("Not implemented method");
+        return {};
+    }
+    [[nodiscard]] virtual auto Var([[maybe_unused]] const std::string &circuit,
+                                   [[maybe_unused]] const std::string &hw_name,
+                                   [[maybe_unused]] size_t shots) const -> double
+    {
+        RT_FAIL("Not implemented method");
+        return {};
+    }
+    [[nodiscard]] virtual auto
+    State([[maybe_unused]] const std::string &circuit, [[maybe_unused]] const std::string &hw_name,
+          [[maybe_unused]] size_t shots, [[maybe_unused]] size_t num_qubits) const
+        -> std::vector<std::complex<double>>
+    {
+        RT_FAIL("Not implemented method");
+        return {};
+    }
+    [[nodiscard]] virtual auto Gradient([[maybe_unused]] const std::string &circuit,
+                                        [[maybe_unused]] const std::string &hw_name,
+                                        [[maybe_unused]] size_t shots,
+                                        [[maybe_unused]] size_t num_qubits) const
+        -> std::vector<double>
     {
         RT_FAIL("Not implemented method");
         return {};
@@ -191,6 +223,74 @@ struct BraketRunner : public OpenQasmRunner {
         }
 
         return samples;
+    }
+
+    [[nodiscard]] auto Expval(const std::string &circuit, const std::string &device,
+                              size_t shots) const -> double override
+    {
+        namespace py = pybind11;
+        using namespace py::literals;
+
+        RT_FAIL_IF(!Py_IsInitialized(), "The Python interpreter is not initialized");
+
+        auto locals = py::dict("braket_device"_a = device, "circuit"_a = circuit, "shots"_a = shots,
+                               "msg"_a = "");
+
+        py::exec(
+            R"(
+                  import numpy as np
+                  from braket.aws import AwsDevice
+                  from braket.ir.openqasm import Program as OpenQasmProgram
+
+                  device = AwsDevice(braket_device)
+                  try:
+                      result = device.run(OpenQasmProgram(source=circuit), shots=int(shots)).result()
+                      expval = result.values
+                  except Exception as e:
+                      msg = str(e)
+              )",
+            py::globals(), locals);
+
+        auto &&msg = locals["msg"].cast<std::string>();
+        RT_FAIL_IF(!msg.empty(), msg.c_str());
+
+        py::list results = locals["expval"];
+
+        return results[0].cast<double>();
+    }
+
+    [[nodiscard]] auto Var(const std::string &circuit, const std::string &device,
+                           size_t shots) const -> double override
+    {
+        namespace py = pybind11;
+        using namespace py::literals;
+
+        RT_FAIL_IF(!Py_IsInitialized(), "The Python interpreter is not initialized");
+
+        auto locals = py::dict("braket_device"_a = device, "circuit"_a = circuit, "shots"_a = shots,
+                               "msg"_a = "");
+
+        py::exec(
+            R"(
+                  import numpy as np
+                  from braket.aws import AwsDevice
+                  from braket.ir.openqasm import Program as OpenQasmProgram
+
+                  device = AwsDevice(braket_device)
+                  try:
+                      result = device.run(OpenQasmProgram(source=circuit), shots=int(shots)).result()
+                      var = result.values
+                  except Exception as e:
+                      msg = str(e)
+              )",
+            py::globals(), locals);
+
+        auto &&msg = locals["msg"].cast<std::string>();
+        RT_FAIL_IF(!msg.empty(), msg.c_str());
+
+        py::list results = locals["var"];
+
+        return results[0].cast<double>();
     }
 };
 
