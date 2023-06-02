@@ -33,6 +33,27 @@ func.func private @argmap(%arg0: memref<f64>) -> (memref<?xf64>)
 
 // CHECK-LABEL: func.func @backpropArgmap(%arg0: memref<f64>, %arg1: index, %arg2: memref<?xf64>) -> memref<?xf64> {
 func.func @backpropArgmap(%arg0: memref<f64>, %arg1 : index, %arg2: memref<?xf64>) -> memref<?xf64> {
+    // CHECK:   [[ENZYMEWRAPPER:%.+]] = constant @argmap.enzyme_wrapper : (!llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64)>>, !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>) -> ()
+    // CHECK:   [[ARG0CAST:%.+]] = builtin.unrealized_conversion_cast %arg0 : memref<f64> to !llvm.struct<(ptr<f64>, ptr<f64>, i64)>
+    // CHECK:   [[QJACS:%.+]] = builtin.unrealized_conversion_cast %arg2 : memref<?xf64> to !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>
+    // CHECK:   [[ENZYMEWRAPPERCAST:%.+]] = builtin.unrealized_conversion_cast [[ENZYMEWRAPPER]] : (!llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64)>>, !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>) -> () to !llvm.ptr<func<void (ptr<struct<(ptr<f64>, ptr<f64>, i64)>>, ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>)>>
+    // CHECK:   [[ARGPTR:%.+]] = llvm.alloca %5 x !llvm.struct<(ptr<f64>, ptr<f64>, i64)> : (i32) -> !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64)>>
+    // CHECK:   llvm.store [[ARG0CAST]], [[ARGPTR]] : !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64)>>
+    // CHECK:   [[MEMREFSIZE:%.+]] = llvm.mul %1, %4  : i64
+    // CHECK:   [[ALLOC:%.+]] = llvm.call @_mlir_memref_to_llvm_alloc([[MEMREFSIZE]]) : (i64) -> !llvm.ptr
+    // CHECK:   [[MEMSET:%.+]] = llvm.call @memset([[ALLOC]], {{.*}}, [[MEMREFSIZE]]) : (!llvm.ptr, i32, i64) -> !llvm.ptr
+    // CHECK:   [[BITCAST:%.+]] = llvm.bitcast [[ALLOC]] : !llvm.ptr to !llvm.ptr<f64>
+    // CHECK:   [[INSERT0:%.+]] = llvm.insertvalue [[BITCAST]], %38[0] : !llvm.struct<(ptr<f64>, ptr<f64>, i64)> 
+    // CHECK:   [[INSERT1:%.+]] = llvm.insertvalue [[BITCAST]], [[INSERT0]][1] : !llvm.struct<(ptr<f64>, ptr<f64>, i64)> 
+    // CHECK:   [[ARGSHADOW:%.+]] = llvm.alloca %5 x !llvm.struct<(ptr<f64>, ptr<f64>, i64)> : (i32) -> !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64)>>
+    // CHECK:   llvm.store [[INSERT1]], [[ARGSHADOW]] : !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64)>>
+    // CHECK:   [[CALLARGMAP:%.+]] = call @argmap(%arg0) : (memref<f64>) -> memref<?xf64>
+    // CHECK:   [[CALLARGMAPSCAST:%.+]] = builtin.unrealized_conversion_cast [[CALLARGMAP]] : memref<?xf64> to !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>
+    // CHECK:   [[RES:%.+]] = llvm.alloca %5 x !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)> : (i32) -> !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>
+    // CHECK:   llvm.store [[CALLARGMAPSCAST]], [[RES]] : !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>
+    // CHECK:   [[RESSHADOW:%.+]] = llvm.alloca %5 x !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)> : (i32) -> !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>
+    // CHECK:   llvm.store [[QJACS]], [[RESSHADOW]] : !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>
+    // CHECK:   llvm.call @__enzyme_autodiff([[ENZYMEWRAPPERCAST]], [[ARGPTR]], [[ARGSHADOW]], [[RES]], [[RESSHADOW]]) : (!llvm.ptr<func<void (ptr<struct<(ptr<f64>, ptr<f64>, i64)>>, ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>)>>, !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64)>>, !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64)>>, !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>, !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>) -> ()
 
     %alloc0 = memref.alloc(%arg1) : memref<?xf64>
     gradient.backprop @argmap(%arg0) size(%arg1) qjacobians(%arg2: memref<?xf64>) in(%alloc0 : memref<?xf64>) {diffArgIndices=dense<0> : tensor<1xindex>} : (memref<f64>) -> ()
@@ -57,7 +78,27 @@ func.func private @argmap(%arg0: memref<1xf64>) -> (memref<?xf64>)
 
 // CHECK-LABEL: func.func @backpropArgmap2(%arg0: memref<1xf64>, %arg1: index, %arg2: memref<?xf64>) -> memref<?xf64> {
 func.func @backpropArgmap2(%arg0: memref<1xf64>, %arg1 : index, %arg2: memref<?xf64>) -> memref<?xf64> {
-    
+    // CHECK:   [[ENZYMEWRAPPER:%.+]] = constant @argmap.enzyme_wrapper : (!llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>, !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>) -> ()
+    // CHECK:   [[ARG0CAST:%.+]] = builtin.unrealized_conversion_cast %arg0 : memref<1xf64> to !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>
+    // CHECK:   [[QJACS:%.+]] = builtin.unrealized_conversion_cast %arg2 : memref<?xf64> to !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>
+    // CHECK:   [[ENZYMEWRAPPERCAST:%.+]] = builtin.unrealized_conversion_cast [[ENZYMEWRAPPER]] : (!llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>, !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>) -> () to !llvm.ptr<func<void (ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>, ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>)>>
+    // CHECK:   [[ARGPTR:%.+]] = llvm.alloca %4 x !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)> : (i32) -> !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>
+    // CHECK:   llvm.store [[ARG0CAST]], [[ARGPTR]] : !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>
+    // CHECK:   [[MEMREFSIZE:%.+]] = llvm.mul %46, %3  : i64
+    // CHECK:   [[ALLOC:%.+]] = llvm.call @_mlir_memref_to_llvm_alloc([[MEMREFSIZE]]) : (i64) -> !llvm.ptr
+    // CHECK:   [[MEMSET:%.+]] = llvm.call @memset([[ALLOC]], {{.*}}, [[MEMREFSIZE]]) : (!llvm.ptr, i32, i64) -> !llvm.ptr
+    // CHECK:   [[BITCAST:%.+]] = llvm.bitcast [[ALLOC]] : !llvm.ptr to !llvm.ptr<f64>
+    // CHECK:   [[INSERT0:%.+]] = llvm.insertvalue [[BITCAST]], %41[0] : !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)> 
+    // CHECK:   [[INSERT1:%.+]] = llvm.insertvalue [[BITCAST]], [[INSERT0]][1] : !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)> 
+    // CHECK:   [[ARGSHADOW:%.+]] = llvm.alloca %4 x !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)> : (i32) -> !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>
+    // CHECK:   llvm.store [[INSERT1]], [[ARGSHADOW]] : !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>
+    // CHECK:   [[CALLARGMAP:%.+]] = call @argmap(%arg0) : (memref<1xf64>) -> memref<?xf64>
+    // CHECK:   [[CALLARGMAPSCAST:%.+]] = builtin.unrealized_conversion_cast [[CALLARGMAP]] : memref<?xf64> to !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>
+    // CHECK:   [[RES:%.+]] = llvm.alloca %4 x !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)> : (i32) -> !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>
+    // CHECK:   llvm.store [[CALLARGMAPSCAST]], [[RES]] : !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>
+    // CHECK:   [[RESSHADOW:%.+]] = llvm.alloca %4 x !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)> : (i32) -> !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>
+    // CHECK:   llvm.store [[QJACS]], [[RESSHADOW]] : !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>
+    // CHECK:   llvm.call @__enzyme_autodiff([[ENZYMEWRAPPERCAST]], [[ARGPTR]], [[ARGSHADOW]], [[RES]], [[RESSHADOW]]) : (!llvm.ptr<func<void (ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>, ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>)>>, !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>, !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>, !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>, !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>) -> ()
     %alloc0 = memref.alloc(%arg1) : memref<?xf64>
     gradient.backprop @argmap(%arg0) size(%arg1) qjacobians(%arg2: memref<?xf64>) in(%alloc0 : memref<?xf64>) {diffArgIndices=dense<0> : tensor<1xindex>} : (memref<1xf64>) -> ()
 
