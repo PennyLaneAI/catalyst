@@ -24,7 +24,7 @@ from typing import Any, Callable, Iterable, List, Optional, Union
 import jax
 import jax.numpy as jnp
 import pennylane as qml
-from jax import ShapedArray
+from jax.core import ShapedArray
 from jax._src.lax.control_flow import (
     _initial_style_jaxpr,
     _initial_style_jaxprs_with_common_consts,
