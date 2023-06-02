@@ -51,6 +51,7 @@ from mlir_quantum.dialects.quantum import (
     StateOp,
     TensorOp,
     VarianceOp,
+    YieldOp as QYieldOp
 )
 from mlir_quantum.dialects.scf import ConditionOp, ForOp, IfOp, WhileOp, YieldOp
 from mlir_quantum.dialects.tensor import ExtractOp as TensorExtractOp
@@ -1516,7 +1517,7 @@ def _adjoint_lowering(ctx, *args, jaxpr):
             dim_var_values=ctx.dim_var_values,
         )
 
-        YieldOp([a[0] for a in out])
+        QYieldOp([a[0] for a in out])
 
     return op.results
 

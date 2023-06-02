@@ -539,12 +539,13 @@ def adjoint(f:Callable) -> Callable:
             tape.quantum_tape = new_quantum_tape
             tape.quantum_tape.jax_tape = tape
 
-        has_tracer_return_values = True
+        has_tracer_return_values = False
         return_values, qreg, qubit_states = trace_quantum_tape(
             tape, qreg, has_tracer_return_values
         )
         qreg = insert_to_qreg(qubit_states, qreg)
         return qreg, return_values
+
 
     def _callable(*args, **kwargs):
         init_vals, in_tree = tree_flatten((jprim.Qreg(), *args))

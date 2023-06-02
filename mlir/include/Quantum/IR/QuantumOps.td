@@ -19,6 +19,7 @@ include "mlir/IR/EnumAttr.td"
 include "mlir/IR/OpBase.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Dialect/Bufferization/IR/AllocationOpInterface.td"
+include "mlir/Interfaces/ControlFlowInterfaces.td"
 
 include "Quantum/IR/QuantumDialect.td"
 include "Quantum/IR/QuantumInterfaces.td"
@@ -756,17 +757,28 @@ def AdjointOp : Op<QuantumDialect, "adjoint", []> {
     let regions = (region SizedRegion<1>:$region);
 
     let arguments = (ins
-      Variadic<AnyTypeOf<[AnyFloat, RankedTensorOf<[AnyFloat]>]>>:$params
+      QuregType:$qreg,
+      Variadic<AnyType>:$params
     );
 
     let results = (outs
-      Variadic<AnyTypeOf<[AnyFloat, RankedTensorOf<[AnyFloat]>]>>:$results
+      QuregType:$qreg_results,
+      Variadic<AnyType>:$results
     );
 
     let assemblyFormat = [{
-        `(` $params `)` attr-dict `:` functional-type(operands, results) $region
+        `(` $qreg `,` $params `)` attr-dict `:` functional-type(operands, results) $region
     }];
 
+}
+
+def YieldOp : Op<QuantumDialect, "yield", [Pure, ReturnLike, Terminator]> {
+    let summary = "Return results from quantum program regions";
+
+    let arguments = (ins Variadic<AnyType>:$results);
+    let builders = [OpBuilder<(ins), [{ /* nothing to do */ }]>];
+
+    let assemblyFormat = [{  attr-dict ($results^ `:` type($results))? }];
 }
 
 #endif // QUANTUM_OPS
