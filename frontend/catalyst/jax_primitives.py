@@ -23,6 +23,7 @@ import numpy as np
 from jax._src import util
 from jax._src.lib.mlir import ir
 from jax._src import core
+from jax._src import api_util
 from jax.interpreters import mlir, xla
 from jaxlib.mlir.dialects._func_ops_gen import CallOp
 from jaxlib.mlir.dialects._mhlo_ops_gen import ConstantOp, ConvertOp
@@ -1477,3 +1478,6 @@ mlir.register_lowering(grad_p, _grad_lowering)
 mlir.register_lowering(func_p, _func_lowering)
 mlir.register_lowering(jvp_p, _jvp_lowering)
 mlir.register_lowering(vjp_p, _vjp_lowering)
+
+api_util._shaped_abstractify_handlers[type] = \
+        lambda x: core.ShapedArray([], x)
