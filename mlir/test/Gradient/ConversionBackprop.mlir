@@ -25,6 +25,11 @@ func.func private @argmap(%arg0: memref<f64>) -> (memref<?xf64>)
 // CHECK-DAG:  llvm.func @_mlir_memref_to_llvm_alloc(i64) -> !llvm.ptr
 // CHECK-DAG:  func.func private @argmap(memref<f64>) -> memref<?xf64>
 // CHECK-DAG:  func.func private @argmap.enzyme_wrapper(%arg0: !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64)>>, %arg1: !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>) {
+// CHECK-DAG:  [[LOADARG0:%.+]] = llvm.load %arg0 : !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64)>>
+// CHECK-DAG:  [[CASTARG0:%.+]] = builtin.unrealized_conversion_cast [[LOADARG0]] : !llvm.struct<(ptr<f64>, ptr<f64>, i64)> to memref<f64>
+// CHECK-DAG:  [[ARGMAPRES:%.+]] = call @argmap([[CASTARG0]]) : (memref<f64>) -> memref<?xf64>
+// CHECK-DAG:  [[ARGMAPRESCAST:%.+]] = builtin.unrealized_conversion_cast [[ARGMAPRES]] : memref<?xf64> to !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>
+// CHECK-DAG:  llvm.store [[ARGMAPRESCAST]], %arg1 : !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>
 
 // CHECK-LABEL: func.func @backpropArgmap(%arg0: memref<f64>, %arg1: index, %arg2: memref<?xf64>) -> memref<?xf64> {
 func.func @backpropArgmap(%arg0: memref<f64>, %arg1 : index, %arg2: memref<?xf64>) -> memref<?xf64> {
@@ -43,9 +48,14 @@ func.func private @argmap(%arg0: memref<1xf64>) -> (memref<?xf64>)
 // CHECK-DAG:  llvm.func @__enzyme_autodiff(...)
 // CHECK-DAG:  llvm.func @_mlir_memref_to_llvm_alloc(i64) -> !llvm.ptr
 // CHECK-DAG:  func.func private @argmap(memref<1xf64>) -> memref<?xf64>
-// CHECK-DAG:  func.func private @argmap.enzyme_wrapper(%arg0: !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>> %arg1: !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>) {
+// CHECK-DAG:  func.func private @argmap.enzyme_wrapper(%arg0: !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>, %arg1: !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>) {
+// CHECK-DAG:  [[LOADARG0:%.+]] = llvm.load %arg0 : !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>
+// CHECK-DAG:  [[CASTARG0:%.+]] = builtin.unrealized_conversion_cast [[LOADARG0]] : !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)> to memref<1xf64>
+// CHECK-DAG:  [[ARGMAPRES:%.+]] = call @argmap([[CASTARG0]]) : (memref<1xf64>) -> memref<?xf64>
+// CHECK-DAG:  [[ARGMAPRESCAST:%.+]] = builtin.unrealized_conversion_cast [[ARGMAPRES]] : memref<?xf64> to !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>
+// CHECK-DAG:  llvm.store [[ARGMAPRESCAST]], %arg1 : !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>
 
-// CHECK-LABEL: func.func @backpropArgmap(%arg0: memref<1xf64>, %arg1: index, %arg2: memref<?xf64>) -> memref<?xf64> {
+// CHECK-LABEL: func.func @backpropArgmap2(%arg0: memref<1xf64>, %arg1: index, %arg2: memref<?xf64>) -> memref<?xf64> {
 func.func @backpropArgmap2(%arg0: memref<1xf64>, %arg1 : index, %arg2: memref<?xf64>) -> memref<?xf64> {
     
     %alloc0 = memref.alloc(%arg1) : memref<?xf64>
