@@ -1293,8 +1293,8 @@ def _qwhile_lowering(
 
     # cond block
     cond_block = while_op_scf.regions[0].blocks.append(*loop_carry_types)
-    name_stack = source_info_util.extend_name_stack("while")
-    cond_ctx = jax_ctx.module_context.replace(name_stack=xla.extend_name_stack(name_stack, "cond"))
+    name_stack = jax_ctx.module_context.name_stack.extend("while")
+    cond_ctx = jax_ctx.module_context.replace(name_stack=name_stack.extend("cond"))
     with ir.InsertionPoint(cond_block):
         cond_args = [cond_block.arguments[i] for i in range(len(loop_carry_types))]
 
@@ -1313,7 +1313,7 @@ def _qwhile_lowering(
 
     # body block
     body_block = while_op_scf.regions[1].blocks.append(*loop_carry_types)
-    body_ctx = jax_ctx.module_context.replace(name_stack=xla.extend_name_stack(name_stack, "body"))
+    body_ctx = jax_ctx.module_context.replace(name_stack=name_stack.extend("body"))
     with ir.InsertionPoint(body_block):
         body_args = [body_block.arguments[i] for i in range(len(loop_carry_types))]
 
