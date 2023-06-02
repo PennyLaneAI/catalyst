@@ -178,15 +178,15 @@ def test_decompose_rot():
     # CHECK-LABEL: public @jit_decompose_rot
     def decompose_rot(phi: float, theta: float, omega: float):
         # CHECK-NOT: name = "Rot"
-        # CHECK: [[phi:%.+]] = tensor.extract %arg0[] : tensor<f64>
+        # CHECK: [[phi:%.+]] = "tensor.extract"(%arg0)
         # CHECK-NOT: name = "Rot"
         # CHECK:  {{%.+}} = "quantum.custom"([[phi]], {{%.+}}) {gate_name = "RZ"
         # CHECK-NOT: name = "Rot"
-        # CHECK: [[theta:%.+]] = tensor.extract %arg1[] : tensor<f64>
+        # CHECK: [[theta:%.+]] = "tensor.extract"(%arg1)
         # CHECK-NOT: name = "Rot"
         # CHECK: {{%.+}} = "quantum.custom"([[theta]], {{%.+}}) {gate_name = "RY"
         # CHECK-NOT: name = "Rot"
-        # CHECK: [[omega:%.+]] = tensor.extract %arg2[] : tensor<f64>
+        # CHECK: [[omega:%.+]] = "tensor.extract"(%arg2)
         # CHECK-NOT: name = "Rot"
         # CHECK: {{%.+}} = "quantum.custom"([[omega]], {{%.+}}) {gate_name = "RZ"
         # CHECK-NOT: name = "Rot"
@@ -207,9 +207,9 @@ def test_decompose_s():
     # CHECK-LABEL: public @jit_decompose_s
     def decompose_s():
         # CHECK-NOT: name="S"
-        # CHECK: [[pi_div_2_t:%.+]] = mhlo.constant dense<1.57079{{.+}}> : tensor<f64>
+        # CHECK: [[pi_div_2_t:%.+]] = stablehlo.constant dense<1.57079{{.+}}> : tensor<f64>
         # CHECK-NOT: name = "S"
-        # CHECK: [[pi_div_2:%.+]] = tensor.extract [[pi_div_2_t]][] : tensor<f64>
+        # CHECK: [[pi_div_2:%.+]] = "tensor.extract"([[pi_div_2_t]])
         # CHECK-NOT: name = "S"
         # CHECK: {{%.+}} = "quantum.custom"([[pi_div_2]], {{%.+}}) {gate_name = "PhaseShift"
         # CHECK-NOT: name = "S"
@@ -249,19 +249,19 @@ def test_decompose_singleexcitationplus():
     # CHECK-LABEL: public @jit_decompose_singleexcitationplus
     def decompose_singleexcitationplus(theta: float):
         # CHECK-NOT: name = "SingleExcitationPlus"
-        # CHECK: [[a_scalar_tensor_float_2:%.+]] = mhlo.constant dense<2.{{[0]+}}e+00>
+        # CHECK: [[a_scalar_tensor_float_2:%.+]] = stablehlo.constant dense<2.{{[0]+}}e+00>
         # CHECK-NOT: name = "SingleExcitationPlus"
-        # CHECK: [[a_theta_div_2:%.+]] = mhlo.divide %arg0, [[a_scalar_tensor_float_2]]
+        # CHECK: [[a_theta_div_2:%.+]] = stablehlo.divide %arg0, [[a_scalar_tensor_float_2]]
         # CHECK-NOT: name = "SingleExcitationPlus"
-        # CHECK: [[b_scalar_tensor_float_2:%.+]] = mhlo.constant dense<2.{{[0]+}}e+00>
+        # CHECK: [[b_scalar_tensor_float_2:%.+]] = stablehlo.constant dense<2.{{[0]+}}e+00>
         # CHECK-NOT: name = "SingleExcitationPlus"
-        # CHECK: [[b_theta_div_2:%.+]] = mhlo.divide %arg0, [[b_scalar_tensor_float_2]]
+        # CHECK: [[b_theta_div_2:%.+]] = stablehlo.divide %arg0, [[b_scalar_tensor_float_2]]
         # CHECK-NOT: name = "SingleExcitationPlus"
         # CHECK: [[s0q1:%.+]] = "quantum.custom"({{%.+}}) {gate_name = "PauliX"
         # CHECK-NOT: name = "SingleExcitationPlus"
         # CHECK: [[s0q0:%.+]] = "quantum.custom"({{%.+}}) {gate_name = "PauliX"
         # CHECK-NOT: name = "SingleExcitationPlus"
-        # CHECK: [[a_theta_div_2_scalar:%.+]] = tensor.extract [[a_theta_div_2]][] : tensor<f64>
+        # CHECK: [[a_theta_div_2_scalar:%.+]] = "tensor.extract"([[a_theta_div_2]])
         # CHECK-NOT: name = "SingleExcitationPlus"
         # CHECK: [[s1:%.+]]:2 = "quantum.custom"([[a_theta_div_2_scalar]], [[s0q0]], [[s0q1]]) {gate_name = "ControlledPhaseShift"
         # CHECK-NOT: name = "SingleExcitationPlus"
@@ -269,13 +269,13 @@ def test_decompose_singleexcitationplus():
         # CHECK-NOT: name = "SingleExcitationPlus"
         # CHECK: [[s2q0:%.+]] = "quantum.custom"([[s1]]#0) {gate_name = "PauliX"
         # CHECK-NOT: name = "SingleExcitationPlus"
-        # CHECK: [[b_theta_div_2_scalar:%.+]] = tensor.extract [[b_theta_div_2]][] : tensor<f64>
+        # CHECK: [[b_theta_div_2_scalar:%.+]] = "tensor.extract"([[b_theta_div_2]])
         # CHECK-NOT: name = "SingleExcitationPlus"
         # CHECK: [[s3:%.+]]:2 = "quantum.custom"([[b_theta_div_2_scalar]], [[s2q1]], [[s2q0]]) {gate_name = "ControlledPhaseShift"
         # CHECK-NOT: name = "SingleExcitationPlus"
         # CHECK: [[s4:%.+]]:2 = "quantum.custom"([[s3]]#0, [[s3]]#1) {gate_name = "CNOT"
         # CHECK-NOT: name = "SingleExcitationPlus"
-        # CHECK: [[theta_scalar:%.+]] = tensor.extract %arg0[]
+        # CHECK: [[theta_scalar:%.+]] = "tensor.extract"(%arg0)
         # CHECK-NOT: name = "SingleExcitationPlus"
         # CHECK: [[s5:%.+]]:2 = "quantum.custom"([[theta_scalar]], [[s4]]#1, [[s4]]#0) {gate_name = "CRY"
         # CHECK-NOT: name = "SingleExcitationPlus"
