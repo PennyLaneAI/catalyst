@@ -494,7 +494,7 @@ def _qalloc_lowering(jax_ctx: mlir.LoweringRuleContext, size_value: ir.Value):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
-    assert size_value.owner.name == "mhlo.constant"
+    assert size_value.owner.name == "stablehlo.constant"
     size_value_attr = size_value.owner.attributes["value"]
     assert ir.DenseIntElementsAttr.isinstance(size_value_attr)
     size = ir.DenseIntElementsAttr(size_value_attr)[0]
