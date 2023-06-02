@@ -29,23 +29,24 @@ using namespace mlir;
 using namespace catalyst::gradient;
 
 //===----------------------------------------------------------------------===//
-// CallOpInterface
+// SymbolUserOpInterface
 //===----------------------------------------------------------------------===//
-
-CallInterfaceCallable GradOp::getCallableForCallee() { return getCalleeAttr(); }
 
 void GradOp::setCalleeFromCallable(CallInterfaceCallable callee)
 {
     (*this)->setAttr("callee", callee.get<SymbolRefAttr>());
 };
 
-Operation::operand_range GradOp::getArgOperands() { return getOperands(); }
+void JVPOp::setCalleeFromCallable(CallInterfaceCallable callee)
+{
+    (*this)->setAttr("callee", callee.get<SymbolRefAttr>());
+};
 
-//===----------------------------------------------------------------------===//
-// SymbolUserOpInterface
-//===----------------------------------------------------------------------===//
+void VJPOp::setCalleeFromCallable(CallInterfaceCallable callee)
+{
+    (*this)->setAttr("callee", callee.get<SymbolRefAttr>());
+};
 
-LogicalResult GradOp::verifySymbolUses(SymbolTableCollection &symbolTable)
 
 // Gradient input checker
 LogicalResult verifyGradInputs(OpState *op_state, func::FuncOp callee, ValueRange callee_operands,
