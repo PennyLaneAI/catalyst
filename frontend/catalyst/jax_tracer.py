@@ -17,31 +17,25 @@
 import jax
 import pennylane as qml
 from jax._src.dispatch import jaxpr_replicas
+from jax._src import source_info_util
 from jax.interpreters.mlir import (
-    Any,
     AxisContext,
-    List,
     ModuleContext,
-    Optional,
     ReplicaAxisContext,
-    Sequence,
-    Tuple,
-    _module_name_regex,
-    _set_up_aliases,
     ir,
-    itertools,
     lower_jaxpr_to_fun,
     lowerable_effects,
-    sharded_aval,
-    source_info_util,
-    util,
-    warnings,
-    xb,
-    xc,
-    xla,
+    #sharded_aval,
+    #source_info_util,
+    #util,
+    #warnings,
+    #xb,
+    #xc,
+    #xla,
 )
 from jax.interpreters.partial_eval import DynamicJaxprTracer
 from jax.tree_util import tree_unflatten
+from jax._src.lax.lax import xb, xc, xla
 from pennylane.measurements import MeasurementProcess
 from pennylane.operation import Wires
 
@@ -84,7 +78,7 @@ def get_mlir(func, *args, **kwargs):
     nrep = jaxpr_replicas(jaxpr)
     effects = [eff for eff in jaxpr.effects if eff in jax.core.ordered_effects]
     axis_context = ReplicaAxisContext(xla.AxisEnv(nrep, (), ()))
-    name_stack = util.new_name_stack(util.wrap_name("ok", "jit"))
+    name_stack = source_info_util.new_name_stack(util.wrap_name("ok", "jit"))
     module, context = custom_lower_jaxpr_to_module(
         func_name="jit_" + func.__name__,
         module_name=func.__name__,
@@ -462,15 +456,15 @@ def custom_lower_jaxpr_to_module(
     func_name: str,
     module_name: str,
     jaxpr: jax.core.ClosedJaxpr,
-    effects: List[jax.core.Effect],
+    effects,
     platform: str,
     axis_context: AxisContext,
-    name_stack: source_info_util.NameStack,
-    donated_args: Sequence[bool],
-    replicated_args: Optional[Sequence[bool]] = None,
-    arg_shardings: Optional[Sequence[Optional[xc.OpSharding]]] = None,
-    result_shardings: Optional[Sequence[Optional[xc.OpSharding]]] = None,
-) -> Tuple[ir.Module, ir.Context]:
+    name_stack,
+    donated_args,
+    replicated_args  = None,
+    arg_shardings = None,
+    result_shardings = None,
+):
     """Lowers a top-level jaxpr to an MHLO module.
 
     Handles the quirks of the argument/return value passing conventions of the
@@ -487,20 +481,12 @@ def custom_lower_jaxpr_to_module(
         raise ValueError(f"Unknown platform {platform}")
     input_output_aliases = None
     in_avals = jaxpr.in_avals
-    if arg_shardings is not None:
-        in_avals = [
-            sharded_aval(in_aval, in_sharding)
-            for in_aval, in_sharding in zip(in_avals, arg_shardings)
-        ]
+    assert arg_shardings is None
     out_avals = jaxpr.out_avals
-    if result_shardings is not None:
-        out_avals = [
-            sharded_aval(out_aval, out_sharding)
-            for out_aval, out_sharding in zip(out_avals, result_shardings)
-        ]
+    assert result_shardings is None
     platforms_with_donation = ("cuda", "rocm", "tpu")
-    if platform in platforms_with_donation:
-        input_output_aliases, donated_args = _set_up_aliases(in_avals, out_avals, donated_args)
+    #if platform in platforms_with_donation:
+    #    input_output_aliases, donated_args = _set_up_aliases(in_avals, out_avals, donated_args)
     if any(eff not in lowerable_effects for eff in jaxpr.effects):
         raise ValueError(f"Cannot lower jaxpr with effects: {jaxpr.effects}")
     if any(donated_args):
@@ -508,15 +494,12 @@ def custom_lower_jaxpr_to_module(
         msg = "See an explanation at https://jax.readthedocs.io/en/latest/faq.html#buffer-donation."
         if platform not in platforms_with_donation:
             msg = f"Donation is not implemented for {platform}.\n{msg}"
-        warnings.warn(
-            f"Some donated buffers were not usable: {', '.join(unused_donations)}.\n{msg}"
-        )
 
     # MHLO channels need to start at 1
-    channel_iter = itertools.count(1)
+    channel_iter = 1
     # Create a keepalives list that will be mutated during the lowering.
-    keepalives: List[Any] = []
-    host_callbacks: List[Any] = []
+    keepalives = []
+    host_callbacks = []
     ctx = ModuleContext(
         None, platform, axis_context, name_stack, keepalives, channel_iter, host_callbacks
     )
@@ -525,7 +508,7 @@ def custom_lower_jaxpr_to_module(
         # register_dialect()
         # Remove module name characters that XLA would alter. This ensures that
         # XLA computation preserves the module name.
-        module_name = _module_name_regex.sub("_", module_name)
+        # module_name = _module_name_regex.sub("_", module_name)
         ctx.module.operation.attributes["sym_name"] = ir.StringAttr.get(module_name)
         unlowerable_effects = {eff for eff in jaxpr.effects if eff not in lowerable_effects}
         if unlowerable_effects:
@@ -541,7 +524,7 @@ def custom_lower_jaxpr_to_module(
             replicated_args=replicated_args,
             arg_shardings=arg_shardings,
             result_shardings=result_shardings,
-            input_output_aliases=input_output_aliases,
+            #input_output_aliases=input_output_aliases,
         )
 
         for op in ctx.module.body.operations:
