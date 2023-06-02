@@ -143,6 +143,7 @@ class MHLOPass(PassPipeline):
         "--allow-unregistered-dialect",
         "--canonicalize",
         "--chlo-legalize-to-hlo",
+        "--stablehlo-legalize-to-hlo",
         "--mhlo-legalize-control-flow",
         "--hlo-legalize-to-linalg",
         "--mhlo-legalize-to-std",
