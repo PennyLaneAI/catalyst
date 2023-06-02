@@ -17,9 +17,11 @@
 #include <algorithm>
 #include <array>
 #include <iomanip>
+#include <memory>
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <unordered_set>
 #include <vector>
 
 #include "Exception.hpp"
@@ -119,7 +121,8 @@ class QasmVariable {
     [[nodiscard]] auto getType() const -> VariableType { return this->type; }
     [[nodiscard]] auto getName() const -> std::string { return this->name; }
 
-    auto toOpenQasm([[maybe_unused]] const std::string &version = "3.0") const -> std::string
+    [[nodiscard]] auto toOpenQasm([[maybe_unused]] const std::string &version = "3.0") const
+        -> std::string
     {
         std::ostringstream oss;
         switch (this->type) {
@@ -159,7 +162,7 @@ class QasmRegister {
 
     void updateSize(size_t new_size) { this->size = new_size; }
     void resetSize() { this->size = 0; }
-    auto isValidSlice(const std::vector<size_t> &slice) const -> bool
+    [[nodiscard]] auto isValidSlice(const std::vector<size_t> &slice) const -> bool
     {
         if (slice.empty()) {
             return false;
@@ -169,8 +172,10 @@ class QasmRegister {
                            [this](auto qubit) { return this->size > qubit; });
     }
 
-    auto toOpenQasm(RegisterMode mode, [[maybe_unused]] const std::vector<size_t> &slice = {},
-                    [[maybe_unused]] const std::string &version = "3.0") const -> std::string
+    [[nodiscard]] auto toOpenQasm(RegisterMode mode,
+                                  [[maybe_unused]] const std::vector<size_t> &slice = {},
+                                  [[maybe_unused]] const std::string &version = "3.0") const
+        -> std::string
     {
         std::ostringstream oss;
         switch (mode) {
@@ -254,8 +259,10 @@ class QasmGate {
     [[nodiscard]] auto getWires() const -> std::vector<size_t> { return this->wires; }
     [[nodiscard]] auto getInverse() const -> bool { return this->inverse; }
 
-    auto toOpenQasm(const QasmRegister &qregister, [[maybe_unused]] size_t precision = 5,
-                    [[maybe_unused]] const std::string &version = "3.0") const -> std::string
+    [[nodiscard]] auto toOpenQasm(const QasmRegister &qregister,
+                                  [[maybe_unused]] size_t precision = 5,
+                                  [[maybe_unused]] const std::string &version = "3.0") const
+        -> std::string
     {
         // name(param_1, ..., param_n) qubit_1, ..., qubit_m
         std::ostringstream oss;
@@ -302,22 +309,184 @@ class QasmMeasure {
     [[nodiscard]] auto getBit() const -> size_t { return this->bit; }
     [[nodiscard]] auto getWire() const -> size_t { return this->wire; }
 
-    auto toOpenQasm(const QasmRegister &qregister,
-                    [[maybe_unused]] const std::string &version = "3.0") const -> std::string
+    [[nodiscard]] auto toOpenQasm(const QasmRegister &qregister,
+                                  [[maybe_unused]] const std::string &version = "3.0") const
+        -> std::string
     {
         // measure wire
         std::ostringstream oss;
         oss << "measure " << qregister.toOpenQasm(RegisterMode::Slice, {this->wire}) << ";\n";
         return oss.str();
     }
-    auto toOpenQasm(const QasmRegister &bregister, const QasmRegister &qregister,
-                    RegisterMode mode = RegisterMode::Slice,
-                    [[maybe_unused]] const std::string &version = "3.0") const -> std::string
+    [[nodiscard]] auto toOpenQasm(const QasmRegister &bregister, const QasmRegister &qregister,
+                                  RegisterMode mode = RegisterMode::Slice,
+                                  [[maybe_unused]] const std::string &version = "3.0") const
+        -> std::string
     {
         // bit = measure wire
         std::ostringstream oss;
         oss << bregister.toOpenQasm(mode, {this->bit}) << " = measure "
             << qregister.toOpenQasm(mode, {this->wire}) << ";\n";
+        return oss.str();
+    }
+};
+
+/**
+ * A base class for all Braket/OpenQasm3 observable types.
+ */
+class QasmObs {
+  protected:
+    QasmObs() = default;
+    QasmObs(const QasmObs &) = default;
+    QasmObs(QasmObs &&) = default;
+    QasmObs &operator=(const QasmObs &) = default;
+    QasmObs &operator=(QasmObs &&) noexcept = default;
+
+  public:
+    virtual ~QasmObs() = default;
+    [[nodiscard]] virtual auto getName() const -> std::string = 0;
+    [[nodiscard]] virtual auto getWires() const -> std::vector<size_t> = 0;
+    [[nodiscard]] virtual auto toOpenQasm(const QasmRegister &qregister,
+                                          [[maybe_unused]] const std::string &version = "3.0") const
+        -> std::string = 0;
+};
+
+/**
+ * A class for Braket/OpenQasm3 named observable (PauliX, PauliY, PauliZ, Hadamard, etc.)
+ */
+class QasmNamedObs final : public QasmObs {
+  private:
+    const std::string name;
+    const std::vector<size_t> wires;
+
+  public:
+    explicit QasmNamedObs(const std::string &_name, std::vector<size_t> _wires)
+        : name(lookup_qasm_gate_name(_name)), wires(_wires)
+    {
+    }
+
+    [[nodiscard]] auto getName() const -> std::string override { return name; }
+    [[nodiscard]] auto getWires() const -> std::vector<size_t> override { return wires; }
+
+    [[nodiscard]] auto toOpenQasm(const QasmRegister &qregister,
+                                  [[maybe_unused]] const std::string &version = "3.0") const
+        -> std::string override
+    {
+        std::ostringstream oss;
+        oss << name << "(" << qregister.toOpenQasm(RegisterMode::Slice, wires) << ")";
+        return oss.str();
+    }
+};
+
+/**
+ * A class for Braket/OpenQasm3 tensor product of observables type.
+ *
+ * Note that the support is generic so that it works for any
+ * implementation of the `QasmObs` base class.
+ */
+class QasmTensorObs final : public QasmObs {
+  private:
+    std::vector<std::shared_ptr<QasmObs>> obs;
+    std::vector<size_t> wires;
+
+  public:
+    template <typename... Ts> explicit QasmTensorObs(Ts &&...args) : obs{std::forward<Ts>(args)...}
+    {
+        std::unordered_set<size_t> all_wires;
+
+        for (const auto &ob : obs) {
+            const auto ob_wires = ob->getWires();
+            for (const auto wire : ob_wires) {
+                if (all_wires.contains(wire)) {
+                    RT_FAIL(
+                        "Invalid list of total wires; All wires in observables must be disjoint.");
+                }
+                all_wires.insert(wire);
+            }
+        }
+        wires = std::vector<size_t>(all_wires.begin(), all_wires.end());
+        std::sort(wires.begin(), wires.end());
+    }
+
+    [[nodiscard]] auto getName() const -> std::string override { return "QasmTensorObs"; }
+    [[nodiscard]] auto getWires() const -> std::vector<size_t> override { return wires; }
+
+    [[nodiscard]] auto toOpenQasm(const QasmRegister &qregister,
+                                  [[maybe_unused]] const std::string &version = "3.0") const
+        -> std::string override
+    {
+        std::ostringstream oss;
+        const size_t obs_size = obs.size();
+        for (size_t idx = 0; idx < obs_size; idx++) {
+            oss << obs[idx]->toOpenQasm(qregister, version);
+            if (idx != obs_size - 1) {
+                oss << " @ ";
+            }
+        }
+        return oss.str();
+    }
+};
+
+/**
+ * A class for Braket/OpenQasm3 Hamiltonian as a sum of observables type.
+ *
+ * Note that the support is generic so that it works for any
+ * implementation of the `QasmObs` base class.
+ */
+class QasmHamiltonianObs final : public QasmObs {
+  private:
+    std::vector<double> coeffs;
+    std::vector<std::shared_ptr<QasmObs>> obs;
+
+  public:
+    template <typename ObsVecT, typename CoeffsT>
+    explicit QasmHamiltonianObs(CoeffsT &&_coeffs, ObsVecT &&_obs)
+        : coeffs{std::forward<CoeffsT>(_coeffs)}, obs{std::forward<ObsVecT>(_obs)}
+    {
+        RT_ASSERT(obs.size() == coeffs.size());
+    }
+
+    static auto create(std::initializer_list<double> _coeffs,
+                       std::initializer_list<std::shared_ptr<QasmObs>> _obs)
+        -> std::shared_ptr<QasmHamiltonianObs>
+    {
+        return std::shared_ptr<QasmHamiltonianObs>(
+            new QasmHamiltonianObs{std::move(_coeffs), std::move(_obs)});
+    }
+
+    [[nodiscard]] auto getName() const -> std::string override { return "QasmHamiltonianObs"; }
+    [[nodiscard]] auto getWires() const -> std::vector<size_t> override
+    {
+
+        std::unordered_set<size_t> all_wires;
+
+        for (const auto &ob : obs) {
+            const auto ob_wires = ob->getWires();
+            for (const auto wire : ob_wires) {
+                if (all_wires.contains(wire)) {
+                    continue;
+                }
+                all_wires.insert(wire);
+            }
+        }
+        auto wires = std::vector<size_t>(all_wires.begin(), all_wires.end());
+        std::sort(wires.begin(), wires.end());
+        return wires;
+    }
+    [[nodiscard]] auto getCoeffs() const -> std::vector<double> { return coeffs; }
+
+    [[nodiscard]] auto toOpenQasm(const QasmRegister &qregister,
+                                  [[maybe_unused]] const std::string &version = "3.0") const
+        -> std::string override
+    {
+        std::ostringstream oss;
+        const size_t obs_size = obs.size();
+        for (size_t idx = 0; idx < obs_size; idx++) {
+            oss << coeffs[idx] << " * " << obs[idx]->toOpenQasm(qregister, version);
+            if (idx != obs_size - 1) {
+                oss << " + ";
+            }
+        }
         return oss.str();
     }
 };
@@ -378,8 +547,8 @@ class OpenQasmBuilder {
     }
     void Measure(size_t bit, size_t wire) { measures.emplace_back(bit, wire); }
 
-    virtual auto toOpenQasm(size_t precision = 5, const std::string &version = "3.0") const
-        -> std::string
+    [[nodiscard]] virtual auto toOpenQasm(size_t precision = 5,
+                                          const std::string &version = "3.0") const -> std::string
     {
         RT_FAIL_IF(this->qregs.size() != 1, "Invalid number of quantum registers; Only one quantum "
                                             "register is currently supported.");
@@ -431,7 +600,7 @@ class OpenQasmBuilder {
         return oss.str();
     }
 
-    virtual auto
+    [[nodiscard]] virtual auto
     toOpenQasmWithCustomInstructions([[maybe_unused]] const std::string &serialized_instructions,
                                      [[maybe_unused]] size_t precision = 5,
                                      [[maybe_unused]] const std::string &version = "3.0") const
@@ -454,7 +623,7 @@ class BraketBuilder : public OpenQasmBuilder {
   public:
     using OpenQasmBuilder::OpenQasmBuilder;
 
-    auto toOpenQasm(size_t precision = 5, const std::string &version = "3.0") const
+    [[nodiscard]] auto toOpenQasm(size_t precision = 5, const std::string &version = "3.0") const
         -> std::string override
     {
         RT_FAIL_IF(this->qregs.size() != 1, "Invalid number of quantum registers; Only one quantum "
@@ -495,9 +664,9 @@ class BraketBuilder : public OpenQasmBuilder {
         return oss.str();
     }
 
-    auto toOpenQasmWithCustomInstructions(const std::string &serialized_instructions,
-                                          size_t precision = 5,
-                                          const std::string &version = "3.0") const
+    [[nodiscard]] auto toOpenQasmWithCustomInstructions(const std::string &serialized_instructions,
+                                                        size_t precision = 5,
+                                                        const std::string &version = "3.0") const
         -> std::string override
     {
         RT_FAIL_IF(this->qregs.size() != 1, "Invalid number of quantum registers; Only one quantum "

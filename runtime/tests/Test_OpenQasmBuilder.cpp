@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <memory>
 #include <string>
 #include <typeinfo>
 
@@ -219,6 +220,77 @@ TEST_CASE("Test QasmMeasure from OpenQasmBuilder", "[openqasm]")
 
     std::string mz2_res_toqasm = "bit[1] = measure q[1];\n";
     CHECK(mz2.toOpenQasm(bits, qubits) == mz2_res_toqasm);
+}
+
+TEST_CASE("Test QasmNamedObs from OpenQasmBuilder", "[openqasm]")
+{
+    auto qubits = QasmRegister(RegisterType::Qubit, "q", 5);
+
+    auto obs_x = QasmNamedObs("PauliX", {0});
+    CHECK(obs_x.getName() == "x");
+    CHECK(obs_x.getWires()[0] == 0);
+    CHECK(obs_x.toOpenQasm(qubits) == "x(q[0])");
+
+    auto obs_h = QasmNamedObs("Hadamard", {3});
+    CHECK(obs_h.getName() == "h");
+    CHECK(obs_h.getWires()[0] == 3);
+    CHECK(obs_h.toOpenQasm(qubits) == "h(q[3])");
+}
+
+TEST_CASE("Test QasmTensorObs from OpenQasmBuilder", "[openqasm]")
+{
+    auto qubits = QasmRegister(RegisterType::Qubit, "q", 5);
+
+    auto obs_x = std::shared_ptr<QasmNamedObs>{new QasmNamedObs("PauliX", {0})};
+    auto obs_y = std::shared_ptr<QasmNamedObs>{new QasmNamedObs("PauliY", {1})};
+    auto obs_z = std::shared_ptr<QasmNamedObs>{new QasmNamedObs("PauliZ", {2})};
+    auto obs_h = std::shared_ptr<QasmNamedObs>{new QasmNamedObs("Hadamard", {3})};
+    auto obs_x2 = std::shared_ptr<QasmNamedObs>{new QasmNamedObs("PauliX", {2})};
+
+    auto tp_x2 = QasmTensorObs(obs_x2);
+    CHECK(tp_x2.getName() == "QasmTensorObs");
+    CHECK(tp_x2.getWires()[0] == 2);
+    CHECK(tp_x2.toOpenQasm(qubits) == "x(q[2])");
+
+    auto tp_xyzh = QasmTensorObs(obs_x, obs_y, obs_z, obs_h);
+    CHECK(tp_xyzh.getName() == "QasmTensorObs");
+    std::vector<size_t> all_wires{0, 1, 2, 3};
+    CHECK(tp_xyzh.getWires() == all_wires);
+    CHECK(tp_xyzh.toOpenQasm(qubits) == "x(q[0]) @ y(q[1]) @ z(q[2]) @ h(q[3])");
+
+    REQUIRE_THROWS_WITH(
+        QasmTensorObs(obs_z, obs_x2),
+        Catch::Contains(
+            "[Function:QasmTensorObs] Error in Catalyst Runtime: Invalid list of total wires"));
+}
+
+TEST_CASE("Test QasmHamiltonianObs from OpenQasmBuilder", "[openqasm]")
+{
+    auto qubits = QasmRegister(RegisterType::Qubit, "q", 5);
+
+    auto obs_x = std::shared_ptr<QasmObs>{new QasmNamedObs("PauliX", {0})};
+    auto obs_y = std::shared_ptr<QasmObs>{new QasmNamedObs("PauliY", {1})};
+    auto obs_z = std::shared_ptr<QasmObs>{new QasmNamedObs("PauliZ", {2})};
+    auto obs_h = std::shared_ptr<QasmObs>{new QasmNamedObs("Hadamard", {3})};
+    auto obs_x2 = std::shared_ptr<QasmObs>{new QasmNamedObs("PauliX", {2})};
+
+    auto tp_xx2h = std::shared_ptr<QasmObs>{new QasmTensorObs(obs_x, obs_x2, obs_h)};
+
+    auto hl_x2 = QasmHamiltonianObs::create({0.2}, {obs_x2});
+    CHECK(hl_x2->getName() == "QasmHamiltonianObs");
+    CHECK(hl_x2->getWires()[0] == 2);
+    CHECK(hl_x2->toOpenQasm(qubits) == "0.2 * x(q[2])");
+
+    auto hl_mix = QasmHamiltonianObs::create({0.3, 0.5, 0.1}, {obs_y, obs_z, tp_xx2h});
+    CHECK(hl_mix->getName() == "QasmHamiltonianObs");
+    std::vector<size_t> all_wires{0, 1, 2, 3};
+    CHECK(hl_mix->getWires() == all_wires);
+    CHECK(hl_mix->toOpenQasm(qubits) ==
+          "0.3 * y(q[1]) + 0.5 * z(q[2]) + 0.1 * x(q[0]) @ x(q[2]) @ h(q[3])");
+
+    REQUIRE_THROWS_WITH(QasmHamiltonianObs::create({0.3}, {obs_y, obs_z}),
+                        Catch::Contains("[Function:QasmHamiltonianObs] Error in Catalyst Runtime: "
+                                        "Assertion: obs.size() == coeffs.size()"));
 }
 
 TEMPLATE_TEST_CASE("Test OpenQasmBuilder with dumping the circuit header", "[openqasm]",
