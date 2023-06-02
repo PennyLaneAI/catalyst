@@ -20,7 +20,9 @@ from typing import Dict, List
 
 import jax
 import numpy as np
+from jax._src.util import wrap_name
 from jax._src import util
+from jax._src import source_info_util
 from jax._src.lib.mlir import ir
 from jax._src import core
 from jax._src import api_util
@@ -1190,9 +1192,9 @@ def _qcond_lowering(
             if_block = if_op_scf.then_block
 
             # if block
-            name_stack = util.extend_name_stack(jax_ctx.module_context.name_stack, "if")
+            name_stack = source_info_util.extend_name_stack("if")
             if_ctx = jax_ctx.module_context.replace(
-                name_stack=xla.extend_name_stack(name_stack, "if")
+                name_stack=jax_ctx.module_context.name_stack.extend("if")
             )
             with ir.InsertionPoint(if_block):
                 # recursively generate the mlir for the if block
@@ -1208,9 +1210,9 @@ def _qcond_lowering(
                 YieldOp([o[0] for o in out[0]])
 
             # else block
-            name_stack = util.extend_name_stack(jax_ctx.module_context.name_stack, "else")
+            name_stack = source_info_util.extend_name_stack("else")
             else_ctx = jax_ctx.module_context.replace(
-                name_stack=xla.extend_name_stack(name_stack, "else")
+                name_stack=jax_ctx.module_context.name_stack.extend("else")
             )
             else_block = if_op_scf.else_block
             if len(preds) == 1:
@@ -1291,7 +1293,7 @@ def _qwhile_lowering(
 
     # cond block
     cond_block = while_op_scf.regions[0].blocks.append(*loop_carry_types)
-    name_stack = util.extend_name_stack(jax_ctx.module_context.name_stack, "while")
+    name_stack = source_info_util.extend_name_stack("while")
     cond_ctx = jax_ctx.module_context.replace(name_stack=xla.extend_name_stack(name_stack, "cond"))
     with ir.InsertionPoint(cond_block):
         cond_args = [cond_block.arguments[i] for i in range(len(loop_carry_types))]
@@ -1418,7 +1420,7 @@ def _qfor_lowering(
 
     for_op_scf = ForOp(loop_operands[0], loop_operands[1], loop_operands[2], iter_args=loop_args)
 
-    name_stack = util.extend_name_stack(jax_ctx.module_context.name_stack, "for")
+    name_stack = source_info_util.extend_name_stack("for")
     body_block = for_op_scf.body
     body_ctx = jax_ctx.module_context.replace(name_stack=xla.extend_name_stack(name_stack, "body"))
 
