@@ -18,6 +18,7 @@ import jax
 import pennylane as qml
 from jax._src.dispatch import jaxpr_replicas
 from jax._src import source_info_util
+from jax._src.util import wrap_name
 from jax.interpreters.mlir import (
     AxisContext,
     ModuleContext,
@@ -78,7 +79,7 @@ def get_mlir(func, *args, **kwargs):
     nrep = jaxpr_replicas(jaxpr)
     effects = [eff for eff in jaxpr.effects if eff in jax.core.ordered_effects]
     axis_context = ReplicaAxisContext(xla.AxisEnv(nrep, (), ()))
-    name_stack = source_info_util.new_name_stack(util.wrap_name("ok", "jit"))
+    name_stack = source_info_util.new_name_stack(wrap_name("ok", "jit"))
     module, context = custom_lower_jaxpr_to_module(
         func_name="jit_" + func.__name__,
         module_name=func.__name__,
