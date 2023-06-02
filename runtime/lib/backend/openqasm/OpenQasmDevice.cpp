@@ -195,7 +195,6 @@ auto OpenQasmDevice::Var([[maybe_unused]] ObsIdType obsKey) -> double
 
 void OpenQasmDevice::State([[maybe_unused]] DataView<std::complex<double>, 1> &state)
 {
-
     std::ostringstream oss;
     oss << "#pragma braket result state_vector";
     auto &&circuit = builder->toOpenQasmWithCustomInstructions(oss.str());
@@ -219,8 +218,7 @@ void OpenQasmDevice::Probs(DataView<double, 1> &probs)
 void OpenQasmDevice::PartialProbs([[maybe_unused]] DataView<double, 1> &probs,
                                   [[maybe_unused]] const std::vector<QubitIdType> &wires)
 {
-
-    // // get device wires
+    // get device wires
     auto &&dev_wires = getDeviceWires(wires);
 
     std::ostringstream oss;

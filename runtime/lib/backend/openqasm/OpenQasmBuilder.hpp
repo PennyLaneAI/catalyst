@@ -456,7 +456,6 @@ class QasmHamiltonianObs final : public QasmObs {
     [[nodiscard]] auto getName() const -> std::string override { return "QasmHamiltonianObs"; }
     [[nodiscard]] auto getWires() const -> std::vector<size_t> override
     {
-
         std::unordered_set<size_t> all_wires;
 
         for (const auto &ob : obs) {
