@@ -132,7 +132,7 @@ jobs:
     - name: Install Deps
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
       run: |
-        sudo apt-get install -y python3 python3-pip cmake ninja-build clang lld
+        sudo apt-get install -y python3 python3-pip cmake ninja-build clang lld ccache
         python3 -m pip install numpy pybind11
 
     - name: Build LLVM
