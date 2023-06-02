@@ -515,20 +515,46 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
     return jprim.vjp_p.bind(*params, *cotangents, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
 
 
-class Adjoint:
-    def __init__(self, f:QFunc):
-        self.f = f
+class Adjoint(Operation):
+    """ A minimal implementation of PennyLane operation, designed with a sole purpose of being
+    placed on the quantum tape """
 
-    def __call__(self, *args):
-        TracingContext.check_is_tracing(
-            "catalyst.adjoint can only be used from within @qjit decorated code."
+    num_wires = AnyWires
+
+    def __init__(self, body_jaxpr, *args, **kwargs):
+        self.body_jaxpr = body_jaxpr
+        kwargs["wires"] = Wires(Adjoint.num_wires)
+        super().__init__(*args, **kwargs)
+
+
+def adjoint(f:Callable) -> Callable:
+
+    def _adjoint(qreg=None, *args):
+        assert qreg is not None
+        with JaxTape(do_queue=False) as tape:
+            with tape.quantum_tape:
+                out = f(*args)
+            tape.set_return_val(out)
+            new_quantum_tape = JaxTape.device.expand_fn(tape.quantum_tape)
+            tape.quantum_tape = new_quantum_tape
+            tape.quantum_tape.jax_tape = tape
+
+        has_tracer_return_values = True
+        return_values, qreg, qubit_states = trace_quantum_tape(
+            tape, qreg, has_tracer_return_values
         )
-        jaxpr = jax.make_jaxpr(self.f)(*args)
-        return jprim.adjoint_p.bind(*args, jaxpr=jaxpr, f=self.f)
+        qreg = insert_to_qreg(qubit_states, qreg)
+        return qreg, return_values
 
+    def _callable(*args, **kwargs):
+        init_vals, in_tree = tree_flatten((jprim.Qreg(), *args))
+        init_avals = tuple(_abstractify(val) for val in init_vals)
+        body_jaxpr, body_consts, body_tree = _initial_style_jaxpr(
+            _adjoint, in_tree, init_avals, "adjoint"
+        )
+        return Adjoint(body_jaxpr, *args, **kwargs)
 
-def adjoint(f:QFunc) -> Adjoint:
-    return Adjoint(f)
+    return _callable
 
 
 class Cond(Operation):
@@ -1328,6 +1354,7 @@ class QJITDevice(qml.QubitDevice):
         "CSWAP",
         "MultiRZ",
         "QubitUnitary",
+        "Adjoint",
     ]
     observables = [
         "Identity",

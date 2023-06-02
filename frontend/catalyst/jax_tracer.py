@@ -305,6 +305,12 @@ def trace_quantum_tape(
             # We don't know if the loop modified any of the qubits
             # So let's load them all...
             qubit_states.clear()
+        elif op.__class__.__name__ == "Adjoint":
+            op_nonwires, op_wires = op_args
+            op_results = jprim.adjoint_p.bind(*([qreg]+op_nonwires), jaxpr=op.body_jaxpr)
+            qreg, _ = op_results
+            # FIXME: Figure out if we need it here or not
+            qubit_states.clear()
         else:
             op_args, op_wires = op_args
             qubits = get_qubits_from_wires(op_wires, qubit_states, qreg)

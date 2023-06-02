@@ -1494,19 +1494,32 @@ def _adjoint_def_impl(ctx, *args):
     raise NotImplementedError()
 
 @adjoint_p.def_abstract_eval
-def _adjoint_abstract(*args, f:Callable, jaxpr):
-    print(f"adjoint abstract called, args: {args}")
+def _adjoint_abstract(*args, jaxpr):
     return jaxpr.out_avals
 
-def _adjoint_lowering(ctx, *args, f:"QFunc", jaxpr):
-    print("adjoint lowering called")
-    print(jaxpr)
-    _func_lowering(ctx, *args, call_jaxpr=jaxpr.eqns[0].params["call_jaxpr"], fn=f, call=False)
-    symbol_name = mlir_fn_cache[f]
-    # output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
+def _adjoint_lowering(ctx, *args, jaxpr):
     output_types = util.flatten(map(mlir.aval_to_ir_types, ctx.avals_out))
-    print(f"symbol_name: {symbol_name}")
-    return AdjointOp(output_types, args).results
+    op = AdjointOp(output_types, args)
+    adjoint_block = op.regions[0].blocks.append(*[mlir.aval_to_ir_types(a)[0]
+                                                  for a in ctx.avals_in])
+
+    name_stack = util.extend_name_stack(ctx.module_context.name_stack, "adjoint")
+    body_ctx = ctx.module_context.replace(name_stack=xla.extend_name_stack(name_stack, "body"))
+
+    with ir.InsertionPoint(adjoint_block):
+        out, _ = mlir.jaxpr_subcomp(
+            body_ctx,
+            jaxpr.jaxpr,
+            mlir.TokenSet(),
+            [mlir.ir_constants(c) for c in jaxpr.consts],
+            *([a] for a in adjoint_block.arguments),
+            dim_var_values=ctx.dim_var_values,
+        )
+
+        YieldOp([a[0] for a in out])
+
+    return op.results
+
 
 #
 # registration
