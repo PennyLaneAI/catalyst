@@ -316,8 +316,9 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
 
-    # ``ir.DenseElementsAttr.get()`` constructs a dense elements attribute from an array of element values.
-    # This doesn't support ``jaxlib.xla_extension.Array``, so we have to cast such constants to numpy array types.
+    # ``ir.DenseElementsAttr.get()`` constructs a dense elements attribute from an array of
+    # element values. This doesn't support ``jaxlib.xla_extension.Array``, so we have to cast
+    # such constants to numpy array types.
     constants = [
         ConstantOp(ir.DenseElementsAttr.get(np.asarray(const))).results for const in jaxpr.consts
     ]
