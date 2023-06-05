@@ -214,7 +214,6 @@ jobs:
       run: |
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         MHLO_BUILD_DIR="$(pwd)/mhlo-build" \
-        COMPILER_LAUNCHER="" \
         make mhlo
 
   quantum:

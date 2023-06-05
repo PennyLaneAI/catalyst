@@ -48,6 +48,8 @@ llvm:
 
 .PHONY: mhlo
 mhlo:
+	patch -d mlir-hlo/mhlo/analysis --follow-symlinks < patches/add-lmhlo-dependency.patch
+
 	@echo "build MLIR-HLO"
 	cmake -G Ninja -S mlir-hlo -B $(MHLO_BUILD_DIR) \
 		-DCMAKE_BUILD_TYPE=Release \
