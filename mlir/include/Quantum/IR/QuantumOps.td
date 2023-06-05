@@ -237,7 +237,7 @@ def OpenQASM3CustomOp : Gate_Op<"openqasm3Custom", [NoMemoryEffect, AttrSizedOpe
     );
 
     let assemblyFormat = [{
-        $gate_name `(` $paramId`,` $params `)` $in_qubits attr-dict `:` type($out_qubits)
+        $gate_name `(` $paramId $params `)` $in_qubits attr-dict `:` type($out_qubits)
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration # [{

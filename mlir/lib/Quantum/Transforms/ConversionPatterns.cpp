@@ -261,6 +261,30 @@ struct CustomOpPattern : public OpConversionPattern<CustomOp> {
     }
 };
 
+struct OpenQASM3CustomOpPattern : public OpConversionPattern<OpenQASM3CustomOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(OpenQASM3CustomOp op, OpenQASM3CustomOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        Location loc = op.getLoc();
+        MLIRContext *ctx = getContext();
+
+        SmallVector<Type> argTypes(adaptor.getOperands().getTypes().begin(),
+                                   adaptor.getOperands().getTypes().end());
+
+        std::string qirName = "__quantum__qis__openqasm__" + op.getGateName().str();
+        Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), argTypes);
+
+        LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+
+        rewriter.create<LLVM::CallOp>(loc, fnDecl, adaptor.getOperands());
+        rewriter.replaceOp(op, adaptor.getInQubits());
+
+        return success();
+    }
+};
+
 struct MultiRZOpPattern : public OpConversionPattern<MultiRZOp> {
     using OpConversionPattern::OpConversionPattern;
 
@@ -720,6 +744,7 @@ void populateQIRConversionPatterns(TypeConverter &typeConverter, RewritePatternS
     patterns.add<ExtractOpPattern>(typeConverter, patterns.getContext());
     patterns.add<InsertOpPattern>(typeConverter, patterns.getContext());
     patterns.add<CustomOpPattern>(typeConverter, patterns.getContext());
+    patterns.add<OpenQASM3CustomOpPattern>(typeConverter, patterns.getContext());
     patterns.add<MultiRZOpPattern>(typeConverter, patterns.getContext());
     patterns.add<QubitUnitaryOpPattern>(typeConverter, patterns.getContext());
     patterns.add<MeasureOpPattern>(typeConverter, patterns.getContext());
