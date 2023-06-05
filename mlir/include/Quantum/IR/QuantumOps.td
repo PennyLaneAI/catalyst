@@ -171,6 +171,26 @@ class Gate_Op<string mnemonic, list<Trait> traits = []> :
     let extraClassDeclaration = extraBaseClassDeclaration;
 }
 
+def InlinedFunction : Op<QuantumDialect, "inlinedFunction", [NoTerminator]> {
+  let arguments = (ins
+      Variadic<AnyType>:$operands
+  );
+
+  let results = (outs
+      Variadic<AnyType>:$results
+  );
+
+  let regions = (region
+      SizedRegion<1>:$region
+  );
+
+  let assemblyFormat = [{
+    `(` $operands `)` attr-dict `:` functional-type(operands, results) $region
+  }];
+
+
+}
+
 def CustomOp : Gate_Op<"custom", [NoMemoryEffect, AttrSizedOperandSegments, DifferentiableGate]> {
     let summary = "A generic quantum gate on n qubits with m floating point parameters.";
     let description = [{
@@ -188,6 +208,36 @@ def CustomOp : Gate_Op<"custom", [NoMemoryEffect, AttrSizedOperandSegments, Diff
 
     let assemblyFormat = [{
         $gate_name `(` $params `)` $in_qubits attr-dict `:` type($out_qubits)
+    }];
+
+    let extraClassDeclaration = extraBaseClassDeclaration # [{
+        mlir::ValueRange getDiffParams() {
+            return getParams();
+        }
+        size_t getDiffOperandIdx() {
+            return 0;
+        }
+    }];
+}
+
+def OpenQASM3CustomOp : Gate_Op<"openqasm3Custom", [NoMemoryEffect, AttrSizedOperandSegments, DifferentiableGate]> {
+    let summary = "A generic quantum gate on n qubits with m floating point parameters.";
+    let description = [{
+    }];
+
+    let arguments = (ins
+        Variadic<F64>:$params,
+        Variadic<I64>:$paramId,
+        Variadic<QubitType>:$in_qubits,
+        StrAttr:$gate_name
+    );
+
+    let results = (outs
+        Variadic<QubitType>:$out_qubits
+    );
+
+    let assemblyFormat = [{
+        $gate_name `(` $paramId $params `)` $in_qubits attr-dict `:` type($out_qubits)
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration # [{

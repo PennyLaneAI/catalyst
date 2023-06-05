@@ -208,11 +208,14 @@ def _func_def_impl(ctx, *args, call_jaxpr, fn, call=True):  # pragma: no cover
     raise NotImplementedError()
 
 
-def _func_symbol_lowering(ctx, fn_name, call_jaxpr):
+def _func_symbol_lowering(ctx, fn_name, call_jaxpr, device):
     """Create a func::FuncOp from JAXPR."""
     if isinstance(call_jaxpr, jax.core.Jaxpr):
         call_jaxpr = jax.core.ClosedJaxpr(call_jaxpr, ())
-    symbol_name = mlir.lower_jaxpr_to_fun(ctx, fn_name, call_jaxpr, tuple()).name.value
+    func_op = mlir.lower_jaxpr_to_fun(ctx, fn_name, call_jaxpr, tuple())
+    if device:
+        func_op.attributes["catalyst.device"] = ir.StringAttr.get(device)
+    symbol_name = func_op.name.value
     return symbol_name
 
 
@@ -229,7 +232,7 @@ def _func_call_lowering(symbol_name, avals_out, *args):
     return out_nodes
 
 
-def _func_lowering(ctx, *args, call_jaxpr, fn, call=True):
+def _func_lowering(ctx, *args, call_jaxpr, fn, call=True, device=None):
     """Lower a quantum function into MLIR in a two step process.
     The first step is the compilation of the definition of the function fn.
     The second step is compiling a call to function fn.
@@ -244,7 +247,7 @@ def _func_lowering(ctx, *args, call_jaxpr, fn, call=True):
     if fn in mlir_fn_cache:
         symbol_name = mlir_fn_cache[fn]
     else:
-        symbol_name = _func_symbol_lowering(ctx.module_context, fn.__name__, call_jaxpr)
+        symbol_name = _func_symbol_lowering(ctx.module_context, fn.__name__, call_jaxpr, device)
         mlir_fn_cache[fn] = symbol_name
 
     if not call:
