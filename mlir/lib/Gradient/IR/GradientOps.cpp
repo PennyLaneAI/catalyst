@@ -47,7 +47,6 @@ void VJPOp::setCalleeFromCallable(CallInterfaceCallable callee)
     (*this)->setAttr("callee", callee.get<SymbolRefAttr>());
 };
 
-
 // Gradient input checker
 LogicalResult verifyGradInputs(OpState *op_state, func::FuncOp callee, ValueRange callee_operands,
                                const std::vector<size_t> &diff_arg_indices)
