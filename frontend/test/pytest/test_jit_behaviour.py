@@ -50,6 +50,7 @@ def f_jit_builder(backend, wires=1, shots=1000):
 
     return f
 
+
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
 def function_jaxnumpy_csingle(x: jax.numpy.csingle, y: jax.numpy.csingle):
