@@ -315,7 +315,12 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
     symbol_name = mlir_fn_cache[fn.fn]
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
-    constants = [ConstantOp(ir.DenseElementsAttr.get(const)).results for const in jaxpr.consts]
+
+    # ``ir.DenseElementsAttr.get()`` constructs a dense elements attribute from an array of element values.
+    # This doesn't support ``jaxlib.xla_extension.Array``, so we have to cast such constants to numpy array types.
+    constants = [
+        ConstantOp(ir.DenseElementsAttr.get(np.asarray(const))).results for const in jaxpr.consts
+    ]
     args_and_consts = constants + list(args)
 
     return GradOp(
@@ -357,7 +362,9 @@ def _jvp_lowering(ctx, *args, jaxpr, fn, grad_params):
 
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
-    constants = [ConstantOp(ir.DenseElementsAttr.get(const)).results for const in jaxpr.consts]
+    constants = [
+        ConstantOp(ir.DenseElementsAttr.get(np.asarray(const))).results for const in jaxpr.consts
+    ]
     consts_and_args = constants + args
     func_call_jaxpr = jaxpr.eqns[0].params["call_jaxpr"]
     func_args = consts_and_args[: len(func_call_jaxpr.invars)]
@@ -410,7 +417,9 @@ def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
 
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
     flat_output_types = util.flatten(output_types)
-    constants = [ConstantOp(ir.DenseElementsAttr.get(const)).results for const in jaxpr.consts]
+    constants = [
+        ConstantOp(ir.DenseElementsAttr.get(np.asarray(const))).results for const in jaxpr.consts
+    ]
     consts_and_args = constants + args
     func_call_jaxpr = jaxpr.eqns[0].params["call_jaxpr"]
     func_args = consts_and_args[: len(func_call_jaxpr.invars)]

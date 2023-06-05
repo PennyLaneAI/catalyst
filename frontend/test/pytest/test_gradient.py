@@ -706,14 +706,16 @@ def test_finite_diff_higher_order(inp, backend):
     assert np.allclose(compiled_grad2_default(inp), interpretted_grad2_default(inp), rtol=0.1)
 
 
+@pytest.mark.parametrize(
+    "h_coeffs", [[0.2, -0.53], np.array([0.2, -0.53]), jnp.array([0.2, -0.53])]
+)
 @pytest.mark.parametrize("inp", [([1.0, 2.0])])
-def test_jax_consts(inp, backend):
-    """Test jax consts."""
+def test_jax_consts(inp, h_coeffs, backend):
+    """Test jax constants."""
 
     def circuit(params):
         qml.CRX(params[0], wires=[0, 1])
         qml.CRX(params[0], wires=[0, 2])
-        h_coeffs = np.array([0.2, -0.53])
         h_obs = [qml.PauliX(0) @ qml.PauliZ(1), qml.PauliZ(0) @ qml.Hadamard(2)]
         return qml.expval(qml.Hamiltonian(h_coeffs, h_obs))
 
