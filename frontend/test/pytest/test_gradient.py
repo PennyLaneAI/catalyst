@@ -706,11 +706,12 @@ def test_finite_diff_higher_order(inp, backend):
     assert np.allclose(compiled_grad2_default(inp), interpretted_grad2_default(inp), rtol=0.1)
 
 
+@pytest.mark.parametrize("g_method", ["fd", "ps", "adj"])
 @pytest.mark.parametrize(
     "h_coeffs", [[0.2, -0.53], np.array([0.2, -0.53]), jnp.array([0.2, -0.53])]
 )
 @pytest.mark.parametrize("inp", [([1.0, 2.0])])
-def test_jax_consts(inp, h_coeffs, backend):
+def test_jax_consts(inp, h_coeffs, g_method, backend):
     """Test jax constants."""
 
     def circuit(params):
@@ -722,7 +723,7 @@ def test_jax_consts(inp, h_coeffs, backend):
     @qjit()
     def compile_grad(params):
         g = qml.qnode(qml.device(backend, wires=3))(circuit)
-        h = grad(g)
+        h = grad(g, method=g_method)
         return h(params)
 
     def interpret_grad(params):
