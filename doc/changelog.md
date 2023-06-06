@@ -114,7 +114,8 @@
   [#136](https://github.com/PennyLaneAI/catalyst/pull/136)
 
   Prior to this, the computation of hybrid gradients executed all of the classical code
-  being differentiated in a `pcount` function that solely counted the number of gate
+  being differentiated in a ``pcount`` function that solely counted the number of gate
+
   parameters in the quantum circuit. This was so ``argmap`` and other downstream
   functions could allocate memrefs large enough to store all gate parameters.
 
