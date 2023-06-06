@@ -94,7 +94,7 @@ void __quantum__rt__device(int8_t *spec, int8_t *value)
         return;
     }
     else if (args[0] == "kwargs") {
-        Catalyst::Runtime::CTX->setDeviceInfo(args[1]);
+        Catalyst::Runtime::CTX->setDeviceKwArgs(args[1]);
         return;
     }
     else if (args[0] == "backend") {

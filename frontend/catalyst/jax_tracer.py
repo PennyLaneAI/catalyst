@@ -115,7 +115,7 @@ def get_traceable_fn(qfunc, device):
         num_wires = len(device.wires)
 
         jprim.qdevice("shots", str(shots))
-        jprim.qdevice("kwargs", device.backend_args)
+        jprim.qdevice("kwargs", device.backend_kwargs)
         jprim.qdevice("backend", device.backend_name)
 
         qreg = jprim.qalloc(num_wires)

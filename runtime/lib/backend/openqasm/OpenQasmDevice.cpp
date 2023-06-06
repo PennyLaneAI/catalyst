@@ -77,7 +77,13 @@ void OpenQasmDevice::PrintState()
     oss << "#pragma braket result state_vector";
     auto &&circuit = builder->toOpenQasmWithCustomInstructions(oss.str());
 
-    auto &&state = runner->State(circuit, concrete_device_name, device_shots, GetNumQubits());
+    std::string s3_folder_str{};
+    if (device_kwargs.contains("s3_destination_folder")) {
+        s3_folder_str = device_kwargs["s3_destination_folder"];
+    }
+
+    auto &&state = runner->State(circuit, device_kwargs["device_arn"], device_shots, GetNumQubits(),
+                                 s3_folder_str);
 
     const size_t num_qubits = GetNumQubits();
     const size_t size = 1UL << num_qubits;
@@ -169,7 +175,12 @@ auto OpenQasmDevice::Expval([[maybe_unused]] ObsIdType obsKey) -> double
                                     Catalyst::Runtime::Simulator::Lightning::Measurements::Expval);
     }
 
-    return runner->Expval(circuit, concrete_device_name, device_shots);
+    std::string s3_folder_str{};
+    if (device_kwargs.contains("s3_destination_folder")) {
+        s3_folder_str = device_kwargs["s3_destination_folder"];
+    }
+
+    return runner->Expval(circuit, device_kwargs["device_arn"], device_shots, s3_folder_str);
 }
 
 auto OpenQasmDevice::Var([[maybe_unused]] ObsIdType obsKey) -> double
@@ -190,7 +201,12 @@ auto OpenQasmDevice::Var([[maybe_unused]] ObsIdType obsKey) -> double
                                     Catalyst::Runtime::Simulator::Lightning::Measurements::Var);
     }
 
-    return runner->Var(circuit, concrete_device_name, device_shots);
+    std::string s3_folder_str{};
+    if (device_kwargs.contains("s3_destination_folder")) {
+        s3_folder_str = device_kwargs["s3_destination_folder"];
+    }
+
+    return runner->Var(circuit, device_kwargs["device_arn"], device_shots, s3_folder_str);
 }
 
 void OpenQasmDevice::State([[maybe_unused]] DataView<std::complex<double>, 1> &state)
@@ -199,7 +215,13 @@ void OpenQasmDevice::State([[maybe_unused]] DataView<std::complex<double>, 1> &s
     oss << "#pragma braket result state_vector";
     auto &&circuit = builder->toOpenQasmWithCustomInstructions(oss.str());
 
-    auto &&dv_state = runner->State(circuit, concrete_device_name, device_shots, GetNumQubits());
+    std::string s3_folder_str{};
+    if (device_kwargs.contains("s3_destination_folder")) {
+        s3_folder_str = device_kwargs["s3_destination_folder"];
+    }
+
+    auto &&dv_state = runner->State(circuit, device_kwargs["device_arn"], device_shots,
+                                    GetNumQubits(), s3_folder_str);
     RT_FAIL_IF(state.size() != dv_state.size(), "Invalid size for the pre-allocated state vector");
 
     std::move(dv_state.begin(), dv_state.end(), state.begin());
@@ -207,8 +229,13 @@ void OpenQasmDevice::State([[maybe_unused]] DataView<std::complex<double>, 1> &s
 
 void OpenQasmDevice::Probs(DataView<double, 1> &probs)
 {
-    auto &&dv_probs =
-        runner->Probs(builder->toOpenQasm(), concrete_device_name, device_shots, GetNumQubits());
+    std::string s3_folder_str{};
+    if (device_kwargs.contains("s3_destination_folder")) {
+        s3_folder_str = device_kwargs["s3_destination_folder"];
+    }
+
+    auto &&dv_probs = runner->Probs(builder->toOpenQasm(), device_kwargs["device_arn"],
+                                    device_shots, GetNumQubits(), s3_folder_str);
 
     RT_FAIL_IF(probs.size() != dv_probs.size(), "Invalid size for the pre-allocated probabilities");
 
@@ -226,7 +253,13 @@ void OpenQasmDevice::PartialProbs([[maybe_unused]] DataView<double, 1> &probs,
         << builder->getQubits()[0].toOpenQasm(OpenQasm::RegisterMode::Slice, dev_wires);
     auto &&circuit = builder->toOpenQasmWithCustomInstructions(oss.str());
 
-    auto &&dv_probs = runner->Probs(circuit, concrete_device_name, device_shots, wires.size());
+    std::string s3_folder_str{};
+    if (device_kwargs.contains("s3_destination_folder")) {
+        s3_folder_str = device_kwargs["s3_destination_folder"];
+    }
+
+    auto &&dv_probs = runner->Probs(circuit, device_kwargs["device_arn"], device_shots,
+                                    wires.size(), s3_folder_str);
 
     RT_FAIL_IF(probs.size() != dv_probs.size(), "Invalid size for the pre-allocated probabilities");
 
@@ -235,8 +268,13 @@ void OpenQasmDevice::PartialProbs([[maybe_unused]] DataView<double, 1> &probs,
 
 void OpenQasmDevice::Sample(DataView<double, 2> &samples, size_t shots)
 {
-    auto &&li_samples =
-        runner->Sample(builder->toOpenQasm(), concrete_device_name, device_shots, GetNumQubits());
+    std::string s3_folder_str{};
+    if (device_kwargs.contains("s3_destination_folder")) {
+        s3_folder_str = device_kwargs["s3_destination_folder"];
+    }
+
+    auto &&li_samples = runner->Sample(builder->toOpenQasm(), device_kwargs["device_arn"],
+                                       device_shots, GetNumQubits(), s3_folder_str);
     RT_FAIL_IF(samples.size() != li_samples.size(), "Invalid size for the pre-allocated samples");
 
     const size_t numQubits = GetNumQubits();
@@ -263,8 +301,13 @@ void OpenQasmDevice::PartialSample(DataView<double, 2> &samples,
     // // get device wires
     auto &&dev_wires = getDeviceWires(wires);
 
-    auto &&li_samples =
-        runner->Sample(builder->toOpenQasm(), concrete_device_name, device_shots, GetNumQubits());
+    std::string s3_folder_str{};
+    if (device_kwargs.contains("s3_destination_folder")) {
+        s3_folder_str = device_kwargs["s3_destination_folder"];
+    }
+
+    auto &&li_samples = runner->Sample(builder->toOpenQasm(), device_kwargs["device_arn"],
+                                       device_shots, GetNumQubits(), s3_folder_str);
 
     auto samplesIter = samples.begin();
     for (size_t shot = 0; shot < shots; shot++) {
@@ -283,8 +326,13 @@ void OpenQasmDevice::Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &
     RT_FAIL_IF(eigvals.size() != numElements || counts.size() != numElements,
                "Invalid size for the pre-allocated counts");
 
-    auto &&li_samples =
-        runner->Sample(builder->toOpenQasm(), concrete_device_name, device_shots, GetNumQubits());
+    std::string s3_folder_str{};
+    if (device_kwargs.contains("s3_destination_folder")) {
+        s3_folder_str = device_kwargs["s3_destination_folder"];
+    }
+
+    auto &&li_samples = runner->Sample(builder->toOpenQasm(), device_kwargs["device_arn"],
+                                       device_shots, GetNumQubits(), s3_folder_str);
 
     std::iota(eigvals.begin(), eigvals.end(), 0);
     std::fill(counts.begin(), counts.end(), 0);
@@ -313,8 +361,13 @@ void OpenQasmDevice::PartialCounts(DataView<double, 1> &eigvals, DataView<int64_
 
     auto &&dev_wires = getDeviceWires(wires);
 
-    auto &&li_samples =
-        runner->Sample(builder->toOpenQasm(), concrete_device_name, device_shots, GetNumQubits());
+    std::string s3_folder_str{};
+    if (device_kwargs.contains("s3_destination_folder")) {
+        s3_folder_str = device_kwargs["s3_destination_folder"];
+    }
+
+    auto &&li_samples = runner->Sample(builder->toOpenQasm(), device_kwargs["device_arn"],
+                                       device_shots, GetNumQubits(), s3_folder_str);
 
     std::iota(eigvals.begin(), eigvals.end(), 0);
     std::fill(counts.begin(), counts.end(), 0);

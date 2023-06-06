@@ -74,9 +74,19 @@ class QFunc:
                     f"The {self.device.short_name} device is not "
                     "supported for compilation at the moment."
                 )
-            backend_args = self.device.device_arn if hasattr(self.device, "device_arn") else ""
+
+            backend_kwargs = (
+                "device_arn=" + self.device._device._arn + ";"
+                if hasattr(self.device, "_device") and hasattr(self.device._device, "_arn")
+                else ""
+            )
+            backend_kwargs += (
+                "s3_destination_folder=" + str(self.device._s3_folder) + ";"
+                if hasattr(self.device, "_s3_folder") and self.device._s3_folder
+                else ""
+            )
             device = QJITDevice(
-                self.device.shots, self.device.wires, self.device.short_name, backend_args
+                self.device.shots, self.device.wires, self.device.short_name, backend_kwargs
             )
         else:
             # Allow QFunc to still be used by itself for internal testing.
@@ -1244,9 +1254,9 @@ class QJITDevice(qml.QubitDevice):
         "Hamiltonian",
     ]
 
-    def __init__(self, shots=None, wires=None, backend_name=None, backend_args=None):
+    def __init__(self, shots=None, wires=None, backend_name=None, backend_kwargs=None):
         self.backend_name = backend_name if backend_name else "default"
-        self.backend_args = backend_args if backend_args else ""
+        self.backend_kwargs = backend_kwargs if backend_kwargs else ""
         super().__init__(wires=wires, shots=shots)
 
     def apply(self, operations, **kwargs):

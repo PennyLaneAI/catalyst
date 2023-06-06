@@ -65,13 +65,13 @@ class ExecutionContext final {
         std::function<std::unique_ptr<QuantumDevice>(bool, size_t, std::string)>;
     std::unordered_map<std::string_view, DeviceInitializer> _device_map{
         {"lightning.qubit",
-         [](bool tape_recording, size_t shots, [[maybe_unused]] std::string device_info) {
+         [](bool tape_recording, size_t shots, [[maybe_unused]] std::string device_kwargs) {
              return std::make_unique<Simulator::LightningSimulator>(tape_recording, shots);
          }},
     };
 
     // Device specifications
-    std::string _device_info{};
+    std::string _device_kwargs{};
     size_t _device_shots{1000};
 
     std::string _device_name;
@@ -91,15 +91,15 @@ class ExecutionContext final {
     {
 #ifdef __device_lightning_kokkos
         _device_map.emplace("lightning.kokkos", [](bool tape_recording, size_t shots,
-                                                   [[maybe_unused]] std::string device_info) {
+                                                   [[maybe_unused]] std::string device_kwargs) {
             return std::make_unique<Simulator::LightningKokkosSimulator>(tape_recording, shots);
         });
 #endif
 #ifdef __device_openqasm
         _device_map.emplace("braket.aws.qubit",
-                            [](bool tape_recording, size_t shots, std::string device_info) {
+                            [](bool tape_recording, size_t shots, std::string device_kwargs) {
                                 return std::make_unique<Device::OpenQasmDevice>(
-                                    tape_recording, shots, std::move(device_info));
+                                    tape_recording, shots, std::move(device_kwargs));
                             });
 #endif
         _driver_mm_ptr = std::make_unique<MemoryManager>();
@@ -122,13 +122,13 @@ class ExecutionContext final {
 
     void setDeviceShots(size_t shots) noexcept { _device_shots = shots; }
 
-    void setDeviceInfo(std::string_view info) noexcept { _device_info = info; }
+    void setDeviceKwArgs(std::string_view info) noexcept { _device_kwargs = info; }
 
     [[nodiscard]] auto getDeviceName() const -> std::string_view { return _device_name; }
 
     [[nodiscard]] auto getDeviceShots() const -> size_t { return _device_shots; }
 
-    [[nodiscard]] auto getDeviceInfo() const -> std::string { return _device_info; }
+    [[nodiscard]] auto getDeviceKwArgs() const -> std::string { return _device_kwargs; }
 
     [[nodiscard]] auto getDeviceRecorderStatus() const -> bool { return _tape_recording; }
 
@@ -138,15 +138,16 @@ class ExecutionContext final {
             _device_name = name;
         }
 
-        if (_device_name == "braket.aws.qubit" && _device_info.empty()) {
-            _device_info = "arn:aws:braket:::device/quantum-simulator/amazon/sv1";
+        if (_device_name == "braket.aws.qubit" && _device_kwargs.empty()) {
+            _device_kwargs = "device_arn=arn:aws:braket:::device/quantum-simulator/amazon/sv1;";
+            // Use arn:aws:braket:::device/quantum-simulator/amazon/sv1 as the default device.
         }
 
         _driver_ptr.reset(nullptr);
 
         auto iter = _device_map.find(_device_name);
         if (iter != _device_map.end()) {
-            _driver_ptr = iter->second(_tape_recording, _device_shots, _device_info);
+            _driver_ptr = iter->second(_tape_recording, _device_shots, _device_kwargs);
 
 #ifdef __device_openqasm
             if (_device_name == "braket.aws.qubit" && !Py_IsInitialized()) {
