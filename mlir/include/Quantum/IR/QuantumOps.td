@@ -204,7 +204,8 @@ def CustomOp : Gate_Op<"custom", [NoMemoryEffect, AttrSizedOperandSegments, Diff
     let arguments = (ins
         Variadic<F64>:$params,
         Variadic<QubitType>:$in_qubits,
-        StrAttr:$gate_name
+        StrAttr:$gate_name,
+        OptionalAttr<BoolAttr>:$adjoint
     );
 
     let results = (outs
