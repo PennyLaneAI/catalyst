@@ -83,7 +83,7 @@
 
   @qjit
   def workflow(params, tangent):
-      return jvp(f, [params], [tangent])
+    return jvp(f, [params], [tangent])
 
   workflow(jnp.zeros([4], dtype=float), jnp.ones([4], dtype=float))
   ```
@@ -139,6 +139,32 @@
 
 * Fixes file renaming within pass pipelines.
   [#126](https://github.com/PennyLaneAI/catalyst/pull/126)
+
+* Fixes the issue with the ``do_queue`` deprecation warnings in PennyLane.
+  [#146](https://github.com/PennyLaneAI/catalyst/pull/146)
+
+* Fixes the issue with gradients failing to work with ``jnp.array`` as constants.
+  [#152](https://github.com/PennyLaneAI/catalyst/pull/152)
+  
+  An example of a newly supported workflow:
+  
+  ``` python
+  coeffs = jnp.array([0.1, 0.2])
+  terms = [qml.PauliX(0) @ qml.PauliZ(1), qml.PauliZ(0)]
+  H = qml.Hamiltonian(coeffs, terms)
+
+  @qjit
+  @qml.qnode(qml.device("lightning.qubit", wires=2))
+  def circuit(x):
+    qml.RX(x[0], wires=0)
+    qml.RY(x[1], wires=0)
+    qml.CNOT(wires=[0, 1])
+    return qml.expval(H)
+
+  params = jnp.array([0.3, 0.4])
+  jax.grad(circuit)(params)
+  ```
+
 
 <h3>Contributors</h3>
 
