@@ -305,13 +305,16 @@ LogicalResult StateOp::verify()
 
 LogicalResult AdjointOp::verify()
 {
-    for (auto &block : this->getRegion()) {
-      for (auto &op : block) {
-        if (op.hasTrait<MeasurementProcess::Trait>()) {
-          return emitOpError("quantum measurements are not allowed in the adjoint regions");
-        }
-      }
+  auto res = this->getRegion().walk([](Operation *op) {
+    if (op->hasTrait<MeasurementProcess::Trait>()) {
+      return WalkResult::interrupt();
     }
-    return success();
+    return WalkResult::advance();
+  });
+
+  if (res.wasInterrupted()) {
+      return emitOpError("quantum measurements are not allowed in the adjoint regions");
+  }
+  return success();
 }
 
