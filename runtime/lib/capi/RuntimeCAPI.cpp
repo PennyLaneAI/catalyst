@@ -87,14 +87,23 @@ void __quantum__rt__device(int8_t *spec, int8_t *value)
 
     const std::vector<std::string_view> args{reinterpret_cast<char *>(spec),
                                              reinterpret_cast<char *>(value)};
-
-    if (args[0] == "backend") {
+    if (args[0] == "shots") {
+        int64_t shots = std::atoll(reinterpret_cast<char *>(value));
+        RT_ASSERT(shots >= 0);
+        Catalyst::Runtime::CTX->setDeviceShots(static_cast<size_t>(shots));
+        return;
+    }
+    else if (args[0] == "kwargs") {
+        Catalyst::Runtime::CTX->setDeviceInfo(args[1]);
+        return;
+    }
+    else if (args[0] == "backend") {
         RT_FAIL_IF(!Catalyst::Runtime::CTX->initDevice(args[1]),
                    "Failed initialization of the backend device");
+        return;
     }
-    else {
-        RT_FAIL("Invalid device specification; Supported keys: ['backend']");
-    }
+
+    RT_FAIL("Invalid device specification; Supported keys: ['shots', 'kwargs', 'backend']");
 }
 
 void __quantum__rt__print_state() { Catalyst::Runtime::CTX->getDevice()->PrintState(); }
