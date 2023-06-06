@@ -60,7 +60,7 @@ class QFunc:
     """
 
     # The set of supported devices at runtime
-    RUNTIME_DEVICES = ("lightning.qubit", "lightning.kokkos", "braket.simulator")
+    RUNTIME_DEVICES = ("lightning.qubit", "lightning.kokkos", "braket.aws.qubit")
 
     def __init__(self, fn, device):
         self.func = fn
@@ -74,12 +74,10 @@ class QFunc:
                     f"The {self.device.short_name} device is not "
                     "supported for compilation at the moment."
                 )
-            device_name = (
-                self.device.short_name
-                if self.device.short_name != "braket.simulator"
-                else "arn:aws:braket:::device/quantum-simulator/amazon/sv1"
+            backend_args = self.device.device_arn if hasattr(self.device, "device_arn") else ""
+            device = QJITDevice(
+                self.device.shots, self.device.wires, self.device.short_name, backend_args
             )
-            device = QJITDevice(self.device.shots, self.device.wires, device_name)
         else:
             # Allow QFunc to still be used by itself for internal testing.
             device = self.device
@@ -1246,8 +1244,9 @@ class QJITDevice(qml.QubitDevice):
         "Hamiltonian",
     ]
 
-    def __init__(self, shots=None, wires=None, backend=None):
-        self.backend = backend if backend else "default"
+    def __init__(self, shots=None, wires=None, backend_name=None, backend_args=None):
+        self.backend_name = backend_name if backend_name else "default"
+        self.backend_args = backend_args if backend_args else ""
         super().__init__(wires=wires, shots=shots)
 
     def apply(self, operations, **kwargs):
