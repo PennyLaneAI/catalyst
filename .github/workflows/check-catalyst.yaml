@@ -516,9 +516,6 @@ jobs:
         fail-on-cache-miss: True
 
     - name: Build Catalyst-Runtime
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_BRAKET_DEVICE_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_BRAKET_DEVICE_ACCESS_KEY }}
       run: |
         COMPILER_LAUNCHER="" \
         RT_BUILD_DIR="$(pwd)/runtime-build" \
@@ -538,6 +535,9 @@ jobs:
         chmod +x quantum-build/bin/quantum-opt  # artifact upload does not preserve permissions
 
     - name: Run Python Pytest Tests
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_BRAKET_DEVICE_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_BRAKET_DEVICE_ACCESS_KEY }}
       run: |
         make pytest
 
