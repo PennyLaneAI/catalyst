@@ -1504,8 +1504,18 @@ TEST_CASE("Test __rt__device registering the OpenQasm device", "[CoreQIS]")
 {
     __quantum__rt__initialize();
 
+    char dev_shots[10] = "shots";
+    char dev_value_shots[4] = "500";
+
+    __quantum__rt__device((int8_t *)dev_shots, (int8_t *)dev_value_shots);
+
+    char dev_kwargs[20] = "kwargs";
+    char dev_value_kwargs[60] = "arn:aws:braket:::device/quantum-simulator/amazon/sv1";
+
+    __quantum__rt__device((int8_t *)dev_kwargs, (int8_t *)dev_value_kwargs);
+
     char dev[8] = "backend";
-    char dev_value[60] = "arn:aws:braket:::device/quantum-simulator/amazon/sv1";
+    char dev_value[30] = "braket.aws.qubit";
 
 #if __has_include("OpenQasmDevice.hpp")
     __quantum__rt__device((int8_t *)dev, (int8_t *)dev_value);
