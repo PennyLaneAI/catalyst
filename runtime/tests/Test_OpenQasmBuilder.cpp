@@ -41,15 +41,15 @@ TEST_CASE("Test lookup openqasm gate names from QIR -> OpenQasm map", "[openqasm
 
 TEST_CASE("Test QasmVariable(type=Float) from OpenQasmBuilder", "[openqasm]")
 {
-    auto var = QasmVariable(VariableType::Float, "alpha");
+    auto var = QasmVariable(VariableType::Float, 0, 1.0);
     CHECK(var.getType() == VariableType::Float);
-    CHECK(var.getName() == "alpha");
+    CHECK(var.getName() == "arg0");
 
-    std::string toqasm = "input float alpha;\n";
+    std::string toqasm = "input float arg0;\n";
     CHECK(var.toOpenQasm() == toqasm);
 
     // Check edge cases
-    auto var_buggy = QasmVariable(static_cast<VariableType>(2), "beta");
+    auto var_buggy = QasmVariable(static_cast<VariableType>(2), 1, 1.0);
     REQUIRE_THROWS_WITH(
         var_buggy.toOpenQasm(),
         Catch::Contains(
@@ -157,7 +157,7 @@ TEST_CASE("Test QasmGate from OpenQasmBuilder", "[openqasm]")
     CHECK(gate2.toOpenQasm(qubits) == gate2_toqasm);
 
     // Check a gate with params (value)
-    auto gate3 = QasmGate("RX", {0.361731}, {}, {2}, false);
+    auto gate3 = QasmGate("RX", {0.361731}, {-1}, {2}, false);
 
     std::string gate3_toqasm = "rx(0.36) q[2];\n";
     CHECK(gate3.toOpenQasm(qubits, 2) == gate3_toqasm);
@@ -166,21 +166,21 @@ TEST_CASE("Test QasmGate from OpenQasmBuilder", "[openqasm]")
     CHECK(gate3.toOpenQasm(qubits, 4) == gate3_toqasm_2);
 
     // Check a gate with params (name)
-    auto gate4 = QasmGate("RX", {}, {"gamma"}, {2}, false);
-    std::string gate4_toqasm = "rx(gamma) q[2];\n";
+    auto gate4 = QasmGate("RX", {0.0}, {0}, {2}, false);
+    std::string gate4_toqasm = "rx(arg0) q[2];\n";
     CHECK(gate4.toOpenQasm(qubits, 2) == gate4_toqasm);
 
     // Check a random gate with several params (value)
     // not a valid gate! This is just for testing...
-    auto gate31 = QasmGate("RX", {0.123, 0.456}, {}, {2}, false);
+    auto gate31 = QasmGate("RX", {0.123, 0.456}, {-1, -1}, {2}, false);
 
     std::string gate31_toqasm = "rx(0.123, 0.456) q[2];\n";
     CHECK(gate31.toOpenQasm(qubits, 3) == gate31_toqasm);
 
     // Check a random gate with several params (name)
     // not a valid gate! This is just for testing...
-    auto gate41 = QasmGate("RX", {}, {"alpha", "gamma"}, {2}, false);
-    std::string gate41_toqasm = "rx(alpha, gamma) q[2];\n";
+    auto gate41 = QasmGate("RX", {0.0, 0.0}, {0, 1}, {2}, false);
+    std::string gate41_toqasm = "rx(arg0, arg1) q[2];\n";
     CHECK(gate41.toOpenQasm(qubits, 2) == gate41_toqasm);
 
     // Check edge cases
@@ -188,11 +188,6 @@ TEST_CASE("Test QasmGate from OpenQasmBuilder", "[openqasm]")
         QasmGate("ABC", {}, {}, {}, true),
         Catch::Contains("[Function:lookup_qasm_gate_name] Error in Catalyst Runtime: The given QIR "
                         "gate name is not supported by the OpenQASM builder"));
-
-    REQUIRE_THROWS_WITH(
-        QasmGate("RX", {0.314}, {"gamma"}, {2}, false),
-        Catch::Contains("[Function:QasmGate] Error in Catalyst Runtime: Parametric gates are "
-                        "currently supported via either their values or names but not both."));
 }
 
 TEST_CASE("Test QasmMeasure from OpenQasmBuilder", "[openqasm]")
@@ -358,8 +353,8 @@ TEMPLATE_TEST_CASE("Test OpenQasmBuilder with dumping the circuit header, gates,
     builder.Gate("PauliX", {}, {}, {0}, false);
     builder.Gate("Hadamard", {}, {}, {1}, false);
     builder.Gate("SWAP", {}, {}, {0, 1}, false);
-    builder.Gate("RZ", {0.12}, {}, {1}, false);
-    builder.Gate("RX", {}, {"alpha"}, {0}, false);
+    builder.Gate("RZ", {0.12}, {-1}, {1}, false);
+    builder.Gate("RX", {0.0}, {0}, {0}, false);
 
     std::string toqasm;
     if (TYPE_INFO(TestType) == TYPE_INFO(OpenQasmBuilder)) {
@@ -369,28 +364,28 @@ TEMPLATE_TEST_CASE("Test OpenQasmBuilder with dumping the circuit header, gates,
         builder.Measure(1, 1);
 
         toqasm = "OPENQASM 3.0;\n"
-                 "input float alpha;\n"
+                 "input float arg0;\n"
                  "qubit[2] q;\n"
                  "bit[2] b;\n"
                  "x q[0];\n"
                  "h q[1];\n"
                  "swap q[0], q[1];\n"
                  "rz(0.12) q[1];\n"
-                 "rx(alpha) q[0];\n"
+                 "rx(arg0) q[0];\n"
                  "b[0] = measure q[0];\n"
                  "b[1] = measure q[1];\n"
                  "reset q;\n";
     }
     else if (TYPE_INFO(TestType) == TYPE_INFO(BraketBuilder)) {
         toqasm = "OPENQASM 3.0;\n"
-                 "input float alpha;\n"
+                 "input float arg0;\n"
                  "qubit[2] q;\n"
                  "bit[2] bits;\n"
                  "x q[0];\n"
                  "h q[1];\n"
                  "swap q[0], q[1];\n"
                  "rz(0.12) q[1];\n"
-                 "rx(alpha) q[0];\n"
+                 "rx(arg0) q[0];\n"
                  "bits = measure q;\n";
     }
 

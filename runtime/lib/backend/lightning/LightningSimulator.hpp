@@ -128,6 +128,7 @@ class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {
     // QIS
     void NamedOperation(const std::string &name, const std::vector<double> &params,
                         const std::vector<QubitIdType> &wires, bool inverse) override;
+
     void TraceNamedOperation(__attribute__((unused)) const std::string &name,
                              __attribute__((unused)) const std::vector<double> &params,
                              __attribute__((unused)) const std::vector<int> &paramIds,

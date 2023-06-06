@@ -18,6 +18,7 @@
 #include <array>
 #include <iomanip>
 #include <memory>
+#include <ranges>
 #include <sstream>
 #include <string>
 #include <string_view>
@@ -110,16 +111,23 @@ constexpr auto lookup_qasm_gate_name(std::string_view gate_name) -> std::string_
 class QasmVariable {
   private:
     const VariableType type;
-    const std::string name;
+    const int name;
+    const double value;
 
   public:
-    explicit QasmVariable(VariableType _type, const std::string &_name) : type(_type), name(_name)
+    explicit QasmVariable(VariableType _type, const int _name, const double _value)
+        : type(_type), name(_name), value(_value)
     {
     }
     ~QasmVariable() = default;
 
     [[nodiscard]] auto getType() const -> VariableType { return type; }
-    [[nodiscard]] auto getName() const -> std::string { return name; }
+    [[nodiscard]] auto getName() const -> std::string
+    {
+        std::ostringstream oss;
+        oss << "arg" << name;
+        return oss.str();
+    }
 
     [[nodiscard]] auto toOpenQasm([[maybe_unused]] const std::string &version = "3.0") const
         -> std::string
@@ -127,7 +135,7 @@ class QasmVariable {
         std::ostringstream oss;
         switch (type) {
         case VariableType::Float: {
-            oss << "input float " << name << ";\n";
+            oss << "input float " << getName() << ";\n";
             return oss.str();
         }
         default:
@@ -235,26 +243,23 @@ class QasmGate {
   private:
     const std::string name;
     const std::vector<double> params_val;
-    const std::vector<std::string> params_str;
+    const std::vector<int> params_id;
     const std::vector<size_t> wires;
     const bool inverse;
 
   public:
     explicit QasmGate(const std::string &_name, const std::vector<double> &_params_val,
-                      const std::vector<std::string> &_params_str,
-                      const std::vector<size_t> &_wires, [[maybe_unused]] bool _inverse)
-        : name(lookup_qasm_gate_name(_name)), params_val(_params_val), params_str(_params_str),
+                      const std::vector<int> &_params_id, const std::vector<size_t> &_wires,
+                      [[maybe_unused]] bool _inverse)
+        : name(lookup_qasm_gate_name(_name)), params_val(_params_val), params_id(_params_id),
           wires(_wires), inverse(_inverse)
     {
-        RT_FAIL_IF(!(params_str.empty() || params_val.empty()),
-                   "Parametric gates are currently supported via either their values or names but "
-                   "not both.");
     }
     ~QasmGate() = default;
 
     [[nodiscard]] auto getName() const -> std::string { return name; }
     [[nodiscard]] auto getParams() const -> std::vector<double> { return params_val; }
-    [[nodiscard]] auto getParamsStr() const -> std::vector<std::string> { return params_str; }
+    [[nodiscard]] auto getParamsStr() const -> std::vector<int> { return params_id; }
     [[nodiscard]] auto getWires() const -> std::vector<size_t> { return wires; }
     [[nodiscard]] auto getInverse() const -> bool { return inverse; }
 
@@ -266,25 +271,29 @@ class QasmGate {
         // name(param_1, ..., param_n) qubit_1, ..., qubit_m
         std::ostringstream oss;
         oss << name;
-        if (!params_val.empty()) {
-            oss << "(";
-            auto iter = params_val.begin();
-            for (; iter != params_val.end() - 1; iter++) {
-                oss << std::setprecision(precision) << *iter << ", ";
+        for (size_t i = 0; i < params_val.size(); i++) {
+            if (i == 0) {
+                oss << "(";
             }
-            oss << std::setprecision(precision) << *iter << ") ";
-        }
-        else if (!params_str.empty()) {
-            oss << "(";
-            auto iter = params_str.begin();
-            for (; iter != params_str.end() - 1; iter++) {
-                oss << *iter << ", ";
+
+            if (params_id[i] == -1) {
+                double value = params_val[i];
+                oss << std::setprecision(precision) << value;
             }
-            oss << *iter << ") ";
+            else {
+                int value = params_id[i];
+                oss << "arg" << value;
+            }
+
+            if (i + 1 != params_val.size()) {
+                oss << ",";
+                oss << " ";
+            }
+            else {
+                oss << ")";
+            }
         }
-        else {
-            oss << " ";
-        }
+        oss << " ";
         oss << qregister.toOpenQasm(RegisterMode::Slice, wires) << ";\n";
         return oss.str();
     }
@@ -502,7 +511,7 @@ class QasmHamiltonianObs final : public QasmObs {
  */
 class OpenQasmBuilder {
   protected:
-    std::unordered_map<QasmVariable> vars;
+    std::unordered_map<int, QasmVariable> vars;
     std::vector<QasmRegister> qregs;
     std::vector<QasmRegister> bregs;
     std::vector<QasmGate> gates;
@@ -540,8 +549,11 @@ class OpenQasmBuilder {
     {
         gates.emplace_back(name, params_val, params_id, wires, inverse);
 
-        for (auto &param : params_id) {
-            vars.emplace(param, {VariableType::Float, param});
+        for (size_t i = 0; i < params_val.size(); i++) {
+            if (params_id[i] == -1)
+                continue;
+            QasmVariable var(VariableType::Float, params_id[i], params_val[i]);
+            vars.insert({params_id[i], var});
         }
     }
     void Measure(size_t bit, size_t wire) { measures.emplace_back(bit, wire); }
@@ -563,7 +575,7 @@ class OpenQasmBuilder {
 
         // variables
         for (auto &var : vars) {
-            oss << var.toOpenQasm();
+            oss << var.second.toOpenQasm();
         }
 
         // quantum registers
@@ -640,7 +652,7 @@ class BraketBuilder : public OpenQasmBuilder {
 
         // variables
         for (auto &var : vars) {
-            oss << var.toOpenQasm();
+            oss << var.second.toOpenQasm();
         }
 
         // quantum registers
