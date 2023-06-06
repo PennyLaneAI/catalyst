@@ -12,27 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <set>
 #include <map>
+#include <set>
 
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
-#include "mlir/IR/BuiltinOps.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/BlockAndValueMapping.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/RegionUtils.h"
-
-
 
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Passes.h"
 #include "Quantum/Transforms/Patterns.h"
 
 #include "llvm/ADT/SetVector.h"
-
 
 using namespace mlir;
 using namespace catalyst::quantum;
@@ -41,21 +38,22 @@ namespace {
 
 bool hasDeviceAttribute(func::FuncOp op)
 {
-  StringAttr device = StringAttr::get(op->getContext(), "catalyst.device");
-  if (!op->hasAttr(device)) return false;
+    StringAttr device = StringAttr::get(op->getContext(), "catalyst.device");
+    if (!op->hasAttr(device))
+        return false;
 
-  StringAttr deviceName = op->getAttrOfType<StringAttr>(device);
-  StringAttr braketSimulatorAttr = StringAttr::get(op->getContext(), "braket.simulator");
-  bool isBraketSimulator = 0 == deviceName.compare(braketSimulatorAttr);
-  return isBraketSimulator ? true : false;
+    StringAttr deviceName = op->getAttrOfType<StringAttr>(device);
+    StringAttr braketSimulatorAttr = StringAttr::get(op->getContext(), "braket.simulator");
+    bool isBraketSimulator = 0 == deviceName.compare(braketSimulatorAttr);
+    return isBraketSimulator ? true : false;
 }
 
-int
-isParameterToFunction(Value val)
+int isParameterToFunction(Value val)
 {
-  if (!isa<BlockArgument>(val)) return -1;
+    if (!isa<BlockArgument>(val))
+        return -1;
 
-  return cast<BlockArgument>(val).getArgNumber();
+    return cast<BlockArgument>(val).getArgNumber();
 }
 
 struct QuantumToOpenQASM3Transform : public OpRewritePattern<func::FuncOp> {
@@ -65,43 +63,49 @@ struct QuantumToOpenQASM3Transform : public OpRewritePattern<func::FuncOp> {
     void rewrite(func::FuncOp op, PatternRewriter &rewriter) const override;
 };
 
-LogicalResult
-QuantumToOpenQASM3Transform::match(func::FuncOp op) const { return hasDeviceAttribute(op) ? success() : failure(); }
+LogicalResult QuantumToOpenQASM3Transform::match(func::FuncOp op) const
+{
+    return hasDeviceAttribute(op) ? success() : failure();
+}
 
-void
-QuantumToOpenQASM3Transform::rewrite(func::FuncOp op, PatternRewriter &rewriter) const  {
- 
-  
-  std::vector<DifferentiableGate> differentiableGates;
-  op.walk([&](mlir::Operation *nestedOp) {
-     if (DifferentiableGate gate = dyn_cast<DifferentiableGate>(nestedOp)) {
-       differentiableGates.push_back(gate);
-     }
-  });
+void QuantumToOpenQASM3Transform::rewrite(func::FuncOp op, PatternRewriter &rewriter) const
+{
 
-  for (auto gate : differentiableGates) {
-      ValueRange gateParams = gate.getDiffParams();
-      rewriter.setInsertionPoint(gate);
-      std::vector<Value> isGateParamFunctionParam;
-      for (auto gateParam : gateParams) {
-        int isFunctionParam = isParameterToFunction(gateParam);
-	Type i64 = rewriter.getI64Type();
-	Value paramVal = rewriter.create<arith::ConstantOp>(gate.getLoc(), i64, rewriter.getIntegerAttr(i64, isFunctionParam));
-	isGateParamFunctionParam.push_back(paramVal);
-      }
+    std::vector<DifferentiableGate> differentiableGates;
+    op.walk([&](mlir::Operation *nestedOp) {
+        if (DifferentiableGate gate = dyn_cast<DifferentiableGate>(nestedOp)) {
+            differentiableGates.push_back(gate);
+        }
+    });
 
-    if (isa<CustomOp>(gate)) {
-      CustomOp customOp = cast<CustomOp>(gate);
-      rewriter.replaceOpWithNewOp<OpenQASM3CustomOp>(gate, customOp.getResultTypes(), gateParams, isGateParamFunctionParam, customOp.getInQubits(), customOp.getGateName());
-    } else if (isa<MultiRZOp>(gate)) {
-      MultiRZOp multiRZOp = cast<MultiRZOp>(gate);
-      rewriter.replaceOpWithNewOp<OpenQASM3MultiRZOp>(gate, multiRZOp.getResultTypes(), gateParams[0], isGateParamFunctionParam[0], multiRZOp.getInQubits());
+    for (auto gate : differentiableGates) {
+        ValueRange gateParams = gate.getDiffParams();
+        rewriter.setInsertionPoint(gate);
+        std::vector<Value> isGateParamFunctionParam;
+        for (auto gateParam : gateParams) {
+            int isFunctionParam = isParameterToFunction(gateParam);
+            Type i64 = rewriter.getI64Type();
+            Value paramVal = rewriter.create<arith::ConstantOp>(
+                gate.getLoc(), i64, rewriter.getIntegerAttr(i64, isFunctionParam));
+            isGateParamFunctionParam.push_back(paramVal);
+        }
+
+        if (isa<CustomOp>(gate)) {
+            CustomOp customOp = cast<CustomOp>(gate);
+            rewriter.replaceOpWithNewOp<OpenQASM3CustomOp>(
+                gate, customOp.getResultTypes(), gateParams, isGateParamFunctionParam,
+                customOp.getInQubits(), customOp.getGateName());
+        }
+        else if (isa<MultiRZOp>(gate)) {
+            MultiRZOp multiRZOp = cast<MultiRZOp>(gate);
+            rewriter.replaceOpWithNewOp<OpenQASM3MultiRZOp>(
+                gate, multiRZOp.getResultTypes(), gateParams[0], isGateParamFunctionParam[0],
+                multiRZOp.getInQubits());
+        }
     }
-  }
 
-  StringAttr deviceAttr = StringAttr::get(op->getContext(), "catalyst.device");
-  op->removeAttr(deviceAttr);
-
+    StringAttr deviceAttr = StringAttr::get(op->getContext(), "catalyst.device");
+    op->removeAttr(deviceAttr);
 }
 
 } // namespace
@@ -123,7 +127,7 @@ struct QuantumToOpenQasm3Pass
         registry.insert<cf::ControlFlowDialect>();
         registry.insert<scf::SCFDialect>();
         registry.insert<arith::ArithDialect>();
-	registry.insert<QuantumDialect>();
+        registry.insert<QuantumDialect>();
     }
 
     void runOnOperation() final
@@ -134,7 +138,7 @@ struct QuantumToOpenQasm3Pass
 
         if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
             signalPassFailure();
-	}
+        }
     }
 };
 

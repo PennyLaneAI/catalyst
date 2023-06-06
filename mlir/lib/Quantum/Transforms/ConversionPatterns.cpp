@@ -261,6 +261,33 @@ struct CustomOpPattern : public OpConversionPattern<CustomOp> {
     }
 };
 
+/// Return a value representing an access into a global string with the given
+/// name, creating the string if necessary.
+static Value getOrCreateGlobalString(Location loc, OpBuilder &builder, StringRef name,
+                                     StringRef value, ModuleOp module)
+{
+    // Create the global at the entry of the module.
+    LLVM::GlobalOp global;
+    if (!(global = module.lookupSymbol<LLVM::GlobalOp>(name))) {
+        OpBuilder::InsertionGuard insertGuard(builder);
+        builder.setInsertionPointToStart(module.getBody());
+        auto type =
+            LLVM::LLVMArrayType::get(IntegerType::get(builder.getContext(), 8), value.size());
+        global =
+            builder.create<LLVM::GlobalOp>(loc, type, /*isConstant=*/true, LLVM::Linkage::Internal,
+                                           name, builder.getStringAttr(value),
+                                           /*alignment=*/0);
+    }
+
+    // Get the pointer to the first character in the global string.
+    Value globalPtr = builder.create<LLVM::AddressOfOp>(loc, global);
+    Value cst0 =
+        builder.create<LLVM::ConstantOp>(loc, builder.getI64Type(), builder.getIndexAttr(0));
+    return builder.create<LLVM::GEPOp>(
+        loc, LLVM::LLVMPointerType::get(IntegerType::get(builder.getContext(), 8)), globalPtr,
+        ArrayRef<Value>({cst0, cst0}));
+}
+
 struct OpenQASM3CustomOpPattern : public OpConversionPattern<OpenQASM3CustomOp> {
     using OpConversionPattern::OpConversionPattern;
 
@@ -270,15 +297,34 @@ struct OpenQASM3CustomOpPattern : public OpConversionPattern<OpenQASM3CustomOp> 
         Location loc = op.getLoc();
         MLIRContext *ctx = getContext();
 
-        SmallVector<Type> argTypes(adaptor.getOperands().getTypes().begin(),
-                                   adaptor.getOperands().getTypes().end());
+        SmallVector<Type> argTypes;
+        auto i8pointer = LLVM::LLVMPointerType::get(IntegerType::get(ctx, 8));
+        argTypes.push_back({i8pointer});
+        argTypes.push_back({IntegerType::get(ctx, 64)});
+        argTypes.push_back({IntegerType::get(ctx, 64)});
 
-        std::string qirName = "__quantum__qis__openqasm__" + op.getGateName().str();
-        Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), argTypes);
+        std::string qirName = "__openqasm__";
+        Type qirSignature =
+            LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), argTypes, /*isVarArg=*/true);
 
         LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
 
-        rewriter.create<LLVM::CallOp>(loc, fnDecl, adaptor.getOperands());
+        SmallVector<Value> args;
+        ModuleOp parentModule = op->getParentOfType<ModuleOp>();
+
+        Value cString = getOrCreateGlobalString(loc, rewriter, op.getGateName().str(),
+                                                op.getGateName(), parentModule);
+
+        args.push_back(cString);
+        Value diffParametersSize = rewriter.create<LLVM::ConstantOp>(
+            loc, rewriter.getI64IntegerAttr(op.getDiffParams().size()));
+        args.push_back(diffParametersSize);
+        Value qubitsSize = rewriter.create<LLVM::ConstantOp>(
+            loc, rewriter.getI64IntegerAttr(op.getInQubits().size()));
+        args.push_back(qubitsSize);
+        args.insert(args.end(), adaptor.getOperands().begin(), adaptor.getOperands().end());
+
+        rewriter.create<LLVM::CallOp>(loc, fnDecl, args);
         rewriter.replaceOp(op, adaptor.getInQubits());
 
         return success();
@@ -324,7 +370,8 @@ struct OpenQASM3MultiRZOpPattern : public OpConversionPattern<OpenQASM3MultiRZOp
 
         StringRef qirName = "__quantum__qis__openqasm__MultiRZ";
         Type qirSignature = LLVM::LLVMFunctionType::get(
-            LLVM::LLVMVoidType::get(ctx), {Float64Type::get(ctx), IntegerType::get(ctx, 64), IntegerType::get(ctx, 64)},
+            LLVM::LLVMVoidType::get(ctx),
+            {Float64Type::get(ctx), IntegerType::get(ctx, 64), IntegerType::get(ctx, 64)},
             /*isVarArg=*/true);
 
         LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
