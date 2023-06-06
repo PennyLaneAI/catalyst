@@ -302,3 +302,16 @@ LogicalResult StateOp::verify()
 
     return success();
 }
+
+LogicalResult AdjointOp::verify()
+{
+    for (auto &block : this->getRegion()) {
+      for (auto &op : block) {
+        if (op.hasTrait<MeasurementProcess::Trait>()) {
+          return emitOpError("quantum measurements are not allowed in the adjoint regions");
+        }
+      }
+    }
+    return success();
+}
+

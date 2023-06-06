@@ -771,6 +771,7 @@ def AdjointOp : Op<QuantumDialect, "adjoint", []> {
         `(` $qreg `,` $params `)` attr-dict `:` functional-type(operands, results) $region
     }];
 
+    let hasVerifier = 1;
 }
 
 def YieldOp : Op<QuantumDialect, "yield", [Pure, ReturnLike, Terminator]> {
