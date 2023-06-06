@@ -138,15 +138,15 @@ struct LowerListPush : public OpConversionPattern<ListPushOp> {
     LogicalResult matchAndRewrite(ListPushOp op, OpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
-        FailureOr<ArrayListBuilder> dynVectorBuilder =
+        FailureOr<ArrayListBuilder> arraylistBuilder =
             ArrayListBuilder::get(op.getLoc(), getTypeConverter(), op.getList(), rewriter);
-        if (failed(dynVectorBuilder)) {
+        if (failed(arraylistBuilder)) {
             return failure();
         }
         auto moduleOp = op->getParentOfType<ModuleOp>();
         FlatSymbolRefAttr pushFn =
-            dynVectorBuilder.value().getOrInsertPushFunction(op.getLoc(), moduleOp, rewriter);
-        dynVectorBuilder.value().emitPush(op.getLoc(), op.getValue(), rewriter, pushFn);
+            arraylistBuilder.value().getOrInsertPushFunction(op.getLoc(), moduleOp, rewriter);
+        arraylistBuilder.value().emitPush(op.getLoc(), op.getValue(), rewriter, pushFn);
         rewriter.eraseOp(op);
         return success();
     }
@@ -158,19 +158,19 @@ struct LowerListLoadData : public OpConversionPattern<ListLoadDataOp> {
     LogicalResult matchAndRewrite(ListLoadDataOp op, OpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
-        FailureOr<ArrayListBuilder> dynVectorBuilder =
+        FailureOr<ArrayListBuilder> arraylistBuilder =
             ArrayListBuilder::get(op.getLoc(), getTypeConverter(), op.getList(), rewriter);
-        if (failed(dynVectorBuilder)) {
+        if (failed(arraylistBuilder)) {
             return failure();
         }
 
         // Ensure the result memref has the correct underlying size (which may be different than the
         // list's underlying memref due to the geometric reallocation).
         Value data =
-            rewriter.create<memref::LoadOp>(op.getLoc(), dynVectorBuilder.value().dataField);
+            rewriter.create<memref::LoadOp>(op.getLoc(), arraylistBuilder.value().dataField);
         auto memrefType = cast<MemRefType>(data.getType());
         Value size =
-            rewriter.create<memref::LoadOp>(op.getLoc(), dynVectorBuilder.value().sizeField);
+            rewriter.create<memref::LoadOp>(op.getLoc(), arraylistBuilder.value().sizeField);
         SmallVector<OpFoldResult> offsets{rewriter.getIndexAttr(0)}, sizes{size},
             strides{rewriter.getIndexAttr(1)};
         Value dataView = rewriter.create<memref::SubViewOp>(op.getLoc(), memrefType, data, offsets,

@@ -17,7 +17,6 @@
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Index/IR/IndexDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -28,6 +27,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
+#include "Catalyst/IR/CatalystDialect.h"
 #include "Gradient/IR/GradientOps.h"
 #include "Gradient/Transforms/Passes.h"
 #include "Gradient/Transforms/Patterns.h"
@@ -58,8 +58,7 @@ struct GradientLoweringPass : public OperationPass<ModuleOp> {
         registry.insert<linalg::LinalgDialect>();
         registry.insert<index::IndexDialect>();
         registry.insert<tensor::TensorDialect>();
-        registry.insert<scf::SCFDialect>();
-        registry.insert<func::FuncDialect>();
+        registry.insert<catalyst::CatalystDialect>();
         registry.insert<memref::MemRefDialect>();
         registry.insert<bufferization::BufferizationDialect>();
     }
@@ -67,25 +66,6 @@ struct GradientLoweringPass : public OperationPass<ModuleOp> {
     void runOnOperation() final
     {
         ModuleOp op = getOperation();
-        TypeConverter vectorTypeConverter;
-        vectorTypeConverter.addConversion([](Type type) -> llvm::Optional<Type> {
-            if (MemRefType::isValidElementType(type)) {
-                return type;
-            }
-            return llvm::None;
-        });
-        vectorTypeConverter.addConversion(
-            [](ParameterVectorType type, SmallVectorImpl<Type> &resultTypes) {
-                // Data
-                resultTypes.push_back(MemRefType::get(
-                    {}, MemRefType::get({ShapedType::kDynamic}, type.getElementType())));
-                auto indexMemRef = MemRefType::get({}, IndexType::get(type.getContext()));
-                // Size
-                resultTypes.push_back(indexMemRef);
-                // Capacity
-                resultTypes.push_back(indexMemRef);
-                return success();
-            });
 
         RewritePatternSet gradientPatterns(&getContext());
         populateLoweringPatterns(gradientPatterns, lowerOnly);
@@ -100,21 +80,6 @@ struct GradientLoweringPass : public OperationPass<ModuleOp> {
         if (failed(applyPatternsAndFoldGreedily(op, std::move(gradientPatterns)))) {
             return signalPassFailure();
         }
-
-        if (lowerVector) {
-            RewritePatternSet gradientVectorPatterns(&getContext());
-            ConversionTarget target(getContext());
-            target.addLegalDialect<arith::ArithDialect, memref::MemRefDialect, func::FuncDialect,
-                                   scf::SCFDialect>();
-            target.addLegalOp<UnrealizedConversionCastOp>();
-            target.addIllegalOp<VectorInitOp, VectorPushOp, VectorSizeOp, VectorLoadDataOp>();
-
-            populateVectorLoweringPatterns(vectorTypeConverter, gradientVectorPatterns);
-
-            if (failed(applyPartialConversion(op, target, std::move(gradientVectorPatterns)))) {
-                return signalPassFailure();
-            }
-        }
     }
 
     std::unique_ptr<Pass> clonePass() const override
@@ -125,10 +90,6 @@ struct GradientLoweringPass : public OperationPass<ModuleOp> {
   protected:
     Option<std::string> lowerOnly{
         *this, "only", llvm::cl::desc("Restrict lowering to a specific type of gradient.")};
-
-    Option<bool> lowerVector{*this, "lower-vectors",
-                             llvm::cl::desc("Lower gradient vector operations."),
-                             llvm::cl::init(true)};
 };
 
 } // namespace gradient

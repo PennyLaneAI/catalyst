@@ -6,7 +6,6 @@ file(GLOB SRC
     gradient_bufferize.cpp
     LoweringPatterns.cpp
     gradient_lowering.cpp
-    vector_lowering.cpp
     ConversionPatterns.cpp
     gradient_to_llvm.cpp
 )

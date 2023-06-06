@@ -16,7 +16,6 @@
 #define GRADIENT_DIALECT
 
 include "mlir/IR/OpBase.td"
-include "mlir/IR/AttrTypeBase.td"
 
 //===----------------------------------------------------------------------===//
 // Gradient dialect definition.
@@ -31,7 +30,6 @@ def Gradient_Dialect : Dialect {
         gradients.
     }];
     let cppNamespace = "::catalyst::gradient";
-    let useDefaultTypePrinterParser = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -40,20 +38,5 @@ def Gradient_Dialect : Dialect {
 
 class Gradient_Op<string mnemonic, list<Trait> traits = []> :
         Op<Gradient_Dialect, mnemonic, traits>;
-
-//===----------------------------------------------------------------------===//
-// Gradient dialect types.
-//===----------------------------------------------------------------------===//
-
-class Gradient_Type<string name, string typeMnemonic, list<Trait> traits = []>
-        : TypeDef<Gradient_Dialect, name, traits> {
-    let mnemonic = typeMnemonic;
-}
-
-def ParameterVectorType : Gradient_Type<"ParameterVector", "vec"> {
-    let summary = "a parameter vector (dynamically resizable array)";
-    let parameters = (ins "Type":$elementType);
-    let assemblyFormat = "`<` $elementType `>`";
-}
 
 #endif // GRADIENT_DIALECT

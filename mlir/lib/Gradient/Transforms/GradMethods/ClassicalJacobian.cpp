@@ -23,7 +23,7 @@
 #include "mlir/Dialect/Index/IR/IndexOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 
-#include "Gradient/IR/GradientOps.h"
+#include "Catalyst/IR/CatalystOps.h"
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Utils/RemoveQuantumMeasurements.h"
@@ -60,9 +60,8 @@ func::FuncOp genArgMapFunction(PatternRewriter &rewriter, Location loc, func::Fu
         rewriter.setInsertionPointToStart(&argMapFn.getBody().front());
 
         // Allocate the memory for the gate parameters collected at runtime.
-        auto paramVectorType =
-            ParameterVectorType::get(rewriter.getContext(), rewriter.getF64Type());
-        Value paramsBuffer = rewriter.create<VectorInitOp>(loc, paramVectorType);
+        auto arrayListType = ArrayListType::get(rewriter.getContext(), rewriter.getF64Type());
+        Value paramsBuffer = rewriter.create<ListInitOp>(loc, arrayListType);
         MemRefType paramsProcessedType = MemRefType::get({}, rewriter.getIndexType());
         Value paramsProcessed = rewriter.create<memref::AllocaOp>(loc, paramsProcessedType);
         Value cZero = rewriter.create<index::ConstantOp>(loc, 0);
@@ -79,7 +78,7 @@ func::FuncOp genArgMapFunction(PatternRewriter &rewriter, Location loc, func::Fu
                 if (!diffParams.empty()) {
                     Value paramIdx = rewriter.create<memref::LoadOp>(loc, paramsProcessed);
                     for (auto param : diffParams) {
-                        rewriter.create<VectorPushOp>(loc, param, paramsBuffer);
+                        rewriter.create<ListPushOp>(loc, param, paramsBuffer);
                         paramIdx = rewriter.create<index::AddOp>(loc, paramIdx, cOne);
                     }
                     rewriter.create<memref::StoreOp>(loc, paramIdx, paramsProcessed);
@@ -91,7 +90,7 @@ func::FuncOp genArgMapFunction(PatternRewriter &rewriter, Location loc, func::Fu
             else if (isa<func::ReturnOp>(op)) {
                 PatternRewriter::InsertionGuard insertGuard(rewriter);
                 rewriter.setInsertionPoint(op);
-                Value data = rewriter.create<VectorLoadDataOp>(loc, paramsBuffer);
+                Value data = rewriter.create<ListLoadDataOp>(loc, paramsBuffer);
                 Value paramsTensor = rewriter.create<bufferization::ToTensorOp>(loc, data);
                 op->setOperands(paramsTensor);
             }

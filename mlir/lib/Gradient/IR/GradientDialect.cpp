@@ -12,12 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "mlir/Transforms/InliningUtils.h"
+
 #include "Gradient/IR/GradientDialect.h"
 #include "Gradient/IR/GradientOps.h"
-#include "mlir/IR/Builders.h"
-#include "mlir/IR/DialectImplementation.h" // needed for generated type parser
-#include "mlir/Transforms/InliningUtils.h"
-#include "llvm/ADT/TypeSwitch.h" // needed for generated type parser
 
 using namespace mlir;
 using namespace catalyst::gradient;
@@ -47,21 +45,9 @@ struct GradientInlinerInterface : public DialectInlinerInterface {
 
 void GradientDialect::initialize()
 {
-    addTypes<
-#define GET_TYPEDEF_LIST
-#include "Gradient/IR/GradientOpsTypes.cpp.inc"
-        >();
-
     addOperations<
 #define GET_OP_LIST
 #include "Gradient/IR/GradientOps.cpp.inc"
         >();
     addInterface<GradientInlinerInterface>();
 }
-
-//===----------------------------------------------------------------------===//
-// Gradient type definitions.
-//===----------------------------------------------------------------------===//
-
-#define GET_TYPEDEF_CLASSES
-#include "Gradient/IR/GradientOpsTypes.cpp.inc"
