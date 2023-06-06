@@ -20,6 +20,7 @@
 #include <bitset>
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "Exception.hpp"
@@ -51,7 +52,7 @@ class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {
     size_t device_shots{0};
     OpenQasm::OpenQasmObsManager obs_manager{};
     OpenQasm::BuilderType builder_type;
-    std::string concrete_device_name;
+    std::unordered_map<std::string, std::string> device_kwargs;
 
     inline auto getDeviceWires(const std::vector<QubitIdType> &wires) -> std::vector<size_t>
     {
@@ -69,15 +70,30 @@ class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {
     }
 
   public:
-    explicit OpenQasmDevice(
-        [[maybe_unused]] bool status = false, size_t shots = default_device_shots,
-        std::string hw_name = "arn:aws:braket:::device/quantum-simulator/amazon/sv1")
-
-        : tape_recording(status), device_shots(shots), concrete_device_name(std::move(hw_name))
+    explicit OpenQasmDevice([[maybe_unused]] bool status = false,
+                            size_t shots = default_device_shots,
+                            std::string _device_kwargs =
+                                "device_arn=arn:aws:braket:::device/quantum-simulator/amazon/sv1;")
+        : tape_recording(status), device_shots(shots)
     {
-        builder_type = concrete_device_name.find("aws:braket") != std::string::npos
-                           ? OpenQasm::BuilderType::Braket
-                           : OpenQasm::BuilderType::Common;
+        const std::string delimiter{";"}; // constexpr
+        const size_t dlm_size = delimiter.size();
+
+        size_t cur_idx = 0;
+        size_t prev_idx = 0;
+        while ((cur_idx = _device_kwargs.find(delimiter, cur_idx)) != std::string::npos) {
+            auto arg = _device_kwargs.substr(prev_idx, cur_idx - prev_idx);
+            size_t eq_idx = arg.find("=");
+
+            // update device kwargs
+            device_kwargs.emplace(std::make_pair(arg.substr(0, eq_idx), arg.substr(eq_idx + 1)));
+
+            cur_idx += dlm_size;
+            prev_idx = cur_idx;
+        }
+
+        builder_type = device_kwargs.contains("device_arn") ? OpenQasm::BuilderType::Braket
+                                                            : OpenQasm::BuilderType::Common;
 
         switch (builder_type) {
         case OpenQasm::BuilderType::Common:
