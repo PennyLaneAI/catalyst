@@ -23,7 +23,7 @@
 
 #include "QubitManager.hpp"
 
-#include "openqasm/OpenQasmBuilder.hpp"
+#include "OpenQasmBuilder.hpp"
 
 namespace Catalyst::Runtime::Device {
 
