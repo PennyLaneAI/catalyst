@@ -200,6 +200,31 @@ void __quantum__qis__Gradient(int64_t numResults, /* results = */...)
     Catalyst::Runtime::CTX->getDevice()->Gradient(mem_views, {});
 }
 
+void __openqasm__(char *gate, int64_t numDifferentiableParams, int64_t numQubits, ...)
+{
+
+    std::vector<int> parameterIds;
+    std::vector<double> parameters;
+    std::vector<QubitIdType> wires(numQubits);
+
+    va_list varParams;
+    va_start(varParams, numQubits);
+
+    for (int64_t i = 0; i < numDifferentiableParams; i++) {
+        parameterIds.push_back(va_arg(varParams, int));
+    }
+    for (int64_t i = 0; i < numDifferentiableParams; i++) {
+        parameters.push_back(va_arg(varParams, double));
+    }
+    for (int64_t i = 0; i < numQubits; i++) {
+        wires.push_back(va_arg(varParams, QubitIdType));
+    }
+    va_end(varParams);
+
+    Catalyst::Runtime::CTX->getDevice()->TraceNamedOperation(gate, parameters, parameterIds, wires,
+                                                             /* inverse = */ false);
+}
+
 void __quantum__qis__Gradient_params([[maybe_unused]] MemRefT_int64_1d *params,
                                      [[maybe_unused]] int64_t numResults,
                                      /* results = */...)

@@ -124,6 +124,11 @@ class LightningKokkosSimulator final : public Catalyst::Runtime::QuantumDevice {
         -> std::tuple<size_t, size_t, size_t, std::vector<std::string>, std::vector<ObsIdType>>;
 
     // QIS
+    void TraceNamedOperation(__attribute__((unused)) const std::string &name,
+                             __attribute__((unused)) const std::vector<double> &params,
+                             __attribute__((unused)) const std::vector<int> &paramIds,
+                             __attribute__((unused)) const std::vector<QubitIdType> &wires,
+                             __attribute__((unused)) bool inverse) override{};
     void NamedOperation(const std::string &name, const std::vector<double> &params,
                         const std::vector<QubitIdType> &wires, bool inverse) override;
     void MatrixOperation(const std::vector<std::complex<double>> &matrix,

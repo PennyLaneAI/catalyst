@@ -502,7 +502,7 @@ class QasmHamiltonianObs final : public QasmObs {
  */
 class OpenQasmBuilder {
   protected:
-    std::vector<QasmVariable> vars;
+    std::unordered_map<QasmVariable> vars;
     std::vector<QasmRegister> qregs;
     std::vector<QasmRegister> bregs;
     std::vector<QasmGate> gates;
@@ -535,13 +535,13 @@ class OpenQasmBuilder {
     }
 
     void Gate(const std::string &name, const std::vector<double> &params_val,
-              const std::vector<std::string> &params_str, const std::vector<size_t> &wires,
+              const std::vector<int> &params_id, const std::vector<size_t> &wires,
               [[maybe_unused]] bool inverse)
     {
-        gates.emplace_back(name, params_val, params_str, wires, inverse);
+        gates.emplace_back(name, params_val, params_id, wires, inverse);
 
-        for (auto &param : params_str) {
-            vars.emplace_back(VariableType::Float, param);
+        for (auto &param : params_id) {
+            vars.emplace(param, {VariableType::Float, param});
         }
     }
     void Measure(size_t bit, size_t wire) { measures.emplace_back(bit, wire); }

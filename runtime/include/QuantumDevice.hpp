@@ -135,6 +135,20 @@ struct QuantumDevice {
                                 const std::vector<QubitIdType> &wires, bool inverse) = 0;
 
     /**
+     * @brief Apply a single gate to the state vector of a device with its name if this is
+     * supported.
+     *
+     * @param name The name of the gate to apply
+     * @param params Optional parameter list for parametric gates
+     * @param params Optional parameter list for parametric gates with parameter identifiers
+     * @param wires Wires to apply gate to
+     * @param inverse Indicates whether to use inverse of gate
+     */
+    virtual void TraceNamedOperation(const std::string &name, const std::vector<double> &params,
+                                     const std::vector<int> &paramIds,
+                                     const std::vector<QubitIdType> &wires, bool inverse) = 0;
+
+    /**
      * @brief Apply a given matrix directly to the state vector of a device.
      *
      * @param matrix The matrix of data in row-major format

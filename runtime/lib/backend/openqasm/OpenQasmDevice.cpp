@@ -101,6 +101,14 @@ auto OpenQasmDevice::One() const -> Result { return const_cast<Result>(&GLOBAL_R
 void OpenQasmDevice::NamedOperation(const std::string &name, const std::vector<double> &params,
                                     const std::vector<QubitIdType> &wires, bool inverse)
 {
+    std::vector<int> paramIds(params.size(), -1);
+    this->TraceNamedOperation(name, params, paramIds, wires, inverse);
+}
+
+void OpenQasmDevice::TraceNamedOperation(const std::string &name, const std::vector<double> &params,
+                                         const std::vector<int> &paramIds,
+                                         const std::vector<QubitIdType> &wires, bool inverse)
+{
     using namespace Catalyst::Runtime::Simulator::Lightning;
 
     // First, check operation specifications
@@ -113,7 +121,7 @@ void OpenQasmDevice::NamedOperation(const std::string &name, const std::vector<d
     // Convert wires to device wires
     auto &&dev_wires = getDeviceWires(wires);
 
-    builder->Gate(name, params, {}, dev_wires, inverse);
+    builder->Gate(name, params, paramIds, dev_wires, inverse);
 }
 
 void OpenQasmDevice::MatrixOperation(
