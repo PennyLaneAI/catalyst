@@ -186,11 +186,14 @@ func.func @custom_gate(%q0 : !quantum.bit, %p : f64) -> (!quantum.bit, !quantum.
     // CHECK: llvm.call @__quantum__qis__Toffoli(%arg0, %arg0, %arg0)
     %q5:3 = quantum.custom "Toffoli"() %q4#0, %q4#1, %q4#1 : !quantum.bit, !quantum.bit, !quantum.bit
 
+    // CHECK: llvm.call @__quantum__qis__RX_Adjoint(%arg1, %arg0)
+    %q6 = quantum.custom "RX"(%p)  %q5#0 { adjoint = true } : !quantum.bit
+
     // CHECK: [[st1:%.+]] = llvm.insertvalue %arg0
     // CHECK: [[st2:%.+]] = llvm.insertvalue %arg0, [[st1]]
     // CHECK: [[st3:%.+]] = llvm.insertvalue %arg0, [[st2]]
     // CHECK: return [[st3]]
-    return %q5#0, %q5#1, %q5#2 : !quantum.bit, !quantum.bit, !quantum.bit
+    return %q6, %q5#1, %q5#2 : !quantum.bit, !quantum.bit, !quantum.bit
 }
 
 // -----
