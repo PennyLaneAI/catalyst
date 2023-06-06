@@ -280,6 +280,37 @@ def MultiRZOp : Gate_Op<"multirz", [NoMemoryEffect, DifferentiableGate]> {
     }];
 }
 
+def OpenQASM3MultiRZOp : Gate_Op<"openqasm3Multirz", [NoMemoryEffect, DifferentiableGate]> {
+    let summary = "Apply an arbitrary multi Z rotation";
+    let description = [{
+        The `quantum.multirz` operation applies an arbitrary multi Z rotation to the state-vector.
+        The arguments are the rotation angle `theta` and a set of qubits the operation acts on.
+    }];
+
+    let arguments = (ins
+        F64:$theta,
+        I64:$paramId,
+        Variadic<QubitType>:$in_qubits
+    );
+
+    let results = (outs
+        Variadic<QubitType>:$out_qubits
+    );
+
+    let assemblyFormat = [{
+        `(` $paramId $theta `)` $in_qubits attr-dict `:` type($out_qubits)
+    }];
+
+    let extraClassDeclaration = extraBaseClassDeclaration # [{
+        mlir::ValueRange getDiffParams() {
+            return getODSOperands(0);
+        }
+        size_t getDiffOperandIdx() {
+            return 0;
+        }
+    }];
+}
+
 def QubitUnitaryOp : Gate_Op<"unitary", [NoMemoryEffect]> {
     let summary = "Apply an arbitrary fixed unitary matrix";
     let description = [{

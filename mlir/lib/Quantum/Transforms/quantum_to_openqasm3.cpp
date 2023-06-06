@@ -80,7 +80,6 @@ QuantumToOpenQASM3Transform::rewrite(func::FuncOp op, PatternRewriter &rewriter)
   });
 
   for (auto gate : differentiableGates) {
-    if (isa<CustomOp>(gate)) {
       ValueRange gateParams = gate.getDiffParams();
       rewriter.setInsertionPoint(gate);
       std::vector<Value> isGateParamFunctionParam;
@@ -91,8 +90,12 @@ QuantumToOpenQASM3Transform::rewrite(func::FuncOp op, PatternRewriter &rewriter)
 	isGateParamFunctionParam.push_back(paramVal);
       }
 
+    if (isa<CustomOp>(gate)) {
       CustomOp customOp = cast<CustomOp>(gate);
-      OpenQASM3CustomOp newOp = rewriter.replaceOpWithNewOp<OpenQASM3CustomOp>(gate, customOp.getResultTypes(), gateParams, isGateParamFunctionParam, customOp.getInQubits(), customOp.getGateName());
+      rewriter.replaceOpWithNewOp<OpenQASM3CustomOp>(gate, customOp.getResultTypes(), gateParams, isGateParamFunctionParam, customOp.getInQubits(), customOp.getGateName());
+    } else if (isa<MultiRZOp>(gate)) {
+      MultiRZOp multiRZOp = cast<MultiRZOp>(gate);
+      rewriter.replaceOpWithNewOp<OpenQASM3MultiRZOp>(gate, multiRZOp.getResultTypes(), gateParams[0], isGateParamFunctionParam[0], multiRZOp.getInQubits());
     }
   }
 

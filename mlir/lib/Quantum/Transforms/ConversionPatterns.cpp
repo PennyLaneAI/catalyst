@@ -313,6 +313,34 @@ struct MultiRZOpPattern : public OpConversionPattern<MultiRZOp> {
     }
 };
 
+struct OpenQASM3MultiRZOpPattern : public OpConversionPattern<OpenQASM3MultiRZOp> {
+    using OpConversionPattern::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(OpenQASM3MultiRZOp op, OpenQASM3MultiRZOpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        Location loc = op.getLoc();
+        MLIRContext *ctx = getContext();
+
+        StringRef qirName = "__quantum__qis__openqasm__MultiRZ";
+        Type qirSignature = LLVM::LLVMFunctionType::get(
+            LLVM::LLVMVoidType::get(ctx), {Float64Type::get(ctx), IntegerType::get(ctx, 64), IntegerType::get(ctx, 64)},
+            /*isVarArg=*/true);
+
+        LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+
+        int64_t numQubits = op.getNumResults();
+        SmallVector<Value> args = adaptor.getOperands();
+        args.insert(args.begin() + 1,
+                    rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(numQubits)));
+
+        rewriter.create<LLVM::CallOp>(loc, fnDecl, args);
+        rewriter.replaceOp(op, adaptor.getInQubits());
+
+        return success();
+    }
+};
+
 struct QubitUnitaryOpPattern : public OpConversionPattern<QubitUnitaryOp> {
     using OpConversionPattern::OpConversionPattern;
 
@@ -746,6 +774,7 @@ void populateQIRConversionPatterns(TypeConverter &typeConverter, RewritePatternS
     patterns.add<CustomOpPattern>(typeConverter, patterns.getContext());
     patterns.add<OpenQASM3CustomOpPattern>(typeConverter, patterns.getContext());
     patterns.add<MultiRZOpPattern>(typeConverter, patterns.getContext());
+    patterns.add<OpenQASM3MultiRZOpPattern>(typeConverter, patterns.getContext());
     patterns.add<QubitUnitaryOpPattern>(typeConverter, patterns.getContext());
     patterns.add<MeasureOpPattern>(typeConverter, patterns.getContext());
     patterns.add<ComputationalBasisOpPattern>(typeConverter, patterns.getContext());
