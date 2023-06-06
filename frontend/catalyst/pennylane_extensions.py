@@ -548,13 +548,14 @@ class CondCallable:
     def _call_with_quantum_ctx(self, ctx):
         def new_branch_fn(branch_fn):
             def callback(qreg):
-                with JaxTape(do_queue=False) as tape:
-                    with tape.quantum_tape:
-                        out = branch_fn()
-                    tape.set_return_val(out)
-                    new_quantum_tape = JaxTape.device.expand_fn(tape.quantum_tape)
-                    tape.quantum_tape = new_quantum_tape
-                    tape.quantum_tape.jax_tape = tape
+                with qml.QueuingManager.stop_recording():
+                    with JaxTape() as tape:
+                        with tape.quantum_tape:
+                            out = branch_fn()
+                        tape.set_return_val(out)
+                        new_quantum_tape = JaxTape.device.expand_fn(tape.quantum_tape)
+                        tape.quantum_tape = new_quantum_tape
+                        tape.quantum_tape.jax_tape = tape
 
                 has_tracer_return_values = out is not None
                 return_values, qreg, qubit_states = trace_quantum_tape(
@@ -777,13 +778,14 @@ class WhileCallable:
         def new_body(*args_and_qreg):
             args, qreg = args_and_qreg[:-1], args_and_qreg[-1]
 
-            with JaxTape(do_queue=False) as tape:
-                with tape.quantum_tape:
-                    out = self.body_fn(*args)
-                tape.set_return_val(out)
-                new_quantum_tape = JaxTape.device.expand_fn(tape.quantum_tape)
-                tape.quantum_tape = new_quantum_tape
-                tape.quantum_tape.jax_tape = tape
+            with qml.QueuingManager.stop_recording():
+                with JaxTape() as tape:
+                    with tape.quantum_tape:
+                        out = self.body_fn(*args)
+                    tape.set_return_val(out)
+                    new_quantum_tape = JaxTape.device.expand_fn(tape.quantum_tape)
+                    tape.quantum_tape = new_quantum_tape
+                    tape.quantum_tape.jax_tape = tape
 
             has_tracer_return_values = True
             return_values, qreg, qubit_states = trace_quantum_tape(
@@ -966,13 +968,14 @@ class ForLoopCallable:
         def new_body(*args_and_qreg):
             args, qreg = args_and_qreg[:-1], args_and_qreg[-1]
 
-            with JaxTape(do_queue=False) as tape:
-                with tape.quantum_tape:
-                    out = self.body_fn(*args)
-                tape.set_return_val(out)
-                new_quantum_tape = JaxTape.device.expand_fn(tape.quantum_tape)
-                tape.quantum_tape = new_quantum_tape
-                tape.quantum_tape.jax_tape = tape
+            with qml.QueuingManager.stop_recording():
+                with JaxTape() as tape:
+                    with tape.quantum_tape:
+                        out = self.body_fn(*args)
+                    tape.set_return_val(out)
+                    new_quantum_tape = JaxTape.device.expand_fn(tape.quantum_tape)
+                    tape.quantum_tape = new_quantum_tape
+                    tape.quantum_tape.jax_tape = tape
 
             has_tracer_return_values = out is not None
             return_values, qreg, qubit_states = trace_quantum_tape(

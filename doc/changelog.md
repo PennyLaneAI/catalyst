@@ -138,6 +138,9 @@
 * Fixes file renaming within pass pipelines.
   [#126](https://github.com/PennyLaneAI/catalyst/pull/126)
 
+* Fixes the issue with the ``do_queue`` deprecation warnings in PennyLane.
+  [#146](https://github.com/PennyLaneAI/catalyst/pull/146)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
