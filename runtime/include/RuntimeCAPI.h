@@ -58,7 +58,6 @@ void __quantum__qis__RX(double, QUBIT *);
 void __quantum__qis__RY(double, QUBIT *);
 void __quantum__qis__RZ(double, QUBIT *);
 void __quantum__qis__Rot(double, double, double, QUBIT *);
-
 void __quantum__qis__CNOT(QUBIT *, QUBIT *);
 void __quantum__qis__CY(QUBIT *, QUBIT *);
 void __quantum__qis__CZ(QUBIT *, QUBIT *);
@@ -72,11 +71,39 @@ void __quantum__qis__CRX(double, QUBIT *, QUBIT *);
 void __quantum__qis__CRY(double, QUBIT *, QUBIT *);
 void __quantum__qis__CRZ(double, QUBIT *, QUBIT *);
 void __quantum__qis__CRot(double, double, double, QUBIT *, QUBIT *);
-
 void __quantum__qis__CSWAP(QUBIT *, QUBIT *, QUBIT *);
 void __quantum__qis__Toffoli(QUBIT *, QUBIT *, QUBIT *);
-
 void __quantum__qis__MultiRZ(double, int64_t, /*qubits*/...);
+
+// Adjoint version of quantum gate instructions
+void __quantum__qis__Identity_Adjoint(QUBIT *);
+void __quantum__qis__PauliX_Adjoint(QUBIT *);
+void __quantum__qis__PauliY_Adjoint(QUBIT *);
+void __quantum__qis__PauliZ_Adjoint(QUBIT *);
+void __quantum__qis__Hadamard_Adjoint(QUBIT *);
+void __quantum__qis__S_Adjoint(QUBIT *);
+void __quantum__qis__T_Adjoint(QUBIT *);
+void __quantum__qis__PhaseShift_Adjoint(double, QUBIT *);
+void __quantum__qis__RX_Adjoint(double, QUBIT *);
+void __quantum__qis__RY_Adjoint(double, QUBIT *);
+void __quantum__qis__RZ_Adjoint(double, QUBIT *);
+void __quantum__qis__Rot_Adjoint(double, double, double, QUBIT *);
+void __quantum__qis__CNOT_Adjoint(QUBIT *, QUBIT *);
+void __quantum__qis__CY_Adjoint(QUBIT *, QUBIT *);
+void __quantum__qis__CZ_Adjoint(QUBIT *, QUBIT *);
+void __quantum__qis__SWAP_Adjoint(QUBIT *, QUBIT *);
+void __quantum__qis__IsingXX_Adjoint(double, QUBIT *, QUBIT *);
+void __quantum__qis__IsingYY_Adjoint(double, QUBIT *, QUBIT *);
+void __quantum__qis__IsingXY_Adjoint(double, QUBIT *, QUBIT *);
+void __quantum__qis__IsingZZ_Adjoint(double, QUBIT *, QUBIT *);
+void __quantum__qis__ControlledPhaseShift_Adjoint(double, QUBIT *, QUBIT *);
+void __quantum__qis__CRX_Adjoint(double, QUBIT *, QUBIT *);
+void __quantum__qis__CRY_Adjoint(double, QUBIT *, QUBIT *);
+void __quantum__qis__CRZ_Adjoint(double, QUBIT *, QUBIT *);
+void __quantum__qis__CRot_Adjoint(double, double, double, QUBIT *, QUBIT *);
+void __quantum__qis__CSWAP_Adjoint(QUBIT *, QUBIT *, QUBIT *);
+void __quantum__qis__Toffoli_Adjoint(QUBIT *, QUBIT *, QUBIT *);
+void __quantum__qis__MultiRZ_Adjoint(double, int64_t, /*qubits*/...);
 
 // Struct pointer arguments for these instructions represent real arguments,
 // as passing structs by value is too unreliable / compiler dependant.

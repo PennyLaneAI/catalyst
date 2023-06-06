@@ -252,11 +252,25 @@ void __quantum__qis__Identity(QUBIT *qubit)
                                                         /* inverse = */ false);
 }
 
+void __quantum__qis__Identity_Adjoint(QUBIT *qubit)
+{
+    Catalyst::Runtime::CTX->getDevice()->NamedOperation("Identity", {},
+                                                        {reinterpret_cast<QubitIdType>(qubit)},
+                                                        /* inverse = */ true);
+}
+
 void __quantum__qis__PauliX(QUBIT *qubit)
 {
     Catalyst::Runtime::CTX->getDevice()->NamedOperation("PauliX", {},
                                                         {reinterpret_cast<QubitIdType>(qubit)},
                                                         /* inverse = */ false);
+}
+
+void __quantum__qis__PauliX_Adjoint(QUBIT *qubit)
+{
+    Catalyst::Runtime::CTX->getDevice()->NamedOperation("PauliX", {},
+                                                        {reinterpret_cast<QubitIdType>(qubit)},
+                                                        /* inverse = */ true);
 }
 
 void __quantum__qis__PauliY(QUBIT *qubit)
@@ -266,11 +280,25 @@ void __quantum__qis__PauliY(QUBIT *qubit)
                                                         /* inverse = */ false);
 }
 
+void __quantum__qis__PauliY_Adjoint(QUBIT *qubit)
+{
+    Catalyst::Runtime::CTX->getDevice()->NamedOperation("PauliY", {},
+                                                        {reinterpret_cast<QubitIdType>(qubit)},
+                                                        /* inverse = */ true);
+}
+
 void __quantum__qis__PauliZ(QUBIT *qubit)
 {
     Catalyst::Runtime::CTX->getDevice()->NamedOperation("PauliZ", {},
                                                         {reinterpret_cast<QubitIdType>(qubit)},
                                                         /* inverse = */ false);
+}
+
+void __quantum__qis__PauliZ_Adjoint(QUBIT *qubit)
+{
+    Catalyst::Runtime::CTX->getDevice()->NamedOperation("PauliZ", {},
+                                                        {reinterpret_cast<QubitIdType>(qubit)},
+                                                        /* inverse = */ true);
 }
 
 void __quantum__qis__Hadamard(QUBIT *qubit)
@@ -280,11 +308,25 @@ void __quantum__qis__Hadamard(QUBIT *qubit)
                                                         /* inverse = */ false);
 }
 
+void __quantum__qis__Hadamard_Adjoint(QUBIT *qubit)
+{
+    Catalyst::Runtime::CTX->getDevice()->NamedOperation("Hadamard", {},
+                                                        {reinterpret_cast<QubitIdType>(qubit)},
+                                                        /* inverse = */ true);
+}
+
 void __quantum__qis__S(QUBIT *qubit)
 {
     Catalyst::Runtime::CTX->getDevice()->NamedOperation("S", {},
                                                         {reinterpret_cast<QubitIdType>(qubit)},
                                                         /* inverse = */ false);
+}
+
+void __quantum__qis__S_Adjoint(QUBIT *qubit)
+{
+    Catalyst::Runtime::CTX->getDevice()->NamedOperation("S", {},
+                                                        {reinterpret_cast<QubitIdType>(qubit)},
+                                                        /* inverse = */ true);
 }
 
 void __quantum__qis__T(QUBIT *qubit)
@@ -294,11 +336,25 @@ void __quantum__qis__T(QUBIT *qubit)
                                                         /* inverse = */ false);
 }
 
+void __quantum__qis__T_Adjoint(QUBIT *qubit)
+{
+    Catalyst::Runtime::CTX->getDevice()->NamedOperation("T", {},
+                                                        {reinterpret_cast<QubitIdType>(qubit)},
+                                                        /* inverse = */ true);
+}
+
 void __quantum__qis__PhaseShift(double theta, QUBIT *qubit)
 {
     Catalyst::Runtime::CTX->getDevice()->NamedOperation("PhaseShift", {theta},
                                                         {reinterpret_cast<QubitIdType>(qubit)},
                                                         /* inverse = */ false);
+}
+
+void __quantum__qis__PhaseShift_Adjoint(double theta, QUBIT *qubit)
+{
+    Catalyst::Runtime::CTX->getDevice()->NamedOperation("PhaseShift", {theta},
+                                                        {reinterpret_cast<QubitIdType>(qubit)},
+                                                        /* inverse = */ true);
 }
 
 void __quantum__qis__RX(double theta, QUBIT *qubit)
@@ -308,11 +364,25 @@ void __quantum__qis__RX(double theta, QUBIT *qubit)
                                                         /* inverse = */ false);
 }
 
+void __quantum__qis__RX_Adjoint(double theta, QUBIT *qubit)
+{
+    Catalyst::Runtime::CTX->getDevice()->NamedOperation("RX", {theta},
+                                                        {reinterpret_cast<QubitIdType>(qubit)},
+                                                        /* inverse = */ true);
+}
+
 void __quantum__qis__RY(double theta, QUBIT *qubit)
 {
     Catalyst::Runtime::CTX->getDevice()->NamedOperation("RY", {theta},
                                                         {reinterpret_cast<QubitIdType>(qubit)},
                                                         /* inverse = */ false);
+}
+
+void __quantum__qis__RY_Adjoint(double theta, QUBIT *qubit)
+{
+    Catalyst::Runtime::CTX->getDevice()->NamedOperation("RY", {theta},
+                                                        {reinterpret_cast<QubitIdType>(qubit)},
+                                                        /* inverse = */ true);
 }
 
 void __quantum__qis__RZ(double theta, QUBIT *qubit)
@@ -322,11 +392,25 @@ void __quantum__qis__RZ(double theta, QUBIT *qubit)
                                                         /* inverse = */ false);
 }
 
+void __quantum__qis__RZ_Adjoint(double theta, QUBIT *qubit)
+{
+    Catalyst::Runtime::CTX->getDevice()->NamedOperation("RZ", {theta},
+                                                        {reinterpret_cast<QubitIdType>(qubit)},
+                                                        /* inverse = */ true);
+}
+
 void __quantum__qis__Rot(double phi, double theta, double omega, QUBIT *qubit)
 {
     Catalyst::Runtime::CTX->getDevice()->NamedOperation("Rot", {phi, theta, omega},
                                                         {reinterpret_cast<QubitIdType>(qubit)},
                                                         /* inverse = */ false);
+}
+
+void __quantum__qis__Rot_Adjoint(double phi, double theta, double omega, QUBIT *qubit)
+{
+    Catalyst::Runtime::CTX->getDevice()->NamedOperation("Rot", {phi, theta, omega},
+                                                        {reinterpret_cast<QubitIdType>(qubit)},
+                                                        /* inverse = */ true);
 }
 
 void __quantum__qis__CNOT(QUBIT *control, QUBIT *target)
@@ -338,6 +422,15 @@ void __quantum__qis__CNOT(QUBIT *control, QUBIT *target)
         /* inverse = */ false);
 }
 
+void __quantum__qis__CNOT_Adjoint(QUBIT *control, QUBIT *target)
+{
+    Catalyst::Runtime::CTX->getDevice()->NamedOperation(
+        "CNOT", {},
+        {/* control = */ reinterpret_cast<QubitIdType>(control),
+         /* target = */ reinterpret_cast<QubitIdType>(target)},
+        /* inverse = */ true);
+}
+
 void __quantum__qis__CY(QUBIT *control, QUBIT *target)
 {
     Catalyst::Runtime::CTX->getDevice()->NamedOperation(
@@ -345,6 +438,15 @@ void __quantum__qis__CY(QUBIT *control, QUBIT *target)
         {/* control = */ reinterpret_cast<QubitIdType>(control),
          /* target = */ reinterpret_cast<QubitIdType>(target)},
         /* inverse = */ false);
+}
+
+void __quantum__qis__CY_Adjoint(QUBIT *control, QUBIT *target)
+{
+    Catalyst::Runtime::CTX->getDevice()->NamedOperation(
+        "CY", {},
+        {/* control = */ reinterpret_cast<QubitIdType>(control),
+         /* target = */ reinterpret_cast<QubitIdType>(target)},
+        /* inverse = */ true);
 }
 
 void __quantum__qis__CZ(QUBIT *control, QUBIT *target)
@@ -356,6 +458,15 @@ void __quantum__qis__CZ(QUBIT *control, QUBIT *target)
         /* inverse = */ false);
 }
 
+void __quantum__qis__CZ_Adjoint(QUBIT *control, QUBIT *target)
+{
+    Catalyst::Runtime::CTX->getDevice()->NamedOperation(
+        "CZ", {},
+        {/* control = */ reinterpret_cast<QubitIdType>(control),
+         /* target = */ reinterpret_cast<QubitIdType>(target)},
+        /* inverse = */ true);
+}
+
 void __quantum__qis__SWAP(QUBIT *control, QUBIT *target)
 {
     Catalyst::Runtime::CTX->getDevice()->NamedOperation(
@@ -363,6 +474,15 @@ void __quantum__qis__SWAP(QUBIT *control, QUBIT *target)
         {/* control = */ reinterpret_cast<QubitIdType>(control),
          /* target = */ reinterpret_cast<QubitIdType>(target)},
         /* inverse = */ false);
+}
+
+void __quantum__qis__SWAP_Adjoint(QUBIT *control, QUBIT *target)
+{
+    Catalyst::Runtime::CTX->getDevice()->NamedOperation(
+        "SWAP", {},
+        {/* control = */ reinterpret_cast<QubitIdType>(control),
+         /* target = */ reinterpret_cast<QubitIdType>(target)},
+        /* inverse = */ true);
 }
 
 void __quantum__qis__IsingXX(double theta, QUBIT *control, QUBIT *target)
@@ -374,6 +494,15 @@ void __quantum__qis__IsingXX(double theta, QUBIT *control, QUBIT *target)
         /* inverse = */ false);
 }
 
+void __quantum__qis__IsingXX_Adjoint(double theta, QUBIT *control, QUBIT *target)
+{
+    Catalyst::Runtime::CTX->getDevice()->NamedOperation(
+        "IsingXX", {theta},
+        {/* control = */ reinterpret_cast<QubitIdType>(control),
+         /* target = */ reinterpret_cast<QubitIdType>(target)},
+        /* inverse = */ true);
+}
+
 void __quantum__qis__IsingYY(double theta, QUBIT *control, QUBIT *target)
 {
     Catalyst::Runtime::CTX->getDevice()->NamedOperation(
@@ -381,6 +510,15 @@ void __quantum__qis__IsingYY(double theta, QUBIT *control, QUBIT *target)
         {/* control = */ reinterpret_cast<QubitIdType>(control),
          /* target = */ reinterpret_cast<QubitIdType>(target)},
         /* inverse = */ false);
+}
+
+void __quantum__qis__IsingYY_Adjoint(double theta, QUBIT *control, QUBIT *target)
+{
+    Catalyst::Runtime::CTX->getDevice()->NamedOperation(
+        "IsingYY", {theta},
+        {/* control = */ reinterpret_cast<QubitIdType>(control),
+         /* target = */ reinterpret_cast<QubitIdType>(target)},
+        /* inverse = */ true);
 }
 
 void __quantum__qis__IsingXY(double theta, QUBIT *control, QUBIT *target)
@@ -392,6 +530,15 @@ void __quantum__qis__IsingXY(double theta, QUBIT *control, QUBIT *target)
         /* inverse = */ false);
 }
 
+void __quantum__qis__IsingXY_Adjoint(double theta, QUBIT *control, QUBIT *target)
+{
+    Catalyst::Runtime::CTX->getDevice()->NamedOperation(
+        "IsingXY", {theta},
+        {/* control = */ reinterpret_cast<QubitIdType>(control),
+         /* target = */ reinterpret_cast<QubitIdType>(target)},
+        /* inverse = */ true);
+}
+
 void __quantum__qis__IsingZZ(double theta, QUBIT *control, QUBIT *target)
 {
     Catalyst::Runtime::CTX->getDevice()->NamedOperation(
@@ -399,6 +546,15 @@ void __quantum__qis__IsingZZ(double theta, QUBIT *control, QUBIT *target)
         {/* control = */ reinterpret_cast<QubitIdType>(control),
          /* target = */ reinterpret_cast<QubitIdType>(target)},
         /* inverse = */ false);
+}
+
+void __quantum__qis__IsingZZ_Adjoint(double theta, QUBIT *control, QUBIT *target)
+{
+    Catalyst::Runtime::CTX->getDevice()->NamedOperation(
+        "IsingZZ", {theta},
+        {/* control = */ reinterpret_cast<QubitIdType>(control),
+         /* target = */ reinterpret_cast<QubitIdType>(target)},
+        /* inverse = */ true);
 }
 
 void __quantum__qis__ControlledPhaseShift(double theta, QUBIT *control, QUBIT *target)
@@ -410,6 +566,15 @@ void __quantum__qis__ControlledPhaseShift(double theta, QUBIT *control, QUBIT *t
         /* inverse = */ false);
 }
 
+void __quantum__qis__ControlledPhaseShift_Adjoint(double theta, QUBIT *control, QUBIT *target)
+{
+    Catalyst::Runtime::CTX->getDevice()->NamedOperation(
+        "ControlledPhaseShift", {theta},
+        {/* control = */ reinterpret_cast<QubitIdType>(control),
+         /* target = */ reinterpret_cast<QubitIdType>(target)},
+        /* inverse = */ true);
+}
+
 void __quantum__qis__CRX(double theta, QUBIT *control, QUBIT *target)
 {
     Catalyst::Runtime::CTX->getDevice()->NamedOperation(
@@ -417,6 +582,15 @@ void __quantum__qis__CRX(double theta, QUBIT *control, QUBIT *target)
         {/* control = */ reinterpret_cast<QubitIdType>(control),
          /* target = */ reinterpret_cast<QubitIdType>(target)},
         /* inverse = */ false);
+}
+
+void __quantum__qis__CRX_Adjoint(double theta, QUBIT *control, QUBIT *target)
+{
+    Catalyst::Runtime::CTX->getDevice()->NamedOperation(
+        "CRX", {theta},
+        {/* control = */ reinterpret_cast<QubitIdType>(control),
+         /* target = */ reinterpret_cast<QubitIdType>(target)},
+        /* inverse = */ true);
 }
 
 void __quantum__qis__CRY(double theta, QUBIT *control, QUBIT *target)
@@ -428,6 +602,15 @@ void __quantum__qis__CRY(double theta, QUBIT *control, QUBIT *target)
         /* inverse = */ false);
 }
 
+void __quantum__qis__CRY_Adjoint(double theta, QUBIT *control, QUBIT *target)
+{
+    Catalyst::Runtime::CTX->getDevice()->NamedOperation(
+        "CRY", {theta},
+        {/* control = */ reinterpret_cast<QubitIdType>(control),
+         /* target = */ reinterpret_cast<QubitIdType>(target)},
+        /* inverse = */ true);
+}
+
 void __quantum__qis__CRZ(double theta, QUBIT *control, QUBIT *target)
 {
     Catalyst::Runtime::CTX->getDevice()->NamedOperation(
@@ -435,6 +618,15 @@ void __quantum__qis__CRZ(double theta, QUBIT *control, QUBIT *target)
         {/* control = */ reinterpret_cast<QubitIdType>(control),
          /* target = */ reinterpret_cast<QubitIdType>(target)},
         /* inverse = */ false);
+}
+
+void __quantum__qis__CRZ_Adjoint(double theta, QUBIT *control, QUBIT *target)
+{
+    Catalyst::Runtime::CTX->getDevice()->NamedOperation(
+        "CRZ", {theta},
+        {/* control = */ reinterpret_cast<QubitIdType>(control),
+         /* target = */ reinterpret_cast<QubitIdType>(target)},
+        /* inverse = */ true);
 }
 
 void __quantum__qis__CRot(double phi, double theta, double omega, QUBIT *control, QUBIT *target)
@@ -446,6 +638,15 @@ void __quantum__qis__CRot(double phi, double theta, double omega, QUBIT *control
         /* inverse = */ false);
 }
 
+void __quantum__qis__CRot_Adjoint(double phi, double theta, double omega, QUBIT *control, QUBIT *target)
+{
+    Catalyst::Runtime::CTX->getDevice()->NamedOperation(
+        "CRot", {phi, theta, omega},
+        {/* control = */ reinterpret_cast<QubitIdType>(control),
+         /* target = */ reinterpret_cast<QubitIdType>(target)},
+        /* inverse = */ true);
+}
+
 void __quantum__qis__CSWAP(QUBIT *control, QUBIT *aswap, QUBIT *bswap)
 {
     Catalyst::Runtime::CTX->getDevice()->NamedOperation("CSWAP", {},
@@ -455,6 +656,15 @@ void __quantum__qis__CSWAP(QUBIT *control, QUBIT *aswap, QUBIT *bswap)
                                                         /* inverse = */ false);
 }
 
+void __quantum__qis__CSWAP_Adjoint(QUBIT *control, QUBIT *aswap, QUBIT *bswap)
+{
+    Catalyst::Runtime::CTX->getDevice()->NamedOperation("CSWAP", {},
+                                                        {reinterpret_cast<QubitIdType>(control),
+                                                         reinterpret_cast<QubitIdType>(aswap),
+                                                         reinterpret_cast<QubitIdType>(bswap)},
+                                                        /* inverse = */ true);
+}
+
 void __quantum__qis__Toffoli(QUBIT *wire0, QUBIT *wire1, QUBIT *wire2)
 {
     Catalyst::Runtime::CTX->getDevice()->NamedOperation("Toffoli", {},
@@ -462,6 +672,15 @@ void __quantum__qis__Toffoli(QUBIT *wire0, QUBIT *wire1, QUBIT *wire2)
                                                          reinterpret_cast<QubitIdType>(wire1),
                                                          reinterpret_cast<QubitIdType>(wire2)},
                                                         /* inverse = */ false);
+}
+
+void __quantum__qis__Toffoli_Adjoint(QUBIT *wire0, QUBIT *wire1, QUBIT *wire2)
+{
+    Catalyst::Runtime::CTX->getDevice()->NamedOperation("Toffoli", {},
+                                                        {reinterpret_cast<QubitIdType>(wire0),
+                                                         reinterpret_cast<QubitIdType>(wire1),
+                                                         reinterpret_cast<QubitIdType>(wire2)},
+                                                        /* inverse = */ true);
 }
 
 void __quantum__qis__MultiRZ(double theta, int64_t numQubits, ...)
@@ -478,6 +697,22 @@ void __quantum__qis__MultiRZ(double theta, int64_t numQubits, ...)
 
     Catalyst::Runtime::CTX->getDevice()->NamedOperation("MultiRZ", {theta}, wires,
                                                         /* inverse = */ false);
+}
+
+void __quantum__qis__MultiRZ_Adjoint(double theta, int64_t numQubits, ...)
+{
+    RT_ASSERT(numQubits >= 0);
+
+    va_list args;
+    va_start(args, numQubits);
+    std::vector<QubitIdType> wires(numQubits);
+    for (int64_t i = 0; i < numQubits; i++) {
+        wires[i] = va_arg(args, QubitIdType);
+    }
+    va_end(args);
+
+    Catalyst::Runtime::CTX->getDevice()->NamedOperation("MultiRZ", {theta}, wires,
+                                                        /* inverse = */ true);
 }
 
 void __quantum__qis__QubitUnitary(MemRefT_CplxT_double_2d *matrix, int64_t numQubits,
