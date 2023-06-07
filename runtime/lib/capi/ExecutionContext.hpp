@@ -96,7 +96,7 @@ class ExecutionContext final {
         });
 #endif
 #ifdef __device_openqasm
-        _device_map.emplace("braket.aws.qubit",
+        _device_map.emplace("openqasm",
                             [](bool tape_recording, size_t shots, std::string device_kwargs) {
                                 return std::make_unique<Device::OpenQasmDevice>(
                                     tape_recording, shots, std::move(device_kwargs));
@@ -138,9 +138,18 @@ class ExecutionContext final {
             _device_name = name;
         }
 
-        if (_device_name == "braket.aws.qubit" && _device_kwargs.empty()) {
-            _device_kwargs = "device_arn=arn:aws:braket:::device/quantum-simulator/amazon/sv1;";
-            // Use arn:aws:braket:::device/quantum-simulator/amazon/sv1 as the default device.
+        if (_device_name == "braket.aws.qubit") {
+            _device_kwargs =
+                "device_type=braket.aws.qubit;" +
+                (_device_kwargs.empty()
+                     ? "device_arn=arn:aws:braket:::device/quantum-simulator/amazon/sv1;"
+                     : _device_kwargs);
+            _device_name = "openqasm";
+        }
+        else if (_device_name == "braket.local.qubit") {
+            _device_kwargs = "device_type=braket.local.qubit;" +
+                             (_device_kwargs.empty() ? "backend=default;" : _device_kwargs);
+            _device_name = "openqasm";
         }
 
         _driver_ptr.reset(nullptr);

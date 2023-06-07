@@ -70,10 +70,9 @@ class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {
     }
 
   public:
-    explicit OpenQasmDevice([[maybe_unused]] bool status = false,
-                            size_t shots = default_device_shots,
-                            std::string _device_kwargs =
-                                "device_arn=arn:aws:braket:::device/quantum-simulator/amazon/sv1;")
+    explicit OpenQasmDevice(
+        [[maybe_unused]] bool status = false, size_t shots = default_device_shots,
+        std::string _device_kwargs = "device_type=braket.local.qubit;backend=default;")
         : tape_recording(status), device_shots(shots)
     {
         const std::string delimiter{";"}; // constexpr
@@ -92,20 +91,26 @@ class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {
             prev_idx = cur_idx;
         }
 
-        builder_type = device_kwargs.contains("device_arn") ? OpenQasm::BuilderType::Braket
-                                                            : OpenQasm::BuilderType::Common;
-
-        switch (builder_type) {
-        case OpenQasm::BuilderType::Common:
+        if (device_kwargs.contains("device_type")) {
+            if (device_kwargs["device_type"] == "braket.aws.qubit") {
+                builder_type = OpenQasm::BuilderType::BraketRemove;
+            }
+            else if (device_kwargs["device_type"] == "braket.local.qubit") {
+                builder_type = OpenQasm::BuilderType::BraketLocal;
+            }
+            else {
+                RT_ASSERT("Invalid OpenQasm device type");
+            }
+        }
+        else {
+            builder_type = OpenQasm::BuilderType::Common;
             builder = std::make_unique<OpenQasm::OpenQasmBuilder>();
             runner = std::make_unique<OpenQasm::OpenQasmRunner>();
-            break;
-        case OpenQasm::BuilderType::Braket:
+        }
+
+        if (builder_type != OpenQasm::BuilderType::Common) {
             builder = std::make_unique<OpenQasm::BraketBuilder>();
             runner = std::make_unique<OpenQasm::BraketRunner>();
-            break;
-        default:
-            RT_ASSERT("Invalid OpenQasm builder type");
         }
     }
     ~OpenQasmDevice() = default;

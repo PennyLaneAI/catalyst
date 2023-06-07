@@ -60,7 +60,12 @@ class QFunc:
     """
 
     # The set of supported devices at runtime
-    RUNTIME_DEVICES = ("lightning.qubit", "lightning.kokkos", "braket.aws.qubit")
+    RUNTIME_DEVICES = (
+        "lightning.qubit",
+        "lightning.kokkos",
+        "braket.aws.qubit",
+        "braket.local.qubit",
+    )
 
     def __init__(self, fn, device):
         self.func = fn
@@ -76,6 +81,14 @@ class QFunc:
                 )
 
             backend_kwargs = (
+                "shots=" + str(self.device.shots) + ";" if hasattr(self.device, "shots") else ""
+            )
+            backend_kwargs += (
+                "backend=" + self.device._device._delegate.DEVICE_ID + ";"
+                if hasattr(self.device, "_device") and hasattr(self.device._device, "_delegate")
+                else ""
+            )
+            backend_kwargs += (
                 "device_arn=" + self.device._device._arn + ";"
                 if hasattr(self.device, "_device") and hasattr(self.device._device, "_arn")
                 else ""
