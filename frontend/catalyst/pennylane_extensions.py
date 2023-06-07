@@ -81,15 +81,15 @@ class QFunc:
                 )
 
             backend_kwargs = (
-                "shots=" + str(self.device.shots) + ";" if hasattr(self.device, "shots") else ""
+                "shots : " + str(self.device.shots) + "," if hasattr(self.device, "shots") else ""
             )
 
             if self.device.short_name == "braket.local.qubit":
-                backend_kwargs += "backend=" + self.device._device._delegate.DEVICE_ID + ";"
+                backend_kwargs += "backend : " + self.device._device._delegate.DEVICE_ID + ","
             elif self.device.short_name == "braket.aws.qubit":
-                backend_kwargs += "device_arn=" + self.device._device._arn + ";"
+                backend_kwargs += "device_arn : " + self.device._device._arn + ","
                 backend_kwargs += (
-                    "s3_destination_folder=" + str(self.device._s3_folder) + ";"
+                    "s3_destination_folder : " + str(self.device._s3_folder) + ","
                     if self.device._s3_folder
                     else ""
                 )

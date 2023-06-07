@@ -28,6 +28,7 @@
 
 #include "CacheManager.hpp"
 #include "QubitManager.hpp"
+#include "Utils.hpp"
 
 #include "OpenQasmBuilder.hpp"
 #include "OpenQasmObsManager.hpp"
@@ -49,7 +50,7 @@ class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {
     Simulator::CacheManager cache_manager{};
     bool tape_recording{false};
 
-    size_t device_shots{0};
+    size_t device_shots;
     OpenQasm::OpenQasmObsManager obs_manager{};
     OpenQasm::BuilderType builder_type;
     std::unordered_map<std::string, std::string> device_kwargs;
@@ -71,25 +72,14 @@ class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {
 
   public:
     explicit OpenQasmDevice(
-        [[maybe_unused]] bool status = false, size_t shots = default_device_shots,
-        std::string _device_kwargs = "device_type=braket.local.qubit;backend=default;")
-        : tape_recording(status), device_shots(shots)
+        [[maybe_unused]] bool status = false,
+        const std::string &kwargs = "{device_type : braket.local.qubit, backend : default}")
+        : tape_recording(status)
     {
-        const std::string delimiter{";"}; // constexpr
-        const size_t dlm_size = delimiter.size();
-
-        size_t cur_idx = 0;
-        size_t prev_idx = 0;
-        while ((cur_idx = _device_kwargs.find(delimiter, cur_idx)) != std::string::npos) {
-            auto arg = _device_kwargs.substr(prev_idx, cur_idx - prev_idx);
-            size_t eq_idx = arg.find("=");
-
-            // update device kwargs
-            device_kwargs.emplace(std::make_pair(arg.substr(0, eq_idx), arg.substr(eq_idx + 1)));
-
-            cur_idx += dlm_size;
-            prev_idx = cur_idx;
-        }
+        device_kwargs = Simulator::parse_kwargs(kwargs);
+        device_shots = device_kwargs.contains("shots")
+                           ? static_cast<size_t>(std::stoll(device_kwargs["shots"]))
+                           : default_device_shots;
 
         if (device_kwargs.contains("device_type")) {
             if (device_kwargs["device_type"] == "braket.aws.qubit") {
