@@ -1545,7 +1545,7 @@ TEST_CASE("Test __rt__device registering the OpenQasm device", "[CoreQIS]")
 #if __has_include("OpenQasmDevice.hpp")
     __quantum__rt__device((int8_t *)dev_lcl, (int8_t *)dev_value_lcl);
 #else
-    REQUIRE_THROWS_WITH(__quantum__rt__device((int8_t *)dev_lvl, (int8_t *)dev_value_lcl),
+    REQUIRE_THROWS_WITH(__quantum__rt__device((int8_t *)dev_lcl, (int8_t *)dev_value_lcl),
                         Catch::Contains("Failed initialization of the backend device"));
 #endif
 
