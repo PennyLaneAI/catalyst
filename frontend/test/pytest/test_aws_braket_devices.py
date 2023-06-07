@@ -22,7 +22,27 @@ import pennylane as qml
 from catalyst import qjit
 
 
-def test_no_parameters_braket():
+@pytest.mark.parametrize(
+    "device",
+    [
+        qml.device(
+            "braket.aws.qubit",
+            device_arn="arn:aws:braket:::device/quantum-simulator/amazon/sv1",
+            wires=3,
+        ),
+        qml.device(
+            "braket.local.qubit",
+            backend="default",
+            wires=3,
+        ),
+        qml.device(
+            "braket.local.qubit",
+            backend="braket_sv",
+            wires=3,
+        ),
+    ],
+)
+def test_no_parameters_braket(device):
     """Test no-param operations on braket.aws.qubit."""
 
     def circuit():
@@ -51,21 +71,28 @@ def test_no_parameters_braket():
 
         return qml.expval(qml.PauliZ(0) @ qml.PauliZ(1))
 
-    qjit_fn = qjit()(
-        qml.qnode(
-            qml.device(
-                "braket.aws.qubit",
-                device_arn="arn:aws:braket:::device/quantum-simulator/amazon/sv1",
-                wires=3,
-            )
-        )(circuit)
-    )
+    qjit_fn = qjit()(qml.qnode(device)(circuit))
     qml_fn = qml.qnode(qml.device("default.qubit", wires=3))(circuit)
 
     assert np.allclose(qjit_fn(), qml_fn())
 
 
-def test_param_braket():
+@pytest.mark.parametrize(
+    "device",
+    [
+        qml.device(
+            "braket.aws.qubit",
+            device_arn="arn:aws:braket:::device/quantum-simulator/amazon/sv1",
+            wires=3,
+        ),
+        qml.device(
+            "braket.local.qubit",
+            backend="braket_sv",
+            wires=3,
+        ),
+    ],
+)
+def test_param_braket(device):
     """Test param operations on braket.aws.qubit."""
 
     def circuit(x: float, y: float):
@@ -84,29 +111,31 @@ def test_param_braket():
 
         return qml.var(qml.PauliZ(0) @ qml.PauliZ(1) @ qml.PauliZ(2))
 
-    qjit_fn = qjit()(
-        qml.qnode(
-            qml.device(
-                "braket.aws.qubit",
-                device_arn="arn:aws:braket:::device/quantum-simulator/amazon/sv1",
-                wires=3,
-            )
-        )(circuit)
-    )
-    qml_fn = qml.qnode(qml.device("default.qubit", wires=4))(circuit)
+    qjit_fn = qjit()(qml.qnode(device)(circuit))
+    qml_fn = qml.qnode(qml.device("default.qubit", wires=3))(circuit)
 
     assert np.allclose(qjit_fn(3.14, 0.6), qml_fn(3.14, 0.6))
 
 
-def test_sample_on_1qbit_braket():
+@pytest.mark.parametrize(
+    "device",
+    [
+        qml.device(
+            "braket.aws.qubit",
+            device_arn="arn:aws:braket:::device/quantum-simulator/amazon/sv1",
+            wires=1,
+            shots=1000,
+        ),
+        qml.device(
+            "braket.local.qubit",
+            backend="braket_sv",
+            wires=1,
+            shots=1000,
+        ),
+    ],
+)
+def test_sample_on_1qbit_braket(device):
     """Test sample on 1 qubit on braket.aws.qubit."""
-
-    device = qml.device(
-        "braket.aws.qubit",
-        device_arn="arn:aws:braket:::device/quantum-simulator/amazon/sv1",
-        wires=1,
-        shots=1000,
-    )
 
     @qjit()
     @qml.qnode(device)
@@ -123,7 +152,24 @@ def test_sample_on_1qbit_braket():
     assert np.array_equal(observed, expected)
 
 
-def test_sample_on_2qbits_braket():
+@pytest.mark.parametrize(
+    "device",
+    [
+        qml.device(
+            "braket.aws.qubit",
+            device_arn="arn:aws:braket:::device/quantum-simulator/amazon/sv1",
+            wires=2,
+            shots=1000,
+        ),
+        qml.device(
+            "braket.local.qubit",
+            backend="braket_sv",
+            wires=2,
+            shots=1000,
+        ),
+    ],
+)
+def test_sample_on_2qbits_braket(device):
     """Test sample on 2 qubits on braket.aws.qubit."""
 
     device = qml.device(
@@ -148,15 +194,25 @@ def test_sample_on_2qbits_braket():
     assert np.array_equal(observed, expected)
 
 
-def test_count_on_1qbit_braket():
+@pytest.mark.parametrize(
+    "device",
+    [
+        qml.device(
+            "braket.aws.qubit",
+            device_arn="arn:aws:braket:::device/quantum-simulator/amazon/sv1",
+            wires=1,
+            shots=1000,
+        ),
+        qml.device(
+            "braket.local.qubit",
+            backend="braket_sv",
+            wires=1,
+            shots=1000,
+        ),
+    ],
+)
+def test_count_on_1qbit_braket(device):
     """Test counts on 1 qubits on braket.aws.qubit."""
-
-    device = qml.device(
-        "braket.aws.qubit",
-        device_arn="arn:aws:braket:::device/quantum-simulator/amazon/sv1",
-        wires=1,
-        shots=1000,
-    )
 
     @qjit()
     @qml.qnode(device)
@@ -173,15 +229,25 @@ def test_count_on_1qbit_braket():
     assert np.array_equal(observed, expected)
 
 
-def test_count_on_2qbits_braket(backend):
+@pytest.mark.parametrize(
+    "device",
+    [
+        qml.device(
+            "braket.aws.qubit",
+            device_arn="arn:aws:braket:::device/quantum-simulator/amazon/sv1",
+            wires=2,
+            shots=1000,
+        ),
+        qml.device(
+            "braket.local.qubit",
+            backend="braket_sv",
+            wires=2,
+            shots=1000,
+        ),
+    ],
+)
+def test_count_on_2qbits_braket(device):
     """Test counts on 2 qubits on braket.aws.qubit."""
-
-    device = qml.device(
-        "braket.aws.qubit",
-        device_arn="arn:aws:braket:::device/quantum-simulator/amazon/sv1",
-        wires=2,
-        shots=1000,
-    )
 
     @qjit()
     @qml.qnode(device)
@@ -200,14 +266,23 @@ def test_count_on_2qbits_braket(backend):
 
 
 class TestBraketExpval:
-    def test_named(self):
+    @pytest.mark.parametrize(
+        "device",
+        [
+            qml.device(
+                "braket.aws.qubit",
+                device_arn="arn:aws:braket:::device/quantum-simulator/amazon/sv1",
+                wires=1,
+            ),
+            qml.device(
+                "braket.local.qubit",
+                backend="braket_sv",
+                wires=1,
+            ),
+        ],
+    )
+    def test_named(self, device):
         """Test expval for named observables on braket.aws.qubit."""
-
-        device = qml.device(
-            "braket.aws.qubit",
-            device_arn="arn:aws:braket:::device/quantum-simulator/amazon/sv1",
-            wires=1,
-        )
 
         @qjit()
         @qml.qnode(device)
@@ -223,14 +298,23 @@ class TestBraketExpval:
         observed = expval(np.pi)
         assert np.isclose(observed, expected)
 
-    def test_tensor(self):
+    @pytest.mark.parametrize(
+        "device",
+        [
+            qml.device(
+                "braket.aws.qubit",
+                device_arn="arn:aws:braket:::device/quantum-simulator/amazon/sv1",
+                wires=2,
+            ),
+            qml.device(
+                "braket.local.qubit",
+                backend="braket_sv",
+                wires=2,
+            ),
+        ],
+    )
+    def test_tensor(self, device):
         """Test expval for Tensor observable on braket.aws.qubit."""
-
-        device = qml.device(
-            "braket.aws.qubit",
-            device_arn="arn:aws:braket:::device/quantum-simulator/amazon/sv1",
-            wires=2,
-        )
 
         @qjit()
         @qml.qnode(device)
@@ -250,14 +334,23 @@ class TestBraketExpval:
 
 
 class TestBraketVar:
-    def test_rx(self):
+    @pytest.mark.parametrize(
+        "device",
+        [
+            qml.device(
+                "braket.aws.qubit",
+                device_arn="arn:aws:braket:::device/quantum-simulator/amazon/sv1",
+                wires=1,
+            ),
+            qml.device(
+                "braket.local.qubit",
+                backend="braket_sv",
+                wires=1,
+            ),
+        ],
+    )
+    def test_rx(self, device):
         """Test var with RX on braket.aws.qubit."""
-
-        device = qml.device(
-            "braket.aws.qubit",
-            device_arn="arn:aws:braket:::device/quantum-simulator/amazon/sv1",
-            wires=1,
-        )
 
         @qjit()
         @qml.qnode(device)
@@ -271,11 +364,26 @@ class TestBraketVar:
         observed = var(np.pi)
         assert np.isclose(observed, expected)
 
-    def test_hadamard(self, backend):
+    @pytest.mark.parametrize(
+        "device",
+        [
+            qml.device(
+                "braket.aws.qubit",
+                device_arn="arn:aws:braket:::device/quantum-simulator/amazon/sv1",
+                wires=1,
+            ),
+            qml.device(
+                "braket.local.qubit",
+                backend="braket_sv",
+                wires=1,
+            ),
+        ],
+    )
+    def test_hadamard(self, device):
         """Test var with Hadamard on braket.aws.qubit."""
 
         @qjit()
-        @qml.qnode(qml.device(backend, wires=1))
+        @qml.qnode(device)
         def var(x: float):
             qml.Hadamard(wires=0)
             return qml.var(qml.PauliZ(0))
@@ -286,14 +394,23 @@ class TestBraketVar:
         observed = var(np.pi)
         assert np.isclose(observed, expected)
 
-    def test_tensor(self):
+    @pytest.mark.parametrize(
+        "device",
+        [
+            qml.device(
+                "braket.aws.qubit",
+                device_arn="arn:aws:braket:::device/quantum-simulator/amazon/sv1",
+                wires=2,
+            ),
+            qml.device(
+                "braket.local.qubit",
+                backend="braket_sv",
+                wires=2,
+            ),
+        ],
+    )
+    def test_tensor(self, device):
         """Test variance for Tensor observable on braket.aws.qubit."""
-
-        device = qml.device(
-            "braket.aws.qubit",
-            device_arn="arn:aws:braket:::device/quantum-simulator/amazon/sv1",
-            wires=2,
-        )
 
         @qjit()
         @qml.qnode(device)
