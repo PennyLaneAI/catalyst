@@ -1500,7 +1500,7 @@ def _adjoint_abstract(*args, jaxpr):
 
 def _adjoint_lowering(ctx, *args, jaxpr):
     output_types = util.flatten(map(mlir.aval_to_ir_types, ctx.avals_out))
-    op = AdjointOp(output_types, args)
+    op = AdjointOp(output_types[0], output_types[1:], args[0], args[1:])
     adjoint_block = op.regions[0].blocks.append(*[mlir.aval_to_ir_types(a)[0]
                                                   for a in ctx.avals_in])
 
