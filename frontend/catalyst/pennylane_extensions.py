@@ -60,7 +60,12 @@ class QFunc:
     """
 
     # The set of supported devices at runtime
-    RUNTIME_DEVICES = ("lightning.qubit", "lightning.kokkos", "braket.simulator")
+    RUNTIME_DEVICES = (
+        "lightning.qubit",
+        "lightning.kokkos",
+        "braket.aws.qubit",
+        "braket.local.qubit",
+    )
 
     def __init__(self, fn, device):
         self.func = fn
@@ -74,12 +79,20 @@ class QFunc:
                     f"The {self.device.short_name} device is not "
                     "supported for compilation at the moment."
                 )
-            device_name = (
-                self.device.short_name
-                if self.device.short_name != "braket.simulator"
-                else "arn:aws:braket:::device/quantum-simulator/amazon/sv1"
+
+            backend_kwargs = {}
+            if hasattr(self.device, "shots"):
+                backend_kwargs["shots"] = self.device.shots if self.device.shots else 0
+            if self.device.short_name == "braket.local.qubit":
+                backend_kwargs["backend"] = self.device._device._delegate.DEVICE_ID
+            elif self.device.short_name == "braket.aws.qubit":
+                backend_kwargs["device_arn"] = self.device._device._arn
+                if self.device._s3_folder:
+                    backend_kwargs["s3_destination_folder"] = str(self.device._s3_folder)
+
+            device = QJITDevice(
+                self.device.shots, self.device.wires, self.device.short_name, backend_kwargs
             )
-            device = QJITDevice(self.device.shots, self.device.wires, device_name)
         else:
             # Allow QFunc to still be used by itself for internal testing.
             device = self.device
@@ -1246,8 +1259,9 @@ class QJITDevice(qml.QubitDevice):
         "Hamiltonian",
     ]
 
-    def __init__(self, shots=None, wires=None, backend=None):
-        self.backend = backend if backend else "default"
+    def __init__(self, shots=None, wires=None, backend_name=None, backend_kwargs=None):
+        self.backend_name = backend_name if backend_name else "default"
+        self.backend_kwargs = backend_kwargs if backend_kwargs else ""
         super().__init__(wires=wires, shots=shots)
 
     def apply(self, operations, **kwargs):

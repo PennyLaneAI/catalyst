@@ -55,7 +55,7 @@ class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {
     CacheManager cache_manager{};
     bool tape_recording{false};
 
-    size_t device_shots{0};
+    size_t device_shots;
 
     std::unique_ptr<Pennylane::StateVectorDynamicCPU<double>> device_sv =
         std::make_unique<Pennylane::StateVectorDynamicCPU<double>>(0);
@@ -97,9 +97,12 @@ class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {
     }
 
   public:
-    explicit LightningSimulator(bool status = false, size_t shots = default_device_shots)
-        : tape_recording(status), device_shots(shots)
+    explicit LightningSimulator(bool status = false, const std::string &kwargs = "{}")
+        : tape_recording(status)
     {
+        auto &&args = parse_kwargs(kwargs);
+        device_shots = args.contains("shots") ? static_cast<size_t>(std::stoll(args["shots"]))
+                                              : default_device_shots;
     }
     ~LightningSimulator() override = default;
 

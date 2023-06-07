@@ -20,6 +20,7 @@
 #include <bitset>
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "Exception.hpp"
@@ -27,6 +28,7 @@
 
 #include "CacheManager.hpp"
 #include "QubitManager.hpp"
+#include "Utils.hpp"
 
 #include "OpenQasmBuilder.hpp"
 #include "OpenQasmObsManager.hpp"
@@ -48,10 +50,10 @@ class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {
     Simulator::CacheManager cache_manager{};
     bool tape_recording{false};
 
-    size_t device_shots{0};
+    size_t device_shots;
     OpenQasm::OpenQasmObsManager obs_manager{};
     OpenQasm::BuilderType builder_type;
-    std::string concrete_device_name;
+    std::unordered_map<std::string, std::string> device_kwargs;
 
     inline auto getDeviceWires(const std::vector<QubitIdType> &wires) -> std::vector<size_t>
     {
@@ -70,26 +72,42 @@ class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {
 
   public:
     explicit OpenQasmDevice(
-        [[maybe_unused]] bool status = false, size_t shots = default_device_shots,
-        std::string hw_name = "arn:aws:braket:::device/quantum-simulator/amazon/sv1")
-
-        : tape_recording(status), device_shots(shots), concrete_device_name(std::move(hw_name))
+        [[maybe_unused]] bool status = false,
+        const std::string &kwargs = "{device_type : braket.local.qubit, backend : default}")
+        : tape_recording(status)
     {
-        builder_type = concrete_device_name.find("aws:braket") != std::string::npos
-                           ? OpenQasm::BuilderType::Braket
-                           : OpenQasm::BuilderType::Common;
+        device_kwargs = Simulator::parse_kwargs(kwargs);
+        device_shots = device_kwargs.contains("shots")
+                           ? static_cast<size_t>(std::stoll(device_kwargs["shots"]))
+                           : default_device_shots;
 
-        switch (builder_type) {
-        case OpenQasm::BuilderType::Common:
+        if (device_kwargs.contains("device_type")) {
+            if (device_kwargs["device_type"] == "braket.aws.qubit") {
+                builder_type = OpenQasm::BuilderType::BraketRemote;
+                if (!device_kwargs.contains("device_arn")) {
+                    device_kwargs["device_arn"] =
+                        "arn:aws:braket:::device/quantum-simulator/amazon/sv1";
+                }
+            }
+            else if (device_kwargs["device_type"] == "braket.local.qubit") {
+                builder_type = OpenQasm::BuilderType::BraketLocal;
+                if (!device_kwargs.contains("backend")) {
+                    device_kwargs["backend"] = "default";
+                }
+            }
+            else {
+                RT_ASSERT("Invalid OpenQasm device type");
+            }
+        }
+        else {
+            builder_type = OpenQasm::BuilderType::Common;
             builder = std::make_unique<OpenQasm::OpenQasmBuilder>();
             runner = std::make_unique<OpenQasm::OpenQasmRunner>();
-            break;
-        case OpenQasm::BuilderType::Braket:
+        }
+
+        if (builder_type != OpenQasm::BuilderType::Common) {
             builder = std::make_unique<OpenQasm::BraketBuilder>();
             runner = std::make_unique<OpenQasm::BraketRunner>();
-            break;
-        default:
-            RT_ASSERT("Invalid OpenQasm builder type");
         }
     }
     ~OpenQasmDevice() = default;

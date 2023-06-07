@@ -33,7 +33,8 @@ namespace Catalyst::Runtime::Device::OpenQasm {
  */
 enum class BuilderType : uint8_t {
     Common, // = 0
-    Braket,
+    BraketRemote,
+    BraketLocal,
 };
 
 /**
