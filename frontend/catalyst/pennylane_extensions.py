@@ -91,7 +91,7 @@ class QFunc:
                     backend_kwargs["s3_destination_folder"] = str(self.device._s3_folder)
 
             device = QJITDevice(
-                self.device.shots, self.device.wires, self.device.short_name, str(backend_kwargs)
+                self.device.shots, self.device.wires, self.device.short_name, backend_kwargs
             )
         else:
             # Allow QFunc to still be used by itself for internal testing.
