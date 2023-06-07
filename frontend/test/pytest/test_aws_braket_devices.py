@@ -97,8 +97,7 @@ class TestBraketGates:
 
         qjit_fn = qjit()(qml.qnode(device)(circuit))
 
-        with pytest.raises(RuntimeError):
-            # QubitUnitary is not supported!
+        with pytest.raises(RuntimeError, match="Unsupported functionality"):
             qjit_fn()
 
     @pytest.mark.parametrize(
@@ -568,8 +567,7 @@ class TestBraketMeasurementsProcess:
             qml.CNOT(wires=[0, 1])
             return qml.state()
 
-        with pytest.raises(RuntimeError):
-            # state() is not supported yet!
+        with pytest.raises(RuntimeError, match="Not implemented method"):
             circuit(np.pi / 4, np.pi / 3)
 
 
