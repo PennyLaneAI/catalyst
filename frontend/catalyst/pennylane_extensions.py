@@ -80,22 +80,18 @@ class QFunc:
                     "supported for compilation at the moment."
                 )
 
-            backend_kwargs = (
-                "shots : " + str(self.device.shots) + "," if hasattr(self.device, "shots") else ""
-            )
-
-            # if self.device.short_name == "braket.local.qubit":
-            #     backend_kwargs += "backend : " + self.device._device._delegate.DEVICE_ID + ","
-            # elif self.device.short_name == "braket.aws.qubit":
-            #     backend_kwargs += "device_arn : " + self.device._device._arn + ","
-            #     backend_kwargs += (
-            #         "s3_destination_folder : " + str(self.device._s3_folder) + ","
-            #         if self.device._s3_folder
-            #         else ""
-            #     )
+            backend_kwargs = {}
+            if hasattr(self.device, "shots"):
+                backend_kwargs["shots"] = self.device.shots if self.device.shots else 0
+            if self.device.short_name == "braket.local.qubit":
+                backend_kwargs["backend"] = self.device._device._delegate.DEVICE_ID
+            elif self.device.short_name == "braket.aws.qubit":
+                backend_kwargs["device_arn"] = self.device._device._arn
+                if self.device._s3_folder:
+                    backend_kwargs["s3_destination_folder"] = str(self.device._s3_folder)
 
             device = QJITDevice(
-                self.device.shots, self.device.wires, self.device.short_name, backend_kwargs
+                self.device.shots, self.device.wires, self.device.short_name, str(backend_kwargs)
             )
         else:
             # Allow QFunc to still be used by itself for internal testing.

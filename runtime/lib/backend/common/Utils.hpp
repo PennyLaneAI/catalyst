@@ -40,14 +40,20 @@ static inline auto parse_kwargs(std::string kwargs) -> std::unordered_map<std::s
     if (kwargs.empty()) {
         return {};
     }
-    if (kwargs[0] == '{') {
-        kwargs.erase(kwargs.begin());
-    }
-    if (kwargs[kwargs.size() - 1] == '}') {
-        kwargs.erase(kwargs.end() - 1);
-    }
-    kwargs.erase(std::remove(kwargs.begin(), kwargs.end(), ' '), kwargs.end());
-    kwargs.erase(std::remove(kwargs.begin(), kwargs.end(), '\''), kwargs.end());
+
+    kwargs.erase(std::remove_if(kwargs.begin(), kwargs.end(),
+                                [](char c) {
+                                    switch (c) {
+                                    case '{':
+                                    case '}':
+                                    case ' ':
+                                    case '\'':
+                                        return true;
+                                    default:
+                                        return false;
+                                    }
+                                }),
+                 kwargs.end());
 
     // constructing map
     std::unordered_map<std::string, std::string> map;
