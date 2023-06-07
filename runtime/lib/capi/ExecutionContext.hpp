@@ -133,23 +133,12 @@ class ExecutionContext final {
             _device_name = name;
         }
 
-        if (_device_name == "braket.aws.qubit") {
-            _device_kwargs =
-                "device_type' : braket.aws.qubit," +
-                (_device_kwargs.empty()
-                     ? "device_arn : arn:aws:braket:::device/quantum-simulator/amazon/sv1,"
-                     : _device_kwargs);
-            _device_name = "openqasm";
-        }
-        else if (_device_name == "braket.local.qubit") {
-            _device_kwargs = "device_type : braket.local.qubit," +
-                             (_device_kwargs.empty() ? "backend : default" : _device_kwargs);
+        if (_device_name == "braket.aws.qubit" || _device_name == "braket.local.qubit") {
+            _device_kwargs = "device_type : " + _device_name + "," + _device_kwargs;
             _device_name = "openqasm";
         }
 
         _driver_ptr.reset(nullptr);
-
-        std::cerr << _device_kwargs << std::endl;
 
         auto iter = _device_map.find(_device_name);
         if (iter != _device_map.end()) {

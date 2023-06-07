@@ -83,10 +83,17 @@ class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {
 
         if (device_kwargs.contains("device_type")) {
             if (device_kwargs["device_type"] == "braket.aws.qubit") {
-                builder_type = OpenQasm::BuilderType::BraketRemove;
+                builder_type = OpenQasm::BuilderType::BraketRemote;
+                if (!device_kwargs.contains("device_arn")) {
+                    device_kwargs["device_arn"] =
+                        "arn:aws:braket:::device/quantum-simulator/amazon/sv1";
+                }
             }
             else if (device_kwargs["device_type"] == "braket.local.qubit") {
                 builder_type = OpenQasm::BuilderType::BraketLocal;
+                if (!device_kwargs.contains("backend")) {
+                    device_kwargs["backend"] = "default";
+                }
             }
             else {
                 RT_ASSERT("Invalid OpenQasm device type");

@@ -83,7 +83,7 @@ void OpenQasmDevice::PrintState()
     }
 
     std::string device_info{};
-    if (builder_type == OpenQasm::BuilderType::BraketRemove) {
+    if (builder_type == OpenQasm::BuilderType::BraketRemote) {
         device_info = device_kwargs["device_arn"];
     }
     else if (builder_type == OpenQasm::BuilderType::BraketLocal) {
@@ -188,7 +188,7 @@ auto OpenQasmDevice::Expval([[maybe_unused]] ObsIdType obsKey) -> double
     }
 
     std::string device_info{};
-    if (builder_type == OpenQasm::BuilderType::BraketRemove) {
+    if (builder_type == OpenQasm::BuilderType::BraketRemote) {
         device_info = device_kwargs["device_arn"];
     }
     else if (builder_type == OpenQasm::BuilderType::BraketLocal) {
@@ -222,7 +222,7 @@ auto OpenQasmDevice::Var([[maybe_unused]] ObsIdType obsKey) -> double
     }
 
     std::string device_info{};
-    if (builder_type == OpenQasm::BuilderType::BraketRemove) {
+    if (builder_type == OpenQasm::BuilderType::BraketRemote) {
         device_info = device_kwargs["device_arn"];
     }
     else if (builder_type == OpenQasm::BuilderType::BraketLocal) {
@@ -244,7 +244,7 @@ void OpenQasmDevice::State([[maybe_unused]] DataView<std::complex<double>, 1> &s
     }
 
     std::string device_info{};
-    if (builder_type == OpenQasm::BuilderType::BraketRemove) {
+    if (builder_type == OpenQasm::BuilderType::BraketRemote) {
         device_info = device_kwargs["device_arn"];
     }
     else if (builder_type == OpenQasm::BuilderType::BraketLocal) {
@@ -266,7 +266,7 @@ void OpenQasmDevice::Probs(DataView<double, 1> &probs)
     }
 
     std::string device_info{};
-    if (builder_type == OpenQasm::BuilderType::BraketRemove) {
+    if (builder_type == OpenQasm::BuilderType::BraketRemote) {
         device_info = device_kwargs["device_arn"];
     }
     else if (builder_type == OpenQasm::BuilderType::BraketLocal) {
@@ -298,7 +298,7 @@ void OpenQasmDevice::PartialProbs([[maybe_unused]] DataView<double, 1> &probs,
     }
 
     std::string device_info{};
-    if (builder_type == OpenQasm::BuilderType::BraketRemove) {
+    if (builder_type == OpenQasm::BuilderType::BraketRemote) {
         device_info = device_kwargs["device_arn"];
     }
     else if (builder_type == OpenQasm::BuilderType::BraketLocal) {
@@ -321,7 +321,7 @@ void OpenQasmDevice::Sample(DataView<double, 2> &samples, size_t shots)
     }
 
     std::string device_info{};
-    if (builder_type == OpenQasm::BuilderType::BraketRemove) {
+    if (builder_type == OpenQasm::BuilderType::BraketRemote) {
         device_info = device_kwargs["device_arn"];
     }
     else if (builder_type == OpenQasm::BuilderType::BraketLocal) {
@@ -362,7 +362,7 @@ void OpenQasmDevice::PartialSample(DataView<double, 2> &samples,
     }
 
     std::string device_info{};
-    if (builder_type == OpenQasm::BuilderType::BraketRemove) {
+    if (builder_type == OpenQasm::BuilderType::BraketRemote) {
         device_info = device_kwargs["device_arn"];
     }
     else if (builder_type == OpenQasm::BuilderType::BraketLocal) {
@@ -395,7 +395,7 @@ void OpenQasmDevice::Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &
     }
 
     std::string device_info{};
-    if (builder_type == OpenQasm::BuilderType::BraketRemove) {
+    if (builder_type == OpenQasm::BuilderType::BraketRemote) {
         device_info = device_kwargs["device_arn"];
     }
     else if (builder_type == OpenQasm::BuilderType::BraketLocal) {
@@ -438,7 +438,7 @@ void OpenQasmDevice::PartialCounts(DataView<double, 1> &eigvals, DataView<int64_
     }
 
     std::string device_info{};
-    if (builder_type == OpenQasm::BuilderType::BraketRemove) {
+    if (builder_type == OpenQasm::BuilderType::BraketRemote) {
         device_info = device_kwargs["device_arn"];
     }
     else if (builder_type == OpenQasm::BuilderType::BraketLocal) {
