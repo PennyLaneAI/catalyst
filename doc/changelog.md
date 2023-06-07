@@ -110,7 +110,6 @@
 
 * Reduce the number of classical invocations by counting the number of gate parameters in
   the ``argmap`` function.
-
   [#136](https://github.com/PennyLaneAI/catalyst/pull/136)
 
   Prior to this, the computation of hybrid gradients executed all of the classical code
