@@ -40,6 +40,22 @@ TEST_CASE("Test OpenQasmRunner base class", "[openqasm]")
     REQUIRE_THROWS_WITH(runner.Sample("", "", 0, 0),
                         Catch::Contains("[Function:Sample] Error in Catalyst Runtime: "
                                         "Not implemented method"));
+
+    REQUIRE_THROWS_WITH(runner.Expval("", "", 0),
+                        Catch::Contains("[Function:Expval] Error in Catalyst Runtime: "
+                                        "Not implemented method"));
+
+    REQUIRE_THROWS_WITH(runner.Var("", "", 0),
+                        Catch::Contains("[Function:Var] Error in Catalyst Runtime: "
+                                        "Not implemented method"));
+
+    REQUIRE_THROWS_WITH(runner.State("", "", 0, 0),
+                        Catch::Contains("[Function:State] Error in Catalyst Runtime: "
+                                        "Not implemented method"));
+
+    REQUIRE_THROWS_WITH(runner.Gradient("", "", 0, 0),
+                        Catch::Contains("[Function:Gradient] Error in Catalyst Runtime: "
+                                        "Not implemented method"));
 }
 
 TEST_CASE("Test BraketRunner::runCircuit()", "[openqasm]")
