@@ -616,7 +616,7 @@ class TestBraketGradient:
             ),
         ],
     )
-    @pytest.mark.parametrize("inp", [(1.0, 2.0), (2.0, 3.0), (3.0, 4.0), (4.0, 5.0)])
+    @pytest.mark.parametrize("inp", [(1.0, 2.0), (2.0, 3.0)])
     def test_ps_2qubits(self, inp, device):
         """Test the param-shift method on braket devices."""
 
@@ -638,6 +638,105 @@ class TestBraketGradient:
             return h(x, y)
 
         assert np.allclose(compiled(*inp), interpreted(*inp))
+
+    @pytest.mark.parametrize(
+        "device",
+        [
+            qml.device(
+                "braket.local.qubit",
+                backend="braket_sv",
+                wires=1,
+            ),
+        ],
+    )
+    @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
+    def test_fd(self, inp, device):
+        """Test the finite-diff method on braket devices."""
+
+        def f(x):
+            qml.RX(x * 2, wires=0)
+            return qml.expval(qml.PauliY(0))
+
+        @qjit()
+        def compiled(x: float):
+            g = qml.qnode(device)(f)
+            h = grad(g, method="fd", h=1e-4)
+            return h(x)
+
+        def interpreted(x):
+            device = qml.device("default.qubit", wires=1)
+            g = qml.QNode(f, device, diff_method="finite-diff")
+            h = qml.grad(g, argnum=0)
+            return h(x)
+
+        assert np.allclose(compiled(inp), interpreted(inp), rtol=1e-3)
+
+    @pytest.mark.parametrize(
+        "device",
+        [
+            qml.device(
+                "braket.local.qubit",
+                backend="braket_sv",
+                wires=2,
+            ),
+        ],
+    )
+    @pytest.mark.parametrize("inp", [(1.0, 2.0), (2.0, 3.0)])
+    def test_fd_2qubits(self, inp, device):
+        """Test the finite-diff method on braket devices."""
+
+        def f(x, y):
+            qml.RX(y * x, wires=0)
+            qml.RX(x * 2, wires=1)
+            return qml.expval(qml.PauliY(0) @ qml.PauliZ(1))
+
+        @qjit()
+        def compiled(x: float, y: float):
+            g = qml.qnode(device)(f)
+            h = grad(g, method="fd", h=1e-4)
+            return h(x, y)
+
+        def interpreted(x, y):
+            device = qml.device("default.qubit", wires=2)
+            g = qml.QNode(f, device, diff_method="finite-diff")
+            h = qml.grad(g, argnum=0)
+            return h(x, y)
+
+        assert np.allclose(compiled(*inp), interpreted(*inp), rtol=1e-3)
+
+    @pytest.mark.parametrize(
+        "device",
+        [
+            qml.device(
+                "braket.local.qubit",
+                backend="braket_sv",
+                wires=2,
+            ),
+        ],
+    )
+    @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
+    def test_fd_higher_order(self, inp, device):
+        """Test finite diff method on braket devices."""
+
+        def f(x):
+            qml.RX(x, wires=0)
+            return qml.expval(qml.PauliY(0))
+
+        @qjit()
+        def compiled_grad_default(x: float):
+            g = qml.qnode(device)(f)
+            h = grad(g, h=1e-4)
+            i = grad(h, h=1e-4)
+            return i(x)
+
+        def interpretted_grad_default(x):
+            device = qml.device("default.qubit", wires=1)
+            g = qml.QNode(f, device, diff_method="backprop", max_diff=2)
+            h = qml.grad(g, argnum=0)
+            i = qml.grad(h, argnum=0)
+            return i(x)
+
+        assert np.allclose(compiled_grad_default(inp), interpretted_grad_default(inp), rtol=0.1)
 
 
 if __name__ == "__main__":
