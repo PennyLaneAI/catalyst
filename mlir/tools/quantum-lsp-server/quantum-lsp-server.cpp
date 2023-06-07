@@ -16,6 +16,7 @@
 #include "mlir/InitAllDialects.h"
 #include "mlir/Tools/mlir-lsp-server/MlirLspServerMain.h"
 
+#include "Catalyst/IR/CatalystDialect.h"
 #include "Gradient/IR/GradientDialect.h"
 #include "Quantum/IR/QuantumDialect.h"
 
@@ -23,6 +24,7 @@ int main(int argc, char **argv)
 {
     mlir::DialectRegistry registry;
     mlir::registerAllDialects(registry);
+    registry.insert<catalyst::CatalystDialect>();
     registry.insert<catalyst::quantum::QuantumDialect>();
     registry.insert<catalyst::gradient::GradientDialect>();
 

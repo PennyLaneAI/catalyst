@@ -154,8 +154,7 @@ static Value combineGradients(PatternRewriter &rewriter, Location loc, Value cla
 /// the entire quantum function via tensor contraction along the gate parameter dimension.
 ///
 func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc, GradOp gradOp,
-                                 func::FuncOp paramCountFn, func::FuncOp argMapFn,
-                                 func::FuncOp qGradFn, StringRef method)
+                                 func::FuncOp argMapFn, func::FuncOp qGradFn, StringRef method)
 {
     // Define the properties of the full gradient function.
     const std::vector<size_t> &diffArgIndices = compDiffArgIndices(gradOp.getDiffArgIndices());
@@ -179,8 +178,6 @@ func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc, GradOp
         // Collect arguments and invoke the classical jacobian and quantum gradient functions.
         std::vector<Value> callArgs(fullGradFn.getArguments().begin(),
                                     fullGradFn.getArguments().end());
-        Value numParams = rewriter.create<func::CallOp>(loc, paramCountFn, callArgs).getResult(0);
-        callArgs.push_back(numParams);
 
         std::vector<Type> resTypes = computeResultTypes(argMapFn, diffArgIndices);
         DenseIntElementsAttr diffArgIndicesAttr = gradOp.getDiffArgIndices().value_or(nullptr);
@@ -188,6 +185,13 @@ func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc, GradOp
                                                diffArgIndicesAttr, nullptr);
         ValueRange classicalJacobians = jacOp.getResults();
 
+        // The argmap function returns a 1-d dynamic tensor<{pcount}xf64>. If the input has tensor
+        // type, the GradOp will return a transposed Jacobian s.t. the pcount is the last
+        // dimension (tensor<{inputdim}x{pcount}xf64>).
+        int64_t rank = cast<RankedTensorType>(classicalJacobians.front().getType()).getRank();
+        Value numParams =
+            rewriter.create<tensor::DimOp>(loc, classicalJacobians.front(), /*index=*/rank - 1);
+        callArgs.push_back(numParams);
         ValueRange quantumGradients =
             rewriter.create<func::CallOp>(loc, qGradFn, callArgs).getResults();
 

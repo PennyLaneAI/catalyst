@@ -1,4 +1,4 @@
-// Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+// Copyright 2023 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,15 +14,15 @@
 
 #pragma once
 
-#include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/IR/PatternMatch.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Pass/Pass.h"
 
-using namespace mlir;
+#include <memory>
 
 namespace catalyst {
-namespace gradient {
 
-func::FuncOp genArgMapFunction(PatternRewriter &rewriter, Location loc, func::FuncOp callee);
+std::unique_ptr<mlir::Pass> createArrayListToMemRefPass();
 
-} // namespace gradient
+#define GEN_PASS_DEF_ARRAYLISTTOMEMREFPASS
+#include "Catalyst/Transforms/Passes.h.inc"
 } // namespace catalyst

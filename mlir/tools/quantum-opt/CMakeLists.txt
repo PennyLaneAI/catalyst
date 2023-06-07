@@ -4,6 +4,8 @@ set(LIBS
     ${dialect_libs}
     ${conversion_libs}
     MLIROptLib
+    MLIRCatalyst
+    MLIRCatalystTransforms
     MLIRQuantum
     quantum-transforms
     MLIRGradient

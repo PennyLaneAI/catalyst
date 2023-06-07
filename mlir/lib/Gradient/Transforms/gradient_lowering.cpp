@@ -27,6 +27,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
+#include "Catalyst/IR/CatalystDialect.h"
 #include "Gradient/IR/GradientOps.h"
 #include "Gradient/Transforms/Passes.h"
 #include "Gradient/Transforms/Patterns.h"
@@ -57,6 +58,7 @@ struct GradientLoweringPass : public OperationPass<ModuleOp> {
         registry.insert<linalg::LinalgDialect>();
         registry.insert<index::IndexDialect>();
         registry.insert<tensor::TensorDialect>();
+        registry.insert<catalyst::CatalystDialect>();
         registry.insert<memref::MemRefDialect>();
         registry.insert<bufferization::BufferizationDialect>();
     }
