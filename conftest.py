@@ -1,6 +1,5 @@
-import pytest
-
 """Setup pytest configurations."""
+import pytest
 
 
 def pytest_addoption(parser):

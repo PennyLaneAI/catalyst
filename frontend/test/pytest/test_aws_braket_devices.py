@@ -12,14 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import pytest
-
-pytest.importorskip("braket")
-
+"""Unit tests for `OpenQasmDevice` on Amazon Braket devices
+"""
 import numpy as np
 import pennylane as qml
+import pytest
 
 from catalyst import grad, qjit
+
+pytest.importorskip("braket")
 
 
 @pytest.mark.braket
@@ -436,6 +437,7 @@ class TestBraketVar:
         @qml.qnode(device)
         def var(x: float):
             qml.Hadamard(wires=0)
+            qml.RX(x, wires=0)
             return qml.var(qml.PauliZ(0))
 
         expected = np.array(1.0)
