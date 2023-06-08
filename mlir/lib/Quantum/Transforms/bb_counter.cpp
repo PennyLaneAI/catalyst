@@ -19,10 +19,12 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
+#include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Passes.h"
 #include "Quantum/Transforms/Patterns.h"
 
 using namespace mlir;
+using namespace catalyst::quantum;
 
 namespace {
 
@@ -51,6 +53,67 @@ getBasicBlocksInPostOrder(func::FuncOp &op) {
     }
   });
   return blocks;
+}
+
+std::vector<DifferentiableGate>
+getDifferentiableGates(func::FuncOp &op) {
+  std::vector<DifferentiableGate> ops;
+  op.walk([&](mlir::Operation *nestedOp) {
+    if (DifferentiableGate gate = dyn_cast<DifferentiableGate>(nestedOp)) {
+      ops.push_back(gate);
+    }
+  });
+  return ops;
+}
+
+void
+printDifferentiableParam(DifferentiableGate gate, std::unordered_map<Block *, int> &blockOffsetMap)
+{
+  ValueRange diffParams = gate.getDiffParams();
+  for (Value diffParam : diffParams) {
+    mlir::Operation *definingOp = diffParam.getDefiningOp();
+    Block *definingBlock = definingOp->getBlock();
+    int blockOffset = blockOffsetMap.at(definingBlock);
+  }
+}
+
+int
+getDefinitionsBlockOffset(Value value, std::unordered_map<Block *, int> &blockOffsetMap)
+{
+  mlir::Operation *definingOp = value.getDefiningOp();
+  Block *definingBlock = definingOp->getBlock();
+  return blockOffsetMap.at(definingBlock);
+}
+
+std::unordered_map<void*, int>
+getDifferentiableParamsBasicBlockOffsetMap(DifferentiableGate gate, std::unordered_map<Block *, int> &blockOffsetMap)
+{
+  std::unordered_map<void*, int> map;
+  ValueRange diffParams = gate.getDiffParams();
+  for (Value diffParam : diffParams) {
+    int definingBlockOffset = getDefinitionsBlockOffset(diffParam , blockOffsetMap);
+    map.insert({diffParam.getAsOpaquePointer(), definingBlockOffset});
+  }
+  return map;
+}
+
+std::unordered_map<void*, int>
+getDifferentiableParamBasicBlockOffsetMap(std::vector<DifferentiableGate> gates, std::unordered_map<Block *, int> &blockOffsetMap)
+{
+  std::unordered_map<void*, int> map;
+  for (DifferentiableGate gate : gates) {
+    std::unordered_map<void*, int> instructionMap = getDifferentiableParamsBasicBlockOffsetMap(gate, blockOffsetMap);
+    map.merge(instructionMap);
+  }
+  return map;
+}
+
+void
+printDifferentiableParams(std::vector<DifferentiableGate> &gates, std::unordered_map<Block *, int> &blockOffsetMap)
+{
+  for (auto gate : gates) {
+    printDifferentiableParam(gate, blockOffsetMap);
+  }
 }
 
 
@@ -93,9 +156,10 @@ BasicBlockCounterTransform::addIncrements(PatternRewriter &rewriter, Location lo
       rewriter.setInsertionPointToStart(block);
     }
  
-    Value currentCount = rewriter.create<LLVM::ExtractValueOp>(loc, blockCounterArray, ArrayRef<int64_t>{(int64_t)i});
+    ArrayRef<int64_t> basicBlockIndex{static_cast<int64_t>(i)};
+    Value currentCount = rewriter.create<LLVM::ExtractValueOp>(loc, blockCounterArray, basicBlockIndex);
     Value newCount = rewriter.create<LLVM::AddOp>(loc, c1, currentCount);
-    rewriter.create<LLVM::InsertValueOp>(loc, blockCounterArray, newCount, ArrayRef<int64_t>{(int64_t)i});
+    rewriter.create<LLVM::InsertValueOp>(loc, blockCounterArray, newCount, basicBlockIndex);
   }
 }
 
@@ -116,7 +180,9 @@ BasicBlockCounterTransform::rewrite(func::FuncOp op, PatternRewriter &rewriter) 
     blockNumberingMap.insert({blocks[i], i});
   }
 
-  op->emitRemark() << "remark";
+  auto differentiableGates = getDifferentiableGates(op);
+  auto valueDefiningBlockMap = getDifferentiableParamBasicBlockOffsetMap(differentiableGates, blockNumberingMap);
+
 
   removeBasicBlockCounterAttribute(op);
 }
@@ -148,9 +214,6 @@ struct BasicBlockCounterPass : public PassWrapper<BasicBlockCounterPass, Operati
         MLIRContext *context = &getContext();
         RewritePatternSet patterns(context);
         patterns.add<BasicBlockCounterTransform>(context);
-
-	mlir::Operation *op = getOperation();
-	op->emitRemark() << "running on...";
 
         if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
             signalPassFailure();
