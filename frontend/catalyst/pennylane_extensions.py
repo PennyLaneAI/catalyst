@@ -24,6 +24,8 @@ from typing import Any, Callable, Iterable, List, Optional, Union
 import jax
 import jax.numpy as jnp
 import pennylane as qml
+from functools import partial
+from jax import ShapedArray
 from jax._src.lax.control_flow import (
     _initial_style_jaxpr,
     _initial_style_jaxprs_with_common_consts,
@@ -529,12 +531,12 @@ class Adjoint(Operation):
 
 def adjoint(f:Callable) -> Callable:
 
-    def _adjoint(qreg=None, *args):
+    def _adjoint(qreg=None, *args, **kwargs):
         assert qreg is not None
         with JaxTape(do_queue=False) as tape:
             with tape.quantum_tape:
-                out = f(*args)
-            tape.set_return_val(out)
+                out = f(*args, **kwargs)
+            tape.set_return_val(out if not isinstance(out, Operation) else None)
             new_quantum_tape = JaxTape.device.expand_fn(tape.quantum_tape)
             tape.quantum_tape = new_quantum_tape
             tape.quantum_tape.jax_tape = tape
@@ -551,7 +553,7 @@ def adjoint(f:Callable) -> Callable:
         init_vals, in_tree = tree_flatten((jprim.Qreg(), *args))
         init_avals = tuple(_abstractify(val) for val in init_vals)
         body_jaxpr, body_consts, body_tree = _initial_style_jaxpr(
-            _adjoint, in_tree, init_avals, "adjoint"
+            partial(_adjoint, **kwargs), in_tree, init_avals, "adjoint"
         )
         return Adjoint(body_jaxpr, *args, **kwargs)
 
