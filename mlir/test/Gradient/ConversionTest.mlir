@@ -19,7 +19,6 @@
 //////////////////////
 
 func.func private @circuit.nodealloc(%arg0: f32) -> (!quantum.reg)
-func.func private @circuit(%arg0: f32) -> (f64, memref<?xf64>)
 
 // CHECK-DAG:   llvm.func @__quantum__rt__toggle_recorder(i1)
 // CHECK-DAG:   llvm.func @__quantum__qis__Gradient(i64, ...)
