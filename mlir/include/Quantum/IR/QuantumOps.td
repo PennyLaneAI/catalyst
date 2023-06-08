@@ -200,6 +200,38 @@ def CustomOp : Gate_Op<"custom", [NoMemoryEffect, AttrSizedOperandSegments, Diff
     }];
 }
 
+def TraceCustomOp : Gate_Op<"trace", [NoMemoryEffect, AttrSizedOperandSegments, DifferentiableGate]> {
+    let summary = "A generic quantum gate on n qubits with m floating point parameters that is intended to be traced.";
+
+    let description = [{
+    }];
+
+    let arguments = (ins
+        Variadic<F64>:$params,
+        Variadic<I64>:$paramIds,
+        Variadic<I64>:$paramRuntimeDefinition,
+        Variadic<QubitType>:$in_qubits,
+        StrAttr:$gate_name
+    );
+
+    let results = (outs
+        Variadic<QubitType>:$out_qubits
+    );
+
+    let assemblyFormat = [{
+        $gate_name `(` $params `,` $paramIds `,` $paramRuntimeDefinition `)` $in_qubits attr-dict `:` type($out_qubits)
+    }];
+
+    let extraClassDeclaration = extraBaseClassDeclaration # [{
+        mlir::ValueRange getDiffParams() {
+            return getParams();
+        }
+        size_t getDiffOperandIdx() {
+            return 0;
+        }
+    }];
+}
+
 def MultiRZOp : Gate_Op<"multirz", [NoMemoryEffect, DifferentiableGate]> {
     let summary = "Apply an arbitrary multi Z rotation";
     let description = [{
