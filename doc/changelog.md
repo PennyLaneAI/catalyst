@@ -49,8 +49,10 @@
      jax.grad(cost_fn)(jnp.array([0.1, 0.2, 0.3]))
      ```
 
-* Add a Backprop operation with Bufferiation
+* Add a Backprop operation for using AD at the LLVM level with Enzyme AD. It has a 
+  bufferization pattern and a lowering to LLVM.
   [#107](https://github.com/PennyLaneAI/catalyst/pull/107)
+  [#116](https://github.com/PennyLaneAI/catalyst/pull/116)
 
 * Add support for ``else if`` chains for ``@cond`` conditionals
   [#104](https://github.com/PennyLaneAI/catalyst/pull/104)
