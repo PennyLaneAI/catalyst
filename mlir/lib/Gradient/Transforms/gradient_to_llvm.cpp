@@ -32,7 +32,7 @@ namespace gradient {
 #define GEN_PASS_DEF_GRADIENTCONVERSIONPASS
 #include "Gradient/Transforms/Passes.h.inc"
 
-struct GradientConversionPass : public impl::GradientConversionPassBase<GradientConversionPass> {
+struct GradientConversionPass : impl::GradientConversionPassBase<GradientConversionPass> {
     using GradientConversionPassBase::GradientConversionPassBase;
 
     void runOnOperation() final
