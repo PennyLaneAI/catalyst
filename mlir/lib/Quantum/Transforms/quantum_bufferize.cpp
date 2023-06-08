@@ -29,19 +29,11 @@ using namespace catalyst::quantum;
 namespace catalyst {
 namespace quantum {
 
-struct QuantumBufferizationPass
-    : public PassWrapper<QuantumBufferizationPass, OperationPass<ModuleOp>> {
-    QuantumBufferizationPass() {}
+#define GEN_PASS_DEF_QUANTUMBUFFERIZATIONPASS
+#include "Quantum/Transforms/Passes.h.inc"
 
-    StringRef getArgument() const override { return "quantum-bufferize"; }
-
-    StringRef getDescription() const override { return "Bufferize tensors in quantum operations."; }
-
-    void getDependentDialects(DialectRegistry &registry) const override
-    {
-        registry.insert<bufferization::BufferizationDialect>();
-        registry.insert<memref::MemRefDialect>();
-    }
+struct QuantumBufferizationPass : impl::QuantumBufferizationPassBase<QuantumBufferizationPass> {
+    using QuantumBufferizationPassBase::QuantumBufferizationPassBase;
 
     void runOnOperation() final
     {
