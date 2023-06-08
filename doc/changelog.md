@@ -89,6 +89,9 @@
 * Add support for generating OpenQasm3 kernels from the ``QuantumDevice`` API in the runtime.
   [#118](https://github.com/PennyLaneAI/catalyst/pull/118)
 
+* Add end-to-end support for execution of OpenQasm3 kernels on Amazon Braket devices.
+  [#139](https://github.com/PennyLaneAI/catalyst/pull/139)
+
 <h3>Improvements</h3>
 
 * Improving error handling by throwing descriptive and unified expressions for runtime
@@ -175,7 +178,6 @@
   params = jnp.array([0.3, 0.4])
   jax.grad(circuit)(params)
   ```
-
 
 <h3>Contributors</h3>
 
