@@ -110,6 +110,19 @@
 * Support constant negative step sizes in ``@for_loop`` loops.
   [#129](https://github.com/PennyLaneAI/catalyst/pull/129)
 
+* Reduce the number of classical invocations by counting the number of gate parameters in
+  the ``argmap`` function.
+  [#136](https://github.com/PennyLaneAI/catalyst/pull/136)
+
+  Prior to this, the computation of hybrid gradients executed all of the classical code
+  being differentiated in a ``pcount`` function that solely counted the number of gate
+  parameters in the quantum circuit. This was so ``argmap`` and other downstream
+  functions could allocate memrefs large enough to store all gate parameters.
+
+  Now, instead of counting the number of parameters separately, a dynamically-resizable
+  array is used in the ``argmap`` function directly to store the gate parameters. This
+  removes one invocation of all of the classical code being differentiated.
+
 <h3>Breaking changes</h3>
 
 <h3>Bug fixes</h3>

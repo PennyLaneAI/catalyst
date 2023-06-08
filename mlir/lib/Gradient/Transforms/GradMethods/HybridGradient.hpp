@@ -23,8 +23,7 @@ namespace catalyst {
 namespace gradient {
 
 func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc, GradOp gradOp,
-                                 func::FuncOp paramCountFn, func::FuncOp argMapFn,
-                                 func::FuncOp qGradFn, StringRef method);
+                                 func::FuncOp argMapFn, func::FuncOp qGradFn, StringRef method);
 
 } // namespace gradient
 } // namespace catalyst

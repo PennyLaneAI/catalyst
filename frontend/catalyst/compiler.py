@@ -240,7 +240,7 @@ class QuantumCompilationPass(PassPipeline):
     """Pass pipeline to lower gradients."""
 
     _executable = get_executable_path("quantum", "quantum-opt")
-    _default_flags = ["--lower-gradients"]
+    _default_flags = ["--lower-gradients", "--convert-arraylist-to-memref"]
 
     @staticmethod
     def get_output_filename(infile):
