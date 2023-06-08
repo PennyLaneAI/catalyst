@@ -4,6 +4,7 @@ set(LIBS
     ${dialect_libs}
     ${conversion_libs}
     MLIRLspServerLib
+    MLIRCatalyst
     MLIRQuantum
     MLIRGradient
 )

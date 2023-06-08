@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "iostream"
+#include "llvm/Support/raw_ostream.h"
+
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -63,8 +66,6 @@ class BufferizeBackpropOp : public OpConversionPattern<BackpropOp> {
             return failure();
 
         Location loc = op.getLoc();
-
-        Value gradSize = op.getGradSize();
         ValueRange args = op.getArgs();
 
         SmallVector<Value> memrefValues;
@@ -79,13 +80,10 @@ class BufferizeBackpropOp : public OpConversionPattern<BackpropOp> {
             std::vector<Value> dynamicDimSizes;
 
             int argPos = i % numCalleeResults;
-
             Type argType = args[argPos].getType();
-
             if (argType.isa<TensorType>()) {
                 RankedTensorType rankedArg = argType.cast<RankedTensorType>();
                 int numDynDim = rankedArg.getNumDynamicDims();
-
                 for (int i = 0; i < numDynDim; i++) {
                     int dim = rankedArg.getDynamicDimIndex(i);
                     dynamicDimSizes.push_back(
@@ -93,15 +91,20 @@ class BufferizeBackpropOp : public OpConversionPattern<BackpropOp> {
                 }
             }
 
-            dynamicDimSizes.push_back(gradSize);
-
             MemRefType memrefType = resType.cast<MemRefType>();
-            Value memrefValue = rewriter.create<memref::AllocOp>(loc, memrefType, dynamicDimSizes);
+            Value memrefValue;
+            if (!dynamicDimSizes.empty()) {
+                memrefValue = rewriter.create<memref::AllocOp>(loc, memrefType, dynamicDimSizes);
+            }
+            else {
+                memrefValue = rewriter.create<memref::AllocOp>(loc, memrefType);
+            }
             memrefValues.push_back(memrefValue);
         }
 
-        rewriter.create<BackpropOp>(loc, TypeRange{}, op.getCalleeAttr(), adaptor.getGradSize(),
-                                    adaptor.getDiffArgIndices(), adaptor.getArgs(), memrefValues);
+        rewriter.create<BackpropOp>(loc, TypeRange{}, op.getCalleeAttr(),
+                                    adaptor.getDiffArgIndices(), adaptor.getArgs(),
+                                    adaptor.getQuantumJacobian(), memrefValues);
         rewriter.replaceOp(op, memrefValues);
         return success();
     }

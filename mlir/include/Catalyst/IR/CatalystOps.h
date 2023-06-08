@@ -1,4 +1,4 @@
-// Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+// Copyright 2023 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,15 +14,13 @@
 
 #pragma once
 
-#include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/Dialect.h"
+#include "mlir/IR/OpDefinition.h"
+#include "mlir/IR/OpImplementation.h"
+#include "mlir/Interfaces/InferTypeOpInterface.h"
 
-using namespace mlir;
+#include "Catalyst/IR/CatalystDialect.h"
 
-namespace catalyst {
-namespace gradient {
-
-func::FuncOp genArgMapFunction(PatternRewriter &rewriter, Location loc, func::FuncOp callee);
-
-} // namespace gradient
-} // namespace catalyst
+#define GET_OP_CLASSES
+#include "Catalyst/IR/CatalystOps.h.inc"

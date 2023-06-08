@@ -49,8 +49,10 @@
      jax.grad(cost_fn)(jnp.array([0.1, 0.2, 0.3]))
      ```
 
-* Add a Backprop operation with Bufferiation
+* Add a Backprop operation for using AD at the LLVM level with Enzyme AD. It has a 
+  bufferization pattern and a lowering to LLVM.
   [#107](https://github.com/PennyLaneAI/catalyst/pull/107)
+  [#116](https://github.com/PennyLaneAI/catalyst/pull/116)
 
 * Add support for ``else if`` chains for ``@cond`` conditionals
   [#104](https://github.com/PennyLaneAI/catalyst/pull/104)
@@ -81,7 +83,7 @@
 
   @qjit
   def workflow(params, tangent):
-      return jvp(f, [params], [tangent])
+    return jvp(f, [params], [tangent])
 
   workflow(jnp.zeros([4], dtype=float), jnp.ones([4], dtype=float))
   ```
@@ -107,6 +109,19 @@
 
 * Support constant negative step sizes in ``@for_loop`` loops.
   [#129](https://github.com/PennyLaneAI/catalyst/pull/129)
+
+* Reduce the number of classical invocations by counting the number of gate parameters in
+  the ``argmap`` function.
+  [#136](https://github.com/PennyLaneAI/catalyst/pull/136)
+
+  Prior to this, the computation of hybrid gradients executed all of the classical code
+  being differentiated in a ``pcount`` function that solely counted the number of gate
+  parameters in the quantum circuit. This was so ``argmap`` and other downstream
+  functions could allocate memrefs large enough to store all gate parameters.
+
+  Now, instead of counting the number of parameters separately, a dynamically-resizable
+  array is used in the ``argmap`` function directly to store the gate parameters. This
+  removes one invocation of all of the classical code being differentiated.
 
 <h3>Breaking changes</h3>
 
@@ -140,6 +155,29 @@
 
 * Fixes the issue with the ``do_queue`` deprecation warnings in PennyLane.
   [#146](https://github.com/PennyLaneAI/catalyst/pull/146)
+
+* Fixes the issue with gradients failing to work with ``jnp.array`` as constants.
+  [#152](https://github.com/PennyLaneAI/catalyst/pull/152)
+  
+  An example of a newly supported workflow:
+  
+  ``` python
+  coeffs = jnp.array([0.1, 0.2])
+  terms = [qml.PauliX(0) @ qml.PauliZ(1), qml.PauliZ(0)]
+  H = qml.Hamiltonian(coeffs, terms)
+
+  @qjit
+  @qml.qnode(qml.device("lightning.qubit", wires=2))
+  def circuit(x):
+    qml.RX(x[0], wires=0)
+    qml.RY(x[1], wires=0)
+    qml.CNOT(wires=[0, 1])
+    return qml.expval(H)
+
+  params = jnp.array([0.3, 0.4])
+  jax.grad(circuit)(params)
+  ```
+
 
 <h3>Contributors</h3>
 
