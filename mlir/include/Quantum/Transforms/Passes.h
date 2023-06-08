@@ -24,5 +24,6 @@ std::unique_ptr<mlir::Pass> createQuantumBufferizationPass();
 std::unique_ptr<mlir::Pass> createQuantumConversionPass();
 std::unique_ptr<mlir::Pass> createEmitCatalystPyInterfacePass();
 std::unique_ptr<mlir::Pass> createCopyGlobalMemRefPass();
+std::unique_ptr<mlir::Pass> createBasicBlockCounterPass();
 
 } // namespace catalyst
