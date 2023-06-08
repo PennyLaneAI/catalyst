@@ -1,0 +1,70 @@
+
+// Copyright 2023 Xanadu Quantum Technologies Inc.
+
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+
+//     http://www.apache.org/licenses/LICENSE-2.0
+
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+#ifndef GRADIENT_PASSES
+#define GRADIENT_PASSES
+
+include "mlir/Pass/PassBase.td"
+
+def GradientBufferizationPass : Pass<"gradient-bufferize"> {
+    let summary = "Bufferize tensors in quantum operations.";
+
+    let dependentDialects = [
+        "bufferization::BufferizationDialect",
+        "memref::MemRefDialect"
+    ];
+
+    let constructor = "catalyst::createGradientBufferizationPass()";
+}
+
+def GradientLoweringPass : Pass<"lower-gradients"> {
+    let summary = "Lower operations in the gradient dialect to core MLIR dialects.";
+
+    let dependentDialects = [
+        "arith::ArithDialect",
+        "linalg::LinalgDialect",
+        "index::IndexDialect",
+        "tensor::TensorDialect",
+        "memref::MemRefDialect",
+        "bufferization::BufferizationDialect",
+        "catalyst::CatalystDialect"
+    ];
+
+    let constructor = "catalyst::createGradientLoweringPass()";
+
+    let options = [
+        Option<
+            /*C++ var name=*/"lowerOnly",
+            /*CLI arg name=*/"only",
+            /*type=*/"std::string",
+            /*default=*/"\"\"",
+            /*description=*/"Restrict lowering to a specific type of gradient."
+        >
+    ];
+}
+
+def GradientConversionPass : Pass<"convert-gradient-to-llvm"> {
+    let summary = "Perform a dialect conversion from Gradient to LLVM";
+
+    let dependentDialects = [
+        "LLVM::LLVMDialect",
+        "func::FuncDialect",
+        "catalyst::quantum::QuantumDialect"
+    ];
+
+    let constructor = "catalyst::createGradientConversionPass()";
+}
+
+#endif // GRADIENT_PASSES
