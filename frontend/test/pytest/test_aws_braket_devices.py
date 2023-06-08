@@ -22,6 +22,7 @@ import pennylane as qml
 from catalyst import grad, qjit
 
 
+@pytest.mark.braket
 class TestBraketGates:
     @pytest.mark.parametrize(
         "device",
@@ -140,6 +141,7 @@ class TestBraketGates:
         assert np.allclose(qjit_fn(3.14, 0.6), qml_fn(3.14, 0.6))
 
 
+@pytest.mark.braket
 class TestBraketSample:
     @pytest.mark.parametrize(
         "device",
@@ -204,6 +206,7 @@ class TestBraketSample:
         assert np.array_equal(observed, expected)
 
 
+@pytest.mark.braket
 class TestBraketProbs:
     @pytest.mark.parametrize(
         "device",
@@ -259,6 +262,7 @@ class TestBraketProbs:
         assert np.allclose(np.sum(observed), 1.0)
 
 
+@pytest.mark.braket
 class TestBraketCounts:
     @pytest.mark.parametrize(
         "device",
@@ -324,6 +328,7 @@ class TestBraketCounts:
         assert np.array_equal(observed, expected)
 
 
+@pytest.mark.braket
 class TestBraketExpval:
     @pytest.mark.parametrize(
         "device",
@@ -382,6 +387,7 @@ class TestBraketExpval:
         assert np.isclose(observed, expected)
 
 
+@pytest.mark.braket
 class TestBraketVar:
     @pytest.mark.parametrize(
         "device",
@@ -468,6 +474,7 @@ class TestBraketVar:
         assert np.isclose(observed, expected)
 
 
+@pytest.mark.braket
 class TestBraketMeasurementsProcess:
     @pytest.mark.parametrize(
         "device",
@@ -571,6 +578,7 @@ class TestBraketMeasurementsProcess:
             circuit(np.pi / 4, np.pi / 3)
 
 
+@pytest.mark.braket
 class TestBraketGradient:
     @pytest.mark.parametrize(
         "device",

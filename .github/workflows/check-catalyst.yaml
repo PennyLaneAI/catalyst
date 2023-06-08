@@ -539,7 +539,7 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_BRAKET_DEVICE_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_BRAKET_DEVICE_ACCESS_KEY }}
       run: |
-        make pytest
+        make pytest TEST_BRAKET=ON
 
   runtime-tests:
     name: Runtime Tests (Linux)
