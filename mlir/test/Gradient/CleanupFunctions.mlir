@@ -15,8 +15,6 @@
 // RUN: quantum-opt --lower-gradients --split-input-file %s | FileCheck %s
 
 // CHECK-LABEL: @f
-// CHECK-LABEL: @f.pcount
-// CHECK-NOT: quantum.
 // CHECK-LABEL: @f.argmap
 // CHECK-NOT: quantum.
 // CHECK-LABEL: @f.shifted
@@ -49,8 +47,6 @@ func.func @gradCall0(%arg0: tensor<f64>) -> tensor<f64> {
 // -----
 
 // CHECK-LABEL: @f2
-// CHECK-LABEL: @f2.pcount
-// CHECK-NOT: quantum.
 // CHECK-LABEL: @f2.argmap
 // CHECK-NOT: quantum.
 // CHECK-LABEL: @f2.shifted
@@ -102,8 +98,6 @@ func.func public @gradCall1(%arg0: tensor<f64>, %arg1: tensor<i64>, %arg2: tenso
 #map = affine_map<() -> ()>
 
 // CHECK-LABEL: @f3
-// CHECK-LABEL: @f3.pcount
-// CHECK-NOT: quantum.
 // CHECK-LABEL: @f3.argmap
 // CHECK-NOT: quantum.
 // CHECK-LABEL: @f3.shifted

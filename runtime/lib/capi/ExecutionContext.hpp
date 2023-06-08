@@ -22,12 +22,19 @@
 #include "Exception.hpp"
 #include "QuantumDevice.hpp"
 
+#if __has_include("LightningSimulator.hpp")
 // device: lightning.qubit
 #include "LightningSimulator.hpp"
+#endif
 
-#if __has_include("StateVectorKokkos.hpp")
+#if __has_include("LightningKokkosSimulator.hpp")
 // device: lightning.kokkos
 #include "LightningKokkosSimulator.hpp"
+#endif
+
+#if __has_include("OpenQasmDevice.hpp")
+// device: openqasm
+#include "OpenQasmDevice.hpp"
 #endif
 
 namespace Catalyst::Runtime {
@@ -66,8 +73,8 @@ class ExecutionContext final {
     bool _tape_recording;
 
     // ExecutionContext pointers
-    std::unique_ptr<QuantumDevice> _driver_ptr = nullptr;
-    std::unique_ptr<MemoryManager> _driver_mm_ptr = nullptr;
+    std::unique_ptr<QuantumDevice> _driver_ptr{nullptr};
+    std::unique_ptr<MemoryManager> _driver_mm_ptr{nullptr};
 
   public:
     explicit ExecutionContext(std::string_view default_device = "lightning.qubit")
@@ -78,7 +85,7 @@ class ExecutionContext final {
             return std::make_unique<Simulator::LightningKokkosSimulator>(tape_recording);
         });
 #endif
-        this->_driver_mm_ptr = std::make_unique<MemoryManager>();
+        _driver_mm_ptr = std::make_unique<MemoryManager>();
     };
 
     ~ExecutionContext()
@@ -90,23 +97,23 @@ class ExecutionContext final {
         RT_ASSERT(getMemoryManager() == nullptr);
     };
 
-    void setDeviceRecorder(bool status) noexcept { this->_tape_recording = status; }
+    void setDeviceRecorder(bool status) noexcept { _tape_recording = status; }
 
-    [[nodiscard]] auto getDeviceName() const -> std::string_view { return this->_name; }
+    [[nodiscard]] auto getDeviceName() const -> std::string_view { return _name; }
 
-    [[nodiscard]] auto getDeviceRecorderStatus() const -> bool { return this->_tape_recording; }
+    [[nodiscard]] auto getDeviceRecorderStatus() const -> bool { return _tape_recording; }
 
     [[nodiscard]] bool initDevice(std::string_view name) noexcept
     {
         if (name != "default") {
-            this->_name = name;
+            _name = name;
         }
 
-        this->_driver_ptr.reset(nullptr);
+        _driver_ptr.reset(nullptr);
 
-        auto iter = _device_map.find(this->_name);
+        auto iter = _device_map.find(_name);
         if (iter != _device_map.end()) {
-            this->_driver_ptr = iter->second(_tape_recording);
+            _driver_ptr = iter->second(_tape_recording);
             return true;
         }
         return false;

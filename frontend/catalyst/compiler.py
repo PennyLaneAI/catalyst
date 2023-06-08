@@ -17,6 +17,7 @@ MLIR/LLVM representations.
 
 import abc
 import os
+import pathlib
 import shutil
 import subprocess
 import sys
@@ -27,6 +28,7 @@ from io import TextIOWrapper
 from typing import Any, List, Optional
 
 from catalyst._configuration import INSTALLED
+from catalyst.utils.exceptions import CompileError
 
 package_root = os.path.dirname(__file__)
 
@@ -126,7 +128,10 @@ class PassPipeline(abc.ABC):
             raise ValueError("Executable not specified.")
         if flags is None:
             flags = cls._default_flags
-        cls._run(infile, outfile, executable, flags, options)
+        try:
+            cls._run(infile, outfile, executable, flags, options)
+        except subprocess.CalledProcessError as e:
+            raise CompileError(f"{cls.__name__} failed.") from e
         return outfile
 
 
@@ -147,9 +152,10 @@ class MHLOPass(PassPipeline):
 
     @staticmethod
     def get_output_filename(infile):
-        if not infile.endswith(".mlir"):
-            raise ValueError(f"Input file ({infile}) for MHLO is not an MLIR file")
-        return infile.replace(".mlir", ".nohlo.mlir")
+        path = pathlib.Path(infile)
+        if not path.exists():
+            raise FileNotFoundError("Cannot find {infile}.")
+        return str(path.with_suffix(".nohlo.mlir"))
 
 
 class BufferizationPass(PassPipeline):
@@ -182,10 +188,10 @@ class BufferizationPass(PassPipeline):
 
     @staticmethod
     def get_output_filename(infile):
-        if not infile.endswith(".opt.mlir"):
-            raise ValueError(f"Input file ({infile}) for bufferization is not an MLIR file")
-
-        return infile.replace(".opt.mlir", ".buff.mlir")
+        path = pathlib.Path(infile)
+        if not path.exists():
+            raise FileNotFoundError("Cannot find {infile}.")
+        return str(path.with_suffix(".buff.mlir"))
 
 
 class MLIRToLLVMDialect(PassPipeline):
@@ -224,22 +230,24 @@ class MLIRToLLVMDialect(PassPipeline):
 
     @staticmethod
     def get_output_filename(infile):
-        if not infile.endswith(".buff.mlir"):
-            raise ValueError(f"Input file ({infile}) is not a bufferized MLIR file")
-        return infile.replace(".buff.mlir", ".llvm.mlir")
+        path = pathlib.Path(infile)
+        if not path.exists():
+            raise FileNotFoundError("Cannot find {infile}.")
+        return str(path.with_suffix(".llvm.mlir"))
 
 
 class QuantumCompilationPass(PassPipeline):
     """Pass pipeline to lower gradients."""
 
     _executable = get_executable_path("quantum", "quantum-opt")
-    _default_flags = ["--lower-gradients"]
+    _default_flags = ["--lower-gradients", "--convert-arraylist-to-memref"]
 
     @staticmethod
     def get_output_filename(infile):
-        if not infile.endswith(".mlir"):
-            raise ValueError(f"Input file ({infile}) for quantum transforms is not an MLIR file")
-        return infile.replace(".mlir", ".opt.mlir")
+        path = pathlib.Path(infile)
+        if not path.exists():
+            raise FileNotFoundError("Cannot find {infile}.")
+        return str(path.with_suffix(".opt.mlir"))
 
 
 class LLVMDialectToLLVMIR(PassPipeline):
@@ -250,9 +258,10 @@ class LLVMDialectToLLVMIR(PassPipeline):
 
     @staticmethod
     def get_output_filename(infile):
-        if not infile.endswith(".llvm.mlir"):
-            raise ValueError(f"Input file ({infile}) is not an LLVM dialect MLIR file")
-        return infile.replace(".llvm.mlir", ".ll")
+        path = pathlib.Path(infile)
+        if not path.exists():
+            raise FileNotFoundError("Cannot find {infile}.")
+        return str(path.with_suffix(".ll"))
 
 
 class LLVMIRToObjectFile(PassPipeline):
@@ -266,9 +275,10 @@ class LLVMIRToObjectFile(PassPipeline):
 
     @staticmethod
     def get_output_filename(infile):
-        if not infile.endswith(".ll"):
-            raise ValueError(f"Input file ({infile}) for compilation is not an LLVMIR file")
-        return infile.replace(".ll", ".o")
+        path = pathlib.Path(infile)
+        if not path.exists():
+            raise FileNotFoundError("Cannot find {infile}.")
+        return str(path.with_suffix(".o"))
 
 
 class CompilerDriver:
@@ -365,9 +375,10 @@ class CompilerDriver:
             infile (str): input file name
             outfile (str): output file name
         """
-        if not infile.endswith(".o"):
-            raise ValueError(f"Input file ({infile}) is not an object file")
-        return infile.replace(".o", ".so")
+        path = pathlib.Path(infile)
+        if not path.exists():
+            raise FileNotFoundError("Cannot find {infile}.")
+        return str(path.with_suffix(".so"))
 
     @staticmethod
     def run(infile, outfile=None, flags=None, fallback_compilers=None, options=None):

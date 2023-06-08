@@ -33,11 +33,11 @@ func.func @adjoint(%arg0: f64, %arg1: index) {
 func.func private @circuit2(%arg0: f64)
 
 // CHECK-LABEL: @backprop
-func.func @backprop(%arg0: f64, %arg1: index) {
+func.func @backprop(%arg0: f64, %arg1: memref<?xf64>) {
 
-    // CHECK:   [[alloc:%.+]] = memref.alloc(%arg1) : memref<?xf64>
-    // CHECK:   gradient.backprop @circuit2({{.*}}) size(%arg1) in([[alloc]] : memref<?xf64>) {diffArgIndices = dense<0> : tensor<1xindex>} : (f64) -> ()
-    %grad = gradient.backprop @circuit2(%arg0) size(%arg1) {diffArgIndices = dense<0> : tensor<1xindex>}: (f64) -> tensor<?xf64>
+    // CHECK:   [[alloc:%.+]] = memref.alloc() : memref<f64>
+    // CHECK:   gradient.backprop @circuit2({{.*}}) qjacobian(%arg1 : memref<?xf64>) in([[alloc]] : memref<f64>) {diffArgIndices = dense<0> : tensor<1xindex>} : (f64) -> ()
+    %grad = gradient.backprop @circuit2(%arg0) qjacobian(%arg1: memref<?xf64>) {diffArgIndices = dense<0> : tensor<1xindex>}: (f64) -> tensor<f64>
     return
 }
 
@@ -46,13 +46,13 @@ func.func @backprop(%arg0: f64, %arg1: index) {
 func.func private @circuit3(%arg0: tensor<?x2xf64>)
 
 // CHECK-LABEL: @backprop2
-func.func @backprop2(%arg0: tensor<?x2xf64>, %arg1: index) {
+func.func @backprop2(%arg0: tensor<?x2xf64>, %arg1: memref<?xf64>) {
 
     // CHECK:   [[c0:%.+]] = arith.constant 0 : index
     // CHECK:   [[dim:%.+]] = tensor.dim %arg0, [[c0]] : tensor<?x2xf64>
-    // CHECK:   [[alloc:%.+]] = memref.alloc([[dim]], %arg1) : memref<?x?xf64>
-    // CHECK:   gradient.backprop @circuit3({{.*}}) size(%arg1) in([[alloc]] : memref<?x?xf64>) {diffArgIndices = dense<0> : tensor<1xindex>} : (memref<?x2xf64>) -> ()
-    %grad = gradient.backprop @circuit3(%arg0) size(%arg1) {diffArgIndices = dense<0> : tensor<1xindex>}: (tensor<?x2xf64>) -> tensor<?x?xf64>
+    // CHECK:   [[alloc:%.+]] = memref.alloc([[dim]]) : memref<?x2xf64>
+    // CHECK:   gradient.backprop @circuit3({{.*}}) qjacobian(%arg1 : memref<?xf64>) in([[alloc]] : memref<?x2xf64>) {diffArgIndices = dense<0> : tensor<1xindex>} : (memref<?x2xf64>) -> ()
+    %grad = gradient.backprop @circuit3(%arg0) qjacobian(%arg1: memref<?xf64>) {diffArgIndices = dense<0> : tensor<1xindex>}: (tensor<?x2xf64>) -> tensor<?x2xf64>
     return
 }
 
@@ -61,15 +61,15 @@ func.func @backprop2(%arg0: tensor<?x2xf64>, %arg1: index) {
 func.func private @circuit4(%arg0: tensor<?xf64>, %arg1: tensor<?xf64>)
 
 // CHECK-LABEL: @backprop3
-func.func @backprop3(%arg0: tensor<?xf64>, %arg1: tensor<?xf64>,  %arg2: index) {
+func.func @backprop3(%arg0: tensor<?xf64>, %arg1: tensor<?xf64>, %arg2: memref<?xf64>) {
 
     // CHECK:   [[c0:%.+]] = arith.constant 0 : index
     // CHECK:   [[dim:%.+]] = tensor.dim %arg0, [[c0]] : tensor<?xf64>
-    // CHECK:   [[alloc:%.+]] = memref.alloc([[dim]], %arg2) : memref<?x?xf64>
+    // CHECK:   [[alloc:%.+]] = memref.alloc([[dim]]) : memref<?xf64>
     // CHECK:   [[c0_0:%.+]] = arith.constant 0 : index
     // CHECK:   [[dim_1:%.+]] = tensor.dim %arg0, [[c0_0]] : tensor<?xf64>
-    // CHECK:   [[alloc_2:%.+]] = memref.alloc([[dim_1]], %arg2) : memref<?x?xf64>
-    // CHECK:   gradient.backprop @circuit4({{.*}}, {{.*}}) size(%arg2) in([[alloc]], [[alloc_2]] : memref<?x?xf64>, memref<?x?xf64>) {diffArgIndices = dense<0> : tensor<1xindex>} : (memref<?xf64>, memref<?xf64>) -> ()
-    %grad0, %grad1 = gradient.backprop @circuit4(%arg0, %arg1) size(%arg2) {diffArgIndices = dense<0> : tensor<1xindex>}: (tensor<?xf64>, tensor<?xf64>) -> (tensor<?x?xf64>, tensor<?x?xf64>)
+    // CHECK:   [[alloc_2:%.+]] = memref.alloc([[dim_1]]) : memref<?xf64>
+    // CHECK:   gradient.backprop @circuit4({{.*}}, {{.*}}) qjacobian(%arg2 : memref<?xf64>) in([[alloc]], [[alloc_2]] : memref<?xf64>, memref<?xf64>) {diffArgIndices = dense<0> : tensor<1xindex>} : (memref<?xf64>, memref<?xf64>) -> ()
+    %grad0, %grad1 = gradient.backprop @circuit4(%arg0, %arg1) qjacobian(%arg2: memref<?xf64>) {diffArgIndices = dense<0> : tensor<1xindex>}: (tensor<?xf64>, tensor<?xf64>) -> (tensor<?xf64>, tensor<?xf64>)
     return
 }

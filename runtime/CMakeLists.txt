@@ -7,16 +7,31 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Compiler options
 option(ENABLE_CODE_COVERAGE "Enable code coverage" OFF)
-option(ENABLE_LIGHTNING_KOKKOS "Build Lightning-Kokkos" OFF)
 option(RUNTIME_CLANG_TIDY "Enable Clang Tidy" OFF)
+
+option(ENABLE_LIGHTNING "Build Lightning backend device" ON)
+option(ENABLE_LIGHTNING_KOKKOS "Build Lightning-Kokkos backend device" OFF)
+option(ENABLE_OPENQASM "Build OpenQasm backend device" OFF)
 
 set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(runtime_includes "${PROJECT_SOURCE_DIR}/include")
 set(capi_utils_includes "${PROJECT_SOURCE_DIR}/lib/capi")
-set(backend_includes "${PROJECT_SOURCE_DIR}/lib/backend")
 set(extensions_includes "${PROJECT_SOURCE_DIR}/extensions")
+set(backend_includes "${PROJECT_SOURCE_DIR}/lib/backend/common")
+
+if(ENABLE_LIGHTNING)
+    list(APPEND backend_includes "${PROJECT_SOURCE_DIR}/lib/backend/lightning")
+endif()
+
+if(ENABLE_LIGHTNING_KOKKOS)
+    list(APPEND backend_includes "${PROJECT_SOURCE_DIR}/lib/backend/lightning-kokkos")
+endif()
+
+if(ENABLE_OPENQASM)
+    list(APPEND backend_includes "${PROJECT_SOURCE_DIR}/lib/backend/openqasm")
+endif()
 
 add_library(catalyst_qir_runtime INTERFACE)
 

@@ -9,15 +9,21 @@ if(RUNTIME_CLANG_TIDY)
     )
 endif()
 
-list(APPEND source_files LightningSimulator.cpp)
+if(ENABLE_LIGHTNING)
+list(APPEND source_files lightning/LightningSimulator.cpp)
+endif()
 
 if(ENABLE_LIGHTNING_KOKKOS)
-    list(APPEND source_files LightningKokkosSimulator.cpp)
+    list(APPEND source_files lightning-kokkos/LightningKokkosSimulator.cpp)
+endif()
+
+if(ENABLE_OPENQASM)
+    list(APPEND source_files openqasm/OpenQasmDevice.cpp)
 endif()
 
 add_library(rt_backend SHARED ${source_files})
 
-target_include_directories(rt_backend PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}
+target_include_directories(rt_backend PRIVATE   ${backend_includes}
                                                 ${runtime_includes} 
                                                 ${extensions_includes})
 
