@@ -180,34 +180,12 @@ func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc, GradOp
                                     fullGradFn.getArguments().end());
 
         std::vector<Type> resTypes = computeResultTypes(argMapFn, diffArgIndices);
-        DenseIntElementsAttr diffArgIndicesAttr = gradOp.getDiffArgIndices().value_or(nullptr);
-        GradOp jacOp = rewriter.create<GradOp>(loc, resTypes, "fd", argMapFn.getName(), callArgs,
-                                               diffArgIndicesAttr, nullptr);
-        ValueRange classicalJacobians = jacOp.getResults();
 
-        // The argmap function returns a 1-d dynamic tensor<{pcount}xf64>. If the input has tensor
-        // type, the GradOp will return a transposed Jacobian s.t. the pcount is the last
-        // dimension (tensor<{inputdim}x{pcount}xf64>).
-        int64_t rank = cast<RankedTensorType>(classicalJacobians.front().getType()).getRank();
-        Value numParams =
-            rewriter.create<tensor::DimOp>(loc, classicalJacobians.front(), /*index=*/rank - 1);
-        callArgs.push_back(numParams);
-        ValueRange quantumGradients =
-            rewriter.create<func::CallOp>(loc, qGradFn, callArgs).getResults();
+        ValueRange quantumGradients = rewriter.create<func::CallOp>(loc, qGradFn, callArgs).getResults();
 
-        // Compute the hybrid gradients via tensor contraction.
-        std::vector<Value> hybridGradients;
-        hybridGradients.reserve(quantumGradients.size() * classicalJacobians.size());
-        size_t idx = 0;
-        for (Value classicalJacobian : classicalJacobians) {
-            for (Value quantumGradient : quantumGradients) {
-                bool isResultScalar = !gradOp.getResult(idx++).getType().isa<TensorType>();
-                hybridGradients.push_back(combineGradients(
-                    rewriter, loc, classicalJacobian, quantumGradient, numParams, isResultScalar));
-            }
-        }
+        BackpropOp backpropOp = rewriter.create<BackpropOp>(loc, resTypes, argMapFn.getName(), gradOp.getDiffArgIndicesAttr(), callArgs, quantumGradients.front(), ValueRange{});
 
-        rewriter.create<func::ReturnOp>(loc, hybridGradients);
+        rewriter.create<func::ReturnOp>(loc, backpropOp.getResults());
     }
 
     return fullGradFn;
