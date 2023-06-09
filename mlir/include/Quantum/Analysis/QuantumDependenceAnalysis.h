@@ -14,12 +14,22 @@
 
 #pragma once
 
+#include "mlir/Analysis/DataFlowFramework.h"
 #include "mlir/IR/Operation.h"
 
 namespace catalyst {
 namespace quantum {
 
-mlir::LogicalResult runQuantumDependenceAnalysis(mlir::Operation *);
+struct QuantumDependenceAnalysis {
+    QuantumDependenceAnalysis(mlir::Operation *);
+
+    bool dependsOnMeasurement(mlir::Value);
+
+    bool dependsOnMidCircuitMeasurement(mlir::Value);
+
+  private:
+    mlir::DataFlowSolver solver;
+};
 
 } // namespace quantum
 } // namespace catalyst

@@ -137,7 +137,8 @@ class QuantumDependence {
     llvm::Optional<DependenceType> dependenceType;
 };
 
-struct QuantumDependenceAnalysis : public SparseDataFlowAnalysis<Lattice<QuantumDependence>> {
+struct QuantumDependenceDataFlowAnalysis
+    : public SparseDataFlowAnalysis<Lattice<QuantumDependence>> {
     using SparseDataFlowAnalysis::SparseDataFlowAnalysis;
 
     void visitOperation(Operation *op, ArrayRef<const Lattice<QuantumDependence> *> operands,
@@ -182,28 +183,37 @@ struct QuantumDependenceAnalysis : public SparseDataFlowAnalysis<Lattice<Quantum
     }
 };
 
-LogicalResult catalyst::quantum::runQuantumDependenceAnalysis(Operation *op)
+quantum::QuantumDependenceAnalysis::QuantumDependenceAnalysis(Operation *op)
 {
-    // TODO(jacob): design the right API to consume this analysis from passes.
-    DataFlowSolver solver;
-    solver.load<QuantumDependenceAnalysis>();
+    solver.load<QuantumDependenceDataFlowAnalysis>();
     // Dead code analysis and sparse constant propagation are required to be loaded for the region
     // traversal of MLIR's dataflow framework to work.
     solver.load<SparseConstantPropagation>();
     solver.load<DeadCodeAnalysis>();
     if (failed(solver.initializeAndRun(op))) {
-        return failure();
+        // TODO(jacob): error handling
+        assert(0 && "unexpected dataflow failure\n");
+    }
+}
+
+bool quantum::QuantumDependenceAnalysis::dependsOnMeasurement(Value value)
+{
+    auto *state = solver.lookupState<Lattice<QuantumDependence>>(value);
+    if (state) {
+        // A mid-circuit measurement implies a measurement.
+        return state->getValue().dependsOnMeasurement() || state->getValue().dependsOnMCM();
+    }
+    // Conservatively assume that it depends on a measurement.
+    return true;
+}
+
+bool quantum::QuantumDependenceAnalysis::dependsOnMidCircuitMeasurement(Value value)
+{
+    auto *state = solver.lookupState<Lattice<QuantumDependence>>(value);
+    if (state) {
+        return state->getValue().dependsOnMCM();
     }
 
-    op->walk([&](func::ReturnOp returnOp) {
-        for (Value operand : returnOp.getOperands()) {
-            auto *state = solver.lookupState<Lattice<QuantumDependence>>(operand);
-            llvm::dbgs() << "state was nullptr: " << (state == nullptr) << "\n";
-            if (state) {
-                llvm::dbgs() << "ret val " << operand << " had qdep state " << state->getValue()
-                             << "\n";
-            }
-        }
-    });
-    return success();
+    // Conservatively assume that it depends on a measurement.
+    return true;
 }
