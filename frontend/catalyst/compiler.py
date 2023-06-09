@@ -184,6 +184,25 @@ class MHLOPass(PassPipeline):
         return str(path.with_suffix(".nohlo.mlir"))
 
 
+
+class AdjointLoweringTest(PassPipeline):
+    """Adjoint lowering pass, fixme."""
+
+    _executable = get_executable_path("quantum", "quantum-opt")
+    _default_flags = [
+        "--adjoint-lowering",
+        "--debug-only=adjoint"
+    ]
+
+    @staticmethod
+    def get_output_filename(infile):
+        if not infile.endswith(".opt.mlir"):
+            raise ValueError(f"Input file ({infile}) for adjoint lowering is not an MLIR file")
+
+        return infile.replace(".opt.mlir", ".noadj.opt.mlir")
+
+
+
 class BufferizationPass(PassPipeline):
     """Pass pipeline that bufferizes MLIR dialects."""
 
@@ -499,6 +518,7 @@ class Compiler:
             pipelines = [
                 MHLOPass,
                 QuantumCompilationPass,
+                AdjointLoweringTest,
                 BufferizationPass,
                 MLIRToLLVMDialect,
                 LLVMDialectToLLVMIR,
