@@ -142,6 +142,9 @@
   array is used in the ``argmap`` function directly to store the gate parameters. This
   removes one invocation of all of the classical code being differentiated.
 
+* Use Tablegen to define MLIR passes instead of C++ to reduce overhead of adding new passes.
+  [#157](https://github.com/PennyLaneAI/catalyst/pull/157)
+
 <h3>Breaking changes</h3>
 
 <h3>Bug fixes</h3>

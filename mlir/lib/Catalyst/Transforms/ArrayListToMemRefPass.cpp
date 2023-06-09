@@ -10,6 +10,11 @@
 using namespace mlir;
 using namespace catalyst;
 
+namespace catalyst {
+#define GEN_PASS_DEF_ARRAYLISTTOMEMREFPASS
+#include "Catalyst/Transforms/Passes.h.inc"
+} // namespace catalyst
+
 namespace {
 /**
  * A utility builder that aids in lowering dynamically-resizable array lists.
