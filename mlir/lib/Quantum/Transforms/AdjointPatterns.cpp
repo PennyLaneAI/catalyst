@@ -54,6 +54,8 @@ struct AdjointSingleOpRewritePattern : public mlir::OpRewritePattern<AdjointOp> 
         MLIRContext *ctx = op.getContext();
         LLVM_DEBUG(dbgs() << "matching the adjoing op" << "\n");
 
+        assert(op.getRegion().hasOneBlock());
+
         auto adjoint_operands = ({
             std::vector<Value> out;
             for(auto a : op.getOperands()) {
@@ -65,7 +67,6 @@ struct AdjointSingleOpRewritePattern : public mlir::OpRewritePattern<AdjointOp> 
 
         auto reversal_mapping = ({
             llvm::DenseMap<Value,Value> out;
-            assert(op.getRegion().hasOneBlock());
             Block &b = op.getRegion().front();
             auto rb = std::make_reverse_iterator(b.end());
             auto re = std::make_reverse_iterator(b.begin());
