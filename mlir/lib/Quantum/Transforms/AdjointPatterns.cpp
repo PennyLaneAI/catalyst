@@ -35,21 +35,6 @@ using namespace catalyst::quantum;
 namespace {
 
 
-void replaceOperands(Operation &op,
-                     ArrayRef<Value> templates,
-                     ArrayRef<Value> replacement)
-{
-    assert(templates.size() == replacement.size());
-    for (size_t i = 0 ; i < op.getNumOperands(); i++) {
-        auto o = op.getOperand(i);
-        auto res = std::find(templates.begin(), templates.end(), o);
-        if (res == templates.end())
-            continue;
-        size_t res_i = res - templates.begin();
-        op.setOperand(i, replacement[res_i]);
-    }
-}
-
 template<class T>
 T isInstanceOf(Operation &op)
 {
@@ -59,6 +44,7 @@ T isInstanceOf(Operation &op)
       return nullptr;
 }
 
+
 struct AdjointSingleOpRewritePattern : public mlir::OpRewritePattern<AdjointOp> {
     using mlir::OpRewritePattern<AdjointOp>::OpRewritePattern;
 
@@ -67,6 +53,7 @@ struct AdjointSingleOpRewritePattern : public mlir::OpRewritePattern<AdjointOp> 
         Location loc = op.getLoc();
         MLIRContext *ctx = op.getContext();
         LLVM_DEBUG(dbgs() << "matching the adjoing op" << "\n");
+
         auto adjoint_operands = ({
             std::vector<Value> out;
             for(auto a : op.getOperands()) {
@@ -75,76 +62,84 @@ struct AdjointSingleOpRewritePattern : public mlir::OpRewritePattern<AdjointOp> 
             }
             out;
         });
-        auto block_params = ({
-            std::vector<Value> out;
-            for(auto a : op.getRegion().front().getArguments()) {
-                LLVM_DEBUG(dbgs() << "block param: " << a << "\n");
-                out.push_back(a);
+
+        auto reversal_mapping = ({
+            llvm::DenseMap<Value,Value> out;
+            assert(op.getRegion().hasOneBlock());
+            Block &b = op.getRegion().front();
+            auto rb = std::make_reverse_iterator(b.end());
+            auto re = std::make_reverse_iterator(b.begin());
+            for( auto i = rb; i!=re; i++) {
+                LLVM_DEBUG(dbgs() << "reverse walking: " << i->getName() << " " << *i << "\n");
+                if(YieldOp yield = isInstanceOf<YieldOp>(*i)) {
+                    LLVM_DEBUG(dbgs() << "yield! " << *yield << "\n");
+                    assert(yield.getOperands().size() == 1);
+                    auto qreg = ({
+                        Value out = *yield.getResults().begin();
+                        LLVM_DEBUG(dbgs() << "  qreg type: " << out.getType() << "\n");
+                        out;
+                        });
+                    out[qreg] = adjoint_operands[0];
+                }
+                else if(auto insert = isInstanceOf<InsertOp>(*i)) {
+                    auto extract = rewriter.create<ExtractOp>(
+                        loc,
+                        catalyst::quantum::QubitType(),
+                        out[insert.getOutQreg()],
+                        insert.getIdx(),
+                        insert.getIdxAttrAttr()
+                        );
+                    out[insert.getQubit()] = extract.getQubit();
+                }
+                else if(auto custom = isInstanceOf<CustomOp>(*i)) {
+                    assert(custom.getInQubits().size() == custom.getOutQubits().size());
+                    auto in_qubits = ({
+                        std::vector<Value> qbits;
+                         for(auto q: custom.getInQubits()) {
+                            qbits.push_back(out[q]);
+                         }
+                         qbits;
+                    });
+                    auto customA = rewriter.create<CustomOp>(
+                        loc,
+                        custom.getResultTypes(),
+                        custom.getParams(),
+                        in_qubits,
+                        custom.getGateName(),
+                        mlir::BoolAttr::get(ctx, !custom.getAdjoint().value_or(false))
+                    );
+                    for(size_t i = 0; i<customA.getOutQubits().size(); i++) {
+                        out[custom.getInQubits()[i]] = customA.getOutQubits()[i];
+                    }
+                }
+                else if(auto extract = isInstanceOf<ExtractOp>(*i)) {
+                    auto insert = rewriter.create<InsertOp>(
+                        loc,
+                        catalyst::quantum::QuregType(),
+                        out[extract.getQreg()],
+                        extract.getIdx(),
+                        extract.getIdxAttrAttr(),
+                        out[extract.getQubit()]
+                        );
+                    out[extract.getQreg()] = insert.getOutQreg();
+                }
+                else {
+                    /* skip */
+                }
             }
             out;
         });
 
-        assert(op.getRegion().hasOneBlock());
-        Block &b = op.getRegion().front();
-        auto rb = std::make_reverse_iterator(b.end());
-        auto re = std::make_reverse_iterator(b.begin());
+        auto new_outputs = ({
+            std::vector<Value> out;
+            for(auto a : op.getRegion().front().getArguments()) {
+                out.push_back(reversal_mapping[a]);
+            }
+            out;
+        });
 
-        llvm::DenseMap<Value,Value> reversal_mapping;
-
-        for( auto i = rb; i!=re; i++) {
-            LLVM_DEBUG(dbgs() << "reverse walking: " << i->getName() << " " << *i << "\n");
-            if(YieldOp yield = isInstanceOf<YieldOp>(*i)) {
-                LLVM_DEBUG(dbgs() << "yield! " << *yield << "\n");
-                assert(yield.getOperands().size() == 1);
-                auto qreg = ({
-                    Value out = *yield.getResults().begin();
-                    LLVM_DEBUG(dbgs() << "  qreg type: " << out.getType() << "\n");
-                    out;
-                    });
-                reversal_mapping[qreg] = adjoint_operands[0];
-            }
-            else if(auto insert = isInstanceOf<InsertOp>(*i)) {
-                auto extract = rewriter.create<ExtractOp>(
-                    loc,
-                    catalyst::quantum::QubitType(),
-                    reversal_mapping[insert.getQubit()],
-                    insert.getIdx(),
-                    insert.getIdxAttrAttr()
-                    );
-                /* reversal_mapping[insert.getQubit()] = extract.getQubit(); */
-            }
-            else if(auto custom = isInstanceOf<CustomOp>(*i)) {
-                auto customA = rewriter.create<CustomOp>(
-                    loc,
-                    custom.getResultTypes(),
-                    custom.getParams(), ({
-                        std::vector<Value> qbits;
-                         for(auto q: custom.getInQubits()) {
-                            qbits.push_back(reversal_mapping[q]);
-                         }
-                         qbits;
-                    }),
-                    custom.getGateName(),
-                    mlir::BoolAttr::get(ctx, !custom.getAdjoint().value_or(false))
-                );
-                /* reversal_mapping[insert.getQubit()] = qbit; */
-            }
-            else if(auto extract = isInstanceOf<ExtractOp>(*i)) {
-                auto insert = rewriter.create<InsertOp>(
-                    loc,
-                    catalyst::quantum::QuregType(),
-                    extract.getResult(),
-                    extract.getIdx(),
-                    extract.getIdxAttrAttr(),
-                    reversal_mapping[extract.getQubit()]
-                    );
-                /* reversal_mapping[insert.getQubit()] = insert.getOutQreg(); */
-            }
-            else {
-            }
-        }
-
-        return failure();
+        rewriter.replaceOp(op, new_outputs);
+        return success();
     }
 };
 
