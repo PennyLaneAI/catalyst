@@ -24,6 +24,7 @@ import warnings
 import jax
 import numpy as np
 import pennylane as qml
+from jax._src.api_util import _shaped_abstractify_handlers
 from jax.interpreters.mlir import ir
 from mlir_quantum.runtime import (
     as_ctype,
@@ -48,6 +49,13 @@ setattr(jax.interpreters.partial_eval.DynamicJaxprTracer, "__hash__", lambda x: 
 jax.config.update("jax_enable_x64", True)
 jax.config.update("jax_platform_name", "cpu")
 jax.config.update("jax_array", True)
+
+# Allow jax.api_util.shaped_abstractify to handle Python scalar data types.
+def _scalar_abstractify(t):
+    if isinstance(t, (int, float, complex)):
+        raise TypeError(f"Cannot convert given type {t} scalar ShapedArray.")
+    return jax.ShapedArray([], dtype=t, weak_type=True)
+_shaped_abstractify_handlers[type] = _scalar_abstractify
 
 
 def are_params_annotated(f: typing.Callable):

@@ -21,7 +21,7 @@ import jax
 import numpy as np
 from jax._src import util
 from jax._src.lib.mlir import ir
-from jax.interpreters import mlir, xla
+from jax.interpreters import mlir
 from jaxlib.mlir.dialects._func_ops_gen import CallOp
 from jaxlib.mlir.dialects._mhlo_ops_gen import ConstantOp, ConvertOp
 from mlir_quantum.dialects.arith import IndexCastOp
@@ -179,11 +179,11 @@ expval_p = jax.core.Primitive("expval")
 var_p = jax.core.Primitive("var")
 probs_p = jax.core.Primitive("probs")
 state_p = jax.core.Primitive("state")
-qcond_p = jax.core.AxisPrimitive("qcond")
+qcond_p = jax._src.core.AxisPrimitive("qcond")
 qcond_p.multiple_results = True
-qwhile_p = jax.core.AxisPrimitive("qwhile")
+qwhile_p = jax._src.core.AxisPrimitive("qwhile")
 qwhile_p.multiple_results = True
-qfor_p = jax.core.AxisPrimitive("qfor")
+qfor_p = jax._src.core.AxisPrimitive("qfor")
 qfor_p.multiple_results = True
 grad_p = jax.core.Primitive("grad")
 grad_p.multiple_results = True
@@ -361,7 +361,7 @@ def _qalloc_lowering(jax_ctx: mlir.LoweringRuleContext, size_value: ir.Value):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
-    assert size_value.owner.name == "mhlo.constant"
+    assert size_value.owner.name == "stablehlo.constant"
     size_value_attr = size_value.owner.attributes["value"]
     assert ir.DenseIntElementsAttr.isinstance(size_value_attr)
     size = ir.DenseIntElementsAttr(size_value_attr)[0]
@@ -430,8 +430,7 @@ def _qextract_lowering(jax_ctx: mlir.LoweringRuleContext, qreg: ir.Value, qubit_
         ir.RankedTensorType.isinstance(qubit_idx.type)
         and ir.RankedTensorType(qubit_idx.type).shape == []
     ):
-        baseType = ir.RankedTensorType(qubit_idx.type).element_type
-        qubit_idx = TensorExtractOp(baseType, qubit_idx, []).result
+        qubit_idx = TensorExtractOp(qubit_idx, []).result
     assert ir.IntegerType.isinstance(qubit_idx.type), "Scalar integer required for extract op!"
 
     qubit_type = ir.OpaqueType.get("quantum", "bit", ctx)
@@ -473,8 +472,7 @@ def _qinsert_lowering(
         ir.RankedTensorType.isinstance(qubit_idx.type)
         and ir.RankedTensorType(qubit_idx.type).shape == []
     ):
-        baseType = ir.RankedTensorType(qubit_idx.type).element_type
-        qubit_idx = TensorExtractOp(baseType, qubit_idx, []).result
+        qubit_idx = TensorExtractOp(qubit_idx, []).result
     assert ir.IntegerType.isinstance(qubit_idx.type), "Scalar integer required for insert op!"
 
     qreg_type = ir.OpaqueType.get("quantum", "reg", ctx)
@@ -526,7 +524,7 @@ def _qinst_lowering(
             resultTensorType = ir.RankedTensorType.get((), baseType)
             p = ConvertOp(resultTensorType, p).results
 
-        p = TensorExtractOp(baseType, p, []).result
+        p = TensorExtractOp(p, []).result
 
         assert ir.F64Type.isinstance(
             p.type
@@ -1046,21 +1044,20 @@ def _qcond_lowering(
     branch_args_plus_consts = preds_and_branch_args_plus_consts[num_preds:]
     flat_args_plus_consts = mlir.flatten_lowering_ir_args(branch_args_plus_consts)
 
+    name_stack = jax_ctx.module_context.name_stack.extend("cond")
+
     # recursively lower if-else chains to nested IfOps
     def emit_branches(preds, branch_jaxprs, ip):
         # ip is an MLIR InsertionPoint. This allows recursive calls to emit their Operations inside
         # the 'else' blocks of preceding IfOps.
         with ip:
-            pred_extracted = TensorExtractOp(ir.IntegerType.get_signless(1), preds[0], []).result
+            pred_extracted = TensorExtractOp(preds[0], []).result
             if_op_scf = IfOp(pred_extracted, result_types, hasElse=True)
             true_jaxpr = branch_jaxprs[0]
             if_block = if_op_scf.then_block
 
             # if block
-            name_stack = util.extend_name_stack(jax_ctx.module_context.name_stack, "if")
-            if_ctx = jax_ctx.module_context.replace(
-                name_stack=xla.extend_name_stack(name_stack, "if")
-            )
+            if_ctx = jax_ctx.module_context.replace(name_stack=name_stack.extend("if"))
             with ir.InsertionPoint(if_block):
                 # recursively generate the mlir for the if block
                 out = mlir.jaxpr_subcomp(
@@ -1075,10 +1072,7 @@ def _qcond_lowering(
                 YieldOp([o[0] for o in out[0]])
 
             # else block
-            name_stack = util.extend_name_stack(jax_ctx.module_context.name_stack, "else")
-            else_ctx = jax_ctx.module_context.replace(
-                name_stack=xla.extend_name_stack(name_stack, "else")
-            )
+            else_ctx = jax_ctx.module_context.replace(name_stack=name_stack.extend("else"))
             else_block = if_op_scf.else_block
             if len(preds) == 1:
                 # Base case: reached the otherwise block
@@ -1155,11 +1149,11 @@ def _qwhile_lowering(
     assert loop_carry_types == [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_out]
 
     while_op_scf = WhileOp(loop_carry_types, loop_args)
+    name_stack = jax_ctx.module_context.name_stack.extend("while")
 
     # cond block
     cond_block = while_op_scf.regions[0].blocks.append(*loop_carry_types)
-    name_stack = util.extend_name_stack(jax_ctx.module_context.name_stack, "while")
-    cond_ctx = jax_ctx.module_context.replace(name_stack=xla.extend_name_stack(name_stack, "cond"))
+    cond_ctx = jax_ctx.module_context.replace(name_stack=name_stack.extend("cond"))
     with ir.InsertionPoint(cond_block):
         cond_args = [cond_block.arguments[i] for i in range(len(loop_carry_types))]
 
@@ -1173,12 +1167,12 @@ def _qwhile_lowering(
             dim_var_values=jax_ctx.dim_var_values,
         )
 
-        pred_extracted = TensorExtractOp(ir.IntegerType.get_signless(1), pred, []).result
+        pred_extracted = TensorExtractOp(pred, []).result
         ConditionOp(pred_extracted, cond_args)
 
     # body block
     body_block = while_op_scf.regions[1].blocks.append(*loop_carry_types)
-    body_ctx = jax_ctx.module_context.replace(name_stack=xla.extend_name_stack(name_stack, "body"))
+    body_ctx = jax_ctx.module_context.replace(name_stack=name_stack.extend("body"))
     with ir.InsertionPoint(body_block):
         body_args = [body_block.arguments[i] for i in range(len(loop_carry_types))]
 
@@ -1257,19 +1251,16 @@ def _qfor_lowering(
 
     loop_operands = []
     for p in (lower_bound, upper_bound, step):
-        p = TensorExtractOp(
-            ir.RankedTensorType(p.type).element_type, p, []
-        ).result  # tensor<i64> -> i64
+        p = TensorExtractOp(p, []).result  # tensor<i64> -> i64
         p = IndexCastOp(ir.IndexType.get(), p).result  # i64 -> index
         loop_operands.append(p)
     loop_operands.extend(loop_args)
 
     for_op_scf = ForOp(loop_operands[0], loop_operands[1], loop_operands[2], iter_args=loop_args)
+    name_stack = jax_ctx.module_context.name_stack.extend("for")
 
-    name_stack = util.extend_name_stack(jax_ctx.module_context.name_stack, "for")
+    body_ctx = jax_ctx.module_context.replace(name_stack=name_stack.extend("body"))
     body_block = for_op_scf.body
-    body_ctx = jax_ctx.module_context.replace(name_stack=xla.extend_name_stack(name_stack, "body"))
-
     with ir.InsertionPoint(body_block):
         body_args = list(body_block.arguments)
 
