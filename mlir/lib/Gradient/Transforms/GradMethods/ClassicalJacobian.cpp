@@ -22,6 +22,7 @@
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Index/IR/IndexOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 
 #include "Catalyst/IR/CatalystOps.h"
 #include "Quantum/IR/QuantumInterfaces.h"
@@ -44,7 +45,10 @@ func::FuncOp genArgMapFunction(PatternRewriter &rewriter, Location loc, func::Fu
     std::vector<Type> fnArgTypes = callee.getArgumentTypes().vec();
     RankedTensorType paramsVectorType =
         RankedTensorType::get({ShapedType::kDynamic}, rewriter.getF64Type());
-    FunctionType fnType = rewriter.getFunctionType(fnArgTypes, paramsVectorType);
+    RankedTensorType controlFlowTensorType =
+        RankedTensorType::get({ShapedType::kDynamic}, rewriter.getIndexType());
+    FunctionType fnType =
+        rewriter.getFunctionType(fnArgTypes, {paramsVectorType, controlFlowTensorType});
     StringAttr visibility = rewriter.getStringAttr("private");
 
     func::FuncOp argMapFn =
@@ -62,6 +66,8 @@ func::FuncOp genArgMapFunction(PatternRewriter &rewriter, Location loc, func::Fu
         // Allocate the memory for the gate parameters collected at runtime.
         auto arrayListType = ArrayListType::get(rewriter.getContext(), rewriter.getF64Type());
         Value paramsBuffer = rewriter.create<ListInitOp>(loc, arrayListType);
+        Value controlFlowTape = rewriter.create<ListInitOp>(
+            loc, ArrayListType::get(rewriter.getContext(), rewriter.getIndexType()));
         MemRefType paramsProcessedType = MemRefType::get({}, rewriter.getIndexType());
         Value paramsProcessed = rewriter.create<memref::AllocaOp>(loc, paramsProcessedType);
         Value cZero = rewriter.create<index::ConstantOp>(loc, 0);
@@ -92,11 +98,23 @@ func::FuncOp genArgMapFunction(PatternRewriter &rewriter, Location loc, func::Fu
                 rewriter.setInsertionPoint(op);
                 Value data = rewriter.create<ListLoadDataOp>(loc, paramsBuffer);
                 Value paramsTensor = rewriter.create<bufferization::ToTensorOp>(loc, data);
-                op->setOperands(paramsTensor);
+                Value controlFlowData = rewriter.create<ListLoadDataOp>(loc, controlFlowTape);
+                Value controlFlowTensor =
+                    rewriter.create<bufferization::ToTensorOp>(loc, controlFlowData);
+                op->setOperands({paramsTensor, controlFlowTensor});
             }
             // Erase redundant device specifications.
             else if (isa<quantum::DeviceOp>(op)) {
                 rewriter.eraseOp(op);
+            }
+            // Cache the relevant parameters
+            else if (auto forOp = dyn_cast<scf::ForOp>(op)) {
+                PatternRewriter::InsertionGuard insertGuard(rewriter);
+                rewriter.setInsertionPoint(forOp);
+
+                rewriter.create<catalyst::ListPushOp>(loc, forOp.getLowerBound(), controlFlowTape);
+                rewriter.create<catalyst::ListPushOp>(loc, forOp.getUpperBound(), controlFlowTape);
+                rewriter.create<catalyst::ListPushOp>(loc, forOp.getStep(), controlFlowTape);
             }
         });
 

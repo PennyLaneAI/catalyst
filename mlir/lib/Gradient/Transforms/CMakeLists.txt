@@ -8,6 +8,7 @@ file(GLOB SRC
     gradient_lowering.cpp
     ConversionPatterns.cpp
     gradient_to_llvm.cpp
+    QuantumSplitting.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
@@ -19,6 +20,7 @@ set(LIBS
     MLIRGradient
     GradientUtils
     MLIRQuantum
+    MLIRQuantumAnalysis
     QuantumUtils
 )
 

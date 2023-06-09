@@ -31,6 +31,7 @@
 #include "Gradient/IR/GradientOps.h"
 #include "Gradient/Transforms/Passes.h"
 #include "Gradient/Transforms/Patterns.h"
+#include "Quantum/Analysis/QuantumDependenceAnalysis.h"
 #include "Quantum/IR/QuantumOps.h"
 
 using namespace mlir;
@@ -49,6 +50,12 @@ struct GradientLoweringPass : impl::GradientLoweringPassBase<GradientLoweringPas
     void runOnOperation() final
     {
         RewritePatternSet gradientPatterns(&getContext());
+
+        if (splitHybrid) {
+            auto &qdepAnalysis = getAnalysis<quantum::QuantumDependenceAnalysis>();
+            getOperation()->walk(
+                [&](gradient::GradOp gradOp) { splitHybridCircuit(gradOp, qdepAnalysis); });
+        }
         populateLoweringPatterns(gradientPatterns, lowerOnly);
 
         // This is required to remove qubit values returned by if/for ops in the

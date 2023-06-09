@@ -17,12 +17,16 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/DialectConversion.h"
 
+#include "Quantum/Analysis/QuantumDependenceAnalysis.h"
+
 namespace catalyst {
 namespace gradient {
 
 void populateBufferizationPatterns(mlir::TypeConverter &, mlir::RewritePatternSet &);
 void populateLoweringPatterns(mlir::RewritePatternSet &, mlir::StringRef);
 void populateConversionPatterns(mlir::TypeConverter &, mlir::RewritePatternSet &);
+
+void splitHybridCircuit(mlir::Operation *, quantum::QuantumDependenceAnalysis &);
 
 } // namespace gradient
 } // namespace catalyst

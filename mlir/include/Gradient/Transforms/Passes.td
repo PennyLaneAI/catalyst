@@ -50,6 +50,13 @@ def GradientLoweringPass : Pass<"lower-gradients"> {
             /*type=*/"std::string",
             /*default=*/"\"\"",
             /*description=*/"Restrict lowering to a specific type of gradient."
+        >,
+        Option<
+            "splitHybrid",
+            "split",
+            "bool",
+            "false",
+            "Split hybrid differentiated circuits into their classical and gradient parts."
         >
     ];
 }
