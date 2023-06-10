@@ -17,6 +17,7 @@ of quantum operations, measurements, and observables to JAXPR.
 
 from dataclasses import dataclass
 from typing import Dict, List, Callable
+from itertools import chain
 
 import jax
 import numpy as np
@@ -1500,9 +1501,9 @@ def _adjoint_abstract(*args, jaxpr):
 
 def _adjoint_lowering(ctx, *args, jaxpr):
     output_types = util.flatten(map(mlir.aval_to_ir_types, ctx.avals_out))
-    op = AdjointOp(output_types[0], output_types[1:], args[0], args[1:])
+    op = AdjointOp(output_types[0], args[0])
     adjoint_block = op.regions[0].blocks.append(*[mlir.aval_to_ir_types(a)[0]
-                                                  for a in ctx.avals_in])
+                                                  for a in ctx.avals_in[:1]])
 
     name_stack = util.extend_name_stack(ctx.module_context.name_stack, "adjoint")
     body_ctx = ctx.module_context.replace(name_stack=xla.extend_name_stack(name_stack, "body"))
@@ -1513,7 +1514,7 @@ def _adjoint_lowering(ctx, *args, jaxpr):
             jaxpr.jaxpr,
             mlir.TokenSet(),
             [mlir.ir_constants(c) for c in jaxpr.consts],
-            *([a] for a in adjoint_block.arguments),
+            *([a] for a in chain(adjoint_block.arguments, args[1:])),
             dim_var_values=ctx.dim_var_values,
         )
 

@@ -191,7 +191,8 @@ class AdjointLoweringTest(PassPipeline):
     _executable = get_executable_path("quantum", "quantum-opt")
     _default_flags = [
         "--adjoint-lowering",
-        "--debug-only=adjoint"
+        "--debug-only=adjoint",
+        "--mlir-print-ir-after-failure"
     ]
 
     @staticmethod

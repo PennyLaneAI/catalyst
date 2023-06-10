@@ -758,17 +758,15 @@ def AdjointOp : Op<QuantumDialect, "adjoint", []> {
     let regions = (region SizedRegion<1>:$region);
 
     let arguments = (ins
-      QuregType:$qreg,
-      Variadic<AnyType>:$params
+      QuregType:$qreg
     );
 
     let results = (outs
-      QuregType:$qreg_results,
-      Variadic<AnyType>:$results
+      QuregType:$out_qreg
     );
 
     let assemblyFormat = [{
-        `(` $qreg `,` $params `)` attr-dict `:` functional-type(operands, results) $region
+        `(` $qreg `)` attr-dict `:` functional-type(operands, results) $region
     }];
 
     let hasVerifier = 1;
