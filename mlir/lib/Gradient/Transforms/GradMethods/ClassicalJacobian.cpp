@@ -116,6 +116,36 @@ func::FuncOp genArgMapFunction(PatternRewriter &rewriter, Location loc, func::Fu
                 rewriter.create<catalyst::ListPushOp>(loc, forOp.getUpperBound(), controlFlowTape);
                 rewriter.create<catalyst::ListPushOp>(loc, forOp.getStep(), controlFlowTape);
             }
+            else if (auto ifOp = dyn_cast<scf::IfOp>(op)) {
+                PatternRewriter::InsertionGuard insertGuard(rewriter);
+                rewriter.setInsertionPoint(ifOp);
+
+                auto casted = rewriter.create<arith::IndexCastOp>(loc, rewriter.getIndexType(),
+                                                                  ifOp.getCondition());
+                rewriter.create<catalyst::ListPushOp>(loc, casted, controlFlowTape);
+            }
+            else if (auto whileOp = dyn_cast<scf::WhileOp>(op)) {
+                PatternRewriter::InsertionGuard insertGuard(rewriter);
+                rewriter.setInsertionPoint(whileOp);
+
+                // While ops are converted to for ops
+                auto loopCounter = rewriter.create<memref::AllocaOp>(
+                    loc, MemRefType::get({}, rewriter.getIndexType()));
+                rewriter.create<memref::StoreOp>(loc, cZero, loopCounter);
+
+                // Count the number of times the "after" region iterates.
+                // Assume that the loop condition, being a classical value, does not depend on
+                // any quantum operations.
+                rewriter.setInsertionPointToStart(&whileOp.getAfter().front());
+                auto beforeIdx = rewriter.create<memref::LoadOp>(loc, loopCounter);
+                auto afterIdx = rewriter.create<index::AddOp>(loc, beforeIdx, cOne);
+                rewriter.create<memref::StoreOp>(loc, afterIdx, loopCounter);
+
+                // Store the final iteration count to the tape.
+                rewriter.setInsertionPointAfter(whileOp);
+                auto finalCount = rewriter.create<memref::LoadOp>(loc, loopCounter);
+                rewriter.create<catalyst::ListPushOp>(loc, finalCount, controlFlowTape);
+            }
         });
 
         quantum::removeQuantumMeasurements(argMapFn);

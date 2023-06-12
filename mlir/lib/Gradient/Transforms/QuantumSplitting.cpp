@@ -215,6 +215,95 @@ void cloneQuantumRegion(OpBuilder &builder, Location loc, Region &region, BlockA
 
             updateLoopMapping(forOp.getResults(), newForOp.getResults());
         }
+        else if (auto whileOp = dyn_cast<scf::WhileOp>(&oldOp)) {
+            auto cZero = builder.create<index::ConstantOp>(loc, 0);
+            DenseMap<size_t, size_t> loopIndexMapping;
+            size_t newIterIdx = 0;
+            SmallVector<Value> iterArgs;
+            for (const auto &[iterIdx, oldIterOperand] : llvm::enumerate(whileOp.getInits())) {
+                if (&oldIterOperand.getType().getDialect() == quantumDialect) {
+                    iterArgs.push_back(bvm.lookup(oldIterOperand));
+                    loopIndexMapping[iterIdx] = newIterIdx++;
+                }
+            }
+
+            Value tapeIdx = builder.create<memref::LoadOp>(loc, cfCounter);
+            Value newIdx = builder.create<index::AddOp>(loc, tapeIdx, cOne);
+            builder.create<memref::StoreOp>(loc, newIdx, cfCounter);
+            Value numIters = builder.create<tensor::ExtractOp>(loc, cfTape, tapeIdx);
+
+            auto updateLoopMapping = [&bvm, &loopIndexMapping](ValueRange oldValues,
+                                                               ValueRange newValues) {
+                for (const auto &[oldIdx, newIdx] : loopIndexMapping) {
+                    bvm.map(oldValues[oldIdx], newValues[newIdx]);
+                }
+            };
+            auto lookupLoopMapping = [&bvm, &loopIndexMapping](ValueRange oldValues,
+                                                               MutableArrayRef<Value> newValues) {
+                for (const auto &[oldIdx, newIdx] : loopIndexMapping) {
+                    newValues[newIdx] = bvm.lookup(oldValues[oldIdx]);
+                }
+            };
+            auto newLoop = builder.create<scf::ForOp>(
+                loc, cZero, numIters, cOne, iterArgs,
+                [&](OpBuilder &builder, Location loc, Value iv, ValueRange iterArgs) {
+                    updateLoopMapping(whileOp.getAfterArguments(), iterArgs);
+                    cloneQuantumRegion(builder, loc, whileOp.getAfter(), bvm, tapes,
+                                       tapeIndexCounters);
+
+                    auto oldYield = cast<scf::YieldOp>(whileOp.getAfter().front().getTerminator());
+                    SmallVector<Value> newYieldOperands{iterArgs.size()};
+                    lookupLoopMapping(oldYield.getOperands(), newYieldOperands);
+                    builder.create<scf::YieldOp>(loc, newYieldOperands);
+                });
+
+            updateLoopMapping(whileOp.getResults(), newLoop.getResults());
+        }
+        else if (auto ifOp = dyn_cast<scf::IfOp>(&oldOp)) {
+            if (ifOp.getNumResults() == 0) {
+                continue;
+            }
+
+            DenseMap<size_t, size_t> resultIndexMapping;
+            SmallVector<Type> resultTypes;
+            size_t newResultIndex = 0;
+            for (const auto &[oldResultIndex, resultType] :
+                 llvm::enumerate(ifOp.getResultTypes())) {
+                if (&resultType.getDialect() == quantumDialect) {
+                    resultTypes.push_back(resultType);
+                    resultIndexMapping[oldResultIndex] = newResultIndex++;
+                }
+            }
+
+            Value conditionIdx = builder.create<memref::LoadOp>(loc, cfCounter);
+            Value newIdx = builder.create<index::AddOp>(loc, conditionIdx, cOne);
+            builder.create<memref::StoreOp>(loc, newIdx, cfCounter);
+
+            Value condition = builder.create<tensor::ExtractOp>(loc, cfTape, conditionIdx);
+            Value conditionI1 =
+                builder.create<arith::IndexCastOp>(loc, builder.getI1Type(), condition);
+
+            auto createIfOpBuilder = [&](Region &region) {
+                return [&](OpBuilder &builder, Location loc) {
+                    cloneQuantumRegion(builder, loc, region, bvm, tapes, tapeIndexCounters);
+                    auto oldYield = cast<scf::YieldOp>(region.front().getTerminator());
+                    SmallVector<Value> newYieldOperands{resultTypes.size()};
+                    for (const auto &[oldIdx, newIdx] : resultIndexMapping) {
+                        newYieldOperands[newIdx] = bvm.lookup(oldYield.getOperand(oldIdx));
+                    }
+                    builder.create<scf::YieldOp>(loc, newYieldOperands);
+                };
+            };
+
+            auto newIfOp = builder.create<scf::IfOp>(loc, resultTypes, conditionI1,
+                                                     createIfOpBuilder(ifOp.getThenRegion()),
+                                                     createIfOpBuilder(ifOp.getElseRegion()));
+
+            // Update the mapping
+            for (const auto &[oldIdx, newIdx] : resultIndexMapping) {
+                bvm.map(ifOp.getResult(oldIdx), newIfOp.getResult(newIdx));
+            }
+        }
         else if (isConstant || isQuantum || isTensor || isCast) {
             builder.clone(oldOp, bvm);
         }
