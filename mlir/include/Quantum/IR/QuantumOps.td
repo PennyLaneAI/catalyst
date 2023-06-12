@@ -93,7 +93,8 @@ def QNodeOp : Quantum_Op<"qnode", [
 
     let builders = [OpBuilder<(ins
         "mlir::StringRef":$name, "mlir::FunctionType":$type,
-        CArg<"mlir::ArrayRef<mlir::NamedAttribute>", "{}">:$attrs)
+        CArg<"mlir::ArrayRef<mlir::NamedAttribute>", "{}">:$attrs,
+        CArg<"mlir::ArrayRef<mlir::DictionaryAttr>", "{}">:$argAttrs)
     >];
 
     let extraClassDeclaration = [{
@@ -117,10 +118,16 @@ def QNodeOp : Quantum_Op<"qnode", [
         /// Returns the results types that the callable region produces when
         /// executed.
         mlir::ArrayRef<mlir::Type> getCallableResults() { return getFunctionType().getResults(); }
+
+        //===------------------------------------------------------------------===//
+        // OpAsmOpInterface Methods
+        //===------------------------------------------------------------------===//
+
+        /// Allow the dialect prefix to be omitted.
+        static mlir::StringRef getDefaultDialect() { return "quantum"; }
     }];
 
     let hasCustomAssemblyFormat = 1;
-    let skipDefaultBuilders = 1;
 }
 
 def ReturnOp : Quantum_Op<"return", [Pure, HasParent<"QNodeOp">,

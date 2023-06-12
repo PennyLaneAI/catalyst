@@ -16,6 +16,7 @@ declare_mlir_dialect_python_bindings(
   TD_FILE dialects/QuantumOps.td
   SOURCES
   dialects/quantum.py
+  dialects/_quantum_ops_ext.py
   DIALECT_NAME quantum)
 
 declare_mlir_dialect_python_bindings(

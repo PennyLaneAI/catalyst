@@ -40,12 +40,19 @@ Optional<Operation *> AllocOp::buildDealloc(OpBuilder &builder, Value alloc)
 
 // ----- QNodeOp
 
-void QNodeOp::build(mlir::OpBuilder &builder, mlir::OperationState &state, llvm::StringRef name,
-                    mlir::FunctionType type, llvm::ArrayRef<mlir::NamedAttribute> attrs)
+void QNodeOp::build(OpBuilder &builder, OperationState &state, StringRef name, FunctionType type,
+                    ArrayRef<NamedAttribute> attrs, ArrayRef<DictionaryAttr> argAttrs)
 {
-    // FunctionOpInterface provides a convenient `build` method that will populate
-    // the state of our FuncOp, and create an entry block.
-    buildWithEntryBlock(builder, state, name, type, attrs, type.getInputs());
+    state.addAttribute(SymbolTable::getSymbolAttrName(), builder.getStringAttr(name));
+    state.addAttribute(FunctionOpInterface::getTypeAttrName(), TypeAttr::get(type));
+    state.attributes.append(attrs.begin(), attrs.end());
+    state.addRegion();
+
+    if (argAttrs.empty())
+        return;
+    assert(type.getNumInputs() == argAttrs.size());
+    function_interface_impl::addArgAndResultAttrs(builder, state, argAttrs,
+                                                  /*resultAttrs=*/std::nullopt);
 }
 
 mlir::ParseResult QNodeOp::parse(mlir::OpAsmParser &parser, mlir::OperationState &result)

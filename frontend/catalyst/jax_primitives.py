@@ -45,6 +45,8 @@ from mlir_quantum.dialects.quantum import (
     MultiRZOp,
     NamedObsOp,
     ProbsOp,
+    QNodeOp,
+    CallOp as QNodeCallOp,
     QubitUnitaryOp,
     SampleOp,
     StateOp,
@@ -208,23 +210,45 @@ def _func_def_impl(ctx, *args, call_jaxpr, fn, call=True):  # pragma: no cover
     raise NotImplementedError()
 
 
-def _func_symbol_lowering(ctx, fn_name, call_jaxpr):
+from pennylane import QNode
+
+
+def _func_symbol_lowering(ctx, fn_name, call_jaxpr, qnode):
     """Create a func::FuncOp from JAXPR."""
     if isinstance(call_jaxpr, jax.core.Jaxpr):
         call_jaxpr = jax.core.ClosedJaxpr(call_jaxpr, ())
+    func_op = mlir.lower_jaxpr_to_fun(ctx, fn_name, call_jaxpr, tuple())
+    if qnode:
+        qnode_op = QNodeOp(func_op.name, ir.TypeAttr.get(func_op.type), ip=ctx.ip)
+        if qnode.diff_method:
+            qnode_op.diff_method = ir.StringAttr.get(qnode.diff_method)
+        print(qnode_op)
+        # TODO: Need a way to delete the func.func op and to copy its body into the qnode op.
+        func_op.sym_name = ir.StringAttr.get("unused")
+        return qnode_op.name.value
+        # print(func_op)
+    return func_op.name.value
+
     symbol_name = mlir.lower_jaxpr_to_fun(ctx, fn_name, call_jaxpr, tuple()).name.value
     return symbol_name
 
 
-def _func_call_lowering(symbol_name, avals_out, *args):
+def _func_call_lowering(symbol_name, avals_out, qnode, *args):
     """Create a func::CallOp from JAXPR."""
     output_types = list(map(mlir.aval_to_ir_types, avals_out))
     flat_output_types = util.flatten(output_types)
-    call = CallOp(
-        flat_output_types,
-        ir.FlatSymbolRefAttr.get(symbol_name),
-        mlir.flatten_lowering_ir_args(args),
-    )
+    if qnode:
+        call = QNodeCallOp(
+            flat_output_types,
+            ir.FlatSymbolRefAttr.get(symbol_name),
+            mlir.flatten_lowering_ir_args(args),
+        )
+    else:
+        call = CallOp(
+            flat_output_types,
+            ir.FlatSymbolRefAttr.get(symbol_name),
+            mlir.flatten_lowering_ir_args(args),
+        )
     out_nodes = util.unflatten(call.results, map(len, output_types))
     return out_nodes
 
@@ -244,7 +268,9 @@ def _func_lowering(ctx, *args, call_jaxpr, fn, call=True):
     if fn in mlir_fn_cache:
         symbol_name = mlir_fn_cache[fn]
     else:
-        symbol_name = _func_symbol_lowering(ctx.module_context, fn.__name__, call_jaxpr)
+        symbol_name = _func_symbol_lowering(
+            ctx.module_context, fn.__name__, call_jaxpr, fn if isinstance(fn, QNode) else None
+        )
         mlir_fn_cache[fn] = symbol_name
 
     if not call:
@@ -253,6 +279,7 @@ def _func_lowering(ctx, *args, call_jaxpr, fn, call=True):
     out_nodes = _func_call_lowering(
         symbol_name,
         ctx.avals_out,
+        isinstance(fn, QNode),
         *args,
     )
     return out_nodes
