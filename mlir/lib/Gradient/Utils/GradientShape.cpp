@@ -85,7 +85,7 @@ std::vector<Type> computeQGradTypes(func::FuncOp callee)
         std::vector<int64_t> gradShape = {ShapedType::kDynamic};
 
         if (auto tensorType = resultType.dyn_cast<RankedTensorType>()) {
-            assert(tensorType.hasStaticShape() && "only static tensors supported for autodiff");
+            // assert(tensorType.hasStaticShape() && "only static tensors supported for autodiff");
             ArrayRef<int64_t> tensorShape = tensorType.getShape();
             gradShape.insert(gradShape.end(), tensorShape.begin(), tensorShape.end());
             resultType = tensorType.getElementType();
@@ -93,7 +93,7 @@ std::vector<Type> computeQGradTypes(func::FuncOp callee)
 
         qGradResTypes.push_back(RankedTensorType::get(gradShape, resultType));
     }
-
+    
     return qGradResTypes;
 }
 

@@ -14,6 +14,9 @@
 
 #include "ParameterShift.hpp"
 
+#include "iostream"
+#include "llvm/Support/raw_ostream.h"
+
 #include <algorithm>
 #include <sstream>
 #include <vector>
