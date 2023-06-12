@@ -57,6 +57,8 @@ from mlir_quantum.dialects.tensor import FromElementsOp
 
 from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
 
+from pennylane import QNode as pennylane_QNode
+
 # pylint: disable=unused-argument,too-many-lines
 
 #########
@@ -208,12 +210,18 @@ def _func_def_impl(ctx, *args, call_jaxpr, fn, call=True):  # pragma: no cover
     raise NotImplementedError()
 
 
-def _func_symbol_lowering(ctx, fn_name, call_jaxpr):
+def _func_def_lowering(ctx, fn, call_jaxpr) -> str:
     """Create a func::FuncOp from JAXPR."""
     if isinstance(call_jaxpr, jax.core.Jaxpr):
         call_jaxpr = jax.core.ClosedJaxpr(call_jaxpr, ())
-    symbol_name = mlir.lower_jaxpr_to_fun(ctx, fn_name, call_jaxpr, tuple()).name.value
-    return symbol_name
+    func_op = mlir.lower_jaxpr_to_fun(ctx, fn.__name__, call_jaxpr, tuple())
+
+    if isinstance(fn, pennylane_QNode):
+        func_op.attributes["qnode"] = ir.UnitAttr.get()
+        if fn.diff_method is not None:
+            func_op.attributes["diff_method"] = ir.StringAttr.get(fn.diff_method)
+
+    return func_op.name.value
 
 
 def _func_call_lowering(symbol_name, avals_out, *args):
@@ -244,7 +252,7 @@ def _func_lowering(ctx, *args, call_jaxpr, fn, call=True):
     if fn in mlir_fn_cache:
         symbol_name = mlir_fn_cache[fn]
     else:
-        symbol_name = _func_symbol_lowering(ctx.module_context, fn.__name__, call_jaxpr)
+        symbol_name = _func_def_lowering(ctx.module_context, fn, call_jaxpr)
         mlir_fn_cache[fn] = symbol_name
 
     if not call:
