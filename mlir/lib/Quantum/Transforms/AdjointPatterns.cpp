@@ -132,7 +132,7 @@ struct AdjointSingleOpRewritePattern : public mlir::OpRewritePattern<AdjointOp> 
         });
 
         // Finally, we query the outputs of the reversed program using the input program's block
-        // argument quantum values keys.
+        // quantum arguments as keys.
         auto new_outputs = ({
             std::vector<Value> out;
             for(auto a : op.getRegion().front().getArguments()) {
