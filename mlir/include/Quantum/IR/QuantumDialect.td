@@ -45,6 +45,9 @@ def QuantumDialect : Dialect {
     /// This is the C++ namespace that the dialect, and all sub-components, get placed in.
     let cppNamespace = "::catalyst::quantum";
 
+    /// The cf dialect is required to support inlining of QNodes.
+    let dependentDialects = ["cf::ControlFlowDialect"];
+
     /// Use the default type printing/parsing hooks, otherwise we would explicitly define them.
     let useDefaultTypePrinterParser = 1;
 }

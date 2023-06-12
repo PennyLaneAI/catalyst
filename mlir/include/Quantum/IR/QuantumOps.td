@@ -15,7 +15,12 @@
 #ifndef QUANTUM_OPS
 #define QUANTUM_OPS
 
+include "mlir/IR/FunctionInterfaces.td"
 include "mlir/IR/OpBase.td"
+include "mlir/IR/OpAsmInterface.td"
+include "mlir/IR/SymbolInterfaces.td"
+include "mlir/Interfaces/CallInterfaces.td"
+include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Dialect/Bufferization/IR/AllocationOpInterface.td"
 
@@ -68,6 +73,119 @@ def DeviceOp : Quantum_Op<"device"> {
 
     let assemblyFormat = [{
       $specs attr-dict
+    }];
+}
+
+def QNodeOp : Quantum_Op<"qnode", [
+    AutomaticAllocationScope, CallableOpInterface, FunctionOpInterface,
+    IsolatedFromAbove, OpAsmOpInterface, Symbol
+]> {
+    let summary = "A qnode, or quantum function with a specific device.";
+
+    let description = "";
+
+    let arguments = (ins SymbolNameAttr:$sym_name,
+                         TypeAttrOf<FunctionType>:$function_type,
+                         OptionalAttr<StrAttr>:$diff_method,
+                         OptionalAttr<StrAttr>:$sym_visibility);
+
+    let regions = (region AnyRegion:$body);
+
+    let builders = [OpBuilder<(ins
+        "mlir::StringRef":$name, "mlir::FunctionType":$type,
+        CArg<"mlir::ArrayRef<mlir::NamedAttribute>", "{}">:$attrs)
+    >];
+
+    let extraClassDeclaration = [{
+        //===------------------------------------------------------------------===//
+        // FunctionOpInterface Methods
+        //===------------------------------------------------------------------===//
+
+        /// Returns the argument types of this function.
+        mlir::ArrayRef<mlir::Type> getArgumentTypes() { return getFunctionType().getInputs(); }
+
+        /// Returns the result types of this function.
+        mlir::ArrayRef<mlir::Type> getResultTypes() { return getFunctionType().getResults(); }
+
+        //===------------------------------------------------------------------===//
+        // CallableOpInterface
+        //===------------------------------------------------------------------===//
+
+        /// Returns the region on the current operation that is callable.
+        ::mlir::Region *getCallableRegion() { return &getBody(); }
+
+        /// Returns the results types that the callable region produces when
+        /// executed.
+        mlir::ArrayRef<mlir::Type> getCallableResults() { return getFunctionType().getResults(); }
+    }];
+
+    let hasCustomAssemblyFormat = 1;
+    let skipDefaultBuilders = 1;
+}
+
+def ReturnOp : Quantum_Op<"return", [Pure, HasParent<"QNodeOp">,
+                                   MemRefsNormalizable, ReturnLike, Terminator]> {
+    let summary = "QNode function return operation";
+
+    let arguments = (ins Variadic<AnyType>:$operands);
+
+    let builders = [OpBuilder<(ins), [{
+        build($_builder, $_state, std::nullopt);
+    }]>];
+
+    let assemblyFormat = "attr-dict ($operands^ `:` type($operands))?";
+    let hasVerifier = 1;
+}
+
+def CallOp : Quantum_Op<"call",
+        [CallOpInterface, MemRefsNormalizable,
+        DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
+    let summary = "call operation";
+
+    let arguments = (ins FlatSymbolRefAttr:$callee, Variadic<AnyType>:$operands);
+    let results = (outs Variadic<AnyType>);
+
+    let builders = [
+        OpBuilder<(ins "QNodeOp":$callee, CArg<"mlir::ValueRange", "{}">:$operands), [{
+        $_state.addOperands(operands);
+        $_state.addAttribute("callee", mlir::SymbolRefAttr::get(callee));
+        $_state.addTypes(callee.getFunctionType().getResults());
+        }]>,
+        OpBuilder<(ins "mlir::SymbolRefAttr":$callee, "mlir::TypeRange":$results,
+        CArg<"mlir::ValueRange", "{}">:$operands), [{
+        $_state.addOperands(operands);
+        $_state.addAttribute("callee", callee);
+        $_state.addTypes(results);
+        }]>,
+        OpBuilder<(ins "mlir::StringAttr":$callee, "mlir::TypeRange":$results,
+        CArg<"mlir::ValueRange", "{}">:$operands), [{
+        build($_builder, $_state, mlir::SymbolRefAttr::get(callee), results, operands);
+        }]>,
+        OpBuilder<(ins "mlir::StringRef":$callee, "mlir::TypeRange":$results,
+        CArg<"mlir::ValueRange", "{}">:$operands), [{
+        build($_builder, $_state, mlir::StringAttr::get($_builder.getContext(), callee),
+                results, operands);
+        }]>];
+
+    let extraClassDeclaration = [{
+        mlir::FunctionType getCalleeType();
+
+        /// Get the argument operands to the called function.
+        operand_range getArgOperands() {
+        return {arg_operand_begin(), arg_operand_end()};
+        }
+
+        operand_iterator arg_operand_begin() { return operand_begin(); }
+        operand_iterator arg_operand_end() { return operand_end(); }
+
+        /// Return the callee of this operation.
+        mlir::CallInterfaceCallable getCallableForCallee() {
+        return (*this)->getAttrOfType<mlir::SymbolRefAttr>("callee");
+        }
+    }];
+
+    let assemblyFormat = [{
+        $callee `(` $operands `)` attr-dict `:` functional-type($operands, results)
     }];
 }
 

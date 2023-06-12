@@ -17,8 +17,11 @@
 #include "mlir/Dialect/Bufferization/IR/AllocationOpInterface.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
+#include "mlir/IR/FunctionInterfaces.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/Interfaces/CallInterfaces.h"
+#include "mlir/Interfaces/ControlFlowInterfaces.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/Optional.h"
@@ -33,12 +36,11 @@
 namespace mlir {
 namespace OpTrait {
 
-template <typename ConcreteType> class UnitaryTrait : public TraitBase<ConcreteType, UnitaryTrait> {
-};
+template <typename ConcreteType>
+class UnitaryTrait : public TraitBase<ConcreteType, UnitaryTrait> {};
 
 template <typename ConcreteType>
-class HermitianTrait : public TraitBase<ConcreteType, HermitianTrait> {
-};
+class HermitianTrait : public TraitBase<ConcreteType, HermitianTrait> {};
 
 } // namespace OpTrait
 } // namespace mlir

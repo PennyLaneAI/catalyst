@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/FunctionImplementation.h"
 #include "mlir/IR/OpImplementation.h"
 
 #include "Quantum/IR/QuantumDialect.h"
@@ -35,6 +36,37 @@ using namespace catalyst::quantum;
 Optional<Operation *> AllocOp::buildDealloc(OpBuilder &builder, Value alloc)
 {
     return builder.create<DeallocOp>(alloc.getLoc(), alloc).getOperation();
+}
+
+// ----- QNodeOp
+
+void QNodeOp::build(mlir::OpBuilder &builder, mlir::OperationState &state, llvm::StringRef name,
+                    mlir::FunctionType type, llvm::ArrayRef<mlir::NamedAttribute> attrs)
+{
+    // FunctionOpInterface provides a convenient `build` method that will populate
+    // the state of our FuncOp, and create an entry block.
+    buildWithEntryBlock(builder, state, name, type, attrs, type.getInputs());
+}
+
+mlir::ParseResult QNodeOp::parse(mlir::OpAsmParser &parser, mlir::OperationState &result)
+{
+    // Dispatch to the FunctionOpInterface provided utility method that parses the
+    // function operation.
+    auto buildFuncType = [](mlir::Builder &builder, llvm::ArrayRef<mlir::Type> argTypes,
+                            llvm::ArrayRef<mlir::Type> results,
+                            mlir::function_interface_impl::VariadicFlag,
+                            std::string &) { return builder.getFunctionType(argTypes, results); };
+
+    return mlir::function_interface_impl::parseFunctionOp(parser, result, /*allowVariadic=*/false,
+                                                          buildFuncType);
+}
+
+void QNodeOp::print(mlir::OpAsmPrinter &p)
+{
+    // Dispatch to the FunctionOpInterface provided utility method that prints the
+    // function operation.
+    mlir::function_interface_impl::printFunctionOp(p, *this,
+                                                   /*isVariadic=*/false);
 }
 
 //===----------------------------------------------------------------------===//
@@ -75,6 +107,65 @@ LogicalResult InsertOp::canonicalize(InsertOp insert, mlir::PatternRewriter &rew
 //===----------------------------------------------------------------------===//
 // Quantum op verifiers.
 //===----------------------------------------------------------------------===//
+
+LogicalResult ReturnOp::verify()
+{
+    auto qnode = cast<QNodeOp>((*this)->getParentOp());
+    ArrayRef<Type> results = qnode.getFunctionType().getResults();
+
+    if (getNumOperands() != results.size()) {
+        return emitOpError("has ") << getNumOperands() << " operands, but enclosing qnode (@"
+                                   << qnode.getName() << ") returns " << results.size();
+    }
+
+    for (unsigned i = 0, e = results.size(); i != e; ++i)
+        if (getOperand(i).getType() != results[i])
+            return emitError() << "type of return operand " << i << " (" << getOperand(i).getType()
+                               << ") doesn't match function result type (" << results[i] << ")"
+                               << " in qnode @" << qnode.getName();
+    return success();
+}
+
+LogicalResult CallOp::verifySymbolUses(SymbolTableCollection &symbolTable)
+{
+    FlatSymbolRefAttr fnAttr = getCalleeAttr();
+    if (!fnAttr) {
+        return emitOpError("requires a 'callee' symbol reference attribute");
+    }
+    QNodeOp fn = symbolTable.lookupNearestSymbolFrom<QNodeOp>(*this, fnAttr);
+    if (!fn) {
+        return emitOpError() << "'" << fnAttr.getValue() << "' does not reference a valid qnode";
+    }
+
+    // Verify that the operand and result types match the callee.
+    auto fnType = fn.getFunctionType();
+    if (fnType.getNumInputs() != getNumOperands()) {
+        return emitOpError("incorrect number of operands for callee");
+    }
+
+    for (unsigned i = 0, e = fnType.getNumInputs(); i != e; ++i) {
+        if (getOperand(i).getType() != fnType.getInput(i)) {
+            return emitOpError("operand type mismatch: expected operand type ")
+                   << fnType.getInput(i) << ", but provided " << getOperand(i).getType()
+                   << " for operand number " << i;
+        }
+    }
+
+    if (fnType.getNumResults() != getNumResults()) {
+        return emitOpError("incorrect number of results for callee");
+    }
+
+    for (unsigned i = 0, e = fnType.getNumResults(); i != e; ++i) {
+        if (getResult(i).getType() != fnType.getResult(i)) {
+            auto diag = emitOpError("result type mismatch at index ") << i;
+            diag.attachNote() << "      op result types: " << getResultTypes();
+            diag.attachNote() << "function result types: " << fnType.getResults();
+            return diag;
+        }
+    }
+
+    return success();
+}
 
 static LogicalResult verifyObservable(Value obs, size_t *numQubits)
 {
