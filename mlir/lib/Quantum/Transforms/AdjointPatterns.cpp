@@ -125,7 +125,14 @@ struct AdjointSingleOpRewritePattern : public mlir::OpRewritePattern<AdjointOp> 
                     update(extract.getQreg(), insert->getResult(0));
                 }
                 else {
-                    /* skip */
+                    /* TODO: We expect to handle Scf control flow instructions here. Stateless loops
+                     * and conditionals should not be a problem. Stateful loops would probably
+                     * require some kind of classical unrolling.
+                     */
+                    /* TODO: We also expect to handle a 1 level of nested adjoint blocks here as
+                     * well. Just wiring their region contents to the output program should be
+                     * enough. Handling arbitrary-deep nesting needs some investigation.
+                     */
                 }
             }
             out;
