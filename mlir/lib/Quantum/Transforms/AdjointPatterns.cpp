@@ -50,51 +50,54 @@ struct AdjointSingleOpRewritePattern : public mlir::OpRewritePattern<AdjointOp> 
 
     mlir::LogicalResult matchAndRewrite(AdjointOp op, mlir::PatternRewriter &rewriter) const override
     {
+        LLVM_DEBUG(dbgs() << "Adjointing the following:\n" << op << "\n");
         Location loc = op.getLoc();
         MLIRContext *ctx = op.getContext();
-        LLVM_DEBUG(dbgs() << "matching the adjoing op" << "\n");
-
         assert(op.getRegion().hasOneBlock());
 
+        // In essence, we build a map from values mentiond in the original program data flow to
+        // the values of the program where quantum control flow is reversed. Most of the time,
+        // there is a 1-to-1 correspondence with a notable exception caused by
+        // `insert`/`extract` API asymetry.
         auto reversal_mapping = ({
             llvm::DenseMap<Value,Value> out;
+            auto query = [&out] (Value key) -> Value {
+                LLVM_DEBUG(dbgs() << "  querying: " << key << "\n");
+                auto val = out[key];
+                LLVM_DEBUG(dbgs() << "    result: " << val << "\n");
+                return val;
+            };
+            auto update = [&out] (Value key, Value val) -> void {
+                LLVM_DEBUG(dbgs() << "  updating: " << key << "\n");
+                LLVM_DEBUG(dbgs() << "    to: " << val << "\n");
+                out[key] = val;
+            };
             Block &b = op.getRegion().front();
             auto rb = std::make_reverse_iterator(b.end());
             auto re = std::make_reverse_iterator(b.begin());
             for( auto i = rb; i!=re; i++) {
-                LLVM_DEBUG(dbgs() << "reversing: " << i->getName() << " " << *i << "\n");
+                LLVM_DEBUG(dbgs() << "operation: " << *i << "\n");
                 if(YieldOp yield = isInstanceOf<YieldOp>(*i)) {
-                    LLVM_DEBUG(dbgs() << "  yield! " << yield << "\n");
                     assert(yield.getOperands().size() == 1);
-                    auto qreg = ({
-                        Value out = *yield.getResults().begin();
-                        LLVM_DEBUG(dbgs() << "  qreg type: " << out.getType() << "\n");
-                        out;
-                        });
-                    out[qreg] = op.getQreg();
+                    update(*yield.getResults().begin(), op.getQreg());
                 }
                 else if(InsertOp insert = isInstanceOf<InsertOp>(*i)) {
-                    LLVM_DEBUG(dbgs() << "  insert! " << insert << "\n");
                     ExtractOp extract = rewriter.create<ExtractOp>(
                         loc,
                         insert.getQubit().getType(),
-                        out[insert.getOutQreg()],
+                        query(insert.getOutQreg()),
                         insert.getIdx(),
                         insert.getIdxAttrAttr()
                     );
-                    out[insert.getQubit()] = extract->getResult(0);
-                    out[insert.getInQreg()] = out[insert.getOutQreg()];
-                    LLVM_DEBUG(dbgs() << "  done! " << "\n");
+                    update(insert.getQubit(), extract->getResult(0));
+                    update(insert.getInQreg(), out[insert.getOutQreg()]);
                 }
                 else if(CustomOp custom = isInstanceOf<CustomOp>(*i)) {
-                    LLVM_DEBUG(dbgs() << "  custom! " << custom << "\n");
                     assert(custom.getInQubits().size() == custom.getOutQubits().size() && "size");
                     auto in_qubits = ({
                         std::vector<Value> qbits;
                         for(auto q: custom.getOutQubits()) {
-                            LLVM_DEBUG(dbgs() << "  finding! " << q << "\n");
-                            assert(out.find(q) != out.end() && "not found!");
-                            qbits.push_back(out[q]);
+                            qbits.push_back(query(q));
                         }
                         qbits;
                     });
@@ -107,25 +110,19 @@ struct AdjointSingleOpRewritePattern : public mlir::OpRewritePattern<AdjointOp> 
                         mlir::BoolAttr::get(ctx, !custom.getAdjoint().value_or(false))
                     );
                     for(size_t i = 0; i<customA.getOutQubits().size(); i++) {
-                        out[custom.getInQubits()[i]] = customA->getResult(i);
+                        update(custom.getInQubits()[i], customA->getResult(i));
                     }
                 }
                 else if(ExtractOp extract = isInstanceOf<ExtractOp>(*i)) {
-                    LLVM_DEBUG(dbgs() << "  extract! " << extract << "\n");
-                    LLVM_DEBUG(dbgs() << "  finding! " << extract.getQreg() << "\n");
-                    assert(out.find(extract.getQreg()) != out.end() && "not found!");
-                    LLVM_DEBUG(dbgs() << "  finding! " << extract.getQubit() << "\n");
-                    assert(out.find(extract.getQubit()) != out.end() && "not found!");
                     auto insert = rewriter.create<InsertOp>(
                         loc,
                         extract.getQreg().getType(),
-                        out[extract.getQreg()],
+                        query(extract.getQreg()),
                         extract.getIdx(),
                         extract.getIdxAttrAttr(),
-                        out[extract.getQubit()]
+                        query(extract.getQubit())
                     );
-                    LLVM_DEBUG(dbgs() << "  done! " << "\n");
-                    out[extract.getQreg()] = insert->getResult(0);
+                    update(extract.getQreg(), insert->getResult(0));
                 }
                 else {
                     /* skip */
@@ -134,6 +131,8 @@ struct AdjointSingleOpRewritePattern : public mlir::OpRewritePattern<AdjointOp> 
             out;
         });
 
+        // Finally, we query the outputs of the reversed program using the input program's block
+        // argument quantum values keys.
         auto new_outputs = ({
             std::vector<Value> out;
             for(auto a : op.getRegion().front().getArguments()) {
@@ -143,7 +142,6 @@ struct AdjointSingleOpRewritePattern : public mlir::OpRewritePattern<AdjointOp> 
         });
 
         rewriter.replaceOp(op, new_outputs);
-        LLVM_DEBUG(dbgs() << "Adjoint lowering complete" << "\n");
         return success();
     }
 };
