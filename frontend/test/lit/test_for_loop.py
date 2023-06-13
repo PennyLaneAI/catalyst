@@ -40,8 +40,7 @@ def loop_circuit(n: int, inc: float):
     @for_loop(0, n - 1, 1)
     def loop_fn(i, phi):
         # CHECK:       [[i_cast:%.+]] = arith.index_cast [[i]]
-        # CHECK:       [[phi0_stablehlo:%.+]] = stablehlo.convert %arg3
-        # CHECK:       [[phi1:%.+]] = stablehlo.add [[phi0_stablehlo]], %arg1
+        # CHECK:       [[phi1:%.+]] = stablehlo.add %arg3, %arg1
 
         # CHECK:       [[q0:%.+]] = "quantum.extract"([[r0]], [[i_cast]])
         # CHECK:       [[phi_e:%.+]] = tensor.extract [[phi0]]
