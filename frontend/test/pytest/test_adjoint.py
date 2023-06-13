@@ -35,12 +35,16 @@ def test_adjoint_func_simple():
     @qjit()
     @qml.qnode(qml.device("lightning.qubit", wires=2))
     def workflow_C():
+        qml.PauliX(wires=0)
         adjoint_C(func)()
+        qml.PauliY(wires=0)
         return qml.state()
 
     @qml.qnode(qml.device("default.qubit", wires=2))
     def workflow_PL():
+        qml.PauliX(wires=0)
         adjoint_PL(func)()
+        qml.PauliY(wires=0)
         return qml.state()
 
     actual = workflow_C()
