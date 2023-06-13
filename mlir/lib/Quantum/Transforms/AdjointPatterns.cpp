@@ -61,7 +61,7 @@ struct AdjointSingleOpRewritePattern : public mlir::OpRewritePattern<AdjointOp> 
         MLIRContext *ctx = op.getContext();
         assert(op.getRegion().hasOneBlock());
 
-        // First, copy the purely-classical computations directly to the target POI
+        // First, copy the classical computations directly to the target POI
         auto classical_mapping = ({
             BlockAndValueMapping bvm;
             Block &b = op.getRegion().front();

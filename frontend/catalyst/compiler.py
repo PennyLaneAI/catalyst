@@ -192,7 +192,7 @@ class AdjointLoweringTest(PassPipeline):
     _default_flags = [
         "--adjoint-lowering",
         "--debug-only=adjoint",
-        "--mlir-print-ir-after-failure"
+        "--mlir-print-ir-after-failure",
     ]
 
     @staticmethod
