@@ -25,6 +25,8 @@ struct QuantumDependenceAnalysis {
 
     bool dependsOnMeasurement(mlir::Value);
 
+    bool dependsOnMeasurement(mlir::Operation *);
+
     bool dependsOnMidCircuitMeasurement(mlir::Value);
 
   private:

@@ -207,6 +207,12 @@ bool quantum::QuantumDependenceAnalysis::dependsOnMeasurement(Value value)
     return true;
 }
 
+bool quantum::QuantumDependenceAnalysis::dependsOnMeasurement(Operation *op)
+{
+    return llvm::any_of(op->getOperands(),
+                        [this](Value operand) { return dependsOnMeasurement(operand); });
+}
+
 bool quantum::QuantumDependenceAnalysis::dependsOnMidCircuitMeasurement(Value value)
 {
     auto *state = solver.lookupState<Lattice<QuantumDependence>>(value);

@@ -117,6 +117,7 @@ SparseConstantPropagation here.
 #include "Gradient/Transforms/Patterns.h"
 #include "Quantum/Analysis/QuantumDependenceAnalysis.h"
 #include "Quantum/IR/QuantumInterfaces.h"
+#include "Quantum/IR/QuantumOps.h"
 
 #include "mlir/IR/Verifier.h"
 
@@ -126,8 +127,9 @@ using llvm::errs;
 using namespace mlir;
 using namespace catalyst;
 
-void cloneQuantumRegion(OpBuilder &builder, Location loc, Region &region, BlockAndValueMapping &bvm,
-                        ValueRange tapes, ValueRange tapeIndexCounters)
+void cloneQuantumRegion(quantum::QuantumDependenceAnalysis &qdepAnalysis, OpBuilder &builder,
+                        Location loc, Region &region, BlockAndValueMapping &bvm, ValueRange tapes,
+                        ValueRange tapeIndexCounters)
 {
     assert(region.hasOneBlock() && "Expected only structured control flow (region with one block)");
     Dialect *quantumDialect = builder.getContext()->getLoadedDialect("quantum");
@@ -135,14 +137,16 @@ void cloneQuantumRegion(OpBuilder &builder, Location loc, Region &region, BlockA
     Value paramCounter = tapeIndexCounters[0];
     Value cfTape = tapes[1];
     Value cfCounter = tapeIndexCounters[1];
+    Value wireTape = tapes[2];
+    Value wireCounter = tapeIndexCounters[2];
     Value cOne = builder.create<index::ConstantOp>(loc, 1);
 
     for (Operation &oldOp : region.front().without_terminator()) {
         // TODO(jacob): this is a weird case, tensor.from_elements is used to convert the
         // expectation value into a tensor. Should it be considered classical postprocessing?
-        bool isTensor = isa<tensor::FromElementsOp>(&oldOp);
-        bool isCast = isa<arith::IndexCastOp>(&oldOp);
-        bool isConstant = isa<arith::ConstantOp>(&oldOp);
+        // Probably shouldn't have this, could consider returning the expval directly as a float.
+        // Postprocessing should have its own thing.
+        bool dependsOnMeasurement = qdepAnalysis.dependsOnMeasurement(&oldOp);
         bool isQuantum = oldOp.getDialect() == quantumDialect;
 
         if (auto gateOp = dyn_cast<quantum::DifferentiableGate>(&oldOp)) {
@@ -160,6 +164,26 @@ void cloneQuantumRegion(OpBuilder &builder, Location loc, Region &region, BlockA
             }
 
             builder.create<memref::StoreOp>(loc, paramIdx, paramCounter);
+        }
+        else if (auto extractOp = dyn_cast<quantum::ExtractOp>(&oldOp)) {
+            // Load cached wires.
+            Value wireIdx = builder.create<memref::LoadOp>(loc, wireCounter);
+            Value cachedWire = builder.create<tensor::ExtractOp>(loc, wireTape, wireIdx);
+            wireIdx = builder.create<index::AddOp>(loc, wireIdx, cOne);
+            builder.create<memref::StoreOp>(loc, wireIdx, wireCounter);
+
+            auto newExtractOp = cast<quantum::ExtractOp>(builder.clone(*extractOp, bvm));
+            newExtractOp.getIdxMutable().assign(cachedWire);
+        }
+        else if (auto insertOp = dyn_cast<quantum::InsertOp>(&oldOp)) {
+            // TODO consolidate duplication to handle insert/extract ops
+            Value wireIdx = builder.create<memref::LoadOp>(loc, wireCounter);
+            Value cachedWire = builder.create<tensor::ExtractOp>(loc, wireTape, wireIdx);
+            wireIdx = builder.create<index::AddOp>(loc, wireIdx, cOne);
+            builder.create<memref::StoreOp>(loc, wireIdx, wireCounter);
+
+            auto newInsertOp = cast<quantum::InsertOp>(builder.clone(*insertOp, bvm));
+            newInsertOp.getIdxMutable().assign(cachedWire);
         }
         else if (auto forOp = dyn_cast<scf::ForOp>(&oldOp)) {
             // We only want to keep quantum iterArgs, so loopIndexMapping maps the index of the old
@@ -203,7 +227,7 @@ void cloneQuantumRegion(OpBuilder &builder, Location loc, Region &region, BlockA
                 [&](OpBuilder &builder, Location loc, Value iv, ValueRange iterArgs) {
                     bvm.map(forOp.getInductionVar(), iv);
                     updateLoopMapping(forOp.getRegionIterArgs(), iterArgs);
-                    cloneQuantumRegion(builder, loc, forOp.getLoopBody(), bvm, tapes,
+                    cloneQuantumRegion(qdepAnalysis, builder, loc, forOp.getLoopBody(), bvm, tapes,
                                        tapeIndexCounters);
 
                     // Update loop terminator
@@ -248,7 +272,7 @@ void cloneQuantumRegion(OpBuilder &builder, Location loc, Region &region, BlockA
                 loc, cZero, numIters, cOne, iterArgs,
                 [&](OpBuilder &builder, Location loc, Value iv, ValueRange iterArgs) {
                     updateLoopMapping(whileOp.getAfterArguments(), iterArgs);
-                    cloneQuantumRegion(builder, loc, whileOp.getAfter(), bvm, tapes,
+                    cloneQuantumRegion(qdepAnalysis, builder, loc, whileOp.getAfter(), bvm, tapes,
                                        tapeIndexCounters);
 
                     auto oldYield = cast<scf::YieldOp>(whileOp.getAfter().front().getTerminator());
@@ -285,7 +309,8 @@ void cloneQuantumRegion(OpBuilder &builder, Location loc, Region &region, BlockA
 
             auto createIfOpBuilder = [&](Region &region) {
                 return [&](OpBuilder &builder, Location loc) {
-                    cloneQuantumRegion(builder, loc, region, bvm, tapes, tapeIndexCounters);
+                    cloneQuantumRegion(qdepAnalysis, builder, loc, region, bvm, tapes,
+                                       tapeIndexCounters);
                     auto oldYield = cast<scf::YieldOp>(region.front().getTerminator());
                     SmallVector<Value> newYieldOperands{resultTypes.size()};
                     for (const auto &[oldIdx, newIdx] : resultIndexMapping) {
@@ -304,19 +329,21 @@ void cloneQuantumRegion(OpBuilder &builder, Location loc, Region &region, BlockA
                 bvm.map(ifOp.getResult(oldIdx), newIfOp.getResult(newIdx));
             }
         }
-        else if (isConstant || isQuantum || isTensor || isCast) {
+        else if (isQuantum || dependsOnMeasurement) {
             builder.clone(oldOp, bvm);
         }
     }
 }
 
-func::FuncOp genQuantumSplitFunction(OpBuilder &builder, Location loc, func::FuncOp callee)
+func::FuncOp genQuantumSplitFunction(quantum::QuantumDependenceAnalysis &qdepAnalysis,
+                                     OpBuilder &builder, Location loc, func::FuncOp callee)
 {
     auto fnName = builder.getStringAttr(callee.getName() + ".qsplit");
     SmallVector<Type> argTypes{
         RankedTensorType::get({ShapedType::kDynamic}, builder.getF64Type()),
-        RankedTensorType::get({ShapedType::kDynamic}, builder.getIndexType())};
-    SmallVector<Location> argLocs{2, loc};
+        RankedTensorType::get({ShapedType::kDynamic}, builder.getIndexType()),
+        RankedTensorType::get({ShapedType::kDynamic}, builder.getI64Type())};
+    SmallVector<Location> argLocs{argTypes.size(), loc};
     FunctionType fnType = builder.getFunctionType(argTypes, callee.getResultTypes());
     func::FuncOp qsplitFn = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(callee, fnName);
     if (!qsplitFn) {
@@ -329,14 +356,17 @@ func::FuncOp genQuantumSplitFunction(OpBuilder &builder, Location loc, func::Fun
             builder.create<memref::AllocaOp>(loc, MemRefType::get({}, builder.getIndexType()));
         Value cfIndex =
             builder.create<memref::AllocaOp>(loc, MemRefType::get({}, builder.getIndexType()));
+        Value wireIndex =
+            builder.create<memref::AllocaOp>(loc, MemRefType::get({}, builder.getIndexType()));
         Value cZero = builder.create<index::ConstantOp>(loc, 0);
         builder.create<memref::StoreOp>(loc, cZero, paramIndex);
         builder.create<memref::StoreOp>(loc, cZero, cfIndex);
+        builder.create<memref::StoreOp>(loc, cZero, wireIndex);
 
         BlockAndValueMapping bvm;
 
-        cloneQuantumRegion(builder, loc, callee.getFunctionBody(), bvm, newBody.getArguments(),
-                           {paramIndex, cfIndex});
+        cloneQuantumRegion(qdepAnalysis, builder, loc, callee.getFunctionBody(), bvm,
+                           newBody.getArguments(), {paramIndex, cfIndex, wireIndex});
 
         auto oldReturn = cast<func::ReturnOp>(callee.getFunctionBody().front().getTerminator());
         builder.clone(*oldReturn, bvm);
@@ -360,7 +390,7 @@ void catalyst::gradient::splitHybridCircuit(Operation *top,
     OpBuilder builder(top);
     builder.setInsertionPointToStart(moduleOp.getBody());
 
-    genQuantumSplitFunction(builder, gradOp.getLoc(), callee);
+    genQuantumSplitFunction(qdepAnalysis, builder, gradOp.getLoc(), callee);
 
     builder.setInsertionPoint(gradOp);
 }
