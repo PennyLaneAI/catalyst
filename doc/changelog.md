@@ -145,6 +145,10 @@
 * Use Tablegen to define MLIR passes instead of C++ to reduce overhead of adding new passes.
   [#157](https://github.com/PennyLaneAI/catalyst/pull/157)
 
+* Perform constant folding on wire indices for ``quantum.insert`` and ``quantum.extract`` ops,
+  used when writing (resp. reading) qubits to (resp. from) quantum registers.
+  [#161](https://github.com/PennyLaneAI/catalyst/pull/161)
+
 <h3>Breaking changes</h3>
 
 <h3>Bug fixes</h3>
