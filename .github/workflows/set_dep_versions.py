@@ -21,7 +21,7 @@ import sys
 
 import requests
 
-jax_version = "0.4.10"  # sys.argv[1]
+jax_version = sys.argv[1]
 
 url = f"https://raw.githubusercontent.com/google/jax/jaxlib-v{jax_version}/WORKSPACE"
 response = requests.get(url)
