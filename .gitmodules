@@ -6,3 +6,7 @@
 	path = mlir/llvm-project
 	url = https://github.com/llvm/llvm-project.git
 	shallow = true
+[submodule "enzyme"]
+	path = Enzyme
+	url = https://github.com/EnzymeAD/Enzyme.git
+	shallow = true
