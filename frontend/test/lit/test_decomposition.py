@@ -230,7 +230,9 @@ def test_decompose_qubitunitary():
     # CHECK-LABEL: public @jit_decompose_qubit_unitary
     def decompose_qubit_unitary(U: jax.core.ShapedArray([2, 2], float)):
         # CHECK-NOT: name = "QubitUnitary"
-        # CHECK: name = "Rot"
+        # CHECK: name = "RZ"
+        # CHECK: name = "RY"
+        # CHECK: name = "RZ"
         # CHECK-NOT: name = "QubitUnitary"
         qml.QubitUnitary(U, wires=0)
         return measure(wires=0)
