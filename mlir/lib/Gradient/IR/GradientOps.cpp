@@ -151,7 +151,6 @@ void JVPOp::setCalleeFromCallable(CallInterfaceCallable callee)
     (*this)->setAttr("callee", callee.get<SymbolRefAttr>());
 };
 
-
 Operation::operand_range JVPOp::getArgOperands() { return getOperands(); }
 
 //===----------------------------------------------------------------------===//

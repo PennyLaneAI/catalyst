@@ -167,7 +167,8 @@ func::FuncOp genEnzymeWrapperFunction(PatternRewriter &rewriter, Location loc, f
         PatternRewriter::InsertionGuard insertGuard(rewriter);
         rewriter.setInsertionPointAfter(callee);
 
-        wrappedCallee = rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility, nullptr, nullptr);
+        wrappedCallee =
+            rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility, nullptr, nullptr);
         Block *entryBlock = wrappedCallee.addEntryBlock();
         rewriter.setInsertionPointToStart(entryBlock);
 
@@ -315,8 +316,7 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
             Type llvmBaseType = llvmTypeConverter.convertType(memrefArgType.getElementType());
 
             auto llvmInsert0 = rewriter.create<LLVM::InsertValueOp>(loc, llvmDataIn, buffer, 0);
-            auto llvmInsert1 =
-                rewriter.create<LLVM::InsertValueOp>(loc, llvmInsert0, buffer, 1);
+            auto llvmInsert1 = rewriter.create<LLVM::InsertValueOp>(loc, llvmInsert0, buffer, 1);
 
             Value shadowPtr = rewriter.create<LLVM::AllocaOp>(
                 loc, LLVM::LLVMPointerType::get(llvmDataIn.getType()), c1);
