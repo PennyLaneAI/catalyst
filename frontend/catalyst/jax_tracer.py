@@ -392,10 +392,9 @@ def trace_observables(obs, qubit_states, p, num_wires, qreg):
         qubits = get_qubits_from_wires(wires, qubit_states, qreg)
         jax_obs = jprim.compbasis(*qubits)
     elif isinstance(obs, tuple(namedobs_map.keys())):
-        base = namedobs_map[type(obs)]
         _, wires = op_args
         qubits = get_qubits_from_wires(wires, qubit_states, qreg)
-        jax_obs = jprim.namedobs(base, qubits[0])
+        jax_obs = jprim.namedobs(type(obs).__name__, qubits[0])
     elif isinstance(obs, qml.Hermitian):
         matrix, wires = op_args
         qubits = get_qubits_from_wires(wires, qubit_states, qreg)
