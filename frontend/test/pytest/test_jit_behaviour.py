@@ -20,11 +20,11 @@ import jax
 import numpy as np
 import pennylane as qml
 import pytest
-from jax import numpy as jnp
-from numpy import pi
-
 from catalyst import for_loop, grad, measure, qjit
 from catalyst.compilation_pipelines import CompiledFunction
+from catalyst.jax_primitives import _scalar_abstractify
+from jax import numpy as jnp
+from numpy import pi
 
 
 def f_aot_builder(backend, wires=1, shots=1000):
@@ -487,6 +487,29 @@ class TestSignatureErrors:
 
         retval = CompiledFunction.can_promote([], [1])
         assert not retval
+
+    def test_incompatible_type_reachable_from_user_code(self):
+        """Raise error message for incompatible types"""
+
+        with pytest.raises(TypeError) as err:
+
+            @qjit
+            def f(x: str):
+                return
+
+        assert "Unsupported argument type:" in str(err.value)
+
+    def test_incompatible_abstractify(self):
+        """Check error message.
+
+        Note: It is unclear if there's a path that will reach this condition.
+        This is because the incompatible argument above would reach it.
+        """
+
+        with pytest.raises(TypeError) as err:
+            _scalar_abstractify(str)
+
+        assert "Cannot convert given type" in str(err.value)
 
 
 class TestClassicalCompilation:
