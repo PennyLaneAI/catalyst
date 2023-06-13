@@ -18,6 +18,7 @@ import jax
 import pennylane as qml
 from jax._src import source_info_util
 from jax._src.dispatch import jaxpr_replicas
+from jax._src.interpreters.mlir import _module_name_regex
 from jax._src.lax.lax import xb, xla
 from jax._src.util import wrap_name
 from jax.interpreters.mlir import (
@@ -500,7 +501,7 @@ def custom_lower_jaxpr_to_module(
         # register_dialect()
         # Remove module name characters that XLA would alter. This ensures that
         # XLA computation preserves the module name.
-        # module_name = _module_name_regex.sub("_", module_name)
+        module_name = _module_name_regex.sub("_", module_name)
         ctx.module.operation.attributes["sym_name"] = ir.StringAttr.get(module_name)
         unlowerable_effects = {eff for eff in jaxpr.effects if eff not in lowerable_effects}
         if unlowerable_effects:
