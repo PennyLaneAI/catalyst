@@ -20,9 +20,9 @@ from typing import Dict, List
 
 import jax
 import numpy as np
-from jax.core import AbstractValue
 from jax._src import api_util, core, source_info_util, util
 from jax._src.lib.mlir import ir
+from jax.core import AbstractValue
 from jax.interpreters import mlir
 from jaxlib.mlir.dialects._func_ops_gen import CallOp
 from jaxlib.mlir.dialects._mhlo_ops_gen import ConstantOp, ConvertOp
