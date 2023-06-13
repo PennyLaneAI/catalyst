@@ -20,6 +20,7 @@ from typing import Dict, List
 
 import jax
 import numpy as np
+from jax.core import AbstractValue
 from jax._src import api_util, core, source_info_util, util
 from jax._src.lib.mlir import ir
 from jax.interpreters import mlir
@@ -74,7 +75,7 @@ class Qbit:
         self.aval = AbstractQbit()
 
 
-class AbstractQbit(core.AbstractValue):
+class AbstractQbit(AbstractValue):
     """Abstract Qbit"""
 
 
@@ -97,7 +98,7 @@ class Qreg:
         self.aval = AbstractQreg()
 
 
-class AbstractQreg(core.AbstractValue):
+class AbstractQreg(AbstractValue):
     """Abstract quantum register."""
 
 
@@ -120,7 +121,7 @@ class Obs:
         self.aval = AbstractObs(num_qubits, primitive)
 
 
-class AbstractObs(core.AbstractValue):
+class AbstractObs(AbstractValue):
     """Abstract observable."""
 
     def __init__(self, num_qubits=None, primitive=None):
@@ -1487,10 +1488,13 @@ mlir.register_lowering(vjp_p, _vjp_lowering)
 
 
 def _scalar_abstractify(t):
+    # pylint: disable=protected-access
     if t in {int, float, complex, bool} or isinstance(t, jax._src.numpy.lax_numpy._ScalarMeta):
         return core.ShapedArray([], dtype=t, weak_type=True)
     raise TypeError(f"Cannot convert given type {t} scalar ShapedArray.")
 
 
+# pylint: disable=protected-access
 api_util._shaped_abstractify_handlers[type] = _scalar_abstractify
+# pylint: disable=protected-access
 api_util._shaped_abstractify_handlers[jax._src.numpy.lax_numpy._ScalarMeta] = _scalar_abstractify
