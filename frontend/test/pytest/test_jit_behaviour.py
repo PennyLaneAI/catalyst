@@ -139,8 +139,8 @@ class TestJittedWithOneTypeRunWithAnother:
         """Test signless."""
 
         with warnings.catch_warnings():
-            # Treat ResourceWarnings as an error.
-            warnings.filterwarnings("error", category=ResourceWarning)
+            # Treat warnings as an error.
+            warnings.simplefilter("error")
 
             @qjit
             @qml.qnode(qml.device(backend, wires=1))
@@ -176,7 +176,7 @@ class TestJittedWithOneTypeRunWithAnother:
 
         res_from = f(jax.numpy.array(1, dtype=jnp.int8))
         id_from = id(f.compiled_function)
-        with pytest.warns(ResourceWarning):
+        with pytest.warns(UserWarning):
             res_to = f(to_type(1))
         id_to = id(f.compiled_function)
         assert id_from != id_to
@@ -235,7 +235,7 @@ class TestJittedWithOneTypeRunWithAnother:
         res_from = f(jax.numpy.array(1, dtype=jnp.int8))
         id_from = id(f.compiled_function)
         with warnings.catch_warnings():
-            warnings.filterwarnings("error", category=ResourceWarning)
+            warnings.simplefilter("error")
             res_to = f(to_type(1))
         id_to = id(f.compiled_function)
         assert id_from != id_to

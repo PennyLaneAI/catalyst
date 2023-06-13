@@ -531,7 +531,7 @@ class QJIT:
         if needs_compile:
             if self.user_typed:
                 msg = "Provided arguments did not match declared signature, recompiling..."
-                warnings.warn(msg, ResourceWarning)
+                warnings.warn(msg, UserWarning)
             self.mlir_module = self.get_mlir(*r_sig)
             function = self.compile()
         else:
