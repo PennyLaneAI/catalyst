@@ -32,21 +32,6 @@ using namespace catalyst::gradient;
 // SymbolUserOpInterface
 //===----------------------------------------------------------------------===//
 
-void GradOp::setCalleeFromCallable(CallInterfaceCallable callee)
-{
-    (*this)->setAttr("callee", callee.get<SymbolRefAttr>());
-};
-
-void JVPOp::setCalleeFromCallable(CallInterfaceCallable callee)
-{
-    (*this)->setAttr("callee", callee.get<SymbolRefAttr>());
-};
-
-void VJPOp::setCalleeFromCallable(CallInterfaceCallable callee)
-{
-    (*this)->setAttr("callee", callee.get<SymbolRefAttr>());
-};
-
 // Gradient input checker
 LogicalResult verifyGradInputs(OpState *op_state, func::FuncOp callee, ValueRange callee_operands,
                                const std::vector<size_t> &diff_arg_indices)
@@ -111,6 +96,11 @@ LogicalResult verifyGradOutputs(OpState *op_state, func::FuncOp fn,
 
 CallInterfaceCallable GradOp::getCallableForCallee() { return getCalleeAttr(); }
 
+void GradOp::setCalleeFromCallable(CallInterfaceCallable callee)
+{
+    (*this)->setAttr("callee", callee.get<SymbolRefAttr>());
+};
+
 Operation::operand_range GradOp::getArgOperands() { return getOperands(); }
 
 //===----------------------------------------------------------------------===//
@@ -155,6 +145,12 @@ LogicalResult GradOp::verify()
 //===----------------------------------------------------------------------===//
 
 CallInterfaceCallable JVPOp::getCallableForCallee() { return getCalleeAttr(); }
+
+void JVPOp::setCalleeFromCallable(CallInterfaceCallable callee)
+{
+    (*this)->setAttr("callee", callee.get<SymbolRefAttr>());
+};
+
 
 Operation::operand_range JVPOp::getArgOperands() { return getOperands(); }
 
@@ -231,6 +227,11 @@ LogicalResult JVPOp::verify()
 //===----------------------------------------------------------------------===//
 
 CallInterfaceCallable VJPOp::getCallableForCallee() { return getCalleeAttr(); }
+
+void VJPOp::setCalleeFromCallable(CallInterfaceCallable callee)
+{
+    (*this)->setAttr("callee", callee.get<SymbolRefAttr>());
+};
 
 Operation::operand_range VJPOp::getArgOperands() { return getOperands(); }
 
