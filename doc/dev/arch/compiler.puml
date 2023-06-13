@@ -5,53 +5,58 @@
 HIDE_STEREOTYPE()
 HIDE_PERSON_SPRITE()
 
-System(_mlir_sys_, "circuit.mlir", $tags="object")
+System(_mlir_sys_, "workflow.mlir", $tags="object")
 
-System(_so_sys_, "circuit.so", $tags="object")
+System(_so_sys_, "workflow.so", $tags="object")
 
 Boundary(c1, "Compiler", $link="https://github.com/plantuml-stdlib/C4-PlantUML") {
 
-  Component(_nohlo_mlir_, "MHLO-to-MLIR", "mhlo-opt", "Lower MHLO dialect to other MLIR dialects")
+  Component(_nohlo_mlir_, "HLO Lowering", "mlir-hlo-opt", "Lower HLO dialects to standard MLIR dialects")
 
-  Boundary(c2, " ", $link="https://github.com/plantuml-stdlib/C4-PlantUML") {
+  Boundary(c2, "Core", $link="https://github.com/plantuml-stdlib/C4-PlantUML") {
 
-    Component(_opt_mlir_, "Gradient-to-Quantum", "quantum-opt", "Lower Gradient dialect to Quantum dialect..")
+    Component(_opt_mlir_, "Program Optimization", "quantum-opt", "Apply classical & quantum code optimizations")
 
-    Component(_buff_mlir_, "Bufferization", "quantum-opt", "Bufferize scf, tensor, arith, quantum, etc.")
+    Component(_grad_mlir_, "Hybrid AD", "quantum-opt", "Perform hybrid automatic differentiation")
 
-    Component(_llvm_mlir_, "LLVM-MLIR", "quantum-opt", "Lower the code to the LLVM Dialect in MLIR")
+    Component(_buff_mlir_, "Bufferization", "quantum-opt", "Bufferize all dialects")
+
+    Component(_llvm_mlir_, "LLVM Dialect Conversion", "quantum-opt", "Lower all dialects to the LLVM dialect")
   }
 
-  Component(_ll_, "MLIR-to-LLVM", "mlir-translate", "Convert the MLIR to LLVM IR assembly")
+  Component(_ll_, "LLVM IR Generation", "mlir-translate", "Convert the MLIR to LLVM IR assembly")
 
+  Component(_grad_ll_, "Enzyme AD", "opt", "Perform classical AD with Enzyme")
 
-  Boundary(c3, " ", $link="https://github.com/plantuml-stdlib/C4-PlantUML") {
+  Component(_o_, "Code Generation", "llc", "Compile the LLVM code using the LLVM Static Compiler")
 
-    Component(_o_, "Compile", "llc", "Compile the LLVM code using the LLVM Static Compiler")
+  Component(_so_, "Linking", "system compiler", "Link the compiled file to the Runtime")
 
-    Component(_so_, "Link", "Compiler available in system", "Link the compiled file to the Runtime")
-  }
 }
 
-System_Ext(_catalyst_runtime_, "Catalyst-Runtime")
+System_Ext(_catalyst_runtime_, "Catalyst Runtime")
 
 
 Rel_R(_mlir_sys_, _nohlo_mlir_, "*.mlir", "")
 
-Rel_R(_nohlo_mlir_, _opt_mlir_, "*.nohlo.mlir", "")
+Rel_D(_nohlo_mlir_, _opt_mlir_, "*.mlir", "")
 
-Rel_D(_opt_mlir_, _buff_mlir_, "*.opt.mlir", "")
+Rel_R(_opt_mlir_, _grad_mlir_, "*.mlir", "")
 
-Rel_D(_buff_mlir_, _llvm_mlir_, "*.buff.mlir", "")
+Rel_R(_grad_mlir_, _buff_mlir_, "*.mlir", "")
 
-Rel_L(_llvm_mlir_, _ll_, "*.llvm.mlir", "")
+Rel_R(_buff_mlir_, _llvm_mlir_, "*.mlir", "")
 
-Rel(_ll_, _o_, "*.ll", "")
+Rel(_llvm_mlir_, _ll_, "*.mlir", "")
 
-Rel(_o_, _so_, "*.o", "")
+Rel_R(_ll_, _grad_ll_, "*.ll", "")
+
+Rel_R(_grad_ll_, _o_, "*.ll", "")
+
+Rel_R(_o_, _so_, "*.o", "")
 
 Rel_R(_so_, _so_sys_, "*.so", "")
 
-Rel_U(_catalyst_runtime_, _so_, " ", "", $tags="action")
+Rel_U(_catalyst_runtime_, _so_, "link", "", $tags="action")
 
 @enduml

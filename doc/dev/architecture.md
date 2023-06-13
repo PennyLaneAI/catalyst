@@ -90,7 +90,7 @@ operations to their corresponding JAX primitive and by connecting operation argu
 ## Compiler Core
 
 This section will focus on the series of compiler passes that convert a high-level quantum program
-to its low-level LLVMIR and subsequent binary form. While the exact passes may frequently change,
+to its low-level LLVM IR and subsequent binary form. While the exact passes may frequently change,
 the general stages should still be applicable.
 See the graph below for an overview of the transformations applied to the user program:
 
