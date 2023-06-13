@@ -1485,9 +1485,12 @@ mlir.register_lowering(func_p, _func_lowering)
 mlir.register_lowering(jvp_p, _jvp_lowering)
 mlir.register_lowering(vjp_p, _vjp_lowering)
 
-# pylint: disable=protected-access
-api_util._shaped_abstractify_handlers[type] = lambda x: core.ShapedArray([], x)
-# pylint: disable=protected-access
-api_util._shaped_abstractify_handlers[
-    jax._src.numpy.lax_numpy._ScalarMeta
-] = lambda x: core.ShapedArray([], x)
+
+def _scalar_abstractify(t):
+    if t in {int, float, complex, bool} or isinstance(t, jax._src.numpy.lax_numpy._ScalarMeta):
+        return core.ShapedArray([], dtype=t, weak_type=True)
+    raise TypeError(f"Cannot convert given type {t} scalar ShapedArray.")
+
+
+api_util._shaped_abstractify_handlers[type] = _scalar_abstractify
+api_util._shaped_abstractify_handlers[jax._src.numpy.lax_numpy._ScalarMeta] = _scalar_abstractify
