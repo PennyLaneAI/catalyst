@@ -8,6 +8,7 @@ MK_DIR := $(dir $(MK_ABSPATH))
 DIALECTS_BUILD_DIR?=$(MK_DIR)/build
 LLVM_BUILD_DIR?=$(MK_DIR)/llvm-project/build
 MHLO_BUILD_DIR?=$(MK_DIR)/mlir-hlo/build
+ENZYME_BUILD_DIR?=$(MK_DIR)/Enzyme/build
 RT_BUILD_DIR?=$(MK_DIR)/../runtime/build
 ENABLE_LLD?=ON
 
@@ -17,6 +18,7 @@ help:
 	@echo "  all                to build MLIR, MLIR-HLO and custom Catalyst dialects"
 	@echo "  llvm               to build MLIR enabling Python bindings"
 	@echo "  mhlo               to build build MLIR-HLO"
+	@echo "  enzyme             to build build Enzyme"
 	@echo "  dialects           to build custom Catalyst MLIR dialects"
 	@echo "  test               to run the Catalyst MLIR dialects test suite"
 	@echo "  clean              to delete all temporary, cache, and build files"
@@ -24,7 +26,7 @@ help:
 	@echo "  format [version=?] to apply C++ formatter; use with 'version={version}' to run clang-format-{version} instead of clang-format"
 
 .PHONY: all
-all: llvm mhlo dialects
+all: llvm mhlo dialects enzyme
 
 .PHONY: llvm
 llvm:
@@ -61,6 +63,20 @@ mhlo:
 
 	cmake --build $(MHLO_BUILD_DIR) --target check-mlir-hlo
 
+.PHONY: enzyme
+mhlo:
+	@echo "build enzyme"
+	cmake -G Ninja -S enzyme -B $(ENZYME_BUILD_DIR) \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DLLVM_ENABLE_ASSERTIONS=ON \
+		-DMLIR_DIR=$(LLVM_BUILD_DIR)/lib/cmake/mlir \
+		-DCMAKE_C_COMPILER=$(C_COMPILER) \
+		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \
+		-DCMAKE_C_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
+		-DCMAKE_CXX_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
+		-DLLVM_ENABLE_LLD=$(ENABLE_LLD)
+
+	cmake --build $(MHLO_BUILD_DIR) --target check-mlir-hlo
 
 .PHONY: dialects
 dialects:
