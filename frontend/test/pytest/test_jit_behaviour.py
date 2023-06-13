@@ -20,11 +20,12 @@ import jax
 import numpy as np
 import pennylane as qml
 import pytest
+from jax import numpy as jnp
+from numpy import pi
+
 from catalyst import for_loop, grad, measure, qjit
 from catalyst.compilation_pipelines import CompiledFunction
 from catalyst.jax_primitives import _scalar_abstractify
-from jax import numpy as jnp
-from numpy import pi
 
 
 def f_aot_builder(backend, wires=1, shots=1000):
