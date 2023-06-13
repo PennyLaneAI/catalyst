@@ -1,6 +1,6 @@
 # Architecture
 
-The Catalyst stack leverages existing state-of-the-art technologies and combines them into a neat
+The Catalyst stack leverages existing state-of-the-art technologies and combines them into a single
 package to accelerate quantum workflows without losing the ability to quickly prototype in Python.
 Some of the projects Catalyst depends on include the [MLIR](https://mlir.llvm.org/docs/) and
 [LLVM](https://llvm.org/) compiler frameworks, the [QIR](https://github.com/qir-alliance) project,
@@ -9,7 +9,7 @@ Machine Learning (ML).
 Among the transforms provided by JAX, the two most important ones arguably consist of automatic
 differentition (AD) and just-in-time (JIT) compilation.
 AD has long been one of the cornerstones of the PennyLane project, and, with the introduction of
-Catalyst, JIT compilation for quantum (and hybrid quantum) programs is added as another focus.
+Catalyst, JIT compilation for quantum (and hybrid quantum) programs is added as another.
 
 While PennyLane is used as the primary frontend to Catalyst, each element of the compilation stack
 is in-principle built in a modular and reusable way. Let's take a look at what this stack looks
@@ -19,7 +19,7 @@ like.
 ## Compilation Stack
 
 The following diagram represents the current architecture of Catalyst using an adaptation of the C4
-container model. The [Legend](#legend) section describes the notation in more details.
+container model. The [Legend](#legend) section describes the notation in more detail.
 
 ![img](../_static/arch/overview.svg)
 
@@ -32,7 +32,7 @@ The three components of the stack can be summarized as follows:
 - **Compiler Core:** An MLIR-based compiler for hybrid quantum programs.
     Provides optimizations and other transformations such as automatic differentiation, with a
     growing library of compilation passes.
-    Targets LLVMIR with QIR syntax for code generation.
+    Targets LLVM IR with QIR syntax for code generation.
 
 - **Runtime:** A runtime library for execution of hybrid quantum programs.
     While classical computation is compiled to native code, all quantum functionality is managed and
@@ -62,10 +62,10 @@ and compiler driver:
     The user program is passed to the Catalyst compiler libraries in its textual form, as the MLIR
     memory objects are not compatible between Catalyst and `jaxlib`.
     The driver then invokes a sequence of transformations that lowers the user program to a lower
-    level of abstraction, outputing LLVMIR with QIR syntax.
+    level of abstraction, outputing LLVM IR with QIR syntax.
     For more details consult the [next section](#compiler-core).
 
-- **Code Generation:** At this stage the LLVMIR is compiled down to native object code using the
+- **Code Generation:** At this stage the LLVM IR is compiled down to native object code using the
     LLVM Static Compiler (`llc`) for the local system architecture. A native linker is then used
     to link the user program to the Catalyst Runtime library.
     The frontend will load this library into the Python environment and attach its entry point to
@@ -127,19 +127,18 @@ See the graph below for an overview of the transformations applied to the user p
     differentiation of the entire program to allow differentiating through post-processing functions
     as well. In this case, quantum AD methods are registered as custom gradients in the framework.
 
-  - For the quantum execution, different methods are available depending on the execution method.
+  - For the quantum execution, different methods are available depending on the execution device.
     On simulators with support for it, the most efficient differentiation method is the
     *adjoint-jacobian* method, a technique similar to classical backpropagation. By taking
     advantage of the reversibility of quantum computing, a backwards pass can be performed with a
-    much lower memory footprint than with backpropagation. Hardware compatible methods can directly
-    be applied in the compiler without requiring explicit device support. This includes the
-    *parameter-shift* method and *finite-differences*. The parameter-shift method has been adapted
-    to work in presence of hybrid program representations including control flow, as long as
-    measurement feedback is not used.
+    much lower memory footprint than with backpropagation.
 
-  - Checkpointing is employed to eliminate redundant computations of the pre-processing, by storing
-    interemediate results and control flow information in a forwards pass through the classical code
-    to allow the quantum program to be reconstructed exactly.
+    Hardware compatible methods can directly be applied in the compiler without requiring explicit device support. This includes the *parameter-shift* method and *finite-differences*. The
+    parameter-shift method has been adapted to work in presence of hybrid program representations including control flow, as long as measurement feedback is not used.
+
+  - Checkpointing is employed to eliminate redundant invocations of the pre-processing function, by
+    storing interemediate results and control flow information in a forwards pass through the
+    classical code to allow the quantum program to be reconstructed exactly.
 
 - **Classical optimizations:**
 
@@ -201,8 +200,7 @@ See the graph below for an overview of the transformations applied to the user p
 - **Linking:**
 
   - Using a linker available on the system, the user program is linked against the Catalyst runtime.
-
-  - To simplify the process, a compiler will be used to drive the linking process, such as `clang`,
+    To simplify the process, a compiler will be used to drive the linking process, such as `clang`,
     `gcc`, or `c99`.
 
   - The shared library produced by the linking step is the output of the compilation process.
@@ -211,6 +209,89 @@ See the graph below for an overview of the transformations applied to the user p
 ## Runtime & Execution
 
 In progress
+
+![img](../_static/arch/runtime.svg)
+
+The Catalyst runtime essentially acts as a bridge between two public interfaces:
+
+  - The **CAPI** provides a list of QIR-style symbols to target during the LLVM generation phase in the compiler. This includes symbols for runtime functions such as device instantiation, quantum memerory management, and error message emission. Additionally, quantum operations to be executed on a device are also included in this list. The symbols in the user program are then directly linked to the definitions provided by the runtime.
+  Below are some examples of functions that might be included in the CAPI, please see the documentation for an [up-to-date list](https://docs.pennylane.ai/projects/catalyst/en/latest/api/file_runtime_include_RuntimeCAPI.h.html).
+
+    ```c
+    void __quantum__rt__initialize();
+    void __quantum__rt__device(int8_t *, int8_t *);
+    QUBIT *__quantum__rt__qubit_allocate();
+
+    void __quantum__qis__PauliX(QUBIT *);
+    void __quantum__qis__CRZ(double /*angle*/, QUBIT *, QUBIT *);
+    RESULT *__quantum__qis__Measure(QUBIT *);
+
+    ObsIdType __quantum__qis__NamedObs(int64_t /*name_id*/, QUBIT *);
+    double __quantum__qis__Expval(ObsIdType);
+    void __quantum__qis__Probs(MemRefT_double_1d *, int64_t, /*qubits*/...);
+
+    void __quantum__qis__Gradient(int64_t, /*results*/...);
+    ```
+
+  - The **QuantumDevice** interface is a C++ abstract base class that devices can implement in order to automatically receive dispatched QIR calls whenever the respective quantum device is active. This interface is a bit higher level than the CAPI by abstracting away certain details, as well as reuseing common functionality across devices.
+  Below are some examples of functions that might be included in this interface, please see the documentation for an [up-to-date list](https://docs.pennylane.ai/projects/catalyst/en/latest/api/file_runtime_include_QuantumDevice.hpp.html).
+
+
+    ```c++
+    virtual auto AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType> = 0;
+
+    virtual void NamedOperation(const std::string &name,
+                                const std::vector<double> &params,
+                                const std::vector<QubitIdType> &wires,
+                                bool inverse) = 0;
+    virtual auto Measure(QubitIdType wire) -> Result = 0;
+
+    virtual void Probs(DataView<double, 1> &probs) = 0;
+
+    virtual void Gradient(std::vector<DataView<double, 1>> &gradients,
+                          const std::vector<size_t> &trainParams) = 0;
+    ```
+
+Besides the interfaces described above, the runtime also provides a series of other functions relevant to hybrid program execution:
+
+  - **Quantum device management:** The runtime can manage the lifecycle of device instances, which
+    are typically instantiated upon request by the program. With multiple backend devices being
+    available, the program can request to switch between devices . Quantum instructions are always
+    automatically dispatched to the currently active device.
+
+  - **Logical qubit management:** Device backends for free to provide "hardware" or device IDs for
+    qubits when responding to an allocation request. The runtime keeps a record of active device IDs
+    and how they map to logical program qubits. In this way, the same device qubit may be reused for
+    different logical qubits, all the while providing some safety guarantees that an operation
+    acting on a previously deallocated qubit is not silently rerouted to a device qubit that has already been remapped to another logical qubit. Instead, an error is raised as this always idicates a bug in the compiled program (use-after-free).
+
+  - **Remote execution:** While the aim of Catalyst is to locate the runtime as close to devices as
+    possible to enable real-time communication, it currently features a "legacy" execution mode for
+    local or remote devices that require a complete quantum circuit ahead of time.
+    This mode is enabled via a two-step process:
+
+      - **Assembly generation:** Generators for assembly formats such as
+        [OpenQASM](https://openqasm.com/) can be implemented as pseudo execution devices which
+        simply print the instructions rather than executing them. One benefit of generating the
+        circuit at runtime is that the hybrid program can include arbitrary complex classical code,
+        without being constrained by what may or may not be available in the (primarily) quantum
+        assembly.
+
+      - **Circuit execution:** Upon completion of the quantum function the generated assembly can
+        be sent off to local or remote services for execution. Typically, this involves a much
+        higher latency than when executing programs via the runtime directly. As an example,
+        Catalyst currently connects to the AWS Braket cloud service for remote execution on NISQ
+        hardware, but the full list of supported backends should always be obtained from the documentation.
+
+    Circuit execution calls are made in a blocking fashion and will wait until all results are
+    returned from the device. This mode also limits the interaction that host code can have with
+    device code, such as real-time measurement feedback.
+
+  - **Classical memory management:** In order to simplify the bufferization phase in the compiler,
+    memory allocations that are returned from functions are allowed to remain live until the end of
+    the program. The runtime tracks all allocation requests made by the program and will
+    automatically deallocate all remaining buffers by the end of the program's execution.
+
 
 ## Legend
 
