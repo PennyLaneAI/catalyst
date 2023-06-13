@@ -162,23 +162,11 @@ void CopyGlobalMemRefTransform::rewrite(func::FuncOp op, PatternRewriter &rewrit
 
 namespace catalyst {
 
-struct CopyGlobalMemRefPass : public PassWrapper<CopyGlobalMemRefPass, OperationPass<ModuleOp>> {
-    CopyGlobalMemRefPass() {}
+#define GEN_PASS_DEF_COPYGLOBALMEMREFPASS
+#include "Quantum/Transforms/Passes.h.inc"
 
-    StringRef getArgument() const override { return "cp-global-memref"; }
-
-    StringRef getDescription() const override
-    {
-        return "Copy global memrefs before returning from C interface.";
-    }
-
-    void getDependentDialects(DialectRegistry &registry) const override
-    {
-        registry.insert<memref::MemRefDialect>();
-        registry.insert<func::FuncDialect>();
-        registry.insert<scf::SCFDialect>();
-        registry.insert<LLVM::LLVMDialect>();
-    }
+struct CopyGlobalMemRefPass : impl::CopyGlobalMemRefPassBase<CopyGlobalMemRefPass> {
+    using CopyGlobalMemRefPassBase::CopyGlobalMemRefPassBase;
 
     void runOnOperation() final
     {

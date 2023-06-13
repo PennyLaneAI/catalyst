@@ -27,6 +27,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
+#include "Catalyst/IR/CatalystDialect.h"
 #include "Gradient/IR/GradientOps.h"
 #include "Gradient/Transforms/Passes.h"
 #include "Gradient/Transforms/Patterns.h"
@@ -38,33 +39,15 @@ using namespace catalyst::gradient;
 namespace catalyst {
 namespace gradient {
 
-struct GradientLoweringPass : public OperationPass<ModuleOp> {
-    GradientLoweringPass() : OperationPass<ModuleOp>(TypeID::get<GradientLoweringPass>()) {}
-    GradientLoweringPass(const GradientLoweringPass &other) : OperationPass<ModuleOp>(other) {}
+#define GEN_PASS_DECL_GRADIENTLOWERINGPASS
+#define GEN_PASS_DEF_GRADIENTLOWERINGPASS
+#include "Gradient/Transforms/Passes.h.inc"
 
-    StringRef getName() const override { return "GradientLoweringPass"; }
-
-    StringRef getArgument() const override { return "lower-gradients"; }
-
-    StringRef getDescription() const override
-    {
-        return "Lower gradient operation to MLIR operation.";
-    }
-
-    void getDependentDialects(DialectRegistry &registry) const override
-    {
-        registry.insert<arith::ArithDialect>();
-        registry.insert<linalg::LinalgDialect>();
-        registry.insert<index::IndexDialect>();
-        registry.insert<tensor::TensorDialect>();
-        registry.insert<memref::MemRefDialect>();
-        registry.insert<bufferization::BufferizationDialect>();
-    }
+struct GradientLoweringPass : impl::GradientLoweringPassBase<GradientLoweringPass> {
+    using GradientLoweringPassBase::GradientLoweringPassBase;
 
     void runOnOperation() final
     {
-        ModuleOp op = getOperation();
-
         RewritePatternSet gradientPatterns(&getContext());
         populateLoweringPatterns(gradientPatterns, lowerOnly);
 
@@ -75,19 +58,10 @@ struct GradientLoweringPass : public OperationPass<ModuleOp> {
         catalyst::quantum::InsertOp::getCanonicalizationPatterns(gradientPatterns, &getContext());
         catalyst::quantum::DeallocOp::getCanonicalizationPatterns(gradientPatterns, &getContext());
 
-        if (failed(applyPatternsAndFoldGreedily(op, std::move(gradientPatterns)))) {
+        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(gradientPatterns)))) {
             return signalPassFailure();
         }
     }
-
-    std::unique_ptr<Pass> clonePass() const override
-    {
-        return std::make_unique<GradientLoweringPass>(*this);
-    }
-
-  protected:
-    Option<std::string> lowerOnly{
-        *this, "only", llvm::cl::desc("Restrict lowering to a specific type of gradient.")};
 };
 
 } // namespace gradient

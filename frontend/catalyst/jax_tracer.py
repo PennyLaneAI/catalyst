@@ -108,31 +108,32 @@ def get_traceable_fn(qfunc, device):
         qreg = jprim.qalloc(num_wires)
 
         JaxTape.device = device
-        with JaxTape(do_queue=False) as tape:
-            with tape.quantum_tape:
-                out = qfunc(*args, **kwargs)
+        with qml.QueuingManager.stop_recording():
+            with JaxTape() as tape:
+                with tape.quantum_tape:
+                    out = qfunc(*args, **kwargs)
 
-            return_values = out if isinstance(out, (tuple, list)) else (out,)
-            meas_return_values = []
-            meas_ret_val_indices = []
-            non_meas_return_values = []
-            for i, ret_val in enumerate(return_values):
-                if isinstance(ret_val, MeasurementProcess):
-                    meas_return_values.append(ret_val)
-                    meas_ret_val_indices.append(i)
-                else:
-                    non_meas_return_values.append(ret_val)
+                return_values = out if isinstance(out, (tuple, list)) else (out,)
+                meas_return_values = []
+                meas_ret_val_indices = []
+                non_meas_return_values = []
+                for i, ret_val in enumerate(return_values):
+                    if isinstance(ret_val, MeasurementProcess):
+                        meas_return_values.append(ret_val)
+                        meas_ret_val_indices.append(i)
+                    else:
+                        non_meas_return_values.append(ret_val)
 
-            # pylint: disable=protected-access
-            tape.quantum_tape._measurements = meas_return_values
+                # pylint: disable=protected-access
+                tape.quantum_tape._measurements = meas_return_values
 
-            has_tracer_return_values = len(non_meas_return_values) > 0
-            if has_tracer_return_values:
-                tape.set_return_val(tuple(non_meas_return_values))
+                has_tracer_return_values = len(non_meas_return_values) > 0
+                if has_tracer_return_values:
+                    tape.set_return_val(tuple(non_meas_return_values))
 
-            new_quantum_tape = JaxTape.device.expand_fn(tape.quantum_tape)
-            tape.quantum_tape = new_quantum_tape
-            tape.quantum_tape.jax_tape = tape
+                new_quantum_tape = JaxTape.device.expand_fn(tape.quantum_tape)
+                tape.quantum_tape = new_quantum_tape
+                tape.quantum_tape.jax_tape = tape
 
         return_values, _, _ = trace_quantum_tape(
             tape, qreg, has_tracer_return_values, meas_ret_val_indices, num_wires, shots
