@@ -207,7 +207,7 @@ jobs:
     - name: Install Deps
       if: steps.cache-mhlo.outputs.cache-hit != 'true'
       run: |
-        sudo apt-get install -y cmake ninja-build clang lld ccache
+        sudo apt-get install -y cmake ninja-build clang lld
 
     - name: Build MHLO Dialect
       if: steps.cache-mhlo.outputs.cache-hit != 'true'
