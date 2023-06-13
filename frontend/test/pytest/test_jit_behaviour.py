@@ -54,6 +54,7 @@ def f_jit_builder(backend, wires=1, shots=1000):
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
 def function_jaxnumpy_csingle(x: jax.numpy.csingle, y: jax.numpy.csingle):
+    """Test for jax._src.numpy.lax_numpy._ScalarMeta"""
     x_r = x.real
     y_r = y.real
     val = jax.numpy.arctan2(x_r, y_r)
