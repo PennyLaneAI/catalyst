@@ -334,7 +334,7 @@ class TestJAXVectorize:
 
         @qjit
         @qml.qnode(qml.device(backend, wires=2))
-        def circuit(x: jax.ShapedArray((3,), dtype=float)):
+        def circuit(x: jax.core.ShapedArray((3,), dtype=float)):
             qml.RX(jnp.pi * x[0], wires=0)
             qml.RY(x[1] ** 2, wires=0)
             qml.RX(x[1] * x[2], wires=0)
