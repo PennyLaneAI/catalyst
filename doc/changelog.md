@@ -145,6 +145,9 @@
 * Use Tablegen to define MLIR passes instead of C++ to reduce overhead of adding new passes.
   [#157](https://github.com/PennyLaneAI/catalyst/pull/157)
 
+* Update JAX to `v0.4.10`.
+  [#143](https://github.com/PennyLaneAI/catalyst/pull/143)
+
 * Perform constant folding on wire indices for ``quantum.insert`` and ``quantum.extract`` ops,
   used when writing (resp. reading) qubits to (resp. from) quantum registers.
   [#161](https://github.com/PennyLaneAI/catalyst/pull/161)

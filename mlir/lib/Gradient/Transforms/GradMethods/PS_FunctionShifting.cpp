@@ -43,7 +43,7 @@ static Value genSelectiveShift(PatternRewriter &rewriter, Location loc, Value pa
     }
 
     scf::IfOp ifOp = rewriter.create<scf::IfOp>(
-        loc, param.getType(), shiftCondition,
+        loc, shiftCondition,
         [&](OpBuilder &builder, Location loc) { // then
             Value shiftedParam = builder.create<arith::AddFOp>(loc, shift, param);
             builder.create<scf::YieldOp>(loc, shiftedParam);
@@ -78,7 +78,8 @@ func::FuncOp ParameterShiftLowering::genShiftFunction(PatternRewriter &rewriter,
     if (!shiftedFn) {
         PatternRewriter::InsertionGuard insertGuard(rewriter);
 
-        shiftedFn = rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility);
+        shiftedFn =
+            rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility, nullptr, nullptr);
 
         // First copy the entire function as is, then we can add the shifts.
         // Make sure to add the shiftVector/selectorVector parameters to the new function.
