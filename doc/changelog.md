@@ -5,6 +5,7 @@
 * Catalyst programs can now be used inside of a larger JAX workflow which uses JIT compilation,
   automatic differentiation, and other JAX transforms.
   [#96](https://github.com/PennyLaneAI/catalyst/pull/96)
+  [#123](https://github.com/PennyLaneAI/catalyst/pull/123)
 
   Note that generally Catalyst should be used to JIT the entire workflow, but sometimes users may
   wish to delegate only the quantum part of their workflow to Catalyst and let JAX handle the rest
@@ -47,6 +48,24 @@
          return jnp.sum(jnp.cos(circuit(x)) ** 2)
 
      jax.grad(cost_fn)(jnp.array([0.1, 0.2, 0.3]))
+     ```
+
+   * Vectorization of quantum functions with JAX:
+
+     ```py
+     @qjit
+     @qml.qnode(dev)
+     def circuit(x):
+         qml.RX(jnp.pi * x[0], wires=0)
+         qml.RY(x[1] ** 2, wires=0)
+         qml.RX(x[1] * x[2], wires=0)
+         return qml.probs(wires=0)
+
+     def cost_fn(weights):
+         x = jnp.sin(weights)
+         return jnp.sum(jnp.cos(circuit(x)) ** 2)
+
+     jax.vmap(cost_fn)(jnp.array([[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]]))
      ```
 
 * Add a Backprop operation for using AD at the LLVM level with Enzyme AD. It has a 
@@ -125,6 +144,13 @@
 
 * Use Tablegen to define MLIR passes instead of C++ to reduce overhead of adding new passes.
   [#157](https://github.com/PennyLaneAI/catalyst/pull/157)
+
+* Update JAX to `v0.4.10`.
+  [#143](https://github.com/PennyLaneAI/catalyst/pull/143)
+
+* Perform constant folding on wire indices for ``quantum.insert`` and ``quantum.extract`` ops,
+  used when writing (resp. reading) qubits to (resp. from) quantum registers.
+  [#161](https://github.com/PennyLaneAI/catalyst/pull/161)
 
 <h3>Breaking changes</h3>
 

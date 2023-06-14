@@ -171,7 +171,8 @@ func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc, GradOp
         PatternRewriter::InsertionGuard insertGuard(rewriter);
         rewriter.setInsertionPointAfter(qGradFn);
 
-        fullGradFn = rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility);
+        fullGradFn =
+            rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility, nullptr, nullptr);
         Block *entryBlock = fullGradFn.addEntryBlock();
         rewriter.setInsertionPointToStart(entryBlock);
 

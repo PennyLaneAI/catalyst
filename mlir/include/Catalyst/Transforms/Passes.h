@@ -14,7 +14,6 @@
 
 #pragma once
 
-#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Pass/Pass.h"
 
 #include <memory>
@@ -23,6 +22,4 @@ namespace catalyst {
 
 std::unique_ptr<mlir::Pass> createArrayListToMemRefPass();
 
-#define GEN_PASS_DEF_ARRAYLISTTOMEMREFPASS
-#include "Catalyst/Transforms/Passes.h.inc"
 } // namespace catalyst

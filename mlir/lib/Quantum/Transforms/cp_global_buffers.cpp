@@ -108,7 +108,7 @@ void applyCopyGlobalMemRefToReturnOp(func::ReturnOp op, PatternRewriter &rewrite
                                                          deadbeef, allocatedPtrToInt);
 
         scf::IfOp ifOp = rewriter.create<scf::IfOp>(
-            op->getLoc(), ty, comparison,
+            op->getLoc(), comparison,
             [&](OpBuilder &builder, Location loc) { // then
                 Value newMemRef =
                     rewriter.create<memref::AllocOp>(op->getLoc(), ty.cast<MemRefType>());
