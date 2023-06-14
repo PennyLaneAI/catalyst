@@ -15,7 +15,7 @@
 // RUN: quantum-opt %s --lower-gradients=only=ps | FileCheck %s
 
 // CHECK-LABEL: @simple_circuit.shifted(%arg0: tensor<3xf64>, %arg1: tensor<4xf64>, %arg2: tensor<0xindex>) -> f64
-func.func @simple_circuit(%arg0: tensor<3xf64>) -> f64 {
+func.func @simple_circuit(%arg0: tensor<3xf64>) -> f64 attributes {qnode, diff_method = "parameter-shift"} {
     %c0 = arith.constant 0 : index
     %c1 = arith.constant 1 : index
     %c2 = arith.constant 2 : index
@@ -50,14 +50,14 @@ func.func @simple_circuit(%arg0: tensor<3xf64>) -> f64 {
 }
 
 func.func @gradCall0(%arg0: tensor<3xf64>) -> tensor<3xf64> {
-    %0 = gradient.grad "ps" @simple_circuit(%arg0) : (tensor<3xf64>) -> tensor<3xf64>
+    %0 = gradient.grad "mixed" @simple_circuit(%arg0) : (tensor<3xf64>) -> tensor<3xf64>
     func.return %0 : tensor<3xf64>
 }
 
 // -----
 
 // CHECK-LABEL: @structured_circuit.shifted(%arg0: f64, %arg1: i1, %arg2: i1, %arg3: tensor<6xf64>, %arg4: tensor<0xindex>) -> f64
-func.func @structured_circuit(%arg0: f64, %arg1: i1, %arg2: i1) -> f64 {
+func.func @structured_circuit(%arg0: f64, %arg1: i1, %arg2: i1) -> f64 attributes {qnode, diff_method = "parameter-shift"} {
     %idx = arith.constant 0 : i64
     %r_0 = quantum.alloc(1) : !quantum.reg
     // CHECK: [[q0:%.+]] = quantum.extract
@@ -117,14 +117,14 @@ func.func @structured_circuit(%arg0: f64, %arg1: i1, %arg2: i1) -> f64 {
 }
 
 func.func @gradCall1(%arg0: f64, %b0: i1, %b1: i1) -> f64 {
-    %0 = gradient.grad "ps" @structured_circuit(%arg0, %b0, %b1) : (f64, i1, i1) -> f64
+    %0 = gradient.grad "mixed" @structured_circuit(%arg0, %b0, %b1) : (f64, i1, i1) -> f64
     func.return %0 : f64
 }
 
 // -----
 
 // CHECK-LABEL: @loop_circuit.shifted(%arg0: f64, %arg1: tensor<4xf64>, %arg2: tensor<2xindex>) -> f64
-func.func @loop_circuit(%arg0: f64) -> f64 {
+func.func @loop_circuit(%arg0: f64) -> f64 attributes {qnode, diff_method = "parameter-shift"} {
     // CHECK-DAG: [[c0:%.+]] = arith.constant 0 : index
     // CHECK-DAG: [[c1:%.+]] = arith.constant 1 : index
 
@@ -201,6 +201,6 @@ func.func @loop_circuit(%arg0: f64) -> f64 {
 }
 
 func.func @gradCall2(%arg0: f64) -> f64 {
-    %0 = gradient.grad "ps" @loop_circuit(%arg0) : (f64) -> f64
+    %0 = gradient.grad "mixed" @loop_circuit(%arg0) : (f64) -> f64
     func.return %0 : f64
 }

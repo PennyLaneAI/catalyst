@@ -191,12 +191,16 @@ def _make_jaxpr_check_differentiable(f: Differentiable, grad_params: GradParams,
                     return_ops.append(eq.primitive)
                     break
 
-        if method == "ps" and any(prim not in [expval_p, probs_p] for prim in return_ops):
+        assert isinstance(
+            f, qml.QNode
+        ), "Differentiation methods other than finite-differences can only operate on a QNode"
+        has_invalid_return = any(prim not in [expval_p, probs_p] for prim in return_ops)
+        if f.diff_method == "parameter-shift" and has_invalid_return:
             raise TypeError(
                 "The parameter-shift method can only be used for QNodes "
                 "which return either qml.expval or qml.probs."
             )
-        if method == "adj" and any(prim not in [expval_p] for prim in return_ops):
+        if f.diff_method == "adjoint" and has_invalid_return:
             raise TypeError(
                 "The adjoint method can only be used for QNodes which return qml.expval."
             )
@@ -206,7 +210,7 @@ def _make_jaxpr_check_differentiable(f: Differentiable, grad_params: GradParams,
 def _check_grad_params(
     method: str, h: Optional[float], argnum: Optional[Union[int, List[int]]]
 ) -> GradParams:
-    methods = {"fd", "ps", "adj"}
+    methods = {"fd", "mixed"}
     if method is None:
         method = "fd"
     if method not in methods:
@@ -295,15 +299,15 @@ def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
     Args:
         f (Callable): a function or a function object to differentiate
         method (str): The method used for differentiation, which can be any of
-                      ``["fd", "ps", "adj"]``,
+                      ``["fd", "mixed"]``,
             where:
 
-            - ``"fd"`` represents first-order finite-differences,
+            - ``"fd"`` represents first-order finite-differences for the entire hybrid
+              circuit,
 
-            - ``"ps"`` represents the two-term parameter-shift rule, supported by the Pauli
-              rotation gates,
-
-            - ``"adj"`` represents the adjoint differentiation method.
+            - ``"mixed"`` represents deferring the quantum differentiation to the method
+              specified by the QNode, while the classical computation is differentiated
+              using finite differences.
 
         h (float): the step-size value for the finite-difference (``"fd"``) method
         argnum (Tuple[int, List[int]]): the argument indices to differentiate

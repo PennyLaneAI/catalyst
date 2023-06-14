@@ -15,7 +15,7 @@
 // RUN: quantum-opt %s --lower-gradients=only=ps  | FileCheck %s
 
 // Check scalar to scalar function
-func.func private @funcScalarScalar(%arg0: f64) -> f64 {
+func.func private @funcScalarScalar(%arg0: f64) -> f64 attributes {qnode, diff_method = "parameter-shift"} {
     return %arg0 : f64
 }
 
@@ -37,14 +37,14 @@ func.func private @funcScalarScalar(%arg0: f64) -> f64 {
 // }
 
 func.func @gradCallScalarScalar(%arg0: f64) -> f64 {
-    %0 = gradient.grad "ps" @funcScalarScalar(%arg0) : (f64) -> f64
+    %0 = gradient.grad "mixed" @funcScalarScalar(%arg0) : (f64) -> f64
     func.return %0 : f64
 }
 
 // -----
 
 // Check scalar to point tensor
-func.func private @funcScalarPointTensor(%arg0: f64) -> tensor<f64> {
+func.func private @funcScalarPointTensor(%arg0: f64) -> tensor<f64> attributes {qnode, diff_method = "parameter-shift"} {
     %0 = tensor.empty() : tensor<f64>
     %1 = linalg.fill ins(%arg0 : f64) outs(%0 : tensor<f64>) -> tensor<f64>
     return %1 : tensor<f64>
@@ -67,7 +67,7 @@ func.func private @funcScalarPointTensor(%arg0: f64) -> tensor<f64> {
 // }
 
 func.func @gradCallScalarPointTensor(%arg0: f64) -> tensor<f64> {
-    %0 = gradient.grad "ps" @funcScalarPointTensor(%arg0) : (f64) -> tensor<f64>
+    %0 = gradient.grad "mixed" @funcScalarPointTensor(%arg0) : (f64) -> tensor<f64>
     func.return %0 : tensor<f64>
 }
 
@@ -75,7 +75,7 @@ func.func @gradCallScalarPointTensor(%arg0: f64) -> tensor<f64> {
 // -----
 
 // Check point tensor to scalar
-func.func private @funcPointTensorScalar(%arg0: tensor<f64>) -> f64 {
+func.func private @funcPointTensorScalar(%arg0: tensor<f64>) -> f64 attributes {qnode, diff_method = "parameter-shift"} {
     %0 = tensor.extract %arg0[] : tensor<f64>
     return %0 : f64
 }
@@ -98,7 +98,7 @@ func.func private @funcPointTensorScalar(%arg0: tensor<f64>) -> f64 {
 // }
 
 func.func @gradCallPointTensorScalar(%arg0: tensor<f64>) -> f64 {
-    %0 = gradient.grad "ps" @funcPointTensorScalar(%arg0) : (tensor<f64>) -> f64
+    %0 = gradient.grad "mixed" @funcPointTensorScalar(%arg0) : (tensor<f64>) -> f64
     func.return %0 : f64
 }
 
@@ -106,7 +106,7 @@ func.func @gradCallPointTensorScalar(%arg0: tensor<f64>) -> f64 {
 // -----
 
 // Check point tensor to point tensor
-func.func private @funcPointTensorPointTensor(%arg0: tensor<f64>) -> tensor<f64> {
+func.func private @funcPointTensorPointTensor(%arg0: tensor<f64>) -> tensor<f64> attributes {qnode, diff_method = "parameter-shift"} {
     return %arg0 : tensor<f64>
 }
 
@@ -127,14 +127,14 @@ func.func private @funcPointTensorPointTensor(%arg0: tensor<f64>) -> tensor<f64>
 // }
 
 func.func @gradCallPointTensorPointTensor(%arg0: tensor<f64>) -> tensor<f64> {
-    %0 = gradient.grad "ps" @funcPointTensorPointTensor(%arg0) : (tensor<f64>) -> tensor<f64>
+    %0 = gradient.grad "mixed" @funcPointTensorPointTensor(%arg0) : (tensor<f64>) -> tensor<f64>
     func.return %0 : tensor<f64>
 }
 
 // -----
 
 // Check scalar to tensor function
-func.func private @funcScalarTensor(%arg0: f32) -> tensor<2x3xf64> {
+func.func private @funcScalarTensor(%arg0: f32) -> tensor<2x3xf64> attributes {qnode, diff_method = "parameter-shift"} {
     %c0 = arith.constant 0.0 : f64
     %res = tensor.from_elements %c0, %c0, %c0, %c0, %c0, %c0 : tensor<2x3xf64>
     return %res : tensor<2x3xf64>
@@ -157,14 +157,14 @@ func.func private @funcScalarTensor(%arg0: f32) -> tensor<2x3xf64> {
 // }
 
 func.func @gradCallScalarTensor(%arg0: f32) -> tensor<2x3xf64> {
-    %0 = gradient.grad "ps"  @funcScalarTensor(%arg0) : (f32) -> tensor<2x3xf64>
+    %0 = gradient.grad "mixed"  @funcScalarTensor(%arg0) : (f32) -> tensor<2x3xf64>
     func.return %0 : tensor<2x3xf64>
 }
 
 // -----
 
 // Check tensor to scalar
-func.func private @funcTensorScalar(%arg0: tensor<3xf64>) -> f128 {
+func.func private @funcTensorScalar(%arg0: tensor<3xf64>) -> f128 attributes {qnode, diff_method = "parameter-shift"} {
     %res = arith.constant 0.0 : f128
     return %res : f128
 }
@@ -188,14 +188,14 @@ func.func private @funcTensorScalar(%arg0: tensor<3xf64>) -> f128 {
 // }
 
 func.func @gradCallTensorScalar(%arg0: tensor<3xf64>) -> tensor<3xf128> {
-    %2 = gradient.grad "ps"  @funcTensorScalar(%arg0) : (tensor<3xf64>) -> tensor<3xf128>
+    %2 = gradient.grad "mixed"  @funcTensorScalar(%arg0) : (tensor<3xf64>) -> tensor<3xf128>
     func.return %2 : tensor<3xf128>
 }
 
 // -----
 
 // Check tensor to tensor case
-func.func private @funcTensorTensor(%arg0: tensor<7x3x2x1xf64>) -> tensor<2xf32> {
+func.func private @funcTensorTensor(%arg0: tensor<7x3x2x1xf64>) -> tensor<2xf32> attributes {qnode, diff_method = "parameter-shift"} {
     %c0 = arith.constant 0.0 : f32
     %res = tensor.from_elements %c0, %c0 : tensor<2xf32>
     return %res : tensor<2xf32>
@@ -220,14 +220,14 @@ func.func private @funcTensorTensor(%arg0: tensor<7x3x2x1xf64>) -> tensor<2xf32>
 // }
 
 func.func @gradCallTensorTensor(%arg0: tensor<7x3x2x1xf64>) -> tensor<7x3x2x1x2xf32> {
-    %2 = gradient.grad "ps" @funcTensorTensor(%arg0) : (tensor<7x3x2x1xf64>) -> tensor<7x3x2x1x2xf32>
+    %2 = gradient.grad "mixed" @funcTensorTensor(%arg0) : (tensor<7x3x2x1xf64>) -> tensor<7x3x2x1x2xf32>
     func.return %2 : tensor<7x3x2x1x2xf32>
 }
 
 // -----
 
 // Check the multiple results case
-func.func @funcMultiRes(%arg0: f64) -> (f64, tensor<2xf64>) {
+func.func @funcMultiRes(%arg0: f64) -> (f64, tensor<2xf64>) attributes {qnode, diff_method = "parameter-shift"} {
     %res = tensor.from_elements %arg0, %arg0 : tensor<2xf64>
     func.return %arg0, %res : f64, tensor<2xf64>
 }
@@ -258,14 +258,14 @@ func.func @funcMultiRes(%arg0: f64) -> (f64, tensor<2xf64>) {
 // }
 
 func.func @gradCallMultiRes(%arg0: f64) -> (f64, tensor<2xf64>)  {
-    %0:2 = gradient.grad "ps" @funcMultiRes(%arg0) : (f64) -> (f64, tensor<2xf64>)
+    %0:2 = gradient.grad "mixed" @funcMultiRes(%arg0) : (f64) -> (f64, tensor<2xf64>)
     func.return %0#0, %0#1 : f64, tensor<2xf64>
 }
 
 // -----
 
 // Check the multiple arguments case
-func.func @funcMultiArg(%arg0: f64, %arg1: tensor<2xf64>) -> f64 {
+func.func @funcMultiArg(%arg0: f64, %arg1: tensor<2xf64>) -> f64 attributes {qnode, diff_method = "parameter-shift"} {
     func.return %arg0 : f64
 }
 
@@ -329,8 +329,8 @@ func.func @funcMultiArg(%arg0: f64, %arg1: tensor<2xf64>) -> f64 {
 // }
 
 func.func @gradCallMultiArg(%arg0: f64, %arg1: tensor<2xf64>) -> (f64, tensor<2xf64>, f64, tensor<2xf64>)  {
-    %0 = gradient.grad "ps"  @funcMultiArg(%arg0, %arg1) : (f64, tensor<2xf64>) -> f64
-    %1 = gradient.grad "ps"  @funcMultiArg(%arg0, %arg1) {diffArgIndices = dense<[1]> : tensor<1xindex>} : (f64, tensor<2xf64>) -> tensor<2xf64>
-    %2:2 = gradient.grad "ps" @funcMultiArg(%arg0, %arg1) {diffArgIndices = dense<[0, 1]> : tensor<2xindex>} : (f64, tensor<2xf64>) -> (f64, tensor<2xf64>)
+    %0 = gradient.grad "mixed"  @funcMultiArg(%arg0, %arg1) : (f64, tensor<2xf64>) -> f64
+    %1 = gradient.grad "mixed"  @funcMultiArg(%arg0, %arg1) {diffArgIndices = dense<[1]> : tensor<1xindex>} : (f64, tensor<2xf64>) -> tensor<2xf64>
+    %2:2 = gradient.grad "mixed" @funcMultiArg(%arg0, %arg1) {diffArgIndices = dense<[0, 1]> : tensor<2xindex>} : (f64, tensor<2xf64>) -> (f64, tensor<2xf64>)
     func.return %0, %1, %2#0, %2#1 : f64, tensor<2xf64>, f64, tensor<2xf64>
 }

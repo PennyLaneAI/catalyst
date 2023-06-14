@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "FiniteDifference.hpp"
+#include "HybridGradient.hpp"
 
 #include <algorithm>
 #include <sstream>
@@ -29,6 +30,9 @@ namespace gradient {
 
 LogicalResult FiniteDiffLowering::match(GradOp op) const
 {
+    // Assume for now that specifying "fd" on the grad op takes precedence over any "diff_method"
+    // specified on any internal QNodes. Relaxing this assumption depends on further integration
+    // with Enzyme.
     if (op.getMethod() == "fd")
         return success();
 

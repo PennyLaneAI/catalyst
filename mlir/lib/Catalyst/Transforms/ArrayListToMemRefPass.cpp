@@ -197,7 +197,7 @@ struct ArrayListToMemRefPass : catalyst::impl::ArrayListToMemRefPassBase<ArrayLi
             if (MemRefType::isValidElementType(type)) {
                 return type;
             }
-            return llvm::None;
+            return std::nullopt;
         });
         arraylistTypeConverter.addConversion(
             [](ArrayListType type, SmallVectorImpl<Type> &resultTypes) {

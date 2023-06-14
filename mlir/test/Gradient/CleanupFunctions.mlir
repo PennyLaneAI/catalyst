@@ -22,7 +22,7 @@
 // CHECK-NOT: quantum.
 // CHECK-LABEL: @f.fullgrad0ps
 // CHECK-NOT: quantum.
-func.func private @f(%arg0: tensor<f64>) -> tensor<f64> {
+func.func private @f(%arg0: tensor<f64>) -> tensor<f64> attributes {qnode, diff_method = "parameter-shift"} {
     %c0_i64 = arith.constant 0 : i64
     %c2_i64 = arith.constant 2 : i64
     %0 = "quantum.alloc"() {nqubits_attr = 3 : i64} : () -> !quantum.reg
@@ -40,7 +40,7 @@ func.func private @f(%arg0: tensor<f64>) -> tensor<f64> {
 
 // CHECK-LABEL: @gradCall0
 func.func @gradCall0(%arg0: tensor<f64>) -> tensor<f64> {
-    %0 = gradient.grad "ps" @f(%arg0) : (tensor<f64>) -> tensor<f64>
+    %0 = gradient.grad "mixed" @f(%arg0) : (tensor<f64>) -> tensor<f64>
     func.return %0 : tensor<f64>
 }
 
@@ -54,7 +54,7 @@ func.func @gradCall0(%arg0: tensor<f64>) -> tensor<f64> {
 // CHECK-NOT: quantum.
 // CHECK-LABEL: @f2.fullgrad0ps
 // CHECK-NOT: quantum.
-func.func private @f2(%arg0: tensor<f64>, %arg1: tensor<i64>, %arg2: tensor<i64>) -> tensor<f64> {
+func.func private @f2(%arg0: tensor<f64>, %arg1: tensor<i64>, %arg2: tensor<i64>) -> tensor<f64> attributes {qnode, diff_method = "parameter-shift"} {
     %c1 = arith.constant 1 : index
     %c0_i64 = arith.constant 0 : i64
     %0 = "quantum.alloc"() {nqubits_attr = 3 : i64} : () -> !quantum.reg
@@ -89,7 +89,7 @@ func.func private @f2(%arg0: tensor<f64>, %arg1: tensor<i64>, %arg2: tensor<i64>
 
 // CHECK-LABEL: @gradCall1
 func.func public @gradCall1(%arg0: tensor<f64>, %arg1: tensor<i64>, %arg2: tensor<i64>) -> tensor<f64> {
-    %0 = gradient.grad "ps" @f2(%arg0, %arg1, %arg2) : (tensor<f64>, tensor<i64>, tensor<i64>) -> tensor<f64>
+    %0 = gradient.grad "mixed" @f2(%arg0, %arg1, %arg2) : (tensor<f64>, tensor<i64>, tensor<i64>) -> tensor<f64>
     return %0 : tensor<f64>
 }
 
@@ -105,7 +105,7 @@ func.func public @gradCall1(%arg0: tensor<f64>, %arg1: tensor<i64>, %arg2: tenso
 // CHECK-NOT: quantum.
 // CHECK-LABEL: @f3.fullgrad0ps
 // CHECK-NOT: quantum.
-func.func private @f3(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> {
+func.func private @f3(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> attributes {qnode, diff_method = "parameter-shift"} {
     %c0_i64 = arith.constant 0 : i64
     %cst = arith.constant dense<2.000000e+00> : tensor<f64>
     %cst_0 = arith.constant dense<1.500000e+00> : tensor<f64>
@@ -146,6 +146,6 @@ func.func private @f3(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> {
 
 // CHECK-LABEL: @gradcall2
 func.func public @gradcall2(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> {
-    %0 = gradient.grad "ps" @f3(%arg0, %arg1) : (tensor<f64>, tensor<f64>) -> tensor<f64>
+    %0 = gradient.grad "mixed" @f3(%arg0, %arg1) : (tensor<f64>, tensor<f64>) -> tensor<f64>
     return %0 : tensor<f64>
 }

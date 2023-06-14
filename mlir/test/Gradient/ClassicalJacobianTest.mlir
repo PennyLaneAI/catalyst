@@ -15,7 +15,7 @@
 // RUN: quantum-opt %s --lower-gradients="only=ps" --split-input-file | FileCheck %s
 
 // CHECK-LABEL: @simple_circuit.argmap(%arg0: tensor<3xf64>) ->  tensor<?xf64>
-func.func @simple_circuit(%arg0: tensor<3xf64>) -> f64 {
+func.func @simple_circuit(%arg0: tensor<3xf64>) -> f64 attributes {qnode, diff_method = "parameter-shift"} {
     // CHECK: [[c0:%[a-zA-Z0-9_]+]] = index.constant 0
     // CHECK: [[buff:%[a-zA-Z0-9_]+]] = catalyst.list_init : <f64>
     // CHECK: [[count:%[a-zA-Z0-9_]+]] = memref.alloca() : memref<index>
@@ -60,14 +60,14 @@ func.func @simple_circuit(%arg0: tensor<3xf64>) -> f64 {
 }
 
 func.func @gradCall(%arg0: tensor<3xf64>) -> tensor<3xf64> {
-    %0 = gradient.grad "ps" @simple_circuit(%arg0) : (tensor<3xf64>) -> tensor<3xf64>
+    %0 = gradient.grad "mixed" @simple_circuit(%arg0) : (tensor<3xf64>) -> tensor<3xf64>
     func.return %0 : tensor<3xf64>
 }
 
 // -----
 
 // CHECK-LABEL: @structured_circuit.argmap(%arg0: f64, %arg1: i1, %arg2: i1) ->  tensor<?xf64>
-func.func @structured_circuit(%arg0: f64, %arg1: i1, %arg2: i1) -> f64 {
+func.func @structured_circuit(%arg0: f64, %arg1: i1, %arg2: i1) -> f64 attributes {qnode, diff_method = "parameter-shift"} {
     // CHECK: [[c0:%[a-zA-Z0-9_]+]] = index.constant 0
     // CHECK: [[buff:%[a-zA-Z0-9_]+]] = catalyst.list_init : <f64>
     // CHECK: [[count:%[a-zA-Z0-9_]+]] = memref.alloca() : memref<index>
@@ -147,14 +147,14 @@ func.func @structured_circuit(%arg0: f64, %arg1: i1, %arg2: i1) -> f64 {
 }
 
 func.func @gradCall(%arg0: f64, %b0: i1, %b1: i1) -> f64 {
-    %0 = gradient.grad "ps" @structured_circuit(%arg0, %b0, %b1) : (f64, i1, i1) -> f64
+    %0 = gradient.grad "mixed" @structured_circuit(%arg0, %b0, %b1) : (f64, i1, i1) -> f64
     func.return %0 : f64
 }
 
 // -----
 
 // CHECK-LABEL: @loop_circuit.argmap(%arg0: f64) ->  tensor<?xf64>
-func.func @loop_circuit(%arg0: f64) -> f64 {
+func.func @loop_circuit(%arg0: f64) -> f64 attributes {qnode, diff_method = "parameter-shift"} {
     // CHECK: [[c0:%[a-zA-Z0-9_]+]] = index.constant 0
     // CHECK: [[buff:%[a-zA-Z0-9_]+]] = catalyst.list_init : <f64>
     // CHECK: [[count:%[a-zA-Z0-9_]+]] = memref.alloca() : memref<index>
@@ -223,14 +223,14 @@ func.func @loop_circuit(%arg0: f64) -> f64 {
 }
 
 func.func @gradCall(%arg0: f64) -> f64 {
-    %0 = gradient.grad "ps" @loop_circuit(%arg0) : (f64) -> f64
+    %0 = gradient.grad "mixed" @loop_circuit(%arg0) : (f64) -> f64
     func.return %0 : f64
 }
 
 // -----
 
 // CHECK-LABEL: @all_ops_circuit.argmap(%arg0: f64) ->  tensor<?xf64>
-func.func @all_ops_circuit(%arg0: f64) -> f64 {
+func.func @all_ops_circuit(%arg0: f64) -> f64 attributes {qnode, diff_method = "parameter-shift"} {
     // CHECK: [[buff:%[a-zA-Z0-9_]+]] = catalyst.list_init : <f64>
     // CHECK-NOT: quantum.
     %r = quantum.alloc(1) : !quantum.reg
@@ -252,6 +252,6 @@ func.func @all_ops_circuit(%arg0: f64) -> f64 {
 }
 
 func.func @gradCall(%arg0: f64) -> f64 {
-    %0 = gradient.grad "ps" @all_ops_circuit(%arg0) : (f64) -> f64
+    %0 = gradient.grad "mixed" @all_ops_circuit(%arg0) : (f64) -> f64
     func.return %0 : f64
 }

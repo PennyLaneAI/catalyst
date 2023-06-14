@@ -15,7 +15,7 @@
 // RUN: quantum-opt %s --lower-gradients=only=ps --split-input-file | FileCheck %s
 
 // CHECK-LABEL: @simple_circuit.qgrad(%arg0: tensor<3xf64>, %arg1: index) -> tensor<?xf64>
-func.func @simple_circuit(%arg0: tensor<3xf64>) -> f64 {
+func.func @simple_circuit(%arg0: tensor<3xf64>) -> f64 attributes {qnode, diff_method = "parameter-shift"} {
     %c0 = arith.constant 0 : index
     %c1 = arith.constant 1 : index
     %c2 = arith.constant 2 : index
@@ -100,14 +100,14 @@ func.func @simple_circuit(%arg0: tensor<3xf64>) -> f64 {
 }
 
 func.func @gradCall0(%arg0: tensor<3xf64>) -> tensor<3xf64> {
-    %0 = gradient.grad "ps" @simple_circuit(%arg0) : (tensor<3xf64>) -> tensor<3xf64>
+    %0 = gradient.grad "mixed" @simple_circuit(%arg0) : (tensor<3xf64>) -> tensor<3xf64>
     func.return %0 : tensor<3xf64>
 }
 
 // -----
 
 // CHECK-LABEL: @structured_circuit.qgrad(%arg0: f64, %arg1: i1, %arg2: i1, %arg3: index) -> tensor<?xf64>
-func.func @structured_circuit(%arg0: f64, %arg1: i1, %arg2: i1) -> f64 {
+func.func @structured_circuit(%arg0: f64, %arg1: i1, %arg2: i1) -> f64 attributes {qnode, diff_method = "parameter-shift"} {
     // CHECK-DAG: [[c0:%[a-zA-Z0-9_]+]] = index.constant 0
     // CHECK-DAG: [[c1:%[a-zA-Z0-9_]+]] = index.constant 1
     // CHECK-DAG: [[divisor:%[a-zA-Z0-9_]+]] = arith.constant 2.0
@@ -233,14 +233,14 @@ func.func @structured_circuit(%arg0: f64, %arg1: i1, %arg2: i1) -> f64 {
 }
 
 func.func @gradCall1(%arg0: f64, %b0: i1, %b1: i1) -> f64 {
-    %0 = gradient.grad "ps" @structured_circuit(%arg0, %b0, %b1) : (f64, i1, i1) -> f64
+    %0 = gradient.grad "mixed" @structured_circuit(%arg0, %b0, %b1) : (f64, i1, i1) -> f64
     func.return %0 : f64
 }
 
 // -----
 
 // CHECK-LABEL: @loop_circuit.qgrad(%arg0: f64, %arg1: index) -> tensor<?xf64>
-func.func @loop_circuit(%arg0: f64) -> f64 {
+func.func @loop_circuit(%arg0: f64) -> f64 attributes {qnode, diff_method = "parameter-shift"} {
     // CHECK-DAG: [[c0:%[a-zA-Z0-9_]+]] = index.constant 0
     // CHECK-DAG: [[c1:%[a-zA-Z0-9_]+]] = index.constant 1
     // CHECK-DAG: [[divisor:%[a-zA-Z0-9_]+]] = arith.constant 2.0
@@ -346,14 +346,14 @@ func.func @loop_circuit(%arg0: f64) -> f64 {
 }
 
 func.func @gradCall2(%arg0: f64) -> f64 {
-    %0 = gradient.grad "ps" @loop_circuit(%arg0) : (f64) -> f64
+    %0 = gradient.grad "mixed" @loop_circuit(%arg0) : (f64) -> f64
     func.return %0 : f64
 }
 
 // -----
 
 // CHECK-LABEL: @tensor_circuit.qgrad(%arg0: f64, %arg1: index) -> tensor<?x2x3xf64>
-func.func @tensor_circuit(%arg0: f64) -> tensor<2x3xf64> {
+func.func @tensor_circuit(%arg0: f64) -> tensor<2x3xf64> attributes {qnode, diff_method = "parameter-shift"} {
     // CHECK-DAG: [[c0:%[a-zA-Z0-9_]+]] = index.constant 0
     // CHECK-DAG: [[c1:%[a-zA-Z0-9_]+]] = index.constant 1
     // CHECK-DAG: [[divisor:%[a-zA-Z0-9_]+]] = arith.constant dense<2.0{{[0e+]*}}> : tensor<2x3xf64>
@@ -391,14 +391,14 @@ func.func @tensor_circuit(%arg0: f64) -> tensor<2x3xf64> {
 }
 
 func.func @gradCall3(%arg0: f64) -> tensor<2x3xf64> {
-    %0 = gradient.grad "ps" @tensor_circuit(%arg0) : (f64) -> tensor<2x3xf64>
+    %0 = gradient.grad "mixed" @tensor_circuit(%arg0) : (f64) -> tensor<2x3xf64>
     func.return %0 : tensor<2x3xf64>
 }
 
 // -----
 
 // CHECK-LABEL: @multi_res_circuit.qgrad(%arg0: f64, %arg1: index) -> (tensor<?xf64>, tensor<?x2xf64>)
-func.func @multi_res_circuit(%arg0: f64) -> (f64, tensor<2xf64>) {
+func.func @multi_res_circuit(%arg0: f64) -> (f64, tensor<2xf64>) attributes {qnode, diff_method = "parameter-shift"} {
     // CHECK-DAG:     [[C0:%.+]] = index.constant 0
     // CHECK-DAG:     [[C1:%.+]] = index.constant 1
     // CHECK-DAG:     [[DIVISOR0:%.+]] = arith.constant 2.0{{.*}} : f64
@@ -441,14 +441,14 @@ func.func @multi_res_circuit(%arg0: f64) -> (f64, tensor<2xf64>) {
 }
 
 func.func @gradCall4(%arg0: f64) -> (f64, tensor<2xf64>)  {
-    %0:2 = gradient.grad "ps" @multi_res_circuit(%arg0) : (f64) -> (f64, tensor<2xf64>)
+    %0:2 = gradient.grad "mixed" @multi_res_circuit(%arg0) : (f64) -> (f64, tensor<2xf64>)
     func.return %0#0, %0#1 : f64, tensor<2xf64>
 }
 
 // -----
 
 // Check multiple grad calls to same function
-func.func private @funcMultiCall(%arg0: f64) -> f64 {
+func.func private @funcMultiCall(%arg0: f64) -> f64 attributes {qnode, diff_method = "parameter-shift"} {
     %c0 = arith.constant 0 : i64
     %r = quantum.alloc(1) : !quantum.reg
     %q = quantum.extract %r[%c0] : !quantum.reg -> !quantum.bit
@@ -467,7 +467,7 @@ func.func private @funcMultiCall(%arg0: f64) -> f64 {
 
 // CHECK-LABEL: @gradCallMultiCall
 func.func @gradCallMultiCall(%arg0: f64) -> (f64, f64) {
-    %0 = gradient.grad "ps" @funcMultiCall(%arg0) : (f64) -> f64
-    %1 = gradient.grad "ps" @funcMultiCall(%arg0) : (f64) -> f64
+    %0 = gradient.grad "mixed" @funcMultiCall(%arg0) : (f64) -> f64
+    %1 = gradient.grad "mixed" @funcMultiCall(%arg0) : (f64) -> f64
     func.return %0, %1 : f64, f64
 }
