@@ -31,8 +31,7 @@ struct GradientInlinerInterface : public DialectInlinerInterface {
     using DialectInlinerInterface::DialectInlinerInterface;
 
     /// Operations in Gradient dialect are always legal to inline.
-    bool isLegalToInline(Operation *, Region *, bool,
-                         BlockAndValueMapping &valueMapping) const final
+    bool isLegalToInline(Operation *, Region *, bool, IRMapping &valueMapping) const final
     {
         return true;
     }

@@ -145,6 +145,9 @@
 * Use Tablegen to define MLIR passes instead of C++ to reduce overhead of adding new passes.
   [#157](https://github.com/PennyLaneAI/catalyst/pull/157)
 
+* Update JAX to `v0.4.10`.
+  [#143](https://github.com/PennyLaneAI/catalyst/pull/143)
+
 <h3>Breaking changes</h3>
 
 <h3>Bug fixes</h3>

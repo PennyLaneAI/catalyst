@@ -144,6 +144,7 @@ class MHLOPass(PassPipeline):
         "--allow-unregistered-dialect",
         "--canonicalize",
         "--chlo-legalize-to-hlo",
+        "--stablehlo-legalize-to-hlo",
         "--mhlo-legalize-control-flow",
         "--hlo-legalize-to-linalg",
         "--mhlo-legalize-to-std",
@@ -208,7 +209,7 @@ class MLIRToLLVMDialect(PassPipeline):
         # operation on the different metadata. This pass uses affine constructs to materialize these
         # effects.
         # Concretely, expanded-strided-metadata is used to decompose memref.subview as it has no
-        # lowering in -convert-memref-to-llvm.
+        # lowering in -finalize-memref-to-llvm.
         "--expand-strided-metadata",
         "--lower-affine",
         "--arith-expand",  # some arith ops (ceildivsi) require expansion to be lowered to llvm
@@ -218,7 +219,7 @@ class MLIRToLLVMDialect(PassPipeline):
         # Run after -convert-math-to-llvm as it marks math::powf illegal without converting it.
         "--convert-math-to-libm",
         "--convert-arith-to-llvm",
-        "--convert-memref-to-llvm=use-generic-functions",
+        "--finalize-memref-to-llvm=use-generic-functions",
         "--convert-index-to-llvm",
         "--convert-gradient-to-llvm",
         "--convert-quantum-to-llvm",
