@@ -60,6 +60,7 @@ default_bin_paths = {
     "llvm": os.path.join(package_root, "../../mlir/llvm-project/build/bin"),
     "mhlo": os.path.join(package_root, "../../mlir/mlir-hlo/build/bin"),
     "quantum": os.path.join(package_root, "../../mlir/build/bin"),
+    "enzyme": os.path.join(package_root, "../../mlir/Enzyme/enzyme/build/bin"),
 }
 
 default_lib_paths = {
@@ -263,6 +264,20 @@ class LLVMDialectToLLVMIR(PassPipeline):
             raise FileNotFoundError("Cannot find {infile}.")
         return str(path.with_suffix(".ll"))
 
+class Enzyme(PassPipeline):
+    """Pass pipeline to lower LLVM IR to Enzyme LLVM IR."""
+
+    _executable = get_executable_path("llvm", "opt")
+    _default_flags = [
+        "-load-pass-plugin=/../../mlir/Enzyme/enzyme/build/Enzyme/LLVMEnzyme-17.so -load /../../mlir/Enzyme/enzyme/build/Enzyme/LLVMEnzyme-17.so -passes='enzyme' -S -enzyme-loose-type",
+    ]
+
+    @staticmethod
+    def get_output_filename(infile):
+        path = pathlib.Path(infile)
+        if not path.exists():
+            raise FileNotFoundError("Cannot find {infile}.")
+        return str(path.with_suffix(".ll"))
 
 class LLVMIRToObjectFile(PassPipeline):
     """LLVMIR To Object File."""
@@ -455,6 +470,7 @@ class Compiler:
                 BufferizationPass,
                 MLIRToLLVMDialect,
                 LLVMDialectToLLVMIR,
+                Enzyme,
                 LLVMIRToObjectFile,
                 CompilerDriver,
             ]

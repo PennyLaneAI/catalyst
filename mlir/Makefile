@@ -8,7 +8,7 @@ MK_DIR := $(dir $(MK_ABSPATH))
 DIALECTS_BUILD_DIR?=$(MK_DIR)/build
 LLVM_BUILD_DIR?=$(MK_DIR)/llvm-project/build
 MHLO_BUILD_DIR?=$(MK_DIR)/mlir-hlo/build
-ENZYME_BUILD_DIR?=$(MK_DIR)/Enzyme/build
+ENZYME_BUILD_DIR?=$(MK_DIR)/Enzyme/enzyme/build
 RT_BUILD_DIR?=$(MK_DIR)/../runtime/build
 ENABLE_LLD?=ON
 
@@ -64,19 +64,12 @@ mhlo:
 	cmake --build $(MHLO_BUILD_DIR) --target check-mlir-hlo
 
 .PHONY: enzyme
-mhlo:
+enzyme:
 	@echo "build enzyme"
-	cmake -G Ninja -S enzyme -B $(ENZYME_BUILD_DIR) \
-		-DCMAKE_BUILD_TYPE=Release \
-		-DLLVM_ENABLE_ASSERTIONS=ON \
-		-DMLIR_DIR=$(LLVM_BUILD_DIR)/lib/cmake/mlir \
-		-DCMAKE_C_COMPILER=$(C_COMPILER) \
-		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \
-		-DCMAKE_C_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
-		-DCMAKE_CXX_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
-		-DLLVM_ENABLE_LLD=$(ENABLE_LLD)
+	cmake -G Ninja -S Enzyme/enzyme -B $(ENZYME_BUILD_DIR) \
+		-DLLVM_DIR=$(LLVM_BUILD_DIR)/lib/cmake/llvm
 
-	cmake --build $(MHLO_BUILD_DIR) --target check-mlir-hlo
+	cmake --build $(ENZYME_BUILD_DIR)
 
 .PHONY: dialects
 dialects:
