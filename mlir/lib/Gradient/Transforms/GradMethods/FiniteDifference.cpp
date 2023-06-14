@@ -24,6 +24,7 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 
 #include "Gradient/Utils/CompDiffArgIndices.h"
+#include "Gradient/Utils/GetDiffMethod.h"
 
 namespace catalyst {
 namespace gradient {
@@ -33,7 +34,7 @@ LogicalResult FiniteDiffLowering::match(GradOp op) const
     // Assume for now that specifying "fd" on the grad op takes precedence over any "diff_method"
     // specified on any internal QNodes. Relaxing this assumption depends on further integration
     // with Enzyme.
-    if (op.getMethod() == "fd")
+    if (op.getMethod() == "fd" || getQNodeDiffMethod(op) == "finite-diff")
         return success();
 
     return failure();

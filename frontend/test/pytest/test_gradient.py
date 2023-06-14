@@ -216,7 +216,7 @@ def test_adj_in_loop(inp, backend):
 
     @qjit()
     def compiled_grad_default(params, ntrials):
-        diff = grad(f, method="mixed", argnum=0)
+        diff = grad(f, argnum=0, method="mixed")
 
         def fn(i, g):
             return diff(params)
@@ -608,8 +608,7 @@ def test_adjoint_grad_range_change(inp, backend):
     assert np.allclose(compiled_grad_range_change(inp), interpretted_grad_range_change(inp))
 
 
-# @pytest.mark.parametrize("method", [("parameter-shift"), ("adjoint")])
-@pytest.mark.parametrize("method", [("parameter-shift")])
+@pytest.mark.parametrize("method", [("parameter-shift"), ("adjoint")])
 def test_assert_no_higher_order_without_fd(method, backend):
     """Test input validation for gradients"""
 

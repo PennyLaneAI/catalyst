@@ -220,7 +220,12 @@ def _func_def_lowering(ctx, fn, call_jaxpr) -> str:
     if isinstance(fn, pennylane_QNode):
         func_op.attributes["qnode"] = ir.UnitAttr.get()
         if fn.diff_method is not None:
-            func_op.attributes["diff_method"] = ir.StringAttr.get(fn.diff_method)
+            # "best", the default option in PennyLane, chooses backprop on the device
+            # if supported and parameter-shift otherwise. Emulating the same behaviour
+            # would require generating code to query the device.
+            # For simplicity, Catalyst instead defaults to finite-diff.
+            diff_method = fn.diff_method if fn.diff_method != "best" else "finite-diff"
+            func_op.attributes["diff_method"] = ir.StringAttr.get(diff_method)
 
     return func_op.name.value
 
