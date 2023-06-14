@@ -14,8 +14,8 @@
 
 #pragma once
 
-#include "llvm/ADT/StringRef.h"
 #include "Gradient/IR/GradientOps.h"
+#include "llvm/ADT/StringRef.h"
 
 namespace catalyst {
 namespace gradient {
