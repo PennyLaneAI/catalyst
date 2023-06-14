@@ -128,6 +128,9 @@ def ExtractOp : Memory_Op<"extract", [NoMemoryEffect]> {
     let assemblyFormat = [{
         $qreg `[` ($idx^):($idx_attr)? `]` attr-dict `:` type($qreg) `->` type(results)
     }];
+
+    let hasVerifier = 1;
+    let hasFolder = 1;
 }
 
 def InsertOp : Memory_Op<"insert", [NoMemoryEffect]> {
@@ -151,6 +154,8 @@ def InsertOp : Memory_Op<"insert", [NoMemoryEffect]> {
     }];
 
     let hasCanonicalizeMethod = 1;
+    let hasVerifier = 1;
+    let hasFolder = 1;
 }
 
 // -----
