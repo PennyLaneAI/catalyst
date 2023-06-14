@@ -54,14 +54,13 @@ LogicalResult DeallocOp::canonicalize(DeallocOp dealloc, mlir::PatternRewriter &
     return failure();
 }
 
-template <typename IndexingOp>
-LogicalResult foldConstantIndexingOp(IndexingOp op, ArrayRef<Attribute> operands)
+template <typename IndexingOp> LogicalResult foldConstantIndexingOp(IndexingOp op, Attribute idx)
 {
     // Prefer using an attribute when the index is constant.
     bool hasNoIdxAttr = !op.getIdxAttr().has_value();
-    bool isConstantIdx = operands.size() >= 2 && isa_and_nonnull<IntegerAttr>(operands[1]);
+    bool isConstantIdx = isa_and_nonnull<IntegerAttr>(idx);
     if (hasNoIdxAttr && isConstantIdx) {
-        auto constantIdx = cast<IntegerAttr>(operands[1]);
+        auto constantIdx = cast<IntegerAttr>(idx);
         op.setIdxAttr(constantIdx.getValue().getSExtValue());
 
         // Remove the dynamic Value
@@ -71,9 +70,9 @@ LogicalResult foldConstantIndexingOp(IndexingOp op, ArrayRef<Attribute> operands
     return failure();
 }
 
-OpFoldResult ExtractOp::fold(ArrayRef<Attribute> operands)
+OpFoldResult ExtractOp::fold(FoldAdaptor adaptor)
 {
-    if (succeeded(foldConstantIndexingOp(*this, operands))) {
+    if (succeeded(foldConstantIndexingOp(*this, adaptor.getIdx()))) {
         return getResult();
     }
     // Returning nullptr tells the caller the op was unchanged.
@@ -98,9 +97,9 @@ LogicalResult InsertOp::canonicalize(InsertOp insert, mlir::PatternRewriter &rew
     return failure();
 }
 
-OpFoldResult InsertOp::fold(ArrayRef<Attribute> operands)
+OpFoldResult InsertOp::fold(FoldAdaptor adaptor)
 {
-    if (succeeded(foldConstantIndexingOp(*this, operands))) {
+    if (succeeded(foldConstantIndexingOp(*this, adaptor.getIdx()))) {
         return getResult();
     }
     // Returning nullptr tells the caller the op was unchanged.
