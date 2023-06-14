@@ -129,7 +129,7 @@ func::FuncOp genArgMapFunction(PatternRewriter &rewriter, Location loc, func::Fu
                 rewriter.setInsertionPoint(whileOp);
 
                 // While ops are converted to for ops
-                auto loopCounter = rewriter.create<memref::AllocaOp>(
+                Value loopCounter = rewriter.create<memref::AllocaOp>(
                     loc, MemRefType::get({}, rewriter.getIndexType()));
                 rewriter.create<memref::StoreOp>(loc, cZero, loopCounter);
 
