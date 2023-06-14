@@ -439,6 +439,25 @@ class TestCaching:
         run_time = run_end - run_end
         assert run_time < compile_and_run_time
 
+    def test_subfunction_is_cached(self, backend):
+        """
+        Test a function called multiple times within an outer jit function is generated only once
+        """
+
+        @qml.qnode(qml.device(backend, wires=1))
+        def f(x):
+            qml.RX(x, wires=0)
+            return qml.expval(qml.PauliZ(wires=0))
+
+        @qjit
+        def g(x: float):
+            return f(x) + f(x)
+
+        assert "func.func private @f(" in g._mlir
+        assert g._mlir.count("call @f(") == 2
+        # Duplicate function generation results in a "_0" suffix
+        assert not "func.func private @f_0(" in g._mlir
+
 
 class TestShots:
     # Shots influences on the sample instruction
