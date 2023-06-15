@@ -529,7 +529,7 @@ class Adjoint(Operation):
 
 
 def adjoint(f: Callable) -> Callable:
-    """ Getting the quantum adjoint of the computation defined by `f`.
+    """Getting the quantum adjoint of the computation defined by `f`.
     Args:
         f(Callable): PennyLane operation or a Python function containing PennyLane quantum
                      operations. Quantum measurements within `f` are not allowed. Keyword arguments
@@ -558,7 +558,7 @@ def adjoint(f: Callable) -> Callable:
     """
 
     def _adjoint(qreg, *args, **kwargs):
-        """ The adjoint callable wrapper capturing arguments and running the tape tracing. """
+        """The adjoint callable wrapper capturing arguments and running the tape tracing."""
         assert qreg is not None
         with JaxTape(do_queue=False) as tape:
             with tape.quantum_tape:

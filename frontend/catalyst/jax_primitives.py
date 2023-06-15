@@ -1512,7 +1512,8 @@ def _adjoint_lowering(jax_ctx: mlir.LoweringRuleContext, *args, jaxpr):
 
     source_info_util.extend_name_stack("adjoint")
     body_ctx = jax_ctx.module_context.replace(
-        name_stack=jax_ctx.module_context.name_stack.extend("adjoint"))
+        name_stack=jax_ctx.module_context.name_stack.extend("adjoint")
+    )
 
     with ir.InsertionPoint(adjoint_block):
         out, _ = mlir.jaxpr_subcomp(
@@ -1560,6 +1561,7 @@ mlir.register_lowering(func_p, _func_lowering)
 mlir.register_lowering(jvp_p, _jvp_lowering)
 mlir.register_lowering(vjp_p, _vjp_lowering)
 mlir.register_lowering(adjoint_p, _adjoint_lowering)
+
 
 def _scalar_abstractify(t):
     # pylint: disable=protected-access
