@@ -38,13 +38,7 @@ import catalyst.jax_primitives as jprim
 from catalyst.jax_tape import JaxTape
 from catalyst.utils.tracing import TracingContext
 
-namedobs_map = {
-    qml.Identity: 0,
-    qml.PauliX: 1,
-    qml.PauliY: 2,
-    qml.PauliZ: 3,
-    qml.Hadamard: 4,
-}
+KNOWN_NAMED_OBS = (qml.Identity, qml.PauliX, qml.PauliY, qml.PauliZ, qml.Hadamard)
 
 
 def get_mlir(func, *args, **kwargs):
@@ -391,7 +385,7 @@ def trace_observables(obs, qubit_states, p, num_wires, qreg):
         wires = wires or Wires(range(num_wires))
         qubits = get_qubits_from_wires(wires, qubit_states, qreg)
         jax_obs = jprim.compbasis(*qubits)
-    elif isinstance(obs, tuple(namedobs_map.keys())):
+    elif isinstance(obs, KNOWN_NAMED_OBS):
         _, wires = op_args
         qubits = get_qubits_from_wires(wires, qubit_states, qreg)
         jax_obs = jprim.namedobs(type(obs).__name__, qubits[0])
