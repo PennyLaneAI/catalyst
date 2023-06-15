@@ -18,6 +18,8 @@ import pennylane as qml
 
 from catalyst import qjit
 
+# pylint: disable=line-too-long
+
 
 # Non-root nodes have internal linkage.
 # CHECK-DAG: func.func private @qnode{{.*}} {diff_method = "parameter-shift", llvm.linkage = #llvm.linkage<internal>, qnode} {

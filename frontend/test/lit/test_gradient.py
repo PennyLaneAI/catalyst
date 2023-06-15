@@ -45,6 +45,7 @@ def override_method(x: float):
         qml.RX(x, wires=0)
         return qml.expval(qml.PauliY(0))
 
+    # pylint: disable=line-too-long
     # CHECK: "gradient.grad"({{%[0-9]+}}) {callee = @f, diffArgIndices = dense<0> : tensor<1xi64>, method = "mixed"} : (tensor<f64>) -> tensor<f64>
     g = grad(f, method="mixed")
     return g(jax.numpy.pi)
