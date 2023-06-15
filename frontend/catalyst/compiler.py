@@ -60,7 +60,7 @@ default_bin_paths = {
     "llvm": os.path.join(package_root, "../../mlir/llvm-project/build/bin"),
     "mhlo": os.path.join(package_root, "../../mlir/mlir-hlo/build/bin"),
     "quantum": os.path.join(package_root, "../../mlir/build/bin"),
-    "enzyme": os.path.join(package_root, "../../mlir/Enzyme/enzyme/build/bin"),
+    "enzyme": os.path.join(package_root, "../../mlir/Enzyme/enzyme/build/Enzyme"),
 }
 
 default_lib_paths = {
@@ -270,7 +270,11 @@ class Enzyme(PassPipeline):
 
     _executable = get_executable_path("llvm", "opt")
     _default_flags = [
-        "-load-pass-plugin=/../../mlir/Enzyme/enzyme/build/Enzyme/LLVMEnzyme-17.so -load /../../mlir/Enzyme/enzyme/build/Enzyme/LLVMEnzyme-17.so -passes='enzyme' -S -enzyme-loose-type",
+        "-load-pass-plugin="+ get_executable_path("enzyme", "LLVMEnzyme-17.so"),
+        "-load",
+        get_executable_path("enzyme", "LLVMEnzyme-17.so"),
+        "-passes=enzyme",
+        "-S"
     ]
 
     @staticmethod
