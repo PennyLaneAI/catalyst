@@ -313,8 +313,6 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
             rewriter.create<LLVM::CallOp>(loc, memsetFnDecl,
                                           ArrayRef<Value>{buffer, c0, bufferMemSize});
 
-            Type llvmBaseType = llvmTypeConverter.convertType(memrefArgType.getElementType());
-
             auto llvmInsert0 = rewriter.create<LLVM::InsertValueOp>(loc, llvmDataIn, buffer, 0);
             auto llvmInsert1 = rewriter.create<LLVM::InsertValueOp>(loc, llvmInsert0, buffer, 1);
 
