@@ -152,6 +152,13 @@
   used when writing (resp. reading) qubits to (resp. from) quantum registers.
   [#161](https://github.com/PennyLaneAI/catalyst/pull/161)
 
+* Use the differentiation method on the QNode rather than the ``grad`` function to better
+  match PennyLane's differentiation API.
+
+  This is an intermediate step towards differentiating functions that internally call multiple
+  QNodes, and towards supporting differentiation of classical postprocessing.
+  [#163](https://github.com/PennyLaneAI/catalyst/pull/163)
+
 <h3>Breaking changes</h3>
 
 <h3>Bug fixes</h3>
