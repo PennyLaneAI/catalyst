@@ -1503,15 +1503,17 @@ def _adjoint_abstract(*args, jaxpr):
     return jaxpr.out_avals
 
 
-def _adjoint_lowering(ctx, *args, jaxpr):
-    output_types = util.flatten(map(mlir.aval_to_ir_types, ctx.avals_out))
+def _adjoint_lowering(jax_ctx: mlir.LoweringRuleContext, *args, jaxpr):
+    output_types = util.flatten(map(mlir.aval_to_ir_types, jax_ctx.avals_out))
     op = AdjointOp(output_types[0], args[0])
     adjoint_block = op.regions[0].blocks.append(
-        *[mlir.aval_to_ir_types(a)[0] for a in ctx.avals_in[:1]]
+        *[mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_in[:1]]
     )
 
-    name_stack = util.extend_name_stack(ctx.module_context.name_stack, "adjoint")
-    body_ctx = ctx.module_context.replace(name_stack=xla.extend_name_stack(name_stack, "body"))
+    name_stack = source_info_util.extend_name_stack("adjoint")
+    body_ctx = jax_ctx.module_context.replace(
+        name_stack=jax_ctx.module_context.name_stack.extend("body")
+    )
 
     with ir.InsertionPoint(adjoint_block):
         out, _ = mlir.jaxpr_subcomp(
@@ -1520,7 +1522,7 @@ def _adjoint_lowering(ctx, *args, jaxpr):
             mlir.TokenSet(),
             [mlir.ir_constants(c) for c in jaxpr.consts],
             *([a] for a in chain(adjoint_block.arguments, args[1:])),
-            dim_var_values=ctx.dim_var_values,
+            dim_var_values=jax_ctx.dim_var_values,
         )
 
         QYieldOp([a[0] for a in out])
@@ -1559,6 +1561,7 @@ mlir.register_lowering(func_p, _func_lowering)
 mlir.register_lowering(jvp_p, _jvp_lowering)
 mlir.register_lowering(vjp_p, _vjp_lowering)
 mlir.register_lowering(adjoint_p, _adjoint_lowering)
+
 
 def _scalar_abstractify(t):
     # pylint: disable=protected-access

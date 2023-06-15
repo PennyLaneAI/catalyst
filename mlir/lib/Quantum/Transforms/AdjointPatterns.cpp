@@ -24,7 +24,7 @@
 #include "llvm/Support/Errc.h"
 
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/IR/BlockAndValueMapping.h"
+#include "mlir/IR/IRMapping.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "Quantum/IR/QuantumOps.h"
@@ -44,7 +44,7 @@ template <class T> T isInstanceOf(Operation &op)
         return nullptr;
 }
 
-Value copyAdjointVerbatim(AdjointOp op, PatternRewriter &rewriter, BlockAndValueMapping &bvm)
+Value copyAdjointVerbatim(AdjointOp op, PatternRewriter &rewriter, IRMapping &bvm)
 {
     Block &b = op.getRegion().front();
     for (auto i = b.begin(); i != b.end(); i++) {
@@ -77,7 +77,7 @@ struct AdjointSingleOpRewritePattern : public mlir::OpRewritePattern<AdjointOp> 
 
         // First, copy the classical computations directly to the target POI
         auto classical_mapping = ({
-            BlockAndValueMapping bvm;
+            IRMapping bvm;
             Block &b = op.getRegion().front();
             for (auto i = b.begin(); i != b.end(); i++) {
                 if (i->getName().getStringRef().find("quantum") != std::string::npos) {
@@ -155,7 +155,7 @@ struct AdjointSingleOpRewritePattern : public mlir::OpRewritePattern<AdjointOp> 
                 }
                 else if (AdjointOp adjoint = isInstanceOf<AdjointOp>(*i)) {
 
-                    BlockAndValueMapping bvm(classical_mapping);
+                    IRMapping bvm(classical_mapping);
                     assert(adjoint.getRegion().hasOneBlock());
                     Block &b = adjoint.getRegion().front();
                     for (const auto &[a, r] : llvm::zip(b.getArguments(), adjoint->getResults())) {
