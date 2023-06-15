@@ -11,11 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Unit tests for the Catalyst adjoint function.
+"""
 
 from functools import partial
-from typing import Iterable, Tuple, TypeVar, Union
 
-import jax.numpy as jnp
 import pennylane as qml
 import pennylane.numpy as pnp
 import pytest

@@ -154,7 +154,6 @@ struct AdjointSingleOpRewritePattern : public mlir::OpRewritePattern<AdjointOp> 
                     update(extract.getQreg(), insert->getResult(0));
                 }
                 else if (AdjointOp adjoint = isInstanceOf<AdjointOp>(*i)) {
-
                     IRMapping bvm(classical_mapping);
                     assert(adjoint.getRegion().hasOneBlock());
                     Block &b = adjoint.getRegion().front();
