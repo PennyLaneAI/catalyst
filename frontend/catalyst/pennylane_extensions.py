@@ -194,6 +194,12 @@ def _make_jaxpr_check_differentiable(f: Differentiable, grad_params: GradParams,
         assert isinstance(
             f, qml.QNode
         ), "Differentiation methods other than finite-differences can only operate on a QNode"
+        if f.diff_method is None:
+            raise ValueError(
+                "Cannot differentiate a QNode explicitly marked non-differentiable (with"
+                " diff_method=None)"
+            )
+
         has_invalid_return = any(prim not in [expval_p, probs_p] for prim in return_ops)
         if f.diff_method == "parameter-shift" and has_invalid_return:
             raise TypeError(

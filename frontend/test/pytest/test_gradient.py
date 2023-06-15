@@ -50,6 +50,24 @@ def test_grad_outside_qjit():
         grad(f)(1.0)
 
 
+def test_non_differentiable_qnode():
+    """Check for an error message when the QNode is explicitly marked non-differentiable."""
+
+    @qml.qnode(qml.device("lightning.qubit", wires=1), diff_method=None)
+    def f(x: float):
+        qml.RX(x, wires=0)
+        return qml.expval(qml.PauliZ(wires=0))
+
+    @qjit
+    def grad_f(x):
+        return grad(f, method="mixed")(x)
+
+    with pytest.raises(
+        ValueError, match="Cannot differentiate a QNode explicitly marked non-differentiable"
+    ):
+        grad_f(1.0)
+
+
 def test_param_shift_on_non_expval(backend):
     """Check for an error message when parameter-shift is used on QNodes that return anything but
     qml.expval or qml.probs.
