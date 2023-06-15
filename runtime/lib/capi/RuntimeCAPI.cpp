@@ -638,7 +638,8 @@ void __quantum__qis__CRot(double phi, double theta, double omega, QUBIT *control
         /* inverse = */ false);
 }
 
-void __quantum__qis__CRot_Adjoint(double phi, double theta, double omega, QUBIT *control, QUBIT *target)
+void __quantum__qis__CRot_Adjoint(double phi, double theta, double omega, QUBIT *control,
+                                  QUBIT *target)
 {
     Catalyst::Runtime::CTX->getDevice()->NamedOperation(
         "CRot", {phi, theta, omega},

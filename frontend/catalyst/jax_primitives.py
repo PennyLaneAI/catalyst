@@ -16,8 +16,8 @@ of quantum operations, measurements, and observables to JAXPR.
 """
 
 from dataclasses import dataclass
-from typing import Dict, List, Callable
 from itertools import chain
+from typing import Callable, Dict, List
 
 import jax
 import numpy as np
@@ -31,8 +31,8 @@ from jaxlib.mlir.dialects._stablehlo_ops_gen import ConstantOp as StableHLOConst
 from mlir_quantum.dialects.arith import AddIOp, CeilDivSIOp, IndexCastOp, MulIOp, SubIOp
 from mlir_quantum.dialects.gradient import GradOp, JVPOp, VJPOp
 from mlir_quantum.dialects.quantum import (
-    AllocOp,
     AdjointOp,
+    AllocOp,
     ComputationalBasisOp,
     CountsOp,
     CustomOp,
@@ -52,8 +52,8 @@ from mlir_quantum.dialects.quantum import (
     StateOp,
     TensorOp,
     VarianceOp,
-    YieldOp as QYieldOp
 )
+from mlir_quantum.dialects.quantum import YieldOp as QYieldOp
 from mlir_quantum.dialects.scf import ConditionOp, ForOp, IfOp, WhileOp, YieldOp
 from mlir_quantum.dialects.tensor import ExtractOp as TensorExtractOp
 from mlir_quantum.dialects.tensor import FromElementsOp
@@ -1487,23 +1487,28 @@ def _qfor_lowering(
 
     return for_op_scf.results
 
+
 #
 # adjoint
 #
+
 
 @adjoint_p.def_impl
 def _adjoint_def_impl(ctx, *args):
     raise NotImplementedError()
 
+
 @adjoint_p.def_abstract_eval
 def _adjoint_abstract(*args, jaxpr):
     return jaxpr.out_avals
 
+
 def _adjoint_lowering(ctx, *args, jaxpr):
     output_types = util.flatten(map(mlir.aval_to_ir_types, ctx.avals_out))
     op = AdjointOp(output_types[0], args[0])
-    adjoint_block = op.regions[0].blocks.append(*[mlir.aval_to_ir_types(a)[0]
-                                                  for a in ctx.avals_in[:1]])
+    adjoint_block = op.regions[0].blocks.append(
+        *[mlir.aval_to_ir_types(a)[0] for a in ctx.avals_in[:1]]
+    )
 
     name_stack = util.extend_name_stack(ctx.module_context.name_stack, "adjoint")
     body_ctx = ctx.module_context.replace(name_stack=xla.extend_name_stack(name_stack, "body"))

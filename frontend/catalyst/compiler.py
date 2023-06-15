@@ -184,7 +184,6 @@ class MHLOPass(PassPipeline):
         return str(path.with_suffix(".nohlo.mlir"))
 
 
-
 class AdjointLoweringTest(PassPipeline):
     """Adjoint lowering pass, fixme."""
 
@@ -201,7 +200,6 @@ class AdjointLoweringTest(PassPipeline):
             raise ValueError(f"Input file ({infile}) for adjoint lowering is not an MLIR file")
 
         return infile.replace(".opt.mlir", ".noadj.opt.mlir")
-
 
 
 class BufferizationPass(PassPipeline):

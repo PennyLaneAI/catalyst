@@ -43,7 +43,9 @@ namespace quantum {
 
 struct AdjointDistributionPass : public OperationPass<ModuleOp> {
     AdjointDistributionPass() : OperationPass<ModuleOp>(TypeID::get<AdjointDistributionPass>()) {}
-    AdjointDistributionPass(const AdjointDistributionPass &other) : OperationPass<ModuleOp>(other) {}
+    AdjointDistributionPass(const AdjointDistributionPass &other) : OperationPass<ModuleOp>(other)
+    {
+    }
 
     StringRef getName() const override { return "AdjointLoweringPass"; }
 
@@ -66,7 +68,8 @@ struct AdjointDistributionPass : public OperationPass<ModuleOp> {
 
     void runOnOperation() final
     {
-        LLVM_DEBUG(dbgs() << "adjoint distribution pass" << "\n");
+        LLVM_DEBUG(dbgs() << "adjoint distribution pass"
+                          << "\n");
     }
 
     std::unique_ptr<Pass> clonePass() const override
@@ -100,7 +103,8 @@ struct AdjointLoweringPass : public OperationPass<ModuleOp> {
 
     void runOnOperation() final
     {
-        LLVM_DEBUG(dbgs() << "adjoint lowering pass" << "\n");
+        LLVM_DEBUG(dbgs() << "adjoint lowering pass"
+                          << "\n");
         ModuleOp op = getOperation();
 
         RewritePatternSet patterns(&getContext());
@@ -130,4 +134,3 @@ std::unique_ptr<Pass> createAdjointLoweringPass()
 }
 
 } // namespace catalyst
-

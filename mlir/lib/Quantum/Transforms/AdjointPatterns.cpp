@@ -14,20 +14,19 @@
 
 #define DEBUG_TYPE "adjoint"
 
-#include <vector>
-#include <iterator>
 #include <algorithm>
-#include <unordered_map>
+#include <iterator>
 #include <string>
+#include <unordered_map>
+#include <vector>
 
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Errc.h"
 
-#include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-#include "Quantum/IR/QuantumOps.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Patterns.h"
 
@@ -37,34 +36,29 @@ using namespace catalyst::quantum;
 
 namespace {
 
-
-template<class T>
-T isInstanceOf(Operation &op)
+template <class T> T isInstanceOf(Operation &op)
 {
-    if(op.getName().getStringRef() == T::getOperationName())
+    if (op.getName().getStringRef() == T::getOperationName())
         return cast<T>(op);
     else
         return nullptr;
 }
 
-
 Value copyAdjointVerbatim(AdjointOp op, PatternRewriter &rewriter, BlockAndValueMapping &bvm)
 {
     Block &b = op.getRegion().front();
-    for(auto i=b.begin(); i!=b.end(); i++) {
-        if(YieldOp yield = isInstanceOf<YieldOp>(*i)) {
+    for (auto i = b.begin(); i != b.end(); i++) {
+        if (YieldOp yield = isInstanceOf<YieldOp>(*i)) {
             assert(++i == b.end() &&
-                "quantum.yield must be the last operation of an adjoint block");
+                   "quantum.yield must be the last operation of an adjoint block");
             return bvm.lookupOrDefault(yield->getOperand(0));
         }
         else {
             rewriter.insert(i->clone(bvm));
         }
     }
-    assert(false &&
-        "quantum.yield must present in the adjoint region");
+    assert(false && "quantum.yield must present in the adjoint region");
 }
-
 
 struct AdjointSingleOpRewritePattern : public mlir::OpRewritePattern<AdjointOp> {
     using mlir::OpRewritePattern<AdjointOp>::OpRewritePattern;
@@ -73,7 +67,8 @@ struct AdjointSingleOpRewritePattern : public mlir::OpRewritePattern<AdjointOp> 
     /// the values of the program where quantum control flow is reversed. Most of the time,
     /// there is a 1-to-1 correspondence with a notable exception caused by
     /// `insert`/`extract` API asymetry.
-    mlir::LogicalResult matchAndRewrite(AdjointOp op, mlir::PatternRewriter &rewriter) const override
+    mlir::LogicalResult matchAndRewrite(AdjointOp op,
+                                        mlir::PatternRewriter &rewriter) const override
     {
         LLVM_DEBUG(dbgs() << "Adjointing the following:\n" << op << "\n");
         Location loc = op.getLoc();
@@ -84,8 +79,8 @@ struct AdjointSingleOpRewritePattern : public mlir::OpRewritePattern<AdjointOp> 
         auto classical_mapping = ({
             BlockAndValueMapping bvm;
             Block &b = op.getRegion().front();
-            for(auto i = b.begin(); i!=b.end(); i++) {
-                if(i->getName().getStringRef().find("quantum") != std::string::npos) {
+            for (auto i = b.begin(); i != b.end(); i++) {
+                if (i->getName().getStringRef().find("quantum") != std::string::npos) {
                     /* Skip quantum operations */
                 }
                 else {
@@ -99,14 +94,14 @@ struct AdjointSingleOpRewritePattern : public mlir::OpRewritePattern<AdjointOp> 
         // Next, compute and copy the reversed quantum computation flow. The classical dependencies
         // such as gate parameters or qubit indices are already available in `classical_mapping`.
         auto reversal_mapping = ({
-            llvm::DenseMap<Value,Value> out;
-            auto query = [&out] (Value key) -> Value {
+            llvm::DenseMap<Value, Value> out;
+            auto query = [&out](Value key) -> Value {
                 LLVM_DEBUG(dbgs() << "  querying: " << key << "\n");
                 auto val = out[key];
                 LLVM_DEBUG(dbgs() << "    result: " << val << "\n");
                 return val;
             };
-            auto update = [&out] (Value key, Value val) -> void {
+            auto update = [&out](Value key, Value val) -> void {
                 LLVM_DEBUG(dbgs() << "  updating: " << key << "\n");
                 LLVM_DEBUG(dbgs() << "    to: " << val << "\n");
                 out[key] = val;
@@ -114,68 +109,56 @@ struct AdjointSingleOpRewritePattern : public mlir::OpRewritePattern<AdjointOp> 
             Block &b = op.getRegion().front();
             auto rb = std::make_reverse_iterator(b.end());
             auto re = std::make_reverse_iterator(b.begin());
-            for( auto i = rb; i!=re; i++) {
+            for (auto i = rb; i != re; i++) {
                 LLVM_DEBUG(dbgs() << "operation: " << *i << "\n");
-                if(YieldOp yield = isInstanceOf<YieldOp>(*i)) {
+                if (YieldOp yield = isInstanceOf<YieldOp>(*i)) {
                     assert(yield.getOperands().size() == 1);
                     update(*yield.getResults().begin(), op.getQreg());
                 }
-                else if(InsertOp insert = isInstanceOf<InsertOp>(*i)) {
+                else if (InsertOp insert = isInstanceOf<InsertOp>(*i)) {
                     ExtractOp extract = rewriter.create<ExtractOp>(
-                        loc,
-                        insert.getQubit().getType(),
-                        query(insert.getOutQreg()),
+                        loc, insert.getQubit().getType(), query(insert.getOutQreg()),
                         classical_mapping.lookupOrDefault(insert.getIdx()),
-                        insert.getIdxAttrAttr()
-                    );
+                        insert.getIdxAttrAttr());
                     update(insert.getQubit(), extract->getResult(0));
                     update(insert.getInQreg(), out[insert.getOutQreg()]);
                 }
-                else if(CustomOp custom = isInstanceOf<CustomOp>(*i)) {
+                else if (CustomOp custom = isInstanceOf<CustomOp>(*i)) {
                     assert(custom.getInQubits().size() == custom.getOutQubits().size() && "size");
                     auto in_qubits = ({
                         std::vector<Value> qbits;
-                        for(auto q: custom.getOutQubits()) {
+                        for (auto q : custom.getOutQubits()) {
                             qbits.push_back(query(q));
                         }
                         qbits;
                     });
                     auto in_params = ({
                         std::vector<Value> out;
-                        for(auto p: custom.getParams()) {
+                        for (auto p : custom.getParams()) {
                             out.push_back(classical_mapping.lookupOrDefault(p));
                         }
                         out;
                     });
                     auto customA = rewriter.create<CustomOp>(
-                        loc,
-                        custom.getResultTypes(),
-                        in_params,
-                        in_qubits,
-                        custom.getGateName(),
-                        mlir::BoolAttr::get(ctx, !custom.getAdjoint().value_or(false))
-                    );
-                    for(size_t i = 0; i<customA.getOutQubits().size(); i++) {
+                        loc, custom.getResultTypes(), in_params, in_qubits, custom.getGateName(),
+                        mlir::BoolAttr::get(ctx, !custom.getAdjoint().value_or(false)));
+                    for (size_t i = 0; i < customA.getOutQubits().size(); i++) {
                         update(custom.getInQubits()[i], customA->getResult(i));
                     }
                 }
-                else if(ExtractOp extract = isInstanceOf<ExtractOp>(*i)) {
+                else if (ExtractOp extract = isInstanceOf<ExtractOp>(*i)) {
                     auto insert = rewriter.create<InsertOp>(
-                        loc,
-                        extract.getQreg().getType(),
-                        query(extract.getQreg()),
+                        loc, extract.getQreg().getType(), query(extract.getQreg()),
                         classical_mapping.lookupOrDefault(extract.getIdx()),
-                        extract.getIdxAttrAttr(),
-                        query(extract.getQubit())
-                    );
+                        extract.getIdxAttrAttr(), query(extract.getQubit()));
                     update(extract.getQreg(), insert->getResult(0));
                 }
-                else if(AdjointOp adjoint = isInstanceOf<AdjointOp>(*i)) {
+                else if (AdjointOp adjoint = isInstanceOf<AdjointOp>(*i)) {
 
                     BlockAndValueMapping bvm(classical_mapping);
                     assert(adjoint.getRegion().hasOneBlock());
                     Block &b = adjoint.getRegion().front();
-                    for(const auto& [a,r]: llvm::zip(b.getArguments(),adjoint->getResults())) {
+                    for (const auto &[a, r] : llvm::zip(b.getArguments(), adjoint->getResults())) {
                         bvm.map(a, query(r));
                     }
                     auto res = copyAdjointVerbatim(adjoint, rewriter, bvm);
@@ -195,7 +178,7 @@ struct AdjointSingleOpRewritePattern : public mlir::OpRewritePattern<AdjointOp> 
         // input source adjoint block arguments as keys.
         auto new_outputs = ({
             std::vector<Value> out;
-            for(auto a : op.getRegion().front().getArguments()) {
+            for (auto a : op.getRegion().front().getArguments()) {
                 out.push_back(reversal_mapping[a]);
             }
             out;

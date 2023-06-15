@@ -19,12 +19,12 @@ while using :func:`~.qjit`.
 import functools
 import numbers
 import uuid
+from functools import partial
 from typing import Any, Callable, Iterable, List, Optional, Union
 
 import jax
 import jax.numpy as jnp
 import pennylane as qml
-from functools import partial
 from jax import ShapedArray
 from jax._src.lax.control_flow import (
     _initial_style_jaxpr,
@@ -40,7 +40,7 @@ from pennylane.operation import AnyWires, Operation, Wires
 
 import catalyst
 import catalyst.jax_primitives as jprim
-from catalyst.jax_primitives import GradParams, expval_p, probs_p, adjoint_p
+from catalyst.jax_primitives import GradParams, adjoint_p, expval_p, probs_p
 from catalyst.jax_tape import JaxTape
 from catalyst.jax_tracer import get_traceable_fn, insert_to_qreg, trace_quantum_tape
 from catalyst.utils.exceptions import CompileError, DifferentiableCompileError
@@ -518,8 +518,8 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
 
 
 class Adjoint(Operation):
-    """ A minimal implementation of PennyLane operation, designed with a sole purpose of being
-    placed on the quantum tape """
+    """A minimal implementation of PennyLane operation, designed with a sole purpose of being
+    placed on the quantum tape"""
 
     num_wires = AnyWires
 
@@ -529,8 +529,7 @@ class Adjoint(Operation):
         super().__init__(*args, **kwargs)
 
 
-def adjoint(f:Callable) -> Callable:
-
+def adjoint(f: Callable) -> Callable:
     def _adjoint(qreg=None, *args, **kwargs):
         assert qreg is not None
         with JaxTape(do_queue=False) as tape:
@@ -542,12 +541,9 @@ def adjoint(f:Callable) -> Callable:
             tape.quantum_tape.jax_tape = tape
 
         has_tracer_return_values = False
-        return_values, qreg, qubit_states = trace_quantum_tape(
-            tape, qreg, has_tracer_return_values
-        )
+        return_values, qreg, qubit_states = trace_quantum_tape(tape, qreg, has_tracer_return_values)
         qreg = insert_to_qreg(qubit_states, qreg)
         return qreg, return_values
-
 
     def _callable(*args, **kwargs):
         init_vals, in_tree = tree_flatten((jprim.Qreg(), *args))

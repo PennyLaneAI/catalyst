@@ -250,7 +250,7 @@ struct CustomOpPattern : public OpConversionPattern<CustomOp> {
                                    adaptor.getOperands().getTypes().end());
 
         std::string qirName = "__quantum__qis__" + op.getGateName().str() +
-          (op.getAdjoint().value_or(false) ? "_Adjoint" : "");
+                              (op.getAdjoint().value_or(false) ? "_Adjoint" : "");
         Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), argTypes);
 
         LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);

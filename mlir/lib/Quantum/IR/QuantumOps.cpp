@@ -317,4 +317,3 @@ LogicalResult AdjointOp::verify()
     }
     return success();
 }
-

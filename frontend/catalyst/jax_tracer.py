@@ -308,7 +308,7 @@ def trace_quantum_tape(
         elif op.__class__.__name__ == "Adjoint":
             op_nonwires, op_wires = op_args
             qreg = insert_to_qreg(qubit_states, qreg)
-            op_results = jprim.adjoint_p.bind(*([qreg]+op_nonwires), jaxpr=op.body_jaxpr)
+            op_results = jprim.adjoint_p.bind(*([qreg] + op_nonwires), jaxpr=op.body_jaxpr)
             qreg = op_results[0]
             # FIXME: Figure out if we need it here or not
             qubit_states.clear()

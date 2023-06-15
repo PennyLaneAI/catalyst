@@ -12,17 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from functools import partial
 from typing import Iterable, Tuple, TypeVar, Union
 
-from functools import partial
 import jax.numpy as jnp
 import pennylane as qml
 import pennylane.numpy as pnp
 import pytest
-
-from catalyst import qjit, adjoint as adjoint_C
-from pennylane import adjoint as adjoint_PL
 from numpy.testing import assert_allclose
+from pennylane import adjoint as adjoint_PL
+
+from catalyst import adjoint as adjoint_C
+from catalyst import qjit
 
 # pylint: disable=missing-function-docstring
 
@@ -72,10 +73,9 @@ def test_adjoint_singleop():
 
 @pytest.mark.parametrize("w, p", [(0, 0.5), (0, -100.0), (1, 123.22)])
 def test_adjoint_paramfun(w, p):
-
     def func(w, theta1, theta2, theta3):
-        qml.RX(theta1*pnp.pi/2, wires=w)
-        qml.RY(theta2/2, wires=w)
+        qml.RX(theta1 * pnp.pi / 2, wires=w)
+        qml.RY(theta2 / 2, wires=w)
         qml.RZ(theta3, wires=1)
 
     @qjit()
@@ -99,7 +99,7 @@ def test_adjoint_paramfun(w, p):
 
 
 def test_adjoint_nestedfun():
-    def func(A,I):
+    def func(A, I):
         qml.RX(I, wires=1)
         qml.RY(I, wires=1)
         if I < 5:
@@ -109,19 +109,18 @@ def test_adjoint_nestedfun():
     @qjit(verbose=True, keep_intermediate=True)
     @qml.qnode(qml.device("lightning.qubit", wires=2))
     def workflow_C():
-        qml.RX(pnp.pi/2, wires=0)
+        qml.RX(pnp.pi / 2, wires=0)
         adjoint_C(partial(func, A=adjoint_C, I=0))()
-        qml.RZ(pnp.pi/2, wires=0)
+        qml.RZ(pnp.pi / 2, wires=0)
         return qml.state()
 
     @qml.qnode(qml.device("default.qubit", wires=2))
     def workflow_PL():
-        qml.RX(pnp.pi/2, wires=0)
+        qml.RX(pnp.pi / 2, wires=0)
         adjoint_PL(partial(func, A=adjoint_PL, I=0))()
-        qml.RZ(pnp.pi/2, wires=0)
+        qml.RZ(pnp.pi / 2, wires=0)
         return qml.state()
 
     actual = workflow_C()
     desired = workflow_PL()
     assert_allclose(actual, desired)
-
