@@ -184,24 +184,6 @@ class MHLOPass(PassPipeline):
         return str(path.with_suffix(".nohlo.mlir"))
 
 
-class AdjointLoweringTest(PassPipeline):
-    """Adjoint lowering pass, fixme."""
-
-    _executable = get_executable_path("quantum", "quantum-opt")
-    _default_flags = [
-        "--adjoint-lowering",
-        "--debug-only=adjoint",
-        "--mlir-print-ir-after-failure",
-    ]
-
-    @staticmethod
-    def get_output_filename(infile):
-        if not infile.endswith(".opt.mlir"):
-            raise ValueError(f"Input file ({infile}) for adjoint lowering is not an MLIR file")
-
-        return infile.replace(".opt.mlir", ".noadj.opt.mlir")
-
-
 class BufferizationPass(PassPipeline):
     """Pass pipeline that bufferizes MLIR dialects."""
 
@@ -284,7 +266,7 @@ class QuantumCompilationPass(PassPipeline):
     """Pass pipeline to lower gradients."""
 
     _executable = get_executable_path("quantum", "quantum-opt")
-    _default_flags = ["--lower-gradients", "--convert-arraylist-to-memref"]
+    _default_flags = ["--lower-gradients", "--adjoint-lowering", "--convert-arraylist-to-memref"]
 
     @staticmethod
     def get_output_filename(infile):
@@ -517,7 +499,6 @@ class Compiler:
             pipelines = [
                 MHLOPass,
                 QuantumCompilationPass,
-                AdjointLoweringTest,
                 BufferizationPass,
                 MLIRToLLVMDialect,
                 LLVMDialectToLLVMIR,
