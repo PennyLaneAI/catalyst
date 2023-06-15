@@ -51,7 +51,7 @@ llvm:
 .PHONY: mhlo
 mhlo:
 	# TODO: We can remove this patch whenever this ticket is solved https://github.com/tensorflow/mlir-hlo/issues/68
-	patch -d mlir-hlo/mhlo/analysis --follow-symlinks < patches/add-lmhlo-dependency.patch
+	patch -d mlir-hlo/mhlo/analysis --merge --follow-symlinks < patches/add-lmhlo-dependency.patch
 
 	@echo "build MLIR-HLO"
 	cmake -G Ninja -S mlir-hlo -B $(MHLO_BUILD_DIR) \
