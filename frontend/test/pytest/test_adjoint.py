@@ -14,6 +14,7 @@
 
 from typing import Iterable, Tuple, TypeVar, Union
 
+from functools import partial
 import jax.numpy as jnp
 import pennylane as qml
 import pennylane.numpy as pnp
@@ -94,5 +95,33 @@ def test_adjoint_func_paramethrised(w, p):
 
     actual = workflow_C(w, p)
     desired = workflow_PL(w, p)
+    assert_allclose(actual, desired)
+
+
+def test_adjoint_func_nested():
+    def func(A,I):
+        qml.PauliX(wires=1)
+        qml.PauliY(wires=1)
+        if I < 5:
+            I = I + 1
+            A(partial(func, A=A, I=I))()
+
+    @qjit(verbose=True, keep_intermediate=True)
+    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    def workflow_C():
+        qml.RX(pnp.pi/2, wires=0)
+        adjoint_C(partial(func, A=adjoint_C, I=0))()
+        qml.RZ(pnp.pi/2, wires=0)
+        return qml.state()
+
+    @qml.qnode(qml.device("default.qubit", wires=2))
+    def workflow_PL():
+        qml.RX(pnp.pi/2, wires=0)
+        adjoint_PL(partial(func, A=adjoint_PL, I=0))()
+        qml.RZ(pnp.pi/2, wires=0)
+        return qml.state()
+
+    actual = workflow_C()
+    desired = workflow_PL()
     assert_allclose(actual, desired)
 
