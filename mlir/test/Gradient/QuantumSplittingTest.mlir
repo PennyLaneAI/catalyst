@@ -14,6 +14,19 @@
 
 // RUN: quantum-opt %s --lower-gradients=split --split-input-file | FileCheck %s
 #map = affine_map<() -> ()>
+
+// func.func @straight_line(%arg0: f64) -> tensor<f64> attributes {qnode, diff_method = "parameter-shift"} {
+//     %0 = quantum.alloc(1) : !quantum.reg
+//     %1 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
+//     %2 = quantum.custom "RZ"(%arg0) %1 : !quantum.bit
+//     %3 = quantum.insert %0[1], %2 : !quantum.reg, !quantum.bit
+//     %4 = quantum.namedobs %2[3] : !quantum.obs
+//     %5 = quantum.expval %4 : f64
+//     %6 = tensor.from_elements %5 : tensor<f64>
+//     quantum.dealloc %0 : !quantum.reg
+//     return %6 : tensor<f64>
+// }
+
 func.func private @for_loop(%start: index, %stop: index, %step: index, %arg0: tensor<f64>) -> tensor<f64> attributes {qnode, diff_method = "parameter-shift"} {
     %0 = quantum.alloc(4) : !quantum.reg
     %cst = arith.constant dense<2.000000e+00> : tensor<f64>
@@ -37,7 +50,7 @@ func.func private @for_loop(%start: index, %stop: index, %step: index, %arg0: te
     return %5 : tensor<f64>
 }
 
-func.func private @dfor_loop() {
+func.func @dfor_loop() {
     %c0 = arith.constant 0 : index
     %c1 = arith.constant 1 : index
     %c4 = arith.constant 4 : index

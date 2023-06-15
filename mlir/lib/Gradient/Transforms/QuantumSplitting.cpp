@@ -127,6 +127,27 @@ using llvm::errs;
 using namespace mlir;
 using namespace catalyst;
 
+/// Generic way to clone quantum.insert and quantum.extract ops
+template <typename IndexingOp>
+void cloneIndexingOp(IndexingOp op, OpBuilder &builder, Location loc, IRMapping &map,
+                     Value wireTape, Value wireCounter)
+{
+    auto newIndexingOp = cast<IndexingOp>(builder.clone(*op.getOperation(), map));
+    // Load cached dynamic wires.
+    if (!op.getIdxAttr().has_value()) {
+        OpBuilder::InsertionGuard insertGuard(builder);
+        builder.setInsertionPoint(newIndexingOp);
+
+        Value cOne = builder.create<index::ConstantOp>(loc, 1);
+        Value wireIdx = builder.create<memref::LoadOp>(loc, wireCounter);
+        Value cachedWire = builder.create<tensor::ExtractOp>(loc, wireTape, wireIdx);
+        wireIdx = builder.create<index::AddOp>(loc, wireIdx, cOne);
+        builder.create<memref::StoreOp>(loc, wireIdx, wireCounter);
+
+        newIndexingOp.getIdxMutable().assign(cachedWire);
+    }
+}
+
 void cloneQuantumRegion(quantum::QuantumDependenceAnalysis &qdepAnalysis, OpBuilder &builder,
                         Location loc, Region &region, IRMapping &map, ValueRange tapes,
                         ValueRange tapeIndexCounters)
@@ -170,24 +191,10 @@ void cloneQuantumRegion(quantum::QuantumDependenceAnalysis &qdepAnalysis, OpBuil
             builder.create<memref::StoreOp>(loc, paramIdx, paramCounter);
         }
         else if (auto extractOp = dyn_cast<quantum::ExtractOp>(&oldOp)) {
-            // Load cached wires.
-            Value wireIdx = builder.create<memref::LoadOp>(loc, wireCounter);
-            Value cachedWire = builder.create<tensor::ExtractOp>(loc, wireTape, wireIdx);
-            wireIdx = builder.create<index::AddOp>(loc, wireIdx, cOne);
-            builder.create<memref::StoreOp>(loc, wireIdx, wireCounter);
-
-            auto newExtractOp = cast<quantum::ExtractOp>(builder.clone(*extractOp, map));
-            newExtractOp.getIdxMutable().assign(cachedWire);
+            cloneIndexingOp(extractOp, builder, loc, map, wireTape, wireCounter);
         }
         else if (auto insertOp = dyn_cast<quantum::InsertOp>(&oldOp)) {
-            // TODO consolidate duplication to handle insert/extract ops
-            Value wireIdx = builder.create<memref::LoadOp>(loc, wireCounter);
-            Value cachedWire = builder.create<tensor::ExtractOp>(loc, wireTape, wireIdx);
-            wireIdx = builder.create<index::AddOp>(loc, wireIdx, cOne);
-            builder.create<memref::StoreOp>(loc, wireIdx, wireCounter);
-
-            auto newInsertOp = cast<quantum::InsertOp>(builder.clone(*insertOp, map));
-            newInsertOp.getIdxMutable().assign(cachedWire);
+            cloneIndexingOp(insertOp, builder, loc, map, wireTape, wireCounter);
         }
         else if (auto forOp = dyn_cast<scf::ForOp>(&oldOp)) {
             // We only want to keep quantum iterArgs, so loopIndexMapping maps the index of the old
