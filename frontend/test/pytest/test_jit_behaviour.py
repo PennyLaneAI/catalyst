@@ -453,10 +453,10 @@ class TestCaching:
         def g(x: float):
             return f(x) + f(x)
 
-        assert "func.func private @f(" in g._mlir
-        assert g._mlir.count("call @f(") == 2
+        assert "func.func private @f(" in g.mlir
+        assert g.mlir.count("call @f(") == 2
         # Duplicate function generation results in a "_0" suffix
-        assert not "func.func private @f_0(" in g._mlir
+        assert not "func.func private @f_0(" in g.mlir
 
 
 class TestShots:
