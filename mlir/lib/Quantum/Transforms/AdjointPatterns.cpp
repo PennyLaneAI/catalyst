@@ -47,6 +47,25 @@ T isInstanceOf(Operation &op)
         return nullptr;
 }
 
+
+Value copyAdjointVerbatim(AdjointOp op, PatternRewriter &rewriter, BlockAndValueMapping &bvm)
+{
+    Block &b = op.getRegion().front();
+    for(auto i=b.begin(); i!=b.end(); i++) {
+        if(YieldOp yield = isInstanceOf<YieldOp>(*i)) {
+            assert(++i == b.end() &&
+                "quantum.yield must be the last operation of an adjoint block");
+            return bvm.lookupOrDefault(yield->getOperand(0));
+        }
+        else {
+            rewriter.insert(i->clone(bvm));
+        }
+    }
+    assert(false &&
+        "quantum.yield must present in the adjoint region");
+}
+
+
 struct AdjointSingleOpRewritePattern : public mlir::OpRewritePattern<AdjointOp> {
     using mlir::OpRewritePattern<AdjointOp>::OpRewritePattern;
 
@@ -151,14 +170,21 @@ struct AdjointSingleOpRewritePattern : public mlir::OpRewritePattern<AdjointOp> 
                     );
                     update(extract.getQreg(), insert->getResult(0));
                 }
+                else if(AdjointOp adjoint = isInstanceOf<AdjointOp>(*i)) {
+
+                    BlockAndValueMapping bvm(classical_mapping);
+                    assert(adjoint.getRegion().hasOneBlock());
+                    Block &b = adjoint.getRegion().front();
+                    for(const auto& [a,r]: llvm::zip(b.getArguments(),adjoint->getResults())) {
+                        bvm.map(a, query(r));
+                    }
+                    auto res = copyAdjointVerbatim(adjoint, rewriter, bvm);
+                    update(adjoint.getQreg(), res);
+                }
                 else {
                     /* TODO: We expect to handle Scf control flow instructions here. Stateless loops
                      * and conditionals should not be a problem. Stateful loops would probably
                      * require some kind of classical unrolling.
-                     */
-                    /* TODO: We also expect to handle a 1 level of nested adjoint blocks here as
-                     * well. Just wiring their region contents to the output program should be
-                     * enough. Handling arbitrary-deep nesting needs some investigation.
                      */
                 }
             }
