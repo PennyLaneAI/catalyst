@@ -25,7 +25,6 @@ from typing import Any, Callable, Iterable, List, Optional, Union
 import jax
 import jax.numpy as jnp
 import pennylane as qml
-from jax import ShapedArray
 from jax._src.lax.control_flow import (
     _initial_style_jaxpr,
     _initial_style_jaxprs_with_common_consts,
@@ -40,7 +39,7 @@ from pennylane.operation import AnyWires, Operation, Wires
 
 import catalyst
 import catalyst.jax_primitives as jprim
-from catalyst.jax_primitives import GradParams, adjoint_p, expval_p, probs_p
+from catalyst.jax_primitives import GradParams, expval_p, probs_p
 from catalyst.jax_tape import JaxTape
 from catalyst.jax_tracer import get_traceable_fn, insert_to_qreg, trace_quantum_tape
 from catalyst.utils.exceptions import CompileError, DifferentiableCompileError
@@ -530,7 +529,36 @@ class Adjoint(Operation):
 
 
 def adjoint(f: Callable) -> Callable:
-    def _adjoint(qreg=None, *args, **kwargs):
+    """ Getting the quantum adjoint of the computation defined by `f`.
+    Args:
+        f(Callable): PennyLane operation or a Python function containing PennyLane quantum
+                     operations. Quantum measurements within `f` are not allowed. Keyword arguments
+                     of `f` are not traced. The Catalyst control flow instructions are not supported
+                     at the moment.
+    Returns:
+        A callable opject accepting the same parameters as `f` but performing the computation
+        adjointed to what `f` does.
+
+    **Example**
+
+    .. code-block:: python
+
+        def f(param):
+            qml.RX(param, wires=0)
+            qml.RY(param, wires=0)
+
+        @qjit
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def workflow():
+            catalyst.adjoint(f)(pnp.pi/2)
+            return qml.state()
+
+    >>> workflow()
+    array([ 0.5-0.5j, -0.5+0.5j])
+    """
+
+    def _adjoint(qreg, *args, **kwargs):
+        """ The adjoint callable wrapper capturing arguments and running the tape tracing. """
         assert qreg is not None
         with JaxTape(do_queue=False) as tape:
             with tape.quantum_tape:
@@ -548,7 +576,7 @@ def adjoint(f: Callable) -> Callable:
     def _callable(*args, **kwargs):
         init_vals, in_tree = tree_flatten((jprim.Qreg(), *args))
         init_avals = tuple(_abstractify(val) for val in init_vals)
-        body_jaxpr, body_consts, body_tree = _initial_style_jaxpr(
+        body_jaxpr, _, _ = _initial_style_jaxpr(
             partial(_adjoint, **kwargs), in_tree, init_avals, "adjoint"
         )
         return Adjoint(body_jaxpr, *args, **kwargs)
