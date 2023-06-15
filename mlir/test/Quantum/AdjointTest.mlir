@@ -14,8 +14,8 @@
 
 // RUN: quantum-opt --adjoint-lowering --split-input-file %s | FileCheck %s
 
-func.func private @workflow() -> tensor<4xcomplex<f64>> attributes {} {
-  // CHECK:      workflow
+// CHECK:      workflow_plain
+func.func private @workflow_plain() -> tensor<4xcomplex<f64>> attributes {} {
   %c1_i64 = arith.constant 1 : i64
   %cst = arith.constant 4.000000e-01 : f64
   %c0_i64 = arith.constant 0 : i64
@@ -51,3 +51,53 @@ func.func private @workflow() -> tensor<4xcomplex<f64>> attributes {} {
   quantum.dealloc %0 : !quantum.reg
   return %9 : tensor<4xcomplex<f64>>
 }
+
+
+// CHECK:      workflow_nested
+// CHECK:      OpC
+// CHECK:      OpD
+// CHECK:      OpF
+// CHECK-SAME:      adjoint = true
+// CHECK:      OpE
+// CHECK-SAME:      adjoint = true
+// CHECK:      OpB
+// CHECK-SAME:      adjoint = true
+// CHECK:      OpA
+// CHECK-SAME:      adjoint = true
+func.func private @workflow_nested() -> tensor<4xcomplex<f64>> attributes {} {
+  %c1_i64 = arith.constant 1 : i64
+  %c0_i64 = arith.constant 0 : i64
+  quantum.device ["backend", "lightning.qubit"]
+  %0 = quantum.alloc( 2) : !quantum.reg
+  %1 = quantum.adjoint(%0) : (!quantum.reg) -> !quantum.reg {
+  ^bb0(%arg0: !quantum.reg):
+    %6 = quantum.extract %arg0[%c1_i64] : !quantum.reg -> !quantum.bit
+    %7 = quantum.custom "OpA"() %6 : !quantum.bit
+    %8 = quantum.custom "OpB"() %7 : !quantum.bit
+    %9 = quantum.insert %arg0[%c1_i64], %8 : !quantum.reg, !quantum.bit
+    %10 = quantum.adjoint(%9) : (!quantum.reg) -> !quantum.reg {
+    ^bb0(%arg1: !quantum.reg):
+      %11 = quantum.extract %arg1[%c1_i64] : !quantum.reg -> !quantum.bit
+      %12 = quantum.custom "OpC"() %11 : !quantum.bit
+      %13 = quantum.custom "OpD"() %12 : !quantum.bit
+      %14 = quantum.insert %arg1[%c1_i64], %13 : !quantum.reg, !quantum.bit
+      %15 = quantum.adjoint(%14) : (!quantum.reg) -> !quantum.reg {
+      ^bb0(%arg2: !quantum.reg):
+        %16 = quantum.extract %arg2[%c1_i64] : !quantum.reg -> !quantum.bit
+        %17 = quantum.custom "OpE"() %16 : !quantum.bit
+        %18 = quantum.custom "OpF"() %17 : !quantum.bit
+        %19 = quantum.insert %arg2[%c1_i64], %18 : !quantum.reg, !quantum.bit
+        quantum.yield %19 : !quantum.reg
+      }
+      quantum.yield %15 : !quantum.reg
+    }
+    quantum.yield %10 : !quantum.reg
+  }
+  %2 = quantum.extract %1[%c0_i64] : !quantum.reg -> !quantum.bit
+  %3 = quantum.extract %1[%c1_i64] : !quantum.reg -> !quantum.bit
+  %4 = quantum.compbasis %2, %3 : !quantum.obs
+  %5 = quantum.state %4 : tensor<4xcomplex<f64>>
+  quantum.dealloc %0 : !quantum.reg
+  return %5 : tensor<4xcomplex<f64>>
+}
+

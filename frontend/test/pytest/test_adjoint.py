@@ -27,7 +27,7 @@ from numpy.testing import assert_allclose
 # pylint: disable=missing-function-docstring
 
 
-def test_adjoint_func_simple():
+def test_adjoint_func_singlefun():
     def func():
         qml.PauliX(wires=0)
         qml.PauliY(wires=0)
@@ -71,7 +71,7 @@ def test_adjoint_singleop():
 
 
 @pytest.mark.parametrize("w, p", [(0, 0.5), (0, -100.0), (1, 123.22)])
-def test_adjoint_func_paramethrised(w, p):
+def test_adjoint_paramfun(w, p):
 
     def func(w, theta1, theta2, theta3):
         qml.RX(theta1*pnp.pi/2, wires=w)
@@ -98,10 +98,10 @@ def test_adjoint_func_paramethrised(w, p):
     assert_allclose(actual, desired)
 
 
-def test_adjoint_func_nested():
+def test_adjoint_nestedfun():
     def func(A,I):
-        qml.PauliX(wires=1)
-        qml.PauliY(wires=1)
+        qml.RX(I, wires=1)
+        qml.RY(I, wires=1)
         if I < 5:
             I = I + 1
             A(partial(func, A=A, I=I))()
