@@ -60,7 +60,6 @@ default_bin_paths = {
     "llvm": os.path.join(package_root, "../../mlir/llvm-project/build/bin"),
     "mhlo": os.path.join(package_root, "../../mlir/mlir-hlo/build/bin"),
     "quantum": os.path.join(package_root, "../../mlir/build/bin"),
-    "enzyme": os.path.join(package_root, "../../mlir/Enzyme/enzyme/build/Enzyme"),
 }
 
 default_lib_paths = {
@@ -68,6 +67,7 @@ default_lib_paths = {
     "runtime": os.path.join(package_root, "../../runtime/build/lib"),
 }
 
+default_enzyme_path = {"enzyme": os.path.join(package_root, "../../mlir/Enzyme/enzyme/build/Enzyme")}
 
 def get_executable_path(project, tool):
     """Get path to executable."""
@@ -75,6 +75,11 @@ def get_executable_path(project, tool):
     executable_path = os.path.join(path, tool)
     return executable_path if os.path.exists(executable_path) else tool
 
+def get_enzyme_path(project, tool):
+    """Get path to Enzyme."""
+    path = os.path.join(package_root, "enzyme") if INSTALLED else default_enzyme_path.get(project, "")
+    enzyme_path = os.path.join(path, tool)
+    return enzyme_path if os.path.exists(enzyme_path) else tool
 
 def get_lib_path(project, env_var):
     """Get the library path."""
@@ -270,9 +275,9 @@ class Enzyme(PassPipeline):
 
     _executable = get_executable_path("llvm", "opt")
     _default_flags = [
-        "-load-pass-plugin="+ get_executable_path("enzyme", "LLVMEnzyme-17.so"),
+        "-load-pass-plugin="+ get_enzyme_path("enzyme", "LLVMEnzyme-17.so"),
         "-load",
-        get_executable_path("enzyme", "LLVMEnzyme-17.so"),
+        get_enzyme_path("enzyme", "LLVMEnzyme-17.so"),
         "-passes=enzyme",
         "-S"
     ]
