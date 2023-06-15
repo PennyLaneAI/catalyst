@@ -203,9 +203,7 @@ bool quantum::QuantumDependenceAnalysis::dependsOnMeasurement(Value value)
         // A mid-circuit measurement implies a measurement.
         return state->getValue().dependsOnMeasurement() || state->getValue().dependsOnMCM();
     }
-    if (Operation *op = value.getDefiningOp()) {
-        op->emitWarning() << "depends on measurement looked up but not found";
-    }
+
     // If not visited, we assume it does not depend on a measurement.
     return false;
 }
@@ -224,5 +222,15 @@ bool quantum::QuantumDependenceAnalysis::dependsOnMidCircuitMeasurement(Value va
     }
 
     // If not visited, we assume it does not depend on a mid-circuit measurement.
+    return false;
+}
+
+bool quantum::QuantumDependenceAnalysis::isFunctionLive(FunctionOpInterface funcOp)
+{
+    auto *state = solver.getOrCreateState<Executable>(&funcOp.getFunctionBody().front());
+    if (state) {
+        return state->isLive();
+    }
+
     return false;
 }

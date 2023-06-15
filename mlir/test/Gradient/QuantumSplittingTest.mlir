@@ -13,20 +13,38 @@
 // limitations under the License.
 
 // RUN: quantum-opt %s --lower-gradients=split --split-input-file | FileCheck %s
-#map = affine_map<() -> ()>
 
-// func.func @straight_line(%arg0: f64) -> tensor<f64> attributes {qnode, diff_method = "parameter-shift"} {
-//     %0 = quantum.alloc(1) : !quantum.reg
-//     %1 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
-//     %2 = quantum.custom "RZ"(%arg0) %1 : !quantum.bit
-//     %3 = quantum.insert %0[1], %2 : !quantum.reg, !quantum.bit
-//     %4 = quantum.namedobs %2[3] : !quantum.obs
-//     %5 = quantum.expval %4 : f64
-//     %6 = tensor.from_elements %5 : tensor<f64>
-//     quantum.dealloc %0 : !quantum.reg
-//     return %6 : tensor<f64>
-// }
+// CHECK-LABEL: func.func private @straight_line.qsplit(%arg0: tensor<?xf64>, %arg1: tensor<?xindex>, %arg2: tensor<?xi64>) -> tensor<f64>
+func.func private @straight_line(%arg0: f64) -> tensor<f64> attributes {qnode, diff_method = "parameter-shift"} {
+    // CHECK-NEXT: [[idx1:%.+]] = index.constant 1
+    // CHECK-NEXT: [[idx0:%.+]] = index.constant 0
+    // CHECK-NEXT: [[paramCounter:%.+]] = memref.alloca() : memref<index>
+    // CHECK: memref.store [[idx0]], [[paramCounter]]
 
+    %0 = quantum.alloc(1) : !quantum.reg
+    %1 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
+    // CHECK: [[pidx:%.+]] = memref.load [[paramCounter]]
+    // CHECK-NEXT: [[param:%.+]] = tensor.extract %arg0[[[pidx]]]
+    // CHECK-NEXT: [[pidxNext:%.+]] = index.add [[pidx]], [[idx1]]
+    // CHECK-NEXT: quantum.custom "RZ"([[param]])
+    // CHECK-NEXT: memref.store [[pidxNext]], [[paramCounter]]
+    %2 = quantum.custom "RZ"(%arg0) %1 : !quantum.bit
+    %3 = quantum.insert %0[1], %2 : !quantum.reg, !quantum.bit
+    %4 = quantum.namedobs %2[3] : !quantum.obs
+    %5 = quantum.expval %4 : f64
+    %6 = tensor.from_elements %5 : tensor<f64>
+    quantum.dealloc %0 : !quantum.reg
+    return %6 : tensor<f64>
+}
+
+func.func @dstraight_line(%arg0: f64) {
+    gradient.grad "ps" @straight_line(%arg0) : (f64) -> tensor<f64>
+    return
+}
+
+// -----
+
+// CHECK-LABEL: func.func private @for_loop.qsplit(%arg0: tensor<?xf64>, %arg1: tensor<?xindex>, %arg2: tensor<?xi64>) -> tensor<f64>
 func.func private @for_loop(%start: index, %stop: index, %step: index, %arg0: tensor<f64>) -> tensor<f64> attributes {qnode, diff_method = "parameter-shift"} {
     %0 = quantum.alloc(4) : !quantum.reg
     %cst = arith.constant dense<2.000000e+00> : tensor<f64>

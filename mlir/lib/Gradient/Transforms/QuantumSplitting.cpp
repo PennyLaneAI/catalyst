@@ -163,16 +163,8 @@ void cloneQuantumRegion(quantum::QuantumDependenceAnalysis &qdepAnalysis, OpBuil
     Value cOne = builder.create<index::ConstantOp>(loc, 1);
 
     for (Operation &oldOp : region.front().without_terminator()) {
-        // TODO(jacob): this is a weird case, tensor.from_elements is used to convert the
-        // expectation value into a tensor. Should it be considered classical postprocessing?
-        // Probably shouldn't have this, could consider returning the expval directly as a float.
-        // Postprocessing should have its own thing.
         bool dependsOnMeasurement = qdepAnalysis.dependsOnMeasurement(&oldOp);
         bool isQuantum = oldOp.getDialect() == quantumDialect;
-
-        if (isa<tensor::ExtractOp>(&oldOp)) {
-            errs() << "depends on measurement: " << dependsOnMeasurement << "\n";
-        }
 
         if (auto gateOp = dyn_cast<quantum::DifferentiableGate>(&oldOp)) {
             // Load cached parameters.
@@ -347,6 +339,11 @@ void cloneQuantumRegion(quantum::QuantumDependenceAnalysis &qdepAnalysis, OpBuil
 func::FuncOp genQuantumSplitFunction(quantum::QuantumDependenceAnalysis &qdepAnalysis,
                                      OpBuilder &builder, Location loc, func::FuncOp callee)
 {
+    if (!qdepAnalysis.isFunctionLive(callee)) {
+        callee.emitWarning() << "Trying to split function that was not marked live, dataflow "
+                                "analysis will likely fail";
+    }
+
     auto fnName = builder.getStringAttr(callee.getName() + ".qsplit");
     SmallVector<Type> argTypes{
         RankedTensorType::get({ShapedType::kDynamic}, builder.getF64Type()),
@@ -357,6 +354,7 @@ func::FuncOp genQuantumSplitFunction(quantum::QuantumDependenceAnalysis &qdepAna
     func::FuncOp qsplitFn = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(callee, fnName);
     if (!qsplitFn) {
         qsplitFn = builder.create<func::FuncOp>(loc, fnName, fnType);
+        qsplitFn.setPrivate();
         Region &newBody = qsplitFn.getFunctionBody();
         PatternRewriter::InsertionGuard insertGuard(builder);
 
@@ -381,10 +379,6 @@ func::FuncOp genQuantumSplitFunction(quantum::QuantumDependenceAnalysis &qdepAna
         builder.clone(*oldReturn, map);
     }
 
-    errs() << "qsplit: " << qsplitFn << "\n";
-    if (failed(mlir::verify(qsplitFn))) {
-        errs() << "fn failed verification\n";
-    }
     return qsplitFn;
 }
 

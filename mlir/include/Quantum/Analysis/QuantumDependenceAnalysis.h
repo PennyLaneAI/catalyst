@@ -15,19 +15,22 @@
 #pragma once
 
 #include "mlir/Analysis/DataFlowFramework.h"
+#include "mlir/IR/FunctionInterfaces.h"
 #include "mlir/IR/Operation.h"
 
 namespace catalyst {
 namespace quantum {
 
 struct QuantumDependenceAnalysis {
-    QuantumDependenceAnalysis(mlir::Operation *);
+    QuantumDependenceAnalysis(mlir::Operation *op);
 
-    bool dependsOnMeasurement(mlir::Value);
+    bool dependsOnMeasurement(mlir::Value value);
 
-    bool dependsOnMeasurement(mlir::Operation *);
+    bool dependsOnMeasurement(mlir::Operation *op);
 
-    bool dependsOnMidCircuitMeasurement(mlir::Value);
+    bool dependsOnMidCircuitMeasurement(mlir::Value value);
+
+    bool isFunctionLive(mlir::FunctionOpInterface funcOp);
 
   private:
     mlir::DataFlowSolver solver;
