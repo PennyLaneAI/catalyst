@@ -366,8 +366,9 @@ struct NamedObsOpPattern : public OpConversionPattern<NamedObsOp> {
 
         LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
 
+        auto obsTypeInt = static_cast<uint32_t>(op.getType());
         Value obsType =
-            rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(op.getType()));
+            rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(obsTypeInt));
         SmallVector<Value> args = {obsType, adaptor.getQubit()};
 
         rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, args);
