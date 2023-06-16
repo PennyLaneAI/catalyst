@@ -90,7 +90,7 @@ func::FuncOp genArgMapFunction(PatternRewriter &rewriter, Location loc, func::Fu
                     rewriter.create<memref::StoreOp>(loc, paramIdx, paramsProcessed);
                 }
 
-                rewriter.replaceOp(op, cast<quantum::QuantumGate>(op).getQubitOperands());
+                rewriter.replaceOp(op, gate.getQubitOperands());
             }
             // Replace any return statements from the original function with the params vector.
             else if (isa<func::ReturnOp>(op)) {

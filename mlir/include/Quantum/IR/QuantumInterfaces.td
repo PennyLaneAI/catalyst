@@ -50,8 +50,7 @@ def QuantumGate : OpInterface<"QuantumGate"> {
     }];
 }
 
-// TODO: Make this interface inherit from QuantumGate (available since llvm/llvm-project@83a635c).
-def DifferentiableGate : OpInterface<"DifferentiableGate"> {
+def DifferentiableGate : OpInterface<"DifferentiableGate", [QuantumGate]> {
     let description = [{
         This interface provides a generic way to interact with differentiable
         quantum instructions. These are quantum operations with differentiable

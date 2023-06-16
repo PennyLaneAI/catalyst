@@ -55,6 +55,7 @@ from mlir_quantum.dialects.quantum import (
 from mlir_quantum.dialects.scf import ConditionOp, ForOp, IfOp, WhileOp, YieldOp
 from mlir_quantum.dialects.tensor import ExtractOp as TensorExtractOp
 from mlir_quantum.dialects.tensor import FromElementsOp
+from pennylane import QNode as pennylane_QNode
 
 from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
 
@@ -209,12 +210,22 @@ def _func_def_impl(ctx, *args, call_jaxpr, fn, call=True):  # pragma: no cover
     raise NotImplementedError()
 
 
-def _func_symbol_lowering(ctx, fn_name, call_jaxpr):
+def _func_def_lowering(ctx, fn, call_jaxpr) -> str:
     """Create a func::FuncOp from JAXPR."""
     if isinstance(call_jaxpr, core.Jaxpr):
         call_jaxpr = core.ClosedJaxpr(call_jaxpr, ())
-    symbol_name = mlir.lower_jaxpr_to_fun(ctx, fn_name, call_jaxpr, tuple()).name.value
-    return symbol_name
+    func_op = mlir.lower_jaxpr_to_fun(ctx, fn.__name__, call_jaxpr, tuple())
+
+    if isinstance(fn, pennylane_QNode):
+        func_op.attributes["qnode"] = ir.UnitAttr.get()
+        # "best", the default option in PennyLane, chooses backprop on the device
+        # if supported and parameter-shift otherwise. Emulating the same behaviour
+        # would require generating code to query the device.
+        # For simplicity, Catalyst instead defaults to finite-diff.
+        diff_method = fn.diff_method if fn.diff_method != "best" else "finite-diff"
+        func_op.attributes["diff_method"] = ir.StringAttr.get(diff_method)
+
+    return func_op.name.value
 
 
 def _func_call_lowering(symbol_name, avals_out, *args):
@@ -245,7 +256,7 @@ def _func_lowering(ctx, *args, call_jaxpr, fn, call=True):
     if fn in mlir_fn_cache:
         symbol_name = mlir_fn_cache[fn]
     else:
-        symbol_name = _func_symbol_lowering(ctx.module_context, fn.__name__, call_jaxpr)
+        symbol_name = _func_def_lowering(ctx.module_context, fn, call_jaxpr)
         mlir_fn_cache[fn] = symbol_name
 
     if not call:

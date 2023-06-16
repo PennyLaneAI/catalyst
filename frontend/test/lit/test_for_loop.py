@@ -57,7 +57,7 @@ def loop_circuit(n: int, inc: float):
     return qml.state()
 
 
-# TODO: replace with internally applied canonicalization (#241)
+# TODO: replace with internally applied canonicalization (#48)
 subprocess.run(
     ["mlir-hlo-opt", "--canonicalize", "--allow-unregistered-dialect"],
     input=loop_circuit.mlir,
