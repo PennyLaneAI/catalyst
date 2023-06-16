@@ -55,10 +55,7 @@ try:
     # From within a build target we have access to cmake variables configured in lit.site.cfg.py.in.
     llvm_config.with_environment(
         "PYTHONPATH",
-        [
-            config.mlir_bindings_dir,
-            # TODO: add gradient dialect bindings
-        ],
+        [config.mlir_bindings_dir],
         append_path=True,
     )
 except AttributeError:

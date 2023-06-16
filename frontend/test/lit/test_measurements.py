@@ -29,7 +29,7 @@ def sample1(x: float, y: float):
     # CHECK: [[q0:%.+]] = "quantum.custom"({{%.+}}, {{%.+}}) {gate_name = "RZ"
     qml.RZ(0.1, wires=0)
 
-    # CHECK: [[obs:%.+]] = "quantum.namedobs"([[q0]]) {type = 3 : i8}
+    # CHECK: [[obs:%.+]] = "quantum.namedobs"([[q0]]) {type = #quantum<named_observable PauliZ>}
     # CHECK: "quantum.sample"([[obs]]) {shots = 1000 : i64} {{.+}} -> tensor<1000xf64>
     return qml.sample(qml.PauliZ(0))
 
@@ -47,8 +47,8 @@ def sample2(x: float, y: float):
     # CHECK: [[q0:%.+]] = "quantum.custom"({{%.+}}, {{%.+}}) {gate_name = "RZ"
     qml.RZ(0.1, wires=0)
 
-    # CHECK: [[obs1:%.+]] = "quantum.namedobs"([[q1]]) {type = 1 : i8}
-    # CHECK: [[obs2:%.+]] = "quantum.namedobs"([[q0]]) {type = 0 : i8}
+    # CHECK: [[obs1:%.+]] = "quantum.namedobs"([[q1]]) {type = #quantum<named_observable PauliX>}
+    # CHECK: [[obs2:%.+]] = "quantum.namedobs"([[q0]]) {type = #quantum<named_observable Identity>}
     # CHECK: [[obs3:%.+]] = "quantum.tensor"([[obs1]], [[obs2]])
     # CHECK: "quantum.sample"([[obs3]]) {shots = 1000 : i64} {{.+}} -> tensor<1000xf64>
     return qml.sample(qml.PauliX(1) @ qml.Identity(0))
@@ -84,7 +84,7 @@ def counts1(x: float, y: float):
     # CHECK: [[q0:%.+]] = "quantum.custom"({{%.+}}, {{%.+}}) {gate_name = "RZ"
     qml.RZ(0.1, wires=0)
 
-    # CHECK: [[obs:%.+]] = "quantum.namedobs"([[q0]]) {type = 3 : i8}
+    # CHECK: [[obs:%.+]] = "quantum.namedobs"([[q0]]) {type = #quantum<named_observable PauliZ>}
     # CHECK: "quantum.counts"([[obs]]) {{.*}}shots = 1000 : i64{{.*}} : (!quantum.obs) -> (tensor<2xf64>, tensor<2xi64>)
     return qml.counts(qml.PauliZ(0))
 
@@ -102,8 +102,8 @@ def counts2(x: float, y: float):
     # CHECK: [[q0:%.+]] = "quantum.custom"({{%.+}}, {{%.+}}) {gate_name = "RZ"
     qml.RZ(0.1, wires=0)
 
-    # CHECK: [[obs1:%.+]] = "quantum.namedobs"([[q1]]) {type = 1 : i8}
-    # CHECK: [[obs2:%.+]] = "quantum.namedobs"([[q0]]) {type = 0 : i8}
+    # CHECK: [[obs1:%.+]] = "quantum.namedobs"([[q1]]) {type = #quantum<named_observable PauliX>}
+    # CHECK: [[obs2:%.+]] = "quantum.namedobs"([[q0]]) {type = #quantum<named_observable Identity>}
     # CHECK: [[obs3:%.+]] = "quantum.tensor"([[obs1]], [[obs2]])
     # CHECK: "quantum.counts"([[obs3]]) {{.*}}shots = 1000 : i64{{.*}} : (!quantum.obs) -> (tensor<2xf64>, tensor<2xi64>)
     return qml.counts(qml.PauliX(1) @ qml.Identity(0))
@@ -139,7 +139,7 @@ def expval1(x: float, y: float):
     # CHECK: [[q0:%.+]] = "quantum.custom"({{%.+}}, {{%.+}}) {gate_name = "RZ"
     qml.RZ(0.1, wires=0)
 
-    # CHECK: [[obs:%.+]] = "quantum.namedobs"([[q0]]) {type = 1 : i8}
+    # CHECK: [[obs:%.+]] = "quantum.namedobs"([[q0]]) {type = #quantum<named_observable PauliX>}
     # CHECK: "quantum.expval"([[obs]]) {{.+}} -> f64
     return qml.expval(qml.PauliX(0))
 
@@ -158,9 +158,9 @@ def expval2(x: float, y: float):
     # CHECK: [[q2:%.+]] = "quantum.custom"({{%.+}}, {{%.+}}) {gate_name = "RZ"
     qml.RZ(0.1, wires=2)
 
-    # CHECK: [[p1:%.+]] = "quantum.namedobs"([[q0]]) {type = 1 : i8}
-    # CHECK: [[p2:%.+]] = "quantum.namedobs"([[q1]]) {type = 3 : i8}
-    # CHECK: [[p3:%.+]] = "quantum.namedobs"([[q2]]) {type = 4 : i8}
+    # CHECK: [[p1:%.+]] = "quantum.namedobs"([[q0]]) {type = #quantum<named_observable PauliX>}
+    # CHECK: [[p2:%.+]] = "quantum.namedobs"([[q1]]) {type = #quantum<named_observable PauliZ>}
+    # CHECK: [[p3:%.+]] = "quantum.namedobs"([[q2]]) {type = #quantum<named_observable Hadamard>}
     # CHECK: [[t0:%.+]] = "quantum.tensor"([[p1]], [[p2]], [[p3]])
     # CHECK: "quantum.expval"([[t0]]) {{.+}} -> f64
     return qml.expval(qml.PauliX(0) @ qml.PauliZ(1) @ qml.Hadamard(2))
@@ -224,7 +224,7 @@ def expval5(x: float, y: float):
         ]
     )
 
-    # CHECK: [[p0:%.+]] = "quantum.namedobs"([[q1]]) {type = 1 : i8}
+    # CHECK: [[p0:%.+]] = "quantum.namedobs"([[q1]]) {type = #quantum<named_observable PauliX>}
     # CHECK: [[h0:%.+]] = "quantum.hermitian"({{%.+}}, [[q0]], [[q2]]) : (tensor<4x4xcomplex<f64>>, !quantum.bit, !quantum.bit) -> !quantum.obs
     # CHECK: [[obs:%.+]] = "quantum.tensor"([[p0]], [[h0]])
     # CHECK: "quantum.expval"([[obs]]) {{.+}} -> f64
@@ -248,11 +248,11 @@ def expval5(x: float, y: float):
     coeffs = np.array([0.2, -0.543])
     obs = [qml.PauliX(0) @ qml.PauliZ(1), qml.PauliZ(0) @ qml.Hadamard(2)]
 
-    # CHECK: [[n0:%.+]] = "quantum.namedobs"([[q0]]) {type = 1 : i8}
-    # CHECK: [[n1:%.+]] = "quantum.namedobs"([[q1]]) {type = 3 : i8}
+    # CHECK: [[n0:%.+]] = "quantum.namedobs"([[q0]]) {type = #quantum<named_observable PauliX>}
+    # CHECK: [[n1:%.+]] = "quantum.namedobs"([[q1]]) {type = #quantum<named_observable PauliZ>}
     # CHECK: [[t0:%.+]] = "quantum.tensor"([[n0]], [[n1]])
-    # CHECK: [[n2:%.+]] = "quantum.namedobs"([[q0]]) {type = 3 : i8}
-    # CHECK: [[n3:%.+]] = "quantum.namedobs"([[q2]]) {type = 4 : i8}
+    # CHECK: [[n2:%.+]] = "quantum.namedobs"([[q0]]) {type = #quantum<named_observable PauliZ>}
+    # CHECK: [[n3:%.+]] = "quantum.namedobs"([[q2]]) {type = #quantum<named_observable Hadamard>}
     # CHECK: [[t1:%.+]] = "quantum.tensor"([[n2]], [[n3]])
     # CHECK: [[obs:%.+]] = "quantum.hamiltonian"({{%.+}}, [[t0]], [[t1]]) : (tensor<2xf64>, !quantum.obs, !quantum.obs) -> !quantum.obs
     # CHECK: "quantum.expval"([[obs]]) {{.+}} -> f64
@@ -282,7 +282,7 @@ def expval6(x: float):
     # CHECK: [[h0:%.+]] = "quantum.hermitian"({{%.+}}, {{%.+}}, {{%.+}}) : (tensor<4x4xcomplex<f64>>, !quantum.bit, !quantum.bit) -> !quantum.obs
     obs = qml.Hermitian(obs_matrix, wires=[0, 1])
 
-    # CHECK: [[n0:%.+]] = "quantum.namedobs"([[q0]]) {type = 1 : i8}
+    # CHECK: [[n0:%.+]] = "quantum.namedobs"([[q0]]) {type = #quantum<named_observable PauliX>}
     # CHECK: [[obs:%.+]] = "quantum.hamiltonian"({{%.+}}, [[h0]], [[n0]]) : (tensor<2xf64>, !quantum.obs, !quantum.obs) -> !quantum.obs
     # CHECK: "quantum.expval"([[obs]]) {{.+}} -> f64
     return qml.expval(qml.Hamiltonian(coeff, [obs, qml.PauliX(0)]))
@@ -337,9 +337,9 @@ def expval9(x: float, y: float):
     # CHECK: [[q2:%.+]] = "quantum.custom"({{%.+}}, {{%.+}}) {gate_name = "RZ"
     qml.RZ(0.1, wires=2)
 
-    # CHECK: [[p1:%.+]] = "quantum.namedobs"([[q0]]) {type = 1 : i8}
-    # CHECK: [[p2:%.+]] = "quantum.namedobs"([[q1]]) {type = 3 : i8}
-    # CHECK: [[p3:%.+]] = "quantum.namedobs"([[q2]]) {type = 4 : i8}
+    # CHECK: [[p1:%.+]] = "quantum.namedobs"([[q0]]) {type = #quantum<named_observable PauliX>}
+    # CHECK: [[p2:%.+]] = "quantum.namedobs"([[q1]]) {type = #quantum<named_observable PauliZ>}
+    # CHECK: [[p3:%.+]] = "quantum.namedobs"([[q2]]) {type = #quantum<named_observable Hadamard>}
     # CHECK: [[obs:%.+]] = "quantum.tensor"([[p1]], [[p2]], [[p3]])
     # CHECK: "quantum.expval"([[obs]]) {{.+}} -> f64
     return qml.expval(qml.PauliX(0) @ qml.PauliZ(1) @ qml.Hadamard(2))
@@ -368,7 +368,7 @@ def expval10(x: float, y: float):
         ]
     )
 
-    # CHECK: [[p0:%.+]] = "quantum.namedobs"([[q1]]) {type = 1 : i8}
+    # CHECK: [[p0:%.+]] = "quantum.namedobs"([[q1]]) {type = #quantum<named_observable PauliX>}
     # CHECK: [[h0:%.+]] = "quantum.hermitian"({{%.+}}, [[q0]], [[q2]]) : (tensor<4x4xcomplex<f64>>, !quantum.bit, !quantum.bit) -> !quantum.obs
     # CHECK: [[obs:%.+]] = "quantum.tensor"([[p0]], [[h0]])
     # CHECK: "quantum.expval"([[obs]]) {{.+}} -> f64
@@ -387,7 +387,7 @@ def var1(x: float, y: float):
     # CHECK: [[q0:%.+]] = "quantum.custom"({{%.+}}, {{%.+}}) {gate_name = "RZ"
     qml.RZ(0.1, wires=0)
 
-    # CHECK: [[obs:%.+]] = "quantum.namedobs"([[q0]]) {type = 1 : i8}
+    # CHECK: [[obs:%.+]] = "quantum.namedobs"([[q0]]) {type = #quantum<named_observable PauliX>}
     # CHECK: "quantum.var"([[obs]]) {{.+}} -> f64
     return qml.var(qml.PauliX(0))
 

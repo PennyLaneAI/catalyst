@@ -14,6 +14,7 @@
 
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/OpImplementation.h"
+#include "llvm/ADT/TypeSwitch.h"
 
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/IR/QuantumOps.h"
@@ -25,6 +26,7 @@ using namespace catalyst::quantum;
 // Quantum op definitions.
 //===----------------------------------------------------------------------===//
 
+#include "Quantum/IR/QuantumEnums.cpp.inc"
 #define GET_OP_CLASSES
 #include "Quantum/IR/QuantumOps.cpp.inc"
 

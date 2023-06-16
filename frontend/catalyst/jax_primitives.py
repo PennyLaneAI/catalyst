@@ -55,6 +55,7 @@ from mlir_quantum.dialects.quantum import (
 from mlir_quantum.dialects.scf import ConditionOp, ForOp, IfOp, WhileOp, YieldOp
 from mlir_quantum.dialects.tensor import ExtractOp as TensorExtractOp
 from mlir_quantum.dialects.tensor import FromElementsOp
+from pennylane import QNode as pennylane_QNode
 
 from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
 
@@ -209,12 +210,22 @@ def _func_def_impl(ctx, *args, call_jaxpr, fn, call=True):  # pragma: no cover
     raise NotImplementedError()
 
 
-def _func_symbol_lowering(ctx, fn_name, call_jaxpr):
+def _func_def_lowering(ctx, fn, call_jaxpr) -> str:
     """Create a func::FuncOp from JAXPR."""
     if isinstance(call_jaxpr, core.Jaxpr):
         call_jaxpr = core.ClosedJaxpr(call_jaxpr, ())
-    symbol_name = mlir.lower_jaxpr_to_fun(ctx, fn_name, call_jaxpr, tuple()).name.value
-    return symbol_name
+    func_op = mlir.lower_jaxpr_to_fun(ctx, fn.__name__, call_jaxpr, tuple())
+
+    if isinstance(fn, pennylane_QNode):
+        func_op.attributes["qnode"] = ir.UnitAttr.get()
+        # "best", the default option in PennyLane, chooses backprop on the device
+        # if supported and parameter-shift otherwise. Emulating the same behaviour
+        # would require generating code to query the device.
+        # For simplicity, Catalyst instead defaults to finite-diff.
+        diff_method = fn.diff_method if fn.diff_method != "best" else "finite-diff"
+        func_op.attributes["diff_method"] = ir.StringAttr.get(diff_method)
+
+    return func_op.name.value
 
 
 def _func_call_lowering(symbol_name, avals_out, *args):
@@ -245,7 +256,7 @@ def _func_lowering(ctx, *args, call_jaxpr, fn, call=True):
     if fn in mlir_fn_cache:
         symbol_name = mlir_fn_cache[fn]
     else:
-        symbol_name = _func_symbol_lowering(ctx.module_context, fn.__name__, call_jaxpr)
+        symbol_name = _func_def_lowering(ctx.module_context, fn, call_jaxpr)
         mlir_fn_cache[fn] = symbol_name
 
     if not call:
@@ -835,7 +846,13 @@ def _namedobs_abstract_eval(qubit, kind):
     return AbstractObs()
 
 
-def _named_obs_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value, kind: int):
+def _named_obs_attribute(ctx, kind: str):
+    return ir.OpaqueAttr.get(
+        "quantum", ("named_observable " + kind).encode("utf-8"), ir.NoneType.get(ctx), ctx
+    )
+
+
+def _named_obs_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value, kind: str):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
@@ -843,8 +860,7 @@ def _named_obs_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value, kind
     assert ir.OpaqueType(qubit.type).dialect_namespace == "quantum"
     assert ir.OpaqueType(qubit.type).data == "bit"
 
-    i8_type = ir.IntegerType.get_signless(8, ctx)
-    obsId = ir.IntegerAttr.get(i8_type, kind)
+    obsId = _named_obs_attribute(ctx, kind)
     result_type = ir.OpaqueType.get("quantum", "obs", ctx)
 
     return NamedObsOp(result_type, qubit, obsId).results

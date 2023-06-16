@@ -15,7 +15,7 @@
 // RUN: quantum-opt %s --lower-gradients=only=fd --split-input-file | FileCheck %s
 
 // Check scalar to scalar function
-func.func private @funcScalarScalar(%arg0: f64) -> f64
+func.func private @funcScalarScalar(%arg0: f64) -> f64 attributes {qnode, diff_method = "finite-diff"}
 
 // CHECK-LABEL: @funcScalarScalar.finitediff0(%arg0: f64) -> f64
     // CHECK:        [[CONSTANT:%.+]] = arith.constant 2.000000e+00 : f64
@@ -38,7 +38,7 @@ func.func @gradCallScalarScalar(%arg0: f64) -> f64 {
 // -----
 
 // Check scalar to tensor function
-func.func private @funcScalarTensor(%arg0: f64) -> tensor<2x3xf64>
+func.func private @funcScalarTensor(%arg0: f64) -> tensor<2x3xf64> attributes {qnode, diff_method = "finite-diff"}
 
 // CHECK-LABEL: @funcScalarTensor.finitediff0(%arg0: f64) -> tensor<2x3xf64>
     // CHECK:        [[RESULTCONST:%.+]] = arith.constant dense<2.000000e+00> : tensor<2x3xf64>
@@ -62,7 +62,7 @@ func.func @gradCallScalarTensor(%arg0: f64) -> tensor<2x3xf64> {
 // -----
 
 // Check scalar tensor to scalar
-func.func private @funcTensorScalar(%arg0: tensor<f64>) -> f64
+func.func private @funcTensorScalar(%arg0: tensor<f64>) -> f64 attributes {qnode, diff_method = "finite-diff"}
 
 // CHECK-LABEL: @funcTensorScalar.finitediff0(%arg0: tensor<f64>) -> f64
     // CHECK:        [[CONSTANT:%.+]] = arith.constant {{.+}} : f64
@@ -86,7 +86,7 @@ func.func @gradCallTensorScalar(%arg0: tensor<f64>) -> f64 {
 // -----
 
 // Check scalar to scalar tensor function
-func.func private @funcScalarScalarTensor(%arg0: f64) -> tensor<f64>
+func.func private @funcScalarScalarTensor(%arg0: f64) -> tensor<f64> attributes {qnode, diff_method = "finite-diff"}
 
 // CHECK-LABEL: @funcScalarScalarTensor.finitediff0(%arg0: f64) -> tensor<f64>
     // CHECK:        [[RESULTCONST:%.+]] = arith.constant dense<{{.+}}> : tensor<f64>
@@ -111,7 +111,7 @@ func.func @gradCallScalarScalarTensor(%arg0: f64) -> tensor<f64> {
 // -----
 
 // Check tensor to scalar
-func.func private @funcTensorScalar(%arg0: tensor<3xf64>) -> f64
+func.func private @funcTensorScalar(%arg0: tensor<3xf64>) -> f64 attributes {qnode, diff_method = "finite-diff"}
 
 // CHECK-LABEL: @funcTensorScalar.finitediff0(%arg0: tensor<3xf64>) -> tensor<3xf64>
     // CHECK:        [[OPERANDCONST:%.+]] = arith.constant dense<3.000000e+00> : tensor<3xf64>
@@ -133,7 +133,7 @@ func.func @gradCallTensorScalar(%arg0: tensor<3xf64>) -> tensor<3xf64> {
 // -----
 
 // Check tensor to tensor case
-func.func private @funcTensorTensor(%arg0: tensor<7x3x2x1xf64>) -> tensor<2xf32>
+func.func private @funcTensorTensor(%arg0: tensor<7x3x2x1xf64>) -> tensor<2xf32> attributes {qnode, diff_method = "finite-diff"}
 
 // CHECK-LABEL: @funcTensorTensor.finitediff0(%arg0: tensor<7x3x2x1xf64>) -> tensor<7x3x2x1x2xf32>
     // CHECK:        [[RESULTCONST:%.+]] = arith.constant dense<4.000000e+00> : tensor<7x3x2x1x2xf32>
@@ -155,7 +155,7 @@ func.func @gradCallTensorTensor(%arg0: tensor<7x3x2x1xf64>) -> tensor<7x3x2x1x2x
 // -----
 
 // Check multiple arguments case
-func.func private @funcMultiArg(%arg0: tensor<7xf64>, %arg1: f64) -> tensor<2xf64>
+func.func private @funcMultiArg(%arg0: tensor<7xf64>, %arg1: f64) -> tensor<2xf64> attributes {qnode, diff_method = "finite-diff"}
 
 // CHECK-LABEL: @funcMultiArg.finitediff0(%arg0: tensor<7xf64>, %arg1: f64) -> tensor<7x2xf64>
     // CHECK:        [[BASE:%.+]] = call @funcMultiArg(%arg0, %arg1)
@@ -215,7 +215,7 @@ func.func @gradCallMultiArg(%arg0: tensor<7xf64>, %arg1: f64) -> (tensor<7x2xf64
 // -----
 
 // Check multiple results case
-func.func private @funcMultiRes(%arg0: tensor<7xf64>) -> (f64, tensor<2xf64>)
+func.func private @funcMultiRes(%arg0: tensor<7xf64>) -> (f64, tensor<2xf64>) attributes {qnode, diff_method = "finite-diff"}
 
 // CHECK-LABEL: @funcMultiRes.finitediff0(%arg0: tensor<7xf64>) -> (tensor<7xf64>, tensor<7x2xf64>)
     // CHECK:        [[BASE:%.+]]:2 = call @funcMultiRes(%arg0)
@@ -252,7 +252,7 @@ func.func @gradCallMultiRes(%arg0: tensor<7xf64>) -> (tensor<7xf64>, tensor<7x2x
 // -----
 
 // Check dynamic tensor shape case
-func.func private @funcDynamicTensor(%arg0: tensor<?x3xf64>) -> tensor<2x?xf32>
+func.func private @funcDynamicTensor(%arg0: tensor<?x3xf64>) -> tensor<2x?xf32> attributes {qnode, diff_method = "finite-diff"}
 
 // CHECK-LABEL: @funcDynamicTensor.finitediff0(%arg0: tensor<?x3xf64>) -> tensor<?x3x2x?xf32>
     // CHECK-DAG:    [[C0:%.+]] = arith.constant 0 : index
@@ -291,7 +291,7 @@ func.func @gradCallDynamicTensor(%arg0: tensor<?x3xf64>) -> tensor<?x3x2x?xf32> 
 // -----
 
 // Check multiple grad calls to same function
-func.func private @funcMultiCall(%arg0: f64) -> f64
+func.func private @funcMultiCall(%arg0: f64) -> f64 attributes {qnode, diff_method = "finite-diff"}
 
 // CHECK-LABEL: @funcMultiCall.finitediff0(%arg0: f64) -> f64
 
