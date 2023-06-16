@@ -22,6 +22,7 @@ from jax import numpy as jnp
 
 import catalyst.utils.calculate_grad_shape as infer
 from catalyst import CompileError, cond, for_loop, grad, qjit
+from catalyst.pennylane_extensions import DifferentiableTypeError
 
 
 class TestGradShape:
@@ -60,10 +61,11 @@ def test_non_differentiable_qnode():
 
     @qjit
     def grad_f(x):
-        return grad(f, method="mixed")(x)
+        return grad(f, method="defer")(x)
 
     with pytest.raises(
-        ValueError, match="Cannot differentiate a QNode explicitly marked non-differentiable"
+        DifferentiableTypeError,
+        match="Cannot differentiate a QNode explicitly marked non-differentiable",
     ):
         grad_f(1.0)
 
@@ -80,9 +82,11 @@ def test_param_shift_on_non_expval(backend):
         return x, y
 
     def workflow(p: float):
-        return grad(func, method="mixed")(p)
+        return grad(func, method="defer")(p)
 
-    with pytest.raises(TypeError, match="The parameter-shift method can only be used"):
+    with pytest.raises(
+        DifferentiableTypeError, match="The parameter-shift method can only be used"
+    ):
         qjit(workflow)
 
 
@@ -98,9 +102,9 @@ def test_adjoint_on_non_expval(backend):
         return x, y
 
     def workflow(p: float):
-        return grad(func, method="mixed")(p)
+        return grad(func, method="defer")(p)
 
-    with pytest.raises(TypeError, match="The adjoint method can only be used"):
+    with pytest.raises(DifferentiableTypeError, match="The adjoint method can only be used"):
         qjit(workflow)
 
 
@@ -188,7 +192,7 @@ def test_adj(inp, backend):
     @qjit()
     def compiled(x: float):
         g = qml.qnode(qml.device(backend, wires=1), diff_method="adjoint")(f)
-        h = grad(g, method="mixed")
+        h = grad(g, method="defer")
         return h(x)
 
     def interpreted(x):
@@ -211,7 +215,7 @@ def test_adj_mult(inp, backend):
     @qjit()
     def compiled(x: float):
         g = qml.qnode(qml.device(backend, wires=1), diff_method="adjoint")(f)
-        h = grad(g, method="mixed")
+        h = grad(g, method="defer")
         return h(x)
 
     def interpreted(x):
@@ -234,7 +238,7 @@ def test_adj_in_loop(inp, backend):
 
     @qjit()
     def compiled_grad_default(params, ntrials):
-        diff = grad(f, argnum=0, method="mixed")
+        diff = grad(f, argnum=0, method="defer")
 
         def fn(i, g):
             return diff(params)
@@ -261,7 +265,7 @@ def test_ps(inp, backend):
     @qjit()
     def compiled(x: float):
         g = qml.qnode(qml.device(backend, wires=1), diff_method="parameter-shift")(f)
-        h = grad(g, method="mixed")
+        h = grad(g, method="defer")
         return h(x)
 
     def interpreted(x):
@@ -299,7 +303,7 @@ def test_ps_conditionals(inp, backend):
     @qjit()
     def compiled(x: float, y: float):
         g = qml.qnode(qml.device(backend, wires=1), diff_method="parameter-shift")(f_compiled)
-        h = grad(g, method="mixed", argnum=0)
+        h = grad(g, method="defer", argnum=0)
         return h(x, y)
 
     def interpreted(x, y):
@@ -332,7 +336,7 @@ def test_ps_for_loops(inp, backend):
     @qjit()
     def compiled(x: float, y: int):
         g = qml.qnode(qml.device(backend, wires=1), diff_method="parameter-shift")(f_compiled)
-        h = grad(g, method="mixed", argnum=0)
+        h = grad(g, method="defer", argnum=0)
         return h(x, y)
 
     def interpreted(x, y):
@@ -374,7 +378,7 @@ def test_ps_for_loops_entangled(inp, backend):
     @qjit()
     def compiled(x: float, y: int, z: int):
         g = qml.qnode(qml.device(backend, wires=3), diff_method="parameter-shift")(f_compiled)
-        h = grad(g, method="mixed", argnum=0)
+        h = grad(g, method="defer", argnum=0)
         return h(x, y, z)
 
     def interpreted(x, y, z):
@@ -432,7 +436,7 @@ def test_ps_qft(inp, backend):
     @qjit()
     def compiled(x: float, y: int, z: int):
         g = qml.qnode(qml.device(backend, wires=3), diff_method="parameter-shift")(qft_compiled)
-        h = grad(g, method="mixed", argnum=0)
+        h = grad(g, method="defer", argnum=0)
         return h(x, y, z)
 
     def interpreted(x, y, z):
@@ -455,7 +459,7 @@ def test_ps_probs(backend):
 
     @qjit
     def workflow(p: float):
-        return grad(func, method="mixed")(p)
+        return grad(func, method="defer")(p)
 
     assert np.allclose(workflow(0.5), [0.93879128, 0.06120872])
 
@@ -567,7 +571,7 @@ def test_ps_grad_range_change(inp, backend):
     @qjit()
     def compiled_grad_range_change(x: float):
         g = qml.qnode(qml.device(backend, wires=1), diff_method="parameter-shift")(f2)
-        h = grad(g, method="mixed", argnum=[0, 1])
+        h = grad(g, method="defer", argnum=[0, 1])
         return h(x, 2.0)
 
     def interpretted_grad_range_change(x):
@@ -590,7 +594,7 @@ def test_ps_tensorinp(inp, backend):
     @qjit()
     def compiled(x: jax.core.ShapedArray([1], float)):
         g = qml.qnode(qml.device(backend, wires=1), diff_method="parameter-shift")(f2)
-        h = grad(g, method="mixed", argnum=[0, 1])
+        h = grad(g, method="defer", argnum=[0, 1])
         return h(x, 2.0)
 
     def interpretted(x):
@@ -614,7 +618,7 @@ def test_adjoint_grad_range_change(inp, backend):
     @qjit()
     def compiled_grad_range_change(x: float):
         g = qml.qnode(qml.device(backend, wires=1), diff_method="adjoint")(f2)
-        h = grad(g, method="mixed", argnum=[0, 1])
+        h = grad(g, method="defer", argnum=[0, 1])
         return h(x, 2.0)
 
     def interpretted_grad_range_change(x):
@@ -639,8 +643,8 @@ def test_assert_no_higher_order_without_fd(method, backend):
         @qjit()
         def workflow(x: float):
             g = qml.qnode(qml.device(backend, wires=1), diff_method=method)(f)
-            h = grad(g, method="mixed")
-            i = grad(h, method="mixed")
+            h = grad(g, method="defer")
+            i = grad(h, method="defer")
             return i(x)
 
 
@@ -724,7 +728,7 @@ def test_finite_diff_higher_order(inp, backend):
     assert np.allclose(compiled_grad2_default(inp), interpretted_grad2_default(inp), rtol=0.1)
 
 
-@pytest.mark.parametrize("g_method", ["fd", "mixed"])
+@pytest.mark.parametrize("g_method", ["fd", "defer"])
 @pytest.mark.parametrize(
     "h_coeffs", [[0.2, -0.53], np.array([0.2, -0.53]), jnp.array([0.2, -0.53])]
 )
@@ -790,7 +794,7 @@ def test_non_float_res(backend):
         cost_fn(1.0, 2.0)
 
 
-@pytest.mark.parametrize("diff_method", ["fd", "mixed"])
+@pytest.mark.parametrize("diff_method", ["fd", "defer"])
 @pytest.mark.parametrize("inp", [(1.0), (2.0)])
 def test_finite_diff_multiple_devices(inp, diff_method, backend):
     """Test gradient methods using multiple backend devices."""

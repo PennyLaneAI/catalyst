@@ -149,6 +149,10 @@ DifferentiableLike = Union[Differentiable, Callable, "catalyst.compilation_pipel
 Jaxpr = Any
 
 
+class DifferentiableTypeError(TypeError):
+    pass
+
+
 def _ensure_differentiable(f: DifferentiableLike) -> Differentiable:
     """Narrows down the set of the supported differentiable objects."""
     if isinstance(f, (Function, QNode)):
@@ -157,7 +161,7 @@ def _ensure_differentiable(f: DifferentiableLike) -> Differentiable:
         return f.qfunc
     elif isinstance(f, Callable):  # Keep at the bottom
         return Function(f)
-    raise TypeError(f"Non-differentiable object passed: {type(f)}")
+    raise DifferentiableTypeError(f"Non-differentiable object passed: {type(f)}")
 
 
 def _make_jaxpr_check_differentiable(f: Differentiable, grad_params: GradParams, *args) -> Jaxpr:
@@ -171,13 +175,13 @@ def _make_jaxpr_check_differentiable(f: Differentiable, grad_params: GradParams,
 
     for pos, arg in enumerate(jaxpr.in_avals):
         if arg.dtype.kind != "f" and pos in grad_params.argnum:
-            raise TypeError(
+            raise DifferentiableTypeError(
                 "Catalyst.grad only supports differentiation on floating-point "
                 f"arguments, got '{arg.dtype}' at position {pos}."
             )
     for pos, res in enumerate(jaxpr.out_avals):
         if res.dtype.kind != "f":
-            raise TypeError(
+            raise DifferentiableTypeError(
                 "Catalyst.grad only supports differentiation on floating-point "
                 f"results, got '{res.dtype}' at position {pos}."
             )
@@ -195,7 +199,7 @@ def _make_jaxpr_check_differentiable(f: Differentiable, grad_params: GradParams,
             f, qml.QNode
         ), "Differentiation methods other than finite-differences can only operate on a QNode"
         if f.diff_method is None:
-            raise TypeError(
+            raise DifferentiableTypeError(
                 "Cannot differentiate a QNode explicitly marked non-differentiable (with"
                 " diff_method=None)"
             )
@@ -203,12 +207,12 @@ def _make_jaxpr_check_differentiable(f: Differentiable, grad_params: GradParams,
         if f.diff_method == "parameter-shift" and any(
             prim not in [expval_p, probs_p] for prim in return_ops
         ):
-            raise TypeError(
+            raise DifferentiableTypeError(
                 "The parameter-shift method can only be used for QNodes "
                 "which return either qml.expval or qml.probs."
             )
         if f.diff_method == "adjoint" and any(prim not in [expval_p] for prim in return_ops):
-            raise TypeError(
+            raise DifferentiableTypeError(
                 "The adjoint method can only be used for QNodes which return qml.expval."
             )
     return jaxpr
@@ -217,7 +221,7 @@ def _make_jaxpr_check_differentiable(f: Differentiable, grad_params: GradParams,
 def _check_grad_params(
     method: str, h: Optional[float], argnum: Optional[Union[int, List[int]]]
 ) -> GradParams:
-    methods = {"fd", "mixed"}
+    methods = {"fd", "defer"}
     if method is None:
         method = "fd"
     if method not in methods:
@@ -306,13 +310,13 @@ def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
     Args:
         f (Callable): a function or a function object to differentiate
         method (str): The method used for differentiation, which can be any of
-                      ``["fd", "mixed"]``,
+                      ``["fd", "defer"]``,
             where:
 
             - ``"fd"`` represents first-order finite-differences for the entire hybrid
               circuit,
 
-            - ``"mixed"`` represents deferring the quantum differentiation to the method
+            - ``"defer"`` represents deferring the quantum differentiation to the method
               specified by the QNode, while the classical computation is differentiated
               using finite differences.
 

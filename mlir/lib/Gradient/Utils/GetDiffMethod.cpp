@@ -26,7 +26,7 @@ StringRef catalyst::gradient::getQNodeDiffMethod(catalyst::gradient::GradOp grad
     func::FuncOp callee =
         SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(gradOp, gradOp.getCalleeAttr());
     bool isQNode = callee->hasAttr("qnode") && callee->hasAttrOfType<StringAttr>(diffMethodKey);
-    if (gradOp.getMethod() == "mixed" && isQNode) {
+    if (gradOp.getMethod() == "defer" && isQNode) {
         return callee->getAttrOfType<StringAttr>(diffMethodKey).strref();
     }
     return "";

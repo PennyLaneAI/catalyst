@@ -100,7 +100,7 @@ func.func @simple_circuit(%arg0: tensor<3xf64>) -> f64 attributes {qnode, diff_m
 }
 
 func.func @gradCall0(%arg0: tensor<3xf64>) -> tensor<3xf64> {
-    %0 = gradient.grad "mixed" @simple_circuit(%arg0) : (tensor<3xf64>) -> tensor<3xf64>
+    %0 = gradient.grad "defer" @simple_circuit(%arg0) : (tensor<3xf64>) -> tensor<3xf64>
     func.return %0 : tensor<3xf64>
 }
 
@@ -233,7 +233,7 @@ func.func @structured_circuit(%arg0: f64, %arg1: i1, %arg2: i1) -> f64 attribute
 }
 
 func.func @gradCall1(%arg0: f64, %b0: i1, %b1: i1) -> f64 {
-    %0 = gradient.grad "mixed" @structured_circuit(%arg0, %b0, %b1) : (f64, i1, i1) -> f64
+    %0 = gradient.grad "defer" @structured_circuit(%arg0, %b0, %b1) : (f64, i1, i1) -> f64
     func.return %0 : f64
 }
 
@@ -346,7 +346,7 @@ func.func @loop_circuit(%arg0: f64) -> f64 attributes {qnode, diff_method = "par
 }
 
 func.func @gradCall2(%arg0: f64) -> f64 {
-    %0 = gradient.grad "mixed" @loop_circuit(%arg0) : (f64) -> f64
+    %0 = gradient.grad "defer" @loop_circuit(%arg0) : (f64) -> f64
     func.return %0 : f64
 }
 
@@ -391,7 +391,7 @@ func.func @tensor_circuit(%arg0: f64) -> tensor<2x3xf64> attributes {qnode, diff
 }
 
 func.func @gradCall3(%arg0: f64) -> tensor<2x3xf64> {
-    %0 = gradient.grad "mixed" @tensor_circuit(%arg0) : (f64) -> tensor<2x3xf64>
+    %0 = gradient.grad "defer" @tensor_circuit(%arg0) : (f64) -> tensor<2x3xf64>
     func.return %0 : tensor<2x3xf64>
 }
 
@@ -441,7 +441,7 @@ func.func @multi_res_circuit(%arg0: f64) -> (f64, tensor<2xf64>) attributes {qno
 }
 
 func.func @gradCall4(%arg0: f64) -> (f64, tensor<2xf64>)  {
-    %0:2 = gradient.grad "mixed" @multi_res_circuit(%arg0) : (f64) -> (f64, tensor<2xf64>)
+    %0:2 = gradient.grad "defer" @multi_res_circuit(%arg0) : (f64) -> (f64, tensor<2xf64>)
     func.return %0#0, %0#1 : f64, tensor<2xf64>
 }
 
@@ -467,7 +467,7 @@ func.func private @funcMultiCall(%arg0: f64) -> f64 attributes {qnode, diff_meth
 
 // CHECK-LABEL: @gradCallMultiCall
 func.func @gradCallMultiCall(%arg0: f64) -> (f64, f64) {
-    %0 = gradient.grad "mixed" @funcMultiCall(%arg0) : (f64) -> f64
-    %1 = gradient.grad "mixed" @funcMultiCall(%arg0) : (f64) -> f64
+    %0 = gradient.grad "defer" @funcMultiCall(%arg0) : (f64) -> f64
+    %1 = gradient.grad "defer" @funcMultiCall(%arg0) : (f64) -> f64
     func.return %0, %1 : f64, f64
 }

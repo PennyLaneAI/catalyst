@@ -135,7 +135,7 @@ LogicalResult GradOp::verifySymbolUses(SymbolTableCollection &symbolTable)
 LogicalResult GradOp::verify()
 {
     StringRef method = this->getMethod();
-    if (method != "fd" && method != "mixed")
+    if (method != "fd" && method != "defer")
         return emitOpError("got invalid differentiation method: ") << method;
     return success();
 }

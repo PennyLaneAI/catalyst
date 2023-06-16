@@ -46,8 +46,8 @@ def override_method(x: float):
         return qml.expval(qml.PauliY(0))
 
     # pylint: disable=line-too-long
-    # CHECK: "gradient.grad"({{%[0-9]+}}) {callee = @f, diffArgIndices = dense<0> : tensor<1xi64>, method = "mixed"} : (tensor<f64>) -> tensor<f64>
-    g = grad(f, method="mixed")
+    # CHECK: "gradient.grad"({{%[0-9]+}}) {callee = @f, diffArgIndices = dense<0> : tensor<1xi64>, method = "defer"} : (tensor<f64>) -> tensor<f64>
+    g = grad(f, method="defer")
     return g(jax.numpy.pi)
 
 

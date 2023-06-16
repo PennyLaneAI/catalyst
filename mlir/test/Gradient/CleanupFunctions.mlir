@@ -40,7 +40,7 @@ func.func private @f(%arg0: tensor<f64>) -> tensor<f64> attributes {qnode, diff_
 
 // CHECK-LABEL: @gradCall0
 func.func @gradCall0(%arg0: tensor<f64>) -> tensor<f64> {
-    %0 = gradient.grad "mixed" @f(%arg0) : (tensor<f64>) -> tensor<f64>
+    %0 = gradient.grad "defer" @f(%arg0) : (tensor<f64>) -> tensor<f64>
     func.return %0 : tensor<f64>
 }
 
@@ -89,7 +89,7 @@ func.func private @f2(%arg0: tensor<f64>, %arg1: tensor<i64>, %arg2: tensor<i64>
 
 // CHECK-LABEL: @gradCall1
 func.func public @gradCall1(%arg0: tensor<f64>, %arg1: tensor<i64>, %arg2: tensor<i64>) -> tensor<f64> {
-    %0 = gradient.grad "mixed" @f2(%arg0, %arg1, %arg2) : (tensor<f64>, tensor<i64>, tensor<i64>) -> tensor<f64>
+    %0 = gradient.grad "defer" @f2(%arg0, %arg1, %arg2) : (tensor<f64>, tensor<i64>, tensor<i64>) -> tensor<f64>
     return %0 : tensor<f64>
 }
 
@@ -146,6 +146,6 @@ func.func private @f3(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> att
 
 // CHECK-LABEL: @gradcall2
 func.func public @gradcall2(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> {
-    %0 = gradient.grad "mixed" @f3(%arg0, %arg1) : (tensor<f64>, tensor<f64>) -> tensor<f64>
+    %0 = gradient.grad "defer" @f3(%arg0, %arg1) : (tensor<f64>, tensor<f64>) -> tensor<f64>
     return %0 : tensor<f64>
 }

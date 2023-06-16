@@ -37,7 +37,7 @@ func.func private @funcScalarScalar(%arg0: f64) -> f64 attributes {qnode, diff_m
 // }
 
 func.func @gradCallScalarScalar(%arg0: f64) -> f64 {
-    %0 = gradient.grad "mixed" @funcScalarScalar(%arg0) : (f64) -> f64
+    %0 = gradient.grad "defer" @funcScalarScalar(%arg0) : (f64) -> f64
     func.return %0 : f64
 }
 
@@ -67,7 +67,7 @@ func.func private @funcScalarPointTensor(%arg0: f64) -> tensor<f64> attributes {
 // }
 
 func.func @gradCallScalarPointTensor(%arg0: f64) -> tensor<f64> {
-    %0 = gradient.grad "mixed" @funcScalarPointTensor(%arg0) : (f64) -> tensor<f64>
+    %0 = gradient.grad "defer" @funcScalarPointTensor(%arg0) : (f64) -> tensor<f64>
     func.return %0 : tensor<f64>
 }
 
@@ -98,7 +98,7 @@ func.func private @funcPointTensorScalar(%arg0: tensor<f64>) -> f64 attributes {
 // }
 
 func.func @gradCallPointTensorScalar(%arg0: tensor<f64>) -> f64 {
-    %0 = gradient.grad "mixed" @funcPointTensorScalar(%arg0) : (tensor<f64>) -> f64
+    %0 = gradient.grad "defer" @funcPointTensorScalar(%arg0) : (tensor<f64>) -> f64
     func.return %0 : f64
 }
 
@@ -127,7 +127,7 @@ func.func private @funcPointTensorPointTensor(%arg0: tensor<f64>) -> tensor<f64>
 // }
 
 func.func @gradCallPointTensorPointTensor(%arg0: tensor<f64>) -> tensor<f64> {
-    %0 = gradient.grad "mixed" @funcPointTensorPointTensor(%arg0) : (tensor<f64>) -> tensor<f64>
+    %0 = gradient.grad "defer" @funcPointTensorPointTensor(%arg0) : (tensor<f64>) -> tensor<f64>
     func.return %0 : tensor<f64>
 }
 
@@ -157,7 +157,7 @@ func.func private @funcScalarTensor(%arg0: f32) -> tensor<2x3xf64> attributes {q
 // }
 
 func.func @gradCallScalarTensor(%arg0: f32) -> tensor<2x3xf64> {
-    %0 = gradient.grad "mixed"  @funcScalarTensor(%arg0) : (f32) -> tensor<2x3xf64>
+    %0 = gradient.grad "defer"  @funcScalarTensor(%arg0) : (f32) -> tensor<2x3xf64>
     func.return %0 : tensor<2x3xf64>
 }
 
@@ -188,7 +188,7 @@ func.func private @funcTensorScalar(%arg0: tensor<3xf64>) -> f128 attributes {qn
 // }
 
 func.func @gradCallTensorScalar(%arg0: tensor<3xf64>) -> tensor<3xf128> {
-    %2 = gradient.grad "mixed"  @funcTensorScalar(%arg0) : (tensor<3xf64>) -> tensor<3xf128>
+    %2 = gradient.grad "defer"  @funcTensorScalar(%arg0) : (tensor<3xf64>) -> tensor<3xf128>
     func.return %2 : tensor<3xf128>
 }
 
@@ -220,7 +220,7 @@ func.func private @funcTensorTensor(%arg0: tensor<7x3x2x1xf64>) -> tensor<2xf32>
 // }
 
 func.func @gradCallTensorTensor(%arg0: tensor<7x3x2x1xf64>) -> tensor<7x3x2x1x2xf32> {
-    %2 = gradient.grad "mixed" @funcTensorTensor(%arg0) : (tensor<7x3x2x1xf64>) -> tensor<7x3x2x1x2xf32>
+    %2 = gradient.grad "defer" @funcTensorTensor(%arg0) : (tensor<7x3x2x1xf64>) -> tensor<7x3x2x1x2xf32>
     func.return %2 : tensor<7x3x2x1x2xf32>
 }
 
@@ -258,7 +258,7 @@ func.func @funcMultiRes(%arg0: f64) -> (f64, tensor<2xf64>) attributes {qnode, d
 // }
 
 func.func @gradCallMultiRes(%arg0: f64) -> (f64, tensor<2xf64>)  {
-    %0:2 = gradient.grad "mixed" @funcMultiRes(%arg0) : (f64) -> (f64, tensor<2xf64>)
+    %0:2 = gradient.grad "defer" @funcMultiRes(%arg0) : (f64) -> (f64, tensor<2xf64>)
     func.return %0#0, %0#1 : f64, tensor<2xf64>
 }
 
@@ -329,8 +329,8 @@ func.func @funcMultiArg(%arg0: f64, %arg1: tensor<2xf64>) -> f64 attributes {qno
 // }
 
 func.func @gradCallMultiArg(%arg0: f64, %arg1: tensor<2xf64>) -> (f64, tensor<2xf64>, f64, tensor<2xf64>)  {
-    %0 = gradient.grad "mixed"  @funcMultiArg(%arg0, %arg1) : (f64, tensor<2xf64>) -> f64
-    %1 = gradient.grad "mixed"  @funcMultiArg(%arg0, %arg1) {diffArgIndices = dense<[1]> : tensor<1xindex>} : (f64, tensor<2xf64>) -> tensor<2xf64>
-    %2:2 = gradient.grad "mixed" @funcMultiArg(%arg0, %arg1) {diffArgIndices = dense<[0, 1]> : tensor<2xindex>} : (f64, tensor<2xf64>) -> (f64, tensor<2xf64>)
+    %0 = gradient.grad "defer"  @funcMultiArg(%arg0, %arg1) : (f64, tensor<2xf64>) -> f64
+    %1 = gradient.grad "defer"  @funcMultiArg(%arg0, %arg1) {diffArgIndices = dense<[1]> : tensor<1xindex>} : (f64, tensor<2xf64>) -> tensor<2xf64>
+    %2:2 = gradient.grad "defer" @funcMultiArg(%arg0, %arg1) {diffArgIndices = dense<[0, 1]> : tensor<2xindex>} : (f64, tensor<2xf64>) -> (f64, tensor<2xf64>)
     func.return %0, %1, %2#0, %2#1 : f64, tensor<2xf64>, f64, tensor<2xf64>
 }
