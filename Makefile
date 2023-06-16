@@ -44,7 +44,7 @@ mhlo:
 	$(MAKE) -C mlir mhlo
 
 enzyme:
-	$(MAKE) -C mlir llvm enzyme
+	$(MAKE) -C mlir enzyme
 
 dialects:
 	$(MAKE) -C mlir dialects

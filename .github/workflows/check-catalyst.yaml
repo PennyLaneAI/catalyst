@@ -282,7 +282,7 @@ jobs:
       run: |
         sudo apt-get install -y cmake ninja-build clang lld
 
-    - name: Build Enzyme Dialect
+    - name: Build Enzyme
       if: steps.cache-enzyme.outputs.cache-hit != 'true'
       run: |
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
