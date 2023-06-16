@@ -404,7 +404,7 @@ jobs:
     
     - name: Get Enzyme Version
       id: enzyme-hash
-      run: echo "enzyme-hash=$(grep enzyme .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
+      run: echo "enzyme-hash=$(grep Enzyme .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
 
     - name: Get Cached Enzyme Build
       id: cache-enzyme
