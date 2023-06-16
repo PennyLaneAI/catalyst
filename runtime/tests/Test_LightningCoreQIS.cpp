@@ -1556,7 +1556,7 @@ TEST_CASE("Test the main porperty of the adjoint quantum operations", "[CoreQIS]
         QUBIT *q0 = __quantum__rt__qubit_allocate();
         QUBIT *q1 = __quantum__rt__qubit_allocate();
         QUBIT *q2 = __quantum__rt__qubit_allocate();
-        double theta = 3.14/2.0;
+        double theta = 3.14 / 2.0;
 
         __quantum__qis__MultiRZ(theta, 2, q0, q1);
         __quantum__qis__Toffoli(q0, q1, q2);
@@ -1622,9 +1622,9 @@ TEST_CASE("Test the main porperty of the adjoint quantum operations", "[CoreQIS]
 
         CHECK(stateVec[0].real == Approx(1.0).margin(1e-5));
         CHECK(stateVec[0].imag == Approx(0.0).margin(1e-5));
-        for ( size_t i = 1; i<8; i++) {
-          CHECK(stateVec[i].real == Approx(0.0).margin(1e-5));
-          CHECK(stateVec[i].imag == Approx(0.0).margin(1e-5));
+        for (size_t i = 1; i < 8; i++) {
+            CHECK(stateVec[i].real == Approx(0.0).margin(1e-5));
+            CHECK(stateVec[i].imag == Approx(0.0).margin(1e-5));
         }
 
         freeState(result);
