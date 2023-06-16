@@ -529,6 +529,7 @@ jobs:
     - name: Add Frontend Dependencies to PATH
       run: |
         echo "$(pwd)/llvm-build/bin" >> $GITHUB_PATH
+        ls $(pwd)/llvm-build/bin
         echo "$(pwd)/mhlo-build/bin" >> $GITHUB_PATH
         echo "$(pwd)/quantum-build/bin" >> $GITHUB_PATH
         echo "PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
