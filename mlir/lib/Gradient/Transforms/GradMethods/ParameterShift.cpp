@@ -22,6 +22,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 
+#include "Gradient/Utils/GetDiffMethod.h"
 #include "Quantum/IR/QuantumOps.h"
 
 namespace catalyst {
@@ -29,8 +30,9 @@ namespace gradient {
 
 LogicalResult ParameterShiftLowering::match(GradOp op) const
 {
-    if (op.getMethod() == "ps")
+    if (getQNodeDiffMethod(op) == "parameter-shift") {
         return success();
+    }
 
     return failure();
 }

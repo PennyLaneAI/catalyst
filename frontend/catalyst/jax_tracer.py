@@ -38,13 +38,7 @@ import catalyst.jax_primitives as jprim
 from catalyst.jax_tape import JaxTape
 from catalyst.utils.tracing import TracingContext
 
-namedobs_map = {
-    qml.Identity: 0,
-    qml.PauliX: 1,
-    qml.PauliY: 2,
-    qml.PauliZ: 3,
-    qml.Hadamard: 4,
-}
+KNOWN_NAMED_OBS = (qml.Identity, qml.PauliX, qml.PauliY, qml.PauliZ, qml.Hadamard)
 
 
 def get_mlir(func, *args, **kwargs):
@@ -352,7 +346,7 @@ def trace_quantum_tape(
     return out, qreg, qubit_states
 
 
-# TODO: remove once fixed upstream
+# TODO: remove once fixed upstream: https://github.com/PennyLaneAI/pennylane/issues/4263
 def trace_hamiltonian(coeffs, *nested_obs):
     """Trace a hamiltonian.
 
@@ -375,7 +369,7 @@ def trace_observables(obs, qubit_states, p, num_wires, qreg):
 
     Args:
         obs: an observable
-        qubit_states: the statically known qubit state at this progam point
+        qubit_states: the statically known qubit state at this program point
         p: parameter evaluator
         num_wires: the number of wires
         qreg: the quantum register with the state at this program point
@@ -391,11 +385,10 @@ def trace_observables(obs, qubit_states, p, num_wires, qreg):
         wires = wires or Wires(range(num_wires))
         qubits = get_qubits_from_wires(wires, qubit_states, qreg)
         jax_obs = jprim.compbasis(*qubits)
-    elif isinstance(obs, tuple(namedobs_map.keys())):
-        base = namedobs_map[type(obs)]
+    elif isinstance(obs, KNOWN_NAMED_OBS):
         _, wires = op_args
         qubits = get_qubits_from_wires(wires, qubit_states, qreg)
-        jax_obs = jprim.namedobs(base, qubits[0])
+        jax_obs = jprim.namedobs(type(obs).__name__, qubits[0])
     elif isinstance(obs, qml.Hermitian):
         matrix, wires = op_args
         qubits = get_qubits_from_wires(wires, qubit_states, qreg)

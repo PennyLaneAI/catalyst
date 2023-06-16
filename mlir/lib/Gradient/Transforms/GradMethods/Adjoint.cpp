@@ -27,6 +27,7 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 
+#include "Gradient/Utils/GetDiffMethod.h"
 #include "Gradient/Utils/GradientShape.h"
 #include "Quantum/IR/QuantumOps.h"
 
@@ -35,7 +36,7 @@ namespace gradient {
 
 LogicalResult AdjointLowering::match(GradOp op) const
 {
-    if (op.getMethod() == "adj")
+    if (getQNodeDiffMethod(op) == "adjoint")
         return success();
 
     return failure();
