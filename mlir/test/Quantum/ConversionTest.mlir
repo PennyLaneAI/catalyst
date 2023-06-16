@@ -275,10 +275,10 @@ func.func @namedobs(%q : !quantum.bit) {
 
     // CHECK: [[c0:%.+]] = llvm.mlir.constant(0 : i64)
     // CHECK: llvm.call @__quantum__qis__NamedObs([[c0]], %arg0)
-    quantum.namedobs %q[0] : !quantum.obs
+    quantum.namedobs %q[Identity] : !quantum.obs
     // CHECK: [[c4:%.+]] = llvm.mlir.constant(4 : i64)
     // CHECK: llvm.call @__quantum__qis__NamedObs([[c4]], %arg0)
-    quantum.namedobs %q[4] : !quantum.obs
+    quantum.namedobs %q[Hadamard] : !quantum.obs
 
     return
 }

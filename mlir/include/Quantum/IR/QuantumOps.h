@@ -52,6 +52,8 @@ class QuantumMemory : public mlir::SideEffects::Resource::Base<QuantumMemory> {
 //===----------------------------------------------------------------------===//
 
 #include "Quantum/IR/QuantumDialect.h"
-
+#include "Quantum/IR/QuantumEnums.h.inc"
+#define GET_ATTRDEF_CLASSES
+#include "Quantum/IR/QuantumAttributes.h.inc"
 #define GET_OP_CLASSES
 #include "Quantum/IR/QuantumOps.h.inc"

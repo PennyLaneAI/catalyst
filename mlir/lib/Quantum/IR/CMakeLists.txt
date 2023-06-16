@@ -9,4 +9,5 @@ add_mlir_library(MLIRQuantum
     DEPENDS
     MLIRQuantumInterfacesIncGen
     MLIRQuantumOpsIncGen
+    MLIRQuantumEnumsIncGen
 )
