@@ -122,7 +122,7 @@ jobs:
         enableCrossOsArchive: True
 
     - name: Clone LLVM Submodule
-      if: steps.cache-llvm-source.outputs.cache-hit != 'true'
+      if: steps.cache-llvm-source.outputs.cache-hit == 'true'
       uses: actions/checkout@v3
       with:
         repository: llvm/llvm-project
@@ -130,13 +130,13 @@ jobs:
         path: mlir/llvm-project
 
     - name: Install Deps
-      if: steps.cache-llvm-build.outputs.cache-hit != 'true'
+      if: steps.cache-llvm-build.outputs.cache-hit == 'true'
       run: |
         sudo apt-get install -y python3 python3-pip cmake ninja-build clang lld
         python3 -m pip install numpy pybind11
 
     - name: Build LLVM
-      if: steps.cache-llvm-build.outputs.cache-hit != 'true'
+      if: steps.cache-llvm-build.outputs.cache-hit == 'true'
       # Note: Disable instrumentation for the mlir runtime support library,
       #       as user programs aren't instrumented.
       run: |
