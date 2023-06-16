@@ -594,7 +594,7 @@ class JAX_QJIT:
         self.qfunc = qfunc
         self.deriv_qfuncs = {}
         self.jaxed_qfunc = jaxed_qfunc
-        jaxed_qfunc.defjvp(self.compute_jvp)
+        jaxed_qfunc.defjvp(self.compute_jvp, symbolic_zeros=True)
 
     @staticmethod
     def wrap_callback(qfunc, *args, **kwargs):
@@ -634,10 +634,9 @@ class JAX_QJIT:
 
         # Optimization: Do not compute Jacobians for arguments which do not participate in
         #               differentiation.
-        # TODO: replace with symbolic zero support
         argnums = []
         for idx, tangent in enumerate(tangents):
-            if qml.math.is_abstract(tangent, like="jax") or jnp.any(jnp.atleast_1d(tangent) != 0.0):
+            if not isinstance(tangent, jax.custom_derivatives.SymbolicZero):
                 argnums.append(idx)
 
         results = self.wrap_callback(self.qfunc, *primals)
