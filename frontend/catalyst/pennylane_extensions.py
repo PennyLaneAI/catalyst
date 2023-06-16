@@ -318,7 +318,7 @@ def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
 
             - ``"defer"`` represents deferring the quantum differentiation to the method
               specified by the QNode, while the classical computation is differentiated
-              using finite differences.
+              using traditional auto-diff.
 
         h (float): the step-size value for the finite-difference (``"fd"``) method
         argnum (Tuple[int, List[int]]): the argument indices to differentiate
