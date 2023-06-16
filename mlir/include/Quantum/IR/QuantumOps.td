@@ -268,7 +268,8 @@ def QubitUnitaryOp : Gate_Op<"unitary", [NoMemoryEffect]> {
         AnyTypeOf<[
             2DTensorOf<[Complex<F64>]>, MemRefRankOf<[Complex<F64>], [2]>
         ]>:$matrix,
-        Variadic<QubitType>:$in_qubits
+        Variadic<QubitType>:$in_qubits,
+        OptionalAttr<BoolAttr>:$adjoint
     );
 
     let results = (outs

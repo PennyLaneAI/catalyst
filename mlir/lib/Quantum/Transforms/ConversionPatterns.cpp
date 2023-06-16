@@ -306,7 +306,8 @@ struct QubitUnitaryOpPattern : public OpConversionPattern<QubitUnitaryOp> {
         Type matrixType = conv->convertType(
             MemRefType::get({UNKNOWN, UNKNOWN}, ComplexType::get(Float64Type::get(ctx))));
 
-        StringRef qirName = "__quantum__qis__QubitUnitary";
+        std::string qirName = std::string("__quantum__qis__QubitUnitary") +
+                            (op.getAdjoint().value_or(false) ? "_Adjoint" : "");
         Type qirSignature = LLVM::LLVMFunctionType::get(
             LLVM::LLVMVoidType::get(ctx),
             {LLVM::LLVMPointerType::get(matrixType), IntegerType::get(ctx, 64)},
