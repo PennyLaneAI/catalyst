@@ -34,6 +34,11 @@ void QuantumDialect::initialize()
 #include "Quantum/IR/QuantumOpsTypes.cpp.inc"
         >();
 
+    addAttributes<
+#define GET_ATTRDEF_LIST
+#include "Quantum/IR/QuantumAttributes.cpp.inc"
+        >();
+
     addOperations<
 #define GET_OP_LIST
 #include "Quantum/IR/QuantumOps.cpp.inc"
@@ -46,3 +51,6 @@ void QuantumDialect::initialize()
 
 #define GET_TYPEDEF_CLASSES
 #include "Quantum/IR/QuantumOpsTypes.cpp.inc"
+
+#define GET_ATTRDEF_CLASSES
+#include "Quantum/IR/QuantumAttributes.cpp.inc"

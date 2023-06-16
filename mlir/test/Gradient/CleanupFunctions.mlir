@@ -31,7 +31,7 @@ func.func private @f(%arg0: tensor<f64>) -> tensor<f64> attributes {qnode, diff_
     %3 = "quantum.extract"(%0, %c0_i64) : (!quantum.reg, i64) -> !quantum.bit
     %4 = tensor.extract %arg0[] : tensor<f64>
     %5:2 = "quantum.custom"(%4, %3, %2) {gate_name = "CRX", operand_segment_sizes = array<i32: 1, 2> } : (f64, !quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
-    %6 = "quantum.namedobs"(%5#0) {type = 3 : i8} : (!quantum.bit) -> !quantum.obs
+    %6 = "quantum.namedobs"(%5#0) {type = #quantum<named_observable PauliZ>} : (!quantum.bit) -> !quantum.obs
     %7 = "quantum.expval"(%6) {shots = 1000 : i64} : (!quantum.obs) -> f64
     %8 = tensor.from_elements %7 : tensor<f64>
     "quantum.dealloc"(%0) : (!quantum.reg) -> ()
@@ -80,7 +80,7 @@ func.func private @f2(%arg0: tensor<f64>, %arg1: tensor<i64>, %arg2: tensor<i64>
     }
     %extracted_1 = tensor.extract %arg2[] : tensor<i64>
     %7 = "quantum.extract"(%6, %extracted_1) : (!quantum.reg, i64) -> !quantum.bit
-    %8 = "quantum.namedobs"(%7) {type = 2 : i8} : (!quantum.bit) -> !quantum.obs
+    %8 = "quantum.namedobs"(%7) {type = #quantum<named_observable PauliY>} : (!quantum.bit) -> !quantum.obs
     %9 = "quantum.expval"(%8) {shots = 1000 : i64} : (!quantum.obs) -> f64
     %from_elements = tensor.from_elements %9 : tensor<f64>
     "quantum.dealloc"(%0) : (!quantum.reg) -> ()
@@ -137,7 +137,7 @@ func.func private @f3(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> att
         scf.yield %9 : !quantum.reg
     }
     %4 = "quantum.extract"(%3, %c0_i64) : (!quantum.reg, i64) -> !quantum.bit
-    %5 = "quantum.namedobs"(%4) {type = 2 : i8} : (!quantum.bit) -> !quantum.obs
+    %5 = "quantum.namedobs"(%4) {type = #quantum<named_observable PauliY>} : (!quantum.bit) -> !quantum.obs
     %6 = "quantum.expval"(%5) {shots = 1000 : i64} : (!quantum.obs) -> f64
     %from_elements = tensor.from_elements %6 : tensor<f64>
     "quantum.dealloc"(%0) : (!quantum.reg) -> ()

@@ -15,12 +15,31 @@
 #ifndef QUANTUM_OPS
 #define QUANTUM_OPS
 
+include "mlir/IR/EnumAttr.td"
 include "mlir/IR/OpBase.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Dialect/Bufferization/IR/AllocationOpInterface.td"
 
 include "Quantum/IR/QuantumDialect.td"
 include "Quantum/IR/QuantumInterfaces.td"
+
+//===----------------------------------------------------------------------===//
+// Quantum dialect enums.
+//===----------------------------------------------------------------------===//
+
+def NamedObservable : I32EnumAttr<"NamedObservable",
+    "Known named observables",
+    [
+        I32EnumAttrCase<"Identity", 0>,
+        I32EnumAttrCase<"PauliX",   1>,
+        I32EnumAttrCase<"PauliY",   2>,
+        I32EnumAttrCase<"PauliZ",   3>,
+        I32EnumAttrCase<"Hadamard", 4>,
+    ]> {
+    let cppNamespace = "catalyst::quantum";
+    let genSpecializedAttr = 0;
+}
+
 
 //===----------------------------------------------------------------------===//
 // Quantum dialect traits.
@@ -35,7 +54,7 @@ def QuantumMemory : Resource<"QuantumMemory">;
 // Quantum dialect attributes.
 //===----------------------------------------------------------------------===//
 
-def ObsNameAttr : ConfinedAttr<I8Attr, [IntMinValue<0>, IntMaxValue<4>]>;
+def NamedObservableAttr : EnumAttr<QuantumDialect, NamedObservable, "named_observable">;
 
 //===----------------------------------------------------------------------===//
 // Quantum dialect operations.
@@ -318,7 +337,7 @@ def NamedObsOp : Observable_Op<"namedobs", [Pure]> {
 
     let arguments = (ins
         QubitType:$qubit,
-        ObsNameAttr:$type
+        NamedObservableAttr:$type
     );
 
     let results = (outs

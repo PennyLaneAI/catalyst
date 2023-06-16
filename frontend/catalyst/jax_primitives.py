@@ -846,7 +846,13 @@ def _namedobs_abstract_eval(qubit, kind):
     return AbstractObs()
 
 
-def _named_obs_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value, kind: int):
+def _named_obs_attribute(ctx, kind: str):
+    return ir.OpaqueAttr.get(
+        "quantum", ("named_observable " + kind).encode("utf-8"), ir.NoneType.get(ctx), ctx
+    )
+
+
+def _named_obs_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value, kind: str):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
@@ -854,8 +860,7 @@ def _named_obs_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value, kind
     assert ir.OpaqueType(qubit.type).dialect_namespace == "quantum"
     assert ir.OpaqueType(qubit.type).data == "bit"
 
-    i8_type = ir.IntegerType.get_signless(8, ctx)
-    obsId = ir.IntegerAttr.get(i8_type, kind)
+    obsId = _named_obs_attribute(ctx, kind)
     result_type = ir.OpaqueType.get("quantum", "obs", ctx)
 
     return NamedObsOp(result_type, qubit, obsId).results

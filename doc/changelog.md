@@ -159,6 +159,10 @@
   QNodes, and towards supporting differentiation of classical postprocessing.
   [#163](https://github.com/PennyLaneAI/catalyst/pull/163)
 
+* Represent known named observables as members of an MLIR Enum rather than a raw integer.
+  This improves IR readability.
+  [#165](https://github.com/PennyLaneAI/catalyst/pull/165)
+
 <h3>Breaking changes</h3>
 
 <h3>Bug fixes</h3>
