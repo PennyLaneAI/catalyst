@@ -1,15 +1,22 @@
 # Architecture
 
-The Catalyst stack leverages existing state-of-the-art technologies and combines them into a single
-package to accelerate quantum workflows without losing the ability to quickly prototype in Python.
-Some of the projects Catalyst depends on include the [MLIR](https://mlir.llvm.org/docs/) and
-[LLVM](https://llvm.org/) compiler frameworks, the [QIR](https://github.com/qir-alliance) project,
-as well as the [JAX](https://jax.readthedocs.io/en/latest/) framework for composable transforms in
-Machine Learning (ML).
-Among the transforms provided by JAX, the two most important ones arguably consist of automatic
-differentition (AD) and just-in-time (JIT) compilation. AD has long been one of the cornerstones of
-the PennyLane project, and, with the introduction of Catalyst, JIT compilation for quantum (and
-hybrid quantum) programs is added as another.
+The Catalyst stack leverages state-of-the-art technologies to accelerate quantum workflows without
+losing the ability to quickly prototype in Python. Some of the projects Catalyst builds upon include
+the [MLIR](https://mlir.llvm.org/docs/) and [LLVM](https://llvm.org/) compiler frameworks, the
+[QIR](https://github.com/qir-alliance) project, and the [JAX](https://jax.readthedocs.io/en/latest/)
+framework for composable transforms in machine learning (ML).
+Among the transforms provided by JAX, some of the most impactful arguably consist of automatic
+differentiation (AD) and just-in-time (JIT) compilation. AD has long been one of the cornerstones of
+PennyLane, and, with the introduction of Catalyst, JIT compilation for (hybrid) quantum programs is
+added as another.
+
+One of the core goals of Catalyst is to provide a unified representation for hybrid programs with
+which to drive optimization, device compilation, automatic differentiation, and many other types of
+transformations in a scalable way. Moreover, Catalyst is being developed to support next-generation
+quantum programming paradigms, such as dynamic circuit generation with classical control flow,
+real-time measurement feedback, qubit reuse, and dynamic quantum memory management. Most
+importantly, Catalyst provides a way transform large scale user workflows from Python into low-level
+binary code for accelerated execution in heterogenous environments.
 
 While PennyLane is used as the primary frontend to Catalyst, each element of the compilation stack
 is in-principle built in a modular and reusable way. Let's take a look at what this stack looks
@@ -63,13 +70,14 @@ Compilation happens in 3 stages which are successively invoked by the frontend a
     representation for hybrid quantum programs defined by Catalyst. The user program is passed to
     the Catalyst compiler libraries in its textual form, as the MLIR memory objects are not
     compatible between Catalyst and `jaxlib`. The driver then invokes a sequence of transformations
-    that *lowers* the user program to a lower level of abstraction, outputing LLVM IR with QIR
+    that *lowers* the user program to a lower level of abstraction, outputting LLVM IR with QIR
     syntax.
     For more details consult the [next section](#compiler-core).
 
 - **Code Generation:** At this stage the LLVM IR is compiled down to native object code using the
     LLVM Static Compiler (`llc`) for the local system architecture. A native linker is then used
-    to link the user program to the Catalyst Runtime library. The frontend will load this library into the Python environment and attach its entry point to the callable `@qjit` object defined
+    to link the user program to the Catalyst Runtime library. The frontend will load this library
+    into the Python environment and attach its entry point to the callable `@qjit` object defined
     by the user.
     For more details on the program execution consult the [runtime section](#runtime--execution).
 
@@ -117,13 +125,13 @@ See the graph below for an overview of the transformations applied to the user p
 
   - Many quantum compilation routines can be run at this point, in order to reduce the gate or qubit
     count of the program. This could include
-    [peephole optimzations](https://en.wikipedia.org/wiki/Peephole_optimization) expressed as MLIR
+    [peephole optimizations](https://en.wikipedia.org/wiki/Peephole_optimization) expressed as MLIR
     DAG rewrites (such as adjoint cancellation, operator fusion, gate identities, etc.), or more
     complex synthesis algorithms that act on an entire block of quantum code.
 
 - **Automatic differentiation:**
 
-  - Several automatic differenation routines are implemented at the compiler level. In general,
+  - Several automatic differentiation routines are implemented at the compiler level. In general,
     a quantum function will be split out into *classical pre-processing* and *quantum execution*.
     Separate compilation routines are then applied to both components.
 
@@ -138,18 +146,20 @@ See the graph below for an overview of the transformations applied to the user p
     advantage of the reversibility of quantum computing, a backwards pass can be performed with a
     much lower memory footprint than with backpropagation.
 
-    Hardware compatible methods can directly be applied in the compiler without requiring explicit device support. This includes the *parameter-shift* method and *finite-differences*. The
-    parameter-shift method has been adapted to work in presence of hybrid program representations including control flow, as long as measurement feedback is not used.
+    Hardware compatible methods can directly be applied in the compiler without requiring explicit
+    device support. This includes the *parameter-shift* method and *finite-differences*. The
+    parameter-shift method has been adapted to work in presence of hybrid program representations
+    including control flow, as long as measurement feedback is not used.
 
   - Checkpointing is employed to eliminate redundant invocations of the pre-processing function, by
-    storing interemediate results and control flow information in a forward pass through the
+    storing intermediate results and control flow information in a forward pass through the
     classical code to allow the quantum program to be reconstructed exactly.
 
 - **Classical optimizations:**
 
   - Basic optimizations are frequently performed in between other passes in order to improve
     performance and reduce the computational load of subsequent transformations. This includes
-    dead code elimation, common sub-expression elimination, and constant propagation, as well
+    dead code elimination, common sub-expression elimination, and constant propagation, as well
     other simplifications (canonicalizations) registered to the various dialect operations.
 
   - More advanced optimization techniques might also be added to various parts of the pass pipeline.
