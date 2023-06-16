@@ -16,3 +16,7 @@
 
 class CompileError(Exception):
     """Error encountered in the compilation phase."""
+
+
+class DifferentiableCompileError(CompileError):
+    """An error indicating an invalid differentiation configuration."""

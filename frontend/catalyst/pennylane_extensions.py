@@ -41,7 +41,7 @@ import catalyst.jax_primitives as jprim
 from catalyst.jax_primitives import GradParams, expval_p, probs_p
 from catalyst.jax_tape import JaxTape
 from catalyst.jax_tracer import get_traceable_fn, insert_to_qreg, trace_quantum_tape
-from catalyst.utils.exceptions import CompileError
+from catalyst.utils.exceptions import CompileError, DifferentiableCompileError
 from catalyst.utils.patching import Patcher
 from catalyst.utils.tracing import TracingContext
 
@@ -157,7 +157,7 @@ def _ensure_differentiable(f: DifferentiableLike) -> Differentiable:
         return f.qfunc
     elif isinstance(f, Callable):  # Keep at the bottom
         return Function(f)
-    raise TypeError(f"Non-differentiable object passed: {type(f)}")
+    raise DifferentiableCompileError(f"Non-differentiable object passed: {type(f)}")
 
 
 def _make_jaxpr_check_differentiable(f: Differentiable, grad_params: GradParams, *args) -> Jaxpr:
@@ -171,13 +171,13 @@ def _make_jaxpr_check_differentiable(f: Differentiable, grad_params: GradParams,
 
     for pos, arg in enumerate(jaxpr.in_avals):
         if arg.dtype.kind != "f" and pos in grad_params.argnum:
-            raise TypeError(
+            raise DifferentiableCompileError(
                 "Catalyst.grad only supports differentiation on floating-point "
                 f"arguments, got '{arg.dtype}' at position {pos}."
             )
     for pos, res in enumerate(jaxpr.out_avals):
         if res.dtype.kind != "f":
-            raise TypeError(
+            raise DifferentiableCompileError(
                 "Catalyst.grad only supports differentiation on floating-point "
                 f"results, got '{res.dtype}' at position {pos}."
             )
@@ -191,13 +191,24 @@ def _make_jaxpr_check_differentiable(f: Differentiable, grad_params: GradParams,
                     return_ops.append(eq.primitive)
                     break
 
-        if method == "ps" and any(prim not in [expval_p, probs_p] for prim in return_ops):
-            raise TypeError(
+        assert isinstance(
+            f, qml.QNode
+        ), "Differentiation methods other than finite-differences can only operate on a QNode"
+        if f.diff_method is None:
+            raise DifferentiableCompileError(
+                "Cannot differentiate a QNode explicitly marked non-differentiable (with"
+                " diff_method=None)"
+            )
+
+        if f.diff_method == "parameter-shift" and any(
+            prim not in [expval_p, probs_p] for prim in return_ops
+        ):
+            raise DifferentiableCompileError(
                 "The parameter-shift method can only be used for QNodes "
                 "which return either qml.expval or qml.probs."
             )
-        if method == "adj" and any(prim not in [expval_p] for prim in return_ops):
-            raise TypeError(
+        if f.diff_method == "adjoint" and any(prim not in [expval_p] for prim in return_ops):
+            raise DifferentiableCompileError(
                 "The adjoint method can only be used for QNodes which return qml.expval."
             )
     return jaxpr
@@ -206,7 +217,7 @@ def _make_jaxpr_check_differentiable(f: Differentiable, grad_params: GradParams,
 def _check_grad_params(
     method: str, h: Optional[float], argnum: Optional[Union[int, List[int]]]
 ) -> GradParams:
-    methods = {"fd", "ps", "adj"}
+    methods = {"fd", "defer"}
     if method is None:
         method = "fd"
     if method not in methods:
@@ -295,15 +306,15 @@ def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
     Args:
         f (Callable): a function or a function object to differentiate
         method (str): The method used for differentiation, which can be any of
-                      ``["fd", "ps", "adj"]``,
+                      ``["fd", "defer"]``,
             where:
 
-            - ``"fd"`` represents first-order finite-differences,
+            - ``"fd"`` represents first-order finite-differences for the entire hybrid
+              circuit,
 
-            - ``"ps"`` represents the two-term parameter-shift rule, supported by the Pauli
-              rotation gates,
-
-            - ``"adj"`` represents the adjoint differentiation method.
+            - ``"defer"`` represents deferring the quantum differentiation to the method
+              specified by the QNode, while the classical computation is differentiated
+              using traditional auto-diff.
 
         h (float): the step-size value for the finite-difference (``"fd"``) method
         argnum (Tuple[int, List[int]]): the argument indices to differentiate
