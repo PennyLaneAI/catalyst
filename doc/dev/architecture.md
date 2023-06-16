@@ -7,9 +7,9 @@ Some of the projects Catalyst depends on include the [MLIR](https://mlir.llvm.or
 as well as the [JAX](https://jax.readthedocs.io/en/latest/) framework for composable transforms in
 Machine Learning (ML).
 Among the transforms provided by JAX, the two most important ones arguably consist of automatic
-differentition (AD) and just-in-time (JIT) compilation.
-AD has long been one of the cornerstones of the PennyLane project, and, with the introduction of
-Catalyst, JIT compilation for quantum (and hybrid quantum) programs is added as another.
+differentition (AD) and just-in-time (JIT) compilation. AD has long been one of the cornerstones of
+the PennyLane project, and, with the introduction of Catalyst, JIT compilation for quantum (and
+hybrid quantum) programs is added as another.
 
 While PennyLane is used as the primary frontend to Catalyst, each element of the compilation stack
 is in-principle built in a modular and reusable way. Let's take a look at what this stack looks
@@ -18,8 +18,9 @@ like.
 
 ## Compilation Stack
 
-The following diagram represents the current architecture of Catalyst using an adaptation of the C4
-container model. The [Legend](#legend) section describes the notation in more detail.
+The following diagram represents the current architecture of Catalyst using an adaptation of the
+[C4](https://c4model.com/) container model. The [Legend](#legend) section describes the notation in
+more detail.
 
 ![img](../_static/arch/overview.svg)
 
@@ -48,28 +49,28 @@ that manages the entire compilation pipeline.
 
 ![img](../_static/arch/frontend.svg)
 
-Generally speaking, compilation happens in 3 stages which are successively invoked by the frontend
-and compiler driver:
+Compilation happens in 3 stages which are successively invoked by the frontend and compiler driver:
 
 - **Program Capture / IR Generation:** The frontend primarily provides a method for hybrid program
-    capture of PennyLane/JAX programs. This is achieved by leveraging the tracing & op queueing
-    mechanism of both frameworks, extending the JAX program representation (JAXPR) with quantum
-    primitives. Custom JAXPR -> MLIR lowerings are registered to these primitives to fully convert
-    a hybrid program to MLIR for consumption by the compiler.
+    capture of PennyLane/JAX programs. This uses the tracing & op queueing mechanism of both
+    frameworks, extending the JAX program representation
+    ([JAXPR](https://jax.readthedocs.io/en/latest/jaxpr.html)) with quantum
+    [primitives](https://jax.readthedocs.io/en/latest/notebooks/How_JAX_primitives_work.html).
+    Custom JAXPR -> MLIR lowerings are registered to these primitives to fully convert a hybrid
+    program to MLIR for consumption by the compiler.
 
-- **Program Transformation:** The main phase of the compilation process is performed on the
-    MLIR-based representation for hybrid quantum programs defined by Catalyst.
-    The user program is passed to the Catalyst compiler libraries in its textual form, as the MLIR
-    memory objects are not compatible between Catalyst and `jaxlib`.
-    The driver then invokes a sequence of transformations that lowers the user program to a lower
-    level of abstraction, outputing LLVM IR with QIR syntax.
+- **Program Transformation:** The main part of compilation is performed on the MLIR-based
+    representation for hybrid quantum programs defined by Catalyst. The user program is passed to
+    the Catalyst compiler libraries in its textual form, as the MLIR memory objects are not
+    compatible between Catalyst and `jaxlib`. The driver then invokes a sequence of transformations
+    that *lowers* the user program to a lower level of abstraction, outputing LLVM IR with QIR
+    syntax.
     For more details consult the [next section](#compiler-core).
 
 - **Code Generation:** At this stage the LLVM IR is compiled down to native object code using the
     LLVM Static Compiler (`llc`) for the local system architecture. A native linker is then used
-    to link the user program to the Catalyst Runtime library.
-    The frontend will load this library into the Python environment and attach its entry point to
-    the callable `@qjit` object defined by the user.
+    to link the user program to the Catalyst Runtime library. The frontend will load this library into the Python environment and attach its entry point to the callable `@qjit` object defined
+    by the user.
     For more details on the program execution consult the [runtime section](#runtime--execution).
 
 Elaborating on the program capture phase, tracing is a mechanism by which a function is executed
@@ -79,12 +80,13 @@ data structure. Note that JAX's tracing contexts are thread-local and can be nes
 region capture, which is relevant when tracing control flow operations.
 
 During the tracing of quantum functions (`qml.qnode`), PennyLane's queuing context is activated to
-build a `QuantumTape` data structure that records all quantum operations. Here as well nested
-queuing contexts are leveraged to allow for scoped operation capture, including control flow
-operations which are themselves captured as pseudo-quantum operations on the tape.
+build a `QuantumTape` data structure that records all quantum operations. Nested queuing contexts
+are leveraged to allow for scoped operation capture, including control flow operations which are
+themselves captured as pseudo-quantum operations on the tape.
 
 Catalyst provides the "glue" to embed quantum tapes into the JAXPR, by converting PennyLane
-operations to their corresponding JAX primitive and by connecting operation arguments/results to the correct tracer objects.
+operations to their corresponding JAX primitive and by connecting operation arguments/results to
+the correct tracer objects.
 
 
 ## Compiler Core
@@ -103,18 +105,21 @@ See the graph below for an overview of the transformations applied to the user p
     dialect.
 
   - Since we provide our own compilation & code generation pipeline, we lower out of the HLO dialect
-    into standard MLIR dialects, such as `linalg`, `arith`, `func`, and others. This is done using
-    the lowerings provided by the [mlir-hlo](https://github.com/tensorflow/mlir-hlo) project over
-    in the TensorFlow repository.
+    into standard MLIR dialects, such as `linalg`, `arith`, `func`, and others, such that the
+    program no longer contains any HLO operations. The term lowering here refers to converting one
+    program representation into another "lower down" in the compilation pipeline. This is done using
+    the transformation rules (or lowerings) provided by the
+    [mlir-hlo](https://github.com/tensorflow/mlir-hlo) project.
 
   - Quantum dialect operations present in the input are not affected by this transformation.
 
 - **Quantum optimizations:**
 
   - Many quantum compilation routines can be run at this point, in order to reduce the gate or qubit
-    count of the program. This could include peephole optimzations expressed as MLIR DAG rewrites
-    (such as adjoint cancellation, operator fusion, gate identities, etc.), or more complex
-    synthesis algorithms that act on an entire block of quantum code.
+    count of the program. This could include
+    [peephole optimzations](https://en.wikipedia.org/wiki/Peephole_optimization) expressed as MLIR
+    DAG rewrites (such as adjoint cancellation, operator fusion, gate identities, etc.), or more
+    complex synthesis algorithms that act on an entire block of quantum code.
 
 - **Automatic differentiation:**
 
@@ -124,8 +129,8 @@ See the graph below for an overview of the transformations applied to the user p
 
   - For the classical pre-processing, the main method of differentiation is forward or reverse mode
     AD via the [Enzyme](https://github.com/EnzymeAD/Enzyme) framework. Enzyme can also drive the
-    differentiation of the entire program to allow differentiating through post-processing functions
-    as well. In this case, quantum AD methods are registered as custom gradients in the framework.
+    differentiation of the entire program to allow differentiating through post-processing
+    functions. In this case, quantum AD methods are registered as custom gradients in the framework.
 
   - For the quantum execution, different methods are available depending on the execution device.
     On simulators with support for it, the most efficient differentiation method is the
@@ -137,7 +142,7 @@ See the graph below for an overview of the transformations applied to the user p
     parameter-shift method has been adapted to work in presence of hybrid program representations including control flow, as long as measurement feedback is not used.
 
   - Checkpointing is employed to eliminate redundant invocations of the pre-processing function, by
-    storing interemediate results and control flow information in a forwards pass through the
+    storing interemediate results and control flow information in a forward pass through the
     classical code to allow the quantum program to be reconstructed exactly.
 
 - **Classical optimizations:**
@@ -145,16 +150,17 @@ See the graph below for an overview of the transformations applied to the user p
   - Basic optimizations are frequently performed in between other passes in order to improve
     performance and reduce the computational load of subsequent transformations. This includes
     dead code elimation, common sub-expression elimination, and constant propagation, as well
-    other simplifactions (cannonicalizations) registered to the various dialect operations.
+    other simplifications (canonicalizations) registered to the various dialect operations.
 
-  - More advanced optimzation techniques might also be added to various parts of the pass pipeline.
+  - More advanced optimization techniques might also be added to various parts of the pass pipeline.
 
 - **Bufferization:**
 
-  - Bufferization is a process by which operations are transformed from operating on *tensors* to
-    operating on memory, represented by *memrefs* (Memory References) in MLIR. The key difference
-    between the two is that tensors behave according to value semantics, that is they cannot be
-    modified in-place. Instead, operations consume and produce new tensor values.
+  - [Bufferization](https://mlir.llvm.org/docs/Bufferization/) is a process by which operations are
+    transformed from operating on *tensors* to operating on memory, represented by *memrefs* (Memory
+    References) in MLIR. The key difference between the two is that tensors behave according to
+    value semantics, that is they cannot be modified in-place. Instead, operations consume and
+    produce new tensor values.
 
   - In order to bufferize a program, memory has to be allocated and a buffer assigned to each
     tensor, reusing buffers whenever possible to minimize unnecessary data copies, and eventually
@@ -208,14 +214,23 @@ See the graph below for an overview of the transformations applied to the user p
 
 ## Runtime & Execution
 
-In progress
+The runtime follows a ... model
+
+ - real-time feedback
+
+ - dynamic quantum memory management
 
 ![img](../_static/arch/runtime.svg)
 
 The Catalyst runtime essentially acts as a bridge between two public interfaces:
 
-  - The **CAPI** provides a list of QIR-style symbols to target during the LLVM generation phase in the compiler. This includes symbols for runtime functions such as device instantiation, quantum memerory management, and error message emission. Additionally, quantum operations to be executed on a device are also included in this list. The symbols in the user program are then directly linked to the definitions provided by the runtime.
-  Below are some examples of functions that might be included in the CAPI, please see the documentation for an [up-to-date list](https://docs.pennylane.ai/projects/catalyst/en/latest/api/file_runtime_include_RuntimeCAPI.h.html).
+  - The **CAPI** provides a list of QIR-style symbols to target during the LLVM generation phase in
+    the compiler. This includes symbols for runtime functions such as device instantiation, quantum
+    memerory management, and error message emission. Additionally, quantum operations to be
+    executed on a device are also included in this list. The symbols in the user program are then
+    directly linked to the definitions provided by the runtime.
+    Below are some examples of functions that might be included in the CAPI, please see the
+    documentation for an [up-to-date list](https://docs.pennylane.ai/projects/catalyst/en/latest/api/file_runtime_include_RuntimeCAPI.h.html).
 
     ```c
     void __quantum__rt__initialize();
@@ -233,8 +248,12 @@ The Catalyst runtime essentially acts as a bridge between two public interfaces:
     void __quantum__qis__Gradient(int64_t, /*results*/...);
     ```
 
-  - The **QuantumDevice** interface is a C++ abstract base class that devices can implement in order to automatically receive dispatched QIR calls whenever the respective quantum device is active. This interface is a bit higher level than the CAPI by abstracting away certain details, as well as reuseing common functionality across devices.
-  Below are some examples of functions that might be included in this interface, please see the documentation for an [up-to-date list](https://docs.pennylane.ai/projects/catalyst/en/latest/api/file_runtime_include_QuantumDevice.hpp.html).
+  - The **QuantumDevice** interface is a C++ abstract base class that devices can implement in
+    order to automatically receive dispatched QIR calls whenever the respective quantum device is
+    active. This interface is a bit higher level than the CAPI by abstracting away certain details,
+    as well as reuseing common functionality across devices.
+    Below are some examples of functions that might be included in this interface, please see the
+    documentation for an [up-to-date list](https://docs.pennylane.ai/projects/catalyst/en/latest/api/file_runtime_include_QuantumDevice.hpp.html).
 
 
     ```c++
@@ -252,7 +271,8 @@ The Catalyst runtime essentially acts as a bridge between two public interfaces:
                           const std::vector<size_t> &trainParams) = 0;
     ```
 
-Besides the interfaces described above, the runtime also provides a series of other functions relevant to hybrid program execution:
+Besides the interfaces described above, the runtime also provides a series of other functions
+relevant to hybrid program execution:
 
   - **Quantum device management:** The runtime can manage the lifecycle of device instances, which
     are typically instantiated upon request by the program. With multiple backend devices being
@@ -263,7 +283,9 @@ Besides the interfaces described above, the runtime also provides a series of ot
     qubits when responding to an allocation request. The runtime keeps a record of active device IDs
     and how they map to logical program qubits. In this way, the same device qubit may be reused for
     different logical qubits, all the while providing some safety guarantees that an operation
-    acting on a previously deallocated qubit is not silently rerouted to a device qubit that has already been remapped to another logical qubit. Instead, an error is raised as this always idicates a bug in the compiled program (use-after-free).
+    acting on a previously deallocated qubit is not silently rerouted to a device qubit that has
+    already been remapped to another logical qubit. Instead, an error is raised as this always
+    idicates a bug in the compiled program (use-after-free).
 
   - **Remote execution:** While the aim of Catalyst is to locate the runtime as close to devices as
     possible to enable real-time communication, it currently features a "legacy" execution mode for
@@ -281,7 +303,8 @@ Besides the interfaces described above, the runtime also provides a series of ot
         be sent off to local or remote services for execution. Typically, this involves a much
         higher latency than when executing programs via the runtime directly. As an example,
         Catalyst currently connects to the AWS Braket cloud service for remote execution on NISQ
-        hardware, but the full list of supported backends should always be obtained from the documentation.
+        hardware, but the full list of supported backends should always be obtained from the
+        documentation.
 
     Circuit execution calls are made in a blocking fashion and will wait until all results are
     returned from the device. This mode also limits the interaction that host code can have with
