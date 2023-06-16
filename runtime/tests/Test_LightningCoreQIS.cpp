@@ -1546,3 +1546,88 @@ TEST_CASE("Test __rt__device registering the OpenQasm device", "[CoreQIS]")
 
     __quantum__rt__finalize();
 }
+
+TEST_CASE("Test the main porperty of the adjoint quantum operations", "[CoreQIS]")
+{
+    for (const auto &[key, val] : getDevices()) {
+        __quantum__rt__initialize();
+        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
+
+        QUBIT *q0 = __quantum__rt__qubit_allocate();
+        QUBIT *q1 = __quantum__rt__qubit_allocate();
+        QUBIT *q2 = __quantum__rt__qubit_allocate();
+        double theta = 3.14/2.0;
+
+        __quantum__qis__MultiRZ(theta, 2, q0, q1);
+        __quantum__qis__Toffoli(q0, q1, q2);
+        __quantum__qis__CSWAP(q0, q1, q2);
+        __quantum__qis__CRot(theta, theta, theta, q0, q1);
+        __quantum__qis__CRZ(theta, q0, q1);
+        __quantum__qis__CRY(theta, q0, q1);
+        __quantum__qis__CRX(theta, q0, q1);
+        __quantum__qis__ControlledPhaseShift(theta, q0, q1);
+        __quantum__qis__IsingZZ(theta, q0, q1);
+        __quantum__qis__IsingXY(theta, q0, q1);
+        __quantum__qis__IsingYY(theta, q0, q1);
+        __quantum__qis__IsingXX(theta, q0, q1);
+        __quantum__qis__SWAP(q0, q1);
+        __quantum__qis__CZ(q0, q1);
+        __quantum__qis__CY(q0, q1);
+        __quantum__qis__CNOT(q0, q1);
+        __quantum__qis__Rot(theta, theta, theta, q0);
+        __quantum__qis__RZ(theta, q0);
+        __quantum__qis__RY(theta, q0);
+        __quantum__qis__RX(theta, q0);
+        __quantum__qis__PhaseShift(theta, q0);
+        __quantum__qis__T(q0);
+        __quantum__qis__S(q0);
+        __quantum__qis__Hadamard(q0);
+        __quantum__qis__PauliZ(q0);
+        __quantum__qis__PauliY(q0);
+        __quantum__qis__PauliX(q0);
+        __quantum__qis__Identity(q0);
+
+        __quantum__qis__Identity_Adjoint(q0);
+        __quantum__qis__PauliX_Adjoint(q0);
+        __quantum__qis__PauliY_Adjoint(q0);
+        __quantum__qis__PauliZ_Adjoint(q0);
+        __quantum__qis__Hadamard_Adjoint(q0);
+        __quantum__qis__S_Adjoint(q0);
+        __quantum__qis__T_Adjoint(q0);
+        __quantum__qis__PhaseShift_Adjoint(theta, q0);
+        __quantum__qis__RX_Adjoint(theta, q0);
+        __quantum__qis__RY_Adjoint(theta, q0);
+        __quantum__qis__RZ_Adjoint(theta, q0);
+        __quantum__qis__Rot_Adjoint(theta, theta, theta, q0);
+        __quantum__qis__CNOT_Adjoint(q0, q1);
+        __quantum__qis__CY_Adjoint(q0, q1);
+        __quantum__qis__CZ_Adjoint(q0, q1);
+        __quantum__qis__SWAP_Adjoint(q0, q1);
+        __quantum__qis__IsingXX_Adjoint(theta, q0, q1);
+        __quantum__qis__IsingYY_Adjoint(theta, q0, q1);
+        __quantum__qis__IsingXY_Adjoint(theta, q0, q1);
+        __quantum__qis__IsingZZ_Adjoint(theta, q0, q1);
+        __quantum__qis__ControlledPhaseShift_Adjoint(theta, q0, q1);
+        __quantum__qis__CRX_Adjoint(theta, q0, q1);
+        __quantum__qis__CRY_Adjoint(theta, q0, q1);
+        __quantum__qis__CRZ_Adjoint(theta, q0, q1);
+        __quantum__qis__CRot_Adjoint(theta, theta, theta, q0, q1);
+        __quantum__qis__CSWAP_Adjoint(q0, q1, q2);
+        __quantum__qis__Toffoli_Adjoint(q0, q1, q2);
+        __quantum__qis__MultiRZ_Adjoint(theta, 2, q0, q1);
+
+        MemRefT_CplxT_double_1d result = getState(8);
+        __quantum__qis__State(&result, 0);
+        CplxT_double *stateVec = result.data_allocated;
+
+        CHECK(stateVec[0].real == Approx(1.0).margin(1e-5));
+        CHECK(stateVec[0].imag == Approx(0.0).margin(1e-5));
+        for ( size_t i = 1; i<8; i++) {
+          CHECK(stateVec[i].real == Approx(0.0).margin(1e-5));
+          CHECK(stateVec[i].imag == Approx(0.0).margin(1e-5));
+        }
+
+        freeState(result);
+        __quantum__rt__finalize();
+    }
+}
