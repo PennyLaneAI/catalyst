@@ -30,7 +30,7 @@ func.func private @straight_line(%arg0: f64) -> tensor<f64> attributes {qnode, d
     // CHECK-NEXT: memref.store [[pidxNext]], [[paramCounter]]
     %2 = quantum.custom "RZ"(%arg0) %1 : !quantum.bit
     %3 = quantum.insert %0[1], %2 : !quantum.reg, !quantum.bit
-    %4 = quantum.namedobs %2[3] : !quantum.obs
+    %4 = quantum.namedobs %2[PauliZ] : !quantum.obs
     %5 = quantum.expval %4 : f64
     %6 = tensor.from_elements %5 : tensor<f64>
     quantum.dealloc %0 : !quantum.reg
@@ -61,7 +61,7 @@ func.func private @for_loop(%start: index, %stop: index, %step: index, %arg0: te
     }
 
     %2 = quantum.extract %1#1[0] : !quantum.reg -> !quantum.bit
-    %3 = quantum.namedobs %2[3] : !quantum.obs
+    %3 = quantum.namedobs %2[PauliZ] : !quantum.obs
     %4 = quantum.expval %3 : f64
     quantum.dealloc %0 : !quantum.reg
     %5 = tensor.from_elements %4 : tensor<f64>
