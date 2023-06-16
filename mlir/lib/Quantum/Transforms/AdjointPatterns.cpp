@@ -126,11 +126,11 @@ struct AdjointSingleOpRewritePattern : public mlir::OpRewritePattern<AdjointOp> 
                 }
                 else if (CustomOp custom = isInstanceOf<CustomOp>(*i)) {
                     assert(
-                        custom.getInQubits().size() == custom.getOutQubits().size() &&
+                        custom.getQubitOperands().size() == custom.getQubitResults().size() &&
                         "Quantum operation must have inputs and outputs of the same qubit number");
                     auto in_qubits = ({
                         std::vector<Value> qbits;
-                        for (auto q : custom.getOutQubits()) {
+                        for (auto q : custom.getQubitResults()) {
                             qbits.push_back(query(q));
                         }
                         qbits;
@@ -146,7 +146,27 @@ struct AdjointSingleOpRewritePattern : public mlir::OpRewritePattern<AdjointOp> 
                         loc, custom.getResultTypes(), in_params, in_qubits, custom.getGateName(),
                         mlir::BoolAttr::get(ctx, !custom.getAdjoint().value_or(false)));
                     for (size_t i = 0; i < customA.getOutQubits().size(); i++) {
-                        update(custom.getInQubits()[i], customA->getResult(i));
+                        update(custom.getQubitOperands()[i], customA->getResult(i));
+                    }
+                }
+                else if (QubitUnitaryOp qunitary = isInstanceOf<QubitUnitaryOp>(*i)) {
+                    assert(
+                        qunitary.getQubitOperands().size() == qunitary.getQubitResults().size() &&
+                        "Quantum operation must have inputs and outputs of the same qubit number");
+                    auto in_qubits = ({
+                        std::vector<Value> qbits;
+                        for (auto q : qunitary.getQubitResults()) {
+                            qbits.push_back(query(q));
+                        }
+                        qbits;
+                    });
+                    auto qunitaryA = rewriter.create<QubitUnitaryOp>(
+                        loc, qunitary.getResultTypes(),
+                        classicalMapping.lookupOrDefault(qunitary.getMatrix()),
+                        in_qubits,
+                        mlir::BoolAttr::get(ctx, !custom.getAdjoint().value_or(false)));
+                    for (size_t i = 0; i < qunitaryA.getQubitResults().size(); i++) {
+                        update(qunitary.getQubitOperands()[i], qunitaryA->getResult(i));
                     }
                 }
                 else if (ExtractOp extract = isInstanceOf<ExtractOp>(*i)) {

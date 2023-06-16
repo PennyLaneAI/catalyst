@@ -18,15 +18,15 @@ from functools import partial
 
 import pennylane as qml
 import pennylane.numpy as pnp
+import jax.numpy as jnp
 import pytest
 from numpy.testing import assert_allclose
-from pennylane import adjoint as adjoint_PL
+from pennylane import adjoint as PL_adjoint
 
-from catalyst import adjoint as adjoint_C
+from catalyst import adjoint as C_adjoint
 from catalyst import qjit
 
 # pylint: disable=missing-function-docstring
-
 
 def test_adjoint_func_singlefun():
     def func():
@@ -36,38 +36,38 @@ def test_adjoint_func_singlefun():
 
     @qjit()
     @qml.qnode(qml.device("lightning.qubit", wires=2))
-    def workflow_C():
+    def C_workflow():
         qml.PauliX(wires=0)
-        adjoint_C(func)()
+        C_adjoint(func)()
         qml.PauliY(wires=0)
         return qml.state()
 
     @qml.qnode(qml.device("default.qubit", wires=2))
-    def workflow_PL():
+    def PL_workflow():
         qml.PauliX(wires=0)
-        adjoint_PL(func)()
+        PL_adjoint(func)()
         qml.PauliY(wires=0)
         return qml.state()
 
-    actual = workflow_C()
-    desired = workflow_PL()
+    actual = C_workflow()
+    desired = PL_workflow()
     assert_allclose(actual, desired)
 
 
 def test_adjoint_singleop():
     @qjit()
     @qml.qnode(qml.device("lightning.qubit", wires=2))
-    def workflow_C():
-        adjoint_C(qml.PauliZ)(wires=0)
+    def C_workflow():
+        C_adjoint(qml.PauliZ)(wires=0)
         return qml.state()
 
     @qml.qnode(qml.device("default.qubit", wires=2))
-    def workflow_PL():
-        adjoint_PL(qml.PauliZ)(wires=0)
+    def PL_workflow():
+        PL_adjoint(qml.PauliZ)(wires=0)
         return qml.state()
 
-    actual = workflow_C()
-    desired = workflow_PL()
+    actual = C_workflow()
+    desired = PL_workflow()
     assert_allclose(actual, desired)
 
 
@@ -80,21 +80,21 @@ def test_adjoint_paramfun(w, p):
 
     @qjit()
     @qml.qnode(qml.device("lightning.qubit", wires=2))
-    def workflow_C(w, theta):
+    def C_workflow(w, theta):
         qml.PauliX(wires=0)
-        adjoint_C(func)(w, theta, theta, theta)
+        C_adjoint(func)(w, theta, theta, theta)
         qml.PauliY(wires=0)
         return qml.state()
 
     @qml.qnode(qml.device("default.qubit", wires=2))
-    def workflow_PL(w, theta):
+    def PL_workflow(w, theta):
         qml.PauliX(wires=0)
-        adjoint_PL(func)(w, theta, theta, theta)
+        PL_adjoint(func)(w, theta, theta, theta)
         qml.PauliY(wires=0)
         return qml.state()
 
-    actual = workflow_C(w, p)
-    desired = workflow_PL(w, p)
+    actual = C_workflow(w, p)
+    desired = PL_workflow(w, p)
     assert_allclose(actual, desired)
 
 
@@ -108,19 +108,51 @@ def test_adjoint_nestedfun():
 
     @qjit(verbose=True, keep_intermediate=True)
     @qml.qnode(qml.device("lightning.qubit", wires=2))
-    def workflow_C():
+    def C_workflow():
         qml.RX(pnp.pi / 2, wires=0)
-        adjoint_C(partial(func, A=adjoint_C, I=0))()
+        C_adjoint(partial(func, A=C_adjoint, I=0))()
         qml.RZ(pnp.pi / 2, wires=0)
         return qml.state()
 
     @qml.qnode(qml.device("default.qubit", wires=2))
-    def workflow_PL():
+    def PL_workflow():
         qml.RX(pnp.pi / 2, wires=0)
-        adjoint_PL(partial(func, A=adjoint_PL, I=0))()
+        PL_adjoint(partial(func, A=PL_adjoint, I=0))()
         qml.RZ(pnp.pi / 2, wires=0)
         return qml.state()
 
-    actual = workflow_C()
-    desired = workflow_PL()
+    actual = C_workflow()
+    desired = PL_workflow()
     assert_allclose(actual, desired)
+
+
+def test_adjoint_qubitunitary():
+    def func():
+        qml.QubitUnitary(
+            jnp.array(
+                [
+                    [0.99500417 - 0.09983342j, 0.0 + 0.0j, 0.0 + 0.0j, 0.0 + 0.0j],
+                    [0.0 + 0.0j, 0.99500417 + 0.09983342j, 0.0 + 0.0j, 0.0 + 0.0j],
+                    [0.0 + 0.0j, 0.0 + 0.0j, 0.99500417 + 0.09983342j, 0.0 + 0.0j],
+                    [0.0 + 0.0j, 0.0 + 0.0j, 0.0 + 0.0j, 0.99500417 - 0.09983342j],
+                ]
+            ),
+            wires=[1, 2],
+        )
+
+    @qjit()
+    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    def C_workflow():
+        C_adjoint(func)()
+        return qml.state()
+
+    @qml.qnode(qml.device("default.qubit", wires=2))
+    def PL_workflow():
+        PL_adjoint(func)()
+        return qml.state()
+
+    actual = C_workflow()
+    desired = PL_workflow()
+    assert_allclose(actual, desired)
+
+
