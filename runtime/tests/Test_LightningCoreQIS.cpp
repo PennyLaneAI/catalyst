@@ -1557,7 +1557,21 @@ TEST_CASE("Test the main porperty of the adjoint quantum operations", "[CoreQIS]
         QUBIT *q1 = __quantum__rt__qubit_allocate();
         QUBIT *q2 = __quantum__rt__qubit_allocate();
         double theta = 3.14 / 2.0;
+        CplxT_double matrix_data[4] = {
+            {-0.6709485262524046, -0.6304426335363695},
+            {-0.14885403153998722, 0.3608498832392019},
+            {-0.2376311670004963, 0.3096798175687841},
+            {-0.8818365947322423, -0.26456390390903695},
+        };
+        MemRefT_CplxT_double_2d *matrix = new MemRefT_CplxT_double_2d;
+        matrix->data_allocated = matrix_data;
+        matrix->data_aligned = matrix_data;
+        matrix->offset = 0;
+        matrix->sizes[0] = 2;
+        matrix->sizes[1] = 2;
+        matrix->strides[0] = 1;
 
+        __quantum__qis__QubitUnitary(matrix, 1, q0);
         __quantum__qis__MultiRZ(theta, 2, q0, q1);
         __quantum__qis__Toffoli(q0, q1, q2);
         __quantum__qis__CSWAP(q0, q1, q2);
@@ -1615,6 +1629,7 @@ TEST_CASE("Test the main porperty of the adjoint quantum operations", "[CoreQIS]
         __quantum__qis__CSWAP_Adjoint(q0, q1, q2);
         __quantum__qis__Toffoli_Adjoint(q0, q1, q2);
         __quantum__qis__MultiRZ_Adjoint(theta, 2, q0, q1);
+        __quantum__qis__QubitUnitary_Adjoint(matrix, 1, q0);
 
         MemRefT_CplxT_double_1d result = getState(8);
         __quantum__qis__State(&result, 0);

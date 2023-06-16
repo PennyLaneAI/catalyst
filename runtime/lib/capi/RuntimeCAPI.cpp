@@ -716,6 +716,33 @@ void __quantum__qis__MultiRZ_Adjoint(double theta, int64_t numQubits, ...)
                                                         /* inverse = */ true);
 }
 
+static void _qubitUnitary_impl(MemRefT_CplxT_double_2d *matrix,
+                               int64_t numQubits,
+                               std::vector<std::complex<double>> &coeffs,
+                               std::vector<QubitIdType> &wires,
+                               va_list *args)
+{
+    const size_t num_rows = matrix->sizes[0];
+    const size_t num_col = matrix->sizes[1];
+    const size_t expected_size = std::pow(2, numQubits);
+
+    if (num_rows != expected_size || num_col != expected_size) {
+        RT_FAIL("Invalid given QubitUnitary matrix; "
+                "The size of the matrix must be pow(2, numWires) * pow(2, numWires).");
+    }
+
+    wires.reserve(numQubits);
+    for (int64_t i = 0; i < numQubits; i++) {
+        wires.push_back(va_arg(*args, QubitIdType));
+    }
+
+    const size_t matrix_size = num_rows * num_col;
+    coeffs.reserve(matrix_size);
+    for (size_t i = 0; i < matrix_size; i++) {
+        coeffs.emplace_back(matrix->data_aligned[i].real, matrix->data_aligned[i].imag);
+    }
+}
+
 void __quantum__qis__QubitUnitary(MemRefT_CplxT_double_2d *matrix, int64_t numQubits,
                                   /*qubits*/...)
 {
@@ -729,33 +756,37 @@ void __quantum__qis__QubitUnitary(MemRefT_CplxT_double_2d *matrix, int64_t numQu
         RT_FAIL("Invalid number of wires");
     }
 
-    const size_t num_rows = matrix->sizes[0];
-    const size_t num_col = matrix->sizes[1];
-    const size_t expected_size = std::pow(2, numQubits);
+    va_list args;
+    std::vector<std::complex<double>> coeffs;
+    std::vector<QubitIdType> wires;
+    va_start(args, numQubits);
+    _qubitUnitary_impl(matrix, numQubits, coeffs, wires, &args);
+    va_end(args);
+    return Catalyst::Runtime::CTX->getDevice()->MatrixOperation(coeffs, wires,
+                                                                /*inverse*/ false);
+}
 
-    if (num_rows != expected_size || num_col != expected_size) {
-        RT_FAIL("Invalid given QubitUnitary matrix; "
-                "The size of the matrix must be pow(2, numWires) * pow(2, numWires).");
+void __quantum__qis__QubitUnitary_Adjoint(MemRefT_CplxT_double_2d *matrix, int64_t numQubits,
+                                  /*qubits*/...)
+{
+    RT_ASSERT(numQubits >= 0);
+
+    if (matrix == nullptr) {
+        RT_FAIL("The QubitUnitary matrix must be initialized");
+    }
+
+    if (numQubits > __quantum__rt__num_qubits()) {
+        RT_FAIL("Invalid number of wires");
     }
 
     va_list args;
-    va_start(args, numQubits);
-    std::vector<QubitIdType> wires;
-    wires.reserve(numQubits);
-    for (int64_t i = 0; i < numQubits; i++) {
-        wires.push_back(va_arg(args, QubitIdType));
-    }
-    va_end(args);
-
-    const size_t matrix_size = num_rows * num_col;
     std::vector<std::complex<double>> coeffs;
-    coeffs.reserve(matrix_size);
-    for (size_t i = 0; i < matrix_size; i++) {
-        coeffs.emplace_back(matrix->data_aligned[i].real, matrix->data_aligned[i].imag);
-    }
-
+    std::vector<QubitIdType> wires;
+    va_start(args, numQubits);
+    _qubitUnitary_impl(matrix, numQubits, coeffs, wires, &args);
+    va_end(args);
     return Catalyst::Runtime::CTX->getDevice()->MatrixOperation(coeffs, wires,
-                                                                /*inverse*/ false);
+                                                                /*inverse*/ true);
 }
 
 ObsIdType __quantum__qis__NamedObs(int64_t obsId, QUBIT *wire)
