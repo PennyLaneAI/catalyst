@@ -346,7 +346,7 @@ def trace_quantum_tape(
     return out, qreg, qubit_states
 
 
-# TODO: remove once fixed upstream
+# TODO: remove once fixed upstream: https://github.com/PennyLaneAI/pennylane/issues/4263
 def trace_hamiltonian(coeffs, *nested_obs):
     """Trace a hamiltonian.
 
@@ -369,7 +369,7 @@ def trace_observables(obs, qubit_states, p, num_wires, qreg):
 
     Args:
         obs: an observable
-        qubit_states: the statically known qubit state at this progam point
+        qubit_states: the statically known qubit state at this program point
         p: parameter evaluator
         num_wires: the number of wires
         qreg: the quantum register with the state at this program point
