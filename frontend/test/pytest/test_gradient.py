@@ -682,7 +682,7 @@ def test_assert_invalid_h_type():
 
 def test_assert_non_differentiable():
     """Test non-differentiable parameter detection"""
-    with pytest.raises(TypeError, match="Non-differentiable object passed"):
+    with pytest.raises(DifferentiableCompileError, match="Non-differentiable object passed"):
 
         @qjit()
         def workflow(x: float):
@@ -771,7 +771,8 @@ def test_non_float_arg(backend):
         return grad(circuit)(x, y)
 
     with pytest.raises(
-        TypeError, match="only supports differentiation on floating-point arguments"
+        DifferentiableCompileError,
+        match="only supports differentiation on floating-point arguments",
     ):
         cost_fn(1j, 2.0)
 
@@ -790,7 +791,9 @@ def test_non_float_res(backend):
     def cost_fn(x, y):
         return 1j * circuit(x, y)
 
-    with pytest.raises(TypeError, match="only supports differentiation on floating-point results"):
+    with pytest.raises(
+        DifferentiableCompileError, match="only supports differentiation on floating-point results"
+    ):
         cost_fn(1.0, 2.0)
 
 
