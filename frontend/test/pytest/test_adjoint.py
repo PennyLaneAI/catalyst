@@ -28,7 +28,7 @@ from catalyst import qjit
 
 # pylint: disable=missing-function-docstring
 
-def test_adjoint_func_singlefun():
+def test_adjoint_func():
     def func():
         qml.PauliX(wires=0)
         qml.PauliY(wires=0)
@@ -54,25 +54,50 @@ def test_adjoint_func_singlefun():
     assert_allclose(actual, desired)
 
 
-def test_adjoint_singleop():
+@pytest.mark.parametrize("theta, val", [(3.14, 0),(-100.0, 1)])
+def test_adjoint_op(theta, val):
     @qjit()
     @qml.qnode(qml.device("lightning.qubit", wires=2))
-    def C_workflow():
-        C_adjoint(qml.PauliZ)(wires=0)
+    def C_workflow(theta, val):
+        C_adjoint(qml.RY)(3.14, val)
+        C_adjoint(qml.RZ)(theta, wires=val)
         return qml.state()
 
     @qml.qnode(qml.device("default.qubit", wires=2))
-    def PL_workflow():
-        PL_adjoint(qml.PauliZ)(wires=0)
+    def PL_workflow(theta, val):
+        PL_adjoint(qml.RY)(3.14, val)
+        PL_adjoint(qml.RZ)(theta, wires=val)
         return qml.state()
 
-    actual = C_workflow()
-    desired = PL_workflow()
+    actual = C_workflow(theta, val)
+    desired = PL_workflow(theta, val)
     assert_allclose(actual, desired)
 
 
+@pytest.mark.parametrize("theta, val", [(pnp.pi, 0), (-100.0, 2)])
+def test_adjoint_bound_op(theta, val):
+    @qjit()
+    @qml.qnode(qml.device("lightning.qubit", wires=3))
+    def C_workflow(theta, val):
+        C_adjoint(qml.RX(3.14, val))
+        C_adjoint(qml.PauliY(val))
+        C_adjoint(qml.RZ(theta, wires=val))
+        return qml.state()
+
+    @qml.qnode(qml.device("default.qubit", wires=3))
+    def PL_workflow(theta, val):
+        PL_adjoint(qml.RX(3.14, val))
+        PL_adjoint(qml.PauliY(val))
+        PL_adjoint(qml.RZ(theta, wires=val))
+        return qml.state()
+
+    actual = C_workflow(theta, val)
+    desired = PL_workflow(theta, val)
+    assert_allclose(actual, desired, atol=1e-6, rtol=1e-6)
+
+
 @pytest.mark.parametrize("w, p", [(0, 0.5), (0, -100.0), (1, 123.22)])
-def test_adjoint_paramfun(w, p):
+def test_adjoint_param_fun(w, p):
     def func(w, theta1, theta2, theta3):
         qml.RX(theta1 * pnp.pi / 2, wires=w)
         qml.RY(theta2 / 2, wires=w)
@@ -98,7 +123,7 @@ def test_adjoint_paramfun(w, p):
     assert_allclose(actual, desired)
 
 
-def test_adjoint_nestedfun():
+def test_adjoint_nested_fun():
     def func(A, I):
         qml.RX(I, wires=1)
         qml.RY(I, wires=1)
@@ -137,7 +162,7 @@ def test_adjoint_qubitunitary():
                     [0.0 + 0.0j, 0.0 + 0.0j, 0.0 + 0.0j, 0.99500417 - 0.09983342j],
                 ]
             ),
-            wires=[1, 2],
+            wires=[0, 1],
         )
 
     @qjit()
