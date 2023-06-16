@@ -20,9 +20,10 @@ from typing import Dict, List
 
 import jax
 import numpy as np
-from jax._src import util
+from jax._src import api_util, core, source_info_util, util
 from jax._src.lib.mlir import ir
-from jax.interpreters import mlir, xla
+from jax.core import AbstractValue
+from jax.interpreters import mlir
 from jaxlib.mlir.dialects._func_ops_gen import CallOp
 from jaxlib.mlir.dialects._mhlo_ops_gen import ConstantOp, ConvertOp
 from mlir_quantum.dialects.arith import AddIOp, CeilDivSIOp
@@ -74,7 +75,7 @@ class Qbit:
         self.aval = AbstractQbit()
 
 
-class AbstractQbit(jax.core.AbstractValue):
+class AbstractQbit(AbstractValue):
     """Abstract Qbit"""
 
 
@@ -97,7 +98,7 @@ class Qreg:
         self.aval = AbstractQreg()
 
 
-class AbstractQreg(jax.core.AbstractValue):
+class AbstractQreg(AbstractValue):
     """Abstract quantum register."""
 
 
@@ -120,7 +121,7 @@ class Obs:
         self.aval = AbstractObs(num_qubits, primitive)
 
 
-class AbstractObs(jax.core.AbstractValue):
+class AbstractObs(AbstractValue):
     """Abstract observable."""
 
     def __init__(self, num_qubits=None, primitive=None):
@@ -140,16 +141,16 @@ def _obs_lowering(aval):
 #
 # registration
 #
-jax.core.pytype_aval_mappings[Qbit] = lambda x: x.aval
-jax.core.raise_to_shaped_mappings[AbstractQbit] = lambda aval, _: aval
+core.pytype_aval_mappings[Qbit] = lambda x: x.aval
+core.raise_to_shaped_mappings[AbstractQbit] = lambda aval, _: aval
 mlir.ir_type_handlers[AbstractQbit] = _qbit_lowering
 
-jax.core.pytype_aval_mappings[Qreg] = lambda x: x.aval
-jax.core.raise_to_shaped_mappings[AbstractQreg] = lambda aval, _: aval
+core.pytype_aval_mappings[Qreg] = lambda x: x.aval
+core.raise_to_shaped_mappings[AbstractQreg] = lambda aval, _: aval
 mlir.ir_type_handlers[AbstractQreg] = _qreg_lowering
 
-jax.core.pytype_aval_mappings[Obs] = lambda x: x.aval
-jax.core.raise_to_shaped_mappings[AbstractObs] = lambda aval, _: aval
+core.pytype_aval_mappings[Obs] = lambda x: x.aval
+core.raise_to_shaped_mappings[AbstractObs] = lambda aval, _: aval
 mlir.ir_type_handlers[AbstractObs] = _obs_lowering
 
 
@@ -157,44 +158,44 @@ mlir.ir_type_handlers[AbstractObs] = _obs_lowering
 # Primitives #
 ##############
 
-qdevice_p = jax.core.Primitive("qdevice")
+qdevice_p = core.Primitive("qdevice")
 qdevice_p.multiple_results = True
-qalloc_p = jax.core.Primitive("qalloc")
-qdealloc_p = jax.core.Primitive("qdealloc")
+qalloc_p = core.Primitive("qalloc")
+qdealloc_p = core.Primitive("qdealloc")
 qdealloc_p.multiple_results = True
-qextract_p = jax.core.Primitive("qextract")
-qinsert_p = jax.core.Primitive("qinsert")
-qinst_p = jax.core.Primitive("qinst")
+qextract_p = core.Primitive("qextract")
+qinsert_p = core.Primitive("qinsert")
+qinst_p = core.Primitive("qinst")
 qinst_p.multiple_results = True
-qunitary_p = jax.core.Primitive("qunitary")
+qunitary_p = core.Primitive("qunitary")
 qunitary_p.multiple_results = True
-qmeasure_p = jax.core.Primitive("qmeasure")
+qmeasure_p = core.Primitive("qmeasure")
 qmeasure_p.multiple_results = True
-compbasis_p = jax.core.Primitive("compbasis")
-namedobs_p = jax.core.Primitive("namedobs")
-hermitian_p = jax.core.Primitive("hermitian")
-tensorobs_p = jax.core.Primitive("tensorobs")
-hamiltonian_p = jax.core.Primitive("hamiltonian")
-sample_p = jax.core.Primitive("sample")
-counts_p = jax.core.Primitive("counts")
+compbasis_p = core.Primitive("compbasis")
+namedobs_p = core.Primitive("namedobs")
+hermitian_p = core.Primitive("hermitian")
+tensorobs_p = core.Primitive("tensorobs")
+hamiltonian_p = core.Primitive("hamiltonian")
+sample_p = core.Primitive("sample")
+counts_p = core.Primitive("counts")
 counts_p.multiple_results = True
-expval_p = jax.core.Primitive("expval")
-var_p = jax.core.Primitive("var")
-probs_p = jax.core.Primitive("probs")
-state_p = jax.core.Primitive("state")
-qcond_p = jax.core.AxisPrimitive("qcond")
+expval_p = core.Primitive("expval")
+var_p = core.Primitive("var")
+probs_p = core.Primitive("probs")
+state_p = core.Primitive("state")
+qcond_p = core.AxisPrimitive("qcond")
 qcond_p.multiple_results = True
-qwhile_p = jax.core.AxisPrimitive("qwhile")
+qwhile_p = core.AxisPrimitive("qwhile")
 qwhile_p.multiple_results = True
-qfor_p = jax.core.AxisPrimitive("qfor")
+qfor_p = core.AxisPrimitive("qfor")
 qfor_p.multiple_results = True
-grad_p = jax.core.Primitive("grad")
+grad_p = core.Primitive("grad")
 grad_p.multiple_results = True
-func_p = jax.core.CallPrimitive("func")
+func_p = core.CallPrimitive("func")
 grad_p.multiple_results = True
-jvp_p = jax.core.Primitive("jvp")
+jvp_p = core.Primitive("jvp")
 jvp_p.multiple_results = True
-vjp_p = jax.core.Primitive("vjp")
+vjp_p = core.Primitive("vjp")
 vjp_p.multiple_results = True
 
 #
@@ -210,8 +211,8 @@ def _func_def_impl(ctx, *args, call_jaxpr, fn, call=True):  # pragma: no cover
 
 def _func_symbol_lowering(ctx, fn_name, call_jaxpr):
     """Create a func::FuncOp from JAXPR."""
-    if isinstance(call_jaxpr, jax.core.Jaxpr):
-        call_jaxpr = jax.core.ClosedJaxpr(call_jaxpr, ())
+    if isinstance(call_jaxpr, core.Jaxpr):
+        call_jaxpr = core.ClosedJaxpr(call_jaxpr, ())
     symbol_name = mlir.lower_jaxpr_to_fun(ctx, fn_name, call_jaxpr, tuple()).name.value
     return symbol_name
 
@@ -502,7 +503,7 @@ def _qalloc_lowering(jax_ctx: mlir.LoweringRuleContext, size_value: ir.Value):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
-    assert size_value.owner.name == "mhlo.constant"
+    assert size_value.owner.name == "stablehlo.constant"
     size_value_attr = size_value.owner.attributes["value"]
     assert ir.DenseIntElementsAttr.isinstance(size_value_attr)
     size = ir.DenseIntElementsAttr(size_value_attr)[0]
@@ -753,7 +754,7 @@ def qmeasure(qubit):
 @qmeasure_p.def_abstract_eval
 def _qmeasure_abstract_eval(qubit):
     assert isinstance(qubit, AbstractQbit)
-    return jax.core.ShapedArray((), bool), qubit
+    return core.ShapedArray((), bool), qubit
 
 
 @qmeasure_p.def_impl
@@ -834,7 +835,13 @@ def _namedobs_abstract_eval(qubit, kind):
     return AbstractObs()
 
 
-def _named_obs_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value, kind: int):
+def _named_obs_attribute(ctx, kind: str):
+    return ir.OpaqueAttr.get(
+        "quantum", ("named_observable " + kind).encode("utf-8"), ir.NoneType.get(ctx), ctx
+    )
+
+
+def _named_obs_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value, kind: str):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
@@ -842,8 +849,7 @@ def _named_obs_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value, kind
     assert ir.OpaqueType(qubit.type).dialect_namespace == "quantum"
     assert ir.OpaqueType(qubit.type).data == "bit"
 
-    i8_type = ir.IntegerType.get_signless(8, ctx)
-    obsId = ir.IntegerAttr.get(i8_type, kind)
+    obsId = _named_obs_attribute(ctx, kind)
     result_type = ir.OpaqueType.get("quantum", "obs", ctx)
 
     return NamedObsOp(result_type, qubit, obsId).results
@@ -954,7 +960,7 @@ def _sample_abstract_eval(obs, shots, shape):
     else:
         assert shape == (shots,)
 
-    return jax.core.ShapedArray(shape, jax.numpy.float64)
+    return core.ShapedArray(shape, jax.numpy.float64)
 
 
 @sample_p.def_impl
@@ -997,9 +1003,7 @@ def _counts_abstract_eval(obs, shots, shape):
     else:
         assert shape == (2,)
 
-    return jax.core.ShapedArray(shape, jax.numpy.float64), jax.core.ShapedArray(
-        shape, jax.numpy.int64
-    )
+    return core.ShapedArray(shape, jax.numpy.float64), core.ShapedArray(shape, jax.numpy.int64)
 
 
 def _counts_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: int, shape: tuple):
@@ -1026,7 +1030,7 @@ def expval(obs, shots):
 @expval_p.def_abstract_eval
 def _expval_abstract_eval(obs, shots):
     assert isinstance(obs, AbstractObs)
-    return jax.core.ShapedArray((), jax.numpy.float64)
+    return core.ShapedArray((), jax.numpy.float64)
 
 
 @expval_p.def_impl
@@ -1063,7 +1067,7 @@ def var(obs, shots):
 @var_p.def_abstract_eval
 def _var_abstract_eval(obs, shots):
     assert isinstance(obs, AbstractObs)
-    return jax.core.ShapedArray((), jax.numpy.float64)
+    return core.ShapedArray((), jax.numpy.float64)
 
 
 @var_p.def_impl
@@ -1106,7 +1110,7 @@ def _probs_abstract_eval(obs, shape):
     else:
         raise TypeError("probs only supports computational basis")
 
-    return jax.core.ShapedArray(shape, jax.numpy.float64)
+    return core.ShapedArray(shape, jax.numpy.float64)
 
 
 @var_p.def_impl
@@ -1140,7 +1144,7 @@ def _state_abstract_eval(obs, shape):
     else:
         raise TypeError("state only supports computational basis")
 
-    return jax.core.ShapedArray(shape, jax.numpy.complex128)
+    return core.ShapedArray(shape, jax.numpy.complex128)
 
 
 @state_p.def_impl
@@ -1179,7 +1183,7 @@ def _qcond_def_impl(ctx, *preds_and_branch_args_plus_consts, branch_jaxprs):  # 
 def _qcond_lowering(
     jax_ctx: mlir.LoweringRuleContext,
     *preds_and_branch_args_plus_consts: tuple,
-    branch_jaxprs: List[jax.core.ClosedJaxpr],
+    branch_jaxprs: List[core.ClosedJaxpr],
 ):
     result_types = [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_out]
     num_preds = len(branch_jaxprs) - 1
@@ -1198,9 +1202,9 @@ def _qcond_lowering(
             if_block = if_op_scf.then_block
 
             # if block
-            name_stack = util.extend_name_stack(jax_ctx.module_context.name_stack, "if")
+            source_info_util.extend_name_stack("if")
             if_ctx = jax_ctx.module_context.replace(
-                name_stack=xla.extend_name_stack(name_stack, "if")
+                name_stack=jax_ctx.module_context.name_stack.extend("if")
             )
             with ir.InsertionPoint(if_block):
                 # recursively generate the mlir for the if block
@@ -1216,9 +1220,9 @@ def _qcond_lowering(
                 YieldOp([o[0] for o in out[0]])
 
             # else block
-            name_stack = util.extend_name_stack(jax_ctx.module_context.name_stack, "else")
+            source_info_util.extend_name_stack("else")
             else_ctx = jax_ctx.module_context.replace(
-                name_stack=xla.extend_name_stack(name_stack, "else")
+                name_stack=jax_ctx.module_context.name_stack.extend("else")
             )
             else_block = if_op_scf.else_block
             if len(preds) == 1:
@@ -1274,8 +1278,8 @@ def _qwhile_def_impl(
 def _qwhile_lowering(
     jax_ctx: mlir.LoweringRuleContext,
     *iter_args_plus_consts: tuple,
-    cond_jaxpr: jax.core.ClosedJaxpr,
-    body_jaxpr: jax.core.ClosedJaxpr,
+    cond_jaxpr: core.ClosedJaxpr,
+    body_jaxpr: core.ClosedJaxpr,
     cond_nconsts: int,
     body_nconsts: int,
 ):
@@ -1299,8 +1303,8 @@ def _qwhile_lowering(
 
     # cond block
     cond_block = while_op_scf.regions[0].blocks.append(*loop_carry_types)
-    name_stack = util.extend_name_stack(jax_ctx.module_context.name_stack, "while")
-    cond_ctx = jax_ctx.module_context.replace(name_stack=xla.extend_name_stack(name_stack, "cond"))
+    name_stack = jax_ctx.module_context.name_stack.extend("while")
+    cond_ctx = jax_ctx.module_context.replace(name_stack=name_stack.extend("cond"))
     with ir.InsertionPoint(cond_block):
         cond_args = [cond_block.arguments[i] for i in range(len(loop_carry_types))]
 
@@ -1319,7 +1323,7 @@ def _qwhile_lowering(
 
     # body block
     body_block = while_op_scf.regions[1].blocks.append(*loop_carry_types)
-    body_ctx = jax_ctx.module_context.replace(name_stack=xla.extend_name_stack(name_stack, "body"))
+    body_ctx = jax_ctx.module_context.replace(name_stack=name_stack.extend("body"))
     with ir.InsertionPoint(body_block):
         body_args = [body_block.arguments[i] for i in range(len(loop_carry_types))]
 
@@ -1371,7 +1375,7 @@ def _qfor_lowering(
     upper_bound: ir.Value,
     step: ir.Value,
     *iter_args_plus_consts: tuple,
-    body_jaxpr: jax.core.ClosedJaxpr,
+    body_jaxpr: core.ClosedJaxpr,
     body_nconsts: int,
     apply_reverse_transform: bool,
 ):
@@ -1426,9 +1430,9 @@ def _qfor_lowering(
 
     for_op_scf = ForOp(loop_operands[0], loop_operands[1], loop_operands[2], iter_args=loop_args)
 
-    name_stack = util.extend_name_stack(jax_ctx.module_context.name_stack, "for")
+    name_stack = jax_ctx.module_context.name_stack.extend("for")
     body_block = for_op_scf.body
-    body_ctx = jax_ctx.module_context.replace(name_stack=xla.extend_name_stack(name_stack, "body"))
+    body_ctx = jax_ctx.module_context.replace(name_stack=name_stack.extend("body"))
 
     with ir.InsertionPoint(body_block):
         body_args = list(body_block.arguments)
@@ -1486,3 +1490,16 @@ mlir.register_lowering(grad_p, _grad_lowering)
 mlir.register_lowering(func_p, _func_lowering)
 mlir.register_lowering(jvp_p, _jvp_lowering)
 mlir.register_lowering(vjp_p, _vjp_lowering)
+
+
+def _scalar_abstractify(t):
+    # pylint: disable=protected-access
+    if t in {int, float, complex, bool} or isinstance(t, jax._src.numpy.lax_numpy._ScalarMeta):
+        return core.ShapedArray([], dtype=t, weak_type=True)
+    raise TypeError(f"Cannot convert given type {t} scalar ShapedArray.")
+
+
+# pylint: disable=protected-access
+api_util._shaped_abstractify_handlers[type] = _scalar_abstractify
+# pylint: disable=protected-access
+api_util._shaped_abstractify_handlers[jax._src.numpy.lax_numpy._ScalarMeta] = _scalar_abstractify

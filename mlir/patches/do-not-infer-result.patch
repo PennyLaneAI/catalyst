@@ -1,0 +1,27 @@
+--- _tensor_ops_gen.py
++++ _tensor_ops_gen.py
+@@ -212,22 +212,16 @@ class ExtractOp(_ods_ir.OpView):
+ 
+   _ODS_REGIONS = (0, True)
+ 
+-  def __init__(self, tensor, indices, *, loc=None, ip=None):
++  def __init__(self, results, tensor, indices, *, loc=None, ip=None):
+     operands = []
+-    results = []
+     attributes = {}
+     regions = None
+     operands.append(_get_op_result_or_value(tensor))
+     operands.extend(_get_op_results_or_values(indices))
+     _ods_context = _ods_get_default_loc_context(loc)
+-    results = _ods_ir.InferTypeOpInterface(ExtractOp).inferReturnTypes(
+-        operands=operands,
+-        attributes=_ods_ir.DictAttr.get(attributes, context=_ods_context),
+-        context=_ods_context,
+-        loc=loc)
+     _ods_successors = None
+     super().__init__(self.build_generic(
+-      attributes=attributes, results=results, operands=operands,
++      attributes=attributes, results=[results], operands=operands,
+       successors=_ods_successors, regions=regions, loc=loc, ip=ip))
+ 
+   @builtins.property
