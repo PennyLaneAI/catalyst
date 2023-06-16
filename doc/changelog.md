@@ -16,6 +16,23 @@ This release contains contributions from (in alphabetical order):
 
 <h3>New features</h3>
 
+* Add a preliminary support for native quantum Adjoint operation. `catalyst.adjoint` computes the
+  adjoint of the quantum computation defined by a callee function. Catalyst control flow
+  instructions are not handled yet. The usage pattern is as follows:
+  ``` python
+  def circuit(param):
+      qml.RX(param, wires=0)
+      qml.RY(param, wires=1)
+      qml.RZ(param, wires=2)
+
+  @qjit
+  @qml.qnode(qml.device("lightning.qubit", wires=3))
+  def workflow():
+      catalyst.adjoint(circuit)(pnp.pi/2)
+      return qml.state()
+
+  workflow()
+  ```
 * Catalyst programs can now be used inside of a larger JAX workflow which uses
   JIT compilation, automatic differentiation, and other JAX transforms.
   [#96](https://github.com/PennyLaneAI/catalyst/pull/96)
