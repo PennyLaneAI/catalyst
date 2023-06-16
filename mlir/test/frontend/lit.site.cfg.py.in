@@ -1,7 +1,6 @@
 @LIT_SITE_CFG_IN_HEADER@
 
 config.llvm_tools_dir = lit_config.substitute("@LLVM_TOOLS_DIR@")
-config.llvm_bin_dir = lit_config.substitute("@LLVM_BINARY_DIR@")
 config.python_executable = "@Python3_EXECUTABLE@"
 config.frontend_test_dir = "@CMAKE_BINARY_DIR@" + "/test/frontend"
 config.quantum_bin_dir = "@CMAKE_BINARY_DIR@" + "/bin"

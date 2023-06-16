@@ -40,8 +40,6 @@ config.environment["ASAN_OPTIONS"] = "detect_odr_violation=0"
 try:
     # Access to FileCheck, mlir-translate
     llvm_config.with_environment("PATH", config.llvm_tools_dir, append_path=True)
-    # Access to opt
-    llvm_config.with_environment("PATH", config.llvm_bin_dir, append_path=True)
     # Access to quantum-opt
     llvm_config.with_environment("PATH", config.quantum_bin_dir, append_path=True)
     # Access to mlir-hlo-opt
