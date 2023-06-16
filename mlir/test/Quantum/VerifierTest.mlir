@@ -135,11 +135,11 @@ func.func @compbasis(%q0 : !quantum.bit, %q1 : !quantum.bit, %q2 : !quantum.bit)
 // -----
 
 func.func @namedobs(%q : !quantum.bit) {
-    %0 = quantum.namedobs %q[Identity] : !quantum.obs // Identity
-    %1 = quantum.namedobs %q[PauliX] : !quantum.obs // PauliX
-    %2 = quantum.namedobs %q[PauliY] : !quantum.obs // PauliY
-    %3 = quantum.namedobs %q[PauliZ] : !quantum.obs // PauliZ
-    %4 = quantum.namedobs %q[Hadamard] : !quantum.obs // Hadamard
+    %0 = quantum.namedobs %q[Identity] : !quantum.obs
+    %1 = quantum.namedobs %q[PauliX] : !quantum.obs
+    %2 = quantum.namedobs %q[PauliY] : !quantum.obs
+    %3 = quantum.namedobs %q[PauliZ] : !quantum.obs
+    %4 = quantum.namedobs %q[Hadamard] : !quantum.obs
 
     // expected-error@+2 {{expected valid keyword}}
     // expected-error@+1 {{failed to parse NamedObservableAttr parameter}}
