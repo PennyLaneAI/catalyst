@@ -38,7 +38,7 @@ config.environment["ASAN_OPTIONS"] = "detect_odr_violation=0"
 
 # Define PATH when running frontend tests from an mlir build target.
 try:
-    # Access to FileCheck, mlir-translate
+    # Access to FileCheck, mlir-translate, opt
     llvm_config.with_environment("PATH", config.llvm_tools_dir, append_path=True)
     # Access to quantum-opt
     llvm_config.with_environment("PATH", config.quantum_bin_dir, append_path=True)
