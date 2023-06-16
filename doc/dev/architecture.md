@@ -51,7 +51,7 @@ The three components of the stack can be summarized as follows:
 ## Frontend
 
 An overview of the Python frontend is presented below. At the moment, the frontend is not only
-resposible for converting user programs to the compiler IR, but also comes with a compiler driver
+responsible for converting user programs to the compiler IR, but also comes with a compiler driver
 that manages the entire compilation pipeline.
 
 ![img](../_static/arch/frontend.svg)
@@ -197,7 +197,7 @@ See the graph below for an overview of the transformations applied to the user p
 - **Enzyme auto-differentiation:**
 
   - Functions that have been set-up to be differentiated via Enzyme will be transformed at this
-    stage. The seperately compiled Enzyme library is loaded into the LLVM `opt` tool to perform
+    stage. The separately compiled Enzyme library is loaded into the LLVM `opt` tool to perform
     the relevant code transformations.
 
 - **LLVM optimizations:**
@@ -224,22 +224,30 @@ See the graph below for an overview of the transformations applied to the user p
 
 ## Runtime & Execution
 
-The runtime follows a ... model
+> **Note**
+> Catalyst is constantly evolving and improving, and this is especially true for the runtime
+> component and execution model. Consequently, the below information may not reflect the latest
+> state of development.
 
- - real-time feedback
+The Catalyst Runtime is designed to enable Catalyst's highly dynamic execution model. As such, it
+generally assumes real-time communication between a quantum device and its classical controller or
+host, although it also supports more restrictive execution models.
+Execution of the user program proceeds on the host's native architecture, while the runtime provides
+an abstract communication API for quantum devices that the user program is free to invoke at any
+time during its execution.
 
- - dynamic quantum memory management
+The high-level components of the Catalyst Runtime are shown below.
 
 ![img](../_static/arch/runtime.svg)
 
-The Catalyst runtime essentially acts as a bridge between two public interfaces:
+The runtime essentially acts as a bridge between two public interfaces:
 
-  - The **CAPI** provides a list of QIR-style symbols to target during the LLVM generation phase in
-    the compiler. This includes symbols for runtime functions such as device instantiation, quantum
-    memerory management, and error message emission. Additionally, quantum operations to be
+  - The **QIR API** provides a list of QIR-style symbols to target during the LLVM generation phase
+    in the compiler. This includes symbols for runtime functions such as device instantiation,
+    quantum memory management, and error message emission. Additionally, quantum operations to be
     executed on a device are also included in this list. The symbols in the user program are then
     directly linked to the definitions provided by the runtime.
-    Below are some examples of functions that might be included in the CAPI, please see the
+    Below are some examples of functions that might be included in the QIR API, please see the
     documentation for an [up-to-date list](https://docs.pennylane.ai/projects/catalyst/en/latest/api/file_runtime_include_RuntimeCAPI.h.html).
 
     ```c
@@ -260,8 +268,8 @@ The Catalyst runtime essentially acts as a bridge between two public interfaces:
 
   - The **QuantumDevice** interface is a C++ abstract base class that devices can implement in
     order to automatically receive dispatched QIR calls whenever the respective quantum device is
-    active. This interface is a bit higher level than the CAPI by abstracting away certain details,
-    as well as reuseing common functionality across devices.
+    active. This interface is a bit higher level than the QIR API by abstracting away certain
+    details, as well as reusing common functionality across devices.
     Below are some examples of functions that might be included in this interface, please see the
     documentation for an [up-to-date list](https://docs.pennylane.ai/projects/catalyst/en/latest/api/file_runtime_include_QuantumDevice.hpp.html).
 
@@ -295,7 +303,7 @@ relevant to hybrid program execution:
     different logical qubits, all the while providing some safety guarantees that an operation
     acting on a previously deallocated qubit is not silently rerouted to a device qubit that has
     already been remapped to another logical qubit. Instead, an error is raised as this always
-    idicates a bug in the compiled program (use-after-free).
+    indicates a bug in the compiled program (use-after-free).
 
   - **Remote execution:** While the aim of Catalyst is to locate the runtime as close to devices as
     possible to enable real-time communication, it currently features a "legacy" execution mode for
