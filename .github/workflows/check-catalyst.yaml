@@ -273,8 +273,8 @@ jobs:
         steps.cache-enzyme-source.outputs.cache-hit != 'true'
       uses: actions/checkout@v3
       with:
-        repository: EnzymeAD/enzyme
-        ref: ${{ steps.enzzyme-hash.outputs.enzyme-hash }}
+        repository: EnzymeAD/Enzyme
+        ref: ${{ steps.enzyme-hash.outputs.enzyme-hash }}
         path: mlir/Enzyme
 
     - name: Install Deps
