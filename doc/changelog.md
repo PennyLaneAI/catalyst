@@ -6,7 +6,7 @@
   automatic differentiation, and other JAX transforms.
   [#96](https://github.com/PennyLaneAI/catalyst/pull/96)
   [#123](https://github.com/PennyLaneAI/catalyst/pull/123)
-  []()
+  [#167](https://github.com/PennyLaneAI/catalyst/pull/167)
 
   Note that generally Catalyst should be used to JIT the entire workflow, but sometimes users may
   wish to delegate only the quantum part of their workflow to Catalyst and let JAX handle the rest
