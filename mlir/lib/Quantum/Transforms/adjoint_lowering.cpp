@@ -41,43 +41,6 @@ using namespace mlir;
 namespace catalyst {
 namespace quantum {
 
-struct AdjointDistributionPass : public OperationPass<ModuleOp> {
-    AdjointDistributionPass() : OperationPass<ModuleOp>(TypeID::get<AdjointDistributionPass>()) {}
-    AdjointDistributionPass(const AdjointDistributionPass &other) : OperationPass<ModuleOp>(other)
-    {
-    }
-
-    StringRef getName() const override { return "AdjointLoweringPass"; }
-
-    StringRef getArgument() const override { return "adjoint-distribution"; }
-
-    StringRef getDescription() const override
-    {
-        return "Distribute adjoint over adjoint MLIR regions.";
-    }
-
-    void getDependentDialects(DialectRegistry &registry) const override
-    {
-        registry.insert<arith::ArithDialect>();
-        registry.insert<linalg::LinalgDialect>();
-        registry.insert<index::IndexDialect>();
-        registry.insert<tensor::TensorDialect>();
-        registry.insert<memref::MemRefDialect>();
-        registry.insert<bufferization::BufferizationDialect>();
-    }
-
-    void runOnOperation() final
-    {
-        LLVM_DEBUG(dbgs() << "adjoint distribution pass"
-                          << "\n");
-    }
-
-    std::unique_ptr<Pass> clonePass() const override
-    {
-        return std::make_unique<AdjointDistributionPass>(*this);
-    }
-};
-
 struct AdjointLoweringPass : public OperationPass<ModuleOp> {
     AdjointLoweringPass() : OperationPass<ModuleOp>(TypeID::get<AdjointLoweringPass>()) {}
     AdjointLoweringPass(const AdjointLoweringPass &other) : OperationPass<ModuleOp>(other) {}
@@ -122,11 +85,6 @@ struct AdjointLoweringPass : public OperationPass<ModuleOp> {
 };
 
 } // namespace quantum
-
-std::unique_ptr<Pass> createAdjointDistributionPass()
-{
-    return std::make_unique<quantum::AdjointDistributionPass>();
-}
 
 std::unique_ptr<Pass> createAdjointLoweringPass()
 {
