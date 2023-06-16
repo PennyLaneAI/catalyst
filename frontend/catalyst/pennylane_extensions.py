@@ -150,6 +150,12 @@ Jaxpr = Any
 
 
 class DifferentiableTypeError(TypeError):
+    """An error indicating an invalid differentiation configuration.
+
+    From Catalyst's perspective, the diff config (including the method) is part of the type
+    of the Differentiable.
+    """
+
     pass
 
 
