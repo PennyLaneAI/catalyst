@@ -41,7 +41,7 @@ import catalyst.jax_primitives as jprim
 from catalyst.jax_primitives import GradParams, expval_p, probs_p
 from catalyst.jax_tape import JaxTape
 from catalyst.jax_tracer import get_traceable_fn, insert_to_qreg, trace_quantum_tape
-from catalyst.utils.exceptions import CompileError
+from catalyst.utils.exceptions import CompileError, DifferentiableCompileError
 from catalyst.utils.patching import Patcher
 from catalyst.utils.tracing import TracingContext
 
@@ -149,16 +149,6 @@ DifferentiableLike = Union[Differentiable, Callable, "catalyst.compilation_pipel
 Jaxpr = Any
 
 
-class DifferentiableTypeError(TypeError):
-    """An error indicating an invalid differentiation configuration.
-
-    From Catalyst's perspective, the diff config (including the method) is part of the type
-    of the Differentiable.
-    """
-
-    pass
-
-
 def _ensure_differentiable(f: DifferentiableLike) -> Differentiable:
     """Narrows down the set of the supported differentiable objects."""
     if isinstance(f, (Function, QNode)):
@@ -167,7 +157,7 @@ def _ensure_differentiable(f: DifferentiableLike) -> Differentiable:
         return f.qfunc
     elif isinstance(f, Callable):  # Keep at the bottom
         return Function(f)
-    raise DifferentiableTypeError(f"Non-differentiable object passed: {type(f)}")
+    raise DifferentiableCompileError(f"Non-differentiable object passed: {type(f)}")
 
 
 def _make_jaxpr_check_differentiable(f: Differentiable, grad_params: GradParams, *args) -> Jaxpr:
@@ -181,13 +171,13 @@ def _make_jaxpr_check_differentiable(f: Differentiable, grad_params: GradParams,
 
     for pos, arg in enumerate(jaxpr.in_avals):
         if arg.dtype.kind != "f" and pos in grad_params.argnum:
-            raise DifferentiableTypeError(
+            raise DifferentiableCompileError(
                 "Catalyst.grad only supports differentiation on floating-point "
                 f"arguments, got '{arg.dtype}' at position {pos}."
             )
     for pos, res in enumerate(jaxpr.out_avals):
         if res.dtype.kind != "f":
-            raise DifferentiableTypeError(
+            raise DifferentiableCompileError(
                 "Catalyst.grad only supports differentiation on floating-point "
                 f"results, got '{res.dtype}' at position {pos}."
             )
@@ -205,7 +195,7 @@ def _make_jaxpr_check_differentiable(f: Differentiable, grad_params: GradParams,
             f, qml.QNode
         ), "Differentiation methods other than finite-differences can only operate on a QNode"
         if f.diff_method is None:
-            raise DifferentiableTypeError(
+            raise DifferentiableCompileError(
                 "Cannot differentiate a QNode explicitly marked non-differentiable (with"
                 " diff_method=None)"
             )
@@ -213,12 +203,12 @@ def _make_jaxpr_check_differentiable(f: Differentiable, grad_params: GradParams,
         if f.diff_method == "parameter-shift" and any(
             prim not in [expval_p, probs_p] for prim in return_ops
         ):
-            raise DifferentiableTypeError(
+            raise DifferentiableCompileError(
                 "The parameter-shift method can only be used for QNodes "
                 "which return either qml.expval or qml.probs."
             )
         if f.diff_method == "adjoint" and any(prim not in [expval_p] for prim in return_ops):
-            raise DifferentiableTypeError(
+            raise DifferentiableCompileError(
                 "The adjoint method can only be used for QNodes which return qml.expval."
             )
     return jaxpr

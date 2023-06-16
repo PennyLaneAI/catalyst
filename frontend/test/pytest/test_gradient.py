@@ -22,7 +22,7 @@ from jax import numpy as jnp
 
 import catalyst.utils.calculate_grad_shape as infer
 from catalyst import CompileError, cond, for_loop, grad, qjit
-from catalyst.pennylane_extensions import DifferentiableTypeError
+from catalyst.pennylane_extensions import DifferentiableCompileError
 
 
 class TestGradShape:
@@ -64,7 +64,7 @@ def test_non_differentiable_qnode():
         return grad(f, method="defer")(x)
 
     with pytest.raises(
-        DifferentiableTypeError,
+        DifferentiableCompileError,
         match="Cannot differentiate a QNode explicitly marked non-differentiable",
     ):
         grad_f(1.0)
@@ -85,7 +85,7 @@ def test_param_shift_on_non_expval(backend):
         return grad(func, method="defer")(p)
 
     with pytest.raises(
-        DifferentiableTypeError, match="The parameter-shift method can only be used"
+        DifferentiableCompileError, match="The parameter-shift method can only be used"
     ):
         qjit(workflow)
 
@@ -104,7 +104,7 @@ def test_adjoint_on_non_expval(backend):
     def workflow(p: float):
         return grad(func, method="defer")(p)
 
-    with pytest.raises(DifferentiableTypeError, match="The adjoint method can only be used"):
+    with pytest.raises(DifferentiableCompileError, match="The adjoint method can only be used"):
         qjit(workflow)
 
 
