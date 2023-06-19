@@ -428,15 +428,14 @@ jobs:
 
     - name: Add Frontend Dependencies to PATH
       run: |
-        echo "$(pwd)/enzyme-build/Enzyme" >> $GITHUB_PATH
         echo "$(pwd)/llvm-build/bin" >> $GITHUB_PATH
         echo "$(pwd)/mhlo-build/bin" >> $GITHUB_PATH
         echo "$(pwd)/quantum-build/bin" >> $GITHUB_PATH
         echo "PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
         echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
         echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
+        echo "ENZYME_DIR=$(pwd)/enzyme-build/Enzyme" >> $GITHUB_ENV
         chmod +x quantum-build/bin/quantum-opt  # artifact upload does not preserve permissions
-        chmod +x enzyme-build/Enzyme
 
     - name: Run Python Lit Tests
       run: |
@@ -537,6 +536,7 @@ jobs:
         echo "PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
         echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
         echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
+        echo "ENZYME_DIR=$(pwd)/enzyme-build/Enzyme" >> $GITHUB_ENV
         chmod +x quantum-build/bin/quantum-opt  # artifact upload does not preserve permissions
 
     - name: Install lightning.kokkos used in Python tests

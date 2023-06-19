@@ -79,15 +79,11 @@ def get_executable_path(project, tool):
     return executable_path if os.path.exists(executable_path) else tool
 
 
-def get_enzyme_path(project, tool):
+def get_enzyme_path(project, env_var):
     """Get path to Enzyme."""
-    path = (
-        os.path.join(package_root, "enzyme") if INSTALLED else default_enzyme_path.get(project, "")
-    )
-    print(package_root)
-    print(os.getcwd())
-    enzyme_path = os.path.join(path, tool)
-    return enzyme_path if os.path.exists(enzyme_path) else tool
+    if INSTALLED:
+        return os.path.join(package_root, "enzyme")  # pragma: no cover
+    return os.getenv(env_var, default_enzyme_path.get(project, ""))
 
 
 def get_lib_path(project, env_var):
@@ -284,10 +280,11 @@ class Enzyme(PassPipeline):
     """Pass pipeline to lower LLVM IR to Enzyme LLVM IR."""
 
     _executable = get_executable_path("llvm", "opt")
+    enzyme_path = get_enzyme_path("enzyme", "ENZYME_DIR")
     _default_flags = [
-        "-load-pass-plugin=" + get_enzyme_path("enzyme", "LLVMEnzyme-17.so"),
+        f"-load-pass-plugin={enzyme_path}/LLVMEnzyme-17.so",
         "-load",
-        get_enzyme_path("enzyme", "LLVMEnzyme-17.so"),
+        f"{enzyme_path}/LLVMEnzyme-17.so",
         "-passes=enzyme",
         "-S",
     ]
