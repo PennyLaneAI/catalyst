@@ -325,6 +325,27 @@ class TestJAXAD:
         assert "0" in circuit.jaxed_qfunc.deriv_qfuncs
         assert len(circuit.jaxed_qfunc.deriv_qfuncs["0"].jaxpr.out_avals) == 1
 
+    def test_jit_and_grad(self, backend):
+        """Test that argnum determination works correctly when combining jax.jit with jax.grad.
+        This was fixed by the introduction of symbolic zero detection for tangent vectors."""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=2))
+        def circuit(params: jax.core.ShapedArray((2,), dtype=float), n: int):
+            qml.RX(n * params[0], wires=0)
+            qml.RY(params[1] / n, wires=1)
+            qml.CNOT(wires=[0, 1])
+
+            return qml.expval(qml.PauliZ(1))
+
+        n = 3
+        params = jnp.array([0.1, 0.2])
+
+        result = jax.grad(jax.jit(circuit), argnums=0)(params, n)
+        reference = jax.grad(circuit, argnums=0)(params, n)
+
+        assert jnp.allclose(result, reference)
+
 
 class TestJAXVectorize:
     """Test QJIT compatibility with JAX vectorization."""
