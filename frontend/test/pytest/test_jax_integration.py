@@ -32,7 +32,7 @@ class TestJAXJIT:
 
         @qjit
         @qml.qnode(qml.device(backend, wires=2))
-        def circuit(x: jax.ShapedArray((3,), dtype=float)):
+        def circuit(x: jax.core.ShapedArray((3,), dtype=float)):
             qml.RX(jnp.pi * x[0], wires=0)
             qml.RY(x[1] ** 2, wires=0)
             qml.RX(x[1] * x[2], wires=0)
@@ -53,7 +53,9 @@ class TestJAXJIT:
 
         @qjit
         @qml.qnode(qml.device(backend, wires=2))
-        def circuit(x: jax.ShapedArray((3,), dtype=float), y: jax.ShapedArray((2,), dtype=float)):
+        def circuit(
+            x: jax.core.ShapedArray((3,), dtype=float), y: jax.core.ShapedArray((2,), dtype=float)
+        ):
             qml.RX(jnp.pi * x[0], wires=0)
             qml.RY(x[1] ** 2, wires=0)
             qml.RX(y[1] * x[2], wires=0)
@@ -74,7 +76,9 @@ class TestJAXJIT:
 
         @qjit
         @qml.qnode(qml.device(backend, wires=2))
-        def circuit(x: jax.ShapedArray((3,), dtype=float), y: jax.ShapedArray((2,), dtype=float)):
+        def circuit(
+            x: jax.core.ShapedArray((3,), dtype=float), y: jax.core.ShapedArray((2,), dtype=float)
+        ):
             qml.RX(jnp.pi * x[0], wires=0)
             qml.RY(x[1] ** 2, wires=0)
             qml.RX(y[1] * x[2], wires=0)
@@ -140,7 +144,7 @@ class TestJAXAD:
 
         @qjit
         @qml.qnode(qml.device(backend, wires=2))
-        def circuit(x: jax.ShapedArray((3,), dtype=float)):
+        def circuit(x: jax.core.ShapedArray((3,), dtype=float)):
             qml.RX(jnp.pi * x[0], wires=0)
             qml.RY(x[1] ** 2, wires=0)
             qml.RX(x[1] * x[2], wires=0)
@@ -162,7 +166,9 @@ class TestJAXAD:
 
         @qjit
         @qml.qnode(qml.device(backend, wires=2))
-        def circuit(x: jax.ShapedArray((3,), dtype=float), y: jax.ShapedArray((2,), dtype=float)):
+        def circuit(
+            x: jax.core.ShapedArray((3,), dtype=float), y: jax.core.ShapedArray((2,), dtype=float)
+        ):
             qml.RX(jnp.pi * x[0], wires=0)
             qml.RY(x[1] ** 2, wires=0)
             qml.RX(y[1] * x[2], wires=0)
@@ -186,7 +192,9 @@ class TestJAXAD:
 
         @qjit
         @qml.qnode(qml.device(backend, wires=2))
-        def circuit(x: jax.ShapedArray((3,), dtype=float), y: jax.ShapedArray((2,), dtype=float)):
+        def circuit(
+            x: jax.core.ShapedArray((3,), dtype=float), y: jax.core.ShapedArray((2,), dtype=float)
+        ):
             qml.RX(jnp.pi * x[0], wires=0)
             qml.RY(x[1] ** 2, wires=0)
             qml.RX(y[1] * x[2], wires=0)
@@ -210,7 +218,9 @@ class TestJAXAD:
 
         @qjit
         @qml.qnode(qml.device(backend, wires=2))
-        def circuit(x: jax.ShapedArray((3,), dtype=float), y: jax.ShapedArray((2,), dtype=float)):
+        def circuit(
+            x: jax.core.ShapedArray((3,), dtype=float), y: jax.core.ShapedArray((2,), dtype=float)
+        ):
             qml.RX(jnp.pi * x[0], wires=0)
             qml.RY(x[1] ** 2, wires=0)
             qml.RX(y[1] * x[2], wires=0)
@@ -258,7 +268,7 @@ class TestJAXAD:
 
         @qjit
         @qml.qnode(qml.device(backend, wires=2))
-        def circuit(x: jax.ShapedArray((3,), dtype=float), y: int):
+        def circuit(x: jax.core.ShapedArray((3,), dtype=float), y: int):
             qml.RX(jnp.pi * x[0], wires=0)
             qml.RY(x[1] ** 2, wires=0)
             qml.RX(y * x[2], wires=0)
@@ -314,6 +324,32 @@ class TestJAXAD:
         assert len(circuit.jaxed_qfunc.deriv_qfuncs) == 1
         assert "0" in circuit.jaxed_qfunc.deriv_qfuncs
         assert len(circuit.jaxed_qfunc.deriv_qfuncs["0"].jaxpr.out_avals) == 1
+
+
+class TestJAXVectorize:
+    """Test QJIT compatibility with JAX vectorization."""
+
+    def test_simple_circuit(self, backend):
+        """Test a basic use case of jax.vmap on top of qjit."""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=2))
+        def circuit(x: jax.core.ShapedArray((3,), dtype=float)):
+            qml.RX(jnp.pi * x[0], wires=0)
+            qml.RY(x[1] ** 2, wires=0)
+            qml.RX(x[1] * x[2], wires=0)
+            return qml.expval(qml.PauliZ(0))
+
+        def cost_fn(x):
+            result = circuit(x)
+            return jnp.cos(result) ** 2
+
+        x = jnp.array([[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]])
+        result = jax.vmap(cost_fn)(x)
+
+        assert len(result) == 2
+        assert jnp.allclose(result[0], cost_fn(x[0]))
+        assert jnp.allclose(result[1], cost_fn(x[1]))
 
 
 if __name__ == "__main__":

@@ -25,6 +25,7 @@ from numpy import pi
 
 from catalyst import for_loop, grad, measure, qjit
 from catalyst.compilation_pipelines import CompiledFunction
+from catalyst.jax_primitives import _scalar_abstractify
 
 
 def f_aot_builder(backend, wires=1, shots=1000):
@@ -49,6 +50,17 @@ def f_jit_builder(backend, wires=1, shots=1000):
         return measure(wires=0)
 
     return f
+
+
+@qjit(target="mlir")
+@qml.qnode(qml.device("lightning.qubit", wires=2))
+def function_jaxnumpy_csingle(x: jax.numpy.csingle, y: jax.numpy.csingle):
+    """Test for jax._src.numpy.lax_numpy._ScalarMeta"""
+    x_r = x.real
+    y_r = y.real
+    val = jax.numpy.arctan2(x_r, y_r)
+    qml.RZ(val, wires=0)
+    return measure(wires=0)
 
 
 def fsample_aot_builder(backend, wires=1, shots=1000):
@@ -427,6 +439,25 @@ class TestCaching:
         run_time = run_end - run_end
         assert run_time < compile_and_run_time
 
+    def test_subfunction_is_cached(self, backend):
+        """
+        Test a function called multiple times within an outer jit function is generated only once
+        """
+
+        @qml.qnode(qml.device(backend, wires=1))
+        def f(x):
+            qml.RX(x, wires=0)
+            return qml.expval(qml.PauliZ(wires=0))
+
+        @qjit
+        def g(x: float):
+            return f(x) + f(x)
+
+        assert "func.func private @f(" in g.mlir
+        assert g.mlir.count("call @f(") == 2
+        # Duplicate function generation results in a "_0" suffix
+        assert not "func.func private @f_0(" in g.mlir
+
 
 class TestShots:
     # Shots influences on the sample instruction
@@ -476,6 +507,29 @@ class TestSignatureErrors:
 
         retval = CompiledFunction.can_promote([], [1])
         assert not retval
+
+    def test_incompatible_type_reachable_from_user_code(self):
+        """Raise error message for incompatible types"""
+
+        with pytest.raises(TypeError) as err:
+
+            @qjit
+            def f(x: str):
+                return
+
+        assert "Unsupported argument type:" in str(err.value)
+
+    def test_incompatible_abstractify(self):
+        """Check error message.
+
+        Note: It is unclear if there's a path that will reach this condition.
+        This is because the incompatible argument above would reach it.
+        """
+
+        with pytest.raises(TypeError) as err:
+            _scalar_abstractify(str)
+
+        assert "Cannot convert given type" in str(err.value)
 
 
 class TestClassicalCompilation:

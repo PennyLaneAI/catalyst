@@ -26,6 +26,8 @@ jobs:
 
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
     - if: ${{ inputs.catalyst == 'stable' }}
       run: |
         git checkout $(git tag | sort -V | tail -1)

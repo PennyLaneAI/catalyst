@@ -204,7 +204,7 @@ def get_observables_dependency_tree(obs):
     """
     if obs is None:
         yield obs
-    elif isinstance(obs, tuple(jax_tracer.namedobs_map.keys())):
+    elif isinstance(obs, jax_tracer.KNOWN_NAMED_OBS):
         yield obs
     elif isinstance(obs, qml.Hermitian):
         yield obs

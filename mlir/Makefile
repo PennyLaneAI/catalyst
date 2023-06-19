@@ -8,6 +8,7 @@ MK_DIR := $(dir $(MK_ABSPATH))
 DIALECTS_BUILD_DIR?=$(MK_DIR)/build
 LLVM_BUILD_DIR?=$(MK_DIR)/llvm-project/build
 MHLO_BUILD_DIR?=$(MK_DIR)/mlir-hlo/build
+ENZYME_BUILD_DIR?=$(MK_DIR)/Enzyme/enzyme/build
 RT_BUILD_DIR?=$(MK_DIR)/../runtime/build
 ENABLE_LLD?=ON
 
@@ -17,6 +18,7 @@ help:
 	@echo "  all                to build MLIR, MLIR-HLO and custom Catalyst dialects"
 	@echo "  llvm               to build MLIR enabling Python bindings"
 	@echo "  mhlo               to build build MLIR-HLO"
+	@echo "  enzyme             to build build Enzyme"
 	@echo "  dialects           to build custom Catalyst MLIR dialects"
 	@echo "  test               to run the Catalyst MLIR dialects test suite"
 	@echo "  clean              to delete all temporary, cache, and build files"
@@ -24,7 +26,7 @@ help:
 	@echo "  format [version=?] to apply C++ formatter; use with 'version={version}' to run clang-format-{version} instead of clang-format"
 
 .PHONY: all
-all: llvm mhlo dialects
+all: llvm mhlo dialects enzyme
 
 .PHONY: llvm
 llvm:
@@ -44,10 +46,13 @@ llvm:
 		-DCMAKE_CXX_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
 		-DLLVM_ENABLE_LLD=$(ENABLE_LLD)
 
-	cmake --build $(LLVM_BUILD_DIR) --target check-mlir llvm-symbolizer
+	cmake --build $(LLVM_BUILD_DIR) --target check-mlir llvm-symbolizer opt
 
 .PHONY: mhlo
 mhlo:
+	# TODO: We can remove this patch whenever this ticket is solved https://github.com/tensorflow/mlir-hlo/issues/68
+	patch -d mlir-hlo/mhlo/analysis --merge --follow-symlinks < patches/add-lmhlo-dependency.patch
+
 	@echo "build MLIR-HLO"
 	cmake -G Ninja -S mlir-hlo -B $(MHLO_BUILD_DIR) \
 		-DCMAKE_BUILD_TYPE=Release \
@@ -61,6 +66,13 @@ mhlo:
 
 	cmake --build $(MHLO_BUILD_DIR) --target check-mlir-hlo
 
+.PHONY: enzyme
+enzyme:
+	@echo "build enzyme"
+	cmake -G Ninja -S Enzyme/enzyme -B $(ENZYME_BUILD_DIR) \
+		-DLLVM_DIR=$(LLVM_BUILD_DIR)/lib/cmake/llvm
+
+	cmake --build $(ENZYME_BUILD_DIR)
 
 .PHONY: dialects
 dialects:
@@ -83,6 +95,7 @@ dialects:
 	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects quantum-lsp-server
 	patch -d $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum --follow-symlinks < patches/use-ir-from-jax.patch
 	patch -d $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/dialects --follow-symlinks < patches/use-cext-from-jax.patch
+	patch -d $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/dialects --follow-symlinks < patches/do-not-infer-result.patch
 	patch -d $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/dialects --follow-symlinks < patches/remove-gradient-cext-import.patch
 	patch -d $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/dialects --follow-symlinks < patches/remove-quantum-cext-import.patch
 

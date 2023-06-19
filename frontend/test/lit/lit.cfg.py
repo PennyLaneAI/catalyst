@@ -38,7 +38,7 @@ config.environment["ASAN_OPTIONS"] = "detect_odr_violation=0"
 
 # Define PATH when running frontend tests from an mlir build target.
 try:
-    # Access to FileCheck, mlir-translate
+    # Access to FileCheck, mlir-translate, opt
     llvm_config.with_environment("PATH", config.llvm_tools_dir, append_path=True)
     # Access to quantum-opt
     llvm_config.with_environment("PATH", config.quantum_bin_dir, append_path=True)
@@ -48,21 +48,19 @@ try:
     # Define the location of runtime libraries when running frontend tests
     llvm_config.with_environment("RUNTIME_LIB_DIR", config.lrt_lib_dir, append_path=True)
     llvm_config.with_environment("MLIR_LIB_DIR", config.mlir_lib_dir, append_path=True)
+    llvm_config.with_environment("ENZYME_DIR", config.enzyme_dir, append_path=True)
 
     # Define PYTHONPATH to include the dialect python bindings.
     # From within a build target we have access to cmake variables configured in lit.site.cfg.py.in.
     llvm_config.with_environment(
         "PYTHONPATH",
-        [
-            config.mlir_bindings_dir,
-            # TODO: add gradient dialect bindings
-        ],
+        [config.mlir_bindings_dir],
         append_path=True,
     )
 except AttributeError:
-    # Else we use the system environment variables.
     from lit.llvm.config import LLVMConfig  # fmt:skip
     llvm_config = LLVMConfig(lit_config, config)
     llvm_config.with_system_environment("PYTHONPATH")
     llvm_config.with_system_environment("RUNTIME_LIB_DIR")
     llvm_config.with_system_environment("MLIR_LIB_DIR")
+    llvm_config.with_system_environment("ENZYME_DIR")

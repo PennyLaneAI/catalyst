@@ -32,6 +32,7 @@ from catalyst.compiler import (
     CompileOptions,
     Compiler,
     CompilerDriver,
+    Enzyme,
     LLVMDialectToLLVMIR,
     LLVMIRToObjectFile,
     MHLOPass,
@@ -121,6 +122,7 @@ class TestCompilerErrors:
             (MLIRToLLVMDialect),
             (LLVMDialectToLLVMIR),
             (LLVMIRToObjectFile),
+            (Enzyme)
             # CompilerDiver is missing here because it has a different error message.
         ],
     )
@@ -149,6 +151,7 @@ class TestCompilerErrors:
             (BufferizationPass),
             (MLIRToLLVMDialect),
             (LLVMDialectToLLVMIR),
+            (Enzyme),
             (LLVMIRToObjectFile),
             (CompilerDriver),
         ],
@@ -232,6 +235,7 @@ class TestCompilerState:
         compiler.get_output_of("BufferizationPass")
         compiler.get_output_of("MLIRToLLVMDialect")
         compiler.get_output_of("LLVMDialectToLLVMIR")
+        compiler.get_output_of("Enzyme")
 
     def test_workspace_keep_intermediate(self, backend):
         """Test cwd's has been modified with folder containing intermediate results"""

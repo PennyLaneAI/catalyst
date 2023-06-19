@@ -67,12 +67,23 @@ default_lib_paths = {
     "runtime": os.path.join(package_root, "../../runtime/build/lib"),
 }
 
+default_enzyme_path = {
+    "enzyme": os.path.join(package_root, "../../mlir/Enzyme/enzyme/build/Enzyme")
+}
+
 
 def get_executable_path(project, tool):
     """Get path to executable."""
     path = os.path.join(package_root, "bin") if INSTALLED else default_bin_paths.get(project, "")
     executable_path = os.path.join(path, tool)
     return executable_path if os.path.exists(executable_path) else tool
+
+
+def get_enzyme_path(project, env_var):
+    """Get path to Enzyme."""
+    if INSTALLED:
+        return os.path.join(package_root, "enzyme")  # pragma: no cover
+    return os.getenv(env_var, default_enzyme_path.get(project, ""))
 
 
 def get_lib_path(project, env_var):
@@ -143,6 +154,7 @@ class MHLOPass(PassPipeline):
         "--allow-unregistered-dialect",
         "--canonicalize",
         "--chlo-legalize-to-hlo",
+        "--stablehlo-legalize-to-hlo",
         "--mhlo-legalize-control-flow",
         "--hlo-legalize-to-linalg",
         "--mhlo-legalize-to-std",
@@ -207,7 +219,7 @@ class MLIRToLLVMDialect(PassPipeline):
         # operation on the different metadata. This pass uses affine constructs to materialize these
         # effects.
         # Concretely, expanded-strided-metadata is used to decompose memref.subview as it has no
-        # lowering in -convert-memref-to-llvm.
+        # lowering in -finalize-memref-to-llvm.
         "--expand-strided-metadata",
         "--lower-affine",
         "--arith-expand",  # some arith ops (ceildivsi) require expansion to be lowered to llvm
@@ -217,7 +229,7 @@ class MLIRToLLVMDialect(PassPipeline):
         # Run after -convert-math-to-llvm as it marks math::powf illegal without converting it.
         "--convert-math-to-libm",
         "--convert-arith-to-llvm",
-        "--convert-memref-to-llvm=use-generic-functions",
+        "--finalize-memref-to-llvm=use-generic-functions",
         "--convert-index-to-llvm",
         "--convert-gradient-to-llvm",
         "--convert-quantum-to-llvm",
@@ -255,6 +267,27 @@ class LLVMDialectToLLVMIR(PassPipeline):
 
     _executable = get_executable_path("llvm", "mlir-translate")
     _default_flags = ["--mlir-to-llvmir"]
+
+    @staticmethod
+    def get_output_filename(infile):
+        path = pathlib.Path(infile)
+        if not path.exists():
+            raise FileNotFoundError("Cannot find {infile}.")
+        return str(path.with_suffix(".ll"))
+
+
+class Enzyme(PassPipeline):
+    """Pass pipeline to lower LLVM IR to Enzyme LLVM IR."""
+
+    _executable = get_executable_path("llvm", "opt")
+    enzyme_path = get_enzyme_path("enzyme", "ENZYME_DIR")
+    _default_flags = [
+        f"-load-pass-plugin={enzyme_path}/LLVMEnzyme-17.so",
+        "-load",
+        f"{enzyme_path}/LLVMEnzyme-17.so",
+        "-passes=enzyme",
+        "-S",
+    ]
 
     @staticmethod
     def get_output_filename(infile):
@@ -455,6 +488,7 @@ class Compiler:
                 BufferizationPass,
                 MLIRToLLVMDialect,
                 LLVMDialectToLLVMIR,
+                Enzyme,
                 LLVMIRToObjectFile,
                 CompilerDriver,
             ]

@@ -57,7 +57,7 @@ static std::vector<Value> computePartialDerivative(PatternRewriter &rewriter, Lo
                                                    std::vector<Value> callArgs)
 {
     constexpr double shift = PI / 2;
-    Type shiftVectorType = RankedTensorType::get({numShifts}, rewriter.getF64Type());
+    ShapedType shiftVectorType = RankedTensorType::get({numShifts}, rewriter.getF64Type());
     Value selectorVector = rewriter.create<bufferization::ToTensorOp>(loc, selectorBuffer);
 
     // Define the shift vectors (pos/neg) as sparse tensor constants.
@@ -65,13 +65,13 @@ static std::vector<Value> computePartialDerivative(PatternRewriter &rewriter, Lo
 
     DenseElementsAttr nonZeroValuesPos =
         DenseFPElementsAttr::get(RankedTensorType::get(1, rewriter.getF64Type()), shift);
-    Attribute shiftVectorAttrPos =
+    TypedAttr shiftVectorAttrPos =
         SparseElementsAttr::get(shiftVectorType, nonZeroIndices, nonZeroValuesPos);
     Value shiftVectorPos = rewriter.create<arith::ConstantOp>(loc, shiftVectorAttrPos);
 
     DenseElementsAttr nonZeroValuesNeg =
         DenseFPElementsAttr::get(RankedTensorType::get(1, rewriter.getF64Type()), -shift);
-    Attribute shiftVectorAttrNeg =
+    TypedAttr shiftVectorAttrNeg =
         SparseElementsAttr::get(shiftVectorType, nonZeroIndices, nonZeroValuesNeg);
     Value shiftVectorNeg = rewriter.create<arith::ConstantOp>(loc, shiftVectorAttrNeg);
 
@@ -193,7 +193,8 @@ func::FuncOp ParameterShiftLowering::genQGradFunction(PatternRewriter &rewriter,
     if (!gradientFn) {
         PatternRewriter::InsertionGuard insertGuard(rewriter);
 
-        gradientFn = rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility);
+        gradientFn =
+            rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility, nullptr, nullptr);
 
         // First copy the entire function as is, then we can modify it to compute the gradient.
         rewriter.cloneRegionBefore(callee.getBody(), gradientFn.getBody(), gradientFn.end());

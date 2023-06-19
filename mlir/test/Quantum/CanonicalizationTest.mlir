@@ -90,3 +90,19 @@ func.func @test_extract_insert_no_fold_static(%r1: !quantum.reg, %i1: i64, %i2: 
 
     return %r4 : !quantum.reg
 }
+
+// CHECK-LABEL: test_extract_insert_constant
+func.func @test_extract_insert_constant(%r1: !quantum.reg) -> !quantum.reg {
+    // CHECK-NOT: arith.constant
+    %c1 = arith.constant 1 : i64
+    %c2 = arith.constant 2 : i64
+    // CHECK-NOT: arith.addi
+    %add = arith.addi %c1, %c2 : i64
+
+    // CHECK: quantum.extract %{{.*}}[ 3]
+    %q1 = quantum.extract %r1[%add] : !quantum.reg -> !quantum.bit
+
+    // CHECK: quantum.insert %{{.*}}[ 2]
+    %r2 = quantum.insert %r1[%c2], %q1 : !quantum.reg, !quantum.bit
+    return %r2 : !quantum.reg
+}

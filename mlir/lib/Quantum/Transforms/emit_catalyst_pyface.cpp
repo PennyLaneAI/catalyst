@@ -156,8 +156,8 @@ void wrapResultsAndArgsInTwoStructs(LLVM::LLVMFuncOp op, PatternRewriter &rewrit
         Value arg = wrapperFuncOp.getArgument(1);
         Value structOfMemrefs = rewriter.create<LLVM::LoadOp>(loc, arg);
 
-        for (auto &en : llvm::enumerate(params)) {
-            Value pointer = rewriter.create<LLVM::ExtractValueOp>(loc, structOfMemrefs, en.index());
+        for (size_t idx = 0; idx < params.size(); idx++) {
+            Value pointer = rewriter.create<LLVM::ExtractValueOp>(loc, structOfMemrefs, idx);
             args.push_back(pointer);
         }
     }
@@ -197,21 +197,12 @@ void EmitCatalystPyInterfaceTransform::rewrite(LLVM::LLVMFuncOp op, PatternRewri
 
 namespace catalyst {
 
+#define GEN_PASS_DEF_EMITCATALYSTPYINTERFACEPASS
+#include "Quantum/Transforms/Passes.h.inc"
+
 struct EmitCatalystPyInterfacePass
-    : public PassWrapper<EmitCatalystPyInterfacePass, OperationPass<ModuleOp>> {
-    EmitCatalystPyInterfacePass() {}
-
-    StringRef getArgument() const override { return "emit-catalyst-py-interface"; }
-
-    StringRef getDescription() const override
-    {
-        return "Emit catalyst python's default interface.";
-    }
-
-    void getDependentDialects(DialectRegistry &registry) const override
-    {
-        registry.insert<LLVM::LLVMDialect>();
-    }
+    : impl::EmitCatalystPyInterfacePassBase<EmitCatalystPyInterfacePass> {
+    using EmitCatalystPyInterfacePassBase::EmitCatalystPyInterfacePassBase;
 
     void runOnOperation() final
     {
