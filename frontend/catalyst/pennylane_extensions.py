@@ -540,8 +540,8 @@ def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
         If `f` is a callable:
             A callable object accepting the same parameters as `f` but performing the computation
             adjointed to what `f` does.
-        otherwize, assuming that `f` is an operator:
-            An operation adjointed to `f`
+        Otherwize, assuming that `f` is an operator:
+            The operator which is adjointed to `f`
 
     **Example**
 
