@@ -429,6 +429,7 @@ jobs:
     - name: Add Frontend Dependencies to PATH
       run: |
         echo "$(pwd)/enzyme-build/Enzyme" >> $GITHUB_PATH
+        ls $(pwd)/enzyme-build/Enzyme
         echo "$(pwd)/llvm-build/bin" >> $GITHUB_PATH
         echo "$(pwd)/mhlo-build/bin" >> $GITHUB_PATH
         echo "$(pwd)/quantum-build/bin" >> $GITHUB_PATH
