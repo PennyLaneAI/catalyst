@@ -17,7 +17,7 @@ of quantum operations, measurements, and observables to JAXPR.
 
 from dataclasses import dataclass
 from itertools import chain
-from typing import Dict, List
+from typing import Dict, List, Iterable
 
 import jax
 import numpy as np
@@ -579,7 +579,7 @@ def _qextract_lowering(jax_ctx: mlir.LoweringRuleContext, qreg: ir.Value, qubit_
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
-    assert ir.OpaqueType.isinstance(qreg.type)
+    assert ir.OpaqueType.isinstance(qreg.type), qreg.type
     assert ir.OpaqueType(qreg.type).dialect_namespace == "quantum"
     assert ir.OpaqueType(qreg.type).data == "reg"
 
@@ -1499,34 +1499,43 @@ def _adjoint_def_impl(ctx, *args):
 
 
 @adjoint_p.def_abstract_eval
-def _adjoint_abstract(*args, consts, jaxpr):
+def _adjoint_abstract(*args, const_indices, cargs_indices, qargs_indices, jaxpr):
     return jaxpr.out_avals
 
 
-def _adjoint_lowering(jax_ctx: mlir.LoweringRuleContext, *args, consts, jaxpr):
+def _adjoint_lowering(jax_ctx:mlir.LoweringRuleContext,
+                      *args:Iterable[ir.Value],
+                      const_indices:List[int],
+                      cargs_indices:List[int],
+                      qargs_indices:List[int],
+                      jaxpr: core.ClosedJaxpr) -> ir.Value:
+    """ The JAX bind handler performing the Jaxpr -> MLIR adjoint lowering by taking the `jaxpr`
+    expression to be lowered and all its already lowered arguments as MLIR value references. The Jax
+    requires all the arguments to be passed as a single list of positionals, thus we pass indices of
+    the argument groups. The handler returns the resulting MLIR Value. """
+    consts = [args[i] for i in const_indices]
+    cargs = [args[i] for i in cargs_indices]
+    qargs = [args[i] for i in qargs_indices]
+    assert len(qargs) == 1, "We currently expect exactly one quantum register argument"
     output_types = util.flatten(map(mlir.aval_to_ir_types, jax_ctx.avals_out))
-    op = AdjointOp(output_types[0], args[0])
+
+    # Build an adjoint operation with a single-block region.
+    op = AdjointOp(output_types[0], qargs[0])
     adjoint_block = op.regions[0].blocks.append(
-        *[mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_in[:1]]
+        *[mlir.aval_to_ir_types(jax_ctx.avals_in[i])[0] for i in qargs_indices]
     )
-
-    source_info_util.extend_name_stack("adjoint")
-    body_ctx = jax_ctx.module_context.replace(
-        name_stack=jax_ctx.module_context.name_stack.extend("adjoint")
-    )
-
-    print('jaxpr.jaxpr.invars', jaxpr.jaxpr.invars)
-    print('jaxpr.consts', jaxpr.consts)
-
     with ir.InsertionPoint(adjoint_block):
-        ir_consts = [mlir.ir_constants(c)[0] for c in consts]
-        print('ir_consts', ir_consts)
+        # Build a body of the adjoint operator. We pass constants and classical arguments as-is, but
+        # substitute the quantum arguments with the arguments of the block.
+        source_info_util.extend_name_stack("adjoint")
         out, _ = mlir.jaxpr_subcomp(
-            body_ctx,
+            jax_ctx.module_context.replace(
+                name_stack=jax_ctx.module_context.name_stack.extend("adjoint")
+            ),
             jaxpr.jaxpr,
             mlir.TokenSet(),
             [mlir.ir_constants(c) for c in jaxpr.consts],
-            *([a] for a in chain(ir_consts, adjoint_block.arguments, args[1:])),
+            *([a] for a in chain(consts, adjoint_block.arguments, cargs)),
             dim_var_values=jax_ctx.dim_var_values,
         )
 
