@@ -533,13 +533,15 @@ class Adjoint(Operation):
 def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
     """Getting the quantum adjoint of the computation defined by `f`.
     Args:
-        f(Callable): PennyLane operation or a Python function containing PennyLane quantum
-                     operations. Quantum measurements within `f` are not allowed. Keyword arguments
-                     of `f` are not traced. The Catalyst control flow instructions are not supported
-                     at the moment.
+        f (Callable or Operator): A PennyLane operation or a Python function containing PennyLane
+          quantum operations. Quantum measurements are not allowed. The Catalyst control
+          flow instructions are not supported yet.
     Returns:
-        A callable opject accepting the same parameters as `f` but performing the computation
-        adjointed to what `f` does.
+        If `f` is a callable:
+            A callable object accepting the same parameters as `f` but performing the computation
+            adjointed to what `f` does.
+        otherwize, assuming that `f` is an operator:
+            An operation adjointed to `f`
 
     **Example**
 
