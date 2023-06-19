@@ -530,7 +530,7 @@ class Adjoint(Operation):
         super().__init__(wires=Wires(Adjoint.num_wires))
 
 
-def adjoint(f: Union[Callable, Operator]) -> Callable:
+def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
     """Getting the quantum adjoint of the computation defined by `f`.
     Args:
         f(Callable): PennyLane operation or a Python function containing PennyLane quantum
