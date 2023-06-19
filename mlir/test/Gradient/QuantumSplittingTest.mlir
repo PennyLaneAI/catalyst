@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt %s --lower-gradients=split --split-input-file | FileCheck %s
+// RUN: quantum-opt %s --lower-gradients=split --split-input-file --canonicalize | FileCheck %s
 
-// CHECK-LABEL: func.func private @straight_line.qsplit(%arg0: tensor<?xf64>, %arg1: tensor<?xindex>, %arg2: tensor<?xi64>) -> tensor<f64>
+// CHECK-LABEL: func.func private @straight_line.qsplit(%arg0: f64, %arg1: tensor<?xf64>, %arg2: tensor<?xindex>, %arg3: tensor<?xi64>) -> tensor<f64>
 func.func private @straight_line(%arg0: f64) -> tensor<f64> attributes {qnode, diff_method = "parameter-shift"} {
     // CHECK-NEXT: [[idx1:%.+]] = index.constant 1
     // CHECK-NEXT: [[idx0:%.+]] = index.constant 0
@@ -24,10 +24,10 @@ func.func private @straight_line(%arg0: f64) -> tensor<f64> attributes {qnode, d
     %0 = quantum.alloc(1) : !quantum.reg
     %1 = quantum.extract %0[0] : !quantum.reg -> !quantum.bit
     // CHECK: [[pidx:%.+]] = memref.load [[paramCounter]]
-    // CHECK-NEXT: [[param:%.+]] = tensor.extract %arg0[[[pidx]]]
     // CHECK-NEXT: [[pidxNext:%.+]] = index.add [[pidx]], [[idx1]]
-    // CHECK-NEXT: quantum.custom "RZ"([[param]])
     // CHECK-NEXT: memref.store [[pidxNext]], [[paramCounter]]
+    // CHECK-NEXT: [[param:%.+]] = tensor.extract %arg1[[[pidx]]]
+    // CHECK-NEXT: quantum.custom "RZ"([[param]])
     %2 = quantum.custom "RZ"(%arg0) %1 : !quantum.bit
     %3 = quantum.insert %0[1], %2 : !quantum.reg, !quantum.bit
     %4 = quantum.namedobs %2[PauliZ] : !quantum.obs
@@ -38,25 +38,33 @@ func.func private @straight_line(%arg0: f64) -> tensor<f64> attributes {qnode, d
 }
 
 func.func @dstraight_line(%arg0: f64) {
-    gradient.grad "ps" @straight_line(%arg0) : (f64) -> tensor<f64>
+    gradient.grad "defer" @straight_line(%arg0) : (f64) -> tensor<f64>
     return
 }
 
 // -----
 
-// CHECK-LABEL: func.func private @for_loop.qsplit(%arg0: tensor<?xf64>, %arg1: tensor<?xindex>, %arg2: tensor<?xi64>) -> tensor<f64>
-func.func private @for_loop(%start: index, %stop: index, %step: index, %arg0: tensor<f64>) -> tensor<f64> attributes {qnode, diff_method = "parameter-shift"} {
+// CHECK-LABEL: func.func private @for_loop.qsplit(%arg0: tensor<f64>, %arg1: tensor<1048576xf64>, %arg2: tensor<?xf64>, %arg3: tensor<?xindex>, %arg4: tensor<?xi64>) -> tensor<f64>
+func.func private @for_loop(%arg0: tensor<f64>, %bigtensor: tensor<1048576xf64>) -> tensor<f64> attributes {qnode, diff_method = "parameter-shift"} {
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+    %c4 = arith.constant 4 : index
     %0 = quantum.alloc(4) : !quantum.reg
     %cst = arith.constant dense<2.000000e+00> : tensor<f64>
     %cst_0 = arith.constant dense<3.1415926535897931> : tensor<f64>
     %cst_1 = arith.constant dense<3.400000e+00> : tensor<f64>
-    %1:2 = scf.for %arg1 = %start to %stop step %step iter_args(%arg2 = %arg0, %arg3 = %0) -> (tensor<f64>, !quantum.reg) {
+    // CHECK: scf.for
+    %1:2 = scf.for %arg1 = %c0 to %c4 step %c1 iter_args(%arg2 = %arg0, %arg3 = %0) -> (tensor<f64>, !quantum.reg) {
+        // CHECK-NOT: arith.index_cast
         %5 = arith.index_cast %arg1 : index to i64
         %12 = quantum.extract %arg3[%5] : !quantum.reg -> !quantum.bit
-        %extracted = tensor.extract %arg2[] : tensor<f64>
+        // CHECK-NOT: linalg.dot
+        %param = linalg.dot ins(%bigtensor, %bigtensor : tensor<1048576xf64>, tensor<1048576xf64>) outs(%arg2 : tensor<f64>) -> tensor<f64>
+        %extracted = tensor.extract %param[] : tensor<f64>
         %13 = quantum.custom "RX"(%extracted) %12 : !quantum.bit
         %14 = quantum.insert %arg3[0], %13 : !quantum.reg, !quantum.bit
         %15 = arith.addf %arg2, %cst_0 : tensor<f64>
+        // CHECK: scf.yield
         scf.yield %15, %14 : tensor<f64>, !quantum.reg
     }
 
@@ -69,10 +77,8 @@ func.func private @for_loop(%start: index, %stop: index, %step: index, %arg0: te
 }
 
 func.func @dfor_loop() {
-    %c0 = arith.constant 0 : index
-    %c1 = arith.constant 1 : index
-    %c4 = arith.constant 4 : index
     %cst = arith.constant dense<0.2> : tensor<f64>
-    gradient.grad "ps" @for_loop(%c0, %c4, %c1, %cst) {diffArgIndices = dense<3> : tensor<i64>} : (index, index, index, tensor<f64>) -> tensor<f64>
+    %bigtensor = arith.constant dense<1.0> : tensor<1048576xf64>
+    gradient.grad "defer" @for_loop(%cst, %bigtensor) {diffArgIndices = dense<0> : tensor<i64>} : (tensor<f64>, tensor<1048576xf64>) -> tensor<f64>
     return
 }

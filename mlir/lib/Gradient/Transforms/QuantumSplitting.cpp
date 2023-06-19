@@ -127,256 +127,124 @@ using llvm::errs;
 using namespace mlir;
 using namespace catalyst;
 
-/// Generic way to clone quantum.insert and quantum.extract ops
-template <typename IndexingOp>
-void cloneIndexingOp(IndexingOp op, OpBuilder &builder, Location loc, IRMapping &map,
-                     Value wireTape, Value wireCounter)
+bool catalyst::gradient::shouldCache(Value value)
 {
-    auto newIndexingOp = cast<IndexingOp>(builder.clone(*op.getOperation(), map));
-    // Load cached dynamic wires.
-    if (!op.getIdxAttr().has_value()) {
-        OpBuilder::InsertionGuard insertGuard(builder);
-        builder.setInsertionPoint(newIndexingOp);
-
-        Value cOne = builder.create<index::ConstantOp>(loc, 1);
-        Value wireIdx = builder.create<memref::LoadOp>(loc, wireCounter);
-        Value cachedWire = builder.create<tensor::ExtractOp>(loc, wireTape, wireIdx);
-        wireIdx = builder.create<index::AddOp>(loc, wireIdx, cOne);
-        builder.create<memref::StoreOp>(loc, wireIdx, wireCounter);
-
-        newIndexingOp.getIdxMutable().assign(cachedWire);
-    }
-}
-
-void cloneQuantumRegion(quantum::QuantumDependenceAnalysis &qdepAnalysis, OpBuilder &builder,
-                        Location loc, Region &region, IRMapping &map, ValueRange tapes,
-                        ValueRange tapeIndexCounters)
-{
-    assert(region.hasOneBlock() && "Expected only structured control flow (region with one block)");
-    Dialect *quantumDialect = builder.getContext()->getLoadedDialect("quantum");
-    Value paramTape = tapes[0];
-    Value paramCounter = tapeIndexCounters[0];
-    Value cfTape = tapes[1];
-    Value cfCounter = tapeIndexCounters[1];
-    Value wireTape = tapes[2];
-    Value wireCounter = tapeIndexCounters[2];
-    Value cOne = builder.create<index::ConstantOp>(loc, 1);
-
-    for (Operation &oldOp : region.front().without_terminator()) {
-        bool dependsOnMeasurement = qdepAnalysis.dependsOnMeasurement(&oldOp);
-        bool isQuantum = oldOp.getDialect() == quantumDialect;
-
-        if (auto gateOp = dyn_cast<quantum::DifferentiableGate>(&oldOp)) {
-            // Load cached parameters.
-            Value paramIdx = builder.create<memref::LoadOp>(loc, paramCounter);
-            auto newGateOp = builder.clone(*gateOp, map);
-            for (size_t diffParamIdx = 0; diffParamIdx < gateOp.getDiffParams().size();
-                 diffParamIdx++) {
-                OpBuilder::InsertionGuard insertGuard(builder);
-                builder.setInsertionPoint(newGateOp);
-                Value cachedParam = builder.create<tensor::ExtractOp>(loc, paramTape, paramIdx);
-                newGateOp->setOperand(gateOp.getDiffOperandIdx() + diffParamIdx, cachedParam);
-
-                paramIdx = builder.create<index::AddOp>(loc, paramIdx, cOne);
-            }
-
-            builder.create<memref::StoreOp>(loc, paramIdx, paramCounter);
-        }
-        else if (auto extractOp = dyn_cast<quantum::ExtractOp>(&oldOp)) {
-            cloneIndexingOp(extractOp, builder, loc, map, wireTape, wireCounter);
-        }
-        else if (auto insertOp = dyn_cast<quantum::InsertOp>(&oldOp)) {
-            cloneIndexingOp(insertOp, builder, loc, map, wireTape, wireCounter);
-        }
-        else if (auto forOp = dyn_cast<scf::ForOp>(&oldOp)) {
-            // We only want to keep quantum iterArgs, so loopIndexMapping maps the index of the old
-            // iteration arguments to the new iteration arguments.
-            SmallVector<Value> iterArgs;
-            DenseMap<size_t, size_t> loopIndexMapping;
-            size_t newIterIdx = 0;
-            for (const auto &[iterIdx, oldIterOperand] : llvm::enumerate(forOp.getIterOperands())) {
-                if (&oldIterOperand.getType().getDialect() == quantumDialect) {
-                    iterArgs.push_back(map.lookup(oldIterOperand));
-                    loopIndexMapping[iterIdx] = newIterIdx++;
-                }
-            }
-
-            // Load control flow parameters from the tape, updating the counter index.
-            Value lowerBoundIdx = builder.create<memref::LoadOp>(loc, cfCounter);
-            Value upperBoundIdx = builder.create<index::AddOp>(loc, lowerBoundIdx, cOne);
-            Value stepIdx = builder.create<index::AddOp>(loc, upperBoundIdx, cOne);
-            Value newIdxVal = builder.create<index::AddOp>(loc, stepIdx, cOne);
-            builder.create<memref::StoreOp>(loc, newIdxVal, cfCounter);
-
-            Value lowerBound = builder.create<tensor::ExtractOp>(loc, cfTape, lowerBoundIdx);
-            Value upperBound = builder.create<tensor::ExtractOp>(loc, cfTape, upperBoundIdx);
-            Value step = builder.create<tensor::ExtractOp>(loc, cfTape, stepIdx);
-
-            auto updateLoopMapping = [&map, &loopIndexMapping](ValueRange oldValues,
-                                                               ValueRange newValues) {
-                for (const auto &[oldIdx, newIdx] : loopIndexMapping) {
-                    map.map(oldValues[oldIdx], newValues[newIdx]);
-                }
-            };
-            auto lookupLoopMapping = [&map, &loopIndexMapping](ValueRange oldValues,
-                                                               MutableArrayRef<Value> newValues) {
-                for (const auto &[oldIdx, newIdx] : loopIndexMapping) {
-                    newValues[newIdx] = map.lookup(oldValues[oldIdx]);
-                }
-            };
-
-            auto newForOp = builder.create<scf::ForOp>(
-                loc, lowerBound, upperBound, step, iterArgs,
-                [&](OpBuilder &builder, Location loc, Value iv, ValueRange iterArgs) {
-                    map.map(forOp.getInductionVar(), iv);
-                    updateLoopMapping(forOp.getRegionIterArgs(), iterArgs);
-                    cloneQuantumRegion(qdepAnalysis, builder, loc, forOp.getLoopBody(), map, tapes,
-                                       tapeIndexCounters);
-
-                    // Update loop terminator
-                    auto oldYield = cast<scf::YieldOp>(forOp.getBody()->getTerminator());
-                    SmallVector<Value> newYieldOperands{iterArgs.size()};
-                    lookupLoopMapping(oldYield.getOperands(), newYieldOperands);
-                    builder.create<scf::YieldOp>(loc, newYieldOperands);
-                });
-
-            updateLoopMapping(forOp.getResults(), newForOp.getResults());
-        }
-        else if (auto whileOp = dyn_cast<scf::WhileOp>(&oldOp)) {
-            auto cZero = builder.create<index::ConstantOp>(loc, 0);
-            DenseMap<size_t, size_t> loopIndexMapping;
-            size_t newIterIdx = 0;
-            SmallVector<Value> iterArgs;
-            for (const auto &[iterIdx, oldIterOperand] : llvm::enumerate(whileOp.getInits())) {
-                if (&oldIterOperand.getType().getDialect() == quantumDialect) {
-                    iterArgs.push_back(map.lookup(oldIterOperand));
-                    loopIndexMapping[iterIdx] = newIterIdx++;
-                }
-            }
-
-            Value tapeIdx = builder.create<memref::LoadOp>(loc, cfCounter);
-            Value newIdx = builder.create<index::AddOp>(loc, tapeIdx, cOne);
-            builder.create<memref::StoreOp>(loc, newIdx, cfCounter);
-            Value numIters = builder.create<tensor::ExtractOp>(loc, cfTape, tapeIdx);
-
-            auto updateLoopMapping = [&map, &loopIndexMapping](ValueRange oldValues,
-                                                               ValueRange newValues) {
-                for (const auto &[oldIdx, newIdx] : loopIndexMapping) {
-                    map.map(oldValues[oldIdx], newValues[newIdx]);
-                }
-            };
-            auto lookupLoopMapping = [&map, &loopIndexMapping](ValueRange oldValues,
-                                                               MutableArrayRef<Value> newValues) {
-                for (const auto &[oldIdx, newIdx] : loopIndexMapping) {
-                    newValues[newIdx] = map.lookup(oldValues[oldIdx]);
-                }
-            };
-            auto newLoop = builder.create<scf::ForOp>(
-                loc, cZero, numIters, cOne, iterArgs,
-                [&](OpBuilder &builder, Location loc, Value iv, ValueRange iterArgs) {
-                    updateLoopMapping(whileOp.getAfterArguments(), iterArgs);
-                    cloneQuantumRegion(qdepAnalysis, builder, loc, whileOp.getAfter(), map, tapes,
-                                       tapeIndexCounters);
-
-                    auto oldYield = cast<scf::YieldOp>(whileOp.getAfter().front().getTerminator());
-                    SmallVector<Value> newYieldOperands{iterArgs.size()};
-                    lookupLoopMapping(oldYield.getOperands(), newYieldOperands);
-                    builder.create<scf::YieldOp>(loc, newYieldOperands);
-                });
-
-            updateLoopMapping(whileOp.getResults(), newLoop.getResults());
-        }
-        else if (auto ifOp = dyn_cast<scf::IfOp>(&oldOp)) {
-            if (ifOp.getNumResults() == 0) {
-                continue;
-            }
-
-            DenseMap<size_t, size_t> resultIndexMapping;
-            size_t newResultIndex = 0;
-            for (const auto &[oldResultIndex, resultType] :
-                 llvm::enumerate(ifOp.getResultTypes())) {
-                if (&resultType.getDialect() == quantumDialect) {
-                    resultIndexMapping[oldResultIndex] = newResultIndex++;
-                }
-            }
-
-            Value conditionIdx = builder.create<memref::LoadOp>(loc, cfCounter);
-            Value newIdx = builder.create<index::AddOp>(loc, conditionIdx, cOne);
-            builder.create<memref::StoreOp>(loc, newIdx, cfCounter);
-
-            Value condition = builder.create<tensor::ExtractOp>(loc, cfTape, conditionIdx);
-            Value conditionI1 =
-                builder.create<arith::IndexCastOp>(loc, builder.getI1Type(), condition);
-
-            auto createIfOpBuilder = [&](Region &region) {
-                return [&](OpBuilder &builder, Location loc) {
-                    cloneQuantumRegion(qdepAnalysis, builder, loc, region, map, tapes,
-                                       tapeIndexCounters);
-                    auto oldYield = cast<scf::YieldOp>(region.front().getTerminator());
-                    SmallVector<Value> newYieldOperands{resultIndexMapping.size()};
-                    for (const auto &[oldIdx, newIdx] : resultIndexMapping) {
-                        newYieldOperands[newIdx] = map.lookup(oldYield.getOperand(oldIdx));
-                    }
-                    builder.create<scf::YieldOp>(loc, newYieldOperands);
-                };
-            };
-
-            auto newIfOp =
-                builder.create<scf::IfOp>(loc, conditionI1, createIfOpBuilder(ifOp.getThenRegion()),
-                                          createIfOpBuilder(ifOp.getElseRegion()));
-
-            // Update the mapping
-            for (const auto &[oldIdx, newIdx] : resultIndexMapping) {
-                map.map(ifOp.getResult(oldIdx), newIfOp.getResult(newIdx));
-            }
-        }
-        else if (isQuantum || dependsOnMeasurement) {
-            builder.clone(oldOp, map);
-        }
-    }
+    // As a default, cache every non-null value.
+    return value != nullptr;
 }
 
 func::FuncOp genQuantumSplitFunction(quantum::QuantumDependenceAnalysis &qdepAnalysis,
-                                     OpBuilder &builder, Location loc, func::FuncOp callee)
+                                     PatternRewriter &rewriter, Location loc, func::FuncOp callee)
 {
-    if (!qdepAnalysis.isFunctionLive(callee)) {
-        callee.emitWarning() << "Trying to split function that was not marked live, dataflow "
-                                "analysis will likely fail";
-    }
-
-    auto fnName = builder.getStringAttr(callee.getName() + ".qsplit");
-    SmallVector<Type> argTypes{
-        RankedTensorType::get({ShapedType::kDynamic}, builder.getF64Type()),
-        RankedTensorType::get({ShapedType::kDynamic}, builder.getIndexType()),
-        RankedTensorType::get({ShapedType::kDynamic}, builder.getI64Type())};
-    SmallVector<Location> argLocs{argTypes.size(), loc};
-    FunctionType fnType = builder.getFunctionType(argTypes, callee.getResultTypes());
+    auto fnName = rewriter.getStringAttr(callee.getName() + ".qsplit");
+    SmallVector<Type> tapeTypes{
+        RankedTensorType::get({ShapedType::kDynamic}, rewriter.getF64Type()),
+        RankedTensorType::get({ShapedType::kDynamic}, rewriter.getIndexType()),
+        RankedTensorType::get({ShapedType::kDynamic}, rewriter.getI64Type())};
+    SmallVector<Type> argTypes{callee.getArgumentTypes()};
+    argTypes.insert(argTypes.end(), tapeTypes.begin(), tapeTypes.end());
+    SmallVector<Location> argLocs{tapeTypes.size(), loc};
+    FunctionType fnType = rewriter.getFunctionType(argTypes, callee.getResultTypes());
     func::FuncOp qsplitFn = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(callee, fnName);
     if (!qsplitFn) {
-        qsplitFn = builder.create<func::FuncOp>(loc, fnName, fnType);
+        qsplitFn = rewriter.create<func::FuncOp>(loc, fnName, fnType);
         qsplitFn.setPrivate();
+
+        rewriter.cloneRegionBefore(callee.getBody(), qsplitFn.getBody(), qsplitFn.end());
         Region &newBody = qsplitFn.getFunctionBody();
-        PatternRewriter::InsertionGuard insertGuard(builder);
+        SmallVector<Value, 3> tapes{newBody.addArguments(tapeTypes, argLocs)};
+        Value paramTape = tapes[0];
+        Value cfTape = tapes[1];
+        Value wireTape = tapes[2];
 
-        builder.createBlock(&newBody, newBody.end(), argTypes, argLocs);
-        Value paramIndex =
-            builder.create<memref::AllocaOp>(loc, MemRefType::get({}, builder.getIndexType()));
-        Value cfIndex =
-            builder.create<memref::AllocaOp>(loc, MemRefType::get({}, builder.getIndexType()));
-        Value wireIndex =
-            builder.create<memref::AllocaOp>(loc, MemRefType::get({}, builder.getIndexType()));
-        Value cZero = builder.create<index::ConstantOp>(loc, 0);
-        builder.create<memref::StoreOp>(loc, cZero, paramIndex);
-        builder.create<memref::StoreOp>(loc, cZero, cfIndex);
-        builder.create<memref::StoreOp>(loc, cZero, wireIndex);
+        PatternRewriter::InsertionGuard insertGuard(rewriter);
+        rewriter.setInsertionPointToStart(&newBody.front());
 
-        IRMapping map;
+        Value paramCounter =
+            rewriter.create<memref::AllocaOp>(loc, MemRefType::get({}, rewriter.getIndexType()));
+        Value cfCounter =
+            rewriter.create<memref::AllocaOp>(loc, MemRefType::get({}, rewriter.getIndexType()));
+        Value wireCounter =
+            rewriter.create<memref::AllocaOp>(loc, MemRefType::get({}, rewriter.getIndexType()));
+        Value cZero = rewriter.create<index::ConstantOp>(loc, 0);
+        Value cOne = rewriter.create<index::ConstantOp>(loc, 1);
+        rewriter.create<memref::StoreOp>(loc, cZero, paramCounter);
+        rewriter.create<memref::StoreOp>(loc, cZero, cfCounter);
+        rewriter.create<memref::StoreOp>(loc, cZero, wireCounter);
 
-        cloneQuantumRegion(qdepAnalysis, builder, loc, callee.getFunctionBody(), map,
-                           newBody.getArguments(), {paramIndex, cfIndex, wireIndex});
+        auto loadThenIncrementCounter = [&](OpBuilder &builder, Value counter,
+                                            Value tape) -> Value {
+            Value index = builder.create<memref::LoadOp>(loc, counter);
+            Value nextIndex = builder.create<index::AddOp>(loc, index, cOne);
+            builder.create<memref::StoreOp>(loc, nextIndex, counter);
+            return builder.create<tensor::ExtractOp>(loc, tape, index);
+        };
 
-        auto oldReturn = cast<func::ReturnOp>(callee.getFunctionBody().front().getTerminator());
-        builder.clone(*oldReturn, map);
+        qsplitFn.walk([&](Operation *op) {
+            // Cached parameters
+            if (auto gateOp = dyn_cast<quantum::DifferentiableGate>(op)) {
+                OpBuilder::InsertionGuard insertGuard(rewriter);
+                rewriter.setInsertionPoint(gateOp);
+
+                ValueRange diffParams = gateOp.getDiffParams();
+                SmallVector<Value> newParams{diffParams.size()};
+                for (const auto [paramIdx, recomputedParam] : llvm::enumerate(diffParams)) {
+                    if (gradient::shouldCache(recomputedParam)) {
+                        newParams[paramIdx] =
+                            loadThenIncrementCounter(rewriter, paramCounter, paramTape);
+                    }
+                    else {
+                        newParams[paramIdx] = recomputedParam;
+                    }
+                }
+                MutableOperandRange range{gateOp, static_cast<unsigned>(gateOp.getDiffOperandIdx()),
+                                          static_cast<unsigned>(diffParams.size())};
+                range.assign(newParams);
+            }
+            // Cached wires
+            else if (auto extractOp = dyn_cast<quantum::ExtractOp>(op)) {
+                if (gradient::shouldCache(extractOp.getIdx())) {
+                    extractOp.getIdxMutable().assign(
+                        loadThenIncrementCounter(rewriter, wireCounter, wireTape));
+                }
+            }
+            else if (auto insertOp = dyn_cast<quantum::InsertOp>(op)) {
+                if (gradient::shouldCache(insertOp.getIdx())) {
+                    insertOp.getIdxMutable().assign(
+                        loadThenIncrementCounter(rewriter, wireCounter, wireTape));
+                }
+            }
+            // Cached control flow
+            else if (auto ifOp = dyn_cast<scf::IfOp>(op)) {
+                if (gradient::shouldCache(ifOp.getCondition())) {
+                    ifOp.getConditionMutable().assign(
+                        loadThenIncrementCounter(rewriter, cfCounter, cfTape));
+                }
+            }
+            else if (auto forOp = dyn_cast<scf::ForOp>(op)) {
+                // TODO: If quantum ops and classical ops are jointly returned from a loop, the
+                // canonicalization won't handle removing the classical parts.
+                if (gradient::shouldCache(forOp.getLowerBound())) {
+                    forOp.getLowerBoundMutable().assign(
+                        loadThenIncrementCounter(rewriter, cfCounter, cfTape));
+                }
+                if (gradient::shouldCache(forOp.getUpperBound())) {
+                    forOp.getUpperBoundMutable().assign(
+                        loadThenIncrementCounter(rewriter, cfCounter, cfTape));
+                }
+                if (gradient::shouldCache(forOp.getStep())) {
+                    forOp.getStepMutable().assign(
+                        loadThenIncrementCounter(rewriter, cfCounter, cfTape));
+                }
+            }
+            else if (auto whileOp = dyn_cast<scf::WhileOp>(op)) {
+                auto conditionOp = whileOp.getConditionOp();
+                if (gradient::shouldCache(conditionOp.getCondition())) {
+                    conditionOp.getConditionMutable().assign(
+                        loadThenIncrementCounter(rewriter, cfCounter, cfTape));
+                }
+            }
+        });
     }
 
     return qsplitFn;
@@ -390,10 +258,10 @@ void catalyst::gradient::splitHybridCircuit(Operation *top,
     SymbolTable table(moduleOp);
     auto callee = table.lookup<func::FuncOp>(gradOp.getCallee());
 
-    OpBuilder builder(top);
-    builder.setInsertionPointToStart(moduleOp.getBody());
+    ConversionPatternRewriter rewriter(top->getContext());
+    rewriter.setInsertionPointToStart(moduleOp.getBody());
 
-    genQuantumSplitFunction(qdepAnalysis, builder, gradOp.getLoc(), callee);
+    genQuantumSplitFunction(qdepAnalysis, rewriter, gradOp.getLoc(), callee);
 
-    builder.setInsertionPoint(gradOp);
+    rewriter.setInsertionPoint(gradOp);
 }
