@@ -32,13 +32,13 @@ from catalyst.compiler import (
     CompileOptions,
     Compiler,
     CompilerDriver,
+    Enzyme,
     LLVMDialectToLLVMIR,
     LLVMIRToObjectFile,
     MHLOPass,
     MLIRToLLVMDialect,
     PassPipeline,
     QuantumCompilationPass,
-    Enzyme,
 )
 from catalyst.jax_tracer import get_mlir
 from catalyst.utils.exceptions import CompileError
