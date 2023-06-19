@@ -58,7 +58,6 @@ try:
         append_path=True,
     )
 except AttributeError:
-    # Else we use the system environment variables.
     from lit.llvm.config import LLVMConfig  # fmt:skip
     llvm_config = LLVMConfig(lit_config, config)
     llvm_config.with_system_environment("PYTHONPATH")
