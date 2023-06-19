@@ -35,7 +35,8 @@ from jax.linear_util import wrap_init
 from jax.tree_util import tree_flatten, tree_unflatten, treedef_is_leaf
 from pennylane import QNode
 from pennylane.measurements import MidMeasureMP
-from pennylane.operation import AnyWires, Operation, Wires
+from pennylane.operation import AnyWires, Operation, Wires, Operator
+from pennylane.queuing import QueuingManager
 
 import catalyst
 import catalyst.jax_primitives as jprim
@@ -522,13 +523,17 @@ class Adjoint(Operation):
 
     num_wires = AnyWires
 
-    def __init__(self, body_jaxpr, *args, **kwargs):
+    def __init__(self, body_jaxpr, in_consts, init_vals):
         self.body_jaxpr = body_jaxpr
-        kwargs["wires"] = Wires(Adjoint.num_wires)
-        super().__init__(*args, **kwargs)
+        print("A_init_vals", init_vals)
+        # print("A_kwargs", kwargs)
+        self.init_vals = list(init_vals)
+        self.in_consts = list(in_consts)
+        super().__init__(wires = Wires(Adjoint.num_wires))
+        # super().__init__(*args, wires = Wires(Adjoint.num_wires))
 
 
-def adjoint(f: Callable) -> Callable:
+def adjoint(f: Union[Callable, Operator]) -> Callable:
     """Getting the quantum adjoint of the computation defined by `f`.
     Args:
         f(Callable): PennyLane operation or a Python function containing PennyLane quantum
@@ -557,12 +562,20 @@ def adjoint(f: Callable) -> Callable:
     array([ 0.5-0.5j, -0.5+0.5j])
     """
 
-    def _adjoint(qreg, *args, **kwargs):
+    def _adjoint(*args, _f):
         """The adjoint callable wrapper capturing arguments and running the tape tracing."""
+        # print('adj_in_tree', in_tree)
+        print('adj_args', args)
+        (qreg, args2, kwargs2) = args
+        print('adj_qreg', qreg)
+        print('adj_args2', args2)
+        print('adj_kwargs2', kwargs2)
+        # if wires is not None:
+        #     kwargs['wires'] = wires
         assert qreg is not None
         with JaxTape(do_queue=False) as tape:
             with tape.quantum_tape:
-                out = f(*args, **kwargs)
+                out = _f(*args2, **kwargs2)
             tape.set_return_val(out if not isinstance(out, Operation) else None)
             new_quantum_tape = JaxTape.device.expand_fn(tape.quantum_tape)
             tape.quantum_tape = new_quantum_tape
@@ -573,15 +586,29 @@ def adjoint(f: Callable) -> Callable:
         qreg = insert_to_qreg(qubit_states, qreg)
         return qreg, return_values
 
-    def _callable(*args, **kwargs):
-        init_vals, in_tree = tree_flatten((jprim.Qreg(), *args))
+    def _callable(*args, _f, **kwargs):
+        init_vals, in_tree = tree_flatten((jprim.Qreg(), args, kwargs))
+        init_vals2, in_tree2 = tree_flatten((args, kwargs))
+        print('init_vals', init_vals)
+        print('init_vals2', init_vals2)
         init_avals = tuple(_abstractify(val) for val in init_vals)
-        body_jaxpr, _, _ = _initial_style_jaxpr(
-            partial(_adjoint, **kwargs), in_tree, init_avals, "adjoint"
+        print('init_avals', init_avals)
+        print('in_tree', in_tree)
+        body_jaxpr, in_consts, _ = _initial_style_jaxpr(
+            partial(_adjoint, _f=_f), in_tree, init_avals, "adjoint"
         )
-        return Adjoint(body_jaxpr, *args, **kwargs)
+        print('in_consts', in_consts)
+        return Adjoint(body_jaxpr, in_consts, init_vals2)
 
-    return _callable
+    if isinstance(f, Callable):
+        print("CALLABLE CASE")
+        return partial(_callable, _f=f)
+    elif isinstance(f, Operator):
+        print("OP CASE")
+        QueuingManager.remove(f)
+        return _callable(_f=lambda:QueuingManager.append(f))
+    else:
+        raise ValueError(f"Expected a callable or a qml.Operator, not {f}")
 
 
 class Cond(Operation):

@@ -1499,11 +1499,11 @@ def _adjoint_def_impl(ctx, *args):
 
 
 @adjoint_p.def_abstract_eval
-def _adjoint_abstract(*args, jaxpr):
+def _adjoint_abstract(*args, consts, jaxpr):
     return jaxpr.out_avals
 
 
-def _adjoint_lowering(jax_ctx: mlir.LoweringRuleContext, *args, jaxpr):
+def _adjoint_lowering(jax_ctx: mlir.LoweringRuleContext, *args, consts, jaxpr):
     output_types = util.flatten(map(mlir.aval_to_ir_types, jax_ctx.avals_out))
     op = AdjointOp(output_types[0], args[0])
     adjoint_block = op.regions[0].blocks.append(
@@ -1515,13 +1515,18 @@ def _adjoint_lowering(jax_ctx: mlir.LoweringRuleContext, *args, jaxpr):
         name_stack=jax_ctx.module_context.name_stack.extend("adjoint")
     )
 
+    print('jaxpr.jaxpr.invars', jaxpr.jaxpr.invars)
+    print('jaxpr.consts', jaxpr.consts)
+
     with ir.InsertionPoint(adjoint_block):
+        ir_consts = [mlir.ir_constants(c)[0] for c in consts]
+        print('ir_consts', ir_consts)
         out, _ = mlir.jaxpr_subcomp(
             body_ctx,
             jaxpr.jaxpr,
             mlir.TokenSet(),
             [mlir.ir_constants(c) for c in jaxpr.consts],
-            *([a] for a in chain(adjoint_block.arguments, args[1:])),
+            *([a] for a in chain(ir_consts, adjoint_block.arguments, args[1:])),
             dim_var_values=jax_ctx.dim_var_values,
         )
 

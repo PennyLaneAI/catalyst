@@ -164,7 +164,7 @@ struct AdjointSingleOpRewritePattern : public mlir::OpRewritePattern<AdjointOp> 
                         loc, qunitary.getResultTypes(),
                         classicalMapping.lookupOrDefault(qunitary.getMatrix()),
                         in_qubits,
-                        mlir::BoolAttr::get(ctx, !custom.getAdjoint().value_or(false)));
+                        mlir::BoolAttr::get(ctx, !qunitary.getAdjoint().value_or(false)));
                     for (size_t i = 0; i < qunitaryA.getQubitResults().size(); i++) {
                         update(qunitary.getQubitOperands()[i], qunitaryA->getResult(i));
                     }
