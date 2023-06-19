@@ -94,7 +94,7 @@ def BackpropOp : Gradient_Op<"backprop", [AttrSizedOperandSegments]> {
     let arguments = (ins
         FlatSymbolRefAttr:$callee,
         Variadic<AnyType>:$args,
-        Variadic<AnyMemRef>:$quantum_jacobian,
+        Variadic<AnyType>:$quantum_jacobian,
         Variadic<AnyMemRef>:$data_in,
         OptionalAttr<AnyIntElementsAttr>:$diffArgIndices
     );

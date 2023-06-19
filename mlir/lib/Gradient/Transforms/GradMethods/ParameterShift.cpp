@@ -49,6 +49,10 @@ void ParameterShiftLowering::rewrite(GradOp op, PatternRewriter &rewriter) const
     // containing quantum instructions with at least one gate parameter).
     auto [numShifts, loopDepth] = analyzeFunction(callee);
 
+    // In order to allocate memory for various tensors relating to the number of gate parameters
+    // at runtime we run a function that merely counts up for each gate parameter encountered.
+    func::FuncOp paramCountFn = genParamCountFunction(rewriter, loc, callee);
+
     // Generate the classical argument map from function arguments to gate parameters. This
     // function will be differentiated to produce the classical jacobian.
     func::FuncOp argMapFn = genArgMapFunction(rewriter, loc, callee);
@@ -63,7 +67,7 @@ void ParameterShiftLowering::rewrite(GradOp op, PatternRewriter &rewriter) const
 
     // Generate the full gradient function, computing the partial derivates with respect to the
     // original function arguments from the classical Jacobian and quantum gradient.
-    func::FuncOp fullGradFn = genFullGradFunction(rewriter, loc, op, argMapFn, qGradFn, "ps");
+    func::FuncOp fullGradFn = genFullGradFunction(rewriter, loc, op, paramCountFn, argMapFn, qGradFn, "ps");
 
     rewriter.setInsertionPoint(op);
     rewriter.replaceOpWithNewOp<func::CallOp>(op, fullGradFn, op.getArgOperands());

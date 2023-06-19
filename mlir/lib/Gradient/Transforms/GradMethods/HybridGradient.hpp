@@ -22,7 +22,7 @@ using namespace mlir;
 namespace catalyst {
 namespace gradient {
 
-func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc, GradOp gradOp,
+func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc, GradOp gradOp, func::FuncOp ParamCountFn,
                                  func::FuncOp argMapFn, func::FuncOp qGradFn, StringRef method);
 
 } // namespace gradient
