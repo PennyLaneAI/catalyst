@@ -21,6 +21,7 @@ from jax._src.dispatch import jaxpr_replicas
 from jax._src.interpreters.mlir import _module_name_regex
 from jax._src.lax.lax import xb, xla
 from jax._src.util import wrap_name
+from jax.tree_util import tree_flatten, tree_unflatten, PyTreeDef
 from jax.interpreters.mlir import (
     AxisContext,
     ModuleContext,
@@ -306,23 +307,9 @@ def trace_quantum_tape(
             # So let's load them all...
             qubit_states.clear()
         elif op.__class__.__name__ == "Adjoint":
-            print('op_body_jaxpr', op.body_jaxpr)
-            print('op_in_consts', op.in_consts)
-            print('op_init_vals', op.init_vals)
-            # op_nonwires, op_wires = op_args
-            # print('op_nonwires', op_nonwires)
-            # print('op_wires', op_wires)
             qreg = insert_to_qreg(qubit_states, qreg)
-            args = op.in_consts + op.init_vals + [qreg]
-            const_indices = list(range(len(op.in_consts)))
-            cargs_indices = [len(const_indices) + i for i in range(len(op.init_vals))]
-            qargs_indices = [len(const_indices) + len(cargs_indices) + i for i in range(1)]
-            print('indices', const_indices, cargs_indices, qargs_indices)
-            op_results = jprim.adjoint_p.bind(*args,
-                                              const_indices=const_indices,
-                                              cargs_indices=cargs_indices,
-                                              qargs_indices=qargs_indices,
-                                              jaxpr=op.body_jaxpr)
+            args, args_tree = tree_flatten((op.consts_jaxpr, op.cargs_jaxpr, [qreg]))
+            op_results = jprim.adjoint_p.bind(*args, args_tree=args_tree, jaxpr=op.body_jaxpr)
             qreg = op_results[0]
             # FIXME: Figure out if we need it here or not
             qubit_states.clear()
