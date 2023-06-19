@@ -84,6 +84,8 @@ def get_enzyme_path(project, tool):
     path = (
         os.path.join(package_root, "enzyme") if INSTALLED else default_enzyme_path.get(project, "")
     )
+    print(package_root)
+    print(os.getcwd())
     enzyme_path = os.path.join(path, tool)
     return enzyme_path if os.path.exists(enzyme_path) else tool
 

@@ -237,7 +237,7 @@ jobs:
       run: echo "enzyme-hash=$(grep enzyme .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
 
     - name: Cache Enzyme Build
-      id: enzyme-mhlo
+      id: cache-enzyme
       uses: actions/cache@v3
       with:
         path: enzyme-build
@@ -429,7 +429,6 @@ jobs:
     - name: Add Frontend Dependencies to PATH
       run: |
         echo "$(pwd)/enzyme-build/Enzyme" >> $GITHUB_PATH
-        ls $(pwd)/enzyme-build/Enzyme
         echo "$(pwd)/llvm-build/bin" >> $GITHUB_PATH
         echo "$(pwd)/mhlo-build/bin" >> $GITHUB_PATH
         echo "$(pwd)/quantum-build/bin" >> $GITHUB_PATH
@@ -437,6 +436,7 @@ jobs:
         echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
         echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
         chmod +x quantum-build/bin/quantum-opt  # artifact upload does not preserve permissions
+        chmod +x enzyme-build/Enzyme
 
     - name: Run Python Lit Tests
       run: |
