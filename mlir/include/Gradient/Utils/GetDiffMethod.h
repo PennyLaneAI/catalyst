@@ -14,12 +14,13 @@
 
 #pragma once
 
-#include "mlir/Pass/Pass.h"
-
-#include <memory>
+#include "Gradient/IR/GradientOps.h"
+#include "llvm/ADT/StringRef.h"
 
 namespace catalyst {
+namespace gradient {
 
-std::unique_ptr<mlir::Pass> createArrayListToMemRefPass();
+llvm::StringRef getQNodeDiffMethod(GradOp gradOp);
 
+}
 } // namespace catalyst

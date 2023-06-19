@@ -70,7 +70,7 @@ jobs:
               -DLLVM_ENABLE_ASSERTIONS=ON \
               -DLLVM_INSTALL_UTILS=ON
 
-        cmake --build llvm-build --target lld check-mlir -j$(nproc)
+        cmake --build llvm-build --target lld check-mlir opt -j$(nproc)
 
     # Build and cache MHLO
     - name: Get MHLO Version
@@ -107,7 +107,39 @@ jobs:
 
         cmake --build mhlo-build --target check-mlir-hlo -j$(nproc)
 
-    # Build Catalyst Runtime
+    # Build and cache ENZYME
+    - name: Get Enzyme Version
+      id: enzyme-hash
+      run: echo "enzyme-hash=$(grep enzyme .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
+
+    - name: Cache Enzyme Build
+      id: cache-enzyme
+      uses: actions/cache@v3
+      with:
+        path:  enzyme-build
+        key: ${{ runner.os }}-enzyme-${{ steps.enzyme-hash.outputs.enzyme-hash }}-generic-build
+
+    - name: Clone Enzyme Submodule
+      if:  |
+        steps.cache-enzyme.outputs.cache-hit != 'true'
+      uses: actions/checkout@v3
+      with:
+        repository: EnzymeAD/Enzyme
+        ref: ${{ steps.enzyme-hash.outputs.enzyme-hash }}
+        path: mlir/Enzyme
+
+    - name: Build Enzyme
+      if: steps.cache-enzyme.outputs.cache-hit != 'true'
+
+      run: |
+        export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
+
+        cmake -S mlir/Enzyme/enzyme -B enzyme-build -G Ninja \
+              -DLLVM_DIR=llvm-build/lib/cmake/llvm
+
+        cmake --build enzyme-build
+
+    # Build QIR
     - name: Install rustup with llvm-tools-preview
       uses: actions-rs/toolchain@v1
       with:
@@ -192,6 +224,18 @@ jobs:
         path:  mhlo-build
         key: ${{ runner.os }}-mhlo-${{ steps.mhlo-hash.outputs.mhlo-hash }}-generic-build
         fail-on-cache-miss: True
+    
+    - name: Get Enzyme Version
+      id: enzyme-hash
+      run: echo "enzyme-hash=$(grep enzyme .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
+
+    - name: Get Cached Enzyme Build
+      id: cache-enzyme
+      uses: actions/cache@v3
+      with:
+        path:  enzyme-build
+        key: ${{ runner.os }}-enzyme-${{ steps.enzyme-hash.outputs.enzyme-hash }}-generic-build
+        fail-on-cache-miss: True
 
     - name: Download QIR stdlib Artifact
       uses: actions/download-artifact@v3
@@ -213,7 +257,7 @@ jobs:
               -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -DPython3_NumPy_INCLUDE_DIRS=$(python${{ matrix.python_version }} -c "import numpy as np; print(np.get_include())")
 
-        cmake --build llvm-build --target check-mlir -j$(nproc)
+        cmake --build llvm-build --target check-mlir opt -j$(nproc)
 
     # Build Quantum and Gradient Dialects
     - name: Build MLIR Dialects
@@ -250,6 +294,7 @@ jobs:
         # Copy bins to frontend/catalyst/bin
         mkdir -p $GITHUB_WORKSPACE/frontend/catalyst/bin
         cp $GITHUB_WORKSPACE/llvm-build/bin/llc $GITHUB_WORKSPACE/frontend/catalyst/bin
+        cp $GITHUB_WORKSPACE/llvm-build/bin/opt $GITHUB_WORKSPACE/frontend/catalyst/bin
         cp $GITHUB_WORKSPACE/llvm-build/bin/mlir-translate $GITHUB_WORKSPACE/frontend/catalyst/bin
         cp $GITHUB_WORKSPACE/mhlo-build/bin/mlir-hlo-opt $GITHUB_WORKSPACE/frontend/catalyst/bin
         cp $GITHUB_WORKSPACE/quantum-build/bin/quantum-opt $GITHUB_WORKSPACE/frontend/catalyst/bin
@@ -259,6 +304,8 @@ jobs:
         cp $GITHUB_WORKSPACE/runtime-build/lib/capi/librt_capi.so $GITHUB_WORKSPACE/frontend/catalyst/lib/capi
         cp --dereference $GITHUB_WORKSPACE/llvm-build/lib/libmlir_float16_utils.so.* $GITHUB_WORKSPACE/frontend/catalyst/lib
         cp --dereference $GITHUB_WORKSPACE/llvm-build/lib/libmlir_c_runner_utils.so* $GITHUB_WORKSPACE/frontend/catalyst/lib
+        # Copy enzyme so to frontend
+        cp $GITHUB_WORKSPACE/enzyme-build/Enzyme/LLVMEnzyme-17.so $GITHUB_WORKSPACE/frontend/catalyst/catalyst/enzyme
         # Copy mlir bindings to frontend/mlir_quantum
         mkdir -p $GITHUB_WORKSPACE/frontend/mlir_quantum/dialects
         cp -R --dereference $GITHUB_WORKSPACE/quantum-build/python_packages/quantum/mlir_quantum/runtime $GITHUB_WORKSPACE/frontend/mlir_quantum/runtime

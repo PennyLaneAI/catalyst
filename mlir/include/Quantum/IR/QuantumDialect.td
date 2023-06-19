@@ -47,6 +47,7 @@ def QuantumDialect : Dialect {
 
     /// Use the default type printing/parsing hooks, otherwise we would explicitly define them.
     let useDefaultTypePrinterParser = 1;
+    let useDefaultAttributePrinterParser = 1;
 }
 
 //===----------------------------------------------------------------------===//

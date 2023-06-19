@@ -108,7 +108,7 @@ void applyCopyGlobalMemRefToReturnOp(func::ReturnOp op, PatternRewriter &rewrite
                                                          deadbeef, allocatedPtrToInt);
 
         scf::IfOp ifOp = rewriter.create<scf::IfOp>(
-            op->getLoc(), ty, comparison,
+            op->getLoc(), comparison,
             [&](OpBuilder &builder, Location loc) { // then
                 Value newMemRef =
                     rewriter.create<memref::AllocOp>(op->getLoc(), ty.cast<MemRefType>());
@@ -162,23 +162,11 @@ void CopyGlobalMemRefTransform::rewrite(func::FuncOp op, PatternRewriter &rewrit
 
 namespace catalyst {
 
-struct CopyGlobalMemRefPass : public PassWrapper<CopyGlobalMemRefPass, OperationPass<ModuleOp>> {
-    CopyGlobalMemRefPass() {}
+#define GEN_PASS_DEF_COPYGLOBALMEMREFPASS
+#include "Quantum/Transforms/Passes.h.inc"
 
-    StringRef getArgument() const override { return "cp-global-memref"; }
-
-    StringRef getDescription() const override
-    {
-        return "Copy global memrefs before returning from C interface.";
-    }
-
-    void getDependentDialects(DialectRegistry &registry) const override
-    {
-        registry.insert<memref::MemRefDialect>();
-        registry.insert<func::FuncDialect>();
-        registry.insert<scf::SCFDialect>();
-        registry.insert<LLVM::LLVMDialect>();
-    }
+struct CopyGlobalMemRefPass : impl::CopyGlobalMemRefPassBase<CopyGlobalMemRefPass> {
+    using CopyGlobalMemRefPassBase::CopyGlobalMemRefPassBase;
 
     void runOnOperation() final
     {

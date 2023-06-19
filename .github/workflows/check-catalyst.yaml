@@ -111,7 +111,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-build
+        key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-build-opt
 
     - name: Cache LLVM Source
       id: cache-llvm-source
@@ -143,6 +143,7 @@ jobs:
         # echo 'target_compile_options(mlir_c_runner_utils PRIVATE "-fno-sanitize=all")' \
         #       >> mlir/llvm-project/mlir/lib/ExecutionEngine/CMakeLists.txt
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
+        COMPILER_LAUNCHER="" \
         make llvm
 
   mhlo:
@@ -191,7 +192,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-build
+        key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-build-opt
         fail-on-cache-miss: True
 
     - name: Clone MHLO Submodule
@@ -214,7 +215,79 @@ jobs:
       run: |
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         MHLO_BUILD_DIR="$(pwd)/mhlo-build" \
+        COMPILER_LAUNCHER="" \
         make mhlo
+
+  enzyme:
+    name: Enzyme Build
+    needs: [llvm]
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Cancel previous runs
+      uses: styfle/cancel-workflow-action@0.11.0
+      with:
+        access_token: ${{ github.token }}
+
+    - name: Checkout Catalyst repo
+      uses: actions/checkout@v3
+
+    - name: Get Enzyme Version
+      id: enzyme-hash
+      run: echo "enzyme-hash=$(grep enzyme .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
+
+    - name: Cache Enzyme Build
+      id: cache-enzyme
+      uses: actions/cache@v3
+      with:
+        path: enzyme-build
+        key: ${{ runner.os }}-enzyme-${{ steps.enzyme-hash.outputs.enzyme-hash }}-default-build
+
+    - name: Get LLVM Version
+      id: llvm-hash
+      if: steps.cache-enzyme.outputs.cache-hit != 'true'
+      run: echo "llvm-hash=$(grep llvm .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
+
+    - name: Get Cached LLVM Source
+      id: cache-llvm-source
+      if: steps.cache-enzyme.outputs.cache-hit != 'true'
+      uses: actions/cache@v3
+      with:
+        path: mlir/llvm-project
+        key: Linux-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-source
+        enableCrossOsArchive: True
+        fail-on-cache-miss: True
+
+    - name: Get Cached LLVM Build
+      id: cache-llvm-build
+      if: steps.cache-enzyme.outputs.cache-hit != 'true'
+      uses: actions/cache@v3
+      with:
+        path: llvm-build
+        key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-build-opt
+        fail-on-cache-miss: True
+
+    - name: Clone Enzyme Submodule
+      if: |
+        steps.cache-enzyme.outputs.cache-hit != 'true'
+      uses: actions/checkout@v3
+      with:
+        repository: EnzymeAD/Enzyme
+        ref: ${{ steps.enzyme-hash.outputs.enzyme-hash }}
+        path: mlir/Enzyme
+
+    - name: Install Deps
+      if: steps.cache-enzyme.outputs.cache-hit != 'true'
+      run: |
+        sudo apt-get install -y cmake ninja-build clang lld
+
+    - name: Build Enzyme
+      if: steps.cache-enzyme.outputs.cache-hit != 'true'
+      run: |
+        LLVM_BUILD_DIR="$(pwd)/llvm-build" \
+        ENZYME_BUILD_DIR="$(pwd)/enzyme-build" \
+        COMPILER_LAUNCHER="" \
+        make enzyme
 
   quantum:
     name: Quantum Dialects Build
@@ -253,7 +326,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-build
+        key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-build-opt
         fail-on-cache-miss: True
 
     - name: Cache CCache
@@ -262,6 +335,7 @@ jobs:
       with:
         path: .ccache
         # TODO: revisit once actions/cache has an update feature
+        #       https://github.com/actions/toolkit/issues/505
         #       this will load the latest available cache and generate a new one at the end
         key: ${{ runner.os }}-ccache-${{ github.run_id }}
         restore-keys: ${{ runner.os }}-ccache-
@@ -286,7 +360,7 @@ jobs:
 
   frontend-tests:
     name: Frontend Tests
-    needs: [runtime, mhlo, quantum]
+    needs: [runtime, mhlo, quantum, enzyme]
     runs-on: ubuntu-latest
 
     steps:
@@ -313,7 +387,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-build
+        key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-build-opt
         fail-on-cache-miss: True
 
     - name: Get MHLO Version
@@ -326,6 +400,18 @@ jobs:
       with:
         path: mhlo-build
         key: ${{ runner.os }}-mhlo-${{ steps.mhlo-hash.outputs.mhlo-hash }}-default-build
+        fail-on-cache-miss: True
+    
+    - name: Get Enzyme Version
+      id: enzyme-hash
+      run: echo "enzyme-hash=$(grep enzyme .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
+
+    - name: Get Cached Enzyme Build
+      id: cache-enzyme
+      uses: actions/cache@v3
+      with:
+        path: enzyme-build
+        key: ${{ runner.os }}-enzyme-${{ steps.enzyme-hash.outputs.enzyme-hash }}-default-build
         fail-on-cache-miss: True
 
     - name: Download Quantum Build Artifact
@@ -348,6 +434,7 @@ jobs:
         echo "PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
         echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
         echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
+        echo "ENZYME_DIR=$(pwd)/enzyme-build/Enzyme" >> $GITHUB_ENV
         chmod +x quantum-build/bin/quantum-opt  # artifact upload does not preserve permissions
 
     - name: Run Python Lit Tests
@@ -374,7 +461,7 @@ jobs:
 
   frontend-tests-lightning-kokkos:
     name: Frontend Tests (backend="lightning.kokkos")
-    needs: [runtime, mhlo, quantum]
+    needs: [runtime, mhlo, quantum, enzyme]
     runs-on: ubuntu-latest
 
     steps:
@@ -401,7 +488,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-build
+        key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-build-opt
         fail-on-cache-miss: True
 
     - name: Get MHLO Version
@@ -414,6 +501,18 @@ jobs:
       with:
         path: mhlo-build
         key: ${{ runner.os }}-mhlo-${{ steps.mhlo-hash.outputs.mhlo-hash }}-default-build
+        fail-on-cache-miss: True
+
+    - name: Get Enzyme Version
+      id: enzyme-hash
+      run: echo "enzyme-hash=$(grep enzyme .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
+
+    - name: Get Cached Enzyme Build
+      id: cache-enzyme
+      uses: actions/cache@v3
+      with:
+        path: enzyme-build
+        key: ${{ runner.os }}-enzyme-${{ steps.enzyme-hash.outputs.enzyme-hash }}-default-build
         fail-on-cache-miss: True
 
     - name: Download Quantum Build Artifact
@@ -430,12 +529,14 @@ jobs:
 
     - name: Add Frontend Dependencies to PATH
       run: |
+        echo "$(pwd)/enzyme-build/Enzyme" >> $GITHUB_PATH
         echo "$(pwd)/llvm-build/bin" >> $GITHUB_PATH
         echo "$(pwd)/mhlo-build/bin" >> $GITHUB_PATH
         echo "$(pwd)/quantum-build/bin" >> $GITHUB_PATH
         echo "PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
         echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
         echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
+        echo "ENZYME_DIR=$(pwd)/enzyme-build/Enzyme" >> $GITHUB_ENV
         chmod +x quantum-build/bin/quantum-opt  # artifact upload does not preserve permissions
 
     - name: Install lightning.kokkos used in Python tests

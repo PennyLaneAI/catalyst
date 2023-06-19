@@ -28,6 +28,10 @@
 using namespace mlir;
 using namespace catalyst::gradient;
 
+//===----------------------------------------------------------------------===//
+// SymbolUserOpInterface
+//===----------------------------------------------------------------------===//
+
 // Gradient input checker
 LogicalResult verifyGradInputs(OpState *op_state, func::FuncOp callee, ValueRange callee_operands,
                                const std::vector<size_t> &diff_arg_indices)
@@ -92,6 +96,11 @@ LogicalResult verifyGradOutputs(OpState *op_state, func::FuncOp fn,
 
 CallInterfaceCallable GradOp::getCallableForCallee() { return getCalleeAttr(); }
 
+void GradOp::setCalleeFromCallable(CallInterfaceCallable callee)
+{
+    (*this)->setAttr("callee", callee.get<SymbolRefAttr>());
+};
+
 Operation::operand_range GradOp::getArgOperands() { return getOperands(); }
 
 //===----------------------------------------------------------------------===//
@@ -126,7 +135,7 @@ LogicalResult GradOp::verifySymbolUses(SymbolTableCollection &symbolTable)
 LogicalResult GradOp::verify()
 {
     StringRef method = this->getMethod();
-    if (method != "fd" && method != "ps" && method != "adj")
+    if (method != "fd" && method != "defer")
         return emitOpError("got invalid differentiation method: ") << method;
     return success();
 }
@@ -136,6 +145,11 @@ LogicalResult GradOp::verify()
 //===----------------------------------------------------------------------===//
 
 CallInterfaceCallable JVPOp::getCallableForCallee() { return getCalleeAttr(); }
+
+void JVPOp::setCalleeFromCallable(CallInterfaceCallable callee)
+{
+    (*this)->setAttr("callee", callee.get<SymbolRefAttr>());
+};
 
 Operation::operand_range JVPOp::getArgOperands() { return getOperands(); }
 
@@ -212,6 +226,11 @@ LogicalResult JVPOp::verify()
 //===----------------------------------------------------------------------===//
 
 CallInterfaceCallable VJPOp::getCallableForCallee() { return getCalleeAttr(); }
+
+void VJPOp::setCalleeFromCallable(CallInterfaceCallable callee)
+{
+    (*this)->setAttr("callee", callee.get<SymbolRefAttr>());
+};
 
 Operation::operand_range VJPOp::getArgOperands() { return getOperands(); }
 

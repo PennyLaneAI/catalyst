@@ -29,23 +29,11 @@ using namespace catalyst::gradient;
 namespace catalyst {
 namespace gradient {
 
-struct GradientConversionPass
-    : public PassWrapper<GradientConversionPass, OperationPass<ModuleOp>> {
-    GradientConversionPass() {}
+#define GEN_PASS_DEF_GRADIENTCONVERSIONPASS
+#include "Gradient/Transforms/Passes.h.inc"
 
-    StringRef getArgument() const override { return "convert-gradient-to-llvm"; }
-
-    StringRef getDescription() const override
-    {
-        return "Perform a dialect conversion from Gradient to LLVM.";
-    }
-
-    void getDependentDialects(DialectRegistry &registry) const override
-    {
-        registry.insert<LLVM::LLVMDialect>();
-        registry.insert<func::FuncDialect>();
-        registry.insert<catalyst::quantum::QuantumDialect>();
-    }
+struct GradientConversionPass : impl::GradientConversionPassBase<GradientConversionPass> {
+    using GradientConversionPassBase::GradientConversionPassBase;
 
     void runOnOperation() final
     {

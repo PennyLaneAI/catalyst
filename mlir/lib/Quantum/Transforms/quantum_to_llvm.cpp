@@ -31,6 +31,9 @@ using namespace catalyst::quantum;
 namespace catalyst {
 namespace quantum {
 
+#define GEN_PASS_DEF_QUANTUMCONVERSIONPASS
+#include "Quantum/Transforms/Passes.h.inc"
+
 struct QIRTypeConverter : public LLVMTypeConverter {
 
     QIRTypeConverter(MLIRContext *ctx) : LLVMTypeConverter(ctx)
@@ -63,20 +66,8 @@ struct QIRTypeConverter : public LLVMTypeConverter {
     }
 };
 
-struct QuantumConversionPass : public PassWrapper<QuantumConversionPass, OperationPass<ModuleOp>> {
-    QuantumConversionPass() {}
-
-    StringRef getArgument() const override { return "convert-quantum-to-llvm"; }
-
-    StringRef getDescription() const override
-    {
-        return "Perform a dialect conversion from Quantum to LLVM (QIR).";
-    }
-
-    void getDependentDialects(DialectRegistry &registry) const override
-    {
-        registry.insert<LLVM::LLVMDialect>();
-    }
+struct QuantumConversionPass : impl::QuantumConversionPassBase<QuantumConversionPass> {
+    using QuantumConversionPassBase::QuantumConversionPassBase;
 
     void runOnOperation() final
     {
