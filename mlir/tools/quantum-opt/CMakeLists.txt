@@ -10,6 +10,23 @@ set(LIBS
     quantum-transforms
     MLIRGradient
     gradient-transforms
+
+    MhloRegisterDialects
+    StablehloRegister
+
+    # Taken from mlir-hlo/bindings/c/CMakeLists.txt:
+    # For AllMhLoPasses:
+    ChloPasses
+    MhloPasses
+    MhloToLhloConversion
+    MhloToArithmeticConversion
+    MhloToMemrefConversion
+    MhloToStandard
+    MhloToThloConversion
+    MhloToLinalg
+    MhloToStablehlo
+    MhloShapeOpsToStandard
+    StablehloToMhlo
 )
 
 add_llvm_executable(quantum-opt quantum-opt.cpp)

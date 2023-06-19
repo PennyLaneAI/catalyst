@@ -25,6 +25,10 @@
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/Transforms/Passes.h"
 
+#include "mhlo/IR/register.h"
+#include "mhlo/transforms/passes.h"
+#include "stablehlo/dialect/Register.h"
+
 int main(int argc, char **argv)
 {
     mlir::registerAllPasses();
@@ -37,8 +41,12 @@ int main(int argc, char **argv)
     mlir::registerPass(catalyst::createEmitCatalystPyInterfacePass);
     mlir::registerPass(catalyst::createCopyGlobalMemRefPass);
 
+    mlir::mhlo::registerAllMhloPasses();
+
     mlir::DialectRegistry registry;
     mlir::registerAllDialects(registry);
+    mlir::mhlo::registerAllMhloDialects(registry);
+    mlir::stablehlo::registerAllDialects(registry);
     registry.insert<catalyst::CatalystDialect>();
     registry.insert<catalyst::quantum::QuantumDialect>();
     registry.insert<catalyst::gradient::GradientDialect>();

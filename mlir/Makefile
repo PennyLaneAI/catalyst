@@ -74,6 +74,7 @@ dialects:
 		-DQUANTUM_ENABLE_BINDINGS_PYTHON=ON \
 		-DPython3_EXECUTABLE="$(PYTHON)" \
 		-DMLIR_DIR=$(LLVM_BUILD_DIR)/lib/cmake/mlir \
+		-DMHLO_DIR=$(MHLO_BUILD_DIR)/lib/cmake/mlir-hlo \
 		-DMHLO_BINARY_DIR=$(MHLO_BUILD_DIR)/bin \
 		-DRUNTIME_LIB_DIR=$(RT_BUILD_DIR)/lib \
 		-DMLIR_LIB_DIR=$(LLVM_BUILD_DIR)/lib \
