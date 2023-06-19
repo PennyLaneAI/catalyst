@@ -128,7 +128,7 @@ jobs:
         ref: ${{ steps.enzyme-hash.outputs.enzyme-hash }}
         path: mlir/Enzyme
 
-    - name: Build Enzyme Dialect
+    - name: Build Enzyme
       if: steps.cache-enzyme.outputs.cache-hit != 'true'
 
       run: |
