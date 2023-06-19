@@ -17,8 +17,7 @@ of quantum operations, measurements, and observables to JAXPR.
 
 from dataclasses import dataclass
 from itertools import chain
-from typing import Dict, List, Iterable
-from jax.tree_util import tree_flatten, tree_unflatten, PyTreeDef
+from typing import Dict, Iterable, List
 
 import jax
 import numpy as np
@@ -26,6 +25,7 @@ from jax._src import api_util, core, source_info_util, util
 from jax._src.lib.mlir import ir
 from jax.core import AbstractValue
 from jax.interpreters import mlir
+from jax.tree_util import PyTreeDef, tree_flatten, tree_unflatten
 from jaxlib.mlir.dialects._func_ops_gen import CallOp
 from jaxlib.mlir.dialects._mhlo_ops_gen import ConstantOp, ConvertOp
 from jaxlib.mlir.dialects._stablehlo_ops_gen import ConstantOp as StableHLOConstantOp
@@ -1504,22 +1504,24 @@ def _adjoint_abstract(*args, args_tree, jaxpr):
     return jaxpr.out_avals
 
 
-def _adjoint_lowering(jax_ctx:mlir.LoweringRuleContext,
-                      *args:Iterable[ir.Value],
-                      args_tree: PyTreeDef,
-                      jaxpr: core.ClosedJaxpr) -> ir.Value:
-    """ The JAX bind handler performing the Jaxpr -> MLIR adjoint lowering by taking the `jaxpr`
+def _adjoint_lowering(
+    jax_ctx: mlir.LoweringRuleContext,
+    *args: Iterable[ir.Value],
+    args_tree: PyTreeDef,
+    jaxpr: core.ClosedJaxpr,
+) -> ir.Value:
+    """The JAX bind handler performing the Jaxpr -> MLIR adjoint lowering by taking the `jaxpr`
     expression to be lowered and all its already lowered arguments as MLIR value references. The Jax
     requires all the arguments to be passed as a single list of positionals, thus we pass indices of
-    the argument groups. The handler returns the resulting MLIR Value. """
+    the argument groups. The handler returns the resulting MLIR Value."""
 
     # [1] - MLIR Value of constans, classical and quantum arguments [2] - JAXPR types of constans,
     # classical and quantum arguments [3] - Build a body of the adjoint operator. We pass constants
     # and classical arguments as-is, but substitute the quantum arguments with the arguments of the
     # block.
 
-    consts,cargs,qargs = tree_unflatten(args_tree, args) # [1]
-    aconsts,acargs,aqargs = tree_unflatten(args_tree, jax_ctx.avals_in) # [2]
+    consts, cargs, qargs = tree_unflatten(args_tree, args)  # [1]
+    aconsts, acargs, aqargs = tree_unflatten(args_tree, jax_ctx.avals_in)  # [2]
 
     assert len(qargs) == 1, "We currently expect exactly one quantum register argument"
     output_types = util.flatten(map(mlir.aval_to_ir_types, jax_ctx.avals_out))
@@ -1536,7 +1538,7 @@ def _adjoint_lowering(jax_ctx:mlir.LoweringRuleContext,
             jaxpr.jaxpr,
             mlir.TokenSet(),
             [mlir.ir_constants(c) for c in jaxpr.consts],
-            *([a] for a in chain(consts, adjoint_block.arguments, cargs)), # [3]
+            *([a] for a in chain(consts, adjoint_block.arguments, cargs)),  # [3]
             dim_var_values=jax_ctx.dim_var_values,
         )
 

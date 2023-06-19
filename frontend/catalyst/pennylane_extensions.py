@@ -35,7 +35,7 @@ from jax.linear_util import wrap_init
 from jax.tree_util import tree_flatten, tree_unflatten, treedef_is_leaf
 from pennylane import QNode
 from pennylane.measurements import MidMeasureMP
-from pennylane.operation import AnyWires, Operation, Wires, Operator
+from pennylane.operation import AnyWires, Operation, Operator, Wires
 from pennylane.queuing import QueuingManager
 
 import catalyst
@@ -527,7 +527,7 @@ class Adjoint(Operation):
         self.body_jaxpr = body_jaxpr
         self.consts_jaxpr = list(consts_jaxpr)
         self.cargs_jaxpr = list(cargs_jaxpr)
-        super().__init__(wires = Wires(Adjoint.num_wires))
+        super().__init__(wires=Wires(Adjoint.num_wires))
 
 
 def adjoint(f: Union[Callable, Operator]) -> Callable:
@@ -559,9 +559,9 @@ def adjoint(f: Union[Callable, Operator]) -> Callable:
     array([ 0.5-0.5j, -0.5+0.5j])
     """
 
-    def _trace_quantum_tape(*args, _callee : Callable):
+    def _trace_quantum_tape(*args, _callee: Callable):
         (qargs, cargs, ckwargs) = args
-        assert len(qargs)==1
+        assert len(qargs) == 1
         with JaxTape(do_queue=False) as tape:
             with tape.quantum_tape:
                 out = _callee(*cargs, **ckwargs)
@@ -576,7 +576,7 @@ def adjoint(f: Union[Callable, Operator]) -> Callable:
         qreg = insert_to_qreg(qubit_states, qreg)
         return qreg, return_values
 
-    def _make_adjoint(*args, _callee : Callable, **kwargs):
+    def _make_adjoint(*args, _callee: Callable, **kwargs):
         cargs_qargs_jaxpr, tree = tree_flatten(([jprim.Qreg()], args, kwargs))
         cargs_jaxpr, _ = tree_flatten((args, kwargs))
         cargs_qargs_aval = tuple(_abstractify(val) for val in cargs_qargs_jaxpr)
@@ -586,13 +586,17 @@ def adjoint(f: Union[Callable, Operator]) -> Callable:
         return Adjoint(body_jaxpr, consts_jaxpr, cargs_jaxpr)
 
     if isinstance(f, Callable):
+
         def _callable(*args, **kwargs):
             return _make_adjoint(*args, _callee=f, **kwargs)
+
         return _callable
     elif isinstance(f, Operator):
         QueuingManager.remove(f)
+
         def _callee(*args, **kwargs):
             QueuingManager.append(f)
+
         return _make_adjoint(_callee=_callee)
     else:
         raise ValueError(f"Expected a callable or a qml.Operator, not {f}")

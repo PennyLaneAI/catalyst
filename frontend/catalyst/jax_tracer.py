@@ -21,7 +21,6 @@ from jax._src.dispatch import jaxpr_replicas
 from jax._src.interpreters.mlir import _module_name_regex
 from jax._src.lax.lax import xb, xla
 from jax._src.util import wrap_name
-from jax.tree_util import tree_flatten, tree_unflatten, PyTreeDef
 from jax.interpreters.mlir import (
     AxisContext,
     ModuleContext,
@@ -31,7 +30,7 @@ from jax.interpreters.mlir import (
     lowerable_effects,
 )
 from jax.interpreters.partial_eval import DynamicJaxprTracer
-from jax.tree_util import tree_unflatten
+from jax.tree_util import PyTreeDef, tree_flatten, tree_unflatten
 from pennylane.measurements import MeasurementProcess
 from pennylane.operation import Wires
 

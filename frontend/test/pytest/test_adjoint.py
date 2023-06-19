@@ -16,9 +16,9 @@
 
 from functools import partial
 
+import jax.numpy as jnp
 import pennylane as qml
 import pennylane.numpy as pnp
-import jax.numpy as jnp
 import pytest
 from numpy.testing import assert_allclose
 from pennylane import adjoint as PL_adjoint
@@ -27,6 +27,7 @@ from catalyst import adjoint as C_adjoint
 from catalyst import qjit
 
 # pylint: disable=missing-function-docstring
+
 
 def test_adjoint_func():
     def func():
@@ -54,7 +55,7 @@ def test_adjoint_func():
     assert_allclose(actual, desired)
 
 
-@pytest.mark.parametrize("theta, val", [(3.14, 0),(-100.0, 1)])
+@pytest.mark.parametrize("theta, val", [(3.14, 0), (-100.0, 1)])
 def test_adjoint_op(theta, val):
     @qjit()
     @qml.qnode(qml.device("lightning.qubit", wires=2))
@@ -179,5 +180,3 @@ def test_adjoint_qubitunitary():
     actual = C_workflow()
     desired = PL_workflow()
     assert_allclose(actual, desired)
-
-

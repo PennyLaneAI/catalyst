@@ -716,11 +716,9 @@ void __quantum__qis__MultiRZ_Adjoint(double theta, int64_t numQubits, ...)
                                                         /* inverse = */ true);
 }
 
-static void _qubitUnitary_impl(MemRefT_CplxT_double_2d *matrix,
-                               int64_t numQubits,
+static void _qubitUnitary_impl(MemRefT_CplxT_double_2d *matrix, int64_t numQubits,
                                std::vector<std::complex<double>> &coeffs,
-                               std::vector<QubitIdType> &wires,
-                               va_list *args)
+                               std::vector<QubitIdType> &wires, va_list *args)
 {
     const size_t num_rows = matrix->sizes[0];
     const size_t num_col = matrix->sizes[1];
@@ -767,7 +765,7 @@ void __quantum__qis__QubitUnitary(MemRefT_CplxT_double_2d *matrix, int64_t numQu
 }
 
 void __quantum__qis__QubitUnitary_Adjoint(MemRefT_CplxT_double_2d *matrix, int64_t numQubits,
-                                  /*qubits*/...)
+                                          /*qubits*/...)
 {
     RT_ASSERT(numQubits >= 0);
 
