@@ -161,7 +161,8 @@ class TestJAXAD:
 
         assert jnp.allclose(result, reference)
 
-    def test_multiple_arguments(self, backend):
+    @pytest.mark.parametrize("argnums", (0, 1, [0, 1]))
+    def test_multiple_arguments(self, backend, argnums):
         """Test a circuit with multiple arguments using jax.grad on top of qjit."""
 
         @qjit
@@ -174,7 +175,7 @@ class TestJAXAD:
             qml.RX(y[1] * x[2], wires=0)
             return qml.probs(wires=0)
 
-        @partial(jax.grad, argnums=[0, 1])
+        @partial(jax.grad, argnums=argnums)
         def cost_fn(x, y, qfunc):
             result = qfunc(x, y)
             return jnp.sum(jnp.cos(result) ** 2)
@@ -183,9 +184,9 @@ class TestJAXAD:
         result = cost_fn(x, y, circuit)
         reference = cost_fn(x, y, circuit.qfunc)
 
-        assert len(result) == 2
         assert jnp.allclose(result[0], reference[0])
-        assert jnp.allclose(result[1], reference[1])
+        if isinstance(argnums, list):
+            assert jnp.allclose(result[1], reference[1])
 
     def test_multiple_results(self, backend):
         """Test a circuit with multiple results using jax.grad on top of qjit."""
