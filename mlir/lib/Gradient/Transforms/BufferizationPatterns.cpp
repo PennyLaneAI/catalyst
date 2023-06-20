@@ -72,14 +72,17 @@ class BufferizeBackpropOp : public OpConversionPattern<BackpropOp> {
         size_t resSize = resTypes.size();
 
         int argsSize = args.size();
-
         int numCalleeResults = resSize / argsSize;
 
         for (size_t i = 0; i < resSize; i++) {
             Type resType = resTypes[i];
             std::vector<Value> dynamicDimSizes;
-
-            int argPos = i % numCalleeResults;
+            int argPos;
+            if (numCalleeResults != 0) {
+                argPos = i % numCalleeResults;
+            } else {
+                argPos = 0;
+            }
             Type argType = args[argPos].getType();
             if (argType.isa<TensorType>()) {
                 RankedTensorType rankedArg = argType.cast<RankedTensorType>();

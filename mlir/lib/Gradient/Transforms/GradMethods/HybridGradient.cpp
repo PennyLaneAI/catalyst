@@ -70,7 +70,7 @@ func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc, GradOp
         callArgs.push_back(numParams);
         
         ValueRange quantumGradients = rewriter.create<func::CallOp>(loc, qGradFn, callArgs).getResults();
-
+        callArgs.pop_back();
         DenseIntElementsAttr diffArgIndicesAttr = gradOp.getDiffArgIndices().value_or(nullptr);
         BackpropOp backpropOp = rewriter.create<BackpropOp>(loc, gradOp.getResultTypes(), argMapFn.getName(), callArgs, quantumGradients.front(), ValueRange{}, diffArgIndicesAttr);
 
