@@ -182,7 +182,7 @@ def test_adjoint_qubitunitary():
     assert_allclose(actual, desired)
 
 
-def test_adjoint_nomeasurements():
+def test_adjoint_no_measurements():
     def func():
         qml.RX(pnp.pi / 2, wires=0)
         qml.sample()
@@ -193,6 +193,18 @@ def test_adjoint_nomeasurements():
         @qml.qnode(qml.device("lightning.qubit", wires=2))
         def C_workflow():
             C_adjoint(func)()
+            return qml.state()
+
+        C_workflow()
+
+
+def test_adjoint_invalid_argument():
+    with pytest.raises(ValueError, match="Expected a callable"):
+
+        @qjit()
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def C_workflow():
+            C_adjoint(33)()
             return qml.state()
 
         C_workflow()
