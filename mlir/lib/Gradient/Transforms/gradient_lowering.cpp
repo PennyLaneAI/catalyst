@@ -31,7 +31,6 @@
 #include "Gradient/IR/GradientOps.h"
 #include "Gradient/Transforms/Passes.h"
 #include "Gradient/Transforms/Patterns.h"
-#include "Quantum/Analysis/QuantumDependenceAnalysis.h"
 #include "Quantum/IR/QuantumOps.h"
 
 using namespace mlir;
@@ -52,9 +51,7 @@ struct GradientLoweringPass : impl::GradientLoweringPassBase<GradientLoweringPas
         RewritePatternSet gradientPatterns(&getContext());
 
         if (splitHybrid) {
-            auto &qdepAnalysis = getAnalysis<quantum::QuantumDependenceAnalysis>();
-            getOperation()->walk(
-                [&](gradient::GradOp gradOp) { splitHybridCircuit(gradOp, qdepAnalysis); });
+            getOperation()->walk([&](gradient::GradOp gradOp) { splitHybridCircuit(gradOp); });
         }
         populateLoweringPatterns(gradientPatterns, lowerOnly);
 

@@ -17,8 +17,6 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-#include "Quantum/Analysis/QuantumDependenceAnalysis.h"
-
 namespace catalyst {
 namespace gradient {
 
@@ -29,7 +27,7 @@ void populateConversionPatterns(mlir::TypeConverter &, mlir::RewritePatternSet &
 // TODO(jacob): rework this API. It decides which values that the quantum circuit depends on should
 // be stored to the tape.
 bool shouldCache(mlir::Value value);
-void splitHybridCircuit(mlir::Operation *, quantum::QuantumDependenceAnalysis &);
+void splitHybridCircuit(mlir::Operation *);
 
 } // namespace gradient
 } // namespace catalyst

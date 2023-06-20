@@ -105,6 +105,7 @@ SparseConstantPropagation here.
 */
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Index/IR/IndexOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -113,16 +114,13 @@ SparseConstantPropagation here.
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/SymbolTable.h"
 
+#include "Catalyst/IR/CatalystOps.h"
 #include "Gradient/IR/GradientOps.h"
 #include "Gradient/Transforms/Patterns.h"
 #include "Quantum/Analysis/QuantumDependenceAnalysis.h"
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
-
-#include "mlir/IR/Verifier.h"
-
-#include "llvm/Support/raw_ostream.h"
-using llvm::errs;
+#include "Quantum/Utils/RemoveQuantumMeasurements.h"
 
 using namespace mlir;
 using namespace catalyst;
@@ -133,8 +131,124 @@ bool catalyst::gradient::shouldCache(Value value)
     return value != nullptr;
 }
 
-func::FuncOp genQuantumSplitFunction(quantum::QuantumDependenceAnalysis &qdepAnalysis,
-                                     PatternRewriter &rewriter, Location loc, func::FuncOp callee)
+func::FuncOp genAugmentedClassicalFunction(PatternRewriter &rewriter, Location loc,
+                                           func::FuncOp callee)
+{
+    // Define the properties of the classical preprocessing function.
+    std::string fnName = callee.getSymName().str() + ".augmented";
+    std::vector<Type> fnArgTypes = callee.getArgumentTypes().vec();
+    RankedTensorType paramsVectorType =
+        RankedTensorType::get({ShapedType::kDynamic}, rewriter.getF64Type());
+    RankedTensorType controlFlowTensorType =
+        RankedTensorType::get({ShapedType::kDynamic}, rewriter.getIndexType());
+    FunctionType fnType =
+        rewriter.getFunctionType(fnArgTypes, {paramsVectorType, controlFlowTensorType});
+
+    func::FuncOp augmentedFn =
+        SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(callee, rewriter.getStringAttr(fnName));
+    if (!augmentedFn) {
+        // First copy the original function as is, then we can replace all quantum ops by
+        // collecting their gate parameters in a memory buffer instead. The size of this vector
+        // is passed as an input to the new function.
+        augmentedFn = rewriter.create<func::FuncOp>(loc, fnName, fnType);
+        augmentedFn.setPrivate();
+        rewriter.cloneRegionBefore(callee.getBody(), augmentedFn.getBody(), augmentedFn.end());
+
+        PatternRewriter::InsertionGuard insertGuard(rewriter);
+        rewriter.setInsertionPointToStart(&augmentedFn.getBody().front());
+
+        // Allocate the memory for the gate parameters collected at runtime.
+        auto arrayListType = ArrayListType::get(rewriter.getContext(), rewriter.getF64Type());
+        Value paramsBuffer = rewriter.create<ListInitOp>(loc, arrayListType);
+        Value controlFlowTape = rewriter.create<ListInitOp>(
+            loc, ArrayListType::get(rewriter.getContext(), rewriter.getIndexType()));
+        MemRefType paramsProcessedType = MemRefType::get({}, rewriter.getIndexType());
+        Value paramsProcessed = rewriter.create<memref::AllocaOp>(loc, paramsProcessedType);
+        Value cZero = rewriter.create<index::ConstantOp>(loc, 0);
+        rewriter.create<memref::StoreOp>(loc, cZero, paramsProcessed);
+        Value cOne = rewriter.create<index::ConstantOp>(loc, 1);
+
+        augmentedFn.walk([&](Operation *op) {
+            // Insert gate parameters into the params buffer.
+            if (auto gate = dyn_cast<quantum::DifferentiableGate>(op)) {
+                PatternRewriter::InsertionGuard insertGuard(rewriter);
+                rewriter.setInsertionPoint(gate);
+
+                ValueRange diffParams = gate.getDiffParams();
+                if (!diffParams.empty()) {
+                    Value paramIdx = rewriter.create<memref::LoadOp>(loc, paramsProcessed);
+                    for (auto param : diffParams) {
+                        rewriter.create<ListPushOp>(loc, param, paramsBuffer);
+                        paramIdx = rewriter.create<index::AddOp>(loc, paramIdx, cOne);
+                    }
+                    rewriter.create<memref::StoreOp>(loc, paramIdx, paramsProcessed);
+                }
+
+                rewriter.replaceOp(op, gate.getQubitOperands());
+            }
+            // Replace any return statements from the original function with the params vector.
+            else if (isa<func::ReturnOp>(op)) {
+                PatternRewriter::InsertionGuard insertGuard(rewriter);
+                rewriter.setInsertionPoint(op);
+                Value data = rewriter.create<ListLoadDataOp>(loc, paramsBuffer);
+                Value paramsTensor = rewriter.create<bufferization::ToTensorOp>(loc, data);
+                Value controlFlowData = rewriter.create<ListLoadDataOp>(loc, controlFlowTape);
+                Value controlFlowTensor =
+                    rewriter.create<bufferization::ToTensorOp>(loc, controlFlowData);
+                op->setOperands({paramsTensor, controlFlowTensor});
+            }
+            // Erase redundant device specifications.
+            else if (isa<quantum::DeviceOp>(op)) {
+                rewriter.eraseOp(op);
+            }
+            // Cache the relevant parameters
+            else if (auto forOp = dyn_cast<scf::ForOp>(op)) {
+                PatternRewriter::InsertionGuard insertGuard(rewriter);
+                rewriter.setInsertionPoint(forOp);
+
+                rewriter.create<catalyst::ListPushOp>(loc, forOp.getLowerBound(), controlFlowTape);
+                rewriter.create<catalyst::ListPushOp>(loc, forOp.getUpperBound(), controlFlowTape);
+                rewriter.create<catalyst::ListPushOp>(loc, forOp.getStep(), controlFlowTape);
+            }
+            else if (auto ifOp = dyn_cast<scf::IfOp>(op)) {
+                PatternRewriter::InsertionGuard insertGuard(rewriter);
+                rewriter.setInsertionPoint(ifOp);
+
+                auto casted = rewriter.create<arith::IndexCastOp>(loc, rewriter.getIndexType(),
+                                                                  ifOp.getCondition());
+                rewriter.create<catalyst::ListPushOp>(loc, casted, controlFlowTape);
+            }
+            else if (auto whileOp = dyn_cast<scf::WhileOp>(op)) {
+                PatternRewriter::InsertionGuard insertGuard(rewriter);
+                rewriter.setInsertionPoint(whileOp);
+
+                // While ops are converted to for ops
+                Value loopCounter = rewriter.create<memref::AllocaOp>(
+                    loc, MemRefType::get({}, rewriter.getIndexType()));
+                rewriter.create<memref::StoreOp>(loc, cZero, loopCounter);
+
+                // Count the number of times the "after" region iterates.
+                // Assume that the loop condition, being a classical value, does not depend on
+                // any quantum operations.
+                rewriter.setInsertionPointToStart(&whileOp.getAfter().front());
+                auto beforeIdx = rewriter.create<memref::LoadOp>(loc, loopCounter);
+                auto afterIdx = rewriter.create<index::AddOp>(loc, beforeIdx, cOne);
+                rewriter.create<memref::StoreOp>(loc, afterIdx, loopCounter);
+
+                // Store the final iteration count to the tape.
+                rewriter.setInsertionPointAfter(whileOp);
+                auto finalCount = rewriter.create<memref::LoadOp>(loc, loopCounter);
+                rewriter.create<catalyst::ListPushOp>(loc, finalCount, controlFlowTape);
+            }
+        });
+
+        quantum::removeQuantumMeasurements(augmentedFn);
+    }
+
+    return augmentedFn;
+}
+
+func::FuncOp genQuantumSplitFunction(PatternRewriter &rewriter, Location loc, func::FuncOp callee)
 {
     auto fnName = rewriter.getStringAttr(callee.getName() + ".qsplit");
     SmallVector<Type> tapeTypes{
@@ -250,8 +364,7 @@ func::FuncOp genQuantumSplitFunction(quantum::QuantumDependenceAnalysis &qdepAna
     return qsplitFn;
 }
 
-void catalyst::gradient::splitHybridCircuit(Operation *top,
-                                            quantum::QuantumDependenceAnalysis &qdepAnalysis)
+void catalyst::gradient::splitHybridCircuit(Operation *top)
 {
     auto gradOp = cast<gradient::GradOp>(top);
     auto moduleOp = gradOp->getParentOfType<ModuleOp>();
@@ -261,7 +374,8 @@ void catalyst::gradient::splitHybridCircuit(Operation *top,
     ConversionPatternRewriter rewriter(top->getContext());
     rewriter.setInsertionPointToStart(moduleOp.getBody());
 
-    genQuantumSplitFunction(qdepAnalysis, rewriter, gradOp.getLoc(), callee);
+    genAugmentedClassicalFunction(rewriter, gradOp.getLoc(), callee);
+    genQuantumSplitFunction(rewriter, gradOp.getLoc(), callee);
 
     rewriter.setInsertionPoint(gradOp);
 }
