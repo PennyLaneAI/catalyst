@@ -91,6 +91,58 @@ A lot of the compilation steps are broken into pass pipelines.
 ``PassPipeline`` is a class that specifies which binary and which flags are used for compilation.
 Users can implement their own ``PassPipeline`` by inheriting from this class and implementing the relevant methods/attributes.
 Catalyst's compilation strategy can then adjusted by inserting new passes in then default pipeline or forming a completely new pipeline.
+For example, in the Catalyst tests we have the following compilation strategy that overrides the default compilation pipeline and instead inserts a C++ program to be compiled.
+
+.. code-block:: python
+
+        class CompileCXXException:
+            """Class that overrides the program to be compiled."""
+
+            _executable = "cc"
+            _default_flags = ["-shared", "-fPIC", "-x", "c++"]
+
+            @staticmethod
+            def get_output_filename(infile):
+                """Get the name of the output file based on the input file."""
+                return infile.replace(".mlir", ".o")
+
+            @staticmethod
+            def run(infile, **_kwargs):
+                """Run the compilation step."""
+                contents = """
+#include <stdexcept>
+extern "C" {
+  void _catalyst_pyface_jit_cpp_exception_test(void*, void*);
+  void setup(int, char**);
+  void teardown();
+}
+void setup(int argc, char** argv) {}
+void teardown() {}
+void _catalyst_pyface_jit_cpp_exception_test(void*, void*) {
+  throw std::runtime_error("Hello world");
+}
+                """
+                exe = CompileCXXException._executable
+                flags = CompileCXXException._default_flags
+                outfile = CompileCXXException.get_output_filename(infile)
+                command = [exe] + flags + ["-o", outfile, "-"]
+                with subprocess.Popen(command, stdin=subprocess.PIPE) as pipe:
+                    pipe.communicate(input=bytes(contents, "UTF-8"))
+                return outfile
+
+        @qjit(
+            pipelines=[CompileCXXException, CompilerDriver],
+        )
+        def cpp_exception_test():
+            """A function that will be overwritten by CompileCXXException."""
+            return None
+
+        with pytest.raises(RuntimeError, match="Hello world"):
+            cpp_exception_test()
+
+In the above example, we can see how the class ``CompileCXXException`` is used in the ``pipelines`` keyword argument.
+The ``CompileCXXException`` class will overwrite the contents of ``cpp_exception_test``.
+Even though ``cpp_exception_test`` returns ``None``, the function that is going to be compiled actually corresponds to the contents of the C++ string.
 
 We won't get into too much detail here, but sometimes it is useful to look at the output of a specific ``PassPipeline``.
 To do so, simply use the ``get_output_of`` method available in ``QJIT``.
