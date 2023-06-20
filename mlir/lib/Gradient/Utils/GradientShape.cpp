@@ -11,7 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "Gradient/Utils/GradientShape.h"
 
 using namespace mlir;
@@ -100,15 +100,19 @@ std::vector<Type> computeQGradTypes(func::FuncOp callee)
 std::vector<Type> computeBackpropTypes(func::FuncOp callee)
 {
     std::vector<Type> backpropResTypes;
-    backpropResTypes.reserve(callee.getNumResults());
+    backpropResTypes.reserve(callee.getNumArguments());
 
-    for (Type resultType : callee.getResultTypes()) {
-
-        if (auto tensorType = resultType.dyn_cast<RankedTensorType>()) {
+    for (Type argType : callee.getArgumentTypes()) {
+        if (auto tensorType = argType.dyn_cast<RankedTensorType>()) {
             ArrayRef<int64_t> tensorShape = tensorType.getShape();
-            resultType = tensorType.getElementType();
-            backpropResTypes.push_back(RankedTensorType::get(tensorShape, resultType));
+            argType = tensorType.getElementType();
+            backpropResTypes.push_back(RankedTensorType::get(tensorShape, argType));
         }
+        // Assume Args are always tensor
+        // else {
+        //     ArrayRef<int64_t> tensorShape;
+        //     backpropResTypes.push_back(RankedTensorType::get(tensorShape, argType));
+        // }
     }
     
     return backpropResTypes;

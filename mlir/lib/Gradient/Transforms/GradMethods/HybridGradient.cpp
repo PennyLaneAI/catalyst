@@ -22,6 +22,7 @@
 #include <vector>
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Index/IR/IndexOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 
@@ -39,8 +40,9 @@ namespace gradient {
 /// differentiable output of a circuit. The two components can be combined to form the gradient of
 /// the entire quantum function via tensor contraction along the gate parameter dimension.
 ///
-func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc, GradOp gradOp, func::FuncOp paramCountFn,
-                                 func::FuncOp argMapFn, func::FuncOp qGradFn, StringRef method)
+func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc, GradOp gradOp,
+                                 func::FuncOp paramCountFn, func::FuncOp argMapFn,
+                                 func::FuncOp qGradFn, StringRef method)
 {
     // Define the properties of the full gradient function.
     const std::vector<size_t> &diffArgIndices = compDiffArgIndices(gradOp.getDiffArgIndices());
@@ -68,16 +70,83 @@ func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc, GradOp
 
         Value numParams = rewriter.create<func::CallOp>(loc, paramCountFn, callArgs).getResult(0);
         callArgs.push_back(numParams);
-        
-        ValueRange quantumGradients = rewriter.create<func::CallOp>(loc, qGradFn, callArgs).getResults();
+
+        ValueRange quantumGradients =
+            rewriter.create<func::CallOp>(loc, qGradFn, callArgs).getResults();
         callArgs.pop_back();
         DenseIntElementsAttr diffArgIndicesAttr = gradOp.getDiffArgIndices().value_or(nullptr);
 
         // Compute hybrid gradients via Enzyme
         std::vector<Value> hybridGradients;
         for (Value quantumGradient : quantumGradients) {
-            BackpropOp backpropOp = rewriter.create<BackpropOp>(loc, computeBackpropTypes(argMapFn), argMapFn.getName(), callArgs, quantumGradients.front(), ValueRange{}, diffArgIndicesAttr);
-            hybridGradients.push_back(backpropOp.getResult(0));
+            auto rank = quantumGradient.getType().cast<RankedTensorType>().getRank();
+
+            if (rank > 1) {
+                std::vector<int64_t> sizes =
+                    quantumGradient.getType().cast<RankedTensorType>().getShape();
+
+                std::vector<int64_t> strides(rank, 1);
+                std::vector<Value> dynStrides = {};
+
+                std::vector<Value> dynOffsets = {};
+
+                std::vector<Value> dynSizes;
+
+                for (auto index = 0; index < sizes.size(); ++index) {
+                    if (index == 0) {
+                        Value idx = rewriter.create<index::ConstantOp>(loc, index);
+                        Value dimSize = rewriter.create<tensor::DimOp>(loc, quantumGradient, idx);
+                        dynSizes.push_back(dimSize);
+                    }
+                    else {
+                        sizes[index] = 1;
+                    }
+                }
+
+                std::vector<std::vector<int64_t>> allOffsets;
+                std::vector<int64_t> cutOffset(sizes.begin() + 1, sizes.end());
+
+                std::vector<int64_t> currentOffset(cutOffset.size(), 0);
+
+                int64_t totalOutcomes = 1;
+                for (int64_t dim : cutOffset) {
+                    totalOutcomes *= dim;
+                }
+
+                for (int64_t outcome = 0; outcome < totalOutcomes; outcome++) {
+                    allOffsets.push_back(currentOffset);
+
+                    for (int64_t i = cutOffset.size() - 1; i >= 0; i--) {
+                        currentOffset[i]++;
+                        if (currentOffset[i] < cutOffset[i]) {
+                            break;
+                        }
+                        currentOffset[i] = 0;
+                    }
+                }
+
+                for (auto offsetRight : allOffsets) {
+                    std::vector<int64_t> offsets{0};
+                    offsets.insert(offsets.end(), offsetRight.begin(), offsetRight.end());
+                    Value extractQuantumGradient = rewriter.create<tensor::ExtractSliceOp>(
+                        loc, quantumGradient.getType(), quantumGradient, dynOffsets, dynSizes,
+                        dynStrides, offsets, sizes, strides);
+                    // Potentially collapse
+
+                    BackpropOp backpropOp = rewriter.create<BackpropOp>(
+                        loc, computeBackpropTypes(argMapFn), argMapFn.getName(), callArgs,
+                        extractQuantumGradient, ValueRange{}, diffArgIndicesAttr);
+
+                    // Insert slices
+                    hybridGradients.push_back(backpropOp.getResult(0));
+                }
+            }
+            else {
+                BackpropOp backpropOp = rewriter.create<BackpropOp>(
+                    loc, computeBackpropTypes(argMapFn), argMapFn.getName(), callArgs,
+                    quantumGradient, ValueRange{}, diffArgIndicesAttr);
+                hybridGradients.push_back(backpropOp.getResult(0));
+            }
         }
 
         rewriter.create<func::ReturnOp>(loc, hybridGradients);

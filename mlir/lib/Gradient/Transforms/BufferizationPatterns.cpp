@@ -66,34 +66,18 @@ class BufferizeBackpropOp : public OpConversionPattern<BackpropOp> {
             return failure();
 
         Location loc = op.getLoc();
-        ValueRange args = op.getArgs();
-
+        ValueRange results = op.getResults();
         SmallVector<Value> memrefValues;
-        size_t resSize = resTypes.size();
-
-        int argsSize = args.size();
-        int numCalleeResults = resSize / argsSize;
-
-        for (size_t i = 0; i < resSize; i++) {
-            Type resType = resTypes[i];
-            std::vector<Value> dynamicDimSizes;
-            int argPos;
-            if (numCalleeResults != 0) {
-                argPos = i % numCalleeResults;
-            } else {
-                argPos = 0;
-            }
-            Type argType = args[argPos].getType();
-            if (argType.isa<TensorType>()) {
-                RankedTensorType rankedArg = argType.cast<RankedTensorType>();
+        SmallVector<Value> dynamicDimSizes;
+        for (auto [resType, result] : zip(resTypes, results)) {
+            if (resType.isa<TensorType>()) {
+                RankedTensorType rankedArg = resType.cast<RankedTensorType>();
                 int numDynDim = rankedArg.getNumDynamicDims();
                 for (int i = 0; i < numDynDim; i++) {
                     int dim = rankedArg.getDynamicDimIndex(i);
-                    dynamicDimSizes.push_back(
-                        rewriter.create<tensor::DimOp>(loc, args[argPos], dim));
+                    dynamicDimSizes.push_back(rewriter.create<tensor::DimOp>(loc, result, dim));
                 }
             }
-
             MemRefType memrefType = resType.cast<MemRefType>();
             Value memrefValue;
             if (!dynamicDimSizes.empty()) {
