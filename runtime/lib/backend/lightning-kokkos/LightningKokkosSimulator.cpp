@@ -186,38 +186,6 @@ auto LightningKokkosSimulator::HamiltonianObservable(const std::vector<double> &
     return this->obs_manager.createHamiltonianObs(coeffs, obs);
 }
 
-// TODO: remove this kernel after merging expval(const ObservableKokkos<T> &ob)
-// in PennyLane-Lightning-Kokkos
-template <class Precision> struct getRealOfComplexInnerProductFunctor {
-    Kokkos::View<Kokkos::complex<Precision> *> sv1;
-    Kokkos::View<Kokkos::complex<Precision> *> sv2;
-
-    getRealOfComplexInnerProductFunctor(Kokkos::View<Kokkos::complex<Precision> *> sv1_,
-                                        Kokkos::View<Kokkos::complex<Precision> *> sv2_)
-    {
-        sv1 = sv1_;
-        sv2 = sv2_;
-    }
-
-    KOKKOS_INLINE_FUNCTION
-    void operator()(const std::size_t k, Precision &inner) const
-    {
-        inner += real(conj(sv1[k]) * sv2[k]);
-    }
-};
-
-template <class Precision>
-inline auto getRealOfComplexInnerProduct(Kokkos::View<Kokkos::complex<Precision> *> sv1_vec,
-                                         Kokkos::View<Kokkos::complex<Precision> *> sv2_vec)
-    -> Precision
-{
-    RT_ASSERT(sv1_vec.size() == sv2_vec.size());
-    Precision inner = 0;
-    Kokkos::parallel_reduce(
-        sv1_vec.size(), getRealOfComplexInnerProductFunctor<Precision>(sv1_vec, sv2_vec), inner);
-    return inner;
-}
-
 auto LightningKokkosSimulator::Expval(ObsIdType obsKey) -> double
 {
     RT_FAIL_IF(!this->obs_manager.isValidObservables({obsKey}),
@@ -384,7 +352,7 @@ void LightningKokkosSimulator::Counts(DataView<double, 1> &eigvals, DataView<int
     // corresponding shape is (shots, qubits). Gather the bits of all qubits
     // into a bitstring.
     for (size_t shot = 0; shot < shots; shot++) {
-        std::bitset<52> basisState; // only 52 bits of precision in a double, TODO: improve
+        std::bitset<CHAR_BIT * sizeof(double)> basisState;
         size_t idx = 0;
         for (size_t wire = 0; wire < numQubits; wire++) {
             basisState[idx++] = li_samples[shot * numQubits + wire];
@@ -428,7 +396,7 @@ void LightningKokkosSimulator::PartialCounts(DataView<double, 1> &eigvals,
     // corresponding shape is (shots, qubits). Gather the desired bits
     // corresponding to the input wires into a bitstring.
     for (size_t shot = 0; shot < shots; shot++) {
-        std::bitset<52> basisState; // only 52 bits of precision in a double, TODO: improve
+        std::bitset<CHAR_BIT * sizeof(double)> basisState;
         size_t idx = 0;
         for (auto wire : dev_wires) {
             basisState[idx++] = li_samples[shot * numQubits + wire];
