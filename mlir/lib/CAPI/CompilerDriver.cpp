@@ -131,7 +131,9 @@ const char *Canonicalize(const char *source)
     llvm::raw_string_ostream ostream{output};
     op->print(ostream);
 
-    return std::move(output.c_str());
+    char *outbuf = static_cast<char *>(std::malloc(output.size()));
+    std::strcpy(outbuf, output.c_str());
+    return outbuf;
 }
 
 void QuantumDriverMain(const char *source)

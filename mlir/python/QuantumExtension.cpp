@@ -49,7 +49,7 @@ PYBIND11_MODULE(_quantumDialects, m)
         },
         py::arg("context") = py::none(), py::arg("load") = true);
 
-    m.def("compile_asm", QuantumDriverMain, py::arg("source"));
+    quantum_m.def("compile_asm", QuantumDriverMain, py::arg("source"));
 
-    m.def("canonicalize", Canonicalize, py::arg("source"));
+    quantum_m.def("canonicalize", Canonicalize, py::arg("source"));
 }
