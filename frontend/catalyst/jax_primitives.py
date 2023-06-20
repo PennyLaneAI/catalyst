@@ -1495,7 +1495,7 @@ def _qfor_lowering(
 
 
 @adjoint_p.def_impl
-def _adjoint_def_impl(ctx, *args):
+def _adjoint_def_impl(ctx, *args):  # pragma: no cover
     raise NotImplementedError()
 
 
