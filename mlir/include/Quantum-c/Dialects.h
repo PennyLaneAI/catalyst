@@ -23,6 +23,8 @@ extern "C" {
 MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(Quantum, quantum);
 MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(Gradient, gradient);
 
+void QuantumDriverMain(const char *source);
+
 #ifdef __cplusplus
 }
 #endif

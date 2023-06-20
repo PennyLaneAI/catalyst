@@ -31,6 +31,8 @@ declare_mlir_python_extension(QuantumPythonSources.Extension
   ADD_TO_PARENT QuantumPythonSources
   SOURCES
     QuantumExtension.cpp
+  PRIVATE_LINK_LIBS
+    QuantumCAPI
   EMBED_CAPI_LINK_LIBS
     QuantumCAPI
 )
