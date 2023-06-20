@@ -459,8 +459,6 @@ auto LightningKokkosSimulator::Measure(QubitIdType wire) -> Result
     double norm = std::sqrt(total);
     std::for_each(state.begin(), state.end(), [norm](auto &elem) { elem /= norm; });
 
-    // TODO: rewrite this method using setStateVector(vectorKokkos<T>)
-    // and LinAlg Functors in the next version of PennyLane-Lightning-Kokkos
     this->device_sv =
         std::make_unique<Pennylane::StateVectorKokkos<double>>(state.data(), vec_size);
 
