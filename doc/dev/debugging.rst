@@ -25,13 +25,13 @@ Running without Python runtime
 ==============================
 
 Sometimes, it might be useful to run the JIT compiled function without ``python``, for example in case of debugging.
-If the program succeeds without ``python``, then it is likely that the error is found in the interface between ``python`` and the JIT compiled function, or within Catalyst's ``python``'s internals.
+If the program succeeds without ``python``, then it is likely that the error is found in the interface between ``python`` and the JIT compiled function, or within Catalyst's ``python`` internals.
 As a quick sanity check you might want to run the JIT compiled function without Python.
 Below is an example of how to obtain a C program that can be linked against the generated function:
 
 .. code-block:: python
 
-    @qjit(keep_intermediate=True)
+    @qjit
     def identity(x):
         return x
 
@@ -82,14 +82,15 @@ Using the ``QJIT.get_cmain`` function, the following string is returned to the u
         teardown();
     }
 
-The user can now compile and link this program and run without ``python``.
+The user can now compile and link this program and run it without ``python``.
 
 Pass Pipelines
 ==============
 
 A lot of the compilation steps are broken into pass pipelines.
 ``PassPipeline`` is a class that specifies which binary and which flags are used for compilation.
-``PassPipeline`` can be implemented by a user if the user wants to insert new passes in between defaul ``PassPipeline``'s.
+Users can implement their own ``PassPipeline`` by inheriting from this class and implementing the relevant methods/attributes.
+Catalyst's compilation strategy can then adjusted by inserting new passes in then default pipeline or forming a completely new pipeline.
 We won't get into too much detail here, but sometimes it is useful to look at the output of a specific ``PassPipeline``.
 To do so, simply use the ``get_output_of`` method available in ``QJIT``.
 For example, if one wishes to inspect the output of the ``BufferizationPass``, simply run the following command.
@@ -104,16 +105,16 @@ Compilation Steps
 
 The compilation process of a QJITed quantum function moves through various stages of the compilation pipeline including:
 
-- **Quantum Tape**: The quantum record of variational quantum programs in a single ``qml.QNode``
-- **JAXPR**: The graph data structure maintained by `JAX <https://github.com/google/jax>`_ of the classical part for transformations
-- **MLIR**: A novel compiler framework and intermediate representation
-- **HLO (XLA) + Quantum Dialect**: Lowering to `HLO <https://github.com/tensorflow/mlir-hlo>`_ is the first stage inside MLIR after leaving JAXPR
-- **Builtin + Quantum Dialects**: HLO has been converted to a variety of classical dialects in MLIR
-- **Bufferized MLIR**: All tensors have been `converted <https://mlir.llvm.org/docs/Bufferization>`_ to memory buffer allocations at this step
-- **LLVM Dialect**: Lower the code to `LLVM Dialect <https://mlir.llvm.org/docs/Dialects/LLVM/>`_ to target LLVMIR by providing a one-to-one mapping in MLIR
-- **QIR**: A `specification <https://learn.microsoft.com/en-us/azure/quantum/concepts-qir>`_ for quantum programs in LLVMIR
+- **Quantum Tape**: the quantum record of hybrid quantum programs in a single ``qml.QNode``
+- **JAXPR**: the graph data structure maintained by `JAX <https://github.com/google/jax>`_ for the classical & quantum parts of the compiled program
+- **MLIR**: a novel compiler framework and intermediate representation
+- **HLO (XLA) + Quantum Dialect**: Lowering to `HLO <https://github.com/tensorflow/mlir-hlo>`_ is the first stage inside MLIR after leaving JAXPR.
+- **Builtin + Quantum Dialects**: HLO is then converted to a variety of classical dialects in MLIR.
+- **Bufferized MLIR**: All tensors are `converted <https://mlir.llvm.org/docs/Bufferization>`_ to memory buffer allocations at this step.
+- **LLVM Dialect**: Lowering the code to the `LLVM Dialect <https://mlir.llvm.org/docs/Dialects/LLVM/>`_ in MLIR simplifies the translation to LLVMIR by providing a one-to-one mapping.
+- **QIR (LLVMIR)**: a `specification <https://learn.microsoft.com/en-us/azure/quantum/concepts-qir>`_ for quantum programs in LLVMIR
 
-To ensure that you have access to all the stages, the ``keep_intermediate=True`` flag must be specified in ``qjit``.
+To ensure that you have access to all the stages, the ``keep_intermediate=True`` flag must be specified in the ``qjit`` decorator.
 In the following example, we also compile ahead-of-time so that there is no requirements to pass actual parameters:
 
 .. code-block:: python
