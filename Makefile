@@ -77,7 +77,7 @@ test-demos:
 clean:
 	@echo "uninstall catalyst and delete all temporary and cache files"
 	$(PYTHON) pip uninstall -y pennylane-catalyst
-	rm -rf dist __pycache__
+	rm -rf build dist __pycache__
 	rm -rf .coverage coverage_html_report
 
 clean-all:
