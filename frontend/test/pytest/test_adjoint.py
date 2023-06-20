@@ -180,3 +180,19 @@ def test_adjoint_qubitunitary():
     actual = C_workflow()
     desired = PL_workflow()
     assert_allclose(actual, desired)
+
+
+def test_adjoint_nomeasurements():
+    def func():
+        qml.RX(pnp.pi / 2, wires=0)
+        qml.sample()
+
+    with pytest.raises(ValueError, match="no measurements"):
+
+        @qjit()
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def C_workflow():
+            C_adjoint(func)()
+            return qml.state()
+
+        C_workflow()

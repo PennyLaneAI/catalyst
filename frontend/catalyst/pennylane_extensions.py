@@ -567,6 +567,8 @@ def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
         with JaxTape(do_queue=False) as tape:
             with tape.quantum_tape:
                 out = _callee(*cargs, **ckwargs)
+            if len(tape.quantum_tape.measurements) > 0:
+                raise ValueError("Adjointed operations must contain no measurements")
             tape.set_return_val(out if not isinstance(out, Operation) else None)
             new_quantum_tape = JaxTape.device.expand_fn(tape.quantum_tape)
             tape.quantum_tape = new_quantum_tape
