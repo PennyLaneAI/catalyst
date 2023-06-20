@@ -1393,6 +1393,8 @@ TEST_CASE("Test __quantum__qis__QubitUnitary with invalid number of wires", "[Co
 
         REQUIRE_THROWS_WITH(__quantum__qis__QubitUnitary(matrix, 3, target),
                             Catch::Contains("Invalid number of wires"));
+        REQUIRE_THROWS_WITH(__quantum__qis__QubitUnitary_Adjoint(matrix, 3, target),
+                            Catch::Contains("Invalid number of wires"));
 
         delete matrix;
 
@@ -1415,6 +1417,8 @@ TEST_CASE("Test __quantum__qis__QubitUnitary with invalid matrix", "[CoreQIS]")
         matrix->strides[0] = 1;
 
         REQUIRE_THROWS_WITH(__quantum__qis__QubitUnitary(matrix, 1, target),
+                            Catch::Contains("Invalid given QubitUnitary matrix"));
+        REQUIRE_THROWS_WITH(__quantum__qis__QubitUnitary_Adjoint(matrix, 1, target),
                             Catch::Contains("Invalid given QubitUnitary matrix"));
 
         delete matrix;
