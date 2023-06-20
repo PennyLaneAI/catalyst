@@ -115,12 +115,12 @@
 
   This feature enables JIT compilation of the quantum part of a PennyLane program into a standalone OpenQasm3 kernel.
   It executes the generated OpenQasm3 kernels on both local (``braket.local.qubit``) and remote (``braket.aws.qubit``)
-  devices supported by Amazon Braket Python SDK. Finally, it propagates the measurement results back to the frontend.
+  devices backed by Amazon Braket Python SDK at runtime, and propagates the measurement results back to the frontend.
   However, there are still some limitations with this support. For instance, it currently only works for static circuits
   and does not support mid-circuit measurements.
 
   In the following example, the OpenQasm3 kernel associated with ``circuit`` is generated at runtime and executed on
-  ``braket.local.qubit``:
+  the Braket state-vector simulator locally:
 
   ``` python
   def circuit(x, y):
