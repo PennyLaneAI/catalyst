@@ -619,7 +619,7 @@ class TestBraketGradient:
         @qjit()
         def compiled(x: float):
             g = qml.qnode(device)(f)
-            h = grad(g, method="ps")
+            h = grad(g, method="defer")
             return h(x)
 
         def interpreted(x):
@@ -652,7 +652,7 @@ class TestBraketGradient:
         @qjit()
         def compiled(x: float, y: float):
             g = qml.qnode(device)(f)
-            h = grad(g, method="ps")
+            h = grad(g, method="defer")
             return h(x, y)
 
         def interpreted(x, y):
