@@ -12,12 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import jax.numpy as jnp
+import numpy as np
+import pennylane as qml
 import pytest
 
 from catalyst import qjit
-import pennylane as qml
-import numpy as np
-import jax.numpy as jnp
 
 
 def circuit_jnp():
@@ -30,9 +30,11 @@ def circuit_np():
     return qml.expval(qml.PauliZ(0))
 
 
-def test_variable_wires():
-    jitted_fn_jnp = qjit()(qml.qnode(qml.device("lightning.qubit", wires=1))(circuit_jnp))
-    jitted_fn_np = qjit()(qml.qnode(qml.device("lightning.qubit", wires=1))(circuit_np))
+def test_variable_wires(backend):
+    """Test variable wires."""
+
+    jitted_fn_jnp = qjit()(qml.qnode(qml.device(backend, wires=1))(circuit_jnp))
+    jitted_fn_np = qjit()(qml.qnode(qml.device(backend, wires=1))(circuit_np))
     assert np.isclose(jitted_fn_jnp(), jitted_fn_np())
 
 

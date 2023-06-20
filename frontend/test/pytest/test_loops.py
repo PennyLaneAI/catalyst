@@ -13,11 +13,11 @@
 # limitations under the License.
 """Test suite for loop operations in Catalyst."""
 
-import pytest
 import numpy as np
 import pennylane as qml
+import pytest
 
-from catalyst import qjit, measure, while_loop, for_loop
+from catalyst import for_loop, measure, qjit, while_loop
 
 # pylint: disable=no-value-for-parameter
 
@@ -55,6 +55,7 @@ class TestLoopToJaxpr:
         expected = """\
 { lambda ; a:f64[] b:i64[]. let
     c:i64[] d:f64[] = qfor[
+      apply_reverse_transform=False
       body_jaxpr={ lambda ; e:i64[] f:i64[] g:f64[]. let
           h:i64[] = add f 1
         in (h, g) }
@@ -77,11 +78,11 @@ class TestLoopToJaxpr:
 class TestWhileLoops:
     """Test the Catalyst while_loop operation."""
 
-    def test_alternating_loop(self):
+    def test_alternating_loop(self, backend):
         """Test simple while loop."""
 
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qml.qnode(qml.device(backend, wires=1))
         def circuit(n):
             @while_loop(lambda v: v[0] < v[1])
             def loop(v):
@@ -96,11 +97,11 @@ class TestWhileLoops:
         assert circuit(3)
         assert not circuit(4)
 
-    def test_closure_condition_fn(self):
+    def test_closure_condition_fn(self, backend):
         """Test while loop with captured values (closures) in the condition function."""
 
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qml.qnode(qml.device(backend, wires=1))
         def circuit(n):
             @while_loop(lambda i: i < n)
             def loop(i):
@@ -115,11 +116,11 @@ class TestWhileLoops:
         assert circuit(3)
         assert not circuit(4)
 
-    def test_closure_body_fn(self):
+    def test_closure_body_fn(self, backend):
         """Test while loop with captured values (closures) in the body function."""
 
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qml.qnode(qml.device(backend, wires=1))
         def circuit(n):
             my_const = 1
 
@@ -136,11 +137,11 @@ class TestWhileLoops:
         assert circuit(3)
         assert not circuit(4)
 
-    def test_assert_joint_closure(self):
+    def test_assert_joint_closure(self, backend):
         """Test while loop with captured values (closures) in both body and condition functions."""
 
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qml.qnode(qml.device(backend, wires=1))
         def circuit(n):
             my_const = 1
 
@@ -157,11 +158,11 @@ class TestWhileLoops:
         assert circuit(3)
         assert not circuit(4)
 
-    def test_assert_reference_outside_measure(self):
+    def test_assert_reference_outside_measure(self, backend):
         """Test while loop in conjunction with the measure op."""
 
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qml.qnode(qml.device(backend, wires=1))
         def circuit(n):
             m = measure(wires=0)
 
@@ -178,11 +179,11 @@ class TestWhileLoops:
         assert circuit(3)
         assert not circuit(4)
 
-    def test_multiple_loop_arguments(self):
+    def test_multiple_loop_arguments(self, backend):
         """Test while loop with multiple (loop-carried) arguments."""
 
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qml.qnode(qml.device(backend, wires=1))
         def circuit(n: int):
             @while_loop(lambda v, _: v[0] < v[1])
             def loop(v, inc):
@@ -197,11 +198,11 @@ class TestWhileLoops:
         assert circuit(3)
         assert not circuit(4)
 
-    def test_nested_loops(self):
+    def test_nested_loops(self, backend):
         """Test nested while loops."""
 
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qml.qnode(qml.device(backend, wires=1))
         def circuit(n, m):
             @while_loop(lambda i, _: i < n)
             def outer(i, sum):
@@ -220,11 +221,11 @@ class TestWhileLoops:
 class TestForLoops:
     """Test the Catalyst for_loop operation."""
 
-    def test_required_index(self):
+    def test_required_index(self, backend):
         """Check for loop error message when the iteration index is missing."""
 
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qml.qnode(qml.device(backend, wires=1))
         def circuit(n):
             @for_loop(0, n, 1)
             def loop_fn():
@@ -236,11 +237,11 @@ class TestForLoops:
         with pytest.raises(TypeError, match="takes 0 positional arguments but 1 was given"):
             circuit(5)
 
-    def test_basic_loop(self):
+    def test_basic_loop(self, backend):
         """Test simple for loop."""
 
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qml.qnode(qml.device(backend, wires=1))
         def circuit(n):
             @for_loop(0, n, 1)
             def loop_fn(_):
@@ -252,11 +253,11 @@ class TestForLoops:
         assert circuit(1)
         assert not circuit(2)
 
-    def test_loop_caried_values(self):
+    def test_loop_caried_values(self, backend):
         """Test for loop with updating loop carried values."""
 
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qml.qnode(qml.device(backend, wires=1))
         def circuit(n):
             @for_loop(0, n, 1)
             def loop_fn(_, x):
@@ -271,11 +272,11 @@ class TestForLoops:
         assert np.allclose(circuit(3), -np.sqrt(0.5))
         assert np.allclose(circuit(4), 0.0)
 
-    def test_dynamic_wires(self):
+    def test_dynamic_wires(self, backend):
         """Test for loops with iteration index-dependant wires."""
 
         @qjit()
-        @qml.qnode(qml.device("lightning.qubit", wires=6))
+        @qml.qnode(qml.device(backend, wires=6))
         def circuit(n: int):
             qml.Hadamard(wires=0)
 
@@ -291,11 +292,11 @@ class TestForLoops:
 
         assert np.allclose(circuit(6), expected)
 
-    def test_closure(self):
+    def test_closure(self, backend):
         """Test for loop with captured values (closures)."""
 
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qml.qnode(qml.device(backend, wires=1))
         def circuit(x):
             y = 2 * x
 
@@ -308,11 +309,11 @@ class TestForLoops:
 
         assert np.allclose(circuit(np.pi / 4), 0.0)
 
-    def test_nested_loops(self):
+    def test_nested_loops(self, backend):
         """Test nested for loops."""
 
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=4))
+        @qml.qnode(qml.device(backend, wires=4))
         def circuit(n):
             # Input state: equal superposition
             @for_loop(0, n, 1)
@@ -337,6 +338,22 @@ class TestForLoops:
             return qml.state()
 
         assert np.allclose(circuit(4), np.eye(2**4)[0])
+
+    def test_negative_step(self, backend):
+        """Test loops with a negative step size."""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit(n):
+            @for_loop(n, 0, -1)
+            def loop_fn(_):
+                qml.PauliX(0)
+
+            loop_fn()
+            return measure(0)
+
+        assert circuit(1)
+        assert not circuit(0)
 
 
 class TestClassicalCompilation:
@@ -435,6 +452,43 @@ class TestClassicalCompilation:
         assert mulc.mlir
         assert mulc(x, n) == muli(x, n)
 
+    def test_for_loop_inf(self):
+        """
+        Test for loop with a negative step size (that would produce an infinite range) iterates 0
+        times.
+        """
+
+        @qjit
+        def revc():
+            @for_loop(5, 10, -1)
+            def loop(i, agg):
+                return agg + i
+
+            return loop(27)
+
+        assert revc.mlir
+        assert revc() == 27
+
+    def test_for_loop_neg_step_expression(self):
+        """
+        Test for loop in classical function with a nontrivial expression that evaluates to a
+        negative step, but is constant w.r.t. function args.
+        """
+
+        @qjit
+        def revc(m: int):
+            y = 7
+            x = y * 7
+
+            @for_loop(m, -3, x - 51 + (y - y))
+            def loop(i, agg):
+                return agg + i
+
+            return loop(0)
+
+        assert revc.mlir
+        assert revc(7) == 15
+
 
 class TestInterpretationControlFlow:
     """Test that the loops' executions are semantically equivalent when compiled and interpreted."""
@@ -467,10 +521,10 @@ class TestInterpretationControlFlow:
         mulc = qjit(muli)
         assert np.allclose(mulc(1, 2), muli(1, 2))
 
-    def test_qnode_with_while_loop(self):
+    def test_qnode_with_while_loop(self, backend):
         """Test while loop inside QNode."""
         num_wires = 2
-        device = qml.device("lightning.qubit", wires=num_wires)
+        device = qml.device(backend, wires=num_wires)
 
         @qml.qnode(device)
         def interpreted_circuit(n):
@@ -485,10 +539,10 @@ class TestInterpretationControlFlow:
         compiled_circuit = qjit(interpreted_circuit)
         assert np.allclose(compiled_circuit(num_wires), interpreted_circuit(num_wires))
 
-    def test_qnode_with_for_loop(self):
+    def test_qnode_with_for_loop(self, backend):
         """Test for loop inside QNode."""
         num_wires = 2
-        device = qml.device("lightning.qubit", wires=num_wires)
+        device = qml.device(backend, wires=num_wires)
 
         @qml.qnode(device)
         def interpreted_circuit(n):

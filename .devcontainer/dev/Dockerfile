@@ -1,4 +1,4 @@
-FROM python:3-slim
+FROM --platform=linux/amd64 python:3-slim
 
 # Add non-root user to the image.
 
@@ -18,7 +18,7 @@ RUN chmod 0440 /etc/sudoers.d/$USERNAME
 
 # Install the required C++ build toolchain and git.
 RUN apt-get update && apt-get install -y --no-install-recommends git curl patch \
-      make ninja-build clang lld ccache libomp-dev \
+      build-essential ninja-build clang lld ccache libomp-dev \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 USER $USERNAME
@@ -34,3 +34,4 @@ RUN curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 RUN rustup component add llvm-tools-preview
 
 ENV SHELL /bin/bash
+ENV PATH="/home/${USERNAME}/.local/bin:${PATH}"

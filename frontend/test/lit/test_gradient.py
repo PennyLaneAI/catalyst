@@ -14,10 +14,11 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
-from catalyst import qjit, grad
-import pennylane as qml
 import jax
 import numpy as np
+import pennylane as qml
+
+from catalyst import grad, qjit
 
 
 # CHECK-LABEL: public @jit_grad_default
@@ -44,8 +45,9 @@ def override_method(x: float):
         qml.RX(x, wires=0)
         return qml.expval(qml.PauliY(0))
 
-    # CHECK: "gradient.grad"({{%[0-9]+}}) {callee = @f, diffArgIndices = dense<0> : tensor<1xi64>, method = "ps"} : (tensor<f64>) -> tensor<f64>
-    g = grad(f, method="ps")
+    # pylint: disable=line-too-long
+    # CHECK: "gradient.grad"({{%[0-9]+}}) {callee = @f, diffArgIndices = dense<0> : tensor<1xi64>, method = "defer"} : (tensor<f64>) -> tensor<f64>
+    g = grad(f, method="defer")
     return g(jax.numpy.pi)
 
 

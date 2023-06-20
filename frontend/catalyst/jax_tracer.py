@@ -15,15 +15,22 @@
 """
 
 import jax
-from jax.tree_util import tree_unflatten
-from jax._src.dispatch import jaxpr_replicas
-from jax.interpreters.mlir import List, AxisContext, source_info_util, Sequence, Optional, xc
-from jax.interpreters.mlir import Tuple, ir, ReplicaAxisContext, xla, util, xb, itertools
-from jax.interpreters.mlir import ModuleContext, lower_jaxpr_to_fun, lowerable_effects, Any
-from jax.interpreters.mlir import _set_up_aliases, _module_name_regex, sharded_aval, warnings
-from jax.interpreters.partial_eval import DynamicJaxprTracer
-
 import pennylane as qml
+from jax._src import source_info_util
+from jax._src.dispatch import jaxpr_replicas
+from jax._src.interpreters.mlir import _module_name_regex
+from jax._src.lax.lax import xb, xla
+from jax._src.util import wrap_name
+from jax.interpreters.mlir import (
+    AxisContext,
+    ModuleContext,
+    ReplicaAxisContext,
+    ir,
+    lower_jaxpr_to_fun,
+    lowerable_effects,
+)
+from jax.interpreters.partial_eval import DynamicJaxprTracer
+from jax.tree_util import tree_unflatten
 from pennylane.measurements import MeasurementProcess
 from pennylane.operation import Wires
 
@@ -31,13 +38,7 @@ import catalyst.jax_primitives as jprim
 from catalyst.jax_tape import JaxTape
 from catalyst.utils.tracing import TracingContext
 
-namedobs_map = {
-    qml.Identity: 0,
-    qml.PauliX: 1,
-    qml.PauliY: 2,
-    qml.PauliZ: 3,
-    qml.Hadamard: 4,
-}
+KNOWN_NAMED_OBS = (qml.Identity, qml.PauliX, qml.PauliY, qml.PauliZ, qml.Hadamard)
 
 
 def get_mlir(func, *args, **kwargs):
@@ -66,7 +67,7 @@ def get_mlir(func, *args, **kwargs):
     nrep = jaxpr_replicas(jaxpr)
     effects = [eff for eff in jaxpr.effects if eff in jax.core.ordered_effects]
     axis_context = ReplicaAxisContext(xla.AxisEnv(nrep, (), ()))
-    name_stack = util.new_name_stack(util.wrap_name("ok", "jit"))
+    name_stack = source_info_util.new_name_stack(wrap_name("ok", "jit"))
     module, context = custom_lower_jaxpr_to_module(
         func_name="jit_" + func.__name__,
         module_name=func.__name__,
@@ -95,34 +96,39 @@ def get_traceable_fn(qfunc, device):
     def traceable_fn(*args, **kwargs):
         shots = device.shots
         num_wires = len(device.wires)
+
+        spec = "backend"
+        jprim.qdevice(spec, device.backend)
+
         qreg = jprim.qalloc(num_wires)
 
         JaxTape.device = device
-        with JaxTape(do_queue=False) as tape:
-            with tape.quantum_tape:
-                out = qfunc(*args, **kwargs)
+        with qml.QueuingManager.stop_recording():
+            with JaxTape() as tape:
+                with tape.quantum_tape:
+                    out = qfunc(*args, **kwargs)
 
-            return_values = out if isinstance(out, (tuple, list)) else (out,)
-            meas_return_values = []
-            meas_ret_val_indices = []
-            non_meas_return_values = []
-            for i, ret_val in enumerate(return_values):
-                if isinstance(ret_val, MeasurementProcess):
-                    meas_return_values.append(ret_val)
-                    meas_ret_val_indices.append(i)
-                else:
-                    non_meas_return_values.append(ret_val)
+                return_values = out if isinstance(out, (tuple, list)) else (out,)
+                meas_return_values = []
+                meas_ret_val_indices = []
+                non_meas_return_values = []
+                for i, ret_val in enumerate(return_values):
+                    if isinstance(ret_val, MeasurementProcess):
+                        meas_return_values.append(ret_val)
+                        meas_ret_val_indices.append(i)
+                    else:
+                        non_meas_return_values.append(ret_val)
 
-            # pylint: disable=protected-access
-            tape.quantum_tape._measurements = meas_return_values
+                # pylint: disable=protected-access
+                tape.quantum_tape._measurements = meas_return_values
 
-            has_tracer_return_values = len(non_meas_return_values) > 0
-            if has_tracer_return_values:
-                tape.set_return_val(tuple(non_meas_return_values))
+                has_tracer_return_values = len(non_meas_return_values) > 0
+                if has_tracer_return_values:
+                    tape.set_return_val(tuple(non_meas_return_values))
 
-            new_quantum_tape = JaxTape.device.expand_fn(tape.quantum_tape)
-            tape.quantum_tape = new_quantum_tape
-            tape.quantum_tape.jax_tape = tape
+                new_quantum_tape = JaxTape.device.expand_fn(tape.quantum_tape)
+                tape.quantum_tape = new_quantum_tape
+                tape.quantum_tape.jax_tape = tape
 
         return_values, _, _ = trace_quantum_tape(
             tape, qreg, has_tracer_return_values, meas_ret_val_indices, num_wires, shots
@@ -182,15 +188,16 @@ def get_qubits_from_wires(wires, qubit_states, qreg):
 
 
 def get_new_qubit_state_from_wires_and_qubits(wires, new_qubits, qubit_states, qreg):
-    """Udate qubit state and quantum register with new qubits corresponding to wires in ``wires``.
+    """Update qubit state and quantum register with new qubits corresponding to wires in ``wires``.
 
-    In the presence of any dynamic wires, it is necessary to clear the qubit states as the dynamic wire
-    may have updated any previously known position.
+    In the presence of any dynamic wires, it is necessary to clear the qubit states as the dynamic
+    wire may have updated any previously known position.
 
     Args:
         wires: A list containing integers of ``DynamicJaxprTracer``s.
         new_qubits: A list corresponding to the new SSA qubit variables.
-        qubit_states: The current known pairing of wires and qubits at the program point in which this function is called.
+        qubit_states: The current known pairing of wires and qubits at the program point in which
+                      this function is called.
         qreg: The current quantum register at the program point in which this function is called.
 
     Returns:
@@ -339,7 +346,7 @@ def trace_quantum_tape(
     return out, qreg, qubit_states
 
 
-# TODO: remove once fixed upstream
+# TODO: remove once fixed upstream: https://github.com/PennyLaneAI/pennylane/issues/4263
 def trace_hamiltonian(coeffs, *nested_obs):
     """Trace a hamiltonian.
 
@@ -362,7 +369,7 @@ def trace_observables(obs, qubit_states, p, num_wires, qreg):
 
     Args:
         obs: an observable
-        qubit_states: the statically known qubit state at this progam point
+        qubit_states: the statically known qubit state at this program point
         p: parameter evaluator
         num_wires: the number of wires
         qreg: the quantum register with the state at this program point
@@ -378,11 +385,10 @@ def trace_observables(obs, qubit_states, p, num_wires, qreg):
         wires = wires or Wires(range(num_wires))
         qubits = get_qubits_from_wires(wires, qubit_states, qreg)
         jax_obs = jprim.compbasis(*qubits)
-    elif isinstance(obs, tuple(namedobs_map.keys())):
-        base = namedobs_map[type(obs)]
+    elif isinstance(obs, KNOWN_NAMED_OBS):
         _, wires = op_args
         qubits = get_qubits_from_wires(wires, qubit_states, qreg)
-        jax_obs = jprim.namedobs(base, qubits[0])
+        jax_obs = jprim.namedobs(type(obs).__name__, qubits[0])
     elif isinstance(obs, qml.Hermitian):
         matrix, wires = op_args
         qubits = get_qubits_from_wires(wires, qubit_states, qreg)
@@ -439,15 +445,15 @@ def custom_lower_jaxpr_to_module(
     func_name: str,
     module_name: str,
     jaxpr: jax.core.ClosedJaxpr,
-    effects: List[jax.core.Effect],
+    effects,
     platform: str,
     axis_context: AxisContext,
-    name_stack: source_info_util.NameStack,
-    donated_args: Sequence[bool],
-    replicated_args: Optional[Sequence[bool]] = None,
-    arg_shardings: Optional[Sequence[Optional[xc.OpSharding]]] = None,
-    result_shardings: Optional[Sequence[Optional[xc.OpSharding]]] = None,
-) -> Tuple[ir.Module, ir.Context]:
+    name_stack,
+    donated_args,
+    replicated_args=None,
+    arg_shardings=None,
+    result_shardings=None,
+):
     """Lowers a top-level jaxpr to an MHLO module.
 
     Handles the quirks of the argument/return value passing conventions of the
@@ -462,22 +468,11 @@ def custom_lower_jaxpr_to_module(
     platform = xb.canonicalize_platform(platform)
     if not xb.is_known_platform(platform):
         raise ValueError(f"Unknown platform {platform}")
-    input_output_aliases = None
     in_avals = jaxpr.in_avals
-    if arg_shardings is not None:
-        in_avals = [
-            sharded_aval(in_aval, in_sharding)
-            for in_aval, in_sharding in zip(in_avals, arg_shardings)
-        ]
-    out_avals = jaxpr.out_avals
-    if result_shardings is not None:
-        out_avals = [
-            sharded_aval(out_aval, out_sharding)
-            for out_aval, out_sharding in zip(out_avals, result_shardings)
-        ]
+    assert arg_shardings is None
+    assert result_shardings is None
     platforms_with_donation = ("cuda", "rocm", "tpu")
-    if platform in platforms_with_donation:
-        input_output_aliases, donated_args = _set_up_aliases(in_avals, out_avals, donated_args)
+    assert platform not in platforms_with_donation
     if any(eff not in lowerable_effects for eff in jaxpr.effects):
         raise ValueError(f"Cannot lower jaxpr with effects: {jaxpr.effects}")
     if any(donated_args):
@@ -485,15 +480,12 @@ def custom_lower_jaxpr_to_module(
         msg = "See an explanation at https://jax.readthedocs.io/en/latest/faq.html#buffer-donation."
         if platform not in platforms_with_donation:
             msg = f"Donation is not implemented for {platform}.\n{msg}"
-        warnings.warn(
-            f"Some donated buffers were not usable: {', '.join(unused_donations)}.\n{msg}"
-        )
 
     # MHLO channels need to start at 1
-    channel_iter = itertools.count(1)
+    channel_iter = 1
     # Create a keepalives list that will be mutated during the lowering.
-    keepalives: List[Any] = []
-    host_callbacks: List[Any] = []
+    keepalives = []
+    host_callbacks = []
     ctx = ModuleContext(
         None, platform, axis_context, name_stack, keepalives, channel_iter, host_callbacks
     )
@@ -518,7 +510,6 @@ def custom_lower_jaxpr_to_module(
             replicated_args=replicated_args,
             arg_shardings=arg_shardings,
             result_shardings=result_shardings,
-            input_output_aliases=input_output_aliases,
         )
 
         for op in ctx.module.body.operations:

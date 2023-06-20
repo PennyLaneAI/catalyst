@@ -21,7 +21,6 @@ build:
   tools:
       python: "3.10"
   apt_packages:
-    - clang
     - graphviz
 
 # Optionally set the version of Python and requirements required to build your docs

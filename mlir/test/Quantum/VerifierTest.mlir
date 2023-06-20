@@ -135,13 +135,14 @@ func.func @compbasis(%q0 : !quantum.bit, %q1 : !quantum.bit, %q2 : !quantum.bit)
 // -----
 
 func.func @namedobs(%q : !quantum.bit) {
-    %0 = quantum.namedobs %q[0] : !quantum.obs // Identity
-    %1 = quantum.namedobs %q[1] : !quantum.obs // PauliX
-    %2 = quantum.namedobs %q[2] : !quantum.obs // PauliY
-    %3 = quantum.namedobs %q[3] : !quantum.obs // PauliZ
-    %4 = quantum.namedobs %q[4] : !quantum.obs // Hadamard
+    %0 = quantum.namedobs %q[Identity] : !quantum.obs
+    %1 = quantum.namedobs %q[PauliX] : !quantum.obs
+    %2 = quantum.namedobs %q[PauliY] : !quantum.obs
+    %3 = quantum.namedobs %q[PauliZ] : !quantum.obs
+    %4 = quantum.namedobs %q[Hadamard] : !quantum.obs
 
-    // expected-error@+1 {{8-bit signless integer attribute whose minimum value is 0 whose maximum value is 4}}
+    // expected-error@+2 {{expected valid keyword}}
+    // expected-error@+1 {{failed to parse NamedObservableAttr parameter}}
     %err = quantum.namedobs %q[5] : !quantum.obs  // namedobs range from 0-4 for I, X, Y, Z, H
 
     return
@@ -161,9 +162,9 @@ func.func @hermitian(%q : !quantum.bit, %m1 : tensor<1x1xcomplex<f64>>, %m2 : te
 // -----
 
 func.func @tensorobs(%q0 : !quantum.bit, %q1 : !quantum.bit, %q2 : !quantum.bit) {
-    %o1 = quantum.namedobs %q0[0] :  !quantum.obs
-    %o2 = quantum.namedobs %q1[2] :  !quantum.obs
-    %o3 = quantum.namedobs %q2[4] :  !quantum.obs
+    %o1 = quantum.namedobs %q0[Identity] :  !quantum.obs
+    %o2 = quantum.namedobs %q1[PauliY] :  !quantum.obs
+    %o3 = quantum.namedobs %q2[Hadamard] :  !quantum.obs
     %obs = quantum.tensor %o1, %o2, %o3 : !quantum.obs
 
     return
@@ -172,7 +173,7 @@ func.func @tensorobs(%q0 : !quantum.bit, %q1 : !quantum.bit, %q2 : !quantum.bit)
 // -----
 
 func.func @sample1(%q : !quantum.bit) {
-    %obs = quantum.namedobs %q[0] : !quantum.obs
+    %obs = quantum.namedobs %q[Identity] : !quantum.obs
 
     // expected-error@+1 {{return tensor must have 1D static shape equal to (number of shots)}}
     %err = quantum.sample %obs { shots=1000 } : tensor<1xf64>
@@ -238,7 +239,7 @@ func.func @sample5(%q : !quantum.bit) {
 // -----
 
 func.func @counts1(%q0 : !quantum.bit, %q1 : !quantum.bit) {
-    %obs = quantum.namedobs %q0[1] : !quantum.obs
+    %obs = quantum.namedobs %q0[PauliX] : !quantum.obs
 
     // expected-error@+1 {{number of eigenvalues or counts did not match observable}}
     %err:2 = quantum.counts %obs { shots=1000 } : tensor<4xf64>, tensor<4xi64>
@@ -264,7 +265,7 @@ func.func @counts2(%q0 : !quantum.bit, %q1 : !quantum.bit) {
 // -----
 
 func.func @counts3(%q0 : !quantum.bit, %q1 : !quantum.bit) {
-    %obs = quantum.namedobs %q0[1] : !quantum.obs
+    %obs = quantum.namedobs %q0[PauliX] : !quantum.obs
 
     %in_eigvals_1 = memref.alloc() : memref<4xf64>
     %in_counts_1 = memref.alloc() : memref<4xi64>
@@ -281,7 +282,7 @@ func.func @counts3(%q0 : !quantum.bit, %q1 : !quantum.bit) {
 // -----
 
 func.func @counts4(%q0 : !quantum.bit, %q1 : !quantum.bit) {
-    %obs = quantum.namedobs %q0[1] : !quantum.obs
+    %obs = quantum.namedobs %q0[PauliX] : !quantum.obs
 
     // expected-error@+1 {{either tensors must be returned or memrefs must be used as inputs}}
     quantum.counts %obs { shots=1000 }
@@ -292,7 +293,7 @@ func.func @counts4(%q0 : !quantum.bit, %q1 : !quantum.bit) {
 // -----
 
 func.func @counts5(%q0 : !quantum.bit, %q1 : !quantum.bit) {
-    %obs = quantum.namedobs %q0[1] : !quantum.obs
+    %obs = quantum.namedobs %q0[PauliX] : !quantum.obs
 
     %in_eigvals = memref.alloc() : memref<2xf64>
     %in_counts = memref.alloc() : memref<2xi64>

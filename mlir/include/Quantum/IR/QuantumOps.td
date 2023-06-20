@@ -15,11 +15,31 @@
 #ifndef QUANTUM_OPS
 #define QUANTUM_OPS
 
+include "mlir/IR/EnumAttr.td"
 include "mlir/IR/OpBase.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Dialect/Bufferization/IR/AllocationOpInterface.td"
 
 include "Quantum/IR/QuantumDialect.td"
+include "Quantum/IR/QuantumInterfaces.td"
+
+//===----------------------------------------------------------------------===//
+// Quantum dialect enums.
+//===----------------------------------------------------------------------===//
+
+def NamedObservable : I32EnumAttr<"NamedObservable",
+    "Known named observables",
+    [
+        I32EnumAttrCase<"Identity", 0>,
+        I32EnumAttrCase<"PauliX",   1>,
+        I32EnumAttrCase<"PauliY",   2>,
+        I32EnumAttrCase<"PauliZ",   3>,
+        I32EnumAttrCase<"Hadamard", 4>,
+    ]> {
+    let cppNamespace = "catalyst::quantum";
+    let genSpecializedAttr = 0;
+}
+
 
 //===----------------------------------------------------------------------===//
 // Quantum dialect traits.
@@ -34,7 +54,7 @@ def QuantumMemory : Resource<"QuantumMemory">;
 // Quantum dialect attributes.
 //===----------------------------------------------------------------------===//
 
-def ObsNameAttr : ConfinedAttr<I8Attr, [IntMinValue<0>, IntMaxValue<4>]>;
+def NamedObservableAttr : EnumAttr<QuantumDialect, NamedObservable, "named_observable">;
 
 //===----------------------------------------------------------------------===//
 // Quantum dialect operations.
@@ -127,6 +147,9 @@ def ExtractOp : Memory_Op<"extract", [NoMemoryEffect]> {
     let assemblyFormat = [{
         $qreg `[` ($idx^):($idx_attr)? `]` attr-dict `:` type($qreg) `->` type(results)
     }];
+
+    let hasVerifier = 1;
+    let hasFolder = 1;
 }
 
 def InsertOp : Memory_Op<"insert", [NoMemoryEffect]> {
@@ -150,23 +173,29 @@ def InsertOp : Memory_Op<"insert", [NoMemoryEffect]> {
     }];
 
     let hasCanonicalizeMethod = 1;
+    let hasVerifier = 1;
+    let hasFolder = 1;
 }
 
 // -----
 
-class Gate_Op<string mnemonic, list<Trait> traits = []> : Quantum_Op<mnemonic, traits # [Unitary]> {
-    let hasVerifier = 1;
+class Gate_Op<string mnemonic, list<Trait> traits = []> :
+        Quantum_Op<mnemonic, traits # [QuantumGate, Unitary]> {
 
-    let extraClassDeclaration = [{
-        mlir::LogicalResult verifyQubitNumbers() {
-            if (this->getInQubits().size() != this->getOutQubits().size())
-                return emitOpError("number of qubits in input and output must be the same");
-            return mlir::success();
+    code extraBaseClassDeclaration = [{
+        mlir::ValueRange getQubitOperands() {
+            return getInQubits();
+        }
+
+        mlir::ValueRange getQubitResults() {
+            return getOutQubits();
         }
     }];
+
+    let extraClassDeclaration = extraBaseClassDeclaration;
 }
 
-def CustomOp : Gate_Op<"custom", [NoMemoryEffect, AttrSizedOperandSegments]> {
+def CustomOp : Gate_Op<"custom", [NoMemoryEffect, AttrSizedOperandSegments, DifferentiableGate]> {
     let summary = "A generic quantum gate on n qubits with m floating point parameters.";
     let description = [{
     }];
@@ -184,9 +213,18 @@ def CustomOp : Gate_Op<"custom", [NoMemoryEffect, AttrSizedOperandSegments]> {
     let assemblyFormat = [{
         $gate_name `(` $params `)` $in_qubits attr-dict `:` type($out_qubits)
     }];
+
+    let extraClassDeclaration = extraBaseClassDeclaration # [{
+        mlir::ValueRange getDiffParams() {
+            return getParams();
+        }
+        size_t getDiffOperandIdx() {
+            return 0;
+        }
+    }];
 }
 
-def MultiRZOp : Gate_Op<"multirz", [NoMemoryEffect]> {
+def MultiRZOp : Gate_Op<"multirz", [NoMemoryEffect, DifferentiableGate]> {
     let summary = "Apply an arbitrary multi Z rotation";
     let description = [{
         The `quantum.multirz` operation applies an arbitrary multi Z rotation to the state-vector.
@@ -204,6 +242,15 @@ def MultiRZOp : Gate_Op<"multirz", [NoMemoryEffect]> {
 
     let assemblyFormat = [{
         `(` $theta `)` $in_qubits attr-dict `:` type($out_qubits)
+    }];
+
+    let extraClassDeclaration = extraBaseClassDeclaration # [{
+        mlir::ValueRange getDiffParams() {
+            return getODSOperands(0);
+        }
+        size_t getDiffOperandIdx() {
+            return 0;
+        }
     }];
 }
 
@@ -229,6 +276,8 @@ def QubitUnitaryOp : Gate_Op<"unitary", [NoMemoryEffect]> {
     let assemblyFormat = [{
         `(` $matrix `:` type($matrix) `)` $in_qubits attr-dict `:` type($out_qubits)
     }];
+
+    let hasVerifier = 1;
 }
 
 // -----
@@ -288,7 +337,7 @@ def NamedObsOp : Observable_Op<"namedobs", [Pure]> {
 
     let arguments = (ins
         QubitType:$qubit,
-        ObsNameAttr:$type
+        NamedObservableAttr:$type
     );
 
     let results = (outs
@@ -397,9 +446,10 @@ def HamiltonianOp : Observable_Op<"hamiltonian", [Pure]> {
 
 // -----
 
-class Measurement_Op<string mnemonic, list<Trait> traits = []> : Quantum_Op<mnemonic, traits>;
+class Measurement_Op<string mnemonic, list<Trait> traits = []> :
+        Quantum_Op<mnemonic, traits # [MeasurementProcess]>;
 
-def MeasureOp : Measurement_Op<"measure"> {
+def MeasureOp : Quantum_Op<"measure"> {
     let summary = "A single-qubit projective measurement in the computational basis.";
     let description = [{
     }];

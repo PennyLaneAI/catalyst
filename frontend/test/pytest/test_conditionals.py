@@ -12,15 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import numpy as np
+import pennylane as qml
 import pytest
 
-from catalyst import cond, qjit, measure
-import pennylane as qml
-import numpy as np
+from catalyst import cond, measure, qjit
+
+# pylint: disable=missing-function-docstring
 
 
 class TestCondToJaxpr:
+    """Run tests on the generated JAXPR of conditionals."""
+
     def test_basic_cond_to_jaxpr(self):
+        """Check the JAXPR of simple conditional function."""
+
         expected = """{ lambda ; a:i64[]. let
     b:bool[] = eq a 5
     c:i64[] = qcond[
@@ -41,13 +47,17 @@ class TestCondToJaxpr:
             out = cond_fn()
             return out
 
-        assert expected == str(circuit._jaxpr)
+        assert expected == str(circuit._jaxpr)  # pylint: disable=protected-access
 
 
 class TestCond:
-    def test_simple_cond(self):
+    """Test suite for the Cond functionality in Catalyst."""
+
+    def test_simple_cond(self, backend):
+        """Test basic function with conditional."""
+
         @qjit()
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qml.qnode(qml.device(backend, wires=1))
         def circuit(n):
             @cond(n > 4)
             def cond_fn():
@@ -67,11 +77,11 @@ class TestCond:
         assert circuit(5) == 25
         assert circuit(6) == 36
 
-    def test_cond_one_else_if(self):
+    def test_cond_one_else_if(self, backend):
         """Test a cond with one else_if branch"""
 
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qml.qnode(qml.device(backend, wires=1))
         def circuit(x):
             @cond(x > 2.7)
             def cond_fn():
@@ -91,11 +101,11 @@ class TestCond:
         assert circuit(2) == 4
         assert circuit(1) == 1
 
-    def test_cond_many_else_if(self):
+    def test_cond_many_else_if(self, backend):
         """Test a cond with multiple else_if branches"""
 
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qml.qnode(qml.device(backend, wires=1))
         def circuit(x):
             @cond(x > 4.8)
             def cond_fn():
@@ -148,9 +158,11 @@ class TestCond:
         assert circuit(2) == 8
         assert circuit(-3) == -3
 
-    def test_qubit_manipulation_cond(self):
+    def test_qubit_manipulation_cond(self, backend):
+        """Test conditional with quantum operation."""
+
         @qjit()
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qml.qnode(qml.device(backend, wires=1))
         def circuit(x):
             @cond(x > 4)
             def cond_fn():
@@ -163,7 +175,7 @@ class TestCond:
         assert circuit(3) == False
         assert circuit(6) == True
 
-    def test_branch_return_mismatch(self):
+    def test_branch_return_mismatch(self, backend):
         """
         Test that an exception is raised when the true branch returns a value without an else
         branch
@@ -179,9 +191,9 @@ class TestCond:
         with pytest.raises(
             TypeError, match="Conditional branches all require the same return type"
         ):
-            qjit(qml.qnode(qml.device("lightning.qubit", wires=1))(circuit))
+            qjit(qml.qnode(qml.device(backend, wires=1))(circuit))
 
-    def test_branch_multi_return_mismatch(self):
+    def test_branch_multi_return_mismatch(self, backend):
         """Test that an exception is raised when the return types of all branches do not match"""
 
         def circuit():
@@ -202,7 +214,7 @@ class TestCond:
         with pytest.raises(
             TypeError, match="Conditional branches all require the same return type"
         ):
-            qjit(qml.qnode(qml.device("lightning.qubit", wires=1))(circuit))
+            qjit(qml.qnode(qml.device(backend, wires=1))(circuit))
 
     def test_branch_with_arg(self):
         """Test that an exception is raised when an 'else if' branch function contains an arg"""
@@ -223,9 +235,11 @@ class TestCond:
         ):
             qjit(qml.qnode(qml.device("lightning.qubit", wires=1))(circuit))
 
-    def test_identical_branch_names(self):
+    def test_identical_branch_names(self, backend):
+        """Test that branches of the conditional can carry the same function name."""
+
         @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        @qml.qnode(qml.device(backend, wires=1))
         def circuit(pred: bool):
             @cond(pred)
             def conditional_flip():
@@ -243,12 +257,13 @@ class TestCond:
         assert circuit(True) == 1
 
 
-# pylint: disable=too-few-public-methods
 class TestInterpretationConditional:
-    """Test that the conditional operation's execution is semantically equivalent when compiled and interpreted."""
+    """Test that the conditional operation's execution is semantically equivalent
+    when compiled and interpreted."""
 
-    # pylint: disable=missing-function-docstring
     def test_conditional_interpreted_and_compiled(self):
+        """Test that a compiled and interpreted conditional have the same output."""
+
         def arithi(x: int, y: int, op: int):
             @cond(op == 0)
             def branch():
@@ -264,10 +279,11 @@ class TestInterpretationConditional:
         assert arithc(0, 0, 0) == arithi(0, 0, 0)
         assert arithc(0, 0, 1) == arithi(0, 0, 1)
 
-    # pylint: disable=missing-function-docstring
-    def test_conditional_interpreted_and_compiled_single_if(self):
+    def test_conditional_interpreted_and_compiled_single_if(self, backend):
+        """Test that a compiled and interpreted conditional with no else branch match."""
+
         num_wires = 2
-        device = qml.device("lightning.qubit", wires=num_wires)
+        device = qml.device(backend, wires=num_wires)
 
         @qml.qnode(device)
         def interpreted_circuit(n):
@@ -284,8 +300,12 @@ class TestInterpretationConditional:
 
 
 class TestClassicalCompilation:
+    """Test suite for the Catalyst Cond functionality outside of QNode contexts."""
+
     @pytest.mark.parametrize("x,y,op", [(1, 1, 0), (1, 1, 1)])
     def test_conditional(self, x, y, op):
+        """Test basic conditional in classical context."""
+
         @qjit
         def arithc(x: int, y: int, op: int):
             @cond(op == 0)
@@ -312,6 +332,8 @@ class TestClassicalCompilation:
         "x,y,op1,op2", [(2, 2, 0, 0), (2, 2, 1, 0), (2, 2, 0, 1), (2, 2, 1, 1)]
     )
     def test_nested_conditional(self, x, y, op1, op2):
+        """Test nested conditional in classical context."""
+
         @qjit
         def arithc(x: int, y: int, op1: int, op2: int):
             @cond(op1 == 0)
@@ -358,33 +380,34 @@ class TestClassicalCompilation:
 
     def test_no_true_false_parameters(self):
         """Test non-empty parameter detection in conditionals"""
+
+        def arithc2():
+            @cond(True)
+            def branch(_):
+                return 1
+
+            @branch.otherwise
+            def branch():
+                return 0
+
+            return branch()
+
         with pytest.raises(TypeError, match="Conditional 'True'"):
+            qjit(arithc2)
 
-            @qjit
-            def arithc2():
-                @cond(True)
-                def branch(_):
-                    return 1
+        def arithc1():
+            @cond(True)
+            def branch():
+                return 1
 
-                @branch.otherwise
-                def branch():
-                    return 0
+            @branch.otherwise
+            def branch(_):
+                return 0
 
-                return branch()
+            return branch()  # pylint: disable=no-value-for-parameter
 
         with pytest.raises(TypeError, match="Conditional 'False'"):
-
-            @qjit
-            def arithc1():
-                @cond(True)
-                def branch():
-                    return 1
-
-                @branch.otherwise
-                def branch(_):
-                    return 0
-
-                return branch()
+            qjit(arithc1)
 
 
 if __name__ == "__main__":

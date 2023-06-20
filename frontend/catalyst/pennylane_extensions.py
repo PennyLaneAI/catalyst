@@ -19,32 +19,35 @@ while using :func:`~.qjit`.
 import functools
 import numbers
 import uuid
+from typing import Any, Callable, Iterable, List, Optional, Union
 
 import jax
 import jax.numpy as jnp
 import pennylane as qml
-from jax import ShapedArray
 from jax._src.lax.control_flow import (
     _initial_style_jaxpr,
     _initial_style_jaxprs_with_common_consts,
 )
 from jax._src.lax.lax import _abstractify
+from jax.core import ShapedArray
 from jax.linear_util import wrap_init
 from jax.tree_util import tree_flatten, tree_unflatten, treedef_is_leaf
+from pennylane import QNode
 from pennylane.measurements import MidMeasureMP
 from pennylane.operation import AnyWires, Operation, Wires
 
 import catalyst
 import catalyst.jax_primitives as jprim
-from catalyst.jax_primitives import expval_p, probs_p
+from catalyst.jax_primitives import GradParams, expval_p, probs_p
 from catalyst.jax_tape import JaxTape
 from catalyst.jax_tracer import get_traceable_fn, insert_to_qreg, trace_quantum_tape
-from catalyst.utils.exceptions import CompileError
+from catalyst.utils.exceptions import CompileError, DifferentiableCompileError
 from catalyst.utils.patching import Patcher
 from catalyst.utils.tracing import TracingContext
 
+# pylint: disable=too-many-lines
 
-# pylint: disable=too-few-public-methods
+
 class QFunc:
     """A device specific quantum function.
 
@@ -56,6 +59,9 @@ class QFunc:
             the valid gate set for the quantum function
     """
 
+    # The set of supported devices at runtime
+    RUNTIME_DEVICES = ("lightning.qubit", "lightning.kokkos")
+
     def __init__(self, fn, device):
         self.func = fn
         self.device = device
@@ -63,7 +69,12 @@ class QFunc:
 
     def __call__(self, *args, **kwargs):
         if isinstance(self, qml.QNode):
-            device = QJITDevice(self.device.shots, self.device.wires)
+            if self.device.short_name not in QFunc.RUNTIME_DEVICES:
+                raise CompileError(
+                    f"The {self.device.short_name} device is not "
+                    "supported for compilation at the moment."
+                )
+            device = QJITDevice(self.device.shots, self.device.wires, self.device.short_name)
         else:
             # Allow QFunc to still be used by itself for internal testing.
             device = self.device
@@ -76,6 +87,8 @@ class QFunc:
 
         wrapped = wrap_init(_eval_jaxpr)
         retval = jprim.func_p.bind(wrapped, *args, fn=self)
+        if len(retval) == 1:
+            retval = retval[0]
         return retval
 
 
@@ -105,7 +118,6 @@ def qfunc(num_wires, *, shots=1000, device=None):
     return dec_no_params
 
 
-# pylint: disable=too-few-public-methods
 class Function:
     """An object that represents a compiled function.
 
@@ -132,28 +144,124 @@ class Function:
         return jprim.func_p.bind(wrap_init(_eval_jaxpr), *args, fn=self)
 
 
-# pylint: disable=too-few-public-methods
+Differentiable = Union[Function, QNode]
+DifferentiableLike = Union[Differentiable, Callable, "catalyst.compilation_pipelines.QJIT"]
+Jaxpr = Any
+
+
+def _ensure_differentiable(f: DifferentiableLike) -> Differentiable:
+    """Narrows down the set of the supported differentiable objects."""
+    if isinstance(f, (Function, QNode)):
+        return f
+    elif isinstance(f, catalyst.compilation_pipelines.QJIT):
+        return f.qfunc
+    elif isinstance(f, Callable):  # Keep at the bottom
+        return Function(f)
+    raise DifferentiableCompileError(f"Non-differentiable object passed: {type(f)}")
+
+
+def _make_jaxpr_check_differentiable(f: Differentiable, grad_params: GradParams, *args) -> Jaxpr:
+    """Gets the jaxpr of a differentiable function. Perform the required additional checks."""
+    method = grad_params.method
+    jaxpr = jax.make_jaxpr(f)(*args)
+    assert len(jaxpr.eqns) == 1, "Expected jaxpr consisting of a single function call."
+    assert (
+        jaxpr.eqns[0].primitive == jprim.func_p
+    ), "Expected jaxpr consisting of a single function call."
+
+    for pos, arg in enumerate(jaxpr.in_avals):
+        if arg.dtype.kind != "f" and pos in grad_params.argnum:
+            raise DifferentiableCompileError(
+                "Catalyst.grad only supports differentiation on floating-point "
+                f"arguments, got '{arg.dtype}' at position {pos}."
+            )
+    for pos, res in enumerate(jaxpr.out_avals):
+        if res.dtype.kind != "f":
+            raise DifferentiableCompileError(
+                "Catalyst.grad only supports differentiation on floating-point "
+                f"results, got '{res.dtype}' at position {pos}."
+            )
+
+    if method != "fd":
+        qnode_jaxpr = jaxpr.eqns[0].params["call_jaxpr"]
+        return_ops = []
+        for res in qnode_jaxpr.outvars:
+            for eq in reversed(qnode_jaxpr.eqns):  # pragma: no branch
+                if res in eq.outvars:
+                    return_ops.append(eq.primitive)
+                    break
+
+        assert isinstance(
+            f, qml.QNode
+        ), "Differentiation methods other than finite-differences can only operate on a QNode"
+        if f.diff_method is None:
+            raise DifferentiableCompileError(
+                "Cannot differentiate a QNode explicitly marked non-differentiable (with"
+                " diff_method=None)"
+            )
+
+        if f.diff_method == "parameter-shift" and any(
+            prim not in [expval_p, probs_p] for prim in return_ops
+        ):
+            raise DifferentiableCompileError(
+                "The parameter-shift method can only be used for QNodes "
+                "which return either qml.expval or qml.probs."
+            )
+        if f.diff_method == "adjoint" and any(prim not in [expval_p] for prim in return_ops):
+            raise DifferentiableCompileError(
+                "The adjoint method can only be used for QNodes which return qml.expval."
+            )
+    return jaxpr
+
+
+def _check_grad_params(
+    method: str, h: Optional[float], argnum: Optional[Union[int, List[int]]]
+) -> GradParams:
+    methods = {"fd", "defer"}
+    if method is None:
+        method = "fd"
+    if method not in methods:
+        raise ValueError(
+            f"Invalid differentiation method '{method}'. "
+            f"Supported methods are: {' '.join(sorted(methods))}"
+        )
+    if method == "fd" and h is None:
+        h = 1e-7
+    if not (h is None or isinstance(h, numbers.Number)):
+        raise ValueError(f"Invalid h value ({h}). None or number was excpected.")
+    if argnum is None:
+        argnum = [0]
+    elif isinstance(argnum, int):
+        argnum = [argnum]
+    elif isinstance(argnum, tuple):
+        argnum = list(argnum)
+    elif isinstance(argnum, list) and all(isinstance(i, int) for i in argnum):
+        pass
+    else:
+        raise ValueError(f"argnum should be integer or a list of integers, not {argnum}")
+    return GradParams(method, h, argnum)
+
+
 class Grad:
     """An object that specifies that a function will be differentiated.
 
     Args:
-        fn (Callable): the function to differentiate
+        fn (Differentiable): the function to differentiate
         method (str): the method used for differentiation
         h (float): the step-size value for the finite difference method
-        argnum (int): the argument indices which define over which arguments to differentiate
+        argnum (list[int]): the argument indices which define over which arguments to differentiate
 
     Raises:
         ValueError: Higher-order derivatives and derivatives of non-QNode functions can only be
                     computed with the finite difference method.
+        TypeError: Non-differentiable object was passed as `fn` argument.
     """
 
-    def __init__(self, fn, *, method, h, argnum):
+    def __init__(self, fn: Differentiable, *, grad_params: GradParams):
         self.fn = fn
         self.__name__ = f"grad.{fn.__name__}"
-        self.method = method
-        self.h = h
-        self.argnum = argnum
-        if self.method != "fd" and not isinstance(self.fn, qml.QNode):
+        self.grad_params = grad_params
+        if self.grad_params.method != "fd" and not isinstance(self.fn, qml.QNode):
             raise ValueError(
                 "Only finite difference can compute higher order derivatives "
                 "or gradients of non-QNode functions."
@@ -167,38 +275,11 @@ class Grad:
         TracingContext.check_is_tracing(
             "catalyst.grad can only be used from within @qjit decorated code."
         )
-
-        jaxpr = jax.make_jaxpr(self.fn)(*args)
-        assert len(jaxpr.eqns) == 1, "Expected jaxpr consisting of a single function call."
-        assert (
-            jaxpr.eqns[0].primitive == jprim.func_p
-        ), "Expected jaxpr consisting of a single function call."
-
-        if self.method != "fd":
-            qnode_jaxpr = jaxpr.eqns[0].params["call_jaxpr"]
-            return_ops = []
-            for res in qnode_jaxpr.outvars:
-                for eq in reversed(qnode_jaxpr.eqns):  # pragma: no branch
-                    if res in eq.outvars:
-                        return_ops.append(eq.primitive)
-                        break
-
-            if self.method == "ps" and any(prim not in [expval_p, probs_p] for prim in return_ops):
-                raise TypeError(
-                    "The parameter-shift method can only be used for QNodes "
-                    "which return either qml.expval or qml.probs."
-                )
-            if self.method == "adj" and any(prim not in [expval_p] for prim in return_ops):
-                raise TypeError(
-                    "The adjoint method can only be used for QNodes which return qml.expval."
-                )
-
-        return jprim.grad_p.bind(
-            *args, jaxpr=jaxpr, fn=self, method=self.method, h=self.h, argnum=self.argnum
-        )
+        jaxpr = _make_jaxpr_check_differentiable(self.fn, self.grad_params, *args)
+        return jprim.grad_p.bind(*args, jaxpr=jaxpr, fn=self, grad_params=self.grad_params)
 
 
-def grad(f, *, method=None, h=None, argnum=None):
+def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
     """A :func:`~.qjit` compatible gradient transformation for PennyLane/Catalyst.
 
     This function allows the gradient of a hybrid quantum-classical function
@@ -223,19 +304,20 @@ def grad(f, *, method=None, h=None, argnum=None):
         See the :doc:`/dev/quick_start` for examples.
 
     Args:
-        f (Callable): the function to differentiate
-        method (str): The method used for differentiation, which can be any of ``["fd", "ps", "adj"]``,
+        f (Callable): a function or a function object to differentiate
+        method (str): The method used for differentiation, which can be any of
+                      ``["fd", "defer"]``,
             where:
 
-            - ``"fd"`` represents first-order finite-differences,
+            - ``"fd"`` represents first-order finite-differences for the entire hybrid
+              circuit,
 
-            - ``"ps"`` represents the two-term parameter-shift rule, supported by the Pauli
-              rotation gates,
-
-            - ``"adj"`` represents the adjoint differentiation method.
+            - ``"defer"`` represents deferring the quantum differentiation to the method
+              specified by the QNode, while the classical computation is differentiated
+              using traditional auto-diff.
 
         h (float): the step-size value for the finite-difference (``"fd"``) method
-        argnum (int, List(int)): the argument indices to differentiate
+        argnum (Tuple[int, List[int]]): the argument indices to differentiate
 
     Returns:
         Grad: A Grad object that denotes the derivative of a function.
@@ -262,34 +344,127 @@ def grad(f, *, method=None, h=None, argnum=None):
     >>> workflow(2.0)
     array(-3.14159265)
     """
-    methods = {"fd", "ps", "adj"}
-    if method is None:
-        method = "fd"
-    if method not in methods:
-        raise ValueError(
-            f"Invalid differentiation method '{method}'. "
-            f"Supported methods are: {' '.join(sorted(methods))}"
-        )
-    if method == "fd" and h is None:
-        h = 1e-7
-    if not (h is None or isinstance(h, numbers.Number)):
-        raise ValueError(f"Invalid h value ({h}). None or number was excpected.")
-    if argnum is None:
-        argnum = [0]
-    elif isinstance(argnum, int):
-        argnum = [argnum]
-
-    if isinstance(f, catalyst.compilation_pipelines.QJIT):
-        # Don't generate an extra function when the circuit is already qjitted.
-        f = f.qfunc
-
-    if isinstance(f, qml.QNode):
-        return Grad(f, method=method, h=h, argnum=argnum)
-
-    return Grad(Function(f), method=method, h=h, argnum=argnum)
+    return Grad(_ensure_differentiable(f), grad_params=_check_grad_params(method, h, argnum))
 
 
-# pylint: disable=too-few-public-methods
+def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=None):
+    """A Jacobian-vector product for PennyLane/Catalyst.
+
+    This function allows the Jacobian-vector Product of a hybrid quantum-classical function to be
+    computed within the compiled program.
+
+    Args:
+        f (Callable): Function-like object to calculate JVP for
+        params (List[Array]): List (or a tuple) of the fnuction arguments specifying the point
+                              to calculate JVP at. A subset of these parameters are declared as
+                              differentiable by listing their indices in the ``argnum`` parameter.
+        tangents(List[Array]): List (or a tuple) of tangent values to use in JVP. The list size and
+                               shapes must match the ones of differentiable params.
+        method(str): Differentiation method to use, same as in :func:`~.grad`.
+        h (float): the step-size value for the finite-difference (``"fd"``) method
+        argnum (Union[int, List[int]]): the params' indices to differentiate.
+
+    Returns (Tuple[Array]):
+        Return values of ``f`` paired with the JVP values.
+
+    Raises:
+        TypeError: invalid parameter types
+        ValueError: invalid parameter values
+
+    **Example**
+
+    .. code-block:: python
+
+        def f(p):
+          return jnp.stack([1*p, 2*p, 3*p])
+
+        @qjit
+        def workflow(params, tangent):
+            return jvp(f, [params], [tangent])
+
+    >>> workflow(jnp.zeros([4], dtype=float), jnp.ones([4], dtype=float))
+    (Array([[0., 0., 0., 0.],
+           [0., 0., 0., 0.],
+           [0., 0., 0., 0.]], dtype=float64),
+     Array([[1., 1., 1., 1.],
+           [2., 2., 2., 2.],
+           [3., 3., 3., 3.]], dtype=float64))
+    """
+    TracingContext.check_is_tracing(
+        "catalyst.jvp can only be used from within @qjit decorated code."
+    )
+
+    def _check(x, hint):
+        if not isinstance(x, Iterable):
+            raise ValueError(f"vjp '{hint}' argument must be an iterable, not {type(x)}")
+        return x
+
+    params = _check(params, "params")
+    tangents = _check(tangents, "tangents")
+    fn: Differentiable = _ensure_differentiable(f)
+    grad_params = _check_grad_params(method, h, argnum)
+    jaxpr = _make_jaxpr_check_differentiable(fn, grad_params, *params)
+    return jprim.jvp_p.bind(*params, *tangents, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
+
+
+def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnum=None):
+    """A Vector-Jacobian product for PennyLane/Catalyst.
+
+    This function allows the Vector-Jacobian Product of a hybrid quantum-classical function to be
+    computed within the compiled program.
+
+    Args:
+        f(Callable): Function-like object to calculate JVP for
+        params(List[Array]): List (or a tuble) of f's arguments specifying the point to calculate
+                             VJP at. A subset of these parameters are declared as
+                             differentiable by listing their indices in the ``argnum`` paramerer.
+        cotangents(List[Array]): List (or a tuple) of tangent values to use in JVP. The list size
+                                 and shapes must match the size and shape of ``f`` outputs.
+        method(str): Differentiation method to use, same as in ``grad``.
+        h (float): the step-size value for the finite-difference (``"fd"``) method
+        argnum (Union[int, List[int]]): the params' indices to differentiate.
+
+    Returns (Tuple[Array]):
+        Return values of ``f`` paired with the JVP values.
+
+    Raises:
+        TypeError: invalid parameter types
+        ValueError: invalid parameter values
+
+    **Example**
+
+    .. code-block:: python
+
+        def f(p):
+          return jnp.stack([1*p, 2*p, 3*p])
+
+        @qjit
+        def workflow(params, cotangent):
+            return vjp(f, [params], [cotangent])
+
+    >>> workflow(jnp.zeros([4], dtype=float), jnp.ones([3,4], dtype=float))
+    (Array([[0., 0., 0., 0.],
+            [0., 0., 0., 0.],
+            [0., 0., 0., 0.]], dtype=float64),
+     Array([6., 6., 6., 6.], dtype=float64))
+    """
+    TracingContext.check_is_tracing(
+        "catalyst.vjp can only be used from within @qjit decorated code."
+    )
+
+    def _check(x, hint):
+        if not isinstance(x, Iterable):
+            raise ValueError(f"vjp '{hint}' argument must be an iterable, not {type(x)}")
+        return x
+
+    params = _check(params, "params")
+    cotangents = _check(cotangents, "cotangents")
+    fn: Differentiable = _ensure_differentiable(f)
+    grad_params = _check_grad_params(method, h, argnum)
+    jaxpr = _make_jaxpr_check_differentiable(fn, grad_params, *params)
+    return jprim.vjp_p.bind(*params, *cotangents, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
+
+
 class Cond(Operation):
     """PennyLane's conditional operation."""
 
@@ -306,7 +481,6 @@ class Cond(Operation):
         super().__init__(*args, **kwargs)
 
 
-# pylint: disable=too-few-public-methods
 class CondCallable:
     """
     Some code in this class has been adapted from the cond implementation in the JAX project at
@@ -374,13 +548,14 @@ class CondCallable:
     def _call_with_quantum_ctx(self, ctx):
         def new_branch_fn(branch_fn):
             def callback(qreg):
-                with JaxTape(do_queue=False) as tape:
-                    with tape.quantum_tape:
-                        out = branch_fn()
-                    tape.set_return_val(out)
-                    new_quantum_tape = JaxTape.device.expand_fn(tape.quantum_tape)
-                    tape.quantum_tape = new_quantum_tape
-                    tape.quantum_tape.jax_tape = tape
+                with qml.QueuingManager.stop_recording():
+                    with JaxTape() as tape:
+                        with tape.quantum_tape:
+                            out = branch_fn()
+                        tape.set_return_val(out)
+                        new_quantum_tape = JaxTape.device.expand_fn(tape.quantum_tape)
+                        tape.quantum_tape = new_quantum_tape
+                        tape.quantum_tape.jax_tape = tape
 
                 has_tracer_return_values = out is not None
                 return_values, qreg, qubit_states = trace_quantum_tape(
@@ -533,7 +708,6 @@ def cond(pred):
     return decorator
 
 
-# pylint: disable=too-few-public-methods
 class WhileLoop(Operation):
     """PennyLane's while loop operation."""
 
@@ -561,12 +735,11 @@ class WhileLoop(Operation):
         super().__init__(*args, **kwargs)
 
 
-# pylint: disable=too-few-public-methods
 class WhileCallable:
     """
-    Some code in this class has been adapted from the while loop implementation in the JAX project at
-    https://github.com/google/jax/blob/jax-v0.4.1/jax/_src/lax/control_flow/loops.py
-    released under the Apache License, Version 2.0, with the following copyright notice:
+    Some code in this class has been adapted from the while loop implementation in the JAX project
+    at https://github.com/google/jax/blob/jax-v0.4.1/jax/_src/lax/control_flow/loops.py released
+    under the Apache License, Version 2.0, with the following copyright notice:
 
     Copyright 2021 The JAX Authors.
     """
@@ -605,13 +778,14 @@ class WhileCallable:
         def new_body(*args_and_qreg):
             args, qreg = args_and_qreg[:-1], args_and_qreg[-1]
 
-            with JaxTape(do_queue=False) as tape:
-                with tape.quantum_tape:
-                    out = self.body_fn(*args)
-                tape.set_return_val(out)
-                new_quantum_tape = JaxTape.device.expand_fn(tape.quantum_tape)
-                tape.quantum_tape = new_quantum_tape
-                tape.quantum_tape.jax_tape = tape
+            with qml.QueuingManager.stop_recording():
+                with JaxTape() as tape:
+                    with tape.quantum_tape:
+                        out = self.body_fn(*args)
+                    tape.set_return_val(out)
+                    new_quantum_tape = JaxTape.device.expand_fn(tape.quantum_tape)
+                    tape.quantum_tape = new_quantum_tape
+                    tape.quantum_tape.jax_tape = tape
 
             has_tracer_return_values = True
             return_values, qreg, qubit_states = trace_quantum_tape(
@@ -746,7 +920,6 @@ def while_loop(cond_fn):
     return _while_loop
 
 
-# pylint: disable=too-few-public-methods
 class ForLoop(Operation):
     """PennyLane ForLoop Operation."""
 
@@ -763,7 +936,6 @@ class ForLoop(Operation):
         super().__init__(*args, **kwargs)
 
 
-# pylint: disable=too-few-public-methods
 class ForLoopCallable:
     """
     Some code in this class has been adapted from the for loop implementation in the JAX project at
@@ -796,13 +968,14 @@ class ForLoopCallable:
         def new_body(*args_and_qreg):
             args, qreg = args_and_qreg[:-1], args_and_qreg[-1]
 
-            with JaxTape(do_queue=False) as tape:
-                with tape.quantum_tape:
-                    out = self.body_fn(*args)
-                tape.set_return_val(out)
-                new_quantum_tape = JaxTape.device.expand_fn(tape.quantum_tape)
-                tape.quantum_tape = new_quantum_tape
-                tape.quantum_tape.jax_tape = tape
+            with qml.QueuingManager.stop_recording():
+                with JaxTape() as tape:
+                    with tape.quantum_tape:
+                        out = self.body_fn(*args)
+                    tape.set_return_val(out)
+                    new_quantum_tape = JaxTape.device.expand_fn(tape.quantum_tape)
+                    tape.quantum_tape = new_quantum_tape
+                    tape.quantum_tape.jax_tape = tape
 
             has_tracer_return_values = out is not None
             return_values, qreg, qubit_states = trace_quantum_tape(
@@ -899,6 +1072,9 @@ def for_loop(lower_bound, upper_bound, step):
                 args = loop_fn(i, *args)
             return args
 
+    Unlike ``jax.cond.fori_loop``, the step can be negative if it is known at tracing time
+    (i.e. constant). If a non-constant negative step is used, the loop will produce no iterations.
+
     Args:
         lower_bound (int): starting value of the iteration index
         upper_bound (int): (exclusive) upper bound of the iteration index
@@ -944,7 +1120,6 @@ def for_loop(lower_bound, upper_bound, step):
     return _for_loop
 
 
-# pylint: disable=too-few-public-methods
 class MidCircuitMeasure(Operation):
     """Operation representing a mid-circuit measurement."""
 
@@ -1071,7 +1246,8 @@ class QJITDevice(qml.QubitDevice):
         "Hamiltonian",
     ]
 
-    def __init__(self, shots=None, wires=None):
+    def __init__(self, shots=None, wires=None, backend=None):
+        self.backend = backend if backend else "default"
         super().__init__(wires=wires, shots=shots)
 
     def apply(self, operations, **kwargs):
@@ -1080,7 +1256,7 @@ class QJITDevice(qml.QubitDevice):
         """
         raise RuntimeError("QJIT devices cannot apply operations.")
 
-    def default_expand_fn(self, circuit, max_expansion):
+    def default_expand_fn(self, circuit, max_expansion=10):
         """
         Most decomposition logic will be equivalent to PennyLane's decomposition.
         However, decomposition logic will differ in the following cases:
@@ -1108,10 +1284,10 @@ class QJITDevice(qml.QubitDevice):
         # At the moment, bypassing decomposition for controlled gates will generally have a higher
         # success rate, as complex decomposition paths can fail to trace (c.f. PL #3521, #3522).
 
-        def _decomp_controlled_unitary(self, *args, **kwargs):  # pylint: disable=unused-argument
+        def _decomp_controlled_unitary(self, *_args, **_kwargs):
             return qml.QubitUnitary(qml.matrix(self), wires=self.wires)
 
-        def _decomp_controlled(self, *args, **kwargs):  # pylint: disable=unused-argument
+        def _decomp_controlled(self, *_args, **_kwargs):
             return qml.QubitUnitary(qml.matrix(self), wires=self.wires)
 
         with Patcher(

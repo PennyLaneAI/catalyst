@@ -12,20 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "TestHelpers.hpp"
-
 #include "CacheManager.hpp"
-#include "LightningUtils.hpp"
 #include "QuantumDevice.hpp"
 #include "RuntimeCAPI.h"
+#include "Utils.hpp"
 
-#if defined(_KOKKOS)
-#include "LightningKokkosSimulator.hpp"
-#else
-#include "LightningSimulator.hpp"
-#endif
-
-#include <catch2/catch.hpp>
+#include "TestUtils.hpp"
 
 using namespace Catalyst::Runtime;
 using namespace Catalyst::Runtime::Simulator;
@@ -61,15 +53,24 @@ TEST_CASE("Test addOperations with a naive example", "[CacheManager]")
     CHECK(cm.getNumObservables() == 0);
 }
 
-TEST_CASE("Test a LightningSimulator circuit with num_qubits=2 ", "[CacheManager]")
+TEMPLATE_LIST_TEST_CASE("Test edge cases of the cache manager in QuantumDevice methods",
+                        "[CacheManager]", SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
-#if defined(_KOKKOS)
-    LightningKokkosSimulator *qis = dynamic_cast<LightningKokkosSimulator *>(sim.get());
-#else
-    LightningSimulator *qis = dynamic_cast<LightningSimulator *>(sim.get());
-#endif
+    sim->StartTapeRecording();
+    REQUIRE_THROWS_WITH(sim->StartTapeRecording(),
+                        Catch::Contains("Cannot re-activate the cache manager"));
+
+    sim->StopTapeRecording();
+    REQUIRE_THROWS_WITH(sim->StopTapeRecording(),
+                        Catch::Contains("Cannot stop an already stopped cache manager"));
+}
+
+TEMPLATE_LIST_TEST_CASE("Test a LightningSimulator circuit with num_qubits=2 ", "[CacheManager]",
+                        SimTypes)
+{
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 2;
@@ -84,21 +85,17 @@ TEST_CASE("Test a LightningSimulator circuit with num_qubits=2 ", "[CacheManager
     sim->NamedOperation("PauliX", {}, {Qs[0]}, false);
     sim->NamedOperation("CNOT", {}, {Qs[0], Qs[1]}, false);
 
-    auto &&[num_ops, num_obs, num_params, op_names, _] = qis->CacheManagerInfo();
+    auto &&[num_ops, num_obs, num_params, op_names, _] = sim->CacheManagerInfo();
     CHECK((num_ops == 2 && num_obs == 0));
     CHECK(num_params == 0);
     CHECK(op_names[0] == "PauliX");
     CHECK(op_names[1] == "CNOT");
 }
 
-TEST_CASE("Test a LightningSimulator circuit with num_qubits=4", "[CacheManager]")
+TEMPLATE_LIST_TEST_CASE("Test a LightningSimulator circuit with num_qubits=4", "[CacheManager]",
+                        SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
-#if defined(_KOKKOS)
-    LightningKokkosSimulator *qis = dynamic_cast<LightningKokkosSimulator *>(sim.get());
-#else
-    LightningSimulator *qis = dynamic_cast<LightningSimulator *>(sim.get());
-#endif
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubit = n
     constexpr size_t n = 4;
@@ -119,7 +116,7 @@ TEST_CASE("Test a LightningSimulator circuit with num_qubits=4", "[CacheManager]
     sim->NamedOperation("CRZ", {0.789}, {Qs[0], Qs[3]}, false);
     sim->StopTapeRecording();
 
-    auto &&[num_ops, num_obs, num_params, op_names, _] = qis->CacheManagerInfo();
+    auto &&[num_ops, num_obs, num_params, op_names, _] = sim->CacheManagerInfo();
     CHECK((num_ops == 4 && num_obs == 0));
     CHECK(num_params == 3);
     CHECK(op_names[0] == "Hadamard");
@@ -128,110 +125,10 @@ TEST_CASE("Test a LightningSimulator circuit with num_qubits=4", "[CacheManager]
     CHECK(op_names[3] == "CRZ");
 }
 
-TEST_CASE("Test __quantum__qis__ circuit with observables", "[CacheManager]")
+TEMPLATE_LIST_TEST_CASE("Test a LightningSimulator circuit with num_qubits=4 and observables",
+                        "[CacheManager]", SimTypes)
 {
-    // initialize the simulator
-    __quantum__rt__device(nullptr, nullptr);
-    __quantum__rt__initialize();
-
-    QUBIT *target = __quantum__rt__qubit_allocate();              // id = 0
-    QirArray *ctrls_arr = __quantum__rt__qubit_allocate_array(1); // id = 1
-
-    QUBIT **ctrls = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
-
-    // qml.Hadamard(wires=0)
-    __quantum__qis__Hadamard(target);
-    // qml.ControlledPhaseShift(0.6, wires=[0,1])
-    __quantum__qis__ControlledPhaseShift(0.6, target, *ctrls);
-    // qml.IsingYY(0.2, wires=[0, 1])
-    __quantum__qis__IsingYY(0.2, target, *ctrls);
-    // qml.CRX(0.4, wires=[1,0])
-    __quantum__qis__CRX(0.4, target, *ctrls);
-
-    size_t buffer_len = 4;
-    CplxT_double *buffer = new CplxT_double[buffer_len];
-    MemRefT_CplxT_double_1d result = {buffer, buffer, 0, {buffer_len}, {1}};
-    __quantum__qis__State(&result, 0);
-    CplxT_double *state = result.data_allocated;
-
-    CHECK((state[0].real == Approx(0.70357419).margin(1e-5) &&
-           state[0].imag == Approx(0.0).margin(1e-5)));
-    CHECK((state[1].real == Approx(0.0).margin(1e-5) &&
-           state[1].imag == Approx(-0.0705929).margin(1e-5)));
-    CHECK((state[2].real == Approx(0.70357419).margin(1e-5) &&
-           state[2].imag == Approx(0).margin(1e-5)));
-    CHECK((state[3].real == Approx(0.0).margin(1e-5) &&
-           state[3].imag == Approx(-0.0705929).margin(1e-5)));
-
-    // qml.var(qml.PauliZ(wires=1))
-    QUBIT **qubit = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
-    auto obs = __quantum__qis__NamedObs(ObsId::PauliZ, *qubit);
-
-    CHECK(__quantum__qis__Expval(obs) == Approx(0.9800665778).margin(1e-5));
-
-    delete[] buffer;
-    __quantum__rt__finalize();
-}
-
-TEST_CASE("Test __quantum__qis__ circuit with observables using deactiveCacheManager",
-          "[CacheManager]")
-{
-    // initialize the simulator
-    __quantum__rt__device(nullptr, nullptr);
-    __quantum__rt__initialize();
-
-    QUBIT *target = __quantum__rt__qubit_allocate();              // id = 0
-    QirArray *ctrls_arr = __quantum__rt__qubit_allocate_array(1); // id = 1
-
-    QUBIT **ctrls = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
-
-    __quantum__rt__toggle_recorder(/* activate_cm */ true);
-
-    // qml.Hadamard(wires=0)
-    __quantum__qis__Hadamard(target);
-    // qml.ControlledPhaseShift(0.6, wires=[0,1])
-    __quantum__qis__ControlledPhaseShift(0.6, target, *ctrls);
-    // qml.IsingYY(0.2, wires=[0, 1])
-    __quantum__qis__IsingYY(0.2, target, *ctrls);
-    // qml.CRX(0.4, wires=[1,0])
-    __quantum__qis__CRX(0.4, target, *ctrls);
-
-    size_t buffer_len = 4;
-    CplxT_double *buffer = new CplxT_double[buffer_len];
-    MemRefT_CplxT_double_1d result = {buffer, buffer, 0, {buffer_len}, {1}};
-    __quantum__qis__State(&result, 0);
-    CplxT_double *state = result.data_allocated;
-
-    CHECK((state[0].real == Approx(0.70357419).margin(1e-5) &&
-           state[0].imag == Approx(0.0).margin(1e-5)));
-    CHECK((state[1].real == Approx(0.0).margin(1e-5) &&
-           state[1].imag == Approx(-0.0705929).margin(1e-5)));
-    CHECK((state[2].real == Approx(0.70357419).margin(1e-5) &&
-           state[2].imag == Approx(0).margin(1e-5)));
-    CHECK((state[3].real == Approx(0.0).margin(1e-5) &&
-           state[3].imag == Approx(-0.0705929).margin(1e-5)));
-
-    // qml.var(qml.PauliZ(wires=1))
-    QUBIT **qubit = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
-    auto obs = __quantum__qis__NamedObs(ObsId::PauliZ, *qubit);
-
-    CHECK(__quantum__qis__Expval(obs) == Approx(0.9800665778).margin(1e-5));
-
-    __quantum__rt__toggle_recorder(/* activate_cm */ false);
-
-    __quantum__rt__finalize();
-
-    delete[] buffer;
-}
-
-TEST_CASE("Test a LightningSimulator circuit with num_qubits=4 and observables", "[CacheManager]")
-{
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
-#if defined(_KOKKOS)
-    LightningKokkosSimulator *qis = dynamic_cast<LightningKokkosSimulator *>(sim.get());
-#else
-    LightningSimulator *qis = dynamic_cast<LightningSimulator *>(sim.get());
-#endif
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 4;
@@ -247,19 +144,16 @@ TEST_CASE("Test a LightningSimulator circuit with num_qubits=4 and observables",
     sim->NamedOperation("Hadamard", {}, {Qs[2]}, false);
     sim->NamedOperation("PauliZ", {}, {Qs[3]}, false);
 
-    ObsIdType px = sim->Observable(ObsId::PauliX, {}, {Qs[1]});
     ObsIdType pz = sim->Observable(ObsId::PauliZ, {}, {Qs[0]});
 
+    ObsIdType px = sim->Observable(ObsId::PauliX, {}, {Qs[1]});
     ObsIdType h = sim->Observable(ObsId::Hadamard, {}, {Qs[0]});
 
-#if !defined(_KOKKOS)
-    sim->Var(h);  // Kokkos doesn't support Variance
-    sim->Var(px); // Kokkos doesn't support Variance
-#endif
-
+    sim->Var(h);
+    sim->Var(px);
     sim->Expval(pz);
 
-    auto &&[num_ops, num_obs, num_params, op_names, obs_keys] = qis->CacheManagerInfo();
+    auto &&[num_ops, num_obs, num_params, op_names, obs_keys] = sim->CacheManagerInfo();
     CHECK(num_ops == 4);
     CHECK(num_params == 0);
     CHECK(op_names[0] == "PauliX");
@@ -267,13 +161,104 @@ TEST_CASE("Test a LightningSimulator circuit with num_qubits=4 and observables",
     CHECK(op_names[2] == "Hadamard");
     CHECK(op_names[3] == "PauliZ");
 
-#if defined(_KOKKOS)
-    CHECK(num_obs == 1);
-    CHECK(obs_keys[0] == pz);
-#else
     CHECK(num_obs == 3);
     CHECK(obs_keys[0] == h);
     CHECK(obs_keys[1] == px);
     CHECK(obs_keys[2] == pz);
-#endif
+}
+
+TEST_CASE("Test __quantum__qis__ circuit with observables", "[CacheManager]")
+{
+    __quantum__rt__initialize();
+    for (const auto &[key, val] : getDevices()) {
+        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
+
+        QUBIT *target = __quantum__rt__qubit_allocate();              // id = 0
+        QirArray *ctrls_arr = __quantum__rt__qubit_allocate_array(1); // id = 1
+
+        QUBIT **ctrls = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
+
+        // qml.Hadamard(wires=0)
+        __quantum__qis__Hadamard(target);
+        // qml.ControlledPhaseShift(0.6, wires=[0,1])
+        __quantum__qis__ControlledPhaseShift(0.6, target, *ctrls);
+        // qml.IsingYY(0.2, wires=[0, 1])
+        __quantum__qis__IsingYY(0.2, target, *ctrls);
+        // qml.CRX(0.4, wires=[1,0])
+        __quantum__qis__CRX(0.4, target, *ctrls);
+
+        size_t buffer_len = 4;
+        CplxT_double *buffer = new CplxT_double[buffer_len];
+        MemRefT_CplxT_double_1d result = {buffer, buffer, 0, {buffer_len}, {1}};
+        __quantum__qis__State(&result, 0);
+        CplxT_double *state = result.data_allocated;
+
+        CHECK((state[0].real == Approx(0.70357419).margin(1e-5) &&
+               state[0].imag == Approx(0.0).margin(1e-5)));
+        CHECK((state[1].real == Approx(0.0).margin(1e-5) &&
+               state[1].imag == Approx(-0.0705929).margin(1e-5)));
+        CHECK((state[2].real == Approx(0.70357419).margin(1e-5) &&
+               state[2].imag == Approx(0).margin(1e-5)));
+        CHECK((state[3].real == Approx(0.0).margin(1e-5) &&
+               state[3].imag == Approx(-0.0705929).margin(1e-5)));
+        // qml.expval(qml.PauliZ(wires=1))
+        QUBIT **qubit = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
+        auto obs = __quantum__qis__NamedObs(ObsId::PauliZ, *qubit);
+
+        CHECK(__quantum__qis__Expval(obs) == Approx(0.9800665778).margin(1e-5));
+
+        delete[] buffer;
+    }
+    __quantum__rt__finalize();
+}
+
+TEST_CASE("Test __quantum__qis__ circuit with observables using deactiveCacheManager",
+          "[CacheManager]")
+{
+
+    __quantum__rt__initialize();
+    for (const auto &[key, val] : getDevices()) {
+        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
+
+        QUBIT *target = __quantum__rt__qubit_allocate();              // id = 0
+        QirArray *ctrls_arr = __quantum__rt__qubit_allocate_array(1); // id = 1
+
+        QUBIT **ctrls = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
+
+        __quantum__rt__toggle_recorder(/* activate_cm */ true);
+
+        // qml.Hadamard(wires=0)
+        __quantum__qis__Hadamard(target);
+        // qml.ControlledPhaseShift(0.6, wires=[0,1])
+        __quantum__qis__ControlledPhaseShift(0.6, target, *ctrls);
+        // qml.IsingYY(0.2, wires=[0, 1])
+        __quantum__qis__IsingYY(0.2, target, *ctrls);
+        // qml.CRX(0.4, wires=[1,0])
+        __quantum__qis__CRX(0.4, target, *ctrls);
+
+        size_t buffer_len = 4;
+        CplxT_double *buffer = new CplxT_double[buffer_len];
+        MemRefT_CplxT_double_1d result = {buffer, buffer, 0, {buffer_len}, {1}};
+        __quantum__qis__State(&result, 0);
+        CplxT_double *state = result.data_allocated;
+
+        CHECK((state[0].real == Approx(0.70357419).margin(1e-5) &&
+               state[0].imag == Approx(0.0).margin(1e-5)));
+        CHECK((state[1].real == Approx(0.0).margin(1e-5) &&
+               state[1].imag == Approx(-0.0705929).margin(1e-5)));
+        CHECK((state[2].real == Approx(0.70357419).margin(1e-5) &&
+               state[2].imag == Approx(0).margin(1e-5)));
+        CHECK((state[3].real == Approx(0.0).margin(1e-5) &&
+               state[3].imag == Approx(-0.0705929).margin(1e-5)));
+        // qml.expval(qml.PauliZ(wires=1))
+        QUBIT **qubit = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
+        auto obs = __quantum__qis__NamedObs(ObsId::PauliZ, *qubit);
+
+        CHECK(__quantum__qis__Expval(obs) == Approx(0.9800665778).margin(1e-5));
+
+        __quantum__rt__toggle_recorder(/* activate_cm */ false);
+
+        delete[] buffer;
+    }
+    __quantum__rt__finalize();
 }

@@ -13,8 +13,13 @@
 # limitations under the License.
 
 from os import path
-from setuptools import setup, find_namespace_packages
+
+import numpy as np
 from pybind11.setup_helpers import intree_extensions
+from setuptools import (  # pylint: disable=wrong-import-order
+    find_namespace_packages,
+    setup,
+)
 
 with open(path.join("frontend", "catalyst", "_version.py")) as f:
     version = f.readlines()[-1].split()[-1].strip("\"'")
@@ -23,7 +28,8 @@ with open(".dep-versions") as f:
     jax_version = [line[4:].strip() for line in f.readlines() if "jax=" in line][0]
 
 requirements = [
-    "pennylane>=0.28",
+    # TODO: Change to "pennylane>=0.31" when next version releases.
+    "pennylane @ git+https://github.com/PennyLaneAI/pennylane/@master",
     f"jax=={jax_version}",
     f"jaxlib=={jax_version}",
 ]
@@ -54,7 +60,14 @@ description = {
     "license": "Apache License 2.0",
 }
 
-ext_modules = intree_extensions(["frontend/catalyst/utils/wrapper.cpp"])
+
+lib_path_npymath = path.join(np.get_include(), "..", "lib")
+intree_extension_list = intree_extensions(["frontend/catalyst/utils/wrapper.cpp"])
+for ext in intree_extension_list:
+    ext._add_ldflags(["-L", lib_path_npymath])  # pylint: disable=protected-access
+    ext._add_ldflags(["-lnpymath"])  # pylint: disable=protected-access
+    ext._add_cflags(["-I", np.get_include()])  # pylint: disable=protected-access
+ext_modules = intree_extension_list
 
 setup(
     classifiers=classifiers,

@@ -14,8 +14,9 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
-from catalyst import qjit, while_loop
 import pennylane as qml
+
+from catalyst import qjit, while_loop
 
 
 # CHECK-NOT: Verification failed
@@ -24,14 +25,13 @@ import pennylane as qml
 @qml.qnode(qml.device("lightning.qubit", wires=1))
 def circuit(n: int):
     # CHECK:   "scf.while"({{%[a-zA-Z0-9_]+}}, {{%[a-zA-Z0-9_]+}}, {{%[a-zA-Z0-9_]+}})
-    # CHECK:   [[a1p:%[a-zA-Z0-9_]+]] = mhlo.convert %arg1
-    # CHECK:   [[ct:%[a-zA-Z0-9_]+]] = mhlo.compare  LT, [[a1p]], %arg2,  SIGNED
-    # CHECK:   [[cond:%[a-zA-Z0-9_]+]] = tensor.extract [[ct]]
+    # CHECK:   [[ct:%[a-zA-Z0-9_]+]] = stablehlo.compare  LT, %arg1, %arg2,  SIGNED
+    # CHECK:   [[cond:%[a-zA-Z0-9_]+]] = "tensor.extract"([[ct]])
     # CHECK:   "scf.condition"([[cond]], %arg1, %arg2, %arg3)
     @while_loop(lambda v: v[0] < v[1])
     # CHECK:   ^bb0([[v0:%[a-zA-Z0-9_]+]]: tensor<i64>, [[v1:%[a-zA-Z0-9_]+]]: tensor<i64>, [[array0:%[a-zA-Z0-9_]+]]: !quantum.reg):
     def loop(v):
-        # CHECK:   [[v0p:%[a-zA-Z0-9_]+]] = mhlo.add [[v0]]
+        # CHECK:   [[v0p:%[a-zA-Z0-9_]+]] = stablehlo.add [[v0]]
         # CHECK:   [[q0:%[a-zA-Z0-9_]+]] = "quantum.extract"(%arg3, {{%[a-zA-Z0-9_]+}})
         # CHECK:   [[q1:%[a-zA-Z0-9_]]] = "quantum.custom"([[q0]]) {gate_name = "PauliX"
         qml.PauliX(wires=0)
@@ -54,14 +54,13 @@ print(circuit.mlir)
 def circuit_outer_scope_reference(n: int):
     # CHECK:   [[array0:%[a-zA-Z0-9_]+]] = "quantum.alloc"
     # CHECK:   "scf.while"({{%[a-zA-Z0-9_]+}}, {{%[a-zA-Z0-9_]+}})
-    # CHECK:   [[a1p:%[a-zA-Z0-9_]+]] = mhlo.convert %arg1
-    # CHECK:   [[ct:%[a-zA-Z0-9_]+]] = mhlo.compare  LT, [[a1p]], [[c1]],  SIGNED
-    # CHECK:   [[cond:%[a-zA-Z0-9_]+]] = tensor.extract [[ct]]
+    # CHECK:   [[ct:%[a-zA-Z0-9_]+]] = stablehlo.compare  LT, %arg1, [[c1]],  SIGNED
+    # CHECK:   [[cond:%[a-zA-Z0-9_]+]] = "tensor.extract"([[ct]])
     # CHECK:   "scf.condition"([[cond]], %arg1, %arg2)
     @while_loop(lambda i: i < n)
     # CHECK:   ^bb0([[v0:%[a-zA-Z0-9_]+]]: tensor<i64>, [[array_inner:%[a-zA-Z0-9_]+]]: !quantum.reg):
     def loop(i):
-        # CHECK:   [[v0p:%[a-zA-Z0-9_]]] = mhlo.add [[v0]]
+        # CHECK:   [[v0p:%[a-zA-Z0-9_]]] = stablehlo.add [[v0]]
         # CHECK:   [[q0:%[a-zA-Z0-9_]+]] = "quantum.extract"([[array_inner]], {{%[a-zA-Z0-9_]+}})
         # CHECK:   [[q1:%[a-zA-Z0-9_]]] = "quantum.custom"([[q0]]) {gate_name = "PauliX"
         # CHECK:   [[array_inner_2:%[a-zA-Z0-9_]+]] = "quantum.insert"([[array_inner]], {{%[a-zA-Z0-9_]+}}, [[q1]])
@@ -83,17 +82,16 @@ print(circuit_outer_scope_reference.mlir)
 @qml.qnode(qml.device("lightning.qubit", wires=1))
 def circuit_multiple_args(n: int):
     # CHECK:   [[R0:%.+]] = "quantum.alloc"() {{.+}} -> !quantum.reg
-    # CHECK:   [[C0:%.+]] = mhlo.constant dense<0> : tensor<i64>
-    # CHECK:   [[C1:%.+]] = mhlo.constant dense<1> : tensor<i64>
+    # CHECK:   [[C0:%.+]] = stablehlo.constant dense<0> : tensor<i64>
+    # CHECK:   [[C1:%.+]] = stablehlo.constant dense<1> : tensor<i64>
 
     # CHECK:   "scf.while"([[C0]], %arg0, [[C1]], [[R0]])
-    # CHECK:       [[V0p:%.+]] = mhlo.convert %arg1
-    # CHECK:       [[LT:%.+]] = mhlo.compare  LT, [[V0p]], %arg2,  SIGNED
-    # CHECK:       [[COND:%.+]] = tensor.extract [[LT]]
+    # CHECK:       [[LT:%.+]] = stablehlo.compare  LT, %arg1, %arg2,  SIGNED
+    # CHECK:       [[COND:%.+]] = "tensor.extract"([[LT]])
     # CHECK:       "scf.condition"([[COND]], %arg1, %arg2, %arg3, %arg4)
 
     # CHECK:   ^bb0(%arg1: tensor<i64>, %arg2: tensor<i64>, %arg3: tensor<i64>, %arg4: !quantum.reg):
-    # CHECK:       [[V0p:%.+]] = mhlo.add %arg1, %arg3
+    # CHECK:       [[V0p:%.+]] = stablehlo.add %arg1, %arg3
     # CHECK:       [[Q0:%.+]] = "quantum.extract"(%arg4
     # CHECK:       [[Q1:%.+]] = "quantum.custom"([[Q0]]) {gate_name = "PauliX"
     # CHECK:       [[QREGp:%.+]] = "quantum.insert"(%arg4, {{%[a-zA-Z0-9_]+}}, [[Q1]])

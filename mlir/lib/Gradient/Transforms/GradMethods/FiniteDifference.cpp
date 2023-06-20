@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "FiniteDifference.hpp"
+#include "HybridGradient.hpp"
 
 #include <algorithm>
 #include <sstream>
@@ -22,12 +23,18 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 
+#include "Gradient/Utils/CompDiffArgIndices.h"
+#include "Gradient/Utils/GetDiffMethod.h"
+
 namespace catalyst {
 namespace gradient {
 
 LogicalResult FiniteDiffLowering::match(GradOp op) const
 {
-    if (op.getMethod() == "fd")
+    // Assume for now that specifying "fd" on the grad op takes precedence over any "diff_method"
+    // specified on any internal QNodes. Relaxing this assumption depends on further integration
+    // with Enzyme.
+    if (op.getMethod() == "fd" || getQNodeDiffMethod(op) == "finite-diff")
         return success();
 
     return failure();
@@ -36,7 +43,7 @@ LogicalResult FiniteDiffLowering::match(GradOp op) const
 void FiniteDiffLowering::rewrite(GradOp op, PatternRewriter &rewriter) const
 {
     Location loc = op.getLoc();
-    const std::vector<size_t> &diffArgIndices = op.compDiffArgIndices();
+    const std::vector<size_t> &diffArgIndices = compDiffArgIndices(op.getDiffArgIndices());
     std::stringstream uniquer;
     std::copy(diffArgIndices.begin(), diffArgIndices.end(), std::ostream_iterator<int>(uniquer));
     std::string fnName = op.getCallee().str() + ".finitediff" + uniquer.str();
@@ -54,7 +61,7 @@ void FiniteDiffLowering::rewrite(GradOp op, PatternRewriter &rewriter) const
         PatternRewriter::InsertionGuard insertGuard(rewriter);
         rewriter.setInsertionPointAfter(callee);
 
-        gradFn = rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility);
+        gradFn = rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility, nullptr, nullptr);
         rewriter.setInsertionPointToStart(gradFn.addEntryBlock());
 
         computeFiniteDiff(rewriter, loc, gradFn, callee, diffArgIndices, hValue);
@@ -118,9 +125,8 @@ void FiniteDiffLowering::computeFiniteDiff(PatternRewriter &rewriter, Location l
                 }
             }
 
-            Attribute shiftForResult = rewriter.getFloatAttr(baseResultTy, hValue);
-            Value hForResult =
-                rewriter.create<arith::ConstantOp>(loc, baseResultTy, shiftForResult);
+            TypedAttr shiftForResult = rewriter.getFloatAttr(baseResultTy, hValue);
+            Value hForResult = rewriter.create<arith::ConstantOp>(loc, shiftForResult);
             if (isGradientTensor && gradientTy.cast<TensorType>().hasStaticShape()) {
                 hForResult = rewriter.create<tensor::SplatOp>(loc, hForResult, gradientTy);
             }
@@ -131,9 +137,10 @@ void FiniteDiffLowering::computeFiniteDiff(PatternRewriter &rewriter, Location l
                     rewriter.create<linalg::FillOp>(loc, hForResult, outTensor).getResult(0);
             }
 
-            Attribute shiftForOperand =
-                isOperandScalarTensor ? (Attribute)DenseFPElementsAttr::get(operandTy, hValue)
-                                      : (Attribute)rewriter.getFloatAttr(baseOperandTy, hValue);
+            TypedAttr shiftForOperand =
+                isOperandScalarTensor
+                    ? (TypedAttr)DenseFPElementsAttr::get(cast<ShapedType>(operandTy), hValue)
+                    : (TypedAttr)rewriter.getFloatAttr(baseOperandTy, hValue);
             Value hForOperand = rewriter.create<arith::ConstantOp>(loc, shiftForOperand);
 
             Value gradient;

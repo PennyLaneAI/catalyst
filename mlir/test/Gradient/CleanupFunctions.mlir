@@ -15,8 +15,6 @@
 // RUN: quantum-opt --lower-gradients --split-input-file %s | FileCheck %s
 
 // CHECK-LABEL: @f
-// CHECK-LABEL: @f.pcount
-// CHECK-NOT: quantum.
 // CHECK-LABEL: @f.argmap
 // CHECK-NOT: quantum.
 // CHECK-LABEL: @f.shifted
@@ -24,7 +22,7 @@
 // CHECK-NOT: quantum.
 // CHECK-LABEL: @f.fullgrad0ps
 // CHECK-NOT: quantum.
-func.func private @f(%arg0: tensor<f64>) -> tensor<f64> {
+func.func private @f(%arg0: tensor<f64>) -> tensor<f64> attributes {qnode, diff_method = "parameter-shift"} {
     %c0_i64 = arith.constant 0 : i64
     %c2_i64 = arith.constant 2 : i64
     %0 = "quantum.alloc"() {nqubits_attr = 3 : i64} : () -> !quantum.reg
@@ -33,7 +31,7 @@ func.func private @f(%arg0: tensor<f64>) -> tensor<f64> {
     %3 = "quantum.extract"(%0, %c0_i64) : (!quantum.reg, i64) -> !quantum.bit
     %4 = tensor.extract %arg0[] : tensor<f64>
     %5:2 = "quantum.custom"(%4, %3, %2) {gate_name = "CRX", operand_segment_sizes = array<i32: 1, 2> } : (f64, !quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
-    %6 = "quantum.namedobs"(%5#0) {type = 3 : i8} : (!quantum.bit) -> !quantum.obs
+    %6 = "quantum.namedobs"(%5#0) {type = #quantum<named_observable PauliZ>} : (!quantum.bit) -> !quantum.obs
     %7 = "quantum.expval"(%6) {shots = 1000 : i64} : (!quantum.obs) -> f64
     %8 = tensor.from_elements %7 : tensor<f64>
     "quantum.dealloc"(%0) : (!quantum.reg) -> ()
@@ -42,15 +40,13 @@ func.func private @f(%arg0: tensor<f64>) -> tensor<f64> {
 
 // CHECK-LABEL: @gradCall0
 func.func @gradCall0(%arg0: tensor<f64>) -> tensor<f64> {
-    %0 = gradient.grad "ps" @f(%arg0) : (tensor<f64>) -> tensor<f64>
+    %0 = gradient.grad "defer" @f(%arg0) : (tensor<f64>) -> tensor<f64>
     func.return %0 : tensor<f64>
 }
 
 // -----
 
 // CHECK-LABEL: @f2
-// CHECK-LABEL: @f2.pcount
-// CHECK-NOT: quantum.
 // CHECK-LABEL: @f2.argmap
 // CHECK-NOT: quantum.
 // CHECK-LABEL: @f2.shifted
@@ -58,7 +54,7 @@ func.func @gradCall0(%arg0: tensor<f64>) -> tensor<f64> {
 // CHECK-NOT: quantum.
 // CHECK-LABEL: @f2.fullgrad0ps
 // CHECK-NOT: quantum.
-func.func private @f2(%arg0: tensor<f64>, %arg1: tensor<i64>, %arg2: tensor<i64>) -> tensor<f64> {
+func.func private @f2(%arg0: tensor<f64>, %arg1: tensor<i64>, %arg2: tensor<i64>) -> tensor<f64> attributes {qnode, diff_method = "parameter-shift"} {
     %c1 = arith.constant 1 : index
     %c0_i64 = arith.constant 0 : i64
     %0 = "quantum.alloc"() {nqubits_attr = 3 : i64} : () -> !quantum.reg
@@ -84,7 +80,7 @@ func.func private @f2(%arg0: tensor<f64>, %arg1: tensor<i64>, %arg2: tensor<i64>
     }
     %extracted_1 = tensor.extract %arg2[] : tensor<i64>
     %7 = "quantum.extract"(%6, %extracted_1) : (!quantum.reg, i64) -> !quantum.bit
-    %8 = "quantum.namedobs"(%7) {type = 2 : i8} : (!quantum.bit) -> !quantum.obs
+    %8 = "quantum.namedobs"(%7) {type = #quantum<named_observable PauliY>} : (!quantum.bit) -> !quantum.obs
     %9 = "quantum.expval"(%8) {shots = 1000 : i64} : (!quantum.obs) -> f64
     %from_elements = tensor.from_elements %9 : tensor<f64>
     "quantum.dealloc"(%0) : (!quantum.reg) -> ()
@@ -93,7 +89,7 @@ func.func private @f2(%arg0: tensor<f64>, %arg1: tensor<i64>, %arg2: tensor<i64>
 
 // CHECK-LABEL: @gradCall1
 func.func public @gradCall1(%arg0: tensor<f64>, %arg1: tensor<i64>, %arg2: tensor<i64>) -> tensor<f64> {
-    %0 = gradient.grad "ps" @f2(%arg0, %arg1, %arg2) : (tensor<f64>, tensor<i64>, tensor<i64>) -> tensor<f64>
+    %0 = gradient.grad "defer" @f2(%arg0, %arg1, %arg2) : (tensor<f64>, tensor<i64>, tensor<i64>) -> tensor<f64>
     return %0 : tensor<f64>
 }
 
@@ -102,8 +98,6 @@ func.func public @gradCall1(%arg0: tensor<f64>, %arg1: tensor<i64>, %arg2: tenso
 #map = affine_map<() -> ()>
 
 // CHECK-LABEL: @f3
-// CHECK-LABEL: @f3.pcount
-// CHECK-NOT: quantum.
 // CHECK-LABEL: @f3.argmap
 // CHECK-NOT: quantum.
 // CHECK-LABEL: @f3.shifted
@@ -111,7 +105,7 @@ func.func public @gradCall1(%arg0: tensor<f64>, %arg1: tensor<i64>, %arg2: tenso
 // CHECK-NOT: quantum.
 // CHECK-LABEL: @f3.fullgrad0ps
 // CHECK-NOT: quantum.
-func.func private @f3(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> {
+func.func private @f3(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> attributes {qnode, diff_method = "parameter-shift"} {
     %c0_i64 = arith.constant 0 : i64
     %cst = arith.constant dense<2.000000e+00> : tensor<f64>
     %cst_0 = arith.constant dense<1.500000e+00> : tensor<f64>
@@ -143,7 +137,7 @@ func.func private @f3(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> {
         scf.yield %9 : !quantum.reg
     }
     %4 = "quantum.extract"(%3, %c0_i64) : (!quantum.reg, i64) -> !quantum.bit
-    %5 = "quantum.namedobs"(%4) {type = 2 : i8} : (!quantum.bit) -> !quantum.obs
+    %5 = "quantum.namedobs"(%4) {type = #quantum<named_observable PauliY>} : (!quantum.bit) -> !quantum.obs
     %6 = "quantum.expval"(%5) {shots = 1000 : i64} : (!quantum.obs) -> f64
     %from_elements = tensor.from_elements %6 : tensor<f64>
     "quantum.dealloc"(%0) : (!quantum.reg) -> ()
@@ -152,6 +146,6 @@ func.func private @f3(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> {
 
 // CHECK-LABEL: @gradcall2
 func.func public @gradcall2(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> {
-    %0 = gradient.grad "ps" @f3(%arg0, %arg1) : (tensor<f64>, tensor<f64>) -> tensor<f64>
+    %0 = gradient.grad "defer" @f3(%arg0, %arg1) : (tensor<f64>, tensor<f64>) -> tensor<f64>
     return %0 : tensor<f64>
 }

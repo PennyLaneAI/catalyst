@@ -50,16 +50,15 @@ auto LightningKokkosSimulator::GetNumQubits() const -> size_t
 
 void LightningKokkosSimulator::StartTapeRecording()
 {
-    RT_FAIL_IF(this->cache_recording, "Cannot re-activate the cache manager");
-    this->cache_recording = true;
+    RT_FAIL_IF(this->tape_recording, "Cannot re-activate the cache manager");
+    this->tape_recording = true;
     this->cache_manager.Reset();
 }
 
 void LightningKokkosSimulator::StopTapeRecording()
 {
-    if (this->cache_recording) {
-        this->cache_recording = false;
-    }
+    RT_FAIL_IF(!this->tape_recording, "Cannot stop an already stopped cache manager");
+    this->tape_recording = false;
 }
 
 auto LightningKokkosSimulator::CacheManagerInfo()
@@ -127,7 +126,7 @@ void LightningKokkosSimulator::NamedOperation(const std::string &name,
     this->device_sv->applyOperation(name, dev_wires, inverse, params);
 
     // Update tape caching if required
-    if (this->cache_recording) {
+    if (this->tape_recording) {
         this->cache_manager.addOperation(name, params, dev_wires, inverse);
     }
 }
@@ -156,7 +155,7 @@ void LightningKokkosSimulator::MatrixOperation(const std::vector<std::complex<do
     this->device_sv->applyMultiQubitOp(gate_matrix, dev_wires, inverse);
 
     // Update tape caching if required
-    if (this->cache_recording) {
+    if (this->tape_recording) {
         this->cache_manager.addOperation("MatrixOp", {}, dev_wires, inverse);
     }
 }
@@ -187,48 +186,13 @@ auto LightningKokkosSimulator::HamiltonianObservable(const std::vector<double> &
     return this->obs_manager.createHamiltonianObs(coeffs, obs);
 }
 
-// TODO: remove this kernel after merging expval(const ObservableKokkos<T> &ob)
-// in PennyLane-Lightning-Kokkos
-template <class Precision> struct getRealOfComplexInnerProductFunctor {
-    Kokkos::View<Kokkos::complex<Precision> *> sv1;
-    Kokkos::View<Kokkos::complex<Precision> *> sv2;
-
-    getRealOfComplexInnerProductFunctor(Kokkos::View<Kokkos::complex<Precision> *> sv1_,
-                                        Kokkos::View<Kokkos::complex<Precision> *> sv2_)
-    {
-        sv1 = sv1_;
-        sv2 = sv2_;
-    }
-
-    KOKKOS_INLINE_FUNCTION
-    void operator()(const std::size_t k, Precision &inner) const
-    {
-        inner += real(conj(sv1[k]) * sv2[k]);
-    }
-};
-
-template <class Precision>
-inline auto getRealOfComplexInnerProduct(Kokkos::View<Kokkos::complex<Precision> *> sv1_vec,
-                                         Kokkos::View<Kokkos::complex<Precision> *> sv2_vec)
-    -> Precision
-{
-    RT_ASSERT(sv1_vec.size() == sv2_vec.size());
-    Precision inner = 0;
-    Kokkos::parallel_reduce(
-        sv1_vec.size(), getRealOfComplexInnerProductFunctor<Precision>(sv1_vec, sv2_vec), inner);
-    return inner;
-}
-
 auto LightningKokkosSimulator::Expval(ObsIdType obsKey) -> double
 {
-    using UnmanagedComplexHostView = Kokkos::View<Kokkos::complex<double> *, Kokkos::HostSpace,
-                                                  Kokkos::MemoryTraits<Kokkos::Unmanaged>>;
-
     RT_FAIL_IF(!this->obs_manager.isValidObservables({obsKey}),
                "Invalid key for cached observables");
 
     // update tape caching
-    if (this->cache_recording) {
+    if (this->tape_recording) {
         cache_manager.addObservable(obsKey, Lightning::Measurements::Expval);
     }
 
@@ -245,7 +209,7 @@ auto LightningKokkosSimulator::Var(ObsIdType obsKey) -> double
                "Invalid key for cached observables");
 
     // update tape caching
-    if (this->cache_recording) {
+    if (this->tape_recording) {
         this->cache_manager.addObservable(obsKey, Lightning::Measurements::Var);
     }
 
@@ -308,7 +272,6 @@ void LightningKokkosSimulator::PartialProbs(DataView<double, 1> &probs,
 void LightningKokkosSimulator::Sample(DataView<double, 2> &samples, size_t shots)
 {
     Pennylane::Lightning_Kokkos::Simulators::MeasuresKokkos m{*(this->device_sv)};
-
     // PL-Lightning-Kokkos generates samples using the alias method.
     // Reference: https://en.wikipedia.org/wiki/Inverse_transform_sampling
     auto li_samples = m.generate_samples(shots);
@@ -355,7 +318,6 @@ void LightningKokkosSimulator::PartialSample(DataView<double, 2> &samples,
     // corresponding to the input wires into a bitstring.
     auto samplesIter = samples.begin();
     for (size_t shot = 0; shot < shots; shot++) {
-        size_t idx = 0;
         for (auto wire : dev_wires) {
             *(samplesIter++) = static_cast<double>(li_samples[shot * numQubits + wire]);
         }
@@ -390,7 +352,7 @@ void LightningKokkosSimulator::Counts(DataView<double, 1> &eigvals, DataView<int
     // corresponding shape is (shots, qubits). Gather the bits of all qubits
     // into a bitstring.
     for (size_t shot = 0; shot < shots; shot++) {
-        std::bitset<52> basisState; // only 52 bits of precision in a double, TODO: improve
+        std::bitset<CHAR_BIT * sizeof(double)> basisState;
         size_t idx = 0;
         for (size_t wire = 0; wire < numQubits; wire++) {
             basisState[idx++] = li_samples[shot * numQubits + wire];
@@ -434,7 +396,7 @@ void LightningKokkosSimulator::PartialCounts(DataView<double, 1> &eigvals,
     // corresponding shape is (shots, qubits). Gather the desired bits
     // corresponding to the input wires into a bitstring.
     for (size_t shot = 0; shot < shots; shot++) {
-        std::bitset<52> basisState; // only 52 bits of precision in a double, TODO: improve
+        std::bitset<CHAR_BIT * sizeof(double)> basisState;
         size_t idx = 0;
         for (auto wire : dev_wires) {
             basisState[idx++] = li_samples[shot * numQubits + wire];
@@ -497,8 +459,6 @@ auto LightningKokkosSimulator::Measure(QubitIdType wire) -> Result
     double norm = std::sqrt(total);
     std::for_each(state.begin(), state.end(), [norm](auto &elem) { elem /= norm; });
 
-    // TODO: rewrite this method using setStateVector(vectorKokkos<T>)
-    // and LinAlg Functors in the next version of PennyLane-Lightning-Kokkos
     this->device_sv =
         std::make_unique<Pennylane::StateVectorKokkos<double>>(state.data(), vec_size);
 
@@ -567,10 +527,3 @@ void LightningKokkosSimulator::Gradient(std::vector<DataView<double, 1>> &gradie
 }
 
 } // namespace Catalyst::Runtime::Simulator
-
-namespace Catalyst::Runtime {
-auto CreateQuantumDevice() -> std::unique_ptr<QuantumDevice>
-{
-    return std::make_unique<Simulator::LightningKokkosSimulator>();
-}
-} // namespace Catalyst::Runtime

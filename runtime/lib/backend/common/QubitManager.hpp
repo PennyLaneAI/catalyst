@@ -14,11 +14,12 @@
 
 #pragma once
 
+#include <algorithm>
 #include <map>
 
 #include "Exception.hpp"
-#include "LightningUtils.hpp"
 #include "Types.h"
+#include "Utils.hpp"
 
 namespace Catalyst::Runtime::Simulator {
 

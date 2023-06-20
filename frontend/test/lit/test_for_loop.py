@@ -15,8 +15,10 @@
 # RUN: %PYTHON %s | FileCheck %s
 
 import subprocess
-from catalyst import qjit, for_loop
+
 import pennylane as qml
+
+from catalyst import for_loop, qjit
 
 
 # CHECK-NOT: Verification failed
@@ -27,10 +29,10 @@ def loop_circuit(n: int, inc: float):
     # CHECK-DAG:   [[qreg:%.+]] = "quantum.alloc"
     # CHECK-DAG:   [[c0:%.+]] = arith.constant 0 : index
     # CHECK-DAG:   [[c1:%.+]] = arith.constant 1 : index
-    # CHECK-DAG:   [[init:%.+]] = mhlo.constant dense<0.0{{.+}}>
+    # CHECK-DAG:   [[init:%.+]] = stablehlo.constant dense<0.0{{.+}}>
 
-    # CHECK-DAG:   [[c1_t:%.+]] = mhlo.constant dense<1>
-    # CHECK-DAG:   [[n_1_t:%.+]] = mhlo.subtract %arg0, [[c1_t]]
+    # CHECK-DAG:   [[c1_t:%.+]] = stablehlo.constant dense<1>
+    # CHECK-DAG:   [[n_1_t:%.+]] = stablehlo.subtract %arg0, [[c1_t]]
     # CHECK-DAG:   [[n_1:%.+]] = tensor.extract [[n_1_t]]
     # CHECK-DAG:   [[ub:%.+]] = arith.index_cast [[n_1]]
 
@@ -38,7 +40,7 @@ def loop_circuit(n: int, inc: float):
     @for_loop(0, n - 1, 1)
     def loop_fn(i, phi):
         # CHECK:       [[i_cast:%.+]] = arith.index_cast [[i]]
-        # CHECK:       [[phi1:%.+]] = mhlo.add [[phi0]], %arg1
+        # CHECK:       [[phi1:%.+]] = stablehlo.add %arg3, %arg1
 
         # CHECK:       [[q0:%.+]] = "quantum.extract"([[r0]], [[i_cast]])
         # CHECK:       [[phi_e:%.+]] = tensor.extract [[phi0]]
@@ -55,7 +57,7 @@ def loop_circuit(n: int, inc: float):
     return qml.state()
 
 
-# TODO: replace with internally applied canonicalization (#241)
+# TODO: replace with internally applied canonicalization (#48)
 subprocess.run(
     ["mlir-hlo-opt", "--canonicalize", "--allow-unregistered-dialect"],
     input=loop_circuit.mlir,

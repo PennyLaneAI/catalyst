@@ -12,17 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import jax
+import pennylane as qml
 import pytest
 
-from catalyst import qjit, measure
-import pennylane as qml
-import jax
+from catalyst import measure, qjit
 
 
-def test_strings_aot():
+def test_strings_aot(backend):
+    """Test strings AOT."""
+
     # Due to limitations in the frontend, we can only test qjit with scalar floats.
     @qjit()
-    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    @qml.qnode(qml.device(backend, wires=2))
     def foo(x: float, y: float):
         val = jax.numpy.arctan2(x, y)
         qml.RZ(val, wires=0)
@@ -32,10 +34,12 @@ def test_strings_aot():
         foo("hello", "world")
 
 
-def test_strings_jit():
+def test_strings_jit(backend):
+    """Test strings JIT."""
+
     # Due to limitations in the frontend, we can only test qjit with scalar floats.
     @qjit()
-    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    @qml.qnode(qml.device(backend, wires=2))
     def bar(x, y):
         val = jax.numpy.arctan2(x, y)
         qml.RZ(val, wires=0)

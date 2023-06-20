@@ -12,11 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """ Grover-like problem, PennyLane/PennyLane+JAX implementation """
+
 # pylint: disable=import-outside-toplevel
 # pylint: disable=too-many-instance-attributes
-from typing import Any
+
 from copy import deepcopy
 from dataclasses import dataclass
+from typing import Any
 
 import pennylane as qml
 import pennylane.numpy as pnp

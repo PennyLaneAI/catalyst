@@ -14,8 +14,9 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
-from catalyst import cond, qjit
 import pennylane as qml
+
+from catalyst import cond, qjit
 
 
 # CHECK-NOT: Verification failed
@@ -24,9 +25,9 @@ import pennylane as qml
 @qml.qnode(qml.device("lightning.qubit", wires=1))
 def circuit(n: int):
     # CHECK-DAG:   [[qreg_0:%[a-zA-Z0-9_]+]] = "quantum.alloc"
-    # CHECK-DAG:   [[c5:%[a-zA-Z0-9_]+]] = mhlo.constant dense<5> : tensor<i64>
-    # CHECK:       [[b_t:%[a-zA-Z0-9_]+]] = mhlo.compare  LE, %arg0, [[c5]], SIGNED : (tensor<i64>, tensor<i64>) -> tensor<i1>
-    # CHECK:       [[b:%[a-zA-Z0-9_]+]] = tensor.extract [[b_t]][] : tensor<i1>
+    # CHECK-DAG:   [[c5:%[a-zA-Z0-9_]+]] = stablehlo.constant dense<5> : tensor<i64>
+    # CHECK:       [[b_t:%[a-zA-Z0-9_]+]] = stablehlo.compare  LE, %arg0, [[c5]], SIGNED : (tensor<i64>, tensor<i64>) -> tensor<i1>
+    # CHECK:       [[b:%[a-zA-Z0-9_]+]] = "tensor.extract"([[b_t]])
     @cond(n <= 5)
     # CHECK:       "scf.if"([[b]])
     def cond_fn():
@@ -39,8 +40,8 @@ def circuit(n: int):
 
     @cond_fn.otherwise
     def otherwise():
-        # CHECK:       [[r0:%[a-zA-Z0-9_a-z]+]] = mhlo.multiply %arg0, %arg0
-        # CHECK:       [[r1:%[a-zA-Z0-9_a-z]+]] = mhlo.multiply %arg0, [[r0]]
+        # CHECK:       [[r0:%[a-zA-Z0-9_a-z]+]] = stablehlo.multiply %arg0, %arg0
+        # CHECK:       [[r1:%[a-zA-Z0-9_a-z]+]] = stablehlo.multiply %arg0, [[r0]]
         # CHECK:       "scf.yield"([[r1]], [[qreg_0]])
         return n**3
 

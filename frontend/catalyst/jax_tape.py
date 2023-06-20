@@ -17,10 +17,13 @@ that occur within the circuit.
 """
 
 import jax
-from jax.interpreters.partial_eval import DynamicJaxprTrace, JaxprStackFrame, extend_jaxpr_stack
-from jax.tree_util import tree_flatten, tree_unflatten
-
 import pennylane as qml
+from jax.interpreters.partial_eval import (
+    DynamicJaxprTrace,
+    JaxprStackFrame,
+    extend_jaxpr_stack,
+)
+from jax.tree_util import tree_flatten, tree_unflatten
 from pennylane.tape import QuantumTape
 
 from catalyst import jax_tracer
@@ -168,7 +171,6 @@ class JaxTape:
         self.return_value = return_value
 
 
-# pylint: disable=too-few-public-methods
 class EmptyObservable:
     """Denotes an observable equivalent to a given set of wires.
 
@@ -202,7 +204,7 @@ def get_observables_dependency_tree(obs):
     """
     if obs is None:
         yield obs
-    elif isinstance(obs, tuple(jax_tracer.namedobs_map.keys())):
+    elif isinstance(obs, jax_tracer.KNOWN_NAMED_OBS):
         yield obs
     elif isinstance(obs, qml.Hermitian):
         yield obs

@@ -14,13 +14,15 @@
 
 #pragma once
 
+#include <array>
+#include <string>
+#include <string_view>
+#include <tuple>
+#include <utility>
+
 #include "Types.h"
 
-// PL-Lightning(-Kokkos) uncategorised utility header
-
 #if __has_include("StateVectorKokkos.hpp")
-// this macro is used in the C++ test suite
-#define _KOKKOS
 #include "UtilKokkos.hpp"
 #else
 #include "Util.hpp"

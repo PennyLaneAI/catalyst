@@ -18,59 +18,62 @@
 #include "Types.h"
 
 #include "CacheManager.hpp"
-#include "LightningUtils.hpp"
 #include "MemRefUtils.hpp"
 #include "QuantumDevice.hpp"
+#include "Utils.hpp"
 
-#include <catch2/catch.hpp>
+#include "TestUtils.hpp"
 
 using namespace Catalyst::Runtime;
 using namespace Catalyst::Runtime::Simulator;
 
-TEST_CASE("NameObs test with invalid number of wires", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("NameObs test with invalid number of wires", "[Measures]", SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     REQUIRE_THROWS_WITH(sim->Observable(ObsId::PauliX, {}, {1}),
                         Catch::Contains("Invalid number of wires"));
 }
 
-TEST_CASE("NameObs test with invalid given wires for NamedObs", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("NameObs test with invalid given wires for NamedObs", "[Measures]",
+                        SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
+
     sim->AllocateQubit();
 
     REQUIRE_THROWS_WITH(sim->Observable(ObsId::PauliX, {}, {1}),
                         Catch::Contains("Invalid given wires"));
 }
 
-TEST_CASE("HermitianObs test with invalid number of wires", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("HermitianObs test with invalid number of wires", "[Measures]", SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     REQUIRE_THROWS_WITH(sim->Observable(ObsId::Hermitian, {}, {1}),
                         Catch::Contains("Invalid number of wires"));
 }
 
-TEST_CASE("HermitianObs test with invalid given wires for HermitianObs", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("HermitianObs test with invalid given wires for HermitianObs", "[Measures]",
+                        SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
     sim->AllocateQubit();
 
     REQUIRE_THROWS_WITH(sim->Observable(ObsId::Hermitian, {}, {1}),
                         Catch::Contains("Invalid given wires"));
 }
 
-TEST_CASE("Check an unsupported observable", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("Check an unsupported observable", "[Measures]", SimTypes)
 {
     REQUIRE_THROWS_WITH(Lightning::lookup_obs<Lightning::simulator_observable_support_size>(
                             Lightning::simulator_observable_support, static_cast<ObsId>(10)),
                         Catch::Contains("The given observable is not supported by the simulator"));
 }
 
-TEST_CASE("Measurement collapse test with 2 wires", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("Measurement collapse test with 2 wires", "[Measures]", SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     constexpr size_t n = 2;
     std::vector<QubitIdType> Qs = sim->AllocateQubits(n);
@@ -94,9 +97,10 @@ TEST_CASE("Measurement collapse test with 2 wires", "[lightning]")
     // LCOV_EXCL_STOP
 }
 
-TEST_CASE("Measurement collapse concrete logical qubit difference", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("Measurement collapse concrete logical qubit difference", "[Measures]",
+                        SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     constexpr size_t n = 1;
     // The first time an array is allocated, logical and concrete qubits
@@ -123,9 +127,9 @@ TEST_CASE("Measurement collapse concrete logical qubit difference", "[lightning]
     // LCOV_EXCL_STOP
 }
 
-TEST_CASE("Mid-circuit measurement naive test", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("Mid-circuit measurement naive test", "[Measures]", SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     QubitIdType q;
 
@@ -138,16 +142,17 @@ TEST_CASE("Mid-circuit measurement naive test", "[lightning]")
     CHECK(*m);
 }
 
-TEST_CASE("Expval(ObsT) test with invalid key for cached observables", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("Expval(ObsT) test with invalid key for cached observables", "[Measures]",
+                        SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     REQUIRE_THROWS_WITH(sim->Expval(0), Catch::Contains("Invalid key for cached observables"));
 }
 
-TEST_CASE("Expval(NamedObs) test with numWires=1", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("Expval(NamedObs) test with numWires=1", "[Measures]", SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 4;
@@ -171,9 +176,9 @@ TEST_CASE("Expval(NamedObs) test with numWires=1", "[lightning]")
     CHECK(sim->Expval(pz) == Approx(-1.0).margin(1e-5));
 }
 
-TEST_CASE("Expval(HermitianObs) test with numWires=1", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("Expval(HermitianObs) test with numWires=1", "[Measures]", SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 2;
@@ -196,9 +201,9 @@ TEST_CASE("Expval(HermitianObs) test with numWires=1", "[lightning]")
     CHECK(sim->Expval(h2) == Approx(.0).margin(1e-5));
 }
 
-TEST_CASE("Expval(TensorProd(NamedObs)) test", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("Expval(TensorProd(NamedObs)) test", "[Measures]", SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 4;
@@ -225,9 +230,9 @@ TEST_CASE("Expval(TensorProd(NamedObs)) test", "[lightning]")
     CHECK(sim->Expval(tpz) == Approx(-1.0).margin(1e-5));
 }
 
-TEST_CASE("Expval(TensorProd(NamedObs[])) test", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("Expval(TensorProd(NamedObs[])) test", "[Measures]", SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 4;
@@ -255,9 +260,9 @@ TEST_CASE("Expval(TensorProd(NamedObs[])) test", "[lightning]")
     CHECK(sim->Expval(tpxz) == Approx(-1.0).margin(1e-5));
 }
 
-TEST_CASE("Expval(TensorProd(HermitianObs))", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("Expval(TensorProd(HermitianObs))", "[Measures]", SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 2;
@@ -282,9 +287,9 @@ TEST_CASE("Expval(TensorProd(HermitianObs))", "[lightning]")
     CHECK(sim->Expval(tph2) == Approx(.0).margin(1e-5));
 }
 
-TEST_CASE("Expval(TensorProd(HermitianObs[]))", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("Expval(TensorProd(HermitianObs[]))", "[Measures]", SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 2;
@@ -307,9 +312,9 @@ TEST_CASE("Expval(TensorProd(HermitianObs[]))", "[lightning]")
     CHECK(sim->Expval(tp) == Approx(.0).margin(1e-5));
 }
 
-TEST_CASE("Expval(TensorProd(Obs[]))", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("Expval(TensorProd(Obs[]))", "[Measures]", SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 4;
@@ -335,9 +340,9 @@ TEST_CASE("Expval(TensorProd(Obs[]))", "[lightning]")
     CHECK(sim->Expval(tp) == Approx(-3.0).margin(1e-5));
 }
 
-TEST_CASE("Expval(Hamiltonian(NamedObs[])) test", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("Expval(Hamiltonian(NamedObs[])) test", "[Measures]", SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 4;
@@ -360,9 +365,9 @@ TEST_CASE("Expval(Hamiltonian(NamedObs[])) test", "[lightning]")
     CHECK(sim->Expval(hxyz) == Approx(0.2).margin(1e-5));
 }
 
-TEST_CASE("Expval(Hamiltonian(TensorObs[])) test", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("Expval(Hamiltonian(TensorObs[])) test", "[Measures]", SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 4;
@@ -387,9 +392,9 @@ TEST_CASE("Expval(Hamiltonian(TensorObs[])) test", "[lightning]")
     CHECK(sim->Expval(hxyz) == Approx(-.6).margin(1e-5));
 }
 
-TEST_CASE("Expval(Hamiltonian(Hermitian[])) test", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("Expval(Hamiltonian(Hermitian[])) test", "[Measures]", SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 4;
@@ -414,9 +419,10 @@ TEST_CASE("Expval(Hamiltonian(Hermitian[])) test", "[lightning]")
     CHECK(sim->Expval(hxhz) == Approx(0.5).margin(1e-5));
 }
 
-TEST_CASE("Expval(Hamiltonian({TensorProd, Hermitian}[])) test", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("Expval(Hamiltonian({TensorProd, Hermitian}[])) test", "[Measures]",
+                        SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 4;
@@ -442,9 +448,9 @@ TEST_CASE("Expval(Hamiltonian({TensorProd, Hermitian}[])) test", "[lightning]")
     CHECK(sim->Expval(hhtp) == Approx(1.2).margin(1e-5));
 }
 
-TEST_CASE("Var(NamedObs) test with numWires=4", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("Var(NamedObs) test with numWires=4", "[Measures]", SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 4;
@@ -468,12 +474,9 @@ TEST_CASE("Var(NamedObs) test with numWires=4", "[lightning]")
     CHECK(sim->Var(pz) == Approx(.0).margin(1e-5));
 }
 
-// TODO: Remove this after the next release of PennyLane-Lightning
-#if defined(_KOKKOS)
-
-TEST_CASE("Var(HermitianObs) test with numWires=1", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("Var(HermitianObs) test with numWires=1", "[Measures]", SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 2;
@@ -496,9 +499,9 @@ TEST_CASE("Var(HermitianObs) test with numWires=1", "[lightning]")
     CHECK(sim->Var(h2) == Approx(1.0).margin(1e-5));
 }
 
-TEST_CASE("Var(TensorProd(NamedObs)) test", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("Var(TensorProd(NamedObs)) test", "[Measures]", SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 4;
@@ -525,9 +528,9 @@ TEST_CASE("Var(TensorProd(NamedObs)) test", "[lightning]")
     CHECK(sim->Var(tpz) == Approx(.0).margin(1e-5));
 }
 
-TEST_CASE("Var(TensorProd(NamedObs[])) test", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("Var(TensorProd(NamedObs[])) test", "[Measures]", SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 4;
@@ -552,9 +555,9 @@ TEST_CASE("Var(TensorProd(NamedObs[])) test", "[lightning]")
     CHECK(sim->Var(tpxz) == Approx(0.0).margin(1e-5));
 }
 
-TEST_CASE("Var(TensorProd(HermitianObs))", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("Var(TensorProd(HermitianObs)) test", "[Measures]", SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 2;
@@ -579,9 +582,9 @@ TEST_CASE("Var(TensorProd(HermitianObs))", "[lightning]")
     CHECK(sim->Var(tph2) == Approx(1.0).margin(1e-5));
 }
 
-TEST_CASE("Var(TensorProd(HermitianObs[]))", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("Var(TensorProd(HermitianObs[])) test", "[Measures]", SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 2;
@@ -604,9 +607,9 @@ TEST_CASE("Var(TensorProd(HermitianObs[]))", "[lightning]")
     CHECK(sim->Var(tp) == Approx(2.0).margin(1e-5));
 }
 
-TEST_CASE("Var(TensorProd(Obs[]))", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("Var(TensorProd(Obs[])) test", "[Measures]", SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 4;
@@ -632,9 +635,9 @@ TEST_CASE("Var(TensorProd(Obs[]))", "[lightning]")
     CHECK(sim->Var(tp) == Approx(4.0).margin(1e-5));
 }
 
-TEST_CASE("Var(Hamiltonian(NamedObs[])) test", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("Var(Hamiltonian(NamedObs[])) test", "[Measures]", SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 4;
@@ -657,9 +660,9 @@ TEST_CASE("Var(Hamiltonian(NamedObs[])) test", "[lightning]")
     CHECK(sim->Var(hxyz) == Approx(0.64).margin(1e-5));
 }
 
-TEST_CASE("Var(Hamiltonian(TensorObs[])) test", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("Var(Hamiltonian(TensorObs[])) test", "[Measures]", SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 4;
@@ -684,9 +687,9 @@ TEST_CASE("Var(Hamiltonian(TensorObs[])) test", "[lightning]")
     CHECK(sim->Var(hxyz) == Approx(0.04).margin(1e-5));
 }
 
-TEST_CASE("Var(Hamiltonian(Hermitian[])) test", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("Var(Hamiltonian(Hermitian[])) test", "[Measures]", SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 4;
@@ -711,9 +714,9 @@ TEST_CASE("Var(Hamiltonian(Hermitian[])) test", "[lightning]")
     CHECK(sim->Var(hxhz) == Approx(0.36).margin(1e-5));
 }
 
-TEST_CASE("Var(Hamiltonian({TensorProd, Hermitian}[])) test", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("Var(Hamiltonian({TensorProd, Hermitian}[])) test", "[Measures]", SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 4;
@@ -739,11 +742,9 @@ TEST_CASE("Var(Hamiltonian({TensorProd, Hermitian}[])) test", "[lightning]")
     CHECK(sim->Var(hhtp) == Approx(1.0).margin(1e-5));
 }
 
-#endif
-
-TEST_CASE("State test with incorrect size", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("State test with incorrect size", "[Measures]", SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 4;
@@ -755,9 +756,9 @@ TEST_CASE("State test with incorrect size", "[lightning]")
                         Catch::Contains("Invalid size for the pre-allocated state vector"));
 }
 
-TEST_CASE("State test with numWires=4", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("State test with numWires=4", "[Measures]", SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 4;
@@ -784,9 +785,10 @@ TEST_CASE("State test with numWires=4", "[lightning]")
     }
 }
 
-TEST_CASE("PartialProbs test with incorrect numWires and numAlloc", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("PartialProbs test with incorrect numWires and numAlloc", "[Measures]",
+                        SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 4;
@@ -815,9 +817,9 @@ TEST_CASE("PartialProbs test with incorrect numWires and numAlloc", "[lightning]
                         Catch::Contains("Invalid given wires to measure"));
 }
 
-TEST_CASE("Probs and PartialProbs tests with numWires=0-4", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("Probs and PartialProbs tests with numWires=0-4", "[Measures]", SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 4;
@@ -876,9 +878,10 @@ TEST_CASE("Probs and PartialProbs tests with numWires=0-4", "[lightning]")
     }
 }
 
-TEST_CASE("PartialSample test with incorrect numWires and numAlloc", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("PartialSample test with incorrect numWires and numAlloc", "[Measures]",
+                        SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 4;
@@ -908,9 +911,10 @@ TEST_CASE("PartialSample test with incorrect numWires and numAlloc", "[lightning
                         Catch::Contains("Invalid given wires to measure"));
 }
 
-TEST_CASE("PartialCounts test with incorrect numWires and numAlloc", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("PartialCounts test with incorrect numWires and numAlloc", "[Measures]",
+                        SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 4;
@@ -942,9 +946,10 @@ TEST_CASE("PartialCounts test with incorrect numWires and numAlloc", "[lightning
                         Catch::Contains("Invalid given wires to measure"));
 }
 
-TEST_CASE("Sample and PartialSample tests with numWires=0-4 shots=100", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("Sample and PartialSample tests with numWires=0-4 shots=100", "[Measures]",
+                        SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 4;
@@ -990,9 +995,10 @@ TEST_CASE("Sample and PartialSample tests with numWires=0-4 shots=100", "[lightn
         CHECK((samples4[i] == 0. || samples4[i] == 1.));
 }
 
-TEST_CASE("Counts and PartialCounts tests with numWires=0-4 shots=100", "[lightning]")
+TEMPLATE_LIST_TEST_CASE("Counts and PartialCounts tests with numWires=0-4 shots=100", "[Measures]",
+                        SimTypes)
 {
-    std::unique_ptr<QuantumDevice> sim = CreateQuantumDevice();
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
     constexpr size_t n = 4;

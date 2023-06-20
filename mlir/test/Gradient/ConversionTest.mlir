@@ -12,14 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --convert-gradient-to-llvm --convert-memref-to-llvm --split-input-file %s | FileCheck %s
+// RUN: quantum-opt --convert-gradient-to-llvm --finalize-memref-to-llvm --split-input-file %s | FileCheck %s
 
 //////////////////////
 // Native Gradients //
 //////////////////////
 
 func.func private @circuit.nodealloc(%arg0: f32) -> (!quantum.reg)
-func.func private @circuit(%arg0: f32) -> (f64, memref<?xf64>)
 
 // CHECK-DAG:   llvm.func @__quantum__rt__toggle_recorder(i1)
 // CHECK-DAG:   llvm.func @__quantum__qis__Gradient(i64, ...)
@@ -35,8 +34,8 @@ func.func @adjoint(%arg0: f32, %arg1 : index) -> (memref<?xf64>, memref<?xf64>) 
 
     // CHECK-DAG:   [[C1:%.+]] = llvm.mlir.constant(1 : i64) : i64
     // CHECK-DAG:   [[C2:%.+]] = llvm.mlir.constant(2 : i64) : i64
-    // CHECK:       [[GRAD1:%.+]] = llvm.alloca [[C1]] {{.+}} -> !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>
-    // CHECK:       [[GRAD2:%.+]] = llvm.alloca [[C1]] {{.+}} -> !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<1 x i64>, array<1 x i64>)>>
+    // CHECK:       [[GRAD1:%.+]] = llvm.alloca [[C1]] x !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+    // CHECK:       [[GRAD2:%.+]] = llvm.alloca [[C1]] x !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
 
     // CHECK:       llvm.call @__quantum__qis__Gradient([[C2]], [[GRAD1]], [[GRAD2]])
     // CHECK:       quantum.dealloc [[QREG]]

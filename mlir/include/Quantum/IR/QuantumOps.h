@@ -24,6 +24,8 @@
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
 
+#include "Quantum/IR/QuantumInterfaces.h"
+
 //===----------------------------------------------------------------------===//
 // Quantum trait declarations.
 //===----------------------------------------------------------------------===//
@@ -50,6 +52,8 @@ class QuantumMemory : public mlir::SideEffects::Resource::Base<QuantumMemory> {
 //===----------------------------------------------------------------------===//
 
 #include "Quantum/IR/QuantumDialect.h"
-
+#include "Quantum/IR/QuantumEnums.h.inc"
+#define GET_ATTRDEF_CLASSES
+#include "Quantum/IR/QuantumAttributes.h.inc"
 #define GET_OP_CLASSES
 #include "Quantum/IR/QuantumOps.h.inc"

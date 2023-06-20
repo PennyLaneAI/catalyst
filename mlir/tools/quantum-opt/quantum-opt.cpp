@@ -18,6 +18,8 @@
 #include "mlir/InitAllPasses.h"
 #include "mlir/Tools/mlir-opt/MlirOptMain.h"
 
+#include "Catalyst/IR/CatalystDialect.h"
+#include "Catalyst/Transforms/Passes.h"
 #include "Gradient/IR/GradientDialect.h"
 #include "Gradient/Transforms/Passes.h"
 #include "Quantum/IR/QuantumDialect.h"
@@ -26,15 +28,18 @@
 int main(int argc, char **argv)
 {
     mlir::registerAllPasses();
+    mlir::registerPass(catalyst::createArrayListToMemRefPass);
     mlir::registerPass(catalyst::createGradientBufferizationPass);
     mlir::registerPass(catalyst::createGradientLoweringPass);
     mlir::registerPass(catalyst::createGradientConversionPass);
     mlir::registerPass(catalyst::createQuantumBufferizationPass);
     mlir::registerPass(catalyst::createQuantumConversionPass);
     mlir::registerPass(catalyst::createEmitCatalystPyInterfacePass);
+    mlir::registerPass(catalyst::createCopyGlobalMemRefPass);
 
     mlir::DialectRegistry registry;
     mlir::registerAllDialects(registry);
+    registry.insert<catalyst::CatalystDialect>();
     registry.insert<catalyst::quantum::QuantumDialect>();
     registry.insert<catalyst::gradient::GradientDialect>();
 

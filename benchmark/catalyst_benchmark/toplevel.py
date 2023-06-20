@@ -13,31 +13,32 @@
 # limitations under the License.
 """ This file defines certain high-level routines, such as the data collection cycle, data loading
 and the plotting. Measurement ranges and scales are all defined here as global dictionaries. """
+
 import sys
-from os import makedirs
-from os.path import isfile, dirname, join
-from json import load as json_load
-from argparse import ArgumentParser, Namespace as ParsedArguments
-from typing import List, Tuple, Iterable, Set, Union, Optional
+from argparse import ArgumentParser
+from argparse import Namespace as ParsedArguments
 from collections import defaultdict
 from copy import deepcopy
+from functools import partial
 from hashlib import sha256
 from itertools import chain
-from functools import partial
+from json import load as json_load
+from os import makedirs
+from os.path import dirname, isfile, join
 from subprocess import run as subprocess_run
+from typing import Iterable, List, Optional, Set, Tuple, Union
 
-import vl_convert as vlc
 import altair as alt
 import pandas as pd
-from pandas import DataFrame
+import vl_convert as vlc
 from altair import Chart
-
 from catalyst_benchmark.types import (
-    Sysinfo,
     BenchmarkResult,
     BenchmarkResultV1,
     BooleanOptionalAction,
+    Sysinfo,
 )
+from pandas import DataFrame
 
 # fmt:off
 FMTVERSION = 1
@@ -113,8 +114,8 @@ DIFF_METHODS = {
     ("chemvqe","runtime"): ["finite-diff", "parameter-shift", "adjoint", "backprop"]
 }
 
-# Colors obtained from a Vega colorscheme.
-# Ref. https://stackoverflow.com/questions/70993559/altair-selecting-a-color-from-a-vega-color-scheme-for-plot
+# Colors obtained from a Vega colorscheme. Ref:
+# https://stackoverflow.com/questions/70993559/altair-selecting-a-color-from-a-vega-color-scheme-for-plot
 COLORS = ["#e41a1c", "#377eb8", "#ff7f00", "#4daf4a", "#984ea3",
           "#ffff33", "#a65628", "#f781bf", "#999999"]
 
@@ -212,7 +213,6 @@ def collect(a: ParsedArguments) -> None:  # noqa
     # pylint: disable=too-many-nested-blocks
     # pylint: disable=too-many-branches
     # pylint: disable=broad-except
-    # pylint: disable=complex-method
     known_failures = deepcopy(KNOWN_FAILURES)
     try:
         for config in all_configurations(a):

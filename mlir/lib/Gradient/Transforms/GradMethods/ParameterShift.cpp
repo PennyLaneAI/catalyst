@@ -22,6 +22,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 
+#include "Gradient/Utils/GetDiffMethod.h"
 #include "Quantum/IR/QuantumOps.h"
 
 namespace catalyst {
@@ -29,8 +30,9 @@ namespace gradient {
 
 LogicalResult ParameterShiftLowering::match(GradOp op) const
 {
-    if (op.getMethod() == "ps")
+    if (getQNodeDiffMethod(op) == "parameter-shift") {
         return success();
+    }
 
     return failure();
 }
@@ -47,10 +49,6 @@ void ParameterShiftLowering::rewrite(GradOp op, PatternRewriter &rewriter) const
     // containing quantum instructions with at least one gate parameter).
     auto [numShifts, loopDepth] = analyzeFunction(callee);
 
-    // In order to allocate memory for various tensors relating to the number of gate parameters
-    // at runtime we run a function that merely counts up for each gate parameter encountered.
-    func::FuncOp paramCountFn = genParamCountFunction(rewriter, loc, callee);
-
     // Generate the classical argument map from function arguments to gate parameters. This
     // function will be differentiated to produce the classical jacobian.
     func::FuncOp argMapFn = genArgMapFunction(rewriter, loc, callee);
@@ -65,8 +63,7 @@ void ParameterShiftLowering::rewrite(GradOp op, PatternRewriter &rewriter) const
 
     // Generate the full gradient function, computing the partial derivates with respect to the
     // original function arguments from the classical Jacobian and quantum gradient.
-    func::FuncOp fullGradFn =
-        genFullGradFunction(rewriter, loc, op, paramCountFn, argMapFn, qGradFn, "ps");
+    func::FuncOp fullGradFn = genFullGradFunction(rewriter, loc, op, argMapFn, qGradFn, "ps");
 
     rewriter.setInsertionPoint(op);
     rewriter.replaceOpWithNewOp<func::CallOp>(op, fullGradFn, op.getArgOperands());
@@ -82,11 +79,11 @@ std::pair<int64_t, int64_t> ParameterShiftLowering::analyzeFunction(func::FuncOp
         if (isa<scf::ForOp>(op)) {
             loopLevel++;
         }
-        else if (auto gate = dyn_cast<quantum::CustomOp>(op)) {
-            if (gate.getParams().empty())
+        else if (auto gate = dyn_cast<quantum::DifferentiableGate>(op)) {
+            if (gate.getDiffParams().empty())
                 return;
 
-            numShifts += gate.getParams().size();
+            numShifts += gate.getDiffParams().size();
             maxLoopDepth = std::max(loopLevel, maxLoopDepth);
         }
         else if (isa<scf::YieldOp>(op) && isa<scf::ForOp>(op->getParentOp())) {
