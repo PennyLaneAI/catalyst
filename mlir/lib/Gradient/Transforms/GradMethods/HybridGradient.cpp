@@ -75,33 +75,17 @@ func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc, GradOp
             rewriter.create<func::CallOp>(loc, qGradFn, callArgs).getResults();
         callArgs.pop_back();
         DenseIntElementsAttr diffArgIndicesAttr = gradOp.getDiffArgIndices().value_or(nullptr);
-
+        
+        auto resultsTypes = gradOp.getResultTypes();
         // Compute hybrid gradients via Enzyme
         std::vector<Value> hybridGradients;
         for (Value quantumGradient : quantumGradients) {
+            // auto results = rewriter.create<tensor::EmptyOp>(loc, )
             auto rank = quantumGradient.getType().cast<RankedTensorType>().getRank();
 
             if (rank > 1) {
                 std::vector<int64_t> sizes =
                     quantumGradient.getType().cast<RankedTensorType>().getShape();
-
-                std::vector<int64_t> strides(rank, 1);
-                std::vector<Value> dynStrides = {};
-
-                std::vector<Value> dynOffsets = {};
-
-                std::vector<Value> dynSizes;
-
-                for (auto index = 0; index < sizes.size(); ++index) {
-                    if (index == 0) {
-                        Value idx = rewriter.create<index::ConstantOp>(loc, index);
-                        Value dimSize = rewriter.create<tensor::DimOp>(loc, quantumGradient, idx);
-                        dynSizes.push_back(dimSize);
-                    }
-                    else {
-                        sizes[index] = 1;
-                    }
-                }
 
                 std::vector<std::vector<int64_t>> allOffsets;
                 std::vector<int64_t> cutOffset(sizes.begin() + 1, sizes.end());
@@ -125,18 +109,45 @@ func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc, GradOp
                     }
                 }
 
+                std::vector<int64_t> strides(rank, 1);
+                std::vector<Value> dynStrides = {};
+
+                std::vector<Value> dynOffsets = {};
+
+                std::vector<Value> dynSizes;
+
+                for (auto index = 0; index < sizes.size(); ++index) {
+                    if (index == 0) {
+                        Value idx = rewriter.create<index::ConstantOp>(loc, index);
+                        Value dimSize = rewriter.create<tensor::DimOp>(loc, quantumGradient, idx);
+                        dynSizes.push_back(dimSize);
+                    }
+                    else {
+                        sizes[index] = 1;
+                    }
+                }
+
+                for (auto off: allOffsets) {
+                    for (auto o: off) {
+                        std::cout << o << " ";       
+                    }
+                    std::cout << std::endl;
+                }
                 for (auto offsetRight : allOffsets) {
                     std::vector<int64_t> offsets{0};
                     offsets.insert(offsets.end(), offsetRight.begin(), offsetRight.end());
+                    auto rankReducedType =
+                        tensor::ExtractSliceOp::inferCanonicalRankReducedResultType(
+                            1, quantumGradient.getType().cast<RankedTensorType>(), offsets, sizes, strides)
+                            .cast<RankedTensorType>();
                     Value extractQuantumGradient = rewriter.create<tensor::ExtractSliceOp>(
-                        loc, quantumGradient.getType(), quantumGradient, dynOffsets, dynSizes,
+                        loc, rankReducedType, quantumGradient, dynOffsets, dynSizes,
                         dynStrides, offsets, sizes, strides);
-                    // Potentially collapse
 
                     BackpropOp backpropOp = rewriter.create<BackpropOp>(
                         loc, computeBackpropTypes(argMapFn), argMapFn.getName(), callArgs,
                         extractQuantumGradient, ValueRange{}, diffArgIndicesAttr);
-
+                    backpropOp.getResult(0).getType().print(llvm::outs());
                     // Insert slices
                     hybridGradients.push_back(backpropOp.getResult(0));
                 }
