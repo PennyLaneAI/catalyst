@@ -28,7 +28,8 @@ with open(".dep-versions") as f:
     jax_version = [line[4:].strip() for line in f.readlines() if "jax=" in line][0]
 
 requirements = [
-    "pennylane>=0.28",
+    # TODO: Change to "pennylane>=0.31" when next version releases.
+    "pennylane @ git+https://github.com/PennyLaneAI/pennylane/@master",
     f"jax=={jax_version}",
     f"jaxlib=={jax_version}",
 ]

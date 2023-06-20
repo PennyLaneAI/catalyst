@@ -143,6 +143,7 @@ jobs:
         # echo 'target_compile_options(mlir_c_runner_utils PRIVATE "-fno-sanitize=all")' \
         #       >> mlir/llvm-project/mlir/lib/ExecutionEngine/CMakeLists.txt
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
+        COMPILER_LAUNCHER="" \
         make llvm
 
   mhlo:
@@ -214,6 +215,7 @@ jobs:
       run: |
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         MHLO_BUILD_DIR="$(pwd)/mhlo-build" \
+        COMPILER_LAUNCHER="" \
         make mhlo
 
   quantum:
@@ -262,6 +264,7 @@ jobs:
       with:
         path: .ccache
         # TODO: revisit once actions/cache has an update feature
+        #       https://github.com/actions/toolkit/issues/505
         #       this will load the latest available cache and generate a new one at the end
         key: ${{ runner.os }}-ccache-${{ github.run_id }}
         restore-keys: ${{ runner.os }}-ccache-

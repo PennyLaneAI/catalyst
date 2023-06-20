@@ -25,6 +25,8 @@ pytest.importorskip("braket")
 
 @pytest.mark.braket
 class TestBraketGates:
+    """Unit tests for quantum gates."""
+
     @pytest.mark.parametrize(
         "device",
         [
@@ -144,6 +146,8 @@ class TestBraketGates:
 
 @pytest.mark.braket
 class TestBraketSample:
+    """Unit tests for ``qml.sample``."""
+
     @pytest.mark.parametrize(
         "device",
         [
@@ -209,6 +213,8 @@ class TestBraketSample:
 
 @pytest.mark.braket
 class TestBraketProbs:
+    """Unit tests for ``qml.probs``."""
+
     @pytest.mark.parametrize(
         "device",
         [
@@ -265,6 +271,8 @@ class TestBraketProbs:
 
 @pytest.mark.braket
 class TestBraketCounts:
+    """Unit tests for ``qml.counts``."""
+
     @pytest.mark.parametrize(
         "device",
         [
@@ -331,6 +339,8 @@ class TestBraketCounts:
 
 @pytest.mark.braket
 class TestBraketExpval:
+    """Unit tests for ``qml.expval``."""
+
     @pytest.mark.parametrize(
         "device",
         [
@@ -390,6 +400,8 @@ class TestBraketExpval:
 
 @pytest.mark.braket
 class TestBraketVar:
+    """Unit tests for ``qml.var``."""
+
     @pytest.mark.parametrize(
         "device",
         [
@@ -478,6 +490,8 @@ class TestBraketVar:
 
 @pytest.mark.braket
 class TestBraketMeasurementsProcess:
+    """Unit tests for mixing measurement processes."""
+
     @pytest.mark.parametrize(
         "device",
         [
@@ -582,6 +596,8 @@ class TestBraketMeasurementsProcess:
 
 @pytest.mark.braket
 class TestBraketGradient:
+    """Unit tests for gradient methods."""
+
     @pytest.mark.parametrize(
         "device",
         [

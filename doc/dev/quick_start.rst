@@ -688,3 +688,21 @@ Examples of newly supported workflows:
         return jnp.sum(jnp.cos(circuit(x)) ** 2)
 
     jax.grad(cost_fn)(jnp.array([0.1, 0.2, 0.3]))
+
+- Vectorization of compiled workflows with JAX:
+
+.. code-block:: python
+
+    @qjit
+    @qml.qnode(dev)
+    def circuit(x):
+        qml.RX(jnp.pi * x[0], wires=0)
+        qml.RY(x[1] ** 2, wires=0)
+        qml.RX(x[1] * x[2], wires=0)
+        return qml.probs(wires=0)
+
+    def cost_fn(weights):
+        x = jnp.sin(weights)
+        return jnp.sum(jnp.cos(circuit(x)) ** 2)
+
+    jax.vmap(cost_fn)(jnp.array([[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]]))

@@ -1,0 +1,12 @@
+--- CMakeLists.txt
++++ CMakeLists.txt
+@@ -13,6 +13,9 @@ add_mlir_library(MhloAnalysis
+ add_mlir_library(MhloTestAnalysis
+   test_shape_component_analysis.cc
+ 
++  DEPENDS
++  LMHLOTransformsPassIncGen
++
+   LINK_COMPONENTS
+   Core
+ 

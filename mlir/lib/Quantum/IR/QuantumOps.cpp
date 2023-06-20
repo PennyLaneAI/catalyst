@@ -14,6 +14,7 @@
 
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/OpImplementation.h"
+#include "llvm/ADT/TypeSwitch.h"
 
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/IR/QuantumOps.h"
@@ -25,6 +26,7 @@ using namespace catalyst::quantum;
 // Quantum op definitions.
 //===----------------------------------------------------------------------===//
 
+#include "Quantum/IR/QuantumEnums.cpp.inc"
 #define GET_OP_CLASSES
 #include "Quantum/IR/QuantumOps.cpp.inc"
 
@@ -54,6 +56,31 @@ LogicalResult DeallocOp::canonicalize(DeallocOp dealloc, mlir::PatternRewriter &
     return failure();
 }
 
+template <typename IndexingOp> LogicalResult foldConstantIndexingOp(IndexingOp op, Attribute idx)
+{
+    // Prefer using an attribute when the index is constant.
+    bool hasNoIdxAttr = !op.getIdxAttr().has_value();
+    bool isConstantIdx = isa_and_nonnull<IntegerAttr>(idx);
+    if (hasNoIdxAttr && isConstantIdx) {
+        auto constantIdx = cast<IntegerAttr>(idx);
+        op.setIdxAttr(constantIdx.getValue().getSExtValue());
+
+        // Remove the dynamic Value
+        op.getIdxMutable().clear();
+        return success();
+    }
+    return failure();
+}
+
+OpFoldResult ExtractOp::fold(FoldAdaptor adaptor)
+{
+    if (succeeded(foldConstantIndexingOp(*this, adaptor.getIdx()))) {
+        return getResult();
+    }
+    // Returning nullptr tells the caller the op was unchanged.
+    return nullptr;
+}
+
 LogicalResult InsertOp::canonicalize(InsertOp insert, mlir::PatternRewriter &rewriter)
 {
     if (auto extract = dyn_cast_if_present<ExtractOp>(insert.getQubit().getDefiningOp())) {
@@ -72,9 +99,34 @@ LogicalResult InsertOp::canonicalize(InsertOp insert, mlir::PatternRewriter &rew
     return failure();
 }
 
+OpFoldResult InsertOp::fold(FoldAdaptor adaptor)
+{
+    if (succeeded(foldConstantIndexingOp(*this, adaptor.getIdx()))) {
+        return getResult();
+    }
+    // Returning nullptr tells the caller the op was unchanged.
+    return nullptr;
+}
+
 //===----------------------------------------------------------------------===//
 // Quantum op verifiers.
 //===----------------------------------------------------------------------===//
+
+LogicalResult ExtractOp::verify()
+{
+    if (!(getIdx() || getIdxAttr().has_value())) {
+        return emitOpError() << "expected op to have a non-null index";
+    }
+    return success();
+}
+
+LogicalResult InsertOp::verify()
+{
+    if (!(getIdx() || getIdxAttr().has_value())) {
+        return emitOpError() << "expected op to have a non-null index";
+    }
+    return success();
+}
 
 static LogicalResult verifyObservable(Value obs, size_t *numQubits)
 {

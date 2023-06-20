@@ -29,19 +29,11 @@ using namespace catalyst::gradient;
 namespace catalyst {
 namespace gradient {
 
-struct GradientBufferizationPass
-    : public PassWrapper<GradientBufferizationPass, OperationPass<ModuleOp>> {
-    GradientBufferizationPass() {}
+#define GEN_PASS_DEF_GRADIENTBUFFERIZATIONPASS
+#include "Gradient/Transforms/Passes.h.inc"
 
-    StringRef getArgument() const override { return "gradient-bufferize"; }
-
-    StringRef getDescription() const override { return "Bufferize tensors in quantum operations."; }
-
-    void getDependentDialects(DialectRegistry &registry) const override
-    {
-        registry.insert<bufferization::BufferizationDialect>();
-        registry.insert<memref::MemRefDialect>();
-    }
+struct GradientBufferizationPass : impl::GradientBufferizationPassBase<GradientBufferizationPass> {
+    using GradientBufferizationPassBase::GradientBufferizationPassBase;
 
     void runOnOperation() final
     {
