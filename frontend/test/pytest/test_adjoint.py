@@ -55,18 +55,18 @@ def test_adjoint_func():
     assert_allclose(actual, desired)
 
 
-@pytest.mark.parametrize("theta, val", [(3.14, 0), (-100.0, 1)])
+@pytest.mark.parametrize("theta, val", [(jnp.pi, 0), (-100.0, 1)])
 def test_adjoint_op(theta, val):
     @qjit()
     @qml.qnode(qml.device("lightning.qubit", wires=2))
     def C_workflow(theta, val):
-        C_adjoint(qml.RY)(3.14, val)
+        C_adjoint(qml.RY)(jnp.pi, val)
         C_adjoint(qml.RZ)(theta, wires=val)
         return qml.state()
 
     @qml.qnode(qml.device("default.qubit", wires=2))
     def PL_workflow(theta, val):
-        PL_adjoint(qml.RY)(3.14, val)
+        PL_adjoint(qml.RY)(jnp.pi, val)
         PL_adjoint(qml.RZ)(theta, wires=val)
         return qml.state()
 
@@ -80,14 +80,14 @@ def test_adjoint_bound_op(theta, val):
     @qjit()
     @qml.qnode(qml.device("lightning.qubit", wires=3))
     def C_workflow(theta, val):
-        C_adjoint(qml.RX(3.14, val))
+        C_adjoint(qml.RX(jnp.pi, val))
         C_adjoint(qml.PauliY(val))
         C_adjoint(qml.RZ(theta, wires=val))
         return qml.state()
 
     @qml.qnode(qml.device("default.qubit", wires=3))
     def PL_workflow(theta, val):
-        PL_adjoint(qml.RX(3.14, val))
+        PL_adjoint(qml.RX(jnp.pi, val))
         PL_adjoint(qml.PauliY(val))
         PL_adjoint(qml.RZ(theta, wires=val))
         return qml.state()
