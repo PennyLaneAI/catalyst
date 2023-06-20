@@ -91,6 +91,7 @@ A lot of the compilation steps are broken into pass pipelines.
 ``PassPipeline`` is a class that specifies which binary and which flags are used for compilation.
 Users can implement their own ``PassPipeline`` by inheriting from this class and implementing the relevant methods/attributes.
 Catalyst's compilation strategy can then adjusted by inserting new passes in then default pipeline or forming a completely new pipeline.
+
 We won't get into too much detail here, but sometimes it is useful to look at the output of a specific ``PassPipeline``.
 To do so, simply use the ``get_output_of`` method available in ``QJIT``.
 For example, if one wishes to inspect the output of the ``BufferizationPass``, simply run the following command.
