@@ -596,7 +596,7 @@ def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
     elif isinstance(f, Operator):
         QueuingManager.remove(f)
 
-        def _callee(*args, **kwargs):
+        def _callee():
             QueuingManager.append(f)
 
         return _make_adjoint(_callee=_callee)

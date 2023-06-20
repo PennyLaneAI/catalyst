@@ -30,7 +30,7 @@ from jax.interpreters.mlir import (
     lowerable_effects,
 )
 from jax.interpreters.partial_eval import DynamicJaxprTracer
-from jax.tree_util import PyTreeDef, tree_flatten, tree_unflatten
+from jax.tree_util import tree_flatten, tree_unflatten
 from pennylane.measurements import MeasurementProcess
 from pennylane.operation import Wires
 
