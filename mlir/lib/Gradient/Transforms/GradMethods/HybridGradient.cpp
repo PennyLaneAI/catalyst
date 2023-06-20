@@ -72,9 +72,15 @@ func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc, GradOp
         ValueRange quantumGradients = rewriter.create<func::CallOp>(loc, qGradFn, callArgs).getResults();
         callArgs.pop_back();
         DenseIntElementsAttr diffArgIndicesAttr = gradOp.getDiffArgIndices().value_or(nullptr);
-        BackpropOp backpropOp = rewriter.create<BackpropOp>(loc, gradOp.getResultTypes(), argMapFn.getName(), callArgs, quantumGradients.front(), ValueRange{}, diffArgIndicesAttr);
 
-        rewriter.create<func::ReturnOp>(loc, backpropOp.getResults());
+        // Compute hybrid gradients via Enzyme
+        std::vector<Value> hybridGradients;
+        for (Value quantumGradient : quantumGradients) {
+            BackpropOp backpropOp = rewriter.create<BackpropOp>(loc, computeBackpropTypes(argMapFn), argMapFn.getName(), callArgs, quantumGradients.front(), ValueRange{}, diffArgIndicesAttr);
+            hybridGradients.push_back(backpropOp.getResult(0));
+        }
+
+        rewriter.create<func::ReturnOp>(loc, hybridGradients);
     }
 
     return fullGradFn;

@@ -97,5 +97,22 @@ std::vector<Type> computeQGradTypes(func::FuncOp callee)
     return qGradResTypes;
 }
 
+std::vector<Type> computeBackpropTypes(func::FuncOp callee)
+{
+    std::vector<Type> backpropResTypes;
+    backpropResTypes.reserve(callee.getNumResults());
+
+    for (Type resultType : callee.getResultTypes()) {
+
+        if (auto tensorType = resultType.dyn_cast<RankedTensorType>()) {
+            ArrayRef<int64_t> tensorShape = tensorType.getShape();
+            resultType = tensorType.getElementType();
+            backpropResTypes.push_back(RankedTensorType::get(tensorShape, resultType));
+        }
+    }
+    
+    return backpropResTypes;
+}
+
 } // namespace gradient
 } // namespace catalyst

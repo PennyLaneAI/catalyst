@@ -26,5 +26,7 @@ std::vector<mlir::Type> computeResultTypes(mlir::func::FuncOp callee,
 
 std::vector<mlir::Type> computeQGradTypes(mlir::func::FuncOp callee);
 
+std::vector<mlir::Type> computeBackpropTypes(mlir::func::FuncOp callee);
+
 } // namespace gradient
 } // namespace catalyst
