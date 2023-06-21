@@ -5,10 +5,10 @@ Architecture
 
    <br />
 
-The Catalyst stack leverages state-of-the-art technologies to accelerate quantum workflows without
-losing the ability to quickly prototype in Python. Some of the projects Catalyst builds upon include
-the `MLIR <https://mlir.llvm.org/docs/>`_ and `LLVM <https://llvm.org/>`_ compiler frameworks, the
-`QIR <https://github.com/qir-alliance>`_ project, and the
+The Catalyst stack leverages state-of-the-art technologies to accelerate hybrid quantum-classical
+workflows without losing the ability to quickly prototype in Python. To do so, Catalyst buils upon
+the `MLIR <https://mlir.llvm.org/docs/>`_ and `LLVM <https://llvm.org/>`_ compiler frameworks,
+the `QIR <https://github.com/qir-alliance>`_ project, and the
 `JAX <https://jax.readthedocs.io/en/latest/>`_ framework for composable transforms in machine
 learning (ML).
 Among the transforms provided by JAX, some of the most impactful arguably consist of automatic
@@ -84,8 +84,8 @@ Compilation happens in 3 stages which are successively invoked by the frontend a
   capture of PennyLane/JAX programs. This uses the tracing & op queueing mechanism of both
   frameworks, extending the JAX program representation
   (`JAXPR <https://jax.readthedocs.io/en/latest/jaxpr.html>`_) with quantum
-  `primitives <https://jax.readthedocs.io/en/latest/notebooks/How_JAX_primitives_work.html>`_).
-  Custom JAXPR -> MLIR lowerings are registered to these primitives to fully convert a hybrid
+  `primitives <https://jax.readthedocs.io/en/latest/notebooks/How_JAX_primitives_work.html>`_.
+  Custom JAXPR → MLIR lowerings are registered to these primitives to fully convert a hybrid
   program to MLIR for consumption by the compiler.
 
 - **Program Transformation:** The main part of compilation is performed on the MLIR-based
@@ -94,7 +94,7 @@ Compilation happens in 3 stages which are successively invoked by the frontend a
   compatible between Catalyst and ``jaxlib``. The driver then invokes a sequence of transformations
   that *lowers* the user program to a lower level of abstraction, outputting LLVM IR with QIR
   syntax.
-  For more details consult the :ref:`next section<compiler>`.
+  For more details consult the :ref:`compiler section<compiler>`.
 
 - **Code Generation:** At this stage the LLVM IR is compiled down to native object code using the
   LLVM Static Compiler (``llc``) for the local system architecture. A native linker is then used
@@ -117,6 +117,8 @@ themselves captured as pseudo-quantum operations on the tape.
 Catalyst provides the "glue" to embed quantum tapes into the JAXPR, by converting PennyLane
 operations to their corresponding JAX primitive and by connecting operation arguments/results to
 the correct tracer objects.
+
+.. seealso:: For more details on the frontend code organization see :doc:`/modules/frontend`.
 
 
 .. _compiler:
@@ -253,6 +255,7 @@ See the graph below for an overview of the transformations applied to the user p
 
   - The shared library produced by the linking step is the output of the compilation process.
 
+.. seealso:: For more details on the compiler code organization see :doc:`/modules/mlir`.
 
 .. _runtime:
 
@@ -375,6 +378,7 @@ relevant to hybrid program execution:
   the program. The runtime tracks all allocation requests made by the program and will
   automatically deallocate all remaining buffers by the end of the program's execution.
 
+.. seealso:: For more details on the runtime code organization see :doc:`/modules/runtime`.
 
 .. _legend:
 
