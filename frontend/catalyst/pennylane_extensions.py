@@ -531,7 +531,13 @@ class Adjoint(Operation):
 
 
 def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
-    """Getting the quantum adjoint of the computation defined by `f`.
+    """Returns a quantum function that applies the adjoint of the provided function or operator.
+
+.. warning::
+
+    This function does not support performing the adjoint
+    of quantum functions that contain Catalyst control flow
+    or mid-circuit measurements.
     Args:
         f (Callable or Operator): A PennyLane operation or a Python function containing PennyLane
           quantum operations. Quantum measurements are not allowed. The Catalyst control
