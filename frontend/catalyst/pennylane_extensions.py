@@ -531,7 +531,7 @@ class Adjoint(Operation):
 
 
 def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
-    """ A :func:`~.qjit` compatible adjoint transformer in PennyLane/Catalyst.
+    """ A :func:`~.qjit` compatible adjoint transformer for PennyLane/Catalyst.
 
     Returns a quantum function or operator that applies the adjoint of the
     provided function or operator.
