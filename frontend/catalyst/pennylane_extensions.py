@@ -551,6 +551,9 @@ def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
         a function is provided, returns a function with the same call signature
         that returns the Adjoint of the provided function.
 
+    Raises:
+        ValueError: invalid parameter values
+
     **Example**
 
     .. code-block:: python
