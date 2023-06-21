@@ -45,6 +45,7 @@ from catalyst.pennylane_extensions import (
 from catalyst.utils.exceptions import CompileError
 
 __all__ = (
+    "adjoint",
     "qjit",
     "QJIT",
     "for_loop",
