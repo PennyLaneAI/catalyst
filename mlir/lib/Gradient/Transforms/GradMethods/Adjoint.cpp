@@ -47,7 +47,7 @@ void AdjointLowering::rewrite(GradOp op, PatternRewriter &rewriter) const
     Location loc = op.getLoc();
     func::FuncOp callee =
         SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
-    rewriter.setInsertionPointAfter(callee);   
+    rewriter.setInsertionPointAfter(callee);
 
     // In order to allocate memory for various tensors relating to the number of gate parameters
     // at runtime we run a function that merely counts up for each gate parameter encountered.
@@ -63,7 +63,8 @@ void AdjointLowering::rewrite(GradOp op, PatternRewriter &rewriter) const
 
     // Generate the full gradient function, computing the partial derivatives with respect to the
     // original function arguments from the classical Jacobian and quantum gradient.
-    func::FuncOp fullGradFn = genFullGradFunction(rewriter, loc, op, paramCountFn, argMapFn, qGradFn, "adj");
+    func::FuncOp fullGradFn =
+        genFullGradFunction(rewriter, loc, op, paramCountFn, argMapFn, qGradFn, "adj");
 
     rewriter.setInsertionPoint(op);
     rewriter.replaceOpWithNewOp<func::CallOp>(op, fullGradFn, op.getArgOperands());

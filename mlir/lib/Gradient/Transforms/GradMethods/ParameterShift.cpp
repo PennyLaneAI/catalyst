@@ -67,7 +67,8 @@ void ParameterShiftLowering::rewrite(GradOp op, PatternRewriter &rewriter) const
 
     // Generate the full gradient function, computing the partial derivates with respect to the
     // original function arguments from the classical Jacobian and quantum gradient.
-    func::FuncOp fullGradFn = genFullGradFunction(rewriter, loc, op, paramCountFn, argMapFn, qGradFn, "ps");
+    func::FuncOp fullGradFn =
+        genFullGradFunction(rewriter, loc, op, paramCountFn, argMapFn, qGradFn, "ps");
 
     rewriter.setInsertionPoint(op);
     rewriter.replaceOpWithNewOp<func::CallOp>(op, fullGradFn, op.getArgOperands());

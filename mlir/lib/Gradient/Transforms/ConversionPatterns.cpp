@@ -38,6 +38,7 @@ using namespace catalyst::gradient;
 
 namespace {
 
+int enzyme_const;
 constexpr int64_t UNKNOWN = ShapedType::kDynamic;
 
 LLVM::LLVMFuncOp ensureFunctionDeclaration(PatternRewriter &rewriter, Operation *op,
@@ -264,62 +265,91 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
         // Add the pointer to the wrapped callee
         SmallVector<Value> callArgs = {wrapperPtr};
 
+        // Get the diff arg indices
+        std::vector<size_t> diffArgIndices{0};
+        if (op.getDiffArgIndices().has_value()) {
+            auto range = op.getDiffArgIndices().value().getValues<size_t>();
+            diffArgIndices = std::vector<size_t>(range.begin(), range.end());
+        }
+
+        int index = 0;
+        ValueRange dataIn = adaptor.getDataIn();
         // Add the arguments and their shadow on data in
-        for (auto [memrefArg, llvmMemrefArg, memrefDataIn, llvmDataIn] :
-             llvm::zip(op.getArgs(), adaptor.getArgs(), op.getDataIn(), adaptor.getDataIn())) {
-            // Get information about the memref arg
-            MemRefType memrefArgType = memrefArg.getType().cast<MemRefType>();
-            size_t sizeShape = memrefArgType.getShape().size();
-            size_t value = memrefArgType.getElementTypeBitWidth() / 8;
-            auto memrefArgSize =
-                rewriter.create<LLVM::ConstantOp>(loc, IntegerType::get(ctx, 64), value);
-
-            // Add the argument to call arg as a pointer
-            auto newMemrefArg = rewriter.create<LLVM::AllocaOp>(
-                loc, LLVM::LLVMPointerType::get(llvmMemrefArg.getType()), c1);
-            rewriter.create<LLVM::StoreOp>(loc, llvmMemrefArg, newMemrefArg);
-            callArgs.push_back(newMemrefArg);
-
-            // Shadow of args
-            Value bufferSize;
-
-            if (sizeShape == 0) {
-                bufferSize = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
+        for (auto [memrefArg, llvmMemrefArg] : llvm::zip(op.getArgs(), adaptor.getArgs())) {
+            auto it = std::find(diffArgIndices.begin(), diffArgIndices.end(), index);
+            if (it == diffArgIndices.end()) {
+                auto const_global = getOrInsertEnzymeConstDecl(rewriter, op);
+                auto llvmI8PtrTy =
+                    LLVM::LLVMPointerType::get(IntegerType::get(op->getContext(), 8));
+                auto enzymeConst =
+                    rewriter.create<LLVM::AddressOfOp>(op->getLoc(), llvmI8PtrTy, const_global);
+                callArgs.push_back(enzymeConst);
+                // Add the argument to call arg as a pointer
+                auto newMemrefArg = rewriter.create<LLVM::AllocaOp>(
+                    loc, LLVM::LLVMPointerType::get(llvmMemrefArg.getType()), c1);
+                rewriter.create<LLVM::StoreOp>(loc, llvmMemrefArg, newMemrefArg);
+                callArgs.push_back(newMemrefArg);
             }
             else {
-                Value offset = rewriter.create<LLVM::ExtractValueOp>(loc, llvmMemrefArg, 2);
+                auto position = std::distance(diffArgIndices.begin(), it);
+                auto llvmDataIn = dataIn[position];
+                // Get information about the memref arg
+                MemRefType memrefArgType = memrefArg.getType().cast<MemRefType>();
+                size_t sizeShape = memrefArgType.getShape().size();
+                size_t value = memrefArgType.getElementTypeBitWidth() / 8;
+                auto memrefArgSize =
+                    rewriter.create<LLVM::ConstantOp>(loc, IntegerType::get(ctx, 64), value);
 
-                SmallVector<int64_t> vectorIndices{3, 0};
+                // Add the argument to call arg as a pointer
+                auto newMemrefArg = rewriter.create<LLVM::AllocaOp>(
+                    loc, LLVM::LLVMPointerType::get(llvmMemrefArg.getType()), c1);
+                rewriter.create<LLVM::StoreOp>(loc, llvmMemrefArg, newMemrefArg);
+                callArgs.push_back(newMemrefArg);
 
-                Value sizeArray =
-                    rewriter.create<LLVM::ExtractValueOp>(loc, llvmMemrefArg, vectorIndices);
+                // Shadow of args
+                Value bufferSize;
 
-                vectorIndices[0] = 4;
-                Value strideArray =
-                    rewriter.create<LLVM::ExtractValueOp>(loc, llvmMemrefArg, vectorIndices);
+                if (sizeShape == 0) {
+                    bufferSize =
+                        rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
+                }
+                else {
+                    Value offset = rewriter.create<LLVM::ExtractValueOp>(loc, llvmMemrefArg, 2);
 
-                bufferSize = rewriter.create<LLVM::MulOp>(loc, sizeArray, strideArray);
-                bufferSize = rewriter.create<LLVM::AddOp>(loc, offset, bufferSize);
+                    SmallVector<int64_t> vectorIndices{3, 0};
+
+                    Value sizeArray =
+                        rewriter.create<LLVM::ExtractValueOp>(loc, llvmMemrefArg, vectorIndices);
+
+                    vectorIndices[0] = 4;
+                    Value strideArray =
+                        rewriter.create<LLVM::ExtractValueOp>(loc, llvmMemrefArg, vectorIndices);
+
+                    bufferSize = rewriter.create<LLVM::MulOp>(loc, sizeArray, strideArray);
+                    bufferSize = rewriter.create<LLVM::AddOp>(loc, offset, bufferSize);
+                }
+
+                Value bufferMemSize = rewriter.create<LLVM::MulOp>(loc, bufferSize, memrefArgSize);
+
+                Value buffer =
+                    rewriter.create<LLVM::CallOp>(loc, allocFnDecl, bufferMemSize).getResult();
+                // Set value to 0 (gradients)
+                Value c0 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI32IntegerAttr(0));
+                // Value c0float = rewriter.create<LLVM::ConstantOp>(loc,
+                // rewriter.getF64FloatAttr(0.0));
+                rewriter.create<LLVM::CallOp>(loc, memsetFnDecl,
+                                              ArrayRef<Value>{buffer, c0, bufferMemSize});
+
+                auto llvmInsert0 = rewriter.create<LLVM::InsertValueOp>(loc, llvmDataIn, buffer, 0);
+                auto llvmInsert1 =
+                    rewriter.create<LLVM::InsertValueOp>(loc, llvmInsert0, buffer, 1);
+
+                Value shadowPtr = rewriter.create<LLVM::AllocaOp>(
+                    loc, LLVM::LLVMPointerType::get(llvmDataIn.getType()), c1);
+                rewriter.create<LLVM::StoreOp>(loc, llvmInsert1, shadowPtr);
+                callArgs.push_back(shadowPtr);
             }
-
-            Value bufferMemSize = rewriter.create<LLVM::MulOp>(loc, bufferSize, memrefArgSize);
-
-            Value buffer =
-                rewriter.create<LLVM::CallOp>(loc, allocFnDecl, bufferMemSize).getResult();
-            // Set value to 0 (gradients)
-            Value c0 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI32IntegerAttr(0));
-            // Value c0float = rewriter.create<LLVM::ConstantOp>(loc,
-            // rewriter.getF64FloatAttr(0.0));
-            rewriter.create<LLVM::CallOp>(loc, memsetFnDecl,
-                                          ArrayRef<Value>{buffer, c0, bufferMemSize});
-
-            auto llvmInsert0 = rewriter.create<LLVM::InsertValueOp>(loc, llvmDataIn, buffer, 0);
-            auto llvmInsert1 = rewriter.create<LLVM::InsertValueOp>(loc, llvmInsert0, buffer, 1);
-
-            Value shadowPtr = rewriter.create<LLVM::AllocaOp>(
-                loc, LLVM::LLVMPointerType::get(llvmDataIn.getType()), c1);
-            rewriter.create<LLVM::StoreOp>(loc, llvmInsert1, shadowPtr);
-            callArgs.push_back(shadowPtr);
+            index++;
         }
 
         // Results of callee and their shadow
@@ -359,6 +389,22 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
         rewriter.create<LLVM::CallOp>(loc, backpropFnDecl, callArgs);
         rewriter.eraseOp(op);
         return success();
+    }
+    static FlatSymbolRefAttr getOrInsertEnzymeConstDecl(PatternRewriter &rewriter, Operation *op)
+    {
+        ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
+        auto *context = moduleOp.getContext();
+        if (moduleOp.lookupSymbol<LLVM::GlobalOp>("enzyme_const")) {
+            return SymbolRefAttr::get(context, "enzyme_const");
+        }
+
+        PatternRewriter::InsertionGuard insertGuard(rewriter);
+        rewriter.setInsertionPointToStart(moduleOp.getBody());
+        auto shortTy = IntegerType::get(context, 8);
+        rewriter.create<LLVM::GlobalOp>(moduleOp.getLoc(), shortTy,
+                                        /*isConstant=*/true, LLVM::Linkage::Linkonce,
+                                        "enzyme_const", IntegerAttr::get(shortTy, 0));
+        return SymbolRefAttr::get(context, "enzyme_const");
     }
 };
 

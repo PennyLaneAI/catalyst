@@ -70,7 +70,6 @@ func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc, GradOp
 
         Value numParams = rewriter.create<func::CallOp>(loc, paramCountFn, callArgs).getResult(0);
         callArgs.push_back(numParams);
-
         ValueRange quantumGradients =
             rewriter.create<func::CallOp>(loc, qGradFn, callArgs).getResults();
         callArgs.pop_back();
@@ -127,7 +126,6 @@ func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc, GradOp
                         sizes[index] = 1;
                     }
                 }
-
                 for (auto offsetRight : allOffsets) {
                     std::vector<int64_t> offsets{0};
                     offsets.insert(offsets.end(), offsetRight.begin(), offsetRight.end());
@@ -139,14 +137,12 @@ func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc, GradOp
                     Value extractQuantumGradient = rewriter.create<tensor::ExtractSliceOp>(
                         loc, rankReducedType, quantumGradient, dynOffsets, dynSizes, dynStrides,
                         offsets, sizes, strides);
-
                     BackpropOp backpropOp = rewriter.create<BackpropOp>(
-                        loc, computeBackpropTypes(argMapFn), argMapFn.getName(), callArgs,
-                        extractQuantumGradient, ValueRange{}, diffArgIndicesAttr);
+                        loc, computeBackpropTypes(argMapFn, diffArgIndices), argMapFn.getName(),
+                        callArgs, extractQuantumGradient, ValueRange{}, diffArgIndicesAttr);
 
                     intermediateGradients.push_back(backpropOp);
                 }
-
                 for (size_t i = 0; i < gradOp.getNumResults(); i++) {
                     Type resultType = gradOp.getResult(i).getType();
                     Value result = rewriter.create<tensor::EmptyOp>(loc, resultType, ValueRange{});
@@ -155,7 +151,7 @@ func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc, GradOp
 
                     // strides
                     std::vector<int64_t> stridesSlice(rankResult, 1);
-                    std::cout << totalOutcomes << " :outcomes" << std::endl;
+
                     for (int64_t index = 0; index < totalOutcomes; index++) {
                         auto intermediateGradient = intermediateGradients[index];
                         Value gradient = intermediateGradient.getResult(i);
@@ -166,8 +162,8 @@ func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc, GradOp
 
                         // sizes
                         std::vector<int64_t> sizesSlice{shapeResult};
-                        std::cout << std::endl;
-                        for (int64_t sliceIndex = rankResult - 1; sliceIndex >= rankGradient; sliceIndex--) {
+                        for (int64_t sliceIndex = rankResult - 1; sliceIndex >= rankGradient;
+                             sliceIndex--) {
                             sizesSlice[sliceIndex] = 1;
                         }
 
@@ -177,30 +173,21 @@ func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc, GradOp
                             int64_t zero = 0;
                             offsetSlice.insert(offsetSlice.begin(), zero);
                         }
-                        for (auto off: offsetSlice) {
-                            std::cout << off << ", ";
-                        }
-                        std::cout << "offset" << rankGradient << std::endl;
-                        for (auto off: sizesSlice) {
-                            std::cout << off << ", ";
-                        }
-                        std::cout << "sizes" << std::endl;
-                        for (auto off: stridesSlice) {
-                            std::cout << off << ", ";
-                        }
-                        std::cout << "strides" << std::endl;
-                        result = rewriter.create<tensor::InsertSliceOp>(loc, resultType, gradient, result, ValueRange{}, ValueRange{}, ValueRange{}, offsetSlice, sizesSlice, stridesSlice);
+                        result = rewriter.create<tensor::InsertSliceOp>(
+                            loc, resultType, gradient, result, ValueRange{}, ValueRange{},
+                            ValueRange{}, offsetSlice, sizesSlice, stridesSlice);
                     }
                     hybridGradients.push_back(result);
                 }
             }
             else {
                 BackpropOp backpropOp = rewriter.create<BackpropOp>(
-                    loc, computeBackpropTypes(argMapFn), argMapFn.getName(), callArgs,
-                    quantumGradient, ValueRange{}, diffArgIndicesAttr);
+                    loc, computeBackpropTypes(argMapFn, diffArgIndices), argMapFn.getName(),
+                    callArgs, quantumGradient, ValueRange{}, diffArgIndicesAttr);
                 // Loop over params
-                for (auto r : backpropOp.getResults()) {
-                    hybridGradients.push_back(r);
+                for (size_t i = 0; i < gradOp.getNumResults(); i++) {
+                    Value result = backpropOp.getResult(i);
+                    hybridGradients.push_back(result);
                 }
             }
         }

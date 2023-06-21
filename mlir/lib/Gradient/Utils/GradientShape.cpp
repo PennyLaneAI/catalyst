@@ -11,8 +11,8 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "Gradient/Utils/GradientShape.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 
 using namespace mlir;
 
@@ -93,28 +93,36 @@ std::vector<Type> computeQGradTypes(func::FuncOp callee)
 
         qGradResTypes.push_back(RankedTensorType::get(gradShape, resultType));
     }
-    
+
     return qGradResTypes;
 }
 
-std::vector<Type> computeBackpropTypes(func::FuncOp callee)
+std::vector<Type> computeBackpropTypes(func::FuncOp callee,
+                                       const std::vector<uint64_t> &diffArgIndices)
 {
     std::vector<Type> backpropResTypes;
-    backpropResTypes.reserve(callee.getNumArguments());
+    FunctionType fnType = callee.getFunctionType();
 
-    for (Type argType : callee.getArgumentTypes()) {
-        if (auto tensorType = argType.dyn_cast<RankedTensorType>()) {
+    size_t numDiffArgs = diffArgIndices.size();
+    backpropResTypes.reserve(numDiffArgs);
+
+    for (size_t i = 0; i < numDiffArgs; i++) {
+        assert(diffArgIndices[i] < callee.getNumArguments() && "invalid diff argument index");
+
+        Type diffArgType = fnType.getInput(diffArgIndices[i]);
+
+        if (auto tensorType = diffArgType.dyn_cast<RankedTensorType>()) {
             ArrayRef<int64_t> tensorShape = tensorType.getShape();
-            argType = tensorType.getElementType();
-            backpropResTypes.push_back(RankedTensorType::get(tensorShape, argType));
+            diffArgType = tensorType.getElementType();
+            backpropResTypes.push_back(RankedTensorType::get(tensorShape, diffArgType));
         }
-        // Assume Args are always tensor
-        // else {
-        //     ArrayRef<int64_t> tensorShape;
-        //     backpropResTypes.push_back(RankedTensorType::get(tensorShape, argType));
-        // }
     }
-    
+    // Assume Args are always tensor
+    // else {
+    //     ArrayRef<int64_t> tensorShape;
+    //     backpropResTypes.push_back(RankedTensorType::get(tensorShape, argType));
+    // }
+
     return backpropResTypes;
 }
 
