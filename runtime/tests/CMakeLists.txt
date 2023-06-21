@@ -27,7 +27,7 @@ target_include_directories(runner_tests PRIVATE
             ${pennylane_lightning_SOURCE_DIR}/pennylane_lightning/src/tests)
 
 target_link_libraries(runner_tests PRIVATE  catalyst_qir_runtime
-            lightning_interfaces
+            rt_interfaces
             Catch2::Catch2)
 
 if(ENABLE_CODE_COVERAGE)

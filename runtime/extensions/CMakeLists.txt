@@ -14,10 +14,10 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON) # build with -fPIC
 set(ENABLE_KOKKOS OFF CACHE BOOL "Enable Kokkos")
 FetchContent_MakeAvailable(pennylane_lightning)
 
-add_library(lightning_interfaces INTERFACE)
+add_library(rt_interfaces INTERFACE)
 
-target_link_libraries(lightning_interfaces INTERFACE pennylane_lightning)
-target_include_directories(lightning_interfaces INTERFACE .)
+target_link_libraries(rt_interfaces INTERFACE pennylane_lightning)
+target_include_directories(rt_interfaces INTERFACE .)
 
 set(LIGHTNING_KOKKOS_GIT_TAG "main" CACHE STRING "GIT_TAG value to build Lightning-Kokkos")
 
@@ -30,5 +30,29 @@ if(ENABLE_LIGHTNING_KOKKOS)
 
     FetchContent_MakeAvailable(pennylane_lightning_kokkos)
     
-    target_link_libraries(lightning_interfaces INTERFACE pennylane_lightning_kokkos)
+    target_link_libraries(rt_interfaces INTERFACE pennylane_lightning_kokkos)
+endif()
+
+if(ENABLE_OPENQASM)
+    find_package(pybind11)
+
+    if(pybind11_FOUND)
+        message(STATUS "Found pybind11")
+    else()
+        message(STATUS "Cound not find existing pybind11-dev package. Building from source.")
+        set(CMAKE_POLICY_DEFAULT_CMP0127 NEW) # To suppress pybind11 CMP0127 warning
+
+        # https://cmake.org/cmake/help/latest/module/FindPython.html
+        find_package(Python COMPONENTS Interpreter Development)
+
+        FetchContent_Declare(pybind11
+        GIT_REPOSITORY https://github.com/pybind/pybind11.git
+        GIT_TAG        v2.10.4
+        )
+
+        FetchContent_MakeAvailable(pybind11)
+    endif()
+
+    target_link_libraries(rt_interfaces INTERFACE pybind11::embed)
+
 endif()
