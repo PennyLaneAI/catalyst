@@ -346,7 +346,6 @@ def trace_quantum_tape(
     return out, qreg, qubit_states
 
 
-# TODO: remove once fixed upstream: https://github.com/PennyLaneAI/pennylane/issues/4263
 def trace_hamiltonian(coeffs, *nested_obs):
     """Trace a hamiltonian.
 
