@@ -730,7 +730,14 @@ def test_finite_diff_higher_order(inp, backend):
 
 @pytest.mark.parametrize("g_method", ["fd", "defer"])
 @pytest.mark.parametrize(
-    "h_coeffs", [[0.2, -0.53], np.array([0.2, -0.53]), jnp.array([0.2, -0.53])]
+    "h_coeffs",
+    [
+        [0.2, -0.53],
+        np.array([0.2, -0.53]),
+        jnp.array([0.2, -0.53]),
+        [np.array([0.2]), np.array([-0.53])],
+        [jnp.array([0.2]), jnp.array([-0.53])],
+    ],
 )
 @pytest.mark.parametrize("inp", [([1.0, 2.0])])
 def test_jax_consts(inp, h_coeffs, g_method, backend):
