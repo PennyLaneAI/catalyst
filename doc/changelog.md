@@ -113,8 +113,8 @@
 * Add end-to-end support for execution of OpenQasm3 kernels on Amazon Braket devices.
   [#139](https://github.com/PennyLaneAI/catalyst/pull/139)
 
-  This feature enables JIT compilation of the quantum part of a PennyLane program into a standalone OpenQasm3 kernel.
-  It executes the generated OpenQasm3 kernels on both local (``braket.local.qubit``) and remote (``braket.aws.qubit``)
+  This feature enables JIT compilation of the quantum part of a PennyLane program into a standalone OpenQASM3 kernel.
+  It executes the generated OpenQASM3 kernels on both local (``braket.local.qubit``) and remote (``braket.aws.qubit``)
   devices backed by Amazon Braket Python SDK at runtime, and propagates the measurement results back to the frontend.
   However, there are still some limitations with this support. For instance, it currently only works for static circuits
   and does not support mid-circuit measurements.
