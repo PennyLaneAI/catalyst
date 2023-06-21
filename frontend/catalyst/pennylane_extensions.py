@@ -539,15 +539,11 @@ def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
     of quantum functions that contain Catalyst control flow
     or mid-circuit measurements.
     Args:
-        f (Callable or Operator): A PennyLane operation or a Python function containing PennyLane
-          quantum operations. Quantum measurements are not allowed. The Catalyst control
-          flow instructions are not supported yet.
+        f (Callable or Operator): A PennyLane operation or a Python
+        function containing PennyLane quantum operations.
+
     Returns:
-        If `f` is a callable:
-            A callable object accepting the same parameters as `f` but performing the computation
-            adjointed to what `f` does.
-        Otherwize, assuming that `f` is an operator:
-            The operator which is adjointed to `f`
+        If an Operator is provided, returns an Operator that is the adjoint. If a function is provided, returns a function with the same call signature that returns the Adjoint of the provided function.
 
     **Example**
 
