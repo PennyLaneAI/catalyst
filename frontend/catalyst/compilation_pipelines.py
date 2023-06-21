@@ -26,13 +26,13 @@ import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
 from jax.interpreters.mlir import ir
-from mlir_quantum._mlir_libs._quantumDialects.quantum import mlir_canonicalize
 from mlir_quantum.runtime import (
     as_ctype,
     get_ranked_memref_descriptor,
     make_nd_memref_descriptor,
     make_zero_d_memref_descriptor,
 )
+from mlir_quantum._mlir_libs._quantumDialects.quantum import mlir_canonicalize
 
 import catalyst
 import catalyst.jax_tracer as tracer
