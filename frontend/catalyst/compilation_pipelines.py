@@ -32,6 +32,7 @@ from mlir_quantum.runtime import (
     make_nd_memref_descriptor,
     make_zero_d_memref_descriptor,
 )
+from mlir_quantum._mlir_libs._quantumDialects.quantum import mlir_canonicalize
 
 import catalyst
 import catalyst.jax_tracer as tracer
@@ -482,7 +483,10 @@ class QJIT:
         inject_functions(mlir_module, ctx)
         mod = mlir_module.operation
         self._jaxpr = jaxpr
-        self._mlir = mod.get_asm(binary=False, print_generic_op_form=False, assume_verified=True)
+
+        self._mlir = mlir_canonicalize(
+            mod.get_asm(binary=False, print_generic_op_form=False, assume_verified=True)
+        )
 
         return mlir_module
 

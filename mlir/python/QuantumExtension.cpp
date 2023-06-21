@@ -60,7 +60,7 @@ PYBIND11_MODULE(_quantumDialects, m)
         py::arg("source"), py::arg("keep_intermediate") = false);
 
     quantum_m.def(
-        "canonicalize",
+        "mlir_canonicalize",
         [](const char *source) {
             char *dest = nullptr;
             CatalystCReturnCode code = Canonicalize(source, &dest);
