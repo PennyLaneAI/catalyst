@@ -549,18 +549,19 @@ def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
 
     .. code-block:: python
 
-        def f(param):
-            qml.RX(param, wires=0)
-            qml.RY(param, wires=0)
-
         @qjit
         @qml.qnode(qml.device("lightning.qubit", wires=1))
-        def workflow():
-            catalyst.adjoint(f)(pnp.pi/2)
-            return qml.state()
+        def workflow(theta, wires):
+            catalyst.adjoint(qml.RZ)(theta, wires=wires)
+            catalyst.adjoint(qml.RZ(theta, wires=wires))
+            def func():
+                qml.RX(theta, wires=wires)
+                qml.RY(theta, wires=wires)
+            catalyst.adjoint(func)()
+            return qml.probs()
 
-    >>> workflow()
-    array([ 0.5-0.5j, -0.5+0.5j])
+    >>> workflow(pnp.pi/2, wires=0)
+    array([0.5, 0.5])
     """
 
     def _trace_quantum_tape(*args, _callee: Callable):
