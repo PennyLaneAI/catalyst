@@ -20,7 +20,13 @@ import pytest
 
 from catalyst import grad, qjit
 
-pytest.importorskip("braket")
+try:
+    qml.device("braket.local.qubit", backend="default", wires=3)
+except:
+    pytest.skip(
+        "skipping Braket tests because ``amazon-braket-pennylane-plugin`` is not installed on the system",
+        allow_module_level=True,
+    )
 
 
 @pytest.mark.braket
@@ -30,10 +36,13 @@ class TestBraketGates:
     @pytest.mark.parametrize(
         "device",
         [
-            qml.device(
-                "braket.aws.qubit",
-                device_arn="arn:aws:braket:::device/quantum-simulator/amazon/sv1",
-                wires=3,
+            pytest.param(
+                qml.device(
+                    "braket.aws.qubit",
+                    device_arn="arn:aws:braket:::device/quantum-simulator/amazon/sv1",
+                    wires=3,
+                ),
+                marks=pytest.mark.remotetests,
             ),
             qml.device(
                 "braket.local.qubit",
@@ -107,10 +116,13 @@ class TestBraketGates:
     @pytest.mark.parametrize(
         "device",
         [
-            qml.device(
-                "braket.aws.qubit",
-                device_arn="arn:aws:braket:::device/quantum-simulator/amazon/sv1",
-                wires=3,
+            pytest.param(
+                qml.device(
+                    "braket.aws.qubit",
+                    device_arn="arn:aws:braket:::device/quantum-simulator/amazon/sv1",
+                    wires=3,
+                ),
+                marks=pytest.mark.remotetests,
             ),
             qml.device(
                 "braket.local.qubit",
@@ -151,11 +163,14 @@ class TestBraketSample:
     @pytest.mark.parametrize(
         "device",
         [
-            qml.device(
-                "braket.aws.qubit",
-                device_arn="arn:aws:braket:::device/quantum-simulator/amazon/sv1",
-                wires=1,
-                shots=1000,
+            pytest.param(
+                qml.device(
+                    "braket.aws.qubit",
+                    device_arn="arn:aws:braket:::device/quantum-simulator/amazon/sv1",
+                    wires=1,
+                    shots=1000,
+                ),
+                marks=pytest.mark.remotetests,
             ),
             qml.device(
                 "braket.local.qubit",
@@ -218,11 +233,14 @@ class TestBraketProbs:
     @pytest.mark.parametrize(
         "device",
         [
-            qml.device(
-                "braket.aws.qubit",
-                device_arn="arn:aws:braket:::device/quantum-simulator/amazon/sv1",
-                wires=1,
-                shots=1000,
+            pytest.param(
+                qml.device(
+                    "braket.aws.qubit",
+                    device_arn="arn:aws:braket:::device/quantum-simulator/amazon/sv1",
+                    wires=1,
+                    shots=1000,
+                ),
+                marks=pytest.mark.remotetests,
             ),
             qml.device(
                 "braket.local.qubit",
@@ -276,11 +294,14 @@ class TestBraketCounts:
     @pytest.mark.parametrize(
         "device",
         [
-            qml.device(
-                "braket.aws.qubit",
-                device_arn="arn:aws:braket:::device/quantum-simulator/amazon/sv1",
-                wires=1,
-                shots=1000,
+            pytest.param(
+                qml.device(
+                    "braket.aws.qubit",
+                    device_arn="arn:aws:braket:::device/quantum-simulator/amazon/sv1",
+                    wires=1,
+                    shots=1000,
+                ),
+                marks=pytest.mark.remotetests,
             ),
             qml.device(
                 "braket.local.qubit",
@@ -405,10 +426,14 @@ class TestBraketVar:
     @pytest.mark.parametrize(
         "device",
         [
-            qml.device(
-                "braket.aws.qubit",
-                device_arn="arn:aws:braket:::device/quantum-simulator/amazon/sv1",
-                wires=1,
+            pytest.param(
+                qml.device(
+                    "braket.aws.qubit",
+                    device_arn="arn:aws:braket:::device/quantum-simulator/amazon/sv1",
+                    wires=1,
+                    shots=1000,
+                ),
+                marks=pytest.mark.remotetests,
             ),
             qml.device(
                 "braket.local.qubit",
