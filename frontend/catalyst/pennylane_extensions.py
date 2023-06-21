@@ -531,22 +531,25 @@ class Adjoint(Operation):
 
 
 def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
-    """ A :func:`~.qjit` compatible adjoint transformer for PennyLane/Catalyst.
+    """A :func:`~.qjit` compatible adjoint transformer for PennyLane/Catalyst.
 
     Returns a quantum function or operator that applies the adjoint of the
     provided function or operator.
 
-.. warning::
+    .. warning::
 
-    This function does not support performing the adjoint
-    of quantum functions that contain Catalyst control flow
-    or mid-circuit measurements.
+        This function does not support performing the adjoint
+        of quantum functions that contain Catalyst control flow
+        or mid-circuit measurements.
+
     Args:
-        f (Callable or Operator): A PennyLane operation or a Python
-        function containing PennyLane quantum operations.
+        f (Callable or Operator): A PennyLane operation or a Python function
+                                  containing PennyLane quantum operations.
 
     Returns:
-        If an Operator is provided, returns an Operator that is the adjoint. If a function is provided, returns a function with the same call signature that returns the Adjoint of the provided function.
+        If an Operator is provided, returns an Operator that is the adjoint. If
+        a function is provided, returns a function with the same call signature
+        that returns the Adjoint of the provided function.
 
     **Example**
 
