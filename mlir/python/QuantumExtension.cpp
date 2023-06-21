@@ -49,7 +49,25 @@ PYBIND11_MODULE(_quantumDialects, m)
         },
         py::arg("context") = py::none(), py::arg("load") = true);
 
-    quantum_m.def("compile_asm", QuantumDriverMain, py::arg("source"));
+    quantum_m.def(
+        "compile_asm",
+        [](const char *source, bool keep_intermediate) {
+            CatalystCReturnCode code = QuantumDriverMain(source, keep_intermediate);
+            if (code != ReturnOk) {
+                throw std::runtime_error("Compilation failed");
+            }
+        },
+        py::arg("source"), py::arg("keep_intermediate") = false);
 
-    quantum_m.def("canonicalize", Canonicalize, py::arg("source"));
+    quantum_m.def(
+        "canonicalize",
+        [](const char *source) {
+            char *dest = nullptr;
+            CatalystCReturnCode code = Canonicalize(source, &dest);
+            if (code != ReturnOk) {
+                throw std::runtime_error("Canonicalization failed");
+            }
+            return dest;
+        },
+        py::arg("source"));
 }

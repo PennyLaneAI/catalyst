@@ -23,8 +23,19 @@ extern "C" {
 MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(Quantum, quantum);
 MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(Gradient, gradient);
 
-const char *Canonicalize(const char *source);
-void QuantumDriverMain(const char *source);
+enum CatalystCReturnCode {
+    ReturnOk,
+    ReturnParsingFailed,
+    ReturnLoweringFailed,
+    ReturnTranslationFailed
+};
+
+/// Canonicalize an MLIR module, given in textual form. This performs a round-trip, allocating a
+/// char buffer in "dest" that the caller must take ownership of freeing.
+CatalystCReturnCode Canonicalize(const char *source, char **dest);
+
+/// Entry point to the MLIR portion of the compiler.
+CatalystCReturnCode QuantumDriverMain(const char *source, bool keepIntermediate = false);
 
 #ifdef __cplusplus
 }
