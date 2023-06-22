@@ -305,9 +305,8 @@ LogicalResult StateOp::verify()
 
 LogicalResult AdjointOp::verify()
 {
-    auto res = this->getRegion().walk([](MeasurementProcess op) {
-        return WalkResult::interrupt();
-    });
+    auto res =
+        this->getRegion().walk([](MeasurementProcess op) { return WalkResult::interrupt(); });
 
     if (res.wasInterrupted()) {
         return emitOpError("quantum measurements are not allowed in the adjoint regions");
