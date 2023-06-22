@@ -124,9 +124,6 @@ struct AdjointSingleOpRewritePattern : public mlir::OpRewritePattern<AdjointOp> 
                     update(insert.getInQreg(), quantumMapping[insert.getOutQreg()]);
                 }
                 else if (CustomOp custom = isInstanceOf<CustomOp>(*i)) {
-                    assert(
-                        custom.getQubitOperands().size() == custom.getQubitResults().size() &&
-                        "Quantum operation must have inputs and outputs of the same qubit number");
                     std::vector<Value> in_qubits;
                     for (auto q : custom.getQubitResults()) {
                         in_qubits.push_back(query(q));
