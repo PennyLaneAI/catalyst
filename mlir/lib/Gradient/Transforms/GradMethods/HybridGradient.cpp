@@ -185,7 +185,7 @@ func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc, GradOp
                     loc, computeBackpropTypes(argMapFn, diffArgIndices), argMapFn.getName(),
                     callArgs, quantumGradient, ValueRange{}, diffArgIndicesAttr);
                 // Loop over params
-                for (size_t i = 0; i < gradOp.getNumResults(); i++) {
+                for (size_t i = 0; i < backpropOp.getNumResults(); i++) {
                     Value result = backpropOp.getResult(i);
                     hybridGradients.push_back(result);
                 }
