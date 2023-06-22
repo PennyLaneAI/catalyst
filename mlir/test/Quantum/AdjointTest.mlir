@@ -25,7 +25,7 @@ func.func private @workflow_plain() -> tensor<4xcomplex<f64>> attributes {} {
   // CHECK:        RX
   %2 = quantum.custom "RX"(%cst) %1 : !quantum.bit
   %3 = quantum.insert %0[%c0_i64], %2 : !quantum.reg, !quantum.bit
-  %4 = quantum.adjoint(%3) : (!quantum.reg) -> !quantum.reg {
+  %4 = quantum.adjoint(%3) : !quantum.reg {
   // CHECK:        PauliZ
   // CHECK-SAME:          adjoint = true
   // CHECK:        PauliY
@@ -69,19 +69,19 @@ func.func private @workflow_nested() -> tensor<4xcomplex<f64>> attributes {} {
   %c0_i64 = arith.constant 0 : i64
   quantum.device ["backend", "lightning.qubit"]
   %0 = quantum.alloc( 2) : !quantum.reg
-  %1 = quantum.adjoint(%0) : (!quantum.reg) -> !quantum.reg {
+  %1 = quantum.adjoint(%0) : !quantum.reg {
   ^bb0(%arg0: !quantum.reg):
     %6 = quantum.extract %arg0[%c1_i64] : !quantum.reg -> !quantum.bit
     %7 = quantum.custom "OpA"() %6 : !quantum.bit
     %8 = quantum.custom "OpB"() %7 : !quantum.bit
     %9 = quantum.insert %arg0[%c1_i64], %8 : !quantum.reg, !quantum.bit
-    %10 = quantum.adjoint(%9) : (!quantum.reg) -> !quantum.reg {
+    %10 = quantum.adjoint(%9) : !quantum.reg {
     ^bb0(%arg1: !quantum.reg):
       %11 = quantum.extract %arg1[%c1_i64] : !quantum.reg -> !quantum.bit
       %12 = quantum.custom "OpC"() %11 : !quantum.bit
       %13 = quantum.custom "OpD"() %12 : !quantum.bit
       %14 = quantum.insert %arg1[%c1_i64], %13 : !quantum.reg, !quantum.bit
-      %15 = quantum.adjoint(%14) : (!quantum.reg) -> !quantum.reg {
+      %15 = quantum.adjoint(%14) : !quantum.reg {
       ^bb0(%arg2: !quantum.reg):
         %16 = quantum.extract %arg2[%c1_i64] : !quantum.reg -> !quantum.bit
         %17 = quantum.custom "OpE"() %16 : !quantum.bit
