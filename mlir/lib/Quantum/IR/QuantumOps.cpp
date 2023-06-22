@@ -305,11 +305,8 @@ LogicalResult StateOp::verify()
 
 LogicalResult AdjointOp::verify()
 {
-    auto res = this->getRegion().walk([](Operation *op) {
-        if (op->hasTrait<MeasurementProcess::Trait>()) {
-            return WalkResult::interrupt();
-        }
-        return WalkResult::advance();
+    auto res = this->getRegion().walk([](MeasurementProcess op) {
+        return WalkResult::interrupt();
     });
 
     if (res.wasInterrupted()) {

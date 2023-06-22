@@ -767,7 +767,7 @@ def AdjointOp : Op<QuantumDialect, "adjoint", []> {
     );
 
     let assemblyFormat = [{
-        `(` $qreg `)` attr-dict `:` functional-type(operands, results) $region
+        `(` $qreg `)` attr-dict `:` type(operands) $region
     }];
 
     let hasVerifier = 1;
