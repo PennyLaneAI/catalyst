@@ -735,8 +735,8 @@ def test_finite_diff_higher_order(inp, backend):
         [0.2, -0.53],
         np.array([0.2, -0.53]),
         jnp.array([0.2, -0.53]),
-        [np.array([0.2]), np.array([-0.53])],
-        [jnp.array([0.2]), jnp.array([-0.53])],
+        [np.array(0.2), np.array(-0.53)],
+        [jnp.array(0.2), jnp.array(-0.53)],
     ],
 )
 @pytest.mark.parametrize("inp", [([1.0, 2.0])])
