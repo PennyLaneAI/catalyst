@@ -75,12 +75,19 @@ func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc, GradOp
         callArgs.pop_back();
         DenseIntElementsAttr diffArgIndicesAttr = gradOp.getDiffArgIndices().value_or(nullptr);
 
-        auto resultsTypes = gradOp.getResultTypes();
+        auto resultsBackpropTypes = computeBackpropTypes(argMapFn, diffArgIndices);
         // Compute hybrid gradients via Enzyme
         std::vector<Value> hybridGradients;
-        std::vector<BackpropOp> intermediateGradients;
+        int j = 0;
         // Loop over the measurements
         for (Value quantumGradient : quantumGradients) {
+            Type resultType = gradOp.getResult(j).getType();
+            Value result = rewriter.create<tensor::EmptyOp>(loc, resultType, ValueRange{});
+            auto rankResult = resultType.cast<RankedTensorType>().getRank();
+            auto shapeResult = resultType.cast<RankedTensorType>().getShape();
+            j++;
+            
+            std::vector<BackpropOp> intermediateGradients;
             auto rank = quantumGradient.getType().cast<RankedTensorType>().getRank();
 
             if (rank > 1) {
@@ -138,16 +145,12 @@ func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc, GradOp
                         loc, rankReducedType, quantumGradient, dynOffsets, dynSizes, dynStrides,
                         offsets, sizes, strides);
                     BackpropOp backpropOp = rewriter.create<BackpropOp>(
-                        loc, computeBackpropTypes(argMapFn, diffArgIndices), argMapFn.getName(),
+                        loc, resultsBackpropTypes, argMapFn.getName(),
                         callArgs, extractQuantumGradient, ValueRange{}, diffArgIndicesAttr);
 
                     intermediateGradients.push_back(backpropOp);
                 }
-                for (size_t i = 0; i < gradOp.getNumResults(); i++) {
-                    Type resultType = gradOp.getResult(i).getType();
-                    Value result = rewriter.create<tensor::EmptyOp>(loc, resultType, ValueRange{});
-                    auto rankResult = resultType.cast<RankedTensorType>().getRank();
-                    auto shapeResult = resultType.cast<RankedTensorType>().getShape();
+                for (size_t i = 0; i < resultsBackpropTypes.size(); i++) {
 
                     // strides
                     std::vector<int64_t> stridesSlice(rankResult, 1);
@@ -182,7 +185,7 @@ func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc, GradOp
             }
             else {
                 BackpropOp backpropOp = rewriter.create<BackpropOp>(
-                    loc, computeBackpropTypes(argMapFn, diffArgIndices), argMapFn.getName(),
+                    loc, resultsBackpropTypes, argMapFn.getName(),
                     callArgs, quantumGradient, ValueRange{}, diffArgIndicesAttr);
                 // Loop over params
                 for (size_t i = 0; i < backpropOp.getNumResults(); i++) {

@@ -45,12 +45,12 @@ func.func private @funcTensorTensor(%arg0: tensor<7x3x2x1xf64>) -> tensor<2xf64>
    // CHECK:     %idx0 = index.constant 0
    // CHECK:     [[PCOUNT:%.+]] = call @funcTensorTensor.pcount(%arg0) : (tensor<7x3x2x1xf64>) -> index
    // CHECK:     [[QGRAD:%.+]] = call @funcTensorTensor.qgrad(%arg0, %0) : (tensor<7x3x2x1xf64>, index) -> tensor<?x2xf64>
+   // CHECK:     [[EMPTYTENSOR:%.+]] = tensor.empty() : tensor<7x3x2x1x2xf64>
    // CHECK:     [[DIM:%.+]] = tensor.dim [[QGRAD]], %idx0 : tensor<?x2xf64>
    // CHECK:     [[EXTRACTEDQGRAD0:%.+]] = tensor.extract_slice [[QGRAD]][0, 0] [[[DIM]], 1] [1, 1] : tensor<?x2xf64> to tensor<?xf64>
    // CHECK:     [[GRAD0:%.+]] = gradient.backprop @funcTensorTensor.argmap(%arg0) qjacobian([[EXTRACTEDQGRAD0]] : tensor<?xf64>) : (tensor<7x3x2x1xf64>) -> tensor<7x3x2x1xf64>
    // CHECK:     [[EXTRACTEDQGRAD1:%.+]] = tensor.extract_slice %1[0, 1] [[[DIM]], 1] [1, 1] : tensor<?x2xf64> to tensor<?xf64>
    // CHECK:     [[GRAD1:%.+]] = gradient.backprop @funcTensorTensor.argmap(%arg0) qjacobian([[EXTRACTEDQGRAD1]] : tensor<?xf64>) : (tensor<7x3x2x1xf64>) -> tensor<7x3x2x1xf64>
-   // CHECK:     [[EMPTYTENSOR:%.+]] = tensor.empty() : tensor<7x3x2x1x2xf64>
    // CHECK:     [[INSERTQGRAD0:%.+]] = tensor.insert_slice [[GRAD0]] into [[EMPTYTENSOR]][0, 0, 0, 0, 0] [7, 3, 2, 1, 1] [1, 1, 1, 1, 1] : tensor<7x3x2x1xf64> into tensor<7x3x2x1x2xf64>
    // CHECK:     [[INSERTQGRAD1:%.+]] = tensor.insert_slice [[GRAD1]] into [[INSERTQGRAD0]][0, 0, 0, 0, 1] [7, 3, 2, 1, 1] [1, 1, 1, 1, 1] : tensor<7x3x2x1xf64> into tensor<7x3x2x1x2xf64>
    // CHECK:     return [[INSERTQGRAD1]] : tensor<7x3x2x1x2xf64>

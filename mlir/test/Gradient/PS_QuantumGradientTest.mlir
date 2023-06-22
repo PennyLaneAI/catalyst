@@ -106,8 +106,8 @@ func.func @gradCall0(%arg0: tensor<3xf64>) -> tensor<3xf64> {
 
 // -----
 
-// CHECK-LABEL: @structured_circuit.qgrad(%arg0: f64, %arg1: i1, %arg2: i1, %arg3: index) -> tensor<?xf64>
-func.func @structured_circuit(%arg0: f64, %arg1: i1, %arg2: i1) -> f64 attributes {qnode, diff_method = "parameter-shift"} {
+// CHECK-LABEL: @structured_circuit.qgrad(%arg0: tensor<1xf64>, %arg1: i1, %arg2: i1, %arg3: index) -> tensor<?xf64>
+func.func @structured_circuit(%arg0: tensor<1xf64>, %arg1: i1, %arg2: i1) -> f64 attributes {qnode, diff_method = "parameter-shift"} {
     // CHECK-DAG: [[c0:%[a-zA-Z0-9_]+]] = index.constant 0
     // CHECK-DAG: [[c1:%[a-zA-Z0-9_]+]] = index.constant 1
     // CHECK-DAG: [[divisor:%[a-zA-Z0-9_]+]] = arith.constant 2.0
@@ -128,6 +128,9 @@ func.func @structured_circuit(%arg0: f64, %arg1: i1, %arg2: i1) -> f64 attribute
     // CHECK-DAG: memref.store [[c0]], [[gradIdx]]
     // CHECK-DAG: [[grad:%[a-zA-Z0-9_]+]] = memref.alloc(%arg3) : memref<?xf64>
 
+    %c0 = arith.constant 0 : index
+    %f0 = tensor.extract %arg0[%c0] : tensor<1xf64>
+
     %idx = arith.constant 0 : i64
     // CHECK-NOT: quantum.qalloc
     %r = quantum.alloc(1) : !quantum.reg
@@ -145,7 +148,7 @@ func.func @structured_circuit(%arg0: f64, %arg1: i1, %arg2: i1) -> f64 attribute
     // CHECK: memref.store [[newIdx]], [[gradIdx]]
     //
     // CHECK-NOT: quantum.custom
-    %q_1 = quantum.custom "rx"(%arg0) %q_0 : !quantum.bit
+    %q_1 = quantum.custom "rx"(%f0) %q_0 : !quantum.bit
 
     // CHECK: scf.if %arg1
     %q_2 = scf.if %arg1 -> !quantum.bit {
@@ -160,7 +163,7 @@ func.func @structured_circuit(%arg0: f64, %arg1: i1, %arg2: i1) -> f64 attribute
         // CHECK: memref.store [[newIdx]], [[gradIdx]]
         //
         // CHECK-NOT: quantum.custom
-        %q_1_0 = quantum.custom "ry"(%arg0) %q_1 : !quantum.bit
+        %q_1_0 = quantum.custom "ry"(%f0) %q_1 : !quantum.bit
 
         // CHECK: scf.if %arg2
         %q_1_1 = scf.if %arg2 -> !quantum.bit {
@@ -175,7 +178,7 @@ func.func @structured_circuit(%arg0: f64, %arg1: i1, %arg2: i1) -> f64 attribute
             // CHECK: memref.store [[newIdx]], [[gradIdx]]
             //
             // CHECK-NOT: quantum.custom
-            %q_1_0_0 = quantum.custom "rz"(%arg0) %q_1_0 : !quantum.bit
+            %q_1_0_0 = quantum.custom "rz"(%f0) %q_1_0 : !quantum.bit
             scf.yield %q_1_0_0 : !quantum.bit
         // CHECK: else
         } else {
@@ -190,7 +193,7 @@ func.func @structured_circuit(%arg0: f64, %arg1: i1, %arg2: i1) -> f64 attribute
             // CHECK: memref.store [[newIdx]], [[gradIdx]]
             //
             // CHECK-NOT: quantum.custom
-            %q_1_0_1 = quantum.custom "rz"(%arg0) %q_1_0 : !quantum.bit
+            %q_1_0_1 = quantum.custom "rz"(%f0) %q_1_0 : !quantum.bit
             // CHECK: [[sel:%[a-zA-Z0-9_]+]] = bufferization.to_tensor [[selBuff]]
             // CHECK: [[epos:%[a-zA-Z0-9_]+]] = func.call @structured_circuit.shifted(%arg0, %true, %false, [[shift4pos]], [[sel]])
             // CHECK: [[eneg:%[a-zA-Z0-9_]+]] = func.call @structured_circuit.shifted(%arg0, %true, %false, [[shift4neg]], [[sel]])
@@ -202,7 +205,7 @@ func.func @structured_circuit(%arg0: f64, %arg1: i1, %arg2: i1) -> f64 attribute
             // CHECK: memref.store [[newIdx]], [[gradIdx]]
             //
             // CHECK-NOT: quantum.custom
-            %q_1_0_2 = quantum.custom "rz"(%arg0) %q_1_0_1 : !quantum.bit
+            %q_1_0_2 = quantum.custom "rz"(%f0) %q_1_0_1 : !quantum.bit
             scf.yield %q_1_0_2 : !quantum.bit
         }
         scf.yield %q_1_1 : !quantum.bit
@@ -225,22 +228,22 @@ func.func @structured_circuit(%arg0: f64, %arg1: i1, %arg2: i1) -> f64 attribute
     // CHECK: memref.store [[newIdx]], [[gradIdx]]
     //
     // CHECK-NOT: quantum.custom
-    %q_3 = quantum.custom "rx"(%arg0) %q_2 : !quantum.bit
+    %q_3 = quantum.custom "rx"(%f0) %q_2 : !quantum.bit
 
     // CHECK: [[ret:%[a-zA-Z0-9_]+]] = bufferization.to_tensor [[grad]]
     // CHECK: return [[ret]] : tensor<?xf64>
-    func.return %arg0 : f64
+    func.return %f0 : f64
 }
 
-func.func @gradCall1(%arg0: f64, %b0: i1, %b1: i1) -> f64 {
-    %0 = gradient.grad "defer" @structured_circuit(%arg0, %b0, %b1) : (f64, i1, i1) -> f64
-    func.return %0 : f64
+func.func @gradCall1(%arg0: tensor<1xf64>, %b0: i1, %b1: i1) -> tensor<1xf64> {
+    %0 = gradient.grad "defer" @structured_circuit(%arg0, %b0, %b1) : (tensor<1xf64>, i1, i1) -> tensor<1xf64>
+    func.return %0 : tensor<1xf64>
 }
 
 // -----
 
-// CHECK-LABEL: @loop_circuit.qgrad(%arg0: f64, %arg1: index) -> tensor<?xf64>
-func.func @loop_circuit(%arg0: f64) -> f64 attributes {qnode, diff_method = "parameter-shift"} {
+// CHECK-LABEL: @loop_circuit.qgrad(%arg0: tensor<1xf64>, %arg1: index) -> tensor<?xf64>
+func.func @loop_circuit(%arg0: tensor<1xf64>) -> f64 attributes {qnode, diff_method = "parameter-shift"} {
     // CHECK-DAG: [[c0:%[a-zA-Z0-9_]+]] = index.constant 0
     // CHECK-DAG: [[c1:%[a-zA-Z0-9_]+]] = index.constant 1
     // CHECK-DAG: [[divisor:%[a-zA-Z0-9_]+]] = arith.constant 2.0
@@ -256,6 +259,9 @@ func.func @loop_circuit(%arg0: f64) -> f64 attributes {qnode, diff_method = "par
     // CHECK-DAG: [[gradIdx:%[a-zA-Z0-9_]+]] = memref.alloca() : memref<index>
     // CHECK-DAG: memref.store [[c0]], [[gradIdx]]
     // CHECK-DAG: [[grad:%[a-zA-Z0-9_]+]] = memref.alloc(%arg1) : memref<?xf64>
+
+    %c0 = arith.constant 0 : index
+    %f0 = tensor.extract %arg0[%c0] : tensor<1xf64>
 
     %idx = arith.constant 0 : i64
     // CHECK-NOT: quantum.qalloc
@@ -274,7 +280,7 @@ func.func @loop_circuit(%arg0: f64) -> f64 attributes {qnode, diff_method = "par
     // CHECK: memref.store [[newIdx]], [[gradIdx]]
     //
     // CHECK-NOT: quantum.custom
-    %q_1 = quantum.custom "rx"(%arg0) %q_0 : !quantum.bit
+    %q_1 = quantum.custom "rx"(%f0) %q_0 : !quantum.bit
 
     %lb = arith.constant 0 : index
     %ub = arith.constant 10: index
@@ -295,7 +301,7 @@ func.func @loop_circuit(%arg0: f64) -> f64 attributes {qnode, diff_method = "par
         // CHECK: memref.store [[newIdx]], [[gradIdx]]
         //
         // CHECK-NOT: quantum.custom
-        %q_1_1 = quantum.custom "ry"(%arg0) %q_1_0 : !quantum.bit
+        %q_1_1 = quantum.custom "ry"(%f0) %q_1_0 : !quantum.bit
 
         scf.yield %q_1_1 : !quantum.bit
     }
@@ -315,7 +321,7 @@ func.func @loop_circuit(%arg0: f64) -> f64 attributes {qnode, diff_method = "par
         // CHECK: memref.store [[newIdx]], [[gradIdx]]
         //
         // CHECK-NOT: quantum.custom
-        %q_2_1 = quantum.custom "ry"(%arg0) %q_2_0 : !quantum.bit
+        %q_2_1 = quantum.custom "ry"(%f0) %q_2_0 : !quantum.bit
 
         // CHECK: scf.for [[k:%[a-zA-Z0-9_]+]] =
         %q_1_1 = scf.for %k = %j to %ub step %st iter_args(%q_2_1_0 = %q_2_1) -> !quantum.bit {
@@ -332,7 +338,7 @@ func.func @loop_circuit(%arg0: f64) -> f64 attributes {qnode, diff_method = "par
             // CHECK: memref.store [[newIdx]], [[gradIdx]]
             //
             // CHECK-NOT: quantum.custom
-            %q_2_1_1 = quantum.custom "rz"(%arg0) %q_2_1_0 : !quantum.bit
+            %q_2_1_1 = quantum.custom "rz"(%f0) %q_2_1_0 : !quantum.bit
 
             scf.yield %q_2_1_1 : !quantum.bit
         }
@@ -342,18 +348,18 @@ func.func @loop_circuit(%arg0: f64) -> f64 attributes {qnode, diff_method = "par
 
     // CHECK: [[ret:%[a-zA-Z0-9_]+]] = bufferization.to_tensor [[grad]]
     // CHECK: return [[ret]] : tensor<?xf64>
-    func.return %arg0 : f64
+    func.return %f0 : f64
 }
 
-func.func @gradCall2(%arg0: f64) -> f64 {
-    %0 = gradient.grad "defer" @loop_circuit(%arg0) : (f64) -> f64
-    func.return %0 : f64
+func.func @gradCall2(%arg0: tensor<1xf64>) -> tensor<1xf64> {
+    %0 = gradient.grad "defer" @loop_circuit(%arg0) : (tensor<1xf64>) -> tensor<1xf64>
+    func.return %0 : tensor<1xf64>
 }
 
 // -----
 
-// CHECK-LABEL: @tensor_circuit.qgrad(%arg0: f64, %arg1: index) -> tensor<?x2x3xf64>
-func.func @tensor_circuit(%arg0: f64) -> tensor<2x3xf64> attributes {qnode, diff_method = "parameter-shift"} {
+// CHECK-LABEL: @tensor_circuit.qgrad(%arg0: tensor<1xf64>, %arg1: index) -> tensor<?x2x3xf64>
+func.func @tensor_circuit(%arg0: tensor<1xf64>) -> tensor<2x3xf64> attributes {qnode, diff_method = "parameter-shift"} {
     // CHECK-DAG: [[c0:%[a-zA-Z0-9_]+]] = index.constant 0
     // CHECK-DAG: [[c1:%[a-zA-Z0-9_]+]] = index.constant 1
     // CHECK-DAG: [[divisor:%[a-zA-Z0-9_]+]] = arith.constant dense<2.0{{[0e+]*}}> : tensor<2x3xf64>
@@ -363,6 +369,9 @@ func.func @tensor_circuit(%arg0: f64) -> tensor<2x3xf64> attributes {qnode, diff
     // CHECK-DAG: [[gradIdx:%[a-zA-Z0-9_]+]] = memref.alloca() : memref<index>
     // CHECK-DAG: memref.store [[c0]], [[gradIdx]]
     // CHECK-DAG: [[grad:%[a-zA-Z0-9_]+]] = memref.alloc(%arg1) : memref<?x2x3xf64>
+
+    %c0 = arith.constant 0 : index
+    %f0 = tensor.extract %arg0[%c0] : tensor<1xf64>
 
     %idx = arith.constant 0 : i64
     // CHECK-NOT: quantum.qalloc
@@ -382,23 +391,23 @@ func.func @tensor_circuit(%arg0: f64) -> tensor<2x3xf64> attributes {qnode, diff
     // CHECK: memref.store [[newIdx]], [[gradIdx]]
     //
     // CHECK-NOT: quantum.custom
-    %q_1 = quantum.custom "rx"(%arg0) %q_0 : !quantum.bit
+    %q_1 = quantum.custom "rx"(%f0) %q_0 : !quantum.bit
 
     // CHECK: [[ret:%[a-zA-Z0-9_]+]] = bufferization.to_tensor [[grad]]
     // CHECK: return [[ret]] : tensor<?x2x3xf64>
-    %res = tensor.from_elements %arg0, %arg0, %arg0, %arg0, %arg0, %arg0 : tensor<2x3xf64>
+    %res = tensor.from_elements %f0, %f0, %f0, %f0, %f0, %f0 : tensor<2x3xf64>
     func.return %res : tensor<2x3xf64>
 }
 
-func.func @gradCall3(%arg0: f64) -> tensor<2x3xf64> {
-    %0 = gradient.grad "defer" @tensor_circuit(%arg0) : (f64) -> tensor<2x3xf64>
-    func.return %0 : tensor<2x3xf64>
+func.func @gradCall3(%arg0: tensor<1xf64>) -> tensor<1x2x3xf64> {
+    %0 = gradient.grad "defer" @tensor_circuit(%arg0) : (tensor<1xf64>) -> tensor<1x2x3xf64>
+    func.return %0 : tensor<1x2x3xf64>
 }
 
 // -----
 
-// CHECK-LABEL: @multi_res_circuit.qgrad(%arg0: f64, %arg1: index) -> (tensor<?xf64>, tensor<?x2xf64>)
-func.func @multi_res_circuit(%arg0: f64) -> (f64, tensor<2xf64>) attributes {qnode, diff_method = "parameter-shift"} {
+// CHECK-LABEL: @multi_res_circuit.qgrad(%arg0: tensor<1xf64>, %arg1: index) -> (tensor<?xf64>, tensor<?x2xf64>)
+func.func @multi_res_circuit(%arg0: tensor<1xf64>) -> (f64, tensor<2xf64>) attributes {qnode, diff_method = "parameter-shift"} {
     // CHECK-DAG:     [[C0:%.+]] = index.constant 0
     // CHECK-DAG:     [[C1:%.+]] = index.constant 1
     // CHECK-DAG:     [[DIVISOR0:%.+]] = arith.constant 2.0{{.*}} : f64
@@ -410,6 +419,9 @@ func.func @multi_res_circuit(%arg0: f64) -> (f64, tensor<2xf64>) attributes {qno
     // CHECK-DAG:     [[GRAD1:%.+]] = memref.alloc(%arg1) : memref<?x2xf64>
     // CHECK-DAG:     [[GRADIDX:%.+]] = memref.alloca() : memref<index>
     // CHECK-DAG:     memref.store [[C0]], [[GRADIDX]]
+
+    %c0 = arith.constant 0 : index
+    %f0 = tensor.extract %arg0[%c0] : tensor<1xf64>
 
     %idx = arith.constant 0 : i64
 
@@ -431,43 +443,46 @@ func.func @multi_res_circuit(%arg0: f64) -> (f64, tensor<2xf64>) attributes {qno
     // CHECK:         [[NEWIDX:%.+]] = index.add [[IDX]], [[C1]]
     // CHECK:         memref.store [[NEWIDX]], [[GRADIDX]]
     // CHECK-NOT: quantum.
-    %q_1 = quantum.custom "rx"(%arg0) %q_0 : !quantum.bit
+    %q_1 = quantum.custom "rx"(%f0) %q_0 : !quantum.bit
 
     // CHECK:         [[RES0:%.+]] = bufferization.to_tensor [[GRAD0]]
     // CHECK:         [[RES1:%.+]] = bufferization.to_tensor [[GRAD1]]
     // CHECK:         return [[RES0]], [[RES1]] : tensor<?xf64>, tensor<?x2xf64>
-    %res = tensor.from_elements %arg0, %arg0 : tensor<2xf64>
-    func.return %arg0, %res : f64, tensor<2xf64>
+    %res = tensor.from_elements %f0, %f0 : tensor<2xf64>
+    func.return %f0, %res : f64, tensor<2xf64>
 }
 
-func.func @gradCall4(%arg0: f64) -> (f64, tensor<2xf64>)  {
-    %0:2 = gradient.grad "defer" @multi_res_circuit(%arg0) : (f64) -> (f64, tensor<2xf64>)
-    func.return %0#0, %0#1 : f64, tensor<2xf64>
+func.func @gradCall4(%arg0: tensor<1xf64>) -> (tensor<1xf64>, tensor<1x2xf64>)  {
+    %0:2 = gradient.grad "defer" @multi_res_circuit(%arg0) : (tensor<1xf64>) -> (tensor<1xf64>, tensor<1x2xf64>)
+    func.return %0#0, %0#1 : tensor<1xf64>, tensor<1x2xf64>
 }
 
 // -----
 
 // Check multiple grad calls to same function
-func.func private @funcMultiCall(%arg0: f64) -> f64 attributes {qnode, diff_method = "parameter-shift"} {
+func.func private @funcMultiCall(%arg0: tensor<1xf64>) -> f64 attributes {qnode, diff_method = "parameter-shift"} {
     %c0 = arith.constant 0 : i64
     %r = quantum.alloc(1) : !quantum.reg
     %q = quantum.extract %r[%c0] : !quantum.reg -> !quantum.bit
 
-    quantum.custom "rz"(%arg0) %q : !quantum.bit
+    %c1 = arith.constant 0 : index
+    %f0 = tensor.extract %arg0[%c1] : tensor<1xf64>
 
-    func.return %arg0 : f64
+    quantum.custom "rz"(%f0) %q : !quantum.bit
+
+    func.return %f0 : f64
 }
 
-// CHECK-LABEL: @funcMultiCall.shifted(%arg0: f64, %arg1: tensor<1xf64>, %arg2: tensor<0xindex>) -> f64
+// CHECK-LABEL: @funcMultiCall.shifted(%arg0: tensor<1xf64>, %arg1: tensor<1xf64>, %arg2: tensor<0xindex>) -> f64
 
-// CHECK-LABEL: @funcMultiCall.qgrad(%arg0: f64, %arg1: index) -> tensor<?xf64>
-    // CHECK:   call @funcMultiCall.shifted(%arg0, {{%.+}}, {{%.+}}) : (f64, tensor<1xf64>, tensor<0xindex>) -> f64
-    // CHECK:   call @funcMultiCall.shifted(%arg0, {{%.+}}, {{%.+}}) : (f64, tensor<1xf64>, tensor<0xindex>) -> f64
+// CHECK-LABEL: @funcMultiCall.qgrad(%arg0: tensor<1xf64>, %arg1: index) -> tensor<?xf64>
+    // CHECK:   call @funcMultiCall.shifted(%arg0, {{%.+}}, {{%.+}}) : (tensor<1xf64>, tensor<1xf64>, tensor<0xindex>) -> f64
+    // CHECK:   call @funcMultiCall.shifted(%arg0, {{%.+}}, {{%.+}}) : (tensor<1xf64>, tensor<1xf64>, tensor<0xindex>) -> f64
 // }
 
 // CHECK-LABEL: @gradCallMultiCall
-func.func @gradCallMultiCall(%arg0: f64) -> (f64, f64) {
-    %0 = gradient.grad "defer" @funcMultiCall(%arg0) : (f64) -> f64
-    %1 = gradient.grad "defer" @funcMultiCall(%arg0) : (f64) -> f64
-    func.return %0, %1 : f64, f64
+func.func @gradCallMultiCall(%arg0: tensor<1xf64>) -> (tensor<1xf64>, tensor<1xf64>) {
+    %0 = gradient.grad "defer" @funcMultiCall(%arg0) : (tensor<1xf64>) -> tensor<1xf64>
+    %1 = gradient.grad "defer" @funcMultiCall(%arg0) : (tensor<1xf64>) -> tensor<1xf64>
+    func.return %0, %1 : tensor<1xf64>, tensor<1xf64>
 }
