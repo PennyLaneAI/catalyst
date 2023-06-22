@@ -106,8 +106,8 @@ Compilation happens in 3 stages which are successively invoked by the frontend a
 Elaborating on the program capture phase, tracing is a mechanism by which a function is executed
 with abstract arguments called *tracers*. Calling operations from the tracing library (such as
 ``jax.numpy``) will record the operation and which tracers (or constants) it acts upon in a global
-data structure. Note that JAX's tracing contexts are thread-local and can be nested to allow scoped
-region capture, which is relevant when tracing control flow operations.
+data structure. Note that JAX's tracing contexts can be nested to allow scoped region capture,
+which is relevant when tracing control flow operations.
 
 During the tracing of quantum functions (``qml.qnode``), PennyLane's queuing context is activated to
 build a ``QuantumTape`` data structure that records all quantum operations. Nested queuing contexts

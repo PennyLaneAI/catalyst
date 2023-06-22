@@ -30,7 +30,7 @@ Boundary(c1, "Compiler", $link="https://github.com/plantuml-stdlib/C4-PlantUML")
 
   Component(_o_, "Code Generation", "llc", "Compile the LLVM code using the LLVM Static Compiler")
 
-  Component(_so_, "Linking", "system compiler", "Link the compiled file to the Runtime")
+  Component(_so_, "Linking", "variable", "Link the compiled file to the Runtime")
 
 }
 

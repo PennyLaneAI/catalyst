@@ -32,26 +32,26 @@ Boundary(c2, "Backends", $link="https://github.com/plantuml-stdlib/C4-PlantUML")
 
 Rel_D(_user_program_, _capi_, "links", $tags="implementation")
 
-Rel_U(_runtime_, _capi_, "exposes", "", $tags="action")
+Rel_U(_runtime_, _capi_, "exposes", $tags="action")
 
-Rel_D(_runtime_, _quantumdevice_, "exposes", "", $tags="action")
+Rel_D(_runtime_, _quantumdevice_, "exposes", $tags="action")
 
-Rel_U(_pl_lightning_, _quantumdevice_, "", "", $tags="implementation")
+Rel_U(_pl_lightning_, _quantumdevice_, "implements", $tags="implementation")
 
 _pl_lightning_ -[hidden]> _pl_lightning_kokkos_
 
-Rel_U(_pl_lightning_kokkos_, _quantumdevice_, "", "", $tags="implementation")
+Rel_U(_pl_lightning_kokkos_, _quantumdevice_, "", $tags="implementation")
 
 _pl_lightning_kokkos_ -[hidden]> _pl_lightning_gpu_
 
-Rel_U(_pl_lightning_gpu_, _quantumdevice_, "", "", $tags="implementation")
+Rel_U(_pl_lightning_gpu_, _quantumdevice_, "", $tags="implementation")
 
 _pl_lightning_gpu_ -[hidden]> _openqasm_
 
-Rel_U(_openqasm_, _quantumdevice_, "", "", $tags="implementation")
+Rel_U(_openqasm_, _quantumdevice_, "", $tags="implementation")
 
 Rel_U(_aws_braket_, _quantumdevice_, "receive", $tags="action")
 
-Rel_R(_openqasm_, _aws_braket_, "send", "", $tags="action")
+Rel_R(_openqasm_, _aws_braket_, "send", $tags="action")
 
 @enduml

@@ -24,7 +24,7 @@ Container_Ext(_jaxcore_, "Tracer", "jax.core", "")
 Container_Ext(_jaxlib_, "MLIR Bindings", "jaxlib", "")
 Container_Ext(_quantumopt_, "Compiler Libraries", "quantum-opt", "Catalyst MLIR dialects and passes")
 Container_Ext(_llc_, "LLVM Compiler", "llc", "")
-Container_Ext(_clang_, "System Linker", "...", "")
+Container_Ext(_clang_, "System Linker", "variable", "")
 
 Rel_R(_alg_, _tracing_, " ", "")
 Rel_R(_tracing_, _mlirgen_, "jaxpr", "")
