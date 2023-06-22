@@ -263,7 +263,7 @@ class MLIRToLLVMDialect(PassPipeline):
 
 
 class QuantumCompilationPass(PassPipeline):
-    """Pass pipeline to lower gradients."""
+    """Pass pipeline for Catalyst-specific transformation passes."""
 
     _executable = get_executable_path("quantum", "quantum-opt")
     _default_flags = ["--lower-gradients", "--adjoint-lowering", "--convert-arraylist-to-memref"]

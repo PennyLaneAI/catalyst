@@ -14,7 +14,7 @@
 
 // RUN: quantum-opt --adjoint-lowering --split-input-file %s | FileCheck %s
 
-// CHECK:      workflow_plain
+// CHECK-LABEL:      @workflow_plain
 func.func private @workflow_plain() -> tensor<4xcomplex<f64>> attributes {} {
   %c1_i64 = arith.constant 1 : i64
   %cst = arith.constant 4.000000e-01 : f64
@@ -53,7 +53,7 @@ func.func private @workflow_plain() -> tensor<4xcomplex<f64>> attributes {} {
 }
 
 
-// CHECK:      workflow_nested
+// CHECK-LABEL:      @workflow_nested
 // CHECK:      OpC
 // CHECK:      OpD
 // CHECK:      OpF
