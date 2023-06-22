@@ -576,9 +576,10 @@ def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
     def _trace_quantum_tape(*args, _callee: Callable):
         (qargs, cargs, ckwargs) = args
         assert len(qargs) == 1
-        with JaxTape(do_queue=False) as tape:
-            with tape.quantum_tape:
-                out = _callee(*cargs, **ckwargs)
+        with qml.QueuingManager.stop_recording():
+            with JaxTape() as tape:
+                with tape.quantum_tape:
+                    out = _callee(*cargs, **ckwargs)
             if len(tape.quantum_tape.measurements) > 0:
                 raise ValueError("Adjointed operations must contain no measurements")
             tape.set_return_val(out if not isinstance(out, Operation) else None)
