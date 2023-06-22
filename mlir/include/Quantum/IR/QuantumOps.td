@@ -777,7 +777,6 @@ def YieldOp : Op<QuantumDialect, "yield", [Pure, ReturnLike, Terminator]> {
     let summary = "Return results from quantum program regions";
 
     let arguments = (ins Variadic<AnyType>:$results);
-    let builders = [OpBuilder<(ins), [{ /* nothing to do */ }]>];
 
     let assemblyFormat = [{  attr-dict ($results^ `:` type($results))? }];
 }
