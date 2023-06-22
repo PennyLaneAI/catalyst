@@ -90,7 +90,7 @@ Pass Pipelines
 A lot of the compilation steps are broken into pass pipelines.
 ``PassPipeline`` is a class that specifies which binary and which flags are used for compilation.
 Users can implement their own ``PassPipeline`` by inheriting from this class and implementing the relevant methods/attributes.
-Catalyst's compilation strategy can then adjusted by inserting new passes in then default pipeline or forming a completely new pipeline.
+Catalyst's compilation strategy can then be adjusted by inserting new passes in then default pipeline or forming a completely new pipeline.
 For example, in the Catalyst tests we have the following compilation strategy that overrides the default compilation pipeline and instead inserts a C++ program to be compiled.
 
 .. code-block:: python
