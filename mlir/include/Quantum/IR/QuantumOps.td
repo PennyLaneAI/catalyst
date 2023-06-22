@@ -205,7 +205,7 @@ def CustomOp : Gate_Op<"custom", [NoMemoryEffect, AttrSizedOperandSegments, Diff
         Variadic<F64>:$params,
         Variadic<QubitType>:$in_qubits,
         StrAttr:$gate_name,
-        OptionalAttr<BoolAttr>:$adjoint
+        OptionalAttr<UnitAttr>:$adjoint
     );
 
     let results = (outs
@@ -269,7 +269,7 @@ def QubitUnitaryOp : Gate_Op<"unitary", [NoMemoryEffect]> {
             2DTensorOf<[Complex<F64>]>, MemRefRankOf<[Complex<F64>], [2]>
         ]>:$matrix,
         Variadic<QubitType>:$in_qubits,
-        OptionalAttr<BoolAttr>:$adjoint
+        OptionalAttr<UnitAttr>:$adjoint
     );
 
     let results = (outs

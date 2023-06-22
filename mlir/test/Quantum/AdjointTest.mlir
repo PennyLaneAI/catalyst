@@ -27,11 +27,11 @@ func.func private @workflow_plain() -> tensor<4xcomplex<f64>> attributes {} {
   %3 = quantum.insert %0[%c0_i64], %2 : !quantum.reg, !quantum.bit
   %4 = quantum.adjoint(%3) : !quantum.reg {
   // CHECK:        PauliZ
-  // CHECK-SAME:          adjoint = true
+  // CHECK-SAME:          adjoint
   // CHECK:        PauliY
-  // CHECK-SAME:          adjoint = true
+  // CHECK-SAME:          adjoint
   // CHECK:        PauliX
-  // CHECK-SAME:          adjoint = true
+  // CHECK-SAME:          adjoint
   ^bb0(%arg0: !quantum.reg):
     %10 = quantum.extract %arg0[%c0_i64] : !quantum.reg -> !quantum.bit
     %11 = quantum.custom "PauliX"() %10 : !quantum.bit
@@ -57,13 +57,13 @@ func.func private @workflow_plain() -> tensor<4xcomplex<f64>> attributes {} {
 // CHECK:      OpC
 // CHECK:      OpD
 // CHECK:      OpF
-// CHECK-SAME:      adjoint = true
+// CHECK-SAME:      adjoint
 // CHECK:      OpE
-// CHECK-SAME:      adjoint = true
+// CHECK-SAME:      adjoint
 // CHECK:      OpB
-// CHECK-SAME:      adjoint = true
+// CHECK-SAME:      adjoint
 // CHECK:      OpA
-// CHECK-SAME:      adjoint = true
+// CHECK-SAME:      adjoint
 func.func private @workflow_nested() -> tensor<4xcomplex<f64>> attributes {} {
   %c1_i64 = arith.constant 1 : i64
   %c0_i64 = arith.constant 0 : i64

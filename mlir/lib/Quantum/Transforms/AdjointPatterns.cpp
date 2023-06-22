@@ -120,7 +120,7 @@ struct AdjointSingleOpRewritePattern : public mlir::OpRewritePattern<AdjointOp> 
                     }
                     auto customA = rewriter.create<CustomOp>(
                         loc, custom.getResultTypes(), in_params, in_qubits, custom.getGateName(),
-                        mlir::BoolAttr::get(ctx, !custom.getAdjoint().value_or(false)));
+                        custom.getAdjoint() ? mlir::UnitAttr() : mlir::UnitAttr::get(ctx) ) ;
                     for (size_t i = 0; i < customA.getOutQubits().size(); i++) {
                         update(custom.getQubitOperands()[i], customA->getResult(i));
                     }
@@ -136,7 +136,7 @@ struct AdjointSingleOpRewritePattern : public mlir::OpRewritePattern<AdjointOp> 
                     auto qunitaryA = rewriter.create<QubitUnitaryOp>(
                         loc, qunitary.getResultTypes(),
                         classicalMapping.lookupOrDefault(qunitary.getMatrix()), in_qubits,
-                        mlir::BoolAttr::get(ctx, !qunitary.getAdjoint().value_or(false)));
+                        qunitary.getAdjoint() ? mlir::UnitAttr() : mlir::UnitAttr::get(ctx));
                     for (size_t i = 0; i < qunitaryA.getQubitResults().size(); i++) {
                         update(qunitary.getQubitOperands()[i], qunitaryA->getResult(i));
                     }
