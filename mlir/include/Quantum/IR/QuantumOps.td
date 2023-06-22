@@ -776,7 +776,7 @@ def AdjointOp : Op<QuantumDialect, "adjoint", []> {
 def YieldOp : Op<QuantumDialect, "yield", [Pure, ReturnLike, Terminator]> {
     let summary = "Return results from quantum program regions";
 
-    let arguments = (ins Variadic<AnyType>:$results);
+    let arguments = (ins Variadic<AnyTypeOf<[QuregType]>>:$results);
 
     let assemblyFormat = [{  attr-dict ($results^ `:` type($results))? }];
 }
