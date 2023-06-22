@@ -33,8 +33,9 @@ This release contains contributions from (in alphabetical order):
 
   workflow()
   ```
-* Catalyst programs can now be used inside of a larger JAX workflow which uses
-  JIT compilation, automatic differentiation, and other JAX transforms.
+
+* Catalyst programs can now be used inside of a larger JAX workflow which uses JIT compilation,
+  automatic differentiation, and other JAX transforms.
   [#96](https://github.com/PennyLaneAI/catalyst/pull/96)
   [#123](https://github.com/PennyLaneAI/catalyst/pull/123)
   [#167](https://github.com/PennyLaneAI/catalyst/pull/167)
