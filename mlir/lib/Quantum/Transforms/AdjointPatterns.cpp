@@ -82,10 +82,7 @@ struct AdjointSingleOpRewritePattern : public mlir::OpRewritePattern<AdjointOp> 
         {
             Block &b = adjoint.getRegion().front();
             for (auto i = b.begin(); i != b.end(); i++) {
-                if (isa<QuantumDialect>(i->getDialect())) {
-                    /* Skip quantum operations */
-                }
-                else {
+                if (!isa<QuantumDialect>(i->getDialect())) {
                     LLVM_DEBUG(dbgs() << "classical operation: " << *i << "\n");
                     rewriter.insert(i->clone(classicalMapping));
                 }
