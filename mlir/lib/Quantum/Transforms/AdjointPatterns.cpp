@@ -82,7 +82,7 @@ struct AdjointSingleOpRewritePattern : public mlir::OpRewritePattern<AdjointOp> 
         {
             Block &b = adjoint.getRegion().front();
             for (auto i = b.begin(); i != b.end(); i++) {
-                if (i->getName().getStringRef().find("quantum") != std::string::npos) {
+                if (isa<QuantumDialect>(i->getDialect())) {
                     /* Skip quantum operations */
                 }
                 else {
