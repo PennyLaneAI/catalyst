@@ -20,20 +20,10 @@ func.func private @funcPointTensorPointTensor(%arg0: tensor<f64>) -> tensor<f64>
     return %arg0 : tensor<f64>
 }
 
-// CHECK-LABEL: @funcPointTensorPointTensor.fullgrad0ps(%arg0: tensor<f64>) -> tensor<f64>
-    // CHECK:   [[CJAC:%.+]] = gradient.grad "fd" @funcPointTensorPointTensor.argmap(%arg0) : (tensor<f64>) -> tensor<?xf64>
-    // CHECK:   [[PCOUNT:%.+]] = tensor.dim [[CJAC]]
-    // CHECK:   [[QGRAD:%.+]] = call @funcPointTensorPointTensor.qgrad(%arg0, [[PCOUNT]]) :  (tensor<f64>, index) -> tensor<?xf64>
-
-    // CHECK:   [[GRAD:%.+]] = tensor.generate
-    // CHECK:       [[C_SLICE:%.+]] = tensor.extract_slice [[CJAC]][0] [[[PCOUNT]]] [1]
-    // CHECK:       [[Q_SLICE:%.+]] = tensor.extract_slice [[QGRAD]][0] [[[PCOUNT]]] [1]
-    // CHECK:       [[RES_T:%.+]] = linalg.dot ins([[C_SLICE]], [[Q_SLICE]] : tensor<?xf64>, tensor<?xf64>)
-    // CHECK:       [[RES:%.+]] = tensor.extract [[RES_T]][]
-    // CHECK:       tensor.yield [[RES]]
-
-    // CHECK:   [[GRAD_RESHAPED:%.+]] = tensor.collapse_shape [[GRAD]] [] : tensor<1xf64> into tensor<f64>
-    // CHECK:   return [[GRAD_RESHAPED]]
+// CHECK-LABEL: @funcPointTensorPointTensor.fullgrad0ps(%arg0: tensor<f64>) -> tensor<f64> {
+   // CHECK:    [[PCOUNT:%.+]] = call @funcPointTensorPointTensor.pcount(%arg0) : (tensor<f64>) -> index
+   // CHECK:    [[QGRAD:%.+]] = call @funcPointTensorPointTensor.qgrad(%arg0, [[PCOUNT]]) : (tensor<f64>, index) -> tensor<?xf64>
+   // CHECK:    gradient.backprop @funcPointTensorPointTensor.argmap(%arg0) qjacobian([[QGRAD]] : tensor<?xf64>) : (tensor<f64>) -> tensor<f64>
 // }
 
 func.func @gradCallPointTensorPointTensor(%arg0: tensor<f64>) -> tensor<f64> {
@@ -51,24 +41,20 @@ func.func private @funcTensorTensor(%arg0: tensor<7x3x2x1xf64>) -> tensor<2xf64>
     return %res : tensor<2xf64>
 }
 
-// CHECK-LABEL: @funcTensorTensor.fullgrad0ps(%arg0: tensor<7x3x2x1xf64>) -> tensor<7x3x2x1x2xf32>
-    // CHECK:        [[c4:%.+]] = arith.constant 4 : index
-    // CHECK:        [[CJAC:%.+]] = gradient.grad "fd" @funcTensorTensor.argmap(%arg0) : (tensor<7x3x2x1xf64>) -> tensor<7x3x2x1x?xf64>
-    // CHECK:        [[PCOUNT:%.+]] = tensor.dim [[CJAC]], [[c4]]
-    // CHECK:        [[QGRAD:%.+]] = call @funcTensorTensor.qgrad(%arg0, [[PCOUNT]]) : (tensor<7x3x2x1xf64>, index) -> tensor<?x2xf32>
-    // CHECK:        [[CJAC_t:%.+]] = arith.truncf [[CJAC]] : tensor<7x3x2x1x?xf64> to tensor<7x3x2x1x?xf32>
-
-    // CHECK:        [[GRAD:%.+]] = tensor.generate
-    // CHECK-NEXT:   ^bb0([[i0:%.+]]: index, [[i1:%.+]]: index, [[i2:%.+]]: index, [[i3:%.+]]: index, [[i4:%.+]]: index):
-    // CHECK:            [[C_SLICE:%.+]] = tensor.extract_slice [[CJAC_t]][[[i0]], [[i1]], [[i2]], [[i3]], 0] [1, 1, 1, 1, [[PCOUNT]]] [1, 1, 1, 1, 1]
-    // CHECK:            [[Q_SLICE:%.+]] = tensor.extract_slice [[QGRAD]][0, [[i4]]] [[[PCOUNT]], 1] [1, 1]
-    // CHECK:            [[RES_T:%.+]] = linalg.dot ins([[C_SLICE]], [[Q_SLICE]] : tensor<?xf32>, tensor<?xf32>)
-    // CHECK:            [[RES:%.+]] = tensor.extract [[RES_T]][]
-    // CHECK:            tensor.yield [[RES]]
-
-    // CHECK:        return [[GRAD]]
+// CHECK-LABEL:  @funcTensorTensor.fullgrad0ps(%arg0: tensor<7x3x2x1xf64>) -> tensor<7x3x2x1x2xf64> {
+   // CHECK:     %idx0 = index.constant 0
+   // CHECK:     [[PCOUNT:%.+]] = call @funcTensorTensor.pcount(%arg0) : (tensor<7x3x2x1xf64>) -> index
+   // CHECK:     [[QGRAD:%.+]] = call @funcTensorTensor.qgrad(%arg0, %0) : (tensor<7x3x2x1xf64>, index) -> tensor<?x2xf64>
+   // CHECK:     [[DIM:%.+]] = tensor.dim [[QGRAD]], %idx0 : tensor<?x2xf64>
+   // CHECK:     [[EXTRACTEDQGRAD0:%.+]] = tensor.extract_slice [[QGRAD]][0, 0] [[[DIM]], 1] [1, 1] : tensor<?x2xf64> to tensor<?xf64>
+   // CHECK:     [[GRAD0:%.+]] = gradient.backprop @funcTensorTensor.argmap(%arg0) qjacobian([[EXTRACTEDQGRAD0]] : tensor<?xf64>) : (tensor<7x3x2x1xf64>) -> tensor<7x3x2x1xf64>
+   // CHECK:     [[EXTRACTEDQGRAD1:%.+]] = tensor.extract_slice %1[0, 1] [[[DIM]], 1] [1, 1] : tensor<?x2xf64> to tensor<?xf64>
+   // CHECK:     [[GRAD1:%.+]] = gradient.backprop @funcTensorTensor.argmap(%arg0) qjacobian([[EXTRACTEDQGRAD1]] : tensor<?xf64>) : (tensor<7x3x2x1xf64>) -> tensor<7x3x2x1xf64>
+   // CHECK:     [[EMPTYTENSOR:%.+]] = tensor.empty() : tensor<7x3x2x1x2xf64>
+   // CHECK:     [[INSERTQGRAD0:%.+]] = tensor.insert_slice [[GRAD0]] into [[EMPTYTENSOR]][0, 0, 0, 0, 0] [7, 3, 2, 1, 1] [1, 1, 1, 1, 1] : tensor<7x3x2x1xf64> into tensor<7x3x2x1x2xf64>
+   // CHECK:     [[INSERTQGRAD1:%.+]] = tensor.insert_slice [[GRAD1]] into [[INSERTQGRAD0]][0, 0, 0, 0, 1] [7, 3, 2, 1, 1] [1, 1, 1, 1, 1] : tensor<7x3x2x1xf64> into tensor<7x3x2x1x2xf64>
+   // CHECK:     return [[INSERTQGRAD1]] : tensor<7x3x2x1x2xf64>
 // }
-
 func.func @gradCallTensorTensor(%arg0: tensor<7x3x2x1xf64>) -> tensor<7x3x2x1x2xf64> {
     %2 = gradient.grad "defer" @funcTensorTensor(%arg0) : (tensor<7x3x2x1xf64>) -> tensor<7x3x2x1x2xf64>
     func.return %2 : tensor<7x3x2x1x2xf64>
@@ -81,63 +67,22 @@ func.func @funcMultiArg(%arg0: tensor<f64>, %arg1: tensor<2xf64>) -> tensor<f64>
     func.return %arg0 : tensor<f64>
 }
 
-// CHECK-LABEL: @funcMultiArg.fullgrad0ps(%arg0: f64, %arg1: tensor<2xf64>) -> f64
-    // CHECK:       [[CJAC:%.+]] = gradient.grad "fd" @funcMultiArg.argmap(%arg0, %arg1) : {{.+}} -> tensor<?xf64>
-    // CHECK:       [[PCOUNT:%.+]] = tensor.dim [[CJAC]]
-    // CHECK:       [[QGRAD:%.+]] = call @funcMultiArg.qgrad(%arg0, %arg1, [[PCOUNT]]) : {{.+}} -> tensor<?xf64>
-
-    // CHECK:       [[GRAD:%.+]] = tensor.generate
-    // CHECK:           [[C_SLICE:%.+]] = tensor.extract_slice [[CJAC]][0] [[[PCOUNT]]] [1]
-    // CHECK:           [[Q_SLICE:%.+]] = tensor.extract_slice [[QGRAD]][0] [[[PCOUNT]]] [1]
-    // CHECK:           [[RES_T:%.+]] = linalg.dot ins([[C_SLICE]], [[Q_SLICE]] : tensor<?xf64>, tensor<?xf64>)
-    // CHECK:           [[RES:%.+]] = tensor.extract [[RES_T]][]
-    // CHECK:           tensor.yield [[RES]]
-    // CHECK:       [[GRAD_RESHAPED:%.+]] = tensor.collapse_shape [[GRAD]] [] : tensor<1xf64> into tensor<f64>
-    // CHECK:       [[GRAD0:%.+]] = tensor.extract [[GRAD_RESHAPED]][]
-
-    // CHECK:       return [[GRAD0]] : f64
+// CHECK-LABEL:  @funcMultiArg.fullgrad0ps(%arg0: tensor<f64>, %arg1: tensor<2xf64>) -> tensor<f64> {
+   // CHECK:    [[PCOUNT:%.+]] = call @funcMultiArg.pcount(%arg0, %arg1) : (tensor<f64>, tensor<2xf64>) -> index
+   // CHECK:    [[QGRAD:%.+]] = call @funcMultiArg.qgrad(%arg0, %arg1, [[PCOUNT]]) : (tensor<f64>, tensor<2xf64>, index) -> tensor<?xf64>
+   // CHECK:    [[GRAD:%.+]] = gradient.backprop @funcMultiArg.argmap(%arg0, %arg1) qjacobian([[QGRAD]] : tensor<?xf64>) : (tensor<f64>, tensor<2xf64>) -> tensor<f64>
 // }
 
-// CHECK-LABEL: @funcMultiArg.fullgrad1ps(%arg0: f64, %arg1: tensor<2xf64>) -> tensor<2xf64>
-    // CHECK:        [[c1:%.+]] = arith.constant 1 : index
-    // CHECK:       [[CJAC:%.+]] = gradient.grad "fd" @funcMultiArg.argmap(%arg0, %arg1) {diffArgIndices = dense<1> : tensor<1xindex>} : {{.+}} -> tensor<2x?xf64>
-    // CHECK:       [[PCOUNT:%.+]] = tensor.dim [[CJAC]], [[c1]]
-    // CHECK:       [[QGRAD:%.+]] = call @funcMultiArg.qgrad(%arg0, %arg1, [[PCOUNT]]) : {{.+}} -> tensor<?xf64>
-
-    // CHECK:       [[GRAD1:%.+]] = tensor.generate
-    // CHECK-NEXT:  ^bb0([[i0:%.+]]: index):
-    // CHECK:           [[C_SLICE:%.+]] = tensor.extract_slice [[CJAC]][[[i0]], 0] [1, [[PCOUNT]]] [1, 1]
-    // CHECK:           [[Q_SLICE:%.+]] = tensor.extract_slice [[QGRAD]][0] [[[PCOUNT]]] [1]
-    // CHECK:           [[RES_T:%.+]] = linalg.dot ins([[C_SLICE]], [[Q_SLICE]] : tensor<?xf64>, tensor<?xf64>)
-    // CHECK:           [[RES:%.+]] = tensor.extract [[RES_T]][]
-    // CHECK:           tensor.yield [[RES]]
-
-    // CHECK:       return [[GRAD1]] : tensor<2xf64>
+// CHECK-LABEL:  func.func private @funcMultiArg.fullgrad1ps(%arg0: tensor<f64>, %arg1: tensor<2xf64>) -> tensor<2xf64> {
+   // CHECK:    [[PCOUNT:%.+]] = call @funcMultiArg.pcount(%arg0, %arg1) : (tensor<f64>, tensor<2xf64>) -> index
+   // CHECK:    [[QGRAD:%.+]] = call @funcMultiArg.qgrad(%arg0, %arg1, [[PCOUNT]]) : (tensor<f64>, tensor<2xf64>, index) -> tensor<?xf64>
+   // CHECK:    [[GRAD:%.+]] = gradient.backprop @funcMultiArg.argmap(%arg0, %arg1) qjacobian([[QGRAD]] : tensor<?xf64>) {diffArgIndices = dense<1> : tensor<1xindex>} : (tensor<f64>, tensor<2xf64>) -> tensor<2xf64>
 // }
 
-// CHECK-LABEL: @funcMultiArg.fullgrad01ps(%arg0: f64, %arg1: tensor<2xf64>) -> (f64, tensor<2xf64>)
-    // CHECK:        [[CJAC:%.+]]:2 = gradient.grad "fd" @funcMultiArg.argmap(%arg0, %arg1) {diffArgIndices = dense<[0, 1]> : tensor<2xindex>} : {{.+}} -> (tensor<?xf64>, tensor<2x?xf64>)
-    // CHECK:        [[PCOUNT:%.+]] = tensor.dim [[CJAC]]#0
-    // CHECK:        [[QGRAD:%.+]] = call @funcMultiArg.qgrad(%arg0, %arg1, [[PCOUNT]]) : {{.+}} -> tensor<?xf64>
-
-    // CHECK:        [[GRAD:%.+]] = tensor.generate
-    // CHECK:            [[C_SLICE:%.+]] = tensor.extract_slice [[CJAC]]#0[0] [[[PCOUNT]]] [1]
-    // CHECK:            [[Q_SLICE:%.+]] = tensor.extract_slice [[QGRAD]][0] [[[PCOUNT]]] [1]
-    // CHECK:            [[RES_T:%.+]] = linalg.dot ins([[C_SLICE]], [[Q_SLICE]] : tensor<?xf64>, tensor<?xf64>)
-    // CHECK:            [[RES:%.+]] = tensor.extract [[RES_T]][]
-    // CHECK:            tensor.yield [[RES]]
-    // CHECK:        [[GRAD_RESHAPED:%.+]] = tensor.collapse_shape [[GRAD]] [] : tensor<1xf64> into tensor<f64>
-    // CHECK:        [[GRAD0:%.+]] = tensor.extract [[GRAD_RESHAPED]][]
-
-    // CHECK:        [[GRAD1:%.+]] = tensor.generate
-    // CHECK-NEXT:   ^bb0([[i0:%.+]]: index):
-    // CHECK:            [[C_SLICE:%.+]] = tensor.extract_slice [[CJAC]]#1[[[i0]], 0] [1, [[PCOUNT]]] [1, 1]
-    // CHECK:            [[Q_SLICE:%.+]] = tensor.extract_slice [[QGRAD]][0] [[[PCOUNT]]] [1]
-    // CHECK:            [[RES_T:%.+]] = linalg.dot ins([[C_SLICE]], [[Q_SLICE]] : tensor<?xf64>, tensor<?xf64>)
-    // CHECK:            [[RES:%.+]] = tensor.extract [[RES_T]][]
-    // CHECK:            tensor.yield [[RES]]
-
-    // CHECK:        return [[GRAD0]], [[GRAD1]] : f64, tensor<2xf64>
+// CHECK-LABEL:  @funcMultiArg.fullgrad01ps(%arg0: tensor<f64>, %arg1: tensor<2xf64>) -> (tensor<f64>, tensor<2xf64>) {
+   // CHECK:    [[PCOUNT:%.+]] = call @funcMultiArg.pcount(%arg0, %arg1) : (tensor<f64>, tensor<2xf64>) -> index
+   // CHECK:    [[QGRAD:%.+]] = call @funcMultiArg.qgrad(%arg0, %arg1, [[PCOUNT]]) : (tensor<f64>, tensor<2xf64>, index) -> tensor<?xf64>
+   // CHECK:    [[GRAD:%.+]]:2 = gradient.backprop @funcMultiArg.argmap(%arg0, %arg1) qjacobian([[QGRAD]] : tensor<?xf64>) {diffArgIndices = dense<[0, 1]> : tensor<2xindex>} : (tensor<f64>, tensor<2xf64>) -> (tensor<f64>, tensor<2xf64>)
 // }
 
 func.func @gradCallMultiArg(%arg0: tensor<f64>, %arg1: tensor<2xf64>) -> (tensor<f64>, tensor<2xf64>, tensor<f64>, tensor<2xf64>)  {
