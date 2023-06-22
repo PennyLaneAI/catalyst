@@ -16,6 +16,7 @@
 
 from functools import partial
 
+import jax
 import jax.numpy as jnp
 import pennylane as qml
 import pennylane.numpy as pnp
@@ -24,7 +25,7 @@ from numpy.testing import assert_allclose
 from pennylane import adjoint as PL_adjoint
 
 from catalyst import adjoint as C_adjoint
-from catalyst import qjit
+from catalyst import for_loop, qjit
 
 # pylint: disable=missing-function-docstring
 
@@ -208,3 +209,29 @@ def test_adjoint_invalid_argument():
             return qml.state()
 
         C_workflow()
+
+
+def test_adjoint_classical_loop():
+    def func(w=0):
+        @for_loop(0, 2, 1)
+        def loop(i, s):
+            return s + 1
+
+        qml.PauliX(wires=loop(w))
+        qml.RX(pnp.pi / 2, wires=w)
+
+    @qjit()
+    @qml.qnode(qml.device("lightning.qubit", wires=3))
+    def C_workflow():
+        C_adjoint(func)(0)
+        return qml.state()
+
+    @jax.jit
+    @qml.qnode(qml.device("lightning.qubit", wires=3))
+    def PL_workflow():
+        PL_adjoint(func)(0)
+        return qml.state()
+
+    actual = C_workflow()
+    desired = PL_workflow()
+    assert_allclose(actual, desired)
