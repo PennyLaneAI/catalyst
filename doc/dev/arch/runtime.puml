@@ -1,0 +1,57 @@
+@startuml
+!include <C4/C4_Container.puml>
+!include <C4/C4_Component>
+
+!include common.iuml
+
+HIDE_STEREOTYPE()
+
+Container_Ext(_user_program_, "Compiled Program", "*.o")
+
+Boundary(c1, "Runtime", $link="https://github.com/plantuml-stdlib/C4-PlantUML") {
+
+  Component(_capi_, "CAPI", "C", "Runtime interface for QIR-style programs")
+
+  Container(_runtime_, "Common Functionality", "C++", "Device management, instruction dispatch, & more")
+
+  Component(_quantumdevice_, "QuantumDevice", "C++", "Abstract base class for device implementers")
+}
+
+Boundary(c2, "Backends", $link="https://github.com/plantuml-stdlib/C4-PlantUML") {
+
+  Container_Ext(_pl_lightning_, "Lightning", "CPU")
+
+  Container_Ext(_pl_lightning_kokkos_, "Lightning-Kokkos", "CPU/GPU")
+
+  Container_Ext(_pl_lightning_gpu_, "Lightning-GPU", "GPU")
+
+  Container_Ext(_openqasm_, "OpenQASM", "Text")
+
+  Container_Ext(_aws_braket_, "AWS Braket", "Cloud")
+}
+
+Rel_D(_user_program_, _capi_, "links", $tags="implementation")
+
+Rel_U(_runtime_, _capi_, "exposes", $tags="action")
+
+Rel_D(_runtime_, _quantumdevice_, "exposes", $tags="action")
+
+Rel_U(_pl_lightning_, _quantumdevice_, "implements", $tags="implementation")
+
+_pl_lightning_ -[hidden]> _pl_lightning_kokkos_
+
+Rel_U(_pl_lightning_kokkos_, _quantumdevice_, "", $tags="implementation")
+
+_pl_lightning_kokkos_ -[hidden]> _pl_lightning_gpu_
+
+Rel_U(_pl_lightning_gpu_, _quantumdevice_, "", $tags="implementation")
+
+_pl_lightning_gpu_ -[hidden]> _openqasm_
+
+Rel_U(_openqasm_, _quantumdevice_, "", $tags="implementation")
+
+Rel_U(_aws_braket_, _quantumdevice_, "receive", $tags="action")
+
+Rel_R(_openqasm_, _aws_braket_, "send", $tags="action")
+
+@enduml
