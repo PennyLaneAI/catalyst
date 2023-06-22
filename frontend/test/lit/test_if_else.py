@@ -16,7 +16,7 @@
 
 import pennylane as qml
 
-from catalyst import cond, qjit, measure
+from catalyst import cond, measure, qjit
 
 
 # CHECK-NOT: Verification failed
