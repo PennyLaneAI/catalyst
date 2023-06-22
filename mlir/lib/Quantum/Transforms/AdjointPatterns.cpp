@@ -46,17 +46,17 @@ template <class T> T isInstanceOf(Operation &op)
 
 /// Copy the region of the adjoint operation `op` to the POI specified by the `rewriter`. Build and
 /// return the value mapping `bvm`.
-Value copyAdjointVerbatim(AdjointOp op, PatternRewriter &rewriter, IRMapping &bvm)
+Value copyAdjointVerbatim(AdjointOp op, PatternRewriter &rewriter, IRMapping &mapping)
 {
     Block &b = op.getRegion().front();
     for (auto i = b.begin(); i != b.end(); i++) {
         if (YieldOp yield = isInstanceOf<YieldOp>(*i)) {
             assert(++i == b.end() &&
                    "quantum.yield must be the last operation of an adjoint block");
-            return bvm.lookupOrDefault(yield->getOperand(0));
+            return mapping.lookupOrDefault(yield->getOperand(0));
         }
         else {
-            rewriter.insert(i->clone(bvm));
+            rewriter.insert(i->clone(mapping));
         }
     }
     assert(false && "quantum.yield must present in the adjoint region");
