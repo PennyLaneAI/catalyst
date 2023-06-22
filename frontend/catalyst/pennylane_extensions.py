@@ -523,10 +523,10 @@ class Adjoint(Operation):
 
     num_wires = AnyWires
 
-    def __init__(self, body_jaxpr, consts_jaxpr, cargs_jaxpr):
+    def __init__(self, body_jaxpr, consts, cargs):
         self.body_jaxpr = body_jaxpr
-        self.consts_jaxpr = list(consts_jaxpr)
-        self.cargs_jaxpr = list(cargs_jaxpr)
+        self.consts = list(consts)
+        self.cargs = list(cargs)
         super().__init__(wires=Wires(Adjoint.num_wires))
 
 
@@ -594,13 +594,13 @@ def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
         return qreg, return_values
 
     def _make_adjoint(*args, _callee: Callable, **kwargs):
-        cargs_qargs_jaxpr, tree = tree_flatten(([jprim.Qreg()], args, kwargs))
-        cargs_jaxpr, _ = tree_flatten((args, kwargs))
-        cargs_qargs_aval = tuple(_abstractify(val) for val in cargs_qargs_jaxpr)
-        body_jaxpr, consts_jaxpr, _ = _initial_style_jaxpr(
+        cargs_qargs, tree = tree_flatten(([jprim.Qreg()], args, kwargs))
+        cargs, _ = tree_flatten((args, kwargs))
+        cargs_qargs_aval = tuple(_abstractify(val) for val in cargs_qargs)
+        body, consts, _ = _initial_style_jaxpr(
             partial(_trace_quantum_tape, _callee=_callee), tree, cargs_qargs_aval, "adjoint"
         )
-        return Adjoint(body_jaxpr, consts_jaxpr, cargs_jaxpr)
+        return Adjoint(body, consts, cargs)
 
     if isinstance(f, Callable):
 

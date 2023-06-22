@@ -307,7 +307,7 @@ def trace_quantum_tape(
             qubit_states.clear()
         elif op.__class__.__name__ == "Adjoint":
             qreg = insert_to_qreg(qubit_states, qreg)
-            args, args_tree = tree_flatten((op.consts_jaxpr, op.cargs_jaxpr, [qreg]))
+            args, args_tree = tree_flatten((op.consts, op.cargs, [qreg]))
             op_results = jprim.adjoint_p.bind(*args, args_tree=args_tree, jaxpr=op.body_jaxpr)
             qreg = op_results[0]
         else:
