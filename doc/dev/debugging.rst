@@ -87,66 +87,87 @@ The user can now compile and link this program and run it without ``python``.
 Pass Pipelines
 ==============
 
-A lot of the compilation steps are broken into pass pipelines.
-``PassPipeline`` is a class that specifies which binary and which flags are used for compilation.
+The compilation steps which take MLIR as an input and lower it to binary are broken into pass pipelines.
+A ``PassPipeline`` is a class that specifies which binary and which flags are used for compilation.
 Users can implement their own ``PassPipeline`` by inheriting from this class and implementing the relevant methods/attributes.
-Catalyst's compilation strategy can then be adjusted by inserting new passes in then default pipeline or forming a completely new pipeline.
-For example, in the Catalyst tests we have the following compilation strategy that overrides the default compilation pipeline and instead inserts a C++ program to be compiled.
+Catalyst's compilation strategy can then be adjusted by overriding the default pass pipeline.
+For example, let's imagine that a user is interested in testing different optimization levels when compiling LLVM IR to binary using ``llc``.
+The user would then create a ``PassPipeline`` that replaces the ``LLVMIRToObjectFile`` class.
+First let's take a look at the ``LLVMIRToObjectFile``.
 
 .. code-block:: python
-
-    class CompileCXXException:
-        """Class that overrides the program to be compiled."""
-
-        _executable = "cc"
-        _default_flags = ["-shared", "-fPIC", "-x", "c++"]
-
+    class LLVMDialectToLLVMIR(PassPipeline):
+        """LLVMIR To Object File."""
+    
+        _executable = get_executable_path("llvm", "llc")
+        _default_flags = [
+            "--filetype=obj",
+            "--relocation-model=pic",
+        ]
+    
         @staticmethod
         def get_output_filename(infile):
-            """Get the name of the output file based on the input file."""
-            return infile.replace(".mlir", ".o")
+            path = pathlib.Path(infile)
+            if not path.exists():
+                raise FileNotFoundError("Cannot find {infile}.")
+            return str(path.with_suffix(".ll"))
 
-        @staticmethod
-        def run(infile, **_kwargs):
-            """Run the compilation step."""
-            contents = """
-    #include <stdexcept>
-    extern "C" {
-       void _catalyst_pyface_jit_cpp_exception_test(void*, void*);
-       void setup(int, char**);
-       void teardown();
-    }
-    void setup(int argc, char** argv) {}
-    void teardown() {}
-    void _catalyst_pyface_jit_cpp_exception_test(void*, void*) {
-       throw std::runtime_error("Hello world");
-    }
-            """
-            exe = CompileCXXException._executable
-            flags = CompileCXXException._default_flags
-            outfile = CompileCXXException.get_output_filename(infile)
-            command = [exe] + flags + ["-o", outfile, "-"]
-            with subprocess.Popen(command, stdin=subprocess.PIPE) as pipe:
-                pipe.communicate(input=bytes(contents, "UTF-8"))
-            return outfile
 
-All classes which implement a ``run`` method and return an object that the next pass uses as an input
-can be used as a pass pipeline. In the above code, the ``outfile`` return value will be used by the ``CompilerDriver`` class to finish the compilation process.
+The ``LLVMDialectTOLLVMIR`` and all classes derived from ``PassPipeline`` must define an ``_executable`` and ``_default_flags`` fields.
+The ``_executable`` field is string that corresponds to the command that will be used to execute in a subprocess.
+The ``_default_flags`` are the flags that will be used when running the executable.
+The method ``get_output_filename`` computes the name of the output file given an input file.
+It is expected that the output of a ``PassPipeline`` will be fed as an input to the following ``PassPipeline``.
+
+From here, we can see that in order for the user to test different optimization levels, all that is needed is create a class that extends either ``PassPipeline`` or ``LLVMDialectToLLVMIR`` and appends the ``-O3`` flag to the ``_default_flags`` field. For example, either of the following classes would work:
+
 
 .. code-block:: python
+    class MyLLCOpt(PassPipeline):
+        """LLVMIR To Object File."""
+    
+        _executable = get_executable_path("llvm", "llc")
+        _default_flags = [
+            "--filetype=obj",
+            "--relocation-model=pic",
+            "-O3",
+        ]
+    
+        @staticmethod
+        def get_output_filename(infile):
+            path = pathlib.Path(infile)
+            if not path.exists():
+                raise FileNotFoundError("Cannot find {infile}.")
+            return str(path.with_suffix(".ll"))
 
-        @qjit(
-            pipelines=[CompileCXXException, CompilerDriver],
-        )
-        def cpp_exception_test():
-            """A function that will be overwritten by CompileCXXException."""
-            return None
+or
 
-        with pytest.raises(RuntimeError, match="Hello world"):
-            cpp_exception_test()
+.. code-block:: python
+    class MyLLCOpt(LLVMIRToObjectFile):
+        """LLVMIR To Object File."""
+    
+        _default_flags = [
+            "--filetype=obj",
+            "--relocation-model=pic",
+            "-O3",
+        ]
+    
+In order to actually use this ``PassPipeline``, the user must override the default ``PassPipeline``.
+To do so, use the ``pipelines`` keyword parameter in ``@qjit`` decorator.
+The value assigned to ``pipelines`` must be a list of ``PassPipeline`` that will lower MLIR to binary.
+In this particular case, we are substituting the ``LLVMIRToObjectFile`` pass pipeline with ``MyLLCOpt`` in the default pass pipeline.
+The following will work:
 
-The ``CompileCXXException`` class will overwrite the contents of ``cpp_exception_test``.
-Even though ``cpp_exception_test`` returns ``None``, the function that is going to be compiled actually corresponds to the contents of the C++ string.
+
+.. code-block:: python
+    custom_pipeline = [MHLOPass, QuantumCompilationPass, BufferizationPass, MLIRToLLVMDialect, LLVMDialectToLLVMIR, MyLLCOpt, CompilerDriver])
+    
+    @qjit(pipelines=custom_pipeline)
+    def foo():
+        """A method to be JIT compiled using a custom pipeline"""
+        ...
+
+Users that are interested in ``PassPipeline`` classes are encouraged to look at the ``compiler.py`` file to look at different ``PassPipeline`` child classes.
 
 Printing the IR generated by Pass Pipelines
 ==========================================
