@@ -24,8 +24,8 @@ Most of the time, Catalyst should work without special configuration of the envi
 Running without Python runtime
 ==============================
 
-Sometimes, it might be useful to run the JIT compiled function without ``python``, for example in case of debugging.
-If the program succeeds without ``python``, then it is likely that the error is found in the interface between ``python`` and the JIT compiled function, or within Catalyst's ``python`` internals.
+Sometimes, it might be useful to run the JIT compiled function without Python, for example in case of debugging.
+If the program succeeds without Python, then it is likely that the error is found in the interface between Python and the JIT compiled function, or within Catalyst's Python internals.
 As a quick sanity check you might want to run the JIT compiled function without Python.
 Below is an example of how to obtain a C program that can be linked against the generated function:
 
@@ -82,7 +82,7 @@ Using the ``QJIT.get_cmain`` function, the following string is returned to the u
         teardown();
     }
 
-The user can now compile and link this program and run it without ``python``.
+The user can now compile and link this program and run it without Python.
 
 Pass Pipelines
 ==============
