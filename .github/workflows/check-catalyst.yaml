@@ -263,21 +263,21 @@ jobs:
         fail-on-cache-miss: True
 
     # Testing: don't used the cached version of MHLO
-    - name: Clone MHLO Submodule
-      uses: actions/checkout@v3
-      with:
-        repository: tensorflow/mlir-hlo
-        ref: ${{ steps.mhlo-hash.outputs.mhlo-hash }}
-        path: mlir/mlir-hlo
-
-    # - name: Get Cached MHLO Source
-    #   id: cache-mhlo-source
-    #   uses: actions/cache@v3
+    # - name: Clone MHLO Submodule
+    #   uses: actions/checkout@v3
     #   with:
+    #     repository: tensorflow/mlir-hlo
+    #     ref: ${{ steps.mhlo-hash.outputs.mhlo-hash }}
     #     path: mlir/mlir-hlo
-    #     key: ${{ runner.os }}-mhlo-${{ steps.mhlo-hash.outputs.mhlo-hash }}-default-source
-    #     enableCrossOsArchive: True
-    #     fail-on-cache-miss: True
+
+    - name: Get Cached MHLO Source
+      id: cache-mhlo-source
+      uses: actions/cache@v3
+      with:
+        path: mlir/mlir-hlo
+        key: ${{ runner.os }}-mhlo-${{ steps.mhlo-hash.outputs.mhlo-hash }}-default-source
+        enableCrossOsArchive: True
+        fail-on-cache-miss: True
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
