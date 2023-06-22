@@ -36,23 +36,13 @@ using namespace catalyst::quantum;
 
 namespace {
 
-template <class T> T isInstanceOf(Operation &op)
-{
-    if (op.getName().getStringRef() == T::getOperationName())
-        return cast<T>(op);
-    else
-        return nullptr;
-}
-
 /// Copy the region of the adjoint operation `op` to the POI specified by the `rewriter`. Build and
 /// return the value mapping `bvm`.
 Value copyAdjointVerbatim(AdjointOp op, PatternRewriter &rewriter, IRMapping &mapping)
 {
     Block &b = op.getRegion().front();
     for (auto i = b.begin(); i != b.end(); i++) {
-        if (YieldOp yield = isInstanceOf<YieldOp>(*i)) {
-            assert(++i == b.end() &&
-                   "quantum.yield must be the last operation of an adjoint block");
+        if (YieldOp yield = dyn_cast<YieldOp>(*i)) {
             return mapping.lookupOrDefault(yield->getOperand(0));
         }
         else {
@@ -109,18 +99,18 @@ struct AdjointSingleOpRewritePattern : public mlir::OpRewritePattern<AdjointOp> 
             auto re = std::make_reverse_iterator(b.begin());
             for (auto i = rb; i != re; i++) {
                 LLVM_DEBUG(dbgs() << "operation: " << *i << "\n");
-                if (YieldOp yield = isInstanceOf<YieldOp>(*i)) {
+                if (YieldOp yield = dyn_cast<YieldOp>(*i)) {
                     assert(yield.getOperands().size() == 1);
                     update(*yield.getResults().begin(), adjoint.getQreg());
                 }
-                else if (InsertOp insert = isInstanceOf<InsertOp>(*i)) {
+                else if (InsertOp insert = dyn_cast<InsertOp>(*i)) {
                     ExtractOp extract = rewriter.create<ExtractOp>(
                         loc, insert.getQubit().getType(), query(insert.getOutQreg()),
                         classicalMapping.lookupOrDefault(insert.getIdx()), insert.getIdxAttrAttr());
                     update(insert.getQubit(), extract->getResult(0));
                     update(insert.getInQreg(), quantumMapping[insert.getOutQreg()]);
                 }
-                else if (CustomOp custom = isInstanceOf<CustomOp>(*i)) {
+                else if (CustomOp custom = dyn_cast<CustomOp>(*i)) {
                     std::vector<Value> in_qubits;
                     for (auto q : custom.getQubitResults()) {
                         in_qubits.push_back(query(q));
@@ -136,7 +126,7 @@ struct AdjointSingleOpRewritePattern : public mlir::OpRewritePattern<AdjointOp> 
                         update(custom.getQubitOperands()[i], customA->getResult(i));
                     }
                 }
-                else if (QubitUnitaryOp qunitary = isInstanceOf<QubitUnitaryOp>(*i)) {
+                else if (QubitUnitaryOp qunitary = dyn_cast<QubitUnitaryOp>(*i)) {
                     assert(
                         qunitary.getQubitOperands().size() == qunitary.getQubitResults().size() &&
                         "Quantum operation must have inputs and outputs of the same qubit number");
@@ -152,14 +142,14 @@ struct AdjointSingleOpRewritePattern : public mlir::OpRewritePattern<AdjointOp> 
                         update(qunitary.getQubitOperands()[i], qunitaryA->getResult(i));
                     }
                 }
-                else if (ExtractOp extract = isInstanceOf<ExtractOp>(*i)) {
+                else if (ExtractOp extract = dyn_cast<ExtractOp>(*i)) {
                     auto insert = rewriter.create<InsertOp>(
                         loc, extract.getQreg().getType(), query(extract.getQreg()),
                         classicalMapping.lookupOrDefault(extract.getIdx()),
                         extract.getIdxAttrAttr(), query(extract.getQubit()));
                     update(extract.getQreg(), insert->getResult(0));
                 }
-                else if (AdjointOp adjoint2 = isInstanceOf<AdjointOp>(*i)) {
+                else if (AdjointOp adjoint2 = dyn_cast<AdjointOp>(*i)) {
                     IRMapping bvm(classicalMapping);
                     assert(adjoint2.getRegion().hasOneBlock());
                     Block &b = adjoint2.getRegion().front();
