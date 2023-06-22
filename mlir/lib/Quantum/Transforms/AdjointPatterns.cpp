@@ -64,7 +64,6 @@ struct AdjointSingleOpRewritePattern : public mlir::OpRewritePattern<AdjointOp> 
         LLVM_DEBUG(dbgs() << "Adjointing the following:\n" << adjoint << "\n");
         Location loc = adjoint.getLoc();
         MLIRContext *ctx = adjoint.getContext();
-        assert(adjoint.getRegion().hasOneBlock());
 
         // First, copy the classical computations directly to the target POI and build the classical
         // value mapping dictionary.
@@ -151,7 +150,6 @@ struct AdjointSingleOpRewritePattern : public mlir::OpRewritePattern<AdjointOp> 
                 }
                 else if (AdjointOp adjoint2 = dyn_cast<AdjointOp>(*i)) {
                     IRMapping bvm(classicalMapping);
-                    assert(adjoint2.getRegion().hasOneBlock());
                     Block &b = adjoint2.getRegion().front();
                     for (const auto &[a, r] : llvm::zip(b.getArguments(), adjoint2->getResults())) {
                         bvm.map(a, query(r));
