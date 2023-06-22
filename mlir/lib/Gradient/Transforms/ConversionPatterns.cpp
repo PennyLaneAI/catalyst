@@ -390,9 +390,12 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
         rewriter.eraseOp(op);
         return success();
     }
+
+  private:
     static FlatSymbolRefAttr getOrInsertEnzymeConstDecl(PatternRewriter &rewriter, Operation *op)
     {
-        // Copyright (C) 2023 - Jacob Mai Peng - https://github.com/pengmai/lagrad/blob/main/lib/LAGrad/LowerToLLVM.cpp
+        // Copyright (C) 2023 - Jacob Mai Peng -
+        // https://github.com/pengmai/lagrad/blob/main/lib/LAGrad/LowerToLLVM.cpp
         ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
         auto *context = moduleOp.getContext();
         if (moduleOp.lookupSymbol<LLVM::GlobalOp>("enzyme_const")) {

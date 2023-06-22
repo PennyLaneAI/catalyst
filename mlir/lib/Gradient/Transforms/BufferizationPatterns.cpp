@@ -68,24 +68,11 @@ class BufferizeBackpropOp : public OpConversionPattern<BackpropOp> {
         Location loc = op.getLoc();
         ValueRange results = op.getResults();
         SmallVector<Value> memrefValues;
-        SmallVector<Value> dynamicDimSizes;
         for (auto [resType, result] : zip(resTypes, results)) {
-            if (resType.isa<TensorType>()) {
-                RankedTensorType rankedArg = resType.cast<RankedTensorType>();
-                int numDynDim = rankedArg.getNumDynamicDims();
-                for (int i = 0; i < numDynDim; i++) {
-                    int dim = rankedArg.getDynamicDimIndex(i);
-                    dynamicDimSizes.push_back(rewriter.create<tensor::DimOp>(loc, result, dim));
-                }
-            }
+
             MemRefType memrefType = resType.cast<MemRefType>();
             Value memrefValue;
-            if (!dynamicDimSizes.empty()) {
-                memrefValue = rewriter.create<memref::AllocOp>(loc, memrefType, dynamicDimSizes);
-            }
-            else {
-                memrefValue = rewriter.create<memref::AllocOp>(loc, memrefType);
-            }
+            memrefValue = rewriter.create<memref::AllocOp>(loc, memrefType);
             memrefValues.push_back(memrefValue);
         }
 
