@@ -9,29 +9,37 @@ HIDE_STEREOTYPE()
 Person(_user1_, "Programmer", "Write a PennyLane hybrid program")
 Person(_user2_, "Programmer", "Run a QJIT compiled program")
 
-System(_alg_, "circuit", "A Python function", $tags="object")
-System(_so_, "QJIT/circuit.so", "A shared library object", $tags="object")
+System(_alg_, "workflow", "A Python function", $tags="object")
+System(_so_, "workflow.so", "A loaded shared library with entry point", $tags="object")
 
-Boundary(_frontend_, "Frontend", "Python, JAX, MLIR", "Python code tracer and compiler") {
-  Container(_jaxtracer_, "JAX Tracer", "get-jaxpr", "Python code tracer")
-  Container(_mhlobld_, "MLIR Frontend", "jaxpr-to-mlir", "MLIR/HLO dialect compiler")
-  Container(_socomp_, "LLVM Frontend", "compile", "SharedLibrary compiler")
+Boundary(_frontend_, "Frontend / Compiler Driver", "Python", "Python code tracer and compiler driver") {
+  Container(_tracing_, "Program Capture", "PL / JAX", "Quantum op queueing & numeric code tracing")
+  Container(_mlirgen_, "IR Generation", "MLIR", "JAXPR lowering to MLIR")
+  Container(_core_, "Program Transformation", "MLIR", "Code optimizations & AD transforms")
+  Container(_codegen_, "CodeGen", "LLVM", "Object code generation & linking")
 }
 
-Container_Ext(_qopt_, "Catalyst-Core", "quantum-opt", "Catalyst MLIR dialects and passes")
-Container_Ext(_pl_core_, "PennyLane", "QML", "PennyLane QML API")
-Container_Ext(_jax_, "JAX", "Python", "")
+Container_Ext(_qml_, "OpQueue", "PennyLane", "")
+Container_Ext(_jaxcore_, "Tracer", "jax.core", "")
+Container_Ext(_jaxlib_, "MLIR Bindings", "jaxlib", "")
+Container_Ext(_quantumopt_, "Compiler Libraries", "quantum-opt", "Catalyst MLIR dialects and passes")
+Container_Ext(_llc_, "LLVM Compiler", "llc", "")
+Container_Ext(_clang_, "System Linker", "variable", "")
 
-Rel_D(_mhlobld_, _qopt_, " compiles with","", $tags="action")
-Rel_R(_alg_, _jaxtracer_, " ", "")
-Rel_R(_jaxtracer_, _mhlobld_, "jaxpr", "")
-Rel_R(_mhlobld_, _socomp_, "mlir", "")
-Rel_D(_jaxtracer_, _pl_core_, "uses", "", $tags="action")
-Rel_D(_jaxtracer_, _jax_, "uses", "", $tags="action")
-Rel_R(_socomp_, _so_, " ", "")
+Rel_R(_alg_, _tracing_, " ", "")
+Rel_R(_tracing_, _mlirgen_, "jaxpr", "")
+Rel_R(_mlirgen_, _core_, "mlir", "")
+Rel_R(_core_, _codegen_, "llvmir", "")
+Rel_R(_codegen_, _so_, " ", "")
 
-Rel_D(_user1_, _alg_, " qjit", "", $tags="action")
-Rel_D(_user2_, _so_, " AOT/JIT calls", "", $tags="action")
+Rel_D(_tracing_, _qml_, "uses", "", $tags="action")
+Rel_D(_tracing_, _jaxcore_, "uses", "", $tags="action")
+Rel_D(_mlirgen_, _jaxlib_, "uses", "", $tags="action")
+Rel_D(_core_, _quantumopt_, "uses","", $tags="action")
+Rel_D(_codegen_, _llc_, "uses", "", $tags="action")
+Rel_D(_codegen_, _clang_, "uses","", $tags="action")
+
+Rel_D(_user1_, _alg_, "@qjit\n(AOT/JIT)", "", $tags="action")
+Rel_D(_user2_, _so_, "calls", "", $tags="action")
 
 @enduml
-
