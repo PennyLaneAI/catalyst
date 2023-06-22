@@ -778,6 +778,8 @@ def YieldOp : Op<QuantumDialect, "yield", [Pure, ReturnLike, Terminator]> {
 
     let arguments = (ins Variadic<AnyTypeOf<[QuregType]>>:$results);
 
+    let successors = (successor);
+
     let assemblyFormat = [{  attr-dict ($results^ `:` type($results))? }];
 }
 
