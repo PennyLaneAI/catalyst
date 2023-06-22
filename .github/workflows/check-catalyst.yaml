@@ -205,7 +205,7 @@ jobs:
 
     - name: Clone MHLO Submodule
       if: |
-        steps.cache-mhlo.outputs.cache-hit != 'true' &&
+        steps.cache-mhlo.outputs.cache-hit != 'true' ||
         steps.cache-mhlo-source.outputs.cache-hit != 'true'
       uses: actions/checkout@v3
       with:
@@ -261,14 +261,6 @@ jobs:
         key: Linux-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-source
         enableCrossOsArchive: True
         fail-on-cache-miss: True
-
-    # Testing: don't used the cached version of MHLO
-    # - name: Clone MHLO Submodule
-    #   uses: actions/checkout@v3
-    #   with:
-    #     repository: tensorflow/mlir-hlo
-    #     ref: ${{ steps.mhlo-hash.outputs.mhlo-hash }}
-    #     path: mlir/mlir-hlo
 
     - name: Get Cached MHLO Source
       id: cache-mhlo-source
