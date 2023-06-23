@@ -321,11 +321,10 @@ LogicalResult AdjointOp::verify()
                 break;
             }
         }
-        if (!yieldFound)  {
-            return  emitOpError("quantum.yield must present in the adjoint region");
+        if (!yieldFound) {
+            return emitOpError("quantum.yield must present in the adjoint region");
         }
     }
 
     return success();
 }
-
