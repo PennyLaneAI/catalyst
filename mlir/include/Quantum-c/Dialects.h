@@ -29,7 +29,8 @@ enum CatalystCReturnCode {
     ReturnLoweringFailed,
     ReturnTranslationFailed,
     /// The JIT function was not found within the module
-    ReturnFunctionNotFound
+    ReturnFunctionNotFound,
+    ReturnObjectCompilationFailed,
 };
 
 /// Run a given set of passes on an MLIR module.
@@ -49,7 +50,7 @@ struct FunctionData {
 };
 
 /// Entry point to the MLIR portion of the compiler.
-CatalystCReturnCode QuantumDriverMain(const char *source, bool keepIntermediate = false,
+CatalystCReturnCode QuantumDriverMain(const char *source, const char *dest,
                                       FunctionData *functionData = nullptr);
 
 #ifdef __cplusplus

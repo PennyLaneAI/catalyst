@@ -15,10 +15,14 @@
 #pragma once
 
 #include "mlir/IR/DialectRegistry.h"
+#include "mlir/Support/LogicalResult.h"
+#include "llvm/IR/Module.h"
 
 namespace catalyst {
 
 /// Register the translations needed to convert to LLVM IR.
 void registerLLVMTranslations(mlir::DialectRegistry &registry);
+
+mlir::LogicalResult compileObjectFile(std::unique_ptr<llvm::Module> module, const char *filename);
 
 } // namespace catalyst

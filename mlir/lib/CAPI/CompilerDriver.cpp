@@ -113,8 +113,7 @@ CatalystCReturnCode RunPassPipeline(const char *source, const char *passes, char
     return ReturnOk;
 }
 
-CatalystCReturnCode QuantumDriverMain(const char *source, bool keepIntermediate,
-                                      FunctionData *functionData)
+CatalystCReturnCode QuantumDriverMain(const char *source, const char *dest, FunctionData *functionData)
 {
     registerAllCatalystPasses();
 
@@ -145,5 +144,9 @@ CatalystCReturnCode QuantumDriverMain(const char *source, bool keepIntermediate,
             }
         }
     }
+    if (failed(compileObjectFile(std::move(llvmModule), dest))) {
+        return ReturnObjectCompilationFailed;
+    }
+
     return ReturnOk;
 }

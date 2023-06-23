@@ -51,15 +51,15 @@ PYBIND11_MODULE(_quantumDialects, m)
 
     quantum_m.def(
         "compile_asm",
-        [](const char *source, bool keep_intermediate) {
+        [](const char *source, const char *dest) {
             FunctionData functionData;
-            CatalystCReturnCode code = QuantumDriverMain(source, keep_intermediate, &functionData);
+            CatalystCReturnCode code = QuantumDriverMain(source, dest, &functionData);
             if (code != ReturnOk) {
                 throw std::runtime_error("Compilation failed");
             }
             return std::make_tuple(functionData.functionName, functionData.functionType);
         },
-        py::arg("source"), py::arg("keep_intermediate") = false);
+        py::arg("source"), py::arg("dest"));
 
     quantum_m.def(
         "mlir_run_pipeline",
