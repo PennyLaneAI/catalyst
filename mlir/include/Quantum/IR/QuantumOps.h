@@ -33,18 +33,17 @@
 namespace mlir {
 namespace OpTrait {
 
-template <typename ConcreteType> class UnitaryTrait : public TraitBase<ConcreteType, UnitaryTrait> {
-};
+template <typename ConcreteType>
+class UnitaryTrait : public TraitBase<ConcreteType, UnitaryTrait> {};
 
 template <typename ConcreteType>
-class HermitianTrait : public TraitBase<ConcreteType, HermitianTrait> {
-};
+class HermitianTrait : public TraitBase<ConcreteType, HermitianTrait> {};
 
 } // namespace OpTrait
 } // namespace mlir
 
 class QuantumMemory : public mlir::SideEffects::Resource::Base<QuantumMemory> {
-    llvm::StringRef getName() final { return "QuantumMemory"; }
+  llvm::StringRef getName() final { return "QuantumMemory"; }
 };
 
 //===----------------------------------------------------------------------===//

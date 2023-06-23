@@ -30,143 +30,149 @@ namespace Catalyst::Runtime::Simulator {
  * simulators.
  */
 class CacheManager {
-  protected:
-    // Operations Data
-    std::vector<std::string> ops_names_{};
-    std::vector<std::vector<double>> ops_params_{};
-    std::vector<std::vector<size_t>> ops_wires_{};
-    std::vector<bool> ops_inverses_{};
+protected:
+  // Operations Data
+  std::vector<std::string> ops_names_{};
+  std::vector<std::vector<double>> ops_params_{};
+  std::vector<std::vector<size_t>> ops_wires_{};
+  std::vector<bool> ops_inverses_{};
 
-    // Observables Data
-    std::vector<ObsIdType> obs_keys_{};
-    std::vector<Lightning::Measurements> obs_callees_{};
+  // Observables Data
+  std::vector<ObsIdType> obs_keys_{};
+  std::vector<Lightning::Measurements> obs_callees_{};
 
-    // Number of parameters
-    size_t num_params_{0};
+  // Number of parameters
+  size_t num_params_{0};
 
-  public:
-    CacheManager() = default;
-    ~CacheManager() = default;
+public:
+  CacheManager() = default;
+  ~CacheManager() = default;
 
-    CacheManager(const CacheManager &) = delete;
-    CacheManager &operator=(const CacheManager &) = delete;
-    CacheManager(CacheManager &&) = delete;
-    CacheManager &operator=(CacheManager &&) = delete;
+  CacheManager(const CacheManager &) = delete;
+  CacheManager &operator=(const CacheManager &) = delete;
+  CacheManager(CacheManager &&) = delete;
+  CacheManager &operator=(CacheManager &&) = delete;
 
-    /**
-     * Reset cached gates
-     */
-    void Reset()
-    {
-        this->ops_names_.clear();
-        this->ops_params_.clear();
-        this->ops_wires_.clear();
-        this->ops_inverses_.clear();
+  /**
+   * Reset cached gates
+   */
+  void Reset() {
+    this->ops_names_.clear();
+    this->ops_params_.clear();
+    this->ops_wires_.clear();
+    this->ops_inverses_.clear();
 
-        this->obs_keys_.clear();
-        this->obs_callees_.clear();
+    this->obs_keys_.clear();
+    this->obs_callees_.clear();
 
-        this->num_params_ = 0;
-    }
+    this->num_params_ = 0;
+  }
 
-    /**
-     * @brief Add a new operation to the list of cached gates.
-     *
-     * @param name Name of the given gate
-     * @param params Parameters of the gate
-     * @param wires Wires the gate acts on
-     * @param inverse If true, inverse of the gate is applied
-     */
-    void addOperation(const std::string &name, const std::vector<double> &params,
-                      const std::vector<size_t> &dev_wires, bool inverse)
-    {
-        this->ops_names_.push_back(name);
-        this->ops_params_.push_back(params);
+  /**
+   * @brief Add a new operation to the list of cached gates.
+   *
+   * @param name Name of the given gate
+   * @param params Parameters of the gate
+   * @param wires Wires the gate acts on
+   * @param inverse If true, inverse of the gate is applied
+   */
+  void addOperation(const std::string &name, const std::vector<double> &params,
+                    const std::vector<size_t> &dev_wires, bool inverse) {
+    this->ops_names_.push_back(name);
+    this->ops_params_.push_back(params);
 
-        std::vector<size_t> wires_ul;
-        wires_ul.reserve(dev_wires.size());
-        std::transform(dev_wires.begin(), dev_wires.end(), std::back_inserter(wires_ul),
-                       [](auto w) { return static_cast<size_t>(w); });
+    std::vector<size_t> wires_ul;
+    wires_ul.reserve(dev_wires.size());
+    std::transform(dev_wires.begin(), dev_wires.end(),
+                   std::back_inserter(wires_ul),
+                   [](auto w) { return static_cast<size_t>(w); });
 
-        this->ops_wires_.push_back(wires_ul);
-        this->ops_inverses_.push_back(inverse);
+    this->ops_wires_.push_back(wires_ul);
+    this->ops_inverses_.push_back(inverse);
 
-        this->num_params_ += params.size();
-    }
+    this->num_params_ += params.size();
+  }
 
-    /**
-     * @brief Add a new observable to the list of cached gates.
-     *
-     * @param id The observable key created by LObsManager()
-     * @param callee The measurement operation
-     */
-    void addObservable(const ObsIdType id,
-                       const Lightning::Measurements &callee = Lightning::Measurements::None)
-    {
-        this->obs_keys_.push_back(id);
-        this->obs_callees_.push_back(callee);
-    }
+  /**
+   * @brief Add a new observable to the list of cached gates.
+   *
+   * @param id The observable key created by LObsManager()
+   * @param callee The measurement operation
+   */
+  void addObservable(const ObsIdType id, const Lightning::Measurements &callee =
+                                             Lightning::Measurements::None) {
+    this->obs_keys_.push_back(id);
+    this->obs_callees_.push_back(callee);
+  }
 
-    /**
-     * @brief Get a reference to observables keys.
-     */
-    auto getObservablesKeys() -> const std::vector<ObsIdType> & { return this->obs_keys_; }
+  /**
+   * @brief Get a reference to observables keys.
+   */
+  auto getObservablesKeys() -> const std::vector<ObsIdType> & {
+    return this->obs_keys_;
+  }
 
-    /**
-     * @brief Get a reference to observables callees.
-     */
-    auto getObservablesCallees() -> const std::vector<Lightning::Measurements> &
-    {
-        return this->obs_callees_;
-    }
+  /**
+   * @brief Get a reference to observables callees.
+   */
+  auto getObservablesCallees() -> const std::vector<Lightning::Measurements> & {
+    return this->obs_callees_;
+  }
 
-    /**
-     * @brief Get a reference to operations names.
-     */
-    auto getOperationsNames() -> const std::vector<std::string> & { return this->ops_names_; }
+  /**
+   * @brief Get a reference to operations names.
+   */
+  auto getOperationsNames() -> const std::vector<std::string> & {
+    return this->ops_names_;
+  }
 
-    /**
-     * @brief Get a a reference to operations parameters.
-     */
-    auto getOperationsParameters() -> const std::vector<std::vector<double>> &
-    {
-        return this->ops_params_;
-    }
+  /**
+   * @brief Get a a reference to operations parameters.
+   */
+  auto getOperationsParameters() -> const std::vector<std::vector<double>> & {
+    return this->ops_params_;
+  }
 
-    /**
-     * @brief Get a a reference to operations wires.
-     */
-    auto getOperationsWires() -> const std::vector<std::vector<size_t>> &
-    {
-        return this->ops_wires_;
-    }
+  /**
+   * @brief Get a a reference to operations wires.
+   */
+  auto getOperationsWires() -> const std::vector<std::vector<size_t>> & {
+    return this->ops_wires_;
+  }
 
-    /**
-     * @brief Get a reference to operations inverses.
-     */
-    auto getOperationsInverses() -> const std::vector<bool> & { return this->ops_inverses_; }
+  /**
+   * @brief Get a reference to operations inverses.
+   */
+  auto getOperationsInverses() -> const std::vector<bool> & {
+    return this->ops_inverses_;
+  }
 
-    /**
-     * @brief Get total number of cached gates.
-     */
-    [[nodiscard]] auto getNumGates() const -> size_t
-    {
-        return this->ops_names_.size() + this->obs_keys_.size();
-    }
+  /**
+   * @brief Get total number of cached gates.
+   */
+  [[nodiscard]] auto getNumGates() const -> size_t {
+    return this->ops_names_.size() + this->obs_keys_.size();
+  }
 
-    /**
-     * @brief Get number of operations.
-     */
-    [[nodiscard]] auto getNumOperations() const -> size_t { return this->ops_names_.size(); }
+  /**
+   * @brief Get number of operations.
+   */
+  [[nodiscard]] auto getNumOperations() const -> size_t {
+    return this->ops_names_.size();
+  }
 
-    /**
-     * @brief Get number of observables.
-     */
-    [[nodiscard]] auto getNumObservables() const -> size_t { return this->obs_keys_.size(); }
+  /**
+   * @brief Get number of observables.
+   */
+  [[nodiscard]] auto getNumObservables() const -> size_t {
+    return this->obs_keys_.size();
+  }
 
-    /**
-     * @brief Get total number of cached gates.
-     */
-    [[nodiscard]] auto getNumParams() const -> size_t { return this->num_params_; }
+  /**
+   * @brief Get total number of cached gates.
+   */
+  [[nodiscard]] auto getNumParams() const -> size_t {
+    return this->num_params_;
+  }
 };
 } // namespace Catalyst::Runtime::Simulator

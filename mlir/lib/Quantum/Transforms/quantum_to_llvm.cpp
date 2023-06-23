@@ -36,63 +36,62 @@ namespace quantum {
 
 struct QIRTypeConverter : public LLVMTypeConverter {
 
-    QIRTypeConverter(MLIRContext *ctx) : LLVMTypeConverter(ctx)
-    {
-        addConversion([&](QubitType type) { return convertQubitType(type); });
-        addConversion([&](QuregType type) { return convertQuregType(type); });
-        addConversion([&](ObservableType type) { return convertObservableType(type); });
-        addConversion([&](ResultType type) { return convertResultType(type); });
-    }
+  QIRTypeConverter(MLIRContext *ctx) : LLVMTypeConverter(ctx) {
+    addConversion([&](QubitType type) { return convertQubitType(type); });
+    addConversion([&](QuregType type) { return convertQuregType(type); });
+    addConversion(
+        [&](ObservableType type) { return convertObservableType(type); });
+    addConversion([&](ResultType type) { return convertResultType(type); });
+  }
 
-  private:
-    Type convertQubitType(Type mlirType)
-    {
-        return LLVM::LLVMPointerType::get(LLVM::LLVMStructType::getOpaque("Qubit", &getContext()));
-    }
+private:
+  Type convertQubitType(Type mlirType) {
+    return LLVM::LLVMPointerType::get(
+        LLVM::LLVMStructType::getOpaque("Qubit", &getContext()));
+  }
 
-    Type convertQuregType(Type mlirType)
-    {
-        return LLVM::LLVMPointerType::get(LLVM::LLVMStructType::getOpaque("Array", &getContext()));
-    }
+  Type convertQuregType(Type mlirType) {
+    return LLVM::LLVMPointerType::get(
+        LLVM::LLVMStructType::getOpaque("Array", &getContext()));
+  }
 
-    Type convertObservableType(Type mlirType)
-    {
-        return this->convertType(IntegerType::get(&getContext(), 64));
-    }
+  Type convertObservableType(Type mlirType) {
+    return this->convertType(IntegerType::get(&getContext(), 64));
+  }
 
-    Type convertResultType(Type mlirType)
-    {
-        return LLVM::LLVMPointerType::get(LLVM::LLVMStructType::getOpaque("Result", &getContext()));
-    }
+  Type convertResultType(Type mlirType) {
+    return LLVM::LLVMPointerType::get(
+        LLVM::LLVMStructType::getOpaque("Result", &getContext()));
+  }
 };
 
-struct QuantumConversionPass : impl::QuantumConversionPassBase<QuantumConversionPass> {
-    using QuantumConversionPassBase::QuantumConversionPassBase;
+struct QuantumConversionPass
+    : impl::QuantumConversionPassBase<QuantumConversionPass> {
+  using QuantumConversionPassBase::QuantumConversionPassBase;
 
-    void runOnOperation() final
-    {
-        MLIRContext *context = &getContext();
-        QIRTypeConverter typeConverter(context);
+  void runOnOperation() final {
+    MLIRContext *context = &getContext();
+    QIRTypeConverter typeConverter(context);
 
-        RewritePatternSet patterns(context);
-        cf::populateControlFlowToLLVMConversionPatterns(typeConverter, patterns);
-        populateFuncToLLVMConversionPatterns(typeConverter, patterns);
-        populateQIRConversionPatterns(typeConverter, patterns);
+    RewritePatternSet patterns(context);
+    cf::populateControlFlowToLLVMConversionPatterns(typeConverter, patterns);
+    populateFuncToLLVMConversionPatterns(typeConverter, patterns);
+    populateQIRConversionPatterns(typeConverter, patterns);
 
-        LLVMConversionTarget target(*context);
-        target.addLegalOp<ModuleOp>();
+    LLVMConversionTarget target(*context);
+    target.addLegalOp<ModuleOp>();
 
-        if (failed(applyFullConversion(getOperation(), target, std::move(patterns)))) {
-            signalPassFailure();
-        }
+    if (failed(
+            applyFullConversion(getOperation(), target, std::move(patterns)))) {
+      signalPassFailure();
     }
+  }
 };
 
 } // namespace quantum
 
-std::unique_ptr<Pass> createQuantumConversionPass()
-{
-    return std::make_unique<quantum::QuantumConversionPass>();
+std::unique_ptr<Pass> createQuantumConversionPass() {
+  return std::make_unique<quantum::QuantumConversionPass>();
 }
 
 } // namespace catalyst

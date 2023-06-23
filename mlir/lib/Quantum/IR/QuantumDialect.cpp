@@ -27,22 +27,21 @@ using namespace catalyst::quantum;
 
 #include "Quantum/IR/QuantumOpsDialect.cpp.inc"
 
-void QuantumDialect::initialize()
-{
-    addTypes<
+void QuantumDialect::initialize() {
+  addTypes<
 #define GET_TYPEDEF_LIST
 #include "Quantum/IR/QuantumOpsTypes.cpp.inc"
-        >();
+      >();
 
-    addAttributes<
+  addAttributes<
 #define GET_ATTRDEF_LIST
 #include "Quantum/IR/QuantumAttributes.cpp.inc"
-        >();
+      >();
 
-    addOperations<
+  addOperations<
 #define GET_OP_LIST
 #include "Quantum/IR/QuantumOps.cpp.inc"
-        >();
+      >();
 }
 
 //===----------------------------------------------------------------------===//

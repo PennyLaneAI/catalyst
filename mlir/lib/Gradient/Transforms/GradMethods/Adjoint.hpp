@@ -25,16 +25,16 @@ namespace catalyst {
 namespace gradient {
 
 struct AdjointLowering : public OpRewritePattern<GradOp> {
-    using OpRewritePattern<GradOp>::OpRewritePattern;
+  using OpRewritePattern<GradOp>::OpRewritePattern;
 
-    LogicalResult match(GradOp op) const override;
-    void rewrite(GradOp op, PatternRewriter &rewriter) const override;
+  LogicalResult match(GradOp op) const override;
+  void rewrite(GradOp op, PatternRewriter &rewriter) const override;
 
-  private:
-    static func::FuncOp genQGradFunction(PatternRewriter &rewriter, Location loc,
-                                         func::FuncOp callee);
-    static func::FuncOp discardAndReturnReg(PatternRewriter &rewriter, Location loc,
-                                            func::FuncOp callee);
+private:
+  static func::FuncOp genQGradFunction(PatternRewriter &rewriter, Location loc,
+                                       func::FuncOp callee);
+  static func::FuncOp discardAndReturnReg(PatternRewriter &rewriter,
+                                          Location loc, func::FuncOp callee);
 };
 
 } // namespace gradient

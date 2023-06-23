@@ -32,33 +32,33 @@ namespace gradient {
 #define GEN_PASS_DEF_GRADIENTCONVERSIONPASS
 #include "Gradient/Transforms/Passes.h.inc"
 
-struct GradientConversionPass : impl::GradientConversionPassBase<GradientConversionPass> {
-    using GradientConversionPassBase::GradientConversionPassBase;
+struct GradientConversionPass
+    : impl::GradientConversionPassBase<GradientConversionPass> {
+  using GradientConversionPassBase::GradientConversionPassBase;
 
-    void runOnOperation() final
-    {
-        MLIRContext *context = &getContext();
-        LLVMTypeConverter typeConverter(context);
+  void runOnOperation() final {
+    MLIRContext *context = &getContext();
+    LLVMTypeConverter typeConverter(context);
 
-        RewritePatternSet patterns(context);
-        populateConversionPatterns(typeConverter, patterns);
+    RewritePatternSet patterns(context);
+    populateConversionPatterns(typeConverter, patterns);
 
-        LLVMConversionTarget target(*context);
-        target.addIllegalDialect<GradientDialect>();
-        target.addLegalDialect<catalyst::quantum::QuantumDialect>();
-        target.addLegalDialect<func::FuncDialect>();
+    LLVMConversionTarget target(*context);
+    target.addIllegalDialect<GradientDialect>();
+    target.addLegalDialect<catalyst::quantum::QuantumDialect>();
+    target.addLegalDialect<func::FuncDialect>();
 
-        if (failed(applyPartialConversion(getOperation(), target, std::move(patterns)))) {
-            signalPassFailure();
-        }
+    if (failed(applyPartialConversion(getOperation(), target,
+                                      std::move(patterns)))) {
+      signalPassFailure();
     }
+  }
 };
 
 } // namespace gradient
 
-std::unique_ptr<Pass> createGradientConversionPass()
-{
-    return std::make_unique<gradient::GradientConversionPass>();
+std::unique_ptr<Pass> createGradientConversionPass() {
+  return std::make_unique<gradient::GradientConversionPass>();
 }
 
 } // namespace catalyst

@@ -32,32 +32,32 @@ namespace quantum {
 #define GEN_PASS_DEF_QUANTUMBUFFERIZATIONPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
-struct QuantumBufferizationPass : impl::QuantumBufferizationPassBase<QuantumBufferizationPass> {
-    using QuantumBufferizationPassBase::QuantumBufferizationPassBase;
+struct QuantumBufferizationPass
+    : impl::QuantumBufferizationPassBase<QuantumBufferizationPass> {
+  using QuantumBufferizationPassBase::QuantumBufferizationPassBase;
 
-    void runOnOperation() final
-    {
-        MLIRContext *context = &getContext();
-        bufferization::BufferizeTypeConverter typeConverter;
+  void runOnOperation() final {
+    MLIRContext *context = &getContext();
+    bufferization::BufferizeTypeConverter typeConverter;
 
-        RewritePatternSet patterns(context);
-        populateBufferizationPatterns(typeConverter, patterns);
+    RewritePatternSet patterns(context);
+    populateBufferizationPatterns(typeConverter, patterns);
 
-        ConversionTarget target(*context);
-        bufferization::populateBufferizeMaterializationLegality(target);
-        populateBufferizationLegality(typeConverter, target);
+    ConversionTarget target(*context);
+    bufferization::populateBufferizeMaterializationLegality(target);
+    populateBufferizationLegality(typeConverter, target);
 
-        if (failed(applyPartialConversion(getOperation(), target, std::move(patterns)))) {
-            signalPassFailure();
-        }
+    if (failed(applyPartialConversion(getOperation(), target,
+                                      std::move(patterns)))) {
+      signalPassFailure();
     }
+  }
 };
 
 } // namespace quantum
 
-std::unique_ptr<Pass> createQuantumBufferizationPass()
-{
-    return std::make_unique<quantum::QuantumBufferizationPass>();
+std::unique_ptr<Pass> createQuantumBufferizationPass() {
+  return std::make_unique<quantum::QuantumBufferizationPass>();
 }
 
 } // namespace catalyst

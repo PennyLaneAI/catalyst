@@ -28,17 +28,16 @@ using namespace catalyst;
 // Catalyst dialect.
 //===----------------------------------------------------------------------===//
 
-void CatalystDialect::initialize()
-{
-    addTypes<
+void CatalystDialect::initialize() {
+  addTypes<
 #define GET_TYPEDEF_LIST
 #include "Catalyst/IR/CatalystOpsTypes.cpp.inc"
-        >();
+      >();
 
-    addOperations<
+  addOperations<
 #define GET_OP_LIST
 #include "Catalyst/IR/CatalystOps.cpp.inc"
-        >();
+      >();
 }
 
 //===----------------------------------------------------------------------===//

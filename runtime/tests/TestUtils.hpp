@@ -27,28 +27,32 @@
 #include "LightningSimulator.hpp"
 
 /**
- * A tuple of available backend devices to be tested using TEMPLATE_LIST_TEST_CASE in Catch2
+ * A tuple of available backend devices to be tested using
+ * TEMPLATE_LIST_TEST_CASE in Catch2
  */
 #if __has_include("LightningKokkosSimulator.hpp")
 #include "LightningKokkosSimulator.hpp"
-using SimTypes = std::tuple<Catalyst::Runtime::Simulator::LightningSimulator,
-                            Catalyst::Runtime::Simulator::LightningKokkosSimulator>;
+using SimTypes =
+    std::tuple<Catalyst::Runtime::Simulator::LightningSimulator,
+               Catalyst::Runtime::Simulator::LightningKokkosSimulator>;
 #else
 using SimTypes = std::tuple<Catalyst::Runtime::Simulator::LightningSimulator>;
 #endif
 
 /**
- * Get available device names in the compatible format for `__quantum__rt__device`
+ * Get available device names in the compatible format for
+ * `__quantum__rt__device`
  *
  * This is a utility function used in Catch2 tests.
  *
  * @return `std::vector<std::pair<std::string, std::string>>`
  */
-static inline auto getDevices() -> std::vector<std::pair<std::string, std::string>>
-{
-    std::vector<std::pair<std::string, std::string>> devices{{"backend", "lightning.qubit"}};
+static inline auto getDevices()
+    -> std::vector<std::pair<std::string, std::string>> {
+  std::vector<std::pair<std::string, std::string>> devices{
+      {"backend", "lightning.qubit"}};
 #ifdef __device_lightning_kokkos
-    devices.emplace_back("backend", "lightning.kokkos");
+  devices.emplace_back("backend", "lightning.kokkos");
 #endif
-    return devices;
+  return devices;
 }

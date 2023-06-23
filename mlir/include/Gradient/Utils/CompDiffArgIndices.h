@@ -21,7 +21,9 @@
 
 namespace catalyst {
 
-// Calculate the vector of effective gradient argument indices based on the user settings.
-std::vector<size_t> compDiffArgIndices(llvm::Optional<mlir::DenseIntElementsAttr> indices);
+// Calculate the vector of effective gradient argument indices based on the user
+// settings.
+std::vector<size_t>
+compDiffArgIndices(llvm::Optional<mlir::DenseIntElementsAttr> indices);
 
 }; // namespace catalyst

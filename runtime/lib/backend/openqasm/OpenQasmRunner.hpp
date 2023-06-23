@@ -28,110 +28,112 @@
 namespace Catalyst::Runtime::Device::OpenQasm {
 
 /**
- * A (RAII) class for `pybind11::initialize_interpreter` and `pybind11::finalize_interpreter`.
+ * A (RAII) class for `pybind11::initialize_interpreter` and
+ * `pybind11::finalize_interpreter`.
  *
- * @note This is not copiable or movable and used in C++ tests and the ExecutionContext manager
- * of the runtime to solve the issue with re-initialization of the Python interpreter in `catch2`
- * tests which also enables the runtime to reuse the same interpreter in the scope of the global
+ * @note This is not copiable or movable and used in C++ tests and the
+ * ExecutionContext manager of the runtime to solve the issue with
+ * re-initialization of the Python interpreter in `catch2` tests which also
+ * enables the runtime to reuse the same interpreter in the scope of the global
  * quantum device unique pointer.
  */
 struct PythonInterpreterGuard {
-    PythonInterpreterGuard() { pybind11::initialize_interpreter(); }
-    ~PythonInterpreterGuard() { pybind11::finalize_interpreter(); }
+  PythonInterpreterGuard() { pybind11::initialize_interpreter(); }
+  ~PythonInterpreterGuard() { pybind11::finalize_interpreter(); }
 
-    PythonInterpreterGuard(const PythonInterpreterGuard &) = delete;
-    PythonInterpreterGuard(PythonInterpreterGuard &&) = delete;
-    PythonInterpreterGuard &operator=(const PythonInterpreterGuard &) = delete;
-    PythonInterpreterGuard &operator=(PythonInterpreterGuard &&) = delete;
+  PythonInterpreterGuard(const PythonInterpreterGuard &) = delete;
+  PythonInterpreterGuard(PythonInterpreterGuard &&) = delete;
+  PythonInterpreterGuard &operator=(const PythonInterpreterGuard &) = delete;
+  PythonInterpreterGuard &operator=(PythonInterpreterGuard &&) = delete;
 };
 
 /**
  * The OpenQasm circuit runner interface.
  */
 struct OpenQasmRunner {
-    explicit OpenQasmRunner() = default;
-    virtual ~OpenQasmRunner() = default;
-    [[nodiscard]] virtual auto runCircuit([[maybe_unused]] const std::string &circuit,
-                                          [[maybe_unused]] const std::string &device,
-                                          [[maybe_unused]] size_t shots,
-                                          [[maybe_unused]] const std::string &kwargs = "") const
-        -> std::string
-    {
-        RT_FAIL("Not implemented method");
-        return {};
-    }
-    [[nodiscard]] virtual auto
-    Probs([[maybe_unused]] const std::string &circuit, [[maybe_unused]] const std::string &device,
-          [[maybe_unused]] size_t shots, [[maybe_unused]] size_t num_qubits,
-          [[maybe_unused]] const std::string &kwargs = "") const -> std::vector<double>
-    {
-        RT_FAIL("Not implemented method");
-        return {};
-    }
-    [[nodiscard]] virtual auto
-    Sample([[maybe_unused]] const std::string &circuit, [[maybe_unused]] const std::string &device,
+  explicit OpenQasmRunner() = default;
+  virtual ~OpenQasmRunner() = default;
+  [[nodiscard]] virtual auto runCircuit(
+      [[maybe_unused]] const std::string &circuit,
+      [[maybe_unused]] const std::string &device, [[maybe_unused]] size_t shots,
+      [[maybe_unused]] const std::string &kwargs = "") const -> std::string {
+    RT_FAIL("Not implemented method");
+    return {};
+  }
+  [[nodiscard]] virtual auto
+  Probs([[maybe_unused]] const std::string &circuit,
+        [[maybe_unused]] const std::string &device,
+        [[maybe_unused]] size_t shots, [[maybe_unused]] size_t num_qubits,
+        [[maybe_unused]] const std::string &kwargs = "") const
+      -> std::vector<double> {
+    RT_FAIL("Not implemented method");
+    return {};
+  }
+  [[nodiscard]] virtual auto
+  Sample([[maybe_unused]] const std::string &circuit,
+         [[maybe_unused]] const std::string &device,
+         [[maybe_unused]] size_t shots, [[maybe_unused]] size_t num_qubits,
+         [[maybe_unused]] const std::string &kwargs = "") const
+      -> std::vector<size_t> {
+    RT_FAIL("Not implemented method");
+    return {};
+  }
+  [[nodiscard]] virtual auto
+  Expval([[maybe_unused]] const std::string &circuit,
+         [[maybe_unused]] const std::string &device,
+         [[maybe_unused]] size_t shots,
+         [[maybe_unused]] const std::string &kwargs = "") const -> double {
+    RT_FAIL("Not implemented method");
+    return {};
+  }
+  [[nodiscard]] virtual auto
+  Var([[maybe_unused]] const std::string &circuit,
+      [[maybe_unused]] const std::string &device, [[maybe_unused]] size_t shots,
+      [[maybe_unused]] const std::string &kwargs = "") const -> double {
+    RT_FAIL("Not implemented method");
+    return {};
+  }
+  [[nodiscard]] virtual auto
+  State([[maybe_unused]] const std::string &circuit,
+        [[maybe_unused]] const std::string &device,
+        [[maybe_unused]] size_t shots, [[maybe_unused]] size_t num_qubits,
+        [[maybe_unused]] const std::string &kwargs = "") const
+      -> std::vector<std::complex<double>> {
+    RT_FAIL("Not implemented method");
+    return {};
+  }
+  [[nodiscard]] virtual auto
+  Gradient([[maybe_unused]] const std::string &circuit,
+           [[maybe_unused]] const std::string &device,
            [[maybe_unused]] size_t shots, [[maybe_unused]] size_t num_qubits,
-           [[maybe_unused]] const std::string &kwargs = "") const -> std::vector<size_t>
-    {
-        RT_FAIL("Not implemented method");
-        return {};
-    }
-    [[nodiscard]] virtual auto
-    Expval([[maybe_unused]] const std::string &circuit, [[maybe_unused]] const std::string &device,
-           [[maybe_unused]] size_t shots, [[maybe_unused]] const std::string &kwargs = "") const
-        -> double
-    {
-        RT_FAIL("Not implemented method");
-        return {};
-    }
-    [[nodiscard]] virtual auto Var([[maybe_unused]] const std::string &circuit,
-                                   [[maybe_unused]] const std::string &device,
-                                   [[maybe_unused]] size_t shots,
-                                   [[maybe_unused]] const std::string &kwargs = "") const -> double
-    {
-        RT_FAIL("Not implemented method");
-        return {};
-    }
-    [[nodiscard]] virtual auto
-    State([[maybe_unused]] const std::string &circuit, [[maybe_unused]] const std::string &device,
-          [[maybe_unused]] size_t shots, [[maybe_unused]] size_t num_qubits,
-          [[maybe_unused]] const std::string &kwargs = "") const
-        -> std::vector<std::complex<double>>
-    {
-        RT_FAIL("Not implemented method");
-        return {};
-    }
-    [[nodiscard]] virtual auto Gradient([[maybe_unused]] const std::string &circuit,
-                                        [[maybe_unused]] const std::string &device,
-                                        [[maybe_unused]] size_t shots,
-                                        [[maybe_unused]] size_t num_qubits,
-                                        [[maybe_unused]] const std::string &kwargs = "") const
-        -> std::vector<double>
-    {
-        RT_FAIL("Not implemented method");
-        return {};
-    }
+           [[maybe_unused]] const std::string &kwargs = "") const
+      -> std::vector<double> {
+    RT_FAIL("Not implemented method");
+    return {};
+  }
 };
 
 /**
- * The OpenQasm circuit runner to execute an OpenQasm circuit on Braket Devices backed by
- * Amazon Braket Python SDK.
+ * The OpenQasm circuit runner to execute an OpenQasm circuit on Braket Devices
+ * backed by Amazon Braket Python SDK.
  */
 struct BraketRunner : public OpenQasmRunner {
-    [[nodiscard]] auto runCircuit(const std::string &circuit, const std::string &device,
-                                  size_t shots, const std::string &kwargs = "") const
-        -> std::string override
-    {
-        namespace py = pybind11;
-        using namespace py::literals;
+  [[nodiscard]] auto runCircuit(const std::string &circuit,
+                                const std::string &device, size_t shots,
+                                const std::string &kwargs = "") const
+      -> std::string override {
+    namespace py = pybind11;
+    using namespace py::literals;
 
-        RT_FAIL_IF(!Py_IsInitialized(), "The Python interpreter is not initialized");
+    RT_FAIL_IF(!Py_IsInitialized(),
+               "The Python interpreter is not initialized");
 
-        auto locals = py::dict("circuit"_a = circuit, "braket_device"_a = device,
-                               "kwargs"_a = kwargs, "shots"_a = shots, "msg"_a = "");
+    auto locals =
+        py::dict("circuit"_a = circuit, "braket_device"_a = device,
+                 "kwargs"_a = kwargs, "shots"_a = shots, "msg"_a = "");
 
-        py::exec(
-            R"(
+    py::exec(
+        R"(
             from collections import namedtuple
 
             from braket.aws import AwsDevice
@@ -164,29 +166,30 @@ struct BraketRunner : public OpenQasmRunner {
             except Exception as e:
                 msg = str(e)
               )",
-            py::globals(), locals);
+        py::globals(), locals);
 
-        auto &&msg = locals["msg"].cast<std::string>();
-        RT_FAIL_IF(!msg.empty(), msg.c_str());
+    auto &&msg = locals["msg"].cast<std::string>();
+    RT_FAIL_IF(!msg.empty(), msg.c_str());
 
-        return locals["result"].cast<std::string>();
-    }
+    return locals["result"].cast<std::string>();
+  }
 
-    [[nodiscard]] auto Probs(const std::string &circuit, const std::string &device, size_t shots,
-                             size_t num_qubits, const std::string &kwargs = "") const
-        -> std::vector<double> override
-    {
-        namespace py = pybind11;
-        using namespace py::literals;
+  [[nodiscard]] auto
+  Probs(const std::string &circuit, const std::string &device, size_t shots,
+        size_t num_qubits, const std::string &kwargs = "") const
+      -> std::vector<double> override {
+    namespace py = pybind11;
+    using namespace py::literals;
 
-        RT_FAIL_IF(!Py_IsInitialized(), "The Python interpreter is not initialized");
+    RT_FAIL_IF(!Py_IsInitialized(),
+               "The Python interpreter is not initialized");
 
-        auto locals =
-            py::dict("circuit"_a = circuit, "braket_device"_a = device, "kwargs"_a = kwargs,
-                     "shots"_a = shots, "num_qubits"_a = num_qubits, "msg"_a = "");
+    auto locals = py::dict("circuit"_a = circuit, "braket_device"_a = device,
+                           "kwargs"_a = kwargs, "shots"_a = shots,
+                           "num_qubits"_a = num_qubits, "msg"_a = "");
 
-        py::exec(
-            R"(
+    py::exec(
+        R"(
             from collections import namedtuple
 
             from braket.aws import AwsDevice
@@ -222,36 +225,38 @@ struct BraketRunner : public OpenQasmRunner {
             except Exception as e:
                 msg = str(e)
               )",
-            py::globals(), locals);
+        py::globals(), locals);
 
-        auto &&msg = locals["msg"].cast<std::string>();
-        RT_FAIL_IF(!msg.empty(), msg.c_str());
+    auto &&msg = locals["msg"].cast<std::string>();
+    RT_FAIL_IF(!msg.empty(), msg.c_str());
 
-        py::list results = locals["probs_list"];
+    py::list results = locals["probs_list"];
 
-        std::vector<double> probs;
-        probs.reserve(std::pow(2, num_qubits));
-        for (py::handle item : results) {
-            probs.push_back(item.cast<double>());
-        }
-
-        return probs;
+    std::vector<double> probs;
+    probs.reserve(std::pow(2, num_qubits));
+    for (py::handle item : results) {
+      probs.push_back(item.cast<double>());
     }
 
-    [[nodiscard]] auto Sample(const std::string &circuit, const std::string &device, size_t shots,
-                              size_t num_qubits, const std::string &kwargs = "") const
-        -> std::vector<size_t> override
-    {
-        namespace py = pybind11;
-        using namespace py::literals;
+    return probs;
+  }
 
-        RT_FAIL_IF(!Py_IsInitialized(), "The Python interpreter is not initialized");
+  [[nodiscard]] auto
+  Sample(const std::string &circuit, const std::string &device, size_t shots,
+         size_t num_qubits, const std::string &kwargs = "") const
+      -> std::vector<size_t> override {
+    namespace py = pybind11;
+    using namespace py::literals;
 
-        auto locals = py::dict("circuit"_a = circuit, "braket_device"_a = device,
-                               "kwargs"_a = kwargs, "shots"_a = shots, "msg"_a = "");
+    RT_FAIL_IF(!Py_IsInitialized(),
+               "The Python interpreter is not initialized");
 
-        py::exec(
-            R"(
+    auto locals =
+        py::dict("circuit"_a = circuit, "braket_device"_a = device,
+                 "kwargs"_a = kwargs, "shots"_a = shots, "msg"_a = "");
+
+    py::exec(
+        R"(
             from collections import namedtuple
 
             import numpy as np
@@ -285,35 +290,38 @@ struct BraketRunner : public OpenQasmRunner {
             except Exception as e:
                 msg = str(e)
               )",
-            py::globals(), locals);
+        py::globals(), locals);
 
-        auto &&msg = locals["msg"].cast<std::string>();
-        RT_FAIL_IF(!msg.empty(), msg.c_str());
+    auto &&msg = locals["msg"].cast<std::string>();
+    RT_FAIL_IF(!msg.empty(), msg.c_str());
 
-        py::list results = locals["samples"];
+    py::list results = locals["samples"];
 
-        std::vector<size_t> samples;
-        samples.reserve(shots * num_qubits);
-        for (py::handle item : results) {
-            samples.push_back(item.cast<size_t>());
-        }
-
-        return samples;
+    std::vector<size_t> samples;
+    samples.reserve(shots * num_qubits);
+    for (py::handle item : results) {
+      samples.push_back(item.cast<size_t>());
     }
 
-    [[nodiscard]] auto Expval(const std::string &circuit, const std::string &device, size_t shots,
-                              const std::string &kwargs = "") const -> double override
-    {
-        namespace py = pybind11;
-        using namespace py::literals;
+    return samples;
+  }
 
-        RT_FAIL_IF(!Py_IsInitialized(), "The Python interpreter is not initialized");
+  [[nodiscard]] auto Expval(const std::string &circuit,
+                            const std::string &device, size_t shots,
+                            const std::string &kwargs = "") const
+      -> double override {
+    namespace py = pybind11;
+    using namespace py::literals;
 
-        auto locals = py::dict("circuit"_a = circuit, "braket_device"_a = device,
-                               "kwargs"_a = kwargs, "shots"_a = shots, "msg"_a = "");
+    RT_FAIL_IF(!Py_IsInitialized(),
+               "The Python interpreter is not initialized");
 
-        py::exec(
-            R"(
+    auto locals =
+        py::dict("circuit"_a = circuit, "braket_device"_a = device,
+                 "kwargs"_a = kwargs, "shots"_a = shots, "msg"_a = "");
+
+    py::exec(
+        R"(
             from collections import namedtuple
 
             from braket.aws import AwsDevice
@@ -346,29 +354,31 @@ struct BraketRunner : public OpenQasmRunner {
             except Exception as e:
                 msg = str(e)
               )",
-            py::globals(), locals);
+        py::globals(), locals);
 
-        auto &&msg = locals["msg"].cast<std::string>();
-        RT_FAIL_IF(!msg.empty(), msg.c_str());
+    auto &&msg = locals["msg"].cast<std::string>();
+    RT_FAIL_IF(!msg.empty(), msg.c_str());
 
-        py::list results = locals["expval"];
+    py::list results = locals["expval"];
 
-        return results[0].cast<double>();
-    }
+    return results[0].cast<double>();
+  }
 
-    [[nodiscard]] auto Var(const std::string &circuit, const std::string &device, size_t shots,
-                           const std::string &kwargs = "") const -> double override
-    {
-        namespace py = pybind11;
-        using namespace py::literals;
+  [[nodiscard]] auto Var(const std::string &circuit, const std::string &device,
+                         size_t shots, const std::string &kwargs = "") const
+      -> double override {
+    namespace py = pybind11;
+    using namespace py::literals;
 
-        RT_FAIL_IF(!Py_IsInitialized(), "The Python interpreter is not initialized");
+    RT_FAIL_IF(!Py_IsInitialized(),
+               "The Python interpreter is not initialized");
 
-        auto locals = py::dict("circuit"_a = circuit, "braket_device"_a = device,
-                               "kwargs"_a = kwargs, "shots"_a = shots, "msg"_a = "");
+    auto locals =
+        py::dict("circuit"_a = circuit, "braket_device"_a = device,
+                 "kwargs"_a = kwargs, "shots"_a = shots, "msg"_a = "");
 
-        py::exec(
-            R"(
+    py::exec(
+        R"(
             from collections import namedtuple
 
             from braket.aws import AwsDevice
@@ -401,15 +411,15 @@ struct BraketRunner : public OpenQasmRunner {
             except Exception as e:
                 msg = str(e)
               )",
-            py::globals(), locals);
+        py::globals(), locals);
 
-        auto &&msg = locals["msg"].cast<std::string>();
-        RT_FAIL_IF(!msg.empty(), msg.c_str());
+    auto &&msg = locals["msg"].cast<std::string>();
+    RT_FAIL_IF(!msg.empty(), msg.c_str());
 
-        py::list results = locals["var"];
+    py::list results = locals["var"];
 
-        return results[0].cast<double>();
-    }
+    return results[0].cast<double>();
+  }
 };
 
 } // namespace Catalyst::Runtime::Device::OpenQasm
