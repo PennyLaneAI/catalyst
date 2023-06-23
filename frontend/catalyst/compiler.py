@@ -309,8 +309,8 @@ class CompilerDriver:
         """
         mlir_lib_path = get_lib_path("llvm", "MLIR_LIB_DIR")
         rt_lib_path = get_lib_path("runtime", "RUNTIME_LIB_DIR")
-        rt_capi_path = os.path.join(rt_lib_path, "capi")
-        rt_backend_path = os.path.join(rt_lib_path, "backend")
+        rt_capi_path = os.path.join(rt_lib_path, "capi") if INSTALLED else rt_lib_path
+        rt_backend_path = os.path.join(rt_lib_path, "backend") if INSTALLED else rt_lib_path
 
         default_flags = [
             "-shared",
