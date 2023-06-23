@@ -1,5 +1,5 @@
 add_mlir_library(CatalystCompilerDriver
-    LLVMTarget.cpp
+    CatalystLLVMTarget.cpp
     Pipelines.cpp
 
     LINK_LIBS PRIVATE
