@@ -36,9 +36,9 @@ using namespace catalyst::quantum;
 
 namespace {
 
-/// Copy the region of the adjoint operation `op` to the POI specified by the `rewriter`. Build and
-/// return the value mapping `bvm`.
-Value copyAdjointVerbatim(AdjointOp op, PatternRewriter &rewriter, IRMapping &mapping)
+/// Clone the region of the adjoint operation `op` to the POI specified by the `rewriter`. Build and
+/// return the value mapping `mapping`.
+Value cloneAdjointRegion(AdjointOp op, PatternRewriter &rewriter, IRMapping &mapping)
 {
     Block &b = op.getRegion().front();
     for (auto i = b.begin(); i != b.end(); i++) {
@@ -129,12 +129,12 @@ struct AdjointSingleOpRewritePattern : public mlir::OpRewritePattern<AdjointOp> 
                     update(extract.getQreg(), insert->getResult(0));
                 }
                 else if (AdjointOp adjoint2 = dyn_cast<AdjointOp>(*i)) {
-                    IRMapping bvm(classicalMapping);
+                    IRMapping m(classicalMapping);
                     Block &b = adjoint2.getRegion().front();
                     for (const auto &[a, r] : llvm::zip(b.getArguments(), adjoint2->getResults())) {
-                        bvm.map(a, query(r));
+                        m.map(a, query(r));
                     }
-                    auto res = copyAdjointVerbatim(adjoint2, rewriter, bvm);
+                    auto res = cloneAdjointRegion(adjoint2, rewriter, m);
                     update(adjoint2.getQreg(), res);
                 }
                 else {
