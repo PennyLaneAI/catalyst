@@ -213,6 +213,15 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
         MLIRContext *ctx = getContext();
         LLVMTypeConverter llvmTypeConverter(ctx);
 
+        // Defyne some Enzyme Globals
+        // malloc
+        insertFunctionName(rewriter, op, "mallocname", StringRef("malloc", 7));
+        auto enzymeMallocGlb = insertEnzymeLikeFunction(rewriter, op, "__enzyme_like_function_malloc", "mallocname", "_mlir_memref_to_llvm_alloc");
+
+        // free
+        insertFunctionName(rewriter, op, "freename", StringRef("free", 5));
+        auto enzymeMallocFree = insertEnzymeLikeFunction(rewriter, op, "__enzyme_like_function_free", "freename", "_mlir_memref_to_llvm_free");
+
         for (Type type : op.getResultTypes()) {
             if (!type.isa<MemRefType>())
                 return op.emitOpError("must be bufferized before lowering");
@@ -394,7 +403,7 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
   private:
     static FlatSymbolRefAttr getOrInsertEnzymeConstDecl(PatternRewriter &rewriter, Operation *op)
     {
-        // Copyright (C) 2023 - Jacob Mai Peng -
+        // Copyright (C) 2023 - Jacob Mai Peng
         // https://github.com/pengmai/lagrad/blob/main/lib/LAGrad/LowerToLLVM.cpp
         ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
         auto *context = moduleOp.getContext();
@@ -409,6 +418,54 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
                                         /*isConstant=*/true, LLVM::Linkage::Linkonce,
                                         "enzyme_const", IntegerAttr::get(shortTy, 0));
         return SymbolRefAttr::get(context, "enzyme_const");
+    }
+
+  private:
+    static void insertFunctionName(PatternRewriter &rewriter, Operation *op, StringRef key,
+                                    StringRef value)
+    {
+        ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
+        PatternRewriter::InsertionGuard insertGuard(rewriter);
+        rewriter.setInsertionPointToStart(moduleOp.getBody());
+        LLVM::GlobalOp glb = moduleOp.lookupSymbol<LLVM::GlobalOp>(key);
+        if (!glb) {
+            glb = rewriter.create<LLVM::GlobalOp>(
+                moduleOp.getLoc(),
+                LLVM::LLVMArrayType::get(IntegerType::get(rewriter.getContext(), 8), value.size()),
+                true, LLVM::Linkage::Linkonce, key, rewriter.getStringAttr(value));
+        }
+    }
+private:
+    static LLVM::GlobalOp insertEnzymeLikeFunction(PatternRewriter &rewriter, Operation *op, StringRef key, StringRef name, StringRef originalName)
+    {
+        ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
+        auto *context = moduleOp.getContext();
+        PatternRewriter::InsertionGuard insertGuard(rewriter);
+        rewriter.setInsertionPointToStart(moduleOp.getBody());
+        LLVM::GlobalOp glb = moduleOp.lookupSymbol<LLVM::GlobalOp>(key);
+        auto ptrType = LLVM::LLVMPointerType::get(context);
+        if (!glb) {
+            glb = rewriter.create<LLVM::GlobalOp>(moduleOp.getLoc(), LLVM::LLVMArrayType::get(ptrType, 2), /*isConstant=*/false, LLVM::Linkage::External,
+                key, nullptr);
+        }
+        Block *block = new Block();
+        glb.getInitializerRegion().push_back(block);
+        rewriter.setInsertionPointToStart(block);
+        // Get global name
+        auto llvmI8PtrTy = LLVM::LLVMPointerType::get(IntegerType::get(context, 8));
+        auto nameRefAttr = SymbolRefAttr::get(context, name);
+        auto enzymeGlobal = rewriter.create<LLVM::AddressOfOp>(moduleOp.getLoc(), llvmI8PtrTy, nameRefAttr);
+
+        // Get original global name
+        auto llvmPtr = LLVM::LLVMPointerType::get(context);
+        auto originalNameRefAttr = SymbolRefAttr::get(context, originalName);
+        auto originalGlobal = rewriter.create<LLVM::AddressOfOp>(moduleOp.getLoc(), llvmI8PtrTy, originalNameRefAttr);
+
+        auto undefArray = rewriter.create<LLVM::UndefOp>(moduleOp.getLoc(), LLVM::LLVMArrayType::get(ptrType, 2));
+        Value llvmInsert0 = rewriter.create<LLVM::InsertValueOp>(moduleOp.getLoc(), undefArray, enzymeGlobal, 0);
+        Value llvmInsert1 = rewriter.create<LLVM::InsertValueOp>(moduleOp.getLoc(), llvmInsert0, originalGlobal, 1);
+        rewriter.create<func::ReturnOp>(moduleOp.getLoc(), llvmInsert1);
+        return glb;
     }
 };
 
