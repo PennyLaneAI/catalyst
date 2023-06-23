@@ -34,6 +34,9 @@
 using namespace mlir;
 
 namespace {
+/// Emit the LLVM IR metadata required to register custom gradients in Enzyme.
+/// This interface will convert `gradient.augment` and `gradient.vjp` attributes on function-like
+/// ops to the metadata read by Enzyme.
 class GradientToEnzymeMetadataTranslation : public LLVMTranslationDialectInterface {
     using LLVMTranslationDialectInterface::LLVMTranslationDialectInterface;
 
@@ -68,7 +71,6 @@ class GradientToEnzymeMetadataTranslation : public LLVMTranslationDialectInterfa
                               *llvm::MDNode::get(ctx, llvm::ConstantAsMetadata::get(augmented)));
         function->addMetadata("enzyme_gradient",
                               *llvm::MDNode::get(ctx, llvm::ConstantAsMetadata::get(vjp)));
-        function->dump();
         return success();
     }
 };
