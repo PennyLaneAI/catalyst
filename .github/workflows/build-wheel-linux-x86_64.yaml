@@ -99,6 +99,11 @@ jobs:
       run: |
         export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
 
+        # TODO: We can remove this patch whenever this ticket is solved https://github.com/tensorflow/mlir-hlo/issues/68
+        pushd mlir
+        patch -d mlir-hlo/mhlo/analysis --merge --follow-symlinks < patches/add-lmhlo-dependency.patch
+        popd
+
         cmake -S mlir/mlir-hlo -B mhlo-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_ENABLE_ASSERTIONS=ON \
@@ -229,6 +234,7 @@ jobs:
         cmake --build quantum-build --target check-dialects -j$(nproc)
         patch -d quantum-build/python_packages/quantum/mlir_quantum --follow-symlinks < mlir/patches/use-ir-from-jax.patch
         patch -d quantum-build/python_packages/quantum/mlir_quantum/dialects --follow-symlinks < mlir/patches/use-cext-from-jax.patch
+        patch -d quantum-build/python_packages/quantum/mlir_quantum/dialects --follow-symlinks < mlir/patches/do-not-infer-result.patch
         patch -d quantum-build/python_packages/quantum/mlir_quantum/dialects --follow-symlinks < mlir/patches/remove-gradient-cext-import.patch
         patch -d quantum-build/python_packages/quantum/mlir_quantum/dialects --follow-symlinks < mlir/patches/remove-quantum-cext-import.patch
 
@@ -305,52 +311,6 @@ jobs:
       uses: actions/download-artifact@v3
       with:
         name: catalyst-manylinux2014_x86_64-wheel-py-${{ matrix.python_version }}.zip
-        path: dist
-
-    - name: Set up Python ${{ matrix.python_version }}
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{ matrix.python_version }}
-
-    - name: Install Python dependencies
-      run: |
-        python${{ matrix.python_version }} -m pip install wheel pytest pytest-xdist
-
-    - name: Install Catalyst
-      run: |
-        python${{ matrix.python_version }} -m pip install $GITHUB_WORKSPACE/dist/*.whl
-
-    - name: Run Python Pytest Tests
-      run: |
-        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest -n auto
-
-  test-wheels-forwards-backwards-compat:
-    needs: [catalyst-linux-wheels-x86-64]
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest]
-        python_wheel: ["3.8", "3.11"]
-        python_version: ["3.8", "3.9", "3.10", "3.11"]
-
-    # To check forward and backward compatibility catalyst-py-["3.8", "3.11"]-wheel
-    # with all supported python3 versions: ["3.8", "3.9", "3.10", "3.11"]
-    name: Test py-${{ matrix.python_wheel }} Wheel with python${{ matrix.python_version }}
-    runs-on: ${{ matrix.os }}
-
-    steps:
-    - name: Cancel previous runs
-      uses: styfle/cancel-workflow-action@0.11.0
-      with:
-        access_token: ${{ github.token }}
-
-    - name: Checkout Catalyst repo
-      uses: actions/checkout@v3
-
-    - name: Download py-${{ matrix.python_wheel }} Wheel Artifact
-      uses: actions/download-artifact@v3
-      with:
-        name: catalyst-manylinux2014_x86_64-wheel-py-${{ matrix.python_wheel }}.zip
         path: dist
 
     - name: Set up Python ${{ matrix.python_version }}

@@ -1,3 +1,4 @@
+
 // Copyright 2022-2023 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -25,6 +26,25 @@
 using namespace Catalyst::Runtime;
 using namespace Catalyst::Runtime::Simulator;
 
+TEST_CASE("Test parse_kwargs coverage", "[Utils]")
+{
+    std::string case1{""};
+    CHECK(parse_kwargs(case1).empty());
+
+    std::string case2{"{shots : 1000}"};
+    std::string case3{"shots : 1000"};
+    std::string case4{"'shots':'1000'"};
+    CHECK(parse_kwargs(case2) == parse_kwargs(case3));
+    CHECK(parse_kwargs(case3) == parse_kwargs(case4));
+
+    std::string case5{"{'A':'B', 'C':'D', 'E':'F'}"};
+    auto res5 = parse_kwargs(case5);
+    CHECK(res5.size() == 3);
+    CHECK((res5.contains("A") && res5["A"] == "B"));
+    CHECK((res5.contains("C") && res5["C"] == "D"));
+    CHECK((res5.contains("E") && res5["E"] == "F"));
+}
+
 TEST_CASE("Test Driver", "[Driver]")
 {
     std::unique_ptr<ExecutionContext> driver = std::make_unique<ExecutionContext>("default");
@@ -37,8 +57,10 @@ TEST_CASE("Test Driver", "[Driver]")
 
     // check device specs update
     driver->setDeviceRecorder(true);
+    driver->setDeviceKwArgs("execute=openmp;");
     CHECK(driver->initDevice("default") == false);
     CHECK(driver->getDevice() == nullptr);
+    CHECK(driver->getDeviceKwArgs() == "execute=openmp;");
     CHECK(driver->getDeviceRecorderStatus() == true);
 }
 
