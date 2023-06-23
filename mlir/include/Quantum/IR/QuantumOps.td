@@ -191,6 +191,13 @@ class Gate_Op<string mnemonic, list<Trait> traits = []> :
         mlir::ValueRange getQubitResults() {
             return getOutQubits();
         }
+
+        bool getAdjointFlag() {
+            return getAdjoint().has_value() ? getAdjoint().value() : false;
+        }
+        void setAdjointFlag(bool adjoint) {
+            setAdjoint(adjoint);
+        };
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration;
@@ -235,7 +242,8 @@ def MultiRZOp : Gate_Op<"multirz", [NoMemoryEffect, DifferentiableGate]> {
 
     let arguments = (ins
         F64:$theta,
-        Variadic<QubitType>:$in_qubits
+        Variadic<QubitType>:$in_qubits,
+        OptionalAttr<UnitAttr>:$adjoint
     );
 
     let results = (outs

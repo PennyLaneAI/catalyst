@@ -63,7 +63,6 @@ struct AdjointSingleOpRewritePattern : public mlir::OpRewritePattern<AdjointOp> 
     {
         LLVM_DEBUG(dbgs() << "Adjointing the following:\n" << adjoint << "\n");
         Location loc = adjoint.getLoc();
-        MLIRContext *ctx = adjoint.getContext();
 
         // First, copy the classical computations directly to the target POI and build the classical
         // value mapping dictionary.
@@ -109,36 +108,17 @@ struct AdjointSingleOpRewritePattern : public mlir::OpRewritePattern<AdjointOp> 
                     update(insert.getQubit(), extract->getResult(0));
                     update(insert.getInQreg(), quantumMapping[insert.getOutQreg()]);
                 }
-                else if (CustomOp custom = dyn_cast<CustomOp>(*i)) {
-                    std::vector<Value> in_qubits;
-                    for (auto q : custom.getQubitResults()) {
-                        in_qubits.push_back(query(q));
+                else if (QuantumGate gate = dyn_cast<QuantumGate>(*i)) {
+                    IRMapping m(classicalMapping);
+                    for (const auto &[qr, qo] :
+                         llvm::zip(gate.getQubitResults(), gate.getQubitOperands())) {
+                        m.map(qo, query(qr));
                     }
-                    std::vector<Value> in_params;
-                    for (auto p : custom.getParams()) {
-                        in_params.push_back(classicalMapping.lookupOrDefault(p));
-                    }
-                    auto customA = rewriter.create<CustomOp>(
-                        loc, custom.getResultTypes(), in_params, in_qubits, custom.getGateName(),
-                        custom.getAdjoint() ? mlir::UnitAttr() : mlir::UnitAttr::get(ctx));
-                    for (size_t i = 0; i < customA.getOutQubits().size(); i++) {
-                        update(custom.getQubitOperands()[i], customA->getResult(i));
-                    }
-                }
-                else if (QubitUnitaryOp qunitary = dyn_cast<QubitUnitaryOp>(*i)) {
-                    assert(
-                        qunitary.getQubitOperands().size() == qunitary.getQubitResults().size() &&
-                        "Quantum operation must have inputs and outputs of the same qubit number");
-                    std::vector<Value> in_qubits;
-                    for (auto q : qunitary.getQubitResults()) {
-                        in_qubits.push_back(query(q));
-                    }
-                    auto qunitaryA = rewriter.create<QubitUnitaryOp>(
-                        loc, qunitary.getResultTypes(),
-                        classicalMapping.lookupOrDefault(qunitary.getMatrix()), in_qubits,
-                        qunitary.getAdjoint() ? mlir::UnitAttr() : mlir::UnitAttr::get(ctx));
-                    for (size_t i = 0; i < qunitaryA.getQubitResults().size(); i++) {
-                        update(qunitary.getQubitOperands()[i], qunitaryA->getResult(i));
+                    QuantumGate clone = dyn_cast<QuantumGate>(rewriter.insert(i->clone(m)));
+                    clone.setAdjointFlag(!gate.getAdjointFlag());
+                    for (const auto &[qr, qo] :
+                         llvm::zip(clone.getQubitResults(), gate.getQubitOperands())) {
+                        update(qo, qr);
                     }
                 }
                 else if (ExtractOp extract = dyn_cast<ExtractOp>(*i)) {
