@@ -135,7 +135,6 @@ CatalystCReturnCode QuantumDriverMain(const char *source, const char *dest)
         return ReturnTranslationFailed;
     }
 
-    llvmModule->dump();
     if (failed(compileObjectFile(std::move(llvmModule), dest))) {
         return ReturnObjectCompilationFailed;
     }

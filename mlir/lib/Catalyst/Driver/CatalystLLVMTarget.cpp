@@ -110,8 +110,8 @@ LogicalResult catalyst::compileObjectFile(std::unique_ptr<llvm::Module> llvmModu
     const char *features = "";
 
     TargetOptions opt;
-    auto rm = std::optional<Reloc::Model>();
-    auto targetMachine = target->createTargetMachine(targetTriple, cpu, features, opt, rm);
+    auto targetMachine =
+        target->createTargetMachine(targetTriple, cpu, features, opt, Reloc::Model::PIC_);
     llvmModule->setDataLayout(targetMachine->createDataLayout());
     llvmModule->setTargetTriple(targetTriple);
 
@@ -119,13 +119,13 @@ LogicalResult catalyst::compileObjectFile(std::unique_ptr<llvm::Module> llvmModu
     raw_fd_ostream dest(filename, errCode, sys::fs::OF_None);
 
     if (errCode) {
-        errs() << "could not open file: " << errCode.message();
+        errs() << "could not open file: " << errCode.message() << "\n";
         return failure();
     }
 
     legacy::PassManager pm;
     if (targetMachine->addPassesToEmitFile(pm, dest, nullptr, CGFT_ObjectFile)) {
-        errs() << "TargetMachine can't emit a file of this type";
+        errs() << "TargetMachine can't emit an .o file\n";
         return failure();
     }
 
