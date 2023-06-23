@@ -60,14 +60,14 @@ PYBIND11_MODULE(_quantumDialects, m)
         py::arg("source"), py::arg("keep_intermediate") = false);
 
     quantum_m.def(
-        "mlir_canonicalize",
-        [](const char *source) {
+        "mlir_run_pipeline",
+        [](const char *source, const char *pipeline) {
             char *dest = nullptr;
-            CatalystCReturnCode code = Canonicalize(source, &dest);
+            CatalystCReturnCode code = RunPassPipeline(source, pipeline, &dest);
             if (code != ReturnOk) {
                 throw std::runtime_error("Canonicalization failed");
             }
             return dest;
         },
-        py::arg("source"));
+        py::arg("source"), py::arg("pipeline"));
 }
