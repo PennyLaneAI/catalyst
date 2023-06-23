@@ -120,7 +120,7 @@ struct AdjointSingleOpRewritePattern : public mlir::OpRewritePattern<AdjointOp> 
                     }
                     auto customA = rewriter.create<CustomOp>(
                         loc, custom.getResultTypes(), in_params, in_qubits, custom.getGateName(),
-                        custom.getAdjoint() ? mlir::UnitAttr() : mlir::UnitAttr::get(ctx) ) ;
+                        custom.getAdjoint() ? mlir::UnitAttr() : mlir::UnitAttr::get(ctx));
                     for (size_t i = 0; i < customA.getOutQubits().size(); i++) {
                         update(custom.getQubitOperands()[i], customA->getResult(i));
                     }

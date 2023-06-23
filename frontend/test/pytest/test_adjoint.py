@@ -29,8 +29,9 @@ from catalyst import for_loop, qjit
 
 
 def test_adjoint_func():
-    """ Ensures that catalyst.adjoint accepts simple Python functions as argument. Makes sure that
-    simple quantum gates are adjointed correctly. """
+    """Ensures that catalyst.adjoint accepts simple Python functions as argument. Makes sure that
+    simple quantum gates are adjointed correctly."""
+
     def func():
         qml.PauliX(wires=0)
         qml.PauliY(wires=0)
@@ -58,7 +59,8 @@ def test_adjoint_func():
 
 @pytest.mark.parametrize("theta, val", [(jnp.pi, 0), (-100.0, 1)])
 def test_adjoint_op(theta, val):
-    """ Ensures that catalyst.adjoint accepts single PennyLane operators classes as argument. """
+    """Ensures that catalyst.adjoint accepts single PennyLane operators classes as argument."""
+
     @qjit()
     @qml.qnode(qml.device("lightning.qubit", wires=2))
     def C_workflow(theta, val):
@@ -79,7 +81,8 @@ def test_adjoint_op(theta, val):
 
 @pytest.mark.parametrize("theta, val", [(pnp.pi, 0), (-100.0, 2)])
 def test_adjoint_bound_op(theta, val):
-    """ Ensures that catalyst.adjoint accepts single PennyLane operators objects as argument. """
+    """Ensures that catalyst.adjoint accepts single PennyLane operators objects as argument."""
+
     @qjit()
     @qml.qnode(qml.device("lightning.qubit", wires=3))
     def C_workflow(theta, val):
@@ -102,7 +105,8 @@ def test_adjoint_bound_op(theta, val):
 
 @pytest.mark.parametrize("w, p", [(0, 0.5), (0, -100.0), (1, 123.22)])
 def test_adjoint_param_fun(w, p):
-    """ Ensures that catalyst.adjoint accepts paramethrized Python functions as arguments. """
+    """Ensures that catalyst.adjoint accepts paramethrized Python functions as arguments."""
+
     def func(w, theta1, theta2, theta3=1):
         qml.RX(theta1 * pnp.pi / 2, wires=w)
         qml.RY(theta2 / 2, wires=w)
@@ -129,7 +133,8 @@ def test_adjoint_param_fun(w, p):
 
 
 def test_adjoint_nested_fun():
-    """ Ensures that catalyst.adjoint allows arbitrary nesting. """
+    """Ensures that catalyst.adjoint allows arbitrary nesting."""
+
     def func(A, I):
         qml.RX(I, wires=1)
         qml.RY(I, wires=1)
@@ -158,7 +163,8 @@ def test_adjoint_nested_fun():
 
 
 def test_adjoint_qubitunitary():
-    """ Ensures that catalyst.adjoint supports QubitUnitary oprtations. """
+    """Ensures that catalyst.adjoint supports QubitUnitary oprtations."""
+
     def func():
         qml.QubitUnitary(
             jnp.array(
@@ -189,7 +195,8 @@ def test_adjoint_qubitunitary():
 
 
 def test_adjoint_no_measurements():
-    """ Checks that catalyst.adjoint rejects functions containing quantum measurements. """
+    """Checks that catalyst.adjoint rejects functions containing quantum measurements."""
+
     def func():
         qml.RX(pnp.pi / 2, wires=0)
         qml.sample()
@@ -206,7 +213,7 @@ def test_adjoint_no_measurements():
 
 
 def test_adjoint_invalid_argument():
-    """ Checks that catalyst.adjoint rejects non-quantum program arguments. """
+    """Checks that catalyst.adjoint rejects non-quantum program arguments."""
     with pytest.raises(ValueError, match="Expected a callable"):
 
         @qjit()
@@ -219,7 +226,8 @@ def test_adjoint_invalid_argument():
 
 
 def test_adjoint_classical_loop():
-    """ Checks that catalyst.adjoint supports purely-classical Control-flows. """
+    """Checks that catalyst.adjoint supports purely-classical Control-flows."""
+
     def func(w=0):
         @for_loop(0, 2, 1)
         def loop(i, s):
