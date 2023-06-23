@@ -271,7 +271,8 @@ struct MultiRZOpPattern : public OpConversionPattern<MultiRZOp> {
         Location loc = op.getLoc();
         MLIRContext *ctx = getContext();
 
-        StringRef qirName = "__quantum__qis__MultiRZ";
+        std::string qirName =
+            std::string("__quantum__qis__MultiRZ") + (op.getAdjoint() ? "_Adjoint" : "");
         Type qirSignature = LLVM::LLVMFunctionType::get(
             LLVM::LLVMVoidType::get(ctx), {Float64Type::get(ctx), IntegerType::get(ctx, 64)},
             /*isVarArg=*/true);

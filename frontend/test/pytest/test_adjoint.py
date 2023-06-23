@@ -194,6 +194,29 @@ def test_adjoint_qubitunitary():
     assert_allclose(actual, desired)
 
 
+def test_adjoint_multirz():
+    """Ensures that catalyst.adjoint supports MultiRZ oprtations."""
+
+    def func():
+        qml.PauliX(0)
+        qml.MultiRZ(theta=pnp.pi / 2, wires=[0, 1])
+
+    @qjit()
+    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    def C_workflow():
+        C_adjoint(func)()
+        return qml.state()
+
+    @qml.qnode(qml.device("default.qubit", wires=2))
+    def PL_workflow():
+        PL_adjoint(func)()
+        return qml.state()
+
+    actual = C_workflow()
+    desired = PL_workflow()
+    assert_allclose(actual, desired)
+
+
 def test_adjoint_no_measurements():
     """Checks that catalyst.adjoint rejects functions containing quantum measurements."""
 
