@@ -136,7 +136,6 @@ CatalystCReturnCode QuantumDriverMain(const char *source, const char *dest, Func
         return ReturnTranslationFailed;
     }
 
-    llvmModule->dump();
     if (functionData != nullptr) {
         for (auto &function : llvmModule->functions()) {
             if (function.getName().starts_with("@jit")) {
