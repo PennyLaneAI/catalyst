@@ -32,8 +32,7 @@ namespace gradient {
 #define GEN_PASS_DEF_GRADIENTCONVERSIONPASS
 #include "Gradient/Transforms/Passes.h.inc"
 
-struct GradientConversionPass
-    : impl::GradientConversionPassBase<GradientConversionPass> {
+struct GradientConversionPass : impl::GradientConversionPassBase<GradientConversionPass> {
     using GradientConversionPassBase::GradientConversionPassBase;
 
     void runOnOperation() final {
@@ -48,8 +47,7 @@ struct GradientConversionPass
         target.addLegalDialect<catalyst::quantum::QuantumDialect>();
         target.addLegalDialect<func::FuncDialect>();
 
-        if (failed(applyPartialConversion(getOperation(), target,
-                                          std::move(patterns)))) {
+        if (failed(applyPartialConversion(getOperation(), target, std::move(patterns)))) {
             signalPassFailure();
         }
     }

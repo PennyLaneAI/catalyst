@@ -31,10 +31,10 @@ struct AdjointLowering : public OpRewritePattern<GradOp> {
     void rewrite(GradOp op, PatternRewriter &rewriter) const override;
 
   private:
-    static func::FuncOp genQGradFunction(PatternRewriter &rewriter,
-                                         Location loc, func::FuncOp callee);
-    static func::FuncOp discardAndReturnReg(PatternRewriter &rewriter,
-                                            Location loc, func::FuncOp callee);
+    static func::FuncOp genQGradFunction(PatternRewriter &rewriter, Location loc,
+                                         func::FuncOp callee);
+    static func::FuncOp discardAndReturnReg(PatternRewriter &rewriter, Location loc,
+                                            func::FuncOp callee);
 };
 
 } // namespace gradient

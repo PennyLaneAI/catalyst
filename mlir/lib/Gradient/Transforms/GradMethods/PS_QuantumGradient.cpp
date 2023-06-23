@@ -34,18 +34,16 @@ namespace catalyst {
 namespace gradient {
 
 /// Store the given iteration variables in the selector vector.
-static void updateSelectorVector(
-    PatternRewriter &rewriter, Location loc,
-    std::vector<std::pair<scf::ForOp, int64_t>> &selectorsToStore,
-    Value selectorBuffer) {
+static void updateSelectorVector(PatternRewriter &rewriter, Location loc,
+                                 std::vector<std::pair<scf::ForOp, int64_t>> &selectorsToStore,
+                                 Value selectorBuffer) {
     PatternRewriter::InsertionGuard insertGuard(rewriter);
 
     for (auto &[forOp, idx] : selectorsToStore) {
         rewriter.setInsertionPointToStart(forOp.getBody());
         Value iteration = forOp.getInductionVar();
         Value idxVal = rewriter.create<index::ConstantOp>(loc, idx);
-        rewriter.create<memref::StoreOp>(loc, iteration, selectorBuffer,
-                                         idxVal);
+        rewriter.create<memref::StoreOp>(loc, iteration, selectorBuffer, idxVal);
     }
 
     selectorsToStore.clear();
@@ -53,58 +51,47 @@ static void updateSelectorVector(
 
 /// Generate calls to the shifted function to compute the current gradient
 /// element.
-static std::vector<Value>
-computePartialDerivative(PatternRewriter &rewriter, Location loc,
-                         int64_t numShifts, int64_t currentShift,
-                         Value selectorBuffer, func::FuncOp shiftedFn,
-                         std::vector<Value> callArgs) {
+static std::vector<Value> computePartialDerivative(PatternRewriter &rewriter, Location loc,
+                                                   int64_t numShifts, int64_t currentShift,
+                                                   Value selectorBuffer, func::FuncOp shiftedFn,
+                                                   std::vector<Value> callArgs) {
     constexpr double shift = PI / 2;
-    ShapedType shiftVectorType =
-        RankedTensorType::get({numShifts}, rewriter.getF64Type());
-    Value selectorVector =
-        rewriter.create<bufferization::ToTensorOp>(loc, selectorBuffer);
+    ShapedType shiftVectorType = RankedTensorType::get({numShifts}, rewriter.getF64Type());
+    Value selectorVector = rewriter.create<bufferization::ToTensorOp>(loc, selectorBuffer);
 
     // Define the shift vectors (pos/neg) as sparse tensor constants.
     DenseElementsAttr nonZeroIndices = rewriter.getI64TensorAttr(currentShift);
 
-    DenseElementsAttr nonZeroValuesPos = DenseFPElementsAttr::get(
-        RankedTensorType::get(1, rewriter.getF64Type()), shift);
-    TypedAttr shiftVectorAttrPos = SparseElementsAttr::get(
-        shiftVectorType, nonZeroIndices, nonZeroValuesPos);
-    Value shiftVectorPos =
-        rewriter.create<arith::ConstantOp>(loc, shiftVectorAttrPos);
+    DenseElementsAttr nonZeroValuesPos =
+        DenseFPElementsAttr::get(RankedTensorType::get(1, rewriter.getF64Type()), shift);
+    TypedAttr shiftVectorAttrPos =
+        SparseElementsAttr::get(shiftVectorType, nonZeroIndices, nonZeroValuesPos);
+    Value shiftVectorPos = rewriter.create<arith::ConstantOp>(loc, shiftVectorAttrPos);
 
-    DenseElementsAttr nonZeroValuesNeg = DenseFPElementsAttr::get(
-        RankedTensorType::get(1, rewriter.getF64Type()), -shift);
-    TypedAttr shiftVectorAttrNeg = SparseElementsAttr::get(
-        shiftVectorType, nonZeroIndices, nonZeroValuesNeg);
-    Value shiftVectorNeg =
-        rewriter.create<arith::ConstantOp>(loc, shiftVectorAttrNeg);
+    DenseElementsAttr nonZeroValuesNeg =
+        DenseFPElementsAttr::get(RankedTensorType::get(1, rewriter.getF64Type()), -shift);
+    TypedAttr shiftVectorAttrNeg =
+        SparseElementsAttr::get(shiftVectorType, nonZeroIndices, nonZeroValuesNeg);
+    Value shiftVectorNeg = rewriter.create<arith::ConstantOp>(loc, shiftVectorAttrNeg);
 
     // Compute the partial derivate for this parameter via the simplified
     // parameter-shift rule: df/dx = [f(x + pi/2) - f(x - pi/2)] / 2.
     callArgs.push_back(shiftVectorPos);
     callArgs.push_back(selectorVector);
-    ValueRange evalPos =
-        rewriter.create<func::CallOp>(loc, shiftedFn, callArgs).getResults();
+    ValueRange evalPos = rewriter.create<func::CallOp>(loc, shiftedFn, callArgs).getResults();
 
     callArgs[callArgs.size() - 2] = shiftVectorNeg;
-    ValueRange evalNeg =
-        rewriter.create<func::CallOp>(loc, shiftedFn, callArgs).getResults();
+    ValueRange evalNeg = rewriter.create<func::CallOp>(loc, shiftedFn, callArgs).getResults();
 
     std::vector<Value> derivatives;
     derivatives.reserve(evalPos.size());
 
     for (size_t i = 0; i < evalPos.size(); i++) {
-        Value diff =
-            rewriter.create<arith::SubFOp>(loc, evalPos[i], evalNeg[i]);
-        Value divisor = rewriter.create<arith::ConstantOp>(
-            loc, rewriter.getF64FloatAttr(2.0));
+        Value diff = rewriter.create<arith::SubFOp>(loc, evalPos[i], evalNeg[i]);
+        Value divisor = rewriter.create<arith::ConstantOp>(loc, rewriter.getF64FloatAttr(2.0));
         if (auto tensorType = evalPos[i].getType().dyn_cast<TensorType>())
-            divisor =
-                rewriter.create<tensor::SplatOp>(loc, divisor, tensorType);
-        derivatives.push_back(
-            rewriter.create<arith::DivFOp>(loc, diff, divisor));
+            divisor = rewriter.create<tensor::SplatOp>(loc, divisor, tensorType);
+        derivatives.push_back(rewriter.create<arith::DivFOp>(loc, diff, divisor));
     }
 
     return derivatives;
@@ -112,8 +99,7 @@ computePartialDerivative(PatternRewriter &rewriter, Location loc,
 
 /// Store a partial derivative in the gradient buffer at the next index.
 static void storePartialDerivative(PatternRewriter &rewriter, Location loc,
-                                   ValueRange gradientBuffers,
-                                   Value gradientsProcessed,
+                                   ValueRange gradientBuffers, Value gradientsProcessed,
                                    ValueRange derivatives) {
     Value gradIdx = rewriter.create<memref::LoadOp>(loc, gradientsProcessed);
 
@@ -122,8 +108,7 @@ static void storePartialDerivative(PatternRewriter &rewriter, Location loc,
         Value derivative = derivatives[i];
         bool isDerivativeTensor = derivative.getType().isa<TensorType>();
         bool isDerivativeScalarTensor =
-            isDerivativeTensor &&
-            derivative.getType().cast<TensorType>().getRank() == 0;
+            isDerivativeTensor && derivative.getType().cast<TensorType>().getRank() == 0;
         if (isDerivativeTensor && !isDerivativeScalarTensor) {
             // In the case of tensor return values, we have to do some extra
             // work to extract a view of the gradient buffer corresponding to a
@@ -146,8 +131,7 @@ static void storePartialDerivative(PatternRewriter &rewriter, Location loc,
             // Note that dynamic values for these arrays are specifically marked
             // (with kDynamic) and need to be provided separately as SSA values
             // (e.g. from a tensor.dim op).
-            MemRefType gradientBufferType =
-                gradientBuffer.getType().cast<MemRefType>();
+            MemRefType gradientBufferType = gradientBuffer.getType().cast<MemRefType>();
             int64_t rank = gradientBufferType.getRank();
 
             std::vector<int64_t> sizes = gradientBufferType.getShape();
@@ -156,8 +140,7 @@ static void storePartialDerivative(PatternRewriter &rewriter, Location loc,
             for (int64_t dim = 1; dim < rank; dim++) {
                 if (sizes[dim] == ShapedType::kDynamic) {
                     Value idx = rewriter.create<index::ConstantOp>(loc, dim);
-                    Value dimSize = rewriter.create<tensor::DimOp>(
-                        loc, gradientBuffer, idx);
+                    Value dimSize = rewriter.create<tensor::DimOp>(loc, gradientBuffer, idx);
                     dynSizes.push_back(dimSize);
                 }
             }
@@ -170,21 +153,17 @@ static void storePartialDerivative(PatternRewriter &rewriter, Location loc,
             std::vector<Value> dynStrides = {};
 
             Type resultType = memref::SubViewOp::inferRankReducedResultType(
-                gradientBufferType.getShape().drop_front(), gradientBufferType,
-                offsets, sizes, strides);
-            Value gradientSubview = rewriter.create<memref::SubViewOp>(
-                loc, resultType, gradientBuffer, dynOffsets, dynSizes,
-                dynStrides, offsets, sizes, strides);
-            rewriter.create<memref::TensorStoreOp>(loc, derivative,
-                                                   gradientSubview);
+                gradientBufferType.getShape().drop_front(), gradientBufferType, offsets, sizes,
+                strides);
+            Value gradientSubview =
+                rewriter.create<memref::SubViewOp>(loc, resultType, gradientBuffer, dynOffsets,
+                                                   dynSizes, dynStrides, offsets, sizes, strides);
+            rewriter.create<memref::TensorStoreOp>(loc, derivative, gradientSubview);
         } else if (isDerivativeScalarTensor) {
-            Value extracted =
-                rewriter.create<tensor::ExtractOp>(loc, derivative);
-            rewriter.create<memref::StoreOp>(loc, extracted, gradientBuffer,
-                                             gradIdx);
+            Value extracted = rewriter.create<tensor::ExtractOp>(loc, derivative);
+            rewriter.create<memref::StoreOp>(loc, extracted, gradientBuffer, gradIdx);
         } else {
-            rewriter.create<memref::StoreOp>(loc, derivative, gradientBuffer,
-                                             gradIdx);
+            rewriter.create<memref::StoreOp>(loc, derivative, gradientBuffer, gradIdx);
         }
     }
 
@@ -193,9 +172,10 @@ static void storePartialDerivative(PatternRewriter &rewriter, Location loc,
     rewriter.create<memref::StoreOp>(loc, newGradIdx, gradientsProcessed);
 }
 
-func::FuncOp ParameterShiftLowering::genQGradFunction(
-    PatternRewriter &rewriter, Location loc, func::FuncOp callee,
-    func::FuncOp shiftedFn, const int64_t numShifts, const int64_t loopDepth) {
+func::FuncOp ParameterShiftLowering::genQGradFunction(PatternRewriter &rewriter, Location loc,
+                                                      func::FuncOp callee, func::FuncOp shiftedFn,
+                                                      const int64_t numShifts,
+                                                      const int64_t loopDepth) {
     // Define the properties of the quantum gradient function. The shape of the
     // returned gradient is unknown as the number of gate parameters in the
     // unrolled circuit is only determined at run time. The dynamic size is an
@@ -209,23 +189,20 @@ func::FuncOp ParameterShiftLowering::genQGradFunction(
     StringAttr visibility = rewriter.getStringAttr("private");
 
     func::FuncOp gradientFn =
-        SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
-            callee, rewriter.getStringAttr(fnName));
+        SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(callee, rewriter.getStringAttr(fnName));
     if (!gradientFn) {
         PatternRewriter::InsertionGuard insertGuard(rewriter);
 
-        gradientFn = rewriter.create<func::FuncOp>(
-            loc, fnName, fnType, visibility, nullptr, nullptr);
+        gradientFn =
+            rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility, nullptr, nullptr);
 
         // First copy the entire function as is, then we can modify it to
         // compute the gradient.
-        rewriter.cloneRegionBefore(callee.getBody(), gradientFn.getBody(),
-                                   gradientFn.end());
+        rewriter.cloneRegionBefore(callee.getBody(), gradientFn.getBody(), gradientFn.end());
 
         const std::vector<Value> callArgs(gradientFn.getArguments().begin(),
                                           gradientFn.getArguments().end());
-        Value gradientSize =
-            gradientFn.getBlocks().front().addArgument(gradientSizeType, loc);
+        Value gradientSize = gradientFn.getBlocks().front().addArgument(gradientSizeType, loc);
 
         // Allocate the memory for the selector and gradient vectors and define
         // some constants. All shift vectors will be created as constants
@@ -236,8 +213,7 @@ func::FuncOp ParameterShiftLowering::genQGradFunction(
         std::vector<Value> gradientBuffers;
         gradientBuffers.reserve(gradResTypes.size());
         Value gradientsProcessed;
-        MemRefType selectorBufferType =
-            MemRefType::get({loopDepth}, rewriter.getIndexType());
+        MemRefType selectorBufferType = MemRefType::get({loopDepth}, rewriter.getIndexType());
         {
             PatternRewriter::InsertionGuard insertGuard(rewriter);
             rewriter.setInsertionPointToStart(&gradientFn.getBody().front());
@@ -247,8 +223,7 @@ func::FuncOp ParameterShiftLowering::genQGradFunction(
 
             // Use stack allocation for selector vector as it's not expected to
             // be too big.
-            selectorBuffer =
-                rewriter.create<memref::AllocaOp>(loc, selectorBufferType);
+            selectorBuffer = rewriter.create<memref::AllocaOp>(loc, selectorBufferType);
 
             gradientsProcessed = rewriter.create<memref::AllocaOp>(
                 loc, MemRefType::get({}, rewriter.getIndexType()));
@@ -256,12 +231,12 @@ func::FuncOp ParameterShiftLowering::genQGradFunction(
 
             for (Type gradType : gradResTypes) {
                 TensorType gradTensorType = gradType.cast<TensorType>();
-                MemRefType gradBufferType = MemRefType::get(
-                    gradTensorType.getShape(), gradTensorType.getElementType());
+                MemRefType gradBufferType =
+                    MemRefType::get(gradTensorType.getShape(), gradTensorType.getElementType());
 
                 // TODO: add support for dynamic result dimensions
-                gradientBuffers.push_back(rewriter.create<memref::AllocOp>(
-                    loc, gradBufferType, gradientSize));
+                gradientBuffers.push_back(
+                    rewriter.create<memref::AllocOp>(loc, gradBufferType, gradientSize));
             }
         }
 
@@ -281,26 +256,22 @@ func::FuncOp ParameterShiftLowering::genQGradFunction(
 
                 size_t numParams = gate.getDiffParams().size();
                 if (numParams) {
-                    updateSelectorVector(rewriter, loc, selectorsToStore,
-                                         selectorBuffer);
+                    updateSelectorVector(rewriter, loc, selectorsToStore, selectorBuffer);
 
                     for (size_t _ = 0; _ < numParams; _++) {
                         const std::vector<Value> &derivatives =
-                            computePartialDerivative(
-                                rewriter, loc, numShifts, currentShift++,
-                                selectorBuffer, shiftedFn, callArgs);
-                        storePartialDerivative(rewriter, loc, gradientBuffers,
-                                               gradientsProcessed, derivatives);
+                            computePartialDerivative(rewriter, loc, numShifts, currentShift++,
+                                                     selectorBuffer, shiftedFn, callArgs);
+                        storePartialDerivative(rewriter, loc, gradientBuffers, gradientsProcessed,
+                                               derivatives);
                     }
                 }
-            } else if (isa<scf::YieldOp>(op) &&
-                       isa<scf::ForOp>(op->getParentOp())) {
+            } else if (isa<scf::YieldOp>(op) && isa<scf::ForOp>(op->getParentOp())) {
                 // In case there were no gate parameters in this for loop we
                 // need to pop the current iteration variable so it's not
                 // written to memory at the next gate.
                 scf::ForOp forOp = cast<scf::ForOp>(op->getParentOp());
-                if (!selectorsToStore.empty() &&
-                    selectorsToStore.back().first == forOp) {
+                if (!selectorsToStore.empty() && selectorsToStore.back().first == forOp) {
                     selectorsToStore.pop_back();
                 }
                 loopLevel--;
@@ -312,8 +283,7 @@ func::FuncOp ParameterShiftLowering::genQGradFunction(
                 gradientTensors.reserve(gradResTypes.size());
                 for (Value gradientBuffer : gradientBuffers) {
                     gradientTensors.push_back(
-                        rewriter.create<bufferization::ToTensorOp>(
-                            loc, gradientBuffer));
+                        rewriter.create<bufferization::ToTensorOp>(loc, gradientBuffer));
                 }
                 op->setOperands(gradientTensors);
             }

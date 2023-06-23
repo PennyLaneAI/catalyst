@@ -31,12 +31,10 @@ class BufferizeAdjointOp : public OpConversionPattern<AdjointOp> {
   public:
     using OpConversionPattern::OpConversionPattern;
 
-    LogicalResult
-    matchAndRewrite(AdjointOp op, OpAdaptor adaptor,
-                    ConversionPatternRewriter &rewriter) const override {
+    LogicalResult matchAndRewrite(AdjointOp op, OpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override {
         SmallVector<Type> resTypes;
-        if (failed(getTypeConverter()->convertTypes(op.getResultTypes(),
-                                                    resTypes)))
+        if (failed(getTypeConverter()->convertTypes(op.getResultTypes(), resTypes)))
             return failure();
 
         Location loc = op.getLoc();
@@ -44,14 +42,12 @@ class BufferizeAdjointOp : public OpConversionPattern<AdjointOp> {
         SmallVector<Value> memrefValues;
         for (Type resType : resTypes) {
             MemRefType memrefType = resType.cast<MemRefType>();
-            Value memrefValue =
-                rewriter.create<memref::AllocOp>(loc, memrefType, gradSize);
+            Value memrefValue = rewriter.create<memref::AllocOp>(loc, memrefType, gradSize);
             memrefValues.push_back(memrefValue);
         }
 
-        rewriter.create<AdjointOp>(loc, TypeRange{}, op.getCalleeAttr(),
-                                   adaptor.getGradSize(), adaptor.getArgs(),
-                                   memrefValues);
+        rewriter.create<AdjointOp>(loc, TypeRange{}, op.getCalleeAttr(), adaptor.getGradSize(),
+                                   adaptor.getArgs(), memrefValues);
         rewriter.replaceOp(op, memrefValues);
         return success();
     }
@@ -61,12 +57,10 @@ class BufferizeBackpropOp : public OpConversionPattern<BackpropOp> {
   public:
     using OpConversionPattern::OpConversionPattern;
 
-    LogicalResult
-    matchAndRewrite(BackpropOp op, OpAdaptor adaptor,
-                    ConversionPatternRewriter &rewriter) const override {
+    LogicalResult matchAndRewrite(BackpropOp op, OpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override {
         SmallVector<Type> resTypes;
-        if (failed(getTypeConverter()->convertTypes(op.getResultTypes(),
-                                                    resTypes)))
+        if (failed(getTypeConverter()->convertTypes(op.getResultTypes(), resTypes)))
             return failure();
 
         Location loc = op.getLoc();
@@ -98,17 +92,16 @@ class BufferizeBackpropOp : public OpConversionPattern<BackpropOp> {
             MemRefType memrefType = resType.cast<MemRefType>();
             Value memrefValue;
             if (!dynamicDimSizes.empty()) {
-                memrefValue = rewriter.create<memref::AllocOp>(loc, memrefType,
-                                                               dynamicDimSizes);
+                memrefValue = rewriter.create<memref::AllocOp>(loc, memrefType, dynamicDimSizes);
             } else {
                 memrefValue = rewriter.create<memref::AllocOp>(loc, memrefType);
             }
             memrefValues.push_back(memrefValue);
         }
 
-        rewriter.create<BackpropOp>(
-            loc, TypeRange{}, op.getCalleeAttr(), adaptor.getDiffArgIndices(),
-            adaptor.getArgs(), adaptor.getQuantumJacobian(), memrefValues);
+        rewriter.create<BackpropOp>(loc, TypeRange{}, op.getCalleeAttr(),
+                                    adaptor.getDiffArgIndices(), adaptor.getArgs(),
+                                    adaptor.getQuantumJacobian(), memrefValues);
         rewriter.replaceOp(op, memrefValues);
         return success();
     }
@@ -119,8 +112,7 @@ class BufferizeBackpropOp : public OpConversionPattern<BackpropOp> {
 namespace catalyst {
 namespace gradient {
 
-void populateBufferizationPatterns(TypeConverter &typeConverter,
-                                   RewritePatternSet &patterns) {
+void populateBufferizationPatterns(TypeConverter &typeConverter, RewritePatternSet &patterns) {
     patterns.add<BufferizeAdjointOp>(typeConverter, patterns.getContext());
     patterns.add<BufferizeBackpropOp>(typeConverter, patterns.getContext());
 }

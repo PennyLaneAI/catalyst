@@ -32,8 +32,7 @@ namespace quantum {
 #define GEN_PASS_DEF_QUANTUMBUFFERIZATIONPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
-struct QuantumBufferizationPass
-    : impl::QuantumBufferizationPassBase<QuantumBufferizationPass> {
+struct QuantumBufferizationPass : impl::QuantumBufferizationPassBase<QuantumBufferizationPass> {
     using QuantumBufferizationPassBase::QuantumBufferizationPassBase;
 
     void runOnOperation() final {
@@ -47,8 +46,7 @@ struct QuantumBufferizationPass
         bufferization::populateBufferizeMaterializationLegality(target);
         populateBufferizationLegality(typeConverter, target);
 
-        if (failed(applyPartialConversion(getOperation(), target,
-                                          std::move(patterns)))) {
+        if (failed(applyPartialConversion(getOperation(), target, std::move(patterns)))) {
             signalPassFailure();
         }
     }

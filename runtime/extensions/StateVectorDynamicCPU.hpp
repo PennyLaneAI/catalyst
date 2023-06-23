@@ -36,24 +36,19 @@ namespace Pennylane {
  *
  */
 template <class PrecisionT = double>
-class StateVectorDynamicCPU
-    : public StateVectorCPU<PrecisionT, StateVectorDynamicCPU<PrecisionT>> {
+class StateVectorDynamicCPU : public StateVectorCPU<PrecisionT, StateVectorDynamicCPU<PrecisionT>> {
   public:
-    using BaseType =
-        StateVectorCPU<PrecisionT, StateVectorDynamicCPU<PrecisionT>>;
+    using BaseType = StateVectorCPU<PrecisionT, StateVectorDynamicCPU<PrecisionT>>;
 
     using ComplexPrecisionT = std::complex<PrecisionT>;
 
   private:
-    std::vector<ComplexPrecisionT, Util::AlignedAllocator<ComplexPrecisionT>>
-        data_;
+    std::vector<ComplexPrecisionT, Util::AlignedAllocator<ComplexPrecisionT>> data_;
 
-    static constexpr PrecisionT epsilon_ =
-        std::numeric_limits<PrecisionT>::epsilon() * 100;
+    static constexpr PrecisionT epsilon_ = std::numeric_limits<PrecisionT>::epsilon() * 100;
 
     template <class IIter, class OIter>
-    inline OIter _move_data_elements(IIter first, size_t distance,
-                                     OIter second) {
+    inline OIter _move_data_elements(IIter first, size_t distance, OIter second) {
         *second++ = std::move(*first);
         for (size_t i = 1; i < distance; i++) {
             *second++ = std::move(*++first);
@@ -62,8 +57,7 @@ class StateVectorDynamicCPU
     }
 
     template <class IIter, class OIter>
-    inline OIter _shallow_move_data_elements(IIter first, size_t distance,
-                                             OIter second) {
+    inline OIter _shallow_move_data_elements(IIter first, size_t distance, OIter second) {
         for (size_t i = 0; i < distance; i++) {
             *second++ = std::move(*first);
             *first = Util::ZERO<PrecisionT>();
@@ -73,20 +67,16 @@ class StateVectorDynamicCPU
     }
 
     inline void _scalar_mul_data(
-        std::vector<ComplexPrecisionT,
-                    Util::AlignedAllocator<ComplexPrecisionT>> &data,
+        std::vector<ComplexPrecisionT, Util::AlignedAllocator<ComplexPrecisionT>> &data,
         ComplexPrecisionT scalar) {
-        std::transform(
-            data.begin(), data.end(), data.begin(),
-            [scalar](const ComplexPrecisionT &elem) { return elem * scalar; });
+        std::transform(data.begin(), data.end(), data.begin(),
+                       [scalar](const ComplexPrecisionT &elem) { return elem * scalar; });
     }
 
     inline void _normalize_data(
-        std::vector<ComplexPrecisionT,
-                    Util::AlignedAllocator<ComplexPrecisionT>> &data) {
-        _scalar_mul_data(
-            data, Util::ONE<PrecisionT>() /
-                      std::sqrt(Util::squaredNorm(data.data(), data.size())));
+        std::vector<ComplexPrecisionT, Util::AlignedAllocator<ComplexPrecisionT>> &data) {
+        _scalar_mul_data(data, Util::ONE<PrecisionT>() /
+                                   std::sqrt(Util::squaredNorm(data.data(), data.size())));
     }
 
   public:
@@ -97,9 +87,8 @@ class StateVectorDynamicCPU
      * @param threading Threading option the statevector to use
      * @param memory_model Memory model the statevector will use
      */
-    explicit StateVectorDynamicCPU(
-        size_t num_qubits, Threading threading = Threading::SingleThread,
-        CPUMemoryModel memory_model = bestCPUMemoryModel())
+    explicit StateVectorDynamicCPU(size_t num_qubits, Threading threading = Threading::SingleThread,
+                                   CPUMemoryModel memory_model = bestCPUMemoryModel())
         : BaseType{num_qubits, threading, memory_model},
           data_{Util::exp2(num_qubits), Util::ZERO<PrecisionT>(),
                 getAllocator<ComplexPrecisionT>( // LCOV_EXCL_LINE
@@ -115,10 +104,8 @@ class StateVectorDynamicCPU
      * @param other Another statevector to construct the statevector from
      */
     template <class OtherDerived>
-    explicit StateVectorDynamicCPU(
-        const StateVectorCPU<PrecisionT, OtherDerived> &other)
-        : BaseType(other.getNumQubits(), other.threading(),
-                   other.memoryModel()),
+    explicit StateVectorDynamicCPU(const StateVectorCPU<PrecisionT, OtherDerived> &other)
+        : BaseType(other.getNumQubits(), other.threading(), other.memoryModel()),
           data_{other.getData(), other.getData() + other.getLength(),
                 getAllocator<ComplexPrecisionT>(this->memory_model_)} {}
 
@@ -130,8 +117,7 @@ class StateVectorDynamicCPU
      * @param threading Threading option the statevector to use
      * @param memory_model Memory model the statevector will use
      */
-    StateVectorDynamicCPU(const ComplexPrecisionT *other_data,
-                          size_t other_size,
+    StateVectorDynamicCPU(const ComplexPrecisionT *other_data, size_t other_size,
                           Threading threading = Threading::SingleThread,
                           CPUMemoryModel memory_model = bestCPUMemoryModel())
         : BaseType(Util::log2PerfectPower(other_size), threading, memory_model),
@@ -151,19 +137,16 @@ class StateVectorDynamicCPU
      * @param memory_model Memory model the statevector will use
      */
     template <class Alloc>
-    explicit StateVectorDynamicCPU(
-        const std::vector<std::complex<PrecisionT>, Alloc> &other,
-        Threading threading = Threading::SingleThread,
-        CPUMemoryModel memory_model = bestCPUMemoryModel())
-        : StateVectorDynamicCPU(other.data(), other.size(), threading,
-                                memory_model) {}
+    explicit StateVectorDynamicCPU(const std::vector<std::complex<PrecisionT>, Alloc> &other,
+                                   Threading threading = Threading::SingleThread,
+                                   CPUMemoryModel memory_model = bestCPUMemoryModel())
+        : StateVectorDynamicCPU(other.data(), other.size(), threading, memory_model) {}
 
     StateVectorDynamicCPU(const StateVectorDynamicCPU &rhs) = default;
     StateVectorDynamicCPU(StateVectorDynamicCPU &&) noexcept = default;
 
     StateVectorDynamicCPU &operator=(const StateVectorDynamicCPU &) = default;
-    StateVectorDynamicCPU &
-    operator=(StateVectorDynamicCPU &&) noexcept = default;
+    StateVectorDynamicCPU &operator=(StateVectorDynamicCPU &&) noexcept = default;
 
     ~StateVectorDynamicCPU() = default;
 
@@ -173,20 +156,14 @@ class StateVectorDynamicCPU
      * @tparam Alloc Allocator type of std::vector to use for updating data.
      * @param new_data std::vector contains data.
      */
-    template <class Alloc>
-    void updateData(const std::vector<ComplexPrecisionT, Alloc> &new_data) {
+    template <class Alloc> void updateData(const std::vector<ComplexPrecisionT, Alloc> &new_data) {
         assert(data_.size() == new_data.size());
-        std::copy(new_data.data(), new_data.data() + new_data.size(),
-                  data_.data());
+        std::copy(new_data.data(), new_data.data() + new_data.size(), data_.data());
     }
 
-    Util::AlignedAllocator<ComplexPrecisionT> allocator() const {
-        return data_.get_allocator();
-    }
+    Util::AlignedAllocator<ComplexPrecisionT> allocator() const { return data_.get_allocator(); }
 
-    [[nodiscard]] auto isValidWire(size_t wire) -> bool {
-        return wire < this->getNumQubits();
-    }
+    [[nodiscard]] auto isValidWire(size_t wire) -> bool { return wire < this->getNumQubits(); }
 
     /**
      * @brief Compute the purity of the system after releasing (a qubit) `wire`.
@@ -199,8 +176,7 @@ class StateVectorDynamicCPU
      * @return ComplexPrecisionT
      */
     auto getSubsystemPurity(size_t wire) -> ComplexPrecisionT {
-        PL_ABORT_IF_NOT(isValidWire(wire),
-                        "Invalid wire: The wire must be in the range of wires");
+        PL_ABORT_IF_NOT(isValidWire(wire), "Invalid wire: The wire must be in the range of wires");
 
         const size_t sv_size = data_.size();
 
@@ -219,9 +195,8 @@ class StateVectorDynamicCPU
             for (uint8_t j = 0; j < 2; j++) {
                 ComplexPrecisionT sum{0, 0};
                 for (size_t k = 0; k < (sv_size / 2); k++) {
-                    size_t idx_wire_0 =
-                        (/* upper_bits: */ (upper_mask & k) << 1UL) +
-                        /* lower_bits: */ (lower_mask & k);
+                    size_t idx_wire_0 = (/* upper_bits: */ (upper_mask & k) << 1UL) +
+                                        /* lower_bits: */ (lower_mask & k);
                     size_t idx_i = idx_wire_0 + (i << wire);
                     size_t idx_j = idx_wire_0 + (j << wire);
 
@@ -235,8 +210,7 @@ class StateVectorDynamicCPU
         }
 
         // Compute/Return the trace of rho**2
-        return (rho[0] * rho[0]) + (ComplexPrecisionT{2, 0} * rho[1] * rho[2]) +
-               (rho[3] * rho[3]);
+        return (rho[0] * rho[0]) + (ComplexPrecisionT{2, 0} * rho[1] * rho[2]) + (rho[3] * rho[3]);
     }
 
     /**
@@ -246,8 +220,7 @@ class StateVectorDynamicCPU
      * @param eps The comparing precision threshold.
      * @return bool
      */
-    [[nodiscard]] auto checkSubsystemPurity(size_t wire, double eps = epsilon_)
-        -> bool {
+    [[nodiscard]] auto checkSubsystemPurity(size_t wire, double eps = epsilon_) -> bool {
         ComplexPrecisionT purity = getSubsystemPurity(wire);
         return (std::abs(1.0 - purity.real()) < eps) && (purity.imag() < eps);
     }
@@ -280,10 +253,9 @@ class StateVectorDynamicCPU
      * @param wire Index of the wire to be released
      */
     void releaseWire(size_t wire) {
-        PL_ABORT_IF_NOT(
-            checkSubsystemPurity(wire),
-            "Invalid wire: "
-            "The state-vector must remain pure after releasing a wire")
+        PL_ABORT_IF_NOT(checkSubsystemPurity(wire),
+                        "Invalid wire: "
+                        "The state-vector must remain pure after releasing a wire")
 
         const size_t distance = 1UL << wire;
 
@@ -291,13 +263,10 @@ class StateVectorDynamicCPU
 
         // Check if the reduced state-vector is the first-half
         bool is_first_half = false;
-        for (auto src = dst; src < data_.end();
-             std::advance(src, 2 * distance)) {
+        for (auto src = dst; src < data_.end(); std::advance(src, 2 * distance)) {
             is_first_half =
                 std::any_of(src, src + static_cast<long long>(distance),
-                            [](ComplexPrecisionT &e) {
-                                return e != Util::ZERO<PrecisionT>();
-                            });
+                            [](ComplexPrecisionT &e) { return e != Util::ZERO<PrecisionT>(); });
             if (is_first_half) {
                 break;
             }
@@ -308,8 +277,7 @@ class StateVectorDynamicCPU
             std::advance(src, distance);
         }
 
-        for (; src < data_.end();
-             std::advance(src, 2 * distance), std::advance(dst, distance)) {
+        for (; src < data_.end(); std::advance(src, 2 * distance), std::advance(dst, distance)) {
             _move_data_elements(src, distance, dst);
         }
         data_.resize(data_.size() / 2);
@@ -338,16 +306,13 @@ class StateVectorDynamicCPU
     /**
      * @brief Get underlying C-style data of the state-vector.
      */
-    [[nodiscard]] auto getData() const -> const ComplexPrecisionT * {
-        return data_.data();
-    }
+    [[nodiscard]] auto getData() const -> const ComplexPrecisionT * { return data_.data(); }
 
     /**
      * @brief Get underlying data vector.
      */
     [[nodiscard]] auto getDataVector()
-        -> std::vector<ComplexPrecisionT,
-                       Util::AlignedAllocator<ComplexPrecisionT>> & {
+        -> std::vector<ComplexPrecisionT, Util::AlignedAllocator<ComplexPrecisionT>> & {
         return data_;
     }
 
@@ -355,8 +320,7 @@ class StateVectorDynamicCPU
      * @brief Get underlying data vector.
      */
     [[nodiscard]] auto getDataVector() const
-        -> const std::vector<ComplexPrecisionT,
-                             Util::AlignedAllocator<ComplexPrecisionT>> & {
+        -> const std::vector<ComplexPrecisionT, Util::AlignedAllocator<ComplexPrecisionT>> & {
         return data_;
     }
 };

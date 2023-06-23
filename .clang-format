@@ -1,4 +1,7 @@
 BasedOnStyle: LLVM
+AccessModifierOffset: -2
 BreakBeforeBraces: Attach
-IndentWidth: 4
+ColumnLimit: 100
+FixNamespaceComments: true
 IndentPPDirectives: None
+IndentWidth: 4

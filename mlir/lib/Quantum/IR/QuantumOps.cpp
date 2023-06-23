@@ -42,10 +42,8 @@ Optional<Operation *> AllocOp::buildDealloc(OpBuilder &builder, Value alloc) {
 // Quantum op canonicalizers.
 //===----------------------------------------------------------------------===//
 
-LogicalResult DeallocOp::canonicalize(DeallocOp dealloc,
-                                      mlir::PatternRewriter &rewriter) {
-    if (auto alloc =
-            dyn_cast_if_present<AllocOp>(dealloc.getQreg().getDefiningOp())) {
+LogicalResult DeallocOp::canonicalize(DeallocOp dealloc, mlir::PatternRewriter &rewriter) {
+    if (auto alloc = dyn_cast_if_present<AllocOp>(dealloc.getQreg().getDefiningOp())) {
         if (dealloc.getQreg().hasOneUse()) {
             rewriter.eraseOp(dealloc);
             rewriter.eraseOp(alloc);
@@ -56,8 +54,7 @@ LogicalResult DeallocOp::canonicalize(DeallocOp dealloc,
     return failure();
 }
 
-template <typename IndexingOp>
-LogicalResult foldConstantIndexingOp(IndexingOp op, Attribute idx) {
+template <typename IndexingOp> LogicalResult foldConstantIndexingOp(IndexingOp op, Attribute idx) {
     // Prefer using an attribute when the index is constant.
     bool hasNoIdxAttr = !op.getIdxAttr().has_value();
     bool isConstantIdx = isa_and_nonnull<IntegerAttr>(idx);
@@ -80,18 +77,12 @@ OpFoldResult ExtractOp::fold(FoldAdaptor adaptor) {
     return nullptr;
 }
 
-LogicalResult InsertOp::canonicalize(InsertOp insert,
-                                     mlir::PatternRewriter &rewriter) {
-    if (auto extract =
-            dyn_cast_if_present<ExtractOp>(insert.getQubit().getDefiningOp())) {
-        bool bothStatic =
-            extract.getIdxAttr().has_value() && insert.getIdxAttr().has_value();
-        bool bothDynamic = !extract.getIdxAttr().has_value() &&
-                           !insert.getIdxAttr().has_value();
-        bool staticallyEqual =
-            bothStatic && extract.getIdxAttrAttr() == insert.getIdxAttrAttr();
-        bool dynamicallyEqual =
-            bothDynamic && extract.getIdx() == insert.getIdx();
+LogicalResult InsertOp::canonicalize(InsertOp insert, mlir::PatternRewriter &rewriter) {
+    if (auto extract = dyn_cast_if_present<ExtractOp>(insert.getQubit().getDefiningOp())) {
+        bool bothStatic = extract.getIdxAttr().has_value() && insert.getIdxAttr().has_value();
+        bool bothDynamic = !extract.getIdxAttr().has_value() && !insert.getIdxAttr().has_value();
+        bool staticallyEqual = bothStatic && extract.getIdxAttrAttr() == insert.getIdxAttrAttr();
+        bool dynamicallyEqual = bothDynamic && extract.getIdx() == insert.getIdx();
 
         if (staticallyEqual || dynamicallyEqual) {
             rewriter.replaceOp(insert, extract.getQreg());
@@ -133,10 +124,8 @@ static LogicalResult verifyObservable(Value obs, size_t *numQubits) {
     if (auto compOp = obs.getDefiningOp<ComputationalBasisOp>()) {
         *numQubits = compOp.getQubits().size();
         return success();
-    } else if (obs.getDefiningOp<NamedObsOp>() ||
-               obs.getDefiningOp<HermitianOp>() ||
-               obs.getDefiningOp<TensorOp>() ||
-               obs.getDefiningOp<HamiltonianOp>()) {
+    } else if (obs.getDefiningOp<NamedObsOp>() || obs.getDefiningOp<HermitianOp>() ||
+               obs.getDefiningOp<TensorOp>() || obs.getDefiningOp<HamiltonianOp>()) {
         return success();
     }
 
@@ -153,8 +142,7 @@ static LogicalResult verifyTensorResult(Type ty, int64_t length) {
     return success();
 }
 
-static LogicalResult verifyTensorResult(Type ty, int64_t length0,
-                                        int64_t length1) {
+static LogicalResult verifyTensorResult(Type ty, int64_t length0, int64_t length1) {
     ShapedType tensor = ty.cast<ShapedType>();
     if (!tensor.hasStaticShape() || tensor.getShape().size() != 2 ||
         tensor.getShape()[0] != length0 || tensor.getShape()[1] != length1) {
@@ -168,8 +156,7 @@ static LogicalResult verifyTensorResult(Type ty, int64_t length0,
 
 LogicalResult QubitUnitaryOp::verify() {
     size_t dim = std::pow(2, getInQubits().size());
-    if (failed(verifyTensorResult(getMatrix().getType().cast<ShapedType>(), dim,
-                                  dim))) {
+    if (failed(verifyTensorResult(getMatrix().getType().cast<ShapedType>(), dim, dim))) {
         return emitOpError("The Unitary matrix must be of size 2^(num_qubits) "
                            "* 2^(num_qubits)");
     }
@@ -181,8 +168,7 @@ LogicalResult QubitUnitaryOp::verify() {
 
 LogicalResult HermitianOp::verify() {
     size_t dim = std::pow(2, getQubits().size());
-    if (failed(verifyTensorResult(getMatrix().getType().cast<ShapedType>(), dim,
-                                  dim)))
+    if (failed(verifyTensorResult(getMatrix().getType().cast<ShapedType>(), dim, dim)))
         return emitOpError("The Hermitian matrix must be of size "
                            "2^(num_qubits) * 2^(num_qubits)");
 
@@ -200,8 +186,7 @@ LogicalResult SampleOp::verify() {
                            "used as inputs");
     }
 
-    Type toVerify =
-        getSamples() ? getSamples().getType() : getInData().getType();
+    Type toVerify = getSamples() ? getSamples().getType() : getInData().getType();
     if (getObs().getDefiningOp<ComputationalBasisOp>() &&
         failed(verifyTensorResult(toVerify, getShots(), numQubits))) {
         // In the computational basis, Pennylane adds a second dimension for the
@@ -245,15 +230,13 @@ LogicalResult CountsOp::verify() {
                            "used as inputs");
     }
 
-    Type eigvalsToVerify = getEigvals() ? (Type)getEigvals().getType()
-                                        : (Type)getInEigvals().getType();
-    Type countsToVerify = getCounts() ? (Type)getCounts().getType()
-                                      : (Type)getInCounts().getType();
+    Type eigvalsToVerify =
+        getEigvals() ? (Type)getEigvals().getType() : (Type)getInEigvals().getType();
+    Type countsToVerify = getCounts() ? (Type)getCounts().getType() : (Type)getInCounts().getType();
 
     if (failed(verifyTensorResult(eigvalsToVerify, numEigvals)) ||
         failed(verifyTensorResult(countsToVerify, numEigvals))) {
-        return emitOpError(
-            "number of eigenvalues or counts did not match observable");
+        return emitOpError("number of eigenvalues or counts did not match observable");
     }
 
     return success();
@@ -266,8 +249,7 @@ LogicalResult ProbsOp::verify() {
     }
 
     if (!numQubits) {
-        return emitOpError(
-            "only computational basis observables are supported");
+        return emitOpError("only computational basis observables are supported");
     }
 
     if (!(bool)getProbabilities() ^ (bool)getStateIn()) {
@@ -275,8 +257,8 @@ LogicalResult ProbsOp::verify() {
                            "used as inputs");
     }
 
-    Type toVerify = getProbabilities() ? (Type)getProbabilities().getType()
-                                       : (Type)getStateIn().getType();
+    Type toVerify =
+        getProbabilities() ? (Type)getProbabilities().getType() : (Type)getStateIn().getType();
     size_t dim = std::pow(2, numQubits);
     if (failed(verifyTensorResult(toVerify.cast<ShapedType>(), dim))) {
         return emitOpError("return tensor must have static length equal to "
@@ -293,8 +275,7 @@ LogicalResult StateOp::verify() {
     }
 
     if (!numQubits) {
-        return emitOpError(
-            "only computational basis observables are supported");
+        return emitOpError("only computational basis observables are supported");
     }
 
     if (!(bool)getState() ^ (bool)getStateIn()) {
@@ -302,8 +283,7 @@ LogicalResult StateOp::verify() {
                            "used as inputs");
     }
 
-    Type toVerify =
-        getState() ? (Type)getState().getType() : (Type)getStateIn().getType();
+    Type toVerify = getState() ? (Type)getState().getType() : (Type)getStateIn().getType();
     size_t dim = std::pow(2, numQubits);
     if (failed(verifyTensorResult(toVerify.cast<ShapedType>(), dim))) {
         return emitOpError("return tensor must have static length equal to "

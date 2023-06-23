@@ -33,7 +33,7 @@ namespace catalyst {
 mlir::Value einsumLinalgGeneric(mlir::OpBuilder &builder, mlir::Location loc,
                                 llvm::ArrayRef<size_t> axisCodesA,
                                 llvm::ArrayRef<size_t> axisCodesB,
-                                llvm::ArrayRef<size_t> axisCodesResult,
-                                mlir::Value a, mlir::Value b);
+                                llvm::ArrayRef<size_t> axisCodesResult, mlir::Value a,
+                                mlir::Value b);
 
 } // namespace catalyst

@@ -20,12 +20,9 @@
 namespace catalyst {
 namespace quantum {
 
-void populateBufferizationLegality(mlir::TypeConverter &,
-                                   mlir::ConversionTarget &);
-void populateBufferizationPatterns(mlir::TypeConverter &,
-                                   mlir::RewritePatternSet &);
-void populateQIRConversionPatterns(mlir::TypeConverter &,
-                                   mlir::RewritePatternSet &);
+void populateBufferizationLegality(mlir::TypeConverter &, mlir::ConversionTarget &);
+void populateBufferizationPatterns(mlir::TypeConverter &, mlir::RewritePatternSet &);
+void populateQIRConversionPatterns(mlir::TypeConverter &, mlir::RewritePatternSet &);
 
 } // namespace quantum
 } // namespace catalyst

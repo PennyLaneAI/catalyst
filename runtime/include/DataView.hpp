@@ -50,8 +50,7 @@ template <typename T, size_t R> class DataView {
         using pointer = T *;                                 // LCOV_EXCL_LINE
         using reference = T &;                               // LCOV_EXCL_LINE
 
-        iterator(const DataView<T, R> &_view, int64_t begin_idx)
-            : view(_view), loc(begin_idx) {}
+        iterator(const DataView<T, R> &_view, int64_t begin_idx) : view(_view), loc(begin_idx) {}
         pointer operator->() const { return &view.data_aligned[loc]; }
         reference operator*() const { return view.data_aligned[loc]; }
         iterator &operator++() {
@@ -88,23 +87,18 @@ template <typename T, size_t R> class DataView {
             return tmp;
         }
         bool operator==(const iterator &other) const {
-            return (loc == other.loc &&
-                    view.data_aligned == other.view.data_aligned);
+            return (loc == other.loc && view.data_aligned == other.view.data_aligned);
         }
-        bool operator!=(const iterator &other) const {
-            return !(*this == other);
-        }
+        bool operator!=(const iterator &other) const { return !(*this == other); }
     };
 
-    explicit DataView(std::vector<T> &buffer)
-        : data_aligned(buffer.data()), offset(0) {
+    explicit DataView(std::vector<T> &buffer) : data_aligned(buffer.data()), offset(0) {
         static_assert(R == 1, "[Class: DataView] Assertion: R == 1");
         sizes[0] = buffer.size();
         strides[0] = 1;
     }
 
-    explicit DataView(T *_data_aligned, size_t _offset, size_t *_sizes,
-                      size_t *_strides)
+    explicit DataView(T *_data_aligned, size_t _offset, size_t *_sizes, size_t *_strides)
         : data_aligned(_data_aligned), offset(_offset) {
         static_assert(R > 0, "[Class: DataView] Assertion: R > 0");
         if (_sizes && _strides) {
@@ -128,9 +122,8 @@ template <typename T, size_t R> class DataView {
     }
 
     template <typename... I> T &operator()(I... idxs) const {
-        static_assert(sizeof...(idxs) == R,
-                      "[Class: DataView] Error in Catalyst Runtime: Wrong "
-                      "number of indices");
+        static_assert(sizeof...(idxs) == R, "[Class: DataView] Error in Catalyst Runtime: Wrong "
+                                            "number of indices");
         size_t indices[] = {static_cast<size_t>(idxs)...};
 
         size_t loc = offset;

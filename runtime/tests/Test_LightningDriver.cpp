@@ -45,8 +45,7 @@ TEST_CASE("Test parse_kwargs coverage", "[Utils]") {
 }
 
 TEST_CASE("Test Driver", "[Driver]") {
-    std::unique_ptr<ExecutionContext> driver =
-        std::make_unique<ExecutionContext>("default");
+    std::unique_ptr<ExecutionContext> driver = std::make_unique<ExecutionContext>("default");
 
     // check the scope of memory-manager
     CHECK(driver->getMemoryManager() != nullptr);
@@ -86,8 +85,7 @@ TEMPLATE_LIST_TEST_CASE("lightning Basis vector", "[Driver]", SimTypes) {
     CHECK(view(3).imag() == Approx(0.0).epsilon(1e-5));
 }
 
-TEMPLATE_TEST_CASE("Qubit allocatation and deallocation", "[Driver]",
-                   LightningSimulator) {
+TEMPLATE_TEST_CASE("Qubit allocatation and deallocation", "[Driver]", LightningSimulator) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     constexpr size_t n = 1;
@@ -173,25 +171,20 @@ TEMPLATE_LIST_TEST_CASE("compute register tests", "[Driver]", SimTypes) {
 
     // check the correctness
     std::vector<QubitIdType> Qs_expected(new_n);
-    std::iota(Qs_expected.begin(), Qs_expected.end(),
-              static_cast<QubitIdType>(0));
+    std::iota(Qs_expected.begin(), Qs_expected.end(), static_cast<QubitIdType>(0));
 
     for (size_t i = 0; i < new_n; i++) {
         CHECK(Qs_expected[i] == Qs[i]);
     }
 }
 
-TEMPLATE_LIST_TEST_CASE("Check an unsupported operation", "[Driver]",
-                        SimTypes) {
+TEMPLATE_LIST_TEST_CASE("Check an unsupported operation", "[Driver]", SimTypes) {
     REQUIRE_THROWS_WITH(
-        Lightning::lookup_gates(Lightning::simulator_gate_info,
-                                "UnsupportedGateName"),
-        Catch::Contains(
-            "The given operation is not supported by the simulator"));
+        Lightning::lookup_gates(Lightning::simulator_gate_info, "UnsupportedGateName"),
+        Catch::Contains("The given operation is not supported by the simulator"));
 }
 
-TEMPLATE_TEST_CASE("QuantumDevice object test [lightning.qubit]", "[Driver]",
-                   LightningSimulator) {
+TEMPLATE_TEST_CASE("QuantumDevice object test [lightning.qubit]", "[Driver]", LightningSimulator) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n

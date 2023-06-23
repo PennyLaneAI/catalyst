@@ -64,8 +64,7 @@ const npy_intp *npy_get_dimensions(char *memref, size_t rank) {
     return dims;
 }
 
-const npy_intp *npy_get_strides(char *memref, size_t element_size,
-                                size_t rank) {
+const npy_intp *npy_get_strides(char *memref, size_t element_size, size_t rank) {
     size_t *strides = to_strides(memref, rank);
     for (unsigned int idx = 0; idx < rank; idx++) {
         // memref strides are in terms of elements.
@@ -78,8 +77,8 @@ const npy_intp *npy_get_strides(char *memref, size_t element_size,
     return npy_strides;
 }
 
-py::list move_returns(void *memref_array_ptr, py::object result_desc,
-                      py::object transfer, py::dict numpy_arrays) {
+py::list move_returns(void *memref_array_ptr, py::object result_desc, py::object transfer,
+                      py::dict numpy_arrays) {
     py::list returns;
     if (result_desc.is_none()) {
         return returns;
@@ -87,8 +86,7 @@ py::list move_returns(void *memref_array_ptr, py::object result_desc,
 
     auto ctypes = py::module::import("ctypes");
     using f_ptr_t = bool (*)(void *);
-    f_ptr_t f_transfer_ptr =
-        *((f_ptr_t *)ctypes.attr("addressof")(transfer).cast<size_t>());
+    f_ptr_t f_transfer_ptr = *((f_ptr_t *)ctypes.attr("addressof")(transfer).cast<size_t>());
 
     /* Data from the result description */
     auto ranks = result_desc.attr("_ranks_");
@@ -101,13 +99,11 @@ py::list move_returns(void *memref_array_ptr, py::object result_desc,
     char *memref_array_bytes = (char *)(memref_array_ptr);
 
     for (size_t idx = 0; idx < memref_len; idx++) {
-        unsigned int rank_i =
-            ranks.attr("__getitem__")(idx).cast<unsigned int>();
+        unsigned int rank_i = ranks.attr("__getitem__")(idx).cast<unsigned int>();
         char *memref_i_beginning = memref_array_bytes + offset;
         offset += memref_size_based_on_rank(rank_i);
 
-        struct memref_beginning_t *memref =
-            (struct memref_beginning_t *)memref_i_beginning;
+        struct memref_beginning_t *memref = (struct memref_beginning_t *)memref_i_beginning;
         bool is_in_rt_heap = f_transfer_ptr(memref->allocated);
 
         if (!is_in_rt_heap) {
@@ -121,8 +117,7 @@ py::list move_returns(void *memref_array_ptr, py::object result_desc,
             //
             // Use the numpy_arrays dictionary which sets up the following map:
             // integer (memory address) -> py::object (numpy array)
-            auto array_object =
-                numpy_arrays.attr("__getitem__")((size_t)memref->allocated);
+            auto array_object = numpy_arrays.attr("__getitem__")((size_t)memref->allocated);
             returns.append(array_object);
             continue;
         }
@@ -130,8 +125,7 @@ py::list move_returns(void *memref_array_ptr, py::object result_desc,
         const npy_intp *dims = npy_get_dimensions(memref_i_beginning, rank_i);
 
         size_t element_size = sizes.attr("__getitem__")(idx).cast<size_t>();
-        const npy_intp *strides =
-            npy_get_strides(memref_i_beginning, element_size, rank_i);
+        const npy_intp *strides = npy_get_strides(memref_i_beginning, element_size, rank_i);
 
         auto etype_i = etypes.attr("__getitem__")(idx);
         PyArray_Descr *descr = PyArray_DescrFromTypeObject(etype_i.ptr());
@@ -140,14 +134,14 @@ py::list move_returns(void *memref_array_ptr, py::object result_desc,
         }
 
         void *aligned = memref->aligned;
-        PyObject *new_array = PyArray_NewFromDescr(
-            &PyArray_Type, descr, rank_i, dims, strides, aligned, 0, NULL);
+        PyObject *new_array =
+            PyArray_NewFromDescr(&PyArray_Type, descr, rank_i, dims, strides, aligned, 0, NULL);
         if (!new_array) {
             throw std::runtime_error("PyArray_NewFromDescr failed.");
         }
 
-        PyObject *capsule = PyCapsule_New(memref->allocated, NULL,
-                                          (PyCapsule_Destructor)&free_wrap);
+        PyObject *capsule =
+            PyCapsule_New(memref->allocated, NULL, (PyCapsule_Destructor)&free_wrap);
         if (!capsule) {
             throw std::runtime_error("PyCapsule_New failed.");
         }
@@ -181,8 +175,8 @@ py::list move_returns(void *memref_array_ptr, py::object result_desc,
     return returns;
 }
 
-py::list wrap(py::object func, py::tuple py_args, py::object result_desc,
-              py::object transfer, py::dict numpy_arrays) {
+py::list wrap(py::object func, py::tuple py_args, py::object result_desc, py::object transfer,
+              py::dict numpy_arrays) {
     py::list returns;
 
     size_t length = py_args.attr("__len__")().cast<size_t>();
@@ -192,15 +186,12 @@ py::list wrap(py::object func, py::tuple py_args, py::object result_desc,
 
     auto ctypes = py::module::import("ctypes");
     using f_ptr_t = void (*)(void *, void *);
-    f_ptr_t f_ptr = *reinterpret_cast<f_ptr_t *>(
-        ctypes.attr("addressof")(func).cast<size_t>());
+    f_ptr_t f_ptr = *reinterpret_cast<f_ptr_t *>(ctypes.attr("addressof")(func).cast<size_t>());
 
     auto value0 = py_args.attr("__getitem__")(0);
-    void *value0_ptr = *reinterpret_cast<void **>(
-        ctypes.attr("addressof")(value0).cast<size_t>());
+    void *value0_ptr = *reinterpret_cast<void **>(ctypes.attr("addressof")(value0).cast<size_t>());
     auto value1 = py_args.attr("__getitem__")(1);
-    void *value1_ptr = *reinterpret_cast<void **>(
-        ctypes.attr("addressof")(value1).cast<size_t>());
+    void *value1_ptr = *reinterpret_cast<void **>(ctypes.attr("addressof")(value1).cast<size_t>());
 
     f_ptr(value0_ptr, value1_ptr);
     returns = move_returns(value0_ptr, result_desc, transfer, numpy_arrays);

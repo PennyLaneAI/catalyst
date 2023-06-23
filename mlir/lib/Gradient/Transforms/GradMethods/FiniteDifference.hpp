@@ -33,9 +33,8 @@ struct FiniteDiffLowering : public OpRewritePattern<GradOp> {
     void rewrite(GradOp op, PatternRewriter &rewriter) const override;
 
   private:
-    static void computeFiniteDiff(PatternRewriter &rewriter, Location loc,
-                                  func::FuncOp gradFn, func::FuncOp callee,
-                                  const std::vector<size_t> &diffArgIndices,
+    static void computeFiniteDiff(PatternRewriter &rewriter, Location loc, func::FuncOp gradFn,
+                                  func::FuncOp callee, const std::vector<size_t> &diffArgIndices,
                                   double hValue);
 };
 

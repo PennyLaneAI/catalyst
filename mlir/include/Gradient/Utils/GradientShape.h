@@ -21,9 +21,8 @@
 namespace catalyst {
 namespace gradient {
 
-std::vector<mlir::Type>
-computeResultTypes(mlir::func::FuncOp callee,
-                   const std::vector<uint64_t> &diffArgIndices);
+std::vector<mlir::Type> computeResultTypes(mlir::func::FuncOp callee,
+                                           const std::vector<uint64_t> &diffArgIndices);
 
 std::vector<mlir::Type> computeQGradTypes(mlir::func::FuncOp callee);
 

@@ -25,24 +25,22 @@
 /**
  * @brief Macro that throws `RuntimeException` with given message.
  */
-#define RT_FAIL(message)                                                       \
-    Catalyst::Runtime::_abort((message), __FILE__, __LINE__, __func__)
+#define RT_FAIL(message) Catalyst::Runtime::_abort((message), __FILE__, __LINE__, __func__)
 
 /**
  * @brief Macro that throws `RuntimeException` if expression evaluates
  * to true.
  */
-#define RT_FAIL_IF(expression, message)                                        \
-    if ((expression)) {                                                        \
-        RT_FAIL(message);                                                      \
+#define RT_FAIL_IF(expression, message)                                                            \
+    if ((expression)) {                                                                            \
+        RT_FAIL(message);                                                                          \
     }
 
 /**
  * @brief Macro that throws `RuntimeException` with the given expression
  * and source location if expression evaluates to false.
  */
-#define RT_ASSERT(expression)                                                  \
-    RT_FAIL_IF(!(expression), "Assertion: " #expression)
+#define RT_ASSERT(expression) RT_FAIL_IF(!(expression), "Assertion: " #expression)
 
 namespace Catalyst::Runtime {
 
@@ -75,11 +73,10 @@ class RuntimeException : public std::exception {
  *
  * @note This is not supposed to be called directly.
  */
-[[noreturn]] inline void _abort(const char *message, const char *file_name,
-                                size_t line, const char *function_name) {
+[[noreturn]] inline void _abort(const char *message, const char *file_name, size_t line,
+                                const char *function_name) {
     std::stringstream sstream;
-    sstream << "[" << file_name << "][Line:" << line
-            << "][Function:" << function_name
+    sstream << "[" << file_name << "][Line:" << line << "][Function:" << function_name
             << "] Error in Catalyst Runtime: " << message;
 
     throw RuntimeException(sstream.str());

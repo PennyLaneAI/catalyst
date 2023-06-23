@@ -39,20 +39,17 @@ struct QIRTypeConverter : public LLVMTypeConverter {
     QIRTypeConverter(MLIRContext *ctx) : LLVMTypeConverter(ctx) {
         addConversion([&](QubitType type) { return convertQubitType(type); });
         addConversion([&](QuregType type) { return convertQuregType(type); });
-        addConversion(
-            [&](ObservableType type) { return convertObservableType(type); });
+        addConversion([&](ObservableType type) { return convertObservableType(type); });
         addConversion([&](ResultType type) { return convertResultType(type); });
     }
 
   private:
     Type convertQubitType(Type mlirType) {
-        return LLVM::LLVMPointerType::get(
-            LLVM::LLVMStructType::getOpaque("Qubit", &getContext()));
+        return LLVM::LLVMPointerType::get(LLVM::LLVMStructType::getOpaque("Qubit", &getContext()));
     }
 
     Type convertQuregType(Type mlirType) {
-        return LLVM::LLVMPointerType::get(
-            LLVM::LLVMStructType::getOpaque("Array", &getContext()));
+        return LLVM::LLVMPointerType::get(LLVM::LLVMStructType::getOpaque("Array", &getContext()));
     }
 
     Type convertObservableType(Type mlirType) {
@@ -60,13 +57,11 @@ struct QIRTypeConverter : public LLVMTypeConverter {
     }
 
     Type convertResultType(Type mlirType) {
-        return LLVM::LLVMPointerType::get(
-            LLVM::LLVMStructType::getOpaque("Result", &getContext()));
+        return LLVM::LLVMPointerType::get(LLVM::LLVMStructType::getOpaque("Result", &getContext()));
     }
 };
 
-struct QuantumConversionPass
-    : impl::QuantumConversionPassBase<QuantumConversionPass> {
+struct QuantumConversionPass : impl::QuantumConversionPassBase<QuantumConversionPass> {
     using QuantumConversionPassBase::QuantumConversionPassBase;
 
     void runOnOperation() final {
@@ -74,16 +69,14 @@ struct QuantumConversionPass
         QIRTypeConverter typeConverter(context);
 
         RewritePatternSet patterns(context);
-        cf::populateControlFlowToLLVMConversionPatterns(typeConverter,
-                                                        patterns);
+        cf::populateControlFlowToLLVMConversionPatterns(typeConverter, patterns);
         populateFuncToLLVMConversionPatterns(typeConverter, patterns);
         populateQIRConversionPatterns(typeConverter, patterns);
 
         LLVMConversionTarget target(*context);
         target.addLegalOp<ModuleOp>();
 
-        if (failed(applyFullConversion(getOperation(), target,
-                                       std::move(patterns)))) {
+        if (failed(applyFullConversion(getOperation(), target, std::move(patterns)))) {
             signalPassFailure();
         }
     }

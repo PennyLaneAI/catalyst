@@ -34,8 +34,7 @@ TEST_CASE("Simple allocation and release of one qubit", "[QubitManager]") {
     CHECK(!qm.isValidQubitId(idx));
 }
 
-TEST_CASE("Allocation and reallocation of one qubit multiple times",
-          "[QubitManager]") {
+TEST_CASE("Allocation and reallocation of one qubit multiple times", "[QubitManager]") {
     QubitManager qm = QubitManager();
 
     QubitIdType q = qm.Allocate(0);
@@ -58,8 +57,7 @@ TEST_CASE("Allocation and reallocation of two qubit", "[QubitManager]") {
 
     CHECK(qm.getDeviceId(idx1) == 0);
 
-    REQUIRE_THROWS_WITH(qm.getDeviceId(idx0),
-                        Catch::Contains("Invalid device qubit"));
+    REQUIRE_THROWS_WITH(qm.getDeviceId(idx0), Catch::Contains("Invalid device qubit"));
 }
 
 TEST_CASE("multiple release of qubits", "[QubitManager]") {
@@ -144,6 +142,5 @@ TEST_CASE("Test getSimulatorId for a vector of wires", "[QubitManager]") {
     CHECK(qm.getSimulatorId(1) == idx4);
     CHECK(qm.getSimulatorId(2) == idx6);
 
-    REQUIRE_THROWS_WITH(qm.getSimulatorId(3),
-                        Catch::Contains("Invalid simulator qubit"));
+    REQUIRE_THROWS_WITH(qm.getSimulatorId(3), Catch::Contains("Invalid simulator qubit"));
 }

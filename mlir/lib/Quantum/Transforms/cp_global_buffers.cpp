@@ -27,8 +27,7 @@ using namespace mlir;
 namespace {
 
 bool hasCWrapperAttribute(func::FuncOp op) {
-    return (bool)(op->getAttrOfType<UnitAttr>(
-        LLVM::LLVMDialect::getEmitCWrapperAttrName()));
+    return (bool)(op->getAttrOfType<UnitAttr>(LLVM::LLVMDialect::getEmitCWrapperAttrName()));
 }
 
 bool hasCopyWrapperAttribute(func::FuncOp op) {
@@ -75,8 +74,7 @@ llvm::SmallVector<Value> getReturnMemRefs(func::ReturnOp op) {
     return memrefs;
 }
 
-void applyCopyGlobalMemRefToReturnOp(func::ReturnOp op,
-                                     PatternRewriter &rewriter) {
+void applyCopyGlobalMemRefToReturnOp(func::ReturnOp op, PatternRewriter &rewriter) {
     llvm::SmallVector<Value> memrefs = getReturnMemRefs(op);
     if (memrefs.empty())
         return;
@@ -87,31 +85,26 @@ void applyCopyGlobalMemRefToReturnOp(func::ReturnOp op,
     Type mlirIndex = rewriter.getIndexType();
     Type llvmIndex = typeConverter.convertType(mlirIndex);
     auto deadbeefAttr = rewriter.getIntegerAttr(mlirIndex, 0xdeadbeef);
-    Value deadbeef = rewriter.create<LLVM::ConstantOp>(op->getLoc(), llvmIndex,
-                                                       deadbeefAttr);
+    Value deadbeef = rewriter.create<LLVM::ConstantOp>(op->getLoc(), llvmIndex, deadbeefAttr);
 
     for (Value memref : memrefs) {
         Type ty = memref.getType();
         Type llvmTy = typeConverter.convertType(ty);
-        Value llvmMemRef = rewriter
-                               .create<UnrealizedConversionCastOp>(
-                                   op->getLoc(), llvmTy, memref)
-                               .getResult(0);
+        Value llvmMemRef =
+            rewriter.create<UnrealizedConversionCastOp>(op->getLoc(), llvmTy, memref).getResult(0);
 
-        Value allocatedPtr =
-            rewriter.create<LLVM::ExtractValueOp>(op->getLoc(), llvmMemRef, 0);
-        Value allocatedPtrToInt = rewriter.create<LLVM::PtrToIntOp>(
-            op->getLoc(), llvmIndex, allocatedPtr);
-        Value comparison = rewriter.create<LLVM::ICmpOp>(
-            op->getLoc(), LLVM::ICmpPredicate::eq, deadbeef, allocatedPtrToInt);
+        Value allocatedPtr = rewriter.create<LLVM::ExtractValueOp>(op->getLoc(), llvmMemRef, 0);
+        Value allocatedPtrToInt =
+            rewriter.create<LLVM::PtrToIntOp>(op->getLoc(), llvmIndex, allocatedPtr);
+        Value comparison = rewriter.create<LLVM::ICmpOp>(op->getLoc(), LLVM::ICmpPredicate::eq,
+                                                         deadbeef, allocatedPtrToInt);
 
         scf::IfOp ifOp = rewriter.create<scf::IfOp>(
             op->getLoc(), comparison,
             [&](OpBuilder &builder, Location loc) { // then
-                Value newMemRef = rewriter.create<memref::AllocOp>(
-                    op->getLoc(), ty.cast<MemRefType>());
-                rewriter.create<memref::CopyOp>(op->getLoc(), memref,
-                                                newMemRef);
+                Value newMemRef =
+                    rewriter.create<memref::AllocOp>(op->getLoc(), ty.cast<MemRefType>());
+                rewriter.create<memref::CopyOp>(op->getLoc(), memref, newMemRef);
                 builder.create<scf::YieldOp>(loc, newMemRef);
             },
             [&](OpBuilder &builder, Location loc) { // else
@@ -124,8 +117,7 @@ void applyCopyGlobalMemRefToReturnOp(func::ReturnOp op,
     rewriter.replaceOpWithNewOp<func::ReturnOp>(op, newMemRefs);
 }
 
-void applyCopyGlobalMemRefTransform(func::FuncOp op,
-                                    PatternRewriter &rewriter) {
+void applyCopyGlobalMemRefTransform(func::FuncOp op, PatternRewriter &rewriter) {
     llvm::SmallVector<func::ReturnOp> returnOps = getReturnOps(op);
     for (func::ReturnOp returnOp : returnOps) {
         // The insertion point will be just right before
@@ -150,8 +142,7 @@ LogicalResult CopyGlobalMemRefTransform::match(func::FuncOp op) const {
     return hasMemRefReturnTypes(op) ? success() : failure();
 }
 
-void CopyGlobalMemRefTransform::rewrite(func::FuncOp op,
-                                        PatternRewriter &rewriter) const {
+void CopyGlobalMemRefTransform::rewrite(func::FuncOp op, PatternRewriter &rewriter) const {
     setCopyWrapperAttribute(op, rewriter);
     applyCopyGlobalMemRefTransform(op, rewriter);
 }
@@ -163,8 +154,7 @@ namespace catalyst {
 #define GEN_PASS_DEF_COPYGLOBALMEMREFPASS
 #include "Quantum/Transforms/Passes.h.inc"
 
-struct CopyGlobalMemRefPass
-    : impl::CopyGlobalMemRefPassBase<CopyGlobalMemRefPass> {
+struct CopyGlobalMemRefPass : impl::CopyGlobalMemRefPassBase<CopyGlobalMemRefPass> {
     using CopyGlobalMemRefPassBase::CopyGlobalMemRefPassBase;
 
     void runOnOperation() final {
@@ -172,8 +162,7 @@ struct CopyGlobalMemRefPass
         RewritePatternSet patterns(context);
         patterns.add<CopyGlobalMemRefTransform>(context);
 
-        if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                                std::move(patterns)))) {
+        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
             signalPassFailure();
         }
     }

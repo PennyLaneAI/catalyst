@@ -60,13 +60,12 @@ class MemoryManager final {
 
 class ExecutionContext final {
   private:
-    using DeviceInitializer = std::function<std::unique_ptr<QuantumDevice>(
-        bool, const std::string &)>;
+    using DeviceInitializer =
+        std::function<std::unique_ptr<QuantumDevice>(bool, const std::string &)>;
     std::unordered_map<std::string_view, DeviceInitializer> _device_map{
         {"lightning.qubit",
          [](bool tape_recording, const std::string &device_kwargs) {
-             return std::make_unique<Simulator::LightningSimulator>(
-                 tape_recording, device_kwargs);
+             return std::make_unique<Simulator::LightningSimulator>(tape_recording, device_kwargs);
          }},
     };
 
@@ -82,27 +81,22 @@ class ExecutionContext final {
     std::unique_ptr<MemoryManager> _driver_mm_ptr{nullptr};
 
 #ifdef __device_openqasm
-    std::unique_ptr<Device::OpenQasm::PythonInterpreterGuard> _py_guard{
-        nullptr};
+    std::unique_ptr<Device::OpenQasm::PythonInterpreterGuard> _py_guard{nullptr};
 #endif
 
   public:
-    explicit ExecutionContext(
-        std::string_view default_device = "lightning.qubit")
+    explicit ExecutionContext(std::string_view default_device = "lightning.qubit")
         : _device_name(default_device), _tape_recording(false) {
 #ifdef __device_lightning_kokkos
-        _device_map.emplace(
-            "lightning.kokkos",
-            [](bool tape_recording, const std::string &device_kwargs) {
-                return std::make_unique<Simulator::LightningKokkosSimulator>(
-                    tape_recording, device_kwargs);
-            });
+        _device_map.emplace("lightning.kokkos",
+                            [](bool tape_recording, const std::string &device_kwargs) {
+                                return std::make_unique<Simulator::LightningKokkosSimulator>(
+                                    tape_recording, device_kwargs);
+                            });
 #endif
 #ifdef __device_openqasm
-        _device_map.emplace("openqasm", [](bool tape_recording,
-                                           const std::string &device_kwargs) {
-            return std::make_unique<Device::OpenQasmDevice>(tape_recording,
-                                                            device_kwargs);
+        _device_map.emplace("openqasm", [](bool tape_recording, const std::string &device_kwargs) {
+            return std::make_unique<Device::OpenQasmDevice>(tape_recording, device_kwargs);
         });
 #endif
         _driver_mm_ptr = std::make_unique<MemoryManager>();
@@ -122,31 +116,21 @@ class ExecutionContext final {
 
     void setDeviceRecorder(bool status) noexcept { _tape_recording = status; }
 
-    void setDeviceKwArgs(std::string_view info) noexcept {
-        _device_kwargs = info;
-    }
+    void setDeviceKwArgs(std::string_view info) noexcept { _device_kwargs = info; }
 
-    [[nodiscard]] auto getDeviceName() const -> std::string_view {
-        return _device_name;
-    }
+    [[nodiscard]] auto getDeviceName() const -> std::string_view { return _device_name; }
 
-    [[nodiscard]] auto getDeviceKwArgs() const -> std::string {
-        return _device_kwargs;
-    }
+    [[nodiscard]] auto getDeviceKwArgs() const -> std::string { return _device_kwargs; }
 
-    [[nodiscard]] auto getDeviceRecorderStatus() const -> bool {
-        return _tape_recording;
-    }
+    [[nodiscard]] auto getDeviceRecorderStatus() const -> bool { return _tape_recording; }
 
     [[nodiscard]] bool initDevice(std::string_view name) noexcept {
         if (name != "default") {
             _device_name = name;
         }
 
-        if (_device_name == "braket.aws.qubit" ||
-            _device_name == "braket.local.qubit") {
-            _device_kwargs =
-                "device_type : " + _device_name + "," + _device_kwargs;
+        if (_device_name == "braket.aws.qubit" || _device_name == "braket.local.qubit") {
+            _device_kwargs = "device_type : " + _device_name + "," + _device_kwargs;
             _device_name = "openqasm";
         }
 
@@ -158,9 +142,8 @@ class ExecutionContext final {
 
 #ifdef __device_openqasm
             if (_device_name == "braket.aws.qubit" && !Py_IsInitialized()) {
-                _py_guard = std::make_unique<
-                    Device::OpenQasm::
-                        PythonInterpreterGuard>(); // LCOV_EXCL_LINE
+                _py_guard =
+                    std::make_unique<Device::OpenQasm::PythonInterpreterGuard>(); // LCOV_EXCL_LINE
             }
 #endif
 
@@ -169,13 +152,11 @@ class ExecutionContext final {
         return false;
     }
 
-    [[nodiscard]] auto getDevice() const
-        -> const std::unique_ptr<QuantumDevice> & {
+    [[nodiscard]] auto getDevice() const -> const std::unique_ptr<QuantumDevice> & {
         return _driver_ptr;
     }
 
-    [[nodiscard]] auto getMemoryManager() const
-        -> const std::unique_ptr<MemoryManager> & {
+    [[nodiscard]] auto getMemoryManager() const -> const std::unique_ptr<MemoryManager> & {
         return _driver_mm_ptr;
     }
 };

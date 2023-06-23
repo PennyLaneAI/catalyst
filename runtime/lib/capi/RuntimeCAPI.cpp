@@ -70,16 +70,14 @@ void _mlir_memref_to_llvm_free(void *ptr) {
 void __quantum__rt__fail_cstr(const char *cstr) { RT_FAIL(cstr); }
 
 void __quantum__rt__initialize() {
-    Catalyst::Runtime::CTX =
-        std::make_unique<Catalyst::Runtime::ExecutionContext>();
+    Catalyst::Runtime::CTX = std::make_unique<Catalyst::Runtime::ExecutionContext>();
 }
 
 void __quantum__rt__finalize() { Catalyst::Runtime::CTX.reset(nullptr); }
 
 void __quantum__rt__device(int8_t *spec, int8_t *value) {
     RT_FAIL_IF((!spec || !value), "Invalid device specification");
-    RT_FAIL_IF(!Catalyst::Runtime::CTX,
-               "Invalid use of the global driver before initialization");
+    RT_FAIL_IF(!Catalyst::Runtime::CTX, "Invalid use of the global driver before initialization");
 
     const std::vector<std::string_view> args{reinterpret_cast<char *>(spec),
                                              reinterpret_cast<char *>(value)};
@@ -92,13 +90,10 @@ void __quantum__rt__device(int8_t *spec, int8_t *value) {
         return;
     }
 
-    RT_FAIL(
-        "Invalid device specification; Supported keys: ['kwargs', 'backend']");
+    RT_FAIL("Invalid device specification; Supported keys: ['kwargs', 'backend']");
 }
 
-void __quantum__rt__print_state() {
-    Catalyst::Runtime::CTX->getDevice()->PrintState();
-}
+void __quantum__rt__print_state() { Catalyst::Runtime::CTX->getDevice()->PrintState(); }
 
 void __quantum__rt__toggle_recorder(bool status) {
     if (!Catalyst::Runtime::CTX->getDevice()) {
@@ -117,8 +112,7 @@ QUBIT *__quantum__rt__qubit_allocate() {
     RT_ASSERT(Catalyst::Runtime::CTX->getDevice() != nullptr);
     RT_ASSERT(Catalyst::Runtime::CTX->getMemoryManager() != nullptr);
 
-    return reinterpret_cast<QUBIT *>(
-        Catalyst::Runtime::CTX->getDevice()->AllocateQubit());
+    return reinterpret_cast<QUBIT *>(Catalyst::Runtime::CTX->getDevice()->AllocateQubit());
 }
 
 QirArray *__quantum__rt__qubit_allocate_array(int64_t num_qubits) {
@@ -126,20 +120,17 @@ QirArray *__quantum__rt__qubit_allocate_array(int64_t num_qubits) {
     RT_ASSERT(Catalyst::Runtime::CTX->getMemoryManager() != nullptr);
     RT_ASSERT(num_qubits >= 0);
 
-    QirArray *qubit_array =
-        __quantum__rt__array_create_1d(sizeof(QubitIdType), num_qubits);
-    const auto &&qubit_vector =
-        Catalyst::Runtime::CTX->getDevice()->AllocateQubits(num_qubits);
+    QirArray *qubit_array = __quantum__rt__array_create_1d(sizeof(QubitIdType), num_qubits);
+    const auto &&qubit_vector = Catalyst::Runtime::CTX->getDevice()->AllocateQubits(num_qubits);
     for (int64_t idx = 0; idx < num_qubits; idx++) {
-        *reinterpret_cast<QUBIT **>(__quantum__rt__array_get_element_ptr_1d(
-            qubit_array, idx)) = reinterpret_cast<QUBIT *>(qubit_vector[idx]);
+        *reinterpret_cast<QUBIT **>(__quantum__rt__array_get_element_ptr_1d(qubit_array, idx)) =
+            reinterpret_cast<QUBIT *>(qubit_vector[idx]);
     }
     return qubit_array;
 }
 
 void __quantum__rt__qubit_release(QUBIT *qubit) {
-    return Catalyst::Runtime::CTX->getDevice()->ReleaseQubit(
-        reinterpret_cast<QubitIdType>(qubit));
+    return Catalyst::Runtime::CTX->getDevice()->ReleaseQubit(reinterpret_cast<QubitIdType>(qubit));
 }
 
 void __quantum__rt__qubit_release_array(QirArray *qubit_array) {
@@ -152,8 +143,7 @@ void __quantum__rt__qubit_release_array(QirArray *qubit_array) {
 }
 
 int64_t __quantum__rt__num_qubits() {
-    return static_cast<int64_t>(
-        Catalyst::Runtime::CTX->getDevice()->GetNumQubits());
+    return static_cast<int64_t>(Catalyst::Runtime::CTX->getDevice()->GetNumQubits());
 }
 
 QirString *__quantum__rt__qubit_to_string(QUBIT *qubit) {
@@ -161,17 +151,11 @@ QirString *__quantum__rt__qubit_to_string(QUBIT *qubit) {
         std::to_string(reinterpret_cast<QubitIdType>(qubit)).c_str());
 }
 
-bool __quantum__rt__result_equal(RESULT *r0, RESULT *r1) {
-    return (r0 == r1) || (*r0 == *r1);
-}
+bool __quantum__rt__result_equal(RESULT *r0, RESULT *r1) { return (r0 == r1) || (*r0 == *r1); }
 
-RESULT *__quantum__rt__result_get_one() {
-    return Catalyst::Runtime::CTX->getDevice()->One();
-}
+RESULT *__quantum__rt__result_get_one() { return Catalyst::Runtime::CTX->getDevice()->One(); }
 
-RESULT *__quantum__rt__result_get_zero() {
-    return Catalyst::Runtime::CTX->getDevice()->Zero();
-}
+RESULT *__quantum__rt__result_get_zero() { return Catalyst::Runtime::CTX->getDevice()->Zero(); }
 
 QirString *__quantum__rt__result_to_string(RESULT *result) {
     return __quantum__rt__result_equal(result, __quantum__rt__result_get_one())
@@ -195,8 +179,7 @@ void __quantum__qis__Gradient(int64_t numResults, /* results = */...) {
     std::vector<DataView<double, 1>> mem_views;
     mem_views.reserve(numResults);
     for (auto *mr : mem_ptrs) {
-        mem_views.emplace_back(mr->data_aligned, mr->offset, mr->sizes,
-                               mr->strides);
+        mem_views.emplace_back(mr->data_aligned, mr->offset, mr->sizes, mr->strides);
     }
 
     // num_observables * num_train_params
@@ -237,8 +220,7 @@ void __quantum__qis__Gradient_params([[maybe_unused]] MemRefT_int64_1d *params,
     std::vector<DataView<double, 1>> mem_views;
     mem_views.reserve(numResults);
     for (auto *mr : mem_ptrs) {
-        mem_views.emplace_back(mr->data_aligned, mr->offset, mr->sizes,
-                               mr->strides);
+        mem_views.emplace_back(mr->data_aligned, mr->offset, mr->sizes, mr->strides);
     }
 
     // num_observables * num_train_params
@@ -246,75 +228,75 @@ void __quantum__qis__Gradient_params([[maybe_unused]] MemRefT_int64_1d *params,
 }
 
 void __quantum__qis__Identity(QUBIT *qubit) {
-    Catalyst::Runtime::CTX->getDevice()->NamedOperation(
-        "Identity", {}, {reinterpret_cast<QubitIdType>(qubit)},
-        /* inverse = */ false);
+    Catalyst::Runtime::CTX->getDevice()->NamedOperation("Identity", {},
+                                                        {reinterpret_cast<QubitIdType>(qubit)},
+                                                        /* inverse = */ false);
 }
 
 void __quantum__qis__PauliX(QUBIT *qubit) {
-    Catalyst::Runtime::CTX->getDevice()->NamedOperation(
-        "PauliX", {}, {reinterpret_cast<QubitIdType>(qubit)},
-        /* inverse = */ false);
+    Catalyst::Runtime::CTX->getDevice()->NamedOperation("PauliX", {},
+                                                        {reinterpret_cast<QubitIdType>(qubit)},
+                                                        /* inverse = */ false);
 }
 
 void __quantum__qis__PauliY(QUBIT *qubit) {
-    Catalyst::Runtime::CTX->getDevice()->NamedOperation(
-        "PauliY", {}, {reinterpret_cast<QubitIdType>(qubit)},
-        /* inverse = */ false);
+    Catalyst::Runtime::CTX->getDevice()->NamedOperation("PauliY", {},
+                                                        {reinterpret_cast<QubitIdType>(qubit)},
+                                                        /* inverse = */ false);
 }
 
 void __quantum__qis__PauliZ(QUBIT *qubit) {
-    Catalyst::Runtime::CTX->getDevice()->NamedOperation(
-        "PauliZ", {}, {reinterpret_cast<QubitIdType>(qubit)},
-        /* inverse = */ false);
+    Catalyst::Runtime::CTX->getDevice()->NamedOperation("PauliZ", {},
+                                                        {reinterpret_cast<QubitIdType>(qubit)},
+                                                        /* inverse = */ false);
 }
 
 void __quantum__qis__Hadamard(QUBIT *qubit) {
-    Catalyst::Runtime::CTX->getDevice()->NamedOperation(
-        "Hadamard", {}, {reinterpret_cast<QubitIdType>(qubit)},
-        /* inverse = */ false);
+    Catalyst::Runtime::CTX->getDevice()->NamedOperation("Hadamard", {},
+                                                        {reinterpret_cast<QubitIdType>(qubit)},
+                                                        /* inverse = */ false);
 }
 
 void __quantum__qis__S(QUBIT *qubit) {
-    Catalyst::Runtime::CTX->getDevice()->NamedOperation(
-        "S", {}, {reinterpret_cast<QubitIdType>(qubit)},
-        /* inverse = */ false);
+    Catalyst::Runtime::CTX->getDevice()->NamedOperation("S", {},
+                                                        {reinterpret_cast<QubitIdType>(qubit)},
+                                                        /* inverse = */ false);
 }
 
 void __quantum__qis__T(QUBIT *qubit) {
-    Catalyst::Runtime::CTX->getDevice()->NamedOperation(
-        "T", {}, {reinterpret_cast<QubitIdType>(qubit)},
-        /* inverse = */ false);
+    Catalyst::Runtime::CTX->getDevice()->NamedOperation("T", {},
+                                                        {reinterpret_cast<QubitIdType>(qubit)},
+                                                        /* inverse = */ false);
 }
 
 void __quantum__qis__PhaseShift(double theta, QUBIT *qubit) {
-    Catalyst::Runtime::CTX->getDevice()->NamedOperation(
-        "PhaseShift", {theta}, {reinterpret_cast<QubitIdType>(qubit)},
-        /* inverse = */ false);
+    Catalyst::Runtime::CTX->getDevice()->NamedOperation("PhaseShift", {theta},
+                                                        {reinterpret_cast<QubitIdType>(qubit)},
+                                                        /* inverse = */ false);
 }
 
 void __quantum__qis__RX(double theta, QUBIT *qubit) {
-    Catalyst::Runtime::CTX->getDevice()->NamedOperation(
-        "RX", {theta}, {reinterpret_cast<QubitIdType>(qubit)},
-        /* inverse = */ false);
+    Catalyst::Runtime::CTX->getDevice()->NamedOperation("RX", {theta},
+                                                        {reinterpret_cast<QubitIdType>(qubit)},
+                                                        /* inverse = */ false);
 }
 
 void __quantum__qis__RY(double theta, QUBIT *qubit) {
-    Catalyst::Runtime::CTX->getDevice()->NamedOperation(
-        "RY", {theta}, {reinterpret_cast<QubitIdType>(qubit)},
-        /* inverse = */ false);
+    Catalyst::Runtime::CTX->getDevice()->NamedOperation("RY", {theta},
+                                                        {reinterpret_cast<QubitIdType>(qubit)},
+                                                        /* inverse = */ false);
 }
 
 void __quantum__qis__RZ(double theta, QUBIT *qubit) {
-    Catalyst::Runtime::CTX->getDevice()->NamedOperation(
-        "RZ", {theta}, {reinterpret_cast<QubitIdType>(qubit)},
-        /* inverse = */ false);
+    Catalyst::Runtime::CTX->getDevice()->NamedOperation("RZ", {theta},
+                                                        {reinterpret_cast<QubitIdType>(qubit)},
+                                                        /* inverse = */ false);
 }
 
 void __quantum__qis__Rot(double phi, double theta, double omega, QUBIT *qubit) {
-    Catalyst::Runtime::CTX->getDevice()->NamedOperation(
-        "Rot", {phi, theta, omega}, {reinterpret_cast<QubitIdType>(qubit)},
-        /* inverse = */ false);
+    Catalyst::Runtime::CTX->getDevice()->NamedOperation("Rot", {phi, theta, omega},
+                                                        {reinterpret_cast<QubitIdType>(qubit)},
+                                                        /* inverse = */ false);
 }
 
 void __quantum__qis__CNOT(QUBIT *control, QUBIT *target) {
@@ -381,8 +363,7 @@ void __quantum__qis__IsingZZ(double theta, QUBIT *control, QUBIT *target) {
         /* inverse = */ false);
 }
 
-void __quantum__qis__ControlledPhaseShift(double theta, QUBIT *control,
-                                          QUBIT *target) {
+void __quantum__qis__ControlledPhaseShift(double theta, QUBIT *control, QUBIT *target) {
     Catalyst::Runtime::CTX->getDevice()->NamedOperation(
         "ControlledPhaseShift", {theta},
         {/* control = */ reinterpret_cast<QubitIdType>(control),
@@ -414,8 +395,7 @@ void __quantum__qis__CRZ(double theta, QUBIT *control, QUBIT *target) {
         /* inverse = */ false);
 }
 
-void __quantum__qis__CRot(double phi, double theta, double omega,
-                          QUBIT *control, QUBIT *target) {
+void __quantum__qis__CRot(double phi, double theta, double omega, QUBIT *control, QUBIT *target) {
     Catalyst::Runtime::CTX->getDevice()->NamedOperation(
         "CRot", {phi, theta, omega},
         {/* control = */ reinterpret_cast<QubitIdType>(control),
@@ -424,21 +404,19 @@ void __quantum__qis__CRot(double phi, double theta, double omega,
 }
 
 void __quantum__qis__CSWAP(QUBIT *control, QUBIT *aswap, QUBIT *bswap) {
-    Catalyst::Runtime::CTX->getDevice()->NamedOperation(
-        "CSWAP", {},
-        {reinterpret_cast<QubitIdType>(control),
-         reinterpret_cast<QubitIdType>(aswap),
-         reinterpret_cast<QubitIdType>(bswap)},
-        /* inverse = */ false);
+    Catalyst::Runtime::CTX->getDevice()->NamedOperation("CSWAP", {},
+                                                        {reinterpret_cast<QubitIdType>(control),
+                                                         reinterpret_cast<QubitIdType>(aswap),
+                                                         reinterpret_cast<QubitIdType>(bswap)},
+                                                        /* inverse = */ false);
 }
 
 void __quantum__qis__Toffoli(QUBIT *wire0, QUBIT *wire1, QUBIT *wire2) {
-    Catalyst::Runtime::CTX->getDevice()->NamedOperation(
-        "Toffoli", {},
-        {reinterpret_cast<QubitIdType>(wire0),
-         reinterpret_cast<QubitIdType>(wire1),
-         reinterpret_cast<QubitIdType>(wire2)},
-        /* inverse = */ false);
+    Catalyst::Runtime::CTX->getDevice()->NamedOperation("Toffoli", {},
+                                                        {reinterpret_cast<QubitIdType>(wire0),
+                                                         reinterpret_cast<QubitIdType>(wire1),
+                                                         reinterpret_cast<QubitIdType>(wire2)},
+                                                        /* inverse = */ false);
 }
 
 void __quantum__qis__MultiRZ(double theta, int64_t numQubits, ...) {
@@ -452,13 +430,11 @@ void __quantum__qis__MultiRZ(double theta, int64_t numQubits, ...) {
     }
     va_end(args);
 
-    Catalyst::Runtime::CTX->getDevice()->NamedOperation("MultiRZ", {theta},
-                                                        wires,
+    Catalyst::Runtime::CTX->getDevice()->NamedOperation("MultiRZ", {theta}, wires,
                                                         /* inverse = */ false);
 }
 
-void __quantum__qis__QubitUnitary(MemRefT_CplxT_double_2d *matrix,
-                                  int64_t numQubits,
+void __quantum__qis__QubitUnitary(MemRefT_CplxT_double_2d *matrix, int64_t numQubits,
                                   /*qubits*/...) {
     RT_ASSERT(numQubits >= 0);
 
@@ -493,22 +469,19 @@ void __quantum__qis__QubitUnitary(MemRefT_CplxT_double_2d *matrix,
     std::vector<std::complex<double>> coeffs;
     coeffs.reserve(matrix_size);
     for (size_t i = 0; i < matrix_size; i++) {
-        coeffs.emplace_back(matrix->data_aligned[i].real,
-                            matrix->data_aligned[i].imag);
+        coeffs.emplace_back(matrix->data_aligned[i].real, matrix->data_aligned[i].imag);
     }
 
-    return Catalyst::Runtime::CTX->getDevice()->MatrixOperation(
-        coeffs, wires,
-        /*inverse*/ false);
+    return Catalyst::Runtime::CTX->getDevice()->MatrixOperation(coeffs, wires,
+                                                                /*inverse*/ false);
 }
 
 ObsIdType __quantum__qis__NamedObs(int64_t obsId, QUBIT *wire) {
-    return Catalyst::Runtime::CTX->getDevice()->Observable(
-        static_cast<ObsId>(obsId), {}, {reinterpret_cast<QubitIdType>(wire)});
+    return Catalyst::Runtime::CTX->getDevice()->Observable(static_cast<ObsId>(obsId), {},
+                                                           {reinterpret_cast<QubitIdType>(wire)});
 }
 
-ObsIdType __quantum__qis__HermitianObs(MemRefT_CplxT_double_2d *matrix,
-                                       int64_t numQubits, ...) {
+ObsIdType __quantum__qis__HermitianObs(MemRefT_CplxT_double_2d *matrix, int64_t numQubits, ...) {
     RT_ASSERT(numQubits >= 0);
 
     if (matrix == nullptr) {
@@ -541,12 +514,10 @@ ObsIdType __quantum__qis__HermitianObs(MemRefT_CplxT_double_2d *matrix,
     std::vector<std::complex<double>> coeffs;
     coeffs.reserve(matrix_size);
     for (size_t i = 0; i < matrix_size; i++) {
-        coeffs.emplace_back(matrix->data_aligned[i].real,
-                            matrix->data_aligned[i].imag);
+        coeffs.emplace_back(matrix->data_aligned[i].real, matrix->data_aligned[i].imag);
     }
 
-    return Catalyst::Runtime::CTX->getDevice()->Observable(ObsId::Hermitian,
-                                                           coeffs, wires);
+    return Catalyst::Runtime::CTX->getDevice()->Observable(ObsId::Hermitian, coeffs, wires);
 }
 
 ObsIdType __quantum__qis__TensorObs(int64_t numObs, /*obsKeys*/...) {
@@ -566,8 +537,7 @@ ObsIdType __quantum__qis__TensorObs(int64_t numObs, /*obsKeys*/...) {
     return Catalyst::Runtime::CTX->getDevice()->TensorObservable(obsKeys);
 }
 
-ObsIdType __quantum__qis__HamiltonianObs(MemRefT_double_1d *coeffs,
-                                         int64_t numObs,
+ObsIdType __quantum__qis__HamiltonianObs(MemRefT_double_1d *coeffs, int64_t numObs,
                                          /*obsKeys*/...) {
     RT_ASSERT(numObs >= 0);
 
@@ -592,15 +562,12 @@ ObsIdType __quantum__qis__HamiltonianObs(MemRefT_double_1d *coeffs,
     }
     va_end(args);
 
-    std::vector<double> coeffs_vec(coeffs->data_aligned,
-                                   coeffs->data_aligned + coeffs_size);
-    return Catalyst::Runtime::CTX->getDevice()->HamiltonianObservable(
-        coeffs_vec, obsKeys);
+    std::vector<double> coeffs_vec(coeffs->data_aligned, coeffs->data_aligned + coeffs_size);
+    return Catalyst::Runtime::CTX->getDevice()->HamiltonianObservable(coeffs_vec, obsKeys);
 }
 
 RESULT *__quantum__qis__Measure(QUBIT *wire) {
-    return Catalyst::Runtime::CTX->getDevice()->Measure(
-        reinterpret_cast<QubitIdType>(wire));
+    return Catalyst::Runtime::CTX->getDevice()->Measure(reinterpret_cast<QubitIdType>(wire));
 }
 
 double __quantum__qis__Expval(ObsIdType obsKey) {
@@ -611,11 +578,9 @@ double __quantum__qis__Variance(ObsIdType obsKey) {
     return Catalyst::Runtime::CTX->getDevice()->Var(obsKey);
 }
 
-void __quantum__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits,
-                           ...) {
+void __quantum__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits, ...) {
     RT_ASSERT(numQubits >= 0);
-    MemRefT<std::complex<double>, 1> *result_p =
-        (MemRefT<std::complex<double>, 1> *)result;
+    MemRefT<std::complex<double>, 1> *result_p = (MemRefT<std::complex<double>, 1> *)result;
 
     va_list args;
     va_start(args, numQubits);
@@ -625,9 +590,8 @@ void __quantum__qis__State(MemRefT_CplxT_double_1d *result, int64_t numQubits,
     }
     va_end(args);
 
-    DataView<std::complex<double>, 1> view(result_p->data_aligned,
-                                           result_p->offset, result_p->sizes,
-                                           result_p->strides);
+    DataView<std::complex<double>, 1> view(result_p->data_aligned, result_p->offset,
+                                           result_p->sizes, result_p->strides);
 
     if (wires.empty()) {
         Catalyst::Runtime::CTX->getDevice()->State(view);
@@ -650,8 +614,8 @@ void __quantum__qis__Probs(MemRefT_double_1d *result, int64_t numQubits, ...) {
     }
     va_end(args);
 
-    DataView<double, 1> view(result_p->data_aligned, result_p->offset,
-                             result_p->sizes, result_p->strides);
+    DataView<double, 1> view(result_p->data_aligned, result_p->offset, result_p->sizes,
+                             result_p->strides);
 
     if (wires.empty()) {
         Catalyst::Runtime::CTX->getDevice()->Probs(view);
@@ -660,8 +624,7 @@ void __quantum__qis__Probs(MemRefT_double_1d *result, int64_t numQubits, ...) {
     }
 }
 
-void __quantum__qis__Sample(MemRefT_double_2d *result, int64_t shots,
-                            int64_t numQubits, ...) {
+void __quantum__qis__Sample(MemRefT_double_2d *result, int64_t shots, int64_t numQubits, ...) {
     RT_ASSERT(shots >= 0);
     RT_ASSERT(numQubits >= 0);
     MemRefT<double, 2> *result_p = (MemRefT<double, 2> *)result;
@@ -674,8 +637,8 @@ void __quantum__qis__Sample(MemRefT_double_2d *result, int64_t shots,
     }
     va_end(args);
 
-    DataView<double, 2> view(result_p->data_aligned, result_p->offset,
-                             result_p->sizes, result_p->strides);
+    DataView<double, 2> view(result_p->data_aligned, result_p->offset, result_p->sizes,
+                             result_p->strides);
 
     if (wires.empty()) {
         Catalyst::Runtime::CTX->getDevice()->Sample(view, shots);
@@ -684,13 +647,12 @@ void __quantum__qis__Sample(MemRefT_double_2d *result, int64_t shots,
     }
 }
 
-void __quantum__qis__Counts(PairT_MemRefT_double_int64_1d *result,
-                            int64_t shots, int64_t numQubits, ...) {
+void __quantum__qis__Counts(PairT_MemRefT_double_int64_1d *result, int64_t shots, int64_t numQubits,
+                            ...) {
     RT_ASSERT(shots >= 0);
     RT_ASSERT(numQubits >= 0);
     MemRefT<double, 1> *result_eigvals_p = (MemRefT<double, 1> *)&result->first;
-    MemRefT<int64_t, 1> *result_counts_p =
-        (MemRefT<int64_t, 1> *)&result->second;
+    MemRefT<int64_t, 1> *result_counts_p = (MemRefT<int64_t, 1> *)&result->second;
 
     va_list args;
     va_start(args, numQubits);
@@ -700,19 +662,15 @@ void __quantum__qis__Counts(PairT_MemRefT_double_int64_1d *result,
     }
     va_end(args);
 
-    DataView<double, 1> eigvals_view(
-        result_eigvals_p->data_aligned, result_eigvals_p->offset,
-        result_eigvals_p->sizes, result_eigvals_p->strides);
-    DataView<int64_t, 1> counts_view(
-        result_counts_p->data_aligned, result_counts_p->offset,
-        result_counts_p->sizes, result_counts_p->strides);
+    DataView<double, 1> eigvals_view(result_eigvals_p->data_aligned, result_eigvals_p->offset,
+                                     result_eigvals_p->sizes, result_eigvals_p->strides);
+    DataView<int64_t, 1> counts_view(result_counts_p->data_aligned, result_counts_p->offset,
+                                     result_counts_p->sizes, result_counts_p->strides);
 
     if (wires.empty()) {
-        Catalyst::Runtime::CTX->getDevice()->Counts(eigvals_view, counts_view,
-                                                    shots);
+        Catalyst::Runtime::CTX->getDevice()->Counts(eigvals_view, counts_view, shots);
     } else {
-        Catalyst::Runtime::CTX->getDevice()->PartialCounts(
-            eigvals_view, counts_view, wires, shots);
+        Catalyst::Runtime::CTX->getDevice()->PartialCounts(eigvals_view, counts_view, wires, shots);
     }
 }
 }

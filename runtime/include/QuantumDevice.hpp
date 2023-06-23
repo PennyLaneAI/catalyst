@@ -60,8 +60,7 @@ struct QuantumDevice {
      *
      * @return `std::vector<QubitIdType>`
      */
-    virtual auto AllocateQubits(size_t num_qubits)
-        -> std::vector<QubitIdType> = 0;
+    virtual auto AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType> = 0;
 
     /**
      * @brief Release a qubit.
@@ -134,10 +133,8 @@ struct QuantumDevice {
      * @param wires Wires to apply gate to
      * @param inverse Indicates whether to use inverse of gate
      */
-    virtual void NamedOperation(const std::string &name,
-                                const std::vector<double> &params,
-                                const std::vector<QubitIdType> &wires,
-                                bool inverse) = 0;
+    virtual void NamedOperation(const std::string &name, const std::vector<double> &params,
+                                const std::vector<QubitIdType> &wires, bool inverse) = 0;
 
     /**
      * @brief Apply a given matrix directly to the state vector of a device.
@@ -146,9 +143,8 @@ struct QuantumDevice {
      * @param wires Wires to apply gate to
      * @param inverse Indicates whether to use inverse of gate
      */
-    virtual void
-    MatrixOperation(const std::vector<std::complex<double>> &matrix,
-                    const std::vector<QubitIdType> &wires, bool inverse) = 0;
+    virtual void MatrixOperation(const std::vector<std::complex<double>> &matrix,
+                                 const std::vector<QubitIdType> &wires, bool inverse) = 0;
 
     /**
      * @brief Construct a named (Identity, PauliX, PauliY, PauliZ, and Hadamard)
@@ -160,10 +156,8 @@ struct QuantumDevice {
      *
      * @return `ObsIdType` Index of the constructed observable
      */
-    virtual auto Observable(ObsId id,
-                            const std::vector<std::complex<double>> &matrix,
-                            const std::vector<QubitIdType> &wires)
-        -> ObsIdType = 0;
+    virtual auto Observable(ObsId id, const std::vector<std::complex<double>> &matrix,
+                            const std::vector<QubitIdType> &wires) -> ObsIdType = 0;
 
     /**
      * @brief Construct a tensor product of observables.
@@ -172,8 +166,7 @@ struct QuantumDevice {
      *
      * @return `ObsIdType` Index of the constructed observable
      */
-    virtual auto TensorObservable(const std::vector<ObsIdType> &obs)
-        -> ObsIdType = 0;
+    virtual auto TensorObservable(const std::vector<ObsIdType> &obs) -> ObsIdType = 0;
 
     /**
      * @brief Construct a Hamiltonian observable.
@@ -184,8 +177,7 @@ struct QuantumDevice {
      * @return `ObsIdType` Index of the constructed observable
      */
     virtual auto HamiltonianObservable(const std::vector<double> &coeffs,
-                                       const std::vector<ObsIdType> &obs)
-        -> ObsIdType = 0;
+                                       const std::vector<ObsIdType> &obs) -> ObsIdType = 0;
 
     /**
      * @brief Compute the expected value of an observable.
@@ -250,8 +242,7 @@ struct QuantumDevice {
      * @param wires Wires to compute samples on
      * @param shots The number of shots
      */
-    virtual void PartialSample(DataView<double, 2> &samples,
-                               const std::vector<QubitIdType> &wires,
+    virtual void PartialSample(DataView<double, 2> &samples, const std::vector<QubitIdType> &wires,
                                size_t shots) = 0;
 
     /**
@@ -262,8 +253,8 @@ struct QuantumDevice {
      * @param counts The pre-allocated `DataView<int64_t, 1>`
      * @param shots The number of shots
      */
-    virtual void Counts(DataView<double, 1> &eigvals,
-                        DataView<int64_t, 1> &counts, size_t shots) = 0;
+    virtual void Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts,
+                        size_t shots) = 0;
 
     /**
      * @brief Partial sample with the number of shots on `wires`, returning the
@@ -274,10 +265,8 @@ struct QuantumDevice {
      * @param wires Wires to compute samples on
      * @param shots The number of shots
      */
-    virtual void PartialCounts(DataView<double, 1> &eigvals,
-                               DataView<int64_t, 1> &counts,
-                               const std::vector<QubitIdType> &wires,
-                               size_t shots) = 0;
+    virtual void PartialCounts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts,
+                               const std::vector<QubitIdType> &wires, size_t shots) = 0;
 
     /**
      * @brief A general measurement method that acts on a single wire.

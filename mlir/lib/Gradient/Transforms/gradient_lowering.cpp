@@ -43,8 +43,7 @@ namespace gradient {
 #define GEN_PASS_DEF_GRADIENTLOWERINGPASS
 #include "Gradient/Transforms/Passes.h.inc"
 
-struct GradientLoweringPass
-    : impl::GradientLoweringPassBase<GradientLoweringPass> {
+struct GradientLoweringPass : impl::GradientLoweringPassBase<GradientLoweringPass> {
     using GradientLoweringPassBase::GradientLoweringPassBase;
 
     void runOnOperation() final {
@@ -54,15 +53,11 @@ struct GradientLoweringPass
         // This is required to remove qubit values returned by if/for ops in the
         // quantum gradient function of the parameter-shift pattern.
         scf::IfOp::getCanonicalizationPatterns(gradientPatterns, &getContext());
-        scf::ForOp::getCanonicalizationPatterns(gradientPatterns,
-                                                &getContext());
-        catalyst::quantum::InsertOp::getCanonicalizationPatterns(
-            gradientPatterns, &getContext());
-        catalyst::quantum::DeallocOp::getCanonicalizationPatterns(
-            gradientPatterns, &getContext());
+        scf::ForOp::getCanonicalizationPatterns(gradientPatterns, &getContext());
+        catalyst::quantum::InsertOp::getCanonicalizationPatterns(gradientPatterns, &getContext());
+        catalyst::quantum::DeallocOp::getCanonicalizationPatterns(gradientPatterns, &getContext());
 
-        if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                                std::move(gradientPatterns)))) {
+        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(gradientPatterns)))) {
             return signalPassFailure();
         }
     }

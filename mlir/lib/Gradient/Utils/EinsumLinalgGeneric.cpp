@@ -27,14 +27,12 @@ using namespace llvm;
 
 namespace catalyst {
 
-Value einsumLinalgGeneric(OpBuilder &ob, Location loc,
-                          ArrayRef<size_t> axisCodesA,
-                          ArrayRef<size_t> axisCodesB,
-                          ArrayRef<size_t> axisCodesResult, Value a, Value b) {
+Value einsumLinalgGeneric(OpBuilder &ob, Location loc, ArrayRef<size_t> axisCodesA,
+                          ArrayRef<size_t> axisCodesB, ArrayRef<size_t> axisCodesResult, Value a,
+                          Value b) {
     auto ta = a.getType().cast<TensorType>();
     auto tb = b.getType().cast<TensorType>();
-    assert(ta.getElementType() == tb.getElementType() &&
-           "element types should match");
+    assert(ta.getElementType() == tb.getElementType() && "element types should match");
 
     auto axisDims = ({
         std::map<size_t, size_t> out;
@@ -61,8 +59,7 @@ Value einsumLinalgGeneric(OpBuilder &ob, Location loc,
             for (const auto a : axis) {
                 aexprs.push_back(getAffineDimExpr(a, ob.getContext()));
             }
-            out.push_back(
-                AffineMap::get(axisDims.size(), 0, aexprs, ob.getContext()));
+            out.push_back(AffineMap::get(axisDims.size(), 0, aexprs, ob.getContext()));
         };
         out;
     });
@@ -80,10 +77,9 @@ Value einsumLinalgGeneric(OpBuilder &ob, Location loc,
     });
 
     Value r = ({
-        Value empty =
-            ob.create<tensor::EmptyOp>(loc, tr.getShape(), tr.getElementType());
-        Value zero = ob.create<arith::ConstantOp>(loc, tr.getElementType(),
-                                                  ob.getF64FloatAttr(0.0));
+        Value empty = ob.create<tensor::EmptyOp>(loc, tr.getShape(), tr.getElementType());
+        Value zero =
+            ob.create<arith::ConstantOp>(loc, tr.getElementType(), ob.getF64FloatAttr(0.0));
         ob.create<linalg::FillOp>(loc, zero, empty).getResult(0);
     });
 
@@ -94,8 +90,7 @@ Value einsumLinalgGeneric(OpBuilder &ob, Location loc,
         [](OpBuilder &ob2, Location loc2, ValueRange args) {
             ob2.create<linalg::YieldOp>(
                 loc2, Value(ob2.create<arith::AddFOp>(
-                          loc2, args[2],
-                          ob2.create<arith::MulFOp>(loc2, args[0], args[1]))));
+                          loc2, args[2], ob2.create<arith::MulFOp>(loc2, args[0], args[1]))));
         },
         nattrs);
 

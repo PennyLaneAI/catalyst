@@ -28,40 +28,33 @@ OpenQasm::PythonInterpreterGuard guard{};
 TEST_CASE("Test OpenQasmRunner base class", "[openqasm]") {
     // check the coverage support
     OpenQasm::OpenQasmRunner runner{};
-    REQUIRE_THROWS_WITH(
-        runner.runCircuit("", "", 0),
-        Catch::Contains("[Function:runCircuit] Error in Catalyst Runtime: "
-                        "Not implemented method"));
+    REQUIRE_THROWS_WITH(runner.runCircuit("", "", 0),
+                        Catch::Contains("[Function:runCircuit] Error in Catalyst Runtime: "
+                                        "Not implemented method"));
 
-    REQUIRE_THROWS_WITH(
-        runner.Probs("", "", 0, 0),
-        Catch::Contains("[Function:Probs] Error in Catalyst Runtime: "
-                        "Not implemented method"));
+    REQUIRE_THROWS_WITH(runner.Probs("", "", 0, 0),
+                        Catch::Contains("[Function:Probs] Error in Catalyst Runtime: "
+                                        "Not implemented method"));
 
-    REQUIRE_THROWS_WITH(
-        runner.Sample("", "", 0, 0),
-        Catch::Contains("[Function:Sample] Error in Catalyst Runtime: "
-                        "Not implemented method"));
+    REQUIRE_THROWS_WITH(runner.Sample("", "", 0, 0),
+                        Catch::Contains("[Function:Sample] Error in Catalyst Runtime: "
+                                        "Not implemented method"));
 
-    REQUIRE_THROWS_WITH(
-        runner.Expval("", "", 0),
-        Catch::Contains("[Function:Expval] Error in Catalyst Runtime: "
-                        "Not implemented method"));
+    REQUIRE_THROWS_WITH(runner.Expval("", "", 0),
+                        Catch::Contains("[Function:Expval] Error in Catalyst Runtime: "
+                                        "Not implemented method"));
 
-    REQUIRE_THROWS_WITH(
-        runner.Var("", "", 0),
-        Catch::Contains("[Function:Var] Error in Catalyst Runtime: "
-                        "Not implemented method"));
+    REQUIRE_THROWS_WITH(runner.Var("", "", 0),
+                        Catch::Contains("[Function:Var] Error in Catalyst Runtime: "
+                                        "Not implemented method"));
 
-    REQUIRE_THROWS_WITH(
-        runner.State("", "", 0, 0),
-        Catch::Contains("[Function:State] Error in Catalyst Runtime: "
-                        "Not implemented method"));
+    REQUIRE_THROWS_WITH(runner.State("", "", 0, 0),
+                        Catch::Contains("[Function:State] Error in Catalyst Runtime: "
+                                        "Not implemented method"));
 
-    REQUIRE_THROWS_WITH(
-        runner.Gradient("", "", 0, 0),
-        Catch::Contains("[Function:Gradient] Error in Catalyst Runtime: "
-                        "Not implemented method"));
+    REQUIRE_THROWS_WITH(runner.Gradient("", "", 0, 0),
+                        Catch::Contains("[Function:Gradient] Error in Catalyst Runtime: "
+                                        "Not implemented method"));
 }
 
 TEST_CASE("Test BraketRunner::runCircuit()", "[openqasm]") {
@@ -75,8 +68,8 @@ TEST_CASE("Test BraketRunner::runCircuit()", "[openqasm]") {
     auto &&circuit = builder.toOpenQasm();
 
     OpenQasm::BraketRunner runner{};
-    auto &&results = runner.runCircuit(
-        circuit, "arn:aws:braket:::device/quantum-simulator/amazon/sv1", 100);
+    auto &&results =
+        runner.runCircuit(circuit, "arn:aws:braket:::device/quantum-simulator/amazon/sv1", 100);
     CHECK(results.find("GateModelQuantumTaskResult") != std::string::npos);
 }
 
@@ -85,22 +78,20 @@ TEST_CASE("Test the OpenQasmDevice constructor", "[openqasm]") {
         auto device = OpenQasmDevice(false, "{shots : 100}");
         CHECK(device.GetNumQubits() == 0);
 
-        REQUIRE_THROWS_WITH(
-            device.Circuit(),
-            Catch::Contains("[Function:toOpenQasm] Error in Catalyst Runtime: "
-                            "Invalid number of quantum register"));
+        REQUIRE_THROWS_WITH(device.Circuit(),
+                            Catch::Contains("[Function:toOpenQasm] Error in Catalyst Runtime: "
+                                            "Invalid number of quantum register"));
     }
 
     SECTION("Braket SV1") {
-        auto device = OpenQasmDevice(
-            false, "{shots: 100, device_arn: "
-                   "arn:aws:braket:::device/quantum-simulator/amazon/sv1}");
+        auto device =
+            OpenQasmDevice(false, "{shots: 100, device_arn: "
+                                  "arn:aws:braket:::device/quantum-simulator/amazon/sv1}");
         CHECK(device.GetNumQubits() == 0);
 
-        REQUIRE_THROWS_WITH(
-            device.Circuit(),
-            Catch::Contains("[Function:toOpenQasm] Error in Catalyst Runtime: "
-                            "Invalid number of quantum register"));
+        REQUIRE_THROWS_WITH(device.Circuit(),
+                            Catch::Contains("[Function:toOpenQasm] Error in Catalyst Runtime: "
+                                            "Invalid number of quantum register"));
     }
 }
 
@@ -148,8 +139,7 @@ TEST_CASE("Test measurement processes, the bell pair circuit with "
     constexpr size_t shots{1000};
     constexpr bool status{false};
     std::unique_ptr<OpenQasmDevice> device = std::make_unique<OpenQasmDevice>(
-        status,
-        "{device_type : braket.local.qubit, backend : default, shots : 1000}");
+        status, "{device_type : braket.local.qubit, backend : default, shots : 1000}");
 
     constexpr size_t n{2};
     constexpr size_t size{1UL << n};
@@ -186,10 +176,8 @@ TEST_CASE("Test measurement processes, the bell pair circuit with "
 
     SECTION("Samples") {
         std::vector<double> samples(shots * n);
-        MemRefT<double, 2> buffer{
-            samples.data(), samples.data(), 0, {shots, n}, {1, 1}};
-        DataView<double, 2> view(buffer.data_aligned, buffer.offset,
-                                 buffer.sizes, buffer.strides);
+        MemRefT<double, 2> buffer{samples.data(), samples.data(), 0, {shots, n}, {1, 1}};
+        DataView<double, 2> view(buffer.data_aligned, buffer.offset, buffer.sizes, buffer.strides);
         device->Sample(view, shots);
 
         for (size_t i = 0; i < shots * n; i++) {
@@ -199,10 +187,8 @@ TEST_CASE("Test measurement processes, the bell pair circuit with "
 
     SECTION("PartialSamples") {
         std::vector<double> samples(shots);
-        MemRefT<double, 2> buffer{
-            samples.data(), samples.data(), 0, {shots, 1}, {1, 1}};
-        DataView<double, 2> view(buffer.data_aligned, buffer.offset,
-                                 buffer.sizes, buffer.strides);
+        MemRefT<double, 2> buffer{samples.data(), samples.data(), 0, {shots, 1}, {1, 1}};
+        DataView<double, 2> view(buffer.data_aligned, buffer.offset, buffer.sizes, buffer.strides);
         device->PartialSample(view, std::vector<QubitIdType>{0}, shots);
 
         for (size_t i = 0; i < shots; i++) {
@@ -243,18 +229,15 @@ TEST_CASE("Test measurement processes, the bell pair circuit with "
 
     SECTION("Expval(h(1))") {
         device->SetDeviceShots(0); // to get deterministic results
-        auto obs = device->Observable(ObsId::Hadamard, {},
-                                      std::vector<QubitIdType>{1});
+        auto obs = device->Observable(ObsId::Hadamard, {}, std::vector<QubitIdType>{1});
         auto expval = device->Expval(obs);
         CHECK(expval == Approx(0.0).margin(1e-5));
     }
 
     SECTION("Expval(x(0) @ h(1))") {
         device->SetDeviceShots(0); // to get deterministic results
-        auto obs_x =
-            device->Observable(ObsId::PauliX, {}, std::vector<QubitIdType>{0});
-        auto obs_h = device->Observable(ObsId::Hadamard, {},
-                                        std::vector<QubitIdType>{1});
+        auto obs_x = device->Observable(ObsId::PauliX, {}, std::vector<QubitIdType>{0});
+        auto obs_h = device->Observable(ObsId::Hadamard, {}, std::vector<QubitIdType>{1});
         auto obs = device->TensorObservable({obs_x, obs_h});
         auto expval = device->Expval(obs);
         CHECK(expval == Approx(0.7071067812).margin(1e-5));
@@ -262,27 +245,22 @@ TEST_CASE("Test measurement processes, the bell pair circuit with "
 
     SECTION("Var(h(1))") {
         device->SetDeviceShots(0); // to get deterministic results
-        auto obs = device->Observable(ObsId::Hadamard, {},
-                                      std::vector<QubitIdType>{1});
+        auto obs = device->Observable(ObsId::Hadamard, {}, std::vector<QubitIdType>{1});
         auto expval = device->Var(obs);
         CHECK(expval == Approx(1.0).margin(1e-5));
     }
 
     SECTION("Var(x(0) @ h(1))") {
         device->SetDeviceShots(0); // to get deterministic results
-        auto obs_x =
-            device->Observable(ObsId::PauliX, {}, std::vector<QubitIdType>{0});
-        auto obs_h = device->Observable(ObsId::Hadamard, {},
-                                        std::vector<QubitIdType>{1});
+        auto obs_x = device->Observable(ObsId::PauliX, {}, std::vector<QubitIdType>{0});
+        auto obs_h = device->Observable(ObsId::Hadamard, {}, std::vector<QubitIdType>{1});
         auto obs = device->TensorObservable({obs_x, obs_h});
         auto expval = device->Var(obs);
         CHECK(expval == Approx(0.5).margin(1e-5));
     }
 }
 
-TEST_CASE(
-    "Test measurement processes, a simple circuit with BuilderType::Braket",
-    "[openqasm]") {
+TEST_CASE("Test measurement processes, a simple circuit with BuilderType::Braket", "[openqasm]") {
     std::unique_ptr<OpenQasmDevice> device = std::make_unique<OpenQasmDevice>();
 
     constexpr size_t shots{1000};
@@ -295,8 +273,7 @@ TEST_CASE(
     device->NamedOperation("PauliZ", {}, {wires[2]}, false);
     device->NamedOperation("RX", {0.6}, {wires[4]}, false);
     device->NamedOperation("CNOT", {}, {wires[0], wires[3]}, false);
-    device->NamedOperation("Toffoli", {}, {wires[0], wires[3], wires[4]},
-                           false);
+    device->NamedOperation("Toffoli", {}, {wires[0], wires[3], wires[4]}, false);
 
     std::string toqasm = "OPENQASM 3.0;\n"
                          "qubit[5] qubits;\n"
@@ -329,10 +306,8 @@ TEST_CASE(
 
     SECTION("Samples") {
         std::vector<double> samples(shots * n);
-        MemRefT<double, 2> buffer{
-            samples.data(), samples.data(), 0, {shots, n}, {1, 1}};
-        DataView<double, 2> view(buffer.data_aligned, buffer.offset,
-                                 buffer.sizes, buffer.strides);
+        MemRefT<double, 2> buffer{samples.data(), samples.data(), 0, {shots, n}, {1, 1}};
+        DataView<double, 2> view(buffer.data_aligned, buffer.offset, buffer.sizes, buffer.strides);
         device->Sample(view, shots);
 
         for (size_t i = 0; i < shots * n; i++) {
@@ -342,10 +317,8 @@ TEST_CASE(
 
     SECTION("PartialSamples") {
         std::vector<double> samples(shots);
-        MemRefT<double, 2> buffer{
-            samples.data(), samples.data(), 0, {shots, 1}, {1, 1}};
-        DataView<double, 2> view(buffer.data_aligned, buffer.offset,
-                                 buffer.sizes, buffer.strides);
+        MemRefT<double, 2> buffer{samples.data(), samples.data(), 0, {shots, 1}, {1, 1}};
+        DataView<double, 2> view(buffer.data_aligned, buffer.offset, buffer.sizes, buffer.strides);
         device->PartialSample(view, std::vector<QubitIdType>{0}, shots);
 
         for (size_t i = 0; i < shots; i++) {
@@ -386,49 +359,41 @@ TEST_CASE(
 
     SECTION("Expval(h(1))") {
         device->SetDeviceShots(0); // to get deterministic results
-        auto obs = device->Observable(ObsId::Hadamard, {},
-                                      std::vector<QubitIdType>{1});
+        auto obs = device->Observable(ObsId::Hadamard, {}, std::vector<QubitIdType>{1});
         auto expval = device->Expval(obs);
         CHECK(expval == Approx(-0.7071067812).margin(1e-5));
     }
 
     SECTION("Expval(x(0) @ h(1))") {
         device->SetDeviceShots(0); // to get deterministic results
-        auto obs_z =
-            device->Observable(ObsId::PauliZ, {}, std::vector<QubitIdType>{0});
-        auto obs_h = device->Observable(ObsId::Hadamard, {},
-                                        std::vector<QubitIdType>{1});
+        auto obs_z = device->Observable(ObsId::PauliZ, {}, std::vector<QubitIdType>{0});
+        auto obs_h = device->Observable(ObsId::Hadamard, {}, std::vector<QubitIdType>{1});
         auto tp = device->TensorObservable({obs_z, obs_h});
         auto expval = device->Expval(tp);
         CHECK(expval == Approx(0.7071067812).margin(1e-5));
 
         auto obs = device->HamiltonianObservable({0.2}, {tp});
-        REQUIRE_THROWS_WITH(
-            device->Expval(obs),
-            Catch::Contains("Unsupported observable: QasmHamiltonianObs"));
+        REQUIRE_THROWS_WITH(device->Expval(obs),
+                            Catch::Contains("Unsupported observable: QasmHamiltonianObs"));
     }
 
     SECTION("Var(h(1))") {
         device->SetDeviceShots(0); // to get deterministic results
-        auto obs = device->Observable(ObsId::Hadamard, {},
-                                      std::vector<QubitIdType>{1});
+        auto obs = device->Observable(ObsId::Hadamard, {}, std::vector<QubitIdType>{1});
         auto expval = device->Var(obs);
         CHECK(expval == Approx(0.5).margin(1e-5));
     }
 
     SECTION("Var(x(0) @ h(1))") {
         device->SetDeviceShots(0); // to get deterministic results
-        auto obs_z =
-            device->Observable(ObsId::PauliZ, {}, std::vector<QubitIdType>{0});
-        auto obs_h = device->Observable(ObsId::Hadamard, {},
-                                        std::vector<QubitIdType>{1});
+        auto obs_z = device->Observable(ObsId::PauliZ, {}, std::vector<QubitIdType>{0});
+        auto obs_h = device->Observable(ObsId::Hadamard, {}, std::vector<QubitIdType>{1});
         auto tp = device->TensorObservable({obs_z, obs_h});
         auto expval = device->Var(tp);
         CHECK(expval == Approx(0.5).margin(1e-5));
 
         auto obs = device->HamiltonianObservable({0.2}, {tp});
-        REQUIRE_THROWS_WITH(
-            device->Var(obs),
-            Catch::Contains("Unsupported observable: QasmHamiltonianObs"));
+        REQUIRE_THROWS_WITH(device->Var(obs),
+                            Catch::Contains("Unsupported observable: QasmHamiltonianObs"));
     }
 }

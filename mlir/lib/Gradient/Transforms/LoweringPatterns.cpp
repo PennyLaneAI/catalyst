@@ -27,8 +27,7 @@ using namespace catalyst::gradient;
 namespace catalyst {
 namespace gradient {
 
-void populateLoweringPatterns(RewritePatternSet &patterns,
-                              StringRef lowerOnly) {
+void populateLoweringPatterns(RewritePatternSet &patterns, StringRef lowerOnly) {
     if (lowerOnly == "" || lowerOnly == "fd")
         patterns.add<FiniteDiffLowering>(patterns.getContext(), 1);
     if (lowerOnly == "" || lowerOnly == "ps")

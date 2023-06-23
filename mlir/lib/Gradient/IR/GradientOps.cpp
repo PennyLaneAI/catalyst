@@ -33,24 +33,20 @@ using namespace catalyst::gradient;
 //===----------------------------------------------------------------------===//
 
 // Gradient input checker
-LogicalResult verifyGradInputs(OpState *op_state, func::FuncOp callee,
-                               ValueRange callee_operands,
+LogicalResult verifyGradInputs(OpState *op_state, func::FuncOp callee, ValueRange callee_operands,
                                const std::vector<size_t> &diff_arg_indices) {
     // Check that the call operand types match the callee operand types.
     ValueRange fnArgs = callee_operands;
     FunctionType fnType = callee.getFunctionType();
     if (fnType.getNumInputs() != fnArgs.size())
-        return op_state->emitOpError(
-                   "incorrect number of operands for callee, ")
-               << "expected " << fnType.getNumInputs() << " but got "
-               << fnArgs.size();
+        return op_state->emitOpError("incorrect number of operands for callee, ")
+               << "expected " << fnType.getNumInputs() << " but got " << fnArgs.size();
 
     for (unsigned i = 0; i < fnArgs.size(); ++i)
         if (fnArgs[i].getType() != fnType.getInput(i))
-            return op_state->emitOpError(
-                       "operand type mismatch: expected operand type ")
-                   << fnType.getInput(i) << ", but provided "
-                   << fnArgs[i].getType() << " for operand number " << i;
+            return op_state->emitOpError("operand type mismatch: expected operand type ")
+                   << fnType.getInput(i) << ", but provided " << fnArgs[i].getType()
+                   << " for operand number " << i;
 
     // Only differentiation on real numbers is supported.
     const std::vector<size_t> &diffArgIndices = diff_arg_indices;
@@ -60,8 +56,7 @@ LogicalResult verifyGradInputs(OpState *op_state, func::FuncOp callee,
             diffArgBaseType = tensorType.getElementType();
 
         if (!diffArgBaseType.isa<FloatType>())
-            return op_state->emitOpError(
-                       "invalid numeric base type: callee operand at position ")
+            return op_state->emitOpError("invalid numeric base type: callee operand at position ")
                    << idx << " must be floating point to be differentiable";
     }
     return success();
@@ -71,8 +66,7 @@ LogicalResult verifyGradInputs(OpState *op_state, func::FuncOp callee,
 LogicalResult verifyGradOutputs(OpState *op_state, func::FuncOp fn,
                                 const std::vector<size_t> &diff_arg_indices,
                                 TypeRange result_types) {
-    const std::vector<Type> &expectedTypes =
-        computeResultTypes(fn, diff_arg_indices);
+    const std::vector<Type> &expectedTypes = computeResultTypes(fn, diff_arg_indices);
 
     // Verify the number of results matches the expected gradient shape.
     // The grad output should contain one set of results (equal in size to
@@ -90,10 +84,8 @@ LogicalResult verifyGradOutputs(OpState *op_state, func::FuncOp fn,
     TypeRange gradResultTypes = result_types;
     for (unsigned i = 0; i < expectedTypes.size(); i++) {
         if (gradResultTypes[i] != expectedTypes[i])
-            return op_state->emitOpError(
-                       "invalid result type: grad result at position ")
-                   << i << " must be " << expectedTypes[i] << " but got "
-                   << gradResultTypes[i];
+            return op_state->emitOpError("invalid result type: grad result at position ")
+                   << i << " must be " << expectedTypes[i] << " but got " << gradResultTypes[i];
     }
 
     return success();
@@ -119,19 +111,17 @@ LogicalResult GradOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
     // Check that the callee attribute refers to a valid function.
     auto fn = ({
         auto callee = this->getCalleeAttr();
-        func::FuncOp fn = symbolTable.lookupNearestSymbolFrom<func::FuncOp>(
-            this->getOperation(), callee);
+        func::FuncOp fn =
+            symbolTable.lookupNearestSymbolFrom<func::FuncOp>(this->getOperation(), callee);
         if (!fn)
-            return this->emitOpError("invalid function name specified: ")
-                   << callee;
+            return this->emitOpError("invalid function name specified: ") << callee;
         fn;
     });
 
     auto r1 = ::verifyGradInputs(this, fn, this->getArgOperands(),
                                  compDiffArgIndices(this->getDiffArgIndices()));
 
-    auto r2 = ::verifyGradOutputs(this, fn,
-                                  compDiffArgIndices(this->getDiffArgIndices()),
+    auto r2 = ::verifyGradOutputs(this, fn, compDiffArgIndices(this->getDiffArgIndices()),
                                   this->getResultTypes());
 
     return success(succeeded(r1) && succeeded(r2));
@@ -168,17 +158,14 @@ LogicalResult JVPOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
     // Check that the callee attribute refers to a valid function.
     func::FuncOp callee = ({
         auto cattr = this->getCalleeAttr();
-        auto fn = symbolTable.lookupNearestSymbolFrom<func::FuncOp>(
-            this->getOperation(), cattr);
+        auto fn = symbolTable.lookupNearestSymbolFrom<func::FuncOp>(this->getOperation(), cattr);
         if (!fn)
-            return this->emitOpError("invalid function name specified: ")
-                   << cattr;
+            return this->emitOpError("invalid function name specified: ") << cattr;
         fn;
     });
 
     auto diffArgIndices = compDiffArgIndices(this->getDiffArgIndices());
-    auto r1 =
-        ::verifyGradInputs(this, callee, this->getParams(), diffArgIndices);
+    auto r1 = ::verifyGradInputs(this, callee, this->getParams(), diffArgIndices);
     if (r1.failed()) {
         return r1;
     }
@@ -186,8 +173,8 @@ LogicalResult JVPOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
     if (this->getNumResults() != 2 * callee.getFunctionType().getNumResults()) {
         return this->emitOpError("invalid number of results: must be twice the "
                                  "number of callee results")
-               << " which is " << 2 * callee.getFunctionType().getNumResults()
-               << " but got " << this->getNumResults();
+               << " which is " << 2 * callee.getFunctionType().getNumResults() << " but got "
+               << this->getNumResults();
     }
 
     if (this->getTangents().size() != diffArgIndices.size()) {
@@ -211,8 +198,7 @@ LogicalResult JVPOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
         if (calleeRtype != jvpRtype) {
             return this->emitOpError("result types do not match")
                    << " result " << i << " should match "
-                   << " was expected to match the type " << jvpRtype
-                   << " but got " << calleeRtype;
+                   << " was expected to match the type " << jvpRtype << " but got " << calleeRtype;
         }
     }
 
@@ -250,11 +236,10 @@ LogicalResult VJPOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
     // Check that the callee attribute refers to a valid function.
     auto callee = ({
         auto cattr = this->getCalleeAttr();
-        func::FuncOp fn = symbolTable.lookupNearestSymbolFrom<func::FuncOp>(
-            this->getOperation(), cattr);
+        func::FuncOp fn =
+            symbolTable.lookupNearestSymbolFrom<func::FuncOp>(this->getOperation(), cattr);
         if (!fn)
-            return this->emitOpError("invalid function name specified: ")
-                   << cattr;
+            return this->emitOpError("invalid function name specified: ") << cattr;
         fn;
     });
 
@@ -270,8 +255,7 @@ LogicalResult VJPOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
     auto cotTypes = ({
         std::vector<Type> out;
         auto cotangOperands = OperandRange(
-            this->operand_begin() + callee.getFunctionType().getNumInputs(),
-            this->operand_end());
+            this->operand_begin() + callee.getFunctionType().getNumInputs(), this->operand_end());
         for (auto c : cotangOperands) {
             out.push_back(c.getType());
         }
@@ -282,8 +266,7 @@ LogicalResult VJPOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
     if (calleeResultTypes.size() != cotTypes.size()) {
         return this->emitOpError("number of callee results does not match the "
                                  "number of cotangent arguments")
-               << " expected " << cotTypes.size() << " but got "
-               << calleeResultTypes.size();
+               << " expected " << cotTypes.size() << " but got " << calleeResultTypes.size();
     }
 
     // Check that callee results have the same types as cotangent inputs
@@ -291,10 +274,9 @@ LogicalResult VJPOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
         auto cotType = cotTypes[i];
         auto crType = calleeResultTypes[i];
         if (cotType != crType) {
-            return this->emitOpError(
-                       "callee result type does not match the cotangent type")
-                   << " callee result " << i << " was expected to be of type "
-                   << cotType << " but got " << crType;
+            return this->emitOpError("callee result type does not match the cotangent type")
+                   << " callee result " << i << " was expected to be of type " << cotType
+                   << " but got " << crType;
         }
     }
 

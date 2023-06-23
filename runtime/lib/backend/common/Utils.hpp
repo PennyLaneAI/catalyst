@@ -117,17 +117,14 @@ enum class Measurements : uint8_t {
 
 constexpr std::array simulator_observable_support = {
     // ObsId, ObsName, SimulatorSupport
-    std::tuple<ObsId, std::string_view, bool>{ObsId::Identity, "Identity",
-                                              true},
+    std::tuple<ObsId, std::string_view, bool>{ObsId::Identity, "Identity", true},
     std::tuple<ObsId, std::string_view, bool>{ObsId::PauliX, "PauliX", true},
     std::tuple<ObsId, std::string_view, bool>{ObsId::PauliY, "PauliY", true},
     std::tuple<ObsId, std::string_view, bool>{ObsId::PauliZ, "PauliZ", true},
-    std::tuple<ObsId, std::string_view, bool>{ObsId::Hadamard, "Hadamard",
-                                              true},
+    std::tuple<ObsId, std::string_view, bool>{ObsId::Hadamard, "Hadamard", true},
 };
 
-using GateInfoTupleT =
-    std::tuple<SimulatorGate, std::string_view, size_t, size_t>;
+using GateInfoTupleT = std::tuple<SimulatorGate, std::string_view, size_t, size_t>;
 
 constexpr std::array simulator_gate_info = {
     // 1-qubit
@@ -152,8 +149,7 @@ constexpr std::array simulator_gate_info = {
     GateInfoTupleT{SimulatorGate::IsingYY, "IsingYY", 2, 1},
     GateInfoTupleT{SimulatorGate::IsingXY, "IsingXY", 2, 1},
     GateInfoTupleT{SimulatorGate::IsingZZ, "IsingZZ", 2, 1},
-    GateInfoTupleT{SimulatorGate::ControlledPhaseShift, "ControlledPhaseShift",
-                   2, 1},
+    GateInfoTupleT{SimulatorGate::ControlledPhaseShift, "ControlledPhaseShift", 2, 1},
     GateInfoTupleT{SimulatorGate::CRX, "CRX", 2, 1},
     GateInfoTupleT{SimulatorGate::CRY, "CRY", 2, 1},
     GateInfoTupleT{SimulatorGate::CRZ, "CRZ", 2, 1},
@@ -166,29 +162,25 @@ constexpr std::array simulator_gate_info = {
 };
 
 constexpr size_t simulator_gate_info_size = simulator_gate_info.size();
-constexpr size_t simulator_observable_support_size =
-    simulator_observable_support.size();
+constexpr size_t simulator_observable_support_size = simulator_observable_support.size();
 
 template <size_t size = simulator_gate_info_size>
 using SimulatorGateInfoDataT = std::array<GateInfoTupleT, size>;
 
 template <size_t size = simulator_observable_support_size>
-constexpr auto lookup_obs(
-    const std::array<std::tuple<ObsId, std::string_view, bool>, size> &arr,
-    const ObsId key) -> std::string_view {
+constexpr auto lookup_obs(const std::array<std::tuple<ObsId, std::string_view, bool>, size> &arr,
+                          const ObsId key) -> std::string_view {
     for (size_t idx = 0; idx < size; idx++) {
         auto &&[op_id, op_str, op_support] = arr[idx];
         if (op_id == key && op_support) {
             return op_str;
         }
     }
-    throw std::range_error(
-        "The given observable is not supported by the simulator");
+    throw std::range_error("The given observable is not supported by the simulator");
 }
 
 template <size_t size = simulator_gate_info_size>
-constexpr auto lookup_gates(const SimulatorGateInfoDataT<size> &arr,
-                            const std::string &key)
+constexpr auto lookup_gates(const SimulatorGateInfoDataT<size> &arr, const std::string &key)
     -> std::pair<size_t, size_t> {
     for (size_t idx = 0; idx < size; idx++) {
         auto &&[op, op_str, op_num_wires, op_num_params] = arr[idx];
@@ -196,13 +188,11 @@ constexpr auto lookup_gates(const SimulatorGateInfoDataT<size> &arr,
             return std::make_pair(op_num_wires, op_num_params);
         }
     }
-    throw std::range_error(
-        "The given operation is not supported by the simulator");
+    throw std::range_error("The given operation is not supported by the simulator");
 }
 
 template <size_t size = simulator_gate_info_size>
-constexpr auto has_gate(const SimulatorGateInfoDataT<size> &arr,
-                        const std::string &key) -> bool {
+constexpr auto has_gate(const SimulatorGateInfoDataT<size> &arr, const std::string &key) -> bool {
     for (size_t idx = 0; idx < size; idx++) {
         if (std::get<1>(arr[idx]) == key) {
             return true;

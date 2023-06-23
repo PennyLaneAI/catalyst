@@ -22,8 +22,7 @@ using namespace mlir;
 namespace catalyst {
 namespace gradient {
 
-func::FuncOp genArgMapFunction(PatternRewriter &rewriter, Location loc,
-                               func::FuncOp callee);
+func::FuncOp genArgMapFunction(PatternRewriter &rewriter, Location loc, func::FuncOp callee);
 
 } // namespace gradient
 } // namespace catalyst

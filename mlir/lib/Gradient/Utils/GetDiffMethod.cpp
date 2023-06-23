@@ -19,14 +19,12 @@
 
 using namespace mlir;
 
-StringRef
-catalyst::gradient::getQNodeDiffMethod(catalyst::gradient::GradOp gradOp) {
+StringRef catalyst::gradient::getQNodeDiffMethod(catalyst::gradient::GradOp gradOp) {
     const char *diffMethodKey = "diff_method";
 
-    func::FuncOp callee = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
-        gradOp, gradOp.getCalleeAttr());
-    bool isQNode = callee->hasAttr("qnode") &&
-                   callee->hasAttrOfType<StringAttr>(diffMethodKey);
+    func::FuncOp callee =
+        SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(gradOp, gradOp.getCalleeAttr());
+    bool isQNode = callee->hasAttr("qnode") && callee->hasAttrOfType<StringAttr>(diffMethodKey);
     if (gradOp.getMethod() == "defer" && isQNode) {
         return callee->getAttrOfType<StringAttr>(diffMethodKey).strref();
     }

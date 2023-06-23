@@ -32,8 +32,7 @@ namespace Catalyst::Runtime::Simulator {
  * can act on. When user releases a qubit, the `QubitManager` removes
  * that qubit from the list of active wires.
  */
-template <typename SimQubitIdType = QubitIdType,
-          typename DevQubitIdType = size_t>
+template <typename SimQubitIdType = QubitIdType, typename DevQubitIdType = size_t>
 class QubitManager {
   private:
     using LQMapT = std::map<SimQubitIdType, DevQubitIdType>;
@@ -42,11 +41,9 @@ class QubitManager {
     LQMapT qubits_map{};
 
     template <class OIter = typename LQMapT::iterator>
-    [[nodiscard]] inline OIter
-    _remove_simulator_qubit_id(SimQubitIdType s_idx) {
+    [[nodiscard]] inline OIter _remove_simulator_qubit_id(SimQubitIdType s_idx) {
         const auto &&s_idx_iter = this->qubits_map.find(s_idx);
-        RT_FAIL_IF(s_idx_iter == this->qubits_map.end(),
-                   "Invalid simulator qubit index");
+        RT_FAIL_IF(s_idx_iter == this->qubits_map.end(), "Invalid simulator qubit index");
 
         return this->qubits_map.erase(s_idx_iter);
     }
@@ -71,11 +68,9 @@ class QubitManager {
         return this->qubits_map.contains(s_idx);
     }
 
-    [[nodiscard]] auto isValidQubitId(const std::vector<SimQubitIdType> &ss_idx)
-        -> bool {
-        return std::all_of(
-            ss_idx.begin(), ss_idx.end(),
-            [this](SimQubitIdType s) { return isValidQubitId(s); });
+    [[nodiscard]] auto isValidQubitId(const std::vector<SimQubitIdType> &ss_idx) -> bool {
+        return std::all_of(ss_idx.begin(), ss_idx.end(),
+                           [this](SimQubitIdType s) { return isValidQubitId(s); });
     }
 
     [[nodiscard]] auto getAllQubitIds() -> std::vector<SimQubitIdType> {
@@ -94,8 +89,7 @@ class QubitManager {
         return this->qubits_map[s_idx];
     }
 
-    auto getDeviceIds(const std::vector<SimQubitIdType> &ss_idx)
-        -> std::vector<DevQubitIdType> {
+    auto getDeviceIds(const std::vector<SimQubitIdType> &ss_idx) -> std::vector<DevQubitIdType> {
         std::vector<DevQubitIdType> dd_idx;
         dd_idx.reserve(ss_idx.size());
         for (const auto &s : ss_idx) {
@@ -105,12 +99,10 @@ class QubitManager {
     }
 
     [[nodiscard]] auto getSimulatorId(DevQubitIdType d_idx) -> SimQubitIdType {
-        auto s_idx =
-            std::find_if(this->qubits_map.begin(), this->qubits_map.end(),
-                         [&d_idx](auto &&p) { return p.second == d_idx; });
+        auto s_idx = std::find_if(this->qubits_map.begin(), this->qubits_map.end(),
+                                  [&d_idx](auto &&p) { return p.second == d_idx; });
 
-        RT_FAIL_IF(s_idx == this->qubits_map.end(),
-                   "Invalid simulator qubit index");
+        RT_FAIL_IF(s_idx == this->qubits_map.end(), "Invalid simulator qubit index");
 
         return s_idx->first;
     }
@@ -120,8 +112,7 @@ class QubitManager {
         return this->next_idx - 1;
     }
 
-    auto AllocateRange(DevQubitIdType start_idx, size_t size)
-        -> std::vector<SimQubitIdType> {
+    auto AllocateRange(DevQubitIdType start_idx, size_t size) -> std::vector<SimQubitIdType> {
         std::vector<SimQubitIdType> ids;
         ids.reserve(size);
         for (DevQubitIdType i = start_idx; i < start_idx + size; i++) {

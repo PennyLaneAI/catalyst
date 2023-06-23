@@ -76,16 +76,14 @@ class CacheManager {
      * @param wires Wires the gate acts on
      * @param inverse If true, inverse of the gate is applied
      */
-    void addOperation(const std::string &name,
-                      const std::vector<double> &params,
+    void addOperation(const std::string &name, const std::vector<double> &params,
                       const std::vector<size_t> &dev_wires, bool inverse) {
         this->ops_names_.push_back(name);
         this->ops_params_.push_back(params);
 
         std::vector<size_t> wires_ul;
         wires_ul.reserve(dev_wires.size());
-        std::transform(dev_wires.begin(), dev_wires.end(),
-                       std::back_inserter(wires_ul),
+        std::transform(dev_wires.begin(), dev_wires.end(), std::back_inserter(wires_ul),
                        [](auto w) { return static_cast<size_t>(w); });
 
         this->ops_wires_.push_back(wires_ul);
@@ -100,9 +98,8 @@ class CacheManager {
      * @param id The observable key created by LObsManager()
      * @param callee The measurement operation
      */
-    void addObservable(
-        const ObsIdType id,
-        const Lightning::Measurements &callee = Lightning::Measurements::None) {
+    void addObservable(const ObsIdType id,
+                       const Lightning::Measurements &callee = Lightning::Measurements::None) {
         this->obs_keys_.push_back(id);
         this->obs_callees_.push_back(callee);
     }
@@ -110,24 +107,19 @@ class CacheManager {
     /**
      * @brief Get a reference to observables keys.
      */
-    auto getObservablesKeys() -> const std::vector<ObsIdType> & {
-        return this->obs_keys_;
-    }
+    auto getObservablesKeys() -> const std::vector<ObsIdType> & { return this->obs_keys_; }
 
     /**
      * @brief Get a reference to observables callees.
      */
-    auto getObservablesCallees()
-        -> const std::vector<Lightning::Measurements> & {
+    auto getObservablesCallees() -> const std::vector<Lightning::Measurements> & {
         return this->obs_callees_;
     }
 
     /**
      * @brief Get a reference to operations names.
      */
-    auto getOperationsNames() -> const std::vector<std::string> & {
-        return this->ops_names_;
-    }
+    auto getOperationsNames() -> const std::vector<std::string> & { return this->ops_names_; }
 
     /**
      * @brief Get a a reference to operations parameters.
@@ -146,9 +138,7 @@ class CacheManager {
     /**
      * @brief Get a reference to operations inverses.
      */
-    auto getOperationsInverses() -> const std::vector<bool> & {
-        return this->ops_inverses_;
-    }
+    auto getOperationsInverses() -> const std::vector<bool> & { return this->ops_inverses_; }
 
     /**
      * @brief Get total number of cached gates.
@@ -160,22 +150,16 @@ class CacheManager {
     /**
      * @brief Get number of operations.
      */
-    [[nodiscard]] auto getNumOperations() const -> size_t {
-        return this->ops_names_.size();
-    }
+    [[nodiscard]] auto getNumOperations() const -> size_t { return this->ops_names_.size(); }
 
     /**
      * @brief Get number of observables.
      */
-    [[nodiscard]] auto getNumObservables() const -> size_t {
-        return this->obs_keys_.size();
-    }
+    [[nodiscard]] auto getNumObservables() const -> size_t { return this->obs_keys_.size(); }
 
     /**
      * @brief Get total number of cached gates.
      */
-    [[nodiscard]] auto getNumParams() const -> size_t {
-        return this->num_params_;
-    }
+    [[nodiscard]] auto getNumParams() const -> size_t { return this->num_params_; }
 };
 } // namespace Catalyst::Runtime::Simulator

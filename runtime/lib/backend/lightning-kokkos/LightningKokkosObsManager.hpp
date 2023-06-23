@@ -35,18 +35,15 @@ template <typename PrecisionT> class LightningKokkosObsManager {
   private:
     using ObservableClassName =
         Pennylane::Lightning_Kokkos::Simulators::ObservableKokkos<PrecisionT>;
-    using NamedObsClassName =
-        Pennylane::Lightning_Kokkos::Simulators::NamedObsKokkos<PrecisionT>;
+    using NamedObsClassName = Pennylane::Lightning_Kokkos::Simulators::NamedObsKokkos<PrecisionT>;
     using HermitianObsClassName =
         Pennylane::Lightning_Kokkos::Simulators::HermitianObsKokkos<PrecisionT>;
     using TensorProdObsClassName =
-        Pennylane::Lightning_Kokkos::Simulators::TensorProdObsKokkos<
-            PrecisionT>;
+        Pennylane::Lightning_Kokkos::Simulators::TensorProdObsKokkos<PrecisionT>;
     using HamiltonianClassName =
         Pennylane::Lightning_Kokkos::Simulators::HamiltonianKokkos<PrecisionT>;
 
-    using ObservablePairType =
-        std::pair<std::shared_ptr<ObservableClassName>, ObsType>;
+    using ObservablePairType = std::pair<std::shared_ptr<ObservableClassName>, ObsType>;
     std::vector<ObservablePairType> observables_{};
 
     static constexpr std::array<ObsType, 2> hamiltonian_valid_obs_types = {
@@ -59,8 +56,7 @@ template <typename PrecisionT> class LightningKokkosObsManager {
     ~LightningKokkosObsManager() = default;
 
     LightningKokkosObsManager(const LightningKokkosObsManager &) = delete;
-    LightningKokkosObsManager &
-    operator=(const LightningKokkosObsManager &) = delete;
+    LightningKokkosObsManager &operator=(const LightningKokkosObsManager &) = delete;
     LightningKokkosObsManager(LightningKokkosObsManager &&) = delete;
     LightningKokkosObsManager &operator=(LightningKokkosObsManager &&) = delete;
 
@@ -75,11 +71,9 @@ template <typename PrecisionT> class LightningKokkosObsManager {
      * @param obsKeys The vector of observable keys
      * @return bool
      */
-    [[nodiscard]] auto
-    isValidObservables(const std::vector<ObsIdType> &obsKeys) const -> bool {
+    [[nodiscard]] auto isValidObservables(const std::vector<ObsIdType> &obsKeys) const -> bool {
         return std::all_of(obsKeys.begin(), obsKeys.end(), [this](auto i) {
-            return (i >= 0 &&
-                    static_cast<size_t>(i) < this->observables_.size());
+            return (i >= 0 && static_cast<size_t>(i) < this->observables_.size());
         });
     }
 
@@ -89,8 +83,7 @@ template <typename PrecisionT> class LightningKokkosObsManager {
      * @param key The observable key
      * @return std::shared_ptr<ObservableClassName>
      */
-    [[nodiscard]] auto getObservable(ObsIdType key)
-        -> std::shared_ptr<ObservableClassName> {
+    [[nodiscard]] auto getObservable(ObsIdType key) -> std::shared_ptr<ObservableClassName> {
         RT_FAIL_IF(!this->isValidObservables({key}), "Invalid observable key");
         return std::get<0>(this->observables_[reinterpret_cast<int64_t>(key)]);
     }
@@ -100,9 +93,7 @@ template <typename PrecisionT> class LightningKokkosObsManager {
      *
      * @return size_t
      */
-    [[nodiscard]] auto numObservables() const -> size_t {
-        return this->observables_.size();
-    }
+    [[nodiscard]] auto numObservables() const -> size_t { return this->observables_.size(); }
 
     /**
      * @brief Create and cache a new NamedObs instance.
@@ -111,16 +102,13 @@ template <typename PrecisionT> class LightningKokkosObsManager {
      * @param wires The vector of wires the observable acts on
      * @return ObsIdType
      */
-    [[nodiscard]] auto createNamedObs(ObsId obsId,
-                                      const std::vector<size_t> &wires)
-        -> ObsIdType {
-        auto &&obs_str = std::string(
-            Lightning::lookup_obs<Lightning::simulator_observable_support_size>(
+    [[nodiscard]] auto createNamedObs(ObsId obsId, const std::vector<size_t> &wires) -> ObsIdType {
+        auto &&obs_str =
+            std::string(Lightning::lookup_obs<Lightning::simulator_observable_support_size>(
                 Lightning::simulator_observable_support, obsId));
 
         this->observables_.push_back(
-            std::make_pair(std::make_shared<NamedObsClassName>(obs_str, wires),
-                           ObsType::Basic));
+            std::make_pair(std::make_shared<NamedObsClassName>(obs_str, wires), ObsType::Basic));
         return static_cast<ObsIdType>(this->observables_.size() - 1);
     }
 
@@ -131,13 +119,11 @@ template <typename PrecisionT> class LightningKokkosObsManager {
      * @param wires The vector of wires the observable acts on
      * @return ObsIdType
      */
-    [[nodiscard]] auto
-    createHermitianObs(const std::vector<std::complex<PrecisionT>> &matrix,
-                       const std::vector<size_t> &wires) -> ObsIdType {
-        this->observables_.push_back(
-            std::make_pair(std::make_shared<HermitianObsClassName>(
-                               HermitianObsClassName{matrix, wires}),
-                           ObsType::Basic));
+    [[nodiscard]] auto createHermitianObs(const std::vector<std::complex<PrecisionT>> &matrix,
+                                          const std::vector<size_t> &wires) -> ObsIdType {
+        this->observables_.push_back(std::make_pair(
+            std::make_shared<HermitianObsClassName>(HermitianObsClassName{matrix, wires}),
+            ObsType::Basic));
 
         return static_cast<ObsIdType>(this->observables_.size() - 1);
     }
@@ -148,8 +134,7 @@ template <typename PrecisionT> class LightningKokkosObsManager {
      * @param obsKeys The vector of observable keys
      * @return ObsIdType
      */
-    [[nodiscard]] auto
-    createTensorProdObs(const std::vector<ObsIdType> &obsKeys) -> ObsIdType {
+    [[nodiscard]] auto createTensorProdObs(const std::vector<ObsIdType> &obsKeys) -> ObsIdType {
         const auto key_size = obsKeys.size();
         const auto obs_size = this->observables_.size();
 
@@ -163,17 +148,15 @@ template <typename PrecisionT> class LightningKokkosObsManager {
 
             auto &&[obs, type] = this->observables_[key_t];
 
-            RT_FAIL_IF(type != ObsType::Basic,
-                       "Invalid basic observable to construct TensorProd; "
-                       "NamedObs and HermitianObs are only supported");
+            RT_FAIL_IF(type != ObsType::Basic, "Invalid basic observable to construct TensorProd; "
+                                               "NamedObs and HermitianObs are only supported");
 
             obs_vec.push_back(obs);
         }
 
-        this->observables_.push_back(
-            std::make_pair(std::make_shared<TensorProdObsClassName>(
-                               TensorProdObsClassName::create(obs_vec)),
-                           ObsType::TensorProd));
+        this->observables_.push_back(std::make_pair(
+            std::make_shared<TensorProdObsClassName>(TensorProdObsClassName::create(obs_vec)),
+            ObsType::TensorProd));
 
         return static_cast<ObsIdType>(obs_size);
     }
@@ -185,16 +168,14 @@ template <typename PrecisionT> class LightningKokkosObsManager {
      * @param obsKeys The vector of observable keys
      * @return ObsIdType
      */
-    [[nodiscard]] auto
-    createHamiltonianObs(const std::vector<PrecisionT> &coeffs,
-                         const std::vector<ObsIdType> &obsKeys) -> ObsIdType {
+    [[nodiscard]] auto createHamiltonianObs(const std::vector<PrecisionT> &coeffs,
+                                            const std::vector<ObsIdType> &obsKeys) -> ObsIdType {
         const auto key_size = obsKeys.size();
         const auto obs_size = this->observables_.size();
 
-        RT_FAIL_IF(
-            key_size != coeffs.size(),
-            "Incompatible list of observables and coefficients; "
-            "Number of observables and number of coefficients must be equal");
+        RT_FAIL_IF(key_size != coeffs.size(),
+                   "Incompatible list of observables and coefficients; "
+                   "Number of observables and number of coefficients must be equal");
 
         std::vector<std::shared_ptr<ObservableClassName>> obs_vec;
         obs_vec.reserve(key_size);
@@ -205,22 +186,20 @@ template <typename PrecisionT> class LightningKokkosObsManager {
                        "Invalid observable key");
 
             auto &&[obs, type] = this->observables_[key_t];
-            auto contain_obs =
-                std::find(hamiltonian_valid_obs_types.begin(),
-                          hamiltonian_valid_obs_types.end(), type);
+            auto contain_obs = std::find(hamiltonian_valid_obs_types.begin(),
+                                         hamiltonian_valid_obs_types.end(), type);
 
-            RT_FAIL_IF(
-                contain_obs == hamiltonian_valid_obs_types.end(),
-                "Invalid observable to construct Hamiltonian; "
-                "NamedObs, HermitianObs and TensorProdObs are only supported");
+            RT_FAIL_IF(contain_obs == hamiltonian_valid_obs_types.end(),
+                       "Invalid observable to construct Hamiltonian; "
+                       "NamedObs, HermitianObs and TensorProdObs are only supported");
 
             obs_vec.push_back(obs);
         }
 
-        this->observables_.push_back(std::make_pair(
-            std::make_shared<HamiltonianClassName>(
-                HamiltonianClassName(coeffs, std::move(obs_vec))),
-            ObsType::Hamiltonian));
+        this->observables_.push_back(
+            std::make_pair(std::make_shared<HamiltonianClassName>(
+                               HamiltonianClassName(coeffs, std::move(obs_vec))),
+                           ObsType::Hamiltonian));
 
         return static_cast<ObsIdType>(obs_size);
     }

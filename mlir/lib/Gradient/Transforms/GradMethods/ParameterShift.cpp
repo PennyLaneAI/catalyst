@@ -36,11 +36,10 @@ LogicalResult ParameterShiftLowering::match(GradOp op) const {
     return failure();
 }
 
-void ParameterShiftLowering::rewrite(GradOp op,
-                                     PatternRewriter &rewriter) const {
+void ParameterShiftLowering::rewrite(GradOp op, PatternRewriter &rewriter) const {
     Location loc = op.getLoc();
-    func::FuncOp callee = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
-        op, op.getCalleeAttr());
+    func::FuncOp callee =
+        SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
     rewriter.setInsertionPointAfter(callee);
 
     // Determine the number of parameters to shift (= to the total static number
@@ -57,28 +56,23 @@ void ParameterShiftLowering::rewrite(GradOp op,
 
     // Generate the shifted version of callee, enabling us to shift an arbitrary
     // gate parameter at runtime.
-    func::FuncOp shiftFn =
-        genShiftFunction(rewriter, loc, callee, numShifts, loopDepth);
+    func::FuncOp shiftFn = genShiftFunction(rewriter, loc, callee, numShifts, loopDepth);
 
     // Generate the quantum gradient function, exploiting the structure of the
     // original function to dynamically compute the partial derivate with
     // respect to each gate parameter.
-    func::FuncOp qGradFn =
-        genQGradFunction(rewriter, loc, callee, shiftFn, numShifts, loopDepth);
+    func::FuncOp qGradFn = genQGradFunction(rewriter, loc, callee, shiftFn, numShifts, loopDepth);
 
     // Generate the full gradient function, computing the partial derivates with
     // respect to the original function arguments from the classical Jacobian
     // and quantum gradient.
-    func::FuncOp fullGradFn =
-        genFullGradFunction(rewriter, loc, op, argMapFn, qGradFn, "ps");
+    func::FuncOp fullGradFn = genFullGradFunction(rewriter, loc, op, argMapFn, qGradFn, "ps");
 
     rewriter.setInsertionPoint(op);
-    rewriter.replaceOpWithNewOp<func::CallOp>(op, fullGradFn,
-                                              op.getArgOperands());
+    rewriter.replaceOpWithNewOp<func::CallOp>(op, fullGradFn, op.getArgOperands());
 }
 
-std::pair<int64_t, int64_t>
-ParameterShiftLowering::analyzeFunction(func::FuncOp callee) {
+std::pair<int64_t, int64_t> ParameterShiftLowering::analyzeFunction(func::FuncOp callee) {
     int64_t numShifts = 0;
     int64_t loopLevel = 0;
     int64_t maxLoopDepth = 0;
@@ -92,8 +86,7 @@ ParameterShiftLowering::analyzeFunction(func::FuncOp callee) {
 
             numShifts += gate.getDiffParams().size();
             maxLoopDepth = std::max(loopLevel, maxLoopDepth);
-        } else if (isa<scf::YieldOp>(op) &&
-                   isa<scf::ForOp>(op->getParentOp())) {
+        } else if (isa<scf::YieldOp>(op) && isa<scf::ForOp>(op->getParentOp())) {
             loopLevel--;
         }
     });

@@ -30,21 +30,18 @@ TEST_CASE("Test __quantum__qis__Gradient with numAlloc=0", "[Gradient]") {
     __quantum__rt__finalize();
 }
 
-TEST_CASE("Test __quantum__qis__Gradient_params with numAlloc=0",
-          "[Gradient]") {
+TEST_CASE("Test __quantum__qis__Gradient_params with numAlloc=0", "[Gradient]") {
     __quantum__rt__initialize();
     for (const auto &[key, val] : getDevices()) {
         __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
 
-        REQUIRE_THROWS_WITH(
-            __quantum__qis__Gradient_params(nullptr, 0, nullptr),
-            Catch::Contains("Invalid number of trainable parameters"));
+        REQUIRE_THROWS_WITH(__quantum__qis__Gradient_params(nullptr, 0, nullptr),
+                            Catch::Contains("Invalid number of trainable parameters"));
     }
     __quantum__rt__finalize();
 }
 
-TEST_CASE("Test __quantum__qis__Gradient_params for zero number of obs",
-          "[Gradient]") {
+TEST_CASE("Test __quantum__qis__Gradient_params for zero number of obs", "[Gradient]") {
     std::vector<int64_t> trainParams{0};
     size_t J = 1;
     double *buffer = new double[J];
@@ -97,13 +94,11 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
 
         __quantum__qis__Variance(obs);
 
-        REQUIRE_THROWS_WITH(
-            __quantum__qis__Gradient(1, &results),
-            Catch::Contains("Unsupported measurements to compute gradient"));
+        REQUIRE_THROWS_WITH(__quantum__qis__Gradient(1, &results),
+                            Catch::Contains("Unsupported measurements to compute gradient"));
 
-        REQUIRE_THROWS_WITH(
-            __quantum__qis__Gradient_params(&tp, 1, &results),
-            Catch::Contains("Unsupported measurements to compute gradient"));
+        REQUIRE_THROWS_WITH(__quantum__qis__Gradient_params(&tp, 1, &results),
+                            Catch::Contains("Unsupported measurements to compute gradient"));
 
         __quantum__rt__toggle_recorder(/* activate_cm */ false);
 
@@ -123,8 +118,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     double *buffer_tp = new double[J];
     MemRefT_double_1d result_tp = {buffer_tp, buffer_tp, 0, {J}, {1}};
     int64_t *buffer_memref = trainParams.data();
-    MemRefT_int64_1d tp_memref = {
-        buffer_memref, buffer_memref, 0, {trainParams.size()}, {1}};
+    MemRefT_int64_1d tp_memref = {buffer_memref, buffer_memref, 0, {trainParams.size()}, {1}};
 
     for (const auto &[key, val] : getDevices()) {
         __quantum__rt__initialize();
@@ -166,8 +160,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     double *buffer_tp = new double[J];
     MemRefT_double_1d result_tp = {buffer_tp, buffer_tp, 0, {J}, {1}};
     int64_t *buffer_tp_memref = trainParams.data();
-    MemRefT_int64_1d tp_memref = {
-        buffer_tp_memref, buffer_tp_memref, 0, {trainParams.size()}, {1}};
+    MemRefT_int64_1d tp_memref = {buffer_tp_memref, buffer_tp_memref, 0, {trainParams.size()}, {1}};
 
     for (const auto &[key, val] : getDevices()) {
         __quantum__rt__initialize();
@@ -179,8 +172,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
 
         __quantum__qis__RX(-M_PI / 7, q);
 
-        CplxT_double matrix_data[4] = {
-            {1.0, 0.0}, {0.0, 0.0}, {2.0, 0.0}, {0.0, 0.0}};
+        CplxT_double matrix_data[4] = {{1.0, 0.0}, {0.0, 0.0}, {2.0, 0.0}, {0.0, 0.0}};
 
         MemRefT_CplxT_double_2d *h_matrix = new MemRefT_CplxT_double_2d;
         h_matrix->data_allocated = matrix_data;
@@ -224,16 +216,14 @@ TEST_CASE("Test __quantum__qis__Gradient_params and __quantum__qis__Gradient "
     double *buffer_tp = new double[J];
     MemRefT_double_1d result_tp = {buffer_tp, buffer_tp, 0, {J}, {1}};
     int64_t *buffer_tp_memref = trainParams.data();
-    MemRefT_int64_1d tp_memref = {
-        buffer_tp_memref, buffer_tp_memref, 0, {trainParams.size()}, {1}};
+    MemRefT_int64_1d tp_memref = {buffer_tp_memref, buffer_tp_memref, 0, {trainParams.size()}, {1}};
 
     const std::string dev("backend");
     const std::string dev_value("lightning.qubit");
 
     for (const auto &p : param) {
         __quantum__rt__initialize();
-        __quantum__rt__device((int8_t *)dev.c_str(),
-                              (int8_t *)dev_value.c_str());
+        __quantum__rt__device((int8_t *)dev.c_str(), (int8_t *)dev_value.c_str());
 
         QUBIT *q = __quantum__rt__qubit_allocate();
 
@@ -279,8 +269,7 @@ TEST_CASE("Test __quantum__qis__Gradient_params "
     double *buffer_tp = new double[J];
     MemRefT_double_1d result_tp = {buffer_tp, buffer_tp, 0, {J}, {1}};
     int64_t *buffer_tp_memref = trainParams.data();
-    MemRefT_int64_1d tp_memref = {
-        buffer_tp_memref, buffer_tp_memref, 0, {trainParams.size()}, {1}};
+    MemRefT_int64_1d tp_memref = {buffer_tp_memref, buffer_tp_memref, 0, {trainParams.size()}, {1}};
 
     __quantum__rt__initialize();
     for (const auto &[key, val] : getDevices()) {
@@ -363,11 +352,9 @@ TEST_CASE("Test __quantum__qis__Gradient Op=[RX,CY], Obs=[Z,Z]", "[Gradient]") {
     delete[] buffer1;
 }
 
-TEST_CASE("Test __quantum__qis__Gradient_params Op=[RX,RX,RX,CZ], Obs=[Z,Z,Z]",
-          "[Gradient]") {
+TEST_CASE("Test __quantum__qis__Gradient_params Op=[RX,RX,RX,CZ], Obs=[Z,Z,Z]", "[Gradient]") {
     const std::vector<double> param{-M_PI / 7, M_PI / 5, 2 * M_PI / 3};
-    const std::vector<double> expected{-sin(param[0]), -sin(param[1]),
-                                       -sin(param[2])};
+    const std::vector<double> expected{-sin(param[0]), -sin(param[1]), -sin(param[2])};
 
     std::vector<int64_t> trainParams{0, 1, 2};
     size_t J = trainParams.size();
@@ -378,8 +365,7 @@ TEST_CASE("Test __quantum__qis__Gradient_params Op=[RX,RX,RX,CZ], Obs=[Z,Z,Z]",
     double *buffer2 = new double[J];
     MemRefT_double_1d result2 = {buffer2, buffer2, 0, {J}, {1}};
     int64_t *buffer_tp_memref = trainParams.data();
-    MemRefT_int64_1d tp_memref = {
-        buffer_tp_memref, buffer_tp_memref, 0, {trainParams.size()}, {1}};
+    MemRefT_int64_1d tp_memref = {buffer_tp_memref, buffer_tp_memref, 0, {trainParams.size()}, {1}};
 
     for (const auto &[key, val] : getDevices()) {
         __quantum__rt__initialize();
@@ -404,8 +390,7 @@ TEST_CASE("Test __quantum__qis__Gradient_params Op=[RX,RX,RX,CZ], Obs=[Z,Z,Z]",
         __quantum__qis__Expval(obs_idx_1);
         __quantum__qis__Expval(obs_idx_2);
 
-        __quantum__qis__Gradient_params(&tp_memref, 3, &result0, &result1,
-                                        &result2);
+        __quantum__qis__Gradient_params(&tp_memref, 3, &result0, &result1, &result2);
 
         __quantum__rt__toggle_recorder(/* activate_cm */ false);
 
@@ -425,9 +410,8 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
           "Op=Mixed, Obs=X@X@X",
           "[Gradient]") {
     const std::vector<double> param{-M_PI / 7, M_PI / 5, 2 * M_PI / 3};
-    const std::vector<double> expected{0.0,           -0.6742144271,
-                                       0.275139672,   0.275139672,
-                                       -0.0129093062, 0.3238461564};
+    const std::vector<double> expected{0.0,         -0.6742144271, 0.275139672,
+                                       0.275139672, -0.0129093062, 0.3238461564};
 
     std::vector<int64_t> trainParams{0, 1, 2, 3, 4, 5};
     size_t J = trainParams.size();
@@ -436,8 +420,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     double *buffer_tp = new double[J];
     MemRefT_double_1d result_tp = {buffer_tp, buffer_tp, 0, {J}, {1}};
     int64_t *buffer_tp_memref = trainParams.data();
-    MemRefT_int64_1d tp_memref = {
-        buffer_tp_memref, buffer_tp_memref, 0, {trainParams.size()}, {1}};
+    MemRefT_int64_1d tp_memref = {buffer_tp_memref, buffer_tp_memref, 0, {trainParams.size()}, {1}};
 
     for (const auto &[key, val] : getDevices()) {
         __quantum__rt__initialize();
@@ -461,8 +444,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
         auto obs_idx_0 = __quantum__qis__NamedObs(ObsId::PauliX, q0);
         auto obs_idx_1 = __quantum__qis__NamedObs(ObsId::PauliX, q1);
         auto obs_idx_2 = __quantum__qis__NamedObs(ObsId::PauliX, q2);
-        auto obs_tp =
-            __quantum__qis__TensorObs(3, obs_idx_0, obs_idx_1, obs_idx_2);
+        auto obs_tp = __quantum__qis__TensorObs(3, obs_idx_0, obs_idx_1, obs_idx_2);
 
         __quantum__qis__Expval(obs_tp);
 
@@ -497,8 +479,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
           "Op=Mixed, Obs=Z@Z@Z",
           "[Gradient]") {
     const std::vector<double> param{-M_PI / 7, M_PI / 5, 2 * M_PI / 3};
-    const std::vector<double> expected{0.0, -0.414506421,  0.0,
-                                       0.0, -0.4643270456, 0.0210905264};
+    const std::vector<double> expected{0.0, -0.414506421, 0.0, 0.0, -0.4643270456, 0.0210905264};
 
     std::vector<int64_t> trainParams{0, 1, 2, 3, 4, 5};
     size_t J = 8;
@@ -508,8 +489,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     double *buffer_tp = new double[J_tp];
     MemRefT_double_1d result_tp = {buffer_tp, buffer_tp, 0, {J_tp}, {1}};
     int64_t *buffer_tp_memref = trainParams.data();
-    MemRefT_int64_1d tp_memref = {
-        buffer_tp_memref, buffer_tp_memref, 0, {trainParams.size()}, {0}};
+    MemRefT_int64_1d tp_memref = {buffer_tp_memref, buffer_tp_memref, 0, {trainParams.size()}, {0}};
 
     for (const auto &[key, val] : getDevices()) {
         __quantum__rt__initialize();
@@ -535,8 +515,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
         auto obs_idx_0 = __quantum__qis__NamedObs(ObsId::PauliZ, q0);
         auto obs_idx_1 = __quantum__qis__NamedObs(ObsId::PauliZ, q1);
         auto obs_idx_2 = __quantum__qis__NamedObs(ObsId::PauliZ, q2);
-        auto obs_tensor =
-            __quantum__qis__TensorObs(3, obs_idx_0, obs_idx_1, obs_idx_2);
+        auto obs_tensor = __quantum__qis__TensorObs(3, obs_idx_0, obs_idx_1, obs_idx_2);
 
         __quantum__qis__Expval(obs_tensor);
 
@@ -572,8 +551,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
           "Obs=Hamiltonian([Z@Z, H], {0.2, 0.6})",
           "[Gradient]") {
     const std::vector<double> param{-M_PI / 7, M_PI / 5, 2 * M_PI / 3};
-    const std::vector<double> expected{0.0, -0.2493761627, 0.0,
-                                       0.0, -0.1175570505, 0.0};
+    const std::vector<double> expected{0.0, -0.2493761627, 0.0, 0.0, -0.1175570505, 0.0};
 
     std::vector<int64_t> trainParams{0, 1, 2, 3, 4, 5};
     size_t J = trainParams.size();
@@ -582,8 +560,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     double *buffer_tp = new double[J];
     MemRefT_double_1d result_tp = {buffer_tp, buffer_tp, 0, {J}, {1}};
     int64_t *buffer_tp_memref = trainParams.data();
-    MemRefT_int64_1d tp_memref = {
-        buffer_tp_memref, buffer_tp_memref, 0, {trainParams.size()}, {1}};
+    MemRefT_int64_1d tp_memref = {buffer_tp_memref, buffer_tp_memref, 0, {trainParams.size()}, {1}};
 
     for (const auto &[key, val] : getDevices()) {
         __quantum__rt__initialize();
@@ -611,8 +588,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
         auto obs_idx_1 = __quantum__qis__NamedObs(ObsId::PauliZ, q1);
         auto obs_idx_2 = __quantum__qis__NamedObs(ObsId::Hadamard, q2);
         auto obs_tensor = __quantum__qis__TensorObs(2, obs_idx_0, obs_idx_1);
-        auto obs_hamiltonian =
-            __quantum__qis__HamiltonianObs(&coeffs, 2, obs_tensor, obs_idx_2);
+        auto obs_hamiltonian = __quantum__qis__HamiltonianObs(&coeffs, 2, obs_tensor, obs_idx_2);
 
         __quantum__qis__Expval(obs_hamiltonian);
 
@@ -643,10 +619,9 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
     delete[] buffer_tp;
 }
 
-TEST_CASE(
-    "Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
-    "for a nontrivial qubits map in the qubit-manager Op=RX, Obs=Hermitian",
-    "[Gradient]") {
+TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
+          "for a nontrivial qubits map in the qubit-manager Op=RX, Obs=Hermitian",
+          "[Gradient]") {
     std::vector<int64_t> trainParams{0};
     size_t J = trainParams.size();
     double *buffer = new double[J];
@@ -654,8 +629,7 @@ TEST_CASE(
     double *buffer_tp = new double[J];
     MemRefT_double_1d result_tp = {buffer_tp, buffer_tp, 0, {J}, {1}};
     int64_t *buffer_tp_memref = trainParams.data();
-    MemRefT_int64_1d tp_memref = {
-        buffer_tp_memref, buffer_tp_memref, 0, {1}, {1}};
+    MemRefT_int64_1d tp_memref = {buffer_tp_memref, buffer_tp_memref, 0, {1}, {1}};
 
     for (const auto &[key, val] : getDevices()) {
         __quantum__rt__initialize();
@@ -677,8 +651,7 @@ TEST_CASE(
 
         __quantum__qis__RX(-M_PI / 7, q);
 
-        CplxT_double matrix_data[4] = {
-            {1.0, 0.0}, {0.0, 0.0}, {2.0, 0.0}, {0.0, 0.0}};
+        CplxT_double matrix_data[4] = {{1.0, 0.0}, {0.0, 0.0}, {2.0, 0.0}, {0.0, 0.0}};
 
         MemRefT_CplxT_double_2d *h_matrix = new MemRefT_CplxT_double_2d;
         h_matrix->data_allocated = matrix_data;

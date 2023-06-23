@@ -32,8 +32,7 @@ namespace gradient {
 #define GEN_PASS_DEF_GRADIENTBUFFERIZATIONPASS
 #include "Gradient/Transforms/Passes.h.inc"
 
-struct GradientBufferizationPass
-    : impl::GradientBufferizationPassBase<GradientBufferizationPass> {
+struct GradientBufferizationPass : impl::GradientBufferizationPassBase<GradientBufferizationPass> {
     using GradientBufferizationPassBase::GradientBufferizationPassBase;
 
     void runOnOperation() final {
@@ -56,8 +55,7 @@ struct GradientBufferizationPass
         target.addDynamicallyLegalOp<BackpropOp>(
             [&](BackpropOp op) { return typeConverter.isLegal(op); });
 
-        if (failed(applyPartialConversion(getOperation(), target,
-                                          std::move(patterns)))) {
+        if (failed(applyPartialConversion(getOperation(), target, std::move(patterns)))) {
             signalPassFailure();
         }
     }

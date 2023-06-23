@@ -49,8 +49,7 @@ class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {
     static constexpr bool GLOBAL_RESULT_TRUE_CONST = true;
     static constexpr bool GLOBAL_RESULT_FALSE_CONST = false;
 
-    static constexpr size_t default_device_shots{
-        1000}; // tidy: readability-magic-numbers
+    static constexpr size_t default_device_shots{1000}; // tidy: readability-magic-numbers
 
     QubitManager<QubitIdType, size_t> qubit_manager{};
     CacheManager cache_manager{};
@@ -67,46 +66,37 @@ class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {
     }
 
     inline auto isValidQubits(const std::vector<QubitIdType> &wires) -> bool {
-        return std::all_of(wires.begin(), wires.end(), [this](QubitIdType w) {
-            return this->isValidQubit(w);
-        });
+        return std::all_of(wires.begin(), wires.end(),
+                           [this](QubitIdType w) { return this->isValidQubit(w); });
     }
 
-    inline auto isValidQubits(size_t numWires, const QubitIdType *wires)
-        -> bool {
-        return std::all_of(wires, wires + numWires, [this](QubitIdType w) {
-            return this->isValidQubit(w);
-        });
+    inline auto isValidQubits(size_t numWires, const QubitIdType *wires) -> bool {
+        return std::all_of(wires, wires + numWires,
+                           [this](QubitIdType w) { return this->isValidQubit(w); });
     }
 
-    inline auto getDeviceWires(size_t numWires, const QubitIdType *wires)
-        -> std::vector<size_t> {
+    inline auto getDeviceWires(size_t numWires, const QubitIdType *wires) -> std::vector<size_t> {
         std::vector<size_t> res;
         res.reserve(numWires);
-        std::transform(
-            wires, wires + numWires, std::back_inserter(res),
-            [this](auto w) { return this->qubit_manager.getDeviceId(w); });
+        std::transform(wires, wires + numWires, std::back_inserter(res),
+                       [this](auto w) { return this->qubit_manager.getDeviceId(w); });
         return res;
     }
 
-    inline auto getDeviceWires(const std::vector<QubitIdType> &wires)
-        -> std::vector<size_t> {
+    inline auto getDeviceWires(const std::vector<QubitIdType> &wires) -> std::vector<size_t> {
         std::vector<size_t> res;
         res.reserve(wires.size());
-        std::transform(
-            wires.begin(), wires.end(), std::back_inserter(res),
-            [this](auto w) { return this->qubit_manager.getDeviceId(w); });
+        std::transform(wires.begin(), wires.end(), std::back_inserter(res),
+                       [this](auto w) { return this->qubit_manager.getDeviceId(w); });
         return res;
     }
 
   public:
-    explicit LightningSimulator(bool status = false,
-                                const std::string &kwargs = "{}")
+    explicit LightningSimulator(bool status = false, const std::string &kwargs = "{}")
         : tape_recording(status) {
         auto &&args = parse_kwargs(kwargs);
-        device_shots = args.contains("shots")
-                           ? static_cast<size_t>(std::stoll(args["shots"]))
-                           : default_device_shots;
+        device_shots = args.contains("shots") ? static_cast<size_t>(std::stoll(args["shots"]))
+                                              : default_device_shots;
     }
     ~LightningSimulator() override = default;
 
@@ -130,41 +120,29 @@ class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {
     [[nodiscard]] auto One() const -> Result override;
 
     auto CacheManagerInfo()
-        -> std::tuple<size_t, size_t, size_t, std::vector<std::string>,
-                      std::vector<ObsIdType>>;
+        -> std::tuple<size_t, size_t, size_t, std::vector<std::string>, std::vector<ObsIdType>>;
 
     // QIS
-    void NamedOperation(const std::string &name,
-                        const std::vector<double> &params,
-                        const std::vector<QubitIdType> &wires,
-                        bool inverse) override;
+    void NamedOperation(const std::string &name, const std::vector<double> &params,
+                        const std::vector<QubitIdType> &wires, bool inverse) override;
     void MatrixOperation(const std::vector<std::complex<double>> &matrix,
-                         const std::vector<QubitIdType> &wires,
-                         bool inverse) override;
+                         const std::vector<QubitIdType> &wires, bool inverse) override;
     auto Observable(ObsId id, const std::vector<std::complex<double>> &matrix,
-                    const std::vector<QubitIdType> &wires)
-        -> ObsIdType override;
-    auto TensorObservable(const std::vector<ObsIdType> &obs)
-        -> ObsIdType override;
-    auto HamiltonianObservable(const std::vector<double> &coeffs,
-                               const std::vector<ObsIdType> &obs)
+                    const std::vector<QubitIdType> &wires) -> ObsIdType override;
+    auto TensorObservable(const std::vector<ObsIdType> &obs) -> ObsIdType override;
+    auto HamiltonianObservable(const std::vector<double> &coeffs, const std::vector<ObsIdType> &obs)
         -> ObsIdType override;
     auto Expval(ObsIdType obsKey) -> double override;
     auto Var(ObsIdType obsKey) -> double override;
     void State(DataView<std::complex<double>, 1> &state) override;
     void Probs(DataView<double, 1> &probs) override;
-    void PartialProbs(DataView<double, 1> &probs,
-                      const std::vector<QubitIdType> &wires) override;
+    void PartialProbs(DataView<double, 1> &probs, const std::vector<QubitIdType> &wires) override;
     void Sample(DataView<double, 2> &samples, size_t shots) override;
-    void PartialSample(DataView<double, 2> &samples,
-                       const std::vector<QubitIdType> &wires,
+    void PartialSample(DataView<double, 2> &samples, const std::vector<QubitIdType> &wires,
                        size_t shots) override;
-    void Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts,
-                size_t shots) override;
-    void PartialCounts(DataView<double, 1> &eigvals,
-                       DataView<int64_t, 1> &counts,
-                       const std::vector<QubitIdType> &wires,
-                       size_t shots) override;
+    void Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts, size_t shots) override;
+    void PartialCounts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts,
+                       const std::vector<QubitIdType> &wires, size_t shots) override;
     auto Measure(QubitIdType wire) -> Result override;
     void Gradient(std::vector<DataView<double, 1>> &gradients,
                   const std::vector<size_t> &trainParams) override;

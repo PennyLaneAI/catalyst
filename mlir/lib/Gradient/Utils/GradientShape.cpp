@@ -25,9 +25,8 @@ namespace gradient {
 /// differentiated function, whereas the result signature is the set of shape
 /// unions for each combination of differentiable argument function result.
 ///
-std::vector<Type>
-computeResultTypes(func::FuncOp callee,
-                   const std::vector<uint64_t> &diffArgIndices) {
+std::vector<Type> computeResultTypes(func::FuncOp callee,
+                                     const std::vector<uint64_t> &diffArgIndices) {
     std::vector<Type> gradResultTypes;
     FunctionType fnType = callee.getFunctionType();
 
@@ -43,16 +42,14 @@ computeResultTypes(func::FuncOp callee,
     // differentiated argument shape with the corresponding function result
     // shape.
     for (size_t i = 0; i < numDiffArgs; i++) {
-        assert(diffArgIndices[i] < callee.getNumArguments() &&
-               "invalid diff argument index");
+        assert(diffArgIndices[i] < callee.getNumArguments() && "invalid diff argument index");
 
         Type diffArgType = fnType.getInput(diffArgIndices[i]);
 
         std::vector<int64_t> diffArgShape;
         if (auto tensorType = diffArgType.dyn_cast<TensorType>()) {
             diffArgShape.reserve(tensorType.getRank());
-            diffArgShape.insert(diffArgShape.end(),
-                                tensorType.getShape().begin(),
+            diffArgShape.insert(diffArgShape.end(), tensorType.getShape().begin(),
                                 tensorType.getShape().end());
         }
 
@@ -62,18 +59,15 @@ computeResultTypes(func::FuncOp callee,
             std::vector<int64_t> gradResShape = diffArgShape;
             auto tensorType = fnResType.dyn_cast<TensorType>();
             if (tensorType) {
-                gradResShape.reserve(diffArgShape.size() +
-                                     tensorType.getRank());
-                gradResShape.insert(gradResShape.end(),
-                                    tensorType.getShape().begin(),
+                gradResShape.reserve(diffArgShape.size() + tensorType.getRank());
+                gradResShape.insert(gradResShape.end(), tensorType.getShape().begin(),
                                     tensorType.getShape().end());
                 fnResType = tensorType.getElementType();
             }
 
-            Type gradResType =
-                !gradResShape.empty() || tensorType
-                    ? RankedTensorType::get(gradResShape, fnResType)
-                    : fnResType;
+            Type gradResType = !gradResShape.empty() || tensorType
+                                   ? RankedTensorType::get(gradResShape, fnResType)
+                                   : fnResType;
 
             gradResultTypes.push_back(gradResType);
         }
@@ -90,11 +84,9 @@ std::vector<Type> computeQGradTypes(func::FuncOp callee) {
         std::vector<int64_t> gradShape = {ShapedType::kDynamic};
 
         if (auto tensorType = resultType.dyn_cast<RankedTensorType>()) {
-            assert(tensorType.hasStaticShape() &&
-                   "only static tensors supported for autodiff");
+            assert(tensorType.hasStaticShape() && "only static tensors supported for autodiff");
             ArrayRef<int64_t> tensorShape = tensorType.getShape();
-            gradShape.insert(gradShape.end(), tensorShape.begin(),
-                             tensorShape.end());
+            gradShape.insert(gradShape.end(), tensorShape.begin(), tensorShape.end());
             resultType = tensorType.getElementType();
         }
 
