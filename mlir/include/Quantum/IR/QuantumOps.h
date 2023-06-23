@@ -43,7 +43,7 @@ class HermitianTrait : public TraitBase<ConcreteType, HermitianTrait> {};
 } // namespace mlir
 
 class QuantumMemory : public mlir::SideEffects::Resource::Base<QuantumMemory> {
-  llvm::StringRef getName() final { return "QuantumMemory"; }
+    llvm::StringRef getName() final { return "QuantumMemory"; }
 };
 
 //===----------------------------------------------------------------------===//

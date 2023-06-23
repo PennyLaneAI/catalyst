@@ -25,29 +25,29 @@ namespace quantum {
 
 void removeQuantumMeasurements(func::FuncOp &function) {
 
-  // Delete measurement operations.
-  std::deque<Operation *> opsToDelete;
-  function.walk([&](MeasurementProcess op) { opsToDelete.push_back(op); });
+    // Delete measurement operations.
+    std::deque<Operation *> opsToDelete;
+    function.walk([&](MeasurementProcess op) { opsToDelete.push_back(op); });
 
-  // Measurement operations are not allowed inside scf dialects.
-  // This means that we can remove them.
-  // But the question then becomes, can we have arbitrary control flow
-  // inside after measurements?
-  //
-  // This will remove the operation in opsToDelete as long as any other uses.
-  while (!opsToDelete.empty()) {
-    Operation *currentOp = opsToDelete.front();
-    opsToDelete.pop_front();
-    currentOp->dropAllReferences();
-    for (Operation *user : currentOp->getUsers()) {
-      opsToDelete.push_back(user);
+    // Measurement operations are not allowed inside scf dialects.
+    // This means that we can remove them.
+    // But the question then becomes, can we have arbitrary control flow
+    // inside after measurements?
+    //
+    // This will remove the operation in opsToDelete as long as any other uses.
+    while (!opsToDelete.empty()) {
+        Operation *currentOp = opsToDelete.front();
+        opsToDelete.pop_front();
+        currentOp->dropAllReferences();
+        for (Operation *user : currentOp->getUsers()) {
+            opsToDelete.push_back(user);
+        }
+        if (currentOp->use_empty()) {
+            currentOp->erase();
+        } else {
+            opsToDelete.push_back(currentOp);
+        }
     }
-    if (currentOp->use_empty()) {
-      currentOp->erase();
-    } else {
-      opsToDelete.push_back(currentOp);
-    }
-  }
 }
 
 } // namespace quantum

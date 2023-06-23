@@ -35,7 +35,7 @@ using namespace catalyst::quantum;
 //===----------------------------------------------------------------------===//
 
 Optional<Operation *> AllocOp::buildDealloc(OpBuilder &builder, Value alloc) {
-  return builder.create<DeallocOp>(alloc.getLoc(), alloc).getOperation();
+    return builder.create<DeallocOp>(alloc.getLoc(), alloc).getOperation();
 }
 
 //===----------------------------------------------------------------------===//
@@ -44,70 +44,71 @@ Optional<Operation *> AllocOp::buildDealloc(OpBuilder &builder, Value alloc) {
 
 LogicalResult DeallocOp::canonicalize(DeallocOp dealloc,
                                       mlir::PatternRewriter &rewriter) {
-  if (auto alloc =
-          dyn_cast_if_present<AllocOp>(dealloc.getQreg().getDefiningOp())) {
-    if (dealloc.getQreg().hasOneUse()) {
-      rewriter.eraseOp(dealloc);
-      rewriter.eraseOp(alloc);
-      return success();
+    if (auto alloc =
+            dyn_cast_if_present<AllocOp>(dealloc.getQreg().getDefiningOp())) {
+        if (dealloc.getQreg().hasOneUse()) {
+            rewriter.eraseOp(dealloc);
+            rewriter.eraseOp(alloc);
+            return success();
+        }
     }
-  }
 
-  return failure();
+    return failure();
 }
 
 template <typename IndexingOp>
 LogicalResult foldConstantIndexingOp(IndexingOp op, Attribute idx) {
-  // Prefer using an attribute when the index is constant.
-  bool hasNoIdxAttr = !op.getIdxAttr().has_value();
-  bool isConstantIdx = isa_and_nonnull<IntegerAttr>(idx);
-  if (hasNoIdxAttr && isConstantIdx) {
-    auto constantIdx = cast<IntegerAttr>(idx);
-    op.setIdxAttr(constantIdx.getValue().getSExtValue());
+    // Prefer using an attribute when the index is constant.
+    bool hasNoIdxAttr = !op.getIdxAttr().has_value();
+    bool isConstantIdx = isa_and_nonnull<IntegerAttr>(idx);
+    if (hasNoIdxAttr && isConstantIdx) {
+        auto constantIdx = cast<IntegerAttr>(idx);
+        op.setIdxAttr(constantIdx.getValue().getSExtValue());
 
-    // Remove the dynamic Value
-    op.getIdxMutable().clear();
-    return success();
-  }
-  return failure();
+        // Remove the dynamic Value
+        op.getIdxMutable().clear();
+        return success();
+    }
+    return failure();
 }
 
 OpFoldResult ExtractOp::fold(FoldAdaptor adaptor) {
-  if (succeeded(foldConstantIndexingOp(*this, adaptor.getIdx()))) {
-    return getResult();
-  }
-  // Returning nullptr tells the caller the op was unchanged.
-  return nullptr;
+    if (succeeded(foldConstantIndexingOp(*this, adaptor.getIdx()))) {
+        return getResult();
+    }
+    // Returning nullptr tells the caller the op was unchanged.
+    return nullptr;
 }
 
 LogicalResult InsertOp::canonicalize(InsertOp insert,
                                      mlir::PatternRewriter &rewriter) {
-  if (auto extract =
-          dyn_cast_if_present<ExtractOp>(insert.getQubit().getDefiningOp())) {
-    bool bothStatic =
-        extract.getIdxAttr().has_value() && insert.getIdxAttr().has_value();
-    bool bothDynamic =
-        !extract.getIdxAttr().has_value() && !insert.getIdxAttr().has_value();
-    bool staticallyEqual =
-        bothStatic && extract.getIdxAttrAttr() == insert.getIdxAttrAttr();
-    bool dynamicallyEqual = bothDynamic && extract.getIdx() == insert.getIdx();
+    if (auto extract =
+            dyn_cast_if_present<ExtractOp>(insert.getQubit().getDefiningOp())) {
+        bool bothStatic =
+            extract.getIdxAttr().has_value() && insert.getIdxAttr().has_value();
+        bool bothDynamic = !extract.getIdxAttr().has_value() &&
+                           !insert.getIdxAttr().has_value();
+        bool staticallyEqual =
+            bothStatic && extract.getIdxAttrAttr() == insert.getIdxAttrAttr();
+        bool dynamicallyEqual =
+            bothDynamic && extract.getIdx() == insert.getIdx();
 
-    if (staticallyEqual || dynamicallyEqual) {
-      rewriter.replaceOp(insert, extract.getQreg());
-      rewriter.eraseOp(extract);
-      return success();
+        if (staticallyEqual || dynamicallyEqual) {
+            rewriter.replaceOp(insert, extract.getQreg());
+            rewriter.eraseOp(extract);
+            return success();
+        }
     }
-  }
 
-  return failure();
+    return failure();
 }
 
 OpFoldResult InsertOp::fold(FoldAdaptor adaptor) {
-  if (succeeded(foldConstantIndexingOp(*this, adaptor.getIdx()))) {
-    return getResult();
-  }
-  // Returning nullptr tells the caller the op was unchanged.
-  return nullptr;
+    if (succeeded(foldConstantIndexingOp(*this, adaptor.getIdx()))) {
+        return getResult();
+    }
+    // Returning nullptr tells the caller the op was unchanged.
+    return nullptr;
 }
 
 //===----------------------------------------------------------------------===//
@@ -115,196 +116,199 @@ OpFoldResult InsertOp::fold(FoldAdaptor adaptor) {
 //===----------------------------------------------------------------------===//
 
 LogicalResult ExtractOp::verify() {
-  if (!(getIdx() || getIdxAttr().has_value())) {
-    return emitOpError() << "expected op to have a non-null index";
-  }
-  return success();
+    if (!(getIdx() || getIdxAttr().has_value())) {
+        return emitOpError() << "expected op to have a non-null index";
+    }
+    return success();
 }
 
 LogicalResult InsertOp::verify() {
-  if (!(getIdx() || getIdxAttr().has_value())) {
-    return emitOpError() << "expected op to have a non-null index";
-  }
-  return success();
+    if (!(getIdx() || getIdxAttr().has_value())) {
+        return emitOpError() << "expected op to have a non-null index";
+    }
+    return success();
 }
 
 static LogicalResult verifyObservable(Value obs, size_t *numQubits) {
-  if (auto compOp = obs.getDefiningOp<ComputationalBasisOp>()) {
-    *numQubits = compOp.getQubits().size();
-    return success();
-  } else if (obs.getDefiningOp<NamedObsOp>() ||
-             obs.getDefiningOp<HermitianOp>() ||
-             obs.getDefiningOp<TensorOp>() ||
-             obs.getDefiningOp<HamiltonianOp>()) {
-    return success();
-  }
+    if (auto compOp = obs.getDefiningOp<ComputationalBasisOp>()) {
+        *numQubits = compOp.getQubits().size();
+        return success();
+    } else if (obs.getDefiningOp<NamedObsOp>() ||
+               obs.getDefiningOp<HermitianOp>() ||
+               obs.getDefiningOp<TensorOp>() ||
+               obs.getDefiningOp<HamiltonianOp>()) {
+        return success();
+    }
 
-  return failure();
+    return failure();
 }
 
 static LogicalResult verifyTensorResult(Type ty, int64_t length) {
-  ShapedType tensor = ty.cast<ShapedType>();
-  if (!tensor.hasStaticShape() || tensor.getShape().size() != 1 ||
-      tensor.getShape()[0] != length) {
-    return failure();
-  }
+    ShapedType tensor = ty.cast<ShapedType>();
+    if (!tensor.hasStaticShape() || tensor.getShape().size() != 1 ||
+        tensor.getShape()[0] != length) {
+        return failure();
+    }
 
-  return success();
+    return success();
 }
 
 static LogicalResult verifyTensorResult(Type ty, int64_t length0,
                                         int64_t length1) {
-  ShapedType tensor = ty.cast<ShapedType>();
-  if (!tensor.hasStaticShape() || tensor.getShape().size() != 2 ||
-      tensor.getShape()[0] != length0 || tensor.getShape()[1] != length1) {
-    return failure();
-  }
+    ShapedType tensor = ty.cast<ShapedType>();
+    if (!tensor.hasStaticShape() || tensor.getShape().size() != 2 ||
+        tensor.getShape()[0] != length0 || tensor.getShape()[1] != length1) {
+        return failure();
+    }
 
-  return success();
+    return success();
 }
 
 // ----- gates
 
 LogicalResult QubitUnitaryOp::verify() {
-  size_t dim = std::pow(2, getInQubits().size());
-  if (failed(verifyTensorResult(getMatrix().getType().cast<ShapedType>(), dim,
-                                dim))) {
-    return emitOpError(
-        "The Unitary matrix must be of size 2^(num_qubits) * 2^(num_qubits)");
-  }
+    size_t dim = std::pow(2, getInQubits().size());
+    if (failed(verifyTensorResult(getMatrix().getType().cast<ShapedType>(), dim,
+                                  dim))) {
+        return emitOpError("The Unitary matrix must be of size 2^(num_qubits) "
+                           "* 2^(num_qubits)");
+    }
 
-  return success();
+    return success();
 }
 
 // ----- measurements
 
 LogicalResult HermitianOp::verify() {
-  size_t dim = std::pow(2, getQubits().size());
-  if (failed(verifyTensorResult(getMatrix().getType().cast<ShapedType>(), dim,
-                                dim)))
-    return emitOpError(
-        "The Hermitian matrix must be of size 2^(num_qubits) * 2^(num_qubits)");
+    size_t dim = std::pow(2, getQubits().size());
+    if (failed(verifyTensorResult(getMatrix().getType().cast<ShapedType>(), dim,
+                                  dim)))
+        return emitOpError("The Hermitian matrix must be of size "
+                           "2^(num_qubits) * 2^(num_qubits)");
 
-  return success();
+    return success();
 }
 
 LogicalResult SampleOp::verify() {
-  size_t numQubits;
-  if (failed(verifyObservable(getObs(), &numQubits))) {
-    return emitOpError("observable must be locally defined");
-  }
+    size_t numQubits;
+    if (failed(verifyObservable(getObs(), &numQubits))) {
+        return emitOpError("observable must be locally defined");
+    }
 
-  if (!((bool)getSamples() ^ (bool)getInData())) {
-    return emitOpError(
-        "either tensors must be returned or memrefs must be used as inputs");
-  }
+    if (!((bool)getSamples() ^ (bool)getInData())) {
+        return emitOpError("either tensors must be returned or memrefs must be "
+                           "used as inputs");
+    }
 
-  Type toVerify = getSamples() ? getSamples().getType() : getInData().getType();
-  if (getObs().getDefiningOp<ComputationalBasisOp>() &&
-      failed(verifyTensorResult(toVerify, getShots(), numQubits))) {
-    // In the computational basis, Pennylane adds a second dimension for the
-    // number of qubits.
-    return emitOpError("return tensor must have 2D static shape equal to "
-                       "(number of shots, number of qubits in observable)");
-  } else if (!getObs().getDefiningOp<ComputationalBasisOp>() &&
-             failed(verifyTensorResult(toVerify, getShots()))) {
-    // For any given observables, Pennylane always returns a 1D tensor.
-    return emitOpError(
-        "return tensor must have 1D static shape equal to (number of shots)");
-  }
+    Type toVerify =
+        getSamples() ? getSamples().getType() : getInData().getType();
+    if (getObs().getDefiningOp<ComputationalBasisOp>() &&
+        failed(verifyTensorResult(toVerify, getShots(), numQubits))) {
+        // In the computational basis, Pennylane adds a second dimension for the
+        // number of qubits.
+        return emitOpError("return tensor must have 2D static shape equal to "
+                           "(number of shots, number of qubits in observable)");
+    } else if (!getObs().getDefiningOp<ComputationalBasisOp>() &&
+               failed(verifyTensorResult(toVerify, getShots()))) {
+        // For any given observables, Pennylane always returns a 1D tensor.
+        return emitOpError("return tensor must have 1D static shape equal to "
+                           "(number of shots)");
+    }
 
-  return success();
+    return success();
 }
 
 LogicalResult CountsOp::verify() {
-  size_t numQubits = 0;
-  if (failed(verifyObservable(getObs(), &numQubits))) {
-    return emitOpError("observable must be locally defined");
-  }
+    size_t numQubits = 0;
+    if (failed(verifyObservable(getObs(), &numQubits))) {
+        return emitOpError("observable must be locally defined");
+    }
 
-  size_t numEigvals = 0;
-  if (getObs().getDefiningOp<NamedObsOp>()) {
-    // Any named observable has 2 eigenvalues.
-    numEigvals = 2;
-  } else if (getObs().getDefiningOp<ComputationalBasisOp>()) {
-    // In the computational basis, the "eigenvalues" are all possible bistrings
-    // one can measure.
-    numEigvals = std::pow(2, numQubits);
-  } else {
-    return emitOpError(
-        "cannot determine the number of eigenvalues for general observable");
-  }
+    size_t numEigvals = 0;
+    if (getObs().getDefiningOp<NamedObsOp>()) {
+        // Any named observable has 2 eigenvalues.
+        numEigvals = 2;
+    } else if (getObs().getDefiningOp<ComputationalBasisOp>()) {
+        // In the computational basis, the "eigenvalues" are all possible
+        // bistrings one can measure.
+        numEigvals = std::pow(2, numQubits);
+    } else {
+        return emitOpError("cannot determine the number of eigenvalues for "
+                           "general observable");
+    }
 
-  bool xor_eigvals = (bool)getEigvals() ^ (bool)getInEigvals();
-  bool xor_counts = (bool)getCounts() ^ (bool)getInCounts();
-  bool is_valid = xor_eigvals && xor_counts;
-  if (!is_valid) {
-    return emitOpError(
-        "either tensors must be returned or memrefs must be used as inputs");
-  }
+    bool xor_eigvals = (bool)getEigvals() ^ (bool)getInEigvals();
+    bool xor_counts = (bool)getCounts() ^ (bool)getInCounts();
+    bool is_valid = xor_eigvals && xor_counts;
+    if (!is_valid) {
+        return emitOpError("either tensors must be returned or memrefs must be "
+                           "used as inputs");
+    }
 
-  Type eigvalsToVerify = getEigvals() ? (Type)getEigvals().getType()
-                                      : (Type)getInEigvals().getType();
-  Type countsToVerify =
-      getCounts() ? (Type)getCounts().getType() : (Type)getInCounts().getType();
+    Type eigvalsToVerify = getEigvals() ? (Type)getEigvals().getType()
+                                        : (Type)getInEigvals().getType();
+    Type countsToVerify = getCounts() ? (Type)getCounts().getType()
+                                      : (Type)getInCounts().getType();
 
-  if (failed(verifyTensorResult(eigvalsToVerify, numEigvals)) ||
-      failed(verifyTensorResult(countsToVerify, numEigvals))) {
-    return emitOpError(
-        "number of eigenvalues or counts did not match observable");
-  }
+    if (failed(verifyTensorResult(eigvalsToVerify, numEigvals)) ||
+        failed(verifyTensorResult(countsToVerify, numEigvals))) {
+        return emitOpError(
+            "number of eigenvalues or counts did not match observable");
+    }
 
-  return success();
+    return success();
 }
 
 LogicalResult ProbsOp::verify() {
-  size_t numQubits = 0;
-  if (failed(verifyObservable(getObs(), &numQubits))) {
-    return emitOpError("observable must be locally defined");
-  }
+    size_t numQubits = 0;
+    if (failed(verifyObservable(getObs(), &numQubits))) {
+        return emitOpError("observable must be locally defined");
+    }
 
-  if (!numQubits) {
-    return emitOpError("only computational basis observables are supported");
-  }
+    if (!numQubits) {
+        return emitOpError(
+            "only computational basis observables are supported");
+    }
 
-  if (!(bool)getProbabilities() ^ (bool)getStateIn()) {
-    return emitOpError(
-        "either tensors must be returned or memrefs must be used as inputs");
-  }
+    if (!(bool)getProbabilities() ^ (bool)getStateIn()) {
+        return emitOpError("either tensors must be returned or memrefs must be "
+                           "used as inputs");
+    }
 
-  Type toVerify = getProbabilities() ? (Type)getProbabilities().getType()
-                                     : (Type)getStateIn().getType();
-  size_t dim = std::pow(2, numQubits);
-  if (failed(verifyTensorResult(toVerify.cast<ShapedType>(), dim))) {
-    return emitOpError(
-        "return tensor must have static length equal to 2^(number of qubits)");
-  }
+    Type toVerify = getProbabilities() ? (Type)getProbabilities().getType()
+                                       : (Type)getStateIn().getType();
+    size_t dim = std::pow(2, numQubits);
+    if (failed(verifyTensorResult(toVerify.cast<ShapedType>(), dim))) {
+        return emitOpError("return tensor must have static length equal to "
+                           "2^(number of qubits)");
+    }
 
-  return success();
+    return success();
 }
 
 LogicalResult StateOp::verify() {
-  size_t numQubits = 0;
-  if (failed(verifyObservable(getObs(), &numQubits))) {
-    return emitOpError("observable must be locally defined");
-  }
+    size_t numQubits = 0;
+    if (failed(verifyObservable(getObs(), &numQubits))) {
+        return emitOpError("observable must be locally defined");
+    }
 
-  if (!numQubits) {
-    return emitOpError("only computational basis observables are supported");
-  }
+    if (!numQubits) {
+        return emitOpError(
+            "only computational basis observables are supported");
+    }
 
-  if (!(bool)getState() ^ (bool)getStateIn()) {
-    return emitOpError(
-        "either tensors must be returned or memrefs must be used as inputs");
-  }
+    if (!(bool)getState() ^ (bool)getStateIn()) {
+        return emitOpError("either tensors must be returned or memrefs must be "
+                           "used as inputs");
+    }
 
-  Type toVerify =
-      getState() ? (Type)getState().getType() : (Type)getStateIn().getType();
-  size_t dim = std::pow(2, numQubits);
-  if (failed(verifyTensorResult(toVerify.cast<ShapedType>(), dim))) {
-    return emitOpError(
-        "return tensor must have static length equal to 2^(number of qubits)");
-  }
+    Type toVerify =
+        getState() ? (Type)getState().getType() : (Type)getStateIn().getType();
+    size_t dim = std::pow(2, numQubits);
+    if (failed(verifyTensorResult(toVerify.cast<ShapedType>(), dim))) {
+        return emitOpError("return tensor must have static length equal to "
+                           "2^(number of qubits)");
+    }
 
-  return success();
+    return success();
 }

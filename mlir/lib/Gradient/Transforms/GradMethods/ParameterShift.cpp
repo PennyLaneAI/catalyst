@@ -29,74 +29,76 @@ namespace catalyst {
 namespace gradient {
 
 LogicalResult ParameterShiftLowering::match(GradOp op) const {
-  if (getQNodeDiffMethod(op) == "parameter-shift") {
-    return success();
-  }
+    if (getQNodeDiffMethod(op) == "parameter-shift") {
+        return success();
+    }
 
-  return failure();
+    return failure();
 }
 
 void ParameterShiftLowering::rewrite(GradOp op,
                                      PatternRewriter &rewriter) const {
-  Location loc = op.getLoc();
-  func::FuncOp callee = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
-      op, op.getCalleeAttr());
-  rewriter.setInsertionPointAfter(callee);
+    Location loc = op.getLoc();
+    func::FuncOp callee = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
+        op, op.getCalleeAttr());
+    rewriter.setInsertionPointAfter(callee);
 
-  // Determine the number of parameters to shift (= to the total static number
-  // of gate parameters occuring in the function) and number of selectors needed
-  // (= to the number of loop nests containing quantum instructions with at
-  // least one gate parameter).
-  auto [numShifts, loopDepth] = analyzeFunction(callee);
+    // Determine the number of parameters to shift (= to the total static number
+    // of gate parameters occuring in the function) and number of selectors
+    // needed
+    // (= to the number of loop nests containing quantum instructions with at
+    // least one gate parameter).
+    auto [numShifts, loopDepth] = analyzeFunction(callee);
 
-  // Generate the classical argument map from function arguments to gate
-  // parameters. This function will be differentiated to produce the classical
-  // jacobian.
-  func::FuncOp argMapFn = genArgMapFunction(rewriter, loc, callee);
+    // Generate the classical argument map from function arguments to gate
+    // parameters. This function will be differentiated to produce the classical
+    // jacobian.
+    func::FuncOp argMapFn = genArgMapFunction(rewriter, loc, callee);
 
-  // Generate the shifted version of callee, enabling us to shift an arbitrary
-  // gate parameter at runtime.
-  func::FuncOp shiftFn =
-      genShiftFunction(rewriter, loc, callee, numShifts, loopDepth);
+    // Generate the shifted version of callee, enabling us to shift an arbitrary
+    // gate parameter at runtime.
+    func::FuncOp shiftFn =
+        genShiftFunction(rewriter, loc, callee, numShifts, loopDepth);
 
-  // Generate the quantum gradient function, exploiting the structure of the
-  // original function to dynamically compute the partial derivate with respect
-  // to each gate parameter.
-  func::FuncOp qGradFn =
-      genQGradFunction(rewriter, loc, callee, shiftFn, numShifts, loopDepth);
+    // Generate the quantum gradient function, exploiting the structure of the
+    // original function to dynamically compute the partial derivate with
+    // respect to each gate parameter.
+    func::FuncOp qGradFn =
+        genQGradFunction(rewriter, loc, callee, shiftFn, numShifts, loopDepth);
 
-  // Generate the full gradient function, computing the partial derivates with
-  // respect to the original function arguments from the classical Jacobian and
-  // quantum gradient.
-  func::FuncOp fullGradFn =
-      genFullGradFunction(rewriter, loc, op, argMapFn, qGradFn, "ps");
+    // Generate the full gradient function, computing the partial derivates with
+    // respect to the original function arguments from the classical Jacobian
+    // and quantum gradient.
+    func::FuncOp fullGradFn =
+        genFullGradFunction(rewriter, loc, op, argMapFn, qGradFn, "ps");
 
-  rewriter.setInsertionPoint(op);
-  rewriter.replaceOpWithNewOp<func::CallOp>(op, fullGradFn,
-                                            op.getArgOperands());
+    rewriter.setInsertionPoint(op);
+    rewriter.replaceOpWithNewOp<func::CallOp>(op, fullGradFn,
+                                              op.getArgOperands());
 }
 
 std::pair<int64_t, int64_t>
 ParameterShiftLowering::analyzeFunction(func::FuncOp callee) {
-  int64_t numShifts = 0;
-  int64_t loopLevel = 0;
-  int64_t maxLoopDepth = 0;
+    int64_t numShifts = 0;
+    int64_t loopLevel = 0;
+    int64_t maxLoopDepth = 0;
 
-  callee.walk<WalkOrder::PreOrder>([&](Operation *op) {
-    if (isa<scf::ForOp>(op)) {
-      loopLevel++;
-    } else if (auto gate = dyn_cast<quantum::DifferentiableGate>(op)) {
-      if (gate.getDiffParams().empty())
-        return;
+    callee.walk<WalkOrder::PreOrder>([&](Operation *op) {
+        if (isa<scf::ForOp>(op)) {
+            loopLevel++;
+        } else if (auto gate = dyn_cast<quantum::DifferentiableGate>(op)) {
+            if (gate.getDiffParams().empty())
+                return;
 
-      numShifts += gate.getDiffParams().size();
-      maxLoopDepth = std::max(loopLevel, maxLoopDepth);
-    } else if (isa<scf::YieldOp>(op) && isa<scf::ForOp>(op->getParentOp())) {
-      loopLevel--;
-    }
-  });
+            numShifts += gate.getDiffParams().size();
+            maxLoopDepth = std::max(loopLevel, maxLoopDepth);
+        } else if (isa<scf::YieldOp>(op) &&
+                   isa<scf::ForOp>(op->getParentOp())) {
+            loopLevel--;
+        }
+    });
 
-  return {numShifts, maxLoopDepth};
+    return {numShifts, maxLoopDepth};
 }
 
 } // namespace gradient

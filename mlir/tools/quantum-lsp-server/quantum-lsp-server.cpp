@@ -21,11 +21,11 @@
 #include "Quantum/IR/QuantumDialect.h"
 
 int main(int argc, char **argv) {
-  mlir::DialectRegistry registry;
-  mlir::registerAllDialects(registry);
-  registry.insert<catalyst::CatalystDialect>();
-  registry.insert<catalyst::quantum::QuantumDialect>();
-  registry.insert<catalyst::gradient::GradientDialect>();
+    mlir::DialectRegistry registry;
+    mlir::registerAllDialects(registry);
+    registry.insert<catalyst::CatalystDialect>();
+    registry.insert<catalyst::quantum::QuantumDialect>();
+    registry.insert<catalyst::gradient::GradientDialect>();
 
-  return mlir::failed(mlir::MlirLspServerMain(argc, argv, registry));
+    return mlir::failed(mlir::MlirLspServerMain(argc, argv, registry));
 }

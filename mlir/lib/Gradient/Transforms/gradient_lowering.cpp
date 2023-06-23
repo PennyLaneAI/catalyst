@@ -45,32 +45,33 @@ namespace gradient {
 
 struct GradientLoweringPass
     : impl::GradientLoweringPassBase<GradientLoweringPass> {
-  using GradientLoweringPassBase::GradientLoweringPassBase;
+    using GradientLoweringPassBase::GradientLoweringPassBase;
 
-  void runOnOperation() final {
-    RewritePatternSet gradientPatterns(&getContext());
-    populateLoweringPatterns(gradientPatterns, lowerOnly);
+    void runOnOperation() final {
+        RewritePatternSet gradientPatterns(&getContext());
+        populateLoweringPatterns(gradientPatterns, lowerOnly);
 
-    // This is required to remove qubit values returned by if/for ops in the
-    // quantum gradient function of the parameter-shift pattern.
-    scf::IfOp::getCanonicalizationPatterns(gradientPatterns, &getContext());
-    scf::ForOp::getCanonicalizationPatterns(gradientPatterns, &getContext());
-    catalyst::quantum::InsertOp::getCanonicalizationPatterns(gradientPatterns,
-                                                             &getContext());
-    catalyst::quantum::DeallocOp::getCanonicalizationPatterns(gradientPatterns,
-                                                              &getContext());
+        // This is required to remove qubit values returned by if/for ops in the
+        // quantum gradient function of the parameter-shift pattern.
+        scf::IfOp::getCanonicalizationPatterns(gradientPatterns, &getContext());
+        scf::ForOp::getCanonicalizationPatterns(gradientPatterns,
+                                                &getContext());
+        catalyst::quantum::InsertOp::getCanonicalizationPatterns(
+            gradientPatterns, &getContext());
+        catalyst::quantum::DeallocOp::getCanonicalizationPatterns(
+            gradientPatterns, &getContext());
 
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(gradientPatterns)))) {
-      return signalPassFailure();
+        if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                                std::move(gradientPatterns)))) {
+            return signalPassFailure();
+        }
     }
-  }
 };
 
 } // namespace gradient
 
 std::unique_ptr<Pass> createGradientLoweringPass() {
-  return std::make_unique<gradient::GradientLoweringPass>();
+    return std::make_unique<gradient::GradientLoweringPass>();
 }
 
 } // namespace catalyst

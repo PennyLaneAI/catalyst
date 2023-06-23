@@ -36,83 +36,83 @@
 namespace Catalyst::Runtime::Simulator {
 static inline auto parse_kwargs(std::string kwargs)
     -> std::unordered_map<std::string, std::string> {
-  // cleaning kwargs
-  if (kwargs.empty()) {
-    return {};
-  }
+    // cleaning kwargs
+    if (kwargs.empty()) {
+        return {};
+    }
 
-  kwargs.erase(std::remove_if(kwargs.begin(), kwargs.end(),
-                              [](char c) {
-                                switch (c) {
-                                case '{':
-                                case '}':
-                                case ' ':
-                                case '\'':
-                                  return true;
-                                default:
-                                  return false;
-                                }
-                              }),
-               kwargs.end());
+    kwargs.erase(std::remove_if(kwargs.begin(), kwargs.end(),
+                                [](char c) {
+                                    switch (c) {
+                                    case '{':
+                                    case '}':
+                                    case ' ':
+                                    case '\'':
+                                        return true;
+                                    default:
+                                        return false;
+                                    }
+                                }),
+                 kwargs.end());
 
-  // constructing map
-  std::unordered_map<std::string, std::string> map;
-  std::istringstream iss(kwargs);
-  std::string token;
-  while (std::getline(iss, token, ',')) {
-    std::istringstream issp(token);
-    std::string pair[2];
-    std::getline(issp, pair[0], ':');
-    std::getline(issp, pair[1]);
-    map[pair[0]] = pair[1];
-  }
+    // constructing map
+    std::unordered_map<std::string, std::string> map;
+    std::istringstream iss(kwargs);
+    std::string token;
+    while (std::getline(iss, token, ',')) {
+        std::istringstream issp(token);
+        std::string pair[2];
+        std::getline(issp, pair[0], ':');
+        std::getline(issp, pair[1]);
+        map[pair[0]] = pair[1];
+    }
 
-  return map;
+    return map;
 }
 } // namespace Catalyst::Runtime::Simulator
 
 namespace Catalyst::Runtime::Simulator::Lightning {
 enum class SimulatorGate : uint8_t {
-  // 1-qubit
-  Identity, // = 0
-  PauliX,
-  PauliY,
-  PauliZ,
-  Hadamard,
-  S,
-  T,
-  PhaseShift,
-  RX,
-  RY,
-  RZ,
-  Rot,
-  // 2-qubit
-  CNOT,
-  CY,
-  CZ,
-  SWAP,
-  IsingXX,
-  IsingYY,
-  IsingXY,
-  IsingZZ,
-  ControlledPhaseShift,
-  CRX,
-  CRY,
-  CRZ,
-  CRot,
-  // 3-qubit
-  CSWAP,
-  Toffoli,
-  // n-qubit
-  MultiRZ,
+    // 1-qubit
+    Identity, // = 0
+    PauliX,
+    PauliY,
+    PauliZ,
+    Hadamard,
+    S,
+    T,
+    PhaseShift,
+    RX,
+    RY,
+    RZ,
+    Rot,
+    // 2-qubit
+    CNOT,
+    CY,
+    CZ,
+    SWAP,
+    IsingXX,
+    IsingYY,
+    IsingXY,
+    IsingZZ,
+    ControlledPhaseShift,
+    CRX,
+    CRY,
+    CRZ,
+    CRot,
+    // 3-qubit
+    CSWAP,
+    Toffoli,
+    // n-qubit
+    MultiRZ,
 };
 
 enum class Measurements : uint8_t {
-  None, // = 0
-  Expval,
-  Var,
-  Probs,
-  State,
+    None, // = 0
+    Expval,
+    Var,
+    Probs,
+    State,
 };
 
 constexpr std::array simulator_observable_support = {
@@ -176,39 +176,39 @@ template <size_t size = simulator_observable_support_size>
 constexpr auto lookup_obs(
     const std::array<std::tuple<ObsId, std::string_view, bool>, size> &arr,
     const ObsId key) -> std::string_view {
-  for (size_t idx = 0; idx < size; idx++) {
-    auto &&[op_id, op_str, op_support] = arr[idx];
-    if (op_id == key && op_support) {
-      return op_str;
+    for (size_t idx = 0; idx < size; idx++) {
+        auto &&[op_id, op_str, op_support] = arr[idx];
+        if (op_id == key && op_support) {
+            return op_str;
+        }
     }
-  }
-  throw std::range_error(
-      "The given observable is not supported by the simulator");
+    throw std::range_error(
+        "The given observable is not supported by the simulator");
 }
 
 template <size_t size = simulator_gate_info_size>
 constexpr auto lookup_gates(const SimulatorGateInfoDataT<size> &arr,
                             const std::string &key)
     -> std::pair<size_t, size_t> {
-  for (size_t idx = 0; idx < size; idx++) {
-    auto &&[op, op_str, op_num_wires, op_num_params] = arr[idx];
-    if (op_str == key) {
-      return std::make_pair(op_num_wires, op_num_params);
+    for (size_t idx = 0; idx < size; idx++) {
+        auto &&[op, op_str, op_num_wires, op_num_params] = arr[idx];
+        if (op_str == key) {
+            return std::make_pair(op_num_wires, op_num_params);
+        }
     }
-  }
-  throw std::range_error(
-      "The given operation is not supported by the simulator");
+    throw std::range_error(
+        "The given operation is not supported by the simulator");
 }
 
 template <size_t size = simulator_gate_info_size>
 constexpr auto has_gate(const SimulatorGateInfoDataT<size> &arr,
                         const std::string &key) -> bool {
-  for (size_t idx = 0; idx < size; idx++) {
-    if (std::get<1>(arr[idx]) == key) {
-      return true;
+    for (size_t idx = 0; idx < size; idx++) {
+        if (std::get<1>(arr[idx]) == key) {
+            return true;
+        }
     }
-  }
-  return false;
+    return false;
 }
 
 } // namespace Catalyst::Runtime::Simulator::Lightning

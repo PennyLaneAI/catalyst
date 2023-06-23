@@ -34,75 +34,75 @@ typedef RESULT *Result;
 typedef intptr_t ObsIdType;
 
 enum ObsId : int8_t {
-  Identity = 0,
-  PauliX,
-  PauliY,
-  PauliZ,
-  Hadamard,
-  Hermitian,
+    Identity = 0,
+    PauliX,
+    PauliY,
+    PauliZ,
+    Hadamard,
+    Hermitian,
 };
 
 enum ObsType : int8_t {
-  Basic = 0,
-  TensorProd,
-  Hamiltonian,
+    Basic = 0,
+    TensorProd,
+    Hamiltonian,
 };
 
 // complex<double> type
 struct CplxT_double {
-  double real;
-  double imag;
+    double real;
+    double imag;
 };
 
 // MemRefT<complex<double>, dimension=1> type
 struct MemRefT_CplxT_double_1d {
-  CplxT_double *data_allocated;
-  CplxT_double *data_aligned;
-  size_t offset;
-  size_t sizes[1];
-  size_t strides[1];
+    CplxT_double *data_allocated;
+    CplxT_double *data_aligned;
+    size_t offset;
+    size_t sizes[1];
+    size_t strides[1];
 };
 
 // MemRefT<complex<double>, dimension=2> type
 struct MemRefT_CplxT_double_2d {
-  CplxT_double *data_allocated;
-  CplxT_double *data_aligned;
-  size_t offset;
-  size_t sizes[2];
-  size_t strides[2];
+    CplxT_double *data_allocated;
+    CplxT_double *data_aligned;
+    size_t offset;
+    size_t sizes[2];
+    size_t strides[2];
 };
 
 // MemRefT<double, dimension=1> type
 struct MemRefT_double_1d {
-  double *data_allocated;
-  double *data_aligned;
-  size_t offset;
-  size_t sizes[1];
-  size_t strides[1];
+    double *data_allocated;
+    double *data_aligned;
+    size_t offset;
+    size_t sizes[1];
+    size_t strides[1];
 };
 
 // MemRefT<double, dimension=2> type
 struct MemRefT_double_2d {
-  double *data_allocated;
-  double *data_aligned;
-  size_t offset;
-  size_t sizes[2];
-  size_t strides[2];
+    double *data_allocated;
+    double *data_aligned;
+    size_t offset;
+    size_t sizes[2];
+    size_t strides[2];
 };
 
 // MemRefT<int64_t, dimension=1> type
 struct MemRefT_int64_1d {
-  int64_t *data_allocated;
-  int64_t *data_aligned;
-  size_t offset;
-  size_t sizes[1];
-  size_t strides[1];
+    int64_t *data_allocated;
+    int64_t *data_aligned;
+    size_t offset;
+    size_t sizes[1];
+    size_t strides[1];
 };
 
 // PairT<MemRefT<double, dimension=1>, MemRefT<int64, dimension=2>> type
 struct PairT_MemRefT_double_int64_1d {
-  struct MemRefT_double_1d first;
-  struct MemRefT_int64_1d second;
+    struct MemRefT_double_1d first;
+    struct MemRefT_int64_1d second;
 };
 
 typedef struct CplxT_double CplxT_double;

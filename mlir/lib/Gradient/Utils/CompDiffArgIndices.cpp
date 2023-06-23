@@ -20,14 +20,14 @@ using namespace mlir;
 namespace catalyst {
 
 std::vector<size_t> compDiffArgIndices(Optional<DenseIntElementsAttr> indices) {
-  // By default only the first argument is differentiated, otherwise gather
-  // indices.
-  std::vector<size_t> diffArgIndices{0};
-  if (indices.has_value()) {
-    auto range = indices.value().getValues<size_t>();
-    diffArgIndices = std::vector<size_t>(range.begin(), range.end());
-  }
-  return diffArgIndices;
+    // By default only the first argument is differentiated, otherwise gather
+    // indices.
+    std::vector<size_t> diffArgIndices{0};
+    if (indices.has_value()) {
+        auto range = indices.value().getValues<size_t>();
+        diffArgIndices = std::vector<size_t>(range.begin(), range.end());
+    }
+    return diffArgIndices;
 }
 
 }; // namespace catalyst

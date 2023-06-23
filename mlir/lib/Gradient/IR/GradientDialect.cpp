@@ -28,13 +28,13 @@ using namespace catalyst::gradient;
 
 namespace {
 struct GradientInlinerInterface : public DialectInlinerInterface {
-  using DialectInlinerInterface::DialectInlinerInterface;
+    using DialectInlinerInterface::DialectInlinerInterface;
 
-  /// Operations in Gradient dialect are always legal to inline.
-  bool isLegalToInline(Operation *, Region *, bool,
-                       IRMapping &valueMapping) const final {
-    return true;
-  }
+    /// Operations in Gradient dialect are always legal to inline.
+    bool isLegalToInline(Operation *, Region *, bool,
+                         IRMapping &valueMapping) const final {
+        return true;
+    }
 };
 } // namespace
 
@@ -43,9 +43,9 @@ struct GradientInlinerInterface : public DialectInlinerInterface {
 //===----------------------------------------------------------------------===//
 
 void GradientDialect::initialize() {
-  addOperations<
+    addOperations<
 #define GET_OP_LIST
 #include "Gradient/IR/GradientOps.cpp.inc"
-      >();
-  addInterface<GradientInlinerInterface>();
+        >();
+    addInterface<GradientInlinerInterface>();
 }

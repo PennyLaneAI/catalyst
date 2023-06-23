@@ -35,127 +35,127 @@ namespace catalyst {
 namespace gradient {
 
 LogicalResult AdjointLowering::match(GradOp op) const {
-  if (getQNodeDiffMethod(op) == "adjoint")
-    return success();
+    if (getQNodeDiffMethod(op) == "adjoint")
+        return success();
 
-  return failure();
+    return failure();
 }
 
 void AdjointLowering::rewrite(GradOp op, PatternRewriter &rewriter) const {
-  Location loc = op.getLoc();
-  func::FuncOp callee = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
-      op, op.getCalleeAttr());
-  rewriter.setInsertionPointAfter(callee);
+    Location loc = op.getLoc();
+    func::FuncOp callee = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
+        op, op.getCalleeAttr());
+    rewriter.setInsertionPointAfter(callee);
 
-  // Generate the classical argument map from function arguments to gate
-  // parameters. This function will be differentiated to produce the classical
-  // jacobian.
-  func::FuncOp argMapFn = genArgMapFunction(rewriter, loc, callee);
+    // Generate the classical argument map from function arguments to gate
+    // parameters. This function will be differentiated to produce the classical
+    // jacobian.
+    func::FuncOp argMapFn = genArgMapFunction(rewriter, loc, callee);
 
-  // Generate the quantum gradient function, relying on the backend to implement
-  // the adjoint computation.
-  func::FuncOp qGradFn = genQGradFunction(rewriter, loc, callee);
+    // Generate the quantum gradient function, relying on the backend to
+    // implement the adjoint computation.
+    func::FuncOp qGradFn = genQGradFunction(rewriter, loc, callee);
 
-  // Generate the full gradient function, computing the partial derivatives with
-  // respect to the original function arguments from the classical Jacobian and
-  // quantum gradient.
-  func::FuncOp fullGradFn =
-      genFullGradFunction(rewriter, loc, op, argMapFn, qGradFn, "adj");
+    // Generate the full gradient function, computing the partial derivatives
+    // with respect to the original function arguments from the classical
+    // Jacobian and quantum gradient.
+    func::FuncOp fullGradFn =
+        genFullGradFunction(rewriter, loc, op, argMapFn, qGradFn, "adj");
 
-  rewriter.setInsertionPoint(op);
-  rewriter.replaceOpWithNewOp<func::CallOp>(op, fullGradFn,
-                                            op.getArgOperands());
+    rewriter.setInsertionPoint(op);
+    rewriter.replaceOpWithNewOp<func::CallOp>(op, fullGradFn,
+                                              op.getArgOperands());
 }
 
 func::FuncOp AdjointLowering::discardAndReturnReg(PatternRewriter &rewriter,
                                                   Location loc,
                                                   func::FuncOp callee) {
-  SmallVector<quantum::DeallocOp> deallocs;
-  for (auto op : callee.getOps<quantum::DeallocOp>()) {
-    deallocs.push_back(op);
-  };
+    SmallVector<quantum::DeallocOp> deallocs;
+    for (auto op : callee.getOps<quantum::DeallocOp>()) {
+        deallocs.push_back(op);
+    };
 
-  // If there are no deallocs leave early then this transformation
-  // is invalid. This is because the caller will expect a quantum register
-  // as a return value.
-  // Also, let's handle the simple case that is guaranteed at the moment.
-  size_t numDeallocs = deallocs.size();
-  if (numDeallocs != 1) {
-    callee.emitOpError() << "Invalid number of quantum registers: "
-                         << numDeallocs;
-    return callee;
-  }
+    // If there are no deallocs leave early then this transformation
+    // is invalid. This is because the caller will expect a quantum register
+    // as a return value.
+    // Also, let's handle the simple case that is guaranteed at the moment.
+    size_t numDeallocs = deallocs.size();
+    if (numDeallocs != 1) {
+        callee.emitOpError()
+            << "Invalid number of quantum registers: " << numDeallocs;
+        return callee;
+    }
 
-  // Since the return value is guaranteed to be discarded, then let's change the
-  // return type to be only the quantum register.
-  std::string fnName = callee.getName().str() + ".nodealloc";
-  Type qregType = quantum::QuregType::get(rewriter.getContext());
-  FunctionType fnType =
-      rewriter.getFunctionType(callee.getArgumentTypes(), qregType);
-  StringAttr visibility = rewriter.getStringAttr("private");
+    // Since the return value is guaranteed to be discarded, then let's change
+    // the return type to be only the quantum register.
+    std::string fnName = callee.getName().str() + ".nodealloc";
+    Type qregType = quantum::QuregType::get(rewriter.getContext());
+    FunctionType fnType =
+        rewriter.getFunctionType(callee.getArgumentTypes(), qregType);
+    StringAttr visibility = rewriter.getStringAttr("private");
 
-  func::FuncOp unallocFn = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
-      callee, rewriter.getStringAttr(fnName));
+    func::FuncOp unallocFn = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
+        callee, rewriter.getStringAttr(fnName));
 
-  if (!unallocFn) {
-    PatternRewriter::InsertionGuard insertGuard(rewriter);
-    rewriter.setInsertionPointAfter(callee);
-    unallocFn = rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility,
-                                              nullptr, nullptr);
-    // clone the body.
-    rewriter.cloneRegionBefore(callee.getBody(), unallocFn.getBody(),
-                               unallocFn.end());
-    rewriter.setInsertionPointToStart(&unallocFn.getBody().front());
+    if (!unallocFn) {
+        PatternRewriter::InsertionGuard insertGuard(rewriter);
+        rewriter.setInsertionPointAfter(callee);
+        unallocFn = rewriter.create<func::FuncOp>(loc, fnName, fnType,
+                                                  visibility, nullptr, nullptr);
+        // clone the body.
+        rewriter.cloneRegionBefore(callee.getBody(), unallocFn.getBody(),
+                                   unallocFn.end());
+        rewriter.setInsertionPointToStart(&unallocFn.getBody().front());
 
-    // Let's capture the qreg.
-    quantum::DeallocOp localDealloc =
-        *unallocFn.getOps<quantum::DeallocOp>().begin();
+        // Let's capture the qreg.
+        quantum::DeallocOp localDealloc =
+            *unallocFn.getOps<quantum::DeallocOp>().begin();
 
-    // Let's return the qreg.
-    unallocFn.walk([&](func::ReturnOp returnOp) {
-      returnOp->setOperands(localDealloc.getOperand());
-    });
+        // Let's return the qreg.
+        unallocFn.walk([&](func::ReturnOp returnOp) {
+            returnOp->setOperands(localDealloc.getOperand());
+        });
 
-    // Let's erase the deallocation.
-    rewriter.eraseOp(localDealloc);
-  }
+        // Let's erase the deallocation.
+        rewriter.eraseOp(localDealloc);
+    }
 
-  return unallocFn;
+    return unallocFn;
 }
 
 func::FuncOp AdjointLowering::genQGradFunction(PatternRewriter &rewriter,
                                                Location loc,
                                                func::FuncOp callee) {
 
-  func::FuncOp unallocFn = discardAndReturnReg(rewriter, loc, callee);
+    func::FuncOp unallocFn = discardAndReturnReg(rewriter, loc, callee);
 
-  std::string fnName = callee.getName().str() + ".adjoint";
-  std::vector<Type> fnArgTypes = callee.getArgumentTypes().vec();
-  Type gradientSizeType = rewriter.getIndexType();
-  fnArgTypes.push_back(gradientSizeType);
-  FunctionType fnType =
-      rewriter.getFunctionType(fnArgTypes, computeQGradTypes(callee));
-  StringAttr visibility = rewriter.getStringAttr("private");
+    std::string fnName = callee.getName().str() + ".adjoint";
+    std::vector<Type> fnArgTypes = callee.getArgumentTypes().vec();
+    Type gradientSizeType = rewriter.getIndexType();
+    fnArgTypes.push_back(gradientSizeType);
+    FunctionType fnType =
+        rewriter.getFunctionType(fnArgTypes, computeQGradTypes(callee));
+    StringAttr visibility = rewriter.getStringAttr("private");
 
-  func::FuncOp qGradFn = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
-      callee, rewriter.getStringAttr(fnName));
-  if (!qGradFn) {
-    PatternRewriter::InsertionGuard insertGuard(rewriter);
-    rewriter.setInsertionPointAfter(callee);
+    func::FuncOp qGradFn = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
+        callee, rewriter.getStringAttr(fnName));
+    if (!qGradFn) {
+        PatternRewriter::InsertionGuard insertGuard(rewriter);
+        rewriter.setInsertionPointAfter(callee);
 
-    qGradFn = rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility,
-                                            nullptr, nullptr);
-    rewriter.setInsertionPointToStart(qGradFn.addEntryBlock());
+        qGradFn = rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility,
+                                                nullptr, nullptr);
+        rewriter.setInsertionPointToStart(qGradFn.addEntryBlock());
 
-    AdjointOp qGradOp = rewriter.create<AdjointOp>(
-        loc, computeQGradTypes(callee), unallocFn.getName(),
-        qGradFn.getArguments().back(), qGradFn.getArguments().drop_back(),
-        ValueRange{});
+        AdjointOp qGradOp = rewriter.create<AdjointOp>(
+            loc, computeQGradTypes(callee), unallocFn.getName(),
+            qGradFn.getArguments().back(), qGradFn.getArguments().drop_back(),
+            ValueRange{});
 
-    rewriter.create<func::ReturnOp>(loc, qGradOp.getResults());
-  }
+        rewriter.create<func::ReturnOp>(loc, qGradOp.getResults());
+    }
 
-  return qGradFn;
+    return qGradFn;
 }
 
 } // namespace gradient

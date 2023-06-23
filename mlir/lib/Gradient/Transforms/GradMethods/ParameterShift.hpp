@@ -29,22 +29,22 @@ namespace catalyst {
 namespace gradient {
 
 struct ParameterShiftLowering : public OpRewritePattern<GradOp> {
-  using OpRewritePattern<GradOp>::OpRewritePattern;
+    using OpRewritePattern<GradOp>::OpRewritePattern;
 
-  LogicalResult match(GradOp op) const override;
-  void rewrite(GradOp op, PatternRewriter &rewriter) const override;
+    LogicalResult match(GradOp op) const override;
+    void rewrite(GradOp op, PatternRewriter &rewriter) const override;
 
-private:
-  static std::pair<int64_t, int64_t> analyzeFunction(func::FuncOp callee);
-  static func::FuncOp genShiftFunction(PatternRewriter &rewriter, Location loc,
-                                       func::FuncOp callee,
-                                       const int64_t numShifts,
-                                       const int64_t loopDepth);
-  static func::FuncOp genQGradFunction(PatternRewriter &rewriter, Location loc,
-                                       func::FuncOp callee,
-                                       func::FuncOp shiftedFn,
-                                       const int64_t numShifts,
-                                       const int64_t loopDepth);
+  private:
+    static std::pair<int64_t, int64_t> analyzeFunction(func::FuncOp callee);
+    static func::FuncOp genShiftFunction(PatternRewriter &rewriter,
+                                         Location loc, func::FuncOp callee,
+                                         const int64_t numShifts,
+                                         const int64_t loopDepth);
+    static func::FuncOp genQGradFunction(PatternRewriter &rewriter,
+                                         Location loc, func::FuncOp callee,
+                                         func::FuncOp shiftedFn,
+                                         const int64_t numShifts,
+                                         const int64_t loopDepth);
 };
 
 } // namespace gradient

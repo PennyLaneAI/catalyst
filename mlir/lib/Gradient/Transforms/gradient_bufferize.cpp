@@ -34,38 +34,39 @@ namespace gradient {
 
 struct GradientBufferizationPass
     : impl::GradientBufferizationPassBase<GradientBufferizationPass> {
-  using GradientBufferizationPassBase::GradientBufferizationPassBase;
+    using GradientBufferizationPassBase::GradientBufferizationPassBase;
 
-  void runOnOperation() final {
-    MLIRContext *context = &getContext();
-    bufferization::BufferizeTypeConverter typeConverter;
+    void runOnOperation() final {
+        MLIRContext *context = &getContext();
+        bufferization::BufferizeTypeConverter typeConverter;
 
-    RewritePatternSet patterns(context);
-    populateBufferizationPatterns(typeConverter, patterns);
+        RewritePatternSet patterns(context);
+        populateBufferizationPatterns(typeConverter, patterns);
 
-    ConversionTarget target(*context);
-    bufferization::populateBufferizeMaterializationLegality(target);
-    // Default to operations being legal with the exception of the ones below.
-    target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
-    // Gradient ops which return arrays need to be marked illegal when the type
-    // is a tensor.
-    target.addDynamicallyLegalOp<AdjointOp>(
-        [&](AdjointOp op) { return typeConverter.isLegal(op); });
+        ConversionTarget target(*context);
+        bufferization::populateBufferizeMaterializationLegality(target);
+        // Default to operations being legal with the exception of the ones
+        // below.
+        target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
+        // Gradient ops which return arrays need to be marked illegal when the
+        // type is a tensor.
+        target.addDynamicallyLegalOp<AdjointOp>(
+            [&](AdjointOp op) { return typeConverter.isLegal(op); });
 
-    target.addDynamicallyLegalOp<BackpropOp>(
-        [&](BackpropOp op) { return typeConverter.isLegal(op); });
+        target.addDynamicallyLegalOp<BackpropOp>(
+            [&](BackpropOp op) { return typeConverter.isLegal(op); });
 
-    if (failed(applyPartialConversion(getOperation(), target,
-                                      std::move(patterns)))) {
-      signalPassFailure();
+        if (failed(applyPartialConversion(getOperation(), target,
+                                          std::move(patterns)))) {
+            signalPassFailure();
+        }
     }
-  }
 };
 
 } // namespace gradient
 
 std::unique_ptr<Pass> createGradientBufferizationPass() {
-  return std::make_unique<gradient::GradientBufferizationPass>();
+    return std::make_unique<gradient::GradientBufferizationPass>();
 }
 
 } // namespace catalyst

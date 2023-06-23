@@ -39,79 +39,83 @@ namespace gradient {
 ///
 func::FuncOp genArgMapFunction(PatternRewriter &rewriter, Location loc,
                                func::FuncOp callee) {
-  // Define the properties of the classical preprocessing function.
-  std::string fnName = callee.getSymName().str() + ".argmap";
-  std::vector<Type> fnArgTypes = callee.getArgumentTypes().vec();
-  RankedTensorType paramsVectorType =
-      RankedTensorType::get({ShapedType::kDynamic}, rewriter.getF64Type());
-  FunctionType fnType = rewriter.getFunctionType(fnArgTypes, paramsVectorType);
-  StringAttr visibility = rewriter.getStringAttr("private");
+    // Define the properties of the classical preprocessing function.
+    std::string fnName = callee.getSymName().str() + ".argmap";
+    std::vector<Type> fnArgTypes = callee.getArgumentTypes().vec();
+    RankedTensorType paramsVectorType =
+        RankedTensorType::get({ShapedType::kDynamic}, rewriter.getF64Type());
+    FunctionType fnType =
+        rewriter.getFunctionType(fnArgTypes, paramsVectorType);
+    StringAttr visibility = rewriter.getStringAttr("private");
 
-  func::FuncOp argMapFn = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
-      callee, rewriter.getStringAttr(fnName));
-  if (!argMapFn) {
-    // First copy the original function as is, then we can replace all quantum
-    // ops by collecting their gate parameters in a memory buffer instead. The
-    // size of this vector is passed as an input to the new function.
-    argMapFn = rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility,
-                                             nullptr, nullptr);
-    rewriter.cloneRegionBefore(callee.getBody(), argMapFn.getBody(),
-                               argMapFn.end());
+    func::FuncOp argMapFn = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
+        callee, rewriter.getStringAttr(fnName));
+    if (!argMapFn) {
+        // First copy the original function as is, then we can replace all
+        // quantum ops by collecting their gate parameters in a memory buffer
+        // instead. The size of this vector is passed as an input to the new
+        // function.
+        argMapFn = rewriter.create<func::FuncOp>(loc, fnName, fnType,
+                                                 visibility, nullptr, nullptr);
+        rewriter.cloneRegionBefore(callee.getBody(), argMapFn.getBody(),
+                                   argMapFn.end());
 
-    PatternRewriter::InsertionGuard insertGuard(rewriter);
-    rewriter.setInsertionPointToStart(&argMapFn.getBody().front());
-
-    // Allocate the memory for the gate parameters collected at runtime.
-    auto arrayListType =
-        ArrayListType::get(rewriter.getContext(), rewriter.getF64Type());
-    Value paramsBuffer = rewriter.create<ListInitOp>(loc, arrayListType);
-    MemRefType paramsProcessedType =
-        MemRefType::get({}, rewriter.getIndexType());
-    Value paramsProcessed =
-        rewriter.create<memref::AllocaOp>(loc, paramsProcessedType);
-    Value cZero = rewriter.create<index::ConstantOp>(loc, 0);
-    rewriter.create<memref::StoreOp>(loc, cZero, paramsProcessed);
-    Value cOne = rewriter.create<index::ConstantOp>(loc, 1);
-
-    argMapFn.walk([&](Operation *op) {
-      // Insert gate parameters into the params buffer.
-      if (auto gate = dyn_cast<quantum::DifferentiableGate>(op)) {
         PatternRewriter::InsertionGuard insertGuard(rewriter);
-        rewriter.setInsertionPoint(gate);
+        rewriter.setInsertionPointToStart(&argMapFn.getBody().front());
 
-        ValueRange diffParams = gate.getDiffParams();
-        if (!diffParams.empty()) {
-          Value paramIdx =
-              rewriter.create<memref::LoadOp>(loc, paramsProcessed);
-          for (auto param : diffParams) {
-            rewriter.create<ListPushOp>(loc, param, paramsBuffer);
-            paramIdx = rewriter.create<index::AddOp>(loc, paramIdx, cOne);
-          }
-          rewriter.create<memref::StoreOp>(loc, paramIdx, paramsProcessed);
-        }
+        // Allocate the memory for the gate parameters collected at runtime.
+        auto arrayListType =
+            ArrayListType::get(rewriter.getContext(), rewriter.getF64Type());
+        Value paramsBuffer = rewriter.create<ListInitOp>(loc, arrayListType);
+        MemRefType paramsProcessedType =
+            MemRefType::get({}, rewriter.getIndexType());
+        Value paramsProcessed =
+            rewriter.create<memref::AllocaOp>(loc, paramsProcessedType);
+        Value cZero = rewriter.create<index::ConstantOp>(loc, 0);
+        rewriter.create<memref::StoreOp>(loc, cZero, paramsProcessed);
+        Value cOne = rewriter.create<index::ConstantOp>(loc, 1);
 
-        rewriter.replaceOp(op, gate.getQubitOperands());
-      }
-      // Replace any return statements from the original function with the
-      // params vector.
-      else if (isa<func::ReturnOp>(op)) {
-        PatternRewriter::InsertionGuard insertGuard(rewriter);
-        rewriter.setInsertionPoint(op);
-        Value data = rewriter.create<ListLoadDataOp>(loc, paramsBuffer);
-        Value paramsTensor =
-            rewriter.create<bufferization::ToTensorOp>(loc, data);
-        op->setOperands(paramsTensor);
-      }
-      // Erase redundant device specifications.
-      else if (isa<quantum::DeviceOp>(op)) {
-        rewriter.eraseOp(op);
-      }
-    });
+        argMapFn.walk([&](Operation *op) {
+            // Insert gate parameters into the params buffer.
+            if (auto gate = dyn_cast<quantum::DifferentiableGate>(op)) {
+                PatternRewriter::InsertionGuard insertGuard(rewriter);
+                rewriter.setInsertionPoint(gate);
 
-    quantum::removeQuantumMeasurements(argMapFn);
-  }
+                ValueRange diffParams = gate.getDiffParams();
+                if (!diffParams.empty()) {
+                    Value paramIdx =
+                        rewriter.create<memref::LoadOp>(loc, paramsProcessed);
+                    for (auto param : diffParams) {
+                        rewriter.create<ListPushOp>(loc, param, paramsBuffer);
+                        paramIdx =
+                            rewriter.create<index::AddOp>(loc, paramIdx, cOne);
+                    }
+                    rewriter.create<memref::StoreOp>(loc, paramIdx,
+                                                     paramsProcessed);
+                }
 
-  return argMapFn;
+                rewriter.replaceOp(op, gate.getQubitOperands());
+            }
+            // Replace any return statements from the original function with the
+            // params vector.
+            else if (isa<func::ReturnOp>(op)) {
+                PatternRewriter::InsertionGuard insertGuard(rewriter);
+                rewriter.setInsertionPoint(op);
+                Value data = rewriter.create<ListLoadDataOp>(loc, paramsBuffer);
+                Value paramsTensor =
+                    rewriter.create<bufferization::ToTensorOp>(loc, data);
+                op->setOperands(paramsTensor);
+            }
+            // Erase redundant device specifications.
+            else if (isa<quantum::DeviceOp>(op)) {
+                rewriter.eraseOp(op);
+            }
+        });
+
+        quantum::removeQuantumMeasurements(argMapFn);
+    }
+
+    return argMapFn;
 }
 
 } // namespace gradient
