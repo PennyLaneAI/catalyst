@@ -37,50 +37,28 @@
 
 using namespace llvm;
 using namespace mlir;
+using namespace catalyst::quantum;
 
 namespace catalyst {
 namespace quantum {
 
-struct AdjointLoweringPass : public OperationPass<ModuleOp> {
-    AdjointLoweringPass() : OperationPass<ModuleOp>(TypeID::get<AdjointLoweringPass>()) {}
-    AdjointLoweringPass(const AdjointLoweringPass &other) : OperationPass<ModuleOp>(other) {}
+#define GEN_PASS_DEF_ADJOINTLOWERINGPASS
+#include "Quantum/Transforms/Passes.h.inc"
 
-    StringRef getName() const override { return "AdjointLoweringPass"; }
-
-    StringRef getArgument() const override { return "adjoint-lowering"; }
-
-    StringRef getDescription() const override
-    {
-        return "Lower adjoint regions containing a single quantum operations.";
-    }
-
-    void getDependentDialects(DialectRegistry &registry) const override
-    {
-        registry.insert<arith::ArithDialect>();
-        registry.insert<linalg::LinalgDialect>();
-        registry.insert<index::IndexDialect>();
-        registry.insert<tensor::TensorDialect>();
-        registry.insert<memref::MemRefDialect>();
-        registry.insert<bufferization::BufferizationDialect>();
-    }
+struct AdjointLoweringPass : impl::AdjointLoweringPassBase<AdjointLoweringPass> {
+    using AdjointLoweringPassBase::AdjointLoweringPassBase;
 
     void runOnOperation() final
     {
         LLVM_DEBUG(dbgs() << "adjoint lowering pass"
                           << "\n");
-        ModuleOp op = getOperation();
 
         RewritePatternSet patterns(&getContext());
         populateAdjointPatterns(patterns);
 
-        if (failed(applyPatternsAndFoldGreedily(op, std::move(patterns)))) {
+        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
             return signalPassFailure();
         }
-    }
-
-    std::unique_ptr<Pass> clonePass() const override
-    {
-        return std::make_unique<AdjointLoweringPass>(*this);
     }
 };
 

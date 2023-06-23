@@ -57,4 +57,10 @@ def CopyGlobalMemRefPass : Pass<"cp-global-memref"> {
     let constructor = "catalyst::createCopyGlobalMemRefPass()";
 }
 
+def AdjointLoweringPass : Pass<"adjoint-lowering"> {
+    let summary = "Lower adjoint regions containing a single quantum operations.";
+
+    let constructor = "catalyst::createAdjointLoweringPass()";
+}
+
 #endif // QUANTUM_PASSES
