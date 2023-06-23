@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "Catalyst/Driver/LLVMTarget.h"
+#include "Catalyst/Driver/CatalystLLVMTarget.h"
 #include "Catalyst/Driver/Pipelines.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
@@ -112,7 +112,7 @@ CatalystCReturnCode RunPassPipeline(const char *source, const char *passes, char
     return ReturnOk;
 }
 
-CatalystCReturnCode QuantumDriverMain(const char *source, bool keepIntermediate)
+CatalystCReturnCode QuantumDriverMain(const char *source, const char *dest)
 {
     registerAllCatalystPasses();
 
@@ -136,5 +136,9 @@ CatalystCReturnCode QuantumDriverMain(const char *source, bool keepIntermediate)
     }
 
     llvmModule->dump();
+    if (failed(compileObjectFile(std::move(llvmModule), dest))) {
+        return ReturnObjectCompilationFailed;
+    }
+
     return ReturnOk;
 }

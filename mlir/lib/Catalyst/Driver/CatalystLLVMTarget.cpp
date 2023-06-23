@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "Catalyst/Driver/LLVMTarget.h"
+#include "Catalyst/Driver/CatalystLLVMTarget.h"
 
 #include "mlir/IR/FunctionInterfaces.h"
 #include "mlir/Target/LLVMIR/Dialect/Builtin/BuiltinToLLVMIRTranslation.h"
@@ -23,7 +23,16 @@
 
 #include "Gradient/IR/GradientDialect.h"
 
+#include "llvm/IR/LegacyPassManager.h"
+#include "llvm/MC/TargetRegistry.h"
+#include "llvm/Support/FileSystem.h"
+#include "llvm/Support/TargetSelect.h"
+#include "llvm/Target/TargetMachine.h"
+#include "llvm/Target/TargetOptions.h"
+#include "llvm/TargetParser/Host.h"
+
 using namespace mlir;
+
 namespace {
 class GradientToEnzymeMetadataTranslation : public LLVMTranslationDialectInterface {
     using LLVMTranslationDialectInterface::LLVMTranslationDialectInterface;
@@ -72,4 +81,55 @@ void catalyst::registerLLVMTranslations(DialectRegistry &registry)
     registry.addExtension(+[](MLIRContext *ctx, gradient::GradientDialect *dialect) {
         dialect->addInterfaces<GradientToEnzymeMetadataTranslation>();
     });
+}
+
+LogicalResult catalyst::compileObjectFile(std::unique_ptr<llvm::Module> llvmModule,
+                                          const char *filename)
+{
+    using namespace llvm;
+
+    std::string targetTriple = sys::getDefaultTargetTriple();
+
+    InitializeAllTargetInfos();
+    InitializeAllTargets();
+    InitializeAllTargetMCs();
+    InitializeAllAsmParsers();
+    InitializeAllAsmPrinters();
+
+    std::string err;
+
+    auto target = TargetRegistry::lookupTarget(targetTriple, err);
+
+    if (!target) {
+        errs() << err;
+        return failure();
+    }
+
+    // Target a generic CPU without any additional features, options, or relocation model
+    const char *cpu = "generic";
+    const char *features = "";
+
+    TargetOptions opt;
+    auto rm = std::optional<Reloc::Model>();
+    auto targetMachine = target->createTargetMachine(targetTriple, cpu, features, opt, rm);
+    llvmModule->setDataLayout(targetMachine->createDataLayout());
+    llvmModule->setTargetTriple(targetTriple);
+
+    std::error_code errCode;
+    raw_fd_ostream dest(filename, errCode, sys::fs::OF_None);
+
+    if (errCode) {
+        errs() << "could not open file: " << errCode.message();
+        return failure();
+    }
+
+    legacy::PassManager pm;
+    if (targetMachine->addPassesToEmitFile(pm, dest, nullptr, CGFT_ObjectFile)) {
+        errs() << "TargetMachine can't emit a file of this type";
+        return failure();
+    }
+
+    pm.run(*llvmModule);
+    dest.flush();
+    return success();
 }

@@ -27,7 +27,8 @@ enum CatalystCReturnCode {
     ReturnOk,
     ReturnParsingFailed,
     ReturnLoweringFailed,
-    ReturnTranslationFailed
+    ReturnTranslationFailed,
+    ReturnObjectCompilationFailed,
 };
 
 /// Run a given set of passes on an MLIR module.
@@ -38,7 +39,7 @@ enum CatalystCReturnCode {
 CatalystCReturnCode RunPassPipeline(const char *source, const char *passes, char **dest);
 
 /// Entry point to the MLIR portion of the compiler.
-CatalystCReturnCode QuantumDriverMain(const char *source, bool keepIntermediate = false);
+CatalystCReturnCode QuantumDriverMain(const char *source, const char *dest);
 
 #ifdef __cplusplus
 }
