@@ -65,7 +65,7 @@ PYBIND11_MODULE(_quantumDialects, m)
             char *dest = nullptr;
             CatalystCReturnCode code = RunPassPipeline(source, pipeline, &dest);
             if (code != ReturnOk) {
-                throw std::runtime_error("Canonicalization failed");
+                throw std::runtime_error("Pass pipeline failed");
             }
             return dest;
         },
