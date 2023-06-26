@@ -30,6 +30,8 @@ from typing import Any, List, Optional
 from catalyst._configuration import INSTALLED
 from catalyst.utils.exceptions import CompileError
 
+from mlir_quantum._mlir_libs._quantumDialects.quantum import compile_asm
+
 package_root = os.path.dirname(__file__)
 
 
@@ -466,10 +468,21 @@ class Compiler:
         with open(filename, "w", encoding="utf-8") as f:
             mlir_module.operation.print(f, print_generic_op_form=False, assume_verified=True)
 
-        for pipeline in pipelines:
-            output = pipeline.run(filename, options=options)
-            self.pass_pipeline_output[pipeline.__name__] = output
+        if pipelines is None:
+            filename = f"{workspace_name}/{module_name}.o"
+            compile_asm(
+                mlir_module.operation.get_asm(
+                    binary=False, print_generic_op_form=False, assume_verified=True
+                ),
+                filename,
+            )
+            output = CompilerDriver.run(filename, options=options)
             filename = os.path.abspath(output)
+        else:
+            for pipeline in pipelines:
+                output = pipeline.run(filename, options=options)
+                self.pass_pipeline_output[pipeline.__name__] = output
+                filename = os.path.abspath(output)
 
         return filename
 

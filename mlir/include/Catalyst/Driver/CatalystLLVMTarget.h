@@ -21,6 +21,9 @@ namespace catalyst {
 /// Register the translations needed to convert to LLVM IR.
 void registerLLVMTranslations(mlir::DialectRegistry &registry);
 
-mlir::LogicalResult compileObjectFile(std::unique_ptr<llvm::Module> module, const char *filename);
+mlir::LogicalResult runEnzyme(std::unique_ptr<llvm::Module> &llvmModule);
+
+mlir::LogicalResult compileObjectFile(std::unique_ptr<llvm::Module> llvmModule,
+                                      const char *filename);
 
 } // namespace catalyst

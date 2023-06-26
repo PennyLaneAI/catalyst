@@ -12,12 +12,19 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(CMAKE_CXX_STANDARD 17 CACHE STRING "C++ standard to conform to")
 
+set(ENZYME_EXTERNAL_SHARED_LIB ON)
+
 find_package(MLIR REQUIRED CONFIG)
-find_package(MHLO REQUIRED)
+find_package(LLVM REQUIRED CONFIG)
+find_package(MHLO REQUIRED CONFIG)
+find_package(Enzyme REQUIRED CONFIG COMPONENTS LLVMEnzyme)
+# get_target_property(LLVMEnzyme LLVMEnzyme-${Enzyme_LLVM_VERSION_MAJOR} LOCATION)
 
 message(STATUS "Using MLIRConfig.cmake in: ${MLIR_DIR}")
 message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
 message(STATUS "Using MHLOConfig.cmake in: ${MHLO_DIR}")
+message(STATUS "Found Enzyme at: ${LLVMEnzyme}")
+message(STATUS "Using EnzymeConfig.cmake in: ${Enzyme_CMAKE_DIR}")
 
 # Required so as not to always use the cached option from the mlir build.
 option(QUANTUM_ENABLE_BINDINGS_PYTHON "Enable quantum dialect python bindings" OFF)

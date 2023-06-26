@@ -85,6 +85,16 @@ void catalyst::registerLLVMTranslations(DialectRegistry &registry)
     });
 }
 
+// Defined in Enzyme/Enzyme.h
+llvm::ModulePass *createEnzymePass(bool PostOpt = false);
+
+LogicalResult catalyst::runEnzyme(std::unique_ptr<llvm::Module> &llvmModule)
+{
+    llvm::errs() << "creating enzyme pass\n";
+    llvm::ModulePass *pass = createEnzymePass(/*PostOpt=*/false);
+    return failure();
+}
+
 LogicalResult catalyst::compileObjectFile(std::unique_ptr<llvm::Module> llvmModule,
                                           const char *filename)
 {
