@@ -17,8 +17,8 @@ help:
 	@echo "Please use \`make <target>' where <target> is one of"
 	@echo "  all                to build MLIR, MLIR-HLO and custom Catalyst dialects"
 	@echo "  llvm               to build MLIR enabling Python bindings"
-	@echo "  mhlo               to build build MLIR-HLO"
-	@echo "  enzyme             to build build Enzyme"
+	@echo "  mhlo               to build MLIR-HLO"
+	@echo "  enzyme             to build Enzyme"
 	@echo "  dialects           to build custom Catalyst MLIR dialects"
 	@echo "  test               to run the Catalyst MLIR dialects test suite"
 	@echo "  clean              to delete all temporary, cache, and build files"
@@ -70,7 +70,12 @@ mhlo:
 enzyme:
 	@echo "build enzyme"
 	cmake -G Ninja -S Enzyme/enzyme -B $(ENZYME_BUILD_DIR) \
-		-DLLVM_DIR=$(LLVM_BUILD_DIR)/lib/cmake/llvm
+		-DCMAKE_BUILD_TYPE=Release \
+		-DLLVM_DIR=$(LLVM_BUILD_DIR)/lib/cmake/llvm \
+		-DCMAKE_C_COMPILER=$(C_COMPILER) \
+		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \
+		-DCMAKE_C_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
+		-DCMAKE_CXX_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER)
 
 	cmake --build $(ENZYME_BUILD_DIR)
 
