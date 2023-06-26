@@ -7,6 +7,7 @@ MK_DIR := $(dir $(MK_ABSPATH))
 RT_BUILD_DIR?=$(MK_DIR)/build
 QIR_STDLIB_DIR?=$(MK_DIR)/qir-stdlib/target/release/
 QIR_STDLIB_INCLUDES_DIR?=$(MK_DIR)/qir-stdlib/target/release/build/include/
+CMAKE_ARGS?=""
 CODE_COVERAGE?=OFF
 BUILD_TYPE?=Release
 ENABLE_WARNINGS?=ON
@@ -14,7 +15,6 @@ ENABLE_LIGHTNING_KOKKOS?=OFF
 ENABLE_OPENQASM?=OFF
 LIGHTNING_GIT_TAG_VALUE?=latest_release
 LIGHTNING_KOKKOS_GIT_TAG_VALUE?=latest_release
-CMAKE_ARGS ?= ""
 
 
 coverage: CODE_COVERAGE=ON
