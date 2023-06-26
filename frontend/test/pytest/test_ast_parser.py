@@ -53,5 +53,87 @@ def test_scalar_param():
         qml.RX(x, wires=0)
         return qml.expval(qml.PauliZ(0))
 
+    expected_snapshot = """
+module {
+  func.func @scalar_param(%arg0: f64) -> f64 {
+    %0 = quantum.alloc( 2) : !quantum.reg
+    %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+    %2 = quantum.custom "RX"(%arg0) %1 : !quantum.bit
+    %3 = quantum.insert %0[ 0], %2 : !quantum.reg, !quantum.bit
+    %4 = quantum.extract %3[ 0] : !quantum.reg -> !quantum.bit
+    %5 = quantum.namedobs %4[ PauliZ] : !quantum.obs
+    %6 = quantum.expval %5 : f64
+    return %6 : f64
+  }
+}
+    """
+
     scalar_param(0.3)
-    print(scalar_param.mlir)
+    assert scalar_param.mlir.strip() == expected_snapshot.strip()
+
+
+def test_if_else():
+    @qjit_ast
+    @qml.qnode(dev)
+    def ifelse(x: float, n: int):
+        if n % 2 == 0:
+            qml.RX(x, wires=0)
+        elif x > 4:
+            qml.RZ(x - 2.3, 1)
+        else:
+            qml.RY(x * 2, 0)
+        return qml.expval(qml.PauliZ(0))
+
+    ifelse(5.4, 4)
+
+    expected_snapshot = """
+module {
+  func.func @ifelse(%arg0: f64, %arg1: i64) -> f64 {
+    %cst = arith.constant 2.000000e+00 : f64
+    %cst_0 = arith.constant 4.000000e+00 : f64
+    %cst_1 = arith.constant 2.300000e+00 : f64
+    %c0_i64 = arith.constant 0 : i64
+    %c2_i64 = arith.constant 2 : i64
+    %0 = quantum.alloc( 2) : !quantum.reg
+    %1 = arith.remsi %arg1, %c2_i64 : i64
+    %2 = arith.cmpi eq, %1, %c0_i64 : i64
+    %3 = scf.if %2 -> (!quantum.reg) {
+      %7 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+      %8 = quantum.custom "RX"(%arg0) %7 : !quantum.bit
+      %9 = quantum.insert %0[ 0], %8 : !quantum.reg, !quantum.bit
+      scf.yield %9 : !quantum.reg
+    } else {
+      %7 = arith.cmpf ogt, %arg0, %cst_0 : f64
+      %8 = scf.if %7 -> (!quantum.reg) {
+        %9 = arith.subf %arg0, %cst_1 : f64
+        %10 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
+        %11 = quantum.custom "RZ"(%9) %10 : !quantum.bit
+        %12 = quantum.insert %0[ 1], %11 : !quantum.reg, !quantum.bit
+        scf.yield %12 : !quantum.reg
+      } else {
+        %9 = arith.mulf %arg0, %cst : f64
+        %10 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
+        %11 = quantum.custom "RY"(%9) %10 : !quantum.bit
+        %12 = quantum.insert %0[ 0], %11 : !quantum.reg, !quantum.bit
+        scf.yield %12 : !quantum.reg
+      }
+      scf.yield %8 : !quantum.reg
+    }
+    %4 = quantum.extract %3[ 0] : !quantum.reg -> !quantum.bit
+    %5 = quantum.namedobs %4[ PauliZ] : !quantum.obs
+    %6 = quantum.expval %5 : f64
+    return %6 : f64
+  }
+}
+    """
+    assert ifelse.mlir.strip() == expected_snapshot.strip()
+
+def test_range_for_loop():
+    @qjit_ast
+    @qml.qnode(dev)
+    def range_for(x: float, n: int):
+        for i in range(n):
+            qml.RX(x * i, wires=i)
+        return qml.expval(qml.PauliZ(0))
+
+    range_for(5.4, 4)
