@@ -81,7 +81,11 @@ def get_executable_path(project, tool):
 
 def get_enzyme_path(project, env_var):
     """Get path to Enzyme."""
-    return os.path.join(package_root, "enzyme") if INSTALLED else os.getenv(env_var, default_enzyme_path.get(project, ""))
+    return (
+        os.path.join(package_root, "enzyme")
+        if INSTALLED
+        else os.getenv(env_var, default_enzyme_path.get(project, ""))
+    )
 
 
 def get_lib_path(project, env_var):
