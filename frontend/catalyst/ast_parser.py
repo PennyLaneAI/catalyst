@@ -1,5 +1,5 @@
-from _ast import BinOp, Compare, Constant, Expr, If, Return, Tuple
-from _ast import FunctionDef, Module, Call, Name, Attribute
+from _ast import BinOp, Compare, Constant, Expr, If, For, Return, Tuple
+from _ast import FunctionDef, Module, Call, Name, Attribute, UnaryOp
 from typing import Any
 import ast, inspect, textwrap
 import numpy as np
@@ -31,7 +31,17 @@ class MLIRGenerator(ast.NodeVisitor):
         self.qstate = None
         super().__init__()
 
-    def _lookup(self, name: str):
+    def _lookup(self, name: str | Attribute | Name):
+        if isinstance(name, Attribute):
+            return self._lookup_attr(name)
+        if isinstance(name, Name):
+            return self._lookup_str(name.id)
+        return self._lookup_str(name)
+
+    def _declare(self, name: str, value):
+        self._env[name] = value
+
+    def _lookup_str(self, name: str):
         if name in self._env:
             return self._env[name]
 
@@ -39,12 +49,16 @@ class MLIRGenerator(ast.NodeVisitor):
         if name in env:
             return env[name]
         env = self.frame_info.frame.f_globals
+        if name in env:
+            return env[name]
+
+        env = self.frame_info.frame.f_builtins
         if name not in env:
             raise ValueError(f"MLIR Generator: name not found: {name}")
         return env[name]
 
     def _lookup_attr(self, attr: Attribute):
-        module = self._lookup(attr.value.id)
+        module = self._lookup_str(attr.value.id)
         if module == pennylane and hasattr(pennylane, attr.attr):
             # May get messy to distinguish a namedobservable vs a gate
             return getattr(pennylane, attr.attr)
@@ -59,8 +73,8 @@ class MLIRGenerator(ast.NodeVisitor):
 
     def visit_FunctionDef(self, node: FunctionDef) -> Any:
         qnode = (
-            self._lookup(node.name).fn
-            if isinstance(self._lookup(node.name).fn, pennylane.QNode)
+            self._lookup_str(node.name).fn
+            if isinstance(self._lookup_str(node.name).fn, pennylane.QNode)
             else None
         )
 
@@ -78,7 +92,7 @@ class MLIRGenerator(ast.NodeVisitor):
         self._env = {}
         for argname, blockarg in zip(node.args.args, entry_block.arguments):
             # TODO: this ignores annotations on the function arguments
-            self._env[argname.arg] = blockarg
+            self._declare(argname.arg, blockarg)
 
         with ir.InsertionPoint(entry_block):
             if qnode:
@@ -91,15 +105,23 @@ class MLIRGenerator(ast.NodeVisitor):
         # Not sure this is required
         return self.visit(node.value)
 
-    def get_qubits_for_wires(self, wires: tuple[int]):
-        def emit_extract(wire: int):
-            return quantum.ExtractOp(self.qubit_type, self.qstate, idx_attr=wire).result
+    def get_qubits_for_wires(self, wires: tuple[int | ir.Value]):
+        def emit_extract(wire: int | ir.Value):
+            kwargs = {
+                "idx_attr": wire if isinstance(wire, int) else None,
+                "idx": wire if isinstance(wire, ir.Value) else None,
+            }
+            return quantum.ExtractOp(self.qubit_type, self.qstate, **kwargs).result
 
         return tuple(emit_extract(wire) for wire in wires)
 
-    def update_qubits(self, wires: tuple[int], qubits):
+    def update_qubits(self, wires: tuple[int | ir.Value], qubits):
         for wire, qubit in zip(wires, qubits):
-            self.qstate = quantum.InsertOp(self.qureg_type, self.qstate, qubit, idx_attr=wire)
+            kwargs = {
+                "idx_attr": wire if isinstance(wire, int) else None,
+                "idx": wire if isinstance(wire, ir.Value) else None,
+            }
+            self.qstate = quantum.InsertOp(self.qureg_type, self.qstate, qubit, **kwargs)
 
     def visit_NamedObs(self, node: Call) -> Any:
         callee = self._lookup_attr(node.func)
@@ -111,6 +133,29 @@ class MLIRGenerator(ast.NodeVisitor):
             "quantum", ("named_observable " + kind).encode("utf-8"), ir.NoneType.get()
         )
         return quantum.NamedObsOp(self.obs_type, qubit, obs_type).results
+
+    def visit_For(self, node: For):
+        if len(node.orelse) != 0:
+
+            class ShameError(TypeError):
+                """You should be ashamed of yourself"""
+
+                pass
+
+            raise ShameError("Why in gods name would you use an else block after a for loop")
+
+        assert isinstance(node.target, Name), "Expected for loop iv to be a name"
+        start, stop, step = self.visit(node.iter)
+
+        for_op = scf.ForOp(start, stop, step, iter_args=(self.qstate,))
+        body_block = for_op.body
+        with ir.InsertionPoint(body_block):
+            self._declare(node.target.id, body_block.arguments[0])
+            for stmt in node.body:
+                self.visit(stmt)
+            scf.YieldOp(self.qstate)
+
+        self.qstate = for_op.results[0]
 
     def visit_If(self, node: If) -> Any:
         pred = self.visit(node.test)
@@ -158,7 +203,7 @@ class MLIRGenerator(ast.NodeVisitor):
         return self.visit(node.args[operation.num_params])
 
     def visit_Call(self, node: Call) -> Any:
-        callee = self._lookup_attr(node.func)
+        callee = self._lookup(node.func)
         is_operation = inspect.isclass(callee) and issubclass(callee, pennylane.operation.Operation)
         if callee:
             if callee == pennylane.expval:
@@ -182,6 +227,8 @@ class MLIRGenerator(ast.NodeVisitor):
                 # Ensure we're dealing with a sequence
                 if isinstance(wires, str) or isinstance(wires, int):
                     wires = (wires,)
+                if isinstance(wires, ir.Value):
+                    wires = (self.cast_index_to_int(wires),)
 
                 assert (
                     len(wires) == callee.num_wires
@@ -192,43 +239,96 @@ class MLIRGenerator(ast.NodeVisitor):
                     [self.qubit_type] * len(wires), params, qubits, node.func.attr
                 ).results
                 self.update_qubits(wires, qubits)
+            elif callee == range:
+                # TODO: consolidate Python builtins
+                args = tuple(self.visit(arg) for arg in node.args)
+                if len(args) == 1:
+                    bounds = (0, args[0], 1)
+                else:
+                    bounds = (args[0], args[1], args[2] if len(args) >= 3 else 1)
+                return tuple(
+                    self.cast_int_to_index(self.materialize_constant(bound)) for bound in bounds
+                )
 
     def visit_Name(self, node: Name) -> Any:
-        return self._lookup(node.id)
+        if isinstance(node.ctx, ast.Load):
+            return self._lookup_str(node.id)
+
+    #
+    # Casting
+    #
+    def cast_int_to_index(self, val: ir.Value):
+        return (
+            arith.IndexCastOp(ir.IndexType.get(), val)
+            if ir.IntegerType.isinstance(val.type)
+            else val
+        )
+
+    def cast_index_to_int(self, val: ir.Value):
+        # TODO: handle tensor case
+        is_index_type = ir.IndexType.isinstance(val.type)
+        return (
+            arith.IndexCastOp(ir.IntegerType.get_signless(64), val).result if is_index_type else val
+        )
 
     def cast_to_float(self, val: ir.Value):
         def casted_to_float(typ):
             # TODO: handle tensor case
             return ir.F64Type.get()
 
+        val = self.cast_index_to_int(val)
         return (
             arith.SIToFPOp(casted_to_float(val.type), val).result
-            if self.isIntOrIntTensor(val.type)
+            if self.is_int_or_int_tensor(val.type)
             else val
         )
 
-    def isIntOrIntTensor(self, typ):
+    def is_float_or_float_tensor(self, typ):
+        return ir.F64Type.isinstance(typ)
+
+    def is_int_or_index_or_tensor(self, typ):
+        return ir.IndexType.isinstance(typ) or self.is_int_or_int_tensor(typ)
+
+    def is_int_or_int_tensor(self, typ):
         # TODO: tensor check not implemented
         return ir.IntegerType.isinstance(typ)
+
+    def visit_UnaryOp(self, node: UnaryOp):
+        assert isinstance(node.op, ast.USub), f"Unsupported unary op: {node.op}"
+        value = self.materialize_constant(self.visit(node.operand))
+        if self.is_float_or_float_tensor(value.type):
+            return arith.NegFOp(value).result
+
+        if not self.is_int_or_int_tensor(value.type):
+            raise TypeError(f"Expected float or int type, got: {value.type}")
+
+        c0 = self.materialize_constant(0)
+        return arith.SubIOp(c0, value).result
 
     def visit_BinOp(self, node: BinOp) -> Any:
         lhs = self.materialize_constant(self.visit(node.left))
         rhs = self.materialize_constant(self.visit(node.right))
-
-        both_int = self.isIntOrIntTensor(lhs.type) and self.isIntOrIntTensor(rhs.type)
+        both_int = self.is_int_or_index_or_tensor(lhs.type) and self.is_int_or_index_or_tensor(
+            rhs.type
+        )
         int_op_map = {
             ast.Mod: arith.RemSIOp,
             ast.Mult: arith.MulIOp,
             ast.Sub: arith.SubIOp,
+            ast.Add: arith.AddIOp,
         }
         float_op_map = {
             ast.Mod: arith.RemFOp,
             ast.Mult: arith.MulFOp,
             ast.Sub: arith.SubFOp,
+            ast.Add: arith.AddFOp,
         }
 
         Op = int_op_map[type(node.op)] if both_int else float_op_map[type(node.op)]
-        if not both_int:
+        if both_int:
+            lhs = self.cast_index_to_int(lhs)
+            rhs = self.cast_index_to_int(rhs)
+        else:
             lhs = self.cast_to_float(lhs)
             rhs = self.cast_to_float(rhs)
         return Op(lhs, rhs).result
@@ -237,8 +337,8 @@ class MLIRGenerator(ast.NodeVisitor):
         lhs = self.materialize_constant(self.visit(node.left))
         comparators = tuple(self.materialize_constant(self.visit(c)) for c in node.comparators)
         assert len(comparators) == 1, "more than one comparator not yet supported"
-        all_int = self.isIntOrIntTensor(lhs.type) and all(
-            self.isIntOrIntTensor(c.type) for c in comparators
+        all_int = self.is_int_or_int_tensor(lhs.type) and all(
+            self.is_int_or_int_tensor(c.type) for c in comparators
         )
         Op = arith.CmpIOp if all_int else arith.CmpFOp
         if not all_int:
@@ -286,9 +386,10 @@ Numba doesn't use an AST approach, it operates on the bytecote. May be too low l
 
 
 class AST_QJIT:
-    def __init__(self, fn) -> None:
+    def __init__(self, fn, canonicalize) -> None:
         self.fn = fn
         self._mlir = ""
+        self.canonicalize = canonicalize
 
     def __call__(self, *args, **kwargs):
         # Get argument types and shapes (at least ranks in the case of dynamic types)
@@ -307,16 +408,17 @@ class AST_QJIT:
                 gen.visit(mod_ast)
 
             self._mlir = module.operation.get_asm(print_generic_op_form=False)
-            self._mlir = quantum.mlir_run_pipeline(self._mlir, "canonicalize")
+            if self.canonicalize:
+                self._mlir = quantum.mlir_run_pipeline(self._mlir, "canonicalize")
 
     @property
     def mlir(self):
         return self._mlir
 
 
-def qjit_ast(fn=None):
+def qjit_ast(fn=None, canonicalize=True):
     """Just-in-time compiles the function by parsing it in to an abstract syntax tree."""
     if fn is not None:
-        return AST_QJIT(fn)
+        return AST_QJIT(fn, canonicalize=canonicalize)
 
-    return lambda fn: AST_QJIT(fn)
+    return lambda fn: AST_QJIT(fn, canonicalize=canonicalize)

@@ -128,12 +128,62 @@ module {
     """
     assert ifelse.mlir.strip() == expected_snapshot.strip()
 
+
 def test_range_for_loop():
     @qjit_ast
     @qml.qnode(dev)
     def range_for(x: float, n: int):
         for i in range(n):
             qml.RX(x * i, wires=i)
+        for i in range(-4, n):
+            qml.Hadamard(i)
+        for i in range(-4, n, 2):
+            qml.PauliX(i + 1)
         return qml.expval(qml.PauliZ(0))
 
-    range_for(5.4, 4)
+    range_for(5.4, 2)
+    expected_snapshot = """
+module {
+  func.func @range_for(%arg0: f64, %arg1: i64) -> f64 {
+    %c2 = arith.constant 2 : index
+    %c-4 = arith.constant -4 : index
+    %c1 = arith.constant 1 : index
+    %c0 = arith.constant 0 : index
+    %c1_i64 = arith.constant 1 : i64
+    %0 = quantum.alloc( 2) : !quantum.reg
+    %1 = arith.index_cast %arg1 : i64 to index
+    %2 = scf.for %arg2 = %c0 to %1 step %c1 iter_args(%arg3 = %0) -> (!quantum.reg) {
+      %10 = arith.index_cast %arg2 : index to i64
+      %11 = arith.sitofp %10 : i64 to f64
+      %12 = arith.mulf %arg0, %11 : f64
+      %13 = arith.index_cast %arg2 : index to i64
+      %14 = quantum.extract %0[%13] : !quantum.reg -> !quantum.bit
+      %15 = quantum.custom "RX"(%12) %14 : !quantum.bit
+      %16 = quantum.insert %0[%13], %15 : !quantum.reg, !quantum.bit
+      scf.yield %16 : !quantum.reg
+    }
+    %3 = arith.index_cast %arg1 : i64 to index
+    %4 = scf.for %arg2 = %c-4 to %3 step %c1 iter_args(%arg3 = %2) -> (!quantum.reg) {
+      %10 = arith.index_cast %arg2 : index to i64
+      %11 = quantum.extract %2[%10] : !quantum.reg -> !quantum.bit
+      %12 = quantum.custom "Hadamard"() %11 : !quantum.bit
+      %13 = quantum.insert %2[%10], %12 : !quantum.reg, !quantum.bit
+      scf.yield %13 : !quantum.reg
+    }
+    %5 = arith.index_cast %arg1 : i64 to index
+    %6 = scf.for %arg2 = %c-4 to %5 step %c2 iter_args(%arg3 = %4) -> (!quantum.reg) {
+      %10 = arith.index_cast %arg2 : index to i64
+      %11 = arith.addi %10, %c1_i64 : i64
+      %12 = quantum.extract %4[%11] : !quantum.reg -> !quantum.bit
+      %13 = quantum.custom "PauliX"() %12 : !quantum.bit
+      %14 = quantum.insert %4[%11], %13 : !quantum.reg, !quantum.bit
+      scf.yield %14 : !quantum.reg
+    }
+    %7 = quantum.extract %6[ 0] : !quantum.reg -> !quantum.bit
+    %8 = quantum.namedobs %7[ PauliZ] : !quantum.obs
+    %9 = quantum.expval %8 : f64
+    return %9 : f64
+  }
+}
+    """
+    assert range_for.mlir.strip() == expected_snapshot.strip()
