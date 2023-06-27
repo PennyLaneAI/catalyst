@@ -187,3 +187,49 @@ module {
 }
     """
     assert range_for.mlir.strip() == expected_snapshot.strip()
+
+
+def test_call_twice():
+    def subfunc(param):
+        qml.RX(param, wires=0)
+
+    @qjit_ast
+    @qml.qnode(dev)
+    def call_twice(x: float, n: int):
+        if n < 0:
+            subfunc(x)
+        else:
+            subfunc(x * 3)
+        return qml.expval(qml.PauliZ(0))
+
+    call_twice(4.4, 2)
+
+    expected_snapshot = """
+module {
+  func.func @call_twice(%arg0: f64, %arg1: i64) -> f64 {
+    %cst = arith.constant 3.000000e+00 : f64
+    %c0_i64 = arith.constant 0 : i64
+    %0 = quantum.alloc( 2) : !quantum.reg
+    %1 = arith.cmpi slt, %arg1, %c0_i64 : i64
+    %2 = scf.if %1 -> (!quantum.reg) {
+      %6 = func.call @subfunc(%arg0, %0) : (f64, !quantum.reg) -> !quantum.reg
+      scf.yield %6 : !quantum.reg
+    } else {
+      %6 = arith.mulf %arg0, %cst : f64
+      %7 = func.call @subfunc(%6, %0) : (f64, !quantum.reg) -> !quantum.reg
+      scf.yield %7 : !quantum.reg
+    }
+    %3 = quantum.extract %2[ 0] : !quantum.reg -> !quantum.bit
+    %4 = quantum.namedobs %3[ PauliZ] : !quantum.obs
+    %5 = quantum.expval %4 : f64
+    return %5 : f64
+  }
+  func.func private @subfunc(%arg0: f64, %arg1: !quantum.reg) -> !quantum.reg {
+    %0 = quantum.extract %arg1[ 0] : !quantum.reg -> !quantum.bit
+    %1 = quantum.custom "RX"(%arg0) %0 : !quantum.bit
+    %2 = quantum.insert %arg1[ 0], %1 : !quantum.reg, !quantum.bit
+    return %2 : !quantum.reg
+  }
+}
+    """
+    assert call_twice.mlir.strip() == expected_snapshot.strip()

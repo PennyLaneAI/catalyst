@@ -21,8 +21,14 @@ class MLIRGenerator(ast.NodeVisitor):
     ) -> None:
         self.frame_info = frame_info
         self.module = module
+        self.function_cache = {}
         self.called_argtypes = called_argtypes
-        self._env = {}
+        # Environments are searched in reverse order
+        self._envs = [
+            frame_info.frame.f_builtins,
+            frame_info.frame.f_globals,
+            frame_info.frame.f_locals,
+        ]
 
         # TODO: Would be nice to have this natively represented
         self.qureg_type = ir.OpaqueType.get("quantum", "reg")
@@ -38,24 +44,22 @@ class MLIRGenerator(ast.NodeVisitor):
             return self._lookup_str(name.id)
         return self._lookup_str(name)
 
+    def _push_env(self):
+        self._envs.append({})
+
+    def _pop_env(self):
+        assert len(self._envs) > 3, "_pop_env on empty environment"
+        self._envs.pop()
+
     def _declare(self, name: str, value):
-        self._env[name] = value
+        self._envs[-1][name] = value
 
     def _lookup_str(self, name: str):
-        if name in self._env:
-            return self._env[name]
+        for env in self._envs[::-1]:
+            if name in env:
+                return env[name]
 
-        env = self.frame_info.frame.f_locals
-        if name in env:
-            return env[name]
-        env = self.frame_info.frame.f_globals
-        if name in env:
-            return env[name]
-
-        env = self.frame_info.frame.f_builtins
-        if name not in env:
-            raise ValueError(f"MLIR Generator: name not found: {name}")
-        return env[name]
+        raise ValueError(f"MLIR Generator: name not found: {name}")
 
     def _lookup_attr(self, attr: Attribute):
         module = self._lookup_str(attr.value.id)
@@ -65,41 +69,63 @@ class MLIRGenerator(ast.NodeVisitor):
         return None
 
     def _type_to_mlir_type(self, typ: type):
+        if isinstance(typ, ir.Type):
+            return typ
         if typ == float:
             return ir.F64Type.get()
         if typ == int:
             return ir.IntegerType.get_signless(64)
+        if typ == bool:
+            return ir.IntegerType.get_signless(1)
         assert False, f"Unhandled type {typ}"
 
     def visit_FunctionDef(self, node: FunctionDef) -> Any:
-        qnode = (
-            self._lookup_str(node.name).fn
-            if isinstance(self._lookup_str(node.name).fn, pennylane.QNode)
-            else None
-        )
+        fn = self._lookup_str(node.name)
+
+        is_qnode = isinstance(fn, AST_QJIT) and isinstance(fn.fn, pennylane.QNode)
+        qnode = self._lookup_str(node.name).fn if is_qnode else None
 
         called_types = self.called_argtypes[node.name]
-        if len(called_types) != len(node.args.args):
+        has_qstate = len(called_types) > 0 and self.is_qureg(called_types[-1])
+        if not (
+            len(called_types) == len(node.args.args)
+            or (has_qstate and len(called_types) - 1 == len(node.args.args))
+        ):
             raise TypeError(
-                f"Function {node.name} expects {len(node.args.args)} types but was called with {len(called_types)}"
+                f"Function {node.name} expects {len(node.args.args)} types but was called with {len(called_types) - int(has_qstate)}"
             )
         # TODO: definitely possible that there's a type mismatch here
-        fn_type = ir.FunctionType.get(
-            [self._type_to_mlir_type(typ) for typ in called_types], [ir.F64Type.get()]
-        )
+        arg_types = [self._type_to_mlir_type(typ) for typ in called_types]
+        fn_type = ir.FunctionType.get(arg_types, [])
         func_op = func.FuncOp(node.name, fn_type)
         entry_block = func_op.add_entry_block()
-        self._env = {}
+        self._push_env()
         for argname, blockarg in zip(node.args.args, entry_block.arguments):
             # TODO: this ignores annotations on the function arguments
             self._declare(argname.arg, blockarg)
 
+        result_types = [self.qureg_type] if has_qstate else []
         with ir.InsertionPoint(entry_block):
-            if qnode:
-                self.qstate = quantum.AllocOp(self.qureg_type, nqubits_attr=qnode.device.num_wires)
+            if has_qstate:
+                self.qstate = entry_block.arguments[-1]
+            elif qnode:
+                self.qstate = quantum.AllocOp(
+                    self.qureg_type, nqubits_attr=qnode.device.num_wires
+                ).result
 
             for stmt in node.body:
-                self.visit(stmt)
+                result = self.visit(stmt)
+                if isinstance(stmt, Return):
+                    result_types = [r.type for r in result]
+
+        # Patch the return type based on the returned statement
+        fn_type = ir.FunctionType.get(arg_types, result_types)
+        func_op.attributes["function_type"] = ir.TypeAttr.get(fn_type)
+        self._pop_env()
+
+        self.function_cache[node.name] = func_op
+
+        return func_op
 
     def visit_Expr(self, node: Expr) -> Any:
         # Not sure this is required
@@ -158,7 +184,7 @@ class MLIRGenerator(ast.NodeVisitor):
         self.qstate = for_op.results[0]
 
     def visit_If(self, node: If) -> Any:
-        pred = self.visit(node.test)
+        pred = self.materialize_constant(self.visit(node.test))
         # Naively carry the entire state through the op
         result_types = [self.qureg_type]
         if_op = scf.IfOp(pred, result_types, hasElse=True)
@@ -180,12 +206,17 @@ class MLIRGenerator(ast.NodeVisitor):
 
     def visit_Return(self, node: Return) -> Any:
         return_val = self.visit(node.value)
+        # TODO: Need an ensure_sequence method?
+        if isinstance(return_val, ir.Value):
+            return_val = (return_val,)
+
         func.ReturnOp(return_val)
+        return return_val
 
     def materialize_constant(self, value, force_float=False) -> ir.Value:
         if isinstance(value, int) and force_float:
             value = float(value)
-        if isinstance(value, float) or isinstance(value, int):
+        if isinstance(value, float) or isinstance(value, int) or isinstance(value, bool):
             return arith.ConstantOp(self._type_to_mlir_type(type(value)), value).result
         return value
 
@@ -249,6 +280,34 @@ class MLIRGenerator(ast.NodeVisitor):
                 return tuple(
                     self.cast_int_to_index(self.materialize_constant(bound)) for bound in bounds
                 )
+            else:
+                # If it's an unknown function, look for the source
+                mod_ast = ast.parse(textwrap.dedent(inspect.getsource(callee)))
+                # Implicitly pass in the quantum state as the last argument
+                args = tuple(
+                    self.materialize_constant(self.visit(node.args[i]))
+                    for i in range(len(node.args))
+                ) + (self.qstate,)
+                self.called_argtypes[callee.__name__] = tuple(arg.type for arg in args)
+
+                if callee.__name__ in self.function_cache:
+                    func_op = self.function_cache[callee.__name__]
+                else:
+                    with ir.InsertionPoint(self.module.body):
+                        func_op = self.visit(mod_ast.body[0])
+                    func_op.attributes["sym_visibility"] = ir.StringAttr.get("private")
+                    # If there's no return, insert an implicit return of the quantum state.
+                    # Otherwise, augment the existing return.
+                    oplist = func_op.body.blocks[0].operations
+                    # OperationList in the MLIR bindings doesn't support [-1] indexing
+                    if not isinstance(oplist[len(oplist) - 1], func.ReturnOp):
+                        func_op.body.blocks[0].append(func.ReturnOp(self.qstate))
+                    else:
+                        assert False, "is it possible to append an argument to a return op?"
+
+                # The bindings need the args to be a list and not a tuple
+                results = func.CallOp(func_op, list(args)).results
+                self.qstate = results[-1]
 
     def visit_Name(self, node: Name) -> Any:
         if isinstance(node.ctx, ast.Load):
@@ -281,6 +340,14 @@ class MLIRGenerator(ast.NodeVisitor):
             arith.SIToFPOp(casted_to_float(val.type), val).result
             if self.is_int_or_int_tensor(val.type)
             else val
+        )
+
+    def is_qureg(self, typ):
+        return (
+            isinstance(typ, ir.Type)
+            and ir.OpaqueType.isinstance(typ)
+            and ir.OpaqueType(typ).dialect_namespace == "quantum"
+            and ir.OpaqueType(typ).data == "reg"
         )
 
     def is_float_or_float_tensor(self, typ):
@@ -357,6 +424,10 @@ class MLIRGenerator(ast.NodeVisitor):
         #   I64EnumAttrCase<"uge", 9>,
         int_pred_map = {
             ast.Eq: 0,
+            ast.Lt: 2,
+            ast.LtE: 3,
+            ast.Gt: 4,
+            ast.GtE: 5,
         }
         float_pred_map = {ast.Eq: 1, ast.Gt: 2}
         pred = ir.IntegerAttr.get(
@@ -371,18 +442,6 @@ class MLIRGenerator(ast.NodeVisitor):
 
     def visit_Constant(self, node: Constant) -> Any:
         return node.value
-
-
-"""
-Goals for today: June 26th:
-Focus on parsing. Need support for nested function calls
-Need a general way to think about "I see a name - what does this refer to?"
-Basically an environment
-
-Lots to think about w.r.t. nested modules, traversing other imported modules
-
-Numba doesn't use an AST approach, it operates on the bytecote. May be too low level for our needs
-"""
 
 
 class AST_QJIT:
