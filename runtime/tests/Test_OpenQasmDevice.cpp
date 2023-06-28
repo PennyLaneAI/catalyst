@@ -453,3 +453,63 @@ TEST_CASE("Test measurement processes, a simple circuit with BuilderType::Braket
                             Catch::Contains("Unsupported observable: QasmHamiltonianObs"));
     }
 }
+
+TEST_CASE("Test MatrixOperation with BuilderType::Braket", "[openqasm]")
+{
+    std::unique_ptr<OpenQasmDevice> device = std::make_unique<OpenQasmDevice>();
+
+    constexpr size_t n{5};
+    constexpr size_t size{1UL << n};
+    auto wires = device->AllocateQubits(n);
+
+    device->NamedOperation("PauliX", {}, {wires[0]}, false);
+    device->NamedOperation("PauliY", {}, {wires[1]}, false);
+    std::vector<std::complex<double>> matrix{
+        {0, 0},
+        {0, -1},
+        {0, 1},
+        {0, 0},
+    };
+    device->MatrixOperation(matrix, {wires[0]}, false);
+
+    std::string toqasm = "OPENQASM 3.0;\n"
+                         "qubit[5] qubits;\n"
+                         "bit[5] bits;\n"
+                         "x qubits[0];\n"
+                         "y qubits[1];\n"
+                         "#pragma braket unitary([[0, 0-1im], [0+1im, 0]]) qubits[0];\n"
+                         "bits = measure qubits;\n";
+
+    CHECK(device->Circuit() == toqasm);
+
+    SECTION("Probs")
+    {
+        std::vector<double> probs(size);
+        DataView<double, 1> view(probs);
+        device->Probs(view);
+        CHECK(probs[1] == Approx(1.f).margin(1e-5));
+    }
+
+    SECTION("Expval(h(1))")
+    {
+        device->SetDeviceShots(0); // to get deterministic results
+        auto obs = device->Observable(ObsId::Hadamard, {}, std::vector<QubitIdType>{1});
+        auto expval = device->Expval(obs);
+        CHECK(expval == Approx(-0.7071067812).margin(1e-5));
+    }
+}
+
+TEST_CASE("Test MatrixOperation with OpenQasmDevice and BuilderType::Common", "[openqasm]")
+{
+    auto device = OpenQasmDevice(false, "{shots : 100}");
+    auto wires = device.AllocateQubits(2);
+    std::vector<std::complex<double>> matrix{
+        {0, 0},
+        {0, -1},
+        {0, 1},
+        {0, 0},
+    };
+
+    REQUIRE_THROWS_WITH(device.MatrixOperation(matrix, {wires[0]}, false),
+                        Catch::Contains("Unsupported functionality"));
+}

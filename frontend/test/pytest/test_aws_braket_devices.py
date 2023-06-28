@@ -36,14 +36,6 @@ class TestBraketGates:
     @pytest.mark.parametrize(
         "device",
         [
-            pytest.param(
-                qml.device(
-                    "braket.aws.qubit",
-                    device_arn="arn:aws:braket:::device/quantum-simulator/amazon/sv1",
-                    wires=3,
-                ),
-                marks=pytest.mark.remotetests,
-            ),
             qml.device(
                 "braket.local.qubit",
                 backend="default",
@@ -81,7 +73,24 @@ class TestBraketGates:
             qml.SWAP(wires=[0, 2])
             qml.SWAP(wires=[1, 2])
 
+            U1 = 1 / np.sqrt(2) * np.array([[1.0, 1.0], [1.0, -1.0]], dtype=complex)
+            qml.QubitUnitary(U1, wires=0)
+
+            U2 = np.array(
+                [
+                    [0.99500417 - 0.09983342j, 0.0 + 0.0j, 0.0 + 0.0j, 0.0 + 0.0j],
+                    [0.0 + 0.0j, 0.99500417 + 0.09983342j, 0.0 + 0.0j, 0.0 + 0.0j],
+                    [0.0 + 0.0j, 0.0 + 0.0j, 0.99500417 + 0.09983342j, 0.0 + 0.0j],
+                    [0.0 + 0.0j, 0.0 + 0.0j, 0.0 + 0.0j, 0.99500417 - 0.09983342j],
+                ]
+            )
+            qml.QubitUnitary(U2, wires=[1, 2])
+
+            qml.ISWAP(wires=[0, 1])
             qml.CSWAP(wires=[0, 1, 2])
+            qml.SX(wires=0)
+            qml.MultiControlledX(wires=[0, 1, 2])
+            qml.Toffoli(wires=[0, 1, 2])
 
             return qml.expval(qml.PauliZ(0) @ qml.PauliZ(1))
 
@@ -96,21 +105,22 @@ class TestBraketGates:
             qml.device(
                 "braket.local.qubit",
                 backend="braket_sv",
-                wires=2,
+                wires=3,
             ),
         ],
     )
     def test_unsupported_gate_braket(self, device):
-        """Test unsupported gates on braket devices."""
+        """Test an unsupported gate on braket devices."""
 
         def circuit():
-            U1 = 1 / np.sqrt(2) * np.array([[1.0, 1.0], [1.0, -1.0]], dtype=complex)
-            qml.QubitUnitary(U1, wires=0)
+            qml.MultiRZ(np.pi / 2, wires=[0, 1, 2])
             return qml.expval(qml.PauliZ(0) @ qml.PauliZ(1))
 
         qjit_fn = qjit()(qml.qnode(device)(circuit))
 
-        with pytest.raises(RuntimeError, match="Unsupported functionality"):
+        with pytest.raises(
+            RuntimeError, match="The given QIR gate name is not supported by the OpenQASM builder."
+        ):
             qjit_fn()
 
     @pytest.mark.parametrize(
