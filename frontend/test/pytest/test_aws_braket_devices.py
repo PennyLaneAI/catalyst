@@ -395,11 +395,76 @@ class TestBraketExpval:
             qml.device(
                 "braket.local.qubit",
                 backend="braket_sv",
+                wires=1,
+            ),
+        ],
+    )
+    def test_hermitian_1(self, device):
+        """Test expval for Hermitian observable on braket devices."""
+
+        @qjit()
+        @qml.qnode(device)
+        def expval(x: float):
+            qml.RY(x, wires=0)
+            A = np.array(
+                [[complex(1.0, 0.0), complex(2.0, 0.0)], [complex(2.0, 0.0), complex(1.0, 0.0)]]
+            )
+            return qml.expval(qml.Hermitian(A, wires=0))
+
+        expected = np.array(1.0)
+        observed = expval(0.0)
+        assert np.isclose(observed, expected)
+
+        expected = np.array(3.0)
+        observed = expval(np.pi / 2)
+        assert np.isclose(observed, expected)
+
+    @pytest.mark.parametrize(
+        "device",
+        [
+            qml.device(
+                "braket.local.qubit",
+                backend="braket_sv",
                 wires=2,
             ),
         ],
     )
-    def test_tensor(self, device):
+    def test_hermitian_2(self, device):
+        """Test expval for Hermitian observable on braket devices."""
+
+        @qjit()
+        @qml.qnode(device)
+        def expval(x: float):
+            qml.RX(x, wires=0)
+            B = np.array(
+                [
+                    [complex(1.0, 0.0), complex(2.0, 0.0), complex(1.0, 0.0), complex(2.0, 0.0)],
+                    [complex(2.0, 0.0), complex(2.0, 0.0), complex(1.0, 0.0), complex(2.0, 0.0)],
+                    [complex(1.0, 0.0), complex(1.0, 0.0), complex(1.0, 0.0), complex(2.0, 0.0)],
+                    [complex(2.0, 0.0), complex(2.0, 0.0), complex(2.0, 0.0), complex(2.0, 0.0)],
+                ]
+            )
+            return qml.expval(qml.Hermitian(B, wires=[0, 1]))
+
+        expected = np.array(1.0)
+        observed = expval(0.0)
+        assert np.isclose(observed, expected)
+
+        expected = np.array(1.0)
+        observed = expval(np.pi)
+        assert np.isclose(observed, expected)
+
+    @pytest.mark.parametrize(
+        "device",
+        [
+            qml.device(
+                "braket.local.qubit",
+                backend="braket_sv",
+                wires=2,
+            ),
+        ],
+    )
+    def test_tensor_1(self, device):
         """Test expval for Tensor observable on braket devices."""
 
         @qjit()
@@ -416,6 +481,39 @@ class TestBraketExpval:
 
         expected = np.array(-0.49999788)
         observed = expval(np.pi / 2, np.pi / 3)
+        assert np.isclose(observed, expected)
+
+    @pytest.mark.parametrize(
+        "device",
+        [
+            qml.device(
+                "braket.local.qubit",
+                backend="braket_sv",
+                wires=3,
+            ),
+        ],
+    )
+    def test_tensor_2(self, device):
+        """Test expval for Tensor observable including hermitian observable on braket devices."""
+
+        @qjit()
+        @qml.qnode(device)
+        def expval(x: float, y: float):
+            qml.RX(x, wires=0)
+            qml.RX(y, wires=1)
+            qml.CNOT(wires=[0, 2])
+            qml.CNOT(wires=[1, 2])
+            A = np.array(
+                [[complex(1.0, 0.0), complex(2.0, 0.0)], [complex(2.0, 0.0), complex(-1.0, 0.0)]]
+            )
+            return qml.expval(qml.PauliX(0) @ qml.Hadamard(1) @ qml.Hermitian(A, wires=2))
+
+        expected = np.array(-0.4330127)
+        observed = expval(np.pi / 4, np.pi / 3)
+        assert np.isclose(observed, expected)
+
+        expected = np.array(-0.70710678)
+        observed = expval(np.pi / 2, np.pi / 2)
         assert np.isclose(observed, expected)
 
 
@@ -493,7 +591,7 @@ class TestBraketVar:
             ),
         ],
     )
-    def test_tensor(self, device):
+    def test_tensor_1(self, device):
         """Test variance for Tensor observable on braket devices."""
 
         @qjit()
@@ -509,6 +607,39 @@ class TestBraketVar:
         assert np.isclose(observed, expected)
 
         expected = np.array(1.0)
+        observed = circuit(np.pi / 2, np.pi / 2)
+        assert np.isclose(observed, expected)
+
+    @pytest.mark.parametrize(
+        "device",
+        [
+            qml.device(
+                "braket.local.qubit",
+                backend="braket_sv",
+                wires=3,
+            ),
+        ],
+    )
+    def test_tensor_2(self, device):
+        """Test variance for Tensor observable including hermitian observable on braket devices."""
+
+        @qjit()
+        @qml.qnode(device)
+        def circuit(x: float, y: float):
+            qml.RX(x, wires=0)
+            qml.RX(y, wires=1)
+            qml.CNOT(wires=[0, 2])
+            qml.CNOT(wires=[1, 2])
+            A = np.array(
+                [[complex(1.0, 0.0), complex(2.0, 0.0)], [complex(2.0, 0.0), complex(-1.0, 0.0)]]
+            )
+            return qml.var(qml.PauliX(0) @ qml.Hadamard(1) @ qml.Hermitian(A, wires=2))
+
+        expected = np.array(4.8125)
+        observed = circuit(np.pi / 4, np.pi / 3)
+        assert np.isclose(observed, expected)
+
+        expected = np.array(4.5)
         observed = circuit(np.pi / 2, np.pi / 2)
         assert np.isclose(observed, expected)
 
