@@ -389,6 +389,20 @@ TEST_CASE("Test measurement processes, a simple circuit with BuilderType::Braket
         CHECK(expval == Approx(-0.7071067812).margin(1e-5));
     }
 
+    SECTION("Expval(hermitian(1))")
+    {
+        device->SetDeviceShots(0); // to get deterministic results
+        std::vector<std::complex<double>> matrix{
+            {0, 0},
+            {0, -1},
+            {0, 1},
+            {0, 0},
+        };
+        auto obs = device->Observable(ObsId::Hermitian, matrix, std::vector<QubitIdType>{1});
+        auto expval = device->Expval(obs);
+        CHECK(expval == Approx(0).margin(1e-5));
+    }
+
     SECTION("Expval(x(0) @ h(1))")
     {
         device->SetDeviceShots(0); // to get deterministic results
@@ -407,8 +421,22 @@ TEST_CASE("Test measurement processes, a simple circuit with BuilderType::Braket
     {
         device->SetDeviceShots(0); // to get deterministic results
         auto obs = device->Observable(ObsId::Hadamard, {}, std::vector<QubitIdType>{1});
-        auto expval = device->Var(obs);
-        CHECK(expval == Approx(0.5).margin(1e-5));
+        auto var = device->Var(obs);
+        CHECK(var == Approx(0.5).margin(1e-5));
+    }
+
+    SECTION("Var(hermitian(1))")
+    {
+        device->SetDeviceShots(0); // to get deterministic results
+        std::vector<std::complex<double>> matrix{
+            {0, 0},
+            {0, -1},
+            {0, 1},
+            {0, 0},
+        };
+        auto obs = device->Observable(ObsId::Hermitian, matrix, std::vector<QubitIdType>{1});
+        auto var = device->Var(obs);
+        CHECK(var == Approx(1).margin(1e-5));
     }
 
     SECTION("Var(x(0) @ h(1))")
@@ -417,8 +445,8 @@ TEST_CASE("Test measurement processes, a simple circuit with BuilderType::Braket
         auto obs_z = device->Observable(ObsId::PauliZ, {}, std::vector<QubitIdType>{0});
         auto obs_h = device->Observable(ObsId::Hadamard, {}, std::vector<QubitIdType>{1});
         auto tp = device->TensorObservable({obs_z, obs_h});
-        auto expval = device->Var(tp);
-        CHECK(expval == Approx(0.5).margin(1e-5));
+        auto var = device->Var(tp);
+        CHECK(var == Approx(0.5).margin(1e-5));
 
         auto obs = device->HamiltonianObservable({0.2}, {tp});
         REQUIRE_THROWS_WITH(device->Var(obs),
