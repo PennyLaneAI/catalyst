@@ -60,6 +60,16 @@ PYBIND11_MODULE(_quantumDialects, m)
         py::arg("source"), py::arg("dest"));
 
     quantum_m.def(
+        "compile",
+        [](MlirModule moduleOp, const char *dest) {
+            CatalystCReturnCode code = LowerModule(moduleOp, dest);
+            if (code != ReturnOk) {
+                throw std::runtime_error("Lowering failed");
+            }
+        },
+        py::arg("module"), py::arg("dest"));
+
+    quantum_m.def(
         "mlir_run_pipeline",
         [](const char *source, const char *pipeline) {
             char *dest = nullptr;

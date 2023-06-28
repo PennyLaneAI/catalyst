@@ -112,6 +112,27 @@ CatalystCReturnCode RunPassPipeline(const char *source, const char *passes, char
     return ReturnOk;
 }
 
+CatalystCReturnCode LowerModule(MlirModule operation, const char *dest)
+{
+    auto moduleOp = unwrap(operation);
+    llvm::errs() << "module: " << moduleOp << "\n";
+    if (failed(runDefaultLowering(moduleOp.getContext(), moduleOp))) {
+        return ReturnLoweringFailed;
+    }
+
+    llvm::LLVMContext llvmContext;
+    auto llvmModule = translateModuleToLLVMIR(moduleOp, llvmContext);
+    if (!llvmModule) {
+        return ReturnTranslationFailed;
+    }
+
+    if (failed(compileObjectFile(std::move(llvmModule), dest))) {
+        return ReturnObjectCompilationFailed;
+    }
+
+    return ReturnOk;
+}
+
 CatalystCReturnCode QuantumDriverMain(const char *source, const char *dest)
 {
     registerAllCatalystPasses();

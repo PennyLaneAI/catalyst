@@ -1,5 +1,6 @@
 from catalyst import qjit_ast
 import pennylane as qml
+import pennylane.numpy as pnp
 
 n_qubits = 2
 
@@ -157,26 +158,26 @@ module {
       %11 = arith.sitofp %10 : i64 to f64
       %12 = arith.mulf %arg0, %11 : f64
       %13 = arith.index_cast %arg2 : index to i64
-      %14 = quantum.extract %0[%13] : !quantum.reg -> !quantum.bit
+      %14 = quantum.extract %arg3[%13] : !quantum.reg -> !quantum.bit
       %15 = quantum.custom "RX"(%12) %14 : !quantum.bit
-      %16 = quantum.insert %0[%13], %15 : !quantum.reg, !quantum.bit
+      %16 = quantum.insert %arg3[%13], %15 : !quantum.reg, !quantum.bit
       scf.yield %16 : !quantum.reg
     }
     %3 = arith.index_cast %arg1 : i64 to index
     %4 = scf.for %arg2 = %c-4 to %3 step %c1 iter_args(%arg3 = %2) -> (!quantum.reg) {
       %10 = arith.index_cast %arg2 : index to i64
-      %11 = quantum.extract %2[%10] : !quantum.reg -> !quantum.bit
+      %11 = quantum.extract %arg3[%10] : !quantum.reg -> !quantum.bit
       %12 = quantum.custom "Hadamard"() %11 : !quantum.bit
-      %13 = quantum.insert %2[%10], %12 : !quantum.reg, !quantum.bit
+      %13 = quantum.insert %arg3[%10], %12 : !quantum.reg, !quantum.bit
       scf.yield %13 : !quantum.reg
     }
     %5 = arith.index_cast %arg1 : i64 to index
     %6 = scf.for %arg2 = %c-4 to %5 step %c2 iter_args(%arg3 = %4) -> (!quantum.reg) {
       %10 = arith.index_cast %arg2 : index to i64
       %11 = arith.addi %10, %c1_i64 : i64
-      %12 = quantum.extract %4[%11] : !quantum.reg -> !quantum.bit
+      %12 = quantum.extract %arg3[%11] : !quantum.reg -> !quantum.bit
       %13 = quantum.custom "PauliX"() %12 : !quantum.bit
-      %14 = quantum.insert %4[%11], %13 : !quantum.reg, !quantum.bit
+      %14 = quantum.insert %arg3[%11], %13 : !quantum.reg, !quantum.bit
       scf.yield %14 : !quantum.reg
     }
     %7 = quantum.extract %6[ 0] : !quantum.reg -> !quantum.bit
@@ -187,6 +188,80 @@ module {
 }
     """
     assert range_for.mlir.strip() == expected_snapshot.strip()
+
+
+def test_assign():
+    @qjit_ast
+    @qml.qnode(dev)
+    def assign(n):
+        x = n + 5
+        y = x * 2
+        return y
+
+    assign(3)
+
+    expected_snapshot = """
+module {
+  func.func @assign(%arg0: i64) -> i64 {
+    %c2_i64 = arith.constant 2 : i64
+    %c5_i64 = arith.constant 5 : i64
+    %0 = arith.addi %arg0, %c5_i64 : i64
+    %1 = arith.muli %0, %c2_i64 : i64
+    return %1 : i64
+  }
+}
+    """
+    assert assign.mlir.strip() == expected_snapshot.strip()
+
+
+def test_list_comprehension():
+    @qjit_ast
+    @qml.qnode(dev)
+    def list_comp(n):
+        exp_vals = [qml.expval(qml.PauliZ(position)) for position in range(n)]
+        return exp_vals
+
+    list_comp(2)
+    expected_snapshot = """
+module {
+  func.func @list_comp(%arg0: i64) -> tensor<?xf64> {
+    %c1 = arith.constant 1 : index
+    %c0 = arith.constant 0 : index
+    %0 = quantum.alloc( 2) : !quantum.reg
+    %1 = arith.index_cast %arg0 : i64 to index
+    %2 = tensor.empty(%1) : tensor<?xf64>
+    %3 = scf.for %arg1 = %c0 to %1 step %c1 iter_args(%arg2 = %2) -> (tensor<?xf64>) {
+      %4 = arith.index_cast %arg1 : index to i64
+      %5 = quantum.extract %0[%4] : !quantum.reg -> !quantum.bit
+      %6 = quantum.namedobs %5[ PauliZ] : !quantum.obs
+      %7 = quantum.expval %6 : f64
+      %inserted = tensor.insert %7 into %arg2[%arg1] : tensor<?xf64>
+      scf.yield %inserted : tensor<?xf64>
+    }
+    return %3 : tensor<?xf64>
+  }
+}
+    """
+    assert list_comp.mlir.strip() == expected_snapshot.strip()
+
+
+def test_tensor_slice():
+    @qjit_ast
+    @qml.qnode(dev)
+    def tensor_slice(x, n):
+        return x[n]
+
+    tensor_slice(pnp.array([[4, 5], [6, 7]]), 1)
+    expected_snapshot = """
+module {
+  func.func @tensor_slice(%arg0: tensor<2x2xi64>, %arg1: i64) -> tensor<2xi64> {
+    %0 = arith.index_cast %arg1 : i64 to index
+    %extracted_slice = tensor.extract_slice %arg0[%0, 0] [1, 2] [1, 1] : tensor<2x2xi64> to tensor<2xi64>
+    return %extracted_slice : tensor<2xi64>
+  }
+}
+    """
+    assert tensor_slice.mlir.strip() == expected_snapshot.strip()
 
 
 def test_call_twice():

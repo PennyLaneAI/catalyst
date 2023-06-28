@@ -1,15 +1,52 @@
 from _ast import BinOp, Compare, Constant, Expr, If, For, Return, Tuple
-from _ast import FunctionDef, Module, Call, Name, Attribute, UnaryOp
-from typing import Any
+from _ast import (
+    FunctionDef,
+    Module,
+    Call,
+    Name,
+    Attribute,
+    UnaryOp,
+    List,
+    ListComp,
+    Assign,
+    Subscript,
+)
+from typing import Any, Callable
 import ast, inspect, textwrap
-import numpy as np
+from catalyst.compiler import Compiler, CompileOptions, CompilerDriver
+from catalyst.compilation_pipelines import CompiledFunction
+
+# import numpy as np
 import pennylane
+import pennylane.numpy as np
 
 import mlir_quantum.ir as ir
 import mlir_quantum.dialects.arith as arith
-import mlir_quantum.dialects.quantum as quantum
 import mlir_quantum.dialects.func as func
+import mlir_quantum.dialects.quantum as quantum
 import mlir_quantum.dialects.scf as scf
+import mlir_quantum.dialects.tensor as tensor
+
+from dataclasses import dataclass
+
+
+@dataclass
+class MethodCall:
+    this: ir.Value
+    method: Callable
+
+
+@dataclass
+class Range:
+    start: int
+    stop: int
+    step: int
+
+
+@dataclass
+class Enumerate:
+    value: ir.Value
+    start: int = 0
 
 
 class MLIRGenerator(ast.NodeVisitor):
@@ -29,6 +66,7 @@ class MLIRGenerator(ast.NodeVisitor):
             frame_info.frame.f_globals,
             frame_info.frame.f_locals,
         ]
+        self._len_base_envs = len(self._envs)
 
         # TODO: Would be nice to have this natively represented
         self.qureg_type = ir.OpaqueType.get("quantum", "reg")
@@ -48,10 +86,11 @@ class MLIRGenerator(ast.NodeVisitor):
         self._envs.append({})
 
     def _pop_env(self):
-        assert len(self._envs) > 3, "_pop_env on empty environment"
+        assert len(self._envs) > self._len_base_envs, "_pop_env on empty environment"
         self._envs.pop()
 
     def _declare(self, name: str, value):
+        assert len(self._envs) > self._len_base_envs, "_declare on empty environment"
         self._envs[-1][name] = value
 
     def _lookup_str(self, name: str):
@@ -62,22 +101,17 @@ class MLIRGenerator(ast.NodeVisitor):
         raise ValueError(f"MLIR Generator: name not found: {name}")
 
     def _lookup_attr(self, attr: Attribute):
-        module = self._lookup_str(attr.value.id)
-        if module == pennylane and hasattr(pennylane, attr.attr):
-            # May get messy to distinguish a namedobservable vs a gate
-            return getattr(pennylane, attr.attr)
+        value_id = self._lookup_str(attr.value.id)
+        if inspect.ismodule(value_id):
+            if value_id == pennylane and hasattr(pennylane, attr.attr):
+                return getattr(pennylane, attr.attr)
+            if value_id == np and hasattr(np, attr.attr):
+                return getattr(np, attr.attr)
+        if isinstance(value_id, ir.Value):
+            # This is a method call, try to infer the method from the MLIR type
+            if ir.RankedTensorType.isinstance(value_id.type):
+                return MethodCall(value_id, getattr(np, attr.attr))
         return None
-
-    def _type_to_mlir_type(self, typ: type):
-        if isinstance(typ, ir.Type):
-            return typ
-        if typ == float:
-            return ir.F64Type.get()
-        if typ == int:
-            return ir.IntegerType.get_signless(64)
-        if typ == bool:
-            return ir.IntegerType.get_signless(1)
-        assert False, f"Unhandled type {typ}"
 
     def visit_FunctionDef(self, node: FunctionDef) -> Any:
         fn = self._lookup_str(node.name)
@@ -95,7 +129,7 @@ class MLIRGenerator(ast.NodeVisitor):
                 f"Function {node.name} expects {len(node.args.args)} types but was called with {len(called_types) - int(has_qstate)}"
             )
         # TODO: definitely possible that there's a type mismatch here
-        arg_types = [self._type_to_mlir_type(typ) for typ in called_types]
+        arg_types = [_type_to_mlir_type(typ) for typ in called_types]
         fn_type = ir.FunctionType.get(arg_types, [])
         func_op = func.FuncOp(node.name, fn_type)
         entry_block = func_op.add_entry_block()
@@ -135,7 +169,7 @@ class MLIRGenerator(ast.NodeVisitor):
         def emit_extract(wire: int | ir.Value):
             kwargs = {
                 "idx_attr": wire if isinstance(wire, int) else None,
-                "idx": wire if isinstance(wire, ir.Value) else None,
+                "idx": self.cast_index_to_int(wire) if isinstance(wire, ir.Value) else None,
             }
             return quantum.ExtractOp(self.qubit_type, self.qstate, **kwargs).result
 
@@ -145,7 +179,7 @@ class MLIRGenerator(ast.NodeVisitor):
         for wire, qubit in zip(wires, qubits):
             kwargs = {
                 "idx_attr": wire if isinstance(wire, int) else None,
-                "idx": wire if isinstance(wire, ir.Value) else None,
+                "idx": self.cast_index_to_int(wire) if isinstance(wire, ir.Value) else None,
             }
             self.qstate = quantum.InsertOp(self.qureg_type, self.qstate, qubit, **kwargs)
 
@@ -160,6 +194,101 @@ class MLIRGenerator(ast.NodeVisitor):
         )
         return quantum.NamedObsOp(self.obs_type, qubit, obs_type).results
 
+    def visit_Assign(self, node: Assign):
+        assert len(node.targets) == 1, "destructuring not yet supported"
+        targets = [self.visit(target) for target in node.targets]
+        self._declare(targets[0], self.materialize_constant(self.visit(node.value)))
+
+    def visit_ListComp(self, node: ListComp):
+        self._push_env()
+        # TODO: should reuse code with for code
+        assert len(node.generators) == 1, "Nested list comprehension generators not supported"
+        for idx, generator in enumerate(node.generators):
+            targets = self.visit(generator.target)
+            iteration_space = self.visit(generator.iter)
+            is_tensor = lambda value: isinstance(
+                value, ir.Value
+            ) and ir.RankedTensorType.isinstance(value.type)
+
+            is_enumerate = isinstance(iteration_space, Enumerate)
+
+            assert isinstance(generator.target, Name) or (
+                is_enumerate and isinstance(generator.target, Tuple)
+            ), "Expected for loop iv to be a name"
+            is_iterating_over_tensor = is_tensor(iteration_space) or (
+                is_enumerate and is_tensor(iteration_space.value)
+            )
+
+            if isinstance(iteration_space, Range):
+                start, stop, step = (
+                    iteration_space.start,
+                    iteration_space.stop,
+                    iteration_space.step,
+                )
+                num_iters = arith.CeilDivSIOp(arith.SubIOp(stop, start), step).result
+            elif is_iterating_over_tensor:
+                iter_val = iteration_space.value if is_enumerate else iteration_space
+                tensor_type = ir.RankedTensorType(iter_val.type)
+
+                if len(tensor_type.shape) == 0:
+                    raise ValueError("Can't iterate over a Rank-0 tensor")
+                get_index = lambda idx: self.cast_int_to_index(self.materialize_constant(idx))
+                c0, c1 = get_index(0), get_index(1)
+                start = c0
+                stop = tensor.DimOp(iter_val, c0)
+                step = c1
+            else:
+                raise TypeError(f"Unknown loop iteration space: {iteration_space}")
+
+            # Assume for now that the result of the list comprehension is an expval (f64)
+            output = tensor.EmptyOp([num_iters], ir.F64Type.get())
+
+            for_op = scf.ForOp(start, stop, step, iter_args=(output, self.qstate))
+            body_block = for_op.body
+            with ir.InsertionPoint(body_block):
+                # iv = body_block.arguments[0]
+                iv, output, self.qstate = body_block.arguments
+                # self.qstate = body_block.arguments[-1]
+                if isinstance(iteration_space, Range):
+                    self._declare(targets, iv)
+                elif is_iterating_over_tensor:
+                    # Iterate over slices of the outermost dimension. Iterate over the elements themselves if the tensor is rank 1.
+                    if len(tensor_type.shape) == 1:
+                        # TODO: If we want to support tensor mutation, the tensor needs to be passed through the iter_args
+                        values = tensor.ExtractOp(iter_val, (iv,))
+                    else:
+                        # TODO: slicing is wip/untested
+                        slice_rank = tensor_type.rank - 1
+                        slice_type = ir.RankedTensorType.get(
+                            tensor_type.shape[1:], tensor_type.element_type
+                        )
+                        values = tensor.ExtractSliceOp(
+                            slice_type,
+                            iter_val,
+                            [iv],  # offsets
+                            [],  # sizes
+                            [],  # strides
+                            [ir.ShapedType.get_dynamic_size()] + [0] * slice_rank,  # static offsets
+                            tensor_type.shape[1:],  # static sizes
+                            [1] * slice_rank,  # static strides
+                        )
+                    if not enumerate:
+                        values = (values,)
+                    for name, val in zip(targets, [iv, values]):
+                        self._declare(name, val)
+
+                # for stmt in node.body:
+                #     self.visit(stmt)
+                if idx == len(node.generators) - 1:
+                    output = tensor.InsertOp(self.visit(node.elt), output, [iv])
+
+                scf.YieldOp((output, self.qstate))
+
+            self.qstate = for_op.results[-1]
+
+        self._pop_env()
+        return for_op.results[0]
+
     def visit_For(self, node: For):
         if len(node.orelse) != 0:
 
@@ -170,16 +299,73 @@ class MLIRGenerator(ast.NodeVisitor):
 
             raise ShameError("Why in gods name would you use an else block after a for loop")
 
-        assert isinstance(node.target, Name), "Expected for loop iv to be a name"
-        start, stop, step = self.visit(node.iter)
+        targets = self.visit(node.target)
+        iteration_space = self.visit(node.iter)
+        is_tensor = lambda value: isinstance(value, ir.Value) and ir.RankedTensorType.isinstance(
+            value.type
+        )
+
+        is_enumerate = isinstance(iteration_space, Enumerate)
+
+        assert isinstance(node.target, Name) or (
+            is_enumerate and isinstance(node.target, Tuple)
+        ), "Expected for loop iv to be a name"
+        is_iterating_over_tensor = is_tensor(iteration_space) or (
+            is_enumerate and is_tensor(iteration_space.value)
+        )
+
+        if isinstance(iteration_space, Range):
+            start, stop, step = iteration_space.start, iteration_space.stop, iteration_space.step
+        elif is_iterating_over_tensor:
+            iter_val = iteration_space.value if is_enumerate else iteration_space
+            tensor_type = ir.RankedTensorType(iter_val.type)
+
+            if len(tensor_type.shape) == 0:
+                raise ValueError("Can't iterate over a Rank-0 tensor")
+            get_index = lambda idx: self.cast_int_to_index(self.materialize_constant(idx))
+            c0, c1 = get_index(0), get_index(1)
+            start = c0
+            stop = tensor.DimOp(iter_val, c0)
+            step = c1
+        else:
+            raise TypeError(f"Unknown loop iteration space: {iteration_space}")
 
         for_op = scf.ForOp(start, stop, step, iter_args=(self.qstate,))
         body_block = for_op.body
         with ir.InsertionPoint(body_block):
-            self._declare(node.target.id, body_block.arguments[0])
+            iv = body_block.arguments[0]
+            self.qstate = body_block.arguments[-1]
+            if isinstance(iteration_space, Range):
+                self._declare(targets, iv)
+            elif is_iterating_over_tensor:
+                # Iterate over slices of the outermost dimension. Iterate over the elements themselves if the tensor is rank 1.
+                if len(tensor_type.shape) == 1:
+                    # TODO: If we want to support tensor mutation, the tensor needs to be passed through the iter_args
+                    values = tensor.ExtractOp(iter_val, (iv,))
+                else:
+                    # TODO: slicing is wip/untested
+                    slice_rank = tensor_type.rank - 1
+                    slice_type = ir.RankedTensorType.get(
+                        tensor_type.shape[1:], tensor_type.element_type
+                    )
+                    values = tensor.ExtractSliceOp(
+                        slice_type,
+                        iter_val,
+                        [iv],  # offsets
+                        [],  # sizes
+                        [],  # strides
+                        [ir.ShapedType.get_dynamic_size()] + [0] * slice_rank,  # static offsets
+                        tensor_type.shape[1:],  # static sizes
+                        [1] * slice_rank,  # static strides
+                    )
+                if not enumerate:
+                    values = (values,)
+                for name, val in zip(targets, [iv, values]):
+                    self._declare(name, val)
+
             for stmt in node.body:
                 self.visit(stmt)
-            scf.YieldOp(self.qstate)
+            scf.YieldOp((self.qstate,))
 
         self.qstate = for_op.results[0]
 
@@ -217,7 +403,7 @@ class MLIRGenerator(ast.NodeVisitor):
         if isinstance(value, int) and force_float:
             value = float(value)
         if isinstance(value, float) or isinstance(value, int) or isinstance(value, bool):
-            return arith.ConstantOp(self._type_to_mlir_type(type(value)), value).result
+            return arith.ConstantOp(_type_to_mlir_type(type(value)), value).result
         return value
 
     def get_wires(self, operation: pennylane.operation.Operation, node: Call):
@@ -236,8 +422,61 @@ class MLIRGenerator(ast.NodeVisitor):
     def visit_Call(self, node: Call) -> Any:
         callee = self._lookup(node.func)
         is_operation = inspect.isclass(callee) and issubclass(callee, pennylane.operation.Operation)
+
+        def visit_range(node):
+            args = tuple(self.visit(arg) for arg in node.args)
+            if len(args) == 1:
+                bounds = (0, args[0], 1)
+            else:
+                bounds = (args[0], args[1], args[2] if len(args) >= 3 else 1)
+            return Range(
+                *tuple(self.cast_int_to_index(self.materialize_constant(bound)) for bound in bounds)
+            )
+
+        def visit_tuple_func(node: Call):
+            assert len(node.args) == 1, "tuple function expected to have one argument"
+            args = tuple(self.visit(arg) for arg in node.args)
+
+            if ir.RankedTensorType.isinstance(args[0].type):
+                return args[0]
+            assert False, "Unsupported type for tuple constructor"
+
+        builtin_functions = {
+            enumerate: lambda node: Enumerate(*(self.visit(arg) for arg in node.args)),
+            range: visit_range,
+            tuple: visit_tuple_func,
+        }
         if callee:
-            if callee == pennylane.expval:
+            if isinstance(callee, MethodCall):
+                # We don't support classes, so assume method calls are to builtin (probably numpy) functions.
+                if callee.method == np.reshape:
+                    args = [self.visit(node.args[i]) for i in range(len(node.args))]
+                    result_shape = [
+                        arg if isinstance(arg, int) else ir.ShapedType.get_dynamic_size()
+                        for arg in args
+                    ]
+                    result_type = ir.RankedTensorType.get(
+                        result_shape, _get_element_type(callee.this.type)
+                    )
+                    args = tuple(self.materialize_constant(args[i]) for i in range(len(args)))
+                    new_shape_tensor = tensor.FromElementsOp(
+                        ir.RankedTensorType.get((len(args),), ir.IntegerType.get_signless(64)), args
+                    )
+                    return tensor.ReshapeOp(result_type, callee.this, new_shape_tensor).result
+                assert False, "unimplemented method call"
+            elif callee == np.zeros:
+                # TODO: code duplication between numpy functions
+                # TODO: This won't work with dynamic shapes
+                args = [self.visit(node.args[i]) for i in range(len(node.args))]
+                result_shape = [
+                    arg if isinstance(arg, int) else ir.ShapedType.get_dynamic_size()
+                    for arg in args
+                ]
+                result_type = ir.RankedTensorType.get(result_shape, ir.F64Type.get())
+                zero = self.materialize_constant(0.0)
+                result = tensor.EmptyOp(result_shape, ir.F64Type.get()).result
+                return result
+            elif callee == pennylane.expval:
                 assert len(node.args) == 1, "expected 1 argument"
                 assert isinstance(node.args[0], Call), "expected expval to have Call arg"
                 namedobs = self.visit_NamedObs(node.args[0])
@@ -270,25 +509,32 @@ class MLIRGenerator(ast.NodeVisitor):
                     [self.qubit_type] * len(wires), params, qubits, node.func.attr
                 ).results
                 self.update_qubits(wires, qubits)
-            elif callee == range:
-                # TODO: consolidate Python builtins
-                args = tuple(self.visit(arg) for arg in node.args)
-                if len(args) == 1:
-                    bounds = (0, args[0], 1)
-                else:
-                    bounds = (args[0], args[1], args[2] if len(args) >= 3 else 1)
-                return tuple(
-                    self.cast_int_to_index(self.materialize_constant(bound)) for bound in bounds
-                )
+            elif callee in builtin_functions:
+                return builtin_functions[callee](node)
             else:
                 # If it's an unknown function, look for the source
                 mod_ast = ast.parse(textwrap.dedent(inspect.getsource(callee)))
                 # Implicitly pass in the quantum state as the last argument
-                args = tuple(
+                args = [
                     self.materialize_constant(self.visit(node.args[i]))
                     for i in range(len(node.args))
-                ) + (self.qstate,)
-                self.called_argtypes[callee.__name__] = tuple(arg.type for arg in args)
+                ] + [self.qstate]
+
+                # Use dynamically sized tensors by default
+                arg_types = []
+                for i, arg in enumerate(args):
+                    if ir.RankedTensorType.isinstance(arg.type):
+                        tensor_type = ir.RankedTensorType(arg.type)
+                        dynamic_type = ir.RankedTensorType.get(
+                            [ir.ShapedType.get_dynamic_size()] * tensor_type.rank,
+                            tensor_type.element_type,
+                        )
+                        arg_types.append(dynamic_type)
+                        args[i] = tensor.CastOp(dynamic_type, arg)
+                    else:
+                        arg_types.append(arg.type)
+
+                self.called_argtypes[callee.__name__] = tuple(arg_types)
 
                 if callee.__name__ in self.function_cache:
                     func_op = self.function_cache[callee.__name__]
@@ -301,17 +547,21 @@ class MLIRGenerator(ast.NodeVisitor):
                     oplist = func_op.body.blocks[0].operations
                     # OperationList in the MLIR bindings doesn't support [-1] indexing
                     if not isinstance(oplist[len(oplist) - 1], func.ReturnOp):
-                        func_op.body.blocks[0].append(func.ReturnOp(self.qstate))
+                        func_op.body.blocks[0].append(func.ReturnOp((self.qstate,)))
                     else:
                         assert False, "is it possible to append an argument to a return op?"
 
                 # The bindings need the args to be a list and not a tuple
                 results = func.CallOp(func_op, list(args)).results
                 self.qstate = results[-1]
+        else:
+            assert False, f"unhandled callee: {ast.dump(node.func)}"
 
     def visit_Name(self, node: Name) -> Any:
         if isinstance(node.ctx, ast.Load):
             return self._lookup_str(node.id)
+        # The ctx is store, meaning a variable shouldn't exist
+        return node.id
 
     #
     # Casting
@@ -436,39 +686,117 @@ class MLIRGenerator(ast.NodeVisitor):
         )
         return Op(pred, lhs, comparators[0]).result
 
+    def visit_Subscript(self, node: Subscript):
+        value = self.visit(node.value)
+        _slice = self.visit(node.slice)
+        if not ir.RankedTensorType.isinstance(value.type):
+            raise TypeError("Cannot subscript a non-tensor")
+
+        if not isinstance(_slice, tuple):
+            _slice = (_slice,)
+
+        assert all(indexer is not None for indexer in _slice), "Unhandled indexing"
+
+        # Assume no Slice() indexers for now
+        tensor_type = ir.RankedTensorType(value.type)
+        if len(_slice) < tensor_type.rank:
+            result_type = ir.RankedTensorType.get(
+                tensor_type.shape[len(_slice) :], tensor_type.element_type
+            )
+            reduced_rank = len(_slice)
+            dyn_offsets = [
+                self.cast_int_to_index(offs) for offs in _slice if isinstance(offs, ir.Value)
+            ]
+            static_offsets = [
+                (ir.ShapedType.get_dynamic_size() if isinstance(offs, ir.Value) else offs)
+                for offs in _slice
+            ]
+            return tensor.ExtractSliceOp(
+                result_type,
+                value,
+                dyn_offsets,
+                [],  # dyn_sizes
+                [],  # dyn_strides
+                static_offsets + [0] * result_type.rank,
+                [1] * reduced_rank + result_type.shape,
+                [1] * tensor_type.rank,
+            ).result
+
+        assert False, "unhandled subscript"
+
     # Is there an easier way to get constants back into native Python land?
     def visit_Tuple(self, node: Tuple) -> tuple:
         return tuple(self.visit(val) for val in node.elts)
 
+    def visit_List(self, node: List):
+        return [self.visit(val) for val in node.elts]
+
     def visit_Constant(self, node: Constant) -> Any:
         return node.value
+
+
+def _get_element_type(typ: ir.Type):
+    if ir.ShapedType.isinstance(typ):
+        return ir.ShapedType(typ).element_type
+    return None
+
+
+def _type_to_mlir_type(typ: type):
+    if isinstance(typ, ir.Type):
+        return typ
+    if typ == float:
+        return ir.F64Type.get()
+    if typ == int:
+        return ir.IntegerType.get_signless(64)
+    if typ == bool:
+        return ir.IntegerType.get_signless(1)
+
+    assert False, f"Unhandled type {typ}"
+
+
+def get_argument_types(args):
+    def get_argument_type(arg):
+        if isinstance(arg, np.ndarray):
+            return ir.RankedTensorType.get(arg.shape, _type_to_mlir_type(arg.dtype))
+        return type(arg)
+
+    return [get_argument_type(arg) for arg in args]
 
 
 class AST_QJIT:
     def __init__(self, fn, canonicalize) -> None:
         self.fn = fn
         self._mlir = ""
+        self._module = None
         self.canonicalize = canonicalize
 
-    def __call__(self, *args, **kwargs):
+    def generate_mlir(self, *args, **kwargs):
         # Get argument types and shapes (at least ranks in the case of dynamic types)
         called_argtypes = {}
-        called_argtypes[self.fn.__name__] = tuple(type(arg) for arg in args)
-        frame_info = inspect.stack()[1]
+        # The indexing [2] here is super brittle
+        frame_info = inspect.stack()[2]
 
         mod_ast = ast.parse(textwrap.dedent(inspect.getsource(self.fn)), type_comments=True)
         with ir.Context() as ctx, ir.Location.file(
             frame_info.filename, line=frame_info.lineno, col=0
         ):
             quantum.register_dialect(ctx)
+            called_argtypes[self.fn.__name__] = tuple(get_argument_types(args))
             module = ir.Module.create()
             with ir.InsertionPoint(module.body):
                 gen = MLIRGenerator(frame_info, module, called_argtypes)
                 gen.visit(mod_ast)
 
+            self._module = module
             self._mlir = module.operation.get_asm(print_generic_op_form=False)
             if self.canonicalize:
                 self._mlir = quantum.mlir_run_pipeline(self._mlir, "canonicalize")
+
+    def __call__(self, *args, **kwargs):
+        self.generate_mlir(*args, **kwargs)
+        # compiler = Compiler()
+        # quantum.compile(self._module, "")
+        # compiler.run("", CompileOptions(pipelines=[]))
 
     @property
     def mlir(self):

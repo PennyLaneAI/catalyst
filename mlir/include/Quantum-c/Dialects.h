@@ -41,6 +41,7 @@ CatalystCReturnCode RunPassPipeline(const char *source, const char *passes, char
 /// Entry point to the MLIR portion of the compiler.
 CatalystCReturnCode QuantumDriverMain(const char *source, const char *dest);
 
+CatalystCReturnCode LowerModule(MlirModule operation, const char *dest);
 #ifdef __cplusplus
 }
 #endif
