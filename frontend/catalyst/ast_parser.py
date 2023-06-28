@@ -13,8 +13,11 @@ from _ast import (
 )
 from typing import Any, Callable
 import ast, inspect, textwrap
+from catalyst.libloader import SharedLibraryManager
 from catalyst.compiler import Compiler, CompileOptions, CompilerDriver
 from catalyst.compilation_pipelines import CompiledFunction
+
+import os
 
 # import numpy as np
 import pennylane
@@ -54,11 +57,13 @@ class MLIRGenerator(ast.NodeVisitor):
         self,
         frame_info: inspect.FrameInfo,
         module: ir.Module,
+        fn,
         called_argtypes: dict[str, tuple[type]],
     ) -> None:
         self.frame_info = frame_info
         self.module = module
         self.function_cache = {}
+        self.fn = fn
         self.called_argtypes = called_argtypes
         # Environments are searched in reverse order
         self._envs = [
@@ -68,10 +73,9 @@ class MLIRGenerator(ast.NodeVisitor):
         ]
         self._len_base_envs = len(self._envs)
 
-        # TODO: Would be nice to have this natively represented
-        self.qureg_type = ir.OpaqueType.get("quantum", "reg")
-        self.qubit_type = ir.OpaqueType.get("quantum", "bit")
-        self.obs_type = ir.OpaqueType.get("quantum", "obs")
+        self.qureg_type = quantum.QuregType.get()
+        self.qubit_type = quantum.QubitType.get()
+        self.obs_type = quantum.ObservableType.get()
         self.qstate = None
         super().__init__()
 
@@ -113,6 +117,34 @@ class MLIRGenerator(ast.NodeVisitor):
                 return MethodCall(value_id, getattr(np, attr.attr))
         return None
 
+    def visit_Module(self, node: Module):
+        for stmt in node.body:
+            self.visit(stmt)
+
+        # Add setup and teardown functions
+        void_func_type = ir.FunctionType.get([], [])
+        setup_func = func.FuncOp("setup", void_func_type)
+        entry_block = setup_func.add_entry_block()
+        with ir.InsertionPoint(entry_block):
+            quantum.InitializeOp()
+            func.ReturnOp([])
+        teardown_func = func.FuncOp("teardown", void_func_type)
+        entry_block = teardown_func.add_entry_block()
+        with ir.InsertionPoint(entry_block):
+            quantum.FinalizeOp()
+            func.ReturnOp([])
+
+        # Add the public entry point
+        func_op = ir.SymbolTable(self.module.operation)[self.fn.__name__]
+
+        with ir.InsertionPoint.at_block_begin(self.module.body):
+            public_fn = func.FuncOp(f"jit_{self.fn.__name__}", func_op.type)
+            entry_block = public_fn.add_entry_block()
+            with ir.InsertionPoint(entry_block):
+                results = func.CallOp(func_op, list(entry_block.arguments)).results
+                func.ReturnOp(results)
+        return public_fn
+
     def visit_FunctionDef(self, node: FunctionDef) -> Any:
         fn = self._lookup_str(node.name)
 
@@ -132,6 +164,7 @@ class MLIRGenerator(ast.NodeVisitor):
         arg_types = [_type_to_mlir_type(typ) for typ in called_types]
         fn_type = ir.FunctionType.get(arg_types, [])
         func_op = func.FuncOp(node.name, fn_type)
+        func_op.attributes["sym_visibility"] = ir.StringAttr.get("private")
         entry_block = func_op.add_entry_block()
         self._push_env()
         for argname, blockarg in zip(node.args.args, entry_block.arguments):
@@ -143,6 +176,8 @@ class MLIRGenerator(ast.NodeVisitor):
             if has_qstate:
                 self.qstate = entry_block.arguments[-1]
             elif qnode:
+                name_attr = ir.StringAttr.get(qnode.device.short_name)
+                quantum.DeviceOp(specs=ir.ArrayAttr.get([ir.StringAttr.get("backend"), name_attr]))
                 self.qstate = quantum.AllocOp(
                     self.qureg_type, nqubits_attr=qnode.device.num_wires
                 ).result
@@ -188,10 +223,7 @@ class MLIRGenerator(ast.NodeVisitor):
         assert len(node.args) == 1, "Expected named observable to have one argument (wires)"
         wire = self.visit(node.args[0])
         qubit = self.get_qubits_for_wires((wire,))[0]
-        kind = callee.__name__
-        obs_type = ir.OpaqueAttr.get(
-            "quantum", ("named_observable " + kind).encode("utf-8"), ir.NoneType.get()
-        )
+        obs_type = quantum.NamedObservableAttr.get(callee.__name__)
         return quantum.NamedObsOp(self.obs_type, qubit, obs_type).results
 
     def visit_Assign(self, node: Assign):
@@ -593,12 +625,7 @@ class MLIRGenerator(ast.NodeVisitor):
         )
 
     def is_qureg(self, typ):
-        return (
-            isinstance(typ, ir.Type)
-            and ir.OpaqueType.isinstance(typ)
-            and ir.OpaqueType(typ).dialect_namespace == "quantum"
-            and ir.OpaqueType(typ).data == "reg"
-        )
+        return isinstance(typ, ir.Type) and quantum.QuregType.isinstance(typ)
 
     def is_float_or_float_tensor(self, typ):
         return ir.F64Type.isinstance(typ)
@@ -699,6 +726,9 @@ class MLIRGenerator(ast.NodeVisitor):
 
         # Assume no Slice() indexers for now
         tensor_type = ir.RankedTensorType(value.type)
+        if len(_slice) == tensor_type.rank:
+            offsets = [self.cast_int_to_index(self.materialize_constant(offs)) for offs in _slice]
+            return tensor.ExtractOp(value, offsets).result
         if len(_slice) < tensor_type.rank:
             result_type = ir.RankedTensorType.get(
                 tensor_type.shape[len(_slice) :], tensor_type.element_type
@@ -768,6 +798,8 @@ class AST_QJIT:
         self.fn = fn
         self._mlir = ""
         self._module = None
+        self._func_name = None
+        self._func_type = None
         self.canonicalize = canonicalize
 
     def generate_mlir(self, *args, **kwargs):
@@ -784,8 +816,10 @@ class AST_QJIT:
             called_argtypes[self.fn.__name__] = tuple(get_argument_types(args))
             module = ir.Module.create()
             with ir.InsertionPoint(module.body):
-                gen = MLIRGenerator(frame_info, module, called_argtypes)
-                gen.visit(mod_ast)
+                gen = MLIRGenerator(frame_info, module, self.fn, called_argtypes)
+                func_op = gen.visit(mod_ast)
+                self._func_name = func_op.name
+                self._func_type = func_op.type
 
             self._module = module
             self._mlir = module.operation.get_asm(print_generic_op_form=False)
@@ -794,9 +828,13 @@ class AST_QJIT:
 
     def __call__(self, *args, **kwargs):
         self.generate_mlir(*args, **kwargs)
-        # compiler = Compiler()
-        # quantum.compile(self._module, "")
-        # compiler.run("", CompileOptions(pipelines=[]))
+        public_func_name = str(self._func_name).replace('"', "")
+        compiler = Compiler()
+        filename = f"{compiler.workspace.name}/{self.fn.__name__}.o"
+        quantum.compile(self._module, filename)
+        shared_object = os.path.abspath(CompilerDriver.run(filename))
+        manager = SharedLibraryManager(shared_object, public_func_name, self._func_type)
+        return manager(*args, **kwargs)
 
     @property
     def mlir(self):

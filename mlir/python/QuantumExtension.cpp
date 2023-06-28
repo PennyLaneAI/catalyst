@@ -49,6 +49,43 @@ PYBIND11_MODULE(_quantumDialects, m)
         },
         py::arg("context") = py::none(), py::arg("load") = true);
 
+    //===--------------------------------------------------------------------===//
+    // Quantum Dialect Types
+    //===--------------------------------------------------------------------===//
+    auto quregType = mlir_type_subclass(quantum_m, "QuregType", mlirTypeIsAQuregType);
+    quregType.def_classmethod(
+        "get", [](py::object cls, MlirContext ctx) { return cls(mlirQuantumQuregTypeGet(ctx)); },
+        "Get an instance of QuregType in given context.", py::arg("cls"),
+        py::arg("context") = py::none());
+
+    auto qubitType = mlir_type_subclass(quantum_m, "QubitType", mlirTypeIsAQubitType);
+    qubitType.def_classmethod(
+        "get", [](py::object cls, MlirContext ctx) { return cls(mlirQuantumQubitTypeGet(ctx)); },
+        "Get an instance of QubitType in given context.", py::arg("cls"),
+        py::arg("context") = py::none());
+
+    auto observableType =
+        mlir_type_subclass(quantum_m, "ObservableType", mlirTypeIsAObservableType);
+    observableType.def_classmethod(
+        "get",
+        [](py::object cls, MlirContext ctx) { return cls(mlirQuantumObservableTypeGet(ctx)); },
+        "Get an instance of ObservableType in given context.", py::arg("cls"),
+        py::arg("context") = py::none());
+
+    //===--------------------------------------------------------------------===//
+    // Quantum Dialect Attributes
+    //===--------------------------------------------------------------------===//
+    mlir_attribute_subclass(quantum_m, "NamedObservableAttr", mlirAttributeIsANamedObservableAttr)
+        .def_classmethod(
+            "get",
+            [](py::object cls, const char *observableName, MlirContext context) {
+                return mlirNamedObservableAttrGet(context, observableName);
+            },
+            py::arg("cls"), py::arg("observable_name"), py::arg("context") = py::none());
+
+    //===--------------------------------------------------------------------===//
+    // User-facing functions
+    //===--------------------------------------------------------------------===//
     quantum_m.def(
         "compile_asm",
         [](const char *source, const char *dest) {

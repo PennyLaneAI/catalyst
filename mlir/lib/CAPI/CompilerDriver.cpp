@@ -114,8 +114,13 @@ CatalystCReturnCode RunPassPipeline(const char *source, const char *passes, char
 
 CatalystCReturnCode LowerModule(MlirModule operation, const char *dest)
 {
+    registerAllCatalystPasses();
+
     auto moduleOp = unwrap(operation);
-    llvm::errs() << "module: " << moduleOp << "\n";
+    DialectRegistry registry;
+    registerLLVMTranslations(registry);
+    moduleOp.getContext()->appendDialectRegistry(registry);
+
     if (failed(runDefaultLowering(moduleOp.getContext(), moduleOp))) {
         return ReturnLoweringFailed;
     }

@@ -20,7 +20,11 @@ def test_basic():
 
     expected_snapshot = """
 module {
-  func.func @simple() -> f64 {
+  func.func @jit_simple() -> f64 {
+    %0 = call @simple() : () -> f64
+    return %0 : f64
+  }
+  func.func private @simple() -> f64 {
     %cst = arith.constant 4.430000e+01 : f64
     %cst_0 = arith.constant 4.400000e+01 : f64
     %cst_1 = arith.constant 3.430000e+00 : f64
@@ -41,6 +45,14 @@ module {
     %14 = quantum.expval %13 : f64
     return %14 : f64
   }
+  func.func @setup() {
+    quantum.init
+    return
+  }
+  func.func @teardown() {
+    quantum.finalize
+    return
+  }
 }
 """
 
@@ -56,7 +68,11 @@ def test_scalar_param():
 
     expected_snapshot = """
 module {
-  func.func @scalar_param(%arg0: f64) -> f64 {
+  func.func @jit_scalar_param(%arg0: f64) -> f64 {
+    %0 = call @scalar_param(%arg0) : (f64) -> f64
+    return %0 : f64
+  }
+  func.func private @scalar_param(%arg0: f64) -> f64 {
     %0 = quantum.alloc( 2) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
     %2 = quantum.custom "RX"(%arg0) %1 : !quantum.bit
@@ -65,6 +81,14 @@ module {
     %5 = quantum.namedobs %4[ PauliZ] : !quantum.obs
     %6 = quantum.expval %5 : f64
     return %6 : f64
+  }
+  func.func @setup() {
+    quantum.init
+    return
+  }
+  func.func @teardown() {
+    quantum.finalize
+    return
   }
 }
     """
@@ -89,7 +113,11 @@ def test_if_else():
 
     expected_snapshot = """
 module {
-  func.func @ifelse(%arg0: f64, %arg1: i64) -> f64 {
+  func.func @jit_ifelse(%arg0: f64, %arg1: i64) -> f64 {
+    %0 = call @ifelse(%arg0, %arg1) : (f64, i64) -> f64
+    return %0 : f64
+  }
+  func.func private @ifelse(%arg0: f64, %arg1: i64) -> f64 {
     %cst = arith.constant 2.000000e+00 : f64
     %cst_0 = arith.constant 4.000000e+00 : f64
     %cst_1 = arith.constant 2.300000e+00 : f64
@@ -125,6 +153,14 @@ module {
     %6 = quantum.expval %5 : f64
     return %6 : f64
   }
+  func.func @setup() {
+    quantum.init
+    return
+  }
+  func.func @teardown() {
+    quantum.finalize
+    return
+  }
 }
     """
     assert ifelse.mlir.strip() == expected_snapshot.strip()
@@ -145,7 +181,11 @@ def test_range_for_loop():
     range_for(5.4, 2)
     expected_snapshot = """
 module {
-  func.func @range_for(%arg0: f64, %arg1: i64) -> f64 {
+  func.func @jit_range_for(%arg0: f64, %arg1: i64) -> f64 {
+    %0 = call @range_for(%arg0, %arg1) : (f64, i64) -> f64
+    return %0 : f64
+  }
+  func.func private @range_for(%arg0: f64, %arg1: i64) -> f64 {
     %c2 = arith.constant 2 : index
     %c-4 = arith.constant -4 : index
     %c1 = arith.constant 1 : index
@@ -185,6 +225,14 @@ module {
     %9 = quantum.expval %8 : f64
     return %9 : f64
   }
+  func.func @setup() {
+    quantum.init
+    return
+  }
+  func.func @teardown() {
+    quantum.finalize
+    return
+  }
 }
     """
     assert range_for.mlir.strip() == expected_snapshot.strip()
@@ -202,12 +250,24 @@ def test_assign():
 
     expected_snapshot = """
 module {
-  func.func @assign(%arg0: i64) -> i64 {
+  func.func @jit_assign(%arg0: i64) -> i64 {
+    %0 = call @assign(%arg0) : (i64) -> i64
+    return %0 : i64
+  }
+  func.func private @assign(%arg0: i64) -> i64 {
     %c2_i64 = arith.constant 2 : i64
     %c5_i64 = arith.constant 5 : i64
     %0 = arith.addi %arg0, %c5_i64 : i64
     %1 = arith.muli %0, %c2_i64 : i64
     return %1 : i64
+  }
+  func.func @setup() {
+    quantum.init
+    return
+  }
+  func.func @teardown() {
+    quantum.finalize
+    return
   }
 }
     """
@@ -224,7 +284,11 @@ def test_list_comprehension():
     list_comp(2)
     expected_snapshot = """
 module {
-  func.func @list_comp(%arg0: i64) -> tensor<?xf64> {
+  func.func @jit_list_comp(%arg0: i64) -> tensor<?xf64> {
+    %0 = call @list_comp(%arg0) : (i64) -> tensor<?xf64>
+    return %0 : tensor<?xf64>
+  }
+  func.func private @list_comp(%arg0: i64) -> tensor<?xf64> {
     %c1 = arith.constant 1 : index
     %c0 = arith.constant 0 : index
     %0 = quantum.alloc( 2) : !quantum.reg
@@ -240,6 +304,14 @@ module {
     }
     return %3 : tensor<?xf64>
   }
+  func.func @setup() {
+    quantum.init
+    return
+  }
+  func.func @teardown() {
+    quantum.finalize
+    return
+  }
 }
     """
     assert list_comp.mlir.strip() == expected_snapshot.strip()
@@ -254,10 +326,22 @@ def test_tensor_slice():
     tensor_slice(pnp.array([[4, 5], [6, 7]]), 1)
     expected_snapshot = """
 module {
-  func.func @tensor_slice(%arg0: tensor<2x2xi64>, %arg1: i64) -> tensor<2xi64> {
+  func.func @jit_tensor_slice(%arg0: tensor<2x2xi64>, %arg1: i64) -> tensor<2xi64> {
+    %0 = call @tensor_slice(%arg0, %arg1) : (tensor<2x2xi64>, i64) -> tensor<2xi64>
+    return %0 : tensor<2xi64>
+  }
+  func.func private @tensor_slice(%arg0: tensor<2x2xi64>, %arg1: i64) -> tensor<2xi64> {
     %0 = arith.index_cast %arg1 : i64 to index
     %extracted_slice = tensor.extract_slice %arg0[%0, 0] [1, 2] [1, 1] : tensor<2x2xi64> to tensor<2xi64>
     return %extracted_slice : tensor<2xi64>
+  }
+  func.func @setup() {
+    quantum.init
+    return
+  }
+  func.func @teardown() {
+    quantum.finalize
+    return
   }
 }
     """
@@ -281,7 +365,11 @@ def test_call_twice():
 
     expected_snapshot = """
 module {
-  func.func @call_twice(%arg0: f64, %arg1: i64) -> f64 {
+  func.func @jit_call_twice(%arg0: f64, %arg1: i64) -> f64 {
+    %0 = call @call_twice(%arg0, %arg1) : (f64, i64) -> f64
+    return %0 : f64
+  }
+  func.func private @call_twice(%arg0: f64, %arg1: i64) -> f64 {
     %cst = arith.constant 3.000000e+00 : f64
     %c0_i64 = arith.constant 0 : i64
     %0 = quantum.alloc( 2) : !quantum.reg
@@ -304,6 +392,14 @@ module {
     %1 = quantum.custom "RX"(%arg0) %0 : !quantum.bit
     %2 = quantum.insert %arg1[ 0], %1 : !quantum.reg, !quantum.bit
     return %2 : !quantum.reg
+  }
+  func.func @setup() {
+    quantum.init
+    return
+  }
+  func.func @teardown() {
+    quantum.finalize
+    return
   }
 }
     """

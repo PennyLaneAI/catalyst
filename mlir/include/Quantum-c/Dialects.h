@@ -23,6 +23,19 @@ extern "C" {
 MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(Quantum, quantum);
 MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(Gradient, gradient);
 
+MLIR_CAPI_EXPORTED bool mlirTypeIsAQuregType(MlirType type);
+MLIR_CAPI_EXPORTED MlirType mlirQuantumQuregTypeGet(MlirContext ctx);
+
+MLIR_CAPI_EXPORTED bool mlirTypeIsAQubitType(MlirType type);
+MLIR_CAPI_EXPORTED MlirType mlirQuantumQubitTypeGet(MlirContext ctx);
+
+MLIR_CAPI_EXPORTED bool mlirTypeIsAObservableType(MlirType type);
+MLIR_CAPI_EXPORTED MlirType mlirQuantumObservableTypeGet(MlirContext ctx);
+
+MLIR_CAPI_EXPORTED bool mlirAttributeIsANamedObservableAttr(MlirAttribute attr);
+MLIR_CAPI_EXPORTED MlirAttribute mlirNamedObservableAttrGet(MlirContext ctx,
+                                                            const char *observableType);
+
 enum CatalystCReturnCode {
     ReturnOk,
     ReturnParsingFailed,
