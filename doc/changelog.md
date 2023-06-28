@@ -138,6 +138,9 @@
   workflow(1.0, 2.0)
   ```
 
+* Add ``qml.Hermitian`` support to the OpenQasm3/Braket backend device.
+  [#179](https://github.com/PennyLaneAI/catalyst/pull/179)
+
 <h3>Improvements</h3>
 
 * Improving error handling by throwing descriptive and unified expressions for runtime
