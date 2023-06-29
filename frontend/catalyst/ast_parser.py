@@ -26,6 +26,8 @@ import pennylane.numpy as np
 import mlir_quantum.ir as ir
 import mlir_quantum.dialects.arith as arith
 import mlir_quantum.dialects.func as func
+import mlir_quantum.dialects.linalg as linalg
+import mlir_quantum.dialects.math as math
 import mlir_quantum.dialects.quantum as quantum
 import mlir_quantum.dialects.scf as scf
 import mlir_quantum.dialects.tensor as tensor
@@ -404,23 +406,30 @@ class MLIRGenerator(ast.NodeVisitor):
     def visit_If(self, node: If) -> Any:
         pred = self.materialize_constant(self.visit(node.test))
         # Naively carry the entire state through the op
-        result_types = [self.qureg_type]
-        if_op = scf.IfOp(pred, result_types, hasElse=True)
+        has_qstate = self.qstate is not None
+        result_types = [self.qureg_type] if has_qstate else []
+        has_else = len(node.orelse) > 0 or has_qstate
+        if_op = scf.IfOp(pred, result_types, hasElse=has_else)
         then_block = if_op.then_block
+
+        get_yield_results = lambda: [self.qstate] if has_qstate else []
 
         saved_qstate = self.qstate
         with ir.InsertionPoint(then_block):
             for stmt in node.body:
                 self.visit(stmt)
-                scf.YieldOp((self.qstate,))
-        else_block = if_op.else_block
-        self.qstate = saved_qstate
-        with ir.InsertionPoint(else_block):
-            for stmt in node.orelse:
-                self.visit(stmt)
-                scf.YieldOp((self.qstate,))
+                scf.YieldOp(get_yield_results())
 
-        self.qstate = if_op.results[0]
+        if has_else:
+            else_block = if_op.else_block
+            self.qstate = saved_qstate
+            with ir.InsertionPoint(else_block):
+                for stmt in node.orelse:
+                    self.visit(stmt)
+                    scf.YieldOp(get_yield_results())
+
+        if has_qstate:
+            self.qstate = if_op.results[0]
 
     def visit_Return(self, node: Return) -> Any:
         return_val = self.visit(node.value)
@@ -480,7 +489,7 @@ class MLIRGenerator(ast.NodeVisitor):
         }
         if callee:
             if isinstance(callee, MethodCall):
-                # We don't support classes, so assume method calls are to builtin (probably numpy) functions.
+                # We don't support classes, so assume method calls are to builtin (probably numpy.ndarray) methods.
                 if callee.method == np.reshape:
                     args = [self.visit(node.args[i]) for i in range(len(node.args))]
                     result_shape = [
@@ -508,6 +517,18 @@ class MLIRGenerator(ast.NodeVisitor):
                 zero = self.materialize_constant(0.0)
                 result = tensor.EmptyOp(result_shape, ir.F64Type.get()).result
                 return result
+            elif callee == np.sin:
+                args = [self.visit(arg) for arg in node.args]
+                return math.SinOp(args[0]).result
+            elif callee == np.cos:
+                args = [self.visit(arg) for arg in node.args]
+                return math.CosOp(args[0]).result
+            elif callee == np.tan:
+                args = [self.visit(arg) for arg in node.args]
+                return math.TanOp(args[0]).result
+            elif callee == np.matmul:
+                print("found matmul")
+                assert False, "wip"
             elif callee == pennylane.expval:
                 assert len(node.args) == 1, "expected 1 argument"
                 assert isinstance(node.args[0], Call), "expected expval to have Call arg"
@@ -594,6 +615,9 @@ class MLIRGenerator(ast.NodeVisitor):
             return self._lookup_str(node.id)
         # The ctx is store, meaning a variable shouldn't exist
         return node.id
+
+    def visit_Attribute(self, node: Attribute):
+        return self._lookup(node)
 
     #
     # Casting
@@ -794,13 +818,15 @@ def get_argument_types(args):
 
 
 class AST_QJIT:
-    def __init__(self, fn, canonicalize) -> None:
+    def __init__(self, fn, canonicalize, dump_mlir) -> None:
         self.fn = fn
         self._mlir = ""
         self._module = None
         self._func_name = None
         self._func_type = None
         self.canonicalize = canonicalize
+        self.shared_object = None
+        self.dump_mlir = dump_mlir
 
     def generate_mlir(self, *args, **kwargs):
         # Get argument types and shapes (at least ranks in the case of dynamic types)
@@ -827,13 +853,19 @@ class AST_QJIT:
                 self._mlir = quantum.mlir_run_pipeline(self._mlir, "canonicalize")
 
     def __call__(self, *args, **kwargs):
-        self.generate_mlir(*args, **kwargs)
+        if self.shared_object is None:
+            self.generate_mlir(*args, **kwargs)
+            compiler = Compiler()
+            filename = f"{compiler.workspace.name}/{self.fn.__name__}.o"
+            quantum.compile(self._module, filename)
+            self.shared_object = os.path.abspath(CompilerDriver.run(filename))
         public_func_name = str(self._func_name).replace('"', "")
-        compiler = Compiler()
-        filename = f"{compiler.workspace.name}/{self.fn.__name__}.o"
-        quantum.compile(self._module, filename)
-        shared_object = os.path.abspath(CompilerDriver.run(filename))
-        manager = SharedLibraryManager(shared_object, public_func_name, self._func_type)
+
+        if self.dump_mlir:
+            print(self._mlir)
+            return
+
+        manager = SharedLibraryManager(self.shared_object, public_func_name, self._func_type)
         return manager(*args, **kwargs)
 
     @property
@@ -841,9 +873,9 @@ class AST_QJIT:
         return self._mlir
 
 
-def qjit_ast(fn=None, canonicalize=True):
+def qjit_ast(fn=None, canonicalize=True, dump_mlir=False):
     """Just-in-time compiles the function by parsing it in to an abstract syntax tree."""
     if fn is not None:
-        return AST_QJIT(fn, canonicalize=canonicalize)
+        return AST_QJIT(fn, canonicalize=canonicalize, dump_mlir=dump_mlir)
 
-    return lambda fn: AST_QJIT(fn, canonicalize=canonicalize)
+    return lambda fn: AST_QJIT(fn, canonicalize=canonicalize, dump_mlir=dump_mlir)

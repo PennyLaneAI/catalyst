@@ -59,6 +59,7 @@ declare_mlir_python_extension(QuantumPythonSources.Extension
     QuantumCAPI
   EMBED_CAPI_LINK_LIBS
     QuantumCAPI
+    MLIRCAPILinalg
 )
 
 ################################################################################

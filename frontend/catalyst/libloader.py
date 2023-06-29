@@ -43,6 +43,8 @@ def _mlir_type_to_ctype(typ: ir.Type, as_return=False):
             return [ctypes.c_longlong]
         elif int_type.width == 32:
             return [ctypes.c_long]
+        elif int_type.width == 1:
+            return [ctypes.c_bool]
     if ir.F64Type.isinstance(typ):
         return [ctypes.c_double]
     if ir.F32Type.isinstance(typ):
@@ -143,13 +145,15 @@ class SharedLibraryManager:
         array_of_char_ptrs = (ctypes.c_char_p * len(params_to_setup))()
         array_of_char_ptrs[:] = params_to_setup
 
-        # What are these arguments to the setup function?
         setup(ctypes.c_int(argc), array_of_char_ptrs)
         assert len(self.func_type.results) == 1, "Expected jit function to return 1 result"
 
         jit_func.argtypes = [el for typ in self.func_type.inputs for el in _mlir_type_to_ctype(typ)]
         jit_func.restype = _mlir_type_to_ctype(self.func_type.results[0], as_return=True)[0]
-        return struct_to_tuple(jit_func(*[el for arg in args for el in convert_argument(arg)]))
+        retval = struct_to_tuple(jit_func(*[el for arg in args for el in convert_argument(arg)]))
+
+        teardown()
+        return retval
 
     def __call__(self, *args, **kwargs):
         return self._exec(*args)
