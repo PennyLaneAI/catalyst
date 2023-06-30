@@ -20,16 +20,16 @@
 using namespace mlir;
 
 namespace {
-LogicalResult addMhloToCorePasses(PassManager &pm)
-{
-    const char *mhloToCorePipeline = "func.func(chlo-legalize-to-hlo),"
-                                     "stablehlo-legalize-to-hlo,"
-                                     "func.func(mhlo-legalize-control-flow),"
-                                     "func.func(hlo-legalize-to-linalg),"
-                                     "func.func(mhlo-legalize-to-std),"
-                                     "convert-to-signless";
-    return parsePassPipeline(mhloToCorePipeline, pm);
-}
+// LogicalResult addMhloToCorePasses(PassManager &pm)
+// {
+//     const char *mhloToCorePipeline = "func.func(chlo-legalize-to-hlo),"
+//                                      "stablehlo-legalize-to-hlo,"
+//                                      "func.func(mhlo-legalize-control-flow),"
+//                                      "func.func(hlo-legalize-to-linalg),"
+//                                      "func.func(mhlo-legalize-to-std),"
+//                                      "convert-to-signless";
+//     return parsePassPipeline(mhloToCorePipeline, pm);
+// }
 
 LogicalResult addQuantumCompilationPasses(PassManager &pm)
 {
@@ -90,7 +90,7 @@ LogicalResult addLowerToLLVMPasses(PassManager &pm)
         "convert-index-to-llvm,"
         "convert-gradient-to-llvm,"
         "convert-quantum-to-llvm,"
-        "emit-catalyst-py-interface,"
+        // "emit-catalyst-py-interface,"
         // Remove any dead casts as the final pass expects to remove all existing casts,
         // but only those that form a loop back to the original type.
         "canonicalize,"

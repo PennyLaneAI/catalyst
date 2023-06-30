@@ -90,8 +90,8 @@ llvm::ModulePass *createEnzymePass(bool PostOpt = false);
 
 LogicalResult catalyst::runEnzyme(std::unique_ptr<llvm::Module> &llvmModule)
 {
-    llvm::errs() << "creating enzyme pass\n";
-    llvm::ModulePass *pass = createEnzymePass(/*PostOpt=*/false);
+    // llvm::errs() << "creating enzyme pass\n";
+    // llvm::ModulePass *pass = createEnzymePass(/*PostOpt=*/false);
     return failure();
 }
 

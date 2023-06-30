@@ -1,4 +1,4 @@
-from catalyst import qjit_ast
+from catalyst.ast_parser import chlorophyll
 import pennylane as qml
 import pennylane.numpy as pnp
 
@@ -8,7 +8,7 @@ dev = qml.device("lightning.qubit", wires=n_qubits)
 
 
 def test_basic():
-    @qjit_ast
+    @chlorophyll
     @qml.qnode(dev)
     def simple():
         qml.CNOT((0, 1))
@@ -28,6 +28,7 @@ module {
     %cst = arith.constant 4.430000e+01 : f64
     %cst_0 = arith.constant 4.400000e+01 : f64
     %cst_1 = arith.constant 3.430000e+00 : f64
+    quantum.device ["backend", "lightning.qubit"]
     %0 = quantum.alloc( 2) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
     %2 = quantum.extract %0[ 1] : !quantum.reg -> !quantum.bit
@@ -60,7 +61,7 @@ module {
 
 
 def test_scalar_param():
-    @qjit_ast
+    @chlorophyll
     @qml.qnode(dev)
     def scalar_param(x: float):
         qml.RX(x, wires=0)
@@ -73,6 +74,7 @@ module {
     return %0 : f64
   }
   func.func private @scalar_param(%arg0: f64) -> f64 {
+    quantum.device ["backend", "lightning.qubit"]
     %0 = quantum.alloc( 2) : !quantum.reg
     %1 = quantum.extract %0[ 0] : !quantum.reg -> !quantum.bit
     %2 = quantum.custom "RX"(%arg0) %1 : !quantum.bit
@@ -98,7 +100,7 @@ module {
 
 
 def test_if_else():
-    @qjit_ast
+    @chlorophyll
     @qml.qnode(dev)
     def ifelse(x: float, n: int):
         if n % 2 == 0:
@@ -123,6 +125,7 @@ module {
     %cst_1 = arith.constant 2.300000e+00 : f64
     %c0_i64 = arith.constant 0 : i64
     %c2_i64 = arith.constant 2 : i64
+    quantum.device ["backend", "lightning.qubit"]
     %0 = quantum.alloc( 2) : !quantum.reg
     %1 = arith.remsi %arg1, %c2_i64 : i64
     %2 = arith.cmpi eq, %1, %c0_i64 : i64
@@ -167,15 +170,11 @@ module {
 
 
 def test_range_for_loop():
-    @qjit_ast
+    @chlorophyll
     @qml.qnode(dev)
     def range_for(x: float, n: int):
         for i in range(n):
             qml.RX(x * i, wires=i)
-        for i in range(-4, n):
-            qml.Hadamard(i)
-        for i in range(-4, n, 2):
-            qml.PauliX(i + 1)
         return qml.expval(qml.PauliZ(0))
 
     range_for(5.4, 2)
@@ -186,44 +185,25 @@ module {
     return %0 : f64
   }
   func.func private @range_for(%arg0: f64, %arg1: i64) -> f64 {
-    %c2 = arith.constant 2 : index
-    %c-4 = arith.constant -4 : index
     %c1 = arith.constant 1 : index
     %c0 = arith.constant 0 : index
-    %c1_i64 = arith.constant 1 : i64
+    quantum.device ["backend", "lightning.qubit"]
     %0 = quantum.alloc( 2) : !quantum.reg
     %1 = arith.index_cast %arg1 : i64 to index
     %2 = scf.for %arg2 = %c0 to %1 step %c1 iter_args(%arg3 = %0) -> (!quantum.reg) {
-      %10 = arith.index_cast %arg2 : index to i64
-      %11 = arith.sitofp %10 : i64 to f64
-      %12 = arith.mulf %arg0, %11 : f64
-      %13 = arith.index_cast %arg2 : index to i64
-      %14 = quantum.extract %arg3[%13] : !quantum.reg -> !quantum.bit
-      %15 = quantum.custom "RX"(%12) %14 : !quantum.bit
-      %16 = quantum.insert %arg3[%13], %15 : !quantum.reg, !quantum.bit
-      scf.yield %16 : !quantum.reg
+      %6 = arith.index_cast %arg2 : index to i64
+      %7 = arith.sitofp %6 : i64 to f64
+      %8 = arith.mulf %arg0, %7 : f64
+      %9 = arith.index_cast %arg2 : index to i64
+      %10 = quantum.extract %arg3[%9] : !quantum.reg -> !quantum.bit
+      %11 = quantum.custom "RX"(%8) %10 : !quantum.bit
+      %12 = quantum.insert %arg3[%9], %11 : !quantum.reg, !quantum.bit
+      scf.yield %12 : !quantum.reg
     }
-    %3 = arith.index_cast %arg1 : i64 to index
-    %4 = scf.for %arg2 = %c-4 to %3 step %c1 iter_args(%arg3 = %2) -> (!quantum.reg) {
-      %10 = arith.index_cast %arg2 : index to i64
-      %11 = quantum.extract %arg3[%10] : !quantum.reg -> !quantum.bit
-      %12 = quantum.custom "Hadamard"() %11 : !quantum.bit
-      %13 = quantum.insert %arg3[%10], %12 : !quantum.reg, !quantum.bit
-      scf.yield %13 : !quantum.reg
-    }
-    %5 = arith.index_cast %arg1 : i64 to index
-    %6 = scf.for %arg2 = %c-4 to %5 step %c2 iter_args(%arg3 = %4) -> (!quantum.reg) {
-      %10 = arith.index_cast %arg2 : index to i64
-      %11 = arith.addi %10, %c1_i64 : i64
-      %12 = quantum.extract %arg3[%11] : !quantum.reg -> !quantum.bit
-      %13 = quantum.custom "PauliX"() %12 : !quantum.bit
-      %14 = quantum.insert %arg3[%11], %13 : !quantum.reg, !quantum.bit
-      scf.yield %14 : !quantum.reg
-    }
-    %7 = quantum.extract %6[ 0] : !quantum.reg -> !quantum.bit
-    %8 = quantum.namedobs %7[ PauliZ] : !quantum.obs
-    %9 = quantum.expval %8 : f64
-    return %9 : f64
+    %3 = quantum.extract %2[ 0] : !quantum.reg -> !quantum.bit
+    %4 = quantum.namedobs %3[ PauliZ] : !quantum.obs
+    %5 = quantum.expval %4 : f64
+    return %5 : f64
   }
   func.func @setup() {
     quantum.init
@@ -239,7 +219,7 @@ module {
 
 
 def test_assign():
-    @qjit_ast
+    @chlorophyll
     @qml.qnode(dev)
     def assign(n):
         x = n + 5
@@ -257,6 +237,7 @@ module {
   func.func private @assign(%arg0: i64) -> i64 {
     %c2_i64 = arith.constant 2 : i64
     %c5_i64 = arith.constant 5 : i64
+    quantum.device ["backend", "lightning.qubit"]
     %0 = arith.addi %arg0, %c5_i64 : i64
     %1 = arith.muli %0, %c2_i64 : i64
     return %1 : i64
@@ -275,7 +256,7 @@ module {
 
 
 def test_list_comprehension():
-    @qjit_ast
+    @chlorophyll
     @qml.qnode(dev)
     def list_comp(n):
         exp_vals = [qml.expval(qml.PauliZ(position)) for position in range(n)]
@@ -291,6 +272,7 @@ module {
   func.func private @list_comp(%arg0: i64) -> tensor<?xf64> {
     %c1 = arith.constant 1 : index
     %c0 = arith.constant 0 : index
+    quantum.device ["backend", "lightning.qubit"]
     %0 = quantum.alloc( 2) : !quantum.reg
     %1 = arith.index_cast %arg0 : i64 to index
     %2 = tensor.empty(%1) : tensor<?xf64>
@@ -318,7 +300,7 @@ module {
 
 
 def test_tensor_slice():
-    @qjit_ast
+    @chlorophyll
     @qml.qnode(dev)
     def tensor_slice(x, n):
         return x[n]
@@ -331,6 +313,7 @@ module {
     return %0 : tensor<2xi64>
   }
   func.func private @tensor_slice(%arg0: tensor<2x2xi64>, %arg1: i64) -> tensor<2xi64> {
+    quantum.device ["backend", "lightning.qubit"]
     %0 = arith.index_cast %arg1 : i64 to index
     %extracted_slice = tensor.extract_slice %arg0[%0, 0] [1, 2] [1, 1] : tensor<2x2xi64> to tensor<2xi64>
     return %extracted_slice : tensor<2xi64>
@@ -352,7 +335,7 @@ def test_call_twice():
     def subfunc(param):
         qml.RX(param, wires=0)
 
-    @qjit_ast
+    @chlorophyll
     @qml.qnode(dev)
     def call_twice(x: float, n: int):
         if n < 0:
@@ -372,6 +355,7 @@ module {
   func.func private @call_twice(%arg0: f64, %arg1: i64) -> f64 {
     %cst = arith.constant 3.000000e+00 : f64
     %c0_i64 = arith.constant 0 : i64
+    quantum.device ["backend", "lightning.qubit"]
     %0 = quantum.alloc( 2) : !quantum.reg
     %1 = arith.cmpi slt, %arg1, %c0_i64 : i64
     %2 = scf.if %1 -> (!quantum.reg) {

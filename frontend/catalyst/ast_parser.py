@@ -22,6 +22,7 @@ import os
 # import numpy as np
 import pennylane
 import pennylane.numpy as np
+import jax.numpy as jnp
 
 import mlir_quantum.ir as ir
 import mlir_quantum.dialects.arith as arith
@@ -111,7 +112,7 @@ class MLIRGenerator(ast.NodeVisitor):
         if inspect.ismodule(value_id):
             if value_id == pennylane and hasattr(pennylane, attr.attr):
                 return getattr(pennylane, attr.attr)
-            if value_id == np and hasattr(np, attr.attr):
+            if (value_id == np or value_id == jnp) and hasattr(np, attr.attr):
                 return getattr(np, attr.attr)
         if isinstance(value_id, ir.Value):
             # This is a method call, try to infer the method from the MLIR type
@@ -195,6 +196,9 @@ class MLIRGenerator(ast.NodeVisitor):
                 result = self.visit(stmt)
                 if isinstance(stmt, Return):
                     result_types = [r.type for r in result]
+            # To handle classical postprocessing, unset the quantum state after exiting a QNode.
+            if qnode:
+                self.qstate = None
 
         # Patch the return type based on the returned statement
         fn_type = ir.FunctionType.get(arg_types, result_types)
@@ -284,7 +288,13 @@ class MLIRGenerator(ast.NodeVisitor):
                 raise TypeError(f"Unknown loop iteration space: {iteration_space}")
 
             # Assume for now that the result of the list comprehension is an expval (f64)
-            output = tensor.EmptyOp([num_iters], ir.F64Type.get())
+            if isinstance(iteration_space, Range):
+                output = tensor.EmptyOp([num_iters], ir.F64Type.get())
+            elif is_iterating_over_tensor:
+                # We sorely need ahead-of-time type analysis/checking
+                # This 4 is a result of the shape of the callee, which in a single-pass visitor,
+                # we're unable to see the shape of.
+                output = tensor.EmptyOp([num_iters, 4], ir.F64Type.get())
 
             for_op = scf.ForOp(
                 start, stop, step, iter_args=(output,) + ((self.qstate,) if has_qstate else ())
@@ -342,7 +352,7 @@ class MLIRGenerator(ast.NodeVisitor):
                             output = tensor.InsertOp(self.visit(node.elt), output, [iv])
                         else:
                             output = tensor.InsertSliceOp(
-                                self.visit(node.elt),
+                                self.visit(node.elt)[0],
                                 output,
                                 [iv],
                                 dynamic_sizes,
@@ -521,8 +531,7 @@ class MLIRGenerator(ast.NodeVisitor):
             result = tensor.EmptyOp(shape, ir.F64Type.get()).result
             fill = linalg.FillOp([zero], [result], [result.type])
             linalg.fill_builtin_region(fill)
-            result = fill.result
-            return result
+            return fill.result
 
         def visit_ones(args):
             shape = args[0]
@@ -530,8 +539,7 @@ class MLIRGenerator(ast.NodeVisitor):
             result = tensor.EmptyOp(shape, ir.F64Type.get()).result
             fill = linalg.FillOp([one], [result], [result.type])
             linalg.fill_builtin_region(fill)
-            result = fill.result
-            return result
+            return fill.result
 
         def visit_matmul(args):
             # Get the shape of the result, assuming 2d operands
@@ -556,6 +564,8 @@ class MLIRGenerator(ast.NodeVisitor):
             tuple: visit_tuple_func,
         }
         numpy_functions = {
+            # Assume this is a no-op
+            np.array: lambda args: args[0],
             np.zeros: visit_zeros,
             np.ones: visit_ones,
             np.sin: lambda args: math.SinOp(args[0]).result,
@@ -660,13 +670,14 @@ class MLIRGenerator(ast.NodeVisitor):
                         func_op.body.blocks[0].append(
                             func.ReturnOp((self.qstate,) if has_qstate else ())
                         )
-                    else:
+                    elif has_qstate:
                         assert False, "is it possible to append an argument to a return op?"
 
                 # The bindings need the args to be a list and not a tuple
                 results = func.CallOp(func_op, list(args)).results
                 if has_qstate:
                     self.qstate = results[-1]
+                return results
         else:
             assert False, f"unhandled callee: {ast.dump(node.func)}"
 
@@ -930,15 +941,17 @@ def get_argument_types(args):
 
 
 class AST_QJIT:
-    def __init__(self, fn, canonicalize, dump_mlir) -> None:
+    def __init__(self, fn, canonicalize, dump_mlir, announce) -> None:
         self.fn = fn
         self._mlir = ""
         self._module = None
         self._func_name = None
         self._func_type = None
+        self.announce = announce
         self.canonicalize = canonicalize
         self.shared_object = None
         self.dump_mlir = dump_mlir
+        self.args = None
 
     def generate_mlir(self, *args, **kwargs):
         # Get argument types and shapes (at least ranks in the case of dynamic types)
@@ -964,13 +977,23 @@ class AST_QJIT:
             if self.canonicalize:
                 self._mlir = quantum.mlir_run_pipeline(self._mlir, "canonicalize")
 
+    def compile(self):
+        self.generate_mlir(*self.args)
+        compiler = Compiler()
+        filename = f"{compiler.workspace.name}/{self.fn.__name__}.o"
+        quantum.compile(self._module, filename)
+        self.shared_object = os.path.abspath(CompilerDriver.run(filename))
+
     def __call__(self, *args, **kwargs):
+        self.args = args
         if self.dump_mlir:
             self.generate_mlir(*args, **kwargs)
             print(self.mlir)
             return
 
         if self.shared_object is None:
+            if self.announce:
+                print("🍀 Compiling Chlorophyll 🍀")
             self.generate_mlir(*args, **kwargs)
             compiler = Compiler()
             filename = f"{compiler.workspace.name}/{self.fn.__name__}.o"
@@ -985,9 +1008,11 @@ class AST_QJIT:
         return self._mlir
 
 
-def qjit_ast(fn=None, canonicalize=True, dump_mlir=False):
+def chlorophyll(fn=None, canonicalize=True, dump_mlir=False, announce=False):
     """Just-in-time compiles the function by parsing it in to an abstract syntax tree."""
     if fn is not None:
-        return AST_QJIT(fn, canonicalize=canonicalize, dump_mlir=dump_mlir)
+        return AST_QJIT(fn, canonicalize=canonicalize, dump_mlir=dump_mlir, announce=announce)
 
-    return lambda fn: AST_QJIT(fn, canonicalize=canonicalize, dump_mlir=dump_mlir)
+    return lambda fn: AST_QJIT(
+        fn, canonicalize=canonicalize, dump_mlir=dump_mlir, announce=announce
+    )
