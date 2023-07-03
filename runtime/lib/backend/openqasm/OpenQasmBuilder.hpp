@@ -221,6 +221,70 @@ class QasmRegister {
 };
 
 /**
+ * The OpenQasm Matrix Builder for the following matrix data-types:
+ * - `std::vector<double>`
+ * - `std::vector<std::complex<double>>`
+ *
+ * @note It doesn't store the given matrix.
+ */
+struct MatrixBuilder {
+    [[nodiscard]] static auto toOpenQasm(const std::vector<std::complex<double>> &matrix,
+                                         size_t num_cols, size_t precision = 5,
+                                         [[maybe_unused]] const std::string &version = "3.0")
+        -> std::string
+    {
+        constexpr std::complex<double> zero{0, 0};
+        size_t index{0};
+        std::ostringstream oss;
+        oss << "[[";
+        for (const auto &c : matrix) {
+            if (index == num_cols) {
+                oss << "], [";
+                index = 0;
+            }
+            else if (index) {
+                oss << ", ";
+            }
+            index++;
+
+            if (c == zero) {
+                oss << "0";
+                continue;
+            }
+            oss << std::setprecision(precision) << c.real();
+            oss << std::setprecision(precision) << (c.imag() < 0 ? "" : "+") << c.imag() << "im";
+        }
+        oss << "]]";
+        return oss.str();
+    }
+
+    [[nodiscard]] static auto toOpenQasm(const std::vector<double> &matrix, size_t num_cols,
+                                         size_t precision = 5,
+                                         [[maybe_unused]] const std::string &version = "3.0")
+        -> std::string
+    {
+        size_t index{0};
+
+        std::ostringstream oss;
+        oss << "[[";
+        for (const auto &c : matrix) {
+            if (index == num_cols) {
+                oss << "], [";
+                index = 0;
+            }
+            else if (index) {
+                oss << ", ";
+            }
+            index++;
+
+            oss << std::setprecision(precision) << c;
+        }
+        oss << "]]";
+        return oss.str();
+    }
+};
+
+/**
  * The OpenQasm gate type.
  *
  * @param name The name of the gate to apply from the list of supported gates
@@ -328,63 +392,6 @@ class QasmMeasure {
         std::ostringstream oss;
         oss << bregister.toOpenQasm(mode, {bit}) << " = measure "
             << qregister.toOpenQasm(mode, {wire}) << ";\n";
-        return oss.str();
-    }
-};
-
-struct MatrixBuilder {
-    [[nodiscard]] static auto toOpenQasm(const std::vector<std::complex<double>> &matrix,
-                                         size_t num_cols, size_t precision = 5,
-                                         [[maybe_unused]] const std::string &version = "3.0")
-        -> std::string
-    {
-        constexpr std::complex<double> zero{0, 0};
-        size_t index{0};
-        std::ostringstream oss;
-        oss << "[[";
-        for (const auto &c : matrix) {
-            if (index == num_cols) {
-                oss << "], [";
-                index = 0;
-            }
-            else if (index) {
-                oss << ", ";
-            }
-            index++;
-
-            if (c == zero) {
-                oss << "0";
-                continue;
-            }
-            oss << std::setprecision(precision) << c.real();
-            oss << std::setprecision(precision) << (c.imag() < 0 ? "" : "+") << c.imag() << "im";
-        }
-        oss << "]]";
-        return oss.str();
-    }
-
-    [[nodiscard]] static auto toOpenQasm(const std::vector<double> &matrix, size_t num_cols,
-                                         size_t precision = 5,
-                                         [[maybe_unused]] const std::string &version = "3.0")
-        -> std::string
-    {
-        size_t index{0};
-
-        std::ostringstream oss;
-        oss << "[[";
-        for (const auto &c : matrix) {
-            if (index == num_cols) {
-                oss << "], [";
-                index = 0;
-            }
-            else if (index) {
-                oss << ", ";
-            }
-            index++;
-
-            oss << std::setprecision(precision) << c;
-        }
-        oss << "]]";
         return oss.str();
     }
 };
