@@ -229,16 +229,23 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
         StringRef allocFnName = "_mlir_memref_to_llvm_alloc";
         Type allocFnSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMPointerType::get(ctx),
                                                             {IntegerType::get(ctx, 64)});
+        LLVM::LLVMFuncOp allocFnDecl =
+            ensureFunctionDeclaration(rewriter, op, allocFnName, allocFnSignature);
         
+        // Create mlir memref to free
+        StringRef freeFnName = "_mlir_memref_to_llvm_free";
+        Type freeFnSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMPointerType::get(ctx), {});
+        ensureFunctionDeclaration(rewriter, op, freeFnName, freeFnSignature);
                 
         // Defyne some Enzyme Globals
         // malloc
         insertFunctionName(rewriter, op, "mallocname", StringRef("malloc", 7));
         insertEnzymeFunctionLike(rewriter, op, "__enzyme_function_like_malloc", "mallocname", "_mlir_memref_to_llvm_alloc");
-        
 
-        LLVM::LLVMFuncOp allocFnDecl =
-            ensureFunctionDeclaration(rewriter, op, allocFnName, allocFnSignature);
+        // free
+        insertFunctionName(rewriter, op, "freename", StringRef("free", 5));
+        insertEnzymeFunctionLike(rewriter, op, "__enzyme_function_like_free", "freename", "_mlir_memref_to_llvm_free");
+
         // Create the Enzyme function
         StringRef backpropFnName = "__enzyme_autodiff";
         Type backpropFnSignature =
