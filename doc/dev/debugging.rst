@@ -84,6 +84,37 @@ Using the ``QJIT.get_cmain`` function, the following string is returned to the u
 
 The user can now compile and link this program and run it without Python.
 
+
+Verbose Mode
+============
+
+Catalyst uses a number of command line tools under the hood.
+In order to see how these tools are used, one can use the verbose mode.
+The verbose mode prints out the tools and flags used by Catalyst.
+
+
+In order to enable verbose mode, the user must use the keyword argument ``verbose`` and set it to ``True`` for the ``@qjit`` wrapper.
+For example:
+
+.. code-block:: python
+
+    @qjit(verbose=True)
+    def circuit():
+        ...
+
+Will print out something close to the following:
+
+.. code-block:: bash
+
+        [RUNNING] mlir-hlo-opt --allow-unregistered-dialect --canonicalize --chlo-legalize-to-hlo --stablehlo-legalize-to-hlo --mhlo-legalize-control-flow --hlo-legalize-to-linalg --mhlo-legalize-to-std --convert-to-signless --canonicalize /tmp/tmpwsoh3acq/circuit.mlir -o /tmp/tmpwsoh3acq/circuit.nohlo.mlir
+        [RUNNING] quantum-opt --lower-gradients --convert-arraylist-to-memref /tmp/tmpwsoh3acq/circuit.nohlo.mlir -o /tmp/tmpwsoh3acq/circuit.nohlo.opt.mlir
+        [RUNNING] quantum-opt --inline --gradient-bufferize --scf-bufferize --convert-tensor-to-linalg --convert-elementwise-to-linalg --arith-bufferize --empty-tensor-to-alloc-tensor --bufferization-bufferize --tensor-bufferize --linalg-bufferize --tensor-bufferize --quantum-bufferize --func-bufferize --finalizing-bufferize --buffer-loop-hoisting --convert-bufferization-to-memref --canonicalize --cp-global-memref /tmp/tmpwsoh3acq/circuit.nohlo.opt.mlir -o /tmp/tmpwsoh3acq/circuit.nohlo.opt.buff.mlir
+        [RUNNING] quantum-opt --convert-linalg-to-loops --convert-scf-to-cf --expand-strided-metadata --lower-affine --arith-expand --convert-complex-to-standard --convert-complex-to-llvm --convert-math-to-llvm --convert-math-to-libm --convert-arith-to-llvm --finalize-memref-to-llvm=use-generic-functions --convert-index-to-llvm --convert-gradient-to-llvm --convert-quantum-to-llvm --emit-catalyst-py-interface --canonicalize --reconcile-unrealized-casts /tmp/tmpwsoh3acq/circuit.nohlo.opt.buff.mlir -o /tmp/tmpwsoh3acq/circuit.nohlo.opt.buff.llvm.mlir
+        [RUNNING] mlir-translate --mlir-to-llvmir /tmp/tmpwsoh3acq/circuit.nohlo.opt.buff.llvm.mlir -o /tmp/tmpwsoh3acq/circuit.nohlo.opt.buff.llvm.ll
+        [RUNNING] llc --filetype=obj --relocation-model=pic /tmp/tmpwsoh3acq/circuit.nohlo.opt.buff.llvm.ll -o /tmp/tmpwsoh3acq/circuit.nohlo.opt.buff.llvm.o
+        [RUNNING] clang -shared -rdynamic -Wl,-no-as-needed -Wl,-rpath,runtime/build/lib/capi:runtime/build/lib/backend:mlir/llvm-project/build/lib -Lmlir/llvm-project/build/lib -Lruntime/build/lib/capi -Lruntime/build/lib/backend -lrt_backend -lrt_capi -lpthread -lmlir_c_runner_utils /tmp/tmpwsoh3acq/circuit.nohlo.opt.buff.llvm.o -o /tmp/tmpwsoh3acq/circuit.nohlo.opt.buff.llvm.so
+
+
 Pass Pipelines
 ==============
 
@@ -160,7 +191,7 @@ The following will work:
 
 
 .. code-block:: python
-    custom_pipeline = [MHLOPass, QuantumCompilationPass, BufferizationPass, MLIRToLLVMDialect, LLVMDialectToLLVMIR, MyLLCOpt, CompilerDriver])
+    custom_pipeline = [MHLOPass, QuantumCompilationPass, BufferizationPass, MLIRToLLVMDialect, LLVMDialectToLLVMIR, MyLLCOpt, CompilerDriver]
     
     @qjit(pipelines=custom_pipeline)
     def foo():
