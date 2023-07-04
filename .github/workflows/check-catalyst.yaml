@@ -507,7 +507,9 @@ jobs:
 
     - name: Install additional dependencies (OpenQasm device)
       run: |
-        pip install numpy amazon-braket-sdk amazon-braket-pennylane-plugin
+        # TODO: Use the latest version of boto3 after fixing the issue with
+        # "Device SV1 does not support quantum circuits" from braket-pl-plugin.
+        pip install numpy amazon-braket-sdk amazon-braket-pennylane-plugin "boto3==1.26"
         echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
 
     - name: Get Cached qir-stdlib Build
