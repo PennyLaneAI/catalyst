@@ -15,6 +15,7 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/OpImplementation.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include <optional>
 
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/IR/QuantumOps.h"
@@ -34,7 +35,7 @@ using namespace catalyst::quantum;
 // Quantum op interfaces.
 //===----------------------------------------------------------------------===//
 
-Optional<Operation *> AllocOp::buildDealloc(OpBuilder &builder, Value alloc)
+std::optional<Operation *> AllocOp::buildDealloc(OpBuilder &builder, Value alloc)
 {
     return builder.create<DeallocOp>(alloc.getLoc(), alloc).getOperation();
 }

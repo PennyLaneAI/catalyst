@@ -193,7 +193,7 @@ struct ArrayListToMemRefPass : catalyst::impl::ArrayListToMemRefPassBase<ArrayLi
         MLIRContext *context = &getContext();
         TypeConverter arraylistTypeConverter;
 
-        arraylistTypeConverter.addConversion([](Type type) -> llvm::Optional<Type> {
+        arraylistTypeConverter.addConversion([](Type type) -> std::optional<Type> {
             if (MemRefType::isValidElementType(type)) {
                 return type;
             }
