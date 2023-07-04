@@ -287,7 +287,8 @@ class Enzyme(PassPipeline):
         f"-load-pass-plugin={enzyme_path}/LLVMEnzyme-17.so",
         "-load",
         f"{enzyme_path}/LLVMEnzyme-17.so",
-        "-passes=enzyme",
+        # preserve-nvvm transforms certain global arrays to LLVM metadata that Enzyme will recognize.
+        "-passes=preserve-nvvm,enzyme",
         "-S",
     ]
 
