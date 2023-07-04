@@ -110,6 +110,65 @@
 * Add support for generating OpenQasm3 kernels from the ``QuantumDevice`` API in the runtime.
   [#118](https://github.com/PennyLaneAI/catalyst/pull/118)
 
+* Add end-to-end support for execution of OpenQasm3 kernels on Amazon Braket devices.
+  [#139](https://github.com/PennyLaneAI/catalyst/pull/139)
+
+  This feature enables JIT compilation of the quantum part of a PennyLane program into a standalone OpenQasm3 kernel.
+  It executes the generated OpenQasm3 kernels on both local (``braket.local.qubit``) and remote (``braket.aws.qubit``)
+  devices backed by Amazon Braket Python SDK at runtime, and propagates the measurement results back to the frontend.
+  However, there are still some limitations with this support. For instance, it currently only works for static circuits
+  and does not support mid-circuit measurements.
+
+  In the following example, the OpenQasm3 kernel associated with ``circuit`` is generated at runtime and executed on
+  the Braket state-vector simulator locally:
+
+  ``` python
+  def circuit(x, y):
+      qml.RX(y * x, wires=0)
+      qml.RX(x * 2, wires=1)
+      return qml.expval(qml.PauliY(0) @ qml.PauliZ(1))
+
+  @qjit
+  def workflow(x: float, y: float):
+      device = qml.device("braket.local.qubit", backend="braket_sv", wires=2)
+      g = qml.qnode(device)(circuit)
+      h = catalyst.grad(g)
+      return h(x, y)
+
+  workflow(1.0, 2.0)
+  ```
+
+* Add ``qml.Hermitian`` support to the OpenQasm3/Braket backend device.
+  [#179](https://github.com/PennyLaneAI/catalyst/pull/179)
+
+  ``` python
+  @qjit()
+  @qml.qnode(qml.device("braket.local.qubit", backend="braket_sv", wires=1))
+  def circuit(x: float):
+      qml.RY(x, wires=0)
+      A = np.array(
+          [[complex(1.0, 0.0), complex(2.0, 0.0)], [complex(2.0, 0.0), complex(1.0, 0.0)]]
+      )
+      return qml.expval(qml.Hermitian(A, wires=0))
+
+  circuit(1.0)
+  ```
+
+* Add ``qml.QubitUnitary`` support to the OpenQasm3/Braket backend device.
+  [#180](https://github.com/PennyLaneAI/catalyst/pull/180)
+
+  ``` python
+  @qjit()
+  @qml.qnode(qml.device("braket.local.qubit", backend="braket_sv", wires=1))
+  def circuit(x: float):
+      qml.RX(x, wires=0)
+      U = 1 / np.sqrt(2) * np.array([[1.0, 1.0], [1.0, -1.0]], dtype=complex)
+      qml.QubitUnitary(U, wires=0)
+      return qml.expval(qml.PauliZ(0))
+
+  circuit(1.0)
+  ```
+
 <h3>Improvements</h3>
 
 * Improving error handling by throwing descriptive and unified expressions for runtime
@@ -217,7 +276,6 @@
   params = jnp.array([0.3, 0.4])
   jax.grad(circuit)(params)
   ```
-
 
 <h3>Contributors</h3>
 

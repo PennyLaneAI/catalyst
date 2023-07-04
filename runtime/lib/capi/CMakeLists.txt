@@ -8,7 +8,7 @@ add_library(catalyst_qir_qis_obj OBJECT RuntimeCAPI.cpp)
 target_link_libraries(catalyst_qir_qis_obj ${CMAKE_DL_LIBS}
                                             "-L${CMAKE_BINARY_DIR}/lib/backend"
                                             -lrt_backend
-                                            lightning_interfaces)
+                                            rt_interfaces)
 
 # link to qir_stdlib
 target_link_libraries(catalyst_qir_qis_obj "-L${QIR_STDLIB_LIB}"
@@ -26,7 +26,6 @@ target_include_directories(catalyst_qir_qis_obj PUBLIC .
                                                         ${extensions_includes})
 
 set_property(TARGET catalyst_qir_qis_obj PROPERTY POSITION_INDEPENDENT_CODE ON)
-
 
 #####################
 # Shared Lib rt_capi

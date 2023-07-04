@@ -35,8 +35,9 @@ endif()
 
 add_library(catalyst_qir_runtime INTERFACE)
 
-message(--\ QIR_STDLIB_LIB="${QIR_STDLIB_LIB}")
-message(--\ QIR_STDLIB_INCLUDES="${QIR_STDLIB_INCLUDES}")
+message(STATUS "ENABLE_OPENQASM is ${ENABLE_OPENQASM}.")
+message(--\ QIR_STDLIB_LIB=${QIR_STDLIB_LIB})
+message(--\ QIR_STDLIB_INCLUDES=${QIR_STDLIB_INCLUDES})
 
 target_link_libraries(catalyst_qir_runtime INTERFACE rt_backend rt_capi)
 

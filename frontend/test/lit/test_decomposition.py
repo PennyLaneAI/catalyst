@@ -39,8 +39,9 @@ def get_custom_device_without(num_wires, discards):
         operations = copy
         observables = discard
 
-        def __init__(self, shots=None, wires=None, backend=None):
-            self.backend = backend if backend else "default"
+        def __init__(self, shots=None, wires=None, backend_name=None, backend_kwargs=None):
+            self.backend_name = backend_name if backend_name else "default"
+            self.backend_kwargs = backend_kwargs if backend_kwargs else ""
             super().__init__(wires=wires, shots=shots)
 
         def apply(self, operations, **kwargs):
@@ -57,6 +58,7 @@ def test_decompose_multicontrolledx():
     # CHECK-LABEL: public @jit_decompose_multicontrolled_x1
     def decompose_multicontrolled_x1(theta: float):
         qml.RX(theta, wires=[0])
+        # pylint: disable=line-too-long
         # CHECK-NOT: name = "MultiControlledX"
         # CHECK: [[state0:%.+]]:3 = "quantum.custom"([[q2:%.+]], [[q4:%.+]], [[q3:%.+]]) {gate_name = "Toffoli"
         # CHECK-NOT: name = "MultiControlledX"
@@ -84,6 +86,7 @@ def test_decompose_multicontrolledx_in_conditional():
     def decompose_multicontrolled_x2(theta: float, n: int):
         qml.RX(theta, wires=[0])
 
+        # pylint: disable=line-too-long
         # CHECK-NOT: name = "MultiControlledX"
         # CHECK: [[state0:%.+]]:3 = "quantum.custom"([[q2:%.+]], [[q4:%.+]], [[q3:%.+]]) {gate_name = "Toffoli"
         # CHECK-NOT: name = "MultiControlledX"
@@ -116,6 +119,7 @@ def test_decompose_multicontrolledx_in_while_loop():
     def decompose_multicontrolled_x3(theta: float, n: int):
         qml.RX(theta, wires=[0])
 
+        # pylint: disable=line-too-long
         # CHECK-NOT: name = "MultiControlledX"
         # CHECK: [[state0:%[0-9]+]]{{:3}} = "quantum.custom"([[q2:%[0-9]+]], [[q4:%[0-9]+]], [[q3:%[0-9]+]]) {gate_name = "Toffoli"
         # CHECK-NOT: name = "MultiControlledX"
@@ -148,6 +152,7 @@ def test_decompose_multicontrolledx_in_for_loop():
     def decompose_multicontrolled_x4(theta: float, n: int):
         qml.RX(theta, wires=[0])
 
+        # pylint: disable=line-too-long
         # CHECK-NOT: name = "MultiControlledX"
         # CHECK: [[state0:%[0-9]+]]{{:3}} = "quantum.custom"([[q2:%[0-9]+]], [[q4:%[0-9]+]], [[q3:%[0-9]+]]) {gate_name = "Toffoli"
         # CHECK-NOT: name = "MultiControlledX"
@@ -250,6 +255,7 @@ def test_decompose_singleexcitationplus():
     @qfunc(2, device=dev)
     # CHECK-LABEL: public @jit_decompose_singleexcitationplus
     def decompose_singleexcitationplus(theta: float):
+        # pylint: disable=line-too-long
         # CHECK-NOT: name = "SingleExcitationPlus"
         # CHECK: [[a_scalar_tensor_float_2:%.+]] = stablehlo.constant dense<2.{{[0]+}}e+00>
         # CHECK-NOT: name = "SingleExcitationPlus"

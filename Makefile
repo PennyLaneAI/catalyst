@@ -8,6 +8,7 @@ MK_DIR := $(dir $(MK_ABSPATH))
 DIALECTS_BUILD_DIR ?= $(MK_DIR)/mlir/build
 COVERAGE_REPORT ?= term-missing
 TEST_BACKEND ?= "lightning.qubit"
+TEST_BRAKET ?= OFF
 
 .PHONY: help
 help:
@@ -66,8 +67,11 @@ lit:
 
 pytest:
 	@echo "check the Catalyst PyTest suite"
-	$(PYTHON) pytest frontend/test/pytest --tb=native --backend=$(TEST_BACKEND) -n auto
-
+ifdef remotetests
+	$(PYTHON) pytest frontend/test/pytest --tb=native --backend=$(TEST_BACKEND) --runbraket=$(TEST_BRAKET) -n auto
+else
+	$(PYTHON) pytest frontend/test/pytest --tb=native --backend=$(TEST_BACKEND) --runbraket=$(TEST_BRAKET) -k "not remotetests" -n auto
+endif
 test-demos:
 	@echo "check the Catalyst demos"
 	MDD_BENCHMARK_PRECISION=1 \
@@ -113,9 +117,11 @@ endif
 	$(MAKE) -C mlir format
 	$(MAKE) -C runtime format
 ifdef check
+	python3 ./bin/format.py --check $(if $(version:-=),--cfversion $(version)) ./frontend/catalyst/utils
 	black --check --verbose .
 	isort --check --diff .
 else
+	python3 ./bin/format.py $(if $(version:-=),--cfversion $(version)) ./frontend/catalyst/utils
 	black .
 	isort .
 endif

@@ -50,39 +50,49 @@ New device backends for the runtime can be realized by implementing the quantum 
 The following table shows the available devices along with supported features:
 
 .. list-table::
-   :widths: 25 25 25
+   :widths: 25 25 25 25
    :header-rows: 0
 
    * - **Features**
      - **PennyLane-Lightning**
      - **PennyLane-Lightning-Kokkos**
+     - **Amazon-Braket-OpenQasm**
    * - Qubit Management
      - Dynamic allocation/deallocation
+     - Static allocation/deallocation
      - Static allocation/deallocation
    * - Gate Operations
      - `Lightning operations <https://github.com/PennyLaneAI/pennylane-lightning/blob/master/pennylane_lightning/src/gates/GateOperation.hpp>`_
      - `Lightning operations <https://github.com/PennyLaneAI/pennylane-lightning/blob/master/pennylane_lightning/src/gates/GateOperation.hpp>`_
+     - `Braket operations <https://github.com/PennyLaneAI/catalyst/blob/e812afbadbd777209862d5c76f394e3f0c43ffb6/runtime/lib/backend/openqasm/OpenQasmBuilder.hpp#L49>`_
    * - Quantum Observables
      - ``Identity``, ``PauliX``, ``PauliY``, ``PauliZ``, ``Hadamard``, ``Hermitian``, ``Hamiltonian``, and Tensor Product of Observables
      - ``Identity``, ``PauliX``, ``PauliY``, ``PauliZ``, ``Hadamard``, ``Hermitian``, ``Hamiltonian``, and Tensor Product of Observables
+     - ``Identity``, ``PauliX``, ``PauliY``, ``PauliZ``, ``Hadamard``, ``Hermitian``, and Tensor Product of Observables
    * - Expectation Value
      - All observables; Finite-shots not supported
      - All observables; Finite-shots not supported
+     - All observables; Finite-shots supported
    * - Variance
      - All observables; Finite-shots not supported
      - All observables; Finite-shots not supported
+     - All observables; Finite-shots supported
    * - Probability
      - Only for the computational basis on the supplied qubits; Finite-shots not supported
      - Only for the computational basis on the supplied qubits; Finite-shots not supported
+     - The computational basis on all active qubits; Finite-shots supported
    * - Sampling
      - Only for the computational basis on the supplied qubits
      - Only for the computational basis on the supplied qubits
+     - The computational basis on all active qubits; Finite-shots supported
    * - Mid-Circuit Measurement
      - Only for the computational basis on the supplied qubit
      - Only for the computational basis on the supplied qubit
+     - Not supported
    * - Gradient
      - The Adjoint-Jacobian method for expectation values on all observables
      - The Adjoint-Jacobian method for expectation values on all observables
+     - Not supported
 
 Requirements
 ============

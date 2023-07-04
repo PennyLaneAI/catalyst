@@ -1,4 +1,4 @@
-// Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+// Copyright 2023 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,27 +20,21 @@
 #include <utility>
 
 #include "Exception.hpp"
-#include "Types.h"
+#include "OpenQasmBuilder.hpp"
 #include "Utils.hpp"
 
-#include "Observables.hpp"
+#include "Types.h"
 
-namespace Catalyst::Runtime::Simulator {
+namespace Catalyst::Runtime::Device::OpenQasm {
 
 /**
- * @brief The LightningObsManager caches observables of a program at runtime
+ * @brief The OpenQasmObsManager caches observables of a program at runtime
  * and maps each one to a const unique index (`int64_t`) in the scope
  * of the global context manager.
  */
-template <typename PrecisionT> class LightningObsManager {
+class OpenQasmObsManager {
   private:
-    using ObservableClassName = Pennylane::Simulators::Observable<PrecisionT>;
-    using NamedObsClassName = Pennylane::Simulators::NamedObs<PrecisionT>;
-    using HermitianObsClassName = Pennylane::Simulators::HermitianObs<PrecisionT>;
-    using TensorProdObsClassName = Pennylane::Simulators::TensorProdObs<PrecisionT>;
-    using HamiltonianClassName = Pennylane::Simulators::Hamiltonian<PrecisionT>;
-
-    using ObservablePairType = std::pair<std::shared_ptr<ObservableClassName>, ObsType>;
+    using ObservablePairType = std::pair<std::shared_ptr<QasmObs>, ObsType>;
     std::vector<ObservablePairType> observables_{};
 
     static constexpr std::array<ObsType, 2> hamiltonian_valid_obs_types = {
@@ -49,13 +43,13 @@ template <typename PrecisionT> class LightningObsManager {
     };
 
   public:
-    LightningObsManager() = default;
-    ~LightningObsManager() = default;
+    OpenQasmObsManager() = default;
+    ~OpenQasmObsManager() = default;
 
-    LightningObsManager(const LightningObsManager &) = delete;
-    LightningObsManager &operator=(const LightningObsManager &) = delete;
-    LightningObsManager(LightningObsManager &&) = delete;
-    LightningObsManager &operator=(LightningObsManager &&) = delete;
+    OpenQasmObsManager(const OpenQasmObsManager &) = delete;
+    OpenQasmObsManager &operator=(const OpenQasmObsManager &) = delete;
+    OpenQasmObsManager(OpenQasmObsManager &&) = delete;
+    OpenQasmObsManager &operator=(OpenQasmObsManager &&) = delete;
 
     /**
      * @brief A helper function to clear constructed observables in the program.
@@ -81,7 +75,7 @@ template <typename PrecisionT> class LightningObsManager {
      * @param key The observable key
      * @return std::shared_ptr<ObservableClassName>
      */
-    [[nodiscard]] auto getObservable(ObsIdType key) -> std::shared_ptr<ObservableClassName>
+    [[nodiscard]] auto getObservable(ObsIdType key) -> std::shared_ptr<QasmObs>
     {
         RT_FAIL_IF(!isValidObservables({key}), "Invalid observable key");
         return std::get<0>(observables_[reinterpret_cast<int64_t>(key)]);
@@ -103,12 +97,13 @@ template <typename PrecisionT> class LightningObsManager {
      */
     [[nodiscard]] auto createNamedObs(ObsId obsId, const std::vector<size_t> &wires) -> ObsIdType
     {
-        auto &&obs_str =
-            std::string(Lightning::lookup_obs<Lightning::simulator_observable_support_size>(
-                Lightning::simulator_observable_support, obsId));
+        using namespace Catalyst::Runtime::Simulator::Lightning;
+
+        auto &&obs_str = std::string(
+            lookup_obs<simulator_observable_support_size>(simulator_observable_support, obsId));
 
         observables_.push_back(
-            std::make_pair(std::make_shared<NamedObsClassName>(obs_str, wires), ObsType::Basic));
+            std::make_pair(std::make_shared<QasmNamedObs>(obs_str, wires), ObsType::Basic));
         return static_cast<ObsIdType>(observables_.size() - 1);
     }
 
@@ -119,12 +114,12 @@ template <typename PrecisionT> class LightningObsManager {
      * @param wires The vector of wires the observable acts on
      * @return ObsIdType
      */
-    [[nodiscard]] auto createHermitianObs(const std::vector<std::complex<PrecisionT>> &matrix,
-                                          const std::vector<size_t> &wires) -> ObsIdType
+    [[nodiscard]] auto
+    createHermitianObs([[maybe_unused]] const std::vector<std::complex<double>> &matrix,
+                       [[maybe_unused]] const std::vector<size_t> &wires) -> ObsIdType
     {
         observables_.push_back(std::make_pair(
-            std::make_shared<HermitianObsClassName>(HermitianObsClassName{matrix, wires}),
-            ObsType::Basic));
+            std::make_shared<QasmHermitianObs>(QasmHermitianObs{matrix, wires}), ObsType::Basic));
 
         return static_cast<ObsIdType>(observables_.size() - 1);
     }
@@ -140,7 +135,7 @@ template <typename PrecisionT> class LightningObsManager {
         const auto key_size = obsKeys.size();
         const auto obs_size = observables_.size();
 
-        std::vector<std::shared_ptr<ObservableClassName>> obs_vec;
+        std::vector<std::shared_ptr<QasmObs>> obs_vec;
         obs_vec.reserve(key_size);
 
         for (const auto &key : obsKeys) {
@@ -156,9 +151,9 @@ template <typename PrecisionT> class LightningObsManager {
             obs_vec.push_back(obs);
         }
 
-        observables_.push_back(std::make_pair(
-            std::make_shared<TensorProdObsClassName>(TensorProdObsClassName::create(obs_vec)),
-            ObsType::TensorProd));
+        observables_.push_back(
+            std::make_pair(std::make_shared<QasmTensorObs>(QasmTensorObs(std::move(obs_vec))),
+                           ObsType::TensorProd));
 
         return static_cast<ObsIdType>(obs_size);
     }
@@ -170,7 +165,7 @@ template <typename PrecisionT> class LightningObsManager {
      * @param obsKeys The vector of observable keys
      * @return ObsIdType
      */
-    [[nodiscard]] auto createHamiltonianObs(const std::vector<PrecisionT> &coeffs,
+    [[nodiscard]] auto createHamiltonianObs(const std::vector<double> &coeffs,
                                             const std::vector<ObsIdType> &obsKeys) -> ObsIdType
     {
         const auto key_size = obsKeys.size();
@@ -180,7 +175,7 @@ template <typename PrecisionT> class LightningObsManager {
                    "Incompatible list of observables and coefficients; "
                    "Number of observables and number of coefficients must be equal");
 
-        std::vector<std::shared_ptr<ObservableClassName>> obs_vec;
+        std::vector<std::shared_ptr<QasmObs>> obs_vec;
         obs_vec.reserve(key_size);
 
         for (auto key : obsKeys) {
@@ -199,11 +194,11 @@ template <typename PrecisionT> class LightningObsManager {
             obs_vec.push_back(obs);
         }
 
-        observables_.push_back(std::make_pair(std::make_shared<HamiltonianClassName>(
-                                                  HamiltonianClassName(coeffs, std::move(obs_vec))),
-                                              ObsType::Hamiltonian));
+        observables_.push_back(std::make_pair(
+            std::make_shared<QasmHamiltonianObs>(QasmHamiltonianObs(coeffs, std::move(obs_vec))),
+            ObsType::Hamiltonian));
 
         return static_cast<ObsIdType>(obs_size);
     }
 };
-} // namespace Catalyst::Runtime::Simulator
+} // namespace Catalyst::Runtime::Device::OpenQasm

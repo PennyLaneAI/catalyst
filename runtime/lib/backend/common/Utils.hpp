@@ -14,19 +14,62 @@
 
 #pragma once
 
+#include <algorithm>
 #include <array>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <tuple>
+#include <unordered_map>
 #include <utility>
 
 #include "Types.h"
 
 #if __has_include("StateVectorKokkos.hpp")
 #include "UtilKokkos.hpp"
-#else
+#endif
+
+#if __has_include("StateVectorDynamicCPU.hpp")
 #include "Util.hpp"
 #endif
+
+namespace Catalyst::Runtime::Simulator {
+static inline auto parse_kwargs(std::string kwargs) -> std::unordered_map<std::string, std::string>
+{
+    // cleaning kwargs
+    if (kwargs.empty()) {
+        return {};
+    }
+
+    kwargs.erase(std::remove_if(kwargs.begin(), kwargs.end(),
+                                [](char c) {
+                                    switch (c) {
+                                    case '{':
+                                    case '}':
+                                    case ' ':
+                                    case '\'':
+                                        return true;
+                                    default:
+                                        return false;
+                                    }
+                                }),
+                 kwargs.end());
+
+    // constructing map
+    std::unordered_map<std::string, std::string> map;
+    std::istringstream iss(kwargs);
+    std::string token;
+    while (std::getline(iss, token, ',')) {
+        std::istringstream issp(token);
+        std::string pair[2];
+        std::getline(issp, pair[0], ':');
+        std::getline(issp, pair[1]);
+        map[pair[0]] = pair[1];
+    }
+
+    return map;
+}
+} // namespace Catalyst::Runtime::Simulator
 
 namespace Catalyst::Runtime::Simulator::Lightning {
 enum class SimulatorGate : uint8_t {

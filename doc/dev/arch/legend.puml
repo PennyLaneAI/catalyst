@@ -13,6 +13,6 @@ System_Ext(c, "External project")
 
 Rel_D(p,a, "acts", "", $tags="action")
 Lay_D(a,b1)
-Rel_R(b1,b2,"object")
+Rel_R(b1,b2,"data")
 Lay_D(b1,c)
 @enduml
