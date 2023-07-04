@@ -127,7 +127,8 @@ The user would then create a ``PassPipeline`` that replaces the ``LLVMIRToObject
 First let's take a look at the ``LLVMIRToObjectFile``.
 
 .. code-block:: python
-    class LLVMDialectToLLVMIR(PassPipeline):
+
+    class LLVMIRToObjectFile(PassPipeline):
         """LLVMIR To Object File."""
     
         _executable = get_executable_path("llvm", "llc")
@@ -141,7 +142,7 @@ First let's take a look at the ``LLVMIRToObjectFile``.
             path = pathlib.Path(infile)
             if not path.exists():
                 raise FileNotFoundError("Cannot find {infile}.")
-            return str(path.with_suffix(".ll"))
+            return str(path.with_suffix(".o"))
 
 
 The ``LLVMDialectTOLLVMIR`` and all classes derived from ``PassPipeline`` must define an ``_executable`` and ``_default_flags`` fields.
@@ -154,6 +155,7 @@ From here, we can see that in order for the user to test different optimization 
 
 
 .. code-block:: python
+
     class MyLLCOpt(PassPipeline):
         """LLVMIR To Object File."""
     
@@ -169,11 +171,12 @@ From here, we can see that in order for the user to test different optimization 
             path = pathlib.Path(infile)
             if not path.exists():
                 raise FileNotFoundError("Cannot find {infile}.")
-            return str(path.with_suffix(".ll"))
+            return str(path.with_suffix(".o"))
 
 or
 
 .. code-block:: python
+
     class MyLLCOpt(LLVMIRToObjectFile):
         """LLVMIR To Object File."""
     
