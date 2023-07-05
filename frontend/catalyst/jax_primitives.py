@@ -26,8 +26,8 @@ from jax.core import AbstractValue
 from jax.interpreters import mlir
 from jaxlib.mlir.dialects._func_ops_gen import CallOp
 from jaxlib.mlir.dialects._mhlo_ops_gen import ConstantOp, ConvertOp
+from jaxlib.mlir.dialects._stablehlo_ops_gen import ConstantOp as StableHLOConstantOp
 from mlir_quantum.dialects.arith import AddIOp, CeilDivSIOp
-from mlir_quantum.dialects.arith import ConstantOp as ArithConstantOp
 from mlir_quantum.dialects.arith import IndexCastOp, MulIOp, SubIOp
 from mlir_quantum.dialects.gradient import GradOp, JVPOp, VJPOp
 from mlir_quantum.dialects.quantum import (
@@ -1426,8 +1426,19 @@ def _qfor_lowering(
         loop_operands.append(p)
 
     if apply_reverse_transform:
-        zero = ArithConstantOp(ir.IndexType.get(), 0)
-        one = ArithConstantOp(ir.IndexType.get(), 1)
+        zero_np = np.array(0)
+        one_np = np.array(1)
+        zero_attr = ir.DenseIntElementsAttr.get(zero_np)
+        one_attr = ir.DenseIntElementsAttr.get(one_np)
+        zero_tensor = StableHLOConstantOp(zero_attr)
+        one_tensor = StableHLOConstantOp(one_attr)
+        ctx = jax_ctx.module_context.context
+        i64_type = ir.IntegerType.get_signless(64, ctx)
+        zero_i64 = TensorExtractOp(i64_type, zero_tensor, []).result
+        one_i64 = TensorExtractOp(i64_type, one_tensor, []).result
+        zero = IndexCastOp(ir.IndexType.get(), zero_i64).result
+        one = IndexCastOp(ir.IndexType.get(), one_i64).result
+
         start_val, stop_val, step_val = loop_operands[0], loop_operands[1], loop_operands[2]
 
         # Iterate from 0 to the number of iterations (ceil((stop - start) / step))
