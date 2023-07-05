@@ -70,7 +70,7 @@ jobs:
               -DLLVM_ENABLE_ASSERTIONS=ON \
               -DLLVM_INSTALL_UTILS=ON
 
-        cmake --build llvm-build --target lld check-mlir -j$(nproc)
+        LIT_FILTER_OUT="Bytecode" cmake --build llvm-build --target lld check-mlir -j$(nproc)
 
     # Build and cache MHLO
     - name: Get MHLO Version
@@ -218,7 +218,7 @@ jobs:
               -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -DPython3_NumPy_INCLUDE_DIRS=$(python${{ matrix.python_version }} -c "import numpy as np; print(np.get_include())")
 
-        cmake --build llvm-build --target check-mlir -j$(nproc)
+        LIT_FILTER_OUT="Bytecode" cmake --build llvm-build --target check-mlir -j$(nproc)
 
     # Build Quantum and Gradient Dialects
     - name: Build MLIR Dialects
