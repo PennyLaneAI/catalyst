@@ -1,126 +1,78 @@
-# Release 0.2.0-dev
+# Release 0.2.0
 
 <h3>New features</h3>
 
-* Catalyst programs can now be used inside of a larger JAX workflow which uses JIT compilation,
-  automatic differentiation, and other JAX transforms.
-  [#96](https://github.com/PennyLaneAI/catalyst/pull/96)
-  [#123](https://github.com/PennyLaneAI/catalyst/pull/123)
+* Catalyst programs can now be used inside of a larger JAX workflow which uses
+  JIT compilation, automatic differentiation, and other JAX transforms.[#96]
+  (https://github.com/PennyLaneAI/catalyst/pull/96)[#123]
+  (https://github.com/PennyLaneAI/catalyst/pull/123)
 
-  Note that generally Catalyst should be used to JIT the entire workflow, but sometimes users may
-  wish to delegate only the quantum part of their workflow to Catalyst and let JAX handle the rest
-  (for example due to missing a feature or compatibility issue in Catalyst).
+  For example, call a Catalyst qjit-compiled function from within a JAX jit-compiled
+  function:
 
-  Examples of newly supported workflows:
-
-   * JIT compilation with JAX:
-
-     ```py
-     @qjit
-     @qml.qnode(dev)
-     def circuit(x):
-         qml.RX(jnp.pi * x[0], wires=0)
-         qml.RY(x[1] ** 2, wires=0)
-         qml.RX(x[1] * x[2], wires=0)
-         return qml.probs(wires=0)
-
-     @jax.jit
-     def cost_fn(weights):
-         x = jnp.sin(weights)
-         return jnp.sum(jnp.cos(circuit(x)) ** 2)
-
-     cost_fn(jnp.array([0.1, 0.2, 0.3]))
-     ```
-
-   * Automatic differentiation with JAX, both in forward and reverse mode, but to first-order only:
-
-     ```py
-     @qjit
-     @qml.qnode(dev)
-     def circuit(x):
-         qml.RX(jnp.pi * x[0], wires=0)
-         qml.RY(x[1] ** 2, wires=0)
-         qml.RX(x[1] * x[2], wires=0)
-         return qml.probs(wires=0)
-
-     def cost_fn(weights):
-         x = jnp.sin(weights)
-         return jnp.sum(jnp.cos(circuit(x)) ** 2)
-
-     jax.grad(cost_fn)(jnp.array([0.1, 0.2, 0.3]))
-     ```
-
-   * Vectorization of quantum functions with JAX:
-
-     ```py
-     @qjit
-     @qml.qnode(dev)
-     def circuit(x):
-         qml.RX(jnp.pi * x[0], wires=0)
-         qml.RY(x[1] ** 2, wires=0)
-         qml.RX(x[1] * x[2], wires=0)
-         return qml.probs(wires=0)
-
-     def cost_fn(weights):
-         x = jnp.sin(weights)
-         return jnp.sum(jnp.cos(circuit(x)) ** 2)
-
-     jax.vmap(cost_fn)(jnp.array([[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]]))
-     ```
-
-* Add a Backprop operation for using AD at the LLVM level with Enzyme AD. It has a 
-  bufferization pattern and a lowering to LLVM.
-  [#107](https://github.com/PennyLaneAI/catalyst/pull/107)
-  [#116](https://github.com/PennyLaneAI/catalyst/pull/116)
-
-* Add support for ``else if`` chains for ``@cond`` conditionals
-  [#104](https://github.com/PennyLaneAI/catalyst/pull/104)
-
-* Add the end-to-end support for multiple backend devices. The compilation flag
-  ``ENABLE_LIGHTNING_KOKKOS=ON`` builds the runtime with support for PennyLane's
-  ``lightning.kokkos``. Both ``lightning.qubit`` and ``lightning.kokkos`` can be
-  chosen as available backend devices from the frontend.
-  [#89](https://github.com/PennyLaneAI/catalyst/pull/89)
-
-* Add support for ``var`` of general observables
-  [#124](https://github.com/PennyLaneAI/catalyst/pull/124)
-
-* Add support for Jacobian product operations. The function ``jvp(f, params, tangents)`` returns
-  the Jacobian-vector product of a function ``f``, and the ``vjp(f, params, cotangents)`` returns
-  its vector-Jacobian product.
-
-  [#98](https://github.com/PennyLaneAI/catalyst/pull/98)
-
-  An example of a newly supported workflow:
-
-
-  ``` python
-  from catalyst import jvp
-
-  def f(p):
-    return jnp.stack([1*p, 2*p, 3*p])
-
+  ```python
+  dev = qml.device("lightning.qubit", wires=1)
+  
   @qjit
-  def workflow(params, tangent):
-    return jvp(f, [params], [tangent])
-
-  workflow(jnp.zeros([4], dtype=float), jnp.ones([4], dtype=float))
+  @qml.qnode(dev)
+  def circuit(x):
+      qml.RX(jnp.pi * x[0], wires=0)
+      qml.RY(x[1] ** 2, wires=0)
+      qml.RX(x[1] * x[2], wires=0)
+      return qml.probs(wires=0)
+  
+  @jax.jit
+  def cost_fn(weights):
+      x = jnp.sin(weights)
+      return jnp.sum(jnp.cos(circuit(x)) ** 2)
+  ```
+  
+  ```pycon
+  >>> cost_fn(jnp.array([0.1, 0.2, 0.3]))
+  Array(1.32269195, dtype=float64)
   ```
 
-* Add support for generating OpenQasm3 kernels from the ``QuantumDevice`` API in the runtime.
+  Catalyst-compiled functions can now also be automatically differentiated
+  via JAX, both in forward and reverse mode to first-order,
+
+  ```pycon
+  >>> jax.grad(cost_fn)(jnp.array([0.1, 0.2, 0.3]))
+  Array([0.49249037, 0.05197949, 0.02991883], dtype=float64)
+  ```
+
+  as well as vectorized using `jax.vmap`:
+
+  ```pycon
+  >>> jax.vmap(cost_fn)(jnp.array([[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]]))
+  Array([1.32269195, 1.53905377], dtype=float64)
+  ```
+
+  In particular, this allows for a reduction in boilerplate when using
+  JAX-compatible optimizers such as `jaxopt`:
+
+  ```pycon
+  >>> opt = jaxopt.GradientDescent(cost_fn)
+  >>> params = jnp.array([0.1, 0.2, 0.3])
+  >>> (final_params, _) = jax.jit(opt.run)(params)
+  >>> final_params
+  Array([-0.00320799,  0.03475223,  0.29362844], dtype=float64)
+  ```
+
+  Note that, in general, best performance will be seen when the Catalyst
+  `@qjit` decorator is used to JIT the entire hybrid workflow. However, there
+  may be cases where you may want to delegate only the quantum part of your
+  workflow to Catalyst, and let JAX handle classical components (for example,
+  due to missing a feature or compatibility issue in Catalyst).
+
+* Support for Amazon Braket devices provided via the PennyLane-Braket plugin.
   [#118](https://github.com/PennyLaneAI/catalyst/pull/118)
-
-* Add end-to-end support for execution of OpenQasm3 kernels on Amazon Braket devices.
   [#139](https://github.com/PennyLaneAI/catalyst/pull/139)
+  [#179](https://github.com/PennyLaneAI/catalyst/pull/179)
+  [#180](https://github.com/PennyLaneAI/catalyst/pull/180)
 
-  This feature enables JIT compilation of the quantum part of a PennyLane program into a standalone OpenQasm3 kernel.
-  It executes the generated OpenQasm3 kernels on both local (``braket.local.qubit``) and remote (``braket.aws.qubit``)
-  devices backed by Amazon Braket Python SDK at runtime, and propagates the measurement results back to the frontend.
-  However, there are still some limitations with this support. For instance, it currently only works for static circuits
-  and does not support mid-circuit measurements.
-
-  In the following example, the OpenQasm3 kernel associated with ``circuit`` is generated at runtime and executed on
-  the Braket state-vector simulator locally:
+  This enables quantum subprograms within a JIT-compiled Catalyst workflow to
+  execute on Braket simulator and hardware devices, including remote
+  cloud-based simulators such as SV1.
 
   ``` python
   def circuit(x, y):
@@ -138,36 +90,105 @@
   workflow(1.0, 2.0)
   ```
 
-* Add ``qml.Hermitian`` support to the OpenQasm3/Braket backend device.
-  [#179](https://github.com/PennyLaneAI/catalyst/pull/179)
+  For a list of available devices, please see the [PennyLane-Braket]
+  (https://amazon-braket-pennylane-plugin-python.readthedocs.io/en/latest/)
+  documentation.
 
-  ``` python
-  @qjit()
-  @qml.qnode(qml.device("braket.local.qubit", backend="braket_sv", wires=1))
-  def circuit(x: float):
-      qml.RY(x, wires=0)
-      A = np.array(
-          [[complex(1.0, 0.0), complex(2.0, 0.0)], [complex(2.0, 0.0), complex(1.0, 0.0)]]
-      )
-      return qml.expval(qml.Hermitian(A, wires=0))
+  Internally, the quantum instructions are generating OpenQASM3 kernels at
+  runtime; these are then executed on both local (``braket.local.qubit``) and
+  remote(``braket.aws.qubit``) devices backed by Amazon Braket Python SDK,
+  with measurement results then propagated back to the frontend.
 
-  circuit(1.0)
+  Note that at initial release, not all Catalyst features are supported with Braket.
+  In particular, dynamic circuit features, such as mid-circuit measurements, will
+  not work with Braket devices.
+
+* Catalyst conditional functions defined via `@catalyst.cond` now support an arbitrary
+  number of 'else if' chains.
+  [#104](https://github.com/PennyLaneAI/catalyst/pull/104)
+
+  ```python
+  dev = qml.device("lightning.qubit", wires=1)
+  
+  @qjit
+  @qml.qnode(dev)
+  def circuit(x):
+  
+      @catalyst.cond(x > 2.7)
+      def cond_fn():
+          qml.RX(x, wires=0)
+  
+      @cond_fn.else_if(x > 1.4)
+      def cond_elif():
+          qml.RY(x, wires=0)
+  
+      @cond_fn.otherwise
+      def cond_else():
+          qml.RX(x ** 2, wires=0)
+  
+      cond_fn()
+  
+      return qml.probs(wires=0)
   ```
 
-* Add ``qml.QubitUnitary`` support to the OpenQasm3/Braket backend device.
-  [#180](https://github.com/PennyLaneAI/catalyst/pull/180)
+* Additional gradient transforms for computing the vector-Jacobian product (VJP)
+  and Jacobian-vector product (JVP) are now available in Catalyst.
+  [#98](https://github.com/PennyLaneAI/catalyst/pull/98)
 
-  ``` python
-  @qjit()
-  @qml.qnode(qml.device("braket.local.qubit", backend="braket_sv", wires=1))
-  def circuit(x: float):
-      qml.RX(x, wires=0)
-      U = 1 / np.sqrt(2) * np.array([[1.0, 1.0], [1.0, -1.0]], dtype=complex)
-      qml.QubitUnitary(U, wires=0)
-      return qml.expval(qml.PauliZ(0))
+  Use `catalyst.vjp` to compute the forward-pass value and VJP:
 
-  circuit(1.0)
+  ```python
+  @qjit
+  def vjp(params, cotangent):
+      def f(x):
+          y = [jnp.sin(x[0]), x[1] ** 2, x[0] * x[1]]
+          return jnp.stack(y)
+
+      return catalyst.vjp(f, [params], [cotangent])
   ```
+
+  ```pycon
+  >>> x = jnp.array([0.1, 0.2])
+  >>> dy = jnp.array([-0.5, 0.1, 0.3])
+  >>> vjp(x, dy)
+  [array([0.09983342, 0.04      , 0.02      ]),
+   array([-0.43750208,  0.07000001])]
+  ```
+
+  Use `catalyst.jvp` to compute the forward-pass value and VJP:
+
+  ```python
+  @qjit
+  def jvp(params, tangent):
+      def f(x):
+          y = [jnp.sin(x[0]), x[1] ** 2, x[0] * x[1]]
+          return jnp.stack(y)
+
+      return catalyst.jvp(f, [params], [tangent])
+  ```
+
+  ```pycon
+  >>> x = jnp.array([0.1, 0.2])
+  >>> tangent = jnp.array([0.3, 0.6])
+  >>> jvp(x, tangent)
+  [array([0.09983342, 0.04      , 0.02      ]),
+   array([0.29850125, 0.24000006, 0.12      ])]
+  ```
+
+* Add a Backprop operation for using AD at the LLVM level with Enzyme AD. It has a 
+  bufferization pattern and a lowering to LLVM.
+  [#107](https://github.com/PennyLaneAI/catalyst/pull/107)
+  [#116](https://github.com/PennyLaneAI/catalyst/pull/116)
+
+* Add the end-to-end support for multiple backend devices. The compilation flag
+  ``ENABLE_LIGHTNING_KOKKOS=ON`` builds the runtime with support for PennyLane's
+  ``lightning.kokkos``. Both ``lightning.qubit`` and ``lightning.kokkos`` can be
+  chosen as available backend devices from the frontend.
+  [#89](https://github.com/PennyLaneAI/catalyst/pull/89)
+
+* Add support for ``var`` of general observables
+  [#124](https://github.com/PennyLaneAI/catalyst/pull/124)
+
 
 <h3>Improvements</h3>
 

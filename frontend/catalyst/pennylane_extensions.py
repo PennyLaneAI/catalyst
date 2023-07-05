@@ -707,6 +707,30 @@ def cond(pred):
     >>> circuit(1.6)
     array(0.)
 
+    Additional 'else-if' clauses can also be included via the ``else_if`` method:
+
+    .. code-block:: python
+
+        @qjit
+        @qml.qnode(dev)
+        def circuit(x):
+
+            @catalyst.cond(x > 2.7)
+            def cond_fn():
+                qml.RX(x, wires=0)
+
+            @cond_fn.else_if(x > 1.4)
+            def cond_elif():
+                qml.RY(x, wires=0)
+
+            @cond_fn.otherwise
+            def cond_else():
+                qml.RX(x ** 2, wires=0)
+
+            cond_fn()
+
+            eturn qml.probs(wires=0)
+
     The conditional function is permitted to also return values.
     Any value that is supported by JAX JIT compilation is supported as a return
     type. Note that this **does not** include PennyLane operations.
