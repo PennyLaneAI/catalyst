@@ -64,6 +64,18 @@ def GradientConversionPass : Pass<"convert-gradient-to-llvm"> {
     ];
 
     let constructor = "catalyst::createGradientConversionPass()";
+
+    let options = [
+        Option<
+            /*C++ var name=*/"useGenericFunctions",
+            /*CLI arg name=*/"use-generic-functions",
+            /*type=*/"bool",
+            /*default=*/"true",
+            /*description=*/
+            "Use generic allocation and deallocation functions instead of the "
+            "classic 'malloc', 'aligned_alloc' and 'free' functions"
+        >
+    ];
 }
 
 #endif // GRADIENT_PASSES
