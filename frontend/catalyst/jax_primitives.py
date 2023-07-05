@@ -1379,6 +1379,7 @@ def _qfor_def_impl(
     raise NotImplementedError()
 
 
+# pylint: disable=too-many-statements
 def _qfor_lowering(
     jax_ctx: mlir.LoweringRuleContext,
     lower_bound: ir.Value,
