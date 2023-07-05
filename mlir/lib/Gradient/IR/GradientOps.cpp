@@ -135,7 +135,7 @@ LogicalResult GradOp::verifySymbolUses(SymbolTableCollection &symbolTable)
 LogicalResult GradOp::verify()
 {
     StringRef method = this->getMethod();
-    if (method != "fd" && method != "ps" && method != "adj")
+    if (method != "fd" && method != "defer")
         return emitOpError("got invalid differentiation method: ") << method;
     return success();
 }
@@ -188,13 +188,12 @@ LogicalResult JVPOp::verifySymbolUses(SymbolTableCollection &symbolTable)
                << this->getTangents().size();
     }
 
-    auto jvp_types = ({
-        std::vector<Type> out;
+    std::vector<Type> jvp_types;
+    {
         for (auto s : this->getJvps()) {
-            out.push_back(s.getType());
+            jvp_types.push_back(s.getType());
         }
-        out;
-    });
+    }
 
     for (size_t i = 0; i < callee.getFunctionType().getNumResults(); i++) {
         auto calleeRtype = callee.getFunctionType().getResult(i);
@@ -259,15 +258,14 @@ LogicalResult VJPOp::verifySymbolUses(SymbolTableCollection &symbolTable)
 
     auto calleeResultTypes = callee.getFunctionType().getResults();
 
-    auto cotTypes = ({
-        std::vector<Type> out;
+    std::vector<Type> cotTypes;
+    {
         auto cotangOperands = OperandRange(
             this->operand_begin() + callee.getFunctionType().getNumInputs(), this->operand_end());
         for (auto c : cotangOperands) {
-            out.push_back(c.getType());
+            cotTypes.push_back(c.getType());
         }
-        out;
-    });
+    }
 
     // Check that callee results have the same size as cotangent inputs
     if (calleeResultTypes.size() != cotTypes.size()) {

@@ -7,14 +7,15 @@ MK_DIR := $(dir $(MK_ABSPATH))
 RT_BUILD_DIR?=$(MK_DIR)/build
 QIR_STDLIB_DIR?=$(MK_DIR)/qir-stdlib/target/release/
 QIR_STDLIB_INCLUDES_DIR?=$(MK_DIR)/qir-stdlib/target/release/build/include/
+CMAKE_ARGS?=""
 CODE_COVERAGE?=OFF
 BUILD_TYPE?=Release
 ENABLE_WARNINGS?=ON
-ENABLE_OPENMP?=ON
 ENABLE_LIGHTNING_KOKKOS?=OFF
 ENABLE_OPENQASM?=OFF
 LIGHTNING_GIT_TAG_VALUE?=latest_release
 LIGHTNING_KOKKOS_GIT_TAG_VALUE?=latest_release
+
 
 coverage: CODE_COVERAGE=ON
 coverage: BUILD_TYPE=Debug
@@ -53,11 +54,10 @@ configure:
 		-DCMAKE_C_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
 		-DCMAKE_CXX_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
 		-DENABLE_WARNINGS=$(ENABLE_WARNINGS) \
-		-DENABLE_OPENMP=$(ENABLE_OPENMP) \
-		-DKokkos_ENABLE_OPENMP=$(ENABLE_OPENMP) \
 		-DQIR_STDLIB_LIB=$(QIR_STDLIB_DIR) \
 		-DQIR_STDLIB_INCLUDES=$(QIR_STDLIB_INCLUDES_DIR) \
-		-DENABLE_CODE_COVERAGE=$(CODE_COVERAGE)
+		-DENABLE_CODE_COVERAGE=$(CODE_COVERAGE) \
+		$(CMAKE_ARGS)
 
 $(QIR_STDLIB_DIR)/libqir_stdlib.a $(QIR_STDLIB_INCLUDES_DIR)/qir_stdlib.h:
 	$(MAKE) -C qir-stdlib all
@@ -85,7 +85,7 @@ coverage: $(RT_BUILD_DIR)/tests/runner_tests
 
 	$(RT_BUILD_DIR)/tests/runner_tests
 	lcov --directory $(RT_BUILD_DIR) -b $(MK_DIR)/lib --capture --output-file $(RT_BUILD_DIR)/coverage.info
-	lcov --remove $(RT_BUILD_DIR)/coverage.info '/usr/*' '*/_deps/*' --output-file $(RT_BUILD_DIR)/coverage.info
+	lcov --remove $(RT_BUILD_DIR)/coverage.info '/usr/*' '*/_deps/*' '*/envs/*' --output-file $(RT_BUILD_DIR)/coverage.info
 	genhtml $(RT_BUILD_DIR)/coverage.info --output-directory $(RT_BUILD_DIR)/cov -t "Catalyst Runtime C++ Coverage" --num-spaces 4
 
 .PHONY: examples

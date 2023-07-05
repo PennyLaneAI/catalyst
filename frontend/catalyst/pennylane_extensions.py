@@ -41,7 +41,7 @@ import catalyst.jax_primitives as jprim
 from catalyst.jax_primitives import GradParams, expval_p, probs_p
 from catalyst.jax_tape import JaxTape
 from catalyst.jax_tracer import get_traceable_fn, insert_to_qreg, trace_quantum_tape
-from catalyst.utils.exceptions import CompileError
+from catalyst.utils.exceptions import CompileError, DifferentiableCompileError
 from catalyst.utils.patching import Patcher
 from catalyst.utils.tracing import TracingContext
 
@@ -60,7 +60,12 @@ class QFunc:
     """
 
     # The set of supported devices at runtime
-    RUNTIME_DEVICES = ("lightning.qubit", "lightning.kokkos")
+    RUNTIME_DEVICES = (
+        "lightning.qubit",
+        "lightning.kokkos",
+        "braket.aws.qubit",
+        "braket.local.qubit",
+    )
 
     def __init__(self, fn, device):
         self.func = fn
@@ -74,7 +79,20 @@ class QFunc:
                     f"The {self.device.short_name} device is not "
                     "supported for compilation at the moment."
                 )
-            device = QJITDevice(self.device.shots, self.device.wires, self.device.short_name)
+
+            backend_kwargs = {}
+            if hasattr(self.device, "shots"):
+                backend_kwargs["shots"] = self.device.shots if self.device.shots else 0
+            if self.device.short_name == "braket.local.qubit":  # pragma: no cover
+                backend_kwargs["backend"] = self.device._device._delegate.DEVICE_ID
+            elif self.device.short_name == "braket.aws.qubit":  # pragma: no cover
+                backend_kwargs["device_arn"] = self.device._device._arn
+                if self.device._s3_folder:
+                    backend_kwargs["s3_destination_folder"] = str(self.device._s3_folder)
+
+            device = QJITDevice(
+                self.device.shots, self.device.wires, self.device.short_name, backend_kwargs
+            )
         else:
             # Allow QFunc to still be used by itself for internal testing.
             device = self.device
@@ -157,7 +175,7 @@ def _ensure_differentiable(f: DifferentiableLike) -> Differentiable:
         return f.qfunc
     elif isinstance(f, Callable):  # Keep at the bottom
         return Function(f)
-    raise TypeError(f"Non-differentiable object passed: {type(f)}")
+    raise DifferentiableCompileError(f"Non-differentiable object passed: {type(f)}")
 
 
 def _make_jaxpr_check_differentiable(f: Differentiable, grad_params: GradParams, *args) -> Jaxpr:
@@ -171,42 +189,61 @@ def _make_jaxpr_check_differentiable(f: Differentiable, grad_params: GradParams,
 
     for pos, arg in enumerate(jaxpr.in_avals):
         if arg.dtype.kind != "f" and pos in grad_params.argnum:
-            raise TypeError(
+            raise DifferentiableCompileError(
                 "Catalyst.grad only supports differentiation on floating-point "
                 f"arguments, got '{arg.dtype}' at position {pos}."
             )
     for pos, res in enumerate(jaxpr.out_avals):
         if res.dtype.kind != "f":
-            raise TypeError(
+            raise DifferentiableCompileError(
                 "Catalyst.grad only supports differentiation on floating-point "
                 f"results, got '{res.dtype}' at position {pos}."
             )
 
-    if method != "fd":
-        qnode_jaxpr = jaxpr.eqns[0].params["call_jaxpr"]
-        return_ops = []
-        for res in qnode_jaxpr.outvars:
-            for eq in reversed(qnode_jaxpr.eqns):  # pragma: no branch
-                if res in eq.outvars:
-                    return_ops.append(eq.primitive)
-                    break
+    _check_created_jaxpr_gradient_methods(f, method, jaxpr)
 
-        if method == "ps" and any(prim not in [expval_p, probs_p] for prim in return_ops):
-            raise TypeError(
-                "The parameter-shift method can only be used for QNodes "
-                "which return either qml.expval or qml.probs."
-            )
-        if method == "adj" and any(prim not in [expval_p] for prim in return_ops):
-            raise TypeError(
-                "The adjoint method can only be used for QNodes which return qml.expval."
-            )
     return jaxpr
+
+
+def _check_created_jaxpr_gradient_methods(f: Differentiable, method: str, jaxpr: Jaxpr):
+    """Additional checks for the given jaxpr of a differentiable function."""
+    if method == "fd":
+        return
+
+    qnode_jaxpr = jaxpr.eqns[0].params["call_jaxpr"]
+    return_ops = []
+    for res in qnode_jaxpr.outvars:
+        for eq in reversed(qnode_jaxpr.eqns):  # pragma: no branch
+            if res in eq.outvars:
+                return_ops.append(eq.primitive)
+                break
+
+    assert isinstance(
+        f, qml.QNode
+    ), "Differentiation methods other than finite-differences can only operate on a QNode"
+    if f.diff_method is None:
+        raise DifferentiableCompileError(
+            "Cannot differentiate a QNode explicitly marked non-differentiable (with"
+            " diff_method=None)"
+        )
+
+    if f.diff_method == "parameter-shift" and any(
+        prim not in [expval_p, probs_p] for prim in return_ops
+    ):
+        raise DifferentiableCompileError(
+            "The parameter-shift method can only be used for QNodes "
+            "which return either qml.expval or qml.probs."
+        )
+    if f.diff_method == "adjoint" and any(prim not in [expval_p] for prim in return_ops):
+        raise DifferentiableCompileError(
+            "The adjoint method can only be used for QNodes which return qml.expval."
+        )
 
 
 def _check_grad_params(
     method: str, h: Optional[float], argnum: Optional[Union[int, List[int]]]
 ) -> GradParams:
-    methods = {"fd", "ps", "adj"}
+    methods = {"fd", "defer"}
     if method is None:
         method = "fd"
     if method not in methods:
@@ -295,15 +332,15 @@ def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
     Args:
         f (Callable): a function or a function object to differentiate
         method (str): The method used for differentiation, which can be any of
-                      ``["fd", "ps", "adj"]``,
+                      ``["fd", "defer"]``,
             where:
 
-            - ``"fd"`` represents first-order finite-differences,
+            - ``"fd"`` represents first-order finite-differences for the entire hybrid
+              circuit,
 
-            - ``"ps"`` represents the two-term parameter-shift rule, supported by the Pauli
-              rotation gates,
-
-            - ``"adj"`` represents the adjoint differentiation method.
+            - ``"defer"`` represents deferring the quantum differentiation to the method
+              specified by the QNode, while the classical computation is differentiated
+              using traditional auto-diff.
 
         h (float): the step-size value for the finite-difference (``"fd"``) method
         argnum (Tuple[int, List[int]]): the argument indices to differentiate
@@ -1235,8 +1272,9 @@ class QJITDevice(qml.QubitDevice):
         "Hamiltonian",
     ]
 
-    def __init__(self, shots=None, wires=None, backend=None):
-        self.backend = backend if backend else "default"
+    def __init__(self, shots=None, wires=None, backend_name=None, backend_kwargs=None):
+        self.backend_name = backend_name if backend_name else "default"
+        self.backend_kwargs = backend_kwargs if backend_kwargs else ""
         super().__init__(wires=wires, shots=shots)
 
     def apply(self, operations, **kwargs):
