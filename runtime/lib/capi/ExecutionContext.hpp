@@ -145,7 +145,7 @@ class ExecutionContext final {
             _driver_ptr = iter->second(_tape_recording, _device_kwargs);
 
 #ifdef __device_openqasm
-            if (_device_name == "braket.aws.qubit" && !Py_IsInitialized()) {
+            if (_device_name == "openqasm" && !Py_IsInitialized()) {
                 _py_guard =
                     std::make_unique<Device::OpenQasm::PythonInterpreterGuard>(); // LCOV_EXCL_LINE
             }

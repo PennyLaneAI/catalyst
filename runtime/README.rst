@@ -68,7 +68,7 @@ The following table shows the available devices along with supported features:
    * - Quantum Observables
      - ``Identity``, ``PauliX``, ``PauliY``, ``PauliZ``, ``Hadamard``, ``Hermitian``, ``Hamiltonian``, and Tensor Product of Observables
      - ``Identity``, ``PauliX``, ``PauliY``, ``PauliZ``, ``Hadamard``, ``Hermitian``, ``Hamiltonian``, and Tensor Product of Observables
-     - ``Identity``, ``PauliX``, ``PauliY``, ``PauliZ``, ``Hadamard``, and Tensor Product of Observables
+     - ``Identity``, ``PauliX``, ``PauliY``, ``PauliZ``, ``Hadamard``, ``Hermitian``, and Tensor Product of Observables
    * - Expectation Value
      - All observables; Finite-shots not supported
      - All observables; Finite-shots not supported
