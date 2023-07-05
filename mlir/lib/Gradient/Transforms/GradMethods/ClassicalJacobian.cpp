@@ -117,6 +117,7 @@ func::FuncOp genArgMapFunction(PatternRewriter &rewriter, Location loc, func::Fu
     // Define the properties of the classical preprocessing function.
     std::string fnName = callee.getSymName().str() + ".argmap";
     std::vector<Type> fnArgTypes = callee.getArgumentTypes().vec();
+    fnArgTypes.push_back(rewriter.getIndexType());
     RankedTensorType paramsVectorType =
         RankedTensorType::get({ShapedType::kDynamic}, rewriter.getF64Type());
     FunctionType fnType = rewriter.getFunctionType(fnArgTypes, paramsVectorType);
@@ -130,13 +131,15 @@ func::FuncOp genArgMapFunction(PatternRewriter &rewriter, Location loc, func::Fu
         // input to the new function.
         argMapFn = rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility, nullptr, nullptr);
         rewriter.cloneRegionBefore(callee.getBody(), argMapFn.getBody(), argMapFn.end());
+        Value numParams = argMapFn.getBody().front().addArgument(rewriter.getIndexType(), loc);
 
         PatternRewriter::InsertionGuard insertGuard(rewriter);
         rewriter.setInsertionPointToStart(&argMapFn.getBody().front());
 
         // Allocate the memory for the gate parameters collected at runtime.
-        auto arrayListType = ArrayListType::get(rewriter.getContext(), rewriter.getF64Type());
-        Value paramsBuffer = rewriter.create<ListInitOp>(loc, arrayListType);
+        MemRefType paramsBufferType = MemRefType::get({ShapedType::kDynamic}, rewriter.getF64Type());
+        Value paramsBuffer = rewriter.create<memref::AllocOp>(loc, paramsBufferType, numParams);
+
         MemRefType paramsProcessedType = MemRefType::get({}, rewriter.getIndexType());
         Value paramsProcessed = rewriter.create<memref::AllocaOp>(loc, paramsProcessedType);
         Value cZero = rewriter.create<index::ConstantOp>(loc, 0);
@@ -153,7 +156,7 @@ func::FuncOp genArgMapFunction(PatternRewriter &rewriter, Location loc, func::Fu
                 if (!diffParams.empty()) {
                     Value paramIdx = rewriter.create<memref::LoadOp>(loc, paramsProcessed);
                     for (auto param : diffParams) {
-                        rewriter.create<ListPushOp>(loc, param, paramsBuffer);
+                        rewriter.create<memref::StoreOp>(loc, param, paramsBuffer, paramIdx);
                         paramIdx = rewriter.create<index::AddOp>(loc, paramIdx, cOne);
                     }
                     rewriter.create<memref::StoreOp>(loc, paramIdx, paramsProcessed);
@@ -165,9 +168,8 @@ func::FuncOp genArgMapFunction(PatternRewriter &rewriter, Location loc, func::Fu
             else if (isa<func::ReturnOp>(op)) {
                 PatternRewriter::InsertionGuard insertGuard(rewriter);
                 rewriter.setInsertionPoint(op);
-                Value data = rewriter.create<ListLoadDataOp>(loc, paramsBuffer);
-                Value paramsTensor = rewriter.create<bufferization::ToTensorOp>(loc, data);
-                op->setOperands(paramsTensor);
+                Value paramsVector = rewriter.create<bufferization::ToTensorOp>(loc, paramsBuffer);
+                op->setOperands(paramsVector);
             }
             // Erase redundant device specifications.
             else if (isa<quantum::DeviceOp>(op)) {
