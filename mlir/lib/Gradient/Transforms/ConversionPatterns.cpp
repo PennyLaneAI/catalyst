@@ -348,8 +348,7 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
                     rewriter.create<LLVM::CallOp>(loc, allocFnDecl, bufferMemSize).getResult();
                 // Set value to 0 (gradients)
                 Value c0 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI32IntegerAttr(0));
-                // Value c0float = rewriter.create<LLVM::ConstantOp>(loc,
-                // rewriter.getF64FloatAttr(0.0));
+
                 rewriter.create<LLVM::CallOp>(loc, memsetFnDecl,
                                               ArrayRef<Value>{buffer, c0, bufferMemSize});
 
