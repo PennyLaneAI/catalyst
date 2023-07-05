@@ -70,6 +70,8 @@ jobs:
               -DLLVM_ENABLE_ASSERTIONS=ON \
               -DLLVM_INSTALL_UTILS=ON
 
+        # TODO: when updating LLVM, test to see if mlir/unittests/Bytecode/BytecodeTest.cpp:55 is passing
+        # and remove filter
         LIT_FILTER_OUT="Bytecode" cmake --build llvm-build --target lld check-mlir -j$(nproc)
 
     # Build and cache MHLO
@@ -218,6 +220,8 @@ jobs:
               -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -DPython3_NumPy_INCLUDE_DIRS=$(python${{ matrix.python_version }} -c "import numpy as np; print(np.get_include())")
 
+        # TODO: when updating LLVM, test to see if mlir/unittests/Bytecode/BytecodeTest.cpp:55 is passing
+        # and remove filter
         LIT_FILTER_OUT="Bytecode" cmake --build llvm-build --target check-mlir -j$(nproc)
 
     # Build Quantum and Gradient Dialects
