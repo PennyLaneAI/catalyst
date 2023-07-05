@@ -222,7 +222,7 @@
   This improves IR readability.
   [#165](https://github.com/PennyLaneAI/catalyst/pull/165)
 
-* Update JAX to `v0.4.13`.
+* Update JAX to ``v0.4.13``.
   [#185](https://github.com/PennyLaneAI/catalyst/pull/185)
 
 <h3>Breaking changes</h3>
