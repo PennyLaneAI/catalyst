@@ -21,7 +21,8 @@ import jax.numpy as jnp
 import pennylane as qml
 import pytest
 
-from catalyst import measure, qjit
+from catalyst import measure, qjit, for_loop
+from catalyst.compilation_pipelines import JAX_QJIT
 
 
 class TestJAXJIT:
@@ -346,6 +347,33 @@ class TestJAXAD:
         reference = jax.grad(circuit, argnums=0)(params, n)
 
         assert jnp.allclose(result, reference)
+
+    def test_argnums_passed(self, backend, monkeypatch):
+        """Test that when combining jax.jit and jax.grad, the internal argnums are correctly
+        passed to the custom quantum JVP"""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=2))
+        def circuit(p1, n, p2):
+            def ansatz(i):
+                qml.RX(p1, wires=0)
+                qml.RY(p2, wires=1)
+                qml.CNOT(wires=[0, 1])
+
+            for_loop(0, n, 1)(ansatz)()
+
+            return qml.expval(qml.PauliZ(1))
+
+        # Patch the quantum gradient wrapper to verify the internal argnums
+        get_derivative_qfunc = JAX_QJIT.get_derivative_qfunc
+
+        def get_derivative_qfunc_wrapper(self, argnums):
+            assert argnums == [0, 2]
+            return get_derivative_qfunc(self, argnums)
+
+        monkeypatch.setattr(JAX_QJIT, "get_derivative_qfunc", get_derivative_qfunc_wrapper)
+
+        jax.grad(jax.jit(circuit), argnums=(0, 2))(-4.5, 3, 4.3)
 
 
 class TestJAXVectorize:
