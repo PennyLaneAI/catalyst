@@ -19,7 +19,7 @@ using namespace mlir;
 
 namespace catalyst {
 
-std::vector<size_t> compDiffArgIndices(Optional<DenseIntElementsAttr> indices)
+std::vector<size_t> compDiffArgIndices(std::optional<DenseIntElementsAttr> indices)
 {
     // By default only the first argument is differentiated, otherwise gather indices.
     std::vector<size_t> diffArgIndices{0};
