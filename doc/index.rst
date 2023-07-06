@@ -72,6 +72,7 @@ Catalyst
    modules/frontend
    modules/mlir
    modules/runtime
+   dev/debugging
    dev/roadmap
 
 .. toctree::
