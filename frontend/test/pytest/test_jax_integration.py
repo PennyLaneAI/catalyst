@@ -21,7 +21,7 @@ import jax.numpy as jnp
 import pennylane as qml
 import pytest
 
-from catalyst import measure, qjit, for_loop
+from catalyst import for_loop, measure, qjit
 from catalyst.compilation_pipelines import JAX_QJIT
 
 
@@ -355,7 +355,7 @@ class TestJAXAD:
         @qjit
         @qml.qnode(qml.device(backend, wires=2))
         def circuit(p1, n, p2):
-            def ansatz(i):
+            def ansatz(_):
                 qml.RX(p1, wires=0)
                 qml.RY(p2, wires=1)
                 qml.CNOT(wires=[0, 1])
