@@ -35,54 +35,51 @@ Value einsumLinalgGeneric(OpBuilder &ob, Location loc, ArrayRef<size_t> axisCode
     auto tb = b.getType().cast<TensorType>();
     assert(ta.getElementType() == tb.getElementType() && "element types should match");
 
-    auto axisDims = ({
-        std::map<size_t, size_t> out;
+    std::map<size_t, size_t> axisDims;
+    {
         for (size_t i = 0; i < ta.getShape().size(); i++)
-            out[axisCodesA[i]] = ta.getShape()[i];
+            axisDims[axisCodesA[i]] = ta.getShape()[i];
         for (size_t i = 0; i < tb.getShape().size(); i++)
-            out[axisCodesB[i]] = tb.getShape()[i];
-        out;
-    });
+            axisDims[axisCodesB[i]] = tb.getShape()[i];
+    }
 
-    auto shapeR = ({
-        std::vector<int64_t> out;
+    std::vector<int64_t> shapeR;
+    {
         for (auto i : axisCodesResult)
-            out.push_back(axisDims[i]);
-        out;
-    });
+            shapeR.push_back(axisDims[i]);
+    }
 
     auto tr = ta.cloneWith(ArrayRef<int64_t>(shapeR), ta.getElementType());
 
-    auto maps = ({
-        SmallVector<AffineMap> out;
+    SmallVector<AffineMap> maps;
+    {
         for (const auto axis : {axisCodesA, axisCodesB, axisCodesResult}) {
             SmallVector<AffineExpr> aexprs;
             for (const auto a : axis) {
                 aexprs.push_back(getAffineDimExpr(a, ob.getContext()));
             }
-            out.push_back(AffineMap::get(axisDims.size(), 0, aexprs, ob.getContext()));
+            maps.push_back(AffineMap::get(axisDims.size(), 0, aexprs, ob.getContext()));
         };
-        out;
-    });
+    }
 
-    auto attrs = ({
-        SmallVector<utils::IteratorType, 4> out;
+    SmallVector<utils::IteratorType, 4> attrs;
+    {
         SmallSetVector<size_t, 4> ua(axisCodesA.begin(), axisCodesA.end());
         SmallSetVector<size_t, 4> ub(axisCodesB.begin(), axisCodesB.end());
         for (const auto a : axisDims) {
-            out.push_back((ua.contains(a.first) && ub.contains(a.first))
-                              ? utils::IteratorType::reduction
-                              : utils::IteratorType::parallel);
+            attrs.push_back((ua.contains(a.first) && ub.contains(a.first))
+                                ? utils::IteratorType::reduction
+                                : utils::IteratorType::parallel);
         }
-        out;
-    });
+    }
 
-    Value r = ({
+    Value r;
+    {
         Value empty = ob.create<tensor::EmptyOp>(loc, tr.getShape(), tr.getElementType());
         Value zero =
             ob.create<arith::ConstantOp>(loc, tr.getElementType(), ob.getF64FloatAttr(0.0));
-        ob.create<linalg::FillOp>(loc, zero, empty).getResult(0);
-    });
+        r = ob.create<linalg::FillOp>(loc, zero, empty).getResult(0);
+    }
 
     SmallVector<Value> operands = {a, b};
     SmallVector<NamedAttribute> nattrs = {};

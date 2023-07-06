@@ -170,6 +170,18 @@ TEST_CASE("Test QasmGate from OpenQasmBuilder", "[openqasm]")
     std::string gate4_toqasm = "rx(gamma) q[2];\n";
     CHECK(gate4.toOpenQasm(qubits, 2) == gate4_toqasm);
 
+    // Check the QubitUnitary gate
+    std::vector<std::complex<double>> mat{
+        {0, 0},
+        {0, -1},
+        {0, 1},
+        {0, 0},
+    };
+    auto gate5 = QasmGate(mat, {2}, false);
+    CHECK(gate5.getMatrix() == mat);
+    std::string gate5_toqasm = "#pragma braket unitary([[0, 0-1im], [0+1im, 0]]) q[2];\n";
+    CHECK(gate5.toOpenQasm(qubits, 2) == gate5_toqasm);
+
     // Check a random gate with several params (value)
     // not a valid gate! This is just for testing...
     auto gate31 = QasmGate("RX", {0.123, 0.456}, {}, {2}, false);
@@ -220,6 +232,63 @@ TEST_CASE("Test QasmMeasure from OpenQasmBuilder", "[openqasm]")
 
     std::string mz2_res_toqasm = "bit[1] = measure q[1];\n";
     CHECK(mz2.toOpenQasm(bits, qubits) == mz2_res_toqasm);
+}
+
+TEST_CASE("Test MatrixBuilder", "[openqasm]")
+{
+    SECTION("matrix(2 * 2) vector(complex(double))")
+    {
+        std::vector<std::complex<double>> mat{
+            {0, 0},
+            {-0.1488, 0.360849},
+            {0, 0},
+            {-0.8818, -0.26456},
+        };
+
+        std::string expected = "[[0, -0.1+0.4im], [0, -0.9-0.3im]]";
+        auto result = MatrixBuilder::toOpenQasm(mat, 2, 1);
+        CHECK(result == expected);
+    }
+
+    SECTION("matrix(4 * 2) vector(complex(double))")
+    {
+        std::vector<std::complex<double>> mat{
+            {-0.67094, -0.63044}, {-0.148854, 0.36084}, {-0.23763, 0.309679}, {-0.88183, -0.26456},
+            {-0.67094, -0.63044}, {-0.148854, 0.36084}, {-0.23763, 0.309679}, {-0.88183, -0.26456},
+        };
+
+        std::string expected = "[[-0.671-0.63im, -0.149+0.361im], [-0.238+0.31im, -0.882-0.265im], "
+                               "[-0.671-0.63im, -0.149+0.361im], [-0.238+0.31im, -0.882-0.265im]]";
+        auto result = MatrixBuilder::toOpenQasm(mat, 2, 3);
+        CHECK(result == expected);
+    }
+
+    SECTION("matrix(2 * 2) vector(double)")
+    {
+        std::vector<double> mat{
+            -0.670,
+            0.1488,
+            -0.237,
+            0.8818,
+        };
+
+        std::string expected = "[[-0.7, 0.1], [-0.2, 0.9]]";
+        auto result = MatrixBuilder::toOpenQasm(mat, 2, 1);
+        CHECK(result == expected);
+    }
+
+    SECTION("matrix(4 * 4) vector(double)")
+    {
+        std::vector<double> mat{
+            -0.67094, 0.63044,  -0.148854, 0.36084, -0.23763, 0.309679, -0.88183, 0.26456,
+            0.67094,  -0.63044, -0.148854, 0.36084, -0.23763, 0.309679, -0.88183, 0.26456,
+        };
+
+        std::string expected = "[[-0.671, 0.63, -0.149, 0.361], [-0.238, 0.31, -0.882, 0.265], "
+                               "[0.671, -0.63, -0.149, 0.361], [-0.238, 0.31, -0.882, 0.265]]";
+        auto result = MatrixBuilder::toOpenQasm(mat, 4, 3);
+        CHECK(result == expected);
+    }
 }
 
 TEST_CASE("Test QasmNamedObs from OpenQasmBuilder", "[openqasm]")
