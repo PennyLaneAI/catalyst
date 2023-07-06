@@ -213,19 +213,13 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
 
         // Create mlir memref to llvm free
         StringRef freeFnName = "_mlir_memref_to_llvm_free";
-        Type freeFnSignature = LLVM::LLVMFunctionType::get(llvmPtrType, {});
+        Type freeFnSignature =
+            LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), {llvmPtrType});
         ensureFunctionDeclaration(rewriter, op, freeFnName, freeFnSignature);
 
         // Register the previous functions as llvm globals (for Enzyme)
-        // Register malloc
-        insertFunctionName(rewriter, op, "mallocname", StringRef("malloc", 7));
-        insertEnzymeFunctionLike(rewriter, op, "__enzyme_function_like_malloc", "mallocname",
-                                 "_mlir_memref_to_llvm_alloc");
-
-        // Register free
-        insertFunctionName(rewriter, op, "freename", StringRef("free", 5));
-        insertEnzymeFunctionLike(rewriter, op, "__enzyme_function_like_free", "freename",
-                                 "_mlir_memref_to_llvm_free");
+        insertEnzymeAllocationLike(rewriter, op->getParentOfType<ModuleOp>(), op.getLoc(),
+                                   allocFnName, freeFnName);
 
         // Create the Enzyme function
         StringRef backpropFnName = "__enzyme_autodiff";
@@ -416,49 +410,47 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
         return bufferSizeBytes;
     }
 
-    static LLVM::GlobalOp insertEnzymeFunctionLike(PatternRewriter &rewriter, Operation *op,
-                                                   StringRef key, StringRef name,
-                                                   StringRef originalName)
+    static LLVM::GlobalOp insertEnzymeAllocationLike(OpBuilder &builder, ModuleOp moduleOp,
+                                                     Location loc, StringRef allocFuncName,
+                                                     StringRef freeFuncName)
     {
-        ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
-        auto *context = moduleOp.getContext();
-        PatternRewriter::InsertionGuard insertGuard(rewriter);
-        rewriter.setInsertionPointToStart(moduleOp.getBody());
+        MLIRContext *context = moduleOp.getContext();
+        OpBuilder::InsertionGuard insertGuard(builder);
+        builder.setInsertionPointToStart(moduleOp.getBody());
+        const char *key = "__enzyme_allocation_like";
 
-        LLVM::GlobalOp glb = moduleOp.lookupSymbol<LLVM::GlobalOp>(key);
-
-        auto ptrType = LLVM::LLVMPointerType::get(context);
-        if (!glb) {
-            glb = rewriter.create<LLVM::GlobalOp>(
-                moduleOp.getLoc(), LLVM::LLVMArrayType::get(ptrType, 2), /*isConstant=*/false,
-                LLVM::Linkage::External, key, nullptr);
+        auto allocationLike = moduleOp.lookupSymbol<LLVM::GlobalOp>(key);
+        if (allocationLike) {
+            return allocationLike;
         }
 
-        // Create the block and push it back in the global
-        auto *contextGlb = glb.getContext();
-        Block *block = new Block();
-        glb.getInitializerRegion().push_back(block);
-        rewriter.setInsertionPointToStart(block);
+        auto ptrType = LLVM::LLVMPointerType::get(context);
+        auto resultType = LLVM::LLVMArrayType::get(ptrType, 4);
 
-        auto llvmPtr = LLVM::LLVMPointerType::get(contextGlb);
+        // TODO(jacob): document the weirdness of __enzyme_allocation_like
+        // TODO(jacob): the dealloc_indices and size index should probably be configurable
+        builder.create<LLVM::GlobalOp>(loc, LLVM::LLVMArrayType::get(builder.getI8Type(), 3), true,
+                                       LLVM::Linkage::Linkonce, "dealloc_indices",
+                                       builder.getStringAttr(StringRef("-1", 3)));
+        allocationLike = builder.create<LLVM::GlobalOp>(
+            loc, resultType,
+            /*isConstant=*/false, LLVM::Linkage::External, key, /*address space=*/nullptr);
+        builder.createBlock(&allocationLike.getInitializerRegion());
+        auto allocFn = builder.create<LLVM::AddressOfOp>(loc, ptrType, allocFuncName);
+        auto sizeArgIndex =
+            builder.create<LLVM::ConstantOp>(loc, builder.getIntegerAttr(builder.getI64Type(), 0));
+        auto sizeArgIndexPtr = builder.create<LLVM::IntToPtrOp>(loc, ptrType, sizeArgIndex);
+        auto deallocIndicesPtr = builder.create<LLVM::AddressOfOp>(loc, ptrType, "dealloc_indices");
+        auto freeFn = builder.create<LLVM::AddressOfOp>(loc, ptrType, freeFuncName);
 
-        // Get original global name
-        auto originalNameRefAttr = SymbolRefAttr::get(contextGlb, originalName);
-        auto originalGlobal =
-            rewriter.create<LLVM::AddressOfOp>(glb.getLoc(), llvmPtr, originalNameRefAttr);
+        Value result = builder.create<LLVM::UndefOp>(loc, resultType);
+        result = builder.create<LLVM::InsertValueOp>(loc, result, allocFn, 0);
+        result = builder.create<LLVM::InsertValueOp>(loc, result, sizeArgIndexPtr, 1);
+        result = builder.create<LLVM::InsertValueOp>(loc, result, deallocIndicesPtr, 2);
+        result = builder.create<LLVM::InsertValueOp>(loc, result, freeFn, 3);
+        builder.create<LLVM::ReturnOp>(loc, result);
 
-        // Get global name
-        auto nameRefAttr = SymbolRefAttr::get(contextGlb, name);
-        auto enzymeGlobal = rewriter.create<LLVM::AddressOfOp>(glb.getLoc(), llvmPtr, nameRefAttr);
-
-        auto undefArray =
-            rewriter.create<LLVM::UndefOp>(glb.getLoc(), LLVM::LLVMArrayType::get(ptrType, 2));
-        Value llvmInsert0 =
-            rewriter.create<LLVM::InsertValueOp>(glb.getLoc(), undefArray, originalGlobal, 0);
-        Value llvmInsert1 =
-            rewriter.create<LLVM::InsertValueOp>(glb.getLoc(), llvmInsert0, enzymeGlobal, 1);
-        rewriter.create<LLVM::ReturnOp>(glb.getLoc(), llvmInsert1);
-        return glb;
+        return allocationLike;
     }
 };
 
