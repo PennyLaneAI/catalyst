@@ -21,7 +21,8 @@ import jax.numpy as jnp
 import pennylane as qml
 import pytest
 
-from catalyst import measure, qjit
+from catalyst import for_loop, measure, qjit
+from catalyst.compilation_pipelines import JAX_QJIT
 
 
 class TestJAXJIT:
@@ -161,7 +162,8 @@ class TestJAXAD:
 
         assert jnp.allclose(result, reference)
 
-    def test_multiple_arguments(self, backend):
+    @pytest.mark.parametrize("argnums", (0, 1, [0, 1]))
+    def test_multiple_arguments(self, backend, argnums):
         """Test a circuit with multiple arguments using jax.grad on top of qjit."""
 
         @qjit
@@ -174,7 +176,7 @@ class TestJAXAD:
             qml.RX(y[1] * x[2], wires=0)
             return qml.probs(wires=0)
 
-        @partial(jax.grad, argnums=[0, 1])
+        @partial(jax.grad, argnums=argnums)
         def cost_fn(x, y, qfunc):
             result = qfunc(x, y)
             return jnp.sum(jnp.cos(result) ** 2)
@@ -183,9 +185,9 @@ class TestJAXAD:
         result = cost_fn(x, y, circuit)
         reference = cost_fn(x, y, circuit.qfunc)
 
-        assert len(result) == 2
         assert jnp.allclose(result[0], reference[0])
-        assert jnp.allclose(result[1], reference[1])
+        if isinstance(argnums, list):
+            assert jnp.allclose(result[1], reference[1])
 
     def test_multiple_results(self, backend):
         """Test a circuit with multiple results using jax.grad on top of qjit."""
@@ -324,6 +326,54 @@ class TestJAXAD:
         assert len(circuit.jaxed_qfunc.deriv_qfuncs) == 1
         assert "0" in circuit.jaxed_qfunc.deriv_qfuncs
         assert len(circuit.jaxed_qfunc.deriv_qfuncs["0"].jaxpr.out_avals) == 1
+
+    def test_jit_and_grad(self, backend):
+        """Test that argnum determination works correctly when combining jax.jit with jax.grad.
+        This was fixed by the introduction of symbolic zero detection for tangent vectors."""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=2))
+        def circuit(params: jax.core.ShapedArray((2,), dtype=float), n: int):
+            qml.RX(n * params[0], wires=0)
+            qml.RY(params[1] / n, wires=1)
+            qml.CNOT(wires=[0, 1])
+
+            return qml.expval(qml.PauliZ(1))
+
+        n = 3
+        params = jnp.array([0.1, 0.2])
+
+        result = jax.grad(jax.jit(circuit), argnums=0)(params, n)
+        reference = jax.grad(circuit, argnums=0)(params, n)
+
+        assert jnp.allclose(result, reference)
+
+    def test_argnums_passed(self, backend, monkeypatch):
+        """Test that when combining jax.jit and jax.grad, the internal argnums are correctly
+        passed to the custom quantum JVP"""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=2))
+        def circuit(p1, n, p2):
+            def ansatz(_):
+                qml.RX(p1, wires=0)
+                qml.RY(p2, wires=1)
+                qml.CNOT(wires=[0, 1])
+
+            for_loop(0, n, 1)(ansatz)()
+
+            return qml.expval(qml.PauliZ(1))
+
+        # Patch the quantum gradient wrapper to verify the internal argnums
+        get_derivative_qfunc = JAX_QJIT.get_derivative_qfunc
+
+        def get_derivative_qfunc_wrapper(self, argnums):
+            assert argnums == [0, 2]
+            return get_derivative_qfunc(self, argnums)
+
+        monkeypatch.setattr(JAX_QJIT, "get_derivative_qfunc", get_derivative_qfunc_wrapper)
+
+        jax.grad(jax.jit(circuit), argnums=(0, 2))(-4.5, 3, 4.3)
 
 
 class TestJAXVectorize:

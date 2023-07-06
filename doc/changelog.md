@@ -6,6 +6,7 @@
   automatic differentiation, and other JAX transforms.
   [#96](https://github.com/PennyLaneAI/catalyst/pull/96)
   [#123](https://github.com/PennyLaneAI/catalyst/pull/123)
+  [#167](https://github.com/PennyLaneAI/catalyst/pull/167)
 
   Note that generally Catalyst should be used to JIT the entire workflow, but sometimes users may
   wish to delegate only the quantum part of their workflow to Catalyst and let JAX handle the rest
@@ -68,7 +69,7 @@
      jax.vmap(cost_fn)(jnp.array([[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]]))
      ```
 
-* Add a Backprop operation for using AD at the LLVM level with Enzyme AD. It has a 
+* Add a Backprop operation for using AD at the LLVM level with Enzyme AD. It has a
   bufferization pattern and a lowering to LLVM.
   [#107](https://github.com/PennyLaneAI/catalyst/pull/107)
   [#116](https://github.com/PennyLaneAI/catalyst/pull/116)
@@ -260,9 +261,9 @@
 
 * Fixes the issue with gradients failing to work with ``jnp.array`` as constants.
   [#152](https://github.com/PennyLaneAI/catalyst/pull/152)
-  
+
   An example of a newly supported workflow:
-  
+
   ``` python
   coeffs = jnp.array([0.1, 0.2])
   terms = [qml.PauliX(0) @ qml.PauliZ(1), qml.PauliZ(0)]
