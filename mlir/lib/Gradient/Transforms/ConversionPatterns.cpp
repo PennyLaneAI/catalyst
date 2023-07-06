@@ -293,10 +293,8 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
                     Value bufferSizeBytes =
                         this->computeMemRefSizeInBytes(memrefType, shadowDesc, builder, loc);
                     Value zero = builder.create<LLVM::ConstantOp>(loc, builder.getI8Type(), 0);
-                    Value isVolatile =
-                        builder.create<LLVM::ConstantOp>(loc, builder.getI1Type(), 0);
                     builder.create<LLVM::MemsetOp>(loc, shadowPtr, zero, bufferSizeBytes,
-                                                   isVolatile);
+                                                   /*isVolatile=*/false);
                 }
                 callArgs.push_back(shadowPtr);
             }
