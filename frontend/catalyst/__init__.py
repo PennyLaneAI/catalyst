@@ -19,17 +19,6 @@ This package contains the Catalyst Python interface.
 from catalyst._configuration import INSTALLED
 from catalyst._version import __version__
 
-if not INSTALLED:
-    import os
-
-    default_bindings_path = os.path.join(
-        os.path.dirname(__file__), "../../mlir/build/python_packages/quantum"
-    )
-    if os.path.exists(default_bindings_path):  # pragma: no cover
-        import sys
-
-        sys.path.insert(0, default_bindings_path)
-
 # pylint: disable=wrong-import-position
 from catalyst.compilation_pipelines import QJIT, CompileOptions, qjit
 from catalyst.pennylane_extensions import (

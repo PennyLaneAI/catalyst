@@ -13,7 +13,6 @@ pennylane_catalyst.egg-info
 dist
 frontend/catalyst/bin
 frontend/catalyst/lib
-frontend/mlir_quantum
 
 # IDEs
 .vscode

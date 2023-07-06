@@ -98,12 +98,6 @@ wheel:
 	# Copy enzyme to frontend
 	cp --dereference $(ENZYME_BUILD_DIR)/Enzyme/LLVMEnzyme-17.so $(MK_DIR)/frontend/catalyst/lib
 	# Copy mlir bindings to frontend/mlir_quantum
-	mkdir -p $(MK_DIR)/frontend/mlir_quantum/dialects
-	cp -R --dereference $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/runtime $(MK_DIR)/frontend/mlir_quantum/runtime
-	cp --dereference $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/ir.py $(MK_DIR)/frontend/mlir_quantum/
-	for file in arith tensor scf gradient quantum _ods_common ; do \
-		cp --dereference $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/dialects/*$${file}* $(MK_DIR)/frontend/mlir_quantum/dialects ; \
-	done
 	find $(MK_DIR)/frontend -type d -name __pycache__ -exec rm -rf {} +
 
 	$(PYTHON) $(MK_DIR)/setup.py bdist_wheel

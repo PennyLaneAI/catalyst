@@ -272,11 +272,39 @@ jobs:
               -DMLIR_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir
 
         cmake --build quantum-build --target check-dialects -j$(nproc)
-        patch -d quantum-build/python_packages/quantum/mlir_quantum --follow-symlinks < mlir/patches/use-ir-from-jax.patch
-        patch -d quantum-build/python_packages/quantum/mlir_quantum/dialects --follow-symlinks < mlir/patches/use-cext-from-jax.patch
-        patch -d quantum-build/python_packages/quantum/mlir_quantum/dialects --follow-symlinks < mlir/patches/do-not-infer-result.patch
-        patch -d quantum-build/python_packages/quantum/mlir_quantum/dialects --follow-symlinks < mlir/patches/remove-gradient-cext-import.patch
-        patch -d quantum-build/python_packages/quantum/mlir_quantum/dialects --follow-symlinks < mlir/patches/remove-quantum-cext-import.patch
+
+    # Build Catalyst-Runtime
+    - name: Build Catalyst-Runtime
+      run: |
+        cmake -S runtime -B runtime-build -G Ninja \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DPYTHON_INCLUDE_DIRS=$(which python${{ matrix.python_version }}) \
+          -DQIR_STDLIB_LIB=$GITHUB_WORKSPACE/runtime/qir-stdlib/target/release \
+          -DQIR_STDLIB_INCLUDES=$GITHUB_WORKSPACE/runtime/qir-stdlib/target/release/build/include
+
+        cmake --build runtime-build --target rt_capi -j$(nproc)
+
+    # Requirements:
+    - name: Prepare the python package
+      run: |
+        echo "INSTALLED = True" > $GITHUB_WORKSPACE/frontend/catalyst/_configuration.py
+        # Copy bins to frontend/catalyst/bin
+        mkdir -p $GITHUB_WORKSPACE/frontend/catalyst/bin
+        cp $GITHUB_WORKSPACE/llvm-build/bin/llc $GITHUB_WORKSPACE/frontend/catalyst/bin
+        cp $GITHUB_WORKSPACE/llvm-build/bin/opt $GITHUB_WORKSPACE/frontend/catalyst/bin
+        cp $GITHUB_WORKSPACE/llvm-build/bin/mlir-translate $GITHUB_WORKSPACE/frontend/catalyst/bin
+        cp $GITHUB_WORKSPACE/mhlo-build/bin/mlir-hlo-opt $GITHUB_WORKSPACE/frontend/catalyst/bin
+        cp $GITHUB_WORKSPACE/quantum-build/bin/quantum-opt $GITHUB_WORKSPACE/frontend/catalyst/bin
+        # Copy libs to frontend/catalyst/lib
+        mkdir -p $GITHUB_WORKSPACE/frontend/catalyst/lib/backend/ $GITHUB_WORKSPACE/frontend/catalyst/lib/capi
+        cp $GITHUB_WORKSPACE/runtime-build/lib/backend/librt_backend.so $GITHUB_WORKSPACE/frontend/catalyst/lib/backend/
+        cp $GITHUB_WORKSPACE/runtime-build/lib/capi/librt_capi.so $GITHUB_WORKSPACE/frontend/catalyst/lib/capi
+        cp --dereference $GITHUB_WORKSPACE/llvm-build/lib/libmlir_float16_utils.so.* $GITHUB_WORKSPACE/frontend/catalyst/lib
+        cp --dereference $GITHUB_WORKSPACE/llvm-build/lib/libmlir_c_runner_utils.so* $GITHUB_WORKSPACE/frontend/catalyst/lib
+        # Copy enzyme so to frontend
+        mkdir -p $GITHUB_WORKSPACE/frontend/catalyst/enzyme
+        cp --dereference $GITHUB_WORKSPACE/enzyme-build/Enzyme/LLVMEnzyme-17.so $GITHUB_WORKSPACE/frontend/catalyst/enzyme
+        find $GITHUB_WORKSPACE/frontend -type d -name __pycache__ -exec rm -rf {} +
 
     - name: Build wheel
       run: |
