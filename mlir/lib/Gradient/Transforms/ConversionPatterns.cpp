@@ -133,57 +133,18 @@ struct AdjointOpPattern : public OpConversionPattern<AdjointOp> {
     }
 };
 
-func::FuncOp genEnzymeWrapperFunction(PatternRewriter &rewriter, Location loc, func::FuncOp callee)
-{
-    MLIRContext *ctx = rewriter.getContext();
-    LLVMTypeConverter llvmTypeConverter(ctx);
+/// Options that configure preprocessing done on MemRefs before being passed to Enzyme.
+struct EnzymeMemRefInterfaceOptions {
+    /// Fill memref with zero values
+    bool zeroOut = false;
+    /// Mark memref as dupnoneed, allowing Enzyme to avoid computing its primal value.
+    bool dupNoNeed = false;
+};
 
-    // Define the properties of the enzyme wrapper function.
-    std::string fnName = callee.getName().str() + ".enzyme_wrapper";
-    SmallVector<Type> argResTypes(callee.getArgumentTypes().begin(),
-                                  callee.getArgumentTypes().end());
-    argResTypes.insert(argResTypes.end(), callee.getResultTypes().begin(),
-                       callee.getResultTypes().end());
-    SmallVector<Type> originalArgTypes(callee.getArgumentTypes().begin(),
-                                       callee.getArgumentTypes().end());
-    SmallVector<Type> convertedTypes;
-
-    // Create the wrapped operation
-    FunctionType fnType = rewriter.getFunctionType(argResTypes, {});
-
-    func::FuncOp wrappedCallee =
-        SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(callee, rewriter.getStringAttr(fnName));
-    if (!wrappedCallee) {
-        PatternRewriter::InsertionGuard insertGuard(rewriter);
-        rewriter.setInsertionPointAfter(callee);
-
-        wrappedCallee = rewriter.create<func::FuncOp>(loc, fnName, fnType);
-        wrappedCallee.setPrivate();
-        Block *entryBlock = wrappedCallee.addEntryBlock();
-        rewriter.setInsertionPointToStart(entryBlock);
-
-        // Get the arguments
-        SmallVector<Value> callArgs(wrappedCallee.getArguments().begin(),
-                                    wrappedCallee.getArguments().end() - callee.getNumResults());
-
-        // Call the callee
-        ValueRange results = rewriter.create<func::CallOp>(loc, callee, callArgs).getResults();
-        ValueRange dpsOutputs = wrappedCallee.getArguments().drop_front(callee.getNumArguments());
-
-        // Store the results
-        for (auto [result, dpsOut] : llvm::zip(results, dpsOutputs)) {
-            assert(result.getType() == dpsOut.getType() &&
-                   "unexpected type mismatch between enzyme_wrapper destination-passing style "
-                   "output and callee result");
-            rewriter.create<memref::CopyOp>(loc, /*source=*/result, /*target=*/dpsOut);
-        }
-
-        // Add return op
-        rewriter.create<func::ReturnOp>(loc);
-    }
-
-    return wrappedCallee;
-}
+static constexpr const char *enzyme_autodiff_func_name = "__enzyme_autodiff";
+static constexpr const char *enzyme_allocation_key = "__enzyme_allocation_like";
+static constexpr const char *enzyme_const_key = "enzyme_const";
+static constexpr const char *enzyme_dupnoneed_key = "enzyme_dupnoneed";
 
 struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
     using OpConversionPattern::OpConversionPattern;
@@ -193,7 +154,7 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
     {
         Location loc = op.getLoc();
         MLIRContext *ctx = getContext();
-        LLVMTypeConverter llvmTypeConverter(ctx);
+        ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
         auto llvmPtrType = LLVM::LLVMPointerType::get(ctx);
 
         for (Type type : op.getResultTypes()) {
@@ -222,90 +183,26 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
                                    allocFnName, freeFnName);
 
         // Create the Enzyme function
-        StringRef backpropFnName = "__enzyme_autodiff";
         Type backpropFnSignature =
             LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), {}, /*isVarArg=*/true);
 
         LLVM::LLVMFuncOp backpropFnDecl =
-            ensureFunctionDeclaration(rewriter, op, backpropFnName, backpropFnSignature);
+            ensureFunctionDeclaration(rewriter, op, enzyme_autodiff_func_name, backpropFnSignature);
 
-        // Generate the wrapper function for argmapfn
-        func::FuncOp wrapper = genEnzymeWrapperFunction(rewriter, loc, callee);
-
-        // Set up the first argument and transforms the wrapper value in ptr
-        FunctionType wrapperType = wrapper.getFunctionType();
-        Value wrapperValue =
-            rewriter.create<func::ConstantOp>(loc, wrapperType, wrapper.getName()).getResult();
-        Type wrapperPtrType = llvmTypeConverter.convertType(wrapperType);
-        Value wrapperPtr =
-            rewriter.create<UnrealizedConversionCastOp>(loc, wrapperPtrType, wrapperValue)
-                .getResult(0);
-        // Add the pointer to the wrapped callee
-        SmallVector<Value> callArgs = {wrapperPtr};
+        // The first argument to Enzyme is a function pointer of the function to be differentiated
+        Value calleePtr =
+            rewriter.create<func::ConstantOp>(loc, callee.getFunctionType(), callee.getName());
+        calleePtr = castToConvertedType(calleePtr, rewriter, loc);
+        SmallVector<Value> callArgs = {calleePtr};
 
         std::vector<size_t> diffArgIndices = catalyst::compDiffArgIndices(op.getDiffArgIndices());
-        auto const_global = getOrInsertEnzymeGlobal(rewriter, op, "enzyme_const");
+        auto const_global = getOrInsertEnzymeGlobal(rewriter, moduleOp, enzyme_const_key);
         auto enzymeConst =
             rewriter.create<LLVM::AddressOfOp>(op->getLoc(), llvmPtrType, const_global);
-        auto const_dupnoneed = getOrInsertEnzymeGlobal(rewriter, op, "enzyme_dupnoneed");
-        auto enzymeDupNoNeed =
-            rewriter.create<LLVM::AddressOfOp>(op->getLoc(), llvmPtrType, const_dupnoneed);
+        getOrInsertEnzymeGlobal(rewriter, moduleOp, enzyme_dupnoneed_key);
 
         int index = 0;
         ValueRange dataIn = adaptor.getDataIn();
-        auto unpackMemRef = [&](Value memrefArg, Value shadowMemRef,
-                                SmallVectorImpl<Value> &callArgs, OpBuilder &builder, Location loc,
-                                bool zeroOut = false, bool dupNoNeed = false) {
-            auto memrefType = cast<MemRefType>(memrefArg.getType());
-            Value argStruct =
-                builder
-                    .create<UnrealizedConversionCastOp>(
-                        loc, llvmTypeConverter.convertType(memrefArg.getType()), memrefArg)
-                    .getResult(0);
-            MemRefDescriptor desc(argStruct);
-
-            // Allocated pointer is always constant
-            callArgs.push_back(enzymeConst);
-            callArgs.push_back(desc.allocatedPtr(builder, loc));
-
-            // Aligned pointer is active if a shadow is provided
-            if (shadowMemRef) {
-                if (dupNoNeed) {
-                    callArgs.push_back(enzymeDupNoNeed);
-                }
-                callArgs.push_back(desc.alignedPtr(builder, loc));
-                Value shadowStruct =
-                    builder
-                        .create<UnrealizedConversionCastOp>(
-                            loc, llvmTypeConverter.convertType(shadowMemRef.getType()),
-                            shadowMemRef)
-                        .getResult(0);
-                MemRefDescriptor shadowDesc(shadowStruct);
-                Value shadowPtr = shadowDesc.alignedPtr(builder, loc);
-
-                if (zeroOut) {
-                    Value bufferSizeBytes =
-                        this->computeMemRefSizeInBytes(memrefType, shadowDesc, builder, loc);
-                    Value zero = builder.create<LLVM::ConstantOp>(loc, builder.getI8Type(), 0);
-                    builder.create<LLVM::MemsetOp>(loc, shadowPtr, zero, bufferSizeBytes,
-                                                   /*isVolatile=*/false);
-                }
-                callArgs.push_back(shadowPtr);
-            }
-            else {
-                callArgs.push_back(enzymeConst);
-                callArgs.push_back(desc.alignedPtr(builder, loc));
-            }
-
-            // Offsets, sizes, and strides
-            callArgs.push_back(desc.offset(builder, loc));
-            for (int64_t dim = 0; dim < memrefType.getRank(); dim++) {
-                callArgs.push_back(desc.size(builder, loc, dim));
-            }
-            for (int64_t dim = 0; dim < memrefType.getRank(); dim++) {
-                callArgs.push_back(desc.stride(builder, loc, dim));
-            }
-        };
 
         // Add the arguments and their shadow on data in
         for (auto [arg, llvmMemrefArg] : llvm::zip(op.getArgs(), adaptor.getArgs())) {
@@ -313,25 +210,21 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
             if (it == diffArgIndices.end()) {
                 callArgs.push_back(enzymeConst);
                 if (isa<MemRefType>(arg.getType())) {
-                    unpackMemRef(arg, nullptr, callArgs, rewriter, loc);
+                    unpackMemRef(arg, /*shadow=*/nullptr, callArgs, rewriter, loc);
                 }
                 else {
-                    Value casted = rewriter
-                                       .create<UnrealizedConversionCastOp>(
-                                           loc, llvmTypeConverter.convertType(arg.getType()), arg)
-                                       .getResult(0);
-                    callArgs.push_back(casted);
+                    callArgs.push_back(castToConvertedType(arg, rewriter, loc));
                 }
             }
             else {
                 auto position = std::distance(diffArgIndices.begin(), it);
-                unpackMemRef(arg, dataIn[position], callArgs, rewriter, loc, /*zeroOut=*/true);
+                unpackMemRef(arg, dataIn[position], callArgs, rewriter, loc, {.zeroOut = true});
             }
             index++;
         }
 
         for (Value qJacobian : op.getQuantumJacobian()) {
-            // Enzyme requires buffers for the primal outputs, but we don't need them.
+            // Enzyme requires buffers for the primal outputs, but we don't need their values.
             // We'll need to allocate space for them regardless, so marking them as dupNoNeed will
             // allow Enzyme to optimize away their computation.
             auto memrefType = cast<MemRefType>(qJacobian.getType());
@@ -344,8 +237,8 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
             }
             Value result = rewriter.create<memref::AllocOp>(loc, memrefType, dynamicDims);
 
-            unpackMemRef(result, qJacobian, callArgs, rewriter, loc, /*zeroOut=*/false,
-                         /*dupNoNeed=*/true);
+            unpackMemRef(result, qJacobian, callArgs, rewriter, loc,
+                         {.zeroOut = false, .dupNoNeed = true});
         }
 
         // The results of backprop are in data in
@@ -355,23 +248,22 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
     }
 
   private:
-    static FlatSymbolRefAttr getOrInsertEnzymeGlobal(PatternRewriter &rewriter, Operation *op,
+    static FlatSymbolRefAttr getOrInsertEnzymeGlobal(OpBuilder &builder, ModuleOp moduleOp,
                                                      const char *globalName)
     {
         // Copyright (C) 2023 - Jacob Mai Peng
         // https://github.com/pengmai/lagrad/blob/main/lib/LAGrad/LowerToLLVM.cpp
-        ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
         auto *context = moduleOp.getContext();
         if (moduleOp.lookupSymbol<LLVM::GlobalOp>(globalName)) {
             return SymbolRefAttr::get(context, globalName);
         }
 
-        PatternRewriter::InsertionGuard insertGuard(rewriter);
-        rewriter.setInsertionPointToStart(moduleOp.getBody());
+        OpBuilder::InsertionGuard insertGuard(builder);
+        builder.setInsertionPointToStart(moduleOp.getBody());
         auto shortTy = IntegerType::get(context, 8);
-        rewriter.create<LLVM::GlobalOp>(moduleOp.getLoc(), shortTy,
-                                        /*isConstant=*/true, LLVM::Linkage::Linkonce, globalName,
-                                        IntegerAttr::get(shortTy, 0));
+        builder.create<LLVM::GlobalOp>(moduleOp.getLoc(), shortTy,
+                                       /*isConstant=*/true, LLVM::Linkage::Linkonce, globalName,
+                                       IntegerAttr::get(shortTy, 0));
         return SymbolRefAttr::get(context, globalName);
     }
 
@@ -387,6 +279,64 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
                 moduleOp.getLoc(),
                 LLVM::LLVMArrayType::get(IntegerType::get(rewriter.getContext(), 8), value.size()),
                 true, LLVM::Linkage::Linkonce, key, rewriter.getStringAttr(value));
+        }
+    }
+
+    Value castToConvertedType(Value value, OpBuilder &builder, Location loc) const
+    {
+        auto casted = builder.create<UnrealizedConversionCastOp>(
+            loc, getTypeConverter()->convertType(value.getType()), value);
+        return casted.getResult(0);
+    }
+
+    void unpackMemRef(Value memRefArg, Value shadowMemRef, SmallVectorImpl<Value> &callArgs,
+                      OpBuilder &builder, Location loc,
+                      EnzymeMemRefInterfaceOptions options = EnzymeMemRefInterfaceOptions()) const
+
+    {
+        auto llvmPtrType = LLVM::LLVMPointerType::get(builder.getContext());
+        auto enzymeConst = builder.create<LLVM::AddressOfOp>(loc, llvmPtrType, enzyme_const_key);
+        auto enzymeDupNoNeed =
+            builder.create<LLVM::AddressOfOp>(loc, llvmPtrType, enzyme_dupnoneed_key);
+        auto memRefType = cast<MemRefType>(memRefArg.getType());
+        Value argStruct = castToConvertedType(memRefArg, builder, loc);
+        MemRefDescriptor desc(argStruct);
+
+        // Allocated pointer is always constant
+        callArgs.push_back(enzymeConst);
+        callArgs.push_back(desc.allocatedPtr(builder, loc));
+
+        // Aligned pointer is active if a shadow is provided
+        if (shadowMemRef) {
+            if (options.dupNoNeed) {
+                callArgs.push_back(enzymeDupNoNeed);
+            }
+            callArgs.push_back(desc.alignedPtr(builder, loc));
+            Value shadowStruct = castToConvertedType(shadowMemRef, builder, loc);
+            MemRefDescriptor shadowDesc(shadowStruct);
+            Value shadowPtr = shadowDesc.alignedPtr(builder, loc);
+
+            if (options.zeroOut) {
+                Value bufferSizeBytes =
+                    computeMemRefSizeInBytes(memRefType, shadowDesc, builder, loc);
+                Value zero = builder.create<LLVM::ConstantOp>(loc, builder.getI8Type(), 0);
+                builder.create<LLVM::MemsetOp>(loc, shadowPtr, zero, bufferSizeBytes,
+                                               /*isVolatile=*/false);
+            }
+            callArgs.push_back(shadowPtr);
+        }
+        else {
+            callArgs.push_back(enzymeConst);
+            callArgs.push_back(desc.alignedPtr(builder, loc));
+        }
+
+        // Offsets, sizes, and strides
+        callArgs.push_back(desc.offset(builder, loc));
+        for (int64_t dim = 0; dim < memRefType.getRank(); dim++) {
+            callArgs.push_back(desc.size(builder, loc, dim));
+        }
+        for (int64_t dim = 0; dim < memRefType.getRank(); dim++) {
+            callArgs.push_back(desc.stride(builder, loc, dim));
         }
     }
 
@@ -410,6 +360,12 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
         return bufferSizeBytes;
     }
 
+    /// This registers a custom allocation and deallocation functions with Enzyme. It creates a
+    /// global LLVM array that Enzyme will convert to the appropriate metadata using the
+    /// `preserve-nvvm` pass.
+    ///
+    /// This functionality is described at:
+    /// https://github.com/EnzymeAD/Enzyme/issues/930#issuecomment-1334502012
     static LLVM::GlobalOp insertEnzymeAllocationLike(OpBuilder &builder, ModuleOp moduleOp,
                                                      Location loc, StringRef allocFuncName,
                                                      StringRef freeFuncName)
@@ -417,9 +373,8 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
         MLIRContext *context = moduleOp.getContext();
         OpBuilder::InsertionGuard insertGuard(builder);
         builder.setInsertionPointToStart(moduleOp.getBody());
-        const char *key = "__enzyme_allocation_like";
 
-        auto allocationLike = moduleOp.lookupSymbol<LLVM::GlobalOp>(key);
+        auto allocationLike = moduleOp.lookupSymbol<LLVM::GlobalOp>(enzyme_allocation_key);
         if (allocationLike) {
             return allocationLike;
         }
@@ -427,14 +382,13 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
         auto ptrType = LLVM::LLVMPointerType::get(context);
         auto resultType = LLVM::LLVMArrayType::get(ptrType, 4);
 
-        // TODO(jacob): document the weirdness of __enzyme_allocation_like
-        // TODO(jacob): the dealloc_indices and size index should probably be configurable
         builder.create<LLVM::GlobalOp>(loc, LLVM::LLVMArrayType::get(builder.getI8Type(), 3), true,
                                        LLVM::Linkage::Linkonce, "dealloc_indices",
                                        builder.getStringAttr(StringRef("-1", 3)));
-        allocationLike = builder.create<LLVM::GlobalOp>(
-            loc, resultType,
-            /*isConstant=*/false, LLVM::Linkage::External, key, /*address space=*/nullptr);
+        allocationLike =
+            builder.create<LLVM::GlobalOp>(loc, resultType,
+                                           /*isConstant=*/false, LLVM::Linkage::External,
+                                           enzyme_allocation_key, /*address space=*/nullptr);
         builder.createBlock(&allocationLike.getInitializerRegion());
         auto allocFn = builder.create<LLVM::AddressOfOp>(loc, ptrType, allocFuncName);
         auto sizeArgIndex =

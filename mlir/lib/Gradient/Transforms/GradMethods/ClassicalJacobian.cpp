@@ -57,7 +57,8 @@ func::FuncOp genParamCountFunction(PatternRewriter &rewriter, Location loc, func
         // First copy the original function as is, then we can replace all quantum ops by counting
         // their gate parameters instead.
         rewriter.setInsertionPointAfter(callee);
-        paramCountFn = rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility, nullptr, nullptr);
+        paramCountFn =
+            rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility, nullptr, nullptr);
         rewriter.cloneRegionBefore(callee.getBody(), paramCountFn.getBody(), paramCountFn.end());
 
         PatternRewriter::InsertionGuard insertGuard(rewriter);
@@ -118,9 +119,9 @@ func::FuncOp genArgMapFunction(PatternRewriter &rewriter, Location loc, func::Fu
     std::string fnName = callee.getSymName().str() + ".argmap";
     std::vector<Type> fnArgTypes = callee.getArgumentTypes().vec();
     fnArgTypes.push_back(rewriter.getIndexType());
-    RankedTensorType paramsVectorType =
-        RankedTensorType::get({ShapedType::kDynamic}, rewriter.getF64Type());
-    FunctionType fnType = rewriter.getFunctionType(fnArgTypes, paramsVectorType);
+    auto paramsBufferType = MemRefType::get({ShapedType::kDynamic}, rewriter.getF64Type());
+    fnArgTypes.push_back(paramsBufferType);
+    FunctionType fnType = rewriter.getFunctionType(fnArgTypes, {});
     StringAttr visibility = rewriter.getStringAttr("private");
 
     func::FuncOp argMapFn =
@@ -131,14 +132,13 @@ func::FuncOp genArgMapFunction(PatternRewriter &rewriter, Location loc, func::Fu
         // input to the new function.
         argMapFn = rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility, nullptr, nullptr);
         rewriter.cloneRegionBefore(callee.getBody(), argMapFn.getBody(), argMapFn.end());
-        Value numParams = argMapFn.getBody().front().addArgument(rewriter.getIndexType(), loc);
+        Block &argMapBlock = argMapFn.getFunctionBody().front();
+        // TODO: if we're passing in the paramsBuffer, I don't think we need the numParams
+        Value numParams = argMapBlock.addArgument(rewriter.getIndexType(), loc);
+        Value paramsBuffer = argMapBlock.addArgument(paramsBufferType, loc);
 
         PatternRewriter::InsertionGuard insertGuard(rewriter);
         rewriter.setInsertionPointToStart(&argMapFn.getBody().front());
-
-        // Allocate the memory for the gate parameters collected at runtime.
-        MemRefType paramsBufferType = MemRefType::get({ShapedType::kDynamic}, rewriter.getF64Type());
-        Value paramsBuffer = rewriter.create<memref::AllocOp>(loc, paramsBufferType, numParams);
 
         MemRefType paramsProcessedType = MemRefType::get({}, rewriter.getIndexType());
         Value paramsProcessed = rewriter.create<memref::AllocaOp>(loc, paramsProcessedType);
@@ -164,12 +164,10 @@ func::FuncOp genArgMapFunction(PatternRewriter &rewriter, Location loc, func::Fu
 
                 rewriter.replaceOp(op, gate.getQubitOperands());
             }
-            // Replace any return statements from the original function with the params vector.
-            else if (isa<func::ReturnOp>(op)) {
-                PatternRewriter::InsertionGuard insertGuard(rewriter);
-                rewriter.setInsertionPoint(op);
-                Value paramsVector = rewriter.create<bufferization::ToTensorOp>(loc, paramsBuffer);
-                op->setOperands(paramsVector);
+            // The function does not return anything (the parameter vector is passed in as an
+            // argument.)
+            else if (auto returnOp = dyn_cast<func::ReturnOp>(op)) {
+                returnOp.getOperandsMutable().clear();
             }
             // Erase redundant device specifications.
             else if (isa<quantum::DeviceOp>(op)) {
