@@ -248,17 +248,20 @@
 * Catalyst has been upgraded to work with JAX v0.4.10.
   [#143](https://github.com/PennyLaneAI/catalyst/pull/143)
 
-* The `catalyst.grad` function now defaults to using the differentiation
+* The `catalyst.grad` function now supports using the differentiation
   method defined on the QNode (via the `diff_method` argument) rather than
-  determining a global differentiation method.
+  applying a global differentiation method.
   [#163](https://github.com/PennyLaneAI/catalyst/pull/163)
 
   As part of this change, the `catalyst.grad()` `method` argument now accepts
   the following options:
 
-  - `method="defer"` (default):  Quantum components of the hybrid function are
+  - `method="defer"`:  Quantum components of the hybrid function are
     differentiated according to the corresponding QNode `diff_method`, while
     the classical computation is differentiated using traditional auto-diff.
+
+    With this strategy, Catalyst only currently supports QNodes with
+    `diff_method="param-shift" and `diff_method="adjoint"`.
 
   - `method="fd"`: First-order finite-differences for the entire hybrid function.
     The `diff_method` argument for each QNode is ignored.
