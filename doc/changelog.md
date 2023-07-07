@@ -95,8 +95,9 @@
   documentation.
 
   Internally, the quantum instructions are generating OpenQASM3 kernels at
-  runtime; these are then executed on both local (``braket.local.qubit``) and
-  remote (``braket.aws.qubit``) devices backed by Amazon Braket Python SDK,
+  runtime; these are then executed on both local (`braket.local.qubit`) and
+  remote (`braket.aws.qubit`) devices backed by Amazon Braket Python SDK,
+
   with measurement results then propagated back to the frontend.
 
   Note that at initial release, not all Catalyst features are supported with Braket.
@@ -177,7 +178,9 @@
 
 * Support for multiple backend devices within a single qjit-compiled function
   is now available.
+  [#86](https://github.com/PennyLaneAI/catalyst/pull/86)
   [#89](https://github.com/PennyLaneAI/catalyst/pull/89)
+
 
   For example, if you compile the Catalyst runtime
   with `lightning.kokkos` support (via the compilation flag
@@ -222,7 +225,8 @@
   ```
 
 * Support for returning the variance of Hamiltonians,
-  Hermitian matrices, and Tensors via ``qml.var``
+  Hermitian matrices, and Tensors via `qml.var`
+
   has been added.
   [#124](https://github.com/PennyLaneAI/catalyst/pull/124)
 
@@ -310,7 +314,8 @@
 
   As part of this refactor, the following changes were made:
 
-  - Passes are now classes. This allow developers/users looking to change
+  - Passes are now classes. This allows developers/users looking to change
+
     flags to inherit from these passes and change the flags.
   
   - Passes are now passed as arguments to the compiler. Custom passes can just
@@ -359,8 +364,10 @@
   temporary buffers. [#100](https://github.com/PennyLaneAI/catalyst/pull/100)
 
 * Provide a new abstraction to the `QuantumDevice` interface in the runtime
-  called `MemRefView`. C++ implementations of the interface can iterate
-  through and directly store results into the `MemRefView` independant of the
+  called `DataView`. C++ implementations of the interface can iterate
+
+  through and directly store results into the `DataView` independant of the
+
   underlying memory layout. This can eliminate redundant buffer copies at the
   interface boundaries, which has been applied to existing devices. [#109](https://github.com/PennyLaneAI/catalyst/pull/109)
 
@@ -372,13 +379,16 @@
 * Temporary fix of use-after-free and dependency of uninitialized memory.
   [#121](https://github.com/PennyLaneAI/catalyst/pull/121)
 
-* Fixes file renaming within pass pipelines.
+* Fix file renaming within pass pipelines.
+
   [#126](https://github.com/PennyLaneAI/catalyst/pull/126)
 
-* Fixes the issue with the `do_queue` deprecation warnings in PennyLane.
+* Fix the issue with the `do_queue` deprecation warnings in PennyLane.
+
   [#146](https://github.com/PennyLaneAI/catalyst/pull/146)
 
-* Fixes the issue with gradients failing to work with hybrid functions that
+* Fix the issue with gradients failing to work with hybrid functions that
+
   contain constant `jnp.array` objects. This will enable PennyLane operators
   that have data in the form of a `jnp.array`, such as a Hamiltonian, to be
   included in a qjit-compiled function. [#152](https://github.com/PennyLaneAI/catalyst/pull/152)
