@@ -91,13 +91,12 @@
   workflow(1.0, 2.0)
   ```
 
-  For a list of available devices, please see the [PennyLane-Braket]
-  (https://amazon-braket-pennylane-plugin-python.readthedocs.io/en/latest/)
+  For a list of available devices, please see the [PennyLane-Braket](https://amazon-braket-pennylane-plugin-python.readthedocs.io/en/latest/)
   documentation.
 
   Internally, the quantum instructions are generating OpenQASM3 kernels at
   runtime; these are then executed on both local (``braket.local.qubit``) and
-  remote(``braket.aws.qubit``) devices backed by Amazon Braket Python SDK,
+  remote (``braket.aws.qubit``) devices backed by Amazon Braket Python SDK,
   with measurement results then propagated back to the frontend.
 
   Note that at initial release, not all Catalyst features are supported with Braket.
@@ -243,19 +242,14 @@
   >>> circuit(x)
   array(0.95187467)
   ```
-
-<h3>Improvements</h3>
-
-* Catalyst has been upgraded to work with JAX v0.4.13.
-  [#143](https://github.com/PennyLaneAI/catalyst/pull/143)
-  [#185](https://github.com/PennyLaneAI/catalyst/pull/185)
+<h3>Breaking changes</h3>
 
 * The `catalyst.grad` function now supports using the differentiation
   method defined on the QNode (via the `diff_method` argument) rather than
   applying a global differentiation method.
   [#163](https://github.com/PennyLaneAI/catalyst/pull/163)
 
-  As part of this change, the `catalyst.grad()` `method` argument now accepts
+  As part of this change, the `method` argument now accepts
   the following options:
 
   - `method="defer"`:  Quantum components of the hybrid function are
@@ -272,8 +266,14 @@
   internally call multiple QNodes, and towards supporting differentiation of
   classical postprocessing.
 
+<h3>Improvements</h3>
+
+* Catalyst has been upgraded to work with JAX v0.4.13.
+  [#143](https://github.com/PennyLaneAI/catalyst/pull/143)
+  [#185](https://github.com/PennyLaneAI/catalyst/pull/185)
+
 * The `catalyst.for_loop` function now supports constant negative step sizes.
-  (https://github.com/PennyLaneAI/catalyst/pull/129)
+  [#129](https://github.com/PennyLaneAI/catalyst/pull/129)
 
   ```python
   dev = qml.device("lightning.qubit", wires=1)
@@ -292,17 +292,16 @@
 
 * Add a Backprop operation for using autodifferentiation (AD) at the LLVM
   level with Enzyme AD. The Backprop operations has a bufferization pattern
-  and a lowering to LLVM. [#107]
-  (https://github.com/PennyLaneAI/catalyst/pull/107)[#116]
-  (https://github.com/PennyLaneAI/catalyst/pull/116)
+  and a lowering to LLVM.
+  [#107](https://github.com/PennyLaneAI/catalyst/pull/107)
+  [#116](https://github.com/PennyLaneAI/catalyst/pull/116)
 
 * Error handling has been improved. The runtime now throws more descriptive
-  and unified expressions for runtime errors and assertions. [#92]
-  (https://github.com/PennyLaneAI/catalyst/pull/92)
+  and unified expressions for runtime errors and assertions.
+  [#92](https://github.com/PennyLaneAI/catalyst/pull/92)
 
 * In preparation for easier debugging, the compiler has been refactored to
-  allow easy prototyping of new compilation pipelines. [#38]
-  (https://github.com/PennyLaneAI/catalyst/pull/38)
+  allow easy prototyping of new compilation pipelines. [#38](https://github.com/PennyLaneAI/catalyst/pull/38)
 
   In the future, this will allow the ability to generate MLIR or LLVM-IR by
   loading input from a string or file, rather than generating it from Python.
@@ -318,11 +317,9 @@
     the next pass.
 
 * Improved Python compatibility by providing a stable signature for user
-  generated functions. [#106]
-  (https://github.com/PennyLaneAI/catalyst/pull/106)
+  generated functions. [#106](https://github.com/PennyLaneAI/catalyst/pull/106)
 
-* Handle C++ exceptions without unwinding the whole stack. [#99]
-  (https://github.com/PennyLaneAI/catalyst/pull/99)
+* Handle C++ exceptions without unwinding the whole stack. [#99](https://github.com/PennyLaneAI/catalyst/pull/99)
 
 * Reduce the number of classical invocations by counting the number of gate parameters in
   the `argmap` function.
@@ -348,8 +345,6 @@
   This improves IR readability.
   [#165](https://github.com/PennyLaneAI/catalyst/pull/165)
 
-<h3>Breaking changes</h3>
-
 <h3>Bug fixes</h3>
 
 * Fix a bug in the mapping from logical to concrete qubits for mid-circuit measurements.
@@ -365,14 +360,12 @@
   called `MemRefView`. C++ implementations of the interface can iterate
   through and directly store results into the `MemRefView` independant of the
   underlying memory layout. This can eliminate redundant buffer copies at the
-  interface boundaries, which has been applied to existing devices. [#109]
-  (https://github.com/PennyLaneAI/catalyst/pull/109)
+  interface boundaries, which has been applied to existing devices. [#109](https://github.com/PennyLaneAI/catalyst/pull/109)
 
 * Reduce memory utilization by transferring ownership of buffers from the
   runtime to Python instead of copying them. This includes adding a compiler
   pass that copies global buffers into the heap as global buffers cannot be
-  transferred to Python. [#112]
-  (https://github.com/PennyLaneAI/catalyst/pull/112)
+  transferred to Python. [#112](https://github.com/PennyLaneAI/catalyst/pull/112)
 
 * Temporary fix of use-after-free and dependency of uninitialized memory.
   [#121](https://github.com/PennyLaneAI/catalyst/pull/121)
@@ -386,8 +379,7 @@
 * Fixes the issue with gradients failing to work with hybrid functions that
   contain constant `jnp.array` objects. This will enable PennyLane operators
   that have data in the form of a `jnp.array`, such as a Hamiltonian, to be
-  included in a qjit-compiled function. [#152]
-  (https://github.com/PennyLaneAI/catalyst/pull/152)
+  included in a qjit-compiled function. [#152](https://github.com/PennyLaneAI/catalyst/pull/152)
 
   An example of a newly supported workflow:
 
