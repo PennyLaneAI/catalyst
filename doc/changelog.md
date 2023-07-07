@@ -181,7 +181,6 @@
   [#86](https://github.com/PennyLaneAI/catalyst/pull/86)
   [#89](https://github.com/PennyLaneAI/catalyst/pull/89)
 
-
   For example, if you compile the Catalyst runtime
   with `lightning.kokkos` support (via the compilation flag
   `ENABLE_LIGHTNING_KOKKOS=ON`), you can use `lightning.qubit` and
