@@ -221,26 +221,28 @@
   array([0.80842369, 0.19157631])
   ```
 
-* Support for returning the variance of general observables via ``qml.var``
+* Support for returning the variance of Hamiltonians,
+  Hermitian matrices, and Tensors via ``qml.var``
   has been added.
   [#124](https://github.com/PennyLaneAI/catalyst/pull/124)
 
   ```python
-  dev = qml.device("lightning.qubit", wires=1)
+  dev = qml.device("lightning.qubit", wires=2)
 
   @qjit
   @qml.qnode(dev)
   def circuit(x):
       qml.RX(jnp.pi * x[0], wires=0)
-      qml.RY(x[1] ** 2, wires=0)
+      qml.RY(x[1] ** 2, wires=1)
+      qml.CNOT(wires=[0, 1])
       qml.RX(x[1] * x[2], wires=0)
-      return qml.var(qml.PauliZ(0))
+      return qml.var(qml.PauliZ(0) @ qml.PauliX(1))
   ```
 
   ```pycon
   >>> x = jnp.array([0.54, 0.31])
   >>> circuit(x)
-  array(0.95187467)
+  array(0.98851544)
   ```
 <h3>Breaking changes</h3>
 
