@@ -117,7 +117,7 @@ LogicalResult JVPLoweringPattern::matchAndRewrite(JVPOp op, PatternRewriter &rew
 
     std::vector<Value> einsumResults;
     for (size_t nout = 0; nout < funcResultTypes.size(); nout++) {
-        Optional<Value> acc;
+        std::optional<Value> acc;
         for (size_t nparam = 0; nparam < func_diff_operand_indices.size(); nparam++) {
             LLVM_DEBUG(dbgs() << "iteration: nout " << nout << " nparam " << nparam << "\n");
             auto jac = gradOp.getResults()[nparam * funcResultTypes.size() + nout];
@@ -236,7 +236,7 @@ LogicalResult VJPLoweringPattern::matchAndRewrite(VJPOp op, PatternRewriter &rew
 
     std::vector<Value> einsumResults;
     for (size_t nparam = 0; nparam < func_diff_operand_indices.size(); nparam++) {
-        Optional<Value> acc;
+        std::optional<Value> acc;
         for (size_t nout = 0; nout < funcResultTypes.size(); nout++) {
             auto jac = gradOp.getResults()[nparam * funcResultTypes.size() + nout];
             auto param = calleeOperands[func_diff_operand_indices[nparam]];

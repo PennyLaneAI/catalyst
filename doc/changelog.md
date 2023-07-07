@@ -3,9 +3,10 @@
 <h3>New features</h3>
 
 * Catalyst programs can now be used inside of a larger JAX workflow which uses
-  JIT compilation, automatic differentiation, and other JAX transforms.[#96]
-  (https://github.com/PennyLaneAI/catalyst/pull/96)[#123]
-  (https://github.com/PennyLaneAI/catalyst/pull/123)
+  JIT compilation, automatic differentiation, and other JAX transforms.
+  [#96](https://github.com/PennyLaneAI/catalyst/pull/96)
+  [#123](https://github.com/PennyLaneAI/catalyst/pull/123)
+  [#167](https://github.com/PennyLaneAI/catalyst/pull/167)
 
   For example, call a Catalyst qjit-compiled function from within a JAX jit-compiled
   function:
@@ -245,8 +246,9 @@
 
 <h3>Improvements</h3>
 
-* Catalyst has been upgraded to work with JAX v0.4.10.
+* Catalyst has been upgraded to work with JAX v0.4.13.
   [#143](https://github.com/PennyLaneAI/catalyst/pull/143)
+  [#185](https://github.com/PennyLaneAI/catalyst/pull/185)
 
 * The `catalyst.grad` function now supports using the differentiation
   method defined on the QNode (via the `diff_method` argument) rather than
@@ -386,9 +388,9 @@
   that have data in the form of a `jnp.array`, such as a Hamiltonian, to be
   included in a qjit-compiled function. [#152]
   (https://github.com/PennyLaneAI/catalyst/pull/152)
-  
+
   An example of a newly supported workflow:
-  
+
   ``` python
   coeffs = jnp.array([0.1, 0.2])
   terms = [qml.PauliX(0) @ qml.PauliZ(1), qml.PauliZ(0)]
