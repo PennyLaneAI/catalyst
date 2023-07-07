@@ -401,20 +401,19 @@ def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=
 
     .. code-block:: python
 
-        def f(p):
-          return jnp.stack([1*p, 2*p, 3*p])
-
         @qjit
-        def workflow(params, tangent):
-            return jvp(f, [params], [tangent])
+        def jvp(params, tangent):
+          def f(x):
+              y = [jnp.sin(x[0]), x[1] ** 2, x[0] * x[1]]
+              return jnp.stack(y)
 
-    >>> workflow(jnp.zeros([4], dtype=float), jnp.ones([4], dtype=float))
-    (Array([[0., 0., 0., 0.],
-           [0., 0., 0., 0.],
-           [0., 0., 0., 0.]], dtype=float64),
-     Array([[1., 1., 1., 1.],
-           [2., 2., 2., 2.],
-           [3., 3., 3., 3.]], dtype=float64))
+          return catalyst.jvp(f, [params], [tangent])
+
+    >>> x = jnp.array([0.1, 0.2])
+    >>> tangent = jnp.array([0.3, 0.6])
+    >>> jvp(x, tangent)
+    [array([0.09983342, 0.04      , 0.02      ]),
+    array([0.29850125, 0.24000006, 0.12      ])]
     """
     TracingContext.check_is_tracing(
         "catalyst.jvp can only be used from within @qjit decorated code."
@@ -461,18 +460,19 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
 
     .. code-block:: python
 
-        def f(p):
-          return jnp.stack([1*p, 2*p, 3*p])
-
         @qjit
-        def workflow(params, cotangent):
-            return vjp(f, [params], [cotangent])
+        def vjp(params, cotangent):
+          def f(x):
+              y = [jnp.sin(x[0]), x[1] ** 2, x[0] * x[1]]
+              return jnp.stack(y)
 
-    >>> workflow(jnp.zeros([4], dtype=float), jnp.ones([3,4], dtype=float))
-    (Array([[0., 0., 0., 0.],
-            [0., 0., 0., 0.],
-            [0., 0., 0., 0.]], dtype=float64),
-     Array([6., 6., 6., 6.], dtype=float64))
+          return catalyst.vjp(f, [params], [cotangent])
+
+    >>> x = jnp.array([0.1, 0.2])
+    >>> dy = jnp.array([-0.5, 0.1, 0.3])
+    >>> vjp(x, dy)
+    [array([0.09983342, 0.04      , 0.02      ]),
+    array([-0.43750208,  0.07000001])]
     """
     TracingContext.check_is_tracing(
         "catalyst.vjp can only be used from within @qjit decorated code."
@@ -706,6 +706,30 @@ def cond(pred):
     array(0.16996714)
     >>> circuit(1.6)
     array(0.)
+
+    Additional 'else-if' clauses can also be included via the ``else_if`` method:
+
+    .. code-block:: python
+
+        @qjit
+        @qml.qnode(dev)
+        def circuit(x):
+
+            @catalyst.cond(x > 2.7)
+            def cond_fn():
+                qml.RX(x, wires=0)
+
+            @cond_fn.else_if(x > 1.4)
+            def cond_elif():
+                qml.RY(x, wires=0)
+
+            @cond_fn.otherwise
+            def cond_else():
+                qml.RX(x ** 2, wires=0)
+
+            cond_fn()
+
+            eturn qml.probs(wires=0)
 
     The conditional function is permitted to also return values.
     Any value that is supported by JAX JIT compilation is supported as a return

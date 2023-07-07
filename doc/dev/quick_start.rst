@@ -524,15 +524,29 @@ as the loop body function. The return type of the condition function must be a B
 Calculating Quantum Gradients
 =============================
 
+**Catalyst-provided gradient operations:**
+
+.. raw:: html
+
+    <div class="summary-table">
+
+.. autosummary::
+    :nosignatures:
+
+    ~catalyst.grad
+    ~catalyst.vjp
+    ~catalyst.jvp
+
+.. raw:: html
+
+    </div>
+
+
 :func:`.grad` is a QJIT compatible grad decorator in Catalyst that can differentiate a hybrid quantum function
 using finite-difference, parameter-shift, or adjoint-jacobian methods. See the documentation for more details.
-This decorator requires:
 
-- the function to differentiate,
-- the grad method from the list of ``["fd", "ps", "adj"]`` (``method``),
-- and the argument indices which define over which arguments to differentiate (``argnum``).
 
-Let's start with computing the gradient of a simple circuit using the default method, ``"fd"``.
+This decorator accepts the function to differentiate, a differentiation strategy, and the argnument indices of the function with which to differentiate:
 
 .. code-block:: python
 
@@ -549,17 +563,22 @@ Let's start with computing the gradient of a simple circuit using the default me
 >>> workflow(2.0)
 array(-3.14159265)
 
-To differentiate this circuit using parameter-shift and adjoint methods, you only need to update
-the :func:`.grad` call providing ``method="ps"`` and ``method="adj"``.
+To specify the differentiation strategy, the ``method`` argument can be passed
+to the ``grad`` function:
 
-.. code-block:: python
+- ``method="defer"``: Quantum components of the hybrid function are
+  differentiated according to the corresponding QNode ``diff_method``, while
+  the classical computation is differentiated using traditional autodiff.
 
-    g_ps = grad(circuit, method="ps")
-    g_adj = grad(circuit, method="adj")
+  With this strategy, Catalyst only currently supports QNodes with
+  ``diff_method="param-shift"`` and ``diff_method="adjoint"``.
 
-Currently, higher-order differentiation is only supported by the finite-difference method.
-The gradient of circuits with QJIT compatible control flow is supported for all methods
-in Catalyst.
+- ``method="fd"``: First-order finite-differences for the entire hybrid
+  function. The ``diff_method`` argument for each QNode is ignored.
+
+Currently, higher-order differentiation is only supported by the
+finite-difference method. The gradient of circuits with QJIT compatible
+control flow is supported for all methods in Catalyst.
 
 You can further provide the step size (``h``-value) of finite-difference in the :func:`.grad` method.
 For example, the gradient call to differentiate ``circuit`` with respect to its second argument using
@@ -643,66 +662,56 @@ array(4.94807684e-09)
 JAX Integration
 ===============
 
-Catalyst programs can also be used inside of a larger JAX workflow which uses JIT compilation,
-automatic differentiation, and other JAX transforms.
+Catalyst programs can also be used inside of a larger JAX workflow which uses
+JIT compilation, automatic differentiation, and other JAX transforms.
 
-Note that generally Catalyst should be used to JIT the entire workflow, but sometimes users may
-wish to delegate only the quantum part of their workflow to Catalyst and let JAX handle the rest
-(for example due to a missing feature or compatibility issue in Catalyst).
+.. note::
+    
+    Note that, in general, best performance will be seen when the Catalyst
+    ``@qjit`` decorator is used to JIT the entire hybrid workflow. However, there
+    may be cases where you may want to delegate only the quantum part of your
+    workflow to Catalyst, and let JAX handle classical components (for example,
+    due to missing a feature or compatibility issue in Catalyst).
 
-Examples of newly supported workflows:
-
-- JIT compilation with JAX:
+For example, call a Catalyst qjit-compiled function from within a JAX jit-compiled
+function:
 
 .. code-block:: python
+
+    dev = qml.device("lightning.qubit", wires=1)
 
     @qjit
     @qml.qnode(dev)
     def circuit(x):
-        qml.RX(jnp.pi * x[0], wires=0)
-        qml.RY(x[1] ** 2, wires=0)
-        qml.RX(x[1] * x[2], wires=0)
-        return qml.probs(wires=0)
+      qml.RX(jnp.pi * x[0], wires=0)
+      qml.RY(x[1] ** 2, wires=0)
+      qml.RX(x[1] * x[2], wires=0)
+      return qml.probs(wires=0)
 
     @jax.jit
     def cost_fn(weights):
-        x = jnp.sin(weights)
-        return jnp.sum(jnp.cos(circuit(x)) ** 2)
+      x = jnp.sin(weights)
+      return jnp.sum(jnp.cos(circuit(x)) ** 2)
 
-    cost_fn(jnp.array([0.1, 0.2, 0.3]))
+>>> cost_fn(jnp.array([0.1, 0.2, 0.3]))
+Array(1.32269195, dtype=float64)
 
-- Automatic differentiation with JAX, both in forward and reverse mode, but to first-order only:
+Catalyst-compiled functions can now also be automatically differentiated
+via JAX, both in forward and reverse mode to first-order,
 
-.. code-block:: python
+>>> jax.grad(cost_fn)(jnp.array([0.1, 0.2, 0.3]))
+Array([0.49249037, 0.05197949, 0.02991883], dtype=float64)
 
-    @qjit
-    @qml.qnode(dev)
-    def circuit(x):
-        qml.RX(jnp.pi * x[0], wires=0)
-        qml.RY(x[1] ** 2, wires=0)
-        qml.RX(x[1] * x[2], wires=0)
-        return qml.probs(wires=0)
+as well as vectorized using ``jax.vmap``:
 
-    def cost_fn(weights):
-        x = jnp.sin(weights)
-        return jnp.sum(jnp.cos(circuit(x)) ** 2)
+>>> jax.vmap(cost_fn)(jnp.array([[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]]))
+Array([1.32269195, 1.53905377], dtype=float64)
 
-    jax.grad(cost_fn)(jnp.array([0.1, 0.2, 0.3]))
+In particular, this allows for a reduction in boilerplate when using
+JAX-compatible optimizers such as ``jaxopt``:
 
-- Vectorization of compiled workflows with JAX:
-
-.. code-block:: python
-
-    @qjit
-    @qml.qnode(dev)
-    def circuit(x):
-        qml.RX(jnp.pi * x[0], wires=0)
-        qml.RY(x[1] ** 2, wires=0)
-        qml.RX(x[1] * x[2], wires=0)
-        return qml.probs(wires=0)
-
-    def cost_fn(weights):
-        x = jnp.sin(weights)
-        return jnp.sum(jnp.cos(circuit(x)) ** 2)
-
-    jax.vmap(cost_fn)(jnp.array([[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]]))
+>>> opt = jaxopt.GradientDescent(cost_fn)
+>>> params = jnp.array([0.1, 0.2, 0.3])
+>>> (final_params, _) = jax.jit(opt.run)(params)
+>>> final_params
+Array([-0.00320799,  0.03475223,  0.29362844], dtype=float64)
