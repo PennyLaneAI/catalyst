@@ -155,7 +155,7 @@
    array([-0.43750208,  0.07000001])]
   ```
 
-  Use `catalyst.jvp` to compute the forward-pass value and VJP:
+  Use `catalyst.jvp` to compute the forward-pass value and JVP:
 
   ```python
   @qjit
@@ -175,69 +175,169 @@
    array([0.29850125, 0.24000006, 0.12      ])]
   ```
 
-* Add a Backprop operation for using AD at the LLVM level with Enzyme AD. It has a 
-  bufferization pattern and a lowering to LLVM.
-  [#107](https://github.com/PennyLaneAI/catalyst/pull/107)
-  [#116](https://github.com/PennyLaneAI/catalyst/pull/116)
-
-* Add the end-to-end support for multiple backend devices. The compilation flag
-  ``ENABLE_LIGHTNING_KOKKOS=ON`` builds the runtime with support for PennyLane's
-  ``lightning.kokkos``. Both ``lightning.qubit`` and ``lightning.kokkos`` can be
-  chosen as available backend devices from the frontend.
+* Support for multiple backend devices within a single qjit-compiled function
+  is now available.
   [#89](https://github.com/PennyLaneAI/catalyst/pull/89)
 
-* Add support for ``var`` of general observables
+  For example, if you compile the Catalyst runtime
+  with `lightning.kokkos` support (via the compilation flag
+  `ENABLE_LIGHTNING_KOKKOS=ON`), you can use `lightning.qubit` and
+  `lightning.kokkos` within a singular workflow:
+
+  ```python
+  dev1 = qml.device("lightning.qubit", wires=1)
+  dev2 = qml.device("lightning.kokkos", wires=1)
+
+  @qml.qnode(dev1)
+  def circuit1(x):
+      qml.RX(jnp.pi * x[0], wires=0)
+      qml.RY(x[1] ** 2, wires=0)
+      qml.RX(x[1] * x[2], wires=0)
+      return qml.var(qml.PauliZ(0))
+
+  @qml.qnode(dev2)
+  def circuit2(x):
+  
+      @catalyst.cond(x > 2.7)
+      def cond_fn():
+          qml.RX(x, wires=0)
+  
+      @cond_fn.otherwise
+      def cond_else():
+          qml.RX(x ** 2, wires=0)
+  
+      cond_fn()
+  
+      return qml.probs(wires=0)
+
+  @qjit
+  def cost(x):
+      return circuit2(circuit1(x))
+  ```
+
+  ```pycon
+  >>> x = jnp.array([0.54, 0.31])
+  >>> cost(x)
+  array([0.80842369, 0.19157631])
+  ```
+
+* Support for returning the variance of general observables via ``qml.var``
+  has been added.
   [#124](https://github.com/PennyLaneAI/catalyst/pull/124)
 
+  ```python
+  dev = qml.device("lightning.qubit", wires=1)
+
+  @qjit
+  @qml.qnode(dev)
+  def circuit(x):
+      qml.RX(jnp.pi * x[0], wires=0)
+      qml.RY(x[1] ** 2, wires=0)
+      qml.RX(x[1] * x[2], wires=0)
+      return qml.var(qml.PauliZ(0))
+  ```
+
+  ```pycon
+  >>> x = jnp.array([0.54, 0.31])
+  >>> circuit(x)
+  array(0.95187467)
+  ```
 
 <h3>Improvements</h3>
 
-* Improving error handling by throwing descriptive and unified expressions for runtime
-  errors and assertions.
-  [#92](https://github.com/PennyLaneAI/catalyst/pull/92)
+* Catalyst has been upgraded to work with JAX v0.4.10.
+  [#143](https://github.com/PennyLaneAI/catalyst/pull/143)
 
-* Improve interface for adding and re-using flags to quantum-opt commands.
-  These are called pipelines, as they contain multiple passes.
-  [#38](https://github.com/PennyLaneAI/catalyst/pull/38)
+* The `catalyst.grad` function now defaults to using the differentiation
+  method defined on the QNode (via the `diff_method` argument) rather than
+  determining a global differentiation method.
+  [#163](https://github.com/PennyLaneAI/catalyst/pull/163)
 
-* Improve python compatibility by providing a stable signature for user generated functions.
-  [#106](https://github.com/PennyLaneAI/catalyst/pull/106)
+  As part of this change, the `catalyst.grad()` `method` argument now accepts
+  the following options:
 
-* Handle C++ exceptions without unwinding the whole stack.
-  [#99](https://github.com/PennyLaneAI/catalyst/pull/99)
+  - `method="defer"` (default):  Quantum components of the hybrid function are
+    differentiated according to the corresponding QNode `diff_method`, while
+    the classical computation is differentiated using traditional auto-diff.
 
-* Support constant negative step sizes in ``@for_loop`` loops.
-  [#129](https://github.com/PennyLaneAI/catalyst/pull/129)
+  - `method="fd"`: First-order finite-differences for the entire hybrid function.
+    The `diff_method` argument for each QNode is ignored.
+
+  This is an intermediate step towards differentiating functions that
+  internally call multiple QNodes, and towards supporting differentiation of
+  classical postprocessing.
+
+* The `catalyst.for_loop` function now supports constant negative step sizes.
+  (https://github.com/PennyLaneAI/catalyst/pull/129)
+
+  ```python
+  dev = qml.device("lightning.qubit", wires=1)
+
+  @qjit
+  @qml.qnode(dev)
+  def circuit(n):
+
+      @catalyst.for_loop(n, 0, -1)
+      def loop_fn(_):
+          qml.PauliX(0)
+
+      loop_fn()
+      return measure(0)
+  ```
+
+* Add a Backprop operation for using autodifferentiation (AD) at the LLVM
+  level with Enzyme AD. The Backprop operations has a bufferization pattern
+  and a lowering to LLVM. [#107]
+  (https://github.com/PennyLaneAI/catalyst/pull/107)[#116]
+  (https://github.com/PennyLaneAI/catalyst/pull/116)
+
+* Error handling has been improved. The runtime now throws more descriptive
+  and unified expressions for runtime errors and assertions. [#92]
+  (https://github.com/PennyLaneAI/catalyst/pull/92)
+
+* In preparation for easier debugging, the compiler has been refactored to
+  allow easy prototyping of new compilation pipelines. [#38]
+  (https://github.com/PennyLaneAI/catalyst/pull/38)
+
+  In the future, this will allow the ability to generate MLIR or LLVM-IR by
+  loading input from a string or file, rather than generating it from Python.
+
+  As part of this refactor, the following changes were made:
+
+  - Passes are now classes. This allow developers/users looking to change
+    flags to inherit from these passes and change the flags.
+  
+  - Passes are now passed as arguments to the compiler. Custom passes can just
+    be passed to the compiler as an argument, as long as they implement a run
+    method which takes an input and the output of this method can be fed to
+    the next pass.
+
+* Improved Python compatibility by providing a stable signature for user
+  generated functions. [#106]
+  (https://github.com/PennyLaneAI/catalyst/pull/106)
+
+* Handle C++ exceptions without unwinding the whole stack. [#99]
+  (https://github.com/PennyLaneAI/catalyst/pull/99)
 
 * Reduce the number of classical invocations by counting the number of gate parameters in
-  the ``argmap`` function.
+  the `argmap` function.
   [#136](https://github.com/PennyLaneAI/catalyst/pull/136)
 
   Prior to this, the computation of hybrid gradients executed all of the classical code
-  being differentiated in a ``pcount`` function that solely counted the number of gate
-  parameters in the quantum circuit. This was so ``argmap`` and other downstream
+  being differentiated in a `pcount` function that solely counted the number of gate
+  parameters in the quantum circuit. This was so `argmap` and other downstream
   functions could allocate memrefs large enough to store all gate parameters.
 
   Now, instead of counting the number of parameters separately, a dynamically-resizable
-  array is used in the ``argmap`` function directly to store the gate parameters. This
+  array is used in the `argmap` function directly to store the gate parameters. This
   removes one invocation of all of the classical code being differentiated.
 
 * Use Tablegen to define MLIR passes instead of C++ to reduce overhead of adding new passes.
   [#157](https://github.com/PennyLaneAI/catalyst/pull/157)
 
-* Update JAX to `v0.4.10`.
-  [#143](https://github.com/PennyLaneAI/catalyst/pull/143)
-
-* Perform constant folding on wire indices for ``quantum.insert`` and ``quantum.extract`` ops,
+* Perform constant folding on wire indices for `quantum.insert` and `quantum.extract` ops,
   used when writing (resp. reading) qubits to (resp. from) quantum registers.
   [#161](https://github.com/PennyLaneAI/catalyst/pull/161)
-
-* Use the differentiation method on the QNode rather than the ``grad`` function to better
-  match PennyLane's differentiation API.
-
-  This is an intermediate step towards differentiating functions that internally call multiple
-  QNodes, and towards supporting differentiation of classical postprocessing.
-  [#163](https://github.com/PennyLaneAI/catalyst/pull/163)
 
 * Represent known named observables as members of an MLIR Enum rather than a raw integer.
   This improves IR readability.
@@ -253,19 +353,21 @@
 * Fix a bug in the way gradient result type is inferred.
   [#84](https://github.com/PennyLaneAI/catalyst/pull/84)
 
-* Fix a memory regression and reduce memory footprint by removing unnecessary temporary buffers.
-  [#100](https://github.com/PennyLaneAI/catalyst/pull/100)
+* Fix a memory regression and reduce memory footprint by removing unnecessary
+  temporary buffers. [#100](https://github.com/PennyLaneAI/catalyst/pull/100)
 
-* Provide a new abstraction to the ``QuantumDevice`` interface in the runtime called ``MemRefView``.
-  C++ implementations of the interface can iterate through and directly store results into the
-  ``MemRefView`` independant of the underlying memory layout. This can eliminate redundant buffer
-  copies at the interface boundaries, which has been applied to existing devices.
-  [#109](https://github.com/PennyLaneAI/catalyst/pull/109)
+* Provide a new abstraction to the `QuantumDevice` interface in the runtime
+  called `MemRefView`. C++ implementations of the interface can iterate
+  through and directly store results into the `MemRefView` independant of the
+  underlying memory layout. This can eliminate redundant buffer copies at the
+  interface boundaries, which has been applied to existing devices. [#109]
+  (https://github.com/PennyLaneAI/catalyst/pull/109)
 
-* Reduce memory utilization by transferring ownership of buffers from the runtime to Python instead
-  of copying them. This includes adding a compiler pass that copies global buffers into the heap
-  as global buffers cannot be transferred to Python.
-  [#112](https://github.com/PennyLaneAI/catalyst/pull/112)
+* Reduce memory utilization by transferring ownership of buffers from the
+  runtime to Python instead of copying them. This includes adding a compiler
+  pass that copies global buffers into the heap as global buffers cannot be
+  transferred to Python. [#112]
+  (https://github.com/PennyLaneAI/catalyst/pull/112)
 
 * Temporary fix of use-after-free and dependency of uninitialized memory.
   [#121](https://github.com/PennyLaneAI/catalyst/pull/121)
@@ -273,11 +375,14 @@
 * Fixes file renaming within pass pipelines.
   [#126](https://github.com/PennyLaneAI/catalyst/pull/126)
 
-* Fixes the issue with the ``do_queue`` deprecation warnings in PennyLane.
+* Fixes the issue with the `do_queue` deprecation warnings in PennyLane.
   [#146](https://github.com/PennyLaneAI/catalyst/pull/146)
 
-* Fixes the issue with gradients failing to work with ``jnp.array`` as constants.
-  [#152](https://github.com/PennyLaneAI/catalyst/pull/152)
+* Fixes the issue with gradients failing to work with hybrid functions that
+  contain constant `jnp.array` objects. This will enable PennyLane operators
+  that have data in the form of a `jnp.array`, such as a Hamiltonian, to be
+  included in a qjit-compiled function. [#152]
+  (https://github.com/PennyLaneAI/catalyst/pull/152)
   
   An example of a newly supported workflow:
   
