@@ -237,8 +237,7 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
             }
             Value result = rewriter.create<memref::AllocOp>(loc, memrefType, dynamicDims);
 
-            unpackMemRef(result, qJacobian, callArgs, rewriter, loc,
-                         {.zeroOut = false, .dupNoNeed = true});
+            unpackMemRef(result, qJacobian, callArgs, rewriter, loc, {.dupNoNeed = true});
         }
 
         // The results of backprop are in data in

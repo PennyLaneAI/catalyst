@@ -117,8 +117,7 @@ func::FuncOp genArgMapFunction(PatternRewriter &rewriter, Location loc, func::Fu
 {
     // Define the properties of the classical preprocessing function.
     std::string fnName = callee.getSymName().str() + ".argmap";
-    std::vector<Type> fnArgTypes = callee.getArgumentTypes().vec();
-    fnArgTypes.push_back(rewriter.getIndexType());
+    SmallVector<Type> fnArgTypes(callee.getArgumentTypes());
     auto paramsBufferType = MemRefType::get({ShapedType::kDynamic}, rewriter.getF64Type());
     fnArgTypes.push_back(paramsBufferType);
     FunctionType fnType = rewriter.getFunctionType(fnArgTypes, {});
@@ -133,8 +132,6 @@ func::FuncOp genArgMapFunction(PatternRewriter &rewriter, Location loc, func::Fu
         argMapFn = rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility, nullptr, nullptr);
         rewriter.cloneRegionBefore(callee.getBody(), argMapFn.getBody(), argMapFn.end());
         Block &argMapBlock = argMapFn.getFunctionBody().front();
-        // TODO: if we're passing in the paramsBuffer, I don't think we need the numParams
-        Value numParams = argMapBlock.addArgument(rewriter.getIndexType(), loc);
         Value paramsBuffer = argMapBlock.addArgument(paramsBufferType, loc);
 
         PatternRewriter::InsertionGuard insertGuard(rewriter);
