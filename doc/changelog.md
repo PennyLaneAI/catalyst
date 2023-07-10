@@ -7,6 +7,7 @@
   [#96](https://github.com/PennyLaneAI/catalyst/pull/96)
   [#123](https://github.com/PennyLaneAI/catalyst/pull/123)
   [#167](https://github.com/PennyLaneAI/catalyst/pull/167)
+  [#192](https://github.com/PennyLaneAI/catalyst/pull/192)
 
   For example, call a Catalyst qjit-compiled function from within a JAX jit-compiled
   function:
@@ -75,7 +76,7 @@
   execute on Braket simulator and hardware devices, including remote
   cloud-based simulators such as SV1.
 
-  ``` python
+  ```python
   def circuit(x, y):
       qml.RX(y * x, wires=0)
       qml.RX(x * 2, wires=1)
@@ -364,9 +365,7 @@
 
 * Provide a new abstraction to the `QuantumDevice` interface in the runtime
   called `DataView`. C++ implementations of the interface can iterate
-
   through and directly store results into the `DataView` independant of the
-
   underlying memory layout. This can eliminate redundant buffer copies at the
   interface boundaries, which has been applied to existing devices. [#109](https://github.com/PennyLaneAI/catalyst/pull/109)
 
@@ -379,22 +378,19 @@
   [#121](https://github.com/PennyLaneAI/catalyst/pull/121)
 
 * Fix file renaming within pass pipelines.
-
   [#126](https://github.com/PennyLaneAI/catalyst/pull/126)
 
 * Fix the issue with the `do_queue` deprecation warnings in PennyLane.
-
   [#146](https://github.com/PennyLaneAI/catalyst/pull/146)
 
 * Fix the issue with gradients failing to work with hybrid functions that
-
   contain constant `jnp.array` objects. This will enable PennyLane operators
   that have data in the form of a `jnp.array`, such as a Hamiltonian, to be
   included in a qjit-compiled function. [#152](https://github.com/PennyLaneAI/catalyst/pull/152)
 
   An example of a newly supported workflow:
 
-  ``` python
+  ```python
   coeffs = jnp.array([0.1, 0.2])
   terms = [qml.PauliX(0) @ qml.PauliZ(1), qml.PauliZ(0)]
   H = qml.Hamiltonian(coeffs, terms)

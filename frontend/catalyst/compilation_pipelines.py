@@ -109,7 +109,7 @@ class CompiledFunction:
             assert isinstance(c_param, jax.core.ShapedArray)
             assert isinstance(r_param, jax.core.ShapedArray)
             promote_to = jax.numpy.promote_types(r_param.dtype, c_param.dtype)
-            if c_param.dtype != promote_to:
+            if c_param.dtype != promote_to or c_param.shape != r_param.shape:
                 return False
         return True
 
@@ -558,11 +558,12 @@ class QJIT:
             return self.qfunc(*args, **kwargs)
 
         function, args = self._maybe_promote(self.compiled_function, *args)
+        recompilation_needed = function != self.compiled_function
         self.compiled_function = function
 
         if any(isinstance(arg, jax.core.Tracer) for arg in args):
             # Only compile a derivative version of the compiled function when needed.
-            if self.jaxed_qfunc is None:
+            if self.jaxed_qfunc is None or recompilation_needed:
                 self.jaxed_qfunc = JAX_QJIT(self)
 
             return self.jaxed_qfunc(*args, **kwargs)

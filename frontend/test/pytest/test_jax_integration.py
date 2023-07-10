@@ -402,5 +402,53 @@ class TestJAXVectorize:
         assert jnp.allclose(result[1], cost_fn(x[1]))
 
 
+class TestJAXRecompilation:
+    """
+    Test obtained from ticket: https://github.com/PennyLaneAI/catalyst/issues/149
+
+    JAX is asked the gradient of a function, but the function itself might need recompilation.
+    """
+
+    def test_jax_function_has_not_been_jit_compiled(self, backend):
+        """Test if function can be used by jax.grad even if it has not been JIT compiled"""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=2))
+        def circuit(params, n):
+            def ansatz(i, x):
+                qml.RX(x[i, 0], wires=0)
+                qml.RY(x[i, 1], wires=1)
+                qml.CNOT(wires=[0, 1])
+                return x
+
+            for_loop(0, n, 1)(ansatz)(jnp.reshape(params, (-1, 2)))
+
+            return qml.expval(qml.PauliZ(1))
+
+        params = jnp.array([0.54, 0.3154, 0.654, 0.123])
+        jax.grad(circuit, argnums=0)(params, 2)
+
+    def test_jax_function_needs_recompilation(self, backend):
+        """Test if function can be used by jax.grad but it needs recompilation"""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=2))
+        def circuit(params, n):
+            def ansatz(i, x):
+                qml.RX(x[i, 0], wires=0)
+                qml.RY(x[i, 1], wires=1)
+                qml.CNOT(wires=[0, 1])
+                return x
+
+            for_loop(0, n, 1)(ansatz)(jnp.reshape(params, (-1, 2)))
+
+            return qml.expval(qml.PauliZ(1))
+
+        params = jnp.array([0.54, 0.3154, 0.654, 0.123])
+        jax.grad(circuit, argnums=0)(params, 2)
+        params = jnp.array([0.54, 0.3154, 0.654, 0.123, 0.1, 0.2])
+        jax.grad(circuit, argnums=0)(params, 3)
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
