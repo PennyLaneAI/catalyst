@@ -51,6 +51,8 @@ __all__ = (
     "cond",
     "measure",
     "grad",
+    "vjp",
+    "jvp",
     "CompileError",
     "CompileOptions",
 )
