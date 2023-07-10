@@ -119,7 +119,7 @@ struct AdjointOpPattern : public OpConversionPattern<AdjointOp> {
             loc, rewriter.getI64IntegerAttr(op.getDataIn().size()));
         SmallVector<Value> args = {numResults};
         for (Value memref : adaptor.getDataIn()) {
-            auto newArg =
+            Value newArg =
                 rewriter.create<LLVM::AllocaOp>(loc, LLVM::LLVMPointerType::get(vectorType), c1);
             rewriter.create<LLVM::StoreOp>(loc, memref, newArg);
             args.push_back(newArg);
@@ -214,7 +214,7 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
                 }
             }
             else {
-                auto position = std::distance(diffArgIndices.begin(), it);
+                size_t position = std::distance(diffArgIndices.begin(), it);
                 unpackMemRef(arg, dataIn[position], callArgs, rewriter, loc, {.zeroOut = true});
             }
             index++;
@@ -291,10 +291,10 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
 
     {
         auto llvmPtrType = LLVM::LLVMPointerType::get(builder.getContext());
-        auto enzymeConst = builder.create<LLVM::AddressOfOp>(loc, llvmPtrType, enzyme_const_key);
-        auto enzymeDupNoNeed =
-            builder.create<LLVM::AddressOfOp>(loc, llvmPtrType, enzyme_dupnoneed_key);
         auto memRefType = cast<MemRefType>(memRefArg.getType());
+        Value enzymeConst = builder.create<LLVM::AddressOfOp>(loc, llvmPtrType, enzyme_const_key);
+        Value enzymeDupNoNeed =
+            builder.create<LLVM::AddressOfOp>(loc, llvmPtrType, enzyme_dupnoneed_key);
         Value argStruct = castToConvertedType(memRefArg, builder, loc);
         MemRefDescriptor desc(argStruct);
 
@@ -387,12 +387,13 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
                                            /*isConstant=*/false, LLVM::Linkage::External,
                                            enzyme_allocation_key, /*address space=*/nullptr);
         builder.createBlock(&allocationLike.getInitializerRegion());
-        auto allocFn = builder.create<LLVM::AddressOfOp>(loc, ptrType, allocFuncName);
-        auto sizeArgIndex =
+        Value allocFn = builder.create<LLVM::AddressOfOp>(loc, ptrType, allocFuncName);
+        Value sizeArgIndex =
             builder.create<LLVM::ConstantOp>(loc, builder.getI64Type(), builder.getIndexAttr(0));
-        auto sizeArgIndexPtr = builder.create<LLVM::IntToPtrOp>(loc, ptrType, sizeArgIndex);
-        auto deallocIndicesPtr = builder.create<LLVM::AddressOfOp>(loc, ptrType, "dealloc_indices");
-        auto freeFn = builder.create<LLVM::AddressOfOp>(loc, ptrType, freeFuncName);
+        Value sizeArgIndexPtr = builder.create<LLVM::IntToPtrOp>(loc, ptrType, sizeArgIndex);
+        Value deallocIndicesPtr =
+            builder.create<LLVM::AddressOfOp>(loc, ptrType, "dealloc_indices");
+        Value freeFn = builder.create<LLVM::AddressOfOp>(loc, ptrType, freeFuncName);
 
         Value result = builder.create<LLVM::UndefOp>(loc, resultType);
         result = builder.create<LLVM::InsertValueOp>(loc, result, allocFn, 0);
