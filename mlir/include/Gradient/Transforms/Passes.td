@@ -58,6 +58,7 @@ def GradientConversionPass : Pass<"convert-gradient-to-llvm"> {
     let summary = "Perform a dialect conversion from Gradient to LLVM";
 
     let dependentDialects = [
+        "index::IndexDialect",
         "LLVM::LLVMDialect",
         "func::FuncDialect",
         "catalyst::quantum::QuantumDialect"
