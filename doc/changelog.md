@@ -406,6 +406,39 @@
   jax.grad(circuit)(params)
   ```
 
+* Allow JIT compiled functions to be recompiled when recompilation is triggered by JAX.
+  For example:
+
+  ```python
+  @qjit
+  @qml.qnode(dev)
+  def circuit(params, n):
+    
+    def ansatz(i, x):
+      qml.RX(x[i, 0], wires=0)
+      qml.RY(x[i, 1], wires=1)
+      qml.CNOT(wires=[0, 1])
+      return x
+
+    catalyst.for_loop(0, n, 1)(ansatz)(jnp.reshape(params, (-1, 2)))
+
+    return qml.expval(qml.PauliZ(1))
+  ```
+
+  ```pycon
+  >>> params = jnp.array([0.54, 0.3154, 0.654, 0.123])
+  >>> circuit(params, 2)
+  0.7612754362314241
+  >>> jax.grad(circuit, argnums=0)(params, 2)
+  [ 0.07954928 -0.32372842 -0.50406511  0.00828534]
+  >>> params = jnp.array([0.54, 0.3154, 0.654, 0.123, 0.1, 0.2])
+  >>> jax.grad(circuit, argnums=0)(params, 3)
+  [-0.42763436 -0.46892463  0.13741047 -0.54825337 -0.42408931 -0.07123154]
+  ```
+
+  In the case above, recompilation is needed when calling `jax.grad` for the second time.
+  [#192](https://github.com/PennyLaneAI/catalyst/pull/192)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
