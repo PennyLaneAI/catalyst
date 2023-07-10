@@ -558,11 +558,12 @@ class QJIT:
             return self.qfunc(*args, **kwargs)
 
         function, args = self._maybe_promote(self.compiled_function, *args)
+        recompilation_needed = function != self.compiled_function
         self.compiled_function = function
 
         if any(isinstance(arg, jax.core.Tracer) for arg in args):
             # Only compile a derivative version of the compiled function when needed.
-            if self.jaxed_qfunc is None:
+            if self.jaxed_qfunc is None or recompilation_needed:
                 self.jaxed_qfunc = JAX_QJIT(self)
 
             return self.jaxed_qfunc(*args, **kwargs)
@@ -659,16 +660,6 @@ class JAX_QJIT:
         return results, jvps
 
     def __call__(self, *args, **kwargs):
-        @jax.custom_jvp
-        def jaxed_qfunc(*args, **kwargs):
-            results = self.wrap_callback(self.qfunc, *args, **kwargs)
-            if len(results) == 1:
-                results = results[0]
-            return results
-
-        self.deriv_qfuncs = {}
-        self.jaxed_qfunc = jaxed_qfunc
-        jaxed_qfunc.defjvp(self.compute_jvp, symbolic_zeros=True)
         return self.jaxed_qfunc(*args, **kwargs)
 
 
