@@ -322,7 +322,7 @@ def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
         Currently, higher-order differentiation or differentiation of non-QNode functions
         is only supported by the finite-difference method.
 
-    .. note:
+    .. note::
 
         Any JAX-compatible optimization library, such as `JAXopt
         <https://jaxopt.github.io/stable/index.html>`_, can be used
@@ -374,7 +374,7 @@ def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
 
 
 def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=None):
-    """A Jacobian-vector product for PennyLane/Catalyst.
+    """A :func:`~.qjit` compatible Jacobian-vector product for PennyLane/Catalyst.
 
     This function allows the Jacobian-vector Product of a hybrid quantum-classical function to be
     computed within the compiled program.
@@ -433,7 +433,7 @@ def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=
 
 
 def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnum=None):
-    """A Vector-Jacobian product for PennyLane/Catalyst.
+    """A :func:`~.qjit` compatible Vector-Jacobian product for PennyLane/Catalyst.
 
     This function allows the Vector-Jacobian Product of a hybrid quantum-classical function to be
     computed within the compiled program.
@@ -655,7 +655,7 @@ def cond(pred):
     This form of control flow is a functional version of the traditional if-else conditional. This
     means that each execution path, an 'if' branch, any 'else if' branches, and a final 'otherwise'
     branch, is provided as a separate function. All functions will be traced during compilation,
-    but only one of them the will be executed at runtime, depending of the value of one or more
+    but only one of them will be executed at runtime, depending on the value of one or more
     Boolean predicates. The JAX equivalent is the ``jax.lax.cond`` function, but this version is
     optimized to work with quantum programs in PennyLane. This version also supports an 'else if'
     construct which the JAX version does not.
@@ -1155,7 +1155,7 @@ def for_loop(lower_bound, upper_bound, step):
                 # update the value of x for the next iteration
                 return jnp.sin(x)
 
-            # apply the while loop
+            # apply the for loop
             final_x = for_loop(0, n, 1)(loop_rx)(x)
 
             return qml.expval(qml.PauliZ(0)), final_x
@@ -1245,7 +1245,10 @@ class QJITDevice(qml.QubitDevice):
         shots (int): How many times the circuit should be evaluated (or sampled) to estimate
             the expectation values. Defaults to ``None`` if not specified. Setting
             to ``None`` results in computing statistics like expectation values and
-            variances analytically.
+            variances analytically
+        backend_name (str): name of the device from the list of supported and compiled backend
+            devices by the runtime
+        backend_kwargs (Dict(str, AnyType)): An optional dictionary of the device specifications
     """
 
     name = "QJIT device"
@@ -1298,7 +1301,7 @@ class QJITDevice(qml.QubitDevice):
 
     def __init__(self, shots=None, wires=None, backend_name=None, backend_kwargs=None):
         self.backend_name = backend_name if backend_name else "default"
-        self.backend_kwargs = backend_kwargs if backend_kwargs else ""
+        self.backend_kwargs = backend_kwargs if backend_kwargs else {}
         super().__init__(wires=wires, shots=shots)
 
     def apply(self, operations, **kwargs):
