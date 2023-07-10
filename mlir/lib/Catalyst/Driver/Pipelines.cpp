@@ -102,17 +102,18 @@ LogicalResult addLowerToLLVMPasses(PassManager &pm)
 LogicalResult catalyst::runDefaultLowering(MLIRContext *ctx, ModuleOp moduleOp)
 {
     auto pm = PassManager::on<ModuleOp>(ctx, PassManager::Nesting::Implicit);
-    if (failed(addMhloToCorePasses(pm))) {
-        return failure();
-    }
-    if (failed(addQuantumCompilationPasses(pm))) {
-        return failure();
-    }
-    if (failed(addBufferizationPasses(pm))) {
-        return failure();
-    }
-    if (failed(addLowerToLLVMPasses(pm))) {
-        return failure();
+    using PassesFunc = LogicalResult (*)(PassManager&);
+    PassesFunc pfs[] = {
+        addMhloToCorePasses,
+        addQuantumCompilationPasses,
+        addBufferizationPasses,
+        addLowerToLLVMPasses
+    };
+
+    for (const auto &pf : pfs) {
+        if (failed(pf(pm))) {
+            return failure();
+        }
     }
 
     return pm.run(moduleOp);
