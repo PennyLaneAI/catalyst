@@ -20,11 +20,13 @@
 #include <vector>
 
 #include "mlir/Conversion/LLVMCommon/MemRefBuilder.h"
+#include "mlir/Conversion/LLVMCommon/Pattern.h"
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Bufferization/Transforms/Bufferize.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Index/IR/IndexOps.h"
+#include "mlir/Dialect/LLVMIR/FunctionCallUtils.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 
@@ -146,8 +148,8 @@ static constexpr const char *enzyme_allocation_key = "__enzyme_allocation_like";
 static constexpr const char *enzyme_const_key = "enzyme_const";
 static constexpr const char *enzyme_dupnoneed_key = "enzyme_dupnoneed";
 
-struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
-    using OpConversionPattern::OpConversionPattern;
+struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
+    using ConvertOpToLLVMPattern::ConvertOpToLLVMPattern;
 
     LogicalResult matchAndRewrite(BackpropOp op, BackpropOpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
@@ -155,7 +157,6 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
         Location loc = op.getLoc();
         MLIRContext *ctx = getContext();
         ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
-        auto llvmPtrType = LLVM::LLVMPointerType::get(ctx);
 
         for (Type type : op.getResultTypes()) {
             if (!type.isa<MemRefType>())
@@ -167,20 +168,17 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
             SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
         assert(callee && "Expected a valid callee of type func.func");
 
-        // Create mlir memref to llvm alloc
-        StringRef allocFnName = "_mlir_memref_to_llvm_alloc";
-        Type allocFnSignature = LLVM::LLVMFunctionType::get(llvmPtrType, {rewriter.getI64Type()});
-        ensureFunctionDeclaration(rewriter, op, allocFnName, allocFnSignature);
+        LowerToLLVMOptions options = getTypeConverter()->getOptions();
+        if (options.useGenericFunctions) {
+            LLVM::LLVMFuncOp allocFn = LLVM::lookupOrCreateGenericAllocFn(
+                moduleOp, getTypeConverter()->getIndexType(), options.useOpaquePointers);
+            LLVM::LLVMFuncOp freeFn =
+                LLVM::lookupOrCreateGenericFreeFn(moduleOp, options.useOpaquePointers);
 
-        // Create mlir memref to llvm free
-        StringRef freeFnName = "_mlir_memref_to_llvm_free";
-        Type freeFnSignature =
-            LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), {llvmPtrType});
-        ensureFunctionDeclaration(rewriter, op, freeFnName, freeFnSignature);
-
-        // Register the previous functions as llvm globals (for Enzyme)
-        insertEnzymeAllocationLike(rewriter, op->getParentOfType<ModuleOp>(), op.getLoc(),
-                                   allocFnName, freeFnName);
+            // Register the previous functions as llvm globals (for Enzyme)
+            insertEnzymeAllocationLike(rewriter, op->getParentOfType<ModuleOp>(), op.getLoc(),
+                                       allocFn.getName(), freeFn.getName());
+        }
 
         // Create the Enzyme function
         Type backpropFnSignature =
@@ -263,21 +261,6 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
         return SymbolRefAttr::get(context, globalName);
     }
 
-    static void insertFunctionName(PatternRewriter &rewriter, Operation *op, StringRef key,
-                                   StringRef value)
-    {
-        ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
-        PatternRewriter::InsertionGuard insertGuard(rewriter);
-        rewriter.setInsertionPointToStart(moduleOp.getBody());
-        LLVM::GlobalOp glb = moduleOp.lookupSymbol<LLVM::GlobalOp>(key);
-        if (!glb) {
-            glb = rewriter.create<LLVM::GlobalOp>(
-                moduleOp.getLoc(),
-                LLVM::LLVMArrayType::get(IntegerType::get(rewriter.getContext(), 8), value.size()),
-                true, LLVM::Linkage::Linkonce, key, rewriter.getStringAttr(value));
-        }
-    }
-
     Value castToConvertedType(Value value, OpBuilder &builder, Location loc) const
     {
         auto casted = builder.create<UnrealizedConversionCastOp>(
@@ -336,14 +319,14 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
         }
     }
 
-    static Value computeMemRefSizeInBytes(MemRefType type, MemRefDescriptor descriptor,
-                                          OpBuilder &builder, Location loc)
+    Value computeMemRefSizeInBytes(MemRefType type, MemRefDescriptor descriptor, OpBuilder &builder,
+                                   Location loc) const
     {
         // element_size * (offset + sizes[0] * strides[0])
         Value bufferSize;
+        Type indexType = getTypeConverter()->getIndexType();
         if (type.getRank() == 0) {
-            bufferSize = builder.create<LLVM::ConstantOp>(loc, builder.getI64Type(),
-                                                          builder.getIndexAttr(1));
+            bufferSize = builder.create<LLVM::ConstantOp>(loc, indexType, builder.getIndexAttr(1));
         }
         else {
             bufferSize = builder.create<LLVM::MulOp>(loc, descriptor.size(builder, loc, 0),
@@ -352,7 +335,7 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
                 builder.create<LLVM::AddOp>(loc, descriptor.offset(builder, loc), bufferSize);
         }
         Value elementByteSize = builder.create<LLVM::ConstantOp>(
-            loc, builder.getI64Type(), builder.getIndexAttr(type.getElementTypeBitWidth() / 8));
+            loc, indexType, builder.getIndexAttr(type.getElementTypeBitWidth() / 8));
         Value bufferSizeBytes = builder.create<LLVM::MulOp>(loc, elementByteSize, bufferSize);
         return bufferSizeBytes;
     }
@@ -363,11 +346,11 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
     ///
     /// This functionality is described at:
     /// https://github.com/EnzymeAD/Enzyme/issues/930#issuecomment-1334502012
-    static LLVM::GlobalOp insertEnzymeAllocationLike(OpBuilder &builder, ModuleOp moduleOp,
-                                                     Location loc, StringRef allocFuncName,
-                                                     StringRef freeFuncName)
+    LLVM::GlobalOp insertEnzymeAllocationLike(OpBuilder &builder, ModuleOp moduleOp, Location loc,
+                                              StringRef allocFuncName, StringRef freeFuncName) const
     {
         MLIRContext *context = moduleOp.getContext();
+        Type indexType = getTypeConverter()->getIndexType();
         OpBuilder::InsertionGuard insertGuard(builder);
         builder.setInsertionPointToStart(moduleOp.getBody());
 
@@ -389,7 +372,7 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
         builder.createBlock(&allocationLike.getInitializerRegion());
         Value allocFn = builder.create<LLVM::AddressOfOp>(loc, ptrType, allocFuncName);
         Value sizeArgIndex =
-            builder.create<LLVM::ConstantOp>(loc, builder.getI64Type(), builder.getIndexAttr(0));
+            builder.create<LLVM::ConstantOp>(loc, indexType, builder.getIndexAttr(0));
         Value sizeArgIndexPtr = builder.create<LLVM::IntToPtrOp>(loc, ptrType, sizeArgIndex);
         Value deallocIndicesPtr =
             builder.create<LLVM::AddressOfOp>(loc, ptrType, "dealloc_indices");
@@ -411,10 +394,10 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
 namespace catalyst {
 namespace gradient {
 
-void populateConversionPatterns(TypeConverter &typeConverter, RewritePatternSet &patterns)
+void populateConversionPatterns(LLVMTypeConverter &typeConverter, RewritePatternSet &patterns)
 {
     patterns.add<AdjointOpPattern>(typeConverter, patterns.getContext());
-    patterns.add<BackpropOpPattern>(typeConverter, patterns.getContext());
+    patterns.add<BackpropOpPattern>(typeConverter);
 }
 
 } // namespace gradient

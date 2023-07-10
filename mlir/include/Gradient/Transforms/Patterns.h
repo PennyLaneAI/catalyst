@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/DialectConversion.h"
 
@@ -22,7 +23,7 @@ namespace gradient {
 
 void populateBufferizationPatterns(mlir::TypeConverter &, mlir::RewritePatternSet &);
 void populateLoweringPatterns(mlir::RewritePatternSet &, mlir::StringRef);
-void populateConversionPatterns(mlir::TypeConverter &, mlir::RewritePatternSet &);
+void populateConversionPatterns(mlir::LLVMTypeConverter &, mlir::RewritePatternSet &);
 
 } // namespace gradient
 } // namespace catalyst

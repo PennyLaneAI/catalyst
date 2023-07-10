@@ -231,9 +231,7 @@ class MLIRToLLVMDialect(PassPipeline):
         # Run after -convert-math-to-llvm as it marks math::powf illegal without converting it.
         "--convert-math-to-libm",
         "--convert-arith-to-llvm",
-        "--finalize-memref-to-llvm=use-generic-functions",
-        "--convert-index-to-llvm",
-        "--convert-gradient-to-llvm",
+        "--convert-gradient-to-llvm=use-generic-functions",
         "--convert-quantum-to-llvm",
         "--emit-catalyst-py-interface",
         # Remove any dead casts as the final pass expects to remove all existing casts,
