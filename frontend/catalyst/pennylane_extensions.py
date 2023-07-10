@@ -397,7 +397,7 @@ def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=
         TypeError: invalid parameter types
         ValueError: invalid parameter values
 
-    **Example**
+    **Example 1 (basic usage)**
 
     .. code-block:: python
 
@@ -414,6 +414,30 @@ def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=
     >>> jvp(x, tangent)
     [array([0.09983342, 0.04      , 0.02      ]),
     array([0.29850125, 0.24000006, 0.12      ])]
+
+    **Example 2 (argnum usage)**
+
+    Here we show how to use ``argnum`` to ignore the non-differentiable parameter ``n`` of the
+    target function. Note that the length and shapes of tangents must match the length and shape of
+    primal parameters which we mark as differentiable by passing their indices to ``argnum``.
+
+    .. code-block:: python
+
+        @qjit
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def circuit(n, params):
+            qml.RX(params[n, 0], wires=n)
+            qml.RY(params[n, 1], wires=n)
+            return qml.expval(qml.PauliZ(1))
+
+        @qjit
+        def workflow(primals, tangents):
+            return catalyst.jvp(circuit, [1, primals], [tangents], argnum=[1])
+
+    >>> params = jnp.array([[0.54, 0.3154], [0.654, 0.123]])
+    >>> dy = jnp.array([[1.0, 1.0], [1.0, 1.0]])
+    >>> workflow(params, dy)
+    [array(0.78766064), array(-0.7011436)]
     """
     TracingContext.check_is_tracing(
         "catalyst.jvp can only be used from within @qjit decorated code."
