@@ -193,7 +193,7 @@ master_doc = "index"
 
 # General information about the project.
 project = "Catalyst"
-copyright = "2022, Xanadu Quantum Technologies"
+copyright = "2023, Xanadu Quantum Technologies"
 author = "Xanadu Inc."
 
 add_module_names = False
@@ -254,7 +254,7 @@ html_theme = "pennylane"
 html_theme_options = {
     "navbar_name": "Catalyst",
     "navbar_active_link": 3,
-    "google_analytics_tracking_id": "UA-130507810-1",
+    "google_analytics_tracking_id": "G-C480Z9JL0D",
     "extra_copyrights": [
         "TensorFlow, the TensorFlow logo, and any related marks are trademarks " "of Google Inc."
     ],

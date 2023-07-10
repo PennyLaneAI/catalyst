@@ -117,9 +117,11 @@ endif
 	$(MAKE) -C mlir format
 	$(MAKE) -C runtime format
 ifdef check
+	python3 ./bin/format.py --check $(if $(version:-=),--cfversion $(version)) ./frontend/catalyst/utils
 	black --check --verbose .
 	isort --check --diff .
 else
+	python3 ./bin/format.py $(if $(version:-=),--cfversion $(version)) ./frontend/catalyst/utils
 	black .
 	isort .
 endif

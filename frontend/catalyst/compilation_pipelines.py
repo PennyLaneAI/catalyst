@@ -597,7 +597,7 @@ class JAX_QJIT:
         self.qfunc = qfunc
         self.deriv_qfuncs = {}
         self.jaxed_qfunc = jaxed_qfunc
-        jaxed_qfunc.defjvp(self.compute_jvp)
+        jaxed_qfunc.defjvp(self.compute_jvp, symbolic_zeros=True)
 
     @staticmethod
     def wrap_callback(qfunc, *args, **kwargs):
@@ -637,22 +637,19 @@ class JAX_QJIT:
 
         # Optimization: Do not compute Jacobians for arguments which do not participate in
         #               differentiation.
-        # TODO: replace with symbolic zero support
         argnums = []
         for idx, tangent in enumerate(tangents):
-            if qml.math.is_abstract(tangent, like="jax") or jnp.any(jnp.atleast_1d(tangent) != 0.0):
+            if not isinstance(tangent, jax.custom_derivatives.SymbolicZero):
                 argnums.append(idx)
 
         results = self.wrap_callback(self.qfunc, *primals)
         derivatives = self.wrap_callback(self.get_derivative_qfunc(argnums), *primals)
 
         jvps = [jnp.zeros_like(results[res_idx]) for res_idx in range(len(results))]
-        for arg_idx, tangent in enumerate(tangents):
-            # Skip JVP for arguments which do not participate in differentiation.
-            if arg_idx not in argnums:
-                continue
+        for diff_arg_idx, arg_idx in enumerate(argnums):
+            tangent = tangents[arg_idx]
             for res_idx in range(len(results)):
-                deriv_idx = arg_idx * len(results) + res_idx
+                deriv_idx = diff_arg_idx * len(results) + res_idx
                 num_axes = 0 if tangent.ndim == 0 else 1
                 jvp = jnp.tensordot(jnp.transpose(derivatives[deriv_idx]), tangent, axes=num_axes)
                 jvps[res_idx] = jvps[res_idx] + jvp
