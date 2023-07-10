@@ -351,6 +351,16 @@
   This improves IR readability.
   [#165](https://github.com/PennyLaneAI/catalyst/pull/165)
 
+* Move to an alternate compiler driver in C++. This improves compile-time performance by
+  avoiding *round-tripping*, which is when the entire program being compiled is dumped to
+  a textual form and re-parsed by another tool.
+  [#172](https://github.com/PennyLaneAI/catalyst/pull/172)
+
+  This is also a requirement for providing custom metadata at the LLVM level, which is
+  necessary for better integration with tools like Enzyme. Finally, this makes it more natural
+  to improve error messages originating from C++ when compared to the prior subprocess-based
+  approach.
+
 <h3>Bug fixes</h3>
 
 * Fix a bug in the mapping from logical to concrete qubits for mid-circuit measurements.

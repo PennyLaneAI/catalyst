@@ -15,20 +15,7 @@ set(LIBS
 
     MhloRegisterDialects
     StablehloRegister
-
-    # Taken from mlir-hlo/bindings/c/CMakeLists.txt:
-    # For AllMhLoPasses:
-    ChloPasses
-    MhloPasses
-    MhloToLhloConversion
-    MhloToArithmeticConversion
-    MhloToMemrefConversion
-    MhloToStandard
-    MhloToThloConversion
-    MhloToLinalg
-    MhloToStablehlo
-    MhloShapeOpsToStandard
-    StablehloToMhlo
+    ${ALL_MHLO_PASSES}
 )
 
 add_llvm_executable(quantum-opt quantum-opt.cpp)

@@ -26,6 +26,23 @@ set(LLVM_RUNTIME_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/bin)
 set(LLVM_LIBRARY_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/lib)
 set(MLIR_BINARY_DIR ${CMAKE_BINARY_DIR})
 
+# Taken from mlir-hlo/mhlo/transforms/CMakeLists.txt.
+# Unfortunately, AllMhloPasses doesn't appear to be exported.
+set(ALL_MHLO_PASSES
+  ChloPasses
+  MhloPasses
+  MhloToLhloConversion
+  MhloToArithmeticConversion
+  MhloToMemrefConversion
+  MhloToStandard
+  HloToLinalgUtils
+  MhloToLinalg
+  MhloToThloConversion
+  MhloShapeOpsToStandard
+  MhloToStablehlo
+  StablehloToMhlo
+)
+
 list(APPEND CMAKE_MODULE_PATH "${MLIR_CMAKE_DIR}")
 list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
 include(TableGen)

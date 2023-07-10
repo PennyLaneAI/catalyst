@@ -41,6 +41,7 @@ using namespace mlir;
 using namespace catalyst;
 
 namespace {
+/// Parse an MLIR module given in textual ASM representation.
 OwningOpRef<ModuleOp> parseSource(MLIRContext *ctx, const char *source)
 {
     auto moduleBuffer = llvm::MemoryBuffer::getMemBufferCopy(source, "jit source");

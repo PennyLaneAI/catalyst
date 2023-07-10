@@ -13,18 +13,5 @@ add_mlir_public_c_api_library(QuantumCAPI
 
     MhloRegisterDialects
     StablehloRegister
-
-    # Taken from mlir-hlo/bindings/c/CMakeLists.txt:
-    # For AllMhLoPasses:
-    ChloPasses
-    MhloPasses
-    MhloToLhloConversion
-    MhloToArithmeticConversion
-    MhloToMemrefConversion
-    MhloToStandard
-    MhloToThloConversion
-    MhloToLinalg
-    MhloToStablehlo
-    MhloShapeOpsToStandard
-    StablehloToMhlo
+    ${ALL_MHLO_PASSES}
 )
