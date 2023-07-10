@@ -342,7 +342,8 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
         // element_size * (offset + sizes[0] * strides[0])
         Value bufferSize;
         if (type.getRank() == 0) {
-            bufferSize = builder.create<LLVM::ConstantOp>(loc, builder.getI64IntegerAttr(1));
+            bufferSize = builder.create<LLVM::ConstantOp>(loc, builder.getI64Type(),
+                                                          builder.getIndexAttr(1));
         }
         else {
             bufferSize = builder.create<LLVM::MulOp>(loc, descriptor.size(builder, loc, 0),
@@ -350,8 +351,8 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
             bufferSize =
                 builder.create<LLVM::AddOp>(loc, descriptor.offset(builder, loc), bufferSize);
         }
-        Value elementByteSize = builder.create<LLVM::ConstantOp>(loc, builder.getI64Type(),
-                                                                 type.getElementTypeBitWidth() / 8);
+        Value elementByteSize = builder.create<LLVM::ConstantOp>(
+            loc, builder.getI64Type(), builder.getIndexAttr(type.getElementTypeBitWidth() / 8));
         Value bufferSizeBytes = builder.create<LLVM::MulOp>(loc, elementByteSize, bufferSize);
         return bufferSizeBytes;
     }
@@ -388,7 +389,7 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
         builder.createBlock(&allocationLike.getInitializerRegion());
         auto allocFn = builder.create<LLVM::AddressOfOp>(loc, ptrType, allocFuncName);
         auto sizeArgIndex =
-            builder.create<LLVM::ConstantOp>(loc, builder.getIntegerAttr(builder.getI64Type(), 0));
+            builder.create<LLVM::ConstantOp>(loc, builder.getI64Type(), builder.getIndexAttr(0));
         auto sizeArgIndexPtr = builder.create<LLVM::IntToPtrOp>(loc, ptrType, sizeArgIndex);
         auto deallocIndicesPtr = builder.create<LLVM::AddressOfOp>(loc, ptrType, "dealloc_indices");
         auto freeFn = builder.create<LLVM::AddressOfOp>(loc, ptrType, freeFuncName);
