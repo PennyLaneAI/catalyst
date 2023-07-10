@@ -253,7 +253,7 @@ def test_adjoint_classical_loop():
 
     def func(w=0):
         @for_loop(0, 2, 1)
-        def loop(i, s):
+        def loop(_i, s):
             return s + 1
 
         qml.PauliX(wires=loop(w))
