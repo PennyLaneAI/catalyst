@@ -110,7 +110,7 @@ class CompiledFunction:
             assert isinstance(c_param, jax.core.ShapedArray)
             assert isinstance(r_param, jax.core.ShapedArray)
             promote_to = jax.numpy.promote_types(r_param.dtype, c_param.dtype)
-            if c_param.dtype != promote_to:
+            if c_param.dtype != promote_to or c_param.shape != r_param.shape:
                 return False
         return True
 
@@ -659,6 +659,16 @@ class JAX_QJIT:
         return results, jvps
 
     def __call__(self, *args, **kwargs):
+        @jax.custom_jvp
+        def jaxed_qfunc(*args, **kwargs):
+            results = self.wrap_callback(self.qfunc, *args, **kwargs)
+            if len(results) == 1:
+                results = results[0]
+            return results
+
+        self.deriv_qfuncs = {}
+        self.jaxed_qfunc = jaxed_qfunc
+        jaxed_qfunc.defjvp(self.compute_jvp, symbolic_zeros=True)
         return self.jaxed_qfunc(*args, **kwargs)
 
 
