@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <array>
+#include <complex>
 #include <iomanip>
 #include <memory>
 #include <sstream>
@@ -220,10 +221,75 @@ class QasmRegister {
 };
 
 /**
+ * The OpenQasm Matrix Builder for the following matrix data-types:
+ * - `std::vector<double>`
+ * - `std::vector<std::complex<double>>`
+ *
+ * @note It doesn't store the given matrix.
+ */
+struct MatrixBuilder {
+    [[nodiscard]] static auto toOpenQasm(const std::vector<std::complex<double>> &matrix,
+                                         size_t num_cols, size_t precision = 5,
+                                         [[maybe_unused]] const std::string &version = "3.0")
+        -> std::string
+    {
+        constexpr std::complex<double> zero{0, 0};
+        size_t index{0};
+        std::ostringstream oss;
+        oss << "[[";
+        for (const auto &c : matrix) {
+            if (index == num_cols) {
+                oss << "], [";
+                index = 0;
+            }
+            else if (index) {
+                oss << ", ";
+            }
+            index++;
+
+            if (c == zero) {
+                oss << "0";
+                continue;
+            }
+            oss << std::setprecision(precision) << c.real();
+            oss << std::setprecision(precision) << (c.imag() < 0 ? "" : "+") << c.imag() << "im";
+        }
+        oss << "]]";
+        return oss.str();
+    }
+
+    [[nodiscard]] static auto toOpenQasm(const std::vector<double> &matrix, size_t num_cols,
+                                         size_t precision = 5,
+                                         [[maybe_unused]] const std::string &version = "3.0")
+        -> std::string
+    {
+        size_t index{0};
+
+        std::ostringstream oss;
+        oss << "[[";
+        for (const auto &c : matrix) {
+            if (index == num_cols) {
+                oss << "], [";
+                index = 0;
+            }
+            else if (index) {
+                oss << ", ";
+            }
+            index++;
+
+            oss << std::setprecision(precision) << c;
+        }
+        oss << "]]";
+        return oss.str();
+    }
+};
+
+/**
  * The OpenQasm gate type.
  *
  * @param name The name of the gate to apply from the list of supported gates
  * (`rt_qasm_gate_map`)
+ * @param matrix Optional matrix of complex numbers for QubitUnitary
  * @param params_val Optional list of parameter values for parametric gates
  * @param params_str Optional list of parameter names for parametric gates
  * @param wires Wires to apply gate to
@@ -235,6 +301,7 @@ class QasmRegister {
 class QasmGate {
   private:
     const std::string name;
+    const std::vector<std::complex<double>> matrix;
     const std::vector<double> params_val;
     const std::vector<std::string> params_str;
     const std::vector<size_t> wires;
@@ -244,28 +311,43 @@ class QasmGate {
     explicit QasmGate(const std::string &_name, const std::vector<double> &_params_val,
                       const std::vector<std::string> &_params_str,
                       const std::vector<size_t> &_wires, [[maybe_unused]] bool _inverse)
-        : name(lookup_qasm_gate_name(_name)), params_val(_params_val), params_str(_params_str),
-          wires(_wires), inverse(_inverse)
+        : name(lookup_qasm_gate_name(_name)), matrix({}), params_val(_params_val),
+          params_str(_params_str), wires(_wires), inverse(_inverse)
     {
         RT_FAIL_IF(!(params_str.empty() || params_val.empty()),
                    "Parametric gates are currently supported via either their values or names but "
                    "not both.");
     }
+    explicit QasmGate(const std::vector<std::complex<double>> _matrix,
+                      const std::vector<size_t> &_wires, [[maybe_unused]] bool _inverse)
+        : name("QubitUnitary"), matrix(_matrix), params_val({}), params_str({}), wires(_wires),
+          inverse(_inverse)
+    {
+    }
     ~QasmGate() = default;
 
     [[nodiscard]] auto getName() const -> std::string { return name; }
+    [[nodiscard]] auto getMatrix() const -> std::vector<std::complex<double>> { return matrix; }
     [[nodiscard]] auto getParams() const -> std::vector<double> { return params_val; }
     [[nodiscard]] auto getParamsStr() const -> std::vector<std::string> { return params_str; }
     [[nodiscard]] auto getWires() const -> std::vector<size_t> { return wires; }
     [[nodiscard]] auto getInverse() const -> bool { return inverse; }
 
-    [[nodiscard]] auto toOpenQasm(const QasmRegister &qregister,
-                                  [[maybe_unused]] size_t precision = 5,
-                                  [[maybe_unused]] const std::string &version = "3.0") const
-        -> std::string
+    [[nodiscard]] auto toOpenQasm(const QasmRegister &qregister, size_t precision = 5,
+                                  const std::string &version = "3.0") const -> std::string
     {
-        // name(param_1, ..., param_n) qubit_1, ..., qubit_m
         std::ostringstream oss;
+        // @note This is a Braket specific functionality
+        // #pragma braket unitary(matrix) qubit_1, ..., qubit_m
+        if (name == "QubitUnitary") {
+            oss << "#pragma braket unitary(";
+            oss << MatrixBuilder::toOpenQasm(matrix, (1UL << wires.size()), precision, version);
+            oss << ") ";
+            oss << qregister.toOpenQasm(RegisterMode::Slice, wires) << ";\n";
+            return oss.str();
+        }
+
+        // name(param_1, ..., param_n) qubit_1, ..., qubit_m
         oss << name;
         if (!params_val.empty()) {
             oss << "(";
@@ -347,6 +429,7 @@ class QasmObs {
     [[nodiscard]] virtual auto getName() const -> std::string = 0;
     [[nodiscard]] virtual auto getWires() const -> std::vector<size_t> = 0;
     [[nodiscard]] virtual auto toOpenQasm(const QasmRegister &qregister,
+                                          [[maybe_unused]] size_t precision = 5,
                                           [[maybe_unused]] const std::string &version = "3.0") const
         -> std::string = 0;
 };
@@ -369,11 +452,52 @@ class QasmNamedObs final : public QasmObs {
     [[nodiscard]] auto getWires() const -> std::vector<size_t> override { return wires; }
 
     [[nodiscard]] auto toOpenQasm(const QasmRegister &qregister,
+                                  [[maybe_unused]] size_t precision = 5,
                                   [[maybe_unused]] const std::string &version = "3.0") const
         -> std::string override
     {
         std::ostringstream oss;
         oss << name << "(" << qregister.toOpenQasm(RegisterMode::Slice, wires) << ")";
+        return oss.str();
+    }
+};
+
+/**
+ * A class for Braket/OpenQasm3 the hermitian observable.
+ *
+ * Note that the support is generic so that it works for any
+ * implementation of the `QasmObs` base class.
+ */
+class QasmHermitianObs final : public QasmObs {
+  private:
+    std::vector<std::complex<double>> matrix;
+    std::vector<size_t> wires;
+    const size_t num_cols;
+
+  public:
+    template <typename T1>
+    QasmHermitianObs(T1 &&_matrix, std::vector<size_t> _wires)
+        : matrix{std::forward<T1>(_matrix)}, wires{std::move(_wires)}, num_cols(1UL << wires.size())
+    {
+        RT_ASSERT(matrix.size() == num_cols * num_cols);
+    }
+
+    [[nodiscard]] auto getMatrix() const -> const std::vector<std::complex<double>> &
+    {
+        return matrix;
+    }
+    [[nodiscard]] auto getName() const -> std::string override { return "QasmHermitianObs"; }
+    [[nodiscard]] auto getWires() const -> std::vector<size_t> override { return wires; }
+
+    [[nodiscard]] auto toOpenQasm(const QasmRegister &qregister, size_t precision = 5,
+                                  const std::string &version = "3.0") const -> std::string override
+    {
+        std::ostringstream oss;
+        oss << "hermitian(";
+        oss << MatrixBuilder::toOpenQasm(matrix, num_cols, precision, version);
+        oss << ") ";
+        oss << qregister.toOpenQasm(RegisterMode::Slice, wires);
+
         return oss.str();
     }
 };
@@ -411,14 +535,13 @@ class QasmTensorObs final : public QasmObs {
     [[nodiscard]] auto getName() const -> std::string override { return "QasmTensorObs"; }
     [[nodiscard]] auto getWires() const -> std::vector<size_t> override { return wires; }
 
-    [[nodiscard]] auto toOpenQasm(const QasmRegister &qregister,
-                                  [[maybe_unused]] const std::string &version = "3.0") const
-        -> std::string override
+    [[nodiscard]] auto toOpenQasm(const QasmRegister &qregister, size_t precision = 5,
+                                  const std::string &version = "3.0") const -> std::string override
     {
         std::ostringstream oss;
         const size_t obs_size = obs.size();
         for (size_t idx = 0; idx < obs_size; idx++) {
-            oss << obs[idx]->toOpenQasm(qregister, version);
+            oss << obs[idx]->toOpenQasm(qregister, precision, version);
             if (idx != obs_size - 1) {
                 oss << " @ ";
             }
@@ -474,14 +597,13 @@ class QasmHamiltonianObs final : public QasmObs {
     }
     [[nodiscard]] auto getCoeffs() const -> std::vector<double> { return coeffs; }
 
-    [[nodiscard]] auto toOpenQasm(const QasmRegister &qregister,
-                                  [[maybe_unused]] const std::string &version = "3.0") const
-        -> std::string override
+    [[nodiscard]] auto toOpenQasm(const QasmRegister &qregister, size_t precision = 5,
+                                  const std::string &version = "3.0") const -> std::string override
     {
         std::ostringstream oss;
         const size_t obs_size = obs.size();
         for (size_t idx = 0; idx < obs_size; idx++) {
-            oss << coeffs[idx] << " * " << obs[idx]->toOpenQasm(qregister, version);
+            oss << coeffs[idx] << " * " << obs[idx]->toOpenQasm(qregister, precision, version);
             if (idx != obs_size - 1) {
                 oss << " + ";
             }
@@ -544,6 +666,11 @@ class OpenQasmBuilder {
         for (auto &param : params_str) {
             vars.emplace_back(VariableType::Float, param);
         }
+    }
+    void Gate(const std::vector<std::complex<double>> &matrix, const std::vector<size_t> &wires,
+              [[maybe_unused]] bool inverse)
+    {
+        gates.emplace_back(matrix, wires, inverse);
     }
     void Measure(size_t bit, size_t wire) { measures.emplace_back(bit, wire); }
 

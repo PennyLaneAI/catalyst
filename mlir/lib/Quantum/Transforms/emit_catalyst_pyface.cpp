@@ -25,10 +25,10 @@ using namespace catalyst::quantum;
 
 namespace {
 
-Optional<LLVM::LLVMFuncOp> getCallee(LLVM::LLVMFuncOp op)
+std::optional<LLVM::LLVMFuncOp> getCallee(LLVM::LLVMFuncOp op)
 {
     size_t counter = 0;
-    Optional<LLVM::LLVMFuncOp> callee = std::nullopt;
+    std::optional<LLVM::LLVMFuncOp> callee = std::nullopt;
     op.walk([&](LLVM::CallOp callOp) {
         auto calleeAttr = callOp.getCalleeAttr();
         // calleeAttr is optional in case of function pointers.
@@ -48,7 +48,7 @@ bool hasCWrapperAttribute(LLVM::LLVMFuncOp op)
 
 bool hasCalleeCWrapperAttribute(LLVM::LLVMFuncOp op)
 {
-    Optional<LLVM::LLVMFuncOp> callee = getCallee(op);
+    std::optional<LLVM::LLVMFuncOp> callee = getCallee(op);
     if (!callee)
         return false;
     return hasCWrapperAttribute(callee.value());
