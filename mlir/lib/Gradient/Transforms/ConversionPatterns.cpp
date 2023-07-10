@@ -196,9 +196,7 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
         SmallVector<Value> callArgs = {calleePtr};
 
         std::vector<size_t> diffArgIndices = catalyst::compDiffArgIndices(op.getDiffArgIndices());
-        auto const_global = getOrInsertEnzymeGlobal(rewriter, moduleOp, enzyme_const_key);
-        auto enzymeConst =
-            rewriter.create<LLVM::AddressOfOp>(op->getLoc(), llvmPtrType, const_global);
+        getOrInsertEnzymeGlobal(rewriter, moduleOp, enzyme_const_key);
         getOrInsertEnzymeGlobal(rewriter, moduleOp, enzyme_dupnoneed_key);
 
         int index = 0;
@@ -208,7 +206,6 @@ struct BackpropOpPattern : public OpConversionPattern<BackpropOp> {
         for (auto [arg, llvmMemrefArg] : llvm::zip(op.getArgs(), adaptor.getArgs())) {
             auto it = std::find(diffArgIndices.begin(), diffArgIndices.end(), index);
             if (it == diffArgIndices.end()) {
-                callArgs.push_back(enzymeConst);
                 if (isa<MemRefType>(arg.getType())) {
                     unpackMemRef(arg, /*shadow=*/nullptr, callArgs, rewriter, loc);
                 }

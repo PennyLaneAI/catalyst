@@ -161,7 +161,6 @@ func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc, GradOp
 
                         Type gradientType = gradient.getType();
                         auto rankGradient = gradientType.cast<RankedTensorType>().getRank();
-                        auto shapeGradient = gradientType.cast<RankedTensorType>().getShape();
 
                         // sizes
                         std::vector<int64_t> sizesSlice{shapeResult};
@@ -173,8 +172,7 @@ func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc, GradOp
                         // offset
                         auto offsetSlice = allOffsets[index];
                         for (int64_t offsetIndex = 0; offsetIndex < rankGradient; offsetIndex++) {
-                            int64_t zero = 0;
-                            offsetSlice.insert(offsetSlice.begin(), zero);
+                            offsetSlice.insert(offsetSlice.begin(), 0);
                         }
                         result = rewriter.create<tensor::InsertSliceOp>(
                             loc, resultType, gradient, result, ValueRange{}, ValueRange{},
