@@ -12,13 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "mlir/Conversion/IndexToLLVM/IndexToLLVM.h"
 #include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
-#include "mlir/Conversion/MemRefToLLVM/MemRefToLLVM.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Index/IR/IndexDialect.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/BuiltinOps.h"
 
 #include "Gradient/IR/GradientDialect.h"
@@ -49,13 +48,11 @@ struct GradientConversionPass : impl::GradientConversionPassBase<GradientConvers
 
         RewritePatternSet patterns(context);
         populateConversionPatterns(typeConverter, patterns);
-        populateFinalizeMemRefToLLVMConversionPatterns(typeConverter, patterns);
-        index::populateIndexToLLVMConversionPatterns(typeConverter, patterns);
 
         LLVMConversionTarget target(*context);
         target.addIllegalDialect<GradientDialect>();
         target.addLegalDialect<catalyst::quantum::QuantumDialect>();
-        target.addLegalDialect<func::FuncDialect>();
+        target.addLegalDialect<func::FuncDialect, index::IndexDialect, memref::MemRefDialect>();
 
         if (failed(applyPartialConversion(getOperation(), target, std::move(patterns)))) {
             signalPassFailure();

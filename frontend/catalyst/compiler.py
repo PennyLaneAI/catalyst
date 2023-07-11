@@ -232,6 +232,8 @@ class MLIRToLLVMDialect(PassPipeline):
         "--convert-math-to-libm",
         "--convert-arith-to-llvm",
         "--convert-gradient-to-llvm=use-generic-functions",
+        "--finalize-memref-to-llvm=use-generic-functions",
+        "--convert-index-to-llvm",
         "--convert-quantum-to-llvm",
         "--emit-catalyst-py-interface",
         # Remove any dead casts as the final pass expects to remove all existing casts,
