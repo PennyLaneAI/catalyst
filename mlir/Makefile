@@ -10,6 +10,7 @@ LLVM_BUILD_DIR?=$(MK_DIR)/llvm-project/build
 MHLO_BUILD_DIR?=$(MK_DIR)/mlir-hlo/build
 RT_BUILD_DIR?=$(MK_DIR)/../runtime/build
 ENABLE_LLD?=ON
+LLVM_CMAKE_ARGS?=""
 
 .PHONY: help
 help:
@@ -42,7 +43,8 @@ llvm:
 		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \
 		-DCMAKE_C_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
 		-DCMAKE_CXX_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
-		-DLLVM_ENABLE_LLD=$(ENABLE_LLD)
+		-DLLVM_ENABLE_LLD=$(ENABLE_LLD) \
+		$(LLVM_CMAKE_ARGS)
 
 	# TODO: when updating LLVM, test to see if mlir/unittests/Bytecode/BytecodeTest.cpp:55 is passing
 	# and remove filter
@@ -62,7 +64,8 @@ mhlo:
 		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \
 		-DCMAKE_C_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
 		-DCMAKE_CXX_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
-		-DLLVM_ENABLE_LLD=$(ENABLE_LLD)
+		-DLLVM_ENABLE_LLD=$(ENABLE_LLD) \
+		$(LLVM_CMAKE_ARGS)
 
 	cmake --build $(MHLO_BUILD_DIR) --target check-mlir-hlo
 
@@ -83,7 +86,8 @@ dialects:
 		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \
 		-DCMAKE_C_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
 		-DCMAKE_CXX_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
-		-DLLVM_ENABLE_LLD=$(ENABLE_LLD)
+		-DLLVM_ENABLE_LLD=$(ENABLE_LLD) \
+		$(LLVM_CMAKE_ARGS)
 
 	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects quantum-lsp-server
 	patch -d $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum --follow-symlinks < patches/use-ir-from-jax.patch

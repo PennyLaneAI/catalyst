@@ -111,14 +111,14 @@ jobs:
       uses: actions/cache@v3
       with:
         path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-build
+        key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-sanitize-build
 
     - name: Cache LLVM Source
       id: cache-llvm-source
       uses: actions/cache@v3
       with:
         path: mlir/llvm-project
-        key: Linux-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-source
+        key: Linux-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-sanitize-source
         enableCrossOsArchive: True
 
     - name: Clone LLVM Submodule
@@ -144,6 +144,7 @@ jobs:
         #       >> mlir/llvm-project/mlir/lib/ExecutionEngine/CMakeLists.txt
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         COMPILER_LAUNCHER="" \
+        LLVM_CMAKE_ARGS="-DLLVM_USE_SANITIZER=Address;Undefined" \
         make llvm
 
   mhlo:
@@ -169,7 +170,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: mhlo-build
-        key: ${{ runner.os }}-mhlo-${{ steps.mhlo-hash.outputs.mhlo-hash }}-default-build
+        key: ${{ runner.os }}-mhlo-${{ steps.mhlo-hash.outputs.mhlo-hash }}-sanitize-build
 
     - name: Get LLVM Version
       id: llvm-hash
@@ -182,7 +183,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: mlir/llvm-project
-        key: Linux-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-source
+        key: Linux-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-sanitize-source
         enableCrossOsArchive: True
         fail-on-cache-miss: True
 
@@ -192,7 +193,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-build
+        key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-sanitize-build
         fail-on-cache-miss: True
 
     - name: Clone MHLO Submodule
@@ -216,6 +217,7 @@ jobs:
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         MHLO_BUILD_DIR="$(pwd)/mhlo-build" \
         COMPILER_LAUNCHER="" \
+        LLVM_CMAKE_ARGS="-DLLVM_USE_SANITIZER=Address;Undefined" \
         make mhlo
 
   quantum:
@@ -246,7 +248,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: mlir/llvm-project
-        key: Linux-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-source
+        key: Linux-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-sanitize-source
         enableCrossOsArchive: True
         fail-on-cache-miss: True
 
@@ -255,7 +257,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-build
+        key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-sanitize-build
         fail-on-cache-miss: True
 
     - name: Cache CCache
@@ -275,6 +277,7 @@ jobs:
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         MHLO_BUILD_DIR="$(pwd)/mhlo-build" \
         DIALECTS_BUILD_DIR="$(pwd)/quantum-build" \
+        LLVM_CMAKE_ARGS="-DLLVM_USE_SANITIZER=Address;Undefined" \
         make dialects
 
     - name: Upload Quantum Build Artifact
@@ -316,7 +319,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-build
+        key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-sanitize-build
         fail-on-cache-miss: True
 
     - name: Get MHLO Version
@@ -328,7 +331,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: mhlo-build
-        key: ${{ runner.os }}-mhlo-${{ steps.mhlo-hash.outputs.mhlo-hash }}-default-build
+        key: ${{ runner.os }}-mhlo-${{ steps.mhlo-hash.outputs.mhlo-hash }}-sanitize-build
         fail-on-cache-miss: True
 
     - name: Download Quantum Build Artifact
@@ -359,7 +362,6 @@ jobs:
 
     - name: Run Python Pytest Tests
       run: |
-        # export ASAN_OPTIONS=detect_odr_violation=0
         COVERAGE_REPORT="xml:coverage.xml -p no:warnings" \
         make coverage-frontend
         mv coverage.xml coverage-${{ github.job }}.xml
@@ -404,7 +406,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-build
+        key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-sanitize-build
         fail-on-cache-miss: True
 
     - name: Get MHLO Version
@@ -416,7 +418,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: mhlo-build
-        key: ${{ runner.os }}-mhlo-${{ steps.mhlo-hash.outputs.mhlo-hash }}-default-build
+        key: ${{ runner.os }}-mhlo-${{ steps.mhlo-hash.outputs.mhlo-hash }}-sanitize-build
         fail-on-cache-miss: True
 
     - name: Download Quantum Build Artifact
@@ -478,7 +480,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-build
+        key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-sanitize-build
         fail-on-cache-miss: True
 
     - name: Get MHLO Version
@@ -490,7 +492,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: mhlo-build
-        key: ${{ runner.os }}-mhlo-${{ steps.mhlo-hash.outputs.mhlo-hash }}-default-build
+        key: ${{ runner.os }}-mhlo-${{ steps.mhlo-hash.outputs.mhlo-hash }}-sanitize-build
         fail-on-cache-miss: True
 
     - name: Download Quantum Build Artifact
