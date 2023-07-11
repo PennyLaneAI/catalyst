@@ -1,3 +1,17 @@
+# Release 0.2.1-dev
+
+<h3>New features</h3>
+
+<h3>Improvements</h3>
+
+<h3>Breaking changes</h3>
+
+<h3>Bug fixes</h3>
+
+<h3>Contributors</h3>
+
+This release contains contributions from (in alphabetical order):
+
 # Release 0.2.0
 
 <h3>New features</h3>
@@ -133,6 +147,23 @@
       return qml.probs(wires=0)
   ```
 
+* Iterating in reverse is now supported with constant negative step sizes via `catalyst.for_loop`. [#129](https://github.com/PennyLaneAI/catalyst/pull/129)
+
+  ```python
+  dev = qml.device("lightning.qubit", wires=1)
+
+  @qjit
+  @qml.qnode(dev)
+  def circuit(n):
+
+      @catalyst.for_loop(n, 0, -1)
+      def loop_fn(_):
+          qml.PauliX(0)
+
+      loop_fn()
+      return measure(0)
+  ```
+
 * Additional gradient transforms for computing the vector-Jacobian product (VJP)
   and Jacobian-vector product (JVP) are now available in Catalyst.
   [#98](https://github.com/PennyLaneAI/catalyst/pull/98)
@@ -225,9 +256,7 @@
   ```
 
 * Support for returning the variance of Hamiltonians,
-  Hermitian matrices, and Tensors via `qml.var`
-
-  has been added.
+  Hermitian matrices, and Tensors via `qml.var` has been added.
   [#124](https://github.com/PennyLaneAI/catalyst/pull/124)
 
   ```python
@@ -248,6 +277,7 @@
   >>> circuit(x)
   array(0.98851544)
   ```
+
 <h3>Breaking changes</h3>
 
 * The `catalyst.grad` function now supports using the differentiation
@@ -277,24 +307,6 @@
 * Catalyst has been upgraded to work with JAX v0.4.13.
   [#143](https://github.com/PennyLaneAI/catalyst/pull/143)
   [#185](https://github.com/PennyLaneAI/catalyst/pull/185)
-
-* The `catalyst.for_loop` function now supports constant negative step sizes.
-  [#129](https://github.com/PennyLaneAI/catalyst/pull/129)
-
-  ```python
-  dev = qml.device("lightning.qubit", wires=1)
-
-  @qjit
-  @qml.qnode(dev)
-  def circuit(n):
-
-      @catalyst.for_loop(n, 0, -1)
-      def loop_fn(_):
-          qml.PauliX(0)
-
-      loop_fn()
-      return measure(0)
-  ```
 
 * Add a Backprop operation for using autodifferentiation (AD) at the LLVM
   level with Enzyme AD. The Backprop operations has a bufferization pattern
