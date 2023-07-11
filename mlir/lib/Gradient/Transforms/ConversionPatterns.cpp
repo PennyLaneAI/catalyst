@@ -63,8 +63,8 @@ LLVM::LLVMFuncOp ensureFunctionDeclaration(PatternRewriter &rewriter, Operation 
     return cast<LLVM::LLVMFuncOp>(fnDecl);
 }
 
-struct AdjointOpPattern : public OpConversionPattern<AdjointOp> {
-    using OpConversionPattern::OpConversionPattern;
+struct AdjointOpPattern : public ConvertOpToLLVMPattern<AdjointOp> {
+    using ConvertOpToLLVMPattern::ConvertOpToLLVMPattern;
 
     LogicalResult matchAndRewrite(AdjointOp op, AdjointOpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
@@ -199,15 +199,20 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
 
         int index = 0;
         ValueRange dataIn = adaptor.getDataIn();
+        Value enzymeConst = rewriter.create<LLVM::AddressOfOp>(loc, LLVM::LLVMPointerType::get(ctx),
+                                                               enzyme_const_key);
 
         // Add the arguments and their shadow on data in
-        for (auto [arg, llvmMemrefArg] : llvm::zip(op.getArgs(), adaptor.getArgs())) {
-            auto it = std::find(diffArgIndices.begin(), diffArgIndices.end(), index);
+        for (Value arg : op.getArgs()) {
+            std::vector<size_t>::iterator it =
+                std::find(diffArgIndices.begin(), diffArgIndices.end(), index);
             if (it == diffArgIndices.end()) {
                 if (isa<MemRefType>(arg.getType())) {
+                    // unpackMemRef will handle the appropriate enzyme_const annotations
                     unpackMemRef(arg, /*shadow=*/nullptr, callArgs, rewriter, loc);
                 }
                 else {
+                    callArgs.push_back(enzymeConst);
                     callArgs.push_back(castToConvertedType(arg, rewriter, loc));
                 }
             }
@@ -396,7 +401,7 @@ namespace gradient {
 
 void populateConversionPatterns(LLVMTypeConverter &typeConverter, RewritePatternSet &patterns)
 {
-    patterns.add<AdjointOpPattern>(typeConverter, patterns.getContext());
+    patterns.add<AdjointOpPattern>(typeConverter);
     patterns.add<BackpropOpPattern>(typeConverter);
 }
 
