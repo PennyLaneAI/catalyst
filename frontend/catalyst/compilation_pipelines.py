@@ -94,8 +94,7 @@ class CompiledFunction:
 
         Args:
             compiled_signature: user supplied signature, obtain from either an annotation or a
-                                previously compiled
-            implementation of the compiled function
+                                previously compiled implementation of the compiled function
             runtime_signature: runtime signature
 
         Returns:
@@ -110,7 +109,7 @@ class CompiledFunction:
             assert isinstance(c_param, jax.core.ShapedArray)
             assert isinstance(r_param, jax.core.ShapedArray)
             promote_to = jax.numpy.promote_types(r_param.dtype, c_param.dtype)
-            if c_param.dtype != promote_to:
+            if c_param.dtype != promote_to or c_param.shape != r_param.shape:
                 return False
         return True
 
@@ -121,8 +120,7 @@ class CompiledFunction:
 
         Args:
             compiled_signature: user supplied signature, obtain from either an annotation or a
-                                previously compiled
-            implementation of the compiled function
+                                previously compiled implementation of the compiled function
             runtime_signature: runtime signature
             *args: actual arguments to the function
 
@@ -159,6 +157,7 @@ class CompiledFunction:
             function: function handle
             setup: handle to the setup function, which initializes the device
             teardown: handle to the teardown function, which tears down the device
+            mem_transfer: memory transfer shared object
         """
         shared_object = ctypes.CDLL(shared_object_file)
 
@@ -187,6 +186,7 @@ class CompiledFunction:
 
         Args:
             *args: arguments to the compiled function
+
         Returns:
             a list of JAX shaped arrays
         """
@@ -201,12 +201,13 @@ class CompiledFunction:
 
     @staticmethod
     def _exec(shared_object_file, func_name, has_return, numpy_dict, *args):
-        """Execute the compiled function with arguments `*args`.
+        """Execute the compiled function with arguments ``*args``.
 
         Args:
             shared_object_file: path to the shared object file containing the JIT compiled function
             func_name: name of compiled function to be executed
             has_return: whether the function returns a value or not
+            numpy_dict: dictionary of numpy arrays of buffers from the runtime
             *args: arguments to the function
 
         Returns:
@@ -328,13 +329,13 @@ class CompiledFunction:
 
     @staticmethod
     def args_to_memref_descs(restype, args):
-        """Convert args to memref descriptors.
+        """Convert ``args`` to memref descriptors.
 
         Besides converting the arguments to memrefs, it also prepares the return value. To respect
         the ABI, the return value is changed to a pointer and passed as the first parameter.
 
         Args:
-            restype: the type of restype is a CompiledFunctionReturnValue
+            restype: the type of restype is a ``CompiledFunctionReturnValue``
             args: the JAX arrays to be used as arguments to the function
 
         Returns:
@@ -434,8 +435,7 @@ class QJIT:
                 self.compiled_function = self.compile()
 
     def print_stage(self, stage):
-        """
-        Print one of the recorded stages.
+        """Print one of the recorded stages.
 
         Args:
             stage: string corresponding with the name of the stage to be printed
@@ -464,10 +464,10 @@ class QJIT:
         return self._llvmir
 
     def get_mlir(self, *args):
-        """Trace self.qfunc
+        """Trace :func:`~.qfunc`
 
         Args:
-            *args: either the concrete values to be passed as arguments to `fn` or abstract values
+            *args: either the concrete values to be passed as arguments to ``fn`` or abstract values
 
         Returns:
             an MLIR module
@@ -512,14 +512,14 @@ class QJIT:
 
     def _maybe_promote(self, function, *args):
         """Logic to decide whether the function needs to be recompiled
-        given *args and whether *args need to be promoted.
+        given ``*args`` and whether ``*args`` need to be promoted.
 
         Args:
-          function: an instance of CompiledFunction that may need recompilation
+          function: an instance of ``CompiledFunction`` that may need recompilation
           *args: arguments that may be promoted.
 
         Returns:
-          function: an instance of CompiledFunction that may have been recompiled
+          function: an instance of ``CompiledFunction`` that may have been recompiled
           *args: arguments that may have been promoted
         """
         args = [jax.numpy.array(arg) for arg in args]
@@ -558,11 +558,12 @@ class QJIT:
             return self.qfunc(*args, **kwargs)
 
         function, args = self._maybe_promote(self.compiled_function, *args)
+        recompilation_needed = function != self.compiled_function
         self.compiled_function = function
 
         if any(isinstance(arg, jax.core.Tracer) for arg in args):
             # Only compile a derivative version of the compiled function when needed.
-            if self.jaxed_qfunc is None:
+            if self.jaxed_qfunc is None or recompilation_needed:
                 self.jaxed_qfunc = JAX_QJIT(self)
 
             return self.jaxed_qfunc(*args, **kwargs)
@@ -689,9 +690,10 @@ def qjit(
             compilation. If ``True``, intermediate representations are available via the
             :attr:`~.QJIT.mlir`, :attr:`~.QJIT.jaxpr`, and :attr:`~.QJIT.qir`, representing
             different stages in the optimization process.
-        verbosity (int): Verbosity level (0 - disabled, >0 - enabled)
+        verbosity (bool): If ``True``, the tools and flags used by Catalyst behind the scenes are
+            printed out.
         logfile (Optional[TextIOWrapper]): File object to write verbose messages to (default -
-            sys.stderr).
+            ``sys.stderr``).
         pipelines (Optional(List[AnyType]): A list of pipelines to be executed. The elements of
             the list are asked to implement a run method which takes the output of the previous run
             as an input to the next element, and so on.

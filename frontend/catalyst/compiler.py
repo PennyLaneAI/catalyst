@@ -35,7 +35,19 @@ package_root = os.path.dirname(__file__)
 
 @dataclass
 class CompileOptions:
-    """Generic compilation options"""
+    """Generic compilation options.
+
+    Args:
+        verbose (bool, optional): flag indicating whether to enable verbose output.
+            Default is ``False``
+        logfile (TextIOWrapper, optional): the logfile to write output to.
+            Default is ``sys.stderr``
+        target (str, optional): target of the functionality. Default is ``"binary"``
+        keep_intermediate (bool, optional): flag indicating whether to keep intermediate results.
+            Default is ``False``
+        pipelines (List[Any], optional): list of pipelines to be used.
+            Default is ``None``
+    """
 
     verbose: Optional[bool] = False
     logfile: Optional[TextIOWrapper] = sys.stderr
