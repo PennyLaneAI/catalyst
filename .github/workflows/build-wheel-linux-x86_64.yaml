@@ -316,7 +316,9 @@ jobs:
         cp --dereference $GITHUB_WORKSPACE/llvm-build/lib/libmlir_c_runner_utils.so* $GITHUB_WORKSPACE/frontend/catalyst/lib
         # Copy enzyme so to frontend
         mkdir -p $GITHUB_WORKSPACE/frontend/enzyme
+        ls $GITHUB_WORKSPACE/enzyme-build/Enzyme
         cp --dereference $GITHUB_WORKSPACE/enzyme-build/Enzyme/LLVMEnzyme-17.so $GITHUB_WORKSPACE/frontend/enzyme
+        ls $GITHUB_WORKSPACE/frontend/enzyme
         # Copy mlir bindings to frontend/mlir_quantum
         mkdir -p $GITHUB_WORKSPACE/frontend/mlir_quantum/dialects
         cp -R --dereference $GITHUB_WORKSPACE/quantum-build/python_packages/quantum/mlir_quantum/runtime $GITHUB_WORKSPACE/frontend/mlir_quantum/runtime
