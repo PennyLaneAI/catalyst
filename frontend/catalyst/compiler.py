@@ -243,9 +243,9 @@ class MLIRToLLVMDialect(PassPipeline):
         # Run after -convert-math-to-llvm as it marks math::powf illegal without converting it.
         "--convert-math-to-libm",
         "--convert-arith-to-llvm",
+        "--convert-gradient-to-llvm=use-generic-functions",
         "--finalize-memref-to-llvm=use-generic-functions",
         "--convert-index-to-llvm",
-        "--convert-gradient-to-llvm",
         "--convert-quantum-to-llvm",
         "--emit-catalyst-py-interface",
         # Remove any dead casts as the final pass expects to remove all existing casts,
@@ -290,6 +290,20 @@ class LLVMDialectToLLVMIR(PassPipeline):
         return str(path.with_suffix(".ll"))
 
 
+class PreEnzymeOpt(PassPipeline):
+    """Run optimizations on the LLVM IR prior to being run through Enzyme."""
+
+    _executable = get_executable_path("llvm", "opt")
+    _default_flags = ["-O2", "-S"]
+
+    @staticmethod
+    def get_output_filename(infile):
+        path = pathlib.Path(infile)
+        if not path.exists():
+            raise FileNotFoundError("Cannot find {infile}.")
+        return str(path.with_suffix(".preenzyme.ll"))
+
+
 class Enzyme(PassPipeline):
     """Pass pipeline to lower LLVM IR to Enzyme LLVM IR."""
 
@@ -297,11 +311,8 @@ class Enzyme(PassPipeline):
     enzyme_path = get_enzyme_path("enzyme", "ENZYME_DIR")
     _default_flags = [
         f"-load-pass-plugin={enzyme_path}/LLVMEnzyme-17.so",
-        "-load",
-        f"{enzyme_path}/LLVMEnzyme-17.so",
         # preserve-nvvm transforms certain global arrays to LLVM metadata that Enzyme will recognize.
         "-passes=preserve-nvvm,enzyme",
-        "-enzyme-loose-types",
         "-S",
     ]
 
@@ -504,6 +515,7 @@ class Compiler:
                 BufferizationPass,
                 MLIRToLLVMDialect,
                 LLVMDialectToLLVMIR,
+                PreEnzymeOpt,
                 Enzyme,
                 LLVMIRToObjectFile,
                 CompilerDriver,
