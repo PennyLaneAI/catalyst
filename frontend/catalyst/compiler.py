@@ -79,12 +79,25 @@ default_lib_paths = {
     "runtime": os.path.join(package_root, "../../runtime/build/lib"),
 }
 
+default_enzyme_path = {
+    "enzyme": os.path.join(package_root, "../../mlir/Enzyme/enzyme/build/Enzyme")
+}
+
 
 def get_executable_path(project, tool):
     """Get path to executable."""
     path = os.path.join(package_root, "bin") if INSTALLED else default_bin_paths.get(project, "")
     executable_path = os.path.join(path, tool)
     return executable_path if os.path.exists(executable_path) else tool
+
+
+def get_enzyme_path(project, env_var):
+    """Get path to Enzyme."""
+    return (
+        os.path.join(package_root, "enzyme")
+        if INSTALLED
+        else os.getenv(env_var, default_enzyme_path.get(project, ""))
+    )
 
 
 def get_lib_path(project, env_var):
@@ -268,6 +281,27 @@ class LLVMDialectToLLVMIR(PassPipeline):
 
     _executable = get_executable_path("llvm", "mlir-translate")
     _default_flags = ["--mlir-to-llvmir"]
+
+    @staticmethod
+    def get_output_filename(infile):
+        path = pathlib.Path(infile)
+        if not path.exists():
+            raise FileNotFoundError("Cannot find {infile}.")
+        return str(path.with_suffix(".ll"))
+
+
+class Enzyme(PassPipeline):
+    """Pass pipeline to lower LLVM IR to Enzyme LLVM IR."""
+
+    _executable = get_executable_path("llvm", "opt")
+    enzyme_path = get_enzyme_path("enzyme", "ENZYME_DIR")
+    _default_flags = [
+        f"-load-pass-plugin={enzyme_path}/LLVMEnzyme-17.so",
+        "-load",
+        f"{enzyme_path}/LLVMEnzyme-17.so",
+        "-passes=enzyme",
+        "-S",
+    ]
 
     @staticmethod
     def get_output_filename(infile):
@@ -468,6 +502,7 @@ class Compiler:
                 BufferizationPass,
                 MLIRToLLVMDialect,
                 LLVMDialectToLLVMIR,
+                Enzyme,
                 LLVMIRToObjectFile,
                 CompilerDriver,
             ]
