@@ -77,7 +77,7 @@ setup(
     install_requires=requirements,
     packages=find_namespace_packages(
         where="frontend",
-        include=["catalyst", "catalyst.*", "mlir_quantum", "enzyme"],
+        include=["catalyst", "catalyst.*", "mlir_quantum"],
     ),
     package_dir={"": "frontend"},
     include_package_data=True,
