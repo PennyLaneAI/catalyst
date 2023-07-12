@@ -1,16 +1,18 @@
-# Release 0.2.1-dev
-
-<h3>New features</h3>
-
-<h3>Improvements</h3>
-
-<h3>Breaking changes</h3>
+# Release 0.2.1
 
 <h3>Bug fixes</h3>
+
+* Add missing OpenQASM backend in binary distribution, which relies on the latest version of the
+  AWS Braket plugin for PennyLane to resolve dependency issues between the plugin, Catalyst, and
+  PennyLane. The Lightning-Kokkos backend with Serial and OpenMP modes is also added to the binary
+  distribution.
+  [#198](https://github.com/PennyLaneAI/catalyst/pull/198)
 
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
+
+David Ittah
 
 # Release 0.2.0
 
@@ -28,7 +30,7 @@ This release contains contributions from (in alphabetical order):
 
   ```python
   dev = qml.device("lightning.qubit", wires=1)
-  
+
   @qjit
   @qml.qnode(dev)
   def circuit(x):
@@ -36,13 +38,13 @@ This release contains contributions from (in alphabetical order):
       qml.RY(x[1] ** 2, wires=0)
       qml.RX(x[1] * x[2], wires=0)
       return qml.probs(wires=0)
-  
+
   @jax.jit
   def cost_fn(weights):
       x = jnp.sin(weights)
       return jnp.sum(jnp.cos(circuit(x)) ** 2)
   ```
-  
+
   ```pycon
   >>> cost_fn(jnp.array([0.1, 0.2, 0.3]))
   Array(1.32269195, dtype=float64)
@@ -125,25 +127,25 @@ This release contains contributions from (in alphabetical order):
 
   ```python
   dev = qml.device("lightning.qubit", wires=1)
-  
+
   @qjit
   @qml.qnode(dev)
   def circuit(x):
-  
+
       @catalyst.cond(x > 2.7)
       def cond_fn():
           qml.RX(x, wires=0)
-  
+
       @cond_fn.else_if(x > 1.4)
       def cond_elif():
           qml.RY(x, wires=0)
-  
+
       @cond_fn.otherwise
       def cond_else():
           qml.RX(x ** 2, wires=0)
-  
+
       cond_fn()
-  
+
       return qml.probs(wires=0)
   ```
 
@@ -231,17 +233,17 @@ This release contains contributions from (in alphabetical order):
 
   @qml.qnode(dev2)
   def circuit2(x):
-  
+
       @catalyst.cond(x > 2.7)
       def cond_fn():
           qml.RX(x, wires=0)
-  
+
       @cond_fn.otherwise
       def cond_else():
           qml.RX(x ** 2, wires=0)
-  
+
       cond_fn()
-  
+
       return qml.probs(wires=0)
 
   @qjit
@@ -329,7 +331,7 @@ This release contains contributions from (in alphabetical order):
   - Passes are now classes. This allows developers/users looking to change
 
     flags to inherit from these passes and change the flags.
-  
+
   - Passes are now passed as arguments to the compiler. Custom passes can just
     be passed to the compiler as an argument, as long as they implement a run
     method which takes an input and the output of this method can be fed to
