@@ -77,7 +77,8 @@ void __quantum__qis__MultiRZ(double, bool /*adjoint*/, int64_t, /*qubits*/...);
 
 // Struct pointer arguments for these instructions represent real arguments,
 // as passing structs by value is too unreliable / compiler dependant.
-void __quantum__qis__QubitUnitary(MemRefT_CplxT_double_2d *, bool /*adjoint*/, int64_t, /*qubits*/...);
+void __quantum__qis__QubitUnitary(MemRefT_CplxT_double_2d *, bool /*adjoint*/, int64_t,
+                                  /*qubits*/...);
 
 ObsIdType __quantum__qis__NamedObs(int64_t, QUBIT *);
 ObsIdType __quantum__qis__HermitianObs(MemRefT_CplxT_double_2d *, int64_t, /*qubits*/...);
