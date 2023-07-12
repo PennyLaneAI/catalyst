@@ -329,8 +329,8 @@ David Ittah
   As part of this refactor, the following changes were made:
 
   - Passes are now classes. This allows developers/users looking to change
-
     flags to inherit from these passes and change the flags.
+
 
   - Passes are now passed as arguments to the compiler. Custom passes can just
     be passed to the compiler as an argument, as long as they implement a run
