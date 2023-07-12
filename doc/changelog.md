@@ -1,3 +1,17 @@
+# Release 0.2.1-dev
+
+<h3>New features</h3>
+
+<h3>Improvements</h3>
+
+<h3>Breaking changes</h3>
+
+<h3>Bug fixes</h3>
+
+<h3>Contributors</h3>
+
+This release contains contributions from (in alphabetical order):
+
 # Release 0.2.0
 
 <h3>New features</h3>
@@ -7,6 +21,7 @@
   [#96](https://github.com/PennyLaneAI/catalyst/pull/96)
   [#123](https://github.com/PennyLaneAI/catalyst/pull/123)
   [#167](https://github.com/PennyLaneAI/catalyst/pull/167)
+  [#192](https://github.com/PennyLaneAI/catalyst/pull/192)
 
   For example, call a Catalyst qjit-compiled function from within a JAX jit-compiled
   function:
@@ -75,7 +90,7 @@
   execute on Braket simulator and hardware devices, including remote
   cloud-based simulators such as SV1.
 
-  ``` python
+  ```python
   def circuit(x, y):
       qml.RX(y * x, wires=0)
       qml.RX(x * 2, wires=1)
@@ -130,6 +145,23 @@
       cond_fn()
   
       return qml.probs(wires=0)
+  ```
+
+* Iterating in reverse is now supported with constant negative step sizes via `catalyst.for_loop`. [#129](https://github.com/PennyLaneAI/catalyst/pull/129)
+
+  ```python
+  dev = qml.device("lightning.qubit", wires=1)
+
+  @qjit
+  @qml.qnode(dev)
+  def circuit(n):
+
+      @catalyst.for_loop(n, 0, -1)
+      def loop_fn(_):
+          qml.PauliX(0)
+
+      loop_fn()
+      return measure(0)
   ```
 
 * Additional gradient transforms for computing the vector-Jacobian product (VJP)
@@ -224,9 +256,7 @@
   ```
 
 * Support for returning the variance of Hamiltonians,
-  Hermitian matrices, and Tensors via `qml.var`
-
-  has been added.
+  Hermitian matrices, and Tensors via `qml.var` has been added.
   [#124](https://github.com/PennyLaneAI/catalyst/pull/124)
 
   ```python
@@ -247,6 +277,7 @@
   >>> circuit(x)
   array(0.98851544)
   ```
+
 <h3>Breaking changes</h3>
 
 * The `catalyst.grad` function now supports using the differentiation
@@ -276,24 +307,6 @@
 * Catalyst has been upgraded to work with JAX v0.4.13.
   [#143](https://github.com/PennyLaneAI/catalyst/pull/143)
   [#185](https://github.com/PennyLaneAI/catalyst/pull/185)
-
-* The `catalyst.for_loop` function now supports constant negative step sizes.
-  [#129](https://github.com/PennyLaneAI/catalyst/pull/129)
-
-  ```python
-  dev = qml.device("lightning.qubit", wires=1)
-
-  @qjit
-  @qml.qnode(dev)
-  def circuit(n):
-
-      @catalyst.for_loop(n, 0, -1)
-      def loop_fn(_):
-          qml.PauliX(0)
-
-      loop_fn()
-      return measure(0)
-  ```
 
 * Add a Backprop operation for using autodifferentiation (AD) at the LLVM
   level with Enzyme AD. The Backprop operations has a bufferization pattern
@@ -365,9 +378,7 @@
 
 * Provide a new abstraction to the `QuantumDevice` interface in the runtime
   called `DataView`. C++ implementations of the interface can iterate
-
   through and directly store results into the `DataView` independant of the
-
   underlying memory layout. This can eliminate redundant buffer copies at the
   interface boundaries, which has been applied to existing devices. [#109](https://github.com/PennyLaneAI/catalyst/pull/109)
 
@@ -380,22 +391,19 @@
   [#121](https://github.com/PennyLaneAI/catalyst/pull/121)
 
 * Fix file renaming within pass pipelines.
-
   [#126](https://github.com/PennyLaneAI/catalyst/pull/126)
 
 * Fix the issue with the `do_queue` deprecation warnings in PennyLane.
-
   [#146](https://github.com/PennyLaneAI/catalyst/pull/146)
 
 * Fix the issue with gradients failing to work with hybrid functions that
-
   contain constant `jnp.array` objects. This will enable PennyLane operators
   that have data in the form of a `jnp.array`, such as a Hamiltonian, to be
   included in a qjit-compiled function. [#152](https://github.com/PennyLaneAI/catalyst/pull/152)
 
   An example of a newly supported workflow:
 
-  ``` python
+  ```python
   coeffs = jnp.array([0.1, 0.2])
   terms = [qml.PauliX(0) @ qml.PauliZ(1), qml.PauliZ(0)]
   H = qml.Hamiltonian(coeffs, terms)
