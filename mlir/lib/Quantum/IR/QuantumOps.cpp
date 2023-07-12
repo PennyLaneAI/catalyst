@@ -312,19 +312,5 @@ LogicalResult AdjointOp::verify()
         return emitOpError("quantum measurements are not allowed in the adjoint regions");
     }
 
-    {
-        bool yieldFound = false;
-        Block &b = this->getRegion().front();
-        for (auto i = b.begin(); i != b.end(); i++) {
-            if (YieldOp yield = dyn_cast<YieldOp>(*i)) {
-                yieldFound = true;
-                break;
-            }
-        }
-        if (!yieldFound) {
-            return emitOpError("quantum.yield must present in the adjoint region");
-        }
-    }
-
     return success();
 }

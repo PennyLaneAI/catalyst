@@ -761,7 +761,7 @@ def StateOp : Measurement_Op<"state"> {
     let hasVerifier = 1;
 }
 
-def AdjointOp : Op<QuantumDialect, "adjoint", [SingleBlock]> {
+def AdjointOp : Op<QuantumDialect, "adjoint", [SingleBlockImplicitTerminator<"YieldOp">]> {
     let summary = "Calculate the adjoint of the enclosed operations";
 
     let regions = (region SizedRegion<1>:$region);
@@ -781,12 +781,15 @@ def AdjointOp : Op<QuantumDialect, "adjoint", [SingleBlock]> {
     let hasVerifier = 1;
 }
 
-def YieldOp : Op<QuantumDialect, "yield", [Pure, ReturnLike, Terminator]> {
+def YieldOp : Op<QuantumDialect, "yield",
+                [Pure, ReturnLike, Terminator, ParentOneOf<["AdjointOp"]>]> {
     let summary = "Return results from quantum program regions";
 
     let arguments = (ins Variadic<AnyTypeOf<[QuregType]>>:$results);
 
     let assemblyFormat = [{  attr-dict ($results^ `:` type($results))? }];
+
+    let builders = [OpBuilder<(ins), [{ /* nothing to do */ }]>];
 }
 
 #endif // QUANTUM_OPS
