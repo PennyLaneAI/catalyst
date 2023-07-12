@@ -111,8 +111,8 @@ TEST_CASE("Test lightning__core__qis methods", "[CoreQIS]")
         QUBIT *target =
             *reinterpret_cast<QUBIT **>(__quantum__rt__array_get_element_ptr_1d(reg, 2));
 
-        __quantum__qis__RY(angle, target);
-        __quantum__qis__RX(angle, target);
+        __quantum__qis__RY(angle, target, false);
+        __quantum__qis__RX(angle, target, false);
 
         // The `ctrls` is a dangling pointer from now on.
         __quantum__rt__qubit_release_array(reg);
@@ -174,7 +174,7 @@ TEST_CASE("Test __quantum__qis__Identity", "[CoreQIS]")
 
         __quantum__rt__qubit_allocate();
 
-        __quantum__qis__Identity(wire0);
+        __quantum__qis__Identity(wire0, false);
 
         MemRefT_CplxT_double_1d result = getState(4);
         __quantum__qis__State(&result, 0);
@@ -200,7 +200,7 @@ TEST_CASE("Test __quantum__qis__PauliX", "[CoreQIS]")
 
         __quantum__rt__qubit_allocate();
 
-        __quantum__qis__PauliX(wire0);
+        __quantum__qis__PauliX(wire0, false);
 
         MemRefT_CplxT_double_1d result = getState(4);
         __quantum__qis__State(&result, 0);
@@ -226,8 +226,8 @@ TEST_CASE("Test __quantum__qis__ PauliY and Rot", "[CoreQIS]")
 
         __quantum__rt__qubit_allocate();
 
-        __quantum__qis__PauliY(wire0);
-        __quantum__qis__Rot(0.4, 0.6, -0.2, wire0);
+        __quantum__qis__PauliY(wire0, false);
+        __quantum__qis__Rot(0.4, 0.6, -0.2, wire0, false);
 
         MemRefT_CplxT_double_1d result = getState(4);
         __quantum__qis__State(&result, 0);
@@ -365,7 +365,7 @@ TEST_CASE("Test __quantum__qis__Measure", "[CoreQIS]")
 
         __quantum__rt__qubit_allocate();
 
-        __quantum__qis__PauliX(wire0);
+        __quantum__qis__PauliX(wire0, false);
 
         Result m = __quantum__qis__Measure(wire0);
 
@@ -387,11 +387,11 @@ TEST_CASE("Test __quantum__qis__ Hadamard, PauliZ, IsingXX, IsingZZ, and SWAP", 
 
         QUBIT **ctrls = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
 
-        __quantum__qis__Hadamard(target);
-        __quantum__qis__PauliZ(target);
-        __quantum__qis__IsingXX(0.2, *ctrls, target);
-        __quantum__qis__IsingZZ(0.5, *ctrls, target);
-        __quantum__qis__SWAP(*ctrls, target);
+        __quantum__qis__Hadamard(target, false);
+        __quantum__qis__PauliZ(target, false);
+        __quantum__qis__IsingXX(0.2, *ctrls, target, false);
+        __quantum__qis__IsingZZ(0.5, *ctrls, target, false);
+        __quantum__qis__SWAP(*ctrls, target, false);
 
         MemRefT_CplxT_double_1d result = getState(4);
         __quantum__qis__State(&result, 0);
@@ -423,12 +423,12 @@ TEST_CASE("Test __quantum__qis__ CRot, IsingXY and Toffoli", "[CoreQIS]")
         QUBIT **ctrls_0 = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
         QUBIT **ctrls_1 = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 1);
 
-        __quantum__qis__Hadamard(target);
-        __quantum__qis__PauliZ(target);
-        __quantum__qis__CRot(0.2, 0.5, 0.7, *ctrls_0, target);
-        __quantum__qis__IsingXY(0.2, *ctrls_0, target);
-        __quantum__qis__SWAP(*ctrls_0, target);
-        __quantum__qis__Toffoli(*ctrls_0, *ctrls_1, target);
+        __quantum__qis__Hadamard(target, false);
+        __quantum__qis__PauliZ(target, false);
+        __quantum__qis__CRot(0.2, 0.5, 0.7, *ctrls_0, target, false);
+        __quantum__qis__IsingXY(0.2, *ctrls_0, target, false);
+        __quantum__qis__SWAP(*ctrls_0, target, false);
+        __quantum__qis__Toffoli(*ctrls_0, *ctrls_1, target, false);
 
         MemRefT_CplxT_double_1d result = getState(8);
         __quantum__qis__State(&result, 0);
@@ -460,13 +460,13 @@ TEST_CASE("Test __quantum__qis__ Hadamard, PauliX, IsingYY, CRX, and Expval", "[
         QUBIT **ctrls = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
 
         // qml.Hadamard(wires=0)
-        __quantum__qis__Hadamard(target);
+        __quantum__qis__Hadamard(target, false);
         // qml.PauliX(wires=0)
-        __quantum__qis__PauliX(target);
+        __quantum__qis__PauliX(target, false);
         // qml.IsingYY(0.2, wires=[1,0])
-        __quantum__qis__IsingYY(0.2, *ctrls, target);
+        __quantum__qis__IsingYY(0.2, *ctrls, target, false);
         // qml.CRX(0.4, wires=[1,0])
-        __quantum__qis__CRX(0.4, *ctrls, target);
+        __quantum__qis__CRX(0.4, *ctrls, target, false);
 
         MemRefT_CplxT_double_1d result = getState(4);
         __quantum__qis__State(&result, 0);
@@ -503,11 +503,11 @@ TEST_CASE("Test __quantum__qis__ PhaseShift", "[CoreQIS]")
         QUBIT **ctrls = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
 
         // qml.Hadamard(wires=0)
-        __quantum__qis__Hadamard(target);
+        __quantum__qis__Hadamard(target, false);
         // qml.RX(0.123, wires=1)
-        __quantum__qis__RX(0.123, *ctrls);
+        __quantum__qis__RX(0.123, *ctrls, false);
         // qml.PhaseShift(0.456, wires=0)
-        __quantum__qis__PhaseShift(0.456, target);
+        __quantum__qis__PhaseShift(0.456, target, false);
 
         MemRefT_CplxT_double_1d result = getState(4);
         __quantum__qis__State(&result, 0);
@@ -592,13 +592,13 @@ TEST_CASE("Test __quantum__qis__HermitianObs and Expval", "[CoreQIS]")
         QUBIT **ctrls = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
 
         // qml.Hadamard(wires=0)
-        __quantum__qis__Hadamard(target);
+        __quantum__qis__Hadamard(target, false);
         // qml.PauliX(wires=0)
-        __quantum__qis__PauliX(target);
+        __quantum__qis__PauliX(target, false);
         // qml.IsingYY(0.2, wires=[1,0])
-        __quantum__qis__IsingYY(0.2, *ctrls, target);
+        __quantum__qis__IsingYY(0.2, *ctrls, target, false);
         // qml.CRX(0.4, wires=[1,0])
-        __quantum__qis__CRX(0.4, *ctrls, target);
+        __quantum__qis__CRX(0.4, *ctrls, target, false);
 
         MemRefT_CplxT_double_1d result = getState(4);
         __quantum__qis__State(&result, 0);
@@ -667,13 +667,13 @@ TEST_CASE("Test __quantum__qis__TensorProdObs and Expval", "[CoreQIS]")
         QUBIT **ctrls = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
 
         // qml.Hadamard(wires=0)
-        __quantum__qis__Hadamard(target);
+        __quantum__qis__Hadamard(target, false);
         // qml.Hadamard(wires=1)
-        __quantum__qis__Hadamard(*ctrls);
+        __quantum__qis__Hadamard(*ctrls, false);
         // qml.IsingYY(0.2, wires=[1,0])
-        __quantum__qis__IsingYY(0.6, *ctrls, target);
+        __quantum__qis__IsingYY(0.6, *ctrls, target, false);
         // qml.CRX(0.4, wires=[1,0])
-        __quantum__qis__CRX(0.3, *ctrls, target);
+        __quantum__qis__CRX(0.3, *ctrls, target, false);
 
         MemRefT_CplxT_double_1d result = getState(4);
         __quantum__qis__State(&result, 0);
@@ -754,13 +754,13 @@ TEST_CASE("Test __quantum__qis__HamiltonianObs(h, x) and Expval", "[CoreQIS]")
         QUBIT **ctrls = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
 
         // qml.Hadamard(wires=0)
-        __quantum__qis__Hadamard(target);
+        __quantum__qis__Hadamard(target, false);
         // qml.Hadamard(wires=1)
-        __quantum__qis__Hadamard(*ctrls);
+        __quantum__qis__Hadamard(*ctrls, false);
         // qml.IsingYY(0.2, wires=[1,0])
-        __quantum__qis__IsingYY(0.6, *ctrls, target);
+        __quantum__qis__IsingYY(0.6, *ctrls, target, false);
         // qml.CRX(0.4, wires=[1,0])
-        __quantum__qis__CRX(0.3, *ctrls, target);
+        __quantum__qis__CRX(0.3, *ctrls, target, false);
 
         MemRefT_CplxT_double_1d result = getState(4);
         __quantum__qis__State(&result, 0);
@@ -813,13 +813,13 @@ TEST_CASE("Test __quantum__qis__HamiltonianObs(t) and Expval", "[CoreQIS]")
         QUBIT **ctrls = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
 
         // qml.Hadamard(wires=0)
-        __quantum__qis__Hadamard(target);
+        __quantum__qis__Hadamard(target, false);
         // qml.Hadamard(wires=1)
-        __quantum__qis__Hadamard(*ctrls);
+        __quantum__qis__Hadamard(*ctrls, false);
         // qml.IsingYY(0.2, wires=[1,0])
-        __quantum__qis__IsingYY(0.6, *ctrls, target);
+        __quantum__qis__IsingYY(0.6, *ctrls, target, false);
         // qml.CRX(0.4, wires=[1,0])
-        __quantum__qis__CRX(0.3, *ctrls, target);
+        __quantum__qis__CRX(0.3, *ctrls, target, false);
 
         MemRefT_CplxT_double_1d result = getState(4);
         __quantum__qis__State(&result, 0);
@@ -873,13 +873,13 @@ TEST_CASE("Test __quantum__qis__ Hadamard, PauliX, IsingYY, CRX, and Expval_arr"
         QUBIT **ctrls = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
 
         // qml.Hadamard(wires=0)
-        __quantum__qis__Hadamard(target);
+        __quantum__qis__Hadamard(target, false);
         // qml.PauliX(wires=0)
-        __quantum__qis__PauliX(target);
+        __quantum__qis__PauliX(target, false);
         // qml.IsingYY(0.2, wires=[1,0])
-        __quantum__qis__IsingYY(0.2, *ctrls, target);
+        __quantum__qis__IsingYY(0.2, *ctrls, target, false);
         // qml.CRX(0.4, wires=[1,0])
-        __quantum__qis__CRX(0.4, *ctrls, target);
+        __quantum__qis__CRX(0.4, *ctrls, target, false);
 
         MemRefT_CplxT_double_1d result = getState(4);
         __quantum__qis__State(&result, 0);
@@ -919,13 +919,13 @@ TEST_CASE("Test __quantum__qis__ Hadamard, ControlledPhaseShift, IsingYY, CRX, a
         QUBIT **ctrls = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
 
         // qml.Hadamard(wires=0)
-        __quantum__qis__Hadamard(target);
+        __quantum__qis__Hadamard(target, false);
         // qml.ControlledPhaseShift(0.6, wires=[0,1])
-        __quantum__qis__ControlledPhaseShift(0.6, target, *ctrls);
+        __quantum__qis__ControlledPhaseShift(0.6, target, *ctrls, false);
         // qml.IsingYY(0.2, wires=[0, 1])
-        __quantum__qis__IsingYY(0.2, target, *ctrls);
+        __quantum__qis__IsingYY(0.2, target, *ctrls, false);
         // qml.CRX(0.4, wires=[1,0])
-        __quantum__qis__CRX(0.4, target, *ctrls);
+        __quantum__qis__CRX(0.4, target, *ctrls, false);
 
         MemRefT_CplxT_double_1d result = getState(4);
         __quantum__qis__State(&result, 0);
@@ -962,13 +962,13 @@ TEST_CASE("Test __quantum__qis__ Hadamard, PauliX, IsingYY, CRX, and Probs", "[C
         QUBIT **ctrls = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
 
         // qml.Hadamard(wires=0)
-        __quantum__qis__Hadamard(target);
+        __quantum__qis__Hadamard(target, false);
         // qml.PauliX(wires=0)
-        __quantum__qis__PauliX(target);
+        __quantum__qis__PauliX(target, false);
         // qml.IsingYY(0.2, wires=[1,0])
-        __quantum__qis__IsingYY(0.2, *ctrls, target);
+        __quantum__qis__IsingYY(0.2, *ctrls, target, false);
         // qml.CRX(0.4, wires=[1,0])
-        __quantum__qis__CRX(0.4, *ctrls, target);
+        __quantum__qis__CRX(0.4, *ctrls, target, false);
 
         size_t buffer_len = 4;
         double *buffer = new double[buffer_len];
@@ -997,13 +997,13 @@ TEST_CASE("Test __quantum__qis__ Hadamard, PauliX, IsingYY, CRX, and partial Pro
         QUBIT **ctrls = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
 
         // qml.Hadamard(wires=0)
-        __quantum__qis__Hadamard(target);
+        __quantum__qis__Hadamard(target, false);
         // qml.PauliX(wires=0)
-        __quantum__qis__PauliX(target);
+        __quantum__qis__PauliX(target, false);
         // qml.IsingYY(0.2, wires=[1,0])
-        __quantum__qis__IsingYY(0.2, *ctrls, target);
+        __quantum__qis__IsingYY(0.2, *ctrls, target, false);
         // qml.CRX(0.4, wires=[1,0])
-        __quantum__qis__CRX(0.4, *ctrls, target);
+        __quantum__qis__CRX(0.4, *ctrls, target, false);
 
         size_t buffer_len = 2;
         double *buffer = new double[buffer_len];
@@ -1032,13 +1032,13 @@ TEST_CASE("Test __quantum__qis__State on the heap using malloc", "[CoreQIS]")
         QUBIT **ctrls = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
 
         // qml.Hadamard(wires=0)
-        __quantum__qis__Hadamard(target);
+        __quantum__qis__Hadamard(target, false);
         // qml.ControlledPhaseShift(0.6, wires=[0,1])
-        __quantum__qis__ControlledPhaseShift(0.6, target, *ctrls);
+        __quantum__qis__ControlledPhaseShift(0.6, target, *ctrls, false);
         // qml.IsingYY(0.2, wires=[0, 1])
-        __quantum__qis__IsingYY(0.2, target, *ctrls);
+        __quantum__qis__IsingYY(0.2, target, *ctrls, false);
         // qml.CRX(0.4, wires=[1,0])
-        __quantum__qis__CRX(0.4, target, *ctrls);
+        __quantum__qis__CRX(0.4, target, *ctrls, false);
 
         MemRefT_CplxT_double_1d result = getState(4);
         __quantum__qis__State(&result, 0);
@@ -1070,7 +1070,7 @@ TEST_CASE("Test __quantum__qis__Measure with false", "[CoreQIS]")
         QUBIT *target = __quantum__rt__qubit_allocate(); // id = 0
 
         // qml.Hadamard(wires=0)
-        __quantum__qis__RY(0.0, target);
+        __quantum__qis__RY(0.0, target, false);
 
         Result mres = __quantum__qis__Measure(target);
 
@@ -1090,7 +1090,7 @@ TEST_CASE("Test __quantum__qis__Measure with true", "[CoreQIS]")
         QUBIT *target = __quantum__rt__qubit_allocate(); // id = 0
 
         // qml.Hadamard(wires=0)
-        __quantum__qis__RY(3.14, target);
+        __quantum__qis__RY(3.14, target, false);
 
         Result mres = __quantum__qis__Measure(target);
 
@@ -1109,12 +1109,12 @@ TEST_CASE("Test __quantum__qis__MultiRZ", "[CoreQIS]")
 
         QUBIT *q0 = __quantum__rt__qubit_allocate();
         QUBIT *q1 = __quantum__rt__qubit_allocate();
-        __quantum__qis__RX(M_PI, q0);
-        __quantum__qis__Hadamard(q0);
-        __quantum__qis__Hadamard(q1);
-        __quantum__qis__MultiRZ(M_PI, 2, q0, q1);
-        __quantum__qis__Hadamard(q0);
-        __quantum__qis__Hadamard(q1);
+        __quantum__qis__RX(M_PI, q0, false);
+        __quantum__qis__Hadamard(q0, false);
+        __quantum__qis__Hadamard(q1, false);
+        __quantum__qis__MultiRZ(M_PI, false, 2, q0, q1);
+        __quantum__qis__Hadamard(q0, false);
+        __quantum__qis__Hadamard(q1, false);
 
         Result q0_m = __quantum__qis__Measure(q0);
         Result q1_m = __quantum__qis__Measure(q1);
@@ -1137,9 +1137,9 @@ TEST_CASE("Test __quantum__qis__CSWAP ", "[CoreQIS]")
         QUBIT *q0 = __quantum__rt__qubit_allocate();
         QUBIT *q1 = __quantum__rt__qubit_allocate();
         QUBIT *q2 = __quantum__rt__qubit_allocate();
-        __quantum__qis__RX(M_PI, q0);
-        __quantum__qis__RX(M_PI, q1);
-        __quantum__qis__CSWAP(q0, q1, q2);
+        __quantum__qis__RX(M_PI, q0, false);
+        __quantum__qis__RX(M_PI, q1, false);
+        __quantum__qis__CSWAP(q0, q1, q2, false);
 
         Result q1_m = __quantum__qis__Measure(q1);
         Result q2_m = __quantum__qis__Measure(q2);
@@ -1178,13 +1178,13 @@ TEST_CASE("Test __quantum__qis__Counts with num_qubits=2 calling Hadamard, Contr
         QUBIT **ctrls = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
 
         // qml.Hadamard(wires=0)
-        __quantum__qis__Hadamard(target);
+        __quantum__qis__Hadamard(target, false);
         // qml.ControlledPhaseShift(0.6, wires=[0,1])
-        __quantum__qis__ControlledPhaseShift(0.6, target, *ctrls);
+        __quantum__qis__ControlledPhaseShift(0.6, target, *ctrls, false);
         // qml.IsingYY(0.2, wires=[0, 1])
-        __quantum__qis__IsingYY(0.2, target, *ctrls);
+        __quantum__qis__IsingYY(0.2, target, *ctrls, false);
         // qml.CRX(0.4, wires=[1,0])
-        __quantum__qis__CRX(0.4, target, *ctrls);
+        __quantum__qis__CRX(0.4, target, *ctrls, false);
 
         constexpr size_t shots = 1000;
 
@@ -1222,13 +1222,13 @@ TEST_CASE("Test __quantum__qis__Counts with num_qubits=2 PartialCounts calling H
         QUBIT **ctrls = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
 
         // qml.Hadamard(wires=0)
-        __quantum__qis__Hadamard(target);
+        __quantum__qis__Hadamard(target, false);
         // qml.ControlledPhaseShift(0.6, wires=[0,1])
-        __quantum__qis__ControlledPhaseShift(0.6, target, *ctrls);
+        __quantum__qis__ControlledPhaseShift(0.6, target, *ctrls, false);
         // qml.IsingYY(0.2, wires=[0, 1])
-        __quantum__qis__IsingYY(0.2, target, *ctrls);
+        __quantum__qis__IsingYY(0.2, target, *ctrls, false);
         // qml.CRX(0.4, wires=[1,0])
-        __quantum__qis__CRX(0.4, target, *ctrls);
+        __quantum__qis__CRX(0.4, target, *ctrls, false);
 
         constexpr size_t shots = 1000;
 
@@ -1260,13 +1260,13 @@ TEST_CASE("Test __quantum__qis__Sample with num_qubits=2 calling Hadamard, Contr
         QUBIT **ctrls = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
 
         // qml.Hadamard(wires=0)
-        __quantum__qis__Hadamard(target);
+        __quantum__qis__Hadamard(target, false);
         // qml.ControlledPhaseShift(0.6, wires=[0,1])
-        __quantum__qis__ControlledPhaseShift(0.6, target, *ctrls);
+        __quantum__qis__ControlledPhaseShift(0.6, target, *ctrls, false);
         // qml.IsingYY(0.2, wires=[0, 1])
-        __quantum__qis__IsingYY(0.2, target, *ctrls);
+        __quantum__qis__IsingYY(0.2, target, *ctrls, false);
         // qml.CRX(0.4, wires=[1,0])
-        __quantum__qis__CRX(0.4, target, *ctrls);
+        __quantum__qis__CRX(0.4, target, *ctrls, false);
 
         constexpr size_t n = 2;
         constexpr size_t shots = 1000;
@@ -1325,13 +1325,13 @@ TEST_CASE("Test __quantum__qis__Sample with num_qubits=2 and PartialSample calli
         QUBIT **ctrls = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
 
         // qml.Hadamard(wires=0)
-        __quantum__qis__Hadamard(target);
+        __quantum__qis__Hadamard(target, false);
         // qml.ControlledPhaseShift(0.6, wires=[0,1])
-        __quantum__qis__ControlledPhaseShift(0.6, target, *ctrls);
+        __quantum__qis__ControlledPhaseShift(0.6, target, *ctrls, false);
         // qml.IsingYY(0.2, wires=[0, 1])
-        __quantum__qis__IsingYY(0.2, target, *ctrls);
+        __quantum__qis__IsingYY(0.2, target, *ctrls, false);
         // qml.CRX(0.4, wires=[1,0])
-        __quantum__qis__CRX(0.4, target, *ctrls);
+        __quantum__qis__CRX(0.4, target, *ctrls, false);
 
         constexpr size_t n = 1;
         constexpr size_t shots = 1000;
@@ -1374,7 +1374,7 @@ TEST_CASE("Test __quantum__qis__QubitUnitary with an uninitialized matrix", "[Co
         MemRefT_CplxT_double_2d *matrix = nullptr;
 
         REQUIRE_THROWS_WITH(
-            __quantum__qis__QubitUnitary(matrix, 1, target),
+            __quantum__qis__QubitUnitary(matrix, false, 1, target),
             Catch::Contains("[Function:__quantum__qis__QubitUnitary] Error in Catalyst Runtime: "
                             "The QubitUnitary matrix must be initialized"));
 
@@ -1391,9 +1391,9 @@ TEST_CASE("Test __quantum__qis__QubitUnitary with invalid number of wires", "[Co
         QUBIT *target = __quantum__rt__qubit_allocate(); // id = 0
         MemRefT_CplxT_double_2d *matrix = new MemRefT_CplxT_double_2d;
 
-        REQUIRE_THROWS_WITH(__quantum__qis__QubitUnitary(matrix, 3, target),
+        REQUIRE_THROWS_WITH(__quantum__qis__QubitUnitary(matrix, false, 3, target, false),
                             Catch::Contains("Invalid number of wires"));
-        REQUIRE_THROWS_WITH(__quantum__qis__QubitUnitary_Adjoint(matrix, 3, target),
+        REQUIRE_THROWS_WITH(__quantum__qis__QubitUnitary(matrix, false, 3, target, true),
                             Catch::Contains("Invalid number of wires"));
 
         delete matrix;
@@ -1416,9 +1416,9 @@ TEST_CASE("Test __quantum__qis__QubitUnitary with invalid matrix", "[CoreQIS]")
         matrix->sizes[1] = 1;
         matrix->strides[0] = 1;
 
-        REQUIRE_THROWS_WITH(__quantum__qis__QubitUnitary(matrix, 1, target),
+        REQUIRE_THROWS_WITH(__quantum__qis__QubitUnitary(matrix, false, 1, target),
                             Catch::Contains("Invalid given QubitUnitary matrix"));
-        REQUIRE_THROWS_WITH(__quantum__qis__QubitUnitary_Adjoint(matrix, 1, target),
+        REQUIRE_THROWS_WITH(__quantum__qis__QubitUnitary(matrix, false, 1, target, true),
                             Catch::Contains("Invalid given QubitUnitary matrix"));
 
         delete matrix;
@@ -1438,8 +1438,8 @@ TEST_CASE("Test __quantum__qis__QubitUnitary with num_qubits=2", "[CoreQIS]")
 
         QUBIT **ctrls = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
 
-        __quantum__qis__Hadamard(target);
-        __quantum__qis__CNOT(target, *ctrls);
+        __quantum__qis__Hadamard(target, false);
+        __quantum__qis__CNOT(target, *ctrls, false);
 
         CplxT_double matrix_data[4] = {
             {-0.6709485262524046, -0.6304426335363695},
@@ -1456,7 +1456,7 @@ TEST_CASE("Test __quantum__qis__QubitUnitary with num_qubits=2", "[CoreQIS]")
         matrix->sizes[1] = 2;
         matrix->strides[0] = 1;
 
-        __quantum__qis__QubitUnitary(matrix, 1, target);
+        __quantum__qis__QubitUnitary(matrix, false, 1, target);
 
         MemRefT_CplxT_double_1d result = getState(4);
         __quantum__qis__State(&result, 0);
@@ -1575,65 +1575,65 @@ TEST_CASE("Test the main porperty of the adjoint quantum operations", "[CoreQIS]
         matrix->sizes[1] = 2;
         matrix->strides[0] = 1;
 
-        __quantum__qis__QubitUnitary(matrix, 1, q0);
-        __quantum__qis__MultiRZ(theta, 2, q0, q1);
-        __quantum__qis__Toffoli(q0, q1, q2);
-        __quantum__qis__CSWAP(q0, q1, q2);
-        __quantum__qis__CRot(theta, theta, theta, q0, q1);
-        __quantum__qis__CRZ(theta, q0, q1);
-        __quantum__qis__CRY(theta, q0, q1);
-        __quantum__qis__CRX(theta, q0, q1);
-        __quantum__qis__ControlledPhaseShift(theta, q0, q1);
-        __quantum__qis__IsingZZ(theta, q0, q1);
-        __quantum__qis__IsingXY(theta, q0, q1);
-        __quantum__qis__IsingYY(theta, q0, q1);
-        __quantum__qis__IsingXX(theta, q0, q1);
-        __quantum__qis__SWAP(q0, q1);
-        __quantum__qis__CZ(q0, q1);
-        __quantum__qis__CY(q0, q1);
-        __quantum__qis__CNOT(q0, q1);
-        __quantum__qis__Rot(theta, theta, theta, q0);
-        __quantum__qis__RZ(theta, q0);
-        __quantum__qis__RY(theta, q0);
-        __quantum__qis__RX(theta, q0);
-        __quantum__qis__PhaseShift(theta, q0);
-        __quantum__qis__T(q0);
-        __quantum__qis__S(q0);
-        __quantum__qis__Hadamard(q0);
-        __quantum__qis__PauliZ(q0);
-        __quantum__qis__PauliY(q0);
-        __quantum__qis__PauliX(q0);
-        __quantum__qis__Identity(q0);
+        __quantum__qis__QubitUnitary(matrix, false, 1, q0);
+        __quantum__qis__MultiRZ(theta, false, 2, q0, q1);
+        __quantum__qis__Toffoli(q0, q1, q2, false);
+        __quantum__qis__CSWAP(q0, q1, q2, false);
+        __quantum__qis__CRot(theta, theta, theta, q0, q1, false);
+        __quantum__qis__CRZ(theta, q0, q1, false);
+        __quantum__qis__CRY(theta, q0, q1, false);
+        __quantum__qis__CRX(theta, q0, q1, false);
+        __quantum__qis__ControlledPhaseShift(theta, q0, q1, false);
+        __quantum__qis__IsingZZ(theta, q0, q1, false);
+        __quantum__qis__IsingXY(theta, q0, q1, false);
+        __quantum__qis__IsingYY(theta, q0, q1, false);
+        __quantum__qis__IsingXX(theta, q0, q1, false);
+        __quantum__qis__SWAP(q0, q1, false);
+        __quantum__qis__CZ(q0, q1, false);
+        __quantum__qis__CY(q0, q1, false);
+        __quantum__qis__CNOT(q0, q1, false);
+        __quantum__qis__Rot(theta, theta, theta, q0, false);
+        __quantum__qis__RZ(theta, q0, false);
+        __quantum__qis__RY(theta, q0, false);
+        __quantum__qis__RX(theta, q0, false);
+        __quantum__qis__PhaseShift(theta, q0, false);
+        __quantum__qis__T(q0, false);
+        __quantum__qis__S(q0, false);
+        __quantum__qis__Hadamard(q0, false);
+        __quantum__qis__PauliZ(q0, false);
+        __quantum__qis__PauliY(q0, false);
+        __quantum__qis__PauliX(q0, false);
+        __quantum__qis__Identity(q0, false);
 
-        __quantum__qis__Identity_Adjoint(q0);
-        __quantum__qis__PauliX_Adjoint(q0);
-        __quantum__qis__PauliY_Adjoint(q0);
-        __quantum__qis__PauliZ_Adjoint(q0);
-        __quantum__qis__Hadamard_Adjoint(q0);
-        __quantum__qis__S_Adjoint(q0);
-        __quantum__qis__T_Adjoint(q0);
-        __quantum__qis__PhaseShift_Adjoint(theta, q0);
-        __quantum__qis__RX_Adjoint(theta, q0);
-        __quantum__qis__RY_Adjoint(theta, q0);
-        __quantum__qis__RZ_Adjoint(theta, q0);
-        __quantum__qis__Rot_Adjoint(theta, theta, theta, q0);
-        __quantum__qis__CNOT_Adjoint(q0, q1);
-        __quantum__qis__CY_Adjoint(q0, q1);
-        __quantum__qis__CZ_Adjoint(q0, q1);
-        __quantum__qis__SWAP_Adjoint(q0, q1);
-        __quantum__qis__IsingXX_Adjoint(theta, q0, q1);
-        __quantum__qis__IsingYY_Adjoint(theta, q0, q1);
-        __quantum__qis__IsingXY_Adjoint(theta, q0, q1);
-        __quantum__qis__IsingZZ_Adjoint(theta, q0, q1);
-        __quantum__qis__ControlledPhaseShift_Adjoint(theta, q0, q1);
-        __quantum__qis__CRX_Adjoint(theta, q0, q1);
-        __quantum__qis__CRY_Adjoint(theta, q0, q1);
-        __quantum__qis__CRZ_Adjoint(theta, q0, q1);
-        __quantum__qis__CRot_Adjoint(theta, theta, theta, q0, q1);
-        __quantum__qis__CSWAP_Adjoint(q0, q1, q2);
-        __quantum__qis__Toffoli_Adjoint(q0, q1, q2);
-        __quantum__qis__MultiRZ_Adjoint(theta, 2, q0, q1);
-        __quantum__qis__QubitUnitary_Adjoint(matrix, 1, q0);
+        __quantum__qis__Identity(q0, true);
+        __quantum__qis__PauliX(q0, true);
+        __quantum__qis__PauliY(q0, true);
+        __quantum__qis__PauliZ(q0, true);
+        __quantum__qis__Hadamard(q0, true);
+        __quantum__qis__S(q0, true);
+        __quantum__qis__T(q0, true);
+        __quantum__qis__PhaseShift(theta, q0, true);
+        __quantum__qis__RX(theta, q0, true);
+        __quantum__qis__RY(theta, q0, true);
+        __quantum__qis__RZ(theta, q0, true);
+        __quantum__qis__Rot(theta, theta, theta, q0, true);
+        __quantum__qis__CNOT(q0, q1, true);
+        __quantum__qis__CY(q0, q1, true);
+        __quantum__qis__CZ(q0, q1, true);
+        __quantum__qis__SWAP(q0, q1, true);
+        __quantum__qis__IsingXX(theta, q0, q1, true);
+        __quantum__qis__IsingYY(theta, q0, q1, true);
+        __quantum__qis__IsingXY(theta, q0, q1, true);
+        __quantum__qis__IsingZZ(theta, q0, q1, true);
+        __quantum__qis__ControlledPhaseShift(theta, q0, q1, true);
+        __quantum__qis__CRX(theta, q0, q1, true);
+        __quantum__qis__CRY(theta, q0, q1, true);
+        __quantum__qis__CRZ(theta, q0, q1, true);
+        __quantum__qis__CRot(theta, theta, theta, q0, q1, true);
+        __quantum__qis__CSWAP(q0, q1, q2, true);
+        __quantum__qis__Toffoli(q0, q1, q2, true);
+        __quantum__qis__MultiRZ(theta, true, 2, q0, q1);
+        __quantum__qis__QubitUnitary(matrix, true, 1, q0);
 
         MemRefT_CplxT_double_1d result = getState(8);
         __quantum__qis__State(&result, 0);
