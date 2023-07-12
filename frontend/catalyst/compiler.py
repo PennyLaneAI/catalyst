@@ -51,6 +51,7 @@ class CompileOptions:
 
     verbose: Optional[bool] = False
     logfile: Optional[TextIOWrapper] = sys.stderr
+    source: str = "python"
     target: Optional[str] = "binary"
     keep_intermediate: Optional[bool] = False
     pipelines: Optional[List[Any]] = None

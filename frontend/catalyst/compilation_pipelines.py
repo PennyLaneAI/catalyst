@@ -415,25 +415,37 @@ class QJIT:
         compile_options (Optional[CompileOptions]): common compilation options
     """
 
-    def __init__(self, fn, compile_options):
-        self.qfunc = fn
+    def __init__(self, fn, compile_options: CompileOptions):
+        valid_sources = ["python", "mlir", "llvm"]
+        if compile_options.source not in valid_sources:
+            raise ValueError(f"Expected source type to be one of {valid_sources}")
+
+        self.qfunc = fn if compile_options.source == "python" else None
         self.jaxed_qfunc = None
         self.c_sig = None
         functools.update_wrapper(self, fn)
         self.compile_options = compile_options
         self._compiler = Compiler()
         self._jaxpr = None
-        self._mlir = None
-        self._llvmir = None
+        self._mlir = fn if compile_options.source == "mlir" else None
+        self._llvmir = fn if compile_options.source == "llvm" else None
         self.mlir_module = None
         self.compiled_function = None
-        parameter_types = get_type_annotations(self.qfunc)
         self.user_typed = False
-        if parameter_types is not None:
-            self.user_typed = True
-            self.mlir_module = self.get_mlir(*parameter_types)
-            if self.compile_options.target == "binary":
-                self.compiled_function = self.compile()
+
+        if compile_options.source == "python":
+            parameter_types = get_type_annotations(self.qfunc)
+            if parameter_types is not None:
+                self.user_typed = True
+                self.mlir_module = self.get_mlir(*parameter_types)
+                if self.compile_options.target == "binary":
+                    self.compiled_function = self.compile()
+        else:
+            if not isinstance(fn, str):
+                raise TypeError(
+                    "Specifying a source other than Python requires a str of textual IR"
+                )
+            TracingContext.check_is_not_tracing("Cannot compile from IR in tracing context.")
 
     def print_stage(self, stage):
         """Print one of the recorded stages.
@@ -492,25 +504,35 @@ class QJIT:
     def compile(self):
         """Compile the current MLIR module."""
 
-        # This will make a check before sending it to the compiler that the return type
-        # is actually available in most systems. f16 needs a special symbol and linking
-        # will fail if it is not available.
-        restype = self.mlir_module.body.operations[0].type.results
-        for res in restype:
-            baseType = ir.RankedTensorType(res).element_type
-            mlir_type_to_numpy_type(baseType)
+        if self.compile_options.source == "python":
+            # This will make a check before sending it to the compiler that the return type
+            # is actually available in most systems. f16 needs a special symbol and linking
+            # will fail if it is not available.
+            restype = self.mlir_module.body.operations[0].type.results
+            # How do we get this from LLVM IR or lowered MLIR?
+            # We can look for the return type of the only function that begins with "@jit_*"
+            # and get its result type
+            print("restype:", restype)
+            for res in restype:
+                baseType = ir.RankedTensorType(res).element_type
+                mlir_type_to_numpy_type(baseType)
 
-        shared_object = self._compiler.run(
-            self.mlir_module,
-            options=self.compile_options,
-        )
+            shared_object = self._compiler.run(
+                self.mlir_module,
+                options=self.compile_options,
+            )
 
-        self._llvmir = self._compiler.get_output_of("LLVMDialectToLLVMIR")
+            self._llvmir = self._compiler.get_output_of("LLVMDialectToLLVMIR")
 
-        # The function name out of MLIR has quotes around it, which we need to remove.
-        # The MLIR function name is actually a derived type from string which has no
-        # `replace` method, so we need to get a regular Python string out of it.
-        qfunc_name = str(self.mlir_module.body.operations[0].name).replace('"', "")
+            # The function name out of MLIR has quotes around it, which we need to remove.
+            # The MLIR function name is actually a derived type from string which has no
+            # `replace` method, so we need to get a regular Python string out of it.
+            qfunc_name = str(self.mlir_module.body.operations[0].name).replace('"', "")
+            print("qfunc name", qfunc_name)
+        elif self.compile_options.source == "mlir":
+            # TODO: Need to parse then return the mlir module?
+            # Need to get the qfunc name and the result type
+            pass
         return CompiledFunction(shared_object, qfunc_name, restype)
 
     def _maybe_promote(self, function, *args):
@@ -673,6 +695,7 @@ class JAX_QJIT:
 def qjit(
     fn=None,
     *,
+    source="python",
     target="binary",
     keep_intermediate=False,
     verbose=False,
@@ -770,9 +793,13 @@ def qjit(
     """
 
     if fn is not None:
-        return QJIT(fn, CompileOptions(verbose, logfile, target, keep_intermediate, pipelines))
+        return QJIT(
+            fn, CompileOptions(verbose, logfile, source, target, keep_intermediate, pipelines)
+        )
 
     def wrap_fn(fn):
-        return QJIT(fn, CompileOptions(verbose, logfile, target, keep_intermediate, pipelines))
+        return QJIT(
+            fn, CompileOptions(verbose, logfile, source, target, keep_intermediate, pipelines)
+        )
 
     return wrap_fn

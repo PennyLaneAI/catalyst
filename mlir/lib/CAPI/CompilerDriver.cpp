@@ -113,7 +113,8 @@ CatalystCReturnCode RunPassPipeline(const char *source, const char *passes, char
     return ReturnOk;
 }
 
-CatalystCReturnCode QuantumDriverMain(const char *source, bool keepIntermediate)
+CatalystCReturnCode QuantumDriverMain(const char *source, bool keepIntermediate,
+                                      FunctionData *functionData)
 {
     registerAllCatalystPasses();
 
@@ -137,5 +138,12 @@ CatalystCReturnCode QuantumDriverMain(const char *source, bool keepIntermediate)
     }
 
     llvmModule->dump();
+    if (functionData != nullptr) {
+        for (auto &function : llvmModule->functions()) {
+            if (function.getName().starts_with("@jit")) {
+                llvm::errs() << "found jit function: " << function.getName() << "\n";
+            }
+        }
+    }
     return ReturnOk;
 }

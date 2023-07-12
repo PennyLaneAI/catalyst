@@ -27,7 +27,9 @@ enum CatalystCReturnCode {
     ReturnOk,
     ReturnParsingFailed,
     ReturnLoweringFailed,
-    ReturnTranslationFailed
+    ReturnTranslationFailed,
+    /// The JIT function was not found within the module
+    ReturnFunctionNotFound
 };
 
 /// Run a given set of passes on an MLIR module.
@@ -37,8 +39,18 @@ enum CatalystCReturnCode {
 /// take ownership of freeing.
 CatalystCReturnCode RunPassPipeline(const char *source, const char *passes, char **dest);
 
+/// Data about the JIT function that is optionally inferred and returned to the caller.
+///
+/// This is important for calling a function when invoking the compiler on an MLIR or LLVM textual
+/// representation intead of from Python.
+struct FunctionData {
+    char *functionName;
+    MlirType functionType;
+};
+
 /// Entry point to the MLIR portion of the compiler.
-CatalystCReturnCode QuantumDriverMain(const char *source, bool keepIntermediate = false);
+CatalystCReturnCode QuantumDriverMain(const char *source, bool keepIntermediate = false,
+                                      FunctionData *functionData = nullptr);
 
 #ifdef __cplusplus
 }

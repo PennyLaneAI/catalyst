@@ -52,10 +52,12 @@ PYBIND11_MODULE(_quantumDialects, m)
     quantum_m.def(
         "compile_asm",
         [](const char *source, bool keep_intermediate) {
-            CatalystCReturnCode code = QuantumDriverMain(source, keep_intermediate);
+            FunctionData functionData;
+            CatalystCReturnCode code = QuantumDriverMain(source, keep_intermediate, &functionData);
             if (code != ReturnOk) {
                 throw std::runtime_error("Compilation failed");
             }
+            return std::make_tuple(functionData.functionName, functionData.functionType);
         },
         py::arg("source"), py::arg("keep_intermediate") = false);
 
