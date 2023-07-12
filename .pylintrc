@@ -18,7 +18,7 @@ ignored-modules=pennylane.ops,jaxlib.mlir.ir
 ; ignored-classes=
 
 # List of file/directory patters to ignore.
-ignore=test,llvm-project,mlir-hlo,.git,__pycache__,build,doc
+ignore=mlir_quantum,test,llvm-project,mlir-hlo,.git,__pycache__,build,doc
 
 [MESSAGES CONTROL]
 
