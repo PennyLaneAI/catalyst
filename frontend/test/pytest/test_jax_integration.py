@@ -21,7 +21,7 @@ import jax.numpy as jnp
 import pennylane as qml
 import pytest
 
-from catalyst import for_loop, measure, qjit, grad
+from catalyst import for_loop, grad, measure, qjit
 from catalyst.compilation_pipelines import JAX_QJIT
 
 
@@ -313,8 +313,8 @@ class TestJAXAD:
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(p1, p2):
-            qml.RY(p1[0,1], wires=0)
-            qml.RZ(p2[1,0], wires=0)
+            qml.RY(p1[0, 1], wires=0)
+            qml.RZ(p2[1, 0], wires=0)
             return jnp.asarray(measure(0), dtype=float)
 
         def cost_fn(p1, p2):
@@ -322,7 +322,7 @@ class TestJAXAD:
             m2 = circuit(p1, p2)
             return m1 + m2
 
-        p1 = jnp.array([[0.1, 0.3, 0.5],[0.1, 0.2, 0.8]])
+        p1 = jnp.array([[0.1, 0.3, 0.5], [0.1, 0.2, 0.8]])
         p2 = jnp.array([[0.3, 0.5], [0.2, 0.8], [0.2, 0.8]])
         result = jax.grad(cost_fn)(p1, p2)
         reference = qjit(grad(cost_fn))(p1, p2)

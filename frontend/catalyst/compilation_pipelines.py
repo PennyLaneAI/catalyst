@@ -648,12 +648,12 @@ class JAX_QJIT:
 
         jvps = [jnp.zeros_like(results[res_idx]) for res_idx in range(len(results))]
         for diff_arg_idx, arg_idx in enumerate(argnums):
-            tangent = tangents[arg_idx] # [1]
+            tangent = tangents[arg_idx]  # [1]
             taxis = list(range(tangent.ndim))
             for res_idx in range(len(results)):
                 deriv_idx = diff_arg_idx * len(results) + res_idx
-                deriv = derivatives[deriv_idx] # [2]
-                jvp = jnp.tensordot(deriv, tangent, axes=(taxis,taxis))
+                deriv = derivatives[deriv_idx]  # [2]
+                jvp = jnp.tensordot(deriv, tangent, axes=(taxis, taxis))
                 jvps[res_idx] = jvps[res_idx] + jvp
 
         if len(results) == 1:
