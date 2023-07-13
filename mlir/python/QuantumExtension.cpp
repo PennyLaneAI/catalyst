@@ -14,6 +14,7 @@
 
 #include "Quantum-c/Dialects.h"
 #include "mlir/Bindings/Python/PybindAdaptors.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 
 namespace py = pybind11;
 using namespace mlir::python::adaptors;
@@ -51,15 +52,21 @@ PYBIND11_MODULE(_quantumDialects, m)
 
     quantum_m.def(
         "compile_asm",
-        [](const char *source, const char *dest) {
+        [](const char *source, const char *dest, const char *sourceType,
+           bool infer_function_data) -> std::tuple<const char *, const char *> {
             FunctionData functionData;
-            CatalystCReturnCode code = QuantumDriverMain(source, dest, &functionData);
+            CatalystCReturnCode code = QuantumDriverMain(
+                source, dest, sourceType, infer_function_data ? &functionData : nullptr);
             if (code != ReturnOk) {
                 throw std::runtime_error("Compilation failed");
             }
-            return std::make_tuple(functionData.functionName, functionData.functionType);
+            if (infer_function_data) {
+                return std::make_tuple(functionData.functionName, functionData.returnType);
+            }
+            return std::make_tuple("", "");
         },
-        py::arg("source"), py::arg("dest"));
+        py::arg("source"), py::arg("dest"), py::arg("source_type") = "mlir",
+        py::arg("infer_function_data") = false);
 
     quantum_m.def(
         "mlir_run_pipeline",

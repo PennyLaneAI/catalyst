@@ -25,10 +25,12 @@
 
 #include "mlir/IR/DialectRegistry.h"
 #include "mlir/InitAllDialects.h"
+#include "mlir/InitAllExtensions.h"
 #include "mlir/InitAllPasses.h"
 #include "mlir/Parser/Parser.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Target/LLVMIR/Export.h"
+#include "llvm/IRReader/IRReader.h"
 #include "llvm/Support/SourceMgr.h"
 
 #include "memory"
@@ -42,7 +44,7 @@ using namespace catalyst;
 
 namespace {
 /// Parse an MLIR module given in textual ASM representation.
-OwningOpRef<ModuleOp> parseSource(MLIRContext *ctx, const char *source)
+OwningOpRef<ModuleOp> parseMLIRSource(MLIRContext *ctx, const char *source)
 {
     auto moduleBuffer = llvm::MemoryBuffer::getMemBufferCopy(source, "jit source");
     auto sourceMgr = std::make_shared<llvm::SourceMgr>();
@@ -55,11 +57,19 @@ OwningOpRef<ModuleOp> parseSource(MLIRContext *ctx, const char *source)
     return parseSourceFile<ModuleOp>(sourceMgr, parserConfig);
 }
 
+std::unique_ptr<llvm::Module> parseLLVMSource(llvm::LLVMContext &context, llvm::SMDiagnostic &err,
+                                              const char *source)
+{
+    auto moduleBuffer = llvm::MemoryBuffer::getMemBufferCopy(source, "jit source");
+    return llvm::parseIR(llvm::MemoryBufferRef(*moduleBuffer), err, context);
+}
+
 /// Register all dialects required by the Catalyst compiler.
 void registerAllCatalystDialects(DialectRegistry &registry)
 {
     // MLIR Core dialects
     registerAllDialects(registry);
+    registerAllExtensions(registry);
 
     // HLO
     mhlo::registerAllMhloDialects(registry);
@@ -86,63 +96,132 @@ void registerAllCatalystPasses()
 }
 } // namespace
 
+template <typename MLIRObject> void serializeMLIRObject(MLIRObject &obj, char **dest)
+{
+    std::string output;
+    llvm::raw_string_ostream ostream{output};
+    obj.print(ostream);
+
+    // Need to explicitly allocate the char buffer for C interop - don't forget the + 1 for the null
+    // terminator
+    *dest = static_cast<char *>(std::malloc(output.size() + 1));
+    std::strcpy(*dest, output.c_str());
+}
+
 CatalystCReturnCode RunPassPipeline(const char *source, const char *passes, char **dest)
 {
     DialectRegistry registry;
     registerAllCatalystDialects(registry);
     MLIRContext context{registry};
-    OwningOpRef<ModuleOp> op = parseSource(&context, source);
+    OwningOpRef<ModuleOp> op = parseMLIRSource(&context, source);
 
     auto pm = PassManager::on<ModuleOp>(&context);
     if (!op || failed(parsePassPipeline(passes, pm))) {
         return ReturnParsingFailed;
     }
 
-    if (failed(pm.run(*op))) {
+    ModuleOp moduleOp = op.get();
+    if (failed(pm.run(moduleOp))) {
         return ReturnLoweringFailed;
     }
 
-    std::string output;
-    llvm::raw_string_ostream ostream{output};
-    op->print(ostream);
-
-    // Need to explicitly allocate the char buffer for C interop - don't forget the + 1 for the null
-    // terminator
-    *dest = static_cast<char *>(std::malloc(output.size() + 1));
-    std::strcpy(*dest, output.c_str());
+    serializeMLIRObject(moduleOp, dest);
     return ReturnOk;
 }
 
-CatalystCReturnCode QuantumDriverMain(const char *source, const char *dest, FunctionData *functionData)
+llvm::Function *getJITFunction(llvm::Module &llvmModule)
 {
+    for (auto &function : llvmModule.functions()) {
+        if (function.getName().starts_with("jit_")) {
+            return &function;
+        }
+    }
+    assert(false && "Failed to find JIT function in module");
+}
+
+RankedTensorType inferMLIRReturnType(MLIRContext *ctx, llvm::Type *memRefDescType,
+                                     Type assumedElementType)
+{
+    SmallVector<int64_t> resultShape;
+    auto *structType = cast<llvm::StructType>(memRefDescType);
+    assert(structType->getNumElements() >= 3 &&
+           "Expected MemRef descriptor struct to have at least 3 entries");
+    if (structType->getNumElements() == 3) {
+        // resultShape is empty
+    }
+    else {
+        auto *arrayType = cast<llvm::ArrayType>(structType->getTypeAtIndex(3));
+        size_t rank = arrayType->getNumElements();
+        for (size_t i = 0; i < rank; i++) {
+            resultShape.push_back(ShapedType::kDynamic);
+        }
+    }
+    return RankedTensorType::get(resultShape, assumedElementType);
+}
+
+std::optional<SourceType> symbolizeSourceType(llvm::StringRef str)
+{
+    return llvm::StringSwitch<std::optional<SourceType>>(str)
+        .Case("mlir", SourceMLIR)
+        .Case("llvm", SourceLLVMIR)
+        .Default(std::nullopt);
+}
+
+CatalystCReturnCode QuantumDriverMain(const char *source, const char *dest,
+                                      const char *sourceTypeStr, FunctionData *functionData)
+{
+    auto sourceType = symbolizeSourceType(sourceTypeStr);
+    if (!sourceType) {
+        return ReturnUnrecognizedSourceType;
+    }
+
     registerAllCatalystPasses();
 
     DialectRegistry registry;
     registerAllCatalystDialects(registry);
     registerLLVMTranslations(registry);
     MLIRContext context{registry};
-    OwningOpRef<ModuleOp> op = parseSource(&context, source);
-    if (!op) {
-        return ReturnParsingFailed;
-    }
-
-    if (failed(runDefaultLowering(&context, *op))) {
-        return ReturnLoweringFailed;
-    }
 
     llvm::LLVMContext llvmContext;
-    auto llvmModule = translateModuleToLLVMIR(*op, llvmContext);
-    if (!llvmModule) {
-        return ReturnTranslationFailed;
-    }
+    std::unique_ptr<llvm::Module> llvmModule;
+    if (sourceType == SourceMLIR) {
+        OwningOpRef<ModuleOp> op = parseMLIRSource(&context, source);
+        if (!op) {
+            return ReturnParsingFailed;
+        }
 
-    if (functionData != nullptr) {
-        for (auto &function : llvmModule->functions()) {
-            if (function.getName().starts_with("@jit")) {
-                llvm::errs() << "found jit function: " << function.getName() << "\n";
-            }
+        if (failed(runDefaultLowering(&context, *op))) {
+            return ReturnLoweringFailed;
+        }
+
+        llvmModule = translateModuleToLLVMIR(*op, llvmContext);
+        if (!llvmModule) {
+            return ReturnTranslationFailed;
         }
     }
+    else if (sourceType == SourceLLVMIR) {
+        llvm::SMDiagnostic err;
+        llvmModule = parseLLVMSource(llvmContext, err, source);
+        if (!llvmModule) {
+            return ReturnParsingFailed;
+        }
+    }
+
+    // The user has requested that we infer the name and return type of the JIT'ed function.
+    if (functionData != nullptr) {
+        auto *function = getJITFunction(*llvmModule);
+        functionData->functionName =
+            static_cast<char *>(std::malloc(function->getName().size() + 1));
+        std::strcpy(functionData->functionName, function->getName().data());
+
+        // When inferring the return type from LLVM, assume a f64 element type.
+        // This is because the LLVM pointer type is opaque and requires looking into its uses to
+        // infer its type.
+        auto tensorType =
+            inferMLIRReturnType(&context, function->getReturnType(), Float64Type::get(&context));
+        serializeMLIRObject(tensorType, &functionData->returnType);
+    }
+
     if (failed(compileObjectFile(std::move(llvmModule), dest))) {
         return ReturnObjectCompilationFailed;
     }

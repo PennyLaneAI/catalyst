@@ -509,30 +509,32 @@ class QJIT:
             # is actually available in most systems. f16 needs a special symbol and linking
             # will fail if it is not available.
             restype = self.mlir_module.body.operations[0].type.results
-            # How do we get this from LLVM IR or lowered MLIR?
-            # We can look for the return type of the only function that begins with "@jit_*"
-            # and get its result type
-            print("restype:", restype)
+
             for res in restype:
                 baseType = ir.RankedTensorType(res).element_type
                 mlir_type_to_numpy_type(baseType)
-
-            shared_object = self._compiler.run(
-                self.mlir_module,
-                options=self.compile_options,
-            )
-
-            self._llvmir = self._compiler.get_output_of("LLVMDialectToLLVMIR")
 
             # The function name out of MLIR has quotes around it, which we need to remove.
             # The MLIR function name is actually a derived type from string which has no
             # `replace` method, so we need to get a regular Python string out of it.
             qfunc_name = str(self.mlir_module.body.operations[0].name).replace('"', "")
-            print("qfunc name", qfunc_name)
-        elif self.compile_options.source == "mlir":
-            # TODO: Need to parse then return the mlir module?
-            # Need to get the qfunc name and the result type
-            pass
+
+            shared_object, inferred_func_data = self._compiler.run(
+                self.mlir_module,
+                options=self.compile_options,
+            )
+        else:
+            shared_object, inferred_func_data = self._compiler.run_from_ir(
+                self.mlir or self.qir, "mlir_module", self.compile_options
+            )
+            qfunc_name = inferred_func_data[0]
+            # Parse back the return type given as a string
+            with ir.Context():
+                restype = [ir.RankedTensorType.parse(inferred_func_data[1])]
+
+            # TODO: Not sure how to get the LLVM IR in a nice way
+            # self._llvmir = self._compiler.get_output_of("LLVMDialectToLLVMIR")
+
         return CompiledFunction(shared_object, qfunc_name, restype)
 
     def _maybe_promote(self, function, *args):
@@ -557,7 +559,8 @@ class QJIT:
             if self.user_typed:
                 msg = "Provided arguments did not match declared signature, recompiling..."
                 warnings.warn(msg, UserWarning)
-            self.mlir_module = self.get_mlir(*r_sig)
+            if self.compile_options.source == "python":
+                self.mlir_module = self.get_mlir(*r_sig)
             function = self.compile()
         else:
             args = CompiledFunction.promote_arguments(self.c_sig, r_sig, *args)

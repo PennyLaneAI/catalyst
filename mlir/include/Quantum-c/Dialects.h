@@ -23,8 +23,12 @@ extern "C" {
 MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(Quantum, quantum);
 MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(Gradient, gradient);
 
+/// The possible IRs the compiler supports generation from.
+enum SourceType { SourceMLIR, SourceLLVMIR };
+
 enum CatalystCReturnCode {
     ReturnOk,
+    ReturnUnrecognizedSourceType,
     ReturnParsingFailed,
     ReturnLoweringFailed,
     ReturnTranslationFailed,
@@ -46,11 +50,11 @@ CatalystCReturnCode RunPassPipeline(const char *source, const char *passes, char
 /// representation intead of from Python.
 struct FunctionData {
     char *functionName;
-    MlirType functionType;
+    char *returnType;
 };
 
 /// Entry point to the MLIR portion of the compiler.
-CatalystCReturnCode QuantumDriverMain(const char *source, const char *dest,
+CatalystCReturnCode QuantumDriverMain(const char *source, const char *dest, const char *sourceType,
                                       FunctionData *functionData = nullptr);
 
 #ifdef __cplusplus

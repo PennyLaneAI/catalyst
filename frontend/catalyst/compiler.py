@@ -30,6 +30,8 @@ from typing import Any, List, Optional
 from catalyst._configuration import INSTALLED
 from catalyst.utils.exceptions import CompileError
 
+from mlir_quantum._mlir_libs._quantumDialects.quantum import compile_asm
+
 package_root = os.path.dirname(__file__)
 
 
@@ -470,6 +472,36 @@ class Compiler:
         # in order to avoid being garbage collected
         self.workspace = tempfile.TemporaryDirectory()  # pylint: disable=consider-using-with
 
+    def run_from_ir(self, ir: str, module_name: str, options: CompileOptions):
+        """Compile a shared object from a textual IR (MLIR or LLVM)."""
+        if options.keep_intermediate:
+            parent_dir = os.getcwd()
+            path = os.path.join(parent_dir, module_name)
+            os.makedirs(path, exist_ok=True)
+            workspace_name = os.path.abspath(path)
+        else:
+            workspace_name = self.workspace.name
+
+        pipelines = options.pipelines
+        inferred_data = None
+        if pipelines is None:
+            filename = str(pathlib.Path(workspace_name) / f"{module_name}.o")
+            # The compiler receives MLIR when compiling from Python
+            source_type = "mlir" if options.source == "python" else options.source
+
+            inferred_data = compile_asm(
+                ir, filename, source_type, infer_function_data=options.source != "python"
+            )
+            output = CompilerDriver.run(filename, options=options)
+            filename = str(pathlib.Path(output).absolute())
+        else:
+            for pipeline in pipelines:
+                output = pipeline.run(filename, options=options)
+                self.pass_pipeline_output[pipeline.__name__] = output
+                filename = os.path.abspath(output)
+
+        return filename, inferred_data
+
     def run(self, mlir_module, options):
         """Compile an MLIR module to a shared object.
 
@@ -491,39 +523,13 @@ class Compiler:
         # Remove quotations
         module_name = module_name.replace('"', "")
 
-        if options.keep_intermediate:
-            parent_dir = os.getcwd()
-            path = os.path.join(parent_dir, module_name)
-            os.makedirs(path, exist_ok=True)
-            workspace_name = os.path.abspath(path)
-        else:
-            workspace_name = self.workspace.name
-
-        pipelines = options.pipelines
-        if pipelines is None:
-            pipelines = [
-                MHLOPass,
-                QuantumCompilationPass,
-                BufferizationPass,
-                MLIRToLLVMDialect,
-                LLVMDialectToLLVMIR,
-                Enzyme,
-                LLVMIRToObjectFile,
-                CompilerDriver,
-            ]
-
-        self.pass_pipeline_output = {}
-
-        filename = f"{workspace_name}/{module_name}.mlir"
-        with open(filename, "w", encoding="utf-8") as f:
-            mlir_module.operation.print(f, print_generic_op_form=False, assume_verified=True)
-
-        for pipeline in pipelines:
-            output = pipeline.run(filename, options=options)
-            self.pass_pipeline_output[pipeline.__name__] = output
-            filename = os.path.abspath(output)
-
-        return filename
+        return self.run_from_ir(
+            mlir_module.operation.get_asm(
+                binary=False, print_generic_op_form=False, assume_verified=True
+            ),
+            module_name,
+            options,
+        )
 
     def get_output_of(self, pipeline):
         """Get the output IR of a pipeline.
