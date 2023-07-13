@@ -30,7 +30,7 @@ from jax.interpreters.mlir import (
     lowerable_effects,
 )
 from jax.interpreters.partial_eval import DynamicJaxprTracer
-from jax.tree_util import tree_unflatten
+from jax.tree_util import tree_flatten, tree_unflatten
 from pennylane.measurements import MeasurementProcess
 from pennylane.operation import Wires
 
@@ -305,6 +305,11 @@ def trace_quantum_tape(
             # We don't know if the loop modified any of the qubits
             # So let's load them all...
             qubit_states.clear()
+        elif op.__class__.__name__ == "Adjoint":
+            qreg = insert_to_qreg(qubit_states, qreg)
+            args, args_tree = tree_flatten((op.consts, op.cargs, [qreg]))
+            op_results = jprim.adjoint_p.bind(*args, args_tree=args_tree, jaxpr=op.body_jaxpr)
+            qreg = op_results[0]
         else:
             op_args, op_wires = op_args
             qubits = get_qubits_from_wires(op_wires, qubit_states, qreg)
