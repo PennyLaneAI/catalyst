@@ -20,6 +20,7 @@
 #include "Gradient/IR/GradientDialect.h"
 #include "Gradient/IR/GradientOps.h"
 #include "Gradient/Utils/GradientShape.h"
+#include "Quantum/IR/QuantumOps.h"
 
 #define GET_OP_CLASSES
 #include "Gradient/IR/GradientOps.cpp.inc"
@@ -53,6 +54,13 @@ LogicalResult verifyGradInputs(OpState *op_state, func::FuncOp callee, ValueRang
     if (fnType.getNumInputs() != fnArgs.size())
         return op_state->emitOpError("incorrect number of operands for callee, ")
                << "expected " << fnType.getNumInputs() << " but got " << fnArgs.size();
+
+    auto res = callee.walk([](catalyst::quantum::MeasureOp op) { return WalkResult::interrupt(); });
+
+    if (res.wasInterrupted()) {
+        return op_state->emitOpError(
+            "quantum measurements are not allowed in the gradient regions");
+    }
 
     for (unsigned i = 0; i < fnArgs.size(); ++i)
         if (!shapeEqual(fnArgs[i].getType(), fnType.getInput(i)))

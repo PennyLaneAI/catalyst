@@ -153,3 +153,19 @@ func.func private @multiple_args(%arg0: tensor<f64>, %arg1: tensor<f64>)
 
 // expected-error@+1 {{number of gradient results did not match number of differentiable arguments, expected 1 but got 2}}
 %grad:2 = gradient.backprop @multiple_args(%t0, %t0) cotangents(%t0: tensor<f64>) {diffArgIndices = dense<0> : tensor<1xindex>}: (tensor<f64>, tensor<f64>) -> (tensor<f64>, tensor<f64>)
+// -----
+
+func.func @measure(%arg0: f64) -> f64 {
+
+    %c0 = arith.constant 0 : i64
+    %0 = quantum.alloc(2) : !quantum.reg
+    %1 = quantum.extract %0[%c0] : !quantum.reg -> !quantum.bit
+    %res, %new_q = quantum.measure %1 : i1, !quantum.bit
+    %c1 = arith.constant 1.0 : f64
+
+    return %c1 : f64
+}
+
+%f0 = arith.constant 0.0 : f64
+// expected-error@+1 {{quantum measurements are not allowed in the gradient regions}}
+gradient.grad "fd" @measure(%f0) : (f64) -> (f64)
