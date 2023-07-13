@@ -12,6 +12,7 @@ FetchContent_Declare(
 )
 set(CMAKE_POSITION_INDEPENDENT_CODE ON) # build with -fPIC
 set(ENABLE_KOKKOS OFF CACHE BOOL "Enable Kokkos")
+# set(ENABLE_PYTHON OFF CACHE BOOL "Enable compilation of the Python module")
 FetchContent_MakeAvailable(pennylane_lightning)
 
 add_library(rt_interfaces INTERFACE)
@@ -28,6 +29,7 @@ if(ENABLE_LIGHTNING_KOKKOS)
         GIT_TAG        ${LIGHTNING_KOKKOS_GIT_TAG}
     )
 
+    # set(PLKOKKOS_ENABLE_PYTHON OFF CACHE BOOL "Enable compilation of the Python bindings")
     FetchContent_MakeAvailable(pennylane_lightning_kokkos)
 
     target_link_libraries(rt_interfaces INTERFACE pennylane_lightning_kokkos)
@@ -53,6 +55,7 @@ if(ENABLE_OPENQASM)
         FetchContent_MakeAvailable(pybind11)
     endif()
 
-    target_link_libraries(rt_interfaces INTERFACE pybind11::embed)
+    # To avoid link to libpython, we use pybind11::module interface library.
+    target_link_libraries(rt_interfaces INTERFACE pybind11::module)
 
 endif()
