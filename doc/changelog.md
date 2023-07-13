@@ -2,20 +2,6 @@
 
 <h3>New features</h3>
 
-<h3>Improvements</h3>
-
-<h3>Breaking changes</h3>
-
-<h3>Bug fixes</h3>
-
-<h3>Contributors</h3>
-
-This release contains contributions from (in alphabetical order):
-
-# Release 0.2.0
-
-<h3>New features</h3>
-
 * Add a preliminary support for native quantum Adjoint operation. `catalyst.adjoint` computes the
   adjoint of the quantum computation defined by a callee function. Catalyst control flow
   instructions are not handled yet. The usage pattern is as follows:
@@ -34,8 +20,24 @@ This release contains contributions from (in alphabetical order):
   workflow()
   ```
 
-* Catalyst programs can now be used inside of a larger JAX workflow which uses JIT compilation,
-  automatic differentiation, and other JAX transforms.
+<h3>Improvements</h3>
+
+<h3>Breaking changes</h3>
+
+<h3>Bug fixes</h3>
+
+<h3>Contributors</h3>
+
+This release contains contributions from (in alphabetical order):
+
+Sergei Mironov.
+
+# Release 0.2.0
+
+<h3>New features</h3>
+
+* Catalyst programs can now be used inside of a larger JAX workflow which uses
+  JIT compilation, automatic differentiation, and other JAX transforms.
   [#96](https://github.com/PennyLaneAI/catalyst/pull/96)
   [#123](https://github.com/PennyLaneAI/catalyst/pull/123)
   [#167](https://github.com/PennyLaneAI/catalyst/pull/167)
