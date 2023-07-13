@@ -29,12 +29,12 @@ if(ENABLE_LIGHTNING_KOKKOS)
     )
 
     FetchContent_MakeAvailable(pennylane_lightning_kokkos)
-    
+
     target_link_libraries(rt_interfaces INTERFACE pennylane_lightning_kokkos)
 endif()
 
 if(ENABLE_OPENQASM)
-    find_package(pybind11)
+    find_package(pybind11 CONFIG)
 
     if(pybind11_FOUND)
         message(STATUS "Found pybind11")

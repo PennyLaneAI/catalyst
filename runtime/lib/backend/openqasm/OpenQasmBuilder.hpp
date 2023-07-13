@@ -70,6 +70,7 @@ using GateNameT = std::string_view;
  */
 constexpr std::array rt_qasm_gate_map = {
     // (RT-GateName, Qasm-GateName)
+    std::tuple<GateNameT, GateNameT>{"Identity", "i"},
     std::tuple<GateNameT, GateNameT>{"PauliX", "x"},
     std::tuple<GateNameT, GateNameT>{"PauliY", "y"},
     std::tuple<GateNameT, GateNameT>{"PauliZ", "z"},
@@ -77,6 +78,7 @@ constexpr std::array rt_qasm_gate_map = {
     std::tuple<GateNameT, GateNameT>{"S", "s"},
     std::tuple<GateNameT, GateNameT>{"T", "t"},
     std::tuple<GateNameT, GateNameT>{"CNOT", "cnot"},
+    std::tuple<GateNameT, GateNameT>{"CY", "cy"},
     std::tuple<GateNameT, GateNameT>{"CZ", "cz"},
     std::tuple<GateNameT, GateNameT>{"SWAP", "swap"},
     std::tuple<GateNameT, GateNameT>{"PhaseShift", "phaseshift"},
@@ -343,7 +345,7 @@ class QasmGate {
             oss << "#pragma braket unitary(";
             oss << MatrixBuilder::toOpenQasm(matrix, (1UL << wires.size()), precision, version);
             oss << ") ";
-            oss << qregister.toOpenQasm(RegisterMode::Slice, wires) << ";\n";
+            oss << qregister.toOpenQasm(RegisterMode::Slice, wires) << "\n";
             return oss.str();
         }
 

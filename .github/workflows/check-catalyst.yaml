@@ -507,12 +507,6 @@ jobs:
         name: runtime-build
         path: runtime-build/lib
 
-    - name: Install awscli (OpenQasm device)
-      id: install-aws-cli
-      uses: unfor19/install-aws-cli-action@v1
-      with:
-        version: 2
-
     - name: Install additional dependencies (OpenQasm device)
       run: |
         # TODO: Use the latest version of boto3 after fixing the issue with
@@ -539,11 +533,8 @@ jobs:
         chmod +x quantum-build/bin/quantum-opt  # artifact upload does not preserve permissions
 
     - name: Run Python Pytest Tests
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_BRAKET_DEVICE_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_BRAKET_DEVICE_ACCESS_KEY }}
       run: |
-        make pytest TEST_BRAKET=ON
+        make pytest TEST_BRAKET=LOCAL
 
   runtime-tests:
     name: Runtime Tests (Linux)
@@ -566,13 +557,6 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get -y -q install cmake ninja-build libomp-dev lcov
-
-      - name: Install awscli (OpenQasm device)
-        if: ${{ matrix.simulator == 'openqasm' }}
-        id: install-aws-cli
-        uses: unfor19/install-aws-cli-action@v1
-        with:
-          version: 2
 
       - name: Install additional dependencies (OpenQasm device)
         if: ${{ matrix.simulator == 'openqasm' }}
@@ -613,9 +597,6 @@ jobs:
 
       - name: Build Runtime test suite for OpenQasm device
         if: ${{ matrix.simulator == 'openqasm' }}
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_BRAKET_DEVICE_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_BRAKET_DEVICE_ACCESS_KEY }}
         run: |
             C_COMPILER=$(which gcc) \
             CXX_COMPILER=$(which g++) \

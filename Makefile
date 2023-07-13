@@ -8,7 +8,7 @@ MK_DIR := $(dir $(MK_ABSPATH))
 DIALECTS_BUILD_DIR ?= $(MK_DIR)/mlir/build
 COVERAGE_REPORT ?= term-missing
 TEST_BACKEND ?= "lightning.qubit"
-TEST_BRAKET ?= OFF
+TEST_BRAKET ?= NONE
 
 .PHONY: help
 help:
@@ -67,11 +67,7 @@ lit:
 
 pytest:
 	@echo "check the Catalyst PyTest suite"
-ifdef remotetests
 	$(PYTHON) pytest frontend/test/pytest --tb=native --backend=$(TEST_BACKEND) --runbraket=$(TEST_BRAKET) -n auto
-else
-	$(PYTHON) pytest frontend/test/pytest --tb=native --backend=$(TEST_BACKEND) --runbraket=$(TEST_BRAKET) -k "not remotetests" -n auto
-endif
 test-demos:
 	@echo "check the Catalyst demos"
 	MDD_BENCHMARK_PRECISION=1 \
