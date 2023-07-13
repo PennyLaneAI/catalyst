@@ -14,6 +14,10 @@
   exception.
   [#199](https://github.com/PennyLaneAI/catalyst/pull/199)
 
+* Use ``pybind11::module`` interface library instead of ``pybind11::embed`` in the runtime for
+  OpenQasm backend to avoid link to the python library at compile time.
+  [#200](https://github.com/PennyLaneAI/catalyst/pull/200)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
