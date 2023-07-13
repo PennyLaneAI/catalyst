@@ -53,6 +53,6 @@ if(ENABLE_OPENQASM)
         FetchContent_MakeAvailable(pybind11)
     endif()
 
-    target_link_libraries(rt_interfaces INTERFACE pybind11::embed)
+    target_link_libraries(rt_interfaces INTERFACE pybind11::module)
 
 endif()
