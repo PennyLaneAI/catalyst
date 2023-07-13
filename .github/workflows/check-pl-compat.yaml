@@ -65,7 +65,7 @@ jobs:
     - uses: actions/cache@v3
       with:
         path: mhlo-build
-        key: ${{ runner.os }}-mhlo-${{ steps.mhlo-hash.outputs.mhlo-hash }}-default-build-opt
+        key: ${{ runner.os }}-mhlo-${{ steps.mhlo-hash.outputs.mhlo-hash }}-default-build
         fail-on-cache-miss: True
     - uses: actions/cache@v3
       with:
