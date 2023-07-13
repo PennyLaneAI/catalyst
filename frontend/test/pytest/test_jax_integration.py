@@ -21,7 +21,7 @@ import jax.numpy as jnp
 import pennylane as qml
 import pytest
 
-from catalyst import for_loop, measure, qjit
+from catalyst import for_loop, measure, qjit, grad
 from catalyst.compilation_pipelines import JAX_QJIT
 
 
@@ -306,6 +306,27 @@ class TestJAXAD:
         result2 = cost_fn(0.0, jnp.pi)
         assert jnp.allclose(result1, 0.0)
         assert jnp.allclose(result2, 0.0)
+
+    def test_multiD_calls(self, backend):
+        """Test a jax.grad function which repeatedly calls a qjit function."""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit(p1, p2):
+            qml.RY(p1[0,1], wires=0)
+            qml.RZ(p2[1,0], wires=0)
+            return jnp.asarray(measure(0), dtype=float)
+
+        def cost_fn(p1, p2):
+            m1 = circuit(p1, p2)
+            m2 = circuit(p1, p2)
+            return m1 + m2
+
+        p1 = jnp.array([[0.1, 0.3, 0.5],[0.1, 0.2, 0.8]])
+        p2 = jnp.array([[0.3, 0.5], [0.2, 0.8], [0.2, 0.8]])
+        result = jax.grad(cost_fn)(p1, p2)
+        reference = qjit(grad(cost_fn))(p1, p2)
+        assert jnp.allclose(result, reference, rtol=1e-6, atol=1e-6)
 
     def test_efficient_Jacobian(self, backend):
         """Test a jax.grad function does not compute Jacobians for arguments not in argnum."""
