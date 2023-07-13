@@ -321,7 +321,7 @@ class Enzyme(PassPipeline):
         path = pathlib.Path(infile)
         if not path.exists():
             raise FileNotFoundError("Cannot find {infile}.")
-        return str(path.with_suffix(".ll"))
+        return str(path.with_suffix(".postenzyme.ll"))
 
 
 class LLVMIRToObjectFile(PassPipeline):
