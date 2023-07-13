@@ -208,12 +208,6 @@ jobs:
         name: qir-stdlib
         path: runtime/qir-stdlib/target/release
 
-    - name: Extract Python libraries from manylinux image
-      run: |
-        pushd /opt/_internal && \
-        tar -xJf static-libs-for-embedding-only.tar.xz && \
-        popd
-
     # Build Catalyst-Runtime
     - name: Build Catalyst-Runtime
       run: |
