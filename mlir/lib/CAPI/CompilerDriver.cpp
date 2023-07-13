@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "Catalyst/Driver/CompilerDriver.h"
 #include "Catalyst/Driver/CatalystLLVMTarget.h"
 #include "Catalyst/Driver/Pipelines.h"
 
@@ -43,22 +44,24 @@ using namespace mlir;
 using namespace catalyst;
 
 namespace {
-/// Parse an MLIR module given in textual ASM representation.
-OwningOpRef<ModuleOp> parseMLIRSource(MLIRContext *ctx, const char *source)
+/// Parse an MLIR module given in textual ASM representation. Any errors during parsing will be
+/// output to diagnosticStream.
+OwningOpRef<ModuleOp> parseMLIRSource(MLIRContext *ctx, StringRef source, StringRef moduleName,
+                                      raw_ostream &diagnosticStream)
 {
-    auto moduleBuffer = llvm::MemoryBuffer::getMemBufferCopy(source, "jit source");
+    auto moduleBuffer = llvm::MemoryBuffer::getMemBufferCopy(source, moduleName);
     auto sourceMgr = std::make_shared<llvm::SourceMgr>();
     sourceMgr->AddNewSourceBuffer(std::move(moduleBuffer), SMLoc());
 
     FallbackAsmResourceMap fallbackResourceMap;
     ParserConfig parserConfig{ctx, /*verifyAfterParse=*/true, &fallbackResourceMap};
 
-    SourceMgrDiagnosticHandler sourceMgrHandler(*sourceMgr, ctx);
+    SourceMgrDiagnosticHandler sourceMgrHandler(*sourceMgr, ctx, diagnosticStream);
     return parseSourceFile<ModuleOp>(sourceMgr, parserConfig);
 }
 
 std::unique_ptr<llvm::Module> parseLLVMSource(llvm::LLVMContext &context, llvm::SMDiagnostic &err,
-                                              const char *source)
+                                              StringRef source)
 {
     auto moduleBuffer = llvm::MemoryBuffer::getMemBufferCopy(source, "jit source");
     return llvm::parseIR(llvm::MemoryBufferRef(*moduleBuffer), err, context);
@@ -96,47 +99,44 @@ void registerAllCatalystPasses()
 }
 } // namespace
 
-template <typename MLIRObject> void serializeMLIRObject(MLIRObject &obj, char **dest)
+template <typename MLIRObject> std::string serializeMLIRObject(MLIRObject &obj)
 {
     std::string output;
     llvm::raw_string_ostream ostream{output};
     obj.print(ostream);
-
-    // Need to explicitly allocate the char buffer for C interop - don't forget the + 1 for the null
-    // terminator
-    *dest = static_cast<char *>(std::malloc(output.size() + 1));
-    std::strcpy(*dest, output.c_str());
+    return output;
 }
 
-CatalystCReturnCode RunPassPipeline(const char *source, const char *passes, char **dest)
+FailureOr<std::string> RunPassPipeline(StringRef source, StringRef passes)
 {
     DialectRegistry registry;
     registerAllCatalystDialects(registry);
     MLIRContext context{registry};
-    OwningOpRef<ModuleOp> op = parseMLIRSource(&context, source);
+    OwningOpRef<ModuleOp> op = parseMLIRSource(&context, source, "jit source", llvm::errs());
 
     auto pm = PassManager::on<ModuleOp>(&context);
     if (!op || failed(parsePassPipeline(passes, pm))) {
-        return ReturnParsingFailed;
+        return failure();
     }
 
     ModuleOp moduleOp = op.get();
     if (failed(pm.run(moduleOp))) {
-        return ReturnLoweringFailed;
+        return failure();
     }
 
-    serializeMLIRObject(moduleOp, dest);
-    return ReturnOk;
+    return serializeMLIRObject(moduleOp);
 }
 
-llvm::Function *getJITFunction(llvm::Module &llvmModule)
+FailureOr<llvm::Function *> getJITFunction(MLIRContext *ctx, llvm::Module &llvmModule)
 {
     for (auto &function : llvmModule.functions()) {
         if (function.getName().starts_with("jit_")) {
             return &function;
         }
     }
-    assert(false && "Failed to find JIT function in module");
+    emitError(NameLoc::get(StringAttr::get(ctx, llvmModule.getName())),
+              "Failed to find JIT function");
+    return failure();
 }
 
 RankedTensorType inferMLIRReturnType(MLIRContext *ctx, llvm::Type *memRefDescType,
@@ -159,72 +159,62 @@ RankedTensorType inferMLIRReturnType(MLIRContext *ctx, llvm::Type *memRefDescTyp
     return RankedTensorType::get(resultShape, assumedElementType);
 }
 
-std::optional<SourceType> symbolizeSourceType(llvm::StringRef str)
+LogicalResult QuantumDriverMain(const CompilerOptions &options, FunctionAttributes *inferredData)
 {
-    return llvm::StringSwitch<std::optional<SourceType>>(str)
-        .Case("mlir", SourceMLIR)
-        .Case("llvm", SourceLLVMIR)
-        .Default(std::nullopt);
-}
-
-CatalystCReturnCode QuantumDriverMain(const char *source, const char *dest,
-                                      const char *sourceTypeStr, FunctionData *functionData)
-{
-    auto sourceType = symbolizeSourceType(sourceTypeStr);
-    if (!sourceType) {
-        return ReturnUnrecognizedSourceType;
-    }
-
     registerAllCatalystPasses();
-
     DialectRegistry registry;
     registerAllCatalystDialects(registry);
     registerLLVMTranslations(registry);
-    MLIRContext context{registry};
+    auto ctx = options.ctx;
+    ctx->appendDialectRegistry(registry);
+    ScopedDiagnosticHandler scopedHandler(
+        ctx, [&](Diagnostic &diag) { diag.print(options.diagnosticStream); });
 
     llvm::LLVMContext llvmContext;
     std::unique_ptr<llvm::Module> llvmModule;
-    if (sourceType == SourceMLIR) {
-        OwningOpRef<ModuleOp> op = parseMLIRSource(&context, source);
-        if (!op) {
-            return ReturnParsingFailed;
-        }
 
-        if (failed(runDefaultLowering(&context, *op))) {
-            return ReturnLoweringFailed;
+    // First attempt to parse the input as an MLIR module.
+    OwningOpRef<ModuleOp> op =
+        parseMLIRSource(ctx, options.source, options.moduleName, options.diagnosticStream);
+    if (op) {
+        if (failed(runDefaultLowering(ctx, *op))) {
+            return failure();
         }
 
         llvmModule = translateModuleToLLVMIR(*op, llvmContext);
         if (!llvmModule) {
-            return ReturnTranslationFailed;
+            return failure();
         }
     }
-    else if (sourceType == SourceLLVMIR) {
+    else {
+        // If parsing as an MLIR module failed, attempt to parse as an LLVM IR module.
         llvm::SMDiagnostic err;
-        llvmModule = parseLLVMSource(llvmContext, err, source);
+        llvmModule = parseLLVMSource(llvmContext, err, options.source);
         if (!llvmModule) {
-            return ReturnParsingFailed;
+            // If both MLIR and LLVM failed to parse, exit.
+            err.print(options.moduleName.data(), options.diagnosticStream);
+            return failure();
         }
     }
 
     // The user has requested that we infer the name and return type of the JIT'ed function.
-    if (functionData != nullptr) {
-        auto *function = getJITFunction(*llvmModule);
-        functionData->functionName =
-            static_cast<char *>(std::malloc(function->getName().size() + 1));
-        std::strcpy(functionData->functionName, function->getName().data());
+    if (inferredData != nullptr) {
+        auto function = getJITFunction(options.ctx, *llvmModule);
+        if (failed(function)) {
+            return failure();
+        }
+        inferredData->functionName = function.value()->getName().str();
 
-        // When inferring the return type from LLVM, assume a f64 element type.
-        // This is because the LLVM pointer type is opaque and requires looking into its uses to
-        // infer its type.
+        // When inferring the return type from LLVM, assume a f64
+        // element type. This is because the LLVM pointer type is
+        // opaque and requires looking into its uses to infer its type.
         auto tensorType =
-            inferMLIRReturnType(&context, function->getReturnType(), Float64Type::get(&context));
-        serializeMLIRObject(tensorType, &functionData->returnType);
+            inferMLIRReturnType(ctx, function.value()->getReturnType(), Float64Type::get(ctx));
+        inferredData->returnType = serializeMLIRObject(tensorType);
     }
 
-    if (failed(compileObjectFile(std::move(llvmModule), dest))) {
-        return ReturnObjectCompilationFailed;
+    if (failed(compileObjectFile(std::move(llvmModule), options.dest))) {
+        return failure();
     }
-
-    return ReturnOk;
+    return success();
 }

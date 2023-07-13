@@ -30,7 +30,7 @@ from typing import Any, List, Optional
 from catalyst._configuration import INSTALLED
 from catalyst.utils.exceptions import CompileError
 
-from mlir_quantum._mlir_libs._quantumDialects.quantum import compile_asm
+from mlir_quantum._mlir_libs._catalystDriver import compile_asm
 
 package_root = os.path.dirname(__file__)
 
@@ -486,11 +486,8 @@ class Compiler:
         inferred_data = None
         if pipelines is None:
             filename = str(pathlib.Path(workspace_name) / f"{module_name}.o")
-            # The compiler receives MLIR when compiling from Python
-            source_type = "mlir" if options.source == "python" else options.source
-
             inferred_data = compile_asm(
-                ir, filename, source_type, infer_function_data=options.source != "python"
+                ir, filename, module_name, infer_function_attrs=options.source != "python"
             )
             output = CompilerDriver.run(filename, options=options)
             filename = str(pathlib.Path(output).absolute())

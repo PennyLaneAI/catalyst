@@ -31,9 +31,16 @@ declare_mlir_python_extension(QuantumPythonSources.Extension
   ADD_TO_PARENT QuantumPythonSources
   SOURCES
     QuantumExtension.cpp
-  PRIVATE_LINK_LIBS
-    QuantumCAPI
   EMBED_CAPI_LINK_LIBS
+    QuantumCAPI
+)
+
+declare_mlir_python_extension(CatalystPythonDriver
+  MODULE_NAME _catalystDriver
+  ADD_TO_PARENT QuantumPythonSources
+  SOURCES
+    PyCompilerDriver.cpp
+  PRIVATE_LINK_LIBS
     QuantumCAPI
 )
 

@@ -49,34 +49,4 @@ PYBIND11_MODULE(_quantumDialects, m)
             }
         },
         py::arg("context") = py::none(), py::arg("load") = true);
-
-    quantum_m.def(
-        "compile_asm",
-        [](const char *source, const char *dest, const char *sourceType,
-           bool infer_function_data) -> std::tuple<const char *, const char *> {
-            FunctionData functionData;
-            CatalystCReturnCode code = QuantumDriverMain(
-                source, dest, sourceType, infer_function_data ? &functionData : nullptr);
-            if (code != ReturnOk) {
-                throw std::runtime_error("Compilation failed");
-            }
-            if (infer_function_data) {
-                return std::make_tuple(functionData.functionName, functionData.returnType);
-            }
-            return std::make_tuple("", "");
-        },
-        py::arg("source"), py::arg("dest"), py::arg("source_type") = "mlir",
-        py::arg("infer_function_data") = false);
-
-    quantum_m.def(
-        "mlir_run_pipeline",
-        [](const char *source, const char *pipeline) {
-            char *dest = nullptr;
-            CatalystCReturnCode code = RunPassPipeline(source, pipeline, &dest);
-            if (code != ReturnOk) {
-                throw std::runtime_error("Pass pipeline failed");
-            }
-            return dest;
-        },
-        py::arg("source"), py::arg("pipeline"));
 }

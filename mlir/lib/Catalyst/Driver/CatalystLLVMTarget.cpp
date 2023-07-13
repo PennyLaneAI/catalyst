@@ -86,7 +86,7 @@ void catalyst::registerLLVMTranslations(DialectRegistry &registry)
 }
 
 LogicalResult catalyst::compileObjectFile(std::unique_ptr<llvm::Module> llvmModule,
-                                          const char *filename)
+                                          StringRef filename)
 {
     using namespace llvm;
 

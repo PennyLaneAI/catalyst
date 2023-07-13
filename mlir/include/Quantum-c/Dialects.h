@@ -23,40 +23,6 @@ extern "C" {
 MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(Quantum, quantum);
 MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(Gradient, gradient);
 
-/// The possible IRs the compiler supports generation from.
-enum SourceType { SourceMLIR, SourceLLVMIR };
-
-enum CatalystCReturnCode {
-    ReturnOk,
-    ReturnUnrecognizedSourceType,
-    ReturnParsingFailed,
-    ReturnLoweringFailed,
-    ReturnTranslationFailed,
-    /// The JIT function was not found within the module
-    ReturnFunctionNotFound,
-    ReturnObjectCompilationFailed,
-};
-
-/// Run a given set of passes on an MLIR module.
-///
-/// The IR is supplied in textual form while the passes are expected in MLIR's command line
-/// interface form. This allocates a buffer for the resulting textual IR that the caller must
-/// take ownership of freeing.
-CatalystCReturnCode RunPassPipeline(const char *source, const char *passes, char **dest);
-
-/// Data about the JIT function that is optionally inferred and returned to the caller.
-///
-/// This is important for calling a function when invoking the compiler on an MLIR or LLVM textual
-/// representation intead of from Python.
-struct FunctionData {
-    char *functionName;
-    char *returnType;
-};
-
-/// Entry point to the MLIR portion of the compiler.
-CatalystCReturnCode QuantumDriverMain(const char *source, const char *dest, const char *sourceType,
-                                      FunctionData *functionData = nullptr);
-
 #ifdef __cplusplus
 }
 #endif

@@ -26,7 +26,7 @@ import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
 from jax.interpreters.mlir import ir
-from mlir_quantum._mlir_libs._quantumDialects.quantum import mlir_run_pipeline
+from mlir_quantum._mlir_libs._catalystDriver import mlir_run_pipeline
 from mlir_quantum.runtime import (
     as_ctype,
     get_ranked_memref_descriptor,
