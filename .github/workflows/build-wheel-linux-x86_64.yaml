@@ -218,6 +218,7 @@ jobs:
               -DQIR_STDLIB_INCLUDES=$GITHUB_WORKSPACE/runtime/qir-stdlib/target/release/build/include \
               -DENABLE_PYTHON=OFF \
               -DENABLE_LIGHTNING_KOKKOS=ON \
+              -DKokkos_ENABLE_SERIAL=ON \
               -DKokkos_ENABLE_OPENMP=ON \
               -DENABLE_OPENQASM=ON
 
