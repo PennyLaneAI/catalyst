@@ -8,11 +8,18 @@
   distribution.
   [#198](https://github.com/PennyLaneAI/catalyst/pull/198)
 
+<h3>Improvements</h3>
+
+* When using OpenQASM-based devices the string representation of the circuit is printed on
+  exception.
+  [#199](https://github.com/PennyLaneAI/catalyst/pull/199)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
 
-David Ittah
+Ali Asadi,
+David Ittah.
 
 # Release 0.2.0
 
