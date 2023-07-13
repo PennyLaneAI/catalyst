@@ -75,6 +75,8 @@ jobs:
           QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build" \
           QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include" \
           ENABLE_LIGHTNING_KOKKOS=ON \
+          CMAKE_ARGS="-DKokkos_ENABLE_OPENMP=ON" \
+          ENABLE_OPENQASM=ON \
           make runtime
 
       - name: Upload Catalyst-Runtime Artifact
@@ -499,6 +501,12 @@ jobs:
         name: quantum-build
         path: quantum-build
 
+    - name: Download Catalyst-Runtime Artifact
+      uses: actions/download-artifact@v3
+      with:
+        name: runtime-build
+        path: runtime-build/lib
+
     - name: Install awscli (OpenQasm device)
       id: install-aws-cli
       uses: unfor19/install-aws-cli-action@v1
@@ -519,16 +527,6 @@ jobs:
         path: qir-stdlib-build
         key: Linux-qir-stdlib-build
         fail-on-cache-miss: True
-
-    - name: Build Catalyst-Runtime
-      run: |
-        COMPILER_LAUNCHER="" \
-        ENABLE_OPENQASM=ON \
-        RT_BUILD_DIR="$(pwd)/runtime-build" \
-        QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build" \
-        QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include" \
-        CMAKE_ARGS="-DENABLE_OPENMP=ON" \
-        make runtime
 
     - name: Add Frontend Dependencies to PATH
       run: |
