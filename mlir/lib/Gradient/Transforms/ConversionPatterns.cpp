@@ -176,12 +176,15 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
                 LLVM::lookupOrCreateGenericFreeFn(moduleOp, options.useOpaquePointers);
 
             // Register the previous functions as llvm globals (for Enzyme)
+            // With the following piece of metadata, shadow memory is allocated with
+            // _mlir_memref_to_llvm_alloc and shadow memory is freed with
+            // _mlir_memref_to_llvm_free.
             insertEnzymeAllocationLike(rewriter, op->getParentOfType<ModuleOp>(), op.getLoc(),
                                        allocFn.getName(), freeFn.getName());
 
             // Register free
-            // Allocation like fails to register the allocation function as the inverse of
-            // _mlir_memref_to_llvm_free.
+            // With the following piece of metadata, _mlir_memref_to_llvm_free's semantics are
+            // stated to be equivalent to free.
             insertFunctionName(rewriter, op, "freename", StringRef("free", 5));
             insertEnzymeFunctionLike(rewriter, op, "__enzyme_function_like_free", "freename",
                                      freeFn.getName());
