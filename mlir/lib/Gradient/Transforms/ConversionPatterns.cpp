@@ -176,8 +176,18 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
                 LLVM::lookupOrCreateGenericFreeFn(moduleOp, options.useOpaquePointers);
 
             // Register the previous functions as llvm globals (for Enzyme)
+            // With the following piece of metadata, shadow memory is allocated with
+            // _mlir_memref_to_llvm_alloc and shadow memory is freed with
+            // _mlir_memref_to_llvm_free.
             insertEnzymeAllocationLike(rewriter, op->getParentOfType<ModuleOp>(), op.getLoc(),
                                        allocFn.getName(), freeFn.getName());
+
+            // Register free
+            // With the following piece of metadata, _mlir_memref_to_llvm_free's semantics are
+            // stated to be equivalent to free.
+            insertFunctionName(rewriter, op, "freename", StringRef("free", 5));
+            insertEnzymeFunctionLike(rewriter, op, "__enzyme_function_like_free", "freename",
+                                     freeFn.getName());
         }
 
         // Create the Enzyme function
@@ -391,6 +401,67 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         builder.create<LLVM::ReturnOp>(loc, result);
 
         return allocationLike;
+    }
+
+    static void insertFunctionName(PatternRewriter &rewriter, Operation *op, StringRef key,
+                                   StringRef value)
+    {
+        ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
+        PatternRewriter::InsertionGuard insertGuard(rewriter);
+        rewriter.setInsertionPointToStart(moduleOp.getBody());
+        LLVM::GlobalOp glb = moduleOp.lookupSymbol<LLVM::GlobalOp>(key);
+        if (!glb) {
+            glb = rewriter.create<LLVM::GlobalOp>(
+                moduleOp.getLoc(),
+                LLVM::LLVMArrayType::get(IntegerType::get(rewriter.getContext(), 8), value.size()),
+                true, LLVM::Linkage::Linkonce, key, rewriter.getStringAttr(value));
+        }
+    }
+
+    static LLVM::GlobalOp insertEnzymeFunctionLike(PatternRewriter &rewriter, Operation *op,
+                                                   StringRef key, StringRef name,
+                                                   StringRef originalName)
+    {
+
+        ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
+        auto *context = moduleOp.getContext();
+        PatternRewriter::InsertionGuard insertGuard(rewriter);
+        rewriter.setInsertionPointToStart(moduleOp.getBody());
+
+        LLVM::GlobalOp glb = moduleOp.lookupSymbol<LLVM::GlobalOp>(key);
+
+        auto ptrType = LLVM::LLVMPointerType::get(context);
+        if (!glb) {
+            glb = rewriter.create<LLVM::GlobalOp>(
+                moduleOp.getLoc(), LLVM::LLVMArrayType::get(ptrType, 2), /*isConstant=*/false,
+                LLVM::Linkage::External, key, nullptr);
+        }
+
+        // Create the block and push it back in the global
+        auto *contextGlb = glb.getContext();
+        Block *block = new Block();
+        glb.getInitializerRegion().push_back(block);
+        rewriter.setInsertionPointToStart(block);
+
+        auto llvmPtr = LLVM::LLVMPointerType::get(contextGlb);
+
+        // Get original global name
+        auto originalNameRefAttr = SymbolRefAttr::get(contextGlb, originalName);
+        auto originalGlobal =
+            rewriter.create<LLVM::AddressOfOp>(glb.getLoc(), llvmPtr, originalNameRefAttr);
+
+        // Get global name
+        auto nameRefAttr = SymbolRefAttr::get(contextGlb, name);
+        auto enzymeGlobal = rewriter.create<LLVM::AddressOfOp>(glb.getLoc(), llvmPtr, nameRefAttr);
+
+        auto undefArray =
+            rewriter.create<LLVM::UndefOp>(glb.getLoc(), LLVM::LLVMArrayType::get(ptrType, 2));
+        Value llvmInsert0 =
+            rewriter.create<LLVM::InsertValueOp>(glb.getLoc(), undefArray, originalGlobal, 0);
+        Value llvmInsert1 =
+            rewriter.create<LLVM::InsertValueOp>(glb.getLoc(), llvmInsert0, enzymeGlobal, 1);
+        rewriter.create<LLVM::ReturnOp>(glb.getLoc(), llvmInsert1);
+        return glb;
     }
 };
 
