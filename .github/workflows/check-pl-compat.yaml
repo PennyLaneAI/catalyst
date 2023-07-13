@@ -60,12 +60,12 @@ jobs:
     - uses: actions/cache@v3
       with:
         path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-build
+        key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-build-opt
         fail-on-cache-miss: True
     - uses: actions/cache@v3
       with:
         path: mhlo-build
-        key: ${{ runner.os }}-mhlo-${{ steps.mhlo-hash.outputs.mhlo-hash }}-default-build
+        key: ${{ runner.os }}-mhlo-${{ steps.mhlo-hash.outputs.mhlo-hash }}-default-build-opt
         fail-on-cache-miss: True
     - uses: actions/cache@v3
       with:
