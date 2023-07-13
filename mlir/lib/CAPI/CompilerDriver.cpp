@@ -129,13 +129,14 @@ FailureOr<std::string> RunPassPipeline(StringRef source, StringRef passes)
 
 FailureOr<llvm::Function *> getJITFunction(MLIRContext *ctx, llvm::Module &llvmModule)
 {
+    Location loc = NameLoc::get(StringAttr::get(ctx, llvmModule.getName()));
     for (auto &function : llvmModule.functions()) {
+        emitRemark(loc) << "Found LLVM function: " << function.getName() << "\n";
         if (function.getName().starts_with("jit_")) {
             return &function;
         }
     }
-    emitError(NameLoc::get(StringAttr::get(ctx, llvmModule.getName())),
-              "Failed to find JIT function");
+    emitError(loc, "Failed to find JIT function");
     return failure();
 }
 

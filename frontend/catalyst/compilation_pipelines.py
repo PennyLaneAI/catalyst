@@ -416,36 +416,29 @@ class QJIT:
     """
 
     def __init__(self, fn, compile_options: CompileOptions):
-        valid_sources = ["python", "mlir", "llvm"]
-        if compile_options.source not in valid_sources:
-            raise ValueError(f"Expected source type to be one of {valid_sources}")
-
-        self.qfunc = fn if compile_options.source == "python" else None
+        self.qfunc = fn
         self.jaxed_qfunc = None
         self.c_sig = None
         functools.update_wrapper(self, fn)
         self.compile_options = compile_options
         self._compiler = Compiler()
         self._jaxpr = None
-        self._mlir = fn if compile_options.source == "mlir" else None
-        self._llvmir = fn if compile_options.source == "llvm" else None
+        self._mlir = None
+        self._llvmir = None
         self.mlir_module = None
         self.compiled_function = None
         self.user_typed = False
+        self.compiling_from_textual_ir = isinstance(fn, str)
 
-        if compile_options.source == "python":
+        if self.compiling_from_textual_ir:
+            TracingContext.check_is_not_tracing("Cannot compile from IR in tracing context.")
+        else:
             parameter_types = get_type_annotations(self.qfunc)
             if parameter_types is not None:
                 self.user_typed = True
                 self.mlir_module = self.get_mlir(*parameter_types)
                 if self.compile_options.target == "binary":
                     self.compiled_function = self.compile()
-        else:
-            if not isinstance(fn, str):
-                raise TypeError(
-                    "Specifying a source other than Python requires a str of textual IR"
-                )
-            TracingContext.check_is_not_tracing("Cannot compile from IR in tracing context.")
 
     def print_stage(self, stage):
         """Print one of the recorded stages.
@@ -504,7 +497,18 @@ class QJIT:
     def compile(self):
         """Compile the current MLIR module."""
 
-        if self.compile_options.source == "python":
+        if self.compiling_from_textual_ir:
+            shared_object, inferred_func_data = self._compiler.run_from_ir(
+                self.qfunc, "mlir_module", self.compile_options
+            )
+            qfunc_name = inferred_func_data[0]
+            # Parse back the return type given as a string
+            with ir.Context():
+                restype = [ir.RankedTensorType.parse(inferred_func_data[1])]
+
+            # TODO: Not sure how to get the LLVM IR in a nice way
+            # self._llvmir = self._compiler.get_output_of("LLVMDialectToLLVMIR")
+        else:
             # This will make a check before sending it to the compiler that the return type
             # is actually available in most systems. f16 needs a special symbol and linking
             # will fail if it is not available.
@@ -523,17 +527,6 @@ class QJIT:
                 self.mlir_module,
                 options=self.compile_options,
             )
-        else:
-            shared_object, inferred_func_data = self._compiler.run_from_ir(
-                self.mlir or self.qir, "mlir_module", self.compile_options
-            )
-            qfunc_name = inferred_func_data[0]
-            # Parse back the return type given as a string
-            with ir.Context():
-                restype = [ir.RankedTensorType.parse(inferred_func_data[1])]
-
-            # TODO: Not sure how to get the LLVM IR in a nice way
-            # self._llvmir = self._compiler.get_output_of("LLVMDialectToLLVMIR")
 
         return CompiledFunction(shared_object, qfunc_name, restype)
 
@@ -559,7 +552,7 @@ class QJIT:
             if self.user_typed:
                 msg = "Provided arguments did not match declared signature, recompiling..."
                 warnings.warn(msg, UserWarning)
-            if self.compile_options.source == "python":
+            if not self.compiling_from_textual_ir:
                 self.mlir_module = self.get_mlir(*r_sig)
             function = self.compile()
         else:
@@ -698,7 +691,6 @@ class JAX_QJIT:
 def qjit(
     fn=None,
     *,
-    source="python",
     target="binary",
     keep_intermediate=False,
     verbose=False,
@@ -796,13 +788,9 @@ def qjit(
     """
 
     if fn is not None:
-        return QJIT(
-            fn, CompileOptions(verbose, logfile, source, target, keep_intermediate, pipelines)
-        )
+        return QJIT(fn, CompileOptions(verbose, logfile, target, keep_intermediate, pipelines))
 
     def wrap_fn(fn):
-        return QJIT(
-            fn, CompileOptions(verbose, logfile, source, target, keep_intermediate, pipelines)
-        )
+        return QJIT(fn, CompileOptions(verbose, logfile, target, keep_intermediate, pipelines))
 
     return wrap_fn
