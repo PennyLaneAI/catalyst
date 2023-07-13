@@ -337,8 +337,13 @@ jobs:
       run: |
         python${{ matrix.python_version }} -m pip install $GITHUB_WORKSPACE/dist/*.whl
 
+    - name: Install PennyLane Plugins
+      run: |
+        python${{ matrix.python_version }} -m pip install PennyLane-Lightning-Kokkos
+        python${{ matrix.python_version }} -m pip install amazon-braket-pennylane-plugin "boto3==1.26"
+
     - name: Run Python Pytest Tests
       run: |
         python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest -n auto
         python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest --backend="lightning.kokkos" -n auto
-        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest --runbraket=ON -k "not remotetests" -n auto
+        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest --runbraket=LOCAL -n auto
