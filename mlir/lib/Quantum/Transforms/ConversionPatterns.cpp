@@ -248,13 +248,17 @@ struct CustomOpPattern : public OpConversionPattern<CustomOp> {
 
         SmallVector<Type> argTypes(adaptor.getOperands().getTypes().begin(),
                                    adaptor.getOperands().getTypes().end());
+        argTypes.insert(argTypes.end(), IntegerType::get(ctx, 1));
 
         std::string qirName = "__quantum__qis__" + op.getGateName().str();
         Type qirSignature = LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), argTypes);
 
         LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
 
-        rewriter.create<LLVM::CallOp>(loc, fnDecl, adaptor.getOperands());
+        SmallVector<Value> args = adaptor.getOperands();
+        args.insert(args.end(), rewriter.create<LLVM::ConstantOp>(
+                                    loc, rewriter.getBoolAttr(op.getAdjointFlag())));
+        rewriter.create<LLVM::CallOp>(loc, fnDecl, args);
         rewriter.replaceOp(op, adaptor.getInQubits());
 
         return success();
@@ -270,9 +274,10 @@ struct MultiRZOpPattern : public OpConversionPattern<MultiRZOp> {
         Location loc = op.getLoc();
         MLIRContext *ctx = getContext();
 
-        StringRef qirName = "__quantum__qis__MultiRZ";
+        std::string qirName = "__quantum__qis__MultiRZ";
         Type qirSignature = LLVM::LLVMFunctionType::get(
-            LLVM::LLVMVoidType::get(ctx), {Float64Type::get(ctx), IntegerType::get(ctx, 64)},
+            LLVM::LLVMVoidType::get(ctx),
+            {Float64Type::get(ctx), IntegerType::get(ctx, 1), IntegerType::get(ctx, 64)},
             /*isVarArg=*/true);
 
         LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
@@ -281,6 +286,8 @@ struct MultiRZOpPattern : public OpConversionPattern<MultiRZOp> {
         SmallVector<Value> args = adaptor.getOperands();
         args.insert(args.begin() + 1,
                     rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(numQubits)));
+        args.insert(args.begin() + 1, rewriter.create<LLVM::ConstantOp>(
+                                          loc, rewriter.getBoolAttr(op.getAdjointFlag())));
 
         rewriter.create<LLVM::CallOp>(loc, fnDecl, args);
         rewriter.replaceOp(op, adaptor.getInQubits());
@@ -305,11 +312,12 @@ struct QubitUnitaryOpPattern : public OpConversionPattern<QubitUnitaryOp> {
         Type matrixType = conv->convertType(
             MemRefType::get({UNKNOWN, UNKNOWN}, ComplexType::get(Float64Type::get(ctx))));
 
-        StringRef qirName = "__quantum__qis__QubitUnitary";
-        Type qirSignature = LLVM::LLVMFunctionType::get(
-            LLVM::LLVMVoidType::get(ctx),
-            {LLVM::LLVMPointerType::get(matrixType), IntegerType::get(ctx, 64)},
-            /*isVarArg=*/true);
+        std::string qirName = "__quantum__qis__QubitUnitary";
+        Type qirSignature =
+            LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx),
+                                        {LLVM::LLVMPointerType::get(matrixType),
+                                         IntegerType::get(ctx, 1), IntegerType::get(ctx, 64)},
+                                        /*isVarArg=*/true);
 
         LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
 
@@ -317,6 +325,8 @@ struct QubitUnitaryOpPattern : public OpConversionPattern<QubitUnitaryOp> {
         SmallVector<Value> args = adaptor.getOperands();
         args.insert(args.begin() + 1,
                     rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(numQubits)));
+        args.insert(args.begin() + 1, rewriter.create<LLVM::ConstantOp>(
+                                          loc, rewriter.getBoolAttr(op.getAdjointFlag())));
         // Replace the memref argument (LLVM struct) with a pointer to memref.
         Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
         args[0] = rewriter.create<LLVM::AllocaOp>(loc, LLVM::LLVMPointerType::get(matrixType), c1);

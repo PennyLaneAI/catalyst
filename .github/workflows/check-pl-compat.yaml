@@ -40,6 +40,10 @@ jobs:
       id: mhlo-hash
       run: echo "mhlo-hash=$(grep mhlo .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
 
+    - name: Get Enzyme Version
+      id: enzyme-hash
+      run: echo "enzyme-hash=$(grep enzyme .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
+
     - name: Install deps
       run: |
         sudo apt-get install -y cmake ninja-build ccache clang lld libomp-dev
@@ -60,12 +64,17 @@ jobs:
     - uses: actions/cache@v3
       with:
         path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-build
+        key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-build-opt
         fail-on-cache-miss: True
     - uses: actions/cache@v3
       with:
         path: mhlo-build
         key: ${{ runner.os }}-mhlo-${{ steps.mhlo-hash.outputs.mhlo-hash }}-default-build
+        fail-on-cache-miss: True
+    - uses: actions/cache@v3
+      with:
+        path: enzyme-build
+        key: ${{ runner.os }}-enzyme-${{ steps.enzyme-hash.outputs.enzyme-hash }}-default-build
         fail-on-cache-miss: True
     - uses: actions/cache@v3
       with:
@@ -143,6 +152,7 @@ jobs:
         echo "PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
         echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
         echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
+        echo "ENZYME_DIR=$(pwd)/enzyme-build/Enzyme" >> $GITHUB_ENV
 
     - name: Run Frontend Tests
       run: |

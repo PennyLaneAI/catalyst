@@ -1,3 +1,38 @@
+# Release 0.2.2-dev
+
+<h3>New features</h3>
+
+* Add a preliminary support for native quantum Adjoint operation. `catalyst.adjoint` computes the
+  adjoint of the quantum computation defined by a callee function. Catalyst control flow
+  instructions are not handled yet. The usage pattern is as follows:
+  ``` python
+  def circuit(param):
+      qml.RX(param, wires=0)
+      qml.RY(param, wires=1)
+      qml.RZ(param, wires=2)
+
+  @qjit
+  @qml.qnode(qml.device("lightning.qubit", wires=3))
+  def workflow():
+      catalyst.adjoint(circuit)(pnp.pi/2)
+      return qml.state()
+
+  workflow()
+  ```
+
+<h3>Improvements</h3>
+
+<h3>Breaking changes</h3>
+
+<h3>Bug fixes</h3>
+
+<h3>Contributors</h3>
+
+This release contains contributions from (in alphabetical order):
+
+Sergei Mironov.
+
+
 # Release 0.2.1
 
 <h3>Bug fixes</h3>
@@ -15,7 +50,7 @@
   [#199](https://github.com/PennyLaneAI/catalyst/pull/199)
 
 * Use ``pybind11::module`` interface library instead of ``pybind11::embed`` in the runtime for
-  OpenQasm backend to avoid link to the python library at compile time.
+  OpenQasm backend to avoid linking to the python library at compile time.
   [#200](https://github.com/PennyLaneAI/catalyst/pull/200)
 
 <h3>Contributors</h3>
