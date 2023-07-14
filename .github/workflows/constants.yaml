@@ -16,6 +16,18 @@ on:
       enzyme_version:
         description: "Enzyme version"
         value: ${{ jobs.set-constants.outputs.enzyme_version }}
+      python_versions:
+        description: "List of Python versions"
+        value: ${{ jobs.set-constants.outputs.python_versions }}
+      rt_backends:
+        description: "List of backends."
+        value: ${{ jobs.set-constants.outputs.rt_backends }}
+
+# TODO: Commenting this since a deadlock for concurrency group 'Check Catalyst Build-refs/pull/209/merge'
+# was detected between 'top level workflow' and 'constants'
+# concurrency:
+#   group: ${{ github.workflow }}-${{ github.ref }}
+#   cancel-in-progress: true
 
 jobs:
   set-constants:
@@ -37,7 +49,17 @@ jobs:
         id: enzyme_version
         run: echo "enzyme_version=$(grep enzyme .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
 
+      - name: Python versions
+        id: python_versions
+        run: echo "python_versions=[\"3.8\", \"3.9\", \"3.10\", \"3.11\"]" >> $GITHUB_OUTPUT
+
+      - name: Runtime Backend Devices
+        id: rt_backends
+        run: echo "rt_backends=[\"lightning\", \"lightning-kokkos\", \"openqasm\"]" >> $GITHUB_OUTPUT
+
     outputs:
       llvm_version: ${{ steps.llvm_version.outputs.llvm_version }}
       mhlo_version: ${{ steps.mhlo_version.outputs.mhlo_version }}
       enzyme_version: ${{ steps.enzyme_version.outputs.enzyme_version }}
+      python_versions: ${{ steps.python_versions.outputs.python_versions }}
+      rt_backends: ${{ steps.rt_backends.outputs.rt_backends }}

@@ -147,16 +147,12 @@ jobs:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
-    - name: Get MHLO Version
-      id: mhlo-hash
-      run: echo "mhlo-hash=$(grep mhlo .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
-
     - name: Cache MHLO Build
       id: cache-mhlo
       uses: actions/cache@v3
       with:
         path: mhlo-build
-        key: ${{ runner.os }}-mhlo-${{ steps.mhlo-hash.outputs.mhlo-hash }}-default-build
+        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-build
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
@@ -184,7 +180,7 @@ jobs:
       uses: actions/checkout@v3
       with:
         repository: tensorflow/mlir-hlo
-        ref: ${{ steps.mhlo-hash.outputs.mhlo-hash }}
+        ref: ${{ needs.constants.outputs.mhlo_version }}
         path: mlir/mlir-hlo
 
     - name: Install Deps
@@ -209,16 +205,12 @@ jobs:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
-    - name: Get Enzyme Version
-      id: enzyme-hash
-      run: echo "enzyme-hash=$(grep enzyme .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
-
     - name: Cache Enzyme Build
       id: cache-enzyme
       uses: actions/cache@v3
       with:
         path: enzyme-build
-        key: ${{ runner.os }}-enzyme-${{ steps.enzyme-hash.outputs.enzyme-hash }}-default-build
+        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.enzyme_version }}-default-build
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
@@ -245,7 +237,7 @@ jobs:
       uses: actions/checkout@v3
       with:
         repository: EnzymeAD/Enzyme
-        ref: ${{ steps.enzyme-hash.outputs.enzyme-hash }}
+        ref: ${{ needs.constants.outputs.llvm_version }}
         path: mlir/Enzyme
 
     - name: Install Deps
@@ -344,28 +336,20 @@ jobs:
         key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
         fail-on-cache-miss: True
 
-    - name: Get MHLO Version
-      id: mhlo-hash
-      run: echo "mhlo-hash=$(grep mhlo .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
-
     - name: Get Cached MHLO Build
       id: cache-mhlo
       uses: actions/cache@v3
       with:
         path: mhlo-build
-        key: ${{ runner.os }}-mhlo-${{ steps.mhlo-hash.outputs.mhlo-hash }}-default-build
+        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-build
         fail-on-cache-miss: True
-    
-    - name: Get Enzyme Version
-      id: enzyme-hash
-      run: echo "enzyme-hash=$(grep enzyme .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
 
     - name: Get Cached Enzyme Build
       id: cache-enzyme
       uses: actions/cache@v3
       with:
         path: enzyme-build
-        key: ${{ runner.os }}-enzyme-${{ steps.enzyme-hash.outputs.enzyme-hash }}-default-build
+        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-default-build
         fail-on-cache-miss: True
 
     - name: Download Quantum Build Artifact
@@ -436,28 +420,20 @@ jobs:
         key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
         fail-on-cache-miss: True
 
-    - name: Get MHLO Version
-      id: mhlo-hash
-      run: echo "mhlo-hash=$(grep mhlo .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
-
     - name: Get Cached MHLO Build
       id: cache-mhlo
       uses: actions/cache@v3
       with:
         path: mhlo-build
-        key: ${{ runner.os }}-mhlo-${{ steps.mhlo-hash.outputs.mhlo-hash }}-default-build
+        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-build
         fail-on-cache-miss: True
-
-    - name: Get Enzyme Version
-      id: enzyme-hash
-      run: echo "enzyme-hash=$(grep enzyme .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
 
     - name: Get Cached Enzyme Build
       id: cache-enzyme
       uses: actions/cache@v3
       with:
         path: enzyme-build
-        key: ${{ runner.os }}-enzyme-${{ steps.enzyme-hash.outputs.enzyme-hash }}-default-build
+        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-default-build
         fail-on-cache-miss: True
 
     - name: Download Quantum Build Artifact
@@ -515,28 +491,20 @@ jobs:
         key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
         fail-on-cache-miss: True
 
-    - name: Get MHLO Version
-      id: mhlo-hash
-      run: echo "mhlo-hash=$(grep mhlo .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
-
     - name: Get Cached MHLO Build
       id: cache-mhlo
       uses: actions/cache@v3
       with:
         path: mhlo-build
-        key: ${{ runner.os }}-mhlo-${{ steps.mhlo-hash.outputs.mhlo-hash }}-default-build
+        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-build
         fail-on-cache-miss: True
-
-    - name: Get Enzyme Version
-      id: enzyme-hash
-      run: echo "enzyme-hash=$(grep enzyme .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
 
     - name: Get Cached Enzyme Build
       id: cache-enzyme
       uses: actions/cache@v3
       with:
         path: enzyme-build
-        key: ${{ runner.os }}-enzyme-${{ steps.enzyme-hash.outputs.enzyme-hash }}-default-build
+        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-default-build
         fail-on-cache-miss: True
 
     - name: Download Quantum Build Artifact
@@ -596,12 +564,12 @@ jobs:
 
   runtime-tests:
     name: Runtime Tests (Linux)
-    needs: [qir-stdlib]
+    needs: [constants, qir-stdlib]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        simulator: ['lightning', 'lightning-kokkos', 'openqasm']
+        backend: ${{ fromJson(needs.constants.outputs.rt_backends) }}
 
     steps:
       - name: Checkout the repo
@@ -612,14 +580,14 @@ jobs:
           sudo apt-get -y -q install cmake ninja-build libomp-dev lcov
 
       - name: Install awscli (OpenQasm device)
-        if: ${{ matrix.simulator == 'openqasm' }}
+        if: ${{ matrix.backend == 'openqasm' }}
         id: install-aws-cli
         uses: unfor19/install-aws-cli-action@v1
         with:
           version: 2
 
       - name: Install additional dependencies (OpenQasm device)
-        if: ${{ matrix.simulator == 'openqasm' }}
+        if: ${{ matrix.backend == 'openqasm' }}
         run: |
           pip install numpy amazon-braket-sdk
           echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
@@ -633,7 +601,7 @@ jobs:
           fail-on-cache-miss: True
 
       - name: Build Runtime test suite for Lightning simulator
-        if: ${{ matrix.simulator == 'lightning' }}
+        if: ${{ matrix.backend == 'lightning' }}
         run: |
             C_COMPILER=$(which gcc) \
             CXX_COMPILER=$(which g++) \
@@ -644,7 +612,7 @@ jobs:
             mv runtime/build/coverage.info coverage-${{ github.job }}.info
 
       - name: Build Runtime test suite for Lightning-Kokkos simulator
-        if: ${{ matrix.simulator == 'lightning-kokkos' }}
+        if: ${{ matrix.backend == 'lightning-kokkos' }}
         run: |
             C_COMPILER=$(which gcc) \
             CXX_COMPILER=$(which g++) \
@@ -656,7 +624,7 @@ jobs:
             make test-runtime
 
       - name: Build Runtime test suite for OpenQasm device
-        if: ${{ matrix.simulator == 'openqasm' }}
+        if: ${{ matrix.backend == 'openqasm' }}
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_BRAKET_DEVICE_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_BRAKET_DEVICE_ACCESS_KEY }}
@@ -670,14 +638,14 @@ jobs:
             make test-runtime
 
       - name: Upload to Codecov
-        if: ${{ matrix.simulator == 'lightning' }}
+        if: ${{ matrix.backend == 'lightning' }}
         uses: codecov/codecov-action@v3
         with:
           fail_ci_if_error: true
           token: ${{ secrets.CODECOV_TOKEN }}
 
       - name: Build examples
-        if: ${{ matrix.simulator == 'lightning' }}
+        if: ${{ matrix.backend == 'lightning' }}
         run: |
           C_COMPILER=$(which gcc) \
           CXX_COMPILER=$(which g++) \
