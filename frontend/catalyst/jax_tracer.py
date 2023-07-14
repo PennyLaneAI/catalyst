@@ -299,10 +299,14 @@ def trace_quantum_tape(
             qubit_states.clear()
         elif op.__class__.__name__ == "ForLoop":
             loop_bounds, body_consts, iter_args = op_args
+            print(f"{body_consts=}")
+            print(f"{iter_args=}")
             qreg = insert_to_qreg(qubit_states, qreg)
             header_and_iter_args_plus_consts = loop_bounds + body_consts + iter_args + [qreg]
             outs = jprim.qfor(op.body_jaxpr, len(body_consts), *header_and_iter_args_plus_consts)
             v, qreg = tree_unflatten(op.body_tree, outs)
+            print(f"{v=}, {qreg=}")
+            # qreg = qregs[0]
             p.send_partial_input(v)
             # We don't know if the loop modified any of the qubits
             # So let's load them all...

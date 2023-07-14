@@ -1113,13 +1113,17 @@ class ForLoopCallable:
         # Insert iteration counter into loop body arguments with the type of the lower bound.
         args = (self.lower_bound, *args)
 
-        def new_body(*args_and_qreg):
-            args, qreg = args_and_qreg[:-1], args_and_qreg[-1]
+        # def new_body(*qreg_and_args):
+        #     qregs, cargs, kwargs = qreg_and_args
+        #     qreg = qregs[0]
+        def new_body(*qreg_and_args):
+            cargs, _, qregs = qreg_and_args
+            qreg = qregs[0]
 
             with qml.QueuingManager.stop_recording():
                 with JaxTape() as tape:
                     with tape.quantum_tape:
-                        out = self.body_fn(*args)
+                        out = self.body_fn(*cargs)
                     tape.set_return_val(out)
                     new_quantum_tape = JaxTape.device.expand_fn(tape.quantum_tape)
                     tape.quantum_tape = new_quantum_tape
@@ -1134,9 +1138,11 @@ class ForLoopCallable:
             return return_values, qreg
 
         body_jaxpr, body_consts, body_tree = ForLoopCallable._create_jaxpr(
-            (*args, jprim.Qreg()), new_body
+            # ([jprim.Qreg()], args, {}), new_body
+            (args, {}, [jprim.Qreg()]), new_body
         )
 
+        print(f"{body_tree}")
         flat_init_vals_no_qubits = tree_flatten(args)[0]
 
         ForLoop(
@@ -1149,6 +1155,7 @@ class ForLoopCallable:
 
         # Create tracers for any non-qreg return values (if there are any).
         ret_vals, _ = tree_unflatten(body_tree, body_jaxpr.out_avals)
+        print(f"{ret_vals=}")
         a, t = tree_flatten(ret_vals)
         return ctx.jax_tape.create_tracer(t, a)
 
