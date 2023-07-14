@@ -14,12 +14,14 @@
 
 #pragma once
 
+#include "Catalyst/Driver/CompilerDriver.h"
+
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Support/LogicalResult.h"
 
 namespace catalyst {
 
-mlir::LogicalResult runDefaultLowering(mlir::MLIRContext *ctx, mlir::ModuleOp moduleOp);
+mlir::LogicalResult runDefaultLowering(const CompilerOptions &options, mlir::ModuleOp moduleOp);
 
 }

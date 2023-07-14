@@ -24,8 +24,12 @@ set(LLVM_LINK_COMPONENTS
   )
 
 add_mlir_library(CatalystCompilerDriver
+    CompilerDriver.cpp
     CatalystLLVMTarget.cpp
     Pipelines.cpp
 
     LINK_LIBS PRIVATE
+    MhloRegisterDialects
+    StablehloRegister
+    ${ALL_MHLO_PASSES}
 )

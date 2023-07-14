@@ -60,10 +60,10 @@ OwningOpRef<ModuleOp> parseMLIRSource(MLIRContext *ctx, StringRef source, String
     return parseSourceFile<ModuleOp>(sourceMgr, parserConfig);
 }
 
-std::unique_ptr<llvm::Module> parseLLVMSource(llvm::LLVMContext &context, llvm::SMDiagnostic &err,
-                                              StringRef source)
+std::unique_ptr<llvm::Module> parseLLVMSource(llvm::LLVMContext &context, StringRef source,
+                                              StringRef moduleName, llvm::SMDiagnostic &err)
 {
-    auto moduleBuffer = llvm::MemoryBuffer::getMemBufferCopy(source, "jit source");
+    auto moduleBuffer = llvm::MemoryBuffer::getMemBufferCopy(source, moduleName);
     return llvm::parseIR(llvm::MemoryBufferRef(*moduleBuffer), err, context);
 }
 
@@ -160,14 +160,16 @@ RankedTensorType inferMLIRReturnType(MLIRContext *ctx, llvm::Type *memRefDescTyp
     return RankedTensorType::get(resultShape, assumedElementType);
 }
 
-LogicalResult QuantumDriverMain(const CompilerOptions &options, FunctionAttributes *inferredData)
+LogicalResult QuantumDriverMain(const CompilerOptions &options,
+                                std::optional<FunctionAttributes> inferredData)
 {
     registerAllCatalystPasses();
     DialectRegistry registry;
     registerAllCatalystDialects(registry);
     registerLLVMTranslations(registry);
-    auto ctx = options.ctx;
+    MLIRContext *ctx = options.ctx;
     ctx->appendDialectRegistry(registry);
+    ctx->disableMultithreading();
     ScopedDiagnosticHandler scopedHandler(
         ctx, [&](Diagnostic &diag) { diag.print(options.diagnosticStream); });
 
@@ -178,7 +180,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, FunctionAttribut
     OwningOpRef<ModuleOp> op =
         parseMLIRSource(ctx, options.source, options.moduleName, options.diagnosticStream);
     if (op) {
-        if (failed(runDefaultLowering(ctx, *op))) {
+        if (failed(runDefaultLowering(options, *op))) {
             return failure();
         }
 
@@ -190,7 +192,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, FunctionAttribut
     else {
         // If parsing as an MLIR module failed, attempt to parse as an LLVM IR module.
         llvm::SMDiagnostic err;
-        llvmModule = parseLLVMSource(llvmContext, err, options.source);
+        llvmModule = parseLLVMSource(llvmContext, options.source, options.moduleName, err);
         if (!llvmModule) {
             // If both MLIR and LLVM failed to parse, exit.
             err.print(options.moduleName.data(), options.diagnosticStream);
@@ -199,7 +201,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, FunctionAttribut
     }
 
     // The user has requested that we infer the name and return type of the JIT'ed function.
-    if (inferredData != nullptr) {
+    if (inferredData.has_value()) {
         auto function = getJITFunction(options.ctx, *llvmModule);
         if (failed(function)) {
             return failure();
@@ -214,7 +216,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, FunctionAttribut
         inferredData->returnType = serializeMLIRObject(tensorType);
     }
 
-    if (failed(compileObjectFile(std::move(llvmModule), options.dest))) {
+    if (failed(compileObjectFile(std::move(llvmModule), options.getObjectFile()))) {
         return failure();
     }
     return success();

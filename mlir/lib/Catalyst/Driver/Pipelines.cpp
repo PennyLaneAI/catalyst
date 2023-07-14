@@ -13,104 +13,182 @@
 // limitations under the License.
 
 #include "Catalyst/Driver/Pipelines.h"
+#include "Catalyst/Driver/CompilerDriver.h"
 
+#include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassRegistry.h"
+#include "llvm/Support/FileSystem.h"
+
+#include <filesystem>
 
 using namespace mlir;
 
 namespace {
-LogicalResult addMhloToCorePasses(PassManager &pm)
+// clang-format off
+const static SmallVector<const char *> mhloToCorePasses = {
+    "func.func(chlo-legalize-to-hlo)",
+    "stablehlo-legalize-to-hlo",
+    "func.func(mhlo-legalize-control-flow)",
+    "func.func(hlo-legalize-to-linalg)",
+    "func.func(mhlo-legalize-to-std)",
+    "convert-to-signless",
+};
+
+const static SmallVector<const char *> quantumCompilationPasses = {
+    "lower-gradients",
+    "convert-arraylist-to-memref",
+};
+
+const static SmallVector<const char *> bufferizationPasses = {
+    "inline",
+    "gradient-bufferize",
+    "scf-bufferize",
+    "convert-tensor-to-linalg",      // tensor.pad
+    "convert-elementwise-to-linalg", // Must be run before --arith-bufferize
+    "arith-bufferize",
+    "empty-tensor-to-alloc-tensor",
+    "func.func(bufferization-bufferize)",
+    "func.func(tensor-bufferize)",
+    "func.func(linalg-bufferize)",
+    "func.func(tensor-bufferize)",
+    "quantum-bufferize",
+    "func-bufferize",
+    "func.func(finalizing-bufferize)",
+    // "func.func(buffer-hoisting)",
+    "func.func(buffer-loop-hoisting)",
+    // "func.func(buffer-deallocation)",
+    "convert-bufferization-to-memref",
+    "canonicalize",
+    // "cse",
+    "cp-global-memref",
+};
+
+const static SmallVector<const char *> lowerToLLVMPasses = {
+    "func.func(convert-linalg-to-loops)",
+    "convert-scf-to-cf",
+    // This pass expands memref operations that modify the metadata of a memref (sizes, offsets,
+    // strides) into a sequence of easier to analyze constructs. In particular, this pass
+    // transforms operations into explicit sequence of operations that model the effect of this
+    // operation on the different metadata. This pass uses affine constructs to materialize
+    // these effects. Concretely, expanded-strided-metadata is used to decompose memref.subview
+    // as it has no lowering in -finalize-memref-to-llvm.
+    "expand-strided-metadata",
+    "lower-affine",
+    "arith-expand", // some arith ops (ceildivsi) require expansion to be lowered to llvm
+    "convert-complex-to-standard", // added for complex.exp lowering
+    "convert-complex-to-llvm",
+    "convert-math-to-llvm",
+    // Run after -convert-math-to-llvm as it marks math::powf illegal without converting it.
+    "convert-math-to-libm",
+    "convert-arith-to-llvm",
+    "finalize-memref-to-llvm{use-generic-functions}",
+    "convert-index-to-llvm",
+    "convert-gradient-to-llvm",
+    "convert-quantum-to-llvm",
+    "emit-catalyst-py-interface",
+    // Remove any dead casts as the final pass expects to remove all existing casts,
+    // but only those that form a loop back to the original type.
+    "canonicalize",
+    "reconcile-unrealized-casts",
+};
+// clang-format on
+
+std::string joinPasses(const SmallVector<const char *> &passes)
 {
-    const char *mhloToCorePipeline = "func.func(chlo-legalize-to-hlo),"
-                                     "stablehlo-legalize-to-hlo,"
-                                     "func.func(mhlo-legalize-control-flow),"
-                                     "func.func(hlo-legalize-to-linalg),"
-                                     "func.func(mhlo-legalize-to-std),"
-                                     "convert-to-signless";
-    return parsePassPipeline(mhloToCorePipeline, pm);
+    std::string joined;
+    llvm::raw_string_ostream stream{joined};
+    llvm::interleaveComma(passes, stream);
+    return joined;
 }
 
-LogicalResult addQuantumCompilationPasses(PassManager &pm)
+LogicalResult dumpStringToFile(StringRef directory, StringRef fileName, std::string &outString)
 {
-    const char *quantumPipeline = "lower-gradients,"
-                                  "convert-arraylist-to-memref";
-
-    return parsePassPipeline(quantumPipeline, pm);
+    using std::filesystem::path;
+    std::error_code errCode;
+    std::string outFileName =
+        path(directory.str()) / path(fileName.str()).replace_extension(".mlir");
+    llvm::raw_fd_ostream outfile{outFileName, errCode};
+    if (errCode) {
+        llvm::errs() << "unable to open file: " << errCode.message() << "\n";
+        return failure();
+    }
+    outfile << outString;
+    outfile.flush();
+    outString.clear();
+    return success();
 }
 
-LogicalResult addBufferizationPasses(PassManager &pm)
-{
-    const char *bufferizationPipeline =
-        "inline,"
-        "gradient-bufferize,"
-        "scf-bufferize,"
-        "convert-tensor-to-linalg,"      // tensor.pad
-        "convert-elementwise-to-linalg," // Must be run before --arith-bufferize
-        "arith-bufferize,"
-        "empty-tensor-to-alloc-tensor,"
-        "func.func(bufferization-bufferize),"
-        "func.func(tensor-bufferize),"
-        "func.func(linalg-bufferize),"
-        "func.func(tensor-bufferize),"
-        "quantum-bufferize,"
-        "func-bufferize,"
-        "func.func(finalizing-bufferize),"
-        // "func.func(buffer-hoisting),"
-        "func.func(buffer-loop-hoisting),"
-        // "func.func(buffer-deallocation),"
-        "convert-bufferization-to-memref,"
-        "canonicalize,"
-        // "cse,"
-        "cp-global-memref";
-    return parsePassPipeline(bufferizationPipeline, pm);
-}
+struct Pipeline {
+    const char *name;
+    const SmallVector<const char *> passes;
+};
 
-LogicalResult addLowerToLLVMPasses(PassManager &pm)
+/// Configure the printing of intermediate IR between pass stages.
+/// By overriding the shouldPrintAfterPass hook, this function sets up both 1. after which passes
+/// the IR should be printed, and 2. printing the IR to files in the workspace.
+void configureIRPrinting(const CompilerOptions &options, PassManager &pm,
+                         llvm::raw_ostream &outStream, size_t &pipelineIdx, std::string &outStr,
+                         MutableArrayRef<Pipeline> pipelines)
 {
-    const char *lowerToLLVMDialectPipeline =
-        "func.func(convert-linalg-to-loops),"
-        "convert-scf-to-cf,"
-        // This pass expands memref operations that modify the metadata of a memref (sizes, offsets,
-        // strides) into a sequence of easier to analyze constructs. In particular, this pass
-        // transforms operations into explicit sequence of operations that model the effect of this
-        // operation on the different metadata. This pass uses affine constructs to materialize
-        // these effects. Concretely, expanded-strided-metadata is used to decompose memref.subview
-        // as it has no lowering in -finalize-memref-to-llvm.
-        "expand-strided-metadata,"
-        "lower-affine,"
-        "arith-expand," // some arith ops (ceildivsi) require expansion to be lowered to llvm
-        "convert-complex-to-standard," // added for complex.exp lowering
-        "convert-complex-to-llvm,"
-        "convert-math-to-llvm,"
-        // Run after -convert-math-to-llvm as it marks math::powf illegal without converting it.
-        "convert-math-to-libm,"
-        "convert-arith-to-llvm,"
-        "finalize-memref-to-llvm{use-generic-functions},"
-        "convert-index-to-llvm,"
-        "convert-gradient-to-llvm,"
-        "convert-quantum-to-llvm,"
-        "emit-catalyst-py-interface,"
-        // Remove any dead casts as the final pass expects to remove all existing casts,
-        // but only those that form a loop back to the original type.
-        "canonicalize,"
-        "reconcile-unrealized-casts";
-    return parsePassPipeline(lowerToLLVMDialectPipeline, pm);
+    auto shouldPrintAfterPass = [&](Pass *pass, Operation *) {
+        Pipeline *pipeline = llvm::find_if(pipelines, [&pass](Pipeline pipeline) {
+            // Print the IR after the last pass of each pipeline stage.
+            return pipeline.passes.back() == pass->getArgument();
+        });
+        bool shouldPrint = pipeline != std::end(pipelines);
+        if (shouldPrint && !outStr.empty()) {
+            if (failed(dumpStringToFile(options.workspace, pipelines[pipelineIdx].name, outStr))) {
+                return false;
+            }
+            pipelineIdx++;
+        }
+        return shouldPrint;
+    };
+
+    pm.enableIRPrinting(/*shouldPrintBeforePass=*/[](Pass *, Operation *) { return false; },
+                        shouldPrintAfterPass, /*printModuleScope=*/true,
+                        /*printAfterOnlyOnChange=*/false, /*printAfterOnlyOnFailure=*/false,
+                        /*out=*/outStream);
 }
 } // namespace
 
-LogicalResult catalyst::runDefaultLowering(MLIRContext *ctx, ModuleOp moduleOp)
+LogicalResult catalyst::runDefaultLowering(const CompilerOptions &options, ModuleOp moduleOp)
 {
-    auto pm = PassManager::on<ModuleOp>(ctx, PassManager::Nesting::Implicit);
-    using PassesFunc = LogicalResult (*)(PassManager &);
-    PassesFunc pfs[] = {addMhloToCorePasses, addQuantumCompilationPasses, addBufferizationPasses,
-                        addLowerToLLVMPasses};
 
-    for (const auto &pf : pfs) {
-        if (failed(pf(pm))) {
+    Pipeline pipelines[] = {{.name = "mhlo_to_core", .passes = mhloToCorePasses},
+                            {.name = "quantum_compilation", .passes = quantumCompilationPasses},
+                            {.name = "bufferization", .passes = bufferizationPasses},
+                            {.name = "llvm_dialect", .passes = lowerToLLVMPasses}};
+    auto pm = PassManager::on<ModuleOp>(options.ctx, PassManager::Nesting::Implicit);
+
+    // We enable printing and dumping intermediate IR by hooking into the shouldPrintAfterPass
+    // method when configuring the PassManager. The PassManager prints to outStr and checks if it
+    // should print *before* printing, meaning outStr will contain the IR after the *previous* pass
+    // that should be printed. We thus need to keep track of a separate pipelineIdx to know which
+    // pass has its output *currently* stored in outStr.
+    std::string outStr;
+    llvm::raw_string_ostream outStream{outStr};
+    size_t pipelineIdx = 0;
+    if (options.keepIntermediate) {
+        configureIRPrinting(options, pm, outStream, pipelineIdx, outStr, pipelines);
+    }
+
+    for (const auto &pipeline : pipelines) {
+        if (failed(parsePassPipeline(joinPasses(pipeline.passes), pm, options.diagnosticStream))) {
             return failure();
         }
     }
 
-    return pm.run(moduleOp);
+    if (failed(pm.run(moduleOp))) {
+        return failure();
+    }
+
+    if (options.keepIntermediate && !outStr.empty()) {
+        if (failed(dumpStringToFile(options.workspace, pipelines[pipelineIdx].name, outStr))) {
+            return failure();
+        }
+    }
+
+    return success();
 }

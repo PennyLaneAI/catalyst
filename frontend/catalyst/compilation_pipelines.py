@@ -20,6 +20,7 @@ import functools
 import inspect
 import typing
 import warnings
+import pathlib
 
 import jax
 import jax.numpy as jnp
@@ -498,16 +499,19 @@ class QJIT:
         """Compile the current MLIR module."""
 
         if self.compiling_from_textual_ir:
+            import __main__
+
+            # Since we don't know the name of the original function when compiling from IR
+            # (without parsing the IR), assume the name is that of the currently executing
+            # Python file.
+            module_name = pathlib.Path(__main__.__file__).stem
             shared_object, inferred_func_data = self._compiler.run_from_ir(
-                self.qfunc, "mlir_module", self.compile_options
+                self.qfunc, module_name, self.compile_options
             )
             qfunc_name = inferred_func_data[0]
             # Parse back the return type given as a string
             with ir.Context():
                 restype = [ir.RankedTensorType.parse(inferred_func_data[1])]
-
-            # TODO: Not sure how to get the LLVM IR in a nice way
-            # self._llvmir = self._compiler.get_output_of("LLVMDialectToLLVMIR")
         else:
             # This will make a check before sending it to the compiler that the return type
             # is actually available in most systems. f16 needs a special symbol and linking

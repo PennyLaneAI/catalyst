@@ -28,8 +28,8 @@ PYBIND11_MODULE(_catalystDriver, m)
 
     m.def(
         "compile_asm",
-        [](const char *source, const char *dest, const char *moduleName,
-           bool infer_function_attrs) -> std::tuple<std::string, std::string> {
+        [](const char *source, const char *workspace, const char *moduleName,
+           bool inferFunctionAttrs, bool keepIntermediate) {
             FunctionAttributes inferredAttributes;
             mlir::MLIRContext ctx;
             std::string errors;
@@ -37,20 +37,22 @@ PYBIND11_MODULE(_catalystDriver, m)
 
             CompilerOptions options{.ctx = &ctx,
                                     .source = source,
-                                    .dest = dest,
+                                    .workspace = workspace,
                                     .moduleName = moduleName,
-                                    .diagnosticStream = errStream};
+                                    .diagnosticStream = errStream,
+                                    .keepIntermediate = keepIntermediate};
 
-            if (mlir::failed(QuantumDriverMain(options, infer_function_attrs ? &inferredAttributes
-                                                                             : nullptr))) {
+            if (mlir::failed(QuantumDriverMain(options, inferFunctionAttrs
+                                                            ? std::optional(inferredAttributes)
+                                                            : std::nullopt))) {
                 throw std::runtime_error("Compilation failed:\n" + errors);
             }
 
-            // TODO: I'd like to have this be a separate function call ideally.
-            return std::make_tuple(inferredAttributes.functionName, inferredAttributes.returnType);
+            return std::make_tuple(options.getObjectFile(), inferredAttributes.functionName,
+                                   inferredAttributes.returnType);
         },
-        py::arg("source"), py::arg("dest"), py::arg("module_name") = "jit source",
-        py::arg("infer_function_attrs") = false);
+        py::arg("source"), py::arg("workspace"), py::arg("module_name") = "jit source",
+        py::arg("infer_function_attrs") = false, py::arg("keep_intermediate") = false);
 
     m.def(
         "mlir_run_pipeline",

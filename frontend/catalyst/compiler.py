@@ -484,8 +484,13 @@ class Compiler:
         pipelines = options.pipelines
         inferred_data = None
         if pipelines is None:
-            filename = str(pathlib.Path(workspace_name) / f"{module_name}.o")
-            inferred_data = compile_asm(ir, filename, module_name, infer_function_attrs=True)
+            filename, *inferred_data = compile_asm(
+                ir,
+                workspace_name,
+                module_name,
+                infer_function_attrs=True,
+                keep_intermediate=options.keep_intermediate,
+            )
             output = CompilerDriver.run(filename, options=options)
             filename = str(pathlib.Path(output).absolute())
         else:
