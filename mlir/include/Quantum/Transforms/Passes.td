@@ -77,4 +77,10 @@ def RemoveChainedSelfInversePass : Pass<"remove-chained-self-inverse"> {
     let constructor = "catalyst::createRemoveChainedSelfInversePass()";
 }
 
+def AnnotateFunctionPass : Pass<"annotate-function"> {
+    let summary = "Annotate functions that contain a measurement operation.";
+
+    let constructor = "catalyst::createAnnotateFunctionPass()";
+}
+
 #endif // QUANTUM_PASSES
