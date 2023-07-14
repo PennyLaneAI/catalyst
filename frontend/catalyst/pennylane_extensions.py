@@ -20,7 +20,7 @@ import functools
 import numbers
 import uuid
 from functools import partial
-from typing import Any, Callable, Iterable, List, Optional, Union
+from typing import Any, Callable, Iterable, List, Optional, Tuple, Union
 
 import jax
 import jax.numpy as jnp
@@ -49,16 +49,31 @@ from catalyst.utils.tracing import TracingContext
 
 # pylint: disable=too-many-lines
 
-def _trace_quantum_tape(*args, _callee: Callable):
-    (cargs, ckwargs, qargs) = args
-    assert len(qargs) == 1
+
+def _trace_quantum_tape(
+    cargs, ckwargs, qargs, _callee: Callable, _allow_quantum_measurements: bool = True
+) -> Tuple[Any, Any]:
+    """Jax-trace the ``_callee`` function accepting positional and keyword arguments and containig
+    quantum calls by running it under the PennyLane's quantum tape recorder.
+
+    Args:
+        cargs (Jaxpr): classical positional arguemnts to be passed to ``_callee``
+        kwargs (Jaxpr): classical keyword arguemnts to be passed to ``_callee``
+        qargs (Jaxpr): quantum arguments to consume in the course of tracing
+        _callee (Callable): function to trace
+        _allow_quantum_measurements (bool): If set to False, raise an exception if quantum
+                                            measurements are detected
+    Returns (Tuple[Any,Any]):
+        - Jax representaion of classical return values of ``_callee``
+        - Jax representation of quantum return values obtained in the course of tracing
+    """
+    assert len(qargs) == 1, f"A single quantum argument was expected, got {qargs}"
     with qml.QueuingManager.stop_recording():
         with JaxTape() as tape:
             with tape.quantum_tape:
                 out = _callee(*cargs, **ckwargs)
-            # FIXME
-            # if len(tape.quantum_tape.measurements) > 0:
-            #     raise ValueError("Adjointed operations must contain no measurements")
+            if not _allow_quantum_measurements and len(tape.quantum_tape.measurements) > 0:
+                raise ValueError("Quantum measurements are not allowed in this scope")
             if isinstance(out, Operation):
                 out = None
             tape.set_return_val(out)
@@ -601,7 +616,10 @@ def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
         cargs, _ = tree_flatten((args, kwargs))
         cargs_qargs_aval = tuple(_abstractify(val) for val in cargs_qargs)
         body, consts, _ = _initial_style_jaxpr(
-            partial(_trace_quantum_tape, _callee=_callee), tree, cargs_qargs_aval, "adjoint"
+            partial(_trace_quantum_tape, _callee=_callee, _allow_quantum_measurements=False),
+            tree,
+            cargs_qargs_aval,
+            "adjoint",
         )
         return Adjoint(body, consts, cargs)
 
@@ -706,7 +724,7 @@ class CondCallable:
         def new_branch_fn(branch_fn):
             return partial(_trace_quantum_tape, _callee=branch_fn)
 
-        args, args_tree = tree_flatten(([],{},[jprim.Qreg()]))
+        args, args_tree = tree_flatten(([], {}, [jprim.Qreg()]))
         args_avals = tuple(map(_abstractify, args))
         branch_fns = self.branch_fns + [self.otherwise_fn]
         branch_jaxprs, consts, out_trees = _initial_style_jaxprs_with_common_consts(
@@ -716,14 +734,11 @@ class CondCallable:
             "cond",
         )
 
-        print(f"{out_trees=}")
-
         CondCallable._check_branches_return_types(branch_jaxprs)
         Cond(self.preds, consts, branch_jaxprs, args_tree, out_trees)
 
         # Create tracers for any non-qreg return values (if there are any).
         ret_vals, _ = tree_unflatten(out_trees[0], branch_jaxprs[0].out_avals)
-        print(f"{ret_vals=}, {branch_jaxprs[0].out_avals=}")
         a, t = tree_flatten(ret_vals)
         return ctx.jax_tape.create_tracer(t, a)
 
@@ -1119,7 +1134,6 @@ class ForLoopCallable:
             (args, {}, [jprim.Qreg()]), new_body
         )
 
-        print(f"{body_tree}")
         flat_init_vals_no_qubits = tree_flatten(args)[0]
 
         ForLoop(
@@ -1132,7 +1146,6 @@ class ForLoopCallable:
 
         # Create tracers for any non-qreg return values (if there are any).
         ret_vals, _ = tree_unflatten(body_tree, body_jaxpr.out_avals)
-        print(f"{ret_vals=}")
         a, t = tree_flatten(ret_vals)
         return ctx.jax_tape.create_tracer(t, a)
 
