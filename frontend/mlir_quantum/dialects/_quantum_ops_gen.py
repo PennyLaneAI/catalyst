@@ -21,6 +21,38 @@ class _Dialect(_ods_ir.Dialect):
 
 @_ods_cext.register_operation(_Dialect)
 @_ods_extend_opview_class(_ods_ext_module)
+class AdjointOp(_ods_ir.OpView):
+  OPERATION_NAME = "quantum.adjoint"
+
+  _ODS_REGIONS = (1, True)
+
+  def __init__(self, out_qreg, qreg, *, loc=None, ip=None):
+    operands = []
+    results = []
+    attributes = {}
+    regions = None
+    operands.append(_get_op_result_or_value(qreg))
+    _ods_context = _ods_get_default_loc_context(loc)
+    results.append(out_qreg)
+    _ods_successors = None
+    super().__init__(self.build_generic(
+      attributes=attributes, results=results, operands=operands,
+      successors=_ods_successors, regions=regions, loc=loc, ip=ip))
+
+  @builtins.property
+  def qreg(self):
+    return self.operation.operands[0]
+
+  @builtins.property
+  def out_qreg(self):
+    return self.operation.results[0]
+
+  @builtins.property
+  def region(self):
+    return self.regions[0]
+
+@_ods_cext.register_operation(_Dialect)
+@_ods_extend_opview_class(_ods_ext_module)
 class AllocOp(_ods_ir.OpView):
   OPERATION_NAME = "quantum.alloc"
 
@@ -182,7 +214,7 @@ class CustomOp(_ods_ir.OpView):
 
   _ODS_REGIONS = (0, True)
 
-  def __init__(self, out_qubits, params, in_qubits, gate_name, *, loc=None, ip=None):
+  def __init__(self, out_qubits, params, in_qubits, gate_name, *, adjoint=None, loc=None, ip=None):
     operands = []
     results = []
     attributes = {}
@@ -194,6 +226,8 @@ class CustomOp(_ods_ir.OpView):
     issubclass(type(gate_name), _ods_ir.Attribute) or
     not _ods_ir.AttrBuilder.contains('StrAttr')) else
       _ods_ir.AttrBuilder.get('StrAttr')(gate_name, context=_ods_context))
+    if bool(adjoint): attributes["adjoint"] = _ods_ir.UnitAttr.get(
+      _ods_get_default_loc_context(loc))
     results.extend(out_qubits)
     _ods_successors = None
     super().__init__(self.build_generic(
@@ -223,6 +257,21 @@ class CustomOp(_ods_ir.OpView):
     if value is None:
       raise ValueError("'None' not allowed as value for mandatory attributes")
     self.operation.attributes["gate_name"] = value
+
+  @builtins.property
+  def adjoint(self):
+    return "adjoint" in self.operation.attributes
+
+  @adjoint.setter
+  def adjoint(self, value):
+    if bool(value):
+      self.operation.attributes["adjoint"] = _ods_ir.UnitAttr.get()
+    elif "adjoint" in self.operation.attributes:
+      del self.operation.attributes["adjoint"]
+
+  @adjoint.deleter
+  def adjoint(self):
+    del self.operation.attributes["adjoint"]
 
   @builtins.property
   def out_qubits(self):
@@ -581,7 +630,7 @@ class MultiRZOp(_ods_ir.OpView):
 
   _ODS_REGIONS = (0, True)
 
-  def __init__(self, out_qubits, theta, in_qubits, *, loc=None, ip=None):
+  def __init__(self, out_qubits, theta, in_qubits, *, adjoint=None, loc=None, ip=None):
     operands = []
     results = []
     attributes = {}
@@ -589,6 +638,8 @@ class MultiRZOp(_ods_ir.OpView):
     operands.append(_get_op_result_or_value(theta))
     operands.extend(_get_op_results_or_values(in_qubits))
     _ods_context = _ods_get_default_loc_context(loc)
+    if bool(adjoint): attributes["adjoint"] = _ods_ir.UnitAttr.get(
+      _ods_get_default_loc_context(loc))
     results.extend(out_qubits)
     _ods_successors = None
     super().__init__(self.build_generic(
@@ -603,6 +654,21 @@ class MultiRZOp(_ods_ir.OpView):
   def in_qubits(self):
     _ods_variadic_group_length = len(self.operation.operands) - 2 + 1
     return self.operation.operands[1:1 + _ods_variadic_group_length]
+
+  @builtins.property
+  def adjoint(self):
+    return "adjoint" in self.operation.attributes
+
+  @adjoint.setter
+  def adjoint(self, value):
+    if bool(value):
+      self.operation.attributes["adjoint"] = _ods_ir.UnitAttr.get()
+    elif "adjoint" in self.operation.attributes:
+      del self.operation.attributes["adjoint"]
+
+  @adjoint.deleter
+  def adjoint(self):
+    del self.operation.attributes["adjoint"]
 
   @builtins.property
   def out_qubits(self):
@@ -681,7 +747,7 @@ class QubitUnitaryOp(_ods_ir.OpView):
 
   _ODS_REGIONS = (0, True)
 
-  def __init__(self, out_qubits, matrix, in_qubits, *, loc=None, ip=None):
+  def __init__(self, out_qubits, matrix, in_qubits, *, adjoint=None, loc=None, ip=None):
     operands = []
     results = []
     attributes = {}
@@ -689,6 +755,8 @@ class QubitUnitaryOp(_ods_ir.OpView):
     operands.append(_get_op_result_or_value(matrix))
     operands.extend(_get_op_results_or_values(in_qubits))
     _ods_context = _ods_get_default_loc_context(loc)
+    if bool(adjoint): attributes["adjoint"] = _ods_ir.UnitAttr.get(
+      _ods_get_default_loc_context(loc))
     results.extend(out_qubits)
     _ods_successors = None
     super().__init__(self.build_generic(
@@ -703,6 +771,21 @@ class QubitUnitaryOp(_ods_ir.OpView):
   def in_qubits(self):
     _ods_variadic_group_length = len(self.operation.operands) - 2 + 1
     return self.operation.operands[1:1 + _ods_variadic_group_length]
+
+  @builtins.property
+  def adjoint(self):
+    return "adjoint" in self.operation.attributes
+
+  @adjoint.setter
+  def adjoint(self, value):
+    if bool(value):
+      self.operation.attributes["adjoint"] = _ods_ir.UnitAttr.get()
+    elif "adjoint" in self.operation.attributes:
+      del self.operation.attributes["adjoint"]
+
+  @adjoint.deleter
+  def adjoint(self):
+    del self.operation.attributes["adjoint"]
 
   @builtins.property
   def out_qubits(self):
@@ -866,3 +949,27 @@ class VarianceOp(_ods_ir.OpView):
   @builtins.property
   def variance(self):
     return self.operation.results[0]
+
+@_ods_cext.register_operation(_Dialect)
+@_ods_extend_opview_class(_ods_ext_module)
+class YieldOp(_ods_ir.OpView):
+  OPERATION_NAME = "quantum.yield"
+
+  _ODS_REGIONS = (0, True)
+
+  def __init__(self, results_, *, loc=None, ip=None):
+    operands = []
+    results = []
+    attributes = {}
+    regions = None
+    operands.extend(_get_op_results_or_values(results_))
+    _ods_context = _ods_get_default_loc_context(loc)
+    _ods_successors = None
+    super().__init__(self.build_generic(
+      attributes=attributes, results=results, operands=operands,
+      successors=_ods_successors, regions=regions, loc=loc, ip=ip))
+
+  @builtins.property
+  def results_(self):
+    _ods_variadic_group_length = len(self.operation.operands) - 1 + 1
+    return self.operation.operands[0:0 + _ods_variadic_group_length]

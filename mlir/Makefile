@@ -28,6 +28,15 @@ help:
 .PHONY: all
 all: llvm mhlo dialects enzyme
 
+.PHONY: patch
+patch:
+	patch -d $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum --follow-symlinks < patches/use-ir-from-jax.patch
+	patch -d $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/dialects --follow-symlinks < patches/use-cext-from-jax.patch
+	patch -d $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/dialects --follow-symlinks < patches/do-not-infer-result.patch
+	patch -d $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/dialects --follow-symlinks < patches/remove-gradient-cext-import.patch
+	patch -d $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/dialects --follow-symlinks < patches/remove-quantum-cext-import.patch
+	cp -lr mlir/build/python_packages/quantum/mlir_quantum/ frontend/
+
 .PHONY: llvm
 llvm:
 	@echo "build LLVM and MLIR enabling Python bindings"
