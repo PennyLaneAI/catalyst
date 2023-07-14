@@ -704,29 +704,8 @@ class CondCallable:
 
     def _call_with_quantum_ctx(self, ctx):
         def new_branch_fn(branch_fn):
-            def callback(*qregs):
-                qreg=qregs[0][0]
-                with qml.QueuingManager.stop_recording():
-                    with JaxTape() as tape:
-                        with tape.quantum_tape:
-                            out = branch_fn()
-                        tape.set_return_val(out)
-                        new_quantum_tape = JaxTape.device.expand_fn(tape.quantum_tape)
-                        tape.quantum_tape = new_quantum_tape
-                        tape.quantum_tape.jax_tape = tape
-
-                has_tracer_return_values = out is not None
-                return_values, qreg, qubit_states = trace_quantum_tape(
-                    tape, qreg, has_tracer_return_values
-                )
-                qreg = insert_to_qreg(qubit_states, qreg)
-
-                return [qreg], return_values
-
-            # return callback
             return partial(_trace_quantum_tape, _callee=branch_fn)
 
-        # args, args_tree = tree_flatten((jprim.Qreg(),))
         args, args_tree = tree_flatten(([jprim.Qreg()],[],{}))
         args_avals = tuple(map(_abstractify, args))
         branch_fns = self.branch_fns + [self.otherwise_fn]
@@ -958,32 +937,14 @@ class WhileCallable:
         return body_jaxpr, cond_jaxpr, cond_consts, body_consts, body_tree
 
     def _call_with_quantum_ctx(self, ctx, args):
-        def new_cond(*args_and_qreg):
-            args = args_and_qreg[:-1]
-            return self.cond_fn(*args)
+        def new_cond(*qregs_and_args):
+            _, cargs, _ = qregs_and_args
+            return self.cond_fn(*cargs)
 
-        def new_body(*args_and_qreg):
-            args, qreg = args_and_qreg[:-1], args_and_qreg[-1]
-
-            with qml.QueuingManager.stop_recording():
-                with JaxTape() as tape:
-                    with tape.quantum_tape:
-                        out = self.body_fn(*args)
-                    tape.set_return_val(out)
-                    new_quantum_tape = JaxTape.device.expand_fn(tape.quantum_tape)
-                    tape.quantum_tape = new_quantum_tape
-                    tape.quantum_tape.jax_tape = tape
-
-            has_tracer_return_values = True
-            return_values, qreg, qubit_states = trace_quantum_tape(
-                tape, qreg, has_tracer_return_values
-            )
-            qreg = insert_to_qreg(qubit_states, qreg)
-
-            return return_values, qreg
+        new_body = partial(_trace_quantum_tape, _callee=self.body_fn)
 
         body_jaxpr, cond_jaxpr, cond_consts, body_consts, body_tree = WhileCallable._create_jaxpr(
-            (*args, jprim.Qreg()), new_cond, new_body
+            ([jprim.Qreg()], args, {}), new_cond, new_body
         )
         flat_init_vals_no_qubits = tree_flatten(args)[0]
 
@@ -996,7 +957,7 @@ class WhileCallable:
             body_tree,
         )
 
-        ret_vals, _ = tree_unflatten(body_tree, body_jaxpr.out_avals)
+        _, ret_vals = tree_unflatten(body_tree, body_jaxpr.out_avals)
         a, t = tree_flatten(ret_vals)
         return ctx.jax_tape.create_tracer(t, a)
 
