@@ -35,6 +35,14 @@ def QuantumGate : OpInterface<"QuantumGate"> {
             "Return all results which are considered output qubit values.",
             "mlir::ValueRange", "getQubitResults"
         >,
+        InterfaceMethod<
+            "Return adjoint flag.",
+            "bool", "getAdjointFlag"
+        >,
+        InterfaceMethod<
+            "Set adjoint flag.",
+            "void", "setAdjointFlag", (ins "bool":$adjoint)
+        >
     ];
 
     let verify = [{

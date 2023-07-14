@@ -25,9 +25,6 @@ if "Address" in getattr(config, "llvm_use_sanitizer", ""):
 
     python_executable = f"LD_PRELOAD=$({config.host_cxx} -print-file-name=libclang_rt.asan-{config.host_arch}.so) {python_executable}"
 
-    # # TODO: find out why we have odr violations
-    # config.environment["ASAN_OPTIONS"] = "detect_odr_violation=0"
-
 config.substitutions.append(("%PYTHON", python_executable))
 
 # Define PATH to include the various tools needed for our tests.
