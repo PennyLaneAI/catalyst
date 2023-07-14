@@ -549,7 +549,7 @@ jobs:
 
   frontend-tests-openqasm-device:
     name: Frontend Tests (backend="openqasm3")
-    needs: [qir-stdlib, mhlo, quantum, enzyme]
+    needs: [qir-stdlib, mhlo, quantum, enzyme, llvm]
     runs-on: ubuntu-latest
 
     steps:
@@ -576,7 +576,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-build
+        key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-build-opt
         fail-on-cache-miss: True
 
     - name: Get MHLO Version

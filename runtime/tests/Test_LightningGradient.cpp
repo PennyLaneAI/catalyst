@@ -60,8 +60,8 @@ TEST_CASE("Test __quantum__qis__Gradient_params for zero number of obs", "[Gradi
 
         __quantum__rt__toggle_recorder(/* activate_cm */ true);
 
-        __quantum__qis__S(q);
-        __quantum__qis__T(q);
+        __quantum__qis__S(q, false);
+        __quantum__qis__T(q, false);
 
         REQUIRE_NOTHROW(__quantum__qis__Gradient_params(&tp, 0, &results));
 
@@ -92,7 +92,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
 
         QUBIT *q = __quantum__rt__qubit_allocate();
 
-        __quantum__qis__RX(-M_PI / 7, q);
+        __quantum__qis__RX(-M_PI / 7, q, false);
 
         auto obs = __quantum__qis__NamedObs(ObsId::PauliZ, q);
 
@@ -133,7 +133,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
 
         __quantum__rt__toggle_recorder(/* activate_cm */ true);
 
-        __quantum__qis__RX(-M_PI / 7, q);
+        __quantum__qis__RX(-M_PI / 7, q, false);
 
         auto obs_idx_0 = __quantum__qis__NamedObs(ObsId::PauliZ, q);
 
@@ -176,7 +176,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
 
         __quantum__rt__toggle_recorder(/* activate_cm */ true);
 
-        __quantum__qis__RX(-M_PI / 7, q);
+        __quantum__qis__RX(-M_PI / 7, q, false);
 
         CplxT_double matrix_data[4] = {{1.0, 0.0}, {0.0, 0.0}, {2.0, 0.0}, {0.0, 0.0}};
 
@@ -236,7 +236,7 @@ TEST_CASE("Test __quantum__qis__Gradient_params and __quantum__qis__Gradient "
 
         __quantum__rt__toggle_recorder(/* activate_cm */ true);
 
-        __quantum__qis__RY(p, q);
+        __quantum__qis__RY(p, q, false);
 
         auto obs_idx_0 = __quantum__qis__NamedObs(ObsId::PauliX, q);
 
@@ -287,12 +287,12 @@ TEST_CASE("Test __quantum__qis__Gradient_params Op=[Hadamard,RZ,RY,RZ,S,T,ParamS
 
         __quantum__rt__toggle_recorder(/* activate_cm */ true);
 
-        __quantum__qis__Hadamard(q0);
-        __quantum__qis__RZ(param[0], q0);
-        __quantum__qis__RY(param[1], q0);
-        __quantum__qis__RZ(param[2], q0);
-        __quantum__qis__S(q0);
-        __quantum__qis__T(q0);
+        __quantum__qis__Hadamard(q0, false);
+        __quantum__qis__RZ(param[0], q0, false);
+        __quantum__qis__RY(param[1], q0, false);
+        __quantum__qis__RZ(param[2], q0, false);
+        __quantum__qis__S(q0, false);
+        __quantum__qis__T(q0, false);
 
         auto obs_idx_0 = __quantum__qis__NamedObs(ObsId::PauliX, q0);
 
@@ -337,8 +337,8 @@ TEST_CASE("Test __quantum__qis__Gradient Op=[RX,CY], Obs=[Z,Z]", "[Gradient]")
 
         __quantum__rt__toggle_recorder(/* activate_cm */ true);
 
-        __quantum__qis__RX(-M_PI / 7, q0);
-        __quantum__qis__CY(q0, q1);
+        __quantum__qis__RX(-M_PI / 7, q0, false);
+        __quantum__qis__CY(q0, q1, false);
 
         auto obs_idx_0 = __quantum__qis__NamedObs(ObsId::PauliZ, q0);
         auto obs_idx_1 = __quantum__qis__NamedObs(ObsId::PauliZ, q1);
@@ -386,10 +386,10 @@ TEST_CASE("Test __quantum__qis__Gradient_params Op=[RX,RX,RX,CZ], Obs=[Z,Z,Z]", 
 
         __quantum__rt__toggle_recorder(/* activate_cm */ true);
 
-        __quantum__qis__RX(param[0], q0);
-        __quantum__qis__RX(param[1], q1);
-        __quantum__qis__RX(param[2], q2);
-        __quantum__qis__CZ(q0, q2);
+        __quantum__qis__RX(param[0], q0, false);
+        __quantum__qis__RX(param[1], q1, false);
+        __quantum__qis__RX(param[2], q2, false);
+        __quantum__qis__CZ(q0, q2, false);
 
         auto obs_idx_0 = __quantum__qis__NamedObs(ObsId::PauliZ, q0);
         auto obs_idx_1 = __quantum__qis__NamedObs(ObsId::PauliZ, q1);
@@ -442,14 +442,14 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
 
         __quantum__rt__toggle_recorder(/* activate_cm */ true);
 
-        __quantum__qis__RZ(param[0], q0);
-        __quantum__qis__RY(param[1], q0);
-        __quantum__qis__RZ(param[2], q0);
-        __quantum__qis__CNOT(q0, q1);
-        __quantum__qis__CNOT(q1, q2);
-        __quantum__qis__RZ(param[0], q1);
-        __quantum__qis__RY(param[1], q1);
-        __quantum__qis__RZ(param[2], q1);
+        __quantum__qis__RZ(param[0], q0, false);
+        __quantum__qis__RY(param[1], q0, false);
+        __quantum__qis__RZ(param[2], q0, false);
+        __quantum__qis__CNOT(q0, q1, false);
+        __quantum__qis__CNOT(q1, q2, false);
+        __quantum__qis__RZ(param[0], q1, false);
+        __quantum__qis__RY(param[1], q1, false);
+        __quantum__qis__RZ(param[2], q1, false);
 
         auto obs_idx_0 = __quantum__qis__NamedObs(ObsId::PauliX, q0);
         auto obs_idx_1 = __quantum__qis__NamedObs(ObsId::PauliX, q1);
@@ -512,16 +512,16 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
 
         __quantum__rt__toggle_recorder(/* activate_cm */ true);
 
-        __quantum__qis__RZ(param[0], q0);
-        __quantum__qis__RY(param[1], q0);
-        __quantum__qis__RZ(param[2], q0);
-        __quantum__qis__CNOT(q0, q1);
-        __quantum__qis__CNOT(q1, q2);
-        __quantum__qis__RZ(param[0], q1);
-        __quantum__qis__RY(param[1], q1);
-        __quantum__qis__RZ(param[2], q1);
-        __quantum__qis__CRY(param[0], q0, q1);
-        __quantum__qis__CRZ(param[1], q0, q2);
+        __quantum__qis__RZ(param[0], q0, false);
+        __quantum__qis__RY(param[1], q0, false);
+        __quantum__qis__RZ(param[2], q0, false);
+        __quantum__qis__CNOT(q0, q1, false);
+        __quantum__qis__CNOT(q1, q2, false);
+        __quantum__qis__RZ(param[0], q1, false);
+        __quantum__qis__RY(param[1], q1, false);
+        __quantum__qis__RZ(param[2], q1, false);
+        __quantum__qis__CRY(param[0], q0, q1, false);
+        __quantum__qis__CRZ(param[1], q0, q2, false);
 
         auto obs_idx_0 = __quantum__qis__NamedObs(ObsId::PauliZ, q0);
         auto obs_idx_1 = __quantum__qis__NamedObs(ObsId::PauliZ, q1);
@@ -584,14 +584,14 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
 
         __quantum__rt__toggle_recorder(/* activate_cm */ true);
 
-        __quantum__qis__RZ(param[0], q0);
-        __quantum__qis__RY(param[1], q0);
-        __quantum__qis__RZ(param[2], q0);
-        __quantum__qis__CNOT(q0, q1);
-        __quantum__qis__CNOT(q1, q2);
-        __quantum__qis__RZ(param[0], q1);
-        __quantum__qis__RY(param[1], q1);
-        __quantum__qis__RZ(param[2], q1);
+        __quantum__qis__RZ(param[0], q0, false);
+        __quantum__qis__RY(param[1], q0, false);
+        __quantum__qis__RZ(param[2], q0, false);
+        __quantum__qis__CNOT(q0, q1, false);
+        __quantum__qis__CNOT(q1, q2, false);
+        __quantum__qis__RZ(param[0], q1, false);
+        __quantum__qis__RY(param[1], q1, false);
+        __quantum__qis__RZ(param[2], q1, false);
 
         double coeffs_data[2] = {0.2, 0.6};
         MemRefT_double_1d coeffs = {coeffs_data, coeffs_data, 0, {2}, {1}};
@@ -662,7 +662,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
 
         __quantum__rt__toggle_recorder(/* activate_cm */ true);
 
-        __quantum__qis__RX(-M_PI / 7, q);
+        __quantum__qis__RX(-M_PI / 7, q, false);
 
         CplxT_double matrix_data[4] = {{1.0, 0.0}, {0.0, 0.0}, {2.0, 0.0}, {0.0, 0.0}};
 
