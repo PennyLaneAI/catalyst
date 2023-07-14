@@ -21,7 +21,7 @@ import jax.numpy as jnp
 import pennylane as qml
 import pytest
 
-from catalyst import for_loop, grad, measure, qjit
+from catalyst import for_loop, measure, qjit
 from catalyst.compilation_pipelines import JAX_QJIT
 
 
