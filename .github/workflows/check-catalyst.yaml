@@ -445,7 +445,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-build-opt
+        key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-sanitize-build
         fail-on-cache-miss: True
 
     - name: Get MHLO Version
