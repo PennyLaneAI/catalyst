@@ -80,6 +80,10 @@ def RemoveChainedSelfInversePass : Pass<"remove-chained-self-inverse"> {
 def AnnotateFunctionPass : Pass<"annotate-function"> {
     let summary = "Annotate functions that contain a measurement operation.";
 
+    let dependentDialects = [
+        "func::FuncDialect"
+    ];
+
     let constructor = "catalyst::createAnnotateFunctionPass()";
 }
 
