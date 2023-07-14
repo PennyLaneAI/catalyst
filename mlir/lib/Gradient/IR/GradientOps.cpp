@@ -55,9 +55,7 @@ LogicalResult verifyGradInputs(OpState *op_state, func::FuncOp callee, ValueRang
         return op_state->emitOpError("incorrect number of operands for callee, ")
                << "expected " << fnType.getNumInputs() << " but got " << fnArgs.size();
 
-    auto res = callee.walk([](catalyst::quantum::MeasureOp op) { return WalkResult::interrupt(); });
-
-    if (res.wasInterrupted()) {
+    if (callee->getAttrOfType<UnitAttr>("catalyst.hasMeasureOp")) {
         return op_state->emitOpError(
             "quantum measurements are not allowed in the gradient regions");
     }
