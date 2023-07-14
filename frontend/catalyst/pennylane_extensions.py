@@ -49,6 +49,29 @@ from catalyst.utils.tracing import TracingContext
 
 # pylint: disable=too-many-lines
 
+def _trace_quantum_tape(*args, _callee: Callable):
+    (qargs, cargs, ckwargs) = args
+    assert len(qargs) == 1
+    with qml.QueuingManager.stop_recording():
+        with JaxTape() as tape:
+            with tape.quantum_tape:
+                out = _callee(*cargs, **ckwargs)
+            # FIXME
+            # if len(tape.quantum_tape.measurements) > 0:
+            #     raise ValueError("Adjointed operations must contain no measurements")
+            if isinstance(out, Operation):
+                out = None
+            tape.set_return_val(out)
+            new_quantum_tape = JaxTape.device.expand_fn(tape.quantum_tape)
+            tape.quantum_tape = new_quantum_tape
+            tape.quantum_tape.jax_tape = tape
+
+    has_tracer_return_values = out is not None
+    qreg = qargs[0]
+    return_values, qreg, qubit_states = trace_quantum_tape(tape, qreg, has_tracer_return_values)
+    qreg = insert_to_qreg(qubit_states, qreg)
+    return [qreg], return_values
+
 
 class QFunc:
     """A device specific quantum function.
@@ -573,26 +596,6 @@ def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
     array([0.5, 0.5])
     """
 
-    def _trace_quantum_tape(*args, _callee: Callable):
-        (qargs, cargs, ckwargs) = args
-        assert len(qargs) == 1
-        with qml.QueuingManager.stop_recording():
-            with JaxTape() as tape:
-                with tape.quantum_tape:
-                    out = _callee(*cargs, **ckwargs)
-            if len(tape.quantum_tape.measurements) > 0:
-                raise ValueError("Adjointed operations must contain no measurements")
-            tape.set_return_val(out if not isinstance(out, Operation) else None)
-            new_quantum_tape = JaxTape.device.expand_fn(tape.quantum_tape)
-            tape.quantum_tape = new_quantum_tape
-            tape.quantum_tape.jax_tape = tape
-
-        has_tracer_return_values = False
-        qreg = qargs[0]
-        return_values, qreg, qubit_states = trace_quantum_tape(tape, qreg, has_tracer_return_values)
-        qreg = insert_to_qreg(qubit_states, qreg)
-        return qreg, return_values
-
     def _make_adjoint(*args, _callee: Callable, **kwargs):
         cargs_qargs, tree = tree_flatten(([jprim.Qreg()], args, kwargs))
         cargs, _ = tree_flatten((args, kwargs))
@@ -701,7 +704,8 @@ class CondCallable:
 
     def _call_with_quantum_ctx(self, ctx):
         def new_branch_fn(branch_fn):
-            def callback(qreg):
+            def callback(*qregs):
+                qreg=qregs[0][0]
                 with qml.QueuingManager.stop_recording():
                     with JaxTape() as tape:
                         with tape.quantum_tape:
@@ -717,11 +721,13 @@ class CondCallable:
                 )
                 qreg = insert_to_qreg(qubit_states, qreg)
 
-                return return_values, qreg
+                return [qreg], return_values
 
-            return callback
+            # return callback
+            return partial(_trace_quantum_tape, _callee=branch_fn)
 
-        args, args_tree = tree_flatten((jprim.Qreg(),))
+        # args, args_tree = tree_flatten((jprim.Qreg(),))
+        args, args_tree = tree_flatten(([jprim.Qreg()],[],{}))
         args_avals = tuple(map(_abstractify, args))
         branch_fns = self.branch_fns + [self.otherwise_fn]
         branch_jaxprs, consts, out_trees = _initial_style_jaxprs_with_common_consts(
@@ -731,11 +737,14 @@ class CondCallable:
             "cond",
         )
 
+        print(f"{out_trees=}")
+
         CondCallable._check_branches_return_types(branch_jaxprs)
         Cond(self.preds, consts, branch_jaxprs, args_tree, out_trees)
 
         # Create tracers for any non-qreg return values (if there are any).
-        ret_vals, _ = tree_unflatten(out_trees[0], branch_jaxprs[0].out_avals)
+        _, ret_vals = tree_unflatten(out_trees[0], branch_jaxprs[0].out_avals)
+        print(f"{ret_vals=}, {branch_jaxprs[0].out_avals=}")
         a, t = tree_flatten(ret_vals)
         return ctx.jax_tape.create_tracer(t, a)
 
