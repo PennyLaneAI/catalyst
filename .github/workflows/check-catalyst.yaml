@@ -6,17 +6,16 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+concurrency:
+  group: check-catalyst-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   qir-stdlib:
     name: QIR-stdlib Build
     runs-on: ubuntu-latest
 
     steps:
-      - name: Cancel previous runs
-        uses: styfle/cancel-workflow-action@0.11.0
-        with:
-          access_token: ${{ github.token }}
-
       - name: Checkout Catalyst repo
         uses: actions/checkout@v3
 
@@ -48,11 +47,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Cancel previous runs
-        uses: styfle/cancel-workflow-action@0.11.0
-        with:
-          access_token: ${{ github.token }}
-
       - name: Checkout Catalyst repo
         uses: actions/checkout@v3
 
@@ -91,11 +85,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Cancel previous runs
-      uses: styfle/cancel-workflow-action@0.11.0
-      with:
-        access_token: ${{ github.token }}
-
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
@@ -152,11 +141,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Cancel previous runs
-      uses: styfle/cancel-workflow-action@0.11.0
-      with:
-        access_token: ${{ github.token }}
-
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
@@ -224,11 +208,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Cancel previous runs
-      uses: styfle/cancel-workflow-action@0.11.0
-      with:
-        access_token: ${{ github.token }}
-
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
@@ -295,11 +274,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Cancel previous runs
-      uses: styfle/cancel-workflow-action@0.11.0
-      with:
-        access_token: ${{ github.token }}
-
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
@@ -364,11 +338,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Cancel previous runs
-      uses: styfle/cancel-workflow-action@0.11.0
-      with:
-        access_token: ${{ github.token }}
-
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
@@ -465,11 +434,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Cancel previous runs
-      uses: styfle/cancel-workflow-action@0.11.0
-      with:
-        access_token: ${{ github.token }}
-
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
@@ -553,11 +517,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Cancel previous runs
-      uses: styfle/cancel-workflow-action@0.11.0
-      with:
-        access_token: ${{ github.token }}
-
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
@@ -668,11 +627,6 @@ jobs:
         simulator: ['lightning', 'lightning-kokkos', 'openqasm']
 
     steps:
-      - name: Cancel previous runs
-        uses: styfle/cancel-workflow-action@0.11.0
-        with:
-          access_token: ${{ github.token }}
-
       - name: Checkout the repo
         uses: actions/checkout@v3
 
