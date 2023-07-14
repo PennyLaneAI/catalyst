@@ -274,7 +274,7 @@ def trace_quantum_tape(
                 op.branch_jaxprs,
                 *header_and_branch_args_plus_consts,
             )
-            qregs, v = tree_unflatten(op.out_trees[0], outs)
+            v, qregs = tree_unflatten(op.out_trees[0], outs)
             qreg = qregs[0]
             p.send_partial_input(v)
             # We don't know if the conditional modified any of the qubits

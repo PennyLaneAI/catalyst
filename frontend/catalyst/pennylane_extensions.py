@@ -722,7 +722,7 @@ class CondCallable:
         Cond(self.preds, consts, branch_jaxprs, args_tree, out_trees)
 
         # Create tracers for any non-qreg return values (if there are any).
-        _, ret_vals = tree_unflatten(out_trees[0], branch_jaxprs[0].out_avals)
+        ret_vals, _ = tree_unflatten(out_trees[0], branch_jaxprs[0].out_avals)
         print(f"{ret_vals=}, {branch_jaxprs[0].out_avals=}")
         a, t = tree_flatten(ret_vals)
         return ctx.jax_tape.create_tracer(t, a)
