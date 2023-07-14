@@ -2,10 +2,6 @@ name: Set constants
 
 on:
   workflow_call:
-    inputs:
-      event_name:
-        required: true
-        type: string
     outputs:
       llvm_version:
         description: "LLVM version"
@@ -22,12 +18,6 @@ on:
       rt_backends:
         description: "List of backends."
         value: ${{ jobs.set-constants.outputs.rt_backends }}
-
-# TODO: Commenting this since a deadlock for concurrency group 'Check Catalyst Build-refs/pull/209/merge'
-# was detected between 'top level workflow' and 'constants'
-# concurrency:
-#   group: ${{ github.workflow }}-${{ github.ref }}
-#   cancel-in-progress: true
 
 jobs:
   set-constants:

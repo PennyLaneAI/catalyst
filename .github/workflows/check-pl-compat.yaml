@@ -21,8 +21,6 @@ jobs:
   constants:
     name: "Set build matrix"
     uses: ./.github/workflows/constants.yaml
-    with:
-      event_name: ${{ github.event_name }}
 
   check-config:
     name: Build Configuration
