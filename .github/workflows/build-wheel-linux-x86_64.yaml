@@ -5,6 +5,10 @@ on:
     - cron: "0 0 * * 0"
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-dependencies:
     name: Build Dependencies
@@ -12,11 +16,6 @@ jobs:
     container: "quay.io/pypa/manylinux2014_x86_64"
 
     steps:
-    - name: Cancel previous runs
-      uses: styfle/cancel-workflow-action@0.11.0
-      with:
-        access_token: ${{ github.token }}
-
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
@@ -181,11 +180,6 @@ jobs:
     container: ${{ matrix.container_img }}
 
     steps:
-    - name: Cancel previous runs
-      uses: styfle/cancel-workflow-action@0.11.0
-      with:
-        access_token: ${{ github.token }}
-
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
@@ -351,11 +345,6 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-    - name: Cancel previous runs
-      uses: styfle/cancel-workflow-action@0.11.0
-      with:
-        access_token: ${{ github.token }}
-
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
