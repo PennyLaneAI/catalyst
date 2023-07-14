@@ -310,22 +310,23 @@ class TestJAXAD:
     def test_multiD_calls(self, backend):
         """Test a jax.grad in combination with qjit on non-1D input parameters."""
 
-        @qjit
-        @qml.qnode(qml.device(backend, wires=1))
         def circuit(p1, p2):
             qml.RY(p1[0, 1], wires=0)
             qml.RZ(p2[1, 0], wires=0)
             return qml.expval(qml.PauliZ(0))
 
-        def cost_fn(p1, p2):
-            m1 = circuit(p1, p2)
-            m2 = circuit(p1, p2)
+        PL_circuit = jax.jit(qml.qnode(qml.device("default.qubit", wires=1))(circuit))
+        C_circuit = qjit(qml.qnode(qml.device(backend, wires=1))(circuit))
+
+        def cost_fn(p1, p2, C):
+            m1 = C(p1, p2)
+            m2 = C(p1, p2)
             return m1 + m2
 
         p1 = jnp.array([[0.1, 0.3, 0.5], [0.1, 0.2, 0.8]])
         p2 = jnp.array([[0.3, 0.5], [0.2, 0.8], [0.2, 0.8]])
-        result = jax.grad(cost_fn)(p1, p2)
-        reference = qjit(grad(cost_fn))(p1, p2)
+        result = jax.grad(partial(cost_fn,C=C_circuit))(p1, p2)
+        reference = jax.grad(partial(cost_fn,C=PL_circuit))(p1, p2)
         assert jnp.allclose(result, reference, rtol=1e-6, atol=1e-6)
 
     def test_efficient_Jacobian(self, backend):
