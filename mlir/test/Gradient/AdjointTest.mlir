@@ -30,7 +30,7 @@ func.func private @funcTensorTensor(%arg0: tensor<7x3x2x1xf64>) -> tensor<2xf64>
 
 // CHECK-LABEL: @funcTensorTensor.fullgrad0adj(%arg0: tensor<7x3x2x1xf64>) -> tensor<7x3x2x1x2xf64>
 
-// CHECK-LABEL: @funcTensorTensor.argmap(%arg0: tensor<7x3x2x1xf64>) -> tensor<?xf64>
+// CHECK-LABEL: @funcTensorTensor.argmap(%arg0: tensor<7x3x2x1xf64>, %arg1: memref<?xf64>)
 
 // CHECK-LABEL: @gradCallTensorTensor
 func.func @gradCallTensorTensor(%arg0: tensor<7x3x2x1xf64>) -> tensor<7x3x2x1x2xf64> {
@@ -58,7 +58,7 @@ func.func @funcMultiRes(%arg0: tensor<f64>) -> (tensor<f64>, tensor<f64>) attrib
 
 // CHECK-LABEL: @funcMultiRes.fullgrad0adj(%arg0: tensor<f64>) -> (tensor<f64>, tensor<f64>)
 
-// CHECK-LABEL: @funcMultiRes.argmap(%arg0: tensor<f64>) -> tensor<?xf64>
+// CHECK-LABEL: @funcMultiRes.argmap(%arg0: tensor<f64>, %arg1: memref<?xf64>)
 
 // CHECK-LABEL: @gradCallMultiRes
 func.func @gradCallMultiRes(%arg0: tensor<f64>) -> (tensor<f64>, tensor<f64>)  {
@@ -88,7 +88,7 @@ func.func @funcMultiArg(%arg0: tensor<f64>, %arg1: tensor<2xf64>) -> tensor<f64>
 
 // CHECK-LABEL: @funcMultiArg.fullgrad01adj(%arg0: tensor<f64>, %arg1: tensor<2xf64>) -> (tensor<f64>, tensor<2xf64>)
 
-// CHECK-LABEL: @funcMultiArg.argmap(%arg0: tensor<f64>, %arg1: tensor<2xf64>) -> tensor<?xf64>
+// CHECK-LABEL: @funcMultiArg.argmap(%arg0: tensor<f64>, %arg1: tensor<2xf64>, %arg2: memref<?xf64>)
 
 // CHECK-LABEL: @gradCallMultiArg
 func.func @gradCallMultiArg(%arg0: tensor<f64>, %arg1: tensor<2xf64>) -> (tensor<f64>, tensor<2xf64>, tensor<f64>, tensor<2xf64>) {
@@ -116,7 +116,7 @@ func.func private @funcMultiCall(%arg0: tensor<f64>) -> tensor<f64> attributes {
 
 // CHECK-LABEL: @funcMultiCall.fullgrad0adj(%arg0: tensor<f64>) -> tensor<f64>
 
-// CHECK-LABEL: @funcMultiCall.argmap(%arg0: tensor<f64>) -> tensor<?xf64>
+// CHECK-LABEL: @funcMultiCall.argmap(%arg0: tensor<f64>, %arg1: memref<?xf64>)
 
 // CHECK-LABEL: @gradCallMultiCall
 func.func @gradCallMultiCall(%arg0: tensor<f64>) -> (tensor<f64>, tensor<f64>) {

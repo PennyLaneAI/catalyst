@@ -311,7 +311,7 @@ class Enzyme(PassPipeline):
     enzyme_path = get_enzyme_path("enzyme", "ENZYME_DIR")
     _default_flags = [
         f"-load-pass-plugin={enzyme_path}/LLVMEnzyme-17.so",
-        # preserve-nvvm transforms certain global arrays to LLVM metadata that Enzyme will recognize.
+        # preserve-nvvm transforms certain global arrays to LLVM metadata that Enzyme will recognize
         "-passes=preserve-nvvm,enzyme",
         "-S",
     ]
