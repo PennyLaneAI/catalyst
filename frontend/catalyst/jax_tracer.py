@@ -283,7 +283,7 @@ def trace_quantum_tape(
         elif op.__class__.__name__ == "WhileLoop":
             cond_consts, body_consts, iter_args = op_args
             qreg = insert_to_qreg(qubit_states, qreg)
-            iter_args_plus_consts = cond_consts + body_consts + [qreg] + iter_args
+            iter_args_plus_consts = cond_consts + body_consts + iter_args + [qreg]
             outs = jprim.qwhile(
                 op.cond_jaxpr,
                 op.body_jaxpr,
@@ -291,7 +291,7 @@ def trace_quantum_tape(
                 len(body_consts),
                 *iter_args_plus_consts,
             )
-            qregs, v = tree_unflatten(op.body_tree, outs)
+            v, qregs = tree_unflatten(op.body_tree, outs)
             qreg = qregs[0]
             p.send_partial_input(v)
             # We don't know if the loop modified any of the qubits
@@ -304,9 +304,9 @@ def trace_quantum_tape(
             qreg = insert_to_qreg(qubit_states, qreg)
             header_and_iter_args_plus_consts = loop_bounds + body_consts + iter_args + [qreg]
             outs = jprim.qfor(op.body_jaxpr, len(body_consts), *header_and_iter_args_plus_consts)
-            v, qreg = tree_unflatten(op.body_tree, outs)
+            v, qregs = tree_unflatten(op.body_tree, outs)
+            qreg = qregs[0]
             print(f"{v=}, {qreg=}")
-            # qreg = qregs[0]
             p.send_partial_input(v)
             # We don't know if the loop modified any of the qubits
             # So let's load them all...

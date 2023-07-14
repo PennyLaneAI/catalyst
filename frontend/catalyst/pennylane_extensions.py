@@ -50,7 +50,7 @@ from catalyst.utils.tracing import TracingContext
 # pylint: disable=too-many-lines
 
 def _trace_quantum_tape(*args, _callee: Callable):
-    (qargs, cargs, ckwargs) = args
+    (cargs, ckwargs, qargs) = args
     assert len(qargs) == 1
     with qml.QueuingManager.stop_recording():
         with JaxTape() as tape:
@@ -70,7 +70,7 @@ def _trace_quantum_tape(*args, _callee: Callable):
     qreg = qargs[0]
     return_values, qreg, qubit_states = trace_quantum_tape(tape, qreg, has_tracer_return_values)
     qreg = insert_to_qreg(qubit_states, qreg)
-    return [qreg], return_values
+    return return_values, [qreg]
 
 
 class QFunc:
@@ -597,7 +597,7 @@ def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
     """
 
     def _make_adjoint(*args, _callee: Callable, **kwargs):
-        cargs_qargs, tree = tree_flatten(([jprim.Qreg()], args, kwargs))
+        cargs_qargs, tree = tree_flatten((args, kwargs, [jprim.Qreg()]))
         cargs, _ = tree_flatten((args, kwargs))
         cargs_qargs_aval = tuple(_abstractify(val) for val in cargs_qargs)
         body, consts, _ = _initial_style_jaxpr(
@@ -706,7 +706,7 @@ class CondCallable:
         def new_branch_fn(branch_fn):
             return partial(_trace_quantum_tape, _callee=branch_fn)
 
-        args, args_tree = tree_flatten(([jprim.Qreg()],[],{}))
+        args, args_tree = tree_flatten(([],{},[jprim.Qreg()]))
         args_avals = tuple(map(_abstractify, args))
         branch_fns = self.branch_fns + [self.otherwise_fn]
         branch_jaxprs, consts, out_trees = _initial_style_jaxprs_with_common_consts(
@@ -938,13 +938,13 @@ class WhileCallable:
 
     def _call_with_quantum_ctx(self, ctx, args):
         def new_cond(*qregs_and_args):
-            _, cargs, _ = qregs_and_args
+            cargs, _, _ = qregs_and_args
             return self.cond_fn(*cargs)
 
         new_body = partial(_trace_quantum_tape, _callee=self.body_fn)
 
         body_jaxpr, cond_jaxpr, cond_consts, body_consts, body_tree = WhileCallable._create_jaxpr(
-            ([jprim.Qreg()], args, {}), new_cond, new_body
+            (args, {}, [jprim.Qreg()]), new_cond, new_body
         )
         flat_init_vals_no_qubits = tree_flatten(args)[0]
 
@@ -957,7 +957,7 @@ class WhileCallable:
             body_tree,
         )
 
-        _, ret_vals = tree_unflatten(body_tree, body_jaxpr.out_avals)
+        ret_vals, _ = tree_unflatten(body_tree, body_jaxpr.out_avals)
         a, t = tree_flatten(ret_vals)
         return ctx.jax_tape.create_tracer(t, a)
 
@@ -1113,32 +1113,9 @@ class ForLoopCallable:
         # Insert iteration counter into loop body arguments with the type of the lower bound.
         args = (self.lower_bound, *args)
 
-        # def new_body(*qreg_and_args):
-        #     qregs, cargs, kwargs = qreg_and_args
-        #     qreg = qregs[0]
-        def new_body(*qreg_and_args):
-            cargs, _, qregs = qreg_and_args
-            qreg = qregs[0]
-
-            with qml.QueuingManager.stop_recording():
-                with JaxTape() as tape:
-                    with tape.quantum_tape:
-                        out = self.body_fn(*cargs)
-                    tape.set_return_val(out)
-                    new_quantum_tape = JaxTape.device.expand_fn(tape.quantum_tape)
-                    tape.quantum_tape = new_quantum_tape
-                    tape.quantum_tape.jax_tape = tape
-
-            has_tracer_return_values = out is not None
-            return_values, qreg, qubit_states = trace_quantum_tape(
-                tape, qreg, has_tracer_return_values
-            )
-            qreg = insert_to_qreg(qubit_states, qreg)
-
-            return return_values, qreg
+        new_body = partial(_trace_quantum_tape, _callee=self.body_fn)
 
         body_jaxpr, body_consts, body_tree = ForLoopCallable._create_jaxpr(
-            # ([jprim.Qreg()], args, {}), new_body
             (args, {}, [jprim.Qreg()]), new_body
         )
 
