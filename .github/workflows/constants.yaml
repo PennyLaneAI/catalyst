@@ -51,11 +51,11 @@ jobs:
 
       - name: Python versions
         id: python_versions
-        run: echo "python_versions=[\"3.8\", \"3.9\", \"3.10\", \"3.11\"]" >> $GITHUB_OUTPUT
+        run: echo 'python_versions=["3.8", "3.9", "3.10", "3.11"]' >> $GITHUB_OUTPUT
 
       - name: Runtime Backend Devices
         id: rt_backends
-        run: echo "rt_backends=[\"lightning\", \"lightning-kokkos\", \"openqasm\"]" >> $GITHUB_OUTPUT
+        run: echo 'rt_backends=["lightning", "lightning-kokkos", "openqasm"]' >> $GITHUB_OUTPUT
 
     outputs:
       llvm_version: ${{ steps.llvm_version.outputs.llvm_version }}
