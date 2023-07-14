@@ -11,6 +11,12 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  constants:
+    name: "Set build matrix"
+    uses: ./.github/workflows/constants.yaml
+    with:
+      event_name: ${{ github.event_name }}
+
   qir-stdlib:
     name: QIR-stdlib Build
     runs-on: ubuntu-latest
@@ -82,15 +88,12 @@ jobs:
 
   llvm:
     name: LLVM Build
+    needs: [constants]
     runs-on: ubuntu-latest
 
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
-
-    - name: Get LLVM Version
-      id: llvm-hash
-      run: echo "llvm-hash=$(grep llvm .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
 
     # Both the LLVM source and build folder are required for further dialect builds.
     # Caching is significantly faster than git cloning since LLVM is such a large repository.
@@ -100,14 +103,14 @@ jobs:
       uses: actions/cache@v3
       with:
         path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-build-opt
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
 
     - name: Cache LLVM Source
       id: cache-llvm-source
       uses: actions/cache@v3
       with:
         path: mlir/llvm-project
-        key: Linux-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-source
+        key: Linux-llvm-${{ needs.constants.outputs.llvm_version }}-default-source
         enableCrossOsArchive: True
 
     - name: Clone LLVM Submodule
@@ -115,7 +118,7 @@ jobs:
       uses: actions/checkout@v3
       with:
         repository: llvm/llvm-project
-        ref: ${{ steps.llvm-hash.outputs.llvm-hash }}
+        ref: ${{ needs.constants.outputs.llvm_version }}
         path: mlir/llvm-project
 
     - name: Install Deps
@@ -137,7 +140,7 @@ jobs:
 
   mhlo:
     name: MHLO Dialect Build
-    needs: [llvm]
+    needs: [constants, llvm]
     runs-on: ubuntu-latest
 
     steps:
@@ -155,18 +158,13 @@ jobs:
         path: mhlo-build
         key: ${{ runner.os }}-mhlo-${{ steps.mhlo-hash.outputs.mhlo-hash }}-default-build
 
-    - name: Get LLVM Version
-      id: llvm-hash
-      if: steps.cache-mhlo.outputs.cache-hit != 'true'
-      run: echo "llvm-hash=$(grep llvm .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
-
     - name: Get Cached LLVM Source
       id: cache-llvm-source
       if: steps.cache-mhlo.outputs.cache-hit != 'true'
       uses: actions/cache@v3
       with:
         path: mlir/llvm-project
-        key: Linux-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-source
+        key: Linux-llvm-${{ needs.constants.outputs.llvm_version }}-default-source
         enableCrossOsArchive: True
         fail-on-cache-miss: True
 
@@ -176,7 +174,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-build-opt
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
         fail-on-cache-miss: True
 
     - name: Clone MHLO Submodule
@@ -204,7 +202,7 @@ jobs:
 
   enzyme:
     name: Enzyme Build
-    needs: [llvm]
+    needs: [constants, llvm]
     runs-on: ubuntu-latest
 
     steps:
@@ -222,18 +220,13 @@ jobs:
         path: enzyme-build
         key: ${{ runner.os }}-enzyme-${{ steps.enzyme-hash.outputs.enzyme-hash }}-default-build
 
-    - name: Get LLVM Version
-      id: llvm-hash
-      if: steps.cache-enzyme.outputs.cache-hit != 'true'
-      run: echo "llvm-hash=$(grep llvm .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
-
     - name: Get Cached LLVM Source
       id: cache-llvm-source
       if: steps.cache-enzyme.outputs.cache-hit != 'true'
       uses: actions/cache@v3
       with:
         path: mlir/llvm-project
-        key: Linux-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-source
+        key: Linux-llvm-${{ needs.constants.outputs.llvm_version }}-default-source
         enableCrossOsArchive: True
         fail-on-cache-miss: True
 
@@ -243,7 +236,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-build-opt
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
         fail-on-cache-miss: True
 
     - name: Clone Enzyme Submodule
@@ -270,7 +263,7 @@ jobs:
 
   quantum:
     name: Quantum Dialects Build
-    needs: [llvm]
+    needs: [constants, llvm]
     runs-on: ubuntu-latest
 
     steps:
@@ -282,16 +275,12 @@ jobs:
         sudo apt-get install -y python3 python3-pip cmake ninja-build ccache clang lld
         python3 -m pip install numpy pybind11
 
-    - name: Get LLVM Version
-      id: llvm-hash
-      run: echo "llvm-hash=$(grep llvm .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
-
     - name: Get Cached LLVM Source
       id: cache-llvm-source
       uses: actions/cache@v3
       with:
         path: mlir/llvm-project
-        key: Linux-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-source
+        key: Linux-llvm-${{ needs.constants.outputs.llvm_version }}-default-source
         enableCrossOsArchive: True
         fail-on-cache-miss: True
 
@@ -300,7 +289,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-build-opt
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
         fail-on-cache-miss: True
 
     - name: Cache CCache
@@ -334,7 +323,7 @@ jobs:
 
   frontend-tests:
     name: Frontend Tests
-    needs: [runtime, mhlo, quantum, enzyme]
+    needs: [constants, runtime, mhlo, quantum, enzyme]
     runs-on: ubuntu-latest
 
     steps:
@@ -347,16 +336,12 @@ jobs:
         python3 -m pip install -r requirements.txt
         python3 -m pip install .
 
-    - name: Get LLVM Version
-      id: llvm-hash
-      run: echo "llvm-hash=$(grep llvm .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
-
     - name: Get Cached LLVM Build
       id: cache-llvm-build
       uses: actions/cache@v3
       with:
         path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-build-opt
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
         fail-on-cache-miss: True
 
     - name: Get MHLO Version
@@ -430,7 +415,7 @@ jobs:
 
   frontend-tests-lightning-kokkos:
     name: Frontend Tests (backend="lightning.kokkos")
-    needs: [runtime, mhlo, quantum, enzyme]
+    needs: [constants, runtime, mhlo, quantum, enzyme]
     runs-on: ubuntu-latest
 
     steps:
@@ -443,16 +428,12 @@ jobs:
         python3 -m pip install -r requirements.txt
         python3 -m pip install .
 
-    - name: Get LLVM Version
-      id: llvm-hash
-      run: echo "llvm-hash=$(grep llvm .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
-
     - name: Get Cached LLVM Build
       id: cache-llvm-build
       uses: actions/cache@v3
       with:
         path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-build-opt
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
         fail-on-cache-miss: True
 
     - name: Get MHLO Version
@@ -513,7 +494,7 @@ jobs:
 
   frontend-tests-openqasm-device:
     name: Frontend Tests (backend="openqasm3")
-    needs: [qir-stdlib, mhlo, quantum, enzyme, llvm]
+    needs: [constants, qir-stdlib, mhlo, quantum, enzyme, llvm]
     runs-on: ubuntu-latest
 
     steps:
@@ -526,16 +507,12 @@ jobs:
         python3 -m pip install -r requirements.txt
         python3 -m pip install .
 
-    - name: Get LLVM Version
-      id: llvm-hash
-      run: echo "llvm-hash=$(grep llvm .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
-
     - name: Get Cached LLVM Build
       id: cache-llvm-build
       uses: actions/cache@v3
       with:
         path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-build-opt
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
         fail-on-cache-miss: True
 
     - name: Get MHLO Version

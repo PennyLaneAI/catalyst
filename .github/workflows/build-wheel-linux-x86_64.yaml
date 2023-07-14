@@ -341,7 +341,7 @@ jobs:
         container: ["quay.io/pypa/manylinux2014_x86_64", "ubuntu-20.04", "ubuntu-22.04"]
 
     # To check all wheels for supported python3 versions
-    name: Test Wheels (Python ${{ matrix.python_version }})
+    name: Test Wheels (Python ${{ matrix.python_version }}) on ${{ matrix.container }}
     runs-on: ${{ matrix.os }}
 
     steps:
