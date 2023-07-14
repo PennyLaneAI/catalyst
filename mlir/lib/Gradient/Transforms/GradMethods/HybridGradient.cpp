@@ -151,7 +151,6 @@ func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc, GradOp
                     intermediateGradients.push_back(backpropOp);
                 }
                 for (size_t i = 0; i < resultsBackpropTypes.size(); i++) {
-
                     // strides
                     std::vector<int64_t> stridesSlice(rankResult, 1);
 

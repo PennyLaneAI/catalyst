@@ -69,7 +69,6 @@ class BufferizeBackpropOp : public OpConversionPattern<BackpropOp> {
         ValueRange results = op.getResults();
         SmallVector<Value> memrefValues;
         for (auto [resType, result] : zip(resTypes, results)) {
-
             MemRefType memrefType = resType.cast<MemRefType>();
             Value memrefValue;
             memrefValue = rewriter.create<memref::AllocOp>(loc, memrefType);

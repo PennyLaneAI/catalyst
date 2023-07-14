@@ -422,7 +422,6 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
                                                    StringRef key, StringRef name,
                                                    StringRef originalName)
     {
-
         ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
         auto *context = moduleOp.getContext();
         PatternRewriter::InsertionGuard insertGuard(rewriter);
