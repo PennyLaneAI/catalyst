@@ -308,7 +308,7 @@ class TestJAXAD:
         assert jnp.allclose(result2, 0.0)
 
     def test_multiD_calls(self, backend):
-        """Test a jax.grad function which repeatedly calls a qjit function."""
+        """Test a jax.grad in combination with qjit on non-1D input parameters."""
 
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
