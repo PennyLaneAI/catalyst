@@ -632,9 +632,9 @@ class JAX_QJIT:
 
     def compute_jvp(self, primals, tangents):
         """Compute the set of results and JVPs for a QJIT function."""
-        # Notes: Assume we have primals of shape `[a,b]` and results of shape `[c,d]`.  derivatives
-        # [2] would get the shape `[a,b,c,d]` and tangents [1] would be the same as primals.  In
-        # this function we apply tensordot on shapes `[a,b,c,d]*[a,b] -> [c,d]`.
+        # Assume we have primals of shape `[a,b]` and results of shape `[c,d]`. Derivatives [2]
+        # would get the shape `[a,b,c,d]` and tangents [1] would have the same shape as primals.
+        # Now, In this function we apply tensordot using the pattern `[a,b,c,d]*[a,b] -> [c,d]`.
 
         # Optimization: Do not compute Jacobians for arguments which do not participate in
         #               differentiation.
