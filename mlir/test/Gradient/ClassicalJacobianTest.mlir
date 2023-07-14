@@ -17,7 +17,6 @@
 // CHECK-LABEL: @simple_circuit.argmap(%arg0: tensor<3xf64>, %arg1: memref<?xf64>)
 func.func @simple_circuit(%arg0: tensor<3xf64>) -> f64 attributes {qnode, diff_method = "parameter-shift"} {
     // CHECK: [[c0:%[a-zA-Z0-9_]+]] = index.constant 0
-    // CHECK: [[buff:%[a-zA-Z0-9_]+]] = catalyst.list_init : <f64>
     // CHECK: [[count:%[a-zA-Z0-9_]+]] = memref.alloca() : memref<index>
     // CHECK: memref.store [[c0]], [[count]]
 
@@ -37,25 +36,22 @@ func.func @simple_circuit(%arg0: tensor<3xf64>) -> f64 attributes {qnode, diff_m
     %q_0 = quantum.extract %r[%idx] : !quantum.reg -> !quantum.bit
     %q_1 = quantum.custom "h"() %q_0 : !quantum.bit
     // CHECK: [[idx:%[a-zA-Z0-9_]+]] = memref.load [[count]]
-    // CHECK-NEXT: catalyst.list_push [[a0]], [[buff]]
+    // CHECK-NEXT: memref.store [[a0]]
     // CHECK-NEXT: [[ip1:%[a-zA-Z0-9_]+]] = index.add [[idx]]
     // CHECK-NEXT: memref.store [[ip1]], [[count]]
     // CHECK-NOT: quantum.
     %q_2 = quantum.custom "rz"(%f0) %q_1 : !quantum.bit
     // CHECK: [[idx:%[a-zA-Z0-9_]+]] = memref.load [[count]]
-    // CHECK-NEXT: catalyst.list_push [[a0]], [[buff]]
+    // CHECK-NEXT: memref.store [[a0]]
     // CHECK-NEXT: [[ip1:%[a-zA-Z0-9_]+]] = index.add [[idx]]
-    // CHECK-NEXT: catalyst.list_push [[a1]], [[buff]]
+    // CHECK-NEXT: memref.store [[a1]]
     // CHECK-NEXT: [[ip2:%[a-zA-Z0-9_]+]] = index.add [[ip1]]
-    // CHECK-NEXT: catalyst.list_push [[a2]], [[buff]]
+    // CHECK-NEXT: memref.store [[a2]]
     // CHECK-NEXT: [[ip3:%[a-zA-Z0-9_]+]] = index.add [[ip2]]
     // CHECK-NEXT: memref.store [[ip3]], [[count]]
     // CHECK-NOT: quantum.
     %q_3 = quantum.custom "u3"(%f0, %f1, %f2) %q_2 : !quantum.bit
 
-    // CHECK: [[vec:%[a-zA-Z0-9_]+]] = catalyst.list_load_data [[buff]]
-    // CHECK: [[tensor:%[a-zA-Z0-9_]+]] = bufferization.to_tensor [[vec]] : memref<?xf64>
-    // CHECK: return [[tensor]]
     func.return %f0 : f64
 }
 
@@ -68,9 +64,7 @@ func.func @gradCall(%arg0: tensor<3xf64>) -> tensor<3xf64> {
 
 // CHECK-LABEL: @structured_circuit.argmap(%arg0: tensor<1xf64>, %arg1: i1, %arg2: i1, %arg3: memref<?xf64>)
 func.func @structured_circuit(%arg0: tensor<1xf64>, %arg1: i1, %arg2: i1) -> f64 attributes {qnode, diff_method = "parameter-shift"} {
-
     // CHECK: [[c0:%[a-zA-Z0-9_]+]] = index.constant 0
-    // CHECK: [[buff:%[a-zA-Z0-9_]+]] = catalyst.list_init : <f64>
     // CHECK: [[count:%[a-zA-Z0-9_]+]] = memref.alloca() : memref<index>
     // CHECK: memref.store [[c0]], [[count]]
     // CHECK: [[e0:%.+]] = tensor.extract %arg0[%c0]
@@ -83,17 +77,17 @@ func.func @structured_circuit(%arg0: tensor<1xf64>, %arg1: i1, %arg2: i1) -> f64
     %r = quantum.alloc(1) : !quantum.reg
     %q_0 = quantum.extract %r[%c0] : !quantum.reg -> !quantum.bit
 
-    // CHECK: [[idx:%[a-zA-Z0-9_]+]] = memref.load [[count]]
-    // CHECK-NEXT: catalyst.list_push [[e0]], [[buff]]
-    // CHECK-NEXT: [[ip1:%[a-zA-Z0-9_]+]] = index.add [[idx]]
-    // CHECK-NEXT: memref.store [[ip1]], [[count]]
+    //CHECK: [[idx:%[a-zA-Z0-9_]+]] = memref.load [[count]]
+    //CHECK: memref.store [[e0]], %arg3[[[idx]]]
+    //CHECK: [[ip1:%[a-zA-Z0-9_]+]] = index.add [[idx]]
+    //CHECK: memref.store [[ip1]], [[count]]
     // CHECK-NOT: quantum.
     %q_1 = quantum.custom "rx"(%f0) %q_0 : !quantum.bit
 
     // CHECK: scf.if %arg1
     %q_2 = scf.if %arg1 -> !quantum.bit {
         // CHECK: [[idx:%[a-zA-Z0-9_]+]] = memref.load [[count]]
-        // CHECK-NEXT: catalyst.list_push [[e0]], [[buff]]
+        // CHECK-NEXT: memref.store [[e0]], %arg3[[[idx]]]
         // CHECK-NEXT: [[ip1:%[a-zA-Z0-9_]+]] = index.add [[idx]]
         // CHECK-NEXT: memref.store [[ip1]], [[count]]
         // CHECK-NOT: quantum.
@@ -102,7 +96,7 @@ func.func @structured_circuit(%arg0: tensor<1xf64>, %arg1: i1, %arg2: i1) -> f64
         // CHECK:  scf.if %arg2
         %q_1_1 = scf.if %arg2 -> !quantum.bit {
             // CHECK: [[idx:%[a-zA-Z0-9_]+]] = memref.load [[count]]
-            // CHECK-NEXT: catalyst.list_push [[e0]], [[buff]]
+            // CHECK-NEXT: memref.store [[e0]], %arg3[[[idx]]]
             // CHECK-NEXT: [[ip1:%[a-zA-Z0-9_]+]] = index.add [[idx]]
             // CHECK-NEXT: memref.store [[ip1]], [[count]]
             // CHECK-NOT: quantum.
@@ -112,13 +106,13 @@ func.func @structured_circuit(%arg0: tensor<1xf64>, %arg1: i1, %arg2: i1) -> f64
         // CHECK: else
         } else {
             // CHECK: [[idx:%[a-zA-Z0-9_]+]] = memref.load [[count]]
-            // CHECK-NEXT: catalyst.list_push [[e0]], [[buff]]
+            // CHECK-NEXT: memref.store [[e0]], %arg3[[[idx]]]
             // CHECK-NEXT: [[ip1:%[a-zA-Z0-9_]+]] = index.add [[idx]]
             // CHECK-NEXT: memref.store [[ip1]], [[count]]
             // CHECK-NOT: quantum.
             %q_1_0_1 = quantum.custom "rz"(%f0) %q_1_0 : !quantum.bit
             // CHECK: [[idx:%[a-zA-Z0-9_]+]] = memref.load [[count]]
-            // CHECK-NEXT: catalyst.list_push [[e0]], [[buff]]
+            // CHECK-NEXT: memref.store [[e0]], %arg3[[[idx]]]
             // CHECK-NEXT: [[ip1:%[a-zA-Z0-9_]+]] = index.add [[idx]]
             // CHECK-NEXT: memref.store [[ip1]], [[count]]
             // CHECK-NOT: quantum.
@@ -138,15 +132,12 @@ func.func @structured_circuit(%arg0: tensor<1xf64>, %arg1: i1, %arg2: i1) -> f64
 
   ^exit:
     // CHECK: [[idx:%[a-zA-Z0-9_]+]] = memref.load [[count]]
-    // CHECK-NEXT: catalyst.list_push [[e0]], [[buff]]
+    // CHECK-NEXT: memref.store [[e0]], %arg3[[[idx]]]
     // CHECK-NEXT: [[ip1:%[a-zA-Z0-9_]+]] = index.add [[idx]]
     // CHECK-NEXT: memref.store [[ip1]], [[count]]
     // CHECK-NOT: quantum.
     %q_3 = quantum.custom "rx"(%f0) %q_2 : !quantum.bit
 
-    // CHECK: [[vec:%[a-zA-Z0-9_]+]] = catalyst.list_load_data [[buff]]
-    // CHECK: [[tensor:%[a-zA-Z0-9_]+]] = bufferization.to_tensor [[vec]] : memref<?xf64>
-    // CHECK: return [[tensor]]
     func.return %f0 : f64
 }
 
@@ -160,7 +151,6 @@ func.func @gradCall(%arg0: tensor<1xf64>, %b0: i1, %b1: i1) -> tensor<1xf64> {
 // CHECK-LABEL: @loop_circuit.argmap(%arg0: tensor<1xf64>, %arg1: memref<?xf64>)
 func.func @loop_circuit(%arg0: tensor<1xf64>) -> f64 attributes {qnode, diff_method = "parameter-shift"} {
     // CHECK: [[c0:%[a-zA-Z0-9_]+]] = index.constant 0
-    // CHECK: [[buff:%[a-zA-Z0-9_]+]] = catalyst.list_init : <f64>
     // CHECK: [[count:%[a-zA-Z0-9_]+]] = memref.alloca() : memref<index>
     // CHECK: memref.store [[c0]], [[count]]
     // CHECK: [[e0:%.+]] = tensor.extract %arg0[%c0]
@@ -174,7 +164,7 @@ func.func @loop_circuit(%arg0: tensor<1xf64>) -> f64 attributes {qnode, diff_met
     %q_0 = quantum.extract %r[%idx] : !quantum.reg -> !quantum.bit
 
     // CHECK: [[idx:%[a-zA-Z0-9_]+]] = memref.load [[count]]
-    // CHECK-NEXT: catalyst.list_push [[e0]], [[buff]]
+    // CHECK-NEXT: memref.store [[e0]], %arg1[[[idx]]]
     // CHECK-NEXT: [[ip1:%[a-zA-Z0-9_]+]] = index.add [[idx]]
     // CHECK-NEXT: memref.store [[ip1]], [[count]]
     // CHECK-NOT: quantum.
@@ -187,7 +177,7 @@ func.func @loop_circuit(%arg0: tensor<1xf64>) -> f64 attributes {qnode, diff_met
     // CHECK: scf.for
     %q_2 = scf.for %i = %lb to %ub step %st iter_args(%q_1_0 = %q_1) -> !quantum.bit {
         // CHECK: [[idx:%[a-zA-Z0-9_]+]] = memref.load [[count]]
-        // CHECK-NEXT: catalyst.list_push [[e0]], [[buff]]
+        // CHECK-NEXT: memref.store [[e0]], %arg1[[[idx]]]
         // CHECK-NEXT: [[ip1:%[a-zA-Z0-9_]+]] = index.add [[idx]]
         // CHECK-NEXT: memref.store [[ip1]], [[count]]
         // CHECK-NOT: quantum.
@@ -200,7 +190,7 @@ func.func @loop_circuit(%arg0: tensor<1xf64>) -> f64 attributes {qnode, diff_met
     // CHECK: scf.for
     %q_3 = scf.for %j = %lb to %ub step %st iter_args(%q_2_0 = %q_2) -> !quantum.bit {
         // CHECK: [[idx:%[a-zA-Z0-9_]+]] = memref.load [[count]]
-        // CHECK-NEXT: catalyst.list_push [[e0]], [[buff]]
+        // CHECK-NEXT: memref.store [[e0]], %arg1[[[idx]]]
         // CHECK-NEXT: [[ip1:%[a-zA-Z0-9_]+]] = index.add [[idx]]
         // CHECK-NEXT: memref.store [[ip1]], [[count]]
         // CHECK-NOT: quantum.
@@ -209,7 +199,7 @@ func.func @loop_circuit(%arg0: tensor<1xf64>) -> f64 attributes {qnode, diff_met
         // CHECK: scf.for
         %q_1_1 = scf.for %k = %j to %ub step %st iter_args(%q_2_1_0 = %q_2_1) -> !quantum.bit {
             // CHECK: [[idx:%[a-zA-Z0-9_]+]] = memref.load [[count]]
-            // CHECK-NEXT: catalyst.list_push [[e0]], [[buff]]
+            // CHECK-NEXT: memref.store [[e0]], %arg1[[[idx]]]
             // CHECK-NEXT: [[ip1:%[a-zA-Z0-9_]+]] = index.add [[idx]]
             // CHECK-NEXT: memref.store [[ip1]], [[count]]
             // CHECK-NOT: quantum.
@@ -223,9 +213,6 @@ func.func @loop_circuit(%arg0: tensor<1xf64>) -> f64 attributes {qnode, diff_met
         scf.yield %q_1_1 : !quantum.bit
     }
 
-    // CHECK: [[vec:%[a-zA-Z0-9_]+]] = catalyst.list_load_data [[buff]]
-    // CHECK: [[tensor:%[a-zA-Z0-9_]+]] = bufferization.to_tensor [[vec]] : memref<?xf64>
-    // CHECK: return [[tensor]]
     func.return %f0 : f64
 }
 
@@ -234,11 +221,13 @@ func.func @gradCall(%arg0: tensor<1xf64>) -> tensor<1xf64> {
     func.return %0 : tensor<1xf64>
 }
 
+
 // -----
 
 // CHECK-LABEL: @all_ops_circuit.argmap(%arg0: tensor<1xf64>, %arg1: memref<?xf64>)
 func.func @all_ops_circuit(%arg0: tensor<1xf64>) -> f64 attributes {qnode, diff_method = "parameter-shift"} {
-    // CHECK: [[buff:%[a-zA-Z0-9_]+]] = catalyst.list_init : <f64>
+    // CHECK: [[c0:%[a-zA-Z0-9_]+]] = index.constant 0
+    // CHECK: [[count:%[a-zA-Z0-9_]+]] = memref.alloca() : memref<index>
     %c0 = arith.constant 0 : index
     // CHECK: [[e0:%.+]] = tensor.extract %arg0[%c0]
     %f0 = tensor.extract %arg0[%c0] : tensor<1xf64>
@@ -248,17 +237,16 @@ func.func @all_ops_circuit(%arg0: tensor<1xf64>) -> f64 attributes {qnode, diff_
     %q_0 = quantum.extract %r[%idx] : !quantum.reg -> !quantum.bit
 
 
-    // CHECK: catalyst.list_push [[e0]], [[buff]]
+    // CHECK: [[idx:%[a-zA-Z0-9_]+]] = memref.load [[count]]
+    // CHECK-NEXT: memref.store [[e0]], %arg1[[[idx]]]
     // CHECK-NOT: quantum.
     %q_1 = quantum.custom "rz"(%f0) %q_0 : !quantum.bit
 
-    // CHECK: catalyst.list_push [[e0]], [[buff]]
+    // CHECK: [[idx:%[a-zA-Z0-9_]+]] = memref.load [[count]]
+    // CHECK-NEXT: memref.store [[e0]], %arg1[[[idx]]]
     // CHECK-NOT: quantum.
     %q_2:3 = quantum.multirz(%f0) %q_0, %q_0, %q_0 : !quantum.bit, !quantum.bit, !quantum.bit
 
-    // CHECK: [[vec:%[a-zA-Z0-9_]+]] = catalyst.list_load_data [[buff]]
-    // CHECK: [[tensor:%[a-zA-Z0-9_]+]] = bufferization.to_tensor [[vec]] : memref<?xf64>
-    // CHECK: return [[tensor]]
     func.return %f0 : f64
 }
 
