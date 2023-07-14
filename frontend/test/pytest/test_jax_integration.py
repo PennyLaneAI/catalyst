@@ -307,16 +307,17 @@ class TestJAXAD:
         assert jnp.allclose(result1, 0.0)
         assert jnp.allclose(result2, 0.0)
 
-    def test_multiD_calls(self, backend):
+    @pytest.mark.parametrize("shape", ([2, 3], [3, 2], [1, 6]))
+    def test_multiD_calls(self, backend, shape):
         """Test a jax.grad in combination with qjit on non-1D input parameters."""
 
         def mock_circuit(p1, p2):
-            return jnp.reshape(p1, [2, 3]) + jnp.reshape(p2, [2, 3])
+            return jnp.reshape(p1, shape) + 2 * jnp.reshape(p2, shape)
 
         def circuit(p1, p2):
             qml.RY(p1[0, 1], wires=0)
             qml.RZ(p2[1, 0], wires=0)
-            return jnp.reshape(p1, [2, 3]) + jnp.reshape(p2, [2, 3])
+            return jnp.reshape(p1, shape) + 2 * jnp.reshape(p2, shape)
 
         C_circuit = qjit(qml.qnode(qml.device(backend, wires=1))(circuit))
         PL_circuit = jax.jit(mock_circuit)
