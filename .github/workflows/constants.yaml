@@ -17,10 +17,6 @@ on:
         description: "Enzyme version"
         value: ${{ jobs.set-constants.outputs.enzyme_version }}
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   set-constants:
     runs-on: ubuntu-22.04
