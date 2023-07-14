@@ -315,7 +315,7 @@ class TestJAXAD:
         def circuit(p1, p2):
             qml.RY(p1[0, 1], wires=0)
             qml.RZ(p2[1, 0], wires=0)
-            return jnp.asarray(measure(0), dtype=float)
+            return qml.expval(qml.PauliZ(0))
 
         def cost_fn(p1, p2):
             m1 = circuit(p1, p2)
