@@ -35,7 +35,12 @@ patch:
 	patch -d $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/dialects --follow-symlinks < patches/do-not-infer-result.patch
 	patch -d $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/dialects --follow-symlinks < patches/remove-gradient-cext-import.patch
 	patch -d $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/dialects --follow-symlinks < patches/remove-quantum-cext-import.patch
-	cp -lr mlir/build/python_packages/quantum/mlir_quantum/ frontend/
+	mkdir -p ../frontend/mlir_quantum/dialects
+	cp -R --dereference $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/runtime ../frontend/mlir_quantum/runtime
+	cp --dereference $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/ir.py ../frontend/mlir_quantum/
+	for file in arith tensor scf gradient quantum _ods_common ; do \
+		cp --dereference $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/dialects/*$${file}* ../frontend/mlir_quantum/dialects ; \
+	done
 
 .PHONY: llvm
 llvm:
