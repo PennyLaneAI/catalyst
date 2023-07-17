@@ -58,4 +58,4 @@ struct CompilerOptions {
 
 /// Entry point to the MLIR portion of the compiler.
 mlir::LogicalResult QuantumDriverMain(const CompilerOptions &options,
-                                      std::optional<FunctionAttributes> inferredData);
+                                      std::optional<FunctionAttributes> &inferredData);

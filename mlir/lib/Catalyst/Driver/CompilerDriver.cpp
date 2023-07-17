@@ -15,6 +15,7 @@
 #include "Catalyst/Driver/CompilerDriver.h"
 #include "Catalyst/Driver/CatalystLLVMTarget.h"
 #include "Catalyst/Driver/Pipelines.h"
+#include "Catalyst/Driver/Support.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Catalyst/Transforms/Passes.h"
@@ -161,7 +162,7 @@ RankedTensorType inferMLIRReturnType(MLIRContext *ctx, llvm::Type *memRefDescTyp
 }
 
 LogicalResult QuantumDriverMain(const CompilerOptions &options,
-                                std::optional<FunctionAttributes> inferredData)
+                                std::optional<FunctionAttributes> &inferredData)
 {
     registerAllCatalystPasses();
     DialectRegistry registry;
@@ -187,6 +188,12 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options,
         llvmModule = translateModuleToLLVMIR(*op, llvmContext);
         if (!llvmModule) {
             return failure();
+        }
+
+        if (options.keepIntermediate) {
+            if (failed(catalyst::dumpToFile(options.workspace, "llvm_ir.ll", *llvmModule))) {
+                return failure();
+            }
         }
     }
     else {

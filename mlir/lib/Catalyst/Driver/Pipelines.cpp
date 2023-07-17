@@ -14,6 +14,7 @@
 
 #include "Catalyst/Driver/Pipelines.h"
 #include "Catalyst/Driver/CompilerDriver.h"
+#include "Catalyst/Driver/Support.h"
 
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
@@ -23,6 +24,7 @@
 #include <filesystem>
 
 using namespace mlir;
+namespace fs = std::filesystem;
 
 namespace {
 // clang-format off
@@ -102,23 +104,6 @@ std::string joinPasses(const SmallVector<const char *> &passes)
     return joined;
 }
 
-LogicalResult dumpStringToFile(StringRef directory, StringRef fileName, std::string &outString)
-{
-    using std::filesystem::path;
-    std::error_code errCode;
-    std::string outFileName =
-        path(directory.str()) / path(fileName.str()).replace_extension(".mlir");
-    llvm::raw_fd_ostream outfile{outFileName, errCode};
-    if (errCode) {
-        llvm::errs() << "unable to open file: " << errCode.message() << "\n";
-        return failure();
-    }
-    outfile << outString;
-    outfile.flush();
-    outString.clear();
-    return success();
-}
-
 struct Pipeline {
     const char *name;
     const SmallVector<const char *> passes;
@@ -138,9 +123,11 @@ void configureIRPrinting(const CompilerOptions &options, PassManager &pm,
         });
         bool shouldPrint = pipeline != std::end(pipelines);
         if (shouldPrint && !outStr.empty()) {
-            if (failed(dumpStringToFile(options.workspace, pipelines[pipelineIdx].name, outStr))) {
+            std::string outFile = fs::path(pipelines[pipelineIdx].name).replace_extension(".mlir");
+            if (failed(catalyst::dumpToFile(options.workspace, outFile, outStr))) {
                 return false;
             }
+            outStr.clear();
             pipelineIdx++;
         }
         return shouldPrint;
@@ -155,10 +142,9 @@ void configureIRPrinting(const CompilerOptions &options, PassManager &pm,
 
 LogicalResult catalyst::runDefaultLowering(const CompilerOptions &options, ModuleOp moduleOp)
 {
-
-    Pipeline pipelines[] = {{.name = "mhlo_to_core", .passes = mhloToCorePasses},
-                            {.name = "quantum_compilation", .passes = quantumCompilationPasses},
-                            {.name = "bufferization", .passes = bufferizationPasses},
+    Pipeline pipelines[] = {{.name = "no_mhlo", .passes = mhloToCorePasses},
+                            {.name = "gradients_lowered", .passes = quantumCompilationPasses},
+                            {.name = "bufferized", .passes = bufferizationPasses},
                             {.name = "llvm_dialect", .passes = lowerToLLVMPasses}};
     auto pm = PassManager::on<ModuleOp>(options.ctx, PassManager::Nesting::Implicit);
 
@@ -184,8 +170,10 @@ LogicalResult catalyst::runDefaultLowering(const CompilerOptions &options, Modul
         return failure();
     }
 
+    // After the last pass, outStr will need to be dumped one last time.
     if (options.keepIntermediate && !outStr.empty()) {
-        if (failed(dumpStringToFile(options.workspace, pipelines[pipelineIdx].name, outStr))) {
+        std::string outFile = fs::path(pipelines[pipelineIdx].name).replace_extension(".mlir");
+        if (failed(catalyst::dumpToFile(options.workspace, outFile, outStr))) {
             return failure();
         }
     }
