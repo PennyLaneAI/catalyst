@@ -483,8 +483,9 @@ class Compiler:
 
         pipelines = options.pipelines
         inferred_data = None
+        llvm_ir = None
         if pipelines is None:
-            filename, *inferred_data = compile_asm(
+            filename, llvm_ir, *inferred_data = compile_asm(
                 ir,
                 workspace_name,
                 module_name,
@@ -499,7 +500,7 @@ class Compiler:
                 self.pass_pipeline_output[pipeline.__name__] = output
                 filename = os.path.abspath(output)
 
-        return filename, inferred_data
+        return filename, llvm_ir, inferred_data
 
     def run(self, mlir_module, options):
         """Compile an MLIR module to a shared object.

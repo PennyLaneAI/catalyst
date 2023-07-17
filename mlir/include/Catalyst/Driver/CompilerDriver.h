@@ -33,6 +33,8 @@ struct FunctionAttributes {
     std::string functionName;
     /// The return type of the JIT entry point function.
     std::string returnType;
+    /// The lowered LLVM IR module (in textual form).
+    std::string llvmir;
 };
 
 struct CompilerOptions {
@@ -58,4 +60,4 @@ struct CompilerOptions {
 
 /// Entry point to the MLIR portion of the compiler.
 mlir::LogicalResult QuantumDriverMain(const CompilerOptions &options,
-                                      std::optional<FunctionAttributes> &inferredData);
+                                      FunctionAttributes &inferredData);

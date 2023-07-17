@@ -30,9 +30,7 @@ PYBIND11_MODULE(_catalystDriver, m)
         "compile_asm",
         [](const char *source, const char *workspace, const char *moduleName,
            bool inferFunctionAttrs, bool keepIntermediate) {
-            FunctionAttributes emptyAttributes;
-            std::optional<FunctionAttributes> inferredAttributes =
-                inferFunctionAttrs ? std::optional(emptyAttributes) : std::nullopt;
+            FunctionAttributes inferredAttributes;
             mlir::MLIRContext ctx;
             std::string errors;
             llvm::raw_string_ostream errStream{errors};
@@ -48,9 +46,8 @@ PYBIND11_MODULE(_catalystDriver, m)
                 throw std::runtime_error("Compilation failed:\n" + errors);
             }
 
-            return std::make_tuple(options.getObjectFile(),
-                                   inferredAttributes.value_or(emptyAttributes).functionName,
-                                   inferredAttributes.value_or(emptyAttributes).returnType);
+            return std::make_tuple(options.getObjectFile(), inferredAttributes.llvmir,
+                                   inferredAttributes.functionName, inferredAttributes.returnType);
         },
         py::arg("source"), py::arg("workspace"), py::arg("module_name") = "jit source",
         py::arg("infer_function_attrs") = false, py::arg("keep_intermediate") = false);

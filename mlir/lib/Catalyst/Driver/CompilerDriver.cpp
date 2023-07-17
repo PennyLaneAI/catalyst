@@ -61,6 +61,8 @@ OwningOpRef<ModuleOp> parseMLIRSource(MLIRContext *ctx, StringRef source, String
     return parseSourceFile<ModuleOp>(sourceMgr, parserConfig);
 }
 
+/// Parse an LLVM module given in textual representation. Any parse errors will be output to
+/// the provided SMDiagnostic.
 std::unique_ptr<llvm::Module> parseLLVMSource(llvm::LLVMContext &context, StringRef source,
                                               StringRef moduleName, llvm::SMDiagnostic &err)
 {
@@ -141,28 +143,42 @@ FailureOr<llvm::Function *> getJITFunction(MLIRContext *ctx, llvm::Module &llvmM
     return failure();
 }
 
-RankedTensorType inferMLIRReturnType(MLIRContext *ctx, llvm::Type *memRefDescType,
-                                     Type assumedElementType)
+void inferMLIRReturnTypes(MLIRContext *ctx, llvm::Type *returnType, Type assumedElementType,
+                          SmallVectorImpl<RankedTensorType> &inferredTypes)
 {
-    SmallVector<int64_t> resultShape;
-    auto *structType = cast<llvm::StructType>(memRefDescType);
-    assert(structType->getNumElements() >= 3 &&
-           "Expected MemRef descriptor struct to have at least 3 entries");
-    if (structType->getNumElements() == 3) {
-        // resultShape is empty
-    }
-    else {
-        auto *arrayType = cast<llvm::ArrayType>(structType->getTypeAtIndex(3));
-        size_t rank = arrayType->getNumElements();
-        for (size_t i = 0; i < rank; i++) {
-            resultShape.push_back(ShapedType::kDynamic);
+    auto inferSingleMemRef = [&](llvm::StructType *descriptorType) {
+        SmallVector<int64_t> resultShape;
+        assert(descriptorType->getNumElements() >= 3 &&
+               "Expected MemRef descriptor struct to have at least 3 entries");
+        if (descriptorType->getNumElements() == 3) {
+            // resultShape is empty
+        }
+        else {
+            auto *arrayType = cast<llvm::ArrayType>(descriptorType->getTypeAtIndex(3));
+            size_t rank = arrayType->getNumElements();
+            for (size_t i = 0; i < rank; i++) {
+                resultShape.push_back(ShapedType::kDynamic);
+            }
+        };
+        return RankedTensorType::get(resultShape, assumedElementType);
+    };
+
+    auto *structType = cast<llvm::StructType>(returnType);
+    // The return type could be a single memref descriptor or a struct of multiple memref
+    // descriptors.
+    if (isa<llvm::StructType>(structType->getElementType(0))) {
+        for (size_t i = 0; i < structType->getNumElements(); i++) {
+            inferredTypes.push_back(
+                inferSingleMemRef(cast<llvm::StructType>(structType->getTypeAtIndex(i))));
         }
     }
-    return RankedTensorType::get(resultShape, assumedElementType);
+    else {
+        // Assume the function returns a single memref
+        inferredTypes.push_back(inferSingleMemRef(structType));
+    }
 }
 
-LogicalResult QuantumDriverMain(const CompilerOptions &options,
-                                std::optional<FunctionAttributes> &inferredData)
+LogicalResult QuantumDriverMain(const CompilerOptions &options, FunctionAttributes &inferredData)
 {
     registerAllCatalystPasses();
     DialectRegistry registry;
@@ -207,20 +223,26 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options,
         }
     }
 
-    // The user has requested that we infer the name and return type of the JIT'ed function.
-    if (inferredData.has_value()) {
-        auto function = getJITFunction(options.ctx, *llvmModule);
-        if (failed(function)) {
-            return failure();
-        }
-        inferredData->functionName = function.value()->getName().str();
+    // For feature parity with the previous driver, always return the LLVM module.
+    llvm::raw_string_ostream llvmIRStream(inferredData.llvmir);
+    llvmIRStream << *llvmModule;
+
+    // Attempt to infer the name and return type of the module from LLVM IR. This information is
+    // required when executing a module given as textual IR.
+    auto function = getJITFunction(options.ctx, *llvmModule);
+    if (succeeded(function)) {
+        inferredData.functionName = function.value()->getName().str();
 
         // When inferring the return type from LLVM, assume a f64
         // element type. This is because the LLVM pointer type is
         // opaque and requires looking into its uses to infer its type.
-        auto tensorType =
-            inferMLIRReturnType(ctx, function.value()->getReturnType(), Float64Type::get(ctx));
-        inferredData->returnType = serializeMLIRObject(tensorType);
+        SmallVector<RankedTensorType> returnTypes;
+        inferMLIRReturnTypes(ctx, function.value()->getReturnType(), Float64Type::get(ctx),
+                             returnTypes);
+        llvm::raw_string_ostream returnTypeStream(inferredData.returnType);
+        llvm::interleaveComma(returnTypes, returnTypeStream, [](RankedTensorType tensorType) {
+            return serializeMLIRObject(tensorType);
+        });
     }
 
     if (failed(compileObjectFile(std::move(llvmModule), options.getObjectFile()))) {

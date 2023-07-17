@@ -113,8 +113,9 @@ struct Pipeline {
 /// By overriding the shouldPrintAfterPass hook, this function sets up both 1. after which passes
 /// the IR should be printed, and 2. printing the IR to files in the workspace.
 void configureIRPrinting(const CompilerOptions &options, PassManager &pm,
-                         llvm::raw_ostream &outStream, size_t &pipelineIdx, std::string &outStr,
-                         MutableArrayRef<Pipeline> pipelines)
+                         llvm::raw_ostream &outStream, std::string &outStr,
+                         MutableArrayRef<Pipeline> pipelines,
+                         function_ref<LogicalResult()> dumpIntermediate)
 {
     auto shouldPrintAfterPass = [&](Pass *pass, Operation *) {
         Pipeline *pipeline = llvm::find_if(pipelines, [&pass](Pipeline pipeline) {
@@ -122,13 +123,9 @@ void configureIRPrinting(const CompilerOptions &options, PassManager &pm,
             return pipeline.passes.back() == pass->getArgument();
         });
         bool shouldPrint = pipeline != std::end(pipelines);
-        if (shouldPrint && !outStr.empty()) {
-            std::string outFile = fs::path(pipelines[pipelineIdx].name).replace_extension(".mlir");
-            if (failed(catalyst::dumpToFile(options.workspace, outFile, outStr))) {
-                return false;
-            }
-            outStr.clear();
-            pipelineIdx++;
+        if (shouldPrint && !outStr.empty() && failed(dumpIntermediate()) &&
+            failed(dumpIntermediate())) {
+            return false;
         }
         return shouldPrint;
     };
@@ -156,8 +153,29 @@ LogicalResult catalyst::runDefaultLowering(const CompilerOptions &options, Modul
     std::string outStr;
     llvm::raw_string_ostream outStream{outStr};
     size_t pipelineIdx = 0;
+    auto dumpIntermediate = [&](std::optional<std::string> outFile = std::nullopt) {
+        if (!outFile) {
+            outFile = fs::path(std::to_string(pipelineIdx + 1) + "_" + pipelines[pipelineIdx].name)
+                          .replace_extension(".mlir");
+            pipelineIdx++;
+        }
+        if (failed(catalyst::dumpToFile(options.workspace, outFile.value(), outStr))) {
+            return failure();
+        }
+        outStr.clear();
+        return success();
+    };
+
     if (options.keepIntermediate) {
-        configureIRPrinting(options, pm, outStream, pipelineIdx, outStr, pipelines);
+        // Dump the IR before running any passes
+        outStream << moduleOp;
+        if (failed(
+                dumpIntermediate(fs::path(options.moduleName.str()).replace_extension(".mlir")))) {
+            return failure();
+        }
+        outStr.clear();
+
+        configureIRPrinting(options, pm, outStream, outStr, pipelines, dumpIntermediate);
     }
 
     for (const auto &pipeline : pipelines) {
@@ -171,11 +189,8 @@ LogicalResult catalyst::runDefaultLowering(const CompilerOptions &options, Modul
     }
 
     // After the last pass, outStr will need to be dumped one last time.
-    if (options.keepIntermediate && !outStr.empty()) {
-        std::string outFile = fs::path(pipelines[pipelineIdx].name).replace_extension(".mlir");
-        if (failed(catalyst::dumpToFile(options.workspace, outFile, outStr))) {
-            return failure();
-        }
+    if (options.keepIntermediate && !outStr.empty() && failed(dumpIntermediate())) {
+        return failure();
     }
 
     return success();

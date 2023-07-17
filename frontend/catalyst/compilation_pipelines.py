@@ -505,13 +505,13 @@ class QJIT:
             # (without parsing the IR), assume the name is that of the currently executing
             # Python file.
             module_name = pathlib.Path(__main__.__file__).stem
-            shared_object, inferred_func_data = self._compiler.run_from_ir(
+            shared_object, llvm_ir, inferred_func_data = self._compiler.run_from_ir(
                 self.qfunc, module_name, self.compile_options
             )
             qfunc_name = inferred_func_data[0]
-            # Parse back the return type given as a string
+            # Parse back the return types given as a semicolon-separated string
             with ir.Context():
-                restype = [ir.RankedTensorType.parse(inferred_func_data[1])]
+                restype = [ir.RankedTensorType.parse(rt) for rt in inferred_func_data[1].split(",")]
         else:
             # This will make a check before sending it to the compiler that the return type
             # is actually available in most systems. f16 needs a special symbol and linking
@@ -527,11 +527,12 @@ class QJIT:
             # `replace` method, so we need to get a regular Python string out of it.
             qfunc_name = str(self.mlir_module.body.operations[0].name).replace('"', "")
 
-            shared_object, inferred_func_data = self._compiler.run(
+            shared_object, llvm_ir, inferred_func_data = self._compiler.run(
                 self.mlir_module,
                 options=self.compile_options,
             )
 
+        self._llvmir = llvm_ir
         return CompiledFunction(shared_object, qfunc_name, restype)
 
     def _maybe_promote(self, function, *args):
