@@ -24,7 +24,7 @@ from jax import numpy as jnp
 from numpy import pi
 
 from catalyst import for_loop, grad, measure, qjit
-from catalyst.compilation_pipelines import CompiledFunction
+from catalyst.compilation_pipelines import CompiledFunction, TypeCompatibility
 from catalyst.jax_primitives import _scalar_abstractify
 
 
@@ -505,8 +505,8 @@ class TestSignatureErrors:
     def test_incompatible_compiled_vs_runtime(self):
         """Test incompatible compiled vs runtime."""
 
-        retval = CompiledFunction.can_promote([], [1])
-        assert not retval
+        retval = CompiledFunction.typecheck([], [1])
+        assert TypeCompatibility.NEEDS_COMPILATION == retval
 
     def test_incompatible_type_reachable_from_user_code(self):
         """Raise error message for incompatible types"""

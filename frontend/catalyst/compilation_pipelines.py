@@ -20,6 +20,7 @@ import functools
 import inspect
 import typing
 import warnings
+from enum import Enum
 
 import jax
 import jax.numpy as jnp
@@ -122,6 +123,18 @@ class SharedObjectManager:
         return function, setup, teardown, mem_transfer
 
 
+class TypeCompatibility(Enum):
+    """Enum class for state machine.
+
+    The state represent the transition between states.
+    """
+
+    UNKNOWN = 0
+    CAN_SKIP_PROMOTION = 1
+    NEEDS_PROMOTION = 2
+    NEEDS_COMPILATION = 3
+
+
 class CompiledFunction:
     """CompiledFunction, represents a Compiled Function.
 
@@ -143,7 +156,7 @@ class CompiledFunction:
         self.restype = restype
 
     @staticmethod
-    def can_skip_promote(compiled_signature, runtime_signature):
+    def typecheck(compiled_signature, runtime_signature):
         """Whether arguments can be promoted.
 
         Args:
@@ -158,37 +171,21 @@ class CompiledFunction:
         len_compile = len(compiled_signature)
         len_runtime = len(runtime_signature)
         if len_compile != len_runtime:
-            return False
+            return TypeCompatibility.NEEDS_COMPILATION
 
+        best_case = TypeCompatibility.CAN_SKIP_PROMOTION
         for c_param, r_param in zip(compiled_signature, runtime_signature):
-            if c_param.dtype != r_param.dtype or c_param.shape != r_param.shape:
-                return False
-        return True
+            if c_param.dtype != r_param.dtype:
+                best_case = TypeCompatibility.NEEDS_PROMOTION
 
-    @staticmethod
-    def can_promote(compiled_signature, runtime_signature):
-        """Whether arguments can be promoted.
+            if c_param.shape != r_param.shape:
+                return TypeCompatibility.NEEDS_COMPILATION
 
-        Args:
-            compiled_signature: user supplied signature, obtain from either an annotation or a
-                                previously compiled implementation of the compiled function
-            runtime_signature: runtime signature
-
-        Returns:
-            bool.
-        """
-        len_compile = len(compiled_signature)
-        len_runtime = len(runtime_signature)
-        if len_compile != len_runtime:
-            return False
-
-        for c_param, r_param in zip(compiled_signature, runtime_signature):
-            assert isinstance(c_param, jax.core.ShapedArray)
-            assert isinstance(r_param, jax.core.ShapedArray)
             promote_to = jax.numpy.promote_types(r_param.dtype, c_param.dtype)
-            if c_param.dtype != promote_to or c_param.shape != r_param.shape:
-                return False
-        return True
+            if c_param.dtype != promote_to:
+                return TypeCompatibility.NEEDS_COMPILATION
+
+        return best_case
 
     @staticmethod
     def promote_arguments(compiled_signature, runtime_signature, *args):
@@ -245,8 +242,7 @@ class CompiledFunction:
         """Execute the compiled function with arguments ``*args``.
 
         Args:
-            shared_object_file: path to the shared object file containing the JIT compiled function
-            func_name: name of compiled function to be executed
+            lib: Shared object
             has_return: whether the function returns a value or not
             numpy_dict: dictionary of numpy arrays of buffers from the runtime
             *args: arguments to the function
@@ -574,22 +570,24 @@ class QJIT:
             )
         )
         r_sig = CompiledFunction.get_runtime_signature(*args)
-        is_prev_compile = self.compiled_function is not None
-        can_skip_promote = is_prev_compile and CompiledFunction.can_skip_promote(self.c_sig, r_sig)
-        if can_skip_promote:
-            return function, args
 
-        can_promote = not is_prev_compile or CompiledFunction.can_promote(self.c_sig, r_sig)
-        needs_compile = not is_prev_compile or not can_promote
+        has_been_compiled = self.compiled_function is not None
+        next_action = TypeCompatibility.UNKNOWN
+        if not has_been_compiled:
+            next_action = TypeCompatibility.NEEDS_COMPILATION
+        else:
+            next_action = CompiledFunction.typecheck(self.c_sig, r_sig)
 
-        if needs_compile:
+        if next_action == TypeCompatibility.NEEDS_PROMOTION:
+            args = CompiledFunction.promote_arguments(self.c_sig, r_sig, *args)
+        elif next_action == TypeCompatibility.NEEDS_COMPILATION:
             if self.user_typed:
                 msg = "Provided arguments did not match declared signature, recompiling..."
                 warnings.warn(msg, UserWarning)
             self.mlir_module = self.get_mlir(*r_sig)
             function = self.compile()
-        elif can_promote:
-            args = CompiledFunction.promote_arguments(self.c_sig, r_sig, *args)
+        else:
+            assert next_action == TypeCompatibility.CAN_SKIP_PROMOTION
 
         return function, args
 
