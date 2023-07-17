@@ -127,6 +127,7 @@ class CompiledFunction:
         restype,
     ):
         self.shared_object = SharedObjectManager(shared_object_file, func_name)
+        self.return_type_c_abi = None
         self.func_name = func_name
         self.restype = restype
 
@@ -305,8 +306,22 @@ class CompiledFunction:
         shape = ir.RankedTensorType(mlir_tensor_type).shape
         return len(shape) if shape else 0
 
-    @staticmethod
-    def restype_to_memref_descs(mlir_tensor_types):
+    def getCompiledReturnValueType(self, return_fields_types, ranks, etypes, sizes):
+        if self.return_type_c_abi is not None:
+            return self.return_type_c_abi
+
+        class CompiledFunctionReturnValue(ctypes.Structure):
+            """Programmatically create a structure which holds tensors of varying base types."""
+
+            _fields_ = [("f" + str(i), type(t)) for i, t in enumerate(return_fields_types)]
+            _ranks_ = ranks
+            _etypes_ = etypes
+            _sizes_ = sizes
+
+        self.return_type_c_abi = CompiledFunctionReturnValue()
+        return self.return_type_c_abi
+
+    def restype_to_memref_descs(self, mlir_tensor_types):
         """Converts the return type to a compatible type for the expected ABI.
 
         Args:
@@ -331,20 +346,11 @@ class CompiledFunction:
             CompiledFunction.get_sizes(mlir_tensor_type) for mlir_tensor_type in mlir_tensor_types
         ]
 
-        class CompiledFunctionReturnValue(ctypes.Structure):
-            """Programmatically create a structure which holds tensors of varying base types."""
-
-            _fields_ = [("f" + str(i), type(t)) for i, t in enumerate(return_fields_types)]
-            _ranks_ = ranks
-            _etypes_ = etypes
-            _sizes_ = sizes
-
-        return_value = CompiledFunctionReturnValue()
+        return_value = self.getCompiledReturnValueType(return_fields_types, ranks, etypes, sizes)
         return_value_pointer = ctypes.pointer(return_value)
         return return_value_pointer
 
-    @staticmethod
-    def args_to_memref_descs(restype, args):
+    def args_to_memref_descs(self, restype, args):
         """Convert ``args`` to memref descriptors.
 
         Besides converting the arguments to memrefs, it also prepares the return value. To respect
@@ -365,7 +371,7 @@ class CompiledFunction:
         return_value_pointer = ctypes.POINTER(ctypes.c_int)()  # This is the null pointer
 
         if restype:
-            return_value_pointer = CompiledFunction.restype_to_memref_descs(restype)
+            return_value_pointer = self.restype_to_memref_descs(restype)
 
         c_abi_args = []
 
@@ -396,12 +402,12 @@ class CompiledFunction:
 
     def get_cmain(self, *args):
         """Get a string representing a C program that can be linked against the shared object."""
-        _, buffer = CompiledFunction.args_to_memref_descs(self.restype, args)
+        _, buffer = self.args_to_memref_descs(self.restype, args)
 
         return get_template(self.func_name, self.restype, *buffer)
 
     def __call__(self, *args, **kwargs):
-        abi_args, _buffer = CompiledFunction.args_to_memref_descs(self.restype, args)
+        abi_args, _buffer = self.args_to_memref_descs(self.restype, args)
 
         numpy_dict = {nparr.ctypes.data: nparr for nparr in _buffer}
 
