@@ -22,6 +22,9 @@
 
 <h3>Improvements</h3>
 
+* Disallow measurement operations taking place inside gradients from MLIR.
+  [#204](https://github.com/PennyLaneAI/catalyst/pull/204)
+
 <h3>Breaking changes</h3>
 
 <h3>Bug fixes</h3>
@@ -30,6 +33,7 @@
 
 This release contains contributions from (in alphabetical order):
 
+Erick Ochoa Lopez,
 Sergei Mironov.
 
 # Release 0.2.0

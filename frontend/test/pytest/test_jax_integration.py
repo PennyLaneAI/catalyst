@@ -294,7 +294,7 @@ class TestJAXAD:
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(x):
             qml.RY(x, wires=0)
-            return jnp.asarray(measure(0), dtype=float)
+            return qml.expval(qml.PauliZ(0))
 
         @jax.grad
         def cost_fn(x, y):
@@ -304,8 +304,8 @@ class TestJAXAD:
 
         result1 = cost_fn(0.0, 0.0)
         result2 = cost_fn(0.0, jnp.pi)
-        assert jnp.allclose(result1, 0.0)
-        assert jnp.allclose(result2, 0.0)
+        assert jnp.allclose(result1, 0.0, atol=1e-7)
+        assert jnp.allclose(result2, 0.0, atol=1e-7)
 
     @pytest.mark.parametrize("shape", ([2, 3], [3, 2], [1, 6]))
     def test_multiD_calls(self, backend, shape):
