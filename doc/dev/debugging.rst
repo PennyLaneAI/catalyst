@@ -194,6 +194,7 @@ The following will work:
 
 
 .. code-block:: python
+
     custom_pipeline = [MHLOPass, QuantumCompilationPass, BufferizationPass, MLIRToLLVMDialect, LLVMDialectToLLVMIR, MyLLCOpt, CompilerDriver]
     
     @qjit(pipelines=custom_pipeline)

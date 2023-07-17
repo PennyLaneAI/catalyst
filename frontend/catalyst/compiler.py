@@ -35,7 +35,19 @@ package_root = os.path.dirname(__file__)
 
 @dataclass
 class CompileOptions:
-    """Generic compilation options"""
+    """Generic compilation options.
+
+    Args:
+        verbose (bool, optional): flag indicating whether to enable verbose output.
+            Default is ``False``
+        logfile (TextIOWrapper, optional): the logfile to write output to.
+            Default is ``sys.stderr``
+        target (str, optional): target of the functionality. Default is ``"binary"``
+        keep_intermediate (bool, optional): flag indicating whether to keep intermediate results.
+            Default is ``False``
+        pipelines (List[Any], optional): list of pipelines to be used.
+            Default is ``None``
+    """
 
     verbose: Optional[bool] = False
     logfile: Optional[TextIOWrapper] = sys.stderr
@@ -67,12 +79,25 @@ default_lib_paths = {
     "runtime": os.path.join(package_root, "../../runtime/build/lib"),
 }
 
+default_enzyme_path = {
+    "enzyme": os.path.join(package_root, "../../mlir/Enzyme/enzyme/build/Enzyme")
+}
+
 
 def get_executable_path(project, tool):
     """Get path to executable."""
     path = os.path.join(package_root, "bin") if INSTALLED else default_bin_paths.get(project, "")
     executable_path = os.path.join(path, tool)
     return executable_path if os.path.exists(executable_path) else tool
+
+
+def get_enzyme_path(project, env_var):
+    """Get path to Enzyme."""
+    return (
+        os.path.join(package_root, "enzyme")
+        if INSTALLED
+        else os.getenv(env_var, default_enzyme_path.get(project, ""))
+    )
 
 
 def get_lib_path(project, env_var):
@@ -164,6 +189,10 @@ class BufferizationPass(PassPipeline):
 
     _executable = get_executable_path("quantum", "quantum-opt")
     _default_flags = [
+        # The following pass allows differentiation of qml.probs with the parameter-shift method,
+        # as it performs the bufferization of `memref.tensor_op` (for which no dialect bufferization
+        # exists).
+        "--one-shot-bufferize=dialect-filter=memref",  # must run before any dialect bufferization
         "--inline",
         "--gradient-bufferize",
         "--scf-bufferize",
@@ -238,10 +267,10 @@ class MLIRToLLVMDialect(PassPipeline):
 
 
 class QuantumCompilationPass(PassPipeline):
-    """Pass pipeline to lower gradients."""
+    """Pass pipeline for Catalyst-specific transformation passes."""
 
     _executable = get_executable_path("quantum", "quantum-opt")
-    _default_flags = ["--lower-gradients", "--convert-arraylist-to-memref"]
+    _default_flags = ["--lower-gradients", "--adjoint-lowering", "--convert-arraylist-to-memref"]
 
     @staticmethod
     def get_output_filename(infile):
@@ -256,6 +285,27 @@ class LLVMDialectToLLVMIR(PassPipeline):
 
     _executable = get_executable_path("llvm", "mlir-translate")
     _default_flags = ["--mlir-to-llvmir"]
+
+    @staticmethod
+    def get_output_filename(infile):
+        path = pathlib.Path(infile)
+        if not path.exists():
+            raise FileNotFoundError("Cannot find {infile}.")
+        return str(path.with_suffix(".ll"))
+
+
+class Enzyme(PassPipeline):
+    """Pass pipeline to lower LLVM IR to Enzyme LLVM IR."""
+
+    _executable = get_executable_path("llvm", "opt")
+    enzyme_path = get_enzyme_path("enzyme", "ENZYME_DIR")
+    _default_flags = [
+        f"-load-pass-plugin={enzyme_path}/LLVMEnzyme-17.so",
+        "-load",
+        f"{enzyme_path}/LLVMEnzyme-17.so",
+        "-passes=enzyme",
+        "-S",
+    ]
 
     @staticmethod
     def get_output_filename(infile):
@@ -456,6 +506,7 @@ class Compiler:
                 BufferizationPass,
                 MLIRToLLVMDialect,
                 LLVMDialectToLLVMIR,
+                Enzyme,
                 LLVMIRToObjectFile,
                 CompilerDriver,
             ]

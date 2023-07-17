@@ -307,6 +307,30 @@ class TestJAXAD:
         assert jnp.allclose(result1, 0.0)
         assert jnp.allclose(result2, 0.0)
 
+    @pytest.mark.parametrize("shape", ([2, 3], [3, 2], [1, 6]))
+    def test_multiD_calls(self, backend, shape):
+        """Test a jax.grad in combination with qjit on non-1D input parameters."""
+
+        def func(p1, p2):
+            return jnp.reshape(p1, shape) + 2 * jnp.reshape(p2, shape)
+
+        C_func = qjit(qml.qnode(qml.device(backend, wires=1))(func))
+        PL_func = func
+
+        def cost_fn(p1, p2, f):
+            m1 = f(p1, p2)
+            m2 = f(p1, p2)
+            return m1 + m2
+
+        p1 = jnp.array([[0.1, 0.3, 0.5], [0.1, 0.2, 0.8]])
+        p2 = jnp.array([[0.3, 0.5], [0.2, 0.8], [0.2, 0.8]])
+        result = jax.jacobian(cost_fn, argnums=[0, 1])(p1, p2, C_func)
+        reference = jax.jacobian(cost_fn, argnums=[0, 1])(p1, p2, PL_func)
+        assert len(result) == len(reference)
+        for a, b in zip(result, reference):
+            assert a.shape == b.shape
+            assert jnp.allclose(a, b, rtol=1e-6, atol=1e-6)
+
     def test_efficient_Jacobian(self, backend):
         """Test a jax.grad function does not compute Jacobians for arguments not in argnum."""
 
@@ -400,6 +424,54 @@ class TestJAXVectorize:
         assert len(result) == 2
         assert jnp.allclose(result[0], cost_fn(x[0]))
         assert jnp.allclose(result[1], cost_fn(x[1]))
+
+
+class TestJAXRecompilation:
+    """
+    Test obtained from ticket: https://github.com/PennyLaneAI/catalyst/issues/149
+
+    JAX is asked the gradient of a function, but the function itself might need recompilation.
+    """
+
+    def test_jax_function_has_not_been_jit_compiled(self, backend):
+        """Test if function can be used by jax.grad even if it has not been JIT compiled"""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=2))
+        def circuit(params, n):
+            def ansatz(i, x):
+                qml.RX(x[i, 0], wires=0)
+                qml.RY(x[i, 1], wires=1)
+                qml.CNOT(wires=[0, 1])
+                return x
+
+            for_loop(0, n, 1)(ansatz)(jnp.reshape(params, (-1, 2)))
+
+            return qml.expval(qml.PauliZ(1))
+
+        params = jnp.array([0.54, 0.3154, 0.654, 0.123])
+        jax.grad(circuit, argnums=0)(params, 2)
+
+    def test_jax_function_needs_recompilation(self, backend):
+        """Test if function can be used by jax.grad but it needs recompilation"""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=2))
+        def circuit(params, n):
+            def ansatz(i, x):
+                qml.RX(x[i, 0], wires=0)
+                qml.RY(x[i, 1], wires=1)
+                qml.CNOT(wires=[0, 1])
+                return x
+
+            for_loop(0, n, 1)(ansatz)(jnp.reshape(params, (-1, 2)))
+
+            return qml.expval(qml.PauliZ(1))
+
+        params = jnp.array([0.54, 0.3154, 0.654, 0.123])
+        jax.grad(circuit, argnums=0)(params, 2)
+        params = jnp.array([0.54, 0.3154, 0.654, 0.123, 0.1, 0.2])
+        jax.grad(circuit, argnums=0)(params, 3)
 
 
 if __name__ == "__main__":

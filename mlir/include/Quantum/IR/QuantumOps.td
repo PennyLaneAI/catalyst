@@ -19,6 +19,7 @@ include "mlir/IR/EnumAttr.td"
 include "mlir/IR/OpBase.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Dialect/Bufferization/IR/AllocationOpInterface.td"
+include "mlir/Interfaces/ControlFlowInterfaces.td"
 
 include "Quantum/IR/QuantumDialect.td"
 include "Quantum/IR/QuantumInterfaces.td"
@@ -190,6 +191,13 @@ class Gate_Op<string mnemonic, list<Trait> traits = []> :
         mlir::ValueRange getQubitResults() {
             return getOutQubits();
         }
+
+        bool getAdjointFlag() {
+            return getAdjoint().has_value() ? getAdjoint().value() : false;
+        }
+        void setAdjointFlag(bool adjoint) {
+            setAdjoint(adjoint);
+        };
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration;
@@ -203,7 +211,8 @@ def CustomOp : Gate_Op<"custom", [NoMemoryEffect, AttrSizedOperandSegments, Diff
     let arguments = (ins
         Variadic<F64>:$params,
         Variadic<QubitType>:$in_qubits,
-        StrAttr:$gate_name
+        StrAttr:$gate_name,
+        OptionalAttr<UnitAttr>:$adjoint
     );
 
     let results = (outs
@@ -233,7 +242,8 @@ def MultiRZOp : Gate_Op<"multirz", [NoMemoryEffect, DifferentiableGate]> {
 
     let arguments = (ins
         F64:$theta,
-        Variadic<QubitType>:$in_qubits
+        Variadic<QubitType>:$in_qubits,
+        OptionalAttr<UnitAttr>:$adjoint
     );
 
     let results = (outs
@@ -266,7 +276,8 @@ def QubitUnitaryOp : Gate_Op<"unitary", [NoMemoryEffect]> {
         AnyTypeOf<[
             2DTensorOf<[Complex<F64>]>, MemRefRankOf<[Complex<F64>], [2]>
         ]>:$matrix,
-        Variadic<QubitType>:$in_qubits
+        Variadic<QubitType>:$in_qubits,
+        OptionalAttr<UnitAttr>:$adjoint
     );
 
     let results = (outs
@@ -748,6 +759,37 @@ def StateOp : Measurement_Op<"state"> {
     }];
 
     let hasVerifier = 1;
+}
+
+def AdjointOp : Op<QuantumDialect, "adjoint", [SingleBlockImplicitTerminator<"YieldOp">]> {
+    let summary = "Calculate the adjoint of the enclosed operations";
+
+    let regions = (region SizedRegion<1>:$region);
+
+    let arguments = (ins
+      QuregType:$qreg
+    );
+
+    let results = (outs
+      QuregType:$out_qreg
+    );
+
+    let assemblyFormat = [{
+        `(` $qreg `)` attr-dict `:` type(operands) $region
+    }];
+
+    let hasVerifier = 1;
+}
+
+def YieldOp : Op<QuantumDialect, "yield",
+                [Pure, ReturnLike, Terminator, ParentOneOf<["AdjointOp"]>]> {
+    let summary = "Return results from quantum program regions";
+
+    let arguments = (ins Variadic<AnyTypeOf<[QuregType]>>:$results);
+
+    let assemblyFormat = [{  attr-dict ($results^ `:` type($results))? }];
+
+    let builders = [OpBuilder<(ins), [{ /* nothing to do */ }]>];
 }
 
 #endif // QUANTUM_OPS
