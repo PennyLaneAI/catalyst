@@ -448,7 +448,6 @@ def test_ps_qft(inp, backend):
     assert np.allclose(compiled(inp, 2, 2), interpreted(inp, 2, 2))
 
 
-@pytest.mark.xfail(reason="https://github.com/PennyLaneAI/catalyst/issues/73")
 def test_ps_probs(backend):
     """Check that the parameter-shift method works for qml.probs."""
 
@@ -461,7 +460,10 @@ def test_ps_probs(backend):
     def workflow(p: float):
         return grad(func, method="defer")(p)
 
-    assert np.allclose(workflow(0.5), [0.93879128, 0.06120872])
+    result = workflow(0.5)
+    reference = qml.jacobian(func, argnum=0)(0.5)
+
+    assert np.allclose(result, reference)
 
 
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])

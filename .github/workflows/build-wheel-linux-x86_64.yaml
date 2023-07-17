@@ -5,52 +5,47 @@ on:
     - cron: "0 0 * * 0"
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  constants:
+    name: "Set build matrix"
+    uses: ./.github/workflows/constants.yaml
+
   build-dependencies:
     name: Build Dependencies
+    needs: [constants]
     runs-on: ubuntu-latest
     container: "quay.io/pypa/manylinux2014_x86_64"
 
     steps:
-    - name: Cancel previous runs
-      uses: styfle/cancel-workflow-action@0.11.0
-      with:
-        access_token: ${{ github.token }}
-
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
     # Build and cache LLVM / MLIR
-    - name: Get LLVM Version
-      id: llvm-hash
-      run: echo "llvm-hash=$(grep llvm .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
-
     - name: Cache LLVM Build
       id: cache-llvm-build
       uses: actions/cache@v3
       with:
         path:  llvm-build
-        key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-generic-build-opt
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-generic-build-opt
 
     - name: Cache LLVM Source
       id: cache-llvm-source
       uses: actions/cache@v3
       with:
         path:  mlir/llvm-project
-        key: Linux-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-source
+        key: Linux-llvm-${{ needs.constants.outputs.llvm_version }}-default-source
         enableCrossOsArchive: True
-
-    # Build and cache MHLO
-    - name: Get MHLO Version
-      id: mhlo-hash
-      run: echo "mhlo-hash=$(grep mhlo .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
 
     - name: Cache MHLO Build
       id: cache-mhlo
       uses: actions/cache@v3
       with:
         path:  mhlo-build
-        key: ${{ runner.os }}-mhlo-${{ steps.mhlo-hash.outputs.mhlo-hash }}-generic-build
+        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-generic-build
 
     - name: Set Ownership in Container
       run: |
@@ -62,7 +57,7 @@ jobs:
       uses: actions/checkout@v3
       with:
         repository: llvm/llvm-project
-        ref: ${{ steps.llvm-hash.outputs.llvm-hash }}
+        ref: ${{ needs.constants.outputs.llvm_version }}
         path: mlir/llvm-project
 
     - name: Clone MHLO Submodule
@@ -70,7 +65,7 @@ jobs:
       uses: actions/checkout@v3
       with:
         repository: tensorflow/mlir-hlo
-        ref: ${{ steps.mhlo-hash.outputs.mhlo-hash }}
+        ref: ${{ needs.constants.outputs.mhlo_version }}
         path: mlir/mlir-hlo
 
     - name: Install dependencies (CentOS)
@@ -117,16 +112,12 @@ jobs:
         cmake --build mhlo-build --target check-mlir-hlo -j$(nproc)
 
     # Build and cache Enzyme
-    - name: Get Enzyme Version
-      id: enzyme-hash
-      run: echo "enzyme-hash=$(grep enzyme .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
-
     - name: Cache Enzyme Build
       id: cache-enzyme
       uses: actions/cache@v3
       with:
         path:  enzyme-build
-        key: ${{ runner.os }}-enzyme-${{ steps.enzyme-hash.outputs.enzyme-hash }}-generic-build
+        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.enzyme_version }}-generic-build
 
     - name: Clone Enzyme Submodule
       if:  |
@@ -134,7 +125,7 @@ jobs:
       uses: actions/checkout@v3
       with:
         repository: EnzymeAD/Enzyme
-        ref: ${{ steps.enzyme-hash.outputs.enzyme-hash }}
+        ref: ${{ needs.constants.outputs.enzyme_version }}
         path: mlir/Enzyme
 
     - name: Build Enzyme
@@ -169,13 +160,13 @@ jobs:
         retention-days: 1
 
   catalyst-linux-wheels-x86-64:
-    needs: [build-dependencies]
+    needs: [constants, build-dependencies]
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
         arch: [x86_64]
-        python_version: ["3.8", "3.9", "3.10", "3.11"]
+        python_version: ${{ fromJson(needs.constants.outputs.python_versions) }}
         container_img: ["quay.io/pypa/manylinux2014_x86_64"]
 
     name: Build Wheels (Python ${{ matrix.python_version }})
@@ -183,11 +174,6 @@ jobs:
     container: ${{ matrix.container_img }}
 
     steps:
-    - name: Cancel previous runs
-      uses: styfle/cancel-workflow-action@0.11.0
-      with:
-        access_token: ${{ github.token }}
-
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
@@ -201,16 +187,12 @@ jobs:
       run: |
         python${{ matrix.python_version }} -m pip install wheel numpy pybind11 PyYAML
 
-    - name: Get LLVM Version
-      id: llvm-hash
-      run: echo "llvm-hash=$(grep llvm .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
-
     - name: Get Cached LLVM Source
       id: cache-llvm-source
       uses: actions/cache@v3
       with:
         path: mlir/llvm-project
-        key: Linux-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-source
+        key: Linux-llvm-${{ needs.constants.outputs.llvm_version }}-default-source
         enableCrossOsArchive: True
         fail-on-cache-miss: True
 
@@ -219,31 +201,23 @@ jobs:
       uses: actions/cache@v3
       with:
         path:  llvm-build
-        key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-generic-build-opt
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-generic-build-opt
         fail-on-cache-miss: True
-
-    - name: Get MHLO Version
-      id: mhlo-hash
-      run: echo "mhlo-hash=$(grep mhlo .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
 
     - name: Get Cached MHLO Build
       id: cache-mhlo
       uses: actions/cache@v3
       with:
         path:  mhlo-build
-        key: ${{ runner.os }}-mhlo-${{ steps.mhlo-hash.outputs.mhlo-hash }}-generic-build
+        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-generic-build
         fail-on-cache-miss: True
-    
-    - name: Get Enzyme Version
-      id: enzyme-hash
-      run: echo "enzyme-hash=$(grep enzyme .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
 
     - name: Get Cached Enzyme Build
       id: cache-enzyme
       uses: actions/cache@v3
       with:
         path:  enzyme-build
-        key: ${{ runner.os }}-enzyme-${{ steps.enzyme-hash.outputs.enzyme-hash }}-generic-build
+        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.enzyme_version }}-generic-build
         fail-on-cache-miss: True
 
     - name: Download QIR stdlib Artifact
@@ -345,24 +319,19 @@ jobs:
         retention-days: 14
 
   test-wheels:
-    needs: [catalyst-linux-wheels-x86-64]
+    needs: [constants, catalyst-linux-wheels-x86-64]
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        python_version: ["3.8", "3.9", "3.10", "3.11"]
+        python_version: ${{ fromJson(needs.constants.outputs.python_versions) }}
         container: ["quay.io/pypa/manylinux2014_x86_64", "ubuntu-20.04", "ubuntu-22.04"]
 
     # To check all wheels for supported python3 versions
-    name: Test Wheels (Python ${{ matrix.python_version }})
+    name: Test Wheels (Python ${{ matrix.python_version }}) on ${{ matrix.container }}
     runs-on: ${{ matrix.os }}
 
     steps:
-    - name: Cancel previous runs
-      uses: styfle/cancel-workflow-action@0.11.0
-      with:
-        access_token: ${{ github.token }}
-
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 

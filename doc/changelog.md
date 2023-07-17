@@ -26,10 +26,14 @@
 
 <h3>Bug fixes</h3>
 
+* Fix issue preventing the differentiation of ``qml.probs`` with the parameter-shift method.
+  [#211](https://github.com/PennyLaneAI/catalyst/pull/211)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
 
+David Ittah,
 Sergei Mironov.
 
 
@@ -376,7 +380,6 @@ David Ittah.
 
   - Passes are now classes. This allows developers/users looking to change
     flags to inherit from these passes and change the flags.
-
 
   - Passes are now passed as arguments to the compiler. Custom passes can just
     be passed to the compiler as an argument, as long as they implement a run
