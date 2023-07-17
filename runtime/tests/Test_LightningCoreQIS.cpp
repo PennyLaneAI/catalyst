@@ -85,6 +85,8 @@ TEST_CASE("Qubits: allocate, release, dump", "[CoreQIS]")
         qstr = __quantum__rt__qubit_to_string(first);
         CHECK(__quantum__rt__string_equal(qstr, one_str));
 
+        __quantum__rt__string_update_reference_count(qstr, -1);
+
         QUBIT *last = *reinterpret_cast<QUBIT **>(__quantum__rt__array_get_element_ptr_1d(qs, 2));
         qstr = __quantum__rt__qubit_to_string(last);
         CHECK(__quantum__rt__string_equal(qstr, three_str));
@@ -92,6 +94,10 @@ TEST_CASE("Qubits: allocate, release, dump", "[CoreQIS]")
         __quantum__rt__string_update_reference_count(qstr, -1);
 
         QirArray *copy = __quantum__rt__array_copy(qs, true /*force*/);
+
+        __quantum__rt__string_update_reference_count(zero_str, -1);
+        __quantum__rt__string_update_reference_count(one_str, -1);
+        __quantum__rt__string_update_reference_count(three_str, -1);
 
         __quantum__rt__qubit_release_array(qs); // The `qs` is a dangling pointer from now on.
         __quantum__rt__array_update_reference_count(copy, -1);
@@ -128,7 +134,7 @@ TEST_CASE("Test __quantum__rt__print_state", "[CoreQIS]")
     for (const auto &[key, val] : getDevices()) {
         __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
 
-        __quantum__rt__qubit_allocate_array(2);
+        QirArray *reg = __quantum__rt__qubit_allocate_array(2);
 
         std::string expected = "*** State-Vector of Size 4 ***\n[(1,0), (0,0), (0,0), (0,0)]\n";
         std::stringstream buffer;
@@ -139,6 +145,8 @@ TEST_CASE("Test __quantum__rt__print_state", "[CoreQIS]")
 
         std::string result = buffer.str();
         CHECK(!result.compare(expected));
+
+        __quantum__rt__qubit_release_array(reg);
     }
     __quantum__rt__finalize();
 }
@@ -151,7 +159,7 @@ TEST_CASE("Test __quantum__qis__State with wires", "[CoreQIS]")
 
         QUBIT *wire0 = __quantum__rt__qubit_allocate();
 
-        __quantum__rt__qubit_allocate();
+        QUBIT *wire1 = __quantum__rt__qubit_allocate();
 
         MemRefT_CplxT_double_1d result = getState(8);
 
@@ -160,6 +168,8 @@ TEST_CASE("Test __quantum__qis__State with wires", "[CoreQIS]")
                                             "Runtime: Partial State-Vector not supported yet"));
 
         freeState(result);
+        __quantum__rt__qubit_release(wire1);
+        __quantum__rt__qubit_release(wire0);
     }
     __quantum__rt__finalize();
 }
@@ -172,7 +182,7 @@ TEST_CASE("Test __quantum__qis__Identity", "[CoreQIS]")
 
         QUBIT *wire0 = __quantum__rt__qubit_allocate();
 
-        __quantum__rt__qubit_allocate();
+        QUBIT *wire1 = __quantum__rt__qubit_allocate();
 
         __quantum__qis__Identity(wire0, false);
 
@@ -186,6 +196,8 @@ TEST_CASE("Test __quantum__qis__Identity", "[CoreQIS]")
         CHECK(state[1].imag == Approx(0.0).margin(1e-5));
 
         freeState(result);
+        __quantum__rt__qubit_release(wire1);
+        __quantum__rt__qubit_release(wire0);
         __quantum__rt__finalize();
     }
 }
@@ -198,7 +210,7 @@ TEST_CASE("Test __quantum__qis__PauliX", "[CoreQIS]")
 
         QUBIT *wire0 = __quantum__rt__qubit_allocate();
 
-        __quantum__rt__qubit_allocate();
+        QUBIT *wire1 = __quantum__rt__qubit_allocate();
 
         __quantum__qis__PauliX(wire0, false);
 
@@ -212,6 +224,8 @@ TEST_CASE("Test __quantum__qis__PauliX", "[CoreQIS]")
                state[2].imag == Approx(0.0).margin(1e-5)));
 
         freeState(result);
+        __quantum__rt__qubit_release(wire1);
+        __quantum__rt__qubit_release(wire0);
         __quantum__rt__finalize();
     }
 }
@@ -223,8 +237,7 @@ TEST_CASE("Test __quantum__qis__ PauliY and Rot", "[CoreQIS]")
         __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
 
         QUBIT *wire0 = __quantum__rt__qubit_allocate();
-
-        __quantum__rt__qubit_allocate();
+        QUBIT *wire1 = __quantum__rt__qubit_allocate();
 
         __quantum__qis__PauliY(wire0, false);
         __quantum__qis__Rot(0.4, 0.6, -0.2, wire0, false);
@@ -239,6 +252,8 @@ TEST_CASE("Test __quantum__qis__ PauliY and Rot", "[CoreQIS]")
                state[2].imag == Approx(0.9505637859).margin(1e-5)));
 
         freeState(result);
+        __quantum__rt__qubit_release(wire1);
+        __quantum__rt__qubit_release(wire0);
         __quantum__rt__finalize();
     }
 }
@@ -363,7 +378,7 @@ TEST_CASE("Test __quantum__qis__Measure", "[CoreQIS]")
 
         QUBIT *wire0 = __quantum__rt__qubit_allocate();
 
-        __quantum__rt__qubit_allocate();
+        QUBIT *wire1 = __quantum__rt__qubit_allocate();
 
         __quantum__qis__PauliX(wire0, false);
 
@@ -372,6 +387,8 @@ TEST_CASE("Test __quantum__qis__Measure", "[CoreQIS]")
         Result one = __quantum__rt__result_get_one();
         CHECK(*m == *one);
 
+        __quantum__rt__qubit_release(wire1);
+        __quantum__rt__qubit_release(wire0);
         __quantum__rt__finalize();
     }
 }
@@ -382,16 +399,16 @@ TEST_CASE("Test __quantum__qis__ Hadamard, PauliZ, IsingXX, IsingZZ, and SWAP", 
         __quantum__rt__initialize();
         __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
 
-        QUBIT *target = __quantum__rt__qubit_allocate();
-        QirArray *ctrls_arr = __quantum__rt__qubit_allocate_array(1);
+        QirArray *qs = __quantum__rt__qubit_allocate_array(2);
 
-        QUBIT **ctrls = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
+        QUBIT **target = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 0);
+        QUBIT **ctrls = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 1);
 
-        __quantum__qis__Hadamard(target, false);
-        __quantum__qis__PauliZ(target, false);
-        __quantum__qis__IsingXX(0.2, *ctrls, target, false);
-        __quantum__qis__IsingZZ(0.5, *ctrls, target, false);
-        __quantum__qis__SWAP(*ctrls, target, false);
+        __quantum__qis__Hadamard(*target, false);
+        __quantum__qis__PauliZ(*target, false);
+        __quantum__qis__IsingXX(0.2, *ctrls, *target, false);
+        __quantum__qis__IsingZZ(0.5, *ctrls, *target, false);
+        __quantum__qis__SWAP(*ctrls, *target, false);
 
         MemRefT_CplxT_double_1d result = getState(4);
         __quantum__qis__State(&result, 0);
@@ -407,6 +424,7 @@ TEST_CASE("Test __quantum__qis__ Hadamard, PauliZ, IsingXX, IsingZZ, and SWAP", 
                state[3].imag == Approx(-0.068398324).margin(1e-5)));
 
         freeState(result);
+        __quantum__rt__qubit_release_array(qs);
         __quantum__rt__finalize();
     }
 }
@@ -417,18 +435,18 @@ TEST_CASE("Test __quantum__qis__ CRot, IsingXY and Toffoli", "[CoreQIS]")
     for (const auto &[key, val] : getDevices()) {
         __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
 
-        QUBIT *target = __quantum__rt__qubit_allocate();
-        QirArray *ctrls_arr = __quantum__rt__qubit_allocate_array(2);
+        QirArray *qs = __quantum__rt__qubit_allocate_array(3);
 
-        QUBIT **ctrls_0 = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
-        QUBIT **ctrls_1 = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 1);
+        QUBIT **target = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 0);
+        QUBIT **ctrls_0 = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 1);
+        QUBIT **ctrls_1 = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 2);
 
-        __quantum__qis__Hadamard(target, false);
-        __quantum__qis__PauliZ(target, false);
-        __quantum__qis__CRot(0.2, 0.5, 0.7, *ctrls_0, target, false);
-        __quantum__qis__IsingXY(0.2, *ctrls_0, target, false);
-        __quantum__qis__SWAP(*ctrls_0, target, false);
-        __quantum__qis__Toffoli(*ctrls_0, *ctrls_1, target, false);
+        __quantum__qis__Hadamard(*target, false);
+        __quantum__qis__PauliZ(*target, false);
+        __quantum__qis__CRot(0.2, 0.5, 0.7, *ctrls_0, *target, false);
+        __quantum__qis__IsingXY(0.2, *ctrls_0, *target, false);
+        __quantum__qis__SWAP(*ctrls_0, *target, false);
+        __quantum__qis__Toffoli(*ctrls_0, *ctrls_1, *target, false);
 
         MemRefT_CplxT_double_1d result = getState(8);
         __quantum__qis__State(&result, 0);
@@ -444,6 +462,7 @@ TEST_CASE("Test __quantum__qis__ CRot, IsingXY and Toffoli", "[CoreQIS]")
                state[3].imag == Approx(0.0).margin(1e-5)));
 
         freeState(result);
+        __quantum__rt__qubit_release_array(qs);
     }
     __quantum__rt__finalize();
 }
@@ -454,19 +473,19 @@ TEST_CASE("Test __quantum__qis__ Hadamard, PauliX, IsingYY, CRX, and Expval", "[
         __quantum__rt__initialize();
         __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
 
-        QUBIT *target = __quantum__rt__qubit_allocate();
-        QirArray *ctrls_arr = __quantum__rt__qubit_allocate_array(1);
+        QirArray *qs = __quantum__rt__qubit_allocate_array(2);
 
-        QUBIT **ctrls = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
+        QUBIT **target = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 0);
+        QUBIT **ctrls = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 1);
 
         // qml.Hadamard(wires=0)
-        __quantum__qis__Hadamard(target, false);
+        __quantum__qis__Hadamard(*target, false);
         // qml.PauliX(wires=0)
-        __quantum__qis__PauliX(target, false);
+        __quantum__qis__PauliX(*target, false);
         // qml.IsingYY(0.2, wires=[1,0])
-        __quantum__qis__IsingYY(0.2, *ctrls, target, false);
+        __quantum__qis__IsingYY(0.2, *ctrls, *target, false);
         // qml.CRX(0.4, wires=[1,0])
-        __quantum__qis__CRX(0.4, *ctrls, target, false);
+        __quantum__qis__CRX(0.4, *ctrls, *target, false);
 
         MemRefT_CplxT_double_1d result = getState(4);
         __quantum__qis__State(&result, 0);
@@ -487,6 +506,7 @@ TEST_CASE("Test __quantum__qis__ Hadamard, PauliX, IsingYY, CRX, and Expval", "[
         CHECK(__quantum__qis__Expval(obs) == Approx(0.69301172).margin(1e-5));
 
         freeState(result);
+        __quantum__rt__qubit_release_array(qs);
         __quantum__rt__finalize();
     }
 }
