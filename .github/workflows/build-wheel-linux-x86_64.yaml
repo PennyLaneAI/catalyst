@@ -40,6 +40,13 @@ jobs:
         key: Linux-llvm-${{ needs.constants.outputs.llvm_version }}-default-source
         enableCrossOsArchive: True
 
+    - name: Cache MHLO Build
+      id: cache-mhlo
+      uses: actions/cache@v3
+      with:
+        path:  mhlo-build
+        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-generic-build
+
     - name: Set Ownership in Container
       run: |
         # To fix the git issue with the owner of the checkout dir
@@ -53,11 +60,22 @@ jobs:
         ref: ${{ needs.constants.outputs.llvm_version }}
         path: mlir/llvm-project
 
+    - name: Clone MHLO Submodule
+      if: steps.cache-mhlo.outputs.cache-hit != 'true'
+      uses: actions/checkout@v3
+      with:
+        repository: tensorflow/mlir-hlo
+        ref: ${{ needs.constants.outputs.mhlo_version }}
+        path: mlir/mlir-hlo
+
     - name: Install dependencies (CentOS)
+      if: |
+        steps.cache-llvm-build.outputs.cache-hit != 'true' ||
+        steps.cache-mhlo.outputs.cache-hit != 'true'
       run: |
         # Reduce wait time for repos not responding
         cat /etc/yum.conf | sed "s/\[main\]/\[main\]\ntimeout=5/g" > /etc/yum.conf
-        yum update -y && yum install -y cmake ninja-build openmpi-devel
+        yum update -y && yum install -y cmake ninja-build
 
     - name: Build LLVM / MLIR
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
@@ -73,23 +91,6 @@ jobs:
         # TODO: when updating LLVM, test to see if mlir/unittests/Bytecode/BytecodeTest.cpp:55 is passing
         # and remove filter
         LIT_FILTER_OUT="Bytecode" cmake --build llvm-build --target lld check-mlir opt -j$(nproc)
-
-    # Build and cache MHLO
-    - name: Cache MHLO Build
-      id: cache-mhlo
-      uses: actions/cache@v3
-      with:
-        path:  mhlo-build
-        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-generic-build
-
-    - name: Clone MHLO Submodule
-      if:  |
-        steps.cache-mhlo.outputs.cache-hit != 'true'
-      uses: actions/checkout@v3
-      with:
-        repository: tensorflow/mlir-hlo
-        ref: ${{ needs.constants.outputs.mhlo_version }}
-        path: mlir/mlir-hlo
 
     - name: Build MHLO Dialect
       if: steps.cache-mhlo.outputs.cache-hit != 'true'
@@ -210,7 +211,7 @@ jobs:
         path:  mhlo-build
         key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-generic-build
         fail-on-cache-miss: True
-    
+
     - name: Get Cached Enzyme Build
       id: cache-enzyme
       uses: actions/cache@v3
@@ -224,6 +225,22 @@ jobs:
       with:
         name: qir-stdlib
         path: runtime/qir-stdlib/target/release
+
+    # Build Catalyst-Runtime
+    - name: Build Catalyst-Runtime
+      run: |
+        cmake -S runtime -B runtime-build -G Ninja \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DPYTHON_EXECUTABLE=$(which python${{ matrix.python_version }}) \
+              -Dpybind11_DIR=$(python${{ matrix.python_version }} -c "import pybind11; print(pybind11.get_cmake_dir())") \
+              -DQIR_STDLIB_LIB=$GITHUB_WORKSPACE/runtime/qir-stdlib/target/release \
+              -DQIR_STDLIB_INCLUDES=$GITHUB_WORKSPACE/runtime/qir-stdlib/target/release/build/include \
+              -DENABLE_LIGHTNING_KOKKOS=ON \
+              -DKokkos_ENABLE_SERIAL=ON \
+              -DKokkos_ENABLE_OPENMP=ON \
+              -DENABLE_OPENQASM=ON
+
+        cmake --build runtime-build --target rt_capi -j$(nproc)
 
     # Build MLIR Python Bindings
     - name: Build MLIR Python Bindings
@@ -247,12 +264,12 @@ jobs:
     - name: Build MLIR Dialects
       run: |
         cmake -S mlir -B quantum-build -G Ninja \
-          -DCMAKE_BUILD_TYPE=Release \
-          -DLLVM_ENABLE_ASSERTIONS=ON \
-          -DQUANTUM_ENABLE_BINDINGS_PYTHON=ON \
-          -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
-          -DPython3_NumPy_INCLUDE_DIRS=$(python${{ matrix.python_version }} -c "import numpy as np; print(np.get_include())") \
-          -DMLIR_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir
+              -DCMAKE_BUILD_TYPE=Release \
+              -DLLVM_ENABLE_ASSERTIONS=ON \
+              -DQUANTUM_ENABLE_BINDINGS_PYTHON=ON \
+              -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
+              -DPython3_NumPy_INCLUDE_DIRS=$(python${{ matrix.python_version }} -c "import numpy as np; print(np.get_include())") \
+              -DMLIR_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir
 
         cmake --build quantum-build --target check-dialects -j$(nproc)
         patch -d quantum-build/python_packages/quantum/mlir_quantum --follow-symlinks < mlir/patches/use-ir-from-jax.patch
@@ -260,17 +277,6 @@ jobs:
         patch -d quantum-build/python_packages/quantum/mlir_quantum/dialects --follow-symlinks < mlir/patches/do-not-infer-result.patch
         patch -d quantum-build/python_packages/quantum/mlir_quantum/dialects --follow-symlinks < mlir/patches/remove-gradient-cext-import.patch
         patch -d quantum-build/python_packages/quantum/mlir_quantum/dialects --follow-symlinks < mlir/patches/remove-quantum-cext-import.patch
-
-    # Build Catalyst-Runtime
-    - name: Build Catalyst-Runtime
-      run: |
-        cmake -S runtime -B runtime-build -G Ninja \
-          -DCMAKE_BUILD_TYPE=Release \
-          -DPYTHON_INCLUDE_DIRS=$(which python${{ matrix.python_version }}) \
-          -DQIR_STDLIB_LIB=$GITHUB_WORKSPACE/runtime/qir-stdlib/target/release \
-          -DQIR_STDLIB_INCLUDES=$GITHUB_WORKSPACE/runtime/qir-stdlib/target/release/build/include
-
-        cmake --build runtime-build --target rt_capi -j$(nproc)
 
     # Requirements:
     - name: Prepare the python package
@@ -348,6 +354,13 @@ jobs:
       run: |
         python${{ matrix.python_version }} -m pip install $GITHUB_WORKSPACE/dist/*.whl
 
+    - name: Install PennyLane Plugins
+      run: |
+        python${{ matrix.python_version }} -m pip install PennyLane-Lightning-Kokkos
+        python${{ matrix.python_version }} -m pip install amazon-braket-pennylane-plugin "boto3==1.26"
+
     - name: Run Python Pytest Tests
       run: |
         python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest -n auto
+        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest --backend="lightning.kokkos" -n auto
+        python${{ matrix.python_version }} -m pytest $GITHUB_WORKSPACE/frontend/test/pytest --runbraket=LOCAL -n auto

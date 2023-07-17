@@ -70,8 +70,7 @@ TEST_CASE("Test BraketRunner::runCircuit()", "[openqasm]")
     auto &&circuit = builder.toOpenQasm();
 
     OpenQasm::BraketRunner runner{};
-    auto &&results =
-        runner.runCircuit(circuit, "arn:aws:braket:::device/quantum-simulator/amazon/sv1", 100);
+    auto &&results = runner.runCircuit(circuit, "default", 100);
     CHECK(results.find("GateModelQuantumTaskResult") != std::string::npos);
 }
 
@@ -90,8 +89,7 @@ TEST_CASE("Test the OpenQasmDevice constructor", "[openqasm]")
     SECTION("Braket SV1")
     {
         auto device = OpenQasmDevice(
-            false,
-            "{shots: 100, device_arn: arn:aws:braket:::device/quantum-simulator/amazon/sv1}");
+            false, "{shots: 100, device_type : braket.local.qubit, backend : default}");
         CHECK(device.GetNumQubits() == 0);
 
         REQUIRE_THROWS_WITH(device.Circuit(),
@@ -477,7 +475,7 @@ TEST_CASE("Test MatrixOperation with BuilderType::Braket", "[openqasm]")
                          "bit[5] bits;\n"
                          "x qubits[0];\n"
                          "y qubits[1];\n"
-                         "#pragma braket unitary([[0, 0-1im], [0+1im, 0]]) qubits[0];\n"
+                         "#pragma braket unitary([[0, 0-1im], [0+1im, 0]]) qubits[0]\n"
                          "bits = measure qubits;\n";
 
     CHECK(device->Circuit() == toqasm);

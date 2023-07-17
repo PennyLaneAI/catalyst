@@ -1,4 +1,4 @@
-# Release 0.2.1-dev
+# Release 0.2.2-dev
 
 <h3>New features</h3>
 
@@ -35,6 +35,34 @@ This release contains contributions from (in alphabetical order):
 
 David Ittah,
 Sergei Mironov.
+
+
+# Release 0.2.1
+
+<h3>Bug fixes</h3>
+
+* Add missing OpenQASM backend in binary distribution, which relies on the latest version of the
+  AWS Braket plugin for PennyLane to resolve dependency issues between the plugin, Catalyst, and
+  PennyLane. The Lightning-Kokkos backend with Serial and OpenMP modes is also added to the binary
+  distribution.
+  [#198](https://github.com/PennyLaneAI/catalyst/pull/198)
+
+<h3>Improvements</h3>
+
+* When using OpenQASM-based devices the string representation of the circuit is printed on
+  exception.
+  [#199](https://github.com/PennyLaneAI/catalyst/pull/199)
+
+* Use ``pybind11::module`` interface library instead of ``pybind11::embed`` in the runtime for
+  OpenQasm backend to avoid linking to the python library at compile time.
+  [#200](https://github.com/PennyLaneAI/catalyst/pull/200)
+
+<h3>Contributors</h3>
+
+This release contains contributions from (in alphabetical order):
+
+Ali Asadi,
+David Ittah.
 
 # Release 0.2.0
 
@@ -351,7 +379,6 @@ Sergei Mironov.
   As part of this refactor, the following changes were made:
 
   - Passes are now classes. This allows developers/users looking to change
-
     flags to inherit from these passes and change the flags.
 
   - Passes are now passed as arguments to the compiler. Custom passes can just

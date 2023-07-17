@@ -73,6 +73,8 @@ jobs:
           QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build" \
           QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include" \
           ENABLE_LIGHTNING_KOKKOS=ON \
+          CMAKE_ARGS="-DKokkos_ENABLE_OPENMP=ON" \
+          ENABLE_OPENQASM=ON \
           make runtime
 
       - name: Upload Catalyst-Runtime Artifact
@@ -511,11 +513,11 @@ jobs:
         name: quantum-build
         path: quantum-build
 
-    - name: Install awscli (OpenQasm device)
-      id: install-aws-cli
-      uses: unfor19/install-aws-cli-action@v1
+    - name: Download Catalyst-Runtime Artifact
+      uses: actions/download-artifact@v3
       with:
-        version: 2
+        name: runtime-build
+        path: runtime-build/lib
 
     - name: Install additional dependencies (OpenQasm device)
       run: |
@@ -532,16 +534,6 @@ jobs:
         key: Linux-qir-stdlib-build
         fail-on-cache-miss: True
 
-    - name: Build Catalyst-Runtime
-      run: |
-        COMPILER_LAUNCHER="" \
-        ENABLE_OPENQASM=ON \
-        RT_BUILD_DIR="$(pwd)/runtime-build" \
-        QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build" \
-        QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include" \
-        CMAKE_ARGS="-DENABLE_OPENMP=ON" \
-        make runtime
-
     - name: Add Frontend Dependencies to PATH
       run: |
         echo "$(pwd)/llvm-build/bin" >> $GITHUB_PATH
@@ -554,11 +546,8 @@ jobs:
         chmod +x quantum-build/bin/quantum-opt  # artifact upload does not preserve permissions
 
     - name: Run Python Pytest Tests
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_BRAKET_DEVICE_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_BRAKET_DEVICE_ACCESS_KEY }}
       run: |
-        make pytest TEST_BRAKET=ON
+        make pytest TEST_BRAKET=LOCAL
 
   runtime-tests:
     name: Runtime Tests (Linux)
@@ -576,13 +565,6 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get -y -q install cmake ninja-build libomp-dev lcov
-
-      - name: Install awscli (OpenQasm device)
-        if: ${{ matrix.backend == 'openqasm' }}
-        id: install-aws-cli
-        uses: unfor19/install-aws-cli-action@v1
-        with:
-          version: 2
 
       - name: Install additional dependencies (OpenQasm device)
         if: ${{ matrix.backend == 'openqasm' }}
@@ -623,9 +605,6 @@ jobs:
 
       - name: Build Runtime test suite for OpenQasm device
         if: ${{ matrix.backend == 'openqasm' }}
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_BRAKET_DEVICE_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_BRAKET_DEVICE_ACCESS_KEY }}
         run: |
             C_COMPILER=$(which gcc) \
             CXX_COMPILER=$(which g++) \
