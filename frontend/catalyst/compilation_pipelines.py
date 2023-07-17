@@ -26,6 +26,7 @@ import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
 from jax.interpreters.mlir import ir
+from mlir_quantum._mlir_libs._quantumDialects.quantum import mlir_run_pipeline
 from mlir_quantum.runtime import (
     as_ctype,
     get_ranked_memref_descriptor,
@@ -482,7 +483,9 @@ class QJIT:
         inject_functions(mlir_module, ctx)
         mod = mlir_module.operation
         self._jaxpr = jaxpr
+
         self._mlir = mod.get_asm(binary=False, print_generic_op_form=False, assume_verified=True)
+        self._mlir = mlir_run_pipeline(self._mlir, "canonicalize")
 
         return mlir_module
 

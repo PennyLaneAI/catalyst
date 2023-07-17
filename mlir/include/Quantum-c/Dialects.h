@@ -23,6 +23,23 @@ extern "C" {
 MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(Quantum, quantum);
 MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(Gradient, gradient);
 
+enum CatalystCReturnCode {
+    ReturnOk,
+    ReturnParsingFailed,
+    ReturnLoweringFailed,
+    ReturnTranslationFailed
+};
+
+/// Run a given set of passes on an MLIR module.
+///
+/// The IR is supplied in textual form while the passes are expected in MLIR's command line
+/// interface form. This allocates a buffer for the resulting textual IR that the caller must
+/// take ownership of freeing.
+CatalystCReturnCode RunPassPipeline(const char *source, const char *passes, char **dest);
+
+/// Entry point to the MLIR portion of the compiler.
+CatalystCReturnCode QuantumDriverMain(const char *source, bool keepIntermediate = false);
+
 #ifdef __cplusplus
 }
 #endif

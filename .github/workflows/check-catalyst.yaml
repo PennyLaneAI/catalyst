@@ -171,6 +171,14 @@ jobs:
         path: mhlo-build
         key: ${{ runner.os }}-mhlo-${{ steps.mhlo-hash.outputs.mhlo-hash }}-default-build
 
+    - name: Cache MHLO Source
+      id: cache-mhlo-source
+      uses: actions/cache@v3
+      with:
+        path: mlir/mlir-hlo
+        key: ${{ runner.os }}-mhlo-${{ steps.mhlo-hash.outputs.mhlo-hash }}-default-source
+        enableCrossOsArchive: True
+
     - name: Get LLVM Version
       id: llvm-hash
       if: steps.cache-mhlo.outputs.cache-hit != 'true'
@@ -197,7 +205,7 @@ jobs:
 
     - name: Clone MHLO Submodule
       if: |
-        steps.cache-mhlo.outputs.cache-hit != 'true' &&
+        steps.cache-mhlo.outputs.cache-hit != 'true' ||
         steps.cache-mhlo-source.outputs.cache-hit != 'true'
       uses: actions/checkout@v3
       with:
@@ -220,7 +228,7 @@ jobs:
 
   quantum:
     name: Quantum Dialects Build
-    needs: [llvm]
+    needs: [llvm, mhlo]
     runs-on: ubuntu-latest
 
     steps:
@@ -241,6 +249,10 @@ jobs:
       id: llvm-hash
       run: echo "llvm-hash=$(grep llvm .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
 
+    - name: Get MHLO Version
+      id: mhlo-hash
+      run: echo "mhlo-hash=$(grep mhlo .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
+
     - name: Get Cached LLVM Source
       id: cache-llvm-source
       uses: actions/cache@v3
@@ -250,12 +262,29 @@ jobs:
         enableCrossOsArchive: True
         fail-on-cache-miss: True
 
+    - name: Get Cached MHLO Source
+      id: cache-mhlo-source
+      uses: actions/cache@v3
+      with:
+        path: mlir/mlir-hlo
+        key: ${{ runner.os }}-mhlo-${{ steps.mhlo-hash.outputs.mhlo-hash }}-default-source
+        enableCrossOsArchive: True
+        fail-on-cache-miss: True
+
     - name: Get Cached LLVM Build
       id: cache-llvm-build
       uses: actions/cache@v3
       with:
         path: llvm-build
         key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-build
+        fail-on-cache-miss: True
+
+    - name: Get Cached MHLO Build
+      id: cache-mhlo-build
+      uses: actions/cache@v3
+      with:
+        path: mhlo-build
+        key: ${{ runner.os }}-mhlo-${{ steps.mhlo-hash.outputs.mhlo-hash }}-default-build
         fail-on-cache-miss: True
 
     - name: Cache CCache
