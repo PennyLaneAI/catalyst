@@ -282,7 +282,7 @@ class Enzyme(PassPipeline):
     """Pass pipeline to lower LLVM IR to Enzyme LLVM IR."""
 
     _executable = get_executable_path("llvm", "opt")
-    enzyme_path = get_lib_path("enzyme", "ENZYME_DIR")
+    enzyme_path = get_lib_path("enzyme", "ENZYME_LIB_DIR")
     _default_flags = [
         f"-load-pass-plugin={enzyme_path}/LLVMEnzyme-17.so",
         "-load",

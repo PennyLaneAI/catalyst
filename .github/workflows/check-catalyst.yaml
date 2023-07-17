@@ -401,7 +401,7 @@ jobs:
         path: mhlo-build
         key: ${{ runner.os }}-mhlo-${{ steps.mhlo-hash.outputs.mhlo-hash }}-default-build
         fail-on-cache-miss: True
-    
+
     - name: Get Enzyme Version
       id: enzyme-hash
       run: echo "enzyme-hash=$(grep enzyme .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
@@ -434,7 +434,7 @@ jobs:
         echo "PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
         echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
         echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
-        echo "ENZYME_DIR=$(pwd)/enzyme-build/Enzyme" >> $GITHUB_ENV
+        echo "ENZYME_LIB_DIR=$(pwd)/enzyme-build/Enzyme" >> $GITHUB_ENV
         chmod +x quantum-build/bin/quantum-opt  # artifact upload does not preserve permissions
 
     - name: Run Python Lit Tests
@@ -536,7 +536,7 @@ jobs:
         echo "PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
         echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
         echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
-        echo "ENZYME_DIR=$(pwd)/enzyme-build/Enzyme" >> $GITHUB_ENV
+        echo "ENZYME_LIB_DIR=$(pwd)/enzyme-build/Enzyme" >> $GITHUB_ENV
         chmod +x quantum-build/bin/quantum-opt  # artifact upload does not preserve permissions
 
     - name: Install lightning.kokkos used in Python tests
@@ -648,7 +648,7 @@ jobs:
         echo "PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
         echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
         echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
-        echo "ENZYME_DIR=$(pwd)/enzyme-build/Enzyme" >> $GITHUB_ENV
+        echo "ENZYME_LIB_DIR=$(pwd)/enzyme-build/Enzyme" >> $GITHUB_ENV
         chmod +x quantum-build/bin/quantum-opt  # artifact upload does not preserve permissions
 
     - name: Run Python Pytest Tests

@@ -152,7 +152,7 @@ jobs:
         echo "PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
         echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
         echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
-        echo "ENZYME_DIR=$(pwd)/enzyme-build/Enzyme" >> $GITHUB_ENV
+        echo "ENZYME_LIB_DIR=$(pwd)/enzyme-build/Enzyme" >> $GITHUB_ENV
 
     - name: Run Frontend Tests
       run: |
