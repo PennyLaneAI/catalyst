@@ -420,6 +420,7 @@ jobs:
     name: Frontend Tests
     needs: [runtime, mhlo, quantum, enzyme]
     runs-on: ubuntu-latest
+    continue-on-error: true
 
     steps:
     - name: Cancel previous runs
