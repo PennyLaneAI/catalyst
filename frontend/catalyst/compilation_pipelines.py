@@ -67,13 +67,23 @@ def get_type_annotations(func: typing.Callable):
 
     return None
 
+
 class SharedObjectManager:
+    """Shared object manager.
+
+    Manages the life time of the shared object. When is it loaded, when to close it.
+
+    Args:
+        shared_object_file: path to shared object containing compiled function
+        func_name: name of compiled function
+    """
 
     def __init__(self, shared_object_file, func_name):
         self.shared_object = ctypes.CDLL(shared_object_file)
         self.function, self.setup, self.teardown, self.mem_transfer = self.load_symbols(func_name)
 
     def close(self):
+        """Close the shared object"""
         dlclose = ctypes.CDLL(None).dlclose
         dlclose.argtypes = [ctypes.c_void_p]
         # pylint: disable=protected-access
@@ -110,6 +120,7 @@ class SharedObjectManager:
         mem_transfer = self.shared_object["_mlir_memory_transfer"]
 
         return function, setup, teardown, mem_transfer
+
 
 class CompiledFunction:
     """CompiledFunction, represents a Compiled Function.
@@ -210,7 +221,6 @@ class CompiledFunction:
             promoted_args.append(promoted_arg)
         return promoted_args
 
-
     @staticmethod
     def get_runtime_signature(*args):
         """Get signature from arguments.
@@ -306,30 +316,20 @@ class CompiledFunction:
         shape = ir.RankedTensorType(mlir_tensor_type).shape
         return len(shape) if shape else 0
 
-    def getCompiledReturnValueType(self, return_fields_types, ranks, etypes, sizes):
-        if self.return_type_c_abi is not None:
-            return self.return_type_c_abi
+    def getCompiledReturnValueType(self, mlir_tensor_types):
+        """Compute the type for the return value and memoize it
 
-        class CompiledFunctionReturnValue(ctypes.Structure):
-            """Programmatically create a structure which holds tensors of varying base types."""
-
-            _fields_ = [("f" + str(i), type(t)) for i, t in enumerate(return_fields_types)]
-            _ranks_ = ranks
-            _etypes_ = etypes
-            _sizes_ = sizes
-
-        self.return_type_c_abi = CompiledFunctionReturnValue()
-        return self.return_type_c_abi
-
-    def restype_to_memref_descs(self, mlir_tensor_types):
-        """Converts the return type to a compatible type for the expected ABI.
-
+        This type does not need to be recomputed as it is generated once per compiled function.
         Args:
             mlir_tensor_types: a list of MLIR tensor types which match the expected return type
         Returns:
             a pointer to a CompiledFunctionReturnValue, which corresponds to a structure in which
             fields match the expected return types
         """
+
+        if self.return_type_c_abi is not None:
+            return self.return_type_c_abi
+
         error_msg = """This function must be called with a non-zero length list as an argument."""
         assert mlir_tensor_types, error_msg
         _get_rmd = CompiledFunction.get_ranked_memref_descriptor_from_mlir_tensor_type
@@ -346,9 +346,29 @@ class CompiledFunction:
             CompiledFunction.get_sizes(mlir_tensor_type) for mlir_tensor_type in mlir_tensor_types
         ]
 
-        return_value = self.getCompiledReturnValueType(return_fields_types, ranks, etypes, sizes)
+        class CompiledFunctionReturnValue(ctypes.Structure):
+            """Programmatically create a structure which holds tensors of varying base types."""
+
+            _fields_ = [("f" + str(i), type(t)) for i, t in enumerate(return_fields_types)]
+            _ranks_ = ranks
+            _etypes_ = etypes
+            _sizes_ = sizes
+
+        return_value = CompiledFunctionReturnValue()
         return_value_pointer = ctypes.pointer(return_value)
-        return return_value_pointer
+        self.return_type_c_abi = return_value_pointer
+        return self.return_type_c_abi
+
+    def restype_to_memref_descs(self, mlir_tensor_types):
+        """Converts the return type to a compatible type for the expected ABI.
+
+        Args:
+            mlir_tensor_types: a list of MLIR tensor types which match the expected return type
+        Returns:
+            a pointer to a CompiledFunctionReturnValue, which corresponds to a structure in which
+            fields match the expected return types
+        """
+        return self.getCompiledReturnValueType(mlir_tensor_types)
 
     def args_to_memref_descs(self, restype, args):
         """Convert ``args`` to memref descriptors.
@@ -546,7 +566,13 @@ class QJIT:
           *args: arguments that may have been promoted
         """
         bitmask = map(lambda x: not isinstance(x, jax.Array), args)
-        args = list(map(lambda arg, is_not_jax_array: jax.numpy.asarray(arg) if is_not_jax_array else arg, args, bitmask))
+        args = list(
+            map(
+                lambda arg, is_not_jax_array: jax.numpy.asarray(arg) if is_not_jax_array else arg,
+                args,
+                bitmask,
+            )
+        )
         r_sig = CompiledFunction.get_runtime_signature(*args)
         is_prev_compile = self.compiled_function is not None
         can_skip_promote = is_prev_compile and CompiledFunction.can_skip_promote(self.c_sig, r_sig)
