@@ -420,7 +420,6 @@ jobs:
     name: Frontend Tests
     needs: [runtime, mhlo, quantum, enzyme]
     runs-on: ubuntu-latest
-    continue-on-error: true
 
     steps:
     - name: Cancel previous runs
@@ -497,6 +496,7 @@ jobs:
         chmod +x quantum-build/bin/quantum-opt  # artifact upload does not preserve permissions
 
     - name: Run Python Lit Tests
+      continue-on-error: true
       run: |
         llvm-lit -sv frontend/test/lit -j$(nproc)
 
