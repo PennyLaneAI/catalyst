@@ -67,6 +67,49 @@ def get_type_annotations(func: typing.Callable):
 
     return None
 
+class SharedObjectManager:
+
+    def __init__(self, shared_object_file, func_name):
+        self.shared_object = ctypes.CDLL(shared_object_file)
+        self.function, self.setup, self.teardown, self.mem_transfer = self.load_symbols(func_name)
+
+    def close(self):
+        dlclose = ctypes.CDLL(None).dlclose
+        dlclose.argtypes = [ctypes.c_void_p]
+        # pylint: disable=protected-access
+        dlclose(self.shared_object._handle)
+
+    def load_symbols(self, func_name):
+        """Load symbols necessary for for execution of the compiled function.
+
+        Args:
+            func_name: name of compiled function to be executed
+
+        Returns:
+            function: function handle
+            setup: handle to the setup function, which initializes the device
+            teardown: handle to the teardown function, which tears down the device
+            mem_transfer: memory transfer shared object
+        """
+
+        setup = self.shared_object.setup
+        setup.argtypes = [ctypes.c_int, ctypes.POINTER(ctypes.c_char_p)]
+        setup.restypes = ctypes.c_int
+
+        teardown = self.shared_object.teardown
+        teardown.argtypes = None
+        teardown.restypes = None
+
+        # We are calling the c-interface
+        function = self.shared_object["_catalyst_pyface_" + func_name]
+        # Guaranteed from _mlir_ciface specification
+        function.restypes = None
+        # Not needed, computed from the arguments.
+        # function.argyptes
+
+        mem_transfer = self.shared_object["_mlir_memory_transfer"]
+
+        return function, setup, teardown, mem_transfer
 
 class CompiledFunction:
     """CompiledFunction, represents a Compiled Function.
@@ -83,8 +126,7 @@ class CompiledFunction:
         func_name,
         restype,
     ):
-        self.shared_object_file = shared_object_file
-        assert func_name  # make sure that func_name is not false-y
+        self.shared_object = SharedObjectManager(shared_object_file, func_name)
         self.func_name = func_name
         self.restype = restype
 
@@ -167,41 +209,6 @@ class CompiledFunction:
             promoted_args.append(promoted_arg)
         return promoted_args
 
-    @staticmethod
-    def load_symbols(shared_object_file, func_name):
-        """Load symbols necessary for for execution of the compiled function.
-
-        Args:
-            shared_object_file: path to shared object file
-            func_name: name of compiled function to be executed
-
-        Returns:
-            shared_object: in memory shared object
-            function: function handle
-            setup: handle to the setup function, which initializes the device
-            teardown: handle to the teardown function, which tears down the device
-            mem_transfer: memory transfer shared object
-        """
-        shared_object = ctypes.CDLL(shared_object_file)
-
-        setup = shared_object.setup
-        setup.argtypes = [ctypes.c_int, ctypes.POINTER(ctypes.c_char_p)]
-        setup.restypes = ctypes.c_int
-
-        teardown = shared_object.teardown
-        teardown.argtypes = None
-        teardown.restypes = None
-
-        # We are calling the c-interface
-        function = shared_object["_catalyst_pyface_" + func_name]
-        # Guaranteed from _mlir_ciface specification
-        function.restypes = None
-        # Not needed, computed from the arguments.
-        # function.argyptes
-
-        mem_transfer = shared_object["_mlir_memory_transfer"]
-
-        return shared_object, function, setup, teardown, mem_transfer
 
     @staticmethod
     def get_runtime_signature(*args):
@@ -223,7 +230,7 @@ class CompiledFunction:
             raise TypeError(f"Unsupported argument type: {arg_type}") from exc
 
     @staticmethod
-    def _exec(shared_object_file, func_name, has_return, numpy_dict, *args):
+    def _exec(lib, has_return, numpy_dict, *args):
         """Execute the compiled function with arguments ``*args``.
 
         Args:
@@ -237,36 +244,22 @@ class CompiledFunction:
             retval: the value computed by the function or None if the function has no return value
         """
 
-        shared_object, function, setup, teardown, mem_transfer = CompiledFunction.load_symbols(
-            shared_object_file, func_name
-        )
-
         params_to_setup = [b"jitted-function"]
         argc = len(params_to_setup)
         array_of_char_ptrs = (ctypes.c_char_p * len(params_to_setup))()
         array_of_char_ptrs[:] = params_to_setup
 
-        setup(ctypes.c_int(argc), array_of_char_ptrs)
+        lib.setup(ctypes.c_int(argc), array_of_char_ptrs)
         result_desc = type(args[0].contents) if has_return else None
 
-        retval = wrapper.wrap(function, args, result_desc, mem_transfer, numpy_dict)
+        retval = wrapper.wrap(lib.function, args, result_desc, lib.mem_transfer, numpy_dict)
         if len(retval) == 0:
             retval = None
         elif len(retval) == 1:
             retval = retval[0]
 
         # Teardown has to be made after the return valued has been copied.
-        teardown()
-
-        # Unmap the shared library. This is necessary in case the function is re-compiled.
-        # Without unmapping the shared library, there would be a conflict in the name of
-        # the function and the previous one would succeed.
-        # Need to close after obtaining value, since the value can point to memory in the shared
-        # object. This is in the case of returning a constant, for example.
-        dlclose = ctypes.CDLL(None).dlclose
-        dlclose.argtypes = [ctypes.c_void_p]
-        # pylint: disable=protected-access
-        dlclose(shared_object._handle)
+        lib.teardown()
 
         return retval
 
@@ -413,8 +406,7 @@ class CompiledFunction:
         numpy_dict = {nparr.ctypes.data: nparr for nparr in _buffer}
 
         result = CompiledFunction._exec(
-            self.shared_object_file,
-            self.func_name,
+            self.shared_object,
             self.restype,
             numpy_dict,
             *abi_args,
@@ -515,6 +507,8 @@ class QJIT:
         # This will make a check before sending it to the compiler that the return type
         # is actually available in most systems. f16 needs a special symbol and linking
         # will fail if it is not available.
+        if self.compiled_function and self.compiled_function.shared_object:
+            self.compiled_function.shared_object.close()
         restype = self.mlir_module.body.operations[0].type.results
         for res in restype:
             baseType = ir.RankedTensorType(res).element_type
