@@ -311,27 +311,25 @@ class TestJAXAD:
     def test_multiD_calls(self, backend, shape):
         """Test a jax.grad in combination with qjit on non-1D input parameters."""
 
-        def mock_circuit(p1, p2):
+        def func(p1, p2):
             return jnp.reshape(p1, shape) + 2 * jnp.reshape(p2, shape)
 
-        def circuit(p1, p2):
-            qml.RY(p1[0, 1], wires=0)
-            qml.RZ(p2[1, 0], wires=0)
-            return jnp.reshape(p1, shape) + 2 * jnp.reshape(p2, shape)
+        C_func = qjit(qml.qnode(qml.device(backend, wires=1))(func))
+        PL_func = func
 
-        C_circuit = qjit(qml.qnode(qml.device(backend, wires=1))(circuit))
-        PL_circuit = jax.jit(mock_circuit)
-
-        def cost_fn(p1, p2, c):
-            m1 = c(p1, p2)
-            m2 = c(p1, p2)
+        def cost_fn(p1, p2, f):
+            m1 = f(p1, p2)
+            m2 = f(p1, p2)
             return m1 + m2
 
         p1 = jnp.array([[0.1, 0.3, 0.5], [0.1, 0.2, 0.8]])
         p2 = jnp.array([[0.3, 0.5], [0.2, 0.8], [0.2, 0.8]])
-        result = jax.jacobian(partial(cost_fn, c=C_circuit))(p1, p2)
-        reference = jax.jacobian(partial(cost_fn, c=PL_circuit))(p1, p2)
-        assert jnp.allclose(result, reference, rtol=1e-6, atol=1e-6)
+        result = jax.jacobian(cost_fn, argnums=[0, 1])(p1, p2, C_func)
+        reference = jax.jacobian(cost_fn, argnums=[0, 1])(p1, p2, PL_func)
+        assert len(result) == len(reference)
+        for a, b in zip(result, reference):
+            assert a.shape == b.shape
+            assert jnp.allclose(a, b, rtol=1e-6, atol=1e-6)
 
     def test_efficient_Jacobian(self, backend):
         """Test a jax.grad function does not compute Jacobians for arguments not in argnum."""
