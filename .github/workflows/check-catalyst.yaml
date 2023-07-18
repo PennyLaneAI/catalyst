@@ -588,11 +588,10 @@ jobs:
             COMPILER_LAUNCHER="" \
             QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build" \
             QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include" \
-            CMAKE_ARGS="-DENABLE_SANITIZER=ON" \
             make coverage-runtime
             mv runtime/build/coverage.info coverage-${{ github.job }}.info
 
-      - name: Build Runtime test suite for Lightning-Kokkos simulator
+      - name: Build Runtime test suite with both Lightning and Lightning-Kokkos simulators
         if: ${{ matrix.backend == 'lightning-kokkos' }}
         run: |
             C_COMPILER=$(which gcc) \
@@ -601,7 +600,7 @@ jobs:
             QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build" \
             QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include" \
             ENABLE_LIGHTNING_KOKKOS=ON \
-            CMAKE_ARGS="-DKokkos_ENABLE_OPENMP=ON" \
+            CMAKE_ARGS="-DKokkos_ENABLE_OPENMP=ON -DENABLE_SANITIZER=ON" \
             make test-runtime
 
       - name: Build Runtime test suite for OpenQasm device
