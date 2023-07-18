@@ -1,0 +1,55 @@
+name: Set constants
+
+on:
+  workflow_call:
+    outputs:
+      llvm_version:
+        description: "LLVM version"
+        value: ${{ jobs.set-constants.outputs.llvm_version }}
+      mhlo_version:
+        description: "MHLO version"
+        value: ${{ jobs.set-constants.outputs.mhlo_version }}
+      enzyme_version:
+        description: "Enzyme version"
+        value: ${{ jobs.set-constants.outputs.enzyme_version }}
+      python_versions:
+        description: "List of Python versions"
+        value: ${{ jobs.set-constants.outputs.python_versions }}
+      rt_backends:
+        description: "List of backends."
+        value: ${{ jobs.set-constants.outputs.rt_backends }}
+
+jobs:
+  set-constants:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout Catalyst repo
+        uses: actions/checkout@v3
+
+      - name: LLVM version
+        id: llvm_version
+        run: echo "llvm_version=$(grep llvm .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
+
+      - name: MHLO version
+        id: mhlo_version
+        run: echo "mhlo_version=$(grep mhlo .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
+
+      - name: Enzyme version
+        id: enzyme_version
+        run: echo "enzyme_version=$(grep enzyme .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
+
+      - name: Python versions
+        id: python_versions
+        run: echo 'python_versions=["3.8", "3.9", "3.10", "3.11"]' >> $GITHUB_OUTPUT
+
+      - name: Runtime Backend Devices
+        id: rt_backends
+        run: echo 'rt_backends=["lightning", "lightning-kokkos", "openqasm"]' >> $GITHUB_OUTPUT
+
+    outputs:
+      llvm_version: ${{ steps.llvm_version.outputs.llvm_version }}
+      mhlo_version: ${{ steps.mhlo_version.outputs.mhlo_version }}
+      enzyme_version: ${{ steps.enzyme_version.outputs.enzyme_version }}
+      python_versions: ${{ steps.python_versions.outputs.python_versions }}
+      rt_backends: ${{ steps.rt_backends.outputs.rt_backends }}

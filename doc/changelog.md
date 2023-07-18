@@ -1,4 +1,4 @@
-# Release 0.2.1-dev
+# Release 0.2.2-dev
 
 <h3>New features</h3>
 
@@ -26,11 +26,43 @@
 
 <h3>Bug fixes</h3>
 
+* Fix issue preventing the differentiation of ``qml.probs`` with the parameter-shift method.
+  [#211](https://github.com/PennyLaneAI/catalyst/pull/211)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
 
+David Ittah,
 Sergei Mironov.
+
+
+# Release 0.2.1
+
+<h3>Bug fixes</h3>
+
+* Add missing OpenQASM backend in binary distribution, which relies on the latest version of the
+  AWS Braket plugin for PennyLane to resolve dependency issues between the plugin, Catalyst, and
+  PennyLane. The Lightning-Kokkos backend with Serial and OpenMP modes is also added to the binary
+  distribution.
+  [#198](https://github.com/PennyLaneAI/catalyst/pull/198)
+
+<h3>Improvements</h3>
+
+* When using OpenQASM-based devices the string representation of the circuit is printed on
+  exception.
+  [#199](https://github.com/PennyLaneAI/catalyst/pull/199)
+
+* Use ``pybind11::module`` interface library instead of ``pybind11::embed`` in the runtime for
+  OpenQasm backend to avoid linking to the python library at compile time.
+  [#200](https://github.com/PennyLaneAI/catalyst/pull/200)
+
+<h3>Contributors</h3>
+
+This release contains contributions from (in alphabetical order):
+
+Ali Asadi,
+David Ittah.
 
 # Release 0.2.0
 
@@ -48,7 +80,7 @@ Sergei Mironov.
 
   ```python
   dev = qml.device("lightning.qubit", wires=1)
-  
+
   @qjit
   @qml.qnode(dev)
   def circuit(x):
@@ -56,13 +88,13 @@ Sergei Mironov.
       qml.RY(x[1] ** 2, wires=0)
       qml.RX(x[1] * x[2], wires=0)
       return qml.probs(wires=0)
-  
+
   @jax.jit
   def cost_fn(weights):
       x = jnp.sin(weights)
       return jnp.sum(jnp.cos(circuit(x)) ** 2)
   ```
-  
+
   ```pycon
   >>> cost_fn(jnp.array([0.1, 0.2, 0.3]))
   Array(1.32269195, dtype=float64)
@@ -145,25 +177,25 @@ Sergei Mironov.
 
   ```python
   dev = qml.device("lightning.qubit", wires=1)
-  
+
   @qjit
   @qml.qnode(dev)
   def circuit(x):
-  
+
       @catalyst.cond(x > 2.7)
       def cond_fn():
           qml.RX(x, wires=0)
-  
+
       @cond_fn.else_if(x > 1.4)
       def cond_elif():
           qml.RY(x, wires=0)
-  
+
       @cond_fn.otherwise
       def cond_else():
           qml.RX(x ** 2, wires=0)
-  
+
       cond_fn()
-  
+
       return qml.probs(wires=0)
   ```
 
@@ -251,17 +283,17 @@ Sergei Mironov.
 
   @qml.qnode(dev2)
   def circuit2(x):
-  
+
       @catalyst.cond(x > 2.7)
       def cond_fn():
           qml.RX(x, wires=0)
-  
+
       @cond_fn.otherwise
       def cond_else():
           qml.RX(x ** 2, wires=0)
-  
+
       cond_fn()
-  
+
       return qml.probs(wires=0)
 
   @qjit
@@ -347,9 +379,8 @@ Sergei Mironov.
   As part of this refactor, the following changes were made:
 
   - Passes are now classes. This allows developers/users looking to change
-
     flags to inherit from these passes and change the flags.
-  
+
   - Passes are now passed as arguments to the compiler. Custom passes can just
     be passed to the compiler as an argument, as long as they implement a run
     method which takes an input and the output of this method can be fed to

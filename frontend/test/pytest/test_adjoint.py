@@ -37,7 +37,7 @@ def test_adjoint_func():
         qml.PauliY(wires=0)
         qml.PauliZ(wires=1)
 
-    @qjit()
+    @qjit
     @qml.qnode(qml.device("lightning.qubit", wires=2))
     def C_workflow():
         qml.PauliX(wires=0)
@@ -61,7 +61,7 @@ def test_adjoint_func():
 def test_adjoint_op(theta, val):
     """Ensures that catalyst.adjoint accepts single PennyLane operators classes as argument."""
 
-    @qjit()
+    @qjit
     @qml.qnode(qml.device("lightning.qubit", wires=2))
     def C_workflow(theta, val):
         C_adjoint(qml.RY)(jnp.pi, val)
@@ -83,7 +83,7 @@ def test_adjoint_op(theta, val):
 def test_adjoint_bound_op(theta, val):
     """Ensures that catalyst.adjoint accepts single PennyLane operators objects as argument."""
 
-    @qjit()
+    @qjit
     @qml.qnode(qml.device("lightning.qubit", wires=3))
     def C_workflow(theta, val):
         C_adjoint(qml.RX(jnp.pi, val))
@@ -105,14 +105,14 @@ def test_adjoint_bound_op(theta, val):
 
 @pytest.mark.parametrize("w, p", [(0, 0.5), (0, -100.0), (1, 123.22)])
 def test_adjoint_param_fun(w, p):
-    """Ensures that catalyst.adjoint accepts paramethrized Python functions as arguments."""
+    """Ensures that catalyst.adjoint accepts parameterized Python functions as arguments."""
 
     def func(w, theta1, theta2, theta3=1):
         qml.RX(theta1 * pnp.pi / 2, wires=w)
         qml.RY(theta2 / 2, wires=w)
         qml.RZ(theta3, wires=1)
 
-    @qjit()
+    @qjit
     @qml.qnode(qml.device("lightning.qubit", wires=2))
     def C_workflow(w, theta):
         qml.PauliX(wires=0)
@@ -142,7 +142,7 @@ def test_adjoint_nested_fun():
             I = I + 1
             A(partial(func, A=A, I=I))()
 
-    @qjit(verbose=True, keep_intermediate=True)
+    @qjit
     @qml.qnode(qml.device("lightning.qubit", wires=2))
     def C_workflow():
         qml.RX(pnp.pi / 2, wires=0)
@@ -178,7 +178,7 @@ def test_adjoint_qubitunitary():
             wires=[0, 1],
         )
 
-    @qjit()
+    @qjit
     @qml.qnode(qml.device("lightning.qubit", wires=2))
     def C_workflow():
         C_adjoint(func)()
@@ -201,7 +201,7 @@ def test_adjoint_multirz():
         qml.PauliX(0)
         qml.MultiRZ(theta=pnp.pi / 2, wires=[0, 1])
 
-    @qjit()
+    @qjit
     @qml.qnode(qml.device("lightning.qubit", wires=2))
     def C_workflow():
         C_adjoint(func)()
@@ -226,7 +226,7 @@ def test_adjoint_no_measurements():
 
     with pytest.raises(ValueError, match="no measurements"):
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device("lightning.qubit", wires=2))
         def C_workflow():
             C_adjoint(func)()
@@ -239,7 +239,7 @@ def test_adjoint_invalid_argument():
     """Checks that catalyst.adjoint rejects non-quantum program arguments."""
     with pytest.raises(ValueError, match="Expected a callable"):
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device("lightning.qubit", wires=2))
         def C_workflow():
             C_adjoint(33)()
@@ -259,7 +259,7 @@ def test_adjoint_classical_loop():
         qml.PauliX(wires=loop(w))
         qml.RX(pnp.pi / 2, wires=w)
 
-    @qjit()
+    @qjit
     @qml.qnode(qml.device("lightning.qubit", wires=3))
     def C_workflow():
         C_adjoint(func)(0)
