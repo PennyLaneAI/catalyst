@@ -8,7 +8,7 @@ MK_DIR := $(dir $(MK_ABSPATH))
 DIALECTS_BUILD_DIR?=$(MK_DIR)/build
 LLVM_BUILD_DIR?=$(MK_DIR)/llvm-project/build
 MHLO_BUILD_DIR?=$(MK_DIR)/mlir-hlo/build
-ENZYME_BUILD_DIR?=$(MK_DIR)/Enzyme/enzyme/build
+ENZYME_BUILD_DIR?=$(MK_DIR)/Enzyme/build
 RT_BUILD_DIR?=$(MK_DIR)/../runtime/build
 ENABLE_LLD?=ON
 

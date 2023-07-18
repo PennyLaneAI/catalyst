@@ -278,38 +278,15 @@ jobs:
         patch -d quantum-build/python_packages/quantum/mlir_quantum/dialects --follow-symlinks < mlir/patches/remove-gradient-cext-import.patch
         patch -d quantum-build/python_packages/quantum/mlir_quantum/dialects --follow-symlinks < mlir/patches/remove-quantum-cext-import.patch
 
-    # Requirements:
-    - name: Prepare the python package
-      run: |
-        echo "INSTALLED = True" > $GITHUB_WORKSPACE/frontend/catalyst/_configuration.py
-        # Copy bins to frontend/catalyst/bin
-        mkdir -p $GITHUB_WORKSPACE/frontend/catalyst/bin
-        cp $GITHUB_WORKSPACE/llvm-build/bin/llc $GITHUB_WORKSPACE/frontend/catalyst/bin
-        cp $GITHUB_WORKSPACE/llvm-build/bin/opt $GITHUB_WORKSPACE/frontend/catalyst/bin
-        cp $GITHUB_WORKSPACE/llvm-build/bin/mlir-translate $GITHUB_WORKSPACE/frontend/catalyst/bin
-        cp $GITHUB_WORKSPACE/mhlo-build/bin/mlir-hlo-opt $GITHUB_WORKSPACE/frontend/catalyst/bin
-        cp $GITHUB_WORKSPACE/quantum-build/bin/quantum-opt $GITHUB_WORKSPACE/frontend/catalyst/bin
-        # Copy libs to frontend/catalyst/lib
-        mkdir -p $GITHUB_WORKSPACE/frontend/catalyst/lib/backend/ $GITHUB_WORKSPACE/frontend/catalyst/lib/capi
-        cp $GITHUB_WORKSPACE/runtime-build/lib/backend/librt_backend.so $GITHUB_WORKSPACE/frontend/catalyst/lib/backend/
-        cp $GITHUB_WORKSPACE/runtime-build/lib/capi/librt_capi.so $GITHUB_WORKSPACE/frontend/catalyst/lib/capi
-        cp --dereference $GITHUB_WORKSPACE/llvm-build/lib/libmlir_float16_utils.so.* $GITHUB_WORKSPACE/frontend/catalyst/lib
-        cp --dereference $GITHUB_WORKSPACE/llvm-build/lib/libmlir_c_runner_utils.so* $GITHUB_WORKSPACE/frontend/catalyst/lib
-        # Copy enzyme so to frontend
-        mkdir -p $GITHUB_WORKSPACE/frontend/catalyst/enzyme
-        cp --dereference $GITHUB_WORKSPACE/enzyme-build/Enzyme/LLVMEnzyme-17.so $GITHUB_WORKSPACE/frontend/catalyst/enzyme
-        # Copy mlir bindings to frontend/mlir_quantum
-        mkdir -p $GITHUB_WORKSPACE/frontend/mlir_quantum/dialects
-        cp -R --dereference $GITHUB_WORKSPACE/quantum-build/python_packages/quantum/mlir_quantum/runtime $GITHUB_WORKSPACE/frontend/mlir_quantum/runtime
-        cp --dereference $GITHUB_WORKSPACE/quantum-build/python_packages/quantum/mlir_quantum/ir.py $GITHUB_WORKSPACE/frontend/mlir_quantum/
-        for file in arith tensor scf gradient quantum _ods_common ; do \
-           cp --dereference $GITHUB_WORKSPACE/quantum-build/python_packages/quantum/mlir_quantum/dialects/*${file}* $GITHUB_WORKSPACE/frontend/mlir_quantum/dialects ; \
-        done
-        find $GITHUB_WORKSPACE/frontend -type d -name __pycache__ -exec rm -rf {} +
-
     - name: Build wheel
       run: |
-        python${{ matrix.python_version }} setup.py bdist_wheel
+        PYTHON=python${{ matrix.python_version }} \
+        LLVM_BUILD_DIR=$GITHUB_WORKSPACE/llvm-build \
+        MHLO_BUILD_DIR=$GITHUB_WORKSPACE/mhlo-build \
+        DIALECTS_BUILD_DIR=$GITHUB_WORKSPACE/quantum-build \
+        RT_BUILD_DIR=$GITHUB_WORKSPACE/runtime-build \
+        ENZYME_BUILD_DIR=$GITHUB_WORKSPACE/enzyme-build \
+        make wheel
 
     - name: Upload Wheel Artifact
       uses: actions/upload-artifact@v3

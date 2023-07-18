@@ -77,10 +77,7 @@ default_bin_paths = {
 default_lib_paths = {
     "llvm": os.path.join(package_root, "../../mlir/llvm-project/build/lib"),
     "runtime": os.path.join(package_root, "../../runtime/build/lib"),
-}
-
-default_enzyme_path = {
-    "enzyme": os.path.join(package_root, "../../mlir/Enzyme/enzyme/build/Enzyme")
+    "enzyme": os.path.join(package_root, "../../mlir/Enzyme/build/Enzyme"),
 }
 
 
@@ -89,15 +86,6 @@ def get_executable_path(project, tool):
     path = os.path.join(package_root, "bin") if INSTALLED else default_bin_paths.get(project, "")
     executable_path = os.path.join(path, tool)
     return executable_path if os.path.exists(executable_path) else tool
-
-
-def get_enzyme_path(project, env_var):
-    """Get path to Enzyme."""
-    return (
-        os.path.join(package_root, "enzyme")
-        if INSTALLED
-        else os.getenv(env_var, default_enzyme_path.get(project, ""))
-    )
 
 
 def get_lib_path(project, env_var):
@@ -298,7 +286,7 @@ class Enzyme(PassPipeline):
     """Pass pipeline to lower LLVM IR to Enzyme LLVM IR."""
 
     _executable = get_executable_path("llvm", "opt")
-    enzyme_path = get_enzyme_path("enzyme", "ENZYME_DIR")
+    enzyme_path = get_lib_path("enzyme", "ENZYME_LIB_DIR")
     _default_flags = [
         f"-load-pass-plugin={enzyme_path}/LLVMEnzyme-17.so",
         "-load",
