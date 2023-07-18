@@ -13,17 +13,21 @@ on:
         required: true
         type: string
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  constants:
+    name: "Set build matrix"
+    uses: ./.github/workflows/constants.yaml
+
   check-config:
     name: Build Configuration
+    needs: [constants]
     runs-on: ubuntu-latest
 
     steps:
-    - name: Cancel previous runs
-      uses: styfle/cancel-workflow-action@0.11.0
-      with:
-        access_token: ${{ github.token }}
-
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
       with:
@@ -31,18 +35,6 @@ jobs:
     - if: ${{ inputs.catalyst == 'stable' }}
       run: |
         git checkout $(git tag | sort -V | tail -1)
-
-    - name: Get LLVM version
-      id: llvm-hash
-      run: echo "llvm-hash=$(grep llvm .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
-
-    - name: Get MHLO version
-      id: mhlo-hash
-      run: echo "mhlo-hash=$(grep mhlo .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
-
-    - name: Get Enzyme Version
-      id: enzyme-hash
-      run: echo "enzyme-hash=$(grep enzyme .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
 
     - name: Install deps
       run: |
@@ -58,23 +50,23 @@ jobs:
     - uses: actions/cache@v3
       with:
         path: mlir/llvm-project
-        key: Linux-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-source
+        key: Linux-llvm-${{ needs.constants.outputs.llvm_version }}-default-source
         enableCrossOsArchive: True
         fail-on-cache-miss: True
     - uses: actions/cache@v3
       with:
         path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-build-opt
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
         fail-on-cache-miss: True
     - uses: actions/cache@v3
       with:
         path: mhlo-build
-        key: ${{ runner.os }}-mhlo-${{ steps.mhlo-hash.outputs.mhlo-hash }}-default-build
+        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-build
         fail-on-cache-miss: True
     - uses: actions/cache@v3
       with:
         path: enzyme-build
-        key: ${{ runner.os }}-enzyme-${{ steps.enzyme-hash.outputs.enzyme-hash }}-default-build
+        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.enzyme_version }}-default-build
         fail-on-cache-miss: True
     - uses: actions/cache@v3
       with:

@@ -177,6 +177,10 @@ class BufferizationPass(PassPipeline):
 
     _executable = get_executable_path("quantum", "quantum-opt")
     _default_flags = [
+        # The following pass allows differentiation of qml.probs with the parameter-shift method,
+        # as it performs the bufferization of `memref.tensor_op` (for which no dialect bufferization
+        # exists).
+        "--one-shot-bufferize=dialect-filter=memref",  # must run before any dialect bufferization
         "--inline",
         "--gradient-bufferize",
         "--scf-bufferize",
