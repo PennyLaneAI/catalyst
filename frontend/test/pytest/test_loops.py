@@ -97,8 +97,8 @@ class TestWhileLoops:
         assert circuit(3)
         assert not circuit(4)
 
-    def test_non_bool_condition(self, backend):
-        """Test while loop with captured values (closures) in the condition function."""
+    def test_non_bool_condition_error(self, backend):
+        """Test error messages issues when the non-bool conditions are provided."""
 
         def workflow(R):
             @qjit
