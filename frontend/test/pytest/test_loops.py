@@ -97,6 +97,28 @@ class TestWhileLoops:
         assert circuit(3)
         assert not circuit(4)
 
+    def test_non_bool_condition(self, backend):
+        """Test while loop with captured values (closures) in the condition function."""
+
+        def workflow(R):
+            @qjit
+            @qml.qnode(qml.device(backend, wires=1))
+            def circuit():
+                @while_loop(lambda i: R)
+                def loop(i):
+                    qml.PauliX(wires=0)
+                    return i + 1
+
+                loop(0)
+                return measure(wires=0)
+
+            return circuit()
+
+        with pytest.raises(TypeError, match="must return a single boolean scalar"):
+            workflow((44, 33))
+        with pytest.raises(TypeError, match="must return a boolean scalar"):
+            workflow(33)
+
     def test_closure_condition_fn(self, backend):
         """Test while loop with captured values (closures) in the condition function."""
 
