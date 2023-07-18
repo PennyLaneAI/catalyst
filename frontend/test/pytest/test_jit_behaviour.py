@@ -493,14 +493,8 @@ class TestShots:
             # assert expected_shape == observed_shape
 
 
-class TestSignatureErrors:
-    def test_incompatible_argument(self):
-        """Test incompatible argument."""
-
-        string = "hello world"
-        with pytest.raises(TypeError) as err:
-            CompiledFunction.get_runtime_signature([string])
-        assert "Unsupported argument type:" in str(err.value)
+class TestPromotionRules:
+    """Class to test different promotion rules."""
 
     def test_incompatible_compiled_vs_runtime_different_lengths(self):
         """Test incompatible compiled vs runtime."""
@@ -531,6 +525,16 @@ class TestSignatureErrors:
 
         retval = CompiledFunction.typecheck(jnp.array([1.0]), jnp.array([1]))
         assert TypeCompatibility.NEEDS_PROMOTION == retval
+
+
+class TestSignatureErrors:
+    def test_incompatible_argument(self):
+        """Test incompatible argument."""
+
+        string = "hello world"
+        with pytest.raises(TypeError) as err:
+            CompiledFunction.get_runtime_signature([string])
+        assert "Unsupported argument type:" in str(err.value)
 
     def test_incompatible_type_reachable_from_user_code(self):
         """Raise error message for incompatible types"""
