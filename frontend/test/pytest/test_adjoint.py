@@ -224,7 +224,7 @@ def test_adjoint_no_measurements():
         qml.RX(pnp.pi / 2, wires=0)
         qml.sample()
 
-    with pytest.raises(ValueError, match="no measurements"):
+    with pytest.raises(ValueError, match="Quantum measurements are not allowed"):
 
         @qjit
         @qml.qnode(qml.device("lightning.qubit", wires=2))
