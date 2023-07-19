@@ -118,8 +118,11 @@ func::FuncOp genQuantumGradient(PatternRewriter &rewriter, Location loc, func::F
 
             Value reconstructedTensor =
                 rewriter
-                    .create<UnrealizedConversionCastOp>(arg.getLoc(), arg.getType(), unpackedValues)
+                    .create<UnrealizedConversionCastOp>(
+                        arg.getLoc(), typeConverter.convertType(arg.getType()), unpackedValues)
                     .getResult(0);
+            reconstructedTensor =
+                rewriter.create<bufferization::ToTensorOp>(arg.getLoc(), reconstructedTensor);
 
             if (arg == oldArgs.back()) {
                 // The last argument should be replaced with its shadow
@@ -194,130 +197,6 @@ func::FuncOp genAugmentedForwardPass(PatternRewriter &rewriter, Location loc, fu
     return augmentedForwardPass;
 }
 
-func::FuncOp genEnzymeWrapper(PatternRewriter &rewriter, Location loc, func::FuncOp callee,
-                              func::FuncOp modifiedCallee)
-{
-    // Copied from the argmap function because it's very similar.
-    // Define the properties of the classical preprocessing function.
-    std::string fnName = callee.getSymName().str() + ".enzymewrapper";
-    SmallVector<Type> fnArgTypes(callee.getArgumentTypes());
-    auto paramsBufferType = MemRefType::get({ShapedType::kDynamic}, rewriter.getF64Type());
-    // fnArgTypes.push_back(paramsBufferType);
-    fnArgTypes.push_back(rewriter.getIndexType()); // parameter count
-
-    // fnArgTypes.push_back()
-    // Need this to be in destination passing style
-    bufferization::BufferizeTypeConverter typeConverter;
-    for (Type resultType : callee.getResultTypes()) {
-        fnArgTypes.push_back(typeConverter.convertType(resultType));
-    }
-
-    FunctionType fnType = rewriter.getFunctionType(fnArgTypes, {});
-    StringAttr visibility = rewriter.getStringAttr("private");
-
-    func::FuncOp argMapFn =
-        SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(callee, rewriter.getStringAttr(fnName));
-    if (!argMapFn) {
-        // First copy the original function as is, then we can replace all quantum ops by collecting
-        // their gate parameters in a memory buffer instead. The size of this vector is passed as an
-        // input to the new function.
-        argMapFn = rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility, nullptr, nullptr);
-        rewriter.cloneRegionBefore(callee.getBody(), argMapFn.getBody(), argMapFn.end());
-        Block &argMapBlock = argMapFn.getFunctionBody().front();
-        SmallVector<Value> modifiedCalleeArgs{argMapBlock.getArguments()};
-
-        Value paramCount = argMapBlock.addArgument(rewriter.getIndexType(), loc);
-        SmallVector<Value> dpsOutputs;
-        for (Type resultType : callee.getResultTypes()) {
-            dpsOutputs.push_back(
-                argMapBlock.addArgument(typeConverter.convertType(resultType), loc));
-        }
-
-        PatternRewriter::InsertionGuard insertGuard(rewriter);
-        rewriter.setInsertionPointToStart(&argMapFn.getBody().front());
-        Value paramsBuffer = rewriter.create<memref::AllocOp>(loc, paramsBufferType, paramCount);
-
-        modifiedCalleeArgs.push_back(paramsBuffer);
-        MemRefType paramsProcessedType = MemRefType::get({}, rewriter.getIndexType());
-        Value paramsProcessed = rewriter.create<memref::AllocaOp>(loc, paramsProcessedType);
-        Value cZero = rewriter.create<index::ConstantOp>(loc, 0);
-        rewriter.create<memref::StoreOp>(loc, cZero, paramsProcessed);
-        Value cOne = rewriter.create<index::ConstantOp>(loc, 1);
-
-        argMapFn.walk([&](Operation *op) {
-            // Insert gate parameters into the params buffer.
-            if (auto gate = dyn_cast<quantum::DifferentiableGate>(op)) {
-                PatternRewriter::InsertionGuard insertGuard(rewriter);
-                rewriter.setInsertionPoint(gate);
-
-                ValueRange diffParams = gate.getDiffParams();
-                if (!diffParams.empty()) {
-                    Value paramIdx = rewriter.create<memref::LoadOp>(loc, paramsProcessed);
-                    for (auto param : diffParams) {
-                        rewriter.create<memref::StoreOp>(loc, param, paramsBuffer, paramIdx);
-                        paramIdx = rewriter.create<index::AddOp>(loc, paramIdx, cOne);
-                    }
-                    rewriter.create<memref::StoreOp>(loc, paramIdx, paramsProcessed);
-                }
-
-                rewriter.replaceOp(op, gate.getQubitOperands());
-            }
-            // Return ops should be preceded with calls to the modified quantum callee
-            else if (auto returnOp = dyn_cast<func::ReturnOp>(op)) {
-                PatternRewriter::InsertionGuard insertionGuard(rewriter);
-                rewriter.setInsertionPoint(returnOp);
-                auto modifiedCall =
-                    rewriter.create<func::CallOp>(loc, modifiedCallee, modifiedCalleeArgs);
-
-                // Copy over results
-                for (const auto &[dpsOut, funcResult] :
-                     llvm::zip(dpsOutputs, modifiedCall.getResults())) {
-                    Value castedResult = rewriter.create<bufferization::ToMemrefOp>(
-                        loc, typeConverter.convertType(funcResult.getType()), funcResult);
-                    // Let's hope this doesn't break type analysis
-                    rewriter.create<memref::CopyOp>(loc, castedResult, dpsOut);
-                }
-                returnOp.getOperandsMutable().clear();
-            }
-            // Erase redundant device specifications.
-            else if (isa<quantum::DeviceOp>(op)) {
-                rewriter.eraseOp(op);
-            }
-        });
-
-        quantum::removeQuantumMeasurements(argMapFn);
-    }
-
-    return argMapFn;
-}
-
-func::FuncOp genModifiedCallee(PatternRewriter &rewriter, Location loc, func::FuncOp callee)
-{
-    // The callee requires two modifications, but the most important one is that it accepts the gate
-    // parameters as an argument. This is so Enzyme will see that the gate params flow into the
-    // custom quantum function.
-    std::string fnName = (callee.getName() + ".withparams").str();
-    SmallVector<Type> fnArgTypes(callee.getArgumentTypes());
-    auto paramsBufferType = MemRefType::get({ShapedType::kDynamic}, rewriter.getF64Type());
-    fnArgTypes.push_back(paramsBufferType);
-    FunctionType fnType = rewriter.getFunctionType(fnArgTypes, callee.getResultTypes());
-
-    func::FuncOp modifiedCallee =
-        SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(callee, rewriter.getStringAttr(fnName));
-    if (modifiedCallee) {
-        return modifiedCallee;
-    }
-
-    modifiedCallee = rewriter.create<func::FuncOp>(loc, fnName, fnType);
-    modifiedCallee.setPrivate();
-    rewriter.cloneRegionBefore(callee.getBody(), modifiedCallee.getBody(), modifiedCallee.end());
-    Block &entryBlock = modifiedCallee.getFunctionBody().front();
-    entryBlock.addArgument(paramsBufferType, loc);
-
-    // This is the point where we can remove the classical preprocessing as a later optimization.
-    return modifiedCallee;
-}
-
 /// Generate an mlir function to compute the full gradient of a quantum function.
 ///
 /// With the parameter-shift method (and certain other methods) the gradient of a quantum function
@@ -340,12 +219,37 @@ func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc, GradOp
     StringAttr visibility = rewriter.getStringAttr("private");
     auto callee =
         SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(gradOp, gradOp.getCalleeAttr());
-    func::FuncOp modifiedCallee = genModifiedCallee(rewriter, loc, callee);
-    // TODO: Pass this is in wherever it's required
-    bufferization::BufferizeTypeConverter typeConverter;
-    genEnzymeWrapper(rewriter, loc, callee, modifiedCallee);
-    genAugmentedForwardPass(rewriter, loc, callee);
-    genQuantumGradient(rewriter, loc, qGradFn, typeConverter);
+    // For each QNode, generate a wrapper containing classical preprocessing that then calls a
+    // function that accepts the parameters. This conceptually is splitting the QNode into classical
+    // preprocessing and quantum parts that end in a measurement.
+    SmallVector<func::FuncOp> qnodes;
+    if (callee->hasAttr("qnode")) {
+        qnodes.push_back(callee);
+    }
+    else {
+        callee.walk([&qnodes](func::CallOp callOp) {
+            auto callee =
+                SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(callOp, callOp.getCalleeAttr());
+            if (callee->hasAttr("qnode")) {
+                qnodes.push_back(callee);
+            }
+        });
+    }
+
+    // for (func::FuncOp qnode : qnodes) {
+    //     func::FuncOp withParams = genQNodeWithParams(rewriter, qnode.getLoc(), qnode);
+    //     func::FuncOp splitPreprocessing =
+    //         genSplitPreprocessed(rewriter, qnode.getLoc(), qnode, withParams);
+    // }
+
+    // The modified callee
+    // func::FuncOp modifiedCallee = genModifiedCallee(rewriter, loc, callee);
+    // func::FuncOp primal = genEnzymeWrapper(rewriter, loc, callee, modifiedCallee);
+    // func::FuncOp augmented = genAugmentedForwardPass(rewriter, loc, callee);
+    // func::FuncOp gradient = genQuantumGradient(rewriter, loc, qGradFn, typeConverter);
+    // modifiedCallee->setAttr("gradient.augment", augmented.getNameAttr());
+    // modifiedCallee->setAttr("gradient.vjp", gradient.getNameAttr());
+
     func::FuncOp fullGradFn =
         SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(gradOp, rewriter.getStringAttr(fnName));
     if (!fullGradFn) {

@@ -15,9 +15,10 @@
 #include "iostream"
 #include "llvm/Support/raw_ostream.h"
 
-#include "mlir/Dialect/Index/IR/IndexOps.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/IR/SymbolTable.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "Gradient/IR/GradientOps.h"
@@ -93,53 +94,30 @@ class BufferizeBackpropOp : public OpConversionPattern<BackpropOp> {
     LogicalResult matchAndRewrite(BackpropOp op, OpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
+        SmallVector<Type> resTypes;
+        SmallVector<Type> outTypes;
+        if (failed(getTypeConverter()->convertTypes(op.getResultTypes(), resTypes))) {
+            return failure();
+        }
+        if (failed(getTypeConverter()->convertTypes(op.getOutputs().getTypes(), outTypes))) {
+            return failure();
+        }
+
         Location loc = op.getLoc();
-        SmallVector<Value> gradients;
         SmallVector<Value> argShadows;
-        // Conceptually a map from scalar result indices (w.r.t. other scalars) to the position in
-        // the overall list of returned gradients.
-        // For instance, a backprop op that returns (tensor, f64, tensor, f64, f64) will have
-        // scalarIndices = {1, 3, 4}.
-        SmallVector<unsigned> scalarIndices;
-        SmallVector<Type> scalarReturnTypes;
-        std::vector<Value> diffArgs =
-            computeDiffArgs(adaptor.getArgs(), op.getDiffArgIndicesAttr());
-        for (const auto &[idx, diffArg] : llvm::enumerate(diffArgs)) {
-            // Allocate buffers to place the differentiation results (gradients) into. Enzyme refers
-            // to these as shadow arguments. There is one result for each differentiable MemRef
-            // argument, with a matching shape and type.
-            if (isa<MemRefType>(diffArg.getType())) {
-                Value shadow = generateAllocation(rewriter, loc, diffArg);
-                gradients.push_back(shadow);
-                argShadows.push_back(shadow);
-            }
-            else if (isa<FloatType>(diffArg.getType())) {
-                scalarReturnTypes.push_back(diffArg.getType());
-                scalarIndices.push_back(idx);
-                // Put a null placeholder value that will be filled in with the result of the
-                // bufferized BackpropOp.
-                gradients.push_back(Value());
-            }
+        SmallVector<Value> outShadows;
+        for (Type resType : resTypes) {
+            argShadows.push_back(rewriter.create<memref::AllocOp>(loc, cast<MemRefType>(resType)));
         }
 
-        // Enzyme requires buffers for the primal outputs as well, even though we don't need their
-        // values. We'll mark them dupNoNeed later on to allow Enzyme to optimize away their
-        // computation.
-        SmallVector<Value> calleeResults;
-        ValueRange resShadows = adaptor.getCotangents();
-        generateAllocations(rewriter, loc, calleeResults, resShadows);
-
-        DenseIntElementsAttr diffArgIndicesAttr = adaptor.getDiffArgIndices().value_or(nullptr);
-        auto bufferizedBackpropOp = rewriter.create<BackpropOp>(
-            loc, scalarReturnTypes, op.getCalleeAttr(), adaptor.getArgs(), argShadows,
-            calleeResults, resShadows, diffArgIndicesAttr);
-
-        // Fill in the null placeholders.
-        for (const auto &[idx, scalarResult] : llvm::enumerate(bufferizedBackpropOp.getResults())) {
-            gradients[scalarIndices[idx]] = scalarResult;
+        for (Type outType : outTypes) {
+            outShadows.push_back(rewriter.create<memref::AllocOp>(loc, cast<MemRefType>(outType)));
         }
 
-        rewriter.replaceOp(op, gradients);
+        rewriter.create<BackpropOp>(loc, TypeRange{}, op.getCalleeAttr(), adaptor.getArgs(),
+                                    adaptor.getOutputs(), argShadows, outShadows,
+                                    op.getDiffArgIndicesAttr());
+        rewriter.replaceOp(op, argShadows);
         return success();
     }
 };

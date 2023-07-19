@@ -29,6 +29,7 @@
 #include "mlir/Dialect/LLVMIR/FunctionCallUtils.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/IR/IRMapping.h"
 
 #include "Gradient/IR/GradientOps.h"
 #include "Gradient/Transforms/Patterns.h"
@@ -145,9 +146,97 @@ struct EnzymeMemRefInterfaceOptions {
 
 static constexpr const char *enzyme_autodiff_func_name = "__enzyme_autodiff";
 static constexpr const char *enzyme_allocation_key = "__enzyme_allocation_like";
-static constexpr const char *enzyme_like_free_key = "__enzyme_function_like_free";
+static constexpr const char *enzyme_custom_gradient_key = "__enzyme_register_gradient_";
 static constexpr const char *enzyme_const_key = "enzyme_const";
 static constexpr const char *enzyme_dupnoneed_key = "enzyme_dupnoneed";
+
+/// Convert every MemRef-typed return value in callee to writing to a new argument in
+/// destination-passing style.
+void convertToDestinationPassingStyle(func::FuncOp callee)
+{
+    MLIRContext *ctx = callee.getContext();
+    if (callee.getNumResults() == 0) {
+        // Callee is already in destination-passing style
+        return;
+    }
+
+    SmallVector<Value> memRefReturns;
+    SmallVector<Type> nonMemRefReturns;
+    callee.walk([&](func::ReturnOp returnOp) {
+        // This is the first return op we've seen.
+        if (memRefReturns.empty()) {
+            for (Value operand : returnOp.getOperands()) {
+                if (isa<MemRefType>(operand.getType())) {
+                    memRefReturns.push_back(operand);
+                }
+                else {
+                    nonMemRefReturns.push_back(operand.getType());
+                }
+            }
+            return WalkResult::interrupt();
+        }
+        return WalkResult::advance();
+    });
+
+    // Insert the new output arguments to the function.
+    unsigned dpsOutputIdx = callee.getNumArguments();
+    SmallVector<unsigned> argIndices(/*size=*/memRefReturns.size(),
+                                     /*values=*/dpsOutputIdx);
+    SmallVector<Type> memRefTypes{memRefReturns.size()};
+    SmallVector<DictionaryAttr> argAttrs{memRefReturns.size()};
+    SmallVector<Location> argLocs{memRefReturns.size(), UnknownLoc::get(ctx)};
+
+    llvm::transform(memRefReturns, memRefTypes.begin(),
+                    [](Value memRef) { return memRef.getType(); });
+    llvm::transform(memRefReturns, argLocs.begin(), [](Value memRef) { return memRef.getLoc(); });
+
+    callee.insertArguments(argIndices, memRefTypes, argAttrs, argLocs);
+    callee.setFunctionType(FunctionType::get(ctx, callee.getArgumentTypes(), nonMemRefReturns));
+
+    // Update the old MemRefs to be replaced with the output argument. Many allocations will be
+    // able to be trivially canonicalized away.
+    callee.walk([&](func::ReturnOp returnOp) {
+        SmallVector<Value> nonMemRefReturns;
+        size_t idx = 0;
+        for (Value operand : returnOp.getOperands()) {
+            if (isa<MemRefType>(operand.getType())) {
+                operand.replaceAllUsesWith(callee.getArgument(idx + dpsOutputIdx));
+                idx++;
+            }
+            else {
+                nonMemRefReturns.push_back(operand);
+            }
+        }
+        returnOp.getOperandsMutable().assign(nonMemRefReturns);
+    });
+    return;
+}
+
+LogicalResult traverseCallGraph(func::FuncOp start, SymbolTableCollection &symbolTable,
+                                function_ref<LogicalResult(func::FuncOp)> processCallable)
+{
+    DenseSet<Operation *> visited{start};
+    std::deque<Operation *> frontier{start};
+
+    while (!frontier.empty()) {
+        auto callable = cast<func::FuncOp>(frontier.front());
+        frontier.pop_front();
+
+        if (failed(processCallable(callable))) {
+            return failure();
+        }
+
+        callable.walk([&](CallOpInterface callOp) {
+            if (auto nextFunc = dyn_cast<func::FuncOp>(callOp.resolveCallable(&symbolTable))) {
+                if (!visited.contains(nextFunc)) {
+                    visited.insert(nextFunc);
+                    frontier.push_back(nextFunc);
+                }
+            }
+        });
+    }
+    return success();
+}
 
 struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
     using ConvertOpToLLVMPattern::ConvertOpToLLVMPattern;
@@ -168,7 +257,29 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
             SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
         assert(callee && "Expected a valid callee of type func.func");
 
-        catalyst::convertToDestinationPassingStyle(callee, rewriter);
+        convertToDestinationPassingStyle(callee);
+        SymbolTableCollection symbolTable;
+        LogicalResult traversalResult =
+            traverseCallGraph(callee, symbolTable, [this, &rewriter](func::FuncOp func) {
+                if (func->hasAttrOfType<FlatSymbolRefAttr>("gradient.qgrad")) {
+                    auto qgradFn = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
+                        func, func->getAttrOfType<FlatSymbolRefAttr>("gradient.qgrad"));
+                    func::FuncOp augFwd = genAugmentedForward(func, rewriter);
+                    func::FuncOp customQGrad =
+                        genCustomQGradient(func, func.getLoc(), qgradFn, rewriter);
+                    insertEnzymeCustomGradient(rewriter, func->getParentOfType<ModuleOp>(),
+                                               func.getLoc(), func, augFwd, customQGrad);
+                    // What should the function signatures be?
+                    // original: (memref<f64>, memref<f64>, memref<?xf64>) -> memref<f64>
+                    // augmented: (memref<f64>, memref<f64>, memref<?xf64>) -> struct{{},
+                    // memref<f64>, memref<f64>} gradient: (unpacked memref<f64>, unpacked
+                    // memref<f64>, unpacked memref<?xf64>, {}) -> ()
+                }
+                return success();
+            });
+        if (failed(traversalResult)) {
+            return failure();
+        }
 
         LowerToLLVMOptions options = getTypeConverter()->getOptions();
         if (options.useGenericFunctions) {
@@ -213,13 +324,14 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         insertGlobalSymbol(rewriter, moduleOp, enzyme_const_key, std::nullopt);
         insertGlobalSymbol(rewriter, moduleOp, enzyme_dupnoneed_key, std::nullopt);
 
-        ValueRange argShadows = adaptor.getDiffArgShadows();
+        int index = 0;
         Value enzymeConst = rewriter.create<LLVM::AddressOfOp>(loc, LLVM::LLVMPointerType::get(ctx),
                                                                enzyme_const_key);
-        ValueRange convArgs = adaptor.getArgs();
-        // Add the arguments and the argument shadows of memrefs
-        for (auto [index, arg] : llvm::enumerate(op.getArgs())) {
-            auto it = std::find(diffArgIndices.begin(), diffArgIndices.end(), index);
+
+        // Add the arguments and their appropriate shadows
+        for (Value arg : op.getArgs()) {
+            std::vector<size_t>::iterator it =
+                std::find(diffArgIndices.begin(), diffArgIndices.end(), index);
             if (it == diffArgIndices.end()) {
                 if (isa<MemRefType>(arg.getType())) {
                     // unpackMemRefAndAppend will handle the appropriate enzyme_const annotations
@@ -231,29 +343,20 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
                 }
             }
             else {
-                assert(isDifferentiable(arg.getType()));
-                if (isa<MemRefType>(arg.getType())) {
-                    size_t position = std::distance(diffArgIndices.begin(), it);
-                    unpackMemRefAndAppend(arg, argShadows[position], callArgs, rewriter, loc,
-                                          {.zeroOut = true});
-                }
-                else {
-                    callArgs.push_back(arg);
-                }
+                size_t position = std::distance(diffArgIndices.begin(), it);
+                unpackMemRef(arg, op.getArgShadows()[position], callArgs, rewriter, loc,
+                             {.zeroOut = true});
             }
+            index++;
         }
 
-        for (auto [result, cotangent] :
-             llvm::zip_equal(op.getCalleeResults(), op.getCotangents())) {
-            unpackMemRefAndAppend(result, cotangent, callArgs, rewriter, loc, {.dupNoNeed = true});
+        for (const auto &[outSpace, outShadow] : llvm::zip(op.getOutputs(), op.getOutShadows())) {
+            unpackMemRef(outSpace, outShadow, callArgs, rewriter, loc, {.dupNoNeed = true});
         }
 
-        // The results of backprop are in argShadows, except scalar derivatives which are in the
-        // results of the enzyme call.
-        auto enzymeCall = rewriter.create<LLVM::CallOp>(loc, backpropFnDecl, callArgs);
-        SmallVector<Value> scalarResults;
-        unpackScalarResults(enzymeCall, scalarResults, rewriter, loc);
-        rewriter.replaceOp(op, scalarResults);
+        // The results of backprop are in arg_shadows
+        rewriter.create<LLVM::CallOp>(loc, backpropFnDecl, callArgs);
+        rewriter.eraseOp(op);
         return success();
     }
 
@@ -373,6 +476,310 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
             loc, indexType, builder.getIndexAttr(type.getElementTypeBitWidth() / 8));
         Value bufferSizeBytes = builder.create<LLVM::MulOp>(loc, elementByteSize, bufferSize);
         return bufferSizeBytes;
+    }
+
+    func::FuncOp genAugmentedForward(func::FuncOp qnode, OpBuilder &builder) const
+    {
+        using mlir::LLVM::LLVMStructType;
+        assert(qnode.getNumResults() == 1 &&
+               "QNodes that return multiple results not yet supported");
+        Type resultType = qnode.getResultTypes()[0];
+        MLIRContext *ctx = builder.getContext();
+        std::string augmentedName = (qnode.getName() + ".augfwd").str();
+        OpBuilder::InsertionGuard insertionGuard(builder);
+        builder.setInsertionPointAfter(qnode);
+        auto augmentedForward = cast<func::FuncOp>(builder.clone(*qnode));
+        augmentedForward->removeAttr("gradient.qgrad");
+        augmentedForward.setName(augmentedName);
+        // The tape type is an empty struct because we don't need to pass any data from the forward
+        // pass to the reverse pass.
+        auto tapeType = LLVMStructType::getLiteral(ctx, {});
+        ArrayRef<Type> argTypes = cast<FunctionType>(qnode.getFunctionType()).getInputs();
+        augmentedForward.setFunctionType(
+            FunctionType::get(ctx, argTypes, {tapeType, resultType, resultType}));
+
+        IRMapping shadowMap;
+        augmentedForward.walk([&](func::ReturnOp returnOp) {
+            OpBuilder::InsertionGuard insertionGuard(builder);
+            builder.setInsertionPoint(returnOp);
+
+            Value tape = builder.create<LLVM::UndefOp>(returnOp.getLoc(), tapeType);
+            SmallVector<Value> returnOperands{tape};
+            returnOperands.append(returnOp.getOperands().begin(), returnOp.getOperands().end());
+
+            for (Value operand : returnOp.getOperands()) {
+                if (!shadowMap.contains(operand)) {
+                    if (auto allocOp = dyn_cast_or_null<memref::AllocOp>(operand.getDefiningOp())) {
+                        // Allocate a shadow for the return
+                        OpBuilder::InsertionGuard insertionGuard(builder);
+                        builder.setInsertionPointAfter(allocOp);
+                        Value shadowAlloc = cast<memref::AllocOp>(builder.clone(*allocOp));
+                        Location loc = shadowAlloc.getLoc();
+                        MemRefDescriptor shadowDesc{castToConvertedType(shadowAlloc, builder, loc)};
+                        Value bufferSizeBytes = computeMemRefSizeInBytes(
+                            cast<MemRefType>(operand.getType()), shadowDesc, builder, loc);
+                        Value zero = builder.create<LLVM::ConstantOp>(loc, builder.getI8Type(), 0);
+                        builder.create<LLVM::MemsetOp>(loc, shadowDesc.alignedPtr(builder, loc),
+                                                       zero, bufferSizeBytes,
+                                                       /*isVolatile=*/false);
+                        shadowMap.map(operand, shadowAlloc);
+                    }
+                }
+                returnOperands.push_back(shadowMap.lookup(operand));
+            }
+
+            returnOp.getOperandsMutable().assign(returnOperands);
+        });
+
+        return augmentedForward;
+    }
+
+    func::FuncOp genCustomQGradient(func::FuncOp qnode, Location loc, func::FuncOp qgradFn,
+                                    OpBuilder &builder) const
+    {
+        SmallVector<Type> customArgTypes;
+        std::string customQGradName = (qnode.getName() + ".customqgrad").str();
+        MLIRContext *ctx = builder.getContext();
+        auto ptrType = LLVM::LLVMPointerType::get(ctx);
+        auto indexType = getTypeConverter()->getIndexType();
+        for (Type argType : qnode.getArgumentTypes()) {
+            if (auto memRefType = dyn_cast<MemRefType>(argType)) {
+                int64_t rank = memRefType.getRank();
+                // The allocated and aligned pointers need shadow pointers even if they won't be
+                // used because Enzyme's custom gradients assume all pointers are active.
+                customArgTypes.append({ptrType, ptrType, ptrType, ptrType, indexType});
+                for (int64_t dim = 0; dim < rank; dim++) {
+                    customArgTypes.append({indexType, indexType});
+                }
+            }
+        }
+
+        OpBuilder::InsertionGuard insertionGuard(builder);
+        builder.setInsertionPoint(qnode);
+        auto funcType = FunctionType::get(ctx, customArgTypes, {});
+        auto customQGrad = builder.create<func::FuncOp>(qnode.getLoc(), customQGradName, funcType);
+        customQGrad.setPrivate();
+        Block *block = customQGrad.addEntryBlock();
+        builder.setInsertionPointToStart(block);
+
+        // Reconstruct the MemRefs from the unpacked arguments
+        size_t idx = 0;
+        Region::BlockArgListType unpackedArgs = customQGrad.getArguments();
+        SmallVector<Value> reconstructedPrimals;
+        SmallVector<Value> reconstructedShadows;
+        for (Type argType : qnode.getArgumentTypes()) {
+            auto memRefType = cast<MemRefType>(argType);
+            int64_t rank = memRefType.getRank();
+            Type structType = getTypeConverter()->convertType(memRefType);
+            Type sizesOrStridesType =
+                LLVM::LLVMArrayType::get(getTypeConverter()->getIndexType(), rank);
+            Value primal = builder.create<LLVM::UndefOp>(loc, structType);
+            Value shadow = builder.create<LLVM::UndefOp>(loc, structType);
+
+            primal = builder.create<LLVM::InsertValueOp>(loc, structType, primal,
+                                                         unpackedArgs[idx + 0], 0);
+            primal = builder.create<LLVM::InsertValueOp>(loc, structType, primal,
+                                                         unpackedArgs[idx + 2], 1);
+            primal = builder.create<LLVM::InsertValueOp>(loc, structType, primal,
+                                                         unpackedArgs[idx + 4], 2);
+
+            shadow = builder.create<LLVM::InsertValueOp>(loc, structType, shadow,
+                                                         unpackedArgs[idx + 1], 0);
+            shadow = builder.create<LLVM::InsertValueOp>(loc, structType, shadow,
+                                                         unpackedArgs[idx + 3], 1);
+            shadow = builder.create<LLVM::InsertValueOp>(loc, structType, shadow,
+                                                         unpackedArgs[idx + 4], 2);
+            idx += 5;
+            if (rank != 0) {
+                Value sizes = builder.create<LLVM::UndefOp>(loc, sizesOrStridesType);
+                Value strides = builder.create<LLVM::UndefOp>(loc, sizesOrStridesType);
+                for (int64_t dim = 0; dim < rank; dim++) {
+                    sizes = builder.create<LLVM::InsertValueOp>(loc, sizesOrStridesType, sizes,
+                                                                unpackedArgs[idx++], dim);
+                }
+                for (int64_t dim = 0; dim < rank; dim++) {
+                    strides = builder.create<LLVM::InsertValueOp>(loc, sizesOrStridesType, strides,
+                                                                  unpackedArgs[idx++], dim);
+                }
+
+                primal = builder.create<LLVM::InsertValueOp>(loc, structType, primal, sizes, 3);
+                primal = builder.create<LLVM::InsertValueOp>(loc, structType, primal, strides, 4);
+
+                shadow = builder.create<LLVM::InsertValueOp>(loc, structType, shadow, sizes, 3);
+                shadow = builder.create<LLVM::InsertValueOp>(loc, structType, shadow, strides, 4);
+            }
+
+            reconstructedPrimals.push_back(
+                builder.create<UnrealizedConversionCastOp>(loc, memRefType, primal).getResult(0));
+
+            reconstructedShadows.push_back(
+                builder.create<UnrealizedConversionCastOp>(loc, memRefType, shadow).getResult(0));
+        }
+
+        SmallVector<Value> primalInputs{ValueRange{reconstructedPrimals}.drop_back(1)};
+        Value gateParamShadow = reconstructedShadows.back();
+        // The gate param list is always 1-d
+        Value pcount = builder.create<memref::DimOp>(loc, gateParamShadow, 0);
+        primalInputs.push_back(pcount);
+
+        // TODO: don't know if this works in jacobian contexts
+        Value qgrad = builder.create<func::CallOp>(loc, qgradFn, primalInputs).getResult(0);
+        builder.create<memref::CopyOp>(loc, qgrad, gateParamShadow);
+        builder.create<func::ReturnOp>(loc);
+
+        return customQGrad;
+    }
+
+    func::FuncOp genAugmentedForward(func::FuncOp qnode, OpBuilder &builder) const
+    {
+        using mlir::LLVM::LLVMStructType;
+        assert(qnode.getNumResults() == 1 &&
+               "QNodes that return multiple results not yet supported");
+        Type resultType = qnode.getResultTypes()[0];
+        MLIRContext *ctx = builder.getContext();
+        std::string augmentedName = (qnode.getName() + ".augfwd").str();
+        OpBuilder::InsertionGuard insertionGuard(builder);
+        builder.setInsertionPointAfter(qnode);
+        auto augmentedForward = cast<func::FuncOp>(builder.clone(*qnode));
+        augmentedForward->removeAttr("gradient.qgrad");
+        augmentedForward.setName(augmentedName);
+        // The tape type is an empty struct because we don't need to pass any data from the forward
+        // pass to the reverse pass.
+        auto tapeType = LLVMStructType::getLiteral(ctx, {});
+        ArrayRef<Type> argTypes = cast<FunctionType>(qnode.getFunctionType()).getInputs();
+        augmentedForward.setFunctionType(
+            FunctionType::get(ctx, argTypes, {tapeType, resultType, resultType}));
+
+        IRMapping shadowMap;
+        augmentedForward.walk([&](func::ReturnOp returnOp) {
+            OpBuilder::InsertionGuard insertionGuard(builder);
+            builder.setInsertionPoint(returnOp);
+
+            Value tape = builder.create<LLVM::UndefOp>(returnOp.getLoc(), tapeType);
+            SmallVector<Value> returnOperands{tape};
+            returnOperands.append(returnOp.getOperands().begin(), returnOp.getOperands().end());
+
+            for (Value operand : returnOp.getOperands()) {
+                if (!shadowMap.contains(operand)) {
+                    if (auto allocOp = dyn_cast_or_null<memref::AllocOp>(operand.getDefiningOp())) {
+                        // Allocate a shadow for the return
+                        OpBuilder::InsertionGuard insertionGuard(builder);
+                        builder.setInsertionPointAfter(allocOp);
+                        Value shadowAlloc = cast<memref::AllocOp>(builder.clone(*allocOp));
+                        Location loc = shadowAlloc.getLoc();
+                        MemRefDescriptor shadowDesc{castToConvertedType(shadowAlloc, builder, loc)};
+                        Value bufferSizeBytes = computeMemRefSizeInBytes(
+                            cast<MemRefType>(operand.getType()), shadowDesc, builder, loc);
+                        Value zero = builder.create<LLVM::ConstantOp>(loc, builder.getI8Type(), 0);
+                        builder.create<LLVM::MemsetOp>(loc, shadowDesc.alignedPtr(builder, loc),
+                                                       zero, bufferSizeBytes,
+                                                       /*isVolatile=*/false);
+                        shadowMap.map(operand, shadowAlloc);
+                    }
+                }
+                returnOperands.push_back(shadowMap.lookup(operand));
+            }
+
+            returnOp.getOperandsMutable().assign(returnOperands);
+        });
+
+        return augmentedForward;
+    }
+
+    func::FuncOp genCustomQGradient(func::FuncOp qnode, Location loc, func::FuncOp qgradFn,
+                                    OpBuilder &builder) const
+    {
+        SmallVector<Type> customArgTypes;
+        std::string customQGradName = (qnode.getName() + ".customqgrad").str();
+        MLIRContext *ctx = builder.getContext();
+        auto ptrType = LLVM::LLVMPointerType::get(ctx);
+        auto indexType = getTypeConverter()->getIndexType();
+        for (Type argType : qnode.getArgumentTypes()) {
+            if (auto memRefType = dyn_cast<MemRefType>(argType)) {
+                int64_t rank = memRefType.getRank();
+                // The allocated and aligned pointers need shadow pointers even if they won't be
+                // used because Enzyme's custom gradients assume all pointers are active.
+                customArgTypes.append({ptrType, ptrType, ptrType, ptrType, indexType});
+                for (int64_t dim = 0; dim < rank; dim++) {
+                    customArgTypes.append({indexType, indexType});
+                }
+            }
+        }
+
+        OpBuilder::InsertionGuard insertionGuard(builder);
+        builder.setInsertionPoint(qnode);
+        auto funcType = FunctionType::get(ctx, customArgTypes, {});
+        auto customQGrad = builder.create<func::FuncOp>(qnode.getLoc(), customQGradName, funcType);
+        customQGrad.setPrivate();
+        Block *block = customQGrad.addEntryBlock();
+        builder.setInsertionPointToStart(block);
+
+        // Reconstruct the MemRefs from the unpacked arguments
+        size_t idx = 0;
+        Region::BlockArgListType unpackedArgs = customQGrad.getArguments();
+        SmallVector<Value> reconstructedPrimals;
+        SmallVector<Value> reconstructedShadows;
+        for (Type argType : qnode.getArgumentTypes()) {
+            auto memRefType = cast<MemRefType>(argType);
+            int64_t rank = memRefType.getRank();
+            Type structType = getTypeConverter()->convertType(memRefType);
+            Type sizesOrStridesType =
+                LLVM::LLVMArrayType::get(getTypeConverter()->getIndexType(), rank);
+            Value primal = builder.create<LLVM::UndefOp>(loc, structType);
+            Value shadow = builder.create<LLVM::UndefOp>(loc, structType);
+
+            primal = builder.create<LLVM::InsertValueOp>(loc, structType, primal,
+                                                         unpackedArgs[idx + 0], 0);
+            primal = builder.create<LLVM::InsertValueOp>(loc, structType, primal,
+                                                         unpackedArgs[idx + 2], 1);
+            primal = builder.create<LLVM::InsertValueOp>(loc, structType, primal,
+                                                         unpackedArgs[idx + 4], 2);
+
+            shadow = builder.create<LLVM::InsertValueOp>(loc, structType, shadow,
+                                                         unpackedArgs[idx + 1], 0);
+            shadow = builder.create<LLVM::InsertValueOp>(loc, structType, shadow,
+                                                         unpackedArgs[idx + 3], 1);
+            shadow = builder.create<LLVM::InsertValueOp>(loc, structType, shadow,
+                                                         unpackedArgs[idx + 4], 2);
+            idx += 5;
+            if (rank != 0) {
+                Value sizes = builder.create<LLVM::UndefOp>(loc, sizesOrStridesType);
+                Value strides = builder.create<LLVM::UndefOp>(loc, sizesOrStridesType);
+                for (int64_t dim = 0; dim < rank; dim++) {
+                    sizes = builder.create<LLVM::InsertValueOp>(loc, sizesOrStridesType, sizes,
+                                                                unpackedArgs[idx++], dim);
+                }
+                for (int64_t dim = 0; dim < rank; dim++) {
+                    strides = builder.create<LLVM::InsertValueOp>(loc, sizesOrStridesType, strides,
+                                                                  unpackedArgs[idx++], dim);
+                }
+
+                primal = builder.create<LLVM::InsertValueOp>(loc, structType, primal, sizes, 3);
+                primal = builder.create<LLVM::InsertValueOp>(loc, structType, primal, strides, 4);
+
+                shadow = builder.create<LLVM::InsertValueOp>(loc, structType, shadow, sizes, 3);
+                shadow = builder.create<LLVM::InsertValueOp>(loc, structType, shadow, strides, 4);
+            }
+
+            reconstructedPrimals.push_back(
+                builder.create<UnrealizedConversionCastOp>(loc, memRefType, primal).getResult(0));
+
+            reconstructedShadows.push_back(
+                builder.create<UnrealizedConversionCastOp>(loc, memRefType, shadow).getResult(0));
+        }
+
+        SmallVector<Value> primalInputs{ValueRange{reconstructedPrimals}.drop_back(1)};
+        Value gateParamShadow = reconstructedShadows.back();
+        // The gate param list is always 1-d
+        Value pcount = builder.create<memref::DimOp>(loc, gateParamShadow, 0);
+        primalInputs.push_back(pcount);
+
+        // TODO: don't know if this works in jacobian contexts
+        Value qgrad = builder.create<func::CallOp>(loc, qgradFn, primalInputs).getResult(0);
+        builder.create<memref::CopyOp>(loc, qgrad, gateParamShadow);
+        builder.create<func::ReturnOp>(loc);
+
+        return customQGrad;
     }
 
     /// This registers custom allocation and deallocation functions with Enzyme. It creates a
@@ -495,6 +902,46 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
             rewriter.create<LLVM::InsertValueOp>(glb.getLoc(), llvmInsert0, enzymeGlobal, 1);
         rewriter.create<LLVM::ReturnOp>(glb.getLoc(), llvmInsert1);
         return glb;
+    }
+
+    static LLVM::GlobalOp insertEnzymeCustomGradient(OpBuilder &builder, ModuleOp moduleOp,
+                                                     Location loc, func::FuncOp originalFunc,
+                                                     func::FuncOp augmentedPrimal,
+                                                     func::FuncOp gradient)
+    {
+        MLIRContext *context = moduleOp.getContext();
+        OpBuilder::InsertionGuard insertGuard(builder);
+        builder.setInsertionPointToStart(moduleOp.getBody());
+
+        std::string key = (enzyme_custom_gradient_key + originalFunc.getName()).str();
+        auto customGradient = moduleOp.lookupSymbol<LLVM::GlobalOp>(key);
+        if (customGradient) {
+            return customGradient;
+        }
+
+        auto ptrType = LLVM::LLVMPointerType::get(context);
+        auto resultType = LLVM::LLVMArrayType::get(ptrType, 3);
+        customGradient = builder.create<LLVM::GlobalOp>(
+            loc, resultType,
+            /*isConstant=*/false, LLVM::Linkage::External, key, /*address space=*/nullptr);
+        builder.createBlock(&customGradient.getInitializerRegion());
+        Value origFnPtr = builder.create<func::ConstantOp>(loc, originalFunc.getFunctionType(),
+                                                           originalFunc.getName());
+        Value augFnPtr = builder.create<func::ConstantOp>(loc, augmentedPrimal.getFunctionType(),
+                                                          augmentedPrimal.getName());
+        Value gradFnPtr =
+            builder.create<func::ConstantOp>(loc, gradient.getFunctionType(), gradient.getName());
+        SmallVector<Value> fnPtrs{origFnPtr, augFnPtr, gradFnPtr};
+        Value result = builder.create<LLVM::UndefOp>(loc, resultType);
+        for (const auto &[idx, fnPtr] : llvm::enumerate(fnPtrs)) {
+            Value casted =
+                builder.create<UnrealizedConversionCastOp>(loc, ptrType, fnPtr).getResult(0);
+            result = builder.create<LLVM::InsertValueOp>(loc, result, casted, idx);
+        }
+
+        builder.create<LLVM::ReturnOp>(loc, result);
+
+        return customGradient;
     }
 };
 
