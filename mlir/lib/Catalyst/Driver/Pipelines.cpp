@@ -44,7 +44,7 @@ const static SmallVector<const char *> quantumCompilationPasses = {
 };
 
 const static SmallVector<const char *> bufferizationPasses = {
-    "one-shot-bufferize{dialect-filter=memref}"
+    "one-shot-bufferize{dialect-filter=memref}",
     "inline",
     "gradient-bufferize",
     "scf-bufferize",

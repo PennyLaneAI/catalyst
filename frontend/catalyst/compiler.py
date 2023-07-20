@@ -495,6 +495,10 @@ class Compiler:
             output = CompilerDriver.run(filename, options=options)
             filename = str(pathlib.Path(output).absolute())
         else:
+            filename = f"{workspace_name}/{module_name}.mlir"
+            with open(filename, "w", encoding="utf-8") as f:
+                f.write(ir)
+
             for pipeline in pipelines:
                 output = pipeline.run(filename, options=options)
                 self.pass_pipeline_output[pipeline.__name__] = output

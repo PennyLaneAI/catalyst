@@ -129,8 +129,9 @@ FailureOr<llvm::Function *> getJITFunction(MLIRContext *ctx, llvm::Module &llvmM
     return failure();
 }
 
-void inferMLIRReturnTypes(MLIRContext *ctx, llvm::Type *returnType, Type assumedElementType,
-                          SmallVectorImpl<RankedTensorType> &inferredTypes)
+LogicalResult inferMLIRReturnTypes(MLIRContext *ctx, llvm::Type *returnType,
+                                   Type assumedElementType,
+                                   SmallVectorImpl<RankedTensorType> &inferredTypes)
 {
     auto inferSingleMemRef = [&](llvm::StructType *descriptorType) {
         SmallVector<int64_t> resultShape;
@@ -148,20 +149,25 @@ void inferMLIRReturnTypes(MLIRContext *ctx, llvm::Type *returnType, Type assumed
         };
         return RankedTensorType::get(resultShape, assumedElementType);
     };
-
-    auto *structType = cast<llvm::StructType>(returnType);
-    // The return type could be a single memref descriptor or a struct of multiple memref
-    // descriptors.
-    if (isa<llvm::StructType>(structType->getElementType(0))) {
-        for (size_t i = 0; i < structType->getNumElements(); i++) {
-            inferredTypes.push_back(
-                inferSingleMemRef(cast<llvm::StructType>(structType->getTypeAtIndex(i))));
+    if (returnType->isVoidTy()) {
+        return success();
+    }
+    if (auto *structType = dyn_cast<llvm::StructType>(returnType)) {
+        // The return type could be a single memref descriptor or a struct of multiple memref
+        // descriptors.
+        if (isa<llvm::StructType>(structType->getElementType(0))) {
+            for (size_t i = 0; i < structType->getNumElements(); i++) {
+                inferredTypes.push_back(
+                    inferSingleMemRef(cast<llvm::StructType>(structType->getTypeAtIndex(i))));
+            }
         }
+        else {
+            // Assume the function returns a single memref
+            inferredTypes.push_back(inferSingleMemRef(structType));
+        }
+        return success();
     }
-    else {
-        // Assume the function returns a single memref
-        inferredTypes.push_back(inferSingleMemRef(structType));
-    }
+    return failure();
 }
 
 LogicalResult QuantumDriverMain(const CompilerOptions &options, FunctionAttributes &inferredData)
@@ -225,8 +231,11 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, FunctionAttribut
         // element type. This is because the LLVM pointer type is
         // opaque and requires looking into its uses to infer its type.
         SmallVector<RankedTensorType> returnTypes;
-        inferMLIRReturnTypes(ctx, function.value()->getReturnType(), Float64Type::get(ctx),
-                             returnTypes);
+        if (failed(inferMLIRReturnTypes(ctx, function.value()->getReturnType(),
+                                        Float64Type::get(ctx), returnTypes))) {
+            // Inferred return types are only required when compiling from textual IR. This
+            // inference failing is not a problem when compiling from Python.
+        }
         llvm::raw_string_ostream returnTypeStream(inferredData.returnType);
         llvm::interleaveComma(returnTypes, returnTypeStream, [](RankedTensorType tensorType) {
             return serializeMLIRObject(tensorType);
