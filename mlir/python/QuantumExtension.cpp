@@ -14,7 +14,6 @@
 
 #include "Quantum-c/Dialects.h"
 #include "mlir/Bindings/Python/PybindAdaptors.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
 
 namespace py = pybind11;
 using namespace mlir::python::adaptors;
