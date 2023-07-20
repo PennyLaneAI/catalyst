@@ -85,6 +85,10 @@ class SharedObjectManager:
 
     def close(self):
         """Close the shared object"""
+        self.function = None
+        self.setup = None
+        self.teardown = None
+        self.mem_transfer = None
         dlclose = ctypes.CDLL(None).dlclose
         dlclose.argtypes = [ctypes.c_void_p]
         # pylint: disable=protected-access
