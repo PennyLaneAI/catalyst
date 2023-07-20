@@ -22,6 +22,9 @@
 
 <h3>Improvements</h3>
 
+* Remove redundant unflat and flattening of parameters using PyTrees.
+  [#215](https://github.com/PennyLaneAI/catalyst/pull/215)
+
 <h3>Breaking changes</h3>
 
 <h3>Bug fixes</h3>
