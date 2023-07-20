@@ -285,8 +285,6 @@ def _check_created_jaxpr_gradient_methods(f: Differentiable, method: str, jaxpr:
         return
 
     # TODO: reimplement these checks
-    print("jaxpr: ", jaxpr.eqns[0].params["call_jaxpr"])
-
     qnode_jaxpr = jaxpr.eqns[0].params["call_jaxpr"]
     return_ops = []
     for res in qnode_jaxpr.outvars:
@@ -294,7 +292,6 @@ def _check_created_jaxpr_gradient_methods(f: Differentiable, method: str, jaxpr:
             if res in eq.outvars:
                 return_ops.append(eq.primitive)
                 break
-    print(return_ops)
 
     # assert isinstance(
     #     f, qml.QNode
