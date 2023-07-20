@@ -29,9 +29,31 @@ from catalyst import measure, qjit
 # perhaps they rely on another function?
 # jnp.hypot
 
+# TODO: Update these tests to use the C++ compiler driver
+# The C++ driver is missing the `print_stage` functionality
+from catalyst.compiler import (
+    MHLOPass,
+    QuantumCompilationPass,
+    BufferizationPass,
+    MLIRToLLVMDialect,
+    LLVMDialectToLLVMIR,
+    LLVMIRToObjectFile,
+    CompilerDriver,
+)
+
+pipelines = [
+    MHLOPass,
+    QuantumCompilationPass,
+    BufferizationPass,
+    MLIRToLLVMDialect,
+    LLVMDialectToLLVMIR,
+    LLVMIRToObjectFile,
+    CompilerDriver,
+]
+
 
 # CHECK-LABEL: test_ewise_arctan2
-@qjit(keep_intermediate=True)
+@qjit(keep_intermediate=True, pipelines=pipelines)
 @qml.qnode(qml.device("lightning.qubit", wires=2))
 def test_ewise_arctan2(x, y):
     # CHECK: linalg.generic
@@ -64,7 +86,7 @@ test_ewise_arctan2.print_stage("BufferizationPass")
 # and we currently support only leaf functions.
 
 
-@qjit(keep_intermediate=True)
+@qjit(keep_intermediate=True, pipelines=pipelines)
 @qml.qnode(qml.device("lightning.qubit", wires=2))
 # CHECK-LABEL: test_ewise_add
 def test_ewise_add(x, y):
@@ -81,7 +103,7 @@ test_ewise_add.print_stage("BufferizationPass")
 
 
 # CHECK-LABEL: test_ewise_mult
-@qjit(keep_intermediate=True)
+@qjit(keep_intermediate=True, pipelines=pipelines)
 @qml.qnode(qml.device("lightning.qubit", wires=2))
 def test_ewise_mult(x, y):
     # CHECK: linalg.generic
@@ -97,7 +119,7 @@ test_ewise_mult.print_stage("BufferizationPass")
 
 
 # CHECK-LABEL: test_ewise_div
-@qjit(keep_intermediate=True)
+@qjit(keep_intermediate=True, pipelines=pipelines)
 @qml.qnode(qml.device("lightning.qubit", wires=2))
 def test_ewise_div(x, y):
     # CHECK: linalg.generic
@@ -113,7 +135,7 @@ test_ewise_div.print_stage("BufferizationPass")
 
 
 # CHECK-LABEL: test_ewise_power
-@qjit(keep_intermediate=True)
+@qjit(keep_intermediate=True, pipelines=pipelines)
 @qml.qnode(qml.device("lightning.qubit", wires=2))
 def test_ewise_power(x, y):
     # CHECK: linalg.generic
@@ -129,7 +151,7 @@ test_ewise_power.print_stage("BufferizationPass")
 
 
 # CHECK-LABEL: test_ewise_sub
-@qjit(keep_intermediate=True)
+@qjit(keep_intermediate=True, pipelines=pipelines)
 @qml.qnode(qml.device("lightning.qubit", wires=2))
 def test_ewise_sub(x, y):
     # CHECK: linalg.generic
@@ -144,7 +166,7 @@ test_ewise_sub(jnp.array(1.0), jnp.array(2.0))
 test_ewise_sub.print_stage("BufferizationPass")
 
 
-@qjit(keep_intermediate=True)
+@qjit(keep_intermediate=True, pipelines=pipelines)
 @qml.qnode(qml.device("lightning.qubit", wires=2))
 # CHECK-LABEL: test_ewise_true_div
 def test_ewise_true_div(x, y):
@@ -165,7 +187,7 @@ test_ewise_true_div.print_stage("BufferizationPass")
 
 
 # CHECK-LABEL: test_ewise_float_power
-@qjit(keep_intermediate=True)
+@qjit(keep_intermediate=True, pipelines=pipelines)
 @qml.qnode(qml.device("lightning.qubit", wires=2))
 def test_ewise_float_power(x, y):
     # CHECK: linalg.generic
@@ -191,7 +213,7 @@ test_ewise_float_power.print_stage("BufferizationPass")
 
 
 # CHECK-LABEL: test_ewise_maximum
-@qjit(keep_intermediate=True)
+@qjit(keep_intermediate=True, pipelines=pipelines)
 @qml.qnode(qml.device("lightning.qubit", wires=2))
 def test_ewise_maximum(x, y):
     # CHECK: linalg.generic
@@ -210,7 +232,7 @@ test_ewise_maximum.print_stage("BufferizationPass")
 
 
 # CHECK-LABEL: test_ewise_minimum
-@qjit(keep_intermediate=True)
+@qjit(keep_intermediate=True, pipelines=pipelines)
 @qml.qnode(qml.device("lightning.qubit", wires=2))
 def test_ewise_minimum(x, y):
     # CHECK: linalg.generic
