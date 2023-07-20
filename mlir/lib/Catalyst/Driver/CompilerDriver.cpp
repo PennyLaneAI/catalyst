@@ -86,20 +86,6 @@ void registerAllCatalystDialects(DialectRegistry &registry)
     registry.insert<quantum::QuantumDialect>();
     registry.insert<gradient::GradientDialect>();
 }
-
-void registerAllCatalystPasses()
-{
-    mlir::registerPass(catalyst::createArrayListToMemRefPass);
-    mlir::registerPass(catalyst::createGradientBufferizationPass);
-    mlir::registerPass(catalyst::createGradientLoweringPass);
-    mlir::registerPass(catalyst::createGradientConversionPass);
-    mlir::registerPass(catalyst::createQuantumBufferizationPass);
-    mlir::registerPass(catalyst::createQuantumConversionPass);
-    mlir::registerPass(catalyst::createEmitCatalystPyInterfacePass);
-    mlir::registerPass(catalyst::createCopyGlobalMemRefPass);
-
-    mhlo::registerAllMhloPasses();
-}
 } // namespace
 
 template <typename MLIRObject> std::string serializeMLIRObject(MLIRObject &obj)
@@ -181,6 +167,8 @@ void inferMLIRReturnTypes(MLIRContext *ctx, llvm::Type *returnType, Type assumed
 LogicalResult QuantumDriverMain(const CompilerOptions &options, FunctionAttributes &inferredData)
 {
     registerAllCatalystPasses();
+    mhlo::registerAllMhloPasses();
+
     DialectRegistry registry;
     registerAllCatalystDialects(registry);
     registerLLVMTranslations(registry);

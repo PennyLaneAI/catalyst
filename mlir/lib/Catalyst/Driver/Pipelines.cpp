@@ -39,10 +39,12 @@ const static SmallVector<const char *> mhloToCorePasses = {
 
 const static SmallVector<const char *> quantumCompilationPasses = {
     "lower-gradients",
+    "adjoint-lowering",
     "convert-arraylist-to-memref",
 };
 
 const static SmallVector<const char *> bufferizationPasses = {
+    "one-shot-bufferize{dialect-filter=memref}"
     "inline",
     "gradient-bufferize",
     "scf-bufferize",
