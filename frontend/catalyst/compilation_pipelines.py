@@ -242,7 +242,7 @@ class CompiledFunction:
             raise TypeError(f"Unsupported argument type: {arg_type}") from exc
 
     @staticmethod
-    def _exec(lib, has_return, numpy_dict, *args):
+    def _exec(shared_object, has_return, numpy_dict, *args):
         """Execute the compiled function with arguments ``*args``.
 
         Args:
@@ -260,17 +260,19 @@ class CompiledFunction:
         array_of_char_ptrs = (ctypes.c_char_p * len(params_to_setup))()
         array_of_char_ptrs[:] = params_to_setup
 
-        lib.setup(ctypes.c_int(argc), array_of_char_ptrs)
+        shared_object.setup(ctypes.c_int(argc), array_of_char_ptrs)
         result_desc = type(args[0].contents) if has_return else None
 
-        retval = wrapper.wrap(lib.function, args, result_desc, lib.mem_transfer, numpy_dict)
+        retval = wrapper.wrap(
+            shared_object.function, args, result_desc, shared_object.mem_transfer, numpy_dict
+        )
         if len(retval) == 0:
             retval = None
         elif len(retval) == 1:
             retval = retval[0]
 
         # Teardown has to be made after the return valued has been copied.
-        lib.teardown()
+        shared_object.teardown()
 
         return retval
 
