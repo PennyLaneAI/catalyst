@@ -165,8 +165,7 @@ class CompiledFunction:
 
         Args:
             compiled_signature: user supplied signature, obtain from either an annotation or a
-                                previously compiled
-            implementation of the compiled function
+                                previously compiled implementation of the compiled function
             runtime_signature: runtime signature
 
         Returns:
