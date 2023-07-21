@@ -22,7 +22,7 @@
 
 <h3>Improvements</h3>
 
-* Remove redundant unflat and flattening of parameters using PyTrees.
+* Eliminate redundant unflattening and flattening of PyTrees parameters in Catalyst control flow operations.
   [#215](https://github.com/PennyLaneAI/catalyst/pull/215)
 
 <h3>Breaking changes</h3>
