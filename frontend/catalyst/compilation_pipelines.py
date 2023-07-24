@@ -134,7 +134,7 @@ class SharedObjectManager:
         self.setup(ctypes.c_int(argc), array_of_char_ptrs)
         return self
 
-    def __exit__(self, type, value, traceback):
+    def __exit__(self, _type, _value, _traceback):
         self.teardown()
 
 
