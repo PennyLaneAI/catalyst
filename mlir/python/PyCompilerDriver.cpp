@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <iostream>
 #include "Catalyst/Driver/CompilerDriver.h"
 #include "mlir/Bindings/Python/PybindAdaptors.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -29,10 +30,11 @@ PYBIND11_MODULE(_catalystDriver, m)
     m.def(
         "compile_asm",
         [](const char *source, const char *workspace, const char *moduleName,
-           bool inferFunctionAttrs, bool keepIntermediate) {
+           bool inferFunctionAttrs, bool keepIntermediate, bool verbose) {
             FunctionAttributes inferredAttributes;
             mlir::MLIRContext ctx;
             std::string errors;
+            Verbosity verbosity = verbose ? CO_VERB_ALL : CO_VERB_SILENT;
             llvm::raw_string_ostream errStream{errors};
 
             CompilerOptions options{.ctx = &ctx,
@@ -40,17 +42,24 @@ PYBIND11_MODULE(_catalystDriver, m)
                                     .workspace = workspace,
                                     .moduleName = moduleName,
                                     .diagnosticStream = errStream,
-                                    .keepIntermediate = keepIntermediate};
+                                    .keepIntermediate = keepIntermediate,
+                                    .verbosity = verbosity};
 
             if (mlir::failed(QuantumDriverMain(options, inferredAttributes))) {
                 throw std::runtime_error("Compilation failed:\n" + errors);
+            }
+            if (verbosity > CO_VERB_SILENT && !errors.empty()) {
+                // TODO: There must be warnings/debug messages. We need to print them to the correct
+                // stream.
+                std::cerr << errors;
             }
 
             return std::make_tuple(options.getObjectFile(), inferredAttributes.llvmir,
                                    inferredAttributes.functionName, inferredAttributes.returnType);
         },
         py::arg("source"), py::arg("workspace"), py::arg("module_name") = "jit source",
-        py::arg("infer_function_attrs") = false, py::arg("keep_intermediate") = false);
+        py::arg("infer_function_attrs") = false, py::arg("keep_intermediate") = false,
+        py::arg("verbose") = false);
 
     m.def(
         "mlir_run_pipeline",

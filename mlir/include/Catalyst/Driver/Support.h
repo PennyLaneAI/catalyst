@@ -19,22 +19,36 @@
 #include <filesystem>
 #include <string>
 
+#include "CompilerDriver.h"
+
 namespace catalyst {
 
 template <typename Obj>
-mlir::LogicalResult dumpToFile(mlir::StringRef directory, mlir::StringRef fileName, const Obj &obj,
-                               llvm::raw_ostream &errs = llvm::errs())
+mlir::LogicalResult dumpToFile(const CompilerOptions &options,
+                               mlir::StringRef fileName,
+                               const Obj &obj)
 {
     using std::filesystem::path;
     std::error_code errCode;
-    std::string outFileName = path(directory.str()) / path(fileName.str());
+    std::string outFileName = path(options.workspace.str()) / path(fileName.str());
+    if (options.verbosity >= CO_VERB_DEBUG) {
+        options.diagnosticStream << "DUMPING '" << outFileName << "'\n";
+    }
     llvm::raw_fd_ostream outfile{outFileName, errCode};
     if (errCode) {
-        errs << "unable to open file: " << errCode.message() << "\n";
+        if (options.verbosity >= CO_VERB_URGENT) {
+            options.diagnosticStream << "Unable to open file: " << errCode.message() << "\n";
+        }
         return mlir::failure();
     }
     outfile << obj;
     outfile.flush();
+    if (errCode) {
+        if (options.verbosity >= CO_VERB_URGENT) {
+            options.diagnosticStream << "Unable to write to file: " << errCode.message() << "\n";
+        }
+        return mlir::failure();
+    }
     return mlir::success();
 }
 } // namespace catalyst

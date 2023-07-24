@@ -37,6 +37,8 @@ struct FunctionAttributes {
     std::string llvmir;
 };
 
+typedef enum { CO_VERB_SILENT = 0, CO_VERB_URGENT = 1, CO_VERB_DEBUG = 2, CO_VERB_ALL = 3 } Verbosity;
+
 struct CompilerOptions {
     mlir::MLIRContext *ctx;
     /// The textual IR (MLIR or LLVM IR)
@@ -49,6 +51,8 @@ struct CompilerOptions {
     llvm::raw_ostream &diagnosticStream;
     /// If true, the driver will output the module at intermediate points.
     bool keepIntermediate;
+    /// Sets the verbosity level to use when printing messages.
+    Verbosity verbosity;
 
     /// Get the destination of the object file at the end of compilation.
     std::string getObjectFile() const

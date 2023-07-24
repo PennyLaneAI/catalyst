@@ -201,7 +201,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, FunctionAttribut
         }
 
         if (options.keepIntermediate) {
-            if (failed(catalyst::dumpToFile(options.workspace, "llvm_ir.ll", *llvmModule))) {
+            if (failed(catalyst::dumpToFile(options, "llvm_ir.ll", *llvmModule))) {
                 return failure();
             }
         }

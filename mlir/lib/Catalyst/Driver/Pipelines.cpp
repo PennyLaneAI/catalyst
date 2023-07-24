@@ -161,7 +161,7 @@ LogicalResult catalyst::runDefaultLowering(const CompilerOptions &options, Modul
                           .replace_extension(".mlir");
             pipelineIdx++;
         }
-        if (failed(catalyst::dumpToFile(options.workspace, outFile.value(), outStr))) {
+        if (failed(catalyst::dumpToFile(options, outFile.value(), outStr))) {
             return failure();
         }
         outStr.clear();

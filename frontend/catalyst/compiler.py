@@ -491,6 +491,7 @@ class Compiler:
                 module_name,
                 infer_function_attrs=True,
                 keep_intermediate=options.keep_intermediate,
+                verbose = options.verbose
             )
             output = CompilerDriver.run(filename, options=options)
             filename = str(pathlib.Path(output).absolute())
