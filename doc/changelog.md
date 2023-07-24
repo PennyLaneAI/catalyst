@@ -24,6 +24,8 @@
 
 * Eliminate redundant unflattening and flattening of PyTrees parameters in Catalyst control flow operations.
   [#215](https://github.com/PennyLaneAI/catalyst/pull/215)
+* Reduce execution and compilation times by using `-scalarize` and `-O0`.
+  [#217](https://github.com/PennyLaneAI/catalyst/pull/217)
 
 <h3>Breaking changes</h3>
 
@@ -37,6 +39,7 @@
 This release contains contributions from (in alphabetical order):
 
 David Ittah,
+Erick Ochoa Lopez,
 Sergei Mironov.
 
 
