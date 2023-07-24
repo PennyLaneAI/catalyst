@@ -126,6 +126,17 @@ class SharedObjectManager:
 
         return function, setup, teardown, mem_transfer
 
+    def __enter__(self):
+        params_to_setup = [b"jitted-function"]
+        argc = len(params_to_setup)
+        array_of_char_ptrs = (ctypes.c_char_p * len(params_to_setup))()
+        array_of_char_ptrs[:] = params_to_setup
+        self.setup(ctypes.c_int(argc), array_of_char_ptrs)
+        return self
+
+    def __exit__(self, type, value, traceback):
+        self.teardown()
+
 
 class TypeCompatibility(Enum):
     """Enum class for state machine.
@@ -254,24 +265,14 @@ class CompiledFunction:
             retval: the value computed by the function or None if the function has no return value
         """
 
-        params_to_setup = [b"jitted-function"]
-        argc = len(params_to_setup)
-        array_of_char_ptrs = (ctypes.c_char_p * len(params_to_setup))()
-        array_of_char_ptrs[:] = params_to_setup
+        with shared_object as lib:
+            result_desc = type(args[0].contents) if has_return else None
 
-        shared_object.setup(ctypes.c_int(argc), array_of_char_ptrs)
-        result_desc = type(args[0].contents) if has_return else None
-
-        retval = wrapper.wrap(
-            shared_object.function, args, result_desc, shared_object.mem_transfer, numpy_dict
-        )
-        if len(retval) == 0:
-            retval = None
-        elif len(retval) == 1:
-            retval = retval[0]
-
-        # Teardown has to be made after the return valued has been copied.
-        shared_object.teardown()
+            retval = wrapper.wrap(lib.function, args, result_desc, lib.mem_transfer, numpy_dict)
+            if len(retval) == 0:
+                retval = None
+            elif len(retval) == 1:
+                retval = retval[0]
 
         return retval
 
