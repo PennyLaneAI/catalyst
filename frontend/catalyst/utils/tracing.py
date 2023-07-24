@@ -35,13 +35,17 @@ class TracingContext:
         assert not TracingContext._is_tracing, "Cannot nest tracing contexts."
         TracingContext._is_tracing = True
         jax_version = jax.version.__version__
-        supported_version = TracingContext._supported_version
-        if jax_version != supported_version:
-            msg = f"Attempting to trace with JAX version {jax_version} when supported version is {supported_version}."
+        if not TracingContext.is_supported_jax_version(jax_version):
+            msg = f"Attempting to trace with JAX version {jax_version} when supported version is {TracingContext._supported_version}."
             warnings.warn(msg)
+        return self
 
     def __exit__(self, *args, **kwargs):
         TracingContext._is_tracing = False
+
+    @staticmethod
+    def is_supported_jax_version(version: str):
+        return version == TracingContext._supported_version
 
     @staticmethod
     def is_tracing():

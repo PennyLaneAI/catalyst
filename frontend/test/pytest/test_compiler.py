@@ -25,7 +25,6 @@ import warnings
 
 import pennylane as qml
 import pytest
-
 from catalyst import qjit
 from catalyst.compiler import (
     BufferizationPass,
@@ -42,6 +41,8 @@ from catalyst.compiler import (
 )
 from catalyst.jax_tracer import get_mlir
 from catalyst.utils.exceptions import CompileError
+from catalyst.utils.patching import Patcher
+from catalyst.utils.tracing import TracingContext
 
 # pylint: disable=missing-function-docstring
 
@@ -97,6 +98,13 @@ class TestCompilerWarnings:
         with pytest.warns(UserWarning, match="Compiler .* failed .*"):
             # pylint: disable=protected-access
             CompilerDriver._attempt_link("cc", [""], "in.o", "out.so", None)
+
+    def test_incompatible_jax_version(self):
+        """Test warning message with incompatible jax version."""
+        with Patcher((TracingContext, "is_supported_jax_version", lambda x: False)):
+            with pytest.warns(UserWarning, match="Attempting to trace with JAX version"):
+                with TracingContext():
+                    pass
 
 
 class TestCompilerErrors:
