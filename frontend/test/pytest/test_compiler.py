@@ -25,6 +25,7 @@ import warnings
 
 import pennylane as qml
 import pytest
+
 from catalyst import qjit
 from catalyst.compiler import (
     BufferizationPass,
@@ -101,7 +102,7 @@ class TestCompilerWarnings:
 
     def test_incompatible_jax_version(self):
         """Test warning message with incompatible jax version."""
-        with Patcher((TracingContext, "is_supported_jax_version", lambda x: False)):
+        with Patcher((TracingContext, "is_supported_jax_version", lambda: False)):
             with pytest.warns(UserWarning, match="Attempting to trace with JAX version"):
                 with TracingContext():
                     pass

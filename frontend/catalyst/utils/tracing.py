@@ -19,6 +19,7 @@ Tracing module.
 import warnings
 
 import jax
+
 from catalyst.utils.exceptions import CompileError
 
 
@@ -32,20 +33,22 @@ class TracingContext:
     _supported_version = "0.4.13"
 
     def __enter__(self):
+        if not TracingContext.is_supported_jax_version():
+            jax_version = jax.version.__version__
+            msg = f"Attempting to trace with JAX version {jax_version}"
+            msg += f" when supported version is {TracingContext._supported_version}."
+            warnings.warn(msg)
         assert not TracingContext._is_tracing, "Cannot nest tracing contexts."
         TracingContext._is_tracing = True
-        jax_version = jax.version.__version__
-        if not TracingContext.is_supported_jax_version(jax_version):
-            msg = f"Attempting to trace with JAX version {jax_version} when supported version is {TracingContext._supported_version}."
-            warnings.warn(msg)
         return self
 
-    def __exit__(self, *args, **kwargs):
+    def __exit__(self, _type, _value, _traceback):
         TracingContext._is_tracing = False
 
     @staticmethod
-    def is_supported_jax_version(version: str):
-        return version == TracingContext._supported_version
+    def is_supported_jax_version():
+        """Returns true if JAXs version string is supported."""
+        return jax.version.__version__ == TracingContext._supported_version
 
     @staticmethod
     def is_tracing():
