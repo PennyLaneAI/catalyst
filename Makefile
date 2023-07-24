@@ -97,7 +97,6 @@ wheel:
 	cp --dereference $(LLVM_BUILD_DIR)/lib/libmlir_c_runner_utils.so* $(MK_DIR)/frontend/catalyst/lib
 	# Copy enzyme to frontend
 	cp --dereference $(ENZYME_BUILD_DIR)/Enzyme/LLVMEnzyme-17.so $(MK_DIR)/frontend/catalyst/lib
-	# Copy mlir bindings to frontend/mlir_quantum
 	find $(MK_DIR)/frontend -type d -name __pycache__ -exec rm -rf {} +
 
 	$(PYTHON) $(MK_DIR)/setup.py bdist_wheel
