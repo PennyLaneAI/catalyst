@@ -18,9 +18,9 @@ compiling of hybrid quantum-classical functions using Catalyst.
 import ctypes
 import functools
 import inspect
+import pathlib
 import typing
 import warnings
-import pathlib
 
 import jax
 import jax.numpy as jnp

@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <iostream>
 #include "Catalyst/Driver/CompilerDriver.h"
 #include "mlir/Bindings/Python/PybindAdaptors.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "llvm/Support/raw_ostream.h"
+#include <iostream>
 
 namespace py = pybind11;
 using namespace mlir::python::adaptors;
@@ -49,8 +49,8 @@ PYBIND11_MODULE(_catalystDriver, m)
                 throw std::runtime_error("Compilation failed:\n" + errors);
             }
             if (verbosity > CO_VERB_SILENT && !errors.empty()) {
-                // TODO: There must be warnings/debug messages. We need to print them to the correct
-                // stream.
+                // TODO: There must be warnings/debug messages. We might need to print them to the
+                // correct stream rather than to the cerr.
                 std::cerr << errors;
             }
 

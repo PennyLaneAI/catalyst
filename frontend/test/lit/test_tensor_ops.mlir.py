@@ -19,6 +19,18 @@ from jax import numpy as jnp
 
 from catalyst import measure, qjit
 
+# TODO: Update these tests to use the C++ compiler driver
+# The C++ driver is missing the `print_stage` functionality
+from catalyst.compiler import (
+    BufferizationPass,
+    CompilerDriver,
+    LLVMDialectToLLVMIR,
+    LLVMIRToObjectFile,
+    MHLOPass,
+    MLIRToLLVMDialect,
+    QuantumCompilationPass,
+)
+
 # Test methodology:
 # Each mathematical function found in numpy
 #   https://numpy.org/doc/stable/reference/routines.math.html
@@ -29,17 +41,6 @@ from catalyst import measure, qjit
 # perhaps they rely on another function?
 # jnp.hypot
 
-# TODO: Update these tests to use the C++ compiler driver
-# The C++ driver is missing the `print_stage` functionality
-from catalyst.compiler import (
-    MHLOPass,
-    QuantumCompilationPass,
-    BufferizationPass,
-    MLIRToLLVMDialect,
-    LLVMDialectToLLVMIR,
-    LLVMIRToObjectFile,
-    CompilerDriver,
-)
 
 pipelines = [
     MHLOPass,

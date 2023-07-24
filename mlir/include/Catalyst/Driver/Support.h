@@ -24,8 +24,7 @@
 namespace catalyst {
 
 template <typename Obj>
-mlir::LogicalResult dumpToFile(const CompilerOptions &options,
-                               mlir::StringRef fileName,
+mlir::LogicalResult dumpToFile(const CompilerOptions &options, mlir::StringRef fileName,
                                const Obj &obj)
 {
     using std::filesystem::path;

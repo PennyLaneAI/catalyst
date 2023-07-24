@@ -37,7 +37,15 @@ struct FunctionAttributes {
     std::string llvmir;
 };
 
-typedef enum { CO_VERB_SILENT = 0, CO_VERB_URGENT = 1, CO_VERB_DEBUG = 2, CO_VERB_ALL = 3 } Verbosity;
+/// Verbosity level
+// TODO: Adjust the number of levels according to our needs. MLIR seems to print few really
+// low-level messages we might want to hide.
+typedef enum {
+    CO_VERB_SILENT = 0,
+    CO_VERB_URGENT = 1,
+    CO_VERB_DEBUG = 2,
+    CO_VERB_ALL = 3
+} Verbosity;
 
 struct CompilerOptions {
     mlir::MLIRContext *ctx;

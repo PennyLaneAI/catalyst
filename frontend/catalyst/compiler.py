@@ -27,10 +27,10 @@ from dataclasses import dataclass
 from io import TextIOWrapper
 from typing import Any, List, Optional
 
+from mlir_quantum._mlir_libs._catalystDriver import compile_asm
+
 from catalyst._configuration import INSTALLED
 from catalyst.utils.exceptions import CompileError
-
-from mlir_quantum._mlir_libs._catalystDriver import compile_asm
 
 package_root = os.path.dirname(__file__)
 
@@ -491,7 +491,7 @@ class Compiler:
                 module_name,
                 infer_function_attrs=True,
                 keep_intermediate=options.keep_intermediate,
-                verbose = options.verbose
+                verbose=options.verbose,
             )
             output = CompilerDriver.run(filename, options=options)
             filename = str(pathlib.Path(output).absolute())
