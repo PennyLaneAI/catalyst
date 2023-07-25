@@ -45,13 +45,12 @@ PYBIND11_MODULE(_catalystDriver, m)
                                     .keepIntermediate = keepIntermediate,
                                     .verbosity = verbosity};
 
+
             if (mlir::failed(QuantumDriverMain(options, inferredAttributes))) {
                 throw std::runtime_error("Compilation failed:\n" + errors);
             }
             if (verbosity > CO_VERB_SILENT && !errors.empty()) {
-                // TODO: There must be warnings/debug messages. We might need to print them to the
-                // correct stream rather than to the cerr.
-                std::cerr << errors;
+                py::print(errors);
             }
 
             return std::make_tuple(options.getObjectFile(), inferredAttributes.llvmir,
