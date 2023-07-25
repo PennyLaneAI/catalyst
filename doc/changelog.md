@@ -34,7 +34,9 @@
   inputs.
   [#213](https://github.com/PennyLaneAI/catalyst/pull/213)
 
-
+* Improve compilation speed of EmitCatalystPyInterface by changing it from greedy pattern
+  to partial conversion
+  [#219](https://github.com/PennyLaneAI/catalyst/pull/219)
 
 <h3>Breaking changes</h3>
 
