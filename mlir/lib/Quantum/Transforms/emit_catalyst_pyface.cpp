@@ -166,6 +166,7 @@ void EmitCatalystPyInterfaceTransform::rewrite(LLVM::LLVMFuncOp op, PatternRewri
     const char *symNameStr = symName.data();
     const char *functionNameWithoutPrefix = symNameStr + _mlir_ciface_len;
     auto newName = llvm::formatv("_catalyst_ciface_{0}", functionNameWithoutPrefix).str();
+    rewriter.updateRootInPlace(op, [&] { op.setSymName(newName); });
 
     wrapResultsAndArgsInTwoStructs(op, rewriter, functionNameWithoutPrefix);
 }
@@ -187,7 +188,12 @@ struct EmitCatalystPyInterfacePass
         RewritePatternSet patterns(context);
         patterns.add<EmitCatalystPyInterfaceTransform>(context);
 
-        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
+        ConversionTarget target(getContext());
+        target.addLegalDialect<LLVM::LLVMDialect>();
+        target.addDynamicallyLegalOp<LLVM::LLVMFuncOp>(
+            [&](LLVM::LLVMFuncOp op) { return !isTransformCandidate(op); });
+
+        if (failed(applyPartialConversion(getOperation(), target, std::move(patterns)))) {
             signalPassFailure();
         }
     }

@@ -17,6 +17,7 @@
 llvm.func @foo() -> () attributes {llvm.emit_c_interface} 
 
 // Test name change
+// CHECK-LABEL: @_catalyst_ciface_foo
 llvm.func @_mlir_ciface_foo() {
     llvm.call @foo() : () -> ()
     llvm.return
@@ -70,7 +71,7 @@ llvm.func @_mlir_ciface_foo(%arg0: !llvm.ptr<struct<(ptr<struct<(f64, f64)>>, pt
 llvm.func @foo(%arg0: !llvm.ptr<f64>, %arg1: !llvm.ptr<f64>, %arg2: i64, %arg3: !llvm.ptr<f64>, %arg4: !llvm.ptr<f64>, %arg5: i64) -> !llvm.struct<(ptr<struct<(f64, f64)>>, ptr<struct<(f64, f64)>>, i64, array<1 x i64>, array<1 x i64>)> attributes {llvm.emit_c_interface} 
 
 // Test that the return argument is passed without modification to the wrapped function
-// CHECK-LABEL: llvm.call @_mlir_ciface_foo(%arg0
+// CHECK-LABEL: llvm.call @_catalyst_ciface_foo(%arg0
 
 llvm.func @_mlir_ciface_foo(%arg0: !llvm.ptr<struct<(ptr<struct<(f64, f64)>>, ptr<struct<(f64, f64)>>, i64, array<1 x i64>, array<1 x i64>)>>, %arg1: !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64)>>, %arg2: !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64)>>) {
     %0 = llvm.load %arg1 : !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64)>>
@@ -116,7 +117,7 @@ llvm.func @foo(%arg0: !llvm.ptr<f64>, %arg1: !llvm.ptr<f64>, %arg2: i64, %arg3: 
 // CHECK:    [[var0:%.+]] = llvm.load %arg1
 // CHECK:    [[var1:%.+]] = llvm.extractvalue [[var0]][0]
 // CHECK:    [[var2:%.+]] = llvm.extractvalue [[var0]][1]
-// CHECK:    llvm.call @_mlir_ciface_foo([[var1]], [[var2]])
+// CHECK:    llvm.call @_catalyst_ciface_foo([[var1]], [[var2]])
 
 llvm.func @_mlir_ciface_foo(%arg0: !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64)>>, %arg1: !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64)>>) {
     %0 = llvm.load %arg0 : !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64)>>
@@ -157,7 +158,7 @@ llvm.func @foo(%arg0: !llvm.ptr<f64>, %arg1: !llvm.ptr<f64>, %arg2: i64) -> () a
 // CHECK-LABEL: llvm.func @_catalyst_pyface_foo
 // CHECK:    [[var0:%.+]] = llvm.load %arg1
 // CHECK:    [[var1:%.+]] = llvm.extractvalue [[var0]][0]
-// CHECK:    llvm.call @_mlir_ciface_foo([[var1]])
+// CHECK:    llvm.call @_catalyst_ciface_foo([[var1]])
 
 llvm.func @_mlir_ciface_foo(%arg0: !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64)>>) {
     %0 = llvm.load %arg0 : !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64)>>
