@@ -75,9 +75,44 @@ func::FuncOp genQNodeWithParams(PatternRewriter &rewriter, Location loc, func::F
     modifiedCallee.setPrivate();
     rewriter.cloneRegionBefore(qnode.getBody(), modifiedCallee.getBody(), modifiedCallee.end());
     Block &entryBlock = modifiedCallee.getFunctionBody().front();
-    entryBlock.addArgument(paramsTensorType, loc);
+    BlockArgument paramsTensor = entryBlock.addArgument(paramsTensorType, loc);
 
-    // This is the point where we can remove the classical preprocessing as a later optimization.
+    PatternRewriter::InsertionGuard insertionGuard(rewriter);
+    rewriter.setInsertionPointToStart(&modifiedCallee.getFunctionBody().front());
+
+    MemRefType paramsProcessedType = MemRefType::get({}, rewriter.getIndexType());
+    Value paramCounter = rewriter.create<memref::AllocaOp>(loc, paramsProcessedType);
+    Value cZero = rewriter.create<index::ConstantOp>(loc, 0);
+    rewriter.create<memref::StoreOp>(loc, cZero, paramCounter);
+    Value cOne = rewriter.create<index::ConstantOp>(loc, 1);
+
+    auto loadThenIncrementCounter = [&](OpBuilder &builder, Value counter,
+                                        Value paramTensor) -> Value {
+        Value index = builder.create<memref::LoadOp>(loc, counter);
+        Value nextIndex = builder.create<index::AddOp>(loc, index, cOne);
+        builder.create<memref::StoreOp>(loc, nextIndex, counter);
+        return builder.create<tensor::ExtractOp>(loc, paramTensor, index);
+    };
+
+    modifiedCallee.walk([&](Operation *op) {
+        if (auto gateOp = dyn_cast<quantum::DifferentiableGate>(op)) {
+            OpBuilder::InsertionGuard insertGuard(rewriter);
+            rewriter.setInsertionPoint(gateOp);
+
+            ValueRange diffParams = gateOp.getDiffParams();
+            SmallVector<Value> newParams{diffParams.size()};
+            for (const auto [paramIdx, recomputedParam] : llvm::enumerate(diffParams)) {
+                newParams[paramIdx] =
+                    loadThenIncrementCounter(rewriter, paramCounter, paramsTensor);
+            }
+            MutableOperandRange range{gateOp, static_cast<unsigned>(gateOp.getDiffOperandIdx()),
+                                      static_cast<unsigned>(diffParams.size())};
+            range.assign(newParams);
+        }
+    });
+
+    // This function is the point where we can remove the classical preprocessing as a later
+    // optimization.
     return modifiedCallee;
 }
 
@@ -227,6 +262,9 @@ void ParameterShiftLowering::rewrite(GradOp op, PatternRewriter &rewriter) const
         // Generate the quantum gradient function at the tensor level, then register it as an
         // attribute.
         qnodeWithParams->setAttr("gradient.qgrad", FlatSymbolRefAttr::get(qGradFn.getNameAttr()));
+        // Enzyme will fail if this function gets inlined.
+        qnodeWithParams->setAttr("passthrough",
+                                 rewriter.getArrayAttr(rewriter.getStringAttr("noinline")));
     }
 
     // Generate the full gradient function, computing the partial derivates with respect to the
