@@ -27,23 +27,24 @@ namespace {
 
 std::optional<LLVM::LLVMFuncOp> getCallee(LLVM::LLVMFuncOp op)
 {
-    size_t counter = 0;
     std::optional<LLVM::LLVMFuncOp> callee = std::nullopt;
     op.walk([&](LLVM::CallOp callOp) {
         auto calleeAttr = callOp.getCalleeAttr();
-        // calleeAttr is optional in case of function pointers.
-        if (!calleeAttr)
-            return;
-
-        counter++;
-        callee = SymbolTable::lookupNearestSymbolFrom<LLVM::LLVMFuncOp>(op, calleeAttr);
+        if (calleeAttr)
+            callee = SymbolTable::lookupNearestSymbolFrom<LLVM::LLVMFuncOp>(op, calleeAttr);
+        return WalkResult::interrupt();
     });
-    return counter == 1 ? callee : std::nullopt;
+    return callee;
 }
 
 bool hasCWrapperAttribute(LLVM::LLVMFuncOp op)
 {
     return (bool)(op->getAttrOfType<UnitAttr>(LLVM::LLVMDialect::getEmitCWrapperAttrName()));
+}
+
+bool hasCatalystWrapperAttribute(LLVM::LLVMFuncOp op)
+{
+    return (bool)(op->getAttrOfType<UnitAttr>("catalyst.pyface"));
 }
 
 bool hasCalleeCWrapperAttribute(LLVM::LLVMFuncOp op)
