@@ -47,36 +47,12 @@ bool hasCatalystWrapperAttribute(LLVM::LLVMFuncOp op)
     return (bool)(op->getAttrOfType<UnitAttr>("catalyst.pyface"));
 }
 
-bool hasCalleeCWrapperAttribute(LLVM::LLVMFuncOp op)
+bool isTransformCandidate(LLVM::LLVMFuncOp op)
 {
     std::optional<LLVM::LLVMFuncOp> callee = getCallee(op);
     if (!callee)
         return false;
-    return hasCWrapperAttribute(callee.value());
-}
-
-bool matchesNamingConvention(LLVM::LLVMFuncOp op)
-{
-    std::string _mlir_ciface = "_mlir_ciface_";
-    size_t _mlir_ciface_len = _mlir_ciface.length();
-    auto symName = op.getSymName();
-    const char *symNameStr = symName.data();
-    size_t symNameLength = strlen(symNameStr);
-    // Filter based on name.
-    if (symNameLength <= _mlir_ciface_len)
-        return false;
-
-    bool nameMatches = 0 == strncmp(symNameStr, _mlir_ciface.c_str(), _mlir_ciface_len);
-    return nameMatches;
-}
-
-bool isFunctionMLIRCWrapper(LLVM::LLVMFuncOp op)
-{
-    if (!matchesNamingConvention(op))
-        return false;
-    if (!hasCalleeCWrapperAttribute(op))
-        return false;
-    return true;
+    return hasCWrapperAttribute(callee.value()) && !hasCatalystWrapperAttribute(callee.value());
 }
 
 bool functionHasReturns(LLVM::LLVMFuncOp op)
@@ -128,6 +104,7 @@ void wrapResultsAndArgsInTwoStructs(LLVM::LLVMFuncOp op, PatternRewriter &rewrit
 {
     // Guaranteed by match
     LLVM::LLVMFuncOp callee = getCallee(op).value();
+    callee->setAttr("catalyst.pyface", rewriter.getUnitAttr());
     bool hasReturns = functionHasReturns(callee);
     bool hasInputs = functionHasInputs(callee);
 
@@ -177,7 +154,7 @@ struct EmitCatalystPyInterfaceTransform : public OpRewritePattern<LLVM::LLVMFunc
 
 LogicalResult EmitCatalystPyInterfaceTransform::match(LLVM::LLVMFuncOp op) const
 {
-    return isFunctionMLIRCWrapper(op) ? success() : failure();
+    return isTransformCandidate(op) ? success() : failure();
 }
 
 void EmitCatalystPyInterfaceTransform::rewrite(LLVM::LLVMFuncOp op, PatternRewriter &rewriter) const
@@ -190,7 +167,6 @@ void EmitCatalystPyInterfaceTransform::rewrite(LLVM::LLVMFuncOp op, PatternRewri
     const char *functionNameWithoutPrefix = symNameStr + _mlir_ciface_len;
     auto newName = llvm::formatv("_catalyst_ciface_{0}", functionNameWithoutPrefix).str();
 
-    rewriter.updateRootInPlace(op, [&] { op.setSymName(newName); });
     wrapResultsAndArgsInTwoStructs(op, rewriter, functionNameWithoutPrefix);
 }
 
