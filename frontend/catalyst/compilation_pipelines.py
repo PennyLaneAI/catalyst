@@ -20,6 +20,7 @@ import functools
 import inspect
 import typing
 import warnings
+from enum import Enum
 
 import jax
 import jax.numpy as jnp
@@ -68,6 +69,87 @@ def get_type_annotations(func: typing.Callable):
     return None
 
 
+class SharedObjectManager:
+    """Shared object manager.
+
+    Manages the life time of the shared object. When is it loaded, when to close it.
+
+    Args:
+        shared_object_file: path to shared object containing compiled function
+        func_name: name of compiled function
+    """
+
+    def __init__(self, shared_object_file, func_name):
+        self.shared_object = ctypes.CDLL(shared_object_file)
+        self.function, self.setup, self.teardown, self.mem_transfer = self.load_symbols(func_name)
+
+    def close(self):
+        """Close the shared object"""
+        self.function = None
+        self.setup = None
+        self.teardown = None
+        self.mem_transfer = None
+        dlclose = ctypes.CDLL(None).dlclose
+        dlclose.argtypes = [ctypes.c_void_p]
+        # pylint: disable=protected-access
+        dlclose(self.shared_object._handle)
+
+    def load_symbols(self, func_name):
+        """Load symbols necessary for for execution of the compiled function.
+
+        Args:
+            func_name: name of compiled function to be executed
+
+        Returns:
+            function: function handle
+            setup: handle to the setup function, which initializes the device
+            teardown: handle to the teardown function, which tears down the device
+            mem_transfer: memory transfer shared object
+        """
+
+        setup = self.shared_object.setup
+        setup.argtypes = [ctypes.c_int, ctypes.POINTER(ctypes.c_char_p)]
+        setup.restypes = ctypes.c_int
+
+        teardown = self.shared_object.teardown
+        teardown.argtypes = None
+        teardown.restypes = None
+
+        # We are calling the c-interface
+        function = self.shared_object["_catalyst_pyface_" + func_name]
+        # Guaranteed from _mlir_ciface specification
+        function.restypes = None
+        # Not needed, computed from the arguments.
+        # function.argyptes
+
+        mem_transfer = self.shared_object["_mlir_memory_transfer"]
+
+        return function, setup, teardown, mem_transfer
+
+    def __enter__(self):
+        params_to_setup = [b"jitted-function"]
+        argc = len(params_to_setup)
+        array_of_char_ptrs = (ctypes.c_char_p * len(params_to_setup))()
+        array_of_char_ptrs[:] = params_to_setup
+        self.setup(ctypes.c_int(argc), array_of_char_ptrs)
+        return self
+
+    def __exit__(self, _type, _value, _traceback):
+        self.teardown()
+
+
+class TypeCompatibility(Enum):
+    """Enum class for state machine.
+
+    The state represent the transition between states.
+    """
+
+    UNKNOWN = 0
+    CAN_SKIP_PROMOTION = 1
+    NEEDS_PROMOTION = 2
+    NEEDS_COMPILATION = 3
+
+
 class CompiledFunction:
     """CompiledFunction, represents a Compiled Function.
 
@@ -83,13 +165,13 @@ class CompiledFunction:
         func_name,
         restype,
     ):
-        self.shared_object_file = shared_object_file
-        assert func_name  # make sure that func_name is not false-y
+        self.shared_object = SharedObjectManager(shared_object_file, func_name)
+        self.return_type_c_abi = None
         self.func_name = func_name
         self.restype = restype
 
     @staticmethod
-    def can_promote(compiled_signature, runtime_signature):
+    def typecheck(compiled_signature, runtime_signature):
         """Whether arguments can be promoted.
 
         Args:
@@ -103,15 +185,21 @@ class CompiledFunction:
         len_compile = len(compiled_signature)
         len_runtime = len(runtime_signature)
         if len_compile != len_runtime:
-            return False
+            return TypeCompatibility.NEEDS_COMPILATION
 
+        best_case = TypeCompatibility.CAN_SKIP_PROMOTION
         for c_param, r_param in zip(compiled_signature, runtime_signature):
-            assert isinstance(c_param, jax.core.ShapedArray)
-            assert isinstance(r_param, jax.core.ShapedArray)
+            if c_param.dtype != r_param.dtype:
+                best_case = TypeCompatibility.NEEDS_PROMOTION
+
+            if c_param.shape != r_param.shape:
+                return TypeCompatibility.NEEDS_COMPILATION
+
             promote_to = jax.numpy.promote_types(r_param.dtype, c_param.dtype)
-            if c_param.dtype != promote_to or c_param.shape != r_param.shape:
-                return False
-        return True
+            if c_param.dtype != promote_to:
+                return TypeCompatibility.NEEDS_COMPILATION
+
+        return best_case
 
     @staticmethod
     def promote_arguments(compiled_signature, runtime_signature, *args):
@@ -145,42 +233,6 @@ class CompiledFunction:
         return promoted_args
 
     @staticmethod
-    def load_symbols(shared_object_file, func_name):
-        """Load symbols necessary for for execution of the compiled function.
-
-        Args:
-            shared_object_file: path to shared object file
-            func_name: name of compiled function to be executed
-
-        Returns:
-            shared_object: in memory shared object
-            function: function handle
-            setup: handle to the setup function, which initializes the device
-            teardown: handle to the teardown function, which tears down the device
-            mem_transfer: memory transfer shared object
-        """
-        shared_object = ctypes.CDLL(shared_object_file)
-
-        setup = shared_object.setup
-        setup.argtypes = [ctypes.c_int, ctypes.POINTER(ctypes.c_char_p)]
-        setup.restypes = ctypes.c_int
-
-        teardown = shared_object.teardown
-        teardown.argtypes = None
-        teardown.restypes = None
-
-        # We are calling the c-interface
-        function = shared_object["_catalyst_pyface_" + func_name]
-        # Guaranteed from _mlir_ciface specification
-        function.restypes = None
-        # Not needed, computed from the arguments.
-        # function.argyptes
-
-        mem_transfer = shared_object["_mlir_memory_transfer"]
-
-        return shared_object, function, setup, teardown, mem_transfer
-
-    @staticmethod
     def get_runtime_signature(*args):
         """Get signature from arguments.
 
@@ -200,12 +252,11 @@ class CompiledFunction:
             raise TypeError(f"Unsupported argument type: {arg_type}") from exc
 
     @staticmethod
-    def _exec(shared_object_file, func_name, has_return, numpy_dict, *args):
+    def _exec(shared_object, has_return, numpy_dict, *args):
         """Execute the compiled function with arguments ``*args``.
 
         Args:
-            shared_object_file: path to the shared object file containing the JIT compiled function
-            func_name: name of compiled function to be executed
+            lib: Shared object
             has_return: whether the function returns a value or not
             numpy_dict: dictionary of numpy arrays of buffers from the runtime
             *args: arguments to the function
@@ -214,36 +265,14 @@ class CompiledFunction:
             retval: the value computed by the function or None if the function has no return value
         """
 
-        shared_object, function, setup, teardown, mem_transfer = CompiledFunction.load_symbols(
-            shared_object_file, func_name
-        )
+        with shared_object as lib:
+            result_desc = type(args[0].contents) if has_return else None
 
-        params_to_setup = [b"jitted-function"]
-        argc = len(params_to_setup)
-        array_of_char_ptrs = (ctypes.c_char_p * len(params_to_setup))()
-        array_of_char_ptrs[:] = params_to_setup
-
-        setup(ctypes.c_int(argc), array_of_char_ptrs)
-        result_desc = type(args[0].contents) if has_return else None
-
-        retval = wrapper.wrap(function, args, result_desc, mem_transfer, numpy_dict)
-        if len(retval) == 0:
-            retval = None
-        elif len(retval) == 1:
-            retval = retval[0]
-
-        # Teardown has to be made after the return valued has been copied.
-        teardown()
-
-        # Unmap the shared library. This is necessary in case the function is re-compiled.
-        # Without unmapping the shared library, there would be a conflict in the name of
-        # the function and the previous one would succeed.
-        # Need to close after obtaining value, since the value can point to memory in the shared
-        # object. This is in the case of returning a constant, for example.
-        dlclose = ctypes.CDLL(None).dlclose
-        dlclose.argtypes = [ctypes.c_void_p]
-        # pylint: disable=protected-access
-        dlclose(shared_object._handle)
+            retval = wrapper.wrap(lib.function, args, result_desc, lib.mem_transfer, numpy_dict)
+            if len(retval) == 0:
+                retval = None
+            elif len(retval) == 1:
+                retval = retval[0]
 
         return retval
 
@@ -289,16 +318,20 @@ class CompiledFunction:
         shape = ir.RankedTensorType(mlir_tensor_type).shape
         return len(shape) if shape else 0
 
-    @staticmethod
-    def restype_to_memref_descs(mlir_tensor_types):
-        """Converts the return type to a compatible type for the expected ABI.
+    def getCompiledReturnValueType(self, mlir_tensor_types):
+        """Compute the type for the return value and memoize it
 
+        This type does not need to be recomputed as it is generated once per compiled function.
         Args:
             mlir_tensor_types: a list of MLIR tensor types which match the expected return type
         Returns:
             a pointer to a CompiledFunctionReturnValue, which corresponds to a structure in which
             fields match the expected return types
         """
+
+        if self.return_type_c_abi is not None:
+            return self.return_type_c_abi
+
         error_msg = """This function must be called with a non-zero length list as an argument."""
         assert mlir_tensor_types, error_msg
         _get_rmd = CompiledFunction.get_ranked_memref_descriptor_from_mlir_tensor_type
@@ -325,10 +358,21 @@ class CompiledFunction:
 
         return_value = CompiledFunctionReturnValue()
         return_value_pointer = ctypes.pointer(return_value)
-        return return_value_pointer
+        self.return_type_c_abi = return_value_pointer
+        return self.return_type_c_abi
 
-    @staticmethod
-    def args_to_memref_descs(restype, args):
+    def restype_to_memref_descs(self, mlir_tensor_types):
+        """Converts the return type to a compatible type for the expected ABI.
+
+        Args:
+            mlir_tensor_types: a list of MLIR tensor types which match the expected return type
+        Returns:
+            a pointer to a CompiledFunctionReturnValue, which corresponds to a structure in which
+            fields match the expected return types
+        """
+        return self.getCompiledReturnValueType(mlir_tensor_types)
+
+    def args_to_memref_descs(self, restype, args):
         """Convert ``args`` to memref descriptors.
 
         Besides converting the arguments to memrefs, it also prepares the return value. To respect
@@ -349,7 +393,7 @@ class CompiledFunction:
         return_value_pointer = ctypes.POINTER(ctypes.c_int)()  # This is the null pointer
 
         if restype:
-            return_value_pointer = CompiledFunction.restype_to_memref_descs(restype)
+            return_value_pointer = self.restype_to_memref_descs(restype)
 
         c_abi_args = []
 
@@ -380,18 +424,17 @@ class CompiledFunction:
 
     def get_cmain(self, *args):
         """Get a string representing a C program that can be linked against the shared object."""
-        _, buffer = CompiledFunction.args_to_memref_descs(self.restype, args)
+        _, buffer = self.args_to_memref_descs(self.restype, args)
 
         return get_template(self.func_name, self.restype, *buffer)
 
     def __call__(self, *args, **kwargs):
-        abi_args, _buffer = CompiledFunction.args_to_memref_descs(self.restype, args)
+        abi_args, _buffer = self.args_to_memref_descs(self.restype, args)
 
         numpy_dict = {nparr.ctypes.data: nparr for nparr in _buffer}
 
         result = CompiledFunction._exec(
-            self.shared_object_file,
-            self.func_name,
+            self.shared_object,
             self.restype,
             numpy_dict,
             *abi_args,
@@ -492,6 +535,8 @@ class QJIT:
         # This will make a check before sending it to the compiler that the return type
         # is actually available in most systems. f16 needs a special symbol and linking
         # will fail if it is not available.
+        if self.compiled_function and self.compiled_function.shared_object:
+            self.compiled_function.shared_object.close()
         restype = self.mlir_module.body.operations[0].type.results
         for res in restype:
             baseType = ir.RankedTensorType(res).element_type
@@ -522,21 +567,33 @@ class QJIT:
           function: an instance of ``CompiledFunction`` that may have been recompiled
           *args: arguments that may have been promoted
         """
-        args = [jax.numpy.array(arg) for arg in args]
+        bitmask = map(lambda x: not isinstance(x, jax.Array), args)
+        args = list(
+            map(
+                lambda arg, is_not_jax_array: jax.numpy.asarray(arg) if is_not_jax_array else arg,
+                args,
+                bitmask,
+            )
+        )
         r_sig = CompiledFunction.get_runtime_signature(*args)
-        is_prev_compile = self.compiled_function is not None
-        can_promote = not is_prev_compile or CompiledFunction.can_promote(self.c_sig, r_sig)
-        needs_compile = not is_prev_compile or not can_promote
 
-        if needs_compile:
+        has_been_compiled = self.compiled_function is not None
+        next_action = TypeCompatibility.UNKNOWN
+        if not has_been_compiled:
+            next_action = TypeCompatibility.NEEDS_COMPILATION
+        else:
+            next_action = CompiledFunction.typecheck(self.c_sig, r_sig)
+
+        if next_action == TypeCompatibility.NEEDS_PROMOTION:
+            args = CompiledFunction.promote_arguments(self.c_sig, r_sig, *args)
+        elif next_action == TypeCompatibility.NEEDS_COMPILATION:
             if self.user_typed:
                 msg = "Provided arguments did not match declared signature, recompiling..."
                 warnings.warn(msg, UserWarning)
             self.mlir_module = self.get_mlir(*r_sig)
             function = self.compile()
         else:
-            args = CompiledFunction.promote_arguments(self.c_sig, r_sig, *args)
-        args = [jax.numpy.array(arg) for arg in args]
+            assert next_action == TypeCompatibility.CAN_SKIP_PROMOTION
 
         return function, args
 

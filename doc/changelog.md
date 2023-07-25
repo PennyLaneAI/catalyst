@@ -25,6 +25,17 @@
 * Eliminate redundant unflattening and flattening of PyTrees parameters in Catalyst control flow operations.
   [#215](https://github.com/PennyLaneAI/catalyst/pull/215)
 
+* Improve execution speed by:
+    * load the shared library once per compilation
+    * generate return value type only once per compilation
+    * avoiding type promotion
+    * avoiding unnecessary copies
+  This leads to a small but measurable improvement when using larger matrices as inputs or many
+  inputs.
+  [#213](https://github.com/PennyLaneAI/catalyst/pull/213)
+
+
+
 <h3>Breaking changes</h3>
 
 <h3>Bug fixes</h3>
@@ -37,6 +48,7 @@
 This release contains contributions from (in alphabetical order):
 
 David Ittah,
+Erick Ochoa Lopez,
 Sergei Mironov.
 
 
