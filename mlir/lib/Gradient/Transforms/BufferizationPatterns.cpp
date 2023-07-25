@@ -110,8 +110,13 @@ class BufferizeBackpropOp : public OpConversionPattern<BackpropOp> {
             argShadows.push_back(rewriter.create<memref::AllocOp>(loc, cast<MemRefType>(resType)));
         }
 
+        Value one =
+            rewriter.create<arith::ConstantFloatOp>(loc, APFloat(1.0), rewriter.getF64Type());
+        Value c0 = rewriter.create<arith::ConstantIndexOp>(loc, 0);
         for (Type outType : outTypes) {
-            outShadows.push_back(rewriter.create<memref::AllocOp>(loc, cast<MemRefType>(outType)));
+            Value outShadow = rewriter.create<memref::AllocOp>(loc, cast<MemRefType>(outType));
+            rewriter.create<memref::StoreOp>(loc, one, outShadow, c0);
+            outShadows.push_back(outShadow);
         }
 
         rewriter.create<BackpropOp>(loc, TypeRange{}, op.getCalleeAttr(), adaptor.getArgs(),

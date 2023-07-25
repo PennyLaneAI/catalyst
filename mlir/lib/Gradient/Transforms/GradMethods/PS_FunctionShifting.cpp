@@ -62,14 +62,15 @@ func::FuncOp ParameterShiftLowering::genShiftFunction(PatternRewriter &rewriter,
     // The shiftVector is a new function argument with 1 element for each gate parameter to be
     // shifted. For gates inside of loops, we additionally use a selector to dynamically
     // choose on which iteration of a loop to shift the gate parameter.
+    // Type paramVectorType = RankedTensorType::get({ShapedType::kDynamic}, rewriter.getF64Type());
     Type shiftVectorType = RankedTensorType::get({numShifts}, rewriter.getF64Type());
     Type selectorVectorType = RankedTensorType::get({loopDepth}, rewriter.getIndexType());
 
     // Define the properties of the "shifted" version of the function to be differentiated.
     std::string fnName = callee.getSymName().str() + ".shifted";
-    std::vector<Type> fnArgTypes = callee.getArgumentTypes().vec();
-    fnArgTypes.push_back(shiftVectorType);
-    fnArgTypes.push_back(selectorVectorType);
+    SmallVector<Type> fnArgTypes{callee.getArgumentTypes()};
+    fnArgTypes.append({// paramVectorType,
+                       shiftVectorType, selectorVectorType});
     FunctionType fnType = rewriter.getFunctionType(fnArgTypes, callee.getResultTypes());
     StringAttr visibility = rewriter.getStringAttr("private");
 
@@ -84,6 +85,7 @@ func::FuncOp ParameterShiftLowering::genShiftFunction(PatternRewriter &rewriter,
         // First copy the entire function as is, then we can add the shifts.
         // Make sure to add the shiftVector/selectorVector parameters to the new function.
         rewriter.cloneRegionBefore(callee.getBody(), shiftedFn.getBody(), shiftedFn.end());
+        // Value paramVector = shiftedFn.getBlocks().front().addArgument(paramVectorType, loc);
         Value shiftVector = shiftedFn.getBlocks().front().addArgument(shiftVectorType, loc);
         Value selectorVector = shiftedFn.getBlocks().front().addArgument(selectorVectorType, loc);
         std::vector<std::pair<Value, Value>> selectors;
@@ -119,6 +121,7 @@ func::FuncOp ParameterShiftLowering::genShiftFunction(PatternRewriter &rewriter,
                 for (size_t i = 0; i < params.size(); i++) {
                     Value idx = rewriter.create<index::ConstantOp>(loc, shiftsProcessed++);
                     Value shift = rewriter.create<tensor::ExtractOp>(loc, shiftVector, idx);
+                    // Params[i] needs to be replaced with a load from the paramVector
                     Value shiftedParam =
                         genSelectiveShift(rewriter, loc, params[i], shift, selectors);
                     shiftedParams.push_back(shiftedParam);

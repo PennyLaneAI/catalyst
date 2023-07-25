@@ -699,8 +699,7 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         // the gradient here, which we're taking the dim of to get the pcount.
         SmallVector<Value> primalInputs{
             ValueRange{reconstructedPrimals}.take_front(qgradFn.getNumArguments() - 1)};
-        // TODO: ugly, but the -2 is because the gate param is the last input. The dps output is
-        // also an argument.
+        Value shadowResult = reconstructedShadows[qnode.getNumArguments() - 1];
         Value gateParamShadow = reconstructedShadows[qnode.getNumArguments() - 2];
         // The gate param list is always 1-d
         Value pcount = builder.create<memref::DimOp>(loc, gateParamShadow, 0);
@@ -709,6 +708,10 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         // TODO: don't know if this works in jacobian contexts
         // TODO: This is segfaulting because the original arguments are optimized to poison values.
         // Value qgrad = builder.create<func::CallOp>(loc, qgradFn, primalInputs).getResult(0);
+        shadowResult = builder.create<memref::LoadOp>(loc, shadowResult, /*indices=*/ValueRange{});
+        Value cst = builder.create<LLVM::ConstantOp>(loc, builder.getF64Type(), APFloat(4.53));
+        Value c0 = builder.create<index::ConstantOp>(loc, 0);
+        builder.create<memref::StoreOp>(loc, cst, gateParamShadow, c0);
         // builder.create<memref::CopyOp>(loc, qgrad, gateParamShadow);
         builder.create<func::ReturnOp>(loc);
 
