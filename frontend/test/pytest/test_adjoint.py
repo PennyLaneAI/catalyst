@@ -25,7 +25,7 @@ from numpy.testing import assert_allclose
 from pennylane import adjoint as PL_adjoint
 
 from catalyst import adjoint as C_adjoint
-from catalyst import for_loop, while_loop, qjit
+from catalyst import for_loop, cond, while_loop, qjit
 
 
 def test_adjoint_func():
@@ -281,19 +281,34 @@ def run_catalyst_against_pennylane(quantum_func, device, *args):
 
     @qjit
     @qml.qnode(device)
-    def catalyst_workflow():
+    def catalyst_workflow(*args):
         C_adjoint(quantum_func)(*args)
         return qml.state()
 
     @qml.qnode(device)
-    def pennylane_workflow():
+    def pennylane_workflow(*args):
         PL_adjoint(quantum_func)(*args)
         return qml.state()
 
-    assert_allclose(catalyst_workflow(), pennylane_workflow())
+    assert_allclose(catalyst_workflow(*args), pennylane_workflow(*args))
 
 
-def test_adjoint_while_loop():
+@pytest.mark.parametrize("pred", [True, False])
+def test_adjoint_cond(backend, pred):
+    """Tests that the correct gates are applied in reverse in a conditional branch"""
+
+    def func(pred, theta):
+        @cond(pred)
+        def cond_fn():
+            qml.RX(theta, wires=0)
+
+        cond_fn()
+
+    dev = qml.device(backend, wires=1)
+    run_catalyst_against_pennylane(func, dev, pred, jnp.pi)
+
+
+def test_adjoint_while_loop(backend):
     """Tests that the correct gates are applied in reverse in a while loop with a statically unknown number of iterations."""
 
     def func(limit):
@@ -307,5 +322,35 @@ def test_adjoint_while_loop():
         final = loop_body(1)
         qml.RZ(final, wires=0)
 
-    dev = qml.device("lightning.qubit", wires=1)
+    dev = qml.device(backend, wires=1)
     run_catalyst_against_pennylane(func, dev, 10)
+
+
+def test_adjoint_while_nested(backend):
+    """Tests the correct handling of nested while loops."""
+
+    def func(limit, inner_iters):
+        @while_loop(lambda carried: carried < limit)
+        def loop_outer(carried):
+            qml.RX(carried, wires=0)
+
+            @while_loop(lambda counter: counter < inner_iters[carried])
+            def loop_inner(counter):
+                @cond(counter > 3)
+                def cond_fn():
+                    qml.RY(counter, wires=0)
+
+                @cond_fn.otherwise
+                def cond_otherwise():
+                    qml.RZ(counter / jnp.pi, wires=0)
+
+                cond_fn()
+                return counter + 1
+
+            loop_inner(0)
+            return carried + 2
+
+        final = loop_outer(1)
+
+    dev = qml.device(backend, wires=1)
+    run_catalyst_against_pennylane(func, dev, 10, jnp.array([2, 4, 3, 5, 1, 7, 4, 6, 9, 10]))
