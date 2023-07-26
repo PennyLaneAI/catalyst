@@ -99,10 +99,57 @@ struct ArrayListBuilder {
         return SymbolRefAttr::get(ctx, funcName);
     }
 
+    FlatSymbolRefAttr getOrInsertPopFunction(Location loc, ModuleOp moduleOp,
+                                             OpBuilder &builder) const
+    {
+        MLIRContext *ctx = builder.getContext();
+        std::string funcName = "__catalyst_arraylist_pop";
+        llvm::raw_string_ostream nameStream{funcName};
+        nameStream << elementType;
+        if (moduleOp.lookupSymbol<func::FuncOp>(funcName)) {
+            return SymbolRefAttr::get(ctx, funcName);
+        }
+
+        OpBuilder::InsertionGuard insertionGuard(builder);
+        builder.setInsertionPointToStart(moduleOp.getBody());
+
+        auto popFnType =
+            FunctionType::get(ctx, /*inputs=*/
+                              {dataField.getType(), sizeField.getType(), capacityField.getType()},
+                              /*outputs=*/elementType);
+        auto popFn = builder.create<func::FuncOp>(loc, funcName, popFnType);
+        popFn.setPrivate();
+
+        Block *entryBlock = popFn.addEntryBlock();
+        builder.setInsertionPointToStart(entryBlock);
+
+        Region::BlockArgListType arguments = popFn.getArguments();
+        BlockArgument elementsField = arguments[0];
+        BlockArgument sizeField = arguments[1];
+
+        Value elementsVal = builder.create<memref::LoadOp>(loc, elementsField);
+        Value sizeVal = builder.create<memref::LoadOp>(loc, sizeField);
+        Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
+        Value newSize = builder.create<arith::SubIOp>(loc, sizeVal, one);
+        Value poppedVal = builder.create<memref::LoadOp>(loc, elementsVal, newSize);
+
+        builder.create<memref::StoreOp>(loc, newSize, sizeField);
+        builder.create<func::ReturnOp>(loc, poppedVal);
+        return SymbolRefAttr::get(ctx, funcName);
+    }
+
     void emitPush(Location loc, Value value, OpBuilder &b, FlatSymbolRefAttr pushFn) const
     {
         b.create<func::CallOp>(loc, pushFn, /*results=*/TypeRange{},
                                /*operands=*/ValueRange{dataField, sizeField, capacityField, value});
+    }
+
+    Value emitPop(Location loc, OpBuilder &builder, FlatSymbolRefAttr popFn) const
+    {
+        auto callOp = builder.create<func::CallOp>(
+            loc, popFn, /*results=*/elementType,
+            /*operands=*/ValueRange{dataField, sizeField, capacityField});
+        return callOp.getResult(0);
     }
 };
 
@@ -153,6 +200,26 @@ struct LowerListPush : public OpConversionPattern<ListPushOp> {
             arraylistBuilder.value().getOrInsertPushFunction(op.getLoc(), moduleOp, rewriter);
         arraylistBuilder.value().emitPush(op.getLoc(), op.getValue(), rewriter, pushFn);
         rewriter.eraseOp(op);
+        return success();
+    }
+};
+
+struct LowerListPop : public OpConversionPattern<ListPopOp> {
+    using OpConversionPattern<ListPopOp>::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(ListPopOp op, OpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        FailureOr<ArrayListBuilder> arraylistBuilder =
+            ArrayListBuilder::get(op.getLoc(), getTypeConverter(), op.getList(), rewriter);
+        if (failed(arraylistBuilder)) {
+            return failure();
+        }
+        auto moduleOp = op->getParentOfType<ModuleOp>();
+        FlatSymbolRefAttr popFn =
+            arraylistBuilder.value().getOrInsertPopFunction(op.getLoc(), moduleOp, rewriter);
+        Value poppedVal = arraylistBuilder->emitPop(op.getLoc(), rewriter, popFn);
+        rewriter.replaceOp(op, poppedVal);
         return success();
     }
 };
@@ -215,6 +282,7 @@ struct ArrayListToMemRefPass : catalyst::impl::ArrayListToMemRefPassBase<ArrayLi
         RewritePatternSet patterns(context);
         patterns.add<LowerListInit>(arraylistTypeConverter, context);
         patterns.add<LowerListPush>(arraylistTypeConverter, context);
+        patterns.add<LowerListPop>(arraylistTypeConverter, context);
         patterns.add<LowerListLoadData>(arraylistTypeConverter, context);
 
         ConversionTarget target(getContext());

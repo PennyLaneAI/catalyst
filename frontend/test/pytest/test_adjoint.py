@@ -25,7 +25,7 @@ from numpy.testing import assert_allclose
 from pennylane import adjoint as PL_adjoint
 
 from catalyst import adjoint as C_adjoint
-from catalyst import for_loop, qjit
+from catalyst import for_loop, while_loop, qjit
 
 
 def test_adjoint_func():
@@ -274,3 +274,38 @@ def test_adjoint_classical_loop():
     actual = C_workflow()
     desired = PL_workflow()
     assert_allclose(actual, desired)
+
+
+def run_catalyst_against_pennylane(quantum_func, device, *args):
+    """A helper function for verifying Catalyst's native adjoint against the behaviour of PennyLane's adjoint function."""
+
+    @qjit
+    @qml.qnode(device)
+    def catalyst_workflow():
+        C_adjoint(quantum_func)(*args)
+        return qml.state()
+
+    @qml.qnode(device)
+    def pennylane_workflow():
+        PL_adjoint(quantum_func)(*args)
+        return qml.state()
+
+    assert_allclose(catalyst_workflow(), pennylane_workflow())
+
+
+def test_adjoint_while_loop():
+    """Tests that the correct gates are applied in reverse in a while loop with a statically unknown number of iterations."""
+
+    def func(limit):
+        qml.PauliY(wires=0)
+
+        @while_loop(lambda carried: carried < limit)
+        def loop_body(carried):
+            qml.RX(carried, wires=0)
+            return carried * 2
+
+        final = loop_body(1)
+        qml.RZ(final, wires=0)
+
+    dev = qml.device("lightning.qubit", wires=1)
+    run_catalyst_against_pennylane(func, dev, 10)

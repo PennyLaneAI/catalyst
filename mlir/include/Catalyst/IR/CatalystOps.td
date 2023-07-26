@@ -37,6 +37,16 @@ def ListPushOp : Catalyst_Op<"list_push",
     let assemblyFormat = [{ $value `,` $list attr-dict `:` type($list) }];
 }
 
+def ListPopOp : Catalyst_Op<"list_pop",
+        [TypesMatchWith<"type of 'result' matches element type of 'list'",
+                        "list", "result",
+                        "$_self.cast<ArrayListType>().getElementType()">]> {
+    let summary = "Remove an element from the end of an array list and return it.";
+    let arguments = (ins ArrayListType:$list);
+    let results = (outs AnyType:$result);
+    let assemblyFormat = [{ $list attr-dict `:` type($list) }];
+}
+
 def ListLoadDataOp : Catalyst_Op<"list_load_data"> {
     let summary = "Get the underlying memref storing the data of an array list.";
     let arguments = (ins ArrayListType:$list);
