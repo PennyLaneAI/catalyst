@@ -22,6 +22,8 @@
 
 namespace catalyst {
 
-mlir::LogicalResult runDefaultLowering(const CompilerOptions &options, mlir::ModuleOp moduleOp);
+mlir::LogicalResult runDefaultLowering(const CompilerSpec &spec,
+                                       const CompilerOptions &options,
+                                       mlir::ModuleOp moduleOp);
 
 }

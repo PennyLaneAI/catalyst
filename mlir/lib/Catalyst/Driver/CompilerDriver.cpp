@@ -170,7 +170,9 @@ LogicalResult inferMLIRReturnTypes(MLIRContext *ctx, llvm::Type *returnType,
     return failure();
 }
 
-LogicalResult QuantumDriverMain(const CompilerOptions &options, FunctionAttributes &inferredData)
+LogicalResult QuantumDriverMain(const CompilerSpec &spec,
+                                const CompilerOptions &options,
+                                FunctionAttributes &inferredData)
 {
     registerAllCatalystPasses();
     mhlo::registerAllMhloPasses();
@@ -191,7 +193,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, FunctionAttribut
     OwningOpRef<ModuleOp> op =
         parseMLIRSource(ctx, options.source, options.moduleName, options.diagnosticStream);
     if (op) {
-        if (failed(runDefaultLowering(options, *op))) {
+        if (failed(runDefaultLowering(spec, options, *op))) {
             return failure();
         }
 

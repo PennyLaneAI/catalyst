@@ -14,15 +14,12 @@
 
 #pragma once
 
+#include "llvm/Support/raw_ostream.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Support/LogicalResult.h"
+#include "llvm/ADT/SmallVector.h"
 #include <filesystem>
-
-/// Run a given set of passes on an MLIR module.
-///
-/// The IR is supplied in textual form while the passes are expected in MLIR's command line
-/// interface form.
-mlir::FailureOr<std::string> RunPassPipeline(mlir::StringRef source, mlir::StringRef passes);
+#include <vector>
 
 /// Data about the JIT function that is optionally inferred and returned to the caller.
 ///
@@ -39,7 +36,7 @@ struct FunctionAttributes {
 
 /// Verbosity level
 // TODO: Adjust the number of levels according to our needs. MLIR seems to print few really
-// low-level messages we might want to hide.
+// low-level messages, we might want to hide these.
 typedef enum {
     CO_VERB_SILENT = 0,
     CO_VERB_URGENT = 1,
@@ -47,22 +44,39 @@ typedef enum {
     CO_VERB_ALL = 3
 } Verbosity;
 
+
+/// Pipeline descriptor
+struct Pipeline {
+    std::string name;
+    typedef llvm::SmallVector<std::string> PassList;
+    PassList passes;
+};
+
+/// Structure which defines the task for the driver to solve.
+struct CompilerSpec {
+    /// Ordered list of named pipelines to execute, each pipeline is described by a list of MLIR passes
+    /// it includes.
+    std::vector< Pipeline > pipelinesCfg;
+};
+
+/// Optional parameters, for which we provide reasonable default values.
 struct CompilerOptions {
-    mlir::MLIRContext *ctx;
+    mlir::MLIRContext *ctx; // TODO: Move to Spec
     /// The textual IR (MLIR or LLVM IR)
-    mlir::StringRef source;
+    mlir::StringRef source; // TODO: Move to Spec
     /// The directory to place outputs (object file and intermediate results)
-    mlir::StringRef workspace;
+    mlir::StringRef workspace; // TODO: Move to Spec
     /// The name of the module to compile. This is usually the same as the Python function.
-    mlir::StringRef moduleName;
+    mlir::StringRef moduleName; // TODO: Move to Spec
     /// The stream to output any error messages from MLIR/LLVM passes and translation.
-    llvm::raw_ostream &diagnosticStream;
+    llvm::raw_ostream &diagnosticStream; // TODO: Move to Spec
     /// If true, the driver will output the module at intermediate points.
     bool keepIntermediate;
     /// Sets the verbosity level to use when printing messages.
     Verbosity verbosity;
 
     /// Get the destination of the object file at the end of compilation.
+    /// TODO: Move to Spec
     std::string getObjectFile() const
     {
         using path = std::filesystem::path;
@@ -70,6 +84,31 @@ struct CompilerOptions {
     }
 };
 
+
+/// Run a given set of passes on an MLIR module.
+///
+/// The IR is supplied in textual form while the passes are expected in MLIR's command line
+/// interface form.
+mlir::FailureOr<std::string> RunPassPipeline(mlir::StringRef source, mlir::StringRef passes);
+
 /// Entry point to the MLIR portion of the compiler.
-mlir::LogicalResult QuantumDriverMain(const CompilerOptions &options,
+mlir::LogicalResult QuantumDriverMain(const CompilerSpec &spec,
+                                      const CompilerOptions &options,
                                       FunctionAttributes &inferredData);
+
+namespace llvm {
+
+inline raw_ostream &operator<<(raw_ostream &oss, const Pipeline &p)
+{
+    oss << "Pipeline('" << p.name << "', [";
+    bool first = true;
+    for (const auto &i : p.passes) {
+        oss << (first ? "" : ", ") << i;
+        first = false;
+    }
+    oss << "])";
+    return oss;
+}
+
+}; // namespace llvm
+

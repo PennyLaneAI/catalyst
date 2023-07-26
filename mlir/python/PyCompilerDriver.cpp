@@ -30,12 +30,31 @@ PYBIND11_MODULE(_catalystDriver, m)
     m.def(
         "compile_asm",
         [](const char *source, const char *workspace, const char *moduleName,
-           bool inferFunctionAttrs, bool keepIntermediate, bool verbose) {
+           bool inferFunctionAttrs, bool keepIntermediate, bool verbose,
+           py::list pipelines)
+        {
             FunctionAttributes inferredAttributes;
             mlir::MLIRContext ctx;
             std::string errors;
             Verbosity verbosity = verbose ? CO_VERB_ALL : CO_VERB_SILENT;
             llvm::raw_string_ostream errStream{errors};
+
+            CompilerSpec spec;
+            {
+                for (py::handle obj : pipelines) {
+                    py::tuple t = obj.cast<py::tuple>();
+                    auto i = t.begin();
+                    auto py_name = i; i++;
+                    auto py_passes = i; i++;
+                    assert(i==t.end());
+                    std::string name = py_name->attr("__str__")().cast<std::string>();
+                    Pipeline::PassList passes;
+                    std::transform(py_passes->begin(), py_passes->end(), std::back_inserter(passes),
+                        [](py::handle p){ return p.attr("__str__")().cast<std::string>();});
+                    spec.pipelinesCfg.push_back(Pipeline({name, passes}));
+                    errStream << spec.pipelinesCfg.back() << "\n";
+                }
+            }
 
             CompilerOptions options{.ctx = &ctx,
                                     .source = source,
@@ -46,7 +65,7 @@ PYBIND11_MODULE(_catalystDriver, m)
                                     .verbosity = verbosity};
 
 
-            if (mlir::failed(QuantumDriverMain(options, inferredAttributes))) {
+            if (mlir::failed(QuantumDriverMain(spec, options, inferredAttributes))) {
                 throw std::runtime_error("Compilation failed:\n" + errors);
             }
             if (verbosity > CO_VERB_SILENT && !errors.empty()) {
@@ -58,7 +77,7 @@ PYBIND11_MODULE(_catalystDriver, m)
         },
         py::arg("source"), py::arg("workspace"), py::arg("module_name") = "jit source",
         py::arg("infer_function_attrs") = false, py::arg("keep_intermediate") = false,
-        py::arg("verbose") = false);
+        py::arg("verbose") = false, py::arg("pipelines") = py::list());
 
     m.def(
         "mlir_run_pipeline",

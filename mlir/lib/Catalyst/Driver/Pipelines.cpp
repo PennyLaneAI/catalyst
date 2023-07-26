@@ -98,7 +98,7 @@ const static SmallVector<const char *> lowerToLLVMPasses = {
 };
 // clang-format on
 
-std::string joinPasses(const SmallVector<const char *> &passes)
+std::string joinPasses(const Pipeline::PassList &passes)
 {
     std::string joined;
     llvm::raw_string_ostream stream{joined};
@@ -106,25 +106,23 @@ std::string joinPasses(const SmallVector<const char *> &passes)
     return joined;
 }
 
-struct Pipeline {
-    const char *name;
-    const SmallVector<const char *> passes;
-};
-
 /// Configure the printing of intermediate IR between pass stages.
 /// By overriding the shouldPrintAfterPass hook, this function sets up both 1. after which passes
 /// the IR should be printed, and 2. printing the IR to files in the workspace.
-void configureIRPrinting(const CompilerOptions &options, PassManager &pm,
-                         llvm::raw_ostream &outStream, std::string &outStr,
-                         MutableArrayRef<Pipeline> pipelines,
+void configureIRPrinting(const CompilerOptions &options,
+                         PassManager &pm,
+                         llvm::raw_ostream &outStream,
+                         std::string &outStr,
+                         const std::vector<Pipeline> &pipelines,
                          function_ref<LogicalResult()> dumpIntermediate)
 {
     auto shouldPrintAfterPass = [&](Pass *pass, Operation *) {
-        Pipeline *pipeline = llvm::find_if(pipelines, [&pass](Pipeline pipeline) {
+        auto pipeline = llvm::find_if(pipelines, [&pass](const Pipeline &pipeline) {
             // Print the IR after the last pass of each pipeline stage.
-            return pipeline.passes.back() == pass->getArgument();
+            assert(pipeline.passes.size() > 0);
+            return pipeline.passes.back() == std::string(pass->getArgument());
         });
-        bool shouldPrint = pipeline != std::end(pipelines);
+        bool shouldPrint = pipeline != pipelines.end();
         if (shouldPrint && !outStr.empty() && failed(dumpIntermediate()) &&
             failed(dumpIntermediate())) {
             return false;
@@ -139,12 +137,14 @@ void configureIRPrinting(const CompilerOptions &options, PassManager &pm,
 }
 } // namespace
 
-LogicalResult catalyst::runDefaultLowering(const CompilerOptions &options, ModuleOp moduleOp)
+LogicalResult catalyst::runDefaultLowering(const CompilerSpec &spec,
+                                           const CompilerOptions &options,
+                                           ModuleOp moduleOp)
 {
-    Pipeline pipelines[] = {{.name = "no_mhlo", .passes = mhloToCorePasses},
-                            {.name = "gradients_lowered", .passes = quantumCompilationPasses},
-                            {.name = "bufferized", .passes = bufferizationPasses},
-                            {.name = "llvm_dialect", .passes = lowerToLLVMPasses}};
+    /* Pipeline pipelines[] = {{.name = "no_mhlo", .passes = mhloToCorePasses}, */
+    /*                         {.name = "gradients_lowered", .passes = quantumCompilationPasses}, */
+    /*                         {.name = "bufferized", .passes = bufferizationPasses}, */
+    /*                         {.name = "llvm_dialect", .passes = lowerToLLVMPasses}}; */
     auto pm = PassManager::on<ModuleOp>(options.ctx, PassManager::Nesting::Implicit);
 
     // We enable printing and dumping intermediate IR by hooking into the shouldPrintAfterPass
@@ -157,7 +157,7 @@ LogicalResult catalyst::runDefaultLowering(const CompilerOptions &options, Modul
     size_t pipelineIdx = 0;
     auto dumpIntermediate = [&](std::optional<std::string> outFile = std::nullopt) {
         if (!outFile) {
-            outFile = fs::path(std::to_string(pipelineIdx + 1) + "_" + pipelines[pipelineIdx].name)
+            outFile = fs::path(std::to_string(pipelineIdx + 1) + "_" + spec.pipelinesCfg.at(pipelineIdx).name)
                           .replace_extension(".mlir");
             pipelineIdx++;
         }
@@ -177,10 +177,10 @@ LogicalResult catalyst::runDefaultLowering(const CompilerOptions &options, Modul
         }
         outStr.clear();
 
-        configureIRPrinting(options, pm, outStream, outStr, pipelines, dumpIntermediate);
+        configureIRPrinting(options, pm, outStream, outStr, spec.pipelinesCfg, dumpIntermediate);
     }
 
-    for (const auto &pipeline : pipelines) {
+    for (const auto &pipeline : spec.pipelinesCfg) {
         if (failed(parsePassPipeline(joinPasses(pipeline.passes), pm, options.diagnosticStream))) {
             return failure();
         }

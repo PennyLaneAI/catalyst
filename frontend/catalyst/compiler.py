@@ -108,6 +108,77 @@ def get_lib_path(project, env_var):
         return os.path.join(package_root, "lib")  # pragma: no cover
     return os.getenv(env_var, default_lib_paths.get(project, ""))
 
+PIPELINES = [
+    ('mhloToCorePasses', [
+    "func.func(chlo-legalize-to-hlo)",
+    "stablehlo-legalize-to-hlo",
+    "func.func(mhlo-legalize-control-flow)",
+    "func.func(hlo-legalize-to-linalg)",
+    "func.func(mhlo-legalize-to-std)",
+    "convert-to-signless",
+    ]),
+    ('quantumCompilationPasses', [
+    "lower-gradients",
+    "adjoint-lowering",
+    "convert-arraylist-to-memref",
+    ]),
+    ('bufferizationPasses', [
+    "one-shot-bufferize{dialect-filter=memref}",
+    "inline",
+    "gradient-bufferize",
+    "scf-bufferize",
+    "convert-tensor-to-linalg",      # tensor.pad
+    "convert-elementwise-to-linalg", # Must be run before --arith-bufferize
+    "arith-bufferize",
+    "empty-tensor-to-alloc-tensor",
+    "func.func(bufferization-bufferize)",
+    "func.func(tensor-bufferize)",
+    "func.func(linalg-bufferize)",
+    "func.func(tensor-bufferize)",
+    "quantum-bufferize",
+    "func-bufferize",
+    "func.func(finalizing-bufferize)",
+    # "func.func(buffer-hoisting)",
+    "func.func(buffer-loop-hoisting)",
+    # "func.func(buffer-deallocation)",
+    "convert-bufferization-to-memref",
+    "canonicalize",
+    # "cse",
+    "cp-global-memref",
+    ]),
+
+    ('lowerToLLVMPasses', [
+    "func.func(convert-linalg-to-loops)",
+    "convert-scf-to-cf",
+    # This pass expands memref operations that modify the metadata of a memref (sizes, offsets,
+    # strides) into a sequence of easier to analyze constructs. In particular, this pass
+    # transforms operations into explicit sequence of operations that model the effect of this
+    # operation on the different metadata. This pass uses affine constructs to materialize
+    # these effects. Concretely, expanded-strided-metadata is used to decompose memref.subview
+    # as it has no lowering in -finalize-memref-to-llvm.
+    "expand-strided-metadata",
+    "lower-affine",
+    "arith-expand", # some arith ops (ceildivsi) require expansion to be lowered to llvm
+    "convert-complex-to-standard", # added for complex.exp lowering
+    "convert-complex-to-llvm",
+    "convert-math-to-llvm",
+    # Run after -convert-math-to-llvm as it marks math::powf illegal without converting it.
+    "convert-math-to-libm",
+    "convert-arith-to-llvm",
+    "finalize-memref-to-llvm{use-generic-functions}",
+    "convert-index-to-llvm",
+    "convert-gradient-to-llvm",
+    "convert-quantum-to-llvm",
+    "emit-catalyst-py-interface",
+    # Remove any dead casts as the final pass expects to remove all existing casts,
+    # but only those that form a loop back to the original type.
+    "canonicalize",
+    "reconcile-unrealized-casts",
+    ]),
+]
+
+
+
 
 class PassPipeline(abc.ABC):
     """Abstract PassPipeline class."""
@@ -492,6 +563,7 @@ class Compiler:
                 infer_function_attrs=True,
                 keep_intermediate=options.keep_intermediate,
                 verbose=options.verbose,
+                pipelines=PIPELINES
             )
             output = CompilerDriver.run(filename, options=options)
             filename = str(pathlib.Path(output).absolute())
