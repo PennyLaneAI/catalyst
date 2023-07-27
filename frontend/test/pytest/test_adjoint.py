@@ -25,7 +25,7 @@ from numpy.testing import assert_allclose
 from pennylane import adjoint as PL_adjoint
 
 from catalyst import adjoint as C_adjoint
-from catalyst import for_loop, cond, while_loop, qjit
+from catalyst import cond, for_loop, qjit, while_loop
 
 
 def test_adjoint_func():
