@@ -171,12 +171,16 @@ Jaxpr = Any
 
 def _ensure_differentiable(f: DifferentiableLike) -> Differentiable:
     """Narrows down the set of the supported differentiable objects."""
+
+    # Unwrap the function from an existing QJIT object.
+    if isinstance(f, catalyst.compilation_pipelines.QJIT):
+        f = f.qfunc
+
     if isinstance(f, (Function, QNode)):
         return f
-    elif isinstance(f, catalyst.compilation_pipelines.QJIT):
-        return f.qfunc
-    elif isinstance(f, Callable):  # Keep at the bottom
+    elif isinstance(f, Callable):  # keep at the bottom
         return Function(f)
+
     raise DifferentiableCompileError(f"Non-differentiable object passed: {type(f)}")
 
 

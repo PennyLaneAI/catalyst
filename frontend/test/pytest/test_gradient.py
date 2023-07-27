@@ -108,6 +108,19 @@ def test_adjoint_on_non_expval(backend):
         qjit(workflow)
 
 
+def test_grad_on_qjit():
+    """Check that grad works when called on an existing qjit object that does not wrap a QNode."""
+
+    @qjit
+    def f(x: float):
+        return x * x
+
+    result = qjit(grad(f))(3.0)
+    expected = 6.0
+
+    assert np.allclose(result, expected)
+
+
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
 def test_finite_diff(inp, backend):
     """Test finite diff."""
