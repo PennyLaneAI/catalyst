@@ -22,10 +22,13 @@ namespace quantum {
 struct QuantumCache {
     mlir::TypedValue<ArrayListType> paramVector;
     mlir::TypedValue<ArrayListType> wireVector;
+    /// For every structured control flow op, store the values required for it to execute.
+    /// Specifically: store the conditions for scf.if ops, the start/stop/step of scf.for ops, and
+    /// the number of iterations for scf.while ops.
     mlir::DenseMap<mlir::Operation *, mlir::TypedValue<ArrayListType>> controlFlowTapes;
 
-    // Initialize the quantum cache to traverse and store the necessary parameters for the given
-    // `region`.
+    /// Initialize the quantum cache to traverse and store the necessary parameters for the given
+    /// `region`.
     static QuantumCache initialize(mlir::Region &region, mlir::OpBuilder &builder,
                                    mlir::Location loc);
 };
