@@ -73,7 +73,7 @@ void generateReversedQuantum(IRMapping &oldToCloned, Region &region, OpBuilder &
     };
     for (Operation &op : llvm::reverse(region.front().without_terminator())) {
         LLVM_DEBUG(dbgs() << "generating adjoint for: " << op << "\n");
-        if (auto forOp = dyn_cast<scf::ForOp>(&op)) {
+        if (auto forOp = dyn_cast<scf::ForOp>(op)) {
             std::optional<Value> yieldedQureg =
                 getQuantumReg(forOp.getBody()->getTerminator()->getOperands());
             if (!yieldedQureg.has_value()) {
@@ -99,7 +99,7 @@ void generateReversedQuantum(IRMapping &oldToCloned, Region &region, OpBuilder &
                 });
             oldToCloned.map(getQuantumReg(forOp.getInitArgs()).value(), replacedFor.getResult(0));
         }
-        else if (auto ifOp = dyn_cast<scf::IfOp>(&op)) {
+        else if (auto ifOp = dyn_cast<scf::IfOp>(op)) {
             std::optional<Value> qureg = getQuantumReg(ifOp.getResults());
             if (!qureg.has_value()) {
                 // This operation is purely classical
@@ -143,7 +143,7 @@ void generateReversedQuantum(IRMapping &oldToCloned, Region &region, OpBuilder &
                    "Expected the same input register for both scf.if branches");
             oldToCloned.map(startingThenQureg, reversedIf.getResult(0));
         }
-        else if (auto whileOp = dyn_cast<scf::WhileOp>(&op)) {
+        else if (auto whileOp = dyn_cast<scf::WhileOp>(op)) {
             std::optional<Value> yieldedQureg =
                 getQuantumReg(whileOp.getAfter().front().getTerminator()->getOperands());
             if (!yieldedQureg.has_value()) {
@@ -169,7 +169,7 @@ void generateReversedQuantum(IRMapping &oldToCloned, Region &region, OpBuilder &
                 });
             oldToCloned.map(getQuantumReg(whileOp.getInits()).value(), replacedWhile.getResult(0));
         }
-        else if (auto insertOp = dyn_cast<quantum::InsertOp>(&op)) {
+        else if (auto insertOp = dyn_cast<quantum::InsertOp>(op)) {
             Value dynamicWire;
             if (!insertOp.getIdxAttr().has_value()) {
                 dynamicWire = builder.create<ListPopOp>(insertOp.getLoc(), cache.wireVector);
@@ -180,7 +180,7 @@ void generateReversedQuantum(IRMapping &oldToCloned, Region &region, OpBuilder &
             oldToCloned.map(insertOp.getQubit(), extractOp.getResult());
             oldToCloned.map(insertOp.getInQreg(), oldToCloned.lookup(insertOp.getOutQreg()));
         }
-        else if (auto gate = dyn_cast<quantum::QuantumGate>(&op)) {
+        else if (auto gate = dyn_cast<quantum::QuantumGate>(op)) {
             for (const auto &[qubitResult, qubitOperand] :
                  llvm::zip(gate.getQubitResults(), gate.getQubitOperands())) {
                 oldToCloned.map(qubitOperand, oldToCloned.lookup(qubitResult));
@@ -190,7 +190,7 @@ void generateReversedQuantum(IRMapping &oldToCloned, Region &region, OpBuilder &
             clone.setAdjointFlag(!gate.getAdjointFlag());
 
             // Read cached differentiable parameters from the recorded parameter vector.
-            if (auto differentiableGate = dyn_cast<quantum::DifferentiableGate>(&op)) {
+            if (auto differentiableGate = dyn_cast<quantum::DifferentiableGate>(op)) {
                 OpBuilder::InsertionGuard insertionGuard(builder);
                 builder.setInsertionPoint(clone);
                 SmallVector<Value> cachedParams;
@@ -209,7 +209,7 @@ void generateReversedQuantum(IRMapping &oldToCloned, Region &region, OpBuilder &
                 oldToCloned.map(qubitOperand, qubitResult);
             }
         }
-        else if (auto extractOp = dyn_cast<quantum::ExtractOp>(&op)) {
+        else if (auto extractOp = dyn_cast<quantum::ExtractOp>(op)) {
             Value dynamicWire;
             if (!extractOp.getIdxAttr().has_value()) {
                 dynamicWire = builder.create<ListPopOp>(extractOp.getLoc(), cache.wireVector);
@@ -244,7 +244,8 @@ struct AdjointSingleOpRewritePattern : public mlir::OpRewritePattern<AdjointOp> 
 
         // First, copy the classical computations directly to the target insertion point.
         IRMapping oldToCloned;
-        cloneClassical(adjoint.getRegion(), oldToCloned, rewriter, cache);
+        AugmentedCircuitGenerator generator{oldToCloned, rewriter, cache};
+        generator.generate(adjoint.getRegion());
 
         // Initialize the backward pass with the operand of the quantum.yield
         auto yieldOp = cast<quantum::YieldOp>(adjoint.getRegion().front().getTerminator());

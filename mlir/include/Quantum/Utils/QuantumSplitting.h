@@ -28,15 +28,48 @@ struct QuantumCache {
     mlir::DenseMap<mlir::Operation *, mlir::TypedValue<ArrayListType>> controlFlowTapes;
 
     /// Initialize the quantum cache to traverse and store the necessary parameters for the given
-    /// `region`.
-    static QuantumCache initialize(mlir::Region &region, mlir::OpBuilder &builder,
+    /// `topLevelRegion`.
+    static QuantumCache initialize(mlir::Region &topLevelRegion, mlir::OpBuilder &builder,
                                    mlir::Location loc);
 };
 
-/// Given a `region` containing classical preprocessing and quantum operations, clone the
-/// preprocessing
-void cloneClassical(mlir::Region &region, mlir::IRMapping &oldToCloned,
-                    mlir::PatternRewriter &rewriter, QuantumCache &cache);
+class AugmentedCircuitGenerator {
+  public:
+    AugmentedCircuitGenerator(mlir::IRMapping &oldToCloned, mlir::PatternRewriter &rewriter,
+                              QuantumCache &cache)
+        : oldToCloned(oldToCloned), rewriter(rewriter), cache(cache)
+    {
+    }
 
+    /// Given a `region` containing classical preprocessing and quantum operations, generate an
+    /// augmented version that caches all the parameters required to deterministically re-execute
+    /// the circuit (gate params, classical control flow, and dynamic wires).
+    void generate(mlir::Region &region);
+
+  private:
+    mlir::IRMapping &oldToCloned;
+    mlir::PatternRewriter &rewriter;
+    QuantumCache &cache;
+
+    void visitOperation(mlir::scf::ForOp forOp);
+    void visitOperation(mlir::scf::WhileOp forOp);
+    void visitOperation(mlir::scf::IfOp forOp);
+
+    void cloneTerminatorClassicalOperands(mlir::Operation *terminator);
+
+    /// Update the internal mapping of the results of `oldOp` to the results of `clonedOp` using the
+    /// given result remapping.
+    void mapResults(mlir::Operation *oldOp, mlir::Operation *clonedOp,
+                    const mlir::DenseMap<unsigned, unsigned> &argIdxMapping);
+
+    // Emit an operation to cache a dynamic wire for quantum.insert/extract ops.
+    template <typename IndexingOp> void cacheDynamicWire(IndexingOp op)
+    {
+        if (!op.getIdxAttr().has_value()) {
+            rewriter.create<ListPushOp>(op.getLoc(), oldToCloned.lookupOrDefault(op.getIdx()),
+                                        cache.wireVector);
+        }
+    }
+};
 } // namespace quantum
 } // namespace catalyst
