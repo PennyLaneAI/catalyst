@@ -326,6 +326,20 @@ def test_adjoint_while_loop(backend):
     run_catalyst_against_pennylane(func, dev, 10)
 
 
+def test_adjoint_for_loop(backend):
+    """Tests the correct application of gates (with dynamic wires)"""
+
+    def func(ub):
+        @for_loop(0, ub, 1)
+        def loop_body(i):
+            qml.CNOT(wires=(i, i + 1))
+
+        loop_body()
+
+    dev = qml.device(backend, wires=5)
+    run_catalyst_against_pennylane(func, dev, 4)
+
+
 def test_adjoint_while_nested(backend):
     """Tests the correct handling of nested while loops."""
 
@@ -351,6 +365,37 @@ def test_adjoint_while_nested(backend):
             return carried + 2
 
         final = loop_outer(1)
+        qml.MultiRZ(final / 30, wires=(0, 1))
+
+    dev = qml.device(backend, wires=2)
+    run_catalyst_against_pennylane(func, dev, 10, jnp.array([2, 4, 3, 5, 1, 7, 4, 6, 9, 10]))
+
+
+def test_adjoint_for_nested(backend):
+    def func(theta):
+        @for_loop(0, 6, 1)
+        def loop_outer(iv):
+            qml.RX(theta / 2, wires=0)
+
+            @for_loop(0, iv, 2)
+            def loop_inner(jv, ub):
+                qml.RY(theta, wires=0)
+                return ub + jv
+
+            ub = loop_inner(1)
+
+            qml.RX(theta / ub, wires=0)
+
+            @while_loop(lambda counter: counter < ub)
+            def while_loop_inner(counter):
+                qml.RZ(ub / 5, wires=0)
+                return counter + 1
+
+            final = while_loop_inner(0)
+
+            qml.RX(theta / final, wires=0)
+
+        loop_outer()
 
     dev = qml.device(backend, wires=1)
-    run_catalyst_against_pennylane(func, dev, 10, jnp.array([2, 4, 3, 5, 1, 7, 4, 6, 9, 10]))
+    run_catalyst_against_pennylane(func, dev, jnp.pi)
