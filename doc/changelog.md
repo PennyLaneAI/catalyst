@@ -24,7 +24,9 @@
 
 * Eliminate redundant unflattening and flattening of PyTrees parameters in Catalyst control flow operations.
   [#215](https://github.com/PennyLaneAI/catalyst/pull/215)
-* Reduce execution and compilation times by using `-scalarize` and `-O0`.
+* Reduce the execution and compile times of user programs by generating more efficient code and
+  avoiding unnecessary optimizations. Specifically, a scalarization procedure was added to the MLIR
+  pass pipeline and LLVM IR compilation is now invoked with optimization level 0.
   [#217](https://github.com/PennyLaneAI/catalyst/pull/217)
 
 <h3>Breaking changes</h3>
