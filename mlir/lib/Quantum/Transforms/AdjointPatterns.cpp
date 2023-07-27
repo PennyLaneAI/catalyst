@@ -34,6 +34,7 @@
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Patterns.h"
+#include "Quantum/Utils/QuantumSplitting.h"
 
 using llvm::dbgs;
 using namespace mlir;
@@ -54,249 +55,10 @@ Value cloneAdjointRegion(AdjointOp op, OpBuilder &builder, IRMapping &mapping)
     return mapping.lookupOrDefault(yieldOp.getOperand(0));
 }
 
-/// Recursively clone the given region, removing all quantum ops.
-void cloneOnlyClassical(IRMapping &oldToCloned, Region &region, PatternRewriter &rewriter,
-                        Value paramVector, Value wireVector,
-                        DenseMap<Operation *, TypedValue<ArrayListType>> &controlFlowTapes)
-{
-    assert(region.hasOneBlock() &&
-           "Expected only structured control flow (each region should have a single block)");
-    auto isQuantumType = [](Type type) { return isa<QuantumDialect>(type.getDialect()); };
-    auto hasQuantumType = [&isQuantumType](Value value) { return isQuantumType(value.getType()); };
-
-    for (Operation &op : region.front().without_terminator()) {
-        auto isQuantumSCFOp = [](Operation *op) {
-            return llvm::any_of(op->getResultTypes(), [](Type resultType) {
-                return isa<quantum::QuregType>(resultType);
-            });
-        };
-        // Cache dynamic wires
-        if (auto insertOp = dyn_cast<quantum::InsertOp>(op)) {
-            if (!insertOp.getIdxAttr().has_value()) {
-                rewriter.create<ListPushOp>(
-                    insertOp.getLoc(), oldToCloned.lookupOrDefault(insertOp.getIdx()), wireVector);
-            }
-        }
-        if (auto extractOp = dyn_cast<quantum::ExtractOp>(op)) {
-            if (!extractOp.getIdxAttr().has_value()) {
-                rewriter.create<ListPushOp>(extractOp.getLoc(),
-                                            oldToCloned.lookupOrDefault(extractOp.getIdx()),
-                                            wireVector);
-            }
-        }
-        else if (auto gate = dyn_cast<quantum::DifferentiableGate>(op)) {
-            ValueRange diffParams = gate.getDiffParams();
-            if (!diffParams.empty()) {
-                for (Value param : diffParams) {
-                    rewriter.create<catalyst::ListPushOp>(
-                        gate.getLoc(), oldToCloned.lookupOrDefault(param), paramVector);
-                }
-            }
-        }
-        else if (isa<QuantumDialect>(op.getDialect())) {
-            continue;
-        }
-        // TODO: Reduce code duplication with different structured control flow constructs
-        else if (auto forOp = dyn_cast<scf::ForOp>(op)) {
-            if (!isQuantumSCFOp(forOp)) {
-                auto clonedFor = cast<scf::ForOp>(rewriter.clone(*forOp, oldToCloned));
-                oldToCloned.map(forOp.getResults(), clonedFor.getResults());
-                continue;
-            }
-            DenseMap<unsigned, unsigned> argIdxMapping;
-            SmallVector<Value> classicalInits;
-            unsigned newIdx = 0;
-            for (const auto &[oldIdx, initArg] : llvm::enumerate(forOp.getInitArgs())) {
-                if (!isQuantumType(initArg.getType())) {
-                    argIdxMapping.insert({oldIdx, newIdx++});
-                    classicalInits.push_back(oldToCloned.lookupOrDefault(initArg));
-                }
-            }
-
-            // Store the start, stop, and step to this op's control flow tape.
-            Value tape = controlFlowTapes.at(forOp);
-            for (Value param : {forOp.getLowerBound(), forOp.getUpperBound(), forOp.getStep()}) {
-                rewriter.create<ListPushOp>(forOp.getLoc(), oldToCloned.lookupOrDefault(param),
-                                            tape);
-            }
-
-            auto newForOp = rewriter.create<scf::ForOp>(
-                forOp.getLoc(), oldToCloned.lookupOrDefault(forOp.getLowerBound()),
-                oldToCloned.lookupOrDefault(forOp.getUpperBound()),
-                oldToCloned.lookupOrDefault(forOp.getStep()), classicalInits,
-                [&](OpBuilder &builder, Location loc, Value inductionVar, ValueRange iterArgs) {
-                    oldToCloned.map(forOp.getInductionVar(), inductionVar);
-                    for (const auto &[oldIdx, newIdx] : argIdxMapping) {
-                        oldToCloned.map(forOp.getRegionIterArg(oldIdx), iterArgs[newIdx]);
-                    }
-
-                    ConversionPatternRewriter rewriter(builder.getContext());
-                    rewriter.restoreInsertionPoint(builder.saveInsertionPoint());
-                    cloneOnlyClassical(oldToCloned, forOp.getRegion(), rewriter, paramVector,
-                                       wireVector, controlFlowTapes);
-
-                    // Clone the classical operands of the terminator.
-                    Operation *terminator = forOp.getRegion().front().getTerminator();
-                    SmallVector<Value> newYieldOperands;
-                    for (Value operand : terminator->getOperands()) {
-                        if (!hasQuantumType(operand)) {
-                            newYieldOperands.push_back(oldToCloned.lookupOrDefault(operand));
-                        }
-                    }
-                    Operation *newTerminator = builder.clone(*terminator, oldToCloned);
-                    newTerminator->setOperands(newYieldOperands);
-                });
-            // Replace uses of the old for loop's results
-            for (const auto &[oldIdx, oldResult] : llvm::enumerate(forOp.getResults())) {
-                if (argIdxMapping.contains(oldIdx)) {
-                    unsigned newIdx = argIdxMapping.at(oldIdx);
-                    oldToCloned.map(forOp.getResult(oldIdx), newForOp.getResult(newIdx));
-                }
-            }
-        }
-        else if (auto ifOp = dyn_cast<scf::IfOp>(op)) {
-            if (!isQuantumSCFOp(ifOp)) {
-                auto clonedOp = rewriter.clone(*ifOp, oldToCloned);
-                oldToCloned.map(ifOp.getResults(), clonedOp->getResults());
-                continue;
-            }
-            auto getRegionBuilder = [&](Region &oldRegion) {
-                return [&](OpBuilder &builder, Location loc) {
-                    // Recursively clone the region
-                    ConversionPatternRewriter rewriter(builder.getContext());
-                    rewriter.restoreInsertionPoint(builder.saveInsertionPoint());
-                    cloneOnlyClassical(oldToCloned, oldRegion, rewriter, paramVector, wireVector,
-                                       controlFlowTapes);
-
-                    // Clone the classical operands of the terminator.
-                    Operation *terminator = oldRegion.front().getTerminator();
-                    SmallVector<Value> newYieldOperands;
-                    for (Value operand : terminator->getOperands()) {
-                        if (!hasQuantumType(operand)) {
-                            newYieldOperands.push_back(oldToCloned.lookupOrDefault(operand));
-                        }
-                    }
-                    Operation *newTerminator = rewriter.clone(*terminator, oldToCloned);
-                    newTerminator->setOperands(newYieldOperands);
-                };
-            };
-            DenseMap<unsigned, unsigned> argIdxMapping;
-            unsigned newIdx = 0;
-            for (const auto &[oldIdx, resultType] : llvm::enumerate(ifOp.getResultTypes())) {
-                if (!isQuantumType(resultType)) {
-                    argIdxMapping.insert({oldIdx, newIdx++});
-                }
-            }
-
-            // Store the condition to this op's control flow tape
-            Value condition = oldToCloned.lookupOrDefault(ifOp.getCondition());
-            Value tape = controlFlowTapes.at(ifOp);
-            Value castedCondition =
-                rewriter.create<index::CastSOp>(ifOp.getLoc(), rewriter.getIndexType(), condition);
-            rewriter.create<ListPushOp>(ifOp.getLoc(), castedCondition, tape);
-
-            auto newIfOp = rewriter.create<scf::IfOp>(ifOp.getLoc(), condition,
-                                                      getRegionBuilder(ifOp.getThenRegion()),
-                                                      getRegionBuilder(ifOp.getElseRegion()));
-
-            // Replace uses of the old if op's results
-            for (const auto &[oldIdx, oldResult] : llvm::enumerate(ifOp.getResults())) {
-                if (argIdxMapping.contains(oldIdx)) {
-                    unsigned newIdx = argIdxMapping.at(oldIdx);
-                    oldToCloned.map(ifOp.getResult(oldIdx), newIfOp.getResult(newIdx));
-                }
-            }
-        }
-        else if (auto whileOp = dyn_cast<scf::WhileOp>(op)) {
-            if (!isQuantumSCFOp(whileOp)) {
-                auto clonedOp = rewriter.clone(*whileOp, oldToCloned);
-                oldToCloned.map(whileOp.getResults(), clonedOp->getResults());
-                continue;
-            }
-            SmallVector<Type> classicalResultTypes;
-            SmallVector<Value> classicalInits;
-            DenseMap<unsigned, unsigned> argIdxMapping;
-            unsigned newIdx = 0;
-            for (const auto &[oldIdx, init] : llvm::enumerate(whileOp.getInits())) {
-                if (!hasQuantumType(init)) {
-                    classicalInits.push_back(oldToCloned.lookupOrDefault(init));
-                    classicalResultTypes.push_back(init.getType());
-                    argIdxMapping.insert({oldIdx, newIdx++});
-                }
-            }
-
-            // Augment the classical loop by counting the number of iterations.
-            auto counterType = MemRefType::get({}, rewriter.getIndexType());
-            Location loc = whileOp.getLoc();
-            Value idx0 = rewriter.create<index::ConstantOp>(loc, 0);
-            Value idx1 = rewriter.create<index::ConstantOp>(loc, 1);
-            Value counter = rewriter.create<memref::AllocaOp>(loc, counterType);
-            rewriter.create<memref::StoreOp>(loc, idx0, counter);
-
-            auto getRegionBuilder = [&](Region &oldRegion, bool incrementCounter) {
-                return [&, incrementCounter](OpBuilder &builder, Location loc,
-                                             ValueRange newRegionArgs) {
-                    for (const auto &[oldIdx, newIdx] : argIdxMapping) {
-                        oldToCloned.map(oldRegion.getArgument(oldIdx), newRegionArgs[newIdx]);
-                    }
-
-                    if (incrementCounter) {
-                        Value countVal = builder.create<memref::LoadOp>(loc, counter);
-                        countVal = builder.create<index::AddOp>(loc, countVal, idx1);
-                        builder.create<memref::StoreOp>(loc, countVal, counter);
-                    }
-
-                    // Recursively clone the region
-                    ConversionPatternRewriter rewriter(builder.getContext());
-                    rewriter.restoreInsertionPoint(builder.saveInsertionPoint());
-                    cloneOnlyClassical(oldToCloned, oldRegion, rewriter, paramVector, wireVector,
-                                       controlFlowTapes);
-
-                    // Clone the classical operands of the terminator.
-                    Operation *terminator = oldRegion.front().getTerminator();
-                    SmallVector<Value> newYieldOperands;
-                    for (Value operand : terminator->getOperands()) {
-                        if (!hasQuantumType(operand)) {
-                            newYieldOperands.push_back(oldToCloned.lookupOrDefault(operand));
-                        }
-                    }
-                    Operation *newTerminator = builder.clone(*terminator, oldToCloned);
-                    newTerminator->setOperands(newYieldOperands);
-                };
-            };
-
-            // We only care about the number of times the "After" region executes. The frontend does
-            // not support putting quantum operations in the "Before" region, which only computes
-            // the iteration condition.
-            auto newWhileOp = rewriter.create<scf::WhileOp>(
-                whileOp.getLoc(), classicalResultTypes, classicalInits,
-                getRegionBuilder(whileOp.getBefore(), /*incrementCounter=*/false),
-                getRegionBuilder(whileOp.getAfter(), /*incrementCounter=*/true));
-
-            // Replace uses of the old while loop's results
-            for (const auto &[oldIdx, oldResult] : llvm::enumerate(whileOp.getResults())) {
-                if (argIdxMapping.contains(oldIdx)) {
-                    unsigned newIdx = argIdxMapping.at(oldIdx);
-                    rewriter.replaceAllUsesWith(whileOp.getResult(oldIdx),
-                                                newWhileOp.getResult(newIdx));
-                }
-            }
-
-            Value numIters = rewriter.create<memref::LoadOp>(whileOp.getLoc(), counter);
-            Value tape = controlFlowTapes.at(whileOp);
-            rewriter.create<catalyst::ListPushOp>(whileOp.getLoc(), numIters, tape);
-        }
-        else {
-            rewriter.clone(op, oldToCloned);
-        }
-    }
-}
-
 /// Generate the quantum "backwards pass" of the adjoint operation using the stored gate parameters
 /// and cached control flow.
 void generateReversedQuantum(IRMapping &oldToCloned, Region &region, OpBuilder &builder,
-                             Value paramVector, TypedValue<ArrayListType> wireVector,
-                             DenseMap<Operation *, TypedValue<ArrayListType>> &controlFlowTapes)
+                             QuantumCache &cache)
 {
     assert(region.hasOneBlock() &&
            "Expected only structured control flow (each region should have a single block)");
@@ -319,7 +81,7 @@ void generateReversedQuantum(IRMapping &oldToCloned, Region &region, OpBuilder &
                 continue;
             }
 
-            Value tape = controlFlowTapes.at(forOp);
+            Value tape = cache.controlFlowTapes.at(forOp);
             // Popping the start, stop, and step implies that these are backwards relative to the
             // order they were pushed.
             Value step = builder.create<ListPopOp>(forOp.getLoc(), tape);
@@ -331,8 +93,7 @@ void generateReversedQuantum(IRMapping &oldToCloned, Region &region, OpBuilder &
                 forOp.getLoc(), start, stop, step, reversedResult,
                 [&](OpBuilder &builder, Location loc, Value iv, ValueRange iterArgs) {
                     oldToCloned.map(yieldedQureg.value(), iterArgs[0]);
-                    generateReversedQuantum(oldToCloned, forOp.getBodyRegion(), builder,
-                                            paramVector, wireVector, controlFlowTapes);
+                    generateReversedQuantum(oldToCloned, forOp.getBodyRegion(), builder, cache);
                     builder.create<scf::YieldOp>(
                         loc, oldToCloned.lookup(getQuantumReg(forOp.getRegionIterArgs()).value()));
                 });
@@ -345,7 +106,7 @@ void generateReversedQuantum(IRMapping &oldToCloned, Region &region, OpBuilder &
                 continue;
             }
 
-            Value tape = controlFlowTapes.at(ifOp);
+            Value tape = cache.controlFlowTapes.at(ifOp);
             Value condition = builder.create<ListPopOp>(ifOp.getLoc(), tape);
             condition =
                 builder.create<index::CastSOp>(ifOp.getLoc(), builder.getI1Type(), condition);
@@ -368,8 +129,7 @@ void generateReversedQuantum(IRMapping &oldToCloned, Region &region, OpBuilder &
                     std::optional<Value> yieldedQureg =
                         getQuantumReg(oldRegion.front().getTerminator()->getOperands());
                     oldToCloned.map(yieldedQureg.value(), reversedResult);
-                    generateReversedQuantum(oldToCloned, oldRegion, builder, paramVector,
-                                            wireVector, controlFlowTapes);
+                    generateReversedQuantum(oldToCloned, oldRegion, builder, cache);
                     builder.create<scf::YieldOp>(
                         loc, oldToCloned.lookup(findOldestQuregInRegion(oldRegion)));
                 };
@@ -391,7 +151,7 @@ void generateReversedQuantum(IRMapping &oldToCloned, Region &region, OpBuilder &
                 continue;
             }
 
-            Value tape = controlFlowTapes.at(whileOp);
+            Value tape = cache.controlFlowTapes.at(whileOp);
             Value numIterations = builder.create<ListPopOp>(whileOp.getLoc(), tape);
             Value c0 = builder.create<index::ConstantOp>(whileOp.getLoc(), 0);
             Value c1 = builder.create<index::ConstantOp>(whileOp.getLoc(), 1);
@@ -402,8 +162,7 @@ void generateReversedQuantum(IRMapping &oldToCloned, Region &region, OpBuilder &
                 /*bodyBuilder=*/
                 [&](OpBuilder &builder, Location loc, Value iv, ValueRange iterArgs) {
                     oldToCloned.map(yieldedQureg.value(), iterArgs[0]);
-                    generateReversedQuantum(oldToCloned, whileOp.getAfter(), builder, paramVector,
-                                            wireVector, controlFlowTapes);
+                    generateReversedQuantum(oldToCloned, whileOp.getAfter(), builder, cache);
                     builder.create<scf::YieldOp>(
                         loc, oldToCloned.lookup(
                                  getQuantumReg(whileOp.getAfter().front().getArguments()).value()));
@@ -413,7 +172,7 @@ void generateReversedQuantum(IRMapping &oldToCloned, Region &region, OpBuilder &
         else if (auto insertOp = dyn_cast<quantum::InsertOp>(&op)) {
             Value dynamicWire;
             if (!insertOp.getIdxAttr().has_value()) {
-                dynamicWire = builder.create<ListPopOp>(insertOp.getLoc(), wireVector);
+                dynamicWire = builder.create<ListPopOp>(insertOp.getLoc(), cache.wireVector);
             }
             auto extractOp = builder.create<quantum::ExtractOp>(
                 insertOp.getLoc(), insertOp.getQubit().getType(),
@@ -438,7 +197,7 @@ void generateReversedQuantum(IRMapping &oldToCloned, Region &region, OpBuilder &
                 ValueRange diffParams = differentiableGate.getDiffParams();
                 for (unsigned i = 0; i < diffParams.size(); i++) {
                     cachedParams.push_back(
-                        builder.create<ListPopOp>(differentiableGate.getLoc(), paramVector));
+                        builder.create<ListPopOp>(differentiableGate.getLoc(), cache.paramVector));
                 }
                 MutableOperandRange(clone, differentiableGate.getDiffOperandIdx(),
                                     diffParams.size())
@@ -453,7 +212,7 @@ void generateReversedQuantum(IRMapping &oldToCloned, Region &region, OpBuilder &
         else if (auto extractOp = dyn_cast<quantum::ExtractOp>(&op)) {
             Value dynamicWire;
             if (!extractOp.getIdxAttr().has_value()) {
-                dynamicWire = builder.create<ListPopOp>(extractOp.getLoc(), wireVector);
+                dynamicWire = builder.create<ListPopOp>(extractOp.getLoc(), cache.wireVector);
             }
             auto insertOp = builder.create<quantum::InsertOp>(
                 extractOp.getLoc(), extractOp.getQreg().getType(),
@@ -481,26 +240,11 @@ struct AdjointSingleOpRewritePattern : public mlir::OpRewritePattern<AdjointOp> 
                                         mlir::PatternRewriter &rewriter) const override
     {
         LLVM_DEBUG(dbgs() << "Adjointing the following:\n" << adjoint << "\n");
-        Location loc = adjoint.getLoc();
-        MLIRContext *ctx = rewriter.getContext();
-        auto paramVectorType = ArrayListType::get(ctx, rewriter.getF64Type());
-        auto wireVectorType = ArrayListType::get(ctx, rewriter.getI64Type());
-        auto controlFlowTapeType = ArrayListType::get(ctx, rewriter.getIndexType());
-        Value paramVector = rewriter.create<ListInitOp>(loc, paramVectorType);
-        auto wireVector = rewriter.create<ListInitOp>(loc, wireVectorType);
-        // Initialize the tapes that store the structure of control flow.
-        DenseMap<Operation *, TypedValue<ArrayListType>> controlFlowTapes;
-        adjoint.walk([&](Operation *op) {
-            if (isa<scf::ForOp, scf::IfOp, scf::WhileOp>(op)) {
-                auto tape = rewriter.create<catalyst::ListInitOp>(loc, controlFlowTapeType);
-                controlFlowTapes.insert({op, tape});
-            }
-        });
+        auto cache = QuantumCache::initialize(adjoint.getRegion(), rewriter, adjoint.getLoc());
 
         // First, copy the classical computations directly to the target insertion point.
         IRMapping oldToCloned;
-        cloneOnlyClassical(oldToCloned, adjoint.getRegion(), rewriter, paramVector, wireVector,
-                           controlFlowTapes);
+        cloneClassical(adjoint.getRegion(), oldToCloned, rewriter, cache);
 
         // Initialize the backward pass with the operand of the quantum.yield
         auto yieldOp = cast<quantum::YieldOp>(adjoint.getRegion().front().getTerminator());
@@ -508,8 +252,7 @@ struct AdjointSingleOpRewritePattern : public mlir::OpRewritePattern<AdjointOp> 
         oldToCloned.map(yieldOp.getOperands().front(), adjoint.getQreg());
 
         // Emit the adjoint quantum operations and reversed control flow, using cached values.
-        generateReversedQuantum(oldToCloned, adjoint.getRegion(), rewriter, paramVector, wireVector,
-                                controlFlowTapes);
+        generateReversedQuantum(oldToCloned, adjoint.getRegion(), rewriter, cache);
 
         // The final register is the re-mapped region argument of the original adjoint op.
         SmallVector<Value> reversedOutputs;
