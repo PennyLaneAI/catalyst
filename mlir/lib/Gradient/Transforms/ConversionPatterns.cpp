@@ -32,7 +32,6 @@
 
 #include "Gradient/IR/GradientOps.h"
 #include "Gradient/Transforms/Patterns.h"
-#include "Gradient/Utils/CompDiffArgIndices.h"
 #include "Gradient/Utils/GradientShape.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Utils/RemoveQuantumMeasurements.h"
@@ -203,19 +202,17 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         calleePtr = castToConvertedType(calleePtr, rewriter, loc);
         SmallVector<Value> callArgs = {calleePtr};
 
-        std::vector<size_t> diffArgIndices = catalyst::compDiffArgIndices(op.getDiffArgIndices());
+        const std::vector<size_t> &diffArgIndices = computeDiffArgIndices(op.getDiffArgIndices());
         getOrInsertEnzymeGlobal(rewriter, moduleOp, enzyme_const_key);
         getOrInsertEnzymeGlobal(rewriter, moduleOp, enzyme_dupnoneed_key);
 
-        int index = 0;
         ValueRange dataIn = adaptor.getDataIn();
         Value enzymeConst = rewriter.create<LLVM::AddressOfOp>(loc, LLVM::LLVMPointerType::get(ctx),
                                                                enzyme_const_key);
 
         // Add the arguments and their shadow on data in
-        for (Value arg : op.getArgs()) {
-            std::vector<size_t>::iterator it =
-                std::find(diffArgIndices.begin(), diffArgIndices.end(), index);
+        for (auto [index, arg] : llvm::enumerate(op.getArgs())) {
+            auto it = std::find(diffArgIndices.begin(), diffArgIndices.end(), index);
             if (it == diffArgIndices.end()) {
                 if (isa<MemRefType>(arg.getType())) {
                     // unpackMemRef will handle the appropriate enzyme_const annotations
@@ -230,7 +227,6 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
                 size_t position = std::distance(diffArgIndices.begin(), it);
                 unpackMemRef(arg, dataIn[position], callArgs, rewriter, loc, {.zeroOut = true});
             }
-            index++;
         }
 
         for (Value qJacobian : op.getQuantumJacobian()) {
