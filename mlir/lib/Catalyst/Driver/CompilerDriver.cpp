@@ -96,26 +96,6 @@ template <typename MLIRObject> std::string serializeMLIRObject(MLIRObject &obj)
     return output;
 }
 
-FailureOr<std::string> RunPassPipeline(StringRef source, StringRef passes)
-{
-    DialectRegistry registry;
-    registerAllCatalystDialects(registry);
-    MLIRContext context{registry};
-    OwningOpRef<ModuleOp> op = parseMLIRSource(&context, source, "jit source", llvm::errs());
-
-    auto pm = PassManager::on<ModuleOp>(&context);
-    if (!op || failed(parsePassPipeline(passes, pm))) {
-        return failure();
-    }
-
-    ModuleOp moduleOp = op.get();
-    if (failed(pm.run(moduleOp))) {
-        return failure();
-    }
-
-    return serializeMLIRObject(moduleOp);
-}
-
 FailureOr<llvm::Function *> getJITFunction(MLIRContext *ctx, llvm::Module &llvmModule)
 {
     Location loc = NameLoc::get(StringAttr::get(ctx, llvmModule.getName()));
@@ -172,7 +152,7 @@ LogicalResult inferMLIRReturnTypes(MLIRContext *ctx, llvm::Type *returnType,
 
 LogicalResult QuantumDriverMain(const CompilerSpec &spec,
                                 const CompilerOptions &options,
-                                FunctionAttributes &inferredData)
+                                CompilerOutput &output)
 {
     registerAllCatalystPasses();
     mhlo::registerAllMhloPasses();
@@ -189,22 +169,29 @@ LogicalResult QuantumDriverMain(const CompilerSpec &spec,
     llvm::LLVMContext llvmContext;
     std::unique_ptr<llvm::Module> llvmModule;
 
+    llvm::raw_string_ostream outIRStream(output.outIR);
+
     // First attempt to parse the input as an MLIR module.
     OwningOpRef<ModuleOp> op =
         parseMLIRSource(ctx, options.source, options.moduleName, options.diagnosticStream);
     if (op) {
-        if (failed(runDefaultLowering(spec, options, *op))) {
+        if (failed(runDefaultLowering(spec, options, *op, output.pipelineOutputs))) {
             return failure();
         }
 
-        llvmModule = translateModuleToLLVMIR(*op, llvmContext);
-        if (!llvmModule) {
-            return failure();
-        }
+        output.outIR.clear();
+        outIRStream << *op;
 
-        if (options.keepIntermediate) {
-            if (failed(catalyst::dumpToFile(options, "llvm_ir.ll", *llvmModule))) {
+        if (spec.attemptLLVMLowering) {
+            llvmModule = translateModuleToLLVMIR(*op, llvmContext);
+            if (!llvmModule) {
                 return failure();
+            }
+
+            if (options.keepIntermediate) {
+                if (failed(catalyst::dumpToFile(options, "llvm_ir.ll", *llvmModule))) {
+                    return failure();
+                }
             }
         }
     }
@@ -219,33 +206,37 @@ LogicalResult QuantumDriverMain(const CompilerSpec &spec,
         }
     }
 
-    // For feature parity with the previous driver, always return the LLVM module.
-    llvm::raw_string_ostream llvmIRStream(inferredData.llvmir);
-    llvmIRStream << *llvmModule;
+    if (llvmModule) {
 
-    // Attempt to infer the name and return type of the module from LLVM IR. This information is
-    // required when executing a module given as textual IR.
-    auto function = getJITFunction(options.ctx, *llvmModule);
-    if (succeeded(function)) {
-        inferredData.functionName = function.value()->getName().str();
+        output.outIR.clear();
+        outIRStream << *llvmModule;
 
-        // When inferring the return type from LLVM, assume a f64
-        // element type. This is because the LLVM pointer type is
-        // opaque and requires looking into its uses to infer its type.
-        SmallVector<RankedTensorType> returnTypes;
-        if (failed(inferMLIRReturnTypes(ctx, function.value()->getReturnType(),
-                                        Float64Type::get(ctx), returnTypes))) {
-            // Inferred return types are only required when compiling from textual IR. This
-            // inference failing is not a problem when compiling from Python.
+        // Attempt to infer the name and return type of the module from LLVM IR. This information is
+        // required when executing a module given as textual IR.
+        auto function = getJITFunction(options.ctx, *llvmModule);
+        if (succeeded(function)) {
+            output.inferredAttributes.functionName = function.value()->getName().str();
+
+            // When inferring the return type from LLVM, assume a f64
+            // element type. This is because the LLVM pointer type is
+            // opaque and requires looking into its uses to infer its type.
+            SmallVector<RankedTensorType> returnTypes;
+            if (failed(inferMLIRReturnTypes(ctx, function.value()->getReturnType(),
+                                            Float64Type::get(ctx), returnTypes))) {
+                // Inferred return types are only required when compiling from textual IR. This
+                // inference failing is not a problem when compiling from Python.
+            }
+            llvm::raw_string_ostream returnTypeStream(output.inferredAttributes.returnType);
+            llvm::interleaveComma(returnTypes, returnTypeStream, [](RankedTensorType tensorType) {
+                return serializeMLIRObject(tensorType);
+            });
         }
-        llvm::raw_string_ostream returnTypeStream(inferredData.returnType);
-        llvm::interleaveComma(returnTypes, returnTypeStream, [](RankedTensorType tensorType) {
-            return serializeMLIRObject(tensorType);
-        });
-    }
 
-    if (failed(compileObjectFile(std::move(llvmModule), options.getObjectFile()))) {
-        return failure();
+        auto outfile = options.getObjectFile();
+        if (failed(compileObjectFile(std::move(llvmModule), outfile))) {
+            return failure();
+        }
+        output.objectFilename = outfile;
     }
     return success();
 }

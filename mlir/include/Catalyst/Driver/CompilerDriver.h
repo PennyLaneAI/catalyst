@@ -30,8 +30,6 @@ struct FunctionAttributes {
     std::string functionName;
     /// The return type of the JIT entry point function.
     std::string returnType;
-    /// The lowered LLVM IR module (in textual form).
-    std::string llvmir;
 };
 
 /// Verbosity level
@@ -47,8 +45,9 @@ typedef enum {
 
 /// Pipeline descriptor
 struct Pipeline {
-    std::string name;
+    typedef std::string Name;
     typedef llvm::SmallVector<std::string> PassList;
+    std::string name;
     PassList passes;
 };
 
@@ -57,6 +56,7 @@ struct CompilerSpec {
     /// Ordered list of named pipelines to execute, each pipeline is described by a list of MLIR passes
     /// it includes.
     std::vector< Pipeline > pipelinesCfg;
+    bool attemptLLVMLowering;
 };
 
 /// Optional parameters, for which we provide reasonable default values.
@@ -85,16 +85,19 @@ struct CompilerOptions {
 };
 
 
-/// Run a given set of passes on an MLIR module.
-///
-/// The IR is supplied in textual form while the passes are expected in MLIR's command line
-/// interface form.
-mlir::FailureOr<std::string> RunPassPipeline(mlir::StringRef source, mlir::StringRef passes);
+struct CompilerOutput {
+    typedef std::unordered_map<Pipeline::Name, std::string> PipelineOutputs;
+    std::string objectFilename;
+    std::string outIR;
+    FunctionAttributes inferredAttributes;
+    PipelineOutputs pipelineOutputs;
+};
+
 
 /// Entry point to the MLIR portion of the compiler.
 mlir::LogicalResult QuantumDriverMain(const CompilerSpec &spec,
                                       const CompilerOptions &options,
-                                      FunctionAttributes &inferredData);
+                                      CompilerOutput &output);
 
 namespace llvm {
 

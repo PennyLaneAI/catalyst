@@ -21,17 +21,63 @@
 namespace py = pybind11;
 using namespace mlir::python::adaptors;
 
+
+std::vector<Pipeline>
+parseCompilerSpec(const py::list &pipelines) {
+    std::vector< Pipeline > out;
+    for (py::handle obj : pipelines) {
+        py::tuple t = obj.cast<py::tuple>();
+        auto i = t.begin();
+        auto py_name = i; i++;
+        auto py_passes = i; i++;
+        assert(i==t.end());
+        std::string name = py_name->attr("__str__")().cast<std::string>();
+        Pipeline::PassList passes;
+        std::transform(py_passes->begin(), py_passes->end(), std::back_inserter(passes),
+            [](py::handle p){ return p.attr("__str__")().cast<std::string>();});
+        out.push_back(Pipeline({name, passes}));
+    }
+    return out;
+}
+
+
 PYBIND11_MODULE(_catalystDriver, m)
 {
     //===--------------------------------------------------------------------===//
     // Catalyst Compiler Driver
     //===--------------------------------------------------------------------===//
+    py::class_<FunctionAttributes> funcattrs_class(m, "FunctionAttributes");
+    funcattrs_class.def(py::init<>())
+        .def("getFunctionName", [](const FunctionAttributes &fa) -> std::string {
+            return fa.functionName;
+        })
+        .def("getReturnType", [](const FunctionAttributes &fa) -> std::string {
+            return fa.returnType;
+        })
+        ;
+
+    py::class_<CompilerOutput> compout_class(m, "CompilerOutput");
+    compout_class.def(py::init<>())
+        .def("getPipelineOutput", [](const CompilerOutput &co, const std::string &name) -> std::string {
+            auto res = co.pipelineOutputs.find(name);
+            return res != co.pipelineOutputs.end() ? res->second : "";
+        })
+        .def("getOutputIR", [](const CompilerOutput &co) -> std::string {
+            return co.outIR;
+        })
+        .def("getObjectFilename", [](const CompilerOutput &co) -> std::string {
+            return co.objectFilename;
+        })
+        .def("getFunctionAttributes", [](const CompilerOutput &co) -> FunctionAttributes {
+            return co.inferredAttributes;
+        })
+        ;
 
     m.def(
         "compile_asm",
         [](const char *source, const char *workspace, const char *moduleName,
            bool inferFunctionAttrs, bool keepIntermediate, bool verbose,
-           py::list pipelines)
+           py::list pipelines, bool attemptLLVMLowering) //-> CompilerOutput *
         {
             FunctionAttributes inferredAttributes;
             mlir::MLIRContext ctx;
@@ -39,23 +85,8 @@ PYBIND11_MODULE(_catalystDriver, m)
             Verbosity verbosity = verbose ? CO_VERB_ALL : CO_VERB_SILENT;
             llvm::raw_string_ostream errStream{errors};
 
-            CompilerSpec spec;
-            {
-                for (py::handle obj : pipelines) {
-                    py::tuple t = obj.cast<py::tuple>();
-                    auto i = t.begin();
-                    auto py_name = i; i++;
-                    auto py_passes = i; i++;
-                    assert(i==t.end());
-                    std::string name = py_name->attr("__str__")().cast<std::string>();
-                    Pipeline::PassList passes;
-                    std::transform(py_passes->begin(), py_passes->end(), std::back_inserter(passes),
-                        [](py::handle p){ return p.attr("__str__")().cast<std::string>();});
-                    spec.pipelinesCfg.push_back(Pipeline({name, passes}));
-                    errStream << spec.pipelinesCfg.back() << "\n";
-                }
-            }
-
+            CompilerSpec spec{.pipelinesCfg = parseCompilerSpec(pipelines),
+                              .attemptLLVMLowering = attemptLLVMLowering };
             CompilerOptions options{.ctx = &ctx,
                                     .source = source,
                                     .workspace = workspace,
@@ -64,29 +95,20 @@ PYBIND11_MODULE(_catalystDriver, m)
                                     .keepIntermediate = keepIntermediate,
                                     .verbosity = verbosity};
 
+            CompilerOutput *output = new CompilerOutput();
+            assert(output);
 
-            if (mlir::failed(QuantumDriverMain(spec, options, inferredAttributes))) {
+            if (mlir::failed(QuantumDriverMain(spec, options, *output))) {
                 throw std::runtime_error("Compilation failed:\n" + errors);
             }
             if (verbosity > CO_VERB_SILENT && !errors.empty()) {
                 py::print(errors);
             }
 
-            return std::make_tuple(options.getObjectFile(), inferredAttributes.llvmir,
-                                   inferredAttributes.functionName, inferredAttributes.returnType);
+            return output;
         },
         py::arg("source"), py::arg("workspace"), py::arg("module_name") = "jit source",
         py::arg("infer_function_attrs") = false, py::arg("keep_intermediate") = false,
-        py::arg("verbose") = false, py::arg("pipelines") = py::list());
-
-    m.def(
-        "mlir_run_pipeline",
-        [](const char *source, const char *pipeline) {
-            auto result = RunPassPipeline(source, pipeline);
-            if (mlir::failed(result)) {
-                throw std::runtime_error("Pass pipeline failed");
-            }
-            return result.value();
-        },
-        py::arg("source"), py::arg("pipeline"));
+        py::arg("verbose") = false, py::arg("pipelines") = py::list(),
+        py::arg("attemptLLVMLowering") = true);
 }

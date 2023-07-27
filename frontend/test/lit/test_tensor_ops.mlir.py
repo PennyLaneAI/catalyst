@@ -21,15 +21,7 @@ from catalyst import measure, qjit
 
 # TODO: Update these tests to use the C++ compiler driver
 # The C++ driver is missing the `print_stage` functionality
-from catalyst.compiler import (
-    BufferizationPass,
-    CompilerDriver,
-    LLVMDialectToLLVMIR,
-    LLVMIRToObjectFile,
-    MHLOPass,
-    MLIRToLLVMDialect,
-    QuantumCompilationPass,
-)
+from catalyst.compiler import PIPELINES
 
 # Test methodology:
 # Each mathematical function found in numpy
@@ -42,15 +34,7 @@ from catalyst.compiler import (
 # jnp.hypot
 
 
-pipelines = [
-    MHLOPass,
-    QuantumCompilationPass,
-    BufferizationPass,
-    MLIRToLLVMDialect,
-    LLVMDialectToLLVMIR,
-    LLVMIRToObjectFile,
-    CompilerDriver,
-]
+pipelines = PIPELINES
 
 
 # CHECK-LABEL: test_ewise_arctan2
