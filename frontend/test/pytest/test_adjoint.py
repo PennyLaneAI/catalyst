@@ -277,7 +277,10 @@ def test_adjoint_classical_loop():
 
 
 def run_catalyst_against_pennylane(quantum_func, device, *args):
-    """A helper function for verifying Catalyst's native adjoint against the behaviour of PennyLane's adjoint function."""
+    """
+    A helper function for verifying Catalyst's native adjoint against the behaviour of PennyLane's
+    adjoint function.
+    """
 
     @qjit
     @qml.qnode(device)
@@ -309,7 +312,10 @@ def test_adjoint_cond(backend, pred):
 
 
 def test_adjoint_while_loop(backend):
-    """Tests that the correct gates are applied in reverse in a while loop with a statically unknown number of iterations."""
+    """
+    Tests that the correct gates are applied in reverse in a while loop with a statically unknown
+    number of iterations.
+    """
 
     def func(limit):
         qml.PauliY(wires=0)
@@ -372,6 +378,11 @@ def test_adjoint_while_nested(backend):
 
 
 def test_adjoint_for_nested(backend):
+    """
+    Tests the adjoint op with nested and interspersed for/while loops that produce classical
+    values in addition to quantum ones
+    """
+
     def func(theta):
         @for_loop(0, 6, 1)
         def loop_outer(iv):
