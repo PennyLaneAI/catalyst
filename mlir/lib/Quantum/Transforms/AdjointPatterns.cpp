@@ -83,10 +83,7 @@ class AdjointGenerator {
                 visitOperation(whileOp);
             }
             else if (auto insertOp = dyn_cast<quantum::InsertOp>(op)) {
-                Value dynamicWire;
-                if (!insertOp.getIdxAttr().has_value()) {
-                    dynamicWire = builder.create<ListPopOp>(insertOp.getLoc(), cache.wireVector);
-                }
+                Value dynamicWire = getDynamicWire(insertOp);
                 auto extractOp = builder.create<quantum::ExtractOp>(
                     insertOp.getLoc(), insertOp.getQubit().getType(),
                     remappedValues.lookup(insertOp.getOutQreg()), dynamicWire,
@@ -94,6 +91,14 @@ class AdjointGenerator {
                 remappedValues.map(insertOp.getQubit(), extractOp.getResult());
                 remappedValues.map(insertOp.getInQreg(),
                                    remappedValues.lookup(insertOp.getOutQreg()));
+            }
+            else if (auto extractOp = dyn_cast<quantum::ExtractOp>(op)) {
+                Value dynamicWire = getDynamicWire(extractOp);
+                auto insertOp = builder.create<quantum::InsertOp>(
+                    extractOp.getLoc(), extractOp.getQreg().getType(),
+                    remappedValues.lookup(extractOp.getQreg()), dynamicWire,
+                    extractOp.getIdxAttrAttr(), remappedValues.lookup(extractOp.getQubit()));
+                remappedValues.map(extractOp.getQreg(), insertOp.getResult());
             }
             else if (auto gate = dyn_cast<quantum::QuantumGate>(op)) {
                 for (const auto &[qubitResult, qubitOperand] :
@@ -124,17 +129,6 @@ class AdjointGenerator {
                     remappedValues.map(qubitOperand, qubitResult);
                 }
             }
-            else if (auto extractOp = dyn_cast<quantum::ExtractOp>(op)) {
-                Value dynamicWire;
-                if (!extractOp.getIdxAttr().has_value()) {
-                    dynamicWire = builder.create<ListPopOp>(extractOp.getLoc(), cache.wireVector);
-                }
-                auto insertOp = builder.create<quantum::InsertOp>(
-                    extractOp.getLoc(), extractOp.getQreg().getType(),
-                    remappedValues.lookup(extractOp.getQreg()), dynamicWire,
-                    extractOp.getIdxAttrAttr(), remappedValues.lookup(extractOp.getQubit()));
-                remappedValues.map(extractOp.getQreg(), insertOp.getResult());
-            }
             else if (auto adjointOp = dyn_cast<quantum::AdjointOp>(&op)) {
                 BlockArgument regionArg = adjointOp.getRegion().getArgument(0);
                 Value result = adjointOp.getResult();
@@ -143,6 +137,15 @@ class AdjointGenerator {
                 remappedValues.map(adjointOp.getQreg(), reversedResult);
             }
         }
+    }
+
+    template <typename IndexingOp> Value getDynamicWire(IndexingOp op)
+    {
+        Value dynamicWire;
+        if (!op.getIdxAttr().has_value()) {
+            dynamicWire = builder.create<ListPopOp>(op.getLoc(), cache.wireVector);
+        }
+        return dynamicWire;
     }
 
     std::optional<Value> getQuantumReg(ValueRange values)
