@@ -624,15 +624,12 @@ class QJIT:
         data = self.compiled_function(*args, **kwargs)
 
         # Unflatten the return value w.r.t. the original PyTree definition if available
-        if self.pytree_dict and "func_return_value" in self.pytree_dict.keys():
+        if "func_return_value" in self.pytree_dict:
             data = jax.tree_util.tree_unflatten(self.pytree_dict["func_return_value"], data)
 
         # For the classical and pennylane_extensions compilation path,
-        if isinstance(data, (list, tuple)):
-            if len(data) == 0:
-                return None
-            elif len(data) == 1:
-                return data[0]
+        if isinstance(data, (list, tuple)) and len(data) == 1:
+            return data[0]
 
         return data
 
