@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Test PyTree support in Catalyst."""
+
 import jax.numpy as jnp
 import pennylane as qml
 import pytest
@@ -109,6 +111,26 @@ class TestReturnValues:
         assert result[0][0][0] + result[0][0][1] == result[0][1]
         assert result[0][0][0] * result[0][0][1] == result[1]
 
+        @qml.qnode(qml.device(backend, wires=2, shots=100))
+        def circuit3(params):
+            qml.RX(params[0], wires=0)
+            qml.RX(params[1], wires=1)
+            return (
+                qml.counts(),
+                qml.state(),
+                qml.expval(qml.PauliZ(0)),
+            )
+
+        params = [0.5, 0.6]
+        expected_expval = 0.87758256
+
+        jitted_fn = qjit(circuit3)
+        result = jitted_fn(params)
+        assert isinstance(result, tuple)
+        assert isinstance(result[0], tuple)
+        assert len(result[1]) == 4
+        assert jnp.allclose(result[2], expected_expval)
+
         @qjit
         def workflow(x):
             def _f(x):
@@ -133,10 +155,12 @@ class TestReturnValues:
         @qjit
         def workflow1(param):
             a = circuit1()
-            return (a, [jnp.sin(param), jnp.cos(param)])
+            return (a, [jnp.sin(param) ** 2, jnp.cos(param) ** 2], a)
 
         result = workflow1(1.27)
         assert isinstance(result, tuple)
+        assert jnp.allclose(result[0], result[2])
+        assert jnp.allclose(result[1][0] + result[1][1], 1.0)
 
     def test_return_value_cond(self, backend):
         """Test conditionals."""
@@ -147,34 +171,46 @@ class TestReturnValues:
         def circuit1(n):
             @cond(n > 4)
             def cond_fn():
-                return n**2
+                return n**2, (n**3, n**4)
 
             @cond_fn.otherwise
             def else_fn():
-                return n
+                return n, (n**2, n**3)
 
             return cond_fn()
 
-        assert circuit1(0) == 0
-        assert circuit1(2) == 2
-        assert circuit1(5) == 25
+        res2 = circuit1(2)
+        assert res2[0] == 2
+        assert res2[1] == (4, 8)
+
+        res5 = circuit1(5)
+        assert res5[0] == 25
+        assert res5[1] == (125, 625)
 
         # Classical Path.
         @qjit
         def circuit2(n):
             @cond(n > 4)
             def cond_fn():
-                return n**2
+                return n**2, (n**3, n**4)
 
             @cond_fn.otherwise
             def else_fn():
-                return n
+                return n, (n**2, n**3)
 
-            return cond_fn()
+            return {
+                "cond": cond_fn(),
+                "const": n,
+                "classical": n * jnp.pi,
+            }
 
-        assert circuit2(0) == 0
-        assert circuit2(2) == 2
-        assert circuit2(5) == 25
+        res2 = circuit2(2)
+        assert res2["cond"][1] == (4, 8)
+        assert res2["const"] == 2
+
+        res5 = circuit2(5)
+        assert res5["cond"][1] == (125, 625)
+        assert res5["const"] == 5
 
     def test_return_value_dict(self, backend):
         """Test dictionaries."""
@@ -197,6 +233,28 @@ class TestReturnValues:
         assert jnp.allclose(result["w0"], expected["w0"])
         assert jnp.allclose(result["w1"], expected["w1"])
 
+        @qml.qnode(qml.device(backend, wires=2, shots=100))
+        def circuit2(params):
+            qml.RX(params[0], wires=0)
+            qml.RX(params[1], wires=1)
+            return {
+                "counts": qml.counts(),
+                "state": qml.state(),
+                "expval": {
+                    "z0": qml.expval(qml.PauliZ(0)),
+                },
+            }
+
+        params = [0.5, 0.6]
+        expected_expval = 0.87758256
+
+        jitted_fn = qjit(circuit2)
+        result = jitted_fn(params)
+        assert isinstance(result, dict)
+        assert isinstance(result["counts"], tuple)
+        assert len(result["state"]) == 4
+        assert jnp.allclose(result["expval"]["z0"], expected_expval)
+
         @qjit
         def workflow1(param):
             return {"w": jnp.sin(param), "q": jnp.cos(param)}
@@ -204,6 +262,7 @@ class TestReturnValues:
         result = workflow1(jnp.pi / 2)
         assert isinstance(result, dict)
         assert result["w"] == 1
+
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])

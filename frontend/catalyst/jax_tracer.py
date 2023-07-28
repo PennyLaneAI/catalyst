@@ -30,8 +30,8 @@ from jax.interpreters.mlir import (
     lowerable_effects,
 )
 from jax.interpreters.partial_eval import DynamicJaxprTracer
-from jax.tree_util import tree_flatten, tree_unflatten
-from pennylane.measurements import MeasurementProcess
+from jax.tree_util import tree_flatten, tree_structure, tree_unflatten
+from pennylane.measurements import CountsMP, MeasurementProcess
 from pennylane.operation import Wires
 
 import catalyst.jax_primitives as jprim
@@ -41,7 +41,7 @@ from catalyst.utils.tracing import TracingContext
 KNOWN_NAMED_OBS = (qml.Identity, qml.PauliX, qml.PauliY, qml.PauliZ, qml.Hadamard)
 
 
-def get_mlir(func, pytree_dict={}, *args, **kwargs):
+def get_mlir(func, pytree_dict, *args, **kwargs):
     """Lower a Python function into an MLIR module.
 
     Args:
@@ -61,16 +61,11 @@ def get_mlir(func, pytree_dict={}, *args, **kwargs):
     # if we wanted to compile a single python function multiple times with different options.
     jprim.mlir_fn_cache.clear()
 
-    # import pdb
-    # pdb.set_trace()
-
     with TracingContext():
         jaxpr, shape = jax.make_jaxpr(func, return_shape=True)(*args, **kwargs)
 
-    _, pytree_dict["func_return_value"] = tree_flatten(shape)
-
-    # import pdb
-    # pdb.set_trace()
+    # Store the func_return_value PyTree definition to be used later by QJIT
+    pytree_dict["func_return_value"] = tree_structure(shape)
 
     nrep = jaxpr_replicas(jaxpr)
     effects = [eff for eff in jaxpr.effects if eff in jax.core.ordered_effects]
@@ -90,7 +85,7 @@ def get_mlir(func, pytree_dict={}, *args, **kwargs):
     return module, context, jaxpr
 
 
-def get_traceable_fn(qfunc, device, pytree_dict):
+def get_traceable_fn(qfunc, device):
     """Generate a function suitable for jax tracing with custom quantum primitives.
 
     Args:
@@ -124,6 +119,18 @@ def get_traceable_fn(qfunc, device, pytree_dict):
                     if isinstance(ret_val, MeasurementProcess):
                         meas_return_values.append(ret_val)
                         meas_ret_val_indices.append(i)
+                        if isinstance(ret_val, CountsMP):
+                            counts_tree = tree_structure(("keys", "counts"))
+                            meas_return_trees_children = meas_return_trees.children()
+                            if len(meas_return_trees_children):
+                                meas_return_trees_children[i] = counts_tree
+                                meas_return_trees = (
+                                    meas_return_trees.make_from_node_data_and_children(
+                                        meas_return_trees.node_data(), meas_return_trees_children
+                                    )
+                                )
+                            else:
+                                meas_return_trees = counts_tree
                     else:
                         non_meas_return_values.append(ret_val)
 
@@ -143,9 +150,6 @@ def get_traceable_fn(qfunc, device, pytree_dict):
         )
 
         jprim.qdealloc(qreg)
-
-        # Store the meas_return_value PyTree definition to be used later by QJIT.__call__
-        pytree_dict["meas_return_value"] = meas_return_trees
 
         return_values = tree_unflatten(meas_return_trees, return_values)
 

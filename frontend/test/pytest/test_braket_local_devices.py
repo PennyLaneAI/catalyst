@@ -690,10 +690,10 @@ class TestBraketMeasurementsProcess:
         assert result[0].shape[0] == 100
 
         # qml.counts
-        assert sum(result[2]) == 100
+        assert sum(result[1][1]) == 100
 
         # qml.probs
-        assert result[3][0] > result[3][1]
+        assert result[2][0] > result[2][1]
 
     @pytest.mark.parametrize(
         "device",

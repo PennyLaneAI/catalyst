@@ -32,7 +32,7 @@ from jax._src.lax.control_flow import (
 from jax._src.lax.lax import _abstractify
 from jax.core import ShapedArray
 from jax.linear_util import wrap_init
-from jax.tree_util import tree_flatten, tree_unflatten, treedef_is_leaf
+from jax.tree_util import tree_flatten, tree_structure, tree_unflatten, treedef_is_leaf
 from pennylane import QNode
 from pennylane.measurements import MidMeasureMP
 from pennylane.operation import AnyWires, Operation, Operator, Wires
@@ -116,7 +116,7 @@ class QFunc:
         self.device = device
         functools.update_wrapper(self, fn)
 
-    def __call__(self, pytree_dict, *args, **kwargs):
+    def __call__(self, *args, **kwargs):
         if isinstance(self, qml.QNode):
             if self.device.short_name not in QFunc.RUNTIME_DEVICES:
                 raise CompileError(
@@ -141,9 +141,9 @@ class QFunc:
             # Allow QFunc to still be used by itself for internal testing.
             device = self.device
 
-        traceable_fn = get_traceable_fn(self.func, device, pytree_dict)
+        traceable_fn = get_traceable_fn(self.func, device)
         jaxpr, shape = jax.make_jaxpr(traceable_fn, return_shape=True)(*args)
-        _, retval_tree = tree_flatten(shape)
+        retval_tree = tree_structure(shape)
 
         def _eval_jaxpr(*args):
             return jax.core.eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *args)
@@ -170,7 +170,6 @@ def qfunc(num_wires, *, shots=1000, device=None):
         Grad: A QFunc object that denotes the the declaration of a quantum function.
 
     """
-
     if not device:
         device = QJITDevice(shots=shots, wires=num_wires)
 
@@ -199,7 +198,7 @@ class Function:
 
     def __call__(self, *args, **kwargs):
         jaxpr, shape = jax.make_jaxpr(self.fn, return_shape=True)(*args)
-        _, shape_tree = tree_flatten(shape)
+        shape_tree = tree_structure(shape)
 
         def _eval_jaxpr(*args):
             return jax.core.eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *args)
@@ -349,6 +348,8 @@ class Grad:
             "catalyst.grad can only be used from within @qjit decorated code."
         )
         jaxpr = _make_jaxpr_check_differentiable(self.fn, self.grad_params, *args)
+
+        # It always returns list as required by catalyst control-flows
         return jprim.grad_p.bind(*args, jaxpr=jaxpr, fn=self, grad_params=self.grad_params)
 
 

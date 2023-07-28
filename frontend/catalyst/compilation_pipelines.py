@@ -463,7 +463,7 @@ class QJIT:
         self._mlir = None
         self._llvmir = None
         self.mlir_module = None
-        self.pytree_dict = dict()
+        self.pytree_dict = {}
         self.compiled_function = None
         parameter_types = get_type_annotations(self.qfunc)
         self.user_typed = False
@@ -513,11 +513,8 @@ class QJIT:
         """
         self.c_sig = CompiledFunction.get_runtime_signature(*args)
 
-        def qfunc_closure(_, *args, **kwargs):
-            return QFunc.__call__(_, self.pytree_dict, *args, **kwargs)
-
         with Patcher(
-            (qml.QNode, "__call__", qfunc_closure),
+            (qml.QNode, "__call__", QFunc.__call__),
         ):
             mlir_module, ctx, jaxpr = tracer.get_mlir(self.qfunc, self.pytree_dict, *self.c_sig)
 
