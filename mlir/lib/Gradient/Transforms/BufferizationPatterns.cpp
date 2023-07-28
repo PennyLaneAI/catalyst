@@ -77,7 +77,7 @@ class BufferizeBackpropOp : public OpConversionPattern<BackpropOp> {
 
         DenseIntElementsAttr diffArgIndicesAttr = adaptor.getDiffArgIndices().value_or(nullptr);
         rewriter.create<BackpropOp>(loc, TypeRange{}, adaptor.getCalleeAttr(), adaptor.getArgs(),
-                                    adaptor.getQuantumJacobian(), memrefValues, diffArgIndicesAttr);
+                                    adaptor.getCotangents(), memrefValues, diffArgIndicesAttr);
         rewriter.replaceOp(op, memrefValues);
         return success();
     }

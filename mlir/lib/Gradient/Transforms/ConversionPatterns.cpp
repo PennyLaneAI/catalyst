@@ -229,21 +229,21 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
             }
         }
 
-        for (Value qJacobian : op.getQuantumJacobian()) {
+        for (Value cotangent : op.getCotangents()) {
             // Enzyme requires buffers for the primal outputs, but we don't need their values.
             // We'll need to allocate space for them regardless, so marking them as dupNoNeed will
             // allow Enzyme to optimize away their computation.
-            auto memrefType = cast<MemRefType>(qJacobian.getType());
+            auto memrefType = cast<MemRefType>(cotangent.getType());
             SmallVector<Value> dynamicDims;
             for (int64_t dim = 0; dim < memrefType.getRank(); dim++) {
                 if (memrefType.isDynamicDim(dim)) {
                     Value dimIndex = rewriter.create<index::ConstantOp>(loc, dim);
-                    dynamicDims.push_back(rewriter.create<memref::DimOp>(loc, qJacobian, dimIndex));
+                    dynamicDims.push_back(rewriter.create<memref::DimOp>(loc, cotangent, dimIndex));
                 }
             }
             Value result = rewriter.create<memref::AllocOp>(loc, memrefType, dynamicDims);
 
-            unpackMemRef(result, qJacobian, callArgs, rewriter, loc, {.dupNoNeed = true});
+            unpackMemRef(result, cotangent, callArgs, rewriter, loc, {.dupNoNeed = true});
         }
 
         // The results of backprop are in data in

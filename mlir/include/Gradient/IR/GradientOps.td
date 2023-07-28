@@ -70,7 +70,7 @@ def AdjointOp : Gradient_Op<"adjoint", [AttrSizedOperandSegments]> {
         FlatSymbolRefAttr:$callee,
         Index:$gradSize,
         Variadic<AnyType>:$args,
-        Variadic<AnyMemRef>:$data_in
+        Variadic<MemRefOf<[AnyFloat]>>:$data_in
     );
 
     let results = (outs
@@ -88,27 +88,30 @@ def AdjointOp : Gradient_Op<"adjoint", [AttrSizedOperandSegments]> {
     }];
 }
 
-def BackpropOp : Gradient_Op<"backprop", [AttrSizedOperandSegments]> {
+def BackpropOp : Gradient_Op<"backprop", [AttrSizedOperandSegments,
+        DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
     let summary = "Perform classic automatic differentiation using Enzyme AD.";
 
     let arguments = (ins
         FlatSymbolRefAttr:$callee,
         Variadic<AnyType>:$args,
-        Variadic<AnyType>:$quantum_jacobian,
-        Variadic<AnyMemRef>:$data_in,
+        Variadic<AnyTypeOf<[
+            RankedTensorOf<[AnyFloat]>,
+            MemRefOf<[AnyFloat]>
+        ]>>:$cotangents,
+        Variadic<MemRefOf<[AnyFloat]>>:$data_in,
         OptionalAttr<AnyIntElementsAttr>:$diffArgIndices
     );
 
     let results = (outs
-        Variadic<AnyTypeOf<[
-            AnyFloat,
-            RankedTensorOf<[AnyFloat]>,
-        ]>>
+        Variadic<RankedTensorOf<[AnyFloat]>>:$gradients
     );
+
+    let hasVerifier = 1;
 
     let assemblyFormat = [{
         $callee `(` $args `)`
-        `qjacobian` `(` $quantum_jacobian`:` type($quantum_jacobian) `)`
+        `cotangents` `(` $cotangents `:` type($cotangents) `)`
         ( `in` `(` $data_in^ `:` type($data_in) `)` )?
         attr-dict `:` functional-type($args, results)
     }];

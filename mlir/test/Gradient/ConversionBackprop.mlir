@@ -70,7 +70,7 @@ func.func @backpropArgmap(%arg0: memref<f64>, %arg1: memref<?xf64>) -> memref<f6
     // CHECK: llvm.call @__enzyme_autodiff([[argmapCasted]], [[enzymeConst]], [[arg0Allocated]], [[arg0Aligned]], [[shadowAligned]], [[arg0Offset]], [[enzymeConst]], [[outputAllocated]], [[enzymeDupNoNeed]], [[outputAligned]], [[qJacobianAligned]], [[outputOffset]], [[outputSize]], [[outputStride]])
 
     %alloc0 = memref.alloc() : memref<f64>
-    gradient.backprop @argmap(%arg0) qjacobian(%arg1: memref<?xf64>) in(%alloc0 : memref<f64>) {diffArgIndices=dense<0> : tensor<1xindex>} : (memref<f64>) -> ()
+    gradient.backprop @argmap(%arg0) cotangents(%arg1: memref<?xf64>) in(%alloc0 : memref<f64>) {diffArgIndices=dense<0> : tensor<1xindex>} : (memref<f64>) -> ()
 
     return %alloc0: memref<f64>
 }

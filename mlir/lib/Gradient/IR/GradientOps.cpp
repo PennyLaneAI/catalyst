@@ -298,3 +298,38 @@ LogicalResult VJPOp::verify()
         return emitOpError("got invalid differentiation method: ") << method;
     return success();
 }
+
+//===----------------------------------------------------------------------===//
+// Backprop SymbolUserOpInterface
+//===----------------------------------------------------------------------===//
+
+LogicalResult BackpropOp::verifySymbolUses(SymbolTableCollection &symbolTable)
+{
+    // Check that the callee attribute refers to a valid function.
+    func::FuncOp fn = symbolTable.lookupNearestSymbolFrom<func::FuncOp>(this->getOperation(),
+                                                                        this->getCalleeAttr());
+    if (!fn)
+        return this->emitOpError("invalid function name specified: ") << this->getCallee();
+
+    return success();
+}
+
+//===----------------------------------------------------------------------===//
+// BackpropOp Extra methods
+//===----------------------------------------------------------------------===//
+
+LogicalResult BackpropOp::verify()
+{
+    size_t numDiffArgs =
+        this->getDiffArgIndices().has_value() ? this->getDiffArgIndicesAttr().size() : 1;
+
+    if (this->getDataIn().size() && this->getNumResults())
+        return emitOpError("cannot have both tensor results and memref output arguments");
+
+    if (this->getDataIn().size() + this->getNumResults() != numDiffArgs)
+        return emitOpError("number of gradient results did not match number of differentiable")
+               << " arguments, expected " << numDiffArgs << " but got "
+               << this->getDataIn().size() + this->getNumResults();
+
+    return success();
+}
