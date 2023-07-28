@@ -613,10 +613,6 @@ class QJIT:
         if TracingContext.is_tracing():
             return self.qfunc(*args, **kwargs)
 
-        import pdb
-
-        pdb.set_trace()
-
         function, args = self._maybe_promote(self.compiled_function, *args)
         recompilation_needed = function != self.compiled_function
         self.compiled_function = function
@@ -632,13 +628,14 @@ class QJIT:
 
         # Unflatten the return value w.r.t. the original PyTree definition if available
         if self.pytree_dict and "func_return_value" in self.pytree_dict.keys():
-            return jax.tree_util.tree_unflatten(self.pytree_dict["func_return_value"], data)
+            data = jax.tree_util.tree_unflatten(self.pytree_dict["func_return_value"], data)
 
-        # For the classical compilation path,
-        if len(data) == 0:
-            return None
-        elif len(data) == 1:
-            return data[0]
+        # For the classical and pennylane_extensions compilation path,
+        if isinstance(data, (list, tuple)):
+            if len(data) == 0:
+                return None
+            elif len(data) == 1:
+                return data[0]
 
         return data
 

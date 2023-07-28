@@ -110,12 +110,16 @@ class TestReturnValues:
         assert result[0][0][0] * result[0][0][1] == result[1]
 
         @qjit
-        def workflow1(param):
-            return {"w": jnp.sin(param), "q": jnp.cos(param)}
+        def workflow(x):
+            def _f(x):
+                return (2 * x, 3 * x)
 
-        result = workflow1(jnp.pi / 2)
-        assert isinstance(result, dict)
-        assert result["w"] == 1
+            return _f(x)
+
+        result = workflow(2.0)
+        assert isinstance(result, tuple)
+        assert result[0] == 4.0
+        assert result[1] == 6.0
 
     def test_return_value_hybrid(self, backend):
         """Test tuples."""
@@ -176,7 +180,7 @@ class TestReturnValues:
         """Test dictionaries."""
 
         @qml.qnode(qml.device(backend, wires=2))
-        def circuit(params):
+        def circuit1(params):
             qml.RX(params[0], wires=0)
             qml.RX(params[1], wires=1)
             return {
@@ -184,7 +188,7 @@ class TestReturnValues:
                 "w1": qml.expval(qml.PauliZ(1)),
             }
 
-        jitted_fn = qjit(circuit)
+        jitted_fn = qjit(circuit1)
 
         params = [0.2, 0.6]
         expected = {"w0": 0.98006658, "w1": 0.82533561}
@@ -193,30 +197,13 @@ class TestReturnValues:
         assert jnp.allclose(result["w0"], expected["w0"])
         assert jnp.allclose(result["w1"], expected["w1"])
 
-    # def test_return_value_dict(self):
-    #     """Test a function with returning a nonhomogenous dictionary."""
+        @qjit
+        def workflow1(param):
+            return {"w": jnp.sin(param), "q": jnp.cos(param)}
 
-    #     @qml.qnode(qml.device("lightning.qubit", wires=2))
-    #     def circuit(params):
-    #         qml.RX(params[0], wires=0)
-    #         qml.RX(params[1], wires=1)
-    #         return { 'w0' : qml.expval(qml.PauliZ(0)),
-    #                  'w1' : qml.expval(qml.PauliZ(1)),
-    #         }
-
-    #     params = [0.2, 0.6]
-    #     jitted_fn = qjit(circuit)
-    #     result = jitted_fn(params)
-    #     assert isinstance(result, dict)
-
-    #     expected = {
-    #         'w0': 0.98006658,
-    #         'w1': 0.82533561
-    #     }
-
-    #     assert jnp.allclose(result['w0'], expected['w0'])
-    #     assert jnp.allclose(result['w1'], expected['w1'])
-
+        result = workflow1(jnp.pi / 2)
+        assert isinstance(result, dict)
+        assert result["w"] == 1
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])

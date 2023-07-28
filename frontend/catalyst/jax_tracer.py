@@ -61,18 +61,16 @@ def get_mlir(func, pytree_dict={}, *args, **kwargs):
     # if we wanted to compile a single python function multiple times with different options.
     jprim.mlir_fn_cache.clear()
 
-    import pdb
-
-    pdb.set_trace()
+    # import pdb
+    # pdb.set_trace()
 
     with TracingContext():
         jaxpr, shape = jax.make_jaxpr(func, return_shape=True)(*args, **kwargs)
 
     _, pytree_dict["func_return_value"] = tree_flatten(shape)
 
-    import pdb
-
-    pdb.set_trace()
+    # import pdb
+    # pdb.set_trace()
 
     nrep = jaxpr_replicas(jaxpr)
     effects = [eff for eff in jaxpr.effects if eff in jax.core.ordered_effects]
