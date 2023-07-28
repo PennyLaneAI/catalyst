@@ -18,10 +18,7 @@ import pennylane as qml
 from jax import numpy as jnp
 
 from catalyst import measure, qjit
-
-# TODO: Update these tests to use the C++ compiler driver
-# The C++ driver is missing the `print_stage` functionality
-from catalyst.compiler import PIPELINES
+from catalyst.compiler import DEFAULT_PIPELINES
 
 # Test methodology:
 # Each mathematical function found in numpy
@@ -33,8 +30,7 @@ from catalyst.compiler import PIPELINES
 # perhaps they rely on another function?
 # jnp.hypot
 
-
-pipelines = PIPELINES
+pipelines = DEFAULT_PIPELINES
 
 
 # CHECK-LABEL: test_ewise_arctan2
