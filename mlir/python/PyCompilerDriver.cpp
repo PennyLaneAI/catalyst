@@ -95,6 +95,7 @@ PYBIND11_MODULE(_catalystDriver, m)
                                     .keepIntermediate = keepIntermediate,
                                     .verbosity = verbosity};
 
+            errStream.flush();
             CompilerOutput *output = new CompilerOutput();
             assert(output);
 

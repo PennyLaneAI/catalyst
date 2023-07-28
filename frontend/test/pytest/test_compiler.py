@@ -22,23 +22,16 @@ import subprocess
 import sys
 import tempfile
 import warnings
+import pathlib
 
 import pennylane as qml
 import pytest
 
 from catalyst import qjit
 from catalyst.compiler import (
-#     BufferizationPass,
     CompileOptions,
     Compiler,
     CppCompiler,
-#     Enzyme,
-#     LLVMDialectToLLVMIR,
-#     LLVMIRToObjectFile,
-#     MHLOPass,
-#     MLIRToLLVMDialect,
-#     PassPipeline,
-#     QuantumCompilationPass,
 )
 from catalyst.jax_tracer import get_mlir
 from catalyst.utils.exceptions import CompileError
@@ -102,38 +95,6 @@ class TestCompilerWarnings:
 class TestCompilerErrors:
     """Test compiler's error messages."""
 
-    # def test_no_executable(self):
-    #     """Test that executable was set from a custom PassPipeline."""
-
-    #     class CustomClassWithNoExecutable(PassPipeline):
-    #         """Custom pipeline with missing executable."""
-
-    #         _default_flags = ["some-command-but-it-is-actually-a-flag"]
-
-    #     with pytest.raises(ValueError, match="Executable not specified."):
-    #         CustomClassWithNoExecutable.run("some-filename")
-
-    # @pytest.mark.parametrize(
-    #     "pipeline",
-    #     [
-    #         (MHLOPass),
-    #         (QuantumCompilationPass),
-    #         (BufferizationPass),
-    #         (MLIRToLLVMDialect),
-    #         (LLVMDialectToLLVMIR),
-    #         (LLVMIRToObjectFile),
-    #         (Enzyme)
-    #         # CompilerDiver is missing here because it has a different error message.
-    #     ],
-    # )
-    # def test_lower_mhlo_input_validation(self, pipeline):
-    #     """Test that error is raised if pass failed."""
-    #     with tempfile.NamedTemporaryFile(mode="w+", encoding="utf-8") as invalid_file:
-    #         invalid_file.write("These are invalid contents.")
-    #         invalid_file.flush()
-    #         with pytest.raises(CompileError, match=f"{pipeline.__name__} failed."):
-    #             pipeline.run(invalid_file.name)
-
     def test_link_failure(self):
         """Test that an exception is raised when all compiler possibilities are exhausted."""
         with tempfile.NamedTemporaryFile(mode="w+", encoding="utf-8", suffix=".o") as invalid_file:
@@ -143,49 +104,15 @@ class TestCompilerErrors:
                 with pytest.warns(UserWarning, match="Compiler cc failed during execution"):
                     CppCompiler.run(invalid_file.name, fallback_compilers=["cc"])
 
-    # @pytest.mark.parametrize(
-    #     "pipeline",
-    #     [
-    #         (MHLOPass),
-    #         (QuantumCompilationPass),
-    #         (BufferizationPass),
-    #         (MLIRToLLVMDialect),
-    #         (LLVMDialectToLLVMIR),
-    #         (Enzyme),
-    #         (LLVMIRToObjectFile),
-    #         (CppCompiler),
-    #     ],
-    # )
-    # def test_lower_file_not_found(self, pipeline):
-    #     """Test that exception is raised if file is not found."""
-    #     with pytest.raises(FileNotFoundError):
-    #         pipeline.run("this-file-does-not-exists.txt")
-
     def test_attempts_to_get_inexistent_intermediate_file(self):
         """Test return value if user request intermediate file that doesn't exist."""
         compiler = Compiler()
         result = compiler.get_output_of("inexistent-file")
         assert result is None
 
-    @pytest.mark.skip(reason="FIXME: test the same behavior using a new compiler driver")
-    def test_runtime_error(self):
-        """Test that an exception is emitted when the runtime raises a C++ exception."""
-
-        class CompileCXXException:
-            """Class that overrides the program to be compiled."""
-
-            _executable = "cc"
-            _default_flags = ["-shared", "-fPIC", "-x", "c++"]
-
-            @staticmethod
-            def get_output_filename(infile):
-                """Get the name of the output file based on the input file."""
-                return infile.replace(".mlir", ".o")
-
-            @staticmethod
-            def run(infile, **_kwargs):
-                """Run the compilation step."""
-                contents = """
+    def test_runtime_error(self, backend):
+        """Test with non-default flags."""
+        contents = """
 #include <stdexcept>
 extern "C" {
   void _catalyst_pyface_jit_cpp_exception_test(void*, void*);
@@ -197,25 +124,33 @@ void teardown() {}
 void _catalyst_pyface_jit_cpp_exception_test(void*, void*) {
   throw std::runtime_error("Hello world");
 }
-                """
-                exe = CompileCXXException._executable
-                flags = CompileCXXException._default_flags
-                outfile = CompileCXXException.get_output_filename(infile)
-                command = [exe] + flags + ["-o", outfile, "-"]
-                with subprocess.Popen(command, stdin=subprocess.PIPE) as pipe:
-                    pipe.communicate(input=bytes(contents, "UTF-8"))
-                return outfile
+        """
+        class MockCompiler(Compiler):
+            def __init__(self, co):
+                return super(MockCompiler, self).__init__(co)
 
-        @qjit(
-            pipelines=[CompileCXXException, CppCompiler],
-        )
+            def run_from_ir(self, *args, **kwargs):
+                with tempfile.TemporaryDirectory() as workspace:
+                    filename = workspace + "a.cpp"
+                    with open(filename, "w", encoding="utf-8") as f:
+                        f.write(contents)
+
+                    object_file = filename.replace(".c", ".o")
+                    os.system(f"cc -shared -fPIC -x c++ {filename} -o {object_file}")
+                    output = CppCompiler.run(object_file, options=self.options)
+                    filename = str(pathlib.Path(output).absolute())
+                    return filename, "<FAKE_IR>", ["<FAKE_FN>", "<FAKE_TYPE>"]
+
+        @qjit(target="fake_binary")
+        @qml.qnode(qml.device(backend, wires=1))
         def cpp_exception_test():
-            """A function that will be overwritten by CompileCXXException."""
             return None
+
+        cpp_exception_test._compiler = MockCompiler(cpp_exception_test._compiler.options)
+        cpp_exception_test.compile(inplace=True)
 
         with pytest.raises(RuntimeError, match="Hello world"):
             cpp_exception_test()
-
 
 class TestCompilerState:
     """Test states that the compiler can reach."""
@@ -229,8 +164,8 @@ class TestCompilerState:
             return qml.state()
 
         mlir_module, _, _ = get_mlir(workflow)
-        compiler = Compiler()
-        compiler.run(mlir_module, CompileOptions(keep_intermediate=True))
+        compiler = Compiler(CompileOptions(keep_intermediate=True))
+        compiler.run(mlir_module)
         assert compiler.get_output_of("MHLOPass")
         assert compiler.get_output_of("QuantumCompilationPass")
         assert compiler.get_output_of("BufferizationPass")
@@ -250,9 +185,8 @@ class TestCompilerState:
         mlir_module, _, _ = get_mlir(workflow)
         # This means that we are not running any pass.
         pipelines = []
-        identity_compiler = Compiler(attemptLLVMLowering=False)
-        options = CompileOptions(keep_intermediate=True, pipelines=pipelines)
-        identity_compiler.run(mlir_module, options)
+        identity_compiler = Compiler(CompileOptions(keep_intermediate=True))
+        identity_compiler.run(mlir_module, pipelines=pipelines, attempt_LLVM_lowering=False)
         directory = os.path.join(os.getcwd(), workflow.__name__)
         assert os.path.exists(directory)
         files = os.listdir(directory)
@@ -271,82 +205,12 @@ class TestCompilerState:
 
         mlir_module, _, _ = get_mlir(workflow)
         # This means that we are not running any pass.
-        identity_compiler = Compiler(attemptLLVMLowering=False)
-        options = CompileOptions(pipelines=[], keep_intermediate=True)
-        identity_compiler.run(mlir_module, options)
-        files = os.listdir(identity_compiler.workspace.name)
+        identity_compiler = Compiler(CompileOptions(keep_intermediate=True))
+        identity_compiler.run(mlir_module, pipelines=[], attempt_LLVM_lowering=False)
+        files = os.listdir(identity_compiler.last_workspace)
         # The directory is non-empty. Should at least contain the original .mlir file
         assert files
 
-    # def test_pass_with_output_name(self):
-    #     """Test for making sure that outfile in arguments works"""
-
-    #     class PassWithNoFlags(PassPipeline):
-    #         """Pass pipeline without any flags."""
-
-    #         _executable = "c99"
-    #         _default_flags = []
-
-    #     with tempfile.TemporaryDirectory() as workspace:
-    #         filename = workspace + "a.c"
-    #         outfilename = workspace + "a.out"
-    #         with open(filename, "w", encoding="utf-8") as f:
-    #             print("int main() {}", file=f)
-
-    #         PassWithNoFlags.run(filename, outfile=outfilename)
-
-    #         assert os.path.exists(outfilename)
-
-    # def test_pass_with_different_executable(self):
-    #     """Test for making sure different executable works.
-
-    #     It might be best in the future to remove this functionality and instead
-    #     guarantee it from the start."""
-
-    #     class C99(PassPipeline):
-    #         """Pass pipeline using custom executable."""
-
-    #         _executable = "c99"
-    #         _default_flags = []
-
-    #         @staticmethod
-    #         def get_output_filename(infile):
-    #             return infile.replace(".c", ".out")
-
-    #     with tempfile.TemporaryDirectory() as workspace:
-    #         filename = workspace + "a.c"
-    #         expected_outfilename = workspace + "a.out"
-    #         with open(filename, "w", encoding="utf-8") as f:
-    #             print("int main() {}", file=f)
-
-    #         observed_outfilename = C99.run(filename, executable="c89")
-
-    #         assert observed_outfilename == expected_outfilename
-    #         assert os.path.exists(observed_outfilename)
-
-    # def test_pass_with_flags(self):
-    #     """Test with non-default flags."""
-
-    #     class C99(PassPipeline):
-    #         """Simple pass pipeline."""
-
-    #         _executable = "c99"
-    #         _default_flags = []
-
-    #         @staticmethod
-    #         def get_output_filename(infile):
-    #             return infile.replace(".c", ".o")
-
-    #     with tempfile.TemporaryDirectory() as workspace:
-    #         filename = workspace + "a.c"
-    #         expected_outfilename = workspace + "a.o"
-    #         with open(filename, "w", encoding="utf-8") as f:
-    #             print("int main() {}", file=f)
-
-    #         observed_outfilename = C99.run(filename, flags=["-c"])
-
-    #         assert observed_outfilename == expected_outfilename
-    #         assert os.path.exists(observed_outfilename)
 
     def test_compiler_driver_with_output_name(self):
         """Test with non-default output name."""
@@ -361,26 +225,16 @@ class TestCompilerState:
             assert os.path.exists(outfilename)
 
 
-    @pytest.mark.skip(reason="FIXME: test the same behavior using a new compiler driver")
     def test_compiler_driver_with_flags(self):
         """Test with non-default flags."""
-
-        class C99(PassPipeline):
-            """Pass pipeline with custom flags."""
-
-            _executable = "c99"
-            _default_flags = ["-c"]
-
-            @staticmethod
-            def get_output_filename(infile):
-                return infile.replace(".c", ".o")
 
         with tempfile.TemporaryDirectory() as workspace:
             filename = workspace + "a.c"
             with open(filename, "w", encoding="utf-8") as f:
                 print("int main() {}", file=f)
 
-            object_file = C99.run(filename)
+            object_file = filename.replace(".c", ".o")
+            os.system(f"c99 -c {filename} -o {object_file}")
             expected_outfilename = workspace + "a.so"
             observed_outfilename = CppCompiler.run(object_file, flags=[])
 

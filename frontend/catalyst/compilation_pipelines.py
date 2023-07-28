@@ -416,13 +416,12 @@ class QJIT:
         compile_options (Optional[CompileOptions]): common compilation options
     """
 
-    def __init__(self, fn, compile_options: CompileOptions):
+    def __init__(self, fn, target, pipelines, compile_options: CompileOptions):
         self.qfunc = fn
         self.jaxed_qfunc = None
         self.c_sig = None
         functools.update_wrapper(self, fn)
-        self.compile_options = compile_options
-        self._compiler = Compiler()
+        self._compiler = Compiler(compile_options)
         self._jaxpr = None
         self._mlir = None
         self._llvmir = None
@@ -430,6 +429,8 @@ class QJIT:
         self.compiled_function = None
         self.user_typed = False
         self.compiling_from_textual_ir = isinstance(fn, str)
+        self.target = target
+        self.pipelines = pipelines
 
         if self.compiling_from_textual_ir:
             TracingContext.check_is_not_tracing("Cannot compile from IR in tracing context.")
@@ -438,8 +439,8 @@ class QJIT:
             if parameter_types is not None:
                 self.user_typed = True
                 self.mlir_module = self.get_mlir(*parameter_types)
-                if self.compile_options.target == "binary":
-                    self.compiled_function = self.compile()
+                if self.target == "binary":
+                    self.compile(inplace=True)
 
     def print_stage(self, stage):
         """Print one of the recorded stages.
@@ -490,17 +491,13 @@ class QJIT:
         mod = mlir_module.operation
         self._jaxpr = jaxpr
 
-        self._mlir = mod.get_asm(binary=False, print_generic_op_form=False, assume_verified=True)
-        self._mlir = compile_asm(self._mlir, "", "",
-            infer_function_attrs=False,
-            keep_intermediate=False,
-            pipelines=[("pipeline",["canonicalize"])],
-            attemptLLVMLowering = False
-        ).getOutputIR()
-
+        _,self._mlir,_ = self._compiler.run(mlir_module,
+                                        infer_function_attrs=False,
+                                        attempt_LLVM_lowering = False,
+                                        pipelines=[("pipeline",["canonicalize"])])
         return mlir_module
 
-    def compile(self):
+    def compile(self, inplace=False):
         """Compile the current MLIR module."""
 
         if self.compiling_from_textual_ir:
@@ -511,7 +508,7 @@ class QJIT:
             # Python file.
             module_name = pathlib.Path(__main__.__file__).stem
             shared_object, llvm_ir, inferred_func_data = self._compiler.run_from_ir(
-                self.qfunc, module_name, self.compile_options
+                self.qfunc, module_name
             )
             qfunc_name = inferred_func_data[0]
             # Parse back the return types given as a semicolon-separated string
@@ -534,11 +531,14 @@ class QJIT:
 
             shared_object, llvm_ir, inferred_func_data = self._compiler.run(
                 self.mlir_module,
-                options=self.compile_options,
+                pipelines = self.pipelines
             )
 
         self._llvmir = llvm_ir
-        return CompiledFunction(shared_object, qfunc_name, restype)
+        compiled_function = CompiledFunction(shared_object, qfunc_name, restype)
+        if inplace:
+            self.compiled_function = compiled_function
+        return compiled_function
 
     def _maybe_promote(self, function, *args):
         """Logic to decide whether the function needs to be recompiled
@@ -658,7 +658,8 @@ class JAX_QJIT:
         deriv_wrapper.__annotations__ = annotations
         deriv_wrapper.__signature__ = signature.replace(parameters=updated_params)
 
-        self.deriv_qfuncs[argnum_key] = QJIT(deriv_wrapper, self.qfunc.compile_options)
+        self.deriv_qfuncs[argnum_key] = QJIT(deriv_wrapper, self.qfunc.target,
+                                             self.qfunc.pipelines, self.qfunc._compiler.options)
         return self.deriv_qfuncs[argnum_key]
 
     def compute_jvp(self, primals, tangents):
@@ -798,9 +799,9 @@ def qjit(
     """
 
     if fn is not None:
-        return QJIT(fn, CompileOptions(verbose, logfile, target, keep_intermediate, pipelines))
+        return QJIT(fn, target, pipelines, CompileOptions(verbose, logfile, keep_intermediate))
 
     def wrap_fn(fn):
-        return QJIT(fn, CompileOptions(verbose, logfile, target, keep_intermediate, pipelines))
+        return QJIT(fn, target, pipelines, CompileOptions(verbose, logfile, keep_intermediate))
 
     return wrap_fn

@@ -25,7 +25,7 @@ import tempfile
 import warnings
 from dataclasses import dataclass
 from io import TextIOWrapper
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Tuple
 
 from mlir_quantum._mlir_libs._catalystDriver import compile_asm
 
@@ -47,15 +47,16 @@ class CompileOptions:
         target (str, optional): target of the functionality. Default is ``"binary"``
         keep_intermediate (bool, optional): flag indicating whether to keep intermediate results.
             Default is ``False``
-        pipelines (List[Any], optional): list of pipelines to be used.
-            Default is ``None``
+        pipelines (list, optional): list of tuples containing a pipeline name and a list of MLIR
+                                    passes to call. The Default is ``None`` meaning that the
+                                    pre-defined pipelines are used.
     """
 
     verbose: Optional[bool] = False
     logfile: Optional[TextIOWrapper] = sys.stderr
-    target: Optional[str] = "binary"
+    # target: Optional[str] = "binary"
     keep_intermediate: Optional[bool] = False
-    pipelines: Optional[List[Any]] = None
+    # pipelines: Optional[List[Tuple[str,List[str]]]] = None
 
 
 def run_writing_command(
@@ -108,7 +109,7 @@ def get_lib_path(project, env_var):
         return os.path.join(package_root, "lib")  # pragma: no cover
     return os.getenv(env_var, default_lib_paths.get(project, ""))
 
-PIPELINES = [
+DEFAULT_PIPELINES = [
     ('MHLOPass', [
     "canonicalize",
     "func.func(chlo-legalize-to-hlo)",
@@ -181,7 +182,8 @@ PIPELINES = [
     ]),
 ]
 
-# FIXME: define Enzyme pipeline in the compiler driver's format
+# FIXME: Figure out how to encode Enzyme pipeline. Probably we should make it the same way we make
+# CppCompiler
 if False:
     class Enzyme(PassPipeline):
         """Pass pipeline to lower LLVM IR to Enzyme LLVM IR."""
@@ -205,7 +207,7 @@ if False:
 
 
 class CppCompiler:
-    """Compiler Driver Interface
+    """C/C++ compiler interface.
     In order to avoid relying on a single compiler at run time and allow the user some flexibility,
     this class defines a compiler resolution order where multiple known compilers are attempted.
     The order is defined as follows:
@@ -335,51 +337,49 @@ class CppCompiler:
 class Compiler:
     """Compiles MLIR modules to shared objects."""
 
-    def __init__(self, attemptLLVMLowering = True):
-        self.compiler_output = None
-        # The temporary directory must be referenced by the wrapper class
-        # in order to avoid being garbage collected
-        # FIXME: deduce from CompileOptions
-        self.workspace = tempfile.TemporaryDirectory()  # pylint: disable=consider-using-with
-        self.attemptLLVMLowering = attemptLLVMLowering
+    def __init__(self, options: Optional[CompileOptions] = None):
+        self.options = options if options is not None else CompileOptions
+        self.last_compiler_output = None
+        self.last_workspace = None
 
-    def run_from_ir(self, ir: str, module_name: str, options: CompileOptions):
+    def run_from_ir(self,
+                    ir: str,
+                    module_name: str,
+                    pipelines = None,
+                    infer_function_attrs = True,
+                    attempt_LLVM_lowering = True):
         """Compile a shared object from a textual IR (MLIR or LLVM)."""
-        if options.keep_intermediate:
-            parent_dir = os.getcwd()
-            path = os.path.join(parent_dir, module_name)
-            os.makedirs(path, exist_ok=True)
-            workspace_name = os.path.abspath(path)
+        if self.options.keep_intermediate:
+            workspace = os.path.abspath(os.path.join(os.getcwd(), module_name))
+            os.makedirs(workspace, exist_ok=True)
         else:
-            workspace_name = self.workspace.name
+            workspace = tempfile.mkdtemp()
+        self.last_workspace = workspace
 
-        print(f"{workspace_name=}")
-        pipelines = options.pipelines if options.pipelines else PIPELINES
-        inferred_data = None
-        llvm_ir = None
-        # assert (pipelines == []) or (pipelines is None) # FIXME: Remove after fixing
-        self.compiler_output = compile_asm(
+        pipelines = pipelines if pipelines is not None else DEFAULT_PIPELINES
+        compiler_output = compile_asm(
             ir,
-            workspace_name,
+            workspace,
             module_name,
-            infer_function_attrs=True,
-            keep_intermediate=options.keep_intermediate,
-            verbose=options.verbose,
+            infer_function_attrs=infer_function_attrs,
+            keep_intermediate=self.options.keep_intermediate,
+            verbose=self.options.verbose,
             pipelines=pipelines,
-            attemptLLVMLowering = self.attemptLLVMLowering
+            attemptLLVMLowering=attempt_LLVM_lowering
         )
-        filename = self.compiler_output.getObjectFilename()
-        outIR = self.compiler_output.getOutputIR()
-        func_name = self.compiler_output.getFunctionAttributes().getFunctionName()
-        ret_type_name = self.compiler_output.getFunctionAttributes().getReturnType()
+        filename = compiler_output.getObjectFilename()
+        outIR = compiler_output.getOutputIR()
+        func_name = compiler_output.getFunctionAttributes().getFunctionName()
+        ret_type_name = compiler_output.getFunctionAttributes().getReturnType()
 
-        if self.attemptLLVMLowering:
-            output = CppCompiler.run(filename, options=options)
+        if attempt_LLVM_lowering:
+            output = CppCompiler.run(filename, options=self.options)
             filename = str(pathlib.Path(output).absolute())
 
+        self.last_compiler_output = compiler_output
         return filename, outIR, [func_name, ret_type_name]
 
-    def run(self, mlir_module, options):
+    def run(self, mlir_module, *args, **kwargs):
         """Compile an MLIR module to a shared object.
 
         .. note::
@@ -387,25 +387,17 @@ class Compiler:
             For compilation of hybrid quantum-classical PennyLane programs,
             please see the :func:`~.qjit` decorator.
 
-        Args:
-            compile_options (Optional[CompileOptions]): common compilation options
-
         Returns:
             (str): filename of shared object
         """
-
-        module_name = mlir_module.operation.attributes["sym_name"]
-        # Convert MLIR string to Python string
-        module_name = str(module_name)
-        # Remove quotations
-        module_name = module_name.replace('"', "")
 
         return self.run_from_ir(
             mlir_module.operation.get_asm(
                 binary=False, print_generic_op_form=False, assume_verified=True
             ),
-            module_name,
-            options,
+            *args,
+            module_name=str(mlir_module.operation.attributes["sym_name"]).replace('"', ""),
+            **kwargs
         )
 
     def get_output_of(self, pipeline) -> Optional[str]:
@@ -416,9 +408,9 @@ class Compiler:
         Returns
             (Optional[str]): output IR
         """
-        if self.compiler_output is not None:
+        if self.last_compiler_output is not None:
             # FIXME: Find out how to return None from Pybind
-            out = self.compiler_output.getPipelineOutput(pipeline)
+            out = self.last_compiler_output.getPipelineOutput(pipeline)
             return out if len(out)>0 else None
         else:
             return None
@@ -429,3 +421,4 @@ class Compiler:
             pipeline (str): name of pass class
         """
         print(self.get_output_of(pipeline))  # pragma: no cover
+
