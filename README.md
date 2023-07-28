@@ -38,8 +38,10 @@ frontends.**
 
 - Built to be end-to-end differentiable.
 
-- Support for the [Lightning](https://github.com/PennyLaneAI/pennylane-lightning/) high
-  performance simulator. Additional hardware support, including GPUs and QPUs to come.
+- Support for [Lightning](https://github.com/PennyLaneAI/pennylane-lightning/) and
+  [Lightning-Kokkos](https://github.com/PennyLaneAI/pennylane-lightning-kokkos/)
+  high performance simulators as well as AWS Braket local and remote devices.
+  Additional hardware support, including GPUs and QPUs to come.
 
 ## Overview
 
@@ -56,20 +58,15 @@ Catalyst currently consists of the following components:
 - [Catalyst
   Runtime](https://docs.pennylane.ai/projects/catalyst/en/latest/modules/runtime.html).
 
-  The
-  runtime is a C++ runtime based on QIR that enables the execution of Catalyst-compiled quantum programs.
-  Currently, a runtime implementation is available for the state-vector simulators
-  [Lightning](https://github.com/PennyLaneAI/pennylane-lightning/). A complete
-  list of the quantum instruction set supported by these runtime implementations can be found by
-  visiting the Catalyst documentation.
+  The runtime is a C++ runtime with multiple-device support based on QIR that enables the execution
+  of Catalyst-compiled quantum programs. A complete list of all backend devices along with the quantum
+  instruction set supported by these runtime implementations can be found by visiting the Catalyst documentation.
 
 In addition, we also provide a Python frontend for [PennyLane](https://pennylane.ai) and [JAX](https://jax.readthedocs.io):
 
-- [PennyLane JAX
-  frontend](https://docs.pennylane.ai/projects/catalyst/en/latest/modules/frontend.html).
+- [PennyLane JAX frontend](https://docs.pennylane.ai/projects/catalyst/en/latest/modules/frontend.html).
 
-  A Python
-  library that provides a `@qjit` decorator to just-in-time compile PennyLane hybrid
+  A Python library that provides a `@qjit` decorator to just-in-time compile PennyLane hybrid
   quantum-classical programs. In addition, the frontend package provides Python functions for
   defining Catalyst-compatible control flow structures, gradient, and mid-circuit measurement.
 
