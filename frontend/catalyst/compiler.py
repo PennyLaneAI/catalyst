@@ -204,7 +204,7 @@ if False:
             return str(path.with_suffix(".ll"))
 
 
-class CompilerDriver:
+class CppCompiler:
     """Compiler Driver Interface
     In order to avoid relying on a single compiler at run time and allow the user some flexibility,
     this class defines a compiler resolution order where multiple known compilers are attempted.
@@ -254,7 +254,7 @@ class CompilerDriver:
     def _get_compiler_fallback_order(fallback_compilers):
         """Compiler fallback order"""
         preferred_compiler = os.environ.get("CATALYST_CC", None)
-        preferred_compiler_exists = CompilerDriver._exists(preferred_compiler)
+        preferred_compiler_exists = CppCompiler._exists(preferred_compiler)
         compilers = fallback_compilers
         emit_warning = preferred_compiler and not preferred_compiler_exists
         if emit_warning:
@@ -272,8 +272,8 @@ class CompilerDriver:
 
     @staticmethod
     def _available_compilers(fallback_compilers):
-        for compiler in CompilerDriver._get_compiler_fallback_order(fallback_compilers):
-            if CompilerDriver._exists(compiler):
+        for compiler in CppCompiler._get_compiler_fallback_order(fallback_compilers):
+            if CppCompiler._exists(compiler):
                 yield compiler
 
     @staticmethod
@@ -318,13 +318,13 @@ class CompilerDriver:
             EnvironmentError: The exception is raised when no compiler succeeded.
         """
         if outfile is None:
-            outfile = CompilerDriver.get_output_filename(infile)
+            outfile = CppCompiler.get_output_filename(infile)
         if flags is None:
-            flags = CompilerDriver.get_default_flags()
+            flags = CppCompiler.get_default_flags()
         if fallback_compilers is None:
-            fallback_compilers = CompilerDriver._default_fallback_compilers
-        for compiler in CompilerDriver._available_compilers(fallback_compilers):
-            success = CompilerDriver._attempt_link(compiler, flags, infile, outfile, options)
+            fallback_compilers = CppCompiler._default_fallback_compilers
+        for compiler in CppCompiler._available_compilers(fallback_compilers):
+            success = CppCompiler._attempt_link(compiler, flags, infile, outfile, options)
             if success:
                 return outfile
         msg = f"Unable to link {infile}. All available compiler options exhausted. "
@@ -374,7 +374,7 @@ class Compiler:
         ret_type_name = self.compiler_output.getFunctionAttributes().getReturnType()
 
         if self.attemptLLVMLowering:
-            output = CompilerDriver.run(filename, options=options)
+            output = CppCompiler.run(filename, options=options)
             filename = str(pathlib.Path(output).absolute())
 
         return filename, outIR, [func_name, ret_type_name]

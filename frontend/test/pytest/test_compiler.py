@@ -13,7 +13,7 @@
 # limitations under the License.
 
 """
-Unit tests for CompilerDriver class
+Unit tests for CppCompiler class
 """
 
 import os
@@ -31,7 +31,7 @@ from catalyst.compiler import (
 #     BufferizationPass,
     CompileOptions,
     Compiler,
-    CompilerDriver,
+    CppCompiler,
 #     Enzyme,
 #     LLVMDialectToLLVMIR,
 #     LLVMIRToObjectFile,
@@ -58,7 +58,7 @@ class TestCompilerOptions:
         with warnings.catch_warnings():
             warnings.simplefilter("error")
             # pylint: disable=protected-access
-            compilers = CompilerDriver._get_compiler_fallback_order([])
+            compilers = CppCompiler._get_compiler_fallback_order([])
             assert compiler in compilers
 
     @pytest.mark.parametrize("logfile", [("stdout"), ("stderr"), (None)])
@@ -90,13 +90,13 @@ class TestCompilerWarnings:
         monkeypatch.setenv("CATALYST_CC", "this-binary-does-not-exist")
         with pytest.warns(UserWarning, match="User defined compiler.* is not in PATH."):
             # pylint: disable=protected-access
-            CompilerDriver._get_compiler_fallback_order([])
+            CppCompiler._get_compiler_fallback_order([])
 
     def test_compiler_failed_warning(self):
         """Test that a warning is emitted when a compiler failed."""
         with pytest.warns(UserWarning, match="Compiler .* failed .*"):
             # pylint: disable=protected-access
-            CompilerDriver._attempt_link("cc", [""], "in.o", "out.so", None)
+            CppCompiler._attempt_link("cc", [""], "in.o", "out.so", None)
 
 
 class TestCompilerErrors:
@@ -141,7 +141,7 @@ class TestCompilerErrors:
             invalid_file.flush()
             with pytest.raises(EnvironmentError, match="Unable to link .*"):
                 with pytest.warns(UserWarning, match="Compiler cc failed during execution"):
-                    CompilerDriver.run(invalid_file.name, fallback_compilers=["cc"])
+                    CppCompiler.run(invalid_file.name, fallback_compilers=["cc"])
 
     # @pytest.mark.parametrize(
     #     "pipeline",
@@ -153,7 +153,7 @@ class TestCompilerErrors:
     #         (LLVMDialectToLLVMIR),
     #         (Enzyme),
     #         (LLVMIRToObjectFile),
-    #         (CompilerDriver),
+    #         (CppCompiler),
     #     ],
     # )
     # def test_lower_file_not_found(self, pipeline):
@@ -207,7 +207,7 @@ void _catalyst_pyface_jit_cpp_exception_test(void*, void*) {
                 return outfile
 
         @qjit(
-            pipelines=[CompileCXXException, CompilerDriver],
+            pipelines=[CompileCXXException, CppCompiler],
         )
         def cpp_exception_test():
             """A function that will be overwritten by CompileCXXException."""
@@ -356,7 +356,7 @@ class TestCompilerState:
             with open(filename, "w", encoding="utf-8") as f:
                 print("int main() {}", file=f)
 
-            CompilerDriver.run(filename, outfile=outfilename)
+            CppCompiler.run(filename, outfile=outfilename)
 
             assert os.path.exists(outfilename)
 
@@ -382,7 +382,7 @@ class TestCompilerState:
 
             object_file = C99.run(filename)
             expected_outfilename = workspace + "a.so"
-            observed_outfilename = CompilerDriver.run(object_file, flags=[])
+            observed_outfilename = CppCompiler.run(object_file, flags=[])
 
             assert observed_outfilename == expected_outfilename
             assert os.path.exists(observed_outfilename)
