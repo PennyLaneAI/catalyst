@@ -85,6 +85,10 @@ def _trace_quantum_tape(
     qreg = qargs[0]
     return_values, qreg, qubit_states = trace_quantum_tape(tape, qreg, has_tracer_return_values)
     qreg = insert_to_qreg(qubit_states, qreg)
+
+    if return_values and len(return_values) == 1:
+        return_values = return_values[0]
+
     return return_values, [qreg]
 
 
@@ -112,7 +116,7 @@ class QFunc:
         self.device = device
         functools.update_wrapper(self, fn)
 
-    def __call__(self, *args, **kwargs):
+    def __call__(self, pytree_dict, *args, **kwargs):
         if isinstance(self, qml.QNode):
             if self.device.short_name not in QFunc.RUNTIME_DEVICES:
                 raise CompileError(
@@ -137,17 +141,17 @@ class QFunc:
             # Allow QFunc to still be used by itself for internal testing.
             device = self.device
 
-        traceable_fn = get_traceable_fn(self.func, device)
-        jaxpr = jax.make_jaxpr(traceable_fn)(*args)
+        traceable_fn = get_traceable_fn(self.func, device, pytree_dict)
+        jaxpr, shape = jax.make_jaxpr(traceable_fn, return_shape=True)(*args)
+        _, retval_tree = tree_flatten(shape)
 
         def _eval_jaxpr(*args):
             return jax.core.eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *args)
 
         wrapped = wrap_init(_eval_jaxpr)
         retval = jprim.func_p.bind(wrapped, *args, fn=self)
-        if len(retval) == 1:
-            retval = retval[0]
-        return retval
+
+        return tree_unflatten(retval_tree, retval)
 
 
 def qfunc(num_wires, *, shots=1000, device=None):

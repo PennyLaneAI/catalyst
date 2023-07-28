@@ -41,7 +41,7 @@ from catalyst.utils.tracing import TracingContext
 KNOWN_NAMED_OBS = (qml.Identity, qml.PauliX, qml.PauliY, qml.PauliZ, qml.Hadamard)
 
 
-def get_mlir(func, *args, **kwargs):
+def get_mlir(func, pytree_dict={}, *args, **kwargs):
     """Lower a Python function into an MLIR module.
 
     Args:
@@ -62,7 +62,9 @@ def get_mlir(func, *args, **kwargs):
     jprim.mlir_fn_cache.clear()
 
     with TracingContext():
-        jaxpr = jax.make_jaxpr(func)(*args, **kwargs)
+        jaxpr, shape = jax.make_jaxpr(func, return_shape=True)(*args, **kwargs)
+
+    _, pytree_dict["func_return_value"] = tree_flatten(shape)
 
     nrep = jaxpr_replicas(jaxpr)
     effects = [eff for eff in jaxpr.effects if eff in jax.core.ordered_effects]
@@ -82,7 +84,7 @@ def get_mlir(func, *args, **kwargs):
     return module, context, jaxpr
 
 
-def get_traceable_fn(qfunc, device):
+def get_traceable_fn(qfunc, device, pytree_dict):
     """Generate a function suitable for jax tracing with custom quantum primitives.
 
     Args:
@@ -108,11 +110,11 @@ def get_traceable_fn(qfunc, device):
                 with tape.quantum_tape:
                     out = qfunc(*args, **kwargs)
 
-                return_values = out if isinstance(out, (tuple, list)) else (out,)
                 meas_return_values = []
                 meas_ret_val_indices = []
                 non_meas_return_values = []
-                for i, ret_val in enumerate(return_values):
+                meas_return_vals, meas_return_trees = tree_flatten(out)
+                for i, ret_val in enumerate(meas_return_vals):
                     if isinstance(ret_val, MeasurementProcess):
                         meas_return_values.append(ret_val)
                         meas_ret_val_indices.append(i)
@@ -135,6 +137,11 @@ def get_traceable_fn(qfunc, device):
         )
 
         jprim.qdealloc(qreg)
+
+        # Store the meas_return_value PyTree definition to be used later by QJIT.__call__
+        pytree_dict["meas_return_value"] = meas_return_trees
+
+        return_values = tree_unflatten(meas_return_trees, return_values)
 
         return return_values
 
@@ -346,12 +353,7 @@ def trace_quantum_tape(
         return_values[idx:idx] = ret_val
         idx_offset += len(ret_val) - 1
 
-    if len(return_values) == 1:
-        out = return_values[0]
-    else:
-        out = tuple(return_values)
-
-    return out, qreg, qubit_states
+    return return_values, qreg, qubit_states
 
 
 # TODO: remove once fixed upstream: https://github.com/PennyLaneAI/pennylane/issues/4263

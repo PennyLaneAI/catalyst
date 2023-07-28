@@ -267,12 +267,7 @@ class CompiledFunction:
 
         with shared_object as lib:
             result_desc = type(args[0].contents) if has_return else None
-
             retval = wrapper.wrap(lib.function, args, result_desc, lib.mem_transfer, numpy_dict)
-            if len(retval) == 0:
-                retval = None
-            elif len(retval) == 1:
-                retval = retval[0]
 
         return retval
 
@@ -468,6 +463,7 @@ class QJIT:
         self._mlir = None
         self._llvmir = None
         self.mlir_module = None
+        self.pytree_dict = dict()
         self.compiled_function = None
         parameter_types = get_type_annotations(self.qfunc)
         self.user_typed = False
@@ -517,10 +513,13 @@ class QJIT:
         """
         self.c_sig = CompiledFunction.get_runtime_signature(*args)
 
+        def qfunc_closure(_, *args, **kwargs):
+            return QFunc.__call__(_, self.pytree_dict, *args, **kwargs)
+
         with Patcher(
-            (qml.QNode, "__call__", QFunc.__call__),
+            (qml.QNode, "__call__", qfunc_closure),
         ):
-            mlir_module, ctx, jaxpr = tracer.get_mlir(self.qfunc, *self.c_sig)
+            mlir_module, ctx, jaxpr = tracer.get_mlir(self.qfunc, self.pytree_dict, *self.c_sig)
 
         inject_functions(mlir_module, ctx)
         mod = mlir_module.operation
@@ -625,7 +624,19 @@ class QJIT:
 
             return self.jaxed_qfunc(*args, **kwargs)
 
-        return self.compiled_function(*args, **kwargs)
+        data = self.compiled_function(*args, **kwargs)
+
+        # Unflatten the return value w.r.t. the original PyTree definition if available
+        if self.pytree_dict and "func_return_value" in self.pytree_dict.keys():
+            return jax.tree_util.tree_unflatten(self.pytree_dict["func_return_value"], data)
+
+        # For the classical compilation path,
+        if len(data) == 0:
+            return None
+        elif len(data) == 1:
+            return data[0]
+
+        return data
 
 
 class JAX_QJIT:
