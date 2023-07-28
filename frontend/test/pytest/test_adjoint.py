@@ -377,6 +377,59 @@ def test_adjoint_while_nested(backend):
     run_catalyst_against_pennylane(func, dev, 10, jnp.array([2, 4, 3, 5, 1, 7, 4, 6, 9, 10]))
 
 
+def test_adjoint_nested_with_control_flow(backend):
+    """
+    Tests that nested adjoint ops produce correct results in the presence of nested control flow.
+    """
+
+    def c_quantum_func(theta):
+        @for_loop(0, 4, 1)
+        def loop_outer(iv):
+            qml.PauliX(wires=0)
+
+            def inner_func():
+                @for_loop(0, 4, 1)
+                def loop_inner(jv):
+                    qml.RX(theta, wires=0)
+
+                loop_inner()
+
+            C_adjoint(inner_func)()
+
+        loop_outer()
+
+    def pl_quantum_func(theta):
+        @for_loop(0, 4, 1)
+        def loop_outer(iv):
+            qml.PauliX(wires=0)
+
+            def inner_func():
+                @for_loop(0, 4, 1)
+                def loop_inner(jv):
+                    qml.RX(theta, wires=0)
+
+                loop_inner()
+
+            PL_adjoint(inner_func)()
+
+        loop_outer()
+
+    dev = qml.device(backend, wires=1)
+
+    @qjit
+    @qml.qnode(dev)
+    def catalyst_workflow(*args):
+        C_adjoint(c_quantum_func)(*args)
+        return qml.state()
+
+    @qml.qnode(dev)
+    def pennylane_workflow(*args):
+        PL_adjoint(pl_quantum_func)(*args)
+        return qml.state()
+
+    assert_allclose(catalyst_workflow(jnp.pi), pennylane_workflow(jnp.pi))
+
+
 def test_adjoint_for_nested(backend):
     """
     Tests the adjoint op with nested and interspersed for/while loops that produce classical

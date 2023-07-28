@@ -577,8 +577,7 @@ def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
     .. warning::
 
         This function does not support performing the adjoint
-        of quantum functions that contain Catalyst control flow
-        or mid-circuit measurements.
+        of quantum functions that contain mid-circuit measurements.
 
     Args:
         f (Callable or Operator): A PennyLane operation or a Python function
@@ -592,7 +591,7 @@ def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
     Raises:
         ValueError: invalid parameter values
 
-    **Example**
+    **Example 1 (basic usage)**
 
     .. code-block:: python
 
@@ -607,8 +606,27 @@ def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
             catalyst.adjoint(func)()
             return qml.probs()
 
-    >>> workflow(pnp.pi/2, wires=0)
+    >>> workflow(jnp.pi/2, wires=0)
     array([0.5, 0.5])
+
+    **Example 2 (with Catalyst control flow)**
+
+    .. code-block:: python
+
+        @qjit
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def workflow(theta, n, wires):
+            def func():
+                @catalyst.for_loop(0, n, 1)
+                def loop_fn(i):
+                    qml.RX(theta, wires=wires)
+
+                loop_fn()
+            catalyst.adjoint(func)()
+            return qml.probs()
+
+    >>> workflow(jnp.pi/2, 3, 0)
+    [1.00000000e+00 7.39557099e-32]
     """
 
     def _make_adjoint(*args, _callee: Callable, **kwargs):
