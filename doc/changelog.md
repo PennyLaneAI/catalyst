@@ -22,6 +22,10 @@
 
 <h3>Improvements</h3>
 
+* Use the compiler driver library implemented in C++ forthe compilation process management. This
+  change reduces the compilation time by avoiding copying textual form of intermediate
+  representations using the operating system I/O streams.
+
 <h3>Breaking changes</h3>
 
 <h3>Bug fixes</h3>
@@ -34,6 +38,7 @@
 This release contains contributions from (in alphabetical order):
 
 David Ittah,
+Jacob Mai Peng,
 Sergei Mironov.
 
 # Release 0.2.0
