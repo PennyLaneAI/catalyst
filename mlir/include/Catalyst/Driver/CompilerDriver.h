@@ -14,10 +14,10 @@
 
 #pragma once
 
-#include "llvm/Support/raw_ostream.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/raw_ostream.h"
 #include <filesystem>
 #include <vector>
 
@@ -42,7 +42,6 @@ typedef enum {
     CO_VERB_ALL = 3
 } Verbosity;
 
-
 /// Pipeline descriptor
 struct Pipeline {
     typedef std::string Name;
@@ -66,9 +65,9 @@ struct CompilerOptions {
     bool keepIntermediate;
     /// Sets the verbosity level to use when printing messages.
     Verbosity verbosity;
-    /// Ordered list of named pipelines to execute, each pipeline is described by a list of MLIR passes
-    /// it includes.
-    std::vector< Pipeline > pipelinesCfg;
+    /// Ordered list of named pipelines to execute, each pipeline is described by a list of MLIR
+    /// passes it includes.
+    std::vector<Pipeline> pipelinesCfg;
     /// Whether to assume that the pipelines output is a valid LLVM dialect and lower it to LLVM IR
     bool attemptLLVMLowering;
 
@@ -80,7 +79,6 @@ struct CompilerOptions {
     }
 };
 
-
 struct CompilerOutput {
     typedef std::unordered_map<Pipeline::Name, std::string> PipelineOutputs;
     std::string objectFilename;
@@ -90,10 +88,8 @@ struct CompilerOutput {
     PipelineOutputs pipelineOutputs;
 };
 
-
 /// Entry point to the MLIR portion of the compiler.
-mlir::LogicalResult QuantumDriverMain(const CompilerOptions &options,
-                                      CompilerOutput &output);
+mlir::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &output);
 
 namespace llvm {
 
@@ -110,4 +106,3 @@ inline raw_ostream &operator<<(raw_ostream &oss, const Pipeline &p)
 }
 
 }; // namespace llvm
-

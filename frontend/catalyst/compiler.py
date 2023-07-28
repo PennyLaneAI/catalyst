@@ -109,82 +109,93 @@ def get_lib_path(project, env_var):
         return os.path.join(package_root, "lib")  # pragma: no cover
     return os.getenv(env_var, default_lib_paths.get(project, ""))
 
+
 DEFAULT_PIPELINES = [
-    ('MHLOPass', [
-    "canonicalize",
-    "func.func(chlo-legalize-to-hlo)",
-    "stablehlo-legalize-to-hlo",
-    "func.func(mhlo-legalize-control-flow)",
-    "func.func(hlo-legalize-to-linalg)",
-    "func.func(mhlo-legalize-to-std)",
-    "convert-to-signless",
-    "canonicalize",
-    ]),
-
-    ('QuantumCompilationPass', [
-    "lower-gradients",
-    "adjoint-lowering",
-    "convert-arraylist-to-memref",
-    ]),
-
-    ('BufferizationPass', [
-    "one-shot-bufferize{dialect-filter=memref}",
-    "inline",
-    "gradient-bufferize",
-    "scf-bufferize",
-    "convert-tensor-to-linalg",      # tensor.pad
-    "convert-elementwise-to-linalg", # Must be run before --arith-bufferize
-    "arith-bufferize",
-    "empty-tensor-to-alloc-tensor",
-    "func.func(bufferization-bufferize)",
-    "func.func(tensor-bufferize)",
-    "func.func(linalg-bufferize)",
-    "func.func(tensor-bufferize)",
-    "quantum-bufferize",
-    "func-bufferize",
-    "func.func(finalizing-bufferize)",
-    # "func.func(buffer-hoisting)",
-    "func.func(buffer-loop-hoisting)",
-    # "func.func(buffer-deallocation)",
-    "convert-bufferization-to-memref",
-    "canonicalize",
-    # "cse",
-    "cp-global-memref",
-    ]),
-
-    ('MLIRToLLVMDialect', [
-    "func.func(convert-linalg-to-loops)",
-    "convert-scf-to-cf",
-    # This pass expands memref operations that modify the metadata of a memref (sizes, offsets,
-    # strides) into a sequence of easier to analyze constructs. In particular, this pass
-    # transforms operations into explicit sequence of operations that model the effect of this
-    # operation on the different metadata. This pass uses affine constructs to materialize
-    # these effects. Concretely, expanded-strided-metadata is used to decompose memref.subview
-    # as it has no lowering in -finalize-memref-to-llvm.
-    "expand-strided-metadata",
-    "lower-affine",
-    "arith-expand", # some arith ops (ceildivsi) require expansion to be lowered to llvm
-    "convert-complex-to-standard", # added for complex.exp lowering
-    "convert-complex-to-llvm",
-    "convert-math-to-llvm",
-    # Run after -convert-math-to-llvm as it marks math::powf illegal without converting it.
-    "convert-math-to-libm",
-    "convert-arith-to-llvm",
-    "finalize-memref-to-llvm{use-generic-functions}",
-    "convert-index-to-llvm",
-    "convert-gradient-to-llvm",
-    "convert-quantum-to-llvm",
-    "emit-catalyst-py-interface",
-    # Remove any dead casts as the final pass expects to remove all existing casts,
-    # but only those that form a loop back to the original type.
-    "canonicalize",
-    "reconcile-unrealized-casts",
-    ]),
+    (
+        "MHLOPass",
+        [
+            "canonicalize",
+            "func.func(chlo-legalize-to-hlo)",
+            "stablehlo-legalize-to-hlo",
+            "func.func(mhlo-legalize-control-flow)",
+            "func.func(hlo-legalize-to-linalg)",
+            "func.func(mhlo-legalize-to-std)",
+            "convert-to-signless",
+            "canonicalize",
+        ],
+    ),
+    (
+        "QuantumCompilationPass",
+        [
+            "lower-gradients",
+            "adjoint-lowering",
+            "convert-arraylist-to-memref",
+        ],
+    ),
+    (
+        "BufferizationPass",
+        [
+            "one-shot-bufferize{dialect-filter=memref}",
+            "inline",
+            "gradient-bufferize",
+            "scf-bufferize",
+            "convert-tensor-to-linalg",  # tensor.pad
+            "convert-elementwise-to-linalg",  # Must be run before --arith-bufferize
+            "arith-bufferize",
+            "empty-tensor-to-alloc-tensor",
+            "func.func(bufferization-bufferize)",
+            "func.func(tensor-bufferize)",
+            "func.func(linalg-bufferize)",
+            "func.func(tensor-bufferize)",
+            "quantum-bufferize",
+            "func-bufferize",
+            "func.func(finalizing-bufferize)",
+            # "func.func(buffer-hoisting)",
+            "func.func(buffer-loop-hoisting)",
+            # "func.func(buffer-deallocation)",
+            "convert-bufferization-to-memref",
+            "canonicalize",
+            # "cse",
+            "cp-global-memref",
+        ],
+    ),
+    (
+        "MLIRToLLVMDialect",
+        [
+            "func.func(convert-linalg-to-loops)",
+            "convert-scf-to-cf",
+            # This pass expands memref operations that modify the metadata of a memref (sizes, offsets,
+            # strides) into a sequence of easier to analyze constructs. In particular, this pass
+            # transforms operations into explicit sequence of operations that model the effect of this
+            # operation on the different metadata. This pass uses affine constructs to materialize
+            # these effects. Concretely, expanded-strided-metadata is used to decompose memref.subview
+            # as it has no lowering in -finalize-memref-to-llvm.
+            "expand-strided-metadata",
+            "lower-affine",
+            "arith-expand",  # some arith ops (ceildivsi) require expansion to be lowered to llvm
+            "convert-complex-to-standard",  # added for complex.exp lowering
+            "convert-complex-to-llvm",
+            "convert-math-to-llvm",
+            # Run after -convert-math-to-llvm as it marks math::powf illegal without converting it.
+            "convert-math-to-libm",
+            "convert-arith-to-llvm",
+            "finalize-memref-to-llvm{use-generic-functions}",
+            "convert-index-to-llvm",
+            "convert-gradient-to-llvm",
+            "convert-quantum-to-llvm",
+            "emit-catalyst-py-interface",
+            # Remove any dead casts as the final pass expects to remove all existing casts,
+            # but only those that form a loop back to the original type.
+            "canonicalize",
+            "reconcile-unrealized-casts",
+        ],
+    ),
 ]
 
 # FIXME: Figure out how to encode Enzyme pipeline. Probably we should make it the same way we make
 # CppCompiler
 if False:
+
     class Enzyme(PassPipeline):
         """Pass pipeline to lower LLVM IR to Enzyme LLVM IR."""
 
@@ -343,12 +354,14 @@ class Compiler:
         self.last_workspace = None
         self.last_tmpdir = None
 
-    def run_from_ir(self,
-                    ir: str,
-                    module_name: str,
-                    pipelines = None,
-                    infer_function_attrs = True,
-                    attempt_LLVM_lowering = True):
+    def run_from_ir(
+        self,
+        ir: str,
+        module_name: str,
+        pipelines=None,
+        infer_function_attrs=True,
+        attempt_LLVM_lowering=True,
+    ):
         """Compile a shared object from a textual IR (MLIR or LLVM)."""
         pipelines = pipelines if pipelines is not None else DEFAULT_PIPELINES
         if self.options.keep_intermediate:
@@ -371,11 +384,11 @@ class Compiler:
             keep_intermediate=self.options.keep_intermediate,
             verbose=self.options.verbose,
             pipelines=pipelines,
-            attemptLLVMLowering=attempt_LLVM_lowering
+            attemptLLVMLowering=attempt_LLVM_lowering,
         )
 
         if self.options.verbose:
-            for line in compiler_output.get_diagnostic_messages().strip().split('\n'):
+            for line in compiler_output.get_diagnostic_messages().strip().split("\n"):
                 print(f"[LIB] {line}", file=self.options.logfile)
 
         filename = compiler_output.get_object_filename()
@@ -408,7 +421,7 @@ class Compiler:
             ),
             *args,
             module_name=str(mlir_module.operation.attributes["sym_name"]).replace('"', ""),
-            **kwargs
+            **kwargs,
         )
 
     def get_output_of(self, pipeline) -> Optional[str]:
@@ -419,8 +432,11 @@ class Compiler:
         Returns
             (Optional[str]): output IR
         """
-        return self.last_compiler_output.get_pipeline_output(pipeline) \
-               if self.last_compiler_output else None
+        return (
+            self.last_compiler_output.get_pipeline_output(pipeline)
+            if self.last_compiler_output
+            else None
+        )
 
     def print(self, pipeline):
         """Print the output IR of pass.
@@ -428,4 +444,3 @@ class Compiler:
             pipeline (str): name of pass class
         """
         print(self.get_output_of(pipeline))  # pragma: no cover
-

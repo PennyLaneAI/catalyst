@@ -490,10 +490,12 @@ class QJIT:
         mod = mlir_module.operation
         self._jaxpr = jaxpr
 
-        _,self._mlir,_ = self._compiler.run(mlir_module,
-                                        infer_function_attrs=False,
-                                        attempt_LLVM_lowering = False,
-                                        pipelines=[("pipeline",["canonicalize"])])
+        _, self._mlir, _ = self._compiler.run(
+            mlir_module,
+            infer_function_attrs=False,
+            attempt_LLVM_lowering=False,
+            pipelines=[("pipeline", ["canonicalize"])],
+        )
         return mlir_module
 
     def compile(self, inplace=False):
@@ -529,8 +531,7 @@ class QJIT:
             qfunc_name = str(self.mlir_module.body.operations[0].name).replace('"', "")
 
             shared_object, llvm_ir, inferred_func_data = self._compiler.run(
-                self.mlir_module,
-                pipelines = self.pipelines
+                self.mlir_module, pipelines=self.pipelines
             )
 
         self._llvmir = llvm_ir
@@ -657,8 +658,9 @@ class JAX_QJIT:
         deriv_wrapper.__annotations__ = annotations
         deriv_wrapper.__signature__ = signature.replace(parameters=updated_params)
 
-        self.deriv_qfuncs[argnum_key] = QJIT(deriv_wrapper, self.qfunc.target,
-                                             self.qfunc.pipelines, self.qfunc._compiler.options)
+        self.deriv_qfuncs[argnum_key] = QJIT(
+            deriv_wrapper, self.qfunc.target, self.qfunc.pipelines, self.qfunc._compiler.options
+        )
         return self.deriv_qfuncs[argnum_key]
 
     def compute_jvp(self, primals, tangents):

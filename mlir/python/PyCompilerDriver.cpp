@@ -21,25 +21,25 @@
 namespace py = pybind11;
 using namespace mlir::python::adaptors;
 
-
-std::vector<Pipeline>
-parseCompilerSpec(const py::list &pipelines) {
-    std::vector< Pipeline > out;
+std::vector<Pipeline> parseCompilerSpec(const py::list &pipelines)
+{
+    std::vector<Pipeline> out;
     for (py::handle obj : pipelines) {
         py::tuple t = obj.cast<py::tuple>();
         auto i = t.begin();
-        auto py_name = i; i++;
-        auto py_passes = i; i++;
-        assert(i==t.end());
+        auto py_name = i;
+        i++;
+        auto py_passes = i;
+        i++;
+        assert(i == t.end());
         std::string name = py_name->attr("__str__")().cast<std::string>();
         Pipeline::PassList passes;
         std::transform(py_passes->begin(), py_passes->end(), std::back_inserter(passes),
-            [](py::handle p){ return p.attr("__str__")().cast<std::string>();});
+                       [](py::handle p) { return p.attr("__str__")().cast<std::string>(); });
         out.push_back(Pipeline({name, passes}));
     }
     return out;
 }
-
 
 PYBIND11_MODULE(_catalystDriver, m)
 {
@@ -48,39 +48,32 @@ PYBIND11_MODULE(_catalystDriver, m)
     //===--------------------------------------------------------------------===//
     py::class_<FunctionAttributes> funcattrs_class(m, "FunctionAttributes");
     funcattrs_class.def(py::init<>())
-        .def("getFunctionName", [](const FunctionAttributes &fa) -> std::string {
-            return fa.functionName;
-        })
-        .def("getReturnType", [](const FunctionAttributes &fa) -> std::string {
-            return fa.returnType;
-        })
-        ;
+        .def("getFunctionName",
+             [](const FunctionAttributes &fa) -> std::string { return fa.functionName; })
+        .def("getReturnType",
+             [](const FunctionAttributes &fa) -> std::string { return fa.returnType; });
 
     py::class_<CompilerOutput> compout_class(m, "CompilerOutput");
     compout_class.def(py::init<>())
-        .def("get_pipeline_output", [](const CompilerOutput &co, const std::string &name) -> std::optional<std::string> {
-            auto res = co.pipelineOutputs.find(name);
-            return res != co.pipelineOutputs.end() ? res->second : std::optional<std::string>();
-        })
-        .def("get_output_IR", [](const CompilerOutput &co) -> std::string {
-            return co.outIR;
-        })
-        .def("get_object_filename", [](const CompilerOutput &co) -> std::string {
-            return co.objectFilename;
-        })
-        .def("get_function_attributes", [](const CompilerOutput &co) -> FunctionAttributes {
-            return co.inferredAttributes;
-        })
-        .def("get_diagnostic_messages", [](const CompilerOutput &co) -> std::string {
-            return co.diagnosticMessages;
-        })
-        ;
+        .def("get_pipeline_output",
+             [](const CompilerOutput &co, const std::string &name) -> std::optional<std::string> {
+                 auto res = co.pipelineOutputs.find(name);
+                 return res != co.pipelineOutputs.end() ? res->second
+                                                        : std::optional<std::string>();
+             })
+        .def("get_output_IR", [](const CompilerOutput &co) -> std::string { return co.outIR; })
+        .def("get_object_filename",
+             [](const CompilerOutput &co) -> std::string { return co.objectFilename; })
+        .def("get_function_attributes",
+             [](const CompilerOutput &co) -> FunctionAttributes { return co.inferredAttributes; })
+        .def("get_diagnostic_messages",
+             [](const CompilerOutput &co) -> std::string { return co.diagnosticMessages; });
 
     m.def(
         "run_compiler_driver",
         [](const char *source, const char *workspace, const char *moduleName,
-           bool inferFunctionAttrs, bool keepIntermediate, bool verbose,
-           py::list pipelines, bool attemptLLVMLowering) //-> CompilerOutput *
+           bool inferFunctionAttrs, bool keepIntermediate, bool verbose, py::list pipelines,
+           bool attemptLLVMLowering) //-> CompilerOutput *
         {
             FunctionAttributes inferredAttributes;
             mlir::MLIRContext ctx;

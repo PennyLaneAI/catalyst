@@ -17,22 +17,18 @@ Unit tests for CppCompiler class
 """
 
 import os
+import pathlib
 import shutil
 import subprocess
 import sys
 import tempfile
 import warnings
-import pathlib
 
 import pennylane as qml
 import pytest
 
 from catalyst import qjit
-from catalyst.compiler import (
-    CompileOptions,
-    Compiler,
-    CppCompiler,
-)
+from catalyst.compiler import CompileOptions, Compiler, CppCompiler
 from catalyst.jax_tracer import get_mlir
 from catalyst.utils.exceptions import CompileError
 
@@ -54,9 +50,9 @@ class TestCompilerOptions:
             compilers = CppCompiler._get_compiler_fallback_order([])
             assert compiler in compilers
 
-    @pytest.mark.parametrize("logfile,keep_intermediate", [("stdout",True),
-                                                           ("stderr",False),
-                                                           (None, False)])
+    @pytest.mark.parametrize(
+        "logfile,keep_intermediate", [("stdout", True), ("stderr", False), (None, False)]
+    )
     def test_verbose_compilation(self, logfile, keep_intermediate, capsys, backend):
         """Test verbose compilation mode"""
 
@@ -129,6 +125,7 @@ void _catalyst_pyface_jit_cpp_exception_test(void*, void*) {
   throw std::runtime_error("Hello world");
 }
         """
+
         class MockCompiler(Compiler):
             def __init__(self, co):
                 return super(MockCompiler, self).__init__(co)
@@ -155,6 +152,7 @@ void _catalyst_pyface_jit_cpp_exception_test(void*, void*) {
 
         with pytest.raises(RuntimeError, match="Hello world"):
             cpp_exception_test()
+
 
 class TestCompilerState:
     """Test states that the compiler can reach."""
@@ -221,7 +219,6 @@ class TestCompilerState:
         # The directory is non-empty. Should at least contain the original .mlir file
         assert files
 
-
     def test_compiler_driver_with_output_name(self):
         """Test with non-default output name."""
         with tempfile.TemporaryDirectory() as workspace:
@@ -233,7 +230,6 @@ class TestCompilerState:
             CppCompiler.run(filename, outfile=outfilename)
 
             assert os.path.exists(outfilename)
-
 
     def test_compiler_driver_with_flags(self):
         """Test with non-default flags."""

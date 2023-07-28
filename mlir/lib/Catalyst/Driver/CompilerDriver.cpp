@@ -40,7 +40,6 @@
 #include "mhlo/transforms/passes.h"
 #include "stablehlo/dialect/Register.h"
 
-
 #include <filesystem>
 #include <list>
 
@@ -59,17 +58,17 @@ std::string joinPasses(const Pipeline::PassList &passes)
 }
 
 struct CatalystIRPrinterConfig : public PassManager::IRPrinterConfig {
-    typedef std::function<LogicalResult(Pass*, PrintCallbackFn print)> PrintHandler;
+    typedef std::function<LogicalResult(Pass *, PrintCallbackFn print)> PrintHandler;
     PrintHandler printHandler;
 
-    CatalystIRPrinterConfig(PrintHandler printHandler) :
-        IRPrinterConfig (/*printModuleScope=*/true), printHandler(printHandler)
+    CatalystIRPrinterConfig(PrintHandler printHandler)
+        : IRPrinterConfig(/*printModuleScope=*/true), printHandler(printHandler)
     {
     }
 
-    void printAfterIfEnabled(Pass *pass, Operation *operation,
-                             PrintCallbackFn printCallback) final {
-        if(failed(printHandler(pass, printCallback))) {
+    void printAfterIfEnabled(Pass *pass, Operation *operation, PrintCallbackFn printCallback) final
+    {
+        if (failed(printHandler(pass, printCallback))) {
             operation->emitError("IR printing failed");
         }
     }
@@ -183,20 +182,18 @@ LogicalResult inferMLIRReturnTypes(MLIRContext *ctx, llvm::Type *returnType,
     return failure();
 }
 
-
-LogicalResult runLowering(const CompilerOptions &options,
-                          ModuleOp moduleOp,
+LogicalResult runLowering(const CompilerOptions &options, ModuleOp moduleOp,
                           CompilerOutput::PipelineOutputs &outputs)
 {
     auto pm = PassManager::on<ModuleOp>(options.ctx, PassManager::Nesting::Implicit);
 
-    std::unordered_map<void*, std::list<Pipeline::Name>> pipelineTailMarkers;
+    std::unordered_map<void *, std::list<Pipeline::Name>> pipelineTailMarkers;
     for (const auto &pipeline : options.pipelinesCfg) {
         if (failed(parsePassPipeline(joinPasses(pipeline.passes), pm, options.diagnosticStream))) {
             return failure();
         }
         PassManager::pass_iterator p = pm.end();
-        void *lastPass = &(*(p-1));
+        void *lastPass = &(*(p - 1));
         pipelineTailMarkers[lastPass].push_back(pipeline.name);
     }
 
@@ -204,7 +201,10 @@ LogicalResult runLowering(const CompilerOptions &options,
 
         {
             std::string tmp;
-            { llvm::raw_string_ostream s{tmp}; s << moduleOp; }
+            {
+                llvm::raw_string_ostream s{tmp};
+                s << moduleOp;
+            }
             std::string outFile = fs::path(options.moduleName.str()).replace_extension(".mlir");
             if (failed(catalyst::dumpToFile(options, outFile, tmp))) {
                 return failure();
@@ -213,13 +213,18 @@ LogicalResult runLowering(const CompilerOptions &options,
 
         {
             size_t pipelineIdx = 0;
-            auto printHandler = [&](Pass* pass, CatalystIRPrinterConfig::PrintCallbackFn print) -> LogicalResult {
+            auto printHandler =
+                [&](Pass *pass, CatalystIRPrinterConfig::PrintCallbackFn print) -> LogicalResult {
                 auto res = pipelineTailMarkers.find(pass);
-                if(res != pipelineTailMarkers.end()) {
-                    for( const auto &pn : res->second) {
-                        std::string outFile = fs::path(std::to_string(pipelineIdx++) + "_" + pn).replace_extension(".mlir");
-                        {llvm::raw_string_ostream s{outputs[pn]}; print(s);}
-                        if(failed(catalyst::dumpToFile(options, outFile, outputs[pn]))) {
+                if (res != pipelineTailMarkers.end()) {
+                    for (const auto &pn : res->second) {
+                        std::string outFile = fs::path(std::to_string(pipelineIdx++) + "_" + pn)
+                                                  .replace_extension(".mlir");
+                        {
+                            llvm::raw_string_ostream s{outputs[pn]};
+                            print(s);
+                        }
+                        if (failed(catalyst::dumpToFile(options, outFile, outputs[pn]))) {
                             return failure();
                         }
                     }
@@ -227,8 +232,8 @@ LogicalResult runLowering(const CompilerOptions &options,
                 return success();
             };
 
-            pm.enableIRPrinting(
-                std::unique_ptr<PassManager::IRPrinterConfig>(new CatalystIRPrinterConfig(printHandler)));
+            pm.enableIRPrinting(std::unique_ptr<PassManager::IRPrinterConfig>(
+                new CatalystIRPrinterConfig(printHandler)));
         }
     }
 
@@ -239,9 +244,7 @@ LogicalResult runLowering(const CompilerOptions &options,
     return success();
 }
 
-
-LogicalResult QuantumDriverMain(const CompilerOptions &options,
-                                CompilerOutput &output)
+LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &output)
 {
     registerAllCatalystPasses();
     mhlo::registerAllMhloPasses();
