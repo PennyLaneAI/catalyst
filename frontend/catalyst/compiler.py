@@ -37,26 +37,20 @@ package_root = os.path.dirname(__file__)
 
 @dataclass
 class CompileOptions:
-    """Generic compilation options.
+    """Generic compilation options, for which reasonable default values exist.
 
     Args:
         verbose (bool, optional): flag indicating whether to enable verbose output.
             Default is ``False``
         logfile (TextIOWrapper, optional): the logfile to write output to.
             Default is ``sys.stderr``
-        target (str, optional): target of the functionality. Default is ``"binary"``
         keep_intermediate (bool, optional): flag indicating whether to keep intermediate results.
             Default is ``False``
-        pipelines (list, optional): list of tuples containing a pipeline name and a list of MLIR
-                                    passes to call. The Default is ``None`` meaning that the
-                                    pre-defined pipelines are used.
     """
 
     verbose: Optional[bool] = False
     logfile: Optional[TextIOWrapper] = sys.stderr
-    # target: Optional[str] = "binary"
     keep_intermediate: Optional[bool] = False
-    # pipelines: Optional[List[Tuple[str,List[str]]]] = None
 
 
 def run_writing_command(
@@ -324,9 +318,9 @@ class CppCompiler:
         Args:
             infile (str): input file
             outfile (str): output file
-            Optional flags (List[str]): flags to be passed down to the compiler
-            Optional fallback_compilers (List[str]): name of executables to be looked for in PATH
-            Optional compile_options (CompileOptions): generic compilation options.
+            flags (List[str], optional): flags to be passed down to the compiler
+            fallback_compilers (List[str], optional): name of executables to be looked for in PATH
+            compile_options (CompileOptions, optional): generic compilation options.
         Raises:
             EnvironmentError: The exception is raised when no compiler succeeded.
         """
@@ -346,7 +340,7 @@ class CppCompiler:
 
 
 class Compiler:
-    """Compiles MLIR modules to shared objects."""
+    """Compiles MLIR modules to shared objects by executing the Catalyst compiler driver library."""
 
     def __init__(self, options: Optional[CompileOptions] = None):
         self.options = options if options is not None else CompileOptions
@@ -362,7 +356,27 @@ class Compiler:
         infer_function_attrs=True,
         attempt_LLVM_lowering=True,
     ):
-        """Compile a shared object from a textual IR (MLIR or LLVM)."""
+        """Compile a shared object from a textual IR (MLIR or LLVM).
+
+        Args:
+            ir (str): Textual MLIR to be compiled
+            module_name (str): Module name to use for naming
+            pipelines (list, optional): Custom compilation pipelines configuration. The default is
+                                        None which means to use the default pipelines config.
+            infer_function_attrs (bool, optional): whether to infer main function name and return
+                                                   types after the compilation.
+            attempt_LLVM_lowering (bool, optional): Whether to attempt the LLVM lowering, assuming
+                                                    that the pipeline outputs MLIR LLVM dialect
+
+        Returns:
+            output_filename (str): Output file name. For the default pipeline this would be the
+                                   shard object library path.
+            out_IR (str): Output IR in textual form. For the default pipeline this would be the
+                          LLVM IR.
+            A list of:
+               func_name (str) Inferred name of the main function
+               ret_type_name (str) Inferred main function result type name
+        """
         pipelines = pipelines if pipelines is not None else DEFAULT_PIPELINES
         if self.options.keep_intermediate:
             workspace = os.path.abspath(os.path.join(os.getcwd(), module_name))
@@ -392,16 +406,18 @@ class Compiler:
                 print(f"[LIB] {line}", file=self.options.logfile)
 
         filename = compiler_output.get_object_filename()
-        outIR = compiler_output.get_output_IR()
+        out_IR = compiler_output.get_output_IR()
         func_name = compiler_output.get_function_attributes().getFunctionName()
         ret_type_name = compiler_output.get_function_attributes().getReturnType()
 
         if attempt_LLVM_lowering:
             output = CppCompiler.run(filename, options=self.options)
-            filename = str(pathlib.Path(output).absolute())
+            output_filename = str(pathlib.Path(output).absolute())
+        else:
+            output_filename = filename
 
         self.last_compiler_output = compiler_output
-        return filename, outIR, [func_name, ret_type_name]
+        return output_filename, out_IR, [func_name, ret_type_name]
 
     def run(self, mlir_module, *args, **kwargs):
         """Compile an MLIR module to a shared object.

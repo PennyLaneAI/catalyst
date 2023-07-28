@@ -412,6 +412,9 @@ class QJIT:
 
     Args:
         fn (Callable): the quantum or classical function
+        target (str): target of the functionality, e.g. ``"binary"``
+        pipelines (list): list of tuples containing a pipeline name and a list of MLIR
+                          passes to call.
         compile_options (Optional[CompileOptions]): common compilation options
     """
 
