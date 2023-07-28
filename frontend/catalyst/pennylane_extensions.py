@@ -198,12 +198,14 @@ class Function:
         self.__name__ = fn.__name__
 
     def __call__(self, *args, **kwargs):
-        jaxpr = jax.make_jaxpr(self.fn)(*args)
+        jaxpr, shape = jax.make_jaxpr(self.fn, return_shape=True)(*args)
+        _, shape_tree = tree_flatten(shape)
 
         def _eval_jaxpr(*args):
             return jax.core.eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *args)
 
-        return jprim.func_p.bind(wrap_init(_eval_jaxpr), *args, fn=self)
+        retval = jprim.func_p.bind(wrap_init(_eval_jaxpr), *args, fn=self)
+        return tree_unflatten(shape_tree, retval)
 
 
 Differentiable = Union[Function, QNode]
@@ -226,6 +228,7 @@ def _make_jaxpr_check_differentiable(f: Differentiable, grad_params: GradParams,
     """Gets the jaxpr of a differentiable function. Perform the required additional checks."""
     method = grad_params.method
     jaxpr = jax.make_jaxpr(f)(*args)
+
     assert len(jaxpr.eqns) == 1, "Expected jaxpr consisting of a single function call."
     assert (
         jaxpr.eqns[0].primitive == jprim.func_p

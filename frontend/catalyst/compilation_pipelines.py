@@ -613,6 +613,10 @@ class QJIT:
         if TracingContext.is_tracing():
             return self.qfunc(*args, **kwargs)
 
+        import pdb
+
+        pdb.set_trace()
+
         function, args = self._maybe_promote(self.compiled_function, *args)
         recompilation_needed = function != self.compiled_function
         self.compiled_function = function
