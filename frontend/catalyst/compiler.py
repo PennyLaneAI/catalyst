@@ -161,6 +161,8 @@ class MHLOPass(PassPipeline):
         "--hlo-legalize-to-linalg",
         "--mhlo-legalize-to-std",
         "--convert-to-signless",
+        # Substitute tensors<1xf64> with tensors<f64>
+        "--scalarize",
         "--canonicalize",
     ]
 
@@ -310,6 +312,9 @@ class LLVMIRToObjectFile(PassPipeline):
     _default_flags = [
         "--filetype=obj",
         "--relocation-model=pic",
+        # -O0 is used to achieve compile times similar to -regalloc=fast and disabling
+        # -twoaddrinst. However, from the command line, one cannot disable -twoaddrinst
+        "-O0",
     ]
 
     @staticmethod
