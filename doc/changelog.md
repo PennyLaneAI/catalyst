@@ -20,6 +20,28 @@
   workflow()
   ```
 
+* Add support for compile-time backpropagation of classical preprocessing via Enzyme AD.
+  [#193](https://github.com/PennyLaneAI/catalyst/pull/193)
+
+  This enables high-performance reverse mode automatic differentiation of arbitrary classical
+  preprocessing when ``method=defer`` is specified on the ``grad`` operation:
+
+  ```python
+  @qml.qnode(qml.device("lightning.qubit", wires=1), diff_method="parameter-shift")
+  def circuit(theta):
+      qml.RX(jnp.exp(theta ** 2) / jnp.cos(theta / 4), wires=0)
+      return qml.expval(qml.PauliZ(wires=0))
+
+  @qjit
+  def grad_circuit(theta):
+      return catalyst.grad(circuit, method="defer")(theta)
+  ```
+
+  ```pycon
+  >>> grad_circuit(jnp.pi)
+  array(112936.34906843)
+  ```
+
 <h3>Improvements</h3>
 
 * Eliminate redundant unflattening and flattening of PyTrees parameters in Catalyst control flow operations.
@@ -53,6 +75,8 @@ This release contains contributions from (in alphabetical order):
 
 David Ittah,
 Erick Ochoa Lopez,
+Jacob Mai Peng,
+Romain Moyard,
 Sergei Mironov.
 
 
@@ -384,7 +408,6 @@ David Ittah.
   and a lowering to LLVM.
   [#107](https://github.com/PennyLaneAI/catalyst/pull/107)
   [#116](https://github.com/PennyLaneAI/catalyst/pull/116)
-  [#193](https://github.com/PennyLaneAI/catalyst/pull/193)
 
 * Error handling has been improved. The runtime now throws more descriptive
   and unified expressions for runtime errors and assertions.
