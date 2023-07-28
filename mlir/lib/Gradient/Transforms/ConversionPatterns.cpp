@@ -206,7 +206,7 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         getOrInsertEnzymeGlobal(rewriter, moduleOp, enzyme_const_key);
         getOrInsertEnzymeGlobal(rewriter, moduleOp, enzyme_dupnoneed_key);
 
-        ValueRange dataIn = adaptor.getDataIn();
+        ValueRange dataIn = adaptor.getDiffArgShadows();
         Value enzymeConst = rewriter.create<LLVM::AddressOfOp>(loc, LLVM::LLVMPointerType::get(ctx),
                                                                enzyme_const_key);
 
@@ -229,20 +229,8 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
             }
         }
 
-        for (Value cotangent : op.getCotangents()) {
-            // Enzyme requires buffers for the primal outputs, but we don't need their values.
-            // We'll need to allocate space for them regardless, so marking them as dupNoNeed will
-            // allow Enzyme to optimize away their computation.
-            auto memrefType = cast<MemRefType>(cotangent.getType());
-            SmallVector<Value> dynamicDims;
-            for (int64_t dim = 0; dim < memrefType.getRank(); dim++) {
-                if (memrefType.isDynamicDim(dim)) {
-                    Value dimIndex = rewriter.create<index::ConstantOp>(loc, dim);
-                    dynamicDims.push_back(rewriter.create<memref::DimOp>(loc, cotangent, dimIndex));
-                }
-            }
-            Value result = rewriter.create<memref::AllocOp>(loc, memrefType, dynamicDims);
-
+        for (auto [result, cotangent] :
+             llvm::zip_equal(op.getCalleeResults(), op.getCotangents())) {
             unpackMemRef(result, cotangent, callArgs, rewriter, loc, {.dupNoNeed = true});
         }
 

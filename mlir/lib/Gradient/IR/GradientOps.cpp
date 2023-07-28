@@ -323,13 +323,21 @@ LogicalResult BackpropOp::verify()
     size_t numDiffArgs =
         this->getDiffArgIndices().has_value() ? this->getDiffArgIndicesAttr().size() : 1;
 
-    if (this->getDataIn().size() && this->getNumResults())
+    if (this->getDiffArgShadows().size() && this->getNumResults())
         return emitOpError("cannot have both tensor results and memref output arguments");
 
-    if (this->getDataIn().size() + this->getNumResults() != numDiffArgs)
+    if (this->getCalleeResults().size() && this->getNumResults())
+        return emitOpError("cannot have callee result buffers before bufferization");
+
+    if (!this->getNumResults() && this->getCalleeResults().size() != this->getCotangents().size())
+        return emitOpError("need as many callee result buffers as there are cotangents")
+               << ", expected " << this->getCotangents().size() << " but got "
+               << this->getCalleeResults().size();
+
+    if (this->getDiffArgShadows().size() + this->getNumResults() != numDiffArgs)
         return emitOpError("number of gradient results did not match number of differentiable")
                << " arguments, expected " << numDiffArgs << " but got "
-               << this->getDataIn().size() + this->getNumResults();
+               << this->getDiffArgShadows().size() + this->getNumResults();
 
     return success();
 }

@@ -15,17 +15,45 @@
 #include "iostream"
 #include "llvm/Support/raw_ostream.h"
 
+#include "mlir/Dialect/Index/IR/IndexOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "Gradient/IR/GradientOps.h"
 #include "Gradient/Transforms/Passes.h"
+#include "Gradient/Utils/GradientShape.h"
 
 using namespace mlir;
 using namespace catalyst::gradient;
 
 namespace {
+
+/// Helper function to generate a set of memref allocations.
+///
+/// The allocation size and shape is deduced from a list of existing memref values.
+///
+void generateAllocations(PatternRewriter &rewriter, Location loc,
+                         SmallVectorImpl<Value> &allocations, ValueRange referenceValues)
+{
+    for (Value memref : referenceValues) {
+        MemRefType memrefType = memref.getType().cast<MemRefType>();
+
+        // Get dynamic dimension sizes from the provided reference value if necessary.
+        SmallVector<Value> dynamicDims;
+        if (!memrefType.hasStaticShape()) {
+            for (int64_t dim = 0; dim < memrefType.getRank(); dim++) {
+                if (memrefType.isDynamicDim(dim)) {
+                    Value dimIndex = rewriter.create<index::ConstantOp>(loc, dim);
+                    dynamicDims.push_back(rewriter.create<memref::DimOp>(loc, memref, dimIndex));
+                }
+            }
+        }
+
+        Value allocation = rewriter.create<memref::AllocOp>(loc, memrefType, dynamicDims);
+        allocations.push_back(allocation);
+    }
+}
 
 class BufferizeAdjointOp : public OpConversionPattern<AdjointOp> {
   public:
@@ -61,24 +89,28 @@ class BufferizeBackpropOp : public OpConversionPattern<BackpropOp> {
     LogicalResult matchAndRewrite(BackpropOp op, OpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
-        SmallVector<Type> resTypes;
-        if (failed(getTypeConverter()->convertTypes(op.getResultTypes(), resTypes)))
-            return failure();
-
         Location loc = op.getLoc();
-        ValueRange results = op.getResults();
-        SmallVector<Value> memrefValues;
-        for (auto [resType, result] : zip(resTypes, results)) {
-            MemRefType memrefType = resType.cast<MemRefType>();
-            Value memrefValue;
-            memrefValue = rewriter.create<memref::AllocOp>(loc, memrefType);
-            memrefValues.push_back(memrefValue);
-        }
+
+        // Allocate buffers to place the differentiation results (gradients) into. Enzyme refers to
+        // these as shadow arguments. There is one result for each differentiable argument, with a
+        // matching shape and type.
+        SmallVector<Value> argShadows;
+        const std::vector<Value> &diffArgs =
+            computeDiffArgs(adaptor.getArgs(), op.getDiffArgIndices());
+        generateAllocations(rewriter, loc, argShadows, diffArgs);
+
+        // Enzyme requires buffers for the primal outputs as well, even though we don't need their
+        // values. We'll mark them dupNoNeed later on to allow Enzyme to optimize away their
+        // computation.
+        SmallVector<Value> calleeResults;
+        ValueRange resShadows = adaptor.getCotangents();
+        generateAllocations(rewriter, loc, calleeResults, resShadows);
 
         DenseIntElementsAttr diffArgIndicesAttr = adaptor.getDiffArgIndices().value_or(nullptr);
-        rewriter.create<BackpropOp>(loc, TypeRange{}, adaptor.getCalleeAttr(), adaptor.getArgs(),
-                                    adaptor.getCotangents(), memrefValues, diffArgIndicesAttr);
-        rewriter.replaceOp(op, memrefValues);
+        rewriter.create<BackpropOp>(loc, TypeRange{}, op.getCalleeAttr(), adaptor.getArgs(),
+                                    argShadows, calleeResults, resShadows, diffArgIndicesAttr);
+
+        rewriter.replaceOp(op, argShadows);
         return success();
     }
 };

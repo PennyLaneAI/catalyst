@@ -144,8 +144,8 @@ func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc, GradOp
                         loc, rankReducedType, quantumGradient, dynOffsets, dynSizes, dynStrides,
                         offsets, sizes, strides);
                     BackpropOp backpropOp = rewriter.create<BackpropOp>(
-                        loc, resultsBackpropTypes, argMapFn.getName(), callArgs,
-                        extractQuantumGradient, ValueRange{}, diffArgIndicesAttr);
+                        loc, resultsBackpropTypes, argMapFn.getName(), callArgs, ValueRange{},
+                        ValueRange{}, extractQuantumGradient, diffArgIndicesAttr);
 
                     intermediateGradients.push_back(backpropOp);
                 }
@@ -181,8 +181,8 @@ func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc, GradOp
             }
             else {
                 BackpropOp backpropOp = rewriter.create<BackpropOp>(
-                    loc, resultsBackpropTypes, argMapFn.getName(), callArgs, quantumGradient,
-                    ValueRange{}, diffArgIndicesAttr);
+                    loc, resultsBackpropTypes, argMapFn.getName(), callArgs, ValueRange{},
+                    ValueRange{}, quantumGradient, diffArgIndicesAttr);
                 // Loop over params
                 for (size_t i = 0; i < backpropOp.getNumResults(); i++) {
                     Value result = backpropOp.getResult(i);
