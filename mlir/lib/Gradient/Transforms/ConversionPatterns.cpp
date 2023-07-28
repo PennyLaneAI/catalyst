@@ -334,10 +334,13 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         }
     }
 
+    /// Compute the number of bytes required to store the array data of a general ranked MemRef.
+    /// This is computed using the formula `element_size * (offset + sizes[0] * strides[0])`.
+    /// For example, a rank-3 MemRef with shape [M, N, K] has sizes [M, N, K] and strides [N * K, K,
+    /// 1]. The overall number of elements is M * N * K = sizes[0] * strides[0].
     Value computeMemRefSizeInBytes(MemRefType type, MemRefDescriptor descriptor, OpBuilder &builder,
                                    Location loc) const
     {
-        // element_size * (offset + sizes[0] * strides[0])
         Value bufferSize;
         Type indexType = getTypeConverter()->getIndexType();
         if (type.getRank() == 0) {
