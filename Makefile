@@ -1,14 +1,18 @@
-PYTHON := python3 -m
+PYTHON ?= python3
 BLACKVERSIONMAJOR := $(shell black --version 2> /dev/null | head -n1 | awk '{ print $$2 }' | cut -d. -f1)
 BLACKVERSIONMAJOR := $(if $(BLACKVERSIONMAJOR),$(BLACKVERSIONMAJOR),0)
 BLACKVERSIONMINOR := $(shell black --version 2> /dev/null | head -n1 | awk '{ print $$2 }' | cut -d. -f2)
 BLACKVERSIONMINOR := $(if $(BLACKVERSIONMINOR),$(BLACKVERSIONMINOR),0)
 MK_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 MK_DIR := $(dir $(MK_ABSPATH))
+LLVM_BUILD_DIR ?= $(MK_DIR)/mlir/llvm-project/build
+MHLO_BUILD_DIR ?= $(MK_DIR)/mlir/mlir-hlo/build
 DIALECTS_BUILD_DIR ?= $(MK_DIR)/mlir/build
+RT_BUILD_DIR ?= $(MK_DIR)/runtime/build
+ENZYME_BUILD_DIR ?= $(MK_DIR)/mlir/Enzyme/build
 COVERAGE_REPORT ?= term-missing
 TEST_BACKEND ?= "lightning.qubit"
-TEST_BRAKET ?= OFF
+TEST_BRAKET ?= NONE
 
 .PHONY: help
 help:
@@ -32,7 +36,7 @@ all: runtime mlir frontend
 .PHONY: frontend
 frontend:
 	@echo "install Catalyst Frontend"
-	$(PYTHON) pip install -e .
+	$(PYTHON) -m pip install -e .
 
 .PHONY: mlir llvm mhlo enzyme dialects runtime qir
 mlir:
@@ -70,26 +74,50 @@ lit:
 
 pytest:
 	@echo "check the Catalyst PyTest suite"
-ifdef remotetests
-	$(PYTHON) pytest frontend/test/pytest --tb=native --backend=$(TEST_BACKEND) --runbraket=$(TEST_BRAKET) -n auto
-else
-	$(PYTHON) pytest frontend/test/pytest --tb=native --backend=$(TEST_BACKEND) --runbraket=$(TEST_BRAKET) -k "not remotetests" -n auto
-endif
+	$(PYTHON) -m pytest frontend/test/pytest --tb=native --backend=$(TEST_BACKEND) --runbraket=$(TEST_BRAKET) -n auto
 test-demos:
 	@echo "check the Catalyst demos"
 	MDD_BENCHMARK_PRECISION=1 \
-	$(PYTHON) pytest demos/*.ipynb --nbmake -n auto
+	$(PYTHON) -m pytest demos/*.ipynb --nbmake -n auto
+
+wheel:
+	echo "INSTALLED = True" > $(MK_DIR)/frontend/catalyst/_configuration.py
+	# Copy bins to frontend/catalyst/bin
+	mkdir -p $(MK_DIR)/frontend/catalyst/bin
+	cp $(LLVM_BUILD_DIR)/bin/llc $(MK_DIR)/frontend/catalyst/bin
+	cp $(LLVM_BUILD_DIR)/bin/opt $(MK_DIR)/frontend/catalyst/bin
+	cp $(LLVM_BUILD_DIR)/bin/mlir-translate $(MK_DIR)/frontend/catalyst/bin
+	cp $(MHLO_BUILD_DIR)/bin/mlir-hlo-opt $(MK_DIR)/frontend/catalyst/bin
+	cp $(DIALECTS_BUILD_DIR)/bin/quantum-opt $(MK_DIR)/frontend/catalyst/bin
+	# Copy libs to frontend/catalyst/lib
+	mkdir -p $(MK_DIR)/frontend/catalyst/lib/backend/ $(MK_DIR)/frontend/catalyst/lib/capi
+	cp $(RT_BUILD_DIR)/lib/backend/librt_backend.so $(MK_DIR)/frontend/catalyst/lib/backend/
+	cp $(RT_BUILD_DIR)/lib/capi/librt_capi.so $(MK_DIR)/frontend/catalyst/lib/capi
+	cp --dereference $(LLVM_BUILD_DIR)/lib/libmlir_float16_utils.so.* $(MK_DIR)/frontend/catalyst/lib
+	cp --dereference $(LLVM_BUILD_DIR)/lib/libmlir_c_runner_utils.so* $(MK_DIR)/frontend/catalyst/lib
+	# Copy enzyme to frontend
+	cp --dereference $(ENZYME_BUILD_DIR)/Enzyme/LLVMEnzyme-17.so $(MK_DIR)/frontend/catalyst/lib
+	# Copy mlir bindings to frontend/mlir_quantum
+	mkdir -p $(MK_DIR)/frontend/mlir_quantum/dialects
+	cp -R --dereference $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/runtime $(MK_DIR)/frontend/mlir_quantum/runtime
+	cp --dereference $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/ir.py $(MK_DIR)/frontend/mlir_quantum/
+	for file in arith tensor scf gradient quantum _ods_common ; do \
+		cp --dereference $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/dialects/*$${file}* $(MK_DIR)/frontend/mlir_quantum/dialects ; \
+	done
+	find $(MK_DIR)/frontend -type d -name __pycache__ -exec rm -rf {} +
+
+	$(PYTHON) $(MK_DIR)/setup.py bdist_wheel
 
 .PHONY: clean clean-all
 clean:
 	@echo "uninstall catalyst and delete all temporary and cache files"
-	$(PYTHON) pip uninstall -y pennylane-catalyst
+	$(PYTHON) -m pip uninstall -y pennylane-catalyst
 	rm -rf dist __pycache__
 	rm -rf .coverage coverage_html_report
 
 clean-all:
 	@echo "uninstall catalyst and delete all temporary, cache files"
-	$(PYTHON) pip uninstall -y pennylane-catalyst
+	$(PYTHON) -m pip uninstall -y pennylane-catalyst
 	rm -rf dist __pycache__
 	rm -rf .coverage coverage_html_report/
 	$(MAKE) -C mlir clean
@@ -100,7 +128,7 @@ coverage: coverage-frontend coverage-runtime
 
 coverage-frontend:
 	@echo "Generating coverage report for the frontend"
-	$(PYTHON) pytest frontend/test/pytest -n auto --cov=catalyst --tb=native --cov-report=$(COVERAGE_REPORT)
+	$(PYTHON) -m pytest frontend/test/pytest -n auto --cov=catalyst --tb=native --cov-report=$(COVERAGE_REPORT)
 
 coverage-runtime:
 	$(MAKE) -C runtime coverage

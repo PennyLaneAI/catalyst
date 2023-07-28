@@ -179,7 +179,7 @@ TEST_CASE("Test QasmGate from OpenQasmBuilder", "[openqasm]")
     };
     auto gate5 = QasmGate(mat, {2}, false);
     CHECK(gate5.getMatrix() == mat);
-    std::string gate5_toqasm = "#pragma braket unitary([[0, 0-1im], [0+1im, 0]]) q[2];\n";
+    std::string gate5_toqasm = "#pragma braket unitary([[0, 0-1im], [0+1im, 0]]) q[2]\n";
     CHECK(gate5.toOpenQasm(qubits, 2) == gate5_toqasm);
 
     // Check a random gate with several params (value)
