@@ -27,7 +27,7 @@ from dataclasses import dataclass
 from io import TextIOWrapper
 from typing import Any, List, Optional, Tuple
 
-from mlir_quantum._mlir_libs._catalystDriver import compile_asm
+from mlir_quantum._mlir_libs._catalystDriver import run_compiler_driver
 
 from catalyst._configuration import INSTALLED
 from catalyst.utils.exceptions import CompileError
@@ -363,7 +363,7 @@ class Compiler:
         if self.options.verbose:
             print(f"[LIB] Running compiler driver in {workspace}", file=self.options.logfile)
 
-        compiler_output = compile_asm(
+        compiler_output = run_compiler_driver(
             ir,
             workspace,
             module_name,

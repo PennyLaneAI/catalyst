@@ -77,7 +77,7 @@ PYBIND11_MODULE(_catalystDriver, m)
         ;
 
     m.def(
-        "compile_asm",
+        "run_compiler_driver",
         [](const char *source, const char *workspace, const char *moduleName,
            bool inferFunctionAttrs, bool keepIntermediate, bool verbose,
            py::list pipelines, bool attemptLLVMLowering) //-> CompilerOutput *
