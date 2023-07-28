@@ -67,7 +67,7 @@ def run_writing_command(
         compile_options = CompileOptions()
 
     if compile_options.verbose:
-        print(f"[RUNNING] {' '.join(command)}", file=compile_options.logfile)
+        print(f"[SYSTEM] {' '.join(command)}", file=compile_options.logfile)
     subprocess.run(command, check=True)
 
 
@@ -202,7 +202,7 @@ if False:
         def get_output_filename(infile):
             path = pathlib.Path(infile)
             if not path.exists():
-                raise FileNotFoundError("Cannot find {infile}.")
+                raise FileNotFoundError(f"Cannot find {infile}.")
             return str(path.with_suffix(".ll"))
 
 
@@ -302,7 +302,7 @@ class CppCompiler:
         """
         path = pathlib.Path(infile)
         if not path.exists():
-            raise FileNotFoundError("Cannot find {infile}.")
+            raise FileNotFoundError(f"Cannot find {infile}.")
         return str(path.with_suffix(".so"))
 
     @staticmethod
@@ -341,6 +341,7 @@ class Compiler:
         self.options = options if options is not None else CompileOptions
         self.last_compiler_output = None
         self.last_workspace = None
+        self.last_tmpdir = None
 
     def run_from_ir(self,
                     ir: str,
@@ -349,14 +350,19 @@ class Compiler:
                     infer_function_attrs = True,
                     attempt_LLVM_lowering = True):
         """Compile a shared object from a textual IR (MLIR or LLVM)."""
+        pipelines = pipelines if pipelines is not None else DEFAULT_PIPELINES
         if self.options.keep_intermediate:
             workspace = os.path.abspath(os.path.join(os.getcwd(), module_name))
             os.makedirs(workspace, exist_ok=True)
         else:
-            workspace = tempfile.mkdtemp()
+            self.last_tmpdir = tempfile.TemporaryDirectory()
+            workspace = self.last_tmpdir.name
+
         self.last_workspace = workspace
 
-        pipelines = pipelines if pipelines is not None else DEFAULT_PIPELINES
+        if self.options.verbose:
+            print(f"[LIB] Running compiler driver in {workspace}", file=self.options.logfile)
+
         compiler_output = compile_asm(
             ir,
             workspace,
@@ -367,10 +373,15 @@ class Compiler:
             pipelines=pipelines,
             attemptLLVMLowering=attempt_LLVM_lowering
         )
-        filename = compiler_output.getObjectFilename()
-        outIR = compiler_output.getOutputIR()
-        func_name = compiler_output.getFunctionAttributes().getFunctionName()
-        ret_type_name = compiler_output.getFunctionAttributes().getReturnType()
+
+        if self.options.verbose:
+            for line in compiler_output.get_diagnostic_messages().strip().split('\n'):
+                print(f"[LIB] {line}", file=self.options.logfile)
+
+        filename = compiler_output.get_object_filename()
+        outIR = compiler_output.get_output_IR()
+        func_name = compiler_output.get_function_attributes().getFunctionName()
+        ret_type_name = compiler_output.get_function_attributes().getReturnType()
 
         if attempt_LLVM_lowering:
             output = CppCompiler.run(filename, options=self.options)
@@ -408,12 +419,8 @@ class Compiler:
         Returns
             (Optional[str]): output IR
         """
-        if self.last_compiler_output is not None:
-            # FIXME: Find out how to return None from Pybind
-            out = self.last_compiler_output.getPipelineOutput(pipeline)
-            return out if len(out)>0 else None
-        else:
-            return None
+        return self.last_compiler_output.get_pipeline_output(pipeline) \
+               if self.last_compiler_output else None
 
     def print(self, pipeline):
         """Print the output IR of pass.

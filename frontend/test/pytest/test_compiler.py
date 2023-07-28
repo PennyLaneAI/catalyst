@@ -54,8 +54,10 @@ class TestCompilerOptions:
             compilers = CppCompiler._get_compiler_fallback_order([])
             assert compiler in compilers
 
-    @pytest.mark.parametrize("logfile", [("stdout"), ("stderr"), (None)])
-    def test_verbose_compilation(self, logfile, capsys, backend):
+    @pytest.mark.parametrize("logfile,keep_intermediate", [("stdout",True),
+                                                           ("stderr",False),
+                                                           (None, False)])
+    def test_verbose_compilation(self, logfile, keep_intermediate, capsys, backend):
         """Test verbose compilation mode"""
 
         if logfile is not None:
@@ -63,7 +65,7 @@ class TestCompilerOptions:
 
         verbose = logfile is not None
 
-        @qjit(verbose=verbose, logfile=logfile)
+        @qjit(verbose=verbose, logfile=logfile, keep_intermediate=keep_intermediate)
         @qml.qnode(qml.device(backend, wires=1))
         def workflow():
             qml.X(wires=1)
@@ -72,7 +74,9 @@ class TestCompilerOptions:
         workflow()
         capture_result = capsys.readouterr()
         capture = capture_result.out + capture_result.err
-        assert ("[RUNNING]" in capture) if verbose else ("[RUNNING]" not in capture)
+        assert ("[SYSTEM]" in capture) if verbose else ("[SYSTEM]" not in capture)
+        assert ("[LIB]" in capture) if verbose else ("[LIB]" not in capture)
+        assert ("Dumping" in capture) if (verbose and keep_intermediate) else True
 
 
 class TestCompilerWarnings:
@@ -170,8 +174,14 @@ class TestCompilerState:
         assert compiler.get_output_of("QuantumCompilationPass")
         assert compiler.get_output_of("BufferizationPass")
         assert compiler.get_output_of("MLIRToLLVMDialect")
+        assert compiler.get_output_of("None-existing-pipeline") is None
         # assert compiler.get_output_of("LLVMDialectToLLVMIR")
         # assert compiler.get_output_of("Enzyme")
+
+        compiler = Compiler(CompileOptions(keep_intermediate=False))
+        compiler.run(mlir_module)
+        assert compiler.get_output_of("MHLOPass") is None
+        assert compiler.get_output_of("None-existing-pipeline") is None
 
     def test_workspace_keep_intermediate(self, backend):
         """Test cwd's has been modified with folder containing intermediate results"""

@@ -31,7 +31,7 @@ mlir::LogicalResult dumpToFile(const CompilerOptions &options, mlir::StringRef f
     std::error_code errCode;
     std::string outFileName = path(options.workspace.str()) / path(fileName.str());
     if (options.verbosity >= CO_VERB_DEBUG) {
-        options.diagnosticStream << "DUMPING '" << outFileName << "'\n";
+        options.diagnosticStream << "Dumping '" << outFileName << "'\n";
     }
     llvm::raw_fd_ostream outfile{outFileName, errCode};
     if (errCode) {

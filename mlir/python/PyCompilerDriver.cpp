@@ -58,18 +58,21 @@ PYBIND11_MODULE(_catalystDriver, m)
 
     py::class_<CompilerOutput> compout_class(m, "CompilerOutput");
     compout_class.def(py::init<>())
-        .def("getPipelineOutput", [](const CompilerOutput &co, const std::string &name) -> std::string {
+        .def("get_pipeline_output", [](const CompilerOutput &co, const std::string &name) -> std::optional<std::string> {
             auto res = co.pipelineOutputs.find(name);
-            return res != co.pipelineOutputs.end() ? res->second : "";
+            return res != co.pipelineOutputs.end() ? res->second : std::optional<std::string>();
         })
-        .def("getOutputIR", [](const CompilerOutput &co) -> std::string {
+        .def("get_output_IR", [](const CompilerOutput &co) -> std::string {
             return co.outIR;
         })
-        .def("getObjectFilename", [](const CompilerOutput &co) -> std::string {
+        .def("get_object_filename", [](const CompilerOutput &co) -> std::string {
             return co.objectFilename;
         })
-        .def("getFunctionAttributes", [](const CompilerOutput &co) -> FunctionAttributes {
+        .def("get_function_attributes", [](const CompilerOutput &co) -> FunctionAttributes {
             return co.inferredAttributes;
+        })
+        .def("get_diagnostic_messages", [](const CompilerOutput &co) -> std::string {
+            return co.diagnosticMessages;
         })
         ;
 
@@ -82,30 +85,27 @@ PYBIND11_MODULE(_catalystDriver, m)
             FunctionAttributes inferredAttributes;
             mlir::MLIRContext ctx;
             std::string errors;
-            Verbosity verbosity = verbose ? CO_VERB_ALL : CO_VERB_SILENT;
-            llvm::raw_string_ostream errStream{errors};
 
-            CompilerSpec spec{.pipelinesCfg = parseCompilerSpec(pipelines),
-                              .attemptLLVMLowering = attemptLLVMLowering };
+            CompilerOutput *output = new CompilerOutput();
+            assert(output);
+
+            llvm::raw_string_ostream errStream{output->diagnosticMessages};
+
             CompilerOptions options{.ctx = &ctx,
                                     .source = source,
                                     .workspace = workspace,
                                     .moduleName = moduleName,
                                     .diagnosticStream = errStream,
                                     .keepIntermediate = keepIntermediate,
-                                    .verbosity = verbosity};
+                                    .verbosity = verbose ? CO_VERB_ALL : CO_VERB_SILENT,
+                                    .pipelinesCfg = parseCompilerSpec(pipelines),
+                                    .attemptLLVMLowering = attemptLLVMLowering};
 
             errStream.flush();
-            CompilerOutput *output = new CompilerOutput();
-            assert(output);
 
-            if (mlir::failed(QuantumDriverMain(spec, options, *output))) {
-                throw std::runtime_error("Compilation failed:\n" + errors);
+            if (mlir::failed(QuantumDriverMain(options, *output))) {
+                throw std::runtime_error("Compilation failed:\n" + output->diagnosticMessages);
             }
-            if (verbosity > CO_VERB_SILENT && !errors.empty()) {
-                py::print(errors);
-            }
-
             return output;
         },
         py::arg("source"), py::arg("workspace"), py::arg("module_name") = "jit source",

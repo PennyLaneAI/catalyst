@@ -184,15 +184,14 @@ LogicalResult inferMLIRReturnTypes(MLIRContext *ctx, llvm::Type *returnType,
 }
 
 
-LogicalResult runLowering(const CompilerSpec &spec,
-                          const CompilerOptions &options,
+LogicalResult runLowering(const CompilerOptions &options,
                           ModuleOp moduleOp,
                           CompilerOutput::PipelineOutputs &outputs)
 {
     auto pm = PassManager::on<ModuleOp>(options.ctx, PassManager::Nesting::Implicit);
 
     std::unordered_map<void*, std::list<Pipeline::Name>> pipelineTailMarkers;
-    for (const auto &pipeline : spec.pipelinesCfg) {
+    for (const auto &pipeline : options.pipelinesCfg) {
         if (failed(parsePassPipeline(joinPasses(pipeline.passes), pm, options.diagnosticStream))) {
             return failure();
         }
@@ -241,8 +240,7 @@ LogicalResult runLowering(const CompilerSpec &spec,
 }
 
 
-LogicalResult QuantumDriverMain(const CompilerSpec &spec,
-                                const CompilerOptions &options,
+LogicalResult QuantumDriverMain(const CompilerOptions &options,
                                 CompilerOutput &output)
 {
     registerAllCatalystPasses();
@@ -266,14 +264,14 @@ LogicalResult QuantumDriverMain(const CompilerSpec &spec,
     OwningOpRef<ModuleOp> op =
         parseMLIRSource(ctx, options.source, options.moduleName, options.diagnosticStream);
     if (op) {
-        if (failed(runLowering(spec, options, *op, output.pipelineOutputs))) {
+        if (failed(runLowering(options, *op, output.pipelineOutputs))) {
             return failure();
         }
 
         output.outIR.clear();
         outIRStream << *op;
 
-        if (spec.attemptLLVMLowering) {
+        if (options.attemptLLVMLowering) {
             llvmModule = translateModuleToLLVMIR(*op, llvmContext);
             if (!llvmModule) {
                 return failure();

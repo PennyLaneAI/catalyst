@@ -51,32 +51,28 @@ struct Pipeline {
     PassList passes;
 };
 
-/// Structure which defines the task for the driver to solve.
-struct CompilerSpec {
-    /// Ordered list of named pipelines to execute, each pipeline is described by a list of MLIR passes
-    /// it includes.
-    std::vector< Pipeline > pipelinesCfg;
-    bool attemptLLVMLowering;
-};
-
 /// Optional parameters, for which we provide reasonable default values.
 struct CompilerOptions {
-    mlir::MLIRContext *ctx; // TODO: Move to Spec
+    mlir::MLIRContext *ctx;
     /// The textual IR (MLIR or LLVM IR)
-    mlir::StringRef source; // TODO: Move to Spec
+    mlir::StringRef source;
     /// The directory to place outputs (object file and intermediate results)
-    mlir::StringRef workspace; // TODO: Move to Spec
+    mlir::StringRef workspace;
     /// The name of the module to compile. This is usually the same as the Python function.
-    mlir::StringRef moduleName; // TODO: Move to Spec
+    mlir::StringRef moduleName;
     /// The stream to output any error messages from MLIR/LLVM passes and translation.
-    llvm::raw_ostream &diagnosticStream; // TODO: Move to Spec
+    llvm::raw_ostream &diagnosticStream;
     /// If true, the driver will output the module at intermediate points.
     bool keepIntermediate;
     /// Sets the verbosity level to use when printing messages.
     Verbosity verbosity;
+    /// Ordered list of named pipelines to execute, each pipeline is described by a list of MLIR passes
+    /// it includes.
+    std::vector< Pipeline > pipelinesCfg;
+    /// Whether to assume that the pipelines output is a valid LLVM dialect and lower it to LLVM IR
+    bool attemptLLVMLowering;
 
     /// Get the destination of the object file at the end of compilation.
-    /// TODO: Move to Spec
     std::string getObjectFile() const
     {
         using path = std::filesystem::path;
@@ -89,14 +85,14 @@ struct CompilerOutput {
     typedef std::unordered_map<Pipeline::Name, std::string> PipelineOutputs;
     std::string objectFilename;
     std::string outIR;
+    std::string diagnosticMessages;
     FunctionAttributes inferredAttributes;
     PipelineOutputs pipelineOutputs;
 };
 
 
 /// Entry point to the MLIR portion of the compiler.
-mlir::LogicalResult QuantumDriverMain(const CompilerSpec &spec,
-                                      const CompilerOptions &options,
+mlir::LogicalResult QuantumDriverMain(const CompilerOptions &options,
                                       CompilerOutput &output);
 
 namespace llvm {
