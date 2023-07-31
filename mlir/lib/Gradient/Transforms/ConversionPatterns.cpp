@@ -472,13 +472,14 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         rewriter.setInsertionPointToStart(moduleOp.getBody());
 
         LLVM::GlobalOp glb = moduleOp.lookupSymbol<LLVM::GlobalOp>(key);
+        if (glb) {
+            return glb;
+        }
 
         auto ptrType = LLVM::LLVMPointerType::get(context);
-        if (!glb) {
-            glb = rewriter.create<LLVM::GlobalOp>(
-                moduleOp.getLoc(), LLVM::LLVMArrayType::get(ptrType, 2), /*isConstant=*/false,
-                LLVM::Linkage::External, key, nullptr);
-        }
+        glb = rewriter.create<LLVM::GlobalOp>(
+            moduleOp.getLoc(), LLVM::LLVMArrayType::get(ptrType, 2), /*isConstant=*/false,
+            LLVM::Linkage::External, key, nullptr);
 
         // Create the block and push it back in the global
         auto *contextGlb = glb.getContext();

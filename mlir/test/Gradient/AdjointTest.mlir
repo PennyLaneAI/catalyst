@@ -14,6 +14,90 @@
 
 // RUN: quantum-opt %s --lower-gradients=only=adj --split-input-file --verify-diagnostics | FileCheck %s
 
+// Check scalar to scalar function
+func.func private @funcScalarScalar(%arg0: f64) -> f64 attributes {qnode, diff_method = "adjoint"} {
+    %0 = quantum.alloc(1) : !quantum.reg
+    quantum.dealloc %0 : !quantum.reg
+    return %arg0 : f64
+}
+
+// CHECK-LABEL: @funcScalarScalar.adjoint(%arg0: f64, %arg1: index) -> tensor<?xf64>
+    // CHECK-NEXT:   [[GRAD:%.+]] = gradient.adjoint @funcScalarScalar.nodealloc(%arg0)
+    // CHECK-NEXT:   return [[GRAD]]
+// }
+
+// CHECK-LABEL: @funcScalarScalar.fullgrad0adj(%arg0: f64) -> f64
+
+// CHECK-LABEL: @funcScalarScalar.argmap(%arg0: f64, %arg1: memref<?xf64>)
+
+// CHECK-LABEL: @gradCallScalarScalar
+func.func @gradCallScalarScalar(%arg0: f64) -> f64 {
+    // CHECK:   [[GRAD:%.+]] = call @funcScalarScalar.fullgrad0adj(%arg0) : (f64) -> f64
+    %0 = gradient.grad "defer" @funcScalarScalar(%arg0) : (f64) -> f64
+
+    // CHECK:   return [[GRAD]]
+    func.return %0 : f64
+}
+
+// -----
+
+// Check scalar to tensor function
+func.func private @funcScalarTensor(%arg0: f64) -> tensor<2x3xf64> attributes {qnode, diff_method = "adjoint"} {
+    %0 = quantum.alloc(1) : !quantum.reg
+    quantum.dealloc %0 : !quantum.reg
+    %c0 = arith.constant 0.0 : f64
+    %res = tensor.from_elements %c0, %c0, %c0, %c0, %c0, %c0 : tensor<2x3xf64>
+    return %res : tensor<2x3xf64>
+}
+
+// CHECK-LABEL: @funcScalarTensor.adjoint(%arg0: f64, %arg1: index) -> tensor<?x2x3xf64>
+    // CHECK-NEXT:   [[GRAD:%.+]] = gradient.adjoint @funcScalarTensor.nodealloc(%arg0)
+    // CHECK-NEXT:   return [[GRAD]]
+// }
+
+// CHECK-LABEL: @funcScalarTensor.fullgrad0adj(%arg0: f64) -> tensor<2x3xf64>
+
+// CHECK-LABEL: @funcScalarTensor.argmap(%arg0: f64, %arg1: memref<?xf64>)
+
+// CHECK-LABEL: @gradCallScalarTensor
+func.func @gradCallScalarTensor(%arg0: f64) -> tensor<2x3xf64> {
+    // CHECK:   [[GRAD:%.+]] = call @funcScalarTensor.fullgrad0adj(%arg0) : (f64) -> tensor<2x3xf64>
+    %0 = gradient.grad "defer"  @funcScalarTensor(%arg0) : (f64) -> tensor<2x3xf64>
+
+    // CHECK:   return [[GRAD]]
+    func.return %0 : tensor<2x3xf64>
+}
+
+// -----
+
+// Check tensor to scalar
+func.func private @funcTensorScalar(%arg0: tensor<3xf64>) -> f64 attributes {qnode, diff_method = "adjoint"} {
+    %0 = quantum.alloc(1) : !quantum.reg
+    quantum.dealloc %0 : !quantum.reg
+    %res = arith.constant 0.0 : f64
+    return %res : f64
+}
+
+// CHECK-LABEL: @funcTensorScalar.adjoint(%arg0: tensor<3xf64>, %arg1: index) -> tensor<?xf64>
+    // CHECK-NEXT:   [[GRAD:%.+]] = gradient.adjoint @funcTensorScalar.nodealloc(%arg0)
+    // CHECK-NEXT:   return [[GRAD]]
+// }
+
+// CHECK-LABEL: @funcTensorScalar.fullgrad0adj(%arg0: tensor<3xf64>) -> tensor<3xf64>
+
+// CHECK-LABEL: @funcTensorScalar.argmap(%arg0: tensor<3xf64>, %arg1: memref<?xf64>)
+
+// CHECK-LABEL: @gradCallTensorScalar
+func.func @gradCallTensorScalar(%arg0: tensor<3xf64>) -> tensor<3xf64> {
+    // CHECK:   [[GRAD:%.+]] = call @funcTensorScalar.fullgrad0adj(%arg0) : (tensor<3xf64>) -> tensor<3xf64>
+    %2 = gradient.grad "defer"  @funcTensorScalar(%arg0) : (tensor<3xf64>) -> tensor<3xf64>
+
+    // CHECK:   return [[GRAD]]
+    func.return %2 : tensor<3xf64>
+}
+
+// -----
+
 // Check tensor to tensor case
 func.func private @funcTensorTensor(%arg0: tensor<7x3x2x1xf64>) -> tensor<2xf64> attributes {qnode, diff_method = "adjoint"} {
     %0 = quantum.alloc(1) : !quantum.reg
