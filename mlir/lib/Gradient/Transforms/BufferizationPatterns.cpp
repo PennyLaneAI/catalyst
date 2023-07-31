@@ -67,18 +67,42 @@ class BufferizeBackpropOp : public OpConversionPattern<BackpropOp> {
 
         Location loc = op.getLoc();
         ValueRange results = op.getResults();
-        SmallVector<Value> memrefValues;
-        for (auto [resType, result] : zip(resTypes, results)) {
-            MemRefType memrefType = resType.cast<MemRefType>();
-            Value memrefValue;
-            memrefValue = rewriter.create<memref::AllocOp>(loc, memrefType);
-            memrefValues.push_back(memrefValue);
+        // Scalar results are returned by Enzyme while shadows are initialized outside and passed
+        // in. These values must be split into inputs and outputs, then recombined when the tensor
+        // BackpropOp is replaced.
+        SmallVector<Value> shadows;
+        SmallVector<Value> gradients;
+        // Conceptually a map from scalar result index (w.r.t. other scalars) to the position in the
+        // overall list of gradients.
+        SmallVector<unsigned> scalarIndices;
+        SmallVector<Type> scalarReturnTypes;
+        for (auto [idx, result] : llvm::enumerate(results)) {
+            Type resType = resTypes[idx];
+            if (auto memRefType = dyn_cast<MemRefType>(resType)) {
+                Value shadow = rewriter.create<memref::AllocOp>(loc, memRefType);
+                shadows.push_back(shadow);
+                gradients.push_back(shadow);
+            }
+            else if (isa<FloatType>(resTypes[idx])) {
+                scalarReturnTypes.push_back(resType);
+                scalarIndices.push_back(idx);
+                // Put a null placeholder value that will be filled in with the result of the
+                // bufferized BackpropOp.
+                gradients.push_back(Value());
+            }
         }
 
         DenseIntElementsAttr diffArgIndicesAttr = adaptor.getDiffArgIndices().value_or(nullptr);
-        rewriter.create<BackpropOp>(loc, TypeRange{}, adaptor.getCalleeAttr(), adaptor.getArgs(),
-                                    adaptor.getQuantumJacobian(), memrefValues, diffArgIndicesAttr);
-        rewriter.replaceOp(op, memrefValues);
+        auto bufferizedBackpropOp = rewriter.create<BackpropOp>(
+            loc, scalarReturnTypes, adaptor.getCalleeAttr(), adaptor.getArgs(),
+            adaptor.getQuantumJacobian(), shadows, diffArgIndicesAttr);
+
+        // Fill in the null placeholders.
+        for (const auto &[idx, scalarResult] : llvm::enumerate(bufferizedBackpropOp.getResults())) {
+            gradients[scalarIndices[idx]] = scalarResult;
+        }
+
+        rewriter.replaceOp(op, gradients);
         return success();
     }
 };

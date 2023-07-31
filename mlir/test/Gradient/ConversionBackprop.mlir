@@ -22,7 +22,7 @@ func.func private @argmap(%arg0: memref<f64>, %arg1: memref<?xf64>)
 
 // CHECK-DAG:  llvm.mlir.global linkonce constant @enzyme_dupnoneed
 // CHECK-DAG:  llvm.mlir.global linkonce constant @enzyme_const
-// CHECK-DAG:  llvm.func @__enzyme_autodiff(...)
+// CHECK-DAG:  llvm.func @__enzyme_autodiff0(...)
 // CHECK-DAG:  llvm.func @_mlir_memref_to_llvm_alloc(i64) -> !llvm.ptr
 // CHECK-DAG:  func.func private @argmap(memref<f64>, memref<?xf64>)
 
@@ -67,7 +67,7 @@ func.func @backpropArgmap(%arg0: memref<f64>, %arg1: memref<?xf64>) -> memref<f6
     // CHECK-DAG: [[outputOffset:%.+]] = llvm.extractvalue [[outputCasted]][2]
     // CHECK-DAG: [[outputSize:%.+]] = llvm.extractvalue [[outputCasted]][3, 0]
     // CHECK-DAG: [[outputStride:%.+]] = llvm.extractvalue [[outputCasted]][4, 0]
-    // CHECK: llvm.call @__enzyme_autodiff([[argmapCasted]], [[enzymeConst]], [[arg0Allocated]], [[arg0Aligned]], [[shadowAligned]], [[arg0Offset]], [[enzymeConst]], [[outputAllocated]], [[enzymeDupNoNeed]], [[outputAligned]], [[qJacobianAligned]], [[outputOffset]], [[outputSize]], [[outputStride]])
+    // CHECK: llvm.call @__enzyme_autodiff0([[argmapCasted]], [[enzymeConst]], [[arg0Allocated]], [[arg0Aligned]], [[shadowAligned]], [[arg0Offset]], [[enzymeConst]], [[outputAllocated]], [[enzymeDupNoNeed]], [[outputAligned]], [[qJacobianAligned]], [[outputOffset]], [[outputSize]], [[outputStride]])
 
     %alloc0 = memref.alloc() : memref<f64>
     gradient.backprop @argmap(%arg0) qjacobian(%arg1: memref<?xf64>) in(%alloc0 : memref<f64>) {diffArgIndices=dense<0> : tensor<1xindex>} : (memref<f64>) -> ()

@@ -111,17 +111,16 @@ std::vector<Type> computeBackpropTypes(func::FuncOp callee,
 
         Type diffArgType = fnType.getInput(diffArgIndices[i]);
 
-        if (auto tensorType = diffArgType.dyn_cast<RankedTensorType>()) {
+        if (auto tensorType = dyn_cast<RankedTensorType>(diffArgType)) {
             ArrayRef<int64_t> tensorShape = tensorType.getShape();
             diffArgType = tensorType.getElementType();
             backpropResTypes.push_back(RankedTensorType::get(tensorShape, diffArgType));
         }
+        else {
+            assert(isa<FloatType>(diffArgType) && "diff argument must be a float or float tensor");
+            backpropResTypes.push_back(diffArgType);
+        }
     }
-    // Assume Args are always tensor
-    // else {
-    //     ArrayRef<int64_t> tensorShape;
-    //     backpropResTypes.push_back(RankedTensorType::get(tensorShape, argType));
-    // }
 
     return backpropResTypes;
 }

@@ -157,10 +157,9 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         Location loc = op.getLoc();
         MLIRContext *ctx = getContext();
         ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
-
-        for (Type type : op.getResultTypes()) {
-            if (!type.isa<MemRefType>())
-                return op.emitOpError("must be bufferized before lowering");
+        if (llvm::any_of(op.getResultTypes(),
+                         [](Type resultType) { return isa<TensorType>(resultType); })) {
+            return op.emitOpError("must be bufferized before lowering");
         }
 
         // The callee of the backprop Op
@@ -191,11 +190,15 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         }
 
         // Create the Enzyme function
-        Type backpropFnSignature =
-            LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), {}, /*isVarArg=*/true);
+        Type backpropFnSignature = LLVM::LLVMFunctionType::get(
+            getEnzymeReturnType(ctx, op.getResultTypes()), {}, /*isVarArg=*/true);
 
+        // We need to generate a new __enzyme_autodiff name per different function signature. One
+        // way to do this is to append the number of scalar results to the name of the function.
+        std::string autodiff_func_name =
+            enzyme_autodiff_func_name + std::to_string(op.getNumResults());
         LLVM::LLVMFuncOp backpropFnDecl =
-            ensureFunctionDeclaration(rewriter, op, enzyme_autodiff_func_name, backpropFnSignature);
+            ensureFunctionDeclaration(rewriter, op, autodiff_func_name, backpropFnSignature);
 
         // The first argument to Enzyme is a function pointer of the function to be differentiated
         Value calleePtr =
@@ -226,9 +229,13 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
                     callArgs.push_back(castToConvertedType(arg, rewriter, loc));
                 }
             }
-            else {
+            else if (isa<MemRefType>(arg.getType())) {
                 size_t position = std::distance(diffArgIndices.begin(), it);
                 unpackMemRef(arg, dataIn[position], callArgs, rewriter, loc, {.zeroOut = true});
+            }
+            else {
+                assert(isa<FloatType>(arg.getType()) && "diff arg must be a float or float tensor");
+                callArgs.push_back(arg);
             }
             index++;
         }
@@ -251,8 +258,10 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         }
 
         // The results of backprop are in data in
-        rewriter.create<LLVM::CallOp>(loc, backpropFnDecl, callArgs);
-        rewriter.eraseOp(op);
+        auto enzymeCall = rewriter.create<LLVM::CallOp>(loc, backpropFnDecl, callArgs);
+        SmallVector<Value> scalarResults;
+        unpackScalarResults(enzymeCall, scalarResults, rewriter, loc);
+        rewriter.replaceOp(op, scalarResults);
         return success();
     }
 
@@ -331,6 +340,38 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         }
         for (int64_t dim = 0; dim < memRefType.getRank(); dim++) {
             callArgs.push_back(desc.stride(builder, loc, dim));
+        }
+    }
+
+    /// Determine the return type of the __enzyme_autodiff function based on the expected number of
+    /// scalar returns.
+    static Type getEnzymeReturnType(MLIRContext *ctx, TypeRange scalarReturns)
+    {
+        if (scalarReturns.empty()) {
+            return LLVM::LLVMVoidType::get(ctx);
+        }
+        if (scalarReturns.size() == 1) {
+            return scalarReturns.front();
+        }
+        return LLVM::LLVMStructType::getLiteral(ctx, SmallVector<Type>(scalarReturns));
+    }
+
+    static void unpackScalarResults(LLVM::CallOp enzymeCall, SmallVectorImpl<Value> &results,
+                                    OpBuilder &builder, Location loc)
+    {
+        if (enzymeCall.getNumResults() == 0) {
+            return;
+        }
+
+        Value result = enzymeCall.getResult();
+        if (isa<FloatType>(result.getType())) {
+            results.push_back(result);
+        }
+        if (auto structType = dyn_cast<LLVM::LLVMStructType>(result.getType())) {
+            size_t numResults = structType.getBody().size();
+            for (size_t i = 0; i < numResults; i++) {
+                results.push_back(builder.create<LLVM::ExtractValueOp>(loc, result, i));
+            }
         }
     }
 

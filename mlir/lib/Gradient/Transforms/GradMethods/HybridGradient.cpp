@@ -82,15 +82,19 @@ func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc, GradOp
         // Loop over the measurements
         for (Value quantumGradient : quantumGradients) {
             Type resultType = gradOp.getResult(j).getType();
-            Value result = rewriter.create<tensor::EmptyOp>(loc, resultType, ValueRange{});
-            auto rankResult = resultType.cast<RankedTensorType>().getRank();
-            auto shapeResult = resultType.cast<RankedTensorType>().getShape();
+            int64_t rankResult = 0;
+            ArrayRef<int64_t> shapeResult;
+            if (auto resultTensorType = dyn_cast<RankedTensorType>(resultType)) {
+                rankResult = resultTensorType.getRank();
+                shapeResult = resultTensorType.getShape();
+            }
             j++;
 
             std::vector<BackpropOp> intermediateGradients;
             auto rank = quantumGradient.getType().cast<RankedTensorType>().getRank();
 
             if (rank > 1) {
+                Value result = rewriter.create<tensor::EmptyOp>(loc, resultType, ValueRange{});
                 std::vector<int64_t> sizes =
                     quantumGradient.getType().cast<RankedTensorType>().getShape();
 
