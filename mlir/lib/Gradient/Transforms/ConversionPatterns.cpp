@@ -414,38 +414,38 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         LLVM::GlobalOp glb = moduleOp.lookupSymbol<LLVM::GlobalOp>(key);
 
         auto ptrType = LLVM::LLVMPointerType::get(context);
-        if (!glb) {
-            glb = rewriter.create<LLVM::GlobalOp>(
-                moduleOp.getLoc(), LLVM::LLVMArrayType::get(ptrType, 2), /*isConstant=*/false,
-                LLVM::Linkage::External, key, nullptr);
-
-            // Create the block and push it back in the global
-            auto *contextGlb = glb.getContext();
-            Block *block = new Block();
-            glb.getInitializerRegion().push_back(block);
-            rewriter.setInsertionPointToStart(block);
-
-            auto llvmPtr = LLVM::LLVMPointerType::get(contextGlb);
-
-            // Get original global name
-            auto originalNameRefAttr = SymbolRefAttr::get(contextGlb, originalName);
-            auto originalGlobal =
-                rewriter.create<LLVM::AddressOfOp>(glb.getLoc(), llvmPtr, originalNameRefAttr);
-
-            // Get global name
-            auto nameRefAttr = SymbolRefAttr::get(contextGlb, name);
-            auto enzymeGlobal =
-                rewriter.create<LLVM::AddressOfOp>(glb.getLoc(), llvmPtr, nameRefAttr);
-
-            auto undefArray =
-                rewriter.create<LLVM::UndefOp>(glb.getLoc(), LLVM::LLVMArrayType::get(ptrType, 2));
-            Value llvmInsert0 =
-                rewriter.create<LLVM::InsertValueOp>(glb.getLoc(), undefArray, originalGlobal, 0);
-            Value llvmInsert1 =
-                rewriter.create<LLVM::InsertValueOp>(glb.getLoc(), llvmInsert0, enzymeGlobal, 1);
-            rewriter.create<LLVM::ReturnOp>(glb.getLoc(), llvmInsert1);
+        if (glb) {
             return glb;
         }
+        glb = rewriter.create<LLVM::GlobalOp>(
+            moduleOp.getLoc(), LLVM::LLVMArrayType::get(ptrType, 2), /*isConstant=*/false,
+            LLVM::Linkage::External, key, nullptr);
+
+        // Create the block and push it back in the global
+        auto *contextGlb = glb.getContext();
+        Block *block = new Block();
+        glb.getInitializerRegion().push_back(block);
+        rewriter.setInsertionPointToStart(block);
+
+        auto llvmPtr = LLVM::LLVMPointerType::get(contextGlb);
+
+        // Get original global name
+        auto originalNameRefAttr = SymbolRefAttr::get(contextGlb, originalName);
+        auto originalGlobal =
+            rewriter.create<LLVM::AddressOfOp>(glb.getLoc(), llvmPtr, originalNameRefAttr);
+
+        // Get global name
+        auto nameRefAttr = SymbolRefAttr::get(contextGlb, name);
+        auto enzymeGlobal = rewriter.create<LLVM::AddressOfOp>(glb.getLoc(), llvmPtr, nameRefAttr);
+
+        auto undefArray =
+            rewriter.create<LLVM::UndefOp>(glb.getLoc(), LLVM::LLVMArrayType::get(ptrType, 2));
+        Value llvmInsert0 =
+            rewriter.create<LLVM::InsertValueOp>(glb.getLoc(), undefArray, originalGlobal, 0);
+        Value llvmInsert1 =
+            rewriter.create<LLVM::InsertValueOp>(glb.getLoc(), llvmInsert0, enzymeGlobal, 1);
+        rewriter.create<LLVM::ReturnOp>(glb.getLoc(), llvmInsert1);
+        return glb;
     }
 };
 

@@ -384,7 +384,6 @@ David Ittah.
   and a lowering to LLVM.
   [#107](https://github.com/PennyLaneAI/catalyst/pull/107)
   [#116](https://github.com/PennyLaneAI/catalyst/pull/116)
-  [#193](https://github.com/PennyLaneAI/catalyst/pull/193)
 
 * Error handling has been improved. The runtime now throws more descriptive
   and unified expressions for runtime errors and assertions.
