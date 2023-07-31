@@ -241,7 +241,8 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
             unpackMemRef(result, cotangent, callArgs, rewriter, loc, {.dupNoNeed = true});
         }
 
-        // The results of backprop are in data in
+        // The results of backprop are in data in, except scalar derivatives which are in the
+        // results of the enzyme call.
         auto enzymeCall = rewriter.create<LLVM::CallOp>(loc, backpropFnDecl, callArgs);
         SmallVector<Value> scalarResults;
         unpackScalarResults(enzymeCall, scalarResults, rewriter, loc);
