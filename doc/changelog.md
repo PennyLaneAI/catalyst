@@ -22,9 +22,9 @@
 
 <h3>Improvements</h3>
 
-* Use the compiler driver library implemented in C++ forthe compilation process management. This
-  change reduces the compilation time by avoiding copying textual form of intermediate
-  representations using the operating system I/O streams.
+* Use a new C++-based compiler driver to drive the compilation process. This reduces the compilation time
+  by avoiding repeatedly parsing and serializing textual intermediate representations to disk.
+
 
 <h3>Breaking changes</h3>
 
