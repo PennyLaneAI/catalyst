@@ -384,12 +384,12 @@ def test_adjoint_nested_with_control_flow(backend):
 
     def c_quantum_func(theta):
         @for_loop(0, 4, 1)
-        def loop_outer(iv):
+        def loop_outer(_):
             qml.PauliX(wires=0)
 
             def inner_func():
                 @for_loop(0, 4, 1)
-                def loop_inner(jv):
+                def loop_inner(_):
                     qml.RX(theta, wires=0)
 
                 loop_inner()
@@ -400,12 +400,12 @@ def test_adjoint_nested_with_control_flow(backend):
 
     def pl_quantum_func(theta):
         @for_loop(0, 4, 1)
-        def loop_outer(iv):
+        def loop_outer(_):
             qml.PauliX(wires=0)
 
             def inner_func():
                 @for_loop(0, 4, 1)
-                def loop_inner(jv):
+                def loop_inner(_):
                     qml.RX(theta, wires=0)
 
                 loop_inner()
