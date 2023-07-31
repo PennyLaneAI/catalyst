@@ -144,6 +144,7 @@ struct EnzymeMemRefInterfaceOptions {
 
 static constexpr const char *enzyme_autodiff_func_name = "__enzyme_autodiff";
 static constexpr const char *enzyme_allocation_key = "__enzyme_allocation_like";
+static constexpr const char *enzyme_like_free_key = "__enzyme_function_like_free";
 static constexpr const char *enzyme_const_key = "enzyme_const";
 static constexpr const char *enzyme_dupnoneed_key = "enzyme_dupnoneed";
 
@@ -156,11 +157,6 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         Location loc = op.getLoc();
         MLIRContext *ctx = getContext();
         ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
-
-        for (Type type : op.getResultTypes()) {
-            if (!type.isa<MemRefType>())
-                return op.emitOpError("must be bufferized before lowering");
-        }
 
         // The callee of the backprop Op
         func::FuncOp callee =
@@ -184,8 +180,8 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
             // Register free
             // With the following piece of metadata, _mlir_memref_to_llvm_free's semantics are
             // stated to be equivalent to free.
-            insertFunctionName(rewriter, op, "freename", StringRef("free", 5));
-            insertEnzymeFunctionLike(rewriter, op, "__enzyme_function_like_free", "freename",
+            insertGlobalSymbol(rewriter, moduleOp, "freename", StringRef("free", 5));
+            insertEnzymeFunctionLike(rewriter, moduleOp, enzyme_like_free_key, "freename",
                                      freeFn.getName());
         }
 
@@ -203,35 +199,36 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         SmallVector<Value> callArgs = {calleePtr};
 
         const std::vector<size_t> &diffArgIndices = computeDiffArgIndices(op.getDiffArgIndices());
-        getOrInsertEnzymeGlobal(rewriter, moduleOp, enzyme_const_key);
-        getOrInsertEnzymeGlobal(rewriter, moduleOp, enzyme_dupnoneed_key);
+        insertGlobalSymbol(rewriter, moduleOp, enzyme_const_key, std::nullopt);
+        insertGlobalSymbol(rewriter, moduleOp, enzyme_dupnoneed_key, std::nullopt);
 
         ValueRange dataIn = adaptor.getDiffArgShadows();
         Value enzymeConst = rewriter.create<LLVM::AddressOfOp>(loc, LLVM::LLVMPointerType::get(ctx),
                                                                enzyme_const_key);
-
+        ValueRange convArgs = adaptor.getArgs();
         // Add the arguments and their shadow on data in
         for (auto [index, arg] : llvm::enumerate(op.getArgs())) {
             auto it = std::find(diffArgIndices.begin(), diffArgIndices.end(), index);
             if (it == diffArgIndices.end()) {
                 if (isa<MemRefType>(arg.getType())) {
-                    // unpackMemRef will handle the appropriate enzyme_const annotations
-                    unpackMemRef(arg, /*shadow=*/nullptr, callArgs, rewriter, loc);
+                    // unpackMemRefAndAppend will handle the appropriate enzyme_const annotations
+                    unpackMemRefAndAppend(arg, /*shadow=*/nullptr, callArgs, rewriter, loc);
                 }
                 else {
                     callArgs.push_back(enzymeConst);
-                    callArgs.push_back(castToConvertedType(arg, rewriter, loc));
+                    callArgs.push_back(convArgs[index]);
                 }
             }
             else {
                 size_t position = std::distance(diffArgIndices.begin(), it);
-                unpackMemRef(arg, dataIn[position], callArgs, rewriter, loc, {.zeroOut = true});
+                unpackMemRefAndAppend(arg, dataIn[position], callArgs, rewriter, loc,
+                                      {.zeroOut = true});
             }
         }
 
         for (auto [result, cotangent] :
              llvm::zip_equal(op.getCalleeResults(), op.getCotangents())) {
-            unpackMemRef(result, cotangent, callArgs, rewriter, loc, {.dupNoNeed = true});
+            unpackMemRefAndAppend(result, cotangent, callArgs, rewriter, loc, {.dupNoNeed = true});
         }
 
         // The results of backprop are in data in
@@ -241,25 +238,6 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
     }
 
   private:
-    static FlatSymbolRefAttr getOrInsertEnzymeGlobal(OpBuilder &builder, ModuleOp moduleOp,
-                                                     const char *globalName)
-    {
-        // Copyright (C) 2023 - Jacob Mai Peng
-        // https://github.com/pengmai/lagrad/blob/main/lib/LAGrad/LowerToLLVM.cpp
-        auto *context = moduleOp.getContext();
-        if (moduleOp.lookupSymbol<LLVM::GlobalOp>(globalName)) {
-            return SymbolRefAttr::get(context, globalName);
-        }
-
-        OpBuilder::InsertionGuard insertGuard(builder);
-        builder.setInsertionPointToStart(moduleOp.getBody());
-        auto shortTy = IntegerType::get(context, 8);
-        builder.create<LLVM::GlobalOp>(moduleOp.getLoc(), shortTy,
-                                       /*isConstant=*/true, LLVM::Linkage::Linkonce, globalName,
-                                       IntegerAttr::get(shortTy, 0));
-        return SymbolRefAttr::get(context, globalName);
-    }
-
     Value castToConvertedType(Value value, OpBuilder &builder, Location loc) const
     {
         auto casted = builder.create<UnrealizedConversionCastOp>(
@@ -267,9 +245,9 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         return casted.getResult(0);
     }
 
-    void unpackMemRef(Value memRefArg, Value shadowMemRef, SmallVectorImpl<Value> &callArgs,
-                      OpBuilder &builder, Location loc,
-                      EnzymeMemRefInterfaceOptions options = EnzymeMemRefInterfaceOptions()) const
+    void unpackMemRefAndAppend(
+        Value memRefArg, Value shadowMemRef, SmallVectorImpl<Value> &callArgs, OpBuilder &builder,
+        Location loc, EnzymeMemRefInterfaceOptions options = EnzymeMemRefInterfaceOptions()) const
 
     {
         auto llvmPtrType = LLVM::LLVMPointerType::get(builder.getContext());
@@ -339,7 +317,7 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         return bufferSizeBytes;
     }
 
-    /// This registers a custom allocation and deallocation functions with Enzyme. It creates a
+    /// This registers custom allocation and deallocation functions with Enzyme. It creates a
     /// global LLVM array that Enzyme will convert to the appropriate metadata using the
     /// `preserve-nvvm` pass.
     ///
@@ -387,39 +365,52 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         return allocationLike;
     }
 
-    static void insertFunctionName(PatternRewriter &rewriter, Operation *op, StringRef key,
-                                   StringRef value)
+    /// This function inserts a llvm global (symbol) and associates it to a value if provided
+    /// (optional).
+    ///
+    /// It can be used to add Enzyme globals.
+    static void insertGlobalSymbol(PatternRewriter &rewriter, ModuleOp op, StringRef key,
+                                   std::optional<StringRef> value)
     {
-        ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
-        PatternRewriter::InsertionGuard insertGuard(rewriter);
-        rewriter.setInsertionPointToStart(moduleOp.getBody());
-        LLVM::GlobalOp glb = moduleOp.lookupSymbol<LLVM::GlobalOp>(key);
+        auto *context = op.getContext();
+        LLVM::GlobalOp glb = op.lookupSymbol<LLVM::GlobalOp>(key);
+
+        OpBuilder::InsertionGuard insertGuard(rewriter);
+        rewriter.setInsertionPointToStart(op.getBody());
+        auto shortTy = IntegerType::get(context, 8);
         if (!glb) {
-            glb = rewriter.create<LLVM::GlobalOp>(
-                moduleOp.getLoc(),
-                LLVM::LLVMArrayType::get(IntegerType::get(rewriter.getContext(), 8), value.size()),
-                true, LLVM::Linkage::Linkonce, key, rewriter.getStringAttr(value));
+            if (!value) {
+                rewriter.create<LLVM::GlobalOp>(op.getLoc(), shortTy,
+                                                /*isConstant=*/true, LLVM::Linkage::Linkonce, key,
+                                                IntegerAttr::get(shortTy, 0));
+            }
+            else {
+                rewriter.create<LLVM::GlobalOp>(
+                    op.getLoc(), LLVM::LLVMArrayType::get(shortTy, value->size()), true,
+                    LLVM::Linkage::Linkonce, key, rewriter.getStringAttr(*value));
+            }
         }
     }
 
-    static LLVM::GlobalOp insertEnzymeFunctionLike(PatternRewriter &rewriter, Operation *op,
+    /// This functions inserts a llvm global (with a block), it is used to tell Enzyme
+    /// how to deal with function with custom definition like mlir allocation and free.
+    static LLVM::GlobalOp insertEnzymeFunctionLike(PatternRewriter &rewriter, ModuleOp op,
                                                    StringRef key, StringRef name,
                                                    StringRef originalName)
     {
-        ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
-        auto *context = moduleOp.getContext();
+        auto *context = op.getContext();
         PatternRewriter::InsertionGuard insertGuard(rewriter);
-        rewriter.setInsertionPointToStart(moduleOp.getBody());
+        rewriter.setInsertionPointToStart(op.getBody());
 
-        LLVM::GlobalOp glb = moduleOp.lookupSymbol<LLVM::GlobalOp>(key);
+        LLVM::GlobalOp glb = op.lookupSymbol<LLVM::GlobalOp>(key);
 
         auto ptrType = LLVM::LLVMPointerType::get(context);
         if (glb) {
             return glb;
         }
-        glb = rewriter.create<LLVM::GlobalOp>(
-            moduleOp.getLoc(), LLVM::LLVMArrayType::get(ptrType, 2), /*isConstant=*/false,
-            LLVM::Linkage::External, key, nullptr);
+        glb = rewriter.create<LLVM::GlobalOp>(op.getLoc(), LLVM::LLVMArrayType::get(ptrType, 2),
+                                              /*isConstant=*/false, LLVM::Linkage::External, key,
+                                              nullptr);
 
         // Create the block and push it back in the global
         auto *contextGlb = glb.getContext();

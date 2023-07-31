@@ -99,6 +99,10 @@ std::vector<Type> computeQGradTypes(func::FuncOp callee)
     return qGradResTypes;
 }
 
+/// Produce a vector of the expected types of the backpropagation results.
+///
+/// The non differentiable params are filtered out.
+///
 std::vector<Type> computeBackpropTypes(func::FuncOp callee,
                                        const std::vector<uint64_t> &diffArgIndices)
 {
@@ -119,11 +123,6 @@ std::vector<Type> computeBackpropTypes(func::FuncOp callee,
             backpropResTypes.push_back(RankedTensorType::get(tensorShape, diffArgType));
         }
     }
-    // Assume Args are always tensor
-    // else {
-    //     ArrayRef<int64_t> tensorShape;
-    //     backpropResTypes.push_back(RankedTensorType::get(tensorShape, argType));
-    // }
 
     return backpropResTypes;
 }

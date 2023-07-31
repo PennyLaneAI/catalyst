@@ -20,6 +20,23 @@
   workflow()
   ```
 
+* The classical part of the jacobian/gradient is calculated through backpropagation using     Enzyme AD.
+
+  [#193](https://github.com/PennyLaneAI/catalyst/pull/193)
+  
+  ```python
+  @qml.qnode(qml.device(backend, wires=1), diff_method="parameter-shift")
+  def func(p):
+      qml.RY(jax.numpy.sin(p), wires=0)
+      return qml.probs(wires=0)
+
+  @qjit
+  def workflow(p: float):
+      return grad(func, method="defer")(p)
+
+  results = qml.jacobian(func, argnum=0)(0.5)
+  ```
+
 <h3>Improvements</h3>
 
 * Eliminate redundant unflattening and flattening of PyTrees parameters in Catalyst control flow operations.
