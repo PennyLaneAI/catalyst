@@ -32,7 +32,6 @@
 
 #include "Gradient/IR/GradientOps.h"
 #include "Gradient/Transforms/Patterns.h"
-#include "Gradient/Utils/CompDiffArgIndices.h"
 #include "Gradient/Utils/GradientShape.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Utils/RemoveQuantumMeasurements.h"
@@ -206,19 +205,17 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         calleePtr = castToConvertedType(calleePtr, rewriter, loc);
         SmallVector<Value> callArgs = {calleePtr};
 
-        std::vector<size_t> diffArgIndices = catalyst::compDiffArgIndices(op.getDiffArgIndices());
+        const std::vector<size_t> &diffArgIndices = computeDiffArgIndices(op.getDiffArgIndices());
         getOrInsertEnzymeGlobal(rewriter, moduleOp, enzyme_const_key);
         getOrInsertEnzymeGlobal(rewriter, moduleOp, enzyme_dupnoneed_key);
 
-        int index = 0;
-        ValueRange dataIn = adaptor.getDataIn();
+        ValueRange dataIn = adaptor.getDiffArgShadows();
         Value enzymeConst = rewriter.create<LLVM::AddressOfOp>(loc, LLVM::LLVMPointerType::get(ctx),
                                                                enzyme_const_key);
 
         // Add the arguments and their shadow on data in
-        for (Value arg : op.getArgs()) {
-            std::vector<size_t>::iterator it =
-                std::find(diffArgIndices.begin(), diffArgIndices.end(), index);
+        for (auto [index, arg] : llvm::enumerate(op.getArgs())) {
+            auto it = std::find(diffArgIndices.begin(), diffArgIndices.end(), index);
             if (it == diffArgIndices.end()) {
                 if (isa<MemRefType>(arg.getType())) {
                     // unpackMemRef will handle the appropriate enzyme_const annotations
@@ -240,21 +237,9 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
             index++;
         }
 
-        for (Value qJacobian : op.getQuantumJacobian()) {
-            // Enzyme requires buffers for the primal outputs, but we don't need their values.
-            // We'll need to allocate space for them regardless, so marking them as dupNoNeed will
-            // allow Enzyme to optimize away their computation.
-            auto memrefType = cast<MemRefType>(qJacobian.getType());
-            SmallVector<Value> dynamicDims;
-            for (int64_t dim = 0; dim < memrefType.getRank(); dim++) {
-                if (memrefType.isDynamicDim(dim)) {
-                    Value dimIndex = rewriter.create<index::ConstantOp>(loc, dim);
-                    dynamicDims.push_back(rewriter.create<memref::DimOp>(loc, qJacobian, dimIndex));
-                }
-            }
-            Value result = rewriter.create<memref::AllocOp>(loc, memrefType, dynamicDims);
-
-            unpackMemRef(result, qJacobian, callArgs, rewriter, loc, {.dupNoNeed = true});
+        for (auto [result, cotangent] :
+             llvm::zip_equal(op.getCalleeResults(), op.getCotangents())) {
+            unpackMemRef(result, cotangent, callArgs, rewriter, loc, {.dupNoNeed = true});
         }
 
         // The results of backprop are in data in

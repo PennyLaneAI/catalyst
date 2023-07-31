@@ -26,7 +26,6 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 
-#include "Gradient/Utils/CompDiffArgIndices.h"
 #include "Gradient/Utils/GradientShape.h"
 
 namespace catalyst {
@@ -45,7 +44,7 @@ func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc, GradOp
                                  func::FuncOp qGradFn, StringRef method)
 {
     // Define the properties of the full gradient function.
-    const std::vector<size_t> &diffArgIndices = compDiffArgIndices(gradOp.getDiffArgIndices());
+    const std::vector<size_t> &diffArgIndices = computeDiffArgIndices(gradOp.getDiffArgIndices());
     std::stringstream uniquer;
     std::copy(diffArgIndices.begin(), diffArgIndices.end(), std::ostream_iterator<int>(uniquer));
     std::string fnName = gradOp.getCallee().str() + ".fullgrad" + uniquer.str() + method.str();
@@ -149,8 +148,8 @@ func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc, GradOp
                         loc, rankReducedType, quantumGradient, dynOffsets, dynSizes, dynStrides,
                         offsets, sizes, strides);
                     BackpropOp backpropOp = rewriter.create<BackpropOp>(
-                        loc, resultsBackpropTypes, argMapFn.getName(), callArgs,
-                        extractQuantumGradient, ValueRange{}, diffArgIndicesAttr);
+                        loc, resultsBackpropTypes, argMapFn.getName(), callArgs, ValueRange{},
+                        ValueRange{}, extractQuantumGradient, diffArgIndicesAttr);
 
                     intermediateGradients.push_back(backpropOp);
                 }
@@ -197,23 +196,27 @@ func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc, GradOp
                 }
             }
             else {
+                // Co-tangent is a rank 1 tensor
                 BackpropOp backpropOp = rewriter.create<BackpropOp>(
-                    loc, resultsBackpropTypes, argMapFn.getName(), callArgs, quantumGradient,
-                    ValueRange{}, diffArgIndicesAttr);
-                for (Value result : backpropOp.getResults()) {
+                    loc, resultsBackpropTypes, argMapFn.getName(), callArgs, ValueRange{},
+                    ValueRange{}, quantumGradient, diffArgIndicesAttr);
+                for (OpResult result : backpropOp.getResults()) {
                     // The backprop op produces a row of the Jacobian, which always has the same
-                    // type as the differentiated argument. If the rank of the quantum gradient is
+                    // type as the differentiated argument. If the rank of the cotangent is
                     // 1, this implies the primal function returns a rank-0 value (either a scalar
                     // or a tensor<scalar>). The Jacobian of a scalar -> scalar should be a scalar,
                     // but as a special case, the Jacobian of a scalar -> tensor<scalar> should be
                     // tensor<scalar>.
-                    if (true) {
+                    Value hybridGradient = result;
+                    if (gradOp.getResult(result.getResultNumber()).getType()) {
                         Value jacobian = rewriter.create<tensor::EmptyOp>(
-                            loc, gradOp.getResultTypes().front(), ValueRange{});
-                        result =
-                            rewriter.create<tensor::InsertOp>(loc, result, jacobian, ValueRange{});
+                            loc, gradOp.getResult(result.getResultNumber()).getType(),
+                            ValueRange{});
+                        hybridGradient =
+                            rewriter.create<tensor::InsertOp>(loc, result, jacobian, ValueRange{})
+                                .getResult();
                     }
-                    hybridGradients.push_back(result);
+                    hybridGradients.push_back(hybridGradient);
                 }
             }
         }
