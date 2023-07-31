@@ -13,7 +13,7 @@
 # limitations under the License.
 
 """
-Unit tests for CppCompiler class
+Unit tests for LinkerDriver class
 """
 
 import os
@@ -28,7 +28,7 @@ import pennylane as qml
 import pytest
 
 from catalyst import qjit
-from catalyst.compiler import CompileOptions, Compiler, CppCompiler
+from catalyst.compiler import CompileOptions, Compiler, LinkerDriver
 from catalyst.jax_tracer import get_mlir
 from catalyst.utils.exceptions import CompileError
 
@@ -47,7 +47,7 @@ class TestCompilerOptions:
         with warnings.catch_warnings():
             warnings.simplefilter("error")
             # pylint: disable=protected-access
-            compilers = CppCompiler._get_compiler_fallback_order([])
+            compilers = LinkerDriver._get_compiler_fallback_order([])
             assert compiler in compilers
 
     @pytest.mark.parametrize(
@@ -83,13 +83,13 @@ class TestCompilerWarnings:
         monkeypatch.setenv("CATALYST_CC", "this-binary-does-not-exist")
         with pytest.warns(UserWarning, match="User defined compiler.* is not in PATH."):
             # pylint: disable=protected-access
-            CppCompiler._get_compiler_fallback_order([])
+            LinkerDriver._get_compiler_fallback_order([])
 
     def test_compiler_failed_warning(self):
         """Test that a warning is emitted when a compiler failed."""
         with pytest.warns(UserWarning, match="Compiler .* failed .*"):
             # pylint: disable=protected-access
-            CppCompiler._attempt_link("cc", [""], "in.o", "out.so", None)
+            LinkerDriver._attempt_link("cc", [""], "in.o", "out.so", None)
 
 
 class TestCompilerErrors:
@@ -102,7 +102,7 @@ class TestCompilerErrors:
             invalid_file.flush()
             with pytest.raises(EnvironmentError, match="Unable to link .*"):
                 with pytest.warns(UserWarning, match="Compiler cc failed during execution"):
-                    CppCompiler.run(invalid_file.name, fallback_compilers=["cc"])
+                    LinkerDriver.run(invalid_file.name, fallback_compilers=["cc"])
 
     def test_attempts_to_get_inexistent_intermediate_file(self):
         """Test return value if user request intermediate file that doesn't exist."""
@@ -138,7 +138,7 @@ void _catalyst_pyface_jit_cpp_exception_test(void*, void*) {
 
                     object_file = filename.replace(".c", ".o")
                     os.system(f"cc -shared -fPIC -x c++ {filename} -o {object_file}")
-                    output = CppCompiler.run(object_file, options=self.options)
+                    output = LinkerDriver.run(object_file, options=self.options)
                     filename = str(pathlib.Path(output).absolute())
                     return filename, "<FAKE_IR>", ["<FAKE_FN>", "<FAKE_TYPE>"]
 
@@ -227,7 +227,7 @@ class TestCompilerState:
             with open(filename, "w", encoding="utf-8") as f:
                 print("int main() {}", file=f)
 
-            CppCompiler.run(filename, outfile=outfilename)
+            LinkerDriver.run(filename, outfile=outfilename)
 
             assert os.path.exists(outfilename)
 
@@ -242,7 +242,7 @@ class TestCompilerState:
             object_file = filename.replace(".c", ".o")
             os.system(f"c99 -c {filename} -o {object_file}")
             expected_outfilename = workspace + "a.so"
-            observed_outfilename = CppCompiler.run(object_file, flags=[])
+            observed_outfilename = LinkerDriver.run(object_file, flags=[])
 
             assert observed_outfilename == expected_outfilename
             assert os.path.exists(observed_outfilename)

@@ -187,7 +187,7 @@ DEFAULT_PIPELINES = [
 ]
 
 # FIXME: Figure out how to encode Enzyme pipeline. Probably we should make it the same way we make
-# CppCompiler
+# LinkerDriver
 if False:
 
     class Enzyme(PassPipeline):
@@ -211,7 +211,7 @@ if False:
             return str(path.with_suffix(".ll"))
 
 
-class CppCompiler:
+class LinkerDriver:
     """C/C++ compiler interface.
     In order to avoid relying on a single compiler at run time and allow the user some flexibility,
     this class defines a compiler resolution order where multiple known compilers are attempted.
@@ -261,7 +261,7 @@ class CppCompiler:
     def _get_compiler_fallback_order(fallback_compilers):
         """Compiler fallback order"""
         preferred_compiler = os.environ.get("CATALYST_CC", None)
-        preferred_compiler_exists = CppCompiler._exists(preferred_compiler)
+        preferred_compiler_exists = LinkerDriver._exists(preferred_compiler)
         compilers = fallback_compilers
         emit_warning = preferred_compiler and not preferred_compiler_exists
         if emit_warning:
@@ -279,8 +279,8 @@ class CppCompiler:
 
     @staticmethod
     def _available_compilers(fallback_compilers):
-        for compiler in CppCompiler._get_compiler_fallback_order(fallback_compilers):
-            if CppCompiler._exists(compiler):
+        for compiler in LinkerDriver._get_compiler_fallback_order(fallback_compilers):
+            if LinkerDriver._exists(compiler):
                 yield compiler
 
     @staticmethod
@@ -325,13 +325,13 @@ class CppCompiler:
             EnvironmentError: The exception is raised when no compiler succeeded.
         """
         if outfile is None:
-            outfile = CppCompiler.get_output_filename(infile)
+            outfile = LinkerDriver.get_output_filename(infile)
         if flags is None:
-            flags = CppCompiler.get_default_flags()
+            flags = LinkerDriver.get_default_flags()
         if fallback_compilers is None:
-            fallback_compilers = CppCompiler._default_fallback_compilers
-        for compiler in CppCompiler._available_compilers(fallback_compilers):
-            success = CppCompiler._attempt_link(compiler, flags, infile, outfile, options)
+            fallback_compilers = LinkerDriver._default_fallback_compilers
+        for compiler in LinkerDriver._available_compilers(fallback_compilers):
+            success = LinkerDriver._attempt_link(compiler, flags, infile, outfile, options)
             if success:
                 return outfile
         msg = f"Unable to link {infile}. All available compiler options exhausted. "
@@ -411,7 +411,7 @@ class Compiler:
         ret_type_name = compiler_output.get_function_attributes().get_return_type()
 
         if attempt_LLVM_lowering:
-            output = CppCompiler.run(filename, options=self.options)
+            output = LinkerDriver.run(filename, options=self.options)
             output_filename = str(pathlib.Path(output).absolute())
         else:
             output_filename = filename
