@@ -234,7 +234,6 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
                 assert(isa<FloatType>(arg.getType()) && "diff arg must be a float or float tensor");
                 callArgs.push_back(arg);
             }
-            index++;
         }
 
         for (auto [result, cotangent] :

@@ -110,21 +110,24 @@ std::vector<Type> computeBackpropTypes(func::FuncOp callee,
 
     for (size_t i = 0; i < numDiffArgs; i++) {
         assert(diffArgIndices[i] < callee.getNumArguments() && "invalid diff argument index");
-
         Type diffArgType = fnType.getInput(diffArgIndices[i]);
-
-        if (auto tensorType = dyn_cast<RankedTensorType>(diffArgType)) {
-            ArrayRef<int64_t> tensorShape = tensorType.getShape();
-            diffArgType = tensorType.getElementType();
-            backpropResTypes.push_back(RankedTensorType::get(tensorShape, diffArgType));
-        }
-        else {
-            assert(isa<FloatType>(diffArgType) && "diff argument must be a float or float tensor");
-            backpropResTypes.push_back(diffArgType);
-        }
+        assert(isDifferentiable(diffArgType) &&
+               "diff argument must be a float, complex or tensor of either");
+        backpropResTypes.push_back(diffArgType);
     }
 
     return backpropResTypes;
+}
+
+bool isDifferentiable(Type type)
+{
+    if (isa<FloatType, ComplexType>(type)) {
+        return true;
+    }
+    if (auto shapedType = dyn_cast<ShapedType>(type)) {
+        return isDifferentiable(shapedType.getElementType());
+    }
+    return false;
 }
 
 /// Produce a normalized array of argument indices considered differentiable.

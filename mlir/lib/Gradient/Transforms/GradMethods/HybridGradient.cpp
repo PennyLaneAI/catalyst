@@ -196,7 +196,7 @@ func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc, GradOp
                 }
             }
             else {
-                // Co-tangent is a rank 1 tensor
+                // Cotangent is a rank 1 tensor
                 BackpropOp backpropOp = rewriter.create<BackpropOp>(
                     loc, resultsBackpropTypes, argMapFn.getName(), callArgs, ValueRange{},
                     ValueRange{}, quantumGradient, diffArgIndicesAttr);
