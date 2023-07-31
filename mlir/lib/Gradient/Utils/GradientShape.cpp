@@ -99,6 +99,10 @@ std::vector<Type> computeQGradTypes(func::FuncOp callee)
     return qGradResTypes;
 }
 
+/// Produce a vector of the expected types of the backpropagation results.
+///
+/// The non differentiable params are filtered out.
+///
 std::vector<Type> computeBackpropTypes(func::FuncOp callee,
                                        const std::vector<uint64_t> &diffArgIndices)
 {
