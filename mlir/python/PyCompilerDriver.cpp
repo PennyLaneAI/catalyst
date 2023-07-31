@@ -48,9 +48,9 @@ PYBIND11_MODULE(_catalystDriver, m)
     //===--------------------------------------------------------------------===//
     py::class_<FunctionAttributes> funcattrs_class(m, "FunctionAttributes");
     funcattrs_class.def(py::init<>())
-        .def("getFunctionName",
+        .def("get_function_name",
              [](const FunctionAttributes &fa) -> std::string { return fa.functionName; })
-        .def("getReturnType",
+        .def("get_return_type",
              [](const FunctionAttributes &fa) -> std::string { return fa.returnType; });
 
     py::class_<CompilerOutput> compout_class(m, "CompilerOutput");
@@ -61,7 +61,7 @@ PYBIND11_MODULE(_catalystDriver, m)
                  return res != co.pipelineOutputs.end() ? res->second
                                                         : std::optional<std::string>();
              })
-        .def("get_output_IR", [](const CompilerOutput &co) -> std::string { return co.outIR; })
+        .def("get_output_ir", [](const CompilerOutput &co) -> std::string { return co.outIR; })
         .def("get_object_filename",
              [](const CompilerOutput &co) -> std::string { return co.objectFilename; })
         .def("get_function_attributes",
