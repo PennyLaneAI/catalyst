@@ -406,9 +406,9 @@ class Compiler:
                 print(f"[LIB] {line}", file=self.options.logfile)
 
         filename = compiler_output.get_object_filename()
-        out_IR = compiler_output.get_output_IR()
-        func_name = compiler_output.get_function_attributes().getFunctionName()
-        ret_type_name = compiler_output.get_function_attributes().getReturnType()
+        out_IR = compiler_output.get_output_ir()
+        func_name = compiler_output.get_function_attributes().get_function_name()
+        ret_type_name = compiler_output.get_function_attributes().get_return_type()
 
         if attempt_LLVM_lowering:
             output = CppCompiler.run(filename, options=self.options)
