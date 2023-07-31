@@ -186,30 +186,6 @@ DEFAULT_PIPELINES = [
     ),
 ]
 
-# FIXME: Figure out how to encode Enzyme pipeline. Probably we should make it the same way we make
-# LinkerDriver
-if False:
-
-    class Enzyme(PassPipeline):
-        """Pass pipeline to lower LLVM IR to Enzyme LLVM IR."""
-
-        _executable = get_executable_path("llvm", "opt")
-        enzyme_path = get_lib_path("enzyme", "ENZYME_LIB_DIR")
-        _default_flags = [
-            f"-load-pass-plugin={enzyme_path}/LLVMEnzyme-17.so",
-            "-load",
-            f"{enzyme_path}/LLVMEnzyme-17.so",
-            "-passes=enzyme",
-            "-S",
-        ]
-
-        @staticmethod
-        def get_output_filename(infile):
-            path = pathlib.Path(infile)
-            if not path.exists():
-                raise FileNotFoundError(f"Cannot find {infile}.")
-            return str(path.with_suffix(".ll"))
-
 
 class LinkerDriver:
     """C/C++ compiler interface.
