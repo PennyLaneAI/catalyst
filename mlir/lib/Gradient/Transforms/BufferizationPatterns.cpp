@@ -97,7 +97,9 @@ class BufferizeBackpropOp : public OpConversionPattern<BackpropOp> {
         SmallVector<Value> gradients;
         SmallVector<Value> argShadows;
         // Conceptually a map from scalar result indices (w.r.t. other scalars) to the position in
-        // the overall list of gradients.
+        // the overall list of returned gradients.
+        // For instance, a backprop op that returns (tensor, f64, tensor, f64, f64) will have
+        // scalarIndices = {1, 3, 4}.
         SmallVector<unsigned> scalarIndices;
         SmallVector<Type> scalarReturnTypes;
         std::vector<Value> diffArgs =
