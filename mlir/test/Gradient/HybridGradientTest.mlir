@@ -90,6 +90,62 @@ func.func @gradCallPointTensorPointTensor(%arg0: tensor<f64>) -> tensor<f64> {
 
 // -----
 
+// Check scalar to tensor function
+func.func private @funcScalarTensor(%arg0: f64) -> tensor<2x3xf64> attributes {qnode, diff_method = "parameter-shift"} {
+    %c0 = arith.constant 0.0 : f64
+    %res = tensor.from_elements %c0, %c0, %c0, %c0, %c0, %c0 : tensor<2x3xf64>
+    return %res : tensor<2x3xf64>
+}
+
+// CHECK-LABEL: @funcScalarTensor.fullgrad0ps(%arg0: f64) -> tensor<2x3xf64>
+    // CHECK:   [[pcount:%.+]] = call @funcScalarTensor.pcount(%arg0) : (f64) -> index
+    // CHECK:   [[qgrad:%.+]] = call @funcScalarTensor.qgrad(%arg0, [[pcount]]) : (f64, index) -> tensor<?x2x3xf64>
+    // CHECK:   [[jacobian0:%.+]] = tensor.empty() : tensor<2x3xf64>
+    // CHECK:   [[qgrad00:%.+]] = tensor.extract_slice [[qgrad]][0, 0, 0]
+    // CHECK:   [[jacvl00:%.+]] = gradient.backprop @funcScalarTensor.argmap(%arg0) cotangents([[qgrad00]]
+    // CHECK:   [[qgrad01:%.+]] = tensor.extract_slice [[qgrad]][0, 0, 1]
+    // CHECK:   [[jacvl01:%.+]] = gradient.backprop @funcScalarTensor.argmap(%arg0) cotangents([[qgrad01]]
+    // CHECK:   [[qgrad02:%.+]] = tensor.extract_slice [[qgrad]][0, 0, 2]
+    // CHECK:   [[jacvl02:%.+]] = gradient.backprop @funcScalarTensor.argmap(%arg0) cotangents([[qgrad02]]
+    // CHECK:   [[qgrad10:%.+]] = tensor.extract_slice [[qgrad]][0, 1, 0]
+    // CHECK:   [[jacvl10:%.+]] = gradient.backprop @funcScalarTensor.argmap(%arg0) cotangents([[qgrad10]]
+    // CHECK:   [[qgrad11:%.+]] = tensor.extract_slice [[qgrad]][0, 1, 1]
+    // CHECK:   [[jacvl11:%.+]] = gradient.backprop @funcScalarTensor.argmap(%arg0) cotangents([[qgrad11]]
+    // CHECK:   [[qgrad12:%.+]] = tensor.extract_slice [[qgrad]][0, 1, 2]
+    // CHECK:   [[jacvl12:%.+]] = gradient.backprop @funcScalarTensor.argmap(%arg0) cotangents([[qgrad12]]
+
+    // CHECK:   [[jacobian1:%.+]] = tensor.insert [[jacvl00]] into [[jacobian0]][%idx0, %idx0]
+    // CHECK:   [[jacobian2:%.+]] = tensor.insert [[jacvl01]] into [[jacobian1]][%idx0, %idx1]
+    // CHECK:   [[jacobian3:%.+]] = tensor.insert [[jacvl02]] into [[jacobian2]][%idx0, %idx2]
+    // CHECK:   [[jacobian4:%.+]] = tensor.insert [[jacvl10]] into [[jacobian3]][%idx1, %idx0]
+    // CHECK:   [[jacobian5:%.+]] = tensor.insert [[jacvl11]] into [[jacobian4]][%idx1, %idx1]
+    // CHECK:   [[jacobian6:%.+]] = tensor.insert [[jacvl12]] into [[jacobian5]][%idx1, %idx2]
+    // CHECK:   return [[jacobian6]]
+func.func @gradCallScalarTensor(%arg0: f64) -> tensor<2x3xf64> {
+    %0 = gradient.grad "defer"  @funcScalarTensor(%arg0) : (f64) -> tensor<2x3xf64>
+    func.return %0 : tensor<2x3xf64>
+}
+
+// -----
+
+// Check tensor to scalar
+func.func private @funcTensorScalar(%arg0: tensor<3xf64>) -> f64 attributes {qnode, diff_method = "parameter-shift"} {
+    %res = arith.constant 0.0 : f64
+    return %res : f64
+}
+
+// CHECK-LABEL: @funcTensorScalar.fullgrad0ps(%arg0: tensor<3xf64>) -> tensor<3xf64>
+    // CHECK:   [[pcount:%.+]] = call @funcTensorScalar.pcount(%arg0) : (tensor<3xf64>) -> index
+    // CHECK:   [[qgrad:%.+]] = call @funcTensorScalar.qgrad(%arg0, [[pcount]]) : (tensor<3xf64>, index) -> tensor<?xf64>
+    // CHECK:   [[grad:%.+]] = gradient.backprop @funcTensorScalar.argmap(%arg0) cotangents([[qgrad]] : tensor<?xf64>) : (tensor<3xf64>) -> tensor<3xf64>
+    // CHECK:   return [[grad]]
+
+func.func @gradCallTensorScalar(%arg0: tensor<3xf64>) -> tensor<3xf64> {
+    %2 = gradient.grad "defer"  @funcTensorScalar(%arg0) : (tensor<3xf64>) -> tensor<3xf64>
+    func.return %2 : tensor<3xf64>
+}
+
+// -----
 
 // Check tensor to tensor case
 func.func private @funcTensorTensor(%arg0: tensor<7x3x2x1xf64>) -> tensor<2xf64> attributes {qnode, diff_method = "parameter-shift"} {
