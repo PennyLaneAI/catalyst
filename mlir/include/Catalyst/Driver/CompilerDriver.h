@@ -42,11 +42,11 @@ typedef enum {
     CO_VERB_ALL = 3
 } Verbosity;
 
-#define CO_MSG(opt, level, op)               \
-    {                                        \
-        if ((opt).verbosity >= (level)) {    \
-            options.diagnosticStream << op;  \
-        }                                    \
+#define CO_MSG(opt, level, op)                                                                     \
+    {                                                                                              \
+        if ((opt).verbosity >= (level)) {                                                          \
+            options.diagnosticStream << op;                                                        \
+        }                                                                                          \
     }
 
 /// Pipeline descriptor

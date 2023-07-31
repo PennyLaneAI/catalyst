@@ -14,11 +14,11 @@
 
 #pragma once
 
+#include "CompilerDriver.h"
 #include "mlir/IR/DialectRegistry.h"
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/IR/Module.h"
-#include "CompilerDriver.h"
 
 namespace catalyst {
 
