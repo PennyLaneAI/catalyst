@@ -379,7 +379,6 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
 
         return allocationLike;
     }
-
 };
 
 } // namespace
