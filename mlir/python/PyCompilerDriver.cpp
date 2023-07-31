@@ -90,7 +90,7 @@ PYBIND11_MODULE(_catalystDriver, m)
                                     .moduleName = moduleName,
                                     .diagnosticStream = errStream,
                                     .keepIntermediate = keepIntermediate,
-                                    .verbosity = verbose ? CO_VERB_ALL : CO_VERB_SILENT,
+                                    .verbosity = verbose ? CO_VERB_ALL : CO_VERB_URGENT,
                                     .pipelinesCfg = parseCompilerSpec(pipelines),
                                     .attemptLLVMLowering = attemptLLVMLowering};
 

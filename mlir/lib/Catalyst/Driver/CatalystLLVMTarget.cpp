@@ -85,7 +85,8 @@ void catalyst::registerLLVMTranslations(DialectRegistry &registry)
     });
 }
 
-LogicalResult catalyst::compileObjectFile(std::unique_ptr<llvm::Module> llvmModule,
+LogicalResult catalyst::compileObjectFile(const CompilerOptions &options,
+                                          std::unique_ptr<llvm::Module> llvmModule,
                                           StringRef filename)
 {
     using namespace llvm;
@@ -103,7 +104,7 @@ LogicalResult catalyst::compileObjectFile(std::unique_ptr<llvm::Module> llvmModu
     auto target = TargetRegistry::lookupTarget(targetTriple, err);
 
     if (!target) {
-        errs() << err;
+        CO_MSG(options, CO_VERB_URGENT, err);
         return failure();
     }
 
@@ -121,13 +122,13 @@ LogicalResult catalyst::compileObjectFile(std::unique_ptr<llvm::Module> llvmModu
     raw_fd_ostream dest(filename, errCode, sys::fs::OF_None);
 
     if (errCode) {
-        errs() << "could not open file: " << errCode.message() << "\n";
+        CO_MSG(options, CO_VERB_URGENT, "could not open file: " << errCode.message() << "\n");
         return failure();
     }
 
     legacy::PassManager pm;
     if (targetMachine->addPassesToEmitFile(pm, dest, nullptr, CGFT_ObjectFile)) {
-        errs() << "TargetMachine can't emit an .o file\n";
+        CO_MSG(options, CO_VERB_URGENT, "TargetMachine can't emit an .o file\n");
         return failure();
     }
 

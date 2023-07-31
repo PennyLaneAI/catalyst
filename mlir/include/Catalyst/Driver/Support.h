@@ -30,22 +30,17 @@ mlir::LogicalResult dumpToFile(const CompilerOptions &options, mlir::StringRef f
     using std::filesystem::path;
     std::error_code errCode;
     std::string outFileName = path(options.workspace.str()) / path(fileName.str());
-    if (options.verbosity >= CO_VERB_DEBUG) {
-        options.diagnosticStream << "Dumping '" << outFileName << "'\n";
-    }
+
+    CO_MSG(options, CO_VERB_DEBUG, "Dumping '" << outFileName << "'\n");
     llvm::raw_fd_ostream outfile{outFileName, errCode};
     if (errCode) {
-        if (options.verbosity >= CO_VERB_URGENT) {
-            options.diagnosticStream << "Unable to open file: " << errCode.message() << "\n";
-        }
+        CO_MSG(options, CO_VERB_URGENT, "Unable to open file: " << errCode.message() << "\n");
         return mlir::failure();
     }
     outfile << obj;
     outfile.flush();
     if (errCode) {
-        if (options.verbosity >= CO_VERB_URGENT) {
-            options.diagnosticStream << "Unable to write to file: " << errCode.message() << "\n";
-        }
+        CO_MSG(options, CO_VERB_URGENT, "Unable to write to file: " << errCode.message() << "\n");
         return mlir::failure();
     }
     return mlir::success();

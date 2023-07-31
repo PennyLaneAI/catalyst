@@ -18,13 +18,15 @@
 #include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/IR/Module.h"
+#include "CompilerDriver.h"
 
 namespace catalyst {
 
 /// Register the translations needed to convert to LLVM IR.
 void registerLLVMTranslations(mlir::DialectRegistry &registry);
 
-mlir::LogicalResult compileObjectFile(std::unique_ptr<llvm::Module> module,
+mlir::LogicalResult compileObjectFile(const CompilerOptions &options,
+                                      std::unique_ptr<llvm::Module> module,
                                       llvm::StringRef filename);
 
 } // namespace catalyst

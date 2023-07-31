@@ -325,7 +325,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         }
 
         auto outfile = options.getObjectFile();
-        if (failed(compileObjectFile(std::move(llvmModule), outfile))) {
+        if (failed(compileObjectFile(options, std::move(llvmModule), outfile))) {
             return failure();
         }
         output.objectFilename = outfile;
