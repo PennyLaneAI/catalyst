@@ -37,7 +37,7 @@ void generateAllocations(PatternRewriter &rewriter, Location loc,
                          SmallVectorImpl<Value> &allocations, ValueRange referenceValues)
 {
     for (Value memref : referenceValues) {
-        MemRefType memrefType = memref.getType().cast<MemRefType>();
+        MemRefType memrefType = cast<MemRefType>(memref.getType());
 
         // Get dynamic dimension sizes from the provided reference value if necessary.
         SmallVector<Value> dynamicDims;
