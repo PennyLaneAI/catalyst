@@ -105,7 +105,10 @@ def BackpropOp : Gradient_Op<"backprop", [AttrSizedOperandSegments,
     );
 
     let results = (outs
-        Variadic<RankedTensorOf<[AnyFloat]>>:$gradients
+        Variadic<AnyTypeOf<[
+            AnyFloat,
+            RankedTensorOf<[AnyFloat]>
+        ]>>:$gradients
     );
 
     let hasVerifier = 1;
