@@ -162,6 +162,7 @@ struct BraketRunner : public OpenQasmRunner {
                     result = device.run(OpenQasmProgram(source=circuit), shots=int(shots)).result()
                 result = str(result)
             except Exception as e:
+                print(f"circuit: {circuit}")
                 msg = str(e)
               )",
             py::globals(), locals);
@@ -220,6 +221,7 @@ struct BraketRunner : public OpenQasmRunner {
                 for i in range(2 ** int(num_qubits)):
                     probs_list.append(probs_dict[i] if i in probs_dict else 0)
             except Exception as e:
+                print(f"circuit: {circuit}")
                 msg = str(e)
               )",
             py::globals(), locals);
@@ -283,6 +285,7 @@ struct BraketRunner : public OpenQasmRunner {
                     result = device.run(OpenQasmProgram(source=circuit), shots=int(shots)).result()
                 samples = np.array(result.measurements).flatten()
             except Exception as e:
+                print(f"circuit: {circuit}")
                 msg = str(e)
               )",
             py::globals(), locals);
@@ -344,6 +347,7 @@ struct BraketRunner : public OpenQasmRunner {
                     result = device.run(OpenQasmProgram(source=circuit), shots=int(shots)).result()
                 expval = result.values
             except Exception as e:
+                print(f"circuit: {circuit}")
                 msg = str(e)
               )",
             py::globals(), locals);
@@ -399,6 +403,7 @@ struct BraketRunner : public OpenQasmRunner {
                     result = device.run(OpenQasmProgram(source=circuit), shots=int(shots)).result()
                 var = result.values
             except Exception as e:
+                print(f"circuit: {circuit}")
                 msg = str(e)
               )",
             py::globals(), locals);

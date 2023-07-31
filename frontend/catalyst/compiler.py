@@ -77,10 +77,7 @@ default_bin_paths = {
 default_lib_paths = {
     "llvm": os.path.join(package_root, "../../mlir/llvm-project/build/lib"),
     "runtime": os.path.join(package_root, "../../runtime/build/lib"),
-}
-
-default_enzyme_path = {
-    "enzyme": os.path.join(package_root, "../../mlir/Enzyme/enzyme/build/Enzyme")
+    "enzyme": os.path.join(package_root, "../../mlir/Enzyme/build/Enzyme"),
 }
 
 
@@ -89,15 +86,6 @@ def get_executable_path(project, tool):
     path = os.path.join(package_root, "bin") if INSTALLED else default_bin_paths.get(project, "")
     executable_path = os.path.join(path, tool)
     return executable_path if os.path.exists(executable_path) else tool
-
-
-def get_enzyme_path(project, env_var):
-    """Get path to Enzyme."""
-    return (
-        os.path.join(package_root, "enzyme")
-        if INSTALLED
-        else os.getenv(env_var, default_enzyme_path.get(project, ""))
-    )
 
 
 def get_lib_path(project, env_var):
@@ -173,6 +161,8 @@ class MHLOPass(PassPipeline):
         "--hlo-legalize-to-linalg",
         "--mhlo-legalize-to-std",
         "--convert-to-signless",
+        # Substitute tensors<1xf64> with tensors<f64>
+        "--scalarize",
         "--canonicalize",
     ]
 
@@ -189,6 +179,10 @@ class BufferizationPass(PassPipeline):
 
     _executable = get_executable_path("quantum", "quantum-opt")
     _default_flags = [
+        # The following pass allows differentiation of qml.probs with the parameter-shift method,
+        # as it performs the bufferization of `memref.tensor_op` (for which no dialect bufferization
+        # exists).
+        "--one-shot-bufferize=dialect-filter=memref",  # must run before any dialect bufferization
         "--inline",
         "--gradient-bufferize",
         "--scf-bufferize",
@@ -308,7 +302,7 @@ class Enzyme(PassPipeline):
     """Pass pipeline to lower LLVM IR to Enzyme LLVM IR."""
 
     _executable = get_executable_path("llvm", "opt")
-    enzyme_path = get_enzyme_path("enzyme", "ENZYME_DIR")
+    enzyme_path = get_lib_path("enzyme", "ENZYME_LIB_DIR")
     _default_flags = [
         f"-load-pass-plugin={enzyme_path}/LLVMEnzyme-17.so",
         # preserve-nvvm transforms certain global arrays to LLVM metadata that Enzyme will recognize
@@ -331,6 +325,9 @@ class LLVMIRToObjectFile(PassPipeline):
     _default_flags = [
         "--filetype=obj",
         "--relocation-model=pic",
+        # -O0 is used to achieve compile times similar to -regalloc=fast and disabling
+        # -twoaddrinst. However, from the command line, one cannot disable -twoaddrinst
+        "-O0",
     ]
 
     @staticmethod
