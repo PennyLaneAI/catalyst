@@ -22,7 +22,8 @@ def GradientBufferizationPass : Pass<"gradient-bufferize"> {
 
     let dependentDialects = [
         "bufferization::BufferizationDialect",
-        "memref::MemRefDialect"
+        "memref::MemRefDialect",
+        "index::IndexDialect"
     ];
 
     let constructor = "catalyst::createGradientBufferizationPass()";

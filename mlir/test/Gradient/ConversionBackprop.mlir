@@ -26,19 +26,16 @@ func.func private @argmap(%arg0: memref<f64>, %arg1: memref<?xf64>)
 // CHECK-DAG:  llvm.func @_mlir_memref_to_llvm_alloc(i64) -> !llvm.ptr
 // CHECK-DAG:  func.func private @argmap(memref<f64>, memref<?xf64>)
 
-// CHECK-LABEL: func.func @backpropArgmap(%arg0: memref<f64>, %arg1: memref<?xf64>) -> memref<f64> {
-func.func @backpropArgmap(%arg0: memref<f64>, %arg1: memref<?xf64>) -> memref<f64> {
+// CHECK-LABEL: func.func @backpropArgmap(%arg0: memref<f64>, %arg1: memref<f64>, %arg2: memref<?xf64>, %arg3: memref<?xf64>) -> memref<f64> {
+func.func @backpropArgmap(%arg0: memref<f64>, %arg1: memref<f64>, %arg2: memref<?xf64>, %arg3: memref<?xf64>) -> memref<f64> {
     // Constants and quantum gradient casting
-    // CHECK-DAG:   [[idx0:%.+]] = index.constant 0
     // CHECK-DAG:   [[memsetVal:%.+]] = llvm.mlir.constant(0 : i8) : i8
     // CHECK-DAG:   [[c8:%.+]] = llvm.mlir.constant(8 : index) : i64
     // CHECK-DAG:   [[argmapPtr:%.+]] = constant @argmap
     // CHECK-DAG:   [[c1:%.+]] = llvm.mlir.constant(1 : index) : i64
 
-    // Allocate space for the shadow
-    // CHECK:   [[shadowMemRef:%.+]] = memref.alloc()
-    // CHECK:   [[shadowCasted:%.+]] = builtin.unrealized_conversion_cast [[shadowMemRef]]
-
+    // Cast the arg shadow
+    // CHECK:   [[shadowCasted:%.+]] = builtin.unrealized_conversion_cast %arg1
 
     // More casting
     // CHECK-DAG: [[argmapCasted:%.+]] = builtin.unrealized_conversion_cast [[argmapPtr]] : (memref<f64>, memref<?xf64>) -> () to !llvm.ptr
@@ -52,25 +49,22 @@ func.func @backpropArgmap(%arg0: memref<f64>, %arg1: memref<?xf64>) -> memref<f6
     // CHECK: [[memsetSize:%.+]] = llvm.mul [[c8]], [[c1]]
     // CHECK-DAG: "llvm.intr.memset"([[shadowAligned]], [[memsetVal]], [[memsetSize]]) <{isVolatile = false}>
     // CHECK-DAG: [[arg0Offset:%.+]] = llvm.extractvalue [[arg0Casted]][2]
-    // CHECK-DAG: [[qJacobianSize:%.+]] = memref.dim %arg1, [[idx0]]
 
-    // Allocate space for the primal result
-    // CHECK: [[outputMemRef:%.+]] = memref.alloc([[qJacobianSize]])
+    // Cast the primal result
     // CHECK-DAG: [[enzymeDupNoNeed:%.+]] = llvm.mlir.addressof @enzyme_dupnoneed
-    // CHECK-DAG: [[outputCasted:%.+]] = builtin.unrealized_conversion_cast [[outputMemRef]]
+    // CHECK-DAG: [[outputCasted:%.+]] = builtin.unrealized_conversion_cast %arg2
     // CHECK: [[outputAllocated:%.+]] = llvm.extractvalue [[outputCasted]][0]
     // CHECK: [[outputAligned:%.+]] = llvm.extractvalue [[outputCasted]][1]
 
     // Call Enzyme
-    // CHECK:   [[qJacobianCasted:%.+]] = builtin.unrealized_conversion_cast %arg1 : memref<?xf64> to !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+    // CHECK:   [[qJacobianCasted:%.+]] = builtin.unrealized_conversion_cast %arg3 : memref<?xf64> to !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
     // CHECK-DAG: [[qJacobianAligned:%.+]] = llvm.extractvalue [[qJacobianCasted]][1]
     // CHECK-DAG: [[outputOffset:%.+]] = llvm.extractvalue [[outputCasted]][2]
     // CHECK-DAG: [[outputSize:%.+]] = llvm.extractvalue [[outputCasted]][3, 0]
     // CHECK-DAG: [[outputStride:%.+]] = llvm.extractvalue [[outputCasted]][4, 0]
     // CHECK: llvm.call @__enzyme_autodiff([[argmapCasted]], [[enzymeConst]], [[arg0Allocated]], [[arg0Aligned]], [[shadowAligned]], [[arg0Offset]], [[enzymeConst]], [[outputAllocated]], [[enzymeDupNoNeed]], [[outputAligned]], [[qJacobianAligned]], [[outputOffset]], [[outputSize]], [[outputStride]])
 
-    %alloc0 = memref.alloc() : memref<f64>
-    gradient.backprop @argmap(%arg0) qjacobian(%arg1: memref<?xf64>) in(%alloc0 : memref<f64>) {diffArgIndices=dense<0> : tensor<1xindex>} : (memref<f64>) -> ()
+    gradient.backprop @argmap(%arg0) grad_out(%arg1 : memref<f64>) callee_out(%arg2 : memref<?xf64>) cotangents(%arg3 : memref<?xf64>) {diffArgIndices=dense<0> : tensor<1xindex>} : (memref<f64>) -> ()
 
-    return %alloc0: memref<f64>
+    return %arg1 : memref<f64>
 }

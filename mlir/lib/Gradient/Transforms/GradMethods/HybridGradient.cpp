@@ -26,7 +26,6 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 
-#include "Gradient/Utils/CompDiffArgIndices.h"
 #include "Gradient/Utils/GradientShape.h"
 
 namespace catalyst {
@@ -45,7 +44,7 @@ func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc, GradOp
                                  func::FuncOp qGradFn, StringRef method)
 {
     // Define the properties of the full gradient function.
-    const std::vector<size_t> &diffArgIndices = compDiffArgIndices(gradOp.getDiffArgIndices());
+    const std::vector<size_t> &diffArgIndices = computeDiffArgIndices(gradOp.getDiffArgIndices());
     std::stringstream uniquer;
     std::copy(diffArgIndices.begin(), diffArgIndices.end(), std::ostream_iterator<int>(uniquer));
     std::string fnName = gradOp.getCallee().str() + ".fullgrad" + uniquer.str() + method.str();
@@ -145,8 +144,8 @@ func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc, GradOp
                         loc, rankReducedType, quantumGradient, dynOffsets, dynSizes, dynStrides,
                         offsets, sizes, strides);
                     BackpropOp backpropOp = rewriter.create<BackpropOp>(
-                        loc, resultsBackpropTypes, argMapFn.getName(), callArgs,
-                        extractQuantumGradient, ValueRange{}, diffArgIndicesAttr);
+                        loc, resultsBackpropTypes, argMapFn.getName(), callArgs, ValueRange{},
+                        ValueRange{}, extractQuantumGradient, diffArgIndicesAttr);
 
                     intermediateGradients.push_back(backpropOp);
                 }
@@ -182,8 +181,8 @@ func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc, GradOp
             }
             else {
                 BackpropOp backpropOp = rewriter.create<BackpropOp>(
-                    loc, resultsBackpropTypes, argMapFn.getName(), callArgs, quantumGradient,
-                    ValueRange{}, diffArgIndicesAttr);
+                    loc, resultsBackpropTypes, argMapFn.getName(), callArgs, ValueRange{},
+                    ValueRange{}, quantumGradient, diffArgIndicesAttr);
                 // Loop over params
                 for (size_t i = 0; i < backpropOp.getNumResults(); i++) {
                     Value result = backpropOp.getResult(i);
