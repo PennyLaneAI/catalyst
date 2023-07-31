@@ -22,7 +22,7 @@ func.func private @funcScalarScalar(%arg0: f64) -> f64 attributes {qnode, diff_m
 // CHECK-LABEL: @funcScalarScalar.fullgrad0ps(%arg0: f64) -> f64
     // CHECK:    [[PCOUNT:%.+]] = call @funcScalarScalar.pcount(%arg0) : (f64) -> index
     // CHECK:    [[QGRAD:%.+]] = call @funcScalarScalar.qgrad(%arg0, [[PCOUNT]]) : (f64, index) -> tensor<?xf64>
-    // CHECK:    gradient.backprop @funcScalarScalar.argmap(%arg0) qjacobian([[QGRAD]] : tensor<?xf64>) : (f64) -> f64
+    // CHECK:    gradient.backprop @funcScalarScalar.argmap(%arg0) cotangents([[QGRAD]] : tensor<?xf64>) : (f64) -> f64
 
 func.func @gradCallScalarScalar(%arg0: f64) -> f64 {
     %0 = gradient.grad "defer" @funcScalarScalar(%arg0) : (f64) -> f64
@@ -40,8 +40,8 @@ func.func private @funcScalarPointTensor(%arg0: f64) -> tensor<f64> attributes {
 
 // CHECK-LABEL: @funcScalarPointTensor.fullgrad0ps(%arg0: f64) -> tensor<f64>
     // CHECK:    [[PCOUNT:%.+]] = call @funcScalarPointTensor.pcount(%arg0) : (f64) -> index
-    // CHECK:    [[QGRAD:%.+]] = call @funcScalarPointTensor.qgrad(%arg0, [[PCOUNT]]) : (tensorf64, index) -> tensor<?xf64>
-    // CHECK:    gradient.backprop @funcScalarPointTensor.argmap(%arg0) qjacobian([[QGRAD]] : tensor<?xf64>) : (f64) -> f64
+    // CHECK:    [[QGRAD:%.+]] = call @funcScalarPointTensor.qgrad(%arg0, [[PCOUNT]]) : (f64, index) -> tensor<?xf64>
+    // CHECK:    gradient.backprop @funcScalarPointTensor.argmap(%arg0) cotangents([[QGRAD]] : tensor<?xf64>) : (f64) -> f64
 
 func.func @gradCallScalarPointTensor(%arg0: f64) -> tensor<f64> {
     %0 = gradient.grad "defer" @funcScalarPointTensor(%arg0) : (f64) -> tensor<f64>
@@ -58,21 +58,11 @@ func.func private @funcPointTensorScalar(%arg0: tensor<f64>) -> f64 attributes {
 }
 
 // CHECK-LABEL: @funcPointTensorScalar.fullgrad0ps(%arg0: tensor<f64>) -> f64
-    // CHECK:   [[CJAC:%.+]] = gradient.grad "fd" @funcPointTensorScalar.argmap(%arg0) : (tensor<f64>) -> tensor<?xf64>
-    // CHECK:   [[PCOUNT:%.+]] = tensor.dim [[CJAC]]
-    // CHECK:   [[QGRAD:%.+]] = call @funcPointTensorScalar.qgrad(%arg0, [[PCOUNT]]) :  (tensor<f64>, index) -> tensor<?xf64>
-
-    // CHECK:   [[GRAD:%.+]] = tensor.generate
-    // CHECK:       [[C_SLICE:%.+]] = tensor.extract_slice [[CJAC]][0] [[[PCOUNT]]] [1]
-    // CHECK:       [[Q_SLICE:%.+]] = tensor.extract_slice [[QGRAD]][0] [[[PCOUNT]]] [1]
-    // CHECK:       [[RES_T:%.+]] = linalg.dot ins([[C_SLICE]], [[Q_SLICE]] : tensor<?xf64>, tensor<?xf64>)
-    // CHECK:       [[RES:%.+]] = tensor.extract [[RES_T]][]
-    // CHECK:       tensor.yield [[RES]]
-
-    // CHECK:   [[GRAD_RESHAPED:%.+]] = tensor.collapse_shape [[GRAD]] [] : tensor<1xf64> into tensor<f64>
+    // CHECK:   [[PCOUNT:%.+]] = call @funcPointTensorScalar.pcount(%arg0) : (tensor<f64>) -> index
+    // CHECK:   [[QGRAD:%.+]] = call @funcPointTensorScalar.qgrad(%arg0, [[PCOUNT]]) : (tensor<f64>, index) -> tensor<?xf64>
+    // CHECK:   [[GRAD_RESHAPED:%.+]] = gradient.backprop @funcPointTensorScalar.argmap(%arg0) cotangents([[QGRAD]] : tensor<?xf64>) : (tensor<f64>) -> tensor<f64>
     // CHECK:   [[GRAD_SCALAR:%.+]] = tensor.extract [[GRAD_RESHAPED]][]
     // CHECK:   return [[GRAD_SCALAR]]
-// }
 
 func.func @gradCallPointTensorScalar(%arg0: tensor<f64>) -> f64 {
     %0 = gradient.grad "defer" @funcPointTensorScalar(%arg0) : (tensor<f64>) -> f64

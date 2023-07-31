@@ -100,17 +100,19 @@ class BufferizeBackpropOp : public OpConversionPattern<BackpropOp> {
         // the overall list of gradients.
         SmallVector<unsigned> scalarIndices;
         SmallVector<Type> scalarReturnTypes;
-        for (const auto &[idx, result] : llvm::enumerate(op.getResults())) {
+        std::vector<Value> diffArgs =
+            computeDiffArgs(adaptor.getArgs(), op.getDiffArgIndicesAttr());
+        for (const auto &[idx, diffArg] : llvm::enumerate(diffArgs)) {
             // Allocate buffers to place the differentiation results (gradients) into. Enzyme refers
             // to these as shadow arguments. There is one result for each differentiable MemRef
             // argument, with a matching shape and type.
-            if (isa<MemRefType>(result.getType())) {
-                Value shadow = generateAllocation(rewriter, loc, result);
+            if (isa<MemRefType>(diffArg.getType())) {
+                Value shadow = generateAllocation(rewriter, loc, diffArg);
                 gradients.push_back(shadow);
                 argShadows.push_back(shadow);
             }
-            else if (isa<FloatType>(result.getType())) {
-                scalarReturnTypes.push_back(result.getType());
+            else if (isa<FloatType>(diffArg.getType())) {
+                scalarReturnTypes.push_back(diffArg.getType());
                 scalarIndices.push_back(idx);
                 // Put a null placeholder value that will be filled in with the result of the
                 // bufferized BackpropOp.
@@ -126,9 +128,9 @@ class BufferizeBackpropOp : public OpConversionPattern<BackpropOp> {
         generateAllocations(rewriter, loc, calleeResults, resShadows);
 
         DenseIntElementsAttr diffArgIndicesAttr = adaptor.getDiffArgIndices().value_or(nullptr);
-        auto bufferizedBackpropOp =
-            rewriter.create<BackpropOp>(loc, TypeRange{}, op.getCalleeAttr(), adaptor.getArgs(),
-                                        argShadows, calleeResults, resShadows, diffArgIndicesAttr);
+        auto bufferizedBackpropOp = rewriter.create<BackpropOp>(
+            loc, scalarReturnTypes, op.getCalleeAttr(), adaptor.getArgs(), argShadows,
+            calleeResults, resShadows, diffArgIndicesAttr);
 
         // Fill in the null placeholders.
         for (const auto &[idx, scalarResult] : llvm::enumerate(bufferizedBackpropOp.getResults())) {

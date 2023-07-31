@@ -201,21 +201,33 @@ func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc, GradOp
                     loc, resultsBackpropTypes, argMapFn.getName(), callArgs, ValueRange{},
                     ValueRange{}, quantumGradient, diffArgIndicesAttr);
                 for (OpResult result : backpropOp.getResults()) {
-                    // The backprop op produces a row of the Jacobian, which always has the same
-                    // type as the differentiated argument. If the rank of the cotangent is
-                    // 1, this implies the primal function returns a rank-0 value (either a scalar
-                    // or a tensor<scalar>). The Jacobian of a scalar -> scalar should be a scalar,
-                    // but as a special case, the Jacobian of a scalar -> tensor<scalar> should be
-                    // tensor<scalar>.
                     Value hybridGradient = result;
-                    if (gradOp.getResult(result.getResultNumber()).getType()) {
-                        Value jacobian = rewriter.create<tensor::EmptyOp>(
-                            loc, gradOp.getResult(result.getResultNumber()).getType(),
-                            ValueRange{});
-                        hybridGradient =
-                            rewriter.create<tensor::InsertOp>(loc, result, jacobian, ValueRange{})
-                                .getResult();
+                    Type gradResultType = gradOp.getResult(result.getResultNumber()).getType();
+                    if (gradResultType != result.getType()) {
+                        // The backprop op produces a row of the Jacobian, which always has the same
+                        // type as the differentiated argument. If the rank of the cotangent is
+                        // 1, this implies the primal function returns a rank-0 value (either a
+                        // scalar or a tensor<scalar>). The Jacobian of a scalar -> scalar should be
+                        // a scalar, but as a special case, the Jacobian of a scalar ->
+                        // tensor<scalar> should be tensor<scalar>.
+                        if (isa<RankedTensorType>(gradResultType) &&
+                            isa<FloatType>(result.getType())) {
+                            Value jacobian =
+                                rewriter.create<tensor::EmptyOp>(loc, gradResultType, ValueRange{});
+                            hybridGradient = rewriter.create<tensor::InsertOp>(
+                                loc, result, jacobian, ValueRange{});
+                        }
+
+                        // We also support where the argument is a tensor<scalar> but the resulting
+                        // gradient is a scalar. This is less about mathematical precision and more
+                        // about ergonomics.
+                        if (isa<FloatType>(gradResultType) &&
+                            isa<RankedTensorType>(result.getType())) {
+                            hybridGradient =
+                                rewriter.create<tensor::ExtractOp>(loc, result, ValueRange{});
+                        }
                     }
+
                     hybridGradients.push_back(hybridGradient);
                 }
             }
