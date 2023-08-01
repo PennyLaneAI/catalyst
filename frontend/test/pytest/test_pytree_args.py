@@ -288,6 +288,47 @@ class TestPyTreesFuncArgs:
         assert jnp.allclose(result[0], expected)
         assert jnp.allclose(result[1], params["a"][0])
 
+    def test_promotion_unneeded(self, backend):
+        """Test arguments list of lists."""
+
+        @qml.qnode(qml.device(backend, wires=2))
+        def circuit1(params):
+            qml.RX(params["a"][0], wires=0)
+            qml.RX(params["b"][0], wires=1)
+            return qml.expval(qml.PauliZ(0) @ qml.PauliZ(1)), params["a"][0]
+
+        jitted_fn = qjit(circuit1)
+
+        params = {
+            "a": [0.4, 0.6],
+            "b": [0.8],
+        }
+        expected = 0.64170937
+        result = jitted_fn(params)
+        result = jitted_fn(params)
+
+    def test_promotion_needed(self, backend):
+        """Test arguments list of lists."""
+
+        @qml.qnode(qml.device(backend, wires=2))
+        def circuit1(params):
+            qml.RX(params["a"][0], wires=0)
+            qml.RX(params["b"][0], wires=1)
+            return qml.expval(qml.PauliZ(0) @ qml.PauliZ(1)), params["a"][0]
+
+        jitted_fn = qjit(circuit1)
+
+        params = {
+            "a": [0.4, 0.6],
+            "b": [0.8],
+        }
+        result = jitted_fn(params)
+        params = {
+            "a": [4, 6],
+            "b": [8],
+        }
+        result = jitted_fn(params)
+
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])

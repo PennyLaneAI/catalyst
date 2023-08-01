@@ -527,6 +527,42 @@ class TestPromotionRules:
         assert TypeCompatibility.NEEDS_PROMOTION == retval
 
 
+class TestPromotionRulesDictionary:
+    """Class for test promotion rules for dictionaries."""
+
+    def test_trivial_no_promotion(self):
+        """Test trivial for the same dictionary as input."""
+        one = jnp.array(1.0)
+        retval = CompiledFunction.typecheck({"key1": one}, {"key1": one})
+        assert TypeCompatibility.CAN_SKIP_PROMOTION == retval
+
+    def test_trivial_no_promotion_different_values(self):
+        """Test trivial for the same dictionary with different values."""
+        one = jnp.array(1.0)
+        two = jnp.array(2.0)
+        retval = CompiledFunction.typecheck({"key1": one}, {"key1": two})
+        assert TypeCompatibility.CAN_SKIP_PROMOTION == retval
+
+    def test_trivial_promotion_different_values(self):
+        """Test promotion where keys have different values."""
+        one = jnp.array(1.0)
+        one_int = jnp.array(1)
+        retval = CompiledFunction.typecheck({"key1": one}, {"key1": one_int})
+        assert TypeCompatibility.NEEDS_PROMOTION == retval
+
+    def test_recompilation_superset_keys(self):
+        """Recompile if the structure is different superset case."""
+        one = jnp.array(1.0)
+        retval = CompiledFunction.typecheck({"key1": one}, {"key2": one, "key1": one})
+        assert TypeCompatibility.NEEDS_COMPILATION == retval
+
+    def test_recompilation_subset_keys(self):
+        """Recompile if the structure is different subset case."""
+        one = jnp.array(1.0)
+        retval = CompiledFunction.typecheck({"key2": one, "key1": one}, {"key1": one})
+        assert TypeCompatibility.NEEDS_COMPILATION == retval
+
+
 class TestSignatureErrors:
     def test_incompatible_argument(self):
         """Test incompatible argument."""

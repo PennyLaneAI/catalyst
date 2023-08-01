@@ -182,13 +182,13 @@ class CompiledFunction:
         Returns:
             bool.
         """
-        len_compile = len(compiled_signature)
-        len_runtime = len(runtime_signature)
-        if len_compile != len_runtime:
+        compiled_data, compiled_shape = jax.tree_util.tree_flatten(compiled_signature)
+        runtime_data, runtime_shape = jax.tree_util.tree_flatten(runtime_signature)
+        if compiled_shape != runtime_shape:
             return TypeCompatibility.NEEDS_COMPILATION
 
         best_case = TypeCompatibility.CAN_SKIP_PROMOTION
-        for c_param, r_param in zip(compiled_signature, runtime_signature):
+        for c_param, r_param in zip(compiled_data, runtime_data):
             if c_param.dtype != r_param.dtype:
                 best_case = TypeCompatibility.NEEDS_PROMOTION
 
@@ -215,22 +215,21 @@ class CompiledFunction:
         Returns:
             promoted_args: Arguments after promotion.
         """
-        len_compile = len(compiled_signature)
-        len_runtime = len(runtime_signature)
+        compiled_data, compiled_shape = jax.tree_util.tree_flatten(compiled_signature)
+        runtime_data, runtime_shape = jax.tree_util.tree_flatten(args)
         assert (
-            len_compile == len_runtime
-        ), "Compiled function incompatible with quantity of runtime arguments"
+            compiled_shape == runtime_shape
+        ), "Compiled function incompatible runtime arguments' shape"
 
         promoted_args = []
-        for c_param, r_param, arg in zip(compiled_signature, runtime_signature, args):
-            assert isinstance(arg, jax.Array)
+        for c_param, r_param in zip(compiled_data, runtime_data):
             assert isinstance(c_param, jax.core.ShapedArray)
-            assert isinstance(r_param, jax.core.ShapedArray)
-            arg_dtype = arg.dtype
+            r_param = jax.numpy.asarray(r_param)
+            arg_dtype = r_param.dtype
             promote_to = jax.numpy.promote_types(arg_dtype, c_param.dtype)
-            promoted_arg = jax.numpy.asarray(arg, dtype=promote_to)
+            promoted_arg = jax.numpy.asarray(r_param, dtype=promote_to)
             promoted_args.append(promoted_arg)
-        return promoted_args
+        return jax.tree_util.tree_unflatten(compiled_shape, promoted_args)
 
     @staticmethod
     def get_runtime_signature(*args):
