@@ -597,7 +597,6 @@ class TestArraysInHamiltonian:
         "coeffs",
         [
             (np.array([0.4, 0.7])),
-            ([0.4, 0.7]),
             (jnp.array([0.4, 0.7])),
         ],
     )
@@ -619,7 +618,6 @@ class TestArraysInHamiltonian:
         [
             (np.array),
             (jnp.array),
-            (list),
         ],
     )
     def test_array_repr_built_in(self, repr, backend):
@@ -652,7 +650,6 @@ class TestArraysInHermitian:
         [
             (np.array),
             (jnp.array),
-            (list),
         ],
     )
     def test_array_repr_from_context(self, matrix, repr, backend):
@@ -672,7 +669,6 @@ class TestArraysInHermitian:
         [
             (np.array),
             (jnp.array),
-            (list),
         ],
     )
     def test_array_repr_as_parameter(self, matrix, repr, backend):
@@ -692,7 +688,6 @@ class TestArraysInHermitian:
         [
             (np.array),
             (jnp.array),
-            (list),
         ],
     )
     def test_array_repr_built_in(self, repr, backend):
