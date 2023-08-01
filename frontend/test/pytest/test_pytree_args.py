@@ -21,7 +21,7 @@ import pytest
 from catalyst import cond, measure, qjit
 
 
-class TestReturnValues:
+class TestPyTreesReturnValues:
     """Test QJIT workflows with different return value data-types."""
 
     def test_return_value_float(self, backend):
@@ -262,6 +262,31 @@ class TestReturnValues:
         result = workflow1(jnp.pi / 2)
         assert isinstance(result, dict)
         assert result["w"] == 1
+
+
+class TestPyTreesFuncArgs:
+    """Test QJIT workflows with PyTrees as function arguments."""
+
+    def test_args_list(self, backend):
+        """Test arguments list of lists."""
+
+        @qml.qnode(qml.device(backend, wires=2))
+        def circuit1(params):
+            qml.RX(params["a"][0], wires=0)
+            qml.RX(params["b"][0], wires=1)
+            return qml.expval(qml.PauliZ(0) @ qml.PauliZ(1)), params["a"][0]
+
+        jitted_fn = qjit(circuit1)
+
+        params = {
+            "a": [0.4, 0.6],
+            "b": [0.8],
+        }
+        expected = 0.64170937
+        result = jitted_fn(params)
+
+        assert jnp.allclose(result[0], expected)
+        assert jnp.allclose(result[1], params["a"][0])
 
 
 if __name__ == "__main__":

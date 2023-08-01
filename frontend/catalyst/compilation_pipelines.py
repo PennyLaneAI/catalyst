@@ -242,11 +242,14 @@ class CompiledFunction:
         Returns:
             a list of JAX shaped arrays
         """
+        args_data, args_shape = jax.tree_util.tree_flatten(args)
+
         try:
             r_sig = []
-            for arg in args:
+            for arg in args_data:
                 r_sig.append(jax.api_util.shaped_abstractify(arg))
-            return r_sig
+            return jax.tree_util.tree_unflatten(args_shape, r_sig)
+            # return r_sig
         except Exception as exc:
             arg_type = type(arg)
             raise TypeError(f"Unsupported argument type: {arg_type}") from exc
@@ -387,16 +390,23 @@ class CompiledFunction:
         numpy_arg_buffer = []
         return_value_pointer = ctypes.POINTER(ctypes.c_int)()  # This is the null pointer
 
+        # import pdb
+        # pdb.set_trace()
+
         if restype:
             return_value_pointer = self.restype_to_memref_descs(restype)
 
         c_abi_args = []
 
-        for arg in args:
+        args_data, args_shape = jax.tree_util.tree_flatten(args)
+
+        for arg in args_data:
             numpy_arg = np.asarray(arg)
             numpy_arg_buffer.append(numpy_arg)
             c_abi_ptr = ctypes.pointer(get_ranked_memref_descriptor(numpy_arg))
             c_abi_args.append(c_abi_ptr)
+
+        args = jax.tree_util.tree_unflatten(args_shape, c_abi_args)
 
         class CompiledFunctionArgValue(ctypes.Structure):
             """Programmatically create a structure which holds tensors of varying base types."""
@@ -563,14 +573,14 @@ class QJIT:
           function: an instance of ``CompiledFunction`` that may have been recompiled
           *args: arguments that may have been promoted
         """
-        bitmask = map(lambda x: not isinstance(x, jax.Array), args)
-        args = list(
-            map(
-                lambda arg, is_not_jax_array: jax.numpy.asarray(arg) if is_not_jax_array else arg,
-                args,
-                bitmask,
-            )
-        )
+        # bitmask = map(lambda x: not isinstance(x, jax.Array), args)
+        # args = list(
+        #     map(
+        #         lambda arg, is_not_jax_array: jax.numpy.asarray(arg) if is_not_jax_array else arg,
+        #         args,
+        #         bitmask,
+        #     )
+        # )
         r_sig = CompiledFunction.get_runtime_signature(*args)
 
         has_been_compiled = self.compiled_function is not None

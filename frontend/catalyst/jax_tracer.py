@@ -64,6 +64,9 @@ def get_mlir(func, pytree_dict, *args, **kwargs):
     with TracingContext():
         jaxpr, shape = jax.make_jaxpr(func, return_shape=True)(*args, **kwargs)
 
+    # import pdb
+    # pdb.set_trace()
+
     # Store the func_return_value PyTree definition to be used later by QJIT
     pytree_dict["func_return_value"] = tree_structure(shape)
 

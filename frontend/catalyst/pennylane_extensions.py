@@ -148,8 +148,13 @@ class QFunc:
         def _eval_jaxpr(*args):
             return jax.core.eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *args)
 
+        args_data, args_shape = tree_flatten(args)
+
+        # import pdb
+        # pdb.set_trace()
+
         wrapped = wrap_init(_eval_jaxpr)
-        retval = jprim.func_p.bind(wrapped, *args, fn=self)
+        retval = jprim.func_p.bind(wrapped, *args_data, fn=self)
 
         return tree_unflatten(retval_tree, retval)
 
