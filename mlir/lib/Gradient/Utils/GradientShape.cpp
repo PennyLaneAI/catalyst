@@ -125,7 +125,8 @@ std::vector<Type> computeBackpropTypes(func::FuncOp callee,
 
 bool isDifferentiable(Type type)
 {
-    if (isa<FloatType, ComplexType>(type)) {
+    // Only real-numbers are supported for differentiation
+    if (isa<FloatType>(type)) {
         return true;
     }
     if (auto shapedType = dyn_cast<ShapedType>(type)) {

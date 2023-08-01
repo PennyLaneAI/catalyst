@@ -210,11 +210,11 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         insertGlobalSymbol(rewriter, moduleOp, enzyme_const_key, std::nullopt);
         insertGlobalSymbol(rewriter, moduleOp, enzyme_dupnoneed_key, std::nullopt);
 
-        ValueRange dataIn = adaptor.getDiffArgShadows();
+        ValueRange argShadows = adaptor.getDiffArgShadows();
         Value enzymeConst = rewriter.create<LLVM::AddressOfOp>(loc, LLVM::LLVMPointerType::get(ctx),
                                                                enzyme_const_key);
         ValueRange convArgs = adaptor.getArgs();
-        // Add the arguments and their shadow on data in
+        // Add the arguments and the argument shadows of memrefs
         for (auto [index, arg] : llvm::enumerate(op.getArgs())) {
             auto it = std::find(diffArgIndices.begin(), diffArgIndices.end(), index);
             if (it == diffArgIndices.end()) {
@@ -227,14 +227,16 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
                     callArgs.push_back(convArgs[index]);
                 }
             }
-            else if (isa<MemRefType>(arg.getType())) {
-                size_t position = std::distance(diffArgIndices.begin(), it);
-                unpackMemRefAndAppend(arg, dataIn[position], callArgs, rewriter, loc,
-                                      {.zeroOut = true});
-            }
             else {
-                assert(isa<FloatType>(arg.getType()) && "diff arg must be a float or float tensor");
-                callArgs.push_back(arg);
+                assert(isDifferentiable(arg.getType()));
+                if (isa<MemRefType>(arg.getType())) {
+                    size_t position = std::distance(diffArgIndices.begin(), it);
+                    unpackMemRefAndAppend(arg, argShadows[position], callArgs, rewriter, loc,
+                                          {.zeroOut = true});
+                }
+                else {
+                    callArgs.push_back(arg);
+                }
             }
         }
 
@@ -243,7 +245,7 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
             unpackMemRefAndAppend(result, cotangent, callArgs, rewriter, loc, {.dupNoNeed = true});
         }
 
-        // The results of backprop are in data in, except scalar derivatives which are in the
+        // The results of backprop are in argShadows, except scalar derivatives which are in the
         // results of the enzyme call.
         auto enzymeCall = rewriter.create<LLVM::CallOp>(loc, backpropFnDecl, callArgs);
         SmallVector<Value> scalarResults;
