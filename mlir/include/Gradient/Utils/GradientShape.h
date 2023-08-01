@@ -22,6 +22,8 @@
 namespace catalyst {
 namespace gradient {
 
+bool isDifferentiable(mlir::Type type);
+
 std::vector<mlir::Type> computeResultTypes(mlir::func::FuncOp callee,
                                            const std::vector<uint64_t> &diffArgIndices);
 

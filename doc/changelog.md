@@ -20,21 +20,26 @@
   workflow()
   ```
 
-* The classical part of the jacobian/gradient is calculated through backpropagation using     Enzyme AD.
-
+* Add support for compile-time backpropagation of classical preprocessing via Enzyme AD.
   [#193](https://github.com/PennyLaneAI/catalyst/pull/193)
-  
+
+  This enables high-performance reverse mode automatic differentiation of arbitrary classical
+  preprocessing when ``method=defer`` is specified on the ``grad`` operation:
+
   ```python
-  @qml.qnode(qml.device(backend, wires=1), diff_method="parameter-shift")
-  def func(p):
-      qml.RY(jax.numpy.sin(p), wires=0)
-      return qml.probs(wires=0)
+  @qml.qnode(qml.device("lightning.qubit", wires=1), diff_method="parameter-shift")
+  def circuit(theta):
+      qml.RX(jnp.exp(theta ** 2) / jnp.cos(theta / 4), wires=0)
+      return qml.expval(qml.PauliZ(wires=0))
 
   @qjit
-  def workflow(p: float):
-      return grad(func, method="defer")(p)
+  def grad_circuit(theta):
+      return catalyst.grad(circuit, method="defer")(theta)
+  ```
 
-  results = qml.jacobian(func, argnum=0)(0.5)
+  ```pycon
+  >>> grad_circuit(jnp.pi)
+  array(112936.34906843)
   ```
 
 <h3>Improvements</h3>
@@ -70,6 +75,8 @@ This release contains contributions from (in alphabetical order):
 
 David Ittah,
 Erick Ochoa Lopez,
+Jacob Mai Peng,
+Romain Moyard,
 Sergei Mironov.
 
 

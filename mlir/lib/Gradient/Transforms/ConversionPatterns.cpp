@@ -157,6 +157,10 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         Location loc = op.getLoc();
         MLIRContext *ctx = getContext();
         ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
+        if (llvm::any_of(op.getResultTypes(),
+                         [](Type resultType) { return isa<TensorType>(resultType); })) {
+            return op.emitOpError("must be bufferized before lowering");
+        }
 
         // The callee of the backprop Op
         func::FuncOp callee =
@@ -186,11 +190,15 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         }
 
         // Create the Enzyme function
-        Type backpropFnSignature =
-            LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(ctx), {}, /*isVarArg=*/true);
+        Type backpropFnSignature = LLVM::LLVMFunctionType::get(
+            getEnzymeReturnType(ctx, op.getResultTypes()), {}, /*isVarArg=*/true);
 
+        // We need to generate a new __enzyme_autodiff name per different function signature. One
+        // way to do this is to append the number of scalar results to the name of the function.
+        std::string autodiff_func_name =
+            enzyme_autodiff_func_name + std::to_string(op.getNumResults());
         LLVM::LLVMFuncOp backpropFnDecl =
-            ensureFunctionDeclaration(rewriter, op, enzyme_autodiff_func_name, backpropFnSignature);
+            ensureFunctionDeclaration(rewriter, op, autodiff_func_name, backpropFnSignature);
 
         // The first argument to Enzyme is a function pointer of the function to be differentiated
         Value calleePtr =
@@ -202,11 +210,11 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         insertGlobalSymbol(rewriter, moduleOp, enzyme_const_key, std::nullopt);
         insertGlobalSymbol(rewriter, moduleOp, enzyme_dupnoneed_key, std::nullopt);
 
-        ValueRange dataIn = adaptor.getDiffArgShadows();
+        ValueRange argShadows = adaptor.getDiffArgShadows();
         Value enzymeConst = rewriter.create<LLVM::AddressOfOp>(loc, LLVM::LLVMPointerType::get(ctx),
                                                                enzyme_const_key);
         ValueRange convArgs = adaptor.getArgs();
-        // Add the arguments and their shadow on data in
+        // Add the arguments and the argument shadows of memrefs
         for (auto [index, arg] : llvm::enumerate(op.getArgs())) {
             auto it = std::find(diffArgIndices.begin(), diffArgIndices.end(), index);
             if (it == diffArgIndices.end()) {
@@ -220,9 +228,15 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
                 }
             }
             else {
-                size_t position = std::distance(diffArgIndices.begin(), it);
-                unpackMemRefAndAppend(arg, dataIn[position], callArgs, rewriter, loc,
-                                      {.zeroOut = true});
+                assert(isDifferentiable(arg.getType()));
+                if (isa<MemRefType>(arg.getType())) {
+                    size_t position = std::distance(diffArgIndices.begin(), it);
+                    unpackMemRefAndAppend(arg, argShadows[position], callArgs, rewriter, loc,
+                                          {.zeroOut = true});
+                }
+                else {
+                    callArgs.push_back(arg);
+                }
             }
         }
 
@@ -231,9 +245,12 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
             unpackMemRefAndAppend(result, cotangent, callArgs, rewriter, loc, {.dupNoNeed = true});
         }
 
-        // The results of backprop are in data in
-        rewriter.create<LLVM::CallOp>(loc, backpropFnDecl, callArgs);
-        rewriter.eraseOp(op);
+        // The results of backprop are in argShadows, except scalar derivatives which are in the
+        // results of the enzyme call.
+        auto enzymeCall = rewriter.create<LLVM::CallOp>(loc, backpropFnDecl, callArgs);
+        SmallVector<Value> scalarResults;
+        unpackScalarResults(enzymeCall, scalarResults, rewriter, loc);
+        rewriter.replaceOp(op, scalarResults);
         return success();
     }
 
@@ -296,10 +313,48 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         }
     }
 
+    /// Determine the return type of the __enzyme_autodiff function based on the expected number of
+    /// scalar returns.
+    static Type getEnzymeReturnType(MLIRContext *ctx, TypeRange scalarReturns)
+    {
+        if (scalarReturns.empty()) {
+            return LLVM::LLVMVoidType::get(ctx);
+        }
+        if (scalarReturns.size() == 1) {
+            return scalarReturns.front();
+        }
+        return LLVM::LLVMStructType::getLiteral(ctx, SmallVector<Type>(scalarReturns));
+    }
+
+    static void unpackScalarResults(LLVM::CallOp enzymeCall, SmallVectorImpl<Value> &results,
+                                    OpBuilder &builder, Location loc)
+    {
+        if (enzymeCall.getNumResults() == 0) {
+            return;
+        }
+
+        // LLVM Functions can only return up to one result. If one scalar is being differentiated,
+        // it will be the sole result. If there are multiple scalars being differentiated, Enzyme
+        // will return a struct of all the derivatives with respect to those scalars.
+        Value result = enzymeCall.getResult();
+        if (isa<FloatType>(result.getType())) {
+            results.push_back(result);
+        }
+        if (auto structType = dyn_cast<LLVM::LLVMStructType>(result.getType())) {
+            size_t numResults = structType.getBody().size();
+            for (size_t i = 0; i < numResults; i++) {
+                results.push_back(builder.create<LLVM::ExtractValueOp>(loc, result, i));
+            }
+        }
+    }
+
+    /// Compute the number of bytes required to store the array data of a general ranked MemRef.
+    /// This is computed using the formula `element_size * (offset + sizes[0] * strides[0])`.
+    /// For example, a rank-3 MemRef with shape [M, N, K] has sizes [M, N, K] and strides [N * K, K,
+    /// 1]. The overall number of elements is M * N * K = sizes[0] * strides[0].
     Value computeMemRefSizeInBytes(MemRefType type, MemRefDescriptor descriptor, OpBuilder &builder,
                                    Location loc) const
     {
-        // element_size * (offset + sizes[0] * strides[0])
         Value bufferSize;
         Type indexType = getTypeConverter()->getIndexType();
         if (type.getRank() == 0) {
