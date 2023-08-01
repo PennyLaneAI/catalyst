@@ -215,6 +215,76 @@ void convertToDestinationPassingStyle(func::FuncOp callee)
     });
 }
 
+void wrapMemRefArgs(func::FuncOp func, LLVMTypeConverter &typeConverter, OpBuilder &builder,
+                    Location loc)
+{
+    ModuleOp moduleOp = func->getParentOfType<ModuleOp>();
+    MLIRContext *ctx = builder.getContext();
+    auto ptrType = LLVM::LLVMPointerType::get(ctx);
+    OpBuilder::InsertionGuard insertionGuard(builder);
+    builder.setInsertionPointToStart(&func.getFunctionBody().front());
+    for (const auto [idx, argType] : llvm::enumerate(func.getArgumentTypes())) {
+        if (auto memrefType = dyn_cast<MemRefType>(argType)) {
+            BlockArgument memrefArg = func.getArgument(idx);
+            func.insertArgument(idx, ptrType, DictionaryAttr::get(ctx), loc);
+            Value wrappedMemref = func.getArgument(idx);
+
+            Type convertedType = typeConverter.convertType(memrefType);
+            Value replacedMemref = builder.create<LLVM::LoadOp>(loc, convertedType, wrappedMemref);
+            replacedMemref =
+                builder.create<UnrealizedConversionCastOp>(loc, argType, replacedMemref)
+                    .getResult(0);
+            memrefArg.replaceAllUsesWith(replacedMemref);
+            func.eraseArgument(memrefArg.getArgNumber());
+        }
+    }
+
+    std::optional<SymbolTable::UseRange> uses = func.getSymbolUses(moduleOp);
+    if (uses.has_value()) {
+        for (auto use : *uses) {
+            if (auto callOp = dyn_cast<func::CallOp>(use.getUser())) {
+                OpBuilder::InsertionGuard insertionGuard(builder);
+                builder.setInsertionPoint(callOp);
+
+                Value c1 = builder.create<LLVM::ConstantOp>(loc, builder.getI64IntegerAttr(1));
+
+                SmallVector<Value> operands;
+                SmallVector<Value> outputs;
+                llvm::dbgs() << "user: " << callOp << "\n";
+                auto wrapMemref = [&](Value memref) {
+                    Type convertedType = typeConverter.convertType(memref.getType());
+                    Value space = builder.create<LLVM::AllocaOp>(loc, /*resultType=*/ptrType,
+                                                                 /*elementType=*/convertedType, c1);
+                    Value convertedValue =
+                        builder.create<UnrealizedConversionCastOp>(loc, convertedType, memref)
+                            .getResult(0);
+                    builder.create<LLVM::StoreOp>(loc, convertedValue, space);
+                    return space;
+                };
+                for (Value oldOperand : callOp.getOperands()) {
+                    if (isa<MemRefType>(oldOperand.getType())) {
+                        operands.push_back(wrapMemref(oldOperand));
+                    }
+                }
+                for (Type resultType : callOp.getResultTypes()) {
+                    if (auto memrefType = dyn_cast<MemRefType>(resultType)) {
+                        assert(memrefType.hasStaticShape());
+                        Value memref = builder.create<memref::AllocOp>(loc, memrefType);
+                        outputs.push_back(memref);
+
+                        memref = wrapMemref(memref);
+                        operands.push_back(memref);
+                    }
+                }
+
+                builder.create<func::CallOp>(callOp.getLoc(), func, operands);
+                callOp->replaceAllUsesWith(outputs);
+                callOp->erase();
+            }
+        }
+    }
+}
+
 LogicalResult traverseCallGraph(func::FuncOp start, SymbolTableCollection &symbolTable,
                                 function_ref<LogicalResult(func::FuncOp)> processCallable)
 {
@@ -268,16 +338,20 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
                 if (func->hasAttrOfType<FlatSymbolRefAttr>("gradient.qgrad")) {
                     auto qgradFn = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
                         func, func->getAttrOfType<FlatSymbolRefAttr>("gradient.qgrad"));
-                    auto augFwd = genAugmentedForward(func, rewriter);
-                    if (failed(augFwd)) {
-                        return failure();
-                    }
-                    auto customQGrad = genCustomQGradient(func, func.getLoc(), qgradFn, rewriter);
-                    if (failed(customQGrad)) {
-                        return failure();
-                    }
-                    insertEnzymeCustomGradient(rewriter, func->getParentOfType<ModuleOp>(),
-                                               func.getLoc(), func, *augFwd, *customQGrad);
+                    convertToDestinationPassingStyle(func);
+                    wrapMemRefArgs(func, *getTypeConverter(), rewriter, loc);
+                    // Need to update all the callers of quantum functions
+
+                    // auto augFwd = genAugmentedForward(func, rewriter);
+                    // if (failed(augFwd)) {
+                    //     return failure();
+                    // }
+                    // auto customQGrad = genCustomQGradient(func, func.getLoc(), qgradFn,
+                    // rewriter); if (failed(customQGrad)) {
+                    //     return failure();
+                    // }
+                    // insertEnzymeCustomGradient(rewriter, func->getParentOfType<ModuleOp>(),
+                    //                            func.getLoc(), func, *augFwd, *customQGrad);
                 }
 
                 return success();
@@ -285,6 +359,9 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         if (failed(traversalResult)) {
             return failure();
         }
+
+        rewriter.eraseOp(op);
+        return success();
 
         LowerToLLVMOptions options = getTypeConverter()->getOptions();
         if (options.useGenericFunctions) {

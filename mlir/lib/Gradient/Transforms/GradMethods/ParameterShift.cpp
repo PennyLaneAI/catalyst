@@ -22,6 +22,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Index/IR/IndexOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -271,18 +272,32 @@ void ParameterShiftLowering::rewrite(GradOp op, PatternRewriter &rewriter) const
     // original function arguments from the classical Jacobian and quantum gradient.
     // func::FuncOp fullGradFn =
     //     genFullGradFunction(rewriter, loc, op, paramCountFn, argMapFn, qGradFn, "ps");
+    // rewriter.setInsertionPoint(op);
+    // SmallVector<Value> outputs;
+    // for (auto type : callee.getResultTypes()) {
+    //     if (auto tensorType = dyn_cast<RankedTensorType>(type)) {
+    //         outputs.push_back(rewriter.create<tensor::EmptyOp>(
+    //             callee.getLoc(), tensorType.getShape(), tensorType.getElementType()));
+    //     }
+    // }
+
     rewriter.setInsertionPoint(op);
-    SmallVector<Value> outputs;
-    for (auto type : callee.getResultTypes()) {
-        if (auto tensorType = dyn_cast<RankedTensorType>(type)) {
-            outputs.push_back(rewriter.create<tensor::EmptyOp>(
-                callee.getLoc(), tensorType.getShape(), tensorType.getElementType()));
-        }
+    assert(clonedCallee.getNumResults() == 1 && "Jacobian case not yet supported");
+    SmallVector<Value> cotangents;
+    for (Type resultType : clonedCallee.getResultTypes()) {
+        auto tensorType = cast<RankedTensorType>(resultType);
+        assert(tensorType.hasStaticShape());
+        Value cotangent =
+            rewriter.create<tensor::EmptyOp>(loc, tensorType, /*dynamicSizes=*/ValueRange{});
+        Value one = rewriter.create<arith::ConstantOp>(loc, rewriter.getF64FloatAttr(1.0));
+        cotangent = rewriter.create<linalg::FillOp>(loc, one, cotangent).getResult(0);
+        cotangents.push_back(cotangent);
     }
 
     rewriter.replaceOpWithNewOp<gradient::BackpropOp>(
-        op, op.getResultTypes(), clonedCallee.getName(), op.getArgOperands(), outputs,
-        /*arg_shadows=*/ValueRange{}, /*out_shadows=*/ValueRange{}, op.getDiffArgIndicesAttr());
+        op, op.getResultTypes(), clonedCallee.getName(), op.getArgOperands(),
+        /*arg_shadows=*/ValueRange{}, /*primal results=*/ValueRange{}, cotangents,
+        op.getDiffArgIndicesAttr());
     // rewriter.replaceOpWithNewOp<func::CallOp>(op, fullGradFn, op.getArgOperands());
 }
 
