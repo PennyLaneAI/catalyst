@@ -331,6 +331,9 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
             return;
         }
 
+        // LLVM Functions can only return up to one result. If one scalar is being differentiated,
+        // it will be the sole result. If there are multiple scalars being differentiated, Enzyme
+        // will return a struct of all the derivatives with respect to those scalars.
         Value result = enzymeCall.getResult();
         if (isa<FloatType>(result.getType())) {
             results.push_back(result);
