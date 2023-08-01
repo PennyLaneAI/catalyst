@@ -68,3 +68,13 @@ func.func @backpropArgmap(%arg0: memref<f64>, %arg1: memref<f64>, %arg2: memref<
 
     return %arg1 : memref<f64>
 }
+
+
+///
+
+func.func private @argmap2(%arg0: memref<f64>, %arg1: f64)
+
+func.func @backpropArgmap2(%arg0: memref<f64>, %arg1: f64, %arg2: memref<f64>, %arg3: memref<?xf64>, %arg4 : memref<?xf64>, %arg5 : memref<?xf64>, %arg6: memref<?xf64>) -> (memref<f64>, f64) {
+  %res = gradient.backprop @argmap2(%arg0, %arg1) grad_out(%arg2: memref<f64>) callee_out(%arg3, %arg4 : memref<?xf64>, memref<?xf64>) cotangents(%arg5, %arg6 : memref<?xf64>, memref<?xf64>) {diffArgIndices = dense<[0, 1]> : tensor<2xindex>} : (memref<f64>, f64) -> f64
+  return %arg2, %res: memref<f64>, f64
+}
