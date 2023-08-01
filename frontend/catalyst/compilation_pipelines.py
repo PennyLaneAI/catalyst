@@ -202,14 +202,13 @@ class CompiledFunction:
         return best_case
 
     @staticmethod
-    def promote_arguments(compiled_signature, runtime_signature, *args):
+    def promote_arguments(compiled_signature, *args):
         """Promote arguments from the type specified in args to the type specified by
            compiled_signature.
 
         Args:
             compiled_signature: user supplied signature, obtain from either an annotation or a
                                 previously compiled implementation of the compiled function
-            runtime_signature: runtime signature
             *args: actual arguments to the function
 
         Returns:
