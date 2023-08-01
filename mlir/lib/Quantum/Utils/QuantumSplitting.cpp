@@ -64,7 +64,7 @@ QuantumCache QuantumCache::initialize(Region &region, OpBuilder &builder, Locati
         .paramVector = paramVector, .wireVector = wireVector, .controlFlowTapes = controlFlowTapes};
 }
 
-void AugmentedCircuitGenerator::generate(Region &region)
+void AugmentedCircuitGenerator::generate(Region &region, OpBuilder &builder)
 {
     assert(region.hasOneBlock() &&
            "Expected only structured control flow (each region should have a single block)");
@@ -75,43 +75,45 @@ void AugmentedCircuitGenerator::generate(Region &region)
 
     for (Operation &op : region.front().without_terminator()) {
         if (auto insertOp = dyn_cast<quantum::InsertOp>(op)) {
-            cacheDynamicWire(insertOp);
+            cacheDynamicWire(insertOp, builder);
         }
         else if (auto extractOp = dyn_cast<quantum::ExtractOp>(op)) {
-            cacheDynamicWire(extractOp);
+            cacheDynamicWire(extractOp, builder);
         }
         else if (auto gate = dyn_cast<quantum::DifferentiableGate>(op)) {
             ValueRange diffParams = gate.getDiffParams();
             if (!diffParams.empty()) {
                 for (Value param : diffParams) {
-                    rewriter.create<ListPushOp>(gate.getLoc(), oldToCloned.lookupOrDefault(param),
-                                                cache.paramVector);
+                    builder.create<ListPushOp>(gate.getLoc(), oldToCloned.lookupOrDefault(param),
+                                               cache.paramVector);
                 }
             }
         }
         else if (isa<QuantumDialect>(op.getDialect())) {
-            continue;
+            // Any quantum op other than a differentiable gate/insert/extract is ignored.
         }
         else if (isClassicalSCFOp(op)) {
-            rewriter.clone(op, oldToCloned);
-            continue;
+            // Purely classical SCF ops should be treated as any other purely classical op, but
+            // quantum SCF ops need to be recursively visited.
+            builder.clone(op, oldToCloned);
         }
         else if (auto forOp = dyn_cast<scf::ForOp>(op)) {
-            visitOperation(forOp);
+            visitOperation(forOp, builder);
         }
         else if (auto ifOp = dyn_cast<scf::IfOp>(op)) {
-            visitOperation(ifOp);
+            visitOperation(ifOp, builder);
         }
         else if (auto whileOp = dyn_cast<scf::WhileOp>(&op)) {
-            visitOperation(whileOp);
+            visitOperation(whileOp, builder);
         }
         else {
-            rewriter.clone(op, oldToCloned);
+            // Purely classical ops are deeply cloned as-is.
+            builder.clone(op, oldToCloned);
         }
     }
 }
 
-void AugmentedCircuitGenerator::visitOperation(scf::ForOp forOp)
+void AugmentedCircuitGenerator::visitOperation(scf::ForOp forOp, OpBuilder &builder)
 {
     DenseMap<unsigned, unsigned> argIdxMapping;
     SmallVector<Value> classicalInits;
@@ -127,10 +129,10 @@ void AugmentedCircuitGenerator::visitOperation(scf::ForOp forOp)
     // Store the start, stop, and step to this op's control flow tape.
     Value tape = cache.controlFlowTapes.at(forOp);
     for (Value param : {forOp.getLowerBound(), forOp.getUpperBound(), forOp.getStep()}) {
-        rewriter.create<ListPushOp>(forOp.getLoc(), oldToCloned.lookupOrDefault(param), tape);
+        builder.create<ListPushOp>(forOp.getLoc(), oldToCloned.lookupOrDefault(param), tape);
     }
 
-    auto newForOp = rewriter.create<scf::ForOp>(
+    auto newForOp = builder.create<scf::ForOp>(
         forOp.getLoc(), oldToCloned.lookupOrDefault(forOp.getLowerBound()),
         oldToCloned.lookupOrDefault(forOp.getUpperBound()),
         oldToCloned.lookupOrDefault(forOp.getStep()), classicalInits,
@@ -140,16 +142,14 @@ void AugmentedCircuitGenerator::visitOperation(scf::ForOp forOp)
                 oldToCloned.map(forOp.getRegionIterArg(oldIdx), iterArgs[newIdx]);
             }
 
-            PatternRewriter::InsertionGuard insertionGuard(rewriter);
-            rewriter.restoreInsertionPoint(builder.saveInsertionPoint());
-            generate(forOp.getRegion());
-            cloneTerminatorClassicalOperands(forOp.getBody()->getTerminator());
+            generate(forOp.getRegion(), builder);
+            cloneTerminatorClassicalOperands(forOp.getBody()->getTerminator(), builder);
         });
 
     mapResults(forOp, newForOp, argIdxMapping);
 }
 
-void AugmentedCircuitGenerator::visitOperation(scf::WhileOp whileOp)
+void AugmentedCircuitGenerator::visitOperation(scf::WhileOp whileOp, OpBuilder &builder)
 {
     SmallVector<Type> classicalResultTypes;
     SmallVector<Value> classicalInits;
@@ -165,12 +165,12 @@ void AugmentedCircuitGenerator::visitOperation(scf::WhileOp whileOp)
     }
 
     // Augment the classical loop by counting the number of iterations.
-    auto counterType = MemRefType::get({}, rewriter.getIndexType());
+    auto counterType = MemRefType::get({}, builder.getIndexType());
     Location loc = whileOp.getLoc();
-    Value idx0 = rewriter.create<index::ConstantOp>(loc, 0);
-    Value idx1 = rewriter.create<index::ConstantOp>(loc, 1);
-    Value counter = rewriter.create<memref::AllocaOp>(loc, counterType);
-    rewriter.create<memref::StoreOp>(loc, idx0, counter);
+    Value idx0 = builder.create<index::ConstantOp>(loc, 0);
+    Value idx1 = builder.create<index::ConstantOp>(loc, 1);
+    Value counter = builder.create<memref::AllocaOp>(loc, counterType);
+    builder.create<memref::StoreOp>(loc, idx0, counter);
 
     auto getRegionBuilder = [&](Region &oldRegion, bool incrementCounter) {
         return [&, incrementCounter](OpBuilder &builder, Location loc, ValueRange newRegionArgs) {
@@ -185,14 +185,12 @@ void AugmentedCircuitGenerator::visitOperation(scf::WhileOp whileOp)
             }
 
             // Recursively clone the region
-            PatternRewriter::InsertionGuard insertionGuard(rewriter);
-            rewriter.restoreInsertionPoint(builder.saveInsertionPoint());
-            generate(oldRegion);
-            cloneTerminatorClassicalOperands(oldRegion.front().getTerminator());
+            generate(oldRegion, builder);
+            cloneTerminatorClassicalOperands(oldRegion.front().getTerminator(), builder);
         };
     };
 
-    auto newWhileOp = rewriter.create<scf::WhileOp>(
+    auto newWhileOp = builder.create<scf::WhileOp>(
         whileOp.getLoc(), classicalResultTypes, classicalInits,
         getRegionBuilder(whileOp.getBefore(), /*incrementCounter=*/false),
         // We only care about the number of times the "After" region executes. The frontend
@@ -202,19 +200,17 @@ void AugmentedCircuitGenerator::visitOperation(scf::WhileOp whileOp)
 
     mapResults(whileOp, newWhileOp, argIdxMapping);
 
-    Value numIters = rewriter.create<memref::LoadOp>(whileOp.getLoc(), counter);
+    Value numIters = builder.create<memref::LoadOp>(whileOp.getLoc(), counter);
     Value tape = cache.controlFlowTapes.at(whileOp);
-    rewriter.create<ListPushOp>(whileOp.getLoc(), numIters, tape);
+    builder.create<ListPushOp>(whileOp.getLoc(), numIters, tape);
 }
 
-void AugmentedCircuitGenerator::visitOperation(scf::IfOp ifOp)
+void AugmentedCircuitGenerator::visitOperation(scf::IfOp ifOp, OpBuilder &builder)
 {
     auto getRegionBuilder = [&](Region &oldRegion) {
         return [&](OpBuilder &builder, Location loc) {
-            PatternRewriter::InsertionGuard insertionGuard(rewriter);
-            rewriter.restoreInsertionPoint(builder.saveInsertionPoint());
-            generate(oldRegion);
-            cloneTerminatorClassicalOperands(oldRegion.front().getTerminator());
+            generate(oldRegion, builder);
+            cloneTerminatorClassicalOperands(oldRegion.front().getTerminator(), builder);
         };
     };
     DenseMap<unsigned, unsigned> argIdxMapping;
@@ -224,17 +220,18 @@ void AugmentedCircuitGenerator::visitOperation(scf::IfOp ifOp)
     Value condition = oldToCloned.lookupOrDefault(ifOp.getCondition());
     Value tape = cache.controlFlowTapes.at(ifOp);
     Value castedCondition =
-        rewriter.create<index::CastSOp>(ifOp.getLoc(), rewriter.getIndexType(), condition);
-    rewriter.create<ListPushOp>(ifOp.getLoc(), castedCondition, tape);
+        builder.create<index::CastSOp>(ifOp.getLoc(), builder.getIndexType(), condition);
+    builder.create<ListPushOp>(ifOp.getLoc(), castedCondition, tape);
 
     auto newIfOp =
-        rewriter.create<scf::IfOp>(ifOp.getLoc(), condition, getRegionBuilder(ifOp.getThenRegion()),
-                                   getRegionBuilder(ifOp.getElseRegion()));
+        builder.create<scf::IfOp>(ifOp.getLoc(), condition, getRegionBuilder(ifOp.getThenRegion()),
+                                  getRegionBuilder(ifOp.getElseRegion()));
 
     mapResults(ifOp, newIfOp, argIdxMapping);
 }
 
-void AugmentedCircuitGenerator::cloneTerminatorClassicalOperands(Operation *terminator)
+void AugmentedCircuitGenerator::cloneTerminatorClassicalOperands(Operation *terminator,
+                                                                 OpBuilder &builder)
 {
     SmallVector<Value> newYieldOperands;
     for (Value operand : terminator->getOperands()) {
@@ -242,7 +239,7 @@ void AugmentedCircuitGenerator::cloneTerminatorClassicalOperands(Operation *term
             newYieldOperands.push_back(oldToCloned.lookupOrDefault(operand));
         }
     }
-    Operation *newTerminator = rewriter.clone(*terminator, oldToCloned);
+    Operation *newTerminator = builder.clone(*terminator, oldToCloned);
     newTerminator->setOperands(newYieldOperands);
 }
 

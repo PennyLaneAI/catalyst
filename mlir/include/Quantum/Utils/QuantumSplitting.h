@@ -35,27 +35,25 @@ struct QuantumCache {
 
 class AugmentedCircuitGenerator {
   public:
-    AugmentedCircuitGenerator(mlir::IRMapping &oldToCloned, mlir::PatternRewriter &rewriter,
-                              QuantumCache &cache)
-        : oldToCloned(oldToCloned), rewriter(rewriter), cache(cache)
+    AugmentedCircuitGenerator(mlir::IRMapping &oldToCloned, QuantumCache &cache)
+        : oldToCloned(oldToCloned), cache(cache)
     {
     }
 
     /// Given a `region` containing classical preprocessing and quantum operations, generate an
     /// augmented version that caches all the parameters required to deterministically re-execute
     /// the circuit (gate params, classical control flow, and dynamic wires).
-    void generate(mlir::Region &region);
+    void generate(mlir::Region &region, mlir::OpBuilder &builder);
 
   private:
     mlir::IRMapping &oldToCloned;
-    mlir::PatternRewriter &rewriter;
     QuantumCache &cache;
 
-    void visitOperation(mlir::scf::ForOp forOp);
-    void visitOperation(mlir::scf::WhileOp forOp);
-    void visitOperation(mlir::scf::IfOp forOp);
+    void visitOperation(mlir::scf::ForOp forOp, mlir::OpBuilder &builder);
+    void visitOperation(mlir::scf::WhileOp forOp, mlir::OpBuilder &builder);
+    void visitOperation(mlir::scf::IfOp forOp, mlir::OpBuilder &builder);
 
-    void cloneTerminatorClassicalOperands(mlir::Operation *terminator);
+    void cloneTerminatorClassicalOperands(mlir::Operation *terminator, mlir::OpBuilder &builder);
 
     /// Update the internal mapping of the results of `oldOp` to the results of `clonedOp` using the
     /// given result remapping.
@@ -63,11 +61,11 @@ class AugmentedCircuitGenerator {
                     const mlir::DenseMap<unsigned, unsigned> &argIdxMapping);
 
     // Emit an operation to cache a dynamic wire for quantum.insert/extract ops.
-    template <typename IndexingOp> void cacheDynamicWire(IndexingOp op)
+    template <typename IndexingOp> void cacheDynamicWire(IndexingOp op, mlir::OpBuilder &builder)
     {
         if (!op.getIdxAttr().has_value()) {
-            rewriter.create<ListPushOp>(op.getLoc(), oldToCloned.lookupOrDefault(op.getIdx()),
-                                        cache.wireVector);
+            builder.create<ListPushOp>(op.getLoc(), oldToCloned.lookupOrDefault(op.getIdx()),
+                                       cache.wireVector);
         }
     }
 };

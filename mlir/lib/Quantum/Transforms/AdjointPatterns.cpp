@@ -59,14 +59,14 @@ Value cloneAdjointRegion(AdjointOp op, OpBuilder &builder, IRMapping &mapping)
 /// gate parameters and cached control flow.
 class AdjointGenerator {
   public:
-    AdjointGenerator(IRMapping &remappedValues, OpBuilder &builder, QuantumCache &cache)
-        : remappedValues(remappedValues), builder(builder), cache(cache)
+    AdjointGenerator(IRMapping &remappedValues, QuantumCache &cache)
+        : remappedValues(remappedValues), cache(cache)
     {
     }
 
     /// Recursively generate the adjoint version of `region` with reversed control flow and adjoint
     /// quantum gates.
-    void generate(Region &region)
+    void generate(Region &region, OpBuilder &builder)
     {
         assert(region.hasOneBlock() &&
                "Expected only structured control flow (each region should have a single block)");
@@ -74,16 +74,16 @@ class AdjointGenerator {
         for (Operation &op : llvm::reverse(region.front().without_terminator())) {
             LLVM_DEBUG(dbgs() << "generating adjoint for: " << op << "\n");
             if (auto forOp = dyn_cast<scf::ForOp>(op)) {
-                visitOperation(forOp);
+                visitOperation(forOp, builder);
             }
             else if (auto ifOp = dyn_cast<scf::IfOp>(op)) {
-                visitOperation(ifOp);
+                visitOperation(ifOp, builder);
             }
             else if (auto whileOp = dyn_cast<scf::WhileOp>(op)) {
-                visitOperation(whileOp);
+                visitOperation(whileOp, builder);
             }
             else if (auto insertOp = dyn_cast<quantum::InsertOp>(op)) {
-                Value dynamicWire = getDynamicWire(insertOp);
+                Value dynamicWire = getDynamicWire(insertOp, builder);
                 auto extractOp = builder.create<quantum::ExtractOp>(
                     insertOp.getLoc(), insertOp.getQubit().getType(),
                     remappedValues.lookup(insertOp.getOutQreg()), dynamicWire,
@@ -93,7 +93,7 @@ class AdjointGenerator {
                                    remappedValues.lookup(insertOp.getOutQreg()));
             }
             else if (auto extractOp = dyn_cast<quantum::ExtractOp>(op)) {
-                Value dynamicWire = getDynamicWire(extractOp);
+                Value dynamicWire = getDynamicWire(extractOp, builder);
                 auto insertOp = builder.create<quantum::InsertOp>(
                     extractOp.getLoc(), extractOp.getQreg().getType(),
                     remappedValues.lookup(extractOp.getQreg()), dynamicWire,
@@ -139,7 +139,7 @@ class AdjointGenerator {
         }
     }
 
-    template <typename IndexingOp> Value getDynamicWire(IndexingOp op)
+    template <typename IndexingOp> Value getDynamicWire(IndexingOp op, OpBuilder &builder)
     {
         Value dynamicWire;
         if (!op.getIdxAttr().has_value()) {
@@ -158,7 +158,7 @@ class AdjointGenerator {
         return std::nullopt;
     }
 
-    void visitOperation(scf::ForOp forOp)
+    void visitOperation(scf::ForOp forOp, OpBuilder &builder)
     {
         std::optional<Value> yieldedQureg =
             getQuantumReg(forOp.getBody()->getTerminator()->getOperands());
@@ -182,14 +182,14 @@ class AdjointGenerator {
                 builder.restoreInsertionPoint(bodyBuilder.saveInsertionPoint());
 
                 remappedValues.map(yieldedQureg.value(), iterArgs[0]);
-                generate(forOp.getBodyRegion());
+                generate(forOp.getBodyRegion(), builder);
                 builder.create<scf::YieldOp>(
                     loc, remappedValues.lookup(getQuantumReg(forOp.getRegionIterArgs()).value()));
             });
         remappedValues.map(getQuantumReg(forOp.getInitArgs()).value(), replacedFor.getResult(0));
     }
 
-    void visitOperation(scf::IfOp ifOp)
+    void visitOperation(scf::IfOp ifOp, OpBuilder &builder)
     {
         std::optional<Value> qureg = getQuantumReg(ifOp.getResults());
         if (!qureg.has_value()) {
@@ -222,7 +222,7 @@ class AdjointGenerator {
                 std::optional<Value> yieldedQureg =
                     getQuantumReg(oldRegion.front().getTerminator()->getOperands());
                 remappedValues.map(yieldedQureg.value(), reversedResult);
-                generate(oldRegion);
+                generate(oldRegion, builder);
                 builder.create<scf::YieldOp>(
                     loc, remappedValues.lookup(findOldestQuregInRegion(oldRegion)));
             };
@@ -237,7 +237,7 @@ class AdjointGenerator {
         remappedValues.map(startingThenQureg, reversedIf.getResult(0));
     }
 
-    void visitOperation(scf::WhileOp whileOp)
+    void visitOperation(scf::WhileOp whileOp, OpBuilder &builder)
     {
         std::optional<Value> yieldedQureg =
             getQuantumReg(whileOp.getAfter().front().getTerminator()->getOperands());
@@ -260,7 +260,7 @@ class AdjointGenerator {
                 builder.restoreInsertionPoint(bodyBuilder.saveInsertionPoint());
 
                 remappedValues.map(yieldedQureg.value(), iterArgs[0]);
-                generate(whileOp.getAfter());
+                generate(whileOp.getAfter(), builder);
                 builder.create<scf::YieldOp>(
                     loc, remappedValues.lookup(
                              getQuantumReg(whileOp.getAfter().front().getArguments()).value()));
@@ -270,7 +270,6 @@ class AdjointGenerator {
 
   private:
     IRMapping &remappedValues;
-    OpBuilder &builder;
     QuantumCache &cache;
 };
 
@@ -288,8 +287,8 @@ struct AdjointSingleOpRewritePattern : public mlir::OpRewritePattern<AdjointOp> 
 
         // First, copy the classical computations directly to the target insertion point.
         IRMapping oldToCloned;
-        AugmentedCircuitGenerator augmentedGenerator{oldToCloned, rewriter, cache};
-        augmentedGenerator.generate(adjoint.getRegion());
+        AugmentedCircuitGenerator augmentedGenerator{oldToCloned, cache};
+        augmentedGenerator.generate(adjoint.getRegion(), rewriter);
 
         // Initialize the backward pass with the operand of the quantum.yield
         auto yieldOp = cast<quantum::YieldOp>(adjoint.getRegion().front().getTerminator());
@@ -297,8 +296,8 @@ struct AdjointSingleOpRewritePattern : public mlir::OpRewritePattern<AdjointOp> 
         oldToCloned.map(yieldOp.getOperands().front(), adjoint.getQreg());
 
         // Emit the adjoint quantum operations and reversed control flow, using cached values.
-        AdjointGenerator adjointGenerator{oldToCloned, rewriter, cache};
-        adjointGenerator.generate(adjoint.getRegion());
+        AdjointGenerator adjointGenerator{oldToCloned, cache};
+        adjointGenerator.generate(adjoint.getRegion(), rewriter);
 
         // The final register is the re-mapped region argument of the original adjoint op.
         SmallVector<Value> reversedOutputs;
