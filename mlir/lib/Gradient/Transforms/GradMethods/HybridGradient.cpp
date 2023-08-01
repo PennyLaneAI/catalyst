@@ -196,7 +196,7 @@ func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc, GradOp
                 }
             }
             else {
-                // Cotangent is a rank 1 tensor
+                // The quantum gradient is a rank 1 tensor
                 BackpropOp backpropOp = rewriter.create<BackpropOp>(
                     loc, resultsBackpropTypes, argMapFn.getName(), callArgs, ValueRange{},
                     ValueRange{}, quantumGradient, diffArgIndicesAttr);
@@ -205,8 +205,8 @@ func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc, GradOp
                     Type gradResultType = gradOp.getResult(result.getResultNumber()).getType();
                     if (gradResultType != result.getType()) {
                         // The backprop op produces a row of the Jacobian, which always has the same
-                        // type as the differentiated argument. If the rank of the cotangent is
-                        // 1, this implies the primal function returns a rank-0 value (either a
+                        // type as the differentiated argument. If the rank of the quantum gradient
+                        // is 1, this implies the callee returns a rank-0 value (either a
                         // scalar or a tensor<scalar>). The Jacobian of a scalar -> scalar should be
                         // a scalar, but as a special case, the Jacobian of a scalar ->
                         // tensor<scalar> should be tensor<scalar>.
@@ -218,9 +218,9 @@ func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc, GradOp
                                 loc, result, jacobian, ValueRange{});
                         }
 
-                        // We also support where the argument is a tensor<scalar> but the resulting
-                        // gradient is a scalar. This is less about mathematical precision and more
-                        // about ergonomics.
+                        // We also support where the argument is a tensor<scalar> but the desired
+                        // hybrid gradient is a scalar. This is less about mathematical precision
+                        // and more about ergonomics.
                         if (isa<FloatType>(gradResultType) &&
                             isa<RankedTensorType>(result.getType())) {
                             hybridGradient =
