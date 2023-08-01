@@ -14,10 +14,12 @@
 
 """Test PyTree support in Catalyst."""
 
+from typing import Iterable
+
+import jax
 import jax.numpy as jnp
 import pennylane as qml
 import pytest
-
 from catalyst import cond, measure, qjit
 
 
@@ -328,6 +330,44 @@ class TestPyTreesFuncArgs:
             "b": [8],
         }
         result = jitted_fn(params)
+
+
+class TestAuxiliaryData:
+    def test_auxiliary_data(self):
+        """Make sure that we are able to return arbitrary PyTrees.
+
+        The example below was taken from https://jax.readthedocs.io/en/latest/jax-101/05.1-pytrees.html"""
+
+        class MyContainer:
+            """A named container."""
+
+            def __init__(self, name: str, a: int):
+                self.name = name
+                self.a = a
+
+        def flatten_MyContainer(container) -> tuple[Iterable[int], str]:
+            """Returns an iterable over container contents, and aux data."""
+            flat_contents = [container.a]
+
+            # we don't want the name to appear as a child, so it is auxiliary data.
+            # auxiliary data is usually a description of the structure of a node,
+            # e.g., the keys of a dict -- anything that isn't a node's children.
+            aux_data = container.name
+            return flat_contents, aux_data
+
+        def unflatten_MyContainer(aux_data: str, flat_contents: Iterable[int]) -> MyContainer:
+            """Converts aux data and the flat contents into a MyContainer."""
+            return MyContainer(aux_data, *flat_contents)
+
+        jax.tree_util.register_pytree_node(MyContainer, flatten_MyContainer, unflatten_MyContainer)
+
+        @qjit
+        def classical(x):
+            return MyContainer("aux_data", x * x)
+
+        result = classical(2)
+        assert result.name == "aux_data"
+        assert result.a == 4
 
 
 if __name__ == "__main__":
