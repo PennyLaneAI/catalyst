@@ -589,7 +589,7 @@ class QJIT:
             next_action = CompiledFunction.typecheck(self.c_sig, r_sig)
 
         if next_action == TypeCompatibility.NEEDS_PROMOTION:
-            args = CompiledFunction.promote_arguments(self.c_sig, r_sig, *args)
+            args = CompiledFunction.promote_arguments(self.c_sig, *args)
         elif next_action == TypeCompatibility.NEEDS_COMPILATION:
             if self.user_typed:
                 msg = "Provided arguments did not match declared signature, recompiling..."
