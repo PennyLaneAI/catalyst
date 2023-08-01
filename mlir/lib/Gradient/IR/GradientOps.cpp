@@ -322,14 +322,18 @@ LogicalResult BackpropOp::verify()
 {
     size_t numDiffArgs =
         this->getDiffArgIndices().has_value() ? this->getDiffArgIndicesAttr().size() : 1;
+    auto hasTensorType = [](Type type) { return isa<RankedTensorType>(type); };
+    bool hasTensorOperands = llvm::any_of(this->getOperandTypes(), hasTensorType);
+    bool hasTensorResults = llvm::any_of(this->getResultTypes(), hasTensorType);
+    bool hasTensorSemantics = hasTensorOperands || hasTensorResults;
 
-    if (this->getDiffArgShadows().size() && this->getNumResults())
+    if (this->getDiffArgShadows().size() && hasTensorSemantics)
         return emitOpError("cannot have both tensor results and memref output arguments");
 
-    if (this->getCalleeResults().size() && this->getNumResults())
+    if (this->getCalleeResults().size() && hasTensorSemantics)
         return emitOpError("cannot have callee result buffers before bufferization");
 
-    if (!this->getNumResults() && this->getCalleeResults().size() != this->getCotangents().size())
+    if (!hasTensorSemantics && this->getCalleeResults().size() != this->getCotangents().size())
         return emitOpError("need as many callee result buffers as there are cotangents")
                << ", expected " << this->getCotangents().size() << " but got "
                << this->getCalleeResults().size();

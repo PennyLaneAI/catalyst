@@ -81,15 +81,19 @@ func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc, GradOp
         // Loop over the measurements
         for (Value quantumGradient : quantumGradients) {
             Type resultType = gradOp.getResult(j).getType();
-            Value result = rewriter.create<tensor::EmptyOp>(loc, resultType, ValueRange{});
-            auto rankResult = resultType.cast<RankedTensorType>().getRank();
-            auto shapeResult = resultType.cast<RankedTensorType>().getShape();
+            int64_t rankResult = 0;
+            ArrayRef<int64_t> shapeResult;
+            if (auto resultTensorType = dyn_cast<RankedTensorType>(resultType)) {
+                rankResult = resultTensorType.getRank();
+                shapeResult = resultTensorType.getShape();
+            }
             j++;
 
             std::vector<BackpropOp> intermediateGradients;
             auto rank = quantumGradient.getType().cast<RankedTensorType>().getRank();
 
             if (rank > 1) {
+                Value result = rewriter.create<tensor::EmptyOp>(loc, resultType, ValueRange{});
                 std::vector<int64_t> sizes =
                     quantumGradient.getType().cast<RankedTensorType>().getShape();
 
@@ -158,35 +162,73 @@ func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc, GradOp
                         Value gradient = intermediateGradient.getResult(i);
 
                         Type gradientType = gradient.getType();
-                        auto rankGradient = gradientType.cast<RankedTensorType>().getRank();
+                        if (auto gradientTensorType = dyn_cast<RankedTensorType>(gradientType)) {
+                            int64_t rankGradient = gradientTensorType.getRank();
+                            // sizes
+                            std::vector<int64_t> sizesSlice{shapeResult};
+                            for (int64_t sliceIndex = rankResult - 1; sliceIndex >= rankGradient;
+                                 sliceIndex--) {
+                                sizesSlice[sliceIndex] = 1;
+                            }
 
-                        // sizes
-                        std::vector<int64_t> sizesSlice{shapeResult};
-                        for (int64_t sliceIndex = rankResult - 1; sliceIndex >= rankGradient;
-                             sliceIndex--) {
-                            sizesSlice[sliceIndex] = 1;
+                            // offset
+                            auto offsetSlice = allOffsets[index];
+                            for (int64_t offsetIndex = 0; offsetIndex < rankGradient;
+                                 offsetIndex++) {
+                                offsetSlice.insert(offsetSlice.begin(), 0);
+                            }
+                            result = rewriter.create<tensor::InsertSliceOp>(
+                                loc, resultType, gradient, result, ValueRange{}, ValueRange{},
+                                ValueRange{}, offsetSlice, sizesSlice, stridesSlice);
                         }
-
-                        // offset
-                        auto offsetSlice = allOffsets[index];
-                        for (int64_t offsetIndex = 0; offsetIndex < rankGradient; offsetIndex++) {
-                            offsetSlice.insert(offsetSlice.begin(), 0);
+                        else {
+                            assert(isa<FloatType>(gradient.getType()));
+                            SmallVector<Value> insertIndices;
+                            for (int64_t offset : allOffsets[index]) {
+                                insertIndices.push_back(
+                                    rewriter.create<index::ConstantOp>(loc, offset));
+                            }
+                            result = rewriter.create<tensor::InsertOp>(loc, gradient, result,
+                                                                       insertIndices);
                         }
-                        result = rewriter.create<tensor::InsertSliceOp>(
-                            loc, resultType, gradient, result, ValueRange{}, ValueRange{},
-                            ValueRange{}, offsetSlice, sizesSlice, stridesSlice);
                     }
                     hybridGradients.push_back(result);
                 }
             }
             else {
+                // The quantum gradient is a rank 1 tensor
                 BackpropOp backpropOp = rewriter.create<BackpropOp>(
                     loc, resultsBackpropTypes, argMapFn.getName(), callArgs, ValueRange{},
                     ValueRange{}, quantumGradient, diffArgIndicesAttr);
-                // Loop over params
-                for (size_t i = 0; i < backpropOp.getNumResults(); i++) {
-                    Value result = backpropOp.getResult(i);
-                    hybridGradients.push_back(result);
+                for (OpResult result : backpropOp.getResults()) {
+                    Value hybridGradient = result;
+                    Type gradResultType = gradOp.getResult(result.getResultNumber()).getType();
+                    if (gradResultType != result.getType()) {
+                        // The backprop op produces a row of the Jacobian, which always has the same
+                        // type as the differentiated argument. If the rank of the quantum gradient
+                        // is 1, this implies the callee returns a rank-0 value (either a
+                        // scalar or a tensor<scalar>). The Jacobian of a scalar -> scalar should be
+                        // a scalar, but as a special case, the Jacobian of a scalar ->
+                        // tensor<scalar> should be tensor<scalar>.
+                        if (isa<RankedTensorType>(gradResultType) &&
+                            isa<FloatType>(result.getType())) {
+                            Value jacobian =
+                                rewriter.create<tensor::EmptyOp>(loc, gradResultType, ValueRange{});
+                            hybridGradient = rewriter.create<tensor::InsertOp>(
+                                loc, result, jacobian, ValueRange{});
+                        }
+
+                        // We also support where the argument is a tensor<scalar> but the desired
+                        // hybrid gradient is a scalar. This is less about mathematical precision
+                        // and more about ergonomics.
+                        if (isa<FloatType>(gradResultType) &&
+                            isa<RankedTensorType>(result.getType())) {
+                            hybridGradient =
+                                rewriter.create<tensor::ExtractOp>(loc, result, ValueRange{});
+                        }
+                    }
+
+                    hybridGradients.push_back(hybridGradient);
                 }
             }
         }

@@ -30,16 +30,15 @@ func.func @adjoint(%arg0: f64, %arg1: index) {
 
 // -----
 
-func.func private @circuit2(%arg0: tensor<f64>)
+func.func private @circuit2(%arg0: f64)
 
 // CHECK-LABEL: @backprop
-func.func @backprop(%arg0: tensor<f64>, %arg1: tensor<?xf64>) {
+func.func @backprop(%arg0: f64, %arg1: tensor<?xf64>) {
 
-    // CHECK:   [[argShadow:%.+]] = memref.alloc() : memref<f64>
     // CHECK:   [[dim:%.+]] = memref.dim
     // CHECK:   [[calleeRes:%.+]] = memref.alloc([[dim]]) : memref<?xf64>
-    // CHECK:   gradient.backprop @circuit2({{%.+}}) grad_out([[argShadow]] : memref<f64>) callee_out([[calleeRes]] : memref<?xf64>) cotangents({{%.+}} : memref<?xf64>) {diffArgIndices = dense<0> : tensor<1xindex>} : (memref<f64>) -> ()
-    %grad = gradient.backprop @circuit2(%arg0) cotangents(%arg1: tensor<?xf64>) {diffArgIndices = dense<0> : tensor<1xindex>}: (tensor<f64>) -> tensor<f64>
+    // CHECK:   gradient.backprop @circuit2({{%.+}}) callee_out([[calleeRes]] : memref<?xf64>) cotangents({{%.+}} : memref<?xf64>) {diffArgIndices = dense<0> : tensor<1xindex>} : (f64) -> f64
+    %grad = gradient.backprop @circuit2(%arg0) cotangents(%arg1: tensor<?xf64>) {diffArgIndices = dense<0> : tensor<1xindex>}: (f64) -> f64
     return
 }
 
