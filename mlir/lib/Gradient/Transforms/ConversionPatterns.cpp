@@ -264,46 +264,6 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         SymbolTableCollection symbolTable;
         LogicalResult traversalResult =
             traverseCallGraph(callee, symbolTable, [&](func::FuncOp func) {
-                // Convert the function and all of its callers to destination passing style.
-                if (llvm::any_of(func.getResultTypes(),
-                                 [](Type resultType) { return isa<MemRefType>(resultType); })) {
-                    convertToDestinationPassingStyle(func);
-
-                    // Update all callees of this function to pass in output memrefs
-                    std::optional<SymbolTable::UseRange> symbolUses = func.getSymbolUses(moduleOp);
-                    for (auto symbolUse : *symbolUses) {
-                        if (auto callOp = dyn_cast<func::CallOp>(symbolUse.getUser())) {
-                            OpBuilder::InsertionGuard insertionGuard(rewriter);
-                            rewriter.setInsertionPoint(callOp);
-
-                            SmallVector<Value> newOperands{callOp.getArgOperands()};
-                            SmallVector<Value> outputOperands;
-
-                            // Hardcode this for now, it's gotta be a postorder traversal such that
-                            // we visit child nodes before their parents.
-                            if (callOp.getCallee() == "workflow.withparams") {
-                                callOp.emitWarning() << "Using hard-coded DPS transformation";
-                                outputOperands.push_back(
-                                    callOp->getParentOfType<func::FuncOp>().getArguments().back());
-                            }
-                            else {
-                                for (Type resultType : callOp.getResultTypes()) {
-                                    if (auto memRefType = dyn_cast<MemRefType>(resultType)) {
-                                        assert(memRefType.hasStaticShape() &&
-                                               "Cannot convert a dynamically-sized memref to "
-                                               "destination-passing style");
-                                        outputOperands.push_back(rewriter.create<memref::AllocOp>(
-                                            callOp.getLoc(), memRefType));
-                                    }
-                                }
-                            }
-
-                            newOperands.append(outputOperands);
-                            rewriter.create<func::CallOp>(callOp.getLoc(), func, newOperands);
-                            rewriter.replaceOp(callOp, outputOperands);
-                        }
-                    }
-                }
                 // Register custom gradients of quantum functions
                 if (func->hasAttrOfType<FlatSymbolRefAttr>("gradient.qgrad")) {
                     auto qgradFn = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
