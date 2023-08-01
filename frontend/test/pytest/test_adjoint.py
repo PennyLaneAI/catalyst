@@ -28,7 +28,28 @@ from catalyst import adjoint as C_adjoint
 from catalyst import cond, for_loop, qjit, while_loop
 
 
-def test_adjoint_func():
+def verify_catalyst_adjoint_against_pennylane(quantum_func, device, *args):
+    """
+    A helper function for verifying Catalyst's native adjoint against the behaviour of PennyLane's
+    adjoint function. This is specialized to verifying the behaviour of a single function that has
+    its adjoint computed.
+    """
+
+    @qjit
+    @qml.qnode(device)
+    def catalyst_workflow(*args):
+        C_adjoint(quantum_func)(*args)
+        return qml.state()
+
+    @qml.qnode(device)
+    def pennylane_workflow(*args):
+        PL_adjoint(quantum_func)(*args)
+        return qml.state()
+
+    assert_allclose(catalyst_workflow(*args), pennylane_workflow(*args))
+
+
+def test_adjoint_func(backend):
     """Ensures that catalyst.adjoint accepts simple Python functions as argument. Makes sure that
     simple quantum gates are adjointed correctly."""
 
@@ -37,15 +58,17 @@ def test_adjoint_func():
         qml.PauliY(wires=0)
         qml.PauliZ(wires=1)
 
+    device = qml.device(backend, wires=2)
+
     @qjit
-    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    @qml.qnode(device)
     def C_workflow():
         qml.PauliX(wires=0)
         C_adjoint(func)()
         qml.PauliY(wires=0)
         return qml.state()
 
-    @qml.qnode(qml.device("default.qubit", wires=2))
+    @qml.qnode(device)
     def PL_workflow():
         qml.PauliX(wires=0)
         PL_adjoint(func)()
@@ -58,17 +81,18 @@ def test_adjoint_func():
 
 
 @pytest.mark.parametrize("theta, val", [(jnp.pi, 0), (-100.0, 1)])
-def test_adjoint_op(theta, val):
+def test_adjoint_op(theta, val, backend):
     """Ensures that catalyst.adjoint accepts single PennyLane operators classes as argument."""
+    device = qml.device(backend, wires=2)
 
     @qjit
-    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    @qml.qnode(device)
     def C_workflow(theta, val):
         C_adjoint(qml.RY)(jnp.pi, val)
         C_adjoint(qml.RZ)(theta, wires=val)
         return qml.state()
 
-    @qml.qnode(qml.device("default.qubit", wires=2))
+    @qml.qnode(device)
     def PL_workflow(theta, val):
         PL_adjoint(qml.RY)(jnp.pi, val)
         PL_adjoint(qml.RZ)(theta, wires=val)
@@ -80,18 +104,20 @@ def test_adjoint_op(theta, val):
 
 
 @pytest.mark.parametrize("theta, val", [(pnp.pi, 0), (-100.0, 2)])
-def test_adjoint_bound_op(theta, val):
+def test_adjoint_bound_op(theta, val, backend):
     """Ensures that catalyst.adjoint accepts single PennyLane operators objects as argument."""
 
+    device = qml.device(backend, wires=3)
+
     @qjit
-    @qml.qnode(qml.device("lightning.qubit", wires=3))
+    @qml.qnode(device)
     def C_workflow(theta, val):
         C_adjoint(qml.RX(jnp.pi, val))
         C_adjoint(qml.PauliY(val))
         C_adjoint(qml.RZ(theta, wires=val))
         return qml.state()
 
-    @qml.qnode(qml.device("default.qubit", wires=3))
+    @qml.qnode(device)
     def PL_workflow(theta, val):
         PL_adjoint(qml.RX(jnp.pi, val))
         PL_adjoint(qml.PauliY(val))
@@ -104,7 +130,7 @@ def test_adjoint_bound_op(theta, val):
 
 
 @pytest.mark.parametrize("w, p", [(0, 0.5), (0, -100.0), (1, 123.22)])
-def test_adjoint_param_fun(w, p):
+def test_adjoint_param_fun(w, p, backend):
     """Ensures that catalyst.adjoint accepts parameterized Python functions as arguments."""
 
     def func(w, theta1, theta2, theta3=1):
@@ -112,15 +138,17 @@ def test_adjoint_param_fun(w, p):
         qml.RY(theta2 / 2, wires=w)
         qml.RZ(theta3, wires=1)
 
+    device = qml.device(backend, wires=2)
+
     @qjit
-    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    @qml.qnode(device)
     def C_workflow(w, theta):
         qml.PauliX(wires=0)
         C_adjoint(func)(w, theta, theta2=theta)
         qml.PauliY(wires=0)
         return qml.state()
 
-    @qml.qnode(qml.device("default.qubit", wires=2))
+    @qml.qnode(device)
     def PL_workflow(w, theta):
         qml.PauliX(wires=0)
         PL_adjoint(func)(w, theta, theta2=theta)
@@ -132,7 +160,7 @@ def test_adjoint_param_fun(w, p):
     assert_allclose(actual, desired)
 
 
-def test_adjoint_nested_fun():
+def test_adjoint_nested_fun(backend):
     """Ensures that catalyst.adjoint allows arbitrary nesting."""
 
     def func(A, I):
@@ -143,7 +171,7 @@ def test_adjoint_nested_fun():
             A(partial(func, A=A, I=I))()
 
     @qjit
-    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    @qml.qnode(qml.device(backend, wires=2))
     def C_workflow():
         qml.RX(pnp.pi / 2, wires=0)
         C_adjoint(partial(func, A=C_adjoint, I=0))()
@@ -157,12 +185,10 @@ def test_adjoint_nested_fun():
         qml.RZ(pnp.pi / 2, wires=0)
         return qml.state()
 
-    actual = C_workflow()
-    desired = PL_workflow()
-    assert_allclose(actual, desired)
+    assert_allclose(C_workflow(), PL_workflow())
 
 
-def test_adjoint_qubitunitary():
+def test_adjoint_qubitunitary(backend):
     """Ensures that catalyst.adjoint supports QubitUnitary oprtations."""
 
     def func():
@@ -178,43 +204,17 @@ def test_adjoint_qubitunitary():
             wires=[0, 1],
         )
 
-    @qjit
-    @qml.qnode(qml.device("lightning.qubit", wires=2))
-    def C_workflow():
-        C_adjoint(func)()
-        return qml.state()
-
-    @qml.qnode(qml.device("default.qubit", wires=2))
-    def PL_workflow():
-        PL_adjoint(func)()
-        return qml.state()
-
-    actual = C_workflow()
-    desired = PL_workflow()
-    assert_allclose(actual, desired)
+    verify_catalyst_adjoint_against_pennylane(func, qml.device(backend, wires=2))
 
 
-def test_adjoint_multirz():
-    """Ensures that catalyst.adjoint supports MultiRZ oprtations."""
+def test_adjoint_multirz(backend):
+    """Ensures that catalyst.adjoint supports MultiRZ operations."""
 
     def func():
         qml.PauliX(0)
         qml.MultiRZ(theta=pnp.pi / 2, wires=[0, 1])
 
-    @qjit
-    @qml.qnode(qml.device("lightning.qubit", wires=2))
-    def C_workflow():
-        C_adjoint(func)()
-        return qml.state()
-
-    @qml.qnode(qml.device("default.qubit", wires=2))
-    def PL_workflow():
-        PL_adjoint(func)()
-        return qml.state()
-
-    actual = C_workflow()
-    desired = PL_workflow()
-    assert_allclose(actual, desired)
+    verify_catalyst_adjoint_against_pennylane(func, qml.device(backend, wires=2))
 
 
 def test_adjoint_no_measurements():
@@ -248,7 +248,7 @@ def test_adjoint_invalid_argument():
         C_workflow()
 
 
-def test_adjoint_classical_loop():
+def test_adjoint_classical_loop(backend):
     """Checks that catalyst.adjoint supports purely-classical Control-flows."""
 
     def func(w=0):
@@ -259,41 +259,7 @@ def test_adjoint_classical_loop():
         qml.PauliX(wires=loop(w))
         qml.RX(pnp.pi / 2, wires=w)
 
-    @qjit
-    @qml.qnode(qml.device("lightning.qubit", wires=3))
-    def C_workflow():
-        C_adjoint(func)(0)
-        return qml.state()
-
-    @jax.jit
-    @qml.qnode(qml.device("lightning.qubit", wires=3))
-    def PL_workflow():
-        PL_adjoint(func)(0)
-        return qml.state()
-
-    actual = C_workflow()
-    desired = PL_workflow()
-    assert_allclose(actual, desired)
-
-
-def run_catalyst_against_pennylane(quantum_func, device, *args):
-    """
-    A helper function for verifying Catalyst's native adjoint against the behaviour of PennyLane's
-    adjoint function.
-    """
-
-    @qjit
-    @qml.qnode(device)
-    def catalyst_workflow(*args):
-        C_adjoint(quantum_func)(*args)
-        return qml.state()
-
-    @qml.qnode(device)
-    def pennylane_workflow(*args):
-        PL_adjoint(quantum_func)(*args)
-        return qml.state()
-
-    assert_allclose(catalyst_workflow(*args), pennylane_workflow(*args))
+    verify_catalyst_adjoint_against_pennylane(func, qml.device(backend, wires=3), 0)
 
 
 @pytest.mark.parametrize("pred", [True, False])
@@ -308,7 +274,7 @@ def test_adjoint_cond(backend, pred):
         cond_fn()
 
     dev = qml.device(backend, wires=1)
-    run_catalyst_against_pennylane(func, dev, pred, jnp.pi)
+    verify_catalyst_adjoint_against_pennylane(func, dev, pred, jnp.pi)
 
 
 def test_adjoint_while_loop(backend):
@@ -329,7 +295,7 @@ def test_adjoint_while_loop(backend):
         qml.RZ(final, wires=0)
 
     dev = qml.device(backend, wires=1)
-    run_catalyst_against_pennylane(func, dev, 10)
+    verify_catalyst_adjoint_against_pennylane(func, dev, 10)
 
 
 def test_adjoint_for_loop(backend):
@@ -343,7 +309,7 @@ def test_adjoint_for_loop(backend):
         loop_body()
 
     dev = qml.device(backend, wires=5)
-    run_catalyst_against_pennylane(func, dev, 4)
+    verify_catalyst_adjoint_against_pennylane(func, dev, 4)
 
 
 def test_adjoint_while_nested(backend):
@@ -374,7 +340,9 @@ def test_adjoint_while_nested(backend):
         qml.MultiRZ(final / 30, wires=(0, 1))
 
     dev = qml.device(backend, wires=2)
-    run_catalyst_against_pennylane(func, dev, 10, jnp.array([2, 4, 3, 5, 1, 7, 4, 6, 9, 10]))
+    verify_catalyst_adjoint_against_pennylane(
+        func, dev, 10, jnp.array([2, 4, 3, 5, 1, 7, 4, 6, 9, 10])
+    )
 
 
 def test_adjoint_nested_with_control_flow(backend):
@@ -462,4 +430,4 @@ def test_adjoint_for_nested(backend):
         loop_outer()
 
     dev = qml.device(backend, wires=1)
-    run_catalyst_against_pennylane(func, dev, jnp.pi)
+    verify_catalyst_adjoint_against_pennylane(func, dev, jnp.pi)
