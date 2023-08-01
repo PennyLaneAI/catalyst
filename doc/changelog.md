@@ -20,8 +20,11 @@
   workflow()
   ```
 
-* Add support for compile-time backpropagation of classical preprocessing via Enzyme AD.
+* Add support for compile-time backpropagation of classical pre-processing via Enzyme AD.
+  [#158](https://github.com/PennyLaneAI/catalyst/pull/158)
   [#193](https://github.com/PennyLaneAI/catalyst/pull/193)
+  [#224](https://github.com/PennyLaneAI/catalyst/pull/224)
+  [#225](https://github.com/PennyLaneAI/catalyst/pull/225)
 
   This enables high-performance reverse mode automatic differentiation of arbitrary classical
   preprocessing when ``method=defer`` is specified on the ``grad`` operation:
