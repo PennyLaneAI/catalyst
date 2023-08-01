@@ -20,7 +20,8 @@ import jax
 import jax.numpy as jnp
 import pennylane as qml
 import pytest
-from catalyst import cond, measure, qjit
+
+from catalyst import cond, for_loop, grad, measure, qjit
 
 
 class TestPyTreesReturnValues:
@@ -269,8 +270,8 @@ class TestPyTreesReturnValues:
 class TestPyTreesFuncArgs:
     """Test QJIT workflows with PyTrees as function arguments."""
 
-    def test_args_list(self, backend):
-        """Test arguments list of lists."""
+    def test_args_dict(self, backend):
+        """Test arguments dict."""
 
         @qml.qnode(qml.device(backend, wires=2))
         def circuit1(params):
@@ -289,6 +290,32 @@ class TestPyTreesFuncArgs:
 
         assert jnp.allclose(result[0], expected)
         assert jnp.allclose(result[1], params["a"][0])
+
+        @qml.qnode(qml.device(backend, wires=2))
+        def circuit2(params):
+            qml.RX(params["a"]["c"][0], wires=0)
+            qml.RX(params["b"][0], wires=1)
+            return qml.expval(qml.PauliZ(0) @ qml.PauliZ(1)), params["a"]
+
+        jitted_fn = qjit(circuit2)
+
+        params = {
+            "a": {"c": (0.4, 0.6)},
+            "b": [0.8],
+        }
+        expected = 0.64170937
+        result = jitted_fn(params)
+
+        assert jnp.allclose(result[0], expected)
+        assert isinstance(result[1]["c"], tuple)
+        assert jnp.allclose(result[1]["c"][0], params["a"]["c"][0])
+        assert jnp.allclose(result[1]["c"][1], params["a"]["c"][1])
+
+        @qml.qnode(qml.device(backend, wires=2))
+        def circuit3(params1, params2):
+            qml.RX(params1["a"][0] * params2[0], wires=0)
+            qml.RX(params1["b"][0] * params2[1], wires=1)
+            return qml.expval(qml.PauliZ(0) @ qml.PauliZ(1))
 
     def test_promotion_unneeded(self, backend):
         """Test arguments list of lists."""
@@ -330,6 +357,84 @@ class TestPyTreesFuncArgs:
             "b": [8],
         }
         result = jitted_fn(params)
+
+    def test_args_workflow(self, backend):
+        """Test arguments with workflows."""
+
+        @qjit
+        def workflow1(params1, params2):
+            """A classical workflow"""
+            res1 = params1["a"][0][0] + params2[1]
+            return jnp.sin(res1)
+
+        params1 = {
+            "a": [[0.1], 0.2],
+        }
+        params2 = (0.6, 0.8)
+        expected = 0.78332691
+        result = workflow1(params1, params2)
+        assert jnp.allclose(result, expected)
+
+        @qjit
+        def workflow2(params1, params2):
+            """A hybrid workflow"""
+
+            @qml.qnode(qml.device(backend, wires=2))
+            def circuit(params):
+                qml.RX(params["a"][0], wires=0)
+                qml.RX(params["b"][0], wires=1)
+                return qml.expval(qml.PauliZ(0) @ qml.PauliZ(1))
+
+            res1 = circuit(params1)
+            return jnp.sin(res1), res1 * params2[1]
+
+        params1 = {
+            "a": [0.4, 0.6],
+            "b": [0.8],
+        }
+        params2 = (0.6, 2.8)
+
+        res1, res2 = workflow2(params1, params2)
+        assert jnp.allclose(res1, 0.59856565)
+        assert jnp.allclose(res2, 1.79678625)
+
+    def test_args_grad(self, backend):
+        """Test arguments with the grad operation."""
+
+        @qml.qnode(qml.device(backend, wires=2))
+        def circuit1(params):
+            qml.RX(params["a"][0], wires=0)
+            qml.RX(params["b"][1], wires=1)
+            return qml.expval(qml.PauliZ(0) @ qml.PauliZ(1))
+
+        @qjit()
+        def workflow1(params):
+            g = qml.qnode(qml.device(backend, wires=1))(circuit1)
+            h = grad(g)
+            return h(params)
+
+        params = {
+            "a": [0.4, 0.6],
+            "b": [0.8, 0.6],
+        }
+        result = workflow1(params)
+        assert jnp.allclose(result, -0.32140087)
+
+    def test_args_control_flow(self, backend):
+        """Test arguments with control-flows operations."""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=2))
+        def circuit(n, params):
+            @for_loop(0, n, 1)
+            def loop(i):
+                qml.RX(params[i], wires=i)
+                return ()
+
+            loop()
+            return qml.state()
+
+        result = circuit(1, [0.2, 0.5])
 
 
 class TestAuxiliaryData:

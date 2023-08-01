@@ -148,10 +148,7 @@ class QFunc:
         def _eval_jaxpr(*args):
             return jax.core.eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *args)
 
-        args_data, args_shape = tree_flatten(args)
-
-        # import pdb
-        # pdb.set_trace()
+        args_data, _ = tree_flatten(args)
 
         wrapped = wrap_init(_eval_jaxpr)
         retval = jprim.func_p.bind(wrapped, *args_data, fn=self)
@@ -354,8 +351,10 @@ class Grad:
         )
         jaxpr = _make_jaxpr_check_differentiable(self.fn, self.grad_params, *args)
 
+        args_data, _ = tree_flatten(args)
+
         # It always returns list as required by catalyst control-flows
-        return jprim.grad_p.bind(*args, jaxpr=jaxpr, fn=self, grad_params=self.grad_params)
+        return jprim.grad_p.bind(*args_data, jaxpr=jaxpr, fn=self, grad_params=self.grad_params)
 
 
 def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
