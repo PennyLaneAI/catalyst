@@ -22,11 +22,12 @@
 
 * Add support for PyTrees as function arguments and return values.
   [#221](https://github.com/PennyLaneAI/catalyst/pull/221)
+
   For example:
   
   ```python
   @qjit
-  def workflow1(params1, params2):
+  def workflow(params1, params2):
     """A classical workflow"""
     res1 = params1["a"][0][0] + params2[1]
     return jnp.sin(res1)
@@ -35,7 +36,25 @@
     "a": [[0.1], 0.2],
   }
   params2 = (0.6, 0.8)
-  workflow1(params1, params2)
+  workflow(params1, params2)
+  ```
+
+  ```python
+  @qjit
+  @qml.qnode(qml.device("lightning.qubit", wires=2, shots=100))
+  def circuit(params):
+      """A hybrid circuit"""
+      qml.RX(params[0] * jnp.pi(), wires=0)
+      qml.RX(params[1], wires=1)
+      return {
+          "counts": qml.counts(),
+          "state": qml.state(),
+          "expval": {
+              "z0": qml.expval(qml.PauliZ(0)),
+              "z1": qml.expval(qml.PauliZ(1)),
+          },
+      }
+  circuit([0.5, 0.6])
   ```
 
 * Add support for compile-time backpropagation of classical pre-processing via Enzyme AD.
@@ -101,7 +120,7 @@
   ```
 
   will no longer work. This is more consistent with JAX's behaviour. However, if the variable
-  ``list`` above is a JAX array, the compilation still succeeds.
+  ``list`` above is a JAX or Numpy array, the compilation still succeeds.
   [#221](https://github.com/PennyLaneAI/catalyst/pull/221)
 
 <h3>Bug fixes</h3>
@@ -109,10 +128,14 @@
 * Fix issue preventing the differentiation of ``qml.probs`` with the parameter-shift method.
   [#211](https://github.com/PennyLaneAI/catalyst/pull/211)
 
+* Fix incorrect return value data-type with functions returning ``qml.counts``.
+  [#221](https://github.com/PennyLaneAI/catalyst/pull/221)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
 
+Ali Asadi,
 David Ittah,
 Erick Ochoa Lopez,
 Jacob Mai Peng,
