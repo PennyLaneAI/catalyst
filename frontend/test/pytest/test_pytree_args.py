@@ -307,6 +307,7 @@ class TestPyTreesFuncArgs:
         expected = 0.64170937
         result = jitted_fn(params)
 
+        assert isinstance(result, tuple)
         assert jnp.allclose(result[0], expected)
         assert isinstance(result[1]["c"], tuple)
         assert jnp.allclose(result[1]["c"][0], params["a"]["c"][0])

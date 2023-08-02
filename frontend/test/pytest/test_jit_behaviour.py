@@ -610,7 +610,7 @@ class TestClassicalCompilation:
 
 
 class TestArraysInHamiltonian:
-    """Test arrays in hamiltonians."""
+    """Test arrays in ``qml.Hamiltonian``."""
 
     @pytest.mark.parametrize(
         "coeffs",

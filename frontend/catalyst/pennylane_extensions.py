@@ -173,6 +173,7 @@ def qfunc(num_wires, *, shots=1000, device=None):
         Grad: A QFunc object that denotes the the declaration of a quantum function.
 
     """
+
     if not device:
         device = QJITDevice(shots=shots, wires=num_wires)
 

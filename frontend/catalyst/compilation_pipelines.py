@@ -27,6 +27,7 @@ import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
 from jax.interpreters.mlir import ir
+from jax.tree_util import tree_flatten, tree_unflatten
 from mlir_quantum.runtime import (
     as_ctype,
     get_ranked_memref_descriptor,
@@ -182,8 +183,8 @@ class CompiledFunction:
         Returns:
             bool.
         """
-        compiled_data, compiled_shape = jax.tree_util.tree_flatten(compiled_signature)
-        runtime_data, runtime_shape = jax.tree_util.tree_flatten(runtime_signature)
+        compiled_data, compiled_shape = tree_flatten(compiled_signature)
+        runtime_data, runtime_shape = tree_flatten(runtime_signature)
         if compiled_shape != runtime_shape:
             return TypeCompatibility.NEEDS_COMPILATION
 
@@ -214,8 +215,8 @@ class CompiledFunction:
         Returns:
             promoted_args: Arguments after promotion.
         """
-        compiled_data, compiled_shape = jax.tree_util.tree_flatten(compiled_signature)
-        runtime_data, runtime_shape = jax.tree_util.tree_flatten(args)
+        compiled_data, compiled_shape = tree_flatten(compiled_signature)
+        runtime_data, runtime_shape = tree_flatten(args)
         assert (
             compiled_shape == runtime_shape
         ), "Compiled function incompatible runtime arguments' shape"
@@ -228,7 +229,7 @@ class CompiledFunction:
             promote_to = jax.numpy.promote_types(arg_dtype, c_param.dtype)
             promoted_arg = jax.numpy.asarray(r_param, dtype=promote_to)
             promoted_args.append(promoted_arg)
-        return jax.tree_util.tree_unflatten(compiled_shape, promoted_args)
+        return tree_unflatten(compiled_shape, promoted_args)
 
     @staticmethod
     def get_runtime_signature(*args):
@@ -240,14 +241,14 @@ class CompiledFunction:
         Returns:
             a list of JAX shaped arrays
         """
-        args_data, args_shape = jax.tree_util.tree_flatten(args)
+        args_data, args_shape = tree_flatten(args)
 
         try:
             r_sig = []
             for arg in args_data:
                 r_sig.append(jax.api_util.shaped_abstractify(arg))
             # Unflatten JAX abstracted args to preserve the shape
-            return jax.tree_util.tree_unflatten(args_shape, r_sig)
+            return tree_unflatten(args_shape, r_sig)
         except Exception as exc:
             arg_type = type(arg)
             raise TypeError(f"Unsupported argument type: {arg_type}") from exc
@@ -393,7 +394,7 @@ class CompiledFunction:
 
         c_abi_args = []
 
-        args_data, args_shape = jax.tree_util.tree_flatten(args)
+        args_data, args_shape = tree_flatten(args)
 
         for arg in args_data:
             numpy_arg = np.asarray(arg)
@@ -401,7 +402,7 @@ class CompiledFunction:
             c_abi_ptr = ctypes.pointer(get_ranked_memref_descriptor(numpy_arg))
             c_abi_args.append(c_abi_ptr)
 
-        args = jax.tree_util.tree_unflatten(args_shape, c_abi_args)
+        args = tree_unflatten(args_shape, c_abi_args)
 
         class CompiledFunctionArgValue(ctypes.Structure):
             """Programmatically create a structure which holds tensors of varying base types."""
@@ -622,7 +623,7 @@ class QJIT:
 
         # Unflatten the return value w.r.t. the original PyTree definition if available
         assert self.shape is not None, "Shape must not be none."
-        data = jax.tree_util.tree_unflatten(self.shape, data)
+        data = tree_unflatten(self.shape, data)
 
         # For the classical and pennylane_extensions compilation path,
         if isinstance(data, (list, tuple)) and len(data) == 1:
