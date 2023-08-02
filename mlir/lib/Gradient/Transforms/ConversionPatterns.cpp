@@ -157,7 +157,6 @@ static constexpr const char *enzyme_dupnoneed_key = "enzyme_dupnoneed";
 /// destination-passing style.
 void convertToDestinationPassingStyle(func::FuncOp callee, OpBuilder &builder)
 {
-    errs() << "converting " << callee.getName() << " to dps\n";
     MLIRContext *ctx = callee.getContext();
     if (callee.getNumResults() == 0) {
         // Callee is already in destination-passing style
@@ -199,27 +198,16 @@ void convertToDestinationPassingStyle(func::FuncOp callee, OpBuilder &builder)
     callee.insertArguments(argIndices, memRefTypes, argAttrs, argLocs);
     callee.setFunctionType(FunctionType::get(ctx, callee.getArgumentTypes(), nonMemRefReturns));
 
-    // Update the old MemRefs to be replaced with the output argument. Many allocations will be
-    // able to be trivially canonicalized away.
+    // Update return sites to copy over the memref that would have been returned to the output.
     callee.walk([&](func::ReturnOp returnOp) {
+        OpBuilder::InsertionGuard insertionGuard(builder);
+        builder.setInsertionPoint(returnOp);
         SmallVector<Value> nonMemRefReturns;
         size_t idx = 0;
         for (Value operand : returnOp.getOperands()) {
             if (isa<MemRefType>(operand.getType())) {
-                // TODO: Revisit the way we update the return operands. Consider using
-                // DestinationStyleInterface? Maybe copy it all the time?
                 BlockArgument output = callee.getArgument(idx + dpsOutputIdx);
-                if (auto callOp = dyn_cast_or_null<func::CallOp>(operand.getDefiningOp())) {
-                    errs() << "call op: " << callOp << " operand " << operand << "\n";
-                    OpBuilder::InsertionGuard insertionGuard(builder);
-                    builder.setInsertionPoint(returnOp);
-                    // Enzyme appears to have correctness issues around memref::CopyOp lowering to a
-                    // memcpy
-                    builder.create<linalg::CopyOp>(callOp.getLoc(), operand, output);
-                }
-                else {
-                    operand.replaceAllUsesWith(output);
-                }
+                builder.create<linalg::CopyOp>(returnOp.getLoc(), operand, output);
                 idx++;
             }
             else {
@@ -573,27 +561,12 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         return bufferSizeBytes;
     }
 
-    LogicalResult convertCustomGradArgumentTypes(TypeRange argTypes,
-                                                 SmallVectorImpl<Type> &llvmArgTypes) const
+    void convertCustomGradArgumentTypes(TypeRange argTypes,
+                                        SmallVectorImpl<Type> &llvmArgTypes) const
     {
         for (Type argType : argTypes) {
             llvmArgTypes.append(2, argType);
         }
-        return success();
-    }
-
-    func::FuncOp getPrintI64(ModuleOp moduleOp, OpBuilder &builder) const
-    {
-        if (auto printFn = moduleOp.lookupSymbol("printI64")) {
-            return cast<func::FuncOp>(printFn);
-        }
-        OpBuilder::InsertionGuard insertionGuard(builder);
-        builder.setInsertionPointToStart(moduleOp.getBody());
-        auto printFn = builder.create<func::FuncOp>(
-            moduleOp.getLoc(), "printI64",
-            FunctionType::get(builder.getContext(), builder.getI64Type(), {}));
-        printFn.setPrivate();
-        return printFn;
     }
 
     void printMemRefF64(Operation *op, OpBuilder &builder, Value value) const
@@ -615,20 +588,6 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         builder.create<func::CallOp>(op->getLoc(), cast<func::FuncOp>(printFn), casted);
     }
 
-    void printInt(Operation *op, OpBuilder &builder, int64_t val) const
-    {
-        auto fn = getPrintI64(op->getParentOfType<ModuleOp>(), builder);
-        Value constant =
-            builder.create<arith::ConstantIntOp>(op->getLoc(), val, builder.getI64Type());
-        builder.create<func::CallOp>(op->getLoc(), fn, constant);
-    }
-
-    void printInt(Operation *op, OpBuilder &builder, Value val) const
-    {
-        auto fn = getPrintI64(op->getParentOfType<ModuleOp>(), builder);
-        builder.create<func::CallOp>(op->getLoc(), fn, val);
-    }
-
     FailureOr<func::FuncOp> genAugmentedForward(func::FuncOp qnode, OpBuilder &builder) const
     {
         assert(qnode.getNumResults() == 0 && "Expected QNode to be in destination-passing style");
@@ -640,9 +599,7 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         // pass to the reverse pass.
         auto tapeType = LLVM::LLVMPointerType::get(ctx);
         SmallVector<Type> argTypes;
-        if (failed(convertCustomGradArgumentTypes(qnode.getArgumentTypes(), argTypes))) {
-            return failure();
-        }
+        convertCustomGradArgumentTypes(qnode.getArgumentTypes(), argTypes);
         auto augmentedForward = builder.create<func::FuncOp>(
             qnode.getLoc(), augmentedName, FunctionType::get(ctx, argTypes, {tapeType}));
         augmentedForward.setPrivate();
@@ -674,9 +631,7 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         MLIRContext *ctx = builder.getContext();
         auto tapeType = LLVM::LLVMPointerType::get(ctx);
         SmallVector<Type> argTypes;
-        if (failed(convertCustomGradArgumentTypes(qnode.getArgumentTypes(), argTypes))) {
-            return failure();
-        }
+        convertCustomGradArgumentTypes(qnode.getArgumentTypes(), argTypes);
         argTypes.push_back(tapeType);
 
         OpBuilder::InsertionGuard insertionGuard(builder);
