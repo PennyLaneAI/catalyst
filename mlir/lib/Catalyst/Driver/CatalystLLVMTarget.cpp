@@ -12,23 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "llvm/IR/LegacyPassManager.h"
-#include "llvm/MC/TargetRegistry.h"
-#include "llvm/Support/FileSystem.h"
-#include "llvm/Support/TargetSelect.h"
-#include "llvm/TargetParser/Host.h"
-#include "llvm/Target/TargetMachine.h"
-#include "llvm/Target/TargetOptions.h"
 #include "mlir/IR/FunctionInterfaces.h"
 #include "mlir/Target/LLVMIR/Dialect/Builtin/BuiltinToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Export.h"
 #include "mlir/Target/LLVMIR/LLVMTranslationInterface.h"
 #include "mlir/Target/LLVMIR/ModuleTranslation.h"
+#include "llvm/IR/LegacyPassManager.h"
+#include "llvm/MC/TargetRegistry.h"
+#include "llvm/Support/FileSystem.h"
+#include "llvm/Support/TargetSelect.h"
+#include "llvm/Target/TargetMachine.h"
+#include "llvm/Target/TargetOptions.h"
+#include "llvm/TargetParser/Host.h"
 
 #include "Catalyst/Driver/CatalystLLVMTarget.h"
 #include "Gradient/IR/GradientDialect.h"
-
 
 using namespace mlir;
 

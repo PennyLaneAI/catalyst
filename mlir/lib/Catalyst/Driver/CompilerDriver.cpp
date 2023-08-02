@@ -16,18 +16,18 @@
 #include <list>
 #include <memory>
 
-#include "llvm/IRReader/IRReader.h"
-#include "llvm/Support/SourceMgr.h"
 #include "mhlo/IR/register.h"
 #include "mhlo/transforms/passes.h"
+#include "mlir/IR/DialectRegistry.h"
 #include "mlir/InitAllDialects.h"
 #include "mlir/InitAllExtensions.h"
 #include "mlir/InitAllPasses.h"
-#include "mlir/IR/DialectRegistry.h"
 #include "mlir/Parser/Parser.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Target/LLVMIR/Export.h"
 #include "stablehlo/dialect/Register.h"
+#include "llvm/IRReader/IRReader.h"
+#include "llvm/Support/SourceMgr.h"
 
 #include "Catalyst/Driver/CatalystLLVMTarget.h"
 #include "Catalyst/Driver/CompilerDriver.h"
@@ -298,8 +298,8 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         if (succeeded(function)) {
             output.inferredAttributes.functionName = function.value()->getName().str();
 
-            CO_MSG(options, CO_VERB_DEBUG, "Inferred function name: '" <<
-                output.inferredAttributes.functionName << "'\n");
+            CO_MSG(options, CO_VERB_DEBUG,
+                   "Inferred function name: '" << output.inferredAttributes.functionName << "'\n");
 
             // When inferring the return type from LLVM, assume a f64
             // element type. This is because the LLVM pointer type is
@@ -314,12 +314,12 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
             else {
                 {
                     llvm::raw_string_ostream returnTypeStream(output.inferredAttributes.returnType);
-                    llvm::interleaveComma(returnTypes, returnTypeStream, [&](RankedTensorType t) {
-                        t.print(returnTypeStream);
-                    });
+                    llvm::interleaveComma(returnTypes, returnTypeStream,
+                                          [&](RankedTensorType t) { t.print(returnTypeStream); });
                 }
-                CO_MSG(options, CO_VERB_DEBUG, "Inferred function return type: '" <<
-                    output.inferredAttributes.returnType << "'\n");
+                CO_MSG(options, CO_VERB_DEBUG,
+                       "Inferred function return type: '" << output.inferredAttributes.returnType
+                                                          << "'\n");
             }
         }
         else {

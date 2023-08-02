@@ -14,9 +14,9 @@
 
 #include <iostream>
 
-#include "llvm/Support/raw_ostream.h"
 #include "mlir/Bindings/Python/PybindAdaptors.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "llvm/Support/raw_ostream.h"
 
 #include "Catalyst/Driver/CompilerDriver.h"
 

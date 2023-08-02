@@ -17,10 +17,10 @@
 #include <filesystem>
 #include <vector>
 
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/Support/raw_ostream.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Support/LogicalResult.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/raw_ostream.h"
 
 /// Data about the JIT function that is optionally inferred and returned to the caller.
 ///

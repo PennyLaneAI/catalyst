@@ -158,6 +158,7 @@ void _catalyst_pyface_jit_cpp_exception_test(void*, void*) {
         with pytest.raises(FileNotFoundError):
             LinkerDriver.get_output_filename("fooo.cpp")
 
+
 class TestCompilerState:
     """Test states that the compiler can reach."""
 
@@ -292,7 +293,6 @@ module @workflow {
 """
         out = qjit(ir, keep_intermediate=True, verbose=True)
         out(0.1)
-
 
 
 if __name__ == "__main__":
