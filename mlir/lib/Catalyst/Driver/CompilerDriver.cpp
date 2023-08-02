@@ -12,10 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "Catalyst/Driver/CompilerDriver.h"
-#include "Catalyst/Driver/CatalystLLVMTarget.h"
-#include "Catalyst/Driver/Support.h"
+#include <filesystem>
+#include <list>
+#include <memory>
 
+#include "llvm/IRReader/IRReader.h"
+#include "llvm/Support/SourceMgr.h"
+#include "mhlo/IR/register.h"
+#include "mhlo/transforms/passes.h"
+#include "mlir/InitAllDialects.h"
+#include "mlir/InitAllExtensions.h"
+#include "mlir/InitAllPasses.h"
+#include "mlir/IR/DialectRegistry.h"
+#include "mlir/Parser/Parser.h"
+#include "mlir/Pass/PassManager.h"
+#include "mlir/Target/LLVMIR/Export.h"
+#include "stablehlo/dialect/Register.h"
+
+#include "Catalyst/Driver/CatalystLLVMTarget.h"
+#include "Catalyst/Driver/CompilerDriver.h"
+#include "Catalyst/Driver/Support.h"
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Catalyst/Transforms/Passes.h"
 #include "Gradient/IR/GradientDialect.h"
@@ -23,25 +39,6 @@
 #include "Quantum-c/Dialects.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/Transforms/Passes.h"
-
-#include "mlir/IR/DialectRegistry.h"
-#include "mlir/InitAllDialects.h"
-#include "mlir/InitAllExtensions.h"
-#include "mlir/InitAllPasses.h"
-#include "mlir/Parser/Parser.h"
-#include "mlir/Pass/PassManager.h"
-#include "mlir/Target/LLVMIR/Export.h"
-#include "llvm/IRReader/IRReader.h"
-#include "llvm/Support/SourceMgr.h"
-
-#include "memory"
-
-#include "mhlo/IR/register.h"
-#include "mhlo/transforms/passes.h"
-#include "stablehlo/dialect/Register.h"
-
-#include <filesystem>
-#include <list>
 
 using namespace mlir;
 using namespace catalyst;

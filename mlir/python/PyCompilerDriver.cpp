@@ -12,11 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "Catalyst/Driver/CompilerDriver.h"
+#include <iostream>
+
+#include "llvm/Support/raw_ostream.h"
 #include "mlir/Bindings/Python/PybindAdaptors.h"
 #include "mlir/IR/BuiltinTypes.h"
-#include "llvm/Support/raw_ostream.h"
-#include <iostream>
+
+#include "Catalyst/Driver/CompilerDriver.h"
 
 namespace py = pybind11;
 using namespace mlir::python::adaptors;

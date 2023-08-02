@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "Quantum-c/Dialects.h"
 #include "mlir/Bindings/Python/PybindAdaptors.h"
+
+#include "Quantum-c/Dialects.h"
 
 namespace py = pybind11;
 using namespace mlir::python::adaptors;

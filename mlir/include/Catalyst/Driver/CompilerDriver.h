@@ -14,12 +14,13 @@
 
 #pragma once
 
-#include "mlir/IR/MLIRContext.h"
-#include "mlir/Support/LogicalResult.h"
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/Support/raw_ostream.h"
 #include <filesystem>
 #include <vector>
+
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/raw_ostream.h"
+#include "mlir/IR/MLIRContext.h"
+#include "mlir/Support/LogicalResult.h"
 
 /// Data about the JIT function that is optionally inferred and returned to the caller.
 ///
