@@ -620,8 +620,8 @@ class QJIT:
         data = self.compiled_function(*args, **kwargs)
 
         # Unflatten the return value w.r.t. the original PyTree definition if available
-        if self.shape:
-            data = jax.tree_util.tree_unflatten(self.shape, data)
+        assert self.shape is not None, "Shape must not be none."
+        data = jax.tree_util.tree_unflatten(self.shape, data)
 
         # For the classical and pennylane_extensions compilation path,
         if isinstance(data, (list, tuple)) and len(data) == 1:
