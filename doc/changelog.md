@@ -24,10 +24,36 @@
   [#221](https://github.com/PennyLaneAI/catalyst/pull/221)
   For example:
 
+* Add support for compile-time backpropagation of classical pre-processing via Enzyme AD.
+  [#158](https://github.com/PennyLaneAI/catalyst/pull/158)
+  [#193](https://github.com/PennyLaneAI/catalyst/pull/193)
+  [#224](https://github.com/PennyLaneAI/catalyst/pull/224)
+  [#225](https://github.com/PennyLaneAI/catalyst/pull/225)
+
+  This enables high-performance reverse mode automatic differentiation of arbitrary classical
+  preprocessing when ``method=defer`` is specified on the ``grad`` operation:
+
+  ```python
+  @qml.qnode(qml.device("lightning.qubit", wires=1), diff_method="parameter-shift")
+  def circuit(theta):
+      qml.RX(jnp.exp(theta ** 2) / jnp.cos(theta / 4), wires=0)
+      return qml.expval(qml.PauliZ(wires=0))
+
+  @qjit
+  def grad_circuit(theta):
+      return catalyst.grad(circuit, method="defer")(theta)
+  ```
+
+  ```pycon
+  >>> grad_circuit(jnp.pi)
+  array(112936.34906843)
+  ```
+
 <h3>Improvements</h3>
 
 * Eliminate redundant unflattening and flattening of PyTrees parameters in Catalyst control flow operations.
   [#215](https://github.com/PennyLaneAI/catalyst/pull/215)
+
 * Reduce the execution and compile times of user programs by generating more efficient code and
   avoiding unnecessary optimizations. Specifically, a scalarization procedure was added to the MLIR
   pass pipeline and LLVM IR compilation is now invoked with optimization level 0.
@@ -42,6 +68,10 @@
   inputs.
   [#213](https://github.com/PennyLaneAI/catalyst/pull/213)
 
+* Re-enable buffer deallocation. This reduces the peak memory utilization of a JIT compiled program
+  by allowing tensors to be scheduled for deallocation. Previously the tensors were not deallocated
+  until the end of the call to the JIT compiled function.
+  [#201](https://github.com/PennyLaneAI/catalyst/pull/201)
 
 
 <h3>Breaking changes</h3>
@@ -57,6 +87,8 @@ This release contains contributions from (in alphabetical order):
 
 David Ittah,
 Erick Ochoa Lopez,
+Jacob Mai Peng,
+Romain Moyard,
 Sergei Mironov.
 
 

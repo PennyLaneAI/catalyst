@@ -38,6 +38,7 @@ from catalyst.compiler import (
     MHLOPass,
     MLIRToLLVMDialect,
     PassPipeline,
+    PreEnzymeOpt,
     QuantumCompilationPass,
 )
 from catalyst.jax_tracer import get_mlir
@@ -122,6 +123,7 @@ class TestCompilerErrors:
             (MLIRToLLVMDialect),
             (LLVMDialectToLLVMIR),
             (LLVMIRToObjectFile),
+            (PreEnzymeOpt),
             (Enzyme)
             # CompilerDiver is missing here because it has a different error message.
         ],
@@ -151,6 +153,7 @@ class TestCompilerErrors:
             (BufferizationPass),
             (MLIRToLLVMDialect),
             (LLVMDialectToLLVMIR),
+            (PreEnzymeOpt),
             (Enzyme),
             (LLVMIRToObjectFile),
             (CompilerDriver),
@@ -235,6 +238,7 @@ class TestCompilerState:
         compiler.get_output_of("BufferizationPass")
         compiler.get_output_of("MLIRToLLVMDialect")
         compiler.get_output_of("LLVMDialectToLLVMIR")
+        compiler.get_output_of("PreEnzymeOpt")
         compiler.get_output_of("Enzyme")
 
     def test_workspace_keep_intermediate(self, backend):
