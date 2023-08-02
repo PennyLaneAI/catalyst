@@ -106,7 +106,7 @@ def get_lib_path(project, env_var):
 
 DEFAULT_PIPELINES = [
     (
-        "MHLOPass",
+        "HLOLoweringPass",
         [
             "canonicalize",
             "func.func(chlo-legalize-to-hlo)",
