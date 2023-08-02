@@ -247,7 +247,6 @@ class CompiledFunction:
             for arg in args_data:
                 r_sig.append(jax.api_util.shaped_abstractify(arg))
             return jax.tree_util.tree_unflatten(args_shape, r_sig)
-            # return r_sig
         except Exception as exc:
             arg_type = type(arg)
             raise TypeError(f"Unsupported argument type: {arg_type}") from exc
@@ -568,14 +567,6 @@ class QJIT:
           function: an instance of ``CompiledFunction`` that may have been recompiled
           *args: arguments that may have been promoted
         """
-        # bitmask = map(lambda x: not isinstance(x, jax.Array), args)
-        # args = list(
-        #     map(
-        #         lambda arg, is_not_jax_array: jax.numpy.asarray(arg) if is_not_jax_array else arg,
-        #         args,
-        #         bitmask,
-        #     )
-        # )
         r_sig = CompiledFunction.get_runtime_signature(*args)
 
         has_been_compiled = self.compiled_function is not None
