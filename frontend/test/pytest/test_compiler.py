@@ -247,6 +247,11 @@ class TestCompilerState:
             assert observed_outfilename == expected_outfilename
             assert os.path.exists(observed_outfilename)
 
+    def test_linker_driver_invalid_file(self):
+        """Test with the invalid input name."""
+        with pytest.raises(FileNotFoundError):
+            LinkerDriver.get_output_filename("fooo.cpp")
+
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
