@@ -117,14 +117,6 @@ void registerAllCatalystDialects(DialectRegistry &registry)
 }
 } // namespace
 
-template <typename MLIRObject> std::string serializeMLIRObject(MLIRObject &obj)
-{
-    std::string output;
-    llvm::raw_string_ostream ostream{output};
-    obj.print(ostream);
-    return output;
-}
-
 FailureOr<llvm::Function *> getJITFunction(MLIRContext *ctx, llvm::Module &llvmModule)
 {
     Location loc = NameLoc::get(StringAttr::get(ctx, llvmModule.getName()));
@@ -159,7 +151,7 @@ LogicalResult inferMLIRReturnTypes(MLIRContext *ctx, llvm::Type *returnType,
         return RankedTensorType::get(resultShape, assumedElementType);
     };
     if (returnType->isVoidTy()) {
-        return success();
+        return failure();
     }
     if (auto *structType = dyn_cast<llvm::StructType>(returnType)) {
         // The return type could be a single memref descriptor or a struct of multiple memref
@@ -306,6 +298,9 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         if (succeeded(function)) {
             output.inferredAttributes.functionName = function.value()->getName().str();
 
+            CO_MSG(options, CO_VERB_DEBUG, "Inferred function name: '" <<
+                output.inferredAttributes.functionName << "'\n");
+
             // When inferring the return type from LLVM, assume a f64
             // element type. This is because the LLVM pointer type is
             // opaque and requires looking into its uses to infer its type.
@@ -314,11 +309,21 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
                                             Float64Type::get(ctx), returnTypes))) {
                 // Inferred return types are only required when compiling from textual IR. This
                 // inference failing is not a problem when compiling from Python.
+                CO_MSG(options, CO_VERB_URGENT, "Unable to infer function return type\n");
             }
-            llvm::raw_string_ostream returnTypeStream(output.inferredAttributes.returnType);
-            llvm::interleaveComma(returnTypes, returnTypeStream, [](RankedTensorType tensorType) {
-                return serializeMLIRObject(tensorType);
-            });
+            else {
+                {
+                    llvm::raw_string_ostream returnTypeStream(output.inferredAttributes.returnType);
+                    llvm::interleaveComma(returnTypes, returnTypeStream, [&](RankedTensorType t) {
+                        t.print(returnTypeStream);
+                    });
+                }
+                CO_MSG(options, CO_VERB_DEBUG, "Inferred function return type: '" <<
+                    output.inferredAttributes.returnType << "'\n");
+            }
+        }
+        else {
+            CO_MSG(options, CO_VERB_URGENT, "Unable to infer jit_* function attributes\n");
         }
 
         auto outfile = options.getObjectFile();

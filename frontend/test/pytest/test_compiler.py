@@ -153,6 +153,10 @@ void _catalyst_pyface_jit_cpp_exception_test(void*, void*) {
         with pytest.raises(RuntimeError, match="Hello world"):
             cpp_exception_test()
 
+    def test_linker_driver_invalid_file(self):
+        """Test with the invalid input name."""
+        with pytest.raises(FileNotFoundError):
+            LinkerDriver.get_output_filename("fooo.cpp")
 
 class TestCompilerState:
     """Test states that the compiler can reach."""
@@ -247,10 +251,48 @@ class TestCompilerState:
             assert observed_outfilename == expected_outfilename
             assert os.path.exists(observed_outfilename)
 
-    def test_linker_driver_invalid_file(self):
-        """Test with the invalid input name."""
-        with pytest.raises(FileNotFoundError):
-            LinkerDriver.get_output_filename("fooo.cpp")
+    def test_compiler_from_textual_ir(self):
+        """Test the textual IR compilation."""
+
+        ir = r"""
+module @workflow {
+  func.func public @jit_workflow(%arg0: tensor<f64>) -> tensor<f64> attributes {llvm.emit_c_interface} {
+    %0 = call @workflow(%arg0) : (tensor<f64>) -> tensor<f64>
+    return %0 : tensor<f64>
+  }
+  func.func private @workflow(%arg0: tensor<f64>) -> tensor<f64> attributes {diff_method = "finite-diff", llvm.linkage = #llvm.linkage<internal>, qnode} {
+    quantum.device ["kwargs", "{'shots': 0}"]
+    quantum.device ["backend", "lightning.qubit"]
+    %0 = stablehlo.constant dense<4> : tensor<i64>
+    %1 = quantum.alloc( 4) : !quantum.reg
+    %2 = stablehlo.constant dense<0> : tensor<i64>
+    %extracted = tensor.extract %2[] : tensor<i64>
+    %3 = quantum.extract %1[%extracted] : !quantum.reg -> !quantum.bit
+    %4 = quantum.custom "PauliX"() %3 : !quantum.bit
+    %5 = stablehlo.constant dense<1> : tensor<i64>
+    %extracted_0 = tensor.extract %5[] : tensor<i64>
+    %6 = quantum.extract %1[%extracted_0] : !quantum.reg -> !quantum.bit
+    %extracted_1 = tensor.extract %arg0[] : tensor<f64>
+    %7 = quantum.custom "RX"(%extracted_1) %6 : !quantum.bit
+    %8 = quantum.namedobs %4[ PauliZ] : !quantum.obs
+    %9 = quantum.expval %8 : f64
+    %from_elements = tensor.from_elements %9 : tensor<f64>
+    quantum.dealloc %1 : !quantum.reg
+    return %from_elements : tensor<f64>
+  }
+  func.func @setup() {
+    quantum.init
+    return
+  }
+  func.func @teardown() {
+    quantum.finalize
+    return
+  }
+}
+"""
+        out = qjit(ir, keep_intermediate=True, verbose=True)
+        out(0.1)
+
 
 
 if __name__ == "__main__":
