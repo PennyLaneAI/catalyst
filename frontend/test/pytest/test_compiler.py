@@ -168,7 +168,7 @@ class TestCompilerState:
         mlir_module, _, _ = get_mlir(workflow)
         compiler = Compiler(CompileOptions(keep_intermediate=True))
         compiler.run(mlir_module)
-        assert compiler.get_output_of("MHLOPass")
+        assert compiler.get_output_of("HLOLoweringPass")
         assert compiler.get_output_of("QuantumCompilationPass")
         assert compiler.get_output_of("BufferizationPass")
         assert compiler.get_output_of("MLIRToLLVMDialect")
