@@ -173,6 +173,14 @@ jobs:
         key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
         fail-on-cache-miss: True
 
+    - name: Cache MHLO Source
+      id: cache-mhlo-source
+      uses: actions/cache@v3
+      with:
+        path: mlir/mlir-hlo
+        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-source
+        enableCrossOsArchive: True
+
     - name: Clone MHLO Submodule
       if: |
         steps.cache-mhlo.outputs.cache-hit != 'true' ||
@@ -255,7 +263,7 @@ jobs:
 
   quantum:
     name: Quantum Dialects Build
-    needs: [constants, llvm]
+    needs: [constants, mhlo, llvm]
     runs-on: ubuntu-latest
 
     steps:
