@@ -137,7 +137,7 @@ void _catalyst_pyface_jit_cpp_exception_test(void*, void*) {
                         f.write(contents)
 
                     object_file = filename.replace(".c", ".o")
-                    os.system(f"cc -shared -fPIC -x c++ {filename} -o {object_file}")
+                    subprocess.run(f"cc -shared -fPIC -x c++ {filename} -o {object_file}".split())
                     output = LinkerDriver.run(object_file, options=self.options)
                     filename = str(pathlib.Path(output).absolute())
                     return filename, "<FAKE_IR>", ["<FAKE_FN>", "<FAKE_TYPE>"]
@@ -245,7 +245,7 @@ class TestCompilerState:
                 print("int main() {}", file=f)
 
             object_file = filename.replace(".c", ".o")
-            os.system(f"c99 -c {filename} -o {object_file}")
+            subprocess.run(f"c99 -c {filename} -o {object_file}".split())
             expected_outfilename = workspace + "a.so"
             observed_outfilename = LinkerDriver.run(object_file, flags=[])
 
