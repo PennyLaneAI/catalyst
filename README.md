@@ -38,10 +38,10 @@ frontends.**
 
 - Built to be end-to-end differentiable.
 
-- Support for [Lightning](https://github.com/PennyLaneAI/pennylane-lightning/) and
-  [Lightning-Kokkos](https://github.com/PennyLaneAI/pennylane-lightning-kokkos/)
-  high performance simulators as well as AWS Braket local and remote devices.
-  Additional hardware support, including GPUs and QPUs to come.
+- Support for [Lightning](https://github.com/PennyLaneAI/pennylane-lightning) and
+  [Lightning-Kokkos](https://github.com/PennyLaneAI/pennylane-lightning-kokkos)
+  high performance simulators, and [Amazon Braket](https://amazon-braket-pennylane-plugin-python.readthedocs.io)
+  devices. Additional hardware support, including QPUs to come.
 
 ## Overview
 
@@ -60,7 +60,8 @@ Catalyst currently consists of the following components:
 
   The runtime is a C++ runtime with multiple-device support based on QIR that enables the execution
   of Catalyst-compiled quantum programs. A complete list of all backend devices along with the quantum
-  instruction set supported by these runtime implementations can be found by visiting the Catalyst documentation.
+  instruction set supported by these runtime implementations can be found by visiting
+  [the runtime documentation](https://docs.pennylane.ai/projects/catalyst/en/latest/modules/runtime.html).
 
 In addition, we also provide a Python frontend for [PennyLane](https://pennylane.ai) and [JAX](https://jax.readthedocs.io):
 
