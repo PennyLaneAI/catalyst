@@ -458,6 +458,36 @@ class TestPyTreesFuncArgs:
         # TODO: Python lists, tuples, dict, ... aren't supported!
         circuit1(1, inp)
 
+    def test_args_used_in_measure(self, backend):
+        """Argument is used directly in measurement"""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=2))
+        def circuit(dictionary):
+            """q0 = 1; q1 = 0;"""
+            qml.RX(jnp.pi, wires=0)
+            return measure(dictionary["wire"])
+
+        result = circuit({"wire": 0})
+        assert jnp.allclose(result, True)
+        result = circuit({"wire": 1})
+        assert jnp.allclose(result, False)
+
+    def test_args_used_in_measure(self, backend):
+        """Argument is used indirectly in measurement"""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=2))
+        def circuit(dictionary):
+            """q0 = 1; q1 = 0;"""
+            qml.RX(jnp.pi, wires=0)
+            return measure(dictionary["wire"] + 1 % 2)
+
+        result = circuit({"wire": 0})
+        assert jnp.allclose(result, False)
+        result = circuit({"wire": 1})
+        assert jnp.allclose(result, True)
+
 
 class TestAuxiliaryData:
     """Test PyTrees with Auxiliary data."""
