@@ -468,8 +468,8 @@ class QJIT:
         self._mlir = None
         self._llvmir = None
         self.mlir_module = None
-        self.pytree_dict = {}
         self.compiled_function = None
+        self.shape = None
         parameter_types = get_type_annotations(self.qfunc)
         self.user_typed = False
         if parameter_types is not None:
@@ -521,7 +521,7 @@ class QJIT:
         with Patcher(
             (qml.QNode, "__call__", QFunc.__call__),
         ):
-            mlir_module, ctx, jaxpr = tracer.get_mlir(self.qfunc, self.pytree_dict, *self.c_sig)
+            mlir_module, ctx, jaxpr, self.shape = tracer.get_mlir(self.qfunc, *self.c_sig)
 
         inject_functions(mlir_module, ctx)
         mod = mlir_module.operation
@@ -629,8 +629,8 @@ class QJIT:
         data = self.compiled_function(*args, **kwargs)
 
         # Unflatten the return value w.r.t. the original PyTree definition if available
-        if "func_return_value" in self.pytree_dict:
-            data = jax.tree_util.tree_unflatten(self.pytree_dict["func_return_value"], data)
+        if self.shape:
+            data = jax.tree_util.tree_unflatten(self.shape, data)
 
         # For the classical and pennylane_extensions compilation path,
         if isinstance(data, (list, tuple)) and len(data) == 1:

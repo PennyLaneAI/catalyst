@@ -41,7 +41,7 @@ from catalyst.utils.tracing import TracingContext
 KNOWN_NAMED_OBS = (qml.Identity, qml.PauliX, qml.PauliY, qml.PauliZ, qml.Hadamard)
 
 
-def get_mlir(func, pytree_dict, *args, **kwargs):
+def get_mlir(func, *args, **kwargs):
     """Lower a Python function into an MLIR module.
 
     Args:
@@ -64,9 +64,6 @@ def get_mlir(func, pytree_dict, *args, **kwargs):
     with TracingContext():
         jaxpr, shape = jax.make_jaxpr(func, return_shape=True)(*args, **kwargs)
 
-    # Store the func_return_value PyTree definition to be used later by QJIT
-    pytree_dict["func_return_value"] = tree_structure(shape)
-
     nrep = jaxpr_replicas(jaxpr)
     effects = [eff for eff in jaxpr.effects if eff in jax.core.ordered_effects]
     axis_context = ReplicaAxisContext(xla.AxisEnv(nrep, (), ()))
@@ -82,7 +79,7 @@ def get_mlir(func, pytree_dict, *args, **kwargs):
         donated_args=[],
     )
 
-    return module, context, jaxpr
+    return module, context, jaxpr, tree_structure(shape)
 
 
 def get_traceable_fn(qfunc, device):
