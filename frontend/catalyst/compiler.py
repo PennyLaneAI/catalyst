@@ -15,7 +15,6 @@
 MLIR/LLVM representations.
 """
 
-import abc
 import os
 import pathlib
 import shutil
@@ -25,12 +24,11 @@ import tempfile
 import warnings
 from dataclasses import dataclass
 from io import TextIOWrapper
-from typing import Any, List, Optional, Tuple
+from typing import List, Optional
 
 from mlir_quantum._mlir_libs._catalystDriver import run_compiler_driver
 
 from catalyst._configuration import INSTALLED
-from catalyst.utils.exceptions import CompileError
 
 package_root = os.path.dirname(__file__)
 
