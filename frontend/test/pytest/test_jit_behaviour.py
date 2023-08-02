@@ -31,7 +31,7 @@ from catalyst.jax_primitives import _scalar_abstractify
 def f_aot_builder(backend, wires=1, shots=1000):
     """Test AOT builder."""
 
-    @qjit()
+    @qjit
     @qml.qnode(qml.device(backend, wires=wires, shots=shots))
     def f(x: float):
         qml.RY(x, wires=0)
@@ -43,7 +43,7 @@ def f_aot_builder(backend, wires=1, shots=1000):
 def f_jit_builder(backend, wires=1, shots=1000):
     """Test JIT builder."""
 
-    @qjit()
+    @qjit
     @qml.qnode(qml.device(backend, wires=wires, shots=shots))
     def f(x):
         qml.RY(x, wires=0)
@@ -66,7 +66,7 @@ def function_jaxnumpy_csingle(x: jax.numpy.csingle, y: jax.numpy.csingle):
 def fsample_aot_builder(backend, wires=1, shots=1000):
     """Test AOT builder with the sample measurement process."""
 
-    @qjit()
+    @qjit
     @qml.qnode(qml.device(backend, wires=wires, shots=shots))
     def f(x: float):
         qml.RY(x, wires=0)
@@ -409,7 +409,7 @@ class TestDecorator:
             qml.RY(x, wires=0)
             return measure(wires=0)
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def f_parenthesis(x):
             qml.RY(x, wires=0)
@@ -422,7 +422,7 @@ class TestCaching:
     def test_function_is_cached(self, backend):
         """Test function is cached."""
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def f_jit(x):
             qml.RY(x, wires=0)

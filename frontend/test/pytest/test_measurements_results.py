@@ -22,7 +22,7 @@ from catalyst import qjit
 def test_sample_on_1qbit(backend):
     """Test sample on 1 qubit."""
 
-    @qjit()
+    @qjit
     @qml.qnode(qml.device(backend, wires=1, shots=1000))
     def sample_1qbit(x: float):
         qml.RX(x, wires=0)
@@ -40,7 +40,7 @@ def test_sample_on_1qbit(backend):
 def test_sample_on_2qbits(backend):
     """Test sample on 2 qubits."""
 
-    @qjit()
+    @qjit
     @qml.qnode(qml.device(backend, wires=2, shots=1000))
     def sample_2qbits(x: float):
         qml.RX(x, wires=0)
@@ -58,7 +58,7 @@ def test_sample_on_2qbits(backend):
 def test_count_on_1qbit(backend):
     """Test counts on 1 qubits."""
 
-    @qjit()
+    @qjit
     @qml.qnode(qml.device(backend, wires=1, shots=1000))
     def counts_1qbit(x: float):
         qml.RX(x, wires=0)
@@ -76,7 +76,7 @@ def test_count_on_1qbit(backend):
 def test_count_on_2qbits(backend):
     """Test counts on 2 qubits."""
 
-    @qjit()
+    @qjit
     @qml.qnode(qml.device(backend, wires=2, shots=1000))
     def counts_2qbit(x: float):
         qml.RX(x, wires=0)
@@ -96,7 +96,7 @@ class TestExpval:
     def test_named(self, backend):
         """Test expval for named observables."""
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def expval1(x: float):
             qml.RX(x, wires=0)
@@ -113,7 +113,7 @@ class TestExpval:
     def test_hermitian_1(self, backend):
         """Test expval for Hermitian observable."""
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def expval2(x: float):
             qml.RY(x, wires=0)
@@ -133,7 +133,7 @@ class TestExpval:
     def test_hermitian_2(self, backend):
         """Test expval for Hermitian observable."""
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=2))
         def expval3(x: float):
             qml.RX(x, wires=1)
@@ -158,7 +158,7 @@ class TestExpval:
     def test_tensor_1(self, backend):
         """Test expval for Tensor observable."""
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=2))
         def expval4(x: float, y: float):
             qml.RX(x, wires=0)
@@ -177,7 +177,7 @@ class TestExpval:
     def test_tensor_2(self, backend):
         """Test expval for Tensor observable."""
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=3))
         def expval5(x: float, y: float):
             qml.RX(x, wires=0)
@@ -200,7 +200,7 @@ class TestExpval:
     def test_hamiltonian_1(self, backend):
         """Test expval for Hamiltonian observable."""
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=3))
         def expval6(x: float, y: float):
             qml.RX(x, wires=0)
@@ -223,7 +223,7 @@ class TestExpval:
     def test_hamiltonian_2(self, backend):
         """Test expval for Hamiltonian observable."""
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=2))
         def expval6(x: float):
             qml.RX(x, wires=0)
@@ -254,7 +254,7 @@ class TestVar:
     def test_rx(self, backend):
         """Test var with RX."""
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def var1(x: float):
             qml.RX(x, wires=0)
@@ -269,7 +269,7 @@ class TestVar:
     def test_hadamard(self, backend):
         """Test var with Hadamard."""
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def var2(x: float):
             qml.Hadamard(wires=0)
@@ -284,7 +284,7 @@ class TestVar:
     def test_hermitian_1(self, backend):
         """Test variance for Hermitian observable."""
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(x: float):
             qml.RY(x, wires=0)
@@ -304,7 +304,7 @@ class TestVar:
     def test_hermitian_2(self, backend):
         """Test variance for Hermitian observable."""
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=2))
         def circuit(x: float):
             qml.RX(x, wires=1)
@@ -329,7 +329,7 @@ class TestVar:
     def test_tensor_1(self, backend):
         """Test variance for Tensor observable."""
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=2))
         def circuit(x: float, y: float):
             qml.RX(x, wires=0)
@@ -348,7 +348,7 @@ class TestVar:
     def test_tensor_2(self, backend):
         """Test variance for Tensor observable."""
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=3))
         def circuit(x: float, y: float):
             qml.RX(x, wires=0)
@@ -371,7 +371,7 @@ class TestVar:
     def test_hamiltonian_1(self, backend):
         """Test variance for Hamiltonian observable."""
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=3))
         def circuit(x: float, y: float):
             qml.RX(x, wires=0)
@@ -394,7 +394,7 @@ class TestVar:
     def test_hamiltonian_2(self, backend):
         """Test variance for Hamiltonian observable."""
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=2))
         def circuit(x: float):
             qml.RX(x, wires=0)
@@ -424,7 +424,7 @@ class TestVar:
 def test_state(backend):
     """Test state."""
 
-    @qjit()
+    @qjit
     @qml.qnode(qml.device(backend, wires=1))
     def state(x: float):
         qml.RX(x, wires=0)
@@ -438,7 +438,7 @@ def test_state(backend):
 def test_multiple_return_values(backend):
     """Test multiple return values."""
 
-    @qjit()
+    @qjit
     @qml.qnode(qml.device(backend, wires=2, shots=100))
     def all_measurements(x):
         qml.RY(x, wires=0)

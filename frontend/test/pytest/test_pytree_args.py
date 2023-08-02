@@ -408,7 +408,7 @@ class TestPyTreesFuncArgs:
             qml.RX(params["b"][1], wires=1)
             return qml.expval(qml.PauliZ(0) @ qml.PauliZ(1))
 
-        @qjit()
+        @qjit
         def workflow1(params):
             g = qml.qnode(qml.device(backend, wires=1))(circuit1)
             h = grad(g)
@@ -427,7 +427,7 @@ class TestPyTreesFuncArgs:
             qml.RX(params["b"][0], wires=1)
             return qml.expval(qml.PauliZ(0) @ qml.PauliZ(1))
 
-        @qjit()
+        @qjit
         def workflow2(params):
             g = qml.qnode(qml.device(backend, wires=1))(circuit2)
             h = grad(g)
