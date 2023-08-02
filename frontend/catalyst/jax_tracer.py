@@ -50,9 +50,10 @@ def get_mlir(func, *args, **kwargs):
         kwargs: keyword arguments to ``func``
 
     Returns:
-        m: the MLIR module corresponding to ``func``
-        ctx: the MLIR context corresponding
+        module: the MLIR module corresponding to ``func``
+        context: the MLIR context corresponding
         jaxpr: the jaxpr corresponding to ``func``
+        shape: the shape of the return values in ``PyTreeDef``
     """
 
     # The compilation cache must be clear for each translation unit.
@@ -117,6 +118,8 @@ def get_traceable_fn(qfunc, device):
                         meas_return_values.append(ret_val)
                         meas_ret_val_indices.append(i)
                         if isinstance(ret_val, CountsMP):
+                            # As CountsMP expands leaves of the generated PyTreeDef, we need to
+                            # update the leaves based on the endmost tree shape.
                             counts_tree = tree_structure(("keys", "counts"))
                             meas_return_trees_children = meas_return_trees.children()
                             if len(meas_return_trees_children):
