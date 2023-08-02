@@ -49,6 +49,7 @@
 
 * Eliminate redundant unflattening and flattening of PyTrees parameters in Catalyst control flow operations.
   [#215](https://github.com/PennyLaneAI/catalyst/pull/215)
+
 * Reduce the execution and compile times of user programs by generating more efficient code and
   avoiding unnecessary optimizations. Specifically, a scalarization procedure was added to the MLIR
   pass pipeline and LLVM IR compilation is now invoked with optimization level 0.
@@ -63,6 +64,10 @@
   inputs.
   [#213](https://github.com/PennyLaneAI/catalyst/pull/213)
 
+* Re-enable buffer deallocation. This reduces the peak memory utilization of a JIT compiled program
+  by allowing tensors to be scheduled for deallocation. Previously the tensors were not deallocated
+  until the end of the call to the JIT compiled function.
+  [#201](https://github.com/PennyLaneAI/catalyst/pull/201)
 
 
 <h3>Breaking changes</h3>
