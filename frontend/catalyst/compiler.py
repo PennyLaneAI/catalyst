@@ -188,7 +188,7 @@ DEFAULT_PIPELINES = [
 
 
 class LinkerDriver:
-    """C/C++ compiler interface.
+    """Compiler used to drive the linking stage.
     In order to avoid relying on a single compiler at run time and allow the user some flexibility,
     this class defines a compiler resolution order where multiple known compilers are attempted.
     The order is defined as follows:
