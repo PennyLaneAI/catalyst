@@ -42,12 +42,13 @@ typedef enum {
     CO_VERB_ALL = 3
 } Verbosity;
 
+/// Helper verbose reporting macro.
 #define CO_MSG(opt, level, op)                                                                     \
-    {                                                                                              \
+    do {                                                                                           \
         if ((opt).verbosity >= (level)) {                                                          \
-            options.diagnosticStream << op;                                                        \
+            (opt).diagnosticStream << op;                                                          \
         }                                                                                          \
-    }
+    } while (0)
 
 /// Pipeline descriptor
 struct Pipeline {
