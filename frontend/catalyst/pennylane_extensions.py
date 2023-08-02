@@ -86,6 +86,7 @@ def _trace_quantum_tape(
     return_values, qreg, qubit_states = trace_quantum_tape(tape, qreg, has_tracer_return_values)
     qreg = insert_to_qreg(qubit_states, qreg)
 
+    # To support retvals in nested loops
     if return_values and len(return_values) == 1:
         return_values = return_values[0]
 

@@ -246,6 +246,7 @@ class CompiledFunction:
             r_sig = []
             for arg in args_data:
                 r_sig.append(jax.api_util.shaped_abstractify(arg))
+            # Unflatten JAX abstracted args to preserve the shape
             return jax.tree_util.tree_unflatten(args_shape, r_sig)
         except Exception as exc:
             arg_type = type(arg)
