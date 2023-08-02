@@ -137,6 +137,7 @@ class TestJittedWithOneTypeRunWithAnother:
             (jnp.uint8),
         ],
     )
+    @pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
     def test_signless(self, type, backend):
         """Test signless."""
 
@@ -225,6 +226,7 @@ class TestJittedWithOneTypeRunWithAnother:
             (jnp.uint8),
         ],
     )
+    @pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
     def test_recompile_no_warning(self, to_type, backend):
         """Test recompile no warning."""
 
