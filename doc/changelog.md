@@ -20,6 +20,10 @@
   workflow()
   ```
 
+* Add support for PyTrees as function arguments and return values.
+  [#221](https://github.com/PennyLaneAI/catalyst/pull/221)
+  For example:
+
 <h3>Improvements</h3>
 
 * Eliminate redundant unflattening and flattening of PyTrees parameters in Catalyst control flow operations.

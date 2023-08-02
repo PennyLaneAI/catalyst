@@ -333,9 +333,9 @@ class TestPyTreesFuncArgs:
             "a": [0.4, 0.6],
             "b": [0.8],
         }
-        expected = 0.64170937
-        result = jitted_fn(params)
-        result = jitted_fn(params)
+
+        jitted_fn(params)
+        jitted_fn(params)
 
     def test_promotion_needed(self, backend):
         """Test arguments list of lists."""
@@ -443,19 +443,19 @@ class TestPyTreesFuncArgs:
     def test_args_control_flow(self, backend):
         """Test arguments with control-flows operations."""
 
-        # @qjit
-        # @qml.qnode(qml.device(backend, wires=2))
-        # def circuit1(n, params):
-        #     @for_loop(0, n, 1)
-        #     def loop(i):
-        #         qml.RX(params[i], wires=i)
-        #         return ()
+        @qjit
+        @qml.qnode(qml.device(backend, wires=2))
+        def circuit1(n, params):
+            @for_loop(0, n, 1)
+            def loop(i):
+                qml.RX(params[i], wires=i)
+                return ()
 
-        #     loop()
-        #     return qml.state()
+            loop()
+            return qml.state()
 
         # TODO: Python lists, tuples, dict, ... aren't supported!
-        # result = circuit1(1, [0.2, 0.5])
+        circuit1(1, [0.2, 0.5])
 
         @qjit
         @qml.qnode(qml.device(backend, wires=2))
@@ -485,10 +485,13 @@ class TestPyTreesFuncArgs:
 
 
 class TestAuxiliaryData:
+    """Test PyTrees with Auxiliary data."""
+
     def test_auxiliary_data(self):
         """Make sure that we are able to return arbitrary PyTrees.
 
-        The example below was taken from https://jax.readthedocs.io/en/latest/jax-101/05.1-pytrees.html
+        The example below was taken from:
+        https://jax.readthedocs.io/en/latest/jax-101/05.1-pytrees.html
         """
 
         class MyContainer:
