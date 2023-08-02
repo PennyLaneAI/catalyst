@@ -22,7 +22,8 @@ def GradientBufferizationPass : Pass<"gradient-bufferize"> {
 
     let dependentDialects = [
         "bufferization::BufferizationDialect",
-        "memref::MemRefDialect"
+        "memref::MemRefDialect",
+        "index::IndexDialect"
     ];
 
     let constructor = "catalyst::createGradientBufferizationPass()";
@@ -58,12 +59,25 @@ def GradientConversionPass : Pass<"convert-gradient-to-llvm"> {
     let summary = "Perform a dialect conversion from Gradient to LLVM";
 
     let dependentDialects = [
+        "index::IndexDialect",
         "LLVM::LLVMDialect",
         "func::FuncDialect",
         "catalyst::quantum::QuantumDialect"
     ];
 
     let constructor = "catalyst::createGradientConversionPass()";
+
+    let options = [
+        Option<
+            /*C++ var name=*/"useGenericFunctions",
+            /*CLI arg name=*/"use-generic-functions",
+            /*type=*/"bool",
+            /*default=*/"true",
+            /*description=*/
+            "Use generic allocation and deallocation functions instead of the "
+            "classic 'malloc', 'aligned_alloc' and 'free' functions"
+        >
+    ];
 }
 
 #endif // GRADIENT_PASSES

@@ -49,7 +49,7 @@ try:
     # Define the location of runtime libraries when running frontend tests
     llvm_config.with_environment("RUNTIME_LIB_DIR", config.lrt_lib_dir, append_path=True)
     llvm_config.with_environment("MLIR_LIB_DIR", config.mlir_lib_dir, append_path=True)
-    llvm_config.with_environment("ENZYME_DIR", config.enzyme_dir, append_path=True)
+    llvm_config.with_environment("ENZYME_LIB_DIR", config.enzyme_lib_dir, append_path=True)
 
     # Define PYTHONPATH to include the dialect python bindings.
     # From within a build target we have access to cmake variables configured in lit.site.cfg.py.in.
@@ -64,4 +64,4 @@ except AttributeError:
     llvm_config.with_system_environment("PYTHONPATH")
     llvm_config.with_system_environment("RUNTIME_LIB_DIR")
     llvm_config.with_system_environment("MLIR_LIB_DIR")
-    llvm_config.with_system_environment("ENZYME_DIR")
+    llvm_config.with_system_environment("ENZYME_LIB_DIR")

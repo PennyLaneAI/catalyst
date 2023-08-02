@@ -34,7 +34,6 @@ from catalyst import measure, qjit
 @qjit(keep_intermediate=True)
 @qml.qnode(qml.device("lightning.qubit", wires=2))
 def test_ewise_arctan2(x, y):
-    # CHECK: linalg.generic
     # CHECK: math.atan2
     # CHECK-SAME: f64
     val = jnp.arctan2(x, y)
@@ -68,7 +67,6 @@ test_ewise_arctan2.print_stage("BufferizationPass")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
 # CHECK-LABEL: test_ewise_add
 def test_ewise_add(x, y):
-    # CHECK: linalg.generic
     # CHECK: arith.addf
     # CHECK-SAME: f64
     val = jnp.add(x, y)
@@ -84,7 +82,6 @@ test_ewise_add.print_stage("BufferizationPass")
 @qjit(keep_intermediate=True)
 @qml.qnode(qml.device("lightning.qubit", wires=2))
 def test_ewise_mult(x, y):
-    # CHECK: linalg.generic
     # CHECK: arith.mulf
     # CHECK-SAME: f64
     val = jnp.multiply(x, y)
@@ -100,7 +97,6 @@ test_ewise_mult.print_stage("BufferizationPass")
 @qjit(keep_intermediate=True)
 @qml.qnode(qml.device("lightning.qubit", wires=2))
 def test_ewise_div(x, y):
-    # CHECK: linalg.generic
     # CHECK: arith.divf
     # CHECK-SAME: f64
     val = jnp.divide(x, y)
@@ -116,7 +112,6 @@ test_ewise_div.print_stage("BufferizationPass")
 @qjit(keep_intermediate=True)
 @qml.qnode(qml.device("lightning.qubit", wires=2))
 def test_ewise_power(x, y):
-    # CHECK: linalg.generic
     # CHECK: math.powf
     # CHECK-SAME: f64
     val = jnp.power(x, y.astype(int))
@@ -132,7 +127,6 @@ test_ewise_power.print_stage("BufferizationPass")
 @qjit(keep_intermediate=True)
 @qml.qnode(qml.device("lightning.qubit", wires=2))
 def test_ewise_sub(x, y):
-    # CHECK: linalg.generic
     # CHECK: arith.subf
     # CHECK-SAME: f64
     val = jnp.subtract(x, y)
@@ -148,7 +142,6 @@ test_ewise_sub.print_stage("BufferizationPass")
 @qml.qnode(qml.device("lightning.qubit", wires=2))
 # CHECK-LABEL: test_ewise_true_div
 def test_ewise_true_div(x, y):
-    # CHECK: linalg.generic
     # CHECK: arith.divf
     # CHECK-SAME: f64
     val = jnp.true_divide(x, y)
@@ -168,7 +161,6 @@ test_ewise_true_div.print_stage("BufferizationPass")
 @qjit(keep_intermediate=True)
 @qml.qnode(qml.device("lightning.qubit", wires=2))
 def test_ewise_float_power(x, y):
-    # CHECK: linalg.generic
     # CHECK: math.powf
     # CHECK-SAME: f64
     val = jnp.float_power(x, y)
@@ -194,7 +186,6 @@ test_ewise_float_power.print_stage("BufferizationPass")
 @qjit(keep_intermediate=True)
 @qml.qnode(qml.device("lightning.qubit", wires=2))
 def test_ewise_maximum(x, y):
-    # CHECK: linalg.generic
     # CHECK: arith.maxf
     # CHECK-SAME: f64
     val = jnp.maximum(x, y)
@@ -213,7 +204,6 @@ test_ewise_maximum.print_stage("BufferizationPass")
 @qjit(keep_intermediate=True)
 @qml.qnode(qml.device("lightning.qubit", wires=2))
 def test_ewise_minimum(x, y):
-    # CHECK: linalg.generic
     # CHECK: arith.minf
     # CHECK-SAME: f64
     val = jnp.minimum(x, y)

@@ -72,10 +72,7 @@ default_bin_paths = {
 default_lib_paths = {
     "llvm": os.path.join(package_root, "../../mlir/llvm-project/build/lib"),
     "runtime": os.path.join(package_root, "../../runtime/build/lib"),
-}
-
-default_enzyme_path = {
-    "enzyme": os.path.join(package_root, "../../mlir/Enzyme/enzyme/build/Enzyme")
+    "enzyme": os.path.join(package_root, "../../mlir/Enzyme/build/Enzyme"),
 }
 
 
@@ -84,15 +81,6 @@ def get_executable_path(project, tool):
     path = os.path.join(package_root, "bin") if INSTALLED else default_bin_paths.get(project, "")
     executable_path = os.path.join(path, tool)
     return executable_path if os.path.exists(executable_path) else tool
-
-
-def get_enzyme_path(project, env_var):
-    """Get path to Enzyme."""
-    return (
-        os.path.join(package_root, "enzyme")
-        if INSTALLED
-        else os.getenv(env_var, default_enzyme_path.get(project, ""))
-    )
 
 
 def get_lib_path(project, env_var):
@@ -187,7 +175,7 @@ DEFAULT_PIPELINES = [
 
 class LinkerDriver:
     """Compiler used to drive the linking stage.
-    In order to avoid relying on a single compiler at run time and allow the user some flexibility,
+    In order to avoid relying on a single linker at run time and allow the user some flexibility,
     this class defines a compiler resolution order where multiple known compilers are attempted.
     The order is defined as follows:
     1. A user specified compiler via the environment variable CATALYST_CC. It is expected that the

@@ -207,6 +207,12 @@ To make MLIR libraries discoverable to the compiler:
 
   export MLIR_LIB_DIR="$PWD/mlir/llvm-project/build/lib"
 
+To make Enzyme libraries discoverable to the compiler:
+
+.. code-block:: console
+
+  export ENZYME_LIB_DIR="$PWD/mlir/Enzyme/build/Enzyme"
+
 To make required tools in ``llvm-project/build``, ``mlir-hlo/build``, and
 ``mlir/build`` discoverable to the compiler:
 
