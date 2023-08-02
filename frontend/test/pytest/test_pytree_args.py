@@ -473,7 +473,7 @@ class TestPyTreesFuncArgs:
         result = circuit({"wire": 1})
         assert jnp.allclose(result, False)
 
-    def test_args_used_in_measure(self, backend):
+    def test_args_used_indirectly_in_measure(self, backend):
         """Argument is used indirectly in measurement"""
 
         @qjit
