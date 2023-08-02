@@ -23,6 +23,20 @@
 * Add support for PyTrees as function arguments and return values.
   [#221](https://github.com/PennyLaneAI/catalyst/pull/221)
   For example:
+  
+  ```python
+  @qjit
+  def workflow1(params1, params2):
+    """A classical workflow"""
+    res1 = params1["a"][0][0] + params2[1]
+    return jnp.sin(res1)
+
+  params1 = {
+    "a": [[0.1], 0.2],
+  }
+  params2 = (0.6, 0.8)
+  workflow1(params1, params2)
+  ```
 
 * Add support for compile-time backpropagation of classical pre-processing via Enzyme AD.
   [#158](https://github.com/PennyLaneAI/catalyst/pull/158)
@@ -75,6 +89,20 @@
 
 
 <h3>Breaking changes</h3>
+
+* Since we are now using PyTrees, python lists are no longer automatically converted into JAX
+  arrays. This means that indexing on lists when the index is not static will cause a
+  ``TracerIntegerConversionError``.
+
+  ```python
+  @qjit
+  def f(list, index):
+    return list[index]
+  ```
+
+  will no longer work. This is more consistent with JAX's behaviour. However, if the variable
+  ``list`` above is a JAX array, the compilation still succeeds.
+  [#221](https://github.com/PennyLaneAI/catalyst/pull/221)
 
 <h3>Bug fixes</h3>
 
