@@ -388,9 +388,6 @@ class CompiledFunction:
         numpy_arg_buffer = []
         return_value_pointer = ctypes.POINTER(ctypes.c_int)()  # This is the null pointer
 
-        # import pdb
-        # pdb.set_trace()
-
         if restype:
             return_value_pointer = self.restype_to_memref_descs(restype)
 
