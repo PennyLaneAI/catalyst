@@ -569,6 +569,7 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         }
     }
 
+    // TODO(jacob): Useful for debugging but remember to remove it when cleaning up
     void printMemRefF64(Operation *op, OpBuilder &builder, Value value) const
     {
         auto moduleOp = op->getParentOfType<ModuleOp>();
@@ -687,29 +688,30 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         }
 
         assert(qnodeType.getNumResults() == 1);
-        printMemRefF64(qnode, builder,
-                       unwrapMemRef(block->getArguments()[block->getNumArguments() - 2],
-                                    qnodeType.getResult(0)));
-
-        // // TODO: This is a bit redundant, we could just generate the quantum gradient in DPS
-        // // The qgrad func takes the pcount and allocates the gradient. We already have a shadow
-        // for
-        // // the gradient here, which we're taking the dim of to get the pcount.
         SmallVector<Value> primalInputs{
             ValueRange{unwrappedInputs}.take_front(qgradFn.getNumArguments() - 1)};
-        // Value shadowResult = reconstructedShadows[qnode.getNumArguments() - 1];
         Value gateParamShadow = unwrappedShadows.back();
+        Value resultShadow = unwrapMemRef(block->getArguments()[block->getNumArguments() - 2],
+                                          qnodeType.getResult(0));
         // // The gate param list is always 1-d
         Value pcount = builder.create<memref::DimOp>(loc, gateParamShadow, 0);
         primalInputs.push_back(pcount);
 
         // TODO: don't know if this works in jacobian contexts
         Value qgrad = builder.create<func::CallOp>(loc, qgradFn, primalInputs).getResult(0);
-        // shadowResult = builder.create<memref::LoadOp>(loc, shadowResult,
-        // /*indices=*/ValueRange{}); Value cst = builder.create<LLVM::ConstantOp>(loc,
-        // builder.getF64Type(), APFloat(4.53)); Value c0 = builder.create<index::ConstantOp>(loc,
-        // 0); builder.create<memref::StoreOp>(loc, cst, gateParamShadow, c0);
-        builder.create<memref::CopyOp>(loc, qgrad, gateParamShadow);
+        // multiply the things together
+        // for the scalar case, broadcast-multiply the result into the gate param shadow
+        SmallVector<AffineMap> indexingMaps{builder.getMultiDimIdentityMap(1).getSubMap({}),
+                                            builder.getMultiDimIdentityMap(1),
+                                            builder.getMultiDimIdentityMap(1)};
+        SmallVector<utils::IteratorType> iteratorTypes{utils::IteratorType::parallel};
+        builder.create<linalg::GenericOp>(
+            loc, ValueRange{resultShadow, qgrad}, gateParamShadow, indexingMaps, iteratorTypes,
+            [&](OpBuilder &builder, Location loc, ValueRange bbArgs) {
+                Value mul = builder.create<arith::MulFOp>(loc, bbArgs[0], bbArgs[1]);
+                Value add = builder.create<arith::AddFOp>(loc, bbArgs[2], mul);
+                builder.create<linalg::YieldOp>(loc, add);
+            });
         builder.create<func::ReturnOp>(loc);
 
         return customQGrad;
