@@ -440,7 +440,8 @@ class TestPyTreesFuncArgs:
         result = workflow2(params)
         assert jnp.allclose(result, -0.32140087)
 
-    def test_args_control_flow(self, backend):
+    @pytest.mark.parametrize("inp", [([0.2, 0.5]), (np.array([0.2, 0.5])), (jnp.array([0.2, 0.5]))])
+    def test_args_control_flow(self, backend, inp):
         """Test arguments with control-flows operations."""
 
         @qjit
@@ -455,33 +456,7 @@ class TestPyTreesFuncArgs:
             return qml.state()
 
         # TODO: Python lists, tuples, dict, ... aren't supported!
-        circuit1(1, [0.2, 0.5])
-
-        @qjit
-        @qml.qnode(qml.device(backend, wires=2))
-        def circuit2(n, params):
-            @for_loop(0, n, 1)
-            def loop(i):
-                qml.RX(params[i], wires=i)
-                return ()
-
-            loop()
-            return qml.state()
-
-        circuit2(1, jnp.array([0.2, 0.5]))
-
-        @qjit
-        @qml.qnode(qml.device(backend, wires=2))
-        def circuit3(n, params):
-            @for_loop(0, n, 1)
-            def loop(i):
-                qml.RX(params[i], wires=i)
-                return ()
-
-            loop()
-            return qml.state()
-
-        circuit3(1, np.array([0.2, 0.5]))
+        circuit1(1, inp)
 
 
 class TestAuxiliaryData:
