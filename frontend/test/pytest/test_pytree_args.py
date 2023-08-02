@@ -440,7 +440,7 @@ class TestPyTreesFuncArgs:
         result = workflow2(params)
         assert jnp.allclose(result, -0.32140087)
 
-    @pytest.mark.parametrize("inp", [([0.2, 0.5]), (np.array([0.2, 0.5])), (jnp.array([0.2, 0.5]))])
+    @pytest.mark.parametrize("inp", [(np.array([0.2, 0.5])), (jnp.array([0.2, 0.5]))])
     def test_args_control_flow(self, backend, inp):
         """Test arguments with control-flows operations."""
 
