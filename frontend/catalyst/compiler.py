@@ -144,12 +144,12 @@ DEFAULT_PIPELINES = [
         [
             "func.func(convert-linalg-to-loops)",
             "convert-scf-to-cf",
-            # This pass expands memref operations that modify the metadata of a memref (sizes, offsets,
+            # This pass expands memref ops that modify the metadata of a memref (sizes, offsets,
             # strides) into a sequence of easier to analyze constructs. In particular, this pass
-            # transforms operations into explicit sequence of operations that model the effect of this
+            # transforms ops into explicit sequence of operations that model the effect of this
             # operation on the different metadata. This pass uses affine constructs to materialize
-            # these effects. Concretely, expanded-strided-metadata is used to decompose memref.subview
-            # as it has no lowering in -finalize-memref-to-llvm.
+            # these effects. Concretely, expanded-strided-metadata is used to decompose
+            # memref.subview as it has no lowering in -finalize-memref-to-llvm.
             "expand-strided-metadata",
             "lower-affine",
             "arith-expand",  # some arith ops (ceildivsi) require expansion to be lowered to llvm
