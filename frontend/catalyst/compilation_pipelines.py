@@ -533,7 +533,6 @@ class QJIT:
             mlir_module, ctx, jaxpr = tracer.get_mlir(self.qfunc, *self.c_sig)
 
         inject_functions(mlir_module, ctx)
-        mod = mlir_module.operation
         self._jaxpr = jaxpr
 
         _, self._mlir, _ = self._compiler.run(
