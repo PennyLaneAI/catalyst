@@ -1518,11 +1518,15 @@ def _adjoint_lowering(
     # and classical arguments as-is, but substitute the quantum arguments with the arguments of the
     # block.
 
+    ctx = jax_ctx.module_context.context
     consts, cargs, qargs = tree_unflatten(args_tree, args)  # [1]
     _, _, aqargs = tree_unflatten(args_tree, jax_ctx.avals_in)  # [2]
 
     assert len(qargs) == 1, "We currently expect exactly one quantum register argument"
     output_types = util.flatten(map(mlir.aval_to_ir_types, jax_ctx.avals_out))
+    assert len(output_types) == 1 and output_types[0] == ir.OpaqueType.get(
+        "quantum", "reg", ctx
+    ), "Expected a single result of quantum.register type, got: {output_types}"
 
     # Build an adjoint operation with a single-block region.
     op = AdjointOp(output_types[0], qargs[0])
@@ -1536,7 +1540,7 @@ def _adjoint_lowering(
             jaxpr.jaxpr,
             mlir.TokenSet(),
             [mlir.ir_constants(c) for c in jaxpr.consts],
-            *([a] for a in chain(consts, adjoint_block.arguments, cargs)),  # [3]
+            *([a] for a in chain(consts, cargs, adjoint_block.arguments)),  # [3]
             dim_var_values=jax_ctx.dim_var_values,
         )
 

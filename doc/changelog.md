@@ -1,4 +1,4 @@
-# Release 0.2.1-dev
+# Release 0.2.2-dev
 
 <h3>New features</h3>
 
@@ -20,10 +20,57 @@
   workflow()
   ```
 
+* Add support for compile-time backpropagation of classical pre-processing via Enzyme AD.
+  [#158](https://github.com/PennyLaneAI/catalyst/pull/158)
+  [#193](https://github.com/PennyLaneAI/catalyst/pull/193)
+  [#224](https://github.com/PennyLaneAI/catalyst/pull/224)
+  [#225](https://github.com/PennyLaneAI/catalyst/pull/225)
+
+  This enables high-performance reverse mode automatic differentiation of arbitrary classical
+  preprocessing when ``method=defer`` is specified on the ``grad`` operation:
+
+  ```python
+  @qml.qnode(qml.device("lightning.qubit", wires=1), diff_method="parameter-shift")
+  def circuit(theta):
+      qml.RX(jnp.exp(theta ** 2) / jnp.cos(theta / 4), wires=0)
+      return qml.expval(qml.PauliZ(wires=0))
+
+  @qjit
+  def grad_circuit(theta):
+      return catalyst.grad(circuit, method="defer")(theta)
+  ```
+
+  ```pycon
+  >>> grad_circuit(jnp.pi)
+  array(112936.34906843)
+  ```
+
 <h3>Improvements</h3>
 
 * Use a new C++-based compiler driver to drive the compilation process. This reduces the compilation time
   by avoiding repeatedly parsing and serializing textual intermediate representations to disk.
+
+* Eliminate redundant unflattening and flattening of PyTrees parameters in Catalyst control flow operations.
+  [#215](https://github.com/PennyLaneAI/catalyst/pull/215)
+
+* Reduce the execution and compile times of user programs by generating more efficient code and
+  avoiding unnecessary optimizations. Specifically, a scalarization procedure was added to the MLIR
+  pass pipeline and LLVM IR compilation is now invoked with optimization level 0.
+  [#217](https://github.com/PennyLaneAI/catalyst/pull/217)
+
+* Improve execution speed by:
+    * load the shared library once per compilation
+    * generate return value type only once per compilation
+    * avoiding type promotion
+    * avoiding unnecessary copies
+  This leads to a small but measurable improvement when using larger matrices as inputs or many
+  inputs.
+  [#213](https://github.com/PennyLaneAI/catalyst/pull/213)
+
+* Re-enable buffer deallocation. This reduces the peak memory utilization of a JIT compiled program
+  by allowing tensors to be scheduled for deallocation. Previously the tensors were not deallocated
+  until the end of the call to the JIT compiled function.
+  [#201](https://github.com/PennyLaneAI/catalyst/pull/201)
 
 
 <h3>Breaking changes</h3>
@@ -38,8 +85,38 @@
 This release contains contributions from (in alphabetical order):
 
 David Ittah,
+Erick Ochoa Lopez,
 Jacob Mai Peng,
+Romain Moyard,
 Sergei Mironov.
+
+
+# Release 0.2.1
+
+<h3>Bug fixes</h3>
+
+* Add missing OpenQASM backend in binary distribution, which relies on the latest version of the
+  AWS Braket plugin for PennyLane to resolve dependency issues between the plugin, Catalyst, and
+  PennyLane. The Lightning-Kokkos backend with Serial and OpenMP modes is also added to the binary
+  distribution.
+  [#198](https://github.com/PennyLaneAI/catalyst/pull/198)
+
+<h3>Improvements</h3>
+
+* When using OpenQASM-based devices the string representation of the circuit is printed on
+  exception.
+  [#199](https://github.com/PennyLaneAI/catalyst/pull/199)
+
+* Use ``pybind11::module`` interface library instead of ``pybind11::embed`` in the runtime for
+  OpenQasm backend to avoid linking to the python library at compile time.
+  [#200](https://github.com/PennyLaneAI/catalyst/pull/200)
+
+<h3>Contributors</h3>
+
+This release contains contributions from (in alphabetical order):
+
+Ali Asadi,
+David Ittah.
 
 # Release 0.2.0
 
@@ -356,7 +433,6 @@ Sergei Mironov.
   As part of this refactor, the following changes were made:
 
   - Passes are now classes. This allows developers/users looking to change
-
     flags to inherit from these passes and change the flags.
 
   - Passes are now passed as arguments to the compiler. Custom passes can just

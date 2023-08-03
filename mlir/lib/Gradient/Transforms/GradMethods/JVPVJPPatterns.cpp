@@ -21,28 +21,12 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Errc.h"
 
-#include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
-#include "mlir/Dialect/Index/IR/IndexDialect.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/Dialect/SCF/IR/SCF.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/SymbolTable.h"
-#include "mlir/Pass/Pass.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#include "Gradient/IR/GradientOps.h"
-#include "Gradient/Utils/CompDiffArgIndices.h"
 #include "Gradient/Utils/EinsumLinalgGeneric.h"
 #include "Gradient/Utils/GradientShape.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/IR/PatternMatch.h"
-
-#include "Gradient/IR/GradientOps.h"
-#include "Gradient/Transforms/Passes.h"
-#include "Gradient/Transforms/Patterns.h"
 #include "Quantum/IR/QuantumOps.h"
 
 #include "JVPVJPPatterns.hpp"
@@ -80,7 +64,7 @@ LogicalResult JVPLoweringPattern::matchAndRewrite(JVPOp op, PatternRewriter &rew
 
     Location loc = op.getLoc();
 
-    auto func_diff_operand_indices = compDiffArgIndices(op.getDiffArgIndices());
+    auto func_diff_operand_indices = computeDiffArgIndices(op.getDiffArgIndices());
     LLVM_DEBUG(dbgs() << "jvp_num_operands " << op.getOperands().size() << " \n");
     LLVM_DEBUG(dbgs() << "func_diff_operand_indices: " << func_diff_operand_indices << " \n");
     assert(func_diff_operand_indices.size() <= op.getOperands().size() / 2);
@@ -197,7 +181,7 @@ LogicalResult VJPLoweringPattern::matchAndRewrite(VJPOp op, PatternRewriter &rew
 
     Location loc = op.getLoc();
 
-    auto func_diff_operand_indices = compDiffArgIndices(op.getDiffArgIndices());
+    auto func_diff_operand_indices = computeDiffArgIndices(op.getDiffArgIndices());
     LLVM_DEBUG(dbgs() << "vjp_num_operands " << op.getOperands().size() << " \n");
     LLVM_DEBUG(dbgs() << "func_diff_operand_indices: " << func_diff_operand_indices << " \n");
 
