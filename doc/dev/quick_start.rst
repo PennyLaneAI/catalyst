@@ -40,7 +40,8 @@ PennyLane. However, some of PennyLane's features may not be fully supported yet,
 
 .. warning::
 
-    The only supported backend device is currently ``lightning.qubit``, but future plans include the addition of more.
+    The supported backend devices are currently ``lightning.qubit``, ``lightning.kokkos``,
+    ``braket.local.qubit``, and ``braket.aws.qubit`` but future plans include the addition of more.
 
 PennyLane tapes are still used internally by Catalyst and you can express your circuits in the
 way you are used to, as long as you ensure that all operations are added to the main tape.
@@ -89,8 +90,8 @@ Operations
 ----------
 Catalyst allows you to use :doc:`quantum operations <introduction/operations>`
 available in PennyLane either via native support by the runtime or PennyLane's decomposition rules.
-The :func:`qml.adjoint() <pennylane.adjoint>` and :func:`qml.ctrl() <pennylane.ctrl>` functions in PennyLane are also supported via the decomposition mechanism in Catalyst.
-For example,
+The :func:`qml.adjoint() <pennylane.adjoint>` and :func:`qml.ctrl() <pennylane.ctrl>` functions in
+PennyLane are also supported via the decomposition mechanism in Catalyst. For example,
 
 .. code-block:: python
 
