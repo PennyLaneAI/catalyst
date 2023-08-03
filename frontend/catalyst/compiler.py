@@ -341,6 +341,7 @@ class Compiler:
             workspace = os.path.abspath(os.path.join(os.getcwd(), module_name))
             os.makedirs(workspace, exist_ok=True)
         else:
+            # pylint: disable=consider-using-with
             self.last_tmpdir = tempfile.TemporaryDirectory()
             workspace = self.last_tmpdir.name
 
