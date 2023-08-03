@@ -35,6 +35,7 @@
 #include "Gradient/IR/GradientOps.h"
 #include "Gradient/Transforms/Patterns.h"
 #include "Gradient/Utils/DestinationPassingStyle.h"
+#include "Gradient/Utils/EinsumLinalgGeneric.h"
 #include "Gradient/Utils/GradientShape.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Utils/RemoveQuantumMeasurements.h"
@@ -701,17 +702,8 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         Value qgrad = builder.create<func::CallOp>(loc, qgradFn, primalInputs).getResult(0);
         // multiply the things together
         // for the scalar case, broadcast-multiply the result into the gate param shadow
-        SmallVector<AffineMap> indexingMaps{builder.getMultiDimIdentityMap(1).getSubMap({}),
-                                            builder.getMultiDimIdentityMap(1),
-                                            builder.getMultiDimIdentityMap(1)};
-        SmallVector<utils::IteratorType> iteratorTypes{utils::IteratorType::parallel};
-        builder.create<linalg::GenericOp>(
-            loc, ValueRange{resultShadow, qgrad}, gateParamShadow, indexingMaps, iteratorTypes,
-            [&](OpBuilder &builder, Location loc, ValueRange bbArgs) {
-                Value mul = builder.create<arith::MulFOp>(loc, bbArgs[0], bbArgs[1]);
-                Value add = builder.create<arith::AddFOp>(loc, bbArgs[2], mul);
-                builder.create<linalg::YieldOp>(loc, add);
-            });
+        catalyst::einsumLinalgGeneric(builder, loc, {}, {0}, {0}, resultShadow, qgrad,
+                                      gateParamShadow);
         builder.create<func::ReturnOp>(loc);
 
         return customQGrad;

@@ -27,15 +27,28 @@ using namespace llvm;
 
 namespace catalyst {
 
-Value einsumLinalgGeneric(OpBuilder &ob, Location loc, ArrayRef<size_t> axisCodesA,
-                          ArrayRef<size_t> axisCodesB, ArrayRef<size_t> axisCodesResult, Value a,
-                          Value b)
+Value einsumLinalgGeneric(OpBuilder &ob, Location loc, ArrayRef<int64_t> axisCodesA,
+                          ArrayRef<int64_t> axisCodesB, ArrayRef<int64_t> axisCodesResult, Value a,
+                          Value b, std::optional<Value> bufferOut)
 {
-    auto ta = a.getType().cast<TensorType>();
-    auto tb = b.getType().cast<TensorType>();
+    bool useBufferSemantics = bufferOut.has_value();
+    if (useBufferSemantics) {
+        assert(isa<MemRefType>(a.getType()) && isa<MemRefType>(b.getType()) &&
+               isa<MemRefType>(bufferOut->getType()) &&
+               "einsumLinalgGeneric with buffer output expects operands and output to have "
+               "MemRefType");
+    }
+    else {
+        assert(
+            isa<RankedTensorType>(a.getType()) && isa<RankedTensorType>(b.getType()) &&
+            "einsumLinalgGeneric with no buffer output expects operands to have RankedTensorType");
+    }
+
+    auto ta = cast<ShapedType>(a.getType());
+    auto tb = cast<ShapedType>(b.getType());
     assert(ta.getElementType() == tb.getElementType() && "element types should match");
 
-    std::map<size_t, size_t> axisDims;
+    std::map<int64_t, int64_t> axisDims;
     {
         for (size_t i = 0; i < ta.getShape().size(); i++)
             axisDims[axisCodesA[i]] = ta.getShape()[i];
@@ -45,11 +58,21 @@ Value einsumLinalgGeneric(OpBuilder &ob, Location loc, ArrayRef<size_t> axisCode
 
     std::vector<int64_t> shapeR;
     {
-        for (auto i : axisCodesResult)
+        for (auto i : axisCodesResult) {
             shapeR.push_back(axisDims[i]);
+            errs() << "axis dim: " << (axisDims[i] == ShapedType::kDynamic) << "\n";
+        }
     }
 
-    auto tr = ta.cloneWith(ArrayRef<int64_t>(shapeR), ta.getElementType());
+    errs() << "ta: " << ta << "\n";
+    ShapedType tr;
+    if (useBufferSemantics) {
+        tr = MemRefType::get(shapeR, ta.getElementType());
+    }
+    else {
+        tr = RankedTensorType::get(shapeR, ta.getElementType());
+    }
+    // auto tr = ta.cloneWith(ArrayRef<int64_t>(shapeR), ta.getElementType());
 
     SmallVector<AffineMap> maps;
     {
@@ -62,19 +85,22 @@ Value einsumLinalgGeneric(OpBuilder &ob, Location loc, ArrayRef<size_t> axisCode
         };
     }
 
-    SmallVector<utils::IteratorType, 4> attrs;
+    SmallVector<utils::IteratorType, 4> iteratorTypes;
     {
-        SmallSetVector<size_t, 4> ua(axisCodesA.begin(), axisCodesA.end());
-        SmallSetVector<size_t, 4> ub(axisCodesB.begin(), axisCodesB.end());
+        SmallSetVector<int64_t, 4> ua(axisCodesA.begin(), axisCodesA.end());
+        SmallSetVector<int64_t, 4> ub(axisCodesB.begin(), axisCodesB.end());
         for (const auto a : axisDims) {
-            attrs.push_back((ua.contains(a.first) && ub.contains(a.first))
-                                ? utils::IteratorType::reduction
-                                : utils::IteratorType::parallel);
+            iteratorTypes.push_back((ua.contains(a.first) && ub.contains(a.first))
+                                        ? utils::IteratorType::reduction
+                                        : utils::IteratorType::parallel);
         }
     }
 
     Value r;
-    {
+    if (useBufferSemantics) {
+        r = bufferOut.value();
+    }
+    else {
         Value empty = ob.create<tensor::EmptyOp>(loc, tr.getShape(), tr.getElementType());
         Value zero =
             ob.create<arith::ConstantOp>(loc, tr.getElementType(), ob.getF64FloatAttr(0.0));
@@ -82,18 +108,20 @@ Value einsumLinalgGeneric(OpBuilder &ob, Location loc, ArrayRef<size_t> axisCode
     }
 
     SmallVector<Value> operands = {a, b};
-    SmallVector<NamedAttribute> nattrs = {};
-    auto genOp = ob.create<linalg::GenericOp>(
-        loc, tr, operands, r, maps, attrs,
-        [](OpBuilder &ob2, Location loc2, ValueRange args) {
-            ob2.create<linalg::YieldOp>(
-                loc2, Value(ob2.create<arith::AddFOp>(
-                          loc2, args[2], ob2.create<arith::MulFOp>(loc2, args[0], args[1]))));
-        },
-        nattrs);
-
-    assert(genOp.getResults().size() == 1);
-    return genOp.getResults()[0];
+    auto bodyBuilder = [](OpBuilder &ob2, Location loc2, ValueRange args) {
+        ob2.create<linalg::YieldOp>(
+            loc2, Value(ob2.create<arith::AddFOp>(
+                      loc2, args[2], ob2.create<arith::MulFOp>(loc2, args[0], args[1]))));
+    };
+    if (useBufferSemantics) {
+        ob.create<linalg::GenericOp>(loc, operands, r, maps, iteratorTypes, bodyBuilder);
+        return r;
+    }
+    else {
+        auto genOp =
+            ob.create<linalg::GenericOp>(loc, tr, operands, r, maps, iteratorTypes, bodyBuilder);
+        return genOp.getResult(0);
+    }
 }
 
 } // namespace catalyst
