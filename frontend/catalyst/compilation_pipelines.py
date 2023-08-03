@@ -715,6 +715,7 @@ class JAX_QJIT:
         deriv_wrapper.__signature__ = signature.replace(parameters=updated_params)
 
         self.deriv_qfuncs[argnum_key] = QJIT(
+            # pylint: disable=protected-access
             deriv_wrapper, self.qfunc.target, self.qfunc.pipelines, self.qfunc._compiler.options
         )
         return self.deriv_qfuncs[argnum_key]
