@@ -456,7 +456,6 @@ class TestPyTreesFuncArgs:
             loop()
             return qml.state()
 
-        # TODO: Python lists, tuples, dict, ... aren't supported!
         circuit1(1, inp)
 
     def test_args_used_in_measure(self, backend):
