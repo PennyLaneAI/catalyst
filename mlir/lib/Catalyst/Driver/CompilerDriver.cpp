@@ -176,13 +176,13 @@ LogicalResult runLowering(const CompilerOptions &options, ModuleOp moduleOp,
 {
     auto pm = PassManager::on<ModuleOp>(options.ctx, PassManager::Nesting::Implicit);
 
-    std::unordered_map<void *, std::list<Pipeline::Name>> pipelineTailMarkers;
+    std::unordered_map<const Pass *, std::list<Pipeline::Name>> pipelineTailMarkers;
     for (const auto &pipeline : options.pipelinesCfg) {
         if (failed(parsePassPipeline(joinPasses(pipeline.passes), pm, options.diagnosticStream))) {
             return failure();
         }
         PassManager::pass_iterator p = pm.end();
-        void *lastPass = &(*(p - 1));
+        const Pass *lastPass = &(*(p - 1));
         pipelineTailMarkers[lastPass].push_back(pipeline.name);
     }
 
