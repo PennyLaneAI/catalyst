@@ -30,6 +30,8 @@ set(MLIR_BINARY_DIR ${CMAKE_BINARY_DIR})
 # Unfortunately, AllMhloPasses doesn't appear to be exported.
 set(ALL_MHLO_PASSES
   ChloPasses
+  GmlStPasses
+  GmlStTransforms
   MhloPasses
   MhloToLhloConversion
   MhloToArithmeticConversion
