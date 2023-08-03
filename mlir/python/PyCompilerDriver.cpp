@@ -74,8 +74,8 @@ PYBIND11_MODULE(_catalystDriver, m)
     m.def(
         "run_compiler_driver",
         [](const char *source, const char *workspace, const char *moduleName,
-           bool inferFunctionAttrs, bool keepIntermediate, bool verbose, py::list pipelines,
-           bool attemptLLVMLowering) //-> CompilerOutput *
+           bool keepIntermediate, bool verbose, py::list pipelines,
+           bool attempt_llvm_lowering) -> CompilerOutput *
         {
             FunctionAttributes inferredAttributes;
             mlir::MLIRContext ctx;
@@ -94,7 +94,7 @@ PYBIND11_MODULE(_catalystDriver, m)
                                     .keepIntermediate = keepIntermediate,
                                     .verbosity = verbose ? CO_VERB_ALL : CO_VERB_URGENT,
                                     .pipelinesCfg = parseCompilerSpec(pipelines),
-                                    .attemptLLVMLowering = attemptLLVMLowering};
+                                    .attemptLLVMLowering = attempt_llvm_lowering};
 
             errStream.flush();
 
@@ -104,7 +104,7 @@ PYBIND11_MODULE(_catalystDriver, m)
             return output;
         },
         py::arg("source"), py::arg("workspace"), py::arg("module_name") = "jit source",
-        py::arg("infer_function_attrs") = false, py::arg("keep_intermediate") = false,
+        py::arg("keep_intermediate") = false,
         py::arg("verbose") = false, py::arg("pipelines") = py::list(),
-        py::arg("attemptLLVMLowering") = true);
+        py::arg("attempt_llvm_lowering") = true);
 }

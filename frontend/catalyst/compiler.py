@@ -327,8 +327,7 @@ class Compiler:
         ir: str,
         module_name: str,
         pipelines=None,
-        infer_function_attrs=True,
-        attempt_LLVM_lowering=True,
+        attempt_llvm_lowering=True,
     ):
         """Compile a shared object from a textual IR (MLIR or LLVM).
 
@@ -337,9 +336,7 @@ class Compiler:
             module_name (str): Module name to use for naming
             pipelines (list, optional): Custom compilation pipelines configuration. The default is
                                         None which means to use the default pipelines config.
-            infer_function_attrs (bool, optional): whether to infer main function name and return
-                                                   types after the compilation.
-            attempt_LLVM_lowering (bool, optional): Whether to attempt the LLVM lowering, assuming
+            attempt_llvm_lowering (bool, optional): Whether to attempt the LLVM lowering, assuming
                                                     that the pipeline outputs MLIR LLVM dialect
 
         Returns:
@@ -368,11 +365,10 @@ class Compiler:
             ir,
             workspace,
             module_name,
-            infer_function_attrs=infer_function_attrs,
             keep_intermediate=self.options.keep_intermediate,
             verbose=self.options.verbose,
             pipelines=pipelines,
-            attemptLLVMLowering=attempt_LLVM_lowering,
+            attempt_llvm_lowering=attempt_llvm_lowering,
         )
 
         if self.options.verbose:
@@ -384,7 +380,7 @@ class Compiler:
         func_name = compiler_output.get_function_attributes().get_function_name()
         ret_type_name = compiler_output.get_function_attributes().get_return_type()
 
-        if attempt_LLVM_lowering:
+        if attempt_llvm_lowering:
             output = LinkerDriver.run(filename, options=self.options)
             output_filename = str(pathlib.Path(output).absolute())
         else:
