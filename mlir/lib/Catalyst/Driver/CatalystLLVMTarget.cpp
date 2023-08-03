@@ -113,6 +113,7 @@ LogicalResult catalyst::compileObjectFile(const CompilerOptions &options,
     TargetOptions opt;
     auto targetMachine =
         target->createTargetMachine(targetTriple, cpu, features, opt, Reloc::Model::PIC_);
+    targetMachine->setOptLevel(CodeGenOpt::None);
     llvmModule->setDataLayout(targetMachine->createDataLayout());
     llvmModule->setTargetTriple(targetTriple);
 
