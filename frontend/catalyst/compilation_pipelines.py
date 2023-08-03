@@ -716,7 +716,10 @@ class JAX_QJIT:
 
         self.deriv_qfuncs[argnum_key] = QJIT(
             # pylint: disable=protected-access
-            deriv_wrapper, self.qfunc.target, self.qfunc.pipelines, self.qfunc._compiler.options
+            deriv_wrapper,
+            self.qfunc.target,
+            self.qfunc.pipelines,
+            self.qfunc._compiler.options,
         )
         return self.deriv_qfuncs[argnum_key]
 
