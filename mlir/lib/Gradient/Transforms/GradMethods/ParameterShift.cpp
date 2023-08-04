@@ -272,182 +272,108 @@ void ParameterShiftLowering::rewrite(GradOp op, PatternRewriter &rewriter) const
     rewriter.setInsertionPoint(op);
     std::vector<size_t> diffArgIndices = computeDiffArgIndices(op.getDiffArgIndices());
     SmallVector<Value> backpropResults;
-    /*In the event of multiple results, we need as many backprop calls as scalar element results.
-      Assume one input and one output for now.
-      f = (tensor<3xf64>) -> (tensor<2x2xf64>)
-      jacobian = empty() : tensor<3x2x2xf64>
-      for i in range(outshape[0]):
-        for j in range(outshape[1]):
-          cotangent = zeros(outshape)
-          cotangent[i, j] = 1.0
-          jacobian[:, i, j] = backprop(cotangent)
-    */
 
-    assert(clonedCallee.getNumResults() == 1 && "wip multi result");
-    Value jacobian = rewriter.create<tensor::EmptyOp>(loc, op.getResultTypes()[0],
-                                                      /*dynamicSizes=*/ValueRange{});
+    for (const auto &[cotangentIdx, jacobianType, primalResult] :
+         llvm::enumerate(op.getResultTypes(), clonedCallee.getResultTypes())) {
+        Value jacobian = rewriter.create<tensor::EmptyOp>(loc, jacobianType,
+                                                          /*dynamicSizes=*/ValueRange{});
+        auto primalTensorResultType = cast<RankedTensorType>(primalResult);
+        assert(primalTensorResultType.hasStaticShape());
 
-    auto resultType = cast<RankedTensorType>(clonedCallee.getResultTypes().front());
-    assert(resultType.hasStaticShape());
-    ArrayRef<int64_t> shape = resultType.getShape();
-    // Compute the strides in reverse
-    unsigned product = 1;
-    SmallVector<unsigned> strides;
-    for (int64_t dim = resultType.getRank() - 1; dim >= 0; dim--) {
-        strides.push_back(product);
-        product *= shape[dim];
-    }
-    std::reverse(strides.begin(), strides.end());
-
-    auto materializeIndex = [&rewriter, &loc](int64_t idx) {
-        return rewriter.create<index::ConstantOp>(loc, idx);
-    };
-    Value zero =
-        rewriter.create<arith::ConstantOp>(loc, FloatAttr::get(resultType.getElementType(), 0.0));
-    Value one =
-        rewriter.create<arith::ConstantOp>(loc, FloatAttr::get(resultType.getElementType(), 1.0));
-    Value zeroTensor =
-        rewriter.create<tensor::EmptyOp>(loc, resultType, /*dynamicSizes=*/ValueRange{});
-    zeroTensor = rewriter.create<linalg::FillOp>(loc, zero, zeroTensor).getResult(0);
-
-    for (unsigned flatIdx = 0; flatIdx < resultType.getNumElements(); flatIdx++) {
-        // Unflatten the tensor indices
-        SmallVector<Value> indices;
-        for (int64_t dim = 0; dim < resultType.getRank(); dim++) {
-            indices.push_back(materializeIndex(flatIdx / strides[dim] % shape[dim]));
+        ArrayRef<int64_t> shape = primalTensorResultType.getShape();
+        // Compute the strides in reverse
+        unsigned product = 1;
+        SmallVector<unsigned> strides;
+        for (int64_t dim = primalTensorResultType.getRank() - 1; dim >= 0; dim--) {
+            strides.push_back(product);
+            product *= shape[dim];
         }
+        std::reverse(strides.begin(), strides.end());
 
-        Value cotangent = rewriter.create<tensor::InsertOp>(loc, one, zeroTensor, indices);
+        auto materializeIndex = [&rewriter, &loc](int64_t idx) {
+            return rewriter.create<index::ConstantOp>(loc, idx);
+        };
+        Value zero = rewriter.create<arith::ConstantOp>(
+            loc, FloatAttr::get(primalTensorResultType.getElementType(), 0.0));
+        Value one = rewriter.create<arith::ConstantOp>(
+            loc, FloatAttr::get(primalTensorResultType.getElementType(), 1.0));
+        Value zeroTensor = rewriter.create<tensor::EmptyOp>(loc, primalTensorResultType,
+                                                            /*dynamicSizes=*/ValueRange{});
+        zeroTensor = rewriter.create<linalg::FillOp>(loc, zero, zeroTensor).getResult(0);
 
-        auto backpropOp = rewriter.create<gradient::BackpropOp>(
-            loc, computeBackpropTypes(clonedCallee, diffArgIndices), clonedCallee.getName(),
-            op.getArgOperands(),
-            /*arg_shadows=*/ValueRange{}, /*primal results=*/ValueRange{}, cotangent,
-            op.getDiffArgIndicesAttr());
-
-        // May need insert or insert_slice here
-        assert(backpropOp.getNumResults() == 1);
-        Value result = backpropOp.getResult(0);
-        auto sliceType = cast<RankedTensorType>(result.getType());
-        auto jacobianType = cast<RankedTensorType>(op.getResultTypes()[0]);
-        size_t sliceRank = sliceType.getRank();
-        size_t jacobianRank = jacobianType.getRank();
-        if (sliceRank < jacobianRank) {
-            // Offsets are [...indices] + [0] * rank of backprop input
-            SmallVector<OpFoldResult> offsets;
-            offsets.append(indices.begin(), indices.end());
-            offsets.append(sliceRank, rewriter.getIndexAttr(0));
-
-            // Sizes are [1] * (jacobianRank - sliceRank) + [...sliceShape]
-            SmallVector<OpFoldResult> sizes;
-            sizes.append(jacobianRank - sliceRank, rewriter.getIndexAttr(1));
-            for (int64_t dim : sliceType.getShape()) {
-                sizes.push_back(rewriter.getIndexAttr(dim));
+        for (unsigned flatIdx = 0; flatIdx < primalTensorResultType.getNumElements(); flatIdx++) {
+            // Unflatten the tensor indices
+            SmallVector<Value> indices;
+            for (int64_t dim = 0; dim < primalTensorResultType.getRank(); dim++) {
+                indices.push_back(materializeIndex(flatIdx / strides[dim] % shape[dim]));
             }
 
-            // Strides are [1] * jacobianRank
-            SmallVector<OpFoldResult> strides{jacobianRank, rewriter.getIndexAttr(1)};
-
-            // for (auto x : offsets) {
-            //     errs() << "offset: " << x << "\n";
-            // }
-            // for (auto x : sizes) {
-            //     errs() << "size: " << x << "\n";
-            // }
-            // for (auto x : strides) {
-            //     errs() << "stride: " << x << "\n";
-            // }
-
-            jacobian = rewriter.create<tensor::InsertSliceOp>(loc, backpropOp.getResult(0),
-                                                              jacobian, offsets, sizes, strides);
-        }
-        else {
-            jacobian = backpropOp.getResult(0);
-        }
-    }
-
-    rewriter.replaceOp(op, jacobian);
-    return;
-
-    assert(false && "stopping here");
-
-    for (const auto &[activeResultIdx, activeResultType] :
-         llvm::enumerate(clonedCallee.getResultTypes())) {
-        // Initialize cotangents
-        SmallVector<Value> cotangents;
-        for (const auto &[resultIdx, resultType] : llvm::enumerate(clonedCallee.getResultTypes())) {
-            assert(isDifferentiable(resultType));
-            if (resultIdx == activeResultIdx) {
-                if (auto tensorType = dyn_cast<RankedTensorType>(resultType)) {
-                    assert(tensorType.hasStaticShape());
-                    Value cotangent = rewriter.create<tensor::EmptyOp>(
-                        loc, tensorType, /*dynamicSizes=*/ValueRange{});
-                    Value one = rewriter.create<arith::ConstantOp>(
-                        loc, FloatAttr::get(tensorType.getElementType(), 1.0));
-                    Value zero = rewriter.create<arith::ConstantOp>(
-                        loc, FloatAttr::get(tensorType.getElementType(), 0.0));
-
-                    if (tensorType.getRank() == 0) {
-                        cotangent =
-                            rewriter.create<tensor::InsertOp>(loc, one, cotangent, ValueRange{});
-                    }
-                    else {
-                        cotangent =
-                            rewriter.create<linalg::FillOp>(loc, zero, cotangent).getResult(0);
-                        for (int64_t dim = 0; dim < tensorType.getRank(); dim++) {
-                            for (int64_t i = 0; i < tensorType.getDimSize(dim); i++) {
-                                SmallVector<Value> indices;
-                                cotangent =
-                                    rewriter.create<tensor::InsertOp>(loc, one, cotangent, indices);
-                            }
-                        }
-                    }
-
+            SmallVector<Value> cotangents;
+            Value cotangent = rewriter.create<tensor::InsertOp>(loc, one, zeroTensor, indices);
+            for (const auto &[resultIdx, primalResultType] :
+                 llvm::enumerate(clonedCallee.getResultTypes())) {
+                if (resultIdx == cotangentIdx) {
                     cotangents.push_back(cotangent);
                 }
                 else {
-                    // Result type is a float type
-                    Value one =
-                        rewriter.create<arith::ConstantOp>(loc, FloatAttr::get(resultType, 1.0));
-                    using llvm::errs;
-                    cotangents.push_back(one);
+                    // Push back a zeroed-out cotangent
+                    Value zeroTensor =
+                        rewriter.create<tensor::EmptyOp>(loc, primalResultType, ValueRange{});
+                    cotangents.push_back(
+                        rewriter.create<linalg::FillOp>(loc, zero, zeroTensor).getResult(0));
                 }
+            }
+
+            auto backpropOp = rewriter.create<gradient::BackpropOp>(
+                loc, computeBackpropTypes(clonedCallee, diffArgIndices), clonedCallee.getName(),
+                op.getArgOperands(),
+                /*arg_shadows=*/ValueRange{}, /*primal results=*/ValueRange{}, cotangents,
+                op.getDiffArgIndicesAttr());
+
+            // May need insert or insert_slice here
+            assert(backpropOp.getNumResults() == 1);
+            Value result = backpropOp.getResult(0);
+            auto sliceType = cast<RankedTensorType>(result.getType());
+            size_t sliceRank = sliceType.getRank();
+            size_t jacobianRank = cast<RankedTensorType>(jacobianType).getRank();
+            if (sliceRank < jacobianRank) {
+                // Offsets are [...indices] + [0] * rank of backprop input
+                SmallVector<OpFoldResult> offsets;
+                offsets.append(indices.begin(), indices.end());
+                offsets.append(sliceRank, rewriter.getIndexAttr(0));
+
+                // Sizes are [1] * (jacobianRank - sliceRank) + [...sliceShape]
+                SmallVector<OpFoldResult> sizes;
+                sizes.append(jacobianRank - sliceRank, rewriter.getIndexAttr(1));
+                for (int64_t dim : sliceType.getShape()) {
+                    sizes.push_back(rewriter.getIndexAttr(dim));
+                }
+
+                // Strides are [1] * jacobianRank
+                SmallVector<OpFoldResult> strides{jacobianRank, rewriter.getIndexAttr(1)};
+
+                // for (auto x : offsets) {
+                //     errs() << "offset: " << x << "\n";
+                // }
+                // for (auto x : sizes) {
+                //     errs() << "size: " << x << "\n";
+                // }
+                // for (auto x : strides) {
+                //     errs() << "stride: " << x << "\n";
+                // }
+
+                jacobian = rewriter.create<tensor::InsertSliceOp>(
+                    loc, backpropOp.getResult(0), jacobian, offsets, sizes, strides);
             }
             else {
-                // If this result is not the one currently being differentiated, set its shadow to
-                // zero.
-                if (auto tensorType = dyn_cast<RankedTensorType>(resultType)) {
-                    Value cotangent =
-                        rewriter.create<tensor::EmptyOp>(loc, tensorType, ValueRange{});
-                    Value zero = rewriter.create<arith::ConstantOp>(
-                        loc, FloatAttr::get(tensorType.getElementType(), 0.0));
-                    cotangent = rewriter.create<linalg::FillOp>(loc, zero, cotangent).getResult(0);
-                    cotangents.push_back(cotangent);
-                }
-                else {
-                    assert(false && "scalar returns not yet handled");
-                }
+                jacobian = backpropOp.getResult(0);
             }
         }
-
-        auto backpropOp = rewriter.create<gradient::BackpropOp>(
-            loc, computeBackpropTypes(clonedCallee, diffArgIndices), clonedCallee.getName(),
-            op.getArgOperands(),
-            /*arg_shadows=*/ValueRange{}, /*primal results=*/ValueRange{}, cotangents,
-            op.getDiffArgIndicesAttr());
-        backpropResults.append(backpropOp.result_begin(), backpropOp.result_end());
-
-        // auto tensorType = cast<RankedTensorType>(resultType);
-        // assert(tensorType.hasStaticShape());
-        // assert(tensorType.getRank() == 0 && "Expected 0-D tensor");
-        // Value cotangent =
-        //     rewriter.create<tensor::EmptyOp>(loc, tensorType, /*dynamicSizes=*/ValueRange{});
-        // Value one = rewriter.create<arith::ConstantOp>(loc, rewriter.getF64FloatAttr(1.0));
-        // cotangent = rewriter.create<linalg::FillOp>(loc, one, cotangent).getResult(0);
-        // cotangents.push_back(cotangent);
+        backpropResults.push_back(jacobian);
     }
 
     rewriter.replaceOp(op, backpropResults);
+    return;
 }
 
 std::pair<int64_t, int64_t> ParameterShiftLowering::analyzeFunction(func::FuncOp callee)
