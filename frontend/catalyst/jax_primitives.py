@@ -34,8 +34,9 @@ from jaxlib.mlir.dialects._stablehlo_ops_gen import (
     SubtractOp,
     CeilOp,
     DivOp,
+    MulOp,
 )
-from mlir_quantum.dialects.arith import IndexCastOp, MulIOp
+from mlir_quantum.dialects.arith import IndexCastOp
 from mlir_quantum.dialects.gradient import GradOp, JVPOp, VJPOp
 from mlir_quantum.dialects.quantum import (
     AdjointOp,
@@ -1524,9 +1525,14 @@ def _qfor_lowering(
             step_val = IndexCastOp(i64_type, step_val).result
             start_val = IndexCastOp(i64_type, start_val).result
             # mulOp = normalized_iv * step
-            mulOp = MulIOp(body_args[0], step_val)
             tensor_type = ir.RankedTensorType.get((), i64_type)
-            mulOpTensor = FromElementsOp.build_generic([tensor_type], [mulOp.result])
+
+            # Wrap arguments in a tensor
+            body_args[0] = FromElementsOp.build_generic([tensor_type], [body_args[0]]).result
+            step_val = FromElementsOp.build_generic([tensor_type], [step_val]).result
+
+            mulOpTensor = MulOp(body_args[0], step_val)
+
             start_val = FromElementsOp.build_generic([tensor_type], [start_val]).result
             # iv = start + mulOp
             body_args[0] = AddOp(start_val, mulOpTensor.result).result
