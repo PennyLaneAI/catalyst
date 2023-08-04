@@ -172,6 +172,12 @@ LogicalResult inferMLIRReturnTypes(MLIRContext *ctx, llvm::Type *returnType,
     return failure();
 }
 
+LogicalResult runLLVMPasses(const CompilerOptions &options, ModuleOp moduleOp,
+                            CompilerOutput::PipelineOutputs &outputs)
+{
+    return success();
+}
+
 LogicalResult runLowering(const CompilerOptions &options, ModuleOp moduleOp,
                           CompilerOutput::PipelineOutputs &outputs)
 {
@@ -290,6 +296,10 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     }
 
     if (llvmModule) {
+
+        if (failed(runLLVMPasses(options, *op, output.pipelineOutputs))) {
+            return failure();
+        }
 
         output.outIR.clear();
         outIRStream << *llvmModule;
