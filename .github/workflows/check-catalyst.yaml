@@ -73,7 +73,7 @@ jobs:
           QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build" \
           QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include" \
           ENABLE_LIGHTNING_KOKKOS=ON \
-          CMAKE_ARGS="-DKokkos_ENABLE_OPENMP=ON" \
+          CMAKE_ARGS="-DKokkos_ENABLE_OPENMP=ON -DENABLE_SANITIZER=ON" \
           ENABLE_OPENQASM=ON \
           make runtime
 
@@ -561,7 +561,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          sudo apt-get -y -q install cmake ninja-build libomp-dev lcov
+          sudo apt-get -y -q install cmake ninja-build libomp-dev lcov libasan5
 
       - name: Install additional dependencies (OpenQasm device)
         if: ${{ matrix.backend == 'openqasm' }}
@@ -588,7 +588,7 @@ jobs:
             make coverage-runtime
             mv runtime/build/coverage.info coverage-${{ github.job }}.info
 
-      - name: Build Runtime test suite for Lightning-Kokkos simulator
+      - name: Build Runtime test suite with both Lightning and Lightning-Kokkos simulators
         if: ${{ matrix.backend == 'lightning-kokkos' }}
         run: |
             C_COMPILER=$(which gcc) \
@@ -597,7 +597,7 @@ jobs:
             QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build" \
             QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include" \
             ENABLE_LIGHTNING_KOKKOS=ON \
-            CMAKE_ARGS="-DKokkos_ENABLE_OPENMP=ON" \
+            CMAKE_ARGS="-DKokkos_ENABLE_OPENMP=ON -DENABLE_SANITIZER=ON" \
             make test-runtime
 
       - name: Build Runtime test suite for OpenQasm device

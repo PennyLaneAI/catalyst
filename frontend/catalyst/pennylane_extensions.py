@@ -209,12 +209,16 @@ Jaxpr = Any
 
 def _ensure_differentiable(f: DifferentiableLike) -> Differentiable:
     """Narrows down the set of the supported differentiable objects."""
+
+    # Unwrap the function from an existing QJIT object.
+    if isinstance(f, catalyst.compilation_pipelines.QJIT):
+        f = f.qfunc
+
     if isinstance(f, (Function, QNode)):
         return f
-    elif isinstance(f, catalyst.compilation_pipelines.QJIT):
-        return f.qfunc
-    elif isinstance(f, Callable):  # Keep at the bottom
+    elif isinstance(f, Callable):  # keep at the bottom
         return Function(f)
+
     raise DifferentiableCompileError(f"Non-differentiable object passed: {type(f)}")
 
 
@@ -737,10 +741,9 @@ class CondCallable:
         CondCallable._check_branches_return_types(branch_jaxprs)
         Cond(self.preds, consts, branch_jaxprs, args_tree, out_trees)
 
-        # Create tracers for any non-qreg return values (if there are any).
-        ret_vals, _ = tree_unflatten(out_trees[0], branch_jaxprs[0].out_avals)
-        a, t = tree_flatten(ret_vals)
-        return ctx.jax_tape.create_tracer(t, a)
+        # Get tracers for any non-qreg return values (if there are any).
+        args, trees = branch_jaxprs[0].out_avals[:-1], out_trees[0].children()[0]
+        return ctx.jax_tape.create_tracer(trees, args)
 
     def _call_with_classical_ctx(self):
         args, args_tree = tree_flatten([])
@@ -975,9 +978,9 @@ class WhileCallable:
             body_tree,
         )
 
-        ret_vals, _ = tree_unflatten(body_tree, body_jaxpr.out_avals)
-        a, t = tree_flatten(ret_vals)
-        return ctx.jax_tape.create_tracer(t, a)
+        # Get tracers for any non-qreg return values (if there are any).
+        args, trees = body_jaxpr.out_avals[:-1], body_tree.children()[0]
+        return ctx.jax_tape.create_tracer(trees, args)
 
     def _call_with_classical_ctx(self, args):
         body_jaxpr, cond_jaxpr, cond_consts, body_consts, body_tree = WhileCallable._create_jaxpr(
@@ -1147,10 +1150,9 @@ class ForLoopCallable:
             body_tree,
         )
 
-        # Create tracers for any non-qreg return values (if there are any).
-        ret_vals, _ = tree_unflatten(body_tree, body_jaxpr.out_avals)
-        a, t = tree_flatten(ret_vals)
-        return ctx.jax_tape.create_tracer(t, a)
+        # Get tracers for any non-qreg return values (if there are any).
+        args, trees = body_jaxpr.out_avals[:-1], body_tree.children()[0]
+        return ctx.jax_tape.create_tracer(trees, args)
 
     def _call_with_classical_ctx(self, *args):
         # Insert iteration counter into loop body arguments with the type of the lower bound.

@@ -24,7 +24,7 @@ from jax import numpy as jnp
 from numpy import pi
 
 from catalyst import for_loop, grad, measure, qjit
-from catalyst.compilation_pipelines import CompiledFunction
+from catalyst.compilation_pipelines import CompiledFunction, TypeCompatibility
 from catalyst.jax_primitives import _scalar_abstractify
 
 
@@ -493,6 +493,40 @@ class TestShots:
             # assert expected_shape == observed_shape
 
 
+class TestPromotionRules:
+    """Class to test different promotion rules."""
+
+    def test_incompatible_compiled_vs_runtime_different_lengths(self):
+        """Test incompatible compiled vs runtime."""
+
+        retval = CompiledFunction.typecheck([], [1])
+        assert TypeCompatibility.NEEDS_COMPILATION == retval
+
+    def test_incompatible_compiled_vs_runtime_different_types(self):
+        """Test incompatible compiled vs runtime with different types."""
+
+        retval = CompiledFunction.typecheck(jnp.array([1]), jnp.array([complex(1, 2)]))
+        assert TypeCompatibility.NEEDS_COMPILATION == retval
+
+    def test_incompatible_compiled_vs_runtime_different_shapes(self):
+        """Test incompatible compiled vs runtime with different shapes."""
+
+        retval = CompiledFunction.typecheck(jnp.array([1, 2]), jnp.array([1]))
+        assert TypeCompatibility.NEEDS_COMPILATION == retval
+
+    def test_can_skip_promotion(self):
+        """Test skipping promotion"""
+
+        retval = CompiledFunction.typecheck(jnp.array([1]), jnp.array([1]))
+        assert TypeCompatibility.CAN_SKIP_PROMOTION == retval
+
+    def test_needs_promotion(self):
+        """Test promotion"""
+
+        retval = CompiledFunction.typecheck(jnp.array([1.0]), jnp.array([1]))
+        assert TypeCompatibility.NEEDS_PROMOTION == retval
+
+
 class TestSignatureErrors:
     def test_incompatible_argument(self):
         """Test incompatible argument."""
@@ -501,12 +535,6 @@ class TestSignatureErrors:
         with pytest.raises(TypeError) as err:
             CompiledFunction.get_runtime_signature([string])
         assert "Unsupported argument type:" in str(err.value)
-
-    def test_incompatible_compiled_vs_runtime(self):
-        """Test incompatible compiled vs runtime."""
-
-        retval = CompiledFunction.can_promote([], [1])
-        assert not retval
 
     def test_incompatible_type_reachable_from_user_code(self):
         """Raise error message for incompatible types"""

@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Compiler options
 option(ENABLE_CODE_COVERAGE "Enable code coverage" OFF)
+option(ENABLE_SANITIZER "Enable address sanitizer" OFF)
 option(RUNTIME_CLANG_TIDY "Enable Clang Tidy" OFF)
 
 option(ENABLE_LIGHTNING "Build Lightning backend device" ON)
@@ -22,22 +23,21 @@ set(extensions_includes "${PROJECT_SOURCE_DIR}/extensions")
 set(backend_includes "${PROJECT_SOURCE_DIR}/lib/backend/common")
 
 if(ENABLE_LIGHTNING)
+    message(STATUS "ENABLE_LIGHTNING is ${ENABLE_LIGHTNING}.")
     list(APPEND backend_includes "${PROJECT_SOURCE_DIR}/lib/backend/lightning")
 endif()
 
 if(ENABLE_LIGHTNING_KOKKOS)
+    message(STATUS "ENABLE_LIGHTNING_KOKKOS is ${ENABLE_LIGHTNING_KOKKOS}.")
     list(APPEND backend_includes "${PROJECT_SOURCE_DIR}/lib/backend/lightning-kokkos")
 endif()
 
 if(ENABLE_OPENQASM)
+    message(STATUS "ENABLE_OPENQASM is ${ENABLE_OPENQASM}.")
     list(APPEND backend_includes "${PROJECT_SOURCE_DIR}/lib/backend/openqasm")
 endif()
 
 add_library(catalyst_qir_runtime INTERFACE)
-
-message(STATUS "ENABLE_OPENQASM is ${ENABLE_OPENQASM}.")
-message(--\ QIR_STDLIB_LIB=${QIR_STDLIB_LIB})
-message(--\ QIR_STDLIB_INCLUDES=${QIR_STDLIB_INCLUDES})
 
 target_link_libraries(catalyst_qir_runtime INTERFACE rt_backend rt_capi)
 
@@ -49,6 +49,21 @@ if(ENABLE_CODE_COVERAGE)
         $<$<COMPILE_LANGUAGE:CXX>:-fprofile-arcs;-ftest-coverage>)
     target_link_libraries(catalyst_qir_runtime INTERFACE gcov)
 endif()
+
+if(ENABLE_SANITIZER)
+    message(STATUS "ENABLE_SANITIZER is ON.")
+    if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
+        add_compile_options(-fsanitize=address)
+        add_link_options(-fsanitize=address -static-libasan)
+    elseif(CMAKE_C_COMPILER_ID STREQUAL "Clang")
+        target_link_libraries(catalyst_qir_runtime INTERFACE -fno-omit-frame-pointer -fsanitize=address)
+    endif()
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
+    set(CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
+ENDIF()
+
+message(--\ QIR_STDLIB_LIB=${QIR_STDLIB_LIB})
+message(--\ QIR_STDLIB_INCLUDES=${QIR_STDLIB_INCLUDES})
 
 add_subdirectory(extensions)
 add_subdirectory(lib)
