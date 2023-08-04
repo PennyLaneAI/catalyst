@@ -73,28 +73,29 @@ class AdjointOp(_ods_ir.OpView):
 class BackpropOp(_ods_ir.OpView):
   OPERATION_NAME = "gradient.backprop"
 
-  _ODS_OPERAND_SEGMENTS = [-1,-1,-1,]
+  _ODS_OPERAND_SEGMENTS = [-1,-1,-1,-1,]
 
   _ODS_REGIONS = (0, True)
 
-  def __init__(self, result, callee, diffArgIndices, args, quantum_jacobian, data_in, *, loc=None, ip=None):
+  def __init__(self, gradients, callee, args, diffArgShadows, calleeResults, cotangents, *, diffArgIndices=None, loc=None, ip=None):
     operands = []
     results = []
     attributes = {}
     regions = None
     operands.append(_get_op_results_or_values(args))
-    operands.append(_get_op_results_or_values(quantum_jacobian))
-    operands.append(_get_op_results_or_values(data_in))
+    operands.append(_get_op_results_or_values(diffArgShadows))
+    operands.append(_get_op_results_or_values(calleeResults))
+    operands.append(_get_op_results_or_values(cotangents))
     _ods_context = _ods_get_default_loc_context(loc)
     attributes["callee"] = (callee if (
     issubclass(type(callee), _ods_ir.Attribute) or
     not _ods_ir.AttrBuilder.contains('FlatSymbolRefAttr')) else
       _ods_ir.AttrBuilder.get('FlatSymbolRefAttr')(callee, context=_ods_context))
-    attributes["diffArgIndices"] = (diffArgIndices if (
-    issubclass(type(diffArgIndices), _ods_ir.Attribute) or
-    not _ods_ir.AttrBuilder.contains('AnyIntElementsAttr')) else
-      _ods_ir.AttrBuilder.get('AnyIntElementsAttr')(diffArgIndices, context=_ods_context))
-    results.extend(result)
+    if diffArgIndices is not None: attributes["diffArgIndices"] = (diffArgIndices if (
+        issubclass(type(diffArgIndices), _ods_ir.Attribute) or
+        not _ods_ir.AttrBuilder.contains('AnyIntElementsAttr')) else
+          _ods_ir.AttrBuilder.get('AnyIntElementsAttr')(diffArgIndices, context=_ods_context))
+    results.extend(gradients)
     _ods_successors = None
     super().__init__(self.build_generic(
       attributes=attributes, results=results, operands=operands,
@@ -108,28 +109,47 @@ class BackpropOp(_ods_ir.OpView):
     return operand_range
 
   @builtins.property
-  def quantum_jacobian(self):
+  def diffArgShadows(self):
     operand_range = _ods_segmented_accessor(
          self.operation.operands,
          self.operation.attributes["operand_segment_sizes"], 1)
     return operand_range
 
   @builtins.property
-  def data_in(self):
+  def calleeResults(self):
     operand_range = _ods_segmented_accessor(
          self.operation.operands,
          self.operation.attributes["operand_segment_sizes"], 2)
     return operand_range
 
   @builtins.property
+  def cotangents(self):
+    operand_range = _ods_segmented_accessor(
+         self.operation.operands,
+         self.operation.attributes["operand_segment_sizes"], 3)
+    return operand_range
+
+  @builtins.property
   def diffArgIndices(self):
+    if "diffArgIndices" not in self.operation.attributes:
+      return None
     return _ods_ir.DenseIntElementsAttr(self.operation.attributes["diffArgIndices"])
 
   @diffArgIndices.setter
   def diffArgIndices(self, value):
-    if value is None:
-      raise ValueError("'None' not allowed as value for mandatory attributes")
-    self.operation.attributes["diffArgIndices"] = value
+    if value is not None:
+      self.operation.attributes["diffArgIndices"] = value
+    elif "diffArgIndices" in self.operation.attributes:
+      del self.operation.attributes["diffArgIndices"]
+
+  @diffArgIndices.deleter
+  def diffArgIndices(self):
+    del self.operation.attributes["diffArgIndices"]
+
+  @builtins.property
+  def gradients(self):
+    _ods_variadic_group_length = len(self.operation.results) - 1 + 1
+    return self.operation.results[0:0 + _ods_variadic_group_length]
 
 @_ods_cext.register_operation(_Dialect)
 @_ods_extend_opview_class(_ods_ext_module)
