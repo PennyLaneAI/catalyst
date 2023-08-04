@@ -28,8 +28,8 @@ from jax.interpreters import mlir
 from jax.tree_util import PyTreeDef, tree_unflatten
 from jaxlib.mlir.dialects._func_ops_gen import CallOp
 from jaxlib.mlir.dialects._mhlo_ops_gen import ConstantOp, ConvertOp
-from jaxlib.mlir.dialects._stablehlo_ops_gen import ConstantOp as StableHLOConstantOp
-from mlir_quantum.dialects.arith import AddIOp, CeilDivSIOp, IndexCastOp, MulIOp, SubIOp
+from jaxlib.mlir.dialects._stablehlo_ops_gen import ConstantOp as StableHLOConstantOp, AddOp
+from mlir_quantum.dialects.arith import CeilDivSIOp, IndexCastOp, MulIOp, SubIOp
 from mlir_quantum.dialects.gradient import GradOp, JVPOp, VJPOp
 from mlir_quantum.dialects.quantum import (
     AdjointOp,
@@ -1472,9 +1472,16 @@ def _qfor_lowering(
             body_args[0] = IndexCastOp(i64_type, body_args[0]).result
             step_val = IndexCastOp(i64_type, step_val).result
             start_val = IndexCastOp(i64_type, start_val).result
-            # iv = start + normalized_iv * step
+            # mulOp = normalized_iv * step
             mulOp = MulIOp(body_args[0], step_val)
-            body_args[0] = AddIOp(start_val, mulOp.result).result
+            tensor_type = ir.RankedTensorType.get((), i64_type)
+            mulOpTensor = FromElementsOp.build_generic([tensor_type], [mulOp.result])
+            start_val = FromElementsOp.build_generic([tensor_type], [start_val]).result
+            # iv = start + mulOp
+            body_args[0] = AddOp(start_val, mulOpTensor.result).result
+            # Unpack the tensor
+            body_args[0] = TensorExtractOp(i64_type, body_args[0], []).result
+            # Cast it back to index
             body_args[0] = IndexCastOp(ir.IndexType.get(), body_args[0]).result
 
         body_args[0] = IndexCastOp(loop_index_type, body_args[0]).result
