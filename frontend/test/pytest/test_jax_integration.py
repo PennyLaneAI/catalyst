@@ -28,6 +28,25 @@ from catalyst.compilation_pipelines import JAX_QJIT
 class TestJAXJIT:
     """Test QJIT compatibility with JAX compilation."""
 
+    def test_simple_circuit_with_pytree_input(self, backend):
+        """Test a basic use case of jax.jit with a dictionary as input."""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=2))
+        def circuit(x):
+            qml.RX(jnp.pi * x["a"][0], wires=0)
+            qml.RY(x["a"][1] ** 2, wires=0)
+            qml.RX(x["a"][1] * x["a"][2], wires=0)
+            return qml.expval(qml.PauliZ(0))
+
+        def cost_fn(x):
+            result = circuit(x)
+            return jnp.cos(result) ** 2
+
+        x = {"a": jnp.array([0.1, 0.2, 0.3])}
+        result = jax.jit(cost_fn)(x)
+        reference = cost_fn(x)
+
     def test_simple_circuit(self, backend):
         """Test a basic use case of jax.jit on top of qjit."""
 
