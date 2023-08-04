@@ -47,6 +47,29 @@ class TestJAXJIT:
         result = jax.jit(cost_fn)(x)
         reference = cost_fn(x)
 
+        assert jnp.allclose(result, reference)
+
+    def test_simple_circuit_with_pytree_output(self, backend):
+        """Test a basic use case of jax.jit with a dictionary as an output."""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=2))
+        def circuit(x: jax.core.ShapedArray((3,), dtype=float)):
+            qml.RX(jnp.pi * x[0], wires=0)
+            qml.RY(x[1] ** 2, wires=0)
+            qml.RX(x[1] * x[2], wires=0)
+            return { "a" : qml.expval(qml.PauliZ(0)) }
+
+        def cost_fn(x):
+            result = circuit(x)
+            return jnp.cos(result["a"]) ** 2
+
+        x = jnp.array([0.1, 0.2, 0.3])
+        result = jax.jit(cost_fn)(x)
+        reference = cost_fn(x)
+
+        assert jnp.allclose(result, reference)
+
     def test_simple_circuit(self, backend):
         """Test a basic use case of jax.jit on top of qjit."""
 
