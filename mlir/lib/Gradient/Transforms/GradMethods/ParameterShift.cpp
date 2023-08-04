@@ -332,36 +332,38 @@ void ParameterShiftLowering::rewrite(GradOp op, PatternRewriter &rewriter) const
         auto jacobianType = cast<RankedTensorType>(op.getResultTypes()[0]);
         size_t sliceRank = sliceType.getRank();
         size_t jacobianRank = jacobianType.getRank();
-        assert(sliceRank < jacobianRank);
-        errs() << "sliceType: " << sliceType << " jacobian type: " << jacobianType << "\n";
+        if (sliceRank < jacobianRank) {
+            // Offsets are [...indices] + [0] * rank of backprop input
+            SmallVector<OpFoldResult> offsets;
+            offsets.append(indices.begin(), indices.end());
+            offsets.append(sliceRank, rewriter.getIndexAttr(0));
 
-        // Offsets [...indices] + [0] * rank of backprop input
-        SmallVector<OpFoldResult> offsets;
-        offsets.append(indices.begin(), indices.end());
-        offsets.append(sliceRank, rewriter.getIndexAttr(0));
+            // Sizes are [1] * (jacobianRank - sliceRank) + [...sliceShape]
+            SmallVector<OpFoldResult> sizes;
+            sizes.append(jacobianRank - sliceRank, rewriter.getIndexAttr(1));
+            for (int64_t dim : sliceType.getShape()) {
+                sizes.push_back(rewriter.getIndexAttr(dim));
+            }
 
-        // Sizes are [1] * (jacobianRank - sliceRank) + [...sliceShape]
-        SmallVector<OpFoldResult> sizes;
-        sizes.append(jacobianRank - sliceRank, rewriter.getIndexAttr(1));
-        for (int64_t dim : sliceType.getShape()) {
-            sizes.push_back(rewriter.getIndexAttr(dim));
+            // Strides are [1] * jacobianRank
+            SmallVector<OpFoldResult> strides{jacobianRank, rewriter.getIndexAttr(1)};
+
+            // for (auto x : offsets) {
+            //     errs() << "offset: " << x << "\n";
+            // }
+            // for (auto x : sizes) {
+            //     errs() << "size: " << x << "\n";
+            // }
+            // for (auto x : strides) {
+            //     errs() << "stride: " << x << "\n";
+            // }
+
+            jacobian = rewriter.create<tensor::InsertSliceOp>(loc, backpropOp.getResult(0),
+                                                              jacobian, offsets, sizes, strides);
         }
-
-        // Strides are [1] * jacobianRank
-        SmallVector<OpFoldResult> strides{jacobianRank, rewriter.getIndexAttr(1)};
-
-        // for (auto x : offsets) {
-        //     errs() << "offset: " << x << "\n";
-        // }
-        // for (auto x : sizes) {
-        //     errs() << "size: " << x << "\n";
-        // }
-        // for (auto x : strides) {
-        //     errs() << "stride: " << x << "\n";
-        // }
-
-        jacobian = rewriter.create<tensor::InsertSliceOp>(loc, backpropOp.getResult(0), jacobian,
-                                                          offsets, sizes, strides);
+        else {
+            jacobian = backpropOp.getResult(0);
+        }
     }
 
     rewriter.replaceOp(op, jacobian);

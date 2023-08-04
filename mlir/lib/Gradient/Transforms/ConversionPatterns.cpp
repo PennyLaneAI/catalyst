@@ -706,22 +706,50 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
             idx++;
         }
 
-        assert(qnodeType.getNumResults() == 1);
         SmallVector<Value> primalInputs{
             ValueRange{unwrappedInputs}.take_front(qgradFn.getNumArguments() - 1)};
         Value gateParamShadow = unwrappedShadows.back();
-        Value resultShadow = unwrapMemRef(block->getArguments()[block->getNumArguments() - 2],
-                                          qnodeType.getResult(0));
         // The gate param list is always 1-d
         Value pcount = builder.create<memref::DimOp>(loc, gateParamShadow, 0);
         primalInputs.push_back(pcount);
 
-        // TODO: don't know if this works in jacobian contexts
-        Value qgrad = builder.create<func::CallOp>(loc, qgradFn, primalInputs).getResult(0);
-        // multiply the things together
-        // for the scalar case, broadcast-multiply the result into the gate param shadow
-        catalyst::einsumLinalgGeneric(builder, loc, {}, {0}, {0}, resultShadow, qgrad,
-                                      gateParamShadow);
+        auto qgrad = builder.create<func::CallOp>(loc, qgradFn, primalInputs);
+
+        for (unsigned i = 0; i < qnodeType.getNumResults(); i++) {
+            // The QNode has n inputs and m outputs (in destination-passing style).
+            // The customQGrad arguments are: [
+            //   inprimal_0, inshadow_0,
+            //   ...,
+            //   inprimal_n, inshadow_n,
+            //   outprimal_0, outshadow_0,
+            //   ...,
+            //   outprimal_m, outshadow_m
+            // ]
+            // This indexing extracts [outshadow_0, ..., outshadow_m]
+            Value resultShadow = unwrapMemRef(
+                block->getArgument((i + qnodeType.getNumInputs()) * 2 + 1), qnodeType.getResult(i));
+
+            // If G is the number of gate params and [...result] is the shape of the result with
+            // rank R:
+            //   - The result shadow always has shape [...result]
+            //   - The quantum gradient always has shape [G, ...result]
+            //   - The gate param shadow always has shape [G]
+            // Since einsumLinalgGeneric uses integers to represent dimensions, the resulting
+            // einsum to propagate the chain rule should thus be:
+            //   [1,...,R], [0,1,...,R] -> [0]
+            SmallVector<int64_t> qgradDims;
+            int64_t qgradRank = cast<ShapedType>(qgrad.getType(i)).getRank();
+            for (int64_t i = 0; i < qgradRank; i++) {
+                qgradDims.push_back(i);
+            }
+            ArrayRef<int64_t> resultDims(qgradDims.begin() + 1, qgradDims.end());
+
+            // The gate param shadow is shared, meaning it accumulates additions from einsums from
+            // all results (this is due to the multivariate chain rule saying that derivatives
+            // combine additively).
+            catalyst::einsumLinalgGeneric(builder, loc, resultDims, qgradDims, {0}, resultShadow,
+                                          qgrad.getResult(i), gateParamShadow);
+        }
         builder.create<func::ReturnOp>(loc);
 
         return customQGrad;
