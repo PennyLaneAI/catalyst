@@ -649,10 +649,7 @@ class JAX_QJIT:
     def __init__(self, qfunc):
         @jax.custom_jvp
         def jaxed_qfunc(*args, **kwargs):
-            results = self.wrap_callback(qfunc, *args, **kwargs)
-            if len(results) == 1:
-                results = results[0]
-            return results
+            return self.wrap_callback(qfunc, *args, **kwargs)
 
         self.qfunc = qfunc
         self.deriv_qfuncs = {}
@@ -662,7 +659,11 @@ class JAX_QJIT:
     @staticmethod
     def wrap_callback(qfunc, *args, **kwargs):
         """Wrap a QJIT function inside a jax host callback."""
-        return jax.pure_callback(qfunc, qfunc.jaxpr.out_avals, *args, vectorized=False, **kwargs)
+        data = jax.pure_callback(qfunc, qfunc.jaxpr.out_avals, *args, vectorized=False, **kwargs)
+
+        # Unflatten the return value w.r.t. the original PyTree definition if available
+        assert qfunc.shape is not None, "Shape must not be none."
+        return tree_unflatten(qfunc.shape, data)
 
     def get_derivative_qfunc(self, argnums):
         """Compile a function computing the derivative of the wrapped QJIT for the given argnums."""
