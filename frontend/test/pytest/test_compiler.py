@@ -172,7 +172,7 @@ class TestCompilerState:
             qml.X(wires=1)
             return qml.state()
 
-        mlir_module, _, _ = get_mlir(workflow)
+        mlir_module, _, _, _ = get_mlir(workflow)
         compiler = Compiler(CompileOptions(keep_intermediate=True))
         compiler.run(mlir_module)
         assert compiler.get_output_of("HLOLoweringPass")
