@@ -28,8 +28,12 @@ from jax.interpreters import mlir
 from jax.tree_util import PyTreeDef, tree_unflatten
 from jaxlib.mlir.dialects._func_ops_gen import CallOp
 from jaxlib.mlir.dialects._mhlo_ops_gen import ConstantOp, ConvertOp
-from jaxlib.mlir.dialects._stablehlo_ops_gen import ConstantOp as StableHLOConstantOp, AddOp
-from mlir_quantum.dialects.arith import CeilDivSIOp, IndexCastOp, MulIOp, SubIOp
+from jaxlib.mlir.dialects._stablehlo_ops_gen import (
+    ConstantOp as StableHLOConstantOp,
+    AddOp,
+    SubtractOp,
+)
+from mlir_quantum.dialects.arith import CeilDivSIOp, IndexCastOp, MulIOp
 from mlir_quantum.dialects.gradient import GradOp, JVPOp, VJPOp
 from mlir_quantum.dialects.quantum import (
     AdjointOp,
@@ -1452,8 +1456,19 @@ def _qfor_lowering(
         stop_val = IndexCastOp(i64_type, stop_val).result
         step_val = IndexCastOp(i64_type, step_val).result
 
+        # Wrap start_val, stop_val, and step_val into a tensor
+        tensor_type = ir.RankedTensorType.get((), i64_type)
+        start_val = FromElementsOp.build_generic([tensor_type], [start_val]).result
+        stop_val = FromElementsOp.build_generic([tensor_type], [stop_val]).result
+
         # Iterate from 0 to the number of iterations (ceil((stop - start) / step))
-        distance = SubIOp(stop_val, start_val)
+
+        distance = SubtractOp(stop_val, start_val).result
+
+        # Unwrap distance, start_val, stop_val
+        distance = TensorExtractOp(i64_type, distance, []).result
+        start_val = TensorExtractOp(i64_type, start_val, []).result
+        stop_val = TensorExtractOp(i64_type, stop_val, []).result
 
         num_iterations = CeilDivSIOp(distance, step_val)
 
