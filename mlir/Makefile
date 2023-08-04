@@ -38,9 +38,13 @@ patch:
 	mkdir -p ../frontend/mlir_quantum/dialects
 	cp -R --dereference $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/runtime ../frontend/mlir_quantum/runtime
 	cp --dereference $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/ir.py ../frontend/mlir_quantum/
-	for file in arith tensor scf gradient quantum _ods_common ; do \
+	for file in arith scf gradient quantum _ods_common ; do \
 		cp --dereference $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/dialects/*$${file}* ../frontend/mlir_quantum/dialects ; \
 	done
+	# Copy these ones individually to avoid sparse_tensor
+	cp --dereference $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/dialects/_tensor_ops_gen.py ../frontend/mlir_quantum/dialects ; \
+	cp --dereference $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/dialects/_tensor_ops_ext.py ../frontend/mlir_quantum/dialects ; \
+	cp --dereference $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/dialects/tensor.py ../frontend/mlir_quantum/dialects ; \
 
 .PHONY: llvm
 llvm:
