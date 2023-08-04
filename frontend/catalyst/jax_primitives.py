@@ -1447,9 +1447,22 @@ def _qfor_lowering(
 
         start_val, stop_val, step_val = loop_operands[0], loop_operands[1], loop_operands[2]
 
+        # Cast start_val, stop_val and step_val to i64
+        start_val = IndexCastOp(i64_type, start_val).result
+        stop_val = IndexCastOp(i64_type, stop_val).result
+        step_val = IndexCastOp(i64_type, step_val).result
+
         # Iterate from 0 to the number of iterations (ceil((stop - start) / step))
         distance = SubIOp(stop_val, start_val)
+
         num_iterations = CeilDivSIOp(distance, step_val)
+
+        # Cast start_val, stop_val and step_val back to index type
+        start_val = IndexCastOp(ir.IndexType.get(), start_val).result
+        stop_val = IndexCastOp(ir.IndexType.get(), stop_val).result
+        step_val = IndexCastOp(ir.IndexType.get(), step_val).result
+        num_iterations = IndexCastOp(ir.IndexType.get(), num_iterations).result
+
         loop_operands[0] = zero
         loop_operands[1] = num_iterations
         loop_operands[2] = one
