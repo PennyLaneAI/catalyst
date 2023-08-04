@@ -612,7 +612,8 @@ class QJIT:
         recompilation_needed = function != self.compiled_function
         self.compiled_function = function
 
-        if any(isinstance(arg, jax.core.Tracer) for arg in args):
+        args_data, args_shape = tree_flatten(args)
+        if any(isinstance(arg, jax.core.Tracer) for arg in args_data):
             # Only compile a derivative version of the compiled function when needed.
             if self.jaxed_qfunc is None or recompilation_needed:
                 self.jaxed_qfunc = JAX_QJIT(self)
