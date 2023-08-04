@@ -58,7 +58,7 @@ class TestJAXJIT:
             qml.RX(jnp.pi * x[0], wires=0)
             qml.RY(x[1] ** 2, wires=0)
             qml.RX(x[1] * x[2], wires=0)
-            return { "a" : qml.expval(qml.PauliZ(0)) }
+            return {"a": qml.expval(qml.PauliZ(0))}
 
         def cost_fn(x):
             result = circuit(x)
