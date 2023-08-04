@@ -27,7 +27,10 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Target/LLVMIR/Export.h"
 #include "stablehlo/dialect/Register.h"
+#include "llvm/Analysis/CGSCCPassManager.h"
+#include "llvm/Analysis/LoopAnalysisManager.h"
 #include "llvm/IRReader/IRReader.h"
+#include "llvm/Passes/PassBuilder.h"
 #include "llvm/Support/SourceMgr.h"
 
 #include "Catalyst/Driver/CatalystLLVMTarget.h"
@@ -93,7 +96,7 @@ OwningOpRef<ModuleOp> parseMLIRSource(MLIRContext *ctx, StringRef source, String
 
 /// Parse an LLVM module given in textual representation. Any parse errors will be output to
 /// the provided SMDiagnostic.
-std::unique_ptr<llvm::Module> parseLLVMSource(llvm::LLVMContext &context, StringRef source,
+std::shared_ptr<llvm::Module> parseLLVMSource(llvm::LLVMContext &context, StringRef source,
                                               StringRef moduleName, llvm::SMDiagnostic &err)
 {
     auto moduleBuffer = llvm::MemoryBuffer::getMemBufferCopy(source, moduleName);
@@ -172,9 +175,40 @@ LogicalResult inferMLIRReturnTypes(MLIRContext *ctx, llvm::Type *returnType,
     return failure();
 }
 
-LogicalResult runLLVMPasses(const CompilerOptions &options, ModuleOp moduleOp,
+LogicalResult runLLVMPasses(const CompilerOptions &options,
+                            std::shared_ptr<llvm::Module> llvmModule,
                             CompilerOutput::PipelineOutputs &outputs)
 {
+    // opt -O2
+    // As seen here:
+    // https://llvm.org/docs/NewPassManager.html#just-tell-me-how-to-run-the-default-optimization-pipeline-with-the-new-pass-manager
+
+    // Create the analysis managers.
+    llvm::LoopAnalysisManager LAM;
+    llvm::FunctionAnalysisManager FAM;
+    llvm::CGSCCAnalysisManager CGAM;
+    llvm::ModuleAnalysisManager MAM;
+
+    // Create the new pass manager builder.
+    // Take a look at the PassBuilder constructor parameters for more
+    // customization, e.g. specifying a TargetMachine or various debugging
+    // options.
+    llvm::PassBuilder PB;
+
+    // Register all the basic analyses with the managers.
+    PB.registerModuleAnalyses(MAM);
+    PB.registerCGSCCAnalyses(CGAM);
+    PB.registerFunctionAnalyses(FAM);
+    PB.registerLoopAnalyses(LAM);
+    PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
+
+    // Create the pass manager.
+    // This one corresponds to a typical -O2 optimization pipeline.
+    llvm::ModulePassManager MPM = PB.buildPerModuleDefaultPipeline(llvm::OptimizationLevel::O2);
+
+    // Optimize the IR!
+    MPM.run(*llvmModule.get(), MAM);
+
     return success();
 }
 
@@ -256,7 +290,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         ctx, [&](Diagnostic &diag) { diag.print(options.diagnosticStream); });
 
     llvm::LLVMContext llvmContext;
-    std::unique_ptr<llvm::Module> llvmModule;
+    std::shared_ptr<llvm::Module> llvmModule;
 
     llvm::raw_string_ostream outIRStream(output.outIR);
 
@@ -297,7 +331,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
 
     if (llvmModule) {
 
-        if (failed(runLLVMPasses(options, *op, output.pipelineOutputs))) {
+        if (failed(runLLVMPasses(options, llvmModule, output.pipelineOutputs))) {
             return failure();
         }
 

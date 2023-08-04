@@ -27,7 +27,7 @@ namespace catalyst {
 void registerLLVMTranslations(mlir::DialectRegistry &registry);
 
 mlir::LogicalResult compileObjectFile(const CompilerOptions &options,
-                                      std::unique_ptr<llvm::Module> module,
+                                      std::shared_ptr<llvm::Module> module,
                                       llvm::StringRef filename);
 
 } // namespace catalyst
