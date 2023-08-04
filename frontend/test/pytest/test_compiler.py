@@ -197,7 +197,7 @@ class TestCompilerState:
             qml.X(wires=1)
             return qml.state()
 
-        mlir_module, _, _ = get_mlir(workflow)
+        mlir_module, _, _, _ = get_mlir(workflow)
         # This means that we are not running any pass.
         pipelines = []
         identity_compiler = Compiler(CompileOptions(keep_intermediate=True))
@@ -218,7 +218,7 @@ class TestCompilerState:
             qml.X(wires=1)
             return qml.state()
 
-        mlir_module, _, _ = get_mlir(workflow)
+        mlir_module, _, _, _ = get_mlir(workflow)
         # This means that we are not running any pass.
         identity_compiler = Compiler(CompileOptions(keep_intermediate=True))
         identity_compiler.run(mlir_module, pipelines=[], attempt_llvm_lowering=False)

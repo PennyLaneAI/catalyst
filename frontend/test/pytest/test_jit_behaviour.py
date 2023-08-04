@@ -31,7 +31,7 @@ from catalyst.jax_primitives import _scalar_abstractify
 def f_aot_builder(backend, wires=1, shots=1000):
     """Test AOT builder."""
 
-    @qjit()
+    @qjit
     @qml.qnode(qml.device(backend, wires=wires, shots=shots))
     def f(x: float):
         qml.RY(x, wires=0)
@@ -43,7 +43,7 @@ def f_aot_builder(backend, wires=1, shots=1000):
 def f_jit_builder(backend, wires=1, shots=1000):
     """Test JIT builder."""
 
-    @qjit()
+    @qjit
     @qml.qnode(qml.device(backend, wires=wires, shots=shots))
     def f(x):
         qml.RY(x, wires=0)
@@ -66,7 +66,7 @@ def function_jaxnumpy_csingle(x: jax.numpy.csingle, y: jax.numpy.csingle):
 def fsample_aot_builder(backend, wires=1, shots=1000):
     """Test AOT builder with the sample measurement process."""
 
-    @qjit()
+    @qjit
     @qml.qnode(qml.device(backend, wires=wires, shots=shots))
     def f(x: float):
         qml.RY(x, wires=0)
@@ -411,7 +411,7 @@ class TestDecorator:
             qml.RY(x, wires=0)
             return measure(wires=0)
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def f_parenthesis(x):
             qml.RY(x, wires=0)
@@ -424,7 +424,7 @@ class TestCaching:
     def test_function_is_cached(self, backend):
         """Test function is cached."""
 
-        @qjit()
+        @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def f_jit(x):
             qml.RY(x, wires=0)
@@ -529,6 +529,42 @@ class TestPromotionRules:
         assert TypeCompatibility.NEEDS_PROMOTION == retval
 
 
+class TestPromotionRulesDictionary:
+    """Class for test promotion rules for dictionaries."""
+
+    def test_trivial_no_promotion(self):
+        """Test trivial for the same dictionary as input."""
+        one = jnp.array(1.0)
+        retval = CompiledFunction.typecheck({"key1": one}, {"key1": one})
+        assert TypeCompatibility.CAN_SKIP_PROMOTION == retval
+
+    def test_trivial_no_promotion_different_values(self):
+        """Test trivial for the same dictionary with different values."""
+        one = jnp.array(1.0)
+        two = jnp.array(2.0)
+        retval = CompiledFunction.typecheck({"key1": one}, {"key1": two})
+        assert TypeCompatibility.CAN_SKIP_PROMOTION == retval
+
+    def test_trivial_promotion_different_values(self):
+        """Test promotion where keys have different values."""
+        one = jnp.array(1.0)
+        one_int = jnp.array(1)
+        retval = CompiledFunction.typecheck({"key1": one}, {"key1": one_int})
+        assert TypeCompatibility.NEEDS_PROMOTION == retval
+
+    def test_recompilation_superset_keys(self):
+        """Recompile if the structure is different superset case."""
+        one = jnp.array(1.0)
+        retval = CompiledFunction.typecheck({"key1": one}, {"key2": one, "key1": one})
+        assert TypeCompatibility.NEEDS_COMPILATION == retval
+
+    def test_recompilation_subset_keys(self):
+        """Recompile if the structure is different subset case."""
+        one = jnp.array(1.0)
+        retval = CompiledFunction.typecheck({"key2": one, "key1": one}, {"key1": one})
+        assert TypeCompatibility.NEEDS_COMPILATION == retval
+
+
 class TestSignatureErrors:
     def test_incompatible_argument(self):
         """Test incompatible argument."""
@@ -576,11 +612,12 @@ class TestClassicalCompilation:
 
 
 class TestArraysInHamiltonian:
+    """Test arrays in ``qml.Hamiltonian``."""
+
     @pytest.mark.parametrize(
         "coeffs",
         [
             (np.array([0.4, 0.7])),
-            ([0.4, 0.7]),
             (jnp.array([0.4, 0.7])),
         ],
     )
@@ -595,11 +632,12 @@ class TestArraysInHamiltonian:
             obs = [qml.PauliX(0) @ qml.PauliZ(1), qml.Hadamard(0)]
             return qml.expval(qml.Hamiltonian(coeffs, obs))
 
+        f()
+
     @pytest.mark.parametrize(
         "coeffs",
         [
             (np.array([0.4, 0.7])),
-            ([0.4, 0.7]),
             (jnp.array([0.4, 0.7])),
         ],
     )
@@ -621,7 +659,6 @@ class TestArraysInHamiltonian:
         [
             (np.array),
             (jnp.array),
-            (list),
         ],
     )
     def test_array_repr_built_in(self, repr, backend):
@@ -654,7 +691,6 @@ class TestArraysInHermitian:
         [
             (np.array),
             (jnp.array),
-            (list),
         ],
     )
     def test_array_repr_from_context(self, matrix, repr, backend):
@@ -674,7 +710,6 @@ class TestArraysInHermitian:
         [
             (np.array),
             (jnp.array),
-            (list),
         ],
     )
     def test_array_repr_as_parameter(self, matrix, repr, backend):
@@ -694,7 +729,6 @@ class TestArraysInHermitian:
         [
             (np.array),
             (jnp.array),
-            (list),
         ],
     )
     def test_array_repr_built_in(self, repr, backend):
