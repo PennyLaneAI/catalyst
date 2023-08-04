@@ -21,6 +21,7 @@ from typing import Dict, Iterable, List
 
 import jax
 import numpy as np
+from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
 from jax._src import api_util, core, source_info_util, util
 from jax._src.lib.mlir import ir
 from jax.core import AbstractValue
@@ -28,14 +29,9 @@ from jax.interpreters import mlir
 from jax.tree_util import PyTreeDef, tree_unflatten
 from jaxlib.mlir.dialects._func_ops_gen import CallOp
 from jaxlib.mlir.dialects._mhlo_ops_gen import ConstantOp, ConvertOp
-from jaxlib.mlir.dialects._stablehlo_ops_gen import (
-    ConstantOp as StableHLOConstantOp,
-    AddOp,
-    SubtractOp,
-    CeilOp,
-    DivOp,
-    MulOp,
-)
+from jaxlib.mlir.dialects._stablehlo_ops_gen import AddOp, CeilOp
+from jaxlib.mlir.dialects._stablehlo_ops_gen import ConstantOp as StableHLOConstantOp
+from jaxlib.mlir.dialects._stablehlo_ops_gen import DivOp, MulOp, SubtractOp
 from mlir_quantum.dialects.arith import IndexCastOp
 from mlir_quantum.dialects.gradient import GradOp, JVPOp, VJPOp
 from mlir_quantum.dialects.quantum import (
@@ -66,8 +62,6 @@ from mlir_quantum.dialects.scf import ConditionOp, ForOp, IfOp, WhileOp, YieldOp
 from mlir_quantum.dialects.tensor import ExtractOp as TensorExtractOp
 from mlir_quantum.dialects.tensor import FromElementsOp
 from pennylane import QNode as pennylane_QNode
-
-from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
 
 # pylint: disable=unused-argument,too-many-lines
 
