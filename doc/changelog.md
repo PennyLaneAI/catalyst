@@ -20,7 +20,8 @@
   workflow()
   ```
 
-* Add support for PyTrees as function arguments and return values.
+* Add support for container-like and nested Python structures, such as lists of lists or dictionaries,
+  that can occur in a QJIT program as function arguments or return values via the JAX ``pytree`` API.
   [#221](https://github.com/PennyLaneAI/catalyst/pull/221)
 
   For example:
