@@ -60,11 +60,9 @@ Value einsumLinalgGeneric(OpBuilder &ob, Location loc, ArrayRef<int64_t> axisCod
     {
         for (auto i : axisCodesResult) {
             shapeR.push_back(axisDims[i]);
-            errs() << "axis dim: " << (axisDims[i] == ShapedType::kDynamic) << "\n";
         }
     }
 
-    errs() << "ta: " << ta << "\n";
     ShapedType tr;
     if (useBufferSemantics) {
         tr = MemRefType::get(shapeR, ta.getElementType());

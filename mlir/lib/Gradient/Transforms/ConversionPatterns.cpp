@@ -222,6 +222,12 @@ void convertToDestinationPassingStyle(func::FuncOp callee, OpBuilder &builder)
 void wrapMemRefArgs(func::FuncOp func, LLVMTypeConverter &typeConverter, PatternRewriter &rewriter,
                     Location loc)
 {
+    if (llvm::none_of(func.getArgumentTypes(),
+                      [](Type argType) { return isa<MemRefType>(argType); })) {
+        // The memref arguments are already wrapped
+        return;
+    }
+
     ModuleOp moduleOp = func->getParentOfType<ModuleOp>();
     MLIRContext *ctx = rewriter.getContext();
     auto ptrType = LLVM::LLVMPointerType::get(ctx);
@@ -341,22 +347,22 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
                 if (func->hasAttrOfType<FlatSymbolRefAttr>("gradient.qgrad")) {
                     auto qgradFn = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
                         func, func->getAttrOfType<FlatSymbolRefAttr>("gradient.qgrad"));
-                    FunctionType qnodeType = func.getFunctionType();
+
+                    // When lowering multiple backprop ops, the callee type will be mutated by the
+                    // wrapped op. Save the original unwrapped function type so that later backprop
+                    // ops can read it.
+                    if (!func->hasAttr("unwrapped_type")) {
+                        func->setAttr("unwrapped_type", TypeAttr::get(func.getFunctionType()));
+                    }
                     convertToDestinationPassingStyle(func, rewriter);
 
                     wrapMemRefArgs(func, *getTypeConverter(), rewriter, loc);
 
-                    auto augFwd = genAugmentedForward(func, rewriter);
-                    if (failed(augFwd)) {
-                        return failure();
-                    }
-                    auto customQGrad =
-                        genCustomQGradient(func, qnodeType, func.getLoc(), qgradFn, rewriter);
-                    if (failed(customQGrad)) {
-                        return failure();
-                    }
+                    func::FuncOp augFwd = genAugmentedForward(func, rewriter);
+                    func::FuncOp customQGrad =
+                        genCustomQGradient(func, func.getLoc(), qgradFn, rewriter);
                     insertEnzymeCustomGradient(rewriter, func->getParentOfType<ModuleOp>(),
-                                               func.getLoc(), func, *augFwd, *customQGrad);
+                                               func.getLoc(), func, augFwd, customQGrad);
                 }
 
                 return success();
@@ -590,11 +596,16 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         builder.create<func::CallOp>(op->getLoc(), cast<func::FuncOp>(printFn), casted);
     }
 
-    FailureOr<func::FuncOp> genAugmentedForward(func::FuncOp qnode, OpBuilder &builder) const
+    func::FuncOp genAugmentedForward(func::FuncOp qnode, OpBuilder &builder) const
     {
+        std::string augmentedName = (qnode.getName() + ".augfwd").str();
+        auto augmentedForward = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
+            qnode, builder.getStringAttr(augmentedName));
+        if (augmentedForward) {
+            return augmentedForward;
+        }
         assert(qnode.getNumResults() == 0 && "Expected QNode to be in destination-passing style");
         MLIRContext *ctx = builder.getContext();
-        std::string augmentedName = (qnode.getName() + ".augfwd").str();
         OpBuilder::InsertionGuard insertionGuard(builder);
         builder.setInsertionPointAfter(qnode);
         // The tape type is a null pointer because we don't need to pass any data from the forward
@@ -602,7 +613,7 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         auto tapeType = LLVM::LLVMPointerType::get(ctx);
         SmallVector<Type> argTypes;
         convertCustomGradArgumentTypes(qnode.getArgumentTypes(), argTypes);
-        auto augmentedForward = builder.create<func::FuncOp>(
+        augmentedForward = builder.create<func::FuncOp>(
             qnode.getLoc(), augmentedName, FunctionType::get(ctx, argTypes, {tapeType}));
         augmentedForward.setPrivate();
         Location loc = qnode.getLoc();
@@ -624,17 +635,24 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
 
     // `qnodeType` is the original type of the function prior to conversion to destination-passing
     // style and wrapping memrefs into pointers.
-    FailureOr<func::FuncOp> genCustomQGradient(func::FuncOp qnode, FunctionType qnodeType,
-                                               Location loc, func::FuncOp qgradFn,
-                                               OpBuilder &builder) const
+    func::FuncOp genCustomQGradient(func::FuncOp qnode, Location loc, func::FuncOp qgradFn,
+                                    OpBuilder &builder) const
     {
-        SmallVector<Type> customArgTypes;
         std::string customQGradName = (qnode.getName() + ".customqgrad").str();
+        auto customQGrad = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
+            qnode, builder.getStringAttr(customQGradName));
+        if (customQGrad) {
+            return customQGrad;
+        }
+
+        SmallVector<Type> customArgTypes;
         MLIRContext *ctx = builder.getContext();
         auto tapeType = LLVM::LLVMPointerType::get(ctx);
         SmallVector<Type> argTypes;
         convertCustomGradArgumentTypes(qnode.getArgumentTypes(), argTypes);
         argTypes.push_back(tapeType);
+        auto qnodeType =
+            cast<FunctionType>(qnode->getAttrOfType<TypeAttr>("unwrapped_type").getValue());
 
         OpBuilder::InsertionGuard insertionGuard(builder);
         // make volatile load to argument
@@ -651,7 +669,7 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         //
         builder.setInsertionPoint(qnode);
         auto funcType = FunctionType::get(ctx, argTypes, {});
-        auto customQGrad = builder.create<func::FuncOp>(qnode.getLoc(), customQGradName, funcType);
+        customQGrad = builder.create<func::FuncOp>(qnode.getLoc(), customQGradName, funcType);
         customQGrad.setPrivate();
         Block *block = customQGrad.addEntryBlock();
         builder.setInsertionPointToStart(block);
@@ -694,7 +712,7 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         Value gateParamShadow = unwrappedShadows.back();
         Value resultShadow = unwrapMemRef(block->getArguments()[block->getNumArguments() - 2],
                                           qnodeType.getResult(0));
-        // // The gate param list is always 1-d
+        // The gate param list is always 1-d
         Value pcount = builder.create<memref::DimOp>(loc, gateParamShadow, 0);
         primalInputs.push_back(pcount);
 
