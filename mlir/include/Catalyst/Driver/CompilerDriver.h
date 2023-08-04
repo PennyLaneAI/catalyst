@@ -77,6 +77,8 @@ struct CompilerOptions {
     /// Ordered list of named pipelines to execute, each pipeline is described by a list of MLIR
     /// passes it includes.
     std::vector<Pipeline> pipelinesCfg;
+    // LLVM-IR passes.
+    std::vector<Pipeline> pipelinesLLVM;
     /// Whether to assume that the pipelines output is a valid LLVM dialect and lower it to LLVM IR
     bool attemptLLVMLowering;
 
