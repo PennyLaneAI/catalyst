@@ -628,7 +628,7 @@ class QJIT:
 
         # For the classical and pennylane_extensions compilation path,
         if isinstance(data, (list, tuple)) and len(data) == 1:
-            return data[0]
+            data = data[0]
 
         return data
 
@@ -707,20 +707,24 @@ class JAX_QJIT:
                 argnums.append(idx)
 
         results = self.wrap_callback(self.qfunc, *primals)
+        results_data, results_shape = tree_flatten(results)
         derivatives = self.wrap_callback(self.get_derivative_qfunc(argnums), *primals)
+        derivatives_data, derivatives_shape = tree_flatten(derivatives)
 
-        jvps = [jnp.zeros_like(results[res_idx]) for res_idx in range(len(results))]
+        jvps = [jnp.zeros_like(results_data[res_idx]) for res_idx in range(len(results_data))]
         for diff_arg_idx, arg_idx in enumerate(argnums):
             tangent = tangents[arg_idx]  # [1]
             taxis = list(range(tangent.ndim))
-            for res_idx in range(len(results)):
-                deriv_idx = diff_arg_idx * len(results) + res_idx
-                deriv = derivatives[deriv_idx]  # [2]
+            for res_idx in range(len(results_data)):
+                deriv_idx = diff_arg_idx * len(results_data) + res_idx
+                deriv = derivatives_data[deriv_idx]  # [2]
                 jvp = jnp.tensordot(deriv, tangent, axes=(taxis, taxis))
                 jvps[res_idx] = jvps[res_idx] + jvp
 
-        if len(results) == 1:
-            results = results[0]
+        # jvps must match the type of primals
+        # due to pytrees, primals are a tuple
+        primal_type = type(primals)
+        jvps = primal_type(jvps)
         if len(jvps) == 1:
             jvps = jvps[0]
 
