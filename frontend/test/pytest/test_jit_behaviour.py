@@ -619,6 +619,26 @@ class TestArraysInHamiltonian:
             (jnp.array([0.4, 0.7])),
         ],
     )
+    def test_array_repr_from_context(self, coeffs, backend):
+        """Test array representation from context in Hamiltonian."""
+
+        @qjit(target="mlir")
+        @qml.qnode(qml.device(backend, wires=6))
+        def f():
+            qml.Hadamard(wires=0)
+            qml.CNOT(wires=[0, 1])
+            obs = [qml.PauliX(0) @ qml.PauliZ(1), qml.Hadamard(0)]
+            return qml.expval(qml.Hamiltonian(coeffs, obs))
+
+        f()
+
+    @pytest.mark.parametrize(
+        "coeffs",
+        [
+            (np.array([0.4, 0.7])),
+            (jnp.array([0.4, 0.7])),
+        ],
+    )
     def test_array_repr_as_parameter(self, coeffs, backend):
         """Test array representation as parameter in Hamiltonian."""
 
