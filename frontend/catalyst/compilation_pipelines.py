@@ -612,7 +612,7 @@ class QJIT:
         recompilation_needed = function != self.compiled_function
         self.compiled_function = function
 
-        args_data, args_shape = tree_flatten(args)
+        args_data, _args_shape = tree_flatten(args)
         if any(isinstance(arg, jax.core.Tracer) for arg in args_data):
             # Only compile a derivative version of the compiled function when needed.
             if self.jaxed_qfunc is None or recompilation_needed:
@@ -707,9 +707,9 @@ class JAX_QJIT:
                 argnums.append(idx)
 
         results = self.wrap_callback(self.qfunc, *primals)
-        results_data, results_shape = tree_flatten(results)
+        results_data, _results_shape = tree_flatten(results)
         derivatives = self.wrap_callback(self.get_derivative_qfunc(argnums), *primals)
-        derivatives_data, derivatives_shape = tree_flatten(derivatives)
+        derivatives_data, _derivatives_shape = tree_flatten(derivatives)
 
         jvps = [jnp.zeros_like(results_data[res_idx]) for res_idx in range(len(results_data))]
         for diff_arg_idx, arg_idx in enumerate(argnums):
