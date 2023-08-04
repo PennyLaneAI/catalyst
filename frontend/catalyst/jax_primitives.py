@@ -1467,8 +1467,16 @@ def _qfor_lowering(
 
         # Convert the index type iteration variable expected by MLIR to tensor<i64> expected by JAX.
         if apply_reverse_transform:
+            ctx = jax_ctx.module_context.context
+            i64_type = ir.IntegerType.get_signless(64, ctx)
+            body_args[0] = IndexCastOp(i64_type, body_args[0]).result
+            step_val = IndexCastOp(i64_type, step_val).result
+            start_val = IndexCastOp(i64_type, start_val).result
             # iv = start + normalized_iv * step
-            body_args[0] = AddIOp(start_val, MulIOp(body_args[0], step_val))
+            mulOp = MulIOp(body_args[0], step_val)
+            body_args[0] = AddIOp(start_val, mulOp.result).result
+            body_args[0] = IndexCastOp(ir.IndexType.get(), body_args[0]).result
+
         body_args[0] = IndexCastOp(loop_index_type, body_args[0]).result
         result_from_elements_op = ir.RankedTensorType.get((), loop_index_type)
         from_elements_op = FromElementsOp.build_generic([result_from_elements_op], [body_args[0]])
