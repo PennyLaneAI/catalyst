@@ -30,8 +30,8 @@ from jax.interpreters.mlir import (
     lowerable_effects,
 )
 from jax.interpreters.partial_eval import DynamicJaxprTracer
-from jax.tree_util import tree_flatten, tree_unflatten
-from pennylane.measurements import MeasurementProcess
+from jax.tree_util import tree_flatten, tree_structure, tree_unflatten
+from pennylane.measurements import CountsMP, MeasurementProcess
 from pennylane.operation import Wires
 
 import catalyst.jax_primitives as jprim
@@ -50,9 +50,10 @@ def get_mlir(func, *args, **kwargs):
         kwargs: keyword arguments to ``func``
 
     Returns:
-        m: the MLIR module corresponding to ``func``
-        ctx: the MLIR context corresponding
+        module: the MLIR module corresponding to ``func``
+        context: the MLIR context corresponding
         jaxpr: the jaxpr corresponding to ``func``
+        shape: the shape of the return values in ``PyTreeDef``
     """
 
     # The compilation cache must be clear for each translation unit.
@@ -62,7 +63,7 @@ def get_mlir(func, *args, **kwargs):
     jprim.mlir_fn_cache.clear()
 
     with TracingContext():
-        jaxpr = jax.make_jaxpr(func)(*args, **kwargs)
+        jaxpr, shape = jax.make_jaxpr(func, return_shape=True)(*args, **kwargs)
 
     nrep = jaxpr_replicas(jaxpr)
     effects = [eff for eff in jaxpr.effects if eff in jax.core.ordered_effects]
@@ -79,7 +80,7 @@ def get_mlir(func, *args, **kwargs):
         donated_args=[],
     )
 
-    return module, context, jaxpr
+    return module, context, jaxpr, tree_structure(shape)
 
 
 def get_traceable_fn(qfunc, device):
@@ -108,14 +109,28 @@ def get_traceable_fn(qfunc, device):
                 with tape.quantum_tape:
                     out = qfunc(*args, **kwargs)
 
-                return_values = out if isinstance(out, (tuple, list)) else (out,)
                 meas_return_values = []
                 meas_ret_val_indices = []
                 non_meas_return_values = []
-                for i, ret_val in enumerate(return_values):
+                meas_return_vals, meas_return_trees = tree_flatten(out)
+                for i, ret_val in enumerate(meas_return_vals):
                     if isinstance(ret_val, MeasurementProcess):
                         meas_return_values.append(ret_val)
                         meas_ret_val_indices.append(i)
+                        if isinstance(ret_val, CountsMP):
+                            # As CountsMP expands leaves of the generated PyTreeDef, we need to
+                            # update the leaves based on the endmost tree shape.
+                            counts_tree = tree_structure(("keys", "counts"))
+                            meas_return_trees_children = meas_return_trees.children()
+                            if len(meas_return_trees_children):
+                                meas_return_trees_children[i] = counts_tree
+                                meas_return_trees = (
+                                    meas_return_trees.make_from_node_data_and_children(
+                                        meas_return_trees.node_data(), meas_return_trees_children
+                                    )
+                                )
+                            else:
+                                meas_return_trees = counts_tree
                     else:
                         non_meas_return_values.append(ret_val)
 
@@ -135,6 +150,8 @@ def get_traceable_fn(qfunc, device):
         )
 
         jprim.qdealloc(qreg)
+
+        return_values = tree_unflatten(meas_return_trees, return_values)
 
         return return_values
 
@@ -346,12 +363,7 @@ def trace_quantum_tape(
         return_values[idx:idx] = ret_val
         idx_offset += len(ret_val) - 1
 
-    if len(return_values) == 1:
-        out = return_values[0]
-    else:
-        out = tuple(return_values)
-
-    return out, qreg, qubit_states
+    return return_values, qreg, qubit_states
 
 
 # TODO: remove once fixed upstream: https://github.com/PennyLaneAI/pennylane/issues/4263
