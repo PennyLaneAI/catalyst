@@ -32,8 +32,10 @@ from jaxlib.mlir.dialects._stablehlo_ops_gen import (
     ConstantOp as StableHLOConstantOp,
     AddOp,
     SubtractOp,
+    CeilOp,
+    DivOp,
 )
-from mlir_quantum.dialects.arith import CeilDivSIOp, IndexCastOp, MulIOp
+from mlir_quantum.dialects.arith import IndexCastOp, MulIOp
 from mlir_quantum.dialects.gradient import GradOp, JVPOp, VJPOp
 from mlir_quantum.dialects.quantum import (
     AdjointOp,
@@ -1460,17 +1462,38 @@ def _qfor_lowering(
         tensor_type = ir.RankedTensorType.get((), i64_type)
         start_val = FromElementsOp.build_generic([tensor_type], [start_val]).result
         stop_val = FromElementsOp.build_generic([tensor_type], [stop_val]).result
+        step_val = FromElementsOp.build_generic([tensor_type], [step_val]).result
+
+        # Convert start_val, stop_val and step_val to tensor<f64>.
+        # Needed since StableHLO does not have CeilDivSIOp.
+        # StableHLO division of integer types discards the
+        # fractional part. Instead first convert to floating point types
+        # and perform ceiling and cast back to integer types to keep
+        # current semantics.
+        f64_type = ir.F64Type.get(ctx)
+        tensor_type = ir.RankedTensorType.get((), f64_type)
+        start_val = ConvertOp(tensor_type, start_val).result
+        stop_val = ConvertOp(tensor_type, stop_val).result
+        step_val = ConvertOp(tensor_type, step_val).result
 
         # Iterate from 0 to the number of iterations (ceil((stop - start) / step))
 
         distance = SubtractOp(stop_val, start_val).result
+        num_iterations = DivOp(distance, step_val).result
+        num_iterations = CeilOp(num_iterations).result
 
-        # Unwrap distance, start_val, stop_val
-        distance = TensorExtractOp(i64_type, distance, []).result
+        # Convert num_iterations back into an integer
+        tensor_type = ir.RankedTensorType.get((), i64_type)
+        num_iterations = ConvertOp(tensor_type, num_iterations).result
+        start_val = ConvertOp(tensor_type, start_val).result
+        stop_val = ConvertOp(tensor_type, stop_val).result
+        step_val = ConvertOp(tensor_type, step_val).result
+
+        # Unwrap distance, start_val, stop_val, step_val
+        num_iterations = TensorExtractOp(i64_type, num_iterations, []).result
         start_val = TensorExtractOp(i64_type, start_val, []).result
         stop_val = TensorExtractOp(i64_type, stop_val, []).result
-
-        num_iterations = CeilDivSIOp(distance, step_val)
+        step_val = TensorExtractOp(i64_type, step_val, []).result
 
         # Cast start_val, stop_val and step_val back to index type
         start_val = IndexCastOp(ir.IndexType.get(), start_val).result
