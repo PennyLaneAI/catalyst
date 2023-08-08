@@ -100,11 +100,11 @@ dialects:
 		-DLLVM_ENABLE_LLD=$(ENABLE_LLD)
 
 	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects quantum-lsp-server
-	patch -d $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum --follow-symlinks < patches/use-ir-from-jax.patch
-	patch -d $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/dialects --follow-symlinks < patches/use-cext-from-jax.patch
-	patch -d $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/dialects --follow-symlinks < patches/do-not-infer-result.patch
-	patch -d $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/dialects --follow-symlinks < patches/remove-gradient-cext-import.patch
-	patch -d $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/dialects --follow-symlinks < patches/remove-quantum-cext-import.patch
+	$(shell git apply patches/0001-Use-IR-from-JAX.patch)
+	$(shell git apply patches/0002*)
+	$(shell git apply patches/0003*)
+	$(shell git apply patches/0004*)
+	$(shell git apply patches/0005*)
 
 .PHONY: test
 test:
