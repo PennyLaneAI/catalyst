@@ -107,6 +107,9 @@
   until the end of the call to the JIT compiled function.
   [#201](https://github.com/PennyLaneAI/catalyst/pull/201)
 
+* Avoid a type mismatch. This allows dialects to compile with older versions of clang.
+  [#228](https://github.com/PennyLaneAI/catalyst/pull/228)
+
 
 <h3>Breaking changes</h3>
 
