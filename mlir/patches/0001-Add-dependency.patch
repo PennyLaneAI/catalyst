@@ -1,0 +1,26 @@
+From 6db0e653fb9195331a75589a03e554dd004c2ec1 Mon Sep 17 00:00:00 2001
+From: Erick Ochoa <erick.ochoalopez@xanadu.ai>
+Date: Tue, 8 Aug 2023 14:37:45 -0400
+Subject: [PATCH 1/1] Add dependency.
+
+---
+ mhlo/analysis/CMakeLists.txt | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/mhlo/analysis/CMakeLists.txt b/mhlo/analysis/CMakeLists.txt
+index 4e15d73..a10d88d 100644
+--- a/mhlo/analysis/CMakeLists.txt
++++ b/mhlo/analysis/CMakeLists.txt
+@@ -13,6 +13,9 @@ add_mlir_library(MhloAnalysis
+ add_mlir_library(MhloTestAnalysis
+   test_shape_component_analysis.cc
+ 
++  DEPENDS
++  LMHLOTransformsPassIncGen
++
+   LINK_COMPONENTS
+   Core
+ 
+-- 
+2.39.2 (Apple Git-143)
+
