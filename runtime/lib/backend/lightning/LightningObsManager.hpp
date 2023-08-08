@@ -144,8 +144,7 @@ template <typename PrecisionT> class LightningObsManager {
         obs_vec.reserve(key_size);
 
         for (const auto &key : obsKeys) {
-            RT_FAIL_IF(static_cast<size_t>(key) >= obs_size || key < 0,
-                       "Invalid observable key");
+            RT_FAIL_IF(static_cast<size_t>(key) >= obs_size || key < 0, "Invalid observable key");
 
             auto &&[obs, type] = observables_[key];
 
@@ -183,8 +182,7 @@ template <typename PrecisionT> class LightningObsManager {
         obs_vec.reserve(key_size);
 
         for (auto key : obsKeys) {
-            RT_FAIL_IF(static_cast<size_t>(key) >= obs_size || key < 0,
-                       "Invalid observable key");
+            RT_FAIL_IF(static_cast<size_t>(key) >= obs_size || key < 0, "Invalid observable key");
 
             auto &&[obs, type] = observables_[key];
             auto contain_obs = std::find(hamiltonian_valid_obs_types.begin(),
