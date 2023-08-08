@@ -100,11 +100,11 @@ dialects:
 		-DLLVM_ENABLE_LLD=$(ENABLE_LLD)
 
 	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects quantum-lsp-server
-	$(shell rm build/python_packages/quantum/mlir_quantum/ir.py && git apply patches/0001-Use-IR-from-JAX.patch)
-	$(shell rm build/python_packages/quantum/mlir_quantum/dialects/_ods_common.py && git apply patches/0002*)
-	$(shell rm build/python_packages/quantum/mlir_quantum/dialects/_tensor_ops_gen.py && git apply patches/0003*)
-	$(shell rm build/python_packages/quantum/mlir_quantum/quantum.py && git apply patches/0004*)
-	$(shell rm build/python_packages/quantum/mlir_quantum/gradient.py && git apply patches/0005*)
+	rm -f $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/ir.py && git apply patches/0001-Use-IR-from-JAX.patch
+	rm -f $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/dialects/_ods_common.py && git apply patches/0002*
+	rm -f $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/dialects/_tensor_ops_gen.py && git apply patches/0003*
+	rm -f $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/dialects/quantum.py && git apply patches/0004*
+	rm -f $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/dialects/gradient.py && git apply patches/0005*
 
 .PHONY: test
 test:
