@@ -1,0 +1,21 @@
+From 2f8e29c6419e46bd2aaeebf1c39f886292045d8a Mon Sep 17 00:00:00 2001
+From: Erick Ochoa <erick.ochoalopez@xanadu.ai>
+Date: Tue, 8 Aug 2023 15:33:24 -0400
+Subject: [PATCH 1/5] Use IR from JAX.
+
+---
+ mlir/build/python_packages/quantum/mlir_quantum/ir.py | 2 ++
+ 1 file changed, 2 insertions(+)
+ create mode 100644 mlir/build/python_packages/quantum/mlir_quantum/ir.py
+
+diff --git a/mlir/build/python_packages/quantum/mlir_quantum/ir.py b/mlir/build/python_packages/quantum/mlir_quantum/ir.py
+new file mode 100644
+index 0000000..6c090d0
+--- /dev/null
++++ b/mlir/build/python_packages/quantum/mlir_quantum/ir.py
+@@ -0,0 +1,2 @@
++from jaxlib.mlir.ir import *
++from jaxlib.mlir.ir import _GlobalDebug
+-- 
+2.39.2 (Apple Git-143)
+
