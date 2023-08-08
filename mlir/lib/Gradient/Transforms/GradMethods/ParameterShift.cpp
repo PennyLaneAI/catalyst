@@ -271,12 +271,19 @@ void ParameterShiftLowering::rewrite(GradOp op, PatternRewriter &rewriter) const
 
     rewriter.setInsertionPoint(op);
     std::vector<size_t> diffArgIndices = computeDiffArgIndices(op.getDiffArgIndices());
-    SmallVector<Value> backpropResults;
-
+    SmallVector<Value> backpropResults{op.getNumResults()};
+    // This iterates over the primal result (tensor<2xf64>), should only iterate once.
+    // TODO: Explain the TypeRange{}.take_front. Basically the gradOp results are duplicated
     for (const auto &[cotangentIdx, jacobianType, primalResult] :
-         llvm::enumerate(op.getResultTypes(), clonedCallee.getResultTypes())) {
-        Value jacobian = rewriter.create<tensor::EmptyOp>(loc, jacobianType,
-                                                          /*dynamicSizes=*/ValueRange{});
+         llvm::enumerate(TypeRange{op.getResultTypes()}.take_front(clonedCallee.getNumResults()),
+                         clonedCallee.getResultTypes())) {
+        // There is one Jacobian per distinct differential argument.
+        SmallVector<Value> jacobians;
+        for (unsigned argIdx = 0; argIdx < diffArgIndices.size(); argIdx++) {
+            jacobians.push_back(
+                rewriter.create<tensor::EmptyOp>(loc, jacobianType, /*dynamicSizes=*/ValueRange{}));
+        }
+
         auto primalTensorResultType = cast<RankedTensorType>(primalResult);
         assert(primalTensorResultType.hasStaticShape());
 
@@ -330,46 +337,47 @@ void ParameterShiftLowering::rewrite(GradOp op, PatternRewriter &rewriter) const
                 /*arg_shadows=*/ValueRange{}, /*primal results=*/ValueRange{}, cotangents,
                 op.getDiffArgIndicesAttr());
 
-            // May need insert or insert_slice here
-            assert(backpropOp.getNumResults() == 1);
-            Value result = backpropOp.getResult(0);
-            auto sliceType = cast<RankedTensorType>(result.getType());
-            size_t sliceRank = sliceType.getRank();
-            size_t jacobianRank = cast<RankedTensorType>(jacobianType).getRank();
-            if (sliceRank < jacobianRank) {
-                // Offsets are [...indices] + [0] * rank of backprop input
-                SmallVector<OpFoldResult> offsets;
-                offsets.append(indices.begin(), indices.end());
-                offsets.append(sliceRank, rewriter.getIndexAttr(0));
+            for (const auto &[backpropIdx, jacobianSlice] :
+                 llvm::enumerate(backpropOp.getResults())) {
+                auto sliceType = cast<RankedTensorType>(jacobianSlice.getType());
+                size_t sliceRank = sliceType.getRank();
+                size_t jacobianRank = cast<RankedTensorType>(jacobianType).getRank();
+                if (sliceRank < jacobianRank) {
+                    // Offsets are [...indices] + [0] * rank of backprop input
+                    SmallVector<OpFoldResult> offsets;
+                    offsets.append(indices.begin(), indices.end());
+                    offsets.append(sliceRank, rewriter.getIndexAttr(0));
 
-                // Sizes are [1] * (jacobianRank - sliceRank) + [...sliceShape]
-                SmallVector<OpFoldResult> sizes;
-                sizes.append(jacobianRank - sliceRank, rewriter.getIndexAttr(1));
-                for (int64_t dim : sliceType.getShape()) {
-                    sizes.push_back(rewriter.getIndexAttr(dim));
+                    // Sizes are [1] * (jacobianRank - sliceRank) + [...sliceShape]
+                    SmallVector<OpFoldResult> sizes;
+                    sizes.append(jacobianRank - sliceRank, rewriter.getIndexAttr(1));
+                    for (int64_t dim : sliceType.getShape()) {
+                        sizes.push_back(rewriter.getIndexAttr(dim));
+                    }
+
+                    // Strides are [1] * jacobianRank
+                    SmallVector<OpFoldResult> strides{jacobianRank, rewriter.getIndexAttr(1)};
+
+                    // for (auto x : offsets) {
+                    //     errs() << "offset: " << x << "\n";
+                    // }
+                    // for (auto x : sizes) {
+                    //     errs() << "size: " << x << "\n";
+                    // }
+                    // for (auto x : strides) {
+                    //     errs() << "stride: " << x << "\n";
+                    // }
+
+                    jacobians[backpropIdx] = rewriter.create<tensor::InsertSliceOp>(
+                        loc, jacobianSlice, jacobians[backpropIdx], offsets, sizes, strides);
                 }
-
-                // Strides are [1] * jacobianRank
-                SmallVector<OpFoldResult> strides{jacobianRank, rewriter.getIndexAttr(1)};
-
-                // for (auto x : offsets) {
-                //     errs() << "offset: " << x << "\n";
-                // }
-                // for (auto x : sizes) {
-                //     errs() << "size: " << x << "\n";
-                // }
-                // for (auto x : strides) {
-                //     errs() << "stride: " << x << "\n";
-                // }
-
-                jacobian = rewriter.create<tensor::InsertSliceOp>(
-                    loc, backpropOp.getResult(0), jacobian, offsets, sizes, strides);
-            }
-            else {
-                jacobian = backpropOp.getResult(0);
+                else {
+                    jacobians[backpropIdx] = jacobianSlice;
+                }
+                backpropResults[backpropIdx * clonedCallee.getNumResults() + cotangentIdx] =
+                    jacobians[backpropIdx];
             }
         }
-        backpropResults.push_back(jacobian);
     }
 
     rewriter.replaceOp(op, backpropResults);
