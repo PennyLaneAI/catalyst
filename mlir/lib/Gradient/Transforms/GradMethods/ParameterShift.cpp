@@ -211,6 +211,7 @@ void ParameterShiftLowering::rewrite(GradOp op, PatternRewriter &rewriter) const
         qnodes.insert(clonedCallee);
     }
     else {
+        // TODO: This does not traverse the entire call graph
         clonedCallee.walk([&](func::CallOp callOp) {
             auto nestedCallee =
                 SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(callOp, callOp.getCalleeAttr());
@@ -235,19 +236,6 @@ void ParameterShiftLowering::rewrite(GradOp op, PatternRewriter &rewriter) const
 
         func::FuncOp qnodeSplit = genSplitPreprocessed(rewriter, loc, qnode, qnodeWithParams);
 
-        // Replace calls to the original QNode with calls to the split QNode
-        clonedCallee.walk([&](func::CallOp callOp) {
-            if (callOp.getCallee() == qnode.getName()) {
-                PatternRewriter::InsertionGuard insertionGuard(rewriter);
-                rewriter.setInsertionPointToStart(&clonedCallee.getFunctionBody().front());
-                Value paramCount =
-                    rewriter.create<func::CallOp>(loc, paramCountFn, callOp.getArgOperands())
-                        .getResult(0);
-                callOp.setCallee(qnodeSplit.getName());
-                callOp.getOperandsMutable().append(paramCount);
-            }
-        });
-
         // // Generate the classical argument map from function arguments to gate parameters. This
         // // function will be differentiated to produce the classical jacobian.
         // func::FuncOp argMapFn = genArgMapFunction(rewriter, loc, callee);
@@ -261,6 +249,36 @@ void ParameterShiftLowering::rewrite(GradOp op, PatternRewriter &rewriter) const
         func::FuncOp qGradFn =
             genQGradFunction(rewriter, loc, qnode, shiftFn, numShifts, loopDepth);
 
+        // Replace calls to the original QNode with calls to the split QNode
+        if (isQNode(clonedCallee)) {
+            PatternRewriter::InsertionGuard insertionGuard(rewriter);
+            rewriter.eraseBlock(&clonedCallee.getFunctionBody().front());
+            Block *entryBlock = clonedCallee.addEntryBlock();
+
+            rewriter.setInsertionPointToStart(entryBlock);
+            Value paramCount =
+                rewriter.create<func::CallOp>(loc, paramCountFn, clonedCallee.getArguments())
+                    .getResult(0);
+            SmallVector<Value> splitArgs{clonedCallee.getArguments()};
+            splitArgs.push_back(paramCount);
+
+            auto splitCall = rewriter.create<func::CallOp>(loc, qnodeSplit, splitArgs);
+            rewriter.create<func::ReturnOp>(loc, splitCall.getResults());
+        }
+        else {
+            // TODO: Also doesn't traverse the entire call graph
+            clonedCallee.walk([&](func::CallOp callOp) {
+                if (callOp.getCallee() == qnode.getName()) {
+                    PatternRewriter::InsertionGuard insertionGuard(rewriter);
+                    rewriter.setInsertionPointToStart(&clonedCallee.getFunctionBody().front());
+                    Value paramCount =
+                        rewriter.create<func::CallOp>(loc, paramCountFn, callOp.getArgOperands())
+                            .getResult(0);
+                    callOp.setCallee(qnodeSplit.getName());
+                    callOp.getOperandsMutable().append(paramCount);
+                }
+            });
+        }
         // Generate the quantum gradient function at the tensor level, then register it as an
         // attribute.
         qnodeWithParams->setAttr("gradient.qgrad", FlatSymbolRefAttr::get(qGradFn.getNameAttr()));
@@ -272,7 +290,7 @@ void ParameterShiftLowering::rewrite(GradOp op, PatternRewriter &rewriter) const
     rewriter.setInsertionPoint(op);
     std::vector<size_t> diffArgIndices = computeDiffArgIndices(op.getDiffArgIndices());
     SmallVector<Value> backpropResults{op.getNumResults()};
-    // This iterates over the primal result (tensor<2xf64>), should only iterate once.
+    // Iterate over the primal results
     // TODO: Explain the TypeRange{}.take_front. Basically the gradOp results are duplicated
     for (const auto &[cotangentIdx, jacobianType, primalResult] :
          llvm::enumerate(TypeRange{op.getResultTypes()}.take_front(clonedCallee.getNumResults()),
@@ -357,16 +375,6 @@ void ParameterShiftLowering::rewrite(GradOp op, PatternRewriter &rewriter) const
 
                     // Strides are [1] * jacobianRank
                     SmallVector<OpFoldResult> strides{jacobianRank, rewriter.getIndexAttr(1)};
-
-                    // for (auto x : offsets) {
-                    //     errs() << "offset: " << x << "\n";
-                    // }
-                    // for (auto x : sizes) {
-                    //     errs() << "size: " << x << "\n";
-                    // }
-                    // for (auto x : strides) {
-                    //     errs() << "stride: " << x << "\n";
-                    // }
 
                     jacobians[backpropIdx] = rewriter.create<tensor::InsertSliceOp>(
                         loc, jacobianSlice, jacobians[backpropIdx], offsets, sizes, strides);
