@@ -55,7 +55,7 @@ typedef enum {
 struct Pipeline {
     typedef std::string Name;
     typedef llvm::SmallVector<std::string> PassList;
-    std::string name;
+    Name name;
     PassList passes;
 };
 
