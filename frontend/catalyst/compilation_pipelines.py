@@ -539,7 +539,7 @@ class QJIT:
 
         _, self._mlir, _ = self._compiler.run(
             mlir_module,
-            attempt_llvm_lowering=False,
+            lower_to_llvm=False,
             pipelines=[("pipeline", ["canonicalize"])],
         )
         return mlir_module

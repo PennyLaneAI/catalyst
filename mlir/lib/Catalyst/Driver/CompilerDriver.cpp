@@ -305,7 +305,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         output.outIR.clear();
         outIRStream << *op;
 
-        if (options.attemptLLVMLowering) {
+        if (options.lowerToLLVM) {
             llvmModule = translateModuleToLLVMIR(*op, llvmContext);
             if (!llvmModule) {
                 return failure();

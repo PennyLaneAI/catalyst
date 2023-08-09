@@ -80,7 +80,7 @@ struct CompilerOptions {
     // LLVM-IR passes.
     std::vector<Pipeline> pipelinesLLVM;
     /// Whether to assume that the pipelines output is a valid LLVM dialect and lower it to LLVM IR
-    bool attemptLLVMLowering;
+    bool lowerToLLVM;
 
     /// Get the destination of the object file at the end of compilation.
     std::string getObjectFile() const
