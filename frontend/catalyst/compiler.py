@@ -356,7 +356,13 @@ class CompilerDriver:
     6. cc: Usually defaults to gcc, however POSIX states that it is deprecated.
     """
 
-    _default_fallback_compilers = ["clang", "gcc", "c99", "c89", "cc"]
+    # TODO:
+    # Find out why mac requires clang++ as opposed to clang or cc.
+    # I suspect it might be an issue with the fact that clang++
+    # is homebrew installed.
+    _compilers_apple = ["clang++"]
+    _compilers_linux = ["clang", "gcc", "c99", "c89", "cc"]
+    _default_fallback_compilers = _compilers_linux if platform.system() == "Linux" else _compilers_apple
 
     @staticmethod
     def get_default_flags():
@@ -371,6 +377,9 @@ class CompilerDriver:
         rt_lib_path = get_lib_path("runtime", "RUNTIME_LIB_DIR")
         rt_capi_path = os.path.join(rt_lib_path, "capi")
         rt_backend_path = os.path.join(rt_lib_path, "backend")
+        error_flag_apple = "-Wl,-arch_errors_fatal"
+        error_flag_linux = ""
+        error_flag = error_flag_linux if platform.system() == "Linux" else error_flag_apple
 
         default_flags = [
             "-shared",
@@ -384,6 +393,7 @@ class CompilerDriver:
             "-lrt_backend",
             "-lrt_capi",
             "-lpthread",
+            f"{error_flag}",
             "-lmlir_c_runner_utils",  # required for memref.copy
         ]
 
