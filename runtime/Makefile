@@ -15,19 +15,7 @@ ENABLE_LIGHTNING_KOKKOS?=OFF
 ENABLE_OPENQASM?=OFF
 LIGHTNING_GIT_TAG_VALUE?=latest_release
 LIGHTNING_KOKKOS_GIT_TAG_VALUE?=latest_release
-
-# Assumption: uname is installed in the machine
-# building Catalyst. This assumption will not hold
-# on windows machines, for that we will need to have
-# an extra condition before trying to run uname.
-UNAME := $(shell uname)
-ifeq ($(UNAME),Linux)
-  NPROC = $(shell nproc)
-else ifeq ($(UNAME),Darwin)
-  NPROC = $(shell sysctl -n hw.physicalcpu)
-else
-  NPROC = 1
-endif
+NPROC?=$(shell python -c "import os; print(os.cpu_count())")
 
 coverage: CODE_COVERAGE=ON
 coverage: BUILD_TYPE=Debug
