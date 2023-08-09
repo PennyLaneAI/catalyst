@@ -3,7 +3,7 @@ Installation
 
 
 Catalyst is officially supported on Linux (x86_64) platforms, and pre-built binaries are being
-distributed via the Python Package Index (PyPI) for Python versions 3.8 and higher. To install it,
+distributed via the Python Package Index (PyPI) for Python versions 3.9 and higher. To install it,
 simply run the following ``pip`` command:
 
 .. code-block:: console
@@ -77,7 +77,7 @@ following pre-requisites are installed and available on the path:
   <https://www.gnu.org/software/make/>`_, and `CMake
   <https://cmake.org/download/>`_ (v3.20 or greater) build tools.
 
-- `Python <https://www.python.org/>`_ 3.8 or higher for the Python frontend.
+- `Python <https://www.python.org/>`_ 3.9 or higher for the Python frontend.
 
 - ``pip`` must be version 22.3 or higher.
 
