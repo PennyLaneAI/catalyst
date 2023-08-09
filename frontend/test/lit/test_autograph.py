@@ -14,75 +14,86 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
-from catalyst.autograph import convert_cf
+import inspect
+
+from catalyst import qjit
+from catalyst.autograph import AutographError, autograph
 
 
 # CHECK-LABEL: if_simple(
-@convert_cf
+@qjit
+@autograph
 def if_simple(x: float):
-    # CHECK:   @catalyst.cond(x < 3)
-    # CHECK:   def {{.+}}():
+    # CHECK:   def if_body():
     # CHECK:       pass
     if x < 3:
         pass
+    # CHECK:   def else_body():
+    # CHECK:       pass
+
+    # CHECK:   ag__.if_stmt(x < 3, if_body, else_body, get_state, set_state, (), 0)
 
     return x
 
 
-print(if_simple.__source__)
+print(inspect.getsource(if_simple))
 
 # -----
 
 
 # CHECK-LABEL: if_else(
-@convert_cf
+@qjit
+@autograph
 def if_else(x: float):
-    # CHECK:   @catalyst.cond(x < 3)
-    # CHECK:   def [[fn:.+]]():
+    # CHECK:   def if_body():
     # CHECK:       pass
     if x < 3:
         pass
-    # CHECK:   @[[fn]].otherwise
-    # CHECK:   def [[fn]]():
+    # CHECK:   def else_body():
     # CHECK:       pass
     else:
         pass
 
+    # CHECK:   ag__.if_stmt(x < 3, if_body, else_body, get_state, set_state, (), 0)
+
     return x
 
 
-print(if_else.__source__)
+print(inspect.getsource(if_else))
 
 # -----
 
 
 # CHECK-LABEL: if_assign(
-@convert_cf
+@qjit
+@autograph
 def if_assign(x: float):
-    # CHECK:   @catalyst.cond(x < 3)
-    # CHECK:   def [[fn:.+]]():
-    # CHECK:       return 4
+    # CHECK:   def if_body():
+    # CHECK:       nonlocal y
+    # CHECK:       y = 4
     if x < 3:
         y = 4
-    # CHECK:   @[[fn]].otherwise
-    # CHECK:   def [[fn]]():
-    # CHECK:       return 5
+    # CHECK:   def else_body():
+    # CHECK:       nonlocal y
+    # CHECK:       y = 5
     else:
         y = 5
 
-    # CHECK:   y = [[fn]]()
+    # CHECK:   ag__.if_stmt(x < 3, if_body, else_body, get_state, set_state, ('y',), 1)
+
     # CHECK:   return y
     return y
 
 
-print(if_assign.__source__)
+print(inspect.getsource(if_assign))
 
 # -----
 
 
 try:
 
-    @convert_cf
+    @qjit
+    @autograph
     def if_assign_type_mismatch(x: float):
         if x < 3:
             y = 4.0
@@ -91,8 +102,8 @@ try:
 
         return y
 
-except Exception as e:
-    # CHECK:   AutographException: Some branches did not have a consistent type for variable 'y'
+except TypeError as e:
+    # CHECK:   Conditional requires consistent return types across all branches
     print(e)
 
 # -----
@@ -100,101 +111,109 @@ except Exception as e:
 
 try:
 
-    @convert_cf
+    @qjit
+    @autograph
     def if_assign_partial(x: float):
         if x < 3:
             y = 4
 
         return y
 
-except Exception as e:
-    # CHECK:   AutographException: Some branches did not define a value for variable 'y'
+except AutographError as e:
+    # CHECK:   Some branches did not define a value for variable 'y'
     print(e)
 
 # -----
 
 
 # CHECK-LABEL: if_assign_existing(
-@convert_cf
+@qjit
+@autograph
 def if_assign_existing(x: float):
     # CHECK:   y = 0
     y = 0
 
-    # CHECK:   @catalyst.cond(x < 3)
-    # CHECK:   def [[fn:.+]]():
-    # CHECK:       return 4
+    # CHECK:   def if_body():
+    # CHECK:       nonlocal y
+    # CHECK:       y = 4
     if x < 3:
         y = 4
-    # CHECK:   @[[fn]].otherwise
-    # CHECK:   def [[fn]]():
-    # CHECK:       return 5
+    # CHECK:   def else_body():
+    # CHECK:       nonlocal y
+    # CHECK:       y = 5
     else:
         y = 5
 
-    # CHECK:   y = [[fn]]()
+    # CHECK:   ag__.if_stmt(x < 3, if_body, else_body, get_state, set_state, ('y',), 1)
+
     # CHECK:   return y
     return y
 
 
-print(if_assign_existing.__source__)
+print(inspect.getsource(if_assign_existing))
 
 # -----
 
 
 # CHECK-LABEL: if_assign_existing_type_mismatch(
-@convert_cf
+@qjit
+@autograph
 def if_assign_existing_type_mismatch(x: float):
     # CHECK:   y = 0
     y = 0
 
-    # CHECK:   @catalyst.cond(x < 3)
-    # CHECK:   def [[fn:.+]]():
-    # CHECK:       return 4.0
+    # CHECK:   def if_body():
+    # CHECK:       nonlocal y
+    # CHECK:       y = 4.0
     if x < 3:
         y = 4.0
-    # CHECK:   @[[fn]].otherwise
-    # CHECK:   def [[fn]]():
-    # CHECK:       return 5.0
+    # CHECK:   def else_body():
+    # CHECK:       nonlocal y
+    # CHECK:       y = 5.0
     else:
         y = 5.0
 
-    # CHECK:   y = [[fn]]()
+    # CHECK:   ag__.if_stmt(x < 3, if_body, else_body, get_state, set_state, ('y',), 1)
+
     # CHECK:   return y
     return y
 
 
-print(if_assign_existing_type_mismatch.__source__)
+print(inspect.getsource(if_assign_existing_type_mismatch))
 
 # -----
 
 
 # CHECK-LABEL: if_assign_existing_partial(
-@convert_cf
+@qjit
+@autograph
 def if_assign_existing_partial(x: float):
     # CHECK:   y = 0
     y = 0
 
-    # CHECK:   @catalyst.cond(x < 3)
-    # CHECK:   def [[fn:.+]]():
-    # CHECK:       return 4
+    # CHECK:   def if_body():
+    # CHECK:       nonlocal y
+    # CHECK:       y = 4
     if x < 3:
         y = 4
-    # CHECK:   @[[fn]].otherwise
-    # CHECK:   def [[fn]]():
-    # CHECK:       return y
+    # CHECK:   def else_body():
+    # CHECK:       nonlocal y
+    # CHECK:       pass
 
-    # CHECK:   y = [[fn]]()
+    # CHECK:   ag__.if_stmt(x < 3, if_body, else_body, get_state, set_state, ('y',), 1)
+
     # CHECK:   return y
     return y
 
 
-print(if_assign_existing_partial.__source__)
+print(inspect.getsource(if_assign_existing_partial))
 
 # -----
 
 try:
 
-    @convert_cf
+    @qjit
+    @autograph
     def if_assign_existing_partial_type_mismatch(x: float):
         y = 0
 
@@ -203,8 +222,8 @@ try:
 
         return y
 
-except Exception as e:
-    # CHECK:   AutographException: Some branches did not have a consistent type for variable 'y'
+except TypeError as e:
+    # CHECK:   Conditional requires consistent return types across all branches
     print(e)
 
 
@@ -212,36 +231,40 @@ except Exception as e:
 
 
 # CHECK-LABEL: if_assign_multiple(
-@convert_cf
+@qjit
+@autograph
 def if_assign_multiple(x: float):
-    # CHECK:   y, z = 0, False
+    # CHECK:   (y, z) = (0, False)
     y, z = 0, False
 
-    # CHECK:   @catalyst.cond(x < 3)
-    # CHECK:   def [[fn:.+]]():
-    # CHECK:       return 4, z
+    # CHECK:       def if_body():
+    # CHECK:           nonlocal {{[yz], [yz]}}
+    # CHECK:           y = 4
     if x < 3:
         y = 4
-    # CHECK:   @[[fn]].otherwise
-    # CHECK:   def [[fn]]():
-    # CHECK:       return 5, True
+    # CHECK:       def else_body():
+    # CHECK:           nonlocal {{[yz], [yz]}}
+    # CHECK-DAG:       y = 5
+    # CHECK-DAG:       z = True
     else:
         y = 5
         z = True
 
-    # CHECK:   y, z = [[fn]]()
+    # CHECK:   ag__.if_stmt(x < 3, if_body, else_body, get_state, set_state, ('y', 'z'), 2)
+
     # CHECK:   return y * z
     return y * z
 
 
-print(if_assign_multiple.__source__)
+print(inspect.getsource(if_assign_multiple))
 
 # -----
 
 
 try:
 
-    @convert_cf
+    @qjit
+    @autograph
     def if_assign_invalid_type(x: float):
         if x < 3:
             y = "hi"
@@ -250,36 +273,40 @@ try:
 
         return len(y)
 
-except Exception as e:
-    # CHECK:   AutographException: JIT-incompatible type encountered in if-clause assignment to variable 'y'
+except TypeError as e:
+    # CHECK:   Value 'hi' with type <class 'str'> is not a valid JAX type
     print(e)
 
 # -----
 
 
 # CHECK-LABEL: if_elif(
-@convert_cf
+@qjit
+@autograph
 def if_elif(x: float):
     # CHECK:   y = 0
     y = 0
 
-    # CHECK:   @catalyst.cond(x < 3)
-    # CHECK:   def [[fn:.+]]():
-    # CHECK:       return 4
+    # CHECK:   def if_body_1():
+    # CHECK:       nonlocal y
+    # CHECK:       y = 4
     if x < 3:
         y = 4
-    # CHECK:   @[[fn]].else_if
-    # CHECK:   def [[fn]]():
-    # CHECK:       return 7
+    # CHECK:   def else_body_1():
+    # CHECK:       def if_body():
+    # CHECK:           nonlocal y
+    # CHECK:           y = 7
+    # CHECK:       def else_body():
+    # CHECK:           nonlocal y
+    # CHECK:           pass
+    # CHECK:       ag__.if_stmt(x < 5, if_body, else_body, get_state, set_state, ('y',), 1)
     elif x < 5:
         y = 7
-    # CHECK:   @[[fn]].otherwise
-    # CHECK:   def [[fn]]():
-    # CHECK:       return y
 
-    # CHECK:   y = [[fn]]()
+    # CHECK:   ag__.if_stmt(x < 3, if_body_1, else_body_1, get_state_1, set_state_1, ('y',), 1)
+
     # CHECK:   return y
     return y
 
 
-print(if_elif.__source__)
+print(inspect.getsource(if_elif))
