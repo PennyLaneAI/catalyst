@@ -113,6 +113,9 @@
 
 <h3>Breaking changes</h3>
 
+* Support for Python 3.8 is dropped.
+  [#231](https://github.com/PennyLaneAI/catalyst/pull/231)
+
 * Since we are now using PyTrees, python lists are no longer automatically converted into JAX
   arrays. This means that indexing on lists when the index is not static will cause a
   ``TracerIntegerConversionError``.
