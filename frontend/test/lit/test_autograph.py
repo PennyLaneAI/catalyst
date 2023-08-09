@@ -14,14 +14,11 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
-import inspect
-
 from catalyst import qjit
-from catalyst.autograph import AutographError, autograph
+from catalyst.autograph import AutoGraphError, autograph, print_code
 
 
-# CHECK-LABEL: if_simple(
-@qjit
+# CHECK-LABEL: def if_simple
 @autograph
 def if_simple(x: float):
     # CHECK:   def if_body():
@@ -36,13 +33,12 @@ def if_simple(x: float):
     return x
 
 
-print(inspect.getsource(if_simple))
+print_code(if_simple)
 
 # -----
 
 
-# CHECK-LABEL: if_else(
-@qjit
+# CHECK-LABEL: def if_else
 @autograph
 def if_else(x: float):
     # CHECK:   def if_body():
@@ -59,13 +55,12 @@ def if_else(x: float):
     return x
 
 
-print(inspect.getsource(if_else))
+print_code(if_else)
 
 # -----
 
 
-# CHECK-LABEL: if_assign(
-@qjit
+# CHECK-LABEL: def if_assign
 @autograph
 def if_assign(x: float):
     # CHECK:   def if_body():
@@ -85,14 +80,14 @@ def if_assign(x: float):
     return y
 
 
-print(inspect.getsource(if_assign))
+print_code(if_assign)
 
 # -----
 
 
 try:
 
-    @qjit
+    @qjit  # needed to trigger Catalyst type checks during tracing
     @autograph
     def if_assign_type_mismatch(x: float):
         if x < 3:
@@ -111,7 +106,7 @@ except TypeError as e:
 
 try:
 
-    @qjit
+    @qjit  # needed to trigger the execution of ag__.if_stmt which performs the check
     @autograph
     def if_assign_partial(x: float):
         if x < 3:
@@ -119,15 +114,14 @@ try:
 
         return y
 
-except AutographError as e:
+except AutoGraphError as e:
     # CHECK:   Some branches did not define a value for variable 'y'
     print(e)
 
 # -----
 
 
-# CHECK-LABEL: if_assign_existing(
-@qjit
+# CHECK-LABEL: def if_assign_existing
 @autograph
 def if_assign_existing(x: float):
     # CHECK:   y = 0
@@ -150,13 +144,12 @@ def if_assign_existing(x: float):
     return y
 
 
-print(inspect.getsource(if_assign_existing))
+print_code(if_assign_existing)
 
 # -----
 
 
-# CHECK-LABEL: if_assign_existing_type_mismatch(
-@qjit
+# CHECK-LABEL: def if_assign_existing_type_mismatch
 @autograph
 def if_assign_existing_type_mismatch(x: float):
     # CHECK:   y = 0
@@ -179,13 +172,12 @@ def if_assign_existing_type_mismatch(x: float):
     return y
 
 
-print(inspect.getsource(if_assign_existing_type_mismatch))
+print_code(if_assign_existing_type_mismatch)
 
 # -----
 
 
-# CHECK-LABEL: if_assign_existing_partial(
-@qjit
+# CHECK-LABEL: def if_assign_existing_partial
 @autograph
 def if_assign_existing_partial(x: float):
     # CHECK:   y = 0
@@ -206,7 +198,7 @@ def if_assign_existing_partial(x: float):
     return y
 
 
-print(inspect.getsource(if_assign_existing_partial))
+print_code(if_assign_existing_partial)
 
 # -----
 
@@ -230,8 +222,7 @@ except TypeError as e:
 # -----
 
 
-# CHECK-LABEL: if_assign_multiple(
-@qjit
+# CHECK-LABEL: def if_assign_multiple
 @autograph
 def if_assign_multiple(x: float):
     # CHECK:   (y, z) = (0, False)
@@ -256,7 +247,7 @@ def if_assign_multiple(x: float):
     return y * z
 
 
-print(inspect.getsource(if_assign_multiple))
+print_code(if_assign_multiple)
 
 # -----
 
@@ -280,8 +271,7 @@ except TypeError as e:
 # -----
 
 
-# CHECK-LABEL: if_elif(
-@qjit
+# CHECK-LABEL: def if_elif
 @autograph
 def if_elif(x: float):
     # CHECK:   y = 0
@@ -309,4 +299,38 @@ def if_elif(x: float):
     return y
 
 
-print(inspect.getsource(if_elif))
+print_code(if_elif)
+
+# -----
+
+
+# CHECK-LABEL: def nested_call
+def nested_call(x, y):
+    # CHECK:   def if_body():
+    # CHECK:       nonlocal y
+    # CHECK:       y = 4
+    if x < 3:
+        y = 4
+    # CHECK:   def else_body():
+    # CHECK:       nonlocal y
+    # CHECK:       pass
+
+    # CHECK:   ag__.if_stmt(x < 3, if_body, else_body, get_state, set_state, ('y',), 1)
+
+    # CHECK:   return y
+    return y
+
+
+# CHECK-LABEL: def if_call
+@autograph
+def if_call(x: float):
+    # CHECK:   y = 0
+    y = 0
+
+    # CHECK:   return ag__.converted_call(nested_call, (x, y)
+    return nested_call(x, y)
+
+if_call(0.1)  # needed to generate the source code for nested functions
+
+print_code(nested_call)
+print_code(if_call)

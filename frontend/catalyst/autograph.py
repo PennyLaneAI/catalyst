@@ -18,12 +18,16 @@ Here, we integrate Autograph into Catalyst to improve the UX and allow programme
 Python control flow and other imperative expressions rather than the functional equivalents provided
 by Catalyst."""
 
-from tensorflow.python.autograph.converters import control_flow, functions
+import inspect
+
+from tensorflow.python.autograph.converters import call_trees, control_flow, functions
 from tensorflow.python.autograph.core import converter, unsupported_features_checker
-from tensorflow.python.autograph.pyct import cfg, transpiler
+from tensorflow.python.autograph.pyct import transpiler
 
 from catalyst import ag_primitives
-from catalyst.ag_primitives import AutographError  # pylint: disable=unused-import
+from catalyst.ag_primitives import AutoGraphError
+
+__all__ = ["AutoGraphError", "autograph", "print_code"]
 
 
 class CFTransformer(transpiler.PyToPy):
@@ -39,6 +43,9 @@ class CFTransformer(transpiler.PyToPy):
 
         # First transform the top-level function to avoid infinite recursion.
         node = functions.transform(node, user_context)
+
+        # Convert function calls. This allows us to convert these called functions as well.
+        node = call_trees.transform(node, user_context)
 
         # Convert Python control flow to custom 'ag__.if_stmt' ... functions.
         node = control_flow.transform(node, user_context)
@@ -60,9 +67,50 @@ class CFTransformer(transpiler.PyToPy):
 
 
 def autograph(fn):
-    """Control flow conversion decorator used for testing."""
+    """Decorator that converts the given function into graph form."""
 
-    user_context = converter.ProgramContext(converter.STANDARD_OPTIONS)
-    new_fn, module, source_map = CFTransformer().transform(fn, user_context)
+    options = converter.ConversionOptions(
+        recursive=True,
+        user_requested=True,
+        internal_convert_user_code=True,
+        optional_features=None,
+    )
+    user_context = converter.ProgramContext(options)
+
+    new_fn, module, source_map = _TRANSFORMER.transform(fn, user_context)
+    new_fn.ag_module = module
+    new_fn.ag_source_map = source_map
+    new_fn.ag_unconverted = fn
 
     return new_fn
+
+
+def print_code(fn):
+    """Utility function to retrieve the source code of a converted function, in particular of
+    functions that were recursively converted. Note that recursive conversion is only triggered
+    *after* the @autograph decorated function is called at least once."""
+
+    cachekey = ag_primitives.STD
+
+    if hasattr(fn, "ag_unconverted"):
+        # This is a function directly decorated with @autograph.
+        print(inspect.getsource(fn))
+
+    elif _TRANSFORMER._cache.has(fn, cachekey):
+        # Converted functions are cached as a _PythonFnFactory object.
+        cached_factory = _TRANSFORMER._cached_factory(fn, cachekey)
+        # Convert to a Python function object first before getting the source code.
+        new_fn = cached_factory.instantiate(
+            fn.__globals__,
+            fn.__closure__ or (),
+            defaults=fn.__defaults__,
+            kwdefaults=getattr(fn, "__kwdefaults__", None),
+        )
+        print(inspect.getsource(new_fn))
+
+    else:
+        print("Could not print source code: Function has not been converted.")
+
+
+# Keep a global instance of the transformer to benefit from caching.
+_TRANSFORMER = CFTransformer()

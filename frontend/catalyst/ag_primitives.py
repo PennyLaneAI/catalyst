@@ -17,33 +17,33 @@ functions. The purpose is to convert imperative style code to functional or grap
 
 from typing import *
 
+# Use tensorflow implementations for handling function scopes and calls,
+# as well as various utility objects.
+import tensorflow.python.autograph.impl.api as tf_autograph_api
+from tensorflow.python.autograph.core.converter import STANDARD_OPTIONS as STD
+from tensorflow.python.autograph.core.converter import ConversionOptions
+from tensorflow.python.autograph.core.function_wrappers import FunctionScope
+from tensorflow.python.autograph.impl.api import AutoGraphError
+from tensorflow.python.autograph.impl.api import converted_call as tf_converted_call
+from tensorflow.python.autograph.operators.variables import (
+    Undefined,
+    UndefinedReturnValue,
+)
+
+import catalyst
 from catalyst import cond
+from catalyst.utils.patching import Patcher
 
-STD = None
-
-
-class AutographError(Exception):
-    """A class of exceptions for source-to-source transformation related errors."""
-
-
-class Undefined:
-    """A placeholder type for undefined variables."""
-
-    def __init__(self, *args, **kwargs):
-        pass
-
-
-class FunctionScope:
-    """A context manager to handle function scopes in a customizable manner."""
-
-    def __init__(self, *args, **kwargs):
-        pass
-
-    def __enter__(self, *args, **kwargs):
-        pass
-
-    def __exit__(self, *args, **kwargs):
-        pass
+__all__ = [
+    "STD",
+    "ConversionOptions",
+    "AutoGraphError",
+    "Undefined",
+    "UndefinedReturnValue",
+    "FunctionScope",
+    "if_stmt",
+    "converted_call",
+]
 
 
 def assert_results(results, var_names):
@@ -53,7 +53,7 @@ def assert_results(results, var_names):
 
     for r, v in zip(results, var_names):
         if isinstance(r, Undefined):
-            raise AutographError(f"Some branches did not define a value for variable '{v}'")
+            raise AutoGraphError(f"Some branches did not define a value for variable '{v}'")
 
     return results
 
@@ -89,3 +89,11 @@ def if_stmt(
         return assert_results(results, symbol_names)
 
     set_state(functional_cond())
+
+
+def converted_call(*args, **kwargs):
+    """We want Autograph to use our own instance of the AST transformer when recursively
+    transforming functions, but otherwise duplicate the same behaviour."""
+
+    with Patcher((tf_autograph_api, "_TRANSPILER", catalyst.autograph._TRANSFORMER)):
+        return tf_converted_call(*args, **kwargs)
