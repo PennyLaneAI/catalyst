@@ -102,7 +102,7 @@ LogicalResult catalyst::compileObjectFile(const CompilerOptions &options,
     auto target = TargetRegistry::lookupTarget(targetTriple, err);
 
     if (!target) {
-        CO_MSG(options, CO_VERB_URGENT, err);
+        CO_MSG(options, Verbosity::Urgent, err);
         return failure();
     }
 
@@ -121,13 +121,13 @@ LogicalResult catalyst::compileObjectFile(const CompilerOptions &options,
     raw_fd_ostream dest(filename, errCode, sys::fs::OF_None);
 
     if (errCode) {
-        CO_MSG(options, CO_VERB_URGENT, "could not open file: " << errCode.message() << "\n");
+        CO_MSG(options, Verbosity::Urgent, "could not open file: " << errCode.message() << "\n");
         return failure();
     }
 
     legacy::PassManager pm;
     if (targetMachine->addPassesToEmitFile(pm, dest, nullptr, CGFT_ObjectFile)) {
-        CO_MSG(options, CO_VERB_URGENT, "TargetMachine can't emit an .o file\n");
+        CO_MSG(options, Verbosity::Urgent, "TargetMachine can't emit an .o file\n");
         return failure();
     }
 

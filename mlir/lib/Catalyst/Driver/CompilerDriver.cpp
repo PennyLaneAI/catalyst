@@ -344,7 +344,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         if (succeeded(function)) {
             output.inferredAttributes.functionName = function.value()->getName().str();
 
-            CO_MSG(options, CO_VERB_DEBUG,
+            CO_MSG(options, Verbosity::Debug,
                    "Inferred function name: '" << output.inferredAttributes.functionName << "'\n");
 
             // When inferring the return type from LLVM, assume a f64
@@ -355,7 +355,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
                                             Float64Type::get(ctx), returnTypes))) {
                 // Inferred return types are only required when compiling from textual IR. This
                 // inference failing is not a problem when compiling from Python.
-                CO_MSG(options, CO_VERB_URGENT, "Unable to infer function return type\n");
+                CO_MSG(options, Verbosity::Urgent, "Unable to infer function return type\n");
             }
             else {
                 {
@@ -363,13 +363,13 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
                     llvm::interleaveComma(returnTypes, returnTypeStream,
                                           [&](RankedTensorType t) { t.print(returnTypeStream); });
                 }
-                CO_MSG(options, CO_VERB_DEBUG,
+                CO_MSG(options, Verbosity::Debug,
                        "Inferred function return type: '" << output.inferredAttributes.returnType
                                                           << "'\n");
             }
         }
         else {
-            CO_MSG(options, CO_VERB_URGENT, "Unable to infer jit_* function attributes\n");
+            CO_MSG(options, Verbosity::Urgent, "Unable to infer jit_* function attributes\n");
         }
 
         auto outfile = options.getObjectFile();
