@@ -111,7 +111,8 @@
   [#228](https://github.com/PennyLaneAI/catalyst/pull/228)
 
 * Remove unnecessary ``reinterpret_cast``s. Remove these ``reinterpret_cast``s allows compilation
-  of the runtime to succeed in macOS.
+  of the runtime to succeed in macOS. macOS uses an ILP32 mode for Aarch64 where they use the full
+  64 bit mode but with 32 bit pointers.
   [#229](https://github.com/PennyLaneAI/catalyst/pull/230)
 
 <h3>Breaking changes</h3>
