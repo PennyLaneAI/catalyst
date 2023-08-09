@@ -110,6 +110,9 @@
 * Avoid a type mismatch. This allows dialects to compile with older versions of clang.
   [#228](https://github.com/PennyLaneAI/catalyst/pull/228)
 
+* Remove unnecessary ``reinterpret_cast``s. Remove these ``reinterpret_cast``s allows compilation
+  of the runtime to succeed in macOS.
+  [#229](https://github.com/PennyLaneAI/catalyst/pull/230)
 
 <h3>Breaking changes</h3>
 
