@@ -38,7 +38,7 @@ void freeState(MemRefT_CplxT_double_1d &result) { delete[] result.data_allocated
 PairT_MemRefT_double_int64_1d getCounts(size_t buffer_len)
 {
     double *buff_e = new double[buffer_len];
-    long *buff_c = new long[buffer_len];
+    int64_t *buff_c = new int64_t[buffer_len];
     PairT_MemRefT_double_int64_1d result = {{buff_e, buff_e, 0, {buffer_len}, {1}},
                                             {buff_c, buff_c, 0, {buffer_len}, {1}}};
     return result;
