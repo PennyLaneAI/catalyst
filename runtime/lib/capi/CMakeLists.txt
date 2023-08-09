@@ -10,11 +10,20 @@ target_link_libraries(catalyst_qir_qis_obj ${CMAKE_DL_LIBS}
                                             -lrt_backend
                                             rt_interfaces)
 
-# link to qir_stdlib
+if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+  set(LINKER_FLAGS_1, "-Wl,-all_load")
+  # We can technically use "-Wl,-noall_load", but the linker
+  # raises a warning saying that it is a no-op.
+  set(LINKER_FLAGS_2, "")
+elseif(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+  set(LINKER_FLAGS_1, "-Wl,--whole-archive")
+  set(LINKER_FLAGS_2, "-Wl,--no-whole-archive")
+endif()
+
 target_link_libraries(catalyst_qir_qis_obj "-L${QIR_STDLIB_LIB}"
-                                            "-Wl,--whole-archive"
+                                            ${LINKER_FLAGS_1}
                                             qir_stdlib
-                                            "-Wl,--no-whole-archive"
+                                            ${LINKER_FLAGS_2}
                                             pthread
                                             dl)
 
