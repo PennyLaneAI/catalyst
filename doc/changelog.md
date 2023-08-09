@@ -116,6 +116,10 @@
   to prevent a mismatch in machines which compile using ILP32 mode.
   [#229](https://github.com/PennyLaneAI/catalyst/pull/230)
 
+* Allow runtime to be compiled on macOS. Substitute ``nproc`` with a call to ``os.cpu_count()`` and
+  use correct flags for ``ld.64``.
+  [#232](https://github.com/PennyLaneAI/catalyst/pull/232)
+
 <h3>Breaking changes</h3>
 
 * Since we are now using PyTrees, python lists are no longer automatically converted into JAX

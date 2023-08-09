@@ -15,7 +15,7 @@ ENABLE_LIGHTNING_KOKKOS?=OFF
 ENABLE_OPENQASM?=OFF
 LIGHTNING_GIT_TAG_VALUE?=latest_release
 LIGHTNING_KOKKOS_GIT_TAG_VALUE?=latest_release
-
+NPROC?=$(shell python -c "import os; print(os.cpu_count())")
 
 coverage: CODE_COVERAGE=ON
 coverage: BUILD_TYPE=Debug
@@ -63,7 +63,7 @@ $(QIR_STDLIB_DIR)/libqir_stdlib.a $(QIR_STDLIB_INCLUDES_DIR)/qir_stdlib.h:
 	$(MAKE) -C qir-stdlib all
 
 $(RT_BUILD_DIR)/lib/backend/librt_backend.so $(RT_BUILD_DIR)/lib/librt_capi.so: configure
-	cmake --build $(RT_BUILD_DIR) --target rt_capi -j$(if $(nprocs:-=),$(nprocs),$$(nproc))
+	cmake --build $(RT_BUILD_DIR) --target rt_capi -j$(NPROC)
 
 .PHONY: qir
 qir: $(QIR_STDLIB_DIR)/libqir_stdlib.a $(QIR_STDLIB_INCLUDES_DIR)/qir_stdlib.h
@@ -72,7 +72,7 @@ qir: $(QIR_STDLIB_DIR)/libqir_stdlib.a $(QIR_STDLIB_INCLUDES_DIR)/qir_stdlib.h
 runtime: qir $(RT_BUILD_DIR)/lib/backend/librt_backend.so $(RT_BUILD_DIR)/lib/librt_capi.so
 
 $(RT_BUILD_DIR)/tests/runner_tests: configure
-	cmake --build $(RT_BUILD_DIR) --target runner_tests -j$(if $(nprocs:-=),$(nprocs),$$(nproc))
+	cmake --build $(RT_BUILD_DIR) --target runner_tests -j$(NPROC)
 
 .PHONY: test
 test: $(RT_BUILD_DIR)/tests/runner_tests
@@ -120,4 +120,4 @@ check-tidy: | qir
 		-DQIR_STDLIB_INCLUDES=$(QIR_STDLIB_INCLUDES_DIR) \
 		-DRUNTIME_CLANG_TIDY=ON
 
-	cmake --build $(MK_DIR)/BuildTidy --target rt_capi -j$(if $(nprocs:-=),$(nprocs),$$(nproc))
+	cmake --build $(MK_DIR)/BuildTidy --target rt_capi -j$(NPROC)
