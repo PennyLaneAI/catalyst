@@ -119,7 +119,8 @@ func::FuncOp genQNodeWithParams(PatternRewriter &rewriter, Location loc, func::F
 }
 
 /// Generate a version of the QNode that writes gate parameters to a buffer before calling a
-/// modified QNode that explicitly accepts preprocessed gate parameters.
+/// modified QNode that explicitly accepts preprocessed gate parameters (see genQNodeWithParams
+/// above).
 func::FuncOp genSplitPreprocessed(PatternRewriter &rewriter, Location loc, func::FuncOp qnode,
                                   func::FuncOp qnodeWithParams)
 {
@@ -291,13 +292,13 @@ void ParameterShiftLowering::rewrite(GradOp op, PatternRewriter &rewriter) const
     std::vector<size_t> diffArgIndices = computeDiffArgIndices(op.getDiffArgIndices());
     SmallVector<Value> backpropResults{op.getNumResults()};
     // Iterate over the primal results
-    // TODO: Explain the TypeRange{}.take_front. Basically the gradOp results are duplicated
-    for (const auto &[cotangentIdx, jacobianType, primalResult] :
-         llvm::enumerate(TypeRange{op.getResultTypes()}.take_front(clonedCallee.getNumResults()),
-                         clonedCallee.getResultTypes())) {
+    for (const auto &[cotangentIdx, primalResult] :
+         llvm::enumerate(clonedCallee.getResultTypes())) {
         // There is one Jacobian per distinct differential argument.
         SmallVector<Value> jacobians;
         for (unsigned argIdx = 0; argIdx < diffArgIndices.size(); argIdx++) {
+            Type jacobianType =
+                op.getResultTypes()[argIdx * clonedCallee.getNumResults() + cotangentIdx];
             jacobians.push_back(
                 rewriter.create<tensor::EmptyOp>(loc, jacobianType, /*dynamicSizes=*/ValueRange{}));
         }
@@ -359,9 +360,10 @@ void ParameterShiftLowering::rewrite(GradOp op, PatternRewriter &rewriter) const
                  llvm::enumerate(backpropOp.getResults())) {
                 auto sliceType = cast<RankedTensorType>(jacobianSlice.getType());
                 size_t sliceRank = sliceType.getRank();
-                size_t jacobianRank = cast<RankedTensorType>(jacobianType).getRank();
+                auto jacobianType = cast<RankedTensorType>(jacobians[backpropIdx].getType());
+                size_t jacobianRank = jacobianType.getRank();
                 if (sliceRank < jacobianRank) {
-                    // Offsets are [...indices] + [0] * rank of backprop input
+                    // Offsets are [...indices] + [0] * rank of backprop result
                     SmallVector<OpFoldResult> offsets;
                     offsets.append(indices.begin(), indices.end());
                     offsets.append(sliceRank, rewriter.getIndexAttr(0));
