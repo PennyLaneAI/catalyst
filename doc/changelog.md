@@ -120,6 +120,10 @@
   use correct flags for ``ld.64``.
   [#232](https://github.com/PennyLaneAI/catalyst/pull/232)
 
+* Improve portability on the frontend to be available on macOS. Use ``.dylib``, remove unnecessary flags,
+  and address behaviour difference in flags.
+  [#233](https://github.com/PennyLaneAI/catalyst/pull/233)
+
 <h3>Breaking changes</h3>
 
 * Since we are now using PyTrees, python lists are no longer automatically converted into JAX
