@@ -17,8 +17,8 @@ MLIR/LLVM representations.
 
 import abc
 import os
-import platform
 import pathlib
+import platform
 import shutil
 import subprocess
 import sys
