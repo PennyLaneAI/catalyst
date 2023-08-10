@@ -66,7 +66,7 @@ for ext in intree_extension_list:
     ext._add_ldflags(["-L", lib_path_npymath])  # pylint: disable=protected-access
     ext._add_ldflags(["-lnpymath"])  # pylint: disable=protected-access
     ext._add_cflags(["-I", np.get_include()])  # pylint: disable=protected-access
-    ext._add_cflags(["-std=c++11"])  # pylint: disable=protected-access
+    ext._add_cflags(["-std=c++17"])  # pylint: disable=protected-access
 ext_modules = intree_extension_list
 
 setup(
