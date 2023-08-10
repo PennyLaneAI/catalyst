@@ -294,8 +294,8 @@ void wrapMemRefArgs(func::FuncOp func, LLVMTypeConverter &typeConverter, Pattern
     }
 }
 
-LogicalResult traverseCallGraph(func::FuncOp start, SymbolTableCollection &symbolTable,
-                                function_ref<LogicalResult(func::FuncOp)> processCallable)
+void traverseCallGraph(func::FuncOp start, SymbolTableCollection &symbolTable,
+                       function_ref<void(func::FuncOp)> processCallable)
 {
     DenseSet<Operation *> visited{start};
     std::deque<Operation *> frontier{start};
@@ -304,10 +304,7 @@ LogicalResult traverseCallGraph(func::FuncOp start, SymbolTableCollection &symbo
         auto callable = cast<func::FuncOp>(frontier.front());
         frontier.pop_front();
 
-        if (failed(processCallable(callable))) {
-            return failure();
-        }
-
+        processCallable(callable);
         callable.walk([&](CallOpInterface callOp) {
             if (auto nextFunc = dyn_cast<func::FuncOp>(callOp.resolveCallable(&symbolTable))) {
                 if (!visited.contains(nextFunc)) {
@@ -317,7 +314,6 @@ LogicalResult traverseCallGraph(func::FuncOp start, SymbolTableCollection &symbo
             }
         });
     }
-    return success();
 }
 
 struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
@@ -341,35 +337,29 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
 
         convertToDestinationPassingStyle(callee, rewriter);
         SymbolTableCollection symbolTable;
-        LogicalResult traversalResult =
-            traverseCallGraph(callee, symbolTable, [&](func::FuncOp func) {
-                // Register custom gradients of quantum functions
-                if (func->hasAttrOfType<FlatSymbolRefAttr>("gradient.qgrad")) {
-                    auto qgradFn = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
-                        func, func->getAttrOfType<FlatSymbolRefAttr>("gradient.qgrad"));
+        traverseCallGraph(callee, symbolTable, [&](func::FuncOp func) {
+            // Register custom gradients of quantum functions
+            if (func->hasAttrOfType<FlatSymbolRefAttr>("gradient.qgrad")) {
+                auto qgradFn = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
+                    func, func->getAttrOfType<FlatSymbolRefAttr>("gradient.qgrad"));
 
-                    // When lowering multiple backprop ops, the callee type will be mutated by the
-                    // wrapped op. Save the original unwrapped function type so that later backprop
-                    // ops can read it.
-                    if (!func->hasAttr("unwrapped_type")) {
-                        func->setAttr("unwrapped_type", TypeAttr::get(func.getFunctionType()));
-                    }
-                    convertToDestinationPassingStyle(func, rewriter);
-
-                    wrapMemRefArgs(func, *getTypeConverter(), rewriter, loc);
-
-                    func::FuncOp augFwd = genAugmentedForward(func, rewriter);
-                    func::FuncOp customQGrad =
-                        genCustomQGradient(func, func.getLoc(), qgradFn, rewriter);
-                    insertEnzymeCustomGradient(rewriter, func->getParentOfType<ModuleOp>(),
-                                               func.getLoc(), func, augFwd, customQGrad);
+                // When lowering multiple backprop ops, the callee type will be mutated by the
+                // wrapped op. Save the original unwrapped function type so that later backprop
+                // ops can read it.
+                if (!func->hasAttr("unwrapped_type")) {
+                    func->setAttr("unwrapped_type", TypeAttr::get(func.getFunctionType()));
                 }
+                convertToDestinationPassingStyle(func, rewriter);
 
-                return success();
-            });
-        if (failed(traversalResult)) {
-            return failure();
-        }
+                wrapMemRefArgs(func, *getTypeConverter(), rewriter, loc);
+
+                func::FuncOp augFwd = genAugmentedForward(func, rewriter);
+                func::FuncOp customQGrad =
+                    genCustomQGradient(func, func.getLoc(), qgradFn, rewriter);
+                insertEnzymeCustomGradient(rewriter, func->getParentOfType<ModuleOp>(),
+                                           func.getLoc(), func, augFwd, customQGrad);
+            }
+        });
 
         LowerToLLVMOptions options = getTypeConverter()->getOptions();
         if (options.useGenericFunctions) {

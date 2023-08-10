@@ -316,9 +316,6 @@ void ParameterShiftLowering::rewrite(GradOp op, PatternRewriter &rewriter) const
         }
         std::reverse(strides.begin(), strides.end());
 
-        auto materializeIndex = [&rewriter, &loc](int64_t idx) {
-            return rewriter.create<index::ConstantOp>(loc, idx);
-        };
         Value zero = rewriter.create<arith::ConstantOp>(
             loc, FloatAttr::get(primalTensorResultType.getElementType(), 0.0));
         Value one = rewriter.create<arith::ConstantOp>(
@@ -331,7 +328,8 @@ void ParameterShiftLowering::rewrite(GradOp op, PatternRewriter &rewriter) const
             // Unflatten the tensor indices
             SmallVector<Value> indices;
             for (int64_t dim = 0; dim < primalTensorResultType.getRank(); dim++) {
-                indices.push_back(materializeIndex(flatIdx / strides[dim] % shape[dim]));
+                indices.push_back(
+                    rewriter.create<index::ConstantOp>(loc, flatIdx / strides[dim] % shape[dim]));
             }
 
             SmallVector<Value> cotangents;
@@ -356,6 +354,7 @@ void ParameterShiftLowering::rewrite(GradOp op, PatternRewriter &rewriter) const
                 /*arg_shadows=*/ValueRange{}, /*primal results=*/ValueRange{}, cotangents,
                 op.getDiffArgIndicesAttr());
 
+            // Backprop gives a gradient of a single output entry w.r.t. all active inputs.
             for (const auto &[backpropIdx, jacobianSlice] :
                  llvm::enumerate(backpropOp.getResults())) {
                 auto sliceType = cast<RankedTensorType>(jacobianSlice.getType());
