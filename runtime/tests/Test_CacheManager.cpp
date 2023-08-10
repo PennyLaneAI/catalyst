@@ -179,13 +179,13 @@ TEST_CASE("Test __quantum__qis__ circuit with observables", "[CacheManager]")
         QUBIT **ctrls = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
 
         // qml.Hadamard(wires=0)
-        __quantum__qis__Hadamard(target);
+        __quantum__qis__Hadamard(target, false);
         // qml.ControlledPhaseShift(0.6, wires=[0,1])
-        __quantum__qis__ControlledPhaseShift(0.6, target, *ctrls);
+        __quantum__qis__ControlledPhaseShift(0.6, target, *ctrls, false);
         // qml.IsingYY(0.2, wires=[0, 1])
-        __quantum__qis__IsingYY(0.2, target, *ctrls);
+        __quantum__qis__IsingYY(0.2, target, *ctrls, false);
         // qml.CRX(0.4, wires=[1,0])
-        __quantum__qis__CRX(0.4, target, *ctrls);
+        __quantum__qis__CRX(0.4, target, *ctrls, false);
 
         size_t buffer_len = 4;
         CplxT_double *buffer = new CplxT_double[buffer_len];
@@ -207,6 +207,8 @@ TEST_CASE("Test __quantum__qis__ circuit with observables", "[CacheManager]")
 
         CHECK(__quantum__qis__Expval(obs) == Approx(0.9800665778).margin(1e-5));
 
+        __quantum__rt__qubit_release(target);
+        __quantum__rt__qubit_release_array(ctrls_arr);
         delete[] buffer;
     }
     __quantum__rt__finalize();
@@ -228,13 +230,13 @@ TEST_CASE("Test __quantum__qis__ circuit with observables using deactiveCacheMan
         __quantum__rt__toggle_recorder(/* activate_cm */ true);
 
         // qml.Hadamard(wires=0)
-        __quantum__qis__Hadamard(target);
+        __quantum__qis__Hadamard(target, false);
         // qml.ControlledPhaseShift(0.6, wires=[0,1])
-        __quantum__qis__ControlledPhaseShift(0.6, target, *ctrls);
+        __quantum__qis__ControlledPhaseShift(0.6, target, *ctrls, false);
         // qml.IsingYY(0.2, wires=[0, 1])
-        __quantum__qis__IsingYY(0.2, target, *ctrls);
+        __quantum__qis__IsingYY(0.2, target, *ctrls, false);
         // qml.CRX(0.4, wires=[1,0])
-        __quantum__qis__CRX(0.4, target, *ctrls);
+        __quantum__qis__CRX(0.4, target, *ctrls, false);
 
         size_t buffer_len = 4;
         CplxT_double *buffer = new CplxT_double[buffer_len];
@@ -258,6 +260,8 @@ TEST_CASE("Test __quantum__qis__ circuit with observables using deactiveCacheMan
 
         __quantum__rt__toggle_recorder(/* activate_cm */ false);
 
+        __quantum__rt__qubit_release(target);
+        __quantum__rt__qubit_release_array(ctrls_arr);
         delete[] buffer;
     }
     __quantum__rt__finalize();

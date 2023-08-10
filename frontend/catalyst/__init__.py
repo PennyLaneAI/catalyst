@@ -33,6 +33,7 @@ if not INSTALLED:
 # pylint: disable=wrong-import-position
 from catalyst.compilation_pipelines import QJIT, CompileOptions, qjit
 from catalyst.pennylane_extensions import (
+    adjoint,
     cond,
     for_loop,
     grad,
@@ -51,6 +52,9 @@ __all__ = (
     "cond",
     "measure",
     "grad",
+    "vjp",
+    "jvp",
+    "adjoint",
     "CompileError",
     "CompileOptions",
 )

@@ -15,6 +15,7 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/OpImplementation.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include <optional>
 
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/IR/QuantumOps.h"
@@ -34,7 +35,7 @@ using namespace catalyst::quantum;
 // Quantum op interfaces.
 //===----------------------------------------------------------------------===//
 
-Optional<Operation *> AllocOp::buildDealloc(OpBuilder &builder, Value alloc)
+std::optional<Operation *> AllocOp::buildDealloc(OpBuilder &builder, Value alloc)
 {
     return builder.create<DeallocOp>(alloc.getLoc(), alloc).getOperation();
 }
@@ -297,6 +298,18 @@ LogicalResult StateOp::verify()
     size_t dim = std::pow(2, numQubits);
     if (failed(verifyTensorResult(toVerify.cast<ShapedType>(), dim))) {
         return emitOpError("return tensor must have static length equal to 2^(number of qubits)");
+    }
+
+    return success();
+}
+
+LogicalResult AdjointOp::verify()
+{
+    auto res =
+        this->getRegion().walk([](MeasurementProcess op) { return WalkResult::interrupt(); });
+
+    if (res.wasInterrupted()) {
+        return emitOpError("quantum measurements are not allowed in the adjoint regions");
     }
 
     return success();

@@ -14,8 +14,9 @@
 
 #pragma once
 
-#include "Gradient/IR/GradientOps.h"
 #include "mlir/IR/PatternMatch.h"
+
+#include "Gradient/IR/GradientOps.h"
 
 namespace catalyst {
 namespace gradient {

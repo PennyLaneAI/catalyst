@@ -19,7 +19,6 @@
 
 #include "Gradient/IR/GradientDialect.h"
 #include "Gradient/IR/GradientOps.h"
-#include "Gradient/Utils/CompDiffArgIndices.h"
 #include "Gradient/Utils/GradientShape.h"
 
 #define GET_OP_CLASSES
@@ -120,9 +119,9 @@ LogicalResult GradOp::verifySymbolUses(SymbolTableCollection &symbolTable)
     });
 
     auto r1 = ::verifyGradInputs(this, fn, this->getArgOperands(),
-                                 compDiffArgIndices(this->getDiffArgIndices()));
+                                 computeDiffArgIndices(this->getDiffArgIndices()));
 
-    auto r2 = ::verifyGradOutputs(this, fn, compDiffArgIndices(this->getDiffArgIndices()),
+    auto r2 = ::verifyGradOutputs(this, fn, computeDiffArgIndices(this->getDiffArgIndices()),
                                   this->getResultTypes());
 
     return success(succeeded(r1) && succeeded(r2));
@@ -168,7 +167,7 @@ LogicalResult JVPOp::verifySymbolUses(SymbolTableCollection &symbolTable)
         fn;
     });
 
-    auto diffArgIndices = compDiffArgIndices(this->getDiffArgIndices());
+    auto diffArgIndices = computeDiffArgIndices(this->getDiffArgIndices());
     auto r1 = ::verifyGradInputs(this, callee, this->getParams(), diffArgIndices);
     if (r1.failed()) {
         return r1;
@@ -188,13 +187,12 @@ LogicalResult JVPOp::verifySymbolUses(SymbolTableCollection &symbolTable)
                << this->getTangents().size();
     }
 
-    auto jvp_types = ({
-        std::vector<Type> out;
+    std::vector<Type> jvp_types;
+    {
         for (auto s : this->getJvps()) {
-            out.push_back(s.getType());
+            jvp_types.push_back(s.getType());
         }
-        out;
-    });
+    }
 
     for (size_t i = 0; i < callee.getFunctionType().getNumResults(); i++) {
         auto calleeRtype = callee.getFunctionType().getResult(i);
@@ -252,22 +250,21 @@ LogicalResult VJPOp::verifySymbolUses(SymbolTableCollection &symbolTable)
 
     // Check gradient input parameters
     auto r1 = ::verifyGradInputs(this, callee, this->getParams(),
-                                 compDiffArgIndices(this->getDiffArgIndices()));
+                                 computeDiffArgIndices(this->getDiffArgIndices()));
     if (r1.failed()) {
         return r1;
     }
 
     auto calleeResultTypes = callee.getFunctionType().getResults();
 
-    auto cotTypes = ({
-        std::vector<Type> out;
+    std::vector<Type> cotTypes;
+    {
         auto cotangOperands = OperandRange(
             this->operand_begin() + callee.getFunctionType().getNumInputs(), this->operand_end());
         for (auto c : cotangOperands) {
-            out.push_back(c.getType());
+            cotTypes.push_back(c.getType());
         }
-        out;
-    });
+    }
 
     // Check that callee results have the same size as cotangent inputs
     if (calleeResultTypes.size() != cotTypes.size()) {
@@ -299,5 +296,52 @@ LogicalResult VJPOp::verify()
     StringRef method = this->getMethod();
     if (method != "fd" && method != "ps" && method != "adj")
         return emitOpError("got invalid differentiation method: ") << method;
+    return success();
+}
+
+//===----------------------------------------------------------------------===//
+// Backprop SymbolUserOpInterface
+//===----------------------------------------------------------------------===//
+
+LogicalResult BackpropOp::verifySymbolUses(SymbolTableCollection &symbolTable)
+{
+    // Check that the callee attribute refers to a valid function.
+    func::FuncOp fn = symbolTable.lookupNearestSymbolFrom<func::FuncOp>(this->getOperation(),
+                                                                        this->getCalleeAttr());
+    if (!fn)
+        return this->emitOpError("invalid function name specified: ") << this->getCallee();
+
+    return success();
+}
+
+//===----------------------------------------------------------------------===//
+// BackpropOp Extra methods
+//===----------------------------------------------------------------------===//
+
+LogicalResult BackpropOp::verify()
+{
+    size_t numDiffArgs =
+        this->getDiffArgIndices().has_value() ? this->getDiffArgIndicesAttr().size() : 1;
+    auto hasTensorType = [](Type type) { return isa<RankedTensorType>(type); };
+    bool hasTensorOperands = llvm::any_of(this->getOperandTypes(), hasTensorType);
+    bool hasTensorResults = llvm::any_of(this->getResultTypes(), hasTensorType);
+    bool hasTensorSemantics = hasTensorOperands || hasTensorResults;
+
+    if (this->getDiffArgShadows().size() && hasTensorSemantics)
+        return emitOpError("cannot have both tensor results and memref output arguments");
+
+    if (this->getCalleeResults().size() && hasTensorSemantics)
+        return emitOpError("cannot have callee result buffers before bufferization");
+
+    if (!hasTensorSemantics && this->getCalleeResults().size() != this->getCotangents().size())
+        return emitOpError("need as many callee result buffers as there are cotangents")
+               << ", expected " << this->getCotangents().size() << " but got "
+               << this->getCalleeResults().size();
+
+    if (this->getDiffArgShadows().size() + this->getNumResults() != numDiffArgs)
+        return emitOpError("number of gradient results did not match number of differentiable")
+               << " arguments, expected " << numDiffArgs << " but got "
+               << this->getDiffArgShadows().size() + this->getNumResults();
+
     return success();
 }

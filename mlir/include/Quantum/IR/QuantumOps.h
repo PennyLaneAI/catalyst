@@ -19,10 +19,11 @@
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/Interfaces/ControlFlowInterfaces.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Support/LogicalResult.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
+#include <optional>
 
 #include "Quantum/IR/QuantumInterfaces.h"
 

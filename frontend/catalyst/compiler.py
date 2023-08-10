@@ -18,6 +18,7 @@ MLIR/LLVM representations.
 import abc
 import os
 import pathlib
+import platform
 import shutil
 import subprocess
 import sys
@@ -35,7 +36,19 @@ package_root = os.path.dirname(__file__)
 
 @dataclass
 class CompileOptions:
-    """Generic compilation options"""
+    """Generic compilation options.
+
+    Args:
+        verbose (bool, optional): flag indicating whether to enable verbose output.
+            Default is ``False``
+        logfile (TextIOWrapper, optional): the logfile to write output to.
+            Default is ``sys.stderr``
+        target (str, optional): target of the functionality. Default is ``"binary"``
+        keep_intermediate (bool, optional): flag indicating whether to keep intermediate results.
+            Default is ``False``
+        pipelines (List[Any], optional): list of pipelines to be used.
+            Default is ``None``
+    """
 
     verbose: Optional[bool] = False
     logfile: Optional[TextIOWrapper] = sys.stderr
@@ -65,6 +78,7 @@ default_bin_paths = {
 default_lib_paths = {
     "llvm": os.path.join(package_root, "../../mlir/llvm-project/build/lib"),
     "runtime": os.path.join(package_root, "../../runtime/build/lib"),
+    "enzyme": os.path.join(package_root, "../../mlir/Enzyme/build/Enzyme"),
 }
 
 
@@ -148,6 +162,8 @@ class MHLOPass(PassPipeline):
         "--hlo-legalize-to-linalg",
         "--mhlo-legalize-to-std",
         "--convert-to-signless",
+        # Substitute tensors<1xf64> with tensors<f64>
+        "--scalarize",
         "--canonicalize",
     ]
 
@@ -164,6 +180,10 @@ class BufferizationPass(PassPipeline):
 
     _executable = get_executable_path("quantum", "quantum-opt")
     _default_flags = [
+        # The following pass allows differentiation of qml.probs with the parameter-shift method,
+        # as it performs the bufferization of `memref.tensor_op` (for which no dialect bufferization
+        # exists).
+        "--one-shot-bufferize=dialect-filter=memref",  # must run before any dialect bufferization
         "--inline",
         "--gradient-bufferize",
         "--scf-bufferize",
@@ -178,9 +198,9 @@ class BufferizationPass(PassPipeline):
         "--quantum-bufferize",
         "--func-bufferize",
         "--finalizing-bufferize",
-        # "--buffer-hoisting",
+        "--buffer-hoisting",
         "--buffer-loop-hoisting",
-        # "--buffer-deallocation",
+        "--buffer-deallocation",
         "--convert-bufferization-to-memref",
         "--canonicalize",
         # "--cse",
@@ -218,9 +238,9 @@ class MLIRToLLVMDialect(PassPipeline):
         # Run after -convert-math-to-llvm as it marks math::powf illegal without converting it.
         "--convert-math-to-libm",
         "--convert-arith-to-llvm",
+        "--convert-gradient-to-llvm=use-generic-functions",
         "--finalize-memref-to-llvm=use-generic-functions",
         "--convert-index-to-llvm",
-        "--convert-gradient-to-llvm",
         "--convert-quantum-to-llvm",
         "--emit-catalyst-py-interface",
         # Remove any dead casts as the final pass expects to remove all existing casts,
@@ -238,10 +258,10 @@ class MLIRToLLVMDialect(PassPipeline):
 
 
 class QuantumCompilationPass(PassPipeline):
-    """Pass pipeline to lower gradients."""
+    """Pass pipeline for Catalyst-specific transformation passes."""
 
     _executable = get_executable_path("quantum", "quantum-opt")
-    _default_flags = ["--lower-gradients", "--convert-arraylist-to-memref"]
+    _default_flags = ["--lower-gradients", "--adjoint-lowering", "--convert-arraylist-to-memref"]
 
     @staticmethod
     def get_output_filename(infile):
@@ -265,6 +285,43 @@ class LLVMDialectToLLVMIR(PassPipeline):
         return str(path.with_suffix(".ll"))
 
 
+class PreEnzymeOpt(PassPipeline):
+    """Run optimizations on the LLVM IR prior to being run through Enzyme."""
+
+    _executable = get_executable_path("llvm", "opt")
+    _default_flags = ["-O2", "-S"]
+
+    @staticmethod
+    def get_output_filename(infile):
+        path = pathlib.Path(infile)
+        if not path.exists():
+            raise FileNotFoundError("Cannot find {infile}.")
+        return str(path.with_suffix(".preenzyme.ll"))
+
+
+class Enzyme(PassPipeline):
+    """Pass pipeline to lower LLVM IR to Enzyme LLVM IR."""
+
+    _executable = get_executable_path("llvm", "opt")
+    enzyme_path = get_lib_path("enzyme", "ENZYME_LIB_DIR")
+    apple_ext = "dylib"
+    linux_ext = "so"
+    ext = linux_ext if platform.system() == "Linux" else apple_ext
+    _default_flags = [
+        f"-load-pass-plugin={enzyme_path}/LLVMEnzyme-17.{ext}",
+        # preserve-nvvm transforms certain global arrays to LLVM metadata that Enzyme will recognize
+        "-passes=preserve-nvvm,enzyme",
+        "-S",
+    ]
+
+    @staticmethod
+    def get_output_filename(infile):
+        path = pathlib.Path(infile)
+        if not path.exists():
+            raise FileNotFoundError("Cannot find {infile}.")
+        return str(path.with_suffix(".postenzyme.ll"))
+
+
 class LLVMIRToObjectFile(PassPipeline):
     """LLVMIR To Object File."""
 
@@ -272,6 +329,9 @@ class LLVMIRToObjectFile(PassPipeline):
     _default_flags = [
         "--filetype=obj",
         "--relocation-model=pic",
+        # -O0 is used to achieve compile times similar to -regalloc=fast and disabling
+        # -twoaddrinst. However, from the command line, one cannot disable -twoaddrinst
+        "-O0",
     ]
 
     @staticmethod
@@ -315,8 +375,9 @@ class CompilerDriver:
         default_flags = [
             "-shared",
             "-rdynamic",
-            "-Wl,-no-as-needed",
-            f"-Wl,-rpath,{rt_capi_path}:{rt_backend_path}:{mlir_lib_path}",
+            f"-Wl,-rpath,{rt_capi_path}",
+            f"-Wl,-rpath,{rt_backend_path}",
+            f"-Wl,-rpath,{mlir_lib_path}",
             f"-L{mlir_lib_path}",
             f"-L{rt_capi_path}",
             f"-L{rt_backend_path}",
@@ -456,6 +517,8 @@ class Compiler:
                 BufferizationPass,
                 MLIRToLLVMDialect,
                 LLVMDialectToLLVMIR,
+                PreEnzymeOpt,
+                Enzyme,
                 LLVMIRToObjectFile,
                 CompilerDriver,
             ]

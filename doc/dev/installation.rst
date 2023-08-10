@@ -151,6 +151,9 @@ you can build ``qir-stdlib`` and the runtime from the top level directory:
 
   make runtime
 
+The runtime supports multiple backend devices, enabling the execution of quantum
+circuits locally on CPUs and GPUs, and remotely on Amazon Braket NISQ hardware.
+A list of supported backends, along with Make arguments for each device, is available in the `Catalyst Runtime <https://docs.pennylane.ai/projects/catalyst/en/latest/modules/runtime.html>`_ page.
 
 MLIR Dialects
 """""""""""""
@@ -203,6 +206,12 @@ To make MLIR libraries discoverable to the compiler:
 .. code-block:: console
 
   export MLIR_LIB_DIR="$PWD/mlir/llvm-project/build/lib"
+
+To make Enzyme libraries discoverable to the compiler:
+
+.. code-block:: console
+
+  export ENZYME_LIB_DIR="$PWD/mlir/Enzyme/build/Enzyme"
 
 To make required tools in ``llvm-project/build``, ``mlir-hlo/build``, and
 ``mlir/build`` discoverable to the compiler:

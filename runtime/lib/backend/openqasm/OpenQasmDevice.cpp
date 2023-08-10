@@ -133,7 +133,13 @@ void OpenQasmDevice::MatrixOperation(
     [[maybe_unused]] const std::vector<std::complex<double>> &matrix,
     [[maybe_unused]] const std::vector<QubitIdType> &wires, [[maybe_unused]] bool inverse)
 {
-    RT_FAIL("Unsupported functionality");
+    RT_FAIL_IF(builder_type == OpenQasm::BuilderType::Common, "Unsupported functionality");
+
+    // Convert wires to device wires
+    // with checking validity of wires
+    auto &&dev_wires = getDeviceWires(wires);
+
+    builder->Gate(matrix, dev_wires, inverse);
 }
 
 auto OpenQasmDevice::Observable(ObsId id, const std::vector<std::complex<double>> &matrix,
@@ -174,7 +180,7 @@ auto OpenQasmDevice::Expval([[maybe_unused]] ObsIdType obsKey) -> double
 
     std::ostringstream oss;
     oss << "#pragma braket result expectation " << obs->toOpenQasm(builder->getQubits()[0]);
-    auto &&circuit = builder->toOpenQasmWithCustomInstructions(oss.str());
+    auto &&circuit = builder->toOpenQasmWithCustomInstructions(oss.str(), 9);
 
     // update tape caching
     if (tape_recording) {
@@ -208,7 +214,7 @@ auto OpenQasmDevice::Var([[maybe_unused]] ObsIdType obsKey) -> double
 
     std::ostringstream oss;
     oss << "#pragma braket result variance " << obs->toOpenQasm(builder->getQubits()[0]);
-    auto &&circuit = builder->toOpenQasmWithCustomInstructions(oss.str());
+    auto &&circuit = builder->toOpenQasmWithCustomInstructions(oss.str(), 9);
 
     // update tape caching
     if (tape_recording) {

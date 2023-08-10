@@ -70,8 +70,7 @@ TEST_CASE("Test BraketRunner::runCircuit()", "[openqasm]")
     auto &&circuit = builder.toOpenQasm();
 
     OpenQasm::BraketRunner runner{};
-    auto &&results =
-        runner.runCircuit(circuit, "arn:aws:braket:::device/quantum-simulator/amazon/sv1", 100);
+    auto &&results = runner.runCircuit(circuit, "default", 100);
     CHECK(results.find("GateModelQuantumTaskResult") != std::string::npos);
 }
 
@@ -90,8 +89,7 @@ TEST_CASE("Test the OpenQasmDevice constructor", "[openqasm]")
     SECTION("Braket SV1")
     {
         auto device = OpenQasmDevice(
-            false,
-            "{shots: 100, device_arn: arn:aws:braket:::device/quantum-simulator/amazon/sv1}");
+            false, "{shots: 100, device_type : braket.local.qubit, backend : default}");
         CHECK(device.GetNumQubits() == 0);
 
         REQUIRE_THROWS_WITH(device.Circuit(),
@@ -389,6 +387,20 @@ TEST_CASE("Test measurement processes, a simple circuit with BuilderType::Braket
         CHECK(expval == Approx(-0.7071067812).margin(1e-5));
     }
 
+    SECTION("Expval(hermitian(1))")
+    {
+        device->SetDeviceShots(0); // to get deterministic results
+        std::vector<std::complex<double>> matrix{
+            {0, 0},
+            {0, -1},
+            {0, 1},
+            {0, 0},
+        };
+        auto obs = device->Observable(ObsId::Hermitian, matrix, std::vector<QubitIdType>{1});
+        auto expval = device->Expval(obs);
+        CHECK(expval == Approx(0).margin(1e-5));
+    }
+
     SECTION("Expval(x(0) @ h(1))")
     {
         device->SetDeviceShots(0); // to get deterministic results
@@ -407,8 +419,22 @@ TEST_CASE("Test measurement processes, a simple circuit with BuilderType::Braket
     {
         device->SetDeviceShots(0); // to get deterministic results
         auto obs = device->Observable(ObsId::Hadamard, {}, std::vector<QubitIdType>{1});
-        auto expval = device->Var(obs);
-        CHECK(expval == Approx(0.5).margin(1e-5));
+        auto var = device->Var(obs);
+        CHECK(var == Approx(0.5).margin(1e-5));
+    }
+
+    SECTION("Var(hermitian(1))")
+    {
+        device->SetDeviceShots(0); // to get deterministic results
+        std::vector<std::complex<double>> matrix{
+            {0, 0},
+            {0, -1},
+            {0, 1},
+            {0, 0},
+        };
+        auto obs = device->Observable(ObsId::Hermitian, matrix, std::vector<QubitIdType>{1});
+        auto var = device->Var(obs);
+        CHECK(var == Approx(1).margin(1e-5));
     }
 
     SECTION("Var(x(0) @ h(1))")
@@ -417,11 +443,71 @@ TEST_CASE("Test measurement processes, a simple circuit with BuilderType::Braket
         auto obs_z = device->Observable(ObsId::PauliZ, {}, std::vector<QubitIdType>{0});
         auto obs_h = device->Observable(ObsId::Hadamard, {}, std::vector<QubitIdType>{1});
         auto tp = device->TensorObservable({obs_z, obs_h});
-        auto expval = device->Var(tp);
-        CHECK(expval == Approx(0.5).margin(1e-5));
+        auto var = device->Var(tp);
+        CHECK(var == Approx(0.5).margin(1e-5));
 
         auto obs = device->HamiltonianObservable({0.2}, {tp});
         REQUIRE_THROWS_WITH(device->Var(obs),
                             Catch::Contains("Unsupported observable: QasmHamiltonianObs"));
     }
+}
+
+TEST_CASE("Test MatrixOperation with BuilderType::Braket", "[openqasm]")
+{
+    std::unique_ptr<OpenQasmDevice> device = std::make_unique<OpenQasmDevice>();
+
+    constexpr size_t n{5};
+    constexpr size_t size{1UL << n};
+    auto wires = device->AllocateQubits(n);
+
+    device->NamedOperation("PauliX", {}, {wires[0]}, false);
+    device->NamedOperation("PauliY", {}, {wires[1]}, false);
+    std::vector<std::complex<double>> matrix{
+        {0, 0},
+        {0, -1},
+        {0, 1},
+        {0, 0},
+    };
+    device->MatrixOperation(matrix, {wires[0]}, false);
+
+    std::string toqasm = "OPENQASM 3.0;\n"
+                         "qubit[5] qubits;\n"
+                         "bit[5] bits;\n"
+                         "x qubits[0];\n"
+                         "y qubits[1];\n"
+                         "#pragma braket unitary([[0, 0-1im], [0+1im, 0]]) qubits[0]\n"
+                         "bits = measure qubits;\n";
+
+    CHECK(device->Circuit() == toqasm);
+
+    SECTION("Probs")
+    {
+        std::vector<double> probs(size);
+        DataView<double, 1> view(probs);
+        device->Probs(view);
+        CHECK(probs[1] == Approx(1.f).margin(1e-5));
+    }
+
+    SECTION("Expval(h(1))")
+    {
+        device->SetDeviceShots(0); // to get deterministic results
+        auto obs = device->Observable(ObsId::Hadamard, {}, std::vector<QubitIdType>{1});
+        auto expval = device->Expval(obs);
+        CHECK(expval == Approx(-0.7071067812).margin(1e-5));
+    }
+}
+
+TEST_CASE("Test MatrixOperation with OpenQasmDevice and BuilderType::Common", "[openqasm]")
+{
+    auto device = OpenQasmDevice(false, "{shots : 100}");
+    auto wires = device.AllocateQubits(2);
+    std::vector<std::complex<double>> matrix{
+        {0, 0},
+        {0, -1},
+        {0, 1},
+        {0, 0},
+    };
+
+    REQUIRE_THROWS_WITH(device.MatrixOperation(matrix, {wires[0]}, false),
+                        Catch::Contains("Unsupported functionality"));
 }

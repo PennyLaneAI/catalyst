@@ -16,7 +16,8 @@ of quantum operations, measurements, and observables to JAXPR.
 """
 
 from dataclasses import dataclass
-from typing import Dict, List
+from itertools import chain
+from typing import Dict, Iterable, List
 
 import jax
 import numpy as np
@@ -24,13 +25,14 @@ from jax._src import api_util, core, source_info_util, util
 from jax._src.lib.mlir import ir
 from jax.core import AbstractValue
 from jax.interpreters import mlir
+from jax.tree_util import PyTreeDef, tree_unflatten
 from jaxlib.mlir.dialects._func_ops_gen import CallOp
 from jaxlib.mlir.dialects._mhlo_ops_gen import ConstantOp, ConvertOp
-from mlir_quantum.dialects.arith import AddIOp, CeilDivSIOp
-from mlir_quantum.dialects.arith import ConstantOp as ArithConstantOp
-from mlir_quantum.dialects.arith import IndexCastOp, MulIOp, SubIOp
+from jaxlib.mlir.dialects._stablehlo_ops_gen import ConstantOp as StableHLOConstantOp
+from mlir_quantum.dialects.arith import AddIOp, CeilDivSIOp, IndexCastOp, MulIOp, SubIOp
 from mlir_quantum.dialects.gradient import GradOp, JVPOp, VJPOp
 from mlir_quantum.dialects.quantum import (
+    AdjointOp,
     AllocOp,
     ComputationalBasisOp,
     CountsOp,
@@ -52,6 +54,7 @@ from mlir_quantum.dialects.quantum import (
     TensorOp,
     VarianceOp,
 )
+from mlir_quantum.dialects.quantum import YieldOp as QYieldOp
 from mlir_quantum.dialects.scf import ConditionOp, ForOp, IfOp, WhileOp, YieldOp
 from mlir_quantum.dialects.tensor import ExtractOp as TensorExtractOp
 from mlir_quantum.dialects.tensor import FromElementsOp
@@ -198,6 +201,8 @@ jvp_p = core.Primitive("jvp")
 jvp_p.multiple_results = True
 vjp_p = core.Primitive("vjp")
 vjp_p.multiple_results = True
+adjoint_p = jax.core.Primitive("adjoint")
+adjoint_p.multiple_results = True
 
 #
 # func
@@ -575,7 +580,7 @@ def _qextract_lowering(jax_ctx: mlir.LoweringRuleContext, qreg: ir.Value, qubit_
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
-    assert ir.OpaqueType.isinstance(qreg.type)
+    assert ir.OpaqueType.isinstance(qreg.type), qreg.type
     assert ir.OpaqueType(qreg.type).dialect_namespace == "quantum"
     assert ir.OpaqueType(qreg.type).data == "reg"
 
@@ -1380,6 +1385,7 @@ def _qfor_def_impl(
     raise NotImplementedError()
 
 
+# pylint: disable=too-many-statements
 def _qfor_lowering(
     jax_ctx: mlir.LoweringRuleContext,
     lower_bound: ir.Value,
@@ -1426,8 +1432,19 @@ def _qfor_lowering(
         loop_operands.append(p)
 
     if apply_reverse_transform:
-        zero = ArithConstantOp(ir.IndexType.get(), 0)
-        one = ArithConstantOp(ir.IndexType.get(), 1)
+        zero_np = np.array(0)
+        one_np = np.array(1)
+        zero_attr = ir.DenseIntElementsAttr.get(zero_np)
+        one_attr = ir.DenseIntElementsAttr.get(one_np)
+        zero_tensor = StableHLOConstantOp(zero_attr)
+        one_tensor = StableHLOConstantOp(one_attr)
+        ctx = jax_ctx.module_context.context
+        i64_type = ir.IntegerType.get_signless(64, ctx)
+        zero_i64 = TensorExtractOp(i64_type, zero_tensor, []).result
+        one_i64 = TensorExtractOp(i64_type, one_tensor, []).result
+        zero = IndexCastOp(ir.IndexType.get(), zero_i64).result
+        one = IndexCastOp(ir.IndexType.get(), one_i64).result
+
         start_val, stop_val, step_val = loop_operands[0], loop_operands[1], loop_operands[2]
 
         # Iterate from 0 to the number of iterations (ceil((stop - start) / step))
@@ -1473,8 +1490,69 @@ def _qfor_lowering(
 
 
 #
+# adjoint
+#
+@adjoint_p.def_impl
+def _adjoint_def_impl(ctx, *args, args_tree, jaxpr):  # pragma: no cover
+    raise NotImplementedError()
+
+
+@adjoint_p.def_abstract_eval
+def _adjoint_abstract(*args, args_tree, jaxpr):
+    return jaxpr.out_avals
+
+
+def _adjoint_lowering(
+    jax_ctx: mlir.LoweringRuleContext,
+    *args: Iterable[ir.Value],
+    args_tree: PyTreeDef,
+    jaxpr: core.ClosedJaxpr,
+) -> ir.Value:
+    """The JAX bind handler performing the Jaxpr -> MLIR adjoint lowering by taking the `jaxpr`
+    expression to be lowered and all its already lowered arguments as MLIR value references. The Jax
+    requires all the arguments to be passed as a single list of positionals, thus we pass indices of
+    the argument groups. The handler returns the resulting MLIR Value."""
+
+    # [1] - MLIR Value of constans, classical and quantum arguments [2] - JAXPR types of constans,
+    # classical and quantum arguments [3] - Build a body of the adjoint operator. We pass constants
+    # and classical arguments as-is, but substitute the quantum arguments with the arguments of the
+    # block.
+
+    ctx = jax_ctx.module_context.context
+    consts, cargs, qargs = tree_unflatten(args_tree, args)  # [1]
+    _, _, aqargs = tree_unflatten(args_tree, jax_ctx.avals_in)  # [2]
+
+    assert len(qargs) == 1, "We currently expect exactly one quantum register argument"
+    output_types = util.flatten(map(mlir.aval_to_ir_types, jax_ctx.avals_out))
+    assert len(output_types) == 1 and output_types[0] == ir.OpaqueType.get(
+        "quantum", "reg", ctx
+    ), "Expected a single result of quantum.register type, got: {output_types}"
+
+    # Build an adjoint operation with a single-block region.
+    op = AdjointOp(output_types[0], qargs[0])
+    adjoint_block = op.regions[0].blocks.append(*[mlir.aval_to_ir_types(a)[0] for a in aqargs])
+    with ir.InsertionPoint(adjoint_block):
+        source_info_util.extend_name_stack("adjoint")
+        out, _ = mlir.jaxpr_subcomp(
+            jax_ctx.module_context.replace(
+                name_stack=jax_ctx.module_context.name_stack.extend("adjoint")
+            ),
+            jaxpr.jaxpr,
+            mlir.TokenSet(),
+            [mlir.ir_constants(c) for c in jaxpr.consts],
+            *([a] for a in chain(consts, cargs, adjoint_block.arguments)),  # [3]
+            dim_var_values=jax_ctx.dim_var_values,
+        )
+
+        QYieldOp([a[0] for a in out])
+
+    return op.results
+
+
+#
 # registration
 #
+
 mlir.register_lowering(qdevice_p, _qdevice_lowering)
 mlir.register_lowering(qalloc_p, _qalloc_lowering)
 mlir.register_lowering(qdealloc_p, _qdealloc_lowering)
@@ -1501,6 +1579,7 @@ mlir.register_lowering(grad_p, _grad_lowering)
 mlir.register_lowering(func_p, _func_lowering)
 mlir.register_lowering(jvp_p, _jvp_lowering)
 mlir.register_lowering(vjp_p, _vjp_lowering)
+mlir.register_lowering(adjoint_p, _adjoint_lowering)
 
 
 def _scalar_abstractify(t):

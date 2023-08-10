@@ -21,28 +21,12 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Errc.h"
 
-#include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
-#include "mlir/Dialect/Index/IR/IndexDialect.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/Dialect/SCF/IR/SCF.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/SymbolTable.h"
-#include "mlir/Pass/Pass.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#include "Gradient/IR/GradientOps.h"
-#include "Gradient/Utils/CompDiffArgIndices.h"
 #include "Gradient/Utils/EinsumLinalgGeneric.h"
 #include "Gradient/Utils/GradientShape.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/IR/PatternMatch.h"
-
-#include "Gradient/IR/GradientOps.h"
-#include "Gradient/Transforms/Passes.h"
-#include "Gradient/Transforms/Patterns.h"
 #include "Quantum/IR/QuantumOps.h"
 
 #include "JVPVJPPatterns.hpp"
@@ -80,7 +64,7 @@ LogicalResult JVPLoweringPattern::matchAndRewrite(JVPOp op, PatternRewriter &rew
 
     Location loc = op.getLoc();
 
-    auto func_diff_operand_indices = compDiffArgIndices(op.getDiffArgIndices());
+    auto func_diff_operand_indices = computeDiffArgIndices(op.getDiffArgIndices());
     LLVM_DEBUG(dbgs() << "jvp_num_operands " << op.getOperands().size() << " \n");
     LLVM_DEBUG(dbgs() << "func_diff_operand_indices: " << func_diff_operand_indices << " \n");
     assert(func_diff_operand_indices.size() <= op.getOperands().size() / 2);
@@ -94,12 +78,11 @@ LogicalResult JVPLoweringPattern::matchAndRewrite(JVPOp op, PatternRewriter &rew
     }
 
     auto resHalfsize = (op.result_type_end() - op.result_type_begin()) / 2;
-    auto calleeOperandsSize = ({
-        std::vector<Type> out;
+    std::vector<Type> calleeOperandsSize;
+    {
         for (auto o : calleeOperands)
-            out.push_back(o.getType());
-        out;
-    });
+            calleeOperandsSize.push_back(o.getType());
+    }
     auto funcResultTypes =
         ValueTypeRange<ResultRange>(op.result_type_begin(), op.result_type_begin() + resHalfsize);
 
@@ -118,7 +101,7 @@ LogicalResult JVPLoweringPattern::matchAndRewrite(JVPOp op, PatternRewriter &rew
 
     std::vector<Value> einsumResults;
     for (size_t nout = 0; nout < funcResultTypes.size(); nout++) {
-        Optional<Value> acc;
+        std::optional<Value> acc;
         for (size_t nparam = 0; nparam < func_diff_operand_indices.size(); nparam++) {
             LLVM_DEBUG(dbgs() << "iteration: nout " << nout << " nparam " << nparam << "\n");
             auto jac = gradOp.getResults()[nparam * funcResultTypes.size() + nout];
@@ -129,11 +112,8 @@ LogicalResult JVPLoweringPattern::matchAndRewrite(JVPOp op, PatternRewriter &rew
             auto sparam = _tovec(param.getType().cast<mlir::TensorType>().getShape());
             auto stang = _tovec(tang.getType().cast<mlir::TensorType>().getShape());
 
-            auto sjac_param = ({
-                std::vector<int64_t> out(sjac.begin(),
-                                         sjac.begin() + std::min(sjac.size(), sparam.size()));
-                out;
-            });
+            std::vector<int64_t> sjac_param(sjac.begin(),
+                                            sjac.begin() + std::min(sjac.size(), sparam.size()));
 
             LLVM_DEBUG(dbgs() << "jac_type " << sjac << "\n");
             LLVM_DEBUG(dbgs() << "param_type " << sparam << "\n");
@@ -143,24 +123,21 @@ LogicalResult JVPLoweringPattern::matchAndRewrite(JVPOp op, PatternRewriter &rew
             assert(sjac_param == sparam &&
                    "Jacobian shape doesn't contain the parameter shape as a prefix");
 
-            auto jacAxisNames = ({
-                std::vector<size_t> out;
+            std::vector<size_t> jacAxisNames;
+            {
                 for (size_t i = 0; i < sjac.size(); i++)
-                    out.push_back(i);
-                out;
-            });
-            auto tangAxisNames = ({
-                std::vector<size_t> out;
+                    jacAxisNames.push_back(i);
+            }
+            std::vector<size_t> tangAxisNames;
+            {
                 for (size_t i = 0; i < stang.size(); i++)
-                    out.push_back(i);
-                out;
-            });
-            auto jvpAxisNames = ({
-                std::vector<size_t> out;
+                    tangAxisNames.push_back(i);
+            }
+            std::vector<size_t> jvpAxisNames;
+            {
                 for (size_t i = 0; i < sjac.size() - sparam.size(); i++)
-                    out.push_back(i + tangAxisNames.size());
-                out;
-            });
+                    jvpAxisNames.push_back(i + tangAxisNames.size());
+            }
 
             LLVM_DEBUG(dbgs() << "jac_axis " << jacAxisNames << "\n");
             LLVM_DEBUG(dbgs() << "tang_axis " << tangAxisNames << "\n");
@@ -190,12 +167,9 @@ LogicalResult JVPLoweringPattern::matchAndRewrite(JVPOp op, PatternRewriter &rew
         einsumResults.push_back(acc.value());
     }
 
-    auto results = ({
-        std::vector<Value> out;
-        out.insert(out.end(), fCallOp.getResults().begin(), fCallOp.getResults().end());
-        out.insert(out.end(), einsumResults.begin(), einsumResults.end());
-        out;
-    });
+    std::vector<Value> results;
+    results.insert(results.end(), fCallOp.getResults().begin(), fCallOp.getResults().end());
+    results.insert(results.end(), einsumResults.begin(), einsumResults.end());
 
     rewriter.replaceOp(op, results);
     return success();
@@ -207,7 +181,7 @@ LogicalResult VJPLoweringPattern::matchAndRewrite(VJPOp op, PatternRewriter &rew
 
     Location loc = op.getLoc();
 
-    auto func_diff_operand_indices = compDiffArgIndices(op.getDiffArgIndices());
+    auto func_diff_operand_indices = computeDiffArgIndices(op.getDiffArgIndices());
     LLVM_DEBUG(dbgs() << "vjp_num_operands " << op.getOperands().size() << " \n");
     LLVM_DEBUG(dbgs() << "func_diff_operand_indices: " << func_diff_operand_indices << " \n");
 
@@ -219,18 +193,18 @@ LogicalResult VJPLoweringPattern::matchAndRewrite(VJPOp op, PatternRewriter &rew
            "the number of function results doesn't match the number of cotangent arguments");
 
     auto calleeOperands = op.getParams();
-    auto cotang_operands = OperandRange(op.operand_begin() + func_operands_size, op.operand_end());
-
-    for (auto idx : func_diff_operand_indices) {
-        assert(idx < calleeOperands.size() && "all diffArgIndices reference valid arguments");
+    {
+        for (auto idx : func_diff_operand_indices) {
+            assert(idx < calleeOperands.size() && "all diffArgIndices reference valid arguments");
+        }
     }
 
-    auto calleeOperandsSize = ({
-        std::vector<Type> out;
+    auto cotang_operands = OperandRange(op.operand_begin() + func_operands_size, op.operand_end());
+    std::vector<Type> calleeOperandsSize;
+    {
         for (auto o : calleeOperands)
-            out.push_back(o.getType());
-        out;
-    });
+            calleeOperandsSize.push_back(o.getType());
+    }
     auto funcResultTypes = calleeOp.getResultTypes();
 
     auto grad_result_types = computeResultTypes(calleeOp, func_diff_operand_indices);
@@ -246,7 +220,7 @@ LogicalResult VJPLoweringPattern::matchAndRewrite(VJPOp op, PatternRewriter &rew
 
     std::vector<Value> einsumResults;
     for (size_t nparam = 0; nparam < func_diff_operand_indices.size(); nparam++) {
-        Optional<Value> acc;
+        std::optional<Value> acc;
         for (size_t nout = 0; nout < funcResultTypes.size(); nout++) {
             auto jac = gradOp.getResults()[nparam * funcResultTypes.size() + nout];
             auto param = calleeOperands[func_diff_operand_indices[nparam]];
@@ -256,10 +230,7 @@ LogicalResult VJPLoweringPattern::matchAndRewrite(VJPOp op, PatternRewriter &rew
             auto sparam = _tovec(param.getType().cast<mlir::TensorType>().getShape());
             auto scotang = _tovec(cotang.getType().cast<mlir::TensorType>().getShape());
 
-            auto sjac_cotang = ({
-                std::vector<int64_t> out(sjac.begin() + sparam.size(), sjac.end());
-                out;
-            });
+            std::vector<int64_t> sjac_cotang(sjac.begin() + sparam.size(), sjac.end());
 
             LLVM_DEBUG(dbgs() << "jac_type " << sjac << "\n");
             LLVM_DEBUG(dbgs() << "param_type " << sparam << "\n");
@@ -268,24 +239,21 @@ LogicalResult VJPLoweringPattern::matchAndRewrite(VJPOp op, PatternRewriter &rew
             assert(sjac_cotang == scotang &&
                    "Jacobian shape doesn't contain the cotang shape as a suffix");
 
-            auto jacAxisNames = ({
-                std::vector<size_t> out;
+            std::vector<size_t> jacAxisNames;
+            {
                 for (size_t i = 0; i < sjac.size(); i++)
-                    out.push_back(i);
-                out;
-            });
-            auto cotangAxisNames = ({
-                std::vector<size_t> out;
+                    jacAxisNames.push_back(i);
+            }
+            std::vector<size_t> cotangAxisNames;
+            {
                 for (size_t i = sjac.size() - scotang.size(); i < sjac.size(); i++)
-                    out.push_back(i);
-                out;
-            });
-            auto vjpAxisNames = ({
-                std::vector<size_t> out;
+                    cotangAxisNames.push_back(i);
+            }
+            std::vector<size_t> vjpAxisNames;
+            {
                 for (size_t i = 0; i < sjac.size() - scotang.size(); i++)
-                    out.push_back(i);
-                out;
-            });
+                    vjpAxisNames.push_back(i);
+            }
 
             LLVM_DEBUG(dbgs() << "jac_axis " << jacAxisNames << "\n");
             LLVM_DEBUG(dbgs() << "cotang_axis " << cotangAxisNames << "\n");
@@ -313,13 +281,9 @@ LogicalResult VJPLoweringPattern::matchAndRewrite(VJPOp op, PatternRewriter &rew
         einsumResults.push_back(acc.value());
     }
 
-    auto results = ({
-        std::vector<Value> out;
-        out.insert(out.end(), fCallOp.getResults().begin(), fCallOp.getResults().end());
-        out.insert(out.end(), einsumResults.begin(), einsumResults.end());
-        /* out.insert(out.end(), calleeOperands.begin(), calleeOperands.end()); */
-        out;
-    });
+    std::vector<Value> results;
+    results.insert(results.end(), fCallOp.getResults().begin(), fCallOp.getResults().end());
+    results.insert(results.end(), einsumResults.begin(), einsumResults.end());
 
     rewriter.replaceOp(op, results);
     return success();

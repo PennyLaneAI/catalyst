@@ -23,7 +23,7 @@ from utils import get_cpp_files
 
 CLANG_FMT_BIN = "clang-format"
 
-IGNORE_PATTERNS = ["external", "build", "llvm-project", "mlir-hlo"]
+IGNORE_PATTERNS = ["external", "build", "llvm-project", "mlir-hlo", "Enzyme"]
 
 DEFAULT_CLANG_FORMAT_VERSION = 13
 

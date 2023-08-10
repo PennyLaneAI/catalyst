@@ -108,6 +108,19 @@ def test_adjoint_on_non_expval(backend):
         qjit(workflow)
 
 
+def test_grad_on_qjit():
+    """Check that grad works when called on an existing qjit object that does not wrap a QNode."""
+
+    @qjit
+    def f(x: float):
+        return x * x
+
+    result = qjit(grad(f))(3.0)
+    expected = 6.0
+
+    assert np.allclose(result, expected)
+
+
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
 def test_finite_diff(inp, backend):
     """Test finite diff."""
@@ -448,7 +461,6 @@ def test_ps_qft(inp, backend):
     assert np.allclose(compiled(inp, 2, 2), interpreted(inp, 2, 2))
 
 
-@pytest.mark.xfail(reason="https://github.com/PennyLaneAI/catalyst/issues/73")
 def test_ps_probs(backend):
     """Check that the parameter-shift method works for qml.probs."""
 
@@ -461,7 +473,10 @@ def test_ps_probs(backend):
     def workflow(p: float):
         return grad(func, method="defer")(p)
 
-    assert np.allclose(workflow(0.5), [0.93879128, 0.06120872])
+    result = workflow(0.5)
+    reference = qml.jacobian(func, argnum=0)(0.5)
+
+    assert np.allclose(result, reference)
 
 
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])

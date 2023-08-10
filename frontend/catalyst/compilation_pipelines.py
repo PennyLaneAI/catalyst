@@ -20,12 +20,14 @@ import functools
 import inspect
 import typing
 import warnings
+from enum import Enum
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
 from jax.interpreters.mlir import ir
+from jax.tree_util import tree_flatten, tree_unflatten
 from mlir_quantum.runtime import (
     as_ctype,
     get_ranked_memref_descriptor,
@@ -68,6 +70,87 @@ def get_type_annotations(func: typing.Callable):
     return None
 
 
+class SharedObjectManager:
+    """Shared object manager.
+
+    Manages the life time of the shared object. When is it loaded, when to close it.
+
+    Args:
+        shared_object_file: path to shared object containing compiled function
+        func_name: name of compiled function
+    """
+
+    def __init__(self, shared_object_file, func_name):
+        self.shared_object = ctypes.CDLL(shared_object_file)
+        self.function, self.setup, self.teardown, self.mem_transfer = self.load_symbols(func_name)
+
+    def close(self):
+        """Close the shared object"""
+        self.function = None
+        self.setup = None
+        self.teardown = None
+        self.mem_transfer = None
+        dlclose = ctypes.CDLL(None).dlclose
+        dlclose.argtypes = [ctypes.c_void_p]
+        # pylint: disable=protected-access
+        dlclose(self.shared_object._handle)
+
+    def load_symbols(self, func_name):
+        """Load symbols necessary for for execution of the compiled function.
+
+        Args:
+            func_name: name of compiled function to be executed
+
+        Returns:
+            function: function handle
+            setup: handle to the setup function, which initializes the device
+            teardown: handle to the teardown function, which tears down the device
+            mem_transfer: memory transfer shared object
+        """
+
+        setup = self.shared_object.setup
+        setup.argtypes = [ctypes.c_int, ctypes.POINTER(ctypes.c_char_p)]
+        setup.restypes = ctypes.c_int
+
+        teardown = self.shared_object.teardown
+        teardown.argtypes = None
+        teardown.restypes = None
+
+        # We are calling the c-interface
+        function = self.shared_object["_catalyst_pyface_" + func_name]
+        # Guaranteed from _mlir_ciface specification
+        function.restypes = None
+        # Not needed, computed from the arguments.
+        # function.argyptes
+
+        mem_transfer = self.shared_object["_mlir_memory_transfer"]
+
+        return function, setup, teardown, mem_transfer
+
+    def __enter__(self):
+        params_to_setup = [b"jitted-function"]
+        argc = len(params_to_setup)
+        array_of_char_ptrs = (ctypes.c_char_p * len(params_to_setup))()
+        array_of_char_ptrs[:] = params_to_setup
+        self.setup(ctypes.c_int(argc), array_of_char_ptrs)
+        return self
+
+    def __exit__(self, _type, _value, _traceback):
+        self.teardown()
+
+
+class TypeCompatibility(Enum):
+    """Enum class for state machine.
+
+    The state represent the transition between states.
+    """
+
+    UNKNOWN = 0
+    CAN_SKIP_PROMOTION = 1
+    NEEDS_PROMOTION = 2
+    NEEDS_COMPILATION = 3
+
+
 class CompiledFunction:
     """CompiledFunction, represents a Compiled Function.
 
@@ -83,103 +166,70 @@ class CompiledFunction:
         func_name,
         restype,
     ):
-        self.shared_object_file = shared_object_file
-        assert func_name  # make sure that func_name is not false-y
+        self.shared_object = SharedObjectManager(shared_object_file, func_name)
+        self.return_type_c_abi = None
         self.func_name = func_name
         self.restype = restype
 
     @staticmethod
-    def can_promote(compiled_signature, runtime_signature):
+    def typecheck(compiled_signature, runtime_signature):
         """Whether arguments can be promoted.
 
         Args:
             compiled_signature: user supplied signature, obtain from either an annotation or a
-                                previously compiled
-            implementation of the compiled function
+                                previously compiled implementation of the compiled function
             runtime_signature: runtime signature
 
         Returns:
             bool.
         """
-        len_compile = len(compiled_signature)
-        len_runtime = len(runtime_signature)
-        if len_compile != len_runtime:
-            return False
+        compiled_data, compiled_shape = tree_flatten(compiled_signature)
+        runtime_data, runtime_shape = tree_flatten(runtime_signature)
+        if compiled_shape != runtime_shape:
+            return TypeCompatibility.NEEDS_COMPILATION
 
-        for c_param, r_param in zip(compiled_signature, runtime_signature):
-            assert isinstance(c_param, jax.core.ShapedArray)
-            assert isinstance(r_param, jax.core.ShapedArray)
+        best_case = TypeCompatibility.CAN_SKIP_PROMOTION
+        for c_param, r_param in zip(compiled_data, runtime_data):
+            if c_param.dtype != r_param.dtype:
+                best_case = TypeCompatibility.NEEDS_PROMOTION
+
+            if c_param.shape != r_param.shape:
+                return TypeCompatibility.NEEDS_COMPILATION
+
             promote_to = jax.numpy.promote_types(r_param.dtype, c_param.dtype)
             if c_param.dtype != promote_to:
-                return False
-        return True
+                return TypeCompatibility.NEEDS_COMPILATION
+
+        return best_case
 
     @staticmethod
-    def promote_arguments(compiled_signature, runtime_signature, *args):
+    def promote_arguments(compiled_signature, *args):
         """Promote arguments from the type specified in args to the type specified by
            compiled_signature.
 
         Args:
             compiled_signature: user supplied signature, obtain from either an annotation or a
-                                previously compiled
-            implementation of the compiled function
-            runtime_signature: runtime signature
+                                previously compiled implementation of the compiled function
             *args: actual arguments to the function
 
         Returns:
             promoted_args: Arguments after promotion.
         """
-        len_compile = len(compiled_signature)
-        len_runtime = len(runtime_signature)
+        compiled_data, compiled_shape = tree_flatten(compiled_signature)
+        runtime_data, runtime_shape = tree_flatten(args)
         assert (
-            len_compile == len_runtime
-        ), "Compiled function incompatible with quantity of runtime arguments"
+            compiled_shape == runtime_shape
+        ), "Compiled function incompatible runtime arguments' shape"
 
         promoted_args = []
-        for c_param, r_param, arg in zip(compiled_signature, runtime_signature, args):
-            assert isinstance(arg, jax.Array)
+        for c_param, r_param in zip(compiled_data, runtime_data):
             assert isinstance(c_param, jax.core.ShapedArray)
-            assert isinstance(r_param, jax.core.ShapedArray)
-            arg_dtype = arg.dtype
+            r_param = jax.numpy.asarray(r_param)
+            arg_dtype = r_param.dtype
             promote_to = jax.numpy.promote_types(arg_dtype, c_param.dtype)
-            promoted_arg = jax.numpy.asarray(arg, dtype=promote_to)
+            promoted_arg = jax.numpy.asarray(r_param, dtype=promote_to)
             promoted_args.append(promoted_arg)
-        return promoted_args
-
-    @staticmethod
-    def load_symbols(shared_object_file, func_name):
-        """Load symbols necessary for for execution of the compiled function.
-
-        Args:
-            shared_object_file: path to shared object file
-            func_name: name of compiled function to be executed
-
-        Returns:
-            shared_object: in memory shared object
-            function: function handle
-            setup: handle to the setup function, which initializes the device
-            teardown: handle to the teardown function, which tears down the device
-        """
-        shared_object = ctypes.CDLL(shared_object_file)
-
-        setup = shared_object.setup
-        setup.argtypes = [ctypes.c_int, ctypes.POINTER(ctypes.c_char_p)]
-        setup.restypes = ctypes.c_int
-
-        teardown = shared_object.teardown
-        teardown.argtypes = None
-        teardown.restypes = None
-
-        # We are calling the c-interface
-        function = shared_object["_catalyst_pyface_" + func_name]
-        # Guaranteed from _mlir_ciface specification
-        function.restypes = None
-        # Not needed, computed from the arguments.
-        # function.argyptes
-
-        mem_transfer = shared_object["_mlir_memory_transfer"]
-
-        return shared_object, function, setup, teardown, mem_transfer
+        return tree_unflatten(compiled_shape, promoted_args)
 
     @staticmethod
     def get_runtime_signature(*args):
@@ -187,62 +237,39 @@ class CompiledFunction:
 
         Args:
             *args: arguments to the compiled function
+
         Returns:
             a list of JAX shaped arrays
         """
+        args_data, args_shape = tree_flatten(args)
+
         try:
             r_sig = []
-            for arg in args:
+            for arg in args_data:
                 r_sig.append(jax.api_util.shaped_abstractify(arg))
-            return r_sig
+            # Unflatten JAX abstracted args to preserve the shape
+            return tree_unflatten(args_shape, r_sig)
         except Exception as exc:
             arg_type = type(arg)
             raise TypeError(f"Unsupported argument type: {arg_type}") from exc
 
     @staticmethod
-    def _exec(shared_object_file, func_name, has_return, numpy_dict, *args):
-        """Execute the compiled function with arguments `*args`.
+    def _exec(shared_object, has_return, numpy_dict, *args):
+        """Execute the compiled function with arguments ``*args``.
 
         Args:
-            shared_object_file: path to the shared object file containing the JIT compiled function
-            func_name: name of compiled function to be executed
+            lib: Shared object
             has_return: whether the function returns a value or not
+            numpy_dict: dictionary of numpy arrays of buffers from the runtime
             *args: arguments to the function
 
         Returns:
             retval: the value computed by the function or None if the function has no return value
         """
 
-        shared_object, function, setup, teardown, mem_transfer = CompiledFunction.load_symbols(
-            shared_object_file, func_name
-        )
-
-        params_to_setup = [b"jitted-function"]
-        argc = len(params_to_setup)
-        array_of_char_ptrs = (ctypes.c_char_p * len(params_to_setup))()
-        array_of_char_ptrs[:] = params_to_setup
-
-        setup(ctypes.c_int(argc), array_of_char_ptrs)
-        result_desc = type(args[0].contents) if has_return else None
-
-        retval = wrapper.wrap(function, args, result_desc, mem_transfer, numpy_dict)
-        if len(retval) == 0:
-            retval = None
-        elif len(retval) == 1:
-            retval = retval[0]
-
-        # Teardown has to be made after the return valued has been copied.
-        teardown()
-
-        # Unmap the shared library. This is necessary in case the function is re-compiled.
-        # Without unmapping the shared library, there would be a conflict in the name of
-        # the function and the previous one would succeed.
-        # Need to close after obtaining value, since the value can point to memory in the shared
-        # object. This is in the case of returning a constant, for example.
-        dlclose = ctypes.CDLL(None).dlclose
-        dlclose.argtypes = [ctypes.c_void_p]
-        # pylint: disable=protected-access
-        dlclose(shared_object._handle)
+        with shared_object as lib:
+            result_desc = type(args[0].contents) if has_return else None
+            retval = wrapper.wrap(lib.function, args, result_desc, lib.mem_transfer, numpy_dict)
 
         return retval
 
@@ -288,16 +315,20 @@ class CompiledFunction:
         shape = ir.RankedTensorType(mlir_tensor_type).shape
         return len(shape) if shape else 0
 
-    @staticmethod
-    def restype_to_memref_descs(mlir_tensor_types):
-        """Converts the return type to a compatible type for the expected ABI.
+    def getCompiledReturnValueType(self, mlir_tensor_types):
+        """Compute the type for the return value and memoize it
 
+        This type does not need to be recomputed as it is generated once per compiled function.
         Args:
             mlir_tensor_types: a list of MLIR tensor types which match the expected return type
         Returns:
             a pointer to a CompiledFunctionReturnValue, which corresponds to a structure in which
             fields match the expected return types
         """
+
+        if self.return_type_c_abi is not None:
+            return self.return_type_c_abi
+
         error_msg = """This function must be called with a non-zero length list as an argument."""
         assert mlir_tensor_types, error_msg
         _get_rmd = CompiledFunction.get_ranked_memref_descriptor_from_mlir_tensor_type
@@ -324,17 +355,28 @@ class CompiledFunction:
 
         return_value = CompiledFunctionReturnValue()
         return_value_pointer = ctypes.pointer(return_value)
-        return return_value_pointer
+        self.return_type_c_abi = return_value_pointer
+        return self.return_type_c_abi
 
-    @staticmethod
-    def args_to_memref_descs(restype, args):
-        """Convert args to memref descriptors.
+    def restype_to_memref_descs(self, mlir_tensor_types):
+        """Converts the return type to a compatible type for the expected ABI.
+
+        Args:
+            mlir_tensor_types: a list of MLIR tensor types which match the expected return type
+        Returns:
+            a pointer to a CompiledFunctionReturnValue, which corresponds to a structure in which
+            fields match the expected return types
+        """
+        return self.getCompiledReturnValueType(mlir_tensor_types)
+
+    def args_to_memref_descs(self, restype, args):
+        """Convert ``args`` to memref descriptors.
 
         Besides converting the arguments to memrefs, it also prepares the return value. To respect
         the ABI, the return value is changed to a pointer and passed as the first parameter.
 
         Args:
-            restype: the type of restype is a CompiledFunctionReturnValue
+            restype: the type of restype is a ``CompiledFunctionReturnValue``
             args: the JAX arrays to be used as arguments to the function
 
         Returns:
@@ -348,15 +390,19 @@ class CompiledFunction:
         return_value_pointer = ctypes.POINTER(ctypes.c_int)()  # This is the null pointer
 
         if restype:
-            return_value_pointer = CompiledFunction.restype_to_memref_descs(restype)
+            return_value_pointer = self.restype_to_memref_descs(restype)
 
         c_abi_args = []
 
-        for arg in args:
+        args_data, args_shape = tree_flatten(args)
+
+        for arg in args_data:
             numpy_arg = np.asarray(arg)
             numpy_arg_buffer.append(numpy_arg)
             c_abi_ptr = ctypes.pointer(get_ranked_memref_descriptor(numpy_arg))
             c_abi_args.append(c_abi_ptr)
+
+        args = tree_unflatten(args_shape, c_abi_args)
 
         class CompiledFunctionArgValue(ctypes.Structure):
             """Programmatically create a structure which holds tensors of varying base types."""
@@ -379,18 +425,17 @@ class CompiledFunction:
 
     def get_cmain(self, *args):
         """Get a string representing a C program that can be linked against the shared object."""
-        _, buffer = CompiledFunction.args_to_memref_descs(self.restype, args)
+        _, buffer = self.args_to_memref_descs(self.restype, args)
 
         return get_template(self.func_name, self.restype, *buffer)
 
     def __call__(self, *args, **kwargs):
-        abi_args, _buffer = CompiledFunction.args_to_memref_descs(self.restype, args)
+        abi_args, _buffer = self.args_to_memref_descs(self.restype, args)
 
         numpy_dict = {nparr.ctypes.data: nparr for nparr in _buffer}
 
         result = CompiledFunction._exec(
-            self.shared_object_file,
-            self.func_name,
+            self.shared_object,
             self.restype,
             numpy_dict,
             *abi_args,
@@ -425,6 +470,7 @@ class QJIT:
         self._llvmir = None
         self.mlir_module = None
         self.compiled_function = None
+        self.shape = None
         parameter_types = get_type_annotations(self.qfunc)
         self.user_typed = False
         if parameter_types is not None:
@@ -434,8 +480,7 @@ class QJIT:
                 self.compiled_function = self.compile()
 
     def print_stage(self, stage):
-        """
-        Print one of the recorded stages.
+        """Print one of the recorded stages.
 
         Args:
             stage: string corresponding with the name of the stage to be printed
@@ -464,10 +509,10 @@ class QJIT:
         return self._llvmir
 
     def get_mlir(self, *args):
-        """Trace self.qfunc
+        """Trace :func:`~.qfunc`
 
         Args:
-            *args: either the concrete values to be passed as arguments to `fn` or abstract values
+            *args: either the concrete values to be passed as arguments to ``fn`` or abstract values
 
         Returns:
             an MLIR module
@@ -477,7 +522,7 @@ class QJIT:
         with Patcher(
             (qml.QNode, "__call__", QFunc.__call__),
         ):
-            mlir_module, ctx, jaxpr = tracer.get_mlir(self.qfunc, *self.c_sig)
+            mlir_module, ctx, jaxpr, self.shape = tracer.get_mlir(self.qfunc, *self.c_sig)
 
         inject_functions(mlir_module, ctx)
         mod = mlir_module.operation
@@ -492,6 +537,8 @@ class QJIT:
         # This will make a check before sending it to the compiler that the return type
         # is actually available in most systems. f16 needs a special symbol and linking
         # will fail if it is not available.
+        if self.compiled_function and self.compiled_function.shared_object:
+            self.compiled_function.shared_object.close()
         restype = self.mlir_module.body.operations[0].type.results
         for res in restype:
             baseType = ir.RankedTensorType(res).element_type
@@ -512,31 +559,35 @@ class QJIT:
 
     def _maybe_promote(self, function, *args):
         """Logic to decide whether the function needs to be recompiled
-        given *args and whether *args need to be promoted.
+        given ``*args`` and whether ``*args`` need to be promoted.
 
         Args:
-          function: an instance of CompiledFunction that may need recompilation
+          function: an instance of ``CompiledFunction`` that may need recompilation
           *args: arguments that may be promoted.
 
         Returns:
-          function: an instance of CompiledFunction that may have been recompiled
+          function: an instance of ``CompiledFunction`` that may have been recompiled
           *args: arguments that may have been promoted
         """
-        args = [jax.numpy.array(arg) for arg in args]
         r_sig = CompiledFunction.get_runtime_signature(*args)
-        is_prev_compile = self.compiled_function is not None
-        can_promote = not is_prev_compile or CompiledFunction.can_promote(self.c_sig, r_sig)
-        needs_compile = not is_prev_compile or not can_promote
 
-        if needs_compile:
+        has_been_compiled = self.compiled_function is not None
+        next_action = TypeCompatibility.UNKNOWN
+        if not has_been_compiled:
+            next_action = TypeCompatibility.NEEDS_COMPILATION
+        else:
+            next_action = CompiledFunction.typecheck(self.c_sig, r_sig)
+
+        if next_action == TypeCompatibility.NEEDS_PROMOTION:
+            args = CompiledFunction.promote_arguments(self.c_sig, *args)
+        elif next_action == TypeCompatibility.NEEDS_COMPILATION:
             if self.user_typed:
                 msg = "Provided arguments did not match declared signature, recompiling..."
                 warnings.warn(msg, UserWarning)
             self.mlir_module = self.get_mlir(*r_sig)
             function = self.compile()
         else:
-            args = CompiledFunction.promote_arguments(self.c_sig, r_sig, *args)
-        args = [jax.numpy.array(arg) for arg in args]
+            assert next_action == TypeCompatibility.CAN_SKIP_PROMOTION
 
         return function, args
 
@@ -558,16 +609,28 @@ class QJIT:
             return self.qfunc(*args, **kwargs)
 
         function, args = self._maybe_promote(self.compiled_function, *args)
+        recompilation_needed = function != self.compiled_function
         self.compiled_function = function
 
-        if any(isinstance(arg, jax.core.Tracer) for arg in args):
+        args_data, _args_shape = tree_flatten(args)
+        if any(isinstance(arg, jax.core.Tracer) for arg in args_data):
             # Only compile a derivative version of the compiled function when needed.
-            if self.jaxed_qfunc is None:
+            if self.jaxed_qfunc is None or recompilation_needed:
                 self.jaxed_qfunc = JAX_QJIT(self)
 
             return self.jaxed_qfunc(*args, **kwargs)
 
-        return self.compiled_function(*args, **kwargs)
+        data = self.compiled_function(*args, **kwargs)
+
+        # Unflatten the return value w.r.t. the original PyTree definition if available
+        assert self.shape is not None, "Shape must not be none."
+        data = tree_unflatten(self.shape, data)
+
+        # For the classical and pennylane_extensions compilation path,
+        if isinstance(data, (list, tuple)) and len(data) == 1:
+            data = data[0]
+
+        return data
 
 
 class JAX_QJIT:
@@ -586,20 +649,21 @@ class JAX_QJIT:
     def __init__(self, qfunc):
         @jax.custom_jvp
         def jaxed_qfunc(*args, **kwargs):
-            results = self.wrap_callback(qfunc, *args, **kwargs)
-            if len(results) == 1:
-                results = results[0]
-            return results
+            return self.wrap_callback(qfunc, *args, **kwargs)
 
         self.qfunc = qfunc
         self.deriv_qfuncs = {}
         self.jaxed_qfunc = jaxed_qfunc
-        jaxed_qfunc.defjvp(self.compute_jvp)
+        jaxed_qfunc.defjvp(self.compute_jvp, symbolic_zeros=True)
 
     @staticmethod
     def wrap_callback(qfunc, *args, **kwargs):
         """Wrap a QJIT function inside a jax host callback."""
-        return jax.pure_callback(qfunc, qfunc.jaxpr.out_avals, *args, vectorized=False, **kwargs)
+        data = jax.pure_callback(qfunc, qfunc.jaxpr.out_avals, *args, vectorized=False, **kwargs)
+
+        # Unflatten the return value w.r.t. the original PyTree definition if available
+        assert qfunc.shape is not None, "Shape must not be none."
+        return tree_unflatten(qfunc.shape, data)
 
     def get_derivative_qfunc(self, argnums):
         """Compile a function computing the derivative of the wrapped QJIT for the given argnums."""
@@ -631,31 +695,36 @@ class JAX_QJIT:
 
     def compute_jvp(self, primals, tangents):
         """Compute the set of results and JVPs for a QJIT function."""
+        # Assume we have primals of shape `[a,b]` and results of shape `[c,d]`. Derivatives [2]
+        # would get the shape `[a,b,c,d]` and tangents [1] would have the same shape as primals.
+        # Now, In this function we apply tensordot using the pattern `[a,b,c,d]*[a,b] -> [c,d]`.
 
         # Optimization: Do not compute Jacobians for arguments which do not participate in
         #               differentiation.
-        # TODO: replace with symbolic zero support
         argnums = []
         for idx, tangent in enumerate(tangents):
-            if qml.math.is_abstract(tangent, like="jax") or jnp.any(jnp.atleast_1d(tangent) != 0.0):
+            if not isinstance(tangent, jax.custom_derivatives.SymbolicZero):
                 argnums.append(idx)
 
         results = self.wrap_callback(self.qfunc, *primals)
+        results_data, _results_shape = tree_flatten(results)
         derivatives = self.wrap_callback(self.get_derivative_qfunc(argnums), *primals)
+        derivatives_data, _derivatives_shape = tree_flatten(derivatives)
 
-        jvps = [jnp.zeros_like(results[res_idx]) for res_idx in range(len(results))]
-        for arg_idx, tangent in enumerate(tangents):
-            # Skip JVP for arguments which do not participate in differentiation.
-            if arg_idx not in argnums:
-                continue
-            for res_idx in range(len(results)):
-                deriv_idx = arg_idx * len(results) + res_idx
-                num_axes = 0 if tangent.ndim == 0 else 1
-                jvp = jnp.tensordot(jnp.transpose(derivatives[deriv_idx]), tangent, axes=num_axes)
+        jvps = [jnp.zeros_like(results_data[res_idx]) for res_idx in range(len(results_data))]
+        for diff_arg_idx, arg_idx in enumerate(argnums):
+            tangent = tangents[arg_idx]  # [1]
+            taxis = list(range(tangent.ndim))
+            for res_idx in range(len(results_data)):
+                deriv_idx = diff_arg_idx * len(results_data) + res_idx
+                deriv = derivatives_data[deriv_idx]  # [2]
+                jvp = jnp.tensordot(deriv, tangent, axes=(taxis, taxis))
                 jvps[res_idx] = jvps[res_idx] + jvp
 
-        if len(results) == 1:
-            results = results[0]
+        # jvps must match the type of primals
+        # due to pytrees, primals are a tuple
+        primal_type = type(primals)
+        jvps = primal_type(jvps)
         if len(jvps) == 1:
             jvps = jvps[0]
 
@@ -692,9 +761,10 @@ def qjit(
             compilation. If ``True``, intermediate representations are available via the
             :attr:`~.QJIT.mlir`, :attr:`~.QJIT.jaxpr`, and :attr:`~.QJIT.qir`, representing
             different stages in the optimization process.
-        verbosity (int): Verbosity level (0 - disabled, >0 - enabled)
+        verbosity (bool): If ``True``, the tools and flags used by Catalyst behind the scenes are
+            printed out.
         logfile (Optional[TextIOWrapper]): File object to write verbose messages to (default -
-            sys.stderr).
+            ``sys.stderr``).
         pipelines (Optional(List[AnyType]): A list of pipelines to be executed. The elements of
             the list are asked to implement a run method which takes the output of the previous run
             as an input to the next element, and so on.

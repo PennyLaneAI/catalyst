@@ -60,11 +60,12 @@ TEST_CASE("Test __quantum__qis__Gradient_params for zero number of obs", "[Gradi
 
         __quantum__rt__toggle_recorder(/* activate_cm */ true);
 
-        __quantum__qis__S(q);
-        __quantum__qis__T(q);
+        __quantum__qis__S(q, false);
+        __quantum__qis__T(q, false);
 
         REQUIRE_NOTHROW(__quantum__qis__Gradient_params(&tp, 0, &results));
 
+        __quantum__rt__qubit_release(q);
         __quantum__rt__toggle_recorder(/* activate_cm */ false);
     }
     __quantum__rt__finalize();
@@ -92,7 +93,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
 
         QUBIT *q = __quantum__rt__qubit_allocate();
 
-        __quantum__qis__RX(-M_PI / 7, q);
+        __quantum__qis__RX(-M_PI / 7, q, false);
 
         auto obs = __quantum__qis__NamedObs(ObsId::PauliZ, q);
 
@@ -106,6 +107,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
 
         __quantum__rt__toggle_recorder(/* activate_cm */ false);
 
+        __quantum__rt__qubit_release(q);
         __quantum__rt__finalize();
     }
 
@@ -133,7 +135,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
 
         __quantum__rt__toggle_recorder(/* activate_cm */ true);
 
-        __quantum__qis__RX(-M_PI / 7, q);
+        __quantum__qis__RX(-M_PI / 7, q, false);
 
         auto obs_idx_0 = __quantum__qis__NamedObs(ObsId::PauliZ, q);
 
@@ -148,6 +150,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
         CHECK(-sin(-M_PI / 7) == Approx(result_tp.data_aligned[0]));
         CHECK(-sin(-M_PI / 7) == Approx(result.data_aligned[0]));
 
+        __quantum__rt__qubit_release(q);
         __quantum__rt__finalize();
     }
 
@@ -176,7 +179,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
 
         __quantum__rt__toggle_recorder(/* activate_cm */ true);
 
-        __quantum__qis__RX(-M_PI / 7, q);
+        __quantum__qis__RX(-M_PI / 7, q, false);
 
         CplxT_double matrix_data[4] = {{1.0, 0.0}, {0.0, 0.0}, {2.0, 0.0}, {0.0, 0.0}};
 
@@ -203,6 +206,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
         CHECK(expected == Approx(result.data_aligned[0]));
 
         delete h_matrix;
+        __quantum__rt__qubit_release(q);
         __quantum__rt__finalize();
     }
 
@@ -236,7 +240,7 @@ TEST_CASE("Test __quantum__qis__Gradient_params and __quantum__qis__Gradient "
 
         __quantum__rt__toggle_recorder(/* activate_cm */ true);
 
-        __quantum__qis__RY(p, q);
+        __quantum__qis__RY(p, q, false);
 
         auto obs_idx_0 = __quantum__qis__NamedObs(ObsId::PauliX, q);
 
@@ -251,6 +255,7 @@ TEST_CASE("Test __quantum__qis__Gradient_params and __quantum__qis__Gradient "
         CHECK(cos(p) == Approx(result_tp.data_aligned[0]).margin(1e-5));
         CHECK(cos(p) == Approx(result.data_aligned[0]).margin(1e-5));
 
+        __quantum__rt__qubit_release(q);
         __quantum__rt__finalize();
     }
 
@@ -283,16 +288,16 @@ TEST_CASE("Test __quantum__qis__Gradient_params Op=[Hadamard,RZ,RY,RZ,S,T,ParamS
         __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
 
         QUBIT *q0 = __quantum__rt__qubit_allocate();
-        __quantum__rt__qubit_allocate();
+        QUBIT *q1 = __quantum__rt__qubit_allocate();
 
         __quantum__rt__toggle_recorder(/* activate_cm */ true);
 
-        __quantum__qis__Hadamard(q0);
-        __quantum__qis__RZ(param[0], q0);
-        __quantum__qis__RY(param[1], q0);
-        __quantum__qis__RZ(param[2], q0);
-        __quantum__qis__S(q0);
-        __quantum__qis__T(q0);
+        __quantum__qis__Hadamard(q0, false);
+        __quantum__qis__RZ(param[0], q0, false);
+        __quantum__qis__RY(param[1], q0, false);
+        __quantum__qis__RZ(param[2], q0, false);
+        __quantum__qis__S(q0, false);
+        __quantum__qis__T(q0, false);
 
         auto obs_idx_0 = __quantum__qis__NamedObs(ObsId::PauliX, q0);
 
@@ -311,6 +316,9 @@ TEST_CASE("Test __quantum__qis__Gradient_params Op=[Hadamard,RZ,RY,RZ,S,T,ParamS
         CHECK(expected[0] == Approx(result.data_aligned[0]).margin(1e-5));
         CHECK(expected[1] == Approx(result.data_aligned[1]).margin(1e-5));
         CHECK(expected[2] == Approx(result.data_aligned[2]).margin(1e-5));
+
+        __quantum__rt__qubit_release(q1);
+        __quantum__rt__qubit_release(q0);
     }
     __quantum__rt__finalize();
 
@@ -332,16 +340,17 @@ TEST_CASE("Test __quantum__qis__Gradient Op=[RX,CY], Obs=[Z,Z]", "[Gradient]")
         __quantum__rt__initialize();
         __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
 
-        QUBIT *q0 = __quantum__rt__qubit_allocate();
-        QUBIT *q1 = __quantum__rt__qubit_allocate();
+        QirArray *qs = __quantum__rt__qubit_allocate_array(2);
+        QUBIT **q0 = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 0);
+        QUBIT **q1 = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 1);
 
         __quantum__rt__toggle_recorder(/* activate_cm */ true);
 
-        __quantum__qis__RX(-M_PI / 7, q0);
-        __quantum__qis__CY(q0, q1);
+        __quantum__qis__RX(-M_PI / 7, *q0, false);
+        __quantum__qis__CY(*q0, *q1, false);
 
-        auto obs_idx_0 = __quantum__qis__NamedObs(ObsId::PauliZ, q0);
-        auto obs_idx_1 = __quantum__qis__NamedObs(ObsId::PauliZ, q1);
+        auto obs_idx_0 = __quantum__qis__NamedObs(ObsId::PauliZ, *q0);
+        auto obs_idx_1 = __quantum__qis__NamedObs(ObsId::PauliZ, *q1);
 
         __quantum__qis__Expval(obs_idx_0);
         __quantum__qis__Expval(obs_idx_1);
@@ -353,6 +362,7 @@ TEST_CASE("Test __quantum__qis__Gradient Op=[RX,CY], Obs=[Z,Z]", "[Gradient]")
         CHECK(expected[0] == Approx(result0.data_aligned[0]).margin(1e-5));
         CHECK(expected[1] == Approx(result1.data_aligned[0]).margin(1e-5));
 
+        __quantum__rt__qubit_release_array(qs);
         __quantum__rt__finalize();
     }
 
@@ -380,20 +390,21 @@ TEST_CASE("Test __quantum__qis__Gradient_params Op=[RX,RX,RX,CZ], Obs=[Z,Z,Z]", 
         __quantum__rt__initialize();
         __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
 
-        QUBIT *q0 = __quantum__rt__qubit_allocate();
-        QUBIT *q1 = __quantum__rt__qubit_allocate();
-        QUBIT *q2 = __quantum__rt__qubit_allocate();
+        QirArray *qs = __quantum__rt__qubit_allocate_array(3);
+        QUBIT **q0 = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 0);
+        QUBIT **q1 = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 1);
+        QUBIT **q2 = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 2);
 
         __quantum__rt__toggle_recorder(/* activate_cm */ true);
 
-        __quantum__qis__RX(param[0], q0);
-        __quantum__qis__RX(param[1], q1);
-        __quantum__qis__RX(param[2], q2);
-        __quantum__qis__CZ(q0, q2);
+        __quantum__qis__RX(param[0], *q0, false);
+        __quantum__qis__RX(param[1], *q1, false);
+        __quantum__qis__RX(param[2], *q2, false);
+        __quantum__qis__CZ(*q0, *q2, false);
 
-        auto obs_idx_0 = __quantum__qis__NamedObs(ObsId::PauliZ, q0);
-        auto obs_idx_1 = __quantum__qis__NamedObs(ObsId::PauliZ, q1);
-        auto obs_idx_2 = __quantum__qis__NamedObs(ObsId::PauliZ, q2);
+        auto obs_idx_0 = __quantum__qis__NamedObs(ObsId::PauliZ, *q0);
+        auto obs_idx_1 = __quantum__qis__NamedObs(ObsId::PauliZ, *q1);
+        auto obs_idx_2 = __quantum__qis__NamedObs(ObsId::PauliZ, *q2);
 
         __quantum__qis__Expval(obs_idx_0);
         __quantum__qis__Expval(obs_idx_1);
@@ -407,6 +418,7 @@ TEST_CASE("Test __quantum__qis__Gradient_params Op=[RX,RX,RX,CZ], Obs=[Z,Z,Z]", 
         CHECK(expected[1] == Approx(result1.data_aligned[1]).margin(1e-5));
         CHECK(expected[2] == Approx(result2.data_aligned[2]).margin(1e-5));
 
+        __quantum__rt__qubit_release_array(qs);
         __quantum__rt__finalize();
     }
 
@@ -436,24 +448,25 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
         __quantum__rt__initialize();
         __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
 
-        QUBIT *q0 = __quantum__rt__qubit_allocate();
-        QUBIT *q1 = __quantum__rt__qubit_allocate();
-        QUBIT *q2 = __quantum__rt__qubit_allocate();
+        QirArray *qs = __quantum__rt__qubit_allocate_array(3);
+        QUBIT **q0 = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 0);
+        QUBIT **q1 = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 1);
+        QUBIT **q2 = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 2);
 
         __quantum__rt__toggle_recorder(/* activate_cm */ true);
 
-        __quantum__qis__RZ(param[0], q0);
-        __quantum__qis__RY(param[1], q0);
-        __quantum__qis__RZ(param[2], q0);
-        __quantum__qis__CNOT(q0, q1);
-        __quantum__qis__CNOT(q1, q2);
-        __quantum__qis__RZ(param[0], q1);
-        __quantum__qis__RY(param[1], q1);
-        __quantum__qis__RZ(param[2], q1);
+        __quantum__qis__RZ(param[0], *q0, false);
+        __quantum__qis__RY(param[1], *q0, false);
+        __quantum__qis__RZ(param[2], *q0, false);
+        __quantum__qis__CNOT(*q0, *q1, false);
+        __quantum__qis__CNOT(*q1, *q2, false);
+        __quantum__qis__RZ(param[0], *q1, false);
+        __quantum__qis__RY(param[1], *q1, false);
+        __quantum__qis__RZ(param[2], *q1, false);
 
-        auto obs_idx_0 = __quantum__qis__NamedObs(ObsId::PauliX, q0);
-        auto obs_idx_1 = __quantum__qis__NamedObs(ObsId::PauliX, q1);
-        auto obs_idx_2 = __quantum__qis__NamedObs(ObsId::PauliX, q2);
+        auto obs_idx_0 = __quantum__qis__NamedObs(ObsId::PauliX, *q0);
+        auto obs_idx_1 = __quantum__qis__NamedObs(ObsId::PauliX, *q1);
+        auto obs_idx_2 = __quantum__qis__NamedObs(ObsId::PauliX, *q2);
         auto obs_tp = __quantum__qis__TensorObs(3, obs_idx_0, obs_idx_1, obs_idx_2);
 
         __quantum__qis__Expval(obs_tp);
@@ -478,6 +491,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
         CHECK(expected[4] == Approx(result.data_aligned[4]).margin(1e-5));
         CHECK(expected[5] == Approx(result.data_aligned[5]).margin(1e-5));
 
+        __quantum__rt__qubit_release_array(qs);
         __quantum__rt__finalize();
     }
 
@@ -506,26 +520,27 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
         __quantum__rt__initialize();
         __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
 
-        QUBIT *q0 = __quantum__rt__qubit_allocate();
-        QUBIT *q1 = __quantum__rt__qubit_allocate();
-        QUBIT *q2 = __quantum__rt__qubit_allocate();
+        QirArray *qs = __quantum__rt__qubit_allocate_array(3);
+        QUBIT **q0 = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 0);
+        QUBIT **q1 = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 1);
+        QUBIT **q2 = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 2);
 
         __quantum__rt__toggle_recorder(/* activate_cm */ true);
 
-        __quantum__qis__RZ(param[0], q0);
-        __quantum__qis__RY(param[1], q0);
-        __quantum__qis__RZ(param[2], q0);
-        __quantum__qis__CNOT(q0, q1);
-        __quantum__qis__CNOT(q1, q2);
-        __quantum__qis__RZ(param[0], q1);
-        __quantum__qis__RY(param[1], q1);
-        __quantum__qis__RZ(param[2], q1);
-        __quantum__qis__CRY(param[0], q0, q1);
-        __quantum__qis__CRZ(param[1], q0, q2);
+        __quantum__qis__RZ(param[0], *q0, false);
+        __quantum__qis__RY(param[1], *q0, false);
+        __quantum__qis__RZ(param[2], *q0, false);
+        __quantum__qis__CNOT(*q0, *q1, false);
+        __quantum__qis__CNOT(*q1, *q2, false);
+        __quantum__qis__RZ(param[0], *q1, false);
+        __quantum__qis__RY(param[1], *q1, false);
+        __quantum__qis__RZ(param[2], *q1, false);
+        __quantum__qis__CRY(param[0], *q0, *q1, false);
+        __quantum__qis__CRZ(param[1], *q0, *q2, false);
 
-        auto obs_idx_0 = __quantum__qis__NamedObs(ObsId::PauliZ, q0);
-        auto obs_idx_1 = __quantum__qis__NamedObs(ObsId::PauliZ, q1);
-        auto obs_idx_2 = __quantum__qis__NamedObs(ObsId::PauliZ, q2);
+        auto obs_idx_0 = __quantum__qis__NamedObs(ObsId::PauliZ, *q0);
+        auto obs_idx_1 = __quantum__qis__NamedObs(ObsId::PauliZ, *q1);
+        auto obs_idx_2 = __quantum__qis__NamedObs(ObsId::PauliZ, *q2);
         auto obs_tensor = __quantum__qis__TensorObs(3, obs_idx_0, obs_idx_1, obs_idx_2);
 
         __quantum__qis__Expval(obs_tensor);
@@ -550,6 +565,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
         CHECK(expected[4] == Approx(result.data_aligned[4]).margin(1e-5));
         CHECK(expected[5] == Approx(result.data_aligned[5]).margin(1e-5));
 
+        __quantum__rt__qubit_release_array(qs);
         __quantum__rt__finalize();
     }
 
@@ -578,27 +594,28 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
         __quantum__rt__initialize();
         __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
 
-        QUBIT *q0 = __quantum__rt__qubit_allocate();
-        QUBIT *q1 = __quantum__rt__qubit_allocate();
-        QUBIT *q2 = __quantum__rt__qubit_allocate();
+        QirArray *qs = __quantum__rt__qubit_allocate_array(3);
+        QUBIT **q0 = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 0);
+        QUBIT **q1 = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 1);
+        QUBIT **q2 = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 2);
 
         __quantum__rt__toggle_recorder(/* activate_cm */ true);
 
-        __quantum__qis__RZ(param[0], q0);
-        __quantum__qis__RY(param[1], q0);
-        __quantum__qis__RZ(param[2], q0);
-        __quantum__qis__CNOT(q0, q1);
-        __quantum__qis__CNOT(q1, q2);
-        __quantum__qis__RZ(param[0], q1);
-        __quantum__qis__RY(param[1], q1);
-        __quantum__qis__RZ(param[2], q1);
+        __quantum__qis__RZ(param[0], *q0, false);
+        __quantum__qis__RY(param[1], *q0, false);
+        __quantum__qis__RZ(param[2], *q0, false);
+        __quantum__qis__CNOT(*q0, *q1, false);
+        __quantum__qis__CNOT(*q1, *q2, false);
+        __quantum__qis__RZ(param[0], *q1, false);
+        __quantum__qis__RY(param[1], *q1, false);
+        __quantum__qis__RZ(param[2], *q1, false);
 
         double coeffs_data[2] = {0.2, 0.6};
         MemRefT_double_1d coeffs = {coeffs_data, coeffs_data, 0, {2}, {1}};
 
-        auto obs_idx_0 = __quantum__qis__NamedObs(ObsId::PauliZ, q0);
-        auto obs_idx_1 = __quantum__qis__NamedObs(ObsId::PauliZ, q1);
-        auto obs_idx_2 = __quantum__qis__NamedObs(ObsId::Hadamard, q2);
+        auto obs_idx_0 = __quantum__qis__NamedObs(ObsId::PauliZ, *q0);
+        auto obs_idx_1 = __quantum__qis__NamedObs(ObsId::PauliZ, *q1);
+        auto obs_idx_2 = __quantum__qis__NamedObs(ObsId::Hadamard, *q2);
         auto obs_tensor = __quantum__qis__TensorObs(2, obs_idx_0, obs_idx_1);
         auto obs_hamiltonian = __quantum__qis__HamiltonianObs(&coeffs, 2, obs_tensor, obs_idx_2);
 
@@ -624,6 +641,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
         CHECK(expected[4] == Approx(result.data_aligned[4]).margin(1e-5));
         CHECK(expected[5] == Approx(result.data_aligned[5]).margin(1e-5));
 
+        __quantum__rt__qubit_release_array(qs);
         __quantum__rt__finalize();
     }
 
@@ -659,10 +677,12 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
         QirString *expected_str = __quantum__rt__int_to_string(2);
 
         CHECK(__quantum__rt__string_equal(qstr, expected_str));
+        __quantum__rt__string_update_reference_count(qstr, -1);
+        __quantum__rt__string_update_reference_count(expected_str, -1);
 
         __quantum__rt__toggle_recorder(/* activate_cm */ true);
 
-        __quantum__qis__RX(-M_PI / 7, q);
+        __quantum__qis__RX(-M_PI / 7, q, false);
 
         CplxT_double matrix_data[4] = {{1.0, 0.0}, {0.0, 0.0}, {2.0, 0.0}, {0.0, 0.0}};
 
@@ -689,6 +709,7 @@ TEST_CASE("Test __quantum__qis__Gradient and __quantum__qis__Gradient_params "
         CHECK(expected == Approx(result.data_aligned[0]));
 
         delete h_matrix;
+        __quantum__rt__qubit_release(q);
         __quantum__rt__finalize();
     }
 
