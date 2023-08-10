@@ -39,9 +39,9 @@ if(BUILD_QIR_STDLIB_FROM_SRC)
     FetchContent_MakeAvailable(qir_runner)
 
     execute_process(
-    COMMAND cargo build --release --package qir-stdlib --target-dir ${qir_runner_BINARY_DIR}
-    COMMAND ${CMAKE_COMMAND} -E copy ./stdlib/include/qir_stdlib.h ${qir_runner_BINARY_DIR}/release/qir_stdlib.h
-    WORKING_DIRECTORY ${qir_runner_SOURCE_DIR}
+        COMMAND cargo build --release --package qir-stdlib --target-dir ${qir_runner_BINARY_DIR}
+        COMMAND ${CMAKE_COMMAND} -E copy ./stdlib/include/qir_stdlib.h ${qir_runner_BINARY_DIR}/release/qir_stdlib.h
+        WORKING_DIRECTORY ${qir_runner_SOURCE_DIR}
     )
 
     set(QIR_STDLIB_PATH ${qir_runner_BINARY_DIR}/release)
@@ -61,8 +61,8 @@ elseif(NOT DEFINED QIR_STDLIB_PATH)
     message(STATUS "Downloading qir-stdlib status: ${QIRSTDLIB_STATUS}")
 
     execute_process(
-    COMMAND ${CMAKE_COMMAND} -E tar xf ${CMAKE_BINARY_DIR}/qir-stdlib/lib.zip
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/qir-stdlib
+        COMMAND ${CMAKE_COMMAND} -E tar xf ${CMAKE_BINARY_DIR}/qir-stdlib/lib.zip
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/qir-stdlib
     )
 
     set(QIR_STDLIB_PATH "${CMAKE_BINARY_DIR}/qir-stdlib")

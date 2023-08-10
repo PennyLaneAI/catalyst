@@ -98,7 +98,7 @@ Requirements
 ============
 
 To build the runtime from source, it is required to have an up to date version of a C/C++ compiler such as gcc or clang
-with support for the C++20 standard library and the static library of ``stdlib`` from `qir-runner <https://github.com/qir-alliance/qir-runner/tree/main/stdlib>`_.
+with support for the C++20 standard library and the static library of ``stdlib`` from `qir-runner <https://github.com/qir-alliance/qir-runner>`_.
 
 Installation
 ============
@@ -129,6 +129,15 @@ You can also use ``ENABLE_OPENQASM=ON`` to build the runtime with `Amazon-Braket
 This device currently offers generators for the `OpenQasm3 <https://openqasm.com/versions/3.0/index.html>`_ specification and
 `Amazon Braket <https://docs.aws.amazon.com/braket/latest/developerguide/braket-openqasm-supported-features.html>`_ assembly extension.
 Moreover, the generated assembly can be executed on Amazon Braket devices leveraging `amazon-braket-sdk-python <https://github.com/aws/amazon-braket-sdk-python>`_.
+
+The runtime leverages the ``qir-stdlib`` pre-built artifacts from `qir-runner <https://github.com/qir-alliance/qir-runner>`_ by default.
+To build this package from source, a `Rust <https://www.rust-lang.org/tools/install>`_ toolchain installed via ``rustup``
+is required. You can build the runtime with ``BUILD_QIR_STDLIB_FROM_SRC=ON`` after installing the ``llvm-tools-preview`` component:
+
+.. code-block:: console
+
+  rustup component add llvm-tools-preview
+  BUILD_QIR_STDLIB_FROM_SRC=ON make runtime
 
 To check the runtime test suite:
 
