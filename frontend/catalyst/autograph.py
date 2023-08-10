@@ -89,6 +89,7 @@ def print_code(fn):
     """Utility function to retrieve the source code of a converted function, in particular of
     functions that were recursively converted. Note that recursive conversion is only triggered
     *after* the @autograph decorated function is called at least once."""
+    # pylint: disable=protected-access
 
     cachekey = ag_primitives.STD
 

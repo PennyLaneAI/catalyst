@@ -15,7 +15,7 @@
 """This module provides the implementation of Autograph primitives in terms of traceable Catalyst
 functions. The purpose is to convert imperative style code to functional or graph-style code."""
 
-from typing import *
+from typing import Any, Callable, Tuple
 
 # Use tensorflow implementations for handling function scopes and calls,
 # as well as various utility objects.
@@ -58,6 +58,7 @@ def assert_results(results, var_names):
     return results
 
 
+# pylint: disable=too-many-arguments
 def if_stmt(
     pred: bool,
     true_fn: Callable[[], Any],
@@ -65,7 +66,7 @@ def if_stmt(
     get_state: Callable[[], Tuple],
     set_state: Callable[[Tuple], None],
     symbol_names: Tuple[str],
-    num_results: int,
+    _num_results: int,
 ):
     """An implementation of the Autograph 'if' statement. The interface is defined by Autograph,
     here we merely provide an implementation of it in terms of Catalyst primitives."""
@@ -95,5 +96,6 @@ def converted_call(*args, **kwargs):
     """We want Autograph to use our own instance of the AST transformer when recursively
     transforming functions, but otherwise duplicate the same behaviour."""
 
+    # pylint: disable=protected-access
     with Patcher((tf_autograph_api, "_TRANSPILER", catalyst.autograph._TRANSFORMER)):
         return tf_converted_call(*args, **kwargs)

@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Unit tests for the AutoGraph source-to-source transformation feature."""
+
 # RUN: %PYTHON %s | FileCheck %s
 
 from catalyst import qjit
@@ -21,6 +23,8 @@ from catalyst.autograph import AutoGraphError, autograph, print_code
 # CHECK-LABEL: def if_simple
 @autograph
 def if_simple(x: float):
+    """Test a simple conditional with a single branch."""
+
     # CHECK:   def if_body():
     # CHECK:       pass
     if x < 3:
@@ -41,6 +45,8 @@ print_code(if_simple)
 # CHECK-LABEL: def if_else
 @autograph
 def if_else(x: float):
+    """Test a simple conditional with two branches."""
+
     # CHECK:   def if_body():
     # CHECK:       pass
     if x < 3:
@@ -63,6 +69,8 @@ print_code(if_else)
 # CHECK-LABEL: def if_assign
 @autograph
 def if_assign(x: float):
+    """Test a conditional creates a new variable."""
+
     # CHECK:   def if_body():
     # CHECK:       nonlocal y
     # CHECK:       y = 4
@@ -90,6 +98,8 @@ try:
     @qjit  # needed to trigger Catalyst type checks during tracing
     @autograph
     def if_assign_type_mismatch(x: float):
+        """Verify error from a conditional that doesn't produce the same type across branches."""
+
         if x < 3:
             y = 4.0
         else:
@@ -109,6 +119,8 @@ try:
     @qjit  # needed to trigger the execution of ag__.if_stmt which performs the check
     @autograph
     def if_assign_partial(x: float):
+        """Verify error from a conditional that doesn't produce a value in all branches."""
+
         if x < 3:
             y = 4
 
@@ -124,6 +136,8 @@ except AutoGraphError as e:
 # CHECK-LABEL: def if_assign_existing
 @autograph
 def if_assign_existing(x: float):
+    """Test a conditional that assigns to an existing variable in all branches."""
+
     # CHECK:   y = 0
     y = 0
 
@@ -152,6 +166,9 @@ print_code(if_assign_existing)
 # CHECK-LABEL: def if_assign_existing_type_mismatch
 @autograph
 def if_assign_existing_type_mismatch(x: float):
+    """Test a conditional that assigns to an existing variable with a different type, while being
+    consistent across all branches."""
+
     # CHECK:   y = 0
     y = 0
 
@@ -180,6 +197,8 @@ print_code(if_assign_existing_type_mismatch)
 # CHECK-LABEL: def if_assign_existing_partial
 @autograph
 def if_assign_existing_partial(x: float):
+    """Test a conditional that assigns to an existing variable in some branches only."""
+
     # CHECK:   y = 0
     y = 0
 
@@ -207,6 +226,9 @@ try:
     @qjit
     @autograph
     def if_assign_existing_partial_type_mismatch(x: float):
+        """Verify error from a conditional that assigns to an existing value with different type,
+        without defining a value in all branches. This should lead to a type mismatch error."""
+
         y = 0
 
         if x < 3:
@@ -225,6 +247,8 @@ except TypeError as e:
 # CHECK-LABEL: def if_assign_multiple
 @autograph
 def if_assign_multiple(x: float):
+    """Test a conditional that assigns to multiple existing variables."""
+
     # CHECK:   (y, z) = (0, False)
     y, z = 0, False
 
@@ -257,6 +281,8 @@ try:
     @qjit
     @autograph
     def if_assign_invalid_type(x: float):
+        """Verify error from a conditional that produces a type invalid for tracing."""
+
         if x < 3:
             y = "hi"
         else:
@@ -274,6 +300,8 @@ except TypeError as e:
 # CHECK-LABEL: def if_elif
 @autograph
 def if_elif(x: float):
+    """Test a conditional with more than two branches."""
+
     # CHECK:   y = 0
     y = 0
 
@@ -306,6 +334,8 @@ print_code(if_elif)
 
 # CHECK-LABEL: def nested_call
 def nested_call(x, y):
+    """Nested function with conditional."""
+
     # CHECK:   def if_body():
     # CHECK:       nonlocal y
     # CHECK:       y = 4
@@ -324,11 +354,15 @@ def nested_call(x, y):
 # CHECK-LABEL: def if_call
 @autograph
 def if_call(x: float):
+    """Test a conditional that is nested inside another function. All (user) functions invoked by
+    the explicitly transformed function should also be transformed."""
+
     # CHECK:   y = 0
     y = 0
 
     # CHECK:   return ag__.converted_call(nested_call, (x, y)
     return nested_call(x, y)
+
 
 if_call(0.1)  # needed to generate the source code for nested functions
 
