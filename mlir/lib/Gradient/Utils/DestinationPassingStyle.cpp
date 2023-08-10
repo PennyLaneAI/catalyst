@@ -27,40 +27,40 @@ void catalyst::convertToDestinationPassingStyle(func::FuncOp callee, OpBuilder &
     }
 
     MLIRContext *ctx = callee.getContext();
-    SmallVector<Value> memRefReturns;
+    SmallVector<Type> memRefReturnTypes;
     SmallVector<unsigned> outputIndices;
     SmallVector<Type> nonMemRefReturns;
-    callee.walk([&](func::ReturnOp returnOp) {
-        // This is the first return op we've seen.
-        if (memRefReturns.empty()) {
-            for (const auto &[idx, operand] : llvm::enumerate(returnOp.getOperands())) {
-                if (isa<MemRefType>(operand.getType())) {
-                    memRefReturns.push_back(operand);
-                    outputIndices.push_back(idx);
-                }
-                else {
-                    nonMemRefReturns.push_back(operand.getType());
-                }
-            }
-            return WalkResult::interrupt();
+
+    for (const auto &[idx, resultType] : llvm::enumerate(callee.getResultTypes())) {
+        if (isa<MemRefType>(resultType)) {
+            memRefReturnTypes.push_back(resultType);
+            outputIndices.push_back(idx);
         }
-        return WalkResult::advance();
-    });
+        else {
+            nonMemRefReturns.push_back(resultType);
+        }
+    }
+
+    SmallVector<Type> dpsArgumentTypes{callee.getArgumentTypes()};
+    dpsArgumentTypes.append(memRefReturnTypes);
+    auto dpsFunctionType = FunctionType::get(ctx, dpsArgumentTypes, nonMemRefReturns);
+
+    if (callee.isDeclaration()) {
+        // If the function does not have a body, we are done after modifying the function type.
+        callee.setFunctionType(dpsFunctionType);
+        return;
+    }
 
     // Insert the new output arguments to the function.
     unsigned dpsOutputIdx = callee.getNumArguments();
-    SmallVector<unsigned> argIndices(/*size=*/memRefReturns.size(),
+    SmallVector<unsigned> argIndices(/*size=*/memRefReturnTypes.size(),
                                      /*values=*/dpsOutputIdx);
-    SmallVector<Type> memRefTypes{memRefReturns.size()};
-    SmallVector<DictionaryAttr> argAttrs{memRefReturns.size()};
-    SmallVector<Location> argLocs{memRefReturns.size(), UnknownLoc::get(ctx)};
-
-    llvm::transform(memRefReturns, memRefTypes.begin(),
-                    [](Value memRef) { return memRef.getType(); });
-    llvm::transform(memRefReturns, argLocs.begin(), [](Value memRef) { return memRef.getLoc(); });
-
-    callee.insertArguments(argIndices, memRefTypes, argAttrs, argLocs);
-    callee.setFunctionType(FunctionType::get(ctx, callee.getArgumentTypes(), nonMemRefReturns));
+    SmallVector<DictionaryAttr> argAttrs{memRefReturnTypes.size()};
+    SmallVector<Location> argLocs{memRefReturnTypes.size(), UnknownLoc::get(ctx)};
+    // insertArguments modifies the function type, so we need to update the function type *after*
+    // inserting the arguments
+    callee.insertArguments(argIndices, memRefReturnTypes, argAttrs, argLocs);
+    callee.setFunctionType(dpsFunctionType);
 
     // Update return sites to copy over the memref that would have been returned to the output.
     callee.walk([&](func::ReturnOp returnOp) {

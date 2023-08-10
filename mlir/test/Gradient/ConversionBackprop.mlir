@@ -18,7 +18,7 @@
 // Native Gradients //
 //////////////////////
 
-func.func private @argmap(%arg0: memref<f64>, %arg1: memref<?xf64>)
+func.func private @argmap(%arg0: memref<f64>) -> memref<?xf64>
 
 // CHECK-DAG:  llvm.mlir.global linkonce constant @enzyme_dupnoneed
 // CHECK-DAG:  llvm.mlir.global linkonce constant @enzyme_const
@@ -72,7 +72,7 @@ func.func @backpropArgmap(%arg0: memref<f64>, %arg1: memref<f64>, %arg2: memref<
 
 // -----
 
-func.func private @argmap2(%arg0: memref<f64>, %arg1: f64, %arg2: memref<?xf64>, %arg3: memref<?xf64>)
+func.func private @argmap2(%arg0: memref<f64>, %arg1: f64) -> (memref<?xf64>, memref<?xf64>)
 
 // CHECK-DAG:  llvm.mlir.global linkonce constant @enzyme_dupnoneed
 // CHECK-DAG:  llvm.mlir.global linkonce constant @enzyme_const
