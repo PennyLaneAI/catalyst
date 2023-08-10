@@ -124,6 +124,9 @@
   and address behaviour difference in flags.
   [#233](https://github.com/PennyLaneAI/catalyst/pull/233)
 
+* Build the runtime against ``qir-stdlib`` pre-build artifacts.
+  [#236](https://github.com/PennyLaneAI/catalyst/pull/236)
+
 * Small compatibility changes in order for all integration tests to succeed on macOS.
   [#234](https://github.com/PennyLaneAI/catalyst/pull/234)
 
