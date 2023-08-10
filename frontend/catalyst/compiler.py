@@ -17,6 +17,7 @@ MLIR/LLVM representations.
 
 import os
 import pathlib
+import platform
 import shutil
 import subprocess
 import sys
@@ -203,18 +204,23 @@ class LinkerDriver:
         rt_lib_path = get_lib_path("runtime", "RUNTIME_LIB_DIR")
         rt_capi_path = os.path.join(rt_lib_path, "capi")
         rt_backend_path = os.path.join(rt_lib_path, "backend")
+        error_flag_apple = "-Wl,-arch_errors_fatal"
+        error_flag_linux = ""
+        error_flag = error_flag_linux if platform.system() == "Linux" else error_flag_apple
 
         default_flags = [
             "-shared",
             "-rdynamic",
-            "-Wl,-no-as-needed",
-            f"-Wl,-rpath,{rt_capi_path}:{rt_backend_path}:{mlir_lib_path}",
+            f"-Wl,-rpath,{rt_capi_path}",
+            f"-Wl,-rpath,{rt_backend_path}",
+            f"-Wl,-rpath,{mlir_lib_path}",
             f"-L{mlir_lib_path}",
             f"-L{rt_capi_path}",
             f"-L{rt_backend_path}",
             "-lrt_backend",
             "-lrt_capi",
             "-lpthread",
+            f"{error_flag}",
             "-lmlir_c_runner_utils",  # required for memref.copy
         ]
 

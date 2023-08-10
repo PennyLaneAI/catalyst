@@ -110,6 +110,28 @@
   until the end of the call to the JIT compiled function.
   [#201](https://github.com/PennyLaneAI/catalyst/pull/201)
 
+* Avoid a type mismatch. This allows dialects to compile with older versions of clang.
+  [#228](https://github.com/PennyLaneAI/catalyst/pull/228)
+
+* Remove unnecessary ``reinterpret_cast``s. from ``ObsManager``s. Removal of these ``reinterpret_cast``s
+  allows compilation of the runtime to succeed in macOS. macOS uses an ILP32 mode for Aarch64 where they
+  use the full 64 bit mode but with 32 bit Integer, Long, and Pointers. This patch also changes a test file
+  to prevent a mismatch in machines which compile using ILP32 mode.
+  [#229](https://github.com/PennyLaneAI/catalyst/pull/230)
+
+* Allow runtime to be compiled on macOS. Substitute ``nproc`` with a call to ``os.cpu_count()`` and
+  use correct flags for ``ld.64``.
+  [#232](https://github.com/PennyLaneAI/catalyst/pull/232)
+
+* Improve portability on the frontend to be available on macOS. Use ``.dylib``, remove unnecessary flags,
+  and address behaviour difference in flags.
+  [#233](https://github.com/PennyLaneAI/catalyst/pull/233)
+
+* Build the runtime against ``qir-stdlib`` pre-build artifacts.
+  [#236](https://github.com/PennyLaneAI/catalyst/pull/236)
+
+* Small compatibility changes in order for all integration tests to succeed on macOS.
+  [#234](https://github.com/PennyLaneAI/catalyst/pull/234)
 
 <h3>Breaking changes</h3>
 

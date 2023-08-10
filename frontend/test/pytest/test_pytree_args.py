@@ -481,7 +481,7 @@ class TestPyTreesFuncArgs:
         def circuit(dictionary):
             """q0 = 1; q1 = 0;"""
             qml.RX(jnp.pi, wires=0)
-            return measure(dictionary["wire"] + 1 % 2)
+            return measure((dictionary["wire"] + 1) % 2)
 
         result = circuit({"wire": 0})
         assert jnp.allclose(result, False)
