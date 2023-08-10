@@ -82,6 +82,9 @@ class Qbit:
 class AbstractQbit(AbstractValue):
     """Abstract Qbit"""
 
+    def __eq__(self, other):
+        return isinstance(other, AbstractQbit)
+
 
 class ConcreteQbit(AbstractQbit):
     """Concrete Qbit."""
@@ -104,6 +107,9 @@ class Qreg:
 
 class AbstractQreg(AbstractValue):
     """Abstract quantum register."""
+
+    def __eq__(self, other):
+        return isinstance(other, AbstractQreg)
 
 
 class ConcreteQreg(AbstractQreg):
@@ -131,6 +137,12 @@ class AbstractObs(AbstractValue):
     def __init__(self, num_qubits=None, primitive=None):
         self.num_qubits = num_qubits
         self.primitive = primitive
+
+    def __eq__(self, other):
+        if not isinstance(other, AbstractObs):
+            return False
+
+        return self.num_qubits == other.num_qubits and self.primitive == other.primitive
 
 
 class ConcreteObs(AbstractObs):
