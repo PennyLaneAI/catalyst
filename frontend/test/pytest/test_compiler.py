@@ -17,6 +17,7 @@ Unit tests for CompilerDriver class
 """
 
 import os
+import platform
 import shutil
 import subprocess
 import sys
@@ -177,7 +178,10 @@ class TestCompilerErrors:
             """Class that overrides the program to be compiled."""
 
             _executable = "cc"
-            _default_flags = ["-shared", "-fPIC", "-x", "c++"]
+
+            # libstdc++ has been deprecated on macOS in favour of libc++
+            libcpp = "-lstdc++" if platform.system() == "Linux" else "-lc++"
+            _default_flags = ["-shared", "-fPIC", "-x", "c++", libcpp]
 
             @staticmethod
             def get_output_filename(infile):

@@ -13,6 +13,7 @@ ENZYME_BUILD_DIR ?= $(MK_DIR)/mlir/Enzyme/build
 COVERAGE_REPORT ?= term-missing
 TEST_BACKEND ?= "lightning.qubit"
 TEST_BRAKET ?= NONE
+COPY_FLAGS = $(shell python -c "import platform; print('--dereference' if platform.system() == 'Linux' else '')")
 
 .PHONY: help
 help:
@@ -88,18 +89,18 @@ wheel:
 	cp $(DIALECTS_BUILD_DIR)/bin/quantum-opt $(MK_DIR)/frontend/catalyst/bin
 	# Copy libs to frontend/catalyst/lib
 	mkdir -p $(MK_DIR)/frontend/catalyst/lib/backend/ $(MK_DIR)/frontend/catalyst/lib/capi
-	cp $(RT_BUILD_DIR)/lib/backend/librt_backend.so $(MK_DIR)/frontend/catalyst/lib/backend/
-	cp $(RT_BUILD_DIR)/lib/capi/librt_capi.so $(MK_DIR)/frontend/catalyst/lib/capi
-	cp --dereference $(LLVM_BUILD_DIR)/lib/libmlir_float16_utils.so.* $(MK_DIR)/frontend/catalyst/lib
-	cp --dereference $(LLVM_BUILD_DIR)/lib/libmlir_c_runner_utils.so* $(MK_DIR)/frontend/catalyst/lib
+	cp $(RT_BUILD_DIR)/lib/backend/librt_backend.* $(MK_DIR)/frontend/catalyst/lib/backend/
+	cp $(RT_BUILD_DIR)/lib/capi/librt_capi.* $(MK_DIR)/frontend/catalyst/lib/capi
+	cp $(COPY_FLAGS) $(LLVM_BUILD_DIR)/lib/libmlir_float16_utils.* $(MK_DIR)/frontend/catalyst/lib
+	cp $(COPY_FLAGS) $(LLVM_BUILD_DIR)/lib/libmlir_c_runner_utils.* $(MK_DIR)/frontend/catalyst/lib
 	# Copy enzyme to frontend
-	cp --dereference $(ENZYME_BUILD_DIR)/Enzyme/LLVMEnzyme-17.so $(MK_DIR)/frontend/catalyst/lib
+	cp $(COPY_FLAGS) $(ENZYME_BUILD_DIR)/Enzyme/LLVMEnzyme-17.* $(MK_DIR)/frontend/catalyst/lib
 	# Copy mlir bindings to frontend/mlir_quantum
 	mkdir -p $(MK_DIR)/frontend/mlir_quantum/dialects
-	cp -R --dereference $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/runtime $(MK_DIR)/frontend/mlir_quantum/runtime
-	cp --dereference $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/ir.py $(MK_DIR)/frontend/mlir_quantum/
+	cp -R $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/runtime $(MK_DIR)/frontend/mlir_quantum/runtime
+	cp $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/ir.py $(MK_DIR)/frontend/mlir_quantum/
 	for file in arith tensor scf gradient quantum _ods_common ; do \
-		cp --dereference $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/dialects/*$${file}* $(MK_DIR)/frontend/mlir_quantum/dialects ; \
+		cp $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/dialects/*$${file}* $(MK_DIR)/frontend/mlir_quantum/dialects ; \
 	done
 	find $(MK_DIR)/frontend -type d -name __pycache__ -exec rm -rf {} +
 
