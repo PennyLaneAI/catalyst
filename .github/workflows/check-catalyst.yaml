@@ -15,39 +15,8 @@ jobs:
     name: "Set build matrix"
     uses: ./.github/workflows/constants.yaml
 
-  qir-stdlib:
-    name: QIR-stdlib Build
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout Catalyst repo
-        uses: actions/checkout@v3
-
-      - name: Cache qir-stdlib Build
-        id: cache-qir-stdlib
-        uses: actions/cache@v3
-        with:
-          path: qir-stdlib-build
-          key: ${{ runner.os }}-qir-stdlib-build
-
-      - name: Install rustup with llvm-tools-preview
-        if: steps.cache-qir-stdlib.outputs.cache-hit != 'true'
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          components: llvm-tools-preview
-
-      - name: Install QIR-stdlib
-        if: steps.cache-qir-stdlib.outputs.cache-hit != 'true'
-        run: |
-            make qir
-            mkdir -p qir-stdlib-build/include
-            cp runtime/qir-stdlib/target/release/libqir_stdlib.a qir-stdlib-build/
-            cp runtime/qir-stdlib/target/release/build/include/* qir-stdlib-build/include/
-
   runtime:
     name: Catalyst-Runtime Build
-    needs: [qir-stdlib]
     runs-on: ubuntu-latest
 
     steps:
@@ -58,20 +27,10 @@ jobs:
         run: |
           sudo apt-get -y -q install ninja-build make cmake clang libomp-dev
 
-      - name: Get Cached qir-stdlib Build
-        id: cache-qir-stdlib
-        uses: actions/cache@v3
-        with:
-          path: qir-stdlib-build
-          key: Linux-qir-stdlib-build
-          fail-on-cache-miss: True
-
       - name: Build Catalyst-Runtime
         run: |
           COMPILER_LAUNCHER="" \
           RT_BUILD_DIR="$(pwd)/runtime-build" \
-          QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build" \
-          QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include" \
           ENABLE_LIGHTNING_KOKKOS=ON \
           CMAKE_ARGS="-DKokkos_ENABLE_OPENMP=ON -DENABLE_SANITIZER=ON" \
           ENABLE_OPENQASM=ON \
@@ -470,7 +429,7 @@ jobs:
 
   frontend-tests-openqasm-device:
     name: Frontend Tests (backend="openqasm3")
-    needs: [constants, qir-stdlib, mhlo, quantum, enzyme, llvm]
+    needs: [constants, mhlo, quantum, enzyme, llvm]
     runs-on: ubuntu-latest
 
     steps:
@@ -526,14 +485,6 @@ jobs:
         pip install numpy amazon-braket-sdk amazon-braket-pennylane-plugin "boto3==1.26"
         echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
 
-    - name: Get Cached qir-stdlib Build
-      id: cache-qir-stdlib
-      uses: actions/cache@v3
-      with:
-        path: qir-stdlib-build
-        key: Linux-qir-stdlib-build
-        fail-on-cache-miss: True
-
     - name: Add Frontend Dependencies to PATH
       run: |
         echo "$(pwd)/llvm-build/bin" >> $GITHUB_PATH
@@ -551,7 +502,7 @@ jobs:
 
   runtime-tests:
     name: Runtime Tests (Linux)
-    needs: [constants, qir-stdlib]
+    needs: [constants]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -572,22 +523,12 @@ jobs:
           pip install numpy amazon-braket-sdk
           echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
 
-      - name: Get Cached qir-stdlib Build
-        id: cache-qir-stdlib
-        uses: actions/cache@v3
-        with:
-          path: qir-stdlib-build
-          key: Linux-qir-stdlib-build
-          fail-on-cache-miss: True
-
       - name: Build Runtime test suite for Lightning simulator
         if: ${{ matrix.backend == 'lightning' }}
         run: |
             C_COMPILER=$(which gcc) \
             CXX_COMPILER=$(which g++) \
             COMPILER_LAUNCHER="" \
-            QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build" \
-            QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include" \
             make coverage-runtime
             mv runtime/build/coverage.info coverage-${{ github.job }}.info
 
@@ -597,8 +538,6 @@ jobs:
             C_COMPILER=$(which gcc) \
             CXX_COMPILER=$(which g++) \
             COMPILER_LAUNCHER="" \
-            QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build" \
-            QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include" \
             ENABLE_LIGHTNING_KOKKOS=ON \
             CMAKE_ARGS="-DKokkos_ENABLE_OPENMP=ON -DENABLE_SANITIZER=ON" \
             make test-runtime
@@ -610,8 +549,6 @@ jobs:
             CXX_COMPILER=$(which g++) \
             COMPILER_LAUNCHER="" \
             ENABLE_OPENQASM=ON \
-            QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build" \
-            QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include" \
             make test-runtime
 
       - name: Upload to Codecov
@@ -627,6 +564,4 @@ jobs:
           C_COMPILER=$(which gcc) \
           CXX_COMPILER=$(which g++) \
           COMPILER_LAUNCHER="" \
-          QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build" \
-          QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include" \
           make examples-runtime

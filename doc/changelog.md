@@ -124,6 +124,9 @@
   and address behaviour difference in flags.
   [#233](https://github.com/PennyLaneAI/catalyst/pull/233)
 
+* Build the runtime against ``qir-stdlib`` pre-build artifacts.
+  [#236](https://github.com/PennyLaneAI/catalyst/pull/236)
+
 <h3>Breaking changes</h3>
 
 * Since we are now using PyTrees, python lists are no longer automatically converted into JAX

@@ -38,7 +38,7 @@ frontend:
 	@echo "install Catalyst Frontend"
 	$(PYTHON) -m pip install -e .
 
-.PHONY: mlir llvm mhlo enzyme dialects runtime qir
+.PHONY: mlir llvm mhlo enzyme dialects runtime
 mlir:
 	$(MAKE) -C mlir all
 
@@ -56,9 +56,6 @@ dialects:
 
 runtime:
 	$(MAKE) -C runtime all
-
-qir:
-	$(MAKE) -C runtime qir
 
 .PHONY: test test-runtime test-frontend lit pytest test-demos
 test: test-runtime test-frontend test-demos
