@@ -362,7 +362,9 @@ class CompilerDriver:
     # is homebrew installed.
     _compilers_apple = ["clang++"]
     _compilers_linux = ["clang", "gcc", "c99", "c89", "cc"]
-    _default_fallback_compilers = _compilers_linux if platform.system() == "Linux" else _compilers_apple
+    _default_fallback_compilers = (
+        _compilers_linux if platform.system() == "Linux" else _compilers_apple
+    )
 
     @staticmethod
     def get_default_flags():
