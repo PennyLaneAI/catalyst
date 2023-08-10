@@ -179,7 +179,8 @@ class TestCompilerErrors:
 
             _executable = "cc"
 
-            libcpp = "" if platform.system() == "Linux" else "-lc++"
+            # libstdc++ has been deprecated on macOS in favour of libc++
+            libcpp = "-lstdc++" if platform.system() == "Linux" else "-lc++"
             _default_flags = ["-shared", "-fPIC", "-x", "c++", libcpp]
 
             @staticmethod
