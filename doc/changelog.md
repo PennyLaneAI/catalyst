@@ -124,6 +124,9 @@
   and address behaviour difference in flags.
   [#233](https://github.com/PennyLaneAI/catalyst/pull/233)
 
+* Small compatibility changes in order for all integration tests to succeed on macOS.
+  [#234](https://github.com/PennyLaneAI/catalyst/pull/234)
+
 <h3>Breaking changes</h3>
 
 * Since we are now using PyTrees, python lists are no longer automatically converted into JAX
