@@ -20,7 +20,7 @@ elseif(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
   set(LINKER_FLAGS_2, "-Wl,--no-whole-archive")
 endif()
 
-target_link_libraries(catalyst_qir_qis_obj "-L${QIR_STDLIB_LIB}"
+target_link_libraries(catalyst_qir_qis_obj "-L${QIR_STDLIB_PATH}"
                                             ${LINKER_FLAGS_1}
                                             qir_stdlib
                                             ${LINKER_FLAGS_2}
@@ -29,7 +29,7 @@ target_link_libraries(catalyst_qir_qis_obj "-L${QIR_STDLIB_LIB}"
 
 target_include_directories(catalyst_qir_qis_obj PUBLIC .
                                                         ${CMAKE_CURRENT_SOURCE_DIR}
-                                                        ${QIR_STDLIB_INCLUDES}
+                                                        ${QIR_STDLIB_PATH}
                                                         ${runtime_includes}
                                                         ${backend_includes}
                                                         ${extensions_includes})
@@ -49,7 +49,7 @@ add_dependencies(rt_capi rt_backend)
 
 target_include_directories(rt_capi PUBLIC .
                                         ${CMAKE_CURRENT_SOURCE_DIR}
-                                        ${QIR_STDLIB_INCLUDES}
+                                        ${QIR_STDLIB_PATH}
                                         ${runtime_includes}
                                         ${capi_utils_includes}
                                         ${backend_includes}
