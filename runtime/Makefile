@@ -5,8 +5,6 @@ COMPILER_LAUNCHER?=ccache
 MK_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
 MK_DIR := $(dir $(MK_ABSPATH))
 RT_BUILD_DIR?=$(MK_DIR)/build
-QIR_STDLIB_DIR?=$(MK_DIR)/qir-stdlib/target/release/
-QIR_STDLIB_INCLUDES_DIR?=$(MK_DIR)/qir-stdlib/target/release/build/include/
 CMAKE_ARGS?=""
 CODE_COVERAGE?=OFF
 BUILD_TYPE?=Release
@@ -25,10 +23,8 @@ test: BUILD_TYPE?=Release
 .PHONY: help
 help:
 	@echo "Please use \`make <target>' where <target> is one of"
-	@echo "  all                to build Catalyst Runtime and the QIR-stdlib Rust crate"
+	@echo "  all                to build Catalyst Runtime"
 	@echo "  runtime            to build Catalyst Runtime with PennyLane-Lightning"
-	@echo "  runtime kokkos=ON  to build Catalyst Runtime with PennyLane-Lightning-Kokkos"
-	@echo "  qir                to build the QIR-stdlib Rust crate"
 	@echo "  coverage           to generate a coverage report using lcov"
 	@echo "  clean              to delete all temporary, cache, and build files"
 	@echo "  test               to run the Catalyst runtime test suite"
@@ -37,7 +33,7 @@ help:
 	@echo "  check-tidy         to build Catalyst Runtime with RUNTIME_CLANG_TIDY=ON (requires clang-tidy)"
 
 .PHONY: all
-all: qir runtime
+all: runtime
 
 
 .PHONY: configure
@@ -57,14 +53,8 @@ configure:
 		-DENABLE_CODE_COVERAGE=$(CODE_COVERAGE) \
 		$(CMAKE_ARGS)
 
-$(QIR_STDLIB_DIR)/libqir_stdlib.a $(QIR_STDLIB_INCLUDES_DIR)/qir_stdlib.h:
-	$(MAKE) -C qir-stdlib all
-
 $(RT_BUILD_DIR)/lib/backend/librt_backend.so $(RT_BUILD_DIR)/lib/librt_capi.so: configure
 	cmake --build $(RT_BUILD_DIR) --target rt_capi -j$(NPROC)
-
-.PHONY: qir
-qir: $(QIR_STDLIB_DIR)/libqir_stdlib.a $(QIR_STDLIB_INCLUDES_DIR)/qir_stdlib.h
 
 .PHONY: runtime
 runtime: $(RT_BUILD_DIR)/lib/backend/librt_backend.so $(RT_BUILD_DIR)/lib/librt_capi.so
