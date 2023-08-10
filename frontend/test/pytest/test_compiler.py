@@ -17,6 +17,7 @@ Unit tests for CompilerDriver class
 """
 
 import os
+import platform
 import shutil
 import subprocess
 import sys
@@ -170,7 +171,6 @@ class TestCompilerErrors:
         result = compiler.get_output_of("inexistent-file")
         assert result is None
 
-    @pytest.mark.skip(reason="failing on macOS")
     def test_runtime_error(self):
         """Test that an exception is emitted when the runtime raises a C++ exception."""
 
@@ -178,7 +178,9 @@ class TestCompilerErrors:
             """Class that overrides the program to be compiled."""
 
             _executable = "cc"
-            _default_flags = ["-shared", "-fPIC", "-x", "c++"]
+
+            libcpp = "" if platform.system() == "Linux" else "-lc++"
+            _default_flags = ["-shared", "-fPIC", "-x", "c++", libcpp]
 
             @staticmethod
             def get_output_filename(infile):

@@ -356,15 +356,7 @@ class CompilerDriver:
     6. cc: Usually defaults to gcc, however POSIX states that it is deprecated.
     """
 
-    # TODO:
-    # Find out why mac requires clang++ as opposed to clang or cc.
-    # I suspect it might be an issue with the fact that clang++
-    # is homebrew installed.
-    _compilers_apple = ["clang++"]
-    _compilers_linux = ["clang", "gcc", "c99", "c89", "cc"]
-    _default_fallback_compilers = (
-        _compilers_linux if platform.system() == "Linux" else _compilers_apple
-    )
+    _default_fallback_compilers = ["clang", "gcc", "c99", "c89", "cc"]
 
     @staticmethod
     def get_default_flags():
