@@ -54,8 +54,6 @@ configure:
 		-DCMAKE_C_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
 		-DCMAKE_CXX_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
 		-DENABLE_WARNINGS=$(ENABLE_WARNINGS) \
-		-DQIR_STDLIB_LIB=$(QIR_STDLIB_DIR) \
-		-DQIR_STDLIB_INCLUDES=$(QIR_STDLIB_INCLUDES_DIR) \
 		-DENABLE_CODE_COVERAGE=$(CODE_COVERAGE) \
 		$(CMAKE_ARGS)
 
@@ -69,7 +67,7 @@ $(RT_BUILD_DIR)/lib/backend/librt_backend.so $(RT_BUILD_DIR)/lib/librt_capi.so: 
 qir: $(QIR_STDLIB_DIR)/libqir_stdlib.a $(QIR_STDLIB_INCLUDES_DIR)/qir_stdlib.h
 
 .PHONY: runtime
-runtime: qir $(RT_BUILD_DIR)/lib/backend/librt_backend.so $(RT_BUILD_DIR)/lib/librt_capi.so
+runtime: $(RT_BUILD_DIR)/lib/backend/librt_backend.so $(RT_BUILD_DIR)/lib/librt_capi.so
 
 $(RT_BUILD_DIR)/tests/runner_tests: configure
 	cmake --build $(RT_BUILD_DIR) --target runner_tests -j$(NPROC)
@@ -116,8 +114,6 @@ check-tidy: | qir
 		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
 		-DCMAKE_C_COMPILER=$(C_COMPILER) \
 		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \
-		-DQIR_STDLIB_LIB=$(QIR_STDLIB_DIR) \
-		-DQIR_STDLIB_INCLUDES=$(QIR_STDLIB_INCLUDES_DIR) \
 		-DRUNTIME_CLANG_TIDY=ON
 
 	cmake --build $(MK_DIR)/BuildTidy --target rt_capi -j$(NPROC)
