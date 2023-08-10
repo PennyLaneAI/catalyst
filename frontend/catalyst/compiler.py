@@ -220,6 +220,7 @@ class MLIRToLLVMDialect(PassPipeline):
 
     _executable = get_executable_path("quantum", "quantum-opt")
     _default_flags = [
+        "--convert-gradient-to-llvm=use-generic-functions",
         "--convert-linalg-to-loops",
         "--convert-scf-to-cf",
         # This pass expands memref operations that modify the metadata of a memref (sizes, offsets,
@@ -238,7 +239,6 @@ class MLIRToLLVMDialect(PassPipeline):
         # Run after -convert-math-to-llvm as it marks math::powf illegal without converting it.
         "--convert-math-to-libm",
         "--convert-arith-to-llvm",
-        "--convert-gradient-to-llvm=use-generic-functions",
         "--finalize-memref-to-llvm=use-generic-functions",
         "--convert-index-to-llvm",
         "--convert-quantum-to-llvm",

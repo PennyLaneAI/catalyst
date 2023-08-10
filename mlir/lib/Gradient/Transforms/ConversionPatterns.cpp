@@ -32,6 +32,7 @@
 
 #include "Gradient/IR/GradientOps.h"
 #include "Gradient/Transforms/Patterns.h"
+#include "Gradient/Utils/DestinationPassingStyle.h"
 #include "Gradient/Utils/GradientShape.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Utils/RemoveQuantumMeasurements.h"
@@ -166,6 +167,8 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         func::FuncOp callee =
             SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
         assert(callee && "Expected a valid callee of type func.func");
+
+        catalyst::convertToDestinationPassingStyle(callee, rewriter);
 
         LowerToLLVMOptions options = getTypeConverter()->getOptions();
         if (options.useGenericFunctions) {

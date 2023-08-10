@@ -67,10 +67,9 @@ func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc, GradOp
         SmallVector<Value> callArgs(fullGradFn.getArguments());
 
         Value numParams = rewriter.create<func::CallOp>(loc, paramCountFn, callArgs).getResult(0);
-        SmallVector<Value> qGradArgs(callArgs);
-        qGradArgs.push_back(numParams);
+        callArgs.push_back(numParams);
         ValueRange quantumGradients =
-            rewriter.create<func::CallOp>(loc, qGradFn, qGradArgs).getResults();
+            rewriter.create<func::CallOp>(loc, qGradFn, callArgs).getResults();
 
         DenseIntElementsAttr diffArgIndicesAttr = gradOp.getDiffArgIndices().value_or(nullptr);
 
