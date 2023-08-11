@@ -44,6 +44,9 @@
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/Transforms/Passes.h"
 
+#include "Enzyme.h"
+#include "PreserveNVVM.h"
+
 using namespace mlir;
 using namespace catalyst;
 namespace fs = std::filesystem;
@@ -207,6 +210,34 @@ LogicalResult runLLVMPasses(const CompilerOptions &options,
     llvm::ModulePassManager MPM = PB.buildPerModuleDefaultPipeline(llvm::OptimizationLevel::O2);
 
     // Optimize the IR!
+    MPM.run(*llvmModule.get(), MAM);
+
+    return success();
+}
+
+LogicalResult runEnzymePasses(const CompilerOptions &options,
+                            std::shared_ptr<llvm::Module> llvmModule,
+                            CompilerOutput::PipelineOutputs &outputs)
+{
+    // Create the new pass manager builder.
+    // Take a look at the PassBuilder constructor parameters for more
+    // customization, e.g. specifying a TargetMachine or various debugging
+    // options.
+    llvm::PassBuilder PB;
+    augmentPassBuilder(PB);
+    PB.registerPipelineStartEPCallback([&](llvm::ModulePassManager &MPM,
+                                       llvm::OptimizationLevel Level) {
+       MPM.addPass(PreserveNVVMNewPM(/*Begin*/ true));
+       //MPM.addPass(EnzymeNewPM());
+    });
+
+
+    // Create the pass manager.
+    // This one corresponds to a typical -O2 optimization pipeline.
+    llvm::ModulePassManager MPM = PB.buildPerModuleDefaultPipeline(llvm::OptimizationLevel::O2);
+
+    // Optimize the IR!
+    llvm::ModuleAnalysisManager MAM;
     MPM.run(*llvmModule.get(), MAM);
 
     return success();

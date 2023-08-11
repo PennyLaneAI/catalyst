@@ -1,3 +1,15 @@
+if(WIN32)
+    set(EXTERNAL_LIB Version)
+elseif(UNIX AND NOT APPLE)
+    set(EXTERNAL_LIB z tinfo)
+elseif(APPLE)
+    set(EXTERNAL_LIB z ncurses)
+endif()
+
+add_subdirectory(Enzyme/enzyme)
+
+include_directories(Enzyme/enzyme/Enzyme)
+
 # Taken from llvm/tools/llc/CMakeLists.txt
 # TODO: May be possible to simplify linked libs
 set(LLVM_LINK_COMPONENTS
@@ -31,4 +43,6 @@ add_mlir_library(CatalystCompilerDriver
     MhloRegisterDialects
     StablehloRegister
     ${ALL_MHLO_PASSES}
+    ${EXTERNAL_LIB}
+    LLVMEnzyme-${LLVM_VERSION_MAJOR}
 )
