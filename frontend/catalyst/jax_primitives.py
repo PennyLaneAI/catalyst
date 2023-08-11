@@ -82,8 +82,13 @@ class Qbit:
 class AbstractQbit(AbstractValue):
     """Abstract Qbit"""
 
+    hash_value = hash("AbstractQubit")
+
     def __eq__(self, other):
         return isinstance(other, AbstractQbit)
+
+    def __hash__(self):
+        return self.hash_value
 
 
 class ConcreteQbit(AbstractQbit):
@@ -108,8 +113,13 @@ class Qreg:
 class AbstractQreg(AbstractValue):
     """Abstract quantum register."""
 
+    hash_value = hash("AbstractQreg")
+
     def __eq__(self, other):
         return isinstance(other, AbstractQreg)
+
+    def __hash__(self):
+        return self.hash_value
 
 
 class ConcreteQreg(AbstractQreg):
@@ -143,6 +153,9 @@ class AbstractObs(AbstractValue):
             return False
 
         return self.num_qubits == other.num_qubits and self.primitive == other.primitive
+
+    def __hash__(self):
+        return hash(self.primitive) + self.num_qubits
 
 
 class ConcreteObs(AbstractObs):
