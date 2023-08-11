@@ -70,7 +70,7 @@ class TestGradPostprocessing:
 
         jax_jacobian = jax.jacobian(postprocess)(0.5)
         catalyst_jacobian = jacobian(0.5)
-        assert catalyst_jacobian[0] == pytest.approx(jax_jacobian)
+        assert catalyst_jacobian == pytest.approx(jax_jacobian)
 
     @pytest.mark.parametrize("diff_method", SUPPORTED_DIFF_METHODS)
     def test_one_to_many(self, backend, diff_method):
@@ -91,7 +91,7 @@ class TestGradPostprocessing:
 
         jax_jacobian = jax.jacobian(postprocess)(0.5)
         catalyst_jacobian = jacobian(0.5)
-        assert catalyst_jacobian[0] == pytest.approx(jax_jacobian)
+        assert catalyst_jacobian == pytest.approx(jax_jacobian)
 
     @pytest.mark.parametrize("diff_method", SUPPORTED_DIFF_METHODS)
     def test_many_to_one(self, backend, diff_method):
@@ -116,7 +116,7 @@ class TestGradPostprocessing:
         x = jnp.array([0.5, 0.4, 0.3, 0.2])
         jax_jacobian = jax.jacobian(postprocess)(x)
         catalyst_jacobian = jacobian(x)
-        assert catalyst_jacobian[0] == pytest.approx(jax_jacobian)
+        assert catalyst_jacobian == pytest.approx(jax_jacobian)
 
     def test_tensor_measure(self, backend):
         """Tests correctness of a derivative of a qnode that returns a tensor"""
@@ -137,7 +137,7 @@ class TestGradPostprocessing:
 
         jax_jacobian = jax.jacobian(postprocess)(0.5)
         catalyst_jacobian = jacobian(0.5)
-        assert catalyst_jacobian[0] == pytest.approx(jax_jacobian)
+        assert catalyst_jacobian == pytest.approx(jax_jacobian)
 
     def test_multi_measure(self, backend):
         """Tests correctness of a derivative of a qnode with multiple measurements"""
@@ -157,7 +157,7 @@ class TestGradPostprocessing:
 
         jax_jacobian = jax.jacobian(postprocess)(0.5)
         catalyst_jacobian = jacobian(0.5)
-        assert catalyst_jacobian[0] == pytest.approx(jax_jacobian)
+        assert catalyst_jacobian == pytest.approx(jax_jacobian)
 
     def test_purely_classical(self):
         """Test the behaviour of the grad op on a purely classical function"""
@@ -169,7 +169,7 @@ class TestGradPostprocessing:
         def classical_grad(x):
             return grad(postprocess, method="defer")(x)
 
-        assert classical_grad(4.5)[0] == 9
+        assert classical_grad(4.5) == 9
 
     @pytest.mark.parametrize("diff_method", SUPPORTED_DIFF_METHODS)
     def test_jacobian(self, backend, diff_method):
@@ -192,7 +192,7 @@ class TestGradPostprocessing:
             return grad(postprocess, method="defer")(x)
 
         x = jnp.array([0.5, 0.4, 0.3, 0.2])
-        assert jacobian(x)[0] == pytest.approx(jax.jacobian(postprocess)(x))
+        assert jacobian(x) == pytest.approx(jax.jacobian(postprocess)(x))
 
     @pytest.mark.parametrize("diff_method", SUPPORTED_DIFF_METHODS)
     def test_multi_result(self, backend, diff_method):
@@ -270,7 +270,7 @@ class TestGradPostprocessing:
             return grad(postprocess, method="defer")(x)
 
         x = jnp.array([0.1, 0.2, 0.3])
-        assert grad_workflow(x)[0] == pytest.approx(jax.jacobian(postprocess)(x))
+        assert grad_workflow(x) == pytest.approx(jax.jacobian(postprocess)(x))
 
 
 def test_grad_outside_qjit():
