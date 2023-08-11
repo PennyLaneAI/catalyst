@@ -216,28 +216,36 @@ LogicalResult runLLVMPasses(const CompilerOptions &options,
 }
 
 LogicalResult runEnzymePasses(const CompilerOptions &options,
-                            std::shared_ptr<llvm::Module> llvmModule,
-                            CompilerOutput::PipelineOutputs &outputs)
+                              std::shared_ptr<llvm::Module> llvmModule,
+                              CompilerOutput::PipelineOutputs &outputs)
 {
     // Create the new pass manager builder.
     // Take a look at the PassBuilder constructor parameters for more
     // customization, e.g. specifying a TargetMachine or various debugging
     // options.
     llvm::PassBuilder PB;
-    augmentPassBuilder(PB);
-    PB.registerPipelineStartEPCallback([&](llvm::ModulePassManager &MPM,
-                                       llvm::OptimizationLevel Level) {
-       MPM.addPass(PreserveNVVMNewPM(/*Begin*/ true));
-       //MPM.addPass(EnzymeNewPM());
-    });
 
+    // Create the analysis managers.
+    llvm::LoopAnalysisManager LAM;
+    llvm::FunctionAnalysisManager FAM;
+    llvm::CGSCCAnalysisManager CGAM;
+    llvm::ModuleAnalysisManager MAM;
+
+    // Register all the basic analyses with the managers.
+    PB.registerModuleAnalyses(MAM);
+    PB.registerCGSCCAnalyses(CGAM);
+    PB.registerFunctionAnalyses(FAM);
+    PB.registerLoopAnalyses(LAM);
+    PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
+
+    augmentPassBuilder(PB);
 
     // Create the pass manager.
     // This one corresponds to a typical -O2 optimization pipeline.
-    llvm::ModulePassManager MPM = PB.buildPerModuleDefaultPipeline(llvm::OptimizationLevel::O2);
+    llvm::ModulePassManager MPM = PB.buildModuleOptimizationPipeline(
+        llvm::OptimizationLevel::O2, llvm::ThinOrFullLTOPhase::None);
 
     // Optimize the IR!
-    llvm::ModuleAnalysisManager MAM;
     MPM.run(*llvmModule.get(), MAM);
 
     return success();
@@ -363,6 +371,10 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     if (llvmModule) {
 
         if (failed(runLLVMPasses(options, llvmModule, output.pipelineOutputs))) {
+            return failure();
+        }
+
+        if (failed(runEnzymePasses(options, llvmModule, output.pipelineOutputs))) {
             return failure();
         }
 

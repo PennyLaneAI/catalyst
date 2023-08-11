@@ -41,7 +41,8 @@ mlir::LogicalResult dumpToFile(const CompilerOptions &options, mlir::StringRef f
     outfile << obj;
     outfile.flush();
     if (errCode) {
-        CO_MSG(options, Verbosity::Urgent, "Unable to write to file: " << errCode.message() << "\n");
+        CO_MSG(options, Verbosity::Urgent,
+               "Unable to write to file: " << errCode.message() << "\n");
         return mlir::failure();
     }
     return mlir::success();
