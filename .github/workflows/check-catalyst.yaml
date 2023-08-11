@@ -256,7 +256,7 @@ jobs:
         sudo apt-get install -y python3 python3-pip libomp-dev make cmake clang ninja-build ccache
         python3 -m pip install -r requirements.txt
         BUILDALLMODULES="ON" \
-        python3 -m pip install . -v
+        python3 -m pip install .
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
@@ -299,11 +299,9 @@ jobs:
         echo "ENZYME_LIB_DIR=$(pwd)/enzyme-build/Enzyme" >> $GITHUB_ENV
         chmod +x quantum-build/bin/quantum-opt  # artifact upload does not preserve permissions
 
-    # TODO: two tests failing, not related to this work!!
-    # Ali: will investigate and create the issue..
-    # - name: Run Python Lit Tests
-    #   run: |
-    #     llvm-lit -sv frontend/test/lit -j$(nproc)
+    - name: Run Python Lit Tests
+      run: |
+        llvm-lit -sv frontend/test/lit -j$(nproc)
 
     - name: Run Python Pytest Tests
       run: |
@@ -338,7 +336,7 @@ jobs:
         python3 -m pip install -r requirements.txt
         BACKEND="lightning.kokkos" \
         BUILDALLMODULES="ON" \
-        python3 -m pip install . -v
+        python3 -m pip install .
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
@@ -405,7 +403,7 @@ jobs:
         python3 -m pip install -r requirements.txt
         BACKEND="openqasm3" \
         BUILDALLMODULES="ON" \
-        python3 -m pip install . -v
+        python3 -m pip install .
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
