@@ -41,6 +41,7 @@ all: runtime
 configure:
 	@echo "Configure Catalyst Runtime"
 	cmake -G Ninja -B $(RT_BUILD_DIR) . \
+		-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=$(RT_BUILD_DIR)/lib \
 		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
 		-DLIGHTNING_GIT_TAG=$(LIGHTNING_GIT_TAG_VALUE) \
 		-DLIGHTNING_KOKKOS_GIT_TAG=$(LIGHTNING_KOKKOS_GIT_TAG_VALUE) \
@@ -85,10 +86,7 @@ examples: runtime
 .PHONY: clean
 clean:
 	@echo "clean build files"
-	rm -rf $(RT_BUILD_DIR)
-	rm -rf cov coverage.info
-	rm -rf $(MK_DIR)/BuildTidy
-	$(MAKE) -C qir-stdlib clean
+	rm -rf $(RT_BUILD_DIR) cov coverage.info $(MK_DIR)/BuildTidy
 	$(MAKE) -C examples clean
 
 .PHONY: format
@@ -100,7 +98,7 @@ else
 endif
 
 .PHONY: check-tidy
-check-tidy: | qir
+check-tidy:
 	@echo "build Catalyst Runtime with RUNTIME_CLANG_TIDY=ON"
 	cmake -G Ninja -B $(MK_DIR)/BuildTidy . \
 		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \

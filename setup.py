@@ -28,7 +28,6 @@ if build_all_modules:
     import platform
     import shutil
     import subprocess
-    import sys
     from pathlib import Path
 
     from setuptools import Extension
@@ -67,25 +66,24 @@ if build_all_modules:
 
         def build_ext_catalyst_runtime(self, ext: CMakeExtension) -> None:
             """Build Catalyst Runtime"""
-
             extdir = str(
                 Path(self.get_ext_fullpath(ext.name)).parent.joinpath("catalyst", "lib").absolute()
             )
             cfg = "Debug" if int(os.environ.get("DEBUG", 0)) else "Release"
             ninja_bin = self.get_executable("ninja")
             configure_args = [
+                "-GNinja",
+                f"-DCMAKE_MAKE_PROGRAM={str(ninja_bin)}",
                 f"-DCMAKE_LIBRARY_OUTPUT_DIRECTORY={extdir}",
                 f"-DCMAKE_C_COMPILER={os.environ.get('C_COMPILER', 'clang')}",
                 f"-DCMAKE_CXX_COMPILER={os.environ.get('CXX_COMPILER', 'clang++')}",
-                f"-DPYTHON_EXECUTABLE={sys.executable}",
                 f"-DCMAKE_BUILD_TYPE={cfg}",
-                "-GNinja",
-                f"-DCMAKE_MAKE_PROGRAM={str(ninja_bin)}",
+                f"-DBUILD_QIR_STDLIB_FROM_SRC={os.environ.get('BUILD_QIR_STDLIB_FROM_SRC', 'OFF')}",
             ]
 
             # additional conf args
             configure_args += [
-                "-DCMAKE_CXX_FLAGS=-fno-lto",
+                # "-DCMAKE_CXX_FLAGS=-fno-lto",
                 f"-DCMAKE_C_COMPILER_LAUNCHER={os.environ.get('COMPILER_LAUNCHER', 'ccache')}",
                 f"-DCMAKE_CXX_COMPILER_LAUNCHER={os.environ.get('COMPILER_LAUNCHER', 'ccache')}",
                 f"-DENABLE_OPENMP={os.environ.get('ENABLE_OPENMP', 'ON')}",
@@ -107,33 +105,6 @@ if build_all_modules:
             for var, opt in zip(["C_COMPILER", "CXX_COMPILER"], ["C", "CXX"]):
                 if os.getenv(var):
                     configure_args += [f"-DCMAKE_{opt}_COMPILER={os.getenv(var)}"]
-            if not Path(self.build_temp).exists():
-                os.makedirs(self.build_temp)
-
-            qir_stdlib_dir = None
-            qir_stdlib_includes_dir = None
-            if os.getenv("QIR_STDLIB_DIR") and os.getenv("QIR_STDLIB_INCLUDES_DIR"):
-                qir_stdlib_dir = os.getenv("QIR_STDLIB_DIR")
-                qir_stdlib_includes_dir = os.getenv("QIR_STDLIB_INCLUDES_DIR")
-            else:
-                manifest_path = str(Path("runtime", "qir-stdlib", "Cargo.toml").absolute())
-                cargo_bin = self.get_executable("cargo")
-                subprocess.check_call(
-                    [str(cargo_bin), "build", "--release", "--manifest-path", f"{manifest_path}"],
-                    cwd=self.build_temp,
-                )
-                qir_stdlib_dir = str(Path("runtime", "qir-stdlib", "target", "release").absolute())
-                qir_stdlib_includes_dir = str(
-                    Path(
-                        "runtime", "qir-stdlib", "target", "release", "build", "include"
-                    ).absolute()
-                )
-
-            configure_args += [
-                f"-DQIR_STDLIB_LIB={qir_stdlib_dir}",
-                f"-DQIR_STDLIB_INCLUDES={qir_stdlib_includes_dir}",
-            ]
-
             if not Path(self.build_temp).exists():
                 os.makedirs(self.build_temp)
 
@@ -188,6 +159,7 @@ for iext in intree_extension_list:
     iext._add_ldflags(["-L", lib_path_npymath])  # pylint: disable=protected-access
     iext._add_ldflags(["-lnpymath"])  # pylint: disable=protected-access
     iext._add_cflags(["-I", np.get_include()])  # pylint: disable=protected-access
+    iext._add_cflags(["-std=c++17"])  # pylint: disable=protected-access
 
 attrs = {
     "name": "pennylane-catalyst",
@@ -214,32 +186,4 @@ if build_all_modules:
     attrs["ext_modules"].append(CMakeExtension("catalyst", "runtime"))
     attrs["cmdclass"] = {"build_ext": BuildExtension}
 
-<<<<<<< HEAD
 setup(classifiers=classifiers, **(attrs))
-=======
-lib_path_npymath = path.join(np.get_include(), "..", "lib")
-intree_extension_list = intree_extensions(["frontend/catalyst/utils/wrapper.cpp"])
-for ext in intree_extension_list:
-    ext._add_ldflags(["-L", lib_path_npymath])  # pylint: disable=protected-access
-    ext._add_ldflags(["-lnpymath"])  # pylint: disable=protected-access
-    ext._add_cflags(["-I", np.get_include()])  # pylint: disable=protected-access
-    ext._add_cflags(["-std=c++17"])  # pylint: disable=protected-access
-ext_modules = intree_extension_list
-
-setup(
-    classifiers=classifiers,
-    name="pennylane-catalyst",
-    provides=["catalyst"],
-    version=version,
-    python_requires=">=3.8",
-    install_requires=requirements,
-    packages=find_namespace_packages(
-        where="frontend",
-        include=["catalyst", "catalyst.*", "mlir_quantum"],
-    ),
-    package_dir={"": "frontend"},
-    include_package_data=True,
-    ext_modules=ext_modules,
-    **description,
-)
->>>>>>> 087554cf94d864f2931db0fcc053569bf89f7baa

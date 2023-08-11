@@ -37,7 +37,7 @@ all: runtime mlir frontend
 .PHONY: frontend
 frontend:
 	@echo "install Catalyst Frontend"
-	$(PYTHON) -m pip install -e .
+	$(PYTHON) -m pip install -e . -v
 
 .PHONY: mlir llvm mhlo enzyme dialects runtime
 mlir:
@@ -109,7 +109,7 @@ wheel:
 .PHONY: clean clean-all
 clean:
 	@echo "uninstall catalyst and delete all temporary and cache files"
-	$(PYTHON) pip uninstall -y pennylane-catalyst
+	$(PYTHON) -m pip uninstall -y pennylane-catalyst
 	rm -rf build dist __pycache__
 	rm -rf .coverage coverage_html_report
 
