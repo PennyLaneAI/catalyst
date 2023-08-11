@@ -27,7 +27,8 @@ namespace gradient {
 struct HybridGradientLowering : public mlir::OpRewritePattern<GradOp> {
     using OpRewritePattern<GradOp>::OpRewritePattern;
 
-    mlir::LogicalResult matchAndRewrite(GradOp op, mlir::PatternRewriter &rewriter) const override;
+    mlir::LogicalResult match(GradOp op) const override;
+    void rewrite(GradOp op, mlir::PatternRewriter &rewriter) const override;
 
   private:
     /// Generate a version of the QNode that accepts the parameter buffer. This is so Enzyme will
