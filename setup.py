@@ -65,14 +65,22 @@ if build_all_modules:
 
         def build_ext_catalyst_runtime(self, ext: CMakeExtension) -> None:
             """Build Catalyst Runtime"""
-            extdir = str(
-                Path(self.get_ext_fullpath(ext.name)).parent.joinpath("catalyst", "lib").absolute()
-            )
+            ext_path = self.get_ext_fullpath(ext.name)
+            if not ext_path.startswith("build"):
+                # editable mode: copy to lib
+                extdir = os.path.join(os.path.dirname(__file__), "frontend", "catalyst", "lib")
+            else:
+                extdir = str(
+                    Path(self.get_ext_fullpath(ext.name))
+                    .parent.joinpath("catalyst", "lib")
+                    .absolute()
+                )
+
             cfg = "Debug" if int(os.environ.get("DEBUG", 0)) else "Release"
             ninja_bin = self.get_executable("ninja")
             configure_args = [
                 "-GNinja",
-                f"-DCMAKE_MAKE_PROGRAM={str(ninja_bin)}",
+                f"-DCMAKE_MAKE_PROGRAM={ninja_bin}",
                 f"-DCMAKE_LIBRARY_OUTPUT_DIRECTORY={extdir}",
                 f"-DCMAKE_C_COMPILER={os.environ.get('C_COMPILER', 'clang')}",
                 f"-DCMAKE_CXX_COMPILER={os.environ.get('CXX_COMPILER', 'clang++')}",
@@ -108,14 +116,16 @@ if build_all_modules:
                 os.makedirs(self.build_temp)
 
             cmake_bin = self.get_executable("cmake")
-            subprocess.check_call(
-                [cmake_bin, str(ext.sourcedir)] + configure_args, cwd=self.build_temp
-            )
+            subprocess.check_call([cmake_bin, ext.sourcedir] + configure_args, cwd=self.build_temp)
 
             subprocess.check_call(
                 [cmake_bin, "--build", ".", "--target rt_capi", f"-j{os.cpu_count()}"],
                 cwd=self.build_temp,
             )
+
+            if not os.path.isfile(ext_path):
+                # editable mode missing temporary ext file
+                open(ext_path, "a").close()
 
         def get_executable(self, name: str) -> str:
             """Get the absolute path of an executable using shutil.which"""

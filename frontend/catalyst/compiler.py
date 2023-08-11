@@ -77,7 +77,6 @@ default_bin_paths = {
 
 default_lib_paths = {
     "llvm": os.path.join(package_root, "../../mlir/llvm-project/build/lib"),
-    "runtime": os.path.join(package_root, "../../runtime/build/lib"),
     "enzyme": os.path.join(package_root, "../../mlir/Enzyme/build/Enzyme"),
 }
 
@@ -368,7 +367,7 @@ class CompilerDriver:
             (List[str]): The default flag list.
         """
         mlir_lib_path = get_lib_path("llvm", "MLIR_LIB_DIR")
-        rt_lib_path = get_lib_path("runtime", "RUNTIME_LIB_DIR")
+        rt_lib_path = os.getenv("RUNTIME_LIB_DIR", os.path.join(package_root, "lib"))
         error_flag_apple = "-Wl,-arch_errors_fatal"
         error_flag_linux = ""
         error_flag = error_flag_linux if platform.system() == "Linux" else error_flag_apple
