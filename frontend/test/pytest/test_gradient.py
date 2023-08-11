@@ -989,7 +989,8 @@ def test_jax_consts(inp, h_coeffs, g_method, backend):
 
     @qjit()
     def compile_grad(params):
-        g = qml.qnode(qml.device(backend, wires=3))(circuit)
+        diff_method = "adjoint" if g_method == "defer" else "finite-diff"
+        g = qml.qnode(qml.device(backend, wires=3), diff_method=diff_method)(circuit)
         h = grad(g, method=g_method)
         return h(params)
 
@@ -1046,13 +1047,14 @@ def test_non_float_res(backend):
 @pytest.mark.parametrize("inp", [(1.0), (2.0)])
 def test_finite_diff_multiple_devices(inp, diff_method, backend):
     """Test gradient methods using multiple backend devices."""
+    qnode_diff_method = "adjoint" if diff_method == "defer" else "finite-diff"
 
-    @qml.qnode(qml.device(backend, wires=1))
+    @qml.qnode(qml.device(backend, wires=1), diff_method=qnode_diff_method)
     def f(x):
         qml.RX(3 * x, wires=0)
         return qml.expval(qml.PauliY(0))
 
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    @qml.qnode(qml.device("lightning.qubit", wires=1), diff_method=qnode_diff_method)
     def g(x):
         qml.RX(3 * x, wires=0)
         return qml.expval(qml.PauliY(0))
