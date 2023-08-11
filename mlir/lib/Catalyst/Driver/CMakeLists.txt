@@ -6,9 +6,9 @@ elseif(APPLE)
     set(EXTERNAL_LIB z ncurses)
 endif()
 
-add_subdirectory(Enzyme/enzyme)
+add_subdirectory(./../../../Enzyme/enzyme ${CMAKE_CURRENT_BINARY_DIR}/Enzyme/enzyme)
 
-include_directories(Enzyme/enzyme/Enzyme)
+include_directories(../../../Enzyme/enzyme/Enzyme)
 
 # Taken from llvm/tools/llc/CMakeLists.txt
 # TODO: May be possible to simplify linked libs
@@ -44,5 +44,6 @@ add_mlir_library(CatalystCompilerDriver
     StablehloRegister
     ${ALL_MHLO_PASSES}
     ${EXTERNAL_LIB}
+
     LLVMEnzyme-${LLVM_VERSION_MAJOR}
 )
