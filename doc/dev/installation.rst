@@ -91,17 +91,6 @@ They can be installed on Debian/Ubuntu via:
   If the CMake version available in your system is too old, you can also install up-to-date
   versions of it via ``pip install cmake``.
 
-The runtime leverages the ``stdlib`` Rust package from the `qir-runner
-<https://www.qir-alliance.org/qir-runner>`_ project for standard
-QIR runtime instructions. To build this package from source, a `Rust
-<https://www.rust-lang.org/tools/install>`_ toolchain installed via ``rustup``
-is required. After installing ``rustup``, the ``llvm-tools-preview`` component
-needs to be installed:
-
-.. code-block:: console
-
-  rustup component add llvm-tools-preview
-
 All additional build and developer depencies are managed via the repository's ``requirements.txt``
 and can be installed as follows:
 
@@ -144,8 +133,8 @@ By default, the runtime is backed by `PennyLane-Lightning
 <https://github.com/PennyLaneAI/pennylane-lightning>`_
 requiring the use of C++20 standard library headers, and leverages the `QIR
 standard library <https://github.com/qir-alliance/qir-runner>`_. Assuming
-``libomp-dev`` and the ``llvm-tools-preview`` Rustup component are available,
-you can build ``qir-stdlib`` and the runtime from the top level directory:
+``libomp-dev`` is available, you can build the runtime from the top level
+directory:
 
 .. code-block:: console
 

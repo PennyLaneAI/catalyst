@@ -214,4 +214,32 @@ if build_all_modules:
     attrs["ext_modules"].append(CMakeExtension("catalyst", "runtime"))
     attrs["cmdclass"] = {"build_ext": BuildExtension}
 
+<<<<<<< HEAD
 setup(classifiers=classifiers, **(attrs))
+=======
+lib_path_npymath = path.join(np.get_include(), "..", "lib")
+intree_extension_list = intree_extensions(["frontend/catalyst/utils/wrapper.cpp"])
+for ext in intree_extension_list:
+    ext._add_ldflags(["-L", lib_path_npymath])  # pylint: disable=protected-access
+    ext._add_ldflags(["-lnpymath"])  # pylint: disable=protected-access
+    ext._add_cflags(["-I", np.get_include()])  # pylint: disable=protected-access
+    ext._add_cflags(["-std=c++17"])  # pylint: disable=protected-access
+ext_modules = intree_extension_list
+
+setup(
+    classifiers=classifiers,
+    name="pennylane-catalyst",
+    provides=["catalyst"],
+    version=version,
+    python_requires=">=3.8",
+    install_requires=requirements,
+    packages=find_namespace_packages(
+        where="frontend",
+        include=["catalyst", "catalyst.*", "mlir_quantum"],
+    ),
+    package_dir={"": "frontend"},
+    include_package_data=True,
+    ext_modules=ext_modules,
+    **description,
+)
+>>>>>>> 087554cf94d864f2931db0fcc053569bf89f7baa

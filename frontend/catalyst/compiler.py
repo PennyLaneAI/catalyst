@@ -369,8 +369,11 @@ class CompilerDriver:
         """
         mlir_lib_path = get_lib_path("llvm", "MLIR_LIB_DIR")
         rt_lib_path = get_lib_path("runtime", "RUNTIME_LIB_DIR")
-        rt_capi_path = os.path.join(rt_lib_path, "capi") if INSTALLED else rt_lib_path
-        rt_backend_path = os.path.join(rt_lib_path, "backend") if INSTALLED else rt_lib_path
+        rt_capi_path = os.path.join(rt_lib_path, "capi")
+        rt_backend_path = os.path.join(rt_lib_path, "backend")
+        error_flag_apple = "-Wl,-arch_errors_fatal"
+        error_flag_linux = ""
+        error_flag = error_flag_linux if platform.system() == "Linux" else error_flag_apple
 
         default_flags = [
             "-shared",
@@ -384,6 +387,7 @@ class CompilerDriver:
             "-lrt_backend",
             "-lrt_capi",
             "-lpthread",
+            f"{error_flag}",
             "-lmlir_c_runner_utils",  # required for memref.copy
         ]
 
