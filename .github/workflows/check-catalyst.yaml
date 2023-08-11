@@ -435,12 +435,6 @@ jobs:
         name: quantum-build
         path: quantum-build
 
-    - name: Download Catalyst-Runtime Artifact
-      uses: actions/download-artifact@v3
-      with:
-        name: runtime-build
-        path: runtime-build/lib
-
     - name: Install additional dependencies (OpenQasm device)
       run: |
         # TODO: Use the latest version of boto3 after fixing the issue with

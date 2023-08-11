@@ -48,10 +48,9 @@ if build_all_modules:
 
         # The set of supported backends at runtime
         BACKENDS = {
-            "lightning": "ENABLE_LIGHTNING",
+            "lightning.qubit": "ENABLE_LIGHTNING",
             "lightning.kokkos": "ENABLE_LIGHTNING_KOKKOS",
-            "openqasm3": "ENABLE_OPENQASM",
-            "braket": "ENABLE_OPENQASM",
+            "braket.qubit": "ENABLE_OPENQASM",
         }
 
         def build_extension(self, ext: CMakeExtension) -> None:
@@ -69,8 +68,6 @@ if build_all_modules:
             extdir = str(
                 Path(self.get_ext_fullpath(ext.name)).parent.joinpath("catalyst", "lib").absolute()
             )
-            print(extdir)
-            print("\n\n\n\n\n")
             cfg = "Debug" if int(os.environ.get("DEBUG", 0)) else "Release"
             ninja_bin = self.get_executable("ninja")
             configure_args = [
@@ -93,7 +90,7 @@ if build_all_modules:
             ]
 
             selected_backends = (
-                os.getenv("BACKEND").split(";") if os.getenv("BACKEND") else ["lightning"]
+                os.getenv("backend").split(";") if os.getenv("backend") else ["lightning.qubit"]
             )
             for key in selected_backends:
                 if key in BuildExtension.BACKENDS:
@@ -116,7 +113,8 @@ if build_all_modules:
             )
 
             subprocess.check_call(
-                [cmake_bin, "--build", ".", "--target rt_capi"], cwd=self.build_temp
+                [cmake_bin, "--build", ".", "--target rt_capi", f"-j{os.cpu_count()}"],
+                cwd=self.build_temp,
             )
 
         def get_executable(self, name: str) -> str:
