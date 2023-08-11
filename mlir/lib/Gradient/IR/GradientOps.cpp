@@ -31,7 +31,7 @@ using namespace catalyst::gradient;
 // SymbolUserOpInterface
 //===----------------------------------------------------------------------===//
 
-// A method to check types for equality that compares ShapedTypes by their shape an element type.
+// A method to check types for equality that compares ShapedTypes by their shape and element type.
 bool shapeEqual(Type rhs, Type lhs)
 {
     auto shapedRhs = dyn_cast<ShapedType>(rhs);
