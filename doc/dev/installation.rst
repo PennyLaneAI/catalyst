@@ -123,26 +123,8 @@ following make target from the top level directory:
 
   make all
 
-To build each component one by one starting from the runtime, you can follow
+To build each component one by one starting from the core module, you can follow
 the instructions below.
-
-Runtime
-"""""""
-
-By default, the runtime is backed by `PennyLane-Lightning
-<https://github.com/PennyLaneAI/pennylane-lightning>`_
-requiring the use of C++20 standard library headers, and leverages the `QIR
-standard library <https://github.com/qir-alliance/qir-runner>`_. Assuming
-``libomp-dev`` is available, you can build the runtime from the top level
-directory:
-
-.. code-block:: console
-
-  make runtime
-
-The runtime supports multiple backend devices, enabling the execution of quantum
-circuits locally on CPUs and GPUs, and remotely on Amazon Braket NISQ hardware.
-A list of supported backends, along with Make arguments for each device, is available in the `Catalyst Runtime <https://docs.pennylane.ai/projects/catalyst/en/latest/modules/runtime.html>`_ page.
 
 MLIR Dialects
 """""""""""""
@@ -164,11 +146,28 @@ You can also choose to build the custom Catalyst dialects only, with:
 Frontend
 """"""""
 
-To install the ``pennylane-catalyst`` Python package (the compiler frontend) in editable mode:
+To install the ``pennylane-catalyst`` Python package (the compiler frontend)
+along with the runtime in editable mode:
 
 .. code-block:: console
 
   make frontend
+
+By default, the runtime is backed by `PennyLane-Lightning
+<https://github.com/PennyLaneAI/pennylane-lightning>`_ with OpenMP enabled,
+requiring the use of C++20 standard library headers, and leverages the `QIR
+standard library <https://github.com/qir-alliance/qir-runner>`_.
+
+The runtime supports multiple backend devices, enabling the execution of quantum
+circuits locally on CPUs and GPUs, and remotely on Amazon Braket NISQ hardware.
+A list of supported backends, along with Make arguments for each device, is available
+in the `Catalyst Runtime <https://docs.pennylane.ai/projects/catalyst/en/latest/modules/runtime.html>`_ page.
+
+To build the frontend and the runtime with all supported backends:
+
+.. code-block:: console
+
+  backend="lightning.qubit;lightning.kokkos;braket.qubit" pip install .
 
 Variables
 ^^^^^^^^^
@@ -183,12 +182,6 @@ To make the MLIR bindings from the Catalyst dialects discoverable to the compile
 .. code-block:: console
 
   export PYTHONPATH="$PWD/mlir/build/python_packages/quantum:$PYTHONPATH"
-
-To make runtime libraries discoverable to the compiler:
-
-.. code-block:: console
-
-  export RUNTIME_LIB_DIR="$PWD/runtime/build/lib"
 
 To make MLIR libraries discoverable to the compiler:
 

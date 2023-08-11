@@ -255,7 +255,6 @@ jobs:
       run: |
         sudo apt-get install -y python3 python3-pip libomp-dev make cmake clang ninja-build ccache
         python3 -m pip install -r requirements.txt
-        BUILDALLMODULES="ON" \
         python3 -m pip install .
 
     - name: Get Cached LLVM Build
@@ -334,8 +333,7 @@ jobs:
       run: |
         sudo apt-get install -y python3 python3-pip libomp-dev make cmake clang ninja-build ccache
         python3 -m pip install -r requirements.txt
-        BACKEND="lightning.kokkos" \
-        BUILDALLMODULES="ON" \
+        backend="lightning.kokkos" \
         python3 -m pip install .
 
     - name: Get Cached LLVM Build
@@ -401,8 +399,7 @@ jobs:
       run: |
         sudo apt-get install -y python3 python3-pip libomp-dev make cmake clang ninja-build ccache
         python3 -m pip install -r requirements.txt
-        BACKEND="openqasm3" \
-        BUILDALLMODULES="ON" \
+        backend="braket.qubit" \
         python3 -m pip install .
 
     - name: Get Cached LLVM Build

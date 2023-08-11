@@ -22,7 +22,7 @@ from setuptools import (  # pylint: disable=wrong-import-order
 )
 
 # To build the frontend without any other Catalyst components or dependencies:
-build_all_modules = not os.getenv("READTHEDOCS") and os.getenv("BUILDALLMODULES")
+build_all_modules = not os.getenv("READTHEDOCS")
 
 if build_all_modules:
     import platform
