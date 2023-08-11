@@ -56,9 +56,10 @@ void catalyst::convertToDestinationPassingStyle(func::FuncOp callee, OpBuilder &
     SmallVector<unsigned> argIndices(/*size=*/memRefReturnTypes.size(),
                                      /*values=*/dpsOutputIdx);
     SmallVector<DictionaryAttr> argAttrs{memRefReturnTypes.size()};
-    SmallVector<Location> argLocs{memRefReturnTypes.size(), UnknownLoc::get(ctx)};
+    SmallVector<Location> argLocs{memRefReturnTypes.size(), callee.getLoc()};
+
     // insertArguments modifies the function type, so we need to update the function type *after*
-    // inserting the arguments
+    // inserting the arguments.
     callee.insertArguments(argIndices, memRefReturnTypes, argAttrs, argLocs);
     callee.setFunctionType(dpsFunctionType);
 
@@ -71,6 +72,8 @@ void catalyst::convertToDestinationPassingStyle(func::FuncOp callee, OpBuilder &
         for (Value operand : returnOp.getOperands()) {
             if (isa<MemRefType>(operand.getType())) {
                 BlockArgument output = callee.getArgument(idx + dpsOutputIdx);
+                // We need a linalg.copy instead of a memref.copy here because it provides better
+                // type information at the LLVM level for Enzyme.
                 builder.create<linalg::CopyOp>(returnOp.getLoc(), operand, output);
                 idx++;
             }
