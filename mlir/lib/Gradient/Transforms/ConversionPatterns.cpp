@@ -32,6 +32,7 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/IRMapping.h"
 
+#include "Catalyst/Utils/CallGraph.h"
 #include "Gradient/IR/GradientOps.h"
 #include "Gradient/Transforms/Patterns.h"
 #include "Gradient/Utils/DestinationPassingStyle.h"
@@ -154,71 +155,6 @@ static constexpr const char *enzyme_custom_gradient_key = "__enzyme_register_gra
 static constexpr const char *enzyme_const_key = "enzyme_const";
 static constexpr const char *enzyme_dupnoneed_key = "enzyme_dupnoneed";
 
-/// Convert every MemRef-typed return value in callee to writing to a new argument in
-/// destination-passing style.
-void convertToDestinationPassingStyle(func::FuncOp callee, OpBuilder &builder)
-{
-    MLIRContext *ctx = callee.getContext();
-    if (callee.getNumResults() == 0) {
-        // Callee is already in destination-passing style
-        return;
-    }
-
-    SmallVector<Value> memRefReturns;
-    SmallVector<unsigned> outputIndices;
-    SmallVector<Type> nonMemRefReturns;
-    callee.walk([&](func::ReturnOp returnOp) {
-        // This is the first return op we've seen.
-        if (memRefReturns.empty()) {
-            for (const auto &[idx, operand] : llvm::enumerate(returnOp.getOperands())) {
-                if (isa<MemRefType>(operand.getType())) {
-                    memRefReturns.push_back(operand);
-                    outputIndices.push_back(idx);
-                }
-                else {
-                    nonMemRefReturns.push_back(operand.getType());
-                }
-            }
-            return WalkResult::interrupt();
-        }
-        return WalkResult::advance();
-    });
-
-    // Insert the new output arguments to the function.
-    unsigned dpsOutputIdx = callee.getNumArguments();
-    SmallVector<unsigned> argIndices(/*size=*/memRefReturns.size(),
-                                     /*values=*/dpsOutputIdx);
-    SmallVector<Type> memRefTypes{memRefReturns.size()};
-    SmallVector<DictionaryAttr> argAttrs{memRefReturns.size()};
-    SmallVector<Location> argLocs{memRefReturns.size(), UnknownLoc::get(ctx)};
-
-    llvm::transform(memRefReturns, memRefTypes.begin(),
-                    [](Value memRef) { return memRef.getType(); });
-    llvm::transform(memRefReturns, argLocs.begin(), [](Value memRef) { return memRef.getLoc(); });
-
-    callee.insertArguments(argIndices, memRefTypes, argAttrs, argLocs);
-    callee.setFunctionType(FunctionType::get(ctx, callee.getArgumentTypes(), nonMemRefReturns));
-
-    // Update return sites to copy over the memref that would have been returned to the output.
-    callee.walk([&](func::ReturnOp returnOp) {
-        OpBuilder::InsertionGuard insertionGuard(builder);
-        builder.setInsertionPoint(returnOp);
-        SmallVector<Value> nonMemRefReturns;
-        size_t idx = 0;
-        for (Value operand : returnOp.getOperands()) {
-            if (isa<MemRefType>(operand.getType())) {
-                BlockArgument output = callee.getArgument(idx + dpsOutputIdx);
-                builder.create<linalg::CopyOp>(returnOp.getLoc(), operand, output);
-                idx++;
-            }
-            else {
-                nonMemRefReturns.push_back(operand);
-            }
-        }
-        returnOp.getOperandsMutable().assign(nonMemRefReturns);
-    });
-}
-
 void wrapMemRefArgs(func::FuncOp func, LLVMTypeConverter &typeConverter, PatternRewriter &rewriter,
                     Location loc)
 {
@@ -294,28 +230,6 @@ void wrapMemRefArgs(func::FuncOp func, LLVMTypeConverter &typeConverter, Pattern
     }
 }
 
-void traverseCallGraph(func::FuncOp start, SymbolTableCollection &symbolTable,
-                       function_ref<void(func::FuncOp)> processCallable)
-{
-    DenseSet<Operation *> visited{start};
-    std::deque<Operation *> frontier{start};
-
-    while (!frontier.empty()) {
-        auto callable = cast<func::FuncOp>(frontier.front());
-        frontier.pop_front();
-
-        processCallable(callable);
-        callable.walk([&](CallOpInterface callOp) {
-            if (auto nextFunc = dyn_cast<func::FuncOp>(callOp.resolveCallable(&symbolTable))) {
-                if (!visited.contains(nextFunc)) {
-                    visited.insert(nextFunc);
-                    frontier.push_back(nextFunc);
-                }
-            }
-        });
-    }
-}
-
 struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
     using ConvertOpToLLVMPattern::ConvertOpToLLVMPattern;
 
@@ -337,7 +251,7 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
 
         convertToDestinationPassingStyle(callee, rewriter);
         SymbolTableCollection symbolTable;
-        traverseCallGraph(callee, symbolTable, [&](func::FuncOp func) {
+        catalyst::traverseCallGraph(callee, symbolTable, [&](func::FuncOp func) {
             // Register custom gradients of quantum functions
             if (func->hasAttrOfType<FlatSymbolRefAttr>("gradient.qgrad")) {
                 auto qgradFn = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
@@ -349,7 +263,7 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
                 if (!func->hasAttr("unwrapped_type")) {
                     func->setAttr("unwrapped_type", TypeAttr::get(func.getFunctionType()));
                 }
-                convertToDestinationPassingStyle(func, rewriter);
+                catalyst::convertToDestinationPassingStyle(func, rewriter);
 
                 wrapMemRefArgs(func, *getTypeConverter(), rewriter, loc);
 

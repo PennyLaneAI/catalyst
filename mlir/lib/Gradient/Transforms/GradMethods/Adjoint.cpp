@@ -34,40 +34,28 @@
 namespace catalyst {
 namespace gradient {
 
-LogicalResult AdjointLowering::match(GradOp op) const
+LogicalResult AdjointLowering::match(func::FuncOp op) const
 {
-    if (getQNodeDiffMethod(op) == "adjoint")
+    if (getQNodeDiffMethod(op) == "adjoint" && op->hasAttr("withparams"))
         return success();
 
     return failure();
 }
 
-void AdjointLowering::rewrite(GradOp op, PatternRewriter &rewriter) const
+void AdjointLowering::rewrite(func::FuncOp op, PatternRewriter &rewriter) const
 {
     Location loc = op.getLoc();
-    func::FuncOp callee =
-        SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
-    rewriter.setInsertionPointAfter(callee);
-
-    // In order to allocate memory for various tensors relating to the number of gate parameters
-    // at runtime we run a function that merely counts up for each gate parameter encountered.
-    func::FuncOp paramCountFn = genParamCountFunction(rewriter, loc, callee);
-
-    // Generate the classical argument map from function arguments to gate parameters. This
-    // function will be differentiated to produce the classical jacobian.
-    func::FuncOp argMapFn = genArgMapFunction(rewriter, loc, callee);
 
     // Generate the quantum gradient function, relying on the backend to implement the adjoint
     // computation.
-    func::FuncOp qGradFn = genQGradFunction(rewriter, loc, callee);
+    func::FuncOp qGradFn = genQGradFunction(rewriter, loc, op);
 
-    // Generate the full gradient function, computing the partial derivatives with respect to the
-    // original function arguments from the classical Jacobian and quantum gradient.
-    func::FuncOp fullGradFn =
-        genFullGradFunction(rewriter, loc, op, paramCountFn, argMapFn, qGradFn, "adj");
-
-    rewriter.setInsertionPoint(op);
-    rewriter.replaceOpWithNewOp<func::CallOp>(op, fullGradFn, op.getArgOperands());
+    // Register the quantum gradient on the quantum-only split-out QNode.
+    Operation *qnodeWithParams = SymbolTable::lookupNearestSymbolFrom(
+        op, op->getAttrOfType<FlatSymbolRefAttr>("withparams"));
+    qnodeWithParams->setAttr("gradient.qgrad", FlatSymbolRefAttr::get(qGradFn));
+    // Mark this op as processed so it doesn't get processed again.
+    op->removeAttr("withparams");
 }
 
 func::FuncOp AdjointLowering::discardAndReturnReg(PatternRewriter &rewriter, Location loc,
@@ -106,6 +94,9 @@ func::FuncOp AdjointLowering::discardAndReturnReg(PatternRewriter &rewriter, Loc
         // clone the body.
         rewriter.cloneRegionBefore(callee.getBody(), unallocFn.getBody(), unallocFn.end());
         rewriter.setInsertionPointToStart(&unallocFn.getBody().front());
+
+        // Erase redundant device specifications.
+        unallocFn.walk([&rewriter](quantum::DeviceOp deviceOp) { rewriter.eraseOp(deviceOp); });
 
         // Let's capture the qreg.
         quantum::DeallocOp localDealloc = *unallocFn.getOps<quantum::DeallocOp>().begin();

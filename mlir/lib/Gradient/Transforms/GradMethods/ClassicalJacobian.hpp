@@ -23,6 +23,12 @@ namespace catalyst {
 namespace gradient {
 
 func::FuncOp genParamCountFunction(PatternRewriter &rewriter, Location loc, func::FuncOp callee);
+
+/// Generate a version of the QNode that writes gate parameters to a buffer before calling a
+/// modified QNode that explicitly accepts preprocessed gate parameters.
+func::FuncOp genSplitPreprocessed(PatternRewriter &rewriter, Location loc, func::FuncOp qnode,
+                                  func::FuncOp qnodeWithParams);
+
 func::FuncOp genArgMapFunction(PatternRewriter &rewriter, Location loc, func::FuncOp callee);
 
 } // namespace gradient

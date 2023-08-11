@@ -19,18 +19,16 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/PatternMatch.h"
 
-#include "Gradient/IR/GradientOps.h"
-
 using namespace mlir;
 
 namespace catalyst {
 namespace gradient {
 
-struct FiniteDiffLowering : public OpRewritePattern<GradOp> {
-    using OpRewritePattern<GradOp>::OpRewritePattern;
+struct FiniteDiffLowering : public OpRewritePattern<func::FuncOp> {
+    using OpRewritePattern<func::FuncOp>::OpRewritePattern;
 
-    LogicalResult match(GradOp op) const override;
-    void rewrite(GradOp op, PatternRewriter &rewriter) const override;
+    LogicalResult match(func::FuncOp op) const override;
+    void rewrite(func::FuncOp op, PatternRewriter &rewriter) const override;
 
   private:
     static void computeFiniteDiff(PatternRewriter &rewriter, Location loc, func::FuncOp gradFn,

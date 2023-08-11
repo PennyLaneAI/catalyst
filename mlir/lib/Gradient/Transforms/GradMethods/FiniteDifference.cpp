@@ -29,45 +29,45 @@
 namespace catalyst {
 namespace gradient {
 
-LogicalResult FiniteDiffLowering::match(GradOp op) const
+LogicalResult FiniteDiffLowering::match(func::FuncOp op) const
 {
-    // Assume for now that specifying "fd" on the grad op takes precedence over any "diff_method"
-    // specified on any internal QNodes. Relaxing this assumption depends on further integration
-    // with Enzyme.
-    if (op.getMethod() == "fd" || getQNodeDiffMethod(op) == "finite-diff")
+    // TODO: Need to figure out how to get the finite diff params to the QNode
+    return failure();
+    if (getQNodeDiffMethod(op) == "finite-diff" && op->hasAttr("withparams")) {
         return success();
+    }
 
     return failure();
 }
 
-void FiniteDiffLowering::rewrite(GradOp op, PatternRewriter &rewriter) const
+void FiniteDiffLowering::rewrite(func::FuncOp op, PatternRewriter &rewriter) const
 {
     Location loc = op.getLoc();
-    const std::vector<size_t> &diffArgIndices = computeDiffArgIndices(op.getDiffArgIndices());
-    std::stringstream uniquer;
-    std::copy(diffArgIndices.begin(), diffArgIndices.end(), std::ostream_iterator<int>(uniquer));
-    std::string fnName = op.getCallee().str() + ".finitediff" + uniquer.str();
-    FunctionType fnType = rewriter.getFunctionType(op.getOperandTypes(), op.getResultTypes());
-    StringAttr visibility = rewriter.getStringAttr("private");
-    func::FuncOp callee =
-        SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
+    // const std::vector<size_t> &diffArgIndices = computeDiffArgIndices(op.getDiffArgIndices());
+    // std::stringstream uniquer;
+    // std::copy(diffArgIndices.begin(), diffArgIndices.end(), std::ostream_iterator<int>(uniquer));
+    // std::string fnName = op.getCallee().str() + ".finitediff" + uniquer.str();
+    // FunctionType fnType = rewriter.getFunctionType(op.getOperandTypes(), op.getResultTypes());
+    // StringAttr visibility = rewriter.getStringAttr("private");
+    // func::FuncOp callee =
+    //     SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
 
-    double hValue =
-        op.getFiniteDiffParam().has_value() ? op.getFiniteDiffParamAttr().getValueAsDouble() : 1e-7;
+    // double hValue =
+    //     op.getFiniteDiffParam().has_value() ? op.getFiniteDiffParamAttr().getValueAsDouble() : 1e-7;
 
-    func::FuncOp gradFn =
-        SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, rewriter.getStringAttr(fnName));
-    if (!gradFn) {
-        PatternRewriter::InsertionGuard insertGuard(rewriter);
-        rewriter.setInsertionPointAfter(callee);
+    // func::FuncOp gradFn =
+    //     SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, rewriter.getStringAttr(fnName));
+    // if (!gradFn) {
+    //     PatternRewriter::InsertionGuard insertGuard(rewriter);
+    //     rewriter.setInsertionPointAfter(callee);
 
-        gradFn = rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility, nullptr, nullptr);
-        rewriter.setInsertionPointToStart(gradFn.addEntryBlock());
+    //     gradFn = rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility, nullptr, nullptr);
+    //     rewriter.setInsertionPointToStart(gradFn.addEntryBlock());
 
-        computeFiniteDiff(rewriter, loc, gradFn, callee, diffArgIndices, hValue);
-    }
+    //     computeFiniteDiff(rewriter, loc, gradFn, callee, diffArgIndices, hValue);
+    // }
 
-    rewriter.replaceOpWithNewOp<func::CallOp>(op, gradFn, op.getArgOperands());
+    // rewriter.replaceOpWithNewOp<func::CallOp>(op, gradFn, op.getArgOperands());
 }
 
 void FiniteDiffLowering::computeFiniteDiff(PatternRewriter &rewriter, Location loc,

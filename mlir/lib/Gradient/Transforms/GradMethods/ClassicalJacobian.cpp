@@ -106,6 +106,80 @@ func::FuncOp genParamCountFunction(PatternRewriter &rewriter, Location loc, func
     return paramCountFn;
 }
 
+func::FuncOp genSplitPreprocessed(PatternRewriter &rewriter, Location loc, func::FuncOp qnode,
+                                  func::FuncOp qnodeWithParams)
+{
+    // Define the properties of the classical preprocessing function.
+    std::string fnName = qnode.getSymName().str() + ".splitpreprocessed";
+    SmallVector<Type> fnArgTypes(qnode.getArgumentTypes());
+    auto paramsBufferType = MemRefType::get({ShapedType::kDynamic}, rewriter.getF64Type());
+    fnArgTypes.push_back(rewriter.getIndexType()); // parameter count
+    FunctionType fnType = rewriter.getFunctionType(fnArgTypes, qnode.getResultTypes());
+    StringAttr visibility = rewriter.getStringAttr("private");
+
+    func::FuncOp splitFn =
+        SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(qnode, rewriter.getStringAttr(fnName));
+    if (!splitFn) {
+        // First copy the original function as is, then we can replace all quantum ops by collecting
+        // their gate parameters in a memory buffer instead. The size of this vector is passed as an
+        // input to the new function.
+        splitFn = rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility, nullptr, nullptr);
+        rewriter.cloneRegionBefore(qnode.getBody(), splitFn.getBody(), splitFn.end());
+        Block &argMapBlock = splitFn.getFunctionBody().front();
+        SmallVector<Value> qnodeWithParamsArgs{argMapBlock.getArguments()};
+
+        Value paramCount = argMapBlock.addArgument(rewriter.getIndexType(), loc);
+        PatternRewriter::InsertionGuard insertGuard(rewriter);
+        rewriter.setInsertionPointToStart(&splitFn.getBody().front());
+        Value paramsBuffer = rewriter.create<memref::AllocOp>(loc, paramsBufferType, paramCount);
+        Value paramsTensor = rewriter.create<bufferization::ToTensorOp>(loc, paramsBuffer);
+
+        qnodeWithParamsArgs.push_back(paramsTensor);
+        MemRefType paramsProcessedType = MemRefType::get({}, rewriter.getIndexType());
+        Value paramsProcessed = rewriter.create<memref::AllocaOp>(loc, paramsProcessedType);
+        Value cZero = rewriter.create<index::ConstantOp>(loc, 0);
+        rewriter.create<memref::StoreOp>(loc, cZero, paramsProcessed);
+        Value cOne = rewriter.create<index::ConstantOp>(loc, 1);
+
+        splitFn.walk([&](Operation *op) {
+            // Insert gate parameters into the params buffer.
+            if (auto gate = dyn_cast<quantum::DifferentiableGate>(op)) {
+                PatternRewriter::InsertionGuard insertGuard(rewriter);
+                rewriter.setInsertionPoint(gate);
+
+                ValueRange diffParams = gate.getDiffParams();
+                if (!diffParams.empty()) {
+                    Value paramIdx = rewriter.create<memref::LoadOp>(loc, paramsProcessed);
+                    for (auto param : diffParams) {
+                        rewriter.create<memref::StoreOp>(loc, param, paramsBuffer, paramIdx);
+                        paramIdx = rewriter.create<index::AddOp>(loc, paramIdx, cOne);
+                    }
+                    rewriter.create<memref::StoreOp>(loc, paramIdx, paramsProcessed);
+                }
+
+                rewriter.replaceOp(op, gate.getQubitOperands());
+            }
+            // Return ops should be preceded with calls to the modified QNode
+            else if (auto returnOp = dyn_cast<func::ReturnOp>(op)) {
+                PatternRewriter::InsertionGuard insertionGuard(rewriter);
+                rewriter.setInsertionPoint(returnOp);
+                auto modifiedCall =
+                    rewriter.create<func::CallOp>(loc, qnodeWithParams, qnodeWithParamsArgs);
+
+                returnOp.getOperandsMutable().assign(modifiedCall.getResults());
+            }
+            // Erase redundant device specifications.
+            else if (isa<quantum::DeviceOp>(op)) {
+                rewriter.eraseOp(op);
+            }
+        });
+
+        quantum::removeQuantumMeasurements(splitFn);
+    }
+
+    return splitFn;
+}
+
 /// Generate a new mlir function that maps qfunc arguments to gate parameters.
 ///
 /// This enables to extract any classical preprocessing done inside the quantum function and compute

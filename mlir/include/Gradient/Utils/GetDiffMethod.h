@@ -14,13 +14,13 @@
 
 #pragma once
 
-#include "Gradient/IR/GradientOps.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "llvm/ADT/StringRef.h"
 
 namespace catalyst {
 namespace gradient {
 
-llvm::StringRef getQNodeDiffMethod(GradOp gradOp);
+llvm::StringRef getQNodeDiffMethod(mlir::func::FuncOp funcOp);
 
 }
 } // namespace catalyst
