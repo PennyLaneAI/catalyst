@@ -95,9 +95,6 @@ func::FuncOp AdjointLowering::discardAndReturnReg(PatternRewriter &rewriter, Loc
         rewriter.cloneRegionBefore(callee.getBody(), unallocFn.getBody(), unallocFn.end());
         rewriter.setInsertionPointToStart(&unallocFn.getBody().front());
 
-        // Erase redundant device specifications.
-        unallocFn.walk([&rewriter](quantum::DeviceOp deviceOp) { rewriter.eraseOp(deviceOp); });
-
         // Let's capture the qreg.
         quantum::DeallocOp localDealloc = *unallocFn.getOps<quantum::DeallocOp>().begin();
 
