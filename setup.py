@@ -161,7 +161,6 @@ classifiers = [
     "Operating System :: POSIX",
     "Operating System :: POSIX :: Linux",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -180,7 +179,7 @@ attrs = {
     "name": "pennylane-catalyst",
     "provides": ["catalyst"],
     "version": version,
-    "python_requires": ">=3.8",
+    "python_requires": ">=3.9",
     "install_requires": requirements,
     "packages": find_namespace_packages(
         where="frontend", include=["catalyst", "catalyst.*", "mlir_quantum"]
