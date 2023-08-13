@@ -19,6 +19,7 @@ COPY_FLAGS = $(shell python -c "import platform; print('--dereference' if platfo
 help:
 	@echo "Please use \`make <target>' where <target> is one of"
 	@echo "  all                to build and install all Catalyst modules and its MLIR dependencies"
+	@echo "  catalyst           to install Catalyst Frontend and Runtime"
 	@echo "  frontend           to install Catalyst Frontend"
 	@echo "  mlir               to build MLIR and custom Catalyst dialects"
 	@echo "  runtime            to build Catalyst Runtime with PennyLane-Lightning"
@@ -34,10 +35,14 @@ help:
 .PHONY: all
 all: runtime mlir frontend
 
-.PHONY: frontend
+.PHONY: frontend catalyst
 frontend:
 	@echo "install Catalyst Frontend"
-	$(PYTHON) -m pip install -e . -v
+	JUSTFRONTEND=1 $(PYTHON) -m pip install -e .
+
+catalyst:
+	@echo "install Catalyst Frontend and Runtime"
+	$(PYTHON) -m pip install -e .
 
 .PHONY: mlir llvm mhlo enzyme dialects runtime
 mlir:
@@ -89,8 +94,6 @@ wheel:
 	cp $(DIALECTS_BUILD_DIR)/bin/quantum-opt $(MK_DIR)/frontend/catalyst/bin
 	# Copy libs to frontend/catalyst/lib
 	mkdir -p $(MK_DIR)/frontend/catalyst/lib/backend/ $(MK_DIR)/frontend/catalyst/lib/capi
-	cp $(RT_BUILD_DIR)/lib/backend/librt_backend.* $(MK_DIR)/frontend/catalyst/lib/backend/
-	cp $(RT_BUILD_DIR)/lib/capi/librt_capi.* $(MK_DIR)/frontend/catalyst/lib/capi
 	cp $(COPY_FLAGS) $(LLVM_BUILD_DIR)/lib/libmlir_float16_utils.* $(MK_DIR)/frontend/catalyst/lib
 	cp $(COPY_FLAGS) $(LLVM_BUILD_DIR)/lib/libmlir_c_runner_utils.* $(MK_DIR)/frontend/catalyst/lib
 	# Copy enzyme to frontend

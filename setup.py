@@ -22,7 +22,7 @@ from setuptools import (  # pylint: disable=wrong-import-order
 )
 
 # To build the frontend without any other Catalyst components or dependencies:
-build_all_modules = not os.getenv("READTHEDOCS")
+build_all_modules = not (os.getenv("READTHEDOCS") or os.getenv("JUSTFRONTEND"))
 
 if build_all_modules:
     import platform
@@ -89,10 +89,15 @@ if build_all_modules:
             ]
 
             # additional conf args
+            try:
+                ccache_bin = self.get_executable("ccache")
+            except RuntimeError:
+                ccache_bin = ""
+
             configure_args += [
                 "-DCMAKE_CXX_FLAGS=-fno-lto",
-                f"-DCMAKE_C_COMPILER_LAUNCHER={os.environ.get('COMPILER_LAUNCHER', 'ccache')}",
-                f"-DCMAKE_CXX_COMPILER_LAUNCHER={os.environ.get('COMPILER_LAUNCHER', 'ccache')}",
+                f"-DCMAKE_C_COMPILER_LAUNCHER={os.environ.get('COMPILER_LAUNCHER', ccache_bin)}",
+                f"-DCMAKE_CXX_COMPILER_LAUNCHER={os.environ.get('COMPILER_LAUNCHER', ccache_bin)}",
                 f"-DENABLE_OPENMP={os.environ.get('ENABLE_OPENMP', 'ON')}",
                 "-DENABLE_WARNINGS=ON",
             ]
@@ -125,7 +130,7 @@ if build_all_modules:
 
             if not os.path.isfile(ext_path):
                 # editable mode missing temporary ext file
-                open(ext_path, "a").close()
+                open(ext_path, "a", encoding="utf-8").close()  # pylint: disable=consider-using-with
 
         def get_executable(self, name: str) -> str:
             """Get the absolute path of an executable using shutil.which"""

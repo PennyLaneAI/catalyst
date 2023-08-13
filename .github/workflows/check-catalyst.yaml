@@ -253,7 +253,7 @@ jobs:
 
     - name: Install Deps
       run: |
-        sudo apt-get install -y python3 python3-pip libomp-dev make cmake clang ninja-build ccache
+        sudo apt-get install -y python3 python3-pip libomp-dev make ccache
         python3 -m pip install -r requirements.txt
         python3 -m pip install .
 
@@ -293,7 +293,6 @@ jobs:
         echo "$(pwd)/mhlo-build/bin" >> $GITHUB_PATH
         echo "$(pwd)/quantum-build/bin" >> $GITHUB_PATH
         echo "PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
-        echo "RUNTIME_LIB_DIR=$(pwd)/build/lib.linux-x86_64-3.10/catalyst/lib" >> $GITHUB_ENV
         echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
         echo "ENZYME_LIB_DIR=$(pwd)/enzyme-build/Enzyme" >> $GITHUB_ENV
         chmod +x quantum-build/bin/quantum-opt  # artifact upload does not preserve permissions
