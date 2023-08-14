@@ -11,6 +11,7 @@ from jax._src.lax.lax import _abstractify
 from jax._src import linear_util as lu
 from jax._src.tree_util import (tree_flatten, tree_unflatten)
 from jax._src.util import wrap_name
+from jax._src.api import ShapeDtypeStruct
 from jax._src.api_util import (
     flatten_fun, apply_flat_fun, flatten_fun_nokwargs, flatten_fun_nokwargs2,
     argnums_partial, argnums_partial_except, flatten_axes, donation_vector,
@@ -26,10 +27,11 @@ from jax.interpreters.mlir import (
     lower_jaxpr_to_fun,
     lowerable_effects,
 )
+from jax._src.util import unzip2
 from jax._src.lax.lax import xb, xla
 from catalyst.jax_primitives import Qreg, AbstractQreg, qinst, qextract, qinsert, _qfor_lowering
 from catalyst.jax_tracer import custom_lower_jaxpr_to_module
-from typing import Optional, Callable, List, ContextManager, Tuple
+from typing import Optional, Callable, List, ContextManager, Tuple, Any
 from pennylane import QueuingManager
 from pennylane.operation import AnyWires, Operation, Wires
 from pennylane.tape import QuantumTape
@@ -80,13 +82,13 @@ def frame_tracing_context(ctx: MainTracingContex,
 
 
 def deduce_avals(f:Callable, args, kwargs):
-    wf = lu.wrap_init(f)
     flat_args, in_tree = tree_flatten((args, kwargs))
+    wf = lu.wrap_init(f)
     in_avals, keep_inputs = list(map(shaped_abstractify,flat_args)), [True]*len(flat_args)
     in_type = tuple(zip(in_avals, keep_inputs))
-    wff, out_tree = flatten_fun(wf, in_tree)
+    wff, out_tree_promise = flatten_fun(wf, in_tree)
     wffa = lu.annotate(wff, in_type)
-    return wffa, in_avals
+    return wffa, in_avals, out_tree_promise
 
 
 class HybridOp(Operation):
@@ -121,7 +123,7 @@ def hybrid(callee:Callable):
         with frame_tracing_context(ctx) as (inner_frame,inner_trace):
 
             in_classical_tracers = args # FIXME: save kwargs and the tree structure
-            wffa, in_avals = deduce_avals(callee, args, kwargs)
+            wffa, in_avals, _ = deduce_avals(callee, args, kwargs)
             in_tracers = _input_type_to_tracers(inner_trace.new_arg, in_avals)
             with QueuingManager.stop_recording(), quantum_tape:
                 res_classical_tracers = wffa.call_wrapped(*in_tracers)
@@ -149,14 +151,14 @@ class ForLoop(HybridOp):
 
 def for_loop(lower_bound, upper_bound, step):
     def _body_query(callee):
-        def _call(init_state):
+        def _call_handler(*init_state):
             ctx = get_main_tracing_context()
             quantum_tape = QuantumTape()
             outer_trace = ctx.trace
             with frame_tracing_context(ctx) as (inner_frame,inner_trace):
 
-                in_classical_tracers = [lower_bound, upper_bound, step, lower_bound, init_state]
-                wffa, in_avals = deduce_avals(callee, [lower_bound, init_state], {})
+                in_classical_tracers = [lower_bound, upper_bound, step, lower_bound] + list(init_state)
+                wffa, in_avals, _ = deduce_avals(callee, [lower_bound] + list(init_state), {})
                 arg_classical_tracers = _input_type_to_tracers(inner_trace.new_arg, in_avals)
                 with QueuingManager.stop_recording(), quantum_tape:
                     res_classical_tracers = wffa.call_wrapped(*arg_classical_tracers)
@@ -177,9 +179,8 @@ def for_loop(lower_bound, upper_bound, step):
                     inner_frame,
                     inner_trace)
 
-            return out_classical_tracers[0]
-        return _call
-
+            return out_classical_tracers
+        return _call_handler
     return _body_query
 
 
@@ -210,33 +211,34 @@ def trace_quantum_tape(quantum_tape:QuantumTape,
     """ Recursively trace the nested `quantum_tape` and produce the quantum tracers. With quantum
     tracers we can complete the set of tracers and finally emit the JAXPR of the whole quantum
     program. """
+    # Notes:
+    # [1] - We are interested only in the quantum tracer, so we ignore any others.
+    # [2] - HACK: We add alread existing classical tracers into the last JAX equation.
     qreg = _input_type_to_tracers(trace.new_arg, [AbstractQreg()])[0]
     for op in quantum_tape.operations:
         qreg2 = None
         if isinstance(op, HybridOp):
             with frame_tracing_context(ctx, op.frame, op.trace):
                 qreg_out = trace_quantum_tape(op.quantum_tape, ctx, op.frame, op.trace)[0]
-                jaxpr, typ, consts = op.frame.to_jaxpr2([qreg_out] + op.result_classical_tracers)
+                jaxpr, typ, consts = op.frame.to_jaxpr2(op.result_classical_tracers + [qreg_out])
 
-            # FIXME: generalize and remove the [-1] item querying
             if isinstance(op, ForLoop):
                 qreg2 = forloop_p.bind(op.in_classical_tracers[0],
                                        op.in_classical_tracers[1],
                                        op.in_classical_tracers[2],
-                                       *(consts + [op.in_classical_tracers[3], op.in_classical_tracers[4], qreg]),
+                                       *(consts + op.in_classical_tracers[3:] + [qreg]),
                                        body_jaxpr=ClosedJaxpr(jaxpr, consts),
                                        body_nconsts=len(consts),
-                                       apply_reverse_transform=False)[0]
+                                       apply_reverse_transform=False)[0] # [1]
             else:
                 qreg2 = hybrid_p.bind(qreg,
                                       *chain(op.in_classical_tracers, consts),
-                                      body_jaxpr=ClosedJaxpr(jaxpr, consts))[0]
+                                      body_jaxpr=ClosedJaxpr(jaxpr, consts))[0] # [1]
 
-            # HACK: we add variables for the already existing tracers
-            for t in op.out_classical_tracers:
+            for t in op.out_classical_tracers: # [2]
                 frame.eqns[-1].outvars.insert(0,trace.getvar(t))
         else:
-            # Handle custom operation. We support 1-qubit ops only for now.
+            # FIXME: support more-than-1 qubit ops
             qubit = qextract(qreg, op.wires[0])
             qubit2 = qinst(op.name, 1, qubit)[0]
             qreg2 = qinsert(qreg, op.wires[0], qubit2)
@@ -248,21 +250,22 @@ def trace_quantum_tape(quantum_tape:QuantumTape,
 
 def trace_quantum_function(
     f:Callable, args, kwargs,
-    transform:Optional[Callable[[QuantumTape],QuantumTape]]=None) -> ClosedJaxpr:
+    transform:Optional[Callable[[QuantumTape],QuantumTape]]=None) -> Tuple[ClosedJaxpr, Any]:
     """ The tracing function supporting user-defined quantum tape transformation. The tracing is
     done in parts: 1) Classical tracing, producing classical JAX tracers and the nested quantum tape
     2) Calling user-defined tape transformations 3) Quantum tape tracing, producing the quantum JAX
     tracers. Finally, print the resulting jaxpr. """
+
     with main_tracing_context() as ctx:
 
         quantum_tape = QuantumTape()
         # print("1. Tracing classical part")
         with frame_tracing_context(ctx) as (frame, trace):
 
-            wffa, in_avals = deduce_avals(f, args, kwargs)
-            in_tracers = _input_type_to_tracers(trace.new_arg, in_avals)
+            wffa, in_avals, out_tree_promise = deduce_avals(f, args, kwargs)
+            in_classical_tracers = _input_type_to_tracers(trace.new_arg, in_avals)
             with QueuingManager.stop_recording(), quantum_tape:
-                ans = wffa.call_wrapped(*in_tracers)
+                ans = wffa.call_wrapped(*in_classical_tracers)
             out_classical_tracers = list(map(trace.full_raise, ans))
 
         # print("2. Presenting the full quantum tape to users")
@@ -276,10 +279,14 @@ def trace_quantum_function(
             jaxpr, out_type, consts = frame.to_jaxpr2(out_classical_tracers + out_quantum_tracers)
 
     closed_jaxpr = ClosedJaxpr(jaxpr, consts)
-    return closed_jaxpr
+    out_avals, _ = unzip2(out_type[:-1])
+    out_shape = tree_unflatten(out_tree_promise(),
+                               [ShapeDtypeStruct(a.shape, a.dtype, a.named_shape) for a in out_avals])
+    return closed_jaxpr, out_shape
 
 
 def lower_jaxpr_to_mlir(jaxpr):
+
     nrep = jaxpr_replicas(jaxpr)
     effects = [eff for eff in jaxpr.effects if eff in jax.core.ordered_effects]
     axis_context = ReplicaAxisContext(xla.AxisEnv(nrep, (), ()))
