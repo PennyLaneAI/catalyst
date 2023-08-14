@@ -30,6 +30,7 @@
 #include "HybridGradient.hpp"
 
 #include "Catalyst/Utils/CallGraph.h"
+#include "Gradient/Utils/GetDiffMethod.h"
 #include "Gradient/Utils/GradientShape.h"
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
@@ -198,13 +199,12 @@ func::FuncOp genAugmentedForwardPass(PatternRewriter &rewriter, Location loc, fu
     return augmentedForwardPass;
 }
 
-LogicalResult HybridGradientLowering::match(GradOp op) const
+LogicalResult HybridGradientLowering::matchAndRewrite(GradOp op, PatternRewriter &rewriter) const
 {
-    return success(op.getMethod() == "defer");
-}
+    if (op.getMethod() != "defer") {
+        return failure();
+    }
 
-void HybridGradientLowering::rewrite(GradOp op, PatternRewriter &rewriter) const
-{
     Location loc = op.getLoc();
     func::FuncOp callee =
         SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
@@ -229,6 +229,10 @@ void HybridGradientLowering::rewrite(GradOp op, PatternRewriter &rewriter) const
 
     for (Operation *qnodeOp : qnodes) {
         auto qnode = cast<func::FuncOp>(qnodeOp);
+        if (getQNodeDiffMethod(qnode) == "finite-diff") {
+            return op.emitError("A QNode with diff_method='finite-diff' cannot be specified in a "
+                                "callee of method='defer'");
+        }
 
         // In order to allocate memory for various tensors relating to the number of gate parameters
         // at runtime we run a function that merely counts up for each gate parameter encountered.
@@ -379,6 +383,7 @@ void HybridGradientLowering::rewrite(GradOp op, PatternRewriter &rewriter) const
     }
 
     rewriter.replaceOp(op, backpropResults);
+    return success();
 }
 
 func::FuncOp HybridGradientLowering::genQNodeWithParams(PatternRewriter &rewriter, Location loc,
