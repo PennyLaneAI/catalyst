@@ -1,10 +1,12 @@
 import jax
 from jax._src.core import (ClosedJaxpr, MainTrace as JaxMainTrace, new_main, cur_sublevel, get_aval,
-                           Tracer as JaxTracer)
+                           Tracer as JaxTracer, check_jaxpr)
 from jax._src.interpreters.partial_eval import (DynamicJaxprTrace, DynamicJaxprTracer,
                                                 JaxprStackFrame, trace_to_subjaxpr_dynamic2,
                                                 extend_jaxpr_stack, _input_type_to_tracers,
-                                                new_jaxpr_eqn)
+                                                new_jaxpr_eqn, make_jaxpr_effects, Jaxpr,
+                                                _const_folding_and_forwarding, _inline_literals,
+                                                _add_implicit_outputs)
 from jax._src.source_info_util import reset_name_stack, current as jax_current, new_name_stack
 from jax._src.dispatch import jaxpr_replicas
 from jax._src.lax.lax import _abstractify
@@ -238,7 +240,7 @@ def trace_quantum_tape(quantum_tape:QuantumTape,
                                       body_jaxpr=ClosedJaxpr(jaxpr, consts))[0] # [1]
 
             for t in op.out_classical_tracers: # [2]
-                frame.eqns[-1].outvars.insert(0,trace.getvar(t))
+                frame.eqns[-1].outvars.insert(-1,trace.getvar(t))
         else:
             # FIXME: support more-than-1 qubit ops
             qubit = qextract(qreg, op.wires[0])
@@ -284,10 +286,12 @@ def trace_quantum_function(
             qdealloc(qreg_out)
             out_quantum_tracers = [trace.full_raise(qreg_out)]
             jaxpr, out_type, consts = frame.to_jaxpr2(out_classical_tracers + out_quantum_tracers)
-
+            jaxpr._outvars = jaxpr._outvars[:-1]
+            out_type = out_type[:-1]
+            # check_jaxpr(jaxpr) # TODO: uncomment and address AbstractQreg issues
 
     closed_jaxpr = ClosedJaxpr(jaxpr, consts)
-    out_avals, _ = unzip2(out_type[:-1])
+    out_avals, _ = unzip2(out_type)
     out_shape = tree_unflatten(out_tree_promise(),
                                [ShapeDtypeStruct(a.shape, a.dtype, a.named_shape) for a in out_avals])
     return closed_jaxpr, out_shape
