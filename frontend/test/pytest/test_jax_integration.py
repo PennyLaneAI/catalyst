@@ -158,7 +158,7 @@ class TestJAXAD:
 
         x = jnp.array([0.1, 0.2, 0.3])
         result = cost_fn(x, circuit)
-        reference = cost_fn(x, circuit.qfunc)
+        reference = cost_fn(x, circuit.user_function)
 
         assert jnp.allclose(result, reference)
 
@@ -183,7 +183,7 @@ class TestJAXAD:
 
         x, y = jnp.array([0.1, 0.2, 0.3]), jnp.array([0.1, 0.2])
         result = cost_fn(x, y, circuit)
-        reference = cost_fn(x, y, circuit.qfunc)
+        reference = cost_fn(x, y, circuit.user_function)
 
         assert jnp.allclose(result[0], reference[0])
         if isinstance(argnums, list):
@@ -209,7 +209,7 @@ class TestJAXAD:
 
         x, y = jnp.array([0.1, 0.2, 0.3]), jnp.array([0.1, 0.2])
         result = cost_fn(x, y, circuit)
-        reference = cost_fn(x, y, circuit.qfunc)
+        reference = cost_fn(x, y, circuit.user_function)
 
         assert len(result) == 2
         assert jnp.allclose(result[0], reference[0])
@@ -235,7 +235,7 @@ class TestJAXAD:
 
         x, y = jnp.array([0.1, 0.2, 0.3]), jnp.array([0.1, 0.2])
         result = cost_fn(x, y, circuit)
-        reference = cost_fn(x, y, circuit.qfunc)
+        reference = cost_fn(x, y, circuit.user_function)
 
         assert len(result) == 2
         assert jnp.allclose(result[0], reference[0])
@@ -259,7 +259,7 @@ class TestJAXAD:
 
         x, y = jnp.array([0.1, 0.2, 0.3]), jnp.array([0.1, 0.2])
         result = cost_fn(x, y, circuit)
-        reference = cost_fn(x, y, circuit.qfunc)
+        reference = cost_fn(x, y, circuit.user_function)
 
         assert len(result) == 2
         assert jnp.allclose(result[0], reference[0])
@@ -283,7 +283,7 @@ class TestJAXAD:
 
         x, y = jnp.array([0.1, 0.2, 0.3]), 3
         result = cost_fn(x, y, circuit)
-        reference = cost_fn(x, y, circuit.qfunc)
+        reference = cost_fn(x, y, circuit.user_function)
 
         assert jnp.allclose(result, reference)
 
@@ -347,9 +347,9 @@ class TestJAXAD:
 
         cost_fn(0.1, 0.2)
 
-        assert len(circuit.jaxed_qfunc.deriv_qfuncs) == 1
-        assert "0" in circuit.jaxed_qfunc.deriv_qfuncs
-        assert len(circuit.jaxed_qfunc.deriv_qfuncs["0"].jaxpr.out_avals) == 1
+        assert len(circuit.jaxed_function.derivative_functions) == 1
+        assert "0" in circuit.jaxed_function.derivative_functions
+        assert len(circuit.jaxed_function.derivative_functions["0"].jaxpr.out_avals) == 1
 
     def test_jit_and_grad(self, backend):
         """Test that argnum determination works correctly when combining jax.jit with jax.grad.
@@ -389,13 +389,13 @@ class TestJAXAD:
             return qml.expval(qml.PauliZ(1))
 
         # Patch the quantum gradient wrapper to verify the internal argnums
-        get_derivative_qfunc = JAX_QJIT.get_derivative_qfunc
+        get_derivative_qjit = JAX_QJIT.get_derivative_qjit
 
-        def get_derivative_qfunc_wrapper(self, argnums):
+        def get_derivative_qjit_wrapper(self, argnums):
             assert argnums == [0, 2]
-            return get_derivative_qfunc(self, argnums)
+            return get_derivative_qjit(self, argnums)
 
-        monkeypatch.setattr(JAX_QJIT, "get_derivative_qfunc", get_derivative_qfunc_wrapper)
+        monkeypatch.setattr(JAX_QJIT, "get_derivative_qjit", get_derivative_qjit_wrapper)
 
         jax.grad(jax.jit(circuit), argnums=(0, 2))(-4.5, 3, 4.3)
 

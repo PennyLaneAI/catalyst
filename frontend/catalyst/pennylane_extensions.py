@@ -212,7 +212,7 @@ def _ensure_differentiable(f: DifferentiableLike) -> Differentiable:
     if isinstance(f, (Function, QNode)):
         return f
     elif isinstance(f, catalyst.compilation_pipelines.QJIT):
-        return f.qfunc
+        return f.user_function
     elif isinstance(f, Callable):  # Keep at the bottom
         return Function(f)
     raise DifferentiableCompileError(f"Non-differentiable object passed: {type(f)}")
