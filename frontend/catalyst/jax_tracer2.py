@@ -29,7 +29,8 @@ from jax.interpreters.mlir import (
 )
 from jax._src.util import unzip2
 from jax._src.lax.lax import xb, xla
-from catalyst.jax_primitives import Qreg, AbstractQreg, qinst, qextract, qinsert, _qfor_lowering
+from catalyst.jax_primitives import (Qreg, AbstractQreg, qinst, qextract, qinsert, _qfor_lowering,
+                                     qdevice, qalloc, qdealloc)
 from catalyst.jax_tracer import custom_lower_jaxpr_to_module
 from typing import Optional, Callable, List, ContextManager, Tuple, Any
 from pennylane import QueuingManager
@@ -205,21 +206,22 @@ def _abstract_eval(*args, body_jaxpr, **kwargs):
 
 
 def trace_quantum_tape(quantum_tape:QuantumTape,
+                       qreg:JaxTracer,
                        ctx:MainTracingContex,
                        frame:JaxprStackFrame,
-                       trace:DynamicJaxprTrace) -> List[JaxTracer]:
+                       trace:DynamicJaxprTrace) -> JaxTracer:
     """ Recursively trace the nested `quantum_tape` and produce the quantum tracers. With quantum
     tracers we can complete the set of tracers and finally emit the JAXPR of the whole quantum
     program. """
     # Notes:
     # [1] - We are interested only in the quantum tracer, so we ignore any others.
     # [2] - HACK: We add alread existing classical tracers into the last JAX equation.
-    qreg = _input_type_to_tracers(trace.new_arg, [AbstractQreg()])[0]
     for op in quantum_tape.operations:
         qreg2 = None
         if isinstance(op, HybridOp):
             with frame_tracing_context(ctx, op.frame, op.trace):
-                qreg_out = trace_quantum_tape(op.quantum_tape, ctx, op.frame, op.trace)[0]
+                qreg_in = _input_type_to_tracers(op.trace.new_arg, [AbstractQreg()])[0]
+                qreg_out = trace_quantum_tape(op.quantum_tape, qreg_in, ctx, op.frame, op.trace)
                 jaxpr, typ, consts = op.frame.to_jaxpr2(op.result_classical_tracers + [qreg_out])
 
             if isinstance(op, ForLoop):
@@ -245,11 +247,11 @@ def trace_quantum_tape(quantum_tape:QuantumTape,
         assert qreg2 is not None
         qreg = qreg2
 
-    return [qreg]
+    return qreg
 
 
 def trace_quantum_function(
-    f:Callable, args, kwargs,
+    f:Callable, device, args, kwargs,
     transform:Optional[Callable[[QuantumTape],QuantumTape]]=None) -> Tuple[ClosedJaxpr, Any]:
     """ The tracing function supporting user-defined quantum tape transformation. The tracing is
     done in parts: 1) Classical tracing, producing classical JAX tracers and the nested quantum tape
@@ -274,9 +276,15 @@ def trace_quantum_function(
 
         # print("3. Tracing the quantum tape")
         with frame_tracing_context(ctx, frame, trace):
-            ans2 = trace_quantum_tape(transformed_tape, ctx, frame, trace)
-            out_quantum_tracers = list(map(trace.full_raise, ans2))
+
+            qdevice("kwargs", str("some-args"))
+            qdevice("backend", str("device-name"))
+            qreg_in = qalloc(42)
+            qreg_out = trace_quantum_tape(transformed_tape, qreg_in, ctx, frame, trace)
+            qdealloc(qreg_out)
+            out_quantum_tracers = [trace.full_raise(qreg_out)]
             jaxpr, out_type, consts = frame.to_jaxpr2(out_classical_tracers + out_quantum_tracers)
+
 
     closed_jaxpr = ClosedJaxpr(jaxpr, consts)
     out_avals, _ = unzip2(out_type[:-1])
