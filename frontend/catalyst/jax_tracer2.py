@@ -94,10 +94,11 @@ class HybridOp(Operation):
     num_wires = AnyWires
 
     def __init__(self, quantum_tape, in_classical_tracers, out_classical_tracers,
-                 result_classical_tracers, frame, trace):
+                 arg_classical_tracers, result_classical_tracers, frame, trace):
         self.quantum_tape = quantum_tape
         self.in_classical_tracers = in_classical_tracers
         self.out_classical_tracers = out_classical_tracers
+        self.arg_classical_tracers = arg_classical_tracers
         self.result_classical_tracers = result_classical_tracers
         self.frame = frame
         self.trace = trace
@@ -155,9 +156,9 @@ def for_loop(lower_bound, upper_bound, step):
 
                 in_classical_tracers = [lower_bound, upper_bound, step]
                 wffa, in_avals = deduce_avals(callee, [lower_bound, init_state], {})
-                in_tracers = _input_type_to_tracers(inner_trace.new_arg, in_avals)
+                arg_classical_tracers = _input_type_to_tracers(inner_trace.new_arg, in_avals)
                 with QueuingManager.stop_recording(), quantum_tape:
-                    res_classical_tracers = wffa.call_wrapped(*in_tracers)
+                    res_classical_tracers = wffa.call_wrapped(*arg_classical_tracers)
                 res_avals = list(map(shaped_abstractify, res_classical_tracers))
 
             out_classical_tracers = [DynamicJaxprTracer(outer_trace, a, jax_current()) for a in res_avals]
@@ -168,6 +169,7 @@ def for_loop(lower_bound, upper_bound, step):
             ForLoop(quantum_tape,
                     in_classical_tracers,
                     out_classical_tracers,
+                    arg_classical_tracers,
                     res_classical_tracers,
                     inner_frame,
                     inner_trace)
@@ -183,16 +185,18 @@ hybrid_p.multiple_results = True
 
 forloop_p = jax.core.Primitive("forloop")
 forloop_p.multiple_results = True
+# mlir.register_lowering(forloop_p, _qfor_lowering)
 
 # HACK: At the bind time we already know classical output tracers so we will add the variables
 # to the primitive explicitly. Here we only return quantum value to make quantum output tracer
 # appear.
 
 @hybrid_p.def_abstract_eval
-def _abstract_eval(*args, jaxpr_body):
+def _abstract_eval(*args, body_jaxpr, **kwargs):
     return [AbstractQreg()]
+
 @forloop_p.def_abstract_eval
-def _abstract_eval(*args, jaxpr_body):
+def _abstract_eval(*args, body_jaxpr, **kwargs):
     return [AbstractQreg()]
 
 
@@ -211,14 +215,23 @@ def trace_quantum_tape(quantum_tape:QuantumTape,
                 qreg_out = trace_quantum_tape(op.quantum_tape, ctx, op.frame, op.trace)[0]
                 jaxpr, typ, consts = op.frame.to_jaxpr2([qreg_out] + op.result_classical_tracers)
 
-            # FIXME: generalize and remove the [0] item querying
+            # FIXME: generalize and remove the [-1] item querying
             if isinstance(op, ForLoop):
-                qreg2 = forloop_p.bind(qreg, *chain(op.in_classical_tracers, consts), jaxpr_body=jaxpr)[0]
+                qreg2 = forloop_p.bind(op.in_classical_tracers[0],
+                                       op.in_classical_tracers[1],
+                                       op.in_classical_tracers[2],
+                                       *(consts + op.arg_classical_tracers + [qreg]),
+                                       body_jaxpr=ClosedJaxpr(jaxpr, consts),
+                                       body_nconcsts=len(consts),
+                                       apply_reverse_transform=False)[0]
             else:
-                qreg2 = hybrid_p.bind(qreg, *chain(op.in_classical_tracers, consts), jaxpr_body=jaxpr)[0]
+                qreg2 = hybrid_p.bind(qreg,
+                                      *chain(op.in_classical_tracers, consts),
+                                      body_jaxpr=ClosedJaxpr(jaxpr, consts))[0]
 
-            # HACK: we add variables for already existing tracers
-            frame.eqns[-1].outvars.append(trace.getvar(op.out_classical_tracers[0]))
+            # HACK: we add variables for the already existing tracers
+            for t in op.out_classical_tracers:
+                frame.eqns[-1].outvars.append(trace.getvar(t))
         else:
             # Handle custom operation. We support 1-qubit ops only for now.
             qubit = qextract(qreg, op.wires[0])
