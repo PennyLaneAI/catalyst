@@ -53,7 +53,6 @@ class TestGradPostprocessing:
     @pytest.mark.parametrize("diff_method", SUPPORTED_DIFF_METHODS)
     def test_scalar_scalar(self, backend, diff_method):
         """Test a hybrid scalar -> scalar (internally a point tensor -> point tensor) workflow"""
-        print("backend", backend)
 
         @qml.qnode(qml.device(backend, wires=1), diff_method=diff_method)
         def workflow(x):
@@ -116,7 +115,7 @@ class TestGradPostprocessing:
         x = jnp.array([0.5, 0.4, 0.3, 0.2])
         jax_jacobian = jax.jacobian(postprocess)(x)
         catalyst_jacobian = jacobian(x)
-        assert catalyst_jacobian == pytest.approx(jax_jacobian)
+        assert catalyst_jacobian == pytest.approx(jax_jacobian.mT)
 
     def test_tensor_measure(self, backend):
         """Tests correctness of a derivative of a qnode that returns a tensor"""
@@ -192,7 +191,9 @@ class TestGradPostprocessing:
             return grad(postprocess, method="defer")(x)
 
         x = jnp.array([0.5, 0.4, 0.3, 0.2])
-        assert jacobian(x) == pytest.approx(jax.jacobian(postprocess)(x))
+        assert jacobian(x) == pytest.approx(
+            jnp.transpose(jax.jacobian(postprocess)(x), axes=(2, 0, 1))
+        )
 
     @pytest.mark.parametrize("diff_method", SUPPORTED_DIFF_METHODS)
     def test_multi_result(self, backend, diff_method):
@@ -243,7 +244,7 @@ class TestGradPostprocessing:
                 # With multiple arguments and results, the Catalyst jacobian are transposed
                 # w.r.t. the JAX jacobian. This is why the i and j are switched.
                 catalyst_entry = catalyst_jacobian[j * len(row) + i]
-                assert catalyst_entry == pytest.approx(jax_entry)
+                assert catalyst_entry == pytest.approx(jax_entry.T)
 
     def test_multi_qnode(self, backend):
         """Test a multi-QNode workflow where each QNode has a different diff_method"""
@@ -883,7 +884,7 @@ def test_assert_no_higher_order_without_fd(method, backend):
         qml.RX(x, wires=0)
         return qml.expval(qml.PauliY(0))
 
-    with pytest.raises(ValueError, match="higher order derivatives"):
+    with pytest.raises(DifferentiableCompileError, match="higher order derivatives"):
 
         @qjit()
         def workflow(x: float):

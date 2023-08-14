@@ -254,9 +254,27 @@ def _make_jaxpr_check_differentiable(f: Differentiable, grad_params: GradParams,
                 f"results, got '{res.dtype}' at position {pos}."
             )
 
-    _check_created_jaxpr_gradient_methods(f, method, jaxpr)
+    _verify_differentiable_child_qnodes(jaxpr, method)
 
     return jaxpr
+
+
+def _verify_differentiable_child_qnodes(jaxpr, method):
+    """Traverse QNodes being differentiated in the 'call graph' of the JAXPR to verify them."""
+    visited = set()
+
+    def traverse_children(jaxpr):
+        for eqn in jaxpr.eqns:
+            fn = eqn.params.get("fn")
+            if fn and fn not in visited:
+                if isinstance(fn, (qml.QNode, Grad)):
+                    _check_created_jaxpr_gradient_methods(fn, method, jaxpr)
+                child = eqn.params.get("call_jaxpr", None)
+                if child and child not in visited:
+                    traverse_children(child)
+            visited.add(fn)
+
+    traverse_children(jaxpr)
 
 
 def _check_created_jaxpr_gradient_methods(f: Differentiable, method: str, jaxpr: Jaxpr):
@@ -264,6 +282,14 @@ def _check_created_jaxpr_gradient_methods(f: Differentiable, method: str, jaxpr:
     if method == "fd":
         return
 
+    if isinstance(f, Grad):
+        raise DifferentiableCompileError(
+            "Only finite difference can compute higher order derivatives"
+        )
+
+    assert isinstance(
+        f, qml.QNode
+    ), "Expected quantum differentiable node to be a qml.QNode or a catalyst.grad op"
     qnode_jaxpr = jaxpr.eqns[0].params["call_jaxpr"]
     return_ops = []
     for res in qnode_jaxpr.outvars:
@@ -272,24 +298,23 @@ def _check_created_jaxpr_gradient_methods(f: Differentiable, method: str, jaxpr:
                 return_ops.append(eq.primitive)
                 break
 
-    if isinstance(f, qml.QNode):
-        if f.diff_method is None:
-            raise DifferentiableCompileError(
-                "Cannot differentiate a QNode explicitly marked non-differentiable (with"
-                " diff_method=None)"
-            )
+    if f.diff_method is None:
+        raise DifferentiableCompileError(
+            "Cannot differentiate a QNode explicitly marked non-differentiable (with"
+            " diff_method=None)"
+        )
 
-        if f.diff_method == "parameter-shift" and any(
-            prim not in [expval_p, probs_p] for prim in return_ops
-        ):
-            raise DifferentiableCompileError(
-                "The parameter-shift method can only be used for QNodes "
-                "which return either qml.expval or qml.probs."
-            )
-        if f.diff_method == "adjoint" and any(prim not in [expval_p] for prim in return_ops):
-            raise DifferentiableCompileError(
-                "The adjoint method can only be used for QNodes which return qml.expval."
-            )
+    if f.diff_method == "parameter-shift" and any(
+        prim not in [expval_p, probs_p] for prim in return_ops
+    ):
+        raise DifferentiableCompileError(
+            "The parameter-shift method can only be used for QNodes "
+            "which return either qml.expval or qml.probs."
+        )
+    if f.diff_method == "adjoint" and any(prim not in [expval_p] for prim in return_ops):
+        raise DifferentiableCompileError(
+            "The adjoint method can only be used for QNodes which return qml.expval."
+        )
 
 
 def _check_grad_params(

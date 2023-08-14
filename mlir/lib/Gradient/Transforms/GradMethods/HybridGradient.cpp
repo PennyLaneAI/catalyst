@@ -347,7 +347,9 @@ LogicalResult HybridGradientLowering::matchAndRewrite(GradOp op, PatternRewriter
                 /*arg_shadows=*/ValueRange{}, /*primal results=*/ValueRange{}, cotangents,
                 op.getDiffArgIndicesAttr());
 
-            // Backprop gives a gradient of a single output entry w.r.t. all active inputs.
+            // Backprop gives a gradient of a single output entry w.r.t. all active inputs. Catalyst
+            // gives transposed Jacobians, such that the Jacobians are [...shape_inputs,
+            // ...shape_outputs].
             for (const auto &[backpropIdx, jacobianSlice] :
                  llvm::enumerate(backpropOp.getResults())) {
                 auto sliceType = cast<RankedTensorType>(jacobianSlice.getType());
@@ -355,17 +357,17 @@ LogicalResult HybridGradientLowering::matchAndRewrite(GradOp op, PatternRewriter
                 auto jacobianType = cast<RankedTensorType>(jacobians[backpropIdx].getType());
                 size_t jacobianRank = jacobianType.getRank();
                 if (sliceRank < jacobianRank) {
-                    // Offsets are [...indices] + [0] * rank of backprop result
+                    // Offsets are [0] * rank of backprop result + [...indices]
                     SmallVector<OpFoldResult> offsets;
-                    offsets.append(indices.begin(), indices.end());
                     offsets.append(sliceRank, rewriter.getIndexAttr(0));
+                    offsets.append(indices.begin(), indices.end());
 
-                    // Sizes are [1] * (jacobianRank - sliceRank) + [...sliceShape]
+                    // Sizes are [...sliceShape] + [1] * (jacobianRank - sliceRank)
                     SmallVector<OpFoldResult> sizes;
-                    sizes.append(jacobianRank - sliceRank, rewriter.getIndexAttr(1));
                     for (int64_t dim : sliceType.getShape()) {
                         sizes.push_back(rewriter.getIndexAttr(dim));
                     }
+                    sizes.append(jacobianRank - sliceRank, rewriter.getIndexAttr(1));
 
                     // Strides are [1] * jacobianRank
                     SmallVector<OpFoldResult> strides{jacobianRank, rewriter.getIndexAttr(1)};

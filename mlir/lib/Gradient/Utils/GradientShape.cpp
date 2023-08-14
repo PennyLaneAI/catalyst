@@ -61,7 +61,7 @@ std::vector<Type> computeResultTypes(func::FuncOp callee, const std::vector<size
             auto tensorType = fnResType.dyn_cast<TensorType>();
             if (tensorType) {
                 gradResShape.reserve(diffArgShape.size() + tensorType.getRank());
-                gradResShape.insert(gradResShape.begin(), tensorType.getShape().begin(),
+                gradResShape.insert(gradResShape.end(), tensorType.getShape().begin(),
                                     tensorType.getShape().end());
                 fnResType = tensorType.getElementType();
             }
