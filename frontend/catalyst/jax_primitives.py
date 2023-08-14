@@ -1421,7 +1421,8 @@ def _qfor_lowering(
     # Don't include the iteration index in the result types.
     result_types = loop_carry_types[1:]
     assert [val.type for val in loop_args] == result_types
-    assert result_types == [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_out]
+    assert result_types == [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_out], \
+        f"{result_types=} doesn't match {jax_ctx.avals_out=}"
 
     loop_operands = []
     for p in (lower_bound, upper_bound, step):

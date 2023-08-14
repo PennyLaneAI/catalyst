@@ -17,6 +17,7 @@ from jax._src.api_util import (
     rebase_donate_argnums, _ensure_index, _ensure_index_tuple,
     shaped_abstractify, _ensure_str_tuple, apply_flat_fun_nokwargs,
     check_callable, debug_info, result_paths, flat_out_axes, debug_info_final)
+from jax.interpreters import mlir
 from jax.interpreters.mlir import (
     AxisContext,
     ModuleContext,
@@ -26,7 +27,7 @@ from jax.interpreters.mlir import (
     lowerable_effects,
 )
 from jax._src.lax.lax import xb, xla
-from catalyst.jax_primitives import Qreg, AbstractQreg, qinst, qextract, qinsert
+from catalyst.jax_primitives import Qreg, AbstractQreg, qinst, qextract, qinsert, _qfor_lowering
 from catalyst.jax_tracer import custom_lower_jaxpr_to_module
 from typing import Optional, Callable, List, ContextManager, Tuple
 from pennylane import QueuingManager
@@ -154,17 +155,19 @@ def for_loop(lower_bound, upper_bound, step):
             outer_trace = ctx.trace
             with frame_tracing_context(ctx) as (inner_frame,inner_trace):
 
-                in_classical_tracers = [lower_bound, upper_bound, step]
+                in_classical_tracers = [lower_bound, upper_bound, step, lower_bound, init_state]
                 wffa, in_avals = deduce_avals(callee, [lower_bound, init_state], {})
                 arg_classical_tracers = _input_type_to_tracers(inner_trace.new_arg, in_avals)
                 with QueuingManager.stop_recording(), quantum_tape:
                     res_classical_tracers = wffa.call_wrapped(*arg_classical_tracers)
                 res_avals = list(map(shaped_abstractify, res_classical_tracers))
 
-            out_classical_tracers = [DynamicJaxprTracer(outer_trace, a, jax_current()) for a in res_avals]
-            for t, aval in zip(out_classical_tracers, res_avals):
-                outer_trace.frame.tracers.append(t)
-                outer_trace.frame.tracer_to_var[id(t)] = outer_trace.frame.newvar(aval)
+            out_classical_tracers = []
+            for aval in res_avals:
+                dt = DynamicJaxprTracer(outer_trace, aval, jax_current())
+                outer_trace.frame.tracers.append(dt)
+                outer_trace.frame.tracer_to_var[id(dt)] = outer_trace.frame.newvar(aval)
+                out_classical_tracers.append(dt)
 
             ForLoop(quantum_tape,
                     in_classical_tracers,
@@ -185,7 +188,7 @@ hybrid_p.multiple_results = True
 
 forloop_p = jax.core.Primitive("forloop")
 forloop_p.multiple_results = True
-# mlir.register_lowering(forloop_p, _qfor_lowering)
+mlir.register_lowering(forloop_p, _qfor_lowering)
 
 # HACK: At the bind time we already know classical output tracers so we will add the variables
 # to the primitive explicitly. Here we only return quantum value to make quantum output tracer
@@ -220,9 +223,9 @@ def trace_quantum_tape(quantum_tape:QuantumTape,
                 qreg2 = forloop_p.bind(op.in_classical_tracers[0],
                                        op.in_classical_tracers[1],
                                        op.in_classical_tracers[2],
-                                       *(consts + op.arg_classical_tracers + [qreg]),
+                                       *(consts + [op.in_classical_tracers[3], op.in_classical_tracers[4], qreg]),
                                        body_jaxpr=ClosedJaxpr(jaxpr, consts),
-                                       body_nconcsts=len(consts),
+                                       body_nconsts=len(consts),
                                        apply_reverse_transform=False)[0]
             else:
                 qreg2 = hybrid_p.bind(qreg,
@@ -231,7 +234,7 @@ def trace_quantum_tape(quantum_tape:QuantumTape,
 
             # HACK: we add variables for the already existing tracers
             for t in op.out_classical_tracers:
-                frame.eqns[-1].outvars.append(trace.getvar(t))
+                frame.eqns[-1].outvars.insert(0,trace.getvar(t))
         else:
             # Handle custom operation. We support 1-qubit ops only for now.
             qubit = qextract(qreg, op.wires[0])
