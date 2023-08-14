@@ -1454,10 +1454,10 @@ class QJITDevice(qml.QubitDevice):
         # success rate, as complex decomposition paths can fail to trace (c.f. PL #3521, #3522).
 
         def _decomp_controlled_unitary(self, *_args, **_kwargs):
-            return qml.QubitUnitary(qml.matrix(self), wires=self.wires)
+            return [qml.QubitUnitary(qml.matrix(self), wires=self.wires)]
 
         def _decomp_controlled(self, *_args, **_kwargs):
-            return qml.QubitUnitary(qml.matrix(self), wires=self.wires)
+            return [qml.QubitUnitary(qml.matrix(self), wires=self.wires)]
 
         with Patcher(
             (qml.ops.ControlledQubitUnitary, "compute_decomposition", _decomp_controlled_unitary),
