@@ -16,22 +16,54 @@ from jax._src.api_util import (
     shaped_abstractify, _ensure_str_tuple, apply_flat_fun_nokwargs,
     check_callable, debug_info, result_paths, flat_out_axes, debug_info_final)
 from catalyst.jax_primitives import Qreg, AbstractQreg, qinst, qextract, qinsert
-from typing import Optional, Callable, List
+from typing import Optional, Callable, List, ContextManager, Tuple
 from pennylane import QueuingManager
 from pennylane.operation import AnyWires, Operation, Wires
 from pennylane.tape import QuantumTape
 from itertools import chain
+from contextlib import contextmanager
 
 from dataclasses import dataclass
 
 
 @dataclass
-class ToplevelTracingContex:
+class MainTracingContex:
     main: JaxMainTrace
-    trace: DynamicJaxprTrace
-    quantum_tape: QuantumTape
+    trace: Optional[DynamicJaxprTrace] = None
 
-TRACING_CONTEXT : Optional[ToplevelTracingContex] = None
+TRACING_CONTEXT : Optional[MainTracingContex] = None
+
+@contextmanager
+def main_tracing_context() -> ContextManager[MainTracingContex]:
+    global TRACING_CONTEXT
+    with new_main(DynamicJaxprTrace, dynamic=True) as main:
+        main.jaxpr_stack = ()
+        TRACING_CONTEXT = ctx = MainTracingContex(main)
+        try:
+            yield ctx
+        finally:
+            TRACING_CONTEXT = None
+
+def get_main_tracing_context() -> MainTracingContex:
+    """ Should be called from within the `main_tracing_context` manager """
+    assert TRACING_CONTEXT is not None
+    return TRACING_CONTEXT
+
+@contextmanager
+def frame_tracing_context(ctx: MainTracingContex,
+                          frame: Optional[JaxprStackFrame] = None,
+                          trace: Optional[DynamicJaxprTrace] = None
+                          ) -> ContextManager[Tuple[JaxprStackFrame,DynamicJaxprTrace]]:
+    frame = JaxprStackFrame() if frame is None else frame
+    with extend_jaxpr_stack(ctx.main, frame), reset_name_stack():
+        parent_trace = ctx.trace
+        ctx.trace = DynamicJaxprTrace(ctx.main, cur_sublevel()) if trace is None else trace
+        try:
+            yield frame, ctx.trace
+        finally:
+            ctx.trace = parent_trace
+
+
 
 
 def deduce_avals(f:Callable, args, kwargs):
@@ -49,13 +81,14 @@ class HybridOp(Operation):
     catalyst.ForLoop, catalyst.WhileLoop, catalyst.Adjoin, etc """
     num_wires = AnyWires
 
-    def __init__(self, quantum_tape, in_classical_tracers, out_classical_tracers, result_classical_tracers, frame, trace, args, kwargs):
+    def __init__(self, quantum_tape, in_classical_tracers, out_classical_tracers,
+                 result_classical_tracers, frame, trace):
         self.quantum_tape = quantum_tape
-        self.frame = frame
-        self.trace = trace
         self.in_classical_tracers = in_classical_tracers
         self.out_classical_tracers = out_classical_tracers
         self.result_classical_tracers = result_classical_tracers
+        self.frame = frame
+        self.trace = trace
         # kwargs["wires"] = Wires(HybridOp.num_wires)
         super().__init__(wires = Wires(HybridOp.num_wires))
 
@@ -68,29 +101,30 @@ def hybrid(callee:Callable):
     """ A model frontend extension function. Simplified analog of for_loop, while_loop, adjoint,
     etc. """
     def _call(*args, **kwargs):
-        global TRACING_CONTEXT
-        ctx = TRACING_CONTEXT
-        parent_trace = ctx.trace
-
+        ctx = get_main_tracing_context()
         quantum_tape = QuantumTape()
-        frame = JaxprStackFrame()
-        with extend_jaxpr_stack(ctx.main, frame), reset_name_stack():
-            trace = DynamicJaxprTrace(ctx.main, cur_sublevel())
-            ctx.trace = trace
+        outer_trace = ctx.trace
+        with frame_tracing_context(ctx) as (inner_frame,inner_trace):
+
+            in_classical_tracers = args # FIXME: save kwargs and the tree structure
             wffa, in_avals = deduce_avals(callee, args, kwargs)
-            in_tracers = _input_type_to_tracers(trace.new_arg, in_avals)
+            in_tracers = _input_type_to_tracers(inner_trace.new_arg, in_avals)
             with QueuingManager.stop_recording(), quantum_tape:
-                res_tracers = wffa.call_wrapped(*in_tracers)
+                res_classical_tracers = wffa.call_wrapped(*in_tracers)
+            res_avals = list(map(shaped_abstractify, res_classical_tracers))
 
-        res_avals = list(map(shaped_abstractify, res_tracers))
-        out_classical_tracers = [DynamicJaxprTracer(trace, a, jax_current()) for a in res_avals]
+        out_classical_tracers = [DynamicJaxprTracer(outer_trace, a, jax_current()) for a in res_avals]
         for t, aval in zip(out_classical_tracers, res_avals):
-            trace.frame.tracers.append(t)
-            trace.frame.tracer_to_var[id(t)] = trace.frame.newvar(aval)
+            outer_trace.frame.tracers.append(t)
+            outer_trace.frame.tracer_to_var[id(t)] = outer_trace.frame.newvar(aval)
 
-        HybridOp(quantum_tape, args, out_classical_tracers, res_tracers, frame, trace, args, kwargs)
+        HybridOp(quantum_tape,
+                 in_classical_tracers,
+                 out_classical_tracers,
+                 res_classical_tracers,
+                 inner_frame,
+                 inner_trace)
 
-        ctx.trace = parent_trace
         return out_classical_tracers[0] # FIXME: generalize to the arbitrary number of retvals
 
     return _call
@@ -108,7 +142,7 @@ def _abstract_eval(*args, jaxpr_body):
 
 
 def trace_quantum_tape(quantum_tape:QuantumTape,
-                       main:JaxMainTrace,
+                       ctx:MainTracingContex,
                        frame:JaxprStackFrame,
                        trace:DynamicJaxprTrace) -> List[JaxTracer]:
     """ Recursively trace the nested `quantum_tape` and produce the quantum tracers. With quantum
@@ -119,8 +153,8 @@ def trace_quantum_tape(quantum_tape:QuantumTape,
         qreg2 = None
         if isinstance(op, HybridOp):
             # Handle nested quantum operation
-            with extend_jaxpr_stack(main, op.frame), reset_name_stack():
-                qreg_out = trace_quantum_tape(op.quantum_tape, main, op.frame, op.trace)[0]
+            with frame_tracing_context(ctx, op.frame, op.trace):
+                qreg_out = trace_quantum_tape(op.quantum_tape, ctx, op.frame, op.trace)[0]
                 jaxpr, typ, consts = op.frame.to_jaxpr2([qreg_out] + op.result_classical_tracers)
 
             qreg2 = hybrid_p.bind(qreg, *chain(op.in_classical_tracers, consts), jaxpr_body=jaxpr)[0]
@@ -144,31 +178,27 @@ def trace_quantum_function(
     done in parts: 1) Classical tracing, producing classical JAX tracers and the nested quantum tape
     2) Calling user-defined tape transformations 3) Quantum tape tracing, producing the quantum JAX
     tracers. Finally, print the resulting jaxpr. """
-    global TRACING_CONTEXT
-    with new_main(DynamicJaxprTrace, dynamic=True) as main:
-        main.jaxpr_stack = ()
+    with main_tracing_context() as ctx:
 
+        quantum_tape = QuantumTape()
         print("1. Tracing classical part")
-        frame = JaxprStackFrame()
-        with extend_jaxpr_stack(main, frame), reset_name_stack():
-            trace = DynamicJaxprTrace(main, cur_sublevel())
-            TRACING_CONTEXT = ctx = ToplevelTracingContex(main, trace, QuantumTape())
+        with frame_tracing_context(ctx) as (frame, trace):
 
             wffa, in_avals = deduce_avals(f, args, kwargs)
             in_tracers = _input_type_to_tracers(trace.new_arg, in_avals)
-            with QueuingManager.stop_recording(), ctx.quantum_tape:
+            with QueuingManager.stop_recording(), quantum_tape:
                 ans = wffa.call_wrapped(*in_tracers)
             out_classical_tracers = list(map(trace.full_raise, ans))
 
         print("2. Presenting the full quantum tape to users")
-        print(f"\n{ctx.quantum_tape.operations=}\n")
-        transformed_tape = transform(ctx.quantum_tape) if transform else ctx.quantum_tape
+        print(f"\n{quantum_tape.operations=}\n")
+        transformed_tape = transform(quantum_tape) if transform else quantum_tape
 
         print("3. Tracing the quantum tape")
-        with extend_jaxpr_stack(ctx.main, frame), reset_name_stack():
-            ans2 = trace_quantum_tape(transformed_tape, main, frame, trace)
+        with frame_tracing_context(ctx, frame, trace):
+            ans2 = trace_quantum_tape(transformed_tape, ctx, frame, trace)
             out_quantum_tracers = list(map(trace.full_raise, ans2))
-
             jaxpr, out_type, consts = frame.to_jaxpr2(out_classical_tracers + out_quantum_tracers)
+
     return jaxpr
 
