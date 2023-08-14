@@ -179,6 +179,10 @@ Sergei Mironov.
   distribution.
   [#198](https://github.com/PennyLaneAI/catalyst/pull/198)
 
+* Return a list of decompositions when calling the decomposition method for control operations.
+  This allows Catalyst to be compatible with upstream PennyLane.
+  [#241](https://github.com/PennyLaneAI/catalyst/pull/241)
+
 <h3>Improvements</h3>
 
 * When using OpenQASM-based devices the string representation of the circuit is printed on
