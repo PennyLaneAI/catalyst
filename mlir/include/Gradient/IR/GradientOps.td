@@ -95,9 +95,12 @@ def BackpropOp : Gradient_Op<"backprop", [AttrSizedOperandSegments,
     let arguments = (ins
         FlatSymbolRefAttr:$callee,
         Variadic<AnyType>:$args,
-        Variadic<AnyType>:$outputs,
-        Variadic<AnyMemRef>:$arg_shadows,
-        Variadic<AnyMemRef>:$out_shadows,
+        Variadic<MemRefOf<[AnyFloat]>>:$diffArgShadows,
+        Variadic<MemRefOf<[AnyFloat]>>:$calleeResults,
+        Variadic<AnyTypeOf<[
+            RankedTensorOf<[AnyFloat]>,
+            MemRefOf<[AnyFloat]>
+        ]>>:$cotangents,
         OptionalAttr<AnyIntElementsAttr>:$diffArgIndices
     );
 
@@ -112,9 +115,9 @@ def BackpropOp : Gradient_Op<"backprop", [AttrSizedOperandSegments,
 
     let assemblyFormat = [{
         $callee `(` $args `)`
-        `outs` `(` $outputs `:` type($outputs) `)`
-        ( `arg_shadows` `(` $arg_shadows^ `:` type($arg_shadows) `)` )?
-        ( `out_shadows` `(` $out_shadows^ `:` type($out_shadows) `)` )?
+        ( `grad_out` `(` $diffArgShadows^ `:` type($diffArgShadows) `)` )?
+        ( `callee_out` `(` $calleeResults^ `:` type($calleeResults) `)` )?
+        `cotangents` `(` $cotangents `:` type($cotangents) `)`
         attr-dict `:` functional-type($args, results)
     }];
 }
