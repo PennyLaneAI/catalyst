@@ -144,6 +144,7 @@ DEFAULT_PIPELINES = [
     (
         "MLIRToLLVMDialect",
         [
+            "convert-gradient-to-llvm",
             "func.func(convert-linalg-to-loops)",
             "convert-scf-to-cf",
             # This pass expands memref ops that modify the metadata of a memref (sizes, offsets,
@@ -163,7 +164,6 @@ DEFAULT_PIPELINES = [
             "convert-arith-to-llvm",
             "finalize-memref-to-llvm{use-generic-functions}",
             "convert-index-to-llvm",
-            "convert-gradient-to-llvm",
             "convert-quantum-to-llvm",
             "emit-catalyst-py-interface",
             # Remove any dead casts as the final pass expects to remove all existing casts,

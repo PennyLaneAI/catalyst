@@ -63,6 +63,7 @@
   [#193](https://github.com/PennyLaneAI/catalyst/pull/193)
   [#224](https://github.com/PennyLaneAI/catalyst/pull/224)
   [#225](https://github.com/PennyLaneAI/catalyst/pull/225)
+  [#239](https://github.com/PennyLaneAI/catalyst/pull/239)
 
   This enables high-performance reverse mode automatic differentiation of arbitrary classical
   preprocessing when ``method=defer`` is specified on the ``grad`` operation:
