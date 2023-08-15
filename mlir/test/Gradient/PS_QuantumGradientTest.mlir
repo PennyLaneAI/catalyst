@@ -383,10 +383,12 @@ func.func @tensor_circuit(%arg0: f64) -> tensor<2x3xf64> attributes {qnode, diff
     //
     // CHECK-NOT: quantum.custom
     %q_1 = quantum.custom "rx"(%arg0) %q_0 : !quantum.bit
+    %obs = quantum.namedobs %q_1[PauliX] : !quantum.obs
+    %expval = quantum.expval %obs : f64
 
     // CHECK: [[ret:%[a-zA-Z0-9_]+]] = bufferization.to_tensor [[grad]]
     // CHECK: return [[ret]] : tensor<?x2x3xf64>
-    %res = tensor.from_elements %arg0, %arg0, %arg0, %arg0, %arg0, %arg0 : tensor<2x3xf64>
+    %res = tensor.from_elements %expval, %expval, %expval, %expval, %expval, %expval : tensor<2x3xf64>
     func.return %res : tensor<2x3xf64>
 }
 

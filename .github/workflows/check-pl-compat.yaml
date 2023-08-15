@@ -50,7 +50,7 @@ jobs:
     - uses: actions/cache@v3
       with:
         path: mlir/llvm-project
-        key: Linux-llvm-${{ needs.constants.outputs.llvm_version }}-default-source
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-source
         enableCrossOsArchive: True
         fail-on-cache-miss: True
     - uses: actions/cache@v3

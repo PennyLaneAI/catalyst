@@ -32,7 +32,7 @@ jobs:
           COMPILER_LAUNCHER="" \
           RT_BUILD_DIR="$(pwd)/runtime-build" \
           ENABLE_LIGHTNING_KOKKOS=ON \
-          CMAKE_ARGS="-DKokkos_ENABLE_OPENMP=ON -DENABLE_SANITIZER=ON" \
+          CMAKE_ARGS="-DENABLE_SANITIZER=ON" \
           ENABLE_OPENQASM=ON \
           make runtime
 
@@ -69,7 +69,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: mlir/llvm-project
-        key: Linux-llvm-${{ needs.constants.outputs.llvm_version }}-default-source
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-source
         enableCrossOsArchive: True
 
     - name: Clone LLVM Submodule
@@ -119,7 +119,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: mlir/llvm-project
-        key: Linux-llvm-${{ needs.constants.outputs.llvm_version }}-default-source
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-source
         enableCrossOsArchive: True
         fail-on-cache-miss: True
 
@@ -182,7 +182,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: mlir/llvm-project
-        key: Linux-llvm-${{ needs.constants.outputs.llvm_version }}-default-source
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-source
         enableCrossOsArchive: True
         fail-on-cache-miss: True
 
@@ -517,7 +517,7 @@ jobs:
             CXX_COMPILER=$(which g++) \
             COMPILER_LAUNCHER="" \
             ENABLE_LIGHTNING_KOKKOS=ON \
-            CMAKE_ARGS="-DKokkos_ENABLE_OPENMP=ON -DENABLE_SANITIZER=ON" \
+            CMAKE_ARGS="-DENABLE_SANITIZER=ON" \
             make test-runtime
 
       - name: Build Runtime test suite for OpenQasm device
