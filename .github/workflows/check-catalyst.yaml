@@ -32,7 +32,7 @@ jobs:
           COMPILER_LAUNCHER="" \
           RT_BUILD_DIR="$(pwd)/runtime-build" \
           ENABLE_LIGHTNING_KOKKOS=ON \
-          CMAKE_ARGS="-DKokkos_ENABLE_OPENMP=ON -DENABLE_SANITIZER=ON" \
+          CMAKE_ARGS="-DENABLE_SANITIZER=ON" \
           ENABLE_OPENQASM=ON \
           make runtime
 
@@ -539,7 +539,7 @@ jobs:
             CXX_COMPILER=$(which g++) \
             COMPILER_LAUNCHER="" \
             ENABLE_LIGHTNING_KOKKOS=ON \
-            CMAKE_ARGS="-DKokkos_ENABLE_OPENMP=ON -DENABLE_SANITIZER=ON" \
+            CMAKE_ARGS="-DENABLE_SANITIZER=ON" \
             make test-runtime
 
       - name: Build Runtime test suite for OpenQasm device
