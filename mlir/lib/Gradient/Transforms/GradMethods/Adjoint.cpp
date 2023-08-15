@@ -13,20 +13,14 @@
 // limitations under the License.
 
 #include "Adjoint.hpp"
-#include "ClassicalJacobian.hpp"
-#include "HybridGradient.hpp"
 
 #include <algorithm>
-#include <map>
 #include <sstream>
 #include <vector>
 
-#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Dialect/LLVMIR/LLVMTypes.h"
-#include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
 
+#include "Gradient/IR/GradientOps.h"
 #include "Gradient/Utils/GetDiffMethod.h"
 #include "Gradient/Utils/GradientShape.h"
 #include "Quantum/IR/QuantumOps.h"

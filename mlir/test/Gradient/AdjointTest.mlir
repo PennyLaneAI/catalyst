@@ -156,7 +156,7 @@ func.func @gradCallMultiRes(%arg0: f64) -> (f64, tensor<2xf64>)  {
 
 // -----
 
-// Check the multiple grad invocations with varying diffArgIndices
+// Check the case with multiple grad invocations with varying diffArgIndices
 func.func @funcMultiArg(%arg0: f64, %arg1: tensor<2xf64>) -> f64 attributes {qnode, diff_method = "adjoint"} {
     %0 = quantum.alloc(1) : !quantum.reg
     "do-not.dce-the-quantum-reg"(%0) : (!quantum.reg) -> ()

@@ -44,8 +44,6 @@
 using namespace mlir;
 using namespace catalyst::gradient;
 
-using llvm::errs;
-
 namespace {
 
 constexpr int64_t UNKNOWN = ShapedType::kDynamic;
@@ -156,8 +154,12 @@ static constexpr const char *enzyme_like_free_key = "__enzyme_function_like_free
 static constexpr const char *enzyme_const_key = "enzyme_const";
 static constexpr const char *enzyme_dupnoneed_key = "enzyme_dupnoneed";
 
+/// Enzyme custom gradients appear to exhibit better stability when they are registered for
+/// functions where MemRefs are passed via wrapped pointers (!llvm.ptr<struct(ptr, ptr, i64, ...)>)
+/// rather than having their fields unpacked. This function automatically transforms MemRef
+/// arguments of a function to wrapped pointers.
 void wrapMemRefArgs(func::FuncOp func, LLVMTypeConverter &typeConverter, PatternRewriter &rewriter,
-                    Location loc)
+                    Location loc, bool volatileArgs = false)
 {
     if (llvm::none_of(func.getArgumentTypes(),
                       [](Type argType) { return isa<MemRefType>(argType); })) {
@@ -175,9 +177,19 @@ void wrapMemRefArgs(func::FuncOp func, LLVMTypeConverter &typeConverter, Pattern
             BlockArgument memrefArg = func.getArgument(idx);
             func.insertArgument(idx, ptrType, DictionaryAttr::get(ctx), loc);
             Value wrappedMemref = func.getArgument(idx);
+            Type structType = typeConverter.convertType(memrefType);
 
-            Type convertedType = typeConverter.convertType(memrefType);
-            Value replacedMemref = rewriter.create<LLVM::LoadOp>(loc, convertedType, wrappedMemref);
+            // We potentially need all arguments for the custom quantum gradient, but not all of
+            // them will be used by the primal. Mark the load of the wrapped memref as volatile and
+            // perform a no-op store to ensure that the function argument is considered used.
+            // Otherwise, LLVM may optimize it away with a poison value.
+            //   Note: both the volatile load and store are necessary. MLIR respects the store but
+            //   not the load, while LLVM respects the volatile load but not the store.
+            Value replacedMemref = rewriter.create<LLVM::LoadOp>(
+                loc, structType, wrappedMemref, /*alignment*/ 0, /*isVolatile=*/volatileArgs);
+            if (volatileArgs) {
+                rewriter.create<LLVM::StoreOp>(loc, replacedMemref, wrappedMemref);
+            }
             replacedMemref =
                 rewriter.create<UnrealizedConversionCastOp>(loc, argType, replacedMemref)
                     .getResult(0);
@@ -266,7 +278,7 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
                 }
                 catalyst::convertToDestinationPassingStyle(func, rewriter);
 
-                wrapMemRefArgs(func, *getTypeConverter(), rewriter, loc);
+                wrapMemRefArgs(func, *getTypeConverter(), rewriter, loc, /*volatileArgs=*/true);
 
                 func::FuncOp augFwd = genAugmentedForward(func, rewriter);
                 func::FuncOp customQGrad =
@@ -548,18 +560,6 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
             cast<FunctionType>(qnode->getAttrOfType<TypeAttr>("unwrapped_type").getValue());
 
         OpBuilder::InsertionGuard insertionGuard(builder);
-        // make volatile load to argument
-        {
-            for (unsigned i = 0; i < qnodeType.getNumInputs(); i++) {
-                auto structType = getTypeConverter()->convertType(qnodeType.getInput(i));
-                builder.setInsertionPointToStart(&qnode.getFunctionBody().front());
-                Value loaded = builder.create<LLVM::LoadOp>(loc, structType, qnode.getArgument(i),
-                                                            /*alignment=*/0,
-                                                            /*isVolatile=*/true);
-                builder.create<LLVM::StoreOp>(loc, loaded, qnode.getArgument(i));
-            }
-        }
-        //
         builder.setInsertionPoint(qnode);
         auto funcType = FunctionType::get(ctx, argTypes, {});
         customQGrad = builder.create<func::FuncOp>(qnode.getLoc(), customQGradName, funcType);
@@ -602,7 +602,8 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         SmallVector<Value> primalInputs{
             ValueRange{unwrappedInputs}.take_front(qgradFn.getNumArguments() - 1)};
         Value gateParamShadow = unwrappedShadows.back();
-        // The gate param list is always 1-d
+        assert(cast<MemRefType>(gateParamShadow.getType()).getRank() == 1 &&
+               "Expected gate parameter list to be a rank-1 memref");
         Value pcount = builder.create<memref::DimOp>(loc, gateParamShadow, 0);
         primalInputs.push_back(pcount);
 
@@ -638,8 +639,8 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
             ArrayRef<int64_t> resultDims(qgradDims.begin() + 1, qgradDims.end());
 
             // The gate param shadow is shared, meaning it accumulates additions from einsums from
-            // all results (this is due to the multivariate chain rule saying that derivatives
-            // combine additively).
+            // all results (this is due to the multivariate chain rule; derivatives combine
+            // additively).
             catalyst::einsumLinalgGeneric(builder, loc, resultDims, qgradDims, {0}, resultShadow,
                                           qgrad.getResult(i), gateParamShadow);
         }

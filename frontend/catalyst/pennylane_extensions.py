@@ -364,11 +364,6 @@ class Grad:
         self.fn = fn
         self.__name__ = f"grad.{fn.__name__}"
         self.grad_params = grad_params
-        # if self.grad_params.method != "fd" and not isinstance(self.fn, qml.QNode):
-        #     raise ValueError(
-        #         "Only finite difference can compute higher order derivatives "
-        #         "or gradients of non-QNode functions."
-        #     )
 
     def __call__(self, *args, **kwargs):
         """Specifies that an actual call to the differentiated function.

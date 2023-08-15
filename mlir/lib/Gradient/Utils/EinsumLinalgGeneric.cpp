@@ -63,14 +63,13 @@ Value einsumLinalgGeneric(OpBuilder &ob, Location loc, ArrayRef<int64_t> axisCod
         }
     }
 
-    ShapedType tr;
+    ShapedType resultType;
     if (useBufferSemantics) {
-        tr = MemRefType::get(shapeR, ta.getElementType());
+        resultType = MemRefType::get(shapeR, ta.getElementType());
     }
     else {
-        tr = RankedTensorType::get(shapeR, ta.getElementType());
+        resultType = RankedTensorType::get(shapeR, ta.getElementType());
     }
-    // auto tr = ta.cloneWith(ArrayRef<int64_t>(shapeR), ta.getElementType());
 
     SmallVector<AffineMap> maps;
     {
@@ -99,25 +98,26 @@ Value einsumLinalgGeneric(OpBuilder &ob, Location loc, ArrayRef<int64_t> axisCod
         r = bufferOut.value();
     }
     else {
-        Value empty = ob.create<tensor::EmptyOp>(loc, tr.getShape(), tr.getElementType());
+        Value empty =
+            ob.create<tensor::EmptyOp>(loc, resultType.getShape(), resultType.getElementType());
         Value zero =
-            ob.create<arith::ConstantOp>(loc, tr.getElementType(), ob.getF64FloatAttr(0.0));
+            ob.create<arith::ConstantOp>(loc, resultType.getElementType(), ob.getF64FloatAttr(0.0));
         r = ob.create<linalg::FillOp>(loc, zero, empty).getResult(0);
     }
 
     SmallVector<Value> operands = {a, b};
-    auto bodyBuilder = [](OpBuilder &ob2, Location loc2, ValueRange args) {
-        ob2.create<linalg::YieldOp>(
-            loc2, Value(ob2.create<arith::AddFOp>(
-                      loc2, args[2], ob2.create<arith::MulFOp>(loc2, args[0], args[1]))));
+    auto bodyBuilder = [](OpBuilder &builder, Location loc, ValueRange args) {
+        builder.create<linalg::YieldOp>(
+            loc, Value(builder.create<arith::AddFOp>(
+                     loc, args[2], builder.create<arith::MulFOp>(loc, args[0], args[1]))));
     };
     if (useBufferSemantics) {
         ob.create<linalg::GenericOp>(loc, operands, r, maps, iteratorTypes, bodyBuilder);
         return r;
     }
     else {
-        auto genOp =
-            ob.create<linalg::GenericOp>(loc, tr, operands, r, maps, iteratorTypes, bodyBuilder);
+        auto genOp = ob.create<linalg::GenericOp>(loc, resultType, operands, r, maps, iteratorTypes,
+                                                  bodyBuilder);
         return genOp.getResult(0);
     }
 }

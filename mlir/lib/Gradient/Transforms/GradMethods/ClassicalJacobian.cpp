@@ -109,7 +109,7 @@ func::FuncOp genParamCountFunction(PatternRewriter &rewriter, Location loc, func
 func::FuncOp genSplitPreprocessed(PatternRewriter &rewriter, Location loc, func::FuncOp qnode,
                                   func::FuncOp qnodeWithParams)
 {
-    // Define the properties of the classical preprocessing function.
+    // Define the properties of the split-out QNode.
     std::string fnName = qnode.getSymName().str() + ".splitpreprocessed";
     SmallVector<Type> fnArgTypes(qnode.getArgumentTypes());
     auto paramsBufferType = MemRefType::get({ShapedType::kDynamic}, rewriter.getF64Type());
@@ -121,8 +121,8 @@ func::FuncOp genSplitPreprocessed(PatternRewriter &rewriter, Location loc, func:
         SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(qnode, rewriter.getStringAttr(fnName));
     if (!splitFn) {
         // First copy the original function as is, then we can replace all quantum ops by collecting
-        // their gate parameters in a memory buffer instead. The size of this vector is passed as an
-        // input to the new function.
+        // their gate parameters in a memory buffer instead. This buffer is passed into a modified
+        // qnodeWithParams.
         splitFn = rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility, nullptr, nullptr);
         rewriter.cloneRegionBefore(qnode.getBody(), splitFn.getBody(), splitFn.end());
         Block &argMapBlock = splitFn.getFunctionBody().front();

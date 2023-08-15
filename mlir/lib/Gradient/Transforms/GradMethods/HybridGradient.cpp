@@ -18,10 +18,7 @@
 
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
-#include "mlir/Dialect/Bufferization/Transforms/Bufferize.h"
 #include "mlir/Dialect/Index/IR/IndexOps.h"
-#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -40,164 +37,6 @@ using namespace mlir;
 
 namespace catalyst {
 namespace gradient {
-using llvm::errs;
-func::FuncOp genQuantumGradient(PatternRewriter &rewriter, Location loc, func::FuncOp qgradFn,
-                                TypeConverter &typeConverter)
-{
-    // A version of the qgrad function that is compatible with the custom gradient interface in
-    // Enzyme.
-
-    // inputs: arguments and their shadows
-    std::string fnName = (qgradFn.getName() + ".qvjp").str();
-    func::FuncOp quantumGradient =
-        SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(qgradFn, rewriter.getStringAttr(fnName));
-    if (quantumGradient) {
-        return quantumGradient;
-    }
-
-    SmallVector<Type> fnArgTypes;
-    MLIRContext *ctx = rewriter.getContext();
-    LLVMTypeConverter llvmTypeConverter(ctx);
-    auto indexType = llvmTypeConverter.getIndexType();
-    auto ptrType = LLVM::LLVMPointerType::get(ctx);
-    for (Type argType : qgradFn.getArgumentTypes()) {
-        // All tensor types need handling unfortunately because we can't mark int tensors as
-        // constant
-        if (auto shapedType = dyn_cast<ShapedType>(argType)) {
-            // We'll need to unpack the memrefs here, likely requiring an analogue of the
-            // MemRefDescriptor class.
-            int64_t rank = shapedType.getRank();
-            // Allocated and shadow allocated, aligned and shadow aligned
-            fnArgTypes.append({ptrType, ptrType, ptrType, ptrType});
-
-            // Offset, sizes, and strides
-            fnArgTypes.push_back(indexType);
-            for (int64_t dim = 0; dim < rank; dim++) {
-                fnArgTypes.append({indexType, indexType});
-            }
-        }
-        else {
-            fnArgTypes.push_back(argType);
-        }
-    }
-    FunctionType fnType = rewriter.getFunctionType(fnArgTypes, {});
-
-    quantumGradient = rewriter.create<func::FuncOp>(loc, fnName, fnType);
-    quantumGradient.setPrivate();
-
-    rewriter.cloneRegionBefore(qgradFn.getBody(), quantumGradient.getBody(), quantumGradient.end());
-    Block &entryBlock = quantumGradient.getFunctionBody().front();
-    PatternRewriter::InsertionGuard insertionGuard(rewriter);
-    rewriter.setInsertionPointToStart(&entryBlock);
-    // Need to replace tensor types in the block
-    SmallVector<BlockArgument> oldArgs{entryBlock.getArguments()};
-    size_t argIdx = 0;
-    for (BlockArgument arg : oldArgs) {
-        if (auto shapedType = dyn_cast<ShapedType>(arg.getType())) {
-            int64_t rank = shapedType.getRank();
-            SmallVector<Value> unpackedValues;
-            SmallVector<Value> unpackedShadow;
-            Value allocatedPtr = entryBlock.insertArgument(argIdx++, ptrType, loc);
-            Value shadowAllocated = entryBlock.insertArgument(argIdx++, ptrType, loc);
-            Value alignedPtr = entryBlock.insertArgument(argIdx++, ptrType, loc);
-            Value shadowAligned = entryBlock.insertArgument(argIdx++, ptrType, loc);
-
-            unpackedValues.append({allocatedPtr, alignedPtr});
-            unpackedShadow.append({shadowAllocated, shadowAligned});
-
-            // The offsets, sizes, and strides are shared between the primal and shadows
-            SmallVector<Value> sizeValues;
-            sizeValues.push_back(entryBlock.insertArgument(argIdx++, indexType, loc));
-            for (int64_t dim = 0; dim < rank; dim++) {
-                sizeValues.push_back(entryBlock.insertArgument(argIdx++, indexType, loc));
-            }
-            for (int64_t dim = 0; dim < rank; dim++) {
-                sizeValues.push_back(entryBlock.insertArgument(argIdx++, indexType, loc));
-            }
-
-            unpackedValues.insert(unpackedValues.end(), sizeValues.begin(), sizeValues.end());
-            unpackedShadow.insert(unpackedShadow.end(), sizeValues.begin(), sizeValues.end());
-
-            Value reconstructedTensor =
-                rewriter
-                    .create<UnrealizedConversionCastOp>(
-                        arg.getLoc(), typeConverter.convertType(arg.getType()), unpackedValues)
-                    .getResult(0);
-            reconstructedTensor =
-                rewriter.create<bufferization::ToTensorOp>(arg.getLoc(), reconstructedTensor);
-
-            if (arg == oldArgs.back()) {
-                // The last argument should be replaced with its shadow
-                Value reconstructedShadow = rewriter
-                                                .create<UnrealizedConversionCastOp>(
-                                                    arg.getLoc(), arg.getType(), unpackedShadow)
-                                                .getResult(0);
-                arg.replaceAllUsesWith(reconstructedShadow);
-            }
-            else {
-                arg.replaceAllUsesWith(reconstructedTensor);
-            }
-            entryBlock.eraseArgument(argIdx);
-        }
-        else {
-            argIdx++;
-        }
-    }
-
-    quantumGradient.walk([&](func::ReturnOp returnOp) { returnOp.getOperandsMutable().clear(); });
-    return quantumGradient;
-}
-
-func::FuncOp genAugmentedForwardPass(PatternRewriter &rewriter, Location loc, func::FuncOp callee)
-{
-    // The main difference of the augmented forward pass is that it returns any values that need to
-    // be cached from the quantum side (which is usually nothing). If we don't use destination
-    // passing style and return tensors, we need to return zeroed out tensors here.
-    std::string fnName = (callee.getName() + ".augfwd").str();
-    SmallVector<Type> fnArgTypes(callee.getArgumentTypes());
-    MLIRContext *ctx = rewriter.getContext();
-    SmallVector<Type> resultTypes{LLVM::LLVMStructType::getLiteral(ctx, {})};
-    // LLVM Assumes a single return value
-    assert(callee.getResultTypes().size() == 1 && "Assumed callee has a single return");
-    resultTypes.push_back(callee.getResultTypes()[0]);
-    // We also need to return the shadow here
-    resultTypes.push_back(callee.getResultTypes()[0]);
-
-    auto paramsBufferType = MemRefType::get({ShapedType::kDynamic}, rewriter.getF64Type());
-    fnArgTypes.push_back(paramsBufferType);
-    FunctionType fnType = rewriter.getFunctionType(fnArgTypes, resultTypes);
-
-    func::FuncOp augmentedForwardPass =
-        SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(callee, rewriter.getStringAttr(fnName));
-    if (augmentedForwardPass) {
-        return augmentedForwardPass;
-    }
-
-    augmentedForwardPass = rewriter.create<func::FuncOp>(loc, fnName, fnType);
-    augmentedForwardPass.setPrivate();
-    rewriter.cloneRegionBefore(callee.getBody(), augmentedForwardPass.getBody(),
-                               augmentedForwardPass.end());
-    Block &entryBlock = augmentedForwardPass.getFunctionBody().front();
-    entryBlock.addArgument(paramsBufferType, loc);
-
-    augmentedForwardPass.walk([&](func::ReturnOp returnOp) {
-        Location loc = returnOp.getLoc();
-        PatternRewriter::InsertionGuard insertionGuard(rewriter);
-        rewriter.setInsertionPoint(returnOp);
-        Value emptyStruct =
-            rewriter.create<LLVM::UndefOp>(loc, LLVM::LLVMStructType::getLiteral(ctx, {}));
-        Value primalReturn = returnOp.getOperand(0);
-        auto resultType = cast<RankedTensorType>(primalReturn.getType());
-        Value shadow = rewriter.create<tensor::EmptyOp>(loc, resultType.getShape(),
-                                                        resultType.getElementType());
-        Value zero =
-            rewriter.create<arith::ConstantFloatOp>(loc, APFloat(0.0), rewriter.getF64Type());
-        shadow = rewriter.create<linalg::FillOp>(loc, zero, shadow).getResult(0);
-        returnOp.getOperandsMutable().assign({emptyStruct, primalReturn, shadow});
-    });
-    // This is the point where we can remove the classical preprocessing as a later optimization.
-    return augmentedForwardPass;
-}
 
 /// Given a statically-shaped tensor type, execute `processWithIndices` for every entry of the
 /// tensor. For example, a tensor<3x2xf64> will cause `processWithIndices` to be called with
@@ -565,38 +404,6 @@ func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc, GradOp
     FunctionType fnType =
         rewriter.getFunctionType(gradOp.getOperandTypes(), gradOp.getResultTypes());
     StringAttr visibility = rewriter.getStringAttr("private");
-    auto callee =
-        SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(gradOp, gradOp.getCalleeAttr());
-    // For each QNode, generate a wrapper containing classical preprocessing that then calls a
-    // function that accepts the parameters. This conceptually is splitting the QNode into classical
-    // preprocessing and quantum parts that end in a measurement.
-    SmallVector<func::FuncOp> qnodes;
-    if (callee->hasAttr("qnode")) {
-        qnodes.push_back(callee);
-    }
-    else {
-        callee.walk([&qnodes](func::CallOp callOp) {
-            auto callee =
-                SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(callOp, callOp.getCalleeAttr());
-            if (callee->hasAttr("qnode")) {
-                qnodes.push_back(callee);
-            }
-        });
-    }
-
-    // for (func::FuncOp qnode : qnodes) {
-    //     func::FuncOp withParams = genQNodeWithParams(rewriter, qnode.getLoc(), qnode);
-    //     func::FuncOp splitPreprocessing =
-    //         genSplitPreprocessed(rewriter, qnode.getLoc(), qnode, withParams);
-    // }
-
-    // The modified callee
-    // func::FuncOp modifiedCallee = genModifiedCallee(rewriter, loc, callee);
-    // func::FuncOp primal = genEnzymeWrapper(rewriter, loc, callee, modifiedCallee);
-    // func::FuncOp augmented = genAugmentedForwardPass(rewriter, loc, callee);
-    // func::FuncOp gradient = genQuantumGradient(rewriter, loc, qGradFn, typeConverter);
-    // modifiedCallee->setAttr("gradient.augment", augmented.getNameAttr());
-    // modifiedCallee->setAttr("gradient.vjp", gradient.getNameAttr());
 
     func::FuncOp fullGradFn =
         SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(gradOp, rewriter.getStringAttr(fnName));
@@ -609,134 +416,175 @@ func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc, GradOp
         Block *entryBlock = fullGradFn.addEntryBlock();
         rewriter.setInsertionPointToStart(entryBlock);
 
-        // // Collect arguments and invoke the classical jacobian and quantum gradient functions.
-        // SmallVector<Value> callArgs(fullGradFn.getArguments());
+        // Collect arguments and invoke the classical jacobian and quantum gradient functions.
+        SmallVector<Value> callArgs(fullGradFn.getArguments());
 
-        // Value numParams = rewriter.create<func::CallOp>(loc, paramCountFn,
-        // callArgs).getResult(0); SmallVector<Value> qGradArgs(callArgs);
-        // qGradArgs.push_back(numParams);
-        // ValueRange quantumGradients =
-        //     rewriter.create<func::CallOp>(loc, qGradFn, qGradArgs).getResults();
+        Value numParams = rewriter.create<func::CallOp>(loc, paramCountFn, callArgs).getResult(0);
+        callArgs.push_back(numParams);
+        ValueRange quantumGradients =
+            rewriter.create<func::CallOp>(loc, qGradFn, callArgs).getResults();
 
-        // DenseIntElementsAttr diffArgIndicesAttr = gradOp.getDiffArgIndices().value_or(nullptr);
+        DenseIntElementsAttr diffArgIndicesAttr = gradOp.getDiffArgIndices().value_or(nullptr);
 
-        // auto resultsBackpropTypes = computeBackpropTypes(argMapFn, diffArgIndices);
-        // // Compute hybrid gradients via Enzyme
-        // std::vector<Value> hybridGradients;
-        // int j = 0;
-        // // Loop over the measurements
-        // for (Value quantumGradient : quantumGradients) {
-        //     Type resultType = gradOp.getResult(j).getType();
-        //     Value result = rewriter.create<tensor::EmptyOp>(loc, resultType, ValueRange{});
-        //     auto rankResult = resultType.cast<RankedTensorType>().getRank();
-        //     auto shapeResult = resultType.cast<RankedTensorType>().getShape();
-        //     j++;
+        auto resultsBackpropTypes = computeBackpropTypes(argMapFn, diffArgIndices);
+        // Compute hybrid gradients via Enzyme
+        std::vector<Value> hybridGradients;
+        int j = 0;
+        // Loop over the measurements
+        for (Value quantumGradient : quantumGradients) {
+            Type resultType = gradOp.getResult(j).getType();
+            int64_t rankResult = 0;
+            ArrayRef<int64_t> shapeResult;
+            if (auto resultTensorType = dyn_cast<RankedTensorType>(resultType)) {
+                rankResult = resultTensorType.getRank();
+                shapeResult = resultTensorType.getShape();
+            }
+            j++;
 
-        //     std::vector<BackpropOp> intermediateGradients;
-        //     auto rank = quantumGradient.getType().cast<RankedTensorType>().getRank();
+            std::vector<BackpropOp> intermediateGradients;
+            auto rank = quantumGradient.getType().cast<RankedTensorType>().getRank();
 
-        //     if (rank > 1) {
-        //         std::vector<int64_t> sizes =
-        //             quantumGradient.getType().cast<RankedTensorType>().getShape();
+            if (rank > 1) {
+                Value result = rewriter.create<tensor::EmptyOp>(loc, resultType, ValueRange{});
+                std::vector<int64_t> sizes =
+                    quantumGradient.getType().cast<RankedTensorType>().getShape();
 
-        //         std::vector<std::vector<int64_t>> allOffsets;
-        //         std::vector<int64_t> cutOffset(sizes.begin() + 1, sizes.end());
+                std::vector<std::vector<int64_t>> allOffsets;
+                std::vector<int64_t> cutOffset(sizes.begin() + 1, sizes.end());
 
-        //         std::vector<int64_t> currentOffset(cutOffset.size(), 0);
+                std::vector<int64_t> currentOffset(cutOffset.size(), 0);
 
-        //         int64_t totalOutcomes = 1;
-        //         for (int64_t dim : cutOffset) {
-        //             totalOutcomes *= dim;
-        //         }
+                int64_t totalOutcomes = 1;
+                for (int64_t dim : cutOffset) {
+                    totalOutcomes *= dim;
+                }
 
-        //         for (int64_t outcome = 0; outcome < totalOutcomes; outcome++) {
-        //             allOffsets.push_back(currentOffset);
+                for (int64_t outcome = 0; outcome < totalOutcomes; outcome++) {
+                    allOffsets.push_back(currentOffset);
 
-        //             for (int64_t i = cutOffset.size() - 1; i >= 0; i--) {
-        //                 currentOffset[i]++;
-        //                 if (currentOffset[i] < cutOffset[i]) {
-        //                     break;
-        //                 }
-        //                 currentOffset[i] = 0;
-        //             }
-        //         }
+                    for (int64_t i = cutOffset.size() - 1; i >= 0; i--) {
+                        currentOffset[i]++;
+                        if (currentOffset[i] < cutOffset[i]) {
+                            break;
+                        }
+                        currentOffset[i] = 0;
+                    }
+                }
 
-        //         std::vector<int64_t> strides(rank, 1);
-        //         std::vector<Value> dynStrides = {};
+                std::vector<int64_t> strides(rank, 1);
+                std::vector<Value> dynStrides = {};
 
-        //         std::vector<Value> dynOffsets = {};
+                std::vector<Value> dynOffsets = {};
 
-        //         std::vector<Value> dynSizes;
+                std::vector<Value> dynSizes;
 
-        //         for (size_t index = 0; index < sizes.size(); ++index) {
-        //             if (index == 0) {
-        //                 Value idx = rewriter.create<index::ConstantOp>(loc, index);
-        //                 Value dimSize = rewriter.create<tensor::DimOp>(loc, quantumGradient,
-        //                 idx); dynSizes.push_back(dimSize);
-        //             }
-        //             else {
-        //                 sizes[index] = 1;
-        //             }
-        //         }
-        //         for (auto offsetRight : allOffsets) {
-        //             std::vector<int64_t> offsets{0};
-        //             offsets.insert(offsets.end(), offsetRight.begin(), offsetRight.end());
-        //             auto rankReducedType =
-        //                 tensor::ExtractSliceOp::inferCanonicalRankReducedResultType(
-        //                     1, quantumGradient.getType().cast<RankedTensorType>(), offsets,
-        //                     sizes, strides) .cast<RankedTensorType>();
-        //             Value extractQuantumGradient = rewriter.create<tensor::ExtractSliceOp>(
-        //                 loc, rankReducedType, quantumGradient, dynOffsets, dynSizes, dynStrides,
-        //                 offsets, sizes, strides);
-        //             BackpropOp backpropOp = rewriter.create<BackpropOp>(
-        //                 loc, resultsBackpropTypes, argMapFn.getName(), callArgs,
-        //                 extractQuantumGradient, ValueRange{}, diffArgIndicesAttr);
+                for (size_t index = 0; index < sizes.size(); ++index) {
+                    if (index == 0) {
+                        Value idx = rewriter.create<index::ConstantOp>(loc, index);
+                        Value dimSize = rewriter.create<tensor::DimOp>(loc, quantumGradient, idx);
+                        dynSizes.push_back(dimSize);
+                    }
+                    else {
+                        sizes[index] = 1;
+                    }
+                }
+                for (auto offsetRight : allOffsets) {
+                    std::vector<int64_t> offsets{0};
+                    offsets.insert(offsets.end(), offsetRight.begin(), offsetRight.end());
+                    auto rankReducedType =
+                        tensor::ExtractSliceOp::inferCanonicalRankReducedResultType(
+                            1, quantumGradient.getType().cast<RankedTensorType>(), offsets, sizes,
+                            strides)
+                            .cast<RankedTensorType>();
+                    Value extractQuantumGradient = rewriter.create<tensor::ExtractSliceOp>(
+                        loc, rankReducedType, quantumGradient, dynOffsets, dynSizes, dynStrides,
+                        offsets, sizes, strides);
+                    BackpropOp backpropOp = rewriter.create<BackpropOp>(
+                        loc, resultsBackpropTypes, argMapFn.getName(), callArgs, ValueRange{},
+                        ValueRange{}, extractQuantumGradient, diffArgIndicesAttr);
 
-        //             intermediateGradients.push_back(backpropOp);
-        //         }
-        //         for (size_t i = 0; i < resultsBackpropTypes.size(); i++) {
-        //             // strides
-        //             std::vector<int64_t> stridesSlice(rankResult, 1);
+                    intermediateGradients.push_back(backpropOp);
+                }
+                for (size_t i = 0; i < resultsBackpropTypes.size(); i++) {
+                    // strides
+                    std::vector<int64_t> stridesSlice(rankResult, 1);
 
-        //             for (int64_t index = 0; index < totalOutcomes; index++) {
-        //                 auto intermediateGradient = intermediateGradients[index];
-        //                 Value gradient = intermediateGradient.getResult(i);
+                    for (int64_t index = 0; index < totalOutcomes; index++) {
+                        auto intermediateGradient = intermediateGradients[index];
+                        Value gradient = intermediateGradient.getResult(i);
 
-        //                 Type gradientType = gradient.getType();
-        //                 auto rankGradient = gradientType.cast<RankedTensorType>().getRank();
+                        Type gradientType = gradient.getType();
+                        if (auto gradientTensorType = dyn_cast<RankedTensorType>(gradientType)) {
+                            int64_t rankGradient = gradientTensorType.getRank();
+                            // sizes
+                            std::vector<int64_t> sizesSlice{shapeResult};
+                            for (int64_t sliceIndex = rankResult - 1; sliceIndex >= rankGradient;
+                                 sliceIndex--) {
+                                sizesSlice[sliceIndex] = 1;
+                            }
 
-        //                 // sizes
-        //                 std::vector<int64_t> sizesSlice{shapeResult};
-        //                 for (int64_t sliceIndex = rankResult - 1; sliceIndex >= rankGradient;
-        //                      sliceIndex--) {
-        //                     sizesSlice[sliceIndex] = 1;
-        //                 }
+                            // offset
+                            auto offsetSlice = allOffsets[index];
+                            for (int64_t offsetIndex = 0; offsetIndex < rankGradient;
+                                 offsetIndex++) {
+                                offsetSlice.insert(offsetSlice.begin(), 0);
+                            }
+                            result = rewriter.create<tensor::InsertSliceOp>(
+                                loc, resultType, gradient, result, ValueRange{}, ValueRange{},
+                                ValueRange{}, offsetSlice, sizesSlice, stridesSlice);
+                        }
+                        else {
+                            assert(isa<FloatType>(gradient.getType()));
+                            SmallVector<Value> insertIndices;
+                            for (int64_t offset : allOffsets[index]) {
+                                insertIndices.push_back(
+                                    rewriter.create<index::ConstantOp>(loc, offset));
+                            }
+                            result = rewriter.create<tensor::InsertOp>(loc, gradient, result,
+                                                                       insertIndices);
+                        }
+                    }
+                    hybridGradients.push_back(result);
+                }
+            }
+            else {
+                // The quantum gradient is a rank 1 tensor
+                BackpropOp backpropOp = rewriter.create<BackpropOp>(
+                    loc, resultsBackpropTypes, argMapFn.getName(), callArgs, ValueRange{},
+                    ValueRange{}, quantumGradient, diffArgIndicesAttr);
+                for (OpResult result : backpropOp.getResults()) {
+                    Value hybridGradient = result;
+                    Type gradResultType = gradOp.getResult(result.getResultNumber()).getType();
+                    if (gradResultType != result.getType()) {
+                        // The backprop op produces a row of the Jacobian, which always has the same
+                        // type as the differentiated argument. If the rank of the quantum gradient
+                        // is 1, this implies the callee returns a rank-0 value (either a
+                        // scalar or a tensor<scalar>). The Jacobian of a scalar -> scalar should be
+                        // a scalar, but as a special case, the Jacobian of a scalar ->
+                        // tensor<scalar> should be tensor<scalar>.
+                        if (isa<RankedTensorType>(gradResultType) &&
+                            isa<FloatType>(result.getType())) {
+                            Value jacobian =
+                                rewriter.create<tensor::EmptyOp>(loc, gradResultType, ValueRange{});
+                            hybridGradient = rewriter.create<tensor::InsertOp>(
+                                loc, result, jacobian, ValueRange{});
+                        }
 
-        //                 // offset
-        //                 auto offsetSlice = allOffsets[index];
-        //                 for (int64_t offsetIndex = 0; offsetIndex < rankGradient; offsetIndex++)
-        //                 {
-        //                     offsetSlice.insert(offsetSlice.begin(), 0);
-        //                 }
-        //                 result = rewriter.create<tensor::InsertSliceOp>(
-        //                     loc, resultType, gradient, result, ValueRange{}, ValueRange{},
-        //                     ValueRange{}, offsetSlice, sizesSlice, stridesSlice);
-        //             }
-        //             hybridGradients.push_back(result);
-        //         }
-        //     }
-        //     else {
-        //         BackpropOp backpropOp = rewriter.create<BackpropOp>(
-        //             loc, resultsBackpropTypes, argMapFn.getName(), callArgs, quantumGradient,
-        //             ValueRange{}, diffArgIndicesAttr);
-        //         // Loop over params
-        //         for (size_t i = 0; i < backpropOp.getNumResults(); i++) {
-        //             Value result = backpropOp.getResult(i);
-        //             hybridGradients.push_back(result);
-        //         }
-        //     }
-        // }
-        rewriter.create<func::ReturnOp>(loc, entryBlock->getArguments().take_front(2));
+                        // We also support where the argument is a tensor<scalar> but the desired
+                        // hybrid gradient is a scalar. This is less about mathematical precision
+                        // and more about ergonomics.
+                        if (isa<FloatType>(gradResultType) &&
+                            isa<RankedTensorType>(result.getType())) {
+                            hybridGradient =
+                                rewriter.create<tensor::ExtractOp>(loc, result, ValueRange{});
+                        }
+                    }
+
+                    hybridGradients.push_back(hybridGradient);
+                }
+            }
+        }
+        rewriter.create<func::ReturnOp>(loc, hybridGradients);
     }
 
     return fullGradFn;
