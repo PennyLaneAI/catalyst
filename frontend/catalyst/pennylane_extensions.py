@@ -43,7 +43,7 @@ import catalyst.jax_primitives as jprim
 from catalyst.jax_primitives import GradParams, expval_p, probs_p
 from catalyst.jax_tape import JaxTape
 from catalyst.jax_tracer import get_traceable_fn, insert_to_qreg, trace_quantum_tape
-from catalyst.jax_tracer2 import trace_quantum_function
+from catalyst.jax_tracer2 import trace_quantum_function, measure, MidCircuitMeasure
 from catalyst.utils.exceptions import CompileError, DifferentiableCompileError
 from catalyst.utils.patching import Patcher
 from catalyst.utils.tracing import TracingContext
@@ -1287,69 +1287,69 @@ def for_loop(lower_bound, upper_bound, step):
     return _for_loop
 
 
-class MidCircuitMeasure(Operation):
-    """Operation representing a mid-circuit measurement."""
+# class MidCircuitMeasure(Operation):
+#     """Operation representing a mid-circuit measurement."""
 
-    num_wires = 1
+#     num_wires = 1
 
-    def __init__(self, measurement_id, *args, **kwargs):
-        self.measurement_id = measurement_id
-        super().__init__(*args, **kwargs)
+#     def __init__(self, measurement_id, *args, **kwargs):
+#         self.measurement_id = measurement_id
+#         super().__init__(*args, **kwargs)
 
 
-def measure(wires):
-    """A :func:`qjit` compatible mid-circuit measurement for PennyLane/Catalyst.
+# def measure(wires):
+#     """A :func:`qjit` compatible mid-circuit measurement for PennyLane/Catalyst.
 
-    .. important::
+#     .. important::
 
-        The :func:`qml.measure() <pennylane.measure>` function is **not** QJIT
-        compatible and :func:`catalyst.measure` from Catalyst should be used instead.
+#         The :func:`qml.measure() <pennylane.measure>` function is **not** QJIT
+#         compatible and :func:`catalyst.measure` from Catalyst should be used instead.
 
-    Args:
-        wires (Wires): The wire of the qubit the measurement process applies to
+#     Args:
+#         wires (Wires): The wire of the qubit the measurement process applies to
 
-    Returns:
-        A JAX tracer for the mid-circuit measurement.
+#     Returns:
+#         A JAX tracer for the mid-circuit measurement.
 
-    Raises:
-        ValueError: Called outside the tape context.
+#     Raises:
+#         ValueError: Called outside the tape context.
 
-    **Example**
+#     **Example**
 
-    .. code-block:: python
+#     .. code-block:: python
 
-        dev = qml.device("lightning.qubit", wires=2)
+#         dev = qml.device("lightning.qubit", wires=2)
 
-        @qjit
-        @qml.qnode(dev)
-        def circuit(x: float):
-            qml.RX(x, wires=0)
-            m1 = measure(wires=0)
+#         @qjit
+#         @qml.qnode(dev)
+#         def circuit(x: float):
+#             qml.RX(x, wires=0)
+#             m1 = measure(wires=0)
 
-            qml.RX(m1 * jnp.pi, wires=1)
-            m2 = measure(wires=1)
+#             qml.RX(m1 * jnp.pi, wires=1)
+#             m2 = measure(wires=1)
 
-            qml.RZ(m2 * jnp.pi / 2, wires=0)
-            return qml.expval(qml.PauliZ(0)), m2
+#             qml.RZ(m2 * jnp.pi / 2, wires=0)
+#             return qml.expval(qml.PauliZ(0)), m2
 
-    >>> circuit(0.43)
-    [array(1.), array(False)]
-    >>> circuit(0.43)
-    [array(-1.), array(True)]
-    """
-    TracingContext.check_is_tracing(
-        "catalyst.measure can only be used from within @qjit decorated code."
-    )
+#     >>> circuit(0.43)
+#     [array(1.), array(False)]
+#     >>> circuit(0.43)
+#     [array(-1.), array(True)]
+#     """
+#     TracingContext.check_is_tracing(
+#         "catalyst.measure can only be used from within @qjit decorated code."
+#     )
 
-    ctx = qml.QueuingManager.active_context()
-    if ctx is None:
-        raise CompileError("catalyst.measure can only be used from within a qml.qnode.")
+#     ctx = qml.QueuingManager.active_context()
+#     if ctx is None:
+#         raise CompileError("catalyst.measure can only be used from within a qml.qnode.")
 
-    measurement_id = str(uuid.uuid4())[:8]
-    MidCircuitMeasure(measurement_id, wires=wires)
+#     measurement_id = str(uuid.uuid4())[:8]
+#     MidCircuitMeasure(measurement_id, wires=wires)
 
-    a, t = tree_flatten(jax.core.get_aval(True))
-    return ctx.jax_tape.create_tracer(t, a)
+#     a, t = tree_flatten(jax.core.get_aval(True))
+#     return ctx.jax_tape.create_tracer(t, a)
 
 
 class QJITDevice(qml.QubitDevice):
