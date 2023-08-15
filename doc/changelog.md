@@ -162,6 +162,10 @@
 * Fix incorrect return value data-type with functions returning ``qml.counts``.
   [#221](https://github.com/PennyLaneAI/catalyst/pull/221)
 
+* Fix segmentation fault when differentiating a function where a quantum measurement is used
+  multiple times by the same operation.
+  [#242](https://github.com/PennyLaneAI/catalyst/pull/242)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
