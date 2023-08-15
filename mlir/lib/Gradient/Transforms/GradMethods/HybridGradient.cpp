@@ -292,11 +292,20 @@ LogicalResult HybridGradientLowering::matchAndRewrite(GradOp op, PatternRewriter
     if (!clonedCallee) {
         rewriter.setInsertionPointAfter(callee);
         // Replace calls with the QNode with the split QNode in the callee.
-        clonedCallee = cast<func::FuncOp>(rewriter.clone(*callee));
-        clonedCallee.setName(clonedCalleeName);
+        auto isQNode = [](func::FuncOp funcOp) { return funcOp->hasAttr("qnode"); };
+        clonedCallee = rewriter.create<func::FuncOp>(callee.getLoc(), clonedCalleeName,
+                                                     callee.getFunctionType());
+        if (isQNode(callee)) {
+            // TODO: clean this up
+            clonedCallee->setAttr("qnode", callee->getAttr("qnode"));
+            clonedCallee->setAttr("diff_method", callee->getAttr("diff_method"));
+        }
+        else {
+            rewriter.cloneRegionBefore(callee.getBody(), clonedCallee.getBody(),
+                                       clonedCallee.end());
+        }
         SmallPtrSet<Operation *, 4> qnodes;
         SymbolTableCollection symbolTable;
-        auto isQNode = [](func::FuncOp funcOp) { return funcOp->hasAttr("qnode"); };
         traverseCallGraph(clonedCallee, symbolTable, [&](func::FuncOp funcOp) {
             if (funcOp == clonedCallee && isQNode(clonedCallee)) {
                 qnodes.insert(callee);
@@ -330,8 +339,9 @@ LogicalResult HybridGradientLowering::matchAndRewrite(GradOp op, PatternRewriter
 
             // Replace calls to the original QNode with calls to the split QNode
             if (isQNode(clonedCallee) && qnode == callee) {
+                // It would perhaps be cleaner to not special case this, and instead update the call
+                // site (i.e. grad op)
                 PatternRewriter::InsertionGuard insertionGuard(rewriter);
-                rewriter.eraseBlock(&clonedCallee.getFunctionBody().front());
                 Block *entryBlock = clonedCallee.addEntryBlock();
 
                 rewriter.setInsertionPointToStart(entryBlock);
@@ -456,8 +466,17 @@ LogicalResult HybridGradientLowering::matchAndRewrite(GradOp op, PatternRewriter
                 op.getDiffArgIndicesAttr());
             for (const auto &[backpropIdx, jacobianSlice] :
                  llvm::enumerate(backpropOp.getResults())) {
-                backpropResults[backpropIdx * clonedCallee.getNumResults() + cotangentIdx] =
-                    jacobianSlice;
+                size_t resultIdx = backpropIdx * clonedCallee.getNumResults() + cotangentIdx;
+                backpropResults[resultIdx] = jacobianSlice;
+                if (jacobianSlice.getType() != op.getResultTypes()[resultIdx]) {
+                    // For ergonomics, if the backprop result is a point tensor and the
+                    // user requests a scalar, give it to them.
+                    if (isa<RankedTensorType>(jacobianSlice.getType()) &&
+                        isa<FloatType>(op.getResultTypes()[resultIdx])) {
+                        backpropResults[resultIdx] =
+                            rewriter.create<tensor::ExtractOp>(loc, jacobianSlice, ValueRange{});
+                    }
+                }
             }
         }
     }
