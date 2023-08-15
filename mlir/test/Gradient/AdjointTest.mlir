@@ -28,7 +28,7 @@ func.func private @funcScalarScalar(%arg0: f64) -> f64 attributes {qnode, diff_m
 
 // CHECK-LABEL: @funcScalarScalar.fullgrad0adj(%arg0: f64) -> f64
 
-// CHECK-LABEL: @funcScalarScalar.argmap(%arg0: f64, %arg1: memref<?xf64>)
+// CHECK-LABEL: @funcScalarScalar.argmap(%arg0: f64, %arg1: index) -> tensor<?xf64>
 
 // CHECK-LABEL: @gradCallScalarScalar
 func.func @gradCallScalarScalar(%arg0: f64) -> f64 {
@@ -57,7 +57,7 @@ func.func private @funcScalarTensor(%arg0: f64) -> tensor<2x3xf64> attributes {q
 
 // CHECK-LABEL: @funcScalarTensor.fullgrad0adj(%arg0: f64) -> tensor<2x3xf64>
 
-// CHECK-LABEL: @funcScalarTensor.argmap(%arg0: f64, %arg1: memref<?xf64>)
+// CHECK-LABEL: @funcScalarTensor.argmap(%arg0: f64, %arg1: index) -> tensor<?xf64>
 
 // CHECK-LABEL: @gradCallScalarTensor
 func.func @gradCallScalarTensor(%arg0: f64) -> tensor<2x3xf64> {
@@ -85,7 +85,7 @@ func.func private @funcTensorScalar(%arg0: tensor<3xf64>) -> f64 attributes {qno
 
 // CHECK-LABEL: @funcTensorScalar.fullgrad0adj(%arg0: tensor<3xf64>) -> tensor<3xf64>
 
-// CHECK-LABEL: @funcTensorScalar.argmap(%arg0: tensor<3xf64>, %arg1: memref<?xf64>)
+// CHECK-LABEL: @funcTensorScalar.argmap(%arg0: tensor<3xf64>, %arg1: index) -> tensor<?xf64>
 
 // CHECK-LABEL: @gradCallTensorScalar
 func.func @gradCallTensorScalar(%arg0: tensor<3xf64>) -> tensor<3xf64> {
@@ -114,7 +114,7 @@ func.func private @funcTensorTensor(%arg0: tensor<7x3x2x1xf64>) -> tensor<2xf64>
 
 // CHECK-LABEL: @funcTensorTensor.fullgrad0adj(%arg0: tensor<7x3x2x1xf64>) -> tensor<7x3x2x1x2xf64>
 
-// CHECK-LABEL: @funcTensorTensor.argmap(%arg0: tensor<7x3x2x1xf64>, %arg1: memref<?xf64>)
+// CHECK-LABEL: @funcTensorTensor.argmap(%arg0: tensor<7x3x2x1xf64>, %arg1: index) -> tensor<?xf64>
 
 // CHECK-LABEL: @gradCallTensorTensor
 func.func @gradCallTensorTensor(%arg0: tensor<7x3x2x1xf64>) -> tensor<7x3x2x1x2xf64> {
@@ -143,7 +143,7 @@ func.func @funcMultiRes(%arg0: f64) -> (f64, tensor<2xf64>) attributes {qnode, d
 
 // CHECK-LABEL: @funcMultiRes.fullgrad0adj(%arg0: f64) -> (f64, tensor<2xf64>)
 
-// CHECK-LABEL: @funcMultiRes.argmap(%arg0: f64, %arg1: memref<?xf64>)
+// CHECK-LABEL: @funcMultiRes.argmap(%arg0: f64, %arg1: index) -> tensor<?xf64>
 
 // CHECK-LABEL: @gradCallMultiRes
 func.func @gradCallMultiRes(%arg0: f64) -> (f64, tensor<2xf64>)  {
@@ -174,7 +174,7 @@ func.func @funcMultiArg(%arg0: f64, %arg1: tensor<2xf64>) -> f64 attributes {qno
 
 // CHECK-LABEL: @funcMultiArg.fullgrad01adj(%arg0: f64, %arg1: tensor<2xf64>) -> (f64, tensor<2xf64>)
 
-// CHECK-LABEL: @funcMultiArg.argmap(%arg0: f64, %arg1: tensor<2xf64>, %arg2: memref<?xf64>)
+// CHECK-LABEL: @funcMultiArg.argmap(%arg0: f64, %arg1: tensor<2xf64>, %arg2: index) -> tensor<?xf64>
 
 // CHECK-LABEL: @gradCallMultiArg
 func.func @gradCallMultiArg(%arg0: f64, %arg1: tensor<2xf64>) -> (f64, tensor<2xf64>, f64, tensor<2xf64>) {
@@ -202,7 +202,7 @@ func.func private @funcMultiCall(%arg0: f64) -> f64 attributes {qnode, diff_meth
 
 // CHECK-LABEL: @funcMultiCall.fullgrad0adj(%arg0: f64) -> f64
 
-// CHECK-LABEL: @funcMultiCall.argmap(%arg0: f64, %arg1: memref<?xf64>)
+// CHECK-LABEL: @funcMultiCall.argmap(%arg0: f64, %arg1: index) -> tensor<?xf64>
 
 // CHECK-LABEL: @gradCallMultiCall
 func.func @gradCallMultiCall(%arg0: f64) -> (f64, f64) {
