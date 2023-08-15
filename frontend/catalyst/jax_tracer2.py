@@ -33,7 +33,7 @@ from jax.interpreters.mlir import (
 from jax._src.util import unzip2
 from jax._src.lax.lax import xb, xla
 from catalyst.jax_primitives import (Qreg, AbstractQreg, AbstractQbit, qinst, qextract, qinsert,
-                                     _qfor_lowering, _qmeasure_lowering, qdevice, qalloc, qdealloc)
+                                     _qfor_lowering, qmeasure_p, qdevice, qalloc, qdealloc)
 from catalyst.jax_tracer import custom_lower_jaxpr_to_module
 from typing import Optional, Callable, List, ContextManager, Tuple, Any
 from pennylane import QueuingManager, Device
@@ -195,7 +195,7 @@ def for_loop(lower_bound, upper_bound, step):
     return _body_query
 
 
-def measure2(wires) -> JaxprTracer:
+def measure(wires) -> JaxprTracer:
     wires = list(wires) if isinstance(wires, (list, tuple)) else [wires]
     if len(wires) != 1:
         raise TypeError(f"One classical argument (a wire) is expected, got {wires}")
@@ -211,37 +211,12 @@ def measure2(wires) -> JaxprTracer:
         inner_trace=None)
     return result
 
-
 hybrid_p = jax.core.Primitive("hybrid")
 hybrid_p.multiple_results = True
 
-forloop_p = jax.core.Primitive("forloop2")
-forloop_p.multiple_results = True
-mlir.register_lowering(forloop_p, _qfor_lowering)
-
-qmeasure_p = jax.core.Primitive("qmeasure2")
-qmeasure_p.multiple_results = True
-mlir.register_lowering(qmeasure_p, _qmeasure_lowering)
-
-# HACK: At the bind time we already know classical output tracers so we will add the variables
-# to the primitive explicitly. Here we only return quantum value to make quantum output tracer
-# appear.
-
 @hybrid_p.def_abstract_eval
 def _abstract_eval(*args, body_jaxpr, **kwargs):
-    print("ABSTRACT HYBRID")
     return [AbstractQreg()]
-
-@forloop_p.def_abstract_eval
-def _abstract_eval(*args, body_jaxpr, **kwargs):
-    print("ABSTRACT FORLOOP")
-    return [AbstractQreg()]
-
-@qmeasure_p.def_abstract_eval
-def _abstract_eval(qubit):
-    print("ABSTRACT MEASURE")
-    assert isinstance(qubit, AbstractQbit)
-    return [ShapedArray((), bool), qubit]
 
 
 def trace_quantum_tape(quantum_tape:QuantumTape,
@@ -253,8 +228,19 @@ def trace_quantum_tape(quantum_tape:QuantumTape,
     tracers we can complete the set of tracers and finally emit the JAXPR of the whole quantum
     program. """
     # Notes:
-    # [1] - We are interested only in the quantum tracer, so we ignore any others.
+    # [1] - We are interested only in a new quantum tracer, so we ignore all others.
     # [2] - HACK: We add alread existing classical tracers into the last JAX equation.
+
+    def bind_overwrite_classical_tracers(op:HybridOp, prim, *args, **kwargs):
+        """ Binds the primitive `prim` but override the returned classical tracers with the already
+        existing output tracers of the operation `op`."""
+        out_quantum_tracer = prim.bind(*args, **kwargs)[-1]
+        eqn = frame.eqns[-1]
+        assert (len(eqn.outvars)-1) == len(op.out_classical_tracers)
+        for i,t in zip(range(len(eqn.outvars)-1), op.out_classical_tracers): # [2]
+            eqn.outvars[i] = trace.getvar(t)
+        return op.out_classical_tracers + [out_quantum_tracer]
+
     for op in quantum_tape.operations:
         qreg2 = None
         if isinstance(op, HybridOp):
@@ -266,32 +252,27 @@ def trace_quantum_tape(quantum_tape:QuantumTape,
                     jaxpr, typ, consts = op.frame.to_jaxpr2(op.res_classical_tracers + [qreg_out])
 
                 if isinstance(op, ForLoop):
-                    qreg2 = forloop_p.bind(op.in_classical_tracers[0],
-                                           op.in_classical_tracers[1],
-                                           op.in_classical_tracers[2],
-                                           *(consts + op.in_classical_tracers[3:] + [qreg]),
-                                           body_jaxpr=ClosedJaxpr(jaxpr, consts),
-                                           body_nconsts=len(consts),
-                                           apply_reverse_transform=False)[-1] # [1]
+                    qreg2 = bind_overwrite_classical_tracers(
+                        op, forloop_p,
+                        op.in_classical_tracers[0],
+                        op.in_classical_tracers[1],
+                        op.in_classical_tracers[2],
+                        *(consts + op.in_classical_tracers[3:] + [qreg]),
+                        body_jaxpr=ClosedJaxpr(jaxpr, consts),
+                        body_nconsts=len(consts),
+                        apply_reverse_transform=False)[-1] # [1]
                 else:
                     raise TypeError(f"Operation {op} is not implemented")
             else:
                 if isinstance(op, MidCircuitMeasure):
                     wire = op.in_classical_tracers[0]
                     qubit = qextract(qreg, wire)
-                    qubit2 = qmeasure_p.bind(qubit)[-1]
-                    eqn = frame.eqns[-1]
-                    # print("EQN", eqn)
+                    qubit2 = bind_overwrite_classical_tracers(op, qmeasure_p, qubit)[-1] # [1]
                     qreg2 = qinsert(qreg, wire, qubit2)
                 else:
-                    qreg2 = hybrid_p.bind(qreg,
+                    qreg2 = bind_overwrite_classical_tracers(op, hybrid_p, qreg,
                                           *chain(op.in_classical_tracers, consts),
                                           body_jaxpr=ClosedJaxpr(jaxpr, consts))[-1] # [1]
-
-            eqn = frame.eqns[-1] if eqn is None else eqn
-            assert (len(eqn.outvars)-1) == len(op.out_classical_tracers)
-            for i,t in zip(range(len(eqn.outvars)-1), op.out_classical_tracers): # [2]
-                eqn.outvars[i] = trace.getvar(t)
         else:
             # FIXME: support more-than-1 qubit ops
             qubit = qextract(qreg, op.wires[0])
@@ -337,13 +318,14 @@ def trace_quantum_function(
             qdevice("backend", device.backend_name)
             qreg_in = qalloc(len(device.wires))
             qreg_out = trace_quantum_tape(transformed_tape, qreg_in, ctx, frame, trace)
-            # FIXME: Putting `qreg_out` here leads to runtime error. Why is this?
+            # FIXME: Calling `qdealloc` with `qreg_out` leads to a runtime error. Why is this?
             qdealloc(qreg_in)
             out_quantum_tracers = [trace.full_raise(qreg_out)]
             jaxpr, out_type, consts = frame.to_jaxpr2(out_classical_tracers + out_quantum_tracers)
             jaxpr._outvars = jaxpr._outvars[:-1]
             out_type = out_type[:-1]
-            # check_jaxpr(jaxpr) # TODO: uncomment and address AbstractQreg issues
+            # FIXME: `check_jaxpr` complains about the `AbstractQreg` type. Consider fixing.
+            # check_jaxpr(jaxpr)
 
     closed_jaxpr = ClosedJaxpr(jaxpr, consts)
     out_avals, _ = unzip2(out_type)
