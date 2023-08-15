@@ -7,9 +7,9 @@ elseif(APPLE)
 endif()
 
 set(ENZYME_STATIC_LIB ON)
-add_subdirectory(./../../../Enzyme/enzyme ${CMAKE_CURRENT_BINARY_DIR}/Enzyme/enzyme)
+add_subdirectory(${ENZYME_SRC_DIR}/enzyme ${CMAKE_CURRENT_BINARY_DIR}/enzyme)
 
-include_directories(../../../Enzyme/enzyme/Enzyme)
+include_directories(${ENZYME_SRC_DIR}/enzyme/Enzyme)
 
 # Taken from llvm/tools/llc/CMakeLists.txt
 # TODO: May be possible to simplify linked libs

@@ -72,6 +72,7 @@ mhlo:
 enzyme:
 	@echo "build enzyme"
 	cmake -G Ninja -S Enzyme/enzyme -B $(ENZYME_BUILD_DIR) \
+		-DENZYME_STATIC_LIB=ON \
 		-DCMAKE_BUILD_TYPE=Release \
 		-DLLVM_DIR=$(LLVM_BUILD_DIR)/lib/cmake/llvm \
 		-DCMAKE_C_COMPILER=$(C_COMPILER) \
