@@ -222,7 +222,7 @@ jobs:
 
   quantum:
     name: Quantum Dialects Build
-    needs: [constants, mhlo, llvm]
+    needs: [constants, mhlo, llvm, enzyme]
     runs-on: ubuntu-latest
 
     steps:
