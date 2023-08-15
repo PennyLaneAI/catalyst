@@ -28,13 +28,12 @@ if not INSTALLED:
         os.path.dirname(__file__), "../../mlir/build/python_packages/quantum"
     )
     if os.path.exists(default_bindings_path):  # pragma: no cover
-        import sys
-
         sys.path.insert(0, default_bindings_path)
 
 # Patch certain modules to integrate our MLIR bindings with JAX. This needs to happen before any
 # part of 'mlir_quantum' is imported.
 # Note that '__import__' does not return the specific submodule, only the parent package.
+# pylint: disable=protected-access
 sys.modules["mlir_quantum.ir"] = __import__("jaxlib.mlir.ir").mlir.ir
 sys.modules["mlir_quantum._mlir_libs"] = __import__("jaxlib.mlir._mlir_libs").mlir._mlir_libs
 # C++ extensions to the dialects are mocked out.
