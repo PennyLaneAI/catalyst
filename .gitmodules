@@ -13,3 +13,4 @@
 	url = https://github.com/EnzymeAD/Enzyme.git
 	shallow = true
 	ignore = dirty
+	branch = main
