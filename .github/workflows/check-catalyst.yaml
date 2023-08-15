@@ -204,7 +204,7 @@ jobs:
       uses: actions/checkout@v3
       with:
         repository: EnzymeAD/Enzyme
-        ref: ${{ needs.constants.outputs.llvm_version }}
+        ref: ${{ needs.constants.outputs.enzyme_version }}-default-build
         path: mlir/Enzyme
 
     - name: Install Deps
