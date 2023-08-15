@@ -165,7 +165,7 @@ jobs:
 
   quantum:
     name: Quantum Dialects Build
-    needs: [constants, mhlo, llvm, enzyme]
+    needs: [constants, mhlo, llvm]
     runs-on: ubuntu-latest
 
     steps:
@@ -252,7 +252,7 @@ jobs:
 
   frontend-tests:
     name: Frontend Tests
-    needs: [constants, runtime, mhlo, quantum, enzyme]
+    needs: [constants, runtime, mhlo, quantum]
     runs-on: ubuntu-latest
 
     steps:
@@ -336,7 +336,7 @@ jobs:
 
   frontend-tests-lightning-kokkos:
     name: Frontend Tests (backend="lightning.kokkos")
-    needs: [constants, runtime, mhlo, quantum, enzyme]
+    needs: [constants, runtime, mhlo, quantum]
     runs-on: ubuntu-latest
 
     steps:
@@ -394,7 +394,6 @@ jobs:
         echo "PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
         echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
         echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
-        echo "ENZYME_LIB_DIR=$(pwd)/enzyme-build/Enzyme" >> $GITHUB_ENV
         chmod +x quantum-build/bin/quantum-opt  # artifact upload does not preserve permissions
 
     - name: Install lightning.kokkos used in Python tests
