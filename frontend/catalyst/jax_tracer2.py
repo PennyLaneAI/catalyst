@@ -1,7 +1,7 @@
 import jax
 import pennylane as qml
 from jax._src.core import (ClosedJaxpr, MainTrace as JaxMainTrace, new_main, cur_sublevel, get_aval,
-                           Tracer as JaxprTracer, check_jaxpr, ShapedArray)
+                           Tracer as JaxprTracer, check_jaxpr, ShapedArray, JaxprEqn, Var)
 from jax._src.interpreters.partial_eval import (DynamicJaxprTrace, DynamicJaxprTracer,
                                                 JaxprStackFrame, trace_to_subjaxpr_dynamic2,
                                                 extend_jaxpr_stack, _input_type_to_tracers,
@@ -13,7 +13,7 @@ from jax._src.dispatch import jaxpr_replicas
 from jax._src.lax.lax import _abstractify
 from jax._src import linear_util as lu
 from jax._src.tree_util import (tree_flatten, tree_unflatten)
-from jax._src.util import wrap_name
+from jax._src.util import wrap_name, toposort
 from jax._src.api import ShapeDtypeStruct
 from jax._src.api_util import (
     flatten_fun, apply_flat_fun, flatten_fun_nokwargs, flatten_fun_nokwargs2,
@@ -82,6 +82,7 @@ def frame_tracing_context(ctx: MainTracingContex,
     with extend_jaxpr_stack(ctx.main, frame), reset_name_stack():
         parent_trace = ctx.trace
         ctx.trace = DynamicJaxprTrace(ctx.main, cur_sublevel()) if trace is None else trace
+        assert ctx.trace.frame is frame
         try:
             yield frame, ctx.trace
         finally:
@@ -99,7 +100,7 @@ def deduce_avals(f:Callable, args, kwargs):
     wffa = lu.annotate(wff, in_type)
     return wffa, in_avals, out_tree_promise
 
-def new_inner_tracer(trace:JaxprTracer, aval) -> JaxprTracer:
+def new_inner_tracer(trace:DynamicJaxprTrace, aval) -> JaxprTracer:
     dt = DynamicJaxprTracer(trace, aval, jax_current())
     trace.frame.tracers.append(dt)
     trace.frame.tracer_to_var[id(dt)] = trace.frame.newvar(aval)
@@ -203,6 +204,7 @@ def measure(wires) -> JaxprTracer:
     wires = list(wires) if isinstance(wires, (list, tuple)) else [wires]
     if len(wires) != 1:
         raise TypeError(f"One classical argument (a wire) is expected, got {wires}")
+    # assert len(ctx.trace.frame.eqns) == 0, ctx.trace.frame.eqns
     result = new_inner_tracer(ctx.trace, jax.core.get_aval(True))
     MidCircuitMeasure(
         quantum_tape=None,
@@ -220,6 +222,20 @@ hybrid_p.multiple_results = True
 @hybrid_p.def_abstract_eval
 def _abstract_eval(*args, body_jaxpr, **kwargs):
     return [AbstractQreg()]
+
+
+def sort_eqns(eqns:List[JaxprEqn])->List[JaxprEqn]:
+    class Box:
+        def __init__(self, e):
+            self.e = e
+            self.parents = {}
+    boxes = [Box(e) for e in eqns]
+    origin:Dict[int,Box] = {}
+    for b in boxes:
+        origin.update({ov.count:b for ov in b.e.outvars})
+    for b in boxes:
+        b.parents = {origin[v.count] for v in b.e.invars if v.count in origin}
+    return [b.e for b in toposort(boxes)]
 
 
 def trace_quantum_tape(quantum_tape:QuantumTape,
@@ -287,8 +303,8 @@ def trace_quantum_tape(quantum_tape:QuantumTape,
         assert qreg2 is not None
         qreg = qreg2
 
+    frame.eqns = sort_eqns(frame.eqns)
     return qreg
-
 
 def trace_quantum_function(
     f:Callable,
