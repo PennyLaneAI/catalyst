@@ -36,6 +36,7 @@ from mlir_quantum.runtime import (
 
 import catalyst
 import catalyst.jax_tracer as tracer
+from catalyst.autograph import autograph as run_autograph
 from catalyst.compiler import CompileOptions, Compiler
 from catalyst.pennylane_extensions import QFunc
 from catalyst.utils import wrapper  # pylint: disable=no-name-in-module
@@ -473,6 +474,9 @@ class QJIT:
 
         functools.update_wrapper(self, fn)
 
+        if compile_options.autograph:
+            self.user_function = run_autograph(fn)
+
         parameter_types = get_type_annotations(self.user_function)
         if parameter_types is not None:
             self.user_typed = True
@@ -734,6 +738,7 @@ class JAX_QJIT:
 def qjit(
     fn=None,
     *,
+    autograph=False,
     target="binary",
     keep_intermediate=False,
     verbose=False,
@@ -753,6 +758,8 @@ def qjit(
 
     Args:
         fn (Callable): the quantum or classical function
+        autograph (bool): support imperative Python code via autograph source transformations
+            (default - False)
         target (str): the compilation target
         keep_intermediate (bool): Whether or not to store the intermediate files throughout the
             compilation. If ``True``, intermediate representations are available via the
@@ -814,6 +821,33 @@ def qjit(
     array([0.75634905-0.52801002j, 0. +0.j,
            0.35962678+0.14074839j, 0. +0.j])
 
+    Catalyst also supports capturing imperative Python control flow in compiled programs. You can
+    enable this feature via the ``autograph=True`` parameter. Note that it does come with some
+    restrictions, in particular whenever global state is involved. Refer to the documentation page
+    for a complete discussion of the supported and unsupported use-cases.
+
+    .. code-block:: python
+
+        @qjit(autograph=True)
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def circuit(x: int):
+
+            if x < 5:
+                qml.Hadamard(wires=0)
+            else:
+                qml.T(wires=0)
+
+            return qml.expval(qml.PauliZ(0))
+
+    >>> circuit(3)
+    ...
+
+    >>> circuit(5)
+    ...
+
+    Note that imperative control flow will still work in Catalyst even when the autograph feature is
+    turned off, it just won't be captured in the compiled program and cannot involve traced values.
+
     .. important::
 
         Most decomposition logic will be equivalent to PennyLane's decomposition.
@@ -831,9 +865,13 @@ def qjit(
     """
 
     if fn is not None:
-        return QJIT(fn, CompileOptions(verbose, logfile, target, keep_intermediate, pipelines))
+        return QJIT(
+            fn, CompileOptions(verbose, logfile, target, keep_intermediate, pipelines, autograph)
+        )
 
     def wrap_fn(fn):
-        return QJIT(fn, CompileOptions(verbose, logfile, target, keep_intermediate, pipelines))
+        return QJIT(
+            fn, CompileOptions(verbose, logfile, target, keep_intermediate, pipelines, autograph)
+        )
 
     return wrap_fn

@@ -20,6 +20,7 @@ by Catalyst."""
 
 import inspect
 
+import pennylane as qml
 from tensorflow.python.autograph.converters import call_trees, control_flow, functions
 from tensorflow.python.autograph.core import converter, unsupported_features_checker
 from tensorflow.python.autograph.pyct import transpiler
@@ -33,6 +34,29 @@ __all__ = ["AutoGraphError", "autograph", "print_code"]
 class CFTransformer(transpiler.PyToPy):
     """A source-to-source transformer to convert imperative style control flow into a function style
     suitable for tracing."""
+
+    def transform(self, obj, user_context):
+        """Launch the transformation process. Typically this only works on function objects.
+        Here we also allow QNodes to be transformed."""
+
+        # By default AutoGraph will only convert function or method objects, not arbitrary classes
+        # such as QNode objects. Here we handle them explicitly, but we might need a more general
+        # way to handle these in the future.
+        # We may also need to check how this interacts with other common function decorators.
+        fn = obj
+        if isinstance(obj, qml.QNode):
+            fn = obj.func
+
+        if not (inspect.isfunction(fn) or inspect.ismethod(fn)):
+            raise NotImplementedError(f"Unsupported object for transformation: {type(fn)}")
+
+        new_fn, module, source_map = self.transform_function(fn, user_context)
+        new_obj = new_fn
+
+        if isinstance(obj, qml.QNode):
+            new_obj = qml.QNode(new_fn, device=obj.device, diff_method=obj.diff_method)
+
+        return new_obj, module, source_map
 
     def transform_ast(self, node, user_context):
         """This method must be overwritten to run all desired transformations. Autograph provides
@@ -65,6 +89,31 @@ class CFTransformer(transpiler.PyToPy):
 
         return user_context.options
 
+    def has_cache(self, fn, cache_key):
+        """Check for the presence of the given function in the cache. Functions to be converted are
+        cached by the function object itself as well as the conversion options."""
+
+        return self._cache.has(fn, cache_key)
+
+    def get_cached_function(self, fn, cache_key):
+        """Retrieve a Python function object for a previously converted function.
+        Note that repeatedly calling this function with the same arguments will result in new
+        function objects every time, however their source code should be identical with the
+        exception of auto-generated names."""
+
+        # Converted functions are cached as a _PythonFnFactory object.
+        cached_factory = self._cached_factory(fn, cache_key)
+
+        # Convert to a Python function object before returning (e.g. to obtain its source code).
+        new_fn = cached_factory.instantiate(
+            fn.__globals__,
+            fn.__closure__ or (),
+            defaults=fn.__defaults__,
+            kwdefaults=getattr(fn, "__kwdefaults__", None),
+        )
+
+        return new_fn
+
 
 def autograph(fn):
     """Decorator that converts the given function into graph form."""
@@ -89,24 +138,16 @@ def print_code(fn):
     """Utility function to retrieve the source code of a converted function, in particular of
     functions that were recursively converted. Note that recursive conversion is only triggered
     *after* the @autograph decorated function is called at least once."""
-    # pylint: disable=protected-access
 
-    cachekey = ag_primitives.STD
+    cache_key = ag_primitives.STD
 
     if hasattr(fn, "ag_unconverted"):
-        # This is a function directly decorated with @autograph.
+        # This is a function directly decorated with @autograph or @qjit(autograph=True).
         print(inspect.getsource(fn))
 
-    elif _TRANSFORMER._cache.has(fn, cachekey):
-        # Converted functions are cached as a _PythonFnFactory object.
-        cached_factory = _TRANSFORMER._cached_factory(fn, cachekey)
-        # Convert to a Python function object first before getting the source code.
-        new_fn = cached_factory.instantiate(
-            fn.__globals__,
-            fn.__closure__ or (),
-            defaults=fn.__defaults__,
-            kwdefaults=getattr(fn, "__kwdefaults__", None),
-        )
+    elif _TRANSFORMER.has_cache(fn, cache_key):
+        # This is a recursively converted function.
+        new_fn = _TRANSFORMER.get_cached_function(fn, cache_key)
         print(inspect.getsource(new_fn))
 
     else:

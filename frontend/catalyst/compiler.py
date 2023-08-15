@@ -54,6 +54,7 @@ class CompileOptions:
     target: Optional[str] = "binary"
     keep_intermediate: Optional[bool] = False
     pipelines: Optional[List[Any]] = None
+    autograph: Optional[bool] = False
 
 
 def run_writing_command(

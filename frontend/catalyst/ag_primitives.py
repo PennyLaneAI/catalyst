@@ -15,11 +15,14 @@
 """This module provides the implementation of Autograph primitives in terms of traceable Catalyst
 functions. The purpose is to convert imperative style code to functional or graph-style code."""
 
+import functools
 from typing import Any, Callable, Tuple
 
 # Use tensorflow implementations for handling function scopes and calls,
 # as well as various utility objects.
+import pennylane as qml
 import tensorflow.python.autograph.impl.api as tf_autograph_api
+from tensorflow.python.autograph.core import config
 from tensorflow.python.autograph.core.converter import STANDARD_OPTIONS as STD
 from tensorflow.python.autograph.core.converter import ConversionOptions
 from tensorflow.python.autograph.core.function_wrappers import FunctionScope
@@ -31,7 +34,6 @@ from tensorflow.python.autograph.operators.variables import (
 )
 
 import catalyst
-from catalyst import cond
 from catalyst.utils.patching import Patcher
 
 __all__ = [
@@ -75,7 +77,7 @@ def if_stmt(
     # and want to restore the initial state before entering each branch.
     init_state = get_state()
 
-    @cond(pred)
+    @catalyst.cond(pred)
     def functional_cond():
         set_state(init_state)
         true_fn()
@@ -89,13 +91,50 @@ def if_stmt(
         results = get_state()
         return assert_results(results, symbol_names)
 
-    set_state(functional_cond())
+    # Sometimes we unpack the results of nested tracing scopes so that the user doesn't have to
+    # manipulate tuples when they don't expect it. Ensure set_state receives a tuple regardless.
+    results = functional_cond()
+    if not isinstance(results, tuple):
+        results = (results,)
+    set_state(results)
 
 
-def converted_call(*args, **kwargs):
+# Prevent autograph from converting PennyLane and Catalyst library code, this can lead to many
+# issues such as always tracing through code that should only be executed conditionally. We might
+# have to be even more restrictive in the future to prevent issues if necessary.
+module_allowlist = (
+    config.DoNotConvert("pennylane"),
+    config.DoNotConvert("catalyst"),
+) + config.CONVERSION_RULES
+
+
+def converted_call(fn, *args, **kwargs):
     """We want Autograph to use our own instance of the AST transformer when recursively
     transforming functions, but otherwise duplicate the same behaviour."""
 
     # pylint: disable=protected-access
-    with Patcher((tf_autograph_api, "_TRANSPILER", catalyst.autograph._TRANSFORMER)):
-        return tf_converted_call(*args, **kwargs)
+    with Patcher(
+        (tf_autograph_api, "_TRANSPILER", catalyst.autograph._TRANSFORMER),
+        (config, "CONVERSION_RULES", module_allowlist),
+    ):
+        # We need to unpack nested QNode and QJIT calls as autograph will have trouble handling
+        # them. Ideally, we only want the wrapped function to be transformed by autograph, rather
+        # than the QNode or QJIT call method.
+
+        # For nested QJIT calls, the class already forwards to the wrapped function, bypassing any
+        # class functionality. We just do the same here:
+        if isinstance(fn, catalyst.QJIT):
+            fn = fn.user_function
+
+        # For QNode calls, we employ a wrapper to correctly forward the quantum function call to
+        # autograph, while still invoking the QNode call method in the surrounding tracing context.
+        if isinstance(fn, qml.QNode):
+
+            @functools.wraps(fn.func)
+            def qnode_call_wrapper():
+                return tf_converted_call(fn.func, *args, **kwargs)
+
+            new_qnode = qml.QNode(qnode_call_wrapper, device=fn.device, diff_method=fn.diff_method)
+            return new_qnode()
+
+        return tf_converted_call(fn, *args, **kwargs)

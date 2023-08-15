@@ -31,6 +31,7 @@ if not INSTALLED:
         sys.path.insert(0, default_bindings_path)
 
 # pylint: disable=wrong-import-position
+from catalyst.autograph import AutoGraphError
 from catalyst.compilation_pipelines import QJIT, CompileOptions, qjit
 from catalyst.pennylane_extensions import (
     adjoint,
@@ -55,6 +56,7 @@ __all__ = (
     "vjp",
     "jvp",
     "adjoint",
+    "AutoGraphError",
     "CompileError",
     "CompileOptions",
 )
