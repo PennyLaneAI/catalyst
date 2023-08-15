@@ -43,6 +43,7 @@ import catalyst.jax_primitives as jprim
 from catalyst.jax_primitives import GradParams, expval_p, probs_p
 from catalyst.jax_tape import JaxTape
 from catalyst.jax_tracer import get_traceable_fn, insert_to_qreg, trace_quantum_tape
+from catalyst.jax_tracer2 import trace_quantum_function
 from catalyst.utils.exceptions import CompileError, DifferentiableCompileError
 from catalyst.utils.patching import Patcher
 from catalyst.utils.tracing import TracingContext
@@ -142,8 +143,10 @@ class QFunc:
             # Allow QFunc to still be used by itself for internal testing.
             device = self.device
 
-        traceable_fn = get_traceable_fn(self.func, device)
-        jaxpr, shape = jax.make_jaxpr(traceable_fn, return_shape=True)(*args)
+        # traceable_fn = get_traceable_fn(self.func, device)
+        # jaxpr, shape = jax.make_jaxpr(traceable_fn, return_shape=True)(*args)
+        jaxpr, shape = trace_quantum_function(self.func, device, args, kwargs)
+
         retval_tree = tree_structure(shape)
 
         def _eval_jaxpr(*args):

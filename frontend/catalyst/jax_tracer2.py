@@ -1,6 +1,7 @@
 import jax
+import pennylane as qml
 from jax._src.core import (ClosedJaxpr, MainTrace as JaxMainTrace, new_main, cur_sublevel, get_aval,
-                           Tracer as JaxTracer, check_jaxpr)
+                           Tracer as JaxprTracer, check_jaxpr, ShapedArray)
 from jax._src.interpreters.partial_eval import (DynamicJaxprTrace, DynamicJaxprTracer,
                                                 JaxprStackFrame, trace_to_subjaxpr_dynamic2,
                                                 extend_jaxpr_stack, _input_type_to_tracers,
@@ -31,11 +32,11 @@ from jax.interpreters.mlir import (
 )
 from jax._src.util import unzip2
 from jax._src.lax.lax import xb, xla
-from catalyst.jax_primitives import (Qreg, AbstractQreg, qinst, qextract, qinsert, _qfor_lowering,
-                                     qdevice, qalloc, qdealloc)
+from catalyst.jax_primitives import (Qreg, AbstractQreg, AbstractQbit, qinst, qextract, qinsert,
+                                     _qfor_lowering, _qmeasure_lowering, qdevice, qalloc, qdealloc)
 from catalyst.jax_tracer import custom_lower_jaxpr_to_module
 from typing import Optional, Callable, List, ContextManager, Tuple, Any
-from pennylane import QueuingManager
+from pennylane import QueuingManager, Device
 from pennylane.operation import AnyWires, Operation, Wires
 from pennylane.tape import QuantumTape
 from itertools import chain
@@ -93,6 +94,11 @@ def deduce_avals(f:Callable, args, kwargs):
     wffa = lu.annotate(wff, in_type)
     return wffa, in_avals, out_tree_promise
 
+def new_inner_tracer(trace:JaxprTracer, aval) -> JaxprTracer:
+    dt = DynamicJaxprTracer(trace, aval, jax_current())
+    trace.frame.tracers.append(dt)
+    trace.frame.tracer_to_var[id(dt)] = trace.frame.newvar(aval)
+    return dt
 
 class HybridOp(Operation):
     """ A model of an operation carrying nested quantum region. Simplified analog of
@@ -100,20 +106,32 @@ class HybridOp(Operation):
     num_wires = AnyWires
 
     def __init__(self, quantum_tape, in_classical_tracers, out_classical_tracers,
-                 arg_classical_tracers, result_classical_tracers, frame, trace):
+                 arg_classical_tracers, res_classical_tracers, inner_frame, inner_trace):
         self.quantum_tape = quantum_tape
         self.in_classical_tracers = in_classical_tracers
         self.out_classical_tracers = out_classical_tracers
         self.arg_classical_tracers = arg_classical_tracers
-        self.result_classical_tracers = result_classical_tracers
-        self.frame = frame
-        self.trace = trace
+        self.res_classical_tracers = res_classical_tracers
+        self.frame = inner_frame
+        self.trace = inner_trace
         # kwargs["wires"] = Wires(HybridOp.num_wires)
         super().__init__(wires = Wires(HybridOp.num_wires))
+
+    def has_nested_tape(self) -> bool:
+        properties = [self.quantum_tape, self.frame, self.trace]
+        assert all([x is None for x in properties]) or \
+               all([x is not None for  x in properties])
+        return self.quantum_tape is not None
 
     def __repr__(self):
         """Constructor-call-like representation."""
         return f"{self.name}(tape={self.quantum_tape.operations})"
+
+class ForLoop(HybridOp):
+    pass
+
+class MidCircuitMeasure(HybridOp):
+    pass
 
 
 def hybrid(callee:Callable):
@@ -148,17 +166,13 @@ def hybrid(callee:Callable):
 
     return _call
 
-
-class ForLoop(HybridOp):
-    pass
-
 def for_loop(lower_bound, upper_bound, step):
     def _body_query(callee):
         def _call_handler(*init_state):
             ctx = get_main_tracing_context()
             quantum_tape = QuantumTape()
             outer_trace = ctx.trace
-            with frame_tracing_context(ctx) as (inner_frame,inner_trace):
+            with frame_tracing_context(ctx) as (inner_frame, inner_trace):
 
                 in_classical_tracers = [lower_bound, upper_bound, step, lower_bound] + list(init_state)
                 wffa, in_avals, _ = deduce_avals(callee, [lower_bound] + list(init_state), {})
@@ -166,13 +180,7 @@ def for_loop(lower_bound, upper_bound, step):
                 with QueuingManager.stop_recording(), quantum_tape:
                     res_classical_tracers = wffa.call_wrapped(*arg_classical_tracers)
                 res_avals = list(map(shaped_abstractify, res_classical_tracers))
-
-            out_classical_tracers = []
-            for aval in res_avals:
-                dt = DynamicJaxprTracer(outer_trace, aval, jax_current())
-                outer_trace.frame.tracers.append(dt)
-                outer_trace.frame.tracer_to_var[id(dt)] = outer_trace.frame.newvar(aval)
-                out_classical_tracers.append(dt)
+                out_classical_tracers = [new_inner_tracer(outer_trace, aval) for aval in res_avals]
 
             ForLoop(quantum_tape,
                     in_classical_tracers,
@@ -187,12 +195,33 @@ def for_loop(lower_bound, upper_bound, step):
     return _body_query
 
 
+def measure2(wires) -> JaxprTracer:
+    wires = list(wires) if isinstance(wires, (list, tuple)) else [wires]
+    if len(wires) != 1:
+        raise TypeError(f"One classical argument (a wire) is expected, got {wires}")
+    ctx = get_main_tracing_context()
+    result = new_inner_tracer(ctx.trace, jax.core.get_aval(True))
+    MidCircuitMeasure(
+        quantum_tape=None,
+        in_classical_tracers=wires,
+        out_classical_tracers=[result],
+        arg_classical_tracers=[],
+        res_classical_tracers=[],
+        inner_frame=None,
+        inner_trace=None)
+    return result
+
+
 hybrid_p = jax.core.Primitive("hybrid")
 hybrid_p.multiple_results = True
 
-forloop_p = jax.core.Primitive("forloop")
+forloop_p = jax.core.Primitive("forloop2")
 forloop_p.multiple_results = True
 mlir.register_lowering(forloop_p, _qfor_lowering)
+
+qmeasure_p = jax.core.Primitive("qmeasure2")
+qmeasure_p.multiple_results = True
+mlir.register_lowering(qmeasure_p, _qmeasure_lowering)
 
 # HACK: At the bind time we already know classical output tracers so we will add the variables
 # to the primitive explicitly. Here we only return quantum value to make quantum output tracer
@@ -200,18 +229,26 @@ mlir.register_lowering(forloop_p, _qfor_lowering)
 
 @hybrid_p.def_abstract_eval
 def _abstract_eval(*args, body_jaxpr, **kwargs):
+    print("ABSTRACT HYBRID")
     return [AbstractQreg()]
 
 @forloop_p.def_abstract_eval
 def _abstract_eval(*args, body_jaxpr, **kwargs):
+    print("ABSTRACT FORLOOP")
     return [AbstractQreg()]
+
+@qmeasure_p.def_abstract_eval
+def _abstract_eval(qubit):
+    print("ABSTRACT MEASURE")
+    assert isinstance(qubit, AbstractQbit)
+    return [ShapedArray((), bool), qubit]
 
 
 def trace_quantum_tape(quantum_tape:QuantumTape,
-                       qreg:JaxTracer,
+                       qreg:JaxprTracer,
                        ctx:MainTracingContex,
                        frame:JaxprStackFrame,
-                       trace:DynamicJaxprTrace) -> JaxTracer:
+                       trace:DynamicJaxprTrace) -> JaxprTracer:
     """ Recursively trace the nested `quantum_tape` and produce the quantum tracers. With quantum
     tracers we can complete the set of tracers and finally emit the JAXPR of the whole quantum
     program. """
@@ -221,26 +258,40 @@ def trace_quantum_tape(quantum_tape:QuantumTape,
     for op in quantum_tape.operations:
         qreg2 = None
         if isinstance(op, HybridOp):
-            with frame_tracing_context(ctx, op.frame, op.trace):
-                qreg_in = _input_type_to_tracers(op.trace.new_arg, [AbstractQreg()])[0]
-                qreg_out = trace_quantum_tape(op.quantum_tape, qreg_in, ctx, op.frame, op.trace)
-                jaxpr, typ, consts = op.frame.to_jaxpr2(op.result_classical_tracers + [qreg_out])
+            eqn = None
+            if op.has_nested_tape():
+                with frame_tracing_context(ctx, op.frame, op.trace):
+                    qreg_in = _input_type_to_tracers(op.trace.new_arg, [AbstractQreg()])[0]
+                    qreg_out = trace_quantum_tape(op.quantum_tape, qreg_in, ctx, op.frame, op.trace)
+                    jaxpr, typ, consts = op.frame.to_jaxpr2(op.res_classical_tracers + [qreg_out])
 
-            if isinstance(op, ForLoop):
-                qreg2 = forloop_p.bind(op.in_classical_tracers[0],
-                                       op.in_classical_tracers[1],
-                                       op.in_classical_tracers[2],
-                                       *(consts + op.in_classical_tracers[3:] + [qreg]),
-                                       body_jaxpr=ClosedJaxpr(jaxpr, consts),
-                                       body_nconsts=len(consts),
-                                       apply_reverse_transform=False)[0] # [1]
+                if isinstance(op, ForLoop):
+                    qreg2 = forloop_p.bind(op.in_classical_tracers[0],
+                                           op.in_classical_tracers[1],
+                                           op.in_classical_tracers[2],
+                                           *(consts + op.in_classical_tracers[3:] + [qreg]),
+                                           body_jaxpr=ClosedJaxpr(jaxpr, consts),
+                                           body_nconsts=len(consts),
+                                           apply_reverse_transform=False)[-1] # [1]
+                else:
+                    raise TypeError(f"Operation {op} is not implemented")
             else:
-                qreg2 = hybrid_p.bind(qreg,
-                                      *chain(op.in_classical_tracers, consts),
-                                      body_jaxpr=ClosedJaxpr(jaxpr, consts))[0] # [1]
+                if isinstance(op, MidCircuitMeasure):
+                    wire = op.in_classical_tracers[0]
+                    qubit = qextract(qreg, wire)
+                    qubit2 = qmeasure_p.bind(qubit)[-1]
+                    eqn = frame.eqns[-1]
+                    # print("EQN", eqn)
+                    qreg2 = qinsert(qreg, wire, qubit2)
+                else:
+                    qreg2 = hybrid_p.bind(qreg,
+                                          *chain(op.in_classical_tracers, consts),
+                                          body_jaxpr=ClosedJaxpr(jaxpr, consts))[-1] # [1]
 
-            for t in op.out_classical_tracers: # [2]
-                frame.eqns[-1].outvars.insert(-1,trace.getvar(t))
+            eqn = frame.eqns[-1] if eqn is None else eqn
+            assert (len(eqn.outvars)-1) == len(op.out_classical_tracers)
+            for i,t in zip(range(len(eqn.outvars)-1), op.out_classical_tracers): # [2]
+                eqn.outvars[i] = trace.getvar(t)
         else:
             # FIXME: support more-than-1 qubit ops
             qubit = qextract(qreg, op.wires[0])
@@ -253,17 +304,21 @@ def trace_quantum_tape(quantum_tape:QuantumTape,
 
 
 def trace_quantum_function(
-    f:Callable, device, args, kwargs,
+    f:Callable,
+    device:qml.QubitDevice,
+    args, kwargs,
     transform:Optional[Callable[[QuantumTape],QuantumTape]]=None) -> Tuple[ClosedJaxpr, Any]:
-    """ The tracing function supporting user-defined quantum tape transformation. The tracing is
-    done in parts: 1) Classical tracing, producing classical JAX tracers and the nested quantum tape
-    2) Calling user-defined tape transformations 3) Quantum tape tracing, producing the quantum JAX
-    tracers. Finally, print the resulting jaxpr. """
+    """ Trace quantum function in a way that allows building a nested quantum tape describing the
+    whole algorithm. Tape transformations are supported allowing users to modify the algorithm
+    before the final jaxpr is created.
+    The tracing is done in parts as follows: 1) Classical tracing, classical JAX tracers
+    and the quantum tape are produced 2) Quantum tape transformation 3) Quantum tape tracing, the
+    remaining quantum JAX tracers and the final JAXPR are produced. """
 
     with main_tracing_context() as ctx:
 
+        # [1] - Classical tracing
         quantum_tape = QuantumTape()
-        # print("1. Tracing classical part")
         with frame_tracing_context(ctx) as (frame, trace):
 
             wffa, in_avals, out_tree_promise = deduce_avals(f, args, kwargs)
@@ -272,18 +327,18 @@ def trace_quantum_function(
                 ans = wffa.call_wrapped(*in_classical_tracers)
             out_classical_tracers = list(map(trace.full_raise, ans))
 
-        # print("2. Presenting the full quantum tape to users")
-        # print(f"\n{quantum_tape.operations=}\n")
+        # [2] - Tape transformations
         transformed_tape = transform(quantum_tape) if transform else quantum_tape
 
-        # print("3. Tracing the quantum tape")
+        # [3] - Quantum tracing
         with frame_tracing_context(ctx, frame, trace):
 
-            qdevice("kwargs", str("some-args"))
-            qdevice("backend", str("device-name"))
-            qreg_in = qalloc(42)
+            qdevice("kwargs", str(device.backend_kwargs))
+            qdevice("backend", device.backend_name)
+            qreg_in = qalloc(len(device.wires))
             qreg_out = trace_quantum_tape(transformed_tape, qreg_in, ctx, frame, trace)
-            qdealloc(qreg_out)
+            # FIXME: Putting `qreg_out` here leads to runtime error. Why is this?
+            qdealloc(qreg_in)
             out_quantum_tracers = [trace.full_raise(qreg_out)]
             jaxpr, out_type, consts = frame.to_jaxpr2(out_classical_tracers + out_quantum_tracers)
             jaxpr._outvars = jaxpr._outvars[:-1]
