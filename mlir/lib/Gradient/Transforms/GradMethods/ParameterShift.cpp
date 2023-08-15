@@ -46,6 +46,7 @@ LogicalResult ParameterShiftLowering::match(func::FuncOp op) const
 void ParameterShiftLowering::rewrite(func::FuncOp op, PatternRewriter &rewriter) const
 {
     Location loc = op.getLoc();
+    rewriter.setInsertionPointAfter(op);
 
     // Determine the number of parameters to shift (= to the total static number of gate
     // parameters occuring in the function) and number of selectors needed (= to the number of

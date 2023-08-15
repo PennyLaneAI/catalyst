@@ -45,6 +45,7 @@ LogicalResult AdjointLowering::match(func::FuncOp op) const
 void AdjointLowering::rewrite(func::FuncOp op, PatternRewriter &rewriter) const
 {
     Location loc = op.getLoc();
+    rewriter.setInsertionPointAfter(op);
 
     // Generate the quantum gradient function, relying on the backend to implement the adjoint
     // computation.
