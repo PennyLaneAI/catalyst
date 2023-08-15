@@ -88,7 +88,6 @@ clean:
 	rm -rf $(RT_BUILD_DIR)
 	rm -rf cov coverage.info
 	rm -rf $(MK_DIR)/BuildTidy
-	$(MAKE) -C qir-stdlib clean
 	$(MAKE) -C examples clean
 
 .PHONY: format
@@ -100,7 +99,7 @@ else
 endif
 
 .PHONY: check-tidy
-check-tidy: | qir
+check-tidy:
 	@echo "build Catalyst Runtime with RUNTIME_CLANG_TIDY=ON"
 	cmake -G Ninja -B $(MK_DIR)/BuildTidy . \
 		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
