@@ -88,6 +88,7 @@ dialects:
 		-DCMAKE_BUILD_TYPE=Release \
 		-DLLVM_ENABLE_ASSERTIONS=ON \
 		-DQUANTUM_ENABLE_BINDINGS_PYTHON=ON \
+		-DENZYME_SRC_DIR=$(MK_DIR)/Enzyme \
 		-DPython3_EXECUTABLE="$(PYTHON)" \
 		-DMLIR_DIR=$(LLVM_BUILD_DIR)/lib/cmake/mlir \
 		-DMHLO_DIR=$(MHLO_BUILD_DIR)/lib/cmake/mlir-hlo \
