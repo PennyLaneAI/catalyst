@@ -36,7 +36,6 @@ from mlir_quantum.runtime import (
 
 import catalyst
 import catalyst.jax_tracer as tracer
-from catalyst.autograph import autograph as run_autograph
 from catalyst.compiler import CompileOptions, Compiler
 from catalyst.pennylane_extensions import QFunc
 from catalyst.utils import wrapper  # pylint: disable=no-name-in-module
@@ -52,6 +51,12 @@ setattr(jax.interpreters.partial_eval.DynamicJaxprTracer, "__hash__", lambda x: 
 jax.config.update("jax_enable_x64", True)
 jax.config.update("jax_platform_name", "cpu")
 jax.config.update("jax_array", True)
+
+try:
+    AG_AVAILABLE = True
+    from catalyst.autograph import autograph as run_autograph
+except ImportError:
+    AG_AVAILABLE = False
 
 
 def are_params_annotated(f: typing.Callable):
@@ -475,7 +480,14 @@ class QJIT:
         functools.update_wrapper(self, fn)
 
         if compile_options.autograph:
-            self.user_function = run_autograph(fn)
+            if AG_AVAILABLE:
+                self.user_function = run_autograph(fn)
+            else:
+                warnings.warn(
+                    "The autograph feature in Catalyst requires TensorFlow. "
+                    "Please install it (e.g. `pip install tensorflow-cpu`) and make it sure is "
+                    "available in the current environment. The current function won't be converted!"
+                )
 
         parameter_types = get_type_annotations(self.user_function)
         if parameter_types is not None:

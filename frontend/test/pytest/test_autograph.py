@@ -18,16 +18,26 @@ import numpy as np
 import pennylane as qml
 import pytest
 
+import catalyst
 from catalyst import qjit
 from catalyst.ag_primitives import STD
 from catalyst.autograph import _TRANSFORMER as AGT
-from catalyst.autograph import AutoGraphError, print_code
 
 # pylint: disable=missing-function-docstring
 
 
 class TestIntegration:
     """Test that the autograph transformations trigger correctly in different settings."""
+
+    def test_unavailable(self, monkeypatch):
+        """Check the warning produced in the absence of tensorflow."""
+        monkeypatch.setattr(catalyst.compilation_pipelines, "AG_AVAILABLE", False, raising=True)
+
+        def fn(x):
+            return x**2
+
+        with pytest.warns(UserWarning, match="autograph feature in Catalyst requires TensorFlow"):
+            qjit(autograph=True)(fn)
 
     def test_classical_function(self):
         """Test autograph on a purely classical function."""
@@ -143,3 +153,7 @@ class TestIntegration:
         assert hasattr(fn.user_function, "ag_unconverted")
         assert AGT.has_cache(inner.user_function.func, STD)
         assert fn(np.pi) == -1
+
+
+if __name__ == "__main__":
+    pytest.main(["-x", __file__])
