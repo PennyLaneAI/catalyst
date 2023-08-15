@@ -131,6 +131,10 @@
 * Small compatibility changes in order for all integration tests to succeed on macOS.
   [#234](https://github.com/PennyLaneAI/catalyst/pull/234)
 
+* Small improvements to CI/CD. Fix Enzyme cache, generalize caches to other operating systems,
+  and remove references to QIR in runtime's Makefile.
+  [#243](https://github.com/PennyLaneAI/catalyst/pull/243)
+
 <h3>Breaking changes</h3>
 
 * Support for Python 3.8 is dropped.
