@@ -48,8 +48,8 @@ enum class Verbosity { Silent = 0, Urgent = 1, Debug = 2, All = 3 };
 
 /// Pipeline descriptor
 struct Pipeline {
-    typedef std::string Name;
-    typedef llvm::SmallVector<std::string> PassList;
+    using Name = std::string;
+    using PassList = llvm::SmallVector<std::string>;
     Name name;
     PassList passes;
 };
