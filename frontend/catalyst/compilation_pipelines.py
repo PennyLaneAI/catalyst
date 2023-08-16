@@ -551,9 +551,9 @@ class QJIT:
             import __main__
 
             # Since we don't know the name of the original function when compiling from IR
-            # (without parsing the IR), assume the name is that of the currently executing
-            # Python file.
-            module_name = pathlib.Path(__main__.__file__).stem
+            # (without parsing the IR), assume the name is something that can't be parsed
+            # in python as a valid identifier, but is a valid MLIR identifier.
+            module_name = "catalyst.entry_point"
             shared_object, llvm_ir, inferred_func_data = self._compiler.run_from_ir(
                 self.qfunc, module_name
             )
