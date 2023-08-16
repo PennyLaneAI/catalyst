@@ -27,7 +27,7 @@
 #include "HybridGradient.hpp"
 
 #include "Catalyst/Utils/CallGraph.h"
-#include "Gradient/Utils/GetDiffMethod.h"
+#include "Gradient/Utils/DifferentialQNode.h"
 #include "Gradient/Utils/GradientShape.h"
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
@@ -116,30 +116,20 @@ void initializeCotangents(TypeRange primalResultTypes, unsigned activeResult, Va
     }
 }
 
-LogicalResult HybridGradientLowering::matchAndRewrite(GradOp op, PatternRewriter &rewriter) const
+FailureOr<func::FuncOp> HybridGradientLowering::cloneCallee(PatternRewriter &rewriter,
+                                                            func::FuncOp callee)
 {
-    if (op.getMethod() != "defer") {
-        return failure();
-    }
-
-    Location loc = op.getLoc();
-    func::FuncOp callee =
-        SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
+    Location loc = callee.getLoc();
     std::string clonedCalleeName = (callee.getName() + ".cloned").str();
     func::FuncOp clonedCallee = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
-        op, rewriter.getStringAttr(clonedCalleeName));
+        callee, rewriter.getStringAttr(clonedCalleeName));
     if (!clonedCallee) {
         rewriter.setInsertionPointAfter(callee);
         // Replace calls with the QNode with the split QNode in the callee.
-        auto isQNode = [](func::FuncOp funcOp) { return funcOp->hasAttr("qnode"); };
-        clonedCallee = rewriter.create<func::FuncOp>(callee.getLoc(), clonedCalleeName,
-                                                     callee.getFunctionType());
-        if (isQNode(callee)) {
-            // TODO: clean this up
-            clonedCallee->setAttr("qnode", callee->getAttr("qnode"));
-            clonedCallee->setAttr("diff_method", callee->getAttr("diff_method"));
-        }
-        else {
+        clonedCallee = rewriter.cloneWithoutRegions(callee);
+        clonedCallee.setName(clonedCalleeName);
+        clonedCallee.setPrivate();
+        if (!isQNode(callee)) {
             rewriter.cloneRegionBefore(callee.getBody(), clonedCallee.getBody(),
                                        clonedCallee.end());
         }
@@ -157,7 +147,7 @@ LogicalResult HybridGradientLowering::matchAndRewrite(GradOp op, PatternRewriter
         for (Operation *qnodeOp : qnodes) {
             auto qnode = cast<func::FuncOp>(qnodeOp);
             if (getQNodeDiffMethod(qnode) == "finite-diff") {
-                return op.emitError(
+                return callee.emitError(
                     "A QNode with diff_method='finite-diff' cannot be specified in a "
                     "callee of method='defer'");
             }
@@ -171,7 +161,8 @@ LogicalResult HybridGradientLowering::matchAndRewrite(GradOp op, PatternRewriter
 
             // This attribute tells downstream patterns that this QNode requires the registration of
             // a custom quantum gradient.
-            qnode->setAttr("withparams", FlatSymbolRefAttr::get(qnodeWithParams));
+            setRequiresCustomGradient(qnode, FlatSymbolRefAttr::get(qnodeWithParams));
+
             // Enzyme will fail if this function gets inlined.
             qnodeWithParams->setAttr("passthrough",
                                      rewriter.getArrayAttr(rewriter.getStringAttr("noinline")));
@@ -209,18 +200,34 @@ LogicalResult HybridGradientLowering::matchAndRewrite(GradOp op, PatternRewriter
             });
         }
     }
+    return clonedCallee;
+}
+
+LogicalResult HybridGradientLowering::matchAndRewrite(GradOp op, PatternRewriter &rewriter) const
+{
+    if (op.getMethod() != "defer") {
+        return failure();
+    }
+
+    Location loc = op.getLoc();
+    func::FuncOp callee =
+        SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
+    FailureOr<func::FuncOp> clonedCallee = cloneCallee(rewriter, callee);
+    if (failed(clonedCallee)) {
+        return failure();
+    }
 
     rewriter.setInsertionPoint(op);
     std::vector<size_t> diffArgIndices = computeDiffArgIndices(op.getDiffArgIndices());
     SmallVector<Value> backpropResults{op.getNumResults()};
     // Iterate over the primal results
     for (const auto &[cotangentIdx, primalResult] :
-         llvm::enumerate(clonedCallee.getResultTypes())) {
+         llvm::enumerate(clonedCallee->getResultTypes())) {
         // There is one Jacobian per distinct differential argument.
         SmallVector<Value> jacobians;
         for (unsigned argIdx = 0; argIdx < diffArgIndices.size(); argIdx++) {
             Type jacobianType =
-                op.getResultTypes()[argIdx * clonedCallee.getNumResults() + cotangentIdx];
+                op.getResultTypes()[argIdx * clonedCallee->getNumResults() + cotangentIdx];
             if (isa<RankedTensorType>(jacobianType)) {
                 jacobians.push_back(rewriter.create<tensor::EmptyOp>(
                     loc, jacobianType, /*dynamicSizes=*/ValueRange{}));
@@ -239,12 +246,12 @@ LogicalResult HybridGradientLowering::matchAndRewrite(GradOp op, PatternRewriter
                 [&, cotangentIdx = cotangentIdx](ValueRange indices) {
                     // Initialize cotangents for all of the primal outputs
                     SmallVector<Value> cotangents;
-                    initializeCotangents(clonedCallee.getResultTypes(), cotangentIdx, indices,
+                    initializeCotangents(clonedCallee->getResultTypes(), cotangentIdx, indices,
                                          rewriter, loc, cotangents);
 
                     auto backpropOp = rewriter.create<gradient::BackpropOp>(
-                        loc, computeBackpropTypes(clonedCallee, diffArgIndices),
-                        clonedCallee.getName(), op.getArgOperands(),
+                        loc, computeBackpropTypes(*clonedCallee, diffArgIndices),
+                        clonedCallee->getName(), op.getArgOperands(),
                         /*arg_shadows=*/ValueRange{}, /*primal results=*/ValueRange{}, cotangents,
                         op.getDiffArgIndicesAttr());
 
@@ -288,24 +295,24 @@ LogicalResult HybridGradientLowering::matchAndRewrite(GradOp op, PatternRewriter
                             jacobians[backpropIdx] = rewriter.create<tensor::InsertOp>(
                                 loc, jacobianSlice, jacobians[backpropIdx], indices);
                         }
-                        backpropResults[backpropIdx * clonedCallee.getNumResults() + cotangentIdx] =
-                            jacobians[backpropIdx];
+                        backpropResults[backpropIdx * clonedCallee->getNumResults() +
+                                        cotangentIdx] = jacobians[backpropIdx];
                     }
                 });
         }
         else {
             SmallVector<Value> cotangents;
-            initializeCotangents(clonedCallee.getResultTypes(), cotangentIdx, ValueRange(),
+            initializeCotangents(clonedCallee->getResultTypes(), cotangentIdx, ValueRange(),
                                  rewriter, loc, cotangents);
 
             auto backpropOp = rewriter.create<gradient::BackpropOp>(
-                loc, computeBackpropTypes(clonedCallee, diffArgIndices), clonedCallee.getName(),
+                loc, computeBackpropTypes(*clonedCallee, diffArgIndices), clonedCallee->getName(),
                 op.getArgOperands(),
                 /*arg_shadows=*/ValueRange{}, /*primal results=*/ValueRange{}, cotangents,
                 op.getDiffArgIndicesAttr());
             for (const auto &[backpropIdx, jacobianSlice] :
                  llvm::enumerate(backpropOp.getResults())) {
-                size_t resultIdx = backpropIdx * clonedCallee.getNumResults() + cotangentIdx;
+                size_t resultIdx = backpropIdx * clonedCallee->getNumResults() + cotangentIdx;
                 backpropResults[resultIdx] = jacobianSlice;
                 if (jacobianSlice.getType() != op.getResultTypes()[resultIdx]) {
                     // For ergonomics, if the backprop result is a point tensor and the

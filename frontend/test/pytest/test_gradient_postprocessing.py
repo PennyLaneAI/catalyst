@@ -19,8 +19,7 @@ import jax.numpy as jnp
 import pennylane as qml
 import pytest
 
-from catalyst import qjit, grad
-
+from catalyst import grad, qjit
 
 SUPPORTED_DIFF_METHODS = ["parameter-shift", "adjoint"]
 

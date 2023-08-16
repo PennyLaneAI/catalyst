@@ -21,7 +21,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 
 #include "Gradient/IR/GradientOps.h"
-#include "Gradient/Utils/GetDiffMethod.h"
+#include "Gradient/Utils/DifferentialQNode.h"
 #include "Gradient/Utils/GradientShape.h"
 #include "Quantum/IR/QuantumOps.h"
 
@@ -30,7 +30,7 @@ namespace gradient {
 
 LogicalResult AdjointLowering::match(func::FuncOp op) const
 {
-    if (getQNodeDiffMethod(op) == "adjoint" && op->hasAttr("withparams"))
+    if (getQNodeDiffMethod(op) == "adjoint" && requiresCustomGradient(op))
         return success();
 
     return failure();
@@ -46,11 +46,7 @@ void AdjointLowering::rewrite(func::FuncOp op, PatternRewriter &rewriter) const
     func::FuncOp qGradFn = genQGradFunction(rewriter, loc, op);
 
     // Register the quantum gradient on the quantum-only split-out QNode.
-    Operation *qnodeWithParams = SymbolTable::lookupNearestSymbolFrom(
-        op, op->getAttrOfType<FlatSymbolRefAttr>("withparams"));
-    qnodeWithParams->setAttr("gradient.qgrad", FlatSymbolRefAttr::get(qGradFn));
-    // Mark this op as processed so it doesn't get processed again.
-    op->removeAttr("withparams");
+    registerCustomGradient(op, FlatSymbolRefAttr::get(qGradFn));
 }
 
 func::FuncOp AdjointLowering::discardAndReturnReg(PatternRewriter &rewriter, Location loc,

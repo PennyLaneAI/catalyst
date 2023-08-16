@@ -16,7 +16,7 @@
 
 #include "mlir/Dialect/SCF/IR/SCF.h"
 
-#include "Gradient/Utils/GetDiffMethod.h"
+#include "Gradient/Utils/DifferentialQNode.h"
 #include "Gradient/Utils/GradientShape.h"
 #include "Quantum/IR/QuantumOps.h"
 
@@ -25,7 +25,7 @@ namespace gradient {
 
 LogicalResult ParameterShiftLowering::match(func::FuncOp op) const
 {
-    if (getQNodeDiffMethod(op) == "parameter-shift" && op->hasAttr("withparams")) {
+    if (getQNodeDiffMethod(op) == "parameter-shift" && requiresCustomGradient(op)) {
         return success();
     }
     return failure();
@@ -50,11 +50,7 @@ void ParameterShiftLowering::rewrite(func::FuncOp op, PatternRewriter &rewriter)
     func::FuncOp qGradFn = genQGradFunction(rewriter, loc, op, shiftFn, numShifts, loopDepth);
 
     // Register the quantum gradient on the quantum-only split-out QNode.
-    Operation *qnodeWithParams = SymbolTable::lookupNearestSymbolFrom(
-        op, op->getAttrOfType<FlatSymbolRefAttr>("withparams"));
-    qnodeWithParams->setAttr("gradient.qgrad", FlatSymbolRefAttr::get(qGradFn));
-    // Mark this op as processed so it doesn't get processed again.
-    op->removeAttr("withparams");
+    registerCustomGradient(op, FlatSymbolRefAttr::get(qGradFn));
 }
 
 std::pair<int64_t, int64_t> ParameterShiftLowering::analyzeFunction(func::FuncOp callee)
