@@ -23,9 +23,60 @@
 #include "Gradient/Utils/EinsumLinalgGeneric.h"
 
 using namespace mlir;
-using namespace llvm;
 
 namespace catalyst {
+
+Value buildBufferLinalgGeneric(OpBuilder &builder, Location loc, ValueRange operands, Value output,
+                               ArrayRef<AffineMap> indexingMaps,
+                               ArrayRef<utils::IteratorType> iteratorTypes,
+                               function_ref<void(OpBuilder &, Location, ValueRange)> buildBody)
+{
+    builder.create<linalg::GenericOp>(loc, operands, output, indexingMaps, iteratorTypes,
+                                      buildBody);
+    return output;
+}
+
+Value buildTensorLinalgGeneric(OpBuilder &builder, Location loc, ValueRange operands,
+                               RankedTensorType resultType, ArrayRef<AffineMap> indexingMaps,
+                               ArrayRef<utils::IteratorType> iteratorTypes,
+                               function_ref<void(OpBuilder &, Location, ValueRange)> buildBody)
+{
+    // Initialize the result tensor
+    FloatType elementType = cast<FloatType>(resultType.getElementType());
+    Value zero = builder.create<arith::ConstantFloatOp>(
+        loc, APFloat::getZero(elementType.getFloatSemantics()), elementType);
+    Value result =
+        builder.create<tensor::EmptyOp>(loc, resultType.getShape(), resultType.getElementType());
+    result = builder.create<linalg::FillOp>(loc, zero, result).getResult(0);
+
+    auto genericOp = builder.create<linalg::GenericOp>(loc, resultType, operands, result,
+                                                       indexingMaps, iteratorTypes, buildBody);
+    return genericOp.getResult(0);
+}
+
+void inferIndexingMaps(MLIRContext *ctx, unsigned numDims, ArrayRef<int64_t> axisCodesA,
+                       ArrayRef<int64_t> axisCodesB, ArrayRef<int64_t> axisCodesResult,
+                       SmallVectorImpl<AffineMap> &indexingMaps)
+{
+    for (const auto axis : {axisCodesA, axisCodesB, axisCodesResult}) {
+        SmallVector<AffineExpr> aexprs;
+        for (const auto a : axis) {
+            aexprs.push_back(getAffineDimExpr(a, ctx));
+        }
+        indexingMaps.push_back(AffineMap::get(numDims, 0, aexprs, ctx));
+    };
+}
+
+void inferIteratorTypes(const std::map<int64_t, int64_t> &axisDims,
+                        ArrayRef<int64_t> axisCodesResult,
+                        SmallVectorImpl<utils::IteratorType> &iteratorTypes)
+{
+    DenseSet<int64_t> outCodes{axisCodesResult.begin(), axisCodesResult.end()};
+    for (const auto &[code, _size] : axisDims) {
+        iteratorTypes.push_back(outCodes.contains(code) ? utils::IteratorType::reduction
+                                                        : utils::IteratorType::parallel);
+    }
+}
 
 Value einsumLinalgGeneric(OpBuilder &ob, Location loc, ArrayRef<int64_t> axisCodesA,
                           ArrayRef<int64_t> axisCodesB, ArrayRef<int64_t> axisCodesResult, Value a,
@@ -48,6 +99,7 @@ Value einsumLinalgGeneric(OpBuilder &ob, Location loc, ArrayRef<int64_t> axisCod
     auto tb = cast<ShapedType>(b.getType());
     assert(ta.getElementType() == tb.getElementType() && "element types should match");
 
+    // Create an ordered map from axis codes to the size of the corresponding dimension
     std::map<int64_t, int64_t> axisDims;
     {
         for (size_t i = 0; i < ta.getShape().size(); i++)
@@ -56,70 +108,27 @@ Value einsumLinalgGeneric(OpBuilder &ob, Location loc, ArrayRef<int64_t> axisCod
             axisDims[axisCodesB[i]] = tb.getShape()[i];
     }
 
-    std::vector<int64_t> shapeR;
-    {
-        for (auto i : axisCodesResult) {
-            shapeR.push_back(axisDims[i]);
-        }
-    }
-
-    ShapedType resultType;
-    if (useBufferSemantics) {
-        resultType = MemRefType::get(shapeR, ta.getElementType());
-    }
-    else {
-        resultType = RankedTensorType::get(shapeR, ta.getElementType());
-    }
-
     SmallVector<AffineMap> maps;
-    {
-        for (const auto axis : {axisCodesA, axisCodesB, axisCodesResult}) {
-            SmallVector<AffineExpr> aexprs;
-            for (const auto a : axis) {
-                aexprs.push_back(getAffineDimExpr(a, ob.getContext()));
-            }
-            maps.push_back(AffineMap::get(axisDims.size(), 0, aexprs, ob.getContext()));
-        };
-    }
-
-    SmallVector<utils::IteratorType, 4> iteratorTypes;
-    {
-        SmallSetVector<int64_t, 4> ua(axisCodesA.begin(), axisCodesA.end());
-        SmallSetVector<int64_t, 4> ub(axisCodesB.begin(), axisCodesB.end());
-        for (const auto a : axisDims) {
-            iteratorTypes.push_back((ua.contains(a.first) && ub.contains(a.first))
-                                        ? utils::IteratorType::reduction
-                                        : utils::IteratorType::parallel);
-        }
-    }
-
-    Value r;
-    if (useBufferSemantics) {
-        r = bufferOut.value();
-    }
-    else {
-        Value empty =
-            ob.create<tensor::EmptyOp>(loc, resultType.getShape(), resultType.getElementType());
-        Value zero =
-            ob.create<arith::ConstantOp>(loc, resultType.getElementType(), ob.getF64FloatAttr(0.0));
-        r = ob.create<linalg::FillOp>(loc, zero, empty).getResult(0);
-    }
-
-    SmallVector<Value> operands = {a, b};
+    SmallVector<utils::IteratorType> iteratorTypes;
+    inferIndexingMaps(ob.getContext(), axisDims.size(), axisCodesA, axisCodesB, axisCodesResult,
+                      maps);
+    inferIteratorTypes(axisDims, axisCodesResult, iteratorTypes);
     auto bodyBuilder = [](OpBuilder &builder, Location loc, ValueRange args) {
         builder.create<linalg::YieldOp>(
             loc, Value(builder.create<arith::AddFOp>(
                      loc, args[2], builder.create<arith::MulFOp>(loc, args[0], args[1]))));
     };
+
     if (useBufferSemantics) {
-        ob.create<linalg::GenericOp>(loc, operands, r, maps, iteratorTypes, bodyBuilder);
-        return r;
+        return buildBufferLinalgGeneric(ob, loc, {a, b}, *bufferOut, maps, iteratorTypes,
+                                        bodyBuilder);
     }
-    else {
-        auto genOp = ob.create<linalg::GenericOp>(loc, resultType, operands, r, maps, iteratorTypes,
-                                                  bodyBuilder);
-        return genOp.getResult(0);
-    }
+
+    SmallVector<int64_t> resultShape(axisCodesResult.size());
+    llvm::transform(axisCodesResult, resultShape.begin(),
+                    [&](int64_t code) { return axisDims[code]; });
+    auto resultType = RankedTensorType::get(resultShape, ta.getElementType());
+    return buildTensorLinalgGeneric(ob, loc, {a, b}, resultType, maps, iteratorTypes, bodyBuilder);
 }
 
 } // namespace catalyst
