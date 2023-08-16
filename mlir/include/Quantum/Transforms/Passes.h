@@ -20,7 +20,6 @@
 
 namespace catalyst {
 
-// std::unique_ptr<mlir::Pass> createQuantumTensorCastsPass();
 std::unique_ptr<mlir::Pass> createQuantumBufferizationPass();
 std::unique_ptr<mlir::Pass> createQuantumConversionPass();
 std::unique_ptr<mlir::Pass> createEmitCatalystPyInterfacePass();

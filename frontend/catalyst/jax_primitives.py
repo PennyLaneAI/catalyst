@@ -953,6 +953,13 @@ def _hamiltonian_lowering(jax_ctx: mlir.LoweringRuleContext, coeffs: ir.Value, *
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
 
+    baseType = ir.RankedTensorType(coeffs.type).element_type
+    shape = ir.RankedTensorType(coeffs.type).shape
+    if not ir.F64Type.isinstance(baseType):
+        baseType = ir.F64Type.get()
+        resultTensorType = ir.RankedTensorType.get(shape, baseType)
+        coeffs = ConvertOp(resultTensorType, coeffs).results
+
     result_type = ir.OpaqueType.get("quantum", "obs", ctx)
 
     return HamiltonianOp(result_type, coeffs, terms).results

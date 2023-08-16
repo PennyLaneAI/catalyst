@@ -443,8 +443,7 @@ def HamiltonianOp : Observable_Op<"hamiltonian", [Pure]> {
 
     let arguments = (ins
         AnyTypeOf<[
-            1DTensorOf<[F64]>, MemRefRankOf<[F64], [1]>,
-            1DTensorOf<[I64]>, MemRefRankOf<[I64], [1]>
+            1DTensorOf<[F64]>, MemRefRankOf<[F64], [1]>
         ]>:$coeffs,
         Variadic<ObservableType>:$terms
     );

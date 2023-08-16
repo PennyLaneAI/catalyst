@@ -15,6 +15,7 @@
 import numpy as np
 import pennylane as qml
 import pytest
+from jax import numpy as jnp
 
 from catalyst import qjit
 
@@ -424,6 +425,65 @@ class TestVar:
         observed = circuit(np.pi / 2)
         assert np.isclose(observed, expected)
 
+    @pytest.mark.parametrize(
+        "coeffs",
+        [
+            [1, 1],
+            np.array([1, 1], dtype=np.int64),
+            jnp.array([1, 1], dtype=np.int64),
+        ],
+    )
+    def test_hamiltonian_3(self, coeffs, backend):
+        """Test variance for Hamiltonian observable with integer coefficients."""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=3))
+        def circuit(x: float, y: float):
+            qml.RX(x, wires=0)
+            qml.RY(y, wires=1)
+            qml.RZ(0.1, wires=2)
+
+            obs = [qml.PauliX(0) @ qml.PauliZ(1), qml.PauliZ(0) @ qml.Hadamard(2)]
+
+            return qml.var(qml.Hamiltonian(coeffs, obs))
+
+        expected = np.array(1.75)
+        observed = circuit(np.pi / 4, np.pi / 3)
+        assert np.isclose(observed, expected)
+
+        expected = np.array(1.61492442)
+        observed = circuit(0.5, 0.8)
+        assert np.isclose(observed, expected)
+
+    @pytest.mark.parametrize(
+        "coeffs",
+        [
+            np.array([1, 1], dtype=np.int64),
+            jnp.array([1, 1], dtype=np.int64),
+        ],
+    )
+    def test_hamiltonian_4(self, coeffs, backend):
+        """Test variance for Hamiltonian observable with integer coefficients
+        as the circuit parameters."""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=3))
+        def circuit(x, y, coeffs):
+            qml.RX(x, wires=0)
+            qml.RY(y, wires=1)
+            qml.RZ(0.1, wires=2)
+
+            obs = [qml.PauliX(0) @ qml.PauliZ(1), qml.PauliZ(0) @ qml.Hadamard(2)]
+
+            return qml.var(qml.Hamiltonian(coeffs, obs))
+
+        expected = np.array(1.75)
+        observed = circuit(np.pi / 4, np.pi / 3, coeffs)
+        assert np.isclose(
+            observed,
+            expected,
+        )
+
 
 class TestOtherMeasurements:
     """Test other measurement processes."""
@@ -484,29 +544,6 @@ class TestOtherMeasurements:
 
         # qml.state
         assert np.allclose(result[5], expected(x, qml.state()))
-
-
-class TestNewOperatorArith:
-    "Test PennyLane new operator arithmetic"
-
-    def test_op_sum_1(self, backend):
-        """Test expval for qml.sum of observables."""
-
-        @qjit
-        @qml.qnode(qml.device(backend, wires=2))
-        def circuit(x: float, y: float):
-            qml.RX(x, wires=0)
-            qml.RY(y, wires=1)
-            # return qml.expval(qml.PauliX(0) + qml.PauliZ(1))
-            return qml.expval(qml.Hamiltonian(np.array([1, 1]), [qml.PauliX(0), qml.PauliZ(1)]))
-
-        expected = np.array(0.5)
-        observed = circuit(np.pi / 4, np.pi / 3)
-        assert np.isclose(observed, expected)
-
-        # expected = np.array(0.22130985)
-        # observed = circuit(0.5, 0.8)
-        # assert np.isclose(observed, expected)
 
 
 if __name__ == "__main__":

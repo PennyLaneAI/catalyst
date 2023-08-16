@@ -467,44 +467,6 @@ struct HamiltonianOpPattern : public OpConversionPattern<HamiltonianOp> {
         assert(op.getCoeffs().getType().isa<MemRefType>() &&
                "hamiltonian must take in memref before lowering");
 
-        // assert(op.getCoeffs().getType().cast<ShapedType>().getElementType() ==
-        // Float64Type::get(ctx) && "failed in the future support for hamiltonian!!!");
-
-        auto HCoeffs = adaptor.getCoeffs();
-
-        // If the Hamoltonian coefficients are integers, we will create a new MemRefType with F64
-        // element type.
-        if (op.getCoeffs().getType().cast<ShapedType>().getElementType().isInteger(64)) {
-            auto coeffsType = op.getCoeffs().getType().dyn_cast<MemRefType>();
-
-            // assert(false && "failed in the future support for hamiltonian!!!");
-            auto F64Type = rewriter.getF64Type();
-
-            // Create a new MemRefType
-            auto newCoeffsType = MemRefType::get(coeffsType.getShape(), F64Type);
-
-            // Allocate a new MemRef with newCoeffsType
-            Value newCoeffs = rewriter.create<memref::AllocaOp>(loc, newCoeffsType);
-
-            // Iterate over the elements and perform the conversion
-            SmallVector<Value, 2> indices;
-            indices.resize(coeffsType.getRank(),
-                           rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 0));
-
-            for (auto idx : llvm::enumerate(indices)) {
-                Value elem =
-                    rewriter.create<LLVM::LoadOp>(loc, coeffsType.getElementType(), op.getCoeffs(),
-                                                  rewriter.getDimOperands(loc, idx.index()));
-
-                Value newElem = rewriter.create<LLVM::SIToFPOp>(loc, rewriter.getF64Type(), elem);
-
-                rewriter.create<LLVM::StoreOp>(loc, newElem, newCoeffs,
-                                               rewriter.getDimOperands(loc, idx.index()));
-            }
-
-            rewriter.replaceOp(op, newCoeffs);
-        }
-
         Type vectorType = conv->convertType(MemRefType::get({UNKNOWN}, Float64Type::get(ctx)));
 
         StringRef qirName = "__quantum__qis__HamiltonianObs";
