@@ -88,7 +88,8 @@
   [#248](https://github.com/PennyLaneAI/catalyst/pull/248)
 
   For example, compiling the following circuit wasn't allowed before, but it is
-  not supported in Catalyst:
+  now supported in Catalyst:
+
   ``` python
   @qjit
   @qml.qnode(qml.device("lightning.qubit", wires=2))
