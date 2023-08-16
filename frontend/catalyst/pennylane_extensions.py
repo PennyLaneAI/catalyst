@@ -267,9 +267,9 @@ def _verify_differentiable_child_qnodes(jaxpr, method):
         for eqn in jaxpr.eqns:
             fn = eqn.params.get("fn")
             if fn and fn not in visited:
-                if isinstance(fn, (qml.QNode, Grad)):
-                    _check_created_jaxpr_gradient_methods(fn, method, jaxpr)
                 child = eqn.params.get("call_jaxpr", None)
+                if isinstance(fn, (qml.QNode, Grad)):
+                    _check_created_jaxpr_gradient_methods(fn, method, child)
                 if child and child not in visited:
                     traverse_children(child)
             visited.add(fn)
@@ -290,10 +290,9 @@ def _check_created_jaxpr_gradient_methods(f: Differentiable, method: str, jaxpr:
     assert isinstance(
         f, qml.QNode
     ), "Expected quantum differentiable node to be a qml.QNode or a catalyst.grad op"
-    qnode_jaxpr = jaxpr.eqns[0].params["call_jaxpr"]
     return_ops = []
-    for res in qnode_jaxpr.outvars:
-        for eq in reversed(qnode_jaxpr.eqns):  # pragma: no branch
+    for res in jaxpr.outvars:
+        for eq in reversed(jaxpr.eqns):  # pragma: no branch
             if res in eq.outvars:
                 return_ops.append(eq.primitive)
                 break

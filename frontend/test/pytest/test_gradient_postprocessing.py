@@ -253,3 +253,30 @@ def test_multi_qnode(backend):
 
     x = jnp.array([0.1, 0.2, 0.3])
     assert grad_workflow(x) == pytest.approx(jax.jacobian(postprocess)(x))
+
+
+def test_qnode_different_returns(backend):
+    """
+    Test a multi-QNode workflow where the QNodes have different diff_methods and return different
+    shapes.
+    """
+
+    @qml.qnode(qml.device(backend, wires=1), diff_method="parameter-shift")
+    def circuit_A(params):
+        qml.RX(jnp.exp(params[0] ** 2) / jnp.cos(params[1] / 4), wires=0)
+        return qml.probs()
+
+    @qml.qnode(qml.device(backend, wires=1), diff_method="adjoint")
+    def circuit_B(params):
+        qml.RX(jnp.exp(params[1] ** 2) / jnp.cos(params[0] / 4), wires=0)
+        return qml.expval(qml.PauliZ(wires=0))
+
+    def loss(params):
+        return jnp.prod(circuit_A(params)) + circuit_B(params)
+
+    @qjit
+    def grad_loss(theta):
+        return grad(loss, method="defer")(theta)
+
+    x = jnp.array([1.0, 2.0])
+    assert grad_loss(x) == pytest.approx(jax.jacobian(loss)(x))
