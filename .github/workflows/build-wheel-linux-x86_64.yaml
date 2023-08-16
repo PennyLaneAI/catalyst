@@ -139,26 +139,6 @@ jobs:
 
         cmake --build enzyme-build
 
-    # Build QIR
-    - name: Install rustup with llvm-tools-preview
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
-        components: llvm-tools-preview
-
-    - name: Install QIR-stdlib
-      run: |
-          (cd ./runtime/qir-stdlib && cargo build --release)
-
-    - name: Upload qir-stdlib artifact
-      uses: actions/upload-artifact@v3
-      with:
-        name: qir-stdlib
-        path: |
-          runtime/qir-stdlib/target/release/*.a
-          runtime/qir-stdlib/target/release/build/include/*.h
-        retention-days: 1
-
   catalyst-linux-wheels-x86-64:
     needs: [constants, build-dependencies]
     strategy:
@@ -220,12 +200,6 @@ jobs:
         key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.enzyme_version }}-generic-build
         fail-on-cache-miss: True
 
-    - name: Download QIR stdlib Artifact
-      uses: actions/download-artifact@v3
-      with:
-        name: qir-stdlib
-        path: runtime/qir-stdlib/target/release
-
     # Build Catalyst-Runtime
     - name: Build Catalyst-Runtime
       run: |
@@ -233,8 +207,6 @@ jobs:
               -DCMAKE_BUILD_TYPE=Release \
               -DPYTHON_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -Dpybind11_DIR=$(python${{ matrix.python_version }} -c "import pybind11; print(pybind11.get_cmake_dir())") \
-              -DQIR_STDLIB_LIB=$GITHUB_WORKSPACE/runtime/qir-stdlib/target/release \
-              -DQIR_STDLIB_INCLUDES=$GITHUB_WORKSPACE/runtime/qir-stdlib/target/release/build/include \
               -DENABLE_LIGHTNING_KOKKOS=ON \
               -DKokkos_ENABLE_SERIAL=ON \
               -DKokkos_ENABLE_OPENMP=ON \
