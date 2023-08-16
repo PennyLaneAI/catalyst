@@ -86,14 +86,11 @@ def test_adjoint(g):
 def test_control(g, ctrls):
     def circuit():
         qml.Rot(0.3, 0.4, 0.5, wires=0)
-        if isinstance(g, qml.PauliX):
-            qml.ctrl(g, control=ctrls, work_wires=[7])
-        else:
-            qml.ctrl(g, control=ctrls)
+        qml.ctrl(g, control=ctrls)
         return qml.state()
 
-    result = qjit(qml.qnode(qml.device("lightning.qubit", wires=8))(circuit))()
-    expected = qml.qnode(qml.device("default.qubit", 8))(circuit)()
+    result = qjit(qml.qnode(qml.device("lightning.qubit", wires=7))(circuit))()
+    expected = qml.qnode(qml.device("default.qubit", 7))(circuit)()
 
     assert jnp.allclose(result, expected)
 
@@ -103,14 +100,11 @@ def test_control(g, ctrls):
 def test_control_variable_wires(g, ctrls):
     def circuit(ctrls):
         qml.Rot(0.3, 0.4, 0.5, wires=0)
-        if isinstance(g, qml.PauliX):
-            qml.ctrl(g, control=ctrls, work_wires=[7])
-        else:
-            qml.ctrl(g, control=ctrls)
+        qml.ctrl(g, control=ctrls)
         return qml.state()
 
-    result = qjit(qml.qnode(qml.device("lightning.qubit", wires=8))(circuit))(jnp.array(ctrls))
-    expected = qml.qnode(qml.device("default.qubit", 8))(circuit)(ctrls)
+    result = qjit(qml.qnode(qml.device("lightning.qubit", wires=7))(circuit))(jnp.array(ctrls))
+    expected = qml.qnode(qml.device("default.qubit", 7))(circuit)(ctrls)
 
     assert jnp.allclose(result, expected)
 
