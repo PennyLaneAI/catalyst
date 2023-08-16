@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "Quantum-c/Dialects.h"
+#include "CAPI/Dialects.h"
 
 #include "Gradient/IR/GradientDialect.h"
 #include "Quantum/IR/QuantumDialect.h"
