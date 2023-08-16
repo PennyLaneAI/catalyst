@@ -135,10 +135,6 @@
   and remove references to QIR in runtime's Makefile.
   [#243](https://github.com/PennyLaneAI/catalyst/pull/243)
 
-* On gradient tests, do not use finite-diff method for expected values to avoid compatiblity
-  issues with autograd.
-  [#249](https://github.com/PennyLaneAI/catalyst/pull/249)
-
 <h3>Breaking changes</h3>
 
 * Support for Python 3.8 is dropped.
