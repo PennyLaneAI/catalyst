@@ -61,11 +61,50 @@
   benefits: reduced circuit size (= faster compile times!) when using control flow and performance benefits
   from Catalyst's Just-In-Time compilation.
 
+* Add support for container-like and nested Python structures, such as lists of lists or dictionaries,
+  that can occur in a QJIT program as function arguments or return values via the JAX ``pytree`` API.
+  [#221](https://github.com/PennyLaneAI/catalyst/pull/221)
+
+  For example:
+  
+  ```python
+  @qjit
+  def workflow(params1, params2):
+    """A classical workflow"""
+    res1 = params1["a"][0][0] + params2[1]
+    return jnp.sin(res1)
+
+  params1 = {
+    "a": [[0.1], 0.2],
+  }
+  params2 = (0.6, 0.8)
+  workflow(params1, params2)
+  ```
+
+  ```python
+  @qjit
+  @qml.qnode(qml.device("lightning.qubit", wires=2, shots=100))
+  def circuit(params):
+      """A hybrid circuit"""
+      qml.RX(params[0] * jnp.pi(), wires=0)
+      qml.RX(params[1], wires=1)
+      return {
+          "counts": qml.counts(),
+          "state": qml.state(),
+          "expval": {
+              "z0": qml.expval(qml.PauliZ(0)),
+              "z1": qml.expval(qml.PauliZ(1)),
+          },
+      }
+  circuit([0.5, 0.6])
+  ```
+
 * Add support for compile-time backpropagation of classical pre-processing via Enzyme AD.
   [#158](https://github.com/PennyLaneAI/catalyst/pull/158)
   [#193](https://github.com/PennyLaneAI/catalyst/pull/193)
   [#224](https://github.com/PennyLaneAI/catalyst/pull/224)
   [#225](https://github.com/PennyLaneAI/catalyst/pull/225)
+  [#239](https://github.com/PennyLaneAI/catalyst/pull/239)
 
   This enables high-performance reverse mode automatic differentiation of arbitrary classical
   preprocessing when ``method=defer`` is specified on the ``grad`` operation:
@@ -85,6 +124,25 @@
   >>> grad_circuit(jnp.pi)
   array(112936.34906843)
   ```
+
+* Add support for Hamiltonian observables with integer coefficients.
+  [#248](https://github.com/PennyLaneAI/catalyst/pull/248)
+
+  For example, compiling the following circuit wasn't allowed before, but it is
+  now supported in Catalyst:
+
+  ``` python
+  @qjit
+  @qml.qnode(qml.device("lightning.qubit", wires=2))
+  def circuit(x: float, y: float):
+      qml.RX(x, wires=0)
+      qml.RY(y, wires=1)
+
+      coeffs = [1, 2]
+      obs = [qml.PauliZ(0), qml.PauliZ(1)]
+      return qml.expval(qml.Hamiltonian(coeffs, obs))
+  ```
+
 
 <h3>Improvements</h3>
 
@@ -110,18 +168,69 @@
   until the end of the call to the JIT compiled function.
   [#201](https://github.com/PennyLaneAI/catalyst/pull/201)
 
+* Avoid a type mismatch. This allows dialects to compile with older versions of clang.
+  [#228](https://github.com/PennyLaneAI/catalyst/pull/228)
+
+* Remove unnecessary ``reinterpret_cast``s. from ``ObsManager``s. Removal of these ``reinterpret_cast``s
+  allows compilation of the runtime to succeed in macOS. macOS uses an ILP32 mode for Aarch64 where they
+  use the full 64 bit mode but with 32 bit Integer, Long, and Pointers. This patch also changes a test file
+  to prevent a mismatch in machines which compile using ILP32 mode.
+  [#229](https://github.com/PennyLaneAI/catalyst/pull/230)
+
+* Allow runtime to be compiled on macOS. Substitute ``nproc`` with a call to ``os.cpu_count()`` and
+  use correct flags for ``ld.64``.
+  [#232](https://github.com/PennyLaneAI/catalyst/pull/232)
+
+* Improve portability on the frontend to be available on macOS. Use ``.dylib``, remove unnecessary flags,
+  and address behaviour difference in flags.
+  [#233](https://github.com/PennyLaneAI/catalyst/pull/233)
+
+* Build the runtime against ``qir-stdlib`` pre-build artifacts.
+  [#236](https://github.com/PennyLaneAI/catalyst/pull/236)
+
+* Small compatibility changes in order for all integration tests to succeed on macOS.
+  [#234](https://github.com/PennyLaneAI/catalyst/pull/234)
+
+* Small improvements to CI/CD. Fix Enzyme cache, generalize caches to other operating systems,
+  and remove references to QIR in runtime's Makefile.
+  [#243](https://github.com/PennyLaneAI/catalyst/pull/243)
 
 <h3>Breaking changes</h3>
+
+* Support for Python 3.8 is dropped.
+  [#231](https://github.com/PennyLaneAI/catalyst/pull/231)
+
+* Since we are now using PyTrees, python lists are no longer automatically converted into JAX
+  arrays. This means that indexing on lists when the index is not static will cause a
+  ``TracerIntegerConversionError``.
+
+  ```python
+  @qjit
+  def f(list, index):
+    return list[index]
+  ```
+
+  will no longer work. This is more consistent with JAX's behaviour. However, if the variable
+  ``list`` above is a JAX or Numpy array, the compilation still succeeds.
+  [#221](https://github.com/PennyLaneAI/catalyst/pull/221)
 
 <h3>Bug fixes</h3>
 
 * Fix issue preventing the differentiation of ``qml.probs`` with the parameter-shift method.
   [#211](https://github.com/PennyLaneAI/catalyst/pull/211)
 
+* Fix incorrect return value data-type with functions returning ``qml.counts``.
+  [#221](https://github.com/PennyLaneAI/catalyst/pull/221)
+
+* Fix segmentation fault when differentiating a function where a quantum measurement is used
+  multiple times by the same operation.
+  [#242](https://github.com/PennyLaneAI/catalyst/pull/242)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
 
+Ali Asadi,
 David Ittah,
 Erick Ochoa Lopez,
 Jacob Mai Peng,
@@ -138,6 +247,10 @@ Sergei Mironov.
   PennyLane. The Lightning-Kokkos backend with Serial and OpenMP modes is also added to the binary
   distribution.
   [#198](https://github.com/PennyLaneAI/catalyst/pull/198)
+
+* Return a list of decompositions when calling the decomposition method for control operations.
+  This allows Catalyst to be compatible with upstream PennyLane.
+  [#241](https://github.com/PennyLaneAI/catalyst/pull/241)
 
 <h3>Improvements</h3>
 

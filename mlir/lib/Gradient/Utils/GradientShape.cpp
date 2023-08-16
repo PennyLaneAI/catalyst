@@ -27,8 +27,7 @@ namespace gradient {
 /// whereas the result signature is the set of shape unions for each combination of differentiable
 /// argument function result.
 ///
-std::vector<Type> computeResultTypes(func::FuncOp callee,
-                                     const std::vector<uint64_t> &diffArgIndices)
+std::vector<Type> computeResultTypes(func::FuncOp callee, const std::vector<size_t> &diffArgIndices)
 {
     std::vector<Type> gradResultTypes;
     FunctionType fnType = callee.getFunctionType();
@@ -104,7 +103,7 @@ std::vector<Type> computeQGradTypes(func::FuncOp callee)
 /// The non differentiable params are filtered out.
 ///
 std::vector<Type> computeBackpropTypes(func::FuncOp callee,
-                                       const std::vector<uint64_t> &diffArgIndices)
+                                       const std::vector<size_t> &diffArgIndices)
 {
     std::vector<Type> backpropResTypes;
     FunctionType fnType = callee.getFunctionType();

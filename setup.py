@@ -41,7 +41,6 @@ classifiers = [
     "Operating System :: POSIX",
     "Operating System :: POSIX :: Linux",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -66,6 +65,7 @@ for ext in intree_extension_list:
     ext._add_ldflags(["-L", lib_path_npymath])  # pylint: disable=protected-access
     ext._add_ldflags(["-lnpymath"])  # pylint: disable=protected-access
     ext._add_cflags(["-I", np.get_include()])  # pylint: disable=protected-access
+    ext._add_cflags(["-std=c++17"])  # pylint: disable=protected-access
 ext_modules = intree_extension_list
 
 setup(
@@ -73,7 +73,7 @@ setup(
     name="pennylane-catalyst",
     provides=["catalyst"],
     version=version,
-    python_requires=">=3.8",
+    python_requires=">=3.9",
     install_requires=requirements,
     packages=find_namespace_packages(
         where="frontend",

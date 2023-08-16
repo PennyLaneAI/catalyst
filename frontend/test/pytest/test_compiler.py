@@ -17,6 +17,7 @@ Unit tests for CompilerDriver class
 """
 
 import os
+import platform
 import shutil
 import subprocess
 import sys
@@ -177,7 +178,10 @@ class TestCompilerErrors:
             """Class that overrides the program to be compiled."""
 
             _executable = "cc"
-            _default_flags = ["-shared", "-fPIC", "-x", "c++"]
+
+            # libstdc++ has been deprecated on macOS in favour of libc++
+            libcpp = "-lstdc++" if platform.system() == "Linux" else "-lc++"
+            _default_flags = ["-shared", "-fPIC", "-x", "c++", libcpp]
 
             @staticmethod
             def get_output_filename(infile):
@@ -230,7 +234,7 @@ class TestCompilerState:
             qml.X(wires=1)
             return qml.state()
 
-        mlir_module, _, _ = get_mlir(workflow)
+        mlir_module, _, _, _ = get_mlir(workflow)
         compiler = Compiler()
         compiler.run(mlir_module, CompileOptions())
         compiler.get_output_of("MHLOPass")
@@ -250,7 +254,7 @@ class TestCompilerState:
             qml.X(wires=1)
             return qml.state()
 
-        mlir_module, _, _ = get_mlir(workflow)
+        mlir_module, _, _, _ = get_mlir(workflow)
         # This means that we are not running any pass.
         pipelines = []
         identity_compiler = Compiler()
@@ -272,7 +276,7 @@ class TestCompilerState:
             qml.X(wires=1)
             return qml.state()
 
-        mlir_module, _, _ = get_mlir(workflow)
+        mlir_module, _, _, _ = get_mlir(workflow)
         # This means that we are not running any pass.
         pipelines = []
         identity_compiler = Compiler()
@@ -376,7 +380,7 @@ class TestCompilerState:
             qml.X(wires=1)
             return qml.state()
 
-        mlir_module, _, _ = get_mlir(workflow)
+        mlir_module, _, _, _ = get_mlir(workflow)
         compiler = Compiler()
         compiler.run(mlir_module, CompileOptions(pipelines=[MyPass]))
         result = compiler.get_output_of("MyPass")
