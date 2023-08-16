@@ -43,7 +43,7 @@ import catalyst.jax_primitives as jprim
 from catalyst.jax_primitives import GradParams, expval_p, probs_p
 from catalyst.jax_tape import JaxTape
 from catalyst.jax_tracer import get_traceable_fn, insert_to_qreg, trace_quantum_tape
-from catalyst.jax_tracer2 import trace_quantum_function, measure, MidCircuitMeasure
+from catalyst.jax_tracer2 import trace_quantum_function, measure, MidCircuitMeasure, for_loop
 from catalyst.utils.exceptions import CompileError, DifferentiableCompileError
 from catalyst.utils.patching import Patcher
 from catalyst.utils.tracing import TracingContext
@@ -1106,185 +1106,185 @@ def while_loop(cond_fn):
     return _while_loop
 
 
-class ForLoop(Operation):
-    """PennyLane ForLoop Operation."""
+# class ForLoop(Operation):
+#     """PennyLane ForLoop Operation."""
 
-    num_wires = AnyWires
+#     num_wires = AnyWires
 
-    # pylint: disable=too-many-arguments
-    def __init__(self, loop_bounds, iter_args, body_jaxpr, body_consts, body_tree, *args, **kwargs):
-        self.loop_bounds = loop_bounds
-        self.iter_args = iter_args
-        self.body_jaxpr = body_jaxpr
-        self.body_consts = body_consts
-        self.body_tree = body_tree
-        kwargs["wires"] = Wires(ForLoop.num_wires)
-        super().__init__(*args, **kwargs)
-
-
-class ForLoopCallable:
-    """
-    Some code in this class has been adapted from the for loop implementation in the JAX project at
-    https://github.com/google/jax/blob/jax-v0.4.1/jax/_src/lax/control_flow/for_loop.py
-    released under the Apache License, Version 2.0, with the following copyright notice:
-
-    Copyright 2021 The JAX Authors.
-    """
-
-    def __init__(self, lower_bound, upper_bound, step, body_fn):
-        self.lower_bound = lower_bound
-        self.upper_bound = upper_bound
-        self.step = step
-        self.body_fn = body_fn
-
-    @staticmethod
-    def _create_jaxpr(init_val, new_body):
-        init_vals, in_tree = tree_flatten(init_val)
-        init_avals = tuple(_abstractify(val) for val in init_vals)
-        body_jaxpr, body_consts, body_tree = _initial_style_jaxpr(
-            new_body, in_tree, init_avals, "for_loop"
-        )
-
-        return body_jaxpr, body_consts, body_tree
-
-    def _call_with_quantum_ctx(self, ctx, *args):
-        # Insert iteration counter into loop body arguments with the type of the lower bound.
-        args = (self.lower_bound, *args)
-
-        new_body = partial(_trace_quantum_tape, _callee=self.body_fn)
-
-        body_jaxpr, body_consts, body_tree = ForLoopCallable._create_jaxpr(
-            (args, {}, [jprim.Qreg()]), new_body
-        )
-
-        flat_init_vals_no_qubits = tree_flatten(args)[0]
-
-        ForLoop(
-            [self.lower_bound, self.upper_bound, self.step],
-            flat_init_vals_no_qubits,
-            body_jaxpr,
-            body_consts,
-            body_tree,
-        )
-
-        # Get tracers for any non-qreg return values (if there are any).
-        args, trees = body_jaxpr.out_avals[:-1], body_tree.children()[0]
-        return ctx.jax_tape.create_tracer(trees, args)
-
-    def _call_with_classical_ctx(self, *args):
-        # Insert iteration counter into loop body arguments with the type of the lower bound.
-        args = (self.lower_bound, *args)
-
-        body_jaxpr, body_consts, body_tree = ForLoopCallable._create_jaxpr(args, self.body_fn)
-
-        flat_init_vals_no_qubits = tree_flatten(args)[0]
-
-        inputs = (
-            [self.lower_bound, self.upper_bound, self.step] + body_consts + flat_init_vals_no_qubits
-        )
-        ret_tree_flat = jprim.qfor(body_jaxpr, len(body_consts), *inputs)
-        return tree_unflatten(body_tree, ret_tree_flat)
-
-    def _call_during_trace(self, *args):
-        TracingContext.check_is_tracing("Must use 'for_loop' inside tracing context.")
-
-        ctx = qml.QueuingManager.active_context()
-        if ctx is None:
-            return self._call_with_classical_ctx(*args)
-        return self._call_with_quantum_ctx(ctx, *args)
-
-    def _call_during_interpretation(self, *args):
-        fn_res = args if len(args) > 1 else args[0] if len(args) == 1 else None
-
-        for i in range(self.lower_bound, self.upper_bound, self.step):
-            fn_res = self.body_fn(i, *args)
-            args = fn_res if len(args) > 1 else (fn_res,) if len(args) == 1 else ()
-
-        return fn_res
-
-    def __call__(self, *args):
-        is_tracing = TracingContext.is_tracing()
-        if is_tracing:
-            return self._call_during_trace(*args)
-
-        return self._call_during_interpretation(*args)
+#     # pylint: disable=too-many-arguments
+#     def __init__(self, loop_bounds, iter_args, body_jaxpr, body_consts, body_tree, *args, **kwargs):
+#         self.loop_bounds = loop_bounds
+#         self.iter_args = iter_args
+#         self.body_jaxpr = body_jaxpr
+#         self.body_consts = body_consts
+#         self.body_tree = body_tree
+#         kwargs["wires"] = Wires(ForLoop.num_wires)
+#         super().__init__(*args, **kwargs)
 
 
-def for_loop(lower_bound, upper_bound, step):
-    """A :func:`~.qjit` compatible for-loop decorator for PennyLane/Catalyst.
+# class ForLoopCallable:
+#     """
+#     Some code in this class has been adapted from the for loop implementation in the JAX project at
+#     https://github.com/google/jax/blob/jax-v0.4.1/jax/_src/lax/control_flow/for_loop.py
+#     released under the Apache License, Version 2.0, with the following copyright notice:
 
-    This for-loop representation is a functional version of the traditional
-    for-loop, similar to ``jax.cond.fori_loop``. That is, any variables that
-    are modified across iterations need to be provided as inputs/outputs to
-    the loop body function:
+#     Copyright 2021 The JAX Authors.
+#     """
 
-    - Input arguments contain the value of a variable at the start of an
-      iteration.
+#     def __init__(self, lower_bound, upper_bound, step, body_fn):
+#         self.lower_bound = lower_bound
+#         self.upper_bound = upper_bound
+#         self.step = step
+#         self.body_fn = body_fn
 
-    - output arguments contain the value at the end of the iteration. The
-      outputs are then fed back as inputs to the next iteration.
+#     @staticmethod
+#     def _create_jaxpr(init_val, new_body):
+#         init_vals, in_tree = tree_flatten(init_val)
+#         init_avals = tuple(_abstractify(val) for val in init_vals)
+#         body_jaxpr, body_consts, body_tree = _initial_style_jaxpr(
+#             new_body, in_tree, init_avals, "for_loop"
+#         )
 
-    The final iteration values are also returned from the transformed
-    function.
+#         return body_jaxpr, body_consts, body_tree
 
-    This form of control flow can also be called from the Python interpreter without needing to use
-    :func:`~.qjit`.
+#     def _call_with_quantum_ctx(self, ctx, *args):
+#         # Insert iteration counter into loop body arguments with the type of the lower bound.
+#         args = (self.lower_bound, *args)
 
-    The semantics of ``for_loop`` are given by the following Python pseudo-code:
+#         new_body = partial(_trace_quantum_tape, _callee=self.body_fn)
 
-    .. code-block:: python
+#         body_jaxpr, body_consts, body_tree = ForLoopCallable._create_jaxpr(
+#             (args, {}, [jprim.Qreg()]), new_body
+#         )
 
-        def for_loop(lower_bound, upper_bound, step, loop_fn, *args):
-            for i in range(lower_bound, upper_bound, step):
-                args = loop_fn(i, *args)
-            return args
+#         flat_init_vals_no_qubits = tree_flatten(args)[0]
 
-    Unlike ``jax.cond.fori_loop``, the step can be negative if it is known at tracing time
-    (i.e. constant). If a non-constant negative step is used, the loop will produce no iterations.
+#         ForLoop(
+#             [self.lower_bound, self.upper_bound, self.step],
+#             flat_init_vals_no_qubits,
+#             body_jaxpr,
+#             body_consts,
+#             body_tree,
+#         )
 
-    Args:
-        lower_bound (int): starting value of the iteration index
-        upper_bound (int): (exclusive) upper bound of the iteration index
-        step (int): increment applied to the iteration index at the end of each iteration
+#         # Get tracers for any non-qreg return values (if there are any).
+#         args, trees = body_jaxpr.out_avals[:-1], body_tree.children()[0]
+#         return ctx.jax_tape.create_tracer(trees, args)
 
-    Returns:
-        Callable[[int, ...], ...]: A wrapper around the loop body function.
-        Note that the loop body function must always have the iteration index as its first argument,
-        which can be used arbitrarily inside the loop body. As the value of the index across
-        iterations is handled automatically by the provided loop bounds, it must not be returned
-        from the function.
+#     def _call_with_classical_ctx(self, *args):
+#         # Insert iteration counter into loop body arguments with the type of the lower bound.
+#         args = (self.lower_bound, *args)
 
-    **Example**
+#         body_jaxpr, body_consts, body_tree = ForLoopCallable._create_jaxpr(args, self.body_fn)
+
+#         flat_init_vals_no_qubits = tree_flatten(args)[0]
+
+#         inputs = (
+#             [self.lower_bound, self.upper_bound, self.step] + body_consts + flat_init_vals_no_qubits
+#         )
+#         ret_tree_flat = jprim.qfor(body_jaxpr, len(body_consts), *inputs)
+#         return tree_unflatten(body_tree, ret_tree_flat)
+
+#     def _call_during_trace(self, *args):
+#         TracingContext.check_is_tracing("Must use 'for_loop' inside tracing context.")
+
+#         ctx = qml.QueuingManager.active_context()
+#         if ctx is None:
+#             return self._call_with_classical_ctx(*args)
+#         return self._call_with_quantum_ctx(ctx, *args)
+
+#     def _call_during_interpretation(self, *args):
+#         fn_res = args if len(args) > 1 else args[0] if len(args) == 1 else None
+
+#         for i in range(self.lower_bound, self.upper_bound, self.step):
+#             fn_res = self.body_fn(i, *args)
+#             args = fn_res if len(args) > 1 else (fn_res,) if len(args) == 1 else ()
+
+#         return fn_res
+
+#     def __call__(self, *args):
+#         is_tracing = TracingContext.is_tracing()
+#         if is_tracing:
+#             return self._call_during_trace(*args)
+
+#         return self._call_during_interpretation(*args)
 
 
-    .. code-block:: python
+# def for_loop(lower_bound, upper_bound, step):
+#     """A :func:`~.qjit` compatible for-loop decorator for PennyLane/Catalyst.
 
-        dev = qml.device("lightning.qubit", wires=1)
+#     This for-loop representation is a functional version of the traditional
+#     for-loop, similar to ``jax.cond.fori_loop``. That is, any variables that
+#     are modified across iterations need to be provided as inputs/outputs to
+#     the loop body function:
 
-        @qjit
-        @qml.qnode(dev)
-        def circuit(n: int, x: float):
+#     - Input arguments contain the value of a variable at the start of an
+#       iteration.
 
-            def loop_rx(i, x):
-                # perform some work and update (some of) the arguments
-                qml.RX(x, wires=0)
+#     - output arguments contain the value at the end of the iteration. The
+#       outputs are then fed back as inputs to the next iteration.
 
-                # update the value of x for the next iteration
-                return jnp.sin(x)
+#     The final iteration values are also returned from the transformed
+#     function.
 
-            # apply the for loop
-            final_x = for_loop(0, n, 1)(loop_rx)(x)
+#     This form of control flow can also be called from the Python interpreter without needing to use
+#     :func:`~.qjit`.
 
-            return qml.expval(qml.PauliZ(0)), final_x
+#     The semantics of ``for_loop`` are given by the following Python pseudo-code:
 
-    >>> circuit(7, 1.6)
-    [array(0.97926626), array(0.55395718)]
-    """
+#     .. code-block:: python
 
-    def _for_loop(body_fn):
-        return ForLoopCallable(lower_bound, upper_bound, step, body_fn)
+#         def for_loop(lower_bound, upper_bound, step, loop_fn, *args):
+#             for i in range(lower_bound, upper_bound, step):
+#                 args = loop_fn(i, *args)
+#             return args
 
-    return _for_loop
+#     Unlike ``jax.cond.fori_loop``, the step can be negative if it is known at tracing time
+#     (i.e. constant). If a non-constant negative step is used, the loop will produce no iterations.
+
+#     Args:
+#         lower_bound (int): starting value of the iteration index
+#         upper_bound (int): (exclusive) upper bound of the iteration index
+#         step (int): increment applied to the iteration index at the end of each iteration
+
+#     Returns:
+#         Callable[[int, ...], ...]: A wrapper around the loop body function.
+#         Note that the loop body function must always have the iteration index as its first argument,
+#         which can be used arbitrarily inside the loop body. As the value of the index across
+#         iterations is handled automatically by the provided loop bounds, it must not be returned
+#         from the function.
+
+#     **Example**
+
+
+#     .. code-block:: python
+
+#         dev = qml.device("lightning.qubit", wires=1)
+
+#         @qjit
+#         @qml.qnode(dev)
+#         def circuit(n: int, x: float):
+
+#             def loop_rx(i, x):
+#                 # perform some work and update (some of) the arguments
+#                 qml.RX(x, wires=0)
+
+#                 # update the value of x for the next iteration
+#                 return jnp.sin(x)
+
+#             # apply the for loop
+#             final_x = for_loop(0, n, 1)(loop_rx)(x)
+
+#             return qml.expval(qml.PauliZ(0)), final_x
+
+#     >>> circuit(7, 1.6)
+#     [array(0.97926626), array(0.55395718)]
+#     """
+
+#     def _for_loop(body_fn):
+#         return ForLoopCallable(lower_bound, upper_bound, step, body_fn)
+
+#     return _for_loop
 
 
 # class MidCircuitMeasure(Operation):

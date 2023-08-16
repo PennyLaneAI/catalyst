@@ -211,7 +211,7 @@ def get_new_qubit_state_from_wires_and_qubits(wires, new_qubits, qubit_states, q
     wire may have updated any previously known position.
 
     Args:
-        wires: A list containing integers of ``DynamicJaxprTracer``s.
+        wires: A list containing integers or ``DynamicJaxprTracer``s.
         new_qubits: A list corresponding to the new SSA qubit variables.
         qubit_states: The current known pairing of wires and qubits at the program point in which
                       this function is called.
