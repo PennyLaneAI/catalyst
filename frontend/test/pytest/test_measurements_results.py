@@ -19,77 +19,81 @@ import pytest
 from catalyst import qjit
 
 
-def test_sample_on_1qbit(backend):
-    """Test sample on 1 qubit."""
+class TestSample:
+    """Test sample."""
 
-    @qjit
-    @qml.qnode(qml.device(backend, wires=1, shots=1000))
-    def sample_1qbit(x: float):
-        qml.RX(x, wires=0)
-        return qml.sample()
+    def test_sample_on_1qbit(self, backend):
+        """Test sample on 1 qubit."""
 
-    expected = np.array([[0.0]] * 1000)
-    observed = sample_1qbit(0.0)
-    assert np.array_equal(observed, expected)
+        @qjit
+        @qml.qnode(qml.device(backend, wires=1, shots=1000))
+        def sample_1qbit(x: float):
+            qml.RX(x, wires=0)
+            return qml.sample()
 
-    expected = np.array([[1.0]] * 1000)
-    observed = sample_1qbit(np.pi)
-    assert np.array_equal(observed, expected)
+        expected = np.array([[0.0]] * 1000)
+        observed = sample_1qbit(0.0)
+        assert np.array_equal(observed, expected)
 
+        expected = np.array([[1.0]] * 1000)
+        observed = sample_1qbit(np.pi)
+        assert np.array_equal(observed, expected)
 
-def test_sample_on_2qbits(backend):
-    """Test sample on 2 qubits."""
+    def test_sample_on_2qbits(self, backend):
+        """Test sample on 2 qubits."""
 
-    @qjit
-    @qml.qnode(qml.device(backend, wires=2, shots=1000))
-    def sample_2qbits(x: float):
-        qml.RX(x, wires=0)
-        qml.RY(x, wires=1)
-        return qml.sample()
+        @qjit
+        @qml.qnode(qml.device(backend, wires=2, shots=1000))
+        def sample_2qbits(x: float):
+            qml.RX(x, wires=0)
+            qml.RY(x, wires=1)
+            return qml.sample()
 
-    expected = np.array([[0.0, 0.0]] * 1000)
-    observed = sample_2qbits(0.0)
-    assert np.array_equal(observed, expected)
-    expected = np.array([[1.0, 1.0]] * 1000)
-    observed = sample_2qbits(np.pi)
-    assert np.array_equal(observed, expected)
-
-
-def test_count_on_1qbit(backend):
-    """Test counts on 1 qubits."""
-
-    @qjit
-    @qml.qnode(qml.device(backend, wires=1, shots=1000))
-    def counts_1qbit(x: float):
-        qml.RX(x, wires=0)
-        return qml.counts()
-
-    expected = [np.array([0, 1]), np.array([1000, 0])]
-    observed = counts_1qbit(0.0)
-    assert np.array_equal(observed, expected)
-
-    expected = [np.array([0, 1]), np.array([0, 1000])]
-    observed = counts_1qbit(np.pi)
-    assert np.array_equal(observed, expected)
+        expected = np.array([[0.0, 0.0]] * 1000)
+        observed = sample_2qbits(0.0)
+        assert np.array_equal(observed, expected)
+        expected = np.array([[1.0, 1.0]] * 1000)
+        observed = sample_2qbits(np.pi)
+        assert np.array_equal(observed, expected)
 
 
-def test_count_on_2qbits(backend):
-    """Test counts on 2 qubits."""
+class TestCounts:
+    """Test counts."""
 
-    @qjit
-    @qml.qnode(qml.device(backend, wires=2, shots=1000))
-    def counts_2qbit(x: float):
-        qml.RX(x, wires=0)
-        qml.RY(x, wires=1)
-        return qml.counts()
+    def test_count_on_1qbit(self, backend):
+        """Test counts on 1 qubits."""
 
-    expected = [np.array([0, 1, 2, 3]), np.array([1000, 0, 0, 0])]
-    observed = counts_2qbit(0.0)
-    assert np.array_equal(observed, expected)
+        @qjit
+        @qml.qnode(qml.device(backend, wires=1, shots=1000))
+        def counts_1qbit(x: float):
+            qml.RX(x, wires=0)
+            return qml.counts()
 
-    expected = [np.array([0, 1, 2, 3]), np.array([0, 0, 0, 1000])]
-    observed = counts_2qbit(np.pi)
-    assert np.array_equal(observed, expected)
+        expected = [np.array([0, 1]), np.array([1000, 0])]
+        observed = counts_1qbit(0.0)
+        assert np.array_equal(observed, expected)
+
+        expected = [np.array([0, 1]), np.array([0, 1000])]
+        observed = counts_1qbit(np.pi)
+        assert np.array_equal(observed, expected)
+
+    def test_count_on_2qbits(self, backend):
+        """Test counts on 2 qubits."""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=2, shots=1000))
+        def counts_2qbit(x: float):
+            qml.RX(x, wires=0)
+            qml.RY(x, wires=1)
+            return qml.counts()
+
+        expected = [np.array([0, 1, 2, 3]), np.array([1000, 0, 0, 0])]
+        observed = counts_2qbit(0.0)
+        assert np.array_equal(observed, expected)
+
+        expected = [np.array([0, 1, 2, 3]), np.array([0, 0, 0, 1000])]
+        observed = counts_2qbit(np.pi)
+        assert np.array_equal(observed, expected)
 
 
 class TestExpval:
@@ -421,63 +425,88 @@ class TestVar:
         assert np.isclose(observed, expected)
 
 
-def test_state(backend):
-    """Test state."""
+class TestOtherMeasurements:
+    """Test other measurement processes."""
 
-    @qjit
-    @qml.qnode(qml.device(backend, wires=1))
-    def state(x: float):
-        qml.RX(x, wires=0)
-        return qml.state()
+    def test_state(self, backend):
+        """Test state."""
 
-    expected = np.array([complex(1.0, 0.0), complex(0.0, 0.0)])
-    observed = state(0.0)
-    assert np.array_equal(observed, expected)
+        @qjit
+        @qml.qnode(qml.device(backend, wires=1))
+        def state(x: float):
+            qml.RX(x, wires=0)
+            return qml.state()
+
+        expected = np.array([complex(1.0, 0.0), complex(0.0, 0.0)])
+        observed = state(0.0)
+        assert np.array_equal(observed, expected)
+
+    def test_multiple_return_values(self, backend):
+        """Test multiple return values."""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=2, shots=100))
+        def all_measurements(x):
+            qml.RY(x, wires=0)
+            return (
+                qml.sample(),
+                qml.counts(),
+                qml.expval(qml.PauliZ(0)),
+                qml.var(qml.PauliZ(0)),
+                qml.probs(wires=[0, 1]),
+                qml.state(),
+            )
+
+        @qml.qnode(qml.device("default.qubit", wires=2))
+        def expected(x, measurement):
+            qml.RY(x, wires=0)
+            return qml.apply(measurement)
+
+        x = 0.7
+        result = all_measurements(x)
+
+        # qml.sample
+        assert result[0].shape == expected(x, qml.sample(wires=[0, 1]), shots=100).shape
+
+        # qml.counts
+        for r, e in zip(result[1][0], expected(x, qml.counts(all_outcomes=True), shots=100).keys()):
+            assert format(int(r), "02b") == e
+        assert sum(result[1][1]) == 100
+
+        # qml.expval
+        assert np.allclose(result[2], expected(x, qml.expval(qml.PauliZ(0))))
+
+        # qml.var
+        assert np.allclose(result[3], expected(x, qml.var(qml.PauliZ(0))))
+
+        # qml.probs
+        assert np.allclose(result[4], expected(x, qml.probs(wires=[0, 1])))
+
+        # qml.state
+        assert np.allclose(result[5], expected(x, qml.state()))
 
 
-def test_multiple_return_values(backend):
-    """Test multiple return values."""
+class TestNewOperatorArith:
+    "Test PennyLane new operator arithmetic"
 
-    @qjit
-    @qml.qnode(qml.device(backend, wires=2, shots=100))
-    def all_measurements(x):
-        qml.RY(x, wires=0)
-        return (
-            qml.sample(),
-            qml.counts(),
-            qml.expval(qml.PauliZ(0)),
-            qml.var(qml.PauliZ(0)),
-            qml.probs(wires=[0, 1]),
-            qml.state(),
-        )
+    def test_op_sum_1(self, backend):
+        """Test expval for qml.sum of observables."""
 
-    @qml.qnode(qml.device("default.qubit", wires=2))
-    def expected(x, measurement):
-        qml.RY(x, wires=0)
-        return qml.apply(measurement)
+        @qjit
+        @qml.qnode(qml.device(backend, wires=2))
+        def circuit(x: float, y: float):
+            qml.RX(x, wires=0)
+            qml.RY(y, wires=1)
+            # return qml.expval(qml.PauliX(0) + qml.PauliZ(1))
+            return qml.expval(qml.Hamiltonian(np.array([1, 1]), [qml.PauliX(0), qml.PauliZ(1)]))
 
-    x = 0.7
-    result = all_measurements(x)
+        expected = np.array(0.5)
+        observed = circuit(np.pi / 4, np.pi / 3)
+        assert np.isclose(observed, expected)
 
-    # qml.sample
-    assert result[0].shape == expected(x, qml.sample(wires=[0, 1]), shots=100).shape
-
-    # qml.counts
-    for r, e in zip(result[1][0], expected(x, qml.counts(all_outcomes=True), shots=100).keys()):
-        assert format(int(r), "02b") == e
-    assert sum(result[1][1]) == 100
-
-    # qml.expval
-    assert np.allclose(result[2], expected(x, qml.expval(qml.PauliZ(0))))
-
-    # qml.var
-    assert np.allclose(result[3], expected(x, qml.var(qml.PauliZ(0))))
-
-    # qml.probs
-    assert np.allclose(result[4], expected(x, qml.probs(wires=[0, 1])))
-
-    # qml.state
-    assert np.allclose(result[5], expected(x, qml.state()))
+        # expected = np.array(0.22130985)
+        # observed = circuit(0.5, 0.8)
+        # assert np.isclose(observed, expected)
 
 
 if __name__ == "__main__":

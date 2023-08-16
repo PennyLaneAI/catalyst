@@ -17,6 +17,14 @@
 
 include "mlir/Pass/PassBase.td"
 
+// def QuantumTensorCastsPass : Pass<"quantum-tensor-casts"> {
+//     let summary = "Cast tensors in some of quantum operations.";
+
+//     let dependentDialects = ["LLVM::LLVMDialect"];
+
+//     let constructor = "catalyst::createQuantumTensorCastsPass()";
+// }
+
 def QuantumBufferizationPass : Pass<"quantum-bufferize"> {
     let summary = "Bufferize tensors in quantum operations.";
 
