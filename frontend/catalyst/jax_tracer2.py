@@ -37,12 +37,13 @@ from catalyst.jax_primitives import (Qreg, AbstractQreg, AbstractQbit, qinst, qe
 from catalyst.jax_tracer import custom_lower_jaxpr_to_module
 from catalyst.utils.tracing import TracingContext
 from catalyst.utils.exceptions import CompileError
-from typing import Optional, Callable, List, ContextManager, Tuple, Any
+from typing import Optional, Callable, List, ContextManager, Tuple, Any, Dict
 from pennylane import QubitDevice, QueuingManager, Device
 from pennylane.operation import AnyWires, Operation, Wires
 from pennylane.tape import QuantumTape
 from itertools import chain
 from contextlib import contextmanager
+from collections import defaultdict
 
 from dataclasses import dataclass
 
@@ -50,6 +51,7 @@ from dataclasses import dataclass
 @dataclass
 class MainTracingContex:
     main: JaxMainTrace
+    frames: Dict[DynamicJaxprTrace, JaxprStackFrame]
     trace: Optional[DynamicJaxprTrace] = None
 
 TRACING_CONTEXT : Optional[MainTracingContex] = None
@@ -59,7 +61,7 @@ def main_tracing_context() -> ContextManager[MainTracingContex]:
     global TRACING_CONTEXT
     with new_main(DynamicJaxprTrace, dynamic=True) as main:
         main.jaxpr_stack = ()
-        TRACING_CONTEXT = ctx = MainTracingContex(main)
+        TRACING_CONTEXT = ctx = MainTracingContex(main, {})
         try:
             yield ctx
         finally:
@@ -75,16 +77,15 @@ def get_main_tracing_context(hint=None) -> MainTracingContex:
 
 @contextmanager
 def frame_tracing_context(ctx: MainTracingContex,
-                          frame: Optional[JaxprStackFrame] = None,
                           trace: Optional[DynamicJaxprTrace] = None
-                          ) -> ContextManager[Tuple[JaxprStackFrame,DynamicJaxprTrace]]:
-    frame = JaxprStackFrame() if frame is None else frame
+                          ) -> ContextManager[DynamicJaxprTrace]:
+    frame = JaxprStackFrame() if trace is None else ctx.frames[trace]
     with extend_jaxpr_stack(ctx.main, frame), reset_name_stack():
         parent_trace = ctx.trace
         ctx.trace = DynamicJaxprTrace(ctx.main, cur_sublevel()) if trace is None else trace
-        assert ctx.trace.frame is frame
+        ctx.frames[ctx.trace] = frame
         try:
-            yield frame, ctx.trace
+            yield ctx.trace
         finally:
             ctx.trace = parent_trace
 
@@ -112,19 +113,18 @@ class HybridOp(Operation):
     num_wires = AnyWires
 
     def __init__(self, quantum_tape, in_classical_tracers, out_classical_tracers,
-                 arg_classical_tracers, res_classical_tracers, inner_frame, inner_trace):
+                 arg_classical_tracers, res_classical_tracers, inner_trace):
         self.quantum_tape = quantum_tape
         self.in_classical_tracers = in_classical_tracers
         self.out_classical_tracers = out_classical_tracers
         self.arg_classical_tracers = arg_classical_tracers
         self.res_classical_tracers = res_classical_tracers
-        self.frame = inner_frame
         self.trace = inner_trace
         # kwargs["wires"] = Wires(HybridOp.num_wires)
         super().__init__(wires = Wires(HybridOp.num_wires))
 
     def has_nested_tape(self) -> bool:
-        properties = [self.quantum_tape, self.frame, self.trace]
+        properties = [self.quantum_tape, self.trace]
         assert all([x is None for x in properties]) or \
                all([x is not None for  x in properties])
         return self.quantum_tape is not None
@@ -147,7 +147,7 @@ def hybrid(callee:Callable):
         ctx = get_main_tracing_context()
         quantum_tape = QuantumTape()
         outer_trace = ctx.trace
-        with frame_tracing_context(ctx) as (inner_frame,inner_trace):
+        with frame_tracing_context(ctx) as inner_trace:
 
             in_classical_tracers = args # FIXME: save kwargs and the tree structure
             wffa, in_avals, _ = deduce_avals(callee, args, kwargs)
@@ -163,7 +163,6 @@ def hybrid(callee:Callable):
                  out_classical_tracers,
                  arg_classical_tracers,
                  res_classical_tracers,
-                 inner_frame,
                  inner_trace)
 
         return out_classical_tracers[0] # FIXME: generalize to the arbitrary number of retvals
@@ -176,7 +175,7 @@ def for_loop(lower_bound, upper_bound, step):
             ctx = get_main_tracing_context()
             quantum_tape = QuantumTape()
             outer_trace = ctx.trace
-            with frame_tracing_context(ctx) as (inner_frame, inner_trace):
+            with frame_tracing_context(ctx) as inner_trace:
 
                 in_classical_tracers = [lower_bound, upper_bound, step, lower_bound] + list(init_state)
                 wffa, in_avals, _ = deduce_avals(callee, [lower_bound] + list(init_state), {})
@@ -191,7 +190,6 @@ def for_loop(lower_bound, upper_bound, step):
                     out_classical_tracers,
                     arg_classical_tracers,
                     res_classical_tracers,
-                    inner_frame,
                     inner_trace)
 
             return out_classical_tracers
@@ -212,7 +210,6 @@ def measure(wires) -> JaxprTracer:
         out_classical_tracers=[result],
         arg_classical_tracers=[],
         res_classical_tracers=[],
-        inner_frame=None,
         inner_trace=None)
     return result
 
@@ -242,7 +239,6 @@ def trace_quantum_tape(quantum_tape:QuantumTape,
                        device:QubitDevice,
                        qreg:JaxprTracer,
                        ctx:MainTracingContex,
-                       frame:JaxprStackFrame,
                        trace:DynamicJaxprTrace) -> JaxprTracer:
     """ Recursively trace the nested `quantum_tape` and produce the quantum tracers. With quantum
     tracers we can complete the set of tracers and finally emit the JAXPR of the whole quantum
@@ -255,7 +251,7 @@ def trace_quantum_tape(quantum_tape:QuantumTape,
         """ Binds the primitive `prim` but override the returned classical tracers with the already
         existing output tracers of the operation `op`."""
         out_quantum_tracer = prim.bind(*args, **kwargs)[-1]
-        eqn = frame.eqns[-1]
+        eqn = ctx.frames[trace].eqns[-1]
         assert (len(eqn.outvars)-1) == len(op.out_classical_tracers)
         for i,t in zip(range(len(eqn.outvars)-1), op.out_classical_tracers): # [2]
             eqn.outvars[i] = trace.getvar(t)
@@ -266,10 +262,10 @@ def trace_quantum_tape(quantum_tape:QuantumTape,
         if isinstance(op, HybridOp):
             eqn = None
             if op.has_nested_tape():
-                with frame_tracing_context(ctx, op.frame, op.trace):
+                with frame_tracing_context(ctx, op.trace):
                     qreg_in = _input_type_to_tracers(op.trace.new_arg, [AbstractQreg()])[0]
-                    qreg_out = trace_quantum_tape(op.quantum_tape, device, qreg_in, ctx, op.frame, op.trace)
-                    jaxpr, typ, consts = op.frame.to_jaxpr2(op.res_classical_tracers + [qreg_out])
+                    qreg_out = trace_quantum_tape(op.quantum_tape, device, qreg_in, ctx, op.trace)
+                    jaxpr, typ, consts = ctx.frames[trace].to_jaxpr2(op.res_classical_tracers + [qreg_out])
 
                 if isinstance(op, ForLoop):
                     qreg2 = bind_overwrite_classical_tracers(
@@ -303,7 +299,7 @@ def trace_quantum_tape(quantum_tape:QuantumTape,
         assert qreg2 is not None
         qreg = qreg2
 
-    frame.eqns = sort_eqns(frame.eqns)
+    ctx.frames[trace].eqns = sort_eqns(ctx.frames[trace].eqns)
     return qreg
 
 def trace_quantum_function(
@@ -322,7 +318,7 @@ def trace_quantum_function(
 
         # [1] - Classical tracing
         quantum_tape = QuantumTape()
-        with frame_tracing_context(ctx) as (frame, trace):
+        with frame_tracing_context(ctx) as trace:
 
             wffa, in_avals, out_tree_promise = deduce_avals(f, args, kwargs)
             in_classical_tracers = _input_type_to_tracers(trace.new_arg, in_avals)
@@ -334,17 +330,18 @@ def trace_quantum_function(
         transformed_tape = transform(quantum_tape) if transform else quantum_tape
 
         # [3] - Quantum tracing
-        with frame_tracing_context(ctx, frame, trace):
+        with frame_tracing_context(ctx, trace):
 
             qdevice("kwargs", str(device.backend_kwargs))
             qdevice("backend", device.backend_name)
             qreg_in = qalloc(len(device.wires))
-            qreg_out = trace_quantum_tape(transformed_tape, device, qreg_in, ctx, frame, trace)
+            qreg_out = trace_quantum_tape(transformed_tape, device, qreg_in, ctx, trace)
             # FIXME: Calling `qdealloc` with `qreg_out` leads to a runtime error. Why is this?
             qdealloc(qreg_in)
             # FIXME: Port the observable-tracing logic from the original tracer
             out_quantum_tracers = [trace.full_raise(qreg_out)]
-            jaxpr, out_type, consts = frame.to_jaxpr2(out_classical_tracers + out_quantum_tracers)
+
+            jaxpr, out_type, consts = ctx.frames[trace].to_jaxpr2(out_classical_tracers + out_quantum_tracers)
             jaxpr._outvars = jaxpr._outvars[:-1]
             out_type = out_type[:-1]
             # FIXME: `check_jaxpr` complains about the `AbstractQreg` type. Consider fixing.
