@@ -15,7 +15,6 @@
 #include <string>
 
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
-#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "Quantum/IR/QuantumOps.h"
