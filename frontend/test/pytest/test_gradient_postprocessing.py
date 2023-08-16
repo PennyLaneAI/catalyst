@@ -20,6 +20,7 @@ import pennylane as qml
 import pytest
 
 from catalyst import grad, qjit
+from catalyst.pennylane_extensions import DifferentiableCompileError
 
 SUPPORTED_DIFF_METHODS = ["parameter-shift", "adjoint"]
 
@@ -221,7 +222,7 @@ def test_multi_arg_multi_result(backend, diff_method):
     # Catalyst returns a list of 4 values while JAX returns a 2x2 list of lists
     for i, row in enumerate(jax_jacobian):
         for j, jax_entry in enumerate(row):
-            # With multiple arguments and results, the Catalyst jacobian are transposed
+            # With multiple arguments and results, the Catalyst jacobians are transposed
             # w.r.t. the JAX jacobian. This is why the i and j are switched.
             catalyst_entry = catalyst_jacobian[j * len(row) + i]
             assert catalyst_entry == pytest.approx(jax_entry.T)
@@ -256,9 +257,8 @@ def test_multi_qnode(backend):
 
 
 def test_qnode_different_returns(backend):
-    """
-    Test a multi-QNode workflow where the QNodes have different diff_methods and return different
-    shapes.
+    """Test a multi-QNode workflow where the QNodes have different diff_methods and return
+    different shapes.
     """
 
     @qml.qnode(qml.device(backend, wires=1), diff_method="parameter-shift")
@@ -280,3 +280,23 @@ def test_qnode_different_returns(backend):
 
     x = jnp.array([1.0, 2.0])
     assert grad_loss(x) == pytest.approx(jax.jacobian(loss)(x))
+
+
+def test_no_nested_grad_without_fd():
+    """Test input validation for higher order derivatives where outer grad ops don't have
+    method='fd'.
+    """
+
+    def inner(x: float):
+        return x
+
+    def middle(x: float):
+        return grad(inner, method="fd")(x) * 3
+
+    with pytest.raises(DifferentiableCompileError, match="higher order derivatives"):
+
+        @qjit
+        def outer(x: float):
+            return grad(middle, method="defer")(x) ** 2
+
+        outer(9.0)
