@@ -141,7 +141,7 @@ def test_finite_diff(inp, backend):
         h = qml.grad(g, argnum=0)
         return h(x)
 
-    assert np.allclose(compiled_grad_default(inp), interpretted_grad_default(inp))
+    assert np.allclose(compiled_grad_default(inp), interpretted_grad_default(np.array(inp)))
 
 
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
@@ -164,7 +164,7 @@ def test_finite_diff_mul(inp, backend):
         h = qml.grad(g, argnum=0)
         return h(x)
 
-    assert np.allclose(compiled_grad_default(inp), interpretted_grad_default(inp))
+    assert np.allclose(compiled_grad_default(inp), interpretted_grad_default(np.array(inp)))
 
 
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
@@ -191,7 +191,7 @@ def test_finite_diff_in_loop(inp, backend):
         h = qml.grad(g, argnum=0)
         return h(x)
 
-    assert np.allclose(compiled_grad_default(inp, 5), interpretted_grad_default(inp))
+    assert np.allclose(compiled_grad_default(inp, 5), interpretted_grad_default(np.array(inp)))
 
 
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
@@ -499,7 +499,7 @@ def test_finite_diff_h(inp, backend):
         h = qml.grad(g, argnum=0)
         return h(x)
 
-    assert np.allclose(compiled_grad_h(inp), interpretted_grad_h(inp))
+    assert np.allclose(compiled_grad_h(inp), interpretted_grad_h(np.array(inp)))
 
 
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
@@ -522,7 +522,7 @@ def test_finite_diff_argnum(inp, backend):
         h = qml.grad(g, argnum=1)
         return h(x, 2.0)
 
-    assert np.allclose(compiled_grad_argnum(inp), interpretted_grad_argnum(inp))
+    assert np.allclose(compiled_grad_argnum(inp), interpretted_grad_argnum(np.array(inp)))
 
 
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
@@ -549,7 +549,7 @@ def test_finite_diff_argnum_list(inp, backend):
         # argnum list.
         return h(x, 2.0)[0]
 
-    assert np.allclose(compiled_grad_argnum_list(inp), interpretted_grad_argnum_list(inp))
+    assert np.allclose(compiled_grad_argnum_list(inp), interpretted_grad_argnum_list(np.array(inp)))
 
 
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
@@ -572,7 +572,9 @@ def test_finite_grad_range_change(inp, backend):
         h = qml.grad(g, argnum=[0, 1])
         return h(x, 2.0)
 
-    assert np.allclose(compiled_grad_range_change(inp), interpretted_grad_range_change(inp))
+    assert np.allclose(
+        compiled_grad_range_change(inp), interpretted_grad_range_change(np.array(inp))
+    )
 
 
 @pytest.mark.parametrize("inp", [(1.0), (2.0), (3.0), (4.0)])
