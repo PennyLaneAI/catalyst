@@ -102,6 +102,35 @@
       return qml.expval(qml.Hamiltonian(coeffs, obs))
   ```
 
+* Add support for the new PennyLane arithmetic operators.
+
+  PennyLane is in the process of replacing ``Hamiltonian`` and ``Tensor`` observables with a set of
+  general arithmetic operators. These consist of
+  [Prod](https://docs.pennylane.ai/en/stable/code/api/pennylane.ops.op_math.Prod.html),
+  [Sum](https://docs.pennylane.ai/en/stable/code/api/pennylane.ops.op_math.Sum.html) and
+  [SProd](https://docs.pennylane.ai/en/stable/code/api/pennylane.ops.op_math.SProd.html).
+  By default, using dunder methods (eg. ``+``, ``-``, ``@``, ``*``) to combine operators with scalars or other
+  operators will create ``Hamiltonian``s and ``Tensor``s. However, these two methods will be deprecated in
+  coming releases of PennyLane.
+
+  To enable the new arithmetic operators, one can use ``Prod``, ``Sum``, and ``Sprod`` directly or activate them by
+  [enable_new_opmath](https://docs.pennylane.ai/en/stable/code/api/pennylane.operation.enable_new_opmath.html).
+
+  ``` python
+  qml.operation.enable_new_opmath()
+  assert qml.operation.active_new_opmath()
+
+  @qjit
+  @qml.qnode(qml.device("lightning.qubit", wires=2))
+  def circuit(x: float, y: float):
+      qml.RX(x, wires=0)
+      qml.RX(y, wires=1)
+      qml.CNOT(wires=[0, 1])
+      return qml.expval(0.2 * qml.PauliX(wires=0) - 0.4 * qml.PauliY(wires=1))
+
+  circuit(np.pi / 4, np.pi / 2)
+  ```
+
 
 <h3>Improvements</h3>
 

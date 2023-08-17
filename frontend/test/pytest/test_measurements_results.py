@@ -571,7 +571,7 @@ class TestNewArithmeticOps:
 
     @pytest.mark.parametrize(
         "meas, expected",
-        [[qml.expval, np.array(0.5)], [qml.var, np.array(0.75)]],
+        [[qml.expval, np.array(-0.70710678)], [qml.var, np.array(0.5)]],
     )
     def test_prod_xzi(self, meas, expected, backend):
         """Test ``qml.ops.op_math.Prod`` converting to TensorObs with (X,Z,I)."""
@@ -581,7 +581,7 @@ class TestNewArithmeticOps:
         def circuit(x: float, y: float):
             qml.RX(x, wires=0)
             qml.RX(y, wires=1)
-            qml.RX(x + y, wires=1)
+            qml.RX(x + y, wires=2)
             qml.CNOT(wires=[0, 1])
             return meas(
                 qml.ops.op_math.Prod(
@@ -613,7 +613,7 @@ class TestNewArithmeticOps:
         result = circuit(np.pi / 4, np.pi / 4)
         assert np.allclose(expected, result)
 
-        assert qml.operation.active_new_opmath() == True
+        assert qml.operation.active_new_opmath()
         circuit(0, 1)  # another call
 
     @pytest.mark.parametrize(
@@ -645,7 +645,7 @@ class TestNewArithmeticOps:
                         qml.PauliX(wires=0), qml.PauliY(wires=1), qml.PauliZ(wires=2)
                     )
                 ),
-                np.array(1.5),
+                np.array(-1.41421356),
             ],
             [
                 qml.var(
@@ -653,15 +653,15 @@ class TestNewArithmeticOps:
                         qml.PauliX(wires=0), qml.PauliY(wires=1), qml.PauliZ(wires=2)
                     )
                 ),
-                np.array(2.75),
+                np.array(2.0),
             ],
             [
                 qml.expval(qml.PauliX(wires=0) + qml.PauliY(wires=1) + qml.PauliZ(wires=2)),
-                np.array(1.5),
+                np.array(-1.41421356),
             ],
             [
                 qml.var(qml.PauliX(wires=0) + qml.PauliY(wires=1) + qml.PauliZ(wires=2)),
-                np.array(2.75),
+                np.array(2.0),
             ],
         ],
     )
@@ -676,7 +676,7 @@ class TestNewArithmeticOps:
         def circuit(x: float, y: float):
             qml.RX(x, wires=0)
             qml.RX(y, wires=1)
-            qml.RX(x + y, wires=1)
+            qml.RX(x + y, wires=2)
             qml.CNOT(wires=[0, 1])
             return meas
 
@@ -714,7 +714,7 @@ class TestNewArithmeticOps:
                         qml.ops.op_math.SProd(0.5, qml.PauliZ(2)),
                     )
                 ),
-                np.array(1),
+                np.array(-1.06066017),
             ],
             [
                 qml.var(
@@ -724,11 +724,11 @@ class TestNewArithmeticOps:
                         qml.ops.op_math.SProd(0.5, qml.PauliZ(wires=2)),
                     )
                 ),
-                np.array(0.24),
+                np.array(0.245),
             ],
             [
                 qml.expval(qml.PauliX(wires=0) + qml.PauliY(wires=1) + 0.5 * qml.PauliZ(wires=2)),
-                np.array(1),
+                np.array(-1.06066017),
             ],
             [
                 qml.var(
@@ -736,7 +736,7 @@ class TestNewArithmeticOps:
                     + 0.4 * qml.PauliY(wires=1)
                     + 0.5 * qml.PauliZ(wires=2)
                 ),
-                np.array(0.24),
+                np.array(0.245),
             ],
         ],
     )
@@ -752,7 +752,7 @@ class TestNewArithmeticOps:
         def circuit(x: float, y: float):
             qml.RX(x, wires=0)
             qml.RX(y, wires=1)
-            qml.RX(x + y, wires=1)
+            qml.RX(x + y, wires=2)
             qml.CNOT(wires=[0, 1])
             return meas
 
