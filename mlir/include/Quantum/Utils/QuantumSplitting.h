@@ -31,6 +31,8 @@ struct QuantumCache {
     /// `topLevelRegion`.
     static QuantumCache initialize(mlir::Region &topLevelRegion, mlir::OpBuilder &builder,
                                    mlir::Location loc);
+
+    void emitDealloc(mlir::OpBuilder &builder, mlir::Location loc);
 };
 
 class AugmentedCircuitGenerator {

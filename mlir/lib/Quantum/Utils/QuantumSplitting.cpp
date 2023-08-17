@@ -64,6 +64,15 @@ QuantumCache QuantumCache::initialize(Region &region, OpBuilder &builder, Locati
         .paramVector = paramVector, .wireVector = wireVector, .controlFlowTapes = controlFlowTapes};
 }
 
+void QuantumCache::emitDealloc(OpBuilder &builder, Location loc)
+{
+    builder.create<ListDeallocOp>(loc, paramVector);
+    builder.create<ListDeallocOp>(loc, wireVector);
+    for (const auto &[_key, controlFlowTape] : controlFlowTapes) {
+        builder.create<ListDeallocOp>(loc, controlFlowTape);
+    }
+}
+
 void AugmentedCircuitGenerator::generate(Region &region, OpBuilder &builder)
 {
     assert(region.hasOneBlock() &&

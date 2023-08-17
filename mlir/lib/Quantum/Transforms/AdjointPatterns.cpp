@@ -314,6 +314,9 @@ struct AdjointSingleOpRewritePattern : public mlir::OpRewritePattern<AdjointOp> 
             return failure();
         }
 
+        // Explicitly free the memory of the caches.
+        cache.emitDealloc(rewriter, adjoint.getLoc());
+
         // The final register is the re-mapped region argument of the original adjoint op.
         SmallVector<Value> reversedOutputs;
         for (BlockArgument arg : adjoint.getRegion().getArguments()) {

@@ -166,12 +166,12 @@ struct LowerListInit : public OpConversionPattern<ListInitOp> {
         }
         Value capacity = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 32);
         Value initialSize = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 0);
-        auto dataType = resultTypes[0].cast<MemRefType>();
-        auto sizeType = resultTypes[1].cast<MemRefType>();
-        auto capacityType = resultTypes[2].cast<MemRefType>();
-        Value buffer = rewriter.create<memref::AllocOp>(
-            op.getLoc(), dataType.getElementType().cast<MemRefType>(),
-            /*dynamicSize=*/capacity);
+        auto dataType = cast<MemRefType>(resultTypes[0]);
+        auto sizeType = cast<MemRefType>(resultTypes[1]);
+        auto capacityType = cast<MemRefType>(resultTypes[2]);
+        Value buffer = rewriter.create<memref::AllocOp>(op.getLoc(),
+                                                        cast<MemRefType>(dataType.getElementType()),
+                                                        /*dynamicSize=*/capacity);
         Value bufferField = rewriter.create<memref::AllocOp>(op.getLoc(), dataType);
         Value sizeField = rewriter.create<memref::AllocOp>(op.getLoc(), sizeType);
         Value capacityField = rewriter.create<memref::AllocOp>(op.getLoc(), capacityType);
@@ -180,6 +180,29 @@ struct LowerListInit : public OpConversionPattern<ListInitOp> {
         rewriter.create<memref::StoreOp>(op.getLoc(), capacity, capacityField);
         rewriter.replaceOpWithNewOp<UnrealizedConversionCastOp>(
             op, op.getType(), ValueRange{bufferField, sizeField, capacityField});
+        return success();
+    }
+};
+
+struct LowerListDealloc : public OpConversionPattern<ListDeallocOp> {
+    using OpConversionPattern<ListDeallocOp>::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(ListDeallocOp op, OpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+
+        FailureOr<ArrayListBuilder> arraylistBuilder =
+            ArrayListBuilder::get(op.getLoc(), getTypeConverter(), op.getList(), rewriter);
+        if (failed(arraylistBuilder)) {
+            return failure();
+        }
+
+        Value data = rewriter.create<memref::LoadOp>(op.getLoc(), arraylistBuilder->dataField);
+        rewriter.create<memref::DeallocOp>(op.getLoc(), data);
+        rewriter.create<memref::DeallocOp>(op.getLoc(), arraylistBuilder->dataField);
+        rewriter.create<memref::DeallocOp>(op.getLoc(), arraylistBuilder->sizeField);
+        rewriter.create<memref::DeallocOp>(op.getLoc(), arraylistBuilder->capacityField);
+        rewriter.eraseOp(op);
         return success();
     }
 };
@@ -281,6 +304,7 @@ struct ArrayListToMemRefPass : catalyst::impl::ArrayListToMemRefPassBase<ArrayLi
 
         RewritePatternSet patterns(context);
         patterns.add<LowerListInit>(arraylistTypeConverter, context);
+        patterns.add<LowerListDealloc>(arraylistTypeConverter, context);
         patterns.add<LowerListPush>(arraylistTypeConverter, context);
         patterns.add<LowerListPop>(arraylistTypeConverter, context);
         patterns.add<LowerListLoadData>(arraylistTypeConverter, context);
@@ -289,7 +313,7 @@ struct ArrayListToMemRefPass : catalyst::impl::ArrayListToMemRefPassBase<ArrayLi
         target.addLegalDialect<arith::ArithDialect, func::FuncDialect, memref::MemRefDialect,
                                scf::SCFDialect>();
         target.addLegalOp<UnrealizedConversionCastOp>();
-        target.addIllegalOp<ListInitOp, ListPushOp, ListLoadDataOp>();
+        target.addIllegalOp<ListInitOp, ListDeallocOp, ListPushOp, ListPopOp, ListLoadDataOp>();
 
         if (failed(applyPartialConversion(getOperation(), target, std::move(patterns)))) {
             signalPassFailure();
