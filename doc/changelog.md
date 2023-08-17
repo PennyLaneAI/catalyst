@@ -151,8 +151,9 @@
   [#234](https://github.com/PennyLaneAI/catalyst/pull/234)
 
 * Small improvements to CI/CD. Fix Enzyme cache, generalize caches to other operating systems,
-  and remove references to QIR in runtime's Makefile.
+  fix build wheel recipe, and remove references to QIR in runtime's Makefile.
   [#243](https://github.com/PennyLaneAI/catalyst/pull/243)
+  [#247](https://github.com/PennyLaneAI/catalyst/pull/247)
 
 <h3>Breaking changes</h3>
 
