@@ -616,6 +616,9 @@ class TestNewArithmeticOps:
         assert qml.operation.active_new_opmath()
         circuit(0, 1)  # another call
 
+        # Update the global variable `__use_new_opmath` for running tests in parallel is required
+        qml.operation.disable_new_opmath()
+
     @pytest.mark.parametrize(
         "meas, expected",
         [[qml.expval, np.array(0.5)], [qml.var, np.array(1.75)]],
@@ -682,6 +685,9 @@ class TestNewArithmeticOps:
 
         result = circuit(np.pi / 4, np.pi / 2)
         assert np.allclose(expected, result)
+
+        # Update the global variable `__use_new_opmath` for running tests in parallel is required
+        qml.operation.disable_new_opmath()
 
     @pytest.mark.parametrize(
         "meas, expected",
@@ -759,6 +765,9 @@ class TestNewArithmeticOps:
         result = circuit(np.pi / 4, np.pi / 2)
         assert np.allclose(expected, result)
 
+        # Update the global variable `__use_new_opmath` for running tests in parallel is required
+        qml.operation.disable_new_opmath()
+
     @pytest.mark.parametrize(
         "meas, expected",
         [[qml.expval, np.array(0.25)], [qml.var, np.array(0.1875)]],
@@ -779,6 +788,9 @@ class TestNewArithmeticOps:
 
         result = circuit(np.pi / 4, np.pi / 4)
         assert np.allclose(expected, result)
+
+        # Update the global variable `__use_new_opmath` for running tests in parallel is required
+        qml.operation.disable_new_opmath()
 
 
 if __name__ == "__main__":
