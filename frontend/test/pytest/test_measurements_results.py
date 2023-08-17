@@ -546,5 +546,239 @@ class TestOtherMeasurements:
         assert np.allclose(result[5], expected(x, qml.state()))
 
 
+class TestNewArithmeticOps:
+    "Test PennyLane new arithmetic operators"
+
+    @pytest.mark.parametrize(
+        "meas, expected",
+        [[qml.expval, np.array(0.5)], [qml.var, np.array(0.75)]],
+    )
+    def test_prod_zz(self, meas, expected, backend):
+        """Test ``qml.ops.op_math.Prod`` converting to TensorObs."""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=2))
+        def circuit(x: float, y: float):
+            qml.RX(x, wires=0)
+            qml.RX(y, wires=1)
+            qml.CNOT(wires=[0, 1])
+            return meas(qml.ops.op_math.Prod(qml.PauliZ(wires=0), qml.PauliZ(wires=1)))
+
+        result = circuit(np.pi / 4, np.pi / 3)
+        assert np.allclose(expected, result)
+
+        circuit(0, 1)  # another call
+
+    @pytest.mark.parametrize(
+        "meas, expected",
+        [[qml.expval, np.array(0.5)], [qml.var, np.array(0.75)]],
+    )
+    def test_prod_xzi(self, meas, expected, backend):
+        """Test ``qml.ops.op_math.Prod`` converting to TensorObs with (X,Z,I)."""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=3))
+        def circuit(x: float, y: float):
+            qml.RX(x, wires=0)
+            qml.RX(y, wires=1)
+            qml.RX(x + y, wires=1)
+            qml.CNOT(wires=[0, 1])
+            return meas(
+                qml.ops.op_math.Prod(
+                    qml.PauliX(wires=0), qml.PauliZ(wires=1), qml.Identity(wires=2)
+                )
+            )
+
+        result = circuit(np.pi / 4, np.pi / 2)
+        assert np.allclose(expected, result)
+
+    @pytest.mark.parametrize(
+        "meas, expected",
+        [[qml.expval, np.array(-0.5)], [qml.var, np.array(0.75)]],
+    )
+    def test_prod_dunder_xy(self, meas, expected, backend):
+        """Test ``@`` conveting to HamiltonianObs with (X,Y), also checking {Y: PauliY}."""
+
+        # Enabling new arithmetic operators
+        qml.operation.enable_new_opmath()
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=2))
+        def circuit(x, y):
+            qml.RX(x, wires=0)
+            qml.RX(y, wires=1)
+            qml.CNOT(wires=[0, 1])
+            return meas(qml.PauliX(0) @ qml.PauliY(1))
+
+        result = circuit(np.pi / 4, np.pi / 4)
+        assert np.allclose(expected, result)
+
+        assert qml.operation.active_new_opmath() == True
+        circuit(0, 1)  # another call
+
+    @pytest.mark.parametrize(
+        "meas, expected",
+        [[qml.expval, np.array(0.5)], [qml.var, np.array(1.75)]],
+    )
+    def test_sum_xz(self, meas, expected, backend):
+        """Test ``qml.ops.op_math.Sum`` converting to HamiltonianObs."""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=2))
+        def circuit(x: float, y: float):
+            qml.RX(x, wires=0)
+            qml.RX(y, wires=1)
+            qml.CNOT(wires=[0, 1])
+            return meas(qml.ops.op_math.Sum(qml.PauliX(0), qml.PauliZ(0)))
+
+        result = circuit(np.pi / 3, np.pi / 2)
+        assert np.allclose(expected, result)
+
+        circuit(0, 1)  # another call
+
+    @pytest.mark.parametrize(
+        "meas, expected",
+        [
+            [
+                qml.expval(
+                    qml.ops.op_math.Sum(
+                        qml.PauliX(wires=0), qml.PauliY(wires=1), qml.PauliZ(wires=2)
+                    )
+                ),
+                np.array(1.5),
+            ],
+            [
+                qml.var(
+                    qml.ops.op_math.Sum(
+                        qml.PauliX(wires=0), qml.PauliY(wires=1), qml.PauliZ(wires=2)
+                    )
+                ),
+                np.array(2.75),
+            ],
+            [
+                qml.expval(qml.PauliX(wires=0) + qml.PauliY(wires=1) + qml.PauliZ(wires=2)),
+                np.array(1.5),
+            ],
+            [
+                qml.var(qml.PauliX(wires=0) + qml.PauliY(wires=1) + qml.PauliZ(wires=2)),
+                np.array(2.75),
+            ],
+        ],
+    )
+    def test_sum_xyz(self, meas, expected, backend):
+        """Test ``qml.ops.op_math.Sum`` and ``+`` converting to HamiltonianObs."""
+
+        # Enabling new arithmetic operators
+        qml.operation.enable_new_opmath()
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=3))
+        def circuit(x: float, y: float):
+            qml.RX(x, wires=0)
+            qml.RX(y, wires=1)
+            qml.RX(x + y, wires=1)
+            qml.CNOT(wires=[0, 1])
+            return meas
+
+        result = circuit(np.pi / 4, np.pi / 2)
+        assert np.allclose(expected, result)
+
+    @pytest.mark.parametrize(
+        "meas, expected",
+        [[qml.expval, np.array(0.0)], [qml.var, np.array(0.25)]],
+    )
+    def test_sprod_x(self, meas, expected, backend):
+        """Test ``qml.ops.op_math.SProd`` converting to HamiltonianObs."""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=2))
+        def circuit(x: float, y: float):
+            qml.RX(x, wires=0)
+            qml.RX(y, wires=1)
+            qml.CNOT(wires=[0, 1])
+            return meas(qml.ops.op_math.SProd(0.5, qml.PauliX(0)))
+
+        result = circuit(np.pi / 4, np.pi / 2)
+        assert np.allclose(expected, result)
+
+        circuit(0, 1)  # another call
+
+    @pytest.mark.parametrize(
+        "meas, expected",
+        [
+            [
+                qml.expval(
+                    qml.ops.op_math.Sum(
+                        qml.PauliX(wires=0),
+                        qml.PauliY(wires=1),
+                        qml.ops.op_math.SProd(0.5, qml.PauliZ(2)),
+                    )
+                ),
+                np.array(1),
+            ],
+            [
+                qml.var(
+                    qml.ops.op_math.Sum(
+                        qml.ops.op_math.SProd(0.2, qml.PauliX(wires=0)),
+                        qml.ops.op_math.SProd(0.4, qml.PauliY(wires=1)),
+                        qml.ops.op_math.SProd(0.5, qml.PauliZ(wires=2)),
+                    )
+                ),
+                np.array(0.24),
+            ],
+            [
+                qml.expval(qml.PauliX(wires=0) + qml.PauliY(wires=1) + 0.5 * qml.PauliZ(wires=2)),
+                np.array(1),
+            ],
+            [
+                qml.var(
+                    0.2 * qml.PauliX(wires=0)
+                    + 0.4 * qml.PauliY(wires=1)
+                    + 0.5 * qml.PauliZ(wires=2)
+                ),
+                np.array(0.24),
+            ],
+        ],
+    )
+    def test_sum_sprod_xyz(self, meas, expected, backend):
+        """Test ``qml.ops.op_math.Sum`` and ``qml.ops.op_math.SProd`` converting to HamiltonianObs."""
+
+        # Enabling new arithmetic operators
+        qml.operation.enable_new_opmath()
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=3))
+        def circuit(x: float, y: float):
+            qml.RX(x, wires=0)
+            qml.RX(y, wires=1)
+            qml.RX(x + y, wires=1)
+            qml.CNOT(wires=[0, 1])
+            return meas
+
+        result = circuit(np.pi / 4, np.pi / 2)
+        assert np.allclose(expected, result)
+
+    @pytest.mark.parametrize(
+        "meas, expected",
+        [[qml.expval, np.array(0.25)], [qml.var, np.array(0.1875)]],
+    )
+    def test_mix_dunder(self, meas, expected, backend):
+        """Test dunder methods."""
+
+        # Enabling new arithmetic operators
+        qml.operation.enable_new_opmath()
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=2))
+        def circuit(x, y):
+            qml.RX(x, wires=0)
+            qml.RX(y, wires=1)
+            qml.CNOT(wires=[0, 1])
+            return meas(-0.5 * qml.PauliX(0) @ qml.PauliY(1))
+
+        result = circuit(np.pi / 4, np.pi / 4)
+        assert np.allclose(expected, result)
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])

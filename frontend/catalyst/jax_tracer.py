@@ -40,6 +40,13 @@ from catalyst.utils.tracing import TracingContext
 
 KNOWN_NAMED_OBS = (qml.Identity, qml.PauliX, qml.PauliY, qml.PauliZ, qml.Hadamard)
 
+PAULI_NAMED_MAP = {
+    "I": "Identity",
+    "X": "PauliX",
+    "Y": "PauliY",
+    "Z": "PauliZ",
+}
+
 
 def get_mlir(func, *args, **kwargs):
     """Lower a Python function into an MLIR module.
@@ -406,22 +413,101 @@ def trace_observables(obs, qubit_states, p, num_wires, qreg):
         qubits = get_qubits_from_wires(wires, qubit_states, qreg)
         jax_obs = jprim.compbasis(*qubits)
     elif isinstance(obs, KNOWN_NAMED_OBS):
-        _, wires = op_args
-        qubits = get_qubits_from_wires(wires, qubit_states, qreg)
-        jax_obs = jprim.namedobs(type(obs).__name__, qubits[0])
+        jax_obs, qubits = named_obs(obs, op_args, qubit_states, qreg)
     elif isinstance(obs, qml.Hermitian):
-        matrix, wires = op_args
-        qubits = get_qubits_from_wires(wires, qubit_states, qreg)
-        jax_obs = jprim.hermitian(matrix, *qubits)
+        jax_obs, qubits = hermitian_obs(obs, op_args, qubit_states, qreg)
     elif isinstance(obs, qml.operation.Tensor):
         nested_obs = [trace_observables(o, qubit_states, p, num_wires, qreg)[0] for o in obs.obs]
         jax_obs = jprim.tensorobs(*nested_obs)
     elif isinstance(obs, qml.Hamiltonian):
         nested_obs = [trace_observables(o, qubit_states, p, num_wires, qreg)[0] for o in obs.ops]
         jax_obs = trace_hamiltonian(op_args, *nested_obs)
+    elif obs._pauli_rep is not None:
+        jax_obs = pauli_sentence_to_rt_obs(obs._pauli_rep, qubit_states, qreg)
     else:
         raise RuntimeError(f"unknown observable in measurement process: {obs}")
     return jax_obs, qubits
+
+
+def named_obs(obs, op_args, qubit_states, qreg):
+    """Trace a named observable.
+
+    Args:
+        obs: a named observable
+        op_args: arguments of the observable
+        qubit_states: the statically known qubit state at this program point
+        qreg: the quantum register with the state at this program point
+
+    Returns:
+        jax_obs: a NamedObs JAX primitive used for tracing
+        qubits: a list of qubits used by the observable
+    """
+    assert isinstance(obs, KNOWN_NAMED_OBS)
+    _, wires = op_args
+    qubits = get_qubits_from_wires(wires, qubit_states, qreg)
+    jax_obs = jprim.namedobs(type(obs).__name__, qubits[0])
+    return jax_obs, qubits
+
+
+def hermitian_obs(obs, op_args, qubit_states, qreg):
+    """Trace a Hermitian observable.
+
+    Args:
+        obs: a Hermitian observable
+        op_args: arguments of the observable
+        qubit_states: the statically known qubit state at this program point
+        qreg: the quantum register with the state at this program point
+
+    Returns:
+        jax_obs: a Hermitian JAX primitive used for tracing
+        qubits: a list of qubits used by the observable
+    """
+    assert isinstance(obs, qml.Hermitian)
+    matrix, wires = op_args
+    qubits = get_qubits_from_wires(wires, qubit_states, qreg)
+    jax_obs = jprim.hermitian(matrix, *qubits)
+    return jax_obs, qubits
+
+
+def pauli_sentence_to_rt_obs(paulis, qubit_states, qreg):
+    """Convert a :class:`pennylane.pauli.PauliSentence` into a Hamiltonian.
+
+    Args:
+        paulis: a :class:`pennylane.pauli.PauliSentence`
+        qubit_states: the statically known qubit state at this program point
+        qreg: the quantum register with the state at this program point
+
+    Returns:
+        a Hamiltonian JAX primitive used for tracing
+    """
+    pwords, coeffs = zip(*paulis.items())
+    nested_obs = [pauli_word_to_rt_obs(pword, qubit_states, qreg) for pword in pwords]
+    coeffs = jax.numpy.asarray(coeffs)
+    return jprim.hamiltonian(coeffs, *nested_obs)
+
+
+def pauli_word_to_rt_obs(obs, qubit_states, qreg):
+    """Convert a :class:`pennylane.pauli.PauliWord` into a Named or Tensor observable.
+
+    Args:
+        obs: a :class:`pennylane.pauli.PauliWord`
+        qubit_states: the statically known qubit state at this program point
+        qreg: the quantum register with the state at this program point
+
+    Returns:
+        a NamedObs or TensorObs JAX primitive used for tracing
+    """
+    if len(obs) == 1:
+        wire, pauli = list(obs.items())[0]
+        qubits = get_qubits_from_wires([wire], qubit_states, qreg)
+        return jprim.namedobs(PAULI_NAMED_MAP[pauli], qubits[0])
+
+    nested_obs = []
+    for wire, pauli in obs.items():
+        qubits = get_qubits_from_wires([wire], qubit_states, qreg)
+        nested_obs.append(jprim.namedobs(PAULI_NAMED_MAP[pauli], qubits[0]))
+
+    return jprim.tensorobs(*nested_obs)
 
 
 def trace_measurement(meas, obs, qubits, shots):
