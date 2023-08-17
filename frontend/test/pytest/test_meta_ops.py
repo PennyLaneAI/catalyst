@@ -65,6 +65,7 @@ ops = [
     qml.CRY(0.6, wires=[1, 2]),
     qml.CRZ(0.6, wires=[1, 2]),
     qml.MultiRZ(0.6, wires=[0, 1, 2, 3]),
+    qml.MultiControlledX(wires=[1, 2, 3]),
 ]
 
 
