@@ -501,6 +501,14 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         }
     }
 
+    /// Generate an augmented forward pass, which computes the original value of the `qnode` in
+    /// addition to any data that the gradient of this qnode needs. Currently, the gradient does not
+    /// require any intermediate data, so the augmented forward pass just calls + returns the result
+    /// of the regular QNode.
+    ///
+    /// Enzyme additionally expects this function to take shadow pointers of forward pass arguments,
+    /// which are currently unused. For more detail, see:
+    /// https://enzyme.mit.edu/getting_started/CallingConvention#custom-gradients
     func::FuncOp genAugmentedForward(func::FuncOp qnode, OpBuilder &builder) const
     {
         std::string augmentedName = (qnode.getName() + ".augfwd").str();
@@ -538,8 +546,15 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         return augmentedForward;
     }
 
-    // `qnodeType` is the original type of the function prior to conversion to destination-passing
-    // style and wrapping memrefs into pointers.
+    /// Given a `qnode` in destination passing style and a function that computes its quantum
+    /// derivative with respect to gate parameters `qgradFn`, generate an Enzyme-compatible custom
+    /// gradient function that computes the derivative of the QNode in the context of a larger,
+    /// Enzyme-driven hybrid gradient computation.
+    ///
+    /// To do this, it takes the incoming cotangent (expressed as the shadow of the QNode result)
+    /// and applies the chain rule via multiplication with the quantum derivative to produce the
+    /// gradient of the final output with respect to the gate parameters. This is stored in the
+    /// appropriate shadow argument.
     func::FuncOp genCustomQGradient(func::FuncOp qnode, Location loc, func::FuncOp qgradFn,
                                     OpBuilder &builder) const
     {

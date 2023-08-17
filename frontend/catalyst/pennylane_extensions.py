@@ -388,14 +388,19 @@ def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
 
     .. warning::
 
-        If parameter-shift or adjoint is specified, this will only be used
-        for internal _quantum_ functions. Classical components will be differentiated
-        using finite-differences.
+        If ``method="fd"`` is specified, any internal QNode ``diff_method`` will be
+        ignored and the entire function will be differentiated using finite-differences.
 
     .. warning::
 
-        Currently, higher-order differentiation or differentiation of non-QNode functions
-        is only supported by the finite-difference method.
+        If ``method="defer"`` is specified, Catalyst supports ``diff_method="parameter-shift"``
+        and ``diff_method="adjoint"`` on internal QNodes. Notably, the default QNode
+        differentiation method of ``"finite-diff"`` is not supported when used with ``"defer"``.
+
+    .. warning::
+
+        Currently, higher-order differentiation is only supported by the finite-difference
+        method.
 
     .. note::
 
@@ -426,7 +431,7 @@ def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
     Raises:
         ValueError: Invalid method or step size parameters.
 
-    **Example**
+    **Example 1 (Classical preprocessing)**
 
     .. code-block:: python
 
@@ -444,6 +449,53 @@ def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
 
     >>> workflow(2.0)
     array(-3.14159265)
+
+    **Example 2 (Classical preprocessing and postprocessing)**
+
+    .. code-block:: python
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qjit
+        def grad_loss(theta):
+            @qml.qnode(dev, diff_method="adjoint")
+            def circuit(theta):
+                qml.RX(jnp.exp(theta ** 2) / jnp.cos(theta / 4), wires=0)
+                return qml.expval(qml.PauliZ(wires=0))
+
+            def loss(theta):
+                return jnp.pi / jnp.tanh(circuit(theta))
+
+            return catalyst.grad(loss, method="defer")(theta)
+
+    >>> grad_loss(1.0)
+    array(-1.90958669)
+
+    **Example 3 (Multiple QNodes with their own differentiation methods)**
+
+    .. code-block:: python
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qjit
+        def grad_loss(theta):
+            @qml.qnode(dev, diff_method="parameter-shift")
+            def circuit_A(params):
+                qml.RX(jnp.exp(params[0] ** 2) / jnp.cos(params[1] / 4), wires=0)
+                return qml.probs()
+
+            @qml.qnode(dev, diff_method="adjoint")
+            def circuit_B(params):
+                qml.RX(jnp.exp(params[1] ** 2) / jnp.cos(params[0] / 4), wires=0)
+                return qml.expval(qml.PauliZ(wires=0))
+
+            def loss(params):
+                return jnp.prod(circuit_A(params)) + circuit_B(params)
+
+            return catalyst.grad(loss, method="defer")(theta)
+
+    >>> grad_loss(jnp.array([1.0, 2.0]))
+    array([ 0.57367285, 44.4911605 ])
     """
     return Grad(_ensure_differentiable(f), grad_params=_check_grad_params(method, h, argnum))
 
