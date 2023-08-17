@@ -741,7 +741,8 @@ class TestNewArithmeticOps:
         ],
     )
     def test_sum_sprod_xyz(self, meas, expected, backend):
-        """Test ``qml.ops.op_math.Sum`` and ``qml.ops.op_math.SProd`` converting to HamiltonianObs."""
+        """Test ``qml.ops.op_math.Sum`` and ``qml.ops.op_math.SProd`` converting to
+        HamiltonianObs."""
 
         # Enabling new arithmetic operators
         qml.operation.enable_new_opmath()

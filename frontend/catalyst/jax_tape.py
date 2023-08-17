@@ -216,7 +216,7 @@ def get_observables_dependency_tree(obs):
         yield obs
         for o in obs.ops:
             yield from get_observables_dependency_tree(o)
-    elif obs._pauli_rep is not None:
+    elif obs._pauli_rep is not None:  # pylint: disable=protected-access
         yield obs
     else:
         raise ValueError("Unsupported observable")
