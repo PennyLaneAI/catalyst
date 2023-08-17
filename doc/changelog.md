@@ -84,6 +84,25 @@
   array(112936.34906843)
   ```
 
+* Add support for Hamiltonian observables with integer coefficients.
+  [#248](https://github.com/PennyLaneAI/catalyst/pull/248)
+
+  For example, compiling the following circuit wasn't allowed before, but it is
+  now supported in Catalyst:
+
+  ``` python
+  @qjit
+  @qml.qnode(qml.device("lightning.qubit", wires=2))
+  def circuit(x: float, y: float):
+      qml.RX(x, wires=0)
+      qml.RY(y, wires=1)
+
+      coeffs = [1, 2]
+      obs = [qml.PauliZ(0), qml.PauliZ(1)]
+      return qml.expval(qml.Hamiltonian(coeffs, obs))
+  ```
+
+
 <h3>Improvements</h3>
 
 * Eliminate redundant unflattening and flattening of PyTrees parameters in Catalyst control flow operations.
@@ -132,8 +151,9 @@
   [#234](https://github.com/PennyLaneAI/catalyst/pull/234)
 
 * Small improvements to CI/CD. Fix Enzyme cache, generalize caches to other operating systems,
-  and remove references to QIR in runtime's Makefile.
+  fix build wheel recipe, and remove references to QIR in runtime's Makefile.
   [#243](https://github.com/PennyLaneAI/catalyst/pull/243)
+  [#247](https://github.com/PennyLaneAI/catalyst/pull/247)
 
 <h3>Breaking changes</h3>
 

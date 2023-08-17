@@ -1458,6 +1458,8 @@ class QJITDevice(qml.QubitDevice):
         with Patcher(
             (qml.ops.Controlled, "has_decomposition", lambda self: True),
             (qml.ops.Controlled, "decomposition", _decomp_controlled),
+            # TODO: Remove once work_wires is no longer needed for decomposition.
+            (qml.ops.MultiControlledX, "decomposition", _decomp_controlled),
         ):
             expanded_tape = super().default_expand_fn(circuit, max_expansion)
 
