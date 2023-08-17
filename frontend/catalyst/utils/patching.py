@@ -34,9 +34,9 @@ class Patcher:
 
     def __enter__(self):
         for obj, attr_name, fn in self.patch_data:
-            self.backup[attr_name] = getattr(obj, attr_name)
+            self.backup[(obj, attr_name)] = getattr(obj, attr_name)
             setattr(obj, attr_name, fn)
 
     def __exit__(self, _type, _value, _traceback):
         for obj, attr_name, _ in self.patch_data:
-            setattr(obj, attr_name, self.backup[attr_name])
+            setattr(obj, attr_name, self.backup[(obj, attr_name)])
