@@ -34,8 +34,8 @@ from jax._src.util import unzip2
 from jax._src.lax.lax import xb, xla
 from catalyst.jax_primitives import (Qreg, AbstractQreg, AbstractQbit, qinst, qextract, qinsert,
                                      qfor_p, qfor, qmeasure_p, qdevice, qalloc, qdealloc, compbasis,
-                                     sample)
-from catalyst.jax_tracer import custom_lower_jaxpr_to_module, trace_observables
+                                     sample, namedobs, hermitian, expval, state, compbasis_p)
+from catalyst.jax_tracer import (custom_lower_jaxpr_to_module, trace_observables, KNOWN_NAMED_OBS)
 from catalyst.utils.tracing import TracingContext
 from catalyst.utils.exceptions import CompileError
 from typing import Optional, Callable, List, ContextManager, Tuple, Any, Dict, Union
@@ -326,7 +326,6 @@ def trace_quantum_measurements(quantum_tape,
                                outputs:List[Union[MeasurementProcess, DynamicJaxprTracer]]
                                ) -> List[DynamicJaxprTracer]:
     shots = device.shots
-    qubit_states = {}
     out_classical_tracers = []
 
     for i, o in enumerate(outputs):
@@ -337,15 +336,34 @@ def trace_quantum_measurements(quantum_tape,
             qubits = [qextract(qreg, wire) for wire in op.wires]
             if obs is None:
                 obs_tracers = compbasis(*qubits)
+            elif isinstance(obs, KNOWN_NAMED_OBS):
+                obs_tracers = namedobs(type(obs).__name__, qubits[0])
+            elif isinstance(obs, qml.Hermitian):
+                assert False, f"{obs.matrix=}"
+                obs_tracers = hermitian(matrix, *qubits)
+            # elif isinstance(obs, qml.operation.Tensor):
+            #     nested_obs = [trace_observables(o, qubit_states, p, num_wires, qreg)[0] for o in obs.obs]
+            #     obs_tracers = jprim.tensorobs(*nested_obs)
+            # elif isinstance(obs, qml.Hamiltonian):
+            #     nested_obs = [trace_observables(o, qubit_states, p, num_wires, qreg)[0] for o in obs.ops]
+            #     obs_tracers = trace_hamiltonian(op_args, *nested_obs)
             else:
                 raise NotImplementedError(f"Observable {obs} is not impemented")
 
+            mres_tracer = None
             if o.return_type.value == "sample":
                 shape = (shots, len(qubits)) if obs is None else (shots,)
-                mres = sample(obs_tracers, shots, shape)
-                out_classical_tracers.append(mres)
+                mres_tracer = sample(obs_tracers, shots, shape)
+            elif o.return_type.value == "expval":
+                mres_tracer = expval(obs_tracers, shots)
+            elif o.return_type.value == "state":
+                # assert obs is None, "Expected no observables for the state 'measurement'"
+                assert obs_tracers.primitive == compbasis_p
+                shape = (2 ** len(qubits),)
+                mres_tracer = state(obs_tracers, shape)
             else:
                 raise NotImplementedError(f"Measurement {o.return_type.value} is not impemented")
+            out_classical_tracers.append(mres_tracer)
         else:
             raise CompileError(f"Expected a tracer or a measurement, got {o}")
 
@@ -402,6 +420,7 @@ def trace_quantum_function(
     out_avals, _ = unzip2(out_type)
     out_shape = tree_unflatten(out_tree_promise(),
                                [ShapeDtypeStruct(a.shape, a.dtype, a.named_shape) for a in out_avals])
+    # print("JAXPR", jaxpr)
     return closed_jaxpr, out_shape
 
 
