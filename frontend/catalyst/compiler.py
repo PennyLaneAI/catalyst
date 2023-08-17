@@ -201,6 +201,7 @@ class BufferizationPass(PassPipeline):
         "--buffer-hoisting",
         "--buffer-loop-hoisting",
         "--buffer-deallocation",
+        "--convert-arraylist-to-memref",
         "--convert-bufferization-to-memref",
         "--canonicalize",
         # "--cse",
@@ -261,7 +262,7 @@ class QuantumCompilationPass(PassPipeline):
     """Pass pipeline for Catalyst-specific transformation passes."""
 
     _executable = get_executable_path("quantum", "quantum-opt")
-    _default_flags = ["--lower-gradients", "--adjoint-lowering", "--convert-arraylist-to-memref"]
+    _default_flags = ["--lower-gradients", "--adjoint-lowering"]
 
     @staticmethod
     def get_output_filename(infile):
