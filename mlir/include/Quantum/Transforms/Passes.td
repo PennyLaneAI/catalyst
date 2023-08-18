@@ -60,6 +60,11 @@ def CopyGlobalMemRefPass : Pass<"cp-global-memref"> {
 def AdjointLoweringPass : Pass<"adjoint-lowering"> {
     let summary = "Lower adjoint regions containing a single quantum operations.";
 
+    let dependentDialects = [
+        "catalyst::CatalystDialect",
+        "index::IndexDialect"
+    ];
+
     let constructor = "catalyst::createAdjointLoweringPass()";
 }
 

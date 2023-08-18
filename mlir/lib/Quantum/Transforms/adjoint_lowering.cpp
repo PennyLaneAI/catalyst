@@ -32,6 +32,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
+#include "Catalyst/IR/CatalystDialect.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Patterns.h"
 
@@ -55,7 +56,6 @@ struct AdjointLoweringPass : impl::AdjointLoweringPassBase<AdjointLoweringPass> 
 
         RewritePatternSet patterns(&getContext());
         populateAdjointPatterns(patterns);
-
         if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
             return signalPassFailure();
         }

@@ -17,6 +17,7 @@ RUN chmod 0440 /etc/sudoers.d/$USERNAME
 ## Catalyst will be installed from source from within the running container. ##
 
 # Install the required C++ build toolchain and git.
+# TODO: remove patch installation once jax dependency is >= 0.4.14
 RUN apt-get update && apt-get install -y --no-install-recommends git curl patch \
       build-essential ninja-build clang lld ccache libomp-dev \
     && apt-get clean && rm -rf /var/lib/apt/lists/*

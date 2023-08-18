@@ -2,9 +2,9 @@
 
 <h3>New features</h3>
 
-* Add a preliminary support for native quantum Adjoint operation. `catalyst.adjoint` computes the
-  adjoint of the quantum computation defined by a callee function. Catalyst control flow
-  instructions are not handled yet. The usage pattern is as follows:
+* Add support for natively representing the quantum adjoint operation. ``catalyst.adjoint`` computes the
+  adjoint of the quantum computation defined by a provided quantum function. For example:
+
   ``` python
   def circuit(param):
       qml.RX(param, wires=0)
@@ -14,11 +14,52 @@
   @qjit
   @qml.qnode(qml.device("lightning.qubit", wires=3))
   def workflow():
-      catalyst.adjoint(circuit)(pnp.pi/2)
+      catalyst.adjoint(circuit)(jnp.pi/2)
       return qml.state()
 
   workflow()
   ```
+
+  Quantum functions with arbitrary Catalyst control flow can have their adjoint versions computed, even
+  when the control flow contains classical preprocessing:
+
+  ```python
+  def circuit_control_flow(param):
+    @for_loop(0, 6, 1)
+    def loop_outer(iv):
+      qml.RX(theta / 2, wires=0)
+
+      # This loop both applies gates and computes a classical gate parameter!
+      @for_loop(0, iv, 2)
+      def loop_inner(jv, ub):
+        qml.RY(theta, wires=0)
+        return ub + jv
+
+      ub = loop_inner(1)
+
+      qml.RX(theta / ub, wires=0)
+
+      @while_loop(lambda counter: counter < ub)
+      def while_loop_inner(counter):
+        qml.RZ(ub / 5, wires=0)
+        return counter + 1
+
+      final = while_loop_inner(0)
+
+      qml.RX(theta / final, wires=0)
+
+  @qjit
+  @qml.qnode(qml.device("lightning.qubit", wires=3))
+  def workflow_control_flow():
+      catalyst.adjoint(circuit_control_flow)(jnp.pi)
+      return qml.state()
+
+  workflow_control_flow()
+  ```
+
+  The key of being *natively represented* means the adjoint operation now shares the usual Catalyst
+  benefits: reduced circuit size (= faster compile times!) when using control flow and performance benefits
+  from Catalyst's Just-In-Time compilation.
 
 * Add support for container-like and nested Python structures, such as lists of lists or dictionaries,
   that can occur in a QJIT program as function arguments or return values via the JAX ``pytree`` API.
@@ -84,6 +125,25 @@
   array(112936.34906843)
   ```
 
+* Add support for Hamiltonian observables with integer coefficients.
+  [#248](https://github.com/PennyLaneAI/catalyst/pull/248)
+
+  For example, compiling the following circuit wasn't allowed before, but it is
+  now supported in Catalyst:
+
+  ``` python
+  @qjit
+  @qml.qnode(qml.device("lightning.qubit", wires=2))
+  def circuit(x: float, y: float):
+      qml.RX(x, wires=0)
+      qml.RY(y, wires=1)
+
+      coeffs = [1, 2]
+      obs = [qml.PauliZ(0), qml.PauliZ(1)]
+      return qml.expval(qml.Hamiltonian(coeffs, obs))
+  ```
+
+
 <h3>Improvements</h3>
 
 * Use a new C++-based compiler driver to drive the compilation process. This reduces the compilation time
@@ -135,8 +195,9 @@
   [#234](https://github.com/PennyLaneAI/catalyst/pull/234)
 
 * Small improvements to CI/CD. Fix Enzyme cache, generalize caches to other operating systems,
-  and remove references to QIR in runtime's Makefile.
+  fix build wheel recipe, and remove references to QIR in runtime's Makefile.
   [#243](https://github.com/PennyLaneAI/catalyst/pull/243)
+  [#247](https://github.com/PennyLaneAI/catalyst/pull/247)
 
 <h3>Breaking changes</h3>
 
