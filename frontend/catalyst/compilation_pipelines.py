@@ -777,7 +777,7 @@ def qjit(
     Args:
         fn (Callable): the quantum or classical function
         autograph (bool): support imperative Python code via autograph source transformations
-            (default - False)
+                          (requires tensorflow package)
         target (str): the compilation target
         keep_intermediate (bool): Whether or not to store the intermediate files throughout the
             compilation. If ``True``, intermediate representations are available via the
