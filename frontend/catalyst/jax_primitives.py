@@ -1475,8 +1475,10 @@ def _qfor_lowering(
         from_elements_op = FromElementsOp.build_generic([result_from_elements_op], [body_args[0]])
         body_args[0] = from_elements_op.result
 
-        print("BJBJBJ", body_jaxpr)
-        print("BJBJBJ", body_jaxpr.consts)
+        print("BJBJBJ1", body_jaxpr)
+        print("BJBJBJ2", body_jaxpr.consts)
+        print("BJBJBJ3", type(body_jaxpr.consts[0]).__mro__)
+        print("BJBJBJ4", body_jaxpr.consts[0].__dir__())
 
         # recursively generate the mlir for the loop body
         out, _ = mlir.jaxpr_subcomp(

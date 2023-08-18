@@ -31,6 +31,9 @@ from jax.interpreters.mlir import (
     lower_jaxpr_to_fun,
     lowerable_effects,
 )
+from jax._src.interpreters.mlir import (
+    _constant_handlers
+)
 from jax._src.util import unzip2
 from jax._src.lax.lax import xb, xla
 from catalyst.jax_primitives import (Qreg, AbstractQreg, AbstractQbit, qinst, qextract, qinsert,
@@ -427,6 +430,7 @@ def trace_quantum_function(
     out_shape = tree_unflatten(out_tree_promise(),
                                [ShapeDtypeStruct(a.shape, a.dtype, a.named_shape) for a in out_avals])
     print("JJJAXPR", jaxpr)
+    print("CONHAND", _constant_handlers)
     print(lower_jaxpr_to_mlir(closed_jaxpr))
     print("111111111111111111111")
     return closed_jaxpr, out_shape
