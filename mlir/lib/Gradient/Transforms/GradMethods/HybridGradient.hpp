@@ -30,8 +30,12 @@ struct HybridGradientLowering : public mlir::OpRewritePattern<GradOp> {
     mlir::LogicalResult matchAndRewrite(GradOp op, mlir::PatternRewriter &rewriter) const override;
 
   private:
-    static mlir::FailureOr<mlir::func::FuncOp> cloneCallee(mlir::PatternRewriter &rewriter,
-                                                           mlir::func::FuncOp callee);
+    /// Recursively process all the QNodes of the `callee` being differentiated. The resulting
+    /// BackpropOps will be called with `backpropArgs`.
+    static mlir::FailureOr<mlir::func::FuncOp>
+    cloneCallee(mlir::PatternRewriter &rewriter, GradOp gradOp, mlir::func::FuncOp callee,
+                mlir::SmallVectorImpl<Value> &backpropArgs);
+
     /// Generate a version of the QNode that accepts the parameter buffer. This is so Enzyme will
     /// see that the gate parameters flow into the custom quantum function.
     static mlir::func::FuncOp genQNodeWithParams(mlir::PatternRewriter &rewriter,

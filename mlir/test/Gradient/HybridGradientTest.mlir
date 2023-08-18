@@ -18,14 +18,14 @@
 func.func private @funcScalarScalar(%arg0: f64) -> f64 attributes {qnode, diff_method = "parameter-shift"} {
     return %arg0 : f64
 }
-
 // CHECK-LABEL: @gradCallScalarScalar(%arg0: f64) -> f64
     // CHECK-DAG:    [[zero:%.+]] = arith.constant 0.0{{.+}}+00 : f64
     // CHECK-DAG:    [[one:%.+]] = arith.constant 1.0{{.+}}+00 : f64
+    // CHECK-DAG:    [[pcount:%.+]] = call @funcScalarScalar.pcount
     // CHECK:        [[cotangent0:%.+]] = tensor.empty() : tensor<f64>
     // CHECK:        [[cotangent1:%.+]] = linalg.fill ins([[zero]] : f64) outs([[cotangent0]]
     // CHECK:        [[cotangent:%.+]] = tensor.insert [[one]] into [[cotangent1]]
-    // CHECK:        [[grad:%.+]] = gradient.backprop @funcScalarScalar.cloned(%arg0) cotangents([[cotangent]]
+    // CHECK:        [[grad:%.+]] = gradient.backprop @funcScalarScalar.splitpreprocessed(%arg0, [[pcount]]) cotangents([[cotangent]]
     // CHECK:        return [[grad]]
 
 func.func @gradCallScalarScalar(%arg0: f64) -> f64 {
@@ -45,10 +45,11 @@ func.func private @funcScalarPointTensor(%arg0: f64) -> tensor<f64> attributes {
 // CHECK-LABEL: @gradCallScalarPointTensor(%arg0: f64) -> tensor<f64>
     // CHECK-DAG:    [[zero:%.+]] = arith.constant 0.0{{.+}}+00 : f64
     // CHECK-DAG:    [[one:%.+]] = arith.constant 1.0{{.+}}+00 : f64
+    // CHECK-DAG:    [[pcount:%.+]] = call @funcScalarPointTensor.pcount
     // CHECK:        [[empty:%.+]] = tensor.empty() : tensor<f64>
     // CHECK:        [[cotangent1:%.+]] = linalg.fill ins([[zero]] : f64) outs([[empty]]
     // CHECK:        [[cotangent:%.+]] = tensor.insert [[one]] into [[cotangent1]]
-    // CHECK:        [[grad:%.+]] = gradient.backprop @funcScalarPointTensor.cloned(%arg0) cotangents([[cotangent]]
+    // CHECK:        [[grad:%.+]] = gradient.backprop @funcScalarPointTensor.splitpreprocessed(%arg0, [[pcount]]) cotangents([[cotangent]]
     // CHECK:        [[gradTensor:%.+]] = tensor.insert [[grad]] into [[empty]]
     // CHECK:        return [[gradTensor]]
 
@@ -69,10 +70,11 @@ func.func private @funcPointTensorScalar(%arg0: tensor<f64>) -> f64 attributes {
 // CHECK-LABEL: @gradCallPointTensorScalar(%arg0: tensor<f64>) -> f64
     // CHECK-DAG:    [[zero:%.+]] = arith.constant 0.0{{.+}}+00 : f64
     // CHECK-DAG:    [[one:%.+]] = arith.constant 1.0{{.+}}+00 : f64
+    // CHECK-DAG:    [[pcount:%.+]] = call @funcPointTensorScalar.pcount
     // CHECK:        [[empty:%.+]] = tensor.empty() : tensor<f64>
     // CHECK:        [[cotangent1:%.+]] = linalg.fill ins([[zero]] : f64) outs([[empty]]
     // CHECK:        [[cotangent:%.+]] = tensor.insert [[one]] into [[cotangent1]]
-    // CHECK:        [[gradTensor:%.+]] = gradient.backprop @funcPointTensorScalar.cloned(%arg0) cotangents([[cotangent]]
+    // CHECK:        [[gradTensor:%.+]] = gradient.backprop @funcPointTensorScalar.splitpreprocessed(%arg0, [[pcount]]) cotangents([[cotangent]]
     // CHECK:        [[grad:%.+]] = tensor.extract [[gradTensor]]
     // CHECK:        return [[grad]]
 
@@ -92,10 +94,11 @@ func.func private @funcPointTensorPointTensor(%arg0: tensor<f64>) -> tensor<f64>
 // CHECK-LABEL: @gradCallPointTensorPointTensor(%arg0: tensor<f64>) -> tensor<f64>
     // CHECK-DAG:    [[zero:%.+]] = arith.constant 0.0{{.+}}+00 : f64
     // CHECK-DAG:    [[one:%.+]] = arith.constant 1.0{{.+}}+00 : f64
+    // CHECK-DAG:    [[pcount:%.+]] = call @funcPointTensorPointTensor.pcount
     // CHECK:        [[empty:%.+]] = tensor.empty() : tensor<f64>
     // CHECK:        [[cotangent1:%.+]] = linalg.fill ins([[zero]] : f64) outs([[empty]]
     // CHECK:        [[cotangent:%.+]] = tensor.insert [[one]] into [[cotangent1]]
-    // CHECK:        [[gradTensor:%.+]] = gradient.backprop @funcPointTensorPointTensor.cloned(%arg0) cotangents([[cotangent]]
+    // CHECK:        [[gradTensor:%.+]] = gradient.backprop @funcPointTensorPointTensor.splitpreprocessed(%arg0, [[pcount]]) cotangents([[cotangent]]
     // CHECK:        return [[gradTensor]]
 
 func.func @gradCallPointTensorPointTensor(%arg0: tensor<f64>) -> tensor<f64> {
@@ -118,31 +121,32 @@ func.func private @funcScalarTensor(%arg0: f64) -> tensor<2x3xf64> attributes {q
     // CHECK-DAG:    [[idx0:%.+]] = index.constant 0
     // CHECK-DAG:    [[idx1:%.+]] = index.constant 1
     // CHECK-DAG:    [[idx2:%.+]] = index.constant 2
+    // CHECK-DAG:    [[pcount:%.+]] = call @funcScalarTensor.pcount
     // CHECK:        [[empty:%.+]] = tensor.empty() : tensor<2x3xf64>
     // CHECK:        [[zeroed:%.+]] = linalg.fill ins([[zero]] : f64) outs([[empty]]
 
     // CHECK:        [[cotangent0:%.+]] = tensor.insert [[one]] into [[zeroed]][[[idx0]], [[idx0]]]
-    // CHECK:        [[jacEntry00:%.+]] = gradient.backprop @funcScalarTensor.cloned(%arg0) cotangents([[cotangent0]]
+    // CHECK:        [[jacEntry00:%.+]] = gradient.backprop @funcScalarTensor.splitpreprocessed(%arg0, [[pcount]]) cotangents([[cotangent0]]
     // CHECK:        [[jac0:%.+]] = tensor.insert [[jacEntry00]] into [[empty]][[[idx0]], [[idx0]]]
 
     // CHECK:        [[cotangent1:%.+]] = tensor.insert [[one]] into [[zeroed]][[[idx0]], [[idx1]]]
-    // CHECK:        [[jacEntry01:%.+]] = gradient.backprop @funcScalarTensor.cloned(%arg0) cotangents([[cotangent1]]
+    // CHECK:        [[jacEntry01:%.+]] = gradient.backprop @funcScalarTensor.splitpreprocessed(%arg0, [[pcount]]) cotangents([[cotangent1]]
     // CHECK:        [[jac1:%.+]] = tensor.insert [[jacEntry01]] into [[jac0]][[[idx0]], [[idx1]]]
 
     // CHECK:        [[cotangent2:%.+]] = tensor.insert [[one]] into [[zeroed]][[[idx0]], [[idx2]]]
-    // CHECK:        [[jacEntry02:%.+]] = gradient.backprop @funcScalarTensor.cloned(%arg0) cotangents([[cotangent2]]
+    // CHECK:        [[jacEntry02:%.+]] = gradient.backprop @funcScalarTensor.splitpreprocessed(%arg0, [[pcount]]) cotangents([[cotangent2]]
     // CHECK:        [[jac2:%.+]] = tensor.insert [[jacEntry02]] into [[jac1]][[[idx0]], [[idx2]]]
 
     // CHECK:        [[cotangent3:%.+]] = tensor.insert [[one]] into [[zeroed]][[[idx1]], [[idx0]]]
-    // CHECK:        [[jacEntry10:%.+]] = gradient.backprop @funcScalarTensor.cloned(%arg0) cotangents([[cotangent3]]
+    // CHECK:        [[jacEntry10:%.+]] = gradient.backprop @funcScalarTensor.splitpreprocessed(%arg0, [[pcount]]) cotangents([[cotangent3]]
     // CHECK:        [[jac3:%.+]] = tensor.insert [[jacEntry10]] into [[jac2]][[[idx1]], [[idx0]]]
 
     // CHECK:        [[cotangent4:%.+]] = tensor.insert [[one]] into [[zeroed]][[[idx1]], [[idx1]]]
-    // CHECK:        [[jacEntry11:%.+]] = gradient.backprop @funcScalarTensor.cloned(%arg0) cotangents([[cotangent4]]
+    // CHECK:        [[jacEntry11:%.+]] = gradient.backprop @funcScalarTensor.splitpreprocessed(%arg0, [[pcount]]) cotangents([[cotangent4]]
     // CHECK:        [[jac4:%.+]] = tensor.insert [[jacEntry11]] into [[jac3]][[[idx1]], [[idx1]]]
 
     // CHECK:        [[cotangent5:%.+]] = tensor.insert [[one]] into [[zeroed]][[[idx1]], [[idx2]]]
-    // CHECK:        [[jacEntry12:%.+]] = gradient.backprop @funcScalarTensor.cloned(%arg0) cotangents([[cotangent5]]
+    // CHECK:        [[jacEntry12:%.+]] = gradient.backprop @funcScalarTensor.splitpreprocessed(%arg0, [[pcount]]) cotangents([[cotangent5]]
     // CHECK:        [[jac5:%.+]] = tensor.insert [[jacEntry12]] into [[jac4]][[[idx1]], [[idx2]]]
 
     // CHECK:        return [[jac5]]
@@ -163,10 +167,11 @@ func.func private @funcTensorScalar(%arg0: tensor<3xf64>) -> f64 attributes {qno
 // CHECK-LABEL: @gradCallTensorScalar(%arg0: tensor<3xf64>) -> tensor<3xf64>
     // CHECK-DAG:    [[zero:%.+]] = arith.constant 0.0{{.+}}+00 : f64
     // CHECK-DAG:    [[one:%.+]] = arith.constant 1.0{{.+}}+00 : f64
+    // CHECK-DAG:    [[pcount:%.+]] = call @funcTensorScalar.pcount
     // CHECK:        [[empty:%.+]] = tensor.empty() : tensor<f64>
     // CHECK:        [[cotangent1:%.+]] = linalg.fill ins([[zero]] : f64) outs([[empty]]
     // CHECK:        [[cotangent:%.+]] = tensor.insert [[one]] into [[cotangent1]]
-    // CHECK:        [[gradTensor:%.+]] = gradient.backprop @funcTensorScalar.cloned(%arg0) cotangents([[cotangent]]
+    // CHECK:        [[gradTensor:%.+]] = gradient.backprop @funcTensorScalar.splitpreprocessed(%arg0, [[pcount]]) cotangents([[cotangent]]
     // CHECK:        return [[gradTensor]]
 
 func.func @gradCallTensorScalar(%arg0: tensor<3xf64>) -> tensor<3xf64> {
@@ -188,16 +193,17 @@ func.func private @funcTensorTensor(%arg0: tensor<7x3x2x1xf64>) -> tensor<2xf64>
     // CHECK-DAG:    [[one:%.+]] = arith.constant 1.0{{.+}}+00 : f64
     // CHECK-DAG:    [[idx0:%.+]] = index.constant 0
     // CHECK-DAG:    [[idx1:%.+]] = index.constant 1
+    // CHECK-DAG:    [[pcount:%.+]] = call @funcTensorTensor.pcount
     // CHECK-DAG:    [[jacobian0:%.+]] = tensor.empty() : tensor<7x3x2x1x2xf64>
     // CHECK-DAG:    [[empty:%.+]] = tensor.empty() : tensor<2xf64>
     // CHECK:        [[zeroed:%.+]] = linalg.fill ins([[zero]] : f64) outs([[empty]]
 
     // CHECK:        [[cotangent0:%.+]] = tensor.insert [[one]] into [[zeroed]][[[idx0]]]
-    // CHECK:        [[jacSlice0:%.+]] = gradient.backprop @funcTensorTensor.cloned(%arg0) cotangents([[cotangent0]]
+    // CHECK:        [[jacSlice0:%.+]] = gradient.backprop @funcTensorTensor.splitpreprocessed(%arg0, [[pcount]]) cotangents([[cotangent0]]
     // CHECK:        [[jacobian1:%.+]] = tensor.insert_slice [[jacSlice0]] into [[jacobian0]][0, 0, 0, 0, [[idx0]]] [7, 3, 2, 1, 1] [1, 1, 1, 1, 1]
 
     // CHECK:        [[cotangent1:%.+]] = tensor.insert [[one]] into [[zeroed]][[[idx1]]]
-    // CHECK:        [[jacSlice1:%.+]] = gradient.backprop @funcTensorTensor.cloned(%arg0) cotangents([[cotangent1]]
+    // CHECK:        [[jacSlice1:%.+]] = gradient.backprop @funcTensorTensor.splitpreprocessed(%arg0, [[pcount]]) cotangents([[cotangent1]]
     // CHECK:        [[jacobian:%.+]] = tensor.insert_slice [[jacSlice1]] into [[jacobian1]][0, 0, 0, 0, [[idx1]]] [7, 3, 2, 1, 1] [1, 1, 1, 1, 1]
 
     // CHECK:        return [[jacobian]]
@@ -217,12 +223,15 @@ func.func @funcMultiArg(%arg0: tensor<f64>, %arg1: tensor<2xf64>) -> tensor<f64>
 // CHECK-LABEL:  @gradCallMultiArg(%arg0: tensor<f64>, %arg1: tensor<2xf64>) -> (tensor<f64>, tensor<2xf64>, tensor<f64>, tensor<2xf64>)
     // CHECK-DAG:    [[zero:%.+]] = arith.constant 0.0{{.+}}+00 : f64
     // CHECK-DAG:    [[one:%.+]] = arith.constant 1.0{{.+}}+00 : f64
+    // CHECK-DAG:    [[pcount:%.+]] = call @funcMultiArg.pcount
     // CHECK:        [[cotangent0:%.+]] = tensor.empty() : tensor<f64>
     // CHECK:        [[cotangent1:%.+]] = linalg.fill ins([[zero]] : f64) outs([[cotangent0]]
     // CHECK:        [[cotangent:%.+]] = tensor.insert [[one]] into [[cotangent1]]
-    // CHECK:        [[grad0:%.+]] = gradient.backprop @funcMultiArg.cloned(%arg0, %arg1) cotangents([[cotangent]]
-    // CHECK:        [[grad1:%.+]] = gradient.backprop @funcMultiArg.cloned(%arg0, %arg1) cotangents([[cotangent]] {{.+}} {diffArgIndices = dense<1>
-    // CHECK:        [[grad2:%.+]]:2 = gradient.backprop @funcMultiArg.cloned(%arg0, %arg1) cotangents([[cotangent]] {{.+}} {diffArgIndices = dense<[0, 1]>
+    // CHECK:        [[grad0:%.+]] = gradient.backprop @funcMultiArg.splitpreprocessed(%arg0, %arg1, [[pcount]]) cotangents([[cotangent]]
+    // CHECK-DAG:    [[pcount:%.+]] = call @funcMultiArg.pcount
+    // CHECK:        [[grad1:%.+]] = gradient.backprop @funcMultiArg.splitpreprocessed(%arg0, %arg1, [[pcount]]) cotangents([[cotangent]] {{.+}} {diffArgIndices = dense<1>
+    // CHECK-DAG:    [[pcount:%.+]] = call @funcMultiArg.pcount
+    // CHECK:        [[grad2:%.+]]:2 = gradient.backprop @funcMultiArg.splitpreprocessed(%arg0, %arg1, [[pcount]]) cotangents([[cotangent]] {{.+}} {diffArgIndices = dense<[0, 1]>
     // CHECK:        return [[grad0]], [[grad1]], [[grad2]]#0, [[grad2]]#1
 
 func.func @gradCallMultiArg(%arg0: tensor<f64>, %arg1: tensor<2xf64>) -> (tensor<f64>, tensor<2xf64>, tensor<f64>, tensor<2xf64>)  {

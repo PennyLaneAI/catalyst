@@ -117,26 +117,23 @@ void initializeCotangents(TypeRange primalResultTypes, unsigned activeResult, Va
 }
 
 FailureOr<func::FuncOp> HybridGradientLowering::cloneCallee(PatternRewriter &rewriter,
-                                                            func::FuncOp callee)
+                                                            GradOp gradOp, func::FuncOp callee,
+                                                            SmallVectorImpl<Value> &backpropArgs)
 {
     Location loc = callee.getLoc();
     std::string clonedCalleeName = (callee.getName() + ".cloned").str();
     func::FuncOp clonedCallee = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
         callee, rewriter.getStringAttr(clonedCalleeName));
+    backpropArgs.append(gradOp.getArgOperands().begin(), gradOp.getArgOperands().end());
     if (!clonedCallee) {
         rewriter.setInsertionPointAfter(callee);
         // Replace calls with the QNode with the split QNode in the callee.
-        clonedCallee = rewriter.cloneWithoutRegions(callee);
+        clonedCallee = cast<func::FuncOp>(rewriter.clone(*callee));
         clonedCallee.setName(clonedCalleeName);
-        clonedCallee.setPrivate();
-        if (!isQNode(callee)) {
-            rewriter.cloneRegionBefore(callee.getBody(), clonedCallee.getBody(),
-                                       clonedCallee.end());
-        }
         SmallPtrSet<Operation *, 4> qnodes;
         SymbolTableCollection symbolTable;
-        traverseCallGraph(clonedCallee, symbolTable, [&](func::FuncOp funcOp) {
-            if (funcOp == clonedCallee && isQNode(clonedCallee)) {
+        traverseCallGraph(callee, symbolTable, [&](func::FuncOp funcOp) {
+            if (funcOp == callee && isQNode(callee)) {
                 qnodes.insert(callee);
             }
             else if (isQNode(funcOp)) {
@@ -169,20 +166,20 @@ FailureOr<func::FuncOp> HybridGradientLowering::cloneCallee(PatternRewriter &rew
 
             // Replace calls to the original QNode with calls to the split QNode
             if (isQNode(clonedCallee) && qnode == callee) {
-                // It would perhaps be cleaner to not special case this, and instead update the call
-                // site (i.e. grad op)
+                // As the split preprocessed QNode requires the number of gate params as an extra
+                // argument, we need to insert a call to the parameter count function at the
+                // location of the grad op.
                 PatternRewriter::InsertionGuard insertionGuard(rewriter);
-                Block *entryBlock = clonedCallee.addEntryBlock();
+                rewriter.setInsertionPoint(gradOp);
 
-                rewriter.setInsertionPointToStart(entryBlock);
                 Value paramCount =
-                    rewriter.create<func::CallOp>(loc, paramCountFn, clonedCallee.getArguments())
+                    rewriter.create<func::CallOp>(loc, paramCountFn, gradOp.getArgOperands())
                         .getResult(0);
-                SmallVector<Value> splitArgs{clonedCallee.getArguments()};
-                splitArgs.push_back(paramCount);
-
-                auto splitCall = rewriter.create<func::CallOp>(loc, qnodeSplit, splitArgs);
-                rewriter.create<func::ReturnOp>(loc, splitCall.getResults());
+                backpropArgs.push_back(paramCount);
+                // If the callee is a QNode, we want to backprop through the split preprocessed
+                // version.
+                rewriter.eraseOp(clonedCallee);
+                clonedCallee = qnodeSplit;
             }
             traverseCallGraph(clonedCallee, symbolTable, [&](func::FuncOp funcOp) {
                 funcOp.walk([&](func::CallOp callOp) {
@@ -212,10 +209,9 @@ LogicalResult HybridGradientLowering::matchAndRewrite(GradOp op, PatternRewriter
     Location loc = op.getLoc();
     func::FuncOp callee =
         SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
-    FailureOr<func::FuncOp> clonedCallee = cloneCallee(rewriter, callee);
-    if (failed(clonedCallee)) {
-        return failure();
-    }
+
+    SmallVector<Value> backpropArgs;
+    FailureOr<func::FuncOp> clonedCallee = cloneCallee(rewriter, op, callee, backpropArgs);
 
     rewriter.setInsertionPoint(op);
     std::vector<size_t> diffArgIndices = computeDiffArgIndices(op.getDiffArgIndices());
@@ -251,7 +247,7 @@ LogicalResult HybridGradientLowering::matchAndRewrite(GradOp op, PatternRewriter
 
                     auto backpropOp = rewriter.create<gradient::BackpropOp>(
                         loc, computeBackpropTypes(*clonedCallee, diffArgIndices),
-                        clonedCallee->getName(), op.getArgOperands(),
+                        clonedCallee->getName(), backpropArgs,
                         /*arg_shadows=*/ValueRange{}, /*primal results=*/ValueRange{}, cotangents,
                         op.getDiffArgIndicesAttr());
 
@@ -307,7 +303,7 @@ LogicalResult HybridGradientLowering::matchAndRewrite(GradOp op, PatternRewriter
 
             auto backpropOp = rewriter.create<gradient::BackpropOp>(
                 loc, computeBackpropTypes(*clonedCallee, diffArgIndices), clonedCallee->getName(),
-                op.getArgOperands(),
+                backpropArgs,
                 /*arg_shadows=*/ValueRange{}, /*primal results=*/ValueRange{}, cotangents,
                 op.getDiffArgIndicesAttr());
             for (const auto &[backpropIdx, jacobianSlice] :

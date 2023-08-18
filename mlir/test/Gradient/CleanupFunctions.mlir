@@ -21,8 +21,6 @@
 // CHECK-LABEL: @f.withparams
 // CHECK-LABEL: @f.splitpreprocessed
 // CHECK-NOT: quantum.
-// CHECK-LABEL: @f.cloned
-// CHECK-NOT: quantum.
 func.func private @f(%arg0: tensor<f64>) -> tensor<f64> attributes {qnode, diff_method = "parameter-shift"} {
     %c0_i64 = arith.constant 0 : i64
     %c2_i64 = arith.constant 2 : i64
@@ -40,7 +38,7 @@ func.func private @f(%arg0: tensor<f64>) -> tensor<f64> attributes {qnode, diff_
 }
 
 // CHECK-LABEL: @gradCall0
-// CHECK: gradient.backprop @f.cloned
+// CHECK: gradient.backprop @f.splitpreprocessed
 func.func @gradCall0(%arg0: tensor<f64>) -> tensor<f64> {
     %0 = gradient.grad "defer" @f(%arg0) : (tensor<f64>) -> tensor<f64>
     func.return %0 : tensor<f64>
@@ -54,8 +52,6 @@ func.func @gradCall0(%arg0: tensor<f64>) -> tensor<f64> {
 // CHECK-NOT: quantum.
 // CHECK-LABEL: @f2.withparams
 // CHECK-LABEL: @f2.splitpreprocessed
-// CHECK-NOT: quantum.
-// CHECK-LABEL: @f2.cloned
 // CHECK-NOT: quantum.
 func.func private @f2(%arg0: tensor<f64>, %arg1: tensor<i64>, %arg2: tensor<i64>) -> tensor<f64> attributes {qnode, diff_method = "parameter-shift"} {
     %c1 = arith.constant 1 : index
@@ -106,8 +102,6 @@ func.func public @gradCall1(%arg0: tensor<f64>, %arg1: tensor<i64>, %arg2: tenso
 // CHECK-NOT: quantum.
 // CHECK-LABEL: @f3.withparams
 // CHECK-LABEL: @f3.splitpreprocessed
-// CHECK-NOT: quantum.
-// CHECK-LABEL: @f3.cloned
 // CHECK-NOT: quantum.
 func.func private @f3(%arg0: tensor<f64>, %arg1: tensor<f64>) -> tensor<f64> attributes {qnode, diff_method = "parameter-shift"} {
     %c0_i64 = arith.constant 0 : i64
