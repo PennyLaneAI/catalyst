@@ -132,7 +132,7 @@ FailureOr<func::FuncOp> HybridGradientLowering::cloneCallee(PatternRewriter &rew
         clonedCallee.setName(clonedCalleeName);
         SmallPtrSet<Operation *, 4> qnodes;
         SymbolTableCollection symbolTable;
-        traverseCallGraph(callee, symbolTable, [&](func::FuncOp funcOp) {
+        traverseCallGraph(callee, &symbolTable, [&](func::FuncOp funcOp) {
             if (funcOp == callee && isQNode(callee)) {
                 qnodes.insert(callee);
             }
@@ -181,7 +181,9 @@ FailureOr<func::FuncOp> HybridGradientLowering::cloneCallee(PatternRewriter &rew
                 rewriter.eraseOp(clonedCallee);
                 clonedCallee = qnodeSplit;
             }
-            traverseCallGraph(clonedCallee, symbolTable, [&](func::FuncOp funcOp) {
+            // We modify the callgraph in-place as we traverse it, so we can't use a symbol table
+            // here or else the lookup will be stale.
+            traverseCallGraph(clonedCallee, /*symbolTable=*/nullptr, [&](func::FuncOp funcOp) {
                 funcOp.walk([&](func::CallOp callOp) {
                     if (callOp.getCallee() == qnode.getName()) {
                         PatternRewriter::InsertionGuard insertionGuard(rewriter);

@@ -18,7 +18,7 @@ namespace catalyst {
 
 /// Traverse the call graph and execute the `processFunc` callback for each `func.func` op
 /// encountered.
-void traverseCallGraph(mlir::func::FuncOp start, mlir::SymbolTableCollection &symbolTable,
+void traverseCallGraph(mlir::func::FuncOp start, mlir::SymbolTableCollection *symbolTable,
                        mlir::function_ref<void(mlir::func::FuncOp)> processFunc);
 
 } // namespace catalyst

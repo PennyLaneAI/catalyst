@@ -264,7 +264,7 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
 
         catalyst::convertToDestinationPassingStyle(callee, rewriter);
         SymbolTableCollection symbolTable;
-        catalyst::traverseCallGraph(callee, symbolTable, [&](func::FuncOp func) {
+        catalyst::traverseCallGraph(callee, &symbolTable, [&](func::FuncOp func) {
             // Register custom gradients of quantum functions
             if (func->hasAttrOfType<FlatSymbolRefAttr>("gradient.qgrad")) {
                 auto qgradFn = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(

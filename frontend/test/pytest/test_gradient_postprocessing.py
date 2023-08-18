@@ -300,3 +300,33 @@ def test_no_nested_grad_without_fd():
             return grad(middle, method="defer")(x) ** 2
 
         outer(9.0)
+
+
+def test_nested_qnode(backend):
+    """Test that Enzyme is able to compile a hybrid program containing nested QNodes"""
+    device = qml.device(backend, wires=2)
+
+    @qml.qnode(device, diff_method="adjoint")
+    def inner(x):
+        qml.RX(x, wires=0)
+        return qml.expval(qml.PauliZ(0))
+
+    @qml.qnode(device, diff_method="parameter-shift")
+    def outer(x):
+        qml.RX(inner(x), wires=0)
+        return qml.expval(qml.PauliY(0))
+
+    def post(x):
+        return outer(x)
+
+    @qjit
+    def _grad_qnode_direct(x: float):
+        return grad(outer, method="defer")(x)
+
+    @qjit
+    def _grad_postprocess(x: float):
+        return grad(post, method="defer")(x)
+
+    # The runtime doesn't support actually executing nested QNodes, so we just make sure they
+    # compile without issues.
+    # assert _grad_qnode_direct(1.0) == pytest.approx(jax.grad(post)(1.0))

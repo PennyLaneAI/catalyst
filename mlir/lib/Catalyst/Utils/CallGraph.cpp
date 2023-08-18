@@ -19,7 +19,7 @@ using namespace mlir;
 
 namespace catalyst {
 
-void traverseCallGraph(func::FuncOp start, SymbolTableCollection &symbolTable,
+void traverseCallGraph(func::FuncOp start, SymbolTableCollection *symbolTable,
                        function_ref<void(func::FuncOp)> processFunc)
 {
     DenseSet<Operation *> visited{start};
@@ -32,7 +32,7 @@ void traverseCallGraph(func::FuncOp start, SymbolTableCollection &symbolTable,
         processFunc(callable);
         callable.walk([&](CallOpInterface callOp) {
             if (auto nextFunc =
-                    dyn_cast_or_null<func::FuncOp>(callOp.resolveCallable(&symbolTable))) {
+                    dyn_cast_or_null<func::FuncOp>(callOp.resolveCallable(symbolTable))) {
                 if (!visited.contains(nextFunc)) {
                     visited.insert(nextFunc);
                     frontier.push_back(nextFunc);
