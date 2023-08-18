@@ -866,6 +866,9 @@ def qjit(
 
     Note that imperative control flow will still work in Catalyst even when the autograph feature is
     turned off, it just won't be captured in the compiled program and cannot involve traced values.
+    The example above would then raise a tracing error, as there is no value for ``x`` yet than can
+    be compared in the if statement. A loop like ``for i in range(5)`` would be unrolled during
+    tracing, "copy-pasting" the body 5 times into the program rather than appearing as is.
 
     .. important::
 
