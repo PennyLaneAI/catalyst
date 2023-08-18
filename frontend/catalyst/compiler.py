@@ -18,6 +18,7 @@ MLIR/LLVM representations.
 import abc
 import os
 import pathlib
+import platform
 import shutil
 import subprocess
 import sys
@@ -198,9 +199,10 @@ class BufferizationPass(PassPipeline):
         "--quantum-bufferize",
         "--func-bufferize",
         "--finalizing-bufferize",
-        # "--buffer-hoisting",
+        "--buffer-hoisting",
         "--buffer-loop-hoisting",
-        # "--buffer-deallocation",
+        "--buffer-deallocation",
+        "--convert-arraylist-to-memref",
         "--convert-bufferization-to-memref",
         "--canonicalize",
         # "--cse",
@@ -220,6 +222,7 @@ class MLIRToLLVMDialect(PassPipeline):
 
     _executable = get_executable_path("quantum", "quantum-opt")
     _default_flags = [
+        "--convert-gradient-to-llvm=use-generic-functions",
         "--convert-linalg-to-loops",
         "--convert-scf-to-cf",
         # This pass expands memref operations that modify the metadata of a memref (sizes, offsets,
@@ -240,7 +243,6 @@ class MLIRToLLVMDialect(PassPipeline):
         "--convert-arith-to-llvm",
         "--finalize-memref-to-llvm=use-generic-functions",
         "--convert-index-to-llvm",
-        "--convert-gradient-to-llvm",
         "--convert-quantum-to-llvm",
         "--emit-catalyst-py-interface",
         # Remove any dead casts as the final pass expects to remove all existing casts,
@@ -261,7 +263,7 @@ class QuantumCompilationPass(PassPipeline):
     """Pass pipeline for Catalyst-specific transformation passes."""
 
     _executable = get_executable_path("quantum", "quantum-opt")
-    _default_flags = ["--lower-gradients", "--adjoint-lowering", "--convert-arraylist-to-memref"]
+    _default_flags = ["--lower-gradients", "--adjoint-lowering"]
 
     @staticmethod
     def get_output_filename(infile):
@@ -285,16 +287,32 @@ class LLVMDialectToLLVMIR(PassPipeline):
         return str(path.with_suffix(".ll"))
 
 
+class PreEnzymeOpt(PassPipeline):
+    """Run optimizations on the LLVM IR prior to being run through Enzyme."""
+
+    _executable = get_executable_path("llvm", "opt")
+    _default_flags = ["-O2", "-S"]
+
+    @staticmethod
+    def get_output_filename(infile):
+        path = pathlib.Path(infile)
+        if not path.exists():
+            raise FileNotFoundError("Cannot find {infile}.")
+        return str(path.with_suffix(".preenzyme.ll"))
+
+
 class Enzyme(PassPipeline):
     """Pass pipeline to lower LLVM IR to Enzyme LLVM IR."""
 
     _executable = get_executable_path("llvm", "opt")
     enzyme_path = get_lib_path("enzyme", "ENZYME_LIB_DIR")
+    apple_ext = "dylib"
+    linux_ext = "so"
+    ext = linux_ext if platform.system() == "Linux" else apple_ext
     _default_flags = [
-        f"-load-pass-plugin={enzyme_path}/LLVMEnzyme-17.so",
-        "-load",
-        f"{enzyme_path}/LLVMEnzyme-17.so",
-        "-passes=enzyme",
+        f"-load-pass-plugin={enzyme_path}/LLVMEnzyme-17.{ext}",
+        # preserve-nvvm transforms certain global arrays to LLVM metadata that Enzyme will recognize
+        "-passes=preserve-nvvm,enzyme",
         "-S",
     ]
 
@@ -303,7 +321,7 @@ class Enzyme(PassPipeline):
         path = pathlib.Path(infile)
         if not path.exists():
             raise FileNotFoundError("Cannot find {infile}.")
-        return str(path.with_suffix(".ll"))
+        return str(path.with_suffix(".postenzyme.ll"))
 
 
 class LLVMIRToObjectFile(PassPipeline):
@@ -355,18 +373,23 @@ class CompilerDriver:
         rt_lib_path = get_lib_path("runtime", "RUNTIME_LIB_DIR")
         rt_capi_path = os.path.join(rt_lib_path, "capi")
         rt_backend_path = os.path.join(rt_lib_path, "backend")
+        error_flag_apple = "-Wl,-arch_errors_fatal"
+        error_flag_linux = ""
+        error_flag = error_flag_linux if platform.system() == "Linux" else error_flag_apple
 
         default_flags = [
             "-shared",
             "-rdynamic",
-            "-Wl,-no-as-needed",
-            f"-Wl,-rpath,{rt_capi_path}:{rt_backend_path}:{mlir_lib_path}",
+            f"-Wl,-rpath,{rt_capi_path}",
+            f"-Wl,-rpath,{rt_backend_path}",
+            f"-Wl,-rpath,{mlir_lib_path}",
             f"-L{mlir_lib_path}",
             f"-L{rt_capi_path}",
             f"-L{rt_backend_path}",
             "-lrt_backend",
             "-lrt_capi",
             "-lpthread",
+            f"{error_flag}",
             "-lmlir_c_runner_utils",  # required for memref.copy
         ]
 
@@ -500,6 +523,7 @@ class Compiler:
                 BufferizationPass,
                 MLIRToLLVMDialect,
                 LLVMDialectToLLVMIR,
+                PreEnzymeOpt,
                 Enzyme,
                 LLVMIRToObjectFile,
                 CompilerDriver,

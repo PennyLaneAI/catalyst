@@ -14,136 +14,22 @@
 
 #include "ParameterShift.hpp"
 
+#include "iostream"
+#include "llvm/Support/raw_ostream.h"
+
 #include <algorithm>
 #include <sstream>
 #include <vector>
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Index/IR/IndexOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 
-#include "Gradient/Utils/CompDiffArgIndices.h"
 #include "Gradient/Utils/GradientShape.h"
 
 namespace catalyst {
 namespace gradient {
-
-static Value combineGradients(PatternRewriter &rewriter, Location loc, Value classicalJacobian,
-                              Value quantumGradient, Value numParams, bool isResultScalar)
-{
-    TensorType cjacType = classicalJacobian.getType().cast<TensorType>();
-    TensorType qgradType = quantumGradient.getType().cast<TensorType>();
-
-    assert(cjacType.getRank() >= 1 && ShapedType::isDynamic(cjacType.getShape().back()) &&
-           "classical jacobian is not a >=1D tensor of dynamic length in the last dimension");
-
-    assert(qgradType.getRank() >= 1 && ShapedType::isDynamic(qgradType.getShape().front()) &&
-           "quantum gradient is not a >=1D tensor of dynamic length in the first dimension");
-
-    if (cjacType.getElementType() != qgradType.getElementType()) {
-        bool larger = cjacType.getElementType().getIntOrFloatBitWidth() >
-                      qgradType.getElementType().getIntOrFloatBitWidth();
-
-        cjacType = RankedTensorType::get(cjacType.getShape(), qgradType.getElementType());
-        classicalJacobian =
-            larger ? rewriter.create<arith::TruncFOp>(loc, cjacType, classicalJacobian).getResult()
-                   : rewriter.create<arith::ExtFOp>(loc, cjacType, classicalJacobian).getResult();
-    }
-
-    std::vector<int64_t> staticShape;
-    staticShape.reserve(cjacType.getRank() + qgradType.getRank() - 2);
-    staticShape.insert(staticShape.end(), cjacType.getShape().begin(),
-                       cjacType.getShape().end() - 1);
-    staticShape.insert(staticShape.end(), qgradType.getShape().begin() + 1,
-                       qgradType.getShape().end());
-
-    std::vector<Value> dynamicDimSizes;
-    for (int i = 0; i < cjacType.getRank() - 1; i++) {
-        if (ShapedType::isDynamic(staticShape[i])) {
-            dynamicDimSizes.push_back(rewriter.create<tensor::DimOp>(loc, classicalJacobian, i));
-        }
-    }
-    for (int i = 0; i < qgradType.getRank() - 1; i++) {
-        if (ShapedType::isDynamic(staticShape[cjacType.getRank() - 1 + i])) {
-            dynamicDimSizes.push_back(rewriter.create<tensor::DimOp>(loc, quantumGradient, i));
-        }
-    }
-
-    Type baseType = qgradType.getElementType();
-    TensorType resultTensorType = RankedTensorType::get(staticShape, baseType);
-    bool isResultScalarTensor = resultTensorType.getRank() == 0;
-    if (isResultScalarTensor) {
-        resultTensorType = RankedTensorType::get({1}, baseType);
-    }
-
-    Value cZero = rewriter.create<arith::ConstantOp>(loc, rewriter.getF64FloatAttr(0.0));
-    // Compute the contraction of the classical Jacobian and quantum gradient using
-    // tensor.generate. Each element of the result tensor is constructed and yielded from within
-    // the ops region by applying the dot product to a an appropriate slice of each tensor.
-    auto bodyBuilder = [&](OpBuilder &rewriter, Location loc, ValueRange tensorIndices) {
-        size_t cjacRank = cjacType.getRank();
-        Type cjacSliceType = RankedTensorType::get({ShapedType::kDynamic}, baseType);
-
-        std::vector<int64_t> staticOffsets(cjacRank, ShapedType::kDynamic);
-        staticOffsets[cjacRank - 1] = 0;
-        std::vector<int64_t> staticSizes(cjacRank, 1);
-        staticSizes[cjacRank - 1] = ShapedType::kDynamic;
-        std::vector<int64_t> staticStrides(cjacRank, 1);
-
-        ValueRange dynamicOffsets = tensorIndices.take_front(cjacRank - 1);
-        ValueRange dynamicSizes = numParams;
-        ValueRange dynamicStrides = {};
-
-        Value cjacSlice = rewriter.create<tensor::ExtractSliceOp>(
-            loc, cjacSliceType, classicalJacobian, dynamicOffsets, dynamicSizes, dynamicStrides,
-            staticOffsets, staticSizes, staticStrides);
-
-        size_t qgradRank = qgradType.getRank();
-        Type qgradSliceType = RankedTensorType::get({ShapedType::kDynamic}, baseType);
-
-        staticOffsets = std::vector<int64_t>(qgradRank, ShapedType::kDynamic);
-        staticOffsets[0] = 0;
-        staticSizes = std::vector<int64_t>(qgradRank, 1);
-        staticSizes[0] = ShapedType::kDynamic;
-        staticStrides = std::vector<int64_t>(qgradRank, 1);
-
-        dynamicOffsets = tensorIndices.take_back(qgradRank - 1);
-        dynamicSizes = numParams;
-        dynamicStrides = {};
-
-        Value qgradSlice = rewriter.create<tensor::ExtractSliceOp>(
-            loc, qgradSliceType, quantumGradient, dynamicOffsets, dynamicSizes, dynamicStrides,
-            staticOffsets, staticSizes, staticStrides);
-
-        Value resultTensor = rewriter.create<tensor::EmptyOp>(loc, ArrayRef<int64_t>{}, baseType);
-        Value zeroTensor = rewriter.create<linalg::FillOp>(loc, cZero, resultTensor).getResult(0);
-        Value result =
-            rewriter.create<linalg::DotOp>(loc, ValueRange{cjacSlice, qgradSlice}, zeroTensor)
-                .getResult(0);
-        Value resultElement = rewriter.create<tensor::ExtractOp>(loc, result);
-
-        rewriter.create<tensor::YieldOp>(loc, resultElement);
-    };
-
-    Value hybridGradient =
-        rewriter.create<tensor::GenerateOp>(loc, resultTensorType, dynamicDimSizes, bodyBuilder);
-
-    if (isResultScalarTensor) {
-        TensorType reshapedInputType = RankedTensorType::get({}, baseType);
-        // The result tensor type of a reshape can be zero-ranked if the operand tensor type is
-        // statically shaped with all dimensions being unit extent. In such case the reassociation
-        // map is empty.
-        SmallVector<ReassociationIndices> reassociationIndices = {};
-        hybridGradient = rewriter.create<tensor::CollapseShapeOp>(
-            loc, reshapedInputType, hybridGradient, reassociationIndices);
-    }
-
-    if (isResultScalar) {
-        hybridGradient = rewriter.create<tensor::ExtractOp>(loc, hybridGradient);
-    }
-
-    return hybridGradient;
-}
 
 /// Generate an mlir function to compute the full gradient of a quantum function.
 ///
@@ -154,10 +40,11 @@ static Value combineGradients(PatternRewriter &rewriter, Location loc, Value cla
 /// the entire quantum function via tensor contraction along the gate parameter dimension.
 ///
 func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc, GradOp gradOp,
-                                 func::FuncOp argMapFn, func::FuncOp qGradFn, StringRef method)
+                                 func::FuncOp paramCountFn, func::FuncOp argMapFn,
+                                 func::FuncOp qGradFn, StringRef method)
 {
     // Define the properties of the full gradient function.
-    const std::vector<size_t> &diffArgIndices = compDiffArgIndices(gradOp.getDiffArgIndices());
+    const std::vector<size_t> &diffArgIndices = computeDiffArgIndices(gradOp.getDiffArgIndices());
     std::stringstream uniquer;
     std::copy(diffArgIndices.begin(), diffArgIndices.end(), std::ostream_iterator<int>(uniquer));
     std::string fnName = gradOp.getCallee().str() + ".fullgrad" + uniquer.str() + method.str();
@@ -177,37 +64,173 @@ func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc, GradOp
         rewriter.setInsertionPointToStart(entryBlock);
 
         // Collect arguments and invoke the classical jacobian and quantum gradient functions.
-        std::vector<Value> callArgs(fullGradFn.getArguments().begin(),
-                                    fullGradFn.getArguments().end());
+        SmallVector<Value> callArgs(fullGradFn.getArguments());
 
-        std::vector<Type> resTypes = computeResultTypes(argMapFn, diffArgIndices);
-        DenseIntElementsAttr diffArgIndicesAttr = gradOp.getDiffArgIndices().value_or(nullptr);
-        GradOp jacOp = rewriter.create<GradOp>(loc, resTypes, "fd", argMapFn.getName(), callArgs,
-                                               diffArgIndicesAttr, nullptr);
-        ValueRange classicalJacobians = jacOp.getResults();
-
-        // The argmap function returns a 1-d dynamic tensor<{pcount}xf64>. If the input has tensor
-        // type, the GradOp will return a transposed Jacobian s.t. the pcount is the last
-        // dimension (tensor<{inputdim}x{pcount}xf64>).
-        int64_t rank = cast<RankedTensorType>(classicalJacobians.front().getType()).getRank();
-        Value numParams =
-            rewriter.create<tensor::DimOp>(loc, classicalJacobians.front(), /*index=*/rank - 1);
+        Value numParams = rewriter.create<func::CallOp>(loc, paramCountFn, callArgs).getResult(0);
         callArgs.push_back(numParams);
         ValueRange quantumGradients =
             rewriter.create<func::CallOp>(loc, qGradFn, callArgs).getResults();
 
-        // Compute the hybrid gradients via tensor contraction.
+        DenseIntElementsAttr diffArgIndicesAttr = gradOp.getDiffArgIndices().value_or(nullptr);
+
+        auto resultsBackpropTypes = computeBackpropTypes(argMapFn, diffArgIndices);
+        // Compute hybrid gradients via Enzyme
         std::vector<Value> hybridGradients;
-        hybridGradients.reserve(quantumGradients.size() * classicalJacobians.size());
-        size_t idx = 0;
-        for (Value classicalJacobian : classicalJacobians) {
-            for (Value quantumGradient : quantumGradients) {
-                bool isResultScalar = !gradOp.getResult(idx++).getType().isa<TensorType>();
-                hybridGradients.push_back(combineGradients(
-                    rewriter, loc, classicalJacobian, quantumGradient, numParams, isResultScalar));
+        int j = 0;
+        // Loop over the measurements
+        for (Value quantumGradient : quantumGradients) {
+            Type resultType = gradOp.getResult(j).getType();
+            int64_t rankResult = 0;
+            ArrayRef<int64_t> shapeResult;
+            if (auto resultTensorType = dyn_cast<RankedTensorType>(resultType)) {
+                rankResult = resultTensorType.getRank();
+                shapeResult = resultTensorType.getShape();
+            }
+            j++;
+
+            std::vector<BackpropOp> intermediateGradients;
+            auto rank = quantumGradient.getType().cast<RankedTensorType>().getRank();
+
+            if (rank > 1) {
+                Value result = rewriter.create<tensor::EmptyOp>(loc, resultType, ValueRange{});
+                std::vector<int64_t> sizes =
+                    quantumGradient.getType().cast<RankedTensorType>().getShape();
+
+                std::vector<std::vector<int64_t>> allOffsets;
+                std::vector<int64_t> cutOffset(sizes.begin() + 1, sizes.end());
+
+                std::vector<int64_t> currentOffset(cutOffset.size(), 0);
+
+                int64_t totalOutcomes = 1;
+                for (int64_t dim : cutOffset) {
+                    totalOutcomes *= dim;
+                }
+
+                for (int64_t outcome = 0; outcome < totalOutcomes; outcome++) {
+                    allOffsets.push_back(currentOffset);
+
+                    for (int64_t i = cutOffset.size() - 1; i >= 0; i--) {
+                        currentOffset[i]++;
+                        if (currentOffset[i] < cutOffset[i]) {
+                            break;
+                        }
+                        currentOffset[i] = 0;
+                    }
+                }
+
+                std::vector<int64_t> strides(rank, 1);
+                std::vector<Value> dynStrides = {};
+
+                std::vector<Value> dynOffsets = {};
+
+                std::vector<Value> dynSizes;
+
+                for (size_t index = 0; index < sizes.size(); ++index) {
+                    if (index == 0) {
+                        Value idx = rewriter.create<index::ConstantOp>(loc, index);
+                        Value dimSize = rewriter.create<tensor::DimOp>(loc, quantumGradient, idx);
+                        dynSizes.push_back(dimSize);
+                    }
+                    else {
+                        sizes[index] = 1;
+                    }
+                }
+                for (auto offsetRight : allOffsets) {
+                    std::vector<int64_t> offsets{0};
+                    offsets.insert(offsets.end(), offsetRight.begin(), offsetRight.end());
+                    auto rankReducedType =
+                        tensor::ExtractSliceOp::inferCanonicalRankReducedResultType(
+                            1, quantumGradient.getType().cast<RankedTensorType>(), offsets, sizes,
+                            strides)
+                            .cast<RankedTensorType>();
+                    Value extractQuantumGradient = rewriter.create<tensor::ExtractSliceOp>(
+                        loc, rankReducedType, quantumGradient, dynOffsets, dynSizes, dynStrides,
+                        offsets, sizes, strides);
+                    BackpropOp backpropOp = rewriter.create<BackpropOp>(
+                        loc, resultsBackpropTypes, argMapFn.getName(), callArgs, ValueRange{},
+                        ValueRange{}, extractQuantumGradient, diffArgIndicesAttr);
+
+                    intermediateGradients.push_back(backpropOp);
+                }
+                for (size_t i = 0; i < resultsBackpropTypes.size(); i++) {
+                    // strides
+                    std::vector<int64_t> stridesSlice(rankResult, 1);
+
+                    for (int64_t index = 0; index < totalOutcomes; index++) {
+                        auto intermediateGradient = intermediateGradients[index];
+                        Value gradient = intermediateGradient.getResult(i);
+
+                        Type gradientType = gradient.getType();
+                        if (auto gradientTensorType = dyn_cast<RankedTensorType>(gradientType)) {
+                            int64_t rankGradient = gradientTensorType.getRank();
+                            // sizes
+                            std::vector<int64_t> sizesSlice{shapeResult};
+                            for (int64_t sliceIndex = rankResult - 1; sliceIndex >= rankGradient;
+                                 sliceIndex--) {
+                                sizesSlice[sliceIndex] = 1;
+                            }
+
+                            // offset
+                            auto offsetSlice = allOffsets[index];
+                            for (int64_t offsetIndex = 0; offsetIndex < rankGradient;
+                                 offsetIndex++) {
+                                offsetSlice.insert(offsetSlice.begin(), 0);
+                            }
+                            result = rewriter.create<tensor::InsertSliceOp>(
+                                loc, resultType, gradient, result, ValueRange{}, ValueRange{},
+                                ValueRange{}, offsetSlice, sizesSlice, stridesSlice);
+                        }
+                        else {
+                            assert(isa<FloatType>(gradient.getType()));
+                            SmallVector<Value> insertIndices;
+                            for (int64_t offset : allOffsets[index]) {
+                                insertIndices.push_back(
+                                    rewriter.create<index::ConstantOp>(loc, offset));
+                            }
+                            result = rewriter.create<tensor::InsertOp>(loc, gradient, result,
+                                                                       insertIndices);
+                        }
+                    }
+                    hybridGradients.push_back(result);
+                }
+            }
+            else {
+                // The quantum gradient is a rank 1 tensor
+                BackpropOp backpropOp = rewriter.create<BackpropOp>(
+                    loc, resultsBackpropTypes, argMapFn.getName(), callArgs, ValueRange{},
+                    ValueRange{}, quantumGradient, diffArgIndicesAttr);
+                for (OpResult result : backpropOp.getResults()) {
+                    Value hybridGradient = result;
+                    Type gradResultType = gradOp.getResult(result.getResultNumber()).getType();
+                    if (gradResultType != result.getType()) {
+                        // The backprop op produces a row of the Jacobian, which always has the same
+                        // type as the differentiated argument. If the rank of the quantum gradient
+                        // is 1, this implies the callee returns a rank-0 value (either a
+                        // scalar or a tensor<scalar>). The Jacobian of a scalar -> scalar should be
+                        // a scalar, but as a special case, the Jacobian of a scalar ->
+                        // tensor<scalar> should be tensor<scalar>.
+                        if (isa<RankedTensorType>(gradResultType) &&
+                            isa<FloatType>(result.getType())) {
+                            Value jacobian =
+                                rewriter.create<tensor::EmptyOp>(loc, gradResultType, ValueRange{});
+                            hybridGradient = rewriter.create<tensor::InsertOp>(
+                                loc, result, jacobian, ValueRange{});
+                        }
+
+                        // We also support where the argument is a tensor<scalar> but the desired
+                        // hybrid gradient is a scalar. This is less about mathematical precision
+                        // and more about ergonomics.
+                        if (isa<FloatType>(gradResultType) &&
+                            isa<RankedTensorType>(result.getType())) {
+                            hybridGradient =
+                                rewriter.create<tensor::ExtractOp>(loc, result, ValueRange{});
+                        }
+                    }
+
+                    hybridGradients.push_back(hybridGradient);
+                }
             }
         }
-
         rewriter.create<func::ReturnOp>(loc, hybridGradients);
     }
 

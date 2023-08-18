@@ -56,11 +56,11 @@ from mlir_quantum.dialects.quantum import (
 )
 from mlir_quantum.dialects.quantum import YieldOp as QYieldOp
 from mlir_quantum.dialects.scf import ConditionOp, ForOp, IfOp, WhileOp, YieldOp
-from mlir_quantum.dialects.tensor import ExtractOp as TensorExtractOp
 from mlir_quantum.dialects.tensor import FromElementsOp
 from pennylane import QNode as pennylane_QNode
 
 from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
+from catalyst.utils.extra_bindings import TensorExtractOp
 
 # pylint: disable=unused-argument,too-many-lines
 
@@ -977,6 +977,13 @@ def _hamiltonian_def_impl(ctx, coeffs, *terms):  # pragma: no cover
 def _hamiltonian_lowering(jax_ctx: mlir.LoweringRuleContext, coeffs: ir.Value, *terms: tuple):
     ctx = jax_ctx.module_context.context
     ctx.allow_unregistered_dialects = True
+
+    baseType = ir.RankedTensorType(coeffs.type).element_type
+    shape = ir.RankedTensorType(coeffs.type).shape
+    if not ir.F64Type.isinstance(baseType):
+        baseType = ir.F64Type.get()
+        resultTensorType = ir.RankedTensorType.get(shape, baseType)
+        coeffs = ConvertOp(resultTensorType, coeffs).results
 
     result_type = ir.OpaqueType.get("quantum", "obs", ctx)
 

@@ -72,18 +72,19 @@ def test_no_parameters(backend):
         # and `quantum-opt` doesn't fail to materialize conversion for the result
         qml.CZ(wires=[1, 2])
 
+        qml.MultiControlledX(wires=[0, 1, 2, 3])
+
         # Unsupported:
         # qml.SX(wires=0)
         # qml.ISWAP(wires=[0,1])
         # qml.ECR(wires=[0,1])
         # qml.SISWAP(wires=[0,1])
         # qml.Toffoli(wires=[0,1,2])
-        # qml.MultiControlledX(wires=[0,1,2,3])
 
         return qml.state()
 
-    qjit_fn = qjit()(qml.qnode(qml.device(backend, wires=3))(circuit))
-    qml_fn = qml.qnode(qml.device("default.qubit", wires=3))(circuit)
+    qjit_fn = qjit()(qml.qnode(qml.device(backend, wires=4))(circuit))
+    qml_fn = qml.qnode(qml.device("default.qubit", wires=4))(circuit)
 
     assert np.allclose(qjit_fn(), qml_fn())
 

@@ -27,6 +27,7 @@ import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
 from jax.interpreters.mlir import ir
+from jax.tree_util import tree_flatten, tree_unflatten
 from mlir_quantum.runtime import (
     as_ctype,
     get_ranked_memref_descriptor,
@@ -188,13 +189,13 @@ class CompiledFunction:
         Returns:
             bool.
         """
-        len_compile = len(compiled_signature)
-        len_runtime = len(runtime_signature)
-        if len_compile != len_runtime:
+        compiled_data, compiled_shape = tree_flatten(compiled_signature)
+        runtime_data, runtime_shape = tree_flatten(runtime_signature)
+        if compiled_shape != runtime_shape:
             return TypeCompatibility.NEEDS_COMPILATION
 
         best_case = TypeCompatibility.CAN_SKIP_PROMOTION
-        for c_param, r_param in zip(compiled_signature, runtime_signature):
+        for c_param, r_param in zip(compiled_data, runtime_data):
             if c_param.dtype != r_param.dtype:
                 best_case = TypeCompatibility.NEEDS_PROMOTION
 
@@ -208,35 +209,33 @@ class CompiledFunction:
         return best_case
 
     @staticmethod
-    def promote_arguments(compiled_signature, runtime_signature, *args):
+    def promote_arguments(compiled_signature, *args):
         """Promote arguments from the type specified in args to the type specified by
            compiled_signature.
 
         Args:
             compiled_signature: user supplied signature, obtain from either an annotation or a
                                 previously compiled implementation of the compiled function
-            runtime_signature: runtime signature
             *args: actual arguments to the function
 
         Returns:
             promoted_args: Arguments after promotion.
         """
-        len_compile = len(compiled_signature)
-        len_runtime = len(runtime_signature)
+        compiled_data, compiled_shape = tree_flatten(compiled_signature)
+        runtime_data, runtime_shape = tree_flatten(args)
         assert (
-            len_compile == len_runtime
-        ), "Compiled function incompatible with quantity of runtime arguments"
+            compiled_shape == runtime_shape
+        ), "Compiled function incompatible runtime arguments' shape"
 
         promoted_args = []
-        for c_param, r_param, arg in zip(compiled_signature, runtime_signature, args):
-            assert isinstance(arg, jax.Array)
+        for c_param, r_param in zip(compiled_data, runtime_data):
             assert isinstance(c_param, jax.core.ShapedArray)
-            assert isinstance(r_param, jax.core.ShapedArray)
-            arg_dtype = arg.dtype
+            r_param = jax.numpy.asarray(r_param)
+            arg_dtype = r_param.dtype
             promote_to = jax.numpy.promote_types(arg_dtype, c_param.dtype)
-            promoted_arg = jax.numpy.asarray(arg, dtype=promote_to)
+            promoted_arg = jax.numpy.asarray(r_param, dtype=promote_to)
             promoted_args.append(promoted_arg)
-        return promoted_args
+        return tree_unflatten(compiled_shape, promoted_args)
 
     @staticmethod
     def get_runtime_signature(*args):
@@ -248,11 +247,14 @@ class CompiledFunction:
         Returns:
             a list of JAX shaped arrays
         """
+        args_data, args_shape = tree_flatten(args)
+
         try:
             r_sig = []
-            for arg in args:
+            for arg in args_data:
                 r_sig.append(jax.api_util.shaped_abstractify(arg))
-            return r_sig
+            # Unflatten JAX abstracted args to preserve the shape
+            return tree_unflatten(args_shape, r_sig)
         except Exception as exc:
             arg_type = type(arg)
             raise TypeError(f"Unsupported argument type: {arg_type}") from exc
@@ -273,12 +275,7 @@ class CompiledFunction:
 
         with shared_object as lib:
             result_desc = type(args[0].contents) if has_return else None
-
             retval = wrapper.wrap(lib.function, args, result_desc, lib.mem_transfer, numpy_dict)
-            if len(retval) == 0:
-                retval = None
-            elif len(retval) == 1:
-                retval = retval[0]
 
         return retval
 
@@ -403,11 +400,15 @@ class CompiledFunction:
 
         c_abi_args = []
 
-        for arg in args:
+        args_data, args_shape = tree_flatten(args)
+
+        for arg in args_data:
             numpy_arg = np.asarray(arg)
             numpy_arg_buffer.append(numpy_arg)
             c_abi_ptr = ctypes.pointer(get_ranked_memref_descriptor(numpy_arg))
             c_abi_args.append(c_abi_ptr)
+
+        args = tree_unflatten(args_shape, c_abi_args)
 
         class CompiledFunctionArgValue(ctypes.Structure):
             """Programmatically create a structure which holds tensors of varying base types."""
@@ -473,6 +474,7 @@ class QJIT:
         self.mlir_module = None
         self.user_typed = False
         self.c_sig = None
+        self.shape = None
         self._jaxpr = None
         self._mlir = None
         self._llvmir = None
@@ -539,7 +541,7 @@ class QJIT:
         with Patcher(
             (qml.QNode, "__call__", QFunc.__call__),
         ):
-            mlir_module, ctx, jaxpr = tracer.get_mlir(self.user_function, *self.c_sig)
+            mlir_module, ctx, jaxpr, self.shape = tracer.get_mlir(self.user_function, *self.c_sig)
 
         inject_functions(mlir_module, ctx)
         mod = mlir_module.operation
@@ -586,14 +588,6 @@ class QJIT:
           function: an instance of ``CompiledFunction`` that may have been recompiled
           *args: arguments that may have been promoted
         """
-        bitmask = map(lambda x: not isinstance(x, jax.Array), args)
-        args = list(
-            map(
-                lambda arg, is_not_jax_array: jax.numpy.asarray(arg) if is_not_jax_array else arg,
-                args,
-                bitmask,
-            )
-        )
         r_sig = CompiledFunction.get_runtime_signature(*args)
 
         has_been_compiled = self.compiled_function is not None
@@ -604,7 +598,7 @@ class QJIT:
             next_action = CompiledFunction.typecheck(self.c_sig, r_sig)
 
         if next_action == TypeCompatibility.NEEDS_PROMOTION:
-            args = CompiledFunction.promote_arguments(self.c_sig, r_sig, *args)
+            args = CompiledFunction.promote_arguments(self.c_sig, *args)
         elif next_action == TypeCompatibility.NEEDS_COMPILATION:
             if self.user_typed:
                 msg = "Provided arguments did not match declared signature, recompiling..."
@@ -637,14 +631,25 @@ class QJIT:
         recompilation_needed = function != self.compiled_function
         self.compiled_function = function
 
-        if any(isinstance(arg, jax.core.Tracer) for arg in args):
+        args_data, _args_shape = tree_flatten(args)
+        if any(isinstance(arg, jax.core.Tracer) for arg in args_data):
             # Only compile a derivative version of the compiled function when needed.
             if self.jaxed_function is None or recompilation_needed:
                 self.jaxed_function = JAX_QJIT(self)
 
             return self.jaxed_function(*args, **kwargs)
 
-        return self.compiled_function(*args, **kwargs)
+        data = self.compiled_function(*args, **kwargs)
+
+        # Unflatten the return value w.r.t. the original PyTree definition if available
+        assert self.shape is not None, "Shape must not be none."
+        data = tree_unflatten(self.shape, data)
+
+        # For the classical and pennylane_extensions compilation path,
+        if isinstance(data, (list, tuple)) and len(data) == 1:
+            data = data[0]
+
+        return data
 
 
 class JAX_QJIT:
@@ -663,10 +668,7 @@ class JAX_QJIT:
     def __init__(self, qjit_function):
         @jax.custom_jvp
         def jaxed_function(*args, **kwargs):
-            results = self.wrap_callback(qjit_function, *args, **kwargs)
-            if len(results) == 1:
-                results = results[0]
-            return results
+            return self.wrap_callback(qjit_function, *args, **kwargs)
 
         self.qjit_function = qjit_function
         self.derivative_functions = {}
@@ -676,9 +678,13 @@ class JAX_QJIT:
     @staticmethod
     def wrap_callback(qjit_function, *args, **kwargs):
         """Wrap a QJIT function inside a jax host callback."""
-        return jax.pure_callback(
+        data = jax.pure_callback(
             qjit_function, qjit_function.jaxpr.out_avals, *args, vectorized=False, **kwargs
         )
+
+        # Unflatten the return value w.r.t. the original PyTree definition if available
+        assert qjit_function.shape is not None, "Shape must not be none."
+        return tree_unflatten(qjit_function.shape, data)
 
     def get_derivative_qjit(self, argnums):
         """Compile a function computing the derivative of the wrapped QJIT for the given argnums."""
@@ -724,20 +730,24 @@ class JAX_QJIT:
                 argnums.append(idx)
 
         results = self.wrap_callback(self.qjit_function, *primals)
+        results_data, _results_shape = tree_flatten(results)
         derivatives = self.wrap_callback(self.get_derivative_qjit(argnums), *primals)
+        derivatives_data, _derivatives_shape = tree_flatten(derivatives)
 
-        jvps = [jnp.zeros_like(results[res_idx]) for res_idx in range(len(results))]
+        jvps = [jnp.zeros_like(results_data[res_idx]) for res_idx in range(len(results_data))]
         for diff_arg_idx, arg_idx in enumerate(argnums):
             tangent = tangents[arg_idx]  # [1]
             taxis = list(range(tangent.ndim))
-            for res_idx in range(len(results)):
-                deriv_idx = diff_arg_idx * len(results) + res_idx
-                deriv = derivatives[deriv_idx]  # [2]
+            for res_idx in range(len(results_data)):
+                deriv_idx = diff_arg_idx * len(results_data) + res_idx
+                deriv = derivatives_data[deriv_idx]  # [2]
                 jvp = jnp.tensordot(deriv, tangent, axes=(taxis, taxis))
                 jvps[res_idx] = jvps[res_idx] + jvp
 
-        if len(results) == 1:
-            results = results[0]
+        # jvps must match the type of primals
+        # due to pytrees, primals are a tuple
+        primal_type = type(primals)
+        jvps = primal_type(jvps)
         if len(jvps) == 1:
             jvps = jvps[0]
 

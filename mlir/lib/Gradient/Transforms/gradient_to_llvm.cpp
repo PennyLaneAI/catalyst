@@ -15,7 +15,10 @@
 #include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Index/IR/IndexDialect.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/BuiltinOps.h"
 
 #include "Gradient/IR/GradientDialect.h"
@@ -29,6 +32,7 @@ using namespace catalyst::gradient;
 namespace catalyst {
 namespace gradient {
 
+#define GEN_PASS_DECL_GRADIENTCONVERSIONPASS
 #define GEN_PASS_DEF_GRADIENTCONVERSIONPASS
 #include "Gradient/Transforms/Passes.h.inc"
 
@@ -38,7 +42,10 @@ struct GradientConversionPass : impl::GradientConversionPassBase<GradientConvers
     void runOnOperation() final
     {
         MLIRContext *context = &getContext();
-        LLVMTypeConverter typeConverter(context);
+        LowerToLLVMOptions options(context);
+        options.useGenericFunctions = useGenericFunctions;
+
+        LLVMTypeConverter typeConverter(context, options);
 
         RewritePatternSet patterns(context);
         populateConversionPatterns(typeConverter, patterns);
@@ -46,7 +53,10 @@ struct GradientConversionPass : impl::GradientConversionPassBase<GradientConvers
         LLVMConversionTarget target(*context);
         target.addIllegalDialect<GradientDialect>();
         target.addLegalDialect<catalyst::quantum::QuantumDialect>();
-        target.addLegalDialect<func::FuncDialect>();
+        target.addLegalDialect<func::FuncDialect, index::IndexDialect, memref::MemRefDialect>();
+        // Necessary in place of memref.copy because linalg.copy results in better LLVM type
+        // information for Enzyme.
+        target.addLegalOp<linalg::CopyOp>();
 
         if (failed(applyPartialConversion(getOperation(), target, std::move(patterns)))) {
             signalPassFailure();

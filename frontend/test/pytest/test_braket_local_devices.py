@@ -180,7 +180,7 @@ class TestBraketSample:
     def test_sample_on_1qbit_braket(self, device):
         """Test sample on 1 qubit on braket devices."""
 
-        @qjit()
+        @qjit
         @qml.qnode(device)
         def sample_1qbit(x: float):
             qml.RX(x, wires=0)
@@ -208,7 +208,7 @@ class TestBraketSample:
     def test_sample_on_2qbits_braket(self, device):
         """Test sample on 2 qubits on braket devices."""
 
-        @qjit()
+        @qjit
         @qml.qnode(device)
         def sample_2qbits(x: float):
             qml.RX(x, wires=0)
@@ -241,7 +241,7 @@ class TestBraketProbs:
     def test_probs_on_1qbit_braket(self, device):
         """Test probs on 1 qubit on braket devices."""
 
-        @qjit()
+        @qjit
         @qml.qnode(device)
         def probs_1qbit(x: float):
             qml.RX(x, wires=0)
@@ -264,7 +264,7 @@ class TestBraketProbs:
     def test_probs_on_2qbits_braket(self, device):
         """Test probs on 2 qubits on braket devices."""
 
-        @qjit()
+        @qjit
         @qml.qnode(device)
         def probs_2qbits(x: float):
             qml.RX(x, wires=0)
@@ -293,7 +293,7 @@ class TestBraketCounts:
     def test_count_on_1qbit_braket(self, device):
         """Test counts on 1 qubits on braket devices."""
 
-        @qjit()
+        @qjit
         @qml.qnode(device)
         def counts_1qbit(x: float):
             qml.RX(x, wires=0)
@@ -321,7 +321,7 @@ class TestBraketCounts:
     def test_count_on_2qbits_braket(self, device):
         """Test counts on 2 qubits on braket devices."""
 
-        @qjit()
+        @qjit
         @qml.qnode(device)
         def counts_2qbit(x: float):
             qml.RX(x, wires=0)
@@ -354,7 +354,7 @@ class TestBraketExpval:
     def test_named(self, device):
         """Test expval for named observables on braket devices."""
 
-        @qjit()
+        @qjit
         @qml.qnode(device)
         def expval(x: float):
             qml.RX(x, wires=0)
@@ -381,7 +381,7 @@ class TestBraketExpval:
     def test_hermitian_1(self, device):
         """Test expval for Hermitian observable on braket devices."""
 
-        @qjit()
+        @qjit
         @qml.qnode(device)
         def expval(x: float):
             qml.RY(x, wires=0)
@@ -411,7 +411,7 @@ class TestBraketExpval:
     def test_hermitian_2(self, device):
         """Test expval for Hermitian observable on braket devices."""
 
-        @qjit()
+        @qjit
         @qml.qnode(device)
         def expval(x: float):
             qml.RX(x, wires=0)
@@ -446,7 +446,7 @@ class TestBraketExpval:
     def test_tensor_1(self, device):
         """Test expval for Tensor observable on braket devices."""
 
-        @qjit()
+        @qjit
         @qml.qnode(device)
         def expval(x: float, y: float):
             qml.RX(x, wires=0)
@@ -475,7 +475,7 @@ class TestBraketExpval:
     def test_tensor_2(self, device):
         """Test expval for Tensor observable including hermitian observable on braket devices."""
 
-        @qjit()
+        @qjit
         @qml.qnode(device)
         def expval(x: float, y: float):
             qml.RX(x, wires=0)
@@ -513,7 +513,7 @@ class TestBraketVar:
     def test_rx(self, device):
         """Test var with RX on braket devices."""
 
-        @qjit()
+        @qjit
         @qml.qnode(device)
         def var(x: float):
             qml.RX(x, wires=0)
@@ -538,7 +538,7 @@ class TestBraketVar:
     def test_hadamard(self, device):
         """Test var with Hadamard on braket devices."""
 
-        @qjit()
+        @qjit
         @qml.qnode(device)
         def var(x: float):
             qml.Hadamard(wires=0)
@@ -564,7 +564,7 @@ class TestBraketVar:
     def test_tensor_1(self, device):
         """Test variance for Tensor observable on braket devices."""
 
-        @qjit()
+        @qjit
         @qml.qnode(device)
         def circuit(x: float, y: float):
             qml.RX(x, wires=0)
@@ -593,7 +593,7 @@ class TestBraketVar:
     def test_tensor_2(self, device):
         """Test variance for Tensor observable including hermitian observable on braket devices."""
 
-        @qjit()
+        @qjit
         @qml.qnode(device)
         def circuit(x: float, y: float):
             qml.RX(x, wires=0)
@@ -630,7 +630,7 @@ class TestBraketMeasurementsProcess:
     def test_multiple_return_values_braket1(self, device):
         """Test multiple return values."""
 
-        @qjit()
+        @qjit
         @qml.qnode(device)
         def all_measurements(x):
             qml.RY(x, wires=0)
@@ -666,7 +666,7 @@ class TestBraketMeasurementsProcess:
     def test_multiple_return_values_braket2(self, device):
         """Test multiple return values with shots > 0."""
 
-        @qjit()
+        @qjit
         @qml.qnode(device)
         def all_measurements(x):
             qml.RY(x, wires=0)
@@ -690,10 +690,10 @@ class TestBraketMeasurementsProcess:
         assert result[0].shape[0] == 100
 
         # qml.counts
-        assert sum(result[2]) == 100
+        assert sum(result[1][1]) == 100
 
         # qml.probs
-        assert result[3][0] > result[3][1]
+        assert result[2][0] > result[2][1]
 
     @pytest.mark.parametrize(
         "device",
@@ -708,7 +708,7 @@ class TestBraketMeasurementsProcess:
     def test_unsupported_measurement_braket(self, device):
         """Test unsupported measurement on braket devices."""
 
-        @qjit()
+        @qjit
         @qml.qnode(device)
         def circuit(x: float, y: float):
             qml.RX(x, wires=0)
@@ -742,7 +742,7 @@ class TestBraketGradient:
             qml.RX(x * 2, wires=0)
             return qml.expval(qml.PauliY(0))
 
-        @qjit()
+        @qjit
         def compiled(x: float):
             g = qml.qnode(device)(f)
             h = grad(g, method="fd", h=1e-4)
@@ -775,7 +775,7 @@ class TestBraketGradient:
             qml.RX(x * 2, wires=1)
             return qml.expval(qml.PauliY(0) @ qml.PauliZ(1))
 
-        @qjit()
+        @qjit
         def compiled(x: float, y: float):
             g = qml.qnode(device)(f)
             h = grad(g, method="fd", h=1e-4)
@@ -807,7 +807,7 @@ class TestBraketGradient:
             qml.RX(x, wires=0)
             return qml.expval(qml.PauliY(0))
 
-        @qjit()
+        @qjit
         def compiled_grad_default(x: float):
             g = qml.qnode(device)(f)
             h = grad(g, h=1e-4)

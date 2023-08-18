@@ -32,7 +32,7 @@ from jax._src.lax.control_flow import (
 from jax._src.lax.lax import _abstractify
 from jax.core import ShapedArray
 from jax.linear_util import wrap_init
-from jax.tree_util import tree_flatten, tree_unflatten, treedef_is_leaf
+from jax.tree_util import tree_flatten, tree_structure, tree_unflatten, treedef_is_leaf
 from pennylane import QNode
 from pennylane.measurements import MidMeasureMP
 from pennylane.operation import AnyWires, Operation, Operator, Wires
@@ -85,6 +85,11 @@ def _trace_quantum_tape(
     qreg = qargs[0]
     return_values, qreg, qubit_states = trace_quantum_tape(tape, qreg, has_tracer_return_values)
     qreg = insert_to_qreg(qubit_states, qreg)
+
+    # To support retvals in nested loops
+    if return_values and len(return_values) == 1:
+        return_values = return_values[0]
+
     return return_values, [qreg]
 
 
@@ -138,16 +143,18 @@ class QFunc:
             device = self.device
 
         traceable_fn = get_traceable_fn(self.func, device)
-        jaxpr = jax.make_jaxpr(traceable_fn)(*args)
+        jaxpr, shape = jax.make_jaxpr(traceable_fn, return_shape=True)(*args)
+        retval_tree = tree_structure(shape)
 
         def _eval_jaxpr(*args):
             return jax.core.eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *args)
 
+        args_data, _ = tree_flatten(args)
+
         wrapped = wrap_init(_eval_jaxpr)
-        retval = jprim.func_p.bind(wrapped, *args, fn=self)
-        if len(retval) == 1:
-            retval = retval[0]
-        return retval
+        retval = jprim.func_p.bind(wrapped, *args_data, fn=self)
+
+        return tree_unflatten(retval_tree, retval)
 
 
 def qfunc(num_wires, *, shots=1000, device=None):
@@ -194,12 +201,14 @@ class Function:
         self.__name__ = fn.__name__
 
     def __call__(self, *args, **kwargs):
-        jaxpr = jax.make_jaxpr(self.fn)(*args)
+        jaxpr, shape = jax.make_jaxpr(self.fn, return_shape=True)(*args)
+        shape_tree = tree_structure(shape)
 
         def _eval_jaxpr(*args):
             return jax.core.eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *args)
 
-        return jprim.func_p.bind(wrap_init(_eval_jaxpr), *args, fn=self)
+        retval = jprim.func_p.bind(wrap_init(_eval_jaxpr), *args, fn=self)
+        return tree_unflatten(shape_tree, retval)
 
 
 Differentiable = Union[Function, QNode]
@@ -209,12 +218,16 @@ Jaxpr = Any
 
 def _ensure_differentiable(f: DifferentiableLike) -> Differentiable:
     """Narrows down the set of the supported differentiable objects."""
+
+    # Unwrap the function from an existing QJIT object.
+    if isinstance(f, catalyst.compilation_pipelines.QJIT):
+        f = f.user_function
+
     if isinstance(f, (Function, QNode)):
         return f
-    elif isinstance(f, catalyst.compilation_pipelines.QJIT):
-        return f.user_function
     elif isinstance(f, Callable):  # Keep at the bottom
         return Function(f)
+
     raise DifferentiableCompileError(f"Non-differentiable object passed: {type(f)}")
 
 
@@ -222,6 +235,7 @@ def _make_jaxpr_check_differentiable(f: Differentiable, grad_params: GradParams,
     """Gets the jaxpr of a differentiable function. Perform the required additional checks."""
     method = grad_params.method
     jaxpr = jax.make_jaxpr(f)(*args)
+
     assert len(jaxpr.eqns) == 1, "Expected jaxpr consisting of a single function call."
     assert (
         jaxpr.eqns[0].primitive == jprim.func_p
@@ -342,7 +356,11 @@ class Grad:
             "catalyst.grad can only be used from within @qjit decorated code."
         )
         jaxpr = _make_jaxpr_check_differentiable(self.fn, self.grad_params, *args)
-        return jprim.grad_p.bind(*args, jaxpr=jaxpr, fn=self, grad_params=self.grad_params)
+
+        args_data, _ = tree_flatten(args)
+
+        # It always returns list as required by catalyst control-flows
+        return jprim.grad_p.bind(*args_data, jaxpr=jaxpr, fn=self, grad_params=self.grad_params)
 
 
 def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
@@ -577,8 +595,7 @@ def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
     .. warning::
 
         This function does not support performing the adjoint
-        of quantum functions that contain Catalyst control flow
-        or mid-circuit measurements.
+        of quantum functions that contain mid-circuit measurements.
 
     Args:
         f (Callable or Operator): A PennyLane operation or a Python function
@@ -592,7 +609,7 @@ def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
     Raises:
         ValueError: invalid parameter values
 
-    **Example**
+    **Example 1 (basic usage)**
 
     .. code-block:: python
 
@@ -607,8 +624,27 @@ def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
             catalyst.adjoint(func)()
             return qml.probs()
 
-    >>> workflow(pnp.pi/2, wires=0)
+    >>> workflow(jnp.pi/2, wires=0)
     array([0.5, 0.5])
+
+    **Example 2 (with Catalyst control flow)**
+
+    .. code-block:: python
+
+        @qjit
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def workflow(theta, n, wires):
+            def func():
+                @catalyst.for_loop(0, n, 1)
+                def loop_fn(i):
+                    qml.RX(theta, wires=wires)
+
+                loop_fn()
+            catalyst.adjoint(func)()
+            return qml.probs()
+
+    >>> workflow(jnp.pi/2, 3, 0)
+    [1.00000000e+00 7.39557099e-32]
     """
 
     def _make_adjoint(*args, _callee: Callable, **kwargs):
@@ -1434,17 +1470,14 @@ class QJITDevice(qml.QubitDevice):
         # decomposition is generally faster.
         # At the moment, bypassing decomposition for controlled gates will generally have a higher
         # success rate, as complex decomposition paths can fail to trace (c.f. PL #3521, #3522).
-
-        def _decomp_controlled_unitary(self, *_args, **_kwargs):
-            return qml.QubitUnitary(qml.matrix(self), wires=self.wires)
-
         def _decomp_controlled(self, *_args, **_kwargs):
-            return qml.QubitUnitary(qml.matrix(self), wires=self.wires)
+            return [qml.QubitUnitary(qml.matrix(self), wires=self.wires)]
 
         with Patcher(
-            (qml.ops.ControlledQubitUnitary, "compute_decomposition", _decomp_controlled_unitary),
             (qml.ops.Controlled, "has_decomposition", lambda self: True),
             (qml.ops.Controlled, "decomposition", _decomp_controlled),
+            # TODO: Remove once work_wires is no longer needed for decomposition.
+            (qml.ops.MultiControlledX, "decomposition", _decomp_controlled),
         ):
             expanded_tape = super().default_expand_fn(circuit, max_expansion)
 
