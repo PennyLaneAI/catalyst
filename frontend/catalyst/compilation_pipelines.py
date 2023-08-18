@@ -798,6 +798,7 @@ def qjit(
         FileExistsError: Unable to create temporary directory
         PermissionError: Problems creating temporary directory
         OSError: Problems while creating folder for intermediate files
+        AutoGraphError: Raised if there was an issue converting the given the function(s).
 
     **Example**
 
