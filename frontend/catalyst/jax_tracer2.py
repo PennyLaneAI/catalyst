@@ -1,7 +1,8 @@
 import jax
 import pennylane as qml
-from jax._src.core import (ClosedJaxpr, MainTrace as JaxMainTrace, new_main, cur_sublevel, get_aval,
-                           Tracer as JaxprTracer, check_jaxpr, ShapedArray, JaxprEqn, Var)
+from jax._src.core import (ClosedJaxpr, MainTrace as JaxMainTrace, new_main, new_main2,
+                           new_base_main, cur_sublevel, get_aval, Tracer as JaxprTracer,
+                           check_jaxpr, ShapedArray, JaxprEqn, Var)
 from jax._src.interpreters.partial_eval import (DynamicJaxprTrace, DynamicJaxprTracer,
                                                 JaxprStackFrame, trace_to_subjaxpr_dynamic2,
                                                 extend_jaxpr_stack, _input_type_to_tracers,
@@ -54,6 +55,7 @@ from dataclasses import dataclass
 class MainTracingContex:
     main: JaxMainTrace
     frames: Dict[DynamicJaxprTrace, JaxprStackFrame]
+    mains: Dict[DynamicJaxprTrace, JaxMainTrace]
     trace: Optional[DynamicJaxprTrace] = None
 
 TRACING_CONTEXT : Optional[MainTracingContex] = None
@@ -61,9 +63,9 @@ TRACING_CONTEXT : Optional[MainTracingContex] = None
 @contextmanager
 def main_tracing_context() -> ContextManager[MainTracingContex]:
     global TRACING_CONTEXT
-    with new_main(DynamicJaxprTrace, dynamic=True) as main:
+    with new_base_main(DynamicJaxprTrace, dynamic=True) as main:
         main.jaxpr_stack = ()
-        TRACING_CONTEXT = ctx = MainTracingContex(main, {})
+        TRACING_CONTEXT = ctx = MainTracingContex(main, {}, {})
         try:
             yield ctx
         finally:
@@ -77,21 +79,24 @@ def get_main_tracing_context(hint=None) -> MainTracingContex:
         raise CompileError(f"{hint} can only be used from within a qml.qnode.")
     return TRACING_CONTEXT
 
+
 @contextmanager
 def frame_tracing_context(ctx: MainTracingContex,
                           trace: Optional[DynamicJaxprTrace] = None
                           ) -> ContextManager[DynamicJaxprTrace]:
-    frame = JaxprStackFrame() if trace is None else ctx.frames[trace]
-    with extend_jaxpr_stack(ctx.main, frame), reset_name_stack():
-        parent_trace = ctx.trace
-        ctx.trace = DynamicJaxprTrace(ctx.main, cur_sublevel()) if trace is None else trace
-        ctx.frames[ctx.trace] = frame
-        try:
-            yield ctx.trace
-        finally:
-            ctx.trace = parent_trace
-
-
+    main = ctx.mains[trace] if trace is not None else None
+    with new_main2(DynamicJaxprTrace, dynamic=True, main=main) as nmain:
+        nmain.jaxpr_stack = ()
+        frame = JaxprStackFrame() if trace is None else ctx.frames[trace]
+        with extend_jaxpr_stack(nmain, frame), reset_name_stack():
+            parent_trace = ctx.trace
+            ctx.trace = DynamicJaxprTrace(nmain, cur_sublevel()) if trace is None else trace
+            ctx.frames[ctx.trace] = frame
+            ctx.mains[ctx.trace] = nmain
+            try:
+                yield ctx.trace
+            finally:
+                ctx.trace = parent_trace
 
 
 def deduce_avals(f:Callable, args, kwargs):
@@ -277,6 +282,7 @@ def trace_quantum_tape(quantum_tape:QuantumTape,
                     qreg_in = _input_type_to_tracers(op.trace.new_arg, [AbstractQreg()])[0]
                     qreg_out = trace_quantum_tape(op.quantum_tape, device, qreg_in, ctx, op.trace)
                     jaxpr, typ, consts = ctx.frames[op.trace].to_jaxpr2(op.res_classical_tracers + [qreg_out])
+                    print('CCCCCCCCCC', consts)
 
                 if isinstance(op, ForLoop):
                     qreg2 = bind_overwrite_classical_tracers(
@@ -408,7 +414,7 @@ def trace_quantum_function(
                                                                out_classical_tracers_or_measurement)
             qdealloc(qreg_in)
             # FIXME: Port the observable-tracing logic from the original tracer
-            out_quantum_tracers = [trace.full_raise(qreg_out)]
+            out_quantum_tracers = [qreg_out] #[trace.full_raise(qreg_out)]
 
             jaxpr, out_type, consts = ctx.frames[trace].to_jaxpr2(out_classical_tracers + out_quantum_tracers)
             jaxpr._outvars = jaxpr._outvars[:-1]
@@ -420,7 +426,9 @@ def trace_quantum_function(
     out_avals, _ = unzip2(out_type)
     out_shape = tree_unflatten(out_tree_promise(),
                                [ShapeDtypeStruct(a.shape, a.dtype, a.named_shape) for a in out_avals])
-    # print("JAXPR", jaxpr)
+    print("JJJAXPR", jaxpr)
+    print(lower_jaxpr_to_mlir(closed_jaxpr))
+    print("111111111111111111111")
     return closed_jaxpr, out_shape
 
 
