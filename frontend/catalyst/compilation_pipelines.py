@@ -859,10 +859,10 @@ def qjit(
             return qml.expval(qml.PauliZ(0))
 
     >>> circuit(3)
-    ...
+    array(0.)
 
     >>> circuit(5)
-    ...
+    array(1.)
 
     Note that imperative control flow will still work in Catalyst even when the autograph feature is
     turned off, it just won't be captured in the compiled program and cannot involve traced values.
