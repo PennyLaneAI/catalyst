@@ -412,6 +412,7 @@ def trace_observables(obs, qubit_states, p, num_wires, qreg):
         wires = wires or Wires(range(num_wires))
         qubits = get_qubits_from_wires(wires, qubit_states, qreg)
         jax_obs = jprim.compbasis(*qubits)
+        return jax_obs, qubits
     elif isinstance(obs, KNOWN_NAMED_OBS):
         jax_obs, qubits = named_obs(obs, op_args, qubit_states, qreg)
     elif isinstance(obs, qml.Hermitian):
@@ -422,11 +423,24 @@ def trace_observables(obs, qubit_states, p, num_wires, qreg):
     elif isinstance(obs, qml.Hamiltonian):
         nested_obs = [trace_observables(o, qubit_states, p, num_wires, qreg)[0] for o in obs.ops]
         jax_obs = trace_hamiltonian(op_args, *nested_obs)
-    elif obs._pauli_rep is not None:  # pylint: disable=protected-access
-        paulis = obs._pauli_rep  # pylint: disable=protected-access
+    elif paulis := obs._pauli_rep:  # pragma: no cover
         jax_obs = pauli_sentence_to_rt_obs(paulis, qubit_states, qreg)
-    else:  # pragma: no cover
-        raise RuntimeError(f"unknown observable in measurement process: {obs}")
+    else:
+        obs = qml.simplify(obs)
+        if isinstance(obs, qml.ops.op_math.Sum):
+            nested_obs = [trace_observables(o, qubit_states, p, num_wires, qreg)[0] for o in obs]
+            op_args = jax.numpy.ones(len(obs))
+            jax_obs = trace_hamiltonian(op_args, *nested_obs)
+        elif isinstance(obs, qml.ops.op_math.Prod):
+            nested_obs = [trace_observables(o, qubit_states, p, num_wires, qreg)[0] for o in obs]
+            jax_obs = jprim.tensorobs(*nested_obs)
+        elif isinstance(obs, qml.ops.op_math.SProd):
+            terms = obs.terms()
+            coeffs = jax.numpy.array(terms[0])
+            nested_obs = trace_observables(terms[1][0], qubit_states, p, num_wires, qreg)[0]
+            jax_obs = jprim.hamiltonian(coeffs, nested_obs)
+        else:
+            raise RuntimeError(f"unknown observable in measurement process: {obs}")
     return jax_obs, qubits
 
 
@@ -483,6 +497,11 @@ def pauli_sentence_to_rt_obs(paulis, qubit_states, qreg):
     """
     pwords, coeffs = zip(*paulis.items())
     nested_obs = [pauli_word_to_rt_obs(pword, qubit_states, qreg) for pword in pwords]
+
+    # No need to create a Hamiltonian for a single TensorObs
+    if len(nested_obs) == 1 and coeffs[0] == 1.0:
+        return nested_obs[0]
+
     coeffs = jax.numpy.asarray(coeffs)
     return jprim.hamiltonian(coeffs, *nested_obs)
 

@@ -216,7 +216,17 @@ def get_observables_dependency_tree(obs):
         yield obs
         for o in obs.ops:
             yield from get_observables_dependency_tree(o)
-    elif obs._pauli_rep is not None:  # pylint: disable=protected-access
+    elif obs._pauli_rep:  # pragma: no cover
         yield obs
-    else:  # pragma: no cover
-        raise ValueError("Unsupported observable")
+    else:
+        obs = qml.simplify(obs)
+        if isinstance(obs, (qml.ops.op_math.Sum, qml.ops.op_math.Prod)):
+            yield obs
+            for o in obs:
+                yield from get_observables_dependency_tree(o)
+        elif isinstance(obs, qml.ops.op_math.SProd):
+            yield obs
+            terms = obs.terms()
+            yield from get_observables_dependency_tree(terms[1][0])
+        else:  # pragma: no cover
+            raise ValueError("Unsupported observable")

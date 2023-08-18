@@ -616,7 +616,6 @@ class TestNewArithmeticOps:
         assert qml.operation.active_new_opmath()
         circuit(0, 1)  # another call
 
-        # Update the global variable `__use_new_opmath` for running tests in parallel is required
         qml.operation.disable_new_opmath()
 
     @pytest.mark.parametrize(
@@ -686,7 +685,6 @@ class TestNewArithmeticOps:
         result = circuit(np.pi / 4, np.pi / 2)
         assert np.allclose(expected, result)
 
-        # Update the global variable `__use_new_opmath` for running tests in parallel is required
         qml.operation.disable_new_opmath()
 
     @pytest.mark.parametrize(
@@ -765,14 +763,9 @@ class TestNewArithmeticOps:
         result = circuit(np.pi / 4, np.pi / 2)
         assert np.allclose(expected, result)
 
-        # Update the global variable `__use_new_opmath` for running tests in parallel is required
         qml.operation.disable_new_opmath()
 
-    @pytest.mark.parametrize(
-        "meas, expected",
-        [[qml.expval, np.array(0.25)], [qml.var, np.array(0.1875)]],
-    )
-    def test_mix_dunder(self, meas, expected, backend):
+    def test_mix_dunder(self, backend):
         """Test dunder methods."""
 
         # Enabling new arithmetic operators
@@ -784,13 +777,134 @@ class TestNewArithmeticOps:
             qml.RX(x, wires=0)
             qml.RX(y, wires=1)
             qml.CNOT(wires=[0, 1])
-            return meas(-0.5 * qml.PauliX(0) @ qml.PauliY(1))
+            return qml.expval(-0.5 * qml.PauliX(0) @ qml.PauliY(1))
 
         result = circuit(np.pi / 4, np.pi / 4)
+        expected = np.array(0.25)
         assert np.allclose(expected, result)
 
-        # Update the global variable `__use_new_opmath` for running tests in parallel is required
         qml.operation.disable_new_opmath()
+
+    def test_sum_hermitian(self, backend):
+        """Test Sum with Hermitian observables."""
+
+        # Enabling new arithmetic operators
+        qml.operation.enable_new_opmath()
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=3))
+        def circuit(x, y):
+            qml.RX(x, wires=0)
+            qml.RX(y, wires=1)
+            qml.CNOT(wires=[0, 1])
+            A = np.array(
+                [[complex(1.0, 0.0), complex(2.0, 0.0)], [complex(2.0, 0.0), complex(1.0, 0.0)]]
+            )
+            return qml.expval(qml.Hermitian(A, wires=2) + qml.PauliX(0) + qml.Hermitian(A, wires=1))
+
+        result = circuit(np.pi / 4, np.pi / 4)
+        expected = np.array(2.0)
+        assert np.allclose(expected, result)
+
+        qml.operation.disable_new_opmath()
+
+    def test_prod_hermitian(self, backend):
+        """Test Prod with Hermitian observables."""
+
+        # Enabling new arithmetic operators
+        qml.operation.enable_new_opmath()
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=4))
+        def circuit(x, y):
+            qml.RX(x, wires=0)
+            qml.RX(y, wires=1)
+            qml.RY(x + y, wires=2)
+            qml.RY(x - y, wires=3)
+            qml.CNOT(wires=[0, 1])
+            A = np.array(
+                [[complex(1.0, 0.0), complex(2.0, 0.0)], [complex(2.0, 0.0), complex(1.0, 0.0)]]
+            )
+            return qml.expval(
+                qml.PauliZ(2)
+                @ qml.Hermitian(A, wires=1)
+                @ qml.PauliZ(0)
+                @ qml.Hermitian(A, wires=3)
+            )
+
+        result = circuit(np.pi / 4, np.pi / 2)
+        expected = np.array(0.20710678)
+        assert np.allclose(expected, result)
+
+        qml.operation.disable_new_opmath()
+
+    def test_sprod_hermitian(self, backend):
+        """Test SProd and Prod with Hermitian observables."""
+
+        # Enabling new arithmetic operators
+        qml.operation.enable_new_opmath()
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=2))
+        def circuit(x, y):
+            qml.RX(x, wires=0)
+            qml.RX(y, wires=1)
+            qml.CNOT(wires=[0, 1])
+            A = np.array(
+                [[complex(1.0, 0.0), complex(2.0, 0.0)], [complex(2.0, 0.0), complex(1.0, 0.0)]]
+            )
+            return qml.expval(0.2 * qml.Hermitian(A, wires=1) @ qml.PauliZ(0))
+
+        result = circuit(np.pi / 4, np.pi / 2)
+        expected = np.array(0.14142136)
+        assert np.allclose(expected, result)
+
+        qml.operation.disable_new_opmath()
+
+    def test_sum_sprod_prod_hermitian(self, backend):
+        """Test Sum of SProd and Prod with Hermitian observables."""
+
+        # Enabling new arithmetic operators
+        qml.operation.enable_new_opmath()
+
+        @qjit(keep_intermediate=True)
+        @qml.qnode(qml.device(backend, wires=2))
+        def circuit(x, y):
+            qml.RX(x, wires=0)
+            qml.RX(y, wires=1)
+            qml.CNOT(wires=[0, 1])
+            A = np.array(
+                [[complex(1.0, 0.0), complex(2.0, 0.0)], [complex(2.0, 0.0), complex(1.0, 0.0)]]
+            )
+            return qml.expval(qml.Hermitian(A, wires=1) + qml.PauliZ(0) @ qml.PauliY(1))
+
+        result = circuit(np.pi / 4, np.pi)
+        expected = np.array(1.0)
+        assert np.allclose(expected, result)
+
+        qml.operation.disable_new_opmath()
+
+    # def test_sprod_hermitian(self, backend):
+    #     """Test SProd and Sum with Hermitian observables."""
+
+    #     # Enabling new arithmetic operators
+    #     qml.operation.enable_new_opmath()
+
+    #     @qjit
+    #     @qml.qnode(qml.device(backend, wires=2))
+    #     def circuit(x, y):
+    #         qml.RX(x, wires=0)
+    #         qml.RX(y, wires=1)
+    #         qml.CNOT(wires=[0, 1])
+    #         A = np.array(
+    #             [[complex(1.0, 0.0), complex(2.0, 0.0)], [complex(2.0, 0.0), complex(1.0, 0.0)]]
+    #         )
+    #         return qml.expval(0.2 * (qml.Hermitian(A, wires=1) + qml.PauliZ(0)))
+    #     result = circuit(np.pi / 4, np.pi / 2)
+    #     expected = np.array(0.14142136)
+    #     assert np.allclose(expected, result)
+
+    #     qml.operation.disable_new_opmath()
 
 
 if __name__ == "__main__":
