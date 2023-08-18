@@ -496,6 +496,20 @@ def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
 
     >>> grad_loss(jnp.array([1.0, 2.0]))
     array([ 0.57367285, 44.4911605 ])
+
+    **Example 4 (Purely classical functions)**
+
+    .. code-block:: python
+
+        def square(x: float):
+            return x ** 2
+
+        @qjit
+        def dsquare(x: float):
+            return catalyst.grad(square, method="defer")(x)
+
+    >>> dsquare(2.3)
+    array(4.6)
     """
     return Grad(_ensure_differentiable(f), grad_params=_check_grad_params(method, h, argnum))
 
