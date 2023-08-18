@@ -53,12 +53,6 @@ jax.config.update("jax_enable_x64", True)
 jax.config.update("jax_platform_name", "cpu")
 jax.config.update("jax_array", True)
 
-try:
-    AG_AVAILABLE = True
-    from catalyst.autograph import autograph as run_autograph
-except ImportError:
-    AG_AVAILABLE = False
-
 
 def are_params_annotated(f: typing.Callable):
     """Return true if all parameters are typed-annotated."""
@@ -482,9 +476,11 @@ class QJIT:
         functools.update_wrapper(self, fn)
 
         if compile_options.autograph:
-            if AG_AVAILABLE:
+            try:
+                from catalyst.autograph import autograph as run_autograph
+
                 self.user_function = run_autograph(fn)
-            else:
+            except ImportError:
                 warnings.warn(
                     "The autograph feature in Catalyst requires TensorFlow. "
                     "Please install it (e.g. `pip install tensorflow-cpu`) and make it sure is "
