@@ -143,6 +143,23 @@
       return qml.expval(qml.Hamiltonian(coeffs, obs))
   ```
 
+* Add support for nested Hamiltonian observables.
+
+  ``` python
+  @qjit
+  @qml.qnode(qml.device("lightning.qubit", wires=3))
+  def circuit(x, y, coeffs1, coeffs2):
+      qml.RX(x, wires=0)
+      qml.RX(y, wires=1)
+      qml.RY(x + y, wires=2)
+
+      obs = [
+          qml.PauliX(0) @ qml.PauliZ(1),
+          qml.Hamiltonian(coeffs1, [qml.PauliZ(0) @ qml.Hadamard(2)]),
+      ]
+
+      return qml.var(qml.Hamiltonian(coeffs2, obs))
+  ```
 
 <h3>Improvements</h3>
 
