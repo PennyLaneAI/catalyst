@@ -143,6 +143,12 @@
       return qml.expval(qml.Hamiltonian(coeffs, obs))
   ```
 
+<h3>Breaking changes</h3>
+
+* The `catalyst.grad` function has been renamed to `catalyst.jacobian` and supports differentiation
+  of functions that return multiple or non-scalar outputs. A new `catalyst.grad` function has been
+  added that enforces that it is differentiating a function with a single scalar return value.
+  [#254](https://github.com/PennyLaneAI/catalyst/pull/254)
 
 <h3>Improvements</h3>
 
