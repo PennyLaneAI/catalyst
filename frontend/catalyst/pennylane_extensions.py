@@ -244,13 +244,20 @@ def _make_jaxpr_check_differentiable(f: Differentiable, grad_params: GradParams,
     for pos, arg in enumerate(jaxpr.in_avals):
         if arg.dtype.kind != "f" and pos in grad_params.argnum:
             raise DifferentiableCompileError(
-                "Catalyst.grad only supports differentiation on floating-point "
+                "Catalyst.grad/jacobian only supports differentiation on floating-point "
                 f"arguments, got '{arg.dtype}' at position {pos}."
             )
+
+    if grad_params.scalar_out:
+        if not (len(jaxpr.out_avals) == 1 and jaxpr.out_avals[0].shape == ()):
+            raise DifferentiableCompileError(
+                f"Catalyst.grad only supports scalar-output functions, got {jaxpr.out_avals}"
+            )
+
     for pos, res in enumerate(jaxpr.out_avals):
         if res.dtype.kind != "f":
             raise DifferentiableCompileError(
-                "Catalyst.grad only supports differentiation on floating-point "
+                "Catalyst.grad/jacobian only supports differentiation on floating-point "
                 f"results, got '{res.dtype}' at position {pos}."
             )
 
@@ -295,7 +302,7 @@ def _check_created_jaxpr_gradient_methods(f: Differentiable, method: str, jaxpr:
 
 
 def _check_grad_params(
-    method: str, h: Optional[float], argnum: Optional[Union[int, List[int]]]
+    method: str, scalar_out: bool, h: Optional[float], argnum: Optional[Union[int, List[int]]]
 ) -> GradParams:
     methods = {"fd", "defer"}
     if method is None:
@@ -319,7 +326,7 @@ def _check_grad_params(
         pass
     else:
         raise ValueError(f"argnum should be integer or a list of integers, not {argnum}")
-    return GradParams(method, h, argnum)
+    return GradParams(method, scalar_out, h, argnum)
 
 
 class Grad:
@@ -373,7 +380,7 @@ def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
 
         If parameter-shift or adjoint is specified, this will only be used
         for internal _quantum_ functions. Classical components will be differentiated
-        using finite-differences.
+        using standard reverse-mode automatic differentiation.
 
     .. warning::
 
@@ -408,6 +415,9 @@ def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
 
     Raises:
         ValueError: Invalid method or step size parameters.
+        DifferentiableCompilerError: Called on a function that doesn't return a single scalar.
+
+    .. seealso:: :func:`~.jacobian`
 
     **Example**
 
@@ -428,7 +438,85 @@ def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
     >>> workflow(2.0)
     array(-3.14159265)
     """
-    return Grad(_ensure_differentiable(f), grad_params=_check_grad_params(method, h, argnum))
+    scalar_out = True
+    return Grad(
+        _ensure_differentiable(f), grad_params=_check_grad_params(method, scalar_out, h, argnum)
+    )
+
+
+def jacobian(f: DifferentiableLike, *, method=None, h=None, argnum=None):
+    """A :func:`~.qjit` compatible Jacobian transformation for PennyLane/Catalyst.
+
+    This function allows the Jacobian of a hybrid quantum-classical function
+    to be computed within the compiled program.
+
+    .. warning::
+
+        If parameter-shift or adjoint is specified, this will only be used
+        for internal _quantum_ functions. Classical components will be differentiated
+        using standard reverse-mode automatic differentiation.
+
+    .. warning::
+
+        Currently, higher-order differentiation or differentiation of non-QNode functions
+        is only supported by the finite-difference method.
+
+    .. note::
+
+        Any JAX-compatible optimization library, such as `JAXopt
+        <https://jaxopt.github.io/stable/index.html>`_, can be used
+        alongside ``grad`` for JIT-compatible variational workflows.
+        See the :doc:`/dev/quick_start` for examples.
+
+    Args:
+        f (Callable): a function or a function object to differentiate
+        method (str): The method used for differentiation, which can be any of
+                      ``["fd", "defer"]``,
+            where:
+
+            - ``"fd"`` represents first-order finite-differences for the entire hybrid
+              circuit,
+
+            - ``"defer"`` represents deferring the quantum differentiation to the method
+              specified by the QNode, while the classical computation is differentiated
+              using traditional auto-diff.
+
+        h (float): the step-size value for the finite-difference (``"fd"``) method
+        argnum (Tuple[int, List[int]]): the argument indices to differentiate
+
+    Returns:
+        Grad: A Grad object that denotes the Jacobian of a function.
+
+    Raises:
+        ValueError: Invalid method or step size parameters.
+
+    .. seealso:: :func:`~.grad`
+
+    **Example**
+
+    .. code-block:: python
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qjit
+        def workflow(x):
+            @qml.qnode(dev)
+            def circuit(x):
+                qml.RX(jnp.pi * x[0], wires=0)
+                qml.RY(x[1], wires=0)
+                return qml.probs()
+
+            g = jacobian(circuit)
+            return g(x)
+
+    >>> workflow(jnp.array([2.0, 1.0]))
+    array([[-1.32116540e-07,  1.33781874e-07],
+           [-4.20735506e-01,  4.20735506e-01]])
+    """
+    scalar_out = False
+    return Grad(
+        _ensure_differentiable(f), grad_params=_check_grad_params(method, scalar_out, h, argnum)
+    )
 
 
 def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=None):
@@ -509,7 +597,8 @@ def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=
     params = _check(params, "params")
     tangents = _check(tangents, "tangents")
     fn: Differentiable = _ensure_differentiable(f)
-    grad_params = _check_grad_params(method, h, argnum)
+    scalar_out = False
+    grad_params = _check_grad_params(method, scalar_out, h, argnum)
     jaxpr = _make_jaxpr_check_differentiable(fn, grad_params, *params)
     return jprim.jvp_p.bind(*params, *tangents, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
 
@@ -568,7 +657,8 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
     params = _check(params, "params")
     cotangents = _check(cotangents, "cotangents")
     fn: Differentiable = _ensure_differentiable(f)
-    grad_params = _check_grad_params(method, h, argnum)
+    scalar_out = False
+    grad_params = _check_grad_params(method, scalar_out, h, argnum)
     jaxpr = _make_jaxpr_check_differentiable(fn, grad_params, *params)
     return jprim.vjp_p.bind(*params, *cotangents, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
 
