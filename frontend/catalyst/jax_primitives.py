@@ -1403,6 +1403,8 @@ def _qfor_lowering(
     loop_index = iter_args_plus_consts[body_nconsts]
     loop_args = iter_args_plus_consts[body_nconsts + 1 :]
 
+    # print("BJBJBJ0", body_consts)
+
     all_param_types_plus_consts = [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_in]
 
     # Remove header values: lower_bound, upper_bound, step
@@ -1475,10 +1477,11 @@ def _qfor_lowering(
         from_elements_op = FromElementsOp.build_generic([result_from_elements_op], [body_args[0]])
         body_args[0] = from_elements_op.result
 
-        print("BJBJBJ1", body_jaxpr)
-        print("BJBJBJ2", body_jaxpr.consts)
-        print("BJBJBJ3", type(body_jaxpr.consts[0]).__mro__)
-        print("BJBJBJ4", body_jaxpr.consts[0].__dir__())
+        # print("BJBJBJ1", body_jaxpr)
+        # print("BJBJBJ2-c", body_jaxpr.consts)
+        # print("BJBJBJ2-i", body_jaxpr.invars)
+        # print("BJBJBJ3", type(body_jaxpr.consts[0]).__mro__)
+        # print("BJBJBJ4", body_jaxpr.consts[0].__dir__())
 
         # recursively generate the mlir for the loop body
         out, _ = mlir.jaxpr_subcomp(
@@ -1486,6 +1489,7 @@ def _qfor_lowering(
             body_jaxpr.jaxpr,
             mlir.TokenSet(),
             [mlir.ir_constants(c) for c in body_jaxpr.consts],
+            # [],
             *([a] for a in (*body_consts, *body_args)),
             dim_var_values=jax_ctx.dim_var_values,
         )

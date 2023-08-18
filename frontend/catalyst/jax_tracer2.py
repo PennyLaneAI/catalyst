@@ -8,7 +8,7 @@ from jax._src.interpreters.partial_eval import (DynamicJaxprTrace, DynamicJaxprT
                                                 extend_jaxpr_stack, _input_type_to_tracers,
                                                 new_jaxpr_eqn, make_jaxpr_effects, Jaxpr,
                                                 _const_folding_and_forwarding, _inline_literals,
-                                                _add_implicit_outputs)
+                                                _add_implicit_outputs, convert_constvars_jaxpr)
 from jax._src.source_info_util import reset_name_stack, current as jax_current, new_name_stack
 from jax._src.dispatch import jaxpr_replicas
 from jax._src.lax.lax import _abstractify
@@ -294,7 +294,8 @@ def trace_quantum_tape(quantum_tape:QuantumTape,
                         op.in_classical_tracers[1],
                         op.in_classical_tracers[2],
                         *(consts + op.in_classical_tracers[3:] + [qreg]),
-                        body_jaxpr=ClosedJaxpr(jaxpr, consts),
+                        # body_jaxpr=ClosedJaxpr(jaxpr, consts),
+                        body_jaxpr=ClosedJaxpr(convert_constvars_jaxpr(jaxpr), ()),
                         body_nconsts=len(consts),
                         apply_reverse_transform=False)[-1] # [1]
                 else:
@@ -429,10 +430,10 @@ def trace_quantum_function(
     out_avals, _ = unzip2(out_type)
     out_shape = tree_unflatten(out_tree_promise(),
                                [ShapeDtypeStruct(a.shape, a.dtype, a.named_shape) for a in out_avals])
-    print("JJJAXPR", jaxpr)
-    print("CONHAND", _constant_handlers)
-    print(lower_jaxpr_to_mlir(closed_jaxpr))
-    print("111111111111111111111")
+    # print("JJJAXPR", jaxpr)
+    # print("CONHAND", _constant_handlers)
+    # print(lower_jaxpr_to_mlir(closed_jaxpr))
+    # print("111111111111111111111")
     return closed_jaxpr, out_shape
 
 
