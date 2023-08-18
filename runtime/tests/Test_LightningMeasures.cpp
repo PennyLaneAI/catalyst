@@ -448,6 +448,65 @@ TEMPLATE_LIST_TEST_CASE("Expval(Hamiltonian({TensorProd, Hermitian}[])) test", "
     CHECK(sim->Expval(hhtp) == Approx(1.2).margin(1e-5));
 }
 
+TEMPLATE_LIST_TEST_CASE("Expval(Hamiltonian({Hamiltonian, Hermitian}[])) test", "[Measures]",
+                        SimTypes)
+{
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
+
+    // state-vector with #qubits = n
+    constexpr size_t n = 4;
+    std::vector<QubitIdType> Qs;
+    Qs.reserve(n);
+    for (size_t i = 0; i < n; i++) {
+        Qs.push_back(sim->AllocateQubit());
+    }
+
+    sim->NamedOperation("PauliX", {}, {Qs[0]}, false);
+    sim->NamedOperation("PauliY", {}, {Qs[1]}, false);
+    sim->NamedOperation("Hadamard", {}, {Qs[2]}, false);
+    sim->NamedOperation("PauliZ", {}, {Qs[3]}, false);
+
+    ObsIdType px = sim->Observable(ObsId::PauliX, {}, {Qs[2]});
+    ObsIdType pz = sim->Observable(ObsId::PauliZ, {}, {Qs[1]});
+    ObsIdType hp = sim->HamiltonianObservable({0.2, 0.6}, {px, pz});
+
+    std::vector<std::complex<double>> mat2{{1.0, 0.0}, {2.0, 0.0}, {-1.0, 0.0}, {3.0, 0.0}};
+    ObsIdType h = sim->Observable(ObsId::Hermitian, mat2, {Qs[0]});
+    ObsIdType hhtp = sim->HamiltonianObservable({0.5, 0.3}, {h, hp});
+
+    CHECK(sim->Expval(hhtp) == Approx(1.38).margin(1e-5));
+}
+
+TEMPLATE_LIST_TEST_CASE("Expval(Hamiltonian({Hamiltonian(Hamiltonian), Hermitian}[])) test",
+                        "[Measures]", SimTypes)
+{
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
+
+    // state-vector with #qubits = n
+    constexpr size_t n = 4;
+    std::vector<QubitIdType> Qs;
+    Qs.reserve(n);
+    for (size_t i = 0; i < n; i++) {
+        Qs.push_back(sim->AllocateQubit());
+    }
+
+    sim->NamedOperation("PauliX", {}, {Qs[0]}, false);
+    sim->NamedOperation("PauliY", {}, {Qs[1]}, false);
+    sim->NamedOperation("Hadamard", {}, {Qs[2]}, false);
+    sim->NamedOperation("PauliZ", {}, {Qs[3]}, false);
+
+    ObsIdType px = sim->Observable(ObsId::PauliX, {}, {Qs[2]});
+    ObsIdType pz = sim->Observable(ObsId::PauliZ, {}, {Qs[1]});
+    ObsIdType hp = sim->HamiltonianObservable({0.2, 0.6}, {px, pz});
+    ObsIdType hhp = sim->HamiltonianObservable({1}, {hp});
+
+    std::vector<std::complex<double>> mat2{{1.0, 0.0}, {2.0, 0.0}, {-1.0, 0.0}, {3.0, 0.0}};
+    ObsIdType h = sim->Observable(ObsId::Hermitian, mat2, {Qs[0]});
+    ObsIdType hhtp = sim->HamiltonianObservable({0.5, 0.3}, {hhp, h});
+
+    CHECK(sim->Expval(hhtp) == Approx(0.7).margin(1e-5));
+}
+
 TEMPLATE_LIST_TEST_CASE("Var(NamedObs) test with numWires=4", "[Measures]", SimTypes)
 {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
@@ -740,6 +799,64 @@ TEMPLATE_LIST_TEST_CASE("Var(Hamiltonian({TensorProd, Hermitian}[])) test", "[Me
     ObsIdType hhtp = sim->HamiltonianObservable({0.5, 0.3}, {h, tp});
 
     CHECK(sim->Var(hhtp) == Approx(1.0).margin(1e-5));
+}
+
+TEMPLATE_LIST_TEST_CASE("Var(Hamiltonian({Hamiltonian, Hermitian}[])) test", "[Measures]", SimTypes)
+{
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
+
+    // state-vector with #qubits = n
+    constexpr size_t n = 4;
+    std::vector<QubitIdType> Qs;
+    Qs.reserve(n);
+    for (size_t i = 0; i < n; i++) {
+        Qs.push_back(sim->AllocateQubit());
+    }
+
+    sim->NamedOperation("PauliX", {}, {Qs[0]}, false);
+    sim->NamedOperation("PauliY", {}, {Qs[1]}, false);
+    sim->NamedOperation("Hadamard", {}, {Qs[2]}, false);
+    sim->NamedOperation("PauliZ", {}, {Qs[3]}, false);
+
+    ObsIdType px = sim->Observable(ObsId::PauliX, {}, {Qs[2]});
+    ObsIdType pz = sim->Observable(ObsId::PauliZ, {}, {Qs[1]});
+    ObsIdType hp = sim->HamiltonianObservable({0.2, 0.6}, {px, pz});
+
+    std::vector<std::complex<double>> mat2{{1.0, 0.0}, {2.0, 0.0}, {-1.0, 0.0}, {3.0, 0.0}};
+    ObsIdType h = sim->Observable(ObsId::Hermitian, mat2, {Qs[0]});
+    ObsIdType hhtp = sim->HamiltonianObservable({0.5, 0.3}, {h, hp});
+
+    CHECK(sim->Var(hhtp) == Approx(1.0).margin(1e-5));
+}
+
+TEMPLATE_LIST_TEST_CASE("Var(Hamiltonian({Hamiltonian(Hamiltonian), Hermitian}[])) test",
+                        "[Measures]", SimTypes)
+{
+    std::unique_ptr<TestType> sim = std::make_unique<TestType>();
+
+    // state-vector with #qubits = n
+    constexpr size_t n = 4;
+    std::vector<QubitIdType> Qs;
+    Qs.reserve(n);
+    for (size_t i = 0; i < n; i++) {
+        Qs.push_back(sim->AllocateQubit());
+    }
+
+    sim->NamedOperation("PauliX", {}, {Qs[0]}, false);
+    sim->NamedOperation("PauliY", {}, {Qs[1]}, false);
+    sim->NamedOperation("Hadamard", {}, {Qs[2]}, false);
+    sim->NamedOperation("PauliZ", {}, {Qs[3]}, false);
+
+    ObsIdType px = sim->Observable(ObsId::PauliX, {}, {Qs[2]});
+    ObsIdType pz = sim->Observable(ObsId::PauliZ, {}, {Qs[1]});
+    ObsIdType hp = sim->HamiltonianObservable({0.2, 0.6}, {px, pz});
+    ObsIdType hhp = sim->HamiltonianObservable({1}, {hp});
+
+    std::vector<std::complex<double>> mat2{{1.0, 0.0}, {2.0, 0.0}, {-1.0, 0.0}, {3.0, 0.0}};
+    ObsIdType h = sim->Observable(ObsId::Hermitian, mat2, {Qs[0]});
+    ObsIdType hhtp = sim->HamiltonianObservable({0.5, 0.3}, {hhp, h});
+
+    CHECK(sim->Var(hhtp) == Approx(0.36).margin(1e-5));
 }
 
 TEMPLATE_LIST_TEST_CASE("State test with incorrect size", "[Measures]", SimTypes)
