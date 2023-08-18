@@ -285,7 +285,6 @@ def trace_quantum_tape(quantum_tape:QuantumTape,
                     qreg_in = _input_type_to_tracers(op.trace.new_arg, [AbstractQreg()])[0]
                     qreg_out = trace_quantum_tape(op.quantum_tape, device, qreg_in, ctx, op.trace)
                     jaxpr, typ, consts = ctx.frames[op.trace].to_jaxpr2(op.res_classical_tracers + [qreg_out])
-                    print('CCCCCCCCCC', consts)
 
                 if isinstance(op, ForLoop):
                     qreg2 = bind_overwrite_classical_tracers(
@@ -417,8 +416,8 @@ def trace_quantum_function(
                                                                ctx, trace,
                                                                out_classical_tracers_or_measurement)
             qdealloc(qreg_in)
-            # FIXME: Port the observable-tracing logic from the original tracer
-            out_quantum_tracers = [qreg_out] #[trace.full_raise(qreg_out)]
+            # FIXME: Do we need full_rasie here ? [trace.full_raise(qreg_out)]
+            out_quantum_tracers = [qreg_out]
 
             jaxpr, out_type, consts = ctx.frames[trace].to_jaxpr2(out_classical_tracers + out_quantum_tracers)
             jaxpr._outvars = jaxpr._outvars[:-1]
@@ -430,10 +429,6 @@ def trace_quantum_function(
     out_avals, _ = unzip2(out_type)
     out_shape = tree_unflatten(out_tree_promise(),
                                [ShapeDtypeStruct(a.shape, a.dtype, a.named_shape) for a in out_avals])
-    # print("JJJAXPR", jaxpr)
-    # print("CONHAND", _constant_handlers)
-    # print(lower_jaxpr_to_mlir(closed_jaxpr))
-    # print("111111111111111111111")
     return closed_jaxpr, out_shape
 
 
