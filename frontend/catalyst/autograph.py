@@ -25,10 +25,11 @@ from tensorflow.python.autograph.converters import call_trees, control_flow, fun
 from tensorflow.python.autograph.core import converter, unsupported_features_checker
 from tensorflow.python.autograph.pyct import transpiler
 
+import catalyst
 from catalyst import ag_primitives
 from catalyst.ag_primitives import AutoGraphError
 
-__all__ = ["AutoGraphError", "autograph", "print_code"]
+__all__ = ["AutoGraphError", "autograph", "converted_code", "print_code"]
 
 
 class CFTransformer(transpiler.PyToPy):
@@ -134,24 +135,69 @@ def autograph(fn):
     return new_fn
 
 
-def print_code(fn):
-    """Utility function to retrieve the source code of a converted function, in particular of
-    functions that were recursively converted. Note that recursive conversion is only triggered
-    *after* the @autograph decorated function is called at least once."""
+def converted_code(fn):
+    """Utility function to retrieve the source code of a function converted by autograph.
+
+    Args:
+        fn (Callable): the original function object that was converted
+
+    Returns:
+        str: the source code of the converted function
+
+    Raises:
+        AutoGraphError: If the given function was not converted by autograph, an error will be
+                        raised.
+
+    **Example**
+
+    .. code-block:: python
+
+        def decide(x):
+            if x < 5:
+                y = 15
+            else:
+                y = 1
+            return y
+
+        @qjit(autograph=True)
+        def func(x):
+            y = decide(x)
+            return y ** 2
+
+        print(converted_code(decide))
+    """
 
     cache_key = ag_primitives.STD
 
-    if hasattr(fn, "ag_unconverted"):
-        # This is a function directly decorated with @autograph or @qjit(autograph=True).
-        print(inspect.getsource(fn))
+    if isinstance(fn, catalyst.QJIT):
+        # For both top-level and nested QJIT objects, we always transform the underlying function.
+        fn = fn.user_function
 
-    elif _TRANSFORMER.has_cache(fn, cache_key):
+    if hasattr(fn, "ag_unconverted"):
+        # Catch cases where the function received was directly decorated with @autograph or
+        # @qjit(autograph=True). This includes top-level QNodes but not nested ones.
+        return inspect.getsource(fn)
+
+    if isinstance(fn, qml.QNode):
+        # For nested QNodes we transform the underlying function rather than the QNode itself.
+        # Needs to run after the "ag_unconverted" check.
+        fn = fn.func
+
+    if _TRANSFORMER.has_cache(fn, cache_key):
         # This is a recursively converted function.
         new_fn = _TRANSFORMER.get_cached_function(fn, cache_key)
-        print(inspect.getsource(new_fn))
+        return inspect.getsource(new_fn)
 
-    else:
-        print("Could not print source code: Function has not been converted.")
+    raise AutoGraphError(
+        "The given function was not converted by AutoGraph. If you expect the"
+        "given function to be converted, please submit a bug report."
+    )
+
+
+def print_code(fn):
+    """Convenience function for testing."""
+
+    print(converted_code(fn))
 
 
 # Keep a global instance of the transformer to benefit from caching.
