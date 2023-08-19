@@ -19,7 +19,7 @@ import pennylane as qml
 import pytest
 
 import catalyst
-from catalyst import qjit
+from catalyst import qjit, measure
 from catalyst.ag_primitives import STD
 from catalyst.autograph import AutoGraphError, converted_code, _TRANSFORMER as AGT
 
@@ -274,6 +274,119 @@ class TestCodePrinting:
 
         assert converted_code(fn)
         assert converted_code(inner)
+
+
+class TestConditionals:
+    """Test that the autograph transformations produce correct results on conditionals.
+    These tests are adapted from the test_conditionals.TestCond class of tests."""
+
+    def test_simple_cond(self, backend):
+        """Test basic function with conditional."""
+
+        @qjit(autograph=True)
+        def circuit(n):
+            if n > 4:
+                res = n**2
+            else:
+                res = n
+
+            return res
+
+        assert circuit(0) == 0
+        assert circuit(1) == 1
+        assert circuit(2) == 2
+        assert circuit(3) == 3
+        assert circuit(4) == 4
+        assert circuit(5) == 25
+        assert circuit(6) == 36
+
+    def test_cond_one_else_if(self, backend):
+        """Test a cond with one else_if branch"""
+
+        @qjit(autograph=True)
+        def circuit(x):
+            if x > 2.7:
+                res = x * 4
+            elif x > 1.4:
+                res = x * 2
+            else:
+                res = x
+
+            return res
+
+        assert circuit(4) == 16
+        assert circuit(2) == 4
+        assert circuit(1) == 1
+
+    def test_cond_many_else_if(self, backend):
+        """Test a cond with multiple else_if branches"""
+
+        @qjit(autograph=True)
+        def circuit(x):
+            if x > 4.8:
+                res = x * 8
+            elif x > 2.7:
+                res = x * 4
+            elif x > 1.4:
+                res = x * 2
+            else:
+                res = x
+
+            return res
+
+        assert circuit(5) == 40
+        assert circuit(3) == 12
+        assert circuit(2) == 4
+        assert circuit(-3) == -3
+
+    def test_qubit_manipulation_cond(self, backend):
+        """Test conditional with quantum operation."""
+
+        @qjit(autograph=True)
+        @qml.qnode(qml.device(backend, wires=1))
+        def circuit(x):
+            if x > 4:
+                qml.PauliX(wires=0)
+
+            return measure(wires=0)
+
+        assert circuit(3) == False
+        assert circuit(6) == True
+
+    def test_branch_return_mismatch(self, backend):
+        """Test that an exception is raised when the true branch returns a value without an else
+        branch.
+        """
+
+        def circuit():
+            if True:
+                res = measure(wires=0)
+
+            return res
+
+        with pytest.raises(
+            AutoGraphError, match="Some branches did not define a value for variable 'res'"
+        ):
+            qjit(autograph=True)(qml.qnode(qml.device(backend, wires=1))(circuit))
+
+    def test_branch_multi_return_mismatch(self, backend):
+        """Test that an exception is raised when the return types of all branches do not match."""
+
+        def circuit():
+            if True:
+                res = measure(wires=0)
+            elif False:
+                res = 0
+            else:
+                res = measure(wires=0)
+
+            return res
+
+        with pytest.raises(
+            TypeError, match="Conditional requires consistent return types across all branches"
+        ):
+            qjit(autograph=True)(qml.qnode(qml.device(backend, wires=1))(circuit))
+
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
