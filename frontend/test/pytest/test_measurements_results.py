@@ -884,7 +884,7 @@ class TestNewArithmeticOps:
 
         qml.operation.disable_new_opmath()
 
-    def test_sprod_hermitian(self, backend):
+    def test_sprod_mixed_hermitian(self, backend):
         """Test SProd of mixed observables with Hermitian."""
 
         # Enabling new arithmetic operators

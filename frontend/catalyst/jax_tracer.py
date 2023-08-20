@@ -424,6 +424,7 @@ def trace_observables(obs, qubit_states, p, num_wires, qreg):
         nested_obs = [trace_observables(o, qubit_states, p, num_wires, qreg)[0] for o in obs.ops]
         jax_obs = trace_hamiltonian(op_args, *nested_obs)
     elif paulis := obs._pauli_rep:  # pylint: disable=protected-access
+        # Use the pauli sentence representation of the observable, if applicable
         jax_obs = pauli_sentence_to_rt_obs(paulis, qubit_states, qreg)
     elif isinstance(obs, qml.ops.op_math.Sum):
         nested_obs = [trace_observables(o, qubit_states, p, num_wires, qreg)[0] for o in obs]

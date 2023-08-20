@@ -215,6 +215,7 @@ def get_observables_dependency_tree(obs):
         for o in obs.ops:
             yield from get_observables_dependency_tree(o)
     elif obs._pauli_rep:  # pylint: disable=protected-access
+        # Use the pauli sentence representation of the observable, if applicable
         yield obs
     elif isinstance(obs, (qml.ops.op_math.Sum, qml.ops.op_math.Prod)):
         yield obs
