@@ -144,6 +144,7 @@
   ```
 
 * Add support for nested Hamiltonian observables.
+  [#255](https://github.com/PennyLaneAI/catalyst/pull/255)
 
   ``` python
   @qjit
