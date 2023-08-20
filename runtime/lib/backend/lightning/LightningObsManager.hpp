@@ -142,10 +142,6 @@ template <typename PrecisionT> class LightningObsManager {
             RT_FAIL_IF(static_cast<size_t>(key) >= obs_size || key < 0, "Invalid observable key");
 
             auto &&[obs, type] = observables_[key];
-
-            RT_FAIL_IF(type != ObsType::Basic, "Invalid basic observable to construct TensorProd; "
-                                               "NamedObs and HermitianObs are only supported");
-
             obs_vec.push_back(obs);
         }
 

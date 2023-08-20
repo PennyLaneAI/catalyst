@@ -204,9 +204,7 @@ def get_observables_dependency_tree(obs):
     """
     if obs is None:
         yield obs
-    elif isinstance(obs, jax_tracer.KNOWN_NAMED_OBS):
-        yield obs
-    elif isinstance(obs, qml.Hermitian):
+    elif isinstance(obs, (jax_tracer.KNOWN_NAMED_OBS, qml.Hermitian)):
         yield obs
     elif isinstance(obs, qml.operation.Tensor):
         yield obs
@@ -218,18 +216,10 @@ def get_observables_dependency_tree(obs):
             yield from get_observables_dependency_tree(o)
     elif obs._pauli_rep:  # pylint: disable=protected-access
         yield obs
-    elif isinstance(obs, qml.ops.op_math.Sum):
+    elif isinstance(obs, (qml.ops.op_math.Sum, qml.ops.op_math.Prod)):
         yield obs
         for o in obs:
             yield from get_observables_dependency_tree(o)
-    elif isinstance(obs, qml.ops.op_math.Prod):
-        obs = qml.simplify(obs)
-        if not isinstance(obs, qml.ops.op_math.Prod):
-            yield from get_observables_dependency_tree(obs)
-        else:
-            yield obs
-            for o in obs:
-                yield from get_observables_dependency_tree(o)
     elif isinstance(obs, qml.ops.op_math.SProd):
         yield obs
         terms = obs.terms()
