@@ -931,22 +931,23 @@ TEST_CASE("Test __quantum__qis__HamiltonianObs(h, Ham(x)) and Expval", "[CoreQIS
 
         auto obs_h = __quantum__qis__HermitianObs(h_matrix, 1, *ctrls);
         double coeffs_data[2] = {0.4, 0.7};
-        MemRefT_double_1d *coeffs = new MemRefT_double_1d;
-        coeffs->data_allocated = coeffs_data;
-        coeffs->data_aligned = coeffs_data;
-        coeffs->offset = 0;
-        coeffs->sizes[0] = 2;
-        coeffs->strides[0] = 1;
+        MemRefT_double_1d *coeffs2 = new MemRefT_double_1d;
+        coeffs2->data_allocated = coeffs_data;
+        coeffs2->data_aligned = coeffs_data;
+        coeffs2->offset = 0;
+        coeffs2->sizes[0] = 2;
+        coeffs2->strides[0] = 1;
 
-        auto obs_hamiltonian = __quantum__qis__HamiltonianObs(coeffs, 2, obs_h, obs_ham1);
+        auto obs_hamiltonian = __quantum__qis__HamiltonianObs(coeffs2, 2, obs_h, obs_ham1);
 
         CHECK(obs_hamiltonian == 3);
 
         CHECK(__quantum__qis__Expval(obs_hamiltonian) == Approx(0.7316370598).margin(1e-5));
 
         freeState(result);
+        delete coeffs1;
         delete h_matrix;
-        delete coeffs;
+        delete coeffs2;
         __quantum__rt__qubit_release_array(qs);
         __quantum__rt__finalize();
     }
