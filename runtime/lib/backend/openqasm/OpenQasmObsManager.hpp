@@ -37,11 +37,6 @@ class OpenQasmObsManager {
     using ObservablePairType = std::pair<std::shared_ptr<QasmObs>, ObsType>;
     std::vector<ObservablePairType> observables_{};
 
-    static constexpr std::array<ObsType, 2> hamiltonian_valid_obs_types = {
-        ObsType::Basic,
-        ObsType::TensorProd,
-    };
-
   public:
     OpenQasmObsManager() = default;
     ~OpenQasmObsManager() = default;
@@ -180,13 +175,6 @@ class OpenQasmObsManager {
             RT_FAIL_IF(static_cast<size_t>(key) >= obs_size || key < 0, "Invalid observable key");
 
             auto &&[obs, type] = observables_[key];
-            auto contain_obs = std::find(hamiltonian_valid_obs_types.begin(),
-                                         hamiltonian_valid_obs_types.end(), type);
-
-            RT_FAIL_IF(contain_obs == hamiltonian_valid_obs_types.end(),
-                       "Invalid observable to construct Hamiltonian; "
-                       "NamedObs, HermitianObs and TensorProdObs are only supported");
-
             obs_vec.push_back(obs);
         }
 

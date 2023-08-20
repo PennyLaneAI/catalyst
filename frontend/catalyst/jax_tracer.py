@@ -423,24 +423,26 @@ def trace_observables(obs, qubit_states, p, num_wires, qreg):
     elif isinstance(obs, qml.Hamiltonian):
         nested_obs = [trace_observables(o, qubit_states, p, num_wires, qreg)[0] for o in obs.ops]
         jax_obs = trace_hamiltonian(op_args, *nested_obs)
-    elif paulis := obs._pauli_rep:  # pragma: no cover
+    elif paulis := obs._pauli_rep:  # pylint: disable=protected-access
         jax_obs = pauli_sentence_to_rt_obs(paulis, qubit_states, qreg)
-    else:
+    elif isinstance(obs, qml.ops.op_math.Sum):
+        nested_obs = [trace_observables(o, qubit_states, p, num_wires, qreg)[0] for o in obs]
+        op_args = jax.numpy.ones(len(obs))
+        jax_obs = trace_hamiltonian(op_args, *nested_obs)
+    elif isinstance(obs, qml.ops.op_math.Prod):
         obs = qml.simplify(obs)
-        if isinstance(obs, qml.ops.op_math.Sum):
-            nested_obs = [trace_observables(o, qubit_states, p, num_wires, qreg)[0] for o in obs]
-            op_args = jax.numpy.ones(len(obs))
-            jax_obs = trace_hamiltonian(op_args, *nested_obs)
-        elif isinstance(obs, qml.ops.op_math.Prod):
+        if not isinstance(obs, qml.ops.op_math.Prod):
+            jax_obs = trace_observables(obs, qubit_states, p, num_wires, qreg)[0]
+        else:
             nested_obs = [trace_observables(o, qubit_states, p, num_wires, qreg)[0] for o in obs]
             jax_obs = jprim.tensorobs(*nested_obs)
-        elif isinstance(obs, qml.ops.op_math.SProd):
-            terms = obs.terms()
-            coeffs = jax.numpy.array(terms[0])
-            nested_obs = trace_observables(terms[1][0], qubit_states, p, num_wires, qreg)[0]
-            jax_obs = jprim.hamiltonian(coeffs, nested_obs)
-        else:
-            raise RuntimeError(f"unknown observable in measurement process: {obs}")
+    elif isinstance(obs, qml.ops.op_math.SProd):
+        terms = obs.terms()
+        coeffs = jax.numpy.array(terms[0])
+        nested_obs = trace_observables(terms[1][0], qubit_states, p, num_wires, qreg)[0]
+        jax_obs = jprim.hamiltonian(coeffs, nested_obs)
+    else:  # pragma: no cover
+        raise RuntimeError(f"unknown observable in measurement process: {obs}")
     return jax_obs, qubits
 
 
