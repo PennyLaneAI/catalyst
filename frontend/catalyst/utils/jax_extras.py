@@ -44,7 +44,7 @@ from jax._src.typing import Array, DimSize, Shape
 from jax._src import typing
 
 from jax._src.core import thread_local_state, Trace, MainTrace, _update_thread_local_jit_state
-
+from jax._src.util import wrap_name, toposort
 
 @contextmanager
 def new_main2(trace_type: Type[Trace],

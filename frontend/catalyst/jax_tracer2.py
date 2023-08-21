@@ -15,7 +15,6 @@ from jax._src.dispatch import jaxpr_replicas
 from jax._src.lax.lax import _abstractify
 from jax._src import linear_util as lu
 from jax._src.tree_util import (tree_flatten, tree_unflatten)
-from jax._src.util import wrap_name, toposort
 from jax._src.api import ShapeDtypeStruct
 from jax._src.api_util import (
     flatten_fun, apply_flat_fun, flatten_fun_nokwargs, flatten_fun_nokwargs2,
@@ -358,13 +357,13 @@ def trace_quantum_tape(quantum_tape:QuantumTape,
             if op.has_nested_tapes():
 
                 if isinstance(op, ForLoop):
-                    inner_trace = op.trace[0]
+                    inner_trace = op.traces[0]
                     inner_tape = op.quantum_tapes[0]
 
                     with frame_tracing_context(ctx, inner_trace):
-                        qreg_in = _input_type_to_tracers(op.trace.new_arg, [AbstractQreg()])[0]
-                        qreg_out = trace_quantum_tape(inner_tape, device, qreg_in, ctx, op.trace)
-                        jaxpr, typ, consts = ctx.frames[op.trace].to_jaxpr2(op.res_classical_tracers + [qreg_out])
+                        qreg_in = _input_type_to_tracers(inner_trace.new_arg, [AbstractQreg()])[0]
+                        qreg_out = trace_quantum_tape(inner_tape, device, qreg_in, ctx, inner_trace)
+                        jaxpr, typ, consts = ctx.frames[inner_trace].to_jaxpr2(op.res_classical_tracers + [qreg_out])
 
                     qreg2 = bind_overwrite_classical_tracers(
                         op, qfor_p.bind,
