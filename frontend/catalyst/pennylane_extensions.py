@@ -459,8 +459,7 @@ def jacobian(f: DifferentiableLike, *, method=None, h=None, argnum=None):
     Args:
         f (Callable): a function or a function object to differentiate
         method (str): The method used for differentiation, which can be any of
-                      ``["fd", "defer"]``,
-            where:
+    ``["fd", "defer"]``, where:
 
             - ``"fd"`` represents first-order finite-differences for the entire hybrid
               circuit,
