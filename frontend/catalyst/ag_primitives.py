@@ -111,7 +111,6 @@ def converted_call(fn, *args, **kwargs):
     """We want AutoGraph to use our own instance of the AST transformer when recursively
     transforming functions, but otherwise duplicate the same behaviour."""
 
-    # pylint: disable=protected-access
     with Patcher(
         (tf_autograph_api, "_TRANSPILER", catalyst.autograph.TRANSFORMER),
         (config, "CONVERSION_RULES", module_allowlist),

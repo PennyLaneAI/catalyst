@@ -25,7 +25,6 @@ from tensorflow.python.autograph.converters import call_trees, control_flow, fun
 from tensorflow.python.autograph.core import converter, unsupported_features_checker
 from tensorflow.python.autograph.pyct import transpiler
 
-import catalyst
 from catalyst import ag_primitives
 
 

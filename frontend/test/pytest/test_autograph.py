@@ -20,7 +20,6 @@ import numpy as np
 import pennylane as qml
 import pytest
 
-import catalyst
 from catalyst import measure, qjit
 from catalyst.ag_utils import AutoGraphError, check_cache, converted_code
 
@@ -281,7 +280,7 @@ class TestConditionals:
     """Test that the autograph transformations produce correct results on conditionals.
     These tests are adapted from the test_conditionals.TestCond class of tests."""
 
-    def test_simple_cond(self, backend):
+    def test_simple_cond(self):
         """Test basic function with conditional."""
 
         @qjit(autograph=True)
@@ -301,7 +300,7 @@ class TestConditionals:
         assert circuit(5) == 25
         assert circuit(6) == 36
 
-    def test_cond_one_else_if(self, backend):
+    def test_cond_one_else_if(self):
         """Test a cond with one else_if branch"""
 
         @qjit(autograph=True)
@@ -319,7 +318,7 @@ class TestConditionals:
         assert circuit(2) == 4
         assert circuit(1) == 1
 
-    def test_cond_many_else_if(self, backend):
+    def test_cond_many_else_if(self):
         """Test a cond with multiple else_if branches"""
 
         @qjit(autograph=True)

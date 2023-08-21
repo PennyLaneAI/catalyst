@@ -19,7 +19,9 @@ import inspect
 
 import pennylane as qml
 
-import catalyst
+from catalyst import QJIT
+
+# pylint: disable=import-outside-toplevel
 
 
 class AutoGraphError(Exception):
@@ -31,13 +33,13 @@ def _test_ag_import():
     TensorFlow to be installed."""
 
     try:
-        import catalyst.autograph
-    except ImportError:
+        import catalyst.autograph  # pylint: disable=unused-import
+    except ImportError as e:
         raise ImportError(
             "The AutoGraph feature in Catalyst requires TensorFlow. "
             "Please install it (e.g. `pip install tensorflow-cpu`) and make it sure is "
             "available in the current environment."
-        )
+        ) from e
 
 
 def converted_code(fn):
@@ -78,7 +80,7 @@ def converted_code(fn):
 
     cache_key = STD_OPTIONS
 
-    if isinstance(fn, catalyst.QJIT):
+    if isinstance(fn, QJIT):
         # For both top-level and nested QJIT objects, we always transform the underlying function.
         fn = fn.user_function
 
