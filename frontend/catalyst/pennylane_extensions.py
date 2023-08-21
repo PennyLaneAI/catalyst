@@ -43,7 +43,7 @@ import catalyst.jax_primitives as jprim
 from catalyst.jax_primitives import GradParams, expval_p, probs_p
 from catalyst.jax_tape import JaxTape
 from catalyst.jax_tracer import get_traceable_fn, insert_to_qreg, trace_quantum_tape
-from catalyst.jax_tracer2 import trace_quantum_function, measure, MidCircuitMeasure, for_loop
+from catalyst.jax_tracer2 import trace_quantum_function, measure, MidCircuitMeasure, for_loop, cond
 from catalyst.utils.exceptions import CompileError, DifferentiableCompileError
 from catalyst.utils.patching import Patcher
 from catalyst.utils.tracing import TracingContext
@@ -661,252 +661,252 @@ def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
         raise ValueError(f"Expected a callable or a qml.Operator, not {f}")
 
 
-class Cond(Operation):
-    """PennyLane's conditional operation."""
+# class Cond(Operation):
+#     """PennyLane's conditional operation."""
 
-    num_wires = AnyWires
+#     num_wires = AnyWires
 
-    # pylint: disable=too-many-arguments
-    def __init__(self, preds, consts, branch_jaxprs, args_tree, out_trees, *args, **kwargs):
-        self.preds = preds
-        self.consts = consts
-        self.branch_jaxprs = branch_jaxprs
-        self.args_tree = args_tree
-        self.out_trees = out_trees
-        kwargs["wires"] = Wires(Cond.num_wires)
-        super().__init__(*args, **kwargs)
-
-
-class CondCallable:
-    """
-    Some code in this class has been adapted from the cond implementation in the JAX project at
-    https://github.com/google/jax/blob/jax-v0.4.1/jax/_src/lax/control_flow/conditionals.py
-    released under the Apache License, Version 2.0, with the following copyright notice:
-
-    Copyright 2021 The JAX Authors.
-    """
-
-    def __init__(self, pred, true_fn):
-        self.preds = [pred]
-        self.branch_fns = [true_fn]
-        self.otherwise_fn = lambda: None
-
-    def else_if(self, pred):
-        """
-        Block of code to be run if this predicate evaluates to true, skipping all subsequent
-        conditional blocks.
-
-        Args:
-            pred (bool): The predicate that will determine if this branch is executed.
-
-        Returns:
-            A callable decorator that wraps this 'else if' branch of the conditional and returns
-            self.
-        """
-
-        def decorator(branch_fn):
-            if branch_fn.__code__.co_argcount != 0:
-                raise TypeError(
-                    "Conditional 'else if' function is not allowed to have any arguments"
-                )
-            self.preds.append(pred)
-            self.branch_fns.append(branch_fn)
-            return self
-
-        return decorator
-
-    def otherwise(self, otherwise_fn):
-        """Block of code to be run if the predicate evaluates to false.
-
-        Args:
-            false_fn (Callable): The code to be run in case the condition was not met.
-
-        Returns:
-            self
-        """
-        if otherwise_fn.__code__.co_argcount != 0:
-            raise TypeError("Conditional 'False' function is not allowed to have any arguments")
-        self.otherwise_fn = otherwise_fn
-        return self
-
-    @staticmethod
-    def _check_branches_return_types(branch_jaxprs):
-        expected = branch_jaxprs[0].out_avals[:-1]
-        for i, jaxpr in list(enumerate(branch_jaxprs))[1:]:
-            if expected != jaxpr.out_avals[:-1]:
-                raise TypeError(
-                    "Conditional branches all require the same return type, got:\n"
-                    f" - Branch at index 0: {expected}\n"
-                    f" - Branch at index {i}: {jaxpr.out_avals[:-1]}\n"
-                    "Please specify an else branch if none was specified."
-                )
-
-    def _call_with_quantum_ctx(self, ctx):
-        def new_branch_fn(branch_fn):
-            return partial(_trace_quantum_tape, _callee=branch_fn)
-
-        args, args_tree = tree_flatten(([], {}, [jprim.Qreg()]))
-        args_avals = tuple(map(_abstractify, args))
-        branch_fns = self.branch_fns + [self.otherwise_fn]
-        branch_jaxprs, consts, out_trees = _initial_style_jaxprs_with_common_consts(
-            tuple(new_branch_fn(branch_fn) for branch_fn in branch_fns),
-            args_tree,
-            args_avals,
-            "cond",
-        )
-
-        CondCallable._check_branches_return_types(branch_jaxprs)
-        Cond(self.preds, consts, branch_jaxprs, args_tree, out_trees)
-
-        # Get tracers for any non-qreg return values (if there are any).
-        args, trees = branch_jaxprs[0].out_avals[:-1], out_trees[0].children()[0]
-        return ctx.jax_tape.create_tracer(trees, args)
-
-    def _call_with_classical_ctx(self):
-        args, args_tree = tree_flatten([])
-        args_avals = tuple(map(_abstractify, args))
-
-        branch_jaxprs, consts, out_trees = _initial_style_jaxprs_with_common_consts(
-            (*self.branch_fns, self.otherwise_fn), args_tree, args_avals, "cond"
-        )
-
-        CondCallable._check_branches_return_types(branch_jaxprs)
-
-        inputs = self.preds + consts
-        ret_tree_flat = jprim.qcond(branch_jaxprs, *inputs)
-        return tree_unflatten(out_trees[0], ret_tree_flat)
-
-    def _call_during_trace(self):
-        TracingContext.check_is_tracing("Must use 'cond' inside tracing context.")
-
-        ctx = qml.QueuingManager.active_context()
-        if ctx is None:
-            return self._call_with_classical_ctx()
-
-        return self._call_with_quantum_ctx(ctx)
-
-    def _call_during_interpretation(self):
-        """Create a callable for conditionals."""
-        for pred, branch_fn in zip(self.preds, self.branch_fns):
-            if pred:
-                return branch_fn()
-        return self.otherwise_fn()
-
-    def __call__(self):
-        is_tracing = TracingContext.is_tracing()
-        if is_tracing:
-            return self._call_during_trace()
-
-        return self._call_during_interpretation()
+#     # pylint: disable=too-many-arguments
+#     def __init__(self, preds, consts, branch_jaxprs, args_tree, out_trees, *args, **kwargs):
+#         self.preds = preds
+#         self.consts = consts
+#         self.branch_jaxprs = branch_jaxprs
+#         self.args_tree = args_tree
+#         self.out_trees = out_trees
+#         kwargs["wires"] = Wires(Cond.num_wires)
+#         super().__init__(*args, **kwargs)
 
 
-def cond(pred):
-    """A :func:`~.qjit` compatible decorator for if-else conditionals in PennyLane/Catalyst.
+# class CondCallable:
+#     """
+#     Some code in this class has been adapted from the cond implementation in the JAX project at
+#     https://github.com/google/jax/blob/jax-v0.4.1/jax/_src/lax/control_flow/conditionals.py
+#     released under the Apache License, Version 2.0, with the following copyright notice:
 
-    This form of control flow is a functional version of the traditional if-else conditional. This
-    means that each execution path, an 'if' branch, any 'else if' branches, and a final 'otherwise'
-    branch, is provided as a separate function. All functions will be traced during compilation,
-    but only one of them will be executed at runtime, depending on the value of one or more
-    Boolean predicates. The JAX equivalent is the ``jax.lax.cond`` function, but this version is
-    optimized to work with quantum programs in PennyLane. This version also supports an 'else if'
-    construct which the JAX version does not.
+#     Copyright 2021 The JAX Authors.
+#     """
 
-    Values produced inside the scope of a conditional can be returned to the outside context, but
-    the return type signature of each branch must be identical. If no values are returned, the
-    'otherwise' branch is optional. Refer to the example below to learn more about the syntax of
-    this decorator.
+#     def __init__(self, pred, true_fn):
+#         self.preds = [pred]
+#         self.branch_fns = [true_fn]
+#         self.otherwise_fn = lambda: None
 
-    This form of control flow can also be called from the Python interpreter without needing to use
-    :func:`~.qjit`.
+#     def else_if(self, pred):
+#         """
+#         Block of code to be run if this predicate evaluates to true, skipping all subsequent
+#         conditional blocks.
 
-    Args:
-        pred (bool): the first predicate with which to control the branch to execute
+#         Args:
+#             pred (bool): The predicate that will determine if this branch is executed.
 
-    Returns:
-        A callable decorator that wraps the first 'if' branch of the conditional.
+#         Returns:
+#             A callable decorator that wraps this 'else if' branch of the conditional and returns
+#             self.
+#         """
 
-    Raises:
-        AssertionError: Branch functions cannot have arguments.
+#         def decorator(branch_fn):
+#             if branch_fn.__code__.co_argcount != 0:
+#                 raise TypeError(
+#                     "Conditional 'else if' function is not allowed to have any arguments"
+#                 )
+#             self.preds.append(pred)
+#             self.branch_fns.append(branch_fn)
+#             return self
 
-    **Example**
+#         return decorator
 
-    .. code-block:: python
+#     def otherwise(self, otherwise_fn):
+#         """Block of code to be run if the predicate evaluates to false.
 
-        dev = qml.device("lightning.qubit", wires=1)
+#         Args:
+#             false_fn (Callable): The code to be run in case the condition was not met.
 
-        @qjit
-        @qml.qnode(dev)
-        def circuit(x: float):
+#         Returns:
+#             self
+#         """
+#         if otherwise_fn.__code__.co_argcount != 0:
+#             raise TypeError("Conditional 'False' function is not allowed to have any arguments")
+#         self.otherwise_fn = otherwise_fn
+#         return self
 
-            # define a conditional ansatz
-            @cond(x > 1.4)
-            def ansatz():
-                qml.RX(x, wires=0)
-                qml.Hadamard(wires=0)
+#     @staticmethod
+#     def _check_branches_return_types(branch_jaxprs):
+#         expected = branch_jaxprs[0].out_avals[:-1]
+#         for i, jaxpr in list(enumerate(branch_jaxprs))[1:]:
+#             if expected != jaxpr.out_avals[:-1]:
+#                 raise TypeError(
+#                     "Conditional branches all require the same return type, got:\n"
+#                     f" - Branch at index 0: {expected}\n"
+#                     f" - Branch at index {i}: {jaxpr.out_avals[:-1]}\n"
+#                     "Please specify an else branch if none was specified."
+#                 )
 
-            @ansatz.otherwise
-            def ansatz():
-                qml.RY(x, wires=0)
+#     def _call_with_quantum_ctx(self, ctx):
+#         def new_branch_fn(branch_fn):
+#             return partial(_trace_quantum_tape, _callee=branch_fn)
 
-            # apply the conditional ansatz
-            ansatz()
+#         args, args_tree = tree_flatten(([], {}, [jprim.Qreg()]))
+#         args_avals = tuple(map(_abstractify, args))
+#         branch_fns = self.branch_fns + [self.otherwise_fn]
+#         branch_jaxprs, consts, out_trees = _initial_style_jaxprs_with_common_consts(
+#             tuple(new_branch_fn(branch_fn) for branch_fn in branch_fns),
+#             args_tree,
+#             args_avals,
+#             "cond",
+#         )
 
-            return qml.expval(qml.PauliZ(0))
+#         CondCallable._check_branches_return_types(branch_jaxprs)
+#         Cond(self.preds, consts, branch_jaxprs, args_tree, out_trees)
 
-    >>> circuit(1.4)
-    array(0.16996714)
-    >>> circuit(1.6)
-    array(0.)
+#         # Get tracers for any non-qreg return values (if there are any).
+#         args, trees = branch_jaxprs[0].out_avals[:-1], out_trees[0].children()[0]
+#         return ctx.jax_tape.create_tracer(trees, args)
 
-    Additional 'else-if' clauses can also be included via the ``else_if`` method:
+#     def _call_with_classical_ctx(self):
+#         args, args_tree = tree_flatten([])
+#         args_avals = tuple(map(_abstractify, args))
 
-    .. code-block:: python
+#         branch_jaxprs, consts, out_trees = _initial_style_jaxprs_with_common_consts(
+#             (*self.branch_fns, self.otherwise_fn), args_tree, args_avals, "cond"
+#         )
 
-        @qjit
-        @qml.qnode(dev)
-        def circuit(x):
+#         CondCallable._check_branches_return_types(branch_jaxprs)
 
-            @catalyst.cond(x > 2.7)
-            def cond_fn():
-                qml.RX(x, wires=0)
+#         inputs = self.preds + consts
+#         ret_tree_flat = jprim.qcond(branch_jaxprs, *inputs)
+#         return tree_unflatten(out_trees[0], ret_tree_flat)
 
-            @cond_fn.else_if(x > 1.4)
-            def cond_elif():
-                qml.RY(x, wires=0)
+#     def _call_during_trace(self):
+#         TracingContext.check_is_tracing("Must use 'cond' inside tracing context.")
 
-            @cond_fn.otherwise
-            def cond_else():
-                qml.RX(x ** 2, wires=0)
+#         ctx = qml.QueuingManager.active_context()
+#         if ctx is None:
+#             return self._call_with_classical_ctx()
 
-            cond_fn()
+#         return self._call_with_quantum_ctx(ctx)
 
-            eturn qml.probs(wires=0)
+#     def _call_during_interpretation(self):
+#         """Create a callable for conditionals."""
+#         for pred, branch_fn in zip(self.preds, self.branch_fns):
+#             if pred:
+#                 return branch_fn()
+#         return self.otherwise_fn()
 
-    The conditional function is permitted to also return values.
-    Any value that is supported by JAX JIT compilation is supported as a return
-    type. Note that this **does not** include PennyLane operations.
+#     def __call__(self):
+#         is_tracing = TracingContext.is_tracing()
+#         if is_tracing:
+#             return self._call_during_trace()
 
-    .. code-block:: python
+#         return self._call_during_interpretation()
 
-        @cond(predicate: bool)
-        def conditional_fn():
-            # do something when the predicate is true
-            return "optionally return some value"
 
-        @conditional_fn.otherwise
-        def conditional_fn():
-            # optionally define an alternative execution path
-            return "if provided, return types need to be identical in both branches"
+# def cond(pred):
+#     """A :func:`~.qjit` compatible decorator for if-else conditionals in PennyLane/Catalyst.
 
-        ret_val = conditional_fn()  # must invoke the defined function
-    """
+#     This form of control flow is a functional version of the traditional if-else conditional. This
+#     means that each execution path, an 'if' branch, any 'else if' branches, and a final 'otherwise'
+#     branch, is provided as a separate function. All functions will be traced during compilation,
+#     but only one of them will be executed at runtime, depending on the value of one or more
+#     Boolean predicates. The JAX equivalent is the ``jax.lax.cond`` function, but this version is
+#     optimized to work with quantum programs in PennyLane. This version also supports an 'else if'
+#     construct which the JAX version does not.
 
-    def decorator(true_fn):
-        if true_fn.__code__.co_argcount != 0:
-            raise TypeError("Conditional 'True' function is not allowed to have any arguments")
-        return CondCallable(pred, true_fn)
+#     Values produced inside the scope of a conditional can be returned to the outside context, but
+#     the return type signature of each branch must be identical. If no values are returned, the
+#     'otherwise' branch is optional. Refer to the example below to learn more about the syntax of
+#     this decorator.
 
-    return decorator
+#     This form of control flow can also be called from the Python interpreter without needing to use
+#     :func:`~.qjit`.
+
+#     Args:
+#         pred (bool): the first predicate with which to control the branch to execute
+
+#     Returns:
+#         A callable decorator that wraps the first 'if' branch of the conditional.
+
+#     Raises:
+#         AssertionError: Branch functions cannot have arguments.
+
+#     **Example**
+
+#     .. code-block:: python
+
+#         dev = qml.device("lightning.qubit", wires=1)
+
+#         @qjit
+#         @qml.qnode(dev)
+#         def circuit(x: float):
+
+#             # define a conditional ansatz
+#             @cond(x > 1.4)
+#             def ansatz():
+#                 qml.RX(x, wires=0)
+#                 qml.Hadamard(wires=0)
+
+#             @ansatz.otherwise
+#             def ansatz():
+#                 qml.RY(x, wires=0)
+
+#             # apply the conditional ansatz
+#             ansatz()
+
+#             return qml.expval(qml.PauliZ(0))
+
+#     >>> circuit(1.4)
+#     array(0.16996714)
+#     >>> circuit(1.6)
+#     array(0.)
+
+#     Additional 'else-if' clauses can also be included via the ``else_if`` method:
+
+#     .. code-block:: python
+
+#         @qjit
+#         @qml.qnode(dev)
+#         def circuit(x):
+
+#             @catalyst.cond(x > 2.7)
+#             def cond_fn():
+#                 qml.RX(x, wires=0)
+
+#             @cond_fn.else_if(x > 1.4)
+#             def cond_elif():
+#                 qml.RY(x, wires=0)
+
+#             @cond_fn.otherwise
+#             def cond_else():
+#                 qml.RX(x ** 2, wires=0)
+
+#             cond_fn()
+
+#             eturn qml.probs(wires=0)
+
+#     The conditional function is permitted to also return values.
+#     Any value that is supported by JAX JIT compilation is supported as a return
+#     type. Note that this **does not** include PennyLane operations.
+
+#     .. code-block:: python
+
+#         @cond(predicate: bool)
+#         def conditional_fn():
+#             # do something when the predicate is true
+#             return "optionally return some value"
+
+#         @conditional_fn.otherwise
+#         def conditional_fn():
+#             # optionally define an alternative execution path
+#             return "if provided, return types need to be identical in both branches"
+
+#         ret_val = conditional_fn()  # must invoke the defined function
+#     """
+
+#     def decorator(true_fn):
+#         if true_fn.__code__.co_argcount != 0:
+#             raise TypeError("Conditional 'True' function is not allowed to have any arguments")
+#         return CondCallable(pred, true_fn)
+
+#     return decorator
 
 
 class WhileLoop(Operation):
