@@ -19,8 +19,6 @@ import inspect
 
 import pennylane as qml
 
-from catalyst import QJIT
-
 # pylint: disable=import-outside-toplevel
 
 
@@ -75,6 +73,7 @@ def converted_code(fn):
         print(converted_code(decide))
     """
     _test_ag_import()
+    from catalyst import QJIT
     from catalyst.ag_primitives import STD as STD_OPTIONS
     from catalyst.autograph import TRANSFORMER
 
