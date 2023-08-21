@@ -141,7 +141,7 @@ class HybridOp(Operation):
 
     def __repr__(self):
         """Constructor-call-like representation."""
-        return f"{self.name}(tape={self.quantum_tape.operations})"
+        return f"{self.name}(tape={self.quantum_tapes[0].operations})"
 
 class ForLoop(HybridOp):
     pass
