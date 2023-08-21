@@ -472,7 +472,8 @@ def jacobian(f: DifferentiableLike, *, method=None, h=None, argnum=None):
         argnum (Tuple[int, List[int]]): the argument indices to differentiate
 
     Returns:
-        Grad: A Grad object that denotes the Jacobian of a function.
+        Callable: A callable object that computes the Jacobian of the wrapped function for the given
+                  arguments.
 
     Raises:
         ValueError: Invalid method or step size parameters.
