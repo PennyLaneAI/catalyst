@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""This module provides the implementation of Autograph primitives in terms of traceable Catalyst
+"""This module provides the implementation of AutoGraph primitives in terms of traceable Catalyst
 functions. The purpose is to convert imperative style code to functional or graph-style code."""
 
 import functools
@@ -26,7 +26,6 @@ from tensorflow.python.autograph.core import config
 from tensorflow.python.autograph.core.converter import STANDARD_OPTIONS as STD
 from tensorflow.python.autograph.core.converter import ConversionOptions
 from tensorflow.python.autograph.core.function_wrappers import FunctionScope
-from tensorflow.python.autograph.impl.api import AutoGraphError
 from tensorflow.python.autograph.impl.api import converted_call as tf_converted_call
 from tensorflow.python.autograph.operators.variables import (
     Undefined,
@@ -34,12 +33,12 @@ from tensorflow.python.autograph.operators.variables import (
 )
 
 import catalyst
+from catalyst.ag_utils import AutoGraphError
 from catalyst.utils.patching import Patcher
 
 __all__ = [
     "STD",
     "ConversionOptions",
-    "AutoGraphError",
     "Undefined",
     "UndefinedReturnValue",
     "FunctionScope",
@@ -70,7 +69,7 @@ def if_stmt(
     symbol_names: Tuple[str],
     _num_results: int,
 ):
-    """An implementation of the Autograph 'if' statement. The interface is defined by Autograph,
+    """An implementation of the AutoGraph 'if' statement. The interface is defined by AutoGraph,
     here we merely provide an implementation of it in terms of Catalyst primitives."""
 
     # Cache the initial state of all modified variables. Required because we trace all branches,
@@ -109,12 +108,12 @@ module_allowlist = (
 
 
 def converted_call(fn, *args, **kwargs):
-    """We want Autograph to use our own instance of the AST transformer when recursively
+    """We want AutoGraph to use our own instance of the AST transformer when recursively
     transforming functions, but otherwise duplicate the same behaviour."""
 
     # pylint: disable=protected-access
     with Patcher(
-        (tf_autograph_api, "_TRANSPILER", catalyst.autograph._TRANSFORMER),
+        (tf_autograph_api, "_TRANSPILER", catalyst.autograph.TRANSFORMER),
         (config, "CONVERSION_RULES", module_allowlist),
     ):
         # We need to unpack nested QNode and QJIT calls as autograph will have trouble handling

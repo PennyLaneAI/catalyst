@@ -14,14 +14,15 @@
 
 """PyTests for the AutoGraph source-to-source transformation feature."""
 
+import os
+
 import numpy as np
 import pennylane as qml
 import pytest
 
 import catalyst
-from catalyst import qjit, measure
-from catalyst.ag_primitives import STD
-from catalyst.autograph import AutoGraphError, converted_code, _TRANSFORMER as AGT
+from catalyst import measure, qjit
+from catalyst.ag_utils import AutoGraphError, check_cache, converted_code
 
 # pylint: disable=missing-function-docstring
 
@@ -30,13 +31,13 @@ class TestIntegration:
     """Test that the autograph transformations trigger correctly in different settings."""
 
     def test_unavailable(self, monkeypatch):
-        """Check the warning produced in the absence of tensorflow."""
-        monkeypatch.setattr(catalyst.compilation_pipelines, "AG_AVAILABLE", False, raising=True)
+        """Check the error produced in the absence of tensorflow."""
+        monkeypatch.syspath_prepend(os.path.join(os.path.dirname(__file__), "mock"))
 
         def fn(x):
             return x**2
 
-        with pytest.warns(UserWarning, match="autograph feature in Catalyst requires TensorFlow"):
+        with pytest.raises(ImportError, match="AutoGraph feature in Catalyst requires TensorFlow"):
             qjit(autograph=True)(fn)
 
     def test_classical_function(self):
@@ -60,7 +61,7 @@ class TestIntegration:
             return inner(x)
 
         assert hasattr(fn.user_function, "ag_unconverted")
-        assert AGT.has_cache(inner, STD)
+        assert check_cache(inner)
         assert fn(4) == 16
 
     def test_qnode(self):
@@ -88,7 +89,7 @@ class TestIntegration:
             return inner(x)
 
         assert hasattr(fn.user_function, "ag_unconverted")
-        assert AGT.has_cache(inner.func, STD)
+        assert check_cache(inner.func)
         assert fn(np.pi) == -1
 
     def test_multiple_qnode(self):
@@ -109,8 +110,8 @@ class TestIntegration:
             return inner1(x) + inner2(x)
 
         assert hasattr(fn.user_function, "ag_unconverted")
-        assert AGT.has_cache(inner1.func, STD)
-        assert AGT.has_cache(inner2.func, STD)
+        assert check_cache(inner1.func)
+        assert check_cache(inner2.func)
         assert fn(np.pi) == -2
 
     def test_nested_qnode(self):
@@ -132,8 +133,8 @@ class TestIntegration:
             return inner2(x)
 
         assert hasattr(fn.user_function, "ag_unconverted")
-        assert AGT.has_cache(inner1.func, STD)
-        assert AGT.has_cache(inner2.func, STD)
+        assert check_cache(inner1.func)
+        assert check_cache(inner2.func)
         # Unsupported by the runtime:
         # assert fn(np.pi) == -2
 
@@ -151,7 +152,7 @@ class TestIntegration:
             return inner(x)
 
         assert hasattr(fn.user_function, "ag_unconverted")
-        assert AGT.has_cache(inner.user_function.func, STD)
+        assert check_cache(inner.user_function.func)
         assert fn(np.pi) == -1
 
 

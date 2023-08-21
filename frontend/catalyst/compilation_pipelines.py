@@ -37,6 +37,7 @@ from mlir_quantum.runtime import (
 
 import catalyst
 import catalyst.jax_tracer as tracer
+from catalyst.ag_utils import run_autograph
 from catalyst.compiler import CompileOptions, Compiler
 from catalyst.pennylane_extensions import QFunc
 from catalyst.utils import wrapper  # pylint: disable=no-name-in-module
@@ -476,16 +477,7 @@ class QJIT:
         functools.update_wrapper(self, fn)
 
         if compile_options.autograph:
-            try:
-                from catalyst.autograph import autograph as run_autograph
-
-                self.user_function = run_autograph(fn)
-            except ImportError:
-                warnings.warn(
-                    "The autograph feature in Catalyst requires TensorFlow. "
-                    "Please install it (e.g. `pip install tensorflow-cpu`) and make it sure is "
-                    "available in the current environment. The current function won't be converted!"
-                )
+            self.user_function = run_autograph(fn)
 
         parameter_types = get_type_annotations(self.user_function)
         if parameter_types is not None:
@@ -776,7 +768,7 @@ def qjit(
 
     Args:
         fn (Callable): the quantum or classical function
-        autograph (bool): support imperative Python code via autograph source transformations
+        autograph (bool): support imperative Python code via AutoGraph source transformations
                           (requires tensorflow package)
         target (str): the compilation target
         keep_intermediate (bool): Whether or not to store the intermediate files throughout the
@@ -799,6 +791,7 @@ def qjit(
         PermissionError: Problems creating temporary directory
         OSError: Problems while creating folder for intermediate files
         AutoGraphError: Raised if there was an issue converting the given the function(s).
+        ImportError: Raised if AutoGraph is turned on and TensorFlow could not be found.
 
     **Example**
 
@@ -864,7 +857,7 @@ def qjit(
     >>> circuit(5)
     array(1.)
 
-    Note that imperative control flow will still work in Catalyst even when the autograph feature is
+    Note that imperative control flow will still work in Catalyst even when the AutoGraph feature is
     turned off, it just won't be captured in the compiled program and cannot involve traced values.
     The example above would then raise a tracing error, as there is no value for ``x`` yet than can
     be compared in the if statement. A loop like ``for i in range(5)`` would be unrolled during

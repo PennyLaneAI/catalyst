@@ -17,7 +17,8 @@
 # RUN: %PYTHON %s | FileCheck %s
 
 from catalyst import qjit
-from catalyst.autograph import AutoGraphError, autograph, print_code
+from catalyst.ag_utils import AutoGraphError, print_code
+from catalyst.autograph import autograph
 
 
 # CHECK-LABEL: def if_simple

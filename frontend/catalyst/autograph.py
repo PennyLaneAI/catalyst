@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Autograph is a source-to-source transformation system for converting imperative code into
+"""AutoGraph is a source-to-source transformation system for converting imperative code into
 traceable code for compute graph generation. The system is implemented in the tensorflow project.
-Here, we integrate Autograph into Catalyst to improve the UX and allow programmers to use built-in
+Here, we integrate AutoGraph into Catalyst to improve the UX and allow programmers to use built-in
 Python control flow and other imperative expressions rather than the functional equivalents provided
 by Catalyst."""
 
@@ -27,9 +27,6 @@ from tensorflow.python.autograph.pyct import transpiler
 
 import catalyst
 from catalyst import ag_primitives
-from catalyst.ag_primitives import AutoGraphError
-
-__all__ = ["AutoGraphError", "autograph", "converted_code", "print_code"]
 
 
 class CFTransformer(transpiler.PyToPy):
@@ -60,7 +57,7 @@ class CFTransformer(transpiler.PyToPy):
         return new_obj, module, source_map
 
     def transform_ast(self, node, user_context):
-        """This method must be overwritten to run all desired transformations. Autograph provides
+        """This method must be overwritten to run all desired transformations. AutoGraph provides
         several existing transforms, but we can all also provide our own in the future."""
 
         # Check some unsupported Python code ahead of time.
@@ -79,13 +76,13 @@ class CFTransformer(transpiler.PyToPy):
 
     def get_extra_locals(self):
         """Here we can provide any extra names that the converted function should have access to.
-        At a minimum we need to provide the module with definitions for Autograph primitives."""
+        At a minimum we need to provide the module with definitions for AutoGraph primitives."""
 
         return {"ag__": ag_primitives}
 
     def get_caching_key(self, user_context):
-        """Autograph automatically caches transformed functions, the caching key is a combination of
-        the function source as well as a custom key provided by us here. Changing Autograph options
+        """AutoGraph automatically caches transformed functions, the caching key is a combination of
+        the function source as well as a custom key provided by us here. Changing AutoGraph options
         should trigger the function transform again, rather than getting it from cache."""
 
         return user_context.options
@@ -127,7 +124,7 @@ def autograph(fn):
     )
     user_context = converter.ProgramContext(options)
 
-    new_fn, module, source_map = _TRANSFORMER.transform(fn, user_context)
+    new_fn, module, source_map = TRANSFORMER.transform(fn, user_context)
     new_fn.ag_module = module
     new_fn.ag_source_map = source_map
     new_fn.ag_unconverted = fn
@@ -135,70 +132,5 @@ def autograph(fn):
     return new_fn
 
 
-def converted_code(fn):
-    """Utility function to retrieve the source code of a function converted by autograph.
-
-    Args:
-        fn (Callable): the original function object that was converted
-
-    Returns:
-        str: the source code of the converted function
-
-    Raises:
-        AutoGraphError: If the given function was not converted by autograph, an error will be
-                        raised.
-
-    **Example**
-
-    .. code-block:: python
-
-        def decide(x):
-            if x < 5:
-                y = 15
-            else:
-                y = 1
-            return y
-
-        @qjit(autograph=True)
-        def func(x):
-            y = decide(x)
-            return y ** 2
-
-        print(converted_code(decide))
-    """
-
-    cache_key = ag_primitives.STD
-
-    if isinstance(fn, catalyst.QJIT):
-        # For both top-level and nested QJIT objects, we always transform the underlying function.
-        fn = fn.user_function
-
-    if hasattr(fn, "ag_unconverted"):
-        # Catch cases where the function received was directly decorated with @autograph or
-        # @qjit(autograph=True). This includes top-level QNodes but not nested ones.
-        return inspect.getsource(fn)
-
-    if isinstance(fn, qml.QNode):
-        # For nested QNodes we transform the underlying function rather than the QNode itself.
-        # Needs to run after the "ag_unconverted" check.
-        fn = fn.func
-
-    if _TRANSFORMER.has_cache(fn, cache_key):
-        # This is a recursively converted function.
-        new_fn = _TRANSFORMER.get_cached_function(fn, cache_key)
-        return inspect.getsource(new_fn)
-
-    raise AutoGraphError(
-        "The given function was not converted by AutoGraph. If you expect the"
-        "given function to be converted, please submit a bug report."
-    )
-
-
-def print_code(fn):
-    """Convenience function for testing."""
-
-    print(converted_code(fn))
-
-
 # Keep a global instance of the transformer to benefit from caching.
-_TRANSFORMER = CFTransformer()
+TRANSFORMER = CFTransformer()

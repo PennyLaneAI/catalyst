@@ -46,6 +46,7 @@ sys.modules["mlir_quantum._mlir_libs._quantumDialects.quantum"] = types.ModuleTy
 
 
 # pylint: disable=wrong-import-position
+from catalyst.ag_utils import AutoGraphError, converted_code
 from catalyst.compilation_pipelines import QJIT, CompileOptions, qjit
 from catalyst.pennylane_extensions import (
     adjoint,
@@ -70,6 +71,8 @@ __all__ = (
     "vjp",
     "jvp",
     "adjoint",
+    "converted_code",
+    "AutoGraphError",
     "CompileError",
     "CompileOptions",
 )
