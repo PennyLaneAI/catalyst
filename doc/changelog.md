@@ -2,10 +2,71 @@
 
 <h3>New features</h3>
 
+* Catalyst users can now use Python control flow statements in their programs without having to
+  explicitly use the functions `cond`, `for_loop`, and `while_loop`!
+
+  A new experimental feature was added that automatically converts Python control flow statements
+  like `if`, `for`, and `while` into their equivalent functional forms provided by Catalyst.
+  The feature is based on the AutoGraph module from TensorFlow, and requires a working TensorFlow
+  installation.
+
+  This example shows how existing control flow in Catalyst:
+
+  ```python
+  @qjit
+  @qml.qnode(qml.device("lightning.qubit", wires=n))
+  def f(x):
+
+    @for_loop(0, n, 1)
+    def repeat(i):
+      qml.Hadamard(i)
+
+      @cond(x < 0.5)
+      def correction():
+        return jnp.sin(x)
+
+      @correction.otherwise()
+      def correction():
+        return jnp.cos(x)
+
+      y = correction()
+      qml.RY(y, wires=i)
+
+    repeat()
+
+    return qml.probs()
+  ```
+
+  can now be expressed much more succinctly using Python control flow:
+
+  ```python
+  @qjit(autograph=True)
+  @qml.qnode(qml.device("lightning.qubit", wires=n))
+  def f(x):
+
+    for i in range(n):
+      qml.Hadamard(i)
+
+      if x < 0.5:
+        y = jnp.sin(x)
+      else:
+        y = jnp.cos(x)
+
+      qml.RY(y, wires=i)
+
+    return qml.probs()
+  ```
+
+  The feature is currently opt-in and requires setting the ``autograph=True`` flag in the ``qjit``
+  decorator. Note that there are some caveats when using this feature, especially around modifying
+  global variables or object mutation inside of methods. A functional style is always recommended
+  when using qjit or AutoGraph. Please see the documentation page on the [AutoGraph feature]() for
+  more details.
+
 * Add support for natively representing the quantum adjoint operation. ``catalyst.adjoint`` computes the
   adjoint of the quantum computation defined by a provided quantum function. For example:
 
-  ``` python
+  ```python
   def circuit(param):
       qml.RX(param, wires=0)
       qml.RY(param, wires=1)
@@ -66,7 +127,7 @@
   [#221](https://github.com/PennyLaneAI/catalyst/pull/221)
 
   For example:
-  
+
   ```python
   @qjit
   def workflow(params1, params2):
