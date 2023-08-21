@@ -13,6 +13,7 @@ ENZYME_BUILD_DIR ?= $(MK_DIR)/mlir/Enzyme/build
 COVERAGE_REPORT ?= term-missing
 TEST_BACKEND ?= "lightning.qubit"
 TEST_BRAKET ?= NONE
+COPY_FLAGS = $(shell python -c "import platform; print('--dereference' if platform.system() == 'Linux' else '')")
 
 .PHONY: help
 help:
@@ -80,28 +81,28 @@ test-demos:
 wheel:
 	echo "INSTALLED = True" > $(MK_DIR)/frontend/catalyst/_configuration.py
 	# Copy bins to frontend/catalyst/bin
-	cmake -E make_directory $(MK_DIR)/frontend/catalyst/bin
-	cmake -E copy $(LLVM_BUILD_DIR)/bin/llc $(MK_DIR)/frontend/catalyst/bin
-	cmake -E copy $(LLVM_BUILD_DIR)/bin/opt $(MK_DIR)/frontend/catalyst/bin
-	cmake -E copy $(LLVM_BUILD_DIR)/bin/mlir-translate $(MK_DIR)/frontend/catalyst/bin
-	cmake -E copy $(MHLO_BUILD_DIR)/bin/mlir-hlo-opt $(MK_DIR)/frontend/catalyst/bin
-	cmake -E copy $(DIALECTS_BUILD_DIR)/bin/quantum-opt $(MK_DIR)/frontend/catalyst/bin
+	mkdir -p $(MK_DIR)/frontend/catalyst/bin
+	cp $(LLVM_BUILD_DIR)/bin/llc $(MK_DIR)/frontend/catalyst/bin
+	cp $(LLVM_BUILD_DIR)/bin/opt $(MK_DIR)/frontend/catalyst/bin
+	cp $(LLVM_BUILD_DIR)/bin/mlir-translate $(MK_DIR)/frontend/catalyst/bin
+	cp $(MHLO_BUILD_DIR)/bin/mlir-hlo-opt $(MK_DIR)/frontend/catalyst/bin
+	cp $(DIALECTS_BUILD_DIR)/bin/quantum-opt $(MK_DIR)/frontend/catalyst/bin
 	# Copy libs to frontend/catalyst/lib
-	cmake -E make_directory $(MK_DIR)/frontend/catalyst/lib/backend/ $(MK_DIR)/frontend/catalyst/lib/capi
-	cmake -E copy $(RT_BUILD_DIR)/lib/backend/librt_backend.* $(MK_DIR)/frontend/catalyst/lib/backend/
-	cmake -E copy $(RT_BUILD_DIR)/lib/capi/librt_capi.* $(MK_DIR)/frontend/catalyst/lib/capi
-	cmake -E copy $(LLVM_BUILD_DIR)/lib/libmlir_float16_utils.* $(MK_DIR)/frontend/catalyst/lib
-	cmake -E copy $(LLVM_BUILD_DIR)/lib/libmlir_c_runner_utils.* $(MK_DIR)/frontend/catalyst/lib
+	mkdir -p $(MK_DIR)/frontend/catalyst/lib/backend/ $(MK_DIR)/frontend/catalyst/lib/capi
+	cp $(RT_BUILD_DIR)/lib/backend/librt_backend.* $(MK_DIR)/frontend/catalyst/lib/backend/
+	cp $(RT_BUILD_DIR)/lib/capi/librt_capi.* $(MK_DIR)/frontend/catalyst/lib/capi
+	cp $(COPY_FLAGS) $(LLVM_BUILD_DIR)/lib/libmlir_float16_utils.* $(MK_DIR)/frontend/catalyst/lib
+	cp $(COPY_FLAGS) $(LLVM_BUILD_DIR)/lib/libmlir_c_runner_utils.* $(MK_DIR)/frontend/catalyst/lib
 	# Copy enzyme to frontend
-	cmake -E copy $(ENZYME_BUILD_DIR)/Enzyme/LLVMEnzyme-17.* $(MK_DIR)/frontend/catalyst/lib
+	cp $(COPY_FLAGS) $(ENZYME_BUILD_DIR)/Enzyme/LLVMEnzyme-17.* $(MK_DIR)/frontend/catalyst/lib
 	# Copy mlir bindings to frontend/mlir_quantum
-	cmake -E make_directory $(MK_DIR)/frontend/mlir_quantum/dialects
-	cmake -E copy $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/runtime $(MK_DIR)/frontend/mlir_quantum/runtime
-	cmake -E copy $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/ir.py $(MK_DIR)/frontend/mlir_quantum/
+	mkdir -p $(MK_DIR)/frontend/mlir_quantum/dialects
+	cp -R $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/runtime $(MK_DIR)/frontend/mlir_quantum/runtime
+	cp $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/ir.py $(MK_DIR)/frontend/mlir_quantum/
 	for file in arith tensor scf gradient quantum _ods_common ; do \
-		cmake -E copy $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/dialects/*$${file}* $(MK_DIR)/frontend/mlir_quantum/dialects ; \
+		cp $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/dialects/*$${file}* $(MK_DIR)/frontend/mlir_quantum/dialects ; \
 	done
-	find $(MK_DIR)/frontend -type d -name __pycache__ -exec cmake -E rm -rf {} +
+	find $(MK_DIR)/frontend -type d -name __pycache__ -exec rm -rf {} +
 
 	$(PYTHON) $(MK_DIR)/setup.py bdist_wheel
 
@@ -109,14 +110,14 @@ wheel:
 clean:
 	@echo "uninstall catalyst and delete all temporary and cache files"
 	$(PYTHON) -m pip uninstall -y pennylane-catalyst
-	cmake -E rm -rf dist __pycache__
-	cmake -E rm -rf .coverage coverage_html_report
+	rm -rf dist __pycache__
+	rm -rf .coverage coverage_html_report
 
 clean-all:
 	@echo "uninstall catalyst and delete all temporary, cache files"
 	$(PYTHON) -m pip uninstall -y pennylane-catalyst
-	cmake -E rm -rf dist __pycache__
-	cmake -E rm -rf .coverage coverage_html_report/
+	rm -rf dist __pycache__
+	rm -rf .coverage coverage_html_report/
 	$(MAKE) -C mlir clean
 	$(MAKE) -C runtime clean
 
