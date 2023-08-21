@@ -391,7 +391,7 @@ def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
     Args:
         f (Callable): a function or a function object to differentiate
         method (str): The method used for differentiation, which can be any of
-                      ``["fd", "defer"]``,
+    ``["fd", "defer"]``,
             where:
 
             - ``"fd"`` represents first-order finite-differences for the entire hybrid
@@ -405,7 +405,8 @@ def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
         argnum (Tuple[int, List[int]]): the argument indices to differentiate
 
     Returns:
-        Grad: A Grad object that denotes the derivative of a function.
+        Callable: A callable object that computes the gradient of the wrapped function for the given
+                  arguments.
 
     Raises:
         ValueError: Invalid method or step size parameters.
