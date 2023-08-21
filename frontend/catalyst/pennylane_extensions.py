@@ -378,12 +378,6 @@ def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
 
     .. warning::
 
-        If parameter-shift or adjoint is specified, this will only be used
-        for internal _quantum_ functions. Classical components will be differentiated
-        using standard reverse-mode automatic differentiation.
-
-    .. warning::
-
         Currently, higher-order differentiation or differentiation of non-QNode functions
         is only supported by the finite-difference method.
 
@@ -452,12 +446,6 @@ def jacobian(f: DifferentiableLike, *, method=None, h=None, argnum=None):
 
     .. warning::
 
-        If parameter-shift or adjoint is specified, this will only be used
-        for internal _quantum_ functions. Classical components will be differentiated
-        using standard reverse-mode automatic differentiation.
-
-    .. warning::
-
         Currently, higher-order differentiation or differentiation of non-QNode functions
         is only supported by the finite-difference method.
 
@@ -465,7 +453,7 @@ def jacobian(f: DifferentiableLike, *, method=None, h=None, argnum=None):
 
         Any JAX-compatible optimization library, such as `JAXopt
         <https://jaxopt.github.io/stable/index.html>`_, can be used
-        alongside ``grad`` for JIT-compatible variational workflows.
+        alongside ``jacobian`` for JIT-compatible variational workflows.
         See the :doc:`/dev/quick_start` for examples.
 
     Args:
