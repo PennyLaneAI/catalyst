@@ -390,16 +390,15 @@ def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
 
     Args:
         f (Callable): a function or a function object to differentiate
-        method (str): The method used for differentiation, which can be any of
-    ``["fd", "defer"]``,
-            where:
+        method (str): The method used for differentiation, which can be any of ``["fd", "defer"]``,
+                      where:
 
-            - ``"fd"`` represents first-order finite-differences for the entire hybrid
-              circuit,
+                      - ``"fd"`` represents first-order finite-differences for the entire hybrid
+                        circuit,
 
-            - ``"defer"`` represents deferring the quantum differentiation to the method
-              specified by the QNode, while the classical computation is differentiated
-              using traditional auto-diff.
+                      - ``"defer"`` represents deferring the quantum differentiation to the method
+                        specified by the QNode, while the classical computation is differentiated
+                        using traditional auto-diff.
 
         h (float): the step-size value for the finite-difference (``"fd"``) method
         argnum (Tuple[int, List[int]]): the argument indices to differentiate
@@ -459,15 +458,15 @@ def jacobian(f: DifferentiableLike, *, method=None, h=None, argnum=None):
 
     Args:
         f (Callable): a function or a function object to differentiate
-        method (str): The method used for differentiation, which can be any of
-    ``["fd", "defer"]``, where:
+        method (str): The method used for differentiation, which can be any of ``["fd", "defer"]``,
+                      where:
 
-            - ``"fd"`` represents first-order finite-differences for the entire hybrid
-              circuit,
+                      - ``"fd"`` represents first-order finite-differences for the entire hybrid
+                        circuit,
 
-            - ``"defer"`` represents deferring the quantum differentiation to the method
-              specified by the QNode, while the classical computation is differentiated
-              using traditional auto-diff.
+                      - ``"defer"`` represents deferring the quantum differentiation to the method
+                        specified by the QNode, while the classical computation is differentiated
+                        using traditional auto-diff.
 
         h (float): the step-size value for the finite-difference (``"fd"``) method
         argnum (Tuple[int, List[int]]): the argument indices to differentiate
