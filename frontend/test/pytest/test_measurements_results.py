@@ -207,7 +207,7 @@ class TestExpval:
 
         @qjit
         @qml.qnode(qml.device(backend, wires=3))
-        def expval6(x: float, y: float):
+        def expval(x: float, y: float):
             qml.RX(x, wires=0)
             qml.RY(y, wires=1)
             qml.RZ(0.1, wires=2)
@@ -218,11 +218,11 @@ class TestExpval:
             return qml.expval(qml.Hamiltonian(coeffs, obs))
 
         expected = np.array(-0.2715)
-        observed = expval6(np.pi / 4, np.pi / 3)
+        observed = expval(np.pi / 4, np.pi / 3)
         assert np.isclose(observed, expected)
 
         expected = np.array(-0.33695571)
-        observed = expval6(0.5, 0.8)
+        observed = expval(0.5, 0.8)
         assert np.isclose(observed, expected)
 
     def test_hamiltonian_2(self, backend):
@@ -230,7 +230,7 @@ class TestExpval:
 
         @qjit
         @qml.qnode(qml.device(backend, wires=2))
-        def expval6(x: float):
+        def expval(x: float):
             qml.RX(x, wires=0)
 
             coeff = np.array([0.8, 0.2])
@@ -247,11 +247,79 @@ class TestExpval:
             return qml.expval(qml.Hamiltonian(coeff, [obs, qml.PauliX(0)]))
 
         expected = np.array(0.2359798)
-        observed = expval6(np.pi / 4)
+        observed = expval(np.pi / 4)
         assert np.isclose(observed, expected)
 
         expected = np.array(-0.16)
-        observed = expval6(np.pi / 2)
+        observed = expval(np.pi / 2)
+        assert np.isclose(observed, expected)
+
+    def test_hamiltonian_3(self, backend):
+        """Test expval for nested Hamiltonian observable."""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=2))
+        def expval(x: float):
+            qml.RX(x, wires=0)
+
+            coeff = np.array([0.8, 0.2])
+            obs_matrix = np.array(
+                [
+                    [0.5, 1.0j, 0.0, -3j],
+                    [-1.0j, -1.1, 0.0, -0.1],
+                    [0.0, 0.0, -0.9, 12.0],
+                    [3j, -0.1, 12.0, 0.0],
+                ]
+            )
+
+            obs = qml.Hermitian(obs_matrix, wires=[0, 1])
+            return qml.expval(
+                qml.Hamiltonian(
+                    coeff, [obs, qml.Hamiltonian([1, 1], [qml.PauliX(0), qml.PauliZ(1)])]
+                )
+            )
+
+        expected = np.array(0.4359798)
+        observed = expval(np.pi / 4)
+        assert np.isclose(observed, expected)
+
+        expected = np.array(0.04)
+        observed = expval(np.pi / 2)
+        assert np.isclose(observed, expected)
+
+    def test_hamiltonian_4(self, backend):
+        """Test expval with TensorObs and nested Hamiltonian observables."""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=3))
+        def expval(x: float):
+            qml.RX(x, wires=0)
+            qml.RX(x + 1.0, wires=2)
+
+            coeff = np.array([0.8, 0.2])
+            obs_matrix = np.array(
+                [
+                    [0.5, 1.0j, 0.0, -3j],
+                    [-1.0j, -1.1, 0.0, -0.1],
+                    [0.0, 0.0, -0.9, 12.0],
+                    [3j, -0.1, 12.0, 0.0],
+                ]
+            )
+
+            obs = qml.Hermitian(obs_matrix, wires=[0, 1])
+            return qml.expval(
+                qml.Hamiltonian(
+                    coeff, [obs, qml.Hamiltonian([1, 1], [qml.PauliX(0), qml.PauliZ(1)])]
+                )
+                @ qml.PauliZ(2)
+            )
+
+        expected = np.array(-0.09284557)
+        observed = expval(np.pi / 4)
+        assert np.isclose(observed, expected)
+
+        expected = np.array(-0.03365884)
+        observed = expval(np.pi / 2)
         assert np.isclose(observed, expected)
 
 
@@ -478,6 +546,60 @@ class TestVar:
             return qml.var(qml.Hamiltonian(coeffs, obs))
 
         expected = np.array(1.75)
+        observed = circuit(np.pi / 4, np.pi / 3, coeffs)
+        assert np.isclose(
+            observed,
+            expected,
+        )
+
+    def test_hamiltonian_5(self, backend):
+        """Test variance with nested Hamiltonian observable."""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=3))
+        def circuit(x, y, coeffs):
+            qml.RX(x, wires=0)
+            qml.RY(y, wires=1)
+            qml.RZ(0.1, wires=2)
+
+            obs = [
+                qml.PauliX(0) @ qml.PauliZ(1),
+                qml.Hamiltonian(np.array([0.5]), [qml.PauliZ(0) @ qml.Hadamard(2)]),
+            ]
+
+            return qml.var(qml.Hamiltonian(coeffs, obs))
+
+        expected = np.array(0.1075)
+        coeffs = np.array([0.2, 0.6])
+        observed = circuit(np.pi / 4, np.pi / 3, coeffs)
+        assert np.isclose(
+            observed,
+            expected,
+        )
+
+    def test_hamiltonian_6(self, backend):
+        """Test variance with TensorObs and nested Hamiltonian observables."""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=3))
+        def circuit(x, y, coeffs):
+            qml.RX(x, wires=0)
+            qml.RY(y, wires=1)
+            qml.RZ(0.1, wires=2)
+
+            return qml.var(
+                qml.Hamiltonian(
+                    coeffs,
+                    [
+                        qml.PauliX(0)
+                        @ qml.PauliZ(1)
+                        @ qml.Hamiltonian(np.array([0.5]), [qml.Hadamard(2)])
+                    ],
+                )
+            )
+
+        expected = np.array(0.01)
+        coeffs = np.array([0.2])
         observed = circuit(np.pi / 4, np.pi / 3, coeffs)
         assert np.isclose(
             observed,

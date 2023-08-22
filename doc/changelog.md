@@ -125,31 +125,6 @@
   array(112936.34906843)
   ```
 
-* Add support for Hamiltonian observables with integer coefficients.
-  [#248](https://github.com/PennyLaneAI/catalyst/pull/248)
-
-  For example, compiling the following circuit wasn't allowed before, but it is
-  now supported in Catalyst:
-
-  ``` python
-  @qjit
-  @qml.qnode(qml.device("lightning.qubit", wires=2))
-  def circuit(x: float, y: float):
-      qml.RX(x, wires=0)
-      qml.RY(y, wires=1)
-
-      coeffs = [1, 2]
-      obs = [qml.PauliZ(0), qml.PauliZ(1)]
-      return qml.expval(qml.Hamiltonian(coeffs, obs))
-  ```
-
-<h3>Breaking changes</h3>
-
-* The `catalyst.grad` function has been renamed to `catalyst.jacobian` and supports differentiation
-  of functions that return multiple or non-scalar outputs. A new `catalyst.grad` function has been
-  added that enforces that it is differentiating a function with a single scalar return value.
-  [#254](https://github.com/PennyLaneAI/catalyst/pull/254)
-
 <h3>Improvements</h3>
 
 * Eliminate redundant unflattening and flattening of PyTrees parameters in Catalyst control flow operations.
@@ -202,6 +177,43 @@
   [#243](https://github.com/PennyLaneAI/catalyst/pull/243)
   [#247](https://github.com/PennyLaneAI/catalyst/pull/247)
 
+* Add support for Hamiltonian observables with integer coefficients.
+  [#248](https://github.com/PennyLaneAI/catalyst/pull/248)
+
+  For example, compiling the following circuit wasn't allowed before, but it is
+  now supported in Catalyst:
+
+  ``` python
+  @qjit
+  @qml.qnode(qml.device("lightning.qubit", wires=2))
+  def circuit(x: float, y: float):
+      qml.RX(x, wires=0)
+      qml.RY(y, wires=1)
+
+      coeffs = [1, 2]
+      obs = [qml.PauliZ(0), qml.PauliZ(1)]
+      return qml.expval(qml.Hamiltonian(coeffs, obs))
+  ```
+
+* Add support for nested Hamiltonian observables.
+  [#255](https://github.com/PennyLaneAI/catalyst/pull/255)
+
+  ``` python
+  @qjit
+  @qml.qnode(qml.device("lightning.qubit", wires=3))
+  def circuit(x, y, coeffs1, coeffs2):
+      qml.RX(x, wires=0)
+      qml.RX(y, wires=1)
+      qml.RY(x + y, wires=2)
+
+      obs = [
+          qml.PauliX(0) @ qml.PauliZ(1),
+          qml.Hamiltonian(coeffs1, [qml.PauliZ(0) @ qml.Hadamard(2)]),
+      ]
+
+      return qml.var(qml.Hamiltonian(coeffs2, obs))
+  ```
+
 <h3>Breaking changes</h3>
 
 * Support for Python 3.8 is dropped.
@@ -220,6 +232,11 @@
   will no longer work. This is more consistent with JAX's behaviour. However, if the variable
   ``list`` above is a JAX or Numpy array, the compilation still succeeds.
   [#221](https://github.com/PennyLaneAI/catalyst/pull/221)
+
+* The `catalyst.grad` function has been renamed to `catalyst.jacobian` and supports differentiation
+  of functions that return multiple or non-scalar outputs. A new `catalyst.grad` function has been
+  added that enforces that it is differentiating a function with a single scalar return value.
+  [#254](https://github.com/PennyLaneAI/catalyst/pull/254)
 
 <h3>Bug fixes</h3>
 
