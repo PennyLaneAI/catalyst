@@ -1,6 +1,6 @@
 import jax
 import pennylane as qml
-from catalyst.utils.jax_extras import new_main2, sort_eqns
+from catalyst.utils.jax_extras import new_main2, sort_eqns, initial_style_jaxprs_with_common_consts2
 from jax._src.core import (ClosedJaxpr, MainTrace as JaxMainTrace, new_main,
                            new_base_main, cur_sublevel, get_aval, Tracer as JaxprTracer,
                            check_jaxpr, ShapedArray, JaxprEqn, Var)
@@ -13,7 +13,6 @@ from jax._src.interpreters.partial_eval import (DynamicJaxprTrace, DynamicJaxprT
 from jax._src.source_info_util import reset_name_stack, current as jax_current, new_name_stack
 from jax._src.dispatch import jaxpr_replicas
 from jax._src.lax.lax import _abstractify
-from jax._src.lax.control_flow.common import _initial_style_jaxprs_with_common_consts2
 from jax._src import linear_util as lu
 from jax._src.tree_util import (tree_flatten, tree_unflatten)
 from jax._src.api import ShapeDtypeStruct
@@ -393,7 +392,7 @@ def trace_quantum_tape(quantum_tape:QuantumTape,
                             jaxprs.append(jaxpr)
                             consts.append(const)
 
-                    jaxprs2, combined_consts = _initial_style_jaxprs_with_common_consts2(jaxprs, consts)
+                    jaxprs2, combined_consts = initial_style_jaxprs_with_common_consts2(jaxprs, consts)
 
                     qreg2  = bind_overwrite_classical_tracers(
                         op, qcond_p.bind,
