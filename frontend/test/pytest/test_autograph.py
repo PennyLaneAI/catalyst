@@ -19,6 +19,7 @@ import numpy as np
 import pennylane as qml
 import pytest
 
+import jax
 import jax.numpy as jnp
 
 from catalyst import measure, qjit
@@ -494,8 +495,125 @@ class TestForLoops:
         result = f()
         assert np.allclose(result, -jnp.sqrt(2) / 2)
 
-    def test_for_in_range(self):
-        """unsupported"""
+    def test_for_in_static_range(self):
+        """Test for loop over a Python range with static bounds."""
+
+        @qjit(autograph=True)
+        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        def f():
+            for i in range(3):
+                qml.Hadamard(i)
+            return qml.probs()
+
+        result = f()
+        assert np.allclose(result, [1 / 8] * 8)
+
+    def test_for_in_static_range_indexing_array(self):
+        """Test for loop over a Python range with static bounds that is used to index an array."""
+
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def f():
+            params = jnp.array([0.0, 1 / 4 * jnp.pi, 2 / 4 * jnp.pi])
+            for i in range(3):
+                qml.RY(params[i], wires=0)
+            return qml.expval(qml.PauliZ(0))
+
+        result = f()
+        assert np.allclose(result, -jnp.sqrt(2) / 2)
+
+    # With conversion always taking place, the user needs to be careful to manually wrap
+    # objects accessed via loop iteration indices into arrays (test case above).
+    def test_for_in_static_range_indexing_numeric_list(self):
+        """Test for loop over a Python range with static bounds that is used to index an
+        array-compatible Python list. This should raise a tracing error."""
+
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def f():
+            params = [0.0, 1 / 4 * jnp.pi, 2 / 4 * jnp.pi]
+            for i in range(3):
+                qml.RY(params[i], wires=0)
+            return qml.expval(qml.PauliZ(0))
+
+        with pytest.raises(jax.errors.TracerIntegerConversionError, match="__index__"):
+            qjit(autograph=True)(f)
+
+    # This case is problematic because there is no way for the user to compile this code.
+    # Fallback to a Python loop is necessary, but we have no way of detecting how iteration
+    # indices will be used by the user somewhere in the call graph.
+    # One option might be to catch tracing errors inside a converted loop, and relaunch tracing
+    # with a Python loop, but this could be expensive (uncertain).
+    # An alternative is to rely on explicit conversion triggers similar to tf.range.
+    def test_for_in_static_range_indexing_object_list(self):
+        """Test for loop over a Python range with static bounds that is used to index an
+        array-incompatible Python list. This should raise a tracing error."""
+
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def f():
+            params = ["0", "1", "2"]
+            for i in range(3):
+                qml.RY(int(params[i]) / 4 * jnp.pi, wires=0)
+            return qml.expval(qml.PauliZ(0))
+
+        with pytest.raises(jax.errors.TracerIntegerConversionError, match="__index__"):
+            qjit(autograph=True)(f)
+
+    def test_for_in_dynamic_range(self):
+        """Test for loop over a Python range with dynamic bounds."""
+
+        @qjit(autograph=True)
+        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        def f(n: int):
+            for i in range(n):
+                qml.Hadamard(i)
+            return qml.probs()
+
+        result = f(3)
+        assert np.allclose(result, [1 / 8] * 8)
+
+    def test_for_in_dynamic_range_indexing_array(self):
+        """Test for loop over a Python range with dynamic bounds that is used to index an array."""
+
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def f(n: int):
+            params = jnp.array([0.0, 1 / 4 * jnp.pi, 2 / 4 * jnp.pi])
+            for i in range(n):
+                qml.RY(params[i], wires=0)
+            return qml.expval(qml.PauliZ(0))
+
+        result = f(3)
+        assert np.allclose(result, -jnp.sqrt(2) / 2)
+
+    # This is not possible anyways, a dynamic iteration range would always require indexing into
+    # an array rather than a list. Here AutoGraph improves the situation by allowing the Python
+    # range function to still be used when indexing into arrays (test case above).
+    def test_for_in_dynamic_range_indexing_numeric_list(self):
+        """Test for loop over a Python range with dynamic bounds that is used to index an
+        array-compatible Python list. This should raise a tracing error."""
+
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def f(n: int):
+            params = [0.0, 1 / 4 * jnp.pi, 2 / 4 * jnp.pi]
+            for i in range(n):
+                qml.RY(params[i], wires=0)
+            return qml.expval(qml.PauliZ(0))
+
+        with pytest.raises(jax.errors.TracerIntegerConversionError, match="__index__"):
+            qjit(autograph=True)(f)
+
+    # This is never possible.
+    def test_for_in_dynamic_range_indexing_object_list(self):
+        """Test for loop over a Python range with dynamic bounds that is used to index an
+        array-incompatible Python list. This should raise an error."""
+
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def f(n: int):
+            params = ["0", "1", "2"]
+            for i in range(n):
+                qml.RY(int(params[i]) * jnp.pi, wires=0)
+            return qml.expval(qml.PauliZ(0))
+
+        with pytest.raises(jax.errors.TracerIntegerConversionError, match="__index__"):
+            qjit(autograph=True)(f)
 
     def test_for_in_enumerate(self):
         """unsupported"""
