@@ -43,7 +43,8 @@ import catalyst.jax_primitives as jprim
 from catalyst.jax_primitives import GradParams, expval_p, probs_p
 from catalyst.jax_tape import JaxTape
 from catalyst.jax_tracer import get_traceable_fn, insert_to_qreg, trace_quantum_tape
-from catalyst.jax_tracer2 import trace_quantum_function, measure, MidCircuitMeasure, for_loop, cond
+from catalyst.jax_tracer2 import (trace_quantum_function, measure, MidCircuitMeasure, for_loop, cond,
+                                  while_loop)
 from catalyst.utils.exceptions import CompileError, DifferentiableCompileError
 from catalyst.utils.patching import Patcher
 from catalyst.utils.tracing import TracingContext
@@ -909,201 +910,201 @@ def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
 #     return decorator
 
 
-class WhileLoop(Operation):
-    """PennyLane's while loop operation."""
+# class WhileLoop(Operation):
+#     """PennyLane's while loop operation."""
 
-    num_wires = AnyWires
+#     num_wires = AnyWires
 
-    # pylint: disable=too-many-arguments
-    def __init__(
-        self,
-        iter_args,
-        body_jaxpr,
-        cond_jaxpr,
-        cond_consts,
-        body_consts,
-        body_tree,
-        *args,
-        **kwargs,
-    ):
-        self.iter_args = iter_args
-        self.body_jaxpr = body_jaxpr
-        self.cond_jaxpr = cond_jaxpr
-        self.cond_consts = cond_consts
-        self.body_consts = body_consts
-        self.body_tree = body_tree
-        kwargs["wires"] = Wires(WhileLoop.num_wires)
-        super().__init__(*args, **kwargs)
-
-
-class WhileCallable:
-    """
-    Some code in this class has been adapted from the while loop implementation in the JAX project
-    at https://github.com/google/jax/blob/jax-v0.4.1/jax/_src/lax/control_flow/loops.py released
-    under the Apache License, Version 2.0, with the following copyright notice:
-
-    Copyright 2021 The JAX Authors.
-    """
-
-    def __init__(self, cond_fn, body_fn):
-        self.cond_fn = cond_fn
-        self.body_fn = body_fn
-
-    @staticmethod
-    def _create_jaxpr(init_val, new_cond, new_body):
-        init_vals, in_tree = tree_flatten(init_val)
-        init_avals = tuple(_abstractify(val) for val in init_vals)
-        cond_jaxpr, cond_consts, cond_tree = _initial_style_jaxpr(
-            new_cond, in_tree, init_avals, "while_cond"
-        )
-        body_jaxpr, body_consts, body_tree = _initial_style_jaxpr(
-            new_body, in_tree, init_avals, "while_loop"
-        )
-        if not treedef_is_leaf(cond_tree) or len(cond_jaxpr.out_avals) != 1:
-            raise TypeError(
-                f"cond_fun must return a single boolean scalar, but got pytree: {cond_tree}."
-            )
-        pred_aval = cond_jaxpr.out_avals[0]
-        if not isinstance(
-            pred_aval, ShapedArray
-        ) or pred_aval.strip_weak_type().strip_named_shape() != ShapedArray((), jnp.bool_):
-            raise TypeError(
-                f"cond_fun must return a boolean scalar, but got output type(s): "
-                f"{cond_jaxpr.out_avals}."
-            )
-
-        return body_jaxpr, cond_jaxpr, cond_consts, body_consts, body_tree
-
-    def _call_with_quantum_ctx(self, ctx, args):
-        def new_cond(*qregs_and_args):
-            cargs, _, _ = qregs_and_args
-            return self.cond_fn(*cargs)
-
-        new_body = partial(_trace_quantum_tape, _callee=self.body_fn)
-
-        body_jaxpr, cond_jaxpr, cond_consts, body_consts, body_tree = WhileCallable._create_jaxpr(
-            (args, {}, [jprim.Qreg()]), new_cond, new_body
-        )
-        flat_init_vals_no_qubits = tree_flatten(args)[0]
-
-        WhileLoop(
-            flat_init_vals_no_qubits,
-            body_jaxpr,
-            cond_jaxpr,
-            cond_consts,
-            body_consts,
-            body_tree,
-        )
-
-        # Get tracers for any non-qreg return values (if there are any).
-        args, trees = body_jaxpr.out_avals[:-1], body_tree.children()[0]
-        return ctx.jax_tape.create_tracer(trees, args)
-
-    def _call_with_classical_ctx(self, args):
-        body_jaxpr, cond_jaxpr, cond_consts, body_consts, body_tree = WhileCallable._create_jaxpr(
-            args, self.cond_fn, self.body_fn
-        )
-        flat_init_vals_no_qubits = tree_flatten(args)[0]
-
-        inputs = cond_consts + body_consts + flat_init_vals_no_qubits
-        ret_tree_flat = jprim.qwhile(
-            cond_jaxpr, body_jaxpr, len(cond_consts), len(body_consts), *inputs
-        )
-        return tree_unflatten(body_tree, ret_tree_flat)
-
-    def _call_during_trace(self, *args):
-        TracingContext.check_is_tracing("Must use 'while_loop' inside tracing context.")
-
-        ctx = qml.QueuingManager.active_context()
-        if ctx is not None:
-            return self._call_with_quantum_ctx(ctx, args)
-
-        return self._call_with_classical_ctx(args)
-
-    def _call_during_interpretation(self, *args):
-        fn_res = args if len(args) > 1 else args[0] if len(args) == 1 else None
-
-        while self.cond_fn(*args):
-            fn_res = self.body_fn(*args)
-            args = fn_res if len(args) > 1 else (fn_res,) if len(args) == 1 else ()
-
-        return fn_res
-
-    def __call__(self, *args):
-        is_tracing = TracingContext.is_tracing()
-        if is_tracing:
-            return self._call_during_trace(*args)
-
-        return self._call_during_interpretation(*args)
+#     # pylint: disable=too-many-arguments
+#     def __init__(
+#         self,
+#         iter_args,
+#         body_jaxpr,
+#         cond_jaxpr,
+#         cond_consts,
+#         body_consts,
+#         body_tree,
+#         *args,
+#         **kwargs,
+#     ):
+#         self.iter_args = iter_args
+#         self.body_jaxpr = body_jaxpr
+#         self.cond_jaxpr = cond_jaxpr
+#         self.cond_consts = cond_consts
+#         self.body_consts = body_consts
+#         self.body_tree = body_tree
+#         kwargs["wires"] = Wires(WhileLoop.num_wires)
+#         super().__init__(*args, **kwargs)
 
 
-def while_loop(cond_fn):
-    """A :func:`~.qjit` compatible while-loop decorator for PennyLane/Catalyst.
+# class WhileCallable:
+#     """
+#     Some code in this class has been adapted from the while loop implementation in the JAX project
+#     at https://github.com/google/jax/blob/jax-v0.4.1/jax/_src/lax/control_flow/loops.py released
+#     under the Apache License, Version 2.0, with the following copyright notice:
 
-    This decorator provides a functional version of the traditional while
-    loop, similar to ``jax.lax.while_loop``. That is, any variables that are
-    modified across iterations need to be provided as inputs and outputs to
-    the loop body function:
+#     Copyright 2021 The JAX Authors.
+#     """
 
-    - Input arguments contain the value of a variable at the start of an
-      iteration
+#     def __init__(self, cond_fn, body_fn):
+#         self.cond_fn = cond_fn
+#         self.body_fn = body_fn
 
-    - Output arguments contain the value at the end of the iteration. The
-      outputs are then fed back as inputs to the next iteration.
+#     @staticmethod
+#     def _create_jaxpr(init_val, new_cond, new_body):
+#         init_vals, in_tree = tree_flatten(init_val)
+#         init_avals = tuple(_abstractify(val) for val in init_vals)
+#         cond_jaxpr, cond_consts, cond_tree = _initial_style_jaxpr(
+#             new_cond, in_tree, init_avals, "while_cond"
+#         )
+#         body_jaxpr, body_consts, body_tree = _initial_style_jaxpr(
+#             new_body, in_tree, init_avals, "while_loop"
+#         )
+#         if not treedef_is_leaf(cond_tree) or len(cond_jaxpr.out_avals) != 1:
+#             raise TypeError(
+#                 f"cond_fun must return a single boolean scalar, but got pytree: {cond_tree}."
+#             )
+#         pred_aval = cond_jaxpr.out_avals[0]
+#         if not isinstance(
+#             pred_aval, ShapedArray
+#         ) or pred_aval.strip_weak_type().strip_named_shape() != ShapedArray((), jnp.bool_):
+#             raise TypeError(
+#                 f"cond_fun must return a boolean scalar, but got output type(s): "
+#                 f"{cond_jaxpr.out_avals}."
+#             )
 
-    The final iteration values are also returned from the
-    transformed function.
+#         return body_jaxpr, cond_jaxpr, cond_consts, body_consts, body_tree
 
-    This form of control flow can also be called from the Python interpreter without needing to use
-    :func:`~.qjit`.
+#     def _call_with_quantum_ctx(self, ctx, args):
+#         def new_cond(*qregs_and_args):
+#             cargs, _, _ = qregs_and_args
+#             return self.cond_fn(*cargs)
 
-    The semantics of ``while_loop`` are given by the following Python pseudo-code:
+#         new_body = partial(_trace_quantum_tape, _callee=self.body_fn)
 
-    .. code-block:: python
+#         body_jaxpr, cond_jaxpr, cond_consts, body_consts, body_tree = WhileCallable._create_jaxpr(
+#             (args, {}, [jprim.Qreg()]), new_cond, new_body
+#         )
+#         flat_init_vals_no_qubits = tree_flatten(args)[0]
 
-        def while_loop(cond_fun, body_fun, *args):
-            while cond_fun(*args):
-                args = body_fn(*args)
-            return args
+#         WhileLoop(
+#             flat_init_vals_no_qubits,
+#             body_jaxpr,
+#             cond_jaxpr,
+#             cond_consts,
+#             body_consts,
+#             body_tree,
+#         )
 
-    Args:
-        cond_fn (Callable): the condition function in the while loop
+#         # Get tracers for any non-qreg return values (if there are any).
+#         args, trees = body_jaxpr.out_avals[:-1], body_tree.children()[0]
+#         return ctx.jax_tape.create_tracer(trees, args)
 
-    Returns:
-        Callable: A wrapper around the while-loop function.
+#     def _call_with_classical_ctx(self, args):
+#         body_jaxpr, cond_jaxpr, cond_consts, body_consts, body_tree = WhileCallable._create_jaxpr(
+#             args, self.cond_fn, self.body_fn
+#         )
+#         flat_init_vals_no_qubits = tree_flatten(args)[0]
 
-    Raises:
-        TypeError: Invalid return type of the condition expression.
+#         inputs = cond_consts + body_consts + flat_init_vals_no_qubits
+#         ret_tree_flat = jprim.qwhile(
+#             cond_jaxpr, body_jaxpr, len(cond_consts), len(body_consts), *inputs
+#         )
+#         return tree_unflatten(body_tree, ret_tree_flat)
 
-    **Example**
+#     def _call_during_trace(self, *args):
+#         TracingContext.check_is_tracing("Must use 'while_loop' inside tracing context.")
 
-    .. code-block:: python
+#         ctx = qml.QueuingManager.active_context()
+#         if ctx is not None:
+#             return self._call_with_quantum_ctx(ctx, args)
 
-        dev = qml.device("lightning.qubit", wires=1)
+#         return self._call_with_classical_ctx(args)
 
-        @qjit
-        @qml.qnode(dev)
-        def circuit(x: float):
+#     def _call_during_interpretation(self, *args):
+#         fn_res = args if len(args) > 1 else args[0] if len(args) == 1 else None
 
-            @while_loop(lambda x: x < 2.0)
-            def loop_rx(x):
-                # perform some work and update (some of) the arguments
-                qml.RX(x, wires=0)
-                return x ** 2
+#         while self.cond_fn(*args):
+#             fn_res = self.body_fn(*args)
+#             args = fn_res if len(args) > 1 else (fn_res,) if len(args) == 1 else ()
 
-            # apply the while loop
-            final_x = loop_rx(x)
+#         return fn_res
 
-            return qml.expval(qml.PauliZ(0)), final_x
+#     def __call__(self, *args):
+#         is_tracing = TracingContext.is_tracing()
+#         if is_tracing:
+#             return self._call_during_trace(*args)
 
-    >>> circuit(1.6)
-    [array(-0.02919952), array(2.56)]
-    """
+#         return self._call_during_interpretation(*args)
 
-    def _while_loop(body_fn):
-        return WhileCallable(cond_fn, body_fn)
 
-    return _while_loop
+# def while_loop(cond_fn):
+#     """A :func:`~.qjit` compatible while-loop decorator for PennyLane/Catalyst.
+
+#     This decorator provides a functional version of the traditional while
+#     loop, similar to ``jax.lax.while_loop``. That is, any variables that are
+#     modified across iterations need to be provided as inputs and outputs to
+#     the loop body function:
+
+#     - Input arguments contain the value of a variable at the start of an
+#       iteration
+
+#     - Output arguments contain the value at the end of the iteration. The
+#       outputs are then fed back as inputs to the next iteration.
+
+#     The final iteration values are also returned from the
+#     transformed function.
+
+#     This form of control flow can also be called from the Python interpreter without needing to use
+#     :func:`~.qjit`.
+
+#     The semantics of ``while_loop`` are given by the following Python pseudo-code:
+
+#     .. code-block:: python
+
+#         def while_loop(cond_fun, body_fun, *args):
+#             while cond_fun(*args):
+#                 args = body_fn(*args)
+#             return args
+
+#     Args:
+#         cond_fn (Callable): the condition function in the while loop
+
+#     Returns:
+#         Callable: A wrapper around the while-loop function.
+
+#     Raises:
+#         TypeError: Invalid return type of the condition expression.
+
+#     **Example**
+
+#     .. code-block:: python
+
+#         dev = qml.device("lightning.qubit", wires=1)
+
+#         @qjit
+#         @qml.qnode(dev)
+#         def circuit(x: float):
+
+#             @while_loop(lambda x: x < 2.0)
+#             def loop_rx(x):
+#                 # perform some work and update (some of) the arguments
+#                 qml.RX(x, wires=0)
+#                 return x ** 2
+
+#             # apply the while loop
+#             final_x = loop_rx(x)
+
+#             return qml.expval(qml.PauliZ(0)), final_x
+
+#     >>> circuit(1.6)
+#     [array(-0.02919952), array(2.56)]
+#     """
+
+#     def _while_loop(body_fn):
+#         return WhileCallable(cond_fn, body_fn)
+
+#     return _while_loop
 
 
 # class ForLoop(Operation):
