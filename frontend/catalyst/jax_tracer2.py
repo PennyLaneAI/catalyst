@@ -406,7 +406,7 @@ def trace_quantum_tape(quantum_tape:QuantumTape,
                     cond_trace = op.regions[0].trace
                     res_classical_tracers = op.regions[0].res_classical_tracers
                     with frame_tracing_context(ctx, cond_trace):
-                        qreg_in = qreg_out =_input_type_to_tracers(cond_trace.new_arg, [AbstractQreg()])[0]
+                        _input_type_to_tracers(cond_trace.new_arg, [AbstractQreg()])[0]
                         cond_jaxpr, _, cond_consts = ctx.frames[cond_trace].to_jaxpr2(
                             res_classical_tracers)
 
@@ -469,7 +469,8 @@ def trace_quantum_measurements(quantum_tape,
             out_classical_tracers.append(o)
         elif isinstance(o, MeasurementProcess):
             op,obs = o,o.obs
-            qubits = [qextract(qreg, wire) for wire in op.wires]
+            wires = op.wires if len(op.wires)>0 else range(device.num_wires)
+            qubits = [qextract(qreg, w) for w in wires]
             if obs is None:
                 obs_tracers = compbasis(*qubits)
             elif isinstance(obs, KNOWN_NAMED_OBS):
