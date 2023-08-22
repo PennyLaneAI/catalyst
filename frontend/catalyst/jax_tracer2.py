@@ -14,7 +14,7 @@ from jax._src.source_info_util import reset_name_stack, current as jax_current, 
 from jax._src.dispatch import jaxpr_replicas
 from jax._src.lax.lax import _abstractify
 from jax._src import linear_util as lu
-from jax._src.tree_util import (tree_flatten, tree_unflatten)
+from jax._src.tree_util import (tree_flatten, tree_structure, tree_unflatten)
 from jax._src.api import ShapeDtypeStruct
 from jax._src.api_util import (
     flatten_fun, apply_flat_fun, flatten_fun_nokwargs, flatten_fun_nokwargs2,
@@ -38,8 +38,8 @@ from jax._src.util import unzip2
 from jax._src.lax.lax import xb, xla
 from catalyst.jax_primitives import (Qreg, AbstractQreg, AbstractQbit, qinst, qextract, qinsert,
                                      qfor_p, qcond_p, qmeasure_p, qdevice, qalloc, qwhile_p,
-                                     qdealloc, compbasis,
-                                     sample, namedobs, hermitian, expval, state, compbasis_p)
+                                     qdealloc, compbasis, probs, sample, namedobs, hermitian,
+                                     expval, state, counts, compbasis_p)
 from catalyst.jax_tracer import (custom_lower_jaxpr_to_module, trace_observables, KNOWN_NAMED_OBS)
 from catalyst.utils.tracing import TracingContext
 from catalyst.utils.exceptions import CompileError
@@ -459,7 +459,8 @@ def trace_quantum_measurements(quantum_tape,
                                qreg:DynamicJaxprTracer,
                                ctx:MainTracingContex,
                                trace:DynamicJaxprTrace,
-                               outputs:List[Union[MeasurementProcess, DynamicJaxprTracer]]
+                               outputs:List[Union[MeasurementProcess, DynamicJaxprTracer]],
+                               out_tree
                                ) -> List[DynamicJaxprTracer]:
     shots = device.shots
     out_classical_tracers = []
@@ -486,24 +487,40 @@ def trace_quantum_measurements(quantum_tape,
             else:
                 raise NotImplementedError(f"Observable {obs} is not impemented")
 
-            mres_tracer = None
+            using_compbasis = obs_tracers.primitive == compbasis_p
             if o.return_type.value == "sample":
                 shape = (shots, len(qubits)) if obs is None else (shots,)
-                mres_tracer = sample(obs_tracers, shots, shape)
+                out_classical_tracers.append(sample(obs_tracers, shots, shape))
             elif o.return_type.value == "expval":
-                mres_tracer = expval(obs_tracers, shots)
-            elif o.return_type.value == "state":
-                # assert obs is None, "Expected no observables for the state 'measurement'"
-                assert obs_tracers.primitive == compbasis_p
+                out_classical_tracers.append(expval(obs_tracers, shots))
+            elif o.return_type.value == "probs":
+                assert using_compbasis
                 shape = (2 ** len(qubits),)
-                mres_tracer = state(obs_tracers, shape)
+                out_classical_tracers.append(probs(obs_tracers, shape))
+            elif o.return_type.value == "counts":
+                shape = (2 ** len(qubits),) if using_compbasis else (2,)
+                out_classical_tracers.extend(counts(obs_tracers, shots, shape))
+                counts_tree = tree_structure(("keys", "counts"))
+                meas_return_trees_children = out_tree.children()
+                if len(meas_return_trees_children)>0:
+                    meas_return_trees_children[i] = counts_tree
+                    out_tree = (
+                        out_tree.make_from_node_data_and_children(
+                            out_tree.node_data(), meas_return_trees_children
+                        )
+                    )
+                else:
+                    out_tree = counts_tree
+            elif o.return_type.value == "state":
+                assert using_compbasis
+                shape = (2 ** len(qubits),)
+                out_classical_tracers.append(state(obs_tracers, shape))
             else:
                 raise NotImplementedError(f"Measurement {o.return_type.value} is not impemented")
-            out_classical_tracers.append(mres_tracer)
         else:
             raise CompileError(f"Expected a tracer or a measurement, got {o}")
 
-    return out_classical_tracers
+    return out_classical_tracers, out_tree
 
 
 def trace_quantum_function(
@@ -528,8 +545,8 @@ def trace_quantum_function(
             in_classical_tracers = _input_type_to_tracers(trace.new_arg, in_avals)
             with QueuingManager.stop_recording(), quantum_tape:
                 ans = wffa.call_wrapped(*in_classical_tracers)
-            # FIXME: Do we need this ? list(map(trace.full_raise, ans))
-            out_classical_tracers_or_measurement = ans
+            out_classical_tracers_or_measurements = \
+                [(trace.full_raise(t) if isinstance(t, DynamicJaxprTracer) else t) for t in ans]
 
         # [2] - Tape transformations
         transformed_tape = transform(quantum_tape) if transform else quantum_tape
@@ -541,11 +558,14 @@ def trace_quantum_function(
             qdevice("backend", device.backend_name)
             qreg_in = qalloc(len(device.wires))
             qreg_out = trace_quantum_tape(transformed_tape, device, qreg_in, ctx, trace)
-            out_classical_tracers = trace_quantum_measurements(transformed_tape, device, qreg_out,
-                                                               ctx, trace,
-                                                               out_classical_tracers_or_measurement)
+            out_classical_tracers, out_classical_tree = \
+                trace_quantum_measurements(
+                    transformed_tape, device, qreg_out, ctx, trace,
+                    out_classical_tracers_or_measurements, out_tree_promise())
+
             qdealloc(qreg_in)
-            # FIXME: Do we need full_rasie here ? [trace.full_raise(qreg_out)]
+
+            out_classical_tracers = [trace.full_raise(t) for t in out_classical_tracers]
             out_quantum_tracers = [qreg_out]
 
             jaxpr, out_type, consts = ctx.frames[trace].to_jaxpr2(out_classical_tracers + out_quantum_tracers)
@@ -556,7 +576,7 @@ def trace_quantum_function(
 
     closed_jaxpr = ClosedJaxpr(jaxpr, consts)
     out_avals, _ = unzip2(out_type)
-    out_shape = tree_unflatten(out_tree_promise(),
+    out_shape = tree_unflatten(out_classical_tree,
                                [ShapeDtypeStruct(a.shape, a.dtype, a.named_shape) for a in out_avals])
     return closed_jaxpr, out_shape
 
