@@ -13,6 +13,7 @@ from jax._src.interpreters.partial_eval import (DynamicJaxprTrace, DynamicJaxprT
 from jax._src.source_info_util import reset_name_stack, current as jax_current, new_name_stack
 from jax._src.dispatch import jaxpr_replicas
 from jax._src.lax.lax import _abstractify
+from jax._src.lax.control_flow.common import _initial_style_jaxprs_with_common_consts2
 from jax._src import linear_util as lu
 from jax._src.tree_util import (tree_flatten, tree_unflatten)
 from jax._src.api import ShapeDtypeStruct
@@ -37,7 +38,8 @@ from jax._src.interpreters.mlir import (
 from jax._src.util import unzip2
 from jax._src.lax.lax import xb, xla
 from catalyst.jax_primitives import (Qreg, AbstractQreg, AbstractQbit, qinst, qextract, qinsert,
-                                     qfor_p, qfor, qmeasure_p, qdevice, qalloc, qdealloc, compbasis,
+                                     qfor_p, qcond_p, qmeasure_p, qdevice, qalloc,
+                                     qdealloc, compbasis,
                                      sample, namedobs, hermitian, expval, state, compbasis_p)
 from catalyst.jax_tracer import (custom_lower_jaxpr_to_module, trace_observables, KNOWN_NAMED_OBS)
 from catalyst.utils.tracing import TracingContext
@@ -225,17 +227,20 @@ class CondCallable:
         inner_traces = []
         in_classical_tracers = self.preds
         arg_classical_tracers = []
+        res_classical_tracers = []
 
         for branch in self.branch_fns + [self.otherwise_fn]:
             quantum_tape = QuantumTape()
             with frame_tracing_context(ctx) as inner_trace:
                 wffa, in_avals, _ = deduce_avals(branch, [], {})
                 with QueuingManager.stop_recording(), quantum_tape:
-                    res_classical_tracers = wffa.call_wrapped()
+                    rct = wffa.call_wrapped()
+                    res_tracers = [inner_trace.full_raise(t) for t in rct]
                 inner_traces.append(inner_trace)
+                res_classical_tracers.append(res_tracers)
             quantum_tapes.append(quantum_tape)
 
-        res_avals = list(map(shaped_abstractify, res_classical_tracers))
+        res_avals = list(map(shaped_abstractify, res_tracers))
         out_classical_tracers = [new_inner_tracer(outer_trace, aval) for aval in res_avals]
 
         Cond(quantum_tapes,
@@ -286,7 +291,8 @@ def for_loop(lower_bound, upper_bound, step):
                 wffa, in_avals, _ = deduce_avals(callee, [lower_bound] + list(init_state), {})
                 arg_classical_tracers = _input_type_to_tracers(inner_trace.new_arg, in_avals)
                 with QueuingManager.stop_recording(), quantum_tape:
-                    res_classical_tracers = wffa.call_wrapped(*arg_classical_tracers)
+                    rct = wffa.call_wrapped(*arg_classical_tracers)
+                    res_classical_tracers = [inner_trace.full_raise(t) for t in rct]
                 res_avals = list(map(shaped_abstractify, res_classical_tracers))
 
             out_classical_tracers = [new_inner_tracer(outer_trace, aval) for aval in res_avals]
@@ -371,12 +377,28 @@ def trace_quantum_tape(quantum_tape:QuantumTape,
                         op.in_classical_tracers[1],
                         op.in_classical_tracers[2],
                         *(consts + op.in_classical_tracers[3:] + [qreg]),
-                        # body_jaxpr=ClosedJaxpr(jaxpr, consts),
                         body_jaxpr=ClosedJaxpr(convert_constvars_jaxpr(jaxpr), ()),
                         body_nconsts=len(consts),
                         apply_reverse_transform=False)[-1] # [1]
+
                 elif isinstance(op, Cond):
-                    assert False, "Not implemented"
+                    jaxprs, consts = [], []
+                    for inner_trace, inner_tape, rct in zip(op.traces,
+                                                            op.quantum_tapes,
+                                                            op.res_classical_tracers):
+                        with frame_tracing_context(ctx, inner_trace):
+                            qreg_in = _input_type_to_tracers(inner_trace.new_arg, [AbstractQreg()])[0]
+                            qreg_out = trace_quantum_tape(inner_tape, device, qreg_in, ctx, inner_trace)
+                            jaxpr, typ, const = ctx.frames[inner_trace].to_jaxpr2(rct + [qreg_out])
+                            jaxprs.append(jaxpr)
+                            consts.append(const)
+
+                    jaxprs2, combined_consts = _initial_style_jaxprs_with_common_consts2(jaxprs, consts)
+
+                    qreg2  = bind_overwrite_classical_tracers(
+                        op, qcond_p.bind,
+                        *(op.in_classical_tracers + combined_consts + [qreg]),
+                        branch_jaxprs=jaxprs2)[-1]
                 else:
                     raise TypeError(f"Operation {op} is not implemented")
             else:
