@@ -526,8 +526,8 @@ def trace_quantum_measurements(quantum_tape,
 def trace_quantum_function(
     f:Callable,
     device:QubitDevice,
-    args, kwargs,
-    transform:Optional[Callable[[QuantumTape],QuantumTape]]=None) -> Tuple[ClosedJaxpr, Any]:
+    args,
+    kwargs) -> Tuple[ClosedJaxpr, Any]:
     """ Trace quantum function in a way that allows building a nested quantum tape describing the
     whole algorithm. Tape transformations are supported allowing users to modify the algorithm
     before the final jaxpr is created.
@@ -544,12 +544,10 @@ def trace_quantum_function(
             wffa, in_avals, out_tree_promise = deduce_avals(f, args, kwargs)
             in_classical_tracers = _input_type_to_tracers(trace.new_arg, in_avals)
             with QueuingManager.stop_recording(), quantum_tape:
+                # [2] - Quantum tape transformations happen at the end of tracing
                 ans = wffa.call_wrapped(*in_classical_tracers)
             out_classical_tracers_or_measurements = \
                 [(trace.full_raise(t) if isinstance(t, DynamicJaxprTracer) else t) for t in ans]
-
-        # [2] - Tape transformations
-        transformed_tape = transform(quantum_tape) if transform else quantum_tape
 
         # [3] - Quantum tracing
         with frame_tracing_context(ctx, trace):
@@ -557,10 +555,10 @@ def trace_quantum_function(
             qdevice("kwargs", str(device.backend_kwargs))
             qdevice("backend", device.backend_name)
             qreg_in = qalloc(len(device.wires))
-            qreg_out = trace_quantum_tape(transformed_tape, device, qreg_in, ctx, trace)
+            qreg_out = trace_quantum_tape(quantum_tape, device, qreg_in, ctx, trace)
             out_classical_tracers, out_classical_tree = \
                 trace_quantum_measurements(
-                    transformed_tape, device, qreg_out, ctx, trace,
+                    quantum_tape, device, qreg_out, ctx, trace,
                     out_classical_tracers_or_measurements, out_tree_promise())
 
             qdealloc(qreg_in)
