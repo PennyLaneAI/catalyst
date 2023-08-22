@@ -885,6 +885,74 @@ TEST_CASE("Test __quantum__qis__HamiltonianObs(t) and Expval", "[CoreQIS]")
     }
 }
 
+TEST_CASE("Test __quantum__qis__HamiltonianObs(h, Ham(x)) and Expval", "[CoreQIS]")
+{
+    for (const auto &[key, val] : getDevices()) {
+        __quantum__rt__initialize();
+        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
+
+        QirArray *qs = __quantum__rt__qubit_allocate_array(2);
+
+        QUBIT **target = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 0);
+        QUBIT **ctrls = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(qs, 1);
+
+        // qml.Hadamard(wires=0)
+        __quantum__qis__Hadamard(*target, false);
+        // qml.Hadamard(wires=1)
+        __quantum__qis__Hadamard(*ctrls, false);
+        // qml.IsingYY(0.2, wires=[1,0])
+        __quantum__qis__IsingYY(0.6, *ctrls, *target, false);
+        // qml.CRX(0.4, wires=[1,0])
+        __quantum__qis__CRX(0.3, *ctrls, *target, false);
+
+        MemRefT_CplxT_double_1d result = getState(4);
+        __quantum__qis__State(&result, 0);
+
+        auto obs_x = __quantum__qis__NamedObs(ObsId::PauliX, *target);
+
+        double coeffs1_data[1] = {0.2};
+        MemRefT_double_1d *coeffs1 = new MemRefT_double_1d;
+        coeffs1->data_allocated = coeffs1_data;
+        coeffs1->data_aligned = coeffs1_data;
+        coeffs1->offset = 0;
+        coeffs1->sizes[0] = 1;
+        coeffs1->strides[0] = 1;
+        auto obs_ham1 = __quantum__qis__HamiltonianObs(coeffs1, 1, obs_x);
+
+        CplxT_double matrix_data[4] = {{1.0, 0.0}, {0.0, 3.0}, {2.0, 0.0}, {0.0, 5.0}};
+
+        MemRefT_CplxT_double_2d *h_matrix = new MemRefT_CplxT_double_2d;
+        h_matrix->data_allocated = matrix_data;
+        h_matrix->data_aligned = matrix_data;
+        h_matrix->offset = 0;
+        h_matrix->sizes[0] = 2;
+        h_matrix->sizes[1] = 2;
+        h_matrix->strides[0] = 1;
+
+        auto obs_h = __quantum__qis__HermitianObs(h_matrix, 1, *ctrls);
+        double coeffs_data[2] = {0.4, 0.7};
+        MemRefT_double_1d *coeffs2 = new MemRefT_double_1d;
+        coeffs2->data_allocated = coeffs_data;
+        coeffs2->data_aligned = coeffs_data;
+        coeffs2->offset = 0;
+        coeffs2->sizes[0] = 2;
+        coeffs2->strides[0] = 1;
+
+        auto obs_hamiltonian = __quantum__qis__HamiltonianObs(coeffs2, 2, obs_h, obs_ham1);
+
+        CHECK(obs_hamiltonian == 3);
+
+        CHECK(__quantum__qis__Expval(obs_hamiltonian) == Approx(0.7316370598).margin(1e-5));
+
+        freeState(result);
+        delete coeffs1;
+        delete h_matrix;
+        delete coeffs2;
+        __quantum__rt__qubit_release_array(qs);
+        __quantum__rt__finalize();
+    }
+}
+
 TEST_CASE("Test __quantum__qis__ Hadamard, PauliX, IsingYY, CRX, and Expval_arr", "[CoreQIS]")
 {
     for (const auto &[key, val] : getDevices()) {
