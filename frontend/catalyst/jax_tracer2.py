@@ -360,82 +360,76 @@ def trace_quantum_tape(quantum_tape:QuantumTape,
     for op in device.expand_fn(quantum_tape):
         qreg2 = None
         if isinstance(op, HybridOp):
-            eqn = None
-            if has_nested_tapes(op):
+            if isinstance(op, ForLoop):
+                inner_trace = op.regions[0].trace
+                inner_tape = op.regions[0].quantum_tape
+                res_classical_tracers = op.regions[0].res_classical_tracers
 
-                if isinstance(op, ForLoop):
-                    inner_trace = op.regions[0].trace
-                    inner_tape = op.regions[0].quantum_tape
-                    res_classical_tracers = op.regions[0].res_classical_tracers
+                with frame_tracing_context(ctx, inner_trace):
+                    qreg_in = _input_type_to_tracers(inner_trace.new_arg, [AbstractQreg()])[0]
+                    qreg_out = trace_quantum_tape(inner_tape, device, qreg_in, ctx, inner_trace)
+                    jaxpr, typ, consts = ctx.frames[inner_trace].to_jaxpr2(
+                        res_classical_tracers + [qreg_out])
 
-                    with frame_tracing_context(ctx, inner_trace):
-                        qreg_in = _input_type_to_tracers(inner_trace.new_arg, [AbstractQreg()])[0]
-                        qreg_out = trace_quantum_tape(inner_tape, device, qreg_in, ctx, inner_trace)
-                        jaxpr, typ, consts = ctx.frames[inner_trace].to_jaxpr2(
-                            res_classical_tracers + [qreg_out])
+                qreg2 = bind_overwrite_classical_tracers(
+                    op, qfor_p.bind,
+                    op.in_classical_tracers[0],
+                    op.in_classical_tracers[1],
+                    op.in_classical_tracers[2],
+                    *(consts + op.in_classical_tracers[3:] + [qreg]),
+                    body_jaxpr=ClosedJaxpr(convert_constvars_jaxpr(jaxpr), ()),
+                    body_nconsts=len(consts),
+                    # FIXME: handle the loop reverse conditions
+                    apply_reverse_transform=False)[-1] # [1]
 
-                    qreg2 = bind_overwrite_classical_tracers(
-                        op, qfor_p.bind,
-                        op.in_classical_tracers[0],
-                        op.in_classical_tracers[1],
-                        op.in_classical_tracers[2],
-                        *(consts + op.in_classical_tracers[3:] + [qreg]),
-                        body_jaxpr=ClosedJaxpr(convert_constvars_jaxpr(jaxpr), ()),
-                        body_nconsts=len(consts),
-                        # FIXME: handle the loop reverse conditions
-                        apply_reverse_transform=False)[-1] # [1]
+            elif isinstance(op, Cond):
+                jaxprs, consts = [], []
+                for region in op.regions:
+                    with frame_tracing_context(ctx, region.trace):
+                        qreg_in = _input_type_to_tracers(region.trace.new_arg, [AbstractQreg()])[0]
+                        qreg_out = trace_quantum_tape(region.quantum_tape, device, qreg_in, ctx, region.trace)
+                        jaxpr, typ, const = ctx.frames[region.trace].to_jaxpr2(region.res_classical_tracers + [qreg_out])
+                        jaxprs.append(jaxpr)
+                        consts.append(const)
 
-                elif isinstance(op, Cond):
-                    jaxprs, consts = [], []
-                    for region in op.regions:
-                        with frame_tracing_context(ctx, region.trace):
-                            qreg_in = _input_type_to_tracers(region.trace.new_arg, [AbstractQreg()])[0]
-                            qreg_out = trace_quantum_tape(region.quantum_tape, device, qreg_in, ctx, region.trace)
-                            jaxpr, typ, const = ctx.frames[region.trace].to_jaxpr2(region.res_classical_tracers + [qreg_out])
-                            jaxprs.append(jaxpr)
-                            consts.append(const)
+                jaxprs2, combined_consts = initial_style_jaxprs_with_common_consts2(jaxprs, consts)
 
-                    jaxprs2, combined_consts = initial_style_jaxprs_with_common_consts2(jaxprs, consts)
+                qreg2  = bind_overwrite_classical_tracers(
+                    op, qcond_p.bind,
+                    *(op.in_classical_tracers + combined_consts + [qreg]),
+                    branch_jaxprs=jaxprs2)[-1] # [1]
 
-                    qreg2  = bind_overwrite_classical_tracers(
-                        op, qcond_p.bind,
-                        *(op.in_classical_tracers + combined_consts + [qreg]),
-                        branch_jaxprs=jaxprs2)[-1] # [1]
+            elif isinstance(op, WhileLoop):
+                cond_trace = op.regions[0].trace
+                res_classical_tracers = op.regions[0].res_classical_tracers
+                with frame_tracing_context(ctx, cond_trace):
+                    _input_type_to_tracers(cond_trace.new_arg, [AbstractQreg()])[0]
+                    cond_jaxpr, _, cond_consts = ctx.frames[cond_trace].to_jaxpr2(
+                        res_classical_tracers)
 
-                elif isinstance(op, WhileLoop):
-                    cond_trace = op.regions[0].trace
-                    res_classical_tracers = op.regions[0].res_classical_tracers
-                    with frame_tracing_context(ctx, cond_trace):
-                        _input_type_to_tracers(cond_trace.new_arg, [AbstractQreg()])[0]
-                        cond_jaxpr, _, cond_consts = ctx.frames[cond_trace].to_jaxpr2(
-                            res_classical_tracers)
+                body_trace = op.regions[1].trace
+                body_tape = op.regions[1].quantum_tape
+                res_classical_tracers = op.regions[1].res_classical_tracers
+                with frame_tracing_context(ctx, body_trace):
+                    qreg_in = _input_type_to_tracers(body_trace.new_arg, [AbstractQreg()])[0]
+                    qreg_out = trace_quantum_tape(body_tape, device, qreg_in, ctx, body_trace)
+                    body_jaxpr, _, body_consts = ctx.frames[body_trace].to_jaxpr2(
+                        res_classical_tracers + [qreg_out])
 
-                    body_trace = op.regions[1].trace
-                    body_tape = op.regions[1].quantum_tape
-                    res_classical_tracers = op.regions[1].res_classical_tracers
-                    with frame_tracing_context(ctx, body_trace):
-                        qreg_in = _input_type_to_tracers(body_trace.new_arg, [AbstractQreg()])[0]
-                        qreg_out = trace_quantum_tape(body_tape, device, qreg_in, ctx, body_trace)
-                        body_jaxpr, _, body_consts = ctx.frames[body_trace].to_jaxpr2(
-                            res_classical_tracers + [qreg_out])
-
-                    qreg2 = bind_overwrite_classical_tracers(
-                        op, qwhile_p.bind,
-                        *(cond_consts + body_consts + op.in_classical_tracers + [qreg]),
-                        cond_jaxpr=ClosedJaxpr(convert_constvars_jaxpr(cond_jaxpr), ()),
-                        body_jaxpr=ClosedJaxpr(convert_constvars_jaxpr(body_jaxpr), ()),
-                        cond_nconsts=len(cond_consts),
-                        body_nconsts=len(body_consts))[-1] # [1]
-                else:
-                    raise TypeError(f"Operation {op} is not implemented")
+                qreg2 = bind_overwrite_classical_tracers(
+                    op, qwhile_p.bind,
+                    *(cond_consts + body_consts + op.in_classical_tracers + [qreg]),
+                    cond_jaxpr=ClosedJaxpr(convert_constvars_jaxpr(cond_jaxpr), ()),
+                    body_jaxpr=ClosedJaxpr(convert_constvars_jaxpr(body_jaxpr), ()),
+                    cond_nconsts=len(cond_consts),
+                    body_nconsts=len(body_consts))[-1] # [1]
+            elif isinstance(op, MidCircuitMeasure):
+                wire = op.in_classical_tracers[0]
+                qubit = qextract(qreg, wire)
+                qubit2 = bind_overwrite_classical_tracers(op, qmeasure_p.bind, qubit)[-1] # [1]
+                qreg2 = qinsert(qreg, wire, qubit2)
             else:
-                if isinstance(op, MidCircuitMeasure):
-                    wire = op.in_classical_tracers[0]
-                    qubit = qextract(qreg, wire)
-                    qubit2 = bind_overwrite_classical_tracers(op, qmeasure_p.bind, qubit)[-1] # [1]
-                    qreg2 = qinsert(qreg, wire, qubit2)
-                else:
-                    raise NotImplementedError(f"{op=}")
+                raise NotImplementedError(f"{op=}")
         else:
             if isinstance(op, MeasurementProcess):
                 qreg2 = qreg

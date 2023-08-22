@@ -83,6 +83,8 @@ def new_main2(trace_type: Type[Trace],
 
 def sort_eqns(eqns:List[JaxprEqn])->List[JaxprEqn]:
     """ Topologically sort JAXRR equations in a list, based on their input/output variables. """
+    # FIXME: The functions might emit different correct results, depending on id(eqns). One need to
+    # make this function stable.
     class Box:
         def __init__(self, e):
             self.e = e
