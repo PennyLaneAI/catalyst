@@ -34,6 +34,7 @@ from tensorflow.python.autograph.operators.variables import (
     Undefined,
     UndefinedReturnValue,
 )
+import jax.numpy as jnp
 
 import catalyst
 from catalyst.ag_utils import AutoGraphError
@@ -102,12 +103,74 @@ def if_stmt(
     set_state(results)
 
 
+def _call_catalyst_for(start, stop, step, body_fn, get_state, opts, array_iterable=None):
+    """Dispatch to a Catalyst implementation of for loops."""
+
+    # Do not allow unpacking in Catalyst for loops.
+    assert len(opts["iterate_names"].split(",")) == 1
+
+    @catalyst.for_loop(start, stop, step)
+    def functional_for(i):
+        if array_iterable is None:
+            body_fn(i)
+        else:
+            body_fn(array_iterable[i])
+
+        return get_state()
+
+    return functional_for()
+
+
+def _call_python_for(body_fn, get_state, non_array_iterable):
+    """Fallback to a Python implementation of for loops."""
+    for elem in non_array_iterable:
+        body_fn(elem)
+
+    return get_state()
+
+
+# pylint: disable=too-many-arguments
+def for_stmt(
+    iteration_target: Any,
+    _extra_test: Callable[[], bool] | None,
+    body_fn: Callable[[int], None],
+    get_state: Callable[[], Tuple],
+    set_state: Callable[[Tuple], None],
+    _symbol_names: Tuple[str],
+    opts: dict,
+):
+    """An implementation of the AutoGraph 'for .. in ..' statement. The interface is defined by
+    AutoGraph, here we merely provide an implementation of it in terms of Catalyst primitives."""
+
+    assert _extra_test is None
+
+    # We can attempt to convert the iteration target to an array.
+    # If this fails, we must fall back to Python.
+    try:
+        iteration_array = jnp.asarray(iteration_target)
+    except:
+        iteration_array = None
+
+    if iteration_array is not None:
+        start, stop, step = 0, len(iteration_target), 1
+        results = _call_catalyst_for(start, stop, step, body_fn, get_state, opts, iteration_array)
+    else:
+        results = _call_python_for(body_fn, get_state, iteration_target)
+
+    # Sometimes we unpack the results of nested tracing scopes so that the user doesn't have to
+    # manipulate tuples when they don't expect it. Ensure set_state receives a tuple regardless.
+    if not isinstance(results, tuple):
+        results = (results,)
+    set_state(results)
+
+
 # Prevent autograph from converting PennyLane and Catalyst library code, this can lead to many
 # issues such as always tracing through code that should only be executed conditionally. We might
 # have to be even more restrictive in the future to prevent issues if necessary.
 module_allowlist = (
     config.DoNotConvert("pennylane"),
     config.DoNotConvert("catalyst"),
+    config.DoNotConvert("jax"),
 ) + config.CONVERSION_RULES
 
 

@@ -19,6 +19,8 @@ import numpy as np
 import pennylane as qml
 import pytest
 
+import jax.numpy as jnp
+
 from catalyst import measure, qjit
 from catalyst.ag_utils import AutoGraphError, autograph_source, check_cache
 
@@ -430,6 +432,92 @@ class TestConditionals:
             TypeError, match="Conditional requires consistent return types across all branches"
         ):
             qjit(autograph=True)(qml.qnode(qml.device(backend, wires=1))(circuit))
+
+
+class TestForLoops:
+    """Test that the autograph transformations produce correct results on for loops."""
+
+    def test_for_in_array(self):
+        """Test for loop over JAX array."""
+
+        @qjit(autograph=True)
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def f(params):
+            for x in params:
+                qml.RY(x, wires=0)
+            return qml.expval(qml.PauliZ(0))
+
+        result = f(jnp.array([0.0, 1 / 4 * jnp.pi, 2 / 4 * jnp.pi]))
+        assert np.allclose(result, -jnp.sqrt(2) / 2)
+
+    def test_for_in_numeric_list(self):
+        """Test for loop over a Python list that is convertible to an array."""
+
+        @qjit(autograph=True)
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def f():
+            params = [0.0, 1 / 4 * jnp.pi, 2 / 4 * jnp.pi]
+            for x in params:
+                qml.RY(x, wires=0)
+            return qml.expval(qml.PauliZ(0))
+
+        result = f()
+        assert np.allclose(result, -jnp.sqrt(2) / 2)
+
+    def test_for_in_numeric_list_of_list(self):
+        """Test for loop over a nested Python list that is convertible to an array."""
+
+        @qjit(autograph=True)
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def f():
+            params = [[0.0, 1 / 4 * jnp.pi], [2 / 4 * jnp.pi, jnp.pi]]
+            for xx in params:
+                for x in xx:
+                    qml.RY(x, wires=0)
+            return qml.expval(qml.PauliZ(0))
+
+        result = f()
+        assert np.allclose(result, jnp.sqrt(2) / 2)
+
+    def test_for_in_object_list(self):
+        """Test for loop over a Python list that is *not* convertible to an array.
+        The behaviour should fall back to standard Python."""
+
+        @qjit(autograph=True)
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def f():
+            params = ["0", "1", "2"]
+            for x in params:
+                qml.RY(int(x) / 4 * jnp.pi, wires=0)
+            return qml.expval(qml.PauliZ(0))
+
+        result = f()
+        assert np.allclose(result, -jnp.sqrt(2) / 2)
+
+    def test_for_in_range(self):
+        """unsupported"""
+
+    def test_for_in_enumerate(self):
+        """unsupported"""
+
+    def test_for_in_zip(self):
+        """unsupported"""
+
+    def test_for_in_other_iterable_object(self):
+        """Test for loop over arbitrary iterable Python objects.
+        The behaviour should fall back to standard Python."""
+
+        @qjit(autograph=True)
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def f():
+            params = {"a": 0.0, "b": 1 / 4 * jnp.pi, "c": 2 / 4 * jnp.pi}
+            for k, v in params.items():
+                print(k)
+                qml.RY(v, wires=0)
+            return qml.expval(qml.PauliZ(0))
+
+        result = f()
+        assert np.allclose(result, -jnp.sqrt(2) / 2)
 
 
 if __name__ == "__main__":
