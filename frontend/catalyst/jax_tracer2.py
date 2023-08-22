@@ -118,31 +118,33 @@ def new_inner_tracer(trace:DynamicJaxprTrace, aval) -> JaxprTracer:
     trace.frame.tracer_to_var[id(dt)] = trace.frame.newvar(aval)
     return dt
 
+
+@dataclass
+class HybridOpRegion:
+    """ A code region of a nested HybridOp operation containing a JAX trace manager, a quantum tape,
+    input and output classical tracers. """
+    trace:DynamicJaxprTrace
+    quantum_tape:QuantumTape
+    arg_classical_tracers:List[DynamicJaxprTracer]
+    res_classical_tracers:List[DynamicJaxprTracer]
+
 class HybridOp(Operation):
     """ A model of an operation carrying nested quantum region. Simplified analog of
     catalyst.ForLoop, catalyst.WhileLoop, catalyst.Adjoin, etc """
     num_wires = AnyWires
 
-    def __init__(self, quantum_tapes, in_classical_tracers, out_classical_tracers,
-                 arg_classical_tracers, res_classical_tracers, inner_traces):
-        self.quantum_tapes = quantum_tapes
+    def __init__(self, in_classical_tracers, out_classical_tracers, regions:List[HybridOpRegion]):
         self.in_classical_tracers = in_classical_tracers
         self.out_classical_tracers = out_classical_tracers
-        self.arg_classical_tracers = arg_classical_tracers
-        self.res_classical_tracers = res_classical_tracers
-        self.traces = inner_traces
-        # kwargs["wires"] = Wires(HybridOp.num_wires)
+        self.regions = regions
         super().__init__(wires = Wires(HybridOp.num_wires))
-
-    def has_nested_tapes(self) -> bool:
-        properties = [self.quantum_tapes, self.traces]
-        assert all([len(x)>0 for x in properties]) or \
-               all([len(x)==0 for  x in properties])
-        return len(self.quantum_tapes)>0
 
     def __repr__(self):
         """Constructor-call-like representation."""
-        return f"{self.name}(tape={self.quantum_tapes[0].operations})"
+        return f"{self.name}(tapes={[r.quantum_tape.operations for r in self.regions]})"
+
+def has_nested_tapes(op:Operation) -> bool:
+    return isinstance(op, HybridOp) and len(op.regions)>0
 
 class ForLoop(HybridOp):
     pass
@@ -171,12 +173,14 @@ def hybrid(callee:Callable):
 
         out_classical_tracers = [new_inner_tracer(outer_trace, aval) for aval in res_avals]
 
-        HybridOp([quantum_tape],
-                 in_classical_tracers,
-                 out_classical_tracers,
-                 arg_classical_tracers,
-                 res_classical_tracers,
-                 [inner_trace])
+        HybridOp(
+            in_classical_tracers,
+            out_classical_tracers,
+            [HybridOpRegion(
+                inner_trace,
+                quantum_tape,
+                arg_classical_tracers,
+                res_classical_tracers)])
 
         return out_classical_tracers[0] # FIXME: generalize to the arbitrary number of retvals
 
@@ -222,33 +226,20 @@ class CondCallable:
         ctx = get_main_tracing_context()
         outer_trace = ctx.trace
 
-        quantum_tapes = []
-        inner_traces = []
         in_classical_tracers = self.preds
-        arg_classical_tracers = []
-        res_classical_tracers = []
+        regions:List[HybridOpRegion] = []
 
         for branch in self.branch_fns + [self.otherwise_fn]:
             quantum_tape = QuantumTape()
             with frame_tracing_context(ctx) as inner_trace:
                 wffa, in_avals, _ = deduce_avals(branch, [], {})
                 with QueuingManager.stop_recording(), quantum_tape:
-                    rct = wffa.call_wrapped()
-                    res_tracers = [inner_trace.full_raise(t) for t in rct]
-                inner_traces.append(inner_trace)
-                res_classical_tracers.append(res_tracers)
-            quantum_tapes.append(quantum_tape)
+                    res_classical_tracers = [inner_trace.full_raise(t) for t in wffa.call_wrapped()]
+            regions.append(HybridOpRegion(inner_trace, quantum_tape, [], res_classical_tracers))
 
-        res_avals = list(map(shaped_abstractify, res_tracers))
+        res_avals = list(map(shaped_abstractify, res_classical_tracers))
         out_classical_tracers = [new_inner_tracer(outer_trace, aval) for aval in res_avals]
-
-        Cond(quantum_tapes,
-             in_classical_tracers,
-             out_classical_tracers,
-             arg_classical_tracers,
-             res_classical_tracers,
-             inner_traces)
-
+        Cond(in_classical_tracers, out_classical_tracers, regions)
         return out_classical_tracers
 
     def _call_with_classical_ctx(self):
@@ -290,18 +281,18 @@ def for_loop(lower_bound, upper_bound, step):
                 wffa, in_avals, _ = deduce_avals(callee, [lower_bound] + list(init_state), {})
                 arg_classical_tracers = _input_type_to_tracers(inner_trace.new_arg, in_avals)
                 with QueuingManager.stop_recording(), quantum_tape:
-                    rct = wffa.call_wrapped(*arg_classical_tracers)
-                    res_classical_tracers = [inner_trace.full_raise(t) for t in rct]
-                res_avals = list(map(shaped_abstractify, res_classical_tracers))
+                    res_classical_tracers = [inner_trace.full_raise(t) for t in
+                                             wffa.call_wrapped(*arg_classical_tracers)]
 
+            res_avals = list(map(shaped_abstractify, res_classical_tracers))
             out_classical_tracers = [new_inner_tracer(outer_trace, aval) for aval in res_avals]
 
-            ForLoop([quantum_tape],
-                    in_classical_tracers,
+            ForLoop(in_classical_tracers,
                     out_classical_tracers,
-                    arg_classical_tracers,
-                    res_classical_tracers,
-                    [inner_trace])
+                    [HybridOpRegion(inner_trace,
+                                    quantum_tape,
+                                    arg_classical_tracers,
+                                    res_classical_tracers)])
 
             return out_classical_tracers
         return _call_handler
@@ -314,23 +305,18 @@ def measure(wires) -> JaxprTracer:
     if len(wires) != 1:
         raise TypeError(f"One classical argument (a wire) is expected, got {wires}")
     # assert len(ctx.trace.frame.eqns) == 0, ctx.trace.frame.eqns
-    result = new_inner_tracer(ctx.trace, jax.core.get_aval(True))
+    out_classical_tracer = new_inner_tracer(ctx.trace, jax.core.get_aval(True))
     MidCircuitMeasure(
-        quantum_tapes=[],
         in_classical_tracers=wires,
-        out_classical_tracers=[result],
-        arg_classical_tracers=[],
-        res_classical_tracers=[],
-        inner_traces=[])
-    return result
+        out_classical_tracers=[out_classical_tracer],
+        regions=[])
+    return out_classical_tracer
 
-hybrid_p = jax.core.Primitive("hybrid")
-hybrid_p.multiple_results = True
-
-
-@hybrid_p.def_abstract_eval
-def _abstract_eval(*args, body_jaxpr, **kwargs):
-    return [AbstractQreg()]
+# hybrid_p = jax.core.Primitive("hybrid")
+# hybrid_p.multiple_results = True
+# @hybrid_p.def_abstract_eval
+# def _abstract_eval(*args, body_jaxpr, **kwargs):
+#     return [AbstractQreg()]
 
 
 def trace_quantum_tape(quantum_tape:QuantumTape,
@@ -359,16 +345,18 @@ def trace_quantum_tape(quantum_tape:QuantumTape,
         qreg2 = None
         if isinstance(op, HybridOp):
             eqn = None
-            if op.has_nested_tapes():
+            if has_nested_tapes(op):
 
                 if isinstance(op, ForLoop):
-                    inner_trace = op.traces[0]
-                    inner_tape = op.quantum_tapes[0]
+                    inner_trace = op.regions[0].trace
+                    inner_tape = op.regions[0].quantum_tape
+                    res_classical_tracers = op.regions[0].res_classical_tracers
 
                     with frame_tracing_context(ctx, inner_trace):
                         qreg_in = _input_type_to_tracers(inner_trace.new_arg, [AbstractQreg()])[0]
                         qreg_out = trace_quantum_tape(inner_tape, device, qreg_in, ctx, inner_trace)
-                        jaxpr, typ, consts = ctx.frames[inner_trace].to_jaxpr2(op.res_classical_tracers + [qreg_out])
+                        jaxpr, typ, consts = ctx.frames[inner_trace].to_jaxpr2(
+                            res_classical_tracers + [qreg_out])
 
                     qreg2 = bind_overwrite_classical_tracers(
                         op, qfor_p.bind,
@@ -378,17 +366,16 @@ def trace_quantum_tape(quantum_tape:QuantumTape,
                         *(consts + op.in_classical_tracers[3:] + [qreg]),
                         body_jaxpr=ClosedJaxpr(convert_constvars_jaxpr(jaxpr), ()),
                         body_nconsts=len(consts),
+                        # FIXME: handle the loop reverse conditions
                         apply_reverse_transform=False)[-1] # [1]
 
                 elif isinstance(op, Cond):
                     jaxprs, consts = [], []
-                    for inner_trace, inner_tape, rct in zip(op.traces,
-                                                            op.quantum_tapes,
-                                                            op.res_classical_tracers):
-                        with frame_tracing_context(ctx, inner_trace):
-                            qreg_in = _input_type_to_tracers(inner_trace.new_arg, [AbstractQreg()])[0]
-                            qreg_out = trace_quantum_tape(inner_tape, device, qreg_in, ctx, inner_trace)
-                            jaxpr, typ, const = ctx.frames[inner_trace].to_jaxpr2(rct + [qreg_out])
+                    for region in op.regions:
+                        with frame_tracing_context(ctx, region.trace):
+                            qreg_in = _input_type_to_tracers(region.trace.new_arg, [AbstractQreg()])[0]
+                            qreg_out = trace_quantum_tape(region.quantum_tape, device, qreg_in, ctx, region.trace)
+                            jaxpr, typ, const = ctx.frames[region.trace].to_jaxpr2(region.res_classical_tracers + [qreg_out])
                             jaxprs.append(jaxpr)
                             consts.append(const)
 
@@ -407,9 +394,7 @@ def trace_quantum_tape(quantum_tape:QuantumTape,
                     qubit2 = bind_overwrite_classical_tracers(op, qmeasure_p.bind, qubit)[-1] # [1]
                     qreg2 = qinsert(qreg, wire, qubit2)
                 else:
-                    qreg2 = bind_overwrite_classical_tracers(op, hybrid_p.bind, qreg,
-                                          *chain(op.in_classical_tracers, consts),
-                                          body_jaxpr=ClosedJaxpr(jaxpr, consts))[-1] # [1]
+                    raise NotImplementedError(f"{op=}")
         else:
             if isinstance(op, MeasurementProcess):
                 qreg2 = qreg
