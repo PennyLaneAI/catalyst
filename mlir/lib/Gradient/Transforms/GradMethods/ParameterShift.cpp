@@ -22,7 +22,9 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 
+#include "Gradient/Analysis/ActivityAnalysis.h"
 #include "Gradient/Utils/GetDiffMethod.h"
+#include "Gradient/Utils/GradientShape.h"
 #include "Quantum/IR/QuantumOps.h"
 
 namespace catalyst {
@@ -43,6 +45,8 @@ void ParameterShiftLowering::rewrite(GradOp op, PatternRewriter &rewriter) const
     func::FuncOp callee =
         SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
     rewriter.setInsertionPointAfter(callee);
+
+    ActivityAnalyzer(callee, computeDiffArgIndices(op.getDiffArgIndices()));
 
     // Determine the number of parameters to shift (= to the total static number of gate parameters
     // occuring in the function) and number of selectors needed (= to the number of loop nests

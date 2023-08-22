@@ -17,6 +17,7 @@ set(LIBS
     ${conversion_libs}
     MLIRCatalyst
     MLIRGradient
+    MLIRGradientAnalysis
     GradientUtils
     MLIRQuantum
     QuantumUtils
