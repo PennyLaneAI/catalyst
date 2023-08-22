@@ -476,8 +476,7 @@ def trace_quantum_measurements(quantum_tape,
             elif isinstance(obs, KNOWN_NAMED_OBS):
                 obs_tracers = namedobs(type(obs).__name__, qubits[0])
             elif isinstance(obs, qml.Hermitian):
-                assert False, f"{obs.matrix=}"
-                obs_tracers = hermitian(matrix, *qubits)
+                obs_tracers = hermitian(obs.matrix(), *qubits)
             # elif isinstance(obs, qml.operation.Tensor):
             #     nested_obs = [trace_observables(o, qubit_states, p, num_wires, qreg)[0] for o in obs.obs]
             #     obs_tracers = jprim.tensorobs(*nested_obs)
