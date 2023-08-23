@@ -24,6 +24,7 @@ from catalyst import measure, qjit
 from catalyst.ag_utils import AutoGraphError, check_cache, converted_code
 
 # pylint: disable=missing-function-docstring
+# pylint: disable=unnecessary-lambda-assignment
 
 
 class TestIntegration:
@@ -44,6 +45,8 @@ class TestIntegration:
         QNode, function, or method)."""
 
         class FN:
+            """Test object."""
+
             def __call__(self, x):
                 return x**2
 
