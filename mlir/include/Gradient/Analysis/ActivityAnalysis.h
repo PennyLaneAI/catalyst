@@ -24,12 +24,23 @@ namespace gradient {
 
 class ActivityAnalyzer {
   public:
-    ActivityAnalyzer(mlir::FunctionOpInterface callee, mlir::ArrayRef<size_t> diffArgIndices);
+    /// Initialize and run activity analysis for a given callee and differential activity
+    /// configuration.
+    ActivityAnalyzer(mlir::FunctionOpInterface callee, mlir::ArrayRef<size_t> diffArgIndices,
+                     bool print = false);
 
+    /// Determine if the given value is active (i.e. requires the computation of a derivative).
     bool isActive(mlir::Value value) const;
 
   private:
     mlir::DataFlowSolver solver;
+    bool analysisFailed = false;
+
+    /// Set the initial lattice states for function arguments (for forward dataflow) and return
+    /// values (for backward dataflow)
+    void initializeStates(mlir::FunctionOpInterface callee, mlir::ArrayRef<size_t> diffArgIndices);
+
+    void printResults(mlir::FunctionOpInterface callee);
 };
 
 } // namespace gradient

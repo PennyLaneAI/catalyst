@@ -23,8 +23,6 @@
 using namespace mlir;
 using namespace dataflow;
 
-using llvm::errs;
-
 class ValueActivity {
     enum class Activity { Constant, Active };
 
@@ -70,7 +68,7 @@ class ValueActivity {
         if (lhs.isUninitialized()) {
             return rhs;
         }
-        if (lhs.isUninitialized()) {
+        if (rhs.isUninitialized()) {
             return lhs;
         }
 
@@ -91,7 +89,7 @@ raw_ostream &operator<<(raw_ostream &os, const ValueActivity &valueActivity)
 }
 
 //===----------------------------------------------------------------------===//
-// Lattices
+// Activity Lattices
 //===----------------------------------------------------------------------===//
 
 class ForwardActivity : public AbstractSparseLattice {
@@ -209,17 +207,34 @@ class BackwardActivityAnalysis : public SparseBackwardDataFlowAnalysis<BackwardA
 //===----------------------------------------------------------------------===//
 
 catalyst::gradient::ActivityAnalyzer::ActivityAnalyzer(FunctionOpInterface callee,
-                                                       ArrayRef<size_t> diffArgIndices)
+                                                       ArrayRef<size_t> diffArgIndices, bool print)
 {
     SymbolTableCollection symbolTable;
     solver.load<ForwardActivityAnalysis>();
     solver.load<BackwardActivityAnalysis>(symbolTable);
 
-    // These are required by the dataflow framework to traverse region control flow.
+    // DCA and SCP are required by the dataflow framework to traverse region control flow.
     solver.load<DeadCodeAnalysis>();
     solver.load<SparseConstantPropagation>();
 
-    // Initialize the activity states of the arguments and function returns
+    initializeStates(callee, diffArgIndices);
+
+    if (failed(solver.initializeAndRun(callee->getParentOfType<ModuleOp>()))) {
+        callee.emitWarning("activity analysis failed");
+        analysisFailed = true;
+        return;
+    }
+
+    // Print the results
+    if (print) {
+        printResults(callee);
+    }
+}
+
+void catalyst::gradient::ActivityAnalyzer::initializeStates(FunctionOpInterface callee,
+                                                            ArrayRef<size_t> diffArgIndices)
+{
+    // Initialize argument activity
     DenseSet<size_t> activeArgs{diffArgIndices.begin(), diffArgIndices.end()};
     for (BlockArgument arg : callee.getArguments()) {
         ForwardActivity *argState = solver.getOrCreateState<ForwardActivity>(arg);
@@ -227,6 +242,7 @@ catalyst::gradient::ActivityAnalyzer::ActivityAnalyzer(FunctionOpInterface calle
                                                                : ValueActivity::getConstant());
     }
 
+    // Initialize return op activity
     for (Operation &op : callee.getFunctionBody().getOps()) {
         if (op.hasTrait<OpTrait::ReturnLike>()) {
             // Assume that all function returns are active.
@@ -236,17 +252,17 @@ catalyst::gradient::ActivityAnalyzer::ActivityAnalyzer(FunctionOpInterface calle
             }
         }
     }
+}
 
-    if (failed(solver.initializeAndRun(callee->getParentOfType<ModuleOp>()))) {
-        assert(false && "dataflow failed");
-    }
-
-    // Print the results
+void catalyst::gradient::ActivityAnalyzer::printResults(FunctionOpInterface callee)
+{
+    using llvm::errs;
+    errs() << "Activity for '" << FlatSymbolRefAttr::get(callee) << "':\n";
     for (BlockArgument arg : callee.getArguments()) {
         Attribute label = callee.getArgAttr(arg.getArgNumber(), "activity.id");
         if (label) {
-            ForwardActivity *fwdState = solver.getOrCreateState<ForwardActivity>(arg);
-            BackwardActivity *bwdState = solver.getOrCreateState<BackwardActivity>(arg);
+            auto *fwdState = solver.lookupState<ForwardActivity>(arg);
+            auto *bwdState = solver.lookupState<BackwardActivity>(arg);
 
             errs() << label << ": " << (isActive(arg) ? "Active" : "Constant") << " (fwd "
                    << fwdState->getValue() << " bwd " << bwdState->getValue() << ")\n";
@@ -257,8 +273,8 @@ catalyst::gradient::ActivityAnalyzer::ActivityAnalyzer(FunctionOpInterface calle
         if (op->hasAttr("activity.id")) {
             errs() << op->getAttr("activity.id") << ": ";
             for (OpResult result : op->getResults()) {
-                ForwardActivity *fwdState = solver.getOrCreateState<ForwardActivity>(result);
-                BackwardActivity *bwdState = solver.getOrCreateState<BackwardActivity>(result);
+                auto *fwdState = solver.lookupState<ForwardActivity>(result);
+                auto *bwdState = solver.lookupState<BackwardActivity>(result);
 
                 errs() << (isActive(result) ? "Active" : "Constant") << " (fwd "
                        << fwdState->getValue() << " bwd " << bwdState->getValue() << ") ";
@@ -270,12 +286,16 @@ catalyst::gradient::ActivityAnalyzer::ActivityAnalyzer(FunctionOpInterface calle
 
 bool catalyst::gradient::ActivityAnalyzer::isActive(Value value) const
 {
+    if (analysisFailed) {
+        // If the analysis failed, conservatively assume all values are active.
+        return true;
+    }
+
     auto *forwardState = solver.lookupState<ForwardActivity>(value);
     auto *backwardState = solver.lookupState<BackwardActivity>(value);
 
-    if (!(forwardState && backwardState)) {
-        return false;
-    }
+    // All states should be initialized by the time the solver terminates.
+    assert(forwardState && backwardState && "activity states were null");
 
     // A value is overall active iff it is both forward and backward active.
     return forwardState->getValue().isActive() && backwardState->getValue().isActive();
