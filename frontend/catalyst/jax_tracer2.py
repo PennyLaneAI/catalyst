@@ -719,22 +719,3 @@ def trace_quantum_function(
                                [ShapeDtypeStruct(a.shape, a.dtype, a.named_shape) for a in out_avals])
     return closed_jaxpr, out_shape
 
-
-# def lower_jaxpr_to_mlir(jaxpr):
-
-#     nrep = jaxpr_replicas(jaxpr)
-#     effects = [eff for eff in jaxpr.effects if eff in jax.core.ordered_effects]
-#     axis_context = ReplicaAxisContext(xla.AxisEnv(nrep, (), ()))
-#     name_stack = new_name_stack(wrap_name("ok", "jit"))
-#     module, context = custom_lower_jaxpr_to_module(
-#         func_name="jit_func",
-#         module_name="mlir_module",
-#         jaxpr=jaxpr,
-#         effects=effects,
-#         platform="cpu",
-#         axis_context=axis_context,
-#         name_stack=name_stack,
-#         donated_args=[],
-#     )
-#     return module
-
