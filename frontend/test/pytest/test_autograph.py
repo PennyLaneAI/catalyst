@@ -39,6 +39,15 @@ class TestIntegration:
         with pytest.raises(ImportError, match="AutoGraph feature in Catalyst requires TensorFlow"):
             qjit(autograph=True)(fn)
 
+    def test_lambda(self):
+        """Test autograph on a lambda function."""
+
+        fn = lambda x: x**2
+        fn = qjit(autograph=True)(fn)
+
+        assert hasattr(fn.user_function, "ag_unconverted")
+        assert fn(4) == 16
+
     def test_classical_function(self):
         """Test autograph on a purely classical function."""
 
@@ -167,6 +176,14 @@ class TestCodePrinting:
 
         with pytest.raises(AutoGraphError, match="function was not converted by AutoGraph"):
             converted_code(fn)
+
+    def test_lambda(self):
+        """Test printing on a lambda function."""
+
+        fn = lambda x: x**2
+        qjit(autograph=True)(fn)
+
+        assert converted_code(fn)
 
     def test_classical_function(self):
         """Test printing on a purely classical function."""

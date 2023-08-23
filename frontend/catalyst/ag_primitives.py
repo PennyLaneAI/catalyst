@@ -25,7 +25,7 @@ import tensorflow.python.autograph.impl.api as tf_autograph_api
 from tensorflow.python.autograph.core import config
 from tensorflow.python.autograph.core.converter import STANDARD_OPTIONS as STD
 from tensorflow.python.autograph.core.converter import ConversionOptions
-from tensorflow.python.autograph.core.function_wrappers import FunctionScope
+from tensorflow.python.autograph.core.function_wrappers import FunctionScope, with_function_scope
 from tensorflow.python.autograph.impl.api import converted_call as tf_converted_call
 from tensorflow.python.autograph.operators.variables import (
     Undefined,
@@ -42,6 +42,7 @@ __all__ = [
     "Undefined",
     "UndefinedReturnValue",
     "FunctionScope",
+    "with_function_scope",
     "if_stmt",
     "converted_call",
 ]
