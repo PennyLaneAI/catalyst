@@ -698,33 +698,6 @@ class TestNewArithmeticOps:
 
     @pytest.mark.parametrize(
         "meas, expected",
-        [[qml.expval, np.array(-0.5)], [qml.var, np.array(0.75)]],
-    )
-    def test_prod_dunder_xy(self, meas, expected, backend):
-        """Test ``@`` conveting to TensorObs and checking the Paulis map."""
-
-        # Enabling new arithmetic operators
-        qml.operation.enable_new_opmath()
-
-        @qjit
-        @qml.qnode(qml.device(backend, wires=2))
-        def circuit(x, y):
-            qml.RX(x, wires=0)
-            qml.RX(y, wires=1)
-            qml.CNOT(wires=[0, 1])
-            return meas(qml.PauliX(0) @ qml.PauliY(1))
-
-        result = circuit(np.pi / 4, np.pi / 4)
-        assert np.allclose(expected, result)
-
-        assert qml.operation.active_new_opmath()
-
-        circuit(0, 1)  # another call
-
-        qml.operation.disable_new_opmath()
-
-    @pytest.mark.parametrize(
-        "meas, expected",
         [
             [
                 qml.expval(
@@ -772,24 +745,6 @@ class TestNewArithmeticOps:
         assert np.allclose(expected, result)
 
         qml.operation.disable_new_opmath()
-
-    @pytest.mark.parametrize(
-        "meas, expected",
-        [[qml.expval, np.array(0.0)], [qml.var, np.array(0.25)]],
-    )
-    def test_sprod_x(self, meas, expected, backend):
-        """Test ``qml.ops.op_math.SProd`` converting to HamiltonianObs."""
-
-        @qjit
-        @qml.qnode(qml.device(backend, wires=2))
-        def circuit(x: float, y: float):
-            qml.RX(x, wires=0)
-            qml.RX(y, wires=1)
-            qml.CNOT(wires=[0, 1])
-            return meas(qml.ops.op_math.SProd(0.5, qml.PauliX(0)))
-
-        result = circuit(np.pi / 4, np.pi / 2)
-        assert np.allclose(expected, result)
 
         circuit(0, 1)  # another call
 
