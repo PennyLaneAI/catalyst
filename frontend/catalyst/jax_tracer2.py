@@ -308,6 +308,7 @@ def for_loop(lower_bound, upper_bound, step):
                     body_fn, in_tree, init_avals, "for_loop"
                 )
 
+                apply_reverse_transform = isinstance(step, int) and step < 0
                 out_classical_tracers = qfor_p.bind(
                     lower_bound,
                     upper_bound,
@@ -315,8 +316,7 @@ def for_loop(lower_bound, upper_bound, step):
                     *(body_consts + init_vals),
                     body_jaxpr=body_jaxpr,
                     body_nconsts=len(body_consts),
-                    # FIXME: handle the loop reverse conditions
-                    apply_reverse_transform=False)
+                    apply_reverse_transform=apply_reverse_transform)
 
                 return tree_unflatten(body_tree, out_classical_tracers)
 
@@ -466,16 +466,17 @@ def trace_quantum_tape(quantum_tape:QuantumTape,
                     jaxpr, typ, consts = ctx.frames[inner_trace].to_jaxpr2(
                         res_classical_tracers + [qreg_out])
 
+                step = op.in_classical_tracers[2]
+                apply_reverse_transform = isinstance(step, int) and step < 0
                 qreg2 = bind_overwrite_classical_tracers(
                     op, qfor_p.bind,
                     op.in_classical_tracers[0],
                     op.in_classical_tracers[1],
-                    op.in_classical_tracers[2],
+                    step,
                     *(consts + op.in_classical_tracers[3:] + [qreg]),
                     body_jaxpr=ClosedJaxpr(convert_constvars_jaxpr(jaxpr), ()),
                     body_nconsts=len(consts),
-                    # FIXME: handle the loop reverse conditions
-                    apply_reverse_transform=False)[-1] # [1]
+                    apply_reverse_transform=apply_reverse_transform)[-1] # [1]
 
             elif isinstance(op, Cond):
                 jaxprs, consts = [], []
