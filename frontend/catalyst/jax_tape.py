@@ -206,15 +206,26 @@ def get_observables_dependency_tree(obs):
         yield obs
     elif isinstance(obs, jax_tracer.KNOWN_NAMED_OBS):
         yield obs
-    elif isinstance(obs, qml.Hermitian):
-        yield obs
     elif isinstance(obs, qml.operation.Tensor):
         yield obs
         for o in obs.obs:
             yield from get_observables_dependency_tree(o)
+    elif isinstance(obs, qml.Hermitian):
+        yield obs
     elif isinstance(obs, qml.Hamiltonian):
         yield obs
         for o in obs.ops:
             yield from get_observables_dependency_tree(o)
-    else:
+    elif obs._pauli_rep:  # pylint: disable=protected-access
+        # Use the pauli sentence representation of the observable, if applicable
+        yield obs
+    elif isinstance(obs, (qml.ops.op_math.Sum, qml.ops.op_math.Prod)):
+        yield obs
+        for o in obs:
+            yield from get_observables_dependency_tree(o)
+    elif isinstance(obs, qml.ops.op_math.SProd):
+        yield obs
+        terms = obs.terms()
+        yield from get_observables_dependency_tree(terms[1][0])
+    else:  # pragma: no cover
         raise ValueError("Unsupported observable")
