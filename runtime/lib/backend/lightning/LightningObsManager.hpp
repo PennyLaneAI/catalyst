@@ -26,6 +26,14 @@
 #include "ObservablesLQubit.hpp"
 #include "StateVectorDynamicCPU.hpp"
 
+namespace {
+using Pennylane::LightningQubit::StateVectorDynamicCPU;
+using Pennylane::LightningQubit::Observables::HermitianObs;
+using Pennylane::LightningQubit::Observables::NamedObs;
+using Pennylane::LightningQubit::Observables::TensorProdObs;
+using Pennylane::Observables::Observable;
+} // namespace
+
 namespace Catalyst::Runtime::Simulator {
 
 /**
@@ -35,16 +43,8 @@ namespace Catalyst::Runtime::Simulator {
  */
 template <typename PrecisionT> class LightningObsManager {
   private:
-    using VectorStateT = Pennylane::LightningQubit::StateVectorDynamicCPU<PrecisionT>;
-    using ObservableClassName = Pennylane::Observables::Observable<VectorStateT>;
-    using NamedObsClassName = Pennylane::LightningQubit::Observables::NamedObs<VectorStateT>;
-    using HermitianObsClassName =
-        Pennylane::LightningQubit::Observables::HermitianObs<VectorStateT>;
-    using TensorProdObsClassName =
-        Pennylane::LightningQubit::Observables::TensorProdObs<VectorStateT>;
-    using HamiltonianClassName = Pennylane::LightningQubit::Observables::Hamiltonian<VectorStateT>;
-
-    using ObservablePairType = std::pair<std::shared_ptr<ObservableClassName>, ObsType>;
+    using VectorStateT = StateVectorDynamicCPU<PrecisionT>;
+    using ObservablePairType = std::pair<std::shared_ptr<Observable<VectorStateT>>, ObsType>;
     std::vector<ObservablePairType> observables_{};
 
   public:
@@ -78,9 +78,9 @@ template <typename PrecisionT> class LightningObsManager {
      * @brief Get the constructed observable instance.
      *
      * @param key The observable key
-     * @return std::shared_ptr<ObservableClassName>
+     * @return std::shared_ptr<Observable<VectorStateT>>
      */
-    [[nodiscard]] auto getObservable(ObsIdType key) -> std::shared_ptr<ObservableClassName>
+    [[nodiscard]] auto getObservable(ObsIdType key) -> std::shared_ptr<Observable<VectorStateT>>
     {
         RT_FAIL_IF(!isValidObservables({key}), "Invalid observable key");
         return std::get<0>(observables_[key]);
@@ -106,8 +106,8 @@ template <typename PrecisionT> class LightningObsManager {
             std::string(Lightning::lookup_obs<Lightning::simulator_observable_support_size>(
                 Lightning::simulator_observable_support, obsId));
 
-        observables_.push_back(
-            std::make_pair(std::make_shared<NamedObsClassName>(obs_str, wires), ObsType::Basic));
+        observables_.push_back(std::make_pair(
+            std::make_shared<NamedObs<VectorStateT>>(obs_str, wires), ObsType::Basic));
         return static_cast<ObsIdType>(observables_.size() - 1);
     }
 
@@ -122,7 +122,7 @@ template <typename PrecisionT> class LightningObsManager {
                                           const std::vector<size_t> &wires) -> ObsIdType
     {
         observables_.push_back(std::make_pair(
-            std::make_shared<HermitianObsClassName>(HermitianObsClassName{matrix, wires}),
+            std::make_shared<HermitianObs<VectorStateT>>(HermitianObs<VectorStateT>{matrix, wires}),
             ObsType::Basic));
 
         return static_cast<ObsIdType>(observables_.size() - 1);
@@ -139,7 +139,7 @@ template <typename PrecisionT> class LightningObsManager {
         const auto key_size = obsKeys.size();
         const auto obs_size = observables_.size();
 
-        std::vector<std::shared_ptr<ObservableClassName>> obs_vec;
+        std::vector<std::shared_ptr<Observable<VectorStateT>>> obs_vec;
         obs_vec.reserve(key_size);
 
         for (const auto &key : obsKeys) {
@@ -149,9 +149,9 @@ template <typename PrecisionT> class LightningObsManager {
             obs_vec.push_back(obs);
         }
 
-        observables_.push_back(std::make_pair(
-            std::make_shared<TensorProdObsClassName>(TensorProdObsClassName::create(obs_vec)),
-            ObsType::TensorProd));
+        observables_.push_back(std::make_pair(std::make_shared<TensorProdObs<VectorStateT>>(
+                                                  TensorProdObs<VectorStateT>::create(obs_vec)),
+                                              ObsType::TensorProd));
 
         return static_cast<ObsIdType>(obs_size);
     }
@@ -173,7 +173,7 @@ template <typename PrecisionT> class LightningObsManager {
                    "Incompatible list of observables and coefficients; "
                    "Number of observables and number of coefficients must be equal");
 
-        std::vector<std::shared_ptr<ObservableClassName>> obs_vec;
+        std::vector<std::shared_ptr<Observable<VectorStateT>>> obs_vec;
         obs_vec.reserve(key_size);
 
         for (auto key : obsKeys) {
@@ -183,9 +183,11 @@ template <typename PrecisionT> class LightningObsManager {
             obs_vec.push_back(obs);
         }
 
-        observables_.push_back(std::make_pair(std::make_shared<HamiltonianClassName>(
-                                                  HamiltonianClassName(coeffs, std::move(obs_vec))),
-                                              ObsType::Hamiltonian));
+        observables_.push_back(std::make_pair(
+            std::make_shared<Pennylane::LightningQubit::Observables::Hamiltonian<VectorStateT>>(
+                Pennylane::LightningQubit::Observables::Hamiltonian<VectorStateT>(
+                    coeffs, std::move(obs_vec))),
+            ObsType::Hamiltonian));
 
         return static_cast<ObsIdType>(obs_size);
     }

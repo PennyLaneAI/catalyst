@@ -96,16 +96,6 @@ class StateVectorDynamicCPU : public StateVectorLQubit<fp_t, StateVectorDynamicC
                          ONE<PrecisionT>() / std::sqrt(squaredNorm(data.data(), data.size())));
     }
 
-    // /**
-    //  * @brief Redefine the number of qubits in the statevector.
-    //  *
-    //  * @param qubits New number of qubits represented by statevector.
-    //  */
-    // void setNumQubits(size_t qubits) {
-    //     PL_ASSERT(qubits >= 0);
-    //     num_qubits_ = qubits;
-    // }
-
   public:
     /**
      * @brief Create a new statevector
@@ -234,15 +224,6 @@ class StateVectorDynamicCPU : public StateVectorLQubit<fp_t, StateVectorDynamicC
     }
 
     AlignedAllocator<ComplexT> allocator() const { return data_.get_allocator(); }
-
-    // /**
-    //  * @brief Get the number of qubits represented by the statevector data.
-    //  *
-    //  * @return std::size_t
-    //  */
-    // [[nodiscard]] auto getNumQubits() const -> std::size_t {
-    //     return num_qubits_;
-    // }
 
     [[nodiscard]] auto isValidWire(size_t wire) -> bool { return wire < this->getNumQubits(); }
 

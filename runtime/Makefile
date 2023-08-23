@@ -7,20 +7,21 @@ MK_DIR := $(dir $(MK_ABSPATH))
 RT_BUILD_DIR?=$(MK_DIR)/build
 CMAKE_ARGS?=""
 CODE_COVERAGE?=OFF
-BUILD_TYPE?=DEBUG
+BUILD_TYPE?=Release
 ENABLE_WARNINGS?=ON
 ENABLE_LIGHTNING_KOKKOS?=OFF
 ENABLE_OPENQASM?=OFF
 BUILD_QIR_STDLIB_FROM_SRC?=OFF
 # TODO: Update to latest_release after v0.32.0
-LIGHTNING_GIT_TAG_VALUE?=catalyst-deps-2
+# LIGHTNING_GIT_TAG_VALUE?="latest_version"
+LIGHTNING_GIT_TAG_VALUE=catalyst-deps-2
 LIGHTNING_KOKKOS_GIT_TAG_VALUE?=latest_release
 NPROC?=$(shell python -c "import os; print(os.cpu_count())")
 
 coverage: CODE_COVERAGE=ON
 coverage: BUILD_TYPE=Debug
 test: CODE_COVERAGE=OFF
-test: BUILD_TYPE?=DEBUG
+test: BUILD_TYPE?=Release
 
 .PHONY: help
 help:
@@ -58,7 +59,7 @@ configure:
 		$(CMAKE_ARGS)
 
 $(RT_BUILD_DIR)/lib/backend/librt_backend.so $(RT_BUILD_DIR)/lib/librt_capi.so: configure
-	cmake --build $(RT_BUILD_DIR) --target rt_backend -j$(NPROC)
+	cmake --build $(RT_BUILD_DIR) --target rt_capi -j$(NPROC)
 
 .PHONY: runtime
 runtime: $(RT_BUILD_DIR)/lib/backend/librt_backend.so $(RT_BUILD_DIR)/lib/librt_capi.so

@@ -75,8 +75,7 @@ target_sources(runner_tests PRIVATE ${cov_helper_src}
             Test_LightningMeasures.cpp
             Test_LightningGradient.cpp
             Test_SVDynamicCPU_Core.cpp
-            Test_SVDynamicCPU_Allocation.cpp
-            )
+            Test_SVDynamicCPU_Allocation.cpp)
 
 if(KOKKOS_ENABLE_OPENMP)
     find_package(OpenMP REQUIRED)
