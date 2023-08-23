@@ -39,6 +39,19 @@ class TestIntegration:
         with pytest.raises(ImportError, match="AutoGraph feature in Catalyst requires TensorFlow"):
             qjit(autograph=True)(fn)
 
+    def test_unsupported_object(self):
+        """Check the error produced when attempting to convert an unsupported object (neither of
+        QNode, function, or method)."""
+
+        class FN:
+            def __call__(self, x):
+                return x**2
+
+        fn = FN()
+
+        with pytest.raises(AutoGraphError, match="Unsupported object for transformation"):
+            qjit(autograph=True)(fn)
+
     def test_lambda(self):
         """Test autograph on a lambda function."""
 

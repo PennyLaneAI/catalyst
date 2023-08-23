@@ -99,7 +99,7 @@ def converted_code(fn):
 def print_code(fn):
     """Convenience function for testing to print the transformed code."""
 
-    print(converted_code(fn))
+    print(converted_code(fn))  # pragma: nocover
 
 
 def check_cache(fn):

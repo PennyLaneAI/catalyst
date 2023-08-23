@@ -26,6 +26,7 @@ from tensorflow.python.autograph.core import converter, unsupported_features_che
 from tensorflow.python.autograph.pyct import transpiler
 
 from catalyst import ag_primitives
+from catalyst.ag_utils import AutoGraphError
 
 
 class CFTransformer(transpiler.PyToPy):
@@ -45,7 +46,7 @@ class CFTransformer(transpiler.PyToPy):
             fn = obj.func
 
         if not (inspect.isfunction(fn) or inspect.ismethod(fn)):
-            raise NotImplementedError(f"Unsupported object for transformation: {type(fn)}")
+            raise AutoGraphError(f"Unsupported object for transformation: {type(fn)}")
 
         new_fn, module, source_map = self.transform_function(fn, user_context)
         new_obj = new_fn
