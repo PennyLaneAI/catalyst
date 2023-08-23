@@ -1,6 +1,8 @@
 import jax
 import pennylane as qml
-from catalyst.utils.jax_extras import new_main2, sort_eqns, initial_style_jaxprs_with_common_consts2
+from catalyst.utils.jax_extras import (new_main2, sort_eqns,
+                                       initial_style_jaxprs_with_common_consts,
+                                       initial_style_jaxprs_with_common_consts2)
 from jax._src.core import (ClosedJaxpr, MainTrace as JaxMainTrace, new_main,
                            new_base_main, cur_sublevel, get_aval, Tracer as JaxprTracer,
                            check_jaxpr, ShapedArray, JaxprEqn, Var)
@@ -34,6 +36,9 @@ from jax.interpreters.mlir import (
 from jax._src.interpreters.mlir import (
     _constant_handlers
 )
+from jax._src.lax.control_flow import (
+    _initial_style_jaxpr,
+)
 from jax._src.util import unzip2
 from jax._src.lax.lax import xb, xla
 from catalyst.jax_primitives import (Qreg, AbstractQreg, AbstractQbit, qinst, qextract, qinsert,
@@ -53,6 +58,26 @@ from contextlib import contextmanager
 from collections import defaultdict
 
 from dataclasses import dataclass
+from enum import Enum
+
+class EvaluationMode(Enum):
+    QJIT_QNODE = 0
+    QJIT = 1
+    EXEC = 2
+
+
+def get_evaluation_mode() -> Tuple[EvaluationMode, Any]:
+    is_tracing = TracingContext.is_tracing()
+    if is_tracing:
+        ctx = qml.QueuingManager.active_context()
+        if ctx is not None:
+            mctx = get_main_tracing_context()
+            assert mctx is not None
+            return (EvaluationMode.QJIT_QNODE, mctx)
+        else:
+            return (EvaluationMode.QJIT, None)
+    else:
+        return (EvaluationMode.EXEC, None)
 
 
 @dataclass
@@ -196,9 +221,7 @@ class CondCallable:
                 )
 
     def _call_with_quantum_ctx(self, ctx):
-        ctx = get_main_tracing_context()
         outer_trace = ctx.trace
-
         in_classical_tracers = self.preds
         regions:List[HybridOpRegion] = []
 
@@ -216,21 +239,27 @@ class CondCallable:
         return out_classical_tracers
 
     def _call_with_classical_ctx(self):
-        raise NotImplementedError()
+        args, args_tree = tree_flatten([])
+        args_avals = tuple(map(_abstractify, args))
+        branch_jaxprs, consts, out_trees = initial_style_jaxprs_with_common_consts(
+            (*self.branch_fns, self.otherwise_fn), args_tree, args_avals, "cond"
+        )
+        out_classical_tracers = qcond_p.bind(*(self.preds + consts), branch_jaxprs=branch_jaxprs)
+        return tree_unflatten(out_trees[0], out_classical_tracers)
 
     def _call_during_interpretation(self):
         raise NotImplementedError()
 
     def __call__(self):
-        is_tracing = TracingContext.is_tracing()
-        if is_tracing:
-            ctx = qml.QueuingManager.active_context()
-            if ctx is None:
-                return self._call_with_classical_ctx()
-            else:
-                return self._call_with_quantum_ctx(ctx)
-        else:
+        mode, ctx = get_evaluation_mode()
+        if mode == EvaluationMode.QJIT_QNODE:
+            return self._call_with_quantum_ctx(ctx)
+        elif mode == EvaluationMode.QJIT:
+            return self._call_with_classical_ctx()
+        elif mode == EvaluationMode.EXEC:
             return self._call_during_interpretation()
+        else:
+            raise RuntimeError(f"Unsupported evaluation mode {mode}")
 
 
 def cond(pred:DynamicJaxprTracer):
@@ -243,31 +272,130 @@ def cond(pred:DynamicJaxprTracer):
     return _decorator
 
 def for_loop(lower_bound, upper_bound, step):
-    def _body_query(callee):
+    def _body_query(body_fn):
         def _call_handler(*init_state):
-            ctx = get_main_tracing_context()
-            quantum_tape = QuantumTape()
-            outer_trace = ctx.trace
-            with frame_tracing_context(ctx) as inner_trace:
+            def _call_with_quantum_ctx(ctx: MainTracingContex):
+                quantum_tape = QuantumTape()
+                outer_trace = ctx.trace
+                with frame_tracing_context(ctx) as inner_trace:
 
-                in_classical_tracers = [lower_bound, upper_bound, step, lower_bound] + list(init_state)
-                wffa, in_avals, _ = deduce_avals(callee, [lower_bound] + list(init_state), {})
-                arg_classical_tracers = _input_type_to_tracers(inner_trace.new_arg, in_avals)
-                with QueuingManager.stop_recording(), quantum_tape:
-                    res_classical_tracers = [inner_trace.full_raise(t) for t in
-                                             wffa.call_wrapped(*arg_classical_tracers)]
+                    in_classical_tracers = [lower_bound, upper_bound, step, lower_bound] + list(init_state)
+                    wffa, in_avals, _ = deduce_avals(body_fn, [lower_bound] + list(init_state), {})
+                    arg_classical_tracers = _input_type_to_tracers(inner_trace.new_arg, in_avals)
+                    with QueuingManager.stop_recording(), quantum_tape:
+                        res_classical_tracers = [inner_trace.full_raise(t) for t in
+                                                 wffa.call_wrapped(*arg_classical_tracers)]
 
-            res_avals = list(map(shaped_abstractify, res_classical_tracers))
-            out_classical_tracers = [new_inner_tracer(outer_trace, aval) for aval in res_avals]
+                res_avals = list(map(shaped_abstractify, res_classical_tracers))
+                out_classical_tracers = [new_inner_tracer(outer_trace, aval) for aval in res_avals]
 
-            ForLoop(in_classical_tracers,
-                    out_classical_tracers,
-                    [HybridOpRegion(inner_trace,
-                                    quantum_tape,
-                                    arg_classical_tracers,
-                                    res_classical_tracers)])
+                ForLoop(in_classical_tracers,
+                        out_classical_tracers,
+                        [HybridOpRegion(inner_trace,
+                                        quantum_tape,
+                                        arg_classical_tracers,
+                                        res_classical_tracers)])
 
-            return out_classical_tracers
+                return out_classical_tracers
+
+            def _call_with_classical_ctx():
+                iter_arg = lower_bound
+                init_vals, in_tree = tree_flatten((iter_arg, *init_state))
+                init_avals = tuple(_abstractify(val) for val in init_vals)
+                body_jaxpr, body_consts, body_tree = _initial_style_jaxpr(
+                    body_fn, in_tree, init_avals, "for_loop"
+                )
+
+                out_classical_tracers = qfor_p.bind(
+                    lower_bound,
+                    upper_bound,
+                    step,
+                    *(body_consts + init_vals),
+                    body_jaxpr=body_jaxpr,
+                    body_nconsts=len(body_consts),
+                    # FIXME: handle the loop reverse conditions
+                    apply_reverse_transform=False)
+
+                return tree_unflatten(body_tree, out_classical_tracers)
+
+            mode, ctx = get_evaluation_mode()
+            if mode == EvaluationMode.QJIT_QNODE:
+                return _call_with_quantum_ctx(ctx)
+            elif mode == EvaluationMode.QJIT:
+                return _call_with_classical_ctx()
+            # elif mode == EvaluationMode.EXEC:
+            #     return _call_during_interpretation()
+            else:
+                raise RuntimeError(f"Unsupported evaluation mode {mode}")
+        return _call_handler
+    return _body_query
+
+
+def while_loop(cond_fn):
+    def _body_query(body_fn):
+        def _call_handler(*init_state):
+            def _call_with_quantum_ctx(ctx:MainTracingContex):
+                outer_trace = ctx.trace
+                in_classical_tracers = list(init_state)
+
+                with frame_tracing_context(ctx) as cond_trace:
+                    cond_wffa, cond_in_avals, _ = deduce_avals(cond_fn, in_classical_tracers, {})
+                    arg_classical_tracers = _input_type_to_tracers(cond_trace.new_arg, cond_in_avals)
+                    res_classical_tracers = [cond_trace.full_raise(t) for t in
+                                             cond_wffa.call_wrapped(*arg_classical_tracers)]
+                    cond_region = HybridOpRegion(
+                        cond_trace,
+                        None,
+                        arg_classical_tracers,
+                        res_classical_tracers)
+
+                with frame_tracing_context(ctx) as body_trace:
+                    wffa, in_avals, _ = deduce_avals(body_fn, in_classical_tracers, {})
+                    arg_classical_tracers = _input_type_to_tracers(body_trace.new_arg, in_avals)
+                    quantum_tape = QuantumTape()
+                    with QueuingManager.stop_recording(), quantum_tape:
+                        res_classical_tracers = [body_trace.full_raise(t) for t in
+                                                 wffa.call_wrapped(*arg_classical_tracers)]
+                    body_region = HybridOpRegion(
+                        body_trace,
+                        quantum_tape,
+                        arg_classical_tracers,
+                        res_classical_tracers)
+
+                res_avals = list(map(shaped_abstractify, res_classical_tracers))
+                out_classical_tracers = [new_inner_tracer(outer_trace, aval) for aval in res_avals]
+
+                WhileLoop(in_classical_tracers,
+                          out_classical_tracers,
+                          [cond_region, body_region])
+                return out_classical_tracers
+
+            def _call_with_classical_ctx():
+                init_vals, in_tree = tree_flatten(init_state)
+                init_avals = tuple(_abstractify(val) for val in init_vals)
+                cond_jaxpr, cond_consts, cond_tree = _initial_style_jaxpr(
+                    cond_fn, in_tree, init_avals, "while_cond"
+                )
+                body_jaxpr, body_consts, body_tree = _initial_style_jaxpr(
+                    body_fn, in_tree, init_avals, "while_loop"
+                )
+                out_classical_tracers = qwhile_p.bind(
+                    *(cond_consts + body_consts + init_vals),
+                    cond_jaxpr=cond_jaxpr,
+                    body_jaxpr=body_jaxpr,
+                    cond_nconsts=len(cond_consts),
+                    body_nconsts=len(body_consts))
+                return tree_unflatten(body_tree, out_classical_tracers)
+
+            mode, ctx = get_evaluation_mode()
+            if mode == EvaluationMode.QJIT_QNODE:
+                return _call_with_quantum_ctx(ctx)
+            elif mode == EvaluationMode.QJIT:
+                return _call_with_classical_ctx()
+            # elif mode == EvaluationMode.EXEC:
+            #     return _call_during_interpretation()
+            else:
+                raise RuntimeError(f"Unsupported evaluation mode {mode}")
         return _call_handler
     return _body_query
 
@@ -284,55 +412,6 @@ def measure(wires) -> JaxprTracer:
         out_classical_tracers=[out_classical_tracer],
         regions=[])
     return out_classical_tracer
-
-
-def while_loop(cond_fn):
-    def _body_query(body_fn):
-        def _call_handler(*init_state):
-            ctx = get_main_tracing_context()
-            outer_trace = ctx.trace
-            in_classical_tracers = list(init_state)
-
-            with frame_tracing_context(ctx) as cond_trace:
-                cond_wffa, cond_in_avals, _ = deduce_avals(cond_fn, in_classical_tracers, {})
-                arg_classical_tracers = _input_type_to_tracers(cond_trace.new_arg, cond_in_avals)
-                res_classical_tracers = [cond_trace.full_raise(t) for t in
-                                         cond_wffa.call_wrapped(*arg_classical_tracers)]
-                cond_region = HybridOpRegion(
-                    cond_trace,
-                    None,
-                    arg_classical_tracers,
-                    res_classical_tracers)
-
-            with frame_tracing_context(ctx) as body_trace:
-                wffa, in_avals, _ = deduce_avals(body_fn, in_classical_tracers, {})
-                arg_classical_tracers = _input_type_to_tracers(body_trace.new_arg, in_avals)
-                quantum_tape = QuantumTape()
-                with QueuingManager.stop_recording(), quantum_tape:
-                    res_classical_tracers = [body_trace.full_raise(t) for t in
-                                             wffa.call_wrapped(*arg_classical_tracers)]
-                body_region = HybridOpRegion(
-                    body_trace,
-                    quantum_tape,
-                    arg_classical_tracers,
-                    res_classical_tracers)
-
-            res_avals = list(map(shaped_abstractify, res_classical_tracers))
-            out_classical_tracers = [new_inner_tracer(outer_trace, aval) for aval in res_avals]
-
-            WhileLoop(in_classical_tracers,
-                      out_classical_tracers,
-                      [cond_region, body_region])
-            return out_classical_tracers
-        return _call_handler
-    return _body_query
-
-
-# hybrid_p = jax.core.Primitive("hybrid")
-# hybrid_p.multiple_results = True
-# @hybrid_p.def_abstract_eval
-# def _abstract_eval(*args, body_jaxpr, **kwargs):
-#     return [AbstractQreg()]
 
 
 def trace_quantum_tape(quantum_tape:QuantumTape,
