@@ -104,18 +104,17 @@ def if_stmt(
     set_state(results)
 
 
-def _call_catalyst_for(start, stop, step, body_fn, get_state, opts, array_iterable=None):
+def _call_catalyst_for(start, stop, step, body_fn, get_state, enum_start=None, array_iterable=None):
     """Dispatch to a Catalyst implementation of for loops."""
-
-    # Do not allow unpacking in Catalyst for loops.
-    assert len(opts["iterate_names"].split(",")) == 1
 
     @catalyst.for_loop(start, stop, step)
     def functional_for(i):
-        if array_iterable is None:
+        if enum_start is None and array_iterable is None:
             body_fn(i)
-        else:
+        elif enum_start is None:
             body_fn(array_iterable[i])
+        else:
+            body_fn((i + enum_start, array_iterable[i]))
 
         return get_state()
 
@@ -138,32 +137,50 @@ def for_stmt(
     get_state: Callable[[], Tuple],
     set_state: Callable[[Tuple], None],
     _symbol_names: Tuple[str],
-    opts: dict,
+    _opts: dict,
 ):
     """An implementation of the AutoGraph 'for .. in ..' statement. The interface is defined by
     AutoGraph, here we merely provide an implementation of it in terms of Catalyst primitives."""
 
     assert _extra_test is None
 
+    fallback = False
+
     if isinstance(iteration_target, CRange):
         # Ideally we iterate over a simple range.
         start, stop, step = iteration_target.get_raw_range()
-        results = _call_catalyst_for(start, stop, step, body_fn, get_state, opts)
-    else:
+        results = _call_catalyst_for(start, stop, step, body_fn, get_state)
+    elif isinstance(iteration_target, CEnumerate):
         # Otherwise we can attempt to convert the iteration target to an array.
-        # If this fails, we must fall back to Python.
+        # For enumerations, the iteration target is wrapped inside our custom class.
+        start, stop, step = 0, len(iteration_target.iteration_target), 1
+        try:
+            iteration_array = jnp.asarray(iteration_target.iteration_target)
+        except:
+            iteration_array = None
+            fallback = True
+
+        if iteration_array is not None:
+            results = _call_catalyst_for(
+                start, stop, step, body_fn, get_state, iteration_target.start_idx, iteration_array
+            )
+    else:
+        # Otherwise we can attempt to directly convert the iteration target to an array.
+        start, stop, step = 0, len(iteration_target), 1
         try:
             iteration_array = jnp.asarray(iteration_target)
         except:
             iteration_array = None
+            fallback = True
 
         if iteration_array is not None:
-            start, stop, step = 0, len(iteration_target), 1
             results = _call_catalyst_for(
-                start, stop, step, body_fn, get_state, opts, iteration_array
+                start, stop, step, body_fn, get_state, array_iterable=iteration_array
             )
-        else:
-            results = _call_python_for(body_fn, get_state, iteration_target)
+
+    # In case anything goes wrong, we fall back to Python.
+    if fallback:
+        results = _call_python_for(body_fn, get_state, iteration_target)
 
     # Sometimes we unpack the results of nested tracing scopes so that the user doesn't have to
     # manipulate tuples when they don't expect it. Ensure set_state receives a tuple regardless.
@@ -195,6 +212,8 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
         # since the Python range function does not allow tracers as arguments.
         if fn is range:
             return CRange(*args, **(kwargs if kwargs is not None else {}))
+        elif fn is enumerate:
+            return CEnumerate(*args, **(kwargs if kwargs is not None else {}))
 
         # We need to unpack nested QNode and QJIT calls as autograph will have trouble handling
         # them. Ideally, we only want the wrapped function to be transformed by autograph, rather
@@ -283,3 +302,20 @@ class CRange:
 
     def __reversed__(self) -> Iterator[int]:
         self.py_range.__reversed__()
+
+
+class CEnumerate(enumerate):
+    """Catalyst enumeration object.
+
+    Can be passed to a Python for loop for conversion into a for_loop call. The loop index, as well
+    as the iterable element will be provided to the loop body, which would otherwise not be possible
+    as unpacking is generally not supported in Catalyst for loops.
+    Otherwise this class behaves exactly like the Python enumerate class.
+
+    Note that the iterable must be convertible to an array, otherwise the loop will be treated as a
+    regular Python loop.
+    """
+
+    def __init__(self, iterable, start=0):
+        self.iteration_target = iterable
+        self.start_idx = start

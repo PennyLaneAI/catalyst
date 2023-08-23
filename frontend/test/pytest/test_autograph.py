@@ -15,12 +15,11 @@
 """PyTests for the AutoGraph source-to-source transformation feature."""
 
 
+import jax
+import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
 import pytest
-
-import jax
-import jax.numpy as jnp
 
 from catalyst import measure, qjit
 from catalyst.ag_utils import AutoGraphError, autograph_source, check_cache
@@ -615,8 +614,73 @@ class TestForLoops:
         with pytest.raises(jax.errors.TracerIntegerConversionError, match="__index__"):
             qjit(autograph=True)(f)
 
-    def test_for_in_enumerate(self):
-        """unsupported"""
+    def test_for_in_enumerate_array(self):
+        """Test for loop over a Python enumeration on an array."""
+
+        @qjit(autograph=True)
+        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        def f(params):
+            for i, x in enumerate(params):
+                qml.RY(x, wires=i)
+            return [qml.expval(qml.PauliZ(i)) for i in range(3)]
+
+        result = f(jnp.array([0.0, 1 / 4 * jnp.pi, 2 / 4 * jnp.pi]))
+        assert np.allclose(result, [1.0, jnp.sqrt(2) / 2, 0.0])
+
+    def test_for_in_enumerate_start(self):
+        """Test for loop over a Python enumeration with offset indices."""
+
+        @qjit(autograph=True)
+        @qml.qnode(qml.device("lightning.qubit", wires=5))
+        def f(params):
+            for i, x in enumerate(params, start=2):
+                qml.RY(x, wires=i)
+            return [qml.expval(qml.PauliZ(i)) for i in range(5)]
+
+        result = f(jnp.array([0.0, 1 / 4 * jnp.pi, 2 / 4 * jnp.pi]))
+        assert np.allclose(result, [1.0, 1.0, 1.0, jnp.sqrt(2) / 2, 0.0])
+
+    def test_for_in_enumerate_unpack(self):
+        """Test for loop over a Python enumeration with delayed unpacking."""
+
+        @qjit(autograph=True)
+        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        def f(params):
+            for v in enumerate(params):
+                qml.RY(v[1], wires=v[0])
+            return [qml.expval(qml.PauliZ(i)) for i in range(3)]
+
+        result = f(jnp.array([0.0, 1 / 4 * jnp.pi, 2 / 4 * jnp.pi]))
+        assert np.allclose(result, [1.0, jnp.sqrt(2) / 2, 0.0])
+
+    def test_for_in_enumerate_numeric_list(self):
+        """Test for loop over a Python enumeration on a list that is convertible to an array."""
+
+        @qjit(autograph=True)
+        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        def f():
+            params = [0.0, 1 / 4 * jnp.pi, 2 / 4 * jnp.pi]
+            for i, x in enumerate(params):
+                qml.RY(x, wires=i)
+            return [qml.expval(qml.PauliZ(i)) for i in range(3)]
+
+        result = f()
+        assert np.allclose(result, [1.0, jnp.sqrt(2) / 2, 0.0])
+
+    def test_for_in_enumerate_object_list(self):
+        """Test for loop over a Python enumeration on a list that is *not* convertible to an array.
+        The behaviour should fall back to standard Python."""
+
+        @qjit(autograph=True)
+        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        def f():
+            params = ["0", "1", "2"]
+            for i, x in enumerate(params):
+                qml.RY(int(x) / 4 * jnp.pi, wires=i)
+            return [qml.expval(qml.PauliZ(i)) for i in range(3)]
+
+        result = f()
+        assert np.allclose(result, [1.0, jnp.sqrt(2) / 2, 0.0])
 
     def test_for_in_zip(self):
         """unsupported"""
