@@ -75,7 +75,7 @@ def converted_code(fn):
     _test_ag_import()
     from catalyst import QJIT
     from catalyst.ag_primitives import STD as STD_OPTIONS
-    from catalyst.autograph import TRANSFORMER, TOPLEVEL_OPTIONS
+    from catalyst.autograph import TOPLEVEL_OPTIONS, TRANSFORMER
 
     # Unwrap known objects to get the function actually transformed by autograph.
     if isinstance(fn, QJIT):
@@ -106,7 +106,7 @@ def check_cache(fn):
     """Convenience function for testing to check the TRANSFORMER cache."""
     _test_ag_import()
     from catalyst.ag_primitives import STD as STD_OPTIONS
-    from catalyst.autograph import TRANSFORMER, TOPLEVEL_OPTIONS
+    from catalyst.autograph import TOPLEVEL_OPTIONS, TRANSFORMER
 
     return TRANSFORMER.has_cache(fn, STD_OPTIONS) or TRANSFORMER.has_cache(fn, TOPLEVEL_OPTIONS)
 
