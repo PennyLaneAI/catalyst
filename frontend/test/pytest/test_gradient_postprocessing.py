@@ -39,11 +39,11 @@ def test_scalar_scalar(backend, diff_method):
         return jnp.cos(w)
 
     @qjit
-    def jacobian(x):
+    def jac_postprocess(x):
         return grad(postprocess, method="defer")(x)
 
     jax_jacobian = jax.jacobian(postprocess)(0.5)
-    catalyst_jacobian = jacobian(0.5)
+    catalyst_jacobian = jac_postprocess(0.5)
     assert catalyst_jacobian == pytest.approx(jax_jacobian)
 
 
@@ -86,12 +86,12 @@ def test_many_to_one(backend, diff_method):
         return jnp.cos(w)
 
     @qjit
-    def jacobian(x):
+    def jac_postprocess(x):
         return grad(postprocess, method="defer")(x)
 
     x = jnp.array([0.5, 0.4, 0.3, 0.2])
     jax_jacobian = jax.jacobian(postprocess)(x)
-    catalyst_jacobian = jacobian(x)
+    catalyst_jacobian = jac_postprocess(x)
     assert catalyst_jacobian == pytest.approx(jax_jacobian)
 
 
