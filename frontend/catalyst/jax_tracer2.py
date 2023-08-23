@@ -248,7 +248,10 @@ class CondCallable:
         return tree_unflatten(out_trees[0], out_classical_tracers)
 
     def _call_during_interpretation(self):
-        raise NotImplementedError()
+        for pred, branch_fn in zip(self.preds, self.branch_fns):
+            if pred:
+                return branch_fn()
+        return self.otherwise_fn()
 
     def __call__(self):
         mode, ctx = get_evaluation_mode()
@@ -258,8 +261,7 @@ class CondCallable:
             return self._call_with_classical_ctx()
         elif mode == EvaluationMode.EXEC:
             return self._call_during_interpretation()
-        else:
-            raise RuntimeError(f"Unsupported evaluation mode {mode}")
+        raise RuntimeError(f"Unsupported evaluation mode {mode}")
 
 
 def cond(pred:DynamicJaxprTracer):
@@ -318,15 +320,22 @@ def for_loop(lower_bound, upper_bound, step):
 
                 return tree_unflatten(body_tree, out_classical_tracers)
 
+            def _call_during_interpretation():
+                args = init_state
+                fn_res = args if len(args) > 1 else args[0] if len(args) == 1 else None
+                for i in range(lower_bound, upper_bound, step):
+                    fn_res = body_fn(i, *args)
+                    args = fn_res if len(args) > 1 else (fn_res,) if len(args) == 1 else ()
+                return fn_res
+
             mode, ctx = get_evaluation_mode()
             if mode == EvaluationMode.QJIT_QNODE:
                 return _call_with_quantum_ctx(ctx)
             elif mode == EvaluationMode.QJIT:
                 return _call_with_classical_ctx()
-            # elif mode == EvaluationMode.EXEC:
-            #     return _call_during_interpretation()
-            else:
-                raise RuntimeError(f"Unsupported evaluation mode {mode}")
+            elif mode == EvaluationMode.EXEC:
+                return _call_during_interpretation()
+            raise RuntimeError(f"Unsupported evaluation mode {mode}")
         return _call_handler
     return _body_query
 
@@ -387,15 +396,22 @@ def while_loop(cond_fn):
                     body_nconsts=len(body_consts))
                 return tree_unflatten(body_tree, out_classical_tracers)
 
+            def _call_during_interpretation():
+                args = init_state
+                fn_res = args if len(args) > 1 else args[0] if len(args) == 1 else None
+                while cond_fn(*args):
+                    fn_res = body_fn(*args)
+                    args = fn_res if len(args) > 1 else (fn_res,) if len(args) == 1 else ()
+                return fn_res
+
             mode, ctx = get_evaluation_mode()
             if mode == EvaluationMode.QJIT_QNODE:
                 return _call_with_quantum_ctx(ctx)
             elif mode == EvaluationMode.QJIT:
                 return _call_with_classical_ctx()
-            # elif mode == EvaluationMode.EXEC:
-            #     return _call_during_interpretation()
-            else:
-                raise RuntimeError(f"Unsupported evaluation mode {mode}")
+            elif mode == EvaluationMode.EXEC:
+                return _call_during_interpretation()
+            raise RuntimeError(f"Unsupported evaluation mode {mode}")
         return _call_handler
     return _body_query
 
