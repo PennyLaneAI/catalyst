@@ -23,7 +23,8 @@
 #include "Types.h"
 #include "Utils.hpp"
 
-#include "Observables.hpp"
+#include "StateVectorDynamicCPU.hpp"
+#include "ObservablesLQubit.hpp"
 
 namespace Catalyst::Runtime::Simulator {
 
@@ -34,11 +35,12 @@ namespace Catalyst::Runtime::Simulator {
  */
 template <typename PrecisionT> class LightningObsManager {
   private:
-    using ObservableClassName = Pennylane::Simulators::Observable<PrecisionT>;
-    using NamedObsClassName = Pennylane::Simulators::NamedObs<PrecisionT>;
-    using HermitianObsClassName = Pennylane::Simulators::HermitianObs<PrecisionT>;
-    using TensorProdObsClassName = Pennylane::Simulators::TensorProdObs<PrecisionT>;
-    using HamiltonianClassName = Pennylane::Simulators::Hamiltonian<PrecisionT>;
+    using VectorStateT = Pennylane::LightningQubit::StateVectorDynamicCPU<PrecisionT>;
+    using ObservableClassName = Pennylane::Observables::Observable<VectorStateT>;
+    using NamedObsClassName = Pennylane::LightningQubit::Observables::NamedObs<VectorStateT>;
+    using HermitianObsClassName = Pennylane::LightningQubit::Observables::HermitianObs<VectorStateT>;
+    using TensorProdObsClassName = Pennylane::LightningQubit::Observables::TensorProdObs<VectorStateT>;
+    using HamiltonianClassName = Pennylane::LightningQubit::Observables::Hamiltonian<VectorStateT>;
 
     using ObservablePairType = std::pair<std::shared_ptr<ObservableClassName>, ObsType>;
     std::vector<ObservablePairType> observables_{};

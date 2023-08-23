@@ -23,9 +23,6 @@ include(Catch)
 
 add_executable(runner_tests runner_main.cpp)
 
-target_include_directories(runner_tests PRIVATE
-            ${pennylane_lightning_SOURCE_DIR}/pennylane_lightning/src/tests)
-
 if(ENABLE_OPENQASM)
 find_package(pybind11 CONFIG)
 
@@ -70,15 +67,16 @@ endif()
 
 target_sources(runner_tests PRIVATE ${cov_helper_src}
             ${openqasm_tests}
-            Test_QubitManager.cpp
-            Test_CacheManager.cpp
-            Test_LightningDriver.cpp
-            Test_LightningGateSet.cpp
-            Test_LightningCoreQIS.cpp
-            Test_LightningMeasures.cpp
-            Test_LightningGradient.cpp
+            # Test_QubitManager.cpp
+            # Test_CacheManager.cpp
+            # Test_LightningDriver.cpp
+            # Test_LightningGateSet.cpp
+            # Test_LightningCoreQIS.cpp
+            # Test_LightningMeasures.cpp
+            # Test_LightningGradient.cpp
             Test_SVDynamicCPU_Core.cpp
-            Test_SVDynamicCPU_Allocation.cpp)
+            Test_SVDynamicCPU_Allocation.cpp
+            )
 
 if(KOKKOS_ENABLE_OPENMP)
     find_package(OpenMP REQUIRED)

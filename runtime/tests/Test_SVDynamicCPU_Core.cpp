@@ -23,13 +23,13 @@
 
 #include "LinearAlgebra.hpp"
 #include "StateVectorDynamicCPU.hpp"
-#include "StateVectorRawCPU.hpp"
+#include <StateVectorLQubit.hpp>
 #include "Util.hpp"
 #include "cpu_kernels/GateImplementationsPI.hpp"
 
 #include "TestHelpers.hpp"
 
-using namespace Pennylane;
+using namespace Pennylane::LightningQubit;
 
 TEMPLATE_TEST_CASE("StateVectorDynamicCPU::StateVectorDynamicCPU", "[StateVectorDynamicCPU]", float,
                    double)
@@ -50,12 +50,6 @@ TEMPLATE_TEST_CASE("StateVectorDynamicCPU::StateVectorDynamicCPU", "[StateVector
         CHECK(sv.getNumQubits() == 4);
         CHECK(sv.getLength() == 16);
         CHECK(sv.getDataVector().size() == 16);
-    }
-    SECTION("StateVectorDynamicCPU<TestType> {const "
-            "StateVectorRawCPU<TestType>&}")
-    {
-        CHECK(std::is_constructible_v<StateVectorDynamicCPU<TestType>,
-                                      const StateVectorRawCPU<TestType> &>);
     }
     SECTION("StateVectorDynamicCPU<TestType> {const "
             "StateVectorDynamicCPU<TestType>&}")
@@ -130,7 +124,7 @@ TEMPLATE_TEST_CASE("StateVectorDynamicCPU::applyMatrix with a pointer", "[StateV
             std::vector<size_t> wires(num_wires);
             std::iota(wires.begin(), wires.end(), 0);
 
-            const auto m = Util::randomUnitary<PrecisionT>(re, num_wires);
+            const auto m = Pennylane::Util::randomUnitary<PrecisionT>(re, num_wires);
             sv1.applyMatrix(m, wires);
             Gates::GateImplementationsPI::applyMultiQubitOp<PrecisionT>(sv2.getData(), num_qubits,
                                                                         m.data(), wires, false);
@@ -161,7 +155,7 @@ TEMPLATE_TEST_CASE("StateVectorDynamicCPU::applyOperations", "[StateVectorDynami
         const size_t num_qubits = 3;
         StateVectorDynamicCPU<PrecisionT> sv1(num_qubits);
 
-        sv1.updateData(createRandomState<PrecisionT>(re, num_qubits));
+        sv1.updateData(Pennylane::Util::createRandomStateVectorData<PrecisionT>(re, num_qubits));
         StateVectorDynamicCPU<PrecisionT> sv2 = sv1;
 
         sv1.applyOperations({"PauliX", "PauliY"}, {{0}, {1}}, {false, false});
@@ -190,7 +184,7 @@ TEMPLATE_TEST_CASE("StateVectorDynamicCPU::applyOperations", "[StateVectorDynami
         const size_t num_qubits = 3;
         StateVectorDynamicCPU<PrecisionT> sv1(num_qubits);
 
-        sv1.updateData(createRandomState<PrecisionT>(re, num_qubits));
+        sv1.updateData(Pennylane::Util::createRandomStateVectorData<PrecisionT>(re, num_qubits));
         StateVectorDynamicCPU<PrecisionT> sv2 = sv1;
 
         sv1.applyOperations({"RX", "RY"}, {{0}, {1}}, {false, false}, {{0.1}, {0.2}});

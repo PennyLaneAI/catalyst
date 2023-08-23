@@ -15,5 +15,5 @@
 #include "StateVectorDynamicCPU.hpp"
 
 // explicit instantiation
-template class Pennylane::StateVectorDynamicCPU<float>;
-template class Pennylane::StateVectorDynamicCPU<double>;
+template class Pennylane::LightningQubit::StateVectorDynamicCPU<float>;
+template class Pennylane::LightningQubit::StateVectorDynamicCPU<double>;
