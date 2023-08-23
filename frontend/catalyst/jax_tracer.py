@@ -425,7 +425,7 @@ def trace_observables(obs, qubit_states, p, num_wires, qreg):
         jax_obs = trace_hamiltonian(op_args, *nested_obs)
     elif paulis := obs._pauli_rep:  # pylint: disable=protected-access
         # Use the pauli sentence representation of the observable, if applicable
-        jax_obs = pauli_sentence_to_rt_obs(paulis, qubit_states, qreg)
+        jax_obs = pauli_sentence_to_hamiltonian_obs(paulis, qubit_states, qreg)
     elif isinstance(obs, qml.ops.op_math.Sum):
         nested_obs = [trace_observables(o, qubit_states, p, num_wires, qreg)[0] for o in obs]
         op_args = jax.numpy.ones(len(obs))
@@ -483,7 +483,7 @@ def hermitian_obs(obs, op_args, qubit_states, qreg):
     return jax_obs, qubits
 
 
-def pauli_sentence_to_rt_obs(paulis, qubit_states, qreg):
+def pauli_sentence_to_hamiltonian_obs(paulis, qubit_states, qreg):
     """Convert a :class:`pennylane.pauli.PauliSentence` into a Hamiltonian.
 
     Args:
@@ -495,7 +495,7 @@ def pauli_sentence_to_rt_obs(paulis, qubit_states, qreg):
         a Hamiltonian JAX primitive used for tracing
     """
     pwords, coeffs = zip(*paulis.items())
-    nested_obs = [pauli_word_to_rt_obs(pword, qubit_states, qreg) for pword in pwords]
+    nested_obs = [pauli_word_to_tensor_obs(pword, qubit_states, qreg) for pword in pwords]
 
     # No need to create a Hamiltonian for a single TensorObs
     if len(nested_obs) == 1 and coeffs[0] == 1.0:
@@ -505,7 +505,7 @@ def pauli_sentence_to_rt_obs(paulis, qubit_states, qreg):
     return jprim.hamiltonian(coeffs, *nested_obs)
 
 
-def pauli_word_to_rt_obs(obs, qubit_states, qreg):
+def pauli_word_to_tensor_obs(obs, qubit_states, qreg):
     """Convert a :class:`pennylane.pauli.PauliWord` into a Named or Tensor observable.
 
     Args:

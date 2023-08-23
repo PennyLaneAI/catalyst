@@ -694,8 +694,6 @@ class TestNewArithmeticOps:
         result = circuit(np.pi / 4, np.pi / 2)
         assert np.allclose(expected, result)
 
-        circuit(0, 1)  # another call
-
     @pytest.mark.parametrize(
         "meas, expected",
         [
@@ -746,8 +744,6 @@ class TestNewArithmeticOps:
 
         qml.operation.disable_new_opmath()
 
-        circuit(0, 1)  # another call
-
     @pytest.mark.parametrize(
         "meas, expected",
         [
@@ -786,8 +782,7 @@ class TestNewArithmeticOps:
         ],
     )
     def test_sum_sprod_xyz(self, meas, expected, backend):
-        """Test ``qml.ops.op_math.Sum`` (``+``) and ``qml.ops.op_math.SProd`` (``*``) converting
-        to HamiltonianObs."""
+        """Test ``qml.ops.op_math.Sum`` (``+``) and ``qml.ops.op_math.SProd`` (``*``)."""
 
         # Enabling new arithmetic operators
         qml.operation.enable_new_opmath()
@@ -908,7 +903,7 @@ class TestNewArithmeticOps:
         # Enabling new arithmetic operators
         qml.operation.enable_new_opmath()
 
-        @qjit(keep_intermediate=True)
+        @qjit
         @qml.qnode(qml.device(backend, wires=2))
         def circuit(x, y):
             qml.RX(x, wires=0)
