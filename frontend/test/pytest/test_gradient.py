@@ -21,7 +21,7 @@ import pytest
 from jax import numpy as jnp
 
 import catalyst.utils.calculate_grad_shape as infer
-from catalyst import CompileError, cond, for_loop, grad, qjit
+from catalyst import CompileError, cond, for_loop, grad, jacobian, qjit
 from catalyst.pennylane_extensions import DifferentiableCompileError
 
 
@@ -82,7 +82,7 @@ def test_param_shift_on_non_expval(backend):
         return x, y
 
     def workflow(p: float):
-        return grad(func, method="defer")(p)
+        return jacobian(func, method="defer")(p)
 
     with pytest.raises(
         DifferentiableCompileError, match="The parameter-shift method can only be used"
@@ -102,7 +102,7 @@ def test_adjoint_on_non_expval(backend):
         return x, y
 
     def workflow(p: float):
-        return grad(func, method="defer")(p)
+        return jacobian(func, method="defer")(p)
 
     with pytest.raises(DifferentiableCompileError, match="The adjoint method can only be used"):
         qjit(workflow)
@@ -471,7 +471,7 @@ def test_ps_probs(backend):
 
     @qjit
     def workflow(p: float):
-        return grad(func, method="defer")(p)
+        return jacobian(func, method="defer")(p)
 
     result = workflow(0.5)
     reference = qml.jacobian(func, argnum=0)(0.5)
@@ -848,6 +848,38 @@ def test_finite_diff_multiple_devices(inp, diff_method, backend):
 
     result = compiled_grad_default(inp, 5)
     assert np.allclose(result[0], result[1])
+
+
+def test_grad_on_non_scalar_output(backend):
+    """Test a function which attempts to use `grad` on a function that returns a non-scalar."""
+
+    @qml.qnode(qml.device(backend, wires=1), diff_method="parameter-shift")
+    def f(x):
+        qml.RX(3 * x, wires=0)
+        return qml.probs()
+
+    @qjit
+    def compiled(x):
+        return grad(f)(x)
+
+    with pytest.raises(DifferentiableCompileError, match="only supports scalar-output functions"):
+        compiled(1.0)
+
+
+def test_grad_on_multi_result_function(backend):
+    """Test a function which attempts to use `grad` on a function that returns multiple values."""
+
+    @qml.qnode(qml.device(backend, wires=2), diff_method="parameter-shift")
+    def f(x):
+        qml.RX(3 * x, wires=0)
+        return qml.expval(qml.PauliZ(0)), qml.expval(qml.PauliX(1))
+
+    @qjit
+    def compiled(x):
+        return grad(f)(x)
+
+    with pytest.raises(DifferentiableCompileError, match="only supports scalar-output functions"):
+        compiled(1.0)
 
 
 if __name__ == "__main__":
