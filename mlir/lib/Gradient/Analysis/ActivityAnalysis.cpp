@@ -227,7 +227,7 @@ catalyst::gradient::ActivityAnalyzer::ActivityAnalyzer(FunctionOpInterface calle
 
     // Print the results
     if (print) {
-        printResults(callee);
+        printResults(callee, diffArgIndices);
     }
 }
 
@@ -254,24 +254,28 @@ void catalyst::gradient::ActivityAnalyzer::initializeStates(FunctionOpInterface 
     }
 }
 
-void catalyst::gradient::ActivityAnalyzer::printResults(FunctionOpInterface callee)
+void catalyst::gradient::ActivityAnalyzer::printResults(FunctionOpInterface callee,
+                                                        ArrayRef<size_t> diffArgIndices)
 {
     using llvm::errs;
-    errs() << "Activity for '" << FlatSymbolRefAttr::get(callee) << "':\n";
+    const char *indent = "    ";
+    errs() << "Activity for '" << FlatSymbolRefAttr::get(callee) << "' [";
+    llvm::interleaveComma(diffArgIndices, errs());
+    errs() << "]:\n";
     for (BlockArgument arg : callee.getArguments()) {
         Attribute label = callee.getArgAttr(arg.getArgNumber(), "activity.id");
         if (label) {
             auto *fwdState = solver.lookupState<ForwardActivity>(arg);
             auto *bwdState = solver.lookupState<BackwardActivity>(arg);
 
-            errs() << label << ": " << (isActive(arg) ? "Active" : "Constant") << " (fwd "
+            errs() << indent << label << ": " << (isActive(arg) ? "Active" : "Constant") << " (fwd "
                    << fwdState->getValue() << " bwd " << bwdState->getValue() << ")\n";
         }
     }
 
-    callee.walk([this](Operation *op) {
+    callee.walk([this, indent](Operation *op) {
         if (op->hasAttr("activity.id")) {
-            errs() << op->getAttr("activity.id") << ": ";
+            errs() << indent << op->getAttr("activity.id") << ": ";
             for (OpResult result : op->getResults()) {
                 auto *fwdState = solver.lookupState<ForwardActivity>(result);
                 auto *bwdState = solver.lookupState<BackwardActivity>(result);

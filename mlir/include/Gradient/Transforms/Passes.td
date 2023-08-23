@@ -51,6 +51,13 @@ def GradientLoweringPass : Pass<"lower-gradients"> {
             /*type=*/"std::string",
             /*default=*/"\"\"",
             /*description=*/"Restrict lowering to a specific type of gradient."
+        >,
+        Option<
+            /*C++ var name=*/"printActivity",
+            /*CLI arg name=*/"print-activity",
+            /*type=*/"bool",
+            /*default=*/"false",
+            /*description=*/"Print the results of activity analysis to stderr."
         >
     ];
 }

@@ -46,7 +46,7 @@ void ParameterShiftLowering::rewrite(GradOp op, PatternRewriter &rewriter) const
         SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
     rewriter.setInsertionPointAfter(callee);
 
-    ActivityAnalyzer(callee, computeDiffArgIndices(op.getDiffArgIndices()));
+    ActivityAnalyzer(callee, computeDiffArgIndices(op.getDiffArgIndices()), printActivity);
 
     // Determine the number of parameters to shift (= to the total static number of gate parameters
     // occuring in the function) and number of selectors needed (= to the number of loop nests

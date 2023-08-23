@@ -27,12 +27,12 @@ using namespace catalyst::gradient;
 namespace catalyst {
 namespace gradient {
 
-void populateLoweringPatterns(RewritePatternSet &patterns, StringRef lowerOnly)
+void populateLoweringPatterns(RewritePatternSet &patterns, StringRef lowerOnly, bool printActivity)
 {
     if (lowerOnly == "" || lowerOnly == "fd")
         patterns.add<FiniteDiffLowering>(patterns.getContext(), 1);
     if (lowerOnly == "" || lowerOnly == "ps")
-        patterns.add<ParameterShiftLowering>(patterns.getContext(), 1);
+        patterns.add<ParameterShiftLowering>(patterns.getContext(), printActivity);
     if (lowerOnly == "" || lowerOnly == "adj")
         patterns.add<AdjointLowering>(patterns.getContext(), 1);
     if (lowerOnly == "" || lowerOnly == "jp") {

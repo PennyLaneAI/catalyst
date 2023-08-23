@@ -40,7 +40,7 @@ class ActivityAnalyzer {
     /// values (for backward dataflow)
     void initializeStates(mlir::FunctionOpInterface callee, mlir::ArrayRef<size_t> diffArgIndices);
 
-    void printResults(mlir::FunctionOpInterface callee);
+    void printResults(mlir::FunctionOpInterface callee, mlir::ArrayRef<size_t> diffArgIndices);
 };
 
 } // namespace gradient
