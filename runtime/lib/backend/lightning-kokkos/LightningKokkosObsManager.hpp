@@ -46,11 +46,6 @@ template <typename PrecisionT> class LightningKokkosObsManager {
     using ObservablePairType = std::pair<std::shared_ptr<ObservableClassName>, ObsType>;
     std::vector<ObservablePairType> observables_{};
 
-    static constexpr std::array<ObsType, 2> hamiltonian_valid_obs_types = {
-        ObsType::Basic,
-        ObsType::TensorProd,
-    };
-
   public:
     LightningKokkosObsManager() = default;
     ~LightningKokkosObsManager() = default;
@@ -150,10 +145,6 @@ template <typename PrecisionT> class LightningKokkosObsManager {
             RT_FAIL_IF(static_cast<size_t>(key) >= obs_size || key < 0, "Invalid observable key");
 
             auto &&[obs, type] = this->observables_[key];
-
-            RT_FAIL_IF(type != ObsType::Basic, "Invalid basic observable to construct TensorProd; "
-                                               "NamedObs and HermitianObs are only supported");
-
             obs_vec.push_back(obs);
         }
 
@@ -188,13 +179,6 @@ template <typename PrecisionT> class LightningKokkosObsManager {
             RT_FAIL_IF(static_cast<size_t>(key) >= obs_size || key < 0, "Invalid observable key");
 
             auto &&[obs, type] = this->observables_[key];
-            auto contain_obs = std::find(hamiltonian_valid_obs_types.begin(),
-                                         hamiltonian_valid_obs_types.end(), type);
-
-            RT_FAIL_IF(contain_obs == hamiltonian_valid_obs_types.end(),
-                       "Invalid observable to construct Hamiltonian; "
-                       "NamedObs, HermitianObs and TensorProdObs are only supported");
-
             obs_vec.push_back(obs);
         }
 
