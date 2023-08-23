@@ -286,6 +286,7 @@ class GradParams:
     this structure"""
 
     method: str
+    scalar_out: bool
     h: float
     argnum: List[int]
 
