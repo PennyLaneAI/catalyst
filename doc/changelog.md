@@ -4,6 +4,7 @@
 
 * Catalyst users can now use Python control flow statements in their programs without having to
   explicitly use the functions `cond`, `for_loop`, and `while_loop`!
+  [#235](https://github.com/PennyLaneAI/catalyst/pull/235)
 
   A new experimental feature was added that automatically converts Python control flow statements
   like `if`, `for`, and `while` into their equivalent functional forms provided by Catalyst.

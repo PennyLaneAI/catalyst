@@ -896,6 +896,11 @@ class CondCallable:
 def cond(pred):
     """A :func:`~.qjit` compatible decorator for if-else conditionals in PennyLane/Catalyst.
 
+    .. note::
+
+        Catalyst can now automatically convert Python if-statements for you. Requires setting
+        ``autograph=True``, see the :func:`~.qjit` function or documentation page for more details.
+
     This form of control flow is a functional version of the traditional if-else conditional. This
     means that each execution path, an 'if' branch, any 'else if' branches, and a final 'otherwise'
     branch, is provided as a separate function. All functions will be traced during compilation,
