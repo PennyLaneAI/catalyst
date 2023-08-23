@@ -1,5 +1,6 @@
 import jax
 import pennylane as qml
+import jax.numpy as jnp
 from catalyst.utils.jax_extras import (new_main2, sort_eqns,
                                        initial_style_jaxprs_with_common_consts,
                                        initial_style_jaxprs_with_common_consts2)
@@ -16,7 +17,8 @@ from jax._src.source_info_util import reset_name_stack, current as jax_current, 
 from jax._src.dispatch import jaxpr_replicas
 from jax._src.lax.lax import _abstractify
 from jax._src import linear_util as lu
-from jax._src.tree_util import (tree_flatten, tree_structure, tree_unflatten)
+from jax._src.tree_util import (PyTreeDef, tree_flatten, tree_structure, tree_unflatten,
+                                treedef_is_leaf)
 from jax._src.api import ShapeDtypeStruct
 from jax._src.api_util import (
     flatten_fun, apply_flat_fun, flatten_fun_nokwargs, flatten_fun_nokwargs2,
@@ -79,6 +81,46 @@ def get_evaluation_mode() -> Tuple[EvaluationMode, Any]:
     else:
         return (EvaluationMode.EXEC, None)
 
+def _aval_to_primitive_type(aval):
+    if isinstance(aval, DynamicJaxprTracer):
+        aval = aval.strip_weak_type()
+    if isinstance(aval, ShapedArray):
+        aval = aval.dtype
+    assert not isinstance(aval, (list, dict)), f"Unexpected type {aval}"
+    return aval
+
+def _check_single_bool_value(tree:PyTreeDef, avals:List[Any], hint=None) -> None:
+    hint = f"{hint}: " if hint else ""
+    if not treedef_is_leaf(tree):
+        raise TypeError(
+            f"{hint}A single boolean scalar was expected, got value of tree-shape: {tree}."
+        )
+    assert len(avals) == 1, f"{avals} does not match {tree}"
+    dtype = _aval_to_primitive_type(avals[0])
+    if dtype not in (bool, jnp.bool_):
+        raise TypeError(f"{hint}A single boolean scalar was expected, got value {avals[0]}.")
+
+
+def _check_same_types(trees:List[PyTreeDef], avals:List[List[Any]], hint=None) -> None:
+    assert len(trees) == len(avals), f"Input trees ({trees}) don't match input avals ({avals})"
+    hint = f"{hint}: " if hint else ""
+    expected_tree, expected_dtypes = trees[0], [_aval_to_primitive_type(a) for a in avals[0]]
+    for i,(tree, aval) in list(enumerate(zip(trees, avals)))[1:]:
+        if tree != expected_tree:
+            raise TypeError(
+                f"{hint}Same return types were expected, got:\n"
+                f" - Branch at index 0: {expected_tree}\n"
+                f" - Branch at index {i}: {tree}\n"
+                "Please specify the default branch if none was specified."
+            )
+        dtypes = [_aval_to_primitive_type(a) for a in aval]
+        if dtypes != expected_dtypes:
+            raise TypeError(
+                f"{hint}Same return types were expected, got:\n"
+                f" - Branch at index 0: {expected_dtypes}\n"
+                f" - Branch at index {i}: {dtypes}\n"
+                "Please specify the default branch if none was specified."
+            )
 
 @dataclass
 class MainTracingContex:
@@ -225,6 +267,7 @@ class CondCallable:
         in_classical_tracers = self.preds
         regions:List[HybridOpRegion] = []
 
+        out_trees, out_avals = [], []
         for branch in self.branch_fns + [self.otherwise_fn]:
             quantum_tape = QuantumTape()
             with frame_tracing_context(ctx) as inner_trace:
@@ -232,7 +275,10 @@ class CondCallable:
                 with QueuingManager.stop_recording(), quantum_tape:
                     res_classical_tracers = [inner_trace.full_raise(t) for t in wffa.call_wrapped()]
             regions.append(HybridOpRegion(inner_trace, quantum_tape, [], res_classical_tracers))
+            out_trees.append(out_tree())
+            out_avals.append(res_classical_tracers)
 
+        _check_same_types(out_trees, out_avals, hint='Conditional branches')
         res_avals = list(map(shaped_abstractify, res_classical_tracers))
         out_classical_tracers = [new_inner_tracer(outer_trace, aval) for aval in res_avals]
         Cond(in_classical_tracers, out_classical_tracers, regions)
@@ -244,6 +290,7 @@ class CondCallable:
         branch_jaxprs, consts, out_trees = initial_style_jaxprs_with_common_consts(
             (*self.branch_fns, self.otherwise_fn), args_tree, args_avals, "cond"
         )
+        _check_same_types(out_trees, [j.out_avals for j in branch_jaxprs], hint='Conditional branches')
         out_classical_tracers = qcond_p.bind(*(self.preds + consts), branch_jaxprs=branch_jaxprs)
         return tree_unflatten(out_trees[0], out_classical_tracers)
 
@@ -290,7 +337,6 @@ def for_loop(lower_bound, upper_bound, step):
 
                 res_avals = list(map(shaped_abstractify, res_classical_tracers))
                 out_classical_tracers = [new_inner_tracer(outer_trace, aval) for aval in res_avals]
-
                 ForLoop(in_classical_tracers,
                         out_classical_tracers,
                         [HybridOpRegion(inner_trace,
@@ -348,7 +394,7 @@ def while_loop(cond_fn):
                 in_classical_tracers, in_tree = tree_flatten(init_state)
 
                 with frame_tracing_context(ctx) as cond_trace:
-                    cond_wffa, cond_in_avals, _ = deduce_avals(cond_fn, init_state, {})
+                    cond_wffa, cond_in_avals, cond_tree = deduce_avals(cond_fn, init_state, {})
                     arg_classical_tracers = _input_type_to_tracers(cond_trace.new_arg, cond_in_avals)
                     res_classical_tracers = [cond_trace.full_raise(t) for t in
                                              cond_wffa.call_wrapped(*arg_classical_tracers)]
@@ -357,6 +403,9 @@ def while_loop(cond_fn):
                         None,
                         arg_classical_tracers,
                         res_classical_tracers)
+
+                _check_single_bool_value(cond_tree(), res_classical_tracers,
+                                        hint="Condition return value")
 
                 with frame_tracing_context(ctx) as body_trace:
                     wffa, in_avals, body_tree = deduce_avals(body_fn, init_state, {})
@@ -388,6 +437,7 @@ def while_loop(cond_fn):
                 body_jaxpr, body_consts, body_tree = _initial_style_jaxpr(
                     body_fn, in_tree, init_avals, "while_loop"
                 )
+                _check_single_bool_value(cond_tree, cond_jaxpr.out_avals, hint="Condition return value")
                 out_classical_tracers = qwhile_p.bind(
                     *(cond_consts + body_consts + init_vals),
                     cond_jaxpr=cond_jaxpr,

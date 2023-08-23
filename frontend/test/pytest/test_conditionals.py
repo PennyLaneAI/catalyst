@@ -189,7 +189,7 @@ class TestCond:
             return cond_fn()
 
         with pytest.raises(
-            TypeError, match="Conditional branches all require the same return type"
+            TypeError, match="Conditional branches: Same return types were expected"
         ):
             qjit(qml.qnode(qml.device(backend, wires=1))(circuit))
 
@@ -212,7 +212,7 @@ class TestCond:
             return cond_fn()
 
         with pytest.raises(
-            TypeError, match="Conditional branches all require the same return type"
+            TypeError, match="Conditional branches: Same return types were expected"
         ):
             qjit(qml.qnode(qml.device(backend, wires=1))(circuit))
 
