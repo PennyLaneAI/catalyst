@@ -207,7 +207,7 @@ class TestExpval:
 
         @qjit
         @qml.qnode(qml.device(backend, wires=3))
-        def expval6(x: float, y: float):
+        def expval(x: float, y: float):
             qml.RX(x, wires=0)
             qml.RY(y, wires=1)
             qml.RZ(0.1, wires=2)
@@ -218,11 +218,11 @@ class TestExpval:
             return qml.expval(qml.Hamiltonian(coeffs, obs))
 
         expected = np.array(-0.2715)
-        observed = expval6(np.pi / 4, np.pi / 3)
+        observed = expval(np.pi / 4, np.pi / 3)
         assert np.isclose(observed, expected)
 
         expected = np.array(-0.33695571)
-        observed = expval6(0.5, 0.8)
+        observed = expval(0.5, 0.8)
         assert np.isclose(observed, expected)
 
     def test_hamiltonian_2(self, backend):
@@ -230,7 +230,7 @@ class TestExpval:
 
         @qjit
         @qml.qnode(qml.device(backend, wires=2))
-        def expval6(x: float):
+        def expval(x: float):
             qml.RX(x, wires=0)
 
             coeff = np.array([0.8, 0.2])
@@ -247,11 +247,79 @@ class TestExpval:
             return qml.expval(qml.Hamiltonian(coeff, [obs, qml.PauliX(0)]))
 
         expected = np.array(0.2359798)
-        observed = expval6(np.pi / 4)
+        observed = expval(np.pi / 4)
         assert np.isclose(observed, expected)
 
         expected = np.array(-0.16)
-        observed = expval6(np.pi / 2)
+        observed = expval(np.pi / 2)
+        assert np.isclose(observed, expected)
+
+    def test_hamiltonian_3(self, backend):
+        """Test expval for nested Hamiltonian observable."""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=2))
+        def expval(x: float):
+            qml.RX(x, wires=0)
+
+            coeff = np.array([0.8, 0.2])
+            obs_matrix = np.array(
+                [
+                    [0.5, 1.0j, 0.0, -3j],
+                    [-1.0j, -1.1, 0.0, -0.1],
+                    [0.0, 0.0, -0.9, 12.0],
+                    [3j, -0.1, 12.0, 0.0],
+                ]
+            )
+
+            obs = qml.Hermitian(obs_matrix, wires=[0, 1])
+            return qml.expval(
+                qml.Hamiltonian(
+                    coeff, [obs, qml.Hamiltonian([1, 1], [qml.PauliX(0), qml.PauliZ(1)])]
+                )
+            )
+
+        expected = np.array(0.4359798)
+        observed = expval(np.pi / 4)
+        assert np.isclose(observed, expected)
+
+        expected = np.array(0.04)
+        observed = expval(np.pi / 2)
+        assert np.isclose(observed, expected)
+
+    def test_hamiltonian_4(self, backend):
+        """Test expval with TensorObs and nested Hamiltonian observables."""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=3))
+        def expval(x: float):
+            qml.RX(x, wires=0)
+            qml.RX(x + 1.0, wires=2)
+
+            coeff = np.array([0.8, 0.2])
+            obs_matrix = np.array(
+                [
+                    [0.5, 1.0j, 0.0, -3j],
+                    [-1.0j, -1.1, 0.0, -0.1],
+                    [0.0, 0.0, -0.9, 12.0],
+                    [3j, -0.1, 12.0, 0.0],
+                ]
+            )
+
+            obs = qml.Hermitian(obs_matrix, wires=[0, 1])
+            return qml.expval(
+                qml.Hamiltonian(
+                    coeff, [obs, qml.Hamiltonian([1, 1], [qml.PauliX(0), qml.PauliZ(1)])]
+                )
+                @ qml.PauliZ(2)
+            )
+
+        expected = np.array(-0.09284557)
+        observed = expval(np.pi / 4)
+        assert np.isclose(observed, expected)
+
+        expected = np.array(-0.03365884)
+        observed = expval(np.pi / 2)
         assert np.isclose(observed, expected)
 
 
@@ -484,6 +552,60 @@ class TestVar:
             expected,
         )
 
+    def test_hamiltonian_5(self, backend):
+        """Test variance with nested Hamiltonian observable."""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=3))
+        def circuit(x, y, coeffs):
+            qml.RX(x, wires=0)
+            qml.RY(y, wires=1)
+            qml.RZ(0.1, wires=2)
+
+            obs = [
+                qml.PauliX(0) @ qml.PauliZ(1),
+                qml.Hamiltonian(np.array([0.5]), [qml.PauliZ(0) @ qml.Hadamard(2)]),
+            ]
+
+            return qml.var(qml.Hamiltonian(coeffs, obs))
+
+        expected = np.array(0.1075)
+        coeffs = np.array([0.2, 0.6])
+        observed = circuit(np.pi / 4, np.pi / 3, coeffs)
+        assert np.isclose(
+            observed,
+            expected,
+        )
+
+    def test_hamiltonian_6(self, backend):
+        """Test variance with TensorObs and nested Hamiltonian observables."""
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=3))
+        def circuit(x, y, coeffs):
+            qml.RX(x, wires=0)
+            qml.RY(y, wires=1)
+            qml.RZ(0.1, wires=2)
+
+            return qml.var(
+                qml.Hamiltonian(
+                    coeffs,
+                    [
+                        qml.PauliX(0)
+                        @ qml.PauliZ(1)
+                        @ qml.Hamiltonian(np.array([0.5]), [qml.Hadamard(2)])
+                    ],
+                )
+            )
+
+        expected = np.array(0.01)
+        coeffs = np.array([0.2])
+        observed = circuit(np.pi / 4, np.pi / 3, coeffs)
+        assert np.isclose(
+            observed,
+            expected,
+        )
+
 
 class TestOtherMeasurements:
     """Test other measurement processes."""
@@ -551,30 +673,10 @@ class TestNewArithmeticOps:
 
     @pytest.mark.parametrize(
         "meas, expected",
-        [[qml.expval, np.array(0.5)], [qml.var, np.array(0.75)]],
-    )
-    def test_prod_zz(self, meas, expected, backend):
-        """Test ``qml.ops.op_math.Prod`` converting to TensorObs."""
-
-        @qjit
-        @qml.qnode(qml.device(backend, wires=2))
-        def circuit(x: float, y: float):
-            qml.RX(x, wires=0)
-            qml.RX(y, wires=1)
-            qml.CNOT(wires=[0, 1])
-            return meas(qml.ops.op_math.Prod(qml.PauliZ(wires=0), qml.PauliZ(wires=1)))
-
-        result = circuit(np.pi / 4, np.pi / 3)
-        assert np.allclose(expected, result)
-
-        circuit(0, 1)  # another call
-
-    @pytest.mark.parametrize(
-        "meas, expected",
         [[qml.expval, np.array(-0.70710678)], [qml.var, np.array(0.5)]],
     )
     def test_prod_xzi(self, meas, expected, backend):
-        """Test ``qml.ops.op_math.Prod`` converting to TensorObs with (X,Z,I)."""
+        """Test ``qml.ops.op_math.Prod`` converting to TensorObs."""
 
         @qjit
         @qml.qnode(qml.device(backend, wires=3))
@@ -592,12 +694,14 @@ class TestNewArithmeticOps:
         result = circuit(np.pi / 4, np.pi / 2)
         assert np.allclose(expected, result)
 
+        circuit(0, 1)  # another call
+
     @pytest.mark.parametrize(
         "meas, expected",
         [[qml.expval, np.array(-0.5)], [qml.var, np.array(0.75)]],
     )
     def test_prod_dunder_xy(self, meas, expected, backend):
-        """Test ``@`` conveting to HamiltonianObs with (X,Y), also checking {Y: PauliY}."""
+        """Test ``@`` conveting to TensorObs and checking the Paulis map."""
 
         # Enabling new arithmetic operators
         qml.operation.enable_new_opmath()
@@ -614,29 +718,10 @@ class TestNewArithmeticOps:
         assert np.allclose(expected, result)
 
         assert qml.operation.active_new_opmath()
+
         circuit(0, 1)  # another call
 
         qml.operation.disable_new_opmath()
-
-    @pytest.mark.parametrize(
-        "meas, expected",
-        [[qml.expval, np.array(0.5)], [qml.var, np.array(1.75)]],
-    )
-    def test_sum_xz(self, meas, expected, backend):
-        """Test ``qml.ops.op_math.Sum`` converting to HamiltonianObs."""
-
-        @qjit
-        @qml.qnode(qml.device(backend, wires=2))
-        def circuit(x: float, y: float):
-            qml.RX(x, wires=0)
-            qml.RX(y, wires=1)
-            qml.CNOT(wires=[0, 1])
-            return meas(qml.ops.op_math.Sum(qml.PauliX(0), qml.PauliZ(0)))
-
-        result = circuit(np.pi / 3, np.pi / 2)
-        assert np.allclose(expected, result)
-
-        circuit(0, 1)  # another call
 
     @pytest.mark.parametrize(
         "meas, expected",
@@ -668,7 +753,8 @@ class TestNewArithmeticOps:
         ],
     )
     def test_sum_xyz(self, meas, expected, backend):
-        """Test ``qml.ops.op_math.Sum`` and ``+`` converting to HamiltonianObs."""
+        """Test ``qml.ops.op_math.Sum`` and ``+`` converting to HamiltonianObs.
+        with integer coefficients."""
 
         # Enabling new arithmetic operators
         qml.operation.enable_new_opmath()
@@ -745,8 +831,8 @@ class TestNewArithmeticOps:
         ],
     )
     def test_sum_sprod_xyz(self, meas, expected, backend):
-        """Test ``qml.ops.op_math.Sum`` and ``qml.ops.op_math.SProd`` converting to
-        HamiltonianObs."""
+        """Test ``qml.ops.op_math.Sum`` (``+``) and ``qml.ops.op_math.SProd`` (``*``) converting
+        to HamiltonianObs."""
 
         # Enabling new arithmetic operators
         qml.operation.enable_new_opmath()
@@ -766,7 +852,7 @@ class TestNewArithmeticOps:
         qml.operation.disable_new_opmath()
 
     def test_mix_dunder(self, backend):
-        """Test dunder methods."""
+        """Test ``*`` and ``@`` dunder methods."""
 
         # Enabling new arithmetic operators
         qml.operation.enable_new_opmath()
@@ -786,7 +872,7 @@ class TestNewArithmeticOps:
         qml.operation.disable_new_opmath()
 
     def test_sum_hermitian(self, backend):
-        """Test Sum with Hermitian observables."""
+        """Test ``+`` with Hermitian observables."""
 
         # Enabling new arithmetic operators
         qml.operation.enable_new_opmath()
@@ -809,7 +895,7 @@ class TestNewArithmeticOps:
         qml.operation.disable_new_opmath()
 
     def test_prod_hermitian(self, backend):
-        """Test Prod with Hermitian observables."""
+        """Test ``@`` with Hermitian observables."""
 
         # Enabling new arithmetic operators
         qml.operation.enable_new_opmath()
@@ -839,7 +925,7 @@ class TestNewArithmeticOps:
         qml.operation.disable_new_opmath()
 
     def test_sprod_hermitian(self, backend):
-        """Test SProd and Prod with Hermitian observables."""
+        """Test ``*`` and ``@`` with Hermitian observable."""
 
         # Enabling new arithmetic operators
         qml.operation.enable_new_opmath()
@@ -862,7 +948,7 @@ class TestNewArithmeticOps:
         qml.operation.disable_new_opmath()
 
     def test_sum_sprod_prod_hermitian(self, backend):
-        """Test Sum of SProd and Prod with Hermitian observables."""
+        """Test ``+`` of ``@`` with Hermitian observable."""
 
         # Enabling new arithmetic operators
         qml.operation.enable_new_opmath()
@@ -884,8 +970,8 @@ class TestNewArithmeticOps:
 
         qml.operation.disable_new_opmath()
 
-    def test_sprod_mixed_hermitian(self, backend):
-        """Test SProd of mixed observables with Hermitian."""
+    def test_dunder_hermitian_1(self, backend):
+        """Test dunder methods with Hermitian observable to a HamiltonianObs."""
 
         # Enabling new arithmetic operators
         qml.operation.enable_new_opmath()
@@ -912,6 +998,38 @@ class TestNewArithmeticOps:
 
         result = circuit(np.pi / 4, np.pi / 2)
         expected = np.array(0.34142136)
+        assert np.allclose(expected, result)
+
+        qml.operation.disable_new_opmath()
+
+    def test_dunder_hermitian_2(self, backend):
+        """Test dunder methods with Hermitian observable to a TensorObs."""
+
+        # Enabling new arithmetic operators
+        qml.operation.enable_new_opmath()
+
+        @qjit
+        @qml.qnode(qml.device(backend, wires=4))
+        def circuit(x, y):
+            qml.RX(x, wires=0)
+            qml.RX(y, wires=1)
+
+            qml.RX(x + y, wires=2)
+            qml.RX(y - x, wires=3)
+
+            qml.CNOT(wires=[0, 1])
+            qml.CNOT(wires=[0, 2])
+
+            A = np.array(
+                [[complex(1.0, 0.0), complex(2.0, 0.0)], [complex(2.0, 0.0), complex(1.0, 0.0)]]
+            )
+            return qml.var(
+                (qml.Hermitian(A, wires=1) + qml.PauliZ(0))
+                @ (0.5 * (qml.PauliX(2) @ qml.PauliZ(3)))
+            )
+
+        result = circuit(np.pi, np.pi)
+        expected = np.array(1.0)
         assert np.allclose(expected, result)
 
         qml.operation.disable_new_opmath()

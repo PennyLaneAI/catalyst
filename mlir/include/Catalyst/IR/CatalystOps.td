@@ -28,6 +28,12 @@ def ListInitOp : Catalyst_Op<"list_init"> {
     let assemblyFormat = [{ attr-dict `:` type($list) }];
 }
 
+def ListDeallocOp : Catalyst_Op<"list_dealloc"> {
+    let summary = "Deallocate the underlying memory of an arraylist.";
+    let arguments = (ins ArrayListType:$list);
+    let assemblyFormat = [{ $list attr-dict `:` type($list) }];
+}
+
 def ListPushOp : Catalyst_Op<"list_push",
         [TypesMatchWith<"type of 'value' matches element type of 'list'",
                         "list", "value",
@@ -35,6 +41,16 @@ def ListPushOp : Catalyst_Op<"list_push",
     let summary = "Append an element to the end of an array list.";
     let arguments = (ins AnyType:$value, ArrayListType:$list);
     let assemblyFormat = [{ $value `,` $list attr-dict `:` type($list) }];
+}
+
+def ListPopOp : Catalyst_Op<"list_pop",
+        [TypesMatchWith<"type of 'result' matches element type of 'list'",
+                        "list", "result",
+                        "$_self.cast<ArrayListType>().getElementType()">]> {
+    let summary = "Remove an element from the end of an array list and return it.";
+    let arguments = (ins ArrayListType:$list);
+    let results = (outs AnyType:$result);
+    let assemblyFormat = [{ $list attr-dict `:` type($list) }];
 }
 
 def ListLoadDataOp : Catalyst_Op<"list_load_data"> {
