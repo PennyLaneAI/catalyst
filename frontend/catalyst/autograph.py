@@ -115,13 +115,7 @@ class CFTransformer(transpiler.PyToPy):
 def autograph(fn):
     """Decorator that converts the given function into graph form."""
 
-    options = converter.ConversionOptions(
-        recursive=True,
-        user_requested=True,
-        internal_convert_user_code=True,
-        optional_features=None,
-    )
-    user_context = converter.ProgramContext(options)
+    user_context = converter.ProgramContext(TOPLEVEL_OPTIONS)
 
     new_fn, module, source_map = TRANSFORMER.transform(fn, user_context)
     new_fn.ag_module = module
@@ -129,6 +123,14 @@ def autograph(fn):
     new_fn.ag_unconverted = fn
 
     return new_fn
+
+
+TOPLEVEL_OPTIONS = converter.ConversionOptions(
+    recursive=True,
+    user_requested=True,
+    internal_convert_user_code=True,
+    optional_features=None,
+)
 
 
 # Keep a global instance of the transformer to benefit from caching.

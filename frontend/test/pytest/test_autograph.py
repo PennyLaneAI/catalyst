@@ -46,6 +46,7 @@ class TestIntegration:
         fn = qjit(autograph=True)(fn)
 
         assert hasattr(fn.user_function, "ag_unconverted")
+        assert check_cache(fn.original_function)
         assert fn(4) == 16
 
     def test_classical_function(self):
@@ -56,6 +57,7 @@ class TestIntegration:
             return x**2
 
         assert hasattr(fn.user_function, "ag_unconverted")
+        assert check_cache(fn.original_function)
         assert fn(4) == 16
 
     def test_nested_function(self):
@@ -69,6 +71,7 @@ class TestIntegration:
             return inner(x)
 
         assert hasattr(fn.user_function, "ag_unconverted")
+        assert check_cache(fn.original_function)
         assert check_cache(inner)
         assert fn(4) == 16
 
@@ -82,6 +85,7 @@ class TestIntegration:
             return qml.expval(qml.PauliZ(0))
 
         assert hasattr(fn.user_function, "ag_unconverted")
+        assert check_cache(fn.original_function.func)
         assert fn(np.pi) == -1
 
     def test_indirect_qnode(self):
@@ -97,6 +101,7 @@ class TestIntegration:
             return inner(x)
 
         assert hasattr(fn.user_function, "ag_unconverted")
+        assert check_cache(fn.original_function)
         assert check_cache(inner.func)
         assert fn(np.pi) == -1
 
@@ -118,6 +123,7 @@ class TestIntegration:
             return inner1(x) + inner2(x)
 
         assert hasattr(fn.user_function, "ag_unconverted")
+        assert check_cache(fn.original_function)
         assert check_cache(inner1.func)
         assert check_cache(inner2.func)
         assert fn(np.pi) == -2
@@ -141,6 +147,7 @@ class TestIntegration:
             return inner2(x)
 
         assert hasattr(fn.user_function, "ag_unconverted")
+        assert check_cache(fn.original_function)
         assert check_cache(inner1.func)
         assert check_cache(inner2.func)
         # Unsupported by the runtime:
@@ -160,6 +167,7 @@ class TestIntegration:
             return inner(x)
 
         assert hasattr(fn.user_function, "ag_unconverted")
+        assert check_cache(fn.original_function)
         assert check_cache(inner.user_function.func)
         assert fn(np.pi) == -1
 

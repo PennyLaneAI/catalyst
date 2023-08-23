@@ -75,27 +75,19 @@ def converted_code(fn):
     _test_ag_import()
     from catalyst import QJIT
     from catalyst.ag_primitives import STD as STD_OPTIONS
-    from catalyst.autograph import TRANSFORMER
+    from catalyst.autograph import TRANSFORMER, TOPLEVEL_OPTIONS
 
-    cache_key = STD_OPTIONS
-
+    # Unwrap known objects to get the function actually transformed by autograph.
     if isinstance(fn, QJIT):
-        # For both top-level and nested QJIT objects, we always transform the underlying function.
-        fn = fn.user_function
-
-    if hasattr(fn, "ag_unconverted"):
-        # Catch cases where the function received was directly decorated with @autograph or
-        # @qjit(autograph=True). This includes top-level QNodes but not nested ones.
-        return inspect.getsource(fn)
-
+        fn = fn.original_function
     if isinstance(fn, qml.QNode):
-        # For nested QNodes we transform the underlying function rather than the QNode itself.
-        # Needs to run after the "ag_unconverted" check.
         fn = fn.func
 
-    if TRANSFORMER.has_cache(fn, cache_key):
-        # This is a recursively converted function.
-        new_fn = TRANSFORMER.get_cached_function(fn, cache_key)
+    if TRANSFORMER.has_cache(fn, STD_OPTIONS):
+        new_fn = TRANSFORMER.get_cached_function(fn, STD_OPTIONS)
+        return inspect.getsource(new_fn)
+    elif TRANSFORMER.has_cache(fn, TOPLEVEL_OPTIONS):
+        new_fn = TRANSFORMER.get_cached_function(fn, TOPLEVEL_OPTIONS)
         return inspect.getsource(new_fn)
 
     raise AutoGraphError(
@@ -114,9 +106,9 @@ def check_cache(fn):
     """Convenience function for testing to check the TRANSFORMER cache."""
     _test_ag_import()
     from catalyst.ag_primitives import STD as STD_OPTIONS
-    from catalyst.autograph import TRANSFORMER
+    from catalyst.autograph import TRANSFORMER, TOPLEVEL_OPTIONS
 
-    return TRANSFORMER.has_cache(fn, STD_OPTIONS)
+    return TRANSFORMER.has_cache(fn, STD_OPTIONS) or TRANSFORMER.has_cache(fn, TOPLEVEL_OPTIONS)
 
 
 def run_autograph(fn):
