@@ -2,6 +2,10 @@
 
 <h3>New features</h3>
 
+* Catalyst users can now use Python for loop statements in their programs without having to
+  explicitly use the functional `catalyst.for_loop` form!
+  [#258](https://github.com/PennyLaneAI/catalyst/pull/258)
+
 <h3>Improvements</h3>
 
 * Update the Lightning backend device to work with the PL-Lightning monorepo.

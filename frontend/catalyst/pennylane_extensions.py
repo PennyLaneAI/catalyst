@@ -1389,6 +1389,11 @@ class ForLoopCallable:
 def for_loop(lower_bound, upper_bound, step):
     """A :func:`~.qjit` compatible for-loop decorator for PennyLane/Catalyst.
 
+    .. note::
+
+        Catalyst can now automatically convert Python for loop statements for you. Requires setting
+        ``autograph=True``, see the :func:`~.qjit` function or documentation page for more details.
+
     This for-loop representation is a functional version of the traditional
     for-loop, similar to ``jax.cond.fori_loop``. That is, any variables that
     are modified across iterations need to be provided as inputs/outputs to
