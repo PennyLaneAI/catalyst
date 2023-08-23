@@ -13,69 +13,45 @@
 // limitations under the License.
 
 #include "ParameterShift.hpp"
-#include "ClassicalJacobian.hpp"
-#include "HybridGradient.hpp"
 
-#include <algorithm>
-#include <vector>
-
-#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 
 #include "Gradient/Analysis/ActivityAnalysis.h"
-#include "Gradient/Utils/GetDiffMethod.h"
+#include "Gradient/Utils/DifferentialQNode.h"
 #include "Gradient/Utils/GradientShape.h"
 #include "Quantum/IR/QuantumOps.h"
 
 namespace catalyst {
 namespace gradient {
 
-LogicalResult ParameterShiftLowering::match(GradOp op) const
+LogicalResult ParameterShiftLowering::match(func::FuncOp op) const
 {
-    if (getQNodeDiffMethod(op) == "parameter-shift") {
+    if (getQNodeDiffMethod(op) == "parameter-shift" && requiresCustomGradient(op)) {
         return success();
     }
-
     return failure();
 }
 
-void ParameterShiftLowering::rewrite(GradOp op, PatternRewriter &rewriter) const
+void ParameterShiftLowering::rewrite(func::FuncOp op, PatternRewriter &rewriter) const
 {
     Location loc = op.getLoc();
-    func::FuncOp callee =
-        SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
-    rewriter.setInsertionPointAfter(callee);
+    rewriter.setInsertionPointAfter(op);
 
-    ActivityAnalyzer(callee, computeDiffArgIndices(op.getDiffArgIndices()), printActivity);
-
-    // Determine the number of parameters to shift (= to the total static number of gate parameters
-    // occuring in the function) and number of selectors needed (= to the number of loop nests
-    // containing quantum instructions with at least one gate parameter).
-    auto [numShifts, loopDepth] = analyzeFunction(callee);
-
-    // In order to allocate memory for various tensors relating to the number of gate parameters
-    // at runtime we run a function that merely counts up for each gate parameter encountered.
-    func::FuncOp paramCountFn = genParamCountFunction(rewriter, loc, callee);
-
-    // Generate the classical argument map from function arguments to gate parameters. This
-    // function will be differentiated to produce the classical jacobian.
-    func::FuncOp argMapFn = genArgMapFunction(rewriter, loc, callee);
+    // Determine the number of parameters to shift (= to the total static number of gate
+    // parameters occuring in the function) and number of selectors needed (= to the number of
+    // loop nests containing quantum instructions with at least one gate parameter).
+    auto [numShifts, loopDepth] = analyzeFunction(op);
 
     // Generate the shifted version of callee, enabling us to shift an arbitrary gate
     // parameter at runtime.
-    func::FuncOp shiftFn = genShiftFunction(rewriter, loc, callee, numShifts, loopDepth);
+    func::FuncOp shiftFn = genShiftFunction(rewriter, loc, op, numShifts, loopDepth);
 
     // Generate the quantum gradient function, exploiting the structure of the original function
     // to dynamically compute the partial derivate with respect to each gate parameter.
-    func::FuncOp qGradFn = genQGradFunction(rewriter, loc, callee, shiftFn, numShifts, loopDepth);
+    func::FuncOp qGradFn = genQGradFunction(rewriter, loc, op, shiftFn, numShifts, loopDepth);
 
-    // Generate the full gradient function, computing the partial derivates with respect to the
-    // original function arguments from the classical Jacobian and quantum gradient.
-    func::FuncOp fullGradFn =
-        genFullGradFunction(rewriter, loc, op, paramCountFn, argMapFn, qGradFn, "ps");
-
-    rewriter.setInsertionPoint(op);
-    rewriter.replaceOpWithNewOp<func::CallOp>(op, fullGradFn, op.getArgOperands());
+    // Register the quantum gradient on the quantum-only split-out QNode.
+    registerCustomGradient(op, FlatSymbolRefAttr::get(qGradFn));
 }
 
 std::pair<int64_t, int64_t> ParameterShiftLowering::analyzeFunction(func::FuncOp callee)

@@ -13,21 +13,12 @@
 // limitations under the License.
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/IR/SymbolTable.h"
 
-#include "Gradient/Utils/GetDiffMethod.h"
+namespace catalyst {
 
-using namespace mlir;
+/// Traverse the call graph and execute the `processFunc` callback for each `func.func` op
+/// encountered.
+void traverseCallGraph(mlir::func::FuncOp start, mlir::SymbolTableCollection *symbolTable,
+                       mlir::function_ref<void(mlir::func::FuncOp)> processFunc);
 
-StringRef catalyst::gradient::getQNodeDiffMethod(catalyst::gradient::GradOp gradOp)
-{
-    const char *diffMethodKey = "diff_method";
-
-    func::FuncOp callee =
-        SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(gradOp, gradOp.getCalleeAttr());
-    bool isQNode = callee->hasAttr("qnode") && callee->hasAttrOfType<StringAttr>(diffMethodKey);
-    if (gradOp.getMethod() == "defer" && isQNode) {
-        return callee->getAttrOfType<StringAttr>(diffMethodKey).strref();
-    }
-    return "";
-}
+} // namespace catalyst

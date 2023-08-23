@@ -99,15 +99,17 @@
   circuit([0.5, 0.6])
   ```
 
-* Add support for compile-time backpropagation of classical pre-processing via Enzyme AD.
+* Add support for compile-time backpropagation of arbitrary hybrid programs via Enzyme AD.
   [#158](https://github.com/PennyLaneAI/catalyst/pull/158)
   [#193](https://github.com/PennyLaneAI/catalyst/pull/193)
   [#224](https://github.com/PennyLaneAI/catalyst/pull/224)
   [#225](https://github.com/PennyLaneAI/catalyst/pull/225)
   [#239](https://github.com/PennyLaneAI/catalyst/pull/239)
+  [#244](https://github.com/PennyLaneAI/catalyst/pull/244)
 
-  This enables high-performance reverse mode automatic differentiation of arbitrary classical
-  preprocessing when ``method=defer`` is specified on the ``grad`` operation:
+  This enables high-performance reverse mode automatic differentiation of programs when
+  ``method="defer"`` is specified on the ``grad`` operation in conjunction with either
+  ``"parameter-shift"`` or ``"adjoint"`` specified as the ``diff_method`` on each QNode:
 
   ```python
   @qml.qnode(qml.device("lightning.qubit", wires=1), diff_method="parameter-shift")
@@ -123,6 +125,70 @@
   ```pycon
   >>> grad_circuit(jnp.pi)
   array(112936.34906843)
+  ```
+
+  This re-working of the internal gradient architecture means you can now compute exact
+  derivatives of programs with both classical preprocessing and postprocessing.
+
+  ```python
+  @qml.qnode(qml.device("lightning.qubit", wires=1), diff_method="adjoint")
+  def circuit(theta):
+      qml.RX(jnp.exp(theta ** 2) / jnp.cos(theta / 4), wires=0)
+      return qml.expval(qml.PauliZ(wires=0))
+
+  def loss(theta):
+      return jnp.pi / jnp.tanh(circuit(theta))
+  
+  @qjit
+  def grad_loss(theta):
+      return catalyst.grad(loss, method="defer")(theta)
+  ```
+
+  ```pycon
+  >>> grad_loss(1.0)
+  array(-1.90958669)
+  ```
+
+  You can use multiple QNodes with different differentiation methods:
+
+  ```python
+  @qml.qnode(qml.device("lightning.qubit", wires=1), diff_method="parameter-shift")
+  def circuit_A(params):
+      qml.RX(jnp.exp(params[0] ** 2) / jnp.cos(params[1] / 4), wires=0)
+      return qml.probs()
+
+  @qml.qnode(qml.device("lightning.qubit", wires=1), diff_method="adjoint")
+  def circuit_B(params):
+      qml.RX(jnp.exp(params[1] ** 2) / jnp.cos(params[0] / 4), wires=0)
+      return qml.expval(qml.PauliZ(wires=0))
+
+  def loss(params):
+      return jnp.prod(circuit_A(params)) + circuit_B(params)
+
+  @qjit
+  def grad_loss(theta):
+      return catalyst.grad(loss, method="defer")(theta)
+  ```
+
+  ```pycon
+  >>> grad_loss(jnp.array([1.0, 2.0]))
+  array([ 0.57367285, 44.4911605 ])
+  ```
+
+  You can even differentiate purely classical code:
+
+  ```python
+  def square(x: float):
+      return x ** 2
+
+  @qjit
+  def dsquare(x: float):
+      return catalyst.grad(square, method="defer")(x)
+  ```
+
+  ```pycon
+  >>> dsquare(2.3)
+  array(4.6)
   ```
 
 <h3>Improvements</h3>

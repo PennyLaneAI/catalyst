@@ -28,17 +28,13 @@ using namespace mlir;
 namespace catalyst {
 namespace gradient {
 
-struct ParameterShiftLowering : public OpRewritePattern<GradOp> {
-    ParameterShiftLowering(MLIRContext *ctx, bool printActivity)
-        : OpRewritePattern(ctx, /*benefit=*/1), printActivity(printActivity)
-    {
-    }
+struct ParameterShiftLowering : public OpRewritePattern<func::FuncOp> {
+    using OpRewritePattern<func::FuncOp>::OpRewritePattern;
 
-    LogicalResult match(GradOp op) const override;
-    void rewrite(GradOp op, PatternRewriter &rewriter) const override;
+    LogicalResult match(func::FuncOp op) const override;
+    void rewrite(func::FuncOp op, PatternRewriter &rewriter) const override;
 
   private:
-    bool printActivity;
     static std::pair<int64_t, int64_t> analyzeFunction(func::FuncOp callee);
     static func::FuncOp genShiftFunction(PatternRewriter &rewriter, Location loc,
                                          func::FuncOp callee, const int64_t numShifts,

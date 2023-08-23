@@ -14,6 +14,7 @@
 
 #include "GradMethods/Adjoint.hpp"
 #include "GradMethods/FiniteDifference.hpp"
+#include "GradMethods/HybridGradient.hpp"
 #include "GradMethods/JVPVJPPatterns.hpp"
 #include "GradMethods/ParameterShift.hpp"
 
@@ -29,10 +30,11 @@ namespace gradient {
 
 void populateLoweringPatterns(RewritePatternSet &patterns, StringRef lowerOnly, bool printActivity)
 {
+    patterns.add<HybridGradientLowering>(patterns.getContext(), printActivity);
     if (lowerOnly == "" || lowerOnly == "fd")
         patterns.add<FiniteDiffLowering>(patterns.getContext(), 1);
     if (lowerOnly == "" || lowerOnly == "ps")
-        patterns.add<ParameterShiftLowering>(patterns.getContext(), printActivity);
+        patterns.add<ParameterShiftLowering>(patterns.getContext());
     if (lowerOnly == "" || lowerOnly == "adj")
         patterns.add<AdjointLowering>(patterns.getContext(), 1);
     if (lowerOnly == "" || lowerOnly == "jp") {

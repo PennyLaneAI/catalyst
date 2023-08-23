@@ -17,14 +17,39 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/PatternMatch.h"
 
-using namespace mlir;
+#include "Gradient/IR/GradientOps.h"
 
 namespace catalyst {
 namespace gradient {
 
-func::FuncOp genFullGradFunction(PatternRewriter &rewriter, Location loc, GradOp gradOp,
-                                 func::FuncOp ParamCountFn, func::FuncOp argMapFn,
-                                 func::FuncOp qGradFn, StringRef method);
+/// A pattern responsible for common transformations required when differentiating hybrid circuits
+/// with Enzyme.
+struct HybridGradientLowering : public mlir::OpRewritePattern<GradOp> {
+    HybridGradientLowering(MLIRContext *ctx, bool printActivity)
+        : OpRewritePattern(ctx), printActivity(printActivity)
+    {
+    }
+
+    mlir::LogicalResult matchAndRewrite(GradOp op, mlir::PatternRewriter &rewriter) const override;
+
+  private:
+    bool printActivity;
+    /// Recursively process all the QNodes of the `callee` being differentiated. The resulting
+    /// BackpropOps will be called with `backpropArgs`.
+    static mlir::FailureOr<mlir::func::FuncOp>
+    cloneCallee(mlir::PatternRewriter &rewriter, GradOp gradOp, mlir::func::FuncOp callee,
+                mlir::SmallVectorImpl<Value> &backpropArgs);
+
+    /// Generate a version of the QNode that accepts the parameter buffer. This is so Enzyme will
+    /// see that the gate parameters flow into the custom quantum function.
+    static mlir::func::FuncOp genQNodeWithParams(mlir::PatternRewriter &rewriter,
+                                                 mlir::Location loc, mlir::func::FuncOp qnode);
+};
+
+mlir::func::FuncOp genFullGradFunction(mlir::PatternRewriter &rewriter, mlir::Location loc,
+                                       GradOp gradOp, mlir::func::FuncOp paramCountFn,
+                                       mlir::func::FuncOp argMapFn, mlir::func::FuncOp qGradFn,
+                                       mlir::StringRef method);
 
 } // namespace gradient
 } // namespace catalyst
