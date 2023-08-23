@@ -19,7 +19,7 @@ import jax.numpy as jnp
 import pennylane as qml
 import pytest
 
-from catalyst import grad, qjit
+from catalyst import grad, jacobian, qjit
 from catalyst.pennylane_extensions import DifferentiableCompileError
 
 SUPPORTED_DIFF_METHODS = ["parameter-shift", "adjoint"]
@@ -61,11 +61,11 @@ def test_one_to_many(backend, diff_method):
         return jnp.array([jnp.cos(w), w, w * 2])
 
     @qjit
-    def jacobian(x):
-        return grad(postprocess, method="defer")(x)
+    def jac_postprocess(x):
+        return jacobian(postprocess, method="defer")(x)
 
     jax_jacobian = jax.jacobian(postprocess)(0.5)
-    catalyst_jacobian = jacobian(0.5)
+    catalyst_jacobian = jac_postprocess(0.5)
     assert catalyst_jacobian == pytest.approx(jax_jacobian)
 
 
@@ -83,7 +83,7 @@ def test_many_to_one(backend, diff_method):
 
     def postprocess(x):
         w = workflow(x)
-        return jnp.array([jnp.cos(w), w, w * 2])
+        return jnp.cos(w)
 
     @qjit
     def jacobian(x):
@@ -92,7 +92,7 @@ def test_many_to_one(backend, diff_method):
     x = jnp.array([0.5, 0.4, 0.3, 0.2])
     jax_jacobian = jax.jacobian(postprocess)(x)
     catalyst_jacobian = jacobian(x)
-    assert catalyst_jacobian == pytest.approx(jax_jacobian.mT)
+    assert catalyst_jacobian == pytest.approx(jax_jacobian)
 
 
 def test_tensor_measure(backend):
@@ -109,11 +109,11 @@ def test_tensor_measure(backend):
         return jnp.sum(probs) / jnp.prod(probs)
 
     @qjit
-    def jacobian(x):
-        return grad(postprocess, method="defer")(x)
+    def jac_postprocess(x):
+        return jacobian(postprocess, method="defer")(x)
 
     jax_jacobian = jax.jacobian(postprocess)(0.5)
-    catalyst_jacobian = jacobian(0.5)
+    catalyst_jacobian = jac_postprocess(0.5)
     assert catalyst_jacobian == pytest.approx(jax_jacobian)
 
 
@@ -130,11 +130,11 @@ def test_multi_measure(backend):
         return jnp.cos(w) + jnp.prod(probs)
 
     @qjit
-    def jacobian(x):
+    def jac_postprocess(x):
         return grad(postprocess, method="defer")(x)
 
     jax_jacobian = jax.jacobian(postprocess)(0.5)
-    catalyst_jacobian = jacobian(0.5)
+    catalyst_jacobian = jac_postprocess(0.5)
     assert catalyst_jacobian == pytest.approx(jax_jacobian)
 
 
@@ -168,11 +168,13 @@ def test_jacobian(backend, diff_method):
         return jnp.array([[jnp.sin(w), jnp.cos(w)], [w, w * 2], [w / 2, w]])
 
     @qjit
-    def jacobian(x):
-        return grad(postprocess, method="defer")(x)
+    def jac_postprocess(x):
+        return jacobian(postprocess, method="defer")(x)
 
     x = jnp.array([0.5, 0.4, 0.3, 0.2])
-    assert jacobian(x) == pytest.approx(jnp.transpose(jax.jacobian(postprocess)(x), axes=(2, 0, 1)))
+    assert jac_postprocess(x) == pytest.approx(
+        jnp.transpose(jax.jacobian(postprocess)(x), axes=(2, 0, 1))
+    )
 
 
 @pytest.mark.parametrize("diff_method", SUPPORTED_DIFF_METHODS)
@@ -189,11 +191,11 @@ def test_multi_result(backend, diff_method):
         return jnp.cos(w), jnp.array([w, x * 2.454])
 
     @qjit
-    def jacobian(x):
-        return grad(postprocess, method="defer")(x)
+    def jac_postprocess(x):
+        return jacobian(postprocess, method="defer")(x)
 
     jax_jacobian = jax.jacobian(postprocess)(0.5)
-    catalyst_jacobian = jacobian(0.5)
+    catalyst_jacobian = jac_postprocess(0.5)
     for catalyst_result, jax_result in zip(catalyst_jacobian, jax_jacobian):
         assert catalyst_result == pytest.approx(jax_result)
 
@@ -213,12 +215,12 @@ def test_multi_arg_multi_result(backend, diff_method):
         return jnp.cos(w), jnp.array([w, x[0] * 2.454])
 
     @qjit
-    def jacobian(x, y):
-        return grad(postprocess, argnum=(0, 1), method="defer")(x, y)
+    def jac_postprocess(x, y):
+        return jacobian(postprocess, argnum=(0, 1), method="defer")(x, y)
 
     args = (jnp.array([0.5, 0, 0]), 0.4)
     jax_jacobian = jax.jacobian(postprocess, argnums=(0, 1))(*args)
-    catalyst_jacobian = jacobian(*args)
+    catalyst_jacobian = jac_postprocess(*args)
     # Catalyst returns a list of 4 values while JAX returns a 2x2 list of lists
     for i, row in enumerate(jax_jacobian):
         for j, jax_entry in enumerate(row):
@@ -291,13 +293,13 @@ def test_no_nested_grad_without_fd():
         return x
 
     def middle(x: float):
-        return grad(inner, method="fd")(x) * 3
+        return grad(inner, method="fd")(x)
 
     with pytest.raises(DifferentiableCompileError, match="higher order derivatives"):
 
         @qjit
         def outer(x: float):
-            return grad(middle, method="defer")(x) ** 2
+            return grad(middle, method="defer")(x)
 
         outer(9.0)
 
