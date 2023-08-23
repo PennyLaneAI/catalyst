@@ -16,7 +16,9 @@
 functions. The purpose is to convert imperative style code to functional or graph-style code."""
 
 import functools
-from typing import Any, Callable, Tuple, SupportsIndex, Iterator
+from typing import Any, Callable, Iterator, SupportsIndex, Tuple
+
+import jax.numpy as jnp
 
 # Use tensorflow implementations for handling function scopes and calls,
 # as well as various utility objects.
@@ -34,7 +36,6 @@ from tensorflow.python.autograph.operators.variables import (
     Undefined,
     UndefinedReturnValue,
 )
-import jax.numpy as jnp
 
 import catalyst
 from catalyst.ag_utils import AutoGraphError
@@ -193,8 +194,7 @@ def converted_call(fn, args, kwargs, caller_fn_scope=None, options=None):
         # `for .. in range(..)` to be converted natively to `for_loop` calls. This is beneficial
         # since the Python range function does not allow tracers as arguments.
         if fn is range:
-            assert len(args) in (1, 3)
-            return CRange(*args)
+            return CRange(*args, **(kwargs if kwargs is not None else {}))
 
         # We need to unpack nested QNode and QJIT calls as autograph will have trouble handling
         # them. Ideally, we only want the wrapped function to be transformed by autograph, rather
