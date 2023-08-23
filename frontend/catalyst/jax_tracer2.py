@@ -228,7 +228,7 @@ class CondCallable:
         for branch in self.branch_fns + [self.otherwise_fn]:
             quantum_tape = QuantumTape()
             with frame_tracing_context(ctx) as inner_trace:
-                wffa, in_avals, _ = deduce_avals(branch, [], {})
+                wffa, in_avals, out_tree = deduce_avals(branch, [], {})
                 with QueuingManager.stop_recording(), quantum_tape:
                     res_classical_tracers = [inner_trace.full_raise(t) for t in wffa.call_wrapped()]
             regions.append(HybridOpRegion(inner_trace, quantum_tape, [], res_classical_tracers))
@@ -236,7 +236,7 @@ class CondCallable:
         res_avals = list(map(shaped_abstractify, res_classical_tracers))
         out_classical_tracers = [new_inner_tracer(outer_trace, aval) for aval in res_avals]
         Cond(in_classical_tracers, out_classical_tracers, regions)
-        return out_classical_tracers
+        return tree_unflatten(out_tree(), out_classical_tracers)
 
     def _call_with_classical_ctx(self):
         args, args_tree = tree_flatten([])
@@ -279,8 +279,8 @@ def for_loop(lower_bound, upper_bound, step):
                 outer_trace = ctx.trace
                 with frame_tracing_context(ctx) as inner_trace:
 
-                    in_classical_tracers = [lower_bound, upper_bound, step, lower_bound] + list(init_state)
-                    wffa, in_avals, _ = deduce_avals(body_fn, [lower_bound] + list(init_state), {})
+                    in_classical_tracers = [lower_bound, upper_bound, step, lower_bound] + tree_flatten(init_state)[0]
+                    wffa, in_avals, body_tree = deduce_avals(body_fn, [lower_bound] + list(init_state), {})
                     arg_classical_tracers = _input_type_to_tracers(inner_trace.new_arg, in_avals)
                     with QueuingManager.stop_recording(), quantum_tape:
                         res_classical_tracers = [inner_trace.full_raise(t) for t in
@@ -296,7 +296,7 @@ def for_loop(lower_bound, upper_bound, step):
                                         arg_classical_tracers,
                                         res_classical_tracers)])
 
-                return out_classical_tracers
+                return tree_unflatten(body_tree(), out_classical_tracers)
 
             def _call_with_classical_ctx():
                 iter_arg = lower_bound
@@ -336,10 +336,10 @@ def while_loop(cond_fn):
         def _call_handler(*init_state):
             def _call_with_quantum_ctx(ctx:MainTracingContex):
                 outer_trace = ctx.trace
-                in_classical_tracers = list(init_state)
+                in_classical_tracers, in_tree = tree_flatten(init_state)
 
                 with frame_tracing_context(ctx) as cond_trace:
-                    cond_wffa, cond_in_avals, _ = deduce_avals(cond_fn, in_classical_tracers, {})
+                    cond_wffa, cond_in_avals, _ = deduce_avals(cond_fn, init_state, {})
                     arg_classical_tracers = _input_type_to_tracers(cond_trace.new_arg, cond_in_avals)
                     res_classical_tracers = [cond_trace.full_raise(t) for t in
                                              cond_wffa.call_wrapped(*arg_classical_tracers)]
@@ -350,7 +350,7 @@ def while_loop(cond_fn):
                         res_classical_tracers)
 
                 with frame_tracing_context(ctx) as body_trace:
-                    wffa, in_avals, _ = deduce_avals(body_fn, in_classical_tracers, {})
+                    wffa, in_avals, body_tree = deduce_avals(body_fn, init_state, {})
                     arg_classical_tracers = _input_type_to_tracers(body_trace.new_arg, in_avals)
                     quantum_tape = QuantumTape()
                     with QueuingManager.stop_recording(), quantum_tape:
@@ -368,7 +368,7 @@ def while_loop(cond_fn):
                 WhileLoop(in_classical_tracers,
                           out_classical_tracers,
                           [cond_region, body_region])
-                return out_classical_tracers
+                return tree_unflatten(body_tree(), out_classical_tracers)
 
             def _call_with_classical_ctx():
                 init_vals, in_tree = tree_flatten(init_state)
@@ -502,6 +502,7 @@ def trace_quantum_tape(quantum_tape:QuantumTape,
                     body_jaxpr=ClosedJaxpr(convert_constvars_jaxpr(body_jaxpr), ()),
                     cond_nconsts=len(cond_consts),
                     body_nconsts=len(body_consts))[-1] # [1]
+
             elif isinstance(op, MidCircuitMeasure):
                 wire = op.in_classical_tracers[0]
                 qubit = qextract(qreg, wire)
