@@ -469,8 +469,8 @@ void LightningSimulator::Gradient(std::vector<DataView<double, 1>> &gradients,
     auto &&ops_wires = this->cache_manager.getOperationsWires();
 
     auto &&ops_inverses = this->cache_manager.getOperationsInverses();
-    const auto &&ops =
-        Pennylane::Algorithms::OpsData<StateVectorT>(ops_names, ops_params, ops_wires, ops_inverses);
+    const auto &&ops = Pennylane::Algorithms::OpsData<StateVectorT>(ops_names, ops_params,
+                                                                    ops_wires, ops_inverses);
 
     // create the vector of observables
     auto &&obs_keys = this->cache_manager.getObservablesKeys();
@@ -495,7 +495,7 @@ void LightningSimulator::Gradient(std::vector<DataView<double, 1>> &gradients,
     Pennylane::LightningQubit::Algorithms::AdjointJacobian<StateVectorT> adj;
     std::vector<double> jacobian(jac_size, 0);
     adj.adjointJacobian(std::span{jacobian}, tape,
-                                           /* apply_operations */ false);
+                        /* apply_operations */ false);
 
     // convert jacobians to a list of lists for each observable
     std::vector<double> jacobian_t =

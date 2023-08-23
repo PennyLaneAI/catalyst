@@ -44,8 +44,8 @@ throw std::logic_error("StateVectorDynamicCPU.hpp: No such header file");
 
 namespace Catalyst::Runtime::Simulator {
 class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {
-    private:
-        using StateVectorT = Pennylane::LightningQubit::StateVectorDynamicCPU<double>;
+  private:
+    using StateVectorT = Pennylane::LightningQubit::StateVectorDynamicCPU<double>;
 
   private:
     // static constants for RESULT values
@@ -60,8 +60,7 @@ class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {
 
     size_t device_shots;
 
-    std::unique_ptr<StateVectorT> device_sv =
-        std::make_unique<StateVectorT>(0);
+    std::unique_ptr<StateVectorT> device_sv = std::make_unique<StateVectorT>(0);
     LightningObsManager<double> obs_manager{};
 
     inline auto isValidQubit(QubitIdType wire) -> bool

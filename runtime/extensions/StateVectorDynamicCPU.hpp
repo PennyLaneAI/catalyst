@@ -27,6 +27,19 @@
 
 #include <iostream>
 
+/// @cond DEV
+namespace {
+using Pennylane::Util::AlignedAllocator;
+using Pennylane::Util::bestCPUMemoryModel;
+using Pennylane::Util::exp2;
+using Pennylane::Util::isPerfectPowerOf2;
+using Pennylane::Util::log2PerfectPower;
+using Pennylane::Util::ONE;
+using Pennylane::Util::squaredNorm;
+using Pennylane::Util::ZERO;
+} // namespace
+/// @endcond
+
 namespace Pennylane::LightningQubit {
 /**
  * @brief State-vector dynamic class.
@@ -43,11 +56,11 @@ class StateVectorDynamicCPU : public StateVectorLQubit<fp_t, StateVectorDynamicC
     using ComplexT = std::complex<PrecisionT>;
 
   private:
-    using BaseType = StateVectorLQubit<fp_t, StateVectorDynamicCPU<fp_t>>;
-    std::vector<ComplexT, Pennylane::Util::AlignedAllocator<ComplexT>> data_;
+    using BaseType = StateVectorLQubit<PrecisionT, StateVectorDynamicCPU<PrecisionT>>;
+    std::vector<ComplexT, AlignedAllocator<ComplexT>> data_;
     size_t num_qubits_;
 
-    static constexpr fp_t epsilon_ = std::numeric_limits<fp_t>::epsilon() * 100;
+    static constexpr PrecisionT epsilon_ = std::numeric_limits<PrecisionT>::epsilon() * 100;
 
     template <class IIter, class OIter>
     inline OIter _move_data_elements(IIter first, size_t distance, OIter second)
@@ -64,36 +77,34 @@ class StateVectorDynamicCPU : public StateVectorLQubit<fp_t, StateVectorDynamicC
     {
         for (size_t i = 0; i < distance; i++) {
             *second++ = std::move(*first);
-            *first = Pennylane::Util::ZERO<fp_t>();
+            *first = ZERO<PrecisionT>();
             first++;
         }
         return second;
     }
 
-    inline void _scalar_mul_data(
-        std::vector<ComplexT, Pennylane::Util::AlignedAllocator<ComplexT>> &data,
-        ComplexT scalar)
+    inline void _scalar_mul_data(std::vector<ComplexT, AlignedAllocator<ComplexT>> &data,
+                                 ComplexT scalar)
     {
         std::transform(data.begin(), data.end(), data.begin(),
                        [scalar](const ComplexT &elem) { return elem * scalar; });
     }
 
-    inline void
-    _normalize_data(std::vector<ComplexT, Pennylane::Util::AlignedAllocator<ComplexT>> &data)
+    inline void _normalize_data(std::vector<ComplexT, AlignedAllocator<ComplexT>> &data)
     {
-        _scalar_mul_data(data, Pennylane::Util::ONE<fp_t>() /
-                                   std::sqrt(Pennylane::Util::squaredNorm(data.data(), data.size())));
+        _scalar_mul_data(data,
+                         ONE<PrecisionT>() / std::sqrt(squaredNorm(data.data(), data.size())));
     }
 
-    /**
-     * @brief Redefine the number of qubits in the statevector.
-     *
-     * @param qubits New number of qubits represented by statevector.
-     */
-    void setNumQubits(size_t qubits) { 
-        PL_ASSERT(qubits >= 0);
-        num_qubits_ = qubits;
-    }
+    // /**
+    //  * @brief Redefine the number of qubits in the statevector.
+    //  *
+    //  * @param qubits New number of qubits represented by statevector.
+    //  */
+    // void setNumQubits(size_t qubits) {
+    //     PL_ASSERT(qubits >= 0);
+    //     num_qubits_ = qubits;
+    // }
 
   public:
     /**
@@ -105,12 +116,13 @@ class StateVectorDynamicCPU : public StateVectorLQubit<fp_t, StateVectorDynamicC
      */
     explicit StateVectorDynamicCPU(size_t num_qubits, Threading threading = Threading::SingleThread,
                                    CPUMemoryModel memory_model = bestCPUMemoryModel())
-        : BaseType{num_qubits, threading, memory_model}, 
-          data_{Pennylane::Util::exp2(num_qubits), Pennylane::Util::ZERO<fp_t>(),
+        : BaseType{num_qubits, threading, memory_model},
+          data_{exp2(num_qubits), ZERO<PrecisionT>(),
                 getAllocator<ComplexT>( // LCOV_EXCL_LINE
-                    this->memory_model_)}, num_qubits_(num_qubits)
+                    this->memory_model_)},
+          num_qubits_(num_qubits)
     {
-        data_[0] = Pennylane::Util::ONE<fp_t>();
+        data_[0] = ONE<PrecisionT>();
     }
 
     /**
@@ -121,7 +133,7 @@ class StateVectorDynamicCPU : public StateVectorLQubit<fp_t, StateVectorDynamicC
      * @param other Another statevector to construct the statevector from
      */
     template <class OtherDerived>
-    explicit StateVectorDynamicCPU(const StateVectorLQubit<fp_t, OtherDerived> &other)
+    explicit StateVectorDynamicCPU(const StateVectorLQubit<PrecisionT, OtherDerived> &other)
         : BaseType(other.getNumQubits(), other.threading(), other.memoryModel()),
           data_{other.getData(), other.getData() + other.getLength(),
                 getAllocator<ComplexT>(this->memory_model_)}
@@ -139,11 +151,10 @@ class StateVectorDynamicCPU : public StateVectorLQubit<fp_t, StateVectorDynamicC
     StateVectorDynamicCPU(const ComplexT *other_data, size_t other_size,
                           Threading threading = Threading::SingleThread,
                           CPUMemoryModel memory_model = bestCPUMemoryModel())
-        : BaseType(Pennylane::Util::log2PerfectPower(other_size), threading, memory_model),
-          data_{other_data, other_data + other_size,
-                getAllocator<ComplexT>(this->memory_model_)}
+        : BaseType(log2PerfectPower(other_size), threading, memory_model),
+          data_{other_data, other_data + other_size, getAllocator<ComplexT>(this->memory_model_)}
     {
-        PL_ABORT_IF_NOT(Pennylane::Util::isPerfectPowerOf2(other_size),
+        PL_ABORT_IF_NOT(isPerfectPowerOf2(other_size),
                         "The size of provided data must be a power of 2.");
     }
 
@@ -157,7 +168,7 @@ class StateVectorDynamicCPU : public StateVectorLQubit<fp_t, StateVectorDynamicC
      * @param memory_model Memory model the statevector will use
      */
     template <class Alloc>
-    explicit StateVectorDynamicCPU(const std::vector<std::complex<fp_t>, Alloc> &other,
+    explicit StateVectorDynamicCPU(const std::vector<std::complex<PrecisionT>, Alloc> &other,
                                    Threading threading = Threading::SingleThread,
                                    CPUMemoryModel memory_model = bestCPUMemoryModel())
         : StateVectorDynamicCPU(other.data(), other.size(), threading, memory_model)
@@ -173,15 +184,30 @@ class StateVectorDynamicCPU : public StateVectorLQubit<fp_t, StateVectorDynamicC
     ~StateVectorDynamicCPU() = default;
 
     /**
-     * @brief Update data of the class to new_data
-     *
-     * @tparam Alloc Allocator type of std::vector to use for updating data.
-     * @param new_data std::vector contains data.
+     * @brief Get underlying C-style data of the state-vector.
      */
-    template <class Alloc> void updateData(const std::vector<ComplexT, Alloc> &new_data)
+    [[nodiscard]] auto getData() -> ComplexT * { return data_.data(); }
+
+    /**
+     * @brief Get underlying C-style data of the state-vector.
+     */
+    [[nodiscard]] auto getData() const -> const ComplexT * { return data_.data(); }
+
+    /**
+     * @brief Get underlying data vector.
+     */
+    [[nodiscard]] auto getDataVector() -> std::vector<ComplexT, AlignedAllocator<ComplexT>> &
     {
-        PL_ASSERT(data_.size() == new_data.size());
-        std::copy(new_data.data(), new_data.data() + new_data.size(), data_.data());
+        return data_;
+    }
+
+    /**
+     * @brief Get underlying data vector.
+     */
+    [[nodiscard]] auto getDataVector() const
+        -> const std::vector<ComplexT, AlignedAllocator<ComplexT>> &
+    {
+        return data_;
     }
 
     /**
@@ -190,22 +216,33 @@ class StateVectorDynamicCPU : public StateVectorLQubit<fp_t, StateVectorDynamicC
      * @param new_data data pointer to new data.
      * @param new_size size of underlying data storage.
      */
-    void updateData(const ComplexT *new_data, size_t new_size) {
+    void updateData(const ComplexT *new_data, size_t new_size)
+    {
         PL_ASSERT(data_.size() == new_size);
         std::copy(new_data, new_data + new_size, data_.data());
     }
 
     /**
-     * @brief Get the number of qubits represented by the statevector data.
+     * @brief Update data of the class to new_data
      *
-     * @return std::size_t
+     * @tparam Alloc Allocator type of std::vector to use for updating data.
+     * @param new_data std::vector contains data.
      */
-    [[nodiscard]] auto getNumQubits() const -> std::size_t {
-        return num_qubits_;
+    template <class Alloc> void updateData(const std::vector<ComplexT, Alloc> &new_data)
+    {
+        updateData(new_data.data(), new_data.size());
     }
 
+    AlignedAllocator<ComplexT> allocator() const { return data_.get_allocator(); }
 
-    Pennylane::Util::AlignedAllocator<ComplexT> allocator() const { return data_.get_allocator(); }
+    // /**
+    //  * @brief Get the number of qubits represented by the statevector data.
+    //  *
+    //  * @return std::size_t
+    //  */
+    // [[nodiscard]] auto getNumQubits() const -> std::size_t {
+    //     return num_qubits_;
+    // }
 
     [[nodiscard]] auto isValidWire(size_t wire) -> bool { return wire < this->getNumQubits(); }
 
@@ -312,9 +349,8 @@ class StateVectorDynamicCPU : public StateVectorLQubit<fp_t, StateVectorDynamicC
         // Check if the reduced state-vector is the first-half
         bool is_first_half = false;
         for (auto src = dst; src < data_.end(); std::advance(src, 2 * distance)) {
-            is_first_half =
-                std::any_of(src, src + static_cast<long long>(distance),
-                            [](ComplexT &e) { return e != Pennylane::Util::ZERO<fp_t>(); });
+            is_first_half = std::any_of(src, src + static_cast<long long>(distance),
+                                        [](ComplexT &e) { return e != ZERO<PrecisionT>(); });
             if (is_first_half) {
                 break;
             }
@@ -344,35 +380,7 @@ class StateVectorDynamicCPU : public StateVectorLQubit<fp_t, StateVectorDynamicC
         this->setNumQubits(0);
 
         // the init state-vector
-        data_.push_back(Pennylane::Util::ONE<fp_t>());
-    }
-
-    /**
-     * @brief Get underlying C-style data of the state-vector.
-     */
-    [[nodiscard]] auto getData() -> ComplexT * { return data_.data(); }
-
-    /**
-     * @brief Get underlying C-style data of the state-vector.
-     */
-    [[nodiscard]] auto getData() const -> const ComplexT * { return data_.data(); }
-
-    /**
-     * @brief Get underlying data vector.
-     */
-    [[nodiscard]] auto getDataVector()
-        -> std::vector<ComplexT, Pennylane::Util::AlignedAllocator<ComplexT>> &
-    {
-        return data_;
-    }
-
-    /**
-     * @brief Get underlying data vector.
-     */
-    [[nodiscard]] auto getDataVector() const
-        -> const std::vector<ComplexT, Pennylane::Util::AlignedAllocator<ComplexT>> &
-    {
-        return data_;
+        data_.push_back(ONE<PrecisionT>());
     }
 };
 
