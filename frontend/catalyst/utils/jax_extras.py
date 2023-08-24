@@ -93,15 +93,15 @@ def sort_eqns(eqns:List[JaxprEqn])->List[JaxprEqn]:
             self.e:JaxprEqn = e
             self.parents:Set["Box"] = {}
     boxes = [Box(e) for e in eqns]
-    qdevices = [b for b in boxes if b.e.primitive.name == "qdevice"]
+    qdevices = [(i,b) for (i,b) in enumerate(boxes) if b.e.primitive.name == "qdevice"]
     origin:Dict[int,Box] = {}
     for b in boxes:
         origin.update({ov.count:b for ov in b.e.outvars})
     for b in boxes:
         b.parents = {origin[v.count] for v in b.e.invars if v.count in origin}
-    for b in boxes:
-        if b not in qdevices:
-            b.parents.update(qdevices)
+    for i,q in qdevices:
+        for b in boxes[i+1:]:
+            b.parents.add(q)
     return [b.e for b in toposort(boxes)]
 
 
