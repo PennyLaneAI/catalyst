@@ -17,6 +17,13 @@ Tracing module.
 """
 
 from catalyst.utils.exceptions import CompileError
+from enum import Enum
+
+
+class EvaluationMode(Enum):
+    INTERPRETATION = 0
+    CLASSICAL_COMPILATION = 2
+    QUANTUM_COMPILATION = 1
 
 
 class TracingContext:
@@ -25,21 +32,54 @@ class TracingContext:
     It is used to determine whether the program is currently tracing or not.
     """
 
-    _is_tracing = False
+    _tracing_stack = []
+
+    def __init__(self, state):
+        self.state = state
 
     def __enter__(self):
-        assert not TracingContext._is_tracing, "Cannot nest tracing contexts."
-        TracingContext._is_tracing = True
+        TracingContext._tracing_stack.append(self.state)
 
     def __exit__(self, *args, **kwargs):
-        TracingContext._is_tracing = False
+        TracingContext._tracing_stack.pop()
+
+    @staticmethod
+    def check_is_valid_push(state):
+        mode = TracingContext.get_mode()
+        if EvaluationMode.INTERPRETATION == mode:
+            return
+        if (
+            EvaluationMode.CLASSICAL_COMPILATION == mode
+            and EvaluationMode.QUANTUM_COMPILATION == state
+        ):
+            return
+
+        raise CompileError("Invalid state.")
+
+    @staticmethod
+    def is_interpretation():
+        return not TracingContext._tracing_stack
+
+    @staticmethod
+    def is_quantum_compilation():
+        return EvaluationMode.QUANTUM_COMPILATION == TracingContext._tracing_stack[-1]
+
+    @staticmethod
+    def is_classical_compilation():
+        return EvaluationMode.CLASSICAL_COMPILATION == TracingContext._tracing_stack[-1]
+
+    @staticmethod
+    def get_mode():
+        if not TracingContext._tracing_stack:
+            return EvaluationMode.INTERPRETATION
+        return TracingContext._tracing_stack[-1]
 
     @staticmethod
     def is_tracing():
         """Returns true or false depending on whether the execution is currently being
         traced.
         """
-        return TracingContext._is_tracing
+        return bool(TracingContext._tracing_stack)
 
     @staticmethod
     def check_is_tracing(msg):

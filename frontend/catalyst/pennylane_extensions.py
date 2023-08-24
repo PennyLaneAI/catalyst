@@ -54,7 +54,7 @@ from catalyst.jax_tracer2 import (
 )
 from catalyst.utils.exceptions import CompileError, DifferentiableCompileError
 from catalyst.utils.patching import Patcher
-from catalyst.utils.tracing import TracingContext
+from catalyst.utils.tracing import TracingContext, EvaluationMode
 
 # pylint: disable=too-many-lines
 
@@ -153,7 +153,8 @@ class QFunc:
 
         # traceable_fn = get_traceable_fn(self.func, device)
         # jaxpr, shape = jax.make_jaxpr(traceable_fn, return_shape=True)(*args)
-        jaxpr, shape = trace_quantum_function(self.func, device, args, kwargs)
+        with TracingContext(EvaluationMode.QUANTUM_COMPILATION):
+            jaxpr, shape = trace_quantum_function(self.func, device, args, kwargs)
 
         retval_tree = tree_structure(shape)
 

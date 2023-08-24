@@ -36,7 +36,7 @@ from pennylane.operation import Wires
 
 import catalyst.jax_primitives as jprim
 from catalyst.jax_tape import JaxTape
-from catalyst.utils.tracing import TracingContext
+from catalyst.utils.tracing import TracingContext, EvaluationMode
 
 KNOWN_NAMED_OBS = (qml.Identity, qml.PauliX, qml.PauliY, qml.PauliZ, qml.Hadamard)
 
@@ -62,7 +62,7 @@ def get_mlir(func, *args, **kwargs):
     # if we wanted to compile a single python function multiple times with different options.
     jprim.mlir_fn_cache.clear()
 
-    with TracingContext():
+    with TracingContext(EvaluationMode.CLASSICAL_COMPILATION):
         jaxpr, shape = jax.make_jaxpr(func, return_shape=True)(*args, **kwargs)
 
     nrep = jaxpr_replicas(jaxpr)
