@@ -286,6 +286,16 @@ class HybridOp(Operation):
         """Constructor-call-like representation."""
         return f"{self.name}(tapes={[r.quantum_tape.operations for r in self.regions]})"
 
+    def bind_overwrite_classical_tracers(self, ctx, trace, *args, **kwargs):
+        """Binds the primitive `prim` but override the returned classical tracers with the already
+        existing output tracers of the operation `op`."""
+        out_quantum_tracer = self.binder(*args, **kwargs)[-1]
+        eqn = ctx.frames[trace].eqns[-1]
+        assert (len(eqn.outvars) - 1) == len(self.out_classical_tracers)
+        for i, t in zip(range(len(eqn.outvars) - 1), self.out_classical_tracers):  # [2]
+            eqn.outvars[i] = trace.getvar(t)
+        return self.out_classical_tracers + [out_quantum_tracer]
+
 
 def has_nested_tapes(op: Operation) -> bool:
     return (
@@ -296,23 +306,23 @@ def has_nested_tapes(op: Operation) -> bool:
 
 
 class ForLoop(HybridOp):
-    pass
+    binder = qfor_p.bind
 
 
 class MidCircuitMeasure(HybridOp):
-    pass
+    binder = qmeasure_p.bind
 
 
 class Cond(HybridOp):
-    pass
+    binder = qcond_p.bind
 
 
 class WhileLoop(HybridOp):
-    pass
+    binder = qwhile_p.bind
 
 
 class Adjoint(HybridOp):
-    pass
+    binder = adjoint_p.bind
 
 
 class CondCallableBase(ABC):
@@ -657,15 +667,6 @@ def trace_quantum_tape(quantum_tape:QuantumTape,
     # [1] - We are interested only in a new quantum tracer, so we ignore all others.
     # [2] - HACK: We add alread existing classical tracers into the last JAX equation.
 
-    def bind_overwrite_classical_tracers(op: HybridOp, binder, *args, **kwargs):
-        """Binds the primitive `prim` but override the returned classical tracers with the already
-        existing output tracers of the operation `op`."""
-        out_quantum_tracer = binder(*args, **kwargs)[-1]
-        eqn = ctx.frames[trace].eqns[-1]
-        assert (len(eqn.outvars) - 1) == len(op.out_classical_tracers)
-        for i, t in zip(range(len(eqn.outvars) - 1), op.out_classical_tracers):  # [2]
-            eqn.outvars[i] = trace.getvar(t)
-        return op.out_classical_tracers + [out_quantum_tracer]
 
     for op in device.expand_fn(quantum_tape):
         qreg2 = None
@@ -684,9 +685,9 @@ def trace_quantum_tape(quantum_tape:QuantumTape,
 
                 step = op.in_classical_tracers[2]
                 apply_reverse_transform = isinstance(step, int) and step < 0
-                qreg2 = bind_overwrite_classical_tracers(
-                    op,
-                    qfor_p.bind,
+                qreg2 = op.bind_overwrite_classical_tracers(
+                    ctx,
+                    trace,
                     op.in_classical_tracers[0],
                     op.in_classical_tracers[1],
                     step,
@@ -714,9 +715,9 @@ def trace_quantum_tape(quantum_tape:QuantumTape,
 
                 jaxprs2, combined_consts = initial_style_jaxprs_with_common_consts2(jaxprs, consts)
 
-                qreg2 = bind_overwrite_classical_tracers(
-                    op,
-                    qcond_p.bind,
+                qreg2 = op.bind_overwrite_classical_tracers(
+                    ctx,
+                    trace,
                     *(op.in_classical_tracers + combined_consts + [qreg]),
                     branch_jaxprs=jaxprs2,
                 )[
@@ -742,9 +743,9 @@ def trace_quantum_tape(quantum_tape:QuantumTape,
                         res_classical_tracers + [qreg_out]
                     )
 
-                qreg2 = bind_overwrite_classical_tracers(
-                    op,
-                    qwhile_p.bind,
+                qreg2 = op.bind_overwrite_classical_tracers(
+                    ctx,
+                    trace,
                     *(cond_consts + body_consts + op.in_classical_tracers + [qreg]),
                     cond_jaxpr=ClosedJaxpr(convert_constvars_jaxpr(cond_jaxpr), ()),
                     body_jaxpr=ClosedJaxpr(convert_constvars_jaxpr(body_jaxpr), ()),
@@ -757,7 +758,7 @@ def trace_quantum_tape(quantum_tape:QuantumTape,
             elif isinstance(op, MidCircuitMeasure):
                 wire = op.in_classical_tracers[0]
                 qubit = qextract(qreg, wire)
-                qubit2 = bind_overwrite_classical_tracers(op, qmeasure_p.bind, qubit)[-1]  # [1]
+                qubit2 = op.bind_overwrite_classical_tracers(ctx, trace, qubit)[-1]  # [1]
                 qreg2 = qinsert(qreg, wire, qubit2)
 
             elif isinstance(op, Adjoint):
