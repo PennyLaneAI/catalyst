@@ -88,14 +88,18 @@ def sort_eqns(eqns:List[JaxprEqn])->List[JaxprEqn]:
     # make this function stable.
     class Box:
         def __init__(self, e):
-            self.e = e
-            self.parents = {}
+            self.e:JaxprEqn = e
+            self.parents:Set["Box"] = {}
     boxes = [Box(e) for e in eqns]
+    qdevices = [b for b in boxes if b.e.primitive.name == "qdevice"]
     origin:Dict[int,Box] = {}
     for b in boxes:
         origin.update({ov.count:b for ov in b.e.outvars})
     for b in boxes:
         b.parents = {origin[v.count] for v in b.e.invars if v.count in origin}
+    for b in boxes:
+        if b not in qdevices:
+            b.parents.update(qdevices)
     return [b.e for b in toposort(boxes)]
 
 def initial_style_jaxprs_with_common_consts2(jaxprs, all_consts):
