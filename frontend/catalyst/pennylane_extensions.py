@@ -43,8 +43,15 @@ import catalyst.jax_primitives as jprim
 from catalyst.jax_primitives import GradParams, expval_p, probs_p
 from catalyst.jax_tape import JaxTape
 from catalyst.jax_tracer import get_traceable_fn, insert_to_qreg, trace_quantum_tape
-from catalyst.jax_tracer2 import (trace_quantum_function, measure, MidCircuitMeasure, for_loop, cond,
-                                  while_loop, adjoint)
+from catalyst.jax_tracer2 import (
+    MidCircuitMeasure,
+    adjoint,
+    cond,
+    for_loop,
+    measure,
+    trace_quantum_function,
+    while_loop,
+)
 from catalyst.utils.exceptions import CompileError, DifferentiableCompileError
 from catalyst.utils.patching import Patcher
 from catalyst.utils.tracing import TracingContext
