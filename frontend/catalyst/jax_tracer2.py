@@ -2,7 +2,7 @@ import jax
 import pennylane as qml
 import jax.numpy as jnp
 from catalyst.utils.jax_extras import (new_main2, sort_eqns,
-                                       initial_style_jaxprs_with_common_consts,
+                                       initial_style_jaxprs_with_common_consts1,
                                        initial_style_jaxprs_with_common_consts2)
 from jax._src.core import (ClosedJaxpr, MainTrace as JaxMainTrace, new_main,
                            new_base_main, cur_sublevel, get_aval, Tracer as JaxprTracer,
@@ -287,7 +287,7 @@ class CondCallable:
     def _call_with_classical_ctx(self):
         args, args_tree = tree_flatten([])
         args_avals = tuple(map(_abstractify, args))
-        branch_jaxprs, consts, out_trees = initial_style_jaxprs_with_common_consts(
+        branch_jaxprs, consts, out_trees = initial_style_jaxprs_with_common_consts1(
             (*self.branch_fns, self.otherwise_fn), args_tree, args_avals, "cond"
         )
         _check_same_types(out_trees, [j.out_avals for j in branch_jaxprs], hint='Conditional branches')

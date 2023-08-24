@@ -85,7 +85,9 @@ def new_main2(trace_type: Type[Trace],
 def sort_eqns(eqns:List[JaxprEqn])->List[JaxprEqn]:
     """ Topologically sort JAXRR equations in a list, based on their input/output variables. """
     # FIXME: The functions might emit different correct results, depending on id(eqns). One need to
-    # make this function stable.
+    # make this function stable. Moreover, some equation (`qdevice` ones) do not depend on others
+    # but need to be at the top of the output. We force this order for now. Stable sorting might
+    # also allow us to remove this conditioning.
     class Box:
         def __init__(self, e):
             self.e:JaxprEqn = e
@@ -102,12 +104,26 @@ def sort_eqns(eqns:List[JaxprEqn])->List[JaxprEqn]:
             b.parents.update(qdevices)
     return [b.e for b in toposort(boxes)]
 
+
+def initial_style_jaxprs_with_common_consts1(
+        funs: Sequence[Callable], in_tree, in_avals, primitive_name: str):
+  """ This function is the head (shorter) part of the original
+  `lax.control_flow.common._initial_style_jaxprs_with_common_consts` of JAX. The algorithm is the
+  same at the time of this writing, we use this function only to avoid conflicts with future
+  versions of JAX.
+  """
+  jaxprs, all_consts, all_out_trees = \
+      unzip3(_initial_style_open_jaxpr(fun, in_tree, in_avals, primitive_name)
+             for fun in funs)
+  closed_jaxprs, consts = initial_style_jaxprs_with_common_consts2(jaxprs, all_consts)
+  return closed_jaxprs, consts, all_out_trees
+
 def initial_style_jaxprs_with_common_consts2(jaxprs, all_consts):
-  """ A slightly modified version of the
-  `lax.control_flow.common._initial_style_jaxprs_with_common_consts` of JAX. The original version of
-  the function accepts a list of Python functions and performs the tracing before unifying their
-  constants. In this version we rely on the fact that the tracing is already done elsewhere. This is
-  the only difference. """
+  """ This function is the tail (largest) part of the
+  `lax.control_flow.common._initial_style_jaxprs_with_common_consts` of JAX. The JAX version traces
+  argument Python functions in order to determine signatures to be unified. Here we rely on the fact
+  that the tracing was already done elsewhere - and this is the only difference.
+  """
 
   all_const_avals = [map(_abstractify, consts) for consts in all_consts]
   for consts, consts_avals in zip(all_consts, all_const_avals):
@@ -166,13 +182,5 @@ def initial_style_jaxprs_with_common_consts2(jaxprs, all_consts):
   closed_jaxprs = [core.ClosedJaxpr(pe.convert_constvars_jaxpr(jaxpr), ())
                    for jaxpr in jaxprs]
   return closed_jaxprs, consts
-
-def initial_style_jaxprs_with_common_consts(
-        funs: Sequence[Callable], in_tree, in_avals, primitive_name: str):
-  jaxprs, all_consts, all_out_trees = \
-      unzip3(_initial_style_open_jaxpr(fun, in_tree, in_avals, primitive_name)
-             for fun in funs)
-  closed_jaxprs, consts = initial_style_jaxprs_with_common_consts2(jaxprs, all_consts)
-  return closed_jaxprs, consts, all_out_trees
 
 
