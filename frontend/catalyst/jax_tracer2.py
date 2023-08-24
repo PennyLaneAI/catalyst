@@ -807,8 +807,8 @@ def trace_observables(
     elif isinstance(obs, KNOWN_NAMED_OBS):
         obs_tracers = namedobs(type(obs).__name__, qubits[0])
     elif isinstance(obs, qml.Hermitian):
-        obs_tracers = hermitian(obs.matrix(), *qubits)
-        # obs_tracers = hermitian(jax.numpy.asarray(obs.parameters), *qubits)
+        # TODO: remove asarray once fixed upstream: https://github.com/PennyLaneAI/pennylane/issues/4263
+        obs_tracers = hermitian(jax.numpy.asarray(*obs.parameters), *qubits)
     elif isinstance(obs, qml.operation.Tensor):
         nested_obs = [trace_observables(o, device, qreg)[0] for o in obs.obs]
         obs_tracers = tensorobs(*nested_obs)

@@ -691,7 +691,7 @@ class TestArraysInHermitian:
             (jnp.array),
         ],
     )
-    def test_array_repr_from_context(self, matrix, repr, backend):
+    def test_array_repr_from_context2(self, matrix, repr, backend):
         """Test array representation from context in Hermitian."""
 
         @qjit(target="mlir")

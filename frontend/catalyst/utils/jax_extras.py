@@ -112,42 +112,6 @@ def new_main2(
             _update_thread_local_jit_state(stack.dynamic)
 
 
-"""
-1. classical tracing is done
-
-  . <-- at this point we have two lists of euquations
-         - quantum tape (a)
-           - quantum tape (b)
-             - ...
-         - equations (filled with some classical eqns) (a)
-           - equantion (b)
-             - ...
-               - ...
-
-  . <-- users can apply transformations
-
-2. quantum tracing
-
-  we need to merge all (a's and b's and ...)  into eqns
-
-  we can see at merging one pair for example
-
-  - quantum tape
-  - equations
-
-  there 3 approachs I can see. 1) param evaluator
-  2) sorting
-    1. take eqns.
-    2. trace quantumn tape and call `binds`. internnaly jax adds all these binds to the end of the
-    eqns.
-
-
-
-  3) 
-
-"""
-
-
 def sort_eqns(eqns: List[JaxprEqn]) -> List[JaxprEqn]:
     """Topologically sort JAXRR equations in a list, based on their input/output variables."""
 
