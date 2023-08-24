@@ -194,30 +194,27 @@ def _check_same_types(trees: List[PyTreeDef], avals: List[List[Any]], hint=None)
 
 
 @dataclass
-class MainTracingContex:
+class MainTracingContext:
     main: JaxMainTrace
     frames: Dict[DynamicJaxprTrace, JaxprStackFrame]
     mains: Dict[DynamicJaxprTrace, JaxMainTrace]
     trace: Optional[DynamicJaxprTrace] = None
 
-
-TRACING_CONTEXT: Optional[MainTracingContex] = None
-
+TRACING_CONTEXT : Optional[MainTracingContext] = None
 
 @contextmanager
-def main_tracing_context() -> ContextManager[MainTracingContex]:
+def main_tracing_context() -> ContextManager[MainTracingContext]:
     global TRACING_CONTEXT
     with new_base_main(DynamicJaxprTrace, dynamic=True) as main:
         main.jaxpr_stack = ()
-        TRACING_CONTEXT = ctx = MainTracingContex(main, {}, {})
+        TRACING_CONTEXT = ctx = MainTracingContext(main, {}, {})
         try:
             yield ctx
         finally:
             TRACING_CONTEXT = None
 
-
-def get_main_tracing_context(hint=None) -> MainTracingContex:
-    """Checks a number of tracing conditions and return the MainTracingContex"""
+def get_main_tracing_context(hint=None) -> MainTracingContext:
+    """ Checks a number of tracing conditions and return the MainTracingContext """
     msg = f"{hint or 'catalyst functions'} can only be used from within @qjit decorated code."
     TracingContext.check_is_tracing(msg)
     if TRACING_CONTEXT is None:
@@ -226,9 +223,9 @@ def get_main_tracing_context(hint=None) -> MainTracingContex:
 
 
 @contextmanager
-def frame_tracing_context(
-    ctx: MainTracingContex, trace: Optional[DynamicJaxprTrace] = None
-) -> ContextManager[DynamicJaxprTrace]:
+def frame_tracing_context(ctx: MainTracingContext,
+                          trace: Optional[DynamicJaxprTrace] = None
+                          ) -> ContextManager[DynamicJaxprTrace]:
     main = ctx.mains[trace] if trace is not None else None
     with new_main2(DynamicJaxprTrace, dynamic=True, main=main) as nmain:
         nmain.jaxpr_stack = ()
@@ -416,7 +413,7 @@ def cond(pred: DynamicJaxprTracer):
 def for_loop(lower_bound, upper_bound, step):
     def _body_query(body_fn):
         def _call_handler(*init_state):
-            def _call_with_quantum_ctx(ctx: MainTracingContex):
+            def _call_with_quantum_ctx(ctx: MainTracingContext):
                 quantum_tape = QuantumTape()
                 outer_trace = ctx.trace
                 with frame_tracing_context(ctx) as inner_trace:
@@ -496,7 +493,7 @@ def for_loop(lower_bound, upper_bound, step):
 def while_loop(cond_fn):
     def _body_query(body_fn):
         def _call_handler(*init_state):
-            def _call_with_quantum_ctx(ctx: MainTracingContex):
+            def _call_with_quantum_ctx(ctx:MainTracingContext):
                 outer_trace = ctx.trace
                 in_classical_tracers, in_tree = tree_flatten(init_state)
 
@@ -639,14 +636,12 @@ def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
         raise ValueError(f"Expected a callable or a qml.Operator, not {f}")
 
 
-def trace_quantum_tape(
-    quantum_tape: QuantumTape,
-    device: QubitDevice,
-    qreg: DynamicJaxprTracer,
-    ctx: MainTracingContex,
-    trace: DynamicJaxprTrace,
-) -> DynamicJaxprTracer:
-    """Recursively trace the nested `quantum_tape` and produce the quantum tracers. With quantum
+def trace_quantum_tape(quantum_tape:QuantumTape,
+                       device:QubitDevice,
+                       qreg:DynamicJaxprTracer,
+                       ctx:MainTracingContext,
+                       trace:DynamicJaxprTrace) -> DynamicJaxprTracer:
+    """ Recursively trace the nested `quantum_tape` and produce the quantum tracers. With quantum
     tracers we can complete the set of tracers and finally emit the JAXPR of the whole quantum
     program."""
     # Notes:
@@ -823,15 +818,14 @@ def trace_observables(
     return obs_tracers, qubits
 
 
-def trace_quantum_measurements(
-    quantum_tape,
-    device: QubitDevice,
-    qreg: DynamicJaxprTracer,
-    ctx: MainTracingContex,
-    trace: DynamicJaxprTrace,
-    outputs: List[Union[MeasurementProcess, DynamicJaxprTracer, Any]],
-    out_tree,
-) -> List[DynamicJaxprTracer]:
+def trace_quantum_measurements(quantum_tape,
+                               device:QubitDevice,
+                               qreg:DynamicJaxprTracer,
+                               ctx:MainTracingContext,
+                               trace:DynamicJaxprTrace,
+                               outputs:List[Union[MeasurementProcess, DynamicJaxprTracer]],
+                               out_tree
+                               ) -> List[DynamicJaxprTracer]:
     shots = device.shots
     out_classical_tracers = []
 
