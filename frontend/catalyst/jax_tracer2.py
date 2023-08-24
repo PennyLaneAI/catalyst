@@ -47,13 +47,13 @@ from catalyst.jax_primitives import (Qreg, AbstractQreg, AbstractQbit, qinst, qe
                                      qfor_p, qcond_p, qmeasure_p, qdevice, qalloc, qwhile_p,
                                      qdealloc, compbasis, probs, sample, namedobs, hermitian,
                                      expval, state, counts, compbasis_p, tensorobs, hamiltonian,
-                                     var as jprim_var)
+                                     var as jprim_var, adjoint_p)
 from catalyst.jax_tracer import (custom_lower_jaxpr_to_module, trace_observables, KNOWN_NAMED_OBS)
 from catalyst.utils.tracing import TracingContext
 from catalyst.utils.exceptions import CompileError
 from typing import Optional, Callable, List, ContextManager, Tuple, Any, Dict, Union
 from pennylane import QubitDevice, QueuingManager, Device
-from pennylane.operation import AnyWires, Operation, Wires
+from pennylane.operation import AnyWires, Operator, Operation, Wires
 from pennylane.measurements import MeasurementProcess, SampleMP
 from pennylane.tape import QuantumTape
 from itertools import chain
@@ -225,6 +225,9 @@ class Cond(HybridOp):
     pass
 
 class WhileLoop(HybridOp):
+    pass
+
+class Adjoint(HybridOp):
     pass
 
 class CondCallable:
@@ -481,6 +484,53 @@ def measure(wires) -> JaxprTracer:
     return out_classical_tracer
 
 
+def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
+
+    def _call_handler(*args, _callee: Callable, **kwargs):
+        ctx = get_main_tracing_context()
+        with frame_tracing_context(ctx) as inner_trace:
+            in_classical_tracers, _ = tree_flatten((args, kwargs))
+            wffa, in_avals, _ = deduce_avals(_callee, args, kwargs)
+            arg_classical_tracers = _input_type_to_tracers(inner_trace.new_arg, in_avals)
+            quantum_tape = QuantumTape()
+            with QueuingManager.stop_recording(), quantum_tape:
+                # FIXME: move all full_raise calls into a separate function
+                res_classical_tracers = [inner_trace.full_raise(t) for t in
+                                         wffa.call_wrapped(*arg_classical_tracers)
+                                         if isinstance(t, DynamicJaxprTracer)]
+
+            if len(quantum_tape.measurements) > 0:
+                raise ValueError("Quantum measurements are not allowed in Adjoints")
+
+            adjoint_region = HybridOpRegion(
+                inner_trace,
+                quantum_tape,
+                arg_classical_tracers,
+                res_classical_tracers)
+
+        Adjoint(
+            in_classical_tracers=in_classical_tracers,
+            out_classical_tracers=[],
+            regions=[adjoint_region])
+        return None
+
+    if isinstance(f, Callable):
+
+        def _callable(*args, **kwargs):
+            return _call_handler(*args, _callee=f, **kwargs)
+
+        return _callable
+    elif isinstance(f, Operator):
+        QueuingManager.remove(f)
+
+        def _callee():
+            QueuingManager.append(f)
+
+        return _call_handler(_callee=_callee)
+    else:
+        raise ValueError(f"Expected a callable or a qml.Operator, not {f}")
+
+
 def trace_quantum_tape(quantum_tape:QuantumTape,
                        device:QubitDevice,
                        qreg:DynamicJaxprTracer,
@@ -576,6 +626,22 @@ def trace_quantum_tape(quantum_tape:QuantumTape,
                 qubit = qextract(qreg, wire)
                 qubit2 = bind_overwrite_classical_tracers(op, qmeasure_p.bind, qubit)[-1] # [1]
                 qreg2 = qinsert(qreg, wire, qubit2)
+
+            elif isinstance(op, Adjoint):
+                body_trace = op.regions[0].trace
+                body_tape = op.regions[0].quantum_tape
+                res_classical_tracers = op.regions[0].res_classical_tracers
+                with frame_tracing_context(ctx, body_trace):
+                    qreg_in = _input_type_to_tracers(body_trace.new_arg, [AbstractQreg()])[0]
+                    qreg_out = trace_quantum_tape(body_tape, device, qreg_in, ctx, body_trace)
+                    body_jaxpr, _, body_consts = ctx.frames[body_trace].to_jaxpr2(
+                        res_classical_tracers + [qreg_out])
+
+                args, args_tree = tree_flatten((body_consts, op.in_classical_tracers, [qreg]))
+                op_results = adjoint_p.bind(*args,
+                                            args_tree=args_tree,
+                                            jaxpr=ClosedJaxpr(convert_constvars_jaxpr(body_jaxpr), ()))
+                qreg2 = op_results[0]
             else:
                 raise NotImplementedError(f"{op=}")
         else:

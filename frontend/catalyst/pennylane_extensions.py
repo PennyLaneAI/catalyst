@@ -44,7 +44,7 @@ from catalyst.jax_primitives import GradParams, expval_p, probs_p
 from catalyst.jax_tape import JaxTape
 from catalyst.jax_tracer import get_traceable_fn, insert_to_qreg, trace_quantum_tape
 from catalyst.jax_tracer2 import (trace_quantum_function, measure, MidCircuitMeasure, for_loop, cond,
-                                  while_loop)
+                                  while_loop, adjoint)
 from catalyst.utils.exceptions import CompileError, DifferentiableCompileError
 from catalyst.utils.patching import Patcher
 from catalyst.utils.tracing import TracingContext
@@ -590,76 +590,76 @@ class Adjoint(Operation):
         super().__init__(wires=Wires(Adjoint.num_wires))
 
 
-def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
-    """A :func:`~.qjit` compatible adjoint transformer for PennyLane/Catalyst.
+# def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
+#     """A :func:`~.qjit` compatible adjoint transformer for PennyLane/Catalyst.
 
-    Returns a quantum function or operator that applies the adjoint of the
-    provided function or operator.
+#     Returns a quantum function or operator that applies the adjoint of the
+#     provided function or operator.
 
-    .. warning::
+#     .. warning::
 
-        This function does not support performing the adjoint
-        of quantum functions that contain Catalyst control flow
-        or mid-circuit measurements.
+#         This function does not support performing the adjoint
+#         of quantum functions that contain Catalyst control flow
+#         or mid-circuit measurements.
 
-    Args:
-        f (Callable or Operator): A PennyLane operation or a Python function
-                                  containing PennyLane quantum operations.
+#     Args:
+#         f (Callable or Operator): A PennyLane operation or a Python function
+#                                   containing PennyLane quantum operations.
 
-    Returns:
-        If an Operator is provided, returns an Operator that is the adjoint. If
-        a function is provided, returns a function with the same call signature
-        that returns the Adjoint of the provided function.
+#     Returns:
+#         If an Operator is provided, returns an Operator that is the adjoint. If
+#         a function is provided, returns a function with the same call signature
+#         that returns the Adjoint of the provided function.
 
-    Raises:
-        ValueError: invalid parameter values
+#     Raises:
+#         ValueError: invalid parameter values
 
-    **Example**
+#     **Example**
 
-    .. code-block:: python
+#     .. code-block:: python
 
-        @qjit
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
-        def workflow(theta, wires):
-            catalyst.adjoint(qml.RZ)(theta, wires=wires)
-            catalyst.adjoint(qml.RZ(theta, wires=wires))
-            def func():
-                qml.RX(theta, wires=wires)
-                qml.RY(theta, wires=wires)
-            catalyst.adjoint(func)()
-            return qml.probs()
+#         @qjit
+#         @qml.qnode(qml.device("lightning.qubit", wires=1))
+#         def workflow(theta, wires):
+#             catalyst.adjoint(qml.RZ)(theta, wires=wires)
+#             catalyst.adjoint(qml.RZ(theta, wires=wires))
+#             def func():
+#                 qml.RX(theta, wires=wires)
+#                 qml.RY(theta, wires=wires)
+#             catalyst.adjoint(func)()
+#             return qml.probs()
 
-    >>> workflow(pnp.pi/2, wires=0)
-    array([0.5, 0.5])
-    """
+#     >>> workflow(pnp.pi/2, wires=0)
+#     array([0.5, 0.5])
+#     """
 
-    def _make_adjoint(*args, _callee: Callable, **kwargs):
-        cargs_qargs, tree = tree_flatten((args, kwargs, [jprim.Qreg()]))
-        cargs, _ = tree_flatten((args, kwargs))
-        cargs_qargs_aval = tuple(_abstractify(val) for val in cargs_qargs)
-        body, consts, _ = _initial_style_jaxpr(
-            partial(_trace_quantum_tape, _callee=_callee, _allow_quantum_measurements=False),
-            tree,
-            cargs_qargs_aval,
-            "adjoint",
-        )
-        return Adjoint(body, consts, cargs)
+#     def _make_adjoint(*args, _callee: Callable, **kwargs):
+#         cargs_qargs, tree = tree_flatten((args, kwargs, [jprim.Qreg()]))
+#         cargs, _ = tree_flatten((args, kwargs))
+#         cargs_qargs_aval = tuple(_abstractify(val) for val in cargs_qargs)
+#         body, consts, _ = _initial_style_jaxpr(
+#             partial(_trace_quantum_tape, _callee=_callee, _allow_quantum_measurements=False),
+#             tree,
+#             cargs_qargs_aval,
+#             "adjoint",
+#         )
+#         return Adjoint(body, consts, cargs)
 
-    if isinstance(f, Callable):
+#     if isinstance(f, Callable):
 
-        def _callable(*args, **kwargs):
-            return _make_adjoint(*args, _callee=f, **kwargs)
+#         def _callable(*args, **kwargs):
+#             return _make_adjoint(*args, _callee=f, **kwargs)
 
-        return _callable
-    elif isinstance(f, Operator):
-        QueuingManager.remove(f)
+#         return _callable
+#     elif isinstance(f, Operator):
+#         QueuingManager.remove(f)
 
-        def _callee():
-            QueuingManager.append(f)
+#         def _callee():
+#             QueuingManager.append(f)
 
-        return _make_adjoint(_callee=_callee)
-    else:
-        raise ValueError(f"Expected a callable or a qml.Operator, not {f}")
+#         return _make_adjoint(_callee=_callee)
+#     else:
+#         raise ValueError(f"Expected a callable or a qml.Operator, not {f}")
 
 
 class QJITDevice(qml.QubitDevice):
