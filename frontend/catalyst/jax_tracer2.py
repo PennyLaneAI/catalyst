@@ -5,6 +5,7 @@ from enum import Enum
 from itertools import chain
 from typing import Any, Callable, ContextManager, Dict, List, Optional, Tuple, Union
 
+from abc import ABC
 import jax
 import jax.numpy as jnp
 import pennylane as qml
@@ -314,7 +315,7 @@ class Adjoint(HybridOp):
     pass
 
 
-class CondCallable:
+class CondCallableBase(ABC):
     def __init__(self, pred, true_fn):
         self.preds = [pred]
         self.branch_fns = [true_fn]
@@ -350,7 +351,13 @@ class CondCallable:
                     "Please specify an else branch if none was specified."
                 )
 
-    def _call_with_quantum_ctx(self, ctx):
+    def __call__(self):
+        ...
+
+
+class CondCallableQuantum(CondCallableBase):
+    def __call__(self):
+        mode, ctx = get_evaluation_mode()
         outer_trace = ctx.trace
         in_classical_tracers = self.preds
         regions: List[HybridOpRegion] = []
@@ -372,7 +379,9 @@ class CondCallable:
         Cond(in_classical_tracers, out_classical_tracers, regions)
         return tree_unflatten(out_tree(), out_classical_tracers)
 
-    def _call_with_classical_ctx(self):
+
+class CondCallableClassical(CondCallableBase):
+    def __call__(self):
         args, args_tree = tree_flatten([])
         args_avals = tuple(map(_abstractify, args))
         branch_jaxprs, consts, out_trees = initial_style_jaxprs_with_common_consts1(
@@ -384,28 +393,28 @@ class CondCallable:
         out_classical_tracers = qcond_p.bind(*(self.preds + consts), branch_jaxprs=branch_jaxprs)
         return tree_unflatten(out_trees[0], out_classical_tracers)
 
-    def _call_during_interpretation(self):
+
+class CondCallableInterpretation(CondCallableBase):
+    def __call__(self):
         for pred, branch_fn in zip(self.preds, self.branch_fns):
             if pred:
                 return branch_fn()
         return self.otherwise_fn()
 
-    def __call__(self):
-        mode, ctx = get_evaluation_mode()
-        if mode == EvaluationMode.QJIT_QNODE:
-            return self._call_with_quantum_ctx(ctx)
-        elif mode == EvaluationMode.QJIT:
-            return self._call_with_classical_ctx()
-        elif mode == EvaluationMode.EXEC:
-            return self._call_during_interpretation()
-        raise RuntimeError(f"Unsupported evaluation mode {mode}")
+
+def cond_multiplex(pred, true_fn):
+    if TracingContext.is_interpretation():
+        return CondCallableInterpretation(pred, true_fn)
+    elif TracingContext.is_quantum_compilation():
+        return CondCallableQuantum(pred, true_fn)
+    return CondCallableClassical(pred, true_fn)
 
 
 def cond(pred: DynamicJaxprTracer):
     def _decorator(true_fn: Callable):
         if true_fn.__code__.co_argcount != 0:
             raise TypeError("Conditional 'True' function is not allowed to have any arguments")
-        return CondCallable(pred, true_fn)
+        return cond_multiplex(pred, true_fn)
 
     return _decorator
 
