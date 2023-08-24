@@ -46,7 +46,8 @@ from jax._src.lax.lax import xb, xla
 from catalyst.jax_primitives import (Qreg, AbstractQreg, AbstractQbit, qinst, qextract, qinsert,
                                      qfor_p, qcond_p, qmeasure_p, qdevice, qalloc, qwhile_p,
                                      qdealloc, compbasis, probs, sample, namedobs, hermitian,
-                                     expval, state, counts, compbasis_p)
+                                     expval, state, counts, compbasis_p, tensorobs, hamiltonian,
+                                     var as jprim_var)
 from catalyst.jax_tracer import (custom_lower_jaxpr_to_module, trace_observables, KNOWN_NAMED_OBS)
 from catalyst.utils.tracing import TracingContext
 from catalyst.utils.exceptions import CompileError
@@ -595,6 +596,27 @@ def trace_quantum_tape(quantum_tape:QuantumTape,
     return qreg
 
 
+def trace_observables(obs:Operation, device, qreg) -> Tuple[List[DynamicJaxprTracer],
+                                                                    List[DynamicJaxprTracer]]:
+    wires = obs.wires if obs and len(obs.wires)>0 else range(device.num_wires)
+    qubits = [qextract(qreg, w) for w in wires]
+    if obs is None:
+        obs_tracers = compbasis(*qubits)
+    elif isinstance(obs, KNOWN_NAMED_OBS):
+        obs_tracers = namedobs(type(obs).__name__, qubits[0])
+    elif isinstance(obs, qml.Hermitian):
+        obs_tracers = hermitian(obs.matrix(), *qubits)
+    elif isinstance(obs, qml.operation.Tensor):
+        nested_obs = [trace_observables(o, device, qreg)[0] for o in obs.obs]
+        obs_tracers = tensorobs(*nested_obs)
+    elif isinstance(obs, qml.Hamiltonian):
+        nested_obs = [trace_observables(o, device, qreg)[0] for o in obs.ops]
+        obs_tracers = hamiltonian(jax.numpy.asarray(obs.parameters), *nested_obs)
+    else:
+        raise NotImplementedError(f"Observable {obs} is not impemented")
+    return obs_tracers, qubits
+
+
 def trace_quantum_measurements(quantum_tape,
                                device:QubitDevice,
                                qreg:DynamicJaxprTracer,
@@ -610,30 +632,16 @@ def trace_quantum_measurements(quantum_tape,
         if isinstance(o, DynamicJaxprTracer):
             out_classical_tracers.append(o)
         elif isinstance(o, MeasurementProcess):
-            op,obs = o,o.obs
-            wires = op.wires if len(op.wires)>0 else range(device.num_wires)
-            qubits = [qextract(qreg, w) for w in wires]
-            if obs is None:
-                obs_tracers = compbasis(*qubits)
-            elif isinstance(obs, KNOWN_NAMED_OBS):
-                obs_tracers = namedobs(type(obs).__name__, qubits[0])
-            elif isinstance(obs, qml.Hermitian):
-                obs_tracers = hermitian(obs.matrix(), *qubits)
-            # elif isinstance(obs, qml.operation.Tensor):
-            #     nested_obs = [trace_observables(o, qubit_states, p, num_wires, qreg)[0] for o in obs.obs]
-            #     obs_tracers = jprim.tensorobs(*nested_obs)
-            # elif isinstance(obs, qml.Hamiltonian):
-            #     nested_obs = [trace_observables(o, qubit_states, p, num_wires, qreg)[0] for o in obs.ops]
-            #     obs_tracers = trace_hamiltonian(op_args, *nested_obs)
-            else:
-                raise NotImplementedError(f"Observable {obs} is not impemented")
+            obs_tracers,qubits = trace_observables(o.obs, device, qreg)
 
             using_compbasis = obs_tracers.primitive == compbasis_p
             if o.return_type.value == "sample":
-                shape = (shots, len(qubits)) if obs is None else (shots,)
+                shape = (shots, len(qubits)) if using_compbasis else (shots,)
                 out_classical_tracers.append(sample(obs_tracers, shots, shape))
             elif o.return_type.value == "expval":
                 out_classical_tracers.append(expval(obs_tracers, shots))
+            elif o.return_type.value == "var":
+                out_classical_tracers.append(jprim_var(obs_tracers, shots))
             elif o.return_type.value == "probs":
                 assert using_compbasis
                 shape = (2 ** len(qubits),)
