@@ -619,7 +619,7 @@ class TestArraysInHamiltonian:
             (jnp.array([0.4, 0.7])),
         ],
     )
-    def test_array_repr_from_context(self, coeffs, backend):
+    def test_array_repr_from_context1(self, coeffs, backend):
         """Test array representation from context in Hamiltonian."""
 
         @qjit(target="mlir")

@@ -833,9 +833,7 @@ def trace_quantum_measurements(
     out_classical_tracers = []
 
     for i, o in enumerate(outputs):
-        if isinstance(o, DynamicJaxprTracer):
-            out_classical_tracers.append(o)
-        elif isinstance(o, MeasurementProcess):
+        if isinstance(o, MeasurementProcess):
             obs_tracers, qubits = trace_observables(o.obs, device, qreg)
 
             using_compbasis = obs_tracers.primitive == compbasis_p
@@ -868,8 +866,14 @@ def trace_quantum_measurements(
                 out_classical_tracers.append(state(obs_tracers, shape))
             else:
                 raise NotImplementedError(f"Measurement {o.return_type.value} is not impemented")
-        else:
+        elif isinstance(o, (list, dict)):
             raise CompileError(f"Expected a tracer or a measurement, got {o}")
+        elif isinstance(o, DynamicJaxprTracer):
+            out_classical_tracers.append(o)
+        else:
+            # FIXME: Constants (numbers) all go here. What about explicitly listing the allowed
+            # types and only allow these?
+            out_classical_tracers.append(o)
 
     return out_classical_tracers, out_tree
 
