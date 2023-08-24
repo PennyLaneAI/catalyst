@@ -798,9 +798,12 @@ def trace_quantum_tape(
 
 
 def trace_observables(
-    obs: Operation, device, qreg
+    obs: Operation,
+    device,
+    qreg,
+    m_wires
 ) -> Tuple[List[DynamicJaxprTracer], List[DynamicJaxprTracer]]:
-    wires = obs.wires if obs and len(obs.wires) > 0 else range(device.num_wires)
+    wires = obs.wires if (obs and len(obs.wires) > 0) else m_wires
     qubits = [qextract(qreg, w) for w in wires]
     if obs is None:
         obs_tracers = compbasis(*qubits)
@@ -810,10 +813,10 @@ def trace_observables(
         # TODO: remove asarray once fixed upstream: https://github.com/PennyLaneAI/pennylane/issues/4263
         obs_tracers = hermitian(jax.numpy.asarray(*obs.parameters), *qubits)
     elif isinstance(obs, qml.operation.Tensor):
-        nested_obs = [trace_observables(o, device, qreg)[0] for o in obs.obs]
+        nested_obs = [trace_observables(o, device, qreg, m_wires)[0] for o in obs.obs]
         obs_tracers = tensorobs(*nested_obs)
     elif isinstance(obs, qml.Hamiltonian):
-        nested_obs = [trace_observables(o, device, qreg)[0] for o in obs.ops]
+        nested_obs = [trace_observables(o, device, qreg, m_wires)[0] for o in obs.ops]
         obs_tracers = hamiltonian(jax.numpy.asarray(obs.parameters), *nested_obs)
     else:
         raise NotImplementedError(f"Observable {obs} is not impemented")
@@ -826,7 +829,7 @@ def trace_quantum_measurements(
     qreg: DynamicJaxprTracer,
     ctx: MainTracingContex,
     trace: DynamicJaxprTrace,
-    outputs: List[Union[MeasurementProcess, DynamicJaxprTracer]],
+    outputs: List[Union[MeasurementProcess, DynamicJaxprTracer, Any]],
     out_tree,
 ) -> List[DynamicJaxprTracer]:
     shots = device.shots
@@ -834,7 +837,8 @@ def trace_quantum_measurements(
 
     for i, o in enumerate(outputs):
         if isinstance(o, MeasurementProcess):
-            obs_tracers, qubits = trace_observables(o.obs, device, qreg)
+            m_wires = o.wires if o.wires else range(device.num_wires)
+            obs_tracers, qubits = trace_observables(o.obs, device, qreg, m_wires)
 
             using_compbasis = obs_tracers.primitive == compbasis_p
             if o.return_type.value == "sample":
@@ -872,7 +876,7 @@ def trace_quantum_measurements(
             out_classical_tracers.append(o)
         else:
             # FIXME: Constants (numbers) all go here. What about explicitly listing the allowed
-            # types and only allow these?
+            # types and only allow these? Anyway, one must change type hints for `outputs`
             out_classical_tracers.append(o)
 
     return out_classical_tracers, out_tree
