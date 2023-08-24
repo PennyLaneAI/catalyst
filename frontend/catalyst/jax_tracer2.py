@@ -47,12 +47,12 @@ from catalyst.jax_primitives import (Qreg, AbstractQreg, AbstractQbit, qinst, qe
                                      qfor_p, qcond_p, qmeasure_p, qdevice, qalloc, qwhile_p,
                                      qdealloc, compbasis, probs, sample, namedobs, hermitian,
                                      expval, state, counts, compbasis_p, tensorobs, hamiltonian,
-                                     var as jprim_var, adjoint_p)
+                                     var as jprim_var, adjoint_p, qunitary)
 from catalyst.jax_tracer import (custom_lower_jaxpr_to_module, trace_observables, KNOWN_NAMED_OBS)
 from catalyst.utils.tracing import TracingContext
 from catalyst.utils.exceptions import CompileError
 from typing import Optional, Callable, List, ContextManager, Tuple, Any, Dict, Union
-from pennylane import QubitDevice, QueuingManager, Device
+from pennylane import QubitDevice, QueuingManager, Device, QubitUnitary
 from pennylane.operation import AnyWires, Operator, Operation, Wires
 from pennylane.measurements import MeasurementProcess, SampleMP
 from pennylane.tape import QuantumTape
@@ -648,9 +648,12 @@ def trace_quantum_tape(quantum_tape:QuantumTape,
             if isinstance(op, MeasurementProcess):
                 qreg2 = qreg
             else:
-                # FIXME: Port the qubit-state caching logic from the original tracer
                 qubits = [qextract(qreg, wire) for wire in op.wires]
-                qubits2 = qinst(op.name, len(qubits), *qubits, *op.parameters)
+                if isinstance(op, QubitUnitary):
+                    qubits2 = qunitary(*[*op.parameters, *qubits])
+                else:
+                    qubits2 = qinst(op.name, len(qubits), *qubits, *op.parameters)
+                # FIXME: Port the qubit-state caching logic from the original tracer
                 qreg2 = qreg
                 for wire, qubit2 in zip(op.wires, qubits2):
                     qreg2 = qinsert(qreg2, wire, qubit2)
@@ -671,8 +674,8 @@ def trace_observables(obs:Operation, device, qreg) -> Tuple[List[DynamicJaxprTra
     elif isinstance(obs, KNOWN_NAMED_OBS):
         obs_tracers = namedobs(type(obs).__name__, qubits[0])
     elif isinstance(obs, qml.Hermitian):
-        # obs_tracers = hermitian(obs.matrix(), *qubits)
-        obs_tracers = hermitian(jax.numpy.asarray(obs.parameters), *qubits)
+        obs_tracers = hermitian(obs.matrix(), *qubits)
+        # obs_tracers = hermitian(jax.numpy.asarray(obs.parameters), *qubits)
     elif isinstance(obs, qml.operation.Tensor):
         nested_obs = [trace_observables(o, device, qreg)[0] for o in obs.obs]
         obs_tracers = tensorobs(*nested_obs)
