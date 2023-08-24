@@ -308,6 +308,36 @@ def has_nested_tapes(op: Operation) -> bool:
 class ForLoop(HybridOp):
     binder = qfor_p.bind
 
+    def trace(self, ctx, device, trace, qreg):
+        inner_trace = self.regions[0].trace
+        inner_tape = self.regions[0].quantum_tape
+        res_classical_tracers = self.regions[0].res_classical_tracers
+
+        with frame_tracing_context(ctx, inner_trace):
+            qreg_in = _input_type_to_tracers(inner_trace.new_arg, [AbstractQreg()])[0]
+            qreg_out = trace_quantum_tape(inner_tape, device, qreg_in, ctx, inner_trace)
+            jaxpr, typ, consts = ctx.frames[inner_trace].to_jaxpr2(
+                res_classical_tracers + [qreg_out]
+            )
+
+        step = self.in_classical_tracers[2]
+        apply_reverse_transform = isinstance(step, int) and step < 0
+        qreg2 = self.bind_overwrite_classical_tracers(
+            ctx,
+            trace,
+            self.in_classical_tracers[0],
+            self.in_classical_tracers[1],
+            step,
+            *(consts + self.in_classical_tracers[3:] + [qreg]),
+            body_jaxpr=ClosedJaxpr(convert_constvars_jaxpr(jaxpr), ()),
+            body_nconsts=len(consts),
+            apply_reverse_transform=apply_reverse_transform,
+        )[
+            -1
+        ]  # [1]
+
+        return qreg2
+
 
 class MidCircuitMeasure(HybridOp):
     binder = qmeasure_p.bind
@@ -316,9 +346,66 @@ class MidCircuitMeasure(HybridOp):
 class Cond(HybridOp):
     binder = qcond_p.bind
 
+    def trace(self, ctx, device, trace, qreg):
+        jaxprs, consts = [], []
+        for region in self.regions:
+            with frame_tracing_context(ctx, region.trace):
+                qreg_in = _input_type_to_tracers(region.trace.new_arg, [AbstractQreg()])[0]
+                qreg_out = trace_quantum_tape(
+                    region.quantum_tape, device, qreg_in, ctx, region.trace
+                )
+                jaxpr, typ, const = ctx.frames[region.trace].to_jaxpr2(
+                    region.res_classical_tracers + [qreg_out]
+                )
+                jaxprs.append(jaxpr)
+                consts.append(const)
+
+        jaxprs2, combined_consts = initial_style_jaxprs_with_common_consts2(jaxprs, consts)
+
+        qreg2 = self.bind_overwrite_classical_tracers(
+            ctx,
+            trace,
+            *(self.in_classical_tracers + combined_consts + [qreg]),
+            branch_jaxprs=jaxprs2,
+        )[
+            -1
+        ]  # [1]
+        return qreg2
+
 
 class WhileLoop(HybridOp):
     binder = qwhile_p.bind
+    def trace(self, ctx, device, trace, qreg):
+        cond_trace = self.regions[0].trace
+        res_classical_tracers = self.regions[0].res_classical_tracers
+        with frame_tracing_context(ctx, cond_trace):
+            _input_type_to_tracers(cond_trace.new_arg, [AbstractQreg()])[0]
+            cond_jaxpr, _, cond_consts = ctx.frames[cond_trace].to_jaxpr2(
+                res_classical_tracers
+            )
+
+        body_trace = self.regions[1].trace
+        body_tape = self.regions[1].quantum_tape
+        res_classical_tracers = self.regions[1].res_classical_tracers
+        with frame_tracing_context(ctx, body_trace):
+            qreg_in = _input_type_to_tracers(body_trace.new_arg, [AbstractQreg()])[0]
+            qreg_out = trace_quantum_tape(body_tape, device, qreg_in, ctx, body_trace)
+            body_jaxpr, _, body_consts = ctx.frames[body_trace].to_jaxpr2(
+                res_classical_tracers + [qreg_out]
+            )
+
+        qreg2 = self.bind_overwrite_classical_tracers(
+            ctx,
+            trace,
+            *(cond_consts + body_consts + self.in_classical_tracers + [qreg]),
+            cond_jaxpr=ClosedJaxpr(convert_constvars_jaxpr(cond_jaxpr), ()),
+            body_jaxpr=ClosedJaxpr(convert_constvars_jaxpr(body_jaxpr), ()),
+            cond_nconsts=len(cond_consts),
+            body_nconsts=len(body_consts),
+        )[
+            -1
+        ]  # [1]
+        return qreg2
 
 
 class Adjoint(HybridOp):
@@ -655,6 +742,12 @@ def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
         raise ValueError(f"Expected a callable or a qml.Operator, not {f}")
 
 
+
+
+
+
+
+
 def trace_quantum_tape(quantum_tape:QuantumTape,
                        device:QubitDevice,
                        qreg:DynamicJaxprTracer,
@@ -671,90 +764,8 @@ def trace_quantum_tape(quantum_tape:QuantumTape,
     for op in device.expand_fn(quantum_tape):
         qreg2 = None
         if isinstance(op, HybridOp):
-            if isinstance(op, ForLoop):
-                inner_trace = op.regions[0].trace
-                inner_tape = op.regions[0].quantum_tape
-                res_classical_tracers = op.regions[0].res_classical_tracers
-
-                with frame_tracing_context(ctx, inner_trace):
-                    qreg_in = _input_type_to_tracers(inner_trace.new_arg, [AbstractQreg()])[0]
-                    qreg_out = trace_quantum_tape(inner_tape, device, qreg_in, ctx, inner_trace)
-                    jaxpr, typ, consts = ctx.frames[inner_trace].to_jaxpr2(
-                        res_classical_tracers + [qreg_out]
-                    )
-
-                step = op.in_classical_tracers[2]
-                apply_reverse_transform = isinstance(step, int) and step < 0
-                qreg2 = op.bind_overwrite_classical_tracers(
-                    ctx,
-                    trace,
-                    op.in_classical_tracers[0],
-                    op.in_classical_tracers[1],
-                    step,
-                    *(consts + op.in_classical_tracers[3:] + [qreg]),
-                    body_jaxpr=ClosedJaxpr(convert_constvars_jaxpr(jaxpr), ()),
-                    body_nconsts=len(consts),
-                    apply_reverse_transform=apply_reverse_transform,
-                )[
-                    -1
-                ]  # [1]
-
-            elif isinstance(op, Cond):
-                jaxprs, consts = [], []
-                for region in op.regions:
-                    with frame_tracing_context(ctx, region.trace):
-                        qreg_in = _input_type_to_tracers(region.trace.new_arg, [AbstractQreg()])[0]
-                        qreg_out = trace_quantum_tape(
-                            region.quantum_tape, device, qreg_in, ctx, region.trace
-                        )
-                        jaxpr, typ, const = ctx.frames[region.trace].to_jaxpr2(
-                            region.res_classical_tracers + [qreg_out]
-                        )
-                        jaxprs.append(jaxpr)
-                        consts.append(const)
-
-                jaxprs2, combined_consts = initial_style_jaxprs_with_common_consts2(jaxprs, consts)
-
-                qreg2 = op.bind_overwrite_classical_tracers(
-                    ctx,
-                    trace,
-                    *(op.in_classical_tracers + combined_consts + [qreg]),
-                    branch_jaxprs=jaxprs2,
-                )[
-                    -1
-                ]  # [1]
-
-            elif isinstance(op, WhileLoop):
-                cond_trace = op.regions[0].trace
-                res_classical_tracers = op.regions[0].res_classical_tracers
-                with frame_tracing_context(ctx, cond_trace):
-                    _input_type_to_tracers(cond_trace.new_arg, [AbstractQreg()])[0]
-                    cond_jaxpr, _, cond_consts = ctx.frames[cond_trace].to_jaxpr2(
-                        res_classical_tracers
-                    )
-
-                body_trace = op.regions[1].trace
-                body_tape = op.regions[1].quantum_tape
-                res_classical_tracers = op.regions[1].res_classical_tracers
-                with frame_tracing_context(ctx, body_trace):
-                    qreg_in = _input_type_to_tracers(body_trace.new_arg, [AbstractQreg()])[0]
-                    qreg_out = trace_quantum_tape(body_tape, device, qreg_in, ctx, body_trace)
-                    body_jaxpr, _, body_consts = ctx.frames[body_trace].to_jaxpr2(
-                        res_classical_tracers + [qreg_out]
-                    )
-
-                qreg2 = op.bind_overwrite_classical_tracers(
-                    ctx,
-                    trace,
-                    *(cond_consts + body_consts + op.in_classical_tracers + [qreg]),
-                    cond_jaxpr=ClosedJaxpr(convert_constvars_jaxpr(cond_jaxpr), ()),
-                    body_jaxpr=ClosedJaxpr(convert_constvars_jaxpr(body_jaxpr), ()),
-                    cond_nconsts=len(cond_consts),
-                    body_nconsts=len(body_consts),
-                )[
-                    -1
-                ]  # [1]
-
+            if isinstance(op, (ForLoop, Cond, WhileLoop)):
+                qreg2 = op.trace(ctx, device, trace, qreg)
             elif isinstance(op, MidCircuitMeasure):
                 wire = op.in_classical_tracers[0]
                 qubit = qextract(qreg, wire)
