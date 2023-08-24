@@ -19,6 +19,8 @@
 #include "mlir/Analysis/DataFlowFramework.h"
 #include "mlir/IR/FunctionInterfaces.h"
 
+#include "Gradient/IR/GradientOps.h"
+
 namespace catalyst {
 namespace gradient {
 
@@ -26,8 +28,7 @@ class ActivityAnalyzer {
   public:
     /// Initialize and run activity analysis for a given callee and differential activity
     /// configuration.
-    ActivityAnalyzer(mlir::FunctionOpInterface callee, mlir::ArrayRef<size_t> diffArgIndices,
-                     bool print = false);
+    ActivityAnalyzer(GradOp gradOp, bool print = false);
 
     /// Determine if the given value is active (i.e. requires the computation of a derivative).
     bool isActive(mlir::Value value) const;

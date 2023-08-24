@@ -19,6 +19,7 @@
 #include "mlir/IR/BuiltinOps.h"
 
 #include "Gradient/Analysis/ActivityAnalysis.h"
+#include "Gradient/Utils/GradientShape.h"
 
 using namespace mlir;
 using namespace dataflow;
@@ -206,10 +207,12 @@ class BackwardActivityAnalysis : public SparseBackwardDataFlowAnalysis<BackwardA
 // ActivityAnalyzer
 //===----------------------------------------------------------------------===//
 
-catalyst::gradient::ActivityAnalyzer::ActivityAnalyzer(FunctionOpInterface callee,
-                                                       ArrayRef<size_t> diffArgIndices, bool print)
+catalyst::gradient::ActivityAnalyzer::ActivityAnalyzer(GradOp gradOp, bool print)
 {
     SymbolTableCollection symbolTable;
+    auto callee =
+        symbolTable.lookupNearestSymbolFrom<FunctionOpInterface>(gradOp, gradOp.getCalleeAttr());
+    std::vector<size_t> diffArgIndices = computeDiffArgIndices(gradOp.getDiffArgIndices());
     solver.load<ForwardActivityAnalysis>();
     solver.load<BackwardActivityAnalysis>(symbolTable);
 

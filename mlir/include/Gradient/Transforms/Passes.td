@@ -53,6 +53,13 @@ def GradientLoweringPass : Pass<"lower-gradients"> {
             /*description=*/"Restrict lowering to a specific type of gradient."
         >,
         Option<
+            /*C++ var name=*/"enableActivity",
+            /*CLI arg name=*/"activity-analysis",
+            /*type=*/"bool",
+            /*default=*/"false",
+            /*description=*/"Skip computation of gate parameters statically proven to be unnecessary."
+        >,
+        Option<
             /*C++ var name=*/"printActivity",
             /*CLI arg name=*/"print-activity",
             /*type=*/"bool",

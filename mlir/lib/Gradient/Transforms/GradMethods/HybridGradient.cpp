@@ -219,8 +219,6 @@ LogicalResult HybridGradientLowering::matchAndRewrite(GradOp op, PatternRewriter
     rewriter.setInsertionPoint(op);
     std::vector<size_t> diffArgIndices = computeDiffArgIndices(op.getDiffArgIndices());
 
-    ActivityAnalyzer(callee, diffArgIndices, printActivity);
-
     SmallVector<Value> backpropResults{op.getNumResults()};
     // Iterate over the primal results
     for (const auto &[cotangentIdx, primalResult] :
