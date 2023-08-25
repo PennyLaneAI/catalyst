@@ -882,5 +882,26 @@ def test_grad_on_multi_result_function(backend):
         compiled(1.0)
 
 
+def test_multiple_grad_invocations(backend):
+    """Test a function that uses grad multiple times."""
+
+    @qml.qnode(qml.device(backend, wires=2), diff_method="parameter-shift")
+    def f(x, y):
+        qml.RX(3 * x, wires=0)
+        qml.RX(y, wires=0)
+        return qml.expval(qml.PauliZ(0))
+
+    @qjit
+    def compiled(x: float, y: float):
+        g1 = grad(f, argnum=0, method="defer")(x, y)[0]
+        g2 = grad(f, argnum=1, method="defer")(x, y)[0]
+        return jnp.array([g1, g2])
+
+    actual = compiled(0.1, 0.2)
+    expected = jax.jacobian(f, argnums=(0, 1))(0.1, 0.2)
+    for actual_entry, expected_entry in zip(actual, expected):
+        assert actual_entry == pytest.approx(expected_entry)
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])

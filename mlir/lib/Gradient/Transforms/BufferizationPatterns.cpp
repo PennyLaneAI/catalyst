@@ -126,9 +126,15 @@ class BufferizeBackpropOp : public OpConversionPattern<BackpropOp> {
         // Enzyme requires buffers for the primal outputs as well, even though we don't need their
         // values. We'll mark them dupNoNeed later on to allow Enzyme to optimize away their
         // computation.
-        SmallVector<Value> calleeResults;
-        ValueRange resShadows = adaptor.getCotangents();
-        generateAllocations(rewriter, loc, calleeResults, resShadows);
+        SmallVector<Value> calleeResults, resShadows;
+        ValueRange cotangents = adaptor.getCotangents();
+        generateAllocations(rewriter, loc, calleeResults, cotangents);
+        // Enzyme mutates the result shadows but the cotangent tensors must be immutable, so we
+        // create copies to pass into Enzyme.
+        generateAllocations(rewriter, loc, resShadows, cotangents);
+        for (const auto &[cotangent, resShadow] : llvm::zip(cotangents, resShadows)) {
+            rewriter.create<memref::CopyOp>(loc, cotangent, resShadow);
+        }
 
         DenseIntElementsAttr diffArgIndicesAttr = adaptor.getDiffArgIndices().value_or(nullptr);
         auto bufferizedBackpropOp = rewriter.create<BackpropOp>(
