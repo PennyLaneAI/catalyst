@@ -1,0 +1,11 @@
+--- _ods_common.py
++++ _ods_common.py
+@@ -4,7 +4,7 @@
+ 
+ # Provide a convenient name for sub-packages to resolve the main C-extension
+ # with a relative import.
+-from .._mlir_libs import _mlir as _cext
++from jaxlib.mlir._mlir_libs import _mlir as _cext
+ from typing import Sequence as _Sequence, Union as _Union
+
+ __all__ = [
