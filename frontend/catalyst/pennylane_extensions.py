@@ -898,7 +898,7 @@ def cond(pred):
 
     .. note::
 
-        Catalyst can now automatically convert Python if-statements for you. Requires setting
+        Catalyst can automatically convert Python if-statements for you. Requires setting
         ``autograph=True``, see the :func:`~.qjit` function or documentation page for more details.
 
     This form of control flow is a functional version of the traditional if-else conditional. This

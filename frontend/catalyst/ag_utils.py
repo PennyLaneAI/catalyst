@@ -43,6 +43,13 @@ def _test_ag_import():
 def autograph_source(fn):
     """Utility function to retrieve the source code of a function converted by AutoGraph.
 
+    .. warning::
+
+        Nested functions (those not directly decorated with ``@qjit``) are only lazily converted by
+        AutoGraph. Make sure that the function has been traced at least once before accessing its
+        transformed source code, for example by specifying the signature of the compiled program
+        or by running it at least once.
+
     Args:
         fn (Callable): the original function object that was converted
 
@@ -66,11 +73,27 @@ def autograph_source(fn):
             return y
 
         @qjit(autograph=True)
-        def func(x):
+        def func(x: int):
             y = decide(x)
             return y ** 2
 
-        print(autograph_source(decide))
+    >>> print(autograph_source(decide))
+    def decide_1(x):
+        with ag__.FunctionScope('decide', 'fscope', ag__.STD) as fscope:
+            def get_state():
+                return (y,)
+            def set_state(vars_):
+                nonlocal y
+                (y,) = vars_
+            def if_body():
+                nonlocal y
+                y = 15
+            def else_body():
+                nonlocal y
+                y = 1
+            y = ag__.Undefined('y')
+            ag__.if_stmt(x < 5, if_body, else_body, get_state, set_state, ('y',), 1)
+            return y
     """
     _test_ag_import()
     from catalyst import QJIT
