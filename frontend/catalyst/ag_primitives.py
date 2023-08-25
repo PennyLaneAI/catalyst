@@ -110,10 +110,13 @@ def _call_catalyst_for(start, stop, step, body_fn, get_state, enum_start=None, a
     @catalyst.for_loop(start, stop, step)
     def functional_for(i):
         if enum_start is None and array_iterable is None:
+            # for i in range(..)
             body_fn(i)
         elif enum_start is None:
+            # for x in array
             body_fn(array_iterable[i])
         else:
+            # for (i, x) in enumerate(array)
             body_fn((i + enum_start, array_iterable[i]))
 
         return get_state()
@@ -123,6 +126,7 @@ def _call_catalyst_for(start, stop, step, body_fn, get_state, enum_start=None, a
 
 def _call_python_for(body_fn, get_state, non_array_iterable):
     """Fallback to a Python implementation of for loops."""
+
     for elem in non_array_iterable:
         body_fn(elem)
 
@@ -308,8 +312,7 @@ class CEnumerate(enumerate):
     """Catalyst enumeration object.
 
     Can be passed to a Python for loop for conversion into a for_loop call. The loop index, as well
-    as the iterable element will be provided to the loop body, which would otherwise not be possible
-    as unpacking is generally not supported in Catalyst for loops.
+    as the iterable element will be provided to the loop body.
     Otherwise this class behaves exactly like the Python enumerate class.
 
     Note that the iterable must be convertible to an array, otherwise the loop will be treated as a

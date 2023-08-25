@@ -450,6 +450,20 @@ class TestForLoops:
         result = f(jnp.array([0.0, 1 / 4 * jnp.pi, 2 / 4 * jnp.pi]))
         assert np.allclose(result, -jnp.sqrt(2) / 2)
 
+    def test_for_in_array_unpack(self):
+        """Test for loop over a 2D JAX array unpacking the inner dimension."""
+
+        @qjit(autograph=True)
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def f(params):
+            for x1, x2 in params:
+                qml.RY(x1, wires=0)
+                qml.RY(x2, wires=0)
+            return qml.expval(qml.PauliZ(0))
+
+        result = f(jnp.array([[0.0, 1 / 4 * jnp.pi], [2 / 4 * jnp.pi, jnp.pi]]))
+        assert np.allclose(result, jnp.sqrt(2) / 2)
+
     def test_for_in_numeric_list(self):
         """Test for loop over a Python list that is convertible to an array."""
 
@@ -627,6 +641,37 @@ class TestForLoops:
         result = f(jnp.array([0.0, 1 / 4 * jnp.pi, 2 / 4 * jnp.pi]))
         assert np.allclose(result, [1.0, jnp.sqrt(2) / 2, 0.0])
 
+    def test_for_in_enumerate_array_no_unpack(self):
+        """Test for loop over a Python enumeration with delayed unpacking."""
+
+        @qjit(autograph=True)
+        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        def f(params):
+            for v in enumerate(params):
+                qml.RY(v[1], wires=v[0])
+            return [qml.expval(qml.PauliZ(i)) for i in range(3)]
+
+        result = f(jnp.array([0.0, 1 / 4 * jnp.pi, 2 / 4 * jnp.pi]))
+        assert np.allclose(result, [1.0, jnp.sqrt(2) / 2, 0.0])
+
+    def test_for_in_enumerate_nested_unpack(self):
+        """Test for loop over a Python enumeration with nested unpacking."""
+
+        @qjit(autograph=True)
+        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        def f(params):
+            for i, (x1, x2) in enumerate(params):
+                qml.RY(x1, wires=i)
+                qml.RY(x2, wires=i)
+            return [qml.expval(qml.PauliZ(i)) for i in range(3)]
+
+        result = f(
+            jnp.array(
+                [[0.0, 1 / 4 * jnp.pi], [2 / 4 * jnp.pi, 3 / 4 * jnp.pi], [jnp.pi, 2 * jnp.pi]]
+            )
+        )
+        assert np.allclose(result, [jnp.sqrt(2) / 2, -jnp.sqrt(2) / 2, -1.0])
+
     def test_for_in_enumerate_start(self):
         """Test for loop over a Python enumeration with offset indices."""
 
@@ -639,19 +684,6 @@ class TestForLoops:
 
         result = f(jnp.array([0.0, 1 / 4 * jnp.pi, 2 / 4 * jnp.pi]))
         assert np.allclose(result, [1.0, 1.0, 1.0, jnp.sqrt(2) / 2, 0.0])
-
-    def test_for_in_enumerate_unpack(self):
-        """Test for loop over a Python enumeration with delayed unpacking."""
-
-        @qjit(autograph=True)
-        @qml.qnode(qml.device("lightning.qubit", wires=3))
-        def f(params):
-            for v in enumerate(params):
-                qml.RY(v[1], wires=v[0])
-            return [qml.expval(qml.PauliZ(i)) for i in range(3)]
-
-        result = f(jnp.array([0.0, 1 / 4 * jnp.pi, 2 / 4 * jnp.pi]))
-        assert np.allclose(result, [1.0, jnp.sqrt(2) / 2, 0.0])
 
     def test_for_in_enumerate_numeric_list(self):
         """Test for loop over a Python enumeration on a list that is convertible to an array."""
