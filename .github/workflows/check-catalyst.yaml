@@ -41,8 +41,7 @@ jobs:
         with:
           name: runtime-build
           path: |
-            runtime-build/lib/capi/*.so
-            runtime-build/lib/backend/*.so
+            runtime-build/lib/*.so
           retention-days: 1
 
   llvm:

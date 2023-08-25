@@ -12,7 +12,8 @@ ENABLE_WARNINGS?=ON
 ENABLE_LIGHTNING_KOKKOS?=OFF
 ENABLE_OPENQASM?=OFF
 BUILD_QIR_STDLIB_FROM_SRC?=OFF
-LIGHTNING_GIT_TAG_VALUE?=latest_release
+# TODO: remove after lightning monorepo upgrade
+LIGHTNING_GIT_TAG_VALUE?=v0.31.0
 LIGHTNING_KOKKOS_GIT_TAG_VALUE?=latest_release
 NPROC?=$(shell python -c "import os; print(os.cpu_count())")
 
@@ -42,6 +43,7 @@ configure:
 	@echo "Configure Catalyst Runtime"
 	cmake -G Ninja -B $(RT_BUILD_DIR) . \
 		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
+		-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=$(RT_BUILD_DIR)/lib \
 		-DLIGHTNING_GIT_TAG=$(LIGHTNING_GIT_TAG_VALUE) \
 		-DLIGHTNING_KOKKOS_GIT_TAG=$(LIGHTNING_KOKKOS_GIT_TAG_VALUE) \
 		-DENABLE_LIGHTNING_KOKKOS=$(ENABLE_LIGHTNING_KOKKOS) \
@@ -85,9 +87,7 @@ examples: runtime
 .PHONY: clean
 clean:
 	@echo "clean build files"
-	rm -rf $(RT_BUILD_DIR)
-	rm -rf cov coverage.info
-	rm -rf $(MK_DIR)/BuildTidy
+	rm -rf $(RT_BUILD_DIR) cov coverage.info $(MK_DIR)/BuildTidy
 	$(MAKE) -C examples clean
 
 .PHONY: format

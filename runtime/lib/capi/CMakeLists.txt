@@ -6,7 +6,7 @@ add_library(catalyst_qir_qis_obj OBJECT RuntimeCAPI.cpp)
 
 # link to rt_backend
 target_link_libraries(catalyst_qir_qis_obj ${CMAKE_DL_LIBS}
-                                            "-L${CMAKE_BINARY_DIR}/lib/backend"
+                                            "-L${CMAKE_LIBRARY_OUTPUT_DIRECTORY}"
                                             -lrt_backend
                                             rt_interfaces)
 
