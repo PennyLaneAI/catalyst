@@ -221,11 +221,11 @@ def _ensure_differentiable(f: DifferentiableLike) -> Differentiable:
 
     # Unwrap the function from an existing QJIT object.
     if isinstance(f, catalyst.compilation_pipelines.QJIT):
-        f = f.qfunc
+        f = f.user_function
 
     if isinstance(f, (Function, QNode)):
         return f
-    elif isinstance(f, Callable):  # keep at the bottom
+    elif isinstance(f, Callable):  # Keep at the bottom
         return Function(f)
 
     raise DifferentiableCompileError(f"Non-differentiable object passed: {type(f)}")
@@ -515,7 +515,7 @@ def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=
 
     Args:
         f (Callable): Function-like object to calculate JVP for
-        params (List[Array]): List (or a tuple) of the fnuction arguments specifying the point
+        params (List[Array]): List (or a tuple) of the function arguments specifying the point
                               to calculate JVP at. A subset of these parameters are declared as
                               differentiable by listing their indices in the ``argnum`` parameter.
         tangents(List[Array]): List (or a tuple) of tangent values to use in JVP. The list size and
@@ -599,9 +599,9 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
 
     Args:
         f(Callable): Function-like object to calculate JVP for
-        params(List[Array]): List (or a tuble) of f's arguments specifying the point to calculate
+        params(List[Array]): List (or a tuple) of f's arguments specifying the point to calculate
                              VJP at. A subset of these parameters are declared as
-                             differentiable by listing their indices in the ``argnum`` paramerer.
+                             differentiable by listing their indices in the ``argnum`` parameter.
         cotangents(List[Array]): List (or a tuple) of tangent values to use in JVP. The list size
                                  and shapes must match the size and shape of ``f`` outputs.
         method(str): Differentiation method to use, same as in ``grad``.
@@ -824,13 +824,13 @@ class CondCallable:
 
     @staticmethod
     def _check_branches_return_types(branch_jaxprs):
-        expected = branch_jaxprs[0].out_avals[:-1]
+        expected = branch_jaxprs[0].out_avals
         for i, jaxpr in list(enumerate(branch_jaxprs))[1:]:
-            if expected != jaxpr.out_avals[:-1]:
+            if expected != jaxpr.out_avals:
                 raise TypeError(
-                    "Conditional branches all require the same return type, got:\n"
+                    "Conditional requires consistent return types across all branches, got:\n"
                     f" - Branch at index 0: {expected}\n"
-                    f" - Branch at index {i}: {jaxpr.out_avals[:-1]}\n"
+                    f" - Branch at index {i}: {jaxpr.out_avals}\n"
                     "Please specify an else branch if none was specified."
                 )
 
@@ -895,6 +895,11 @@ class CondCallable:
 
 def cond(pred):
     """A :func:`~.qjit` compatible decorator for if-else conditionals in PennyLane/Catalyst.
+
+    .. note::
+
+        Catalyst can automatically convert Python if-statements for you. Requires setting
+        ``autograph=True``, see the :func:`~.qjit` function or documentation page for more details.
 
     This form of control flow is a functional version of the traditional if-else conditional. This
     means that each execution path, an 'if' branch, any 'else if' branches, and a final 'otherwise'

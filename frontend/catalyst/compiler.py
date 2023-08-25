@@ -25,7 +25,7 @@ import tempfile
 import warnings
 from dataclasses import dataclass
 from io import TextIOWrapper
-from typing import List, Optional
+from typing import List, Optional, Any
 
 from mlir_quantum.compiler_driver._catalystDriver import run_compiler_driver
 
@@ -49,7 +49,10 @@ class CompileOptions:
 
     verbose: Optional[bool] = False
     logfile: Optional[TextIOWrapper] = sys.stderr
+    target: Optional[str] = "binary"
     keep_intermediate: Optional[bool] = False
+    pipelines: Optional[List[Any]] = None
+    autograph: Optional[bool] = False
 
 
 def run_writing_command(
