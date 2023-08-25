@@ -77,6 +77,10 @@ def converted_code(fn):
     from catalyst.ag_primitives import STD as STD_OPTIONS
     from catalyst.autograph import TOPLEVEL_OPTIONS, TRANSFORMER
 
+    # Handle directly converted objects.
+    if hasattr(fn, "ag_unconverted"):
+        return inspect.getsource(fn)
+
     # Unwrap known objects to get the function actually transformed by autograph.
     if isinstance(fn, QJIT):
         fn = fn.original_function
