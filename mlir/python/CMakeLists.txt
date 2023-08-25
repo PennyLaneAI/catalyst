@@ -42,6 +42,7 @@ declare_mlir_python_extension(CatalystPythonDriver
     PyCompilerDriver.cpp
   PRIVATE_LINK_LIBS
     QuantumCAPI
+
 )
 
 ################################################################################
@@ -50,8 +51,8 @@ declare_mlir_python_extension(CatalystPythonDriver
 
 add_mlir_python_common_capi_library(QuantumPythonCAPI
   INSTALL_COMPONENT QuantumPythonModules
-  INSTALL_DESTINATION python_packages/quantum/mlir_quantum/_mlir_libs
-  OUTPUT_DIRECTORY "${MLIR_BINARY_DIR}/python_packages/quantum/mlir_quantum/_mlir_libs"
+  INSTALL_DESTINATION python_packages/quantum/mlir_quantum/compiler_driver
+  OUTPUT_DIRECTORY "${MLIR_BINARY_DIR}/python_packages/quantum/mlir_quantum/compiler_driver"
   RELATIVE_INSTALL_ROOT "../../../.."
   DECLARED_SOURCES
     QuantumPythonSources
