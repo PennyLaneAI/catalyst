@@ -111,7 +111,6 @@ DEFAULT_PIPELINES = [
         [
             "lower-gradients",
             "adjoint-lowering",
-            "convert-arraylist-to-memref",
         ],
     ),
     (
@@ -135,6 +134,7 @@ DEFAULT_PIPELINES = [
             "func.func(buffer-hoisting)",
             "func.func(buffer-loop-hoisting)",
             "func.func(buffer-deallocation)",
+            "convert-arraylist-to-memref",
             "convert-bufferization-to-memref",
             "canonicalize",
             # "cse",
