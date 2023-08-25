@@ -98,7 +98,7 @@ class TestCompilerWarnings:
         """Test that a warning is emitted when a compiler failed."""
         with pytest.warns(UserWarning, match="Compiler .* failed .*"):
             # pylint: disable=protected-access
-            CompilerDriver._attempt_link("cc", [""], "in.o", "out.so", None)
+            CompilerDriver._attempt_link("cc", [""], "in.o", "out.so", CompileOptions(verbose=True))
 
 
 class TestCompilerErrors:
@@ -142,9 +142,8 @@ class TestCompilerErrors:
         with tempfile.NamedTemporaryFile(mode="w+", encoding="utf-8", suffix=".o") as invalid_file:
             invalid_file.write("These are invalid contents.")
             invalid_file.flush()
-            with pytest.raises(EnvironmentError, match="Unable to link .*"):
-                with pytest.warns(UserWarning, match="Compiler cc failed during execution"):
-                    CompilerDriver.run(invalid_file.name, fallback_compilers=["cc"])
+            with pytest.raises(CompileError, match="Unable to link .*"):
+                CompilerDriver.run(invalid_file.name, fallback_compilers=["cc"])
 
     @pytest.mark.parametrize(
         "pipeline",
