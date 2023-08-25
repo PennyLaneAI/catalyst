@@ -40,7 +40,7 @@ def _test_ag_import():
         ) from e
 
 
-def converted_code(fn):
+def autograph_source(fn):
     """Utility function to retrieve the source code of a function converted by AutoGraph.
 
     Args:
@@ -70,7 +70,7 @@ def converted_code(fn):
             y = decide(x)
             return y ** 2
 
-        print(converted_code(decide))
+        print(autograph_source(decide))
     """
     _test_ag_import()
     from catalyst import QJIT
@@ -103,7 +103,7 @@ def converted_code(fn):
 def print_code(fn):
     """Convenience function for testing to print the transformed code."""
 
-    print(converted_code(fn))  # pragma: nocover
+    print(autograph_source(fn))  # pragma: nocover
 
 
 def check_cache(fn):

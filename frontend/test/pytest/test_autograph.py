@@ -21,7 +21,7 @@ import pennylane as qml
 import pytest
 
 from catalyst import measure, qjit
-from catalyst.ag_utils import AutoGraphError, check_cache, converted_code
+from catalyst.ag_utils import AutoGraphError, autograph_source, check_cache
 
 # pylint: disable=missing-function-docstring
 # pylint: disable=unnecessary-lambda-assignment
@@ -199,7 +199,7 @@ class TestCodePrinting:
             return x**2
 
         with pytest.raises(AutoGraphError, match="function was not converted by AutoGraph"):
-            converted_code(fn)
+            autograph_source(fn)
 
     def test_lambda(self):
         """Test printing on a lambda function."""
@@ -207,7 +207,7 @@ class TestCodePrinting:
         fn = lambda x: x**2
         qjit(autograph=True)(fn)
 
-        assert converted_code(fn)
+        assert autograph_source(fn)
 
     def test_classical_function(self):
         """Test printing on a purely classical function."""
@@ -216,7 +216,7 @@ class TestCodePrinting:
         def fn(x):
             return x**2
 
-        assert converted_code(fn)
+        assert autograph_source(fn)
 
     def test_nested_function(self):
         """Test printing on nested classical functions."""
@@ -228,8 +228,8 @@ class TestCodePrinting:
         def fn(x: int):
             return inner(x)
 
-        assert converted_code(fn)
-        assert converted_code(inner)
+        assert autograph_source(fn)
+        assert autograph_source(inner)
 
     def test_qnode(self):
         """Test printing on a QNode."""
@@ -240,7 +240,7 @@ class TestCodePrinting:
             qml.RY(x, wires=0)
             return qml.expval(qml.PauliZ(0))
 
-        assert converted_code(fn)
+        assert autograph_source(fn)
 
     def test_indirect_qnode(self):
         """Test printing on a QNode called from within a classical function."""
@@ -254,8 +254,8 @@ class TestCodePrinting:
         def fn(x: float):
             return inner(x)
 
-        assert converted_code(fn)
-        assert converted_code(inner)
+        assert autograph_source(fn)
+        assert autograph_source(inner)
 
     def test_multiple_qnode(self):
         """Test printing on multiple QNodes called from different classical functions."""
@@ -274,9 +274,9 @@ class TestCodePrinting:
         def fn(x: float):
             return inner1(x) + inner2(x)
 
-        assert converted_code(fn)
-        assert converted_code(inner1)
-        assert converted_code(inner2)
+        assert autograph_source(fn)
+        assert autograph_source(inner1)
+        assert autograph_source(inner2)
 
     def test_nested_qnode(self):
         """Test printing on a QNode called from within another QNode."""
@@ -296,9 +296,9 @@ class TestCodePrinting:
         def fn(x: int):
             return inner2(x)
 
-        assert converted_code(fn)
-        assert converted_code(inner1)
-        assert converted_code(inner2)
+        assert autograph_source(fn)
+        assert autograph_source(inner1)
+        assert autograph_source(inner2)
 
     def test_nested_qjit(self):
         """Test printing on a QJIT function called from within the compilation entry point."""
@@ -313,8 +313,8 @@ class TestCodePrinting:
         def fn(x: float):
             return inner(x)
 
-        assert converted_code(fn)
-        assert converted_code(inner)
+        assert autograph_source(fn)
+        assert autograph_source(inner)
 
 
 class TestConditionals:
