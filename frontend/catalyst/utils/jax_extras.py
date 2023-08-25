@@ -38,7 +38,6 @@ from typing import (
     Union,
     cast,
     overload,
-    Set
 )
 from weakref import ref
 
@@ -49,14 +48,9 @@ from jax._src import core, dtypes, effects
 from jax._src import linear_util as lu
 from jax._src import source_info_util, state, traceback_util, typing, util
 from jax._src.config import FLAGS, config
-from jax._src.core import (
-    MainTrace,
-    Trace,
-    _update_thread_local_jit_state,
-    thread_local_state,
-    JaxprEqn,
-    Primitive as JaxprPrimitive
-)
+from jax._src.core import JaxprEqn, MainTrace
+from jax._src.core import Primitive as JaxprPrimitive
+from jax._src.core import Trace, _update_thread_local_jit_state, thread_local_state
 from jax._src.errors import (
     ConcretizationTypeError,
     TracerArrayConversionError,
@@ -115,8 +109,7 @@ def new_main2(
             _update_thread_local_jit_state(stack.dynamic)
 
 
-def sort_eqns(eqns: List[JaxprEqn],
-              forced_order_primitives:Set[JaxprPrimitive]) -> List[JaxprEqn]:
+def sort_eqns(eqns: List[JaxprEqn], forced_order_primitives: Set[JaxprPrimitive]) -> List[JaxprEqn]:
     """Topologically sort JAXRR equations in a list, based on their input/output variables."""
 
     # FIXME: The functions might emit different correct results, depending on id(eqns). One need to

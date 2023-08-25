@@ -19,50 +19,23 @@ while using :func:`~.qjit`.
 import functools
 import numbers
 import uuid
-from functools import partial
-from typing import Any, Callable, Iterable, List, Optional, Tuple, Union
-
-import jax
-import jax.numpy as jnp
-import pennylane as qml
-from jax._src.lax.control_flow import (
-    _initial_style_jaxpr,
-    _initial_style_jaxprs_with_common_consts,
-)
-from jax._src.lax.lax import _abstractify
-from jax.core import ShapedArray
-from jax.tree_util import tree_flatten, tree_structure, tree_unflatten, treedef_is_leaf
-from pennylane import QNode
-from pennylane.operation import AnyWires, Operation, Operator, Wires
-from pennylane.queuing import QueuingManager
-
-import catalyst
-import catalyst.jax_primitives as jprim
-from catalyst.jax_primitives import GradParams, expval_p, probs_p
-# from catalyst.jax_tape import JaxTape
-# from catalyst.jax_tracer2 import (
-#     MidCircuitMeasure,
-#     adjoint,
-#     cond,
-#     for_loop,
-#     measure,
-#     trace_quantum_function,
-#     while_loop,
-# )
-from catalyst.utils.exceptions import CompileError, DifferentiableCompileError
-from catalyst.utils.tracing import TracingContext
-
-
-
-
-
-
 from collections import defaultdict
 from contextlib import contextmanager
 from dataclasses import dataclass
 from enum import Enum
+from functools import partial
 from itertools import chain
-from typing import Any, Callable, ContextManager, Dict, List, Optional, Tuple, Union
+from typing import (
+    Any,
+    Callable,
+    ContextManager,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Tuple,
+    Union,
+)
 
 import jax
 import jax.numpy as jnp
@@ -119,7 +92,10 @@ from jax._src.interpreters.partial_eval import (
     new_jaxpr_eqn,
     trace_to_subjaxpr_dynamic2,
 )
-from jax._src.lax.control_flow import _initial_style_jaxpr
+from jax._src.lax.control_flow import (
+    _initial_style_jaxpr,
+    _initial_style_jaxprs_with_common_consts,
+)
 from jax._src.lax.lax import _abstractify, xb, xla
 from jax._src.source_info_util import current as jax_current
 from jax._src.source_info_util import new_name_stack, reset_name_stack
@@ -131,6 +107,7 @@ from jax._src.tree_util import (
     treedef_is_leaf,
 )
 from jax._src.util import unzip2
+from jax.core import ShapedArray
 from jax.interpreters import mlir
 from jax.interpreters.mlir import (
     AxisContext,
@@ -140,24 +117,31 @@ from jax.interpreters.mlir import (
     lower_jaxpr_to_fun,
     lowerable_effects,
 )
-from pennylane import Device, QubitDevice, QubitUnitary, QueuingManager
+from jax.tree_util import tree_flatten, tree_structure, tree_unflatten, treedef_is_leaf
+from pennylane import Device, QNode, QubitDevice, QubitUnitary, QueuingManager
 from pennylane.measurements import MeasurementProcess, SampleMP
 from pennylane.operation import AnyWires, Operation, Operator, Wires
+from pennylane.queuing import QueuingManager
 from pennylane.tape import QuantumTape
 
+import catalyst
+import catalyst.jax_primitives as jprim
 from catalyst.jax_primitives import (
     AbstractQbit,
     AbstractQreg,
+    GradParams,
     Qreg,
     adjoint_p,
     compbasis,
     compbasis_p,
     counts,
     expval,
+    expval_p,
     hamiltonian,
     hermitian,
     namedobs,
     probs,
+    probs_p,
     qalloc,
     qcond_p,
     qdealloc,
@@ -178,11 +162,34 @@ from catalyst.jax_primitives import (
 from catalyst.jax_primitives import var as jprim_var
 from catalyst.jax_tracer import (
     KNOWN_NAMED_OBS,
-    HybridOp, HybridOpRegion, Cond, WhileLoop, Adjoint, ForLoop, QFunc, QJITDevice,
-    get_main_tracing_context, frame_tracing_context, deduce_avals, Function, MainTracingContex,
-    new_inner_tracer, MidCircuitMeasure
+    Adjoint,
+    Cond,
+    ForLoop,
+    Function,
+    HybridOp,
+    HybridOpRegion,
+    MainTracingContex,
+    MidCircuitMeasure,
+    QFunc,
+    QJITDevice,
+    WhileLoop,
+    deduce_avals,
+    frame_tracing_context,
+    get_main_tracing_context,
+    new_inner_tracer,
 )
-from catalyst.utils.exceptions import CompileError
+
+# from catalyst.jax_tape import JaxTape
+# from catalyst.jax_tracer2 import (
+#     MidCircuitMeasure,
+#     adjoint,
+#     cond,
+#     for_loop,
+#     measure,
+#     trace_quantum_function,
+#     while_loop,
+# )
+from catalyst.utils.exceptions import CompileError, DifferentiableCompileError
 from catalyst.utils.jax_extras import (
     initial_style_jaxprs_with_common_consts1,
     initial_style_jaxprs_with_common_consts2,
@@ -190,24 +197,6 @@ from catalyst.utils.jax_extras import (
     sort_eqns,
 )
 from catalyst.utils.tracing import TracingContext
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 # pylint: disable=too-many-lines
 
@@ -600,7 +589,6 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
     return jprim.vjp_p.bind(*params, *cotangents, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
 
 
-
 class EvaluationMode(Enum):
     QJIT_QNODE = 0
     QJIT = 1
@@ -662,7 +650,6 @@ def _check_same_types(trees: List[PyTreeDef], avals: List[List[Any]], hint=None)
                 f" - Branch at index {i}: {dtypes}\n"
                 "Please specify the default branch if none was specified."
             )
-
 
 
 class CondCallable:

@@ -14,38 +14,11 @@
 """This module contains functions tracing and lowering JAX code to MLIR.
 """
 
-import jax
-import pennylane as qml
-from jax._src import source_info_util
-from jax._src.dispatch import jaxpr_replicas
-from jax._src.interpreters.mlir import _module_name_regex
-from jax._src.lax.lax import xb, xla
-from jax._src.util import wrap_name
-from jax.interpreters.mlir import (
-    AxisContext,
-    ModuleContext,
-    ReplicaAxisContext,
-    ir,
-    lower_jaxpr_to_fun,
-    lowerable_effects,
-)
-from jax.interpreters.partial_eval import DynamicJaxprTracer
-from jax.tree_util import tree_flatten, tree_structure, tree_unflatten
-from pennylane.measurements import CountsMP, MeasurementProcess
-from pennylane.operation import Wires
-
-import catalyst.jax_primitives as jprim
-# from catalyst.jax_tape import JaxTape
-from catalyst.utils.tracing import TracingContext
-
-
-
-from functools import update_wrapper
-
 from collections import defaultdict
 from contextlib import contextmanager
 from dataclasses import dataclass
 from enum import Enum
+from functools import update_wrapper
 from itertools import chain
 from typing import Any, Callable, ContextManager, Dict, List, Optional, Tuple, Union
 
@@ -53,6 +26,7 @@ import jax
 import jax.numpy as jnp
 import pennylane as qml
 from jax._src import linear_util as lu
+from jax._src import source_info_util
 from jax._src.api import ShapeDtypeStruct
 from jax._src.api_util import (
     _ensure_index,
@@ -88,7 +62,7 @@ from jax._src.core import (
     new_main,
 )
 from jax._src.dispatch import jaxpr_replicas
-from jax._src.interpreters.mlir import _constant_handlers
+from jax._src.interpreters.mlir import _constant_handlers, _module_name_regex
 from jax._src.interpreters.partial_eval import (
     DynamicJaxprTrace,
     DynamicJaxprTracer,
@@ -115,7 +89,7 @@ from jax._src.tree_util import (
     tree_unflatten,
     treedef_is_leaf,
 )
-from jax._src.util import unzip2
+from jax._src.util import unzip2, wrap_name
 from jax.interpreters import mlir
 from jax.interpreters.mlir import (
     AxisContext,
@@ -125,11 +99,15 @@ from jax.interpreters.mlir import (
     lower_jaxpr_to_fun,
     lowerable_effects,
 )
+from jax.interpreters.partial_eval import DynamicJaxprTracer
+from jax.linear_util import wrap_init
+from jax.tree_util import tree_flatten, tree_structure, tree_unflatten
 from pennylane import Device, QubitDevice, QubitUnitary, QueuingManager
-from pennylane.measurements import MeasurementProcess, SampleMP
+from pennylane.measurements import CountsMP, MeasurementProcess, MidMeasureMP, SampleMP
 from pennylane.operation import AnyWires, Operation, Operator, Wires
 from pennylane.tape import QuantumTape
 
+import catalyst.jax_primitives as jprim
 from catalyst.jax_primitives import (
     AbstractQbit,
     AbstractQreg,
@@ -161,6 +139,7 @@ from catalyst.jax_primitives import (
     tensorobs,
 )
 from catalyst.jax_primitives import var as jprim_var
+
 # from catalyst.jax_tracer import (
 #     KNOWN_NAMED_OBS,
 # )
@@ -171,16 +150,10 @@ from catalyst.utils.jax_extras import (
     new_main2,
     sort_eqns,
 )
-from catalyst.utils.tracing import TracingContext
-
-
-from pennylane.measurements import MidMeasureMP
 from catalyst.utils.patching import Patcher
 
-
-from jax.linear_util import wrap_init
-
-
+# from catalyst.jax_tape import JaxTape
+from catalyst.utils.tracing import TracingContext
 
 
 class Function:
@@ -211,10 +184,10 @@ class Function:
         return tree_unflatten(shape_tree, retval)
 
 
-
 KNOWN_NAMED_OBS = (qml.Identity, qml.PauliX, qml.PauliY, qml.PauliZ, qml.Hadamard)
 
 FORCED_ORDER_PRIMITIVES = {qdevice_p, qextract_p}
+
 
 @dataclass
 class MainTracingContex:
@@ -223,7 +196,7 @@ class MainTracingContex:
     mains: Dict[DynamicJaxprTrace, JaxMainTrace]
     trace: Optional[DynamicJaxprTrace]
 
-    def __init__(self, main:JaxMainTrace):
+    def __init__(self, main: JaxMainTrace):
         self.main, self.frames, self.mains, self.trace = main, {}, {}, None
 
 
@@ -261,8 +234,7 @@ class QRegPromise:
         self.cache = {}
 
 
-def promise_qextract(qrp: QRegPromise,
-                     wires:List[Any]) -> List[DynamicJaxprTracer]:
+def promise_qextract(qrp: QRegPromise, wires: List[Any]) -> List[DynamicJaxprTracer]:
     cached_tracers = set([w for w in qrp.cache.keys() if not isinstance(w, int)])
     requested_tracers = set([w for w in wires if not isinstance(w, int)])
     if cached_tracers != requested_tracers:
@@ -271,8 +243,9 @@ def promise_qextract(qrp: QRegPromise,
     for w in wires:
         if w in qrp.cache:
             qubit = qrp.cache[w]
-            assert qubit is not None, \
-                f"Attempting to extract wire {w} from register {qrp.base} for the second time"
+            assert (
+                qubit is not None
+            ), f"Attempting to extract wire {w} from register {qrp.base} for the second time"
             qubits.append(qubit)
             qrp.cache[w] = None
         else:
@@ -280,19 +253,18 @@ def promise_qextract(qrp: QRegPromise,
     return qubits
 
 
-def promise_qinsert(qrp: QRegPromise,
-                    wires,
-                    qubits) -> None:
-    assert len(wires)==len(qubits)
+def promise_qinsert(qrp: QRegPromise, wires, qubits) -> None:
+    assert len(wires) == len(qubits)
     for w, qubit in zip(wires, qubits):
-        assert (w not in qrp.cache) or (qrp.cache[w] is None), \
-            f"Attempting to insert an already-inserted wire {w} into {qrp.base}"
+        assert (w not in qrp.cache) or (
+            qrp.cache[w] is None
+        ), f"Attempting to insert an already-inserted wire {w} into {qrp.base}"
         qrp.cache[w] = qubit
 
 
 def promise_actualize(qrp: QRegPromise) -> DynamicJaxprTracer:
     qreg = qrp.base
-    for w,qubit in qrp.cache.items():
+    for w, qubit in qrp.cache.items():
         qreg = qinsert(qreg, w, qubit)
     qrp.cache = {}
     qrp.base = qreg
@@ -455,7 +427,7 @@ def trace_quantum_tape(
         assert (len(eqn.outvars) - 1) == len(op.out_classical_tracers)
         for i, t in zip(range(len(eqn.outvars) - 1), op.out_classical_tracers):  # [1]
             eqn.outvars[i] = trace.getvar(t)
-        return out_quantum_tracer # [2]
+        return out_quantum_tracer  # [2]
 
     qrp = QRegPromise(qreg)
     for op in device.expand_fn(quantum_tape):
@@ -477,17 +449,19 @@ def trace_quantum_tape(
                 step = op.in_classical_tracers[2]
                 apply_reverse_transform = isinstance(step, int) and step < 0
                 qreg = promise_actualize(qrp)
-                qrp2 = QRegPromise(bind_overwrite_classical_tracers(
-                    op,
-                    qfor_p.bind,
-                    op.in_classical_tracers[0],
-                    op.in_classical_tracers[1],
-                    step,
-                    *(consts + op.in_classical_tracers[3:] + [qreg]),
-                    body_jaxpr=ClosedJaxpr(convert_constvars_jaxpr(jaxpr), ()),
-                    body_nconsts=len(consts),
-                    apply_reverse_transform=apply_reverse_transform,
-                ))
+                qrp2 = QRegPromise(
+                    bind_overwrite_classical_tracers(
+                        op,
+                        qfor_p.bind,
+                        op.in_classical_tracers[0],
+                        op.in_classical_tracers[1],
+                        step,
+                        *(consts + op.in_classical_tracers[3:] + [qreg]),
+                        body_jaxpr=ClosedJaxpr(convert_constvars_jaxpr(jaxpr), ()),
+                        body_nconsts=len(consts),
+                        apply_reverse_transform=apply_reverse_transform,
+                    )
+                )
 
             elif isinstance(op, Cond):
                 jaxprs, consts = [], []
@@ -506,12 +480,14 @@ def trace_quantum_tape(
                 jaxprs2, combined_consts = initial_style_jaxprs_with_common_consts2(jaxprs, consts)
 
                 qreg = promise_actualize(qrp)
-                qrp2 = QRegPromise(bind_overwrite_classical_tracers(
-                    op,
-                    qcond_p.bind,
-                    *(op.in_classical_tracers + combined_consts + [qreg]),
-                    branch_jaxprs=jaxprs2,
-                ))
+                qrp2 = QRegPromise(
+                    bind_overwrite_classical_tracers(
+                        op,
+                        qcond_p.bind,
+                        *(op.in_classical_tracers + combined_consts + [qreg]),
+                        branch_jaxprs=jaxprs2,
+                    )
+                )
 
             elif isinstance(op, WhileLoop):
                 cond_trace = op.regions[0].trace
@@ -533,15 +509,17 @@ def trace_quantum_tape(
                     )
 
                 qreg = promise_actualize(qrp)
-                qrp2 = QRegPromise(bind_overwrite_classical_tracers(
-                    op,
-                    qwhile_p.bind,
-                    *(cond_consts + body_consts + op.in_classical_tracers + [qreg]),
-                    cond_jaxpr=ClosedJaxpr(convert_constvars_jaxpr(cond_jaxpr), ()),
-                    body_jaxpr=ClosedJaxpr(convert_constvars_jaxpr(body_jaxpr), ()),
-                    cond_nconsts=len(cond_consts),
-                    body_nconsts=len(body_consts),
-                ))
+                qrp2 = QRegPromise(
+                    bind_overwrite_classical_tracers(
+                        op,
+                        qwhile_p.bind,
+                        *(cond_consts + body_consts + op.in_classical_tracers + [qreg]),
+                        cond_jaxpr=ClosedJaxpr(convert_constvars_jaxpr(cond_jaxpr), ()),
+                        body_jaxpr=ClosedJaxpr(convert_constvars_jaxpr(body_jaxpr), ()),
+                        cond_nconsts=len(cond_consts),
+                        body_nconsts=len(body_consts),
+                    )
+                )
 
             elif isinstance(op, MidCircuitMeasure):
                 wire = op.in_classical_tracers[0]
@@ -592,10 +570,7 @@ def trace_quantum_tape(
 
 
 def trace_observables(
-    obs: Operation,
-    device,
-    qreg,
-    m_wires
+    obs: Operation, device, qreg, m_wires
 ) -> Tuple[List[DynamicJaxprTracer], List[DynamicJaxprTracer]]:
     wires = obs.wires if (obs and len(obs.wires) > 0) else m_wires
     qubits = [qextract(qreg, w) for w in wires]
@@ -819,7 +794,6 @@ def custom_lower_jaxpr_to_module(
     return ctx.module, ctx.context
 
 
-
 class QFunc:
     """A device specific quantum function.
 
@@ -882,7 +856,6 @@ class QFunc:
         retval = jprim.func_p.bind(wrapped, *args_data, fn=self)
 
         return tree_unflatten(retval_tree, retval)
-
 
 
 class QJITDevice(qml.QubitDevice):
@@ -1004,4 +977,3 @@ class QJITDevice(qml.QubitDevice):
 
         self.check_validity(expanded_tape.operations, [])
         return expanded_tape
-

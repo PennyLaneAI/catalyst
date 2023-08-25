@@ -36,8 +36,8 @@ from mlir_quantum.runtime import (
 )
 
 import catalyst
-from catalyst.jax_tracer import trace_to_mlir
 from catalyst.compiler import CompileOptions, Compiler
+from catalyst.jax_tracer import trace_to_mlir
 from catalyst.pennylane_extensions import QFunc
 from catalyst.utils import wrapper  # pylint: disable=no-name-in-module
 from catalyst.utils.c_template import get_template, mlir_type_to_numpy_type
