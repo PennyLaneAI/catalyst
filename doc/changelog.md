@@ -11,7 +11,27 @@
   The feature is based on the AutoGraph module from TensorFlow, and requires a working TensorFlow
   installation.
 
-  This example shows how existing control flow in Catalyst:
+  For example, the following can now be expressed much more succinctly using Python control flow:
+
+  ```python
+  @qjit(autograph=True)
+  @qml.qnode(qml.device("lightning.qubit", wires=n))
+  def f(x):
+
+    for i in range(n):
+      qml.Hadamard(i)
+
+      if x < 0.5:
+        y = jnp.sin(x)
+      else:
+        y = jnp.cos(x)
+
+      qml.RY(y, wires=i)
+
+    return qml.probs()
+  ```
+
+  , which previously would be expressed as:
 
   ```python
   @qjit
@@ -34,26 +54,6 @@
       qml.RY(y, wires=i)
 
     repeat()
-
-    return qml.probs()
-  ```
-
-  can now be expressed much more succinctly using Python control flow:
-
-  ```python
-  @qjit(autograph=True)
-  @qml.qnode(qml.device("lightning.qubit", wires=n))
-  def f(x):
-
-    for i in range(n):
-      qml.Hadamard(i)
-
-      if x < 0.5:
-        y = jnp.sin(x)
-      else:
-        y = jnp.cos(x)
-
-      qml.RY(y, wires=i)
 
     return qml.probs()
   ```
