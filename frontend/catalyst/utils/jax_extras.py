@@ -38,6 +38,7 @@ from typing import (
     Union,
     cast,
     overload,
+    Set
 )
 from weakref import ref
 
@@ -53,6 +54,8 @@ from jax._src.core import (
     Trace,
     _update_thread_local_jit_state,
     thread_local_state,
+    JaxprEqn,
+    Primitive as JaxprPrimitive
 )
 from jax._src.errors import (
     ConcretizationTypeError,
@@ -112,7 +115,8 @@ def new_main2(
             _update_thread_local_jit_state(stack.dynamic)
 
 
-def sort_eqns(eqns: List[JaxprEqn]) -> List[JaxprEqn]:
+def sort_eqns(eqns: List[JaxprEqn],
+              forced_order_primitives:Set[JaxprPrimitive]) -> List[JaxprEqn]:
     """Topologically sort JAXRR equations in a list, based on their input/output variables."""
 
     # FIXME: The functions might emit different correct results, depending on id(eqns). One need to
@@ -125,7 +129,7 @@ def sort_eqns(eqns: List[JaxprEqn]) -> List[JaxprEqn]:
             self.parents: Set["Box"] = {}
 
     boxes = [Box(e) for e in eqns]
-    qdevices = [(i, b) for (i, b) in enumerate(boxes) if b.e.primitive.name == "qdevice"]
+    qdevices = [(i, b) for (i, b) in enumerate(boxes) if b.e.primitive in forced_order_primitives]
     origin: Dict[int, Box] = {}
     for b in boxes:
         origin.update({ov.count: b for ov in b.e.outvars})

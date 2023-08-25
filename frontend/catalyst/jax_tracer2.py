@@ -103,7 +103,9 @@ from catalyst.jax_primitives import (
     qcond_p,
     qdealloc,
     qdevice,
+    qdevice_p,
     qextract,
+    qextract_p,
     qfor_p,
     qinsert,
     qinst,
@@ -129,6 +131,7 @@ from catalyst.utils.jax_extras import (
 )
 from catalyst.utils.tracing import TracingContext
 
+FORCED_ORDER_PRIMITIVES = {qdevice_p, qextract_p}
 
 class EvaluationMode(Enum):
     QJIT_QNODE = 0
@@ -198,7 +201,10 @@ class MainTracingContex:
     main: JaxMainTrace
     frames: Dict[DynamicJaxprTrace, JaxprStackFrame]
     mains: Dict[DynamicJaxprTrace, JaxMainTrace]
-    trace: Optional[DynamicJaxprTrace] = None
+    trace: Optional[DynamicJaxprTrace]
+
+    def __init__(self, main:JaxMainTrace):
+        self.main, self.frames, self.mains, self.trace = main, {}, {}, None
 
 
 TRACING_CONTEXT: Optional[MainTracingContex] = None
@@ -209,7 +215,7 @@ def main_tracing_context() -> ContextManager[MainTracingContex]:
     global TRACING_CONTEXT
     with new_base_main(DynamicJaxprTrace, dynamic=True) as main:
         main.jaxpr_stack = ()
-        TRACING_CONTEXT = ctx = MainTracingContex(main, {}, {})
+        TRACING_CONTEXT = ctx = MainTracingContex(main)
         try:
             yield ctx
         finally:
@@ -223,6 +229,54 @@ def get_main_tracing_context(hint=None) -> MainTracingContex:
     if TRACING_CONTEXT is None:
         raise CompileError(f"{hint} can only be used from within a qml.qnode.")
     return TRACING_CONTEXT
+
+
+@dataclass
+class QRegPromise:
+    base: DynamicJaxprTracer
+    cache: Dict[int, DynamicJaxprTracer]
+
+    def __init__(self, base):
+        self.base = base
+        self.cache = {}
+
+
+def promise_qextract(qrp: QRegPromise,
+                     wires:List[Any]) -> List[DynamicJaxprTracer]:
+    cached_tracers = set([w for w in qrp.cache.keys() if not isinstance(w, int)])
+    requested_tracers = set([w for w in wires if not isinstance(w, int)])
+    if cached_tracers != requested_tracers:
+        promise_actualize(qrp)
+    qubits = []
+    for w in wires:
+        if w in qrp.cache:
+            qubit = qrp.cache[w]
+            assert qubit is not None, \
+                f"Attempting to extract wire {w} from register {qrp.base} for the second time"
+            qubits.append(qubit)
+            qrp.cache[w] = None
+        else:
+            qubits.append(qextract(qrp.base, w))
+    return qubits
+
+
+def promise_qinsert(qrp: QRegPromise,
+                    wires,
+                    qubits) -> None:
+    assert len(wires)==len(qubits)
+    for w, qubit in zip(wires, qubits):
+        assert (w not in qrp.cache) or (qrp.cache[w] is None), \
+            f"Attempting to insert an already-inserted wire {w} into {qrp.base}"
+        qrp.cache[w] = qubit
+
+
+def promise_actualize(qrp: QRegPromise) -> DynamicJaxprTracer:
+    qreg = qrp.base
+    for w,qubit in qrp.cache.items():
+        qreg = qinsert(qreg, w, qubit)
+    qrp.cache = {}
+    qrp.base = qreg
+    return qreg
 
 
 @contextmanager
@@ -650,8 +704,8 @@ def trace_quantum_tape(
     tracers we can complete the set of tracers and finally emit the JAXPR of the whole quantum
     program."""
     # Notes:
-    # [1] - We are interested only in a new quantum tracer, so we ignore all others.
-    # [2] - HACK: We add alread existing classical tracers into the last JAX equation.
+    # [1] - We add alread existing classical tracers into the last JAX equation.
+    # [2] - We are interested in a new quantum tracer, so we ignore all others.
 
     def bind_overwrite_classical_tracers(op: HybridOp, binder, *args, **kwargs):
         """Binds the primitive `prim` but override the returned classical tracers with the already
@@ -659,12 +713,14 @@ def trace_quantum_tape(
         out_quantum_tracer = binder(*args, **kwargs)[-1]
         eqn = ctx.frames[trace].eqns[-1]
         assert (len(eqn.outvars) - 1) == len(op.out_classical_tracers)
-        for i, t in zip(range(len(eqn.outvars) - 1), op.out_classical_tracers):  # [2]
+        for i, t in zip(range(len(eqn.outvars) - 1), op.out_classical_tracers):  # [1]
             eqn.outvars[i] = trace.getvar(t)
-        return op.out_classical_tracers + [out_quantum_tracer]
+        return out_quantum_tracer # [2]
 
+    qrp = QRegPromise(qreg)
     for op in device.expand_fn(quantum_tape):
-        qreg2 = None
+        qreg = None
+        qrp2 = None
         if isinstance(op, HybridOp):
             if isinstance(op, ForLoop):
                 inner_trace = op.regions[0].trace
@@ -680,7 +736,8 @@ def trace_quantum_tape(
 
                 step = op.in_classical_tracers[2]
                 apply_reverse_transform = isinstance(step, int) and step < 0
-                qreg2 = bind_overwrite_classical_tracers(
+                qreg = promise_actualize(qrp)
+                qrp2 = QRegPromise(bind_overwrite_classical_tracers(
                     op,
                     qfor_p.bind,
                     op.in_classical_tracers[0],
@@ -690,9 +747,7 @@ def trace_quantum_tape(
                     body_jaxpr=ClosedJaxpr(convert_constvars_jaxpr(jaxpr), ()),
                     body_nconsts=len(consts),
                     apply_reverse_transform=apply_reverse_transform,
-                )[
-                    -1
-                ]  # [1]
+                ))
 
             elif isinstance(op, Cond):
                 jaxprs, consts = [], []
@@ -710,14 +765,13 @@ def trace_quantum_tape(
 
                 jaxprs2, combined_consts = initial_style_jaxprs_with_common_consts2(jaxprs, consts)
 
-                qreg2 = bind_overwrite_classical_tracers(
+                qreg = promise_actualize(qrp)
+                qrp2 = QRegPromise(bind_overwrite_classical_tracers(
                     op,
                     qcond_p.bind,
                     *(op.in_classical_tracers + combined_consts + [qreg]),
                     branch_jaxprs=jaxprs2,
-                )[
-                    -1
-                ]  # [1]
+                ))
 
             elif isinstance(op, WhileLoop):
                 cond_trace = op.regions[0].trace
@@ -738,7 +792,8 @@ def trace_quantum_tape(
                         res_classical_tracers + [qreg_out]
                     )
 
-                qreg2 = bind_overwrite_classical_tracers(
+                qreg = promise_actualize(qrp)
+                qrp2 = QRegPromise(bind_overwrite_classical_tracers(
                     op,
                     qwhile_p.bind,
                     *(cond_consts + body_consts + op.in_classical_tracers + [qreg]),
@@ -746,15 +801,14 @@ def trace_quantum_tape(
                     body_jaxpr=ClosedJaxpr(convert_constvars_jaxpr(body_jaxpr), ()),
                     cond_nconsts=len(cond_consts),
                     body_nconsts=len(body_consts),
-                )[
-                    -1
-                ]  # [1]
+                ))
 
             elif isinstance(op, MidCircuitMeasure):
                 wire = op.in_classical_tracers[0]
-                qubit = qextract(qreg, wire)
-                qubit2 = bind_overwrite_classical_tracers(op, qmeasure_p.bind, qubit)[-1]  # [1]
-                qreg2 = qinsert(qreg, wire, qubit2)
+                qubit = promise_qextract(qrp, [wire])[0]
+                qubit2 = bind_overwrite_classical_tracers(op, qmeasure_p.bind, qubit)
+                promise_qinsert(qrp, [wire], [qubit2])
+                qrp2 = qrp
 
             elif isinstance(op, Adjoint):
                 body_trace = op.regions[0].trace
@@ -767,33 +821,33 @@ def trace_quantum_tape(
                         res_classical_tracers + [qreg_out]
                     )
 
+                qreg = promise_actualize(qrp)
                 args, args_tree = tree_flatten((body_consts, op.in_classical_tracers, [qreg]))
                 op_results = adjoint_p.bind(
                     *args,
                     args_tree=args_tree,
                     jaxpr=ClosedJaxpr(convert_constvars_jaxpr(body_jaxpr), ()),
                 )
-                qreg2 = op_results[0]
+                qrp2 = QRegPromise(op_results[0])
             else:
                 raise NotImplementedError(f"{op=}")
         else:
             if isinstance(op, MeasurementProcess):
-                qreg2 = qreg
+                qrp2 = qrp
             else:
-                qubits = [qextract(qreg, wire) for wire in op.wires]
+                qubits = promise_qextract(qrp, op.wires)
                 if isinstance(op, QubitUnitary):
                     qubits2 = qunitary(*[*op.parameters, *qubits])
                 else:
                     qubits2 = qinst(op.name, len(qubits), *qubits, *op.parameters)
-                # FIXME: Port the qubit-state caching logic from the original tracer
-                qreg2 = qreg
-                for wire, qubit2 in zip(op.wires, qubits2):
-                    qreg2 = qinsert(qreg2, wire, qubit2)
+                promise_qinsert(qrp, op.wires, qubits2)
+                qrp2 = qrp
 
-        assert qreg2 is not None
-        qreg = qreg2
+        assert qrp2 is not None
+        qrp = qrp2
 
-    ctx.frames[trace].eqns = sort_eqns(ctx.frames[trace].eqns)
+    qreg = promise_actualize(qrp)
+    ctx.frames[trace].eqns = sort_eqns(ctx.frames[trace].eqns, FORCED_ORDER_PRIMITIVES)
     return qreg
 
 
