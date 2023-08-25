@@ -36,7 +36,7 @@ from mlir_quantum.runtime import (
 )
 
 import catalyst
-import catalyst.jax_tracer as tracer
+from catalyst.jax_tracer import trace_to_mlir
 from catalyst.compiler import CompileOptions, Compiler
 from catalyst.pennylane_extensions import QFunc
 from catalyst.utils import wrapper  # pylint: disable=no-name-in-module
@@ -522,7 +522,7 @@ class QJIT:
         with Patcher(
             (qml.QNode, "__call__", QFunc.__call__),
         ):
-            mlir_module, ctx, jaxpr, self.shape = tracer.get_mlir(self.qfunc, *self.c_sig)
+            mlir_module, ctx, jaxpr, self.shape = trace_to_mlir(self.qfunc, *self.c_sig)
 
         inject_functions(mlir_module, ctx)
         mod = mlir_module.operation
