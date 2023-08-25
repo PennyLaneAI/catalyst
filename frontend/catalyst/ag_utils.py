@@ -35,7 +35,7 @@ def _test_ag_import():
     except ImportError as e:
         raise ImportError(
             "The AutoGraph feature in Catalyst requires TensorFlow. "
-            "Please install it (e.g. `pip install tensorflow-cpu`) and make it sure is "
+            "Please install TensorFlow (https://www.tensorflow.org/install) and ensure it is "
             "available in the current environment."
         ) from e
 
