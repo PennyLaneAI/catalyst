@@ -150,7 +150,7 @@ void _catalyst_pyface_jit_cpp_exception_test(void*, void*) {
         def cpp_exception_test():
             return None
 
-        cpp_exception_test._compiler = MockCompiler(cpp_exception_test._compiler.options)
+        cpp_exception_test.compiler = MockCompiler(cpp_exception_test.compiler.options)
         cpp_exception_test.compile(inplace=True)
 
         with pytest.raises(RuntimeError, match="Hello world"):
