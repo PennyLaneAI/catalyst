@@ -557,7 +557,7 @@ class QJIT:
             # Since we don't know the name of the original function when compiling from IR
             # (without parsing the IR), assume the name is something that can't be parsed
             # in python as a valid identifier, but is a valid MLIR identifier.
-            module_name = "catalyst.module"
+            module_name = "catalyst_module"
             shared_object, llvm_ir, inferred_func_data = self.compiler.run_from_ir(
                 self.user_function, module_name
             )

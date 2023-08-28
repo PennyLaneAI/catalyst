@@ -129,7 +129,7 @@ FailureOr<llvm::Function *> getJITFunction(MLIRContext *ctx, llvm::Module &llvmM
     Location loc = NameLoc::get(StringAttr::get(ctx, llvmModule.getName()));
     for (auto &function : llvmModule.functions()) {
         emitRemark(loc) << "Found LLVM function: " << function.getName() << "\n";
-        if (function.getName().starts_with("jit_")) {
+        if (function.getName().starts_with("catalyst.entry_point")) {
             return &function;
         }
     }
