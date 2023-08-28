@@ -84,7 +84,7 @@ from catalyst.utils.jax_extras import (
     jaxpr_to_mlir
 )
 from catalyst.utils.patching import Patcher
-from catalyst.utils.tracing import MainTracingContext, EvaluationContext, EvaluationMode
+from catalyst.utils.tracing import JaxTracingContext, EvaluationContext, EvaluationMode
 
 
 class Function:
@@ -260,7 +260,7 @@ def trace_quantum_tape(
     quantum_tape: QuantumTape,
     device: QubitDevice,
     qreg: DynamicJaxprTracer,
-    ctx: MainTracingContext,
+    ctx: JaxTracingContext,
     trace: DynamicJaxprTrace,
 ) -> DynamicJaxprTracer:
     """Recursively trace the nested `quantum_tape` and produce the quantum tracers. With quantum
@@ -447,7 +447,7 @@ def trace_quantum_measurements(
     quantum_tape,
     device: QubitDevice,
     qreg: DynamicJaxprTracer,
-    ctx: MainTracingContext,
+    ctx: JaxTracingContext,
     trace: DynamicJaxprTrace,
     outputs: List[Union[MeasurementProcess, DynamicJaxprTracer, Any]],
     out_tree,

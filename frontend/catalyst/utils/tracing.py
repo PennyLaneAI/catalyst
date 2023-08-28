@@ -48,7 +48,7 @@ class EvaluationMode(Enum):
 
 
 @dataclass
-class MainTracingContext:
+class JaxTracingContext:
     main: JaxMainTrace
     frames: Dict[DynamicJaxprTrace, JaxprStackFrame]
     mains: Dict[DynamicJaxprTrace, JaxMainTrace]
@@ -64,7 +64,7 @@ class EvaluationContext:
     It is used to determine whether the program is currently tracing or not.
     """
 
-    _tracing_stack:List[Tuple[EvaluationMode, Optional[MainTracingContext]]] = []
+    _tracing_stack:List[Tuple[EvaluationMode, Optional[JaxTracingContext]]] = []
 
     def __init__(self, mode:EvaluationMode):
         self.mode = mode
@@ -72,10 +72,10 @@ class EvaluationContext:
 
     @classmethod
     @contextmanager
-    def create_tracing_context(cls, mode) -> ContextManager[MainTracingContext]:
+    def create_tracing_context(cls, mode) -> ContextManager[JaxTracingContext]:
         with new_base_main(DynamicJaxprTrace, dynamic=True) as main:
             main.jaxpr_stack = ()
-            cls._tracing_stack.append((mode, MainTracingContext(main)))
+            cls._tracing_stack.append((mode, JaxTracingContext(main)))
             try:
                 yield cls._tracing_stack[-1][1]
             finally:
@@ -83,7 +83,7 @@ class EvaluationContext:
 
     @classmethod
     @contextmanager
-    def create_interpretation_context(cls) -> ContextManager[MainTracingContext]:
+    def create_interpretation_context(cls) -> ContextManager[JaxTracingContext]:
         cls._tracing_stack.append((EvaluationMode.INTERPRETATION, None))
         try:
             yield cls._tracing_stack[-1][1]
@@ -93,7 +93,7 @@ class EvaluationContext:
     @classmethod
     @contextmanager
     def frame_tracing_context(
-        cls, ctx:MainTracingContext, trace: Optional[DynamicJaxprTrace] = None
+        cls, ctx:JaxTracingContext, trace: Optional[DynamicJaxprTrace] = None
     ) -> ContextManager[DynamicJaxprTrace]:
         assert ctx is cls._tracing_stack[-1][1], f"{ctx=}"
         main = ctx.mains[trace] if trace is not None else None
@@ -111,8 +111,8 @@ class EvaluationContext:
                     ctx.trace = parent_trace
 
     @classmethod
-    def get_main_tracing_context(cls, hint=None) -> MainTracingContext:
-        """Checks a number of tracing conditions and return the MainTracingContext"""
+    def get_main_tracing_context(cls, hint=None) -> JaxTracingContext:
+        """Checks a number of tracing conditions and return the JaxTracingContext"""
         msg = f"{hint or 'catalyst functions'} can only be used from within @qjit decorated code."
         EvaluationContext.check_is_tracing(msg)
         return cls._tracing_stack[-1][1]

@@ -100,7 +100,7 @@ from catalyst.jax_tracer import (
     Function,
     HybridOp,
     HybridOpRegion,
-    MainTracingContext,
+    JaxTracingContext,
     MidCircuitMeasure,
     QFunc,
     QJITDevice,
@@ -120,7 +120,7 @@ from catalyst.utils.jax_extras import (
     new_main2,
     sort_eqns,
 )
-from catalyst.utils.tracing import (EvaluationMode, EvaluationContext, MainTracingContext)
+from catalyst.utils.tracing import (EvaluationMode, EvaluationContext, JaxTracingContext)
 
 # pylint: disable=too-many-lines
 
@@ -666,7 +666,7 @@ def cond(pred: DynamicJaxprTracer):
 def for_loop(lower_bound, upper_bound, step):
     def _body_query(body_fn):
         def _call_handler(*init_state):
-            def _call_with_quantum_ctx(ctx: MainTracingContext):
+            def _call_with_quantum_ctx(ctx: JaxTracingContext):
                 quantum_tape = QuantumTape()
                 outer_trace = ctx.trace
                 with EvaluationContext.frame_tracing_context(ctx) as inner_trace:
@@ -746,7 +746,7 @@ def for_loop(lower_bound, upper_bound, step):
 def while_loop(cond_fn):
     def _body_query(body_fn):
         def _call_handler(*init_state):
-            def _call_with_quantum_ctx(ctx: MainTracingContext):
+            def _call_with_quantum_ctx(ctx: JaxTracingContext):
                 outer_trace = ctx.trace
                 in_classical_tracers, in_tree = tree_flatten(init_state)
 
