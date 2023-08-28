@@ -412,13 +412,9 @@ def trace_quantum_tape(
 
     qrp = QRegPromise(qreg)
     for op in device.expand_fn(quantum_tape):
-        qreg = None
         qrp2 = None
         if isinstance(op, HybridOp):
-            if isinstance(op, (Adjoint, ForLoop, MidCircuitMeasure, Cond, WhileLoop)):
-                qrp2 = op.trace(ctx, device, trace, qrp)
-            else:
-                raise NotImplementedError(f"{op=}")
+            qrp2 = op.trace(ctx, device, trace, qrp)
         else:
             if isinstance(op, MeasurementProcess):
                 qrp2 = qrp
