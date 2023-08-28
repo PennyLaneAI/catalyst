@@ -57,28 +57,53 @@ from typing import (
 from weakref import ref
 
 import numpy as np
-from jax._src import (state, util)
+from jax._src import state, util
+from jax._src.api_util import flatten_fun, shaped_abstractify
 from jax._src.config import FLAGS, config
+from jax._src.core import ClosedJaxpr, Jaxpr, JaxprEqn, MainTrace
+from jax._src.core import Primitive as JaxprPrimitive
 from jax._src.core import (
-    ShapedArray, Trace, _update_thread_local_jit_state, thread_local_state,
-    ClosedJaxpr, Jaxpr, JaxprEqn, MainTrace, Primitive as JaxprPrimitive,
-    gensym
+    ShapedArray,
+    Trace,
+    _update_thread_local_jit_state,
+    gensym,
+    thread_local_state,
 )
+from jax._src.dispatch import jaxpr_replicas
 from jax._src.errors import (
     ConcretizationTypeError,
     TracerArrayConversionError,
     TracerIntegerConversionError,
     UnexpectedTracerError,
 )
+from jax._src.interpreters.mlir import (
+    AxisContext,
+    ModuleContext,
+    _module_name_regex,
+    ir,
+    lower_jaxpr_to_fun,
+    lowerable_effects,
+)
 from jax._src.interpreters.partial_eval import (
     DynamicJaxprTracer,
     _input_type_to_tracers,
-    make_jaxpr_effects,
     convert_constvars_jaxpr,
+    make_jaxpr_effects,
 )
-from jax._src.lax.control_flow import (_initial_style_jaxpr, _initial_style_open_jaxpr)
-from jax._src.lax.lax import _abstractify
+from jax._src.lax.control_flow import _initial_style_jaxpr, _initial_style_open_jaxpr
+from jax._src.lax.lax import _abstractify, xb, xla
 from jax._src.lib import jax_jit
+from jax._src.linear_util import annotate, wrap_init
+from jax._src.sharding_impls import ReplicaAxisContext
+from jax._src.source_info_util import current as jax_current
+from jax._src.source_info_util import new_name_stack, reset_name_stack
+from jax._src.tree_util import (
+    PyTreeDef,
+    tree_flatten,
+    tree_structure,
+    tree_unflatten,
+    treedef_is_leaf,
+)
 from jax._src.typing import Array, DimSize, Shape
 from jax._src.util import (
     HashableFunction,
@@ -95,34 +120,6 @@ from jax._src.util import (
     unzip3,
     weakref_lru_cache,
     wrap_name,
-)
-
-from jax._src.linear_util import (wrap_init, annotate)
-from jax._src.tree_util import (
-    PyTreeDef,
-    tree_flatten,
-    tree_structure,
-    tree_unflatten,
-    treedef_is_leaf,
-)
-from jax._src.api_util import (
-    flatten_fun,
-    shaped_abstractify,
-)
-
-from jax._src.sharding_impls import (
-    ReplicaAxisContext,
-)
-from jax._src.dispatch import jaxpr_replicas
-from jax._src.lax.lax import xb, xla
-from jax._src.source_info_util import (reset_name_stack, new_name_stack, current as jax_current)
-from jax._src.interpreters.mlir import (
-    _module_name_regex,
-    AxisContext,
-    ModuleContext,
-    ir,
-    lower_jaxpr_to_fun,
-    lowerable_effects,
 )
 
 map, unsafe_map = safe_map, map
@@ -268,7 +265,6 @@ def deduce_avals(f: Callable, args, kwargs):
     return wffa, in_avals, out_tree_promise
 
 
-
 def jaxpr_to_mlir(func_name, jaxpr, shape):
     """Lower a Python function into an MLIR module.
 
@@ -382,4 +378,3 @@ def custom_lower_jaxpr_to_module(
             op.attributes["llvm.linkage"] = ir.Attribute.parse("#llvm.linkage<internal>")
 
     return ctx.module, ctx.context
-

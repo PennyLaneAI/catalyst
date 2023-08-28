@@ -120,7 +120,7 @@ from catalyst.utils.jax_extras import (
     new_main2,
     sort_eqns,
 )
-from catalyst.utils.tracing import (EvaluationMode, EvaluationContext, JaxTracingContext)
+from catalyst.utils.tracing import EvaluationContext, EvaluationMode, JaxTracingContext
 
 # pylint: disable=too-many-lines
 
@@ -830,10 +830,10 @@ def while_loop(cond_fn):
 
 
 def measure(wires) -> DynamicJaxprTracer:
-    EvaluationContext.check_is_tracing(
-        "catalyst.measure can only be used from within @qjit.")
+    EvaluationContext.check_is_tracing("catalyst.measure can only be used from within @qjit.")
     EvaluationContext.check_is_quantum_tracing(
-        "catalyst.measure can only be used from within a qml.qnode.")
+        "catalyst.measure can only be used from within a qml.qnode."
+    )
     ctx = EvaluationContext.get_main_tracing_context()
     wires = list(wires) if isinstance(wires, (list, tuple)) else [wires]
     if len(wires) != 1:
@@ -849,7 +849,8 @@ def measure(wires) -> DynamicJaxprTracer:
 def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
     def _call_handler(*args, _callee: Callable, **kwargs):
         EvaluationContext.check_is_quantum_tracing(
-            "catalyst.adjoint can only be used from within a qml.qnode.")
+            "catalyst.adjoint can only be used from within a qml.qnode."
+        )
         ctx = EvaluationContext.get_main_tracing_context()
         with EvaluationContext.frame_tracing_context(ctx) as inner_trace:
             in_classical_tracers, _ = tree_flatten((args, kwargs))

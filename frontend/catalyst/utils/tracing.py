@@ -16,30 +16,26 @@
 Tracing module.
 """
 
-from typing import Any, Callable, ContextManager, Dict, List, Optional, Tuple, Union
-from catalyst.utils.exceptions import CompileError
-from enum import Enum
 from contextlib import contextmanager
 from dataclasses import dataclass
+from enum import Enum
+from typing import Any, Callable, ContextManager, Dict, List, Optional, Tuple, Union
 
-from jax._src.core import (
-    cur_sublevel,
-    new_base_main,
-    ClosedJaxpr,
-    JaxprEqn,
-    MainTrace as JaxMainTrace,
-    ShapedArray,
-)
+from jax._src.core import ClosedJaxpr, JaxprEqn
+from jax._src.core import MainTrace as JaxMainTrace
+from jax._src.core import ShapedArray, cur_sublevel, new_base_main
 from jax._src.interpreters.partial_eval import (
     DynamicJaxprTrace,
     DynamicJaxprTracer,
     JaxprStackFrame,
     extend_jaxpr_stack,
 )
-from catalyst.utils.jax_extras import (
-    new_main2,
-)
-from jax._src.source_info_util import (reset_name_stack, current as jax_current)
+from jax._src.source_info_util import current as jax_current
+from jax._src.source_info_util import reset_name_stack
+
+from catalyst.utils.exceptions import CompileError
+from catalyst.utils.jax_extras import new_main2
+
 
 class EvaluationMode(Enum):
     INTERPRETATION = 0
@@ -64,9 +60,9 @@ class EvaluationContext:
     It is used to determine whether the program is currently tracing or not.
     """
 
-    _tracing_stack:List[Tuple[EvaluationMode, Optional[JaxTracingContext]]] = []
+    _tracing_stack: List[Tuple[EvaluationMode, Optional[JaxTracingContext]]] = []
 
-    def __init__(self, mode:EvaluationMode):
+    def __init__(self, mode: EvaluationMode):
         self.mode = mode
         self.ctx = None
 
@@ -93,7 +89,7 @@ class EvaluationContext:
     @classmethod
     @contextmanager
     def frame_tracing_context(
-        cls, ctx:JaxTracingContext, trace: Optional[DynamicJaxprTrace] = None
+        cls, ctx: JaxTracingContext, trace: Optional[DynamicJaxprTrace] = None
     ) -> ContextManager[DynamicJaxprTrace]:
         assert ctx is cls._tracing_stack[-1][1], f"{ctx=}"
         main = ctx.mains[trace] if trace is not None else None
@@ -143,8 +139,10 @@ class EvaluationContext:
         """Returns true or false depending on whether the execution is currently being
         traced.
         """
-        return cls.get_mode() in [EvaluationMode.CLASSICAL_COMPILATION,
-                                  EvaluationMode.QUANTUM_COMPILATION]
+        return cls.get_mode() in [
+            EvaluationMode.CLASSICAL_COMPILATION,
+            EvaluationMode.QUANTUM_COMPILATION,
+        ]
 
     @classmethod
     def check_modes(cls, modes, msg):
@@ -165,8 +163,9 @@ class EvaluationContext:
 
     @classmethod
     def check_is_tracing(cls, msg):
-        cls.check_modes([EvaluationMode.CLASSICAL_COMPILATION,
-                        EvaluationMode.QUANTUM_COMPILATION], msg)
+        cls.check_modes(
+            [EvaluationMode.CLASSICAL_COMPILATION, EvaluationMode.QUANTUM_COMPILATION], msg
+        )
 
     @classmethod
     def check_is_not_tracing(cls, msg):
@@ -176,4 +175,3 @@ class EvaluationContext:
         """
         if cls.is_tracing():
             raise CompileError(msg)
-
