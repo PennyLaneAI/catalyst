@@ -30,6 +30,7 @@ from typing import Any, List, Optional
 from mlir_quantum.compiler_driver._catalystDriver import run_compiler_driver
 
 from catalyst._configuration import INSTALLED
+from catalyst.utils.exceptions import CompileError
 
 package_root = os.path.dirname(__file__)
 
@@ -250,12 +251,12 @@ class LinkerDriver:
             command = [compiler] + flags + [infile, "-o", outfile]
             run_writing_command(command, options)
             return True
-        except subprocess.CalledProcessError:
-            msg = (
-                f"Compiler {compiler} failed during execution of command {command}. "
-                "Will attempt fallback on available compilers."
-            )
-            warnings.warn(msg, UserWarning)
+        except subprocess.CalledProcessError as e:
+            # Only warn in verbose mode, as users might see it otherwise in regular use.
+            if options.verbose:
+                msg = f"Compiler {compiler} failed to link executable and returned with exit code "
+                msg += f"{e.returncode}. Output was: {e.output}.\nCommand: {command}"
+                warnings.warn(msg, UserWarning)
             return False
 
     @staticmethod
@@ -291,13 +292,15 @@ class LinkerDriver:
             flags = LinkerDriver.get_default_flags()
         if fallback_compilers is None:
             fallback_compilers = LinkerDriver._default_fallback_compilers
+        if options is None:
+            options = CompileOptions()
         for compiler in LinkerDriver._available_compilers(fallback_compilers):
             success = LinkerDriver._attempt_link(compiler, flags, infile, outfile, options)
             if success:
                 return outfile
-        msg = f"Unable to link {infile}. All available compiler options exhausted. "
-        msg += "Please provide a compatible compiler via $CATALYST_CC."
-        raise EnvironmentError(msg)
+        msg = f"Unable to link {infile}. Please check the output for any error messages. If no "
+        msg += "compiler was found by Catalyst, please specify a compatible one via $CATALYST_CC."
+        raise CompileError(msg)
 
 
 class Compiler:
