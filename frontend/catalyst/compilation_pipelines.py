@@ -550,6 +550,8 @@ class QJIT:
 
     def compile(self, inplace=False):
         """Compile the current MLIR module."""
+        if self.compiled_function and self.compiled_function.shared_object:
+            self.compiled_function.shared_object.close()
 
         if self.compiling_from_textual_ir:
             # Since we don't know the name of the original function when compiling from IR
