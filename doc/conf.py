@@ -90,7 +90,7 @@ MOCK_MODULES = [
     "mlir_quantum.dialects.scf",
     "mlir_quantum.dialects.quantum",
     "mlir_quantum.dialects.gradient",
-    "mlir_quantum._mlir_libs._catalystDriver",
+    "mlir_quantum.compiler_driver._catalystDriver",
     "pybind11",
 ]
 
