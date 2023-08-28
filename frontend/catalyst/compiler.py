@@ -27,9 +27,8 @@ from dataclasses import dataclass
 from io import TextIOWrapper
 from typing import Any, List, Optional
 
-from mlir_quantum.compiler_driver._catalystDriver import run_compiler_driver
-
 from catalyst._configuration import INSTALLED
+from mlir_quantum.compiler_driver._catalystDriver import run_compiler_driver
 
 package_root = os.path.dirname(__file__)
 
@@ -78,13 +77,6 @@ default_lib_paths = {
     "runtime": os.path.join(package_root, "../../runtime/build/lib"),
     "enzyme": os.path.join(package_root, "../../mlir/Enzyme/build/Enzyme"),
 }
-
-
-def get_executable_path(project, tool):
-    """Get path to executable."""
-    path = os.path.join(package_root, "bin") if INSTALLED else default_bin_paths.get(project, "")
-    executable_path = os.path.join(path, tool)
-    return executable_path if os.path.exists(executable_path) else tool
 
 
 def get_lib_path(project, env_var):
