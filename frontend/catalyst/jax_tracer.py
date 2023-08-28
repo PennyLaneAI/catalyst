@@ -81,7 +81,8 @@ from catalyst.utils.jax_extras import (
     initial_style_jaxprs_with_common_consts2,
     sort_eqns,
     deduce_avals,
-    jaxpr_to_mlir
+    jaxpr_to_mlir,
+    JaxprPrimitive
 )
 from catalyst.utils.patching import Patcher
 from catalyst.utils.tracing import JaxTracingContext, EvaluationContext, EvaluationMode
@@ -183,12 +184,12 @@ class HybridOpRegion:
     arg_classical_tracers: List[DynamicJaxprTracer]
     res_classical_tracers: List[DynamicJaxprTracer]
 
-
 class HybridOp(Operation):
     """A model of an operation carrying nested quantum region. Simplified analog of
     catalyst.ForLoop, catalyst.WhileLoop, catalyst.Adjoin, etc"""
 
     num_wires = AnyWires
+    binder:JaxprPrimitive = None
 
     def __init__(self, in_classical_tracers, out_classical_tracers, regions: List[HybridOpRegion]):
         self.in_classical_tracers = in_classical_tracers
@@ -201,6 +202,22 @@ class HybridOp(Operation):
         return f"{self.name}(tapes={[r.quantum_tape.operations for r in self.regions]})"
 
 
+    def bind_overwrite_classical_tracers(self, ctx:JaxTracingContext, trace:DynamicJaxprTrace,
+                                         *args, **kwargs) -> DynamicJaxprTracer:
+        """Binds the JAX primitive but override the returned classical tracers with the already
+        existing output tracers, stored in the operations."""
+        # Notes:
+        # [1] - We add alread existing classical tracers into the last JAX equation.
+        # [2] - We are interested in a new quantum tracer, so we ignore all others.
+        assert self.binder is not None, "HybridOp should set a binder"
+        out_quantum_tracer = self.binder(*args, **kwargs)[-1]
+        eqn = ctx.frames[trace].eqns[-1]
+        assert (len(eqn.outvars) - 1) == len(self.out_classical_tracers)
+        for i, t in zip(range(len(eqn.outvars) - 1), self.out_classical_tracers):  # [1]
+            eqn.outvars[i] = trace.getvar(t)
+        return out_quantum_tracer # [2]
+
+
 def has_nested_tapes(op: Operation) -> bool:
     return (
         isinstance(op, HybridOp)
@@ -210,23 +227,23 @@ def has_nested_tapes(op: Operation) -> bool:
 
 
 class ForLoop(HybridOp):
-    pass
+    binder = qfor_p.bind
 
 
 class MidCircuitMeasure(HybridOp):
-    pass
+    binder = qmeasure_p.bind
 
 
 class Cond(HybridOp):
-    pass
+    binder = qcond_p.bind
 
 
 class WhileLoop(HybridOp):
-    pass
+    binder = qwhile_p.bind
 
 
 class Adjoint(HybridOp):
-    pass
+    binder = adjoint_p.bind
 
 
 def trace_to_mlir(func, *args, **kwargs):
@@ -266,19 +283,6 @@ def trace_quantum_tape(
     """Recursively trace the nested `quantum_tape` and produce the quantum tracers. With quantum
     tracers we can complete the set of tracers and finally emit the JAXPR of the whole quantum
     program."""
-    # Notes:
-    # [1] - We add alread existing classical tracers into the last JAX equation.
-    # [2] - We are interested in a new quantum tracer, so we ignore all others.
-
-    def bind_overwrite_classical_tracers(op: HybridOp, binder, *args, **kwargs):
-        """Binds the primitive `prim` but override the returned classical tracers with the already
-        existing output tracers of the operation `op`."""
-        out_quantum_tracer = binder(*args, **kwargs)[-1]
-        eqn = ctx.frames[trace].eqns[-1]
-        assert (len(eqn.outvars) - 1) == len(op.out_classical_tracers)
-        for i, t in zip(range(len(eqn.outvars) - 1), op.out_classical_tracers):  # [1]
-            eqn.outvars[i] = trace.getvar(t)
-        return out_quantum_tracer  # [2]
 
     qrp = QRegPromise(qreg)
     for op in device.expand_fn(quantum_tape):
@@ -301,9 +305,8 @@ def trace_quantum_tape(
                 apply_reverse_transform = isinstance(step, int) and step < 0
                 qreg = promise_actualize(qrp)
                 qrp2 = QRegPromise(
-                    bind_overwrite_classical_tracers(
-                        op,
-                        qfor_p.bind,
+                    op.bind_overwrite_classical_tracers(
+                        ctx, trace,
                         op.in_classical_tracers[0],
                         op.in_classical_tracers[1],
                         step,
@@ -332,9 +335,8 @@ def trace_quantum_tape(
 
                 qreg = promise_actualize(qrp)
                 qrp2 = QRegPromise(
-                    bind_overwrite_classical_tracers(
-                        op,
-                        qcond_p.bind,
+                    op.bind_overwrite_classical_tracers(
+                        ctx, trace,
                         *(op.in_classical_tracers + combined_consts + [qreg]),
                         branch_jaxprs=jaxprs2,
                     )
@@ -361,9 +363,8 @@ def trace_quantum_tape(
 
                 qreg = promise_actualize(qrp)
                 qrp2 = QRegPromise(
-                    bind_overwrite_classical_tracers(
-                        op,
-                        qwhile_p.bind,
+                    op.bind_overwrite_classical_tracers(
+                        ctx, trace,
                         *(cond_consts + body_consts + op.in_classical_tracers + [qreg]),
                         cond_jaxpr=ClosedJaxpr(convert_constvars_jaxpr(cond_jaxpr), ()),
                         body_jaxpr=ClosedJaxpr(convert_constvars_jaxpr(body_jaxpr), ()),
@@ -375,7 +376,7 @@ def trace_quantum_tape(
             elif isinstance(op, MidCircuitMeasure):
                 wire = op.in_classical_tracers[0]
                 qubit = promise_qextract(qrp, [wire])[0]
-                qubit2 = bind_overwrite_classical_tracers(op, qmeasure_p.bind, qubit)
+                qubit2 = op.bind_overwrite_classical_tracers(ctx, trace, qubit)
                 promise_qinsert(qrp, [wire], [qubit2])
                 qrp2 = qrp
 
