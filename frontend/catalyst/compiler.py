@@ -25,7 +25,7 @@ import tempfile
 import warnings
 from dataclasses import dataclass
 from io import TextIOWrapper
-from typing import List, Optional, Any
+from typing import Any, List, Optional
 
 from mlir_quantum.compiler_driver._catalystDriver import run_compiler_driver
 
