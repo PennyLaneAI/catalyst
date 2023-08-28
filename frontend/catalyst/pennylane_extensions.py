@@ -120,7 +120,7 @@ from catalyst.utils.jax_extras import (
     new_main2,
     sort_eqns,
 )
-from catalyst.utils.tracing import (EvaluationMode, TracingContext, MainTracingContext)
+from catalyst.utils.tracing import (EvaluationMode, EvaluationContext, MainTracingContext)
 
 # pylint: disable=too-many-lines
 
@@ -289,7 +289,7 @@ class Grad:
         Args:
             args: the arguments to the differentiated function
         """
-        TracingContext.check_is_tracing(
+        EvaluationContext.check_is_tracing(
             "catalyst.grad can only be used from within @qjit decorated code."
         )
         jaxpr = _make_jaxpr_check_differentiable(self.fn, self.grad_params, *args)
@@ -434,7 +434,7 @@ def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=
     >>> workflow(params, dy)
     [array(0.78766064), array(-0.7011436)]
     """
-    TracingContext.check_is_tracing(
+    EvaluationContext.check_is_tracing(
         "catalyst.jvp can only be used from within @qjit decorated code."
     )
 
@@ -493,7 +493,7 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
     [array([0.09983342, 0.04      , 0.02      ]),
     array([-0.43750208,  0.07000001])]
     """
-    TracingContext.check_is_tracing(
+    EvaluationContext.check_is_tracing(
         "catalyst.vjp can only be used from within @qjit decorated code."
     )
 
@@ -511,7 +511,7 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
 
 
 # def get_evaluation_mode() -> Tuple[EvaluationMode, Any]:
-#     is_tracing = TracingContext.is_tracing()
+#     is_tracing = EvaluationContext.is_tracing()
 #     if is_tracing:
 #         ctx = qml.QueuingManager.active_context()
 #         if ctx is not None:
@@ -611,7 +611,7 @@ class CondCallable:
         out_trees, out_avals = [], []
         for branch in self.branch_fns + [self.otherwise_fn]:
             quantum_tape = QuantumTape()
-            with TracingContext.frame_tracing_context(ctx) as inner_trace:
+            with EvaluationContext.frame_tracing_context(ctx) as inner_trace:
                 wffa, in_avals, out_tree = deduce_avals(branch, [], {})
                 with QueuingManager.stop_recording(), quantum_tape:
                     res_classical_tracers = [inner_trace.full_raise(t) for t in wffa.call_wrapped()]
@@ -644,7 +644,7 @@ class CondCallable:
         return self.otherwise_fn()
 
     def __call__(self):
-        mode, ctx = TracingContext.get_evaluation_mode()
+        mode, ctx = EvaluationContext.get_evaluation_mode()
         if mode == EvaluationMode.QUANTUM_COMPILATION:
             return self._call_with_quantum_ctx(ctx)
         elif mode == EvaluationMode.CLASSICAL_COMPILATION:
@@ -669,7 +669,7 @@ def for_loop(lower_bound, upper_bound, step):
             def _call_with_quantum_ctx(ctx: MainTracingContext):
                 quantum_tape = QuantumTape()
                 outer_trace = ctx.trace
-                with TracingContext.frame_tracing_context(ctx) as inner_trace:
+                with EvaluationContext.frame_tracing_context(ctx) as inner_trace:
                     in_classical_tracers = [
                         lower_bound,
                         upper_bound,
@@ -729,7 +729,7 @@ def for_loop(lower_bound, upper_bound, step):
                     args = fn_res if len(args) > 1 else (fn_res,) if len(args) == 1 else ()
                 return fn_res
 
-            mode, ctx = TracingContext.get_evaluation_mode()
+            mode, ctx = EvaluationContext.get_evaluation_mode()
             if mode == EvaluationMode.QUANTUM_COMPILATION:
                 return _call_with_quantum_ctx(ctx)
             elif mode == EvaluationMode.CLASSICAL_COMPILATION:
@@ -750,7 +750,7 @@ def while_loop(cond_fn):
                 outer_trace = ctx.trace
                 in_classical_tracers, in_tree = tree_flatten(init_state)
 
-                with TracingContext.frame_tracing_context(ctx) as cond_trace:
+                with EvaluationContext.frame_tracing_context(ctx) as cond_trace:
                     cond_wffa, cond_in_avals, cond_tree = deduce_avals(cond_fn, init_state, {})
                     arg_classical_tracers = _input_type_to_tracers(
                         cond_trace.new_arg, cond_in_avals
@@ -767,7 +767,7 @@ def while_loop(cond_fn):
                     cond_tree(), res_classical_tracers, hint="Condition return value"
                 )
 
-                with TracingContext.frame_tracing_context(ctx) as body_trace:
+                with EvaluationContext.frame_tracing_context(ctx) as body_trace:
                     wffa, in_avals, body_tree = deduce_avals(body_fn, init_state, {})
                     arg_classical_tracers = _input_type_to_tracers(body_trace.new_arg, in_avals)
                     quantum_tape = QuantumTape()
@@ -815,7 +815,7 @@ def while_loop(cond_fn):
                     args = fn_res if len(args) > 1 else (fn_res,) if len(args) == 1 else ()
                 return fn_res
 
-            mode, ctx = TracingContext.get_evaluation_mode()
+            mode, ctx = EvaluationContext.get_evaluation_mode()
             if mode == EvaluationMode.QUANTUM_COMPILATION:
                 return _call_with_quantum_ctx(ctx)
             elif mode == EvaluationMode.CLASSICAL_COMPILATION:
@@ -830,7 +830,11 @@ def while_loop(cond_fn):
 
 
 def measure(wires) -> DynamicJaxprTracer:
-    ctx = TracingContext.get_main_tracing_context("catalyst.measure")
+    EvaluationContext.check_is_tracing(
+        "catalyst.measure can only be used from within @qjit.")
+    EvaluationContext.check_is_quantum_tracing(
+        "catalyst.measure can only be used from within a qml.qnode.")
+    ctx = EvaluationContext.get_main_tracing_context()
     wires = list(wires) if isinstance(wires, (list, tuple)) else [wires]
     if len(wires) != 1:
         raise TypeError(f"One classical argument (a wire) is expected, got {wires}")
@@ -844,8 +848,10 @@ def measure(wires) -> DynamicJaxprTracer:
 
 def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
     def _call_handler(*args, _callee: Callable, **kwargs):
-        ctx = TracingContext.get_main_tracing_context()
-        with TracingContext.frame_tracing_context(ctx) as inner_trace:
+        EvaluationContext.check_is_quantum_tracing(
+            "catalyst.adjoint can only be used from within a qml.qnode.")
+        ctx = EvaluationContext.get_main_tracing_context()
+        with EvaluationContext.frame_tracing_context(ctx) as inner_trace:
             in_classical_tracers, _ = tree_flatten((args, kwargs))
             wffa, in_avals, _ = deduce_avals(_callee, args, kwargs)
             arg_classical_tracers = _input_type_to_tracers(inner_trace.new_arg, in_avals)

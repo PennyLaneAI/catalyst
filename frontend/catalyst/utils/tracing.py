@@ -58,7 +58,7 @@ class MainTracingContext:
         self.main, self.frames, self.mains, self.trace = main, {}, {}, None
 
 
-class TracingContext:
+class EvaluationContext:
     """Utility class used for tracing.
 
     It is used to determine whether the program is currently tracing or not.
@@ -93,7 +93,7 @@ class TracingContext:
     @classmethod
     @contextmanager
     def frame_tracing_context(
-        cls, ctx, trace: Optional[DynamicJaxprTrace] = None
+        cls, ctx:MainTracingContext, trace: Optional[DynamicJaxprTrace] = None
     ) -> ContextManager[DynamicJaxprTrace]:
         assert ctx is cls._tracing_stack[-1][1], f"{ctx=}"
         main = ctx.mains[trace] if trace is not None else None
@@ -114,9 +114,7 @@ class TracingContext:
     def get_main_tracing_context(cls, hint=None) -> MainTracingContext:
         """Checks a number of tracing conditions and return the MainTracingContext"""
         msg = f"{hint or 'catalyst functions'} can only be used from within @qjit decorated code."
-        TracingContext.check_is_tracing(msg)
-        if len(cls._tracing_stack) == 0:
-            raise CompileError(f"{hint} can only be used from within a qml.qnode.")
+        EvaluationContext.check_is_tracing(msg)
         return cls._tracing_stack[-1][1]
 
     def __enter__(self):
@@ -132,7 +130,7 @@ class TracingContext:
 
     @classmethod
     def get_evaluation_mode(cls):
-        if not TracingContext._tracing_stack:
+        if not EvaluationContext._tracing_stack:
             return (EvaluationMode.INTERPRETATION, None)
         return cls._tracing_stack[-1]
 
@@ -148,21 +146,34 @@ class TracingContext:
         return cls.get_mode() in [EvaluationMode.CLASSICAL_COMPILATION,
                                   EvaluationMode.QUANTUM_COMPILATION]
 
-    @staticmethod
-    def check_is_tracing(msg):
+    @classmethod
+    def check_modes(cls, modes, msg):
         """Assert if the execution is currently not being traced.
 
         Raises: CompileError
         """
-        if not TracingContext.is_tracing():
+        if cls.get_mode() not in modes:
             raise CompileError(msg)
 
-    @staticmethod
-    def check_is_not_tracing(msg):
+    @classmethod
+    def check_is_quantum_tracing(cls, msg):
+        cls.check_modes([EvaluationMode.QUANTUM_COMPILATION], msg)
+
+    @classmethod
+    def check_is_classical_tracing(cls, msg):
+        cls.check_modes([EvaluationMode.CLASSICAL_COMPILATION], msg)
+
+    @classmethod
+    def check_is_tracing(cls, msg):
+        cls.check_modes([EvaluationMode.CLASSICAL_COMPILATION,
+                        EvaluationMode.QUANTUM_COMPILATION], msg)
+
+    @classmethod
+    def check_is_not_tracing(cls, msg):
         """Assert if the execution is currently being traced.
 
         Raises: CompileError
         """
-        if TracingContext.is_tracing():
+        if cls.is_tracing():
             raise CompileError(msg)
 

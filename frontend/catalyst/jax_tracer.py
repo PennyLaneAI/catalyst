@@ -24,22 +24,17 @@ import pennylane as qml
 from jax._src.linear_util import (wrap_init)
 from jax._src.api import ShapeDtypeStruct
 from jax._src.core import (
-    cur_sublevel,
-    new_base_main,
     ClosedJaxpr,
     JaxprEqn,
-    MainTrace as JaxMainTrace,
     ShapedArray,
 )
 from jax._src.interpreters.partial_eval import (
     DynamicJaxprTrace,
     DynamicJaxprTracer,
-    JaxprStackFrame,
     _input_type_to_tracers,
     convert_constvars_jaxpr,
-    extend_jaxpr_stack,
 )
-from jax._src.source_info_util import (reset_name_stack, current as jax_current)
+from jax._src.source_info_util import (current as jax_current)
 from jax._src.util import unzip2
 from pennylane import QubitDevice, QubitUnitary, QueuingManager
 from pennylane.measurements import MeasurementProcess, MidMeasureMP
@@ -84,13 +79,12 @@ from catalyst.utils.jax_extras import (
     treedef_is_leaf,
     initial_style_jaxprs_with_common_consts1,
     initial_style_jaxprs_with_common_consts2,
-    new_main2,
     sort_eqns,
     deduce_avals,
     jaxpr_to_mlir
 )
 from catalyst.utils.patching import Patcher
-from catalyst.utils.tracing import MainTracingContext, TracingContext, EvaluationMode
+from catalyst.utils.tracing import MainTracingContext, EvaluationContext, EvaluationMode
 
 
 class Function:
@@ -256,7 +250,7 @@ def trace_to_mlir(func, *args, **kwargs):
     # if we wanted to compile a single python function multiple times with different options.
     mlir_fn_cache.clear()
 
-    with TracingContext(EvaluationMode.CLASSICAL_COMPILATION):
+    with EvaluationContext(EvaluationMode.CLASSICAL_COMPILATION):
         jaxpr, shape = jax.make_jaxpr(func, return_shape=True)(*args, **kwargs)
 
     return jaxpr_to_mlir(func.__name__, jaxpr, shape)
@@ -296,7 +290,7 @@ def trace_quantum_tape(
                 inner_tape = op.regions[0].quantum_tape
                 res_classical_tracers = op.regions[0].res_classical_tracers
 
-                with TracingContext.frame_tracing_context(ctx, inner_trace):
+                with EvaluationContext.frame_tracing_context(ctx, inner_trace):
                     qreg_in = _input_type_to_tracers(inner_trace.new_arg, [AbstractQreg()])[0]
                     qreg_out = trace_quantum_tape(inner_tape, device, qreg_in, ctx, inner_trace)
                     jaxpr, typ, consts = ctx.frames[inner_trace].to_jaxpr2(
@@ -323,7 +317,7 @@ def trace_quantum_tape(
             elif isinstance(op, Cond):
                 jaxprs, consts = [], []
                 for region in op.regions:
-                    with TracingContext.frame_tracing_context(ctx, region.trace):
+                    with EvaluationContext.frame_tracing_context(ctx, region.trace):
                         qreg_in = _input_type_to_tracers(region.trace.new_arg, [AbstractQreg()])[0]
                         qreg_out = trace_quantum_tape(
                             region.quantum_tape, device, qreg_in, ctx, region.trace
@@ -349,7 +343,7 @@ def trace_quantum_tape(
             elif isinstance(op, WhileLoop):
                 cond_trace = op.regions[0].trace
                 res_classical_tracers = op.regions[0].res_classical_tracers
-                with TracingContext.frame_tracing_context(ctx, cond_trace):
+                with EvaluationContext.frame_tracing_context(ctx, cond_trace):
                     _input_type_to_tracers(cond_trace.new_arg, [AbstractQreg()])[0]
                     cond_jaxpr, _, cond_consts = ctx.frames[cond_trace].to_jaxpr2(
                         res_classical_tracers
@@ -358,7 +352,7 @@ def trace_quantum_tape(
                 body_trace = op.regions[1].trace
                 body_tape = op.regions[1].quantum_tape
                 res_classical_tracers = op.regions[1].res_classical_tracers
-                with TracingContext.frame_tracing_context(ctx, body_trace):
+                with EvaluationContext.frame_tracing_context(ctx, body_trace):
                     qreg_in = _input_type_to_tracers(body_trace.new_arg, [AbstractQreg()])[0]
                     qreg_out = trace_quantum_tape(body_tape, device, qreg_in, ctx, body_trace)
                     body_jaxpr, _, body_consts = ctx.frames[body_trace].to_jaxpr2(
@@ -389,7 +383,7 @@ def trace_quantum_tape(
                 body_trace = op.regions[0].trace
                 body_tape = op.regions[0].quantum_tape
                 res_classical_tracers = op.regions[0].res_classical_tracers
-                with TracingContext.frame_tracing_context(ctx, body_trace):
+                with EvaluationContext.frame_tracing_context(ctx, body_trace):
                     qreg_in = _input_type_to_tracers(body_trace.new_arg, [AbstractQreg()])[0]
                     qreg_out = trace_quantum_tape(body_tape, device, qreg_in, ctx, body_trace)
                     body_jaxpr, _, body_consts = ctx.frames[body_trace].to_jaxpr2(
@@ -519,10 +513,10 @@ def trace_quantum_function(
     Tape transformations could be applied in-between, allowing users to modify the algorithm
     before the final jaxpr is created."""
 
-    with TracingContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
+    with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
         # (1) - Classical tracing
         quantum_tape = QuantumTape()
-        with TracingContext.frame_tracing_context(ctx) as trace:
+        with EvaluationContext.frame_tracing_context(ctx) as trace:
             wffa, in_avals, out_tree_promise = deduce_avals(f, args, kwargs)
             in_classical_tracers = _input_type_to_tracers(trace.new_arg, in_avals)
             with QueuingManager.stop_recording(), quantum_tape:
@@ -533,7 +527,7 @@ def trace_quantum_function(
             ]
 
         # (2) - Quantum tracing
-        with TracingContext.frame_tracing_context(ctx, trace):
+        with EvaluationContext.frame_tracing_context(ctx, trace):
             qdevice_p.bind(spec="kwargs", val=str(device.backend_kwargs))
             qdevice_p.bind(spec="backend", val=device.backend_name)
             qreg_in = qalloc_p.bind(len(device.wires))
@@ -618,7 +612,7 @@ class QFunc:
             # Allow QFunc to still be used by itself for internal testing.
             device = self.device
 
-        with TracingContext(EvaluationMode.QUANTUM_COMPILATION):
+        with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION):
             jaxpr, shape = trace_quantum_function(self.func, device, args, kwargs)
 
         retval_tree = tree_structure(shape)

@@ -43,7 +43,7 @@ from catalyst.utils import wrapper  # pylint: disable=no-name-in-module
 from catalyst.utils.c_template import get_template, mlir_type_to_numpy_type
 from catalyst.utils.gen_mlir import inject_functions
 from catalyst.utils.patching import Patcher
-from catalyst.utils.tracing import TracingContext
+from catalyst.utils.tracing import EvaluationContext
 
 # Required for JAX tracer objects as PennyLane wires.
 # pylint: disable=unnecessary-lambda
@@ -600,12 +600,12 @@ class QJIT:
           str: A C program that can be compiled with the current shared object.
         """
         msg = "C interface cannot be generated from tracing context."
-        TracingContext.check_is_not_tracing(msg)
+        EvaluationContext.check_is_not_tracing(msg)
         function, args = self._maybe_promote(self.compiled_function, *args)
         return function.get_cmain(*args)
 
     def __call__(self, *args, **kwargs):
-        if TracingContext.is_tracing():
+        if EvaluationContext.is_tracing():
             return self.qfunc(*args, **kwargs)
 
         function, args = self._maybe_promote(self.compiled_function, *args)
