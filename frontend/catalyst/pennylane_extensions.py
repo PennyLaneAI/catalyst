@@ -40,65 +40,9 @@ from typing import (
 import jax
 import jax.numpy as jnp
 import pennylane as qml
-from jax._src import linear_util as lu
-from jax._src.api import ShapeDtypeStruct
-from jax._src.api_util import (
-    _ensure_index,
-    _ensure_index_tuple,
-    _ensure_str_tuple,
-    apply_flat_fun,
-    apply_flat_fun_nokwargs,
-    argnums_partial,
-    argnums_partial_except,
-    check_callable,
-    debug_info,
-    debug_info_final,
-    donation_vector,
-    flat_out_axes,
-    flatten_axes,
-    flatten_fun,
-    flatten_fun_nokwargs,
-    flatten_fun_nokwargs2,
-    rebase_donate_argnums,
-    result_paths,
-    shaped_abstractify,
-)
-from jax._src.core import ClosedJaxpr, JaxprEqn
-from jax._src.core import MainTrace as JaxMainTrace
-from jax._src.core import ShapedArray
-from jax._src.core import Tracer as JaxprTracer
-from jax._src.core import (
-    Var,
-    check_jaxpr,
-    cur_sublevel,
-    get_aval,
-    new_base_main,
-    new_main,
-)
-from jax._src.dispatch import jaxpr_replicas
-from jax._src.interpreters.mlir import _constant_handlers
-from jax._src.interpreters.partial_eval import (
-    DynamicJaxprTrace,
-    DynamicJaxprTracer,
-    Jaxpr,
-    JaxprStackFrame,
-    _add_implicit_outputs,
-    _const_folding_and_forwarding,
-    _inline_literals,
-    _input_type_to_tracers,
-    convert_constvars_jaxpr,
-    extend_jaxpr_stack,
-    make_jaxpr_effects,
-    new_jaxpr_eqn,
-    trace_to_subjaxpr_dynamic2,
-)
-from jax._src.lax.control_flow import (
-    _initial_style_jaxpr,
-    _initial_style_jaxprs_with_common_consts,
-)
-from jax._src.lax.lax import _abstractify, xb, xla
-from jax._src.source_info_util import current as jax_current
-from jax._src.source_info_util import new_name_stack, reset_name_stack
+from jax._src.api_util import shaped_abstractify
+from jax._src.core import get_aval
+from jax._src.lax.lax import _abstractify
 from jax._src.tree_util import (
     PyTreeDef,
     tree_flatten,
@@ -106,26 +50,11 @@ from jax._src.tree_util import (
     tree_unflatten,
     treedef_is_leaf,
 )
-from jax._src.util import unzip2
-from jax.core import ShapedArray
-from jax.interpreters import mlir
-from jax.interpreters.mlir import (
-    AxisContext,
-    ModuleContext,
-    ReplicaAxisContext,
-    ir,
-    lower_jaxpr_to_fun,
-    lowerable_effects,
-)
-from jax.tree_util import tree_flatten, tree_structure, tree_unflatten, treedef_is_leaf
 from pennylane import Device, QNode, QubitDevice, QubitUnitary, QueuingManager
-from pennylane.measurements import MeasurementProcess, SampleMP
-from pennylane.operation import AnyWires, Operation, Operator, Wires
-from pennylane.queuing import QueuingManager
+from pennylane.operation import Operator
 from pennylane.tape import QuantumTape
 
 import catalyst
-import catalyst.jax_primitives as jprim
 from catalyst.jax_primitives import (
     AbstractQbit,
     AbstractQreg,
@@ -137,8 +66,11 @@ from catalyst.jax_primitives import (
     counts,
     expval,
     expval_p,
+    func_p,
+    grad_p,
     hamiltonian,
     hermitian,
+    jvp_p,
     namedobs,
     probs,
     probs_p,
@@ -160,6 +92,7 @@ from catalyst.jax_primitives import (
     tensorobs,
 )
 from catalyst.jax_primitives import var as jprim_var
+from catalyst.jax_primitives import vjp_p
 from catalyst.jax_tracer import (
     KNOWN_NAMED_OBS,
     Adjoint,
@@ -178,9 +111,13 @@ from catalyst.jax_tracer import (
     get_main_tracing_context,
     new_inner_tracer,
 )
-
 from catalyst.utils.exceptions import CompileError, DifferentiableCompileError
+from catalyst.utils.jax_extras import ClosedJaxpr, DynamicJaxprTracer, Jaxpr, JaxprEqn
+from catalyst.utils.jax_extras import MainTrace as JaxMainTrace
 from catalyst.utils.jax_extras import (
+    ShapedArray,
+    _initial_style_jaxpr,
+    _input_type_to_tracers,
     initial_style_jaxprs_with_common_consts1,
     initial_style_jaxprs_with_common_consts2,
     new_main2,
@@ -219,7 +156,6 @@ def qfunc(num_wires, *, shots=1000, device=None):
 
 Differentiable = Union[Function, QNode]
 DifferentiableLike = Union[Differentiable, Callable, "catalyst.compilation_pipelines.QJIT"]
-Jaxpr = Any
 
 
 def _ensure_differentiable(f: DifferentiableLike) -> Differentiable:
@@ -243,9 +179,7 @@ def _make_jaxpr_check_differentiable(f: Differentiable, grad_params: GradParams,
     jaxpr = jax.make_jaxpr(f)(*args)
 
     assert len(jaxpr.eqns) == 1, "Expected jaxpr consisting of a single function call."
-    assert (
-        jaxpr.eqns[0].primitive == jprim.func_p
-    ), "Expected jaxpr consisting of a single function call."
+    assert jaxpr.eqns[0].primitive == func_p, "Expected jaxpr consisting of a single function call."
 
     for pos, arg in enumerate(jaxpr.in_avals):
         if arg.dtype.kind != "f" and pos in grad_params.argnum:
@@ -366,7 +300,7 @@ class Grad:
         args_data, _ = tree_flatten(args)
 
         # It always returns list as required by catalyst control-flows
-        return jprim.grad_p.bind(*args_data, jaxpr=jaxpr, fn=self, grad_params=self.grad_params)
+        return grad_p.bind(*args_data, jaxpr=jaxpr, fn=self, grad_params=self.grad_params)
 
 
 def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
@@ -517,7 +451,7 @@ def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=
     fn: Differentiable = _ensure_differentiable(f)
     grad_params = _check_grad_params(method, h, argnum)
     jaxpr = _make_jaxpr_check_differentiable(fn, grad_params, *params)
-    return jprim.jvp_p.bind(*params, *tangents, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
+    return jvp_p.bind(*params, *tangents, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
 
 
 def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnum=None):
@@ -576,7 +510,7 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
     fn: Differentiable = _ensure_differentiable(f)
     grad_params = _check_grad_params(method, h, argnum)
     jaxpr = _make_jaxpr_check_differentiable(fn, grad_params, *params)
-    return jprim.vjp_p.bind(*params, *cotangents, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
+    return vjp_p.bind(*params, *cotangents, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
 
 
 class EvaluationMode(Enum):
@@ -904,13 +838,13 @@ def while_loop(cond_fn):
     return _body_query
 
 
-def measure(wires) -> JaxprTracer:
+def measure(wires) -> DynamicJaxprTracer:
     ctx = get_main_tracing_context("catalyst.measure")
     wires = list(wires) if isinstance(wires, (list, tuple)) else [wires]
     if len(wires) != 1:
         raise TypeError(f"One classical argument (a wire) is expected, got {wires}")
     # assert len(ctx.trace.frame.eqns) == 0, ctx.trace.frame.eqns
-    out_classical_tracer = new_inner_tracer(ctx.trace, jax.core.get_aval(True))
+    out_classical_tracer = new_inner_tracer(ctx.trace, get_aval(True))
     MidCircuitMeasure(
         in_classical_tracers=wires, out_classical_tracers=[out_classical_tracer], regions=[]
     )

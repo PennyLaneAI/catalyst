@@ -48,9 +48,14 @@ from jax._src import core, dtypes, effects
 from jax._src import linear_util as lu
 from jax._src import source_info_util, state, traceback_util, typing, util
 from jax._src.config import FLAGS, config
-from jax._src.core import JaxprEqn, MainTrace
+from jax._src.core import ClosedJaxpr, Jaxpr, JaxprEqn, MainTrace
 from jax._src.core import Primitive as JaxprPrimitive
-from jax._src.core import Trace, _update_thread_local_jit_state, thread_local_state
+from jax._src.core import (
+    ShapedArray,
+    Trace,
+    _update_thread_local_jit_state,
+    thread_local_state,
+)
 from jax._src.errors import (
     ConcretizationTypeError,
     TracerArrayConversionError,
@@ -58,7 +63,11 @@ from jax._src.errors import (
     UnexpectedTracerError,
 )
 from jax._src.interpreters import partial_eval as pe
-from jax._src.lax.control_flow.common import _initial_style_open_jaxpr
+from jax._src.interpreters.partial_eval import (
+    DynamicJaxprTracer,
+    _input_type_to_tracers,
+)
+from jax._src.lax.control_flow import _initial_style_jaxpr
 from jax._src.lax.lax import _abstractify
 from jax._src.lib import jax_jit
 from jax._src.typing import Array, DimSize, Shape
@@ -160,7 +169,7 @@ def initial_style_jaxprs_with_common_consts2(jaxprs, all_consts):
     for consts, consts_avals in zip(all_consts, all_const_avals):
         for c, aval in zip(consts, consts_avals):
             if isinstance(aval, state.AbstractRef):
-                assert isinstance(c, pe.DynamicJaxprTracer)
+                assert isinstance(c, DynamicJaxprTracer)
     canonical_ref_indices = []
     canonical_refs: List[Any] = []
     tracer_id_to_canonical_id = {}
