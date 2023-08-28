@@ -14,145 +14,94 @@
 """This module contains functions tracing and lowering JAX code to MLIR.
 """
 
-from collections import defaultdict
 from contextlib import contextmanager
 from dataclasses import dataclass
-from enum import Enum
 from functools import update_wrapper
-from itertools import chain
 from typing import Any, Callable, ContextManager, Dict, List, Optional, Tuple, Union
 
 import jax
-import jax.numpy as jnp
 import pennylane as qml
-from jax._src import linear_util as lu
-from jax._src import source_info_util
+from jax._src.linear_util import (wrap_init, annotate)
 from jax._src.api import ShapeDtypeStruct
-from jax._src.api_util import (
-    _ensure_index,
-    _ensure_index_tuple,
-    _ensure_str_tuple,
-    apply_flat_fun,
-    apply_flat_fun_nokwargs,
-    argnums_partial,
-    argnums_partial_except,
-    check_callable,
-    debug_info,
-    debug_info_final,
-    donation_vector,
-    flat_out_axes,
-    flatten_axes,
-    flatten_fun,
-    flatten_fun_nokwargs,
-    flatten_fun_nokwargs2,
-    rebase_donate_argnums,
-    result_paths,
-    shaped_abstractify,
-)
-from jax._src.core import ClosedJaxpr, JaxprEqn
-from jax._src.core import MainTrace as JaxMainTrace
-from jax._src.core import ShapedArray
-from jax._src.core import Tracer as JaxprTracer
 from jax._src.core import (
-    Var,
-    check_jaxpr,
     cur_sublevel,
-    get_aval,
     new_base_main,
-    new_main,
+    ClosedJaxpr,
+    JaxprEqn,
+    MainTrace as JaxMainTrace,
+    ShapedArray,
 )
 from jax._src.dispatch import jaxpr_replicas
-from jax._src.interpreters.mlir import _constant_handlers, _module_name_regex
 from jax._src.interpreters.partial_eval import (
     DynamicJaxprTrace,
     DynamicJaxprTracer,
-    Jaxpr,
     JaxprStackFrame,
-    _add_implicit_outputs,
-    _const_folding_and_forwarding,
-    _inline_literals,
     _input_type_to_tracers,
     convert_constvars_jaxpr,
     extend_jaxpr_stack,
-    make_jaxpr_effects,
-    new_jaxpr_eqn,
-    trace_to_subjaxpr_dynamic2,
 )
-from jax._src.lax.control_flow import _initial_style_jaxpr
-from jax._src.lax.lax import _abstractify, xb, xla
-from jax._src.source_info_util import current as jax_current
-from jax._src.source_info_util import new_name_stack, reset_name_stack
-from jax._src.tree_util import (
+from jax._src.lax.lax import xb, xla
+from jax._src.source_info_util import (new_name_stack, reset_name_stack, current as jax_current)
+from jax._src.util import unzip2, wrap_name
+from jax._src.sharding_impls import (
+    ReplicaAxisContext,
+)
+from jax._src.interpreters.mlir import (
+    _module_name_regex,
+    AxisContext,
+    ModuleContext,
+    ir,
+    lower_jaxpr_to_fun,
+    lowerable_effects,
+)
+from pennylane import QubitDevice, QubitUnitary, QueuingManager
+from pennylane.measurements import MeasurementProcess, MidMeasureMP
+from pennylane.operation import AnyWires, Operation, Wires
+from pennylane.tape import QuantumTape
+
+from catalyst.jax_primitives import (
+    mlir_fn_cache,
+    AbstractQreg,
+    adjoint_p,
+    compbasis_p,
+    expval_p,
+    hamiltonian,
+    hermitian,
+    namedobs,
+    probs_p,
+    qalloc_p,
+    qcond_p,
+    qdealloc_p,
+    qdevice_p,
+    qextract_p,
+    qfor_p,
+    qinsert_p,
+    qmeasure_p,
+    qunitary_p,
+    qwhile_p,
+    sample_p,
+    state_p,
+    tensorobs_p,
+    func_p,
+    counts_p,
+    var_p,
+    qinst_p,
+)
+
+from catalyst.utils.exceptions import CompileError
+from catalyst.utils.jax_extras import (
     PyTreeDef,
     tree_flatten,
     tree_structure,
     tree_unflatten,
     treedef_is_leaf,
-)
-from jax._src.util import unzip2, wrap_name
-from jax.interpreters import mlir
-from jax.interpreters.mlir import (
-    AxisContext,
-    ModuleContext,
-    ReplicaAxisContext,
-    ir,
-    lower_jaxpr_to_fun,
-    lowerable_effects,
-)
-from jax.interpreters.partial_eval import DynamicJaxprTracer
-from jax.linear_util import wrap_init
-from jax.tree_util import tree_flatten, tree_structure, tree_unflatten
-from pennylane import Device, QubitDevice, QubitUnitary, QueuingManager
-from pennylane.measurements import CountsMP, MeasurementProcess, MidMeasureMP, SampleMP
-from pennylane.operation import AnyWires, Operation, Operator, Wires
-from pennylane.tape import QuantumTape
-
-import catalyst.jax_primitives as jprim
-from catalyst.jax_primitives import (
-    AbstractQbit,
-    AbstractQreg,
-    Qreg,
-    adjoint_p,
-    compbasis,
-    compbasis_p,
-    counts,
-    expval,
-    hamiltonian,
-    hermitian,
-    namedobs,
-    probs,
-    qalloc,
-    qcond_p,
-    qdealloc,
-    qdevice,
-    qdevice_p,
-    qextract,
-    qextract_p,
-    qfor_p,
-    qinsert,
-    qinst,
-    qmeasure_p,
-    qunitary,
-    qwhile_p,
-    sample,
-    state,
-    tensorobs,
-)
-from catalyst.jax_primitives import var as jprim_var
-
-# from catalyst.jax_tracer import (
-#     KNOWN_NAMED_OBS,
-# )
-from catalyst.utils.exceptions import CompileError
-from catalyst.utils.jax_extras import (
     initial_style_jaxprs_with_common_consts1,
     initial_style_jaxprs_with_common_consts2,
     new_main2,
     sort_eqns,
+    deduce_avals,
 )
 from catalyst.utils.patching import Patcher
-
-# from catalyst.jax_tape import JaxTape
 from catalyst.utils.tracing import TracingContext
 
 
@@ -180,7 +129,7 @@ class Function:
         def _eval_jaxpr(*args):
             return jax.core.eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *args)
 
-        retval = jprim.func_p.bind(wrap_init(_eval_jaxpr), *args, fn=self)
+        retval = func_p.bind(wrap_init(_eval_jaxpr), *args, fn=self)
         return tree_unflatten(shape_tree, retval)
 
 
@@ -249,7 +198,7 @@ def promise_qextract(qrp: QRegPromise, wires: List[Any]) -> List[DynamicJaxprTra
             qubits.append(qubit)
             qrp.cache[w] = None
         else:
-            qubits.append(qextract(qrp.base, w))
+            qubits.append(qextract_p.bind(qrp.base, w))
     return qubits
 
 
@@ -265,7 +214,7 @@ def promise_qinsert(qrp: QRegPromise, wires, qubits) -> None:
 def promise_actualize(qrp: QRegPromise) -> DynamicJaxprTracer:
     qreg = qrp.base
     for w, qubit in qrp.cache.items():
-        qreg = qinsert(qreg, w, qubit)
+        qreg = qinsert_p.bind(qreg, w, qubit)
     qrp.cache = {}
     qrp.base = qreg
     return qreg
@@ -290,17 +239,7 @@ def frame_tracing_context(
                 ctx.trace = parent_trace
 
 
-def deduce_avals(f: Callable, args, kwargs):
-    flat_args, in_tree = tree_flatten((args, kwargs))
-    wf = lu.wrap_init(f)
-    in_avals, keep_inputs = list(map(shaped_abstractify, flat_args)), [True] * len(flat_args)
-    in_type = tuple(zip(in_avals, keep_inputs))
-    wff, out_tree_promise = flatten_fun(wf, in_tree)
-    wffa = lu.annotate(wff, in_type)
-    return wffa, in_avals, out_tree_promise
-
-
-def new_inner_tracer(trace: DynamicJaxprTrace, aval) -> JaxprTracer:
+def new_inner_tracer(trace: DynamicJaxprTrace, aval) -> DynamicJaxprTracer:
     dt = DynamicJaxprTracer(trace, aval, jax_current())
     trace.frame.tracers.append(dt)
     trace.frame.tracer_to_var[id(dt)] = trace.frame.newvar(aval)
@@ -382,7 +321,7 @@ def trace_to_mlir(func, *args, **kwargs):
     # Otherwise, MLIR functions which do not exist in the current translation unit will be assumed
     # to exist if an equivalent python function is seen in the cache. This happens during testing or
     # if we wanted to compile a single python function multiple times with different options.
-    jprim.mlir_fn_cache.clear()
+    mlir_fn_cache.clear()
 
     with TracingContext():
         jaxpr, shape = jax.make_jaxpr(func, return_shape=True)(*args, **kwargs)
@@ -390,7 +329,7 @@ def trace_to_mlir(func, *args, **kwargs):
     nrep = jaxpr_replicas(jaxpr)
     effects = [eff for eff in jaxpr.effects if eff in jax.core.ordered_effects]
     axis_context = ReplicaAxisContext(xla.AxisEnv(nrep, (), ()))
-    name_stack = source_info_util.new_name_stack(wrap_name("ok", "jit"))
+    name_stack = new_name_stack(wrap_name("ok", "jit"))
     module, context = custom_lower_jaxpr_to_module(
         func_name="jit_" + func.__name__,
         module_name=func.__name__,
@@ -555,9 +494,9 @@ def trace_quantum_tape(
             else:
                 qubits = promise_qextract(qrp, op.wires)
                 if isinstance(op, QubitUnitary):
-                    qubits2 = qunitary(*[*op.parameters, *qubits])
+                    qubits2 = qunitary_p.bind(*[*op.parameters, *qubits])
                 else:
-                    qubits2 = qinst(op.name, len(qubits), *qubits, *op.parameters)
+                    qubits2 = qinst_p.bind(*qubits, *op.parameters, op=op.name, qubits_len=len(qubits))
                 promise_qinsert(qrp, op.wires, qubits2)
                 qrp2 = qrp
 
@@ -573,9 +512,9 @@ def trace_observables(
     obs: Operation, device, qreg, m_wires
 ) -> Tuple[List[DynamicJaxprTracer], List[DynamicJaxprTracer]]:
     wires = obs.wires if (obs and len(obs.wires) > 0) else m_wires
-    qubits = [qextract(qreg, w) for w in wires]
+    qubits = [qextract_p.bind(qreg, w) for w in wires]
     if obs is None:
-        obs_tracers = compbasis(*qubits)
+        obs_tracers = compbasis_p.bind(*qubits)
     elif isinstance(obs, KNOWN_NAMED_OBS):
         obs_tracers = namedobs(type(obs).__name__, qubits[0])
     elif isinstance(obs, qml.Hermitian):
@@ -583,7 +522,7 @@ def trace_observables(
         obs_tracers = hermitian(jax.numpy.asarray(*obs.parameters), *qubits)
     elif isinstance(obs, qml.operation.Tensor):
         nested_obs = [trace_observables(o, device, qreg, m_wires)[0] for o in obs.obs]
-        obs_tracers = tensorobs(*nested_obs)
+        obs_tracers = tensorobs_p.bind(*nested_obs)
     elif isinstance(obs, qml.Hamiltonian):
         nested_obs = [trace_observables(o, device, qreg, m_wires)[0] for o in obs.ops]
         obs_tracers = hamiltonian(jax.numpy.asarray(obs.parameters), *nested_obs)
@@ -612,18 +551,18 @@ def trace_quantum_measurements(
             using_compbasis = obs_tracers.primitive == compbasis_p
             if o.return_type.value == "sample":
                 shape = (shots, len(qubits)) if using_compbasis else (shots,)
-                out_classical_tracers.append(sample(obs_tracers, shots, shape))
+                out_classical_tracers.append(sample_p.bind(obs_tracers, shots=shots, shape=shape))
             elif o.return_type.value == "expval":
-                out_classical_tracers.append(expval(obs_tracers, shots))
+                out_classical_tracers.append(expval_p.bind(obs_tracers, shots=shots))
             elif o.return_type.value == "var":
-                out_classical_tracers.append(jprim_var(obs_tracers, shots))
+                out_classical_tracers.append(var_p.bind(obs_tracers, shots=shots))
             elif o.return_type.value == "probs":
                 assert using_compbasis
                 shape = (2 ** len(qubits),)
-                out_classical_tracers.append(probs(obs_tracers, shape))
+                out_classical_tracers.append(probs_p.bind(obs_tracers, shape=shape))
             elif o.return_type.value == "counts":
                 shape = (2 ** len(qubits),) if using_compbasis else (2,)
-                out_classical_tracers.extend(counts(obs_tracers, shots, shape))
+                out_classical_tracers.extend(counts_p.bind(obs_tracers, shots=shots, shape=shape))
                 counts_tree = tree_structure(("keys", "counts"))
                 meas_return_trees_children = out_tree.children()
                 if len(meas_return_trees_children) > 0:
@@ -636,7 +575,7 @@ def trace_quantum_measurements(
             elif o.return_type.value == "state":
                 assert using_compbasis
                 shape = (2 ** len(qubits),)
-                out_classical_tracers.append(state(obs_tracers, shape))
+                out_classical_tracers.append(state_p.bind(obs_tracers, shape=shape))
             else:
                 raise NotImplementedError(f"Measurement {o.return_type.value} is not impemented")
         elif isinstance(o, (list, dict)):
@@ -677,9 +616,9 @@ def trace_quantum_function(
 
         # (2) - Quantum tracing
         with frame_tracing_context(ctx, trace):
-            qdevice("kwargs", str(device.backend_kwargs))
-            qdevice("backend", device.backend_name)
-            qreg_in = qalloc(len(device.wires))
+            qdevice_p.bind(spec="kwargs", val=str(device.backend_kwargs))
+            qdevice_p.bind(spec="backend", val=device.backend_name)
+            qreg_in = qalloc_p.bind(len(device.wires))
             qreg_out = trace_quantum_tape(quantum_tape, device, qreg_in, ctx, trace)
             out_classical_tracers, out_classical_tree = trace_quantum_measurements(
                 quantum_tape,
@@ -691,7 +630,7 @@ def trace_quantum_function(
                 out_tree_promise(),
             )
 
-            qdealloc(qreg_in)
+            qdealloc_p.bind(qreg_in)
 
             out_classical_tracers = [trace.full_raise(t) for t in out_classical_tracers]
             out_quantum_tracers = [qreg_out]
@@ -853,7 +792,7 @@ class QFunc:
         args_data, _ = tree_flatten(args)
 
         wrapped = wrap_init(_eval_jaxpr)
-        retval = jprim.func_p.bind(wrapped, *args_data, fn=self)
+        retval = func_p.bind(wrapped, *args_data, fn=self)
 
         return tree_unflatten(retval_tree, retval)
 

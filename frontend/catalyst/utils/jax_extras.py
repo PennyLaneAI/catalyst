@@ -1,3 +1,18 @@
+# Copyright 2023 Xanadu Quantum Technologies Inc.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+#     http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+"""This module contains utility functions related to JAX tracing
+"""
 from __future__ import annotations
 
 import collections
@@ -41,20 +56,13 @@ from typing import (
 )
 from weakref import ref
 
-import jax._src.pretty_printer as pp
 import numpy as np
-from jax._src import config as jax_config
-from jax._src import core, dtypes, effects
-from jax._src import linear_util as lu
-from jax._src import source_info_util, state, traceback_util, typing, util
+from jax._src import (state, util)
 from jax._src.config import FLAGS, config
-from jax._src.core import ClosedJaxpr, Jaxpr, JaxprEqn, MainTrace
-from jax._src.core import Primitive as JaxprPrimitive
 from jax._src.core import (
-    ShapedArray,
-    Trace,
-    _update_thread_local_jit_state,
-    thread_local_state,
+    ShapedArray, Trace, _update_thread_local_jit_state, thread_local_state,
+    ClosedJaxpr, Jaxpr, JaxprEqn, MainTrace, Primitive as JaxprPrimitive,
+    gensym
 )
 from jax._src.errors import (
     ConcretizationTypeError,
@@ -62,12 +70,13 @@ from jax._src.errors import (
     TracerIntegerConversionError,
     UnexpectedTracerError,
 )
-from jax._src.interpreters import partial_eval as pe
 from jax._src.interpreters.partial_eval import (
     DynamicJaxprTracer,
     _input_type_to_tracers,
+    make_jaxpr_effects,
+    convert_constvars_jaxpr,
 )
-from jax._src.lax.control_flow import _initial_style_jaxpr
+from jax._src.lax.control_flow import (_initial_style_jaxpr, _initial_style_open_jaxpr)
 from jax._src.lax.lax import _abstractify
 from jax._src.lib import jax_jit
 from jax._src.typing import Array, DimSize, Shape
@@ -86,6 +95,19 @@ from jax._src.util import (
     unzip3,
     weakref_lru_cache,
     wrap_name,
+)
+
+from jax._src.linear_util import (wrap_init, annotate)
+from jax._src.tree_util import (
+    PyTreeDef,
+    tree_flatten,
+    tree_structure,
+    tree_unflatten,
+    treedef_is_leaf,
+)
+from jax._src.api_util import (
+    flatten_fun,
+    shaped_abstractify,
 )
 
 map, unsafe_map = safe_map, map
@@ -197,7 +219,7 @@ def initial_style_jaxprs_with_common_consts2(jaxprs, all_consts):
         all_nonref_const_avals.append(nonref_const_avals)
         canonical_ref_indices.append(ref_indices)
 
-    newvar = core.gensym(jaxprs, suffix="_")
+    newvar = gensym(jaxprs, suffix="_")
     unused_ref_const_vars = map(newvar, canonical_ref_avals)
     unused_const_vars = [map(newvar, const_avals) for const_avals in all_nonref_const_avals]
 
@@ -211,11 +233,23 @@ def initial_style_jaxprs_with_common_consts2(jaxprs, all_consts):
         const_suffix = util.concatenate(unused_const_vars[i + 1 :])
         constvars = [*padded_ref_constvars, *const_prefix, *nonref_constvars, *const_suffix]
         jaxpr = jaxpr.replace(constvars=constvars)
-        effects = pe.make_jaxpr_effects(jaxpr.constvars, jaxpr.invars, jaxpr.outvars, jaxpr.eqns)
+        effects = make_jaxpr_effects(jaxpr.constvars, jaxpr.invars, jaxpr.outvars, jaxpr.eqns)
         jaxpr = jaxpr.replace(effects=effects)
         return jaxpr
 
     consts = [*canonical_refs, *util.concatenate(all_nonref_consts)]
     jaxprs = tuple(pad_jaxpr_constvars(i, jaxpr) for i, jaxpr in enumerate(jaxprs))
-    closed_jaxprs = [core.ClosedJaxpr(pe.convert_constvars_jaxpr(jaxpr), ()) for jaxpr in jaxprs]
+    closed_jaxprs = [ClosedJaxpr(convert_constvars_jaxpr(jaxpr), ()) for jaxpr in jaxprs]
     return closed_jaxprs, consts
+
+
+def deduce_avals(f: Callable, args, kwargs):
+    flat_args, in_tree = tree_flatten((args, kwargs))
+    wf = wrap_init(f)
+    in_avals, keep_inputs = list(map(shaped_abstractify, flat_args)), [True] * len(flat_args)
+    in_type = tuple(zip(in_avals, keep_inputs))
+    wff, out_tree_promise = flatten_fun(wf, in_tree)
+    wffa = annotate(wff, in_type)
+    return wffa, in_avals, out_tree_promise
+
+
