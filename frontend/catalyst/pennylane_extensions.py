@@ -22,7 +22,6 @@ import uuid
 from collections import defaultdict
 from contextlib import contextmanager
 from dataclasses import dataclass
-from enum import Enum
 from functools import partial
 from itertools import chain
 from typing import (
@@ -107,8 +106,6 @@ from catalyst.jax_tracer import (
     QJITDevice,
     WhileLoop,
     deduce_avals,
-    frame_tracing_context,
-    get_main_tracing_context,
     new_inner_tracer,
 )
 from catalyst.utils.exceptions import CompileError, DifferentiableCompileError
@@ -123,7 +120,7 @@ from catalyst.utils.jax_extras import (
     new_main2,
     sort_eqns,
 )
-from catalyst.utils.tracing import TracingContext
+from catalyst.utils.tracing import (EvaluationMode, TracingContext, MainTracingContext)
 
 # pylint: disable=too-many-lines
 
@@ -513,24 +510,18 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
     return vjp_p.bind(*params, *cotangents, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
 
 
-class EvaluationMode(Enum):
-    QJIT_QNODE = 0
-    QJIT = 1
-    EXEC = 2
-
-
-def get_evaluation_mode() -> Tuple[EvaluationMode, Any]:
-    is_tracing = TracingContext.is_tracing()
-    if is_tracing:
-        ctx = qml.QueuingManager.active_context()
-        if ctx is not None:
-            mctx = get_main_tracing_context()
-            assert mctx is not None
-            return (EvaluationMode.QJIT_QNODE, mctx)
-        else:
-            return (EvaluationMode.QJIT, None)
-    else:
-        return (EvaluationMode.EXEC, None)
+# def get_evaluation_mode() -> Tuple[EvaluationMode, Any]:
+#     is_tracing = TracingContext.is_tracing()
+#     if is_tracing:
+#         ctx = qml.QueuingManager.active_context()
+#         if ctx is not None:
+#             mctx = get_main_tracing_context()
+#             assert mctx is not None
+#             return (EvaluationMode.QUANTUM_COMPILATION, mctx)
+#         else:
+#             return (EvaluationMode.CLASSICAL_COMPILATION, None)
+#     else:
+#         return (EvaluationMode.INTERPRETATION, None)
 
 
 def _aval_to_primitive_type(aval):
@@ -620,7 +611,7 @@ class CondCallable:
         out_trees, out_avals = [], []
         for branch in self.branch_fns + [self.otherwise_fn]:
             quantum_tape = QuantumTape()
-            with frame_tracing_context(ctx) as inner_trace:
+            with TracingContext.frame_tracing_context(ctx) as inner_trace:
                 wffa, in_avals, out_tree = deduce_avals(branch, [], {})
                 with QueuingManager.stop_recording(), quantum_tape:
                     res_classical_tracers = [inner_trace.full_raise(t) for t in wffa.call_wrapped()]
@@ -653,12 +644,12 @@ class CondCallable:
         return self.otherwise_fn()
 
     def __call__(self):
-        mode, ctx = get_evaluation_mode()
-        if mode == EvaluationMode.QJIT_QNODE:
+        mode, ctx = TracingContext.get_evaluation_mode()
+        if mode == EvaluationMode.QUANTUM_COMPILATION:
             return self._call_with_quantum_ctx(ctx)
-        elif mode == EvaluationMode.QJIT:
+        elif mode == EvaluationMode.CLASSICAL_COMPILATION:
             return self._call_with_classical_ctx()
-        elif mode == EvaluationMode.EXEC:
+        elif mode == EvaluationMode.INTERPRETATION:
             return self._call_during_interpretation()
         raise RuntimeError(f"Unsupported evaluation mode {mode}")
 
@@ -678,7 +669,7 @@ def for_loop(lower_bound, upper_bound, step):
             def _call_with_quantum_ctx(ctx: MainTracingContext):
                 quantum_tape = QuantumTape()
                 outer_trace = ctx.trace
-                with frame_tracing_context(ctx) as inner_trace:
+                with TracingContext.frame_tracing_context(ctx) as inner_trace:
                     in_classical_tracers = [
                         lower_bound,
                         upper_bound,
@@ -738,12 +729,12 @@ def for_loop(lower_bound, upper_bound, step):
                     args = fn_res if len(args) > 1 else (fn_res,) if len(args) == 1 else ()
                 return fn_res
 
-            mode, ctx = get_evaluation_mode()
-            if mode == EvaluationMode.QJIT_QNODE:
+            mode, ctx = TracingContext.get_evaluation_mode()
+            if mode == EvaluationMode.QUANTUM_COMPILATION:
                 return _call_with_quantum_ctx(ctx)
-            elif mode == EvaluationMode.QJIT:
+            elif mode == EvaluationMode.CLASSICAL_COMPILATION:
                 return _call_with_classical_ctx()
-            elif mode == EvaluationMode.EXEC:
+            elif mode == EvaluationMode.INTERPRETATION:
                 return _call_during_interpretation()
             raise RuntimeError(f"Unsupported evaluation mode {mode}")
 
@@ -759,7 +750,7 @@ def while_loop(cond_fn):
                 outer_trace = ctx.trace
                 in_classical_tracers, in_tree = tree_flatten(init_state)
 
-                with frame_tracing_context(ctx) as cond_trace:
+                with TracingContext.frame_tracing_context(ctx) as cond_trace:
                     cond_wffa, cond_in_avals, cond_tree = deduce_avals(cond_fn, init_state, {})
                     arg_classical_tracers = _input_type_to_tracers(
                         cond_trace.new_arg, cond_in_avals
@@ -776,7 +767,7 @@ def while_loop(cond_fn):
                     cond_tree(), res_classical_tracers, hint="Condition return value"
                 )
 
-                with frame_tracing_context(ctx) as body_trace:
+                with TracingContext.frame_tracing_context(ctx) as body_trace:
                     wffa, in_avals, body_tree = deduce_avals(body_fn, init_state, {})
                     arg_classical_tracers = _input_type_to_tracers(body_trace.new_arg, in_avals)
                     quantum_tape = QuantumTape()
@@ -824,12 +815,12 @@ def while_loop(cond_fn):
                     args = fn_res if len(args) > 1 else (fn_res,) if len(args) == 1 else ()
                 return fn_res
 
-            mode, ctx = get_evaluation_mode()
-            if mode == EvaluationMode.QJIT_QNODE:
+            mode, ctx = TracingContext.get_evaluation_mode()
+            if mode == EvaluationMode.QUANTUM_COMPILATION:
                 return _call_with_quantum_ctx(ctx)
-            elif mode == EvaluationMode.QJIT:
+            elif mode == EvaluationMode.CLASSICAL_COMPILATION:
                 return _call_with_classical_ctx()
-            elif mode == EvaluationMode.EXEC:
+            elif mode == EvaluationMode.INTERPRETATION:
                 return _call_during_interpretation()
             raise RuntimeError(f"Unsupported evaluation mode {mode}")
 
@@ -839,7 +830,7 @@ def while_loop(cond_fn):
 
 
 def measure(wires) -> DynamicJaxprTracer:
-    ctx = get_main_tracing_context("catalyst.measure")
+    ctx = TracingContext.get_main_tracing_context("catalyst.measure")
     wires = list(wires) if isinstance(wires, (list, tuple)) else [wires]
     if len(wires) != 1:
         raise TypeError(f"One classical argument (a wire) is expected, got {wires}")
@@ -853,8 +844,8 @@ def measure(wires) -> DynamicJaxprTracer:
 
 def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
     def _call_handler(*args, _callee: Callable, **kwargs):
-        ctx = get_main_tracing_context()
-        with frame_tracing_context(ctx) as inner_trace:
+        ctx = TracingContext.get_main_tracing_context()
+        with TracingContext.frame_tracing_context(ctx) as inner_trace:
             in_classical_tracers, _ = tree_flatten((args, kwargs))
             wffa, in_avals, _ = deduce_avals(_callee, args, kwargs)
             arg_classical_tracers = _input_type_to_tracers(inner_trace.new_arg, in_avals)

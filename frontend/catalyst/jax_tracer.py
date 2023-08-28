@@ -90,7 +90,7 @@ from catalyst.utils.jax_extras import (
     jaxpr_to_mlir
 )
 from catalyst.utils.patching import Patcher
-from catalyst.utils.tracing import TracingContext
+from catalyst.utils.tracing import MainTracingContext, TracingContext, EvaluationMode
 
 
 class Function:
@@ -124,42 +124,6 @@ class Function:
 KNOWN_NAMED_OBS = (qml.Identity, qml.PauliX, qml.PauliY, qml.PauliZ, qml.Hadamard)
 
 FORCED_ORDER_PRIMITIVES = {qdevice_p, qextract_p}
-
-
-@dataclass
-class MainTracingContext:
-    main: JaxMainTrace
-    frames: Dict[DynamicJaxprTrace, JaxprStackFrame]
-    mains: Dict[DynamicJaxprTrace, JaxMainTrace]
-    trace: Optional[DynamicJaxprTrace]
-
-    def __init__(self, main: JaxMainTrace):
-        self.main, self.frames, self.mains, self.trace = main, {}, {}, None
-
-
-TRACING_CONTEXT: Optional[MainTracingContext] = None
-
-
-@contextmanager
-def main_tracing_context() -> ContextManager[MainTracingContext]:
-    global TRACING_CONTEXT
-    with new_base_main(DynamicJaxprTrace, dynamic=True) as main:
-        main.jaxpr_stack = ()
-        TRACING_CONTEXT = ctx = MainTracingContext(main)
-        try:
-            yield ctx
-        finally:
-            TRACING_CONTEXT = None
-
-
-def get_main_tracing_context(hint=None) -> MainTracingContext:
-    """Checks a number of tracing conditions and return the MainTracingContext"""
-    msg = f"{hint or 'catalyst functions'} can only be used from within @qjit decorated code."
-    TracingContext.check_is_tracing(msg)
-    if TRACING_CONTEXT is None:
-        raise CompileError(f"{hint} can only be used from within a qml.qnode.")
-    return TRACING_CONTEXT
-
 
 @dataclass
 class QRegPromise:
@@ -206,25 +170,6 @@ def promise_actualize(qrp: QRegPromise) -> DynamicJaxprTracer:
     qrp.cache = {}
     qrp.base = qreg
     return qreg
-
-
-@contextmanager
-def frame_tracing_context(
-    ctx: MainTracingContext, trace: Optional[DynamicJaxprTrace] = None
-) -> ContextManager[DynamicJaxprTrace]:
-    main = ctx.mains[trace] if trace is not None else None
-    with new_main2(DynamicJaxprTrace, dynamic=True, main=main) as nmain:
-        nmain.jaxpr_stack = ()
-        frame = JaxprStackFrame() if trace is None else ctx.frames[trace]
-        with extend_jaxpr_stack(nmain, frame), reset_name_stack():
-            parent_trace = ctx.trace
-            ctx.trace = DynamicJaxprTrace(nmain, cur_sublevel()) if trace is None else trace
-            ctx.frames[ctx.trace] = frame
-            ctx.mains[ctx.trace] = nmain
-            try:
-                yield ctx.trace
-            finally:
-                ctx.trace = parent_trace
 
 
 def new_inner_tracer(trace: DynamicJaxprTrace, aval) -> DynamicJaxprTracer:
@@ -311,7 +256,7 @@ def trace_to_mlir(func, *args, **kwargs):
     # if we wanted to compile a single python function multiple times with different options.
     mlir_fn_cache.clear()
 
-    with TracingContext():
+    with TracingContext(EvaluationMode.CLASSICAL_COMPILATION):
         jaxpr, shape = jax.make_jaxpr(func, return_shape=True)(*args, **kwargs)
 
     return jaxpr_to_mlir(func.__name__, jaxpr, shape)
@@ -351,7 +296,7 @@ def trace_quantum_tape(
                 inner_tape = op.regions[0].quantum_tape
                 res_classical_tracers = op.regions[0].res_classical_tracers
 
-                with frame_tracing_context(ctx, inner_trace):
+                with TracingContext.frame_tracing_context(ctx, inner_trace):
                     qreg_in = _input_type_to_tracers(inner_trace.new_arg, [AbstractQreg()])[0]
                     qreg_out = trace_quantum_tape(inner_tape, device, qreg_in, ctx, inner_trace)
                     jaxpr, typ, consts = ctx.frames[inner_trace].to_jaxpr2(
@@ -378,7 +323,7 @@ def trace_quantum_tape(
             elif isinstance(op, Cond):
                 jaxprs, consts = [], []
                 for region in op.regions:
-                    with frame_tracing_context(ctx, region.trace):
+                    with TracingContext.frame_tracing_context(ctx, region.trace):
                         qreg_in = _input_type_to_tracers(region.trace.new_arg, [AbstractQreg()])[0]
                         qreg_out = trace_quantum_tape(
                             region.quantum_tape, device, qreg_in, ctx, region.trace
@@ -404,7 +349,7 @@ def trace_quantum_tape(
             elif isinstance(op, WhileLoop):
                 cond_trace = op.regions[0].trace
                 res_classical_tracers = op.regions[0].res_classical_tracers
-                with frame_tracing_context(ctx, cond_trace):
+                with TracingContext.frame_tracing_context(ctx, cond_trace):
                     _input_type_to_tracers(cond_trace.new_arg, [AbstractQreg()])[0]
                     cond_jaxpr, _, cond_consts = ctx.frames[cond_trace].to_jaxpr2(
                         res_classical_tracers
@@ -413,7 +358,7 @@ def trace_quantum_tape(
                 body_trace = op.regions[1].trace
                 body_tape = op.regions[1].quantum_tape
                 res_classical_tracers = op.regions[1].res_classical_tracers
-                with frame_tracing_context(ctx, body_trace):
+                with TracingContext.frame_tracing_context(ctx, body_trace):
                     qreg_in = _input_type_to_tracers(body_trace.new_arg, [AbstractQreg()])[0]
                     qreg_out = trace_quantum_tape(body_tape, device, qreg_in, ctx, body_trace)
                     body_jaxpr, _, body_consts = ctx.frames[body_trace].to_jaxpr2(
@@ -444,7 +389,7 @@ def trace_quantum_tape(
                 body_trace = op.regions[0].trace
                 body_tape = op.regions[0].quantum_tape
                 res_classical_tracers = op.regions[0].res_classical_tracers
-                with frame_tracing_context(ctx, body_trace):
+                with TracingContext.frame_tracing_context(ctx, body_trace):
                     qreg_in = _input_type_to_tracers(body_trace.new_arg, [AbstractQreg()])[0]
                     qreg_out = trace_quantum_tape(body_tape, device, qreg_in, ctx, body_trace)
                     body_jaxpr, _, body_consts = ctx.frames[body_trace].to_jaxpr2(
@@ -574,10 +519,10 @@ def trace_quantum_function(
     Tape transformations could be applied in-between, allowing users to modify the algorithm
     before the final jaxpr is created."""
 
-    with main_tracing_context() as ctx:
+    with TracingContext(EvaluationMode.QUANTUM_COMPILATION) as ctx:
         # (1) - Classical tracing
         quantum_tape = QuantumTape()
-        with frame_tracing_context(ctx) as trace:
+        with TracingContext.frame_tracing_context(ctx) as trace:
             wffa, in_avals, out_tree_promise = deduce_avals(f, args, kwargs)
             in_classical_tracers = _input_type_to_tracers(trace.new_arg, in_avals)
             with QueuingManager.stop_recording(), quantum_tape:
@@ -588,7 +533,7 @@ def trace_quantum_function(
             ]
 
         # (2) - Quantum tracing
-        with frame_tracing_context(ctx, trace):
+        with TracingContext.frame_tracing_context(ctx, trace):
             qdevice_p.bind(spec="kwargs", val=str(device.backend_kwargs))
             qdevice_p.bind(spec="backend", val=device.backend_name)
             qreg_in = qalloc_p.bind(len(device.wires))
@@ -673,7 +618,8 @@ class QFunc:
             # Allow QFunc to still be used by itself for internal testing.
             device = self.device
 
-        jaxpr, shape = trace_quantum_function(self.func, device, args, kwargs)
+        with TracingContext(EvaluationMode.QUANTUM_COMPILATION):
+            jaxpr, shape = trace_quantum_function(self.func, device, args, kwargs)
 
         retval_tree = tree_structure(shape)
 
