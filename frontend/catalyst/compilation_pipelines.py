@@ -18,7 +18,6 @@ compiling of hybrid quantum-classical functions using Catalyst.
 import ctypes
 import functools
 import inspect
-import pathlib
 import typing
 import warnings
 from enum import Enum
@@ -553,7 +552,6 @@ class QJIT:
         """Compile the current MLIR module."""
 
         if self.compiling_from_textual_ir:
-            import __main__
 
             # Since we don't know the name of the original function when compiling from IR
             # (without parsing the IR), assume the name is something that can't be parsed
