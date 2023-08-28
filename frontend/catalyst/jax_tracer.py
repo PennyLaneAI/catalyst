@@ -21,7 +21,7 @@ from typing import Any, Callable, ContextManager, Dict, List, Optional, Tuple, U
 
 import jax
 import pennylane as qml
-from jax._src.linear_util import (wrap_init, annotate)
+from jax._src.linear_util import (wrap_init)
 from jax._src.api import ShapeDtypeStruct
 from jax._src.core import (
     cur_sublevel,
@@ -31,7 +31,6 @@ from jax._src.core import (
     MainTrace as JaxMainTrace,
     ShapedArray,
 )
-from jax._src.dispatch import jaxpr_replicas
 from jax._src.interpreters.partial_eval import (
     DynamicJaxprTrace,
     DynamicJaxprTracer,
@@ -40,20 +39,8 @@ from jax._src.interpreters.partial_eval import (
     convert_constvars_jaxpr,
     extend_jaxpr_stack,
 )
-from jax._src.lax.lax import xb, xla
-from jax._src.source_info_util import (new_name_stack, reset_name_stack, current as jax_current)
-from jax._src.util import unzip2, wrap_name
-from jax._src.sharding_impls import (
-    ReplicaAxisContext,
-)
-from jax._src.interpreters.mlir import (
-    _module_name_regex,
-    AxisContext,
-    ModuleContext,
-    ir,
-    lower_jaxpr_to_fun,
-    lowerable_effects,
-)
+from jax._src.source_info_util import (reset_name_stack, current as jax_current)
+from jax._src.util import unzip2
 from pennylane import QubitDevice, QubitUnitary, QueuingManager
 from pennylane.measurements import MeasurementProcess, MidMeasureMP
 from pennylane.operation import AnyWires, Operation, Wires
@@ -100,6 +87,7 @@ from catalyst.utils.jax_extras import (
     new_main2,
     sort_eqns,
     deduce_avals,
+    jaxpr_to_mlir
 )
 from catalyst.utils.patching import Patcher
 from catalyst.utils.tracing import TracingContext
@@ -326,22 +314,7 @@ def trace_to_mlir(func, *args, **kwargs):
     with TracingContext():
         jaxpr, shape = jax.make_jaxpr(func, return_shape=True)(*args, **kwargs)
 
-    nrep = jaxpr_replicas(jaxpr)
-    effects = [eff for eff in jaxpr.effects if eff in jax.core.ordered_effects]
-    axis_context = ReplicaAxisContext(xla.AxisEnv(nrep, (), ()))
-    name_stack = new_name_stack(wrap_name("ok", "jit"))
-    module, context = custom_lower_jaxpr_to_module(
-        func_name="jit_" + func.__name__,
-        module_name=func.__name__,
-        jaxpr=jaxpr,
-        effects=effects,
-        platform="cpu",
-        axis_context=axis_context,
-        name_stack=name_stack,
-        donated_args=[],
-    )
-
-    return module, context, jaxpr, tree_structure(shape)
+    return jaxpr_to_mlir(func.__name__, jaxpr, shape)
 
 
 def trace_quantum_tape(
@@ -649,88 +622,6 @@ def trace_quantum_function(
         out_classical_tree, [ShapeDtypeStruct(a.shape, a.dtype, a.named_shape) for a in out_avals]
     )
     return closed_jaxpr, out_shape
-
-
-# pylint: disable=too-many-arguments
-def custom_lower_jaxpr_to_module(
-    func_name: str,
-    module_name: str,
-    jaxpr: jax.core.ClosedJaxpr,
-    effects,
-    platform: str,
-    axis_context: AxisContext,
-    name_stack,
-    donated_args,
-    replicated_args=None,
-    arg_shardings=None,
-    result_shardings=None,
-):
-    """Lowers a top-level jaxpr to an MHLO module.
-
-    Handles the quirks of the argument/return value passing conventions of the
-    runtime.
-
-    This function has been modified from its original form in the JAX project at
-    https://github.com/google/jax/blob/c4d590b1b640cc9fcfdbe91bf3fe34c47bcde917/jax/interpreters/mlir.py#L625version
-    released under the Apache License, Version 2.0, with the following copyright notice:
-
-    Copyright 2021 The JAX Authors.
-    """
-    platform = xb.canonicalize_platform(platform)
-    if not xb.is_known_platform(platform):
-        raise ValueError(f"Unknown platform {platform}")
-    in_avals = jaxpr.in_avals
-    assert arg_shardings is None
-    assert result_shardings is None
-    platforms_with_donation = ("cuda", "rocm", "tpu")
-    assert platform not in platforms_with_donation
-    if any(eff not in lowerable_effects for eff in jaxpr.effects):
-        raise ValueError(f"Cannot lower jaxpr with effects: {jaxpr.effects}")
-    if any(donated_args):
-        unused_donations = [str(a) for a, d in zip(in_avals, donated_args) if d]
-        msg = "See an explanation at https://jax.readthedocs.io/en/latest/faq.html#buffer-donation."
-        if platform not in platforms_with_donation:
-            msg = f"Donation is not implemented for {platform}.\n{msg}"
-
-    # MHLO channels need to start at 1
-    channel_iter = 1
-    # Create a keepalives list that will be mutated during the lowering.
-    keepalives = []
-    host_callbacks = []
-    ctx = ModuleContext(
-        None, platform, axis_context, name_stack, keepalives, channel_iter, host_callbacks
-    )
-    ctx.context.allow_unregistered_dialects = True
-    with ctx.context, ir.Location.unknown(ctx.context):
-        # register_dialect()
-        # Remove module name characters that XLA would alter. This ensures that
-        # XLA computation preserves the module name.
-        module_name = _module_name_regex.sub("_", module_name)
-        ctx.module.operation.attributes["sym_name"] = ir.StringAttr.get(module_name)
-        unlowerable_effects = {eff for eff in jaxpr.effects if eff not in lowerable_effects}
-        if unlowerable_effects:
-            raise ValueError(f"Cannot lower jaxpr with unlowerable effects: {unlowerable_effects}")
-        lower_jaxpr_to_fun(
-            ctx,
-            func_name,
-            jaxpr,
-            effects,
-            public=True,
-            create_tokens=True,
-            replace_tokens_with_dummy=True,
-            replicated_args=replicated_args,
-            arg_shardings=arg_shardings,
-            result_shardings=result_shardings,
-        )
-
-        for op in ctx.module.body.operations:
-            func_name = str(op.name)
-            is_entry_point = func_name.startswith('"jit_')
-            if is_entry_point:
-                continue
-            op.attributes["llvm.linkage"] = ir.Attribute.parse("#llvm.linkage<internal>")
-
-    return ctx.module, ctx.context
 
 
 class QFunc:
