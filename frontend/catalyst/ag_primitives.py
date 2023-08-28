@@ -133,7 +133,6 @@ def _call_python_for(body_fn, get_state, non_array_iterable):
     return get_state()
 
 
-# pylint: disable=too-many-arguments
 def for_stmt(
     iteration_target: Any,
     _extra_test: Callable[[], bool] | None,
@@ -160,7 +159,7 @@ def for_stmt(
         start, stop, step = 0, len(iteration_target.iteration_target), 1
         try:
             iteration_array = jnp.asarray(iteration_target.iteration_target)
-        except:
+        except:  # pylint: disable=bare-except
             iteration_array = None
             fallback = True
 
@@ -173,7 +172,7 @@ def for_stmt(
         start, stop, step = 0, len(iteration_target), 1
         try:
             iteration_array = jnp.asarray(iteration_target)
-        except:
+        except:  # pylint: disable=bare-except
             iteration_array = None
             fallback = True
 
@@ -259,15 +258,19 @@ class CRange:
         self._step = step if step is not None else 1
 
     def get_raw_range(self):
+        """Get the raw values defining this range: start, stop, step."""
         return self._start, self._stop, self._step
 
     @property
     def py_range(self):
+        """Access the underlying Python range object. If it doesn't exist, create one."""
         if self._py_range is None:
             self._py_range = range(self._start, self._stop, self._step)
         return self._py_range
 
     # Interface of the Python range class.
+    # pylint: disable=missing-function-docstring
+
     @property
     def start(self) -> int:
         return self.py_range.start
