@@ -80,13 +80,6 @@ default_lib_paths = {
 }
 
 
-def get_executable_path(project, tool):
-    """Get path to executable."""
-    path = os.path.join(package_root, "bin") if INSTALLED else default_bin_paths.get(project, "")
-    executable_path = os.path.join(path, tool)
-    return executable_path if os.path.exists(executable_path) else tool
-
-
 def get_lib_path(project, env_var):
     """Get the library path."""
     if INSTALLED:
