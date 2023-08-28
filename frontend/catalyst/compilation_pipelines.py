@@ -22,21 +22,12 @@ import typing
 import warnings
 from enum import Enum
 
+import catalyst
+import catalyst.jax_tracer as tracer
 import jax
 import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
-from jax.interpreters.mlir import ir
-from jax.tree_util import tree_flatten, tree_unflatten
-from mlir_quantum.runtime import (
-    as_ctype,
-    get_ranked_memref_descriptor,
-    make_nd_memref_descriptor,
-    make_zero_d_memref_descriptor,
-)
-
-import catalyst
-import catalyst.jax_tracer as tracer
 from catalyst.ag_utils import run_autograph
 from catalyst.compiler import CompileOptions, Compiler
 from catalyst.pennylane_extensions import QFunc
@@ -45,6 +36,14 @@ from catalyst.utils.c_template import get_template, mlir_type_to_numpy_type
 from catalyst.utils.gen_mlir import inject_functions
 from catalyst.utils.patching import Patcher
 from catalyst.utils.tracing import TracingContext
+from jax.interpreters.mlir import ir
+from jax.tree_util import tree_flatten, tree_unflatten
+from mlir_quantum.runtime import (
+    as_ctype,
+    get_ranked_memref_descriptor,
+    make_nd_memref_descriptor,
+    make_zero_d_memref_descriptor,
+)
 
 # Required for JAX tracer objects as PennyLane wires.
 # pylint: disable=unnecessary-lambda
@@ -564,6 +563,8 @@ class QJIT:
             with ir.Context():
                 restype = [ir.RankedTensorType.parse(rt) for rt in inferred_func_data[1].split(",")]
         else:
+            if self.compiled_function and self.compiled_function.shared_object:
+                self.compiled_function.shared_object.close()
             # This will make a check before sending it to the compiler that the return type
             # is actually available in most systems. f16 needs a special symbol and linking
             # will fail if it is not available.
