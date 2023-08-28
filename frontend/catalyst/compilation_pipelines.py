@@ -36,6 +36,8 @@ from mlir_quantum.runtime import (
 )
 
 import catalyst
+import catalyst.jax_tracer as tracer
+from catalyst.ag_utils import run_autograph
 from catalyst.compiler import CompileOptions, Compiler
 from catalyst.jax_tracer import trace_to_mlir
 from catalyst.pennylane_extensions import QFunc
@@ -459,20 +461,26 @@ class QJIT:
     """
 
     def __init__(self, fn, compile_options):
-        self.qfunc = fn
-        self.jaxed_qfunc = None
-        self.c_sig = None
-        functools.update_wrapper(self, fn)
+        self.compiler = Compiler()
         self.compile_options = compile_options
-        self._compiler = Compiler()
+        self.original_function = fn
+        self.user_function = fn
+        self.jaxed_function = None
+        self.compiled_function = None
+        self.mlir_module = None
+        self.user_typed = False
+        self.c_sig = None
+        self.shape = None
         self._jaxpr = None
         self._mlir = None
         self._llvmir = None
-        self.mlir_module = None
-        self.compiled_function = None
-        self.shape = None
-        parameter_types = get_type_annotations(self.qfunc)
-        self.user_typed = False
+
+        functools.update_wrapper(self, fn)
+
+        if compile_options.autograph:
+            self.user_function = run_autograph(fn)
+
+        parameter_types = get_type_annotations(self.user_function)
         if parameter_types is not None:
             self.user_typed = True
             self.mlir_module = self.get_mlir(*parameter_types)
@@ -485,7 +493,7 @@ class QJIT:
         Args:
             stage: string corresponding with the name of the stage to be printed
         """
-        self._compiler.print(stage)  # pragma: nocover
+        self.compiler.print(stage)  # pragma: nocover
 
     @property
     def mlir(self):
@@ -509,7 +517,7 @@ class QJIT:
         return self._llvmir
 
     def get_mlir(self, *args):
-        """Trace :func:`~.qfunc`
+        """Trace :func:`~.user_function`
 
         Args:
             *args: either the concrete values to be passed as arguments to ``fn`` or abstract values
@@ -522,7 +530,7 @@ class QJIT:
         with Patcher(
             (qml.QNode, "__call__", QFunc.__call__),
         ):
-            mlir_module, ctx, jaxpr, self.shape = trace_to_mlir(self.qfunc, *self.c_sig)
+            mlir_module, ctx, jaxpr, self.shape = trace_to_mlir(self.user_function, *self.c_sig)
 
         inject_functions(mlir_module, ctx)
         mod = mlir_module.operation
@@ -544,18 +552,18 @@ class QJIT:
             baseType = ir.RankedTensorType(res).element_type
             mlir_type_to_numpy_type(baseType)
 
-        shared_object = self._compiler.run(
+        shared_object = self.compiler.run(
             self.mlir_module,
             options=self.compile_options,
         )
 
-        self._llvmir = self._compiler.get_output_of("LLVMDialectToLLVMIR")
+        self._llvmir = self.compiler.get_output_of("LLVMDialectToLLVMIR")
 
         # The function name out of MLIR has quotes around it, which we need to remove.
         # The MLIR function name is actually a derived type from string which has no
         # `replace` method, so we need to get a regular Python string out of it.
-        qfunc_name = str(self.mlir_module.body.operations[0].name).replace('"', "")
-        return CompiledFunction(shared_object, qfunc_name, restype)
+        func_name = str(self.mlir_module.body.operations[0].name).replace('"', "")
+        return CompiledFunction(shared_object, func_name, restype)
 
     def _maybe_promote(self, function, *args):
         """Logic to decide whether the function needs to be recompiled
@@ -606,7 +614,7 @@ class QJIT:
 
     def __call__(self, *args, **kwargs):
         if EvaluationContext.is_tracing():
-            return self.qfunc(*args, **kwargs)
+            return self.user_function(*args, **kwargs)
 
         function, args = self._maybe_promote(self.compiled_function, *args)
         recompilation_needed = function != self.compiled_function
@@ -615,10 +623,10 @@ class QJIT:
         args_data, _args_shape = tree_flatten(args)
         if any(isinstance(arg, jax.core.Tracer) for arg in args_data):
             # Only compile a derivative version of the compiled function when needed.
-            if self.jaxed_qfunc is None or recompilation_needed:
-                self.jaxed_qfunc = JAX_QJIT(self)
+            if self.jaxed_function is None or recompilation_needed:
+                self.jaxed_function = JAX_QJIT(self)
 
-            return self.jaxed_qfunc(*args, **kwargs)
+            return self.jaxed_function(*args, **kwargs)
 
         data = self.compiled_function(*args, **kwargs)
 
@@ -643,34 +651,36 @@ class JAX_QJIT:
     compilation time.
 
     Args:
-        qfunc (QJIT): the compiled quantum function object to wrap
+        qjit_function (QJIT): the compiled quantum function object to wrap
     """
 
-    def __init__(self, qfunc):
+    def __init__(self, qjit_function):
         @jax.custom_jvp
-        def jaxed_qfunc(*args, **kwargs):
-            return self.wrap_callback(qfunc, *args, **kwargs)
+        def jaxed_function(*args, **kwargs):
+            return self.wrap_callback(qjit_function, *args, **kwargs)
 
-        self.qfunc = qfunc
-        self.deriv_qfuncs = {}
-        self.jaxed_qfunc = jaxed_qfunc
-        jaxed_qfunc.defjvp(self.compute_jvp, symbolic_zeros=True)
+        self.qjit_function = qjit_function
+        self.derivative_functions = {}
+        self.jaxed_function = jaxed_function
+        jaxed_function.defjvp(self.compute_jvp, symbolic_zeros=True)
 
     @staticmethod
-    def wrap_callback(qfunc, *args, **kwargs):
+    def wrap_callback(qjit_function, *args, **kwargs):
         """Wrap a QJIT function inside a jax host callback."""
-        data = jax.pure_callback(qfunc, qfunc.jaxpr.out_avals, *args, vectorized=False, **kwargs)
+        data = jax.pure_callback(
+            qjit_function, qjit_function.jaxpr.out_avals, *args, vectorized=False, **kwargs
+        )
 
         # Unflatten the return value w.r.t. the original PyTree definition if available
-        assert qfunc.shape is not None, "Shape must not be none."
-        return tree_unflatten(qfunc.shape, data)
+        assert qjit_function.shape is not None, "Shape must not be none."
+        return tree_unflatten(qjit_function.shape, data)
 
-    def get_derivative_qfunc(self, argnums):
+    def get_derivative_qjit(self, argnums):
         """Compile a function computing the derivative of the wrapped QJIT for the given argnums."""
 
         argnum_key = "".join(str(idx) for idx in argnums)
-        if argnum_key in self.deriv_qfuncs:
-            return self.deriv_qfuncs[argnum_key]
+        if argnum_key in self.derivative_functions:
+            return self.derivative_functions[argnum_key]
 
         # Here we define the signature for the new QJIT object explicitly, rather than relying on
         # functools.wrap, in order to guarantee compilation is triggered on instantiation.
@@ -678,20 +688,22 @@ class JAX_QJIT:
         # in QJIT.c_sig, however we don't update the original function with these annotations.
         annotations = {}
         updated_params = []
-        signature = inspect.signature(self.qfunc)
+        signature = inspect.signature(self.qjit_function)
         for idx, (arg_name, param) in enumerate(signature.parameters.items()):
-            annotations[arg_name] = self.qfunc.c_sig[idx]
+            annotations[arg_name] = self.qjit_function.c_sig[idx]
             updated_params.append(param.replace(annotation=annotations[arg_name]))
 
         def deriv_wrapper(*args, **kwargs):
-            return catalyst.grad(self.qfunc, argnum=argnums)(*args, **kwargs)
+            return catalyst.jacobian(self.qjit_function, argnum=argnums)(*args, **kwargs)
 
-        deriv_wrapper.__name__ = "deriv_" + self.qfunc.__name__
+        deriv_wrapper.__name__ = "deriv_" + self.qjit_function.__name__
         deriv_wrapper.__annotations__ = annotations
         deriv_wrapper.__signature__ = signature.replace(parameters=updated_params)
 
-        self.deriv_qfuncs[argnum_key] = QJIT(deriv_wrapper, self.qfunc.compile_options)
-        return self.deriv_qfuncs[argnum_key]
+        self.derivative_functions[argnum_key] = QJIT(
+            deriv_wrapper, self.qjit_function.compile_options
+        )
+        return self.derivative_functions[argnum_key]
 
     def compute_jvp(self, primals, tangents):
         """Compute the set of results and JVPs for a QJIT function."""
@@ -706,9 +718,9 @@ class JAX_QJIT:
             if not isinstance(tangent, jax.custom_derivatives.SymbolicZero):
                 argnums.append(idx)
 
-        results = self.wrap_callback(self.qfunc, *primals)
+        results = self.wrap_callback(self.qjit_function, *primals)
         results_data, _results_shape = tree_flatten(results)
-        derivatives = self.wrap_callback(self.get_derivative_qfunc(argnums), *primals)
+        derivatives = self.wrap_callback(self.get_derivative_qjit(argnums), *primals)
         derivatives_data, _derivatives_shape = tree_flatten(derivatives)
 
         jvps = [jnp.zeros_like(results_data[res_idx]) for res_idx in range(len(results_data))]
@@ -731,12 +743,13 @@ class JAX_QJIT:
         return results, jvps
 
     def __call__(self, *args, **kwargs):
-        return self.jaxed_qfunc(*args, **kwargs)
+        return self.jaxed_function(*args, **kwargs)
 
 
 def qjit(
     fn=None,
     *,
+    autograph=False,
     target="binary",
     keep_intermediate=False,
     verbose=False,
@@ -756,6 +769,8 @@ def qjit(
 
     Args:
         fn (Callable): the quantum or classical function
+        autograph (bool): support imperative Python code via AutoGraph source transformations
+                          (requires tensorflow package)
         target (str): the compilation target
         keep_intermediate (bool): Whether or not to store the intermediate files throughout the
             compilation. If ``True``, intermediate representations are available via the
@@ -776,6 +791,8 @@ def qjit(
         FileExistsError: Unable to create temporary directory
         PermissionError: Problems creating temporary directory
         OSError: Problems while creating folder for intermediate files
+        AutoGraphError: Raised if there was an issue converting the given the function(s).
+        ImportError: Raised if AutoGraph is turned on and TensorFlow could not be found.
 
     **Example**
 
@@ -805,17 +822,47 @@ def qjit(
 
         from jax.core import ShapedArray
 
-            @qjit  # compilation happens at definition
-            @qml.qnode(qml.device("lightning.qubit", wires=2))
-            def circuit(x: complex, z: ShapedArray(shape=(3,), dtype=jnp.float64)):
-                theta = jnp.abs(x)
-                qml.RY(theta, wires=0)
-                qml.Rot(z[0], z[1], z[2], wires=0)
-                return qml.state()
+        @qjit  # compilation happens at definition
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def circuit(x: complex, z: ShapedArray(shape=(3,), dtype=jnp.float64)):
+            theta = jnp.abs(x)
+            qml.RY(theta, wires=0)
+            qml.Rot(z[0], z[1], z[2], wires=0)
+            return qml.state()
 
     >>> circuit(0.2j, jnp.array([0.3, 0.6, 0.9]))  # calls precompiled function
     array([0.75634905-0.52801002j, 0. +0.j,
            0.35962678+0.14074839j, 0. +0.j])
+
+    Catalyst also supports capturing imperative Python control flow in compiled programs. You can
+    enable this feature via the ``autograph=True`` parameter. Note that it does come with some
+    restrictions, in particular whenever global state is involved. Refer to the documentation page
+    for a complete discussion of the supported and unsupported use-cases.
+
+    .. code-block:: python
+
+        @qjit(autograph=True)
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def circuit(x: int):
+
+            if x < 5:
+                qml.Hadamard(wires=0)
+            else:
+                qml.T(wires=0)
+
+            return qml.expval(qml.PauliZ(0))
+
+    >>> circuit(3)
+    array(0.)
+
+    >>> circuit(5)
+    array(1.)
+
+    Note that imperative control flow will still work in Catalyst even when the AutoGraph feature is
+    turned off, it just won't be captured in the compiled program and cannot involve traced values.
+    The example above would then raise a tracing error, as there is no value for ``x`` yet than can
+    be compared in the if statement. A loop like ``for i in range(5)`` would be unrolled during
+    tracing, "copy-pasting" the body 5 times into the program rather than appearing as is.
 
     .. important::
 
@@ -834,9 +881,13 @@ def qjit(
     """
 
     if fn is not None:
-        return QJIT(fn, CompileOptions(verbose, logfile, target, keep_intermediate, pipelines))
+        return QJIT(
+            fn, CompileOptions(verbose, logfile, target, keep_intermediate, pipelines, autograph)
+        )
 
     def wrap_fn(fn):
-        return QJIT(fn, CompileOptions(verbose, logfile, target, keep_intermediate, pipelines))
+        return QJIT(
+            fn, CompileOptions(verbose, logfile, target, keep_intermediate, pipelines, autograph)
+        )
 
     return wrap_fn

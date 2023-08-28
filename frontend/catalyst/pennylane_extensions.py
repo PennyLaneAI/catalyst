@@ -160,11 +160,11 @@ def _ensure_differentiable(f: DifferentiableLike) -> Differentiable:
 
     # Unwrap the function from an existing QJIT object.
     if isinstance(f, catalyst.compilation_pipelines.QJIT):
-        f = f.qfunc
+        f = f.user_function
 
     if isinstance(f, (Function, QNode)):
         return f
-    elif isinstance(f, Callable):  # keep at the bottom
+    elif isinstance(f, Callable):  # Keep at the bottom
         return Function(f)
 
     raise DifferentiableCompileError(f"Non-differentiable object passed: {type(f)}")
@@ -181,13 +181,20 @@ def _make_jaxpr_check_differentiable(f: Differentiable, grad_params: GradParams,
     for pos, arg in enumerate(jaxpr.in_avals):
         if arg.dtype.kind != "f" and pos in grad_params.argnum:
             raise DifferentiableCompileError(
-                "Catalyst.grad only supports differentiation on floating-point "
+                "Catalyst.grad/jacobian only supports differentiation on floating-point "
                 f"arguments, got '{arg.dtype}' at position {pos}."
             )
+
+    if grad_params.scalar_out:
+        if not (len(jaxpr.out_avals) == 1 and jaxpr.out_avals[0].shape == ()):
+            raise DifferentiableCompileError(
+                f"Catalyst.grad only supports scalar-output functions, got {jaxpr.out_avals}"
+            )
+
     for pos, res in enumerate(jaxpr.out_avals):
         if res.dtype.kind != "f":
             raise DifferentiableCompileError(
-                "Catalyst.grad only supports differentiation on floating-point "
+                "Catalyst.grad/jacobian only supports differentiation on floating-point "
                 f"results, got '{res.dtype}' at position {pos}."
             )
 
@@ -232,7 +239,7 @@ def _check_created_jaxpr_gradient_methods(f: Differentiable, method: str, jaxpr:
 
 
 def _check_grad_params(
-    method: str, h: Optional[float], argnum: Optional[Union[int, List[int]]]
+    method: str, scalar_out: bool, h: Optional[float], argnum: Optional[Union[int, List[int]]]
 ) -> GradParams:
     methods = {"fd", "defer"}
     if method is None:
@@ -256,7 +263,7 @@ def _check_grad_params(
         pass
     else:
         raise ValueError(f"argnum should be integer or a list of integers, not {argnum}")
-    return GradParams(method, h, argnum)
+    return GradParams(method, scalar_out, h, argnum)
 
 
 class Grad:
@@ -308,12 +315,6 @@ def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
 
     .. warning::
 
-        If parameter-shift or adjoint is specified, this will only be used
-        for internal _quantum_ functions. Classical components will be differentiated
-        using finite-differences.
-
-    .. warning::
-
         Currently, higher-order differentiation or differentiation of non-QNode functions
         is only supported by the finite-difference method.
 
@@ -326,25 +327,28 @@ def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
 
     Args:
         f (Callable): a function or a function object to differentiate
-        method (str): The method used for differentiation, which can be any of
-                      ``["fd", "defer"]``,
-            where:
+        method (str): The method used for differentiation, which can be any of ``["fd", "defer"]``,
+                      where:
 
-            - ``"fd"`` represents first-order finite-differences for the entire hybrid
-              circuit,
+                      - ``"fd"`` represents first-order finite-differences for the entire hybrid
+                        circuit,
 
-            - ``"defer"`` represents deferring the quantum differentiation to the method
-              specified by the QNode, while the classical computation is differentiated
-              using traditional auto-diff.
+                      - ``"defer"`` represents deferring the quantum differentiation to the method
+                        specified by the QNode, while the classical computation is differentiated
+                        using traditional auto-diff.
 
         h (float): the step-size value for the finite-difference (``"fd"``) method
         argnum (Tuple[int, List[int]]): the argument indices to differentiate
 
     Returns:
-        Grad: A Grad object that denotes the derivative of a function.
+        Callable: A callable object that computes the gradient of the wrapped function for the given
+                  arguments.
 
     Raises:
         ValueError: Invalid method or step size parameters.
+        DifferentiableCompilerError: Called on a function that doesn't return a single scalar.
+
+    .. seealso:: :func:`~.jacobian`
 
     **Example**
 
@@ -365,7 +369,79 @@ def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
     >>> workflow(2.0)
     array(-3.14159265)
     """
-    return Grad(_ensure_differentiable(f), grad_params=_check_grad_params(method, h, argnum))
+    scalar_out = True
+    return Grad(
+        _ensure_differentiable(f), grad_params=_check_grad_params(method, scalar_out, h, argnum)
+    )
+
+
+def jacobian(f: DifferentiableLike, *, method=None, h=None, argnum=None):
+    """A :func:`~.qjit` compatible Jacobian transformation for PennyLane/Catalyst.
+
+    This function allows the Jacobian of a hybrid quantum-classical function
+    to be computed within the compiled program.
+
+    .. warning::
+
+        Currently, higher-order differentiation or differentiation of non-QNode functions
+        is only supported by the finite-difference method.
+
+    .. note::
+
+        Any JAX-compatible optimization library, such as `JAXopt
+        <https://jaxopt.github.io/stable/index.html>`_, can be used
+        alongside ``jacobian`` for JIT-compatible variational workflows.
+        See the :doc:`/dev/quick_start` for examples.
+
+    Args:
+        f (Callable): a function or a function object to differentiate
+        method (str): The method used for differentiation, which can be any of ``["fd", "defer"]``,
+                      where:
+
+                      - ``"fd"`` represents first-order finite-differences for the entire hybrid
+                        circuit,
+
+                      - ``"defer"`` represents deferring the quantum differentiation to the method
+                        specified by the QNode, while the classical computation is differentiated
+                        using traditional auto-diff.
+
+        h (float): the step-size value for the finite-difference (``"fd"``) method
+        argnum (Tuple[int, List[int]]): the argument indices to differentiate
+
+    Returns:
+        Callable: A callable object that computes the Jacobian of the wrapped function for the given
+                  arguments.
+
+    Raises:
+        ValueError: Invalid method or step size parameters.
+
+    .. seealso:: :func:`~.grad`
+
+    **Example**
+
+    .. code-block:: python
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qjit
+        def workflow(x):
+            @qml.qnode(dev)
+            def circuit(x):
+                qml.RX(jnp.pi * x[0], wires=0)
+                qml.RY(x[1], wires=0)
+                return qml.probs()
+
+            g = jacobian(circuit)
+            return g(x)
+
+    >>> workflow(jnp.array([2.0, 1.0]))
+    array([[-1.32116540e-07,  1.33781874e-07],
+           [-4.20735506e-01,  4.20735506e-01]])
+    """
+    scalar_out = False
+    return Grad(
+        _ensure_differentiable(f), grad_params=_check_grad_params(method, scalar_out, h, argnum)
+    )
 
 
 def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=None):
@@ -376,7 +452,7 @@ def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=
 
     Args:
         f (Callable): Function-like object to calculate JVP for
-        params (List[Array]): List (or a tuple) of the fnuction arguments specifying the point
+        params (List[Array]): List (or a tuple) of the function arguments specifying the point
                               to calculate JVP at. A subset of these parameters are declared as
                               differentiable by listing their indices in the ``argnum`` parameter.
         tangents(List[Array]): List (or a tuple) of tangent values to use in JVP. The list size and
@@ -446,7 +522,8 @@ def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=
     params = _check(params, "params")
     tangents = _check(tangents, "tangents")
     fn: Differentiable = _ensure_differentiable(f)
-    grad_params = _check_grad_params(method, h, argnum)
+    scalar_out = False
+    grad_params = _check_grad_params(method, scalar_out, h, argnum)
     jaxpr = _make_jaxpr_check_differentiable(fn, grad_params, *params)
     return jvp_p.bind(*params, *tangents, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
 
@@ -459,9 +536,9 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
 
     Args:
         f(Callable): Function-like object to calculate JVP for
-        params(List[Array]): List (or a tuble) of f's arguments specifying the point to calculate
+        params(List[Array]): List (or a tuple) of f's arguments specifying the point to calculate
                              VJP at. A subset of these parameters are declared as
-                             differentiable by listing their indices in the ``argnum`` paramerer.
+                             differentiable by listing their indices in the ``argnum`` parameter.
         cotangents(List[Array]): List (or a tuple) of tangent values to use in JVP. The list size
                                  and shapes must match the size and shape of ``f`` outputs.
         method(str): Differentiation method to use, same as in ``grad``.
@@ -505,7 +582,8 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
     params = _check(params, "params")
     cotangents = _check(cotangents, "cotangents")
     fn: Differentiable = _ensure_differentiable(f)
-    grad_params = _check_grad_params(method, h, argnum)
+    scalar_out = False
+    grad_params = _check_grad_params(method, scalar_out, h, argnum)
     jaxpr = _make_jaxpr_check_differentiable(fn, grad_params, *params)
     return vjp_p.bind(*params, *cotangents, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
 
@@ -531,6 +609,73 @@ def _aval_to_primitive_type(aval):
         aval = aval.dtype
     assert not isinstance(aval, (list, dict)), f"Unexpected type {aval}"
     return aval
+
+
+#     .. warning::
+
+#         This function does not support performing the adjoint
+#         of quantum functions that contain mid-circuit measurements.
+
+#     Args:
+#         f (Callable or Operator): A PennyLane operation or a Python function
+#                                   containing PennyLane quantum operations.
+
+#     Returns:
+#         If an Operator is provided, returns an Operator that is the adjoint. If
+#         a function is provided, returns a function with the same call signature
+#         that returns the Adjoint of the provided function.
+
+#     Raises:
+#         ValueError: invalid parameter values
+
+#     **Example 1 (basic usage)**
+
+#     .. code-block:: python
+
+#         @qjit
+#         @qml.qnode(qml.device("lightning.qubit", wires=1))
+#         def workflow(theta, wires):
+#             catalyst.adjoint(qml.RZ)(theta, wires=wires)
+#             catalyst.adjoint(qml.RZ(theta, wires=wires))
+#             def func():
+#                 qml.RX(theta, wires=wires)
+#                 qml.RY(theta, wires=wires)
+#             catalyst.adjoint(func)()
+#             return qml.probs()
+
+#     >>> workflow(jnp.pi/2, wires=0)
+#     array([0.5, 0.5])
+
+#     **Example 2 (with Catalyst control flow)**
+
+#     .. code-block:: python
+
+#         @qjit
+#         @qml.qnode(qml.device("lightning.qubit", wires=1))
+#         def workflow(theta, n, wires):
+#             def func():
+#                 @catalyst.for_loop(0, n, 1)
+#                 def loop_fn(i):
+#                     qml.RX(theta, wires=wires)
+
+#                 loop_fn()
+#             catalyst.adjoint(func)()
+#             return qml.probs()
+
+#     >>> workflow(jnp.pi/2, 3, 0)
+#     [1.00000000e+00 7.39557099e-32]
+#     """
+
+#     def _make_adjoint(*args, _callee: Callable, **kwargs):
+#         cargs_qargs, tree = tree_flatten((args, kwargs, [jprim.Qreg()]))
+#         cargs, _ = tree_flatten((args, kwargs))
+#         cargs_qargs_aval = tuple(_abstractify(val) for val in cargs_qargs)
+#         body, consts, _ = _initial_style_jaxpr(
+#             partial(_trace_quantum_tape, _callee=_callee, _allow_quantum_measurements=False),
+#             tree,
+#             cargs_qargs_aval,
+#             "adjoint",
+
 
 
 def _check_single_bool_value(tree: PyTreeDef, avals: List[Any], hint=None) -> None:
@@ -593,13 +738,13 @@ class CondCallable:
 
     @staticmethod
     def _check_branches_return_types(branch_jaxprs):
-        expected = branch_jaxprs[0].out_avals[:-1]
+        expected = branch_jaxprs[0].out_avals
         for i, jaxpr in list(enumerate(branch_jaxprs))[1:]:
-            if expected != jaxpr.out_avals[:-1]:
+            if expected != jaxpr.out_avals:
                 raise TypeError(
-                    "Conditional branches all require the same return type, got:\n"
+                    "Conditional requires consistent return types across all branches, got:\n"
                     f" - Branch at index 0: {expected}\n"
-                    f" - Branch at index {i}: {jaxpr.out_avals[:-1]}\n"
+                    f" - Branch at index {i}: {jaxpr.out_avals}\n"
                     "Please specify an else branch if none was specified."
                 )
 
@@ -655,6 +800,111 @@ class CondCallable:
 
 
 def cond(pred: DynamicJaxprTracer):
+    """A :func:`~.qjit` compatible decorator for if-else conditionals in PennyLane/Catalyst.
+
+    .. note::
+
+        Catalyst can automatically convert Python if-statements for you. Requires setting
+        ``autograph=True``, see the :func:`~.qjit` function or documentation page for more details.
+
+    This form of control flow is a functional version of the traditional if-else conditional. This
+    means that each execution path, an 'if' branch, any 'else if' branches, and a final 'otherwise'
+    branch, is provided as a separate function. All functions will be traced during compilation,
+    but only one of them will be executed at runtime, depending on the value of one or more
+    Boolean predicates. The JAX equivalent is the ``jax.lax.cond`` function, but this version is
+    optimized to work with quantum programs in PennyLane. This version also supports an 'else if'
+    construct which the JAX version does not.
+
+    Values produced inside the scope of a conditional can be returned to the outside context, but
+    the return type signature of each branch must be identical. If no values are returned, the
+    'otherwise' branch is optional. Refer to the example below to learn more about the syntax of
+    this decorator.
+
+    This form of control flow can also be called from the Python interpreter without needing to use
+    :func:`~.qjit`.
+
+    Args:
+        pred (bool): the first predicate with which to control the branch to execute
+
+    Returns:
+        A callable decorator that wraps the first 'if' branch of the conditional.
+
+    Raises:
+        AssertionError: Branch functions cannot have arguments.
+
+    **Example**
+
+    .. code-block:: python
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qjit
+        @qml.qnode(dev)
+        def circuit(x: float):
+
+            # define a conditional ansatz
+            @cond(x > 1.4)
+            def ansatz():
+                qml.RX(x, wires=0)
+                qml.Hadamard(wires=0)
+
+            @ansatz.otherwise
+            def ansatz():
+                qml.RY(x, wires=0)
+
+            # apply the conditional ansatz
+            ansatz()
+
+            return qml.expval(qml.PauliZ(0))
+
+    >>> circuit(1.4)
+    array(0.16996714)
+    >>> circuit(1.6)
+    array(0.)
+
+    Additional 'else-if' clauses can also be included via the ``else_if`` method:
+
+    .. code-block:: python
+
+        @qjit
+        @qml.qnode(dev)
+        def circuit(x):
+
+            @catalyst.cond(x > 2.7)
+            def cond_fn():
+                qml.RX(x, wires=0)
+
+            @cond_fn.else_if(x > 1.4)
+            def cond_elif():
+                qml.RY(x, wires=0)
+
+            @cond_fn.otherwise
+            def cond_else():
+                qml.RX(x ** 2, wires=0)
+
+            cond_fn()
+
+            eturn qml.probs(wires=0)
+
+    The conditional function is permitted to also return values.
+    Any value that is supported by JAX JIT compilation is supported as a return
+    type. Note that this **does not** include PennyLane operations.
+
+    .. code-block:: python
+
+        @cond(predicate: bool)
+        def conditional_fn():
+            # do something when the predicate is true
+            return "optionally return some value"
+
+        @conditional_fn.otherwise
+        def conditional_fn():
+            # optionally define an alternative execution path
+            return "if provided, return types need to be identical in both branches"
+
+        ret_val = conditional_fn()  # must invoke the defined function
+    """
+
     def _decorator(true_fn: Callable):
         if true_fn.__code__.co_argcount != 0:
             raise TypeError("Conditional 'True' function is not allowed to have any arguments")

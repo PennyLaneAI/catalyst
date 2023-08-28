@@ -176,9 +176,8 @@ class TestCond:
         assert circuit(6) == True
 
     def test_branch_return_mismatch(self, backend):
-        """
-        Test that an exception is raised when the true branch returns a value without an else
-        branch
+        """Test that an exception is raised when the true branch returns a value without an else
+        branch.
         """
 
         def circuit():
@@ -189,12 +188,12 @@ class TestCond:
             return cond_fn()
 
         with pytest.raises(
-            TypeError, match="Conditional branches: Same return types were expected"
+            TypeError, match="Conditional requires consistent return types across all branches"
         ):
             qjit(qml.qnode(qml.device(backend, wires=1))(circuit))
 
     def test_branch_multi_return_mismatch(self, backend):
-        """Test that an exception is raised when the return types of all branches do not match"""
+        """Test that an exception is raised when the return types of all branches do not match."""
 
         def circuit():
             @cond(True)
@@ -212,9 +211,30 @@ class TestCond:
             return cond_fn()
 
         with pytest.raises(
-            TypeError, match="Conditional branches: Same return types were expected"
+            TypeError, match="Conditional requires consistent return types across all branches"
         ):
             qjit(qml.qnode(qml.device(backend, wires=1))(circuit))
+
+    def test_branch_return_mismatch_classical(self):
+        """Test that an exception is raised when the true branch returns a different type than the
+        else branch, given a classical tracing context (no QNode).
+        """
+
+        def circuit():
+            @cond(True)
+            def cond_fn():
+                return 1
+
+            @cond_fn.otherwise
+            def cond_fn():
+                return 2.0
+
+            return cond_fn()
+
+        with pytest.raises(
+            TypeError, match="Conditional requires consistent return types across all branches"
+        ):
+            qjit(circuit)
 
     def test_branch_with_arg(self):
         """Test that an exception is raised when an 'else if' branch function contains an arg"""

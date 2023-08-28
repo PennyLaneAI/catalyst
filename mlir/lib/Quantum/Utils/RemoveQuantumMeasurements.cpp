@@ -14,6 +14,8 @@
 
 #include <deque>
 
+#include "llvm/ADT/SmallPtrSet.h"
+
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Utils/RemoveQuantumMeasurements.h"
@@ -25,10 +27,10 @@ namespace quantum {
 
 void removeQuantumMeasurements(func::FuncOp &function)
 {
-
     // Delete measurement operations.
     std::deque<Operation *> opsToDelete;
     function.walk([&](MeasurementProcess op) { opsToDelete.push_back(op); });
+    SmallPtrSet<Operation *, 4> visited{opsToDelete.begin(), opsToDelete.end()};
 
     // Measurement operations are not allowed inside scf dialects.
     // This means that we can remove them.
@@ -41,7 +43,10 @@ void removeQuantumMeasurements(func::FuncOp &function)
         opsToDelete.pop_front();
         currentOp->dropAllReferences();
         for (Operation *user : currentOp->getUsers()) {
-            opsToDelete.push_back(user);
+            if (!visited.contains(user)) {
+                visited.insert(user);
+                opsToDelete.push_back(user);
+            }
         }
         if (currentOp->use_empty()) {
             currentOp->erase();

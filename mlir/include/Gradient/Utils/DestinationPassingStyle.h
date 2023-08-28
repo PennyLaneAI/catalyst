@@ -1,4 +1,4 @@
-// Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+// Copyright 2023 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// The qir_stdlib module wraps qir-runner/stdlib APIs used by the runtime from the list
-// of available APIs: https://github.com/qir-alliance/qir-runner/blob/main/stdlib/src/lib.rs
-pub use qir_stdlib::{
-    arrays::*, bigints::*, callables::*, math::*, output_recording::*, range_support::*,
-    strings::*, tuples::*,
-};
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+
+namespace catalyst {
+/// Convert every MemRef-typed return value in `callee` to writing to a new argument in
+/// destination-passing style.
+void convertToDestinationPassingStyle(mlir::func::FuncOp callee, mlir::OpBuilder &builder);
+} // namespace catalyst

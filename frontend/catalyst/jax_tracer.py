@@ -115,6 +115,13 @@ KNOWN_NAMED_OBS = (qml.Identity, qml.PauliX, qml.PauliY, qml.PauliZ, qml.Hadamar
 
 FORCED_ORDER_PRIMITIVES = {qdevice_p, qextract_p}
 
+PAULI_NAMED_MAP = {
+    "I": "Identity",
+    "X": "PauliX",
+    "Y": "PauliY",
+    "Z": "PauliZ",
+}
+
 
 @dataclass
 class QRegPromise:
@@ -458,6 +465,94 @@ def trace_observables(
     else:
         raise NotImplementedError(f"Observable {obs} is not impemented")
     return obs_tracers, qubits
+
+
+def named_obs(obs, op_args, qubit_states, qreg):
+    """Trace a named observable.
+
+    Args:
+        obs: a named observable
+        op_args: arguments of the observable
+        qubit_states: the statically known qubit state at this program point
+        qreg: the quantum register with the state at this program point
+
+    Returns:
+        jax_obs: a NamedObs JAX primitive used for tracing
+        qubits: a list of qubits used by the observable
+    """
+    assert isinstance(obs, KNOWN_NAMED_OBS)
+    _, wires = op_args
+    qubits = get_qubits_from_wires(wires, qubit_states, qreg)
+    jax_obs = jprim.namedobs(type(obs).__name__, qubits[0])
+    return jax_obs, qubits
+
+
+def hermitian_obs(obs, op_args, qubit_states, qreg):
+    """Trace a Hermitian observable.
+
+    Args:
+        obs: a Hermitian observable
+        op_args: arguments of the observable
+        qubit_states: the statically known qubit state at this program point
+        qreg: the quantum register with the state at this program point
+
+    Returns:
+        jax_obs: a Hermitian JAX primitive used for tracing
+        qubits: a list of qubits used by the observable
+    """
+    assert isinstance(obs, qml.Hermitian)
+    matrix, wires = op_args
+    qubits = get_qubits_from_wires(wires, qubit_states, qreg)
+    jax_obs = jprim.hermitian(matrix, *qubits)
+    return jax_obs, qubits
+
+
+def pauli_sentence_to_hamiltonian_obs(paulis, qubit_states, qreg):
+    """Convert a :class:`pennylane.pauli.PauliSentence` into a Hamiltonian.
+
+    Args:
+        paulis: a :class:`pennylane.pauli.PauliSentence`
+        qubit_states: the statically known qubit state at this program point
+        qreg: the quantum register with the state at this program point
+
+    Returns:
+        a Hamiltonian JAX primitive used for tracing
+    """
+    pwords, coeffs = zip(*paulis.items())
+    nested_obs = [pauli_word_to_tensor_obs(pword, qubit_states, qreg) for pword in pwords]
+
+    # No need to create a Hamiltonian for a single TensorObs
+    if len(nested_obs) == 1 and coeffs[0] == 1.0:
+        return nested_obs[0]
+
+    coeffs = jax.numpy.asarray(coeffs)
+    return jprim.hamiltonian(coeffs, *nested_obs)
+
+
+def pauli_word_to_tensor_obs(obs, qubit_states, qreg):
+    """Convert a :class:`pennylane.pauli.PauliWord` into a Named or Tensor observable.
+
+    Args:
+        obs: a :class:`pennylane.pauli.PauliWord`
+        qubit_states: the statically known qubit state at this program point
+        qreg: the quantum register with the state at this program point
+
+    Returns:
+        a NamedObs or TensorObs JAX primitive used for tracing
+    """
+    if len(obs) == 1:
+        wire, pauli = list(obs.items())[0]
+        qubits = get_qubits_from_wires([wire], qubit_states, qreg)
+        return jprim.namedobs(PAULI_NAMED_MAP[pauli], qubits[0])
+
+    nested_obs = []
+    for wire, pauli in obs.items():
+        qubits = get_qubits_from_wires([wire], qubit_states, qreg)
+        nested_obs.append(jprim.namedobs(PAULI_NAMED_MAP[pauli], qubits[0]))
+
+    return jprim.tensorobs(*nested_obs)
+
+
 
 
 def trace_quantum_measurements(

@@ -15,6 +15,8 @@
 This package contains the Catalyst Python interface.
 """
 
+import sys
+import types
 
 from catalyst._configuration import INSTALLED
 from catalyst._version import __version__
@@ -26,17 +28,32 @@ if not INSTALLED:
         os.path.dirname(__file__), "../../mlir/build/python_packages/quantum"
     )
     if os.path.exists(default_bindings_path):  # pragma: no cover
-        import sys
-
         sys.path.insert(0, default_bindings_path)
 
+# Patch certain modules to integrate our MLIR bindings with JAX. This needs to happen before any
+# part of 'mlir_quantum' is imported.
+# Note that '__import__' does not return the specific submodule, only the parent package.
+# pylint: disable=protected-access
+sys.modules["mlir_quantum.ir"] = __import__("jaxlib.mlir.ir").mlir.ir
+sys.modules["mlir_quantum._mlir_libs"] = __import__("jaxlib.mlir._mlir_libs").mlir._mlir_libs
+# C++ extensions to the dialects are mocked out.
+sys.modules["mlir_quantum._mlir_libs._quantumDialects.gradient"] = types.ModuleType(
+    "mlir_quantum._mlir_libs._quantumDialects.gradient"
+)
+sys.modules["mlir_quantum._mlir_libs._quantumDialects.quantum"] = types.ModuleType(
+    "mlir_quantum._mlir_libs._quantumDialects.quantum"
+)
+
+
 # pylint: disable=wrong-import-position
+from catalyst.ag_utils import AutoGraphError, autograph_source
 from catalyst.compilation_pipelines import QJIT, CompileOptions, qjit
 from catalyst.pennylane_extensions import (
     adjoint,
     cond,
     for_loop,
     grad,
+    jacobian,
     jvp,
     measure,
     vjp,
@@ -52,9 +69,12 @@ __all__ = (
     "cond",
     "measure",
     "grad",
+    "jacobian",
     "vjp",
     "jvp",
     "adjoint",
+    "autograph_source",
+    "AutoGraphError",
     "CompileError",
     "CompileOptions",
 )

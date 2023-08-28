@@ -99,10 +99,57 @@ struct ArrayListBuilder {
         return SymbolRefAttr::get(ctx, funcName);
     }
 
+    FlatSymbolRefAttr getOrInsertPopFunction(Location loc, ModuleOp moduleOp,
+                                             OpBuilder &builder) const
+    {
+        MLIRContext *ctx = builder.getContext();
+        std::string funcName = "__catalyst_arraylist_pop";
+        llvm::raw_string_ostream nameStream{funcName};
+        nameStream << elementType;
+        if (moduleOp.lookupSymbol<func::FuncOp>(funcName)) {
+            return SymbolRefAttr::get(ctx, funcName);
+        }
+
+        OpBuilder::InsertionGuard insertionGuard(builder);
+        builder.setInsertionPointToStart(moduleOp.getBody());
+
+        auto popFnType =
+            FunctionType::get(ctx, /*inputs=*/
+                              {dataField.getType(), sizeField.getType(), capacityField.getType()},
+                              /*outputs=*/elementType);
+        auto popFn = builder.create<func::FuncOp>(loc, funcName, popFnType);
+        popFn.setPrivate();
+
+        Block *entryBlock = popFn.addEntryBlock();
+        builder.setInsertionPointToStart(entryBlock);
+
+        Region::BlockArgListType arguments = popFn.getArguments();
+        BlockArgument elementsField = arguments[0];
+        BlockArgument sizeField = arguments[1];
+
+        Value elementsVal = builder.create<memref::LoadOp>(loc, elementsField);
+        Value sizeVal = builder.create<memref::LoadOp>(loc, sizeField);
+        Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
+        Value newSize = builder.create<arith::SubIOp>(loc, sizeVal, one);
+        Value poppedVal = builder.create<memref::LoadOp>(loc, elementsVal, newSize);
+
+        builder.create<memref::StoreOp>(loc, newSize, sizeField);
+        builder.create<func::ReturnOp>(loc, poppedVal);
+        return SymbolRefAttr::get(ctx, funcName);
+    }
+
     void emitPush(Location loc, Value value, OpBuilder &b, FlatSymbolRefAttr pushFn) const
     {
         b.create<func::CallOp>(loc, pushFn, /*results=*/TypeRange{},
                                /*operands=*/ValueRange{dataField, sizeField, capacityField, value});
+    }
+
+    Value emitPop(Location loc, OpBuilder &builder, FlatSymbolRefAttr popFn) const
+    {
+        auto callOp = builder.create<func::CallOp>(
+            loc, popFn, /*results=*/elementType,
+            /*operands=*/ValueRange{dataField, sizeField, capacityField});
+        return callOp.getResult(0);
     }
 };
 
@@ -119,12 +166,12 @@ struct LowerListInit : public OpConversionPattern<ListInitOp> {
         }
         Value capacity = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 32);
         Value initialSize = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 0);
-        auto dataType = resultTypes[0].cast<MemRefType>();
-        auto sizeType = resultTypes[1].cast<MemRefType>();
-        auto capacityType = resultTypes[2].cast<MemRefType>();
-        Value buffer = rewriter.create<memref::AllocOp>(
-            op.getLoc(), dataType.getElementType().cast<MemRefType>(),
-            /*dynamicSize=*/capacity);
+        auto dataType = cast<MemRefType>(resultTypes[0]);
+        auto sizeType = cast<MemRefType>(resultTypes[1]);
+        auto capacityType = cast<MemRefType>(resultTypes[2]);
+        Value buffer = rewriter.create<memref::AllocOp>(op.getLoc(),
+                                                        cast<MemRefType>(dataType.getElementType()),
+                                                        /*dynamicSize=*/capacity);
         Value bufferField = rewriter.create<memref::AllocOp>(op.getLoc(), dataType);
         Value sizeField = rewriter.create<memref::AllocOp>(op.getLoc(), sizeType);
         Value capacityField = rewriter.create<memref::AllocOp>(op.getLoc(), capacityType);
@@ -133,6 +180,29 @@ struct LowerListInit : public OpConversionPattern<ListInitOp> {
         rewriter.create<memref::StoreOp>(op.getLoc(), capacity, capacityField);
         rewriter.replaceOpWithNewOp<UnrealizedConversionCastOp>(
             op, op.getType(), ValueRange{bufferField, sizeField, capacityField});
+        return success();
+    }
+};
+
+struct LowerListDealloc : public OpConversionPattern<ListDeallocOp> {
+    using OpConversionPattern<ListDeallocOp>::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(ListDeallocOp op, OpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+
+        FailureOr<ArrayListBuilder> arraylistBuilder =
+            ArrayListBuilder::get(op.getLoc(), getTypeConverter(), op.getList(), rewriter);
+        if (failed(arraylistBuilder)) {
+            return failure();
+        }
+
+        Value data = rewriter.create<memref::LoadOp>(op.getLoc(), arraylistBuilder->dataField);
+        rewriter.create<memref::DeallocOp>(op.getLoc(), data);
+        rewriter.create<memref::DeallocOp>(op.getLoc(), arraylistBuilder->dataField);
+        rewriter.create<memref::DeallocOp>(op.getLoc(), arraylistBuilder->sizeField);
+        rewriter.create<memref::DeallocOp>(op.getLoc(), arraylistBuilder->capacityField);
+        rewriter.eraseOp(op);
         return success();
     }
 };
@@ -153,6 +223,26 @@ struct LowerListPush : public OpConversionPattern<ListPushOp> {
             arraylistBuilder.value().getOrInsertPushFunction(op.getLoc(), moduleOp, rewriter);
         arraylistBuilder.value().emitPush(op.getLoc(), op.getValue(), rewriter, pushFn);
         rewriter.eraseOp(op);
+        return success();
+    }
+};
+
+struct LowerListPop : public OpConversionPattern<ListPopOp> {
+    using OpConversionPattern<ListPopOp>::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(ListPopOp op, OpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override
+    {
+        FailureOr<ArrayListBuilder> arraylistBuilder =
+            ArrayListBuilder::get(op.getLoc(), getTypeConverter(), op.getList(), rewriter);
+        if (failed(arraylistBuilder)) {
+            return failure();
+        }
+        auto moduleOp = op->getParentOfType<ModuleOp>();
+        FlatSymbolRefAttr popFn =
+            arraylistBuilder.value().getOrInsertPopFunction(op.getLoc(), moduleOp, rewriter);
+        Value poppedVal = arraylistBuilder->emitPop(op.getLoc(), rewriter, popFn);
+        rewriter.replaceOp(op, poppedVal);
         return success();
     }
 };
@@ -214,14 +304,16 @@ struct ArrayListToMemRefPass : catalyst::impl::ArrayListToMemRefPassBase<ArrayLi
 
         RewritePatternSet patterns(context);
         patterns.add<LowerListInit>(arraylistTypeConverter, context);
+        patterns.add<LowerListDealloc>(arraylistTypeConverter, context);
         patterns.add<LowerListPush>(arraylistTypeConverter, context);
+        patterns.add<LowerListPop>(arraylistTypeConverter, context);
         patterns.add<LowerListLoadData>(arraylistTypeConverter, context);
 
         ConversionTarget target(getContext());
         target.addLegalDialect<arith::ArithDialect, func::FuncDialect, memref::MemRefDialect,
                                scf::SCFDialect>();
         target.addLegalOp<UnrealizedConversionCastOp>();
-        target.addIllegalOp<ListInitOp, ListPushOp, ListLoadDataOp>();
+        target.addIllegalOp<ListInitOp, ListDeallocOp, ListPushOp, ListPopOp, ListLoadDataOp>();
 
         if (failed(applyPartialConversion(getOperation(), target, std::move(patterns)))) {
             signalPassFailure();

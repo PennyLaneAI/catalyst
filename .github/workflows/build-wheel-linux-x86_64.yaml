@@ -37,7 +37,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path:  mlir/llvm-project
-        key: Linux-llvm-${{ needs.constants.outputs.llvm_version }}-default-source
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-source
         enableCrossOsArchive: True
 
     - name: Cache MHLO Build
@@ -71,7 +71,8 @@ jobs:
     - name: Install dependencies (CentOS)
       if: |
         steps.cache-llvm-build.outputs.cache-hit != 'true' ||
-        steps.cache-mhlo.outputs.cache-hit != 'true'
+        steps.cache-mhlo.outputs.cache-hit != 'true' ||
+        steps.cache-enzyme.outputs.cache-hit != 'true'
       run: |
         # Reduce wait time for repos not responding
         cat /etc/yum.conf | sed "s/\[main\]/\[main\]\ntimeout=5/g" > /etc/yum.conf
@@ -139,26 +140,6 @@ jobs:
 
         cmake --build enzyme-build
 
-    # Build QIR
-    - name: Install rustup with llvm-tools-preview
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
-        components: llvm-tools-preview
-
-    - name: Install QIR-stdlib
-      run: |
-          (cd ./runtime/qir-stdlib && cargo build --release)
-
-    - name: Upload qir-stdlib artifact
-      uses: actions/upload-artifact@v3
-      with:
-        name: qir-stdlib
-        path: |
-          runtime/qir-stdlib/target/release/*.a
-          runtime/qir-stdlib/target/release/build/include/*.h
-        retention-days: 1
-
   catalyst-linux-wheels-x86-64:
     needs: [constants, build-dependencies]
     strategy:
@@ -192,7 +173,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: mlir/llvm-project
-        key: Linux-llvm-${{ needs.constants.outputs.llvm_version }}-default-source
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-source
         enableCrossOsArchive: True
         fail-on-cache-miss: True
 
@@ -220,22 +201,18 @@ jobs:
         key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.enzyme_version }}-generic-build
         fail-on-cache-miss: True
 
-    - name: Download QIR stdlib Artifact
-      uses: actions/download-artifact@v3
-      with:
-        name: qir-stdlib
-        path: runtime/qir-stdlib/target/release
-
     # Build Catalyst-Runtime
+    # TODO: remove v0.31.0 after lightning monorepo upgrade
     - name: Build Catalyst-Runtime
       run: |
         cmake -S runtime -B runtime-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=$PWD/runtime-build/lib \
               -DPYTHON_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -Dpybind11_DIR=$(python${{ matrix.python_version }} -c "import pybind11; print(pybind11.get_cmake_dir())") \
-              -DQIR_STDLIB_LIB=$GITHUB_WORKSPACE/runtime/qir-stdlib/target/release \
-              -DQIR_STDLIB_INCLUDES=$GITHUB_WORKSPACE/runtime/qir-stdlib/target/release/build/include \
               -DENABLE_LIGHTNING_KOKKOS=ON \
+              -DLIGHTNING_GIT_TAG=v0.31.0 \
+              -DLIGHTNING_KOKKOS_GIT_TAG=latest_release \
               -DKokkos_ENABLE_SERIAL=ON \
               -DKokkos_ENABLE_OPENMP=ON \
               -DENABLE_OPENQASM=ON
@@ -272,11 +249,6 @@ jobs:
               -DMLIR_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir
 
         cmake --build quantum-build --target check-dialects -j$(nproc)
-        patch -d quantum-build/python_packages/quantum/mlir_quantum --follow-symlinks < mlir/patches/use-ir-from-jax.patch
-        patch -d quantum-build/python_packages/quantum/mlir_quantum/dialects --follow-symlinks < mlir/patches/use-cext-from-jax.patch
-        patch -d quantum-build/python_packages/quantum/mlir_quantum/dialects --follow-symlinks < mlir/patches/do-not-infer-result.patch
-        patch -d quantum-build/python_packages/quantum/mlir_quantum/dialects --follow-symlinks < mlir/patches/remove-gradient-cext-import.patch
-        patch -d quantum-build/python_packages/quantum/mlir_quantum/dialects --follow-symlinks < mlir/patches/remove-quantum-cext-import.patch
 
     - name: Build wheel
       run: |

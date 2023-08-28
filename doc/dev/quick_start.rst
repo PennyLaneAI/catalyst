@@ -535,6 +535,7 @@ Calculating Quantum Gradients
     :nosignatures:
 
     ~catalyst.grad
+    ~catalyst.jacobian
     ~catalyst.vjp
     ~catalyst.jvp
 
@@ -547,7 +548,7 @@ Calculating Quantum Gradients
 using finite-difference, parameter-shift, or adjoint-jacobian methods. See the documentation for more details.
 
 
-This decorator accepts the function to differentiate, a differentiation strategy, and the argnument indices of the function with which to differentiate:
+This decorator accepts the function to differentiate, a differentiation strategy, and the argument indices of the function with which to differentiate:
 
 .. code-block:: python
 
@@ -608,6 +609,28 @@ also feasible.
 
 >>> workflow(jnp.array([2.0, 3.0]))
 array([-2.88051099, -1.92034063])
+
+The :func:`.grad` decorator works for functions that return a scalar value. You can also use the :func:`.jacobian`
+decorator to compute Jacobian matrices of general hybrid functions with multiple or multivariate results.
+
+.. code-block:: python
+
+    @qjit
+    def workflow(x):
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def circuit(x):
+            qml.RX(jnp.pi * x[0], wires=0)
+            qml.RY(x[1], wires=0)
+            return qml.probs()
+
+        g = jacobian(circuit, method="defer")
+        return g(x)
+
+>>> workflow(jnp.array([2.0, 1.0]))
+array([[-1.32116540e-07,  1.33781874e-07],
+       [-4.20735506e-01,  4.20735506e-01]])
+
+This decorator has the same methods and API as `grad`. See the documentation for more details.
 
 Optimizers
 ----------
