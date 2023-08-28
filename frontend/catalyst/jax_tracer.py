@@ -190,7 +190,7 @@ FORCED_ORDER_PRIMITIVES = {qdevice_p, qextract_p}
 
 
 @dataclass
-class MainTracingContex:
+class MainTracingContext:
     main: JaxMainTrace
     frames: Dict[DynamicJaxprTrace, JaxprStackFrame]
     mains: Dict[DynamicJaxprTrace, JaxMainTrace]
@@ -200,23 +200,23 @@ class MainTracingContex:
         self.main, self.frames, self.mains, self.trace = main, {}, {}, None
 
 
-TRACING_CONTEXT: Optional[MainTracingContex] = None
+TRACING_CONTEXT: Optional[MainTracingContext] = None
 
 
 @contextmanager
-def main_tracing_context() -> ContextManager[MainTracingContex]:
+def main_tracing_context() -> ContextManager[MainTracingContext]:
     global TRACING_CONTEXT
     with new_base_main(DynamicJaxprTrace, dynamic=True) as main:
         main.jaxpr_stack = ()
-        TRACING_CONTEXT = ctx = MainTracingContex(main)
+        TRACING_CONTEXT = ctx = MainTracingContext(main)
         try:
             yield ctx
         finally:
             TRACING_CONTEXT = None
 
 
-def get_main_tracing_context(hint=None) -> MainTracingContex:
-    """Checks a number of tracing conditions and return the MainTracingContex"""
+def get_main_tracing_context(hint=None) -> MainTracingContext:
+    """Checks a number of tracing conditions and return the MainTracingContext"""
     msg = f"{hint or 'catalyst functions'} can only be used from within @qjit decorated code."
     TracingContext.check_is_tracing(msg)
     if TRACING_CONTEXT is None:
@@ -273,7 +273,7 @@ def promise_actualize(qrp: QRegPromise) -> DynamicJaxprTracer:
 
 @contextmanager
 def frame_tracing_context(
-    ctx: MainTracingContex, trace: Optional[DynamicJaxprTrace] = None
+    ctx: MainTracingContext, trace: Optional[DynamicJaxprTrace] = None
 ) -> ContextManager[DynamicJaxprTrace]:
     main = ctx.mains[trace] if trace is not None else None
     with new_main2(DynamicJaxprTrace, dynamic=True, main=main) as nmain:
@@ -409,7 +409,7 @@ def trace_quantum_tape(
     quantum_tape: QuantumTape,
     device: QubitDevice,
     qreg: DynamicJaxprTracer,
-    ctx: MainTracingContex,
+    ctx: MainTracingContext,
     trace: DynamicJaxprTrace,
 ) -> DynamicJaxprTracer:
     """Recursively trace the nested `quantum_tape` and produce the quantum tracers. With quantum
@@ -596,7 +596,7 @@ def trace_quantum_measurements(
     quantum_tape,
     device: QubitDevice,
     qreg: DynamicJaxprTracer,
-    ctx: MainTracingContex,
+    ctx: MainTracingContext,
     trace: DynamicJaxprTrace,
     outputs: List[Union[MeasurementProcess, DynamicJaxprTracer, Any]],
     out_tree,

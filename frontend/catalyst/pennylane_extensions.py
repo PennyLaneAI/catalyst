@@ -168,7 +168,7 @@ from catalyst.jax_tracer import (
     Function,
     HybridOp,
     HybridOpRegion,
-    MainTracingContex,
+    MainTracingContext,
     MidCircuitMeasure,
     QFunc,
     QJITDevice,
@@ -179,16 +179,6 @@ from catalyst.jax_tracer import (
     new_inner_tracer,
 )
 
-# from catalyst.jax_tape import JaxTape
-# from catalyst.jax_tracer2 import (
-#     MidCircuitMeasure,
-#     adjoint,
-#     cond,
-#     for_loop,
-#     measure,
-#     trace_quantum_function,
-#     while_loop,
-# )
 from catalyst.utils.exceptions import CompileError, DifferentiableCompileError
 from catalyst.utils.jax_extras import (
     initial_style_jaxprs_with_common_consts1,
@@ -751,7 +741,7 @@ def cond(pred: DynamicJaxprTracer):
 def for_loop(lower_bound, upper_bound, step):
     def _body_query(body_fn):
         def _call_handler(*init_state):
-            def _call_with_quantum_ctx(ctx: MainTracingContex):
+            def _call_with_quantum_ctx(ctx: MainTracingContext):
                 quantum_tape = QuantumTape()
                 outer_trace = ctx.trace
                 with frame_tracing_context(ctx) as inner_trace:
@@ -831,7 +821,7 @@ def for_loop(lower_bound, upper_bound, step):
 def while_loop(cond_fn):
     def _body_query(body_fn):
         def _call_handler(*init_state):
-            def _call_with_quantum_ctx(ctx: MainTracingContex):
+            def _call_with_quantum_ctx(ctx: MainTracingContext):
                 outer_trace = ctx.trace
                 in_classical_tracers, in_tree = tree_flatten(init_state)
 
