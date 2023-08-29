@@ -1588,7 +1588,7 @@ def _adjoint_lowering(
             dim_var_values=jax_ctx.dim_var_values,
         )
 
-        QYieldOp([a[0] for a in out])
+        QYieldOp([a[0] for a in out[-1:]])
 
     return op.results
 
