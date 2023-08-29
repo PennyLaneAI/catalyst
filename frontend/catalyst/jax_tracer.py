@@ -125,52 +125,48 @@ PAULI_NAMED_MAP = {
 }
 
 
-@dataclass
 class QRegPromise:
-    base: DynamicJaxprTracer
-    cache: Dict[int, DynamicJaxprTracer]
-
     def __init__(self, base):
-        self.base = base
-        self.cache = {}
+        self.base: DynamicJaxprTracer = base
+        self.cache: Dict[int, DynamicJaxprTracer] = {}
 
+    def extract(self, wires: List[Any], allow_reuse=False) -> List[DynamicJaxprTracer]:
+        qrp = self
+        cached_tracers = set([w for w in qrp.cache.keys() if not isinstance(w, int)])
+        requested_tracers = set([w for w in wires if not isinstance(w, int)])
+        if cached_tracers != requested_tracers:
+            qrp.actualize()
+        qubits = []
+        for w in wires:
+            if w in qrp.cache:
+                qubit = qrp.cache[w]
+                assert (
+                    qubit is not None
+                ), f"Attempting to extract wire {w} from register {qrp.base} for the second time"
+                qubits.append(qubit)
+                if not allow_reuse:
+                    qrp.cache[w] = None
+            else:
+                qubits.append(qextract_p.bind(qrp.base, w))
+        return qubits
 
-def qrp_extract(qrp: QRegPromise, wires: List[Any], allow_reuse=False) -> List[DynamicJaxprTracer]:
-    cached_tracers = set([w for w in qrp.cache.keys() if not isinstance(w, int)])
-    requested_tracers = set([w for w in wires if not isinstance(w, int)])
-    if cached_tracers != requested_tracers:
-        qrp_actualize(qrp)
-    qubits = []
-    for w in wires:
-        if w in qrp.cache:
-            qubit = qrp.cache[w]
-            assert (
-                qubit is not None
-            ), f"Attempting to extract wire {w} from register {qrp.base} for the second time"
-            qubits.append(qubit)
-            if not allow_reuse:
-                qrp.cache[w] = None
-        else:
-            qubits.append(qextract_p.bind(qrp.base, w))
-    return qubits
+    def insert(self, wires, qubits) -> None:
+        qrp = self
+        assert len(wires) == len(qubits)
+        for w, qubit in zip(wires, qubits):
+            assert (w not in qrp.cache) or (
+                qrp.cache[w] is None
+            ), f"Attempting to insert an already-inserted wire {w} into {qrp.base}"
+            qrp.cache[w] = qubit
 
-
-def qrp_insert(qrp: QRegPromise, wires, qubits) -> None:
-    assert len(wires) == len(qubits)
-    for w, qubit in zip(wires, qubits):
-        assert (w not in qrp.cache) or (
-            qrp.cache[w] is None
-        ), f"Attempting to insert an already-inserted wire {w} into {qrp.base}"
-        qrp.cache[w] = qubit
-
-
-def qrp_actualize(qrp: QRegPromise) -> DynamicJaxprTracer:
-    qreg = qrp.base
-    for w, qubit in qrp.cache.items():
-        qreg = qinsert_p.bind(qreg, w, qubit)
-    qrp.cache = {}
-    qrp.base = qreg
-    return qreg
+    def actualize(self) -> DynamicJaxprTracer:
+        qrp = self
+        qreg = qrp.base
+        for w, qubit in qrp.cache.items():
+            qreg = qinsert_p.bind(qreg, w, qubit)
+        qrp.cache = {}
+        qrp.base = qreg
+        return qreg
 
 
 def new_inner_tracer(trace: DynamicJaxprTrace, aval) -> DynamicJaxprTracer:
@@ -254,14 +250,14 @@ class ForLoop(HybridOp):
         with EvaluationContext.frame_tracing_context(ctx, inner_trace):
             qreg_in = _input_type_to_tracers(inner_trace.new_arg, [AbstractQreg()])[0]
             qrp_out = trace_quantum_tape(inner_tape, device, qreg_in, ctx, inner_trace)
-            qreg_out = qrp_actualize(qrp_out)
+            qreg_out = qrp_out.actualize()
             jaxpr, typ, consts = ctx.frames[inner_trace].to_jaxpr2(
                 res_classical_tracers + [qreg_out]
             )
 
         step = op.in_classical_tracers[2]
         apply_reverse_transform = isinstance(step, int) and step < 0
-        qreg = qrp_actualize(qrp)
+        qreg = qrp.actualize()
         qrp2 = QRegPromise(
             op.bind_overwrite_classical_tracers(
                 ctx,
@@ -284,9 +280,9 @@ class MidCircuitMeasure(HybridOp):
     def trace(self, ctx, device, trace, qrp) -> QRegPromise:
         op = self
         wire = op.in_classical_tracers[0]
-        qubit = qrp_extract(qrp, [wire])[0]
+        qubit = qrp.extract([wire])[0]
         qubit2 = op.bind_overwrite_classical_tracers(ctx, trace, qubit)
-        qrp_insert(qrp, [wire], [qubit2])
+        qrp.insert([wire], [qubit2])
         return qrp
 
 
@@ -302,7 +298,7 @@ class Cond(HybridOp):
                 qrp_out = trace_quantum_tape(
                     region.quantum_tape, device, qreg_in, ctx, region.trace
                 )
-                qreg_out = qrp_actualize(qrp_out)
+                qreg_out = qrp_out.actualize()
                 jaxpr, typ, const = ctx.frames[region.trace].to_jaxpr2(
                     region.res_classical_tracers + [qreg_out]
                 )
@@ -311,7 +307,7 @@ class Cond(HybridOp):
 
         jaxprs2, combined_consts = initial_style_jaxprs_with_common_consts2(jaxprs, consts)
 
-        qreg = qrp_actualize(qrp)
+        qreg = qrp.actualize()
         qrp2 = QRegPromise(
             op.bind_overwrite_classical_tracers(
                 ctx,
@@ -339,12 +335,12 @@ class WhileLoop(HybridOp):
         with EvaluationContext.frame_tracing_context(ctx, body_trace):
             qreg_in = _input_type_to_tracers(body_trace.new_arg, [AbstractQreg()])[0]
             qrp_out = trace_quantum_tape(body_tape, device, qreg_in, ctx, body_trace)
-            qreg_out = qrp_actualize(qrp_out)
+            qreg_out = qrp_out.actualize()
             body_jaxpr, _, body_consts = ctx.frames[body_trace].to_jaxpr2(
                 res_classical_tracers + [qreg_out]
             )
 
-        qreg = qrp_actualize(qrp)
+        qreg = qrp.actualize()
         qrp2 = QRegPromise(
             self.bind_overwrite_classical_tracers(
                 ctx,
@@ -370,12 +366,12 @@ class Adjoint(HybridOp):
         with EvaluationContext.frame_tracing_context(ctx, body_trace):
             qreg_in = _input_type_to_tracers(body_trace.new_arg, [AbstractQreg()])[0]
             qrp_out = trace_quantum_tape(body_tape, device, qreg_in, ctx, body_trace)
-            qreg_out = qrp_actualize(qrp_out)
+            qreg_out = qrp_out.actualize()
             body_jaxpr, _, body_consts = ctx.frames[body_trace].to_jaxpr2(
                 res_classical_tracers + [qreg_out]
             )
 
-        qreg = qrp_actualize(qrp)
+        qreg = qrp.actualize()
         args, args_tree = tree_flatten((body_consts, op.in_classical_tracers, [qreg]))
         op_results = adjoint_p.bind(
             *args,
@@ -433,20 +429,19 @@ def trace_quantum_tape(
             if isinstance(op, MeasurementProcess):
                 qrp2 = qrp
             else:
-                qubits = qrp_extract(qrp, op.wires)
+                qubits = qrp.extract(op.wires)
                 if isinstance(op, QubitUnitary):
                     qubits2 = qunitary_p.bind(*[*op.parameters, *qubits])
                 else:
                     qubits2 = qinst_p.bind(
                         *qubits, *op.parameters, op=op.name, qubits_len=len(qubits)
                     )
-                qrp_insert(qrp, op.wires, qubits2)
+                qrp.insert(op.wires, qubits2)
                 qrp2 = qrp
 
         assert qrp2 is not None
         qrp = qrp2
 
-    # qreg = qrp_actualize(qrp)
     ctx.frames[trace].eqns = sort_eqns(ctx.frames[trace].eqns, FORCED_ORDER_PRIMITIVES)
     return qrp
 
@@ -458,14 +453,14 @@ def trace_observables(
     # qubits = [qextract_p.bind(qreg, w) for w in wires]
     qubits = None
     if obs is None:
-        qubits = qrp_extract(qrp, wires, allow_reuse=True)
+        qubits = qrp.extract(wires, allow_reuse=True)
         obs_tracers = compbasis_p.bind(*qubits)
     elif isinstance(obs, KNOWN_NAMED_OBS):
-        qubits = qrp_extract(qrp, wires, allow_reuse=True)
+        qubits = qrp.extract(wires, allow_reuse=True)
         obs_tracers = namedobs(type(obs).__name__, qubits[0])
     elif isinstance(obs, qml.Hermitian):
         # TODO: remove asarray once fixed upstream: https://github.com/PennyLaneAI/pennylane/issues/4263
-        qubits = qrp_extract(qrp, wires, allow_reuse=True)
+        qubits = qrp.extract(wires, allow_reuse=True)
         obs_tracers = hermitian(jax.numpy.asarray(*obs.parameters), *qubits)
     elif isinstance(obs, qml.operation.Tensor):
         nested_obs = [trace_observables(o, device, qrp, m_wires)[0] for o in obs.obs]
@@ -528,14 +523,14 @@ def pauli_word_to_tensor_obs(obs, qrp):
     if len(obs) == 1:
         wire, pauli = list(obs.items())[0]
         # qubits = [qextract_p.bind(qreg, w) for w in [wire]]
-        qubits = [qrp_extract(qrp, [wire], allow_reuse=True)]
+        qubits = [qrp.extract([wire], allow_reuse=True)]
         return namedobs(PAULI_NAMED_MAP[pauli], qubits[0])
 
     nested_obs = []
     for wire, pauli in obs.items():
         # qubits = get_qubits_from_wires([wire], qubit_states, qreg)
         # qubits = [qextract_p.bind(qreg, w) for w in [wire]]
-        qubits = [qrp_extract(qrp, [wire], allow_reuse=True)]
+        qubits = [qrp.extract([wire], allow_reuse=True)]
         nested_obs.append(jprim.namedobs(PAULI_NAMED_MAP[pauli], qubits[0]))
 
     return tensorobs(*nested_obs)
@@ -639,8 +634,6 @@ def trace_quantum_function(
                 out_classical_tracers_or_measurements,
                 out_tree_promise(),
             )
-            # qreg_out = qrp_actualize(qrp_out)
-
             qdealloc_p.bind(qreg_in)
 
             out_classical_tracers = [trace.full_raise(t) for t in out_classical_tracers]
