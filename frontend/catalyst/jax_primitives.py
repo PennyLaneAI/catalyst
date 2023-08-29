@@ -1543,7 +1543,7 @@ def _adjoint_def_impl(ctx, *args, args_tree, jaxpr):  # pragma: no cover
 
 @adjoint_p.def_abstract_eval
 def _adjoint_abstract(*args, args_tree, jaxpr):
-    return jaxpr.out_avals
+    return jaxpr.out_avals[-1:]
 
 
 def _adjoint_lowering(
