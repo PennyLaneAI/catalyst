@@ -16,6 +16,7 @@
 #include <list>
 #include <memory>
 
+#include "mlir/IR/MLIRContext.h"
 #include "gml_st/transforms/passes.h"
 #include "mhlo/IR/register.h"
 #include "mhlo/transforms/passes.h"
@@ -323,6 +324,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     registerAllCatalystDialects(registry);
     registerLLVMTranslations(registry);
     MLIRContext *ctx = options.ctx;
+    ctx->loadAllAvailableDialects();
     ctx->appendDialectRegistry(registry);
     ctx->disableMultithreading();
     ScopedDiagnosticHandler scopedHandler(

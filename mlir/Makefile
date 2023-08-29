@@ -86,6 +86,7 @@ enzyme:
 dialects:
 	@echo "build custom Catalyst MLIR Dialects"
 	cmake -G Ninja -S . -B $(DIALECTS_BUILD_DIR) \
+		-DCMAKE_EXPORT_COMMANDS=ON \
 		-DCMAKE_BUILD_TYPE=Release \
 		-DLLVM_ENABLE_ASSERTIONS=ON \
 		-DQUANTUM_ENABLE_BINDINGS_PYTHON=ON \
@@ -102,11 +103,11 @@ dialects:
 		-DCMAKE_CXX_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
 		-DLLVM_ENABLE_LLD=$(ENABLE_LLD)
 
-	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects quantum-lsp-server
-	mv $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/_mlir_libs/_catalystDriver.* $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/compiler_driver
-	cp $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/_mlir_libs/_mlir.cpython* $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/compiler_driver
-	cp $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/_mlir_libs/_mlirRegisterEverything.cpython* $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/compiler_driver
-	cp $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/_mlir_libs/__init__.py $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/compiler_driver
+	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects quantum-lsp-server --verbose
+	#mv $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/_mlir_libs/_catalystDriver.* $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/compiler_driver
+	#cp $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/_mlir_libs/_mlir.cpython* $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/compiler_driver
+	#cp $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/_mlir_libs/_mlirRegisterEverything.cpython* $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/compiler_driver
+	#cp $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/_mlir_libs/__init__.py $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/compiler_driver
 
 .PHONY: test
 test:
