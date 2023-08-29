@@ -634,17 +634,17 @@ def trace_quantum_function(
                 out_classical_tracers_or_measurements,
                 out_tree_promise(),
             )
+            out_quantum_tracers = [qrp_out.actualize()]
             qdealloc_p.bind(qreg_in)
 
             out_classical_tracers = [trace.full_raise(t) for t in out_classical_tracers]
             # out_quantum_tracers = [qreg_out]
-            out_quantum_tracers = []
 
             jaxpr, out_type, consts = ctx.frames[trace].to_jaxpr2(
                 out_classical_tracers + out_quantum_tracers
             )
-            # jaxpr._outvars = jaxpr._outvars[:-1]
-            # out_type = out_type[:-1]
+            jaxpr._outvars = jaxpr._outvars[:-1]
+            out_type = out_type[:-1]
             # FIXME: `check_jaxpr` complains about the `AbstractQreg` type. Consider fixing.
             # check_jaxpr(jaxpr)
 

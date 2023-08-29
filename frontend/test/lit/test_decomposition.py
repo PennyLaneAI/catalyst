@@ -257,25 +257,25 @@ def test_decompose_singleexcitationplus():
     def decompose_singleexcitationplus(theta: float):
         # pylint: disable=line-too-long
         # CHECK-NOT: name = "SingleExcitationPlus"
-        # CHECK: [[a_scalar_tensor_float_2:%.+]] = stablehlo.constant dense<2.{{[0]+}}e+00>
-        # CHECK-NOT: name = "SingleExcitationPlus"
-        # CHECK: [[a_theta_div_2:%.+]] = stablehlo.divide %arg0, [[a_scalar_tensor_float_2]]
-        # CHECK-NOT: name = "SingleExcitationPlus"
-        # CHECK: [[b_scalar_tensor_float_2:%.+]] = stablehlo.constant dense<2.{{[0]+}}e+00>
-        # CHECK-NOT: name = "SingleExcitationPlus"
-        # CHECK: [[b_theta_div_2:%.+]] = stablehlo.divide %arg0, [[b_scalar_tensor_float_2]]
-        # CHECK-NOT: name = "SingleExcitationPlus"
         # CHECK: [[s0q1:%.+]] = "quantum.custom"({{%.+}}) {gate_name = "PauliX"
         # CHECK-NOT: name = "SingleExcitationPlus"
         # CHECK: [[s0q0:%.+]] = "quantum.custom"({{%.+}}) {gate_name = "PauliX"
         # CHECK-NOT: name = "SingleExcitationPlus"
+        # CHECK: [[a_scalar_tensor_float_2:%.+]] = stablehlo.constant dense<2.{{[0]+}}e+00>
+        # CHECK-NOT: name = "SingleExcitationPlus"
+        # CHECK: [[a_theta_div_2:%.+]] = stablehlo.divide %arg0, [[a_scalar_tensor_float_2]]
+        # CHECK-NOT: name = "SingleExcitationPlus"
         # CHECK: [[a_theta_div_2_scalar:%.+]] = "tensor.extract"([[a_theta_div_2]])
         # CHECK-NOT: name = "SingleExcitationPlus"
-        # CHECK: [[s1:%.+]]:2 = "quantum.custom"([[a_theta_div_2_scalar]], [[s0q0]], [[s0q1]]) {gate_name = "ControlledPhaseShift"
+        # CHECK: [[s1:%.+]]:2 = "quantum.custom"([[a_theta_div_2_scalar]], [[s0q1]], [[s0q0]]) {gate_name = "ControlledPhaseShift"
         # CHECK-NOT: name = "SingleExcitationPlus"
         # CHECK: [[s2q1:%.+]] = "quantum.custom"([[s1]]#1) {gate_name = "PauliX"
         # CHECK-NOT: name = "SingleExcitationPlus"
         # CHECK: [[s2q0:%.+]] = "quantum.custom"([[s1]]#0) {gate_name = "PauliX"
+        # CHECK-NOT: name = "SingleExcitationPlus"
+        # CHECK: [[b_scalar_tensor_float_2:%.+]] = stablehlo.constant dense<2.{{[0]+}}e+00>
+        # CHECK-NOT: name = "SingleExcitationPlus"
+        # CHECK: [[b_theta_div_2:%.+]] = stablehlo.divide %arg0, [[b_scalar_tensor_float_2]]
         # CHECK-NOT: name = "SingleExcitationPlus"
         # CHECK: [[b_theta_div_2_scalar:%.+]] = "tensor.extract"([[b_theta_div_2]])
         # CHECK-NOT: name = "SingleExcitationPlus"

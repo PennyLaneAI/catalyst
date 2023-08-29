@@ -152,29 +152,64 @@ def new_main2(
             _update_thread_local_jit_state(stack.dynamic)
 
 
+def stable_toposort(end_nodes):
+    if not end_nodes:
+        return []
+    # end_nodes = _remove_duplicates(end_nodes)
+
+    child_counts = {}
+    stack = list(end_nodes)
+    while stack:
+        node = stack.pop()
+        if node.id in child_counts:
+            child_counts[node.id] += 1
+        else:
+            child_counts[node.id] = 1
+            stack.extend(node.parents)
+    for node in end_nodes:
+        child_counts[node.id] -= 1
+
+    sorted_nodes = []
+    childless_nodes = [node for node in end_nodes if child_counts[node.id] == 0]
+    assert childless_nodes
+    while childless_nodes:
+        node = childless_nodes.pop()
+        sorted_nodes.append(node)
+        for parent in node.parents:
+            if child_counts[parent.id] == 1:
+                childless_nodes.append(parent)
+            else:
+                child_counts[parent.id] -= 1
+    sorted_nodes = sorted_nodes[::-1]
+
+    # check_toposort
+    visited = set()
+    for node in sorted_nodes:
+        assert all(parent.id in visited for parent in node.parents)
+        visited.add(node.id)
+    return sorted_nodes
+
+
 def sort_eqns(eqns: List[JaxprEqn], forced_order_primitives: Set[JaxprPrimitive]) -> List[JaxprEqn]:
     """Topologically sort JAXRR equations in a list, based on their input/output variables."""
 
-    # FIXME: The functions might emit different correct results, depending on id(eqns). One need to
-    # make this function stable. Moreover, some equation (`qdevice` ones) do not depend on others
-    # but need to be at the top of the output. We force this order for now. Stable sorting might
-    # also allow us to remove this conditioning.
     class Box:
-        def __init__(self, e):
+        def __init__(self, id, e):
+            self.id: int = id
             self.e: JaxprEqn = e
-            self.parents: Set["Box"] = {}
+            self.parents: List["Box"] = []
 
-    boxes = [Box(e) for e in eqns]
+    boxes = [Box(i, e) for i, e in enumerate(eqns)]
     qdevices = [(i, b) for (i, b) in enumerate(boxes) if b.e.primitive in forced_order_primitives]
     origin: Dict[int, Box] = {}
     for b in boxes:
         origin.update({ov.count: b for ov in b.e.outvars})
     for b in boxes:
-        b.parents = {origin[v.count] for v in b.e.invars if v.count in origin}
+        b.parents = [origin[v.count] for v in b.e.invars if v.count in origin]
     for i, q in qdevices:
         for b in boxes[i + 1 :]:
-            b.parents.add(q)
-    return [b.e for b in toposort(boxes)]
+            b.parents.append(q)
+    return [b.e for b in stable_toposort(boxes)]
 
 
 def initial_style_jaxprs_with_common_consts1(

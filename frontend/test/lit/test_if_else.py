@@ -24,9 +24,9 @@ from catalyst import cond, qjit
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=1))
 def circuit(n: int):
-    # CHECK-DAG:   [[qreg_0:%[a-zA-Z0-9_]+]] = "quantum.alloc"
     # CHECK-DAG:   [[c5:%[a-zA-Z0-9_]+]] = stablehlo.constant dense<5> : tensor<i64>
     # CHECK:       [[b_t:%[a-zA-Z0-9_]+]] = stablehlo.compare  LE, %arg0, [[c5]], SIGNED : (tensor<i64>, tensor<i64>) -> tensor<i1>
+    # CHECK-DAG:   [[qreg_0:%[a-zA-Z0-9_]+]] = "quantum.alloc"
     # CHECK:       [[b:%[a-zA-Z0-9_]+]] = "tensor.extract"([[b_t]])
     @cond(n <= 5)
     # CHECK:       "scf.if"([[b]])
