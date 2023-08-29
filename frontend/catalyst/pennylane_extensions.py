@@ -613,14 +613,10 @@ def _check_cond_same_types(trees: List[PyTreeDef], avals: List[List[Any]]) -> No
     expected_tree, expected_dtypes = trees[0], [_aval_to_primitive_type(a) for a in avals[0]]
     for i, (tree, aval) in list(enumerate(zip(trees, avals)))[1:]:
         if tree != expected_tree:
-            raise TypeError(
-                f"Conditional requires consistent return types across all branches"
-            )
+            raise TypeError(f"Conditional requires consistent return types across all branches")
         dtypes = [_aval_to_primitive_type(a) for a in aval]
         if dtypes != expected_dtypes:
-            raise TypeError(
-                f"Conditional requires consistent return types across all branches"
-            )
+            raise TypeError(f"Conditional requires consistent return types across all branches")
 
 
 class CondCallable:
@@ -652,9 +648,7 @@ class CondCallable:
         expected = branch_jaxprs[0].out_avals
         for i, jaxpr in list(enumerate(branch_jaxprs))[1:]:
             if expected != jaxpr.out_avals:
-                raise TypeError(
-                    "Conditional requires consistent return types across all branches"
-                )
+                raise TypeError("Conditional requires consistent return types across all branches")
 
     def _call_with_quantum_ctx(self, ctx):
         outer_trace = ctx.trace
@@ -684,9 +678,7 @@ class CondCallable:
         branch_jaxprs, consts, out_trees = initial_style_jaxprs_with_common_consts1(
             (*self.branch_fns, self.otherwise_fn), args_tree, args_avals, "cond"
         )
-        _check_cond_same_types(
-            out_trees, [j.out_avals for j in branch_jaxprs]
-        )
+        _check_cond_same_types(out_trees, [j.out_avals for j in branch_jaxprs])
         out_classical_tracers = qcond_p.bind(*(self.preds + consts), branch_jaxprs=branch_jaxprs)
         return tree_unflatten(out_trees[0], out_classical_tracers)
 
@@ -921,9 +913,7 @@ def while_loop(cond_fn):
                         cond_trace, None, arg_classical_tracers, res_classical_tracers
                     )
 
-                _check_single_bool_value(
-                    cond_tree(), res_classical_tracers
-                )
+                _check_single_bool_value(cond_tree(), res_classical_tracers)
 
                 with EvaluationContext.frame_tracing_context(ctx) as body_trace:
                     wffa, in_avals, body_tree = deduce_avals(body_fn, init_state, {})
@@ -953,9 +943,7 @@ def while_loop(cond_fn):
                 body_jaxpr, body_consts, body_tree = _initial_style_jaxpr(
                     body_fn, in_tree, init_avals, "while_loop"
                 )
-                _check_single_bool_value(
-                    cond_tree, cond_jaxpr.out_avals
-                )
+                _check_single_bool_value(cond_tree, cond_jaxpr.out_avals)
                 out_classical_tracers = qwhile_p.bind(
                     *(cond_consts + body_consts + init_vals),
                     cond_jaxpr=cond_jaxpr,

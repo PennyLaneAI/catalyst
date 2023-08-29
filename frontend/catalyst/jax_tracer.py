@@ -46,7 +46,6 @@ from catalyst.jax_primitives import (
     expval_p,
     func_p,
     hamiltonian,
-    tensorobs,
     hermitian,
     mlir_fn_cache,
     namedobs,
@@ -64,6 +63,7 @@ from catalyst.jax_primitives import (
     qwhile_p,
     sample_p,
     state_p,
+    tensorobs,
     tensorobs_p,
     var_p,
 )
@@ -452,7 +452,7 @@ def trace_quantum_tape(
 
 
 def trace_observables(
-    obs: Operation, device, qrp:QRegPromise, m_wires
+    obs: Operation, device, qrp: QRegPromise, m_wires
 ) -> Tuple[List[DynamicJaxprTracer], Optional[int]]:
     wires = obs.wires if (obs and len(obs.wires) > 0) else m_wires
     # qubits = [qextract_p.bind(qreg, w) for w in wires]
@@ -541,8 +541,6 @@ def pauli_word_to_tensor_obs(obs, qrp):
     return tensorobs(*nested_obs)
 
 
-
-
 def trace_quantum_measurements(
     quantum_tape,
     device: QubitDevice,
@@ -570,10 +568,10 @@ def trace_quantum_measurements(
                 out_classical_tracers.append(var_p.bind(obs_tracers, shots=shots))
             elif o.return_type.value == "probs":
                 assert using_compbasis
-                shape = (2 ** nqubits,)
+                shape = (2**nqubits,)
                 out_classical_tracers.append(probs_p.bind(obs_tracers, shape=shape))
             elif o.return_type.value == "counts":
-                shape = (2 ** nqubits,) if using_compbasis else (2,)
+                shape = (2**nqubits,) if using_compbasis else (2,)
                 out_classical_tracers.extend(counts_p.bind(obs_tracers, shots=shots, shape=shape))
                 counts_tree = tree_structure(("keys", "counts"))
                 meas_return_trees_children = out_tree.children()
@@ -586,7 +584,7 @@ def trace_quantum_measurements(
                     out_tree = counts_tree
             elif o.return_type.value == "state":
                 assert using_compbasis
-                shape = (2 ** nqubits,)
+                shape = (2**nqubits,)
                 out_classical_tracers.append(state_p.bind(obs_tracers, shape=shape))
             else:
                 raise NotImplementedError(f"Measurement {o.return_type.value} is not impemented")
