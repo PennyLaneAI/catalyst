@@ -43,7 +43,7 @@ std::vector<Pipeline> parseCompilerSpec(const py::list &pipelines)
     return out;
 }
 
-PYBIND11_MODULE(_catalystDriver, m)
+PYBIND11_MODULE(libCatalystPythonDriver, m)
 {
     //===--------------------------------------------------------------------===//
     // Catalyst Compiler Driver
@@ -78,6 +78,7 @@ PYBIND11_MODULE(_catalystDriver, m)
            bool lower_to_llvm) -> CompilerOutput * {
             FunctionAttributes inferredAttributes;
             mlir::MLIRContext ctx;
+	    ctx.loadAllAvailableDialects();
             std::string errors;
 
             CompilerOutput *output = new CompilerOutput();

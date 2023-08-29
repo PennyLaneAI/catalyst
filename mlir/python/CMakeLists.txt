@@ -35,18 +35,23 @@ declare_mlir_python_extension(QuantumPythonSources.Extension
     QuantumCAPI
 )
 
-declare_mlir_python_extension(CatalystPythonDriver
-  MODULE_NAME _catalystDriver
-  ADD_TO_PARENT QuantumPythonSources
-  SOURCES
-    PyCompilerDriver.cpp
-  PRIVATE_LINK_LIBS
-    QuantumCAPI
-)
+#declare_mlir_python_extension(CatalystPythonDriver
+#  MODULE_NAME _catalystDriver
+#  ADD_TO_PARENT QuantumPythonSources
+#  SOURCES
+#    PyCompilerDriver.cpp
+#  PRIVATE_LINK_LIBS
+#    QuantumCAPI
+#)
 
 ################################################################################
 # Common CAPI
 ################################################################################
+
+add_library(CatalystPythonDriver MODULE PyCompilerDriver.cpp)
+target_link_libraries(CatalystPythonDriver PRIVATE pybind11::headers pybind11::module LLVMSupport MLIRSupport MLIRIR QuantumCAPI MLIRCAPIRegisterEverything)
+set_target_properties(CatalystPythonDriver PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${MLIR_BINARY_DIR}/python_packages/quantum/mlir_quantum/compiler_driver)
+set_target_properties(CatalystPythonDriver PROPERTIES BUILD_WITH_INSTALL_RPATH OFF BUILD_RPATH $ORIGIN INSTALL_RPATH $ORIGIN )
 
 add_mlir_python_common_capi_library(QuantumPythonCAPI
   INSTALL_COMPONENT QuantumPythonModules
@@ -73,3 +78,4 @@ add_mlir_python_modules(QuantumPythonModules
   COMMON_CAPI_LINK_LIBS
     QuantumPythonCAPI
   )
+add_dependencies(QuantumPythonCAPI CatalystPythonDriver)

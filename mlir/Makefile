@@ -79,7 +79,7 @@ enzyme:
 
 .PHONY: dialects
 dialects:
-	@echo "build custom Catalyst MLIR Dialects"
+
 	cmake -G Ninja -S . -B $(DIALECTS_BUILD_DIR) \
 		-DCMAKE_BUILD_TYPE=Release \
 		-DLLVM_ENABLE_ASSERTIONS=ON \
@@ -98,10 +98,10 @@ dialects:
 		-DLLVM_ENABLE_LLD=$(ENABLE_LLD)
 
 	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects quantum-lsp-server
-	mv $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/_mlir_libs/_catalystDriver.* $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/compiler_driver
 	cp $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/_mlir_libs/_mlir.cpython* $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/compiler_driver
 	cp $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/_mlir_libs/_mlirRegisterEverything.cpython* $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/compiler_driver
 	cp $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/_mlir_libs/__init__.py $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/compiler_driver
+	cmake --version
 
 .PHONY: test
 test:
