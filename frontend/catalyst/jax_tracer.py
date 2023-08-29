@@ -378,7 +378,7 @@ class Adjoint(HybridOp):
             args_tree=args_tree,
             jaxpr=ClosedJaxpr(convert_constvars_jaxpr(body_jaxpr), ()),
         )
-        qrp2 = QRegPromise(op_results[0])
+        qrp2 = QRegPromise(op_results[-1])
         return qrp2
 
 
