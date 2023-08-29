@@ -598,7 +598,7 @@ def qextract(qreg, qubit_idx):
 @qextract_p.def_abstract_eval
 def _qextract_abstract_eval(qreg, qubit_idx):
     """This function is called with abstract arguments for tracing."""
-    assert isinstance(qreg, AbstractQreg)
+    assert isinstance(qreg, AbstractQreg), f"Expected AbstractQreg(), got {qreg}"
     return AbstractQbit()
 
 

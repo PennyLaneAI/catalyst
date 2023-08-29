@@ -126,8 +126,8 @@ PAULI_NAMED_MAP = {
 
 
 class QRegPromise:
-    def __init__(self, base):
-        self.base: DynamicJaxprTracer = base
+    def __init__(self, qreg):
+        self.base: DynamicJaxprTracer = qreg
         self.cache: Dict[int, DynamicJaxprTracer] = {}
 
     def extract(self, wires: List[Any], allow_reuse=False) -> List[DynamicJaxprTracer]:
