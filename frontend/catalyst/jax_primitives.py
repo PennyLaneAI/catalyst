@@ -1570,7 +1570,7 @@ def _adjoint_lowering(
     output_types = util.flatten(map(mlir.aval_to_ir_types, jax_ctx.avals_out))
     assert len(output_types) == 1 and output_types[0] == ir.OpaqueType.get(
         "quantum", "reg", ctx
-    ), "Expected a single result of quantum.register type, got: {output_types}"
+    ), f"Expected a single result of quantum.register type, got: {output_types}"
 
     # Build an adjoint operation with a single-block region.
     op = AdjointOp(output_types[0], qargs[0])
