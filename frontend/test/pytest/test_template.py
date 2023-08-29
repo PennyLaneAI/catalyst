@@ -533,6 +533,18 @@ def test_broadcast_double(backend):
     jitted_fn = qjit(interpreted_fn)
     assert np.allclose(jitted_fn(params), interpreted_fn(params))
 
+def test_broadcast_double_odd(backend):
+    """Test broadcast double odd."""
+
+    def broadcast_double_odd(pars):
+        qml.broadcast(unitary=qml.CRot, pattern="double_odd", wires=[0, 1, 2, 3], parameters=pars)
+        return qml.expval(qml.PauliZ(0))
+
+    device = qml.device(backend, wires=4)
+    params = jnp.array([-5.3, 2.3, 3])
+    interpreted_fn = qml.QNode(broadcast_double_odd, device)
+    jitted_fn = qjit(interpreted_fn)
+    assert np.allclose(jitted_fn(params), interpreted_fn(params))
 
 def test_broadcast_chain(backend):
     """Test broadcast chain."""
