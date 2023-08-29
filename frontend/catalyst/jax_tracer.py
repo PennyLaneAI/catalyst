@@ -20,6 +20,7 @@ from functools import update_wrapper
 from typing import Any, Callable, ContextManager, Dict, List, Optional, Tuple, Union
 
 import jax
+import jax.numpy as jnp
 import pennylane as qml
 from jax._src.api import ShapeDtypeStruct
 from jax._src.core import ClosedJaxpr, JaxprEqn, ShapedArray
@@ -45,6 +46,7 @@ from catalyst.jax_primitives import (
     expval_p,
     func_p,
     hamiltonian,
+    tensorobs,
     hermitian,
     mlir_fn_cache,
     namedobs,
@@ -133,7 +135,7 @@ class QRegPromise:
         self.cache = {}
 
 
-def promise_qextract(qrp: QRegPromise, wires: List[Any]) -> List[DynamicJaxprTracer]:
+def promise_qextract(qrp: QRegPromise, wires: List[Any], allow_reuse=False) -> List[DynamicJaxprTracer]:
     cached_tracers = set([w for w in qrp.cache.keys() if not isinstance(w, int)])
     requested_tracers = set([w for w in wires if not isinstance(w, int)])
     if cached_tracers != requested_tracers:
@@ -146,7 +148,8 @@ def promise_qextract(qrp: QRegPromise, wires: List[Any]) -> List[DynamicJaxprTra
                 qubit is not None
             ), f"Attempting to extract wire {w} from register {qrp.base} for the second time"
             qubits.append(qubit)
-            qrp.cache[w] = None
+            if not allow_reuse:
+                qrp.cache[w] = None
         else:
             qubits.append(qextract_p.bind(qrp.base, w))
     return qubits
@@ -250,7 +253,8 @@ class ForLoop(HybridOp):
 
         with EvaluationContext.frame_tracing_context(ctx, inner_trace):
             qreg_in = _input_type_to_tracers(inner_trace.new_arg, [AbstractQreg()])[0]
-            qreg_out = trace_quantum_tape(inner_tape, device, qreg_in, ctx, inner_trace)
+            qrp_out = trace_quantum_tape(inner_tape, device, qreg_in, ctx, inner_trace)
+            qreg_out = promise_actualize(qrp_out)
             jaxpr, typ, consts = ctx.frames[inner_trace].to_jaxpr2(
                 res_classical_tracers + [qreg_out]
             )
@@ -295,9 +299,10 @@ class Cond(HybridOp):
         for region in op.regions:
             with EvaluationContext.frame_tracing_context(ctx, region.trace):
                 qreg_in = _input_type_to_tracers(region.trace.new_arg, [AbstractQreg()])[0]
-                qreg_out = trace_quantum_tape(
+                qrp_out = trace_quantum_tape(
                     region.quantum_tape, device, qreg_in, ctx, region.trace
                 )
+                qreg_out = promise_actualize(qrp_out)
                 jaxpr, typ, const = ctx.frames[region.trace].to_jaxpr2(
                     region.res_classical_tracers + [qreg_out]
                 )
@@ -333,7 +338,8 @@ class WhileLoop(HybridOp):
         res_classical_tracers = self.regions[1].res_classical_tracers
         with EvaluationContext.frame_tracing_context(ctx, body_trace):
             qreg_in = _input_type_to_tracers(body_trace.new_arg, [AbstractQreg()])[0]
-            qreg_out = trace_quantum_tape(body_tape, device, qreg_in, ctx, body_trace)
+            qrp_out = trace_quantum_tape(body_tape, device, qreg_in, ctx, body_trace)
+            qreg_out = promise_actualize(qrp_out)
             body_jaxpr, _, body_consts = ctx.frames[body_trace].to_jaxpr2(
                 res_classical_tracers + [qreg_out]
             )
@@ -363,7 +369,8 @@ class Adjoint(HybridOp):
         res_classical_tracers = op.regions[0].res_classical_tracers
         with EvaluationContext.frame_tracing_context(ctx, body_trace):
             qreg_in = _input_type_to_tracers(body_trace.new_arg, [AbstractQreg()])[0]
-            qreg_out = trace_quantum_tape(body_tape, device, qreg_in, ctx, body_trace)
+            qrp_out = trace_quantum_tape(body_tape, device, qreg_in, ctx, body_trace)
+            qreg_out = promise_actualize(qrp_out)
             body_jaxpr, _, body_consts = ctx.frames[body_trace].to_jaxpr2(
                 res_classical_tracers + [qreg_out]
             )
@@ -412,7 +419,7 @@ def trace_quantum_tape(
     qreg: DynamicJaxprTracer,
     ctx: JaxTracingContext,
     trace: DynamicJaxprTrace,
-) -> DynamicJaxprTracer:
+) -> QRegPromise:
     """Recursively trace the nested `quantum_tape` and produce the quantum tracers. With quantum
     tracers we can complete the set of tracers and finally emit the JAXPR of the whole quantum
     program."""
@@ -439,75 +446,53 @@ def trace_quantum_tape(
         assert qrp2 is not None
         qrp = qrp2
 
-    qreg = promise_actualize(qrp)
+    # qreg = promise_actualize(qrp)
     ctx.frames[trace].eqns = sort_eqns(ctx.frames[trace].eqns, FORCED_ORDER_PRIMITIVES)
-    return qreg
+    return qrp
 
 
 def trace_observables(
-    obs: Operation, device, qreg, m_wires
-) -> Tuple[List[DynamicJaxprTracer], List[DynamicJaxprTracer]]:
+    obs: Operation, device, qrp:QRegPromise, m_wires
+) -> Tuple[List[DynamicJaxprTracer], Optional[int]]:
     wires = obs.wires if (obs and len(obs.wires) > 0) else m_wires
-    qubits = [qextract_p.bind(qreg, w) for w in wires]
+    # qubits = [qextract_p.bind(qreg, w) for w in wires]
+    qubits = None
     if obs is None:
+        qubits = promise_qextract(qrp, wires, allow_reuse=True)
         obs_tracers = compbasis_p.bind(*qubits)
     elif isinstance(obs, KNOWN_NAMED_OBS):
+        qubits = promise_qextract(qrp, wires, allow_reuse=True)
         obs_tracers = namedobs(type(obs).__name__, qubits[0])
     elif isinstance(obs, qml.Hermitian):
         # TODO: remove asarray once fixed upstream: https://github.com/PennyLaneAI/pennylane/issues/4263
+        qubits = promise_qextract(qrp, wires, allow_reuse=True)
         obs_tracers = hermitian(jax.numpy.asarray(*obs.parameters), *qubits)
     elif isinstance(obs, qml.operation.Tensor):
-        nested_obs = [trace_observables(o, device, qreg, m_wires)[0] for o in obs.obs]
+        nested_obs = [trace_observables(o, device, qrp, m_wires)[0] for o in obs.obs]
         obs_tracers = tensorobs_p.bind(*nested_obs)
     elif isinstance(obs, qml.Hamiltonian):
-        nested_obs = [trace_observables(o, device, qreg, m_wires)[0] for o in obs.ops]
+        nested_obs = [trace_observables(o, device, qrp, m_wires)[0] for o in obs.ops]
         obs_tracers = hamiltonian(jax.numpy.asarray(obs.parameters), *nested_obs)
+    elif isinstance(obs, qml.ops.op_math.Prod):
+        nested_obs = [trace_observables(o, device, qrp, m_wires)[0] for o in obs]
+        obs_tracers = tensorobs(*nested_obs)
+    elif isinstance(obs, qml.ops.op_math.Sum):
+        nested_obs = [trace_observables(o, device, qrp, m_wires)[0] for o in obs]
+        obs_tracers = hamiltonian(jax.numpy.asarray(jnp.ones(len(obs))), *nested_obs)
+    elif isinstance(obs, qml.ops.op_math.SProd):
+        terms = obs.terms()
+        coeffs = jax.numpy.array(terms[0])
+        nested_obs = trace_observables(terms[1][0], device, qrp, m_wires)[0]
+        obs_tracers = hamiltonian(coeffs, nested_obs)
+    elif paulis := obs._pauli_rep:  # pylint: disable=protected-access
+        # Use the pauli sentence representation of the observable, if applicable
+        obs_tracers = pauli_sentence_to_hamiltonian_obs(paulis, qrp)
     else:
-        raise NotImplementedError(f"Observable {obs} is not impemented")
-    return obs_tracers, qubits
+        raise NotImplementedError(f"Observable {obs} (of type {type(obs)}) is not impemented")
+    return obs_tracers, (len(qubits) if qubits else None)
 
 
-def named_obs(obs, op_args, qubit_states, qreg):
-    """Trace a named observable.
-
-    Args:
-        obs: a named observable
-        op_args: arguments of the observable
-        qubit_states: the statically known qubit state at this program point
-        qreg: the quantum register with the state at this program point
-
-    Returns:
-        jax_obs: a NamedObs JAX primitive used for tracing
-        qubits: a list of qubits used by the observable
-    """
-    assert isinstance(obs, KNOWN_NAMED_OBS)
-    _, wires = op_args
-    qubits = get_qubits_from_wires(wires, qubit_states, qreg)
-    jax_obs = jprim.namedobs(type(obs).__name__, qubits[0])
-    return jax_obs, qubits
-
-
-def hermitian_obs(obs, op_args, qubit_states, qreg):
-    """Trace a Hermitian observable.
-
-    Args:
-        obs: a Hermitian observable
-        op_args: arguments of the observable
-        qubit_states: the statically known qubit state at this program point
-        qreg: the quantum register with the state at this program point
-
-    Returns:
-        jax_obs: a Hermitian JAX primitive used for tracing
-        qubits: a list of qubits used by the observable
-    """
-    assert isinstance(obs, qml.Hermitian)
-    matrix, wires = op_args
-    qubits = get_qubits_from_wires(wires, qubit_states, qreg)
-    jax_obs = jprim.hermitian(matrix, *qubits)
-    return jax_obs, qubits
-
-
-def pauli_sentence_to_hamiltonian_obs(paulis, qubit_states, qreg):
+def pauli_sentence_to_hamiltonian_obs(paulis, qrp):
     """Convert a :class:`pennylane.pauli.PauliSentence` into a Hamiltonian.
 
     Args:
@@ -519,17 +504,17 @@ def pauli_sentence_to_hamiltonian_obs(paulis, qubit_states, qreg):
         a Hamiltonian JAX primitive used for tracing
     """
     pwords, coeffs = zip(*paulis.items())
-    nested_obs = [pauli_word_to_tensor_obs(pword, qubit_states, qreg) for pword in pwords]
+    nested_obs = [pauli_word_to_tensor_obs(pword, qrp) for pword in pwords]
 
     # No need to create a Hamiltonian for a single TensorObs
     if len(nested_obs) == 1 and coeffs[0] == 1.0:
         return nested_obs[0]
 
     coeffs = jax.numpy.asarray(coeffs)
-    return jprim.hamiltonian(coeffs, *nested_obs)
+    return hamiltonian(coeffs, *nested_obs)
 
 
-def pauli_word_to_tensor_obs(obs, qubit_states, qreg):
+def pauli_word_to_tensor_obs(obs, qrp):
     """Convert a :class:`pennylane.pauli.PauliWord` into a Named or Tensor observable.
 
     Args:
@@ -542,15 +527,18 @@ def pauli_word_to_tensor_obs(obs, qubit_states, qreg):
     """
     if len(obs) == 1:
         wire, pauli = list(obs.items())[0]
-        qubits = get_qubits_from_wires([wire], qubit_states, qreg)
-        return jprim.namedobs(PAULI_NAMED_MAP[pauli], qubits[0])
+        # qubits = [qextract_p.bind(qreg, w) for w in [wire]]
+        qubits = [promise_qextract(qrp, [wire], allow_reuse=True)]
+        return namedobs(PAULI_NAMED_MAP[pauli], qubits[0])
 
     nested_obs = []
     for wire, pauli in obs.items():
-        qubits = get_qubits_from_wires([wire], qubit_states, qreg)
+        # qubits = get_qubits_from_wires([wire], qubit_states, qreg)
+        # qubits = [qextract_p.bind(qreg, w) for w in [wire]]
+        qubits = [promise_qextract(qrp, [wire], allow_reuse=True)]
         nested_obs.append(jprim.namedobs(PAULI_NAMED_MAP[pauli], qubits[0]))
 
-    return jprim.tensorobs(*nested_obs)
+    return tensorobs(*nested_obs)
 
 
 
@@ -558,7 +546,7 @@ def pauli_word_to_tensor_obs(obs, qubit_states, qreg):
 def trace_quantum_measurements(
     quantum_tape,
     device: QubitDevice,
-    qreg: DynamicJaxprTracer,
+    qrp: QRegPromise,
     ctx: JaxTracingContext,
     trace: DynamicJaxprTrace,
     outputs: List[Union[MeasurementProcess, DynamicJaxprTracer, Any]],
@@ -570,11 +558,11 @@ def trace_quantum_measurements(
     for i, o in enumerate(outputs):
         if isinstance(o, MeasurementProcess):
             m_wires = o.wires if o.wires else range(device.num_wires)
-            obs_tracers, qubits = trace_observables(o.obs, device, qreg, m_wires)
+            obs_tracers, nqubits = trace_observables(o.obs, device, qrp, m_wires)
 
             using_compbasis = obs_tracers.primitive == compbasis_p
             if o.return_type.value == "sample":
-                shape = (shots, len(qubits)) if using_compbasis else (shots,)
+                shape = (shots, nqubits) if using_compbasis else (shots,)
                 out_classical_tracers.append(sample_p.bind(obs_tracers, shots=shots, shape=shape))
             elif o.return_type.value == "expval":
                 out_classical_tracers.append(expval_p.bind(obs_tracers, shots=shots))
@@ -582,10 +570,10 @@ def trace_quantum_measurements(
                 out_classical_tracers.append(var_p.bind(obs_tracers, shots=shots))
             elif o.return_type.value == "probs":
                 assert using_compbasis
-                shape = (2 ** len(qubits),)
+                shape = (2 ** nqubits,)
                 out_classical_tracers.append(probs_p.bind(obs_tracers, shape=shape))
             elif o.return_type.value == "counts":
-                shape = (2 ** len(qubits),) if using_compbasis else (2,)
+                shape = (2 ** nqubits,) if using_compbasis else (2,)
                 out_classical_tracers.extend(counts_p.bind(obs_tracers, shots=shots, shape=shape))
                 counts_tree = tree_structure(("keys", "counts"))
                 meas_return_trees_children = out_tree.children()
@@ -598,7 +586,7 @@ def trace_quantum_measurements(
                     out_tree = counts_tree
             elif o.return_type.value == "state":
                 assert using_compbasis
-                shape = (2 ** len(qubits),)
+                shape = (2 ** nqubits,)
                 out_classical_tracers.append(state_p.bind(obs_tracers, shape=shape))
             else:
                 raise NotImplementedError(f"Measurement {o.return_type.value} is not impemented")
@@ -643,27 +631,29 @@ def trace_quantum_function(
             qdevice_p.bind(spec="kwargs", val=str(device.backend_kwargs))
             qdevice_p.bind(spec="backend", val=device.backend_name)
             qreg_in = qalloc_p.bind(len(device.wires))
-            qreg_out = trace_quantum_tape(quantum_tape, device, qreg_in, ctx, trace)
+            qrp_out = trace_quantum_tape(quantum_tape, device, qreg_in, ctx, trace)
             out_classical_tracers, out_classical_tree = trace_quantum_measurements(
                 quantum_tape,
                 device,
-                qreg_out,
+                qrp_out,
                 ctx,
                 trace,
                 out_classical_tracers_or_measurements,
                 out_tree_promise(),
             )
+            # qreg_out = promise_actualize(qrp_out)
 
             qdealloc_p.bind(qreg_in)
 
             out_classical_tracers = [trace.full_raise(t) for t in out_classical_tracers]
-            out_quantum_tracers = [qreg_out]
+            # out_quantum_tracers = [qreg_out]
+            out_quantum_tracers = []
 
             jaxpr, out_type, consts = ctx.frames[trace].to_jaxpr2(
                 out_classical_tracers + out_quantum_tracers
             )
-            jaxpr._outvars = jaxpr._outvars[:-1]
-            out_type = out_type[:-1]
+            # jaxpr._outvars = jaxpr._outvars[:-1]
+            # out_type = out_type[:-1]
             # FIXME: `check_jaxpr` complains about the `AbstractQreg` type. Consider fixing.
             # check_jaxpr(jaxpr)
 
