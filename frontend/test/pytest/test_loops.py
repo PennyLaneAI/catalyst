@@ -114,9 +114,9 @@ class TestWhileLoops:
 
             return circuit()
 
-        with pytest.raises(TypeError, match="boolean scalar was expected, got value of tree-shape"):
+        with pytest.raises(TypeError, match="boolean scalar was expected, got the value"):
             workflow((44, 33))
-        with pytest.raises(TypeError, match="boolean scalar was expected, got value"):
+        with pytest.raises(TypeError, match="boolean scalar was expected, got the value"):
             workflow(33)
 
     def test_closure_condition_fn(self, backend):

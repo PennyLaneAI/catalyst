@@ -588,20 +588,6 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
     return vjp_p.bind(*params, *cotangents, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
 
 
-# def get_evaluation_mode() -> Tuple[EvaluationMode, Any]:
-#     is_tracing = EvaluationContext.is_tracing()
-#     if is_tracing:
-#         ctx = qml.QueuingManager.active_context()
-#         if ctx is not None:
-#             mctx = get_main_tracing_context()
-#             assert mctx is not None
-#             return (EvaluationMode.QUANTUM_COMPILATION, mctx)
-#         else:
-#             return (EvaluationMode.CLASSICAL_COMPILATION, None)
-#     else:
-#         return (EvaluationMode.INTERPRETATION, None)
-
-
 def _aval_to_primitive_type(aval):
     if isinstance(aval, DynamicJaxprTracer):
         aval = aval.strip_weak_type()
@@ -611,104 +597,29 @@ def _aval_to_primitive_type(aval):
     return aval
 
 
-#     .. warning::
-
-#         This function does not support performing the adjoint
-#         of quantum functions that contain mid-circuit measurements.
-
-#     Args:
-#         f (Callable or Operator): A PennyLane operation or a Python function
-#                                   containing PennyLane quantum operations.
-
-#     Returns:
-#         If an Operator is provided, returns an Operator that is the adjoint. If
-#         a function is provided, returns a function with the same call signature
-#         that returns the Adjoint of the provided function.
-
-#     Raises:
-#         ValueError: invalid parameter values
-
-#     **Example 1 (basic usage)**
-
-#     .. code-block:: python
-
-#         @qjit
-#         @qml.qnode(qml.device("lightning.qubit", wires=1))
-#         def workflow(theta, wires):
-#             catalyst.adjoint(qml.RZ)(theta, wires=wires)
-#             catalyst.adjoint(qml.RZ(theta, wires=wires))
-#             def func():
-#                 qml.RX(theta, wires=wires)
-#                 qml.RY(theta, wires=wires)
-#             catalyst.adjoint(func)()
-#             return qml.probs()
-
-#     >>> workflow(jnp.pi/2, wires=0)
-#     array([0.5, 0.5])
-
-#     **Example 2 (with Catalyst control flow)**
-
-#     .. code-block:: python
-
-#         @qjit
-#         @qml.qnode(qml.device("lightning.qubit", wires=1))
-#         def workflow(theta, n, wires):
-#             def func():
-#                 @catalyst.for_loop(0, n, 1)
-#                 def loop_fn(i):
-#                     qml.RX(theta, wires=wires)
-
-#                 loop_fn()
-#             catalyst.adjoint(func)()
-#             return qml.probs()
-
-#     >>> workflow(jnp.pi/2, 3, 0)
-#     [1.00000000e+00 7.39557099e-32]
-#     """
-
-#     def _make_adjoint(*args, _callee: Callable, **kwargs):
-#         cargs_qargs, tree = tree_flatten((args, kwargs, [jprim.Qreg()]))
-#         cargs, _ = tree_flatten((args, kwargs))
-#         cargs_qargs_aval = tuple(_abstractify(val) for val in cargs_qargs)
-#         body, consts, _ = _initial_style_jaxpr(
-#             partial(_trace_quantum_tape, _callee=_callee, _allow_quantum_measurements=False),
-#             tree,
-#             cargs_qargs_aval,
-#             "adjoint",
-
-
-
-def _check_single_bool_value(tree: PyTreeDef, avals: List[Any], hint=None) -> None:
-    hint = f"{hint}: " if hint else ""
+def _check_single_bool_value(tree: PyTreeDef, avals: List[Any]) -> None:
     if not treedef_is_leaf(tree):
         raise TypeError(
-            f"{hint}A single boolean scalar was expected, got value of tree-shape: {tree}."
+            f"A single boolean scalar was expected, got the value of tree-shape: {tree}."
         )
     assert len(avals) == 1, f"{avals} does not match {tree}"
     dtype = _aval_to_primitive_type(avals[0])
     if dtype not in (bool, jnp.bool_):
-        raise TypeError(f"{hint}A single boolean scalar was expected, got value {avals[0]}.")
+        raise TypeError(f"A single boolean scalar was expected, got the value {avals[0]}.")
 
 
-def _check_same_types(trees: List[PyTreeDef], avals: List[List[Any]], hint=None) -> None:
+def _check_cond_same_types(trees: List[PyTreeDef], avals: List[List[Any]]) -> None:
     assert len(trees) == len(avals), f"Input trees ({trees}) don't match input avals ({avals})"
-    hint = f"{hint}: " if hint else ""
     expected_tree, expected_dtypes = trees[0], [_aval_to_primitive_type(a) for a in avals[0]]
     for i, (tree, aval) in list(enumerate(zip(trees, avals)))[1:]:
         if tree != expected_tree:
             raise TypeError(
-                f"{hint}Same return types were expected, got:\n"
-                f" - Branch at index 0: {expected_tree}\n"
-                f" - Branch at index {i}: {tree}\n"
-                "Please specify the default branch if none was specified."
+                f"Conditional requires consistent return types across all branches"
             )
         dtypes = [_aval_to_primitive_type(a) for a in aval]
         if dtypes != expected_dtypes:
             raise TypeError(
-                f"{hint}Same return types were expected, got:\n"
-                f" - Branch at index 0: {expected_dtypes}\n"
-                f" - Branch at index {i}: {dtypes}\n"
-                "Please specify the default branch if none was specified."
+                f"Conditional requires consistent return types across all branches"
             )
 
 
@@ -742,10 +653,7 @@ class CondCallable:
         for i, jaxpr in list(enumerate(branch_jaxprs))[1:]:
             if expected != jaxpr.out_avals:
                 raise TypeError(
-                    "Conditional requires consistent return types across all branches, got:\n"
-                    f" - Branch at index 0: {expected}\n"
-                    f" - Branch at index {i}: {jaxpr.out_avals}\n"
-                    "Please specify an else branch if none was specified."
+                    "Conditional requires consistent return types across all branches"
                 )
 
     def _call_with_quantum_ctx(self, ctx):
@@ -764,7 +672,7 @@ class CondCallable:
             out_trees.append(out_tree())
             out_avals.append(res_classical_tracers)
 
-        _check_same_types(out_trees, out_avals, hint="Conditional branches")
+        _check_cond_same_types(out_trees, out_avals)
         res_avals = list(map(shaped_abstractify, res_classical_tracers))
         out_classical_tracers = [new_inner_tracer(outer_trace, aval) for aval in res_avals]
         Cond(in_classical_tracers, out_classical_tracers, regions)
@@ -776,8 +684,8 @@ class CondCallable:
         branch_jaxprs, consts, out_trees = initial_style_jaxprs_with_common_consts1(
             (*self.branch_fns, self.otherwise_fn), args_tree, args_avals, "cond"
         )
-        _check_same_types(
-            out_trees, [j.out_avals for j in branch_jaxprs], hint="Conditional branches"
+        _check_cond_same_types(
+            out_trees, [j.out_avals for j in branch_jaxprs]
         )
         out_classical_tracers = qcond_p.bind(*(self.preds + consts), branch_jaxprs=branch_jaxprs)
         return tree_unflatten(out_trees[0], out_classical_tracers)
@@ -1014,7 +922,7 @@ def while_loop(cond_fn):
                     )
 
                 _check_single_bool_value(
-                    cond_tree(), res_classical_tracers, hint="Condition return value"
+                    cond_tree(), res_classical_tracers
                 )
 
                 with EvaluationContext.frame_tracing_context(ctx) as body_trace:
@@ -1046,7 +954,7 @@ def while_loop(cond_fn):
                     body_fn, in_tree, init_avals, "while_loop"
                 )
                 _check_single_bool_value(
-                    cond_tree, cond_jaxpr.out_avals, hint="Condition return value"
+                    cond_tree, cond_jaxpr.out_avals
                 )
                 out_classical_tracers = qwhile_p.bind(
                     *(cond_consts + body_consts + init_vals),
