@@ -4,7 +4,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 include(FetchContent)
 
 set(LIGHTNING_GIT_TAG "master" CACHE STRING "GIT_TAG value to build Lightning")
-set(source_files "StateVectorDynamicCPU.cpp")
+set(source_files "StateVectorLQubitDynamic.cpp")
 FetchContent_Declare(
     pennylane_lightning
     GIT_REPOSITORY https://github.com/PennyLaneAI/pennylane-lightning.git

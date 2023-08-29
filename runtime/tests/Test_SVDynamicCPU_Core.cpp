@@ -22,7 +22,7 @@
 #include <vector>
 
 #include "LinearAlgebra.hpp"
-#include "StateVectorDynamicCPU.hpp"
+#include "StateVectorLQubitDynamic.hpp"
 #include "Util.hpp"
 #include "cpu_kernels/GateImplementationsPI.hpp"
 #include <StateVectorLQubit.hpp>
@@ -31,39 +31,42 @@
 
 using namespace Pennylane::LightningQubit;
 
-TEMPLATE_TEST_CASE("StateVectorDynamicCPU::StateVectorDynamicCPU", "[StateVectorDynamicCPU]", float,
-                   double)
+TEMPLATE_TEST_CASE("StateVectorLQubitDynamic::StateVectorLQubitDynamic",
+                   "[StateVectorLQubitDynamic]", float, double)
 {
     using PrecisionT = TestType;
 
-    SECTION("StateVectorDynamicCPU") { CHECK(!std::is_constructible_v<StateVectorDynamicCPU<>>); }
-    SECTION("StateVectorDynamicCPU<TestType>")
+    SECTION("StateVectorLQubitDynamic")
     {
-        CHECK(!std::is_constructible_v<StateVectorDynamicCPU<TestType>>);
+        CHECK(!std::is_constructible_v<StateVectorLQubitDynamic<>>);
     }
-    SECTION("StateVectorDynamicCPU<TestType> {size_t}")
+    SECTION("StateVectorLQubitDynamic<TestType>")
     {
-        CHECK(std::is_constructible_v<StateVectorDynamicCPU<TestType>, size_t>);
+        CHECK(!std::is_constructible_v<StateVectorLQubitDynamic<TestType>>);
+    }
+    SECTION("StateVectorLQubitDynamic<TestType> {size_t}")
+    {
+        CHECK(std::is_constructible_v<StateVectorLQubitDynamic<TestType>, size_t>);
         const size_t num_qubits = 4;
-        StateVectorDynamicCPU<PrecisionT> sv(num_qubits);
+        StateVectorLQubitDynamic<PrecisionT> sv(num_qubits);
 
         CHECK(sv.getNumQubits() == 4);
         CHECK(sv.getLength() == 16);
         CHECK(sv.getDataVector().size() == 16);
     }
-    SECTION("StateVectorDynamicCPU<TestType> {const "
-            "StateVectorDynamicCPU<TestType>&}")
+    SECTION("StateVectorLQubitDynamic<TestType> {const "
+            "StateVectorLQubitDynamic<TestType>&}")
     {
-        CHECK(std::is_copy_constructible_v<StateVectorDynamicCPU<TestType>>);
+        CHECK(std::is_copy_constructible_v<StateVectorLQubitDynamic<TestType>>);
     }
-    SECTION("StateVectorDynamicCPU<TestType> {StateVectorDynamicCPU<TestType>&&}")
+    SECTION("StateVectorLQubitDynamic<TestType> {StateVectorLQubitDynamic<TestType>&&}")
     {
-        CHECK(std::is_move_constructible_v<StateVectorDynamicCPU<TestType>>);
+        CHECK(std::is_move_constructible_v<StateVectorLQubitDynamic<TestType>>);
     }
     SECTION("Aligned 256bit statevector")
     {
         const auto memory_model = CPUMemoryModel::Aligned256;
-        StateVectorDynamicCPU<PrecisionT> sv(4, Threading::SingleThread, memory_model);
+        StateVectorLQubitDynamic<PrecisionT> sv(4, Threading::SingleThread, memory_model);
         /* Even when we allocate 256 bit aligend memory, it is possible that the
          * alignment happens to be 512 bit */
         CHECK(((getMemoryModel(sv.getDataVector().data()) == CPUMemoryModel::Aligned256) ||
@@ -73,20 +76,20 @@ TEMPLATE_TEST_CASE("StateVectorDynamicCPU::StateVectorDynamicCPU", "[StateVector
     SECTION("Aligned 512bit statevector")
     {
         const auto memory_model = CPUMemoryModel::Aligned512;
-        StateVectorDynamicCPU<PrecisionT> sv(4, Threading::SingleThread, memory_model);
+        StateVectorLQubitDynamic<PrecisionT> sv(4, Threading::SingleThread, memory_model);
         CHECK((getMemoryModel(sv.getDataVector().data()) == CPUMemoryModel::Aligned512));
     }
 }
 
-TEMPLATE_TEST_CASE("StateVectorDynamicCPU::applyMatrix with std::vector", "[StateVectorDynamicCPU]",
-                   float, double)
+TEMPLATE_TEST_CASE("StateVectorLQubitDynamic::applyMatrix with std::vector",
+                   "[StateVectorLQubitDynamic]", float, double)
 {
     using PrecisionT = TestType;
     SECTION("Test wrong matrix size")
     {
         std::vector<std::complex<TestType>> m(7, 0.0);
         const size_t num_qubits = 4;
-        StateVectorDynamicCPU<PrecisionT> sv(num_qubits);
+        StateVectorLQubitDynamic<PrecisionT> sv(num_qubits);
         REQUIRE_THROWS_WITH(sv.applyMatrix(m, {0, 1}),
                             Catch::Contains("The size of matrix does not match with the given"));
     }
@@ -95,21 +98,21 @@ TEMPLATE_TEST_CASE("StateVectorDynamicCPU::applyMatrix with std::vector", "[Stat
     {
         std::vector<std::complex<TestType>> m(8, 0.0);
         const size_t num_qubits = 4;
-        StateVectorDynamicCPU<PrecisionT> sv(num_qubits);
+        StateVectorLQubitDynamic<PrecisionT> sv(num_qubits);
         REQUIRE_THROWS_WITH(sv.applyMatrix(m, {0}),
                             Catch::Contains("The size of matrix does not match with the given"));
     }
 }
 
-TEMPLATE_TEST_CASE("StateVectorDynamicCPU::applyMatrix with a pointer", "[StateVectorDynamicCPU]",
-                   float, double)
+TEMPLATE_TEST_CASE("StateVectorLQubitDynamic::applyMatrix with a pointer",
+                   "[StateVectorLQubitDynamic]", float, double)
 {
     using PrecisionT = TestType;
     SECTION("Test wrong matrix")
     {
         std::vector<std::complex<TestType>> m(8, 0.0);
         const size_t num_qubits = 4;
-        StateVectorDynamicCPU<PrecisionT> sv(num_qubits);
+        StateVectorLQubitDynamic<PrecisionT> sv(num_qubits);
         REQUIRE_THROWS_WITH(sv.applyMatrix(m.data(), {}), Catch::Contains("must be larger than 0"));
     }
 
@@ -118,8 +121,8 @@ TEMPLATE_TEST_CASE("StateVectorDynamicCPU::applyMatrix with a pointer", "[StateV
         std::default_random_engine re{1337};
         const size_t num_qubits = 5;
         for (size_t num_wires = 1; num_wires < num_qubits; num_wires++) {
-            StateVectorDynamicCPU<PrecisionT> sv1(num_qubits);
-            StateVectorDynamicCPU<PrecisionT> sv2(num_qubits);
+            StateVectorLQubitDynamic<PrecisionT> sv1(num_qubits);
+            StateVectorLQubitDynamic<PrecisionT> sv2(num_qubits);
 
             std::vector<size_t> wires(num_wires);
             std::iota(wires.begin(), wires.end(), 0);
@@ -133,7 +136,7 @@ TEMPLATE_TEST_CASE("StateVectorDynamicCPU::applyMatrix with a pointer", "[StateV
     }
 }
 
-TEMPLATE_TEST_CASE("StateVectorDynamicCPU::applyOperations", "[StateVectorDynamicCPU]", float,
+TEMPLATE_TEST_CASE("StateVectorLQubitDynamic::applyOperations", "[StateVectorLQubitDynamic]", float,
                    double)
 {
     using PrecisionT = TestType;
@@ -143,7 +146,7 @@ TEMPLATE_TEST_CASE("StateVectorDynamicCPU::applyOperations", "[StateVectorDynami
     SECTION("Test invalid arguments without params")
     {
         const size_t num_qubits = 4;
-        StateVectorDynamicCPU<PrecisionT> sv(num_qubits);
+        StateVectorLQubitDynamic<PrecisionT> sv(num_qubits);
         REQUIRE_THROWS_WITH(sv.applyOperations({"PauliX", "PauliY"}, {{0}}, {false, false}),
                             Catch::Contains("must all be equal")); // invalid wires
         REQUIRE_THROWS_WITH(sv.applyOperations({"PauliX", "PauliY"}, {{0}, {1}}, {false}),
@@ -153,10 +156,10 @@ TEMPLATE_TEST_CASE("StateVectorDynamicCPU::applyOperations", "[StateVectorDynami
     SECTION("applyOperations without params works as expected")
     {
         const size_t num_qubits = 3;
-        StateVectorDynamicCPU<PrecisionT> sv1(num_qubits);
+        StateVectorLQubitDynamic<PrecisionT> sv1(num_qubits);
 
         sv1.updateData(Pennylane::Util::createRandomStateVectorData<PrecisionT>(re, num_qubits));
-        StateVectorDynamicCPU<PrecisionT> sv2 = sv1;
+        StateVectorLQubitDynamic<PrecisionT> sv2 = sv1;
 
         sv1.applyOperations({"PauliX", "PauliY"}, {{0}, {1}}, {false, false});
 
@@ -169,7 +172,7 @@ TEMPLATE_TEST_CASE("StateVectorDynamicCPU::applyOperations", "[StateVectorDynami
     SECTION("Test invalid arguments with params")
     {
         const size_t num_qubits = 4;
-        StateVectorDynamicCPU<PrecisionT> sv(num_qubits);
+        StateVectorLQubitDynamic<PrecisionT> sv(num_qubits);
         REQUIRE_THROWS_WITH(sv.applyOperations({"RX", "RY"}, {{0}}, {false, false}, {{0.0}, {0.0}}),
                             Catch::Contains("must all be equal")); // invalid wires
         REQUIRE_THROWS_WITH(sv.applyOperations({"RX", "RY"}, {{0}, {1}}, {false}, {{0.0}, {0.0}}),
@@ -182,10 +185,10 @@ TEMPLATE_TEST_CASE("StateVectorDynamicCPU::applyOperations", "[StateVectorDynami
     SECTION("applyOperations with params works as expected")
     {
         const size_t num_qubits = 3;
-        StateVectorDynamicCPU<PrecisionT> sv1(num_qubits);
+        StateVectorLQubitDynamic<PrecisionT> sv1(num_qubits);
 
         sv1.updateData(Pennylane::Util::createRandomStateVectorData<PrecisionT>(re, num_qubits));
-        StateVectorDynamicCPU<PrecisionT> sv2 = sv1;
+        StateVectorLQubitDynamic<PrecisionT> sv2 = sv1;
 
         sv1.applyOperations({"RX", "RY"}, {{0}, {1}}, {false, false}, {{0.1}, {0.2}});
 

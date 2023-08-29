@@ -27,7 +27,6 @@
 
 #include <iostream>
 
-/// @cond DEV
 namespace {
 using Pennylane::Util::AlignedAllocator;
 using Pennylane::Util::bestCPUMemoryModel;
@@ -38,7 +37,6 @@ using Pennylane::Util::ONE;
 using Pennylane::Util::squaredNorm;
 using Pennylane::Util::ZERO;
 } // namespace
-/// @endcond
 
 namespace Pennylane::LightningQubit {
 /**
@@ -50,15 +48,14 @@ namespace Pennylane::LightningQubit {
  *
  */
 template <class fp_t = double>
-class StateVectorDynamicCPU : public StateVectorLQubit<fp_t, StateVectorDynamicCPU<fp_t>> {
+class StateVectorLQubitDynamic : public StateVectorLQubit<fp_t, StateVectorLQubitDynamic<fp_t>> {
   public:
     using PrecisionT = fp_t;
     using ComplexT = std::complex<PrecisionT>;
 
   private:
-    using BaseType = StateVectorLQubit<PrecisionT, StateVectorDynamicCPU<PrecisionT>>;
+    using BaseType = StateVectorLQubit<PrecisionT, StateVectorLQubitDynamic<PrecisionT>>;
     std::vector<ComplexT, AlignedAllocator<ComplexT>> data_;
-    size_t num_qubits_;
 
     static constexpr PrecisionT epsilon_ = std::numeric_limits<PrecisionT>::epsilon() * 100;
 
@@ -104,13 +101,13 @@ class StateVectorDynamicCPU : public StateVectorLQubit<fp_t, StateVectorDynamicC
      * @param threading Threading option the statevector to use
      * @param memory_model Memory model the statevector will use
      */
-    explicit StateVectorDynamicCPU(size_t num_qubits, Threading threading = Threading::SingleThread,
-                                   CPUMemoryModel memory_model = bestCPUMemoryModel())
+    explicit StateVectorLQubitDynamic(size_t num_qubits,
+                                      Threading threading = Threading::SingleThread,
+                                      CPUMemoryModel memory_model = bestCPUMemoryModel())
         : BaseType{num_qubits, threading, memory_model},
           data_{exp2(num_qubits), ZERO<PrecisionT>(),
                 getAllocator<ComplexT>( // LCOV_EXCL_LINE
-                    this->memory_model_)},
-          num_qubits_(num_qubits)
+                    this->memory_model_)}
     {
         data_[0] = ONE<PrecisionT>();
     }
@@ -123,7 +120,7 @@ class StateVectorDynamicCPU : public StateVectorLQubit<fp_t, StateVectorDynamicC
      * @param other Another statevector to construct the statevector from
      */
     template <class OtherDerived>
-    explicit StateVectorDynamicCPU(const StateVectorLQubit<PrecisionT, OtherDerived> &other)
+    explicit StateVectorLQubitDynamic(const StateVectorLQubit<PrecisionT, OtherDerived> &other)
         : BaseType(other.getNumQubits(), other.threading(), other.memoryModel()),
           data_{other.getData(), other.getData() + other.getLength(),
                 getAllocator<ComplexT>(this->memory_model_)}
@@ -138,9 +135,9 @@ class StateVectorDynamicCPU : public StateVectorLQubit<fp_t, StateVectorDynamicC
      * @param threading Threading option the statevector to use
      * @param memory_model Memory model the statevector will use
      */
-    StateVectorDynamicCPU(const ComplexT *other_data, size_t other_size,
-                          Threading threading = Threading::SingleThread,
-                          CPUMemoryModel memory_model = bestCPUMemoryModel())
+    StateVectorLQubitDynamic(const ComplexT *other_data, size_t other_size,
+                             Threading threading = Threading::SingleThread,
+                             CPUMemoryModel memory_model = bestCPUMemoryModel())
         : BaseType(log2PerfectPower(other_size), threading, memory_model),
           data_{other_data, other_data + other_size, getAllocator<ComplexT>(this->memory_model_)}
     {
@@ -158,20 +155,27 @@ class StateVectorDynamicCPU : public StateVectorLQubit<fp_t, StateVectorDynamicC
      * @param memory_model Memory model the statevector will use
      */
     template <class Alloc>
-    explicit StateVectorDynamicCPU(const std::vector<std::complex<PrecisionT>, Alloc> &other,
-                                   Threading threading = Threading::SingleThread,
-                                   CPUMemoryModel memory_model = bestCPUMemoryModel())
-        : StateVectorDynamicCPU(other.data(), other.size(), threading, memory_model)
+    explicit StateVectorLQubitDynamic(const std::vector<std::complex<PrecisionT>, Alloc> &other,
+                                      Threading threading = Threading::SingleThread,
+                                      CPUMemoryModel memory_model = bestCPUMemoryModel())
+        : StateVectorLQubitDynamic(other.data(), other.size(), threading, memory_model)
     {
     }
 
-    StateVectorDynamicCPU(const StateVectorDynamicCPU &rhs) = default;
-    StateVectorDynamicCPU(StateVectorDynamicCPU &&) noexcept = default;
+    StateVectorLQubitDynamic(const StateVectorLQubitDynamic &rhs) = default;
+    StateVectorLQubitDynamic(StateVectorLQubitDynamic &&) noexcept = default;
 
-    StateVectorDynamicCPU &operator=(const StateVectorDynamicCPU &) = default;
-    StateVectorDynamicCPU &operator=(StateVectorDynamicCPU &&) noexcept = default;
+    StateVectorLQubitDynamic &operator=(const StateVectorLQubitDynamic &) = default;
+    StateVectorLQubitDynamic &operator=(StateVectorLQubitDynamic &&) noexcept = default;
 
-    ~StateVectorDynamicCPU() = default;
+    ~StateVectorLQubitDynamic() = default;
+
+    /**
+     * @brief Set the number of qubits represented by the statevector data.
+     *
+     * @return std::size_t
+     */
+    void setNumQubits(size_t qubits) noexcept { this->num_qubits_ = qubits; }
 
     /**
      * @brief Get underlying C-style data of the state-vector.

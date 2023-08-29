@@ -14,8 +14,8 @@
 
 #pragma once
 
-#if !__has_include("StateVectorDynamicCPU.hpp")
-throw std::logic_error("StateVectorDynamicCPU.hpp: No such header file");
+#if !__has_include("StateVectorLQubitDynamic.hpp")
+throw std::logic_error("StateVectorLQubitDynamic.hpp: No such header file");
 #endif
 
 #define __device_lightning
@@ -33,7 +33,7 @@ throw std::logic_error("StateVectorDynamicCPU.hpp: No such header file");
 #include "JacobianData.hpp"
 #include "LinearAlgebra.hpp"
 #include "MeasurementsLQubit.hpp"
-#include "StateVectorDynamicCPU.hpp"
+#include "StateVectorLQubitDynamic.hpp"
 
 #include "CacheManager.hpp"
 #include "Exception.hpp"
@@ -45,7 +45,7 @@ throw std::logic_error("StateVectorDynamicCPU.hpp: No such header file");
 namespace Catalyst::Runtime::Simulator {
 class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {
   private:
-    using StateVectorT = Pennylane::LightningQubit::StateVectorDynamicCPU<double>;
+    using StateVectorT = Pennylane::LightningQubit::StateVectorLQubitDynamic<double>;
 
   private:
     // static constants for RESULT values
