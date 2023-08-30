@@ -30,8 +30,8 @@ class ActivityAnalyzer {
     /// configuration.
     ActivityAnalyzer(GradOp gradOp, bool print = false);
 
-    /// Determine if the given value is active (i.e. requires the computation of a derivative).
-    bool isActive(mlir::Value value) const;
+    /// Determine if the given value is constant (i.e. does not influence the derivative)
+    bool isConstant(mlir::Value value) const;
 
   private:
     mlir::DataFlowSolver solver;

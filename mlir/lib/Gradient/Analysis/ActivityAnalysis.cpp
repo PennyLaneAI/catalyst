@@ -271,8 +271,8 @@ void catalyst::gradient::ActivityAnalyzer::printResults(FunctionOpInterface call
             auto *fwdState = solver.lookupState<ForwardActivity>(arg);
             auto *bwdState = solver.lookupState<BackwardActivity>(arg);
 
-            errs() << indent << label << ": " << (isActive(arg) ? "Active" : "Constant") << " (fwd "
-                   << fwdState->getValue() << " bwd " << bwdState->getValue() << ")\n";
+            errs() << indent << label << ": " << (isConstant(arg) ? "Constant" : "Active")
+                   << " (fwd " << fwdState->getValue() << " bwd " << bwdState->getValue() << ")\n";
         }
     }
 
@@ -283,7 +283,7 @@ void catalyst::gradient::ActivityAnalyzer::printResults(FunctionOpInterface call
                 auto *fwdState = solver.lookupState<ForwardActivity>(result);
                 auto *bwdState = solver.lookupState<BackwardActivity>(result);
 
-                errs() << (isActive(result) ? "Active" : "Constant") << " (fwd "
+                errs() << (isConstant(result) ? "Constant" : "Active") << " (fwd "
                        << fwdState->getValue() << " bwd " << bwdState->getValue() << ") ";
             }
             errs() << "\n";
@@ -291,11 +291,11 @@ void catalyst::gradient::ActivityAnalyzer::printResults(FunctionOpInterface call
     });
 }
 
-bool catalyst::gradient::ActivityAnalyzer::isActive(Value value) const
+bool catalyst::gradient::ActivityAnalyzer::isConstant(Value value) const
 {
     if (analysisFailed) {
         // If the analysis failed, conservatively assume all values are active.
-        return true;
+        return false;
     }
 
     auto *forwardState = solver.lookupState<ForwardActivity>(value);
@@ -305,5 +305,6 @@ bool catalyst::gradient::ActivityAnalyzer::isActive(Value value) const
     assert(forwardState && backwardState && "activity states were null");
 
     // A value is overall active iff it is both forward and backward active.
-    return forwardState->getValue().isActive() && backwardState->getValue().isActive();
+    bool isActive = forwardState->getValue().isActive() && backwardState->getValue().isActive();
+    return !isActive;
 }

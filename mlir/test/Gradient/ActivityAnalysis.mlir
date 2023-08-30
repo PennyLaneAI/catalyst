@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt %s --lower-gradients=print-activity --split-input-file -o /dev/null 2>&1 | FileCheck %s
+// RUN: quantum-opt %s --lower-gradients='activity-analysis print-activity' --split-input-file -o /dev/null 2>&1 | FileCheck %s
 
 // CHECK-LABEL: Activity for '@noControlFlow' [0]:
 // CHECK-DAG: "x": Active
@@ -135,7 +135,7 @@ func.func @gradLoop(%arg0: f64) -> f64 {
 
 // -----
 
-// CHECK-LABEL: Activity for '@funcMultiArg' [0, 1]:
+// CHECK-LABEL: Activity for '@funcMultiArg' [0]:
 // CHECK-DAG: "arg0": Active
 // CHECK-DAG: "arg1": Constant
 
@@ -143,7 +143,7 @@ func.func @gradLoop(%arg0: f64) -> f64 {
 // CHECK-DAG: "arg0": Constant
 // CHECK-DAG: "arg1": Constant
 
-// CHECK-LABEL: Activity for '@funcMultiArg' [0]:
+// CHECK-LABEL: Activity for '@funcMultiArg' [0, 1]:
 // CHECK-DAG: "arg0": Active
 // CHECK-DAG: "arg1": Constant
 func.func @funcMultiArg(%arg0: tensor<f64> {activity.id = "arg0"}, %arg1: tensor<2xf64> {activity.id = "arg1"}) -> tensor<f64> attributes {qnode, diff_method = "parameter-shift"} {

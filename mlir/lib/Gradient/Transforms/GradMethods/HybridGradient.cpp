@@ -123,24 +123,39 @@ FailureOr<func::FuncOp> HybridGradientLowering::cloneCallee(PatternRewriter &rew
 {
     Location loc = callee.getLoc();
     std::string clonedCalleeName = (callee.getName() + ".cloned").str();
+    ActivityAnalyzer activityAnalyzer(gradOp);
     func::FuncOp clonedCallee = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
         callee, rewriter.getStringAttr(clonedCalleeName));
     backpropArgs.append(gradOp.getArgOperands().begin(), gradOp.getArgOperands().end());
+
+    SmallPtrSet<Operation *, 4> qnodes;
+    SymbolTableCollection symbolTable;
+    DenseMap<Operation *, ArrayAttr> constGatesForQNode;
+    traverseCallGraph(callee, &symbolTable, [&](func::FuncOp funcOp) {
+        if (isQNode(funcOp)) {
+            qnodes.insert(funcOp);
+            // assume that each invocation of the grad op will have different argument activities
+            // TODO: different argument activites can produce the same gate param activities
+            SmallVector<int64_t> constantGateParams;
+            int64_t paramIdx = 0;
+            funcOp.walk<WalkOrder::PreOrder>([&](quantum::DifferentiableGate gateOp) {
+                for (Value param : gateOp.getDiffParams()) {
+                    if (activityAnalyzer.isConstant(param)) {
+                        constantGateParams.push_back(paramIdx);
+                    }
+                    paramIdx++;
+                }
+            });
+
+            constGatesForQNode[funcOp] = rewriter.getI64ArrayAttr(constantGateParams);
+        }
+    });
+
     if (!clonedCallee) {
         rewriter.setInsertionPointAfter(callee);
         // Replace calls with the QNode with the split QNode in the callee.
         clonedCallee = cast<func::FuncOp>(rewriter.clone(*callee));
         clonedCallee.setName(clonedCalleeName);
-        SmallPtrSet<Operation *, 4> qnodes;
-        SymbolTableCollection symbolTable;
-        traverseCallGraph(callee, &symbolTable, [&](func::FuncOp funcOp) {
-            if (funcOp == callee && isQNode(callee)) {
-                qnodes.insert(callee);
-            }
-            else if (isQNode(funcOp)) {
-                qnodes.insert(funcOp);
-            }
-        });
 
         for (Operation *qnodeOp : qnodes) {
             auto qnode = cast<func::FuncOp>(qnodeOp);

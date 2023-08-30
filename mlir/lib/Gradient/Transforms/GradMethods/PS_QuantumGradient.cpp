@@ -166,10 +166,6 @@ static void storePartialDerivative(PatternRewriter &rewriter, Location loc,
             rewriter.create<memref::StoreOp>(loc, derivative, gradientBuffer, gradIdx);
         }
     }
-
-    Value cOne = rewriter.create<index::ConstantOp>(loc, 1);
-    Value newGradIdx = rewriter.create<index::AddOp>(loc, gradIdx, cOne);
-    rewriter.create<memref::StoreOp>(loc, newGradIdx, gradientsProcessed);
 }
 
 func::FuncOp ParameterShiftLowering::genQGradFunction(PatternRewriter &rewriter, Location loc,
@@ -181,6 +177,16 @@ func::FuncOp ParameterShiftLowering::genQGradFunction(PatternRewriter &rewriter,
     // gradient is unknown as the number of gate parameters in the unrolled circuit is only
     // determined at run time. The dynamic size is an input to the gradient function.
     std::string fnName = callee.getSymName().str() + ".qgrad";
+
+    DenseSet<int64_t> constParams;
+    // if (constParamsAttr) {
+    //     for (APInt constAPIdx : constParamsAttr.getAsValueRange<IntegerAttr>()) {
+    //         int64_t constIdx = constAPIdx.getSExtValue();
+    //         constParams.insert(constIdx);
+    //         fnName += '.';
+    //         fnName += std::to_string(constIdx);
+    //     }
+    // }
     std::vector<Type> fnArgTypes = callee.getArgumentTypes().vec();
     Type gradientSizeType = rewriter.getIndexType();
     fnArgTypes.push_back(gradientSizeType);
@@ -257,11 +263,17 @@ func::FuncOp ParameterShiftLowering::genQGradFunction(PatternRewriter &rewriter,
                     updateSelectorVector(rewriter, loc, selectorsToStore, selectorBuffer);
 
                     for (size_t _ = 0; _ < numParams; _++) {
-                        const std::vector<Value> &derivatives =
-                            computePartialDerivative(rewriter, loc, numShifts, currentShift++,
-                                                     selectorBuffer, shiftedFn, callArgs);
-                        storePartialDerivative(rewriter, loc, gradientBuffers, gradientsProcessed,
-                                               derivatives);
+                        if (!constParams.contains(currentShift)) {
+                            const std::vector<Value> &derivatives =
+                                computePartialDerivative(rewriter, loc, numShifts, currentShift,
+                                                         selectorBuffer, shiftedFn, callArgs);
+                            storePartialDerivative(rewriter, loc, gradientBuffers,
+                                                   gradientsProcessed, derivatives);
+                        }
+                        currentShift++;
+                        Value counter = rewriter.create<memref::LoadOp>(loc, gradientsProcessed);
+                        counter = rewriter.create<index::AddOp>(loc, counter, cOne);
+                        rewriter.create<memref::StoreOp>(loc, counter, gradientsProcessed);
                     }
                 }
             }

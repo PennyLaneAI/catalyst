@@ -17,6 +17,7 @@
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Index/IR/IndexDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -28,6 +29,7 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
+#include "Catalyst/Utils/CallGraph.h"
 #include "Gradient/Analysis/ActivityAnalysis.h"
 #include "Gradient/IR/GradientOps.h"
 #include "Gradient/Transforms/Passes.h"
@@ -49,17 +51,6 @@ struct GradientLoweringPass : impl::GradientLoweringPassBase<GradientLoweringPas
 
     void runOnOperation() final
     {
-        DenseMap<GradOp, DenseSet<Value>> constantValues;
-        if (enableActivity) {
-            getOperation()->walk([&](GradOp gradOp) {
-                llvm::errs() << "found grad op: " << gradOp << "\n";
-                // need a way to say "in the context of this grad op, this param is constant" that
-                // works for multiple grad ops
-
-                // activityInfo[gradOp] = ActivityAnalyzer(gradOp);
-            });
-        }
-
         RewritePatternSet gradientPatterns(&getContext());
         populateLoweringPatterns(gradientPatterns, lowerOnly, printActivity);
 
