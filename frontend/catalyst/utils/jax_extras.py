@@ -15,51 +15,11 @@
 """
 from __future__ import annotations
 
-import collections
-import functools
-import gc
-import inspect
-import itertools as it
-import math
-import operator
-import threading
-import types
-import warnings
-from collections import namedtuple
 from contextlib import contextmanager
-from dataclasses import dataclass
-from functools import partial, partialmethod, total_ordering
-from operator import attrgetter
-from typing import (
-    Any,
-    Callable,
-    ClassVar,
-    DefaultDict,
-    Dict,
-    FrozenSet,
-    Generator,
-    Generic,
-    Hashable,
-    Iterable,
-    Iterator,
-    List,
-    NamedTuple,
-    Optional,
-    Sequence,
-    Set,
-    Tuple,
-    Type,
-    TypeVar,
-    Union,
-    cast,
-    overload,
-)
-from weakref import ref
+from typing import Any, Callable, Dict, Generator, List, Optional, Sequence, Set, Type
 
-import numpy as np
 from jax._src import state, util
 from jax._src.api_util import flatten_fun, shaped_abstractify
-from jax._src.config import FLAGS, config
 from jax._src.core import ClosedJaxpr, Jaxpr, JaxprEqn, MainTrace
 from jax._src.core import Primitive as JaxprPrimitive
 from jax._src.core import (
@@ -70,12 +30,6 @@ from jax._src.core import (
     thread_local_state,
 )
 from jax._src.dispatch import jaxpr_replicas
-from jax._src.errors import (
-    ConcretizationTypeError,
-    TracerArrayConversionError,
-    TracerIntegerConversionError,
-    UnexpectedTracerError,
-)
 from jax._src.interpreters.mlir import (
     AxisContext,
     ModuleContext,
@@ -92,11 +46,9 @@ from jax._src.interpreters.partial_eval import (
 )
 from jax._src.lax.control_flow import _initial_style_jaxpr, _initial_style_open_jaxpr
 from jax._src.lax.lax import _abstractify, xb, xla
-from jax._src.lib import jax_jit
 from jax._src.linear_util import annotate, wrap_init
 from jax._src.sharding_impls import ReplicaAxisContext
-from jax._src.source_info_util import current as jax_current
-from jax._src.source_info_util import new_name_stack, reset_name_stack
+from jax._src.source_info_util import new_name_stack
 from jax._src.tree_util import (
     PyTreeDef,
     tree_flatten,
@@ -104,23 +56,7 @@ from jax._src.tree_util import (
     tree_unflatten,
     treedef_is_leaf,
 )
-from jax._src.typing import Array, DimSize, Shape
-from jax._src.util import (
-    HashableFunction,
-    HashableWrapper,
-    as_hashable_function,
-    cache,
-    curry,
-    partition_list,
-    safe_map,
-    safe_zip,
-    toposort,
-    tuple_delete,
-    tuple_insert,
-    unzip3,
-    weakref_lru_cache,
-    wrap_name,
-)
+from jax._src.util import partition_list, safe_map, unzip3, wrap_name
 
 map, unsafe_map = safe_map, map
 
@@ -413,3 +349,21 @@ def custom_lower_jaxpr_to_module(
             op.attributes["llvm.linkage"] = ir.Attribute.parse("#llvm.linkage<internal>")
 
     return ctx.module, ctx.context
+
+
+__all__ = (
+    _initial_style_jaxpr,
+    initial_style_jaxprs_with_common_consts1,
+    initial_style_jaxprs_with_common_consts2,
+    _input_type_to_tracers,
+    Jaxpr,
+    JaxprPrimitive,
+    jaxpr_to_mlir,
+    PyTreeDef,
+    ShapedArray,
+    sort_eqns,
+    treedef_is_leaf,
+    tree_flatten,
+    tree_structure,
+    tree_unflatten,
+)

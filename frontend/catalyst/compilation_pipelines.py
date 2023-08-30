@@ -36,7 +36,6 @@ from mlir_quantum.runtime import (
 )
 
 import catalyst
-import catalyst.jax_tracer as tracer
 from catalyst.ag_utils import run_autograph
 from catalyst.compiler import CompileOptions, Compiler
 from catalyst.jax_tracer import trace_to_mlir

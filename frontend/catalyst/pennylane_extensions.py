@@ -16,25 +16,8 @@
 while using :func:`~.qjit`.
 """
 
-import functools
 import numbers
-import uuid
-from collections import defaultdict
-from contextlib import contextmanager
-from dataclasses import dataclass
-from functools import partial
-from itertools import chain
-from typing import (
-    Any,
-    Callable,
-    ContextManager,
-    Dict,
-    Iterable,
-    List,
-    Optional,
-    Tuple,
-    Union,
-)
+from typing import Any, Callable, Iterable, List, Optional, Union
 
 import jax
 import jax.numpy as jnp
@@ -42,63 +25,29 @@ import pennylane as qml
 from jax._src.api_util import shaped_abstractify
 from jax._src.core import get_aval
 from jax._src.lax.lax import _abstractify
-from jax._src.tree_util import (
-    PyTreeDef,
-    tree_flatten,
-    tree_structure,
-    tree_unflatten,
-    treedef_is_leaf,
-)
-from pennylane import Device, QNode, QubitDevice, QubitUnitary, QueuingManager
+from jax._src.tree_util import PyTreeDef, tree_flatten, tree_unflatten, treedef_is_leaf
+from pennylane import QNode, QueuingManager
 from pennylane.operation import Operator
 from pennylane.tape import QuantumTape
 
 import catalyst
 from catalyst.jax_primitives import (
-    AbstractQbit,
-    AbstractQreg,
     GradParams,
-    Qreg,
-    adjoint_p,
-    compbasis,
-    compbasis_p,
-    counts,
-    expval,
     expval_p,
     func_p,
     grad_p,
-    hamiltonian,
-    hermitian,
     jvp_p,
-    namedobs,
-    probs,
     probs_p,
-    qalloc,
     qcond_p,
-    qdealloc,
-    qdevice,
-    qdevice_p,
-    qextract,
-    qextract_p,
     qfor_p,
-    qinsert,
-    qinst,
-    qmeasure_p,
-    qunitary,
     qwhile_p,
-    sample,
-    state,
-    tensorobs,
+    vjp_p,
 )
-from catalyst.jax_primitives import var as jprim_var
-from catalyst.jax_primitives import vjp_p
 from catalyst.jax_tracer import (
-    KNOWN_NAMED_OBS,
     Adjoint,
     Cond,
     ForLoop,
     Function,
-    HybridOp,
     HybridOpRegion,
     JaxTracingContext,
     MidCircuitMeasure,
@@ -108,17 +57,14 @@ from catalyst.jax_tracer import (
     deduce_avals,
     new_inner_tracer,
 )
-from catalyst.utils.exceptions import CompileError, DifferentiableCompileError
-from catalyst.utils.jax_extras import ClosedJaxpr, DynamicJaxprTracer, Jaxpr, JaxprEqn
-from catalyst.utils.jax_extras import MainTrace as JaxMainTrace
+from catalyst.utils.exceptions import DifferentiableCompileError
 from catalyst.utils.jax_extras import (
+    DynamicJaxprTracer,
+    Jaxpr,
     ShapedArray,
     _initial_style_jaxpr,
     _input_type_to_tracers,
     initial_style_jaxprs_with_common_consts1,
-    initial_style_jaxprs_with_common_consts2,
-    new_main2,
-    sort_eqns,
 )
 from catalyst.utils.tracing import EvaluationContext, EvaluationMode, JaxTracingContext
 

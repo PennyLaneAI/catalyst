@@ -19,18 +19,15 @@ Tracing module.
 from contextlib import contextmanager
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, ContextManager, Dict, List, Optional, Tuple, Union
+from typing import ContextManager, Dict, List, Optional, Tuple
 
-from jax._src.core import ClosedJaxpr, JaxprEqn
 from jax._src.core import MainTrace as JaxMainTrace
-from jax._src.core import ShapedArray, cur_sublevel, new_base_main
+from jax._src.core import cur_sublevel, new_base_main
 from jax._src.interpreters.partial_eval import (
     DynamicJaxprTrace,
-    DynamicJaxprTracer,
     JaxprStackFrame,
     extend_jaxpr_stack,
 )
-from jax._src.source_info_util import current as jax_current
 from jax._src.source_info_util import reset_name_stack
 
 from catalyst.utils.exceptions import CompileError

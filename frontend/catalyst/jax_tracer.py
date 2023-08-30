@@ -14,16 +14,15 @@
 """This module contains functions tracing and lowering JAX code to MLIR.
 """
 
-from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import update_wrapper
-from typing import Any, Callable, ContextManager, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import jax
 import jax.numpy as jnp
 import pennylane as qml
 from jax._src.api import ShapeDtypeStruct
-from jax._src.core import ClosedJaxpr, JaxprEqn, ShapedArray
+from jax._src.core import ClosedJaxpr
 from jax._src.interpreters.partial_eval import (
     DynamicJaxprTrace,
     DynamicJaxprTracer,
@@ -70,16 +69,13 @@ from catalyst.jax_primitives import (
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.jax_extras import (
     JaxprPrimitive,
-    PyTreeDef,
     deduce_avals,
-    initial_style_jaxprs_with_common_consts1,
     initial_style_jaxprs_with_common_consts2,
     jaxpr_to_mlir,
     sort_eqns,
     tree_flatten,
     tree_structure,
     tree_unflatten,
-    treedef_is_leaf,
 )
 from catalyst.utils.patching import Patcher
 from catalyst.utils.tracing import EvaluationContext, EvaluationMode, JaxTracingContext
