@@ -30,7 +30,7 @@ func::FuncOp genParamCountFunction(PatternRewriter &rewriter, Location loc, func
 /// to know how to differentiate any quantum operations, as those derivatives will be handled
 /// separately.
 func::FuncOp genSplitPreprocessed(PatternRewriter &rewriter, Location loc, func::FuncOp qnode,
-                                  func::FuncOp qnodeWithParams);
+                                  func::FuncOp qnodeQuantum);
 
 func::FuncOp genArgMapFunction(PatternRewriter &rewriter, Location loc, func::FuncOp callee);
 

@@ -153,16 +153,16 @@ FailureOr<func::FuncOp> HybridGradientLowering::cloneCallee(PatternRewriter &rew
             // parameters at runtime we run a function that merely counts up for each gate parameter
             // encountered.
             func::FuncOp paramCountFn = genParamCountFunction(rewriter, loc, qnode);
-            func::FuncOp qnodeWithParams = genQNodeWithParams(rewriter, loc, qnode);
-            func::FuncOp qnodeSplit = genSplitPreprocessed(rewriter, loc, qnode, qnodeWithParams);
+            func::FuncOp qnodeQuantum = genQNodeQuantumOnly(rewriter, loc, qnode);
+            func::FuncOp qnodeSplit = genSplitPreprocessed(rewriter, loc, qnode, qnodeQuantum);
 
             // This attribute tells downstream patterns that this QNode requires the registration of
             // a custom quantum gradient.
-            setRequiresCustomGradient(qnode, FlatSymbolRefAttr::get(qnodeWithParams));
+            setRequiresCustomGradient(qnode, FlatSymbolRefAttr::get(qnodeQuantum));
 
             // Enzyme will fail if this function gets inlined.
-            qnodeWithParams->setAttr("passthrough",
-                                     rewriter.getArrayAttr(rewriter.getStringAttr("noinline")));
+            qnodeQuantum->setAttr("passthrough",
+                                  rewriter.getArrayAttr(rewriter.getStringAttr("noinline")));
 
             // Replace calls to the original QNode with calls to the split QNode
             if (isQNode(clonedCallee) && qnode == callee) {
@@ -329,10 +329,10 @@ LogicalResult HybridGradientLowering::matchAndRewrite(GradOp op, PatternRewriter
     return success();
 }
 
-func::FuncOp HybridGradientLowering::genQNodeWithParams(PatternRewriter &rewriter, Location loc,
-                                                        func::FuncOp qnode)
+func::FuncOp HybridGradientLowering::genQNodeQuantumOnly(PatternRewriter &rewriter, Location loc,
+                                                         func::FuncOp qnode)
 {
-    std::string fnName = (qnode.getName() + ".withparams").str();
+    std::string fnName = (qnode.getName() + ".quantum").str();
     SmallVector<Type> fnArgTypes(qnode.getArgumentTypes());
     auto paramsTensorType = RankedTensorType::get({ShapedType::kDynamic}, rewriter.getF64Type());
     fnArgTypes.push_back(paramsTensorType);

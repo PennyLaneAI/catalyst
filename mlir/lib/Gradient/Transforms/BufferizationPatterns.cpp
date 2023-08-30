@@ -130,7 +130,9 @@ class BufferizeBackpropOp : public OpConversionPattern<BackpropOp> {
         ValueRange cotangents = adaptor.getCotangents();
         generateAllocations(rewriter, loc, calleeResults, cotangents);
         // Enzyme mutates the result shadows but the cotangent tensors must be immutable, so we
-        // create copies to pass into Enzyme.
+        // create copies to pass into Enzyme. Concretely, this issue pops up with multiple
+        // BackpropOps that have the same cotangent tensor due to a CSE effect from one-shot
+        // bufferization.
         generateAllocations(rewriter, loc, resShadows, cotangents);
         for (const auto &[cotangent, resShadow] : llvm::zip(cotangents, resShadows)) {
             rewriter.create<memref::CopyOp>(loc, cotangent, resShadow);

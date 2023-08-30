@@ -38,8 +38,8 @@ struct HybridGradientLowering : public mlir::OpRewritePattern<GradOp> {
 
     /// Generate a version of the QNode that accepts the parameter buffer. This is so Enzyme will
     /// see that the gate parameters flow into the custom quantum function.
-    static mlir::func::FuncOp genQNodeWithParams(mlir::PatternRewriter &rewriter,
-                                                 mlir::Location loc, mlir::func::FuncOp qnode);
+    static mlir::func::FuncOp genQNodeQuantumOnly(mlir::PatternRewriter &rewriter,
+                                                  mlir::Location loc, mlir::func::FuncOp qnode);
 };
 
 mlir::func::FuncOp genFullGradFunction(mlir::PatternRewriter &rewriter, mlir::Location loc,
