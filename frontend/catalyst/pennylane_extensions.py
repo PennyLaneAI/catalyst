@@ -54,7 +54,6 @@ from catalyst.jax_tracer import (
     QJITDevice,
     WhileLoop,
     deduce_avals,
-    new_inner_tracer,
 )
 from catalyst.utils.exceptions import DifferentiableCompileError
 from catalyst.utils.jax_extras import (
@@ -64,6 +63,7 @@ from catalyst.utils.jax_extras import (
     _initial_style_jaxpr,
     _input_type_to_tracers,
     initial_style_jaxprs_with_common_consts1,
+    new_inner_tracer,
 )
 from catalyst.utils.tracing import EvaluationContext, EvaluationMode, JaxTracingContext
 
