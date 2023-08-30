@@ -128,6 +128,7 @@ class QRegPromise:
     def extract(self, wires: List[Any], allow_reuse=False) -> List[DynamicJaxprTracer]:
         """Extract qubits from the wrapped quantum register or get the already extracted qubits
         from cache"""
+        # pylint: disable=consider-iterating-dictionary
         qrp = self
         cached_tracers = {w for w in qrp.cache.keys() if not isinstance(w, int)}
         requested_tracers = {w for w in wires if not isinstance(w, int)}

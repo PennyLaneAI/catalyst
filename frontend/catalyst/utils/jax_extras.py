@@ -117,7 +117,12 @@ def new_main2(
             _update_thread_local_jit_state(stack.dynamic)
 
 
-def stable_toposort(end_nodes):
+def stable_toposort(end_nodes: list) -> list:
+    """Stable topoligy sorting. Input objects are required to have `id` and `parents` members.
+
+    Args:
+        end_nodes (List of objects): Objects to sort
+    """
     if not end_nodes:
         return []
     # end_nodes = _remove_duplicates(end_nodes)
@@ -159,7 +164,9 @@ def sort_eqns(eqns: List[JaxprEqn], forced_order_primitives: Set[JaxprPrimitive]
     """Topologically sort JAXRR equations in a list, based on their input/output variables."""
 
     class Box:
-        def __init__(self, boxid, e):
+        """Wrapper for JaxprEqn keeping track of its id and parents."""
+
+        def __init__(self, boxid: int, e: JaxprEqn):
             self.id: int = boxid
             self.e: JaxprEqn = e
             self.parents: List["Box"] = []
@@ -194,9 +201,9 @@ def initial_style_jaxprs_with_common_consts1(
 
 def initial_style_jaxprs_with_common_consts2(jaxprs, all_consts):
     """This function is the tail (largest) part of the
-    `lax.control_flow.common._initial_style_jaxprs_with_common_consts` of JAX. The JAX version traces
-    argument Python functions in order to determine signatures to be unified. Here we rely on the fact
-    that the tracing was already done elsewhere - and this is the only difference.
+    `lax.control_flow.common._initial_style_jaxprs_with_common_consts` of JAX. The JAX version
+    traces argument Python functions in order to determine signatures to be unified. Here we rely on
+    the fact that the tracing was already done elsewhere - and this is the only difference.
     """
 
     all_const_avals = [map(_abstractify, consts) for consts in all_consts]
@@ -256,6 +263,9 @@ def initial_style_jaxprs_with_common_consts2(jaxprs, all_consts):
 
 
 def deduce_avals(f: Callable, args, kwargs):
+    """Wrapes the callable ``f`` into a WrappedFun JAX container. Calculate input abstract values
+    and output_tree promise. The promise must be called after the resulting wrapped function is
+    evaluated."""
     flat_args, in_tree = tree_flatten((args, kwargs))
     wf = wrap_init(f)
     in_avals, keep_inputs = list(map(shaped_abstractify, flat_args)), [True] * len(flat_args)
@@ -299,6 +309,7 @@ def jaxpr_to_mlir(func_name, jaxpr, shape):
 
 
 # pylint: disable=too-many-arguments
+# pylint: disable=line-too-long
 def custom_lower_jaxpr_to_module(
     func_name: str,
     module_name: str,
@@ -381,6 +392,8 @@ def custom_lower_jaxpr_to_module(
 
 
 def new_inner_tracer(trace: DynamicJaxprTrace, aval) -> DynamicJaxprTracer:
+    """Create a JAX tracer tracing an abstract value ``aval`, without specifying its source
+    primitive."""
     dt = DynamicJaxprTracer(trace, aval, jax_current())
     trace.frame.tracers.append(dt)
     trace.frame.tracer_to_var[id(dt)] = trace.frame.newvar(aval)
