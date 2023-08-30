@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt %s --lower-gradients="only=ps" --split-input-file | FileCheck %s
+// RUN: quantum-opt %s --lower-gradients --split-input-file | FileCheck %s
 
 // CHECK-LABEL: @simple_circuit.preprocess(%arg0: tensor<3xf64>, %arg1: index) -> f64
 func.func @simple_circuit(%arg0: tensor<3xf64>) -> f64 attributes {qnode, diff_method = "parameter-shift"} {

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt %s --lower-gradients=only=ps  | FileCheck %s
+// RUN: quantum-opt %s --lower-gradients | FileCheck %s
 
 // Check scalar to scalar function
 func.func private @funcScalarScalar(%arg0: f64) -> f64 attributes {qnode, diff_method = "parameter-shift"} {
