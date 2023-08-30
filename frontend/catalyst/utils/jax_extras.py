@@ -49,6 +49,7 @@ from jax._src.lax.control_flow import _initial_style_jaxpr, _initial_style_open_
 from jax._src.lax.lax import _abstractify, xb, xla
 from jax._src.linear_util import annotate, wrap_init
 from jax._src.sharding_impls import ReplicaAxisContext
+from jax._src.source_info_util import current as jax_current
 from jax._src.source_info_util import new_name_stack
 from jax._src.tree_util import (
     PyTreeDef,
@@ -74,6 +75,7 @@ __all__ = (
     "tree_flatten",
     "tree_structure",
     "tree_unflatten",
+    "new_inner_tracer",
 )
 
 map, unsafe_map = safe_map, map  # pylint: disable=redefined-builtin
@@ -367,3 +369,10 @@ def custom_lower_jaxpr_to_module(
             op.attributes["llvm.linkage"] = ir.Attribute.parse("#llvm.linkage<internal>")
 
     return ctx.module, ctx.context
+
+
+def new_inner_tracer(trace: DynamicJaxprTrace, aval) -> DynamicJaxprTracer:
+    dt = DynamicJaxprTracer(trace, aval, jax_current())
+    trace.frame.tracers.append(dt)
+    trace.frame.tracer_to_var[id(dt)] = trace.frame.newvar(aval)
+    return dt

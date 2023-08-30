@@ -898,11 +898,6 @@ def _tensor__obs_lowering(jax_ctx: mlir.LoweringRuleContext, *terms: tuple):
 #
 # hamiltonian observable
 #
-def hamiltonian(coeffs, *terms):
-    """Bind operands to operation."""
-    return hamiltonian_p.bind(coeffs, *terms)
-
-
 @hamiltonian_p.def_abstract_eval
 def _hamiltonian_abstract_eval(coeffs, *terms):
     for o in terms:
@@ -1331,8 +1326,6 @@ def _qfor_lowering(
     loop_index = iter_args_plus_consts[body_nconsts]
     loop_args = iter_args_plus_consts[body_nconsts + 1 :]
 
-    # print("BJBJBJ0", body_consts)
-
     all_param_types_plus_consts = [mlir.aval_to_ir_types(a)[0] for a in jax_ctx.avals_in]
 
     # Remove header values: lower_bound, upper_bound, step
@@ -1405,12 +1398,6 @@ def _qfor_lowering(
         result_from_elements_op = ir.RankedTensorType.get((), loop_index_type)
         from_elements_op = FromElementsOp.build_generic([result_from_elements_op], [body_args[0]])
         body_args[0] = from_elements_op.result
-
-        # print("BJBJBJ1", body_jaxpr)
-        # print("BJBJBJ2-c", body_jaxpr.consts)
-        # print("BJBJBJ2-i", body_jaxpr.invars)
-        # print("BJBJBJ3", type(body_jaxpr.consts[0]).__mro__)
-        # print("BJBJBJ4", body_jaxpr.consts[0].__dir__())
 
         # recursively generate the mlir for the loop body
         out, _ = mlir.jaxpr_subcomp(

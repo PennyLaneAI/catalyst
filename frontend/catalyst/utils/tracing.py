@@ -35,13 +35,33 @@ from catalyst.utils.jax_extras import new_main2
 
 
 class EvaluationMode(Enum):
+    """Enumerate the evaluation modes supported by Catalyst:
+    INTERPRETATION - native Python execution of a Catalyst program
+    QUANTUM_COMPILATION - JAX tracing followed by MLIR compilation in the presence of quantum
+                          instructions
+    CLASSICAL_COMPILATION - JAX tracing followed JAX compilation of classical-only Catalyst
+                            programs.
+    """
+
     INTERPRETATION = 0
-    CLASSICAL_COMPILATION = 2
     QUANTUM_COMPILATION = 1
+    CLASSICAL_COMPILATION = 2
 
 
 @dataclass
 class JaxTracingContext:
+    """JAX tracing context supporting nested quantum operations. Keeps track of the re-entrable
+    tracing frames. The tracing algorithm visits these frames several times: first during the
+    classical tracing, then during the quantum tracing and also during the optional transformations.
+
+    Args:
+        main: Base JAX tracing data structure.
+        frames: JAX tracing frames; holding the JAXPR equations.
+        mains: Secondary JAX tracing structrures. Each structure has one frame and
+               corresponds to a :class:`~.jax_tracer.HybridOpRegion`
+        trace: Current JAX trace object.
+    """
+
     main: JaxMainTrace
     frames: Dict[DynamicJaxprTrace, JaxprStackFrame]
     mains: Dict[DynamicJaxprTrace, JaxMainTrace]
@@ -52,20 +72,25 @@ class JaxTracingContext:
 
 
 class EvaluationContext:
-    """Utility class used for tracing.
+    """Utility context managing class keeping track of various modes of Catalyst executions.
 
-    It is used to determine whether the program is currently tracing or not.
+    It is used to determine whether the program is currently tracing or not and if so, tracking the
+    tracing contexts. Contexts can be nested.
     """
 
     _tracing_stack: List[Tuple[EvaluationMode, Optional[JaxTracingContext]]] = []
 
     def __init__(self, mode: EvaluationMode):
+        """Initialise a new instance of the Evaluation context.
+        Args:
+            mode: Evaluation mode of this instance
+        """
         self.mode = mode
         self.ctx = None
 
     @classmethod
     @contextmanager
-    def create_tracing_context(cls, mode) -> ContextManager[JaxTracingContext]:
+    def _create_tracing_context(cls, mode) -> ContextManager[JaxTracingContext]:
         with new_base_main(DynamicJaxprTrace, dynamic=True) as main:
             main.jaxpr_stack = ()
             cls._tracing_stack.append((mode, JaxTracingContext(main)))
@@ -76,7 +101,7 @@ class EvaluationContext:
 
     @classmethod
     @contextmanager
-    def create_interpretation_context(cls) -> ContextManager[JaxTracingContext]:
+    def _create_interpretation_context(cls) -> ContextManager[JaxTracingContext]:
         cls._tracing_stack.append((EvaluationMode.INTERPRETATION, None))
         try:
             yield cls._tracing_stack[-1][1]
@@ -88,6 +113,8 @@ class EvaluationContext:
     def frame_tracing_context(
         cls, ctx: JaxTracingContext, trace: Optional[DynamicJaxprTrace] = None
     ) -> ContextManager[DynamicJaxprTrace]:
+        """Start a new JAX tracing frame, e.g. to trace a region of some
+        :class:`~.jax_tracer.HybridOp`. Not applicable in non-tracing evaluation modes."""
         assert ctx is cls._tracing_stack[-1][1], f"{ctx=}"
         main = ctx.mains[trace] if trace is not None else None
         with new_main2(DynamicJaxprTrace, dynamic=True, main=main) as nmain:
@@ -105,30 +132,32 @@ class EvaluationContext:
 
     @classmethod
     def get_main_tracing_context(cls, hint=None) -> JaxTracingContext:
-        """Checks a number of tracing conditions and return the JaxTracingContext"""
+        """Return the current JAX tracing context, rais an exception if not in tracing mode."""
         msg = f"{hint or 'catalyst functions'} can only be used from within @qjit decorated code."
         EvaluationContext.check_is_tracing(msg)
         return cls._tracing_stack[-1][1]
 
     def __enter__(self):
         if self.mode in [EvaluationMode.QUANTUM_COMPILATION, EvaluationMode.CLASSICAL_COMPILATION]:
-            self.ctx = self.create_tracing_context(self.mode)
+            self.ctx = self._create_tracing_context(self.mode)
         else:
             assert self.mode in {EvaluationMode.INTERPRETATION}, f"Unknown mode {self.mode}"
-            self.ctx = self.create_interpretation_context()
+            self.ctx = self._create_interpretation_context()
         return self.ctx.__enter__()
 
     def __exit__(self, *args, **kwargs):
         self.ctx.__exit__(*args, **kwargs)
 
     @classmethod
-    def get_evaluation_mode(cls):
+    def get_evaluation_mode(cls) -> Tuple[EvaluationMode, Optional[JaxTracingContext]]:
+        """Return the name of the evaluation mode, paired with tracing context if applicable"""
         if not EvaluationContext._tracing_stack:
             return (EvaluationMode.INTERPRETATION, None)
         return cls._tracing_stack[-1]
 
     @classmethod
     def get_mode(cls):
+        """Return the name of current evaluation mode."""
         return cls.get_evaluation_mode()[0]
 
     @classmethod
@@ -143,7 +172,7 @@ class EvaluationContext:
 
     @classmethod
     def check_modes(cls, modes, msg):
-        """Assert if the execution is currently not being traced.
+        """Asserts if the execution mode is not among the expected ``modes``.
 
         Raises: CompileError
         """
@@ -152,21 +181,33 @@ class EvaluationContext:
 
     @classmethod
     def check_is_quantum_tracing(cls, msg):
+        """Asserts if the current evaluation mode is quantum tracing.
+
+        Raises: CompileError
+        """
         cls.check_modes([EvaluationMode.QUANTUM_COMPILATION], msg)
 
     @classmethod
     def check_is_classical_tracing(cls, msg):
+        """Asserts if the current evaluation mode is classical tracing.
+
+        Raises: CompileError
+        """
         cls.check_modes([EvaluationMode.CLASSICAL_COMPILATION], msg)
 
     @classmethod
     def check_is_tracing(cls, msg):
+        """Asserts if the current evaluation mode is not a tracing.
+
+        Raises: CompileError
+        """
         cls.check_modes(
             [EvaluationMode.CLASSICAL_COMPILATION, EvaluationMode.QUANTUM_COMPILATION], msg
         )
 
     @classmethod
     def check_is_not_tracing(cls, msg):
-        """Assert if the execution is currently being traced.
+        """Asserts if the current execution mode is a tracing.
 
         Raises: CompileError
         """
