@@ -367,8 +367,7 @@ func::FuncOp HybridGradientLowering::genQNodeQuantumOnly(PatternRewriter &rewrit
         return builder.create<tensor::ExtractOp>(loc, paramTensor, index);
     };
 
-    modifiedCallee.walk([&](Operation *op) {
-        if (auto gateOp = dyn_cast<quantum::DifferentiableGate>(op)) {
+    modifiedCallee.walk([&](quantum::DifferentiableGate gateOp) {
             OpBuilder::InsertionGuard insertGuard(rewriter);
             rewriter.setInsertionPoint(gateOp);
 
@@ -381,7 +380,6 @@ func::FuncOp HybridGradientLowering::genQNodeQuantumOnly(PatternRewriter &rewrit
             MutableOperandRange range{gateOp, static_cast<unsigned>(gateOp.getDiffOperandIdx()),
                                       static_cast<unsigned>(diffParams.size())};
             range.assign(newParams);
-        }
     });
 
     // This function is the point where we can remove the classical preprocessing as a later
