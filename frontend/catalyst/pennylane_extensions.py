@@ -49,7 +49,6 @@ from catalyst.jax_tracer import (
     ForLoop,
     Function,
     HybridOpRegion,
-    JaxTracingContext,
     MidCircuitMeasure,
     QFunc,
     QJITDevice,
@@ -67,8 +66,6 @@ from catalyst.utils.jax_extras import (
     initial_style_jaxprs_with_common_consts1,
 )
 from catalyst.utils.tracing import EvaluationContext, EvaluationMode, JaxTracingContext
-
-# pylint: disable=too-many-lines
 
 
 def qfunc(num_wires, *, shots=1000, device=None):
@@ -557,12 +554,12 @@ def _check_single_bool_value(tree: PyTreeDef, avals: List[Any]) -> None:
 def _check_cond_same_types(trees: List[PyTreeDef], avals: List[List[Any]]) -> None:
     assert len(trees) == len(avals), f"Input trees ({trees}) don't match input avals ({avals})"
     expected_tree, expected_dtypes = trees[0], [_aval_to_primitive_type(a) for a in avals[0]]
-    for i, (tree, aval) in list(enumerate(zip(trees, avals)))[1:]:
+    for tree, aval in list(zip(trees, avals))[1:]:
         if tree != expected_tree:
-            raise TypeError(f"Conditional requires consistent return types across all branches")
+            raise TypeError("Conditional requires consistent return types across all branches")
         dtypes = [_aval_to_primitive_type(a) for a in aval]
         if dtypes != expected_dtypes:
-            raise TypeError(f"Conditional requires consistent return types across all branches")
+            raise TypeError("Conditional requires consistent return types across all branches")
 
 
 class CondCallable:
@@ -592,7 +589,7 @@ class CondCallable:
     @staticmethod
     def _check_branches_return_types(branch_jaxprs):
         expected = branch_jaxprs[0].out_avals
-        for i, jaxpr in list(enumerate(branch_jaxprs))[1:]:
+        for jaxpr in list(branch_jaxprs)[1:]:
             if expected != jaxpr.out_avals:
                 raise TypeError("Conditional requires consistent return types across all branches")
 
@@ -605,7 +602,7 @@ class CondCallable:
         for branch in self.branch_fns + [self.otherwise_fn]:
             quantum_tape = QuantumTape()
             with EvaluationContext.frame_tracing_context(ctx) as inner_trace:
-                wffa, in_avals, out_tree = deduce_avals(branch, [], {})
+                wffa, _, out_tree = deduce_avals(branch, [], {})
                 with QueuingManager.stop_recording(), quantum_tape:
                     res_classical_tracers = [inner_trace.full_raise(t) for t in wffa.call_wrapped()]
             regions.append(HybridOpRegion(inner_trace, quantum_tape, [], res_classical_tracers))
@@ -844,7 +841,7 @@ def while_loop(cond_fn):
         def _call_handler(*init_state):
             def _call_with_quantum_ctx(ctx: JaxTracingContext):
                 outer_trace = ctx.trace
-                in_classical_tracers, in_tree = tree_flatten(init_state)
+                in_classical_tracers, _ = tree_flatten(init_state)
 
                 with EvaluationContext.frame_tracing_context(ctx) as cond_trace:
                     cond_wffa, cond_in_avals, cond_tree = deduce_avals(cond_fn, init_state, {})
@@ -969,7 +966,6 @@ def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
             out_classical_tracers=[],
             regions=[adjoint_region],
         )
-        return None
 
     if isinstance(f, Callable):
 

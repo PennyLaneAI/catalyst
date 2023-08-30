@@ -45,9 +45,9 @@ from catalyst.jax_primitives import (
     expval_p,
     func_p,
     hamiltonian,
-    hermitian,
+    hermitian_p,
     mlir_fn_cache,
-    namedobs,
+    namedobs_p,
     probs_p,
     qalloc_p,
     qcond_p,
@@ -62,7 +62,6 @@ from catalyst.jax_primitives import (
     qwhile_p,
     sample_p,
     state_p,
-    tensorobs,
     tensorobs_p,
     var_p,
 )
@@ -124,12 +123,12 @@ PAULI_NAMED_MAP = {
 class QRegPromise:
     def __init__(self, qreg):
         self.base: DynamicJaxprTracer = qreg
-        self.cache: Dict[int, DynamicJaxprTracer] = {}
+        self.cache: Dict[Any, DynamicJaxprTracer] = {}
 
     def extract(self, wires: List[Any], allow_reuse=False) -> List[DynamicJaxprTracer]:
         qrp = self
-        cached_tracers = set([w for w in qrp.cache.keys() if not isinstance(w, int)])
-        requested_tracers = set([w for w in wires if not isinstance(w, int)])
+        cached_tracers = {w for w in qrp.cache.keys() if not isinstance(w, int)}
+        requested_tracers = {w for w in wires if not isinstance(w, int)}
         if cached_tracers != requested_tracers:
             qrp.actualize()
         qubits = []
@@ -188,7 +187,7 @@ class HybridOp(Operation):
     catalyst.ForLoop, catalyst.WhileLoop, catalyst.Adjoin, etc"""
 
     num_wires = AnyWires
-    binder: JaxprPrimitive = None
+    binder: Callable
 
     def __init__(self, in_classical_tracers, out_classical_tracers, regions: List[HybridOpRegion]):
         self.in_classical_tracers = in_classical_tracers
@@ -230,7 +229,7 @@ def has_nested_tapes(op: Operation) -> bool:
     return (
         isinstance(op, HybridOp)
         and len(op.regions) > 0
-        and any([r.quantum_tape is not None for r in op.regions])
+        and any(r.quantum_tape is not None for r in op.regions)
     )
 
 
@@ -247,7 +246,7 @@ class ForLoop(HybridOp):
             qreg_in = _input_type_to_tracers(inner_trace.new_arg, [AbstractQreg()])[0]
             qrp_out = trace_quantum_tape(inner_tape, device, qreg_in, ctx, inner_trace)
             qreg_out = qrp_out.actualize()
-            jaxpr, typ, consts = ctx.frames[inner_trace].to_jaxpr2(
+            jaxpr, _, consts = ctx.frames[inner_trace].to_jaxpr2(
                 res_classical_tracers + [qreg_out]
             )
 
@@ -295,7 +294,7 @@ class Cond(HybridOp):
                     region.quantum_tape, device, qreg_in, ctx, region.trace
                 )
                 qreg_out = qrp_out.actualize()
-                jaxpr, typ, const = ctx.frames[region.trace].to_jaxpr2(
+                jaxpr, _, const = ctx.frames[region.trace].to_jaxpr2(
                     region.res_classical_tracers + [qreg_out]
                 )
                 jaxprs.append(jaxpr)
@@ -322,7 +321,7 @@ class WhileLoop(HybridOp):
         cond_trace = self.regions[0].trace
         res_classical_tracers = self.regions[0].res_classical_tracers
         with EvaluationContext.frame_tracing_context(ctx, cond_trace):
-            _input_type_to_tracers(cond_trace.new_arg, [AbstractQreg()])[0]
+            _input_type_to_tracers(cond_trace.new_arg, [AbstractQreg()])
             cond_jaxpr, _, cond_consts = ctx.frames[cond_trace].to_jaxpr2(res_classical_tracers)
 
         body_trace = self.regions[1].trace
@@ -453,11 +452,11 @@ def trace_observables(
         obs_tracers = compbasis_p.bind(*qubits)
     elif isinstance(obs, KNOWN_NAMED_OBS):
         qubits = qrp.extract(wires, allow_reuse=True)
-        obs_tracers = namedobs(type(obs).__name__, qubits[0])
+        obs_tracers = namedobs_p.bind(qubits[0], kind=type(obs).__name__)
     elif isinstance(obs, qml.Hermitian):
-        # TODO: remove asarray once fixed upstream: https://github.com/PennyLaneAI/pennylane/issues/4263
+        # TODO: remove once fixed upstream: https://github.com/PennyLaneAI/pennylane/issues/4263
         qubits = qrp.extract(wires, allow_reuse=True)
-        obs_tracers = hermitian(jax.numpy.asarray(*obs.parameters), *qubits)
+        obs_tracers = hermitian_p.bind(jax.numpy.asarray(*obs.parameters), *qubits)
     elif isinstance(obs, qml.operation.Tensor):
         nested_obs = [trace_observables(o, device, qrp, m_wires)[0] for o in obs.obs]
         obs_tracers = tensorobs_p.bind(*nested_obs)
@@ -466,7 +465,7 @@ def trace_observables(
         obs_tracers = hamiltonian(jax.numpy.asarray(obs.parameters), *nested_obs)
     elif isinstance(obs, qml.ops.op_math.Prod):
         nested_obs = [trace_observables(o, device, qrp, m_wires)[0] for o in obs]
-        obs_tracers = tensorobs(*nested_obs)
+        obs_tracers = tensorobs_p.bind(*nested_obs)
     elif isinstance(obs, qml.ops.op_math.Sum):
         nested_obs = [trace_observables(o, device, qrp, m_wires)[0] for o in obs]
         obs_tracers = hamiltonian(jax.numpy.asarray(jnp.ones(len(obs))), *nested_obs)
@@ -518,29 +517,25 @@ def pauli_word_to_tensor_obs(obs, qrp):
     """
     if len(obs) == 1:
         wire, pauli = list(obs.items())[0]
-        # qubits = [qextract_p.bind(qreg, w) for w in [wire]]
         qubits = [qrp.extract([wire], allow_reuse=True)]
-        return namedobs(PAULI_NAMED_MAP[pauli], qubits[0])
+        return namedobs_p.bind(qubits[0], kind=PAULI_NAMED_MAP[pauli])
 
+    # FIXME: this path doesn't have a test
     nested_obs = []
     for wire, pauli in obs.items():
-        # qubits = get_qubits_from_wires([wire], qubit_states, qreg)
-        # qubits = [qextract_p.bind(qreg, w) for w in [wire]]
         qubits = [qrp.extract([wire], allow_reuse=True)]
-        nested_obs.append(jprim.namedobs(PAULI_NAMED_MAP[pauli], qubits[0]))
+        nested_obs.append(namedobs_p.bind(qubits[0], kind=PAULI_NAMED_MAP[pauli]))
 
-    return tensorobs(*nested_obs)
+    return tensorobs_p.bind(*nested_obs)
 
 
 def trace_quantum_measurements(
-    quantum_tape,
     device: QubitDevice,
     qrp: QRegPromise,
-    ctx: JaxTracingContext,
-    trace: DynamicJaxprTrace,
     outputs: List[Union[MeasurementProcess, DynamicJaxprTracer, Any]],
     out_tree,
 ) -> List[DynamicJaxprTracer]:
+    # pylint: disable=too-many-branches
     shots = device.shots
     out_classical_tracers = []
 
@@ -622,11 +617,8 @@ def trace_quantum_function(
             qreg_in = qalloc_p.bind(len(device.wires))
             qrp_out = trace_quantum_tape(quantum_tape, device, qreg_in, ctx, trace)
             out_classical_tracers, out_classical_tree = trace_quantum_measurements(
-                quantum_tape,
                 device,
                 qrp_out,
-                ctx,
-                trace,
                 out_classical_tracers_or_measurements,
                 out_tree_promise(),
             )
@@ -634,14 +626,13 @@ def trace_quantum_function(
             qdealloc_p.bind(qreg_in)
 
             out_classical_tracers = [trace.full_raise(t) for t in out_classical_tracers]
-            # out_quantum_tracers = [qreg_out]
 
             jaxpr, out_type, consts = ctx.frames[trace].to_jaxpr2(
                 out_classical_tracers + out_quantum_tracers
             )
-            jaxpr._outvars = jaxpr._outvars[:-1]
+            jaxpr._outvars = jaxpr._outvars[:-1] # pylint: disable=protected-access
             out_type = out_type[:-1]
-            # FIXME: `check_jaxpr` complains about the `AbstractQreg` type. Consider fixing.
+            # TODO: `check_jaxpr` complains about the `AbstractQreg` type. Consider fixing.
             # check_jaxpr(jaxpr)
 
     closed_jaxpr = ClosedJaxpr(jaxpr, consts)

@@ -20,17 +20,17 @@ from typing import Any, Callable, Dict, Generator, List, Optional, Sequence, Set
 
 from jax._src import state, util
 from jax._src.api_util import flatten_fun, shaped_abstractify
+from jax._src.core import ClosedJaxpr, Jaxpr, JaxprEqn, MainTrace
+from jax._src.core import Primitive as JaxprPrimitive
 from jax._src.core import (
-    ClosedJaxpr, Jaxpr, JaxprEqn, MainTrace,
-    Primitive as JaxprPrimitive,
     ShapedArray,
     Trace,
     _update_thread_local_jit_state,
     gensym,
     thread_local_state,
 )
-from jax._src.effects import ordered_effects as jax_ordered_effects
 from jax._src.dispatch import jaxpr_replicas
+from jax._src.effects import ordered_effects as jax_ordered_effects
 from jax._src.interpreters.mlir import (
     AxisContext,
     ModuleContext,
@@ -59,7 +59,6 @@ from jax._src.tree_util import (
 )
 from jax._src.util import partition_list, safe_map, unzip3, wrap_name
 
-
 __all__ = (
     "_initial_style_jaxpr",
     "initial_style_jaxprs_with_common_consts1",
@@ -77,14 +76,14 @@ __all__ = (
     "tree_unflatten",
 )
 
-map, unsafe_map = safe_map, map
+map, unsafe_map = safe_map, map  # pylint: disable=redefined-builtin
 
 
 @contextmanager
 def new_main2(
     trace_type: Type[Trace],
     dynamic: bool = False,
-    main: Optional[MainTrace(level, trace_type, **payload)] = None,
+    main: Optional[MainTrace] = None,
     **payload,
 ) -> Generator[MainTrace, None, None]:
     """A verison of JAX `new_main` function that knows how to re-use an already existing `MainTrace`
@@ -149,8 +148,8 @@ def sort_eqns(eqns: List[JaxprEqn], forced_order_primitives: Set[JaxprPrimitive]
     """Topologically sort JAXRR equations in a list, based on their input/output variables."""
 
     class Box:
-        def __init__(self, id, e):
-            self.id: int = id
+        def __init__(self, boxid, e):
+            self.id: int = boxid
             self.e: JaxprEqn = e
             self.parents: List["Box"] = []
 

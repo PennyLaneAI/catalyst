@@ -494,11 +494,6 @@ def _vjp_lowering(ctx, *args, jaxpr, fn, grad_params):
 #
 # qdevice
 #
-def qdevice(spec, val):
-    """Bind operands to operation."""
-    return qdevice_p.bind(spec=spec, val=val)
-
-
 @qdevice_p.def_impl
 def _qdevice_def_impl(ctx, spec, val):  # pragma: no cover
     raise NotImplementedError()
@@ -530,11 +525,6 @@ def _qalloc_def_impl(ctx, size_value):  # pragma: no cover
     raise NotImplementedError()
 
 
-def qalloc(size):
-    """Bind operands to operation."""
-    return qalloc_p.bind(size)
-
-
 @qalloc_p.def_abstract_eval
 def _qalloc_abstract_eval(size):
     """This function is called with abstract arguments for tracing."""
@@ -560,11 +550,6 @@ def _qalloc_lowering(jax_ctx: mlir.LoweringRuleContext, size_value: ir.Value):
 #
 # qdealloc
 #
-def qdealloc(qreg):
-    """Bind operands to operation."""
-    return qdealloc_p.bind(qreg)
-
-
 @qdealloc_p.def_impl
 def _qdealloc_def_impl(ctx, size_value):  # pragma: no cover
     raise NotImplementedError()
@@ -588,11 +573,6 @@ def _qdealloc_lowering(jax_ctx: mlir.LoweringRuleContext, qreg):
 @qextract_p.def_impl
 def _qextract_def_impl(ctx, qreg, qubit_idx):  # pragma: no cover
     raise NotImplementedError()
-
-
-def qextract(qreg, qubit_idx):
-    """Bind operands to operation."""
-    return qextract_p.bind(qreg, qubit_idx)
 
 
 @qextract_p.def_abstract_eval
@@ -630,11 +610,6 @@ def _qinsert_def_impl(ctx, qreg_old, qubit_idx, qubit):  # pragma: no cover
     raise NotImplementedError()
 
 
-def qinsert(qreg_old, qubit_idx, qubit):
-    """Bind operands to operation."""
-    return qinsert_p.bind(qreg_old, qubit_idx, qubit)
-
-
 @qinsert_p.def_abstract_eval
 def _qinsert_abstract_eval(qreg_old, qubit_idx, qubit):
     """This function is called with abstract arguments for tracing."""
@@ -668,11 +643,6 @@ def _qinsert_lowering(
 #
 # qinst
 #
-def qinst(name, qubits_len, *qubits_or_params):
-    """Bind operands to operation."""
-    return qinst_p.bind(*qubits_or_params, op=name, qubits_len=qubits_len)
-
-
 @qinst_p.def_abstract_eval
 def _qinst_abstract_eval(*qubits_or_params, op=None, qubits_len=-1):
     for idx in range(qubits_len):
@@ -733,11 +703,6 @@ def _qinst_lowering(
 #
 # qubit unitary operation
 #
-def qunitary(matrix, *qubits):
-    """Bind operands to operation."""
-    return qunitary_p.bind(matrix, *qubits)
-
-
 @qunitary_p.def_abstract_eval
 def _qunitary_abstract_eval(matrix, *qubits):
     for q in qubits:
@@ -788,11 +753,6 @@ def _qunitary_lowering(jax_ctx: mlir.LoweringRuleContext, matrix: ir.Value, *qub
 #
 # qmeasure
 #
-def qmeasure(qubit):
-    """Bind operands to operation."""
-    return qmeasure_p.bind(qubit)
-
-
 @qmeasure_p.def_abstract_eval
 def _qmeasure_abstract_eval(qubit):
     assert isinstance(qubit, AbstractQbit)
@@ -827,11 +787,6 @@ def _qmeasure_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value):
 #
 # compbasis observable
 #
-def compbasis(*qubits):
-    """Bind operands to operation."""
-    return compbasis_p.bind(*qubits)
-
-
 @compbasis_p.def_abstract_eval
 def _compbasis_abstract_eval(*qubits):
     for qubit in qubits:
@@ -861,11 +816,6 @@ def _compbasis_lowering(jax_ctx: mlir.LoweringRuleContext, *qubits: tuple):
 #
 # named observable
 #
-def namedobs(kind, qubit):
-    """Bind operands to operation."""
-    return namedobs_p.bind(qubit, kind=kind)
-
-
 @namedobs_p.def_impl
 def _namedobs_def_impl(qubit, kind):  # pragma: no cover
     raise NotImplementedError()
@@ -900,11 +850,6 @@ def _named_obs_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value, kind
 #
 # hermitian observable
 #
-def hermitian(matrix, *qubits):
-    """Bind operands to operation."""
-    return hermitian_p.bind(matrix, *qubits)
-
-
 @hermitian_p.def_abstract_eval
 def _hermitian_abstract_eval(matrix, *qubits):
     for q in qubits:
@@ -929,11 +874,6 @@ def _hermitian_lowering(jax_ctx: mlir.LoweringRuleContext, matrix: ir.Value, *qu
 #
 # tensor observable
 #
-def tensorobs(*terms):
-    """Bind operands to operation."""
-    return tensorobs_p.bind(*terms)
-
-
 @tensorobs_p.def_impl
 def _tensorobs_def_impl(ctx, *terms):  # pragma: no cover
     raise NotImplementedError()
@@ -994,12 +934,6 @@ def _hamiltonian_lowering(jax_ctx: mlir.LoweringRuleContext, coeffs: ir.Value, *
 #
 # sample measurement
 #
-def sample(obs, shots, shape):
-    """Bind operands to operation."""
-    assert shots is not None, "must specify shot number for qml.sample"
-    return sample_p.bind(obs, shots=shots, shape=shape)
-
-
 @sample_p.def_abstract_eval
 def _sample_abstract_eval(obs, shots, shape):
     assert isinstance(obs, AbstractObs)
@@ -1032,12 +966,6 @@ def _sample_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: in
 #
 # counts measurement
 #
-def counts(obs, shots, shape):
-    """Bind operands to operation."""
-    assert shots is not None, "must specify shot number for qml.counts"
-    return counts_p.bind(obs, shots=shots, shape=shape)
-
-
 @counts_p.def_impl
 def _counts_def_impl(ctx, obs, shots, shape):  # pragma: no cover
     raise NotImplementedError()
@@ -1179,11 +1107,6 @@ def _probs_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shape: tup
 #
 # state measurement
 #
-def state(obs, shape):
-    """Bind operands to operation."""
-    return state_p.bind(obs, shape=shape)
-
-
 @state_p.def_abstract_eval
 def _state_abstract_eval(obs, shape):
     assert isinstance(obs, AbstractObs)
@@ -1214,11 +1137,6 @@ def _state_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shape: tup
 #
 # qcond
 #
-def qcond(branch_jaxprs, *header_and_branch_args_plus_consts):
-    """Bind operands to operation."""
-    return qcond_p.bind(*header_and_branch_args_plus_consts, branch_jaxprs=branch_jaxprs)
-
-
 @qcond_p.def_abstract_eval
 def _qcond_abstract_eval(*args, branch_jaxprs, **kwargs):
     return branch_jaxprs[0].out_avals
@@ -1301,17 +1219,6 @@ def _qcond_lowering(
 #
 # qwhile loop
 #
-def qwhile(cond_jaxpr, body_jaxpr, cond_nconsts, body_nconsts, *iter_args_plus_consts):
-    """Bind operands to operation."""
-    return qwhile_p.bind(
-        *iter_args_plus_consts,
-        cond_jaxpr=cond_jaxpr,
-        body_jaxpr=body_jaxpr,
-        cond_nconsts=cond_nconsts,
-        body_nconsts=body_nconsts,
-    )
-
-
 @qwhile_p.def_abstract_eval
 def _qwhile_loop_abstract_eval(*args, cond_jaxpr, body_jaxpr, **kwargs):
     return body_jaxpr.out_avals
@@ -1394,18 +1301,6 @@ def _qwhile_lowering(
 #
 # qfor loop
 #
-def qfor(body_jaxpr, body_nconsts, *header_and_iter_args_plus_consts):
-    """Bind operands to operation."""
-    step = header_and_iter_args_plus_consts[2]
-    apply_reverse_transform = isinstance(step, int) and step < 0
-    return qfor_p.bind(
-        *header_and_iter_args_plus_consts,
-        body_jaxpr=body_jaxpr,
-        body_nconsts=body_nconsts,
-        apply_reverse_transform=apply_reverse_transform,
-    )
-
-
 @qfor_p.def_abstract_eval
 def _qfor_loop_abstract_eval(*args, body_jaxpr, **kwargs):
     return body_jaxpr.out_avals
