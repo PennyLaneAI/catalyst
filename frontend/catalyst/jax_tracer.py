@@ -21,16 +21,6 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 import jax
 import jax.numpy as jnp
 import pennylane as qml
-from jax._src.api import ShapeDtypeStruct
-from jax._src.core import ClosedJaxpr
-from jax._src.interpreters.partial_eval import (
-    DynamicJaxprTrace,
-    DynamicJaxprTracer,
-    _input_type_to_tracers,
-    convert_constvars_jaxpr,
-)
-from jax._src.linear_util import wrap_init
-from jax._src.util import unzip2
 from pennylane import QubitDevice, QubitUnitary, QueuingManager
 from pennylane.measurements import MeasurementProcess, MidMeasureMP
 from pennylane.operation import AnyWires, Operation, Wires
@@ -66,8 +56,14 @@ from catalyst.jax_primitives import (
 )
 from catalyst.utils.exceptions import CompileError
 from catalyst.utils.jax_extras import (
+    ClosedJaxpr,
+    DynamicJaxprTrace,
+    DynamicJaxprTracer,
     JaxprPrimitive,
     PyTreeDef,
+    ShapeDtypeStruct,
+    _input_type_to_tracers,
+    convert_constvars_jaxpr,
     deduce_avals,
     initial_style_jaxprs_with_common_consts2,
     jaxpr_to_mlir,
@@ -76,6 +72,8 @@ from catalyst.utils.jax_extras import (
     tree_flatten,
     tree_structure,
     tree_unflatten,
+    unzip2,
+    wrap_init,
 )
 from catalyst.utils.patching import Patcher
 from catalyst.utils.tracing import EvaluationContext, EvaluationMode, JaxTracingContext

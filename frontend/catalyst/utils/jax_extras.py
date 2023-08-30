@@ -19,6 +19,7 @@ from contextlib import contextmanager
 from typing import Any, Callable, Dict, Generator, List, Optional, Sequence, Set, Type
 
 from jax._src import state, util
+from jax._src.api import ShapeDtypeStruct
 from jax._src.api_util import flatten_fun, shaped_abstractify
 from jax._src.core import ClosedJaxpr, Jaxpr, JaxprEqn, MainTrace
 from jax._src.core import Primitive as JaxprPrimitive
@@ -40,6 +41,7 @@ from jax._src.interpreters.mlir import (
     lowerable_effects,
 )
 from jax._src.interpreters.partial_eval import (
+    DynamicJaxprTrace,
     DynamicJaxprTracer,
     _input_type_to_tracers,
     convert_constvars_jaxpr,
@@ -58,24 +60,32 @@ from jax._src.tree_util import (
     tree_unflatten,
     treedef_is_leaf,
 )
-from jax._src.util import partition_list, safe_map, unzip3, wrap_name
+from jax._src.util import partition_list, safe_map, unzip2, unzip3, wrap_name
 
 __all__ = (
-    "_initial_style_jaxpr",
-    "initial_style_jaxprs_with_common_consts1",
-    "initial_style_jaxprs_with_common_consts2",
-    "_input_type_to_tracers",
+    "ClosedJaxpr",
+    "DynamicJaxprTrace",
+    "DynamicJaxprTracer",
     "Jaxpr",
     "JaxprPrimitive",
-    "jaxpr_to_mlir",
     "PyTreeDef",
     "ShapedArray",
+    "ShapeDtypeStruct",
+    "convert_constvars_jaxpr",
+    "initial_style_jaxprs_with_common_consts1",
+    "initial_style_jaxprs_with_common_consts2",
+    "_initial_style_jaxpr",
+    "_input_type_to_tracers",
+    "jaxpr_to_mlir",
+    "make_jaxpr_effects",
+    "new_inner_tracer",
     "sort_eqns",
     "treedef_is_leaf",
     "tree_flatten",
     "tree_structure",
     "tree_unflatten",
-    "new_inner_tracer",
+    "unzip2",
+    "wrap_init",
 )
 
 map, unsafe_map = safe_map, map  # pylint: disable=redefined-builtin
