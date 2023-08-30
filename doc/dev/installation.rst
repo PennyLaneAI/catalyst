@@ -91,9 +91,9 @@ They can be installed on macOS via:
 
 .. code-block:: console
 
-  brew install cmake ninja gpatch
+  brew install cmake ninja
 
-If you install Catalyst on a macOS with an ``ARM`` architecture, you need to install
+If you install Catalyst on a macOS system with ``ARM`` architecture, you need to install
 the ``llvm-tools-preview`` rustup component:
 
 .. code-block:: console
