@@ -87,6 +87,19 @@ They can be installed on Debian/Ubuntu via:
 
   sudo apt install clang lld ccache libomp-dev ninja-build make cmake
 
+They can be installed on macOS via:
+
+.. code-block:: console
+
+  brew install cmake ninja gpatch
+
+If you install Catalyst on a macOS with an ``ARM`` architecture, you need to install
+the ``llvm-tools-preview`` rustup component:
+
+.. code-block:: console
+
+  rustup component add llvm-tools-preview
+
 .. Note::
   If the CMake version available in your system is too old, you can also install up-to-date
   versions of it via ``pip install cmake``.
@@ -122,6 +135,14 @@ following make target from the top level directory:
 .. code-block:: console
 
   make all
+
+.. Note::
+
+  To install on macOS:
+
+  .. code-block:: console
+
+    BUILD_QIR_STDLIB_FROM_SRC=ON ENABLE_LLD=OFF make all
 
 To build each component one by one starting from the runtime, you can follow
 the instructions below.
