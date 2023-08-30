@@ -310,7 +310,7 @@ class Enzyme(PassPipeline):
     linux_ext = "so"
     ext = linux_ext if platform.system() == "Linux" else apple_ext
     _default_flags = [
-        f"-load-pass-plugin={enzyme_path}/LLVMEnzyme-17.{ext}",
+        f"-load-pass-plugin={enzyme_path}/LLVMEnzyme-18.{ext}",
         # preserve-nvvm transforms certain global arrays to LLVM metadata that Enzyme will recognize
         "-passes=preserve-nvvm,enzyme",
         "-S",
