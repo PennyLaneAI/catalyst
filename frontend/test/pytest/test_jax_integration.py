@@ -350,7 +350,7 @@ class TestJAXAD:
         assert jnp.allclose(result2, 0.0)
 
     @pytest.mark.parametrize("shape", ([2, 3], [3, 2], [1, 6]))
-    def test_multiD_calls(self, backend, shape):
+    def test_multiD_calls(self, shape):
         """Test a jax.grad in combination with qjit on non-1D input parameters."""
 
         def func(p1, p2):
