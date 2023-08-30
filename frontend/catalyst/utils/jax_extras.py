@@ -67,7 +67,6 @@ __all__ = (
     "DynamicJaxprTrace",
     "DynamicJaxprTracer",
     "Jaxpr",
-    "JaxprPrimitive",
     "PyTreeDef",
     "ShapedArray",
     "ShapeDtypeStruct",
