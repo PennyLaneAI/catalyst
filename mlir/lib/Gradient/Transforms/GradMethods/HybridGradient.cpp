@@ -368,18 +368,17 @@ func::FuncOp HybridGradientLowering::genQNodeQuantumOnly(PatternRewriter &rewrit
     };
 
     modifiedCallee.walk([&](quantum::DifferentiableGate gateOp) {
-            OpBuilder::InsertionGuard insertGuard(rewriter);
-            rewriter.setInsertionPoint(gateOp);
+        OpBuilder::InsertionGuard insertGuard(rewriter);
+        rewriter.setInsertionPoint(gateOp);
 
-            ValueRange diffParams = gateOp.getDiffParams();
-            SmallVector<Value> newParams{diffParams.size()};
-            for (const auto [paramIdx, recomputedParam] : llvm::enumerate(diffParams)) {
-                newParams[paramIdx] =
-                    loadThenIncrementCounter(rewriter, paramCounter, paramsTensor);
-            }
-            MutableOperandRange range{gateOp, static_cast<unsigned>(gateOp.getDiffOperandIdx()),
-                                      static_cast<unsigned>(diffParams.size())};
-            range.assign(newParams);
+        ValueRange diffParams = gateOp.getDiffParams();
+        SmallVector<Value> newParams{diffParams.size()};
+        for (const auto [paramIdx, recomputedParam] : llvm::enumerate(diffParams)) {
+            newParams[paramIdx] = loadThenIncrementCounter(rewriter, paramCounter, paramsTensor);
+        }
+        MutableOperandRange range{gateOp, static_cast<unsigned>(gateOp.getDiffOperandIdx()),
+                                  static_cast<unsigned>(diffParams.size())};
+        range.assign(newParams);
     });
 
     // This function is the point where we can remove the classical preprocessing as a later
