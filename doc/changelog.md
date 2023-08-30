@@ -251,6 +251,7 @@
   ```pycon
   >>> dsquare(2.3)
   array(4.6)
+  ```
 
 * Add support for the new PennyLane arithmetic operators.
   [#250](https://github.com/PennyLaneAI/catalyst/pull/250)
