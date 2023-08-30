@@ -93,8 +93,8 @@ They can be installed on macOS via:
 
   brew install cmake ninja
 
-If you install Catalyst on a macOS system with ``ARM`` architecture, you need to install
-the ``llvm-tools-preview`` rustup component:
+If you install Catalyst on a macOS system with ``ARM`` architecture (e.g. Apple M1/M2), you 
+additionally need to install the ``llvm-tools-preview`` rustup component:
 
 .. code-block:: console
 
