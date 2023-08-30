@@ -272,6 +272,7 @@ def _verify_differentiable_child_qnodes(jaxpr, method):
 
     def traverse_children(jaxpr):
         for eqn in jaxpr.eqns:
+            # The Python function is stored in the "fn" parameter of func_p JAXPR primitives.
             fn = eqn.params.get("fn")
             if fn and fn not in visited:
                 child = eqn.params.get("call_jaxpr", None)
