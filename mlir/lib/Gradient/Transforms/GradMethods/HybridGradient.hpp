@@ -40,12 +40,12 @@ struct HybridGradientLowering : public mlir::OpRewritePattern<GradOp> {
     /// see that the gate parameters flow into the custom quantum function.
     static mlir::func::FuncOp genQNodeQuantumOnly(mlir::PatternRewriter &rewriter,
                                                   mlir::Location loc, mlir::func::FuncOp qnode);
-};
 
-mlir::func::FuncOp genFullGradFunction(mlir::PatternRewriter &rewriter, mlir::Location loc,
-                                       GradOp gradOp, mlir::func::FuncOp paramCountFn,
-                                       mlir::func::FuncOp argMapFn, mlir::func::FuncOp qGradFn,
-                                       mlir::StringRef method);
+    /// Generate a function that computes a Jacobian row-by-row using one or more BackpropOps.
+    static mlir::func::FuncOp genFullGradFunction(mlir::PatternRewriter &rewriter,
+                                                  mlir::Location loc, GradOp gradOp,
+                                                  mlir::func::FuncOp callee, FunctionType fnType);
+};
 
 } // namespace gradient
 } // namespace catalyst

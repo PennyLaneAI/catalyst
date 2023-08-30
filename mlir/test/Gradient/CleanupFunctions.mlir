@@ -38,7 +38,7 @@ func.func private @f(%arg0: tensor<f64>) -> tensor<f64> attributes {qnode, diff_
 }
 
 // CHECK-LABEL: @gradCall0
-// CHECK: gradient.backprop @f.preprocess
+// CHECK: call @f.fullgrad0
 func.func @gradCall0(%arg0: tensor<f64>) -> tensor<f64> {
     %0 = gradient.grad "defer" @f(%arg0) : (tensor<f64>) -> tensor<f64>
     func.return %0 : tensor<f64>
