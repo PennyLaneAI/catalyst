@@ -329,7 +329,7 @@ def _check_grad_params(
 ) -> GradParams:
     methods = {"fd", "defer"}
     if method is None:
-        method = "fd"
+        method = "defer"
     if method not in methods:
         raise ValueError(
             f"Invalid differentiation method '{method}'. "

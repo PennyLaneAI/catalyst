@@ -132,7 +132,7 @@ def test_finite_diff(inp, backend):
     @qjit()
     def compiled_grad_default(x: float):
         g = qml.qnode(qml.device(backend, wires=1))(f)
-        h = grad(g)
+        h = grad(g, method="fd")
         return h(x)
 
     def interpretted_grad_default(x):
@@ -155,7 +155,7 @@ def test_finite_diff_mul(inp, backend):
     @qjit()
     def compiled_grad_default(x: float):
         g = qml.qnode(qml.device(backend, wires=1))(f)
-        h = grad(g)
+        h = grad(g, method="fd")
         return h(x)
 
     def interpretted_grad_default(x):
@@ -490,7 +490,7 @@ def test_finite_diff_h(inp, backend):
     @qjit()
     def compiled_grad_h(x: float):
         g = qml.qnode(qml.device(backend, wires=1))(f)
-        h = grad(g, h=0.1)
+        h = grad(g, method="fd", h=0.1)
         return h(x)
 
     def interpretted_grad_h(x):
@@ -513,7 +513,7 @@ def test_finite_diff_argnum(inp, backend):
     @qjit()
     def compiled_grad_argnum(x: float):
         g = qml.qnode(qml.device(backend, wires=1))(f2)
-        h = grad(g, argnum=1)
+        h = grad(g, method="fd", argnum=1)
         return h(x, 2.0)
 
     def interpretted_grad_argnum(x):
@@ -536,7 +536,7 @@ def test_finite_diff_argnum_list(inp, backend):
     @qjit()
     def compiled_grad_argnum_list(x: float):
         g = qml.qnode(qml.device(backend, wires=1))(f2)
-        h = grad(g, argnum=[1])
+        h = grad(g, method="fd", argnum=[1])
         return h(x, 2.0)
 
     def interpretted_grad_argnum_list(x):
@@ -563,7 +563,7 @@ def test_finite_grad_range_change(inp, backend):
     @qjit()
     def compiled_grad_range_change(x: float):
         g = qml.qnode(qml.device(backend, wires=1))(f2)
-        h = grad(g, argnum=[0, 1])
+        h = grad(g, method="fd", argnum=[0, 1])
         return h(x, 2.0)
 
     def interpretted_grad_range_change(x):
@@ -729,8 +729,8 @@ def test_finite_diff_higher_order(inp, backend):
     @qjit()
     def compiled_grad2_default(x: float):
         g = qml.qnode(qml.device(backend, wires=1))(f)
-        h = grad(g)
-        i = grad(h)
+        h = grad(g, method="fd")
+        i = grad(h, method="fd")
         return i(x)
 
     def interpretted_grad2_default(x):

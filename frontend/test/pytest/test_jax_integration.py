@@ -336,7 +336,7 @@ class TestJAXAD:
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(x):
             qml.RY(x, wires=0)
-            return jnp.asarray(measure(0), dtype=float)
+            return qml.expval(qml.PauliZ(0))
 
         @jax.grad
         def cost_fn(x, y):
@@ -356,7 +356,7 @@ class TestJAXAD:
         def func(p1, p2):
             return jnp.reshape(p1, shape) + 2 * jnp.reshape(p2, shape)
 
-        C_func = qjit(qml.qnode(qml.device(backend, wires=1))(func))
+        C_func = qjit(func)
         PL_func = func
 
         def cost_fn(p1, p2, f):
