@@ -246,9 +246,7 @@ class ForLoop(HybridOp):
             qreg_in = _input_type_to_tracers(inner_trace.new_arg, [AbstractQreg()])[0]
             qrp_out = trace_quantum_tape(inner_tape, device, qreg_in, ctx, inner_trace)
             qreg_out = qrp_out.actualize()
-            jaxpr, _, consts = ctx.frames[inner_trace].to_jaxpr2(
-                res_classical_tracers + [qreg_out]
-            )
+            jaxpr, _, consts = ctx.frames[inner_trace].to_jaxpr2(res_classical_tracers + [qreg_out])
 
         step = op.in_classical_tracers[2]
         apply_reverse_transform = isinstance(step, int) and step < 0
@@ -630,7 +628,7 @@ def trace_quantum_function(
             jaxpr, out_type, consts = ctx.frames[trace].to_jaxpr2(
                 out_classical_tracers + out_quantum_tracers
             )
-            jaxpr._outvars = jaxpr._outvars[:-1] # pylint: disable=protected-access
+            jaxpr._outvars = jaxpr._outvars[:-1]  # pylint: disable=protected-access
             out_type = out_type[:-1]
             # TODO: `check_jaxpr` complains about the `AbstractQreg` type. Consider fixing.
             # check_jaxpr(jaxpr)
