@@ -20,15 +20,16 @@ from typing import Any, Callable, Dict, Generator, List, Optional, Sequence, Set
 
 from jax._src import state, util
 from jax._src.api_util import flatten_fun, shaped_abstractify
-from jax._src.core import ClosedJaxpr, Jaxpr, JaxprEqn, MainTrace
-from jax._src.core import Primitive as JaxprPrimitive
 from jax._src.core import (
+    ClosedJaxpr, Jaxpr, JaxprEqn, MainTrace,
+    Primitive as JaxprPrimitive,
     ShapedArray,
     Trace,
     _update_thread_local_jit_state,
     gensym,
     thread_local_state,
 )
+from jax._src.effects import ordered_effects as jax_ordered_effects
 from jax._src.dispatch import jaxpr_replicas
 from jax._src.interpreters.mlir import (
     AxisContext,
@@ -57,6 +58,24 @@ from jax._src.tree_util import (
     treedef_is_leaf,
 )
 from jax._src.util import partition_list, safe_map, unzip3, wrap_name
+
+
+__all__ = (
+    "_initial_style_jaxpr",
+    "initial_style_jaxprs_with_common_consts1",
+    "initial_style_jaxprs_with_common_consts2",
+    "_input_type_to_tracers",
+    "Jaxpr",
+    "JaxprPrimitive",
+    "jaxpr_to_mlir",
+    "PyTreeDef",
+    "ShapedArray",
+    "sort_eqns",
+    "treedef_is_leaf",
+    "tree_flatten",
+    "tree_structure",
+    "tree_unflatten",
+)
 
 map, unsafe_map = safe_map, map
 
@@ -252,7 +271,7 @@ def jaxpr_to_mlir(func_name, jaxpr, shape):
     """
 
     nrep = jaxpr_replicas(jaxpr)
-    effects = [eff for eff in jaxpr.effects if eff in jax.core.ordered_effects]
+    effects = [eff for eff in jaxpr.effects if eff in jax_ordered_effects]
     axis_context = ReplicaAxisContext(xla.AxisEnv(nrep, (), ()))
     name_stack = new_name_stack(wrap_name("ok", "jit"))
     module, context = custom_lower_jaxpr_to_module(
@@ -349,21 +368,3 @@ def custom_lower_jaxpr_to_module(
             op.attributes["llvm.linkage"] = ir.Attribute.parse("#llvm.linkage<internal>")
 
     return ctx.module, ctx.context
-
-
-__all__ = (
-    _initial_style_jaxpr,
-    initial_style_jaxprs_with_common_consts1,
-    initial_style_jaxprs_with_common_consts2,
-    _input_type_to_tracers,
-    Jaxpr,
-    JaxprPrimitive,
-    jaxpr_to_mlir,
-    PyTreeDef,
-    ShapedArray,
-    sort_eqns,
-    treedef_is_leaf,
-    tree_flatten,
-    tree_structure,
-    tree_unflatten,
-)
