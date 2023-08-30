@@ -110,7 +110,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path:  enzyme-build
-        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.enzyme_version }}-generic-build
+        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-generic-build
 
     - name: Clone Enzyme Submodule
       if:  |
@@ -190,7 +190,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path:  enzyme-build
-        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.enzyme_version }}-generic-build
+        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-generic-build
         fail-on-cache-miss: True
 
     # Build Catalyst-Runtime
