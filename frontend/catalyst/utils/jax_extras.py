@@ -334,8 +334,9 @@ def custom_lower_jaxpr_to_module(
     assert result_shardings is None
     platforms_with_donation = ("cuda", "rocm", "tpu")
     assert platform not in platforms_with_donation
-    if any(eff not in lowerable_effects for eff in jaxpr.effects):
-        raise ValueError(f"Cannot lower jaxpr with effects: {jaxpr.effects}")
+    assert all(
+        eff in lowerable_effects for eff in jaxpr.effects
+    ), f"Unloweable effects: {jaxpr.effects}"
 
     # MHLO channels need to start at 1
     channel_iter = 1
