@@ -15,8 +15,9 @@
 import numpy as np
 import pennylane as qml
 import pytest
+from pennylane.tape import QuantumTape
 
-from catalyst import qjit
+from catalyst import cond, for_loop, qjit, while_loop
 
 
 def test_no_parameters(backend):
@@ -141,6 +142,46 @@ def test_param(backend):
     qml_fn = qml.qnode(qml.device("default.qubit", wires=4))(circuit)
 
     assert np.allclose(qjit_fn(3.14, 0.6), qml_fn(3.14, 0.6))
+
+
+def test_hybrid_op_repr(backend):
+    """Test hybrid operation representation"""
+
+    def circuit(n):
+        quantum_tape = QuantumTape()
+        with qml.QueuingManager.stop_recording(), quantum_tape:
+
+            @for_loop(0, 1, 1)
+            def loop(i):
+                qml.RX(np.pi, wires=0)
+                return ()
+
+            loop()
+
+            @while_loop(lambda v: v < 1)
+            def loop(v):
+                qml.RY(np.pi, wires=0)
+                return v + 1
+
+            loop(0)
+
+            @cond(n == 1)
+            def cond_fn():
+                qml.RZ(np.pi, wires=0)
+                return 0
+
+            @cond_fn.otherwise
+            def cond_fn():
+                qml.RZ(np.pi, wires=0)
+                return 1
+
+            cond_fn()
+
+        for term in ["ForLoop", "WhileLoop", "Cond", "RX", "RY", "RZ"]:
+            assert term in str(quantum_tape.operations)
+        return qml.state()
+
+    qjit()(qml.qnode(qml.device(backend, wires=4))(circuit))(1)
 
 
 if __name__ == "__main__":

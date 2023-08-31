@@ -218,7 +218,8 @@ class HybridOp(Operation):
 
     def __repr__(self):
         """Constructor-call-like representation."""
-        return f"{self.name}(tapes={[r.quantum_tape.operations for r in self.regions]})"
+        nested_ops = [r.quantum_tape.operations for r in self.regions if r.quantum_tape]
+        return f"{self.name}(tapes={nested_ops})"
 
     def bind_overwrite_classical_tracers(
         self, ctx: JaxTracingContext, trace: DynamicJaxprTrace, *args, **kwargs
