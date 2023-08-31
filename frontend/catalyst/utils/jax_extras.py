@@ -77,6 +77,7 @@ __all__ = (
     "_input_type_to_tracers",
     "jaxpr_to_mlir",
     "make_jaxpr_effects",
+    "new_dynamic_main2",
     "new_inner_tracer",
     "sort_eqns",
     "treedef_is_leaf",
@@ -91,30 +92,28 @@ map, unsafe_map = safe_map, map  # pylint: disable=redefined-builtin
 
 
 @contextmanager
-def new_main2(
+def new_dynamic_main2(
     trace_type: Type[Trace],
-    dynamic: bool = False,
     main: Optional[MainTrace] = None,
     **payload,
 ) -> Generator[MainTrace, None, None]:
     """A verison of JAX `new_main` function that knows how to re-use an already existing `MainTrace`
     object"""
 
+    dynamic = True
     stack = thread_local_state.trace_state.trace_stack
     level = stack.next_level() if main is None else main.level
     main = MainTrace(level, trace_type, **payload) if main is None else main
     stack.push(main)
-    if dynamic:
-        prev_dynamic, stack.dynamic = stack.dynamic, main
-        _update_thread_local_jit_state(stack.dynamic)
+    prev_dynamic, stack.dynamic = stack.dynamic, main
+    _update_thread_local_jit_state(stack.dynamic)
 
     try:
         yield main
     finally:
         stack.pop()
-        if dynamic:
-            stack.dynamic = prev_dynamic
-            _update_thread_local_jit_state(stack.dynamic)
+        stack.dynamic = prev_dynamic
+        _update_thread_local_jit_state(stack.dynamic)
 
 
 def stable_toposort(end_nodes: list) -> list:

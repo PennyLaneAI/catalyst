@@ -31,7 +31,7 @@ from jax._src.interpreters.partial_eval import (
 from jax._src.source_info_util import reset_name_stack
 
 from catalyst.utils.exceptions import CompileError
-from catalyst.utils.jax_extras import new_main2
+from catalyst.utils.jax_extras import new_dynamic_main2
 
 
 class EvaluationMode(Enum):
@@ -117,7 +117,7 @@ class EvaluationContext:
         :class:`~.jax_tracer.HybridOp`. Not applicable in non-tracing evaluation modes."""
         assert ctx is cls._tracing_stack[-1][1], f"{ctx=}"
         main = ctx.mains[trace] if trace is not None else None
-        with new_main2(DynamicJaxprTrace, dynamic=True, main=main) as nmain:
+        with new_dynamic_main2(DynamicJaxprTrace, main=main) as nmain:
             nmain.jaxpr_stack = ()
             frame = JaxprStackFrame() if trace is None else ctx.frames[trace]
             with extend_jaxpr_stack(nmain, frame), reset_name_stack():
