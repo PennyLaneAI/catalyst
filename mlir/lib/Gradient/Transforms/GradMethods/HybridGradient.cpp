@@ -204,7 +204,7 @@ FailureOr<func::FuncOp> HybridGradientLowering::cloneCallee(PatternRewriter &rew
 
 LogicalResult HybridGradientLowering::matchAndRewrite(GradOp op, PatternRewriter &rewriter) const
 {
-    if (op.getMethod() != "defer") {
+    if (op.getMethod() != "auto") {
         return failure();
     }
 

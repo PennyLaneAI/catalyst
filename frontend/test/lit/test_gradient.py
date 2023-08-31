@@ -46,8 +46,8 @@ def override_method(x: float):
         return qml.expval(qml.PauliY(0))
 
     # pylint: disable=line-too-long
-    # CHECK: "gradient.grad"({{%[0-9]+}}) {callee = @f, diffArgIndices = dense<0> : tensor<1xi64>, method = "defer"} : (tensor<f64>) -> tensor<f64>
-    g = grad(f, method="defer")
+    # CHECK: "gradient.grad"({{%[0-9]+}}) {callee = @f, diffArgIndices = dense<0> : tensor<1xi64>, method = "auto"} : (tensor<f64>) -> tensor<f64>
+    g = grad(f, method="auto")
     return g(jax.numpy.pi)
 
 
@@ -78,7 +78,7 @@ def override_diff_arg(x: float):
         qml.RX(x**y, wires=0)
         return qml.expval(qml.PauliY(0))
 
-    # CHECK: "gradient.grad"({{%[0-9]+}}, {{%[0-9]+}}) {callee = @f, diffArgIndices = dense<1> : tensor<1xi64>, method = "defer"} : (tensor<f64>, tensor<f64>) -> tensor<f64>
+    # CHECK: "gradient.grad"({{%[0-9]+}}, {{%[0-9]+}}) {callee = @f, diffArgIndices = dense<1> : tensor<1xi64>, method = "auto"} : (tensor<f64>, tensor<f64>) -> tensor<f64>
     g = grad(f, argnum=1)
     return g(jax.numpy.pi, 2.0)
 
@@ -113,7 +113,7 @@ def grad_range_change():
         qml.RY(y, wires=1)
         return qml.expval(qml.PauliX(0)), qml.expval(qml.PauliY(1))
 
-    # CHECK: "gradient.grad"({{%[0-9]+}}, {{%[0-9]+}}) {callee = @f, diffArgIndices = dense<[0, 1]> : tensor<2xi64>, method = "defer"} : (tensor<f64>, tensor<f64>) -> (tensor<f64>, tensor<f64>, tensor<f64>, tensor<f64>)
+    # CHECK: "gradient.grad"({{%[0-9]+}}, {{%[0-9]+}}) {callee = @f, diffArgIndices = dense<[0, 1]> : tensor<2xi64>, method = "auto"} : (tensor<f64>, tensor<f64>) -> (tensor<f64>, tensor<f64>, tensor<f64>, tensor<f64>)
     g = jacobian(f, argnum=[0, 1])
     return g(jax.numpy.pi, jax.numpy.pi)
 

@@ -40,7 +40,7 @@ def test_scalar_scalar(backend, diff_method):
 
     @qjit
     def jac_postprocess(x):
-        return grad(postprocess, method="defer")(x)
+        return grad(postprocess, method="auto")(x)
 
     jax_jacobian = jax.jacobian(postprocess)(0.5)
     catalyst_jacobian = jac_postprocess(0.5)
@@ -62,7 +62,7 @@ def test_one_to_many(backend, diff_method):
 
     @qjit
     def jac_postprocess(x):
-        return jacobian(postprocess, method="defer")(x)
+        return jacobian(postprocess, method="auto")(x)
 
     jax_jacobian = jax.jacobian(postprocess)(0.5)
     catalyst_jacobian = jac_postprocess(0.5)
@@ -87,7 +87,7 @@ def test_many_to_one(backend, diff_method):
 
     @qjit
     def jac_postprocess(x):
-        return grad(postprocess, method="defer")(x)
+        return grad(postprocess, method="auto")(x)
 
     x = jnp.array([0.5, 0.4, 0.3, 0.2])
     jax_jacobian = jax.jacobian(postprocess)(x)
@@ -110,7 +110,7 @@ def test_tensor_measure(backend):
 
     @qjit
     def jac_postprocess(x):
-        return jacobian(postprocess, method="defer")(x)
+        return jacobian(postprocess, method="auto")(x)
 
     jax_jacobian = jax.jacobian(postprocess)(0.5)
     catalyst_jacobian = jac_postprocess(0.5)
@@ -131,7 +131,7 @@ def test_multi_measure(backend):
 
     @qjit
     def jac_postprocess(x):
-        return grad(postprocess, method="defer")(x)
+        return grad(postprocess, method="auto")(x)
 
     jax_jacobian = jax.jacobian(postprocess)(0.5)
     catalyst_jacobian = jac_postprocess(0.5)
@@ -146,7 +146,7 @@ def test_purely_classical():
 
     @qjit
     def classical_grad(x):
-        return grad(postprocess, method="defer")(x)
+        return grad(postprocess, method="auto")(x)
 
     assert classical_grad(4.5) == 9
 
@@ -169,7 +169,7 @@ def test_jacobian(backend, diff_method):
 
     @qjit
     def jac_postprocess(x):
-        return jacobian(postprocess, method="defer")(x)
+        return jacobian(postprocess, method="auto")(x)
 
     x = jnp.array([0.5, 0.4, 0.3, 0.2])
     assert jac_postprocess(x) == pytest.approx(
@@ -192,7 +192,7 @@ def test_multi_result(backend, diff_method):
 
     @qjit
     def jac_postprocess(x):
-        return jacobian(postprocess, method="defer")(x)
+        return jacobian(postprocess, method="auto")(x)
 
     jax_jacobian = jax.jacobian(postprocess)(0.5)
     catalyst_jacobian = jac_postprocess(0.5)
@@ -216,7 +216,7 @@ def test_multi_arg_multi_result(backend, diff_method):
 
     @qjit
     def jac_postprocess(x, y):
-        return jacobian(postprocess, argnum=(0, 1), method="defer")(x, y)
+        return jacobian(postprocess, argnum=(0, 1), method="auto")(x, y)
 
     args = (jnp.array([0.5, 0, 0]), 0.4)
     jax_jacobian = jax.jacobian(postprocess, argnums=(0, 1))(*args)
@@ -252,7 +252,7 @@ def test_multi_qnode(backend):
 
     @qjit
     def grad_workflow(x):
-        return grad(postprocess, method="defer")(x)
+        return grad(postprocess, method="auto")(x)
 
     x = jnp.array([0.1, 0.2, 0.3])
     assert grad_workflow(x) == pytest.approx(jax.jacobian(postprocess)(x))
@@ -278,7 +278,7 @@ def test_qnode_different_returns(backend):
 
     @qjit
     def grad_loss(theta):
-        return grad(loss, method="defer")(theta)
+        return grad(loss, method="auto")(theta)
 
     x = jnp.array([1.0, 2.0])
     assert grad_loss(x) == pytest.approx(jax.jacobian(loss)(x))
@@ -299,7 +299,7 @@ def test_no_nested_grad_without_fd():
 
         @qjit
         def outer(x: float):
-            return grad(middle, method="defer")(x)
+            return grad(middle, method="auto")(x)
 
         outer(9.0)
 
@@ -323,11 +323,11 @@ def test_nested_qnode(backend):
 
     @qjit
     def _grad_qnode_direct(x: float):
-        return grad(outer, method="defer")(x)
+        return grad(outer, method="auto")(x)
 
     @qjit
     def _grad_postprocess(x: float):
-        return grad(post, method="defer")(x)
+        return grad(post, method="auto")(x)
 
     # The runtime doesn't support actually executing nested QNodes, so we just make sure they
     # compile without issues.

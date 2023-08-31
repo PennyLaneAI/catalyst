@@ -50,7 +50,7 @@ func.func @simple_circuit(%arg0: tensor<3xf64>) -> f64 attributes {qnode, diff_m
 }
 
 func.func @gradCall0(%arg0: tensor<3xf64>) -> tensor<3xf64> {
-    %0 = gradient.grad "defer" @simple_circuit(%arg0) : (tensor<3xf64>) -> tensor<3xf64>
+    %0 = gradient.grad "auto" @simple_circuit(%arg0) : (tensor<3xf64>) -> tensor<3xf64>
     func.return %0 : tensor<3xf64>
 }
 
@@ -121,7 +121,7 @@ func.func @structured_circuit(%arg0: tensor<1xf64>, %arg1: i1, %arg2: i1) -> f64
 }
 
 func.func @gradCall1(%arg0: tensor<1xf64>, %b0: i1, %b1: i1) -> tensor<1xf64> {
-    %0 = gradient.grad "defer" @structured_circuit(%arg0, %b0, %b1) : (tensor<1xf64>, i1, i1) -> tensor<1xf64>
+    %0 = gradient.grad "auto" @structured_circuit(%arg0, %b0, %b1) : (tensor<1xf64>, i1, i1) -> tensor<1xf64>
     func.return %0 : tensor<1xf64>
 }
 
@@ -208,6 +208,6 @@ func.func @loop_circuit(%arg0: tensor<1xf64>) -> f64 attributes {qnode, diff_met
 }
 
 func.func @gradCall2(%arg0: tensor<1xf64>) -> tensor<1xf64> {
-    %0 = gradient.grad "defer" @loop_circuit(%arg0) : (tensor<1xf64>) -> tensor<1xf64>
+    %0 = gradient.grad "auto" @loop_circuit(%arg0) : (tensor<1xf64>) -> tensor<1xf64>
     func.return %0 : tensor<1xf64>
 }
