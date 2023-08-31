@@ -336,7 +336,7 @@ class TestJAXAD:
         @qml.qnode(qml.device(backend, wires=1))
         def circuit(x):
             qml.RY(x, wires=0)
-            return jnp.asarray(measure(0), dtype=float)
+            return qml.expval(qml.PauliZ(0))
 
         @jax.grad
         def cost_fn(x, y):
@@ -350,13 +350,13 @@ class TestJAXAD:
         assert jnp.allclose(result2, 0.0)
 
     @pytest.mark.parametrize("shape", ([2, 3], [3, 2], [1, 6]))
-    def test_multiD_calls(self, backend, shape):
+    def test_multiD_calls(self, shape):
         """Test a jax.grad in combination with qjit on non-1D input parameters."""
 
         def func(p1, p2):
             return jnp.reshape(p1, shape) + 2 * jnp.reshape(p2, shape)
 
-        C_func = qjit(qml.qnode(qml.device(backend, wires=1))(func))
+        C_func = qjit(func)
         PL_func = func
 
         def cost_fn(p1, p2, f):
