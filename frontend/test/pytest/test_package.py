@@ -18,6 +18,8 @@ Unit tests for the Catalyst package in general.
 
 # pylint: disable=import-outside-toplevel
 
+import sys
+
 import pytest
 
 
@@ -26,6 +28,7 @@ def test_jaxlib_mismatch(monkeypatch):
     import jaxlib
 
     monkeypatch.setattr(jaxlib, "__version__", "0.0")
+    monkeypatch.delitem(sys.modules, "catalyst")
 
     with pytest.warns(UserWarning, match="version mismatch for the installed 'jaxlib' package"):
         import catalyst  # pylint: disable=unused-import
