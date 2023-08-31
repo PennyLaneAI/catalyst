@@ -769,8 +769,8 @@ def test_jax_consts(h_coeffs, g_method, backend):
         h = jax.grad(g, argnums=0)
         return h(params)
 
-    input = jnp.array([1.0, 2.0])
-    assert np.allclose(compile_grad(jnp.array(input)), interpret_grad(input))
+    inp = jnp.array([1.0, 2.0])
+    assert np.allclose(compile_grad(jnp.array(inp)), interpret_grad(inp))
 
 
 def test_non_float_arg(backend):
