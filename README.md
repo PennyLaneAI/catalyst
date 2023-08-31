@@ -81,8 +81,8 @@ higher. To install it, simply run the following ``pip`` command:
 pip install pennylane-catalyst
 ```
 
-Pre-built packages for Windows are not yet available, and comptability with those
-platforms is untested and cannot be guaranteed. If you are using one of these platforms, please
+Pre-built packages for Windows are not yet available, and comptability with Windows 
+is untested and cannot be guaranteed. If you are using one of these platforms, please
 try out our Docker and Dev Container images described in the [documentation](https://docs.pennylane.ai/projects/catalyst/en/latest/dev/installation.html#dev-containers)
 or click this button:
 
