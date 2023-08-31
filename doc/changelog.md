@@ -2,72 +2,46 @@
 
 <h3>New features</h3>
 
-* Write Catalyst-compatible programs with native Python control flow.
+* Catalyst now builds on macOS, with macOS binary wheels available. For more details
+  on the changes involved to support macOS, please see the improvements section.
+  [(#229)](https://github.com/PennyLaneAI/catalyst/pull/230)
+  [(#232)](https://github.com/PennyLaneAI/catalyst/pull/232)
+  [(#233)](https://github.com/PennyLaneAI/catalyst/pull/233)
+  [(#234)](https://github.com/PennyLaneAI/catalyst/pull/234)
+
+* Write Catalyst-compatible programs with native Python conditional statements.
   [(#235)](https://github.com/PennyLaneAI/catalyst/pull/235)
 
   `autograph` is a new, experimental, feature that automatically converts
-  Python control flow statements like `if`, `else`, `elif`, for`, and `while`
+  Python conditional statements like `if`, `else`, and `elif`,
   into their equivalent functional forms provided by Catalyst (such as
-  `catalyst.cond` and `catalyst.for_loop`).
+  `catalyst.cond`).
 
-  Note that this feature is based on the AutoGraph module from TensorFlow, and
-  requires a working TensorFlow installation.
-
-  For example, the following program, when `qjit` compiled with `autograph` enabled,
+  This feature is currently opt-in and experimental, and requires setting the
+  `autograph=True` flag in the `qjit` decorator:
 
   ```python
-  dev = qml.device("lightning.qubit", wires=n)
+  dev = qml.device("lightning.qubit", wires=1)
 
   @qjit(autograph=True)
-  @qml.qnode()
-  def f(x):
-
-      for i in range(n):
-          qml.Hadamard(i)
-
-      if x < 0.5:
-          y = jnp.sin(x)
-      else:
-          y = jnp.cos(x)
-
-      qml.RY(y, wires=i)
-
-      return qml.probs()
-  ```
-
-  corresponds to the following program using Catalyst control flow operations:
-
-  ```python
-  @qjit
   @qml.qnode(dev)
   def f(x):
-      @for_loop(0, n, 1)
-      def repeat(i):
-          qml.Hadamard(i)
+      if x < 0.5:
+          qml.RY(jnp.sin(x), wires=0)
+      else:
+          qml.RX(jnp.cos(x), wires=0)
 
-          @cond(x < 0.5)
-          def correction():
-              return jnp.sin(x)
-
-          @correction.otherwise()
-          def correction():
-              return jnp.cos(x)
-
-          y = correction()
-          qml.RY(y, wires=i)
-
-      repeat()
-
-      return qml.probs()
+      return qml.expval(qml.PauliZ(0))
   ```
 
-  This feature is currently opt-in, and requires setting the
-  ``autograph=True`` flag in the ``qjit`` decorator.
+  This feature is based on the AutoGraph module from TensorFlow, and
+  requires a working TensorFlow installation be available. In addition,
+  Python loops (`for` and `while`) are not currently supported, and do
+  not work in Autograph mode.
 
-  Note that there are some caveats when using this feature, especially around
+  Note that there are some caveats when using this feature especially around
   modifying global variables or object mutation inside of methods. A
-  functional style is always recommended when using qjit or AutoGraph. Please
-  see the documentation page on the [AutoGraph feature]() for more details.
+  functional style is always recommended when using `qjit` or AutoGraph.
 
 * The quantum adjoint operation can now be natively represented in Catalyst programs
   using `catalyst.adjoint`.
@@ -83,26 +57,12 @@
     control flow, and
   - performance benefits from Catalyst's Just-In-Time compilation.
 
-  For example:
+  Quantum functions with arbitrary Catalyst control flow can have their
+  adjoint versions computed, even when the control flow contains classical
+  preprocessing:
 
   ```python
-  def circuit(param):
-      qml.RX(param, wires=0)
-      qml.RY(param, wires=1)
-      qml.RZ(param, wires=2)
-
-  @qjit
-  @qml.qnode(qml.device("lightning.qubit", wires=3))
-  def workflow():
-      catalyst.adjoint(circuit)(jnp.pi/2)
-      return qml.state()
-  ```
-
-  Quantum functions with arbitrary Catalyst control flow can have their adjoint versions computed, even
-  when the control flow contains classical preprocessing:
-
-  ```python
-  def circuit_control_flow(param):
+  def circuit_control_flow(theta):
       @for_loop(0, 6, 1)
       def loop_outer(iv):
           qml.RX(theta / 2, wires=0)
@@ -126,13 +86,20 @@
 
           qml.RX(theta / final, wires=0)
 
-  @qjit
-  @qml.qnode(qml.device("lightning.qubit", wires=3))
-  def workflow_control_flow():
-      catalyst.adjoint(circuit_control_flow)(jnp.pi)
-      return qml.state()
+      loop_outer()
 
-  workflow_control_flow()
+  dev = qml.device("lightning.qubit", wires=1)
+
+  @qjit
+  @qml.qnode(dev)
+  def circuit(x):
+      catalyst.adjoint(circuit_control_flow)(x)
+      return qml.expval(qml.PauliZ(0))
+  ```
+
+  ```pycon
+  >>> circuit(0.2)
+  array(0.23572496)
   ```
 
 * QJIT-compiled programs now support container-like and nested Python
@@ -145,24 +112,24 @@
   ```python
   @qjit
   def workflow(params1, params2):
-    """A classical workflow"""
       res1 = params1["a"][0][0] + params2[1]
       return jnp.sin(res1)
-
-  params1 = {"a": [[0.1], 0.2]}
-  params2 = (0.6, 0.8)
   ```
 
   ```pycon
+  >>> params1 = {"a": [[0.1], 0.2]}
+  >>> params2 = (0.6, 0.8)
   >>> workflow(params1, params2)
-
+  array(0.78332691)
   ```
 
   Another example, a program that returns a dictionary:
 
   ```python
+  dev = qml.device("lightning.qubit", wires=2, shots=100)
+
   @qjit
-  @qml.qnode(qml.device("lightning.qubit", wires=2, shots=100))
+  @qml.qnode(dev)
   def circuit(params):
       """A hybrid circuit"""
       qml.RX(params[0] * jnp.pi(), wires=0)
@@ -179,7 +146,10 @@
 
   ```pycon
   >>> circuit([0.5, 0.6])
-
+  {'counts': (array([0., 1., 2., 3.]), array([44, 48,  5,  3])),
+   'expval': {'z0': array(2.01227923e-16), 'z1': array(0.82533561)},
+   'state': array([ 0.67552491+0.j        ,  0.        -0.20896434j,
+                    0.        -0.67552491j, -0.20896434+0.j        ])}
   ```
 
   This is achieved by adding support for the JAX pytree API.
@@ -202,19 +172,18 @@
   operation:
 
   ```python
-  @qml.qnode(qml.device("lightning.qubit", wires=1), diff_method="parameter-shift")
+  dev = qml.device("lightning.qubit", wires=1)
+
+  @qml.qnode(dev, diff_method="parameter-shift")
   def circuit(theta):
       qml.RX(jnp.exp(theta ** 2) / jnp.cos(theta / 4), wires=0)
       return qml.expval(qml.PauliZ(wires=0))
-
-  @qjit
-  def grad_circuit(theta):
-      return catalyst.grad(circuit, method="defer")(theta)
   ```
 
   ```pycon
-  >>> grad_circuit(jnp.pi)
-  array(112936.34906843)
+  >>> grad = qjit(catalyst.grad(circuit, method="defer"))
+  >>> grad(jnp.pi)
+  array(0.05938718)
   ```
 
 * Add support for the new PennyLane arithmetic operators.
@@ -248,10 +217,11 @@
   ```
 
   ```pycon
+  >>> qml.operation.enable_new_opmath()
   >>> qml.operation.active_new_opmath()
   True
   >>> circuit(np.pi / 4, np.pi / 2)
-
+  array(0.28284271)
   ```
 
 <h3>Improvements</h3>
@@ -263,8 +233,10 @@
   now supported in Catalyst:
 
   ```python
+  dev = qml.device("lightning.qubit", wires=2)
+
   @qjit
-  @qml.qnode(qml.device("lightning.qubit", wires=2))
+  @qml.qnode(dev)
   def circuit(x: float, y: float):
       qml.RX(x, wires=0)
       qml.RY(y, wires=1)
