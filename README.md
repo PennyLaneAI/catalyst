@@ -73,15 +73,15 @@ In addition, we also provide a Python frontend for [PennyLane](https://pennylane
 
 ## Installation
 
-Catalyst is officially supported on Linux (x86_64) platforms, and pre-built binaries are being
-distributed via the Python Package Index (PyPI) for Python versions 3.9 and higher. To install it,
-simply run the following ``pip`` command:
+Catalyst is officially supported on Linux (x86_64) and macOS (aarch64) platforms, and pre-built
+binaries are being distributed via the Python Package Index (PyPI) for Python versions 3.9 and
+higher. To install it, simply run the following ``pip`` command:
 
 ```console
 pip install pennylane-catalyst
 ```
 
-Pre-built packages for Windows and MacOS are not yet available, and comptability with those
+Pre-built packages for Windows are not yet available, and comptability with those
 platforms is untested and cannot be guaranteed. If you are using one of these platforms, please
 try out our Docker and Dev Container images described in the [documentation](https://docs.pennylane.ai/projects/catalyst/en/latest/dev/installation.html#dev-containers)
 or click this button:
