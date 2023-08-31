@@ -201,7 +201,7 @@
 
   def loss(theta):
       return jnp.pi / jnp.tanh(circuit(theta))
-  
+
   @qjit
   def grad_loss(theta):
       return catalyst.grad(loss)(theta)
@@ -381,6 +381,10 @@
   finite-differences.
   [#244](https://github.com/PennyLaneAI/catalyst/pull/244)
   [#271](https://github.com/PennyLaneAI/catalyst/pull/271)
+
+* The JAX version used by Catalyst has been updated to `v0.4.14`, the minimum PennyLane version
+  required is now `v0.32`.
+  [#264](https://github.com/PennyLaneAI/catalyst/pull/264)
 
 * Support for Python 3.8 is dropped.
   [#231](https://github.com/PennyLaneAI/catalyst/pull/231)
