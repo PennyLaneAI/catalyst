@@ -72,13 +72,6 @@ from catalyst.utils.extra_bindings import TensorExtractOp
 #
 # qbit
 #
-class Qbit:
-    """Qbit primitive."""
-
-    def __init__(self):
-        self.aval = AbstractQbit()
-
-
 class AbstractQbit(AbstractValue):
     """Abstract Qbit"""
 
@@ -103,13 +96,6 @@ def _qbit_lowering(aval):
 #
 # qreg
 #
-class Qreg:
-    """Quantum register primitive."""
-
-    def __init__(self):
-        self.aval = AbstractQreg()
-
-
 class AbstractQreg(AbstractValue):
     """Abstract quantum register."""
 
@@ -134,13 +120,6 @@ def _qreg_lowering(aval):
 #
 # observable
 #
-class Obs:
-    """Observable JAX type primitive."""
-
-    def __init__(self, num_qubits, primitive):
-        self.aval = AbstractObs(num_qubits, primitive)
-
-
 class AbstractObs(AbstractValue):
     """Abstract observable."""
 
@@ -170,15 +149,12 @@ def _obs_lowering(aval):
 #
 # registration
 #
-core.pytype_aval_mappings[Qbit] = lambda x: x.aval
 core.raise_to_shaped_mappings[AbstractQbit] = lambda aval, _: aval
 mlir.ir_type_handlers[AbstractQbit] = _qbit_lowering
 
-core.pytype_aval_mappings[Qreg] = lambda x: x.aval
 core.raise_to_shaped_mappings[AbstractQreg] = lambda aval, _: aval
 mlir.ir_type_handlers[AbstractQreg] = _qreg_lowering
 
-core.pytype_aval_mappings[Obs] = lambda x: x.aval
 core.raise_to_shaped_mappings[AbstractObs] = lambda aval, _: aval
 mlir.ir_type_handlers[AbstractObs] = _obs_lowering
 
@@ -994,11 +970,6 @@ def _counts_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: in
 #
 # expval measurement
 #
-def expval(obs, shots):
-    """Bind operands to operation."""
-    return expval_p.bind(obs, shots=shots)
-
-
 @expval_p.def_abstract_eval
 def _expval_abstract_eval(obs, shots):
     assert isinstance(obs, AbstractObs)
@@ -1031,11 +1002,6 @@ def _expval_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: in
 #
 # var measurement
 #
-def var(obs, shots):
-    """Bind operands to operation."""
-    return var_p.bind(obs, shots=shots)
-
-
 @var_p.def_abstract_eval
 def _var_abstract_eval(obs, shots):
     assert isinstance(obs, AbstractObs)
@@ -1068,11 +1034,6 @@ def _var_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: int):
 #
 # probs measurement
 #
-def probs(obs, shape):
-    """Bind operands to operation."""
-    return probs_p.bind(obs, shape=shape)
-
-
 @probs_p.def_abstract_eval
 def _probs_abstract_eval(obs, shape):
     assert isinstance(obs, AbstractObs)

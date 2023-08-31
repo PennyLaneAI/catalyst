@@ -47,6 +47,18 @@ class TestMidCircuitMeasurement:
         with pytest.raises(CompileError, match="can only be used from within a qml.qnode"):
             qjit(circuit)()
 
+    def test_invalid_arguments(self, backend):
+        """Test invalid arguments exception."""
+
+        @qml.qnode(qml.device(backend, wires=2))
+        def circuit():
+            qml.RX(0.0, wires=0)
+            m = measure(wires=[1, 2])
+            return m
+
+        with pytest.raises(TypeError, match="One classical argument \(a wire\) is expected"):
+            qjit(circuit)()
+
     def test_basic(self, backend):
         """Test measure (basic)."""
 
