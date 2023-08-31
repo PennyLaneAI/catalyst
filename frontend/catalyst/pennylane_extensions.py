@@ -411,7 +411,7 @@ def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
                         ``diff_method="finite-diff"`` is not supported with ``"auto"``.
 
                       - ``"fd"`` represents first-order finite-differences for the entire hybrid
-                        circuit.
+                        function.
 
         h (float): the step-size value for the finite-difference (``"fd"``) method
         argnum (Tuple[int, List[int]]): the argument indices to differentiate
@@ -537,7 +537,7 @@ def jacobian(f: DifferentiableLike, *, method=None, h=None, argnum=None):
                         ``diff_method="finite-diff"`` is not supported with ``"auto"``.
 
                       - ``"fd"`` represents first-order finite-differences for the entire hybrid
-                        circuit.
+                        function.
 
         h (float): the step-size value for the finite-difference (``"fd"``) method
         argnum (Tuple[int, List[int]]): the argument indices to differentiate
