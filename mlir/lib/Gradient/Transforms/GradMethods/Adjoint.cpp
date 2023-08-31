@@ -13,61 +13,40 @@
 // limitations under the License.
 
 #include "Adjoint.hpp"
-#include "ClassicalJacobian.hpp"
-#include "HybridGradient.hpp"
 
 #include <algorithm>
-#include <map>
 #include <sstream>
 #include <vector>
 
-#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Dialect/LLVMIR/LLVMTypes.h"
-#include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
 
-#include "Gradient/Utils/GetDiffMethod.h"
+#include "Gradient/IR/GradientOps.h"
+#include "Gradient/Utils/DifferentialQNode.h"
 #include "Gradient/Utils/GradientShape.h"
 #include "Quantum/IR/QuantumOps.h"
 
 namespace catalyst {
 namespace gradient {
 
-LogicalResult AdjointLowering::match(GradOp op) const
+LogicalResult AdjointLowering::match(func::FuncOp op) const
 {
-    if (getQNodeDiffMethod(op) == "adjoint")
+    if (getQNodeDiffMethod(op) == "adjoint" && requiresCustomGradient(op))
         return success();
 
     return failure();
 }
 
-void AdjointLowering::rewrite(GradOp op, PatternRewriter &rewriter) const
+void AdjointLowering::rewrite(func::FuncOp op, PatternRewriter &rewriter) const
 {
     Location loc = op.getLoc();
-    func::FuncOp callee =
-        SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, op.getCalleeAttr());
-    rewriter.setInsertionPointAfter(callee);
-
-    // In order to allocate memory for various tensors relating to the number of gate parameters
-    // at runtime we run a function that merely counts up for each gate parameter encountered.
-    func::FuncOp paramCountFn = genParamCountFunction(rewriter, loc, callee);
-
-    // Generate the classical argument map from function arguments to gate parameters. This
-    // function will be differentiated to produce the classical jacobian.
-    func::FuncOp argMapFn = genArgMapFunction(rewriter, loc, callee);
+    rewriter.setInsertionPointAfter(op);
 
     // Generate the quantum gradient function, relying on the backend to implement the adjoint
     // computation.
-    func::FuncOp qGradFn = genQGradFunction(rewriter, loc, callee);
+    func::FuncOp qGradFn = genQGradFunction(rewriter, loc, op);
 
-    // Generate the full gradient function, computing the partial derivatives with respect to the
-    // original function arguments from the classical Jacobian and quantum gradient.
-    func::FuncOp fullGradFn =
-        genFullGradFunction(rewriter, loc, op, paramCountFn, argMapFn, qGradFn, "adj");
-
-    rewriter.setInsertionPoint(op);
-    rewriter.replaceOpWithNewOp<func::CallOp>(op, fullGradFn, op.getArgOperands());
+    // Register the quantum gradient on the quantum-only split-out QNode.
+    registerCustomGradient(op, FlatSymbolRefAttr::get(qGradFn));
 }
 
 func::FuncOp AdjointLowering::discardAndReturnReg(PatternRewriter &rewriter, Location loc,

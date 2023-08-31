@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt %s --lower-gradients="only=ps" --split-input-file | FileCheck %s
+// RUN: quantum-opt %s --lower-gradients --split-input-file | FileCheck %s
 
-// CHECK-LABEL: @simple_circuit.argmap(%arg0: tensor<3xf64>, %arg1: index) -> tensor<?xf64>
+// CHECK-LABEL: @simple_circuit.preprocess(%arg0: tensor<3xf64>, %arg1: index) -> f64
 func.func @simple_circuit(%arg0: tensor<3xf64>) -> f64 attributes {qnode, diff_method = "parameter-shift"} {
     // CHECK: [[c0:%[a-zA-Z0-9_]+]] = index.constant 0
     // CHECK: [[count:%[a-zA-Z0-9_]+]] = memref.alloca() : memref<index>
@@ -62,7 +62,7 @@ func.func @gradCall(%arg0: tensor<3xf64>) -> tensor<3xf64> {
 
 // -----
 
-// CHECK-LABEL: @structured_circuit.argmap(%arg0: tensor<1xf64>, %arg1: i1, %arg2: i1, %arg3: index) -> tensor<?xf64>
+// CHECK-LABEL: @structured_circuit.preprocess(%arg0: tensor<1xf64>, %arg1: i1, %arg2: i1, %arg3: index) -> f64
 func.func @structured_circuit(%arg0: tensor<1xf64>, %arg1: i1, %arg2: i1) -> f64 attributes {qnode, diff_method = "parameter-shift"} {
     // CHECK: [[c0:%[a-zA-Z0-9_]+]] = index.constant 0
     // CHECK: [[paramBuffer:%[a-zA-Z0-9_]+]] = memref.alloc(%arg3) : memref<?xf64>
@@ -139,6 +139,7 @@ func.func @structured_circuit(%arg0: tensor<1xf64>, %arg1: i1, %arg2: i1) -> f64
     // CHECK-NOT: quantum.
     %q_3 = quantum.custom "rx"(%f0) %q_2 : !quantum.bit
 
+    // CHECK: call @structured_circuit.quantum
     func.return %f0 : f64
 }
 
@@ -149,7 +150,7 @@ func.func @gradCall(%arg0: tensor<1xf64>, %b0: i1, %b1: i1) -> tensor<1xf64> {
 
 // -----
 
-// CHECK-LABEL: @loop_circuit.argmap(%arg0: tensor<1xf64>, %arg1: index) -> tensor<?xf64>
+// CHECK-LABEL: @loop_circuit.preprocess(%arg0: tensor<1xf64>, %arg1: index) -> f64
 func.func @loop_circuit(%arg0: tensor<1xf64>) -> f64 attributes {qnode, diff_method = "parameter-shift"} {
     // CHECK: [[c0:%[a-zA-Z0-9_]+]] = index.constant 0
     // CHECK: [[paramBuffer:%[a-zA-Z0-9_]+]] = memref.alloc(%arg1) : memref<?xf64>
@@ -226,7 +227,7 @@ func.func @gradCall(%arg0: tensor<1xf64>) -> tensor<1xf64> {
 
 // -----
 
-// CHECK-LABEL: @all_ops_circuit.argmap(%arg0: tensor<1xf64>, %arg1: index) -> tensor<?xf64>
+// CHECK-LABEL: @all_ops_circuit.preprocess(%arg0: tensor<1xf64>, %arg1: index) -> f64
 func.func @all_ops_circuit(%arg0: tensor<1xf64>) -> f64 attributes {qnode, diff_method = "parameter-shift"} {
     // CHECK: [[c0:%[a-zA-Z0-9_]+]] = index.constant 0
     // CHECK: [[paramBuffer:%[a-zA-Z0-9_]+]] = memref.alloc(%arg1) : memref<?xf64>
