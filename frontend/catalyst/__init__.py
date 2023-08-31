@@ -15,8 +15,23 @@
 This package contains the Catalyst Python interface.
 """
 
+# pylint: disable=wrong-import-position
+
 import sys
 import types
+
+import jaxlib as _jaxlib
+
+_jaxlib_version = "0.4.14"
+if _jaxlib.__version__ != _jaxlib_version:
+    import warnings
+
+    warnings.warn(
+        "Catalyst detected a version mismatch for the installed 'jaxlib' package. Please make sure "
+        "to install the exact version required by Catalyst to avoid undefined behaviour.\n"
+        f"Expected: {_jaxlib_version} Found: {_jaxlib.__version__}",
+    )
+
 
 from catalyst._configuration import INSTALLED
 from catalyst._version import __version__
@@ -45,7 +60,6 @@ sys.modules["mlir_quantum._mlir_libs._quantumDialects.quantum"] = types.ModuleTy
 )
 
 
-# pylint: disable=wrong-import-position
 from catalyst.ag_utils import AutoGraphError, autograph_source
 from catalyst.compilation_pipelines import QJIT, CompileOptions, qjit
 from catalyst.pennylane_extensions import (

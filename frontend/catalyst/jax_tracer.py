@@ -31,6 +31,7 @@ from jax.interpreters.mlir import (
 )
 from jax.interpreters.partial_eval import DynamicJaxprTracer
 from jax.tree_util import tree_flatten, tree_structure, tree_unflatten
+from jaxlib.xla_extension import pytree
 from pennylane.measurements import CountsMP, MeasurementProcess
 from pennylane.operation import Wires
 
@@ -133,7 +134,9 @@ def get_traceable_fn(qfunc, device):
                                 meas_return_trees_children[i] = counts_tree
                                 meas_return_trees = (
                                     meas_return_trees.make_from_node_data_and_children(
-                                        meas_return_trees.node_data(), meas_return_trees_children
+                                        pytree.PyTreeRegistry(),
+                                        meas_return_trees.node_data(),
+                                        meas_return_trees_children,
                                     )
                                 )
                             else:
