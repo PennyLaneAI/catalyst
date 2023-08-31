@@ -219,9 +219,6 @@
 
 <h3>Improvements</h3>
 
-* Use a new C++-based compiler driver to drive the compilation process. This reduces the compilation time
-  by avoiding repeatedly parsing and serializing textual intermediate representations to disk.
-
 * Eliminate redundant unflattening and flattening of PyTrees parameters in Catalyst control flow operations.
   [#215](https://github.com/PennyLaneAI/catalyst/pull/215)
 
@@ -742,12 +739,12 @@ David Ittah.
 * Move to an alternate compiler driver in C++. This improves compile-time performance by
   avoiding *round-tripping*, which is when the entire program being compiled is dumped to
   a textual form and re-parsed by another tool.
-  [#172](https://github.com/PennyLaneAI/catalyst/pull/172)
 
   This is also a requirement for providing custom metadata at the LLVM level, which is
   necessary for better integration with tools like Enzyme. Finally, this makes it more natural
   to improve error messages originating from C++ when compared to the prior subprocess-based
   approach.
+  [#172](https://github.com/PennyLaneAI/catalyst/pull/216)
 
 <h3>Bug fixes</h3>
 
