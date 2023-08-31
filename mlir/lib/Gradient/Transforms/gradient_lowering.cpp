@@ -52,7 +52,7 @@ struct GradientLoweringPass : impl::GradientLoweringPassBase<GradientLoweringPas
     void runOnOperation() final
     {
         RewritePatternSet gradientPatterns(&getContext());
-        populateLoweringPatterns(gradientPatterns, lowerOnly, printActivity);
+        populateLoweringPatterns(gradientPatterns, printActivity);
 
         // This is required to remove qubit values returned by if/for ops in the
         // quantum gradient function of the parameter-shift pattern.

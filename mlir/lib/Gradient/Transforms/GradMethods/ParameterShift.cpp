@@ -16,7 +16,6 @@
 
 #include "mlir/Dialect/SCF/IR/SCF.h"
 
-#include "Gradient/Analysis/ActivityAnalysis.h"
 #include "Gradient/Utils/DifferentialQNode.h"
 #include "Gradient/Utils/GradientShape.h"
 #include "Quantum/IR/QuantumOps.h"

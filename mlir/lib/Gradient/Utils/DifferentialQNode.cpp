@@ -20,7 +20,7 @@
 using namespace mlir;
 
 constexpr const char *diffMethodKey = "diff_method";
-constexpr const char *pureQuantumKey = "withparams";
+constexpr const char *pureQuantumKey = "purequantum";
 
 bool catalyst::gradient::isQNode(func::FuncOp funcOp)
 {

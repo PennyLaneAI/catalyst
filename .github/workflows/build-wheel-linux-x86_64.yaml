@@ -89,21 +89,13 @@ jobs:
               -DLLVM_ENABLE_ASSERTIONS=ON \
               -DLLVM_INSTALL_UTILS=ON
 
-        # TODO: when updating LLVM, test to see if mlir/unittests/Bytecode/BytecodeTest.cpp:55 is passing
-        # and remove filter
-        LIT_FILTER_OUT="Bytecode" cmake --build llvm-build --target lld check-mlir opt -j$(nproc)
+        cmake --build llvm-build --target lld check-mlir opt -j$(nproc)
 
     - name: Build MHLO Dialect
       if: steps.cache-mhlo.outputs.cache-hit != 'true'
       # building with LLD is a strong requirement for mhlo
       run: |
         export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
-
-        # TODO: We can remove this patch whenever this ticket is solved https://github.com/tensorflow/mlir-hlo/issues/68
-        pushd mlir
-        patch -d mlir-hlo/mhlo/analysis --merge --follow-symlinks < patches/add-lmhlo-dependency.patch
-        popd
-
         cmake -S mlir/mlir-hlo -B mhlo-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_ENABLE_ASSERTIONS=ON \
@@ -118,7 +110,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path:  enzyme-build
-        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.enzyme_version }}-generic-build
+        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-generic-build
 
     - name: Clone Enzyme Submodule
       if:  |
@@ -198,7 +190,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path:  enzyme-build
-        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.enzyme_version }}-generic-build
+        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-generic-build
         fail-on-cache-miss: True
 
     # Build Catalyst-Runtime
@@ -233,9 +225,7 @@ jobs:
               -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -DPython3_NumPy_INCLUDE_DIRS=$(python${{ matrix.python_version }} -c "import numpy as np; print(np.get_include())")
 
-        # TODO: when updating LLVM, test to see if mlir/unittests/Bytecode/BytecodeTest.cpp:55 is passing
-        # and remove filter
-        LIT_FILTER_OUT="Bytecode" cmake --build llvm-build --target check-mlir opt -j$(nproc)
+        cmake --build llvm-build --target check-mlir opt -j$(nproc)
 
     # Build Quantum and Gradient Dialects
     - name: Build MLIR Dialects
@@ -298,6 +288,7 @@ jobs:
     - name: Install Python dependencies
       run: |
         python${{ matrix.python_version }} -m pip install wheel pytest pytest-xdist
+        python${{ matrix.python_version }} -m pip install tensorflow-cpu  # for autograph tests
 
     - name: Install Catalyst
       run: |

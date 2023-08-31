@@ -168,7 +168,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: enzyme-build
-        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.enzyme_version }}-default-build
+        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-build
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
@@ -284,6 +284,7 @@ jobs:
       run: |
         sudo apt-get install -y python3 python3-pip libomp-dev
         python3 -m pip install -r requirements.txt
+        python3 -m pip install tensorflow-cpu  # for autograph tests
         python3 -m pip install .
 
     - name: Get Cached LLVM Build
@@ -307,7 +308,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: enzyme-build
-        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.enzyme_version }}-default-build
+        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-build
         fail-on-cache-miss: True
 
     - name: Download Quantum Build Artifact
@@ -368,6 +369,7 @@ jobs:
       run: |
         sudo apt-get install -y python3 python3-pip libomp-dev
         python3 -m pip install -r requirements.txt
+        python3 -m pip install tensorflow-cpu  # for autograph tests
         python3 -m pip install .
 
     - name: Get Cached LLVM Build
@@ -391,7 +393,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: enzyme-build
-        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.enzyme_version }}-default-build
+        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-build
         fail-on-cache-miss: True
 
     - name: Download Quantum Build Artifact
@@ -462,7 +464,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: enzyme-build
-        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.enzyme_version }}-default-build
+        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-build
         fail-on-cache-miss: True
 
     - name: Download Quantum Build Artifact

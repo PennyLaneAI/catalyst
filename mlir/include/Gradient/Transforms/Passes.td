@@ -43,15 +43,7 @@ def GradientLoweringPass : Pass<"lower-gradients"> {
     ];
 
     let constructor = "catalyst::createGradientLoweringPass()";
-
     let options = [
-        Option<
-            /*C++ var name=*/"lowerOnly",
-            /*CLI arg name=*/"only",
-            /*type=*/"std::string",
-            /*default=*/"\"\"",
-            /*description=*/"Restrict lowering to a specific type of gradient."
-        >,
         Option<
             /*C++ var name=*/"enableActivity",
             /*CLI arg name=*/"activity-analysis",

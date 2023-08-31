@@ -22,7 +22,7 @@ namespace catalyst {
 namespace gradient {
 
 void populateBufferizationPatterns(mlir::TypeConverter &, mlir::RewritePatternSet &);
-void populateLoweringPatterns(mlir::RewritePatternSet &, mlir::StringRef, bool printActivity);
+void populateLoweringPatterns(mlir::RewritePatternSet &, bool printActivity);
 void populateConversionPatterns(mlir::LLVMTypeConverter &, mlir::RewritePatternSet &);
 
 } // namespace gradient
