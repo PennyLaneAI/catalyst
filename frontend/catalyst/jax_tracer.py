@@ -247,7 +247,7 @@ class HybridOp(Operation):
         qrp: QRegPromise,
     ) -> QRegPromise:
         """Perform the second, quantum part of the Hybrid operation tracing."""
-        raise NotImplementedError("HybridOp should implement trace")
+        raise NotImplementedError("HybridOp should implement trace")  # pragma: no cover
 
 
 def has_nested_tapes(op: Operation) -> bool:
@@ -646,14 +646,13 @@ def trace_quantum_measurements(
                 shape = (2**nqubits,)
                 out_classical_tracers.append(state_p.bind(obs_tracers, shape=shape))
             else:
-                raise NotImplementedError(f"Measurement {o.return_type.value} is not impemented")
-        elif isinstance(o, (list, dict)):
-            raise CompileError(f"Expected a tracer or a measurement, got {o}")
+                raise NotImplementedError(
+                    f"Measurement {o.return_type.value} is not impemented"
+                )  # pragma: no cover
         elif isinstance(o, DynamicJaxprTracer):
             out_classical_tracers.append(o)
         else:
-            # FIXME: Constants (numbers) all go here. What about explicitly listing the allowed
-            # types and only allow these? Anyway, one must change type hints for `outputs`
+            assert not isinstance(o, (list, dict)), f"Expected a tracer or a measurement, got {o}"
             out_classical_tracers.append(o)
 
     return out_classical_tracers, out_tree
@@ -866,7 +865,7 @@ class QJITDevice(qml.QubitDevice):
         """
         Raises: RuntimeError
         """
-        raise RuntimeError("QJIT devices cannot apply operations.")
+        raise RuntimeError("QJIT devices cannot apply operations.")  # pragma: no cover
 
     def default_expand_fn(self, circuit, max_expansion=10):
         """

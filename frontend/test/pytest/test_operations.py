@@ -18,6 +18,7 @@ import pytest
 from pennylane.tape import QuantumTape
 
 from catalyst import cond, for_loop, qjit, while_loop
+from catalyst.jax_tracer import Cond, ForLoop, WhileLoop, has_nested_tapes
 
 
 def test_no_parameters(backend):
@@ -179,6 +180,9 @@ def test_hybrid_op_repr(backend):
 
         for term in ["ForLoop", "WhileLoop", "Cond", "RX", "RY", "RZ"]:
             assert term in str(quantum_tape.operations)
+        for op in quantum_tape.operations:
+            if isinstance(op, (ForLoop, WhileLoop, Cond)):
+                assert has_nested_tapes(op)
         return qml.state()
 
     qjit()(qml.qnode(qml.device(backend, wires=4))(circuit))(1)

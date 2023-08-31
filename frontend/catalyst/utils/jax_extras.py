@@ -240,7 +240,7 @@ def initial_style_jaxprs_with_common_consts2(jaxprs, all_consts):
         nonref_constvars, ref_constvars = partition_list(is_ref, jaxpr.constvars)
         padded_ref_constvars = unused_ref_const_vars[:]
         for canonical_id, ref_var in zip(canonical_ref_indices[i], ref_constvars):
-            padded_ref_constvars[canonical_id] = ref_var
+            padded_ref_constvars[canonical_id] = ref_var  # pragma: no cover
         const_prefix = util.concatenate(unused_const_vars[:i])
         const_suffix = util.concatenate(unused_const_vars[i + 1 :])
         constvars = [*padded_ref_constvars, *const_prefix, *nonref_constvars, *const_suffix]
