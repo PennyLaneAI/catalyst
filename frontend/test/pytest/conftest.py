@@ -24,6 +24,7 @@ except (ImportError, ModuleNotFoundError) as e:
 else:
     tf_available = True
 
+
 def pytest_runtest_setup(item):
     """Automatically skip tests if interfaces are not installed"""
     interfaces = {"tf"}
@@ -44,5 +45,6 @@ def pytest_runtest_setup(item):
     for b in marks:
         if b not in allowed_interfaces:
             pytest.skip(
-                f"\nTest {item.nodeid} only runs with {allowed_interfaces} interfaces(s) but {b} interface provided",
+                f"\nTest {item.nodeid} only runs with {allowed_interfaces}"
+                f" interfaces(s) but {b} interface provided",
             )
