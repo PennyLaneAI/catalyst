@@ -137,13 +137,11 @@ following make target from the top level directory:
 
   make all
 
-.. Note::
+To build the project on macOS with ``ARM`` architecture (e.g. Apple M1/M2):
 
-  To install on macOS:
+.. code-block:: console
 
-  .. code-block:: console
-
-    BUILD_QIR_STDLIB_FROM_SRC=ON ENABLE_LLD=OFF make all
+  BUILD_QIR_STDLIB_FROM_SRC=ON ENABLE_LLD=OFF make all
 
 To build each component one by one starting from the runtime, you can follow
 the instructions below.
