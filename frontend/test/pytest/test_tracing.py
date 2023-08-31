@@ -17,7 +17,37 @@ import numpy as np
 import pennylane as qml
 import pytest
 
-from catalyst import cond, measure, qjit, while_loop
+from catalyst import CompileError, cond, measure, qjit, while_loop
+from catalyst.utils.tracing import EvaluationContext, EvaluationMode
+
+
+class TestEvaluationModes:
+    def test_evaluation_modes(self, backend):
+        """Check the Python interpetation mode."""
+
+        def wrapper(mode):
+            def func():
+                @while_loop(lambda i: i < 1)
+                def loop(i):
+                    assert mode == EvaluationContext.get_mode()
+                    if mode == EvaluationMode.CLASSICAL_COMPILATION:
+                        EvaluationContext.check_is_tracing("tracing")
+                        EvaluationContext.check_is_classical_tracing("classical tracing")
+                    elif mode == EvaluationMode.QUANTUM_COMPILATION:
+                        EvaluationContext.check_is_tracing("tracing")
+                        EvaluationContext.check_is_quantum_tracing("quantum tracing")
+                    else:
+                        assert mode == EvaluationMode.INTERPRETATION
+                        EvaluationContext.check_is_not_tracing("interpretation")
+                    return i + 1
+
+                return loop(0)
+
+            return func
+
+        wrapper(EvaluationMode.INTERPRETATION)()
+        qjit(wrapper(EvaluationMode.CLASSICAL_COMPILATION))()
+        qjit(qml.qnode(qml.device(backend, wires=1))(wrapper(EvaluationMode.QUANTUM_COMPILATION)))()
 
 
 class TestTracing:
