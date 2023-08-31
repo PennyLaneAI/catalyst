@@ -617,13 +617,6 @@ class CondCallable:
         self.otherwise_fn = otherwise_fn
         return self
 
-    @staticmethod
-    def _check_branches_return_types(branch_jaxprs):
-        expected = branch_jaxprs[0].out_avals
-        for jaxpr in list(branch_jaxprs)[1:]:
-            if expected != jaxpr.out_avals:
-                raise TypeError("Conditional requires consistent return types across all branches")
-
     def _call_with_quantum_ctx(self, ctx):
         outer_trace = ctx.trace
         in_classical_tracers = self.preds
