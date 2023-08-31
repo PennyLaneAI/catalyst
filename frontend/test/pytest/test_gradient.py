@@ -132,7 +132,7 @@ def test_finite_diff(inp, backend):
     @qjit()
     def compiled_grad_default(x: float):
         g = qml.qnode(qml.device(backend, wires=1))(f)
-        h = grad(g)
+        h = grad(g, method="fd")
         return h(x)
 
     def interpretted_grad_default(x):
@@ -155,7 +155,7 @@ def test_finite_diff_mul(inp, backend):
     @qjit()
     def compiled_grad_default(x: float):
         g = qml.qnode(qml.device(backend, wires=1))(f)
-        h = grad(g)
+        h = grad(g, method="fd")
         return h(x)
 
     def interpretted_grad_default(x):
@@ -490,7 +490,7 @@ def test_finite_diff_h(inp, backend):
     @qjit()
     def compiled_grad_h(x: float):
         g = qml.qnode(qml.device(backend, wires=1))(f)
-        h = grad(g, h=0.1)
+        h = grad(g, method="fd", h=0.1)
         return h(x)
 
     def interpretted_grad_h(x):
@@ -513,7 +513,7 @@ def test_finite_diff_argnum(inp, backend):
     @qjit()
     def compiled_grad_argnum(x: float):
         g = qml.qnode(qml.device(backend, wires=1))(f2)
-        h = grad(g, argnum=1)
+        h = grad(g, method="fd", argnum=1)
         return h(x, 2.0)
 
     def interpretted_grad_argnum(x):
@@ -536,7 +536,7 @@ def test_finite_diff_argnum_list(inp, backend):
     @qjit()
     def compiled_grad_argnum_list(x: float):
         g = qml.qnode(qml.device(backend, wires=1))(f2)
-        h = grad(g, argnum=[1])
+        h = grad(g, method="fd", argnum=[1])
         return h(x, 2.0)
 
     def interpretted_grad_argnum_list(x):
@@ -563,7 +563,7 @@ def test_finite_grad_range_change(inp, backend):
     @qjit()
     def compiled_grad_range_change(x: float):
         g = qml.qnode(qml.device(backend, wires=1))(f2)
-        h = grad(g, argnum=[0, 1])
+        h = grad(g, method="fd", argnum=[0, 1])
         return h(x, 2.0)
 
     def interpretted_grad_range_change(x):
@@ -653,7 +653,7 @@ def test_assert_no_higher_order_without_fd(method, backend):
         qml.RX(x, wires=0)
         return qml.expval(qml.PauliY(0))
 
-    with pytest.raises(ValueError, match="higher order derivatives"):
+    with pytest.raises(DifferentiableCompileError, match="higher order derivatives"):
 
         @qjit()
         def workflow(x: float):
@@ -729,8 +729,8 @@ def test_finite_diff_higher_order(inp, backend):
     @qjit()
     def compiled_grad2_default(x: float):
         g = qml.qnode(qml.device(backend, wires=1))(f)
-        h = grad(g)
-        i = grad(h)
+        h = grad(g, method="fd")
+        i = grad(h, method="fd")
         return i(x)
 
     def interpretted_grad2_default(x):
@@ -758,7 +758,8 @@ def test_jax_consts(h_coeffs, g_method, backend):
 
     @qjit()
     def compile_grad(params):
-        g = qml.qnode(qml.device(backend, wires=3))(circuit)
+        diff_method = "adjoint" if g_method == "defer" else "finite-diff"
+        g = qml.qnode(qml.device(backend, wires=3), diff_method=diff_method)(circuit)
         h = grad(g, method=g_method)
         return h(params)
 
@@ -816,13 +817,14 @@ def test_non_float_res(backend):
 @pytest.mark.parametrize("inp", [(1.0), (2.0)])
 def test_finite_diff_multiple_devices(inp, diff_method, backend):
     """Test gradient methods using multiple backend devices."""
+    qnode_diff_method = "adjoint" if diff_method == "defer" else "finite-diff"
 
-    @qml.qnode(qml.device(backend, wires=1))
+    @qml.qnode(qml.device(backend, wires=1), diff_method=qnode_diff_method)
     def f(x):
         qml.RX(3 * x, wires=0)
         return qml.expval(qml.PauliY(0))
 
-    @qml.qnode(qml.device("lightning.qubit", wires=1))
+    @qml.qnode(qml.device("lightning.qubit", wires=1), diff_method=qnode_diff_method)
     def g(x):
         qml.RX(3 * x, wires=0)
         return qml.expval(qml.PauliY(0))
@@ -878,6 +880,27 @@ def test_grad_on_multi_result_function(backend):
 
     with pytest.raises(DifferentiableCompileError, match="only supports scalar-output functions"):
         compiled(1.0)
+
+
+def test_multiple_grad_invocations(backend):
+    """Test a function that uses grad multiple times."""
+
+    @qml.qnode(qml.device(backend, wires=2), diff_method="parameter-shift")
+    def f(x, y):
+        qml.RX(3 * x, wires=0)
+        qml.RX(y, wires=0)
+        return qml.expval(qml.PauliZ(0))
+
+    @qjit
+    def compiled(x: float, y: float):
+        g1 = grad(f, argnum=0, method="defer")(x, y)[0]
+        g2 = grad(f, argnum=1, method="defer")(x, y)[0]
+        return jnp.array([g1, g2])
+
+    actual = compiled(0.1, 0.2)
+    expected = jax.jacobian(f, argnums=(0, 1))(0.1, 0.2)
+    for actual_entry, expected_entry in zip(actual, expected):
+        assert actual_entry == pytest.approx(expected_entry)
 
 
 if __name__ == "__main__":

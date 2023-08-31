@@ -1,6 +1,6 @@
 add_mlir_library(GradientUtils
     DestinationPassingStyle.cpp
-    GetDiffMethod.cpp
+    DifferentialQNode.cpp
     GradientShape.cpp
     EinsumLinalgGeneric.cpp
 )

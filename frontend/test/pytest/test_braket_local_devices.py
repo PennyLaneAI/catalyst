@@ -810,8 +810,8 @@ class TestBraketGradient:
         @qjit
         def compiled_grad_default(x: float):
             g = qml.qnode(device)(f)
-            h = grad(g, h=1e-4)
-            i = grad(h, h=1e-4)
+            h = grad(g, method="fd", h=1e-4)
+            i = grad(h, method="fd", h=1e-4)
             return i(x)
 
         def interpretted_grad_default(x):
