@@ -46,6 +46,8 @@ class TestEvaluationModes:
             return func
 
         wrapper(EvaluationMode.INTERPRETATION)()
+        with EvaluationContext(EvaluationMode.INTERPRETATION):
+            wrapper(EvaluationMode.INTERPRETATION)()
         qjit(wrapper(EvaluationMode.CLASSICAL_COMPILATION))()
         qjit(qml.qnode(qml.device(backend, wires=1))(wrapper(EvaluationMode.QUANTUM_COMPILATION)))()
 
