@@ -52,17 +52,6 @@ def f_jit_builder(backend, wires=1, shots=1000):
     return f
 
 
-@qjit(target="mlir")
-@qml.qnode(qml.device("lightning.qubit", wires=2))
-def function_jaxnumpy_csingle(x: jax.numpy.csingle, y: jax.numpy.csingle):
-    """Test for jax._src.numpy.lax_numpy._ScalarMeta"""
-    x_r = x.real
-    y_r = y.real
-    val = jax.numpy.arctan2(x_r, y_r)
-    qml.RZ(val, wires=0)
-    return measure(wires=0)
-
-
 def fsample_aot_builder(backend, wires=1, shots=1000):
     """Test AOT builder with the sample measurement process."""
 
@@ -73,6 +62,26 @@ def fsample_aot_builder(backend, wires=1, shots=1000):
         return qml.sample()
 
     return f
+
+
+def test_for_jax_src_numpy_lax_numpy_scalar_meta():
+    """Test for jax._src.numpy.lax_numpy._ScalarMeta"""
+
+    # Test whether the following function can be compiled.
+    # No need to call the function object since the arguments are known
+    # statically.
+    @qml.qnode(qml.device("lightning.qubit", wires=2))
+    def interpreted(x: jax.numpy.csingle, y: jax.numpy.csingle):
+        """Use csingle as arguments."""
+        x_r = x.real
+        y_r = y.real
+        val = jax.numpy.arctan2(x_r, y_r)
+        qml.RZ(val, wires=0)
+        return qml.state()
+
+    compiled = qjit(interpreted)
+    x = jnp.array([complex(1, 0)], dtype=jax.numpy.csingle)
+    assert jnp.allclose(interpreted(x[0], x[0]), compiled(x[0], x[0]))
 
 
 class TestDifferentPrecisions:
@@ -622,7 +631,6 @@ class TestArraysInHamiltonian:
     def test_array_repr_from_context(self, coeffs, backend):
         """Test array representation from context in Hamiltonian."""
 
-        @qjit(target="mlir")
         @qml.qnode(qml.device(backend, wires=6))
         def f():
             qml.Hadamard(wires=0)
@@ -630,7 +638,9 @@ class TestArraysInHamiltonian:
             obs = [qml.PauliX(0) @ qml.PauliZ(1), qml.Hadamard(0)]
             return qml.expval(qml.Hamiltonian(coeffs, obs))
 
-        f()
+        interpretted = f
+        compiled = qjit(f)
+        assert jnp.allclose(interpretted(), compiled())
 
     @pytest.mark.parametrize(
         "coeffs",
@@ -642,7 +652,6 @@ class TestArraysInHamiltonian:
     def test_array_repr_as_parameter(self, coeffs, backend):
         """Test array representation as parameter in Hamiltonian."""
 
-        @qjit(target="mlir")
         @qml.qnode(qml.device(backend, wires=6))
         def f(coeffs):
             qml.Hadamard(wires=0)
@@ -650,7 +659,9 @@ class TestArraysInHamiltonian:
             obs = [qml.PauliX(0) @ qml.PauliZ(1), qml.Hadamard(0)]
             return qml.expval(qml.Hamiltonian(coeffs, obs))
 
-        f(coeffs)
+        compiled = qjit(f)
+        interpretted = f
+        assert jnp.allclose(interpretted(coeffs), compiled(coeffs))
 
     @pytest.mark.parametrize(
         "repr",
@@ -662,7 +673,6 @@ class TestArraysInHamiltonian:
     def test_array_repr_built_in(self, repr, backend):
         """Test array representation built-in in Hamiltonian."""
 
-        @qjit(target="mlir")
         @qml.qnode(qml.device(backend, wires=6))
         def f():
             qml.Hadamard(wires=0)
@@ -671,7 +681,9 @@ class TestArraysInHamiltonian:
             coeffs = repr([0.4, 0.7])
             return qml.expval(qml.Hamiltonian(coeffs, obs))
 
-        assert f.mlir
+        compiled = qjit(f)
+        interpretted = f
+        assert jnp.allclose(interpretted(), compiled())
 
 
 class TestArraysInHermitian:
@@ -694,14 +706,15 @@ class TestArraysInHermitian:
     def test_array_repr_from_context(self, matrix, repr, backend):
         """Test array representation from context in Hermitian."""
 
-        @qjit(target="mlir")
         @qml.qnode(qml.device(backend, wires=6))
         def f(x: float):
             qml.RX(x, wires=0)
             hermitian = qml.Hermitian(repr(matrix), wires=[0, 1])
             return qml.expval(hermitian)
 
-        assert f.mlir
+        compiled = qjit(f)
+        interpretted = f
+        assert jnp.allclose(interpretted(1.0), compiled(1.0))
 
     @pytest.mark.parametrize(
         "repr",
@@ -713,14 +726,15 @@ class TestArraysInHermitian:
     def test_array_repr_as_parameter(self, matrix, repr, backend):
         """Test array representation as parameter in Hermitian."""
 
-        @qjit(target="mlir")
         @qml.qnode(qml.device(backend, wires=2))
         def f(matrix):
             qml.RX(jnp.pi, wires=0)
             hermitian = qml.Hermitian(matrix, wires=[0, 1])
             return qml.expval(hermitian)
 
-        f(repr(matrix))
+        compiled = qjit(f)
+        interpretted = f
+        assert jnp.allclose(interpretted(repr(matrix)), compiled(repr(matrix)))
 
     @pytest.mark.parametrize(
         "repr",
@@ -732,7 +746,6 @@ class TestArraysInHermitian:
     def test_array_repr_built_in(self, repr, backend):
         """Test array representation built-in in Hermitian."""
 
-        @qjit(target="mlir")
         @qml.qnode(qml.device(backend, wires=2))
         def f(x: float):
             qml.RX(x, wires=0)
@@ -747,7 +760,9 @@ class TestArraysInHermitian:
             hermitian = qml.Hermitian(matrix, wires=[0, 1])
             return qml.expval(hermitian)
 
-        assert f.mlir
+        compiled = qjit(f)
+        interpretted = f
+        assert jnp.allclose(interpretted(1.0), compiled(1.0))
 
 
 class TestTracingQJITAnnotatedFunctions:
