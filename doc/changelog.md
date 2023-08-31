@@ -226,7 +226,8 @@
 
 <h3>Improvements</h3>
 
-* Add support for Hamiltonian observables with integer coefficients.
+* Support for Hamiltonian observables with integer coefficients has been added.
+
   [(#248)](https://github.com/PennyLaneAI/catalyst/pull/248)
 
   For example, compiling the following circuit wasn't previously allowed, but is
@@ -247,7 +248,8 @@
   ```
 
 * Support for nested Hamiltonian observables has been added.
-  [#255](https://github.com/PennyLaneAI/catalyst/pull/255)
+  [(#255)](https://github.com/PennyLaneAI/catalyst/pull/255)
+
 
   ```python
   @qjit
@@ -337,7 +339,8 @@
 * Due to the change allowing Python container objects as inputs to
   QJIT-compiled functions, Python lists are no longer automatically converted
   to JAX arrays.
-  [(#221)](https://github.com/PennyLaneAI/catalyst/pull/221)
+  [(#231)](https://github.com/PennyLaneAI/catalyst/pull/231)
+
 
   This means that indexing on lists when the index is not
   static will cause a `TracerIntegerConversionError`, consistent with JAX's behaviour.
