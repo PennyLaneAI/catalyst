@@ -14,7 +14,7 @@
 """
 Pytest configuration file for Catalyst test suite.
 """
-
+# pylint: disable=unused-import
 import pytest
 
 try:
