@@ -207,10 +207,11 @@ def initial_style_jaxprs_with_common_consts2(jaxprs, all_consts):
     """
 
     all_const_avals = [map(_abstractify, consts) for consts in all_consts]
-    for consts, consts_avals in zip(all_consts, all_const_avals):
-        for c, aval in zip(consts, consts_avals):
-            if isinstance(aval, state.AbstractRef):
-                assert isinstance(c, DynamicJaxprTracer)
+    for consts_avals in all_const_avals:
+        for aval in consts_avals:
+            assert not isinstance(
+                aval, state.AbstractRef
+            ), "AbstractRefs are not supported in this Catalyst version of this function"
     canonical_ref_indices = []
     canonical_refs: List[Any] = []
     tracer_id_to_canonical_id = {}
@@ -222,18 +223,11 @@ def initial_style_jaxprs_with_common_consts2(jaxprs, all_consts):
         nonref_consts = []
         nonref_const_avals = []
         for c, aval in zip(consts, consts_avals):
-            if isinstance(aval, state.AbstractRef):
-                tracer_id = id(c)
-                if tracer_id not in tracer_id_to_canonical_id:
-                    canonical_id = len(canonical_refs)
-                    canonical_refs.append(c)
-                    tracer_id_to_canonical_id[tracer_id] = canonical_id
-                    canonical_ref_avals.append(aval)
-                canonical_id = tracer_id_to_canonical_id[tracer_id]
-                ref_indices.append(canonical_id)
-            else:
-                nonref_consts.append(c)
-                nonref_const_avals.append(aval)
+            assert not isinstance(
+                aval, state.AbstractRef
+            ), "AbstractRefs are not supported in this Catalyst version of this function"
+            nonref_consts.append(c)
+            nonref_const_avals.append(aval)
         all_nonref_consts.append(nonref_consts)
         all_nonref_const_avals.append(nonref_const_avals)
         canonical_ref_indices.append(ref_indices)
@@ -302,7 +296,6 @@ def jaxpr_to_mlir(func_name, jaxpr, shape):
         platform="cpu",
         axis_context=axis_context,
         name_stack=name_stack,
-        donated_args=[],
     )
 
     return module, context, jaxpr, tree_structure(shape)
@@ -318,7 +311,6 @@ def custom_lower_jaxpr_to_module(
     platform: str,
     axis_context: AxisContext,
     name_stack,
-    donated_args,
     replicated_args=None,
     arg_shardings=None,
     result_shardings=None,
@@ -344,11 +336,6 @@ def custom_lower_jaxpr_to_module(
     assert platform not in platforms_with_donation
     if any(eff not in lowerable_effects for eff in jaxpr.effects):
         raise ValueError(f"Cannot lower jaxpr with effects: {jaxpr.effects}")
-    if any(donated_args):
-        unused_donations = [str(a) for a, d in zip(in_avals, donated_args) if d]
-        msg = "See an explanation at https://jax.readthedocs.io/en/latest/faq.html#buffer-donation."
-        if platform not in platforms_with_donation:
-            msg = f"Donation is not implemented for {platform}.\n{msg}"
 
     # MHLO channels need to start at 1
     channel_iter = 1
