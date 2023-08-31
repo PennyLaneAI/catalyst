@@ -526,6 +526,9 @@ def trace_observables(
     elif isinstance(obs, qml.Hamiltonian):
         nested_obs = [trace_observables(o, qrp, m_wires)[0] for o in obs.ops]
         obs_tracers = hamiltonian_p.bind(jax.numpy.asarray(obs.parameters), *nested_obs)
+    elif paulis := obs._pauli_rep:  # pylint: disable=protected-access
+        # Use the pauli sentence representation of the observable, if applicable
+        obs_tracers = pauli_sentence_to_hamiltonian_obs(paulis, qrp)
     elif isinstance(obs, qml.ops.op_math.Prod):
         nested_obs = [trace_observables(o, qrp, m_wires)[0] for o in obs]
         obs_tracers = tensorobs_p.bind(*nested_obs)
@@ -537,9 +540,6 @@ def trace_observables(
         coeffs = jax.numpy.array(terms[0])
         nested_obs = trace_observables(terms[1][0], qrp, m_wires)[0]
         obs_tracers = hamiltonian_p.bind(coeffs, nested_obs)
-    elif paulis := obs._pauli_rep:  # pylint: disable=protected-access
-        # Use the pauli sentence representation of the observable, if applicable
-        obs_tracers = pauli_sentence_to_hamiltonian_obs(paulis, qrp)
     else:
         raise NotImplementedError(f"Observable {obs} (of type {type(obs)}) is not impemented")
     return obs_tracers, (len(qubits) if qubits else None)
@@ -578,13 +578,12 @@ def pauli_word_to_tensor_obs(obs, qrp: QRegPromise) -> List[DynamicJaxprTracer]:
     """
     if len(obs) == 1:
         wire, pauli = list(obs.items())[0]
-        qubits = [qrp.extract([wire], allow_reuse=True)]
+        qubits = qrp.extract([wire], allow_reuse=True)
         return namedobs_p.bind(qubits[0], kind=PAULI_NAMED_MAP[pauli])
 
-    # FIXME: this path doesn't have a test
     nested_obs = []
     for wire, pauli in obs.items():
-        qubits = [qrp.extract([wire], allow_reuse=True)]
+        qubits = qrp.extract([wire], allow_reuse=True)
         nested_obs.append(namedobs_p.bind(qubits[0], kind=PAULI_NAMED_MAP[pauli]))
 
     return tensorobs_p.bind(*nested_obs)
