@@ -653,13 +653,13 @@ class TestArraysInHamiltonian:
         f(coeffs)
 
     @pytest.mark.parametrize(
-        "repr",
+        "array",
         [
             (np.array),
             (jnp.array),
         ],
     )
-    def test_array_repr_built_in(self, repr, backend):
+    def test_array_repr_built_in(self, array, backend):
         """Test array representation built-in in Hamiltonian."""
 
         @qjit(target="mlir")
@@ -668,7 +668,7 @@ class TestArraysInHamiltonian:
             qml.Hadamard(wires=0)
             qml.CNOT(wires=[0, 1])
             obs = [qml.PauliX(0) @ qml.PauliZ(1), qml.Hadamard(0)]
-            coeffs = repr([0.4, 0.7])
+            coeffs = array([0.4, 0.7])
             return qml.expval(qml.Hamiltonian(coeffs, obs))
 
         assert f.mlir
@@ -685,32 +685,32 @@ class TestArraysInHermitian:
         ]
 
     @pytest.mark.parametrize(
-        "repr",
+        "array",
         [
             (np.array),
             (jnp.array),
         ],
     )
-    def test_array_repr_from_context2(self, matrix, repr, backend):
+    def test_array_repr_from_context2(self, matrix, array, backend):
         """Test array representation from context in Hermitian."""
 
         @qjit(target="mlir")
         @qml.qnode(qml.device(backend, wires=6))
         def f(x: float):
             qml.RX(x, wires=0)
-            hermitian = qml.Hermitian(repr(matrix), wires=[0, 1])
+            hermitian = qml.Hermitian(array(matrix), wires=[0, 1])
             return qml.expval(hermitian)
 
         assert f.mlir
 
     @pytest.mark.parametrize(
-        "repr",
+        "array",
         [
             (np.array),
             (jnp.array),
         ],
     )
-    def test_array_repr_as_parameter(self, matrix, repr, backend):
+    def test_array_repr_as_parameter(self, matrix, array, backend):
         """Test array representation as parameter in Hermitian."""
 
         @qjit(target="mlir")
@@ -720,23 +720,23 @@ class TestArraysInHermitian:
             hermitian = qml.Hermitian(matrix, wires=[0, 1])
             return qml.expval(hermitian)
 
-        f(repr(matrix))
+        f(array(matrix))
 
     @pytest.mark.parametrize(
-        "repr",
+        "array",
         [
             (np.array),
             (jnp.array),
         ],
     )
-    def test_array_repr_built_in(self, repr, backend):
+    def test_array_repr_built_in(self, array, backend):
         """Test array representation built-in in Hermitian."""
 
         @qjit(target="mlir")
         @qml.qnode(qml.device(backend, wires=2))
         def f(x: float):
             qml.RX(x, wires=0)
-            matrix = repr(
+            matrix = array(
                 [
                     [complex(2.0, 0.0), complex(1.0, 1.0), complex(9.0, 2.0), complex(0.0, 0.0)],
                     [complex(1.0, -1.0), complex(5.0, 0.0), complex(4.0, 6.0), complex(3.0, -2.0)],

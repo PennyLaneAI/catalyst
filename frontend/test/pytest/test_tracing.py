@@ -17,11 +17,13 @@ import numpy as np
 import pennylane as qml
 import pytest
 
-from catalyst import CompileError, cond, measure, qjit, while_loop
+from catalyst import cond, measure, qjit, while_loop
 from catalyst.utils.tracing import EvaluationContext, EvaluationMode
 
 
 class TestEvaluationModes:
+    """Test evaluation modes checking and reporting."""
+
     def test_evaluation_modes(self, backend):
         """Check the Python interpetation mode."""
 

@@ -152,18 +152,18 @@ def test_hybrid_op_repr(backend):
         with qml.QueuingManager.stop_recording(), quantum_tape:
 
             @for_loop(0, 1, 1)
-            def loop(i):
+            def loop0(_):
                 qml.RX(np.pi, wires=0)
                 return ()
 
-            loop()
+            loop0()
 
             @while_loop(lambda v: v < 1)
-            def loop(v):
+            def loop1(v):
                 qml.RY(np.pi, wires=0)
                 return v + 1
 
-            loop(0)
+            loop1(0)
 
             @cond(n == 1)
             def cond_fn():
