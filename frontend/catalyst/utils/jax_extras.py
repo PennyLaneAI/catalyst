@@ -100,7 +100,6 @@ def new_dynamic_main2(
     """A verison of JAX `new_main` function that knows how to re-use an already existing `MainTrace`
     object"""
 
-    dynamic = True
     stack = thread_local_state.trace_state.trace_stack
     level = stack.next_level() if main is None else main.level
     main = MainTrace(level, trace_type, **payload) if main is None else main
@@ -300,7 +299,6 @@ def jaxpr_to_mlir(func_name, jaxpr, shape):
 
 
 # pylint: disable=too-many-arguments
-# pylint: disable=line-too-long
 def custom_lower_jaxpr_to_module(
     func_name: str,
     module_name: str,
