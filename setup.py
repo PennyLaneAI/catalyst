@@ -31,6 +31,7 @@ requirements = [
     "pennylane>=0.31",
     f"jax=={jax_version}",
     f"jaxlib=={jax_version}",
+    "tensorflow",
 ]
 
 classifiers = [
