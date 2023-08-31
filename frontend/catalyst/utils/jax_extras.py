@@ -214,7 +214,6 @@ def initial_style_jaxprs_with_common_consts2(jaxprs, all_consts):
             ), "AbstractRefs are not supported in this Catalyst version of this function"
     canonical_ref_indices = []
     canonical_refs: List[Any] = []
-    tracer_id_to_canonical_id = {}
     all_nonref_consts = []
     canonical_ref_avals = []
     all_nonref_const_avals = []
@@ -329,7 +328,6 @@ def custom_lower_jaxpr_to_module(
     platform = xb.canonicalize_platform(platform)
     if not xb.is_known_platform(platform):
         raise ValueError(f"Unknown platform {platform}")
-    in_avals = jaxpr.in_avals
     assert arg_shardings is None
     assert result_shardings is None
     platforms_with_donation = ("cuda", "rocm", "tpu")
