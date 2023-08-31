@@ -53,7 +53,7 @@ def test_buffer_args(fn, params):
 
     device = qml.device("lightning.qubit", wires=1)
     interpreted_fn = qml.QNode(fn, device)
-    jitted_fn = qjit(interpreted_fn, verbose=True)
+    jitted_fn = qjit(interpreted_fn)
     assert jnp.allclose(interpreted_fn(*params), jitted_fn(*params))
 
 

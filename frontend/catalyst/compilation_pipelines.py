@@ -541,11 +541,11 @@ class QJIT:
         inject_functions(mlir_module, ctx)
         self._jaxpr = jaxpr
 
-        #_, self._mlir, _ = self.compiler.run(
-        #    mlir_module,
-        #    lower_to_llvm=False,
-        #    pipelines=[("pipeline", ["canonicalize"])],
-        #)
+        _, self._mlir, _ = self.compiler.run(
+            mlir_module,
+            lower_to_llvm=False,
+            pipelines=[("pipeline", ["canonicalize"])],
+        )
         return mlir_module
 
     def compile(self, inplace=False):
