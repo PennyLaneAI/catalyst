@@ -261,9 +261,28 @@ def _make_jaxpr_check_differentiable(f: Differentiable, grad_params: GradParams,
                 f"results, got '{res.dtype}' at position {pos}."
             )
 
-    _check_created_jaxpr_gradient_methods(f, method, jaxpr)
+    _verify_differentiable_child_qnodes(jaxpr, method)
 
     return jaxpr
+
+
+def _verify_differentiable_child_qnodes(jaxpr, method):
+    """Traverse QNodes being differentiated in the 'call graph' of the JAXPR to verify them."""
+    visited = set()
+
+    def traverse_children(jaxpr):
+        for eqn in jaxpr.eqns:
+            # The Python function is stored in the "fn" parameter of func_p JAXPR primitives.
+            fn = eqn.params.get("fn")
+            if fn and fn not in visited:
+                child = eqn.params.get("call_jaxpr", None)
+                if isinstance(fn, (qml.QNode, Grad)):
+                    _check_created_jaxpr_gradient_methods(fn, method, child)
+                if child and child not in visited:
+                    traverse_children(child)
+            visited.add(fn)
+
+    traverse_children(jaxpr)
 
 
 def _check_created_jaxpr_gradient_methods(f: Differentiable, method: str, jaxpr: Jaxpr):
@@ -271,17 +290,21 @@ def _check_created_jaxpr_gradient_methods(f: Differentiable, method: str, jaxpr:
     if method == "fd":
         return
 
-    qnode_jaxpr = jaxpr.eqns[0].params["call_jaxpr"]
+    if isinstance(f, Grad):
+        raise DifferentiableCompileError(
+            "Only finite difference can compute higher order derivatives"
+        )
+
+    assert isinstance(
+        f, qml.QNode
+    ), "Expected quantum differentiable node to be a qml.QNode or a catalyst.grad op"
     return_ops = []
-    for res in qnode_jaxpr.outvars:
-        for eq in reversed(qnode_jaxpr.eqns):  # pragma: no branch
+    for res in jaxpr.outvars:
+        for eq in reversed(jaxpr.eqns):  # pragma: no branch
             if res in eq.outvars:
                 return_ops.append(eq.primitive)
                 break
 
-    assert isinstance(
-        f, qml.QNode
-    ), "Differentiation methods other than finite-differences can only operate on a QNode"
     if f.diff_method is None:
         raise DifferentiableCompileError(
             "Cannot differentiate a QNode explicitly marked non-differentiable (with"
@@ -306,7 +329,7 @@ def _check_grad_params(
 ) -> GradParams:
     methods = {"fd", "defer"}
     if method is None:
-        method = "fd"
+        method = "defer"
     if method not in methods:
         raise ValueError(
             f"Invalid differentiation method '{method}'. "
@@ -348,11 +371,6 @@ class Grad:
         self.fn = fn
         self.__name__ = f"grad.{fn.__name__}"
         self.grad_params = grad_params
-        if self.grad_params.method != "fd" and not isinstance(self.fn, qml.QNode):
-            raise ValueError(
-                "Only finite difference can compute higher order derivatives "
-                "or gradients of non-QNode functions."
-            )
 
     def __call__(self, *args, **kwargs):
         """Specifies that an actual call to the differentiated function.
@@ -378,8 +396,14 @@ def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
 
     .. warning::
 
-        Currently, higher-order differentiation or differentiation of non-QNode functions
-        is only supported by the finite-difference method.
+        If ``method="defer"`` is specified, Catalyst supports ``diff_method="parameter-shift"``
+        and ``diff_method="adjoint"`` on internal QNodes. Notably, the default QNode
+        differentiation method of ``"finite-diff"`` is not supported when used with ``"defer"``.
+
+    .. warning::
+
+        Currently, higher-order differentiation is only supported by the finite-difference
+        method.
 
     .. note::
 
@@ -413,7 +437,7 @@ def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
 
     .. seealso:: :func:`~.jacobian`
 
-    **Example**
+    **Example 1 (Classical preprocessing)**
 
     .. code-block:: python
 
@@ -431,6 +455,67 @@ def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
 
     >>> workflow(2.0)
     array(-3.14159265)
+
+    **Example 2 (Classical preprocessing and postprocessing)**
+
+    .. code-block:: python
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qjit
+        def grad_loss(theta):
+            @qml.qnode(dev, diff_method="adjoint")
+            def circuit(theta):
+                qml.RX(jnp.exp(theta ** 2) / jnp.cos(theta / 4), wires=0)
+                return qml.expval(qml.PauliZ(wires=0))
+
+            def loss(theta):
+                return jnp.pi / jnp.tanh(circuit(theta))
+
+            return catalyst.grad(loss, method="defer")(theta)
+
+    >>> grad_loss(1.0)
+    array(-1.90958669)
+
+    **Example 3 (Multiple QNodes with their own differentiation methods)**
+
+    .. code-block:: python
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qjit
+        def grad_loss(theta):
+            @qml.qnode(dev, diff_method="parameter-shift")
+            def circuit_A(params):
+                qml.RX(jnp.exp(params[0] ** 2) / jnp.cos(params[1] / 4), wires=0)
+                return qml.probs()
+
+            @qml.qnode(dev, diff_method="adjoint")
+            def circuit_B(params):
+                qml.RX(jnp.exp(params[1] ** 2) / jnp.cos(params[0] / 4), wires=0)
+                return qml.expval(qml.PauliZ(wires=0))
+
+            def loss(params):
+                return jnp.prod(circuit_A(params)) + circuit_B(params)
+
+            return catalyst.grad(loss, method="defer")(theta)
+
+    >>> grad_loss(jnp.array([1.0, 2.0]))
+    array([ 0.57367285, 44.4911605 ])
+
+    **Example 4 (Purely classical functions)**
+
+    .. code-block:: python
+
+        def square(x: float):
+            return x ** 2
+
+        @qjit
+        def dsquare(x: float):
+            return catalyst.grad(square, method="defer")(x)
+
+    >>> dsquare(2.3)
+    array(4.6)
     """
     scalar_out = True
     return Grad(

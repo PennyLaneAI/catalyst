@@ -18,6 +18,7 @@
 #include "mlir/Dialect/Index/IR/IndexOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/IR/SymbolTable.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 #include "Gradient/IR/GradientOps.h"
@@ -125,9 +126,17 @@ class BufferizeBackpropOp : public OpConversionPattern<BackpropOp> {
         // Enzyme requires buffers for the primal outputs as well, even though we don't need their
         // values. We'll mark them dupNoNeed later on to allow Enzyme to optimize away their
         // computation.
-        SmallVector<Value> calleeResults;
-        ValueRange resShadows = adaptor.getCotangents();
-        generateAllocations(rewriter, loc, calleeResults, resShadows);
+        SmallVector<Value> calleeResults, resShadows;
+        ValueRange cotangents = adaptor.getCotangents();
+        generateAllocations(rewriter, loc, calleeResults, cotangents);
+        // Enzyme mutates the result shadows but the cotangent tensors must be immutable, so we
+        // create copies to pass into Enzyme. Concretely, this issue pops up with multiple
+        // BackpropOps that have the same cotangent tensor due to a CSE effect from one-shot
+        // bufferization.
+        generateAllocations(rewriter, loc, resShadows, cotangents);
+        for (const auto &[cotangent, resShadow] : llvm::zip(cotangents, resShadows)) {
+            rewriter.create<memref::CopyOp>(loc, cotangent, resShadow);
+        }
 
         DenseIntElementsAttr diffArgIndicesAttr = adaptor.getDiffArgIndices().value_or(nullptr);
         auto bufferizedBackpropOp = rewriter.create<BackpropOp>(

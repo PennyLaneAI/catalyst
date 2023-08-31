@@ -43,16 +43,6 @@ def GradientLoweringPass : Pass<"lower-gradients"> {
     ];
 
     let constructor = "catalyst::createGradientLoweringPass()";
-
-    let options = [
-        Option<
-            /*C++ var name=*/"lowerOnly",
-            /*CLI arg name=*/"only",
-            /*type=*/"std::string",
-            /*default=*/"\"\"",
-            /*description=*/"Restrict lowering to a specific type of gradient."
-        >
-    ];
 }
 
 def GradientConversionPass : Pass<"convert-gradient-to-llvm"> {
