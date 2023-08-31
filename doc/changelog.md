@@ -154,13 +154,14 @@
 
   This is achieved by adding support for the JAX pytree API.
 
-* Compile-time backpropagation of classical pre-processing is now supported,
+* Compile-time backpropagation of arbitrary hybrid programs is now supported,
   via integration with [Enzyme AD](https://enzyme.mit.edu/).
   [(#158)](https://github.com/PennyLaneAI/catalyst/pull/158)
   [(#193)](https://github.com/PennyLaneAI/catalyst/pull/193)
   [(#224)](https://github.com/PennyLaneAI/catalyst/pull/224)
   [(#225)](https://github.com/PennyLaneAI/catalyst/pull/225)
   [(#239)](https://github.com/PennyLaneAI/catalyst/pull/239)
+  [(#244)](https://github.com/PennyLaneAI/catalyst/pull/244)
 
   This allows `catalyst.grad` to support qjit-compiled programs that contain
   both classical pre-processing and quantum processing via a combination of
@@ -168,8 +169,9 @@
 
   Note that currently, `catalyst.grad` still defaults to finite-diff. To enable
   high-performance reverse mode automatic differentiation of arbitrary
-  classical preprocessing, specify `method=defer on the grad`
-  operation:
+  classical preprocessing, specify `method=auto` on the `grad`
+  operation, in conjunction with either `"parameter-shift"` or `"adjoint"`
+  specified as the `diff_method` on each QNode:
 
   ```python
   dev = qml.device("lightning.qubit", wires=1)
@@ -181,9 +183,73 @@
   ```
 
   ```pycon
-  >>> grad = qjit(catalyst.grad(circuit, method="defer"))
+  >>> grad = qjit(catalyst.grad(circuit, method="auto"))
   >>> grad(jnp.pi)
   array(0.05938718)
+  ```
+
+  This re-working of the internal gradient architecture means you can now compute exact
+  derivatives of programs with both classical preprocessing and postprocessing.
+
+  ```python
+  @qml.qnode(qml.device("lightning.qubit", wires=1), diff_method="adjoint")
+  def circuit(theta):
+      qml.RX(jnp.exp(theta ** 2) / jnp.cos(theta / 4), wires=0)
+      return qml.expval(qml.PauliZ(wires=0))
+
+  def loss(theta):
+      return jnp.pi / jnp.tanh(circuit(theta))
+
+  @qjit
+  def grad_loss(theta):
+      return catalyst.grad(loss)(theta)
+  ```
+
+  ```pycon
+  >>> grad_loss(1.0)
+  array(-1.90958669)
+  ```
+
+  You can use multiple QNodes with different differentiation methods:
+
+  ```python
+  @qml.qnode(qml.device("lightning.qubit", wires=1), diff_method="parameter-shift")
+  def circuit_A(params):
+      qml.RX(jnp.exp(params[0] ** 2) / jnp.cos(params[1] / 4), wires=0)
+      return qml.probs()
+
+  @qml.qnode(qml.device("lightning.qubit", wires=1), diff_method="adjoint")
+  def circuit_B(params):
+      qml.RX(jnp.exp(params[1] ** 2) / jnp.cos(params[0] / 4), wires=0)
+      return qml.expval(qml.PauliZ(wires=0))
+
+  def loss(params):
+      return jnp.prod(circuit_A(params)) + circuit_B(params)
+
+  @qjit
+  def grad_loss(theta):
+      return catalyst.grad(loss)(theta)
+  ```
+
+  ```pycon
+  >>> grad_loss(jnp.array([1.0, 2.0]))
+  array([ 0.57367285, 44.4911605 ])
+  ```
+
+  You can even differentiate purely classical code:
+
+  ```python
+  def square(x: float):
+      return x ** 2
+
+  @qjit
+  def dsquare(x: float):
+      return catalyst.grad(square)(x)
+  ```
+
+  ```pycon
+  >>> dsquare(2.3)
+  array(4.6)
   ```
 
 * Add support for the new PennyLane arithmetic operators.
@@ -335,12 +401,22 @@
 
 * Support for Python 3.8 has been removed.
   [(#231)](https://github.com/PennyLaneAI/catalyst/pull/231)
+  
+* The default differentiation method on ``grad`` and ``jacobian`` is reverse-mode
+  automatic differentiation instead of finite differences. When a QNode does not have a
+  ``diff_method`` specified, it will default to using the parameter shift method instead of
+  finite-differences.
+  [(#244)](https://github.com/PennyLaneAI/catalyst/pull/244)
+  [(#271)](https://github.com/PennyLaneAI/catalyst/pull/271)
+
+* The JAX version used by Catalyst has been updated to `v0.4.14`, the minimum PennyLane version
+  required is now `v0.32`.
+  [(#264)](https://github.com/PennyLaneAI/catalyst/pull/264)
 
 * Due to the change allowing Python container objects as inputs to
   QJIT-compiled functions, Python lists are no longer automatically converted
   to JAX arrays.
   [(#231)](https://github.com/PennyLaneAI/catalyst/pull/231)
-
 
   This means that indexing on lists when the index is not
   static will cause a `TracerIntegerConversionError`, consistent with JAX's behaviour.
@@ -692,7 +768,7 @@ David Ittah.
   As part of this change, the `method` argument now accepts
   the following options:
 
-  - `method="defer"`:  Quantum components of the hybrid function are
+  - `method="auto"`:  Quantum components of the hybrid function are
     differentiated according to the corresponding QNode `diff_method`, while
     the classical computation is differentiated using traditional auto-diff.
 

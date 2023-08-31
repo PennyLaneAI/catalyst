@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt %s --lower-gradients=only=ps --split-input-file | FileCheck %s
+// RUN: quantum-opt %s --lower-gradients --split-input-file | FileCheck %s
 
 // CHECK-LABEL: @simple_circuit.qgrad(%arg0: tensor<3xf64>, %arg1: index) -> tensor<?xf64>
 func.func @simple_circuit(%arg0: tensor<3xf64>) -> f64 attributes {qnode, diff_method = "parameter-shift"} {
@@ -93,14 +93,16 @@ func.func @simple_circuit(%arg0: tensor<3xf64>) -> f64 attributes {qnode, diff_m
     //
     // CHECK-NOT: quantum.custom
     %q_3 = quantum.custom "u3"(%f0, %f1, %f2) %q_2 : !quantum.bit
+    %obs = quantum.namedobs %q_3[PauliX] : !quantum.obs
+    %expval = quantum.expval %obs : f64
 
     // CHECK: [[ret:%[a-zA-Z0-9_]+]] = bufferization.to_tensor [[grad]]
     // CHECK: return [[ret]] : tensor<?xf64>
-    func.return %f0 : f64
+    func.return %expval : f64
 }
 
 func.func @gradCall0(%arg0: tensor<3xf64>) -> tensor<3xf64> {
-    %0 = gradient.grad "defer" @simple_circuit(%arg0) : (tensor<3xf64>) -> tensor<3xf64>
+    %0 = gradient.grad "auto" @simple_circuit(%arg0) : (tensor<3xf64>) -> tensor<3xf64>
     func.return %0 : tensor<3xf64>
 }
 
@@ -226,14 +228,16 @@ func.func @structured_circuit(%arg0: f64, %arg1: i1, %arg2: i1) -> f64 attribute
     //
     // CHECK-NOT: quantum.custom
     %q_3 = quantum.custom "rx"(%arg0) %q_2 : !quantum.bit
+    %obs = quantum.namedobs %q_3[PauliX] : !quantum.obs
+    %expval = quantum.expval %obs : f64
 
     // CHECK: [[ret:%[a-zA-Z0-9_]+]] = bufferization.to_tensor [[grad]]
     // CHECK: return [[ret]] : tensor<?xf64>
-    func.return %arg0 : f64
+    func.return %expval : f64
 }
 
 func.func @gradCall1(%arg0: f64, %b0: i1, %b1: i1) -> f64 {
-    %0 = gradient.grad "defer" @structured_circuit(%arg0, %b0, %b1) : (f64, i1, i1) -> f64
+    %0 = gradient.grad "auto" @structured_circuit(%arg0, %b0, %b1) : (f64, i1, i1) -> f64
     func.return %0 : f64
 }
 
@@ -339,14 +343,16 @@ func.func @loop_circuit(%arg0: f64) -> f64 attributes {qnode, diff_method = "par
 
         scf.yield %q_1_1 : !quantum.bit
     }
+    %obs = quantum.namedobs %q_3[PauliX] : !quantum.obs
+    %expval = quantum.expval %obs : f64
 
     // CHECK: [[ret:%[a-zA-Z0-9_]+]] = bufferization.to_tensor [[grad]]
     // CHECK: return [[ret]] : tensor<?xf64>
-    func.return %arg0 : f64
+    func.return %expval : f64
 }
 
 func.func @gradCall2(%arg0: f64) -> f64 {
-    %0 = gradient.grad "defer" @loop_circuit(%arg0) : (f64) -> f64
+    %0 = gradient.grad "auto" @loop_circuit(%arg0) : (f64) -> f64
     func.return %0 : f64
 }
 
@@ -393,7 +399,7 @@ func.func @tensor_circuit(%arg0: f64) -> tensor<2x3xf64> attributes {qnode, diff
 }
 
 func.func @gradCall3(%arg0: f64) -> tensor<2x3xf64> {
-    %0 = gradient.grad "defer" @tensor_circuit(%arg0) : (f64) -> tensor<2x3xf64>
+    %0 = gradient.grad "auto" @tensor_circuit(%arg0) : (f64) -> tensor<2x3xf64>
     func.return %0 : tensor<2x3xf64>
 }
 
@@ -434,16 +440,18 @@ func.func @multi_res_circuit(%arg0: f64) -> (f64, tensor<2xf64>) attributes {qno
     // CHECK:         memref.store [[NEWIDX]], [[GRADIDX]]
     // CHECK-NOT: quantum.
     %q_1 = quantum.custom "rx"(%arg0) %q_0 : !quantum.bit
+    %obs = quantum.namedobs %q_1[PauliX] : !quantum.obs
+    %expval = quantum.expval %obs : f64
 
     // CHECK:         [[RES0:%.+]] = bufferization.to_tensor [[GRAD0]]
     // CHECK:         [[RES1:%.+]] = bufferization.to_tensor [[GRAD1]]
     // CHECK:         return [[RES0]], [[RES1]] : tensor<?xf64>, tensor<?x2xf64>
-    %res = tensor.from_elements %arg0, %arg0 : tensor<2xf64>
+    %res = tensor.from_elements %expval, %expval : tensor<2xf64>
     func.return %arg0, %res : f64, tensor<2xf64>
 }
 
 func.func @gradCall4(%arg0: f64) -> (f64, tensor<2xf64>)  {
-    %0:2 = gradient.grad "defer" @multi_res_circuit(%arg0) : (f64) -> (f64, tensor<2xf64>)
+    %0:2 = gradient.grad "auto" @multi_res_circuit(%arg0) : (f64) -> (f64, tensor<2xf64>)
     func.return %0#0, %0#1 : f64, tensor<2xf64>
 }
 
@@ -455,9 +463,11 @@ func.func private @funcMultiCall(%arg0: f64) -> f64 attributes {qnode, diff_meth
     %r = quantum.alloc(1) : !quantum.reg
     %q = quantum.extract %r[%c0] : !quantum.reg -> !quantum.bit
 
-    quantum.custom "rz"(%arg0) %q : !quantum.bit
+    %q_1 = quantum.custom "rz"(%arg0) %q : !quantum.bit
+    %obs = quantum.namedobs %q_1[PauliX] : !quantum.obs
+    %expval = quantum.expval %obs : f64
 
-    func.return %arg0 : f64
+    func.return %expval : f64
 }
 
 // CHECK-LABEL: @funcMultiCall.shifted(%arg0: f64, %arg1: tensor<1xf64>, %arg2: tensor<0xindex>) -> f64
@@ -469,7 +479,7 @@ func.func private @funcMultiCall(%arg0: f64) -> f64 attributes {qnode, diff_meth
 
 // CHECK-LABEL: @gradCallMultiCall
 func.func @gradCallMultiCall(%arg0: f64) -> (f64, f64) {
-    %0 = gradient.grad "defer" @funcMultiCall(%arg0) : (f64) -> f64
-    %1 = gradient.grad "defer" @funcMultiCall(%arg0) : (f64) -> f64
+    %0 = gradient.grad "auto" @funcMultiCall(%arg0) : (f64) -> f64
+    %1 = gradient.grad "auto" @funcMultiCall(%arg0) : (f64) -> f64
     func.return %0, %1 : f64, f64
 }

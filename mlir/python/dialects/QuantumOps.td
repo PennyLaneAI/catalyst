@@ -15,7 +15,6 @@
 #ifndef PYTHON_BINDINGS_QUANTUM_OPS
 #define PYTHON_BINDINGS_QUANTUM_OPS
 
-include "mlir/Bindings/Python/Attributes.td"
 include "Quantum/IR/QuantumOps.td"
 
 #endif
