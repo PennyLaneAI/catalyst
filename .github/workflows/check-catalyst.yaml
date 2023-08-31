@@ -162,6 +162,63 @@ jobs:
         COMPILER_LAUNCHER="" \
         make mhlo
 
+  enzyme:
+    name: Enzyme Build
+    needs: [constants, llvm]
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Catalyst repo
+      uses: actions/checkout@v3
+
+    - name: Cache Enzyme Build
+      id: cache-enzyme
+      uses: actions/cache@v3
+      with:
+        path: enzyme-build
+        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-build
+
+    - name: Get Cached LLVM Source
+      id: cache-llvm-source
+      if: steps.cache-enzyme.outputs.cache-hit != 'true'
+      uses: actions/cache@v3
+      with:
+        path: mlir/llvm-project
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-source
+        enableCrossOsArchive: True
+        fail-on-cache-miss: True
+
+    - name: Get Cached LLVM Build
+      id: cache-llvm-build
+      if: steps.cache-enzyme.outputs.cache-hit != 'true'
+      uses: actions/cache@v3
+      with:
+        path: llvm-build
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
+        fail-on-cache-miss: True
+
+    - name: Clone Enzyme Submodule
+      if: |
+        steps.cache-enzyme.outputs.cache-hit != 'true'
+      uses: actions/checkout@v3
+      with:
+        repository: EnzymeAD/Enzyme
+        ref: ${{ needs.constants.outputs.enzyme_version }}
+        path: mlir/Enzyme
+
+    - name: Install Deps
+      if: steps.cache-enzyme.outputs.cache-hit != 'true'
+      run: |
+        sudo apt-get install -y cmake ninja-build clang lld
+
+    - name: Build Enzyme
+      if: steps.cache-enzyme.outputs.cache-hit != 'true'
+      run: |
+        LLVM_BUILD_DIR="$(pwd)/llvm-build" \
+        ENZYME_BUILD_DIR="$(pwd)/enzyme-build" \
+        COMPILER_LAUNCHER="" \
+        make enzyme
+
   quantum:
     name: Quantum Dialects Build
     needs: [constants, mhlo, llvm]
@@ -281,6 +338,14 @@ jobs:
         key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-build
         fail-on-cache-miss: True
 
+    - name: Get Cached Enzyme Build
+      id: cache-enzyme
+      uses: actions/cache@v3
+      with:
+        path: enzyme-build
+        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-build
+        fail-on-cache-miss: True
+
     - name: Download Quantum Build Artifact
       uses: actions/download-artifact@v3
       with:
@@ -357,6 +422,14 @@ jobs:
         key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-build
         fail-on-cache-miss: True
 
+    - name: Get Cached Enzyme Build
+      id: cache-enzyme
+      uses: actions/cache@v3
+      with:
+        path: enzyme-build
+        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-build
+        fail-on-cache-miss: True
+
     - name: Download Quantum Build Artifact
       uses: actions/download-artifact@v3
       with:
@@ -416,6 +489,14 @@ jobs:
       with:
         path: mhlo-build
         key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-build
+        fail-on-cache-miss: True
+
+    - name: Get Cached Enzyme Build
+      id: cache-enzyme
+      uses: actions/cache@v3
+      with:
+        path: enzyme-build
+        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-build
         fail-on-cache-miss: True
 
     - name: Download Quantum Build Artifact

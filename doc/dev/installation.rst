@@ -2,9 +2,9 @@ Installation
 ============
 
 
-Catalyst is officially supported on Linux (x86_64) platforms, and pre-built binaries are being
-distributed via the Python Package Index (PyPI) for Python versions 3.9 and higher. To install it,
-simply run the following ``pip`` command:
+Catalyst is officially supported on Linux (x86_64) and macOS (aarch64) platforms, and pre-built binaries
+are being distributed via the Python Package Index (PyPI) for Python versions 3.9 and higher. To install
+it, simply run the following ``pip`` command:
 
 .. code-block:: console
 
@@ -87,6 +87,20 @@ They can be installed on Debian/Ubuntu via:
 
   sudo apt install clang lld ccache libomp-dev ninja-build make cmake
 
+They can be installed on macOS via:
+
+.. code-block:: console
+
+  brew install cmake ninja
+
+If you install Catalyst on a macOS system with ``ARM`` architecture (e.g. Apple M1/M2), you
+additionally need to install `Rust <https://www.rust-lang.org/tools/install>`_ and the
+``llvm-tools-preview`` rustup component:
+
+.. code-block:: console
+
+  rustup component add llvm-tools-preview
+
 .. Note::
   If the CMake version available in your system is too old, you can also install up-to-date
   versions of it via ``pip install cmake``.
@@ -122,6 +136,12 @@ following make target from the top level directory:
 .. code-block:: console
 
   make all
+
+To build the project on macOS with ``ARM`` architecture (e.g. Apple M1/M2):
+
+.. code-block:: console
+
+  BUILD_QIR_STDLIB_FROM_SRC=ON ENABLE_LLD=OFF make all
 
 To build each component one by one starting from the runtime, you can follow
 the instructions below.

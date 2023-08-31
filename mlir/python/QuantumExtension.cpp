@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "CAPI/Dialects.h"
 #include "mlir/Bindings/Python/PybindAdaptors.h"
 
 #include "Quantum-c/Dialects.h"

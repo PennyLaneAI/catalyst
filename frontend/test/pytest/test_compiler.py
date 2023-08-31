@@ -65,7 +65,7 @@ class TestCompilerOptions:
         @qjit(verbose=verbose, logfile=logfile, keep_intermediate=keep_intermediate)
         @qml.qnode(qml.device(backend, wires=1))
         def workflow():
-            qml.X(wires=1)
+            qml.PauliX(wires=0)
             return qml.state()
 
         workflow()
@@ -169,7 +169,7 @@ class TestCompilerState:
 
         @qml.qnode(qml.device(backend, wires=1))
         def workflow():
-            qml.X(wires=1)
+            qml.PauliX(wires=0)
             return qml.state()
 
         mlir_module, _, _, _ = get_mlir(workflow)
@@ -194,7 +194,7 @@ class TestCompilerState:
         @qjit
         @qml.qnode(qml.device(backend, wires=1))
         def workflow():
-            qml.X(wires=1)
+            qml.PauliX(wires=0)
             return qml.state()
 
         mlir_module, _, _, _ = get_mlir(workflow)
@@ -215,7 +215,7 @@ class TestCompilerState:
         @qjit
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def workflow():
-            qml.X(wires=1)
+            qml.PauliX(wires=0)
             return qml.state()
 
         mlir_module, _, _, _ = get_mlir(workflow)

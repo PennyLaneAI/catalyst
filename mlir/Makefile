@@ -46,15 +46,10 @@ llvm:
 		-DCMAKE_CXX_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
 		-DLLVM_ENABLE_LLD=$(ENABLE_LLD)
 
-	# TODO: when updating LLVM, test to see if mlir/unittests/Bytecode/BytecodeTest.cpp:55 is passing
-	# and remove filter
-	LIT_FILTER_OUT="Bytecode" cmake --build $(LLVM_BUILD_DIR) --target check-mlir llvm-symbolizer opt
+	cmake --build $(LLVM_BUILD_DIR) --target check-mlir llvm-symbolizer opt
 
 .PHONY: mhlo
 mhlo:
-	# TODO: We can remove this patch whenever this ticket is solved https://github.com/tensorflow/mlir-hlo/issues/68
-	patch -d mlir-hlo/mhlo/analysis --merge --follow-symlinks < patches/add-lmhlo-dependency.patch
-
 	@echo "build MLIR-HLO"
 	cmake -G Ninja -S mlir-hlo -B $(MHLO_BUILD_DIR) \
 		-DCMAKE_BUILD_TYPE=Release \
