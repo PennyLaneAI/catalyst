@@ -668,9 +668,9 @@ class CondCallable:
             return self._call_with_quantum_ctx(ctx)
         elif mode == EvaluationMode.CLASSICAL_COMPILATION:
             return self._call_with_classical_ctx()
-        elif mode == EvaluationMode.INTERPRETATION:
+        else:
+            assert mode == EvaluationMode.INTERPRETATION, f"Unsupported evaluation mode {mode}"
             return self._call_during_interpretation()
-        raise RuntimeError(f"Unsupported evaluation mode {mode}")
 
 
 def cond(pred: DynamicJaxprTracer):
@@ -928,9 +928,9 @@ def for_loop(lower_bound, upper_bound, step):
                 return _call_with_quantum_ctx(ctx)
             elif mode == EvaluationMode.CLASSICAL_COMPILATION:
                 return _call_with_classical_ctx()
-            elif mode == EvaluationMode.INTERPRETATION:
+            else:
+                assert mode == EvaluationMode.INTERPRETATION, f"Unsupported evaluation mode {mode}"
                 return _call_during_interpretation()
-            raise RuntimeError(f"Unsupported evaluation mode {mode}")
 
         return _call_handler
 
@@ -1072,9 +1072,9 @@ def while_loop(cond_fn):
                 return _call_with_quantum_ctx(ctx)
             elif mode == EvaluationMode.CLASSICAL_COMPILATION:
                 return _call_with_classical_ctx()
-            elif mode == EvaluationMode.INTERPRETATION:
+            else:
+                assert mode == EvaluationMode.INTERPRETATION, f"Unsupported evaluation mode {mode}"
                 return _call_during_interpretation()
-            raise RuntimeError(f"Unsupported evaluation mode {mode}")
 
         return _call_handler
 
