@@ -12,7 +12,7 @@
 * Write Catalyst-compatible programs with native Python conditional statements.
   [(#235)](https://github.com/PennyLaneAI/catalyst/pull/235)
 
-  `autograph` is a new, experimental, feature that automatically converts
+  Autograph is a new, experimental, feature that automatically converts
   Python conditional statements like `if`, `else`, and `elif`,
   into their equivalent functional forms provided by Catalyst (such as
   `catalyst.cond`).
@@ -47,7 +47,7 @@
   using `catalyst.adjoint`.
   [(#220)](https://github.com/PennyLaneAI/catalyst/pull/220)
 
-  The ``catalyst.adjoint`` function computes the
+  The `catalyst.adjoint` function computes the
   adjoint of the quantum computation defined by a provided quantum function.
 
   An advantage of using the Catalyst-native adjoint is that the adjoint
@@ -168,7 +168,7 @@
 
   Note that currently, `catalyst.grad` still defaults to finite-diff. To enable
   high-performance reverse mode automatic differentiation of arbitrary
-  classical preprocessing, specify ``method=defer`` on the ``grad``
+  classical preprocessing, specify `method=defer on the grad`
   operation:
 
   ```python
@@ -189,19 +189,19 @@
 * Add support for the new PennyLane arithmetic operators.
   [(#250)](https://github.com/PennyLaneAI/catalyst/pull/250)
 
-  PennyLane is in the process of replacing ``Hamiltonian`` and ``Tensor`` observables with a set of
+  PennyLane is in the process of replacing `Hamiltonian` and `Tensor` observables with a set of
   general arithmetic operators. These consist of
   [Prod](https://docs.pennylane.ai/en/stable/code/api/pennylane.ops.op_math.Prod.html),
   [Sum](https://docs.pennylane.ai/en/stable/code/api/pennylane.ops.op_math.Sum.html) and
   [SProd](https://docs.pennylane.ai/en/stable/code/api/pennylane.ops.op_math.SProd.html).
 
-  By default, using dunder methods (eg. ``+``, ``-``, ``@``, ``*``) to combine
-  operators with scalars or other operators will create ``Hamiltonian`` and
-  ``Tensor`` objects. However, these two methods will be deprecated in coming
+  By default, using dunder methods (eg. `+`, `-`, `@`, `*`) to combine
+  operators with scalars or other operators will create `Hamiltonian` and
+  `Tensor` objects. However, these two methods will be deprecated in coming
   releases of PennyLane.
 
-  To enable the new arithmetic operators, one can use ``Prod``, ``Sum``, and
-  ``Sprod`` directly or activate them by calling [enable_new_opmath](https://docs.pennylane.ai/en/stable/code/api/pennylane.operation.enable_new_opmath.html)
+  To enable the new arithmetic operators, one can use `Prod`, `Sum`, and
+  `Sprod` directly or activate them by calling [enable_new_opmath](https://docs.pennylane.ai/en/stable/code/api/pennylane.operation.enable_new_opmath.html)
   at the beginning of your PennyLane program.
 
   ``` python
@@ -295,8 +295,8 @@
 
 * Various improvements have been made to enable Catalyst to compile on macOS:
 
-  - Remove unnecessary ``reinterpret_cast`` from ``ObsManager``. Removal of
-    these ``reinterpret_cast`` allows compilation of the runtime to succeed
+  - Remove unnecessary `reinterpret_cast` from `ObsManager`. Removal of
+    these `reinterpret_cast` allows compilation of the runtime to succeed
     in macOS. macOS uses an ILP32 mode for Aarch64 where they use the full 64
     bit mode but with 32 bit Integer, Long, and Pointers. This patch also
     changes a test file to prevent a mismatch in machines which compile using
@@ -304,11 +304,11 @@
     [(#229)](https://github.com/PennyLaneAI/catalyst/pull/230)
   
   - Allow runtime to be compiled on macOS. Substitute `nproc` with a call to
-    ``os.cpu_count()`` and use correct flags for `ld.64`.
+    `os.cpu_count()` and use correct flags for `ld.64`.
     [(#232)](https://github.com/PennyLaneAI/catalyst/pull/232)
   
   - Improve portability on the frontend to be available on macOS. Use
-    ``.dylib``, remove unnecessary flags, and address behaviour difference in
+    `.dylib`, remove unnecessary flags, and address behaviour difference in
     flags.
     [(#233)](https://github.com/PennyLaneAI/catalyst/pull/233)
 
@@ -350,7 +350,7 @@
       return x[index]
   ```
 
-  However, if the parameter ``x`` above is a JAX or NumPy array, the
+  However, if the parameter `x` above is a JAX or NumPy array, the
   compilation will continue to succeed.
 
 * The `catalyst.grad` function has been renamed to `catalyst.jacobian` and supports differentiation
@@ -360,10 +360,10 @@
 
 <h3>Bug fixes</h3>
 
-* Fixed an issue preventing the differentiation of ``qml.probs`` with the parameter-shift method.
+* Fixed an issue preventing the differentiation of `qml.probs` with the parameter-shift method.
   [(#211)](https://github.com/PennyLaneAI/catalyst/pull/211)
 
-* Fixed the incorrect return value data-type with functions returning ``qml.counts``.
+* Fixed the incorrect return value data-type with functions returning `qml.counts`.
  [(#221)](https://github.com/PennyLaneAI/catalyst/pull/221)
 
 * Fix segmentation fault when differentiating a function where a quantum measurement is used

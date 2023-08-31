@@ -393,7 +393,7 @@ def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
         method (str): The method used for differentiation, which can be any of ``["fd", "defer"]``,
                       where:
 
-                      - ``"fd"`` (default) represents first-order finite-differences for the entire hybrid
+                      - ``"fd"`` represents first-order finite-differences for the entire hybrid
                         circuit,
 
                       - ``"defer"`` represents deferring the quantum differentiation to the method
