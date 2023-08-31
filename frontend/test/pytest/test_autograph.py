@@ -27,6 +27,7 @@ from catalyst.ag_utils import AutoGraphError, autograph_source, check_cache
 # pylint: disable=unnecessary-lambda-assignment
 
 
+@pytest.mark.tf
 class TestIntegration:
     """Test that the autograph transformations trigger correctly in different settings."""
 
@@ -188,6 +189,7 @@ class TestIntegration:
         assert fn(np.pi) == -1
 
 
+@pytest.mark.tf
 class TestCodePrinting:
     """Test that the transformed source code can be printed in different settings."""
 
@@ -317,6 +319,7 @@ class TestCodePrinting:
         assert autograph_source(inner)
 
 
+@pytest.mark.tf
 class TestConditionals:
     """Test that the autograph transformations produce correct results on conditionals.
     These tests are adapted from the test_conditionals.TestCond class of tests."""
