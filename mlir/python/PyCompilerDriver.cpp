@@ -78,7 +78,6 @@ PYBIND11_MODULE(libCatalystPythonDriver, m)
            bool lower_to_llvm) -> CompilerOutput * {
             FunctionAttributes inferredAttributes;
             mlir::MLIRContext ctx;
-	    ctx.loadAllAvailableDialects();
             std::string errors;
 
             CompilerOutput *output = new CompilerOutput();
