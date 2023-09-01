@@ -96,8 +96,8 @@
   array(0.78332691)
   ```
 
-* Compile-time backpropagation of arbitrary hybrid programs is now supported,
-  via integration with [Enzyme AD](https://enzyme.mit.edu/).
+* Compile-time backpropagation of arbitrary hybrid programs is now supported, via integration with
+  [Enzyme AD](https://enzyme.mit.edu/).
   [(#158)](https://github.com/PennyLaneAI/catalyst/pull/158)
   [(#193)](https://github.com/PennyLaneAI/catalyst/pull/193)
   [(#224)](https://github.com/PennyLaneAI/catalyst/pull/224)
@@ -105,15 +105,13 @@
   [(#239)](https://github.com/PennyLaneAI/catalyst/pull/239)
   [(#244)](https://github.com/PennyLaneAI/catalyst/pull/244)
 
-  This allows `catalyst.grad` to support qjit-compiled programs that contain
-  both classical pre-processing and quantum processing via a combination of
-  classical backpropagation and quantum gradient methods.
+  This allows `catalyst.grad` to differentiate hybrid functions that contain both classical
+  pre-processing (inside & outside of QNodes), QNodes, as well as classical post-processing
+  (outside of QNodes) via a combination of backpropagation and quantum gradient methods.
 
-  Note that currently, `catalyst.grad` still defaults to finite-diff. To enable
-  high-performance reverse mode automatic differentiation of arbitrary
-  classical preprocessing, specify `method=auto` on the `grad`
-  operation, in conjunction with either `"parameter-shift"` or `"adjoint"`
-  specified as the `diff_method` on each QNode:
+  The new default for the differentiation `method` attribute in `catalyst.grad` has been changed to
+  `"auto"`, which performs Enzyme-based reverse mode AD on classical code, in conjunction with the
+  quantum `diff_method` specified on each QNode:
 
   ```python
   dev = qml.device("lightning.qubit", wires=1)
@@ -130,8 +128,8 @@
   array(0.05938718)
   ```
 
-  This re-working of the internal gradient architecture means you can now compute exact
-  derivatives of programs with both classical preprocessing and postprocessing.
+  The reworked differentiation pipeline means you can now compute exact derivatives of programs with
+  both classical pre- and post-processing, as shown below:
 
   ```python
   @qml.qnode(qml.device("lightning.qubit", wires=1), diff_method="adjoint")
@@ -152,7 +150,7 @@
   array(-1.90958669)
   ```
 
-  You can use multiple QNodes with different differentiation methods:
+  You can also use multiple QNodes with different differentiation methods:
 
   ```python
   @qml.qnode(qml.device("lightning.qubit", wires=1), diff_method="parameter-shift")
@@ -178,7 +176,7 @@
   array([ 0.57367285, 44.4911605 ])
   ```
 
-  You can even differentiate purely classical code:
+  And you can differentiate purely classical functions as well:
 
   ```python
   def square(x: float):
@@ -193,6 +191,10 @@
   >>> dsquare(2.3)
   array(4.6)
   ```
+
+  Note that the current implementation of reverse mode AD is restricted to 1st order derivatives,
+  but you can still use `catalyst.grad(method="fd")` is still available to perform a finite
+  differences approximation of _any_ differentiable function.
 
 * Add support for the new PennyLane arithmetic operators.
   [(#250)](https://github.com/PennyLaneAI/catalyst/pull/250)
