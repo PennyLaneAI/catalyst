@@ -81,13 +81,13 @@
   [(#215)](https://github.com/PennyLaneAI/catalyst/pull/215)
   [(#221)](https://github.com/PennyLaneAI/catalyst/pull/221)
 
-  For example, a program that accepts a dictionary of nested lists as well as a tuple:
+  For example, a program that accepts and returns a mix of dictionaries, lists, and tuples:
 
   ```python
   @qjit
   def workflow(params1, params2):
       res1 = params1["a"][0][0] + params2[1]
-      return jnp.sin(res1)
+      return {"y1": jnp.sin(res1), "y2": jnp.cos(res1)}
   ```
 
   ```pycon
@@ -261,7 +261,6 @@
 
   - Allow nested Hamiltonian observables.
     [(#255)](https://github.com/PennyLaneAI/catalyst/pull/255)
-
 
     ```python
     @qjit
