@@ -26,6 +26,7 @@ from catalyst.ag_utils import AutoGraphError, autograph_source, check_cache
 # pylint: disable=missing-function-docstring
 # pylint: disable=unnecessary-lambda-assignment
 
+
 def test_unavailable(mocker):
     """Check the error produced in the absence of tensorflow."""
     mocker.patch.dict("sys.modules", {"tensorflow": None})
