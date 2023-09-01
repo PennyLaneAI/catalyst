@@ -78,6 +78,7 @@
 * QJIT-compiled programs now support (nested) container types as inputs and outputs of compiled
   functions. This includes lists and dictionaries, as well as any data structure implementing the
   [PyTree protocol](https://jax.readthedocs.io/en/latest/pytrees.html).
+  [(#215)](https://github.com/PennyLaneAI/catalyst/pull/215)
   [(#221)](https://github.com/PennyLaneAI/catalyst/pull/221)
 
   For example, a program that accepts a dictionary of nested lists as well as a tuple:
@@ -236,67 +237,65 @@
 
 <h3>Improvements</h3>
 
-* Support for Hamiltonian observables with integer coefficients has been added.
-  [(#248)](https://github.com/PennyLaneAI/catalyst/pull/248)
+* Better support for Hamiltonian observables:
 
-  For example, compiling the following circuit wasn't previously allowed, but is
-  now supported in Catalyst:
+  - Allow Hamiltonian observables with integer coefficients.
+    [(#248)](https://github.com/PennyLaneAI/catalyst/pull/248)
 
-  ```python
-  dev = qml.device("lightning.qubit", wires=2)
+    For example, compiling the following circuit wasn't previously allowed, but is
+    now supported in Catalyst:
 
-  @qjit
-  @qml.qnode(dev)
-  def circuit(x: float, y: float):
-      qml.RX(x, wires=0)
-      qml.RY(y, wires=1)
+    ```python
+    dev = qml.device("lightning.qubit", wires=2)
 
-      coeffs = [1, 2]
-      obs = [qml.PauliZ(0), qml.PauliZ(1)]
-      return qml.expval(qml.Hamiltonian(coeffs, obs))
-  ```
+    @qjit
+    @qml.qnode(dev)
+    def circuit(x: float, y: float):
+        qml.RX(x, wires=0)
+        qml.RY(y, wires=1)
 
-* Support for nested Hamiltonian observables has been added.
-  [(#255)](https://github.com/PennyLaneAI/catalyst/pull/255)
+        coeffs = [1, 2]
+        obs = [qml.PauliZ(0), qml.PauliZ(1)]
+        return qml.expval(qml.Hamiltonian(coeffs, obs))
+    ```
+
+  - Allow nested Hamiltonian observables.
+    [(#255)](https://github.com/PennyLaneAI/catalyst/pull/255)
 
 
-  ```python
-  @qjit
-  @qml.qnode(qml.device("lightning.qubit", wires=3))
-  def circuit(x, y, coeffs1, coeffs2):
-      qml.RX(x, wires=0)
-      qml.RX(y, wires=1)
-      qml.RY(x + y, wires=2)
+    ```python
+    @qjit
+    @qml.qnode(qml.device("lightning.qubit", wires=3))
+    def circuit(x, y, coeffs1, coeffs2):
+        qml.RX(x, wires=0)
+        qml.RX(y, wires=1)
+        qml.RY(x + y, wires=2)
 
-      obs = [
-          qml.PauliX(0) @ qml.PauliZ(1),
-          qml.Hamiltonian(coeffs1, [qml.PauliZ(0) @ qml.Hadamard(2)]),
-      ]
+        obs = [
+            qml.PauliX(0) @ qml.PauliZ(1),
+            qml.Hamiltonian(coeffs1, [qml.PauliZ(0) @ qml.Hadamard(2)]),
+        ]
 
-      return qml.var(qml.Hamiltonian(coeffs2, obs))
-  ```
+        return qml.var(qml.Hamiltonian(coeffs2, obs))
+    ```
 
 * Various performance improvements:
 
-  - Eliminate redundant flatten/unflatten operations of PyTree parameters in Catalyst control flow
-    operations.
-    [(#215)](https://github.com/PennyLaneAI/catalyst/pull/215)
-
-  - The execution and compile times of programs has been reduced, by generating more efficient code
+  - The execution and compile time of programs has been reduced, by generating more efficient code
     and avoiding unnecessary optimizations. Specifically, a scalarization procedure was added to the
-    MLIR pass pipeline and LLVM IR compilation is now invoked with optimization level 0.
+    MLIR pass pipeline, and LLVM IR compilation is now invoked with optimization level 0.
     [(#217)](https://github.com/PennyLaneAI/catalyst/pull/217)
 
-  - Execution speed has been improved by:
-
-    + only loading the shared library once per compilation,
-    + generating return value type only once per compilation,
-    + avoiding type promotion, and
-    + avoiding unnecessary copies.
-
-    This leads to a small but measurable improvement when using larger matrices
-    as inputs, or functions with many inputs.
+  - The execution time of compiled functions has been improved in the frontend.
     [(#213)](https://github.com/PennyLaneAI/catalyst/pull/213)
+
+    Specifically, the following changes have been made, which leads to a small but measurable
+    improvement when using larger matrices as inputs, or functions with many inputs:
+
+    + only loading the user program library once per compilation,
+    + generating return value types only once per compilation,
+    + avoiding unnecessary type promotion, and
+    + avoiding unnecessary array copies.
 
   - Peak memory utilization of a JIT compiled program has been reduced, by allowing tensors to be
     scheduled for deallocation. Previously, the tensors were not deallocated until the end of the
