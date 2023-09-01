@@ -26,20 +26,20 @@ from catalyst.ag_utils import AutoGraphError, autograph_source, check_cache
 # pylint: disable=missing-function-docstring
 # pylint: disable=unnecessary-lambda-assignment
 
+def test_unavailable(mocker):
+    """Check the error produced in the absence of tensorflow."""
+    mocker.patch.dict("sys.modules", {"tensorflow": None})
+
+    def fn(x):
+        return x**2
+
+    with pytest.raises(ImportError, match="AutoGraph feature in Catalyst requires TensorFlow"):
+        qjit(autograph=True)(fn)
+
 
 @pytest.mark.tf
 class TestIntegration:
     """Test that the autograph transformations trigger correctly in different settings."""
-
-    def test_unavailable(self, monkeypatch):
-        """Check the error produced in the absence of tensorflow."""
-        monkeypatch.syspath_prepend(os.path.join(os.path.dirname(__file__), "mock"))
-
-        def fn(x):
-            return x**2
-
-        with pytest.raises(ImportError, match="AutoGraph feature in Catalyst requires TensorFlow"):
-            qjit(autograph=True)(fn)
 
     def test_unsupported_object(self):
         """Check the error produced when attempting to convert an unsupported object (neither of
