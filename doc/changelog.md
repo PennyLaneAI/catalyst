@@ -42,64 +42,38 @@
   variables or object mutation inside of methods. A functional style is always recommended when
   using `qjit` or AutoGraph.
 
-* The quantum adjoint operation can now be natively represented in Catalyst programs
-  using `catalyst.adjoint`.
+* The quantum adjoint operation can now be used in conjunction with Catalyst control flow, such as
+  loops and conditionals. For this purpose a new instruction, `catalyst.adjoint`, has been added.
   [(#220)](https://github.com/PennyLaneAI/catalyst/pull/220)
 
-  The `catalyst.adjoint` function computes the
-  adjoint of the quantum computation defined by a provided quantum function.
-
-  An advantage of using the Catalyst-native adjoint is that the adjoint
-  operation now shares the usual Catalyst benefits; namely,
-
-  - reduced circuit size(and corresponding faster compile times!) when using
-    control flow, and
-  - performance benefits from Catalyst's Just-In-Time compilation.
-
-  Quantum functions with arbitrary Catalyst control flow can have their
-  adjoint versions computed, even when the control flow contains classical
-  preprocessing:
+  `catalyst.adjoint` can wrap around quantum functions which contain the Catalyst `cond`,
+  `for_loop`, and `while_loop` primitives. Previously, the usage of `qml.adjoint` on functions with
+  these primitives would result in decomposition errors. Note that a future release of Catalyst will
+  merge the behaviour of `catalyst.adjoint` into `qml.adjoint` for convenience.
 
   ```python
-  def circuit_control_flow(theta):
-      @for_loop(0, 6, 1)
-      def loop_outer(iv):
-          qml.RX(theta / 2, wires=0)
-
-          # This loop both applies gates and computes a classical gate parameter!
-          @for_loop(0, iv, 2)
-          def loop_inner(jv, ub):
-              qml.RY(theta, wires=0)
-              return ub + jv
-
-          ub = loop_inner(1)
-
-          qml.RX(theta / ub, wires=0)
-
-          @while_loop(lambda counter: counter < ub)
-          def while_loop_inner(counter):
-              qml.RZ(ub / 5, wires=0)
-              return counter + 1
-
-          final = while_loop_inner(0)
-
-          qml.RX(theta / final, wires=0)
-
-      loop_outer()
-
-  dev = qml.device("lightning.qubit", wires=1)
+  dev = qml.device("lightning.qubit", wires=3)
 
   @qjit
   @qml.qnode(dev)
   def circuit(x):
-      catalyst.adjoint(circuit_control_flow)(x)
+
+      @for_loop(0, 3, 1)
+      def repeat_rx(i):
+          qml.RX(x / 2, wires=i)
+
+      adjoint(repeat_rx)()
+
       return qml.expval(qml.PauliZ(0))
   ```
 
   ```pycon
   >>> circuit(0.2)
-  array(0.23572496)
+  array(0.99500417)
   ```
+
+  Additionally, the ability to natively represent the adjoint construct in Catalyst's program
+  representation (IR) was added.
 
 * QJIT-compiled programs now support container-like and nested Python
   structures as input and return values, such as lists of lists or
