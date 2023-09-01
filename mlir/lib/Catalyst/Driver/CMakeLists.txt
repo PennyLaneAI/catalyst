@@ -47,4 +47,7 @@ add_mlir_library(CatalystCompilerDriver
     ${EXTERNAL_LIB}
 
     EnzymeStatic-${LLVM_VERSION_MAJOR}
+    DEPENDS
+    EnzymeStatic-${LLVM_VERSION_MAJOR}
+
 )

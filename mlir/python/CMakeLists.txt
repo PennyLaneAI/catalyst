@@ -42,7 +42,6 @@ declare_mlir_python_extension(CatalystPythonDriver
     PyCompilerDriver.cpp
   PRIVATE_LINK_LIBS
     QuantumCAPI
-
 )
 
 ################################################################################

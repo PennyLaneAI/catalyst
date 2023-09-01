@@ -40,7 +40,6 @@
 #include "Catalyst/Transforms/Passes.h"
 #include "Gradient/IR/GradientDialect.h"
 #include "Gradient/Transforms/Passes.h"
-#include "Quantum-c/Dialects.h"
 #include "Quantum/IR/QuantumDialect.h"
 #include "Quantum/Transforms/Passes.h"
 
