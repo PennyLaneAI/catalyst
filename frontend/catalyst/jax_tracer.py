@@ -411,6 +411,22 @@ class Adjoint(HybridOp):
         qrp2 = QRegPromise(op_results[-1])
         return qrp2
 
+class QCtrl(HybridOp):
+    """Catalyst quantum ctrl operation"""
+
+    def _no_binder(*_):
+        raise NotImplementedError("QCtrl does not support JAX binding")
+
+    binder = _no_binder
+
+    def __init__(self, *args, control_wire_tracers, control_value_tracers, **kwargs):
+        self.control_wire_tracers: List[Any] = control_wire_tracers
+        self.control_value_tracers: List[Any] = control_value_tracers
+        super().__init__(*args, **kwargs)
+
+    def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
+        raise NotImplementedError("QCtrl does not support JAX quantum tracing")
+
 
 def trace_to_mlir(func, *args, **kwargs):
     """Lower a Python function into an MLIR module.
