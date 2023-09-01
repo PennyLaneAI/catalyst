@@ -75,12 +75,12 @@
   Additionally, the ability to natively represent the adjoint construct in Catalyst's program
   representation (IR) was added.
 
-* QJIT-compiled programs now support container-like and nested Python
-  structures as input and return values, such as lists of lists or
-  dictionaries.
+* QJIT-compiled programs now support (nested) container types as inputs and outputs of compiled
+  functions. This includes lists and dictionaries, as well as any data structure implementing the
+  [PyTree protocol](https://jax.readthedocs.io/en/latest/pytrees.html).
   [(#221)](https://github.com/PennyLaneAI/catalyst/pull/221)
 
-  For example, a program that accepts dictionaries of nested lists:
+  For example, a program that accepts a dictionary of nested lists as well as a tuple:
 
   ```python
   @qjit
@@ -95,37 +95,6 @@
   >>> workflow(params1, params2)
   array(0.78332691)
   ```
-
-  Another example, a program that returns a dictionary:
-
-  ```python
-  dev = qml.device("lightning.qubit", wires=2, shots=100)
-
-  @qjit
-  @qml.qnode(dev)
-  def circuit(params):
-      """A hybrid circuit"""
-      qml.RX(params[0] * jnp.pi(), wires=0)
-      qml.RX(params[1], wires=1)
-      return {
-          "counts": qml.counts(),
-          "state": qml.state(),
-          "expval": {
-              "z0": qml.expval(qml.PauliZ(0)),
-              "z1": qml.expval(qml.PauliZ(1)),
-          },
-      }
-  ```
-
-  ```pycon
-  >>> circuit([0.5, 0.6])
-  {'counts': (array([0., 1., 2., 3.]), array([44, 48,  5,  3])),
-   'expval': {'z0': array(2.01227923e-16), 'z1': array(0.82533561)},
-   'state': array([ 0.67552491+0.j        ,  0.        -0.20896434j,
-                    0.        -0.67552491j, -0.20896434+0.j        ])}
-  ```
-
-  This is achieved by adding support for the JAX PyTree API.
 
 * Compile-time backpropagation of arbitrary hybrid programs is now supported,
   via integration with [Enzyme AD](https://enzyme.mit.edu/).
