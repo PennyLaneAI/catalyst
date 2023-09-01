@@ -170,8 +170,9 @@
   [#244](https://github.com/PennyLaneAI/catalyst/pull/244)
 
   This enables high-performance reverse mode automatic differentiation of programs when
-  ``method="defer"`` is specified on the ``grad`` operation in conjunction with either
-  ``"parameter-shift"`` or ``"adjoint"`` specified as the ``diff_method`` on each QNode:
+  ``method="auto"`` (now the default) is specified on the ``grad`` operation in conjunction
+  with either ``"parameter-shift"`` or ``"adjoint"`` specified as the ``diff_method`` on each
+  QNode:
 
   ```python
   @qml.qnode(qml.device("lightning.qubit", wires=1), diff_method="parameter-shift")
@@ -181,7 +182,7 @@
 
   @qjit
   def grad_circuit(theta):
-      return catalyst.grad(circuit, method="defer")(theta)
+      return catalyst.grad(circuit, method="auto")(theta)
   ```
 
   ```pycon
@@ -200,10 +201,10 @@
 
   def loss(theta):
       return jnp.pi / jnp.tanh(circuit(theta))
-  
+
   @qjit
   def grad_loss(theta):
-      return catalyst.grad(loss, method="defer")(theta)
+      return catalyst.grad(loss)(theta)
   ```
 
   ```pycon
@@ -229,7 +230,7 @@
 
   @qjit
   def grad_loss(theta):
-      return catalyst.grad(loss, method="defer")(theta)
+      return catalyst.grad(loss)(theta)
   ```
 
   ```pycon
@@ -245,7 +246,7 @@
 
   @qjit
   def dsquare(x: float):
-      return catalyst.grad(square, method="defer")(x)
+      return catalyst.grad(square)(x)
   ```
 
   ```pycon
@@ -373,6 +374,17 @@
   ```
 
 <h3>Breaking changes</h3>
+
+* The default differentiation method on ``grad`` and ``jacobian`` is reverse-mode
+  automatic differentiation instead of finite differences. When a QNode does not have a
+  ``diff_method`` specified, it will default to using the parameter shift method instead of
+  finite-differences.
+  [#244](https://github.com/PennyLaneAI/catalyst/pull/244)
+  [#271](https://github.com/PennyLaneAI/catalyst/pull/271)
+
+* The JAX version used by Catalyst has been updated to `v0.4.14`, the minimum PennyLane version
+  required is now `v0.32`.
+  [#264](https://github.com/PennyLaneAI/catalyst/pull/264)
 
 * Support for Python 3.8 is dropped.
   [#231](https://github.com/PennyLaneAI/catalyst/pull/231)
@@ -727,7 +739,7 @@ David Ittah.
   As part of this change, the `method` argument now accepts
   the following options:
 
-  - `method="defer"`:  Quantum components of the hybrid function are
+  - `method="auto"`:  Quantum components of the hybrid function are
     differentiated according to the corresponding QNode `diff_method`, while
     the classical computation is differentiated using traditional auto-diff.
 
