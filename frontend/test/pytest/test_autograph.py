@@ -14,7 +14,6 @@
 
 """PyTests for the AutoGraph source-to-source transformation feature."""
 
-import os
 
 import numpy as np
 import pennylane as qml
