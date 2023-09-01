@@ -48,7 +48,6 @@ declare_mlir_python_extension(QuantumPythonSources.Extension
 # Common CAPI
 ################################################################################
 
-add_library(CatalystPythonDriver MODULE PyCompilerDriver.cpp)
 
 add_mlir_python_common_capi_library(QuantumPythonCAPI
   INSTALL_COMPONENT QuantumPythonModules
@@ -61,13 +60,37 @@ add_mlir_python_common_capi_library(QuantumPythonCAPI
     MLIRPythonSources.Core
 )
 
-set(LOCAL_LIBS MLIRPresburger;MLIRAnalysis;MLIRAsmParser;MLIRBytecodeReader;MLIRBytecodeWriter;MLIRBytecodeOpInterface;MLIRAffineToStandard;MLIRAMDGPUToROCDL;MLIRArithAttrToLLVMConversion;MLIRArithToLLVM;MLIRArithToSPIRV;MLIRArmNeon2dToIntr;MLIRAsyncToLLVM;MLIRBufferizationToMemRef;MLIRComplexToLLVM;MLIRComplexToLibm;MLIRComplexToSPIRV;MLIRComplexToStandard;MLIRControlFlowToLLVM;MLIRControlFlowToSPIRV;MLIRFuncToLLVM;MLIRFuncToSPIRV;MLIRGPUToGPURuntimeTransforms;MLIRGPUToNVVMTransforms;MLIRGPUToROCDLTransforms;MLIRGPUToSPIRV;MLIRGPUToVulkanTransforms;MLIRIndexToLLVM;MLIRLinalgToLLVM;MLIRLinalgToStandard;MLIRLLVMCommonConversion;MLIRMathToFuncs;MLIRMathToLibm;MLIRMathToLLVM;MLIRMathToSPIRV;MLIRMemRefToLLVM;MLIRMemRefToSPIRV;MLIRNVGPUToNVVM;MLIROpenACCToSCF;MLIROpenMPToLLVM;MLIRPDLToPDLInterp;MLIRReconcileUnrealizedCasts;MLIRSCFToControlFlow;MLIRSCFToGPU;MLIRSCFToOpenMP;MLIRSCFToSPIRV;MLIRShapeToStandard;MLIRSPIRVToLLVM;MLIRTensorToLinalg;MLIRTensorToSPIRV;MLIRTosaToArith;MLIRTosaToLinalg;MLIRTosaToSCF;MLIRTosaToTensor;MLIRVectorToLLVM;MLIRVectorToGPU;MLIRVectorToSCF;MLIRVectorToSPIRV;MLIRObservers;MLIRDebug;MLIRAffineAnalysis;MLIRAffineDialect;MLIRAffineTransforms;MLIRAffineTransformOps;MLIRAffineUtils;MLIRAMDGPUDialect;MLIRAMDGPUTransforms;MLIRAMDGPUUtils;MLIRArithDialect;MLIRArithValueBoundsOpInterfaceImpl;MLIRArithTransforms;MLIRArithUtils;MLIRArmNeonDialect;MLIRArmSMEDialect;MLIRArmSMETransforms;MLIRArmSVEDialect;MLIRArmSVETransforms;MLIRAsyncDialect;MLIRAsyncTransforms;MLIRAMXDialect;MLIRAMXTransforms;MLIRBufferizationDialect;MLIRBufferizationTransformOps;MLIRBufferizationTransforms;MLIRComplexDialect;MLIRControlFlowDialect;MLIRDLTIDialect;MLIREmitCDialect;MLIRFuncInlinerExtension;MLIRFuncAllExtensions;MLIRFuncDialect;MLIRFuncTransforms;MLIRGPUDialect;MLIRGPUTransforms;MLIRGPUTransformOps;MLIRIndexDialect;MLIRIRDL;MLIRLinalgDialect;MLIRLinalgTransformOps;MLIRLinalgTransforms;MLIRLinalgUtils;MLIRLLVMIRTransforms;MLIRLLVMDialect;MLIRNVVMDialect;MLIRROCDLDialect;MLIRMathDialect;MLIRMathTransforms;MLIRMemRefDialect;MLIRMemRefTransformOps;MLIRMemRefTransforms;MLIRMemRefUtils;MLIRMLProgramDialect;MLIRNVGPUDialect;MLIRNVGPUUtils;MLIRNVGPUTransforms;MLIROpenACCDialect;MLIROpenMPDialect;MLIRPDLDialect;MLIRPDLInterpDialect;MLIRQuantDialect;MLIRQuantUtils;MLIRSCFDialect;MLIRSCFTransformOps;MLIRSCFTransforms;MLIRSCFUtils;MLIRShapeDialect;MLIRShapeOpsTransforms;MLIRSparseTensorEnums;MLIRSparseTensorDialect;MLIRSparseTensorTransforms;MLIRSparseTensorPipelines;MLIRSparseTensorUtils;MLIRSPIRVDialect;MLIRSPIRVModuleCombiner;MLIRSPIRVConversion;MLIRSPIRVTransforms;MLIRSPIRVUtils;MLIRTensorDialect;MLIRTensorInferTypeOpInterfaceImpl;MLIRTensorTilingInterfaceImpl;MLIRTensorTransforms;MLIRTensorTransformOps;MLIRTensorUtils;MLIRTosaDialect;MLIRTosaTransforms;MLIRTransformDialect;MLIRTransformPDLExtension;MLIRTransformDialectTransforms;MLIRTransformDialectUtils;MLIRDialectUtils;MLIRVectorDialect;MLIRMaskableOpInterface;MLIRMaskingOpInterface;MLIRVectorTransforms;MLIRVectorTransformOps;MLIRVectorUtils;MLIRX86VectorDialect;MLIRX86VectorTransforms;MLIRDialect;MLIRIR;MLIRCallInterfaces;MLIRCastInterfaces;MLIRControlFlowInterfaces;MLIRCopyOpInterface;MLIRDataLayoutInterfaces;MLIRDerivedAttributeOpInterface;MLIRDestinationStyleOpInterface;MLIRInferIntRangeInterface;MLIRInferTypeOpInterface;MLIRLoopLikeInterface;MLIRMemorySlotInterfaces;MLIRParallelCombiningOpInterface;MLIRRuntimeVerifiableOpInterface;MLIRShapedOpInterfaces;MLIRSideEffectInterfaces;MLIRTilingInterface;MLIRVectorInterfaces;MLIRViewLikeInterface;MLIRValueBoundsOpInterface;MLIRInferIntRangeCommon;MLIRParser;MLIRPass;MLIRReduce;MLIRRewrite;MLIRSupport;MLIRTableGen;MLIRTargetCpp;MLIRSPIRVDeserialization;MLIRSPIRVSerialization;MLIRSPIRVBinaryUtils;MLIRSPIRVTranslateRegistration;MLIRArmNeonToLLVMIRTranslation;MLIRArmSMEToLLVMIRTranslation;MLIRArmSVEToLLVMIRTranslation;MLIRAMXToLLVMIRTranslation;MLIRBuiltinToLLVMIRTranslation;MLIRGPUToLLVMIRTranslation;MLIRLLVMIRToLLVMTranslation;MLIRLLVMToLLVMIRTranslation;MLIRNVVMToLLVMIRTranslation;MLIROpenACCToLLVMIRTranslation;MLIROpenMPToLLVMIRTranslation;MLIRROCDLToLLVMIRTranslation;MLIRX86VectorToLLVMIRTranslation;MLIRTargetLLVMIRExport;MLIRToLLVMIRTranslationRegistration;MLIRTargetLLVMIRImport;MLIRFromLLVMIRTranslationRegistration;MLIRLspServerSupportLib;MLIRLspServerLib;MLIROptLib;MLIRReduceLib;MLIRTblgenLib;MLIRTranslateLib;MLIRPDLLAST;MLIRPDLLCodeGen;MLIRPDLLODS;MLIRPluginsLib;MLIRTransformUtils;MLIRTransforms;MLIRExecutionEngineUtils;MLIRExecutionEngine;MLIRJitRunner;mlir_float16_utils;MLIRSparseTensorRuntime;mlir_c_runner_utils;mlir_runner_utils;mlir_async_runtime)
-target_link_libraries(CatalystPythonDriver PRIVATE pybind11::headers pybind11::module QuantumCAPI QuantumPythonCAPI ${LLVM_LIBS} ${LOCAL_LIBS} LLVMSupport CatalystCompilerDriver MLIRCatalyst MLIRQuantum MLIRGradient)
+get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
+get_property(conversion_libs GLOBAL PROPERTY MLIR_CONVERSION_LIBS)
+get_property(extension_libs GLOBAL PROPERTY MLIR_EXTENSION_LIBS)
+set(LIBS
+    ${dialect_libs}
+    ${conversion_libs}
+    ${extension_libs}
+    MLIROptLib
+    MLIRCatalyst
+    MLIRCatalystTransforms
+    MLIRQuantum
+    quantum-transforms
+    MLIRGradient
+    gradient-transforms
+
+    CatalystCompilerDriver
+    QuantumPythonCAPI
+
+    MhloRegisterDialects
+    StablehloRegister
+    ${ALL_MHLO_PASSES}
+)
+
+add_library(CatalystPythonDriver MODULE PyCompilerDriver.cpp)
+
+target_link_libraries(CatalystPythonDriver PRIVATE pybind11::headers pybind11::module ${LIBS})
 
 set_target_properties(CatalystPythonDriver PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${MLIR_BINARY_DIR}/python_packages/quantum/mlir_quantum/compiler_driver)
-set_target_properties(CatalystPythonDriver PROPERTIES BUILD_WITH_INSTALL_RPATH OFF BUILD_RPATH $ORIGIN INSTALL_RPATH $ORIGIN )
-set_target_properties(CatalystPythonDriver PROPERTIES BUILD_WITH_INSTALL_RPATH OFF BUILD_RPATH ${MLIR_BINARY_DIR}/python_packages/quantum/mlir_quantum/compiler_driver INSTALL_RPATH ${MLIR_BINARY_DIR}/python_packages/quantum/mlir_quantum/compiler_driver)
-set_target_properties(CatalystPythonDriver PROPERTIES BUILD_WITH_INSTALL_RPATH OFF BUILD_RPATH ${MLIR_BINARY_DIR}/python_packages/quantum/mlir_quantum/compiler_driver INSTALL_RPATH ${MLIR_BINARY_DIR}/python_packages/quantum/mlir_quantum/_mlir_libs)
+#set_target_properties(CatalystPythonDriver PROPERTIES BUILD_WITH_INSTALL_RPATH OFF BUILD_RPATH $ORIGIN INSTALL_RPATH $ORIGIN )
+#set_target_properties(CatalystPythonDriver PROPERTIES BUILD_WITH_INSTALL_RPATH OFF BUILD_RPATH ${MLIR_BINARY_DIR}/python_packages/quantum/mlir_quantum/compiler_driver INSTALL_RPATH ${MLIR_BINARY_DIR}/python_packages/quantum/mlir_quantum/compiler_driver)
+#set_target_properties(CatalystPythonDriver PROPERTIES BUILD_WITH_INSTALL_RPATH OFF BUILD_RPATH ${MLIR_BINARY_DIR}/python_packages/quantum/mlir_quantum/compiler_driver INSTALL_RPATH ${MLIR_BINARY_DIR}/python_packages/quantum/mlir_quantum/_mlir_libs)
 
 ################################################################################
 # Instantiation of all Python modules
