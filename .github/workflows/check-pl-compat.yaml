@@ -66,7 +66,7 @@ jobs:
     - uses: actions/cache@v3
       with:
         path: enzyme-build
-        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.enzyme_version }}-default-build
+        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-build
         fail-on-cache-miss: True
     - uses: actions/cache@v3
       with:

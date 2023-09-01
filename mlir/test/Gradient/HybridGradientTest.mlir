@@ -33,7 +33,7 @@ func.func @gradCallScalarScalar(%arg0: f64) -> f64 {
     // CHECK:        [[pcount:%.+]] = call @funcScalarScalar.pcount
     // CHECK:        [[grad:%.+]] = call @funcScalarScalar.fullgrad0(%arg0, [[pcount]])
     // CHECK:        return [[grad]]
-    %0 = gradient.grad "defer" @funcScalarScalar(%arg0) : (f64) -> f64
+    %0 = gradient.grad "auto" @funcScalarScalar(%arg0) : (f64) -> f64
     func.return %0 : f64
 }
 
@@ -61,7 +61,7 @@ func.func @gradCallScalarPointTensor(%arg0: f64) -> tensor<f64> {
     // CHECK:        [[pcount:%.+]] = call @funcScalarPointTensor.pcount
     // CHECK:        [[grad:%.+]] = call @funcScalarPointTensor.fullgrad0(%arg0, [[pcount]])
     // CHECK:        return [[grad]]
-    %0 = gradient.grad "defer" @funcScalarPointTensor(%arg0) : (f64) -> tensor<f64>
+    %0 = gradient.grad "auto" @funcScalarPointTensor(%arg0) : (f64) -> tensor<f64>
     func.return %0 : tensor<f64>
 }
 
@@ -88,7 +88,7 @@ func.func @gradCallPointTensorScalar(%arg0: tensor<f64>) -> f64 {
     // CHECK:        [[pcount:%.+]] = call @funcPointTensorScalar.pcount
     // CHECK:        [[grad:%.+]] = call @funcPointTensorScalar.fullgrad0(%arg0, [[pcount]])
     // CHECK:        return [[grad]]
-    %0 = gradient.grad "defer" @funcPointTensorScalar(%arg0) : (tensor<f64>) -> f64
+    %0 = gradient.grad "auto" @funcPointTensorScalar(%arg0) : (tensor<f64>) -> f64
     func.return %0 : f64
 }
 
@@ -113,7 +113,7 @@ func.func @gradCallPointTensorPointTensor(%arg0: tensor<f64>) -> tensor<f64> {
     // CHECK:        [[pcount:%.+]] = call @funcPointTensorPointTensor.pcount
     // CHECK:        [[grad:%.+]] = call @funcPointTensorPointTensor.fullgrad0(%arg0, [[pcount]])
     // CHECK:        return [[grad]]
-    %0 = gradient.grad "defer" @funcPointTensorPointTensor(%arg0) : (tensor<f64>) -> tensor<f64>
+    %0 = gradient.grad "auto" @funcPointTensorPointTensor(%arg0) : (tensor<f64>) -> tensor<f64>
     func.return %0 : tensor<f64>
 }
 
@@ -166,7 +166,7 @@ func.func @gradCallScalarTensor(%arg0: f64) -> tensor<2x3xf64> {
     // CHECK:        [[pcount:%.+]] = call @funcScalarTensor.pcount
     // CHECK:        [[grad:%.+]] = call @funcScalarTensor.fullgrad0(%arg0, [[pcount]])
     // CHECK:        return [[grad]]
-    %0 = gradient.grad "defer" @funcScalarTensor(%arg0) : (f64) -> tensor<2x3xf64>
+    %0 = gradient.grad "auto" @funcScalarTensor(%arg0) : (f64) -> tensor<2x3xf64>
     func.return %0 : tensor<2x3xf64>
 }
 
@@ -192,7 +192,7 @@ func.func @gradCallTensorScalar(%arg0: tensor<3xf64>) -> tensor<3xf64> {
     // CHECK:        [[pcount:%.+]] = call @funcTensorScalar.pcount
     // CHECK:        [[grad:%.+]] = call @funcTensorScalar.fullgrad0(%arg0, [[pcount]])
     // CHECK:        return [[grad]]
-    %2 = gradient.grad "defer" @funcTensorScalar(%arg0) : (tensor<3xf64>) -> tensor<3xf64>
+    %2 = gradient.grad "auto" @funcTensorScalar(%arg0) : (tensor<3xf64>) -> tensor<3xf64>
     func.return %2 : tensor<3xf64>
 }
 
@@ -229,7 +229,7 @@ func.func @gradCallTensorTensor(%arg0: tensor<7x3x2x1xf64>) -> tensor<7x3x2x1x2x
     // CHECK:        [[pcount:%.+]] = call @funcTensorTensor.pcount
     // CHECK:        [[grad:%.+]] = call @funcTensorTensor.fullgrad0(%arg0, [[pcount]])
     // CHECK:        return [[grad]]
-    %2 = gradient.grad "defer" @funcTensorTensor(%arg0) : (tensor<7x3x2x1xf64>) -> tensor<7x3x2x1x2xf64>
+    %2 = gradient.grad "auto" @funcTensorTensor(%arg0) : (tensor<7x3x2x1xf64>) -> tensor<7x3x2x1x2xf64>
     func.return %2 : tensor<7x3x2x1x2xf64>
 }
 
@@ -274,8 +274,8 @@ func.func @gradCallMultiArg(%arg0: tensor<f64>, %arg1: tensor<2xf64>) -> (tensor
     // CHECK:        [[grad1:%.+]] = call @funcMultiArg.fullgrad1(%arg0, %arg1
     // CHECK:        [[grad2:%.+]]:2 = call @funcMultiArg.fullgrad01(%arg0, %arg1
     // CHECK:        return [[grad0]], [[grad1]], [[grad2]]#0, [[grad2]]#1
-    %0 = gradient.grad "defer"  @funcMultiArg(%arg0, %arg1) : (tensor<f64>, tensor<2xf64>) -> tensor<f64>
-    %1 = gradient.grad "defer"  @funcMultiArg(%arg0, %arg1) {diffArgIndices = dense<[1]> : tensor<1xindex>} : (tensor<f64>, tensor<2xf64>) -> tensor<2xf64>
-    %2:2 = gradient.grad "defer" @funcMultiArg(%arg0, %arg1) {diffArgIndices = dense<[0, 1]> : tensor<2xindex>} : (tensor<f64>, tensor<2xf64>) -> (tensor<f64>, tensor<2xf64>)
+    %0 = gradient.grad "auto"  @funcMultiArg(%arg0, %arg1) : (tensor<f64>, tensor<2xf64>) -> tensor<f64>
+    %1 = gradient.grad "auto"  @funcMultiArg(%arg0, %arg1) {diffArgIndices = dense<[1]> : tensor<1xindex>} : (tensor<f64>, tensor<2xf64>) -> tensor<2xf64>
+    %2:2 = gradient.grad "auto" @funcMultiArg(%arg0, %arg1) {diffArgIndices = dense<[0, 1]> : tensor<2xindex>} : (tensor<f64>, tensor<2xf64>) -> (tensor<f64>, tensor<2xf64>)
     func.return %0, %1, %2#0, %2#1 : tensor<f64>, tensor<2xf64>, tensor<f64>, tensor<2xf64>
 }
