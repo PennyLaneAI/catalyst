@@ -448,7 +448,9 @@ def HamiltonianOp : Observable_Op<"hamiltonian", [Pure]> {
         Variadic<ObservableType>:$terms
     );
 
-    let results = (outs ObservableType:$obs);
+    let results = (outs
+        ObservableType:$obs
+    );
 
     let assemblyFormat = [{
         `(` $coeffs `:` type($coeffs) `)` $terms attr-dict `:` type(results)
@@ -533,15 +535,15 @@ def SampleOp : Measurement_Op<"sample"> {
     }];
 
     let extraClassDeclaration = [{
-      bool isBufferized() {
-        return getResultTypes().empty();
-      }
+        bool isBufferized() {
+            return getResultTypes().empty();
+        }
     }];
 
     let hasVerifier = 1;
 }
 
-def CountsOp : Measurement_Op<"counts", [AttrSizedOperandSegments, AttrSizedResultSegments]> {
+def CountsOp : Measurement_Op<"counts", [SameVariadicOperandSize, SameVariadicResultSize]> {
     let summary = "Compute sample counts for the given observable for the current state";
     let description = [{
         The `quantum.counts` operation represents the measurement process of sampling eigenvalues
@@ -591,9 +593,9 @@ def CountsOp : Measurement_Op<"counts", [AttrSizedOperandSegments, AttrSizedResu
     }];
 
     let extraClassDeclaration = [{
-      bool isBufferized() {
-        return getResultTypes().empty();
-      }
+        bool isBufferized() {
+            return getResultTypes().empty();
+        }
     }];
 
     let hasVerifier = 1;
@@ -709,9 +711,9 @@ def ProbsOp : Measurement_Op<"probs"> {
     }];
 
     let extraClassDeclaration = [{
-      bool isBufferized() {
-        return getResultTypes().empty();
-      }
+        bool isBufferized() {
+            return getResultTypes().empty();
+        }
     }];
 
     let hasVerifier = 1;
@@ -749,9 +751,9 @@ def StateOp : Measurement_Op<"state"> {
     );
 
     let extraClassDeclaration = [{
-      bool isBufferized() {
-        return getResultTypes().empty();
-      }
+        bool isBufferized() {
+            return getResultTypes().empty();
+        }
     }];
 
     let assemblyFormat = [{
@@ -767,11 +769,11 @@ def AdjointOp : Op<QuantumDialect, "adjoint", [SingleBlockImplicitTerminator<"Yi
     let regions = (region SizedRegion<1>:$region);
 
     let arguments = (ins
-      QuregType:$qreg
+        QuregType:$qreg
     );
 
     let results = (outs
-      QuregType:$out_qreg
+        QuregType:$out_qreg
     );
 
     let assemblyFormat = [{
@@ -785,11 +787,17 @@ def YieldOp : Op<QuantumDialect, "yield",
                 [Pure, ReturnLike, Terminator, ParentOneOf<["AdjointOp"]>]> {
     let summary = "Return results from quantum program regions";
 
-    let arguments = (ins Variadic<AnyTypeOf<[QuregType]>>:$results);
+    let arguments = (ins
+        Variadic<AnyTypeOf<[QuregType]>>:$results
+    );
 
-    let assemblyFormat = [{  attr-dict ($results^ `:` type($results))? }];
+    let assemblyFormat = [{
+        attr-dict ($results^ `:` type($results))?
+    }];
 
-    let builders = [OpBuilder<(ins), [{ /* nothing to do */ }]>];
+    let builders = [
+        OpBuilder<(ins), [{ /* nothing to do */ }]>
+    ];
 }
 
 #endif // QUANTUM_OPS

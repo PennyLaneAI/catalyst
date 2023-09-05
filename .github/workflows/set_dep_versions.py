@@ -48,6 +48,7 @@ with open(
 ) as f:
     f.write(
         f"""\
+# Update the version check in catalyst.__init__ when changing the JAX version.
 jax={jax_version}
 mhlo={hlo_commit}
 llvm={llvm_commit}
