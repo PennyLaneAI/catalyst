@@ -315,6 +315,9 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
 LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &output)
 {
     DialectRegistry registry;
+    static bool initialized = false;
+    if (!initialized) registerAllPasses();
+    initialized |= true;
     registerAllCatalystPasses();
     mhlo::registerAllMhloPasses();
     gml_st::registerGmlStPasses();
