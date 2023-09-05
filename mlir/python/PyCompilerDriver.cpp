@@ -12,16 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <pybind11/pybind11.h>
 #include <iostream>
 
-#include "mlir/Bindings/Python/PybindAdaptors.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include "Catalyst/Driver/CompilerDriver.h"
 
 namespace py = pybind11;
-using namespace mlir::python::adaptors;
 
 std::vector<Pipeline> parseCompilerSpec(const py::list &pipelines)
 {
@@ -77,7 +76,6 @@ PYBIND11_MODULE(libCatalystPythonDriver, m)
            bool verbose, py::list pipelines, py::list llvmPipelines,
            bool lower_to_llvm) -> CompilerOutput * {
             FunctionAttributes inferredAttributes;
-            mlir::MLIRContext ctx;
             std::string errors;
 
             CompilerOutput *output = new CompilerOutput();
@@ -85,8 +83,7 @@ PYBIND11_MODULE(libCatalystPythonDriver, m)
 
             llvm::raw_string_ostream errStream{output->diagnosticMessages};
 
-            CompilerOptions options{.ctx = &ctx,
-                                    .source = source,
+            CompilerOptions options{.source = source,
                                     .workspace = workspace,
                                     .moduleName = moduleName,
                                     .diagnosticStream = errStream,

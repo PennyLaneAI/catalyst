@@ -76,7 +76,6 @@ set(LIBS
     gradient-transforms
 
     CatalystCompilerDriver
-    QuantumPythonCAPI
 
     MhloRegisterDialects
     StablehloRegister
@@ -85,7 +84,7 @@ set(LIBS
 
 add_library(CatalystPythonDriver MODULE PyCompilerDriver.cpp)
 
-target_link_libraries(CatalystPythonDriver PRIVATE pybind11::headers pybind11::module ${LIBS})
+target_link_libraries(CatalystPythonDriver PRIVATE pybind11::headers pybind11::module -Wl,--whole-archive ${LIBS} -Wl,--no-whole-archive)
 
 set_target_properties(CatalystPythonDriver PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${MLIR_BINARY_DIR}/python_packages/quantum/mlir_quantum/compiler_driver)
 #set_target_properties(CatalystPythonDriver PROPERTIES BUILD_WITH_INSTALL_RPATH OFF BUILD_RPATH $ORIGIN INSTALL_RPATH $ORIGIN )

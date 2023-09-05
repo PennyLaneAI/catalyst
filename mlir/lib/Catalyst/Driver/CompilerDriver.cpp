@@ -250,10 +250,10 @@ LogicalResult runEnzymePasses(const CompilerOptions &options,
     return success();
 }
 
-LogicalResult runLowering(const CompilerOptions &options, ModuleOp moduleOp,
+LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, ModuleOp moduleOp,
                           CompilerOutput::PipelineOutputs &outputs)
 {
-    auto pm = PassManager::on<ModuleOp>(options.ctx, PassManager::Nesting::Implicit);
+    auto pm = PassManager::on<ModuleOp>(ctx, PassManager::Nesting::Implicit);
 
     std::unordered_map<const Pass *, std::list<Pipeline::Name>> pipelineTailMarkers;
     for (const auto &pipeline : options.pipelinesCfg) {
@@ -314,18 +314,18 @@ LogicalResult runLowering(const CompilerOptions &options, ModuleOp moduleOp,
 
 LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &output)
 {
+    DialectRegistry registry;
     registerAllCatalystPasses();
     mhlo::registerAllMhloPasses();
     gml_st::registerGmlStPasses();
 
-    DialectRegistry registry;
     registerAllCatalystDialects(registry);
     registerLLVMTranslations(registry);
-    MLIRContext *ctx = options.ctx;
-    ctx->appendDialectRegistry(registry);
-    ctx->disableMultithreading();
+    //ctx.appendDialectRegistry(registry);
+    MLIRContext ctx(registry);
+    ctx.disableMultithreading();
     ScopedDiagnosticHandler scopedHandler(
-        ctx, [&](Diagnostic &diag) { diag.print(options.diagnosticStream); });
+        &ctx, [&](Diagnostic &diag) { diag.print(options.diagnosticStream); });
 
     llvm::LLVMContext llvmContext;
     std::shared_ptr<llvm::Module> llvmModule;
@@ -334,9 +334,9 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
 
     // First attempt to parse the input as an MLIR module.
     OwningOpRef<ModuleOp> op =
-        parseMLIRSource(ctx, options.source, options.moduleName, options.diagnosticStream);
+        parseMLIRSource(&ctx, options.source, options.moduleName, options.diagnosticStream);
     if (op) {
-        if (failed(runLowering(options, *op, output.pipelineOutputs))) {
+        if (failed(runLowering(options, &ctx, *op, output.pipelineOutputs))) {
             return failure();
         }
 
@@ -382,7 +382,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
 
         // Attempt to infer the name and return type of the module from LLVM IR. This information is
         // required when executing a module given as textual IR.
-        auto function = getJITFunction(options.ctx, *llvmModule);
+        auto function = getJITFunction(&ctx, *llvmModule);
         if (succeeded(function)) {
             output.inferredAttributes.functionName = function.value()->getName().str();
 
@@ -393,8 +393,8 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
             // element type. This is because the LLVM pointer type is
             // opaque and requires looking into its uses to infer its type.
             SmallVector<RankedTensorType> returnTypes;
-            if (failed(inferMLIRReturnTypes(ctx, function.value()->getReturnType(),
-                                            Float64Type::get(ctx), returnTypes))) {
+            if (failed(inferMLIRReturnTypes(&ctx, function.value()->getReturnType(),
+                                            Float64Type::get(&ctx), returnTypes))) {
                 // Inferred return types are only required when compiling from textual IR. This
                 // inference failing is not a problem when compiling from Python.
                 CO_MSG(options, Verbosity::Urgent, "Unable to infer function return type\n");

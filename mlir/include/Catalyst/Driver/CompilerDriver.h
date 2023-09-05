@@ -56,7 +56,6 @@ struct Pipeline {
 
 /// Optional parameters, for which we provide reasonable default values.
 struct CompilerOptions {
-    mlir::MLIRContext *ctx;
     /// The textual IR (MLIR or LLVM IR)
     mlir::StringRef source;
     /// The directory to place outputs (object file and intermediate results)
