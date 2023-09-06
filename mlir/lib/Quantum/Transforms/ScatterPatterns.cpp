@@ -23,14 +23,14 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Errc.h"
 
-#include "mhlo/IR/hlo_ops.h"
-
 #include "mlir/Dialect/Index/IR/IndexOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/Verifier.h"
 #include "mlir/Transforms/DialectConversion.h"
+
+#include "mhlo/IR/hlo_ops.h"
 
 using llvm::dbgs;
 using namespace mlir;

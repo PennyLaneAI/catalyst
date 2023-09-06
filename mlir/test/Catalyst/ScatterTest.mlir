@@ -15,18 +15,24 @@
 // RUN: quantum-opt %s --scatter-lowering --split-input-file --verify-diagnostics | FileCheck %s
 
 func.func public @jit_test(%arg0: tensor<3xf64>, %arg1: tensor<i64>) -> tensor<3xf64> attributes {llvm.emit_c_interface} {
-    %0 = stablehlo.constant dense<0> : tensor<i64>
-    %1 = stablehlo.compare  LT, %arg1, %0,  SIGNED : (tensor<i64>, tensor<i64>) -> tensor<i1>
-    %2 = stablehlo.constant dense<3> : tensor<i64>
-    %3 = stablehlo.add %arg1, %2 : tensor<i64>
-    %4 = stablehlo.select %1, %3, %arg1 : tensor<i1>, tensor<i64>
-    %5 = stablehlo.convert %4 : (tensor<i64>) -> tensor<i32>
-    %6 = stablehlo.broadcast_in_dim %5, dims = [] : (tensor<i32>) -> tensor<1xi32>
-    %7 = stablehlo.constant dense<2.000000e+00> : tensor<f64>
-    %8 = "stablehlo.scatter"(%arg0, %6, %7) ({
+    %c0_i64 = arith.constant 0 : i64
+    %c3_i64 = arith.constant 3 : i64
+    %cst = arith.constant dense<2.000000e+00> : tensor<f64>
+    %extracted = tensor.extract %arg1[] : tensor<i64>
+    %0 = arith.cmpi slt, %extracted, %c0_i64 : i64
+    %extracted_0 = tensor.extract %arg1[] : tensor<i64>
+    %1 = arith.addi %extracted_0, %c3_i64 : i64
+    %extracted_1 = tensor.extract %arg1[] : tensor<i64>
+    %2 = arith.select %0, %1, %extracted_1 : i64
+    %3 = arith.trunci %2 : i64 to i32
+    %from_elements = tensor.from_elements %3 : tensor<1xi32>
+    %4 = "mhlo.scatter"(%arg0, %from_elements, %cst) ({
     ^bb0(%arg2: tensor<f64>, %arg3: tensor<f64>):
-        %9 = stablehlo.multiply %arg2, %arg3 : tensor<f64>
-        stablehlo.return %9 : tensor<f64>
-    }) {indices_are_sorted = true, scatter_dimension_numbers = #stablehlo.scatter<inserted_window_dims = [0], scatter_dims_to_operand_dims = [0]>, unique_indices = true} : (tensor<3xf64>, tensor<1xi32>, tensor<f64>) -> tensor<3xf64>
-    return %8 : tensor<3xf64>
-    }
+      %extracted_2 = tensor.extract %arg2[] : tensor<f64>
+      %extracted_3 = tensor.extract %arg3[] : tensor<f64>
+      %5 = arith.mulf %extracted_2, %extracted_3 : f64
+      %from_elements_4 = tensor.from_elements %5 : tensor<f64>
+      mhlo.return %from_elements_4 : tensor<f64>
+    }) {indices_are_sorted = true, scatter_dimension_numbers = #mhlo.scatter<inserted_window_dims = [0], scatter_dims_to_operand_dims = [0]>, unique_indices = true} : (tensor<3xf64>, tensor<1xi32>, tensor<f64>) -> tensor<3xf64>
+    return %4 : tensor<3xf64>
+  }
