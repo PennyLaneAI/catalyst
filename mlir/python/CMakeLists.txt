@@ -71,11 +71,12 @@ set(LIBS
     ${ALL_MHLO_PASSES}
 )
 
-add_library(CatalystPythonDriver MODULE PyCompilerDriver.cpp)
+add_library(compiler_driver MODULE PyCompilerDriver.cpp)
+set_target_properties(compiler_driver PROPERTIES PREFIX "")
 
-target_link_libraries(CatalystPythonDriver PRIVATE pybind11::headers pybind11::module ${LIBS})
+target_link_libraries(compiler_driver PRIVATE pybind11::headers pybind11::module ${LIBS})
 
-set_target_properties(CatalystPythonDriver PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${MLIR_BINARY_DIR}/python_packages/quantum/mlir_quantum/compiler_driver)
+set_target_properties(compiler_driver PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${MLIR_BINARY_DIR}/python_packages/quantum/mlir_quantum)
 
 ################################################################################
 # Instantiation of all Python modules
@@ -92,4 +93,4 @@ add_mlir_python_modules(QuantumPythonModules
     QuantumPythonCAPI
   )
 
-add_dependencies(QuantumPythonModules CatalystPythonDriver)
+add_dependencies(QuantumPythonModules compiler_driver)

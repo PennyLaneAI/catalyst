@@ -43,7 +43,7 @@ std::vector<Pipeline> parseCompilerSpec(const py::list &pipelines)
     return out;
 }
 
-PYBIND11_MODULE(libCatalystPythonDriver, m)
+PYBIND11_MODULE(compiler_driver, m)
 {
     //===--------------------------------------------------------------------===//
     // Catalyst Compiler Driver
