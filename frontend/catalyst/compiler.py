@@ -57,11 +57,9 @@ class CompileOptions:
 
 
 def run_writing_command(
-    command: List[str], compile_options: Optional[CompileOptions] = None
+    command: List[str], compile_options: Optional[CompileOptions]
 ) -> None:
     """Run the command after optionally announcing this fact to the user"""
-    if compile_options is None:
-        compile_options = CompileOptions()
 
     if compile_options.verbose:
         print(f"[SYSTEM] {' '.join(command)}", file=compile_options.logfile)
