@@ -190,13 +190,11 @@ LogicalResult runLLVMPasses(const CompilerOptions &options,
     llvm::FunctionAnalysisManager FAM;
     llvm::CGSCCAnalysisManager CGAM;
     llvm::ModuleAnalysisManager MAM;
-
     // Create the new pass manager builder.
     // Take a look at the PassBuilder constructor parameters for more
     // customization, e.g. specifying a TargetMachine or various debugging
     // options.
     llvm::PassBuilder PB;
-
     // Register all the basic analyses with the managers.
     PB.registerModuleAnalyses(MAM);
     PB.registerCGSCCAnalyses(CGAM);
