@@ -1,197 +1,150 @@
-# Release 0.2.2-dev
+# Release 0.3.1-dev
 
 <h3>New features</h3>
 
-* Catalyst users can now use Python control flow statements in their programs without having to
-  explicitly use the functions `cond`, `for_loop`, and `while_loop`!
-  [#235](https://github.com/PennyLaneAI/catalyst/pull/235)
+<h3>Improvements</h3>
 
-  A new experimental feature was added that automatically converts Python control flow statements
-  like `if`, `for`, and `while` into their equivalent functional forms provided by Catalyst.
-  The feature is based on the AutoGraph module from TensorFlow, and requires a working TensorFlow
-  installation.
+<h3>Breaking changes</h3>
 
-  For example, the following can now be expressed much more succinctly using Python control flow:
+<h3>Bug fixes</h3>
+
+<h3>Contributors</h3>
+
+This release contains contributions from (in alphabetical order):
+
+# Release 0.3.0
+
+<h3>New features</h3>
+
+* Catalyst now officially supports macOS ARM devices, such as Apple M1/M2 machines,
+  with macOS binary wheels available on PyPI. For more details on the changes involved to support
+  macOS, please see the improvements section.
+  [(#229)](https://github.com/PennyLaneAI/catalyst/pull/230)
+  [(#232)](https://github.com/PennyLaneAI/catalyst/pull/232)
+  [(#233)](https://github.com/PennyLaneAI/catalyst/pull/233)
+  [(#234)](https://github.com/PennyLaneAI/catalyst/pull/234)
+
+* Write Catalyst-compatible programs with native Python conditional statements.
+  [(#235)](https://github.com/PennyLaneAI/catalyst/pull/235)
+
+  AutoGraph is a new, experimental, feature that automatically converts Python conditional
+  statements like `if`, `else`, and `elif`, into their equivalent functional forms provided by
+  Catalyst (such as `catalyst.cond`).
+
+  This feature is currently opt-in, and requires setting the `autograph=True` flag in the `qjit`
+  decorator:
 
   ```python
+  dev = qml.device("lightning.qubit", wires=1)
+
   @qjit(autograph=True)
-  @qml.qnode(qml.device("lightning.qubit", wires=n))
+  @qml.qnode(dev)
   def f(x):
-
-    for i in range(n):
-      qml.Hadamard(i)
-
       if x < 0.5:
-        y = jnp.sin(x)
+          qml.RY(jnp.sin(x), wires=0)
       else:
-        y = jnp.cos(x)
+          qml.RX(jnp.cos(x), wires=0)
 
-      qml.RY(y, wires=i)
-
-    return qml.probs()
+      return qml.expval(qml.PauliZ(0))
   ```
 
-  , which previously would be expressed as:
+  The implementation is based on the AutoGraph module from TensorFlow, and requires a working
+  TensorFlow installation be available. In addition, Python loops (`for` and `while`) are not
+  yet supported, and do not work in AutoGraph mode.
+
+  Note that there are some caveats when using this feature especially around the ues of global
+  variables or object mutation inside of methods. A functional style is always recommended when
+  using `qjit` or AutoGraph.
+
+* The quantum adjoint operation can now be used in conjunction with Catalyst control flow, such as
+  loops and conditionals. For this purpose a new instruction, `catalyst.adjoint`, has been added.
+  [(#220)](https://github.com/PennyLaneAI/catalyst/pull/220)
+
+  `catalyst.adjoint` can wrap around quantum functions which contain the Catalyst `cond`,
+  `for_loop`, and `while_loop` primitives. Previously, the usage of `qml.adjoint` on functions with
+  these primitives would result in decomposition errors. Note that a future release of Catalyst will
+  merge the behaviour of `catalyst.adjoint` into `qml.adjoint` for convenience.
 
   ```python
-  @qjit
-  @qml.qnode(qml.device("lightning.qubit", wires=n))
-  def f(x):
-
-    @for_loop(0, n, 1)
-    def repeat(i):
-      qml.Hadamard(i)
-
-      @cond(x < 0.5)
-      def correction():
-        return jnp.sin(x)
-
-      @correction.otherwise()
-      def correction():
-        return jnp.cos(x)
-
-      y = correction()
-      qml.RY(y, wires=i)
-
-    repeat()
-
-    return qml.probs()
-  ```
-
-  The feature is currently opt-in and requires setting the ``autograph=True`` flag in the ``qjit``
-  decorator. Note that there are some caveats when using this feature, especially around modifying
-  global variables or object mutation inside of methods. A functional style is always recommended
-  when using qjit or AutoGraph. Please see the documentation page on the [AutoGraph feature]() for
-  more details.
-
-* Add support for natively representing the quantum adjoint operation. ``catalyst.adjoint`` computes the
-  adjoint of the quantum computation defined by a provided quantum function. For example:
-
-  ```python
-  def circuit(param):
-      qml.RX(param, wires=0)
-      qml.RY(param, wires=1)
-      qml.RZ(param, wires=2)
+  dev = qml.device("lightning.qubit", wires=3)
 
   @qjit
-  @qml.qnode(qml.device("lightning.qubit", wires=3))
-  def workflow():
-      catalyst.adjoint(circuit)(jnp.pi/2)
-      return qml.state()
+  @qml.qnode(dev)
+  def circuit(x):
 
-  workflow()
+      @for_loop(0, 3, 1)
+      def repeat_rx(i):
+          qml.RX(x / 2, wires=i)
+
+      adjoint(repeat_rx)()
+
+      return qml.expval(qml.PauliZ(0))
   ```
 
-  Quantum functions with arbitrary Catalyst control flow can have their adjoint versions computed, even
-  when the control flow contains classical preprocessing:
-
-  ```python
-  def circuit_control_flow(param):
-    @for_loop(0, 6, 1)
-    def loop_outer(iv):
-      qml.RX(theta / 2, wires=0)
-
-      # This loop both applies gates and computes a classical gate parameter!
-      @for_loop(0, iv, 2)
-      def loop_inner(jv, ub):
-        qml.RY(theta, wires=0)
-        return ub + jv
-
-      ub = loop_inner(1)
-
-      qml.RX(theta / ub, wires=0)
-
-      @while_loop(lambda counter: counter < ub)
-      def while_loop_inner(counter):
-        qml.RZ(ub / 5, wires=0)
-        return counter + 1
-
-      final = while_loop_inner(0)
-
-      qml.RX(theta / final, wires=0)
-
-  @qjit
-  @qml.qnode(qml.device("lightning.qubit", wires=3))
-  def workflow_control_flow():
-      catalyst.adjoint(circuit_control_flow)(jnp.pi)
-      return qml.state()
-
-  workflow_control_flow()
+  ```pycon
+  >>> circuit(0.2)
+  array(0.99500417)
   ```
 
-  The key of being *natively represented* means the adjoint operation now shares the usual Catalyst
-  benefits: reduced circuit size (= faster compile times!) when using control flow and performance benefits
-  from Catalyst's Just-In-Time compilation.
+  Additionally, the ability to natively represent the adjoint construct in Catalyst's program
+  representation (IR) was added.
 
-* Add support for container-like and nested Python structures, such as lists of lists or dictionaries,
-  that can occur in a QJIT program as function arguments or return values via the JAX ``pytree`` API.
-  [#221](https://github.com/PennyLaneAI/catalyst/pull/221)
+* QJIT-compiled programs now support (nested) container types as inputs and outputs of compiled
+  functions. This includes lists and dictionaries, as well as any data structure implementing the
+  [PyTree protocol](https://jax.readthedocs.io/en/latest/pytrees.html).
+  [(#215)](https://github.com/PennyLaneAI/catalyst/pull/215)
+  [(#221)](https://github.com/PennyLaneAI/catalyst/pull/221)
 
-  For example:
+  For example, a program that accepts and returns a mix of dictionaries, lists, and tuples:
 
   ```python
   @qjit
   def workflow(params1, params2):
-    """A classical workflow"""
-    res1 = params1["a"][0][0] + params2[1]
-    return jnp.sin(res1)
-
-  params1 = {
-    "a": [[0.1], 0.2],
-  }
-  params2 = (0.6, 0.8)
-  workflow(params1, params2)
-  ```
-
-  ```python
-  @qjit
-  @qml.qnode(qml.device("lightning.qubit", wires=2, shots=100))
-  def circuit(params):
-      """A hybrid circuit"""
-      qml.RX(params[0] * jnp.pi(), wires=0)
-      qml.RX(params[1], wires=1)
-      return {
-          "counts": qml.counts(),
-          "state": qml.state(),
-          "expval": {
-              "z0": qml.expval(qml.PauliZ(0)),
-              "z1": qml.expval(qml.PauliZ(1)),
-          },
-      }
-  circuit([0.5, 0.6])
-  ```
-
-* Add support for compile-time backpropagation of arbitrary hybrid programs via Enzyme AD.
-  [#158](https://github.com/PennyLaneAI/catalyst/pull/158)
-  [#193](https://github.com/PennyLaneAI/catalyst/pull/193)
-  [#224](https://github.com/PennyLaneAI/catalyst/pull/224)
-  [#225](https://github.com/PennyLaneAI/catalyst/pull/225)
-  [#239](https://github.com/PennyLaneAI/catalyst/pull/239)
-  [#244](https://github.com/PennyLaneAI/catalyst/pull/244)
-
-  This enables high-performance reverse mode automatic differentiation of programs when
-  ``method="auto"`` (now the default) is specified on the ``grad`` operation in conjunction
-  with either ``"parameter-shift"`` or ``"adjoint"`` specified as the ``diff_method`` on each
-  QNode:
-
-  ```python
-  @qml.qnode(qml.device("lightning.qubit", wires=1), diff_method="parameter-shift")
-  def circuit(theta):
-      qml.RX(jnp.exp(theta ** 2) / jnp.cos(theta / 4), wires=0)
-      return qml.expval(qml.PauliZ(wires=0))
-
-  @qjit
-  def grad_circuit(theta):
-      return catalyst.grad(circuit, method="auto")(theta)
+      res1 = params1["a"][0][0] + params2[1]
+      return {"y1": jnp.sin(res1), "y2": jnp.cos(res1)}
   ```
 
   ```pycon
-  >>> grad_circuit(jnp.pi)
-  array(112936.34906843)
+  >>> params1 = {"a": [[0.1], 0.2]}
+  >>> params2 = (0.6, 0.8)
+  >>> workflow(params1, params2)
+  array(0.78332691)
   ```
 
-  This re-working of the internal gradient architecture means you can now compute exact
-  derivatives of programs with both classical preprocessing and postprocessing.
+* Compile-time backpropagation of arbitrary hybrid programs is now supported, via integration with
+  [Enzyme AD](https://enzyme.mit.edu/).
+  [(#158)](https://github.com/PennyLaneAI/catalyst/pull/158)
+  [(#193)](https://github.com/PennyLaneAI/catalyst/pull/193)
+  [(#224)](https://github.com/PennyLaneAI/catalyst/pull/224)
+  [(#225)](https://github.com/PennyLaneAI/catalyst/pull/225)
+  [(#239)](https://github.com/PennyLaneAI/catalyst/pull/239)
+  [(#244)](https://github.com/PennyLaneAI/catalyst/pull/244)
+
+  This allows `catalyst.grad` to differentiate hybrid functions that contain both classical
+  pre-processing (inside & outside of QNodes), QNodes, as well as classical post-processing
+  (outside of QNodes) via a combination of backpropagation and quantum gradient methods.
+
+  The new default for the differentiation `method` attribute in `catalyst.grad` has been changed to
+  `"auto"`, which performs Enzyme-based reverse mode AD on classical code, in conjunction with the
+  quantum `diff_method` specified on each QNode:
+
+  ```python
+  dev = qml.device("lightning.qubit", wires=1)
+
+  @qml.qnode(dev, diff_method="parameter-shift")
+  def circuit(theta):
+      qml.RX(jnp.exp(theta ** 2) / jnp.cos(theta / 4), wires=0)
+      return qml.expval(qml.PauliZ(wires=0))
+  ```
+
+  ```pycon
+  >>> grad = qjit(catalyst.grad(circuit, method="auto"))
+  >>> grad(jnp.pi)
+  array(0.05938718)
+  ```
+
+  The reworked differentiation pipeline means you can now compute exact derivatives of programs with
+  both classical pre- and post-processing, as shown below:
 
   ```python
   @qml.qnode(qml.device("lightning.qubit", wires=1), diff_method="adjoint")
@@ -212,7 +165,7 @@
   array(-1.90958669)
   ```
 
-  You can use multiple QNodes with different differentiation methods:
+  You can also use multiple QNodes with different differentiation methods:
 
   ```python
   @qml.qnode(qml.device("lightning.qubit", wires=1), diff_method="parameter-shift")
@@ -238,7 +191,7 @@
   array([ 0.57367285, 44.4911605 ])
   ```
 
-  You can even differentiate purely classical code:
+  And you can differentiate purely classical functions as well:
 
   ```python
   def square(x: float):
@@ -254,171 +207,200 @@
   array(4.6)
   ```
 
-* Add support for the new PennyLane arithmetic operators.
-  [#250](https://github.com/PennyLaneAI/catalyst/pull/250)
+  Note that the current implementation of reverse mode AD is restricted to 1st order derivatives,
+  but you can still use `catalyst.grad(method="fd")` is still available to perform a finite
+  differences approximation of _any_ differentiable function.
 
-  PennyLane is in the process of replacing ``Hamiltonian`` and ``Tensor`` observables with a set of
+* Add support for the new PennyLane arithmetic operators.
+  [(#250)](https://github.com/PennyLaneAI/catalyst/pull/250)
+
+  PennyLane is in the process of replacing `Hamiltonian` and `Tensor` observables with a set of
   general arithmetic operators. These consist of
   [Prod](https://docs.pennylane.ai/en/stable/code/api/pennylane.ops.op_math.Prod.html),
   [Sum](https://docs.pennylane.ai/en/stable/code/api/pennylane.ops.op_math.Sum.html) and
   [SProd](https://docs.pennylane.ai/en/stable/code/api/pennylane.ops.op_math.SProd.html).
-  By default, using dunder methods (eg. ``+``, ``-``, ``@``, ``*``) to combine operators with scalars or other
-  operators will create ``Hamiltonian``s and ``Tensor``s. However, these two methods will be deprecated in
-  coming releases of PennyLane.
 
-  To enable the new arithmetic operators, one can use ``Prod``, ``Sum``, and ``Sprod`` directly or activate them by
-  [enable_new_opmath](https://docs.pennylane.ai/en/stable/code/api/pennylane.operation.enable_new_opmath.html).
+  By default, using dunder methods (eg. `+`, `-`, `@`, `*`) to combine
+  operators with scalars or other operators will create `Hamiltonian` and
+  `Tensor` objects. However, these two methods will be deprecated in coming
+  releases of PennyLane.
+
+  To enable the new arithmetic operators, one can use `Prod`, `Sum`, and
+  `Sprod` directly or activate them by calling [enable_new_opmath](https://docs.pennylane.ai/en/stable/code/api/pennylane.operation.enable_new_opmath.html)
+  at the beginning of your PennyLane program.
 
   ``` python
-  qml.operation.enable_new_opmath()
-  assert qml.operation.active_new_opmath()
+  dev = qml.device("lightning.qubit", wires=2)
 
   @qjit
-  @qml.qnode(qml.device("lightning.qubit", wires=2))
+  @qml.qnode(dev)
   def circuit(x: float, y: float):
       qml.RX(x, wires=0)
       qml.RX(y, wires=1)
       qml.CNOT(wires=[0, 1])
       return qml.expval(0.2 * qml.PauliX(wires=0) - 0.4 * qml.PauliY(wires=1))
+  ```
 
-  circuit(np.pi / 4, np.pi / 2)
+  ```pycon
+  >>> qml.operation.enable_new_opmath()
+  >>> qml.operation.active_new_opmath()
+  True
+  >>> circuit(np.pi / 4, np.pi / 2)
+  array(0.28284271)
   ```
 
 <h3>Improvements</h3>
 
-* Eliminate redundant unflattening and flattening of PyTrees parameters in Catalyst control flow operations.
-  [#215](https://github.com/PennyLaneAI/catalyst/pull/215)
+* Better support for Hamiltonian observables:
 
-* Reduce the execution and compile times of user programs by generating more efficient code and
-  avoiding unnecessary optimizations. Specifically, a scalarization procedure was added to the MLIR
-  pass pipeline and LLVM IR compilation is now invoked with optimization level 0.
-  [#217](https://github.com/PennyLaneAI/catalyst/pull/217)
+  - Allow Hamiltonian observables with integer coefficients.
+    [(#248)](https://github.com/PennyLaneAI/catalyst/pull/248)
 
-* Improve execution speed by:
-    * load the shared library once per compilation
-    * generate return value type only once per compilation
-    * avoiding type promotion
-    * avoiding unnecessary copies
-  This leads to a small but measurable improvement when using larger matrices as inputs or many
-  inputs.
-  [#213](https://github.com/PennyLaneAI/catalyst/pull/213)
+    For example, compiling the following circuit wasn't previously allowed, but is
+    now supported in Catalyst:
 
-* Re-enable buffer deallocation. This reduces the peak memory utilization of a JIT compiled program
-  by allowing tensors to be scheduled for deallocation. Previously the tensors were not deallocated
-  until the end of the call to the JIT compiled function.
-  [#201](https://github.com/PennyLaneAI/catalyst/pull/201)
+    ```python
+    dev = qml.device("lightning.qubit", wires=2)
 
-* Avoid a type mismatch. This allows dialects to compile with older versions of clang.
-  [#228](https://github.com/PennyLaneAI/catalyst/pull/228)
+    @qjit
+    @qml.qnode(dev)
+    def circuit(x: float, y: float):
+        qml.RX(x, wires=0)
+        qml.RY(y, wires=1)
 
-* Remove unnecessary ``reinterpret_cast``s. from ``ObsManager``s. Removal of these ``reinterpret_cast``s
-  allows compilation of the runtime to succeed in macOS. macOS uses an ILP32 mode for Aarch64 where they
-  use the full 64 bit mode but with 32 bit Integer, Long, and Pointers. This patch also changes a test file
-  to prevent a mismatch in machines which compile using ILP32 mode.
-  [#229](https://github.com/PennyLaneAI/catalyst/pull/230)
+        coeffs = [1, 2]
+        obs = [qml.PauliZ(0), qml.PauliZ(1)]
+        return qml.expval(qml.Hamiltonian(coeffs, obs))
+    ```
 
-* Allow runtime to be compiled on macOS. Substitute ``nproc`` with a call to ``os.cpu_count()`` and
-  use correct flags for ``ld.64``.
-  [#232](https://github.com/PennyLaneAI/catalyst/pull/232)
+  - Allow nested Hamiltonian observables.
+    [(#255)](https://github.com/PennyLaneAI/catalyst/pull/255)
 
-* Improve portability on the frontend to be available on macOS. Use ``.dylib``, remove unnecessary flags,
-  and address behaviour difference in flags.
-  [#233](https://github.com/PennyLaneAI/catalyst/pull/233)
+    ```python
+    @qjit
+    @qml.qnode(qml.device("lightning.qubit", wires=3))
+    def circuit(x, y, coeffs1, coeffs2):
+        qml.RX(x, wires=0)
+        qml.RX(y, wires=1)
+        qml.RY(x + y, wires=2)
 
-* Build the runtime against ``qir-stdlib`` pre-build artifacts.
-  [#236](https://github.com/PennyLaneAI/catalyst/pull/236)
+        obs = [
+            qml.PauliX(0) @ qml.PauliZ(1),
+            qml.Hamiltonian(coeffs1, [qml.PauliZ(0) @ qml.Hadamard(2)]),
+        ]
 
-* Small compatibility changes in order for all integration tests to succeed on macOS.
-  [#234](https://github.com/PennyLaneAI/catalyst/pull/234)
+        return qml.var(qml.Hamiltonian(coeffs2, obs))
+    ```
 
-* Small improvements to CI/CD. Fix Enzyme cache, generalize caches to other operating systems,
-  fix build wheel recipe, and remove references to QIR in runtime's Makefile.
-  [#243](https://github.com/PennyLaneAI/catalyst/pull/243)
-  [#247](https://github.com/PennyLaneAI/catalyst/pull/247)
+* Various performance improvements:
 
-* Add support for Hamiltonian observables with integer coefficients.
-  [#248](https://github.com/PennyLaneAI/catalyst/pull/248)
+  - The execution and compile time of programs has been reduced, by generating more efficient code
+    and avoiding unnecessary optimizations. Specifically, a scalarization procedure was added to the
+    MLIR pass pipeline, and LLVM IR compilation is now invoked with optimization level 0.
+    [(#217)](https://github.com/PennyLaneAI/catalyst/pull/217)
 
-  For example, compiling the following circuit wasn't allowed before, but it is
-  now supported in Catalyst:
+  - The execution time of compiled functions has been improved in the frontend.
+    [(#213)](https://github.com/PennyLaneAI/catalyst/pull/213)
 
-  ```python
-  @qjit
-  @qml.qnode(qml.device("lightning.qubit", wires=2))
-  def circuit(x: float, y: float):
-      qml.RX(x, wires=0)
-      qml.RY(y, wires=1)
+    Specifically, the following changes have been made, which leads to a small but measurable
+    improvement when using larger matrices as inputs, or functions with many inputs:
 
-      coeffs = [1, 2]
-      obs = [qml.PauliZ(0), qml.PauliZ(1)]
-      return qml.expval(qml.Hamiltonian(coeffs, obs))
-  ```
+    + only loading the user program library once per compilation,
+    + generating return value types only once per compilation,
+    + avoiding unnecessary type promotion, and
+    + avoiding unnecessary array copies.
 
-* Add support for nested Hamiltonian observables.
-  [#255](https://github.com/PennyLaneAI/catalyst/pull/255)
+  - Peak memory utilization of a JIT compiled program has been reduced, by allowing tensors to be
+    scheduled for deallocation. Previously, the tensors were not deallocated until the end of the
+    call to the JIT compiled function.
+    [(#201)](https://github.com/PennyLaneAI/catalyst/pull/201)
 
-  ```python
-  @qjit
-  @qml.qnode(qml.device("lightning.qubit", wires=3))
-  def circuit(x, y, coeffs1, coeffs2):
-      qml.RX(x, wires=0)
-      qml.RX(y, wires=1)
-      qml.RY(x + y, wires=2)
+* Various improvements have been made to enable Catalyst to compile on macOS:
 
-      obs = [
-          qml.PauliX(0) @ qml.PauliZ(1),
-          qml.Hamiltonian(coeffs1, [qml.PauliZ(0) @ qml.Hadamard(2)]),
-      ]
+  - Remove unnecessary `reinterpret_cast` from `ObsManager`. Removal of
+    these `reinterpret_cast` allows compilation of the runtime to succeed
+    in macOS. macOS uses an ILP32 mode for Aarch64 where they use the full 64
+    bit mode but with 32 bit Integer, Long, and Pointers. This patch also
+    changes a test file to prevent a mismatch in machines which compile using
+    ILP32 mode.
+    [(#229)](https://github.com/PennyLaneAI/catalyst/pull/230)
 
-      return qml.var(qml.Hamiltonian(coeffs2, obs))
-  ```
+  - Allow runtime to be compiled on macOS. Substitute `nproc` with a call to
+    `os.cpu_count()` and use correct flags for `ld.64`.
+    [(#232)](https://github.com/PennyLaneAI/catalyst/pull/232)
+
+  - Improve portability on the frontend to be available on macOS. Use
+    `.dylib`, remove unnecessary flags, and address behaviour difference in
+    flags.
+    [(#233)](https://github.com/PennyLaneAI/catalyst/pull/233)
+
+  - Small compatibility changes in order for all integration tests to succeed
+    on macOS.
+    [(#234)](https://github.com/PennyLaneAI/catalyst/pull/234)
+
+* Dialects can compile with older versions of clang by avoiding type mismatches.
+  [(#228)](https://github.com/PennyLaneAI/catalyst/pull/228)
+
+* The runtime is now built against `qir-stdlib` pre-build artifacts.
+  [(#236)](https://github.com/PennyLaneAI/catalyst/pull/236)
+
+* Small improvements have been made to the CI/CD, including fixing the Enzyme
+  cache, generalize caches to other operating systems, fix build wheel
+  recipe, and remove references to QIR in runtime's Makefile.
+  [(#243)](https://github.com/PennyLaneAI/catalyst/pull/243)
+  [(#247)](https://github.com/PennyLaneAI/catalyst/pull/247)
+
 
 <h3>Breaking changes</h3>
+
+* Support for Python 3.8 has been removed.
+  [(#231)](https://github.com/PennyLaneAI/catalyst/pull/231)
 
 * The default differentiation method on ``grad`` and ``jacobian`` is reverse-mode
   automatic differentiation instead of finite differences. When a QNode does not have a
   ``diff_method`` specified, it will default to using the parameter shift method instead of
   finite-differences.
-  [#244](https://github.com/PennyLaneAI/catalyst/pull/244)
-  [#271](https://github.com/PennyLaneAI/catalyst/pull/271)
+  [(#244)](https://github.com/PennyLaneAI/catalyst/pull/244)
+  [(#271)](https://github.com/PennyLaneAI/catalyst/pull/271)
 
 * The JAX version used by Catalyst has been updated to `v0.4.14`, the minimum PennyLane version
   required is now `v0.32`.
-  [#264](https://github.com/PennyLaneAI/catalyst/pull/264)
+  [(#264)](https://github.com/PennyLaneAI/catalyst/pull/264)
 
-* Support for Python 3.8 is dropped.
-  [#231](https://github.com/PennyLaneAI/catalyst/pull/231)
+* Due to the change allowing Python container objects as inputs to QJIT-compiled functions, Python
+  lists are no longer automatically converted to JAX arrays.
+  [(#231)](https://github.com/PennyLaneAI/catalyst/pull/231)
 
-* Since we are now using PyTrees, python lists are no longer automatically converted into JAX
-  arrays. This means that indexing on lists when the index is not static will cause a
-  ``TracerIntegerConversionError``.
+  This means that indexing on lists when the index is not static will cause a
+  `TracerIntegerConversionError`, consistent with JAX's behaviour.
+
+  That is, the following example is no longer support:
 
   ```python
   @qjit
-  def f(list, index):
-    return list[index]
+  def f(x: list, index: int):
+      return x[index]
   ```
 
-  will no longer work. This is more consistent with JAX's behaviour. However, if the variable
-  ``list`` above is a JAX or Numpy array, the compilation still succeeds.
-  [#221](https://github.com/PennyLaneAI/catalyst/pull/221)
+  However, if the parameter `x` above is a JAX or NumPy array, the compilation will continue to
+  succeed.
 
 * The `catalyst.grad` function has been renamed to `catalyst.jacobian` and supports differentiation
   of functions that return multiple or non-scalar outputs. A new `catalyst.grad` function has been
   added that enforces that it is differentiating a function with a single scalar return value.
-  [#254](https://github.com/PennyLaneAI/catalyst/pull/254)
+  [(#254)](https://github.com/PennyLaneAI/catalyst/pull/254)
 
 <h3>Bug fixes</h3>
 
-* Fix issue preventing the differentiation of ``qml.probs`` with the parameter-shift method.
-  [#211](https://github.com/PennyLaneAI/catalyst/pull/211)
+* Fixed an issue preventing the differentiation of `qml.probs` with the parameter-shift method.
+  [(#211)](https://github.com/PennyLaneAI/catalyst/pull/211)
 
-* Fix incorrect return value data-type with functions returning ``qml.counts``.
-  [#221](https://github.com/PennyLaneAI/catalyst/pull/221)
+* Fixed the incorrect return value data-type with functions returning `qml.counts`.
+ [(#221)](https://github.com/PennyLaneAI/catalyst/pull/221)
 
 * Fix segmentation fault when differentiating a function where a quantum measurement is used
   multiple times by the same operation.
-  [#242](https://github.com/PennyLaneAI/catalyst/pull/242)
+  [(#242)](https://github.com/PennyLaneAI/catalyst/pull/242)
 
 <h3>Contributors</h3>
 
@@ -598,7 +580,8 @@ David Ittah.
       return qml.probs(wires=0)
   ```
 
-* Iterating in reverse is now supported with constant negative step sizes via `catalyst.for_loop`. [#129](https://github.com/PennyLaneAI/catalyst/pull/129)
+* Iterating in reverse is now supported with constant negative step sizes via `catalyst.for_loop`.
+  [#129](https://github.com/PennyLaneAI/catalyst/pull/129)
 
   ```python
   dev = qml.device("lightning.qubit", wires=1)
@@ -770,7 +753,8 @@ David Ittah.
   [#92](https://github.com/PennyLaneAI/catalyst/pull/92)
 
 * In preparation for easier debugging, the compiler has been refactored to
-  allow easy prototyping of new compilation pipelines. [#38](https://github.com/PennyLaneAI/catalyst/pull/38)
+  allow easy prototyping of new compilation pipelines.
+  [#38](https://github.com/PennyLaneAI/catalyst/pull/38)
 
   In the future, this will allow the ability to generate MLIR or LLVM-IR by
   loading input from a string or file, rather than generating it from Python.
@@ -786,9 +770,11 @@ David Ittah.
     the next pass.
 
 * Improved Python compatibility by providing a stable signature for user
-  generated functions. [#106](https://github.com/PennyLaneAI/catalyst/pull/106)
+  generated functions.
+  [#106](https://github.com/PennyLaneAI/catalyst/pull/106)
 
-* Handle C++ exceptions without unwinding the whole stack. [#99](https://github.com/PennyLaneAI/catalyst/pull/99)
+* Handle C++ exceptions without unwinding the whole stack.
+  [#99](https://github.com/PennyLaneAI/catalyst/pull/99)
 
 * Reduce the number of classical invocations by counting the number of gate parameters in
   the `argmap` function.
@@ -823,18 +809,21 @@ David Ittah.
   [#84](https://github.com/PennyLaneAI/catalyst/pull/84)
 
 * Fix a memory regression and reduce memory footprint by removing unnecessary
-  temporary buffers. [#100](https://github.com/PennyLaneAI/catalyst/pull/100)
+  temporary buffers.
+  [#100](https://github.com/PennyLaneAI/catalyst/pull/100)
 
 * Provide a new abstraction to the `QuantumDevice` interface in the runtime
   called `DataView`. C++ implementations of the interface can iterate
-  through and directly store results into the `DataView` independant of the
+  through and directly store results into the `DataView` independent of the
   underlying memory layout. This can eliminate redundant buffer copies at the
-  interface boundaries, which has been applied to existing devices. [#109](https://github.com/PennyLaneAI/catalyst/pull/109)
+  interface boundaries, which has been applied to existing devices.
+  [#109](https://github.com/PennyLaneAI/catalyst/pull/109)
 
 * Reduce memory utilization by transferring ownership of buffers from the
   runtime to Python instead of copying them. This includes adding a compiler
   pass that copies global buffers into the heap as global buffers cannot be
-  transferred to Python. [#112](https://github.com/PennyLaneAI/catalyst/pull/112)
+  transferred to Python.
+  [#112](https://github.com/PennyLaneAI/catalyst/pull/112)
 
 * Temporary fix of use-after-free and dependency of uninitialized memory.
   [#121](https://github.com/PennyLaneAI/catalyst/pull/121)
@@ -848,7 +837,8 @@ David Ittah.
 * Fix the issue with gradients failing to work with hybrid functions that
   contain constant `jnp.array` objects. This will enable PennyLane operators
   that have data in the form of a `jnp.array`, such as a Hamiltonian, to be
-  included in a qjit-compiled function. [#152](https://github.com/PennyLaneAI/catalyst/pull/152)
+  included in a qjit-compiled function.
+  [#152](https://github.com/PennyLaneAI/catalyst/pull/152)
 
   An example of a newly supported workflow:
 
@@ -888,7 +878,7 @@ Sergei Mironov.
   [#68](https://github.com/PennyLaneAI/catalyst/pull/68)
 
 * Allow ``catalyst.grad`` to be used on any traceable function (within a qjit context).
-  This means the operation is no longer resticted to acting on ``qml.qnode``s only.
+  This means the operation is no longer restricted to acting on ``qml.qnode``s only.
   [#75](https://github.com/PennyLaneAI/catalyst/pull/75)
 
 
