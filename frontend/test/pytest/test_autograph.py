@@ -14,7 +14,6 @@
 
 """PyTests for the AutoGraph source-to-source transformation feature."""
 
-import os
 
 import numpy as np
 import pennylane as qml
@@ -27,18 +26,20 @@ from catalyst.ag_utils import AutoGraphError, autograph_source, check_cache
 # pylint: disable=unnecessary-lambda-assignment
 
 
+def test_unavailable(mocker):
+    """Check the error produced in the absence of tensorflow."""
+    mocker.patch.dict("sys.modules", {"tensorflow": None})
+
+    def fn(x):
+        return x**2
+
+    with pytest.raises(ImportError, match="AutoGraph feature in Catalyst requires TensorFlow"):
+        qjit(autograph=True)(fn)
+
+
+@pytest.mark.tf
 class TestIntegration:
     """Test that the autograph transformations trigger correctly in different settings."""
-
-    def test_unavailable(self, monkeypatch):
-        """Check the error produced in the absence of tensorflow."""
-        monkeypatch.syspath_prepend(os.path.join(os.path.dirname(__file__), "mock"))
-
-        def fn(x):
-            return x**2
-
-        with pytest.raises(ImportError, match="AutoGraph feature in Catalyst requires TensorFlow"):
-            qjit(autograph=True)(fn)
 
     def test_unsupported_object(self):
         """Check the error produced when attempting to convert an unsupported object (neither of
@@ -188,6 +189,7 @@ class TestIntegration:
         assert fn(np.pi) == -1
 
 
+@pytest.mark.tf
 class TestCodePrinting:
     """Test that the transformed source code can be printed in different settings."""
 
@@ -317,6 +319,7 @@ class TestCodePrinting:
         assert autograph_source(inner)
 
 
+@pytest.mark.tf
 class TestConditionals:
     """Test that the autograph transformations produce correct results on conditionals.
     These tests are adapted from the test_conditionals.TestCond class of tests."""

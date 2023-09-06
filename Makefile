@@ -94,7 +94,7 @@ wheel:
 	cp $(COPY_FLAGS) $(LLVM_BUILD_DIR)/lib/libmlir_float16_utils.* $(MK_DIR)/frontend/catalyst/lib
 	cp $(COPY_FLAGS) $(LLVM_BUILD_DIR)/lib/libmlir_c_runner_utils.* $(MK_DIR)/frontend/catalyst/lib
 	# Copy enzyme to frontend
-	cp $(COPY_FLAGS) $(ENZYME_BUILD_DIR)/Enzyme/LLVMEnzyme-17.* $(MK_DIR)/frontend/catalyst/lib
+	cp $(COPY_FLAGS) $(ENZYME_BUILD_DIR)/Enzyme/LLVMEnzyme-18.* $(MK_DIR)/frontend/catalyst/lib
 	# Copy mlir bindings to frontend/mlir_quantum
 	mkdir -p $(MK_DIR)/frontend/mlir_quantum/dialects
 	cp -R $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/runtime $(MK_DIR)/frontend/mlir_quantum/runtime
