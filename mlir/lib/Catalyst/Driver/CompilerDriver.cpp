@@ -317,7 +317,9 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
 {
     DialectRegistry registry;
     static bool initialized = false;
-    if (!initialized) registerAllPasses();
+    if (!initialized) {
+        registerAllPasses();
+    }
     initialized |= true;
     registerAllCatalystPasses();
     mhlo::registerAllMhloPasses();
@@ -325,7 +327,6 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
 
     registerAllCatalystDialects(registry);
     registerLLVMTranslations(registry);
-    //ctx.appendDialectRegistry(registry);
     MLIRContext ctx(registry);
     ctx.disableMultithreading();
     ScopedDiagnosticHandler scopedHandler(
