@@ -141,7 +141,10 @@ void _catalyst_pyface_jit_cpp_exception_test(void*, void*) {
                     object_file = filename.replace(".c", ".o")
                     # libstdc++ has been deprecated on macOS in favour of libc++
                     libcpp = "-lstdc++" if platform.system() == "Linux" else "-lc++"
-                    subprocess.run(f"cc -shared {libcpp} -fPIC -x c++ {filename} -o {object_file}".split(), check=True)
+                    subprocess.run(
+                        f"cc -shared {libcpp} -fPIC -x c++ {filename} -o {object_file}".split(),
+                        check=True,
+                    )
                     output = LinkerDriver.run(object_file, options=self.options)
                     filename = str(pathlib.Path(output).absolute())
                     return filename, "<FAKE_IR>", ["<FAKE_FN>", "<FAKE_TYPE>"]
