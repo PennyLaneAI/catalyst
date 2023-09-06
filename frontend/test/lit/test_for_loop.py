@@ -14,8 +14,6 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
-import subprocess
-
 import pennylane as qml
 
 from catalyst import for_loop, qjit
