@@ -770,7 +770,8 @@ David Ittah.
     the next pass.
 
 * Improved Python compatibility by providing a stable signature for user
-  generated functions. [#106](https://github.com/PennyLaneAI/catalyst/pull/106)
+  generated functions.
+  [#106](https://github.com/PennyLaneAI/catalyst/pull/106)
 
 * Handle C++ exceptions without unwinding the whole stack.
   [#99](https://github.com/PennyLaneAI/catalyst/pull/99)
@@ -808,7 +809,8 @@ David Ittah.
   [#84](https://github.com/PennyLaneAI/catalyst/pull/84)
 
 * Fix a memory regression and reduce memory footprint by removing unnecessary
-  temporary buffers. [#100](https://github.com/PennyLaneAI/catalyst/pull/100)
+  temporary buffers.
+  [#100](https://github.com/PennyLaneAI/catalyst/pull/100)
 
 * Provide a new abstraction to the `QuantumDevice` interface in the runtime
   called `DataView`. C++ implementations of the interface can iterate
@@ -820,7 +822,8 @@ David Ittah.
 * Reduce memory utilization by transferring ownership of buffers from the
   runtime to Python instead of copying them. This includes adding a compiler
   pass that copies global buffers into the heap as global buffers cannot be
-  transferred to Python. [#112](https://github.com/PennyLaneAI/catalyst/pull/112)
+  transferred to Python.
+  [#112](https://github.com/PennyLaneAI/catalyst/pull/112)
 
 * Temporary fix of use-after-free and dependency of uninitialized memory.
   [#121](https://github.com/PennyLaneAI/catalyst/pull/121)
@@ -875,7 +878,7 @@ Sergei Mironov.
   [#68](https://github.com/PennyLaneAI/catalyst/pull/68)
 
 * Allow ``catalyst.grad`` to be used on any traceable function (within a qjit context).
-  This means the operation is no longer resticted to acting on ``qml.qnode``s only.
+  This means the operation is no longer restricted to acting on ``qml.qnode``s only.
   [#75](https://github.com/PennyLaneAI/catalyst/pull/75)
 
 
