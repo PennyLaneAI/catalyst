@@ -33,16 +33,15 @@
 #include "mhlo/IR/hlo_ops.h"
 
 using llvm::dbgs;
+
 using namespace mlir;
-using namespace catalyst;
-using namespace catalyst::quantum;
 
 namespace {
 
-struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> {
-    using mlir::OpRewritePattern<mhlo::ScatterOp>::OpRewritePattern;
+struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mlir::mhlo::ScatterOp> {
+    using mlir::OpRewritePattern<mlir::mhlo::ScatterOp>::OpRewritePattern;
 
-    mlir::LogicalResult matchAndRewrite(mhlo::ScatterOp scatter,
+    mlir::LogicalResult matchAndRewrite(mlir::mhlo::ScatterOp scatter,
                                         mlir::PatternRewriter &rewriter) const override
     {
         return success();

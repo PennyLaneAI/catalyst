@@ -39,9 +39,15 @@ if(QUANTUM_ENABLE_BINDINGS_PYTHON)
   mlir_configure_python_dev_packages()
 endif()
 
+message(STATUS "The directory is ${MHLO_INCLUDE_DIRS}")
+list(GET MHLO_INCLUDE_DIRS 1 MLIRHLO_DIR)
+list(GET MHLO_INCLUDE_DIRS 2 MLIRHLO_BUILD_DIR)
+
 include_directories(${LLVM_INCLUDE_DIRS}
                     ${MLIR_INCLUDE_DIRS}
                     ${MHLO_INCLUDE_DIRS}
+                    ${MLIRHLO_DIR}/stablehlo
+                    ${MLIRHLO_BUILD_DIR}/stablehlo
                     ${PROJECT_SOURCE_DIR}/include
                     ${PROJECT_BINARY_DIR}/include)
 link_directories(${LLVM_BUILD_LIBRARY_DIR})
