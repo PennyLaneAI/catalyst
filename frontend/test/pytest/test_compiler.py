@@ -130,7 +130,7 @@ void _catalyst_pyface_jit_cpp_exception_test(void*, void*) {
             """Mock compiler class"""
 
             def __init__(self, co):
-                super(MockCompiler, self).__init__(co)
+                super().__init__(co)
 
             def run_from_ir(self, *_args, **_kwargs):
                 with tempfile.TemporaryDirectory() as workspace:
@@ -139,7 +139,9 @@ void _catalyst_pyface_jit_cpp_exception_test(void*, void*) {
                         f.write(contents)
 
                     object_file = filename.replace(".c", ".o")
-                    subprocess.run(f"cc -shared -fPIC -x c++ {filename} -o {object_file}".split())
+                    # libstdc++ has been deprecated on macOS in favour of libc++
+                    libcpp = "-lstdc++" if platform.system() == "Linux" else "-lc++"
+                    subprocess.run(f"cc -shared {libcpp} -fPIC -x c++ {filename} -o {object_file}".split(), check=True)
                     output = LinkerDriver.run(object_file, options=self.options)
                     filename = str(pathlib.Path(output).absolute())
                     return filename, "<FAKE_IR>", ["<FAKE_FN>", "<FAKE_TYPE>"]
@@ -245,7 +247,8 @@ class TestCompilerState:
                 print("int main() {}", file=f)
 
             object_file = filename.replace(".c", ".o")
-            subprocess.run(f"c99 -c {filename} -o {object_file}".split())
+            libcpp = "-lstdc++" if platform.system() == "Linux" else "-lc++"
+            subprocess.run(f"c99 {libcpp} -c {filename} -o {object_file}".split(), check=True)
             expected_outfilename = workspace + "a.so"
             observed_outfilename = LinkerDriver.run(object_file, flags=[])
 
