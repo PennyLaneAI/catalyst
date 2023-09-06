@@ -35,15 +35,6 @@ declare_mlir_python_extension(QuantumPythonSources.Extension
     QuantumCAPI
 )
 
-#declare_mlir_python_extension(CatalystPythonDriver
-#  MODULE_NAME _catalystDriver
-#  ADD_TO_PARENT QuantumPythonSources
-#  SOURCES
-#    PyCompilerDriver.cpp
-#  PRIVATE_LINK_LIBS
-#    QuantumCAPI
-#)
-
 ################################################################################
 # Common CAPI
 ################################################################################
@@ -51,8 +42,8 @@ declare_mlir_python_extension(QuantumPythonSources.Extension
 
 add_mlir_python_common_capi_library(QuantumPythonCAPI
   INSTALL_COMPONENT QuantumPythonModules
-  INSTALL_DESTINATION python_packages/quantum/mlir_quantum/compiler_driver
-  OUTPUT_DIRECTORY "${MLIR_BINARY_DIR}/python_packages/quantum/mlir_quantum/compiler_driver"
+  INSTALL_DESTINATION python_packages/quantum/mlir_quantum/_mlir_libs
+  OUTPUT_DIRECTORY "${MLIR_BINARY_DIR}/python_packages/quantum/mlir_quantum/_mlir_libs"
   RELATIVE_INSTALL_ROOT "../../../.."
   DECLARED_SOURCES
     QuantumPythonSources
@@ -74,9 +65,7 @@ set(LIBS
     quantum-transforms
     MLIRGradient
     gradient-transforms
-
     CatalystCompilerDriver
-
     MhloRegisterDialects
     StablehloRegister
     ${ALL_MHLO_PASSES}
@@ -84,12 +73,9 @@ set(LIBS
 
 add_library(CatalystPythonDriver MODULE PyCompilerDriver.cpp)
 
-target_link_libraries(CatalystPythonDriver PRIVATE pybind11::headers pybind11::module -Wl,--whole-archive ${LIBS} -Wl,--no-whole-archive)
+target_link_libraries(CatalystPythonDriver PRIVATE pybind11::headers pybind11::module ${LIBS})
 
 set_target_properties(CatalystPythonDriver PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${MLIR_BINARY_DIR}/python_packages/quantum/mlir_quantum/compiler_driver)
-#set_target_properties(CatalystPythonDriver PROPERTIES BUILD_WITH_INSTALL_RPATH OFF BUILD_RPATH $ORIGIN INSTALL_RPATH $ORIGIN )
-#set_target_properties(CatalystPythonDriver PROPERTIES BUILD_WITH_INSTALL_RPATH OFF BUILD_RPATH ${MLIR_BINARY_DIR}/python_packages/quantum/mlir_quantum/compiler_driver INSTALL_RPATH ${MLIR_BINARY_DIR}/python_packages/quantum/mlir_quantum/compiler_driver)
-#set_target_properties(CatalystPythonDriver PROPERTIES BUILD_WITH_INSTALL_RPATH OFF BUILD_RPATH ${MLIR_BINARY_DIR}/python_packages/quantum/mlir_quantum/compiler_driver INSTALL_RPATH ${MLIR_BINARY_DIR}/python_packages/quantum/mlir_quantum/_mlir_libs)
 
 ################################################################################
 # Instantiation of all Python modules
