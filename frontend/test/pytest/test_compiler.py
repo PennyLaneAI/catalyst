@@ -184,6 +184,8 @@ class TestCompilerState:
         assert compiler.get_output_of("QuantumCompilationPass")
         assert compiler.get_output_of("BufferizationPass")
         assert compiler.get_output_of("MLIRToLLVMDialect")
+        assert compiler.get_output_of("PreEnzymeOpt")
+        assert compiler.get_output_of("Enzyme")
         assert compiler.get_output_of("None-existing-pipeline") is None
 
         compiler = Compiler(CompileOptions(keep_intermediate=False))
