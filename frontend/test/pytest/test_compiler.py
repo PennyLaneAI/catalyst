@@ -180,8 +180,6 @@ class TestCompilerState:
         assert compiler.get_output_of("BufferizationPass")
         assert compiler.get_output_of("MLIRToLLVMDialect")
         assert compiler.get_output_of("None-existing-pipeline") is None
-        # assert compiler.get_output_of("LLVMDialectToLLVMIR")
-        # assert compiler.get_output_of("Enzyme")
 
         compiler = Compiler(CompileOptions(keep_intermediate=False))
         compiler.run(mlir_module)

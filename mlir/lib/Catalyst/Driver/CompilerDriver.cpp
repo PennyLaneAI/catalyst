@@ -237,6 +237,7 @@ LogicalResult runEnzymePasses(const CompilerOptions &options,
     PB.registerLoopAnalyses(LAM);
     PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
 
+    // Call Enzyme specific augmentPassBuilder which will add Enzyme passes.
     augmentPassBuilder(PB);
 
     // Create the pass manager.
