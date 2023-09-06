@@ -56,9 +56,7 @@ class CompileOptions:
     autograph: Optional[bool] = False
 
 
-def run_writing_command(
-    command: List[str], compile_options: Optional[CompileOptions]
-) -> None:
+def run_writing_command(command: List[str], compile_options: Optional[CompileOptions]) -> None:
     """Run the command after optionally announcing this fact to the user"""
 
     if compile_options.verbose:
