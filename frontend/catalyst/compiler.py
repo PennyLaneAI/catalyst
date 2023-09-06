@@ -386,7 +386,7 @@ class CompilerDriver:
             "-lmlir_c_runner_utils",  # required for memref.copy
         ]
 
-        if platform.system() != "Linux":
+        if platform.system() != "Linux":  # pragma: no cover
             default_flags += [error_flag_apple]
 
         return default_flags
