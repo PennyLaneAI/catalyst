@@ -72,7 +72,8 @@ def ScatterLoweringPass : Pass<"scatter-lowering"> {
     let summary = "Lower scatter op from Stable HLO to loops.";
 
     let dependentDialects = [
-        "index::IndexDialect"
+        "index::IndexDialect",
+        "mhlo::MhloDialect"
     ];
 
     let constructor = "catalyst::createScatterLoweringPass()";

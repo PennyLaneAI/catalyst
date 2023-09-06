@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt %s --scatter-lowering --split-input-file --verify-diagnostics | FileCheck %s
+// RUN: quantum-opt %s --allow-unregistered-dialect --scatter-lowering --split-input-file --verify-diagnostics | FileCheck %s
 
 func.func public @jit_test(%arg0: tensor<3xf64>, %arg1: tensor<i64>) -> tensor<3xf64> attributes {llvm.emit_c_interface} {
     %c0_i64 = arith.constant 0 : i64

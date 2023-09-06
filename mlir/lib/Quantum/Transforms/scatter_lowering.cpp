@@ -20,6 +20,9 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Errc.h"
 
+#include "mhlo/IR/hlo_ops.h"
+#include "mhlo/transforms/passes.h"
+
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Index/IR/IndexDialect.h"

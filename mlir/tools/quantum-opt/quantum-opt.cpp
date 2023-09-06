@@ -19,6 +19,8 @@
 #include "mlir/InitAllPasses.h"
 #include "mlir/Tools/mlir-opt/MlirOptMain.h"
 
+#include "mhlo/IR/hlo_ops.h"
+
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Catalyst/Transforms/Passes.h"
 #include "Gradient/IR/GradientDialect.h"
@@ -38,6 +40,7 @@ int main(int argc, char **argv)
     mlir::registerPass(catalyst::createEmitCatalystPyInterfacePass);
     mlir::registerPass(catalyst::createCopyGlobalMemRefPass);
     mlir::registerPass(catalyst::createAdjointLoweringPass);
+    mlir::registerPass(catalyst::createScatterLoweringPass);
 
     mlir::DialectRegistry registry;
     mlir::registerAllDialects(registry);
@@ -45,6 +48,7 @@ int main(int argc, char **argv)
     registry.insert<catalyst::CatalystDialect>();
     registry.insert<catalyst::quantum::QuantumDialect>();
     registry.insert<catalyst::gradient::GradientDialect>();
+    registry.insert<mlir::mhlo::MhloDialect>();
 
     return mlir::asMainReturnCode(
         mlir::MlirOptMain(argc, argv, "Quantum optimizer driver\n", registry));

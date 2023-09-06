@@ -39,7 +39,6 @@ if(QUANTUM_ENABLE_BINDINGS_PYTHON)
   mlir_configure_python_dev_packages()
 endif()
 
-message(STATUS "The directory is ${MHLO_INCLUDE_DIRS}")
 list(GET MHLO_INCLUDE_DIRS 1 MLIRHLO_DIR)
 list(GET MHLO_INCLUDE_DIRS 2 MLIRHLO_BUILD_DIR)
 
