@@ -544,7 +544,7 @@ class QJIT:
         )
         return mlir_module
 
-    def compile(self, inplace=False):
+    def compile(self):
         """Compile the current MLIR module."""
         if self.compiled_function and self.compiled_function.shared_object:
             self.compiled_function.shared_object.close()
@@ -582,8 +582,6 @@ class QJIT:
 
         self._llvmir = llvm_ir
         compiled_function = CompiledFunction(shared_object, qfunc_name, restype)
-        if inplace:
-            self.compiled_function = compiled_function
         return compiled_function
 
     def _maybe_promote(self, function, *args):

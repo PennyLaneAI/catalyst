@@ -155,10 +155,10 @@ void _catalyst_pyface_jit_cpp_exception_test(void*, void*) {
             return None
 
         cpp_exception_test.compiler = MockCompiler(cpp_exception_test.compiler.options)
-        cpp_exception_test.compile(inplace=True)
+        compiled_function = cpp_exception_test.compile()
 
         with pytest.raises(RuntimeError, match="Hello world"):
-            cpp_exception_test()
+            compiled_function()
 
     def test_linker_driver_invalid_file(self):
         """Test with the invalid input name."""
