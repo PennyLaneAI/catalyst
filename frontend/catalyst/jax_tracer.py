@@ -602,9 +602,7 @@ def trace_quantum_function(
 
         with EvaluationContext.frame_tracing_context(ctx, trace):
             results_tracers_flat, tracers_tree = tree_flatten(results_tracers)
-            import pdb
-            pdb.set_trace()
-            wffa, in_avals, out_tree_promise = deduce_avals(callback, results_tracers, dict())
+            wffa, in_avals, out_tree_promise = deduce_avals(callback, [ a.aval for a in results_tracers], dict())
             wffa.call_wrapped(results_tracers)
             results_tracers = callback(results_tracers_flat)
             out_classical_tracers = [trace.full_raise(results_tracers)]
