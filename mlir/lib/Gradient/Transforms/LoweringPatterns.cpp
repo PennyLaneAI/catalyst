@@ -14,6 +14,7 @@
 
 #include "GradMethods/Adjoint.hpp"
 #include "GradMethods/FiniteDifference.hpp"
+#include "GradMethods/HybridGradient.hpp"
 #include "GradMethods/JVPVJPPatterns.hpp"
 #include "GradMethods/ParameterShift.hpp"
 
@@ -27,18 +28,14 @@ using namespace catalyst::gradient;
 namespace catalyst {
 namespace gradient {
 
-void populateLoweringPatterns(RewritePatternSet &patterns, StringRef lowerOnly)
+void populateLoweringPatterns(RewritePatternSet &patterns)
 {
-    if (lowerOnly == "" || lowerOnly == "fd")
-        patterns.add<FiniteDiffLowering>(patterns.getContext(), 1);
-    if (lowerOnly == "" || lowerOnly == "ps")
-        patterns.add<ParameterShiftLowering>(patterns.getContext(), 1);
-    if (lowerOnly == "" || lowerOnly == "adj")
-        patterns.add<AdjointLowering>(patterns.getContext(), 1);
-    if (lowerOnly == "" || lowerOnly == "jp") {
-        patterns.add<JVPLoweringPattern>(patterns.getContext());
-        patterns.add<VJPLoweringPattern>(patterns.getContext());
-    }
+    patterns.add<HybridGradientLowering>(patterns.getContext());
+    patterns.add<FiniteDiffLowering>(patterns.getContext(), 1);
+    patterns.add<ParameterShiftLowering>(patterns.getContext(), 1);
+    patterns.add<AdjointLowering>(patterns.getContext(), 1);
+    patterns.add<JVPLoweringPattern>(patterns.getContext());
+    patterns.add<VJPLoweringPattern>(patterns.getContext());
 }
 
 } // namespace gradient

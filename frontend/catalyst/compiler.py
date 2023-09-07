@@ -55,6 +55,7 @@ class CompileOptions:
     target: Optional[str] = "binary"
     keep_intermediate: Optional[bool] = False
     pipelines: Optional[List[Any]] = None
+    autograph: Optional[bool] = False
 
 
 def run_writing_command(
@@ -309,7 +310,7 @@ class Enzyme(PassPipeline):
     linux_ext = "so"
     ext = linux_ext if platform.system() == "Linux" else apple_ext
     _default_flags = [
-        f"-load-pass-plugin={enzyme_path}/LLVMEnzyme-17.{ext}",
+        f"-load-pass-plugin={enzyme_path}/LLVMEnzyme-18.{ext}",
         # preserve-nvvm transforms certain global arrays to LLVM metadata that Enzyme will recognize
         "-passes=preserve-nvvm,enzyme",
         "-S",
@@ -370,27 +371,23 @@ class CompilerDriver:
         """
         mlir_lib_path = get_lib_path("llvm", "MLIR_LIB_DIR")
         rt_lib_path = get_lib_path("runtime", "RUNTIME_LIB_DIR")
-        rt_capi_path = os.path.join(rt_lib_path, "capi")
-        rt_backend_path = os.path.join(rt_lib_path, "backend")
         error_flag_apple = "-Wl,-arch_errors_fatal"
-        error_flag_linux = ""
-        error_flag = error_flag_linux if platform.system() == "Linux" else error_flag_apple
 
         default_flags = [
             "-shared",
             "-rdynamic",
-            f"-Wl,-rpath,{rt_capi_path}",
-            f"-Wl,-rpath,{rt_backend_path}",
+            f"-Wl,-rpath,{rt_lib_path}",
             f"-Wl,-rpath,{mlir_lib_path}",
             f"-L{mlir_lib_path}",
-            f"-L{rt_capi_path}",
-            f"-L{rt_backend_path}",
+            f"-L{rt_lib_path}",
             "-lrt_backend",
             "-lrt_capi",
             "-lpthread",
-            f"{error_flag}",
             "-lmlir_c_runner_utils",  # required for memref.copy
         ]
+
+        if platform.system() == "Darwin":  # pragma: no cover
+            default_flags += [error_flag_apple]
 
         return default_flags
 
@@ -426,12 +423,12 @@ class CompilerDriver:
             command = [compiler] + flags + [infile, "-o", outfile]
             run_writing_command(command, options)
             return True
-        except subprocess.CalledProcessError:
-            msg = (
-                f"Compiler {compiler} failed during execution of command {command}. "
-                "Will attempt fallback on available compilers."
-            )
-            warnings.warn(msg, UserWarning)
+        except subprocess.CalledProcessError as e:
+            # Only warn in verbose mode, as users might see it otherwise in regular use.
+            if options.verbose:
+                msg = f"Compiler {compiler} failed to link executable and returned with exit code "
+                msg += f"{e.returncode}. Output was: {e.output}.\nCommand: {command}"
+                warnings.warn(msg, UserWarning)
             return False
 
     @staticmethod
@@ -467,13 +464,15 @@ class CompilerDriver:
             flags = CompilerDriver.get_default_flags()
         if fallback_compilers is None:
             fallback_compilers = CompilerDriver._default_fallback_compilers
+        if options is None:
+            options = CompileOptions()
         for compiler in CompilerDriver._available_compilers(fallback_compilers):
             success = CompilerDriver._attempt_link(compiler, flags, infile, outfile, options)
             if success:
                 return outfile
-        msg = f"Unable to link {infile}. All available compiler options exhausted. "
-        msg += "Please provide a compatible compiler via $CATALYST_CC."
-        raise EnvironmentError(msg)
+        msg = f"Unable to link {infile}. Please check the output for any error messages. If no "
+        msg += "compiler was found by Catalyst, please specify a compatible one via $CATALYST_CC."
+        raise CompileError(msg)
 
 
 class Compiler:

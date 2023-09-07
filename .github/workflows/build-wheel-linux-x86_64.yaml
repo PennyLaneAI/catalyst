@@ -98,12 +98,6 @@ jobs:
       # building with LLD is a strong requirement for mhlo
       run: |
         export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
-
-        # TODO: We can remove this patch whenever this ticket is solved https://github.com/tensorflow/mlir-hlo/issues/68
-        pushd mlir
-        patch -d mlir-hlo/mhlo/analysis --merge --follow-symlinks < patches/add-lmhlo-dependency.patch
-        popd
-
         cmake -S mlir/mlir-hlo -B mhlo-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_ENABLE_ASSERTIONS=ON \
@@ -118,7 +112,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path:  enzyme-build
-        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.enzyme_version }}-generic-build
+        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-generic-build
 
     - name: Clone Enzyme Submodule
       if:  |
@@ -198,17 +192,21 @@ jobs:
       uses: actions/cache@v3
       with:
         path:  enzyme-build
-        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.enzyme_version }}-generic-build
+        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-generic-build
         fail-on-cache-miss: True
 
     # Build Catalyst-Runtime
+    # TODO: remove v0.31.0 after lightning monorepo upgrade
     - name: Build Catalyst-Runtime
       run: |
         cmake -S runtime -B runtime-build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=$PWD/runtime-build/lib \
               -DPYTHON_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -Dpybind11_DIR=$(python${{ matrix.python_version }} -c "import pybind11; print(pybind11.get_cmake_dir())") \
               -DENABLE_LIGHTNING_KOKKOS=ON \
+              -DLIGHTNING_GIT_TAG=v0.31.0 \
+              -DLIGHTNING_KOKKOS_GIT_TAG=latest_release \
               -DKokkos_ENABLE_SERIAL=ON \
               -DKokkos_ENABLE_OPENMP=ON \
               -DENABLE_OPENQASM=ON
@@ -294,6 +292,7 @@ jobs:
     - name: Install Python dependencies
       run: |
         python${{ matrix.python_version }} -m pip install wheel pytest pytest-xdist
+        python${{ matrix.python_version }} -m pip install tensorflow-cpu  # for autograph tests
 
     - name: Install Catalyst
       run: |

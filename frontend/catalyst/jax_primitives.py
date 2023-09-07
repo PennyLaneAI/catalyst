@@ -26,10 +26,11 @@ from jax._src.lib.mlir import ir
 from jax.core import AbstractValue
 from jax.interpreters import mlir
 from jax.tree_util import PyTreeDef, tree_unflatten
-from jaxlib.mlir.dialects._func_ops_gen import CallOp
-from jaxlib.mlir.dialects._mhlo_ops_gen import ConstantOp, ConvertOp
-from jaxlib.mlir.dialects._stablehlo_ops_gen import ConstantOp as StableHLOConstantOp
-from mlir_quantum.dialects.arith import AddIOp, CeilDivSIOp, IndexCastOp, MulIOp, SubIOp
+from jaxlib.mlir.dialects.arith import AddIOp, CeilDivSIOp, IndexCastOp, MulIOp, SubIOp
+from jaxlib.mlir.dialects.func import CallOp
+from jaxlib.mlir.dialects.mhlo import ConstantOp, ConvertOp
+from jaxlib.mlir.dialects.scf import ConditionOp, ForOp, IfOp, WhileOp, YieldOp
+from jaxlib.mlir.dialects.stablehlo import ConstantOp as StableHLOConstantOp
 from mlir_quantum.dialects.gradient import GradOp, JVPOp, VJPOp
 from mlir_quantum.dialects.quantum import (
     AdjointOp,
@@ -55,7 +56,6 @@ from mlir_quantum.dialects.quantum import (
     VarianceOp,
 )
 from mlir_quantum.dialects.quantum import YieldOp as QYieldOp
-from mlir_quantum.dialects.scf import ConditionOp, ForOp, IfOp, WhileOp, YieldOp
 from mlir_quantum.dialects.tensor import FromElementsOp
 from pennylane import QNode as pennylane_QNode
 
@@ -82,6 +82,14 @@ class Qbit:
 class AbstractQbit(AbstractValue):
     """Abstract Qbit"""
 
+    hash_value = hash("AbstractQubit")
+
+    def __eq__(self, other):  # pragma: nocover
+        return isinstance(other, AbstractQbit)
+
+    def __hash__(self):  # pragma: nocover
+        return self.hash_value
+
 
 class ConcreteQbit(AbstractQbit):
     """Concrete Qbit."""
@@ -104,6 +112,14 @@ class Qreg:
 
 class AbstractQreg(AbstractValue):
     """Abstract quantum register."""
+
+    hash_value = hash("AbstractQreg")
+
+    def __eq__(self, other):
+        return isinstance(other, AbstractQreg)
+
+    def __hash__(self):
+        return self.hash_value
 
 
 class ConcreteQreg(AbstractQreg):
@@ -131,6 +147,15 @@ class AbstractObs(AbstractValue):
     def __init__(self, num_qubits=None, primitive=None):
         self.num_qubits = num_qubits
         self.primitive = primitive
+
+    def __eq__(self, other):  # pragma: nocover
+        if not isinstance(other, AbstractObs):
+            return False
+
+        return self.num_qubits == other.num_qubits and self.primitive == other.primitive
+
+    def __hash__(self):  # pragma: nocover
+        return hash(self.primitive) + self.num_qubits
 
 
 class ConcreteObs(AbstractObs):
@@ -226,8 +251,8 @@ def _func_def_lowering(ctx, fn, call_jaxpr) -> str:
         # "best", the default option in PennyLane, chooses backprop on the device
         # if supported and parameter-shift otherwise. Emulating the same behaviour
         # would require generating code to query the device.
-        # For simplicity, Catalyst instead defaults to finite-diff.
-        diff_method = fn.diff_method if fn.diff_method != "best" else "finite-diff"
+        # For simplicity, Catalyst instead defaults to parameter-shift.
+        diff_method = fn.diff_method if fn.diff_method != "best" else "parameter-shift"
         func_op.attributes["diff_method"] = ir.StringAttr.get(diff_method)
 
     return func_op.name.value

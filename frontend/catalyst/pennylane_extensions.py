@@ -221,11 +221,11 @@ def _ensure_differentiable(f: DifferentiableLike) -> Differentiable:
 
     # Unwrap the function from an existing QJIT object.
     if isinstance(f, catalyst.compilation_pipelines.QJIT):
-        f = f.qfunc
+        f = f.user_function
 
     if isinstance(f, (Function, QNode)):
         return f
-    elif isinstance(f, Callable):  # keep at the bottom
+    elif isinstance(f, Callable):  # Keep at the bottom
         return Function(f)
 
     raise DifferentiableCompileError(f"Non-differentiable object passed: {type(f)}")
@@ -261,9 +261,28 @@ def _make_jaxpr_check_differentiable(f: Differentiable, grad_params: GradParams,
                 f"results, got '{res.dtype}' at position {pos}."
             )
 
-    _check_created_jaxpr_gradient_methods(f, method, jaxpr)
+    _verify_differentiable_child_qnodes(jaxpr, method)
 
     return jaxpr
+
+
+def _verify_differentiable_child_qnodes(jaxpr, method):
+    """Traverse QNodes being differentiated in the 'call graph' of the JAXPR to verify them."""
+    visited = set()
+
+    def traverse_children(jaxpr):
+        for eqn in jaxpr.eqns:
+            # The Python function is stored in the "fn" parameter of func_p JAXPR primitives.
+            fn = eqn.params.get("fn")
+            if fn and fn not in visited:
+                child = eqn.params.get("call_jaxpr", None)
+                if isinstance(fn, (qml.QNode, Grad)):
+                    _check_created_jaxpr_gradient_methods(fn, method, child)
+                if child and child not in visited:
+                    traverse_children(child)
+            visited.add(fn)
+
+    traverse_children(jaxpr)
 
 
 def _check_created_jaxpr_gradient_methods(f: Differentiable, method: str, jaxpr: Jaxpr):
@@ -271,17 +290,21 @@ def _check_created_jaxpr_gradient_methods(f: Differentiable, method: str, jaxpr:
     if method == "fd":
         return
 
-    qnode_jaxpr = jaxpr.eqns[0].params["call_jaxpr"]
+    if isinstance(f, Grad):
+        raise DifferentiableCompileError(
+            "Only finite difference can compute higher order derivatives"
+        )
+
+    assert isinstance(
+        f, qml.QNode
+    ), "Expected quantum differentiable node to be a qml.QNode or a catalyst.grad op"
     return_ops = []
-    for res in qnode_jaxpr.outvars:
-        for eq in reversed(qnode_jaxpr.eqns):  # pragma: no branch
+    for res in jaxpr.outvars:
+        for eq in reversed(jaxpr.eqns):  # pragma: no branch
             if res in eq.outvars:
                 return_ops.append(eq.primitive)
                 break
 
-    assert isinstance(
-        f, qml.QNode
-    ), "Differentiation methods other than finite-differences can only operate on a QNode"
     if f.diff_method is None:
         raise DifferentiableCompileError(
             "Cannot differentiate a QNode explicitly marked non-differentiable (with"
@@ -304,9 +327,9 @@ def _check_created_jaxpr_gradient_methods(f: Differentiable, method: str, jaxpr:
 def _check_grad_params(
     method: str, scalar_out: bool, h: Optional[float], argnum: Optional[Union[int, List[int]]]
 ) -> GradParams:
-    methods = {"fd", "defer"}
+    methods = {"fd", "auto"}
     if method is None:
-        method = "fd"
+        method = "auto"
     if method not in methods:
         raise ValueError(
             f"Invalid differentiation method '{method}'. "
@@ -348,11 +371,6 @@ class Grad:
         self.fn = fn
         self.__name__ = f"grad.{fn.__name__}"
         self.grad_params = grad_params
-        if self.grad_params.method != "fd" and not isinstance(self.fn, qml.QNode):
-            raise ValueError(
-                "Only finite difference can compute higher order derivatives "
-                "or gradients of non-QNode functions."
-            )
 
     def __call__(self, *args, **kwargs):
         """Specifies that an actual call to the differentiated function.
@@ -378,27 +396,22 @@ def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
 
     .. warning::
 
-        Currently, higher-order differentiation or differentiation of non-QNode functions
-        is only supported by the finite-difference method.
-
-    .. note::
-
-        Any JAX-compatible optimization library, such as `JAXopt
-        <https://jaxopt.github.io/stable/index.html>`_, can be used
-        alongside ``grad`` for JIT-compatible variational workflows.
-        See the :doc:`/dev/quick_start` for examples.
+        Currently, higher-order differentiation is only supported by the finite-difference
+        method.
 
     Args:
         f (Callable): a function or a function object to differentiate
-        method (str): The method used for differentiation, which can be any of ``["fd", "defer"]``,
+        method (str): The method used for differentiation, which can be any of ``["auto", "fd"]``,
                       where:
 
-                      - ``"fd"`` represents first-order finite-differences for the entire hybrid
-                        circuit,
-
-                      - ``"defer"`` represents deferring the quantum differentiation to the method
+                      - ``"auto"`` represents deferring the quantum differentiation to the method
                         specified by the QNode, while the classical computation is differentiated
-                        using traditional auto-diff.
+                        using traditional auto-diff. Catalyst supports ``"parameter-shift"`` and
+                        ``"adjoint"`` on internal QNodes. Notably, QNodes with
+                        ``diff_method="finite-diff"`` is not supported with ``"auto"``.
+
+                      - ``"fd"`` represents first-order finite-differences for the entire hybrid
+                        function.
 
         h (float): the step-size value for the finite-difference (``"fd"``) method
         argnum (Tuple[int, List[int]]): the argument indices to differentiate
@@ -411,9 +424,16 @@ def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
         ValueError: Invalid method or step size parameters.
         DifferentiableCompilerError: Called on a function that doesn't return a single scalar.
 
+    .. note::
+
+        Any JAX-compatible optimization library, such as `JAXopt
+        <https://jaxopt.github.io/stable/index.html>`_, can be used
+        alongside ``grad`` for JIT-compatible variational workflows.
+        See the :doc:`/dev/quick_start` for examples.
+
     .. seealso:: :func:`~.jacobian`
 
-    **Example**
+    **Example 1 (Classical preprocessing)**
 
     .. code-block:: python
 
@@ -431,6 +451,67 @@ def grad(f: DifferentiableLike, *, method=None, h=None, argnum=None):
 
     >>> workflow(2.0)
     array(-3.14159265)
+
+    **Example 2 (Classical preprocessing and postprocessing)**
+
+    .. code-block:: python
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qjit
+        def grad_loss(theta):
+            @qml.qnode(dev, diff_method="adjoint")
+            def circuit(theta):
+                qml.RX(jnp.exp(theta ** 2) / jnp.cos(theta / 4), wires=0)
+                return qml.expval(qml.PauliZ(wires=0))
+
+            def loss(theta):
+                return jnp.pi / jnp.tanh(circuit(theta))
+
+            return catalyst.grad(loss, method="auto")(theta)
+
+    >>> grad_loss(1.0)
+    array(-1.90958669)
+
+    **Example 3 (Multiple QNodes with their own differentiation methods)**
+
+    .. code-block:: python
+
+        dev = qml.device("lightning.qubit", wires=1)
+
+        @qjit
+        def grad_loss(theta):
+            @qml.qnode(dev, diff_method="parameter-shift")
+            def circuit_A(params):
+                qml.RX(jnp.exp(params[0] ** 2) / jnp.cos(params[1] / 4), wires=0)
+                return qml.probs()
+
+            @qml.qnode(dev, diff_method="adjoint")
+            def circuit_B(params):
+                qml.RX(jnp.exp(params[1] ** 2) / jnp.cos(params[0] / 4), wires=0)
+                return qml.expval(qml.PauliZ(wires=0))
+
+            def loss(params):
+                return jnp.prod(circuit_A(params)) + circuit_B(params)
+
+            return catalyst.grad(loss)(theta)
+
+    >>> grad_loss(jnp.array([1.0, 2.0]))
+    array([ 0.57367285, 44.4911605 ])
+
+    **Example 4 (Purely classical functions)**
+
+    .. code-block:: python
+
+        def square(x: float):
+            return x ** 2
+
+        @qjit
+        def dsquare(x: float):
+            return catalyst.grad(square)(x)
+
+    >>> dsquare(2.3)
+    array(4.6)
     """
     scalar_out = True
     return Grad(
@@ -444,29 +525,19 @@ def jacobian(f: DifferentiableLike, *, method=None, h=None, argnum=None):
     This function allows the Jacobian of a hybrid quantum-classical function
     to be computed within the compiled program.
 
-    .. warning::
-
-        Currently, higher-order differentiation or differentiation of non-QNode functions
-        is only supported by the finite-difference method.
-
-    .. note::
-
-        Any JAX-compatible optimization library, such as `JAXopt
-        <https://jaxopt.github.io/stable/index.html>`_, can be used
-        alongside ``jacobian`` for JIT-compatible variational workflows.
-        See the :doc:`/dev/quick_start` for examples.
-
     Args:
         f (Callable): a function or a function object to differentiate
-        method (str): The method used for differentiation, which can be any of ``["fd", "defer"]``,
+        method (str): The method used for differentiation, which can be any of ``["auto", "fd"]``,
                       where:
 
-                      - ``"fd"`` represents first-order finite-differences for the entire hybrid
-                        circuit,
-
-                      - ``"defer"`` represents deferring the quantum differentiation to the method
+                      - ``"auto"`` represents deferring the quantum differentiation to the method
                         specified by the QNode, while the classical computation is differentiated
-                        using traditional auto-diff.
+                        using traditional auto-diff. Catalyst supports ``"parameter-shift"`` and
+                        ``"adjoint"`` on internal QNodes. Notably, QNodes with
+                        ``diff_method="finite-diff"`` is not supported with ``"auto"``.
+
+                      - ``"fd"`` represents first-order finite-differences for the entire hybrid
+                        function.
 
         h (float): the step-size value for the finite-difference (``"fd"``) method
         argnum (Tuple[int, List[int]]): the argument indices to differentiate
@@ -477,6 +548,13 @@ def jacobian(f: DifferentiableLike, *, method=None, h=None, argnum=None):
 
     Raises:
         ValueError: Invalid method or step size parameters.
+
+    .. note::
+
+        Any JAX-compatible optimization library, such as `JAXopt
+        <https://jaxopt.github.io/stable/index.html>`_, can be used
+        alongside ``jacobian`` for JIT-compatible variational workflows.
+        See the :doc:`/dev/quick_start` for examples.
 
     .. seealso:: :func:`~.grad`
 
@@ -515,7 +593,7 @@ def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=
 
     Args:
         f (Callable): Function-like object to calculate JVP for
-        params (List[Array]): List (or a tuple) of the fnuction arguments specifying the point
+        params (List[Array]): List (or a tuple) of the function arguments specifying the point
                               to calculate JVP at. A subset of these parameters are declared as
                               differentiable by listing their indices in the ``argnum`` parameter.
         tangents(List[Array]): List (or a tuple) of tangent values to use in JVP. The list size and
@@ -599,9 +677,9 @@ def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnu
 
     Args:
         f(Callable): Function-like object to calculate JVP for
-        params(List[Array]): List (or a tuble) of f's arguments specifying the point to calculate
+        params(List[Array]): List (or a tuple) of f's arguments specifying the point to calculate
                              VJP at. A subset of these parameters are declared as
-                             differentiable by listing their indices in the ``argnum`` paramerer.
+                             differentiable by listing their indices in the ``argnum`` parameter.
         cotangents(List[Array]): List (or a tuple) of tangent values to use in JVP. The list size
                                  and shapes must match the size and shape of ``f`` outputs.
         method(str): Differentiation method to use, same as in ``grad``.
@@ -824,13 +902,13 @@ class CondCallable:
 
     @staticmethod
     def _check_branches_return_types(branch_jaxprs):
-        expected = branch_jaxprs[0].out_avals[:-1]
+        expected = branch_jaxprs[0].out_avals
         for i, jaxpr in list(enumerate(branch_jaxprs))[1:]:
-            if expected != jaxpr.out_avals[:-1]:
+            if expected != jaxpr.out_avals:
                 raise TypeError(
-                    "Conditional branches all require the same return type, got:\n"
+                    "Conditional requires consistent return types across all branches, got:\n"
                     f" - Branch at index 0: {expected}\n"
-                    f" - Branch at index {i}: {jaxpr.out_avals[:-1]}\n"
+                    f" - Branch at index {i}: {jaxpr.out_avals}\n"
                     "Please specify an else branch if none was specified."
                 )
 
@@ -895,6 +973,11 @@ class CondCallable:
 
 def cond(pred):
     """A :func:`~.qjit` compatible decorator for if-else conditionals in PennyLane/Catalyst.
+
+    .. note::
+
+        Catalyst can automatically convert Python if-statements for you. Requires setting
+        ``autograph=True``, see the :func:`~.qjit` function or documentation page for more details.
 
     This form of control flow is a functional version of the traditional if-else conditional. This
     means that each execution path, an 'if' branch, any 'else if' branches, and a final 'otherwise'

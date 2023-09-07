@@ -568,7 +568,7 @@ array(-3.14159265)
 To specify the differentiation strategy, the ``method`` argument can be passed
 to the ``grad`` function:
 
-- ``method="defer"``: Quantum components of the hybrid function are
+- ``method="auto"``: Quantum components of the hybrid function are
   differentiated according to the corresponding QNode ``diff_method``, while
   the classical computation is differentiated using traditional autodiff.
 
@@ -623,7 +623,7 @@ decorator to compute Jacobian matrices of general hybrid functions with multiple
             qml.RY(x[1], wires=0)
             return qml.probs()
 
-        g = jacobian(circuit, method="defer")
+        g = jacobian(circuit, method="auto")
         return g(x)
 
 >>> workflow(jnp.array([2.0, 1.0]))

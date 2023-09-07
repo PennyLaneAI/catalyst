@@ -14,6 +14,7 @@
 
 #include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Index/IR/IndexDialect.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -53,10 +54,8 @@ struct GradientConversionPass : impl::GradientConversionPassBase<GradientConvers
         LLVMConversionTarget target(*context);
         target.addIllegalDialect<GradientDialect>();
         target.addLegalDialect<catalyst::quantum::QuantumDialect>();
-        target.addLegalDialect<func::FuncDialect, index::IndexDialect, memref::MemRefDialect>();
-        // Necessary in place of memref.copy because linalg.copy results in better LLVM type
-        // information for Enzyme.
-        target.addLegalOp<linalg::CopyOp>();
+        target.addLegalDialect<arith::ArithDialect, linalg::LinalgDialect, func::FuncDialect,
+                               index::IndexDialect, memref::MemRefDialect>();
 
         if (failed(applyPartialConversion(getOperation(), target, std::move(patterns)))) {
             signalPassFailure();
