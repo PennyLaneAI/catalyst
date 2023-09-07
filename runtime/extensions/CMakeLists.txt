@@ -8,7 +8,7 @@ set(source_files "StateVectorLQubitDynamic.cpp")
 FetchContent_Declare(
     pennylane_lightning
     GIT_REPOSITORY https://github.com/PennyLaneAI/pennylane-lightning.git
-    GIT_TAG      ${LIGHTNING_GIT_TAG}
+    GIT_TAG      "maa/multi-device-build"
 )
 set(CMAKE_POSITION_INDEPENDENT_CODE ON) # build with -fPIC
 set(ENABLE_KOKKOS OFF CACHE BOOL "Enable Kokkos")
@@ -29,7 +29,7 @@ if(ENABLE_LIGHTNING_KOKKOS)
         GIT_TAG        ${LIGHTNING_KOKKOS_GIT_TAG}
     )
 
-    set(PL_BACKEND "lightning_qubit")
+    # set(PL_BACKEND "lightning_qubit;lightning-kokkos")
     set(PLKOKKOS_ENABLE_PYTHON OFF CACHE BOOL "Enable compilation of the Python bindings")
     FetchContent_MakeAvailable(pennylane_lightning_kokkos)
 
