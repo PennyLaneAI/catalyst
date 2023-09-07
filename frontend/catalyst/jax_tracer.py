@@ -66,6 +66,7 @@ from catalyst.utils.jax_extras import (
     deduce_avals,
     initial_style_jaxprs_with_common_consts2,
     jaxpr_to_mlir,
+    pytree,
     sort_eqns,
     tree_flatten,
     tree_structure,
@@ -634,10 +635,12 @@ def trace_quantum_measurements(
                 out_classical_tracers.extend(counts_p.bind(obs_tracers, shots=shots, shape=shape))
                 counts_tree = tree_structure(("keys", "counts"))
                 meas_return_trees_children = out_tree.children()
-                if len(meas_return_trees_children) > 0:
+                if len(meas_return_trees_children):
                     meas_return_trees_children[i] = counts_tree
                     out_tree = out_tree.make_from_node_data_and_children(
-                        out_tree.node_data(), meas_return_trees_children
+                        pytree.PyTreeRegistry(),
+                        out_tree.node_data(),
+                        meas_return_trees_children,
                     )
                 else:
                     out_tree = counts_tree

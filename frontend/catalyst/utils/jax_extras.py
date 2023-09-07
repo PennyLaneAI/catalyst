@@ -61,6 +61,7 @@ from jax._src.tree_util import (
     treedef_is_leaf,
 )
 from jax._src.util import partition_list, safe_map, unzip2, unzip3, wrap_name
+from jaxlib.xla_extension import pytree
 
 __all__ = (
     "ClosedJaxpr",
@@ -79,6 +80,7 @@ __all__ = (
     "make_jaxpr_effects",
     "new_dynamic_main2",
     "new_inner_tracer",
+    "pytree",
     "sort_eqns",
     "treedef_is_leaf",
     "tree_flatten",
