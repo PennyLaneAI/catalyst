@@ -14,6 +14,7 @@
 """This module contains functions tracing and lowering JAX code to MLIR.
 """
 
+from typing import Callable, Sequence
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
@@ -501,6 +502,13 @@ def trace_quantum_measurements(
 
     return out_classical_tracers, out_tree
 
+def transform_callback(tape: QuantumTape) -> (Sequence[QuantumTape], Callable):
+    # for transform registered
+    #  transform(tape) ... (recursively?) I suppose that is what the execute and
+    # transform dispatch are doing.
+    #return [tape, tape], lambda res: jnp.add(res[0], res[1])
+    return [tape], lambda res: res[0]
+
 
 def trace_quantum_function(
     f: Callable, device: QubitDevice, args, kwargs
@@ -554,34 +562,55 @@ def trace_quantum_function(
             ]
 
         # (2) - Quantum tracing
+        tapes, callback = transform_callback(quantum_tape)
+        del quantum_tape
+        results = []
+        results_tracers = []
+        for tape in tapes:
+            with EvaluationContext.frame_tracing_context(ctx, trace):
+
+                qdevice_p.bind(spec="kwargs", val=str(device.backend_kwargs))
+                qdevice_p.bind(spec="backend", val=device.backend_name)
+                qreg_in = qalloc_p.bind(len(device.wires))
+                qrp_out = trace_quantum_tape(tape, device, qreg_in, ctx, trace)
+                out_classical_tracers, out_classical_tree = trace_quantum_measurements(
+                    device,
+                    qrp_out,
+                    out_classical_tracers_or_measurements,
+                    out_tree_promise(),
+                )
+                out_quantum_tracers = [qrp_out.actualize()]
+                qdealloc_p.bind(qreg_in)
+
+                out_classical_tracers = [trace.full_raise(t) for t in out_classical_tracers]
+                results_tracers += out_classical_tracers
+
+                jaxpr, out_type, consts = ctx.frames[trace].to_jaxpr2(
+                    out_classical_tracers + out_quantum_tracers
+                )
+                jaxpr._outvars = jaxpr._outvars[:-1]  # pylint: disable=protected-access
+                out_type = out_type[:-1]
+
+                out_avals, _ = unzip2(out_type)
+                abstract_results = tree_unflatten(
+                    out_classical_tree, [ShapeDtypeStruct(a.shape, a.dtype, a.named_shape) for a in out_avals]
+                )
+                # TODO: `check_jaxpr` complains about the `AbstractQreg` type. Consider fixing.
+                # check_jaxpr(jaxpr)
+
+            results += results_tracers
+
         with EvaluationContext.frame_tracing_context(ctx, trace):
-            qdevice_p.bind(spec="kwargs", val=str(device.backend_kwargs))
-            qdevice_p.bind(spec="backend", val=device.backend_name)
-            qreg_in = qalloc_p.bind(len(device.wires))
-            qrp_out = trace_quantum_tape(quantum_tape, device, qreg_in, ctx, trace)
-            out_classical_tracers, out_classical_tree = trace_quantum_measurements(
-                device,
-                qrp_out,
-                out_classical_tracers_or_measurements,
-                out_tree,
-            )
-            out_quantum_tracers = [qrp_out.actualize()]
-            qdealloc_p.bind(qreg_in)
+            results_tracers_flat, tracers_tree = tree_flatten(results_tracers)
+            import pdb
+            pdb.set_trace()
+            wffa, in_avals, out_tree_promise = deduce_avals(callback, results_tracers, dict())
+            wffa.call_wrapped(results_tracers)
+            results_tracers = callback(results_tracers_flat)
+            out_classical_tracers = [trace.full_raise(results_tracers)]
+            jaxpr, out_type, consts = ctx.frames[trace].to_jaxpr2(out_classical_tracers)
+            closed_jaxpr = ClosedJaxpr(jaxpr, consts)
+            out_avals, _ = unzip2(out_type)
+            abstract_results = tree_unflatten(out_tree_promise(), [ShapeDtypeStruct(a.shape, a.dtype, a.named_shape) for a in out_classical_tracers])
 
-            out_classical_tracers = [trace.full_raise(t) for t in out_classical_tracers]
-
-            jaxpr, out_type, consts = ctx.frames[trace].to_jaxpr2(
-                out_classical_tracers + out_quantum_tracers
-            )
-            jaxpr._outvars = jaxpr._outvars[:-1]  # pylint: disable=protected-access
-            out_type = out_type[:-1]
-            # TODO: `check_jaxpr` complains about the `AbstractQreg` type. Consider fixing.
-            # check_jaxpr(jaxpr)
-
-    closed_jaxpr = ClosedJaxpr(jaxpr, consts)
-    out_avals, _ = unzip2(out_type)
-
-    abstract_results = tree_unflatten(
-        out_classical_tree, [ShapeDtypeStruct(a.shape, a.dtype, a.named_shape) for a in out_avals]
-    )
     return closed_jaxpr, abstract_results
