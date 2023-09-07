@@ -42,6 +42,18 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
     mlir::LogicalResult matchAndRewrite(mhlo::ScatterOp scatter,
                                         mlir::PatternRewriter &rewriter) const override
     {
+        Value inp = *scatter.getInputs().begin();
+        inp.print(llvm::outs());
+
+        // Correct Block extract and make a function out of it.
+        auto &reg = scatter.getUpdateComputation();
+        auto block = reg.getBlocks().begin();
+
+        // Argument of the block
+        ValueRange arguments = block->getArguments();
+        rewriter.replaceOp(scatter, scatter.getInputs());
+
+        // Create the function
         return success();
     }
 };

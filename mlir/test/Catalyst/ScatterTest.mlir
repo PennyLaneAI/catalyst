@@ -14,7 +14,7 @@
 
 // RUN: quantum-opt %s --allow-unregistered-dialect --scatter-lowering --split-input-file --verify-diagnostics | FileCheck %s
 
-func.func public @jit_test(%arg0: tensor<3xf64>, %arg1: tensor<i64>) -> tensor<3xf64> attributes {llvm.emit_c_interface} {
+func.func public @scatter_multiply(%arg0: tensor<3xf64>, %arg1: tensor<i64>) -> tensor<3xf64> attributes {llvm.emit_c_interface} {
     %c0_i64 = arith.constant 0 : i64
     %c3_i64 = arith.constant 3 : i64
     %cst = arith.constant dense<2.000000e+00> : tensor<f64>
