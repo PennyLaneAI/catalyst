@@ -12,8 +12,8 @@ ENABLE_WARNINGS?=ON
 ENABLE_LIGHTNING_KOKKOS?=OFF
 ENABLE_OPENQASM?=OFF
 BUILD_QIR_STDLIB_FROM_SRC?=OFF
-# TODO: remove after lightning monorepo upgrade
-LIGHTNING_GIT_TAG_VALUE?=v0.31.0
+# TODO: Update to latest_release after v0.33.0
+LIGHTNING_GIT_TAG_VALUE=master
 LIGHTNING_KOKKOS_GIT_TAG_VALUE?=latest_release
 NPROC?=$(shell python -c "import os; print(os.cpu_count())")
 

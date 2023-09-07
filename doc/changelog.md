@@ -4,6 +4,9 @@
 
 <h3>Improvements</h3>
 
+* Update the Lightning backend device to work with the PL-Lightning monorepo.
+[(#259)](https://github.com/PennyLaneAI/catalyst/pull/259)
+
 <h3>Breaking changes</h3>
 
 <h3>Bug fixes</h3>
@@ -11,6 +14,8 @@
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
+
+Ali Asadi
 
 # Release 0.3.0
 

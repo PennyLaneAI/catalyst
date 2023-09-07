@@ -30,7 +30,7 @@ The directory is structured as follows:
 - `extensions <https://github.com/PennyLaneAI/catalyst/tree/main/runtime/extensions>`_:
     A collection of extensions for backend simulators to fit into the
     `QIR programming model <https://github.com/qir-alliance/qir-spec/blob/main/specification/v0.1/4_Quantum_Runtime.md#qubits>`_.
-    The `StateVectorDynamicCPU <https://github.com/PennyLaneAI/catalyst/tree/main/runtime/extensions/StateVectorDynamicCPU.hpp>`_
+    The `StateVectorLQubitDynamic <https://github.com/PennyLaneAI/catalyst/tree/main/runtime/extensions/StateVectorLQubitDynamic.hpp>`_
     class extends the state-vector class of `Pennylane-Lightning <https://github.com/PennyLaneAI/pennylane-lightning>`_ providing
     dynamic allocation and deallocation of qubits.
 
