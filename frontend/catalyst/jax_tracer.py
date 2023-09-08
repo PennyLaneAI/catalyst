@@ -566,6 +566,7 @@ def trace_quantum_function(
         del quantum_tape
         results = []
         results_tracers = []
+        results_abstract = []
         for tape in tapes:
             with EvaluationContext.frame_tracing_context(ctx, trace):
 
@@ -595,6 +596,7 @@ def trace_quantum_function(
                 abstract_results = tree_unflatten(
                     out_classical_tree, [ShapeDtypeStruct(a.shape, a.dtype, a.named_shape) for a in out_avals]
                 )
+                results_abstract += [abstract_results]
                 # TODO: `check_jaxpr` complains about the `AbstractQreg` type. Consider fixing.
                 # check_jaxpr(jaxpr)
 
@@ -602,10 +604,10 @@ def trace_quantum_function(
 
         with EvaluationContext.frame_tracing_context(ctx, trace):
             results_tracers_flat, tracers_tree = tree_flatten(results_tracers)
-            wffa, in_avals, out_tree_promise = deduce_avals(callback, [ a.aval for a in results_tracers], dict())
-            wffa.call_wrapped(results_tracers)
-            results_tracers = callback(results_tracers_flat)
-            out_classical_tracers = [trace.full_raise(results_tracers)]
+            args = results_tracers
+            wffa, in_avals, out_tree_promise = deduce_avals(callback, (results_abstract,), {})
+            ans = wffa.call_wrapped(*args)
+            out_classical_tracers = [trace.full_raise(t) for t in ans]
             jaxpr, out_type, consts = ctx.frames[trace].to_jaxpr2(out_classical_tracers)
             closed_jaxpr = ClosedJaxpr(jaxpr, consts)
             out_avals, _ = unzip2(out_type)
