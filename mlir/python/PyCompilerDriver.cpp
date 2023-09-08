@@ -75,9 +75,9 @@ PYBIND11_MODULE(compiler_driver, m)
     m.def(
         "run_compiler_driver",
         [](const char *source, const char *workspace, const char *moduleName, bool keepIntermediate,
-           bool verbose, py::list pipelines, py::list llvmPipelines,
-           bool lower_to_llvm) -> CompilerOutput * {
-            CompilerOutput *output = new CompilerOutput();
+           bool verbose, py::list pipelines,
+           bool lower_to_llvm) -> std::unique_ptr<CompilerOutput> {
+            std::unique_ptr<CompilerOutput> output(new CompilerOutput());
             assert(output);
 
             llvm::raw_string_ostream errStream{output->diagnosticMessages};
@@ -89,7 +89,6 @@ PYBIND11_MODULE(compiler_driver, m)
                                     .keepIntermediate = keepIntermediate,
                                     .verbosity = verbose ? Verbosity::All : Verbosity::Urgent,
                                     .pipelinesCfg = parseCompilerSpec(pipelines),
-                                    .pipelinesLLVM = parseCompilerSpec(llvmPipelines),
                                     .lowerToLLVM = lower_to_llvm};
 
             errStream.flush();
@@ -101,6 +100,5 @@ PYBIND11_MODULE(compiler_driver, m)
         },
         py::arg("source"), py::arg("workspace"), py::arg("module_name") = "jit source",
         py::arg("keep_intermediate") = false, py::arg("verbose") = false,
-        py::arg("pipelines") = py::list(), py::arg("pipelinesLLVM") = py::list(),
-        py::arg("lower_to_llvm") = true);
+        py::arg("pipelines") = py::list(), py::arg("lower_to_llvm") = true);
 }
