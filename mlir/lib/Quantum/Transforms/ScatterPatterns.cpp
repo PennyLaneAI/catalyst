@@ -23,6 +23,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Errc.h"
 
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Index/IR/IndexOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -39,22 +40,60 @@ namespace {
 struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> {
     using mlir::OpRewritePattern<mhlo::ScatterOp>::OpRewritePattern;
 
-    mlir::LogicalResult matchAndRewrite(mhlo::ScatterOp scatter,
+    mlir::LogicalResult matchAndRewrite(mhlo::ScatterOp op,
                                         mlir::PatternRewriter &rewriter) const override
     {
-        Value inp = *scatter.getInputs().begin();
-        inp.print(llvm::outs());
-
         // Correct Block extract and make a function out of it.
-        auto &reg = scatter.getUpdateComputation();
-        auto block = reg.getBlocks().begin();
-
-        // Argument of the block
-        ValueRange arguments = block->getArguments();
-        rewriter.replaceOp(scatter, scatter.getInputs());
+        auto &reg = op.getUpdateComputation();
+        auto moduleOp = op->getParentOfType<ModuleOp>();
+        FlatSymbolRefAttr updateFn =
+            getOrInsertUpdateFunction(op.getLoc(), moduleOp, rewriter, reg);
+        // Replace the results with the updated inputs.
+        rewriter.replaceOp(op, op.getInputs());
 
         // Create the function
         return success();
+    }
+
+    FlatSymbolRefAttr getOrInsertUpdateFunction(Location loc, ModuleOp moduleOp, OpBuilder &b,
+                                                Region &updateRegion) const
+    {
+        MLIRContext *ctx = b.getContext();
+        std::string funcName = "__catalyst_update_scatter";
+
+        if (moduleOp.lookupSymbol<func::FuncOp>(funcName)) {
+            return SymbolRefAttr::get(ctx, funcName);
+        }
+
+        OpBuilder::InsertionGuard guard(b);
+        b.setInsertionPointToStart(moduleOp.getBody());
+
+        auto block = updateRegion.getBlocks().begin();
+        ValueRange arguments = block->getArguments();
+        Operation *originalTerminator = block->getTerminator();
+
+        auto updateFnType = FunctionType::get(ctx, /*inputs=*/
+                                              arguments.getTypes(),
+                                              /*outputs=*/originalTerminator->getOperandTypes());
+
+        auto updateFn = b.create<func::FuncOp>(loc, funcName, updateFnType);
+        updateFn.setPrivate();
+
+        Block *entryBlock = updateFn.addEntryBlock();
+        b.setInsertionPointToStart(entryBlock);
+        BlockArgument inputs = updateFn.getArgument(0);
+        BlockArgument update = updateFn.getArgument(1);
+
+        block->getArgument(0).replaceAllUsesWith(inputs);
+        block->getArgument(1).replaceAllUsesWith(update);
+        
+        for (Operation &op : block->without_terminator()) {
+            op.print(llvm::outs());
+            op.clone();
+        }
+
+        b.create<func::ReturnOp>(loc, inputs);
+        return SymbolRefAttr::get(ctx, funcName);
     }
 };
 
