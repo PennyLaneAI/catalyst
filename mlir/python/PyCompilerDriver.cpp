@@ -77,7 +77,6 @@ PYBIND11_MODULE(compiler_driver, m)
         [](const char *source, const char *workspace, const char *moduleName, bool keepIntermediate,
            bool verbose, py::list pipelines, py::list llvmPipelines,
            bool lower_to_llvm) -> CompilerOutput * {
-
             CompilerOutput *output = new CompilerOutput();
             assert(output);
 
