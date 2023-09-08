@@ -15,6 +15,8 @@
 #include <filesystem>
 #include <list>
 #include <memory>
+#include <string>
+#include <unordered_map>
 
 #include "gml_st/transforms/passes.h"
 #include "mhlo/IR/register.h"
@@ -209,10 +211,9 @@ LogicalResult runLLVMPasses(const CompilerOptions &options,
     // Optimize the IR!
     MPM.run(*llvmModule.get(), MAM);
 
-    std::string moduleStringRepr;
     llvm::raw_string_ostream rawStringOstream{outputs["PreEnzymeOpt"]};
     llvmModule->print(rawStringOstream, nullptr);
-    std::string outFile = fs::path("1_PreEnzymeOpt.ll");
+    const  std::string &outFile = fs::path("1_PreEnzymeOpt.ll");
     if (failed(catalyst::dumpToFile(options, outFile, outputs["PreEnzymeOpt"]))) {
         return failure();
     }
@@ -254,10 +255,9 @@ LogicalResult runEnzymePasses(const CompilerOptions &options,
     // Optimize the IR!
     MPM.run(*llvmModule.get(), MAM);
 
-    std::string moduleStringRepr;
     llvm::raw_string_ostream rawStringOstream{outputs["Enzyme"]};
     llvmModule->print(rawStringOstream, nullptr);
-    std::string outFile = fs::path("2_Enzyme.ll");
+    const std::string &outFile = fs::path("2_Enzyme.ll");
     if (failed(catalyst::dumpToFile(options, outFile, outputs["Enzyme"]))) {
         return failure();
     }
@@ -288,7 +288,7 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
                 llvm::raw_string_ostream s{tmp};
                 s << moduleOp;
             }
-            std::string outFile = fs::path(options.moduleName.str()).replace_extension(".mlir");
+            const std::string &outFile = fs::path(options.moduleName.str()).replace_extension(".mlir");
             if (failed(catalyst::dumpToFile(options, outFile, tmp))) {
                 return failure();
             }

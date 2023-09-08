@@ -15,6 +15,7 @@
 #pragma once
 
 #include <filesystem>
+#include <string>
 #include <vector>
 
 #include "mlir/IR/MLIRContext.h"

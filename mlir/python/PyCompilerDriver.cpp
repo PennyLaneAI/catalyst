@@ -13,6 +13,9 @@
 // limitations under the License.
 
 #include <iostream>
+#include <string>
+#include <vector>
+
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
@@ -29,10 +32,8 @@ std::vector<Pipeline> parseCompilerSpec(const py::list &pipelines)
     for (py::handle obj : pipelines) {
         py::tuple t = obj.cast<py::tuple>();
         auto i = t.begin();
-        auto py_name = i;
-        i++;
-        auto py_passes = i;
-        i++;
+        auto py_name = i++;
+        auto py_passes = i++;
         assert(i == t.end());
         std::string name = py_name->attr("__str__")().cast<std::string>();
         Pipeline::PassList passes;
@@ -76,8 +77,6 @@ PYBIND11_MODULE(compiler_driver, m)
         [](const char *source, const char *workspace, const char *moduleName, bool keepIntermediate,
            bool verbose, py::list pipelines, py::list llvmPipelines,
            bool lower_to_llvm) -> CompilerOutput * {
-            FunctionAttributes inferredAttributes;
-            std::string errors;
 
             CompilerOutput *output = new CompilerOutput();
             assert(output);

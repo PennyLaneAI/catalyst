@@ -1,9 +1,9 @@
 if(WIN32)
     set(EXTERNAL_LIB Version)
-elseif(UNIX AND NOT APPLE)
-    set(EXTERNAL_LIB z tinfo)
 elseif(APPLE)
     set(EXTERNAL_LIB z ncurses)
+elseif(UNIX)
+    set(EXTERNAL_LIB z tinfo)
 endif()
 
 set(ENZYME_STATIC_LIB ON)
@@ -49,5 +49,4 @@ add_mlir_library(CatalystCompilerDriver
     EnzymeStatic-${LLVM_VERSION_MAJOR}
     DEPENDS
     EnzymeStatic-${LLVM_VERSION_MAJOR}
-
-)
+    )

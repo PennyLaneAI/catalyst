@@ -98,7 +98,6 @@ dialects:
 		-DLLVM_ENABLE_LLD=$(ENABLE_LLD)
 
 	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects quantum-lsp-server
-	cmake --version
 
 .PHONY: test
 test:
