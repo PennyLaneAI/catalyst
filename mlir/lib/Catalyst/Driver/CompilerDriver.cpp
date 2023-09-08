@@ -146,16 +146,30 @@ LogicalResult inferMLIRReturnTypes(MLIRContext *ctx, llvm::Type *returnType,
         SmallVector<int64_t> resultShape;
         assert(descriptorType->getNumElements() >= 3 &&
                "Expected MemRef descriptor struct to have at least 3 entries");
-        if (descriptorType->getNumElements() == 3) {
-            // resultShape is empty
+        // WARNING: Assumption follows
+        //
+        // In this piece of code we are making the assumption that the user will
+        // return something that may have been an MLIR tensor once. This is
+        // likely to be true, however, there are no hard guarantees.
+        //
+        // The assumption gives the following invariants:
+        // * The structure we are "parsing" will be a memref with the following fields
+        // * void* allocated_ptr
+        // * void* aligned_ptr
+        // * int offset
+        // * int[rank] sizes
+        // * int[rank] strides
+        //
+        // Please note that strides might be zero which means that the fields sizes
+        // and stride are optional and not required to be defined.
+        // sizes is defined iff strides is defined.
+        // strides is defined iff sizes is defined.
+        bool hasSizes = 5 == descriptorType->getNumElements();
+        auto *sizes = hasSizes ? cast<llvm::ArrayType>(descriptorType->getTypeAtIndex(3)) : NULL;
+        size_t rank = hasSizes ? sizes->getNumElements() : 0;
+        for (size_t i = 0; i < rank; i++) {
+            resultShape.push_back(ShapedType::kDynamic);
         }
-        else {
-            auto *arrayType = cast<llvm::ArrayType>(descriptorType->getTypeAtIndex(3));
-            size_t rank = arrayType->getNumElements();
-            for (size_t i = 0; i < rank; i++) {
-                resultShape.push_back(ShapedType::kDynamic);
-            }
-        };
         return RankedTensorType::get(resultShape, assumedElementType);
     };
     if (returnType->isVoidTy()) {
