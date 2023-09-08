@@ -213,7 +213,7 @@ LogicalResult runLLVMPasses(const CompilerOptions &options,
 
     llvm::raw_string_ostream rawStringOstream{outputs["PreEnzymeOpt"]};
     llvmModule->print(rawStringOstream, nullptr);
-    const  std::string &outFile = fs::path("1_PreEnzymeOpt.ll");
+    const std::string &outFile = fs::path("1_PreEnzymeOpt.ll");
     if (failed(catalyst::dumpToFile(options, outFile, outputs["PreEnzymeOpt"]))) {
         return failure();
     }
@@ -288,7 +288,8 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
                 llvm::raw_string_ostream s{tmp};
                 s << moduleOp;
             }
-            const std::string &outFile = fs::path(options.moduleName.str()).replace_extension(".mlir");
+            const std::string &outFile =
+                fs::path(options.moduleName.str()).replace_extension(".mlir");
             if (failed(catalyst::dumpToFile(options, outFile, tmp))) {
                 return failure();
             }
