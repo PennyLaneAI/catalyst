@@ -30,7 +30,7 @@ auto LightningSimulator::AllocateQubits(size_t num_qubits) -> std::vector<QubitI
 
     // at the first call when num_qubits == 0
     if (this->GetNumQubits() == 0U) {
-        this->device_sv = std::make_unique<Pennylane::StateVectorDynamicCPU<double>>(num_qubits);
+        this->device_sv = std::make_unique<StateVectorT>(num_qubits);
         return this->qubit_manager.AllocateRange(0, num_qubits);
     }
 
@@ -178,7 +178,7 @@ auto LightningSimulator::Expval(ObsIdType obsKey) -> double
         this->cache_manager.addObservable(obsKey, Lightning::Measurements::Expval);
     }
 
-    Pennylane::Simulators::Measures m{*(this->device_sv)};
+    Pennylane::LightningQubit::Measures::Measurements<StateVectorT> m{*(this->device_sv)};
 
     return m.expval(*obs);
 }
@@ -194,7 +194,7 @@ auto LightningSimulator::Var(ObsIdType obsKey) -> double
         this->cache_manager.addObservable(obsKey, Lightning::Measurements::Var);
     }
 
-    Pennylane::Simulators::Measures m{*(this->device_sv)};
+    Pennylane::LightningQubit::Measures::Measurements<StateVectorT> m{*(this->device_sv)};
 
     return m.var(*obs);
 }
@@ -209,7 +209,7 @@ void LightningSimulator::State(DataView<std::complex<double>, 1> &state)
 
 void LightningSimulator::Probs(DataView<double, 1> &probs)
 {
-    Pennylane::Simulators::Measures m{*(this->device_sv)};
+    Pennylane::LightningQubit::Measures::Measurements<StateVectorT> m{*(this->device_sv)};
     auto &&dv_probs = m.probs();
 
     RT_FAIL_IF(probs.size() != dv_probs.size(), "Invalid size for the pre-allocated probabilities");
@@ -227,7 +227,7 @@ void LightningSimulator::PartialProbs(DataView<double, 1> &probs,
     RT_FAIL_IF(!isValidQubits(wires), "Invalid given wires to measure");
 
     auto dev_wires = getDeviceWires(wires);
-    Pennylane::Simulators::Measures m{*(this->device_sv)};
+    Pennylane::LightningQubit::Measures::Measurements<StateVectorT> m{*(this->device_sv)};
     auto &&dv_probs = m.probs(dev_wires);
 
     RT_FAIL_IF(probs.size() != dv_probs.size(),
@@ -239,7 +239,7 @@ void LightningSimulator::PartialProbs(DataView<double, 1> &probs,
 void LightningSimulator::Sample(DataView<double, 2> &samples, size_t shots)
 {
     // generate_samples is a member function of the Measures class.
-    Pennylane::Simulators::Measures m{*(this->device_sv)};
+    Pennylane::LightningQubit::Measures::Measurements<StateVectorT> m{*(this->device_sv)};
 
     // PL-Lightning generates samples using the alias method.
     // Reference: https://en.wikipedia.org/wiki/Alias_method
@@ -279,7 +279,7 @@ void LightningSimulator::PartialSample(DataView<double, 2> &samples,
     auto &&dev_wires = getDeviceWires(wires);
 
     // generate_samples is a member function of the Measures class.
-    Pennylane::Simulators::Measures m{*(this->device_sv)};
+    Pennylane::LightningQubit::Measures::Measurements<StateVectorT> m{*(this->device_sv)};
 
     // PL-Lightning generates samples using the alias method.
     // Reference: https://en.wikipedia.org/wiki/Alias_method
@@ -310,7 +310,7 @@ void LightningSimulator::Counts(DataView<double, 1> &eigvals, DataView<int64_t, 
                "Invalid size for the pre-allocated counts");
 
     // generate_samples is a member function of the Measures class.
-    Pennylane::Simulators::Measures m{*(this->device_sv)};
+    Pennylane::LightningQubit::Measures::Measurements<StateVectorT> m{*(this->device_sv)};
 
     // PL-Lightning generates samples using the alias method.
     // Reference: https://en.wikipedia.org/wiki/Alias_method
@@ -356,7 +356,7 @@ void LightningSimulator::PartialCounts(DataView<double, 1> &eigvals, DataView<in
     auto &&dev_wires = getDeviceWires(wires);
 
     // generate_samples is a member function of the Measures class.
-    Pennylane::Simulators::Measures m{*(this->device_sv)};
+    Pennylane::LightningQubit::Measures::Measurements<StateVectorT> m{*(this->device_sv)};
 
     // PL-Lightning generates samples using the alias method.
     // Reference: https://en.wikipedia.org/wiki/Alias_method
@@ -469,12 +469,12 @@ void LightningSimulator::Gradient(std::vector<DataView<double, 1>> &gradients,
     auto &&ops_wires = this->cache_manager.getOperationsWires();
 
     auto &&ops_inverses = this->cache_manager.getOperationsInverses();
-    const auto &&ops =
-        Pennylane::Algorithms::OpsData<double>(ops_names, ops_params, ops_wires, ops_inverses);
+    const auto &&ops = Pennylane::Algorithms::OpsData<StateVectorT>(ops_names, ops_params,
+                                                                    ops_wires, ops_inverses);
 
     // create the vector of observables
     auto &&obs_keys = this->cache_manager.getObservablesKeys();
-    std::vector<std::shared_ptr<Pennylane::Simulators::Observable<double>>> obs_vec;
+    std::vector<std::shared_ptr<Pennylane::Observables::Observable<StateVectorT>>> obs_vec;
     obs_vec.reserve(obs_keys.size());
     for (auto idx : obs_keys) {
         obs_vec.emplace_back(this->obs_manager.getObservable(idx));
@@ -489,16 +489,20 @@ void LightningSimulator::Gradient(std::vector<DataView<double, 1>> &gradients,
     }
 
     // construct the Jacobian data
-    Pennylane::Algorithms::JacobianData<double> tape{
+    Pennylane::Algorithms::JacobianData<StateVectorT> tape{
         num_params, state.size(), state.data(), obs_vec, ops, tp_empty ? all_params : trainParams};
 
+    const StateVectorT ref_data{0};
+
+    Pennylane::LightningQubit::Algorithms::AdjointJacobian<StateVectorT> adj;
     std::vector<double> jacobian(jac_size, 0);
-    Pennylane::Algorithms::adjointJacobian(std::span{jacobian}, tape,
-                                           /* apply_operations */ false);
+    adj.adjointJacobian(std::span{jacobian}, tape,
+                        /* ref_data */ ref_data,
+                        /* apply_operations */ false);
 
     // convert jacobians to a list of lists for each observable
     std::vector<double> jacobian_t =
-        Pennylane::Util::Transpose(jacobian, num_train_params, num_observables);
+        Pennylane::LightningQubit::Util::Transpose(jacobian, num_train_params, num_observables);
 
     std::vector<double> cur_buffer(num_train_params);
     auto begin_loc_iter = jacobian_t.begin();
