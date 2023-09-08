@@ -196,8 +196,6 @@ class LinkerDriver:
         mlir_lib_path = get_lib_path("llvm", "MLIR_LIB_DIR")
         rt_lib_path = get_lib_path("runtime", "RUNTIME_LIB_DIR")
         error_flag_apple = "-Wl,-arch_errors_fatal"
-        error_flag_linux = ""
-        error_flag = error_flag_linux if platform.system() == "Linux" else error_flag_apple
 
         default_flags = [
             "-shared",
@@ -209,9 +207,11 @@ class LinkerDriver:
             "-lrt_backend",
             "-lrt_capi",
             "-lpthread",
-            f"{error_flag}",
             "-lmlir_c_runner_utils",  # required for memref.copy
         ]
+
+        if platform.system() == "Darwin":  # pragma: no cover
+            default_flags += [error_flag_apple]
 
         return default_flags
 
