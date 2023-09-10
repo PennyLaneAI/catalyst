@@ -19,6 +19,7 @@ while using :func:`~.qjit`.
 import functools
 import numbers
 import uuid
+from enum import Enum
 from functools import partial
 from typing import Any, Callable, Iterable, List, Optional, Tuple, Union
 
@@ -131,10 +132,10 @@ class QFunc:
             if self.device.short_name == "braket.local.qubit":  # pragma: no cover
                 backend_kwargs["backend"] = self.device._device._delegate.DEVICE_ID
             elif self.device.short_name == "braket.aws.qubit":  # pragma: no cover
-                backend_kwargs["device_arn"] = self.device._device._arn
+                arn = self.device._device._arn
+                backend_kwargs["device_arn"] = arn.value if isinstance(arn, Enum) else arn
                 if self.device._s3_folder:
                     backend_kwargs["s3_destination_folder"] = str(self.device._s3_folder)
-
             device = QJITDevice(
                 self.device.shots, self.device.wires, self.device.short_name, backend_kwargs
             )
