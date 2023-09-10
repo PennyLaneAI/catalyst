@@ -520,22 +520,16 @@ void LightningKokkosSimulator::Gradient(std::vector<DataView<double, 1>> &gradie
     Pennylane::Algorithms::JacobianData<StateVectorT> tape{
         num_params, state.size(), state.data(), obs_vec, ops, tp_empty ? all_params : trainParams};
 
-    const StateVectorT ref_data{0};
-
     Pennylane::LightningKokkos::Algorithms::AdjointJacobian<StateVectorT> adj;
     std::vector<double> jacobian(jac_size, 0);
     adj.adjointJacobian(std::span{jacobian}, tape,
-                        /* ref_data */ ref_data,
+                        /* ref_data */ *this->device_sv,
                         /* apply_operations */ false);
 
-    // convert jacobians to a list of lists for each observable
-    std::vector<double> jacobian_t =
-        Pennylane::LightningQubit::Util::Transpose(jacobian, num_train_params, num_observables);
-
     std::vector<double> cur_buffer(num_train_params);
-    auto begin_loc_iter = jacobian_t.begin();
+    auto begin_loc_iter = jacobian.begin();
     for (size_t obs_idx = 0; obs_idx < num_observables; obs_idx++) {
-        RT_ASSERT(begin_loc_iter != jacobian_t.end());
+        RT_ASSERT(begin_loc_iter != jacobian.end());
         RT_ASSERT(num_train_params <= gradients[obs_idx].size());
         std::move(begin_loc_iter, begin_loc_iter + num_train_params, cur_buffer.begin());
         std::move(cur_buffer.begin(), cur_buffer.end(), gradients[obs_idx].begin());

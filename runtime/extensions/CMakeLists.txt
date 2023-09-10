@@ -26,7 +26,7 @@ FetchContent_MakeAvailable(pennylane_lightning)
 
 add_library(rt_interfaces INTERFACE)
 
-target_link_libraries(rt_interfaces INTERFACE pennylane_lightning lightning_qubit lightning_kokkos)
+target_link_libraries(rt_interfaces INTERFACE pennylane_lightning)
 target_include_directories(rt_interfaces INTERFACE .)
 
 set(LIGHTNING_KOKKOS_GIT_TAG "main" CACHE STRING "GIT_TAG value to build Lightning-Kokkos")
