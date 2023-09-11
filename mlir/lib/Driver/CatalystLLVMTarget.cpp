@@ -26,61 +26,15 @@
 #include "llvm/Target/TargetOptions.h"
 #include "llvm/TargetParser/Host.h"
 
-#include "Catalyst/Driver/CatalystLLVMTarget.h"
+#include "Driver/CatalystLLVMTarget.h"
 #include "Gradient/IR/GradientDialect.h"
 
 using namespace mlir;
-
-namespace {
-/// Emit the LLVM IR metadata required to register custom gradients in Enzyme.
-/// This interface will convert `gradient.augment` and `gradient.vjp` attributes on function-like
-/// ops to the metadata read by Enzyme.
-class GradientToEnzymeMetadataTranslation : public LLVMTranslationDialectInterface {
-    using LLVMTranslationDialectInterface::LLVMTranslationDialectInterface;
-
-    LogicalResult amendOperation(Operation *op, NamedAttribute attribute,
-                                 LLVM::ModuleTranslation &moduleTranslation) const override
-    {
-        auto funcOp = dyn_cast<FunctionOpInterface>(op);
-        bool hasAugment = funcOp->hasAttrOfType<FlatSymbolRefAttr>("gradient.augment");
-        bool hasVJP = funcOp->hasAttrOfType<FlatSymbolRefAttr>("gradient.vjp");
-        bool failedToMatch = !(funcOp && hasAugment && hasVJP);
-        if (failedToMatch) {
-            // Do nothing.
-            return success();
-        }
-
-        auto function = moduleTranslation.lookupFunction(funcOp.getName());
-        bool alreadyAmended =
-            function->hasMetadata("enzyme_augment") && function->hasMetadata("enzyme_gradient");
-        if (alreadyAmended) {
-            return success();
-        }
-
-        auto augmented = moduleTranslation.lookupFunction(
-            funcOp->getAttrOfType<FlatSymbolRefAttr>("gradient.augment").getValue());
-        auto vjp = moduleTranslation.lookupFunction(
-            funcOp->getAttrOfType<FlatSymbolRefAttr>("gradient.vjp").getValue());
-        assert(augmented && "gradient.augment did not reference a valid LLVM function");
-        assert(vjp && "gradient.vjp did not reference a valid LLVM function");
-
-        llvm::LLVMContext &ctx = moduleTranslation.getLLVMContext();
-        function->addMetadata("enzyme_augment",
-                              *llvm::MDNode::get(ctx, llvm::ConstantAsMetadata::get(augmented)));
-        function->addMetadata("enzyme_gradient",
-                              *llvm::MDNode::get(ctx, llvm::ConstantAsMetadata::get(vjp)));
-        return success();
-    }
-};
-} // namespace
 
 void catalyst::registerLLVMTranslations(DialectRegistry &registry)
 {
     registerLLVMDialectTranslation(registry);
     registerBuiltinDialectTranslation(registry);
-    registry.addExtension(+[](MLIRContext *ctx, gradient::GradientDialect *dialect) {
-        dialect->addInterfaces<GradientToEnzymeMetadataTranslation>();
-    });
 }
 
 LogicalResult catalyst::compileObjectFile(const CompilerOptions &options,

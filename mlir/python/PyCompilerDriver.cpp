@@ -22,7 +22,7 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "llvm/Support/raw_ostream.h"
 
-#include "Catalyst/Driver/CompilerDriver.h"
+#include "Driver/CompilerDriver.h"
 
 namespace py = pybind11;
 
