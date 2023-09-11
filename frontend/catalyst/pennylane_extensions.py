@@ -136,6 +136,7 @@ class QFunc:
                 backend_kwargs["device_arn"] = arn.value if isinstance(arn, Enum) else arn
                 if self.device._s3_folder:
                     backend_kwargs["s3_destination_folder"] = str(self.device._s3_folder)
+
             device = QJITDevice(
                 self.device.shots, self.device.wires, self.device.short_name, backend_kwargs
             )

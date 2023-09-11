@@ -18,11 +18,11 @@ import numpy as np
 import pennylane as qml
 import pytest
 
+from catalyst import grad, qjit
+
 pytest.importorskip("braket")
 
-from braket.devices import Devices
-
-from catalyst import grad, qjit
+from braket.devices import Devices  # pylint: disable=wrong-import-position
 
 try:
     qml.device(
