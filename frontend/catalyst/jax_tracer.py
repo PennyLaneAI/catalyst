@@ -431,6 +431,9 @@ def pauli_word_to_tensor_obs(obs, qrp: QRegPromise) -> List[DynamicJaxprTracer]:
 
     return tensorobs_p.bind(*nested_obs)
 
+def identity_qnode_transform(tape: QuantumTape) -> (Sequence[QuantumTape], Callable):
+    return [tape], lambda res: res[0]
+
 
 def trace_quantum_measurements(
     device: QubitDevice,
@@ -554,7 +557,10 @@ def trace_quantum_function(
                 (trace.full_raise(t) if isinstance(t, DynamicJaxprTracer) else t) for t in ans
             ]
 
-            tapes, callback = qnode.transform_program([quantum_tape])
+            if qnode.transform_program:
+                tapes, callback = qnode.transform_program([quantum_tape])
+            else:
+                tapes, callback = identity_qnode_transform(quantum_tape)
         # (2) - Quantum tracing
         del quantum_tape
         results = []
