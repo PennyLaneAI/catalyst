@@ -122,6 +122,7 @@ class QFunc:
         update_wrapper(self, fn)
 
     def __call__(self, *args, **kwargs):
+        qnode = self
         if isinstance(self, qml.QNode):
             if isinstance(self.device, qml.Device):
                 name = self.device.short_name
@@ -164,7 +165,7 @@ class QFunc:
             device = self.device
 
         with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION):
-            jaxpr, shape = trace_quantum_function(self.func, device, args, kwargs)
+            jaxpr, shape = trace_quantum_function(self.func, device, args, kwargs, qnode)
 
         retval_tree = tree_structure(shape)
 

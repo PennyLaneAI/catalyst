@@ -511,7 +511,7 @@ def transform_callback(tape: QuantumTape) -> (Sequence[QuantumTape], Callable):
 
 
 def trace_quantum_function(
-    f: Callable, device: QubitDevice, args, kwargs
+    f: Callable, device: QubitDevice, args, kwargs, qnode=None
 ) -> Tuple[ClosedJaxpr, Any]:
     """Trace quantum function in a way that allows building a nested quantum tape describing the
     quantum algorithm.
@@ -561,8 +561,8 @@ def trace_quantum_function(
                 (trace.full_raise(t) if isinstance(t, DynamicJaxprTracer) else t) for t in ans
             ]
 
+            tapes, callback = qnode.transform_program([quantum_tape])
         # (2) - Quantum tracing
-        tapes, callback = transform_callback(quantum_tape)
         del quantum_tape
         results = []
         results_tracers = []
