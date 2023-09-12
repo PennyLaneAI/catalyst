@@ -16,6 +16,7 @@
 functions. The purpose is to convert imperative style code to functional or graph-style code."""
 
 import functools
+import warnings
 from typing import Any, Callable, Iterator, SupportsIndex, Tuple
 
 import jax.numpy as jnp
@@ -147,41 +148,65 @@ def for_stmt(
 
     assert _extra_test is None
 
+    # The general approach is to convert as much code as possible into a graph-based form:
+    # - For loops over iterables will attempt a conversion of the iterable to array, and fall back
+    #   to Python otherwise.
+    # - For loops over a Python range will be converted to a native Catalyst for loop. However,
+    #   since the now dynamic iteration variable can cause issues in downstream user code, any
+    #   errors raised during the tracing of the loop body will restart the tracing process using
+    #   a Python loop instead.
+    # - For loops over a Python enumeration use a combination of the above, providing a dynamic
+    #   iteration variable and conversion of the iterable to array. If either fails, a fallback to
+    #   Python is used.
+    # The fallback mechanism for tracing errors will raise a warning as the user may need to be
+    # aware that the graph conversion failed, for instance for lack of converting lists into arrays,
+    # but the conversion from iterable to array will fall back to Python silently.
     fallback = False
 
     if isinstance(iteration_target, CRange):
-        # Ideally we iterate over a simple range.
         start, stop, step = iteration_target.get_raw_range()
-        results = _call_catalyst_for(start, stop, step, body_fn, get_state)
+        enum_start = None
+        iteration_array = None
     elif isinstance(iteration_target, CEnumerate):
-        # Otherwise we can attempt to convert the iteration target to an array.
-        # For enumerations, the iteration target is wrapped inside our custom class.
         start, stop, step = 0, len(iteration_target.iteration_target), 1
+        enum_start = iteration_target.start_idx
         try:
             iteration_array = jnp.asarray(iteration_target.iteration_target)
         except:  # pylint: disable=bare-except
             iteration_array = None
             fallback = True
-
-        if iteration_array is not None:
-            results = _call_catalyst_for(
-                start, stop, step, body_fn, get_state, iteration_target.start_idx, iteration_array
-            )
     else:
-        # Otherwise we can attempt to directly convert the iteration target to an array.
         start, stop, step = 0, len(iteration_target), 1
+        enum_start = None
         try:
             iteration_array = jnp.asarray(iteration_target)
         except:  # pylint: disable=bare-except
             iteration_array = None
             fallback = True
 
-        if iteration_array is not None:
+    # Attempt to trace the Catalyst for loop.
+    if not fallback:
+        try:
             results = _call_catalyst_for(
-                start, stop, step, body_fn, get_state, array_iterable=iteration_array
+                start, stop, step, body_fn, get_state, enum_start, iteration_array
+            )
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            fallback = True
+
+            warnings.warn(
+                f"Tracing of an AutoGraph converted for loop failed with the following exception:\n"
+                f"{type(e).__name__}: {e}\n"
+                f"\n"
+                f"If you intended for the conversion to happen, make sure that the (now dynamic) "
+                f"loop variable is not used in tracing-incompatible ways, for instance by indexing "
+                f"a Python list with it. In that case, the list should be wrapped into an array.\n"
+                f"To understand different types of JAX tracing errors, please refer to the guide "
+                f"at: https://jax.readthedocs.io/en/latest/errors.html\n"
+                f"If you did not intend for the conversion to happen, you may safely ignore this "
+                f"warning."
             )
 
-    # In case anything goes wrong, we fall back to Python.
+    # If anything goes wrong, we fall back to Python.
     if fallback:
         results = _call_python_for(body_fn, get_state, iteration_target)
 
