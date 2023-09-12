@@ -13,12 +13,12 @@ FetchContent_Declare(
 set(CMAKE_POSITION_INDEPENDENT_CODE ON) # build with -fPIC
 set(ENABLE_KOKKOS OFF CACHE BOOL "Enable Kokkos")
 
-if((ENABLE_LIGHTNING AND ENABLE_LIGHTNING_KOKKOS))
-    set(PL_BACKEND "lightning_qubit;lightning_kokkos")
+if(ENABLE_LIGHTNING AND ENABLE_LIGHTNING_KOKKOS)
+    set(PL_BACKEND "lightning_qubit;lightning_kokkos" CACHE STRING "PennyLane Lightning backend")
 elseif(ENABLE_LIGHTNING)
-    set(PL_BACKEND "lightning_qubit")
+    set(PL_BACKEND "lightning_qubit" CACHE STRING "PennyLane Lightning backend")
 elseif(ENABLE_LIGHTNING_KOKKOS)
-    set(PL_BACKEND "lightning_kokkos")
+    set(PL_BACKEND "lightning_kokkos" CACHE STRING "PennyLane Lightning backend")
 endif()
 
 set(ENABLE_PYTHON OFF CACHE BOOL "Enable compilation of the Python module")
