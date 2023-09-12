@@ -502,13 +502,6 @@ def trace_quantum_measurements(
 
     return out_classical_tracers, out_tree
 
-def transform_callback(tape: QuantumTape) -> (Sequence[QuantumTape], Callable):
-    # for transform registered
-    #  transform(tape) ... (recursively?) I suppose that is what the execute and
-    # transform dispatch are doing.
-    #return [tape, tape], lambda res: jnp.add(res[0], res[1])
-    return [tape], lambda res: res[0]
-
 
 def trace_quantum_function(
     f: Callable, device: QubitDevice, args, kwargs, qnode=None
@@ -569,7 +562,6 @@ def trace_quantum_function(
         results_abstract = []
         for tape in tapes:
             with EvaluationContext.frame_tracing_context(ctx, trace):
-
                 qdevice_p.bind(spec="kwargs", val=str(device.backend_kwargs))
                 qdevice_p.bind(spec="backend", val=device.backend_name)
                 qreg_in = qalloc_p.bind(len(device.wires))
@@ -594,7 +586,8 @@ def trace_quantum_function(
 
                 out_avals, _ = unzip2(out_type)
                 abstract_results = tree_unflatten(
-                    out_classical_tree, [ShapeDtypeStruct(a.shape, a.dtype, a.named_shape) for a in out_avals]
+                    out_classical_tree,
+                    [ShapeDtypeStruct(a.shape, a.dtype, a.named_shape) for a in out_avals],
                 )
                 results_abstract += [abstract_results]
                 # TODO: `check_jaxpr` complains about the `AbstractQreg` type. Consider fixing.
@@ -611,6 +604,9 @@ def trace_quantum_function(
             jaxpr, out_type, consts = ctx.frames[trace].to_jaxpr2(out_classical_tracers)
             closed_jaxpr = ClosedJaxpr(jaxpr, consts)
             out_avals, _ = unzip2(out_type)
-            abstract_results = tree_unflatten(out_tree_promise(), [ShapeDtypeStruct(a.shape, a.dtype, a.named_shape) for a in out_classical_tracers])
+            abstract_results = tree_unflatten(
+                out_tree_promise(),
+                [ShapeDtypeStruct(a.shape, a.dtype, a.named_shape) for a in out_classical_tracers],
+            )
 
     return closed_jaxpr, abstract_results
