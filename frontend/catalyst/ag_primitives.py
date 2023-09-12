@@ -32,12 +32,12 @@ from tensorflow.python.autograph.core.function_wrappers import (
     FunctionScope,
     with_function_scope,
 )
+from tensorflow.python.autograph.impl.api import autograph_artifact
 from tensorflow.python.autograph.impl.api import converted_call as tf_converted_call
 from tensorflow.python.autograph.operators.variables import (
     Undefined,
     UndefinedReturnValue,
 )
-from tensorflow.python.autograph.pyct.error_utils import ErrorMetadataBase
 from tensorflow.python.autograph.pyct.origin_info import LineLocation
 
 import catalyst
@@ -49,6 +49,7 @@ __all__ = [
     "ConversionOptions",
     "Undefined",
     "UndefinedReturnValue",
+    "autograph_artifact",
     "FunctionScope",
     "with_function_scope",
     "if_stmt",

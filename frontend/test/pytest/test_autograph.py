@@ -20,7 +20,7 @@ import numpy as np
 import pennylane as qml
 import pytest
 
-from catalyst import measure, qjit
+from catalyst import for_loop, measure, qjit
 from catalyst.ag_utils import AutoGraphError, autograph_source, check_cache
 
 # pylint: disable=missing-function-docstring
@@ -796,9 +796,6 @@ class TestForLoops:
         result = f()
         assert np.allclose(result, [1.0, jnp.sqrt(2) / 2, 0.0])
 
-    def test_for_in_zip(self):
-        """unsupported"""
-
     def test_for_in_other_iterable_object(self):
         """Test for loop over arbitrary iterable Python objects.
         The behaviour should fall back to standard Python."""
@@ -814,6 +811,19 @@ class TestForLoops:
 
         result = f()
         assert np.allclose(result, -jnp.sqrt(2) / 2)
+
+    def test_no_python_loops(self):
+        """Test AutoGraph behaviour on function with Catalyst loops."""
+
+        @qjit(autograph=True)
+        def f():
+            @for_loop(0, 3, 1)
+            def loop(i, sum):
+                return sum + i
+
+            return loop(0)
+
+        assert f() == 3
 
 
 if __name__ == "__main__":
