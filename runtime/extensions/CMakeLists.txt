@@ -13,7 +13,7 @@ FetchContent_Declare(
 set(CMAKE_POSITION_INDEPENDENT_CODE ON) # build with -fPIC
 set(ENABLE_KOKKOS OFF CACHE BOOL "Enable Kokkos")
 
-if(ENABLE_LIGHTNING AND ENABLE_LIGHTNING_KOKKOS)
+if((ENABLE_LIGHTNING AND ENABLE_LIGHTNING_KOKKOS))
     set(PL_BACKEND "lightning_qubit;lightning_kokkos")
 elseif(ENABLE_LIGHTNING)
     set(PL_BACKEND "lightning_qubit")
