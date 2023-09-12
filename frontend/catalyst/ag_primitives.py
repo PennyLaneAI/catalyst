@@ -195,6 +195,7 @@ def for_stmt(
             )
         except Exception as e:  # pylint: disable=broad-exception-caught
             fallback = True
+            # pylint: disable=import-outside-toplevel
             import inspect
             import textwrap
 
@@ -235,7 +236,7 @@ def get_source_code_info(tb_frame):
     Uses introspection on the call stack to extract the source map record from within AutoGraph
     statements. However, it is not guaranteed to find the source map and may return nothing.
     """
-    import inspect
+    import inspect  # pylint: disable=import-outside-toplevel
 
     ag_source_map = None
 
@@ -249,22 +250,19 @@ def get_source_code_info(tb_frame):
                 obj = frame.frame.f_locals["converted_f"]
                 ag_source_map = obj.ag_source_map
                 break
-            elif "self" in frame.frame.f_locals:
+            if "self" in frame.frame.f_locals:
                 obj = frame.frame.f_locals["self"]
                 if isinstance(obj, qml.QNode):
                     ag_source_map = obj.ag_source_map
                     break
-                elif isinstance(obj, catalyst.QJIT):
+                if isinstance(obj, catalyst.QJIT):
                     ag_source_map = obj.user_function.ag_source_map
                     break
-    except:  # pylint: disable=bare-except
+    except:  # nosec B110 # pylint: disable=bare-except
         pass
 
-    if ag_source_map is None:
-        return ""
-
     loc = LineLocation(tb_frame.filename, tb_frame.lineno)
-    if loc in ag_source_map:
+    if ag_source_map is not None and loc in ag_source_map:
         function_name = ag_source_map[loc].function_name
         filename = ag_source_map[loc].loc.filename
         lineno = ag_source_map[loc].loc.lineno

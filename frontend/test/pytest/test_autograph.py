@@ -25,6 +25,7 @@ from catalyst.ag_utils import AutoGraphError, autograph_source, check_cache
 
 # pylint: disable=missing-function-docstring
 # pylint: disable=unnecessary-lambda-assignment
+# pylint: disable=too-many-public-methods
 
 
 def test_unavailable(mocker):
@@ -818,8 +819,8 @@ class TestForLoops:
         @qjit(autograph=True)
         def f():
             @for_loop(0, 3, 1)
-            def loop(i, sum):
-                return sum + i
+            def loop(i, acc):
+                return acc + i
 
             return loop(0)
 
