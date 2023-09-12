@@ -53,18 +53,18 @@ from catalyst.utils.tracing import TracingContext
 def _trace_quantum_tape(
     cargs, ckwargs, qargs, _callee: Callable, _allow_quantum_measurements: bool = True
 ) -> Tuple[Any, Any]:
-    """Jax-trace the ``_callee`` function accepting positional and keyword arguments and containig
+    """Jax-trace the ``_callee`` function accepting positional and keyword arguments and containing
     quantum calls by running it under the PennyLane's quantum tape recorder.
 
     Args:
-        cargs (Jaxpr): classical positional arguemnts to be passed to ``_callee``
-        kwargs (Jaxpr): classical keyword arguemnts to be passed to ``_callee``
+        cargs (Jaxpr): classical positional arguments to be passed to ``_callee``
+        kwargs (Jaxpr): classical keyword arguments to be passed to ``_callee``
         qargs (Jaxpr): quantum arguments to consume in the course of tracing
         _callee (Callable): function to trace
         _allow_quantum_measurements (bool): If set to False, raise an exception if quantum
                                             measurements are detected
     Returns (Tuple[Any,Any]):
-        - Jax representaion of classical return values of ``_callee``
+        - Jax representation of classical return values of ``_callee``
         - Jax representation of quantum return values obtained in the course of tracing
     """
     assert len(qargs) == 1, f"A single quantum argument was expected, got {qargs}"
