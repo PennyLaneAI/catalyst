@@ -37,6 +37,8 @@ from tensorflow.python.autograph.operators.variables import (
     Undefined,
     UndefinedReturnValue,
 )
+from tensorflow.python.autograph.pyct.error_utils import ErrorMetadataBase
+from tensorflow.python.autograph.pyct.origin_info import LineLocation
 
 import catalyst
 from catalyst.ag_utils import AutoGraphError
@@ -192,16 +194,24 @@ def for_stmt(
             )
         except Exception as e:  # pylint: disable=broad-exception-caught
             fallback = True
+            import inspect
+            import textwrap
+
+            for_loop_info = get_source_code_info(inspect.stack()[1])
 
             warnings.warn(
                 f"Tracing of an AutoGraph converted for loop failed with the following exception:\n"
-                f"{type(e).__name__}: {e}\n"
+                f"  {type(e).__name__}:{textwrap.indent(str(e), '    ')}\n"
+                f"\n"
+                f"The error ocurred within the body of the following for loop statement:\n"
+                f"{for_loop_info}"
                 f"\n"
                 f"If you intended for the conversion to happen, make sure that the (now dynamic) "
                 f"loop variable is not used in tracing-incompatible ways, for instance by indexing "
                 f"a Python list with it. In that case, the list should be wrapped into an array.\n"
                 f"To understand different types of JAX tracing errors, please refer to the guide "
                 f"at: https://jax.readthedocs.io/en/latest/errors.html\n"
+                f"\n"
                 f"If you did not intend for the conversion to happen, you may safely ignore this "
                 f"warning."
             )
@@ -215,6 +225,58 @@ def for_stmt(
     if not isinstance(results, tuple):
         results = (results,)
     set_state(results)
+
+
+def get_source_code_info(tb_frame):
+    """Attempt to obtain original source code information for an exception raised within AutoGraph
+    transformed code.
+
+    Uses introspection on the call stack to extract the source map record from within AutoGraph
+    statements. However, it is not guaranteed to find the source map and may return nothing.
+    """
+    import inspect
+
+    ag_source_map = None
+
+    # Traverse frames in reverse to find caller with `ag_source_map` property:
+    # - function: directly on the callable object
+    # - qnode method: on the self object
+    # - qjit method: on the self.user_function object
+    try:
+        for frame in inspect.stack():
+            if frame.function == "converted_call" and "converted_f" in frame.frame.f_locals:
+                obj = frame.frame.f_locals["converted_f"]
+                ag_source_map = obj.ag_source_map
+                break
+            elif "self" in frame.frame.f_locals:
+                obj = frame.frame.f_locals["self"]
+                if isinstance(obj, qml.QNode):
+                    ag_source_map = obj.ag_source_map
+                    break
+                elif isinstance(obj, catalyst.QJIT):
+                    ag_source_map = obj.user_function.ag_source_map
+                    break
+    except:  # pylint: disable=bare-except
+        pass
+
+    if ag_source_map is None:
+        return ""
+
+    loc = LineLocation(tb_frame.filename, tb_frame.lineno)
+    if loc in ag_source_map:
+        function_name = ag_source_map[loc].function_name
+        filename = ag_source_map[loc].loc.filename
+        lineno = ag_source_map[loc].loc.lineno
+        source_code = ag_source_map[loc].source_code_line.strip()
+    else:
+        function_name = tb_frame.name
+        filename = tb_frame.filename
+        lineno = tb_frame.lineno
+        source_code = tb_frame.line
+
+    info = f'  File "{filename}", line {lineno}, in {function_name}\n' f"    {source_code}\n"
+
+    return info
 
 
 # Prevent autograph from converting PennyLane and Catalyst library code, this can lead to many

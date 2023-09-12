@@ -14,7 +14,6 @@
 
 """PyTests for the AutoGraph source-to-source transformation feature."""
 
-
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -37,6 +36,77 @@ def test_unavailable(mocker):
 
     with pytest.raises(ImportError, match="AutoGraph feature in Catalyst requires TensorFlow"):
         qjit(autograph=True)(fn)
+
+
+# Keep this class first due to hardcoded line numbers.
+@pytest.mark.tf
+class TestSourceCodeInfo:
+    """Unit tests for exception utilities that retrieves traceback information for the original
+    source code."""
+
+    def test_qjit(self):
+        """Test source info retrieval for a qjit function."""
+
+        def main():
+            for _ in range(5):
+                raise RuntimeError("Test failure")
+            return 0
+
+        with pytest.warns(
+            UserWarning,
+            match=(
+                f'  File "{__file__}", line {"51"}, in {main.__name__}\n'
+                r"    for _ in range\(5\):"
+            ),
+        ):
+            try:
+                qjit(autograph=True)(main)
+            except RuntimeError as e:
+                assert e.args == ("Test failure",)
+
+    def test_qnode(self):
+        """Test source info retrieval for a qnode function."""
+
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def main():
+            for _ in range(5):
+                raise RuntimeError("Test failure")
+            return 0
+
+        with pytest.warns(
+            UserWarning,
+            match=(
+                f'  File "{__file__}", line {"72"}, in {main.__name__}\n'
+                r"    for _ in range\(5\):"
+            ),
+        ):
+            try:
+                qjit(autograph=True)(main)
+            except RuntimeError as e:
+                assert e.args == ("Test failure",)
+
+    def test_func(self):
+        """Test source info retrieval for a nested function."""
+
+        def inner():
+            for _ in range(5):
+                raise RuntimeError("Test failure")
+
+        def main():
+            inner()
+            return 0
+
+        with pytest.warns(
+            UserWarning,
+            match=(
+                f'  File "{__file__}", line {"92"}, in {inner.__name__}\n'
+                r"    for _ in range\(5\):"
+            ),
+        ):
+            try:
+                qjit(autograph=True)(main)
+            except RuntimeError as e:
+                assert e.args == ("Test failure",)
 
 
 @pytest.mark.tf
@@ -535,10 +605,11 @@ class TestForLoops:
         assert np.allclose(result, -jnp.sqrt(2) / 2)
 
     # With conversion always taking place, the user needs to be careful to manually wrap
-    # objects accessed via loop iteration indices into arrays (test case above).
+    # objects accessed via loop iteration indices into arrays (see test case above).
+    # The warning here is actionable.
     def test_for_in_static_range_indexing_numeric_list(self):
         """Test for loop over a Python range with static bounds that is used to index an
-        array-compatible Python list. This should raise a tracing error."""
+        array-compatible Python list. This should fall back to Python with a warning."""
 
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def f():
@@ -547,18 +618,17 @@ class TestForLoops:
                 qml.RY(params[i], wires=0)
             return qml.expval(qml.PauliZ(0))
 
-        with pytest.raises(jax.errors.TracerIntegerConversionError, match="__index__"):
+        with pytest.warns(
+            match=r"TracerIntegerConversionError:    The __index__\(\) method was called"
+        ):
             qjit(autograph=True)(f)
 
-    # This case is problematic because there is no way for the user to compile this code.
-    # Fallback to a Python loop is necessary, but we have no way of detecting how iteration
-    # indices will be used by the user somewhere in the call graph.
-    # One option might be to catch tracing errors inside a converted loop, and relaunch tracing
-    # with a Python loop, but this could be expensive (uncertain).
-    # An alternative is to rely on explicit conversion triggers similar to tf.range.
+    # This case is slightly problematic because there is no way for the user to compile this for
+    # loop correctly. Fallback to a Python loop is always necessary, and will result in a warning.
+    # The warning here is not actionable.
     def test_for_in_static_range_indexing_object_list(self):
         """Test for loop over a Python range with static bounds that is used to index an
-        array-incompatible Python list. This should raise a tracing error."""
+        array-incompatible Python list. This should fall back to Python with a warning."""
 
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def f():
@@ -567,7 +637,9 @@ class TestForLoops:
                 qml.RY(int(params[i]) / 4 * jnp.pi, wires=0)
             return qml.expval(qml.PauliZ(0))
 
-        with pytest.raises(jax.errors.TracerIntegerConversionError, match="__index__"):
+        with pytest.warns(
+            match=r"TracerIntegerConversionError:    The __index__\(\) method was called"
+        ):
             qjit(autograph=True)(f)
 
     def test_for_in_dynamic_range(self):
@@ -596,12 +668,15 @@ class TestForLoops:
         result = f(3)
         assert np.allclose(result, -jnp.sqrt(2) / 2)
 
-    # This is not possible anyways, a dynamic iteration range would always require indexing into
-    # an array rather than a list. Here AutoGraph improves the situation by allowing the Python
-    # range function to still be used when indexing into arrays (test case above).
+    # This case will fail even without autograph conversion, since dynamic iteration bounds are not
+    # allowed in Python ranges. Here, AutoGraph improves the situation by allowing this test case
+    # with a slight modification of the user code (see test case above).
+    # Raising the warning is vital here to notify the user that this use case is actually supported,
+    # but requires a modification. Without it, the user may simply conclude it is unsupported.
     def test_for_in_dynamic_range_indexing_numeric_list(self):
         """Test for loop over a Python range with dynamic bounds that is used to index an
-        array-compatible Python list. This should raise a tracing error."""
+        array-compatible Python list. The fallback to Python will first raise a warning,
+        then an error."""
 
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def f(n: int):
@@ -610,13 +685,17 @@ class TestForLoops:
                 qml.RY(params[i], wires=0)
             return qml.expval(qml.PauliZ(0))
 
-        with pytest.raises(jax.errors.TracerIntegerConversionError, match="__index__"):
-            qjit(autograph=True)(f)
+        with pytest.warns(
+            match=r"TracerIntegerConversionError:    The __index__\(\) method was called"
+        ):
+            with pytest.raises(jax.errors.TracerIntegerConversionError, match="__index__"):
+                qjit(autograph=True)(f)
 
-    # This is never possible.
+    # This use case is never possible, regardless of whether AutoGraph is used or not.
     def test_for_in_dynamic_range_indexing_object_list(self):
         """Test for loop over a Python range with dynamic bounds that is used to index an
-        array-incompatible Python list. This should raise an error."""
+        array-incompatible Python list. The fallback to Python will first raise a warning,
+        then an error."""
 
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def f(n: int):
@@ -625,8 +704,11 @@ class TestForLoops:
                 qml.RY(int(params[i]) * jnp.pi, wires=0)
             return qml.expval(qml.PauliZ(0))
 
-        with pytest.raises(jax.errors.TracerIntegerConversionError, match="__index__"):
-            qjit(autograph=True)(f)
+        with pytest.warns(
+            match=r"TracerIntegerConversionError:    The __index__\(\) method was called"
+        ):
+            with pytest.raises(jax.errors.TracerIntegerConversionError, match="__index__"):
+                qjit(autograph=True)(f)
 
     def test_for_in_enumerate_array(self):
         """Test for loop over a Python enumeration on an array."""
