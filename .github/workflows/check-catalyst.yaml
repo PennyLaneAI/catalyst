@@ -284,7 +284,6 @@ jobs:
       run: |
         sudo apt-get install -y python3 python3-pip libomp-dev
         python3 -m pip install -r requirements.txt
-        python3 -m pip install tensorflow-cpu  # for autograph tests
         python3 -m pip install .
 
     - name: Get Cached LLVM Build
@@ -369,7 +368,6 @@ jobs:
       run: |
         sudo apt-get install -y python3 python3-pip libomp-dev
         python3 -m pip install -r requirements.txt
-        python3 -m pip install tensorflow-cpu  # for autograph tests
         python3 -m pip install .
 
     - name: Get Cached LLVM Build

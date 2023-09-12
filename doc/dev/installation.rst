@@ -105,8 +105,8 @@ additionally need to install `Rust <https://www.rust-lang.org/tools/install>`_ a
   If the CMake version available in your system is too old, you can also install up-to-date
   versions of it via ``pip install cmake``.
 
-All additional build and developer depencies are managed via the repository's ``requirements.txt``
-and can be installed as follows:
+All additional build and developer dependencies are managed via the repository's
+``requirements.txt`` and can be installed as follows:
 
 .. code-block:: console
 
