@@ -13,7 +13,6 @@ isort
 # testing
 lit
 pytest
-pytest-mock
 pytest-xdist
 pytest-cov
 nbmake

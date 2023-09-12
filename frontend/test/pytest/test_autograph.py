@@ -14,6 +14,8 @@
 
 """PyTests for the AutoGraph source-to-source transformation feature."""
 
+import sys
+
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -28,9 +30,9 @@ from catalyst.ag_utils import AutoGraphError, autograph_source, check_cache
 # pylint: disable=too-many-public-methods
 
 
-def test_unavailable(mocker):
+def test_unavailable(monkeypatch):
     """Check the error produced in the absence of tensorflow."""
-    mocker.patch.dict("sys.modules", {"tensorflow": None})
+    monkeypatch.setitem(sys.modules, "tensorflow", None)
 
     def fn(x):
         return x**2
@@ -56,7 +58,7 @@ class TestSourceCodeInfo:
         with pytest.warns(
             UserWarning,
             match=(
-                f'  File "{__file__}", line {"51"}, in {main.__name__}\n'
+                f'  File "{__file__}", line {"53"}, in {main.__name__}\n'
                 r"    for _ in range\(5\):"
             ),
         ):
@@ -77,7 +79,7 @@ class TestSourceCodeInfo:
         with pytest.warns(
             UserWarning,
             match=(
-                f'  File "{__file__}", line {"72"}, in {main.__name__}\n'
+                f'  File "{__file__}", line {"74"}, in {main.__name__}\n'
                 r"    for _ in range\(5\):"
             ),
         ):
@@ -100,7 +102,7 @@ class TestSourceCodeInfo:
         with pytest.warns(
             UserWarning,
             match=(
-                f'  File "{__file__}", line {"92"}, in {inner.__name__}\n'
+                f'  File "{__file__}", line {"94"}, in {inner.__name__}\n'
                 r"    for _ in range\(5\):"
             ),
         ):
