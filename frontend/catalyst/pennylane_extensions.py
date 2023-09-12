@@ -122,8 +122,9 @@ class QFunc:
         update_wrapper(self, fn)
 
     def __call__(self, *args, **kwargs):
-        qnode = self
+        qnode = None
         if isinstance(self, qml.QNode):
+            qnode = self
             if isinstance(self.device, qml.Device):
                 name = self.device.short_name
             else:
