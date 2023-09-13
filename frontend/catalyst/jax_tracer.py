@@ -558,12 +558,19 @@ def trace_quantum_function(
                 (trace.full_raise(t) if isinstance(t, DynamicJaxprTracer) else t) for t in ans
             ]
 
+            params = quantum_tape.get_parameters(trainable_only=False)
+            quantum_tape.trainable_params = qml.math.get_trainable_indices(params)
+
+            if isinstance(qnode.gradient_fn, qml.gradients.gradient_transform):
+                quantum_tape = qnode.gradient_fn.expand_fn(quantum_tape)
+
             if qnode and qnode.transform_program:
                 tapes, callback = qnode.transform_program([quantum_tape])
             else:
                 tapes, callback = identity_qnode_transform(quantum_tape)
+
+            del quantum_tape
         # (2) - Quantum tracing
-        del quantum_tape
         results = []
         results_tracers = []
         results_abstract = []
