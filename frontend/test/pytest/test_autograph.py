@@ -41,7 +41,6 @@ def test_unavailable(monkeypatch):
         qjit(autograph=True)(fn)
 
 
-# Keep this class first due to hardcoded line numbers.
 @pytest.mark.tf
 class TestSourceCodeInfo:
     """Unit tests for exception utilities that retrieves traceback information for the original
@@ -58,7 +57,7 @@ class TestSourceCodeInfo:
         with pytest.warns(
             UserWarning,
             match=(
-                f'  File "{__file__}", line {"53"}, in {main.__name__}\n'
+                f'  File "{__file__}", line [0-9]+, in {main.__name__}\n'
                 r"    for _ in range\(5\):"
             ),
         ):
@@ -79,7 +78,7 @@ class TestSourceCodeInfo:
         with pytest.warns(
             UserWarning,
             match=(
-                f'  File "{__file__}", line {"74"}, in {main.__name__}\n'
+                f'  File "{__file__}", line [0-9]+, in {main.__name__}\n'
                 r"    for _ in range\(5\):"
             ),
         ):
@@ -102,7 +101,7 @@ class TestSourceCodeInfo:
         with pytest.warns(
             UserWarning,
             match=(
-                f'  File "{__file__}", line {"94"}, in {inner.__name__}\n'
+                f'  File "{__file__}", line [0-9]+, in {inner.__name__}\n'
                 r"    for _ in range\(5\):"
             ),
         ):
