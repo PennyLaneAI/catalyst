@@ -5,7 +5,10 @@
 <h3>Improvements</h3>
 
 * Update the Lightning backend device to work with the PL-Lightning monorepo.
-[(#259)](https://github.com/PennyLaneAI/catalyst/pull/259)
+  [(#259)](https://github.com/PennyLaneAI/catalyst/pull/259)
+
+* Build both `"lightning.qubit"` and `"lightning.kokkos"` against the PL-Lightning monorepo.
+  [(#277)](https://github.com/PennyLaneAI/catalyst/pull/277)
 
 <h3>Breaking changes</h3>
 
