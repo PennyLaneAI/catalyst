@@ -58,6 +58,9 @@ sys.modules["mlir_quantum._mlir_libs._quantumDialects.gradient"] = types.ModuleT
 sys.modules["mlir_quantum._mlir_libs._quantumDialects.quantum"] = types.ModuleType(
     "mlir_quantum._mlir_libs._quantumDialects.quantum"
 )
+sys.modules["mlir_quantum._mlir_libs._quantumDialects.catalyst"] = types.ModuleType(
+    "mlir_quantum._mlir_libs._quantumDialects.catalyst"
+)
 
 
 from catalyst.ag_utils import AutoGraphError, autograph_source

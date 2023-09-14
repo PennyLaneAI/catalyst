@@ -4,4 +4,5 @@ add_mlir_public_c_api_library(QuantumCAPI
     LINK_LIBS PRIVATE
     MLIRQuantum
     MLIRGradient
+    MLIRCatalyst
 )

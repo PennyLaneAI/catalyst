@@ -31,6 +31,7 @@ from jaxlib.mlir.dialects.func import CallOp
 from jaxlib.mlir.dialects.mhlo import ConstantOp, ConvertOp
 from jaxlib.mlir.dialects.scf import ConditionOp, ForOp, IfOp, WhileOp, YieldOp
 from jaxlib.mlir.dialects.stablehlo import ConstantOp as StableHLOConstantOp
+from mlir_quantum.dialects.catalyst import PrintOp
 from mlir_quantum.dialects.gradient import GradOp, JVPOp, VJPOp
 from mlir_quantum.dialects.quantum import (
     AdjointOp,
@@ -256,7 +257,7 @@ def _print_def_impl(*args, string=None):  # pragma: no cover
 def _print_lowering(jax_ctx: mlir.LoweringRuleContext, *args, string=None):
     val = args[0] if args else None
     const_val = ir.StringAttr.get(string) if string else None
-    return ()
+    return PrintOp(val=val, const_val=const_val).results
 
 
 #

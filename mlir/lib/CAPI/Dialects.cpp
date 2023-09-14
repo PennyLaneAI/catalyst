@@ -16,7 +16,9 @@
 
 #include "Gradient/IR/GradientDialect.h"
 #include "Quantum/IR/QuantumDialect.h"
+#include "Catalyst/IR/CatalystDialect.h"
 #include "mlir/CAPI/Registration.h"
 
 MLIR_DEFINE_CAPI_DIALECT_REGISTRATION(Quantum, quantum, catalyst::quantum::QuantumDialect)
 MLIR_DEFINE_CAPI_DIALECT_REGISTRATION(Gradient, gradient, catalyst::gradient::GradientDialect)
+MLIR_DEFINE_CAPI_DIALECT_REGISTRATION(Catalyst, catalyst, catalyst::CatalystDialect)
