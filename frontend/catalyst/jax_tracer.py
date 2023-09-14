@@ -603,17 +603,28 @@ def trace_quantum_function(
                     out_classical_tree,
                     [ShapeDtypeStruct(a.shape, a.dtype, a.named_shape) for a in out_avals],
                 )
-                results_abstract += [abstract_results]
+                if is_program_batched and is_out_single_measurement:
+                    results_abstract.extend(abstract_results)
+                else:
+                    results_abstract.append(abstract_results)
                 # TODO: `check_jaxpr` complains about the `AbstractQreg` type. Consider fixing.
                 # check_jaxpr(jaxpr)
 
-            results += results_tracers
-
         with EvaluationContext.frame_tracing_context(ctx, trace):
-            results_tracers_flat, tracers_tree = tree_flatten(results_tracers)
-            args = results_tracers
+            # What is the input to the callback function?
+            # The input to the callback function is going to be a list of values
+            # One for each tape.
+
+            # The tracers are all flat in results_tracers.
+            # The shape is in a list of abstract_results.
+
+            # We need to deduce the type/shape/tree of the callback.
             wffa, in_avals, out_tree_promise = deduce_avals(callback, (results_abstract,), {})
-            ans = wffa.call_wrapped(*args)
+
+            # wffa will take as an input a flatten tracers.
+            ans = wffa.call_wrapped(*results_tracers)
+
+            # After wffa is called, then the shape becomes available in out_tree_promise.
             out_classical_tracers = [trace.full_raise(t) for t in ans]
             jaxpr, out_type, consts = ctx.frames[trace].to_jaxpr2(out_classical_tracers)
             closed_jaxpr = ClosedJaxpr(jaxpr, consts)
