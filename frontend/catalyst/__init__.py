@@ -65,6 +65,7 @@ from catalyst.compilation_pipelines import QJIT, CompileOptions, qjit
 from catalyst.pennylane_extensions import (
     adjoint,
     cond,
+    debug_print,
     for_loop,
     grad,
     jacobian,
@@ -87,6 +88,7 @@ __all__ = (
     "vjp",
     "jvp",
     "adjoint",
+    "debug_print",
     "autograph_source",
     "AutoGraphError",
     "CompileError",

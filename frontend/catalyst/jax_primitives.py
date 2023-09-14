@@ -228,6 +228,36 @@ vjp_p = core.Primitive("vjp")
 vjp_p.multiple_results = True
 adjoint_p = jax.core.Primitive("adjoint")
 adjoint_p.multiple_results = True
+print_p = jax.core.Primitive("debug_print")
+print_p.multiple_results = True
+
+
+#
+# print
+#
+def debug_print(x):
+    if isinstance(x, jax.core.Tracer):
+        prim = print_p.bind(x)
+    else:
+        prim = print_p.bind(string=str(x))
+    return prim
+
+
+@print_p.def_abstract_eval
+def _print_abstract_eval(*args, string=None):
+    return ()
+
+
+@print_p.def_impl
+def _print_def_impl(*args, string=None):  # pragma: no cover
+    raise NotImplementedError()
+
+
+def _print_lowering(jax_ctx: mlir.LoweringRuleContext, *args, string=None):
+    val = args[0] if args else None
+    const_val = ir.StringAttr.get(string) if string else None
+    return ()
+
 
 #
 # func
@@ -1609,6 +1639,7 @@ mlir.register_lowering(func_p, _func_lowering)
 mlir.register_lowering(jvp_p, _jvp_lowering)
 mlir.register_lowering(vjp_p, _vjp_lowering)
 mlir.register_lowering(adjoint_p, _adjoint_lowering)
+mlir.register_lowering(print_p, _print_lowering)
 
 
 def _scalar_abstractify(t):

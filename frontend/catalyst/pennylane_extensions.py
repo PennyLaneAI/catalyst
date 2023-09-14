@@ -1528,6 +1528,24 @@ def measure(wires):
     return ctx.jax_tape.create_tracer(t, a)
 
 
+# name to be defined, but "print" would alias built-in
+def debug_print(x):
+    """ "A :func:`qjit` compatible print function for debugging.
+
+    Enables printing of numeric values at runtime. Can also print objects or strings as constants.
+
+    Args:
+        x: A single jax array whose numeric values are printed at runtime, or any objects whose
+           string representation will be treated as a constant and printed at runtime.
+    """
+
+    # Dispatch to Python print outside a qjit context.
+    if TracingContext.is_tracing():
+        jprim.debug_print(x)
+    else:
+        print(x)
+
+
 class QJITDevice(qml.QubitDevice):
     """QJIT device.
 
