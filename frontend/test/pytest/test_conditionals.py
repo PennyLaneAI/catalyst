@@ -29,7 +29,7 @@ class TestCondToJaxpr:
 
         expected = """{ lambda ; a:i64[]. let
     b:bool[] = eq a 5
-    c:i64[] = qcond[
+    c:i64[] = cond[
       branch_jaxprs=[{ lambda ; a:i64[] b_:i64[]. let c:i64[] = integer_pow[y=2] a in (c,) }, { lambda ; a_:i64[] b:i64[]. let c:i64[] = integer_pow[y=3] b in (c,) }]
     ] b a a
   in (c,) }"""

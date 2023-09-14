@@ -944,7 +944,7 @@ class CondCallable:
         CondCallable._check_branches_return_types(branch_jaxprs)
 
         inputs = self.preds + consts
-        ret_tree_flat = jprim.qcond(branch_jaxprs, *inputs)
+        ret_tree_flat = jprim.cond(branch_jaxprs, *inputs)
         return tree_unflatten(out_trees[0], ret_tree_flat)
 
     def _call_during_trace(self):
@@ -1182,7 +1182,7 @@ class WhileCallable:
         flat_init_vals_no_qubits = tree_flatten(args)[0]
 
         inputs = cond_consts + body_consts + flat_init_vals_no_qubits
-        ret_tree_flat = jprim.qwhile(
+        ret_tree_flat = jprim.while_loop(
             cond_jaxpr, body_jaxpr, len(cond_consts), len(body_consts), *inputs
         )
         return tree_unflatten(body_tree, ret_tree_flat)
@@ -1358,7 +1358,7 @@ class ForLoopCallable:
         inputs = (
             [self.lower_bound, self.upper_bound, self.step] + body_consts + flat_init_vals_no_qubits
         )
-        ret_tree_flat = jprim.qfor(body_jaxpr, len(body_consts), *inputs)
+        ret_tree_flat = jprim.for_loop(body_jaxpr, len(body_consts), *inputs)
         return tree_unflatten(body_tree, ret_tree_flat)
 
     def _call_during_trace(self, *args):

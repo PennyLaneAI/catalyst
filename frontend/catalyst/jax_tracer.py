@@ -298,7 +298,7 @@ def trace_quantum_tape(
             predicates, consts = op_args
             qreg = insert_to_qreg(qubit_states, qreg)
             header_and_branch_args_plus_consts = predicates + consts + [qreg]
-            outs = jprim.qcond(
+            outs = jprim.cond(
                 op.branch_jaxprs,
                 *header_and_branch_args_plus_consts,
             )
@@ -312,7 +312,7 @@ def trace_quantum_tape(
             cond_consts, body_consts, iter_args = op_args
             qreg = insert_to_qreg(qubit_states, qreg)
             iter_args_plus_consts = cond_consts + body_consts + iter_args + [qreg]
-            outs = jprim.qwhile(
+            outs = jprim.while_loop(
                 op.cond_jaxpr,
                 op.body_jaxpr,
                 len(cond_consts),
@@ -329,7 +329,9 @@ def trace_quantum_tape(
             loop_bounds, body_consts, iter_args = op_args
             qreg = insert_to_qreg(qubit_states, qreg)
             header_and_iter_args_plus_consts = loop_bounds + body_consts + iter_args + [qreg]
-            outs = jprim.qfor(op.body_jaxpr, len(body_consts), *header_and_iter_args_plus_consts)
+            outs = jprim.for_loop(
+                op.body_jaxpr, len(body_consts), *header_and_iter_args_plus_consts
+            )
             v, qregs = tree_unflatten(op.body_tree, outs)
             qreg = qregs[0]
             p.send_partial_input(v)

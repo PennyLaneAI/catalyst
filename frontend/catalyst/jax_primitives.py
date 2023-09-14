@@ -212,12 +212,12 @@ expval_p = core.Primitive("expval")
 var_p = core.Primitive("var")
 probs_p = core.Primitive("probs")
 state_p = core.Primitive("state")
-qcond_p = core.AxisPrimitive("qcond")
-qcond_p.multiple_results = True
-qwhile_p = core.AxisPrimitive("qwhile")
-qwhile_p.multiple_results = True
-qfor_p = core.AxisPrimitive("qfor")
-qfor_p.multiple_results = True
+cond_p = core.AxisPrimitive("cond")
+cond_p.multiple_results = True
+while_p = core.AxisPrimitive("while_loop")
+while_p.multiple_results = True
+for_p = core.AxisPrimitive("for_loop")
+for_p.multiple_results = True
 grad_p = core.Primitive("grad")
 grad_p.multiple_results = True
 func_p = core.CallPrimitive("func")
@@ -303,8 +303,6 @@ def _func_lowering(ctx, *args, call_jaxpr, fn, call=True):
 #
 # grad
 #
-
-
 @dataclass
 class GradParams:
     """Common gradient parameters. The parameters are expected to be checked before the creation of
@@ -380,8 +378,6 @@ def _grad_lowering(ctx, *args, jaxpr, fn, grad_params):
 #
 # vjp/jvp
 #
-
-
 @jvp_p.def_impl
 def _jvp_def_impl(ctx, *args, jaxpr, fn, grad_params):  # pragma: no cover
     raise NotImplementedError()
@@ -1212,24 +1208,24 @@ def _state_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shape: tup
 
 
 #
-# qcond
+# cond
 #
-def qcond(branch_jaxprs, *header_and_branch_args_plus_consts):
+def cond(branch_jaxprs, *header_and_branch_args_plus_consts):
     """Bind operands to operation."""
-    return qcond_p.bind(*header_and_branch_args_plus_consts, branch_jaxprs=branch_jaxprs)
+    return cond_p.bind(*header_and_branch_args_plus_consts, branch_jaxprs=branch_jaxprs)
 
 
-@qcond_p.def_abstract_eval
-def _qcond_abstract_eval(*args, branch_jaxprs, **kwargs):
+@cond_p.def_abstract_eval
+def _cond_abstract_eval(*args, branch_jaxprs, **kwargs):
     return branch_jaxprs[0].out_avals
 
 
-@qcond_p.def_impl
-def _qcond_def_impl(ctx, *preds_and_branch_args_plus_consts, branch_jaxprs):  # pragma: no cover
+@cond_p.def_impl
+def _cond_def_impl(ctx, *preds_and_branch_args_plus_consts, branch_jaxprs):  # pragma: no cover
     raise NotImplementedError()
 
 
-def _qcond_lowering(
+def _cond_lowering(
     jax_ctx: mlir.LoweringRuleContext,
     *preds_and_branch_args_plus_consts: tuple,
     branch_jaxprs: List[core.ClosedJaxpr],
@@ -1299,11 +1295,11 @@ def _qcond_lowering(
 
 
 #
-# qwhile loop
+# while loop
 #
-def qwhile(cond_jaxpr, body_jaxpr, cond_nconsts, body_nconsts, *iter_args_plus_consts):
+def while_loop(cond_jaxpr, body_jaxpr, cond_nconsts, body_nconsts, *iter_args_plus_consts):
     """Bind operands to operation."""
-    return qwhile_p.bind(
+    return while_p.bind(
         *iter_args_plus_consts,
         cond_jaxpr=cond_jaxpr,
         body_jaxpr=body_jaxpr,
@@ -1312,19 +1308,19 @@ def qwhile(cond_jaxpr, body_jaxpr, cond_nconsts, body_nconsts, *iter_args_plus_c
     )
 
 
-@qwhile_p.def_abstract_eval
-def _qwhile_loop_abstract_eval(*args, cond_jaxpr, body_jaxpr, **kwargs):
+@while_p.def_abstract_eval
+def _while_loop_abstract_eval(*args, cond_jaxpr, body_jaxpr, **kwargs):
     return body_jaxpr.out_avals
 
 
-@qwhile_p.def_impl
-def _qwhile_def_impl(
+@while_p.def_impl
+def _while_loop_def_impl(
     ctx, *iter_args_plus_consts, cond_jaxpr, body_jaxpr, cond_nconsts, body_nconsts
 ):  # pragma: no cover
     raise NotImplementedError()
 
 
-def _qwhile_lowering(
+def _while_loop_lowering(
     jax_ctx: mlir.LoweringRuleContext,
     *iter_args_plus_consts: tuple,
     cond_jaxpr: core.ClosedJaxpr,
@@ -1392,13 +1388,13 @@ def _qwhile_lowering(
 
 
 #
-# qfor loop
+# for loop
 #
-def qfor(body_jaxpr, body_nconsts, *header_and_iter_args_plus_consts):
+def for_loop(body_jaxpr, body_nconsts, *header_and_iter_args_plus_consts):
     """Bind operands to operation."""
     step = header_and_iter_args_plus_consts[2]
     apply_reverse_transform = isinstance(step, int) and step < 0
-    return qfor_p.bind(
+    return for_p.bind(
         *header_and_iter_args_plus_consts,
         body_jaxpr=body_jaxpr,
         body_nconsts=body_nconsts,
@@ -1406,20 +1402,20 @@ def qfor(body_jaxpr, body_nconsts, *header_and_iter_args_plus_consts):
     )
 
 
-@qfor_p.def_abstract_eval
-def _qfor_loop_abstract_eval(*args, body_jaxpr, **kwargs):
+@for_p.def_abstract_eval
+def _for_loop_abstract_eval(*args, body_jaxpr, **kwargs):
     return body_jaxpr.out_avals
 
 
-@qfor_p.def_impl
-def _qfor_def_impl(
+@for_p.def_impl
+def _for_loop_def_impl(
     ctx, lower_bound, upper_bound, step, *iter_args_plus_consts, body_jaxpr, body_nconsts
 ):  # pragma: no cover
     raise NotImplementedError()
 
 
 # pylint: disable=too-many-statements
-def _qfor_lowering(
+def _for_loop_lowering(
     jax_ctx: mlir.LoweringRuleContext,
     lower_bound: ir.Value,
     upper_bound: ir.Value,
@@ -1605,9 +1601,9 @@ mlir.register_lowering(expval_p, _expval_lowering)
 mlir.register_lowering(var_p, _var_lowering)
 mlir.register_lowering(probs_p, _probs_lowering)
 mlir.register_lowering(state_p, _state_lowering)
-mlir.register_lowering(qcond_p, _qcond_lowering)
-mlir.register_lowering(qwhile_p, _qwhile_lowering)
-mlir.register_lowering(qfor_p, _qfor_lowering)
+mlir.register_lowering(cond_p, _cond_lowering)
+mlir.register_lowering(while_p, _while_loop_lowering)
+mlir.register_lowering(for_p, _for_loop_lowering)
 mlir.register_lowering(grad_p, _grad_lowering)
 mlir.register_lowering(func_p, _func_lowering)
 mlir.register_lowering(jvp_p, _jvp_lowering)
