@@ -34,4 +34,14 @@ def ArrayListToMemRefPass : Pass<"convert-arraylist-to-memref"> {
     let constructor = "catalyst::createArrayListToMemRefPass()";
 }
 
+def CatalystConversionPass : Pass<"convert-catalyst-to-llvm"> {
+    let summary = "Lower catalyst utility operations to the LLVM dialect.";
+
+    let dependentDialects = [
+        "mlir::func::FuncDialect",
+    ];
+
+    let constructor = "catalyst::createCatalystConversionPass()";
+}
+
 #endif // CATALYST_PASSES

@@ -21,5 +21,6 @@
 namespace catalyst {
 
 std::unique_ptr<mlir::Pass> createArrayListToMemRefPass();
+std::unique_ptr<mlir::Pass> createCatalystConversionPass();
 
 } // namespace catalyst
