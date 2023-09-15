@@ -45,6 +45,8 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
     {
         // Correct Block extract and make a function out of it.
         auto &reg = op.getUpdateComputation();
+        if (!reg.hasOneBlock())
+            return failure();
         auto moduleOp = op->getParentOfType<ModuleOp>();
         FlatSymbolRefAttr updateFn =
             getOrInsertUpdateFunction(op.getLoc(), moduleOp, rewriter, reg);
@@ -68,33 +70,34 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         OpBuilder::InsertionGuard guard(b);
         b.setInsertionPointToStart(moduleOp.getBody());
 
-        auto block = updateRegion.getBlocks().begin();
-        ValueRange arguments = block->getArguments();
-        Operation *originalTerminator = block->getTerminator();
+        Block *originalBlock = &updateRegion.front();
+        Operation *originalTerminator = originalBlock->getTerminator();
+        ValueRange originalArguments = originalBlock->getArguments();
 
         auto updateFnType = FunctionType::get(ctx, /*inputs=*/
-                                              arguments.getTypes(),
+                                              originalArguments.getTypes(),
                                               /*outputs=*/originalTerminator->getOperandTypes());
 
         auto updateFn = b.create<func::FuncOp>(loc, funcName, updateFnType);
         updateFn.setPrivate();
 
-        Block *entryBlock = updateFn.addEntryBlock();
-        b.setInsertionPointToStart(entryBlock);
-        BlockArgument inputs = updateFn.getArgument(0);
-        BlockArgument update = updateFn.getArgument(1);
+        Block *funcBody = updateFn.addEntryBlock();
+        int64_t numOriginalBlockArguments = originalBlock->getNumArguments(); // it is 2
 
-        block->getArgument(0).replaceAllUsesWith(inputs);
-        block->getArgument(1).replaceAllUsesWith(update);
-        
-        for (Operation &op : block->without_terminator()) {
-            op.print(llvm::outs());
-            op.clone();
-        }
+        auto outlinedFuncBlockArgs = funcBody->getArguments();
+        IRRewriter rewriter(b);
+        b.setInsertionPointToEnd(funcBody);
+        rewriter.mergeBlocks(
+            originalBlock, funcBody,
+            outlinedFuncBlockArgs);
 
-        b.create<func::ReturnOp>(loc, inputs);
+        b.setInsertionPointToEnd(funcBody);
+        b.create<func::ReturnOp>(loc, originalTerminator->getResultTypes(),
+                                        originalTerminator->getOperands());
+        rewriter.eraseOp(originalTerminator);
         return SymbolRefAttr::get(ctx, funcName);
     }
+
 };
 
 } // namespace
