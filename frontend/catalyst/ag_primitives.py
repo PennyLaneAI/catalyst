@@ -161,9 +161,13 @@ def for_stmt(
     # - For loops over a Python enumeration use a combination of the above, providing a dynamic
     #   iteration variable and conversion of the iterable to array. If either fails, a fallback to
     #   Python is used.
-    # The fallback mechanism for tracing errors will raise a warning as the user may need to be
-    # aware that the graph conversion failed, for instance for lack of converting lists into arrays,
-    # but the conversion from iterable to array will fall back to Python silently.
+    # Note that there are two reasons a fallback to Python could have been triggered:
+    # - the iterable provided by the user is not convertible to an array
+    #   -> this will fallback to a Python loop silently (without a warning), since there isn't a
+    #      simple fix to make this loop traceable
+    # - an exception is raised during the tracing of the loop body after conversion
+    #   -> this will raise a warning to allow users to correct mistakes and allow the conversion
+    #      to succeed, for example because they forgot to use a list instead of an array
     fallback = False
 
     if isinstance(iteration_target, CRange):
