@@ -14,6 +14,7 @@
 
 #define DEBUG_TYPE "scatter"
 
+#include <iostream>
 #include <algorithm>
 #include <iterator>
 #include <string>
@@ -43,15 +44,43 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
     mlir::LogicalResult matchAndRewrite(mhlo::ScatterOp op,
                                         mlir::PatternRewriter &rewriter) const override
     {
-        // Correct Block extract and make a function out of it.
-        auto &reg = op.getUpdateComputation();
-        if (!reg.hasOneBlock())
+        // Add checks for supported cases
+        if (!op.getUniqueIndices() || !op.getIndicesAreSorted() ||
+            !op.getScatterDimensionNumbers().getUpdateWindowDims().empty()) {
             return failure();
+        }
+
+        op.getScatterDimensionNumbers();
+        // Extract the block responsible for update
+        auto &region = op.getUpdateComputation();
+
+        if (!region.hasOneBlock())
+            return failure();
+
         auto moduleOp = op->getParentOfType<ModuleOp>();
+
+        // We create a function from the update block
         FlatSymbolRefAttr updateFn =
-            getOrInsertUpdateFunction(op.getLoc(), moduleOp, rewriter, reg);
+            getOrInsertUpdateFunction(op.getLoc(), moduleOp, rewriter, region);
+
+        auto results = op.getInputs();
+        auto resultsOperand = results.front();
+        auto resultsShape = resultsOperand.getType().cast<TensorType>().getShape();
+
+        std::cout << resultsShape[0];
+        
+
+        auto updates = op.getUpdates();
+        auto scatterIndices = op.getScatterIndices();
+
+        // for loop over the update indices
+        std::vector<int> indices;
+
+        // Start generating indices from dimension 0
+        // generateIndicesRecursive(indices, shape, 0);
+
         // Replace the results with the updated inputs.
-        rewriter.replaceOp(op, op.getInputs());
+        rewriter.replaceOp(op, results);
 
         // Create the function
         return success();
@@ -82,18 +111,15 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         updateFn.setPrivate();
 
         Block *funcBody = updateFn.addEntryBlock();
-        int64_t numOriginalBlockArguments = originalBlock->getNumArguments(); // it is 2
 
         auto outlinedFuncBlockArgs = funcBody->getArguments();
         IRRewriter rewriter(b);
         b.setInsertionPointToEnd(funcBody);
-        rewriter.mergeBlocks(
-            originalBlock, funcBody,
-            outlinedFuncBlockArgs);
+        rewriter.mergeBlocks(originalBlock, funcBody, outlinedFuncBlockArgs);
 
         b.setInsertionPointToEnd(funcBody);
         b.create<func::ReturnOp>(loc, originalTerminator->getResultTypes(),
-                                        originalTerminator->getOperands());
+                                 originalTerminator->getOperands());
         rewriter.eraseOp(originalTerminator);
         return SymbolRefAttr::get(ctx, funcName);
     }
