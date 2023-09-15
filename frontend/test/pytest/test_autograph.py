@@ -15,6 +15,7 @@
 """PyTests for the AutoGraph source-to-source transformation feature."""
 
 import sys
+import traceback
 
 import jax
 import jax.numpy as jnp
@@ -25,6 +26,7 @@ import pytest
 from catalyst import for_loop, measure, qjit
 from catalyst.ag_utils import AutoGraphError, autograph_source, check_cache
 
+# pylint: disable=import-outside-toplevel
 # pylint: disable=missing-function-docstring
 # pylint: disable=unnecessary-lambda-assignment
 # pylint: disable=too-many-public-methods
@@ -45,6 +47,17 @@ def test_unavailable(monkeypatch):
 class TestSourceCodeInfo:
     """Unit tests for exception utilities that retrieves traceback information for the original
     source code."""
+
+    def test_non_converted_function(self):
+        """Test the robustness of traceback conversion on a non-converted function."""
+        from catalyst.ag_primitives import get_source_code_info
+
+        try:
+            raise RuntimeError("Test failure")
+        except RuntimeError as e:
+            result = get_source_code_info(traceback.extract_tb(e.__traceback__, limit=1)[0])
+
+        assert result.split("\n")[1] == '    raise RuntimeError("Test failure")'
 
     def test_qjit(self):
         """Test source info retrieval for a qjit function."""
@@ -508,6 +521,17 @@ class TestConditionals:
 
 class TestForLoops:
     """Test that the autograph transformations produce correct results on for loops."""
+
+    def test_python_range_fallback(self):
+        """Test that the custom CRange wrapper correctly falls back to Python."""
+        from catalyst.ag_primitives import CRange
+
+        c_range = CRange(0, 5, 1)
+        assert c_range._py_range is None
+
+        assert isinstance(c_range.py_range, range)  # automatically instantiates the Python range
+        assert isinstance(c_range._py_range, range)
+        assert c_range[2] == 2
 
     def test_for_in_array(self):
         """Test for loop over JAX array."""

@@ -595,16 +595,16 @@ def custom_lower_jaxpr_to_module(
     Copyright 2021 The JAX Authors.
     """
     platform = xb.canonicalize_platform(platform)
-    if not xb.is_known_platform(platform):
+    if not xb.is_known_platform(platform):  # pragma: no cover
         raise ValueError(f"Unknown platform {platform}")
     assert arg_shardings is None
     assert result_shardings is None
     platforms_with_donation = ("cuda", "rocm", "tpu")
     assert platform not in platforms_with_donation
     unlowerable_effects = lowerable_effects.filter_not_in(jaxpr.effects)
-    if unlowerable_effects:
+    if unlowerable_effects:  # pragma: no cover
         raise ValueError(f"Cannot lower jaxpr with effects: {jaxpr.effects}")
-    if any(donated_args):
+    if any(donated_args):  # pragma: no cover
         msg = "See an explanation at https://jax.readthedocs.io/en/latest/faq.html#buffer-donation."
         raise ValueError(f"Donation is not implemented for platform {platform}.\n{msg}")
 

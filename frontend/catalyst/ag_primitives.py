@@ -262,7 +262,7 @@ def get_source_code_info(tb_frame):
                 if isinstance(obj, catalyst.QJIT):
                     ag_source_map = obj.user_function.ag_source_map
                     break
-    except:  # nosec B110 # pylint: disable=bare-except
+    except:  # nosec B110 # pylint: disable=bare-except # pragma: nocover
         pass
 
     loc = LineLocation(tb_frame.filename, tb_frame.lineno)
@@ -362,43 +362,43 @@ class CRange:
     # pylint: disable=missing-function-docstring
 
     @property
-    def start(self) -> int:
+    def start(self) -> int:  # pragma: nocover
         return self.py_range.start
 
     @property
-    def stop(self) -> int:
+    def stop(self) -> int:  # pragma: nocover
         return self.py_range.stop
 
     @property
-    def step(self) -> int:
+    def step(self) -> int:  # pragma: nocover
         return self.py_range.step
 
-    def count(self, __value: int) -> int:
+    def count(self, __value: int) -> int:  # pragma: nocover
         return self.py_range.count(__value)
 
-    def index(self, __value: int) -> int:
+    def index(self, __value: int) -> int:  # pragma: nocover
         return self.py_range.index(__value)
 
-    def __len__(self) -> int:
+    def __len__(self) -> int:  # pragma: nocover
         return self.py_range.__len__()
 
-    def __eq__(self, __value: object) -> bool:
+    def __eq__(self, __value: object) -> bool:  # pragma: nocover
         return self.py_range.__eq__(__value)
 
-    def __hash__(self) -> int:
+    def __hash__(self) -> int:  # pragma: nocover
         return self.py_range.__hash__()
 
-    def __contains__(self, __key: object) -> bool:
+    def __contains__(self, __key: object) -> bool:  # pragma: nocover
         return self.py_range.__contains__(__key)
 
-    def __iter__(self) -> Iterator[int]:
+    def __iter__(self) -> Iterator[int]:  # pragma: nocover
         return self.py_range.__iter__()
 
-    def __getitem__(self, __key: SupportsIndex | slice) -> int | range:
-        self.py_range.__getitem__(__key)
+    def __getitem__(self, __key: SupportsIndex | slice) -> int | range:  # pragma: nocover
+        return self.py_range.__getitem__(__key)
 
-    def __reversed__(self) -> Iterator[int]:
-        self.py_range.__reversed__()
+    def __reversed__(self) -> Iterator[int]:  # pragma: nocover
+        return self.py_range.__reversed__()
 
 
 class CEnumerate(enumerate):
