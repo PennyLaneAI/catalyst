@@ -1391,7 +1391,7 @@ def for_loop(lower_bound, upper_bound, step):
 
     .. note::
 
-        Catalyst can now automatically convert Python for loop statements for you. Requires setting
+        Catalyst can automatically convert Python for loop statements for you. Requires setting
         ``autograph=True``, see the :func:`~.qjit` function or documentation page for more details.
 
     This for-loop representation is a functional version of the traditional
