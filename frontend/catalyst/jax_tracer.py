@@ -564,10 +564,35 @@ def trace_quantum_function(
             if isinstance(qnode.gradient_fn, qml.gradients.gradient_transform):
                 quantum_tape = qnode.gradient_fn.expand_fn(quantum_tape)
 
-            if qnode and qnode.transform_program:
+            # Can transforms be applied?
+            # Since transforms are a PL feature and PL does not support the same things as
+            # Catalyst, transforms may have invariants that rely on PL invariants.
+            # For example:
+            #   * mid-circuit measurements (for batch-transforms)
+            #   * that the output will be only a sequence of `MeasurementProcess`es.
+            is_measurement = lambda maybe: isinstance(maybe, MeasurementProcess)
+            is_out_measurements = map(is_measurement, out_measurements)
+            is_all_out_measurements = all(is_out_measurements) and not out_classical_tracers
+            is_out_measurement_sequence = is_all_out_measurements and isinstance(out_tree_promise().unflatten(out_measurements), Sequence)
+            is_out_measurement_sequence_one_element = is_out_measurement_sequence and len(out_tree_promise().unflatten(out_measurements)) == 1
+            is_out_single_measurement = is_all_out_measurements and isinstance(out_tree_promise().unflatten(out_measurements), MeasurementProcess)
+            is_valid_output = is_out_measurement_sequence or is_out_single_measurement
+            # TODO: check if there were mid circuit measurements in the original tape.
+            is_wave_function_collapsed = False
+            # TODO: check if the device is noisy.
+            is_noise_present = False
+            are_batch_transforms_valid = is_valid_output and not is_wave_function_collapsed and not is_noise_present
+
+            is_program_transformed = qnode and qnode.transform_program
+            if is_program_transformed:
                 tapes, callback = qnode.transform_program([quantum_tape])
             else:
                 tapes, callback = identity_qnode_transform(quantum_tape)
+
+            # I don't think we can now if a transform is a batch transform until we return more than 1 tape.
+            invalid_state = is_program_transformed and not are_batch_transforms_valid
+            # TODO: Consider whether issuing a warning, or an exception is better.
+            assert not invalid_state
 
             del quantum_tape
         # (2) - Quantum tracing
@@ -583,8 +608,11 @@ def trace_quantum_function(
                 out_classical_tracers, out_classical_tree = trace_quantum_measurements(
                     device,
                     qrp_out,
-                    out_classical_tracers_or_measurements,
-                    out_tree_promise(),
+                    # If the program is batched, that means that it was transformed.
+                    # If it was transformed, that means that the program might have
+                    # changed the output. See `split_non_commuting`
+                    out_classical_tracers_or_measurements if not is_program_transformed else tape.measurements,
+                    out_tree_promise() if not is_program_transformed else pytree_measurements,
                 )
                 out_quantum_tracers = [qrp_out.actualize()]
                 qdealloc_p.bind(qreg_in)
@@ -600,10 +628,10 @@ def trace_quantum_function(
 
                 out_avals, _ = unzip2(out_type)
                 abstract_results = tree_unflatten(
-                    out_classical_tree,
+                    out_classical_tree if not is_program_transformed else pytree_measurements,
                     [ShapeDtypeStruct(a.shape, a.dtype, a.named_shape) for a in out_avals],
                 )
-                if is_program_batched and is_out_single_measurement:
+                if is_program_transformed and (is_out_single_measurement or is_out_measurement_sequence_one_element or len(tape.measurements) == 1):
                     results_abstract.extend(abstract_results)
                 else:
                     results_abstract.append(abstract_results)
