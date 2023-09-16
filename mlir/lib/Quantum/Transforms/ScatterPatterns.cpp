@@ -14,8 +14,8 @@
 
 #define DEBUG_TYPE "scatter"
 
-#include <iostream>
 #include <algorithm>
+#include <iostream>
 #include <iterator>
 #include <string>
 #include <unordered_map>
@@ -65,10 +65,8 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
 
         auto results = op.getInputs();
         auto resultsOperand = results.front();
-        auto resultsShape = resultsOperand.getType().cast<TensorType>().getShape();
-
-        std::cout << resultsShape[0];
-        
+        ArrayRef<int64_t> resultsShape = resultsOperand.getType().cast<TensorType>().getShape();
+        std::vector<int> resultShapeVector(resultsShape.begin(), resultsShape.end());
 
         auto updates = op.getUpdates();
         auto scatterIndices = op.getScatterIndices();
@@ -77,8 +75,10 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         std::vector<int> indices;
 
         // Start generating indices from dimension 0
-        // generateIndicesRecursive(indices, shape, 0);
-
+        std::cout << "before";
+        std::vector<std::vector<int>> configurations;
+        generateIndicesRecursive(resultShapeVector, indices, 0, configurations);
+        std::cout << "after";
         // Replace the results with the updated inputs.
         rewriter.replaceOp(op, results);
 
@@ -124,6 +124,21 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         return SymbolRefAttr::get(ctx, funcName);
     }
 
+    void generateIndicesRecursive(const std::vector<int> &shape, std::vector<int> &currentIndex,
+                                  int dimension,  std::vector<std::vector<int>>& configurations) const
+    {
+        if (dimension == shape.size()) {
+            // Base case: Print the current index
+            configurations.push_back(currentIndex);
+        }
+        else {
+            for (int i = 0; i < shape[dimension]; i++) {
+                currentIndex.push_back(i);
+                generateIndicesRecursive(shape, currentIndex, dimension + 1, configurations);
+                currentIndex.pop_back();
+            }
+        }
+    }
 };
 
 } // namespace
