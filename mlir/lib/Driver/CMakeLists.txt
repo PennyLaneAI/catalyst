@@ -32,7 +32,6 @@ set(LLVM_LINK_COMPONENTS
   Support
   Target
   TargetParser
-  TransformUtils
   )
 
 add_mlir_library(CatalystCompilerDriver
