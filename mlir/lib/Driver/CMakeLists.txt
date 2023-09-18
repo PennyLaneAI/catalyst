@@ -16,8 +16,6 @@ include_directories(${ENZYME_SRC_DIR}/enzyme/Enzyme)
 set(LLVM_LINK_COMPONENTS
   AllTargetsAsmParsers
   AllTargetsCodeGens
-  AllTargetsDescs
-  AllTargetsInfos
   )
 
 add_mlir_library(CatalystCompilerDriver
