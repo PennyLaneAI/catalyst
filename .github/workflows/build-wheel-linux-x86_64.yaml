@@ -196,7 +196,7 @@ jobs:
         fail-on-cache-miss: True
 
     # Build Catalyst-Runtime
-    # TODO: remove v0.31.0 after lightning monorepo upgrade
+    # TODO: remove master after lightning monorepo upgrade
     - name: Build Catalyst-Runtime
       run: |
         cmake -S runtime -B runtime-build -G Ninja \
@@ -205,8 +205,7 @@ jobs:
               -DPYTHON_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -Dpybind11_DIR=$(python${{ matrix.python_version }} -c "import pybind11; print(pybind11.get_cmake_dir())") \
               -DENABLE_LIGHTNING_KOKKOS=ON \
-              -DLIGHTNING_GIT_TAG=v0.31.0 \
-              -DLIGHTNING_KOKKOS_GIT_TAG=latest_release \
+              -DLIGHTNING_GIT_TAG="master" \
               -DKokkos_ENABLE_SERIAL=ON \
               -DKokkos_ENABLE_OPENMP=ON \
               -DENABLE_OPENQASM=ON
