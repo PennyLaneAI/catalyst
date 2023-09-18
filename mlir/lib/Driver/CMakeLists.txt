@@ -1,11 +1,4 @@
-if(WIN32)
-    set(EXTERNAL_LIB Version)
-elseif(APPLE)
-    set(EXTERNAL_LIB z ncurses)
-elseif(UNIX)
-    set(EXTERNAL_LIB z tinfo)
-endif()
-
+set(EXTERNAL_LIB z)
 set(ENZYME_STATIC_LIB ON)
 add_subdirectory(${ENZYME_SRC_DIR}/enzyme ${CMAKE_CURRENT_BINARY_DIR}/enzyme)
 
