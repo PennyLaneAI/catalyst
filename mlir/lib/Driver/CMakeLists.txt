@@ -30,7 +30,6 @@ set(LLVM_LINK_COMPONENTS
   ScalarOpts
   SelectionDAG
   Support
-  Target
   )
 
 add_mlir_library(CatalystCompilerDriver
