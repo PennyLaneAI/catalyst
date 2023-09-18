@@ -586,9 +586,13 @@ class QJIT:
         compiled_function = CompiledFunction(shared_object, qfunc_name, restype)
         return compiled_function
 
-    def _maybe_promote(self, function, *args):
+    def _ensure_real_arguments_and_formal_parameters_are_compatible(self, function, *args):
         """Logic to decide whether the function needs to be recompiled
         given ``*args`` and whether ``*args`` need to be promoted.
+        A function may need to be compiled if:
+            1. It was not compiled before
+            2. The real arguments sent to the function are not promotable to the type of the
+                formal parameters.
 
         Args:
           function: an instance of ``CompiledFunction`` that may need recompilation
@@ -631,14 +635,18 @@ class QJIT:
         """
         msg = "C interface cannot be generated from tracing context."
         TracingContext.check_is_not_tracing(msg)
-        function, args = self._maybe_promote(self.compiled_function, *args)
+        function, args = self._ensure_real_arguments_and_formal_parameters_are_compatible(
+            self.compiled_function, *args
+        )
         return function.get_cmain(*args)
 
     def __call__(self, *args, **kwargs):
         if TracingContext.is_tracing():
             return self.user_function(*args, **kwargs)
 
-        function, args = self._maybe_promote(self.compiled_function, *args)
+        function, args = self._ensure_real_arguments_and_formal_parameters_are_compatible(
+            self.compiled_function, *args
+        )
         recompilation_needed = function != self.compiled_function
         self.compiled_function = function
 
