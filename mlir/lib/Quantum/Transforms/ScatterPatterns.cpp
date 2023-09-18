@@ -67,11 +67,11 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
 
         auto results = op.getInputs();
         auto resultsValue = results.front();
-        ArrayRef<int64_t> resultsShape = resultsValue.getType().cast<TensorType>().getShape();
-        std::vector<int64_t> resultShapeVector(resultsShape.begin(), resultsShape.end());
 
         auto updates = op.getUpdates();
         auto updatesValue = updates.front();
+        ArrayRef<int64_t> updatesShape = updatesValue.getType().cast<TensorType>().getShape();
+        std::vector<int64_t> updatesShapeVector(updatesShape.begin(), updatesShape.end());
 
         auto scatterIndices = op.getScatterIndices();
         auto indexVectorDim = op.getScatterDimensionNumbers().getIndexVectorDim();
@@ -81,10 +81,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         // Start generating indices from dimension 0
         std::vector<int64_t> indices;
         std::vector<std::vector<int64_t>> allUpdatesIndices;
-        generateIndicesRecursive(resultShapeVector, indices, 0, allUpdatesIndices);
-
-        // Value outResults = rewriter.create<tensor::EmptyOp>(loc,
-        // resultsValue.getType().cast<RankedTensorType>().getShape(), resultsValue.getType());
+        generateIndicesRecursive(updatesShapeVector, indices, 0, allUpdatesIndices);
 
         // Replace the results with the updated inputs.
         for (auto updatesIndices : allUpdatesIndices) {
