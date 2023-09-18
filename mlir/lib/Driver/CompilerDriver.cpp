@@ -50,7 +50,7 @@
 
 using namespace mlir;
 using namespace catalyst;
-using namespace driver;
+using namespace catalyst::driver;
 namespace fs = std::filesystem;
 
 namespace {
@@ -229,7 +229,7 @@ LogicalResult runLLVMPasses(const CompilerOptions &options,
     llvm::raw_string_ostream rawStringOstream{outputs["PreEnzymeOpt"]};
     llvmModule->print(rawStringOstream, nullptr);
     const std::string &outFile = fs::path("1_PreEnzymeOpt.ll");
-    if (failed(catalyst::dumpToFile(options, outFile, outputs["PreEnzymeOpt"]))) {
+    if (failed(dumpToFile(options, outFile, outputs["PreEnzymeOpt"]))) {
         return failure();
     }
 
@@ -273,7 +273,7 @@ LogicalResult runEnzymePasses(const CompilerOptions &options,
     llvm::raw_string_ostream rawStringOstream{outputs["Enzyme"]};
     llvmModule->print(rawStringOstream, nullptr);
     const std::string &outFile = fs::path("2_Enzyme.ll");
-    if (failed(catalyst::dumpToFile(options, outFile, outputs["Enzyme"]))) {
+    if (failed(dumpToFile(options, outFile, outputs["Enzyme"]))) {
         return failure();
     }
 
@@ -305,7 +305,7 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
             }
             const std::string &outFile =
                 fs::path(options.moduleName.str()).replace_extension(".mlir");
-            if (failed(catalyst::dumpToFile(options, outFile, tmp))) {
+            if (failed(dumpToFile(options, outFile, tmp))) {
                 return failure();
             }
         }
@@ -323,7 +323,7 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
                             llvm::raw_string_ostream s{outputs[pn]};
                             print(s);
                         }
-                        if (failed(catalyst::dumpToFile(options, outFile, outputs[pn]))) {
+                        if (failed(dumpToFile(options, outFile, outputs[pn]))) {
                             return failure();
                         }
                     }
@@ -385,7 +385,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
             }
 
             if (options.keepIntermediate) {
-                if (failed(catalyst::dumpToFile(options, "llvm_ir.ll", *llvmModule))) {
+                if (failed(dumpToFile(options, "llvm_ir.ll", *llvmModule))) {
                     return failure();
                 }
             }

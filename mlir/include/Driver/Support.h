@@ -23,6 +23,7 @@
 #include "CompilerDriver.h"
 
 namespace catalyst {
+namespace driver {
 
 template <typename Obj>
 mlir::LogicalResult dumpToFile(const CompilerOptions &options, mlir::StringRef fileName,
@@ -47,4 +48,5 @@ mlir::LogicalResult dumpToFile(const CompilerOptions &options, mlir::StringRef f
     }
     return mlir::success();
 }
+} // namespace driver
 } // namespace catalyst
