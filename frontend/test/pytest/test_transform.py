@@ -33,6 +33,10 @@ from pennylane_lightning.lightning_qubit import LightningQubit
 import numpy as np
 import pytest
 from catalyst.jax_tracer import QJITDevice
+from jax import numpy as jnp
+from pennylane.transforms import mitigate_with_zne, richardson_extrapolate, fold_global
+from pennylane.transforms import hamiltonian_expand, sum_expand
+from pennylane.transforms import qcut
 
 
 from catalyst import qjit
@@ -176,18 +180,108 @@ class TestBroadcastExpand:
 
         assert np.allclose(result, expected)
 
+class TestCutCircuitMCTransform:
 
-"""
-class TestSignExpand:
+    def test_cut_circuit_mc_sample(self):
+        """
+        Tests that a circuit containing sampling measurements can be cut and
+        postprocessed to return bitstrings of the original circuit size.
+        """
+        """
+        shots = 1
+        dev = qml.device("default.qubit", wires=3, shots=shots)
 
-    def test_sign_expand(self):
+        @qml.qnode(dev, interface="jax")
+        def circuit(x):
+            qml.RX(x, wires=0)
+            qml.RY(0.5, wires=1)
+            qml.RX(1.3, wires=2)
 
-        @qjit
-        @qml.transforms.sign_expand
-        @qml.qnode(qml.device("lightning.qubit", wires=3))
+            qml.CNOT(wires=[0, 1])
+            qml.WireCut(wires=1)
+            qml.CNOT(wires=[1, 2])
+
+            qml.RX(x, wires=0)
+            qml.RY(0.7, wires=1)
+            qml.RX(2.3, wires=2)
+            return qml.sample(wires=[0, 2])
+
+        v = 0.319
+        target = circuit(v)
+
+        cut_circuit_bs = jax.jit(qcut.cut_circuit_mc(circuit))
+        cut_res_bs = cut_circuit_bs(v)
+
+        assert cut_res_bs.shape == target.shape
+        assert isinstance(cut_res_bs, type(target))
+
+        cut_circuit_bs_compiled = qjit(qcut.cut_circuit_mc(circuit))
+        cut_res_bs_compiled = cut_circuit_bs_compiled(v)
+
+        assert cut_res_bs_compiled.shape == target.shape
+        assert isinstance(cut_res_bs_compiled, type(target))
+        """
+
+        dev = qml.device("lightning.qubit", wires=2, shots=None)
+
+        @qml.qnode(dev)
+        def circuit(x):
+            qml.RX(x, wires=0)
+            qml.RY(0.543, wires=1)
+            qml.WireCut(wires=0)
+            qml.CNOT(wires=[0, 1])
+            qml.RZ(0.240, wires=0)
+            qml.RZ(0.133, wires=1)
+            return qml.expval(qml.PauliZ(wires=[0]))
+
+        x = jnp.array(0.531)
+        cut_circuit_jit = jax.jit(qcut.cut_circuit(circuit, use_opt_einsum=False))
+        cut_circuit_qjit = qjit(qcut.cut_circuit(circuit, use_opt_einsum=False))
+
+        # Note we call the function twice but assert qcut_processing_fn is called once. We expect
+        # qcut_processing_fn to be called once during JIT compilation, with subsequent calls to
+        # cut_circuit_jit using the compiled code.
+        res = cut_circuit_jit(x)
+        res_qjit = cut_circuit_qjit(x)
+        res_expected = circuit(x)
+
+        assert np.allclose(res_qjit, res_expected)
+        assert np.allclose(res, res_expected)
+
+class TestHamiltonianExpand:
+
+    def test_hamiltonian_expand(self):
+        H4 = (qml.PauliX(0) @ qml.PauliZ(2)
+                + 3 * qml.PauliZ(2)
+                - 2 * qml.PauliX(0)
+                + qml.PauliZ(2)
+                + qml.PauliZ(2)
+        )
+        H4 += qml.PauliZ(0) @ qml.PauliX(1) @ qml.PauliY(2)
+
+        dev = qml.device("lightning.qubit", wires=3)
+
+        @hamiltonian_expand
+        @qml.qnode(dev)
         def circuit():
-            qml.PauliX(0)
-            return qml.var(qml.Hamiltonian([1.5], [qml.PauliZ(0) @ qml.PauliZ(1)]))
-        print(circuit())
+            qml.Hadamard(0)
+            qml.Hadamard(1)
+            qml.PauliZ(1)
+            qml.PauliX(2)
+            return qml.expval(H4)
 
-"""
+        assert np.allclose(circuit(), qjit(circuit)())
+
+class TestSumExpand:
+
+    def test_sum_expand(self):
+        dev = qml.device("lightning.qubit", wires=2, shots=None)
+
+        @sum_expand
+        @qml.qnode(dev)
+        def circuit():
+            obs1 = qml.prod(qml.PauliX(0), qml.PauliX(1))
+            obs2 = qml.prod(qml.PauliX(0), qml.PauliY(1))
+            return [qml.expval(obs1), qml.expval(obs2)]
+
+        assert np.allclose(circuit(), qjit(circuit)())

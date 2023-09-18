@@ -631,8 +631,10 @@ def trace_quantum_function(
                     out_classical_tree if not is_program_transformed else pytree_measurements,
                     [ShapeDtypeStruct(a.shape, a.dtype, a.named_shape) for a in out_avals],
                 )
-                if is_program_transformed and (is_out_single_measurement or is_out_measurement_sequence_one_element or len(tape.measurements) == 1):
-                    results_abstract.extend(abstract_results)
+                if is_program_transformed and len(abstract_results) == 1:
+                    results_abstract.append(abstract_results[0])
+                elif is_program_transformed:
+                    results_abstract.append(tuple(abstract_results))
                 else:
                     results_abstract.append(abstract_results)
                 # TODO: `check_jaxpr` complains about the `AbstractQreg` type. Consider fixing.
