@@ -563,7 +563,11 @@ class QJIT:
             # This will make a check before sending it to the compiler that the return type
             # is actually available in most systems. f16 needs a special symbol and linking
             # will fail if it is not available.
-            restype = self.mlir_module.body.operations[0].type.results
+            #
+            # WARNING: assumption is that the first function
+            # is the entry point to the compiled program.
+            entry_point_func = self.mlir_module.body.operations[0]
+            restype = entry_point_func.type.results
 
             for res in restype:
                 baseType = ir.RankedTensorType(res).element_type
