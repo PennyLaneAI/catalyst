@@ -24,10 +24,9 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Errc.h"
 
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Index/IR/IndexOps.h"
-#include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/Verifier.h"
@@ -64,6 +63,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         // We create a function from the update block
         FlatSymbolRefAttr updateFn =
             getOrInsertUpdateFunction(op.getLoc(), moduleOp, rewriter, region);
+        auto updateFnOp = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, updateFn);
 
         auto results = op.getInputs();
         auto resultsValue = results.front();
@@ -83,6 +83,9 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         std::vector<std::vector<int64_t>> allUpdatesIndices;
         generateIndicesRecursive(resultShapeVector, indices, 0, allUpdatesIndices);
 
+        // Value outResults = rewriter.create<tensor::EmptyOp>(loc,
+        // resultsValue.getType().cast<RankedTensorType>().getShape(), resultsValue.getType());
+
         // Replace the results with the updated inputs.
         for (auto updatesIndices : allUpdatesIndices) {
             SmallVector<Value> updatesIndicesValue;
@@ -99,15 +102,29 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
                 rewriter.create<tensor::ExtractOp>(loc, updatesValue, updatesIndicesValue);
             Value resultValue =
                 rewriter.create<tensor::ExtractOp>(loc, resultsValue, resultsIndices);
-            ValueRange args{resultValue, updateValue};
 
+            // f64 -> tensor<f64>
+            if (!isa<RankedTensorType>(updateValue.getType())) {
+                Type resultTy = RankedTensorType::get({}, updateValue.getType());
+                updateValue = rewriter.create<tensor::FromElementsOp>(loc, resultTy, updateValue);
+            }
+            if (!isa<RankedTensorType>(resultValue.getType())) {
+                Type resultTy = RankedTensorType::get({}, resultValue.getType());
+                resultValue = rewriter.create<tensor::FromElementsOp>(loc, resultTy, resultValue);
+            }
+            ValueRange args{resultValue, updateValue};
             // Call the function that computes the update
-            Value updated = rewriter.create<func::CallOp>(loc, updateFn, args).getResult(0);
+            Value updated = rewriter.create<func::CallOp>(loc, updateFnOp, args).getResult(0);
+
+            // tensor<f64> -> f64
+            Value updatedExtracted = rewriter.create<tensor::ExtractOp>(loc, updated);
             // Insert the update in the results
-            rewriter.create<tensor::InsertOp>(loc, updated, resultsValue, resultsIndices);
+            Value res = rewriter.create<tensor::InsertOp>(loc, updatedExtracted, resultsValue,
+                                                          resultsIndices);
+            resultsValue = res;
         }
         // Replace the results with the updated one
-        rewriter.replaceOp(op, results);
+        rewriter.replaceOp(op, resultsValue);
         return success();
     }
 
@@ -178,36 +195,39 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         int64_t rank = scatterIndicesTensorType.getRank();
         auto shape = scatterIndicesTensorType.getShape();
 
-        // Offset
-        std::vector<int64_t> offsets = updatesIndices;
-        offsets.push_back(0);
+        if (rank != 1) {
+            // Offset
+            std::vector<int64_t> offsets = updatesIndices;
+            offsets.push_back(0);
 
-        std::vector<Value> dynOffsets = {};
+            std::vector<Value> dynOffsets = {};
 
-        // Size
-        std::vector<int64_t> sizes(rank, 0);
-        sizes[-1] = shape[-1];
-        std::vector<Value> dynSizes = {};
+            // Size
+            std::vector<int64_t> sizes(rank, 0);
+            sizes[-1] = shape[-1];
+            std::vector<Value> dynSizes = {};
 
-        // Stides
-        std::vector<int64_t> strides(rank, 1);
-        std::vector<Value> dynStrides = {};
+            // Stides
+            std::vector<int64_t> strides(rank, 1);
+            std::vector<Value> dynStrides = {};
 
-        // Deduce result types
-        auto resultType = tensor::ExtractSliceOp::inferCanonicalRankReducedResultType(
-            1, scatterIndicesTensorType, offsets, sizes, strides);
+            // Deduce result types
+            auto resultType = tensor::ExtractSliceOp::inferCanonicalRankReducedResultType(
+                1, scatterIndicesTensorType, offsets, sizes, strides);
 
-        Value scatterIndicesExtracted =
-            rewriter.create<tensor::ExtractSliceOp>(loc, resultType, scatterIndices, dynOffsets,
-                                                    dynSizes, dynStrides, offsets, sizes, strides);
-
+            scatterIndices = rewriter.create<tensor::ExtractSliceOp>(
+                loc, resultType, scatterIndices, dynOffsets, dynSizes, dynStrides, offsets, sizes,
+                strides);
+        }
         // Sort
         SmallVector<Value> results(rank);
         for (auto index : scatterDimsToOperandDims) {
             Value indexValue = rewriter.create<index::ConstantOp>(loc, index);
-            Value order = rewriter.create<tensor::ExtractOp>(loc, scatterIndicesExtracted, indexValue);
+            Value value = rewriter.create<tensor::ExtractOp>(loc, scatterIndices, indexValue);
+            Value valueCasted =
+                rewriter.create<arith::IndexCastOp>(loc, rewriter.getIndexType(), value);
             // Add to tensor
-            results[index] = order;
+            results[index] = valueCasted;
         }
 
         // Results indices
