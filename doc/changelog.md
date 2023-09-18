@@ -17,6 +17,9 @@
   approach.
   [(#216)](https://github.com/PennyLaneAI/catalyst/pull/216)
 
+* Build both `"lightning.qubit"` and `"lightning.kokkos"` against the PL-Lightning monorepo.
+  [(#277)](https://github.com/PennyLaneAI/catalyst/pull/277)
+
 <h3>Breaking changes</h3>
 
 <h3>Bug fixes</h3>
@@ -28,6 +31,7 @@ This release contains contributions from (in alphabetical order):
 Ali Asadi,
 Erick Ochoa Lopez,
 Jacob Mai Peng,
+Sergei Mironov.
 
 # Release 0.3.0
 

@@ -47,7 +47,6 @@ class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {
   private:
     using StateVectorT = Pennylane::LightningQubit::StateVectorLQubitDynamic<double>;
 
-  private:
     // static constants for RESULT values
     static constexpr bool GLOBAL_RESULT_TRUE_CONST = true;
     static constexpr bool GLOBAL_RESULT_FALSE_CONST = false;

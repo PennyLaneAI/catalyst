@@ -492,12 +492,10 @@ void LightningSimulator::Gradient(std::vector<DataView<double, 1>> &gradients,
     Pennylane::Algorithms::JacobianData<StateVectorT> tape{
         num_params, state.size(), state.data(), obs_vec, ops, tp_empty ? all_params : trainParams};
 
-    const StateVectorT ref_data{0};
-
     Pennylane::LightningQubit::Algorithms::AdjointJacobian<StateVectorT> adj;
     std::vector<double> jacobian(jac_size, 0);
     adj.adjointJacobian(std::span{jacobian}, tape,
-                        /* ref_data */ ref_data,
+                        /* ref_data */ *this->device_sv,
                         /* apply_operations */ false);
 
     // convert jacobians to a list of lists for each observable
