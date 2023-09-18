@@ -21,6 +21,7 @@
 
 #include "CompilerDriver.h"
 
+namespace catalyst {
 namespace driver {
 
 /// Register the translations needed to convert to LLVM IR.
@@ -31,3 +32,4 @@ mlir::LogicalResult compileObjectFile(const CompilerOptions &options,
                                       llvm::StringRef filename);
 
 } // namespace driver
+} // namespace catalyst

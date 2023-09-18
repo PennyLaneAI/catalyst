@@ -31,15 +31,15 @@
 
 using namespace mlir;
 
-void driver::registerLLVMTranslations(DialectRegistry &registry)
+void catalyst::driver::registerLLVMTranslations(DialectRegistry &registry)
 {
     registerLLVMDialectTranslation(registry);
     registerBuiltinDialectTranslation(registry);
 }
 
-LogicalResult driver::compileObjectFile(const CompilerOptions &options,
-                                        std::shared_ptr<llvm::Module> llvmModule,
-                                        StringRef filename)
+LogicalResult catalyst::driver::compileObjectFile(const CompilerOptions &options,
+                                                  std::shared_ptr<llvm::Module> llvmModule,
+                                                  StringRef filename)
 {
     using namespace llvm;
 
