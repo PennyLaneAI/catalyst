@@ -40,12 +40,17 @@ class CompileOptions:
     """Generic compilation options, for which reasonable default values exist.
 
     Args:
-        verbose (bool, optional): flag indicating whether to enable verbose output.
+        verbose (Optional[bool]): flag indicating whether to enable verbose output.
             Default is ``False``
-        logfile (TextIOWrapper, optional): the logfile to write output to.
+        logfile (Optional[TextIOWrapper]): the logfile to write output to.
             Default is ``sys.stderr``
-        keep_intermediate (bool, optional): flag indicating whether to keep intermediate results.
+        keep_intermediate (Optional[bool]): flag indicating whether to keep intermediate results.
             Default is ``False``
+        pipelines (Optional[List[Tuple[str,List[str]]]]): A list of tuples. The first entry of the
+            tuple corresponds to the name of a pipeline. The second entry of the tuple corresponds
+            to a list of MLIR passes.
+        autograph (Optional[bool]): flag indicating whether experimental autograph support is to
+            be enabled.
     """
 
     verbose: Optional[bool] = False
@@ -57,7 +62,12 @@ class CompileOptions:
 
 
 def run_writing_command(command: List[str], compile_options: Optional[CompileOptions]) -> None:
-    """Run the command after optionally announcing this fact to the user"""
+    """Run the command after optionally announcing this fact to the user.
+
+    Args:
+        command (List[str]): command to be sent to a subprocess.
+        compile_options (Optional[CompileOptions]): compile options.
+    """
 
     if compile_options.verbose:
         print(f"[SYSTEM] {' '.join(command)}", file=compile_options.logfile)
@@ -275,10 +285,10 @@ class LinkerDriver:
 
         Args:
             infile (str): input file
-            outfile (str): output file
-            flags (List[str], optional): flags to be passed down to the compiler
-            fallback_compilers (List[str], optional): name of executables to be looked for in PATH
-            compile_options (CompileOptions, optional): generic compilation options.
+            outfile (Optional[str]): output file
+            flags (Optional[List[str]]): flags to be passed down to the compiler
+            fallback_compilers (Optional[List[str]]): name of executables to be looked for in PATH
+            compile_options (Optional[CompileOptions]): generic compilation options.
         Raises:
             EnvironmentError: The exception is raised when no compiler succeeded.
         """
@@ -383,6 +393,9 @@ class Compiler:
 
             For compilation of hybrid quantum-classical PennyLane programs,
             please see the :func:`~.qjit` decorator.
+
+        Args:
+            mlir_module: The MLIR module to be compiled
 
         Returns:
             (str): filename of shared object
