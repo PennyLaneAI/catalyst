@@ -350,6 +350,8 @@ class Compiler:
             os.makedirs(workspace, exist_ok=True)
         else:
             # pylint: disable=consider-using-with
+            if self.last_tmpdir:
+                self.last_tmpdir.cleanup()
             self.last_tmpdir = tempfile.TemporaryDirectory()
             workspace = self.last_tmpdir.name
 
