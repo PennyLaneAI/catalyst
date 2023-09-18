@@ -18,8 +18,6 @@ set(LLVM_LINK_COMPONENTS
   AllTargetsCodeGens
   AllTargetsDescs
   AllTargetsInfos
-  CodeGen
-  Core
   )
 
 add_mlir_library(CatalystCompilerDriver
