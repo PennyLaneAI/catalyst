@@ -11,8 +11,10 @@ add_subdirectory(${ENZYME_SRC_DIR}/enzyme ${CMAKE_CURRENT_BINARY_DIR}/enzyme)
 
 include_directories(${ENZYME_SRC_DIR}/enzyme/Enzyme)
 
-# Taken from llvm/tools/llc/CMakeLists.txt
-# TODO: May be possible to simplify linked libs
+# Experimentally found through removing items
+# from llvm/tools/llc/CMakeLists.txt.
+# It does make sense that we need the parser to parse MLIR
+# and the codegen to codegen.
 set(LLVM_LINK_COMPONENTS
   AllTargetsAsmParsers
   AllTargetsCodeGens
