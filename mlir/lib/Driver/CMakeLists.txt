@@ -23,10 +23,6 @@ set(LLVM_LINK_COMPONENTS
   CodeGen
   CodeGenTypes
   Core
-  IRReader
-  MC
-  MIRParser
-  Remarks
   )
 
 add_mlir_library(CatalystCompilerDriver
