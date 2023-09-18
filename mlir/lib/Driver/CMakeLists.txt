@@ -27,7 +27,6 @@ set(LLVM_LINK_COMPONENTS
   MC
   MIRParser
   Remarks
-  ScalarOpts
   )
 
 add_mlir_library(CatalystCompilerDriver
