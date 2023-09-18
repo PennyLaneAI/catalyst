@@ -801,9 +801,9 @@ def qjit(
         logfile (Optional[TextIOWrapper]): File object to write verbose messages to (default -
             ``sys.stderr``).
         pipelines (Optional(List[Tuple[str,List[str]]])): A list of pipelines to be executed. The
-            elements of this list are named sequences of MLIR passes to be executed. ``None``
+            elements of this list are named sequences of MLIR passes to be executed. A ``None``
             value (the default) results in the execution of the default pipeline. This option is
-            considered to be used by experts e.g. for the low-level debugging purposes.
+            considered to be used by advanced users for low-level debugging purposes.
 
     Returns:
         QJIT object.

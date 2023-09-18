@@ -15,7 +15,7 @@
   necessary for better integration with tools like Enzyme. Finally, this makes it more natural
   to improve error messages originating from C++ when compared to the prior subprocess-based
   approach.
-  [#216](https://github.com/PennyLaneAI/catalyst/pull/216)
+  [(#216)](https://github.com/PennyLaneAI/catalyst/pull/216)
 
 <h3>Breaking changes</h3>
 
