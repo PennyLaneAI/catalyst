@@ -18,10 +18,7 @@ set(LLVM_LINK_COMPONENTS
   AllTargetsCodeGens
   AllTargetsDescs
   AllTargetsInfos
-  Analysis
-  AsmPrinter
   CodeGen
-  CodeGenTypes
   Core
   )
 
