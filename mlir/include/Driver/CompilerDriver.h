@@ -23,6 +23,9 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/raw_ostream.h"
 
+namespace catalyst {
+namespace driver {
+
 /// Data about the JIT function that is optionally inferred and returned to the caller.
 ///
 /// This is important for calling a function when invoking the compiler on an MLIR or LLVM textual
@@ -92,12 +95,16 @@ struct CompilerOutput {
     PipelineOutputs pipelineOutputs;
 };
 
+}; // namespace driver
+}; // namespace catalyst
+
 /// Entry point to the MLIR portion of the compiler.
-mlir::LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &output);
+mlir::LogicalResult QuantumDriverMain(const catalyst::driver::CompilerOptions &options, catalyst::driver::CompilerOutput &output);
+
 
 namespace llvm {
 
-inline raw_ostream &operator<<(raw_ostream &oss, const Pipeline &p)
+inline raw_ostream &operator<<(raw_ostream &oss, const catalyst::driver::Pipeline &p)
 {
     oss << "Pipeline('" << p.name << "', [";
     bool first = true;

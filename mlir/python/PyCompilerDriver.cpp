@@ -25,6 +25,7 @@
 #include "Driver/CompilerDriver.h"
 
 namespace py = pybind11;
+using namespace catalyst::driver;
 
 std::vector<Pipeline> parseCompilerSpec(const py::list &pipelines)
 {
