@@ -33,7 +33,6 @@ set(LLVM_LINK_COMPONENTS
   Target
   TargetParser
   TransformUtils
-  Vectorize
   )
 
 add_mlir_library(CatalystCompilerDriver
