@@ -1318,15 +1318,15 @@ def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
         raise ValueError(f"Expected a callable or a qml.Operator, not {f}")
 
 
-def qctrl(callee: Callable, control: List[Any], control_values: List[Any]) -> Callable:
-    def _call_handler(*args, **kwargs):
+def qctrl(f: Union[Callable, Operator], control: List[Any], control_values: List[Any]) -> Callable:
+    def _call_handler(*args, _callee: Callable, **kwargs):
         EvaluationContext.check_is_quantum_tracing(
             "catalyst.adjoint can only be used from within a qml.qnode."
         )
         in_classical_tracers, _ = tree_flatten((args, kwargs))
         quantum_tape = QuantumTape()
         with QueuingManager.stop_recording(), quantum_tape:
-            res = callee(*args, **kwargs)
+            res = _callee(*args, **kwargs)
         out_classical_tracers, _ = tree_flatten(res)
 
         if len(quantum_tape.measurements) > 0:
@@ -1342,4 +1342,18 @@ def qctrl(callee: Callable, control: List[Any], control_values: List[Any]) -> Ca
             regions=[region],
         )
 
-    return _call_handler
+    if isinstance(f, Callable):
+
+        def _callable(*args, **kwargs):
+            return _call_handler(*args, _callee=f, **kwargs)
+
+        return _callable
+    elif isinstance(f, Operator):
+        QueuingManager.remove(f)
+
+        def _callee():
+            QueuingManager.append(f)
+
+        return _call_handler(_callee=_callee)
+    else:
+        raise ValueError(f"Expected a callable or a qml.Operator, not {f}")
