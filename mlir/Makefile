@@ -99,7 +99,7 @@ dialects:
 		-DCMAKE_CXX_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
 		-DLLVM_ENABLE_LLD=$(ENABLE_LLD)
 
-	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects quantum-lsp-server
+	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects quantum-lsp-server compiler_driver
 
 .PHONY: test
 test:

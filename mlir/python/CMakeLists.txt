@@ -92,5 +92,3 @@ add_mlir_python_modules(QuantumPythonModules
   COMMON_CAPI_LINK_LIBS
     QuantumPythonCAPI
   )
-
-add_dependencies(QuantumPythonModules compiler_driver)
