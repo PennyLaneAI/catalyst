@@ -12,31 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#define DEBUG_TYPE "adjoint"
+#define DEBUG_TYPE "scatter"
 
-#include <memory>
 #include <vector>
 
 #include "llvm/Support/Debug.h"
-#include "llvm/Support/Errc.h"
 
 #include "mhlo/IR/hlo_ops.h"
 #include "mhlo/transforms/passes.h"
 
-#include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Index/IR/IndexDialect.h"
-#include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/Dialect/SCF/IR/SCF.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/IR/BuiltinOps.h"
-#include "mlir/IR/SymbolTable.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#include "Catalyst/IR/CatalystDialect.h"
-#include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Patterns.h"
 
 using namespace llvm;

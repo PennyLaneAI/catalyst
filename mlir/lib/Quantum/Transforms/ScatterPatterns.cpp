@@ -15,22 +15,12 @@
 #define DEBUG_TYPE "scatter"
 
 #include <algorithm>
-#include <iostream>
-#include <iterator>
-#include <string>
-#include <unordered_map>
 #include <vector>
-
-#include "llvm/Support/Debug.h"
-#include "llvm/Support/Errc.h"
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Index/IR/IndexOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/IR/IRMapping.h"
-#include "mlir/IR/Verifier.h"
-#include "mlir/Transforms/DialectConversion.h"
 
 #include "mhlo/IR/hlo_ops.h"
 
@@ -45,7 +35,8 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
                                         mlir::PatternRewriter &rewriter) const override
     {
         Location loc = op.getLoc();
-        // Add checks for supported cases
+        // Add checks for supported cases (assumptions: no update windows dim, unique indices and
+        // sorted indices)
         if (!op.getUniqueIndices() || !op.getIndicesAreSorted() ||
             !op.getScatterDimensionNumbers().getUpdateWindowDims().empty()) {
             return failure();
@@ -53,32 +44,33 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
 
         op.getScatterDimensionNumbers();
         // Extract the block responsible for update
-        auto &region = op.getUpdateComputation();
+        Region &region = op.getUpdateComputation();
 
         if (!region.hasOneBlock())
             return failure();
 
-        auto moduleOp = op->getParentOfType<ModuleOp>();
+        ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
 
         // We create a function from the update block
         FlatSymbolRefAttr updateFn =
             getOrInsertUpdateFunction(op.getLoc(), moduleOp, rewriter, region);
-        auto updateFnOp = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, updateFn);
+        func::FuncOp updateFnOp = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(op, updateFn);
 
-        auto results = op.getInputs();
-        auto resultsValue = results.front();
+        // Get the inputs and updates values
+        Value resultsValue = op.getInputs().front();
+        Value updatesValue = op.getUpdates().front();
 
-        auto updates = op.getUpdates();
-        auto updatesValue = updates.front();
+        // Get the shape of the updates
         ArrayRef<int64_t> updatesShape = updatesValue.getType().cast<TensorType>().getShape();
         std::vector<int64_t> updatesShapeVector(updatesShape.begin(), updatesShape.end());
 
+        // Get the scatter indices
         auto scatterIndices = op.getScatterIndices();
-        auto indexVectorDim = op.getScatterDimensionNumbers().getIndexVectorDim();
-        auto scatterDimsToOperandDims =
+        int64_t indexVectorDim = op.getScatterDimensionNumbers().getIndexVectorDim();
+        ArrayRef<int64_t> scatterDimsToOperandDims =
             op.getScatterDimensionNumbers().getScatterDimsToOperandDims();
 
-        // Start generating indices from dimension 0
+        // Generate all possible indices given the shape of updates
         std::vector<int64_t> indices;
         std::vector<std::vector<int64_t>> allUpdatesIndices;
         generateIndicesRecursive(updatesShapeVector, indices, 0, allUpdatesIndices);
@@ -86,7 +78,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         // Replace the results with the updated inputs.
         for (auto updatesIndices : allUpdatesIndices) {
             SmallVector<Value> updatesIndicesValue;
-            for (auto index : updatesIndices) {
+            for (int64_t index : updatesIndices) {
                 Value value = rewriter.create<index::ConstantOp>(loc, index);
                 updatesIndicesValue.push_back(value);
             }
@@ -99,7 +91,8 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
                 rewriter.create<tensor::ExtractOp>(loc, updatesValue, updatesIndicesValue);
             Value resultValue =
                 rewriter.create<tensor::ExtractOp>(loc, resultsValue, resultsIndices);
-            // f64 -> tensor<f64>
+
+            // f64 -> tensor<f64> if necessary
             if (!isa<RankedTensorType>(updateValue.getType())) {
                 Type resultTy = RankedTensorType::get({}, updateValue.getType());
                 updateValue = rewriter.create<tensor::FromElementsOp>(loc, resultTy, updateValue);
@@ -108,13 +101,22 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
                 Type resultTy = RankedTensorType::get({}, resultValue.getType());
                 resultValue = rewriter.create<tensor::FromElementsOp>(loc, resultTy, resultValue);
             }
+
+            // Set the arguments for the call op
             ValueRange args{resultValue, updateValue};
+
             // Call the function that computes the update
             Value updated = rewriter.create<func::CallOp>(loc, updateFnOp, args).getResult(0);
 
-            // tensor<f64> -> f64
-            Value updatedExtracted = rewriter.create<tensor::ExtractOp>(loc, updated);
-            // Insert the update in the results
+            // Make it a scalar if necessary tensor<f64> -> f64
+            Value updatedExtracted;
+            if (isa<RankedTensorType>(updated.getType())) {
+                updatedExtracted = rewriter.create<tensor::ExtractOp>(loc, updated);
+            }
+            else {
+                updatedExtracted = updated;
+            }
+            // Insert the update in the results and replace the previous value
             Value res = rewriter.create<tensor::InsertOp>(loc, updatedExtracted, resultsValue,
                                                           resultsIndices);
             resultsValue = res;
@@ -124,40 +126,47 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         return success();
     }
 
-    FlatSymbolRefAttr getOrInsertUpdateFunction(Location loc, ModuleOp moduleOp, OpBuilder &b,
+    FlatSymbolRefAttr getOrInsertUpdateFunction(Location loc, ModuleOp moduleOp, OpBuilder &builder,
                                                 Region &updateRegion) const
     {
-        MLIRContext *ctx = b.getContext();
+        MLIRContext *ctx = builder.getContext();
+
+        // Create the function to replace the update block from scatter
         std::string funcName = "__catalyst_update_scatter";
 
         if (moduleOp.lookupSymbol<func::FuncOp>(funcName)) {
             return SymbolRefAttr::get(ctx, funcName);
         }
 
-        OpBuilder::InsertionGuard guard(b);
-        b.setInsertionPointToStart(moduleOp.getBody());
+        OpBuilder::InsertionGuard guard(builder);
+        builder.setInsertionPointToStart(moduleOp.getBody());
 
         Block *originalBlock = &updateRegion.front();
         Operation *originalTerminator = originalBlock->getTerminator();
         ValueRange originalArguments = originalBlock->getArguments();
 
-        auto updateFnType = FunctionType::get(ctx, /*inputs=*/
-                                              originalArguments.getTypes(),
-                                              /*outputs=*/originalTerminator->getOperandTypes());
+        // Get the arguments and outputs types from the original block
+        FunctionType updateFnType =
+            FunctionType::get(ctx, /*inputs=*/
+                              originalArguments.getTypes(),
+                              /*outputs=*/originalTerminator->getOperandTypes());
 
-        auto updateFn = b.create<func::FuncOp>(loc, funcName, updateFnType);
+        func::FuncOp updateFn = builder.create<func::FuncOp>(loc, funcName, updateFnType);
         updateFn.setPrivate();
 
+        // Create the block of the function
         Block *funcBody = updateFn.addEntryBlock();
 
         auto funcBlockArgs = funcBody->getArguments();
-        IRRewriter rewriter(b);
-        b.setInsertionPointToEnd(funcBody);
+        IRRewriter rewriter(builder);
+        builder.setInsertionPointToEnd(funcBody);
+
+        // Merge the two blocks and delete the first one
         rewriter.mergeBlocks(originalBlock, funcBody, funcBlockArgs);
 
-        b.setInsertionPointToEnd(funcBody);
-        b.create<func::ReturnOp>(loc, originalTerminator->getResultTypes(),
-                                 originalTerminator->getOperands());
+        builder.setInsertionPointToEnd(funcBody);
+        builder.create<func::ReturnOp>(loc, originalTerminator->getResultTypes(),
+                                       originalTerminator->getOperands());
         rewriter.eraseOp(originalTerminator);
         return SymbolRefAttr::get(ctx, funcName);
     }
@@ -167,7 +176,6 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
                                   std::vector<std::vector<int64_t>> &configurations) const
     {
         if (dimension == shape.size()) {
-            // Base case: Print the current index
             configurations.push_back(currentIndex);
         }
         else {
