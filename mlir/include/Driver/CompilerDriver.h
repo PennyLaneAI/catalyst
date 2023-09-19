@@ -99,8 +99,8 @@ struct CompilerOutput {
 }; // namespace catalyst
 
 /// Entry point to the MLIR portion of the compiler.
-mlir::LogicalResult QuantumDriverMain(const catalyst::driver::CompilerOptions &options, catalyst::driver::CompilerOutput &output);
-
+mlir::LogicalResult QuantumDriverMain(const catalyst::driver::CompilerOptions &options,
+                                      catalyst::driver::CompilerOutput &output);
 
 namespace llvm {
 
