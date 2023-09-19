@@ -132,7 +132,7 @@ class EvaluationContext:
 
     @classmethod
     def get_main_tracing_context(cls, hint=None) -> JaxTracingContext:
-        """Return the current JAX tracing context, rais an exception if not in tracing mode."""
+        """Return the current JAX tracing context, raise an exception if not in tracing mode."""
         msg = f"{hint or 'catalyst functions'} can only be used from within @qjit decorated code."
         EvaluationContext.check_is_tracing(msg)
         return cls._tracing_stack[-1][1]

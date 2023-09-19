@@ -52,8 +52,8 @@ from catalyst.jax_tracer import (
     Function,
     HybridOpRegion,
     MidCircuitMeasure,
-    QFunc,
     QCtrl,
+    QFunc,
     QJITDevice,
     WhileLoop,
     deduce_avals,
@@ -1318,32 +1318,21 @@ def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
         raise ValueError(f"Expected a callable or a qml.Operator, not {f}")
 
 
-def qctrl(callee: Callable, control:List[Any], control_values:List[Any]) -> Callable:
-
+def qctrl(callee: Callable, control: List[Any], control_values: List[Any]) -> Callable:
     def _call_handler(*args, **kwargs):
         EvaluationContext.check_is_quantum_tracing(
             "catalyst.adjoint can only be used from within a qml.qnode."
         )
-        ctx = EvaluationContext.get_main_tracing_context()
-        with EvaluationContext.frame_tracing_context(ctx) as inner_trace:
-            in_classical_tracers, _ = tree_flatten((args, kwargs))
-            wffa, in_avals, _ = deduce_avals(callee, args, kwargs)
-            arg_classical_tracers = _input_type_to_tracers(inner_trace.new_arg, in_avals)
-            quantum_tape = QuantumTape()
-            with QueuingManager.stop_recording(), quantum_tape:
-                # FIXME: move all full_raise calls into a separate function
-                res_classical_tracers = [
-                    inner_trace.full_raise(t)
-                    for t in wffa.call_wrapped(*arg_classical_tracers)
-                    if isinstance(t, DynamicJaxprTracer)
-                ]
+        in_classical_tracers, _ = tree_flatten((args, kwargs))
+        quantum_tape = QuantumTape()
+        with QueuingManager.stop_recording(), quantum_tape:
+            res = callee(*args, **kwargs)
+        out_classical_tracers, _ = tree_flatten(res)
 
-            if len(quantum_tape.measurements) > 0:
-                raise ValueError("Quantum measurements are not allowed in QCtrls")
+        if len(quantum_tape.measurements) > 0:
+            raise ValueError("Quantum measurements are not allowed in QCtrls")
 
-            region = HybridOpRegion(
-                inner_trace, quantum_tape, arg_classical_tracers, res_classical_tracers
-            )
+        region = HybridOpRegion(None, quantum_tape, [], [])
 
         QCtrl(
             control_wire_tracers=list(control),
@@ -1352,10 +1341,5 @@ def qctrl(callee: Callable, control:List[Any], control_values:List[Any]) -> Call
             out_classical_tracers=[],
             regions=[region],
         )
-        pass
 
     return _call_handler
-
-
-
-

@@ -24,6 +24,7 @@ import pennylane as qml
 from pennylane import QubitDevice, QubitUnitary, QueuingManager
 from pennylane.measurements import MeasurementProcess, MidMeasureMP
 from pennylane.operation import AnyWires, Operation, Wires
+from pennylane.ops import Controlled
 from pennylane.tape import QuantumTape
 
 from catalyst.jax_primitives import (
@@ -178,14 +179,14 @@ class HybridOpRegion:
     Args:
         trace: JAX tracing context holding the tracers and equations for this region.
         quantum_tape: PennyLane tape containing quantum operations of this region.
-        arg_classical_tracers: JAX tracers or constants which were available in this region as
+        arg_classical_tracers: JAX tracers or constants, available in this region as
                                arguments during the classical tracing.
-        res_classical_tracers: JAX tracers or constants returned to the outer scope during the
+        res_classical_tracers: JAX tracers or constants returned to the outer scope after the
                                classical tracing of this region.
 
     """
 
-    trace: DynamicJaxprTrace
+    trace: Optional[DynamicJaxprTrace]
     quantum_tape: Optional[QuantumTape]
     arg_classical_tracers: List[DynamicJaxprTracer]
     res_classical_tracers: List[DynamicJaxprTracer]
@@ -411,6 +412,7 @@ class Adjoint(HybridOp):
         qrp2 = QRegPromise(op_results[-1])
         return qrp2
 
+
 class QCtrl(HybridOp):
     """Catalyst quantum ctrl operation"""
 
@@ -426,6 +428,53 @@ class QCtrl(HybridOp):
 
     def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
         raise NotImplementedError("QCtrl does not support JAX quantum tracing")
+
+    def compute_decomposition(self, *params, wires=None, **hyperparameters):
+        assert len(self.regions) == 1
+        new_tape = qctrl_transform_region(
+            self.regions[0].quantum_tape, self.control_wire_tracers, self.control_value_tracers
+        )
+        self.regions[0].quantum_tape = new_tape
+
+
+def qctrl_distribute(
+    tape: QuantumTape, control_wires: List[Any], control_values: List[Any]
+) -> QuantumTape:
+    """Distribute the quantum control operation, described by ``control_wires`` and
+    ``control_values``, over all the operations on the nested quantum tape.
+    """
+    ctx = EvaluationContext.get_main_tracing_context()
+    ops2 = []
+    for op in tape.operations:
+        if has_nested_tapes(op):
+            if isinstance(op, QCtrl):
+                for region in op.regions:
+                    with EvaluationContext.frame_tracing_context(ctx, region.trace):
+                        tape2 = qctrl_distribute(
+                            region.quantum_tape,
+                            control_wires + op.control_wire_tracers,
+                            control_values + op.control_value_tracers,
+                        )
+                ops2.extend(tape2.operations)
+            else:
+                for region in op.regions:
+                    with EvaluationContext.frame_tracing_context(ctx, region.trace):
+                        region.quantum_tape = qctrl_distribute(
+                            region.quantum_tape, control_wires, control_values
+                        )
+                ops2.append(op)
+        else:
+            if len(control_wires) > 0:
+                ops2.append(
+                    Controlled(
+                        type(op)(*op.parameters, wires=op.wires),
+                        control_wires=qml.wires.Wires(control_wires),
+                        control_values=control_values,
+                    )
+                )
+            else:
+                ops2.append(type(op)(*op.parameters, wires=op.wires))
+    return QuantumTape(ops2, tape.measurements)
 
 
 def trace_to_mlir(func, *args, **kwargs):
