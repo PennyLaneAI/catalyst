@@ -104,6 +104,14 @@ jobs:
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
+    
+    - name: Cache MHLO Source
+      id: cache-mhlo-source
+      uses: actions/cache@v3
+      with:
+        path: mlir/mhlo
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.mhlo_version }}-default-source
+        enableCrossOsArchive: True
 
     - name: Cache MHLO Build
       id: cache-mhlo
@@ -240,6 +248,15 @@ jobs:
       with:
         path: llvm-build
         key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
+        fail-on-cache-miss: True
+    
+    - name: Get Cached MHLO Source
+      id: cache-mhlo-source
+      uses: actions/cache@v3
+      with:
+        path: mlir/mhlo
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.mhlo_version }}-default-source
+        enableCrossOsArchive: True
         fail-on-cache-miss: True
     
     - name: Get Cached MHLO Build
