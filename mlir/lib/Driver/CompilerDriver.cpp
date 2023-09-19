@@ -226,11 +226,13 @@ LogicalResult runLLVMPasses(const CompilerOptions &options,
     // Optimize the IR!
     MPM.run(*llvmModule.get(), MAM);
 
-    llvm::raw_string_ostream rawStringOstream{outputs["PreEnzymeOpt"]};
-    llvmModule->print(rawStringOstream, nullptr);
-    const std::string &outFile = fs::path("1_PreEnzymeOpt.ll");
-    if (failed(dumpToFile(options, outFile, outputs["PreEnzymeOpt"]))) {
-        return failure();
+    if (options.keepIntermediate) {
+        llvm::raw_string_ostream rawStringOstream{outputs["PreEnzymeOpt"]};
+        llvmModule->print(rawStringOstream, nullptr);
+        const std::string &outFile = fs::path("1_PreEnzymeOpt.ll");
+        if (failed(dumpToFile(options, outFile, outputs["PreEnzymeOpt"]))) {
+            return failure();
+        }
     }
 
     return success();
@@ -270,11 +272,13 @@ LogicalResult runEnzymePasses(const CompilerOptions &options,
     // Optimize the IR!
     MPM.run(*llvmModule.get(), MAM);
 
-    llvm::raw_string_ostream rawStringOstream{outputs["Enzyme"]};
-    llvmModule->print(rawStringOstream, nullptr);
-    const std::string &outFile = fs::path("2_Enzyme.ll");
-    if (failed(dumpToFile(options, outFile, outputs["Enzyme"]))) {
-        return failure();
+    if (options.keepIntermediate) {
+        llvm::raw_string_ostream rawStringOstream{outputs["Enzyme"]};
+        llvmModule->print(rawStringOstream, nullptr);
+        const std::string &outFile = fs::path("2_Enzyme.ll");
+        if (failed(dumpToFile(options, outFile, outputs["Enzyme"]))) {
+            return failure();
+        }
     }
 
     return success();
@@ -314,6 +318,10 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
             size_t pipelineIdx = 0;
             auto printHandler =
                 [&](Pass *pass, CatalystIRPrinterConfig::PrintCallbackFn print) -> LogicalResult {
+                // Do not print if keepIntermediate is not set.
+                if (!options.keepIntermediate) {
+                    return success();
+                }
                 auto res = pipelineTailMarkers.find(pass);
                 if (res != pipelineTailMarkers.end()) {
                     for (const auto &pn : res->second) {
