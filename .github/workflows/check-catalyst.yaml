@@ -213,7 +213,7 @@ jobs:
 
   quantum:
     name: Quantum Dialects Build
-    needs: [constants, llvm]
+    needs: [constants, llvm, mhlo]
     runs-on: ubuntu-latest
 
     steps:
@@ -240,6 +240,14 @@ jobs:
       with:
         path: llvm-build
         key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
+        fail-on-cache-miss: True
+    
+    - name: Get Cached MHLO Build
+      id: cache-mhlo
+      uses: actions/cache@v3
+      with:
+        path: mhlo-build
+        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-build-opt
         fail-on-cache-miss: True
 
     - name: Cache CCache
