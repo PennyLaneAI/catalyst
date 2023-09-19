@@ -184,7 +184,6 @@ class BufferizationPass(PassPipeline):
         # The following pass allows differentiation of qml.probs with the parameter-shift method,
         # as it performs the bufferization of `memref.tensor_op` (for which no dialect bufferization
         # exists).
-        "--scatter-lowering",
         "--one-shot-bufferize=dialect-filter=memref",  # must run before any dialect bufferization
         "--inline",
         "--gradient-bufferize",
@@ -264,7 +263,7 @@ class QuantumCompilationPass(PassPipeline):
     """Pass pipeline for Catalyst-specific transformation passes."""
 
     _executable = get_executable_path("quantum", "quantum-opt")
-    _default_flags = ["--lower-gradients", "--adjoint-lowering"]
+    _default_flags = ["--scatter-lowering","--lower-gradients", "--adjoint-lowering"]
 
     @staticmethod
     def get_output_filename(infile):
