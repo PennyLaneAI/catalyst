@@ -191,6 +191,17 @@ def for_stmt(
             iteration_array = None
             fallback = True
 
+    if catalyst.autograph_strict_conversion and fallback:
+        # pylint: disable=import-outside-toplevel
+        import inspect
+
+        for_loop_info = get_source_code_info(inspect.stack()[1])
+
+        raise AutoGraphError(
+            f"Could not convert the iteration target {iteration_target} to array while processing "
+            f"the following with AutoGraph:\n{for_loop_info}"
+        )
+
     # Attempt to trace the Catalyst for loop.
     if not fallback:
         try:
@@ -198,29 +209,35 @@ def for_stmt(
                 start, stop, step, body_fn, get_state, enum_start, iteration_array
             )
         except Exception as e:  # pylint: disable=broad-exception-caught
-            fallback = True
+            if catalyst.autograph_strict_conversion:
+                raise e
+
             # pylint: disable=import-outside-toplevel
             import inspect
             import textwrap
 
+            fallback = True
+
             for_loop_info = get_source_code_info(inspect.stack()[1])
 
-            warnings.warn(
-                f"Tracing of an AutoGraph converted for loop failed with the following exception:\n"
-                f"  {type(e).__name__}:{textwrap.indent(str(e), '    ')}\n"
-                f"\n"
-                f"The error ocurred within the body of the following for loop statement:\n"
-                f"{for_loop_info}"
-                f"\n"
-                f"If you intended for the conversion to happen, make sure that the (now dynamic) "
-                f"loop variable is not used in tracing-incompatible ways, for instance by indexing "
-                f"a Python list with it. In that case, the list should be wrapped into an array.\n"
-                f"To understand different types of JAX tracing errors, please refer to the guide "
-                f"at: https://jax.readthedocs.io/en/latest/errors.html\n"
-                f"\n"
-                f"If you did not intend for the conversion to happen, you may safely ignore this "
-                f"warning."
-            )
+            if not catalyst.autograph_ignore_fallbacks:
+                warnings.warn(
+                    f"Tracing of an AutoGraph converted for loop failed with an exception:\n"
+                    f"  {type(e).__name__}:{textwrap.indent(str(e), '    ')}\n"
+                    f"\n"
+                    f"The error ocurred within the body of the following for loop statement:\n"
+                    f"{for_loop_info}"
+                    f"\n"
+                    f"If you intended for the conversion to happen, make sure that the (now "
+                    f"dynamic) loop variable is not used in tracing-incompatible ways, for "
+                    f"instance by indexing a Python list with it. In that case, the list should be "
+                    f"wrapped into an array.\n"
+                    f"To understand different types of JAX tracing errors, please refer to the "
+                    f"guide at: https://jax.readthedocs.io/en/latest/errors.html\n"
+                    f"\n"
+                    f"If you did not intend for the conversion to happen, you may safely ignore "
+                    f"this warning."
+                )
 
     # If anything goes wrong, we fall back to Python.
     if fallback:
