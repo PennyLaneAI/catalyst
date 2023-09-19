@@ -170,7 +170,7 @@ passing them to the ``@qjit`` decorator. E.g. if you want to disable inlining
         ]
 
      @qjit(pipelines=my_pipelines)
-     @qml.qnode(dev):
+     @qml.qnode(dev)
      def circuit():
         ...
 
