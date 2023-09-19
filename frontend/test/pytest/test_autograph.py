@@ -838,6 +838,142 @@ class TestForLoops:
         result = f()
         assert np.allclose(result, -jnp.sqrt(2) / 2)
 
+    def test_loop_carried_value(self, monkeypatch):
+        """Test a loop which updates a value each iteration."""
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        @qjit(autograph=True)
+        def f1():
+            acc = 0
+            for x in [0, 4, 5]:
+                acc = acc + x
+
+            return acc
+
+        assert f1() == 9
+
+        @qjit(autograph=True)
+        def f2(acc):
+            for x in [0, 4, 5]:
+                acc = acc + x
+
+            return acc
+
+        assert f2(2) == 11
+
+        @qjit(autograph=True)
+        def f3():
+            acc = 0
+            for x in [0, 4, 5]:
+                acc += x
+
+            return acc
+
+        assert f3() == 9
+
+    def test_iteration_element_access(self, monkeypatch):
+        """Test that access to the iteration index/elements is possible after the loop executed
+        (assuming initialization)."""
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        @qjit(autograph=True)
+        def f1(acc):
+            x = 0
+            for x in [0, 4, 5]:
+                acc = acc + x
+            ...  # use acc
+
+            return x
+
+        assert f1(0) == 5
+
+        @qjit(autograph=True)
+        def f2(acc):
+            i = 0
+            l = jnp.array([0, 4, 5])
+            for i in range(3):
+                acc = acc + l[i]
+            ...  # use acc
+
+            return i
+
+        assert f2(0) == 2
+
+        @qjit(autograph=True)
+        def f3(acc):
+            i, x = 0, 0
+            for i, x in enumerate([0, 4, 5]):
+                acc = acc + x
+            ...  # use acc
+
+            return i, x
+
+        assert f3(0) == (2, 5)
+
+    @pytest.mark.xfail(reason="currently unsupported, but we may find a way to do so in the future")
+    def test_iteration_element_access_no_init(self, monkeypatch):
+        """Test that access to the iteration index/elements is possible after the loop executed
+        even without prior initialization."""
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        @qjit(autograph=True)
+        def f1(acc):
+            for x in [0, 4, 5]:
+                acc = acc + x
+            ...  # use acc
+
+            return x
+
+        assert f1(0) == 5
+
+        @qjit(autograph=True)
+        def f2(acc):
+            l = jnp.array([0, 4, 5])
+            for i in range(3):
+                acc = acc + l[i]
+            ...  # use acc
+
+            return i
+
+        assert f2(0) == 2
+
+        @qjit(autograph=True)
+        def f3(acc):
+            for i, x in enumerate([0, 4, 5]):
+                acc = acc + x
+            ...  # use acc
+
+            return i, x
+
+        assert f3(0) == (2, 5)
+
+    def test_temporary_loop_variable(self, monkeypatch):
+        """Test that temporary (local) variables can be initialized inside a loop."""
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        @qjit(autograph=True)
+        def f1():
+            acc = 0
+            for x in [0, 4, 5]:
+                c = 2
+                acc = acc + c * x
+
+            return acc
+
+        assert f1() == 18
+
+        @qjit(autograph=True)
+        def f2():
+            acc = 0
+            for x in [0, 4, 5]:
+                c = x * 2
+                acc = acc + c
+
+            return acc
+
+        assert f2() == 18
+
+
     def test_no_python_loops(self):
         """Test AutoGraph behaviour on function with Catalyst loops."""
 

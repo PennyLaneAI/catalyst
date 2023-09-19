@@ -109,11 +109,20 @@ def if_stmt(
     set_state(results)
 
 
-def _call_catalyst_for(start, stop, step, body_fn, get_state, enum_start=None, array_iterable=None):
+def _call_catalyst_for(
+    start, stop, step, body_fn, get_state, set_state, enum_start=None, array_iterable=None
+):
     """Dispatch to a Catalyst implementation of for loops."""
 
     @catalyst.for_loop(start, stop, step)
-    def functional_for(i):
+    def functional_for(i, *iter_args):
+        # Assign tracers to the iteration variables identified by AutoGraph (iter_args in mlir).
+        set_state(iter_args)
+
+        # The iteration index/element (for <...> in) is already handled by the body function, e.g.:
+        #   def body_fn(itr):
+        #     i, x = itr
+        #     ...
         if enum_start is None and array_iterable is None:
             # for i in range(..)
             body_fn(i)
@@ -209,7 +218,7 @@ def for_stmt(
         try:
             set_state(init_state)
             results = _call_catalyst_for(
-                start, stop, step, body_fn, get_state, enum_start, iteration_array
+                start, stop, step, body_fn, get_state, set_state, enum_start, iteration_array
             )
         except Exception as e:  # pylint: disable=broad-exception-caught
             if catalyst.autograph_strict_conversion:
