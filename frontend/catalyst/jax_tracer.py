@@ -431,7 +431,7 @@ class QCtrl(HybridOp):
 
     def compute_decomposition(self, *params, wires=None, **hyperparameters):
         assert len(self.regions) == 1
-        new_tape = qctrl_transform_region(
+        new_tape = qctrl_distribute(
             self.regions[0].quantum_tape, self.control_wire_tracers, self.control_value_tracers
         )
         self.regions[0].quantum_tape = new_tape

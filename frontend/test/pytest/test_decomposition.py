@@ -16,10 +16,11 @@ import pennylane as qml
 import pytest
 from jax import numpy as jnp
 
-from catalyst import measure, qjit
+from catalyst import measure, qjit, for_loop
+from numpy.testing import assert_allclose
 
 # This is used just for internal testing
-from catalyst.pennylane_extensions import qfunc
+from catalyst.pennylane_extensions import qfunc, qctrl
 
 lightning = qml.device("lightning.qubit", wires=3)
 copy = lightning.operations.copy()
@@ -66,6 +67,82 @@ def test_decomposition(param, expected):
         return measure(wires=1)
 
     assert mid_circuit(param) == expected
+
+
+def verify_catalyst_ctrl_against_pennylane(
+    quantum_func, device, *args):
+    """
+    A helper function for verifying Catalyst's native adjoint against the behaviour of PennyLane's
+    adjoint function. This is specialized to verifying the behaviour of a single function that has
+    its adjoint computed.
+    """
+
+    @qjit
+    @qml.qnode(device)
+    def catalyst_workflow(*args):
+        return quantum_func(*args, ctrl=qctrl)
+
+    @qml.qnode(device)
+    def pennylane_workflow(*args):
+        return quantum_func(*args, ctrl=qml.ctrl)
+
+    assert_allclose(catalyst_workflow(*args), pennylane_workflow(*args))
+
+
+def test_qctrl_func_simple(backend):
+
+    def circuit(theta, ctrl):
+        def _func():
+            qml.RX(theta, wires=[0])
+            qml.RZ(theta, wires=2)
+
+        ctrl(_func, control=[1], control_values=[True])()
+        return qml.state()
+
+    verify_catalyst_ctrl_against_pennylane(
+        circuit, qml.device(backend, wires=3), 0.1
+    )
+
+
+def test_qctrl_func_hybrid(backend):
+
+    def circuit(theta, ctrl):
+        def _func():
+            qml.RX(theta, wires=[0])
+
+            @for_loop(0,2,1)
+            def _loop(x):
+                qml.RY(theta, wires=2)
+            _loop()
+
+            qml.RZ(theta, wires=2)
+
+        ctrl(_func, control=[1], control_values=[True])()
+        return qml.state()
+
+    verify_catalyst_ctrl_against_pennylane(
+        circuit, qml.device(backend, wires=3), 0.1
+    )
+
+
+def test_qctrl_func_nested(backend):
+
+    def circuit(theta, ctrl):
+        def _func():
+            qml.RX(theta, wires=[0])
+
+            def _func2():
+                qml.RY(theta, wires=[2])
+            ctrl(_func2, control=[0], control_values=[True])()
+
+            qml.RZ(theta, wires=2)
+
+        ctrl(_func, control=[1], control_values=[True])()
+        return qml.state()
+
+    verify_catalyst_ctrl_against_pennylane(
+        circuit, qml.device(backend, wires=3), 0.1
+    )
 
 
 if __name__ == "__main__":
