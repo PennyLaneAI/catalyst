@@ -109,7 +109,7 @@ jobs:
       id: cache-mhlo-source
       uses: actions/cache@v3
       with:
-        path: mlir/mlir-mhlo
+        path: mlir/mlir-hlo
         key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-source
         enableCrossOsArchive: True
 
@@ -254,7 +254,7 @@ jobs:
       id: cache-mhlo-source
       uses: actions/cache@v3
       with:
-        path: mlir/mlir-mhlo
+        path: mlir/mlir-hlo
         key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.mhlo_version }}-default-source
         enableCrossOsArchive: True
         fail-on-cache-miss: True
