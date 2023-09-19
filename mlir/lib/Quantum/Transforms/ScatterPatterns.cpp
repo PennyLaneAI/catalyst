@@ -99,7 +99,6 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
                 rewriter.create<tensor::ExtractOp>(loc, updatesValue, updatesIndicesValue);
             Value resultValue =
                 rewriter.create<tensor::ExtractOp>(loc, resultsValue, resultsIndices);
-
             // f64 -> tensor<f64>
             if (!isa<RankedTensorType>(updateValue.getType())) {
                 Type resultTy = RankedTensorType::get({}, updateValue.getType());
