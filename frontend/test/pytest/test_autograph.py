@@ -27,9 +27,9 @@ from catalyst import cond, for_loop, measure, qjit
 from catalyst.ag_utils import AutoGraphError, autograph_source, check_cache
 
 # pylint: disable=import-outside-toplevel
-# pylint: disable=missing-function-docstring
 # pylint: disable=unnecessary-lambda-assignment
 # pylint: disable=too-many-public-methods
+# pylint: disable=too-many-lines
 
 
 def test_unavailable(monkeypatch):
@@ -53,6 +53,7 @@ class TestSourceCodeInfo:
         from catalyst.ag_primitives import get_source_code_info
 
         try:
+            result = ""
             raise RuntimeError("Test failure")
         except RuntimeError as e:
             result = get_source_code_info(traceback.extract_tb(e.__traceback__, limit=1)[0])
@@ -481,6 +482,7 @@ class TestConditionals:
 
             return measure(wires=0)
 
+        # pylint: disable=singleton-comparison
         assert circuit(3) == False
         assert circuit(6) == True
 
@@ -488,6 +490,7 @@ class TestConditionals:
         """Test that an exception is raised when the true branch returns a value without an else
         branch.
         """
+        # pylint: disable=using-constant-test
 
         def circuit():
             if True:
@@ -502,6 +505,7 @@ class TestConditionals:
 
     def test_branch_multi_return_mismatch(self, backend):
         """Test that an exception is raised when the return types of all branches do not match."""
+        # pylint: disable=using-constant-test
 
         def circuit():
             if True:
@@ -525,6 +529,8 @@ class TestForLoops:
     def test_python_range_fallback(self):
         """Test that the custom CRange wrapper correctly falls back to Python."""
         from catalyst.ag_primitives import CRange
+
+        # pylint: disable=protected-access
 
         c_range = CRange(0, 5, 1)
         assert c_range._py_range is None
@@ -1058,6 +1064,8 @@ class TestMixed:
     def test_cond_if_for_loop_for(self, monkeypatch):
         """Test Python conditionals and loops together with their Catalyst counterparts."""
         monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        # pylint: disable=cell-var-from-loop
 
         @qjit(autograph=True)
         def f(x):
