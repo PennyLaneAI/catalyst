@@ -358,6 +358,8 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     registerAllCatalystDialects(registry);
     registerLLVMTranslations(registry);
     MLIRContext ctx(registry);
+    // TODO: FIXME:
+    // Let's try to enable multithreading.
     ctx.disableMultithreading();
     ScopedDiagnosticHandler scopedHandler(
         &ctx, [&](Diagnostic &diag) { diag.print(options.diagnosticStream); });
