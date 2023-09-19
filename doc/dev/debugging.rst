@@ -119,7 +119,7 @@ Pass Pipelines
 ==============
 
 The compilation steps which take MLIR as an input and lower it to binary are broken into MLIR pass
-pipelines.  The ``pipeline`` argument of the ``qjit`` function may be used to alter the steps used
+pipelines.  The ``pipelines`` argument of the ``qjit`` function may be used to alter the steps used
 for compilation. The default set of pipelines is defined via the ``catalyst.compiler.DEFAULT_PIPELINES``
 list. Its structure is shown below.
 
@@ -146,6 +146,33 @@ list. Its structure is shown below.
         ),
         ...
         ]
+
+
+One could customize what compilation passes are executed. A good use case of this would be if you
+are debugging Catalyst itself or you want to enable or disable passes within a specific pipeline.
+It is recommended to copy the default pipelines and edit them to suit your goals and afterwards
+passing them to the ``@qjit`` decorator. E.g. if you want to disable inlining
+
+.. code-block:: python
+
+    my_pipelines = [
+        ...
+        (
+            "MyBufferizationPass",
+            [
+                "one-shot-bufferize{dialect-filter=memref}",
+                # "inline",
+                "gradient-bufferize",
+                ...
+            ],
+        ),
+        ...
+        ]
+
+     @qjit(pipelines=my_pipelines)
+     @qml.qnode(dev):
+     def circuit():
+        ...
 
 
 Here, each item represents a pipeline. Each pipeline has a name and a list of MLIR passes
