@@ -25,11 +25,7 @@
 
 #include "Types.h"
 
-#if __has_include("StateVectorKokkos.hpp")
-#include "UtilKokkos.hpp"
-#endif
-
-#if __has_include("StateVectorDynamicCPU.hpp")
+#if __has_include("StateVectorLQubitDynamic.hpp")
 #include "Util.hpp"
 #endif
 
