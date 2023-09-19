@@ -610,6 +610,21 @@ class TestForLoops:
         result = f()
         assert np.allclose(result, -jnp.sqrt(2) / 2)
 
+    def test_for_in_object_list_strict(self, monkeypatch):
+        """Check the error raised in strict mode when a for loop iterates over a Python list that
+        is *not* convertible to an array."""
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def f():
+            params = ["0", "1", "2"]
+            for x in params:
+                qml.RY(int(x) / 4 * jnp.pi, wires=0)
+            return qml.expval(qml.PauliZ(0))
+
+        with pytest.raises(AutoGraphError, match="Could not convert the iteration target"):
+            qjit(autograph=True)(f)
+
     def test_for_in_static_range(self):
         """Test for loop over a Python range with static bounds."""
 
@@ -1043,6 +1058,22 @@ class TestForLoops:
 
         with pytest.raises(AutoGraphError, match="'x' was initialized with the wrong type"):
             qjit(autograph=True)(f)
+
+    @pytest.mark.filterwarnings("error")
+    def test_ignore_warnings(self, monkeypatch):
+        """Test the AutoGraph config flag properly silences warnings."""
+        monkeypatch.setattr("catalyst.autograph_ignore_fallbacks", True)
+
+        @qjit(autograph=True)
+        def f():
+            acc = 0
+            data = [0, 4, 5]
+            for i in range(3):
+                acc = acc + data[i]
+
+            return acc
+
+        assert f() == 9
 
 
 class TestMixed:
