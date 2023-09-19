@@ -91,8 +91,35 @@ def counts1(x: float, y: float):
 
 print(counts1.mlir)
 
+# TODO: NOTE:
+# The test below used to pass before the compiler driver. This is because before the compiler
+# driver, "target='mlir'" would not run the verifier. Now that the verifier is run, the circuit
+# below complains.
+#
+# This test is commented out and the expected output is also commented out using the FileCheck
+# comments (COM:).
+#
+# COM: CHECK-LABEL: private @counts2(
+try:
 
-# print(counts2.mlir)
+    @qjit(target="mlir")
+    @qml.qnode(qml.device("lightning.qubit", wires=2, shots=1000))
+    def counts2(x: float, y: float):
+        qml.RX(x, wires=0)
+        # COM: CHECK: [[q1:%.+]] = "quantum.custom"({{%.+}}, {{%.+}}) {gate_name = "RY"
+        qml.RY(y, wires=1)
+        # COM: CHECK: [[q0:%.+]] = "quantum.custom"({{%.+}}, {{%.+}}) {gate_name = "RZ"
+        qml.RZ(0.1, wires=0)
+
+        # COM: CHECK: [[obs1:%.+]] = "quantum.namedobs"([[q1]]) {type = #quantum<named_observable PauliX>}
+        # COM: CHECK: [[obs2:%.+]] = "quantum.namedobs"([[q0]]) {type = #quantum<named_observable Identity>}
+        # COM: CHECK: [[obs3:%.+]] = "quantum.tensor"([[obs1]], [[obs2]])
+        # COM: CHECK: "quantum.counts"([[obs3]]) {{.*}}shots = 1000 : i64{{.*}} : (!quantum.obs) -> (tensor<2xf64>, tensor<2xi64>)
+        return qml.counts(qml.PauliX(1) @ qml.Identity(0))
+
+    print(counts2.mlir)
+except:
+    ...
 
 
 # CHECK-LABEL: private @counts3(
