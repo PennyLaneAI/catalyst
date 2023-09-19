@@ -110,7 +110,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: mlir/mhlo
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.mhlo_version }}-default-source
+        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-source
         enableCrossOsArchive: True
 
     - name: Cache MHLO Build
