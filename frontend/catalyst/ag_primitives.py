@@ -19,6 +19,7 @@ import functools
 import warnings
 from typing import Any, Callable, Iterator, SupportsIndex, Tuple
 
+import jax
 import jax.numpy as jnp
 
 # Use tensorflow implementations for handling function scopes and calls,
@@ -109,10 +110,66 @@ def if_stmt(
     set_state(results)
 
 
+def assert_for_loop_inputs(inputs, iterate_names):
+    """All loop carried values, variables that are updated each iteration or accessed after the
+    loop terminates, need to be initialized prior to entering the loop.
+
+    The reason is two-fold:
+      - the type information from those variables is required for tracing
+      - we want to avoid access of a variable that is uninitialized, or uninitialized in a subset
+        of execution paths
+
+    Additionally, these types need to be valid JAX types.
+    """
+
+    for i, inp in enumerate(inputs):
+        if isinstance(inp, Undefined):
+            raise AutoGraphError(
+                f"The variable '{inp}' is potentially uninitialized:\n"
+                " - you may have forgotten to initialize it prior to accessing it inside a loop, or"
+                "\n"
+                " - you may be attempting to access a variable local to the body of a loop in an "
+                "outer scope.\n"
+                f"Please ensure '{inp}' is initialized with a value before entering the loop."
+            )
+
+        try:
+            jax.api_util.shaped_abstractify(inp)
+        except TypeError as e:
+            raise AutoGraphError(
+                f"The variable '{iterate_names[i]}' was initialized with type {type(inp)}, "
+                "which is not compatible with JAX. Typically, this is the case for non-numeric "
+                "values.\n"
+                "You may still use such a variable as a constant inside a loop, but it cannot "
+                "be updated from one iteration to the next, or accessed outside the loop scope "
+                "if it was defined inside of it."
+            ) from e
+
+
+def assert_for_loop_results(inputs, outputs, iterate_names):
+    """The results of a for loop should have the identical type as the inputs, since they are
+    "passed" as inputs to the next iteration. A mismatch here may indicate that a loop carried
+    variable was initialized with wrong type.
+    """
+
+    for i, (inp, out) in enumerate(zip(inputs, outputs)):
+        inp_t, out_t = jax.api_util.shaped_abstractify(inp), jax.api_util.shaped_abstractify(out)
+        if inp_t.dtype != out_t.dtype or inp_t.shape != out_t.shape:
+            raise AutoGraphError(
+                f"The variable '{iterate_names[i]}' was initialized with the wrong type. "
+                f"Expected: {out_t}, Got: {inp_t}"
+            )
+
+
 def _call_catalyst_for(
-    start, stop, step, body_fn, get_state, set_state, enum_start=None, array_iterable=None
+    start, stop, step, body_fn, get_state, set_state, opts, enum_start=None, array_iterable=None
 ):
     """Dispatch to a Catalyst implementation of for loops."""
+
+    # Ensure iteration arguments are properly initialized. We cannot process uninitialized
+    # loop carried values as we need their type information for tracing.
+    init_iter_args = get_state()
+    assert_for_loop_inputs(init_iter_args, opts["iterate_names"])
 
     @catalyst.for_loop(start, stop, step)
     def functional_for(i, *iter_args):
@@ -135,7 +192,9 @@ def _call_catalyst_for(
 
         return get_state()
 
-    return functional_for()
+    final_iter_args = functional_for(*init_iter_args)
+    assert_for_loop_results(init_iter_args, final_iter_args, opts["iterate_names"])
+    return final_iter_args
 
 
 def _call_python_for(body_fn, get_state, non_array_iterable):
@@ -154,7 +213,7 @@ def for_stmt(
     get_state: Callable[[], Tuple],
     set_state: Callable[[Tuple], None],
     _symbol_names: Tuple[str],
-    _opts: dict,
+    opts: dict,
 ):
     """An implementation of the AutoGraph 'for .. in ..' statement. The interface is defined by
     AutoGraph, here we merely provide an implementation of it in terms of Catalyst primitives."""
@@ -218,7 +277,7 @@ def for_stmt(
         try:
             set_state(init_state)
             results = _call_catalyst_for(
-                start, stop, step, body_fn, get_state, set_state, enum_start, iteration_array
+                start, stop, step, body_fn, get_state, set_state, opts, enum_start, iteration_array
             )
         except Exception as e:  # pylint: disable=broad-exception-caught
             if catalyst.autograph_strict_conversion:

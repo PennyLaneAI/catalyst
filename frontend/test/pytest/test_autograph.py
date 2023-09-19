@@ -973,6 +973,70 @@ class TestForLoops:
 
         assert f2() == 18
 
+    def test_uninitialized_variables(self, monkeypatch):
+        """Verify errors for (potentially) uninitialized loop variables."""
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        def f1():
+            for x in [0, 4, 5]:
+                acc = acc + x
+
+            return acc
+
+        with pytest.raises(AutoGraphError, match="'acc' is potentially uninitialized"):
+            qjit(autograph=True)(f1)
+
+        def f2():
+            acc = 0
+            for x in [0, 4, 5]:
+                acc = acc + x
+
+            return x
+
+        with pytest.raises(AutoGraphError, match="'x' is potentially uninitialized"):
+            qjit(autograph=True)(f2)
+
+        def f3():
+            acc = 0
+            for x in [0, 4, 5]:
+                c = 2
+                acc = acc + c * x
+
+            return c
+
+        with pytest.raises(AutoGraphError, match="'c' is potentially uninitialized"):
+            qjit(autograph=True)(f3)
+
+    def test_init_with_invalid_jax_type(self, monkeypatch):
+        """Test loop carried values initialized with an invalid JAX type."""
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        def f():
+            acc = 0
+            x = ""
+            for x in [0, 4, 5]:
+                acc = acc + x
+
+            return x
+
+        with pytest.raises(AutoGraphError, match="'x' was initialized with type <class 'str'>"):
+            qjit(autograph=True)(f)
+
+    def test_init_with_mismatched_type(self, monkeypatch):
+        """Test loop carried values initialized with a mismatched type compared to the values used
+        inside the loop."""
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        def f():
+            acc = 0
+            x = 0.0
+            for x in [0, 4, 5]:
+                acc = acc + x
+
+            return x
+
+        with pytest.raises(AutoGraphError, match="'x' was initialized with the wrong type"):
+            qjit(autograph=True)(f)
 
     def test_no_python_loops(self):
         """Test AutoGraph behaviour on function with Catalyst loops."""
