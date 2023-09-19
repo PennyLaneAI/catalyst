@@ -82,6 +82,7 @@ enzyme:
 .PHONY: dialects
 dialects:
 
+	@echo "build quantum-lsp compiler_driver and dialects"
 	cmake -G Ninja -S . -B $(DIALECTS_BUILD_DIR) \
 		-DCMAKE_BUILD_TYPE=Release \
 		-DLLVM_ENABLE_ASSERTIONS=ON \
