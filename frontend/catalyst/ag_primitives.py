@@ -53,6 +53,7 @@ __all__ = [
     "FunctionScope",
     "with_function_scope",
     "if_stmt",
+    "for_stmt",
     "converted_call",
 ]
 
@@ -169,6 +170,7 @@ def for_stmt(
     #   -> this will raise a warning to allow users to correct mistakes and allow the conversion
     #      to succeed, for example because they forgot to use a list instead of an array
     fallback = False
+    init_state = get_state()
 
     if isinstance(iteration_target, CRange):
         start, stop, step = iteration_target.get_raw_range()
@@ -205,6 +207,7 @@ def for_stmt(
     # Attempt to trace the Catalyst for loop.
     if not fallback:
         try:
+            set_state(init_state)
             results = _call_catalyst_for(
                 start, stop, step, body_fn, get_state, enum_start, iteration_array
             )
@@ -241,6 +244,7 @@ def for_stmt(
 
     # If anything goes wrong, we fall back to Python.
     if fallback:
+        set_state(init_state)
         results = _call_python_for(body_fn, get_state, iteration_target)
 
     # Sometimes we unpack the results of nested tracing scopes so that the user doesn't have to
