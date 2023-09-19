@@ -106,7 +106,7 @@ jobs:
       uses: actions/checkout@v3
     
     - name: Cache MHLO Source
-      id: cache-mhlo
+      id: cache-mhlo-source
       uses: actions/cache@v3
       with:
         path: mlir/mhlo
@@ -141,7 +141,7 @@ jobs:
 
     - name: Clone MHLO Submodule
       if: |
-        steps.cache-mhlo.outputs.cache-hit != 'true' &&
+        steps.cache-mhlo.outputs.cache-hit != 'true' ||
         steps.cache-mhlo-source.outputs.cache-hit != 'true'
       uses: actions/checkout@v3
       with:
