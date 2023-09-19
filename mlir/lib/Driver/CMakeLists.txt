@@ -17,6 +17,25 @@ set(LLVM_LINK_COMPONENTS
   AllTargetsCodeGens
   )
 
+get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
+get_property(conversion_libs GLOBAL PROPERTY MLIR_CONVERSION_LIBS)
+get_property(extension_libs GLOBAL PROPERTY MLIR_EXTENSION_LIBS)
+set(LIBS
+    ${dialect_libs}
+    ${conversion_libs}
+    ${extension_libs}
+    MLIROptLib
+    MLIRCatalyst
+    MLIRCatalystTransforms
+    MLIRQuantum
+    quantum-transforms
+    MLIRGradient
+    gradient-transforms
+    MhloRegisterDialects
+    StablehloRegister
+    ${ALL_MHLO_PASSES}
+)
+
 add_mlir_library(CatalystCompilerDriver
     CompilerDriver.cpp
     CatalystLLVMTarget.cpp
@@ -26,6 +45,7 @@ add_mlir_library(CatalystCompilerDriver
     StablehloRegister
     ${ALL_MHLO_PASSES}
     ${EXTERNAL_LIB}
+    ${LIBS}
 
     EnzymeStatic-${LLVM_VERSION_MAJOR}
     DEPENDS

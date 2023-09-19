@@ -51,30 +51,10 @@ add_mlir_python_common_capi_library(QuantumPythonCAPI
     MLIRPythonSources.Core
 )
 
-get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
-get_property(conversion_libs GLOBAL PROPERTY MLIR_CONVERSION_LIBS)
-get_property(extension_libs GLOBAL PROPERTY MLIR_EXTENSION_LIBS)
-set(LIBS
-    ${dialect_libs}
-    ${conversion_libs}
-    ${extension_libs}
-    MLIROptLib
-    MLIRCatalyst
-    MLIRCatalystTransforms
-    MLIRQuantum
-    quantum-transforms
-    MLIRGradient
-    gradient-transforms
-    CatalystCompilerDriver
-    MhloRegisterDialects
-    StablehloRegister
-    ${ALL_MHLO_PASSES}
-)
-
 add_library(compiler_driver MODULE PyCompilerDriver.cpp)
 set_target_properties(compiler_driver PROPERTIES PREFIX "")
 
-target_link_libraries(compiler_driver PRIVATE pybind11::headers pybind11::module ${LIBS})
+target_link_libraries(compiler_driver PRIVATE pybind11::headers pybind11::module CatalystCompilerDriver)
 
 set_target_properties(compiler_driver PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${MLIR_BINARY_DIR}/python_packages/quantum/mlir_quantum)
 
