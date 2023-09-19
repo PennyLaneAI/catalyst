@@ -1,3 +1,7 @@
+# Compression library
+# Potentially needed by LLVMSupport.
+# along with zstd.
+# TODO: Investigate if we can depend on only one
 set(EXTERNAL_LIB z)
 set(ENZYME_STATIC_LIB ON)
 add_subdirectory(${ENZYME_SRC_DIR}/enzyme ${CMAKE_CURRENT_BINARY_DIR}/enzyme)
