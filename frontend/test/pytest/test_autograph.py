@@ -23,7 +23,7 @@ import numpy as np
 import pennylane as qml
 import pytest
 
-from catalyst import for_loop, measure, qjit
+from catalyst import cond, for_loop, measure, qjit
 from catalyst.ag_utils import AutoGraphError, autograph_source, check_cache
 
 # pylint: disable=import-outside-toplevel
@@ -1038,6 +1038,10 @@ class TestForLoops:
         with pytest.raises(AutoGraphError, match="'x' was initialized with the wrong type"):
             qjit(autograph=True)(f)
 
+
+class TestMixed:
+    """Test a mix of supported autograph conversions and Catalyst control flow."""
+
     def test_no_python_loops(self):
         """Test AutoGraph behaviour on function with Catalyst loops."""
 
@@ -1050,6 +1054,43 @@ class TestForLoops:
             return loop(0)
 
         assert f() == 3
+
+    def test_cond_if_for_loop_for(self, monkeypatch):
+        """Test Python conditionals and loops together with their Catalyst counterparts."""
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        @qjit(autograph=True)
+        def f(x):
+            acc = 0
+            if x < 3:
+
+                @for_loop(0, 3, 1)
+                def loop(_, acc):
+                    # Oddly enough, AutoGraph treats 'i' as an iter_arg even though it's not
+                    # accessed after the for loop. Maybe because it is captured in the nested
+                    # function's closure?
+                    # TODO: remove the need for initializing 'i'
+                    i = 0
+                    for i in range(5):
+
+                        @cond(i % 2 == 0)
+                        def even():
+                            return i
+
+                        @even.otherwise
+                        def even():
+                            return 0
+
+                        acc += even()
+
+                    return acc
+
+                acc = loop(acc)
+
+            return acc
+
+        assert f(2) == 18
+        assert f(3) == 0
 
 
 if __name__ == "__main__":
