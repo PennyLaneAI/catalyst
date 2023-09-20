@@ -13,6 +13,7 @@ set(DIALECT_TESTS_DEPEND
 set(TEST_SUITES
     Quantum
     Gradient
+    Catalyst
 )
 
 if(QUANTUM_ENABLE_BINDINGS_PYTHON)

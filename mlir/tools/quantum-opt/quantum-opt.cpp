@@ -30,6 +30,7 @@ int main(int argc, char **argv)
 {
     mlir::registerAllPasses();
     mlir::registerPass(catalyst::createArrayListToMemRefPass);
+    mlir::registerPass(catalyst::createCatalystBufferizationPass);
     mlir::registerPass(catalyst::createGradientBufferizationPass);
     mlir::registerPass(catalyst::createGradientLoweringPass);
     mlir::registerPass(catalyst::createGradientConversionPass);

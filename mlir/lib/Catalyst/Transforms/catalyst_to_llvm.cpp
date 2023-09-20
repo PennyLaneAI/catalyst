@@ -22,6 +22,7 @@
 
 #include "Catalyst/IR/CatalystOps.h"
 #include "Catalyst/Transforms/Passes.h"
+#include "Catalyst/Transforms/Patterns.h"
 
 using namespace mlir;
 using namespace catalyst;
