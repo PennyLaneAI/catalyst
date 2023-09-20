@@ -97,7 +97,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
 
             std::copy_if(updatedWindowsDims.begin(), updatedWindowsDims.end(),
                          std::back_inserter(updatedScatterDims), [&dimensions](int64_t element) {
-                             return std::find(dimensions.begin(), dimensions.end(), element) ==
+                             return std::find(dimensions.begin(), dimensions.end(), element) !=
                                     dimensions.end();
                          });
         }
@@ -236,7 +236,6 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
                                          ArrayRef<int64_t> scatterDimsToOperandDims,
                                          mlir::PatternRewriter &rewriter, Location loc) const
     {
-
         // Check index vector dim is the last dimension
         // Rank
         auto scatterIndicesTensorType = scatterIndices.getType().cast<RankedTensorType>();
@@ -298,7 +297,8 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
                     fullStartIndex.push_back(indexScatter);
                 }
                 else {
-                    Value index = rewriter.create<index::ConstantOp>(loc, 0);
+                    TypedAttr indexAttr = rewriter.getI32IntegerAttr(0);
+                    Value index = rewriter.create<arith::ConstantOp>(loc, indexAttr);
                     fullStartIndex.push_back(index);
                 }
             }

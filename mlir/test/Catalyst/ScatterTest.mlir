@@ -84,23 +84,23 @@ func.func public @two_scatter(%arg0: tensor<3xf64>, %arg1: tensor<i64>) -> tenso
   return %11 : tensor<3xf64>
 }
 
-// func.func public @full_example_scatter(%input: tensor<3x4x2xi64>, %update: tensor<2x3x2x2xi64>) -> tensor<3x4x2xi64> attributes {llvm.emit_c_interface} {
-//   %scatter_indices = arith.constant dense<2> : tensor<2x3x2xi64>
-//   %result = "mhlo.scatter"(%input, %scatter_indices, %update) ({
-//     ^bb0(%arg2: tensor<i64>, %arg3: tensor<i64>):
-//       %extracted_1 = tensor.extract %arg2[] : tensor<i64>
-//       %extracted_2 = tensor.extract %arg3[] : tensor<i64>
-//       %1 = arith.addi %extracted_1, %extracted_2 : i64
-//       %from_elements = tensor.from_elements %1 : tensor<i64>
-//       mhlo.return %from_elements : tensor<i64>
-//   }) {
-//     scatter_dimension_numbers = #mhlo.scatter<
-//       update_window_dims = [2, 3],
-//       inserted_window_dims = [0],
-//       scatter_dims_to_operand_dims = [1, 0],
-//       index_vector_dim = 2>,
-//     indices_are_sorted = true,
-//     unique_indices = true
-//   } : (tensor<3x4x2xi64>, tensor<2x3x2xi64>, tensor<2x3x2x2xi64>) -> tensor<3x4x2xi64>
-//   return %result : tensor<3x4x2xi64>
-// }
+func.func public @full_example_scatter(%input: tensor<3x4x2xi64>, %update: tensor<2x3x2x2xi64>) -> tensor<3x4x2xi64> attributes {llvm.emit_c_interface} {
+  %scatter_indices = arith.constant dense<2> : tensor<2x3x2xi32>
+  %result = "mhlo.scatter"(%input, %scatter_indices, %update) ({
+    ^bb0(%arg2: tensor<i64>, %arg3: tensor<i64>):
+      %extracted_1 = tensor.extract %arg2[] : tensor<i64>
+      %extracted_2 = tensor.extract %arg3[] : tensor<i64>
+      %1 = arith.addi %extracted_1, %extracted_2 : i64
+      %from_elements = tensor.from_elements %1 : tensor<i64>
+      mhlo.return %from_elements : tensor<i64>
+  }) {
+    scatter_dimension_numbers = #mhlo.scatter<
+      update_window_dims = [2, 3],
+      inserted_window_dims = [0],
+      scatter_dims_to_operand_dims = [1, 0],
+      index_vector_dim = 2>,
+    indices_are_sorted = true,
+    unique_indices = true
+  } : (tensor<3x4x2xi64>, tensor<2x3x2xi32>, tensor<2x3x2x2xi64>) -> tensor<3x4x2xi64>
+  return %result : tensor<3x4x2xi64>
+}
