@@ -13,10 +13,11 @@
 # limitations under the License.
 
 """
-Unit tests for CompilerDriver class
+Unit tests for LinkerDriver class
 """
 
 import os
+import pathlib
 import platform
 import shutil
 import subprocess
@@ -28,20 +29,7 @@ import pennylane as qml
 import pytest
 
 from catalyst import qjit
-from catalyst.compiler import (
-    BufferizationPass,
-    CompileOptions,
-    Compiler,
-    CompilerDriver,
-    Enzyme,
-    LLVMDialectToLLVMIR,
-    LLVMIRToObjectFile,
-    MHLOPass,
-    MLIRToLLVMDialect,
-    PassPipeline,
-    PreEnzymeOpt,
-    QuantumCompilationPass,
-)
+from catalyst.compiler import CompileOptions, Compiler, LinkerDriver
 from catalyst.jax_tracer import get_mlir
 from catalyst.utils.exceptions import CompileError
 
@@ -60,11 +48,13 @@ class TestCompilerOptions:
         with warnings.catch_warnings():
             warnings.simplefilter("error")
             # pylint: disable=protected-access
-            compilers = CompilerDriver._get_compiler_fallback_order([])
+            compilers = LinkerDriver._get_compiler_fallback_order([])
             assert compiler in compilers
 
-    @pytest.mark.parametrize("logfile", [("stdout"), ("stderr"), (None)])
-    def test_verbose_compilation(self, logfile, capsys, backend):
+    @pytest.mark.parametrize(
+        "logfile,keep_intermediate", [("stdout", True), ("stderr", False), (None, False)]
+    )
+    def test_verbose_compilation(self, logfile, keep_intermediate, capsys, backend):
         """Test verbose compilation mode"""
 
         if logfile is not None:
@@ -72,7 +62,7 @@ class TestCompilerOptions:
 
         verbose = logfile is not None
 
-        @qjit(verbose=verbose, logfile=logfile)
+        @qjit(verbose=verbose, logfile=logfile, keep_intermediate=keep_intermediate)
         @qml.qnode(qml.device(backend, wires=1))
         def workflow():
             qml.PauliX(wires=0)
@@ -81,7 +71,9 @@ class TestCompilerOptions:
         workflow()
         capture_result = capsys.readouterr()
         capture = capture_result.out + capture_result.err
-        assert ("[RUNNING]" in capture) if verbose else ("[RUNNING]" not in capture)
+        assert ("[SYSTEM]" in capture) if verbose else ("[SYSTEM]" not in capture)
+        assert ("[LIB]" in capture) if verbose else ("[LIB]" not in capture)
+        assert ("Dumping" in capture) if (verbose and keep_intermediate) else True
 
 
 class TestCompilerWarnings:
@@ -92,50 +84,17 @@ class TestCompilerWarnings:
         monkeypatch.setenv("CATALYST_CC", "this-binary-does-not-exist")
         with pytest.warns(UserWarning, match="User defined compiler.* is not in PATH."):
             # pylint: disable=protected-access
-            CompilerDriver._get_compiler_fallback_order([])
+            LinkerDriver._get_compiler_fallback_order([])
 
     def test_compiler_failed_warning(self):
         """Test that a warning is emitted when a compiler failed."""
         with pytest.warns(UserWarning, match="Compiler .* failed .*"):
             # pylint: disable=protected-access
-            CompilerDriver._attempt_link("cc", [""], "in.o", "out.so", CompileOptions(verbose=True))
+            LinkerDriver._attempt_link("cc", [""], "in.o", "out.so", CompileOptions(verbose=True))
 
 
 class TestCompilerErrors:
     """Test compiler's error messages."""
-
-    def test_no_executable(self):
-        """Test that executable was set from a custom PassPipeline."""
-
-        class CustomClassWithNoExecutable(PassPipeline):
-            """Custom pipeline with missing executable."""
-
-            _default_flags = ["some-command-but-it-is-actually-a-flag"]
-
-        with pytest.raises(ValueError, match="Executable not specified."):
-            CustomClassWithNoExecutable.run("some-filename")
-
-    @pytest.mark.parametrize(
-        "pipeline",
-        [
-            (MHLOPass),
-            (QuantumCompilationPass),
-            (BufferizationPass),
-            (MLIRToLLVMDialect),
-            (LLVMDialectToLLVMIR),
-            (LLVMIRToObjectFile),
-            (PreEnzymeOpt),
-            (Enzyme)
-            # CompilerDiver is missing here because it has a different error message.
-        ],
-    )
-    def test_lower_mhlo_input_validation(self, pipeline):
-        """Test that error is raised if pass failed."""
-        with tempfile.NamedTemporaryFile(mode="w+", encoding="utf-8") as invalid_file:
-            invalid_file.write("These are invalid contents.")
-            invalid_file.flush()
-            with pytest.raises(CompileError, match=f"{pipeline.__name__} failed."):
-                pipeline.run(invalid_file.name)
 
     def test_link_failure(self):
         """Test that an exception is raised when all compiler possibilities are exhausted."""
@@ -143,26 +102,7 @@ class TestCompilerErrors:
             invalid_file.write("These are invalid contents.")
             invalid_file.flush()
             with pytest.raises(CompileError, match="Unable to link .*"):
-                CompilerDriver.run(invalid_file.name, fallback_compilers=["cc"])
-
-    @pytest.mark.parametrize(
-        "pipeline",
-        [
-            (MHLOPass),
-            (QuantumCompilationPass),
-            (BufferizationPass),
-            (MLIRToLLVMDialect),
-            (LLVMDialectToLLVMIR),
-            (PreEnzymeOpt),
-            (Enzyme),
-            (LLVMIRToObjectFile),
-            (CompilerDriver),
-        ],
-    )
-    def test_lower_file_not_found(self, pipeline):
-        """Test that exception is raised if file is not found."""
-        with pytest.raises(FileNotFoundError):
-            pipeline.run("this-file-does-not-exists.txt")
+                LinkerDriver.run(invalid_file.name, fallback_compilers=["cc"])
 
     def test_attempts_to_get_inexistent_intermediate_file(self):
         """Test return value if user request intermediate file that doesn't exist."""
@@ -170,27 +110,9 @@ class TestCompilerErrors:
         result = compiler.get_output_of("inexistent-file")
         assert result is None
 
-    def test_runtime_error(self):
-        """Test that an exception is emitted when the runtime raises a C++ exception."""
-
-        class CompileCXXException:
-            """Class that overrides the program to be compiled."""
-
-            _executable = "cc"
-
-            # libstdc++ has been deprecated on macOS in favour of libc++
-            libcpp = "-lstdc++" if platform.system() == "Linux" else "-lc++"
-            _default_flags = ["-shared", "-fPIC", "-x", "c++", libcpp]
-
-            @staticmethod
-            def get_output_filename(infile):
-                """Get the name of the output file based on the input file."""
-                return infile.replace(".mlir", ".o")
-
-            @staticmethod
-            def run(infile, **_kwargs):
-                """Run the compilation step."""
-                contents = """
+    def test_runtime_error(self, backend):
+        """Test with non-default flags."""
+        contents = """
 #include <stdexcept>
 extern "C" {
   void _catalyst_pyface_jit_cpp_exception_test(void*, void*);
@@ -202,24 +124,46 @@ void teardown() {}
 void _catalyst_pyface_jit_cpp_exception_test(void*, void*) {
   throw std::runtime_error("Hello world");
 }
-                """
-                exe = CompileCXXException._executable
-                flags = CompileCXXException._default_flags
-                outfile = CompileCXXException.get_output_filename(infile)
-                command = [exe] + flags + ["-o", outfile, "-"]
-                with subprocess.Popen(command, stdin=subprocess.PIPE) as pipe:
-                    pipe.communicate(input=bytes(contents, "UTF-8"))
-                return outfile
+        """
 
-        @qjit(
-            pipelines=[CompileCXXException, CompilerDriver],
-        )
+        class MockCompiler(Compiler):
+            """Mock compiler class"""
+
+            def __init__(self, co):
+                super().__init__(co)
+
+            def run_from_ir(self, *_args, **_kwargs):
+                with tempfile.TemporaryDirectory() as workspace:
+                    filename = workspace + "a.cpp"
+                    with open(filename, "w", encoding="utf-8") as f:
+                        f.write(contents)
+
+                    object_file = filename.replace(".c", ".o")
+                    # libstdc++ has been deprecated on macOS in favour of libc++
+                    libcpp = "-lstdc++" if platform.system() == "Linux" else "-lc++"
+                    subprocess.run(
+                        f"cc -shared {libcpp} -fPIC -x c++ {filename} -o {object_file}".split(),
+                        check=True,
+                    )
+                    output = LinkerDriver.run(object_file, options=self.options)
+                    filename = str(pathlib.Path(output).absolute())
+                    return filename, "<FAKE_IR>", ["<FAKE_FN>", "<FAKE_TYPE>"]
+
+        @qjit(target="fake_binary")
+        @qml.qnode(qml.device(backend, wires=1))
         def cpp_exception_test():
-            """A function that will be overwritten by CompileCXXException."""
             return None
 
+        cpp_exception_test.compiler = MockCompiler(cpp_exception_test.compiler.options)
+        compiled_function = cpp_exception_test.compile()
+
         with pytest.raises(RuntimeError, match="Hello world"):
-            cpp_exception_test()
+            compiled_function()
+
+    def test_linker_driver_invalid_file(self):
+        """Test with the invalid input name."""
+        with pytest.raises(FileNotFoundError):
+            LinkerDriver.get_output_filename("fooo.cpp")
 
 
 class TestCompilerState:
@@ -234,15 +178,20 @@ class TestCompilerState:
             return qml.state()
 
         mlir_module, _, _, _ = get_mlir(workflow)
-        compiler = Compiler()
-        compiler.run(mlir_module, CompileOptions())
-        compiler.get_output_of("MHLOPass")
-        compiler.get_output_of("QuantumCompilationPass")
-        compiler.get_output_of("BufferizationPass")
-        compiler.get_output_of("MLIRToLLVMDialect")
-        compiler.get_output_of("LLVMDialectToLLVMIR")
-        compiler.get_output_of("PreEnzymeOpt")
-        compiler.get_output_of("Enzyme")
+        compiler = Compiler(CompileOptions(keep_intermediate=True))
+        compiler.run(mlir_module)
+        assert compiler.get_output_of("HLOLoweringPass")
+        assert compiler.get_output_of("QuantumCompilationPass")
+        assert compiler.get_output_of("BufferizationPass")
+        assert compiler.get_output_of("MLIRToLLVMDialect")
+        assert compiler.get_output_of("PreEnzymeOpt")
+        assert compiler.get_output_of("Enzyme")
+        assert compiler.get_output_of("None-existing-pipeline") is None
+
+        compiler = Compiler(CompileOptions(keep_intermediate=False))
+        compiler.run(mlir_module)
+        assert compiler.get_output_of("MHLOPass") is None
+        assert compiler.get_output_of("None-existing-pipeline") is None
 
     def test_workspace_keep_intermediate(self, backend):
         """Test cwd's has been modified with folder containing intermediate results"""
@@ -256,9 +205,8 @@ class TestCompilerState:
         mlir_module, _, _, _ = get_mlir(workflow)
         # This means that we are not running any pass.
         pipelines = []
-        identity_compiler = Compiler()
-        options = CompileOptions(keep_intermediate=True, pipelines=pipelines)
-        identity_compiler.run(mlir_module, options)
+        identity_compiler = Compiler(CompileOptions(keep_intermediate=True))
+        identity_compiler.run(mlir_module, pipelines=pipelines, lower_to_llvm=False)
         directory = os.path.join(os.getcwd(), workflow.__name__)
         assert os.path.exists(directory)
         files = os.listdir(directory)
@@ -277,113 +225,11 @@ class TestCompilerState:
 
         mlir_module, _, _, _ = get_mlir(workflow)
         # This means that we are not running any pass.
-        pipelines = []
-        identity_compiler = Compiler()
-        options = CompileOptions(pipelines=pipelines)
-        identity_compiler.run(mlir_module, options)
-        files = os.listdir(identity_compiler.workspace.name)
+        identity_compiler = Compiler(CompileOptions(keep_intermediate=True))
+        identity_compiler.run(mlir_module, pipelines=[], lower_to_llvm=False)
+        files = os.listdir(identity_compiler.last_workspace)
         # The directory is non-empty. Should at least contain the original .mlir file
         assert files
-
-    def test_pass_with_output_name(self):
-        """Test for making sure that outfile in arguments works"""
-
-        class PassWithNoFlags(PassPipeline):
-            """Pass pipeline without any flags."""
-
-            _executable = "c99"
-            _default_flags = []
-
-        with tempfile.TemporaryDirectory() as workspace:
-            filename = workspace + "a.c"
-            outfilename = workspace + "a.out"
-            with open(filename, "w", encoding="utf-8") as f:
-                print("int main() {}", file=f)
-
-            PassWithNoFlags.run(filename, outfile=outfilename)
-
-            assert os.path.exists(outfilename)
-
-    def test_pass_with_different_executable(self):
-        """Test for making sure different executable works.
-
-        It might be best in the future to remove this functionality and instead
-        guarantee it from the start."""
-
-        class C99(PassPipeline):
-            """Pass pipeline using custom executable."""
-
-            _executable = "c99"
-            _default_flags = []
-
-            @staticmethod
-            def get_output_filename(infile):
-                return infile.replace(".c", ".out")
-
-        with tempfile.TemporaryDirectory() as workspace:
-            filename = workspace + "a.c"
-            expected_outfilename = workspace + "a.out"
-            with open(filename, "w", encoding="utf-8") as f:
-                print("int main() {}", file=f)
-
-            observed_outfilename = C99.run(filename, executable="c89")
-
-            assert observed_outfilename == expected_outfilename
-            assert os.path.exists(observed_outfilename)
-
-    def test_pass_with_flags(self):
-        """Test with non-default flags."""
-
-        class C99(PassPipeline):
-            """Simple pass pipeline."""
-
-            _executable = "c99"
-            _default_flags = []
-
-            @staticmethod
-            def get_output_filename(infile):
-                return infile.replace(".c", ".o")
-
-        with tempfile.TemporaryDirectory() as workspace:
-            filename = workspace + "a.c"
-            expected_outfilename = workspace + "a.o"
-            with open(filename, "w", encoding="utf-8") as f:
-                print("int main() {}", file=f)
-
-            observed_outfilename = C99.run(filename, flags=["-c"])
-
-            assert observed_outfilename == expected_outfilename
-            assert os.path.exists(observed_outfilename)
-
-    def test_custom_compiler_pass_output(self):
-        """Test that the output of a custom compiler pass is accessible."""
-
-        class MyPass(PassPipeline):
-            """Simple pass pipeline."""
-
-            _executable = "echo"
-            _default_flags = []
-
-            @staticmethod
-            def get_output_filename(infile):
-                return infile.replace(".mlir", ".txt")
-
-            @staticmethod
-            def _run(_infile, outfile, executable, _flags, _options):
-                cmd = [executable, "hi"]
-                with open(outfile, "w", encoding="UTF-8") as f:
-                    subprocess.run(cmd, stdout=f, check=True)
-
-        @qml.qnode(qml.device("lightning.qubit", wires=1))
-        def workflow():
-            qml.PauliX(wires=0)
-            return qml.state()
-
-        mlir_module, _, _, _ = get_mlir(workflow)
-        compiler = Compiler()
-        compiler.run(mlir_module, CompileOptions(pipelines=[MyPass]))
-        result = compiler.get_output_of("MyPass")
-        assert result == "hi\n"
 
     def test_compiler_driver_with_output_name(self):
         """Test with non-default output name."""
@@ -393,34 +239,68 @@ class TestCompilerState:
             with open(filename, "w", encoding="utf-8") as f:
                 print("int main() {}", file=f)
 
-            CompilerDriver.run(filename, outfile=outfilename)
+            LinkerDriver.run(filename, outfile=outfilename)
 
             assert os.path.exists(outfilename)
 
     def test_compiler_driver_with_flags(self):
         """Test with non-default flags."""
 
-        class C99(PassPipeline):
-            """Pass pipeline with custom flags."""
-
-            _executable = "c99"
-            _default_flags = ["-c"]
-
-            @staticmethod
-            def get_output_filename(infile):
-                return infile.replace(".c", ".o")
-
         with tempfile.TemporaryDirectory() as workspace:
             filename = workspace + "a.c"
             with open(filename, "w", encoding="utf-8") as f:
                 print("int main() {}", file=f)
 
-            object_file = C99.run(filename)
+            object_file = filename.replace(".c", ".o")
+            libcpp = "-lstdc++" if platform.system() == "Linux" else "-lc++"
+            subprocess.run(f"c99 {libcpp} -c {filename} -o {object_file}".split(), check=True)
             expected_outfilename = workspace + "a.so"
-            observed_outfilename = CompilerDriver.run(object_file, flags=[])
+            observed_outfilename = LinkerDriver.run(object_file, flags=[])
 
             assert observed_outfilename == expected_outfilename
             assert os.path.exists(observed_outfilename)
+
+    def test_compiler_from_textual_ir(self):
+        """Test the textual IR compilation."""
+
+        ir = r"""
+module @workflow {
+  func.func public @catalyst.entry_point(%arg0: tensor<f64>) -> tensor<f64> attributes {llvm.emit_c_interface} {
+    %0 = call @workflow(%arg0) : (tensor<f64>) -> tensor<f64>
+    return %0 : tensor<f64>
+  }
+  func.func private @workflow(%arg0: tensor<f64>) -> tensor<f64> attributes {diff_method = "finite-diff", llvm.linkage = #llvm.linkage<internal>, qnode} {
+    quantum.device ["kwargs", "{'shots': 0}"]
+    quantum.device ["backend", "lightning.qubit"]
+    %0 = stablehlo.constant dense<4> : tensor<i64>
+    %1 = quantum.alloc( 4) : !quantum.reg
+    %2 = stablehlo.constant dense<0> : tensor<i64>
+    %extracted = tensor.extract %2[] : tensor<i64>
+    %3 = quantum.extract %1[%extracted] : !quantum.reg -> !quantum.bit
+    %4 = quantum.custom "PauliX"() %3 : !quantum.bit
+    %5 = stablehlo.constant dense<1> : tensor<i64>
+    %extracted_0 = tensor.extract %5[] : tensor<i64>
+    %6 = quantum.extract %1[%extracted_0] : !quantum.reg -> !quantum.bit
+    %extracted_1 = tensor.extract %arg0[] : tensor<f64>
+    %7 = quantum.custom "RX"(%extracted_1) %6 : !quantum.bit
+    %8 = quantum.namedobs %4[ PauliZ] : !quantum.obs
+    %9 = quantum.expval %8 : f64
+    %from_elements = tensor.from_elements %9 : tensor<f64>
+    quantum.dealloc %1 : !quantum.reg
+    return %from_elements : tensor<f64>
+  }
+  func.func @setup() {
+    quantum.init
+    return
+  }
+  func.func @teardown() {
+    quantum.finalize
+    return
+  }
+}
+"""
+        out = qjit(ir, keep_intermediate=True, verbose=True)
+        out(0.1)
 
 
 if __name__ == "__main__":

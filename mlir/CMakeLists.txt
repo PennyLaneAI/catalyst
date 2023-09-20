@@ -17,7 +17,7 @@ find_package(MHLO REQUIRED CONFIG)
 
 message(STATUS "Using MLIRConfig.cmake in: ${MLIR_DIR}")
 message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
-message(STATUS "Using mhlo-config.cmake in: ${MHLO_DIR}")
+message(STATUS "Using MHLOConfig.cmake in: ${MHLO_DIR}")
 
 # Required so as not to always use the cached option from the mlir build.
 option(QUANTUM_ENABLE_BINDINGS_PYTHON "Enable quantum dialect python bindings" OFF)
@@ -25,6 +25,25 @@ option(QUANTUM_ENABLE_BINDINGS_PYTHON "Enable quantum dialect python bindings" O
 set(LLVM_RUNTIME_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/bin)
 set(LLVM_LIBRARY_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/lib)
 set(MLIR_BINARY_DIR ${CMAKE_BINARY_DIR})
+
+# Taken from mlir-hlo/mhlo/transforms/CMakeLists.txt.
+# Unfortunately, AllMhloPasses doesn't appear to be exported.
+set(ALL_MHLO_PASSES
+  ChloPasses
+  GmlStPasses
+  GmlStTransforms
+  MhloPasses
+  MhloToLhloConversion
+  MhloToArithmeticConversion
+  MhloToMemrefConversion
+  MhloToStandard
+  HloToLinalgUtils
+  MhloToLinalg
+  MhloToThloConversion
+  MhloShapeOpsToStandard
+  MhloToStablehlo
+  StablehloToMhlo
+)
 
 list(APPEND CMAKE_MODULE_PATH "${MLIR_CMAKE_DIR}")
 list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")

@@ -118,98 +118,79 @@ Will print out something close to the following:
 Pass Pipelines
 ==============
 
-The compilation steps which take MLIR as an input and lower it to binary are broken into pass pipelines.
-A ``PassPipeline`` is a class that specifies which binary and which flags are used for compilation.
-Users can implement their own ``PassPipeline`` by inheriting from this class and implementing the relevant methods/attributes.
-Catalyst's compilation strategy can then be adjusted by overriding the default pass pipeline.
-For example, let's imagine that a user is interested in testing different optimization levels when compiling LLVM IR to binary using ``llc``.
-The user would then create a ``PassPipeline`` that replaces the ``LLVMIRToObjectFile`` class.
-First let's take a look at the ``LLVMIRToObjectFile``.
+The compilation steps which take MLIR as an input and lower it to binary are broken into MLIR pass
+pipelines.  The ``pipelines`` argument of the ``qjit`` function may be used to alter the steps used
+for compilation. The default set of pipelines is defined via the ``catalyst.compiler.DEFAULT_PIPELINES``
+list. Its structure is shown below.
 
 .. code-block:: python
 
-    class LLVMIRToObjectFile(PassPipeline):
-        """LLVMIR To Object File."""
-    
-        _executable = get_executable_path("llvm", "llc")
-        _default_flags = [
-            "--filetype=obj",
-            "--relocation-model=pic",
+    DEFAULT_PIPELINES = [
+        (
+            "HLOLoweringPass",
+            [
+                "canonicalize",
+                "func.func(chlo-legalize-to-hlo)",
+                "stablehlo-legalize-to-hlo",
+                "func.func(mhlo-legalize-control-flow)",
+                ...
+            ],
+        ),
+        (
+            "QuantumCompilationPass",
+            [
+                "lower-gradients",
+                "adjoint-lowering",
+                "convert-arraylist-to-memref",
+            ],
+        ),
+        ...
         ]
-    
-        @staticmethod
-        def get_output_filename(infile):
-            path = pathlib.Path(infile)
-            if not path.exists():
-                raise FileNotFoundError("Cannot find {infile}.")
-            return str(path.with_suffix(".o"))
 
 
-The ``LLVMDialectTOLLVMIR`` and all classes derived from ``PassPipeline`` must define an ``_executable`` and ``_default_flags`` fields.
-The ``_executable`` field is string that corresponds to the command that will be used to execute in a subprocess.
-The ``_default_flags`` are the flags that will be used when running the executable.
-The method ``get_output_filename`` computes the name of the output file given an input file.
-It is expected that the output of a ``PassPipeline`` will be fed as an input to the following ``PassPipeline``.
-
-From here, we can see that in order for the user to test different optimization levels, all that is needed is create a class that extends either ``PassPipeline`` or ``LLVMDialectToLLVMIR`` and appends the ``-O3`` flag to the ``_default_flags`` field. For example, either of the following classes would work:
-
+One could customize what compilation passes are executed. A good use case of this would be if you
+are debugging Catalyst itself or you want to enable or disable passes within a specific pipeline.
+It is recommended to copy the default pipelines and edit them to suit your goals and afterwards
+passing them to the ``@qjit`` decorator. E.g. if you want to disable inlining
 
 .. code-block:: python
 
-    class MyLLCOpt(PassPipeline):
-        """LLVMIR To Object File."""
-    
-        _executable = get_executable_path("llvm", "llc")
-        _default_flags = [
-            "--filetype=obj",
-            "--relocation-model=pic",
-            "-O3",
+    my_pipelines = [
+        ...
+        (
+            "MyBufferizationPass",
+            [
+                "one-shot-bufferize{dialect-filter=memref}",
+                # "inline",
+                "gradient-bufferize",
+                ...
+            ],
+        ),
+        ...
         ]
-    
-        @staticmethod
-        def get_output_filename(infile):
-            path = pathlib.Path(infile)
-            if not path.exists():
-                raise FileNotFoundError("Cannot find {infile}.")
-            return str(path.with_suffix(".o"))
 
-or
-
-.. code-block:: python
-
-    class MyLLCOpt(LLVMIRToObjectFile):
-        """LLVMIR To Object File."""
-    
-        _default_flags = [
-            "--filetype=obj",
-            "--relocation-model=pic",
-            "-O3",
-        ]
-    
-In order to actually use this ``PassPipeline``, the user must override the default ``PassPipeline``.
-To do so, use the ``pipelines`` keyword parameter in ``@qjit`` decorator.
-The value assigned to ``pipelines`` must be a list of ``PassPipeline`` that will lower MLIR to binary.
-In this particular case, we are substituting the ``LLVMIRToObjectFile`` pass pipeline with ``MyLLCOpt`` in the default pass pipeline.
-The following will work:
-
-
-.. code-block:: python
-
-    custom_pipeline = [MHLOPass, QuantumCompilationPass, BufferizationPass, MLIRToLLVMDialect, LLVMDialectToLLVMIR, MyLLCOpt, CompilerDriver]
-    
-    @qjit(pipelines=custom_pipeline)
-    def foo():
-        """A method to be JIT compiled using a custom pipeline"""
+     @qjit(pipelines=my_pipelines)
+     @qml.qnode(dev)
+     def circuit():
         ...
 
-Users that are interested in ``PassPipeline`` classes are encouraged to look at the ``compiler.py`` file to look at different ``PassPipeline`` child classes.
+
+Here, each item represents a pipeline. Each pipeline has a name and a list of MLIR passes
+to perform. Most of the standard passes are described in the
+`MLIR passes documentation <https://mlir.llvm.org/docs/Passes/>`_. Quantum MLIR passes are
+implemented in Catalyst and can be found in the sources.
+
+All pipelines are executed in sequence, the output MLIR of each pipeline is stored in
+memory and becomes available via the ``get_output_of`` method of the ``QJIT`` object.
 
 Printing the IR generated by Pass Pipelines
-==========================================
+===========================================
 
-We won't get into too much detail here, but sometimes it is useful to look at the output of a specific ``PassPipeline``.
+We won't get into too much detail here, but sometimes it is useful to look at the output of a
+specific pass pipeline.
 To do so, simply use the ``get_output_of`` method available in ``QJIT``.
-For example, if one wishes to inspect the output of the ``BufferizationPass``, simply run the following command.
+For example, if one wishes to inspect the output of the ``BufferizationPass`` pipeline, simply run
+the following command.
 
 .. code-block:: python
 
@@ -278,7 +259,7 @@ compiler used by TensorFlow.
 
 .. code-block:: python
 
-    print(circuit.mlir)    
+    print(circuit.mlir)
 
 Lowering out of the MHLO dialect leaves us with the classical computation represented by generic
 dialects such as ``arith``, ``math``, or ``linalg``. This allows us to later generate machine code
@@ -286,7 +267,13 @@ via standard LLVM-MLIR tooling.
 
 .. code-block:: python
 
-    circuit.get_output_of("MHLOPass")
+    circuit.get_output_of("HLOLoweringPass")
+
+The quantum compilation pipeline expands high-level quantum instructions like adjoint, and applies quantum differentiation methods and optimization techniques.
+
+.. code-block:: python
+
+    circuit.get_output_of("QuantumCompilationPass")
 
 An important step in getting to machine code from a high-level representation is allocating memory
 for all the tensor/array objects in the program.

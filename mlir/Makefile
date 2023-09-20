@@ -69,6 +69,7 @@ mhlo:
 enzyme:
 	@echo "build enzyme"
 	cmake -G Ninja -S Enzyme/enzyme -B $(ENZYME_BUILD_DIR) \
+		-DENZYME_STATIC_LIB=ON \
 		-DCMAKE_BUILD_TYPE=Release \
 		-DLLVM_DIR=$(LLVM_BUILD_DIR)/lib/cmake/llvm \
 		-DCMAKE_C_COMPILER=$(C_COMPILER) \
@@ -80,11 +81,13 @@ enzyme:
 
 .PHONY: dialects
 dialects:
-	@echo "build custom Catalyst MLIR Dialects"
+
+	@echo "build quantum-lsp compiler_driver and dialects"
 	cmake -G Ninja -S . -B $(DIALECTS_BUILD_DIR) \
 		-DCMAKE_BUILD_TYPE=Release \
 		-DLLVM_ENABLE_ASSERTIONS=ON \
 		-DQUANTUM_ENABLE_BINDINGS_PYTHON=ON \
+		-DENZYME_SRC_DIR=$(MK_DIR)/Enzyme \
 		-DPython3_EXECUTABLE="$(PYTHON)" \
 		-DMLIR_DIR=$(LLVM_BUILD_DIR)/lib/cmake/mlir \
 		-DMHLO_DIR=$(MHLO_BUILD_DIR)/lib/cmake/mlir-hlo \
@@ -97,7 +100,7 @@ dialects:
 		-DCMAKE_CXX_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
 		-DLLVM_ENABLE_LLD=$(ENABLE_LLD)
 
-	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects quantum-lsp-server
+	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects quantum-lsp-server compiler_driver
 
 .PHONY: test
 test:
