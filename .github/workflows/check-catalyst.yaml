@@ -139,14 +139,6 @@ jobs:
         key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
         fail-on-cache-miss: True
 
-    - name: Cache MHLO Source
-      id: cache-mhlo-source
-      uses: actions/cache@v3
-      with:
-        path: mlir/mlir-hlo
-        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-source
-        enableCrossOsArchive: True
-
     - name: Clone MHLO Submodule
       if: |
         steps.cache-mhlo.outputs.cache-hit != 'true' ||
@@ -246,15 +238,6 @@ jobs:
       with:
         path: mlir/llvm-project
         key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-source
-        enableCrossOsArchive: True
-        fail-on-cache-miss: True
-
-    - name: Get Cached MHLO Source
-      id: cache-mhlo-source
-      uses: actions/cache@v3
-      with:
-        path: mlir/mlir-hlo
-        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-source
         enableCrossOsArchive: True
         fail-on-cache-miss: True
 
