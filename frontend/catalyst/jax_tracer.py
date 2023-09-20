@@ -416,8 +416,8 @@ class Adjoint(HybridOp):
 class QCtrl(HybridOp):
     """Catalyst quantum ctrl operation"""
 
-    def _no_binder(*_):
-        raise NotImplementedError("QCtrl does not support JAX binding")
+    def _no_binder(self, *_):
+        raise RuntimeError("QCtrl does not support JAX binding")
 
     binder = _no_binder
 
@@ -430,7 +430,13 @@ class QCtrl(HybridOp):
         raise NotImplementedError("QCtrl does not support JAX quantum tracing")
 
     def compute_decomposition(self, *params, wires=None, **hyperparameters):
+        """Compute quantum decomposition of the gate by recursively scanning the nested tape and
+        distributing the quantum control operaiton over the tape operations."""
         assert len(self.regions) == 1
+        assert len(params) == 0, f"Decomposition parameters should be supported"
+        assert len(hyperparameters) == 0, "Decomposition hyperparameters should be empty"
+        # FIXME: What do we expect of the `wires` argument here?
+        assert wires is self.wires, "Altering wires is not supported"
         new_tape = qctrl_distribute(
             self.regions[0].quantum_tape, self.control_wire_tracers, self.control_value_tracers
         )

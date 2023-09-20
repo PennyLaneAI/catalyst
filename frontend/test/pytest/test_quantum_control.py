@@ -12,14 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Test quantum control decomposition in Catalyst."""
+
 from typing import Callable
 
 import pennylane as qml
 import pytest
-from jax import numpy as jnp
 from numpy.testing import assert_allclose
 
-from catalyst import cond, ctrl, for_loop, measure, qjit, while_loop
+from catalyst import cond, ctrl, for_loop, qjit, while_loop
 
 
 def verify_catalyst_ctrl_against_pennylane(quantum_func: Callable, device, *args):
@@ -31,11 +32,11 @@ def verify_catalyst_ctrl_against_pennylane(quantum_func: Callable, device, *args
     @qjit
     @qml.qnode(device)
     def catalyst_workflow(*args):
-        return quantum_func(*args, ctrl=ctrl)
+        return quantum_func(*args, ctrl_fn=ctrl)
 
     @qml.qnode(device)
     def pennylane_workflow(*args):
-        return quantum_func(*args, ctrl=qml.ctrl)
+        return quantum_func(*args, ctrl_fn=qml.ctrl)
 
     assert_allclose(catalyst_workflow(*args), pennylane_workflow(*args))
 
@@ -43,9 +44,9 @@ def verify_catalyst_ctrl_against_pennylane(quantum_func: Callable, device, *args
 def test_qctrl_op_object(backend):
     """Test the quantum control application to an operation object"""
 
-    def circuit(theta, w, cw, ctrl):
-        ctrl(qml.RX(theta, wires=[w]), control=[cw], control_values=[True])
-        ctrl(qml.RX, control=[cw], control_values=[True])(theta, wires=[w])
+    def circuit(theta, w, cw, ctrl_fn):
+        ctrl_fn(qml.RX(theta, wires=[w]), control=[cw], control_values=[True])
+        ctrl_fn(qml.RX, control=[cw], control_values=[True])(theta, wires=[w])
         return qml.state()
 
     verify_catalyst_ctrl_against_pennylane(circuit, qml.device(backend, wires=3), 0.1, 0, 1)
@@ -54,8 +55,8 @@ def test_qctrl_op_object(backend):
 def test_qctrl_op_class(backend):
     """Test the quantum control application to a single operation class"""
 
-    def circuit(theta, w, cw, ctrl):
-        ctrl(qml.RX, control=[w], control_values=[True])(theta, wires=[cw])
+    def circuit(theta, w, cw, ctrl_fn):
+        ctrl_fn(qml.RX, control=[w], control_values=[True])(theta, wires=[cw])
         return qml.state()
 
     verify_catalyst_ctrl_against_pennylane(circuit, qml.device(backend, wires=3), 0.1, 0, 1)
@@ -64,12 +65,12 @@ def test_qctrl_op_class(backend):
 def test_qctrl_func_simple(backend):
     """Test the quantum control distribution over the group of operations"""
 
-    def circuit(arg, ctrl):
+    def circuit(arg, ctrl_fn):
         def _func(theta):
             qml.RX(theta, wires=[0])
             qml.RZ(theta, wires=2)
 
-        ctrl(_func, control=[1], control_values=[True])(arg)
+        ctrl_fn(_func, control=[1], control_values=[True])(arg)
         return qml.state()
 
     verify_catalyst_ctrl_against_pennylane(circuit, qml.device(backend, wires=3), 0.1)
@@ -78,7 +79,7 @@ def test_qctrl_func_simple(backend):
 def test_qctrl_func_hybrid(backend):
     """Test the quantum control distribution over the Catalyst hybrid operation"""
 
-    def circuit(theta, w1, w2, cw, ctrl):
+    def circuit(theta, w1, w2, cw, ctrl_fn):
         def _func():
             qml.RX(theta, wires=[w1])
 
@@ -112,7 +113,7 @@ def test_qctrl_func_hybrid(backend):
 
             qml.RZ((s + x) * theta, wires=w1)
 
-        ctrl(_func, control=[cw], control_values=[True])()
+        ctrl_fn(_func, control=[cw], control_values=[True])()
         return qml.state()
 
     verify_catalyst_ctrl_against_pennylane(circuit, qml.device(backend, wires=3), 0.1, 0, 2, 2)
@@ -121,18 +122,18 @@ def test_qctrl_func_hybrid(backend):
 def test_qctrl_func_nested(backend):
     """Test the quantum control distribution over the nested control operations"""
 
-    def circuit(theta, w1, w2, cw1, cw2, ctrl):
+    def circuit(theta, w1, w2, cw1, cw2, ctrl_fn):
         def _func1():
             qml.RX(theta, wires=[w1])
 
             def _func2():
                 qml.RY(theta, wires=[w2])
 
-            ctrl(_func2, control=[cw2], control_values=[True])()
+            ctrl_fn(_func2, control=[cw2], control_values=[True])()
 
             qml.RZ(theta, wires=w1)
 
-        ctrl(_func1, control=[cw1], control_values=[True])()
+        ctrl_fn(_func1, control=[cw1], control_values=[True])()
         return qml.state()
 
     verify_catalyst_ctrl_against_pennylane(circuit, qml.device(backend, wires=4), 0.1, 0, 1, 2, 3)

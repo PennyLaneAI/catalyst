@@ -1319,6 +1319,8 @@ def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
 
 
 def ctrl(f: Union[Callable, Operator], control: List[Any], control_values: List[Any]) -> Callable:
+    """Catalyst version of the ``qml.ctrl`` that supports Catalyst hybrid operations."""
+
     def _call_handler(*args, _callee: Callable, **kwargs):
         EvaluationContext.check_is_quantum_tracing(
             "catalyst.adjoint can only be used from within a qml.qnode."

@@ -15,7 +15,6 @@
 import pennylane as qml
 import pytest
 from jax import numpy as jnp
-from numpy.testing import assert_allclose
 
 from catalyst import for_loop, measure, qjit
 
