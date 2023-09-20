@@ -19,7 +19,7 @@ import pytest
 from jax import numpy as jnp
 from numpy.testing import assert_allclose
 
-from catalyst import for_loop, measure, qjit
+from catalyst import cond, for_loop, measure, qjit, while_loop
 
 # This is used just for internal testing
 from catalyst.pennylane_extensions import qctrl
@@ -85,13 +85,35 @@ def test_qctrl_func_hybrid(backend):
         def _func():
             qml.RX(theta, wires=[w1])
 
+            s = 0
+
+            @while_loop(lambda s: s < w2)
+            def _while_loop(s):
+                qml.RY(theta, wires=s)
+                return s + 1
+
+            s = _while_loop(s)
+
             @for_loop(0, w2, 1)
-            def _loop(i):
+            def _for_loop(i, s):
                 qml.RY(theta, wires=i)
+                return s + 1
 
-            _loop()
+            s = _for_loop(s)
 
-            qml.RZ(theta, wires=w1)
+            @cond(True)
+            def _branch():
+                qml.RZ(theta, wires=w2 - 1)
+                return 1
+
+            @_branch.otherwise
+            def _branch():
+                qml.RZ(theta, wires=w2 - 1)
+                return 0
+
+            x = _branch()
+
+            qml.RZ((s + x) * theta, wires=w1)
 
         ctrl(_func, control=[cw], control_values=[True])()
         return qml.state()

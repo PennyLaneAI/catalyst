@@ -434,7 +434,7 @@ class QCtrl(HybridOp):
         new_tape = qctrl_distribute(
             self.regions[0].quantum_tape, self.control_wire_tracers, self.control_value_tracers
         )
-        self.regions[0].quantum_tape = new_tape
+        return new_tape.operations
 
 
 def qctrl_distribute(
@@ -443,21 +443,22 @@ def qctrl_distribute(
     """Distribute the quantum control operation, described by ``control_wires`` and
     ``control_values``, over all the operations on the nested quantum tape.
     """
+    # Note: The transformation modifies operations in the source quantum tape, so we must not use it
+    # after we called this function.
     ctx = EvaluationContext.get_main_tracing_context()
     ops2 = []
     for op in tape.operations:
         if has_nested_tapes(op):
             if isinstance(op, QCtrl):
-                for region in op.regions:
-                    with EvaluationContext.frame_tracing_context(ctx, region.trace):
-                        tape2 = qctrl_distribute(
-                            region.quantum_tape,
-                            control_wires + op.control_wire_tracers,
-                            control_values + op.control_value_tracers,
-                        )
-                ops2.extend(tape2.operations)
+                for region in [region for region in op.regions if region.quantum_tape is not None]:
+                    tape2 = qctrl_distribute(
+                        region.quantum_tape,
+                        control_wires + op.control_wire_tracers,
+                        control_values + op.control_value_tracers,
+                    )
+                    ops2.extend(tape2.operations)
             else:
-                for region in op.regions:
+                for region in [region for region in op.regions if region.quantum_tape is not None]:
                     with EvaluationContext.frame_tracing_context(ctx, region.trace):
                         region.quantum_tape = qctrl_distribute(
                             region.quantum_tape, control_wires, control_values

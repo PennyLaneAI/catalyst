@@ -1330,7 +1330,7 @@ def qctrl(f: Union[Callable, Operator], control: List[Any], control_values: List
         out_classical_tracers, _ = tree_flatten(res)
 
         if len(quantum_tape.measurements) > 0:
-            raise ValueError("Quantum measurements are not allowed in QCtrls")
+            raise ValueError("Quantum measurements are not allowed inside qctrl")
 
         region = HybridOpRegion(None, quantum_tape, [], [])
 
@@ -1338,7 +1338,7 @@ def qctrl(f: Union[Callable, Operator], control: List[Any], control_values: List
             control_wire_tracers=list(control),
             control_value_tracers=list(control_values),
             in_classical_tracers=in_classical_tracers,
-            out_classical_tracers=[],
+            out_classical_tracers=out_classical_tracers,
             regions=[region],
         )
 
