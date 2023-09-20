@@ -14,14 +14,11 @@
 
 #pragma once
 
-#include "mlir/Pass/Pass.h"
-
-#include <memory>
+#include "mlir/IR/PatternMatch.h"
+#include "mlir/Transforms/DialectConversion.h"
 
 namespace catalyst {
 
-std::unique_ptr<mlir::Pass> createCatalystBufferizationPass();
-std::unique_ptr<mlir::Pass> createArrayListToMemRefPass();
-std::unique_ptr<mlir::Pass> createCatalystConversionPass();
+void populateBufferizationPatterns(mlir::TypeConverter &, mlir::RewritePatternSet &);
 
 } // namespace catalyst

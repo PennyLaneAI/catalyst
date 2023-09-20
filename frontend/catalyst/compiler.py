@@ -187,6 +187,7 @@ class BufferizationPass(PassPipeline):
         "--one-shot-bufferize=dialect-filter=memref",  # must run before any dialect bufferization
         "--inline",
         "--gradient-bufferize",
+        "--catalyst-bufferize",
         "--scf-bufferize",
         "--convert-tensor-to-linalg",  # tensor.pad
         "--convert-elementwise-to-linalg",  # Must be run before --arith-bufferize
@@ -244,6 +245,7 @@ class MLIRToLLVMDialect(PassPipeline):
         "--finalize-memref-to-llvm=use-generic-functions",
         "--convert-index-to-llvm",
         "--convert-quantum-to-llvm",
+        "--convert-catalyst-to-llvm",
         "--emit-catalyst-py-interface",
         # Remove any dead casts as the final pass expects to remove all existing casts,
         # but only those that form a loop back to the original type.

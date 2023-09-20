@@ -71,6 +71,26 @@ void _mlir_memref_to_llvm_free(void *ptr)
     free(ptr);
 }
 
+void _catalyst_memref_print(MemRefT_int64_1d *array)
+{
+    std::cerr << "cerr: print array from runtime" << std::endl;
+    std::cout << "cout: print array from runtime" << std::endl;
+
+    if (array == nullptr || !array->sizes[0]) {
+        std::cerr << "{}" << std::endl;
+        std::cout << "{}" << std::endl;
+        return;
+    }
+
+    const size_t size = array->sizes[0];
+    std::vector<size_t> array_vec(array->data_aligned, array->data_aligned + size);
+
+    for (size_t i = 0; i < size; i++) {
+        std::cerr << array_vec[i] << ", ";
+    }
+    std::cerr << std::endl;
+}
+
 void __quantum__rt__fail_cstr(const char *cstr) { RT_FAIL(cstr); }
 
 void __quantum__rt__initialize()
@@ -203,8 +223,7 @@ void __quantum__qis__Gradient(int64_t numResults, /* results = */...)
     Catalyst::Runtime::CTX->getDevice()->Gradient(mem_views, {});
 }
 
-void __quantum__qis__Gradient_params([[maybe_unused]] MemRefT_int64_1d *params,
-                                     [[maybe_unused]] int64_t numResults,
+void __quantum__qis__Gradient_params(MemRefT_int64_1d *params, int64_t numResults,
                                      /* results = */...)
 {
     RT_ASSERT(numResults >= 0);

@@ -55,7 +55,7 @@ struct PrintOpPattern : public OpConversionPattern<PrintOp> {
     {
         MLIRContext *ctx = this->getContext();
 
-        StringRef qirName = "__quantum__rt__print";
+        StringRef qirName = "_catalyst_memref_print";
         Type void_t = LLVM::LLVMVoidType::get(ctx);
         Type qirSignature = LLVM::LLVMFunctionType::get(void_t, adaptor.getVal().getType());
         LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
