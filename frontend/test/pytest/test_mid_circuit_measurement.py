@@ -56,7 +56,7 @@ class TestMidCircuitMeasurement:
             m = measure(wires=[1, 2])
             return m
 
-        with pytest.raises(TypeError, match="One classical argument \(a wire\) is expected"):
+        with pytest.raises(TypeError, match=r"One classical argument \(a wire\) is expected"):
             qjit(circuit)()
 
     def test_basic(self, backend):
