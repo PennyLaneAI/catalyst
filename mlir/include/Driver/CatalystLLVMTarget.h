@@ -14,14 +14,22 @@
 
 #pragma once
 
-#include <memory>
+#include "mlir/IR/DialectRegistry.h"
+#include "mlir/Support/LogicalResult.h"
+#include "llvm/ADT/StringRef.h"
+#include "llvm/IR/Module.h"
 
-#include "mlir/Pass/Pass.h"
+#include "CompilerDriver.h"
 
 namespace catalyst {
+namespace driver {
 
-std::unique_ptr<mlir::Pass> createArrayListToMemRefPass();
+/// Register the translations needed to convert to LLVM IR.
+void registerLLVMTranslations(mlir::DialectRegistry &registry);
 
-void registerAllCatalystPasses();
+mlir::LogicalResult compileObjectFile(const CompilerOptions &options,
+                                      std::shared_ptr<llvm::Module> module,
+                                      llvm::StringRef filename);
 
+} // namespace driver
 } // namespace catalyst

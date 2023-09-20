@@ -7,6 +7,8 @@ set(LIBS
     MLIRCatalyst
     MLIRQuantum
     MLIRGradient
+    MhloRegisterDialects
+    StablehloRegister
 )
 
 add_llvm_executable(quantum-lsp-server quantum-lsp-server.cpp)

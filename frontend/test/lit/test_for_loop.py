@@ -14,8 +14,6 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
-import subprocess
-
 import pennylane as qml
 
 from catalyst import for_loop, qjit
@@ -26,7 +24,7 @@ from catalyst import for_loop, qjit
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=3))
 def loop_circuit(n: int, inc: float):
-    # CHECK-DAG:   [[qreg:%.+]] = "quantum.alloc"
+    # CHECK-DAG:   [[qreg:%.+]] = quantum.alloc
     # CHECK-DAG:   [[c0:%.+]] = arith.constant 0 : index
     # CHECK-DAG:   [[c1:%.+]] = arith.constant 1 : index
     # CHECK-DAG:   [[init:%.+]] = stablehlo.constant dense<0.0{{.+}}>
@@ -42,24 +40,19 @@ def loop_circuit(n: int, inc: float):
         # CHECK:       [[i_cast:%.+]] = arith.index_cast [[i]]
         # CHECK:       [[phi1:%.+]] = stablehlo.add %arg3, %arg1
 
-        # CHECK:       [[q0:%.+]] = "quantum.extract"([[r0]], [[i_cast]])
+        # CHECK:       [[q0:%.+]] = quantum.extract [[r0]][[[i_cast]]]
         # CHECK:       [[phi_e:%.+]] = tensor.extract [[phi0]]
-        # CHECK:       [[q1:%.+]] = "quantum.custom"([[phi_e]], [[q0]]) {gate_name = "RY"
-        # CHECK:       [[r1:%.+]] = "quantum.insert"([[r0]], [[i_cast]], [[q1]])
+        # CHECK:       [[q1:%.+]] = quantum.custom "RY"([[phi_e]]) [[q0]]
+        # CHECK:       [[r1:%.+]] = quantum.insert [[r0]][[[i_cast]]], [[q1]]
         qml.RY(phi, wires=i)
 
         # CHECK:       scf.yield [[phi1]], [[r1]]
         return phi + inc
 
     loop_fn(0.0)
-    # CHECK:       "quantum.dealloc"([[qreg]])
+    # CHECK:       quantum.dealloc [[qreg]]
     # CHECK:       return
     return qml.state()
 
 
-# TODO: replace with internally applied canonicalization (#48)
-subprocess.run(
-    ["mlir-hlo-opt", "--canonicalize", "--allow-unregistered-dialect"],
-    input=loop_circuit.mlir,
-    text=True,
-)
+print(loop_circuit.mlir)
