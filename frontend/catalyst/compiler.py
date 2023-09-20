@@ -93,9 +93,6 @@ def get_lib_path(project, env_var):
         return os.path.join(package_root, "lib")  # pragma: no cover
     return os.getenv(env_var, default_lib_paths.get(project, ""))
 
-class CompilerDriver:
-    """Compiler Driver Interface
-    In order to avoid relying on a single compiler at run time and allow the user some flexibility,
 DEFAULT_PIPELINES = [
     (
         "HLOLoweringPass",
