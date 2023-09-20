@@ -1318,7 +1318,7 @@ def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
         raise ValueError(f"Expected a callable or a qml.Operator, not {f}")
 
 
-def qctrl(f: Union[Callable, Operator], control: List[Any], control_values: List[Any]) -> Callable:
+def ctrl(f: Union[Callable, Operator], control: List[Any], control_values: List[Any]) -> Callable:
     def _call_handler(*args, _callee: Callable, **kwargs):
         EvaluationContext.check_is_quantum_tracing(
             "catalyst.adjoint can only be used from within a qml.qnode."
@@ -1330,7 +1330,7 @@ def qctrl(f: Union[Callable, Operator], control: List[Any], control_values: List
         out_classical_tracers, _ = tree_flatten(res)
 
         if len(quantum_tape.measurements) > 0:
-            raise ValueError("Quantum measurements are not allowed inside qctrl")
+            raise ValueError("Quantum measurements are not allowed inside catalyst.ctrl")
 
         region = HybridOpRegion(None, quantum_tape, [], [])
 

@@ -19,10 +19,7 @@ import pytest
 from jax import numpy as jnp
 from numpy.testing import assert_allclose
 
-from catalyst import cond, for_loop, measure, qjit, while_loop
-
-# This is used just for internal testing
-from catalyst.pennylane_extensions import qctrl
+from catalyst import cond, ctrl, for_loop, measure, qjit, while_loop
 
 
 def verify_catalyst_ctrl_against_pennylane(quantum_func: Callable, device, *args):
@@ -34,7 +31,7 @@ def verify_catalyst_ctrl_against_pennylane(quantum_func: Callable, device, *args
     @qjit
     @qml.qnode(device)
     def catalyst_workflow(*args):
-        return quantum_func(*args, ctrl=qctrl)
+        return quantum_func(*args, ctrl=ctrl)
 
     @qml.qnode(device)
     def pennylane_workflow(*args):
