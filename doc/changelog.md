@@ -2,6 +2,25 @@
 
 <h3>New features</h3>
 
+* Add lowering to tensor dialect for MHLO scatter. It unlocks indexing and updating jax arrays.
+  [(#273)](https://github.com/PennyLaneAI/catalyst/pull/273)
+
+  ```python
+  
+  @qjit
+  def add_multiply(l: jax.core.ShapedArray((3,), dtype=float), idx: int):
+      res = l.at[idx].multiply(3)
+      res2 = l.at[idx].add(2)
+      return res + res2
+
+  res = add_multiply(jnp.array([0, 1, 2]), 2)
+  ```
+
+  ```pycon
+  >>> res
+  [0, 2, 10]
+  ```
+
 <h3>Improvements</h3>
 
 * Update the Lightning backend device to work with the PL-Lightning monorepo.
@@ -35,7 +54,8 @@ This release contains contributions from (in alphabetical order):
 Ali Asadi,
 Erick Ochoa Lopez,
 Jacob Mai Peng,
-Sergei Mironov.
+Sergei Mironov,
+Romain Moyard.
 
 # Release 0.3.0
 
