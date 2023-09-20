@@ -20,6 +20,9 @@
 #include "Gradient/IR/GradientDialect.h"
 #include "Quantum/IR/QuantumDialect.h"
 
+#include "mhlo/IR/register.h"
+#include "stablehlo/dialect/Register.h"
+
 int main(int argc, char **argv)
 {
     mlir::DialectRegistry registry;
@@ -27,6 +30,9 @@ int main(int argc, char **argv)
     registry.insert<catalyst::CatalystDialect>();
     registry.insert<catalyst::quantum::QuantumDialect>();
     registry.insert<catalyst::gradient::GradientDialect>();
+
+    mlir::mhlo::registerAllMhloDialects(registry);
+    mlir::stablehlo::registerAllDialects(registry);
 
     return mlir::failed(mlir::MlirLspServerMain(argc, argv, registry));
 }

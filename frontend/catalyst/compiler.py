@@ -15,7 +15,6 @@
 MLIR/LLVM representations.
 """
 
-import abc
 import os
 import pathlib
 import platform
@@ -28,6 +27,8 @@ from dataclasses import dataclass
 from io import TextIOWrapper
 from typing import Any, List, Optional
 
+from mlir_quantum.compiler_driver import run_compiler_driver
+
 from catalyst._configuration import INSTALLED
 from catalyst.utils.exceptions import CompileError
 
@@ -36,18 +37,20 @@ package_root = os.path.dirname(__file__)
 
 @dataclass
 class CompileOptions:
-    """Generic compilation options.
+    """Generic compilation options, for which reasonable default values exist.
 
     Args:
-        verbose (bool, optional): flag indicating whether to enable verbose output.
+        verbose (Optional[bool]): flag indicating whether to enable verbose output.
             Default is ``False``
-        logfile (TextIOWrapper, optional): the logfile to write output to.
+        logfile (Optional[TextIOWrapper]): the logfile to write output to.
             Default is ``sys.stderr``
-        target (str, optional): target of the functionality. Default is ``"binary"``
-        keep_intermediate (bool, optional): flag indicating whether to keep intermediate results.
+        keep_intermediate (Optional[bool]): flag indicating whether to keep intermediate results.
             Default is ``False``
-        pipelines (List[Any], optional): list of pipelines to be used.
-            Default is ``None``
+        pipelines (Optional[List[Tuple[str,List[str]]]]): A list of tuples. The first entry of the
+            tuple corresponds to the name of a pipeline. The second entry of the tuple corresponds
+            to a list of MLIR passes.
+        autograph (Optional[bool]): flag indicating whether experimental autograph support is to
+            be enabled.
     """
 
     verbose: Optional[bool] = False
@@ -58,15 +61,16 @@ class CompileOptions:
     autograph: Optional[bool] = False
 
 
-def run_writing_command(
-    command: List[str], compile_options: Optional[CompileOptions] = None
-) -> None:
-    """Run the command after optionally announcing this fact to the user"""
-    if compile_options is None:
-        compile_options = CompileOptions()
+def run_writing_command(command: List[str], compile_options: Optional[CompileOptions]) -> None:
+    """Run the command after optionally announcing this fact to the user.
+
+    Args:
+        command (List[str]): command to be sent to a subprocess.
+        compile_options (Optional[CompileOptions]): compile options.
+    """
 
     if compile_options.verbose:
-        print(f"[RUNNING] {' '.join(command)}", file=compile_options.logfile)
+        print(f"[SYSTEM] {' '.join(command)}", file=compile_options.logfile)
     subprocess.run(command, check=True)
 
 
@@ -83,13 +87,6 @@ default_lib_paths = {
 }
 
 
-def get_executable_path(project, tool):
-    """Get path to executable."""
-    path = os.path.join(package_root, "bin") if INSTALLED else default_bin_paths.get(project, "")
-    executable_path = os.path.join(path, tool)
-    return executable_path if os.path.exists(executable_path) else tool
-
-
 def get_lib_path(project, env_var):
     """Get the library path."""
     if INSTALLED:
@@ -97,256 +94,93 @@ def get_lib_path(project, env_var):
     return os.getenv(env_var, default_lib_paths.get(project, ""))
 
 
-class PassPipeline(abc.ABC):
-    """Abstract PassPipeline class."""
-
-    _executable: Optional[str] = None
-    _default_flags: Optional[List[str]] = None
-
-    @staticmethod
-    @abc.abstractmethod
-    def get_output_filename(infile):
-        """Compute the output filename from the input filename.
-
-        .. note:
-
-                Derived classes are expected to implement this method.
-
-        Args:
-            infile (str): input file
-        Returns:
-            outfile (str): output file
-        """
-
-    @staticmethod
-    def _run(infile, outfile, executable, flags, options):
-        command = [executable] + flags + [infile, "-o", outfile]
-        run_writing_command(command, options)
-
-    @classmethod
-    # pylint: disable=too-many-arguments
-    def run(cls, infile, outfile=None, executable=None, flags=None, options=None):
-        """Run the pass.
-
-        Args:
-            infile (str): path to MLIR file to be compiled
-            outfile (str): path to output file, defaults to replacing extension in infile to .nohlo
-            executable (str): path to executable, defaults to mlir-hlo-opt
-            flags (List[str]): flags to mlir-hlo-opt, defaults to _default_flags
-            options (CompileOptions): compile options
-        """
-        if outfile is None:
-            outfile = cls.get_output_filename(infile)
-        if executable is None:
-            executable = cls._executable
-        if executable is None:
-            raise ValueError("Executable not specified.")
-        if flags is None:
-            flags = cls._default_flags
-        try:
-            cls._run(infile, outfile, executable, flags, options)
-        except subprocess.CalledProcessError as e:
-            raise CompileError(f"{cls.__name__} failed.") from e
-        return outfile
-
-
-class MHLOPass(PassPipeline):
-    """Pass pipeline to convert (M)HLO dialects to standard MLIR dialects."""
-
-    _executable = get_executable_path("mhlo", "mlir-hlo-opt")
-    _default_flags = [
-        "--allow-unregistered-dialect",
-        "--canonicalize",
-        "--chlo-legalize-to-hlo",
-        "--stablehlo-legalize-to-hlo",
-        "--mhlo-legalize-control-flow",
-        "--hlo-legalize-to-linalg",
-        "--mhlo-legalize-to-std",
-        "--convert-to-signless",
-        # Substitute tensors<1xf64> with tensors<f64>
-        "--scalarize",
-        "--canonicalize",
-    ]
-
-    @staticmethod
-    def get_output_filename(infile):
-        path = pathlib.Path(infile)
-        if not path.exists():
-            raise FileNotFoundError("Cannot find {infile}.")
-        return str(path.with_suffix(".nohlo.mlir"))
-
-
-class BufferizationPass(PassPipeline):
-    """Pass pipeline that bufferizes MLIR dialects."""
-
-    _executable = get_executable_path("quantum", "quantum-opt")
-    _default_flags = [
-        # The following pass allows differentiation of qml.probs with the parameter-shift method,
-        # as it performs the bufferization of `memref.tensor_op` (for which no dialect bufferization
-        # exists).
-        "--one-shot-bufferize=dialect-filter=memref",  # must run before any dialect bufferization
-        "--inline",
-        "--gradient-bufferize",
-        "--scf-bufferize",
-        "--convert-tensor-to-linalg",  # tensor.pad
-        "--convert-elementwise-to-linalg",  # Must be run before --arith-bufferize
-        "--arith-bufferize",
-        "--empty-tensor-to-alloc-tensor",
-        "--bufferization-bufferize",
-        "--tensor-bufferize",
-        "--linalg-bufferize",
-        "--tensor-bufferize",
-        "--quantum-bufferize",
-        "--func-bufferize",
-        "--finalizing-bufferize",
-        "--buffer-hoisting",
-        "--buffer-loop-hoisting",
-        "--buffer-deallocation",
-        "--convert-arraylist-to-memref",
-        "--convert-bufferization-to-memref",
-        "--canonicalize",
-        # "--cse",
-        "--cp-global-memref",
-    ]
-
-    @staticmethod
-    def get_output_filename(infile):
-        path = pathlib.Path(infile)
-        if not path.exists():
-            raise FileNotFoundError("Cannot find {infile}.")
-        return str(path.with_suffix(".buff.mlir"))
+DEFAULT_PIPELINES = [
+    (
+        "HLOLoweringPass",
+        [
+            "canonicalize",
+            "func.func(chlo-legalize-to-hlo)",
+            "stablehlo-legalize-to-hlo",
+            "func.func(mhlo-legalize-control-flow)",
+            "func.func(hlo-legalize-to-linalg)",
+            "func.func(mhlo-legalize-to-std)",
+            "convert-to-signless",
+            "func.func(scalarize)",
+            "canonicalize",
+        ],
+    ),
+    (
+        "QuantumCompilationPass",
+        [
+            "lower-gradients",
+            "adjoint-lowering",
+        ],
+    ),
+    (
+        "BufferizationPass",
+        [
+            "one-shot-bufferize{dialect-filter=memref}",
+            "inline",
+            "gradient-bufferize",
+            "scf-bufferize",
+            "convert-tensor-to-linalg",  # tensor.pad
+            "convert-elementwise-to-linalg",  # Must be run before --arith-bufferize
+            "arith-bufferize",
+            "empty-tensor-to-alloc-tensor",
+            "func.func(bufferization-bufferize)",
+            "func.func(tensor-bufferize)",
+            "func.func(linalg-bufferize)",
+            "func.func(tensor-bufferize)",
+            "quantum-bufferize",
+            "func-bufferize",
+            "func.func(finalizing-bufferize)",
+            "func.func(buffer-hoisting)",
+            "func.func(buffer-loop-hoisting)",
+            "func.func(buffer-deallocation)",
+            "convert-arraylist-to-memref",
+            "convert-bufferization-to-memref",
+            "canonicalize",
+            # "cse",
+            "cp-global-memref",
+        ],
+    ),
+    (
+        "MLIRToLLVMDialect",
+        [
+            "convert-gradient-to-llvm",
+            "func.func(convert-linalg-to-loops)",
+            "convert-scf-to-cf",
+            # This pass expands memref ops that modify the metadata of a memref (sizes, offsets,
+            # strides) into a sequence of easier to analyze constructs. In particular, this pass
+            # transforms ops into explicit sequence of operations that model the effect of this
+            # operation on the different metadata. This pass uses affine constructs to materialize
+            # these effects. Concretely, expanded-strided-metadata is used to decompose
+            # memref.subview as it has no lowering in -finalize-memref-to-llvm.
+            "expand-strided-metadata",
+            "lower-affine",
+            "arith-expand",  # some arith ops (ceildivsi) require expansion to be lowered to llvm
+            "convert-complex-to-standard",  # added for complex.exp lowering
+            "convert-complex-to-llvm",
+            "convert-math-to-llvm",
+            # Run after -convert-math-to-llvm as it marks math::powf illegal without converting it.
+            "convert-math-to-libm",
+            "convert-arith-to-llvm",
+            "finalize-memref-to-llvm{use-generic-functions}",
+            "convert-index-to-llvm",
+            "convert-quantum-to-llvm",
+            "emit-catalyst-py-interface",
+            # Remove any dead casts as the final pass expects to remove all existing casts,
+            # but only those that form a loop back to the original type.
+            "canonicalize",
+            "reconcile-unrealized-casts",
+        ],
+    ),
+]
 
 
-class MLIRToLLVMDialect(PassPipeline):
-    """Pass pipeline to lower MLIR dialects to LLVM dialect."""
-
-    _executable = get_executable_path("quantum", "quantum-opt")
-    _default_flags = [
-        "--convert-gradient-to-llvm=use-generic-functions",
-        "--convert-linalg-to-loops",
-        "--convert-scf-to-cf",
-        # This pass expands memref operations that modify the metadata of a memref (sizes, offsets,
-        # strides) into a sequence of easier to analyze constructs. In particular, this pass
-        # transforms operations into explicit sequence of operations that model the effect of this
-        # operation on the different metadata. This pass uses affine constructs to materialize these
-        # effects.
-        # Concretely, expanded-strided-metadata is used to decompose memref.subview as it has no
-        # lowering in -finalize-memref-to-llvm.
-        "--expand-strided-metadata",
-        "--lower-affine",
-        "--arith-expand",  # some arith ops (ceildivsi) require expansion to be lowered to llvm
-        "--convert-complex-to-standard",  # added for complex.exp lowering
-        "--convert-complex-to-llvm",
-        "--convert-math-to-llvm",
-        # Run after -convert-math-to-llvm as it marks math::powf illegal without converting it.
-        "--convert-math-to-libm",
-        "--convert-arith-to-llvm",
-        "--finalize-memref-to-llvm=use-generic-functions",
-        "--convert-index-to-llvm",
-        "--convert-quantum-to-llvm",
-        "--emit-catalyst-py-interface",
-        # Remove any dead casts as the final pass expects to remove all existing casts,
-        # but only those that form a loop back to the original type.
-        "--canonicalize",
-        "--reconcile-unrealized-casts",
-    ]
-
-    @staticmethod
-    def get_output_filename(infile):
-        path = pathlib.Path(infile)
-        if not path.exists():
-            raise FileNotFoundError("Cannot find {infile}.")
-        return str(path.with_suffix(".llvm.mlir"))
-
-
-class QuantumCompilationPass(PassPipeline):
-    """Pass pipeline for Catalyst-specific transformation passes."""
-
-    _executable = get_executable_path("quantum", "quantum-opt")
-    _default_flags = ["--lower-gradients", "--adjoint-lowering"]
-
-    @staticmethod
-    def get_output_filename(infile):
-        path = pathlib.Path(infile)
-        if not path.exists():
-            raise FileNotFoundError("Cannot find {infile}.")
-        return str(path.with_suffix(".opt.mlir"))
-
-
-class LLVMDialectToLLVMIR(PassPipeline):
-    """Convert LLVM Dialect to LLVM-IR."""
-
-    _executable = get_executable_path("llvm", "mlir-translate")
-    _default_flags = ["--mlir-to-llvmir"]
-
-    @staticmethod
-    def get_output_filename(infile):
-        path = pathlib.Path(infile)
-        if not path.exists():
-            raise FileNotFoundError("Cannot find {infile}.")
-        return str(path.with_suffix(".ll"))
-
-
-class PreEnzymeOpt(PassPipeline):
-    """Run optimizations on the LLVM IR prior to being run through Enzyme."""
-
-    _executable = get_executable_path("llvm", "opt")
-    _default_flags = ["-O2", "-S"]
-
-    @staticmethod
-    def get_output_filename(infile):
-        path = pathlib.Path(infile)
-        if not path.exists():
-            raise FileNotFoundError("Cannot find {infile}.")
-        return str(path.with_suffix(".preenzyme.ll"))
-
-
-class Enzyme(PassPipeline):
-    """Pass pipeline to lower LLVM IR to Enzyme LLVM IR."""
-
-    _executable = get_executable_path("llvm", "opt")
-    enzyme_path = get_lib_path("enzyme", "ENZYME_LIB_DIR")
-    apple_ext = "dylib"
-    linux_ext = "so"
-    ext = linux_ext if platform.system() == "Linux" else apple_ext
-    _default_flags = [
-        f"-load-pass-plugin={enzyme_path}/LLVMEnzyme-18.{ext}",
-        # preserve-nvvm transforms certain global arrays to LLVM metadata that Enzyme will recognize
-        "-passes=preserve-nvvm,enzyme",
-        "-S",
-    ]
-
-    @staticmethod
-    def get_output_filename(infile):
-        path = pathlib.Path(infile)
-        if not path.exists():
-            raise FileNotFoundError("Cannot find {infile}.")
-        return str(path.with_suffix(".postenzyme.ll"))
-
-
-class LLVMIRToObjectFile(PassPipeline):
-    """LLVMIR To Object File."""
-
-    _executable = get_executable_path("llvm", "llc")
-    _default_flags = [
-        "--filetype=obj",
-        "--relocation-model=pic",
-        # -O0 is used to achieve compile times similar to -regalloc=fast and disabling
-        # -twoaddrinst. However, from the command line, one cannot disable -twoaddrinst
-        "-O0",
-    ]
-
-    @staticmethod
-    def get_output_filename(infile):
-        path = pathlib.Path(infile)
-        if not path.exists():
-            raise FileNotFoundError("Cannot find {infile}.")
-        return str(path.with_suffix(".o"))
-
-
-class CompilerDriver:
-    """Compiler Driver Interface
-    In order to avoid relying on a single compiler at run time and allow the user some flexibility,
+class LinkerDriver:
+    """Compiler used to drive the linking stage.
+    In order to avoid relying on a single linker at run time and allow the user some flexibility,
     this class defines a compiler resolution order where multiple known compilers are attempted.
     The order is defined as follows:
     1. A user specified compiler via the environment variable CATALYST_CC. It is expected that the
@@ -395,7 +229,7 @@ class CompilerDriver:
     def _get_compiler_fallback_order(fallback_compilers):
         """Compiler fallback order"""
         preferred_compiler = os.environ.get("CATALYST_CC", None)
-        preferred_compiler_exists = CompilerDriver._exists(preferred_compiler)
+        preferred_compiler_exists = LinkerDriver._exists(preferred_compiler)
         compilers = fallback_compilers
         emit_warning = preferred_compiler and not preferred_compiler_exists
         if emit_warning:
@@ -413,8 +247,8 @@ class CompilerDriver:
 
     @staticmethod
     def _available_compilers(fallback_compilers):
-        for compiler in CompilerDriver._get_compiler_fallback_order(fallback_compilers):
-            if CompilerDriver._exists(compiler):
+        for compiler in LinkerDriver._get_compiler_fallback_order(fallback_compilers):
+            if LinkerDriver._exists(compiler):
                 yield compiler
 
     @staticmethod
@@ -441,7 +275,7 @@ class CompilerDriver:
         """
         path = pathlib.Path(infile)
         if not path.exists():
-            raise FileNotFoundError("Cannot find {infile}.")
+            raise FileNotFoundError(f"Cannot find {infile}.")
         return str(path.with_suffix(".so"))
 
     @staticmethod
@@ -451,23 +285,23 @@ class CompilerDriver:
 
         Args:
             infile (str): input file
-            outfile (str): output file
-            Optional flags (List[str]): flags to be passed down to the compiler
-            Optional fallback_compilers (List[str]): name of executables to be looked for in PATH
-            Optional compile_options (CompileOptions): generic compilation options.
+            outfile (Optional[str]): output file
+            flags (Optional[List[str]]): flags to be passed down to the compiler
+            fallback_compilers (Optional[List[str]]): name of executables to be looked for in PATH
+            compile_options (Optional[CompileOptions]): generic compilation options.
         Raises:
             EnvironmentError: The exception is raised when no compiler succeeded.
         """
         if outfile is None:
-            outfile = CompilerDriver.get_output_filename(infile)
+            outfile = LinkerDriver.get_output_filename(infile)
         if flags is None:
-            flags = CompilerDriver.get_default_flags()
+            flags = LinkerDriver.get_default_flags()
         if fallback_compilers is None:
-            fallback_compilers = CompilerDriver._default_fallback_compilers
+            fallback_compilers = LinkerDriver._default_fallback_compilers
         if options is None:
             options = CompileOptions()
-        for compiler in CompilerDriver._available_compilers(fallback_compilers):
-            success = CompilerDriver._attempt_link(compiler, flags, infile, outfile, options)
+        for compiler in LinkerDriver._available_compilers(fallback_compilers):
+            success = LinkerDriver._attempt_link(compiler, flags, infile, outfile, options)
             if success:
                 return outfile
         msg = f"Unable to link {infile}. Please check the output for any error messages. If no "
@@ -476,15 +310,85 @@ class CompilerDriver:
 
 
 class Compiler:
-    """Compiles MLIR modules to shared objects."""
+    """Compiles MLIR modules to shared objects by executing the Catalyst compiler driver library."""
 
-    def __init__(self):
-        self.pass_pipeline_output = {}
-        # The temporary directory must be referenced by the wrapper class
-        # in order to avoid being garbage collected
-        self.workspace = tempfile.TemporaryDirectory()  # pylint: disable=consider-using-with
+    def __init__(self, options: Optional[CompileOptions] = None):
+        self.options = options if options is not None else CompileOptions
+        self.last_compiler_output = None
+        self.last_workspace = None
+        self.last_tmpdir = None
 
-    def run(self, mlir_module, options):
+    def run_from_ir(
+        self,
+        ir: str,
+        module_name: str,
+        pipelines=None,
+        lower_to_llvm=True,
+    ):
+        """Compile a shared object from a textual IR (MLIR or LLVM).
+
+        Args:
+            ir (str): Textual MLIR to be compiled
+            module_name (str): Module name to use for naming
+            pipelines (list, optional): Custom compilation pipelines configuration. The default is
+                                        None which means to use the default pipelines config.
+            lower_to_llvm (bool, optional): Whether to lower to LLVM after finishing processing of
+                                            the pipelines. Defaults to True.
+
+        Returns:
+            output_filename (str): Output file name. For the default pipeline this would be the
+                                   shard object library path.
+            out_IR (str): Output IR in textual form. For the default pipeline this would be the
+                          LLVM IR.
+            A list of:
+               func_name (str) Inferred name of the main function
+               ret_type_name (str) Inferred main function result type name
+        """
+        pipelines = pipelines if pipelines is not None else DEFAULT_PIPELINES
+        if self.options.keep_intermediate:
+            workspace = os.path.abspath(os.path.join(os.getcwd(), module_name))
+            os.makedirs(workspace, exist_ok=True)
+        else:
+            # pylint: disable=consider-using-with
+            if self.last_tmpdir:
+                self.last_tmpdir.cleanup()
+            self.last_tmpdir = tempfile.TemporaryDirectory()
+            workspace = self.last_tmpdir.name
+
+        self.last_workspace = workspace
+
+        if self.options.verbose:
+            print(f"[LIB] Running compiler driver in {workspace}", file=self.options.logfile)
+
+        compiler_output = run_compiler_driver(
+            ir,
+            workspace,
+            module_name,
+            keep_intermediate=self.options.keep_intermediate,
+            verbose=self.options.verbose,
+            pipelines=pipelines,
+            lower_to_llvm=lower_to_llvm,
+        )
+
+        if self.options.verbose:
+            for line in compiler_output.get_diagnostic_messages().strip().split("\n"):
+                print(f"[LIB] {line}", file=self.options.logfile)
+
+        filename = compiler_output.get_object_filename()
+        out_IR = compiler_output.get_output_ir()
+        func_name = compiler_output.get_function_attributes().get_function_name()
+        ret_type_name = compiler_output.get_function_attributes().get_return_type()
+
+        if lower_to_llvm:
+            output = LinkerDriver.run(filename, options=self.options)
+            output_filename = str(pathlib.Path(output).absolute())
+        else:
+            output_filename = filename
+
+        self.last_compiler_output = compiler_output
+        return output_filename, out_IR, [func_name, ret_type_name]
+
+    def run(self, mlir_module, *args, **kwargs):
         """Compile an MLIR module to a shared object.
 
         .. note::
@@ -493,67 +397,34 @@ class Compiler:
             please see the :func:`~.qjit` decorator.
 
         Args:
-            compile_options (Optional[CompileOptions]): common compilation options
+            mlir_module: The MLIR module to be compiled
 
         Returns:
             (str): filename of shared object
         """
 
-        module_name = mlir_module.operation.attributes["sym_name"]
-        # Convert MLIR string to Python string
-        module_name = str(module_name)
-        # Remove quotations
-        module_name = module_name.replace('"', "")
+        return self.run_from_ir(
+            mlir_module.operation.get_asm(
+                binary=False, print_generic_op_form=False, assume_verified=True
+            ),
+            *args,
+            module_name=str(mlir_module.operation.attributes["sym_name"]).replace('"', ""),
+            **kwargs,
+        )
 
-        if options.keep_intermediate:
-            parent_dir = os.getcwd()
-            path = os.path.join(parent_dir, module_name)
-            os.makedirs(path, exist_ok=True)
-            workspace_name = os.path.abspath(path)
-        else:
-            workspace_name = self.workspace.name
-
-        pipelines = options.pipelines
-        if pipelines is None:
-            pipelines = [
-                MHLOPass,
-                QuantumCompilationPass,
-                BufferizationPass,
-                MLIRToLLVMDialect,
-                LLVMDialectToLLVMIR,
-                PreEnzymeOpt,
-                Enzyme,
-                LLVMIRToObjectFile,
-                CompilerDriver,
-            ]
-
-        self.pass_pipeline_output = {}
-
-        filename = f"{workspace_name}/{module_name}.mlir"
-        with open(filename, "w", encoding="utf-8") as f:
-            mlir_module.operation.print(f, print_generic_op_form=False, assume_verified=True)
-
-        for pipeline in pipelines:
-            output = pipeline.run(filename, options=options)
-            self.pass_pipeline_output[pipeline.__name__] = output
-            filename = os.path.abspath(output)
-
-        return filename
-
-    def get_output_of(self, pipeline):
+    def get_output_of(self, pipeline) -> Optional[str]:
         """Get the output IR of a pipeline.
         Args:
             pipeline (str): name of pass class
 
         Returns
-            (str): output IR
+            (Optional[str]): output IR
         """
-        fname = self.pass_pipeline_output.get(pipeline)
-        if fname:
-            with open(fname, "r", encoding="utf-8") as f:
-                txt = f.read()
-            return txt
-        return None
+        return (
+            self.last_compiler_output.get_pipeline_output(pipeline)
+            if self.last_compiler_output
+            else None
+        )
 
     def print(self, pipeline):
         """Print the output IR of pass.

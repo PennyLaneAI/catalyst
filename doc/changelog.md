@@ -7,6 +7,16 @@
 * Update the Lightning backend device to work with the PL-Lightning monorepo.
   [(#259)](https://github.com/PennyLaneAI/catalyst/pull/259)
 
+* Move to an alternate compiler driver in C++. This improves compile-time performance by
+  avoiding *round-tripping*, which is when the entire program being compiled is dumped to
+  a textual form and re-parsed by another tool.
+
+  This is also a requirement for providing custom metadata at the LLVM level, which is
+  necessary for better integration with tools like Enzyme. Finally, this makes it more natural
+  to improve error messages originating from C++ when compared to the prior subprocess-based
+  approach.
+  [(#216)](https://github.com/PennyLaneAI/catalyst/pull/216)
+
 * Build both `"lightning.qubit"` and `"lightning.kokkos"` against the PL-Lightning monorepo.
   [(#277)](https://github.com/PennyLaneAI/catalyst/pull/277)
 
@@ -22,7 +32,10 @@
 
 This release contains contributions from (in alphabetical order):
 
-Ali Asadi
+Ali Asadi,
+Erick Ochoa Lopez,
+Jacob Mai Peng,
+Sergei Mironov.
 
 # Release 0.3.0
 

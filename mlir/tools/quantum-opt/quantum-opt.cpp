@@ -12,12 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "mhlo/IR/register.h"
+#include "mhlo/transforms/passes.h"
 #include "mlir/Dialect/Func/Extensions/AllExtensions.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/DialectRegistry.h"
 #include "mlir/InitAllDialects.h"
 #include "mlir/InitAllPasses.h"
 #include "mlir/Tools/mlir-opt/MlirOptMain.h"
+#include "stablehlo/dialect/Register.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Catalyst/Transforms/Passes.h"
@@ -29,18 +32,13 @@
 int main(int argc, char **argv)
 {
     mlir::registerAllPasses();
-    mlir::registerPass(catalyst::createArrayListToMemRefPass);
-    mlir::registerPass(catalyst::createGradientBufferizationPass);
-    mlir::registerPass(catalyst::createGradientLoweringPass);
-    mlir::registerPass(catalyst::createGradientConversionPass);
-    mlir::registerPass(catalyst::createQuantumBufferizationPass);
-    mlir::registerPass(catalyst::createQuantumConversionPass);
-    mlir::registerPass(catalyst::createEmitCatalystPyInterfacePass);
-    mlir::registerPass(catalyst::createCopyGlobalMemRefPass);
-    mlir::registerPass(catalyst::createAdjointLoweringPass);
+    catalyst::registerAllCatalystPasses();
+    mlir::mhlo::registerAllMhloPasses();
 
     mlir::DialectRegistry registry;
     mlir::registerAllDialects(registry);
+    mlir::mhlo::registerAllMhloDialects(registry);
+    mlir::stablehlo::registerAllDialects(registry);
     mlir::func::registerAllExtensions(registry);
     registry.insert<catalyst::CatalystDialect>();
     registry.insert<catalyst::quantum::QuantumDialect>();
