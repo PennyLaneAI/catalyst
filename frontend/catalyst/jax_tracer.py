@@ -542,7 +542,9 @@ def trace_observables(
         nested_obs = trace_observables(terms[1][0], qrp, m_wires)[0]
         obs_tracers = hamiltonian_p.bind(coeffs, nested_obs)
     else:
-        raise NotImplementedError(f"Observable {obs} (of type {type(obs)}) is not impemented")
+        raise NotImplementedError(
+            f"Observable {obs} (of type {type(obs)}) is not impemented"
+        )  # pragma: no cover
     return obs_tracers, (len(qubits) if qubits else None)
 
 
