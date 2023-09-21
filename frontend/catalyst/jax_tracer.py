@@ -450,6 +450,7 @@ def qctrl_distribute(
     """
     # Note: The transformation modifies operations in the source quantum tape, so we must not use it
     # after we called this function.
+    assert len(control_wires) > 0, "This transformation expects a non-empty list of control_wires"
     ctx = EvaluationContext.get_main_tracing_context()
     ops2 = []
     for op in tape.operations:
@@ -470,16 +471,13 @@ def qctrl_distribute(
                         )
                 ops2.append(op)
         else:
-            if len(control_wires) > 0:
-                ops2.append(
-                    Controlled(
-                        type(op)(*op.parameters, wires=op.wires),
-                        control_wires=qml.wires.Wires(control_wires),
-                        control_values=control_values,
-                    )
+            ops2.append(
+                Controlled(
+                    type(op)(*op.parameters, wires=op.wires),
+                    control_wires=qml.wires.Wires(control_wires),
+                    control_values=control_values,
                 )
-            else:
-                ops2.append(type(op)(*op.parameters, wires=op.wires))
+            )
     return QuantumTape(ops2, tape.measurements)
 
 
