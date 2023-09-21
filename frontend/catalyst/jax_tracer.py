@@ -51,6 +51,7 @@ from catalyst.jax_primitives import (
     tensorobs_p,
     var_p,
 )
+from catalyst.utils.contexts import EvaluationContext, EvaluationMode, JaxTracingContext
 from catalyst.utils.jax_extras import (
     ClosedJaxpr,
     DynamicJaxprTrace,
@@ -70,7 +71,6 @@ from catalyst.utils.jax_extras import (
     unzip2,
     wrap_init,
 )
-from catalyst.utils.tracing import EvaluationContext, EvaluationMode, JaxTracingContext
 
 
 class Function:

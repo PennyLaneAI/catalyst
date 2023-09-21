@@ -59,6 +59,7 @@ from catalyst.jax_tracer import (
     trace_quantum_function,
     trace_quantum_tape,
 )
+from catalyst.utils.contexts import EvaluationContext, EvaluationMode, JaxTracingContext
 from catalyst.utils.exceptions import CompileError, DifferentiableCompileError
 from catalyst.utils.jax_extras import (
     ClosedJaxpr,
@@ -75,7 +76,6 @@ from catalyst.utils.jax_extras import (
     wrap_init,
 )
 from catalyst.utils.patching import Patcher
-from catalyst.utils.tracing import EvaluationContext, EvaluationMode, JaxTracingContext
 
 
 class QFunc:

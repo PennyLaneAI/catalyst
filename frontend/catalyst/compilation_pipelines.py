@@ -42,9 +42,9 @@ from catalyst.jax_tracer import trace_to_mlir
 from catalyst.pennylane_extensions import QFunc
 from catalyst.utils import wrapper  # pylint: disable=no-name-in-module
 from catalyst.utils.c_template import get_template, mlir_type_to_numpy_type
+from catalyst.utils.contexts import EvaluationContext
 from catalyst.utils.gen_mlir import inject_functions
 from catalyst.utils.patching import Patcher
-from catalyst.utils.tracing import EvaluationContext
 
 # Required for JAX tracer objects as PennyLane wires.
 # pylint: disable=unnecessary-lambda
