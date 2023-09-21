@@ -36,15 +36,15 @@ from mlir_quantum.runtime import (
 )
 
 import catalyst
-import catalyst.jax_tracer as tracer
 from catalyst.ag_utils import run_autograph
 from catalyst.compiler import CompileOptions, Compiler
+from catalyst.jax_tracer import trace_to_mlir
 from catalyst.pennylane_extensions import QFunc
 from catalyst.utils import wrapper  # pylint: disable=no-name-in-module
 from catalyst.utils.c_template import get_template, mlir_type_to_numpy_type
+from catalyst.utils.contexts import EvaluationContext
 from catalyst.utils.gen_mlir import inject_functions
 from catalyst.utils.patching import Patcher
-from catalyst.utils.tracing import TracingContext
 
 # Required for JAX tracer objects as PennyLane wires.
 # pylint: disable=unnecessary-lambda
@@ -480,7 +480,7 @@ class QJIT:
             self.user_function = run_autograph(fn)
 
         if self.compiling_from_textual_ir:
-            TracingContext.check_is_not_tracing("Cannot compile from IR in tracing context.")
+            EvaluationContext.check_is_not_tracing("Cannot compile from IR in tracing context.")
         else:
             parameter_types = get_type_annotations(self.user_function)
             if parameter_types is not None:
@@ -532,7 +532,7 @@ class QJIT:
         with Patcher(
             (qml.QNode, "__call__", QFunc.__call__),
         ):
-            mlir_module, ctx, jaxpr, self.shape = tracer.get_mlir(self.user_function, *self.c_sig)
+            mlir_module, ctx, jaxpr, self.shape = trace_to_mlir(self.user_function, *self.c_sig)
 
         inject_functions(mlir_module, ctx)
         self._jaxpr = jaxpr
@@ -634,14 +634,14 @@ class QJIT:
           str: A C program that can be compiled with the current shared object.
         """
         msg = "C interface cannot be generated from tracing context."
-        TracingContext.check_is_not_tracing(msg)
+        EvaluationContext.check_is_not_tracing(msg)
         function, args = self._ensure_real_arguments_and_formal_parameters_are_compatible(
             self.compiled_function, *args
         )
         return function.get_cmain(*args)
 
     def __call__(self, *args, **kwargs):
-        if TracingContext.is_tracing():
+        if EvaluationContext.is_tracing():
             return self.user_function(*args, **kwargs)
 
         function, args = self._ensure_real_arguments_and_formal_parameters_are_compatible(
