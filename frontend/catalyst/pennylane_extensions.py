@@ -19,6 +19,7 @@ while using :func:`~.qjit`.
 # pylint: disable=too-many-lines
 
 import numbers
+from functools import update_wrapper
 from typing import Any, Callable, Iterable, List, Optional, Union
 
 import jax
@@ -29,6 +30,7 @@ from jax._src.core import get_aval
 from jax._src.lax.lax import _abstractify
 from jax._src.tree_util import PyTreeDef, tree_flatten, tree_unflatten, treedef_is_leaf
 from pennylane import QNode, QueuingManager
+from pennylane.measurements import MidMeasureMP
 from pennylane.operation import Operator
 from pennylane.tape import QuantumTape
 
@@ -52,12 +54,12 @@ from catalyst.jax_tracer import (
     Function,
     HybridOp,
     HybridOpRegion,
-    QFunc,
     QRegPromise,
     deduce_avals,
+    trace_quantum_function,
     trace_quantum_tape,
 )
-from catalyst.utils.exceptions import DifferentiableCompileError
+from catalyst.utils.exceptions import CompileError, DifferentiableCompileError
 from catalyst.utils.jax_extras import (
     ClosedJaxpr,
     DynamicJaxprTracer,
@@ -69,8 +71,195 @@ from catalyst.utils.jax_extras import (
     initial_style_jaxprs_with_common_consts1,
     initial_style_jaxprs_with_common_consts2,
     new_inner_tracer,
+    tree_structure,
+    wrap_init,
 )
+from catalyst.utils.patching import Patcher
 from catalyst.utils.tracing import EvaluationContext, EvaluationMode, JaxTracingContext
+
+
+class QFunc:
+    """A device specific quantum function.
+
+    Args:
+        qfunc (Callable): the quantum function
+        shots (int): How many times the circuit should be evaluated (or sampled) to estimate
+            the expectation values
+        device (a derived class from QubitDevice): a device specification which determines
+            the valid gate set for the quantum function
+    """
+
+    # The set of supported devices at runtime
+    RUNTIME_DEVICES = (
+        "lightning.qubit",
+        "lightning.kokkos",
+        "braket.aws.qubit",
+        "braket.local.qubit",
+    )
+
+    def __init__(self, fn, device):
+        self.func = fn
+        self.device = device
+        update_wrapper(self, fn)
+
+    def __call__(self, *args, **kwargs):
+        if isinstance(self, qml.QNode):
+            if self.device.short_name not in QFunc.RUNTIME_DEVICES:
+                raise CompileError(
+                    f"The {self.device.short_name} device is not "
+                    "supported for compilation at the moment."
+                )
+
+            backend_kwargs = {}
+            if hasattr(self.device, "shots"):
+                backend_kwargs["shots"] = self.device.shots if self.device.shots else 0
+            if self.device.short_name == "braket.local.qubit":  # pragma: no cover
+                backend_kwargs["backend"] = self.device._device._delegate.DEVICE_ID
+            elif self.device.short_name == "braket.aws.qubit":  # pragma: no cover
+                backend_kwargs["device_arn"] = self.device._device._arn
+                if self.device._s3_folder:
+                    backend_kwargs["s3_destination_folder"] = str(self.device._s3_folder)
+
+            device = QJITDevice(
+                self.device.shots, self.device.wires, self.device.short_name, backend_kwargs
+            )
+        else:
+            # Allow QFunc to still be used by itself for internal testing.
+            device = self.device
+
+        with EvaluationContext(EvaluationMode.QUANTUM_COMPILATION):
+            jaxpr, shape = trace_quantum_function(self.func, device, args, kwargs)
+
+        retval_tree = tree_structure(shape)
+
+        def _eval_jaxpr(*args):
+            return jax.core.eval_jaxpr(jaxpr.jaxpr, jaxpr.consts, *args)
+
+        args_data, _ = tree_flatten(args)
+
+        wrapped = wrap_init(_eval_jaxpr)
+        retval = func_p.bind(wrapped, *args_data, fn=self)
+
+        return tree_unflatten(retval_tree, retval)
+
+
+class QJITDevice(qml.QubitDevice):
+    """QJIT device.
+
+    A device that interfaces the compilation pipeline of Pennylane programs.
+
+    Args:
+        wires (int): the number of wires to initialize the device with
+        shots (int): How many times the circuit should be evaluated (or sampled) to estimate
+            the expectation values. Defaults to ``None`` if not specified. Setting
+            to ``None`` results in computing statistics like expectation values and
+            variances analytically
+        backend_name (str): name of the device from the list of supported and compiled backend
+            devices by the runtime
+        backend_kwargs (Dict(str, AnyType)): An optional dictionary of the device specifications
+    """
+
+    name = "QJIT device"
+    short_name = "qjit.device"
+    pennylane_requires = "0.1.0"
+    version = "0.0.1"
+    author = ""
+    operations = [
+        "MidCircuitMeasure",
+        "Cond",
+        "WhileLoop",
+        "ForLoop",
+        "PauliX",
+        "PauliY",
+        "PauliZ",
+        "Hadamard",
+        "Identity",
+        "S",
+        "T",
+        "PhaseShift",
+        "RX",
+        "RY",
+        "RZ",
+        "CNOT",
+        "CY",
+        "CZ",
+        "SWAP",
+        "IsingXX",
+        "IsingYY",
+        "IsingXY",
+        "IsingZZ",
+        "ControlledPhaseShift",
+        "CRX",
+        "CRY",
+        "CRZ",
+        "CRot",
+        "CSWAP",
+        "MultiRZ",
+        "QubitUnitary",
+        "Adjoint",
+    ]
+    observables = [
+        "Identity",
+        "PauliX",
+        "PauliY",
+        "PauliZ",
+        "Hadamard",
+        "Hermitian",
+        "Hamiltonian",
+    ]
+
+    def __init__(self, shots=None, wires=None, backend_name=None, backend_kwargs=None):
+        self.backend_name = backend_name if backend_name else "default"
+        self.backend_kwargs = backend_kwargs if backend_kwargs else {}
+        super().__init__(wires=wires, shots=shots)
+
+    def apply(self, operations, **kwargs):
+        """
+        Raises: RuntimeError
+        """
+        raise RuntimeError("QJIT devices cannot apply operations.")  # pragma: no cover
+
+    def default_expand_fn(self, circuit, max_expansion=10):
+        """
+        Most decomposition logic will be equivalent to PennyLane's decomposition.
+        However, decomposition logic will differ in the following cases:
+
+        1. All :class:`qml.QubitUnitary <pennylane.ops.op_math.Controlled>` operations
+            will decompose to :class:`qml.QubitUnitary <pennylane.QubitUnitary>` operations.
+        2. :class:`qml.ControlledQubitUnitary <pennylane.ControlledQubitUnitary>` operations
+            will decompose to :class:`qml.QubitUnitary <pennylane.QubitUnitary>` operations.
+        3. The list of device-supported gates employed by Catalyst is currently different than
+            that of the ``lightning.qubit`` device, as defined by the
+            :class:`~.pennylane_extensions.QJITDevice`.
+
+        Args:
+            circuit: circuit to expand
+            max_expansion: the maximum number of expansion steps if no fixed-point is reached.
+        """
+        # Ensure catalyst.measure is used instead of qml.measure.
+        if any(isinstance(op, MidMeasureMP) for op in circuit.operations):
+            raise CompileError("Must use 'measure' from Catalyst instead of PennyLane.")
+
+        # Fallback for controlled gates that won't decompose successfully.
+        # Doing so before rather than after decomposition is generally a trade-off. For low
+        # numbers of qubits, a unitary gate might be faster, while for large qubit numbers prior
+        # decomposition is generally faster.
+        # At the moment, bypassing decomposition for controlled gates will generally have a higher
+        # success rate, as complex decomposition paths can fail to trace (c.f. PL #3521, #3522).
+
+        def _decomp_controlled(self, *_args, **_kwargs):
+            return [qml.QubitUnitary(qml.matrix(self), wires=self.wires)]
+
+        with Patcher(
+            (qml.ops.Controlled, "has_decomposition", lambda self: True),
+            (qml.ops.Controlled, "decomposition", _decomp_controlled),
+            # TODO: Remove once work_wires is no longer needed for decomposition.
+            (qml.ops.MultiControlledX, "decomposition", _decomp_controlled),
+        ):
+            expanded_tape = super().default_expand_fn(circuit, max_expansion)
+
+        self.check_validity(expanded_tape.operations, [])
+        return expanded_tape
 
 
 def qfunc(device):
