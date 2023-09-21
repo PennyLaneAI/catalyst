@@ -75,9 +75,9 @@ def PrintOp : Catalyst_Op<"print"> {
         OptionalAttr<StrAttr>:$const_val
     );
 
-    let assemblyFormat = [{
-        ($const_val^)? ($val^ `:` type($val))? attr-dict
-    }];
+    // let assemblyFormat = [{
+    //     ($const_val^)? ($val^ `:` type($val))? attr-dict
+    // }];
 }
 
 #endif // GRADIENT_OPS

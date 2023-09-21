@@ -48,32 +48,73 @@ LLVM::LLVMFuncOp ensureFunctionDeclaration(PatternRewriter &rewriter, Operation 
     return cast<LLVM::LLVMFuncOp>(fnDecl);
 }
 
+Value getGlobalString(Location loc, OpBuilder &rewriter, StringRef key, StringRef value,
+                      ModuleOp mod)
+{
+    LLVM::GlobalOp glb = mod.lookupSymbol<LLVM::GlobalOp>(key);
+    if (!glb) {
+        OpBuilder::InsertionGuard guard(rewriter); // to reset the insertion point
+        rewriter.setInsertionPointToStart(mod.getBody());
+        glb = rewriter.create<LLVM::GlobalOp>(
+            loc, LLVM::LLVMArrayType::get(IntegerType::get(rewriter.getContext(), 8), value.size()),
+            true, LLVM::Linkage::Internal, key, rewriter.getStringAttr(value));
+    }
+
+    auto idx =
+        rewriter.create<LLVM::ConstantOp>(loc, IntegerType::get(rewriter.getContext(), 64),
+                                          rewriter.getIntegerAttr(rewriter.getIndexType(), 0));
+    return rewriter.create<LLVM::GEPOp>(
+        loc, LLVM::LLVMPointerType::get(IntegerType::get(rewriter.getContext(), 8)),
+        rewriter.create<LLVM::AddressOfOp>(loc, glb), ArrayRef<Value>({idx, idx}));
+}
+
 struct PrintOpPattern : public OpConversionPattern<PrintOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(PrintOp op, PrintOpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
-        constexpr int64_t UNKNOWN = ShapedType::kDynamic;
 
         Location loc = op.getLoc();
         MLIRContext *ctx = this->getContext();
-        TypeConverter *conv = getTypeConverter();
 
-        StringRef qirName = "_catalyst_memref_print";
         Type void_t = LLVM::LLVMVoidType::get(ctx);
-        Type vectorType = conv->convertType(MemRefType::get({UNKNOWN}, IntegerType::get(ctx, 64)));
 
-        Type qirSignature =
-            LLVM::LLVMFunctionType::get(void_t, LLVM::LLVMPointerType::get(vectorType));
-        LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+        auto cvar_str = op.getConstVal();
+        if (cvar_str) {
+            ModuleOp mod = op->getParentOfType<ModuleOp>();
 
-        Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
-        Value structPtr =
-            rewriter.create<LLVM::AllocaOp>(loc, LLVM::LLVMPointerType::get(vectorType), c1);
-        rewriter.create<LLVM::StoreOp>(loc, adaptor.getVal(), structPtr);
+            StringRef qirName = "_catalyst_string_print";
 
-        rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, structPtr);
+            Type intPtrType = LLVM::LLVMPointerType::get(IntegerType::get(ctx, 8));
+            Type qirSignature = LLVM::LLVMFunctionType::get(void_t, intPtrType);
+            LLVM::LLVMFuncOp fnDecl =
+                ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+
+            auto spec = cvar_str.value();
+            Value spec_val = getGlobalString(loc, rewriter, spec, spec, mod);
+            rewriter.create<LLVM::CallOp>(loc, fnDecl, spec_val);
+            rewriter.eraseOp(op);
+        }
+        else {
+            constexpr int64_t UNKNOWN = ShapedType::kDynamic;
+            TypeConverter *conv = getTypeConverter();
+            StringRef qirName = "_catalyst_memref_print";
+            Type vectorType =
+                conv->convertType(MemRefType::get({UNKNOWN}, IntegerType::get(ctx, 64)));
+
+            Type qirSignature =
+                LLVM::LLVMFunctionType::get(void_t, LLVM::LLVMPointerType::get(vectorType));
+            LLVM::LLVMFuncOp fnDecl =
+                ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
+
+            Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
+            Value structPtr =
+                rewriter.create<LLVM::AllocaOp>(loc, LLVM::LLVMPointerType::get(vectorType), c1);
+            rewriter.create<LLVM::StoreOp>(loc, adaptor.getVal(), structPtr);
+            rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, structPtr);
+        }
+
         return success();
     }
 };

@@ -98,6 +98,7 @@ void __quantum__qis__Gradient_params(MemRefT_int64_1d *, int64_t, /*results*/...
 
 // Utility methods
 void _catalyst_memref_print(MemRefT_int64_1d *);
+void _catalyst_string_print(int8_t *);
 
 #ifdef __cplusplus
 } // extern "C"

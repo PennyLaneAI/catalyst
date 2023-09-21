@@ -91,6 +91,18 @@ void _catalyst_memref_print(MemRefT_int64_1d *array)
     std::cerr << array_vec[size - 1] << "}\n";
 }
 
+void _catalyst_string_print(int8_t *spec)
+{
+    std::cerr << "cerr: print string from runtime" << std::endl;
+
+    if (!spec) {
+        std::cerr << "None\n";
+    }
+
+    std::string_view spec_str = reinterpret_cast<char *>(spec);
+    std::cerr << spec_str << std::endl;
+}
+
 void __quantum__rt__fail_cstr(const char *cstr) { RT_FAIL(cstr); }
 
 void __quantum__rt__initialize()

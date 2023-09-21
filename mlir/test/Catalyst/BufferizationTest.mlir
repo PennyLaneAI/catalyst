@@ -18,10 +18,20 @@
 // Catalyst PrintOp //
 //////////////////////
 
-func.func @dbprint(%arg0: tensor<?xf64>) {
+func.func @dbprint_val(%arg0: tensor<?xf64>) {
 
-    // CHECK:   catalyst.print {{.*}} : memref<?xf64>
-    catalyst.print %arg0 : tensor<?xf64>
+    // CHECK: "catalyst.print"(%0) : (memref<?xf64>) -> ()
+    "catalyst.print"(%arg0) : (tensor<?xf64>) -> ()
+
+    return
+}
+
+// -----
+
+func.func @dbprint_str() {
+
+    // CHECK: "catalyst.print"() {const_val = "Hello, Catalyst"} : () -> ()
+    "catalyst.print"() {const_val = "Hello, Catalyst"} : () -> ()
 
     return
 }

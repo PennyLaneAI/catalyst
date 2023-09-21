@@ -29,8 +29,9 @@ struct BufferizePrintOp : public OpConversionPattern<PrintOp> {
     LogicalResult matchAndRewrite(PrintOp op, OpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
-        rewriter.replaceOpWithNewOp<PrintOp>(op, adaptor.getVal(), adaptor.getConstValAttr());
-
+        if (op.getVal()) {
+            rewriter.replaceOpWithNewOp<PrintOp>(op, adaptor.getVal(), adaptor.getConstValAttr());
+        }
         return success();
     }
 };
