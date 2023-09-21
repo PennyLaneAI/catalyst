@@ -54,7 +54,7 @@ def test_decompose_multicontrolledx():
     dev = get_custom_device_without(5, {"MultiControlledX"})
 
     @qjit(target="mlir")
-    @qfunc(5, device=dev)
+    @qfunc(device=dev)
     # CHECK-LABEL: public @jit_decompose_multicontrolled_x1
     def decompose_multicontrolled_x1(theta: float):
         qml.RX(theta, wires=[0])
@@ -81,7 +81,7 @@ def test_decompose_multicontrolledx_in_conditional():
     dev = get_custom_device_without(5, {"MultiControlledX"})
 
     @qjit(target="mlir")
-    @qfunc(5, device=dev)
+    @qfunc(device=dev)
     # CHECK-LABEL: @jit_decompose_multicontrolled_x2
     def decompose_multicontrolled_x2(theta: float, n: int):
         qml.RX(theta, wires=[0])
@@ -114,7 +114,7 @@ def test_decompose_multicontrolledx_in_while_loop():
     dev = get_custom_device_without(5, {"MultiControlledX"})
 
     @qjit(target="mlir")
-    @qfunc(5, device=dev)
+    @qfunc(device=dev)
     # CHECK-LABEL: @jit_decompose_multicontrolled_x3
     def decompose_multicontrolled_x3(theta: float, n: int):
         qml.RX(theta, wires=[0])
@@ -147,7 +147,7 @@ def test_decompose_multicontrolledx_in_for_loop():
     dev = get_custom_device_without(5, {"MultiControlledX"})
 
     @qjit(target="mlir")
-    @qfunc(5, device=dev)
+    @qfunc(device=dev)
     # CHECK-LABEL: @jit_decompose_multicontrolled_x4
     def decompose_multicontrolled_x4(theta: float, n: int):
         qml.RX(theta, wires=[0])
@@ -179,7 +179,7 @@ def test_decompose_rot():
     dev = get_custom_device_without(1, {"Rot"})
 
     @qjit(target="mlir")
-    @qfunc(1, device=dev)
+    @qfunc(device=dev)
     # CHECK-LABEL: public @jit_decompose_rot
     def decompose_rot(phi: float, theta: float, omega: float):
         # CHECK-NOT: name = "Rot"
@@ -208,7 +208,7 @@ def test_decompose_s():
     dev = get_custom_device_without(1, {"S"})
 
     @qjit(target="mlir")
-    @qfunc(1, device=dev)
+    @qfunc(device=dev)
     # CHECK-LABEL: public @jit_decompose_s
     def decompose_s():
         # CHECK-NOT: name="S"
@@ -229,7 +229,7 @@ def test_decompose_qubitunitary():
     dev = get_custom_device_without(1, {"QubitUnitary"})
 
     @qjit(target="mlir")
-    @qfunc(1, device=dev)
+    @qfunc(device=dev)
     # CHECK-LABEL: public @jit_decompose_qubit_unitary
     def decompose_qubit_unitary(U: jax.core.ShapedArray([2, 2], float)):
         # CHECK-NOT: name = "QubitUnitary"
@@ -250,7 +250,7 @@ def test_decompose_singleexcitationplus():
     dev = get_custom_device_without(2, {"SingleExcitationPlus"})
 
     @qjit(target="mlir")
-    @qfunc(2, device=dev)
+    @qfunc(device=dev)
     # CHECK-LABEL: public @jit_decompose_singleexcitationplus
     def decompose_singleexcitationplus(theta: float):
         # pylint: disable=line-too-long
