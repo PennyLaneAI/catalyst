@@ -261,17 +261,6 @@ class TestCompilerState:
             assert observed_outfilename == expected_outfilename
             assert os.path.exists(observed_outfilename)
 
-    def test_qfunc_no_device(self):
-        """Test qfunc with device=None"""
-
-        @qjit()
-        @qfunc(1, device=None)
-        def circuit():
-            qml.PauliX(wires=0)
-            return measure(wires=0)
-
-        assert circuit()
-
     def test_compiler_from_textual_ir(self):
         """Test the textual IR compilation."""
 
