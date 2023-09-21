@@ -18,49 +18,45 @@ from __future__ import annotations
 from contextlib import contextmanager
 from typing import Any, Callable, Dict, Generator, List, Optional, Sequence, Set, Type
 
+from jax import ShapeDtypeStruct
 from jax._src import state, util
-from jax._src.api import ShapeDtypeStruct
-from jax._src.api_util import flatten_fun, shaped_abstractify
-from jax._src.core import ClosedJaxpr, Jaxpr, JaxprEqn, MainTrace
-from jax._src.core import Primitive as JaxprPrimitive
-from jax._src.core import (
-    ShapedArray,
-    Trace,
-    _update_thread_local_jit_state,
-    gensym,
-    thread_local_state,
-)
+from jax._src.core import _update_thread_local_jit_state
 from jax._src.dispatch import jaxpr_replicas
 from jax._src.effects import ordered_effects as jax_ordered_effects
-from jax._src.interpreters.mlir import (
+from jax._src.interpreters.mlir import _module_name_regex
+from jax._src.interpreters.partial_eval import _input_type_to_tracers
+from jax._src.lax.control_flow import _initial_style_jaxpr, _initial_style_open_jaxpr
+from jax._src.lax.lax import _abstractify, xb, xla
+from jax._src.linear_util import annotate
+from jax._src.sharding_impls import ReplicaAxisContext
+from jax._src.source_info_util import current as jax_current
+from jax._src.source_info_util import new_name_stack
+from jax._src.util import partition_list, safe_map, unzip2, unzip3, wrap_name
+from jax.api_util import flatten_fun, shaped_abstractify
+from jax.core import ClosedJaxpr, Jaxpr, JaxprEqn, MainTrace
+from jax.core import Primitive as JaxprPrimitive
+from jax.core import ShapedArray, Trace, gensym, thread_local_state
+from jax.interpreters.mlir import (
     AxisContext,
     ModuleContext,
-    _module_name_regex,
     ir,
     lower_jaxpr_to_fun,
     lowerable_effects,
 )
-from jax._src.interpreters.partial_eval import (
+from jax.interpreters.partial_eval import (
     DynamicJaxprTrace,
     DynamicJaxprTracer,
-    _input_type_to_tracers,
     convert_constvars_jaxpr,
     make_jaxpr_effects,
 )
-from jax._src.lax.control_flow import _initial_style_jaxpr, _initial_style_open_jaxpr
-from jax._src.lax.lax import _abstractify, xb, xla
-from jax._src.linear_util import annotate, wrap_init
-from jax._src.sharding_impls import ReplicaAxisContext
-from jax._src.source_info_util import current as jax_current
-from jax._src.source_info_util import new_name_stack
-from jax._src.tree_util import (
+from jax.linear_util import wrap_init
+from jax.tree_util import (
     PyTreeDef,
     tree_flatten,
     tree_structure,
     tree_unflatten,
     treedef_is_leaf,
 )
-from jax._src.util import partition_list, safe_map, unzip2, unzip3, wrap_name
 from jaxlib.xla_extension import pytree
 
 __all__ = (
