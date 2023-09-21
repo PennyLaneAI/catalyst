@@ -56,7 +56,7 @@ class CFTransformer(transpiler.PyToPy):
 
         return new_obj, module, source_map
 
-    def transform_ast(self, node, user_context):
+    def transform_ast(self, node, ctx):
         """This method must be overwritten to run all desired transformations. AutoGraph provides
         several existing transforms, but we can all also provide our own in the future."""
 
@@ -64,13 +64,13 @@ class CFTransformer(transpiler.PyToPy):
         unsupported_features_checker.verify(node)
 
         # First transform the top-level function to avoid infinite recursion.
-        node = functions.transform(node, user_context)
+        node = functions.transform(node, ctx)
 
         # Convert function calls. This allows us to convert these called functions as well.
-        node = call_trees.transform(node, user_context)
+        node = call_trees.transform(node, ctx)
 
         # Convert Python control flow to custom 'ag__.if_stmt' ... functions.
-        node = control_flow.transform(node, user_context)
+        node = control_flow.transform(node, ctx)
 
         return node
 
