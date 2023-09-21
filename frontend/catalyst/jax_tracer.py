@@ -28,7 +28,6 @@ from pennylane.tape import QuantumTape
 
 from catalyst.jax_primitives import (
     AbstractQreg,
-    adjoint_p,
     compbasis_p,
     counts_p,
     expval_p,
@@ -46,7 +45,6 @@ from catalyst.jax_primitives import (
     qfor_p,
     qinsert_p,
     qinst_p,
-    qmeasure_p,
     qunitary_p,
     qwhile_p,
     sample_p,
@@ -258,158 +256,6 @@ def has_nested_tapes(op: Operation) -> bool:
         and len(op.regions) > 0
         and any(r.quantum_tape is not None for r in op.regions)
     )
-
-
-class ForLoop(HybridOp):
-    """PennyLane ForLoop Operation."""
-
-    binder = qfor_p.bind
-
-    def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
-        op = self
-        inner_trace = op.regions[0].trace
-        inner_tape = op.regions[0].quantum_tape
-        res_classical_tracers = op.regions[0].res_classical_tracers
-
-        with EvaluationContext.frame_tracing_context(ctx, inner_trace):
-            qreg_in = _input_type_to_tracers(inner_trace.new_arg, [AbstractQreg()])[0]
-            qrp_out = trace_quantum_tape(inner_tape, device, qreg_in, ctx, inner_trace)
-            qreg_out = qrp_out.actualize()
-            jaxpr, _, consts = ctx.frames[inner_trace].to_jaxpr2(res_classical_tracers + [qreg_out])
-
-        step = op.in_classical_tracers[2]
-        apply_reverse_transform = isinstance(step, int) and step < 0
-        qreg = qrp.actualize()
-        qrp2 = QRegPromise(
-            op.bind_overwrite_classical_tracers(
-                ctx,
-                trace,
-                op.in_classical_tracers[0],
-                op.in_classical_tracers[1],
-                step,
-                *(consts + op.in_classical_tracers[3:] + [qreg]),
-                body_jaxpr=ClosedJaxpr(convert_constvars_jaxpr(jaxpr), ()),
-                body_nconsts=len(consts),
-                apply_reverse_transform=apply_reverse_transform,
-            )
-        )
-        return qrp2
-
-
-class MidCircuitMeasure(HybridOp):
-    """Operation representing a mid-circuit measurement."""
-
-    binder = qmeasure_p.bind
-
-    def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
-        op = self
-        wire = op.in_classical_tracers[0]
-        qubit = qrp.extract([wire])[0]
-        qubit2 = op.bind_overwrite_classical_tracers(ctx, trace, qubit)
-        qrp.insert([wire], [qubit2])
-        return qrp
-
-
-class Cond(HybridOp):
-    """PennyLane's conditional operation."""
-
-    binder = qcond_p.bind
-
-    def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
-        jaxprs, consts = [], []
-        op = self
-        for region in op.regions:
-            with EvaluationContext.frame_tracing_context(ctx, region.trace):
-                qreg_in = _input_type_to_tracers(region.trace.new_arg, [AbstractQreg()])[0]
-                qrp_out = trace_quantum_tape(
-                    region.quantum_tape, device, qreg_in, ctx, region.trace
-                )
-                qreg_out = qrp_out.actualize()
-                jaxpr, _, const = ctx.frames[region.trace].to_jaxpr2(
-                    region.res_classical_tracers + [qreg_out]
-                )
-                jaxprs.append(jaxpr)
-                consts.append(const)
-
-        jaxprs2, combined_consts = initial_style_jaxprs_with_common_consts2(jaxprs, consts)
-
-        qreg = qrp.actualize()
-        qrp2 = QRegPromise(
-            op.bind_overwrite_classical_tracers(
-                ctx,
-                trace,
-                *(op.in_classical_tracers + combined_consts + [qreg]),
-                branch_jaxprs=jaxprs2,
-            )
-        )
-        return qrp2
-
-
-class WhileLoop(HybridOp):
-    """PennyLane's while loop operation."""
-
-    binder = qwhile_p.bind
-
-    def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
-        cond_trace = self.regions[0].trace
-        res_classical_tracers = self.regions[0].res_classical_tracers
-        with EvaluationContext.frame_tracing_context(ctx, cond_trace):
-            _input_type_to_tracers(cond_trace.new_arg, [AbstractQreg()])
-            cond_jaxpr, _, cond_consts = ctx.frames[cond_trace].to_jaxpr2(res_classical_tracers)
-
-        body_trace = self.regions[1].trace
-        body_tape = self.regions[1].quantum_tape
-        res_classical_tracers = self.regions[1].res_classical_tracers
-        with EvaluationContext.frame_tracing_context(ctx, body_trace):
-            qreg_in = _input_type_to_tracers(body_trace.new_arg, [AbstractQreg()])[0]
-            qrp_out = trace_quantum_tape(body_tape, device, qreg_in, ctx, body_trace)
-            qreg_out = qrp_out.actualize()
-            body_jaxpr, _, body_consts = ctx.frames[body_trace].to_jaxpr2(
-                res_classical_tracers + [qreg_out]
-            )
-
-        qreg = qrp.actualize()
-        qrp2 = QRegPromise(
-            self.bind_overwrite_classical_tracers(
-                ctx,
-                trace,
-                *(cond_consts + body_consts + self.in_classical_tracers + [qreg]),
-                cond_jaxpr=ClosedJaxpr(convert_constvars_jaxpr(cond_jaxpr), ()),
-                body_jaxpr=ClosedJaxpr(convert_constvars_jaxpr(body_jaxpr), ()),
-                cond_nconsts=len(cond_consts),
-                body_nconsts=len(body_consts),
-            )
-        )
-        return qrp2
-
-
-class Adjoint(HybridOp):
-    """PennyLane's adjoint operation"""
-
-    binder = adjoint_p.bind
-
-    def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
-        op = self
-        body_trace = op.regions[0].trace
-        body_tape = op.regions[0].quantum_tape
-        res_classical_tracers = op.regions[0].res_classical_tracers
-        with EvaluationContext.frame_tracing_context(ctx, body_trace):
-            qreg_in = _input_type_to_tracers(body_trace.new_arg, [AbstractQreg()])[0]
-            qrp_out = trace_quantum_tape(body_tape, device, qreg_in, ctx, body_trace)
-            qreg_out = qrp_out.actualize()
-            body_jaxpr, _, body_consts = ctx.frames[body_trace].to_jaxpr2(
-                res_classical_tracers + [qreg_out]
-            )
-
-        qreg = qrp.actualize()
-        args, args_tree = tree_flatten((body_consts, op.in_classical_tracers, [qreg]))
-        op_results = adjoint_p.bind(
-            *args,
-            args_tree=args_tree,
-            jaxpr=ClosedJaxpr(convert_constvars_jaxpr(body_jaxpr), ()),
-        )
-        qrp2 = QRegPromise(op_results[-1])
-        return qrp2
 
 
 def trace_to_mlir(func, *args, **kwargs):

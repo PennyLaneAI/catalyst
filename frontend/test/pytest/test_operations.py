@@ -18,7 +18,8 @@ import pytest
 from pennylane.tape import QuantumTape
 
 from catalyst import cond, for_loop, qjit, while_loop
-from catalyst.jax_tracer import Cond, ForLoop, HybridOp, WhileLoop, has_nested_tapes
+from catalyst.jax_tracer import has_nested_tapes
+from catalyst.pennylane_extensions import Cond, ForLoop, HybridOp, WhileLoop
 
 
 def test_no_parameters(backend):
