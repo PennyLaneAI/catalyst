@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include <iostream>
 
 #include "Gradient/Utils/GradientShape.h"
 
@@ -38,7 +39,6 @@ std::vector<Type> computeResultTypes(func::FuncOp callee, const std::vector<size
     size_t numFnResults = fnType.getNumResults();
     size_t numGradResults = numFnResults * numDiffArgs;
     gradResultTypes.reserve(numGradResults);
-
     for (size_t j = 0; j < numFnResults; j++) {
         Type fnResType = fnType.getResult(j);
 
@@ -60,6 +60,9 @@ std::vector<Type> computeResultTypes(func::FuncOp callee, const std::vector<size
                 gradResShape.insert(gradResShape.end(), tensorType.getShape().begin(),
                                     tensorType.getShape().end());
                 fnResType = tensorType.getElementType();
+            }
+            else {
+                fnResType = diffArgType;
             }
 
             Type gradResType = !gradResShape.empty() || tensorType
