@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""This module contains utility functions related to JAX tracing
+"""This module isolates utility functions that depend on JAX low-level internals
 """
 from __future__ import annotations
 
@@ -161,7 +161,13 @@ def stable_toposort(end_nodes: list) -> list:
 
 
 def sort_eqns(eqns: List[JaxprEqn], forced_order_primitives: Set[JaxprPrimitive]) -> List[JaxprEqn]:
-    """Topologically sort JAXRR equations in a list, based on their input/output variables."""
+    """Topologically sort JAXRR equations in a unsorted list of equations, based on their
+    input/output variables and additional criterias."""
+
+    # The procedure goes as follows: [1] - initialize the `origin` map mapping variable identifiers
+    # to the origin Boxed equations, [2] - initialize `parents` fields of boxes with the
+    # correct values, [3] - add additional equation order restrictions to boxes, [4] - call the
+    # topological sorting.
 
     class Box:
         """Wrapper for JaxprEqn keeping track of its id and parents."""
@@ -169,19 +175,19 @@ def sort_eqns(eqns: List[JaxprEqn], forced_order_primitives: Set[JaxprPrimitive]
         def __init__(self, boxid: int, e: JaxprEqn):
             self.id: int = boxid
             self.e: JaxprEqn = e
-            self.parents: List["Box"] = []
+            self.parents: List["Box"] = []  # to be filled later
 
     boxes = [Box(i, e) for i, e in enumerate(eqns)]
-    qdevices = [(i, b) for (i, b) in enumerate(boxes) if b.e.primitive in forced_order_primitives]
+    fixedorder = [(i, b) for (i, b) in enumerate(boxes) if b.e.primitive in forced_order_primitives]
     origin: Dict[int, Box] = {}
     for b in boxes:
-        origin.update({ov.count: b for ov in b.e.outvars})
+        origin.update({ov.count: b for ov in b.e.outvars})  # [1]
     for b in boxes:
-        b.parents = [origin[v.count] for v in b.e.invars if v.count in origin]
-    for i, q in qdevices:
+        b.parents = [origin[v.count] for v in b.e.invars if v.count in origin]  # [2]
+    for i, q in fixedorder:
         for b in boxes[i + 1 :]:
-            b.parents.append(q)
-    return [b.e for b in stable_toposort(boxes)]
+            b.parents.append(q)  # [3]
+    return [b.e for b in stable_toposort(boxes)]  # [4]
 
 
 def initial_style_jaxprs_with_common_consts1(
