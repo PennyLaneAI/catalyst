@@ -54,14 +54,26 @@ struct PrintOpPattern : public OpConversionPattern<PrintOp> {
     LogicalResult matchAndRewrite(PrintOp op, PrintOpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override
     {
+        constexpr int64_t UNKNOWN = ShapedType::kDynamic;
+
+        Location loc = op.getLoc();
         MLIRContext *ctx = this->getContext();
+        TypeConverter *conv = getTypeConverter();
 
         StringRef qirName = "_catalyst_memref_print";
         Type void_t = LLVM::LLVMVoidType::get(ctx);
-        Type qirSignature = LLVM::LLVMFunctionType::get(void_t, adaptor.getVal().getType());
+        Type vectorType = conv->convertType(MemRefType::get({UNKNOWN}, IntegerType::get(ctx, 64)));
+
+        Type qirSignature =
+            LLVM::LLVMFunctionType::get(void_t, LLVM::LLVMPointerType::get(vectorType));
         LLVM::LLVMFuncOp fnDecl = ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
 
-        rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, adaptor.getVal());
+        Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
+        Value structPtr =
+            rewriter.create<LLVM::AllocaOp>(loc, LLVM::LLVMPointerType::get(vectorType), c1);
+        rewriter.create<LLVM::StoreOp>(loc, adaptor.getVal(), structPtr);
+
+        rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, structPtr);
         return success();
     }
 };

@@ -74,7 +74,6 @@ void _mlir_memref_to_llvm_free(void *ptr)
 void _catalyst_memref_print(MemRefT_int64_1d *array)
 {
     std::cerr << "cerr: print array from runtime" << std::endl;
-    std::cout << "cout: print array from runtime" << std::endl;
 
     if (array == nullptr || !array->sizes[0]) {
         std::cerr << "{}" << std::endl;
@@ -85,10 +84,11 @@ void _catalyst_memref_print(MemRefT_int64_1d *array)
     const size_t size = array->sizes[0];
     std::vector<size_t> array_vec(array->data_aligned, array->data_aligned + size);
 
-    for (size_t i = 0; i < size; i++) {
+    std::cerr << "{";
+    for (size_t i = 0; i < size - 1; i++) {
         std::cerr << array_vec[i] << ", ";
     }
-    std::cerr << std::endl;
+    std::cerr << array_vec[size - 1] << "}\n";
 }
 
 void __quantum__rt__fail_cstr(const char *cstr) { RT_FAIL(cstr); }

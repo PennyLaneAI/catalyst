@@ -18,12 +18,12 @@
 // Catalyst PrintOp //
 //////////////////////
 
-// CHECK: llvm.func @_catalyst_memref_print(!llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>)
+// CHECK: llvm.func @_catalyst_memref_print(!llvm.ptr<struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>>)
 
 // CHECK-LABEL: @dbprint
 func.func @dbprint(%arg0 : tensor<1xi64>) {
 
-    // CHECK: llvm.call @_catalyst_memref_print({{.*}}) : (!llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>) -> ()
+    // CHECK: llvm.call @_catalyst_memref_print({{.*}}) : (!llvm.ptr<struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>>) -> ()
     catalyst.print %arg0 : tensor<1xi64>
 
     return
