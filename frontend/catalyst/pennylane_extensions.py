@@ -71,16 +71,13 @@ from catalyst.utils.jax_extras import (
 from catalyst.utils.tracing import EvaluationContext, EvaluationMode, JaxTracingContext
 
 
-def qfunc(num_wires, device, *, shots=1000):
+def qfunc(device):
     """A Device specific quantum function.
 
     Args:
-        num_wires (int): the number of wires
         device (a derived class from QubitDevice): A device specification which determines
             the valid gate set for the quantum function.
         fn (Callable): the quantum function
-        shots (int): How many times the circuit should be evaluated (or sampled) to estimate
-            the expectation values. It defaults to 1000.
 
     Returns:
         Grad: A QFunc object that denotes the the declaration of a quantum function.

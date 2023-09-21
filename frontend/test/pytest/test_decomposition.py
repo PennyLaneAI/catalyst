@@ -53,7 +53,7 @@ dev = CustomDevice(wires=2)
 @pytest.mark.parametrize("param,expected", [(0.0, True), (jnp.pi, False)])
 def test_decomposition(param, expected):
     @qjit()
-    @qfunc(2, device=dev)
+    @qfunc(device=dev)
     def mid_circuit(x: float):
         qml.Hadamard(wires=0)
         qml.Rot(0, 0, x, wires=0)
