@@ -18,6 +18,7 @@ import jax
 import pennylane as qml
 from jax._src import source_info_util
 from jax._src.dispatch import jaxpr_replicas
+from jax._src.effects import ordered_effects
 from jax._src.interpreters.mlir import _module_name_regex
 from jax._src.lax.lax import xb, xla
 from jax._src.util import wrap_name
@@ -74,7 +75,7 @@ def get_mlir(func, *args, **kwargs):
         jaxpr, shape = jax.make_jaxpr(func, return_shape=True)(*args, **kwargs)
 
     nrep = jaxpr_replicas(jaxpr)
-    effects = [eff for eff in jaxpr.effects if eff in jax.core.ordered_effects]
+    effects = list(ordered_effects.filter_in(jaxpr.effects))
     axis_context = ReplicaAxisContext(xla.AxisEnv(nrep, (), ()))
     name_stack = source_info_util.new_name_stack(wrap_name("ok", "jit"))
     module, context = custom_lower_jaxpr_to_module(
@@ -594,20 +595,18 @@ def custom_lower_jaxpr_to_module(
     Copyright 2021 The JAX Authors.
     """
     platform = xb.canonicalize_platform(platform)
-    if not xb.is_known_platform(platform):
+    if not xb.is_known_platform(platform):  # pragma: no cover
         raise ValueError(f"Unknown platform {platform}")
-    in_avals = jaxpr.in_avals
     assert arg_shardings is None
     assert result_shardings is None
     platforms_with_donation = ("cuda", "rocm", "tpu")
     assert platform not in platforms_with_donation
-    if any(eff not in lowerable_effects for eff in jaxpr.effects):
+    unlowerable_effects = lowerable_effects.filter_not_in(jaxpr.effects)
+    if unlowerable_effects:  # pragma: no cover
         raise ValueError(f"Cannot lower jaxpr with effects: {jaxpr.effects}")
-    if any(donated_args):
-        unused_donations = [str(a) for a, d in zip(in_avals, donated_args) if d]
+    if any(donated_args):  # pragma: no cover
         msg = "See an explanation at https://jax.readthedocs.io/en/latest/faq.html#buffer-donation."
-        if platform not in platforms_with_donation:
-            msg = f"Donation is not implemented for {platform}.\n{msg}"
+        raise ValueError(f"Donation is not implemented for platform {platform}.\n{msg}")
 
     # MHLO channels need to start at 1
     channel_iter = 1
@@ -624,9 +623,6 @@ def custom_lower_jaxpr_to_module(
         # XLA computation preserves the module name.
         module_name = _module_name_regex.sub("_", module_name)
         ctx.module.operation.attributes["sym_name"] = ir.StringAttr.get(module_name)
-        unlowerable_effects = {eff for eff in jaxpr.effects if eff not in lowerable_effects}
-        if unlowerable_effects:
-            raise ValueError(f"Cannot lower jaxpr with unlowerable effects: {unlowerable_effects}")
         lower_jaxpr_to_fun(
             ctx,
             func_name,
