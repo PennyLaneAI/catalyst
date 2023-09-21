@@ -29,9 +29,7 @@ import pennylane as qml
 import pytest
 
 from catalyst import qjit
-from catalyst.compiler import (
-    CompileOptions, Compiler, LinkerDriver
-)
+from catalyst.compiler import CompileOptions, Compiler, LinkerDriver
 from catalyst.jax_tracer import trace_to_mlir
 from catalyst.pennylane_extensions import measure, qfunc
 from catalyst.utils.exceptions import CompileError
