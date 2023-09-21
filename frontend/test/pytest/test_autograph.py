@@ -14,27 +14,115 @@
 
 """PyTests for the AutoGraph source-to-source transformation feature."""
 
+import sys
+import traceback
 
+import jax
+import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
 import pytest
 
-from catalyst import measure, qjit
+from catalyst import cond, for_loop, measure, qjit
 from catalyst.ag_utils import AutoGraphError, autograph_source, check_cache
 
-# pylint: disable=missing-function-docstring
+# pylint: disable=import-outside-toplevel
 # pylint: disable=unnecessary-lambda-assignment
+# pylint: disable=too-many-public-methods
+# pylint: disable=too-many-lines
 
 
-def test_unavailable(mocker):
+def test_unavailable(monkeypatch):
     """Check the error produced in the absence of tensorflow."""
-    mocker.patch.dict("sys.modules", {"tensorflow": None})
+    monkeypatch.setitem(sys.modules, "tensorflow", None)
 
     def fn(x):
         return x**2
 
     with pytest.raises(ImportError, match="AutoGraph feature in Catalyst requires TensorFlow"):
         qjit(autograph=True)(fn)
+
+
+@pytest.mark.tf
+class TestSourceCodeInfo:
+    """Unit tests for exception utilities that retrieves traceback information for the original
+    source code."""
+
+    def test_non_converted_function(self):
+        """Test the robustness of traceback conversion on a non-converted function."""
+        from catalyst.ag_primitives import get_source_code_info
+
+        try:
+            result = ""
+            raise RuntimeError("Test failure")
+        except RuntimeError as e:
+            result = get_source_code_info(traceback.extract_tb(e.__traceback__, limit=1)[0])
+
+        assert result.split("\n")[1] == '    raise RuntimeError("Test failure")'
+
+    def test_qjit(self):
+        """Test source info retrieval for a qjit function."""
+
+        def main():
+            for _ in range(5):
+                raise RuntimeError("Test failure")
+            return 0
+
+        with pytest.warns(
+            UserWarning,
+            match=(
+                f'  File "{__file__}", line [0-9]+, in {main.__name__}\n'
+                r"    for _ in range\(5\):"
+            ),
+        ):
+            try:
+                qjit(autograph=True)(main)
+            except RuntimeError as e:
+                assert e.args == ("Test failure",)
+
+    def test_qnode(self):
+        """Test source info retrieval for a qnode function."""
+
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def main():
+            for _ in range(5):
+                raise RuntimeError("Test failure")
+            return 0
+
+        with pytest.warns(
+            UserWarning,
+            match=(
+                f'  File "{__file__}", line [0-9]+, in {main.__name__}\n'
+                r"    for _ in range\(5\):"
+            ),
+        ):
+            try:
+                qjit(autograph=True)(main)
+            except RuntimeError as e:
+                assert e.args == ("Test failure",)
+
+    def test_func(self):
+        """Test source info retrieval for a nested function."""
+
+        def inner():
+            for _ in range(5):
+                raise RuntimeError("Test failure")
+
+        def main():
+            inner()
+            return 0
+
+        with pytest.warns(
+            UserWarning,
+            match=(
+                f'  File "{__file__}", line [0-9]+, in {inner.__name__}\n'
+                r"    for _ in range\(5\):"
+            ),
+        ):
+            try:
+                qjit(autograph=True)(main)
+            except RuntimeError as e:
+                assert e.args == ("Test failure",)
 
 
 @pytest.mark.tf
@@ -394,6 +482,7 @@ class TestConditionals:
 
             return measure(wires=0)
 
+        # pylint: disable=singleton-comparison
         assert circuit(3) == False
         assert circuit(6) == True
 
@@ -401,6 +490,7 @@ class TestConditionals:
         """Test that an exception is raised when the true branch returns a value without an else
         branch.
         """
+        # pylint: disable=using-constant-test
 
         def circuit():
             if True:
@@ -415,6 +505,7 @@ class TestConditionals:
 
     def test_branch_multi_return_mismatch(self, backend):
         """Test that an exception is raised when the return types of all branches do not match."""
+        # pylint: disable=using-constant-test
 
         def circuit():
             if True:
@@ -430,6 +521,615 @@ class TestConditionals:
             TypeError, match="Conditional requires consistent return types across all branches"
         ):
             qjit(autograph=True)(qml.qnode(qml.device(backend, wires=1))(circuit))
+
+
+class TestForLoops:
+    """Test that the autograph transformations produce correct results on for loops."""
+
+    def test_python_range_fallback(self):
+        """Test that the custom CRange wrapper correctly falls back to Python."""
+        from catalyst.ag_primitives import CRange
+
+        # pylint: disable=protected-access
+
+        c_range = CRange(0, 5, 1)
+        assert c_range._py_range is None
+
+        assert isinstance(c_range.py_range, range)  # automatically instantiates the Python range
+        assert isinstance(c_range._py_range, range)
+        assert c_range[2] == 2
+
+    def test_for_in_array(self):
+        """Test for loop over JAX array."""
+
+        @qjit(autograph=True)
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def f(params):
+            for x in params:
+                qml.RY(x, wires=0)
+            return qml.expval(qml.PauliZ(0))
+
+        result = f(jnp.array([0.0, 1 / 4 * jnp.pi, 2 / 4 * jnp.pi]))
+        assert np.allclose(result, -jnp.sqrt(2) / 2)
+
+    def test_for_in_array_unpack(self):
+        """Test for loop over a 2D JAX array unpacking the inner dimension."""
+
+        @qjit(autograph=True)
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def f(params):
+            for x1, x2 in params:
+                qml.RY(x1, wires=0)
+                qml.RY(x2, wires=0)
+            return qml.expval(qml.PauliZ(0))
+
+        result = f(jnp.array([[0.0, 1 / 4 * jnp.pi], [2 / 4 * jnp.pi, jnp.pi]]))
+        assert np.allclose(result, jnp.sqrt(2) / 2)
+
+    def test_for_in_numeric_list(self):
+        """Test for loop over a Python list that is convertible to an array."""
+
+        @qjit(autograph=True)
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def f():
+            params = [0.0, 1 / 4 * jnp.pi, 2 / 4 * jnp.pi]
+            for x in params:
+                qml.RY(x, wires=0)
+            return qml.expval(qml.PauliZ(0))
+
+        result = f()
+        assert np.allclose(result, -jnp.sqrt(2) / 2)
+
+    def test_for_in_numeric_list_of_list(self):
+        """Test for loop over a nested Python list that is convertible to an array."""
+
+        @qjit(autograph=True)
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def f():
+            params = [[0.0, 1 / 4 * jnp.pi], [2 / 4 * jnp.pi, jnp.pi]]
+            for xx in params:
+                for x in xx:
+                    qml.RY(x, wires=0)
+            return qml.expval(qml.PauliZ(0))
+
+        result = f()
+        assert np.allclose(result, jnp.sqrt(2) / 2)
+
+    def test_for_in_object_list(self):
+        """Test for loop over a Python list that is *not* convertible to an array.
+        The behaviour should fall back to standard Python."""
+
+        @qjit(autograph=True)
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def f():
+            params = ["0", "1", "2"]
+            for x in params:
+                qml.RY(int(x) / 4 * jnp.pi, wires=0)
+            return qml.expval(qml.PauliZ(0))
+
+        result = f()
+        assert np.allclose(result, -jnp.sqrt(2) / 2)
+
+    def test_for_in_object_list_strict(self, monkeypatch):
+        """Check the error raised in strict mode when a for loop iterates over a Python list that
+        is *not* convertible to an array."""
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def f():
+            params = ["0", "1", "2"]
+            for x in params:
+                qml.RY(int(x) / 4 * jnp.pi, wires=0)
+            return qml.expval(qml.PauliZ(0))
+
+        with pytest.raises(AutoGraphError, match="Could not convert the iteration target"):
+            qjit(autograph=True)(f)
+
+    def test_for_in_static_range(self):
+        """Test for loop over a Python range with static bounds."""
+
+        @qjit(autograph=True)
+        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        def f():
+            for i in range(3):
+                qml.Hadamard(i)
+            return qml.probs()
+
+        result = f()
+        assert np.allclose(result, [1 / 8] * 8)
+
+    def test_for_in_static_range_indexing_array(self):
+        """Test for loop over a Python range with static bounds that is used to index an array."""
+
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def f():
+            params = jnp.array([0.0, 1 / 4 * jnp.pi, 2 / 4 * jnp.pi])
+            for i in range(3):
+                qml.RY(params[i], wires=0)
+            return qml.expval(qml.PauliZ(0))
+
+        result = f()
+        assert np.allclose(result, -jnp.sqrt(2) / 2)
+
+    # With conversion always taking place, the user needs to be careful to manually wrap
+    # objects accessed via loop iteration indices into arrays (see test case above).
+    # The warning here is actionable.
+    def test_for_in_static_range_indexing_numeric_list(self):
+        """Test for loop over a Python range with static bounds that is used to index an
+        array-compatible Python list. This should fall back to Python with a warning."""
+
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def f():
+            params = [0.0, 1 / 4 * jnp.pi, 2 / 4 * jnp.pi]
+            for i in range(3):
+                qml.RY(params[i], wires=0)
+            return qml.expval(qml.PauliZ(0))
+
+        with pytest.warns(
+            match=r"TracerIntegerConversionError:    The __index__\(\) method was called"
+        ):
+            qjit(autograph=True)(f)
+
+    # This case is slightly problematic because there is no way for the user to compile this for
+    # loop correctly. Fallback to a Python loop is always necessary, and will result in a warning.
+    # The warning here is not actionable.
+    def test_for_in_static_range_indexing_object_list(self):
+        """Test for loop over a Python range with static bounds that is used to index an
+        array-incompatible Python list. This should fall back to Python with a warning."""
+
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def f():
+            params = ["0", "1", "2"]
+            for i in range(3):
+                qml.RY(int(params[i]) / 4 * jnp.pi, wires=0)
+            return qml.expval(qml.PauliZ(0))
+
+        with pytest.warns(
+            match=r"TracerIntegerConversionError:    The __index__\(\) method was called"
+        ):
+            qjit(autograph=True)(f)
+
+    def test_for_in_dynamic_range(self):
+        """Test for loop over a Python range with dynamic bounds."""
+
+        @qjit(autograph=True)
+        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        def f(n: int):
+            for i in range(n):
+                qml.Hadamard(i)
+            return qml.probs()
+
+        result = f(3)
+        assert np.allclose(result, [1 / 8] * 8)
+
+    def test_for_in_dynamic_range_indexing_array(self):
+        """Test for loop over a Python range with dynamic bounds that is used to index an array."""
+
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def f(n: int):
+            params = jnp.array([0.0, 1 / 4 * jnp.pi, 2 / 4 * jnp.pi])
+            for i in range(n):
+                qml.RY(params[i], wires=0)
+            return qml.expval(qml.PauliZ(0))
+
+        result = f(3)
+        assert np.allclose(result, -jnp.sqrt(2) / 2)
+
+    # This case will fail even without autograph conversion, since dynamic iteration bounds are not
+    # allowed in Python ranges. Here, AutoGraph improves the situation by allowing this test case
+    # with a slight modification of the user code (see test case above).
+    # Raising the warning is vital here to notify the user that this use case is actually supported,
+    # but requires a modification. Without it, the user may simply conclude it is unsupported.
+    def test_for_in_dynamic_range_indexing_numeric_list(self):
+        """Test for loop over a Python range with dynamic bounds that is used to index an
+        array-compatible Python list. The fallback to Python will first raise a warning,
+        then an error."""
+
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def f(n: int):
+            params = [0.0, 1 / 4 * jnp.pi, 2 / 4 * jnp.pi]
+            for i in range(n):
+                qml.RY(params[i], wires=0)
+            return qml.expval(qml.PauliZ(0))
+
+        with pytest.warns(
+            match=r"TracerIntegerConversionError:    The __index__\(\) method was called"
+        ):
+            with pytest.raises(jax.errors.TracerIntegerConversionError, match="__index__"):
+                qjit(autograph=True)(f)
+
+    # This use case is never possible, regardless of whether AutoGraph is used or not.
+    def test_for_in_dynamic_range_indexing_object_list(self):
+        """Test for loop over a Python range with dynamic bounds that is used to index an
+        array-incompatible Python list. The fallback to Python will first raise a warning,
+        then an error."""
+
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def f(n: int):
+            params = ["0", "1", "2"]
+            for i in range(n):
+                qml.RY(int(params[i]) * jnp.pi, wires=0)
+            return qml.expval(qml.PauliZ(0))
+
+        with pytest.warns(
+            match=r"TracerIntegerConversionError:    The __index__\(\) method was called"
+        ):
+            with pytest.raises(jax.errors.TracerIntegerConversionError, match="__index__"):
+                qjit(autograph=True)(f)
+
+    def test_for_in_enumerate_array(self):
+        """Test for loop over a Python enumeration on an array."""
+
+        @qjit(autograph=True)
+        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        def f(params):
+            for i, x in enumerate(params):
+                qml.RY(x, wires=i)
+            return [qml.expval(qml.PauliZ(i)) for i in range(3)]
+
+        result = f(jnp.array([0.0, 1 / 4 * jnp.pi, 2 / 4 * jnp.pi]))
+        assert np.allclose(result, [1.0, jnp.sqrt(2) / 2, 0.0])
+
+    def test_for_in_enumerate_array_no_unpack(self):
+        """Test for loop over a Python enumeration with delayed unpacking."""
+
+        @qjit(autograph=True)
+        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        def f(params):
+            for v in enumerate(params):
+                qml.RY(v[1], wires=v[0])
+            return [qml.expval(qml.PauliZ(i)) for i in range(3)]
+
+        result = f(jnp.array([0.0, 1 / 4 * jnp.pi, 2 / 4 * jnp.pi]))
+        assert np.allclose(result, [1.0, jnp.sqrt(2) / 2, 0.0])
+
+    def test_for_in_enumerate_nested_unpack(self):
+        """Test for loop over a Python enumeration with nested unpacking."""
+
+        @qjit(autograph=True)
+        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        def f(params):
+            for i, (x1, x2) in enumerate(params):
+                qml.RY(x1, wires=i)
+                qml.RY(x2, wires=i)
+            return [qml.expval(qml.PauliZ(i)) for i in range(3)]
+
+        result = f(
+            jnp.array(
+                [[0.0, 1 / 4 * jnp.pi], [2 / 4 * jnp.pi, 3 / 4 * jnp.pi], [jnp.pi, 2 * jnp.pi]]
+            )
+        )
+        assert np.allclose(result, [jnp.sqrt(2) / 2, -jnp.sqrt(2) / 2, -1.0])
+
+    def test_for_in_enumerate_start(self):
+        """Test for loop over a Python enumeration with offset indices."""
+
+        @qjit(autograph=True)
+        @qml.qnode(qml.device("lightning.qubit", wires=5))
+        def f(params):
+            for i, x in enumerate(params, start=2):
+                qml.RY(x, wires=i)
+            return [qml.expval(qml.PauliZ(i)) for i in range(5)]
+
+        result = f(jnp.array([0.0, 1 / 4 * jnp.pi, 2 / 4 * jnp.pi]))
+        assert np.allclose(result, [1.0, 1.0, 1.0, jnp.sqrt(2) / 2, 0.0])
+
+    def test_for_in_enumerate_numeric_list(self):
+        """Test for loop over a Python enumeration on a list that is convertible to an array."""
+
+        @qjit(autograph=True)
+        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        def f():
+            params = [0.0, 1 / 4 * jnp.pi, 2 / 4 * jnp.pi]
+            for i, x in enumerate(params):
+                qml.RY(x, wires=i)
+            return [qml.expval(qml.PauliZ(i)) for i in range(3)]
+
+        result = f()
+        assert np.allclose(result, [1.0, jnp.sqrt(2) / 2, 0.0])
+
+    def test_for_in_enumerate_object_list(self):
+        """Test for loop over a Python enumeration on a list that is *not* convertible to an array.
+        The behaviour should fall back to standard Python."""
+
+        @qjit(autograph=True)
+        @qml.qnode(qml.device("lightning.qubit", wires=3))
+        def f():
+            params = ["0", "1", "2"]
+            for i, x in enumerate(params):
+                qml.RY(int(x) / 4 * jnp.pi, wires=i)
+            return [qml.expval(qml.PauliZ(i)) for i in range(3)]
+
+        result = f()
+        assert np.allclose(result, [1.0, jnp.sqrt(2) / 2, 0.0])
+
+    def test_for_in_other_iterable_object(self):
+        """Test for loop over arbitrary iterable Python objects.
+        The behaviour should fall back to standard Python."""
+
+        @qjit(autograph=True)
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def f():
+            params = {"a": 0.0, "b": 1 / 4 * jnp.pi, "c": 2 / 4 * jnp.pi}
+            for k, v in params.items():
+                print(k)
+                qml.RY(v, wires=0)
+            return qml.expval(qml.PauliZ(0))
+
+        result = f()
+        assert np.allclose(result, -jnp.sqrt(2) / 2)
+
+    def test_loop_carried_value(self, monkeypatch):
+        """Test a loop which updates a value each iteration."""
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        @qjit(autograph=True)
+        def f1():
+            acc = 0
+            for x in [0, 4, 5]:
+                acc = acc + x
+
+            return acc
+
+        assert f1() == 9
+
+        @qjit(autograph=True)
+        def f2(acc):
+            for x in [0, 4, 5]:
+                acc = acc + x
+
+            return acc
+
+        assert f2(2) == 11
+
+        @qjit(autograph=True)
+        def f3():
+            acc = 0
+            for x in [0, 4, 5]:
+                acc += x
+
+            return acc
+
+        assert f3() == 9
+
+    def test_iteration_element_access(self, monkeypatch):
+        """Test that access to the iteration index/elements is possible after the loop executed
+        (assuming initialization)."""
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        @qjit(autograph=True)
+        def f1(acc):
+            x = 0
+            for x in [0, 4, 5]:
+                acc = acc + x
+            ...  # use acc
+
+            return x
+
+        assert f1(0) == 5
+
+        @qjit(autograph=True)
+        def f2(acc):
+            i = 0
+            l = jnp.array([0, 4, 5])
+            for i in range(3):
+                acc = acc + l[i]
+            ...  # use acc
+
+            return i
+
+        assert f2(0) == 2
+
+        @qjit(autograph=True)
+        def f3(acc):
+            i, x = 0, 0
+            for i, x in enumerate([0, 4, 5]):
+                acc = acc + x
+            ...  # use acc
+
+            return i, x
+
+        assert f3(0) == (2, 5)
+
+    @pytest.mark.xfail(reason="currently unsupported, but we may find a way to do so in the future")
+    def test_iteration_element_access_no_init(self, monkeypatch):
+        """Test that access to the iteration index/elements is possible after the loop executed
+        even without prior initialization."""
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        @qjit(autograph=True)
+        def f1(acc):
+            for x in [0, 4, 5]:
+                acc = acc + x
+            ...  # use acc
+
+            return x
+
+        assert f1(0) == 5
+
+        @qjit(autograph=True)
+        def f2(acc):
+            l = jnp.array([0, 4, 5])
+            for i in range(3):
+                acc = acc + l[i]
+            ...  # use acc
+
+            return i
+
+        assert f2(0) == 2
+
+        @qjit(autograph=True)
+        def f3(acc):
+            for i, x in enumerate([0, 4, 5]):
+                acc = acc + x
+            ...  # use acc
+
+            return i, x
+
+        assert f3(0) == (2, 5)
+
+    def test_temporary_loop_variable(self, monkeypatch):
+        """Test that temporary (local) variables can be initialized inside a loop."""
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        @qjit(autograph=True)
+        def f1():
+            acc = 0
+            for x in [0, 4, 5]:
+                c = 2
+                acc = acc + c * x
+
+            return acc
+
+        assert f1() == 18
+
+        @qjit(autograph=True)
+        def f2():
+            acc = 0
+            for x in [0, 4, 5]:
+                c = x * 2
+                acc = acc + c
+
+            return acc
+
+        assert f2() == 18
+
+    def test_uninitialized_variables(self, monkeypatch):
+        """Verify errors for (potentially) uninitialized loop variables."""
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        def f1():
+            for x in [0, 4, 5]:
+                acc = acc + x
+
+            return acc
+
+        with pytest.raises(AutoGraphError, match="'acc' is potentially uninitialized"):
+            qjit(autograph=True)(f1)
+
+        def f2():
+            acc = 0
+            for x in [0, 4, 5]:
+                acc = acc + x
+
+            return x
+
+        with pytest.raises(AutoGraphError, match="'x' is potentially uninitialized"):
+            qjit(autograph=True)(f2)
+
+        def f3():
+            acc = 0
+            for x in [0, 4, 5]:
+                c = 2
+                acc = acc + c * x
+
+            return c
+
+        with pytest.raises(AutoGraphError, match="'c' is potentially uninitialized"):
+            qjit(autograph=True)(f3)
+
+    def test_init_with_invalid_jax_type(self, monkeypatch):
+        """Test loop carried values initialized with an invalid JAX type."""
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        def f():
+            acc = 0
+            x = ""
+            for x in [0, 4, 5]:
+                acc = acc + x
+
+            return x
+
+        with pytest.raises(AutoGraphError, match="'x' was initialized with type <class 'str'>"):
+            qjit(autograph=True)(f)
+
+    def test_init_with_mismatched_type(self, monkeypatch):
+        """Test loop carried values initialized with a mismatched type compared to the values used
+        inside the loop."""
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        def f():
+            acc = 0
+            x = 0.0
+            for x in [0, 4, 5]:
+                acc = acc + x
+
+            return x
+
+        with pytest.raises(AutoGraphError, match="'x' was initialized with the wrong type"):
+            qjit(autograph=True)(f)
+
+    @pytest.mark.filterwarnings("error")
+    def test_ignore_warnings(self, monkeypatch):
+        """Test the AutoGraph config flag properly silences warnings."""
+        monkeypatch.setattr("catalyst.autograph_ignore_fallbacks", True)
+
+        @qjit(autograph=True)
+        def f():
+            acc = 0
+            data = [0, 4, 5]
+            for i in range(3):
+                acc = acc + data[i]
+
+            return acc
+
+        assert f() == 9
+
+
+class TestMixed:
+    """Test a mix of supported autograph conversions and Catalyst control flow."""
+
+    def test_no_python_loops(self):
+        """Test AutoGraph behaviour on function with Catalyst loops."""
+
+        @qjit(autograph=True)
+        def f():
+            @for_loop(0, 3, 1)
+            def loop(i, acc):
+                return acc + i
+
+            return loop(0)
+
+        assert f() == 3
+
+    def test_cond_if_for_loop_for(self, monkeypatch):
+        """Test Python conditionals and loops together with their Catalyst counterparts."""
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        # pylint: disable=cell-var-from-loop
+
+        @qjit(autograph=True)
+        def f(x):
+            acc = 0
+            if x < 3:
+
+                @for_loop(0, 3, 1)
+                def loop(_, acc):
+                    # Oddly enough, AutoGraph treats 'i' as an iter_arg even though it's not
+                    # accessed after the for loop. Maybe because it is captured in the nested
+                    # function's closure?
+                    # TODO: remove the need for initializing 'i'
+                    i = 0
+                    for i in range(5):
+
+                        @cond(i % 2 == 0)
+                        def even():
+                            return i
+
+                        @even.otherwise
+                        def even():
+                            return 0
+
+                        acc += even()
+
+                    return acc
+
+                acc = loop(acc)
+
+            return acc
+
+        assert f(2) == 18
+        assert f(3) == 0
 
 
 if __name__ == "__main__":
