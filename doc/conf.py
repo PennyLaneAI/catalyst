@@ -82,6 +82,7 @@ class Mock(MagicMock):
 
 
 MOCK_MODULES = [
+    "mlir_quantum",
     "mlir_quantum.runtime",
     "mlir_quantum.dialects",
     "mlir_quantum.dialects.arith",
@@ -89,6 +90,7 @@ MOCK_MODULES = [
     "mlir_quantum.dialects.scf",
     "mlir_quantum.dialects.quantum",
     "mlir_quantum.dialects.gradient",
+    "mlir_quantum.compiler_driver",
     "pybind11",
 ]
 

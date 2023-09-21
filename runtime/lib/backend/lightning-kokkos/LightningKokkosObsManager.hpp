@@ -33,16 +33,8 @@ namespace Catalyst::Runtime::Simulator {
  */
 template <typename PrecisionT> class LightningKokkosObsManager {
   private:
-    using ObservableClassName =
-        Pennylane::Lightning_Kokkos::Simulators::ObservableKokkos<PrecisionT>;
-    using NamedObsClassName = Pennylane::Lightning_Kokkos::Simulators::NamedObsKokkos<PrecisionT>;
-    using HermitianObsClassName =
-        Pennylane::Lightning_Kokkos::Simulators::HermitianObsKokkos<PrecisionT>;
-    using TensorProdObsClassName =
-        Pennylane::Lightning_Kokkos::Simulators::TensorProdObsKokkos<PrecisionT>;
-    using HamiltonianClassName =
-        Pennylane::Lightning_Kokkos::Simulators::HamiltonianKokkos<PrecisionT>;
-
+    using VectorStateT = Pennylane::LightningKokkos::StateVectorKokkos<PrecisionT>;
+    using ObservableClassName = Pennylane::Observables::Observable<VectorStateT>;
     using ObservablePairType = std::pair<std::shared_ptr<ObservableClassName>, ObsType>;
     std::vector<ObservablePairType> observables_{};
 
@@ -105,8 +97,10 @@ template <typename PrecisionT> class LightningKokkosObsManager {
             std::string(Lightning::lookup_obs<Lightning::simulator_observable_support_size>(
                 Lightning::simulator_observable_support, obsId));
 
-        this->observables_.push_back(
-            std::make_pair(std::make_shared<NamedObsClassName>(obs_str, wires), ObsType::Basic));
+        this->observables_.push_back(std::make_pair(
+            std::make_shared<Pennylane::LightningKokkos::Observables::NamedObs<VectorStateT>>(
+                obs_str, wires),
+            ObsType::Basic));
         return static_cast<ObsIdType>(this->observables_.size() - 1);
     }
 
@@ -120,8 +114,16 @@ template <typename PrecisionT> class LightningKokkosObsManager {
     [[nodiscard]] auto createHermitianObs(const std::vector<std::complex<PrecisionT>> &matrix,
                                           const std::vector<size_t> &wires) -> ObsIdType
     {
+        std::vector<Kokkos::complex<PrecisionT>> matrix_k;
+        matrix_k.reserve(matrix.size());
+        for (const auto &elem : matrix) {
+            matrix_k.push_back(static_cast<Kokkos::complex<PrecisionT>>(elem));
+        }
+
         this->observables_.push_back(std::make_pair(
-            std::make_shared<HermitianObsClassName>(HermitianObsClassName{matrix, wires}),
+            std::make_shared<Pennylane::LightningKokkos::Observables::HermitianObs<VectorStateT>>(
+                Pennylane::LightningKokkos::Observables::HermitianObs<VectorStateT>{matrix_k,
+                                                                                    wires}),
             ObsType::Basic));
 
         return static_cast<ObsIdType>(this->observables_.size() - 1);
@@ -149,7 +151,9 @@ template <typename PrecisionT> class LightningKokkosObsManager {
         }
 
         this->observables_.push_back(std::make_pair(
-            std::make_shared<TensorProdObsClassName>(TensorProdObsClassName::create(obs_vec)),
+            std::make_shared<Pennylane::LightningKokkos::Observables::TensorProdObs<VectorStateT>>(
+                Pennylane::LightningKokkos::Observables::TensorProdObs<VectorStateT>::create(
+                    obs_vec)),
             ObsType::TensorProd));
 
         return static_cast<ObsIdType>(obs_size);
@@ -182,10 +186,11 @@ template <typename PrecisionT> class LightningKokkosObsManager {
             obs_vec.push_back(obs);
         }
 
-        this->observables_.push_back(
-            std::make_pair(std::make_shared<HamiltonianClassName>(
-                               HamiltonianClassName(coeffs, std::move(obs_vec))),
-                           ObsType::Hamiltonian));
+        this->observables_.push_back(std::make_pair(
+            std::make_shared<Pennylane::LightningKokkos::Observables::Hamiltonian<VectorStateT>>(
+                Pennylane::LightningKokkos::Observables::Hamiltonian<VectorStateT>(
+                    coeffs, std::move(obs_vec))),
+            ObsType::Hamiltonian));
 
         return static_cast<ObsIdType>(obs_size);
     }

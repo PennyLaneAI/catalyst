@@ -8,7 +8,7 @@
 	url = https://github.com/llvm/llvm-project.git
 	shallow = true
 	ignore = dirty
-[submodule "enzyme"]
+[submodule "Enzyme"]
 	path = mlir/Enzyme
 	url = https://github.com/EnzymeAD/Enzyme.git
 	shallow = true

@@ -20,6 +20,10 @@ while using :func:`~.qjit`.
 
 import numbers
 from typing import Any, Callable, Iterable, List, Optional, Union
+import uuid
+from enum import Enum
+from functools import partial
+from typing import Any, Callable, Iterable, List, Optional, Tuple, Union
 
 import jax
 import jax.numpy as jnp

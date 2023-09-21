@@ -23,9 +23,6 @@ include(Catch)
 
 add_executable(runner_tests runner_main.cpp)
 
-target_include_directories(runner_tests PRIVATE
-            ${pennylane_lightning_SOURCE_DIR}/pennylane_lightning/src/tests)
-
 if(ENABLE_OPENQASM)
 find_package(pybind11 CONFIG)
 

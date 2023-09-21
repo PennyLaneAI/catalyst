@@ -16,7 +16,7 @@
 
 import pennylane as qml
 
-from catalyst import cond, qjit
+from catalyst import cond, measure, qjit
 
 
 # CHECK-NOT: Verification failed
@@ -31,9 +31,10 @@ def circuit(n: int):
     @cond(n <= 5)
     # CHECK:       scf.if [[b]]
     def cond_fn():
-        # CHECK-DAG:   [[q0:%[a-zA-Z0-9_]+]] = "quantum.extract"
-        # CHECK-DAG:   [[q1:%[a-zA-Z0-9_]+]] = "quantum.custom"([[q0]]) {gate_name = "PauliX"
-        # CHECK-DAG:   [[qreg_1:%[a-zA-Z0-9_]+]] = "quantum.insert"([[qreg_0]], {{%[a-zA-Z0-9_]+}}, [[q1]])
+        # CHECK-DAG:   [[q0:%[a-zA-Z0-9_]+]] = quantum.extract
+        # CHECK-DAG:   [[q1:%[a-zA-Z0-9_]+]] = quantum.custom "PauliX"() [[q0]]
+        # pylint: disable=line-too-long
+        # CHECK-DAG:   [[qreg_1:%[a-zA-Z0-9_]+]] = quantum.insert [[qreg_0]][ {{[%a-zA-Z0-9_]+}}], [[q1]]
         # CHECK:       scf.yield %arg0, [[qreg_1]]
         qml.PauliX(wires=0)
         return n
@@ -46,9 +47,9 @@ def circuit(n: int):
         return n**3
 
     out = cond_fn()
-    # CHECK:       "quantum.dealloc"([[qreg_0]])
+    # CHECK:       quantum.dealloc [[qreg_0]]
     # CHECK:       return
-    return out
+    return out, measure(wires=0)
 
 
 print(circuit.mlir)
