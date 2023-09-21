@@ -2,6 +2,27 @@
 
 <h3>New features</h3>
 
+* Catalyst users can now use Python for loop statements in their programs without having to
+  explicitly use the functional `catalyst.for_loop` form!
+  [#258](https://github.com/PennyLaneAI/catalyst/pull/258)
+
+  This feature extends the existing AutoGraph support for Python if statements with Python for
+  loops. The following example is now supported:
+
+  ```python
+  dev = qml.device("lightning.qubit", wires=n)
+
+  @qjit(autograph=True)
+  @qml.qnode(dev)
+  def f(n):
+      for i in range(n):
+          qml.Hadamard(wires=i)
+
+      ...
+
+      return qml.expval(qml.PauliZ(0))
+  ```
+
 <h3>Improvements</h3>
 
 * Update the Lightning backend device to work with the PL-Lightning monorepo.
@@ -77,7 +98,7 @@ Sergei Mironov.
   TensorFlow installation be available. In addition, Python loops (`for` and `while`) are not
   yet supported, and do not work in AutoGraph mode.
 
-  Note that there are some caveats when using this feature especially around the ues of global
+  Note that there are some caveats when using this feature especially around the use of global
   variables or object mutation inside of methods. A functional style is always recommended when
   using `qjit` or AutoGraph.
 
