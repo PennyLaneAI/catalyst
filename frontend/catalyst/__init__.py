@@ -65,7 +65,6 @@ from catalyst.compilation_pipelines import QJIT, CompileOptions, qjit
 from catalyst.pennylane_extensions import (
     adjoint,
     cond,
-    ctrl,
     for_loop,
     grad,
     jacobian,

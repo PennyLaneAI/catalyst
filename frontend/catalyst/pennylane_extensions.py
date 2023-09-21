@@ -52,7 +52,6 @@ from catalyst.jax_tracer import (
     Function,
     HybridOpRegion,
     MidCircuitMeasure,
-    QCtrl,
     QFunc,
     WhileLoop,
     deduce_avals,
@@ -1293,49 +1292,6 @@ def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
             in_classical_tracers=in_classical_tracers,
             out_classical_tracers=[],
             regions=[adjoint_region],
-        )
-
-    if isinstance(f, Callable):
-
-        def _callable(*args, **kwargs):
-            return _call_handler(*args, _callee=f, **kwargs)
-
-        return _callable
-    elif isinstance(f, Operator):
-        QueuingManager.remove(f)
-
-        def _callee():
-            QueuingManager.append(f)
-
-        return _call_handler(_callee=_callee)
-    else:
-        raise ValueError(f"Expected a callable or a qml.Operator, not {f}")
-
-
-def ctrl(f: Union[Callable, Operator], control: List[Any], control_values: List[Any]) -> Callable:
-    """Catalyst version of the ``qml.ctrl`` that supports Catalyst hybrid operations."""
-
-    def _call_handler(*args, _callee: Callable, **kwargs):
-        EvaluationContext.check_is_quantum_tracing(
-            "catalyst.adjoint can only be used from within a qml.qnode."
-        )
-        in_classical_tracers, _ = tree_flatten((args, kwargs))
-        quantum_tape = QuantumTape()
-        with QueuingManager.stop_recording(), quantum_tape:
-            res = _callee(*args, **kwargs)
-        out_classical_tracers, _ = tree_flatten(res)
-
-        if len(quantum_tape.measurements) > 0:
-            raise ValueError("Quantum measurements are not allowed inside catalyst.ctrl")
-
-        region = HybridOpRegion(None, quantum_tape, [], [])
-
-        QCtrl(
-            control_wire_tracers=list(control),
-            control_value_tracers=list(control_values),
-            in_classical_tracers=in_classical_tracers,
-            out_classical_tracers=out_classical_tracers,
-            regions=[region],
         )
 
     if isinstance(f, Callable):

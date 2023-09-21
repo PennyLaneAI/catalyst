@@ -24,7 +24,6 @@ import pennylane as qml
 from pennylane import QubitDevice, QubitUnitary, QueuingManager
 from pennylane.measurements import MeasurementProcess, MidMeasureMP
 from pennylane.operation import AnyWires, Operation, Wires
-from pennylane.ops import Controlled
 from pennylane.tape import QuantumTape
 
 from catalyst.jax_primitives import (
@@ -411,74 +410,6 @@ class Adjoint(HybridOp):
         )
         qrp2 = QRegPromise(op_results[-1])
         return qrp2
-
-
-class QCtrl(HybridOp):
-    """Catalyst quantum ctrl operation"""
-
-    def _no_binder(self, *_):
-        raise RuntimeError("QCtrl does not support JAX binding")
-
-    binder = _no_binder
-
-    def __init__(self, *args, control_wire_tracers, control_value_tracers, **kwargs):
-        self.control_wire_tracers: List[Any] = control_wire_tracers
-        self.control_value_tracers: List[Any] = control_value_tracers
-        super().__init__(*args, **kwargs)
-
-    def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
-        raise NotImplementedError("QCtrl does not support JAX quantum tracing")
-
-    def compute_decomposition(self, *params, wires=None, **hyperparameters):
-        """Compute quantum decomposition of the gate by recursively scanning the nested tape and
-        distributing the quantum control operaiton over the tape operations."""
-        assert len(self.regions) == 1, "Qctrl is expected to have one region"
-        assert len(params) == 0, "Decomposition parameters should be empty"
-        assert len(hyperparameters) == 0, "Decomposition hyperparameters should be empty"
-        assert wires is self.wires, "Altering wires is not supported"
-        new_tape = qctrl_distribute(
-            self.regions[0].quantum_tape, self.control_wire_tracers, self.control_value_tracers
-        )
-        return new_tape.operations
-
-
-def qctrl_distribute(
-    tape: QuantumTape, control_wires: List[Any], control_values: List[Any]
-) -> QuantumTape:
-    """Distribute the quantum control operation, described by ``control_wires`` and
-    ``control_values``, over all the operations on the nested quantum tape.
-    """
-    # Note: The transformation modifies operations in the source quantum tape, so we must not use it
-    # after we called this function.
-    assert len(control_wires) > 0, "This transformation expects a non-empty list of control_wires"
-    ctx = EvaluationContext.get_main_tracing_context()
-    ops2 = []
-    for op in tape.operations:
-        if has_nested_tapes(op):
-            if isinstance(op, QCtrl):
-                for region in [region for region in op.regions if region.quantum_tape is not None]:
-                    tape2 = qctrl_distribute(
-                        region.quantum_tape,
-                        control_wires + op.control_wire_tracers,
-                        control_values + op.control_value_tracers,
-                    )
-                    ops2.extend(tape2.operations)
-            else:
-                for region in [region for region in op.regions if region.quantum_tape is not None]:
-                    with EvaluationContext.frame_tracing_context(ctx, region.trace):
-                        region.quantum_tape = qctrl_distribute(
-                            region.quantum_tape, control_wires, control_values
-                        )
-                ops2.append(op)
-        else:
-            ops2.append(
-                Controlled(
-                    type(op)(*op.parameters, wires=op.wires),
-                    control_wires=qml.wires.Wires(control_wires),
-                    control_values=control_values,
-                )
-            )
-    return QuantumTape(ops2, tape.measurements)
 
 
 def trace_to_mlir(func, *args, **kwargs):
