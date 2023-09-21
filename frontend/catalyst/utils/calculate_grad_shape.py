@@ -102,22 +102,22 @@ def calculate_grad_shape(signature, indices) -> Signature:
         ``indices``.
     """
     grad_result_types = []
-    for index in indices:
-        diff_arg_type = signature.get_input(index)
-        diff_arg_shape = []
+    
+    for result in signature.get_results():
+        result_shape = []
+        if Signature.is_tensor(result):
+            for axis in result.shape:
+                result_shape.append(axis)
 
-        if Signature.is_tensor(diff_arg_type):
-            for axis in diff_arg_type.shape:
-                diff_arg_shape.append(axis)
+            for index in indices:
+                diff_arg_type = signature.get_input(index)
+                if Signature.is_tensor(diff_arg_type):
+                    grad_res_shape = result_shape.copy()
+                    for axis in diff_arg_type.shape:
+                        grad_res_shape.append(axis)
+                    element_type = diff_arg_type.dtype
 
-        for y in signature.get_results():
-            grad_res_shape = diff_arg_shape.copy()
-            if Signature.is_tensor(y):
-                for axis in y.shape:
-                    grad_res_shape.append(axis)
-                element_type = y.dtype
-
-            grad_res_type = ShapedArray(grad_res_shape, element_type) if grad_res_shape else y
-            grad_result_types.append(grad_res_type)
+                grad_res_type = ShapedArray(grad_res_shape, element_type) if grad_res_shape else diff_arg_type
+                grad_result_types.append(grad_res_type)
 
     return Signature(signature.get_inputs(), grad_result_types)
