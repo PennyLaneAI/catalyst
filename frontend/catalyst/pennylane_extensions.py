@@ -54,7 +54,6 @@ from catalyst.jax_tracer import (
     MidCircuitMeasure,
     QCtrl,
     QFunc,
-    QJITDevice,
     WhileLoop,
     deduce_avals,
 )
