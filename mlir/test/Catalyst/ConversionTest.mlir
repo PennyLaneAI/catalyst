@@ -12,16 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --catalyst-bufferize --split-input-file %s | FileCheck %s
+// RUN: quantum-opt --finalize-memref-to-llvm --catalyst-bufferize --convert-catalyst-to-llvm --split-input-file %s | FileCheck %s
 
 //////////////////////
 // Catalyst PrintOp //
 //////////////////////
 
-func.func @dbprint(%arg0: tensor<?xf64>) {
+// CHECK: llvm.func @_catalyst_memref_print(!llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>)
 
-    // CHECK:   catalyst.print {{.*}} : memref<?xf64>
-    catalyst.print %arg0 : tensor<?xf64>
+// CHECK-LABEL: @dbprint
+func.func @dbprint(%arg0 : tensor<1xi64>) {
+
+    // CHECK: llvm.call @_catalyst_memref_print({{.*}}) : (!llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>) -> ()
+    catalyst.print %arg0 : tensor<1xi64>
 
     return
 }
