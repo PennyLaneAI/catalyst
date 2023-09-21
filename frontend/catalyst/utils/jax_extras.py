@@ -327,7 +327,8 @@ def custom_lower_jaxpr_to_module(
     Copyright 2021 The JAX Authors.
     """
     platform = xb.canonicalize_platform(platform)
-    assert xb.is_known_platform(platform), f"Unknown platform {platform}"
+    if not xb.is_known_platform(platform):  # pragma: no cover
+        raise ValueError(f"Unknown platform {platform}")
     assert arg_shardings is None
     assert result_shardings is None
     platforms_with_donation = ("cuda", "rocm", "tpu")
@@ -351,10 +352,6 @@ def custom_lower_jaxpr_to_module(
         # XLA computation preserves the module name.
         module_name = _module_name_regex.sub("_", module_name)
         ctx.module.operation.attributes["sym_name"] = ir.StringAttr.get(module_name)
-        unlowerable_effects = {eff for eff in jaxpr.effects if eff not in lowerable_effects}
-        assert (
-            not unlowerable_effects
-        ), f"Catalyst version does not support unlowerable effects: {unlowerable_effects}"
         lower_jaxpr_to_fun(
             ctx,
             func_name,

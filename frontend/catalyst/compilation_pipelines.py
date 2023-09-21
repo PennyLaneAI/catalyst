@@ -800,8 +800,8 @@ def qjit(
     Args:
         fn (Callable): the quantum or classical function
         autograph (bool): Experimental support for automatically converting Python control
-            flow statements to Catalyst-compatible control flow. Currently only supports Python
-            ``if``, ``elif``, and ``else`` statements. Note that this feature requires an
+            flow statements to Catalyst-compatible control flow. Currently supports Python ``if``,
+            ``elif``, ``else``, and ``for`` statements. Note that this feature requires an
             available TensorFlow installation.
         target (str): the compilation target
         keep_intermediate (bool): Whether or not to store the intermediate files throughout the
