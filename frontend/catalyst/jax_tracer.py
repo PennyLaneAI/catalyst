@@ -108,7 +108,7 @@ class Function:
 
 KNOWN_NAMED_OBS = (qml.Identity, qml.PauliX, qml.PauliY, qml.PauliZ, qml.Hadamard)
 
-FORCED_ORDER_PRIMITIVES = {qdevice_p, qextract_p}
+FORCED_ORDER_PRIMITIVES = {qdevice_p, qextract_p, qinst_p}
 
 PAULI_NAMED_MAP = {
     "I": "Identity",
