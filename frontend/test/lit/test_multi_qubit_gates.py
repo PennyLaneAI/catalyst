@@ -55,7 +55,7 @@ def circuit():
             [0.0 + 0.0j, 0.0 + 0.0j, 0.0 + 0.0j, 0.99500417 - 0.09983342j],
         ]
     )
-    # CHECK: {{%.+}} = "quantum.unitary"({{%.+}}, {{%.+}}, {{%.+}}) : (tensor<4x4xcomplex<f64>>, !quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
+    # CHECK: {{%.+}} = quantum.unitary({{%.+}} : tensor<4x4xcomplex<f64>>) {{%.+}}, {{%.+}} : !quantum.bit, !quantum.bit
     qml.QubitUnitary(U2, wires=[0, 2])
 
     return measure(wires=0), measure(wires=1)
