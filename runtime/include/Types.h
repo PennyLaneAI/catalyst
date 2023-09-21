@@ -48,10 +48,34 @@ enum ObsType : int8_t {
     Hamiltonian,
 };
 
+// complex<float> type
+struct CplxT_float {
+    float real;
+    float imag;
+};
+
 // complex<double> type
 struct CplxT_double {
     double real;
     double imag;
+};
+
+enum NumericType : int8_t {
+    i1 = 0,
+    i16,
+    i32,
+    i64,
+    f32,
+    f64,
+    c64,
+    c128,
+};
+
+// MemRefT<datatype, dimension=rank> type
+struct OpaqueMemRefT {
+    size_t rank;
+    void *descriptor;
+    NumericType datatype;
 };
 
 // MemRefT<complex<double>, dimension=1> type

@@ -103,6 +103,32 @@ void _catalyst_string_print(int8_t *spec)
     std::cerr << spec_str << std::endl;
 }
 
+void __quantum__rt__print_tensor(OpaqueMemRefT c_memref)
+{
+    DynamicMemRefT memref = get_dynamic_memref(c_memref);
+
+    int indent = 0;
+    for (size_t dim = 0; dim < c_memref.rank; dim++) {
+        std::string prefix = "";
+        for (int i = 0; i < indent; i++)
+            prefix += "  ";
+
+        std::cout << prefix + "[" << std::endl;
+        indent += 2;
+    }
+
+    indent -= 2;
+
+    for (size_t dim = 0; dim < c_memref.rank; dim++) {
+        std::string prefix = "";
+        for (int i = 0; i < indent; i++)
+            prefix += "  ";
+
+        std::cout << prefix + "]" << std::endl;
+        indent -= 2;
+    }
+}
+
 void __quantum__rt__fail_cstr(const char *cstr) { RT_FAIL(cstr); }
 
 void __quantum__rt__initialize()
