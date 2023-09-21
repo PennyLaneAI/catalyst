@@ -78,7 +78,7 @@ devRXX = CustomDeviceWithSupport(wires=2)
 
 def compile_circuit_with_device(device):
     @qjit(target="mlir")
-    @qfunc(2, device=device)
+    @qfunc(device=device)
     def f(x: float):
         RXX(x, wires=[0, 1])
         return measure(wires=0)
