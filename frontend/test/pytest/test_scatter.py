@@ -45,6 +45,7 @@ def test_multiple_index():
     res = multiple_index_multiply(jnp.array([0, 1, 2]))
     assert np.allclose(res, [0, 3, 6])
 
+
 def test_matrix():
     """Test to index a jax array and have operations on it."""
 
