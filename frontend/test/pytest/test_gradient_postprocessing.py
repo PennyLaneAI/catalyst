@@ -226,8 +226,8 @@ def test_multi_arg_multi_result(backend, diff_method):
         for j, jax_entry in enumerate(row):
             # With multiple arguments and results, the Catalyst jacobians are transposed
             # w.r.t. the JAX jacobian. This is why the i and j are switched.
-            catalyst_entry = catalyst_jacobian[j * len(row) + i]
-            assert catalyst_entry == pytest.approx(jax_entry.T)
+            catalyst_entry = catalyst_jacobian[j + i * len(row)]
+            assert catalyst_entry == pytest.approx(jax_entry)
 
 
 def test_multi_qnode(backend):
