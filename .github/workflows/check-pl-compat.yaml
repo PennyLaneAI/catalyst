@@ -74,6 +74,12 @@ jobs:
         key: ${{ runner.os }}-ccache-${{ github.run_id }}
         restore-keys: ${{ runner.os }}-ccache-
 
+    - name: Clone Enzyme Submodule
+      uses: actions/checkout@v3
+      with:
+        repository: EnzymeAD/Enzyme
+        ref: ${{ needs.constants.outputs.enzyme_version }}
+        path: mlir/Enzyme
 
     - name: Install Catalyst (latest/stable)
       run: |
