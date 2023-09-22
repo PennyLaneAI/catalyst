@@ -947,7 +947,7 @@ def _counts_abstract_eval(obs, shots, shape):
     assert isinstance(obs, AbstractObs)
 
     if obs.primitive is compbasis_p:
-        assert shape == (2 ** obs.num_qubits,)
+        assert shape == (2**obs.num_qubits,)
     else:
         assert shape == (2,)
 
@@ -1039,7 +1039,7 @@ def _probs_abstract_eval(obs, shape):
     assert isinstance(obs, AbstractObs)
 
     if obs.primitive is compbasis_p:
-        assert shape == (2 ** obs.num_qubits,)
+        assert shape == (2**obs.num_qubits,)
     else:
         raise TypeError("probs only supports computational basis")
 
@@ -1068,7 +1068,7 @@ def _state_abstract_eval(obs, shape):
     assert isinstance(obs, AbstractObs)
 
     if obs.primitive is compbasis_p:
-        assert shape == (2 ** obs.num_qubits,)
+        assert shape == (2**obs.num_qubits,)
     else:
         raise TypeError("state only supports computational basis")
 

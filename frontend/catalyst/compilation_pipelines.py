@@ -760,7 +760,7 @@ class JAX_QJIT:
             for res_idx in range(len(results_data)):
                 deriv_idx = diff_arg_idx * len(results_data) + res_idx
                 deriv = derivatives_data[deriv_idx]  # [2]
-                daxis = list(range(deriv.ndim-tangent.ndim, deriv.ndim))
+                daxis = list(range(deriv.ndim - tangent.ndim, deriv.ndim))
                 jvp = jnp.tensordot(deriv, tangent, axes=(daxis, taxis))
                 jvps[res_idx] = jvps[res_idx] + jvp
 
