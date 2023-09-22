@@ -75,8 +75,6 @@ jobs:
         restore-keys: ${{ runner.os }}-ccache-
 
     - name: Clone Enzyme Submodule
-      if: |
-        steps.cache-enzyme.outputs.cache-hit != 'true'
       uses: actions/checkout@v3
       with:
         repository: EnzymeAD/Enzyme
