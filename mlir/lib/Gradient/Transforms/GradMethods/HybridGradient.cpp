@@ -349,7 +349,7 @@ func::FuncOp HybridGradientLowering::genFullGradFunction(PatternRewriter &rewrit
                         // Backprop gives a gradient of a single output entry w.r.t. all active
                         // inputs. Catalyst gives transposed Jacobians, such that the Jacobians have
                         // shape
-                        // [...shape_inputs, ...shape_outputs].
+                        // [...shape_outputs, ...shape_inputs,].
                         for (const auto &[backpropIdx, jacobianSlice] :
                              llvm::enumerate(backpropOp.getResults())) {
                             if (auto sliceType =
@@ -361,16 +361,16 @@ func::FuncOp HybridGradientLowering::genFullGradFunction(PatternRewriter &rewrit
                                 if (sliceRank < jacobianRank) {
                                     // Offsets are [0] * rank of backprop result + [...indices]
                                     SmallVector<OpFoldResult> offsets;
-                                    offsets.append(sliceRank, rewriter.getIndexAttr(0));
                                     offsets.append(indices.begin(), indices.end());
+                                    offsets.append(sliceRank, rewriter.getIndexAttr(0));
 
-                                    // Sizes are [...sliceShape] + [1] * (jacobianRank - sliceRank)
+                                    // Sizes are [1] * (jacobianRank - sliceRank) + [...sliceShape]
                                     SmallVector<OpFoldResult> sizes;
+                                    sizes.append(jacobianRank - sliceRank,
+                                                 rewriter.getIndexAttr(1));
                                     for (int64_t dim : sliceType.getShape()) {
                                         sizes.push_back(rewriter.getIndexAttr(dim));
                                     }
-                                    sizes.append(jacobianRank - sliceRank,
-                                                 rewriter.getIndexAttr(1));
 
                                     // Strides are [1] * jacobianRank
                                     SmallVector<OpFoldResult> strides{jacobianRank,
