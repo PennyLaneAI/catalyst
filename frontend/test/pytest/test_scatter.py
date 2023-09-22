@@ -44,3 +44,14 @@ def test_multiple_index():
 
     res = multiple_index_multiply(jnp.array([0, 1, 2]))
     assert np.allclose(res, [0, 3, 6])
+
+def test_matrix():
+    """Test to index a jax array and have operations on it."""
+
+    @qjit
+    def multiple_index_multiply(l: jax.core.ShapedArray((3, 3), dtype=float)):
+        res = l.at[1:3].multiply(jnp.array(3))
+        return res
+
+    res = multiple_index_multiply(jnp.array([[0, 1, 2], [3, 4, 5], [6, 7, 8]]))
+    assert np.allclose(res, jnp.array([[0, 1, 2], [9, 12, 15], [18, 21, 24]]))

@@ -15,6 +15,7 @@
 #define DEBUG_TYPE "scatter"
 
 #include <algorithm>
+#include <iostream>
 #include <vector>
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -271,16 +272,25 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
             SmallVector<Value> results;
             for (size_t i = 0; i < updateWindowsIndices.size(); ++i) {
                 int64_t indexUpdate = updateWindowsIndices[i];
-                Value index = rewriter.create<index::ConstantOp>(loc, i);
-                auto indexScatter = rewriter.create<tensor::ExtractOp>(loc, scatterIndices, index);
+                auto itScatter =
+                    std::find(scatterDimsToOperandDims.begin(), scatterDimsToOperandDims.end(), i);
+                if (itScatter != scatterDimsToOperandDims.end()) {
+                    Value index = rewriter.create<index::ConstantOp>(loc, i);
+                    auto indexScatter =
+                        rewriter.create<tensor::ExtractOp>(loc, scatterIndices, index);
 
-                TypedAttr indexAttr = rewriter.getI32IntegerAttr(indexUpdate);
-                Value indexValue = rewriter.create<arith::ConstantOp>(loc, indexAttr);
+                    TypedAttr indexAttr = rewriter.getI32IntegerAttr(indexUpdate);
+                    Value indexValue = rewriter.create<arith::ConstantOp>(loc, indexAttr);
 
-                Value addValue = rewriter.create<arith::AddIOp>(loc, indexScatter, indexValue);
-                Value addValueCasted =
-                    rewriter.create<arith::IndexCastOp>(loc, rewriter.getIndexType(), addValue);
-                results.push_back(addValueCasted);
+                    Value addValue = rewriter.create<arith::AddIOp>(loc, indexScatter, indexValue);
+                    Value addValueCasted =
+                        rewriter.create<arith::IndexCastOp>(loc, rewriter.getIndexType(), addValue);
+                    results.push_back(addValueCasted);
+                }
+                else {
+                    Value indexValue = rewriter.create<index::ConstantOp>(loc, indexUpdate);
+                    results.push_back(indexValue);
+                }
             }
             return results;
         }

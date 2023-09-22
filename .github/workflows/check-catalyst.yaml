@@ -220,6 +220,7 @@ jobs:
         make enzyme
 
   quantum:
+    name: Quantum Dialects Build
     needs: [constants, mhlo, llvm]
     runs-on: ubuntu-latest
 
@@ -260,14 +261,6 @@ jobs:
     
     - name: Get Cached MHLO Build
       id: cache-mhlo
-      uses: actions/cache@v3
-      with:
-        path: mhlo-build
-        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-build
-        fail-on-cache-miss: True
-
-    - name: Get Cached MHLO Build
-      id: cache-mhlo-build
       uses: actions/cache@v3
       with:
         path: mhlo-build

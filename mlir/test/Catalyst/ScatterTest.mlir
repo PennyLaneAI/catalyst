@@ -179,3 +179,4 @@ func.func public @full_example_scatter(%input: tensor<3x4x2xi64>, %update: tenso
 // CHECK: [[CALL22:%.+]] = call @__catalyst_update_scatter[[NUMBER0]](
 // CHECK: [[CALL23:%.+]] = call @__catalyst_update_scatter[[NUMBER0]](
 // CHECK: [[CALL24:%.+]] = call @__catalyst_update_scatter[[NUMBER0]](
+// CHECK-NOT: call @__catalyst_update_scatter[[NUMBER0]](
