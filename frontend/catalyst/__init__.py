@@ -65,6 +65,7 @@ from catalyst.compilation_pipelines import QJIT, CompileOptions, qjit
 from catalyst.pennylane_extensions import (
     adjoint,
     cond,
+    ctrl,
     for_loop,
     grad,
     jacobian,
@@ -85,6 +86,7 @@ __all__ = (
     "for_loop",
     "while_loop",
     "cond",
+    "ctrl",
     "measure",
     "grad",
     "jacobian",
