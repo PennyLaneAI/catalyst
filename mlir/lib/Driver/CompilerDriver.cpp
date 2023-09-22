@@ -46,7 +46,6 @@
 #include "Quantum/Transforms/Passes.h"
 
 #include "Enzyme.h"
-#include "PreserveNVVM.h"
 
 using namespace mlir;
 using namespace catalyst;
