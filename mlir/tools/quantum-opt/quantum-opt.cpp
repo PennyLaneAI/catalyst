@@ -22,6 +22,8 @@
 #include "mlir/Tools/mlir-opt/MlirOptMain.h"
 #include "stablehlo/dialect/Register.h"
 
+#include "mhlo/IR/hlo_ops.h"
+
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Catalyst/Transforms/Passes.h"
 #include "Gradient/IR/GradientDialect.h"
@@ -43,6 +45,7 @@ int main(int argc, char **argv)
     registry.insert<catalyst::CatalystDialect>();
     registry.insert<catalyst::quantum::QuantumDialect>();
     registry.insert<catalyst::gradient::GradientDialect>();
+    registry.insert<mlir::mhlo::MhloDialect>();
 
     return mlir::asMainReturnCode(
         mlir::MlirOptMain(argc, argv, "Quantum optimizer driver\n", registry));
