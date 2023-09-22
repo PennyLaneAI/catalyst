@@ -1793,8 +1793,27 @@ def ctrl(
         same call signature that creates a controlled version of the provided function.
 
     Raises:
-        ValueError: invalid parameter values or measurements are among the controlled operations.
+        ValueError: invalid parameter values, measurements are among the controlled operations.
 
+    **Example**
+
+    .. code-block:: python
+
+        @qjit
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def workflow(theta, w, cw):
+            qml.Hadamard(wires=[0])
+            qml.Hadamard(wires=[1])
+            def func():
+                qml.RX(theta, wires=w)
+                qml.RY(theta, wires=w)
+            catalyst.ctrl(func, control=[cw])()
+            catalyst.ctrl(qml.RZ, control=[cw])(theta, wires=w)
+            catalyst.ctrl(qml.RY(theta, wires=w), control=[cw])
+            return qml.probs()
+
+    >>> workflow(jnp.pi/4, 1, 0)
+    array([0.25, 0.25, 0.03661165, 0.46338835])
     """
 
     def _tolist(x):
