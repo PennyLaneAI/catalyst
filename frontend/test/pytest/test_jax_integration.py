@@ -252,7 +252,7 @@ class TestJAXAD:
         x, y = jnp.array([0.1, 0.2, 0.3]), jnp.array([0.1, 0.2])
         result = cost_fn(x, y, circuit)
         reference = cost_fn(x, y, circuit.user_function)
-
+        
         assert len(result) == 2
         assert jnp.allclose(result[0], reference[0])
         assert jnp.allclose(result[1], reference[1])

@@ -758,7 +758,7 @@ class JAX_QJIT:
             tangent = tangents[arg_idx]  # [1]
             taxis = list(range(tangent.ndim))
             for res_idx in range(len(results_data)):
-                deriv_idx = diff_arg_idx * len(results_data) + res_idx
+                deriv_idx = diff_arg_idx + res_idx * len(argnums)
                 deriv = derivatives_data[deriv_idx]  # [2]
                 daxis = list(range(deriv.ndim - tangent.ndim, deriv.ndim))
                 jvp = jnp.tensordot(deriv, tangent, axes=(daxis, taxis))
