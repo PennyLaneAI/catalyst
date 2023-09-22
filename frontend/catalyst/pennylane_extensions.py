@@ -988,7 +988,7 @@ class QCtrl(HybridOp):
     """Catalyst quantum ctrl operation"""
 
     def _no_binder(self, *_):
-        raise RuntimeError("QCtrl does not support JAX binding")
+        raise RuntimeError("QCtrl does not support JAX binding")  # pragma: no cover
 
     binder = _no_binder
 
@@ -1001,7 +1001,7 @@ class QCtrl(HybridOp):
         super().__init__(*args, **kwargs)
 
     def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
-        raise NotImplementedError("QCtrl does not support JAX quantum tracing")
+        raise NotImplementedError("QCtrl does not support JAX quantum tracing")  # pragma: no cover
 
     def compute_decomposition(self, *params, wires=None, **hyperparameters):
         """Compute quantum decomposition of the gate by recursively scanning the nested tape and
