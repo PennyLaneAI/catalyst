@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <unordered_map>
+
 #include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -78,22 +80,22 @@ struct PrintOpPattern : public OpConversionPattern<PrintOp> {
         Location loc = op.getLoc();
         MLIRContext *ctx = this->getContext();
 
-        Type void_t = LLVM::LLVMVoidType::get(ctx);
+        Type voidType = LLVM::LLVMVoidType::get(ctx);
 
-        auto cvar_str = op.getConstVal();
-        if (cvar_str) {
+        if (op.getConstVal().has_value()) {
             ModuleOp mod = op->getParentOfType<ModuleOp>();
 
             StringRef qirName = "__quantum__rt__print_string";
 
-            Type intPtrType = LLVM::LLVMPointerType::get(IntegerType::get(ctx, 8));
-            Type qirSignature = LLVM::LLVMFunctionType::get(void_t, intPtrType);
+            Type charPtrType = LLVM::LLVMPointerType::get(IntegerType::get(ctx, 8));
+            Type qirSignature = LLVM::LLVMFunctionType::get(voidType, charPtrType);
             LLVM::LLVMFuncOp fnDecl =
                 ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
 
-            auto spec = cvar_str.value();
-            Value spec_val = getGlobalString(loc, rewriter, spec, spec, mod);
-            rewriter.create<LLVM::CallOp>(loc, fnDecl, spec_val);
+            StringRef stringValue = op.getConstVal().value();
+            std::string symbolName = std::to_string(std::hash<std::string>()(stringValue.str()));
+            Value global = getGlobalString(loc, rewriter, symbolName, stringValue, mod);
+            rewriter.create<LLVM::CallOp>(loc, fnDecl, global);
             rewriter.eraseOp(op);
         }
         else {
@@ -104,7 +106,7 @@ struct PrintOpPattern : public OpConversionPattern<PrintOp> {
                 conv->convertType(MemRefType::get({UNKNOWN}, IntegerType::get(ctx, 64)));
 
             Type qirSignature =
-                LLVM::LLVMFunctionType::get(void_t, LLVM::LLVMPointerType::get(vectorType));
+                LLVM::LLVMFunctionType::get(voidType, LLVM::LLVMPointerType::get(vectorType));
             LLVM::LLVMFuncOp fnDecl =
                 ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
 

@@ -31,12 +31,16 @@ func.func @dbprint_val(%arg0 : tensor<1xi64>) {
 
 // -----
 
-// CHECK: llvm.func @__quantum__rt__print_string(!llvm.ptr<i8>)
+// CHECK-DAG: llvm.mlir.global internal constant @[[hash:["0-9]+]]("Hello, Catalyst")
+// CHECK-DAG: llvm.func @__quantum__rt__print_string(!llvm.ptr<i8>)
 
 // CHECK-LABEL: @dbprint_str
 func.func @dbprint_str() {
 
-    // CHECK: llvm.call @__quantum__rt__print_string({{.*}}) : (!llvm.ptr<i8>) -> ()
+    // CHECK: [[C0:%.+]] = llvm.mlir.constant(0 : index)
+    // CHECK: [[array_ptr:%.+]] = llvm.mlir.addressof @[[hash]] : !llvm.ptr<array<15 x i8>>
+    // CHECK: [[char_ptr:%.+]] = llvm.getelementptr [[array_ptr]][[[C0]], [[C0]]] : {{.*}} -> !llvm.ptr<i8>
+    // CHECK: llvm.call @__quantum__rt__print_string([[char_ptr]])
     "catalyst.print"() {const_val = "Hello, Catalyst"} : () -> ()
 
     return
