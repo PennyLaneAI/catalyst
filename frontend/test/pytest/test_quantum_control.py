@@ -14,6 +14,8 @@
 
 """Test quantum control decomposition in Catalyst."""
 
+# pylint: disable=too-many-arguments
+
 from typing import Callable
 
 import pennylane as qml
