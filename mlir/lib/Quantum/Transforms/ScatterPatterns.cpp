@@ -45,6 +45,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         // Add checks for supported cases (assumptions: no update windows dim, unique indices and
         // sorted indices)
         if (!op.getUniqueIndices() || !op.getIndicesAreSorted()) {
+            op.emitError() << "Indices are not unique and/or not sorted, unique boolean: " << op.getUniqueIndices() << ", sorted boolean :"<< op.getIndicesAreSorted();
             return failure();
         }
 
