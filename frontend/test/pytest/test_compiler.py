@@ -30,7 +30,8 @@ import pytest
 
 from catalyst import qjit
 from catalyst.compiler import CompileOptions, Compiler, LinkerDriver
-from catalyst.jax_tracer import get_mlir
+from catalyst.jax_tracer import trace_to_mlir
+from catalyst.pennylane_extensions import measure, qfunc
 from catalyst.utils.exceptions import CompileError
 
 # pylint: disable=missing-function-docstring
@@ -177,7 +178,7 @@ class TestCompilerState:
             qml.PauliX(wires=0)
             return qml.state()
 
-        mlir_module, _, _, _ = get_mlir(workflow)
+        mlir_module, _, _, _ = trace_to_mlir(workflow)
         compiler = Compiler(CompileOptions(keep_intermediate=True))
         compiler.run(mlir_module)
         assert compiler.get_output_of("HLOLoweringPass")
@@ -202,7 +203,7 @@ class TestCompilerState:
             qml.PauliX(wires=0)
             return qml.state()
 
-        mlir_module, _, _, _ = get_mlir(workflow)
+        mlir_module, _, _, _ = trace_to_mlir(workflow)
         # This means that we are not running any pass.
         pipelines = []
         identity_compiler = Compiler(CompileOptions(keep_intermediate=True))
@@ -223,7 +224,7 @@ class TestCompilerState:
             qml.PauliX(wires=0)
             return qml.state()
 
-        mlir_module, _, _, _ = get_mlir(workflow)
+        mlir_module, _, _, _ = trace_to_mlir(workflow)
         # This means that we are not running any pass.
         identity_compiler = Compiler(CompileOptions(keep_intermediate=True))
         identity_compiler.run(mlir_module, pipelines=[], lower_to_llvm=False)
