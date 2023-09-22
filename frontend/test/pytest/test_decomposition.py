@@ -16,7 +16,7 @@ import pennylane as qml
 import pytest
 from jax import numpy as jnp
 
-from catalyst import measure, qjit
+from catalyst import for_loop, measure, qjit
 
 # This is used just for internal testing
 from catalyst.pennylane_extensions import qfunc
@@ -53,7 +53,7 @@ dev = CustomDevice(wires=2)
 @pytest.mark.parametrize("param,expected", [(0.0, True), (jnp.pi, False)])
 def test_decomposition(param, expected):
     @qjit()
-    @qfunc(2, device=dev)
+    @qfunc(device=dev)
     def mid_circuit(x: float):
         qml.Hadamard(wires=0)
         qml.Rot(0, 0, x, wires=0)
@@ -66,7 +66,3 @@ def test_decomposition(param, expected):
         return measure(wires=1)
 
     assert mid_circuit(param) == expected
-
-
-if __name__ == "__main__":
-    pytest.main(["-x", __file__])
