@@ -466,10 +466,10 @@ def trace_quantum_measurements(
                 out_classical_tracers.append(var_p.bind(obs_tracers, shots=shots))
             elif o.return_type.value == "probs":
                 assert using_compbasis
-                shape = (2**nqubits,)
+                shape = (2 ** nqubits,)
                 out_classical_tracers.append(probs_p.bind(obs_tracers, shape=shape))
             elif o.return_type.value == "counts":
-                shape = (2**nqubits,) if using_compbasis else (2,)
+                shape = (2 ** nqubits,) if using_compbasis else (2,)
                 out_classical_tracers.extend(counts_p.bind(obs_tracers, shots=shots, shape=shape))
                 counts_tree = tree_structure(("keys", "counts"))
                 meas_return_trees_children = out_tree.children()
@@ -484,7 +484,7 @@ def trace_quantum_measurements(
                     out_tree = counts_tree
             elif o.return_type.value == "state":
                 assert using_compbasis
-                shape = (2**nqubits,)
+                shape = (2 ** nqubits,)
                 out_classical_tracers.append(state_p.bind(obs_tracers, shape=shape))
             else:
                 raise NotImplementedError(

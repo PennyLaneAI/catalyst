@@ -104,7 +104,7 @@ LogicalResult JVPLoweringPattern::matchAndRewrite(JVPOp op, PatternRewriter &rew
         std::optional<Value> acc;
         for (size_t nparam = 0; nparam < func_diff_operand_indices.size(); nparam++) {
             LLVM_DEBUG(dbgs() << "iteration: nout " << nout << " nparam " << nparam << "\n");
-            auto jac = gradOp.getResults()[nparam + nout*func_diff_operand_indices.size()];
+            auto jac = gradOp.getResults()[nparam + nout * func_diff_operand_indices.size()];
             auto tang = tangOperands[nparam];
             auto param = calleeOperands[func_diff_operand_indices[nparam]];
 
@@ -121,7 +121,7 @@ LogicalResult JVPLoweringPattern::matchAndRewrite(JVPOp op, PatternRewriter &rew
             assert(sparam == stang && "Parameter and tanget shapes don't match");
             assert(sjac_param == sparam &&
                    "Jacobian shape doesn't contain the parameter shape as a suffix");
- 
+
             std::vector<int64_t> jacAxisNames;
             {
                 for (size_t i = 0; i < sjac.size(); i++) {
@@ -137,7 +137,7 @@ LogicalResult JVPLoweringPattern::matchAndRewrite(JVPOp op, PatternRewriter &rew
             }
             std::vector<int64_t> jvpAxisNames;
             {
-                for (size_t i = 0; i < sjac.size() - sparam.size(); i++){
+                for (size_t i = 0; i < sjac.size() - sparam.size(); i++) {
                     jvpAxisNames.push_back(i);
                 }
             }
