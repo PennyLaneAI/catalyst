@@ -18,6 +18,7 @@
 #include <variant>
 #include <vector>
 
+#include "Exception.hpp"
 #include "Types.h"
 
 extern "C" {
@@ -48,7 +49,7 @@ struct DynamicMemRefT {
     std::vector<size_t> strides;
 };
 
-DynamicMemRefT get_dynamic_memref(OpaqueMemRefT memref)
+inline DynamicMemRefT get_dynamic_memref(OpaqueMemRefT memref)
 {
     DynamicMemRefT newMemref;
 
