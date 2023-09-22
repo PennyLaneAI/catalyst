@@ -31,12 +31,12 @@ func.func @dbprint_val(%arg0 : tensor<1xi64>) {
 
 // -----
 
-// CHECK: llvm.func @_catalyst_string_print(!llvm.ptr<i8>)
+// CHECK: llvm.func @__quantum__rt__print_string(!llvm.ptr<i8>)
 
 // CHECK-LABEL: @dbprint_str
 func.func @dbprint_str() {
 
-    // CHECK: llvm.call @_catalyst_string_print({{.*}}) : (!llvm.ptr<i8>) -> ()
+    // CHECK: llvm.call @__quantum__rt__print_string({{.*}}) : (!llvm.ptr<i8>) -> ()
     "catalyst.print"() {const_val = "Hello, Catalyst"} : () -> ()
 
     return

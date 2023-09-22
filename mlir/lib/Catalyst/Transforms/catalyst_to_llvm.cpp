@@ -84,7 +84,7 @@ struct PrintOpPattern : public OpConversionPattern<PrintOp> {
         if (cvar_str) {
             ModuleOp mod = op->getParentOfType<ModuleOp>();
 
-            StringRef qirName = "_catalyst_string_print";
+            StringRef qirName = "__quantum__rt__print_string";
 
             Type intPtrType = LLVM::LLVMPointerType::get(IntegerType::get(ctx, 8));
             Type qirSignature = LLVM::LLVMFunctionType::get(void_t, intPtrType);

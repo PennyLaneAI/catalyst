@@ -32,6 +32,7 @@ void __quantum__rt__finalize();
 void __quantum__rt__toggle_recorder(bool);
 void __quantum__rt__print_state();
 void __quantum__rt__print_tensor(OpaqueMemRefT);
+void __quantum__rt__print_string(char *);
 
 QUBIT *__quantum__rt__qubit_allocate();
 QirArray *__quantum__rt__qubit_allocate_array(int64_t);
@@ -99,7 +100,6 @@ void __quantum__qis__Gradient_params(MemRefT_int64_1d *, int64_t, /*results*/...
 
 // Utility methods
 void _catalyst_memref_print(MemRefT_int64_1d *);
-void _catalyst_string_print(int8_t *);
 
 #ifdef __cplusplus
 } // extern "C"
