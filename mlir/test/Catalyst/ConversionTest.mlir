@@ -12,19 +12,35 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --finalize-memref-to-llvm --catalyst-bufferize --convert-catalyst-to-llvm --split-input-file %s | FileCheck %s
+// RUN: quantum-opt --finalize-memref-to-llvm --convert-catalyst-to-llvm --split-input-file %s | FileCheck %s
 
 //////////////////////
 // Catalyst PrintOp //
 //////////////////////
 
-// CHECK: llvm.func @_catalyst_memref_print(!llvm.ptr<struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>>)
+// CHECK: llvm.func @__quantum__rt__print_tensor(!llvm.ptr<struct<(i64, ptr, i8)>>)
 
 // CHECK-LABEL: @dbprint_val
-func.func @dbprint_val(%arg0 : tensor<1xi64>) {
+func.func @dbprint_val(%arg0 : memref<1xi64>) {
+    // CHECK: [[memref:%.+]] = builtin.unrealized_conversion_cast %arg0
 
-    // CHECK: llvm.call @_catalyst_memref_print({{.*}}) : (!llvm.ptr<struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>>) -> ()
-    "catalyst.print"(%arg0) : (tensor<1xi64>) -> ()
+    // CHECK: [[struct:%.+]] = llvm.mlir.undef : !llvm.struct<(i64, ptr, i8)>
+
+    // CHECK: [[rank:%.+]] = llvm.mlir.constant(1 : i64)
+    // CHECK: [[struct0:%.+]] = llvm.insertvalue [[rank]], [[struct]][0]
+
+    // CHECK: [[memref_ptr:%.+]] = llvm.alloca {{.*}} x !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+    // CHECK: llvm.store [[memref]], [[memref_ptr]]
+    // CHECK: [[memref_ptr_cast:%.+]] = llvm.bitcast [[memref_ptr]] : {{.*}} to !llvm.ptr
+    // CHECK: [[struct1:%.+]] = llvm.insertvalue [[memref_ptr_cast]], [[struct0]][1]
+
+    // CHECK: [[typeEnc:%.+]] = llvm.mlir.constant(3 : i8)
+    // CHECK: [[struct2:%.+]] = llvm.insertvalue [[typeEnc]], [[struct1]][2]
+
+    // CHECK: [[struct_ptr:%.+]] = llvm.alloca {{.*}} -> !llvm.ptr<struct<(i64, ptr, i8)>>
+    // CHECK: llvm.store [[struct2]], [[struct_ptr]]
+    // CHECK: llvm.call @__quantum__rt__print_tensor([[struct_ptr]])
+    "catalyst.print"(%arg0) : (memref<1xi64>) -> ()
 
     return
 }

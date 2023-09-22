@@ -70,6 +70,61 @@ Value getGlobalString(Location loc, OpBuilder &rewriter, StringRef key, StringRe
         rewriter.create<LLVM::AddressOfOp>(loc, glb), ArrayRef<Value>({idx, idx}));
 }
 
+std::optional<int8_t> encodeNumericType(Type elemType)
+{
+    int8_t typeEncoding;
+    if (auto intType = dyn_cast<IntegerType>(elemType)) {
+        switch (intType.getWidth()) {
+        case 1:
+            typeEncoding = 0;
+            break;
+        case 16:
+            typeEncoding = 1;
+            break;
+        case 32:
+            typeEncoding = 2;
+            break;
+        case 64:
+            typeEncoding = 3;
+            break;
+        default:
+            return std::nullopt;
+        }
+    }
+    else if (auto floatType = dyn_cast<FloatType>(elemType)) {
+        switch (floatType.getWidth()) {
+        case 32:
+            typeEncoding = 4;
+            break;
+        case 64:
+            typeEncoding = 5;
+            break;
+        default:
+            return std::nullopt;
+        }
+    }
+    else if (auto cmplxType = dyn_cast<ComplexType>(elemType)) {
+        auto floatType = dyn_cast<FloatType>(cmplxType.getElementType());
+        if (!floatType)
+            return std::nullopt;
+
+        switch (floatType.getWidth()) {
+        case 32:
+            typeEncoding = 6;
+            break;
+        case 64:
+            typeEncoding = 7;
+            break;
+        default:
+            return std::nullopt;
+        }
+    }
+    else {
+        return std::nullopt;
+    }
+    return typeEncoding;
+}
+
 struct PrintOpPattern : public OpConversionPattern<PrintOp> {
     using OpConversionPattern::OpConversionPattern;
 
@@ -81,6 +136,7 @@ struct PrintOpPattern : public OpConversionPattern<PrintOp> {
         MLIRContext *ctx = this->getContext();
 
         Type voidType = LLVM::LLVMVoidType::get(ctx);
+        Type voidPtrType = LLVM::LLVMPointerType::get(ctx);
 
         if (op.getConstVal().has_value()) {
             ModuleOp mod = op->getParentOfType<ModuleOp>();
@@ -99,21 +155,52 @@ struct PrintOpPattern : public OpConversionPattern<PrintOp> {
             rewriter.eraseOp(op);
         }
         else {
-            constexpr int64_t UNKNOWN = ShapedType::kDynamic;
-            TypeConverter *conv = getTypeConverter();
-            StringRef qirName = "_catalyst_memref_print";
-            Type vectorType =
-                conv->convertType(MemRefType::get({UNKNOWN}, IntegerType::get(ctx, 64)));
+            StringRef qirName = "__quantum__rt__print_tensor";
 
-            Type qirSignature =
-                LLVM::LLVMFunctionType::get(voidType, LLVM::LLVMPointerType::get(vectorType));
+            // C interface for the print function is an unranked & opaque memref descriptor:
+            // {
+            //    i64 rank,
+            //    void* memref_descriptor,
+            //    i8 type_encoding
+            // }
+            // Where the type_encoding is a simple enum for all supported numeric types:
+            //   i1, i16, i32, i64, f32, f64, c64, c128 (see runtime Types.h)
+            Type structType = LLVM::LLVMStructType::getLiteral(
+                ctx, {IntegerType::get(ctx, 64), voidPtrType, IntegerType::get(ctx, 8)});
+            Type structPtrType = LLVM::LLVMPointerType::get(structType);
+            Type qirSignature = LLVM::LLVMFunctionType::get(voidType, structPtrType);
             LLVM::LLVMFuncOp fnDecl =
                 ensureFunctionDeclaration(rewriter, op, qirName, qirSignature);
 
+            Value memref = op.getVal();
+            MemRefType memrefType = cast<MemRefType>(memref.getType());
+            Value llvmMemref = adaptor.getVal();
+            Type llvmMemrefType = llvmMemref.getType();
+            Value structValue = rewriter.create<LLVM::UndefOp>(loc, structType);
+
+            Value rank = rewriter.create<LLVM::ConstantOp>(
+                loc, rewriter.getI64IntegerAttr(memrefType.getRank()));
+            structValue = rewriter.create<LLVM::InsertValueOp>(loc, structValue, rank, 0);
+
             Value c1 = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI64IntegerAttr(1));
+            Value memrefPtr = rewriter.create<LLVM::AllocaOp>(
+                loc, LLVM::LLVMPointerType::get(llvmMemrefType), c1);
+            rewriter.create<LLVM::StoreOp>(loc, llvmMemref, memrefPtr);
+            memrefPtr = rewriter.create<LLVM::BitcastOp>(loc, voidPtrType, memrefPtr);
+            structValue = rewriter.create<LLVM::InsertValueOp>(loc, structValue, memrefPtr, 1);
+
+            Type elemType = memrefType.getElementType();
+            std::optional<int8_t> typeEncoding = encodeNumericType(elemType);
+            if (!typeEncoding.has_value()) {
+                return op.emitOpError("Unsupported element type for printing!");
+            }
+            Value typeValue = rewriter.create<LLVM::ConstantOp>(
+                loc, rewriter.getI8IntegerAttr(typeEncoding.value()));
+            structValue = rewriter.create<LLVM::InsertValueOp>(loc, structValue, typeValue, 2);
+
             Value structPtr =
-                rewriter.create<LLVM::AllocaOp>(loc, LLVM::LLVMPointerType::get(vectorType), c1);
-            rewriter.create<LLVM::StoreOp>(loc, adaptor.getVal(), structPtr);
+                rewriter.create<LLVM::AllocaOp>(loc, LLVM::LLVMPointerType::get(structType), c1);
+            rewriter.create<LLVM::StoreOp>(loc, structValue, structPtr);
             rewriter.replaceOpWithNewOp<LLVM::CallOp>(op, fnDecl, structPtr);
         }
 

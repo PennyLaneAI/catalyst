@@ -102,14 +102,14 @@ void __quantum__rt__print_string(char *string)
     std::cerr << string << std::endl;
 }
 
-void __quantum__rt__print_tensor(OpaqueMemRefT c_memref)
+void __quantum__rt__print_tensor(OpaqueMemRefT *c_memref)
 {
-    DynamicMemRefT memref = get_dynamic_memref(c_memref);
+    DynamicMemRefT memref = get_dynamic_memref(*c_memref);
 
     int indent = 0;
-    for (size_t dim = 0; dim < c_memref.rank; dim++) {
+    for (int64_t dim = 0; dim < (*c_memref).rank; dim++) {
         std::string prefix = "";
-        for (int i = 0; i < indent; i++)
+        for (int64_t i = 0; i < indent; i++)
             prefix += "  ";
 
         std::cout << prefix + "[" << std::endl;
@@ -118,9 +118,9 @@ void __quantum__rt__print_tensor(OpaqueMemRefT c_memref)
 
     indent -= 2;
 
-    for (size_t dim = 0; dim < c_memref.rank; dim++) {
+    for (int64_t dim = 0; dim < (*c_memref).rank; dim++) {
         std::string prefix = "";
-        for (int i = 0; i < indent; i++)
+        for (int64_t i = 0; i < indent; i++)
             prefix += "  ";
 
         std::cout << prefix + "]" << std::endl;

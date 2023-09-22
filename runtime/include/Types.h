@@ -73,7 +73,7 @@ enum NumericType : int8_t {
 
 // MemRefT<datatype, dimension=rank> type
 struct OpaqueMemRefT {
-    size_t rank;
+    int64_t rank;
     void *descriptor;
     NumericType datatype;
 };
