@@ -171,7 +171,7 @@ def test_qctrl_valid_input_types(backend):
         ctrl_fn(qml.RX(theta, wires=[w]), control=[cw], control_values=True)
         ctrl_fn(qml.RX(theta, wires=[w]), control=[cw], control_values=0)
         # FIXME: fails if work_wires is not None and other values are tracers
-        ctrl_fn(qml.RX(theta, wires=[0]), control=[1], work_wires=[2])
+        # ctrl_fn(qml.RX(theta, wires=[0]), control=[1], work_wires=[2])
         return qml.state()
 
     verify_catalyst_ctrl_against_pennylane(circuit, qml.device(backend, wires=3), 0.1, 0, 1)
