@@ -992,9 +992,12 @@ class QCtrl(HybridOp):
 
     binder = _no_binder
 
-    def __init__(self, *args, control_wire_tracers, control_value_tracers, **kwargs):
+    def __init__(
+        self, *args, control_wire_tracers, control_value_tracers, work_wire_tracers, **kwargs
+    ):
         self.control_wire_tracers: List[Any] = control_wire_tracers
         self.control_value_tracers: List[Any] = control_value_tracers
+        self.work_wire_tracers: Optional[List[Any]] = work_wire_tracers
         super().__init__(*args, **kwargs)
 
     def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
@@ -1010,7 +1013,10 @@ class QCtrl(HybridOp):
 
         qctrl_check_no_measurements(self.regions[0].quantum_tape)
         new_tape = qctrl_distribute(
-            self.regions[0].quantum_tape, self.control_wire_tracers, self.control_value_tracers
+            self.regions[0].quantum_tape,
+            self.control_wire_tracers,
+            self.control_value_tracers,
+            self.work_wire_tracers,
         )
         return new_tape.operations
 
@@ -1035,7 +1041,10 @@ def qctrl_check_no_measurements(tape: QuantumTape) -> None:
 
 
 def qctrl_distribute(
-    tape: QuantumTape, control_wires: List[Any], control_values: List[Any]
+    tape: QuantumTape,
+    control_wires: List[Any],
+    control_values: List[Any],
+    work_wires: Optional[List[Any]] = None,
 ) -> QuantumTape:
     """Distribute the quantum control operation, described by ``control_wires`` and
     ``control_values``, over all the operations on the nested quantum tape.
@@ -1043,6 +1052,10 @@ def qctrl_distribute(
     # Note: The transformation modifies operations in the source quantum tape, so we must not use it
     # after we called this function.
     assert len(control_wires) > 0, "This transformation expects a non-empty list of control_wires"
+    assert len(control_wires) == len(control_values), (
+        f"Length of the control_values ({len(control_values)}) must be equal "
+        f"to the lenght of control_wires ({len(control_wires)})"
+    )
     ctx = EvaluationContext.get_main_tracing_context()
     ops2 = []
     for op in tape.operations:
@@ -1053,13 +1066,16 @@ def qctrl_distribute(
                         region.quantum_tape,
                         control_wires + op.control_wire_tracers,
                         control_values + op.control_value_tracers,
+                        ((work_wires or []) + (op.work_wire_tracers or []))
+                        if (work_wires is not None or op.work_wire_tracers is not None)
+                        else None,
                     )
                     ops2.extend(tape2.operations)
             else:
                 for region in [region for region in op.regions if region.quantum_tape is not None]:
                     with EvaluationContext.frame_tracing_context(ctx, region.trace):
                         region.quantum_tape = qctrl_distribute(
-                            region.quantum_tape, control_wires, control_values
+                            region.quantum_tape, control_wires, control_values, work_wires
                         )
                 ops2.append(op)
         else:
@@ -1068,6 +1084,7 @@ def qctrl_distribute(
                     type(op)(*op.parameters, wires=op.wires),
                     control_wires=qml.wires.Wires(control_wires),
                     control_values=control_values,
+                    work_wires=work_wires,
                 )
             )
     return QuantumTape(ops2, tape.measurements)
@@ -1752,8 +1769,45 @@ def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
         raise ValueError(f"Expected a callable or a qml.Operator, not {f}")
 
 
-def ctrl(f: Union[Callable, Operator], control: List[Any], control_values: List[Any]) -> Callable:
-    """Catalyst version of the ``qml.ctrl`` that supports Catalyst hybrid operations."""
+def ctrl(
+    f: Union[Callable, Operator],
+    control: List[Any],
+    control_values: Optional[List[Any]] = None,
+    work_wires: Optional[List[Any]] = None,
+) -> Callable:
+    """Create a method that applies a controlled version of the provided op. This function is the
+    Catalyst version of the ``qml.ctrl`` that supports Catalyst hybrid operations such as loops and
+    conditionals.
+
+    Args:
+        f (Callable or Operator): A PennyLane operation or a Python function
+                                  containing PennyLane quantum operations.
+        control (Wires): The control wire(s).
+        control_values (List[bool], optional): The value(s) the control wire(s) should take.
+            Integers other than 0 or 1 will be treated as ``int(bool(x))``.
+        work_wires (Any): Any auxiliary wires that can be used in the decomposition
+
+    Returns:
+        (function or :class:`~.operation.Operator`): If an Operator is provided, returns a
+        Controlled version of the Operator.  If a function is provided, returns a function with the
+        same call signature that creates a controlled version of the provided function.
+
+    Raises:
+        ValueError: invalid parameter values or measurements are among the controlled operations.
+
+    """
+
+    def _tolist(x):
+        return [x] if not isinstance(x, list) else x
+
+    control = _tolist(control)
+    control_values = _tolist(control_values) if control_values is not None else [1] * len(control)
+    if len(control) != len(control_values):
+        raise ValueError(
+            f"Length of the control_values ({len(control_values)}) must be None or equal "
+            f"to the lenght of control ({len(control)})"
+        )
+    work_wires = _tolist(work_wires) if work_wires is not None else None
 
     def _call_handler(*args, _callee: Callable, **kwargs):
         EvaluationContext.check_is_quantum_tracing(
@@ -1770,8 +1824,9 @@ def ctrl(f: Union[Callable, Operator], control: List[Any], control_values: List[
         region = HybridOpRegion(None, quantum_tape, [], [])
 
         QCtrl(
-            control_wire_tracers=list(control),
-            control_value_tracers=list(control_values),
+            control_wire_tracers=control,
+            control_value_tracers=control_values,
+            work_wire_tracers=work_wires,
             in_classical_tracers=in_classical_tracers,
             out_classical_tracers=out_classical_tracers,
             regions=[region],
@@ -1791,4 +1846,4 @@ def ctrl(f: Union[Callable, Operator], control: List[Any], control_values: List[
 
         return _call_handler(_callee=_callee)
     else:
-        raise ValueError(f"Expected a callable or a qml.Operator, not {f}")
+        raise ValueError(f"Expected a callable or a qml.Operator, not {f}")  # pragma: no cover

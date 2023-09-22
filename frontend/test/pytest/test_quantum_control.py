@@ -47,8 +47,8 @@ def test_qctrl_op_object(backend):
     """Test the quantum control application to an operation object"""
 
     def circuit(theta, w, cw, ctrl_fn):
-        ctrl_fn(qml.RX(theta, wires=[w]), control=[cw], control_values=[True])
-        ctrl_fn(qml.RX, control=[cw], control_values=[True])(theta, wires=[w])
+        ctrl_fn(qml.RX(theta, wires=[w]), control=[cw], control_values=[False])
+        ctrl_fn(qml.RX, control=[cw], control_values=[False])(theta, wires=[w])
         return qml.state()
 
     verify_catalyst_ctrl_against_pennylane(circuit, qml.device(backend, wires=3), 0.1, 0, 1)
@@ -139,6 +139,54 @@ def test_qctrl_func_nested(backend):
         return qml.state()
 
     verify_catalyst_ctrl_against_pennylane(circuit, qml.device(backend, wires=4), 0.1, 0, 1, 2, 3)
+
+
+def test_qctrl_func_work_wires(backend):
+    """Test the quantum control distribution over the nested control operations"""
+
+    def circuit(theta, ctrl_fn):
+        def _func1():
+            qml.RX(theta, wires=[0])
+
+            def _func2():
+                qml.RY(theta, wires=[0])
+
+            ctrl_fn(_func2, control=[3], work_wires=[4])()
+
+            qml.RZ(theta, wires=[0])
+
+        ctrl_fn(_func1, control=[1], work_wires=[2])()
+        return qml.state()
+
+    verify_catalyst_ctrl_against_pennylane(circuit, qml.device(backend, wires=5), 0.1)
+
+
+def test_qctrl_valid_input_types(backend):
+    """Test the quantum control input types"""
+
+    def circuit(theta, w, cw, ctrl_fn):
+        ctrl_fn(qml.RX(theta, wires=[w]), control=[cw])
+        ctrl_fn(qml.RX(theta, wires=[w]), control=cw)
+        ctrl_fn(qml.RX(theta, wires=[w]), control=[cw], control_values=[True])
+        ctrl_fn(qml.RX(theta, wires=[w]), control=[cw], control_values=True)
+        ctrl_fn(qml.RX(theta, wires=[w]), control=[cw], control_values=0)
+        # FIXME: fails if work_wires is not None and other values are tracers
+        ctrl_fn(qml.RX(theta, wires=[0]), control=[1], work_wires=[2])
+        return qml.state()
+
+    verify_catalyst_ctrl_against_pennylane(circuit, qml.device(backend, wires=3), 0.1, 0, 1)
+
+
+def test_qctrl_raises_on_invalid_input(backend):
+    """Test the no-measurements exception"""
+
+    @qml.qnode(qml.device(backend, wires=2))
+    def circuit(theta):
+        ctrl(qml.RX(theta, wires=[0]), control=[1], control_values=[])()
+        return qml.state()
+
+    with pytest.raises(ValueError, match="Length of the control_values"):
+        qjit(circuit)(0.1)
 
 
 def test_qctrl_no_mid_circuit_measurements(backend):
