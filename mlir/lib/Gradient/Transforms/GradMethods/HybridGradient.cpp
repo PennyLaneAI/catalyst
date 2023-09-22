@@ -12,10 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <algorithm>
-#include <sstream>
-#include <vector>
-
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Index/IR/IndexOps.h"
@@ -318,7 +314,7 @@ func::FuncOp HybridGradientLowering::genFullGradFunction(PatternRewriter &rewrit
             SmallVector<Value> jacobians;
             for (unsigned argIdx = 0; argIdx < diffArgIndices.size(); argIdx++) {
                 Type jacobianType =
-                    gradOp.getResultTypes()[argIdx * callee.getNumResults() + cotangentIdx];
+                    gradOp.getResultTypes()[argIdx + cotangentIdx * diffArgIndices.size()];
                 if (auto tensorType = dyn_cast<RankedTensorType>(jacobianType)) {
                     jacobians.push_back(rewriter.create<tensor::EmptyOp>(
                         loc, tensorType.getShape(), tensorType.getElementType()));
@@ -343,12 +339,13 @@ func::FuncOp HybridGradientLowering::genFullGradFunction(PatternRewriter &rewrit
                         auto backpropOp = rewriter.create<gradient::BackpropOp>(
                             loc, computeBackpropTypes(callee, diffArgIndices), callee.getName(),
                             entryBlock->getArguments(),
-                            /*arg_shadows=*/ValueRange{}, /*primal results=*/ValueRange{},
-                            cotangents, gradOp.getDiffArgIndicesAttr());
+                            /*arg_shadows=*/ValueRange{},
+                            /*primal results=*/ValueRange{}, cotangents,
+                            gradOp.getDiffArgIndicesAttr());
 
-                        // Backprop gives a gradient of a single output entry w.r.t. all active
-                        // inputs. Catalyst gives transposed Jacobians, such that the Jacobians have
-                        // shape
+                        // Backprop gives a gradient of a single output entry w.r.t.
+                        // all active inputs. Catalyst gives transposed Jacobians,
+                        // such that the Jacobians have shape
                         // [...shape_outputs, ...shape_inputs,].
                         for (const auto &[backpropIdx, jacobianSlice] :
                              llvm::enumerate(backpropOp.getResults())) {
@@ -364,7 +361,8 @@ func::FuncOp HybridGradientLowering::genFullGradFunction(PatternRewriter &rewrit
                                     offsets.append(indices.begin(), indices.end());
                                     offsets.append(sliceRank, rewriter.getIndexAttr(0));
 
-                                    // Sizes are [1] * (jacobianRank - sliceRank) + [...sliceShape]
+                                    // Sizes are [1] * (jacobianRank - sliceRank) +
+                                    // [...sliceShape]
                                     SmallVector<OpFoldResult> sizes;
                                     sizes.append(jacobianRank - sliceRank,
                                                  rewriter.getIndexAttr(1));
@@ -389,7 +387,7 @@ func::FuncOp HybridGradientLowering::genFullGradFunction(PatternRewriter &rewrit
                                 jacobians[backpropIdx] = rewriter.create<tensor::InsertOp>(
                                     loc, jacobianSlice, jacobians[backpropIdx], indices);
                             }
-                            backpropResults[backpropIdx * callee.getNumResults() + cotangentIdx] =
+                            backpropResults[backpropIdx + cotangentIdx * diffArgIndices.size()] =
                                 jacobians[backpropIdx];
                         }
                     });
