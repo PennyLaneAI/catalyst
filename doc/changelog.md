@@ -19,6 +19,7 @@
   ```pycon
   >>> res
   [0, 2, 10]
+  ```
 
 * Catalyst users can now use Python for loop statements in their programs without having to
   explicitly use the functional `catalyst.for_loop` form!
