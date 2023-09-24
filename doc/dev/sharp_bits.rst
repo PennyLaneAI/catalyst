@@ -38,6 +38,7 @@ Catalyst provides
     :nosignatures:
 
     ~catalyst.debug.print
+    ~catalyst.autograph_source
 
 .. raw:: html
 
