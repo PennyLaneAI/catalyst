@@ -255,7 +255,9 @@ jobs:
               -DQUANTUM_ENABLE_BINDINGS_PYTHON=ON \
               -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -DPython3_NumPy_INCLUDE_DIRS=$(python${{ matrix.python_version }} -c "import numpy as np; print(np.get_include())") \
-              -DMLIR_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir
+              -DMLIR_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir \
+              -DMHLO_DIR=$(GITHUB_WORKSPACE)/mhlo-build/lib/cmake/mlir-hlo \
+              -DMHLO_BINARY_DIR=$(GITHUB_WORKSPACE)/mhlo-build/bin \
 
         cmake --build quantum-build --target check-dialects -j$(nproc)
 
