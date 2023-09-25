@@ -93,13 +93,10 @@ void _catalyst_memref_print(MemRefT_int64_1d *array)
 
 void __quantum__rt__print_string(char *string)
 {
-    std::cerr << "cerr: print string from runtime" << std::endl;
-
     if (!string) {
-        std::cerr << "None\n";
+        std::cout << "None" << std::endl;
     }
-
-    std::cerr << string << std::endl;
+    std::cout << string << std::endl;
 }
 
 void __quantum__rt__print_tensor(OpaqueMemRefT *c_memref)
