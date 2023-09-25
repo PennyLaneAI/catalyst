@@ -46,6 +46,13 @@ jobs:
       with:
         path:  mhlo-build
         key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-generic-build
+    
+    - name: Cache MHLO Source
+      id: cache-mhlo-source
+      uses: actions/cache@v3
+      with:
+        path: mlir/mlir-hlo
+        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-source
 
     - name: Set Ownership in Container
       run: |
@@ -177,6 +184,15 @@ jobs:
       with:
         path:  llvm-build
         key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-generic-build-opt
+        fail-on-cache-miss: True
+
+    - name: Get Cached MHLO Source
+      id: cache-mhlo-source
+      uses: actions/cache@v3
+      with:
+        path: mlir/mlir-hlo
+        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-source
+        enableCrossOsArchive: True
         fail-on-cache-miss: True
 
     - name: Get Cached MHLO Build
