@@ -207,7 +207,55 @@ rather than runtime.
 JAX support and restrictions
 ----------------------------
 
-Todo.
+Catalyst is utilizes JAX for program capture, which means you are able to
+leverage the many functions accessible in ``jax`` and ``jax.numpy`` to write
+code that supports ``@qjit`` and dynamic variables.
+
+Currently, we are aiming to support as many JAX functions as possible, however
+there may be cases where there is missing coverage. Known JAX functionality
+that doesn't work with Catalyst includes:
+
+- ``jax.numpy.polyfit``
+- ``jax.debug``
+
+If you come across any other JAX functions that don't work with Catalyst
+(or don't already have a Catalyst equivalents), please let us know by opening
+a `GitHub issue <https://github.com/PennyLaneAI/catalyst/issues>`__.
+
+While leveraging ``jax.numpy`` makes it easy to port over NumPy-based
+PennyLane workflows to Catalyst, we also inherit `various restrictions
+and 'gotchas' from JAX
+<https://jax.readthedocs.io/en/latest/notebooks/Common_Gotchas_in_JAX.html>`__.
+This includes:
+
+* **Pure functions**: compilation is primarily designed to only work on pure
+    functions. That is, functions that do not have any side-effects; the
+    output is purely dependent only on function inputs.
+
+* **In-place array updates**: Rather than using in-place array updates, the
+    syntax ``new_array = jax_array.at[index].set(value)`` should be used.
+
+* **Lack of stateful random number generators**: In JAX, random number
+    generators need to be explicitly created within the ``@qjit`` function
+    using ``jax.random.PRNGKey(int)``:
+
+    >>> @qjit()
+    ... def f():
+    ...     key = jax.random.PRNGKey(0)
+    ...     a = jax.random.normal(key, shape=(1,))
+    ...     return a
+    >>> f()
+    array([-0.78476578])
+
+* **Dynamic-shaped arrays:** functions that create or return arrays with
+    dynamic shape --- that is, arrays where their shape is determined by a
+    dynamic variable at runtime -- are currently not supported in JAX nor
+    Catalyst. Typically, workarounds involve rewriting the code to utilize
+    ``jnp.where`` where possible.
+
+For more details, please see the `JAX documentation
+<https://jax.readthedocs.io/en/latest/notebooks/Common_Gotchas_in_JAX.html>`__.
+
 
 Dynamic circuit restrictions
 ----------------------------
