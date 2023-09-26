@@ -217,6 +217,8 @@ that doesn't work with Catalyst includes:
 
 - ``jax.numpy.polyfit``
 - ``jax.debug``
+- ``jax.numpy.ndarray.at[index]`` when ``index`` corresponds to all array
+  indices.
 
 If you come across any other JAX functions that don't work with Catalyst
 (or don't already have a Catalyst equivalents), please let us know by opening
@@ -229,29 +231,30 @@ and 'gotchas' from JAX
 This includes:
 
 * **Pure functions**: compilation is primarily designed to only work on pure
-    functions. That is, functions that do not have any side-effects; the
-    output is purely dependent only on function inputs.
+  functions. That is, functions that do not have any side-effects; the
+  output is purely dependent only on function inputs.
 
 * **In-place array updates**: Rather than using in-place array updates, the
-    syntax ``new_array = jax_array.at[index].set(value)`` should be used.
+  syntax ``new_array = jax_array.at[index].set(value)`` should be used.
+  For more details, see `jax.numpy.ndarray.at <https://jax.readthedocs.io/en/latest/_autosummary  /jax.numpy.ndarray.at.html>`__.
 
 * **Lack of stateful random number generators**: In JAX, random number
-    generators need to be explicitly created within the ``@qjit`` function
-    using ``jax.random.PRNGKey(int)``:
-
-    >>> @qjit()
-    ... def f():
-    ...     key = jax.random.PRNGKey(0)
-    ...     a = jax.random.normal(key, shape=(1,))
-    ...     return a
-    >>> f()
-    array([-0.78476578])
+  generators need to be explicitly created within the ``@qjit`` function
+  using ``jax.random.PRNGKey(int)``:
+  
+  >>> @qjit()
+  ... def f():
+  ...     key = jax.random.PRNGKey(0)
+  ...     a = jax.random.normal(key, shape=(1,))
+  ...     return a
+  >>> f()
+  array([-0.78476578])
 
 * **Dynamic-shaped arrays:** functions that create or return arrays with
-    dynamic shape --- that is, arrays where their shape is determined by a
-    dynamic variable at runtime -- are currently not supported in JAX nor
-    Catalyst. Typically, workarounds involve rewriting the code to utilize
-    ``jnp.where`` where possible.
+  dynamic shape --- that is, arrays where their shape is determined by a
+  dynamic variable at runtime -- are currently not supported in JAX nor
+  Catalyst. Typically, workarounds involve rewriting the code to utilize
+  ``jnp.where`` where possible.
 
 For more details, please see the `JAX documentation
 <https://jax.readthedocs.io/en/latest/notebooks/Common_Gotchas_in_JAX.html>`__.
@@ -267,8 +270,8 @@ Classical control debugging
 
 Todo.
 
-Capturing Python control with AutoGraph
----------------------------------------
+PennyLane transformations
+-------------------------
 
 Todo.
 
