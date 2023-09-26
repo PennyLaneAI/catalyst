@@ -12,11 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <algorithm>
 #include <cstring>
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <vector>
 
+#include "DataView.hpp"
 #include "MemRefUtils.hpp"
 #include "QuantumDevice.hpp"
 #include "RuntimeCAPI.h"
@@ -25,6 +28,72 @@
 #include "TestUtils.hpp"
 
 using namespace Catalyst::Runtime;
+
+TEST_CASE("Test __quantum__rt__print_tensor i64 1-dim", "[qir_lightning_core]")
+{
+    std::vector<int64_t> buffer(100);
+    std::iota(buffer.begin(), buffer.end(), 0);
+
+    MemRefT_int64_1d mr_i64_1d{buffer.data(), buffer.data(), 0, {100}, {1}};
+    CHECK(mr_i64_1d.sizes[0] == 100);
+
+    OpaqueMemRefT omr_i64_1d{1, (void *)(&mr_i64_1d), NumericType::i64};
+    CHECK(omr_i64_1d.rank == 1);
+
+    DynamicMemRefT dmr_i64_1d = get_dynamic_memref(omr_i64_1d);
+    CHECK(dmr_i64_1d.sizes[0] == 100);
+
+    __quantum__rt__print_tensor(&omr_i64_1d);
+}
+
+TEST_CASE("Test __quantum__rt__print_tensor dbl 2-dim", "[qir_lightning_core]")
+{
+    std::vector<double> buffer(100 * 2);
+    buffer[0] = 1.0;
+
+    MemRefT_double_2d mr_dbl_2d{buffer.data(), buffer.data(), 0, {100, 2}, {2, 1}};
+    OpaqueMemRefT omr_dbl_2d{2, (void *)(&mr_dbl_2d), NumericType::f64};
+    CHECK(omr_dbl_2d.rank == 2);
+
+    DynamicMemRefT dmr_dbl_2d = get_dynamic_memref(omr_dbl_2d);
+    CHECK(dmr_dbl_2d.sizes[0] == 100);
+    CHECK(dmr_dbl_2d.sizes[1] == 2);
+    CHECK(dmr_dbl_2d.strides[0] == 2);
+    CHECK(dmr_dbl_2d.strides[1] == 1);
+
+    auto data = dmr_dbl_2d.data_aligned;
+    CHECK(std::get<double *>(data)[0] == 1.0);
+    CHECK(std::get<double *>(data)[1] == 0.0);
+    CHECK(std::get<double *>(data)[50] == 0.0);
+
+    __quantum__rt__print_tensor(&omr_dbl_2d);
+}
+
+TEST_CASE("Test __quantum__rt__print_tensor cplx 2-dim", "[qir_lightning_core]")
+{
+    CplxT_double matrix_data[4] = {
+        {-0.67, -0.63},
+        {-0.14, 0.36},
+        {-0.23, 0.30},
+        {-0.88, -0.26},
+    };
+
+    MemRefT_CplxT_double_2d mr_cplx_2d{matrix_data, matrix_data, 0, {2, 2}, {1, 0}};
+    OpaqueMemRefT omr_cplx_2d{2, (void *)(&mr_cplx_2d), NumericType::c128};
+    CHECK(omr_cplx_2d.rank == 2);
+
+    DynamicMemRefT dmr_cplx_2d = get_dynamic_memref(omr_cplx_2d);
+    CHECK(dmr_cplx_2d.sizes[0] == 2);
+    CHECK(dmr_cplx_2d.sizes[1] == 2);
+    CHECK(dmr_cplx_2d.strides[0] == 1);
+    CHECK(dmr_cplx_2d.strides[1] == 0);
+
+    auto data = dmr_cplx_2d.data_aligned;
+    CHECK(std::get<CplxT_double *>(data)[0].real == -0.67);
+    CHECK(std::get<CplxT_double *>(data)[0].imag == -0.63);
+
+    __quantum__rt__print_tensor(&omr_cplx_2d);
+}
 
 MemRefT_CplxT_double_1d getState(size_t buffer_len)
 {

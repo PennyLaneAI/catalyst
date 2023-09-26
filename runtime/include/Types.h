@@ -19,6 +19,7 @@
 #include <cmath>
 #include <cstdint>
 #include <limits>
+#include <ostream>
 
 #ifdef __cplusplus
 extern "C" {
