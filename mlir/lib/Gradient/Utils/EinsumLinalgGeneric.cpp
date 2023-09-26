@@ -49,9 +49,10 @@ Value buildTensorLinalgGeneric(OpBuilder &builder, Location loc, ValueRange oper
         builder.create<tensor::EmptyOp>(loc, resultType.getShape(), resultType.getElementType());
     result = builder.create<linalg::FillOp>(loc, zero, result).getResult(0);
 
-    auto genericOp = builder.create<linalg::GenericOp>(loc, resultType, operands, result,
-                                                       indexingMaps, iteratorTypes, buildBody);
-    return genericOp.getResult(0);
+    /* auto genericOp = builder.create<linalg::GenericOp>(loc, resultType, operands, result, */
+    /*                                                    indexingMaps, iteratorTypes, buildBody); */
+    /* return genericOp.getResult(0); */
+    return result;
 }
 
 void inferIndexingMaps(MLIRContext *ctx, unsigned numDims, ArrayRef<int64_t> axisCodesA,
