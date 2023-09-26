@@ -21,8 +21,8 @@ helpful when using Catalyst.
 
 .. note::
 
-	For a more general overview of Catalyst, please see the
-	:doc:`quick start guide <quick_start>`.
+    For a more general overview of Catalyst, please see the
+    :doc:`quick start guide <quick_start>`.
 
 
 Debugging functions
@@ -49,8 +49,160 @@ Catalyst provides
 Compile-time vs. runtime
 ------------------------
 
-Todo.
+An important distinction to make in Catalyst, which we typically don't have to
+worry about with standard PennyLane, is the concept of **compile time**
+vs. **runtime**.
 
+Very roughly, the following three processes occur when using the ``@qjit`` decorator
+with just-in-time (JIT) compilation.
+
+#. **Program capture or tracing:** When the ``@qjit`` decorated function is
+   first called (or, when the ``@qjit`` is first applied if using function
+   type hints and :ref:`ahead-of-time mode <ahead_of_time>`), Catalyst
+   will 'capture' the entire hybrid workflow with **placeholder variables of
+   unknown value** used as the function arguments
+   (the **runtime arguments**). 
+
+   These symbolic tracer objects represent **dynamic variable**, and are used
+   to determine how the JIT compiled function transforms its inputs to
+   outputs.
+
+#. **Compilation:** The captured program is then compiled to a parametrized
+   binary using the Catalyst compiler.
+
+#. **Execution:** Finally, the compiled function is executed with the
+   provided numerical function inputs, and the results returned.
+
+Once the function is first compiled, subsequent executions of the function
+will simply re-use the previous compiled binary, allowing steps (1) and(2) to
+be skipped. (Note: some cases, such as if the function argument types change,
+may trigger re-compilation.)
+
+For example, consider the following, where we print out a variable in the middle of
+our ``@qjit`` compiled function:
+
+>>> @qjit
+... def f(x):
+...     print(f"x = {x}")
+...     return x ** 2
+>>> f(2.)
+x = Traced<ShapedArray(float64[], weak_type=True)>with<DynamicJaxprTrace(level=1/0)>
+array(4.)
+>>> f(3.)
+array(9.)
+
+We can see that on the first execution, program capture/tracing occurs, and we
+can see the dynamic variable is printed (tracers capture *type*
+and *shape*, but not numeric value). This captured program is compiled, and
+then the binary is executed directly to return the function value --- the
+print statement is never invoked with the numerical value of ``x``.
+
+When we execute the function again, steps (1) and (2) are skipped since we
+have already compiled a binary; this is called directly to get the function
+result, and again the print statement is never hit.
+
+This allows us to distinguish between computations that happen
+at **compile-time** (steps 1 and 2), such as the ``print`` statement above,
+and those that happen at **runtime** (step 3).
+
+.. note::
+
+    As a general rule of thumb, for a function that is repeatedly executed
+    with different parameters, we want as much evaluation as possible to
+    happen at compile time.
+
+    However, computations at compile time cannot depend on the value of
+    dynamic variable, since this is not known yet. It can only depend
+    on **static variables**, those whose values are known.
+
+.. note::
+
+    A general guideline when working with JIT compilation and Catalyst:
+
+    - Python control flow and third party libraries like NumPy and SciPy will
+      be evaluated at compile-time, and can only accept static variables.
+
+    - JAX functions, such as ``jax.numpy``, and Catalyst functions like
+      ``catalyst.cond`` and ``catalyst.for_loop`` will be evaluated at
+      runtime, and can accept dynamic variables.
+
+    Note that if AutoGraph is enabled, Catalyst will attempt to convert Python
+    control flow to its Catalyst equivalent to support dynamic variables.
+
+For example, consider the following:
+
+>>> @qjit
+... def f(x):
+...     if x > 5:
+...       x = x / 2
+...     return x ** 2
+>>> f(2.)
+TracerBoolConversionError: Attempted boolean conversion of traced array with shape bool[]..
+The error occurred while tracing the function f at <ipython-input-15-2aa7bf60efbb>:1 for make_jaxpr. This concrete value was not available in Python because it depends on the value of the argument x.
+See https://jax.readthedocs.io/en/latest/errors.html#jax.errors.TracerBoolConversionError
+
+This function will fail, as the Python ``if`` statement cannot accept a dynamic variable (a JAX tracer) as an argument.
+
+Instead, we can use Catalyst control flow :func:`~.cond` here:
+
+>>> @qjit
+... def f(x):
+... 
+...     @cond(x > 5.)
+...     def g():
+...         return x / 2
+... 
+...     @g.otherwise
+...     def h():
+...         return x
+...     
+...     return g() ** 2
+>>> f(2.)
+array(4.)
+>>> f(6.)
+array(9.)
+
+Here, both conditional branches are compiled, and only evaluated at runtime
+when the value of ``x`` is known.
+
+.. note::
+
+    AutoGraph is an experimental feature that converts Python control flow
+    that depends on dynamic variables to Catalyst control flow behind the
+    scenes:
+
+
+    >>> @qjit(autograph=True)
+    ... def f(x):
+    ...     if x > 5.:
+    ...         print(x)
+    ...         x = x / 2
+    ...     return x ** 2
+    >>> Traced<ShapedArray(float64[], weak_type=True)>with<DynamicJaxprTrace(level=1/0)>
+    ... array(4.)
+    >>> f(6.)
+    ... array(9.)
+
+    For more details, see the AutoGraph guide.
+
+Note that, if the Python ``if`` statement depends only on values that are
+static (known at compile time), this is fine --- the ``if`` statement will
+simply be evaluated at compile time rather than runtime:
+
+>>> @qjit
+... def f(x):
+...     for i in range(2):
+...         print(i, x)
+...         x = x / 2
+...     return x ** 2
+>>> f(2.)
+0 Traced<ShapedArray(float64[], weak_type=True)>with<DynamicJaxprTrace(level=1/0)>
+1 Traced<ShapedArray(float64[], weak_type=True)>with<DynamicJaxprTrace(level=1/0)>
+array(0.25)
+
+Here, the for loop is evaluated at compile time (notice the multiple tracers
+that have been printed out during program capture --- one for each loop!),
+rather than runtime.
 
 JAX support and restrictions
 ----------------------------
