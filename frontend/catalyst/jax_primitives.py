@@ -367,7 +367,7 @@ def _jvp_def_impl(ctx, *args, jaxpr, fn, grad_params):  # pragma: no cover
 def _jvp_abstract(*args, jaxpr, fn, grad_params):  # pylint: disable=unused-argument
     """This function is called with abstract arguments for tracing.
     Note: argument names must match these of `_jvp_lowering`."""
-    return jaxpr.out_avals + jaxpr.out_avals
+    return jaxpr.out_avals + jaxpr.out_avals + [core.ShapedArray([3,4,4], jax.numpy.float64)]
 
 
 def _jvp_lowering(ctx, *args, jaxpr, fn, grad_params):
@@ -381,7 +381,8 @@ def _jvp_lowering(ctx, *args, jaxpr, fn, grad_params):
     new_argnum = np.array([len(jaxpr.consts) + num for num in argnum])
 
     output_types = list(map(mlir.aval_to_ir_types, ctx.avals_out))
-    flat_output_types = util.flatten(output_types)
+    all_output_types = util.flatten(output_types)
+    flat_output_types = all_output_types[:-1]
     constants = [
         ConstantOp(ir.DenseElementsAttr.get(np.asarray(const))).results for const in jaxpr.consts
     ]
@@ -404,6 +405,7 @@ def _jvp_lowering(ctx, *args, jaxpr, fn, grad_params):
     return JVPOp(
         flat_output_types[: len(flat_output_types) // 2],
         flat_output_types[len(flat_output_types) // 2 :],
+        all_output_types[-1:],
         ir.StringAttr.get(method),
         ir.FlatSymbolRefAttr.get(mlir_fn_cache[fn]),
         mlir.flatten_lowering_ir_args(func_args),

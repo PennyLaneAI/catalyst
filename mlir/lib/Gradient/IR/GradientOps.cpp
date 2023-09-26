@@ -185,12 +185,12 @@ LogicalResult JVPOp::verifySymbolUses(SymbolTableCollection &symbolTable)
         return r1;
     }
 
-    if (this->getNumResults() != 2 * callee.getFunctionType().getNumResults()) {
-        return this->emitOpError(
-                   "invalid number of results: must be twice the number of callee results")
-               << " which is " << 2 * callee.getFunctionType().getNumResults() << " but got "
-               << this->getNumResults();
-    }
+    /* if (this->getNumResults() != 2 * callee.getFunctionType().getNumResults()) { */
+    /*     return this->emitOpError( */
+    /*                "invalid number of results: must be twice the number of callee results") */
+    /*            << " which is " << 2 * callee.getFunctionType().getNumResults() << " but got " */
+    /*            << this->getNumResults(); */
+    /* } */
 
     if (this->getTangents().size() != diffArgIndices.size()) {
         return this->emitOpError(

@@ -125,7 +125,8 @@ def BackpropOp : Gradient_Op<"backprop", [AttrSizedOperandSegments,
 
 def JVPOp : Gradient_Op<"jvp", [
         AttrSizedOperandSegments,
-        SameVariadicResultSize,
+        AttrSizedResultSegments,
+        /* SameVariadicResultSize, */
         DeclareOpInterfaceMethods<CallOpInterface>,
         DeclareOpInterfaceMethods<SymbolUserOpInterface>
         ]> {
@@ -142,7 +143,8 @@ def JVPOp : Gradient_Op<"jvp", [
 
     let results = (outs
         Variadic<AnyTypeOf<[AnyFloat, RankedTensorOf<[AnyFloat]>]>>:$calleeResults,
-        Variadic<AnyTypeOf<[AnyFloat, RankedTensorOf<[AnyFloat]>]>>:$jvps
+        Variadic<AnyTypeOf<[AnyFloat, RankedTensorOf<[AnyFloat]>]>>:$jvps,
+        Variadic<AnyTypeOf<[AnyFloat, RankedTensorOf<[AnyFloat]>]>>:$grads
     );
 
     let assemblyFormat = [{

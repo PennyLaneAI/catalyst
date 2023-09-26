@@ -34,6 +34,7 @@
 using namespace mlir;
 using namespace catalyst::gradient;
 using llvm::dbgs;
+using llvm::errs;
 
 namespace llvm {
 
@@ -52,6 +53,11 @@ template <class T> raw_ostream &operator<<(raw_ostream &oss, const std::vector<T
 
 namespace catalyst {
 namespace gradient {
+
+/* std::iostream & ddd() { return std::cerr ; } */
+
+#define LLVM_DEBUG(x) x
+#define dbgs errs
 
 template <class T> std::vector<int64_t> _tovec(const T &x)
 {
@@ -173,6 +179,7 @@ LogicalResult JVPLoweringPattern::matchAndRewrite(JVPOp op, PatternRewriter &rew
     std::vector<Value> results;
     results.insert(results.end(), fCallOp.getResults().begin(), fCallOp.getResults().end());
     results.insert(results.end(), einsumResults.begin(), einsumResults.end());
+    results.insert(results.end(), gradOp.getResults()[0]); // Also include first gradient
 
     rewriter.replaceOp(op, results);
     return success();

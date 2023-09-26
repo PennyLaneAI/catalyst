@@ -25,13 +25,14 @@ func.func @jvptest1(
   // CHECK: call @func1({{[%a-z0-9, ]+}}) : (tensor<4xf64>) -> tensor<3x4xf64>
   // CHECK: linalg.generic {{{[^}]*}}}  ins({{[^:]*}} : tensor<3x4x4xf64>, tensor<4xf64>) outs({{[^:]*}} : tensor<3x4xf64>)
   // CHECK: return {{[^:]+}} : tensor<3x4xf64>, tensor<3x4xf64>
-  %0:2 = "gradient.jvp"(%arg0, %arg1) {
+  %0:3 = "gradient.jvp"(%arg0, %arg1) {
       callee = @func1
     , diffArgIndices = dense<0> : tensor<1xi64>
     , finiteDiffParam = 9.9999999999999995E-8 : f64
     , operand_segment_sizes = array<i32: 1, 1>
+    , result_segment_sizes = array<i32: 1, 1, 1>
     , method = "fd"
-  } : (tensor<4xf64>, tensor<4xf64>) -> (tensor<3x4xf64>, tensor<3x4xf64>)
+  } : (tensor<4xf64>, tensor<4xf64>) -> (tensor<3x4xf64>, tensor<3x4xf64>, tensor<3x4x3x4xf64>)
   return %0#0, %0#1 : tensor<3x4xf64>, tensor<3x4xf64>
 }
 
@@ -66,13 +67,14 @@ func.func public @jvptest2(
 
   // CHECK:      return
   // CHECK-SAME:     : tensor<6xf64>, tensor<2x6xf64>, tensor<6xf64>, tensor<2x6xf64>
-  %0:4 = "gradient.jvp"(%arg0, %arg1, %arg2, %arg3) {
+  %0:5 = "gradient.jvp"(%arg0, %arg1, %arg2, %arg3) {
       callee = @func2
     , diffArgIndices = dense<[0, 1]> : tensor<2xi64>
     , finiteDiffParam = 9.9999999999999995E-8 : f64
     , operand_segment_sizes = array<i32: 2, 2>
+    , result_segment_sizes = array<i32: 2, 2, 1>
     , method = "fd"
-    } : (tensor<3x2xf64>, tensor<2x3xf64>, tensor<3x2xf64>, tensor<2x3xf64>) -> (tensor<6xf64>, tensor<2x6xf64>, tensor<6xf64>, tensor<2x6xf64>)
+    } : (tensor<3x2xf64>, tensor<2x3xf64>, tensor<3x2xf64>, tensor<2x3xf64>) -> (tensor<6xf64>, tensor<2x6xf64>, tensor<6xf64>, tensor<2x6xf64>, tensor<3x2x2x6xf64>)
   return %0#0, %0#1, %0#2, %0#3 : tensor<6xf64>, tensor<2x6xf64>, tensor<6xf64>, tensor<2x6xf64>
 }
 
