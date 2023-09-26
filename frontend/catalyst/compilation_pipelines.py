@@ -36,15 +36,15 @@ from mlir_quantum.runtime import (
 )
 
 import catalyst
-import catalyst.jax_tracer as tracer
 from catalyst.ag_utils import run_autograph
 from catalyst.compiler import CompileOptions, Compiler
+from catalyst.jax_tracer import trace_to_mlir
 from catalyst.pennylane_extensions import QFunc
 from catalyst.utils import wrapper  # pylint: disable=no-name-in-module
 from catalyst.utils.c_template import get_template, mlir_type_to_numpy_type
+from catalyst.utils.contexts import EvaluationContext
 from catalyst.utils.gen_mlir import inject_functions
 from catalyst.utils.patching import Patcher
-from catalyst.utils.tracing import TracingContext
 
 # Required for JAX tracer objects as PennyLane wires.
 # pylint: disable=unnecessary-lambda
@@ -459,8 +459,9 @@ class QJIT:
     """
 
     def __init__(self, fn, compile_options):
-        self.compiler = Compiler()
         self.compile_options = compile_options
+        self.compiler = Compiler(compile_options)
+        self.compiling_from_textual_ir = isinstance(fn, str)
         self.original_function = fn
         self.user_function = fn
         self.jaxed_function = None
@@ -478,12 +479,15 @@ class QJIT:
         if compile_options.autograph:
             self.user_function = run_autograph(fn)
 
-        parameter_types = get_type_annotations(self.user_function)
-        if parameter_types is not None:
-            self.user_typed = True
-            self.mlir_module = self.get_mlir(*parameter_types)
-            if self.compile_options.target == "binary":
-                self.compiled_function = self.compile()
+        if self.compiling_from_textual_ir:
+            EvaluationContext.check_is_not_tracing("Cannot compile from IR in tracing context.")
+        else:
+            parameter_types = get_type_annotations(self.user_function)
+            if parameter_types is not None:
+                self.user_typed = True
+                self.mlir_module = self.get_mlir(*parameter_types)
+                if self.compile_options.target == "binary":
+                    self.compiled_function = self.compile()
 
     def print_stage(self, stage):
         """Print one of the recorded stages.
@@ -528,44 +532,67 @@ class QJIT:
         with Patcher(
             (qml.QNode, "__call__", QFunc.__call__),
         ):
-            mlir_module, ctx, jaxpr, self.shape = tracer.get_mlir(self.user_function, *self.c_sig)
+            mlir_module, ctx, jaxpr, self.shape = trace_to_mlir(self.user_function, *self.c_sig)
 
         inject_functions(mlir_module, ctx)
-        mod = mlir_module.operation
         self._jaxpr = jaxpr
-        self._mlir = mod.get_asm(binary=False, print_generic_op_form=False, assume_verified=True)
 
+        _, self._mlir, _ = self.compiler.run(
+            mlir_module,
+            lower_to_llvm=False,
+            pipelines=[("pipeline", ["canonicalize"])],
+        )
         return mlir_module
 
     def compile(self):
         """Compile the current MLIR module."""
-
-        # This will make a check before sending it to the compiler that the return type
-        # is actually available in most systems. f16 needs a special symbol and linking
-        # will fail if it is not available.
         if self.compiled_function and self.compiled_function.shared_object:
             self.compiled_function.shared_object.close()
-        restype = self.mlir_module.body.operations[0].type.results
-        for res in restype:
-            baseType = ir.RankedTensorType(res).element_type
-            mlir_type_to_numpy_type(baseType)
 
-        shared_object = self.compiler.run(
-            self.mlir_module,
-            options=self.compile_options,
-        )
+        if self.compiling_from_textual_ir:
+            # Module name can be anything.
+            module_name = "catalyst_module"
+            shared_object, llvm_ir, inferred_func_data = self.compiler.run_from_ir(
+                self.user_function, module_name
+            )
+            qfunc_name = inferred_func_data[0]
+            # Parse back the return types given as a semicolon-separated string
+            with ir.Context():
+                restype = [ir.RankedTensorType.parse(rt) for rt in inferred_func_data[1].split(",")]
+        else:
+            # This will make a check before sending it to the compiler that the return type
+            # is actually available in most systems. f16 needs a special symbol and linking
+            # will fail if it is not available.
+            #
+            # WARNING: assumption is that the first function
+            # is the entry point to the compiled program.
+            entry_point_func = self.mlir_module.body.operations[0]
+            restype = entry_point_func.type.results
 
-        self._llvmir = self.compiler.get_output_of("LLVMDialectToLLVMIR")
+            for res in restype:
+                baseType = ir.RankedTensorType(res).element_type
+                mlir_type_to_numpy_type(baseType)
 
-        # The function name out of MLIR has quotes around it, which we need to remove.
-        # The MLIR function name is actually a derived type from string which has no
-        # `replace` method, so we need to get a regular Python string out of it.
-        func_name = str(self.mlir_module.body.operations[0].name).replace('"', "")
-        return CompiledFunction(shared_object, func_name, restype)
+            # The function name out of MLIR has quotes around it, which we need to remove.
+            # The MLIR function name is actually a derived type from string which has no
+            # `replace` method, so we need to get a regular Python string out of it.
+            qfunc_name = str(self.mlir_module.body.operations[0].name).replace('"', "")
 
-    def _maybe_promote(self, function, *args):
+            shared_object, llvm_ir, inferred_func_data = self.compiler.run(
+                self.mlir_module, pipelines=self.compile_options.pipelines
+            )
+
+        self._llvmir = llvm_ir
+        compiled_function = CompiledFunction(shared_object, qfunc_name, restype)
+        return compiled_function
+
+    def _ensure_real_arguments_and_formal_parameters_are_compatible(self, function, *args):
         """Logic to decide whether the function needs to be recompiled
         given ``*args`` and whether ``*args`` need to be promoted.
+        A function may need to be compiled if:
+            1. It was not compiled before
+            2. The real arguments sent to the function are not promotable to the type of the
+                formal parameters.
 
         Args:
           function: an instance of ``CompiledFunction`` that may need recompilation
@@ -590,7 +617,8 @@ class QJIT:
             if self.user_typed:
                 msg = "Provided arguments did not match declared signature, recompiling..."
                 warnings.warn(msg, UserWarning)
-            self.mlir_module = self.get_mlir(*r_sig)
+            if not self.compiling_from_textual_ir:
+                self.mlir_module = self.get_mlir(*r_sig)
             function = self.compile()
         else:
             assert next_action == TypeCompatibility.CAN_SKIP_PROMOTION
@@ -606,15 +634,19 @@ class QJIT:
           str: A C program that can be compiled with the current shared object.
         """
         msg = "C interface cannot be generated from tracing context."
-        TracingContext.check_is_not_tracing(msg)
-        function, args = self._maybe_promote(self.compiled_function, *args)
+        EvaluationContext.check_is_not_tracing(msg)
+        function, args = self._ensure_real_arguments_and_formal_parameters_are_compatible(
+            self.compiled_function, *args
+        )
         return function.get_cmain(*args)
 
     def __call__(self, *args, **kwargs):
-        if TracingContext.is_tracing():
+        if EvaluationContext.is_tracing():
             return self.user_function(*args, **kwargs)
 
-        function, args = self._maybe_promote(self.compiled_function, *args)
+        function, args = self._ensure_real_arguments_and_formal_parameters_are_compatible(
+            self.compiled_function, *args
+        )
         recompilation_needed = function != self.compiled_function
         self.compiled_function = function
 
@@ -629,8 +661,8 @@ class QJIT:
         data = self.compiled_function(*args, **kwargs)
 
         # Unflatten the return value w.r.t. the original PyTree definition if available
-        assert self.shape is not None, "Shape must not be none."
-        data = tree_unflatten(self.shape, data)
+        if self.shape is not None:
+            data = tree_unflatten(self.shape, data)
 
         # For the classical and pennylane_extensions compilation path,
         if isinstance(data, (list, tuple)) and len(data) == 1:
@@ -768,8 +800,8 @@ def qjit(
     Args:
         fn (Callable): the quantum or classical function
         autograph (bool): Experimental support for automatically converting Python control
-            flow statements to Catalyst-compatible control flow. Currently only supports Python
-            ``if``, ``elif``, and ``else`` statements. Note that this feature requires an
+            flow statements to Catalyst-compatible control flow. Currently supports Python ``if``,
+            ``elif``, ``else``, and ``for`` statements. Note that this feature requires an
             available TensorFlow installation.
         target (str): the compilation target
         keep_intermediate (bool): Whether or not to store the intermediate files throughout the
@@ -780,9 +812,10 @@ def qjit(
             printed out.
         logfile (Optional[TextIOWrapper]): File object to write verbose messages to (default -
             ``sys.stderr``).
-        pipelines (Optional(List[AnyType]): A list of pipelines to be executed. The elements of
-            the list are asked to implement a run method which takes the output of the previous run
-            as an input to the next element, and so on.
+        pipelines (Optional(List[Tuple[str,List[str]]])): A list of pipelines to be executed. The
+            elements of this list are named sequences of MLIR passes to be executed. A ``None``
+            value (the default) results in the execution of the default pipeline. This option is
+            considered to be used by advanced users for low-level debugging purposes.
 
     Returns:
         QJIT object.

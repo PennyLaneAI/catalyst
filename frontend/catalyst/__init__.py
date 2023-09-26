@@ -79,6 +79,10 @@ from catalyst.pennylane_extensions import (
 )
 from catalyst.utils.exceptions import CompileError
 
+autograph_ignore_fallbacks = False
+autograph_strict_conversion = False
+
+
 __all__ = (
     "qjit",
     "QJIT",
@@ -93,6 +97,8 @@ __all__ = (
     "adjoint",
     "debug_print",
     "autograph_source",
+    "autograph_ignore_fallbacks",
+    "autograph_strict_conversion",
     "AutoGraphError",
     "CompileError",
     "CompileOptions",

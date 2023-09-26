@@ -23,11 +23,8 @@
 #include <unordered_map>
 #include <utility>
 
+#include "Exception.hpp"
 #include "Types.h"
-
-#if __has_include("StateVectorKokkos.hpp")
-#include "UtilKokkos.hpp"
-#endif
 
 #if __has_include("StateVectorLQubitDynamic.hpp")
 #include "Util.hpp"
@@ -41,7 +38,19 @@ static inline auto parse_kwargs(std::string kwargs) -> std::unordered_map<std::s
         return {};
     }
 
-    kwargs.erase(std::remove_if(kwargs.begin(), kwargs.end(),
+    std::unordered_map<std::string, std::string> map;
+    size_t s3_pos = kwargs.find("\'s3_destination_folder\'");
+    if (s3_pos != std::string::npos) {
+        auto opening_pos = kwargs.find("(", s3_pos);
+        RT_ASSERT(opening_pos != std::string::npos);
+        auto closing_pos = kwargs.find(")", opening_pos);
+        RT_ASSERT(closing_pos != std::string::npos);
+        map["s3_destination_folder"] = kwargs.substr(opening_pos, closing_pos - opening_pos + 1);
+    }
+
+    auto kwargs_end_iter = (s3_pos == std::string::npos) ? kwargs.end() : kwargs.begin() + s3_pos;
+
+    kwargs.erase(std::remove_if(kwargs.begin(), kwargs_end_iter,
                                 [](char c) {
                                     switch (c) {
                                     case '{':
@@ -56,7 +65,6 @@ static inline auto parse_kwargs(std::string kwargs) -> std::unordered_map<std::s
                  kwargs.end());
 
     // constructing map
-    std::unordered_map<std::string, std::string> map;
     std::istringstream iss(kwargs);
     std::string token;
     while (std::getline(iss, token, ',')) {

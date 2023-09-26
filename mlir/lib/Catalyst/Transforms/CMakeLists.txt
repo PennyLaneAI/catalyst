@@ -2,6 +2,7 @@ set(LIBRARY_NAME MLIRCatalystTransforms)
 
 file(GLOB SRC
     ArrayListToMemRefPass.cpp
+    RegisterAllPasses.cpp
     BufferizationPatterns.cpp
     catalyst_bufferize.cpp
     catalyst_to_llvm.cpp

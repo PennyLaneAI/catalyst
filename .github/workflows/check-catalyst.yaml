@@ -104,6 +104,14 @@ jobs:
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
+    
+    - name: Cache MHLO Source
+      id: cache-mhlo-source
+      uses: actions/cache@v3
+      with:
+        path: mlir/mlir-hlo
+        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-source
+        enableCrossOsArchive: True
 
     - name: Cache MHLO Build
       id: cache-mhlo
@@ -133,7 +141,7 @@ jobs:
 
     - name: Clone MHLO Submodule
       if: |
-        steps.cache-mhlo.outputs.cache-hit != 'true' &&
+        steps.cache-mhlo.outputs.cache-hit != 'true' ||
         steps.cache-mhlo-source.outputs.cache-hit != 'true'
       uses: actions/checkout@v3
       with:
@@ -213,7 +221,7 @@ jobs:
 
   quantum:
     name: Quantum Dialects Build
-    needs: [constants, llvm]
+    needs: [constants, mhlo, llvm]
     runs-on: ubuntu-latest
 
     steps:
@@ -241,6 +249,23 @@ jobs:
         path: llvm-build
         key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
         fail-on-cache-miss: True
+    
+    - name: Get Cached MHLO Source
+      id: cache-mhlo-source
+      uses: actions/cache@v3
+      with:
+        path: mlir/mlir-hlo
+        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-source
+        enableCrossOsArchive: True
+        fail-on-cache-miss: True
+    
+    - name: Get Cached MHLO Build
+      id: cache-mhlo
+      uses: actions/cache@v3
+      with:
+        path: mhlo-build
+        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-build
+        fail-on-cache-miss: True
 
     - name: Cache CCache
       id: cache-ccache
@@ -253,11 +278,21 @@ jobs:
         key: ${{ runner.os }}-ccache-${{ github.run_id }}
         restore-keys: ${{ runner.os }}-ccache-
 
+    - name: Clone Enzyme Submodule
+      if: |
+        steps.cache-enzyme.outputs.cache-hit != 'true'
+      uses: actions/checkout@v3
+      with:
+        repository: EnzymeAD/Enzyme
+        ref: ${{ needs.constants.outputs.enzyme_version }}
+        path: mlir/Enzyme
+
     - name: Build MLIR Dialects
       run: |
         CCACHE_DIR="$(pwd)/.ccache" \
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         MHLO_BUILD_DIR="$(pwd)/mhlo-build" \
+        ENZYME_SRC_DIR="$(pwd)/Enzyme" \
         DIALECTS_BUILD_DIR="$(pwd)/quantum-build" \
         make dialects
 
@@ -273,7 +308,7 @@ jobs:
 
   frontend-tests:
     name: Frontend Tests
-    needs: [constants, runtime, mhlo, quantum, enzyme]
+    needs: [constants, runtime, mhlo, quantum]
     runs-on: ubuntu-latest
 
     steps:
@@ -284,7 +319,6 @@ jobs:
       run: |
         sudo apt-get install -y python3 python3-pip libomp-dev
         python3 -m pip install -r requirements.txt
-        python3 -m pip install tensorflow-cpu  # for autograph tests
         python3 -m pip install .
 
     - name: Get Cached LLVM Build
@@ -331,7 +365,6 @@ jobs:
         echo "PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
         echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
         echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
-        echo "ENZYME_LIB_DIR=$(pwd)/enzyme-build/Enzyme" >> $GITHUB_ENV
         chmod +x quantum-build/bin/quantum-opt  # artifact upload does not preserve permissions
 
     - name: Run Python Lit Tests
@@ -358,7 +391,7 @@ jobs:
 
   frontend-tests-lightning-kokkos:
     name: Frontend Tests (backend="lightning.kokkos")
-    needs: [constants, runtime, mhlo, quantum, enzyme]
+    needs: [constants, runtime, mhlo, quantum]
     runs-on: ubuntu-latest
 
     steps:
@@ -369,7 +402,6 @@ jobs:
       run: |
         sudo apt-get install -y python3 python3-pip libomp-dev
         python3 -m pip install -r requirements.txt
-        python3 -m pip install tensorflow-cpu  # for autograph tests
         python3 -m pip install .
 
     - name: Get Cached LLVM Build
@@ -410,14 +442,12 @@ jobs:
 
     - name: Add Frontend Dependencies to PATH
       run: |
-        echo "$(pwd)/enzyme-build/Enzyme" >> $GITHUB_PATH
         echo "$(pwd)/llvm-build/bin" >> $GITHUB_PATH
         echo "$(pwd)/mhlo-build/bin" >> $GITHUB_PATH
         echo "$(pwd)/quantum-build/bin" >> $GITHUB_PATH
         echo "PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
         echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
         echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
-        echo "ENZYME_LIB_DIR=$(pwd)/enzyme-build/Enzyme" >> $GITHUB_ENV
         chmod +x quantum-build/bin/quantum-opt  # artifact upload does not preserve permissions
 
     - name: Install lightning.kokkos used in Python tests
@@ -430,7 +460,7 @@ jobs:
 
   frontend-tests-openqasm-device:
     name: Frontend Tests (backend="openqasm3")
-    needs: [constants, mhlo, quantum, enzyme, llvm]
+    needs: [constants, mhlo, quantum, llvm]
     runs-on: ubuntu-latest
 
     steps:
@@ -494,7 +524,6 @@ jobs:
         echo "PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
         echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
         echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
-        echo "ENZYME_LIB_DIR=$(pwd)/enzyme-build/Enzyme" >> $GITHUB_ENV
         chmod +x quantum-build/bin/quantum-opt  # artifact upload does not preserve permissions
 
     - name: Run Python Pytest Tests

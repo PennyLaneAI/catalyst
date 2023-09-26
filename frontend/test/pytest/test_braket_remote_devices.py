@@ -20,6 +20,10 @@ import pytest
 
 from catalyst import grad, qjit
 
+pytest.importorskip("braket")
+
+from braket.devices import Devices  # pylint: disable=wrong-import-position
+
 try:
     qml.device(
         "braket.aws.qubit",
@@ -35,6 +39,42 @@ except Exception as e:
 
 
 @pytest.mark.braketremote
+class TestBraketS3Bucket:
+    """Unit tests for S3 destination folder."""
+
+    @pytest.mark.parametrize(
+        "device",
+        [
+            qml.device(
+                "braket.aws.qubit",
+                device_arn="arn:aws:braket:::device/quantum-simulator/amazon/sv1",
+                s3_destination_folder=("my-bucket", "my-prefix"),
+                wires=2,
+            ),
+            qml.device(
+                "braket.aws.qubit",
+                device_arn=Devices.Amazon.SV1,
+                s3_destination_folder=("my-bucket", "my-prefix"),
+                wires=2,
+            ),
+        ],
+    )
+    def test_s3_bucket_str(self, device):
+        """Test with an undefined s3 bucket name."""
+
+        @qjit(keep_intermediate=True)
+        @qml.qnode(device)
+        def circuit():
+            qml.PauliX(wires=0)
+            return qml.expval(qml.PauliZ(0) @ qml.PauliZ(1))
+
+        with pytest.raises(
+            RuntimeError, match="Caller doesn't have access to my-bucket or it doesn't exist."
+        ):
+            circuit()
+
+
+@pytest.mark.braketremote
 class TestBraketGates:
     """Unit tests for quantum gates."""
 
@@ -44,6 +84,11 @@ class TestBraketGates:
             qml.device(
                 "braket.aws.qubit",
                 device_arn="arn:aws:braket:::device/quantum-simulator/amazon/sv1",
+                wires=3,
+            ),
+            qml.device(
+                "braket.aws.qubit",
+                device_arn=Devices.Amazon.SV1,
                 wires=3,
             ),
         ],
@@ -90,6 +135,11 @@ class TestBraketGates:
             qml.device(
                 "braket.aws.qubit",
                 device_arn="arn:aws:braket:::device/quantum-simulator/amazon/sv1",
+                wires=3,
+            ),
+            qml.device(
+                "braket.aws.qubit",
+                device_arn=Devices.Amazon.SV1,
                 wires=3,
             ),
         ],
@@ -788,8 +838,8 @@ class TestBraketGradient:
         @qjit
         def compiled_grad_default(x: float):
             g = qml.qnode(device)(f)
-            h = grad(g, h=1e-4)
-            i = grad(h, h=1e-4)
+            h = grad(g, method="fd", h=1e-4)
+            i = grad(h, method="fd", h=1e-4)
             return i(x)
 
         def interpretted_grad_default(x):

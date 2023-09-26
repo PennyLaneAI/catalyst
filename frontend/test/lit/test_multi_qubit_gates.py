@@ -24,13 +24,14 @@ from catalyst import measure, qjit
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=5))
 def circuit(x: float):
-    # CHECK: {{%.+}} = "quantum.custom"({{%.+}}) {gate_name = "Identity"{{.+}}} : (!quantum.bit) -> !quantum.bit
+    # CHECK: {{%.+}} = quantum.custom "Identity"() {{.+}} : !quantum.bit
     qml.Identity(0)
-    # CHECK: {{%.+}} = "quantum.custom"({{%.+}}, {{%.+}}) {gate_name = "CNOT"{{.+}} : (!quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
+    # CHECK: {{%.+}} = quantum.custom "CNOT"() {{.+}} : !quantum.bit, !quantum.bit
     qml.CNOT(wires=[0, 1])
-    # CHECK: {{%.+}} = "quantum.custom"({{%.+}}, {{%.+}}, {{%.+}}) {gate_name = "CSWAP"{{.+}} : (!quantum.bit, !quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit, !quantum.bit)
+    # CHECK: {{%.+}} = quantum.custom "CSWAP"() {{.+}} : !quantum.bit, !quantum.bit, !quantum.bit
     qml.CSWAP(wires=[0, 1, 2])
-    # CHECK: {{%.+}} = "quantum.multirz"({{%.+}}, {{%.+}}, {{%.+}}, {{%.+}}, {{%.+}}, {{%.+}}) : (f64, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit)
+    # pylint: disable=line-too-long
+    # CHECK: {{%.+}} = quantum.multirz({{%.+}}) {{%.+}}, {{%.+}}, {{%.+}}, {{%.+}}, {{%.+}} : !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit, !quantum.bit
     qml.MultiRZ(x, wires=[0, 1, 2, 3, 4])
     return measure(wires=0)
 
@@ -43,7 +44,7 @@ print(circuit.mlir)
 @qml.qnode(qml.device("lightning.qubit", wires=3))
 def circuit():
     U1 = 1 / np.sqrt(2) * np.array([[1.0, 1.0], [1.0, -1.0]], dtype=complex)
-    # CHECK: {{%.+}} = "quantum.unitary"({{%.+}}, {{%.+}}) : (tensor<2x2xcomplex<f64>>, !quantum.bit) -> !quantum.bit
+    # CHECK: {{%.+}} = quantum.unitary({{%.+}} : tensor<2x2xcomplex<f64>>) {{%.+}} : !quantum.bit
     qml.QubitUnitary(U1, wires=0)
 
     U2 = np.array(
@@ -54,10 +55,10 @@ def circuit():
             [0.0 + 0.0j, 0.0 + 0.0j, 0.0 + 0.0j, 0.99500417 - 0.09983342j],
         ]
     )
-    # CHECK: {{%.+}} = "quantum.unitary"({{%.+}}, {{%.+}}, {{%.+}}) : (tensor<4x4xcomplex<f64>>, !quantum.bit, !quantum.bit) -> (!quantum.bit, !quantum.bit)
-    qml.QubitUnitary(U2, wires=[1, 2])
+    # CHECK: {{%.+}} = quantum.unitary({{%.+}} : tensor<4x4xcomplex<f64>>) {{%.+}}, {{%.+}} : !quantum.bit, !quantum.bit
+    qml.QubitUnitary(U2, wires=[0, 2])
 
-    return measure(wires=0)
+    return measure(wires=0), measure(wires=1)
 
 
 print(circuit.mlir)

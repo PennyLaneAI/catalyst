@@ -1,4 +1,4 @@
-// Copyright 2022-2023 Xanadu Quantum Technologies Inc.
+// Copyright 2023 Xanadu Quantum Technologies Inc.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,17 +14,22 @@
 
 #pragma once
 
-#include <memory>
+#include "mlir/IR/DialectRegistry.h"
+#include "mlir/Support/LogicalResult.h"
+#include "llvm/ADT/StringRef.h"
+#include "llvm/IR/Module.h"
 
-#include "mlir/Pass/Pass.h"
+#include "CompilerDriver.h"
 
 namespace catalyst {
+namespace driver {
 
-std::unique_ptr<mlir::Pass> createQuantumBufferizationPass();
-std::unique_ptr<mlir::Pass> createQuantumConversionPass();
-std::unique_ptr<mlir::Pass> createEmitCatalystPyInterfacePass();
-std::unique_ptr<mlir::Pass> createCopyGlobalMemRefPass();
-std::unique_ptr<mlir::Pass> createAdjointLoweringPass();
-std::unique_ptr<mlir::Pass> createScatterLoweringPass();
+/// Register the translations needed to convert to LLVM IR.
+void registerLLVMTranslations(mlir::DialectRegistry &registry);
 
+mlir::LogicalResult compileObjectFile(const CompilerOptions &options,
+                                      std::shared_ptr<llvm::Module> module,
+                                      llvm::StringRef filename);
+
+} // namespace driver
 } // namespace catalyst

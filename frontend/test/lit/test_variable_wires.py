@@ -23,20 +23,18 @@ from catalyst import measure, qjit
 @qml.qnode(qml.device("lightning.qubit", wires=2))
 # CHECK-LABEL @f.jit
 def f(arg0: float, arg1: int, arg2: int):
-    # CHECK:   [[reg0:%.+]] = "quantum.alloc"() {nqubits_attr = 2 : i64} : () -> !quantum.reg
-    # CHECK:   [[w0_0:%.+]] = "tensor.extract"(%arg1)
-    # CHECK:   [[q_w0_0:%.+]] = "quantum.extract"([[reg0]], [[w0_0]]) : (!quantum.reg, i64) -> !quantum.bit
-    # CHECK:   [[q_w0_1:%.+]] = "quantum.custom"({{%.+}}, [[q_w0_0]]) {gate_name = "RZ"{{.+}} : (f64, !quantum.bit) -> !quantum.bit
+    # CHECK:   [[reg0:%.+]] = quantum.alloc( 2)
+    # CHECK:   [[w0_0:%.+]] = tensor.extract %arg1
+    # CHECK:   [[q_w0_0:%.+]] = quantum.extract [[reg0]][[[w0_0]]]
+    # CHECK:   [[q_w0_1:%.+]] = quantum.custom "RZ"({{%.+}}) [[q_w0_0]]
     qml.RZ(arg0, wires=[arg1])
-    # CHECK:   [[w0_1:%.+]] = "tensor.extract"(%arg1)
-    # CHECK:   [[reg1:%.+]] = "quantum.insert"([[reg0]], [[w0_1]], [[q_w0_1]]) : (!quantum.reg, i64, !quantum.bit) -> !quantum.reg
-    # CHECK:   [[w1_0:%.+]] = "tensor.extract"(%arg2)
-    # CHECK:   [[q_w1_0:%.+]] = "quantum.extract"([[reg1]], [[w1_0]]) : (!quantum.reg, i64) -> !quantum.bit
-    # CHECK:   [[q_w1_1:%.+]]:2 = "quantum.measure"([[q_w1_0]]) : (!quantum.bit) -> (i1, !quantum.bit)
+    # CHECK:   [[w0_1:%.+]] = tensor.extract %arg1
+    # CHECK:   [[reg1:%.+]] = quantum.insert [[reg0]][[[w0_1]]], [[q_w0_1]]
+    # CHECK:   [[w1_0:%.+]] = tensor.extract %arg2
+    # CHECK:   [[q_w1_0:%.+]] = quantum.extract [[reg1]][[[w1_0]]]
+    # CHECK:   [[mres:%.+]], [[out_qubit:%.+]] = quantum.measure [[q_w1_0]]
     m = measure(wires=[arg2])
-    # CHECK:   [[w1_1:%.+]] = "tensor.extract"(%arg2)
-    # CHECK:   [[reg2:%.+]] = "quantum.insert"([[reg1]], [[w1_1]], [[q_w1_1]]#1) : (!quantum.reg, i64, !quantum.bit) -> !quantum.reg
-    # CHECK:   "quantum.dealloc"([[reg0]])
+    # CHECK:   quantum.dealloc [[reg0]]
     # CHECK:   return
     return m
 

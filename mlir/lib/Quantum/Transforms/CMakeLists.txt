@@ -9,6 +9,8 @@ file(GLOB SRC
     cp_global_buffers.cpp
     adjoint_lowering.cpp
     AdjointPatterns.cpp
+    scatter_lowering.cpp
+    ScatterPatterns.cpp
 )
 
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)

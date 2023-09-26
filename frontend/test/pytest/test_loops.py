@@ -114,9 +114,9 @@ class TestWhileLoops:
 
             return circuit()
 
-        with pytest.raises(TypeError, match="must return a single boolean scalar"):
+        with pytest.raises(TypeError, match="boolean scalar was expected, got the value"):
             workflow((44, 33))
-        with pytest.raises(TypeError, match="must return a boolean scalar"):
+        with pytest.raises(TypeError, match="boolean scalar was expected, got the value"):
             workflow(33)
 
     def test_closure_condition_fn(self, backend):

@@ -2,10 +2,66 @@
 
 <h3>New features</h3>
 
+* Add lowering to tensor dialect for MHLO scatter. It unlocks indexing and updating jax arrays.
+  [(#273)](https://github.com/PennyLaneAI/catalyst/pull/273)
+
+  ```python
+  
+  @qjit
+  def add_multiply(l: jax.core.ShapedArray((3,), dtype=float), idx: int):
+      res = l.at[idx].multiply(3)
+      res2 = l.at[idx].add(2)
+      return res + res2
+
+  res = add_multiply(jnp.array([0, 1, 2]), 2)
+  ```
+
+  ```pycon
+  >>> res
+  [0, 2, 10]
+
+* Catalyst users can now use Python for loop statements in their programs without having to
+  explicitly use the functional `catalyst.for_loop` form!
+  [#258](https://github.com/PennyLaneAI/catalyst/pull/258)
+
+  This feature extends the existing AutoGraph support for Python if statements with Python for
+  loops. The following example is now supported:
+
+  ```python
+  dev = qml.device("lightning.qubit", wires=n)
+
+  @qjit(autograph=True)
+  @qml.qnode(dev)
+  def f(n):
+      for i in range(n):
+          qml.Hadamard(wires=i)
+
+      ...
+
+      return qml.expval(qml.PauliZ(0))
+  ```
+
 <h3>Improvements</h3>
 
 * Update the Lightning backend device to work with the PL-Lightning monorepo.
-[(#259)](https://github.com/PennyLaneAI/catalyst/pull/259)
+  [(#259)](https://github.com/PennyLaneAI/catalyst/pull/259)
+
+* Move to an alternate compiler driver in C++. This improves compile-time performance by
+  avoiding *round-tripping*, which is when the entire program being compiled is dumped to
+  a textual form and re-parsed by another tool.
+
+  This is also a requirement for providing custom metadata at the LLVM level, which is
+  necessary for better integration with tools like Enzyme. Finally, this makes it more natural
+  to improve error messages originating from C++ when compared to the prior subprocess-based
+  approach.
+  [(#216)](https://github.com/PennyLaneAI/catalyst/pull/216)
+
+* Build both `"lightning.qubit"` and `"lightning.kokkos"` against the PL-Lightning monorepo.
+  [(#277)](https://github.com/PennyLaneAI/catalyst/pull/277)
+
+* Support the `braket.devices.Devices` enum class and `s3_destination_folder`
+  for AWS Braket remove devices.
+  [(#278)](https://github.com/PennyLaneAI/catalyst/pull/278)
 
 <h3>Breaking changes</h3>
 
@@ -15,7 +71,11 @@
 
 This release contains contributions from (in alphabetical order):
 
-Ali Asadi
+Ali Asadi,
+Erick Ochoa Lopez,
+Jacob Mai Peng,
+Sergei Mironov,
+Romain Moyard.
 
 # Release 0.3.0
 
@@ -57,7 +117,7 @@ Ali Asadi
   TensorFlow installation be available. In addition, Python loops (`for` and `while`) are not
   yet supported, and do not work in AutoGraph mode.
 
-  Note that there are some caveats when using this feature especially around the ues of global
+  Note that there are some caveats when using this feature especially around the use of global
   variables or object mutation inside of methods. A functional style is always recommended when
   using `qjit` or AutoGraph.
 
