@@ -259,6 +259,53 @@ This includes:
 For more details, please see the `JAX documentation
 <https://jax.readthedocs.io/en/latest/notebooks/Common_Gotchas_in_JAX.html>`__.
 
+Inspecting and drawing circuits
+-------------------------------
+
+A useful tool for debugging quantum algorithms is the ability to draw them. Currently,
+``@qjit`` compiled QNodes used as input to ``qml.draw``, with the following caveats:
+
+- ``qml.draw`` must occur outside the ``qjit``
+
+- The ``qjit`` decorator must be placed directly on top of the QNode
+
+- The ``catalyst.measure`` function is not supported in drawn QNodes
+
+- Catalyst conditional functions, such as ``catalyst.cond`` and
+  ``catalyst.for_loop``, will be 'unrolled'. That is, the drawn circuit will
+  be a straight-line circuit, without any of the control flow represented
+  explicitly.
+
+For example,
+
+.. code-block:: python
+
+    @qjit
+    @qml.qnode(dev)
+    def circuit(x):
+        def measurement_loop(i, y):
+            qml.RX(y, wires=0)
+            qml.RY(y ** 2, wires=1)
+            qml.CNOT(wires=[0, 1])
+
+            @cond(y < 0.5)
+            def cond_gate():
+                qml.CRX(y * jnp.exp(- y ** 2), wires=[0, 1])
+
+            cond_gate()
+
+            return y * 2
+
+        for_loop(0, 3, step=1)(measurement_loop)(x)
+        return qml.expval(qml.PauliZ(0))
+
+>>> print(qml.draw(circuit)(0.3))
+0: ──RX(0.30)─╭●─╭●─────────RX(0.60)─╭●──RX(1.20)─╭●─┤  <Z>
+1: ──RY(0.09)─╰X─╰RX(0.27)──RY(0.36)─╰X──RY(1.44)─╰X─┤     
+
+At the moment, additional PennyLane `circuit inspection functions
+<https://docs.pennylane.ai/en/stable/introduction/inspecting_circuits.html>`__
+are not supported with Catalyst.
 
 Dynamic circuit restrictions
 ----------------------------
