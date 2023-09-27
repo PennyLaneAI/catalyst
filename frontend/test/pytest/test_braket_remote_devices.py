@@ -62,7 +62,7 @@ class TestBraketS3Bucket:
     def test_s3_bucket_str(self, device):
         """Test with an undefined s3 bucket name."""
 
-        @qjit(keep_intermediate=True)
+        @qjit
         @qml.qnode(device)
         def circuit():
             qml.PauliX(wires=0)
