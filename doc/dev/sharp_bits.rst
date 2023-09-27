@@ -204,6 +204,106 @@ Here, the for loop is evaluated at compile time (notice the multiple tracers
 that have been printed out during program capture --- one for each loop!),
 rather than runtime.
 
+Avoiding recompilation
+----------------------
+
+In general in Catalyst, recompilation of a QJIT-compiled function will usually
+occur when the function is called with different **argument types**
+and **shapes**.
+
+For example, consider the following:
+
+>>> @qjit
+... def f(x, y):
+...     print("Tracing occuring")
+...     return x ** 2 + y
+>>> f(0.4, 1)
+Tracing occuring
+array(1.16)
+>>> f(0.2, 3)
+array(3.04)
+
+However, if we change the argument types in a way where Catalyst can't perform
+auto-type promotion before passing the argument to the comppiled function (e.g., passing a float instead of an integer), recompilation will occur:
+
+>>> f(0.15, 0.65)
+Tracing occuring
+array(0.6725)
+
+However, changing a float to an integer will not cause recompilation:
+
+>>> f(2, 4.65)
+array(8.65)
+
+Similarly, changing the shape of an array will also trigger recompilation:
+
+>>> f(jnp.array([0.2]), jnp.array([0.6]))
+Tracing occuring
+array([0.64])
+>>> f(jnp.array([0.8]), jnp.array([1.6]))
+array([2.24])
+>>> f(jnp.array([0.8, 0.1]), jnp.array([1.6, -2.0]))
+Tracing occuring
+array([ 2.24, -1.99])
+
+This is something to be aware of, especially when porting existing PennyLane
+code to work with Catalyst. For example, consider the following, where the
+size of the input argument determines the number of qubits and gates used:
+
+.. code-block:: python
+
+    dev = qml.device("lightning.qubit", wires=4)
+
+    @qjit
+    @qml.qnode(dev)
+    def circuit(x):
+        print("Tracing occurring")
+
+        def loop_fn(i):
+            qml.RX(x[i], wires=i)
+
+        for_loop(0, x.shape[0], 1)(loop_fn)()
+        return qml.expval(qml.PauliZ(0))
+
+This will run correctly, but tracing and recompilation will occur with every
+function execution:
+
+>>> circuit(jnp.array([0.1, 0.2]))
+Tracing occurring
+array(0.99500417)
+>>> circuit(jnp.array([0.1, 0.2, 0.3]))
+Tracing occurring
+array(0.99500417)
+
+To be explicitly warned about recompilation, you can use ahead-of-time
+(AOT) mode, by specifying types and shapes in the function signature
+directly:
+
+>>> @qjit
+... @qml.qnode(dev)
+... def circuit(x: jax.core.ShapedArray((3,), dtype=np.float64)):
+...     print("Tracing occurring")
+...     def loop_fn(i):
+...         qml.RX(x[i], wires=i)
+...     for_loop(0, x.shape[0], 1)(loop_fn)()
+...     return qml.expval(qml.PauliZ(0))
+Tracing occurring
+
+Note that compilation now happens on **function definition**. We can execute the compiled function as long as the arguments match the specified shapes and type:
+
+>>> circuit(jnp.array([0.1, 0.2, 0.3]))
+array(0.99500417)
+>>> circuit(jnp.array([1.4, 1.4, 0.3]))
+array(0.16996714)
+
+However, deviating from this will result in recompilation and a warning message:
+
+>>> circuit(jnp.array([1.4, 1.4, 0.3, 0.1]))
+/usr/local/lib/python3.10/dist-packages/catalyst/compilation_pipelines.py:592: UserWarning: Provided arguments did not match declared signature, recompiling...
+Tracing occurring
+array(0.16996714)
+
+
 JAX support and restrictions
 ----------------------------
 
@@ -230,7 +330,7 @@ and 'gotchas' from JAX
 <https://jax.readthedocs.io/en/latest/notebooks/Common_Gotchas_in_JAX.html>`__.
 This includes:
 
-* **Pure functions**: compilation is primarily designed to only work on pure
+* **Pure functions**: Compilation is primarily designed to only work on pure
   functions. That is, functions that do not have any side-effects; the
   output is purely dependent only on function inputs.
 
@@ -250,7 +350,7 @@ This includes:
   >>> f()
   array([-0.78476578])
 
-* **Dynamic-shaped arrays:** functions that create or return arrays with
+* **Dynamic-shaped arrays:** Functions that create or return arrays with
   dynamic shape --- that is, arrays where their shape is determined by a
   dynamic variable at runtime -- are currently not supported in JAX nor
   Catalyst. Typically, workarounds involve rewriting the code to utilize
@@ -317,6 +417,20 @@ Classical control debugging
 
 Todo.
 
+.. note::
+
+    See our AutoGraph guide for converting native Python control flow
+    to QJIT compatible control.
+
+- Return values of both true and false branches of ``catalyst.cond`` should be consistent
+
+- cannot return a value in the true branch of catalyst.cond without an else branch:
+
+- There are more limitations with returning values in ``catalyst.cond``: Returning an integer from the true branch and a float from the false branch raises a different error.
+
+- Also, else-if branch cannot have any arguments
+
+
 PennyLane transformations
 -------------------------
 
@@ -326,3 +440,52 @@ Common PennyLane patterns for Catalyst
 --------------------------------------
 
 Todo.
+
+- function arguments need to be numeric types or Pytrees, since we don't
+  support ``static_argnum`` yet
+
+- returning different measurements at different places with control flow is
+  not supported:
+
+  .. code-block:: python
+
+      if x:
+          return expval(..)
+
+      return probs(..)
+
+- Recursion is not supported. E.g., for recursive support using Python if-statement:
+
+.. code-block:: python
+
+@qjit
+def fibonacci(n: int):
+    if n <= 1:
+        return n
+    return fibonacci(n-1) + fibonacci(n-2)
+
+this will raise,
+
+.. code-block:: text
+
+    TracerBoolConversionError: Attempted boolean conversion of traced array with shape bool[]..
+    The error occurred while tracing the function fibonacci at /tmp/ipykernel_137076/1253936487.py:1 for make_jaxpr. This concrete value was not available in Python because it depends on the value of the argument n.
+    See https://jax.readthedocs.io/en/latest/errors.html#jax.errors.TracerBoolConversionError
+
+For recursive support using cond:
+
+.. code-block:: python
+
+    def fibonacci(x: int):
+        return lax.cond(x <= 1, x, lambda x: x, x, lambda x: fibonacci(x-1) + fibonacci(x-2))
+
+this will raise,
+
+.. code-block:: text
+
+    RecursionError: maximum recursion depth exceeded in comparison
+
+This is due to the fact that JAX tries to evaluate both true and false
+statements and this will result the "maximum recursion depth exceeded in
+comparison" error. It should be interesting to explore this support in
+Catalyst though.
