@@ -56,11 +56,10 @@ from mlir_quantum.dialects.quantum import (
     VarianceOp,
 )
 from mlir_quantum.dialects.quantum import YieldOp as QYieldOp
-from mlir_quantum.dialects.tensor import FromElementsOp
 from pennylane import QNode as pennylane_QNode
 
 from catalyst.utils.calculate_grad_shape import Signature, calculate_grad_shape
-from catalyst.utils.extra_bindings import TensorExtractOp
+from catalyst.utils.extra_bindings import FromElementsOp, TensorExtractOp
 
 # pylint: disable=unused-argument,too-many-lines
 
