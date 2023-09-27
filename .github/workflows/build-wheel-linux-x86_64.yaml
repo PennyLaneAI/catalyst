@@ -276,7 +276,7 @@ jobs:
               -DMLIR_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir \
               -DMHLO_DIR=$GITHUB_WORKSPACE/mhlo-build/lib/cmake/mlir-hlo \
               -DMHLO_BINARY_DIR=$GITHUB_WORKSPACE/mhlo-build/bin \
-              -DENZYME_SRC_DIR=$(GITHUB_WORKSPACE)/mlir/Enzyme \
+              -DENZYME_SRC_DIR=$GITHUB_WORKSPACE/mlir/Enzyme \
 
         cmake --build quantum-build --target check-dialects -j$(nproc)
 
