@@ -47,6 +47,7 @@ set(ALL_MHLO_PASSES
 
 list(APPEND CMAKE_MODULE_PATH "${MLIR_CMAKE_DIR}")
 list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
+list(APPEND CMAKE_MODULE_PATH "${MHLO_CMAKE_DIR}")
 include(TableGen)
 include(AddLLVM)
 include(AddMLIR)
@@ -57,8 +58,14 @@ if(QUANTUM_ENABLE_BINDINGS_PYTHON)
   mlir_configure_python_dev_packages()
 endif()
 
+list(GET MHLO_INCLUDE_DIRS 1 MLIRHLO_DIR)
+list(GET MHLO_INCLUDE_DIRS 2 MLIRHLO_BUILD_DIR)
+
 include_directories(${LLVM_INCLUDE_DIRS}
                     ${MLIR_INCLUDE_DIRS}
+                    ${MHLO_INCLUDE_DIRS}
+                    ${MLIRHLO_DIR}/stablehlo
+                    ${MLIRHLO_BUILD_DIR}/stablehlo
                     ${PROJECT_SOURCE_DIR}/include
                     ${PROJECT_BINARY_DIR}/include)
 link_directories(${LLVM_BUILD_LIBRARY_DIR})

@@ -112,6 +112,7 @@ DEFAULT_PIPELINES = [
     (
         "QuantumCompilationPass",
         [
+            "scatter-lowering",
             "lower-gradients",
             "adjoint-lowering",
         ],
