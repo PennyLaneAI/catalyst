@@ -276,7 +276,7 @@ jobs:
               -DMHLO_BINARY_DIR=$GITHUB_WORKSPACE/mhlo-build/bin \
               -DENZYME_SRC_DIR=$GITHUB_WORKSPACE/mlir/Enzyme \
 
-        cmake --build quantum-build --target check-dialects quantum-lsp-server compiler_driver -j$(nproc)
+        cmake --build quantum-build --target check-dialects compiler_driver -j$(nproc)
 
     - name: Build wheel
       run: |
