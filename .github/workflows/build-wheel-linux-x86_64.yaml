@@ -260,9 +260,7 @@ jobs:
               -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -DPython3_NumPy_INCLUDE_DIRS=$(python${{ matrix.python_version }} -c "import numpy as np; print(np.get_include())")
 
-        # TODO: when updating LLVM, test to see if mlir/unittests/Bytecode/BytecodeTest.cpp:55 is passing
-        # and remove filter
-        LIT_FILTER_OUT="Bytecode" cmake --build llvm-build --target check-mlir opt -j$(nproc)
+        cmake --build llvm-build --target check-mlir opt -j$(nproc)
 
     # Build Quantum and Gradient Dialects
     - name: Build MLIR Dialects
@@ -278,7 +276,7 @@ jobs:
               -DMHLO_BINARY_DIR=$GITHUB_WORKSPACE/mhlo-build/bin \
               -DENZYME_SRC_DIR=$GITHUB_WORKSPACE/mlir/Enzyme \
 
-        cmake --build quantum-build --target check-dialects -j$(nproc)
+        cmake --build quantum-build --target check-dialects quantum-lsp-server compiler_driver -j$(nproc)
 
     - name: Build wheel
       run: |
