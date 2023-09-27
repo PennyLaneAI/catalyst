@@ -441,8 +441,19 @@ Common PennyLane patterns for Catalyst
 
 Todo.
 
+- The biggest performance advantage you will see when using Catalyst is if you qjit your *entire* workflow, not just the QNodes. So think about putting everything inside your JIT-compiled function; for loops (including optimization loops), gradient calls, etc.
+
+- Inside the ``@qjit``, you need to use ``catalyst.grad``
+
+- However ``@qjit`` functions remain JAX compatible, and you can call JAX
+  transformations on them. However this will always result in a callback to Python,
+  and so will be slower.
+
 - function arguments need to be numeric types or Pytrees, since we don't
   support ``static_argnum`` yet
+
+- broadcasting/vectorization of parameters for quantum operations isn't yet
+  supported, but you can use ``jax.vmap`` on a qjit-function.
 
 - returning different measurements at different places with control flow is
   not supported:
@@ -456,36 +467,36 @@ Todo.
 
 - Recursion is not supported. E.g., for recursive support using Python if-statement:
 
-.. code-block:: python
+  .. code-block:: python
 
-@qjit
-def fibonacci(n: int):
-    if n <= 1:
-        return n
-    return fibonacci(n-1) + fibonacci(n-2)
+  @qjit
+  def fibonacci(n: int):
+      if n <= 1:
+          return n
+      return fibonacci(n-1) + fibonacci(n-2)
 
-this will raise,
+  this will raise,
 
-.. code-block:: text
+  .. code-block:: text
 
-    TracerBoolConversionError: Attempted boolean conversion of traced array with shape bool[]..
-    The error occurred while tracing the function fibonacci at /tmp/ipykernel_137076/1253936487.py:1 for make_jaxpr. This concrete value was not available in Python because it depends on the value of the argument n.
-    See https://jax.readthedocs.io/en/latest/errors.html#jax.errors.TracerBoolConversionError
+      TracerBoolConversionError: Attempted boolean conversion of traced array with shape bool[]..
+      The error occurred while tracing the function fibonacci at /tmp/ipykernel_137076/1253936487.py:1 for make_jaxpr. This concrete value was not available in Python because it depends on the value of the argument n.
+      See https://jax.readthedocs.io/en/latest/errors.html#jax.errors.TracerBoolConversionError
 
-For recursive support using cond:
+  For recursive support using cond:
 
-.. code-block:: python
+  .. code-block:: python
 
-    def fibonacci(x: int):
-        return lax.cond(x <= 1, x, lambda x: x, x, lambda x: fibonacci(x-1) + fibonacci(x-2))
+      def fibonacci(x: int):
+          return lax.cond(x <= 1, x, lambda x: x, x, lambda x: fibonacci(x-1) + fibonacci(x-2))
 
-this will raise,
+  this will raise,
 
-.. code-block:: text
+  .. code-block:: text
 
-    RecursionError: maximum recursion depth exceeded in comparison
+      RecursionError: maximum recursion depth exceeded in comparison
 
-This is due to the fact that JAX tries to evaluate both true and false
-statements and this will result the "maximum recursion depth exceeded in
-comparison" error. It should be interesting to explore this support in
-Catalyst though.
+  This is due to the fact that JAX tries to evaluate both true and false
+  statements and this will result the "maximum recursion depth exceeded in
+  comparison" error. It should be interesting to explore this support in
+  Catalyst though.
