@@ -67,7 +67,7 @@ def test_jvp_against_jax_full_argnum_case_S_SS():
     @qjit
     def C_workflow():
         f = qml.QNode(circuit_rx, device=qml.device("lightning.qubit", wires=1))
-        return C_jvp(f, x, t, method="fd", argnum=list(range(len(x))))
+        return C_jvp(f, x, t, argnum=list(range(len(x))))
 
     @jax.jit
     def J_workflow():
@@ -93,7 +93,7 @@ def test_jvp_against_jax_full_argnum_case_T_T():
 
     @qjit
     def C_workflow():
-        return C_jvp(f, x, t, method="fd", argnum=list(range(len(x))))
+        return C_jvp(f, x, t, argnum=list(range(len(x))))
 
     @jax.jit
     def J_workflow():
@@ -123,7 +123,7 @@ def test_jvp_against_jax_full_argnum_case_TT_T():
 
     @qjit
     def C_workflow():
-        return C_jvp(f, x, t, method="fd", argnum=list(range(len(x))))
+        return C_jvp(f, x, t, argnum=list(range(len(x))))
 
     @jax.jit
     def J_workflow():
@@ -148,7 +148,7 @@ def test_jvp_against_jax_full_argnum_case_T_TT():
 
     @qjit
     def C_workflow():
-        return C_jvp(f, x, t, method="fd", argnum=list(range(len(x))))
+        return C_jvp(f, x, t, argnum=list(range(len(x))))
 
     @jax.jit
     def J_workflow():
@@ -181,7 +181,7 @@ def test_jvp_against_jax_full_argnum_case_TT_TT():
 
     @qjit
     def C_workflow():
-        return C_jvp(f, x, t, method="fd", argnum=list(range(len(x))))
+        return C_jvp(f, x, t, argnum=list(range(len(x))))
 
     @jax.jit
     def J_workflow():
@@ -204,7 +204,7 @@ def test_vjp_against_jax_full_argnum_case_S_SS():
     @qjit
     def C_workflow():
         f = qml.QNode(circuit_rx, device=qml.device("lightning.qubit", wires=1))
-        return C_vjp(f, x, ct, method="fd", argnum=list(range(len(x))))
+        return C_vjp(f, x, ct, argnum=list(range(len(x))))
 
     @jax.jit
     def J_workflow():
@@ -231,7 +231,7 @@ def test_vjp_against_jax_full_argnum_case_T_T():
 
     @qjit
     def C_workflow():
-        return C_vjp(f, x, ct, method="fd", argnum=list(range(len(x))))
+        return C_vjp(f, x, ct, argnum=list(range(len(x))))
 
     @jax.jit
     def J_workflow():
@@ -262,7 +262,7 @@ def test_vjp_against_jax_full_argnum_case_TT_T():
 
     @qjit
     def C_workflow():
-        return C_vjp(f, x, ct, method="fd", argnum=list(range(len(x))))
+        return C_vjp(f, x, ct, argnum=list(range(len(x))))
 
     @jax.jit
     def J_workflow():
@@ -288,7 +288,7 @@ def test_vjp_against_jax_full_argnum_case_T_TT():
 
     @qjit
     def C_workflow():
-        return C_vjp(f, x, ct, method="fd", argnum=list(range(len(x))))
+        return C_vjp(f, x, ct, argnum=list(range(len(x))))
 
     @jax.jit
     def J_workflow():
@@ -322,7 +322,7 @@ def test_vjp_against_jax_full_argnum_case_TT_TT():
 
     @qjit
     def C_workflow():
-        return C_vjp(f, x, ct, method="fd", argnum=list(range(len(x))))
+        return C_vjp(f, x, ct, argnum=list(range(len(x))))
 
     @jax.jit
     def J_workflow():
@@ -355,11 +355,11 @@ def test_jvpvjp_argument_checks():
 
     @qjit
     def C_workflow1():
-        return C_jvp(f, x, tuple(t), method="fd", argnum=list(range(len(x))))
+        return C_jvp(f, x, tuple(t), argnum=list(range(len(x))))
 
     @qjit
     def C_workflow2():
-        return C_jvp(f, tuple(x), t, method="fd", argnum=tuple(range(len(x))))
+        return C_jvp(f, tuple(x), t, argnum=tuple(range(len(x))))
 
     assert_elements_allclose(C_workflow1(), C_workflow2(), rtol=1e-6, atol=1e-6)
 
@@ -367,19 +367,19 @@ def test_jvpvjp_argument_checks():
 
         @qjit
         def C_workflow_bad1():
-            return C_jvp(f, 33, tuple(t), method="fd", argnum=list(range(len(x))))
+            return C_jvp(f, 33, tuple(t), argnum=list(range(len(x))))
 
     with pytest.raises(ValueError, match="argument must be an iterable"):
 
         @qjit
         def C_workflow_bad2():
-            return C_vjp(f, list(x), 33, method="fd", argnum=list(range(len(x))))
+            return C_vjp(f, list(x), 33, argnum=list(range(len(x))))
 
     with pytest.raises(ValueError, match="argnum should be integer or a list of integers"):
 
         @qjit
         def C_workflow_bad3():
-            return C_vjp(f, x, ct, method="fd", argnum="invalid")
+            return C_vjp(f, x, ct, argnum="invalid")
 
 
 def test_jvp_against_jax_argnum0_case_TT_TT():
@@ -404,11 +404,11 @@ def test_jvp_against_jax_argnum0_case_TT_TT():
 
     @qjit
     def C_workflowA():
-        return C_jvp(f, x, t[0:1], method="fd")
+        return C_jvp(f, x, t[0:1])
 
     @qjit
     def C_workflowB():
-        return C_jvp(f, x, t[0:1], method="fd", argnum=[0])
+        return C_jvp(f, x, t[0:1], argnum=[0])
 
     @jax.jit
     def J_workflow():
@@ -448,11 +448,11 @@ def test_vjp_against_jax_argnum0_case_TT_TT():
 
     @qjit
     def C_workflowA():
-        return C_vjp(f, x, ct, method="fd")
+        return C_vjp(f, x, ct)
 
     @qjit
     def C_workflowB():
-        return C_vjp(f, x, ct, method="fd", argnum=[0])
+        return C_vjp(f, x, ct, argnum=[0])
 
     @jax.jit
     def J_workflow():

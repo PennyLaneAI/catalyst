@@ -172,9 +172,7 @@ def test_jacobian(backend, diff_method):
         return jacobian(postprocess, method="auto")(x)
 
     x = jnp.array([0.5, 0.4, 0.3, 0.2])
-    assert jac_postprocess(x) == pytest.approx(
-        jax.jacobian(postprocess)(x)
-    )
+    assert jac_postprocess(x) == pytest.approx(jax.jacobian(postprocess)(x))
 
 
 @pytest.mark.parametrize("diff_method", SUPPORTED_DIFF_METHODS)
