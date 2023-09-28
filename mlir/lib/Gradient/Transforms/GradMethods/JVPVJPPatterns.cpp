@@ -225,7 +225,7 @@ LogicalResult VJPLoweringPattern::matchAndRewrite(VJPOp op, PatternRewriter &rew
     for (size_t nparam = 0; nparam < func_diff_operand_indices.size(); nparam++) {
         std::optional<Value> acc;
         for (size_t nout = 0; nout < funcResultTypes.size(); nout++) {
-            auto jac = gradOp.getResults()[nparam + nout * funcResultTypes.size()];
+            auto jac = gradOp.getResults()[nparam + nout * func_diff_operand_indices.size()];
             auto param = calleeOperands[func_diff_operand_indices[nparam]];
             auto cotang = cotang_operands[nout];
 
