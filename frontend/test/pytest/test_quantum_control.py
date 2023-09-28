@@ -21,11 +21,18 @@ from typing import Callable
 import pennylane as qml
 import pytest
 from numpy.testing import assert_allclose
+from pennylane import adjoint as PL_adjoint
+from pennylane import ctrl as PL_ctrl
 
-from catalyst import cond, ctrl, for_loop, measure, qjit, while_loop
+from catalyst import adjoint as C_adjoint
+from catalyst import cond
+from catalyst import ctrl as C_ctrl
+from catalyst import for_loop, measure, qjit, while_loop
 
 
-def verify_catalyst_ctrl_against_pennylane(quantum_func: Callable, device, *args):
+def verify_catalyst_ctrl_against_pennylane(
+    quantum_func: Callable, device, *args, with_adjoint_arg=False
+):
     """
     A helper function for verifying Catalyst's native quantum control against the behaviour of
     PennyLane's quantum control function.
@@ -34,11 +41,17 @@ def verify_catalyst_ctrl_against_pennylane(quantum_func: Callable, device, *args
     @qjit
     @qml.qnode(device)
     def catalyst_workflow(*args):
-        return quantum_func(*args, ctrl_fn=ctrl)
+        if with_adjoint_arg:
+            return quantum_func(*args, ctrl_fn=C_ctrl, adjoint_fn=C_adjoint)
+        else:
+            return quantum_func(*args, ctrl_fn=C_ctrl)
 
     @qml.qnode(device)
     def pennylane_workflow(*args):
-        return quantum_func(*args, ctrl_fn=qml.ctrl)
+        if with_adjoint_arg:
+            return quantum_func(*args, ctrl_fn=PL_ctrl, adjoint_fn=PL_adjoint)
+        else:
+            return quantum_func(*args, ctrl_fn=PL_ctrl)
 
     assert_allclose(catalyst_workflow(*args), pennylane_workflow(*args))
 
@@ -62,6 +75,58 @@ def test_qctrl_op_class(backend):
         return qml.state()
 
     verify_catalyst_ctrl_against_pennylane(circuit, qml.device(backend, wires=3), 0.1, 0, 1)
+
+
+def test_qctrl_adjoint_func_simple(backend):
+    """Test the quantum control distribution over the group of operations"""
+
+    def circuit(arg, ctrl_fn, adjoint_fn):
+        def _func(theta):
+            qml.RX(theta, wires=[0])
+            qml.RZ(theta, wires=2)
+
+        ctrl_fn(adjoint_fn(_func), control=[1], control_values=[True])(arg)
+        return qml.state()
+
+    verify_catalyst_ctrl_against_pennylane(
+        circuit, qml.device(backend, wires=3), 0.1, with_adjoint_arg=True
+    )
+
+
+def test_adjoint_qctrl_func_simple(backend):
+    """Test the quantum control distribution over the group of operations"""
+
+    def circuit(arg, ctrl_fn, adjoint_fn):
+        def _func(theta):
+            qml.RX(theta, wires=[0])
+            qml.RZ(theta, wires=2)
+
+        adjoint_fn(ctrl_fn(_func, control=[1], control_values=[True]))(arg)
+        return qml.state()
+
+    verify_catalyst_ctrl_against_pennylane(
+        circuit, qml.device(backend, wires=3), 0.1, with_adjoint_arg=True
+    )
+
+
+def test_qctrl_adjoint_hybrid(backend):
+    """Test the quantum control distribution over the group of operations"""
+
+    def circuit(theta, w1, w2, cw, ctrl_fn, adjoint_fn):
+        def _func():
+            @while_loop(lambda s: s < w2)
+            def _while_loop(s):
+                qml.RY(theta, wires=s)
+                return s + 1
+
+            _while_loop(0)
+
+        ctrl_fn(adjoint_fn(_func), control=[cw], control_values=[True])()
+        return qml.state()
+
+    verify_catalyst_ctrl_against_pennylane(
+        circuit, qml.device(backend, wires=3), 0.1, 0, 2, 2, with_adjoint_arg=True
+    )
 
 
 def test_qctrl_func_simple(backend):
@@ -182,7 +247,7 @@ def test_qctrl_raises_on_invalid_input(backend):
 
     @qml.qnode(qml.device(backend, wires=2))
     def circuit(theta):
-        ctrl(qml.RX(theta, wires=[0]), control=[1], control_values=[])()
+        C_ctrl(qml.RX(theta, wires=[0]), control=[1], control_values=[])()
         return qml.state()
 
     with pytest.raises(ValueError, match="Length of the control_values"):
@@ -198,7 +263,7 @@ def test_qctrl_no_mid_circuit_measurements(backend):
             m = measure(0)
             qml.RX(m * theta, wires=[0])
 
-        ctrl(_func1, control=[1], control_values=[True])()
+        C_ctrl(_func1, control=[1], control_values=[True])()
         return qml.state()
 
     with pytest.raises(ValueError, match="measurements are not allowed"):
@@ -214,7 +279,7 @@ def test_qctrl_no_end_circuit_measurements(backend):
             qml.RX(theta, wires=[0])
             return qml.state()
 
-        ctrl(_func1, control=[1], control_values=[True])()
+        C_ctrl(_func1, control=[1], control_values=[True])()
         return qml.state()
 
     with pytest.raises(ValueError, match="measurements are not allowed"):
