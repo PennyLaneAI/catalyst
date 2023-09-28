@@ -1804,10 +1804,16 @@ def ctrl(
         def workflow(theta, w, cw):
             qml.Hadamard(wires=[0])
             qml.Hadamard(wires=[1])
-            def func():
-                qml.RX(theta, wires=w)
-                qml.RY(theta, wires=w)
-            catalyst.ctrl(func, control=[cw])()
+
+            def func(arg):
+              qml.RX(theta, wires=arg)
+
+            @cond(theta > 0.0)
+            def cond_fn():
+              qml.RY(theta, wires=w)
+
+            catalyst.ctrl(func, control=[cw])(w)
+            catalyst.ctrl(cond_fn, control=[cw])()
             catalyst.ctrl(qml.RZ, control=[cw])(theta, wires=w)
             catalyst.ctrl(qml.RY(theta, wires=w), control=[cw])
             return qml.probs()
