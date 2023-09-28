@@ -80,6 +80,22 @@ from catalyst.utils.jax_extras import (
 from catalyst.utils.patching import Patcher
 
 
+def _check_no_measurements(tape: QuantumTape) -> None:
+    """Check the nested quantum tape for the absense of quantum measurements of any kind"""
+
+    msg = "Quantum measurements are not allowed"
+
+    if len(tape.measurements) > 0:
+        raise ValueError(msg)
+    for op in tape.operations:
+        if has_nested_tapes(op):
+            for r in [r for r in op.regions if r.quantum_tape is not None]:
+                _check_no_measurements(r.quantum_tape)
+        else:
+            if isinstance(op, MidCircuitMeasure):
+                raise ValueError(msg)
+
+
 class QFunc:
     """A device specific quantum function.
 
@@ -1006,7 +1022,7 @@ class QCtrl(HybridOp):
         assert len(hyperparameters) == 0, "Decomposition hyperparameters should be empty"
         assert wires is self.wires, "Altering wires is not supported"
 
-        qctrl_check_no_measurements(self.regions[0].quantum_tape)
+        _check_no_measurements(self.regions[0].quantum_tape)
         new_tape = qctrl_distribute(
             self.regions[0].quantum_tape,
             self.control_wire_tracers,
@@ -1014,23 +1030,6 @@ class QCtrl(HybridOp):
             self.work_wire_tracers,
         )
         return new_tape.operations
-
-
-def qctrl_check_no_measurements(tape: QuantumTape) -> None:
-    """Check the nested quantum tape for the absense of quantum measurements of any kind"""
-
-    msg = "Quantum measurements are not allowed inside catalyst.ctrl"
-    go = qctrl_check_no_measurements
-
-    if len(tape.measurements) > 0:
-        raise ValueError(msg)
-    for op in tape.operations:
-        if has_nested_tapes(op):
-            for r in [r for r in op.regions if r.quantum_tape is not None]:
-                go(r.quantum_tape)
-        else:
-            if isinstance(op, MidCircuitMeasure):
-                raise ValueError(msg)
 
 
 def qctrl_distribute(
@@ -1732,8 +1731,7 @@ def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
                     if isinstance(t, DynamicJaxprTracer)
                 ]
 
-            if len(quantum_tape.measurements) > 0:
-                raise ValueError("Quantum measurements are not allowed in Adjoints")
+            _check_no_measurements(quantum_tape)
 
             adjoint_region = HybridOpRegion(
                 inner_trace, quantum_tape, arg_classical_tracers, res_classical_tracers
@@ -1837,7 +1835,7 @@ def ctrl(
             res = _callee(*args, **kwargs)
         out_classical_tracers, _ = tree_flatten(res)
 
-        qctrl_check_no_measurements(quantum_tape)
+        _check_no_measurements(quantum_tape)
 
         region = HybridOpRegion(None, quantum_tape, [], [])
 

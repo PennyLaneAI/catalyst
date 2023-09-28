@@ -200,7 +200,7 @@ class HybridOp(Operation):
         raise RuntimeError("{self} does not support JAX binding")  # pragma: no cover
 
     num_wires = AnyWires
-    binder:Callable = _no_binder
+    binder: Callable = _no_binder
 
     def __init__(self, in_classical_tracers, out_classical_tracers, regions: List[HybridOpRegion]):
         self.in_classical_tracers = in_classical_tracers
