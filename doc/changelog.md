@@ -41,6 +41,32 @@
       return qml.expval(qml.PauliZ(0))
   ```
 
+* The quantum control operation can now be used in conjunction with Catalyst control flow, such as
+  loops and conditionals. For this purpose a new instruction, `catalyst.ctrl`, has been added.
+  [(#282)](https://github.com/PennyLaneAI/catalyst/pull/282)
+
+  `catalyst.ctrl` can wrap around quantum functions which contain the Catalyst `cond`,
+  `for_loop`, and `while_loop` primitives.
+
+  ```python
+  @qjit
+  @qml.qnode(qml.device("lightning.qubit", wires=4))
+  def circuit(x):
+
+      @for_loop(0, 3, 1)
+      def repeat_rx(i):
+          qml.RX(x / 2, wires=i)
+
+      catalyst.ctrl(repeat_rx, control=3)()
+
+      return qml.expval(qml.PauliZ(0))
+  ```
+
+  ```pycon
+  >>> circuit(0.2)
+  array(1.)
+  ```
+
 <h3>Improvements</h3>
 
 * Update the Lightning backend device to work with the PL-Lightning monorepo.
