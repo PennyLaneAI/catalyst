@@ -306,7 +306,7 @@ LogicalResult VJPOp::verifySymbolUses(SymbolTableCollection &symbolTable)
 LogicalResult VJPOp::verify()
 {
     StringRef method = this->getMethod();
-    if (method != "fd" && method != "ps" && method != "adj" && method!="auto")
+    if (method != "fd" && method != "ps" && method != "adj" && method != "auto")
         return emitOpError("got invalid differentiation method: ") << method;
     return success();
 }
