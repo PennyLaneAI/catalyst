@@ -1025,19 +1025,17 @@ def qctrl_check_no_measurements(tape: QuantumTape) -> None:
     """Check the nested quantum tape for the absense of quantum measurements of any kind"""
 
     msg = "Quantum measurements are not allowed inside catalyst.ctrl"
+    go = qctrl_check_no_measurements
 
-    def _scan(tape):
-        if len(tape.measurements) > 0:
-            raise ValueError(msg)
-        for op in tape.operations:
-            if has_nested_tapes(op):
-                for r in [r for r in op.regions if r.quantum_tape is not None]:
-                    _scan(r.quantum_tape)
-            else:
-                if isinstance(op, MidCircuitMeasure):
-                    raise ValueError(msg)
-
-    _scan(tape)
+    if len(tape.measurements) > 0:
+        raise ValueError(msg)
+    for op in tape.operations:
+        if has_nested_tapes(op):
+            for r in [r for r in op.regions if r.quantum_tape is not None]:
+                go(r.quantum_tape)
+        else:
+            if isinstance(op, MidCircuitMeasure):
+                raise ValueError(msg)
 
 
 def qctrl_distribute(
