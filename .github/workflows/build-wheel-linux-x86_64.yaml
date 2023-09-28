@@ -46,6 +46,13 @@ jobs:
       with:
         path:  mhlo-build
         key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-generic-build
+    
+    - name: Cache MHLO Source
+      id: cache-mhlo-source
+      uses: actions/cache@v3
+      with:
+        path: mlir/mlir-hlo
+        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-source
 
     - name: Set Ownership in Container
       run: |
@@ -61,7 +68,9 @@ jobs:
         path: mlir/llvm-project
 
     - name: Clone MHLO Submodule
-      if: steps.cache-mhlo.outputs.cache-hit != 'true'
+      if: |
+        steps.cache-mhlo.outputs.cache-hit != 'true' ||
+        steps.cache-mhlo-source.outputs.cache-hit != 'true'
       uses: actions/checkout@v3
       with:
         repository: tensorflow/mlir-hlo
@@ -114,9 +123,17 @@ jobs:
         path:  enzyme-build
         key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-generic-build
 
+    - name: Cache Enzyme Source
+      id: cache-enzyme-source
+      uses: actions/cache@v3
+      with:
+        path:  mlir/Enzyme
+        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-source
+
     - name: Clone Enzyme Submodule
       if:  |
-        steps.cache-enzyme.outputs.cache-hit != 'true'
+        steps.cache-enzyme.outputs.cache-hit != 'true' ||
+        steps.cache-enzyme-source.outputs.cache-hit != 'true'
       uses: actions/checkout@v3
       with:
         repository: EnzymeAD/Enzyme
@@ -179,6 +196,15 @@ jobs:
         key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-generic-build-opt
         fail-on-cache-miss: True
 
+    - name: Get Cached MHLO Source
+      id: cache-mhlo-source
+      uses: actions/cache@v3
+      with:
+        path: mlir/mlir-hlo
+        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-source
+        enableCrossOsArchive: True
+        fail-on-cache-miss: True
+
     - name: Get Cached MHLO Build
       id: cache-mhlo
       uses: actions/cache@v3
@@ -193,6 +219,14 @@ jobs:
       with:
         path:  enzyme-build
         key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-generic-build
+        fail-on-cache-miss: True
+    
+    - name: Get Cached Enzyme Source
+      id: cache-enzyme-source
+      uses: actions/cache@v3
+      with:
+        path:  mlir/Enzyme
+        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-source
         fail-on-cache-miss: True
 
     # Build Catalyst-Runtime
@@ -239,7 +273,10 @@ jobs:
               -DQUANTUM_ENABLE_BINDINGS_PYTHON=ON \
               -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
               -DPython3_NumPy_INCLUDE_DIRS=$(python${{ matrix.python_version }} -c "import numpy as np; print(np.get_include())") \
-              -DMLIR_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir
+              -DMLIR_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir \
+              -DMHLO_DIR=$GITHUB_WORKSPACE/mhlo-build/lib/cmake/mlir-hlo \
+              -DMHLO_BINARY_DIR=$GITHUB_WORKSPACE/mhlo-build/bin \
+              -DENZYME_SRC_DIR=$GITHUB_WORKSPACE/mlir/Enzyme \
 
         cmake --build quantum-build --target check-dialects -j$(nproc)
 

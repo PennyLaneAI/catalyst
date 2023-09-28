@@ -12,7 +12,6 @@ set(LIBS
     quantum-transforms
     MLIRGradient
     gradient-transforms
-
     MhloRegisterDialects
     StablehloRegister
     ${ALL_MHLO_PASSES}
