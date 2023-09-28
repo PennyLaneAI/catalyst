@@ -987,11 +987,6 @@ class Adjoint(HybridOp):
 class QCtrl(HybridOp):
     """Catalyst quantum ctrl operation"""
 
-    def _no_binder(self, *_):
-        raise RuntimeError("QCtrl does not support JAX binding")  # pragma: no cover
-
-    binder = _no_binder
-
     def __init__(
         self, *args, control_wire_tracers, control_value_tracers, work_wire_tracers, **kwargs
     ):
