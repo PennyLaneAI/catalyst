@@ -112,7 +112,7 @@ def test_adjoint_qctrl_func_simple(backend):
 def test_qctrl_adjoint_hybrid(backend):
     """Test the quantum control distribution over the group of operations"""
 
-    def circuit(theta, w1, w2, cw, ctrl_fn, adjoint_fn):
+    def circuit(theta, w2, cw, ctrl_fn, adjoint_fn):
         def _func():
             @while_loop(lambda s: s < w2)
             def _while_loop(s):
@@ -125,7 +125,7 @@ def test_qctrl_adjoint_hybrid(backend):
         return qml.state()
 
     verify_catalyst_ctrl_against_pennylane(
-        circuit, qml.device(backend, wires=3), 0.1, 0, 2, 2, with_adjoint_arg=True
+        circuit, qml.device(backend, wires=3), 0.1, 2, 2, with_adjoint_arg=True
     )
 
 
