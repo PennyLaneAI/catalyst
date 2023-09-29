@@ -46,7 +46,7 @@ jobs:
       with:
         path:  mhlo-build
         key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-generic-build
-    
+
     - name: Cache MHLO Source
       id: cache-mhlo-source
       uses: actions/cache@v3
@@ -147,7 +147,8 @@ jobs:
         export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
 
         cmake -S mlir/Enzyme/enzyme -B enzyme-build -G Ninja \
-              -DLLVM_DIR=llvm-build/lib/cmake/llvm
+              -DLLVM_DIR=llvm-build/lib/cmake/llvm \
+              -DENZYME_STATIC_LIB=ON
 
         cmake --build enzyme-build
 
@@ -220,7 +221,7 @@ jobs:
         path:  enzyme-build
         key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-generic-build
         fail-on-cache-miss: True
-    
+
     - name: Get Cached Enzyme Source
       id: cache-enzyme-source
       uses: actions/cache@v3
