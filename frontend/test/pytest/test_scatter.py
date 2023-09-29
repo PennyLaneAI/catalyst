@@ -16,6 +16,7 @@
 
 import jax
 import numpy as np
+import pytest
 from jax import numpy as jnp
 
 from catalyst import qjit
@@ -56,3 +57,7 @@ def test_matrix():
 
     res = multiple_index_multiply(jnp.array([[0, 1, 2], [3, 4, 5], [6, 7, 8]]))
     assert np.allclose(res, jnp.array([[0, 1, 2], [9, 12, 15], [18, 21, 24]]))
+
+
+if __name__ == "__main__":
+    pytest.main(["-x", __file__])
