@@ -673,7 +673,15 @@ def _qinst_lowering(
         float_param = float_params[0]
         return MultiRZOp([qubit.type for qubit in qubits], float_param, qubits).results
 
-    return CustomOp([qubit.type for qubit in qubits], float_params, qubits, name_attr).results
+    return CustomOp(
+        out_qubits=[qubit.type for qubit in qubits],
+        out_ctrl_qubits=[],
+        params=float_params,
+        in_qubits=qubits,
+        gate_name=name_attr,
+        in_ctrl_qubits=[],
+        in_ctrl_values=[],
+    ).results
 
 
 #

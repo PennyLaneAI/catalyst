@@ -203,7 +203,8 @@ class Gate_Op<string mnemonic, list<Trait> traits = []> :
     let extraClassDeclaration = extraBaseClassDeclaration;
 }
 
-def CustomOp : Gate_Op<"custom", [NoMemoryEffect, AttrSizedOperandSegments, DifferentiableGate]> {
+def CustomOp : Gate_Op<"custom", [NoMemoryEffect, AttrSizedOperandSegments,
+                                  AttrSizedResultSegments, DifferentiableGate]> {
     let summary = "A generic quantum gate on n qubits with m floating point parameters.";
     let description = [{
     }];
@@ -212,18 +213,30 @@ def CustomOp : Gate_Op<"custom", [NoMemoryEffect, AttrSizedOperandSegments, Diff
         Variadic<F64>:$params,
         Variadic<QubitType>:$in_qubits,
         StrAttr:$gate_name,
-        OptionalAttr<UnitAttr>:$adjoint
+        OptionalAttr<UnitAttr>:$adjoint,
+        Variadic<QubitType>:$in_ctrl_qubits,
+        Variadic<I1>:$in_ctrl_values
     );
 
     let results = (outs
-        Variadic<QubitType>:$out_qubits
+        Variadic<QubitType>:$out_qubits,
+        Variadic<QubitType>:$out_ctrl_qubits
     );
 
     let assemblyFormat = [{
-        $gate_name `(` $params `)` $in_qubits attr-dict `:` type($out_qubits)
+        $gate_name `(` $params `)` $in_qubits attr-dict ( `ctrl` $in_ctrl_qubits^ )?  ( `ctrlval` $in_ctrl_values^ )? `:` type($out_qubits) (`ctrl` type($out_ctrl_qubits)^ )?
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration # [{
+        mlir::ValueRange getCtrlValueOperands() {
+            return getInCtrlValues();
+        }
+        mlir::ValueRange getCtrlQubitOperands() {
+            return getInCtrlQubits();
+        }
+        mlir::ValueRange getCtrlQubitResults() {
+            return getOutCtrlQubits();
+        }
         mlir::ValueRange getDiffParams() {
             return getParams();
         }
@@ -255,6 +268,15 @@ def MultiRZOp : Gate_Op<"multirz", [NoMemoryEffect, DifferentiableGate]> {
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration # [{
+        mlir::ValueRange getCtrlValueOperands() {
+            return {};
+        }
+        mlir::ValueRange getCtrlQubitOperands() {
+            return {};
+        }
+        mlir::ValueRange getCtrlQubitResults() {
+            return {};
+        }
         mlir::ValueRange getDiffParams() {
             return getODSOperands(0);
         }
@@ -286,6 +308,18 @@ def QubitUnitaryOp : Gate_Op<"unitary", [NoMemoryEffect]> {
 
     let assemblyFormat = [{
         `(` $matrix `:` type($matrix) `)` $in_qubits attr-dict `:` type($out_qubits)
+    }];
+
+    let extraClassDeclaration = extraBaseClassDeclaration # [{
+        mlir::ValueRange getCtrlValueOperands() {
+            return {};
+        }
+        mlir::ValueRange getCtrlQubitOperands() {
+            return {};
+        }
+        mlir::ValueRange getCtrlQubitResults() {
+            return {};
+        }
     }];
 
     let hasVerifier = 1;
@@ -763,6 +797,28 @@ def StateOp : Measurement_Op<"state"> {
     let hasVerifier = 1;
 }
 
+def CtrlOp : Op<QuantumDialect, "ctrl", [SingleBlock, AttrSizedOperandSegments]> {
+    let summary = "Adds control of the enclosed operations";
+
+    let regions = (region SizedRegion<1>:$region);
+
+    let arguments = (ins
+      QuregType:$in_qreg,
+      Variadic<QubitType>:$ctrl_qubits,
+      Variadic<I1>:$ctrl_values
+    );
+
+    let results = (outs
+      QuregType:$out_qreg,
+      Variadic<QubitType>:$out_ctrl
+    );
+
+    let assemblyFormat = [{
+        `(` $in_qreg `,` $ctrl_qubits `,` $ctrl_values `)` attr-dict `:` type($out_qreg) `,` type($out_ctrl) $region
+    }];
+}
+
+
 def AdjointOp : Op<QuantumDialect, "adjoint", [SingleBlockImplicitTerminator<"YieldOp">]> {
     let summary = "Calculate the adjoint of the enclosed operations";
 
@@ -784,7 +840,7 @@ def AdjointOp : Op<QuantumDialect, "adjoint", [SingleBlockImplicitTerminator<"Yi
 }
 
 def YieldOp : Op<QuantumDialect, "yield",
-                [Pure, ReturnLike, Terminator, ParentOneOf<["AdjointOp"]>]> {
+                [Pure, ReturnLike, Terminator, ParentOneOf<["AdjointOp", "CtrlOp"]>]> {
     let summary = "Return results from quantum program regions";
 
     let arguments = (ins
