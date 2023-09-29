@@ -138,13 +138,13 @@ def test_decompose_multicontrolledx_in_while_loop():
 
         # pylint: disable=line-too-long
         # CHECK-NOT: name = "MultiControlledX"
-        # CHECK: [[state0:%[0-9]+]]{{:3}} = quantum.custom "Toffoli"() [[q2:%[0-9]+]], [[q4:%[0-9]+]], [[q3:%[0-9]+]]
+        # CHECK: [[state0:%[a-z_0-9]+]]{{:3}} = quantum.custom "Toffoli"() [[q2:%[0-9]+]], [[q4:%[0-9]+]], [[q3:%[0-9]+]]
         # CHECK-NOT: name = "MultiControlledX"
-        # CHECK: [[state1:%[0-9]+]]{{:3}} = quantum.custom "Toffoli"() [[q0:%[0-9]+]], [[q1:%[0-9]+]], [[state0]]{{#1}}
+        # CHECK: [[state1:%[a-z_0-9]+]]{{:3}} = quantum.custom "Toffoli"() [[q0:%[0-9]+]], [[q1:%[0-9]+]], [[state0]]{{#1}}
         # CHECK-NOT: name = "MultiControlledX"
-        # CHECK: [[state2:%[0-9]+]]{{:3}} = quantum.custom "Toffoli"() [[state0]]{{#0}}, [[state1]]{{#2}}, [[state0]]{{#2}}
+        # CHECK: [[state2:%[a-z_0-9]+]]{{:3}} = quantum.custom "Toffoli"() [[state0]]{{#0}}, [[state1]]{{#2}}, [[state0]]{{#2}}
         # CHECK-NOT: name = "MultiControlledX"
-        # CHECK: [[state3:%[0-9]+]]{{:3}} = quantum.custom "Toffoli"() [[state1]]{{#0}}, [[state1]]{{#1}}, [[state2]]{{#1}}
+        # CHECK: [[state3:%[a-z_0-9]+]]{{:3}} = quantum.custom "Toffoli"() [[state1]]{{#0}}, [[state1]]{{#1}}, [[state2]]{{#1}}
         # CHECK-NOT: name = "MultiControlledX"
         @while_loop(lambda v: v[0] < 10)
         def loop(v):
@@ -172,13 +172,13 @@ def test_decompose_multicontrolledx_in_for_loop():
 
         # pylint: disable=line-too-long
         # CHECK-NOT: name = "MultiControlledX"
-        # CHECK: [[state0:%[0-9]+]]{{:3}} = quantum.custom "Toffoli"() [[q2:%[0-9]+]], [[q4:%[0-9]+]], [[q3:%[0-9]+]]
+        # CHECK: [[state0:%[a-z_0-9]+]]{{:3}} = quantum.custom "Toffoli"() [[q2:%[0-9]+]], [[q4:%[0-9]+]], [[q3:%[0-9]+]]
         # CHECK-NOT: name = "MultiControlledX"
-        # CHECK: [[state1:%[0-9]+]]{{:3}} = quantum.custom "Toffoli"() [[q0:%[0-9]+]], [[q1:%[0-9]+]], [[state0]]{{#1}}
+        # CHECK: [[state1:%[a-z_0-9]+]]{{:3}} = quantum.custom "Toffoli"() [[q0:%[0-9]+]], [[q1:%[0-9]+]], [[state0]]{{#1}}
         # CHECK-NOT: name = "MultiControlledX"
-        # CHECK: [[state2:%[0-9]+]]{{:3}} = quantum.custom "Toffoli"() [[state0]]{{#0}}, [[state1]]{{#2}}, [[state0]]{{#2}}
+        # CHECK: [[state2:%[a-z_0-9]+]]{{:3}} = quantum.custom "Toffoli"() [[state0]]{{#0}}, [[state1]]{{#2}}, [[state0]]{{#2}}
         # CHECK-NOT: name = "MultiControlledX"
-        # CHECK: [[state3:%[0-9]+]]{{:3}} = quantum.custom "Toffoli"() [[state1]]{{#0}}, [[state1]]{{#1}}, [[state2]]{{#1}}
+        # CHECK: [[state3:%[a-z_0-9]+]]{{:3}} = quantum.custom "Toffoli"() [[state1]]{{#0}}, [[state1]]{{#1}}, [[state2]]{{#1}}
         # CHECK-NOT: name = "MultiControlledX"
         @for_loop(0, n, 1)
         def loop(_):
