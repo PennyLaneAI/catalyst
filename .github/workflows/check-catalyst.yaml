@@ -56,13 +56,6 @@ jobs:
     # Both the LLVM source and build folder are required for further dialect builds.
     # Caching is significantly faster than git cloning since LLVM is such a large repository.
 
-    - name: Cache LLVM Build
-      id: cache-llvm-build
-      uses: actions/cache@v3
-      with:
-        path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
-
     - name: Cache LLVM Source
       id: cache-llvm-source
       uses: actions/cache@v3
@@ -78,6 +71,13 @@ jobs:
         repository: llvm/llvm-project
         ref: ${{ needs.constants.outputs.llvm_version }}
         path: mlir/llvm-project
+
+    - name: Cache LLVM Build
+      id: cache-llvm-build
+      uses: actions/cache@v3
+      with:
+        path: llvm-build
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
 
     - name: Install Deps
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
@@ -113,6 +113,14 @@ jobs:
         key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-source
         enableCrossOsArchive: True
 
+    - name: Clone MHLO Submodule
+      if: steps.cache-mhlo-source.outputs.cache-hit != 'true'
+      uses: actions/checkout@v3
+      with:
+        repository: tensorflow/mlir-hlo
+        ref: ${{ needs.constants.outputs.mhlo_version }}
+        path: mlir/mlir-hlo
+
     - name: Cache MHLO Build
       id: cache-mhlo
       uses: actions/cache@v3
@@ -138,16 +146,6 @@ jobs:
         path: llvm-build
         key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
         fail-on-cache-miss: True
-
-    - name: Clone MHLO Submodule
-      if: |
-        steps.cache-mhlo.outputs.cache-hit != 'true' ||
-        steps.cache-mhlo-source.outputs.cache-hit != 'true'
-      uses: actions/checkout@v3
-      with:
-        repository: tensorflow/mlir-hlo
-        ref: ${{ needs.constants.outputs.mhlo_version }}
-        path: mlir/mlir-hlo
 
     - name: Install Deps
       if: steps.cache-mhlo.outputs.cache-hit != 'true'
@@ -179,22 +177,20 @@ jobs:
         key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-source
         enableCrossOsArchive: True
 
+    - name: Clone Enzyme Submodule
+      if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
+      uses: actions/checkout@v3
+      with:
+        repository: EnzymeAD/Enzyme
+        ref: ${{ needs.constants.outputs.enzyme_version }}
+        path: mlir/Enzyme
+
     - name: Cache Enzyme Build
       id: cache-enzyme-build
       uses: actions/cache@v3
       with:
         path: enzyme-build
         key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-build
-
-    - name: Clone Enzyme Submodule
-      if: |
-        steps.cache-enzyme-source.outputs.cache-hit != 'true' ||
-        steps.cache-enzyme-build.outputs.cache-hit != 'true'
-      uses: actions/checkout@v3
-      with:
-        repository: EnzymeAD/Enzyme
-        ref: ${{ needs.constants.outputs.enzyme_version }}
-        path: mlir/Enzyme
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
