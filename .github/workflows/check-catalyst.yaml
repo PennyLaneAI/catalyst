@@ -104,7 +104,7 @@ jobs:
     steps:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
-    
+
     - name: Cache MHLO Source
       id: cache-mhlo-source
       uses: actions/cache@v3
@@ -171,16 +171,34 @@ jobs:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
+    - name: Cache Enzyme Source
+      id: cache-enzyme-source
+      uses: actions/cache@v3
+      with:
+        path:  mlir/Enzyme
+        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-source
+        enableCrossOsArchive: True
+
     - name: Cache Enzyme Build
-      id: cache-enzyme
+      id: cache-enzyme-build
       uses: actions/cache@v3
       with:
         path: enzyme-build
         key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-build
 
+    - name: Clone Enzyme Submodule
+      if: |
+        steps.cache-enzyme-source.outputs.cache-hit != 'true' ||
+        steps.cache-enzyme-build.outputs.cache-hit != 'true'
+      uses: actions/checkout@v3
+      with:
+        repository: EnzymeAD/Enzyme
+        ref: ${{ needs.constants.outputs.enzyme_version }}
+        path: mlir/Enzyme
+
     - name: Get Cached LLVM Source
       id: cache-llvm-source
-      if: steps.cache-enzyme.outputs.cache-hit != 'true'
+      if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
       uses: actions/cache@v3
       with:
         path: mlir/llvm-project
@@ -190,29 +208,20 @@ jobs:
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
-      if: steps.cache-enzyme.outputs.cache-hit != 'true'
+      if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
       uses: actions/cache@v3
       with:
         path: llvm-build
         key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
         fail-on-cache-miss: True
 
-    - name: Clone Enzyme Submodule
-      if: |
-        steps.cache-enzyme.outputs.cache-hit != 'true'
-      uses: actions/checkout@v3
-      with:
-        repository: EnzymeAD/Enzyme
-        ref: ${{ needs.constants.outputs.enzyme_version }}
-        path: mlir/Enzyme
-
     - name: Install Deps
-      if: steps.cache-enzyme.outputs.cache-hit != 'true'
+      if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
       run: |
         sudo apt-get install -y cmake ninja-build clang lld
 
     - name: Build Enzyme
-      if: steps.cache-enzyme.outputs.cache-hit != 'true'
+      if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
       run: |
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         ENZYME_BUILD_DIR="$(pwd)/enzyme-build" \
@@ -249,7 +258,7 @@ jobs:
         path: llvm-build
         key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
         fail-on-cache-miss: True
-    
+
     - name: Get Cached MHLO Source
       id: cache-mhlo-source
       uses: actions/cache@v3
@@ -258,13 +267,30 @@ jobs:
         key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-source
         enableCrossOsArchive: True
         fail-on-cache-miss: True
-    
+
     - name: Get Cached MHLO Build
       id: cache-mhlo
       uses: actions/cache@v3
       with:
         path: mhlo-build
         key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-build
+        fail-on-cache-miss: True
+
+    - name: Get Cached Enzyme Source
+      id: cache-enzyme-source
+      uses: actions/cache@v3
+      with:
+        path:  mlir/Enzyme
+        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-source
+        enableCrossOsArchive: True
+        fail-on-cache-miss: True
+
+    - name: Get Cached Enzyme Build
+      id: cache-enzyme-build
+      uses: actions/cache@v3
+      with:
+        path: enzyme-build
+        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-build
         fail-on-cache-miss: True
 
     - name: Cache CCache
@@ -278,21 +304,12 @@ jobs:
         key: ${{ runner.os }}-ccache-${{ github.run_id }}
         restore-keys: ${{ runner.os }}-ccache-
 
-    - name: Clone Enzyme Submodule
-      if: |
-        steps.cache-enzyme.outputs.cache-hit != 'true'
-      uses: actions/checkout@v3
-      with:
-        repository: EnzymeAD/Enzyme
-        ref: ${{ needs.constants.outputs.enzyme_version }}
-        path: mlir/Enzyme
-
     - name: Build MLIR Dialects
       run: |
         CCACHE_DIR="$(pwd)/.ccache" \
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         MHLO_BUILD_DIR="$(pwd)/mhlo-build" \
-        ENZYME_SRC_DIR="$(pwd)/Enzyme" \
+        ENZYME_BUILD_DIR="$(pwd)/enzyme-build" \
         DIALECTS_BUILD_DIR="$(pwd)/quantum-build" \
         make dialects
 
