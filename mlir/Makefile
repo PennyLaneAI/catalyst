@@ -77,7 +77,7 @@ enzyme:
 		-DCMAKE_C_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
 		-DCMAKE_CXX_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER)
 
-	cmake --build $(ENZYME_BUILD_DIR)
+	cmake --build $(ENZYME_BUILD_DIR) --target EnzymeStatic-18
 
 .PHONY: dialects
 dialects:

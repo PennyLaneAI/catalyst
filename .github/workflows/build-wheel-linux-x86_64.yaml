@@ -150,7 +150,7 @@ jobs:
               -DLLVM_DIR=llvm-build/lib/cmake/llvm \
               -DENZYME_STATIC_LIB=ON
 
-        cmake --build enzyme-build
+        cmake --build enzyme-build --target EnzymeStatic-18
 
   catalyst-linux-wheels-x86-64:
     needs: [constants, build-dependencies]
