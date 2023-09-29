@@ -32,7 +32,7 @@ def circuit(n: int):
     # CHECK:   ^bb0([[v0:%.+]]: tensor<i64>, [[array0:%.+]]: !quantum.reg):
     # CHECK:       [[v0p:%.+]] = stablehlo.add [[v0]]
     # CHECK:       [[q0:%.+]] = quantum.extract [[array0]][{{.+}}]
-    # CHECK:       [[q1:%[a-zA-Z0-9_]]] = quantum.custom "PauliX"() [[q0]]
+    # CHECK:       [[q1:%[a-zA-Z0-9_]+]] = quantum.custom "PauliX"() [[q0]]
     # CHECK:       [[array1:%.+]] = quantum.insert [[array0]][{{.+}}], [[q1]]
     # CHECK:       scf.yield [[v0p]], [[array1]]
     @while_loop(lambda v: v[0] < v[1])
@@ -60,9 +60,9 @@ def circuit_outer_scope_reference(n: int):
     # CHECK:       scf.condition([[cond]]) [[v0]], [[array_inner]]
 
     # CHECK:   ^bb0([[v0:%.+]]: tensor<i64>, [[array_inner:%.+]]: !quantum.reg):
-    # CHECK:       [[v0p:%[a-zA-Z0-9_]]] = stablehlo.add [[v0]]
+    # CHECK:       [[v0p:%[a-zA-Z0-9_]+]] = stablehlo.add [[v0]]
     # CHECK:       [[q0:%.+]] = quantum.extract [[array_inner]][ 0]
-    # CHECK:       [[q1:%[a-zA-Z0-9_]]] = quantum.custom "PauliX"() [[q0]]
+    # CHECK:       [[q1:%[a-zA-Z0-9_]+]] = quantum.custom "PauliX"() [[q0]]
     # CHECK:       [[array_inner_2:%.+]] = quantum.insert [[array_inner]][ 0], [[q1]]
     # CHECK:       scf.yield [[v0p]], [[array_inner_2]]
     @while_loop(lambda i: i < n)
