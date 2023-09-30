@@ -224,7 +224,7 @@ def CustomOp : Gate_Op<"custom", [NoMemoryEffect, AttrSizedOperandSegments, Diff
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration # [{
-        mlir::ValueRange getDiffParams() {
+        mlir::ValueRange getAllParams() {
             return getParams();
         }
         size_t getDiffOperandIdx() {
@@ -255,7 +255,7 @@ def MultiRZOp : Gate_Op<"multirz", [NoMemoryEffect, DifferentiableGate]> {
     }];
 
     let extraClassDeclaration = extraBaseClassDeclaration # [{
-        mlir::ValueRange getDiffParams() {
+        mlir::ValueRange getAllParams() {
             return getODSOperands(0);
         }
         size_t getDiffOperandIdx() {
@@ -264,7 +264,7 @@ def MultiRZOp : Gate_Op<"multirz", [NoMemoryEffect, DifferentiableGate]> {
     }];
 }
 
-def QubitUnitaryOp : Gate_Op<"unitary", [NoMemoryEffect]> {
+def QubitUnitaryOp : Gate_Op<"unitary", [NoMemoryEffect, ParametrizedGate]> {
     let summary = "Apply an arbitrary fixed unitary matrix";
     let description = [{
         The `quantum.unitary` operation applies an arbitrary fixed unitary matrix to the
@@ -286,6 +286,12 @@ def QubitUnitaryOp : Gate_Op<"unitary", [NoMemoryEffect]> {
 
     let assemblyFormat = [{
         `(` $matrix `:` type($matrix) `)` $in_qubits attr-dict `:` type($out_qubits)
+    }];
+
+    let extraClassDeclaration = extraBaseClassDeclaration # [{
+        mlir::ValueRange getAllParams() {
+            return getMatrix();
+        }
     }];
 
     let hasVerifier = 1;

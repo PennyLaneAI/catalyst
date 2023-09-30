@@ -58,7 +58,24 @@ def QuantumGate : OpInterface<"QuantumGate"> {
     }];
 }
 
-def DifferentiableGate : OpInterface<"DifferentiableGate", [QuantumGate]> {
+def ParametrizedGate : OpInterface<"ParametrizedGate", [QuantumGate]> {
+    let description = [{
+        This interface provides a generic way to interact with parametrized
+        quantum instructions. These are quantum operations with differentiable
+        gate parameters.
+    }];
+
+    let cppNamespace = "::catalyst::quantum";
+
+    let methods = [
+        InterfaceMethod<
+            "Return all operands which are considered gate parameters.",
+            "mlir::ValueRange", "getAllParams"
+        >,
+    ];
+}
+
+def DifferentiableGate : OpInterface<"DifferentiableGate", [ParametrizedGate]> {
     let description = [{
         This interface provides a generic way to interact with differentiable
         quantum instructions. These are quantum operations with differentiable
@@ -70,7 +87,10 @@ def DifferentiableGate : OpInterface<"DifferentiableGate", [QuantumGate]> {
     let methods = [
         InterfaceMethod<
             "Return all operands which are considered differentiable gate parameters.",
-            "mlir::ValueRange", "getDiffParams"
+            "mlir::ValueRange", "getDiffParams", (ins), /*methodBody=*/[{}],
+            /*defaultImplementation=*/[{
+                return $_op.getAllParams();
+            }]
         >,
         InterfaceMethod<
             "Return the starting index at which to find differentiable operands in the Operation*."
