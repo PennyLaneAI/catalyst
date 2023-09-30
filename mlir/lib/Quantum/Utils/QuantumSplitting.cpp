@@ -91,14 +91,15 @@ void AugmentedCircuitGenerator::generate(Region &region, OpBuilder &builder)
         else if (auto extractOp = dyn_cast<quantum::ExtractOp>(op)) {
             cacheDynamicWire(extractOp, builder);
         }
-        else if (auto gate = dyn_cast<quantum::DifferentiableGate>(op)) {
-            ValueRange diffParams = gate.getDiffParams();
-            if (!diffParams.empty()) {
-                for (Value param : diffParams) {
-                    builder.create<ListPushOp>(gate.getLoc(), oldToCloned.lookupOrDefault(param),
-                                               cache.paramVector);
-                }
-            }
+        else if (auto gate = dyn_cast<quantum::ParametrizedGate>(op)) {
+            ValueRange params = gate.getAllParams();
+            // TODO: Add capability to cache tensors here
+            // if (!params.empty()) {
+            //     for (Value param : params) {
+            //         builder.create<ListPushOp>(gate.getLoc(), oldToCloned.lookupOrDefault(param),
+            //                                    cache.paramVector);
+            //     }
+            // }
         }
         else if (auto gate = dyn_cast<quantum::QubitUnitaryOp>(op)) {
             Value matrix = gate.getMatrix();
@@ -154,7 +155,7 @@ void AugmentedCircuitGenerator::generate(Region &region, OpBuilder &builder)
             }
         }
         else if (isa<QuantumDialect>(op.getDialect())) {
-            // Any quantum op other than a differentiable gate/insert/extract is ignored.
+            // Any quantum op other than a parametrized gate/insert/extract is ignored.
         }
         else if (isClassicalSCFOp(op)) {
             // Purely classical SCF ops should be treated as any other purely classical op, but
