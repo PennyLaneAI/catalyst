@@ -382,7 +382,7 @@ array(0.)
 >>> circuit(0.5)  # the precompiled quantum function is called
 array(0.)
 
-.. label:: ahead_of_time
+.. _ahead_of_time
 
 Ahead-of-time
 -------------

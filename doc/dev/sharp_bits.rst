@@ -682,13 +682,13 @@ Compatibility with PennyLane transforms
 ---------------------------------------
 
 PennyLane provides a wide variety of
-:doc:`transforms <pennylane/code/qml_transforms>`_ that
+:doc:`transforms <pennylane:code/qml_transforms>` that
 convert a circuit to one or more circuits.
 
 As a general rule of thumb, transforms that result in a single circuit are
 generally applied before the QNode decorator, while transforms that result in
 multiple circuits to be executed (**batch transforms**, such as
-:func:`~pennylane.gradients.param_shift`) are applied after the QNode decorator.
+:func:`~pennylane.transforms.split_non_commuting`) are applied after the QNode decorator.
 
 Currently, batch transforms and transforms that apply *after* the QNode decorator will
 not work with Catalyst:
@@ -709,7 +709,7 @@ However, transforms that are applied *before* the QNode decorator will work with
 Catalyst, as long as:
 
 - The circuit does not include any Catalyst-specific features, such
-as Catalyst control flow or measurement,
+  as Catalyst control flow or measurement,
 
 - AutoGraph is disabled, and
 
