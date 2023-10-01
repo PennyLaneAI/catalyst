@@ -942,3 +942,11 @@ we can use a while loop:
 
 >>> fibonacci(10)
 array(89)
+
+.. 
+  Compatibility with broadcasting
+
+.. 
+  Differences from PennyLane
+  - Finite shot measurement statistics
+  - catalyst.measure
