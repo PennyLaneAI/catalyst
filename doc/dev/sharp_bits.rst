@@ -142,7 +142,8 @@ The error occurred while tracing the function f at <ipython-input-15-2aa7bf60efb
 This concrete value was not available in Python because it depends on the value of the argument x.
 See https://jax.readthedocs.io/en/latest/errors.html#jax.errors.TracerBoolConversionError
 
-This function will fail, as the Python ``if`` statement cannot accept a dynamic variable (a JAX tracer) as an argument.
+This function will fail, as the Python ``if`` statement cannot accept a
+dynamic variable (a JAX tracer) as an argument.
 
 Instead, we can use Catalyst control flow :func:`~.cond` here:
 
@@ -225,7 +226,8 @@ array(1.16)
 array(3.04)
 
 However, if we change the argument types in a way where Catalyst can't perform
-auto-type promotion before passing the argument to the comppiled function (e.g., passing a float instead of an integer), recompilation will occur:
+auto-type promotion before passing the argument to the comppiled function
+(e.g., passing a float instead of an integer), recompilation will occur:
 
 >>> f(0.15, 0.65)
 Tracing occuring
@@ -290,7 +292,9 @@ directly:
 ...     return qml.expval(qml.PauliZ(0))
 Tracing occurring
 
-Note that compilation now happens on **function definition**. We can execute the compiled function as long as the arguments match the specified shapes and type:
+Note that compilation now happens on **function definition**. We can execute
+the compiled function as long as the arguments match the specified shapes and
+type:
 
 >>> circuit(jnp.array([0.1, 0.2, 0.3]))
 array(0.99500417)
@@ -337,8 +341,9 @@ This includes:
   output is purely dependent only on function inputs.
 
 * **In-place array updates**: Rather than using in-place array updates, the
-  syntax ``new_array = jax_array.at[index].set(value)`` should be used.
-  For more details, see `jax.numpy.ndarray.at <https://jax.readthedocs.io/en/latest/_autosummary  /jax.numpy.ndarray.at.html>`__.
+    syntax ``new_array = jax_array.at[index].set(value)`` should be used. For
+    more details, see `jax.numpy.ndarray.at
+    <https://jax.readthedocs.io/en/latest/_autosummary /jax.numpy.ndarray.at.html>`__.
 
 * **Lack of stateful random number generators**: In JAX, random number
   generators need to be explicitly created within the :func:`@qjit <~.qjit>` function
@@ -720,7 +725,9 @@ are registered as Pytrees with compatible data types.
 >>> f(obj)
 TypeError: Unsupported argument type: <class '__main__.MyObject'>
 
-By registring it as a Pytree (that is, specifying to JAX the dynamic and static compile-time information, we make this object compatible with Catalyst:
+By registring it as a Pytree (that is, specifying to JAX the dynamic and
+static compile-time information, we make this object compatible with
+Catalyst:
 
 >>> def flatten_fn(my_object):
 ...     data = (my_object.x,) # Dynamic variables
