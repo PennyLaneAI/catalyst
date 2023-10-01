@@ -28,7 +28,7 @@ helpful when using Catalyst.
 Debugging functions
 -------------------
 
-Catalyst provides 
+Catalyst provides the following functions to help with debugging:
 
 .. raw:: html
 
@@ -61,7 +61,7 @@ with just-in-time (JIT) compilation.
    type hints and :ref:`ahead-of-time mode <ahead_of_time>`), Catalyst
    will 'capture' the entire hybrid workflow with **placeholder variables of
    unknown value** used as the function arguments
-   (the **runtime arguments**). 
+   (the **runtime arguments**).
 
    These symbolic tracer objects represent **dynamic variable**, and are used
    to determine how the JIT compiled function transforms its inputs to
@@ -149,15 +149,12 @@ Instead, we can use Catalyst control flow :func:`~.cond` here:
 
 >>> @qjit
 ... def f(x):
-... 
 ...     @cond(x > 5.)
 ...     def g():
 ...         return x / 2
-... 
 ...     @g.otherwise
 ...     def h():
 ...         return x
-...     
 ...     return g() ** 2
 >>> f(2.)
 array(4.)
@@ -309,6 +306,128 @@ UserWarning: Provided arguments did not match declared signature, recompiling...
 Tracing occurring
 array(0.16996714)
 
+Try and compile the full workflow
+---------------------------------
+
+When porting your PennyLane code to work with Catalyst and :func:`@qjit <~.qjit>`, the
+biggest performance advantage you will see is if you qjit
+your *entire* workflow, not just the QNodes. So think about putting
+everything inside your JIT-compiled function, including for loops
+(including optimization loops), gradient calls, etc.
+
+Consider the following PennyLane example, where we have a parametrized
+circuit, are measuring an expectation value, and are optimizing the result:
+
+.. code-block:: python
+
+    dev = qml.device("default.qubit", wires=4)
+
+    @qml.qnode(dev)
+    def cost(weights, data):
+        qml.AngleEmbedding(data, wires=range(4))
+
+        for x in weights:
+            # each trainable layer
+            for i in range(4):
+                # for each wire
+                if x[i] > 0:
+                    qml.RX(x[i], wires=i)
+                elif x[i] < 0:
+                    qml.RY(x[i], wires=i)
+
+            for i in range(4):
+                qml.CNOT(wires=[i, (i + 1) % 4])
+
+        return qml.expval(qml.PauliZ(0) + qml.PauliZ(3))
+
+    weights = jnp.array(2 * np.random.random([5, 4]) - 1)
+    data = jnp.array(np.random.random([4]))
+
+    opt = jaxopt.GradientDescent(cost, stepsize=0.4)
+
+    params = weights
+    state = opt.init_state(params)
+
+    for i in range(200):
+        (params, _) = tuple(opt.update(params, state, data))
+
+Using PennyLane v0.32 on Google Colab with the Python 3 Google Compute Engine
+backend, this optimization takes 3min 28s ± 2.05s to complete.
+
+We can rewrite this QNode to use Catalyst control flow, and compile
+it using Catalyst:
+
+.. code-block:: python
+
+    dev = qml.device("lightning.qubit", wires=4)
+
+    @qjit
+    @qml.qnode(dev)
+    def cost(weights, data):
+        qml.AngleEmbedding(data, wires=range(4))
+
+        def layer_loop(i):
+            x = weights[i]
+            def wire_loop(j):
+
+                @cond(x[j] > 0)
+                def trainable_gate():
+                    qml.RX(x[j], wires=j)
+
+                @trainable_gate.else_if(x[j] < 0)
+                def negative_gate():
+                    qml.RY(x[j], wires=j)
+
+                trainable_gate.otherwise(lambda: None)
+                trainable_gate()
+
+            def cnot_loop(j):
+                qml.CNOT(wires=[j, jnp.mod((j + 1), 4)])
+
+            for_loop(0, 4, 1)(wire_loop)()
+            for_loop(0, 4, 1)(cnot_loop)()
+
+        for_loop(0, jnp.shape(weights)[0], 1)(layer_loop)()
+        return qml.expval(qml.PauliZ(0) + qml.PauliZ(3))
+
+    opt = jaxopt.GradientDescent(cost, stepsize=0.4)
+
+    params = weights
+    state = opt.init_state(params)
+
+    for i in range(200):
+        (params, _) = tuple(opt.update(params, state, data))
+
+With the quantum function qjit-compiled, the optimization loop
+now takes 16.4s ± 1.51s.
+
+However, while the quantum function is now compiled, and the compiled function
+is called to compute cost and gradient values, the optimization loop is still
+occuring in Python.
+
+Instead, we can write the optimization loop itself as a function and decorate
+it with ``@qjit``; this will compile the optimization loop, and allow the full
+optimization to take place within Catalyst:
+
+.. code-block:: python
+
+    @qjit
+    def optimize(init_weights, data, steps):
+        def loss(x):
+            dy = grad(cost, argnum=0)(x, data)[0]
+            return (cost(x, data), dy)
+
+        opt = jaxopt.GradientDescent(loss, stepsize=0.4, value_and_grad=True)
+        update_step = lambda i, *args: tuple(opt.update(*args))
+
+        params = init_weights
+        state = opt.init_state(params)
+
+        return for_loop(0, steps, 1)(update_step)(params, state)[0]
+
+The optimization now takes 574ms ± 43.1ms to complete when using 200 steps.
+Note that, to compute gradients within a qjit-compiled function,
+the :func:`catalyst.grad` function must be used.
 
 JAX support and restrictions
 ----------------------------
@@ -348,7 +467,7 @@ This includes:
 * **Lack of stateful random number generators**: In JAX, random number
   generators need to be explicitly created within the :func:`@qjit <~.qjit>` function
   using ``jax.random.PRNGKey(int)``:
-  
+
   >>> @qjit()
   ... def f():
   ...     key = jax.random.PRNGKey(0)
@@ -365,6 +484,79 @@ This includes:
 
 For more details, please see the `JAX documentation
 <https://jax.readthedocs.io/en/latest/notebooks/Common_Gotchas_in_JAX.html>`__.
+
+JAX integration
+---------------
+
+Compiled functions remain JAX compatible, and you can call JAX transformations
+on them, such as ``jax.grad`` and ``jax.vmap``. You can even call ``jax.jit``
+on functions that call qjit-compiled functions:
+
+>>> dev = qml.device("lightning.qubit", wires=2)
+>>> @qjit
+... @qml.qnode(dev)
+... def circuit(x):
+...     qml.RX(x, wires=0)
+...     return qml.expval(qml.PauliZ(0))
+>>> @jax.jit
+... def workflow(y):
+...     return jax.grad(circuit)(jnp.sin(y))
+>>> workflow(0.6)
+Array(-0.53511382, dtype=float64, weak_type=True)
+
+However, a ``jax.jit`` function calling a ``qjit`` function will always result
+in a callback to Python, so will be slower than if the function was purely compiled
+using ``jax.jit`` or ``qjit``.
+
+If you want to compile some functionality that is not currently Catalyst
+compatible, or you want to make use of JAX-supported hardware such as TPUs
+for classical processing, mixing ``jax.jit`` and ``qjit`` will allow this.
+However, if possible, try to always use ``qjit`` to compile your entire
+workflow.
+
+Internal QJIT transformations
+-----------------------------
+
+Inside of a qjit-compiled function, JAX transformations
+(``jax.grad``, ``jax.jacobian``, ``jax.vmap``, etc.)
+can be used **as long as they are not applied to quantum processing**.
+
+>>> @qjit
+... def f(x):
+...     def g(y):
+...         return -jnp.sin(y) ** 2
+...     return jax.grad(g)(x)
+>>> f(0.4)
+array(-0.71735609)
+
+If they are applied to quantum processing, an error will occur:
+
+>>> @qjit
+... def f(x):
+...     @qml.qnode(dev)
+...     def g(y):
+...         qml.RX(y, wires=0)
+...         return qml.expval(qml.PauliX(0))
+...     return jax.grad(lambda y: g(y) ** 2)(x)
+>>> f(0.4)
+NotImplementedError: must override
+
+Instead, only Catalyst transformations will work when applied to hybrid
+quantum-classical processing:
+
+>>> @qjit
+... def f(x):
+...     @qml.qnode(dev)
+...     def g(y):
+...         qml.RX(y, wires=0)
+...         return qml.expval(qml.PauliZ(0))
+...     return grad(lambda y: g(y) ** 2)(x)
+>>> f(0.4)
+array(-0.71735609)
+
+Always use the equivalent Catalyst transformation
+(:func:`catalyst.grad`, :func:`catalyst.jacobian`, :func:`catalyst.vjp`, :func:`catalyst.jvp`)
+inside of a qjit-compiled function.
 
 Inspecting and drawing circuits
 -------------------------------
@@ -409,7 +601,7 @@ For example,
 
 >>> print(qml.draw(circuit)(0.3))
 0: ──RX(0.30)─╭●─╭●─────────RX(0.60)─╭●──RX(1.20)─╭●─┤  <Z>
-1: ──RY(0.09)─╰X─╰RX(0.27)──RY(0.36)─╰X──RY(1.44)─╰X─┤     
+1: ──RY(0.09)─╰X─╰RX(0.27)──RY(0.36)─╰X──RY(1.44)─╰X─┤
 
 At the moment, additional PennyLane `circuit inspection functions
 <https://docs.pennylane.ai/en/stable/introduction/inspecting_circuits.html>`__
@@ -486,207 +678,10 @@ when working with classical control in Catalyst.
   accept any arguments.
 
 
-.. 
+..
     PennyLane transformations
     -------------------------
     Todo.
-
-Try and compile the full workflow
----------------------------------
-
-When porting your PennyLane code to work with Catalyst and :func:`@qjit <~.qjit>`, the
-biggest performance advantage you will see is if you qjit
-your *entire* workflow, not just the QNodes. So think about putting
-everything inside your JIT-compiled function, including for loops
-(including optimization loops), gradient calls, etc.
-
-Consider the following PennyLane example, where we have a parametrized
-circuit, are measuring an expectation value, and are optimizing the result:
-
-.. code-block:: python
-
-    dev = qml.device("default.qubit", wires=4)
-
-    @qml.qnode(dev)
-    def cost(weights, data):
-        qml.AngleEmbedding(data, wires=range(4))
-
-        for x in weights:
-            # each trainable layer
-            for i in range(4):
-                # for each wire
-                if x[i] > 0:
-                    qml.RX(x[i], wires=i)
-                elif x[i] < 0:
-                    qml.RY(x[i], wires=i)
-
-            for i in range(4):
-                qml.CNOT(wires=[i, (i + 1) % 4])
-
-        return qml.expval(qml.PauliZ(0) + qml.PauliZ(3))
-
-    weights = jnp.array(2 * np.random.random([5, 4]) - 1)
-    data = jnp.array(np.random.random([4]))
-
-    opt = jaxopt.GradientDescent(cost, stepsize=0.4)
-
-    params = weights
-    state = opt.init_state(params)
-
-    for i in range(200):
-        (params, _) = tuple(opt.update(params, state, data))
-
-Using PennyLane v0.32 on Google Colab with the Python 3 Google Compute Engine
-backend, this optimization takes 3min 28s ± 2.05s to complete.
-
-We can rewrite this QNode to use Catalyst control flow, and compile
-it using Catalyst:
-
-.. code-block:: python
-
-    dev = qml.device("lightning.qubit", wires=4)
-
-    @qjit
-    @qml.qnode(dev)
-    def cost(weights, data):
-        qml.AngleEmbedding(data, wires=range(4))
-
-        def layer_loop(i):
-            x = weights[i]
-            def wire_loop(j):
-                
-                @cond(x[j] > 0)
-                def trainable_gate():
-                    qml.RX(x[j], wires=j)
-
-                @trainable_gate.else_if(x[j] < 0)
-                def negative_gate():
-                    qml.RY(x[j], wires=j)
-
-                trainable_gate.otherwise(lambda: None)
-                trainable_gate()
-
-            def cnot_loop(j):
-                qml.CNOT(wires=[j, jnp.mod((j + 1), 4)])
-
-            for_loop(0, 4, 1)(wire_loop)()
-            for_loop(0, 4, 1)(cnot_loop)()
-
-        for_loop(0, jnp.shape(weights)[0], 1)(layer_loop)()
-        return qml.expval(qml.PauliZ(0) + qml.PauliZ(3))
-
-    opt = jaxopt.GradientDescent(cost, stepsize=0.4)
-
-    params = weights
-    state = opt.init_state(params)
-
-    for i in range(200):
-        (params, _) = tuple(opt.update(params, state, data))
-
-With the quantum function qjit-compiled, the optimization loop
-now takes 16.4s ± 1.51s.
-
-However, while the quantum function is now compiled, and the compiled function
-is called to compute cost and gradient values, the optimization loop is still
-occuring in Python.
-
-Instead, we can write the optimization loop itself as a function and decorate
-it with ``@qjit``; this will compile the optimization loop, and allow the full
-optimization to take place within Catalyst:
-
-.. code-block:: python
-
-    @qjit
-    def optimize(init_weights, data, steps):
-        def loss(x):
-            dy = grad(cost, argnum=0)(x, data)[0]
-            return (cost(x, data), dy)
-
-        opt = jaxopt.GradientDescent(loss, stepsize=0.4, value_and_grad=True)
-        update_step = lambda i, *args: tuple(opt.update(*args))
-
-        params = init_weights
-        state = opt.init_state(params)
-
-        return for_loop(0, steps, 1)(update_step)(params, state)[0]
-
-The optimization now takes 574ms ± 43.1ms to complete when using 200 steps.
-Note that, to compute gradients within a qjit-compiled function,
-the :func:`catalyst.grad` function must be used.
-
-JAX integration
----------------
-
-Compiled functions remain JAX compatible, and you can call JAX transformations
-on them, such as ``jax.grad`` and ``jax.vmap``. You can even call ``jax.jit``
-on functions that call qjit-compiled functions:
-
->>> dev = qml.device("lightning.qubit", wires=2)
->>> @qjit
-... @qml.qnode(dev)
-... def circuit(x):
-...     qml.RX(x, wires=0)
-...     return qml.expval(qml.PauliZ(0))
->>> @jax.jit
-... def workflow(y):
-...     return jax.grad(circuit)(jnp.sin(y))
->>> workflow(0.6)
-Array(-0.53511382, dtype=float64, weak_type=True)
-
-However, a ``jax.jit`` function calling a ``qjit`` function will always result
-in a callback to Python, so will be slower than if the function was purely compiled
-using ``jax.jit`` or ``qjit``.
-
-If you want to compile some functionality that is not currently Catalyst
-compatible, or you want to make use of JAX-supported hardware such as TPUs
-for classical processing, mixing ``jax.jit`` and ``qjit`` will allow this.
-However, if possible, try to always use ``qjit`` to compile your entire
-workflow.
-
-Internal QJIT transformations
------------------------------
-
-Inside of a qjit-compiled function, JAX transformations
-(``jax.grad``, ``jax.jacobian``, ``jax.vmap``, etc.)
-can be used **as long as they are not applied to quantum processing**.
-
->>> @qjit
-... def f(x):
-...     def g(y):
-...         return -jnp.sin(y) ** 2
-...     return jax.grad(g)(x)
->>> f(0.4)
-array(-0.71735609)
-
-If they are applied to quantum processing, an error will occur:
-
->>> @qjit
-... def f(x):
-...     @qml.qnode(dev)
-...     def g(y):
-...         qml.RX(y, wires=0)
-...         return qml.expval(qml.PauliX(0))
-...     return jax.grad(lambda y: g(y) ** 2)(x)
->>> f(0.4)
-NotImplementedError: must override
-
-Instead, only Catalyst transformations will work when applied to hybrid
-quantum-classical processing:
-
->>> @qjit
-... def f(x):
-...     @qml.qnode(dev)
-...     def g(y):
-...         qml.RX(y, wires=0)
-...         return qml.expval(qml.PauliZ(0))
-...     return grad(lambda y: g(y) ** 2)(x)
->>> f(0.4)
-array(-0.71735609)
-
-Always use the equivalent Catalyst transformation
-(:func:`catalyst.grad`, :func:`catalyst.jacobian`, :func:`catalyst.vjp`, :func:`catalyst.jvp`)
-inside of a qjit-compiled function.
-
 
 Function argument restrictions
 ------------------------------
