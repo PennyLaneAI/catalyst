@@ -6,7 +6,7 @@ familiar with when exploring quantum computing (such as Python, NumPy, JAX,
 and PennyLane), while unlocking faster execution and the ability to run
 hybrid quantum-classical workflows on accelerator devices.
 
-Similar to JAX, Catalyst does this via the :func:`@qjit <~.qjit>` decorator, which captures
+Similar to JAX, Catalyst does this via the :func:`@qjit <.qjit>` decorator, which captures
 hybrid programs written in Python, PennyLane, and JAX, and compiles them to
 native machine code --- preserving important aspects like conditional
 branches and classical control.
@@ -53,11 +53,11 @@ An important distinction to make in Catalyst, which we typically don't have to
 worry about with standard PennyLane, is the concept of **compile time**
 vs. **runtime**.
 
-Very roughly, the following three processes occur when using the :func:`@qjit <~.qjit>` decorator
+Very roughly, the following three processes occur when using the :func:`@qjit <.qjit>` decorator
 with just-in-time (JIT) compilation.
 
-#. **Program capture or tracing:** When the :func:`@qjit <~.qjit>` decorated function is
-   first called (or, when the :func:`@qjit <~.qjit>` is first applied if using function
+#. **Program capture or tracing:** When the :func:`@qjit <.qjit>` decorated function is
+   first called (or, when the :func:`@qjit <.qjit>` is first applied if using function
    type hints and :ref:`ahead-of-time mode <ahead_of_time>`), Catalyst
    will 'capture' the entire hybrid workflow with **placeholder variables of
    unknown value** used as the function arguments
@@ -370,12 +370,12 @@ Inspecting and drawing circuits
 -------------------------------
 
 A useful tool for debugging quantum algorithms is the ability to draw them. Currently,
-:func:`@qjit <~.qjit>` compiled QNodes used as input to :func:`qml.draw
- <~pennylane.draw>`, with the following caveats:
+:func:`@qjit <~.qjit>` compiled QNodes used as input to
+:func:`qml.draw <pennylane.draw>`, with the following caveats:
 
-- :func:`qml.draw <~pennylane.draw>` call must occur outside the :func:`@qjit <~.qjit>`
+- :func:`qml.draw <pennylane.draw>` call must occur outside the :func:`@qjit <.qjit>`
 
-- The :func:`@qjit <~.qjit>` decorator must be placed directly on top of the QNode
+- The :func:`@qjit <.qjit>` decorator must be placed directly on top of the QNode
 
 - The :func:`catalyst.measure` function is not supported in drawn QNodes
 
