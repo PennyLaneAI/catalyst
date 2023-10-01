@@ -309,7 +309,7 @@ array(0.16996714)
 Try and compile the full workflow
 ---------------------------------
 
-When porting your PennyLane code to work with Catalyst and :func:`@qjit <~.qjit>`, the
+When porting your PennyLane code to work with Catalyst and :func:`@qjit <.qjit>`, the
 biggest performance advantage you will see is if you qjit
 your *entire* workflow, not just the QNodes. So think about putting
 everything inside your JIT-compiled function, including for loops
@@ -1002,8 +1002,9 @@ Currently, however, this is not the case in two places.
   >>> qjit(circuit)(0.4)
   array(0.92106099)
 
-- :func:`catalyst.measure` currently behaves differently from its PennyLane counterpart
-  :func:`pennylane.measure`. In particular:
+- **Measurement behaviour**. :func:`catalyst.measure` currently behaves
+  differently from its PennyLane counterpart :func:`pennylane.measure`.
+  In particular:
 
   - Final measurement statistics occurring after :func:`pennylane.measure`
     will average over all potential measurements, weighted by their
