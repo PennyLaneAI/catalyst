@@ -460,9 +460,9 @@ This includes:
   output is purely dependent only on function inputs.
 
 * **In-place array updates**: Rather than using in-place array updates, the
-    syntax ``new_array = jax_array.at[index].set(value)`` should be used. For
-    more details, see `jax.numpy.ndarray.at
-    <https://jax.readthedocs.io/en/latest/_autosummary /jax.numpy.ndarray.at.html>`__.
+  syntax ``new_array = jax_array.at[index].set(value)`` should be used. For
+  more details, see `jax.numpy.ndarray.at
+  <https://jax.readthedocs.io/en/latest/_autosummary /jax.numpy.ndarray.at.html>`__.
 
 * **Lack of stateful random number generators**: In JAX, random number
   generators need to be explicitly created within the :func:`@qjit <~.qjit>` function
@@ -678,10 +678,85 @@ when working with classical control in Catalyst.
   accept any arguments.
 
 
-..
-    PennyLane transformations
-    -------------------------
-    Todo.
+Compatibility with PennyLane transforms
+---------------------------------------
+
+PennyLane provides a wide variety of
+:doc:`transforms <pennylane/code/qml_transforms>`_ that
+convert a circuit to one or more circuits.
+
+As a general rule of thumb, transforms that result in a single circuit are
+generally applied before the QNode decorator, while transforms that result in
+multiple circuits to be executed (**batch transforms**, such as
+:func:`~pennylane.gradients.param_shift`) are applied after the QNode decorator.
+
+Currently, batch transforms and transforms that apply *after* the QNode decorator will
+not work with Catalyst:
+
+.. code-block:: python
+
+    @qjit
+    @qml.transforms.split_non_commuting
+    @qml.qnode(dev)
+    def circuit(x):
+        qml.RX(x,wires=0)
+        return [qml.expval(qml.PauliY(0)), qml.expval(qml.PauliZ(0))]
+
+>>> circuit(0.4)
+CompileError: QuantumCompilationPass failed.
+
+However, transforms that are applied *before* the QNode decorator will work with
+Catalyst, as long as:
+
+- The circuit does not include any Catalyst-specific features, such
+as Catalyst control flow or measurement,
+
+- AutoGraph is disabled, and
+
+- The transformation does not require or depend on the numeric value of
+  dynamic variables.
+
+For example:
+
+.. code-block:: python
+
+    @qjit
+    @qml.qnode(dev)
+    @qml.transforms.merge_rotations
+    def circuit(x):
+        qml.RX(x, wires=0)
+        qml.RX(x ** 2, wires=0)
+        return qml.expval(qml.PauliZ(0))
+
+>>> circuit(0.5)
+array(0.73168887)
+
+We can inspect the jaxpr representation of the compiled program, to verify that only
+a single RX gate is being applied due to the rotation gate merger:
+
+>>> circuit.jaxpr
+{ lambda ; a:f64[]. let
+    b:f64[] = func[
+      call_jaxpr={ lambda ; c:f64[]. let
+           = qdevice[spec=kwargs val={'shots': 0}]
+           = qdevice[spec=backend val=lightning.qubit]
+          d:AbstractQreg() = qalloc 1
+          e:f64[] = integer_pow[y=2] c
+          f:f64[1] = broadcast_in_dim[broadcast_dimensions=() shape=(1,)] c
+          g:f64[1] = broadcast_in_dim[broadcast_dimensions=() shape=(1,)] e
+          h:f64[1] = add f g
+          i:f64[1] = slice[limit_indices=(1,) start_indices=(0,) strides=(1,)] h
+          j:f64[] = squeeze[dimensions=(0,)] i
+          k:AbstractQbit() = qextract d 0
+          l:AbstractQbit() = qinst[op=RX qubits_len=1] k j
+          m:AbstractObs(num_qubits=None,primitive=None) = namedobs[kind=PauliZ] l
+          n:f64[] = expval[shots=None] m
+           = qdealloc d
+        in (n,) }
+      fn=<QNode: wires=1, device='lightning.qubit', interface='auto', diff_method='best'>
+    ] a
+  in (b,) }
+
 
 Function argument restrictions
 ------------------------------
