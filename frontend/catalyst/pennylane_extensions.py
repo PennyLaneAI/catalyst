@@ -32,6 +32,7 @@ from jax._src.tree_util import PyTreeDef, tree_flatten, tree_unflatten, treedef_
 from pennylane import QNode, QueuingManager
 from pennylane.measurements import MidMeasureMP
 from pennylane.operation import Operator
+from pennylane.ops import Controlled
 from pennylane.tape import QuantumTape
 
 import catalyst
@@ -56,6 +57,7 @@ from catalyst.jax_tracer import (
     HybridOpRegion,
     QRegPromise,
     deduce_avals,
+    has_nested_tapes,
     trace_quantum_function,
     trace_quantum_tape,
 )
@@ -76,6 +78,22 @@ from catalyst.utils.jax_extras import (
     wrap_init,
 )
 from catalyst.utils.patching import Patcher
+
+
+def _check_no_measurements(tape: QuantumTape) -> None:
+    """Check the nested quantum tape for the absense of quantum measurements of any kind"""
+
+    msg = "Quantum measurements are not allowed"
+
+    if len(tape.measurements) > 0:
+        raise ValueError(msg)
+    for op in tape.operations:
+        if has_nested_tapes(op):
+            for r in [r for r in op.regions if r.quantum_tape is not None]:
+                _check_no_measurements(r.quantum_tape)
+        else:
+            if isinstance(op, MidCircuitMeasure):
+                raise ValueError(msg)
 
 
 class QFunc:
@@ -982,6 +1000,88 @@ class Adjoint(HybridOp):
         return qrp2
 
 
+class QCtrl(HybridOp):
+    """Catalyst quantum ctrl operation"""
+
+    def __init__(
+        self, *args, control_wire_tracers, control_value_tracers, work_wire_tracers, **kwargs
+    ):
+        self.control_wire_tracers: List[Any] = control_wire_tracers
+        self.control_value_tracers: List[Any] = control_value_tracers
+        self.work_wire_tracers: Optional[List[Any]] = work_wire_tracers
+        super().__init__(*args, **kwargs)
+
+    def trace_quantum(self, ctx, device, trace, qrp) -> QRegPromise:
+        raise NotImplementedError("QCtrl does not support JAX quantum tracing")  # pragma: no cover
+
+    def compute_decomposition(self, *params, wires=None, **hyperparameters):
+        """Compute quantum decomposition of the gate by recursively scanning the nested tape and
+        distributing the quantum control operaiton over the tape operations."""
+        assert len(self.regions) == 1, "Qctrl is expected to have one region"
+        assert len(params) == 0, "Decomposition parameters should be empty"
+        assert len(hyperparameters) == 0, "Decomposition hyperparameters should be empty"
+        assert wires is self.wires, "Altering wires is not supported"
+
+        _check_no_measurements(self.regions[0].quantum_tape)
+        new_tape = qctrl_distribute(
+            self.regions[0].quantum_tape,
+            self.control_wire_tracers,
+            self.control_value_tracers,
+            self.work_wire_tracers,
+        )
+        return new_tape.operations
+
+
+def qctrl_distribute(
+    tape: QuantumTape,
+    control_wires: List[Any],
+    control_values: List[Any],
+    work_wires: Optional[List[Any]] = None,
+) -> QuantumTape:
+    """Distribute the quantum control operation, described by ``control_wires`` and
+    ``control_values``, over all the operations on the nested quantum tape.
+    """
+    # Note: The transformation modifies operations in the source quantum tape, so we must not use it
+    # after we called this function.
+    assert len(control_wires) > 0, "This transformation expects a non-empty list of control_wires"
+    assert len(control_wires) == len(control_values), (
+        f"Length of the control_values ({len(control_values)}) must be equal "
+        f"to the lenght of control_wires ({len(control_wires)})"
+    )
+    ctx = EvaluationContext.get_main_tracing_context()
+    ops2 = []
+    for op in tape.operations:
+        if has_nested_tapes(op):
+            if isinstance(op, QCtrl):
+                for region in [region for region in op.regions if region.quantum_tape is not None]:
+                    tape2 = qctrl_distribute(
+                        region.quantum_tape,
+                        control_wires + op.control_wire_tracers,
+                        control_values + op.control_value_tracers,
+                        ((work_wires or []) + (op.work_wire_tracers or []))
+                        if (work_wires is not None or op.work_wire_tracers is not None)
+                        else None,
+                    )
+                    ops2.extend(tape2.operations)
+            else:
+                for region in [region for region in op.regions if region.quantum_tape is not None]:
+                    with EvaluationContext.frame_tracing_context(ctx, region.trace):
+                        region.quantum_tape = qctrl_distribute(
+                            region.quantum_tape, control_wires, control_values, work_wires
+                        )
+                ops2.append(op)
+        else:
+            ops2.append(
+                Controlled(
+                    type(op)(*op.parameters, wires=op.wires),
+                    control_wires=qml.wires.Wires(control_wires),
+                    control_values=control_values,
+                    work_wires=work_wires,
+                )
+            )
+    return QuantumTape(ops2, tape.measurements)
+
+
 class CondCallable:
     """User-facing wrapper provoding "else_if" and "otherwise" public methods.
     Some code in this class has been adapted from the cond implementation in the JAX project at
@@ -1694,8 +1794,7 @@ def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
                     if isinstance(t, DynamicJaxprTracer)
                 ]
 
-            if len(quantum_tape.measurements) > 0:
-                raise ValueError("Quantum measurements are not allowed in Adjoints")
+            _check_no_measurements(quantum_tape)
 
             adjoint_region = HybridOpRegion(
                 inner_trace, quantum_tape, arg_classical_tracers, res_classical_tracers
@@ -1722,3 +1821,108 @@ def adjoint(f: Union[Callable, Operator]) -> Union[Callable, Operator]:
         return _call_handler(_callee=_callee)
     else:
         raise ValueError(f"Expected a callable or a qml.Operator, not {f}")
+
+
+def ctrl(
+    f: Union[Callable, Operator],
+    control: List[Any],
+    control_values: Optional[List[Any]] = None,
+    work_wires: Optional[List[Any]] = None,
+) -> Callable:
+    """Create a method that applies a controlled version of the provided op. This function is the
+    Catalyst version of the ``qml.ctrl`` that supports Catalyst hybrid operations such as loops and
+    conditionals.
+
+    Args:
+        f (Callable or Operator): A PennyLane operation or a Python function
+                                  containing PennyLane quantum operations.
+        control (Wires): The control wire(s).
+        control_values (List[bool], optional): The value(s) the control wire(s) should take.
+            Integers other than 0 or 1 will be treated as ``int(bool(x))``.
+        work_wires (Any): Any auxiliary wires that can be used in the decomposition
+
+    Returns:
+        (function or :class:`~.operation.Operator`): If an Operator is provided, returns a
+        Controlled version of the Operator.  If a function is provided, returns a function with the
+        same call signature that creates a controlled version of the provided function.
+
+    Raises:
+        ValueError: invalid parameter values, measurements are among the controlled operations.
+
+    **Example**
+
+    .. code-block:: python
+
+        @qjit
+        @qml.qnode(qml.device("lightning.qubit", wires=2))
+        def workflow(theta, w, cw):
+            qml.Hadamard(wires=[0])
+            qml.Hadamard(wires=[1])
+
+            def func(arg):
+              qml.RX(theta, wires=arg)
+
+            @cond(theta > 0.0)
+            def cond_fn():
+              qml.RY(theta, wires=w)
+
+            catalyst.ctrl(func, control=[cw])(w)
+            catalyst.ctrl(cond_fn, control=[cw])()
+            catalyst.ctrl(qml.RZ, control=[cw])(theta, wires=w)
+            catalyst.ctrl(qml.RY(theta, wires=w), control=[cw])
+            return qml.probs()
+
+    >>> workflow(jnp.pi/4, 1, 0)
+    array([0.25, 0.25, 0.03661165, 0.46338835])
+    """
+
+    def _tolist(x):
+        return [x] if not isinstance(x, list) else x
+
+    control = _tolist(control)
+    control_values = _tolist(control_values) if control_values is not None else [1] * len(control)
+    if len(control) != len(control_values):
+        raise ValueError(
+            f"Length of the control_values ({len(control_values)}) must be None or equal "
+            f"to the lenght of control ({len(control)})"
+        )
+    work_wires = _tolist(work_wires) if work_wires is not None else None
+
+    def _call_handler(*args, _callee: Callable, **kwargs):
+        EvaluationContext.check_is_quantum_tracing(
+            "catalyst.ctrl can only be used from within a qml.qnode."
+        )
+        in_classical_tracers, _ = tree_flatten((args, kwargs))
+        quantum_tape = QuantumTape()
+        with QueuingManager.stop_recording(), quantum_tape:
+            res = _callee(*args, **kwargs)
+        out_classical_tracers, _ = tree_flatten(res)
+
+        _check_no_measurements(quantum_tape)
+
+        region = HybridOpRegion(None, quantum_tape, [], [])
+
+        QCtrl(
+            control_wire_tracers=control,
+            control_value_tracers=control_values,
+            work_wire_tracers=work_wires,
+            in_classical_tracers=in_classical_tracers,
+            out_classical_tracers=out_classical_tracers,
+            regions=[region],
+        )
+
+    if isinstance(f, Callable):
+
+        def _callable(*args, **kwargs):
+            return _call_handler(*args, _callee=f, **kwargs)
+
+        return _callable
+    elif isinstance(f, Operator):
+        QueuingManager.remove(f)
+
+        def _callee():
+            QueuingManager.append(f)
+
+        return _call_handler(_callee=_callee)
+    else:
+        raise ValueError(f"Expected a callable or a qml.Operator, not {f}")  # pragma: no cover
