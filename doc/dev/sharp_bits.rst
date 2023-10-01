@@ -682,7 +682,7 @@ Compatibility with PennyLane transforms
 ---------------------------------------
 
 PennyLane provides a wide variety of
-:doc:`transforms <pennylane:code/qml_transforms>` that
+:doc:`transforms <code/qml_transforms>` that
 convert a circuit to one or more circuits.
 
 As a general rule of thumb, transforms that result in a single circuit are
