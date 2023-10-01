@@ -354,6 +354,12 @@ circuit, are measuring an expectation value, and are optimizing the result:
 Using PennyLane v0.32 on Google Colab with the Python 3 Google Compute Engine
 backend, this optimization takes 3min 28s ± 2.05s to complete.
 
+Let's switch over to Lightning, our high-performance statevector simulator,
+alongside the adjoint differentiation method. To do so, we change the first
+two lines of the above code-block to set the device as ``"lightning.qubit"``,
+and specify ``diff_method="adjoint"`` in the QNode decorator. With this
+change, we have reduced the execution time down to 30.7s ± 1.8s.
+
 We can rewrite this QNode to use Catalyst control flow, and compile
 it using Catalyst:
 
@@ -943,10 +949,66 @@ we can use a while loop:
 >>> fibonacci(10)
 array(89)
 
-.. 
-  Compatibility with broadcasting
+Compatibility with broadcasting
+-------------------------------
 
-.. 
-  Differences from PennyLane
-  - Finite shot measurement statistics
-  - catalyst.measure
+Catalyst does not currently support passing multi-dimensional arrays
+as quantum operator parameters ('parameter broadcasting'):
+
+>>> @qml.qnode(dev)
+... def circuit(x):
+...     qml.RX(x, wires=0)
+...     qml.RY(0.1, wires=0)
+...     return qml.expval(qml.PauliZ(0))
+>>> circuit(jnp.array([0.1, 0.2]))
+Array([0.99003329, 0.97517033], dtype=float64)
+>>> qjit(circuit)(jnp.array([0.1, 0.2]))
+UnboundLocalError: local variable 'baseType' referenced before assignment
+
+While not as flexible as true vectorized quantum operations, as a workaround
+``jax.vmap`` can be used to allow for multi-dimensional **function**
+arguments:
+
+>>> jax.vmap(qjit(circuit))(jnp.array([0.1, 0.2]))
+Array([0.99003329, 0.97517033], dtype=float64)
+
+Note that ``jax.vmap`` cannot be used within a qjit-compiled function:
+
+>>> qjit(jax.vmap(circuit))(jnp.array([0.1, 0.2]))
+NotImplementedError: Batching rule for 'qinst' not implemented
+
+Functionality differences from PennyLane
+----------------------------------------
+
+The ultimate aim with Catalyst will be the ability to prototype quantum algorithms
+in Python with PennyLane, and easily scale up prototypes by simply adding ``@qjit``.
+This will require that all PennyLane functionality behaves identically whether or not
+the ``@qjit`` decorator is applied.
+
+Currently, however, this is not the case in two places.
+
+- **Finite-shot measurement statistics**. The Catalyst-Lightning runtime does not
+  at the moment have support for finite-shot measurement statistics. As a result,
+  measurement statistics will always be exact within a ``@qjit``, even when Lightning
+  is configured with finite-shots.
+
+  >>> dev = qml.device("lightning.qubit", wires=1, shots=10)
+  ... @qml.qnode(dev)
+  ... def circuit(x):
+  ...     qml.RX(x, wires=0)
+  ...     return qml.expval(qml.PauliZ(0))
+  >>> circuit(0.4)
+  array(0.8)
+  >>> qjit(circuit)(0.4)
+  array(0.92106099)
+
+- :func:`catalyst.measure` currently behaves differently from its PennyLane counterpart
+  :func:`pennylane.measure`. In particular:
+
+  - Final measurement statistics occurring after :func:`pennylane.measure`
+    will average over all potential measurements, weighted by their
+    likelihood.
+
+  - Final measurement statistics occurring after :func:`catalyst.measure` will
+    be post-selected on the outcome that was measured. The post-selected
+    measurement will change with every execution.
