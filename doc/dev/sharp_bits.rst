@@ -6,7 +6,7 @@ familiar with when exploring quantum computing (such as Python, NumPy, JAX,
 and PennyLane), while unlocking faster execution and the ability to run
 hybrid quantum-classical workflows on accelerator devices.
 
-Similar to JAX, Catalyst does this via the ``@qjit`` decorator, which captures
+Similar to JAX, Catalyst does this via the :func:`@qjit <~.qjit>` decorator, which captures
 hybrid programs written in Python, PennyLane, and JAX, and compiles them to
 native machine code --- preserving important aspects like conditional
 branches and classical control.
@@ -53,11 +53,11 @@ An important distinction to make in Catalyst, which we typically don't have to
 worry about with standard PennyLane, is the concept of **compile time**
 vs. **runtime**.
 
-Very roughly, the following three processes occur when using the ``@qjit`` decorator
+Very roughly, the following three processes occur when using the :func:`@qjit <~.qjit>` decorator
 with just-in-time (JIT) compilation.
 
-#. **Program capture or tracing:** When the ``@qjit`` decorated function is
-   first called (or, when the ``@qjit`` is first applied if using function
+#. **Program capture or tracing:** When the :func:`@qjit <~.qjit>` decorated function is
+   first called (or, when the :func:`@qjit <~.qjit>` is first applied if using function
    type hints and :ref:`ahead-of-time mode <ahead_of_time>`), Catalyst
    will 'capture' the entire hybrid workflow with **placeholder variables of
    unknown value** used as the function arguments
@@ -79,7 +79,7 @@ be skipped. (Note: some cases, such as if the function argument types change,
 may trigger re-compilation.)
 
 For example, consider the following, where we print out a variable in the middle of
-our ``@qjit`` compiled function:
+our :func:`@qjit <~.qjit>` compiled function:
 
 >>> @qjit
 ... def f(x):
@@ -123,7 +123,7 @@ and those that happen at **runtime** (step 3).
       be evaluated at compile-time, and can only accept static variables.
 
     - JAX functions, such as ``jax.numpy``, and Catalyst functions like
-      ``catalyst.cond`` and ``catalyst.for_loop`` will be evaluated at
+      :func:`~.cond` and :func:`~.for_loop` will be evaluated at
       runtime, and can accept dynamic variables.
 
     Note that if AutoGraph is enabled, Catalyst will attempt to convert Python
@@ -138,7 +138,8 @@ For example, consider the following:
 ...     return x ** 2
 >>> f(2.)
 TracerBoolConversionError: Attempted boolean conversion of traced array with shape bool[]..
-The error occurred while tracing the function f at <ipython-input-15-2aa7bf60efbb>:1 for make_jaxpr. This concrete value was not available in Python because it depends on the value of the argument x.
+The error occurred while tracing the function f at <ipython-input-15-2aa7bf60efbb>:1 for make_jaxpr.
+This concrete value was not available in Python because it depends on the value of the argument x.
 See https://jax.readthedocs.io/en/latest/errors.html#jax.errors.TracerBoolConversionError
 
 This function will fail, as the Python ``if`` statement cannot accept a dynamic variable (a JAX tracer) as an argument.
@@ -299,7 +300,8 @@ array(0.16996714)
 However, deviating from this will result in recompilation and a warning message:
 
 >>> circuit(jnp.array([1.4, 1.4, 0.3, 0.1]))
-/usr/local/lib/python3.10/dist-packages/catalyst/compilation_pipelines.py:592: UserWarning: Provided arguments did not match declared signature, recompiling...
+catalyst/compilation_pipelines.py:592:
+UserWarning: Provided arguments did not match declared signature, recompiling...
 Tracing occurring
 array(0.16996714)
 
@@ -309,7 +311,7 @@ JAX support and restrictions
 
 Catalyst is utilizes JAX for program capture, which means you are able to
 leverage the many functions accessible in ``jax`` and ``jax.numpy`` to write
-code that supports ``@qjit`` and dynamic variables.
+code that supports :func:`@qjit <~.qjit>` and dynamic variables.
 
 Currently, we are aiming to support as many JAX functions as possible, however
 there may be cases where there is missing coverage. Known JAX functionality
@@ -339,7 +341,7 @@ This includes:
   For more details, see `jax.numpy.ndarray.at <https://jax.readthedocs.io/en/latest/_autosummary  /jax.numpy.ndarray.at.html>`__.
 
 * **Lack of stateful random number generators**: In JAX, random number
-  generators need to be explicitly created within the ``@qjit`` function
+  generators need to be explicitly created within the :func:`@qjit <~.qjit>` function
   using ``jax.random.PRNGKey(int)``:
   
   >>> @qjit()
@@ -363,16 +365,17 @@ Inspecting and drawing circuits
 -------------------------------
 
 A useful tool for debugging quantum algorithms is the ability to draw them. Currently,
-``@qjit`` compiled QNodes used as input to ``qml.draw``, with the following caveats:
+:func:`@qjit <~.qjit>` compiled QNodes used as input to :func:`qml.draw
+ <~pennylane.draw>`, with the following caveats:
 
-- ``qml.draw`` must occur outside the ``qjit``
+- :func:`qml.draw <~pennylane.draw>` call must occur outside the :func:`@qjit <~.qjit>`
 
-- The ``qjit`` decorator must be placed directly on top of the QNode
+- The :func:`@qjit <~.qjit>` decorator must be placed directly on top of the QNode
 
-- The ``catalyst.measure`` function is not supported in drawn QNodes
+- The :func:`catalyst.measure` function is not supported in drawn QNodes
 
-- Catalyst conditional functions, such as ``catalyst.cond`` and
-  ``catalyst.for_loop``, will be 'unrolled'. That is, the drawn circuit will
+- Catalyst conditional functions, such as :func:`~.cond` and
+  :func:`~.for_loop`, will be 'unrolled'. That is, the drawn circuit will
   be a straight-line circuit, without any of the control flow represented
   explicitly.
 
@@ -407,96 +410,458 @@ At the moment, additional PennyLane `circuit inspection functions
 <https://docs.pennylane.ai/en/stable/introduction/inspecting_circuits.html>`__
 are not supported with Catalyst.
 
-Dynamic circuit restrictions
-----------------------------
-
-Todo.
-
 Classical control debugging
 ---------------------------
-
-Todo.
 
 .. note::
 
     See our AutoGraph guide for converting native Python control flow
     to QJIT compatible control.
 
-- Return values of both true and false branches of ``catalyst.cond`` should be consistent
+There are various constraints and restrictions that should be kept in mind
+when working with classical control in Catalyst.
 
-- cannot return a value in the true branch of catalyst.cond without an else branch:
+- The return values of all branches of :func:`~.cond` must be the same type.
+  Returning different types, or ommitting a return value in one branch (e.g.,
+  returning ``None``) but not in others will result in an error.
 
-- There are more limitations with returning values in ``catalyst.cond``: Returning an integer from the true branch and a float from the false branch raises a different error.
+  >>> @qjit
+  ... def f(x: float):
+  ...     @cond(x > 1.5)
+  ...     def cond_fn():
+  ...         return x ** 2  # float
+  ...     @cond_fn.otherwise
+  ...     def else_branch():
+  ...         return 6  # int
+  ...     return cond_fn()
+  TypeError: Conditional requires consistent return types across all branches, got:
+  - Branch at index 0: [ShapedArray(float64[], weak_type=True)]
+  - Branch at index 1: [ShapedArray(int64[], weak_type=True)]
+  Please specify an else branch if none was specified.
+  >>> @qjit
+  ... def f(x: float):
+  ...     @cond(x > 1.5)
+  ...     def cond_fn():
+  ...         return x ** 2  # float
+  ...     @cond_fn.otherwise
+  ...     def else_branch():
+  ...         return 6.  # float
+  ...     return cond_fn()
+  >>> f(1.5)
+  array(6.)
 
-- Also, else-if branch cannot have any arguments
+- Similarly, the else (``my_cond_fn.otherwise``) may be omitted **as long as
+  other branches do not return any values**. If other branches do return values,
+  the else branch must be specified.
+
+  >>> @qjit
+  ... def f(x: float):
+  ...     @cond(x > 1.5)
+  ...     def cond_fn():
+  ...         return x ** 2
+  ...     return cond_fn()
+  TypeError: Conditional requires consistent return types across all branches, got:
+  - Branch at index 0: [ShapedArray(float64[], weak_type=True)]
+  - Branch at index 1: []
+  Please specify an else branch if none was specified.
+
+  >>> @qjit
+  ... def f(x: float):
+  ...     @cond(x > 1.5)
+  ...     def cond_fn():
+  ...         return x ** 2
+  ...     @cond_fn.otherwise
+  ...     def else_branch():
+  ...         return x
+  ...     return cond_fn()
+  >>> f(1.6)
+  array(2.56)
+
+- Finally, a reminder that conditional functions provided to :func:`~.cond` cannot
+  accept any arguments.
 
 
-PennyLane transformations
--------------------------
+.. 
+    PennyLane transformations
+    -------------------------
+    Todo.
 
-Todo.
+Try and compile the full workflow
+---------------------------------
 
-Common PennyLane patterns for Catalyst
---------------------------------------
+When porting your PennyLane code to work with Catalyst and :func:`@qjit <~.qjit>`, the
+biggest performance advantage you will see is if you qjit
+your *entire* workflow, not just the QNodes. So think about putting
+everything inside your JIT-compiled function, including for loops
+(including optimization loops), gradient calls, etc.
 
-Todo.
+Consider the following PennyLane example, where we have a parametrized
+circuit, are measuring an expectation value, and are optimizing the result:
 
-- The biggest performance advantage you will see when using Catalyst is if you qjit your *entire* workflow, not just the QNodes. So think about putting everything inside your JIT-compiled function; for loops (including optimization loops), gradient calls, etc.
+.. code-block:: python
 
-- Inside the ``@qjit``, you need to use ``catalyst.grad``
+    dev = qml.device("default.qubit", wires=4)
 
-- However ``@qjit`` functions remain JAX compatible, and you can call JAX
-  transformations on them. However this will always result in a callback to Python,
-  and so will be slower.
+    @qml.qnode(dev)
+    def cost(weights, data):
+        qml.AngleEmbedding(data, wires=range(4))
 
-- function arguments need to be numeric types or Pytrees, since we don't
-  support ``static_argnum`` yet
+        for x in weights:
+            # each trainable layer
+            for i in range(4):
+                # for each wire
+                if x[i] > 0:
+                    qml.RX(x[i], wires=i)
+                elif x[i] < 0:
+                    qml.RY(x[i], wires=i)
 
-- broadcasting/vectorization of parameters for quantum operations isn't yet
-  supported, but you can use ``jax.vmap`` on a qjit-function.
+            for i in range(4):
+                qml.CNOT(wires=[i, (i + 1) % 4])
 
-- returning different measurements at different places with control flow is
-  not supported:
+        return qml.expval(qml.PauliZ(0) + qml.PauliZ(3))
 
-  .. code-block:: python
+    weights = jnp.array(2 * np.random.random([5, 4]) - 1)
+    data = jnp.array(np.random.random([4]))
 
-      if x:
-          return expval(..)
+    opt = jaxopt.GradientDescent(cost, stepsize=0.4)
 
-      return probs(..)
+    params = weights
+    state = opt.init_state(params)
 
-- Recursion is not supported. E.g., for recursive support using Python if-statement:
+    for i in range(200):
+        (params, _) = tuple(opt.update(params, state, data))
 
-  .. code-block:: python
+Using PennyLane v0.32 on Google Colab with the Python 3 Google Compute Engine
+backend, this optimization takes 3min 28s ± 2.05s to complete.
 
-  @qjit
-  def fibonacci(n: int):
-      if n <= 1:
-          return n
-      return fibonacci(n-1) + fibonacci(n-2)
+We can rewrite this QNode to use Catalyst control flow, and compile
+it using Catalyst:
 
-  this will raise,
+.. code-block:: python
 
-  .. code-block:: text
+    dev = qml.device("lightning.qubit", wires=4)
 
-      TracerBoolConversionError: Attempted boolean conversion of traced array with shape bool[]..
-      The error occurred while tracing the function fibonacci at /tmp/ipykernel_137076/1253936487.py:1 for make_jaxpr. This concrete value was not available in Python because it depends on the value of the argument n.
-      See https://jax.readthedocs.io/en/latest/errors.html#jax.errors.TracerBoolConversionError
+    @qjit
+    @qml.qnode(dev)
+    def cost(weights, data):
+        qml.AngleEmbedding(data, wires=range(4))
 
-  For recursive support using cond:
+        def layer_loop(i):
+            x = weights[i]
+            def wire_loop(j):
+                
+                @cond(x[j] > 0)
+                def trainable_gate():
+                    qml.RX(x[j], wires=j)
 
-  .. code-block:: python
+                @trainable_gate.else_if(x[j] < 0)
+                def negative_gate():
+                    qml.RY(x[j], wires=j)
 
-      def fibonacci(x: int):
-          return lax.cond(x <= 1, x, lambda x: x, x, lambda x: fibonacci(x-1) + fibonacci(x-2))
+                trainable_gate.otherwise(lambda: None)
+                trainable_gate()
 
-  this will raise,
+            def cnot_loop(j):
+                qml.CNOT(wires=[j, jnp.mod((j + 1), 4)])
 
-  .. code-block:: text
+            for_loop(0, 4, 1)(wire_loop)()
+            for_loop(0, 4, 1)(cnot_loop)()
 
-      RecursionError: maximum recursion depth exceeded in comparison
+        for_loop(0, jnp.shape(weights)[0], 1)(layer_loop)()
+        return qml.expval(qml.PauliZ(0) + qml.PauliZ(3))
 
-  This is due to the fact that JAX tries to evaluate both true and false
-  statements and this will result the "maximum recursion depth exceeded in
-  comparison" error. It should be interesting to explore this support in
-  Catalyst though.
+    opt = jaxopt.GradientDescent(cost, stepsize=0.4)
+
+    params = weights
+    state = opt.init_state(params)
+
+    for i in range(200):
+        (params, _) = tuple(opt.update(params, state, data))
+
+With the quantum function qjit-compiled, the optimization loop
+now takes 16.4s ± 1.51s.
+
+However, while the quantum function is now compiled, and the compiled function
+is called to compute cost and gradient values, the optimization loop is still
+occuring in Python.
+
+Instead, we can write the optimization loop itself as a function and decorate
+it with ``@qjit``; this will compile the optimization loop, and allow the full
+optimization to take place within Catalyst:
+
+.. code-block:: python
+
+    @qjit
+    def optimize(init_weights, data, steps):
+        def loss(x):
+            dy = grad(cost, argnum=0)(x, data)[0]
+            return (cost(x, data), dy)
+
+        opt = jaxopt.GradientDescent(loss, stepsize=0.4, value_and_grad=True)
+        update_step = lambda i, *args: tuple(opt.update(*args))
+
+        params = init_weights
+        state = opt.init_state(params)
+
+        return for_loop(0, steps, 1)(update_step)(params, state)[0]
+
+The optimization now takes 574ms ± 43.1ms to complete when using 200 steps.
+Note that, to compute gradients within a qjit-compiled function,
+the :func:`catalyst.grad` function must be used.
+
+JAX integration
+---------------
+
+Compiled functions remain JAX compatible, and you can call JAX transformations
+on them, such as ``jax.grad`` and ``jax.vmap``. You can even call ``jax.jit``
+on functions that call qjit-compiled functions:
+
+>>> dev = qml.device("lightning.qubit", wires=2)
+>>> @qjit
+... @qml.qnode(dev)
+... def circuit(x):
+...     qml.RX(x, wires=0)
+...     return qml.expval(qml.PauliZ(0))
+>>> @jax.jit
+... def workflow(y):
+...     return jax.grad(circuit)(jnp.sin(y))
+>>> workflow(0.6)
+Array(-0.53511382, dtype=float64, weak_type=True)
+
+However, a ``jax.jit`` function calling a ``qjit`` function will always result
+in a callback to Python, so will be slower than if the function was purely compiled
+using ``jax.jit`` or ``qjit``.
+
+If you want to compile some functionality that is not currently Catalyst
+compatible, or you want to make use of JAX-supported hardware such as TPUs
+for classical processing, mixing ``jax.jit`` and ``qjit`` will allow this.
+However, if possible, try to always use ``qjit`` to compile your entire
+workflow.
+
+Internal QJIT transformations
+-----------------------------
+
+Inside of a qjit-compiled function, JAX transformations
+(``jax.grad``, ``jax.jacobian``, ``jax.vmap``, etc.)
+can be used **as long as they are not applied to quantum processing**.
+
+>>> @qjit
+... def f(x):
+...     def g(y):
+...         return -jnp.sin(y) ** 2
+...     return jax.grad(g)(x)
+>>> f(0.4)
+array(-0.71735609)
+
+If they are applied to quantum processing, an error will occur:
+
+>>> @qjit
+... def f(x):
+...     @qml.qnode(dev)
+...     def g(y):
+...         qml.RX(y, wires=0)
+...         return qml.expval(qml.PauliX(0))
+...     return jax.grad(lambda y: g(y) ** 2)(x)
+>>> f(0.4)
+NotImplementedError: must override
+
+Instead, only Catalyst transformations will work when applied to hybrid
+quantum-classical processing:
+
+>>> @qjit
+... def f(x):
+...     @qml.qnode(dev)
+...     def g(y):
+...         qml.RX(y, wires=0)
+...         return qml.expval(qml.PauliZ(0))
+...     return grad(lambda y: g(y) ** 2)(x)
+>>> f(0.4)
+array(-0.71735609)
+
+Always use the equivalent Catalyst transformation
+(:func:`catalyst.grad`, :func:`catalyst.jacobian`, :func:`catalyst.vjp`, :func:`catalyst.jvp`)
+inside of a qjit-compiled function.
+
+
+Function argument restrictions
+------------------------------
+
+Compiled functions can accept arbitrary function arguments, as long as the
+inputs can be represented as `Pytrees
+<https://jax.readthedocs.io/en/latest/pytrees.html>`__ --- tree-like
+structures built out of Python container objects such as lists, dictionaries,
+and tuples --- where the *values* (leaf nodes) are compatible types.
+
+Compatible types includes booleans, Python numeric types, JAX arrays,
+and PennyLane quantum operators.
+
+.. note::
+
+    Catalyst currently doesn't support string arguments to compiled functions
+    with the exception of dictionary keys.
+
+For example, consider the following, where we pass arbitrarily nested lists or
+dictionaries as input to the compiled function:
+
+>>> f = qjit(lambda *args: args)
+>>> x = qml.RX(0.4, wires=0)
+>>> y = {"apple": (True, jnp.array([0.1, 0.2, 0.3]))}
+>>> f(x, y)
+(RX(array(0.4), wires=[0]), {'apple': (array(True), array([0.1, 0.2, 0.3]))})
+
+Arbitrary objects cannot be passed as function arguments, unless they
+are registered as Pytrees with compatible data types.
+
+>>> class MyObject:
+...     def __init__(self, x, name):
+...         self.x = x
+...         self.name = name
+>>> obj = MyObject(jnp.array(0.4), "test")
+>>> f(obj)
+TypeError: Unsupported argument type: <class '__main__.MyObject'>
+
+By registring it as a Pytree (that is, specifying to JAX the dynamic and static compile-time information, we make this object compatible with Catalyst:
+
+>>> def flatten_fn(my_object):
+...     data = (my_object.x,) # Dynamic variables
+...     aux = {"name": my_object.name} # static compile-time data
+...     return (data, aux)
+>>> def unflatten_fn(aux, data):
+...     return MyObject(data[0], **aux)
+>>> register_pytree_node(MyObject, flatten_fn, unflatten_fn)
+>>> f(obj)
+<__main__.MyObject at 0x7c061434b820>
+
+Note that the function will only be re-compiled if the custom objects static
+compile-time data changes (in this case, ``MyObject.name``); **not** if the
+dynamic part of the custom object (``MyObject.x``) changes:
+
+>>> @qjit
+... def f(my_object):
+...     print("compiling")
+...     return my_object.x
+>>> f(MyObject(jnp.array(0.1), name="test1"))
+Compiling: name=test1
+array(0.1)
+>>> f(MyObject(jnp.array(0.2), name="test1"))
+array(0.2)
+>>> f(MyObject(jnp.array(0.2), name="test2"))
+Compiling: name=test2
+array(0.2)
+
+.. note::
+
+    JAX provides a ``static_argnums`` argument for the ``jax.jit`` function,
+    which allows you to specify which arguments to the compile function to treat
+    as static compile-time arguments. Changes to these arguments will trigger
+    re-compilation.
+
+    The Catalyst ``@qjit`` decorator doesn't yet support this functionality.
+
+
+Returning multiple measurements
+-------------------------------
+
+A common pattern in PennyLane is to have multiple return statements within
+a single QNode, allowing the measurement type to alter based on some condition:
+
+.. code-block:: python
+
+    dev = qml.device("default.qubit", wires=2, shots=10)
+
+    @qml.qnode(dev)
+    def circuit(x, sample=False):
+        qml.RX(x, wires=0)
+
+        if sample:
+            return qml.sample(wires=0)
+
+        return qml.expval(qml.PauliZ(0))
+
+This pattern is currently not supported in Catalyst, and will lead to an error:
+
+.. code-block:: python
+
+    dev = qml.device("lightning.qubit", wires=2, shots=10)
+
+    @qjit
+    @qml.qnode(dev)
+    def circuit(x, sample=False):
+        qml.RX(x, wires=0)
+
+        @cond(sample)
+        def measure_fn():
+            return qml.sample(wires=0)
+
+        @measure_fn.otherwise
+        def expval():
+            return qml.expval(qml.PauliZ(0))
+
+        return measure_fn()
+
+>>> circuit(3)
+TypeError: Value sample(wires=[0]) with type <class 'pennylane.measurements.sample.SampleMP'> is not a valid JAX type
+
+It is recommended for now to create separate QNodes if different measurement statistics need to be
+returned, or alternatively using a single return statement with multiple measurements:
+
+>>> @qjit
+... @qml.qnode(dev)
+... def circuit(x):
+...     qml.RX(x, wires=0)
+...     return {"samples": qml.sample(), "expval": qml.expval(qml.PauliZ(0))}
+>>> circuit(0.3)
+{'expval': array(-0.9899925),
+ 'samples': array([[1., 0.],
+        [1., 0.],
+        [1., 0.],
+        [1., 0.],
+        [1., 0.],
+        [1., 0.],
+        [1., 0.],
+        [0., 0.],
+        [1., 0.],
+        [1., 0.]])}
+
+
+Recursion
+---------
+
+Recursion is not currently supported, and will result in errors. For example,
+
+.. code-block:: python
+
+    @qjit(autograph=True)
+    def fibonacci(n: int):
+        if n <= 1:
+            return n
+        return fibonacci(n-1) + fibonacci(n-2)
+
+>>> fibonacci(10)
+RecursionError: maximum recursion depth exceeded in comparison
+
+
+This is due to the fact that during compilation, Catalyst tries to evaluate
+both branches of the conditional statement recursively; because there is
+``n`` is a dynamic variable, it has no concrete value at compile time, and
+tracing can never complete.
+
+Instead, try to write your program without recursion. For example, in this case
+we can use a while loop:
+
+.. code-block:: python
+
+    @qjit
+    def fibonacci(n):
+
+        @catalyst.while_loop(lambda count, *args: count < n)
+        def loop_fn(count, a, b, sum):
+            a, b = b, sum
+            sum = a + b
+            return count + 1, a, b, sum
+
+        _, _, _, result  = loop_fn(1, 0, 1, 1)
+        return result
+
+>>> fibonacci(10)
+array(89)

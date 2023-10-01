@@ -1172,7 +1172,7 @@ def cond(pred: DynamicJaxprTracer):
 
     The conditional function is permitted to also return values.
     Any value that is supported by JAX JIT compilation is supported as a return
-    type. Note that this **does not** include PennyLane operations.
+    type.
 
     .. code-block:: python
 
@@ -1187,6 +1187,69 @@ def cond(pred: DynamicJaxprTracer):
             return "if provided, return types need to be identical in both branches"
 
         ret_val = conditional_fn()  # must invoke the defined function
+
+    .. details::
+        :title: Usage details
+        :href: usage-details
+
+        There are various constraints and restrictions that should be kept in mind
+        when working with classical control in Catalyst.
+
+        The return values of all branches of :func:`~.cond` must be the same type.
+        Returning different types, or ommitting a return value in one branch (e.g.,
+        returning ``None``) but not in others will result in an error.
+
+        >>> @qjit
+        ... def f(x: float):
+        ...     @cond(x > 1.5)
+        ...     def cond_fn():
+        ...         return x ** 2  # float
+        ...     @cond_fn.otherwise
+        ...     def else_branch():
+        ...         return 6  # int
+        ...     return cond_fn()
+        TypeError: Conditional requires consistent return types across all branches, got:
+        - Branch at index 0: [ShapedArray(float64[], weak_type=True)]
+        - Branch at index 1: [ShapedArray(int64[], weak_type=True)]
+        Please specify an else branch if none was specified.
+        >>> @qjit
+        ... def f(x: float):
+        ...     @cond(x > 1.5)
+        ...     def cond_fn():
+        ...         return x ** 2  # float
+        ...     @cond_fn.otherwise
+        ...     def else_branch():
+        ...         return 6.  # float
+        ...     return cond_fn()
+        >>> f(1.5)
+        array(6.)
+
+        Similarly, the else (``my_cond_fn.otherwise``) may be omitted **as long as
+        other branches do not return any values**. If other branches do return values,
+        the else branch must be specified.
+
+        >>> @qjit
+        ... def f(x: float):
+        ...     @cond(x > 1.5)
+        ...     def cond_fn():
+        ...         return x ** 2
+        ...     return cond_fn()
+        TypeError: Conditional requires consistent return types across all branches, got:
+        - Branch at index 0: [ShapedArray(float64[], weak_type=True)]
+        - Branch at index 1: []
+        Please specify an else branch if none was specified.
+
+        >>> @qjit
+        ... def f(x: float):
+        ...     @cond(x > 1.5)
+        ...     def cond_fn():
+        ...         return x ** 2
+        ...     @cond_fn.otherwise
+        ...     def else_branch():
+        ...         return x
+        ...     return cond_fn()
+        >>> f(1.6)
+        array(2.56)
     """
 
     def _decorator(true_fn: Callable):

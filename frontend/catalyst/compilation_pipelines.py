@@ -911,6 +911,82 @@ def qjit(
         3. The list of device-supported gates employed by Catalyst is currently different than that
             of the ``lightning.qubit`` device, as defined by the
             :class:`~.pennylane_extensions.QJITDevice`.
+
+    .. details::
+        :title: Function argument restrictions
+
+        Compiled functions can accept arbitrary function arguments, as long as the
+        inputs can be represented as `Pytrees
+        <https://jax.readthedocs.io/en/latest/pytrees.html>`__ --- tree-like
+        structures built out of Python container objects such as lists, dictionaries,
+        and tuples --- where the *values* (leaf nodes) are compatible types.
+
+        Compatible types includes booleans, Python numeric types, JAX arrays,
+        and PennyLane quantum operators.
+
+        .. note::
+
+            Catalyst currently doesn't support string arguments to compiled functions
+            with the exception of dictionary keys.
+
+        For example, consider the following, where we pass arbitrarily nested lists or
+        dictionaries as input to the compiled function:
+
+        >>> f = qjit(lambda *args: args)
+        >>> x = qml.RX(0.4, wires=0)
+        >>> y = {"apple": (True, jnp.array([0.1, 0.2, 0.3]))}
+        >>> f(x, y)
+        (RX(array(0.4), wires=[0]), {'apple': (array(True), array([0.1, 0.2, 0.3]))})
+
+        Arbitrary objects cannot be passed as function arguments, unless they
+        are registered as Pytrees with compatible data types.
+
+        >>> class MyObject:
+        ...     def __init__(self, x, name):
+        ...         self.x = x
+        ...         self.name = name
+        >>> obj = MyObject(jnp.array(0.4), "test")
+        >>> f(obj)
+        TypeError: Unsupported argument type: <class '__main__.MyObject'>
+
+        By registring it as a Pytree (that is, specifying to JAX the dynamic and static compile-time information, we make this object compatible with Catalyst:
+
+        >>> def flatten_fn(my_object):
+        ...     data = (my_object.x,) # Dynamic variables
+        ...     aux = {"name": my_object.name} # static compile-time data
+        ...     return (data, aux)
+        >>> def unflatten_fn(aux, data):
+        ...     return MyObject(data[0], **aux)
+        >>> register_pytree_node(MyObject, flatten_fn, unflatten_fn)
+        >>> f(obj)
+        <__main__.MyObject at 0x7c061434b820>
+
+        Note that the function will only be re-compiled if the custom objects static
+        compile-time data changes (in this case, ``MyObject.name``); **not** if the
+        dynamic part of the custom object (``MyObject.x``) changes:
+
+        >>> @qjit
+        ... def f(my_object):
+        ...     print("compiling")
+        ...     return my_object.x
+        >>> f(MyObject(jnp.array(0.1), name="test1"))
+        Compiling: name=test1
+        array(0.1)
+        >>> f(MyObject(jnp.array(0.2), name="test1"))
+        array(0.2)
+        >>> f(MyObject(jnp.array(0.2), name="test2"))
+        Compiling: name=test2
+        array(0.2)
+
+        .. note::
+
+            JAX provides a ``static_argnums`` argument for the ``jax.jit`` function,
+            which allows you to specify which arguments to the compile function to treat
+            as static compile-time arguments. Changes to these arguments will trigger
+            re-compilation.
+
+            The Catalyst ``@qjit`` decorator doesn't yet support this functionality.
+
     """
 
     if fn is not None:
