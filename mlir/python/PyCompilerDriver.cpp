@@ -12,23 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <iostream>
-#include <string>
-#include <vector>
+#include "Driver/CompilerDriver.h"
+#include "llvm/Support/raw_ostream.h"
+#include "mlir/IR/BuiltinTypes.h"
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
-#include "mlir/IR/BuiltinTypes.h"
-#include "llvm/Support/raw_ostream.h"
-
-#include "Driver/CompilerDriver.h"
+#include <iostream>
+#include <string>
+#include <vector>
 
 namespace py = pybind11;
 using namespace catalyst::driver;
 
-std::vector<Pipeline> parseCompilerSpec(const py::list &pipelines)
-{
+std::vector<Pipeline> parseCompilerSpec(const py::list& pipelines) {
     std::vector<Pipeline> out;
     for (py::handle obj : pipelines) {
         py::tuple t = obj.cast<py::tuple>();
@@ -45,37 +43,36 @@ std::vector<Pipeline> parseCompilerSpec(const py::list &pipelines)
     return out;
 }
 
-PYBIND11_MODULE(compiler_driver, m)
-{
+PYBIND11_MODULE(compiler_driver, m) {
     //===--------------------------------------------------------------------===//
     // Catalyst Compiler Driver
     //===--------------------------------------------------------------------===//
     py::class_<FunctionAttributes> funcattrs_class(m, "FunctionAttributes");
     funcattrs_class.def(py::init<>())
         .def("get_function_name",
-             [](const FunctionAttributes &fa) -> std::string { return fa.functionName; })
+             [](const FunctionAttributes& fa) -> std::string { return fa.functionName; })
         .def("get_return_type",
-             [](const FunctionAttributes &fa) -> std::string { return fa.returnType; });
+             [](const FunctionAttributes& fa) -> std::string { return fa.returnType; });
 
     py::class_<CompilerOutput> compout_class(m, "CompilerOutput");
     compout_class.def(py::init<>())
         .def("get_pipeline_output",
-             [](const CompilerOutput &co, const std::string &name) -> std::optional<std::string> {
+             [](const CompilerOutput& co, const std::string& name) -> std::optional<std::string> {
                  auto res = co.pipelineOutputs.find(name);
                  return res != co.pipelineOutputs.end() ? res->second
                                                         : std::optional<std::string>();
              })
-        .def("get_output_ir", [](const CompilerOutput &co) -> std::string { return co.outIR; })
+        .def("get_output_ir", [](const CompilerOutput& co) -> std::string { return co.outIR; })
         .def("get_object_filename",
-             [](const CompilerOutput &co) -> std::string { return co.objectFilename; })
+             [](const CompilerOutput& co) -> std::string { return co.objectFilename; })
         .def("get_function_attributes",
-             [](const CompilerOutput &co) -> FunctionAttributes { return co.inferredAttributes; })
+             [](const CompilerOutput& co) -> FunctionAttributes { return co.inferredAttributes; })
         .def("get_diagnostic_messages",
-             [](const CompilerOutput &co) -> std::string { return co.diagnosticMessages; });
+             [](const CompilerOutput& co) -> std::string { return co.diagnosticMessages; });
 
     m.def(
         "run_compiler_driver",
-        [](const char *source, const char *workspace, const char *moduleName, bool keepIntermediate,
+        [](const char* source, const char* workspace, const char* moduleName, bool keepIntermediate,
            bool verbose, py::list pipelines,
            bool lower_to_llvm) -> std::unique_ptr<CompilerOutput> {
             std::unique_ptr<CompilerOutput> output(new CompilerOutput());

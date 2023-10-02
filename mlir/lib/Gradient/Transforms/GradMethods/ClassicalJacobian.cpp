@@ -14,18 +14,17 @@
 
 #include "ClassicalJacobian.hpp"
 
-#include <deque>
-#include <string>
-#include <vector>
-
+#include "Quantum/IR/QuantumInterfaces.h"
+#include "Quantum/IR/QuantumOps.h"
+#include "Quantum/Utils/RemoveQuantumMeasurements.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Index/IR/IndexOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 
-#include "Quantum/IR/QuantumInterfaces.h"
-#include "Quantum/IR/QuantumOps.h"
-#include "Quantum/Utils/RemoveQuantumMeasurements.h"
+#include <deque>
+#include <string>
+#include <vector>
 
 namespace catalyst {
 namespace gradient {
@@ -41,8 +40,7 @@ namespace gradient {
 /// quantum function for the parameter-shift method. However, if this is inefficient in certain
 /// use-cases, other approaches can be employed.
 ///
-func::FuncOp genParamCountFunction(PatternRewriter &rewriter, Location loc, func::FuncOp callee)
-{
+func::FuncOp genParamCountFunction(PatternRewriter& rewriter, Location loc, func::FuncOp callee) {
     // Define the properties of the gate parameter counting version of the function to be
     // differentiated.
     std::string fnName = callee.getSymName().str() + ".pcount";
@@ -70,7 +68,7 @@ func::FuncOp genParamCountFunction(PatternRewriter &rewriter, Location loc, func
         Value cZero = rewriter.create<index::ConstantOp>(loc, 0);
         rewriter.create<memref::StoreOp>(loc, cZero, paramCountBuffer);
 
-        paramCountFn.walk([&](Operation *op) {
+        paramCountFn.walk([&](Operation* op) {
             // For each quantum gate add the number of parameters to the counter.
             if (auto gate = dyn_cast<quantum::DifferentiableGate>(op)) {
                 PatternRewriter::InsertionGuard insertGuard(rewriter);
@@ -106,9 +104,8 @@ func::FuncOp genParamCountFunction(PatternRewriter &rewriter, Location loc, func
     return paramCountFn;
 }
 
-func::FuncOp genSplitPreprocessed(PatternRewriter &rewriter, Location loc, func::FuncOp qnode,
-                                  func::FuncOp qnodeQuantum)
-{
+func::FuncOp genSplitPreprocessed(PatternRewriter& rewriter, Location loc, func::FuncOp qnode,
+                                  func::FuncOp qnodeQuantum) {
     // Define the properties of the split-out preprocessing-only QNode.
     std::string fnName = qnode.getSymName().str() + ".preprocess";
     SmallVector<Type> fnArgTypes(qnode.getArgumentTypes());
@@ -125,7 +122,7 @@ func::FuncOp genSplitPreprocessed(PatternRewriter &rewriter, Location loc, func:
         // qnodeQuantum.
         splitFn = rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility, nullptr, nullptr);
         rewriter.cloneRegionBefore(qnode.getBody(), splitFn.getBody(), splitFn.end());
-        Block &argMapBlock = splitFn.getFunctionBody().front();
+        Block& argMapBlock = splitFn.getFunctionBody().front();
         SmallVector<Value> qnodeQuantumArgs{argMapBlock.getArguments()};
 
         Value paramCount = argMapBlock.addArgument(rewriter.getIndexType(), loc);
@@ -141,7 +138,7 @@ func::FuncOp genSplitPreprocessed(PatternRewriter &rewriter, Location loc, func:
         rewriter.create<memref::StoreOp>(loc, cZero, paramsProcessed);
         Value cOne = rewriter.create<index::ConstantOp>(loc, 1);
 
-        splitFn.walk([&](Operation *op) {
+        splitFn.walk([&](Operation* op) {
             // Insert gate parameters into the params buffer.
             if (auto gate = dyn_cast<quantum::DifferentiableGate>(op)) {
                 PatternRewriter::InsertionGuard insertGuard(rewriter);
@@ -186,8 +183,7 @@ func::FuncOp genSplitPreprocessed(PatternRewriter &rewriter, Location loc, func:
 /// its jacobian separately in order to combine it with quantum-only gradients such as the
 /// parameter-shift or adjoint method.
 ///
-func::FuncOp genArgMapFunction(PatternRewriter &rewriter, Location loc, func::FuncOp callee)
-{
+func::FuncOp genArgMapFunction(PatternRewriter& rewriter, Location loc, func::FuncOp callee) {
     // Define the properties of the classical preprocessing function.
     std::string fnName = callee.getSymName().str() + ".argmap";
     SmallVector<Type> fnArgTypes(callee.getArgumentTypes());
@@ -204,7 +200,7 @@ func::FuncOp genArgMapFunction(PatternRewriter &rewriter, Location loc, func::Fu
         // input to the new function.
         argMapFn = rewriter.create<func::FuncOp>(loc, fnName, fnType, visibility, nullptr, nullptr);
         rewriter.cloneRegionBefore(callee.getBody(), argMapFn.getBody(), argMapFn.end());
-        Block &argMapBlock = argMapFn.getFunctionBody().front();
+        Block& argMapBlock = argMapFn.getFunctionBody().front();
         // Allocate the memory for the gate parameters collected at runtime
         Value numParams = argMapBlock.addArgument(rewriter.getIndexType(), loc);
         auto paramsBufferType =
@@ -220,7 +216,7 @@ func::FuncOp genArgMapFunction(PatternRewriter &rewriter, Location loc, func::Fu
         rewriter.create<memref::StoreOp>(loc, cZero, paramsProcessed);
         Value cOne = rewriter.create<index::ConstantOp>(loc, 1);
 
-        argMapFn.walk([&](Operation *op) {
+        argMapFn.walk([&](Operation* op) {
             // Insert gate parameters into the params buffer.
             if (auto gate = dyn_cast<quantum::DifferentiableGate>(op)) {
                 PatternRewriter::InsertionGuard insertGuard(rewriter);
@@ -237,8 +233,7 @@ func::FuncOp genArgMapFunction(PatternRewriter &rewriter, Location loc, func::Fu
                 }
 
                 rewriter.replaceOp(op, gate.getQubitOperands());
-            }
-            else if (auto returnOp = dyn_cast<func::ReturnOp>(op)) {
+            } else if (auto returnOp = dyn_cast<func::ReturnOp>(op)) {
                 PatternRewriter::InsertionGuard insertionGuard(rewriter);
                 rewriter.setInsertionPoint(returnOp);
                 Value paramsVector =

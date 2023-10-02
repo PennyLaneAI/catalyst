@@ -14,16 +14,15 @@
 
 #pragma once
 
+#include "Exception.hpp"
+#include "OpenQasmBuilder.hpp"
+#include "Types.h"
+#include "Utils.hpp"
+
 #include <array>
 #include <stdexcept>
 #include <tuple>
 #include <utility>
-
-#include "Exception.hpp"
-#include "OpenQasmBuilder.hpp"
-#include "Utils.hpp"
-
-#include "Types.h"
 
 namespace Catalyst::Runtime::Device::OpenQasm {
 
@@ -46,10 +45,10 @@ class OpenQasmObsManager {
     OpenQasmObsManager() = default;
     ~OpenQasmObsManager() = default;
 
-    OpenQasmObsManager(const OpenQasmObsManager &) = delete;
-    OpenQasmObsManager &operator=(const OpenQasmObsManager &) = delete;
-    OpenQasmObsManager(OpenQasmObsManager &&) = delete;
-    OpenQasmObsManager &operator=(OpenQasmObsManager &&) = delete;
+    OpenQasmObsManager(const OpenQasmObsManager&) = delete;
+    OpenQasmObsManager& operator=(const OpenQasmObsManager&) = delete;
+    OpenQasmObsManager(OpenQasmObsManager&&) = delete;
+    OpenQasmObsManager& operator=(OpenQasmObsManager&&) = delete;
 
     /**
      * @brief A helper function to clear constructed observables in the program.
@@ -62,8 +61,7 @@ class OpenQasmObsManager {
      * @param obsKeys The vector of observable keys
      * @return bool
      */
-    [[nodiscard]] auto isValidObservables(const std::vector<ObsIdType> &obsKeys) const -> bool
-    {
+    [[nodiscard]] auto isValidObservables(const std::vector<ObsIdType>& obsKeys) const -> bool {
         return std::all_of(obsKeys.begin(), obsKeys.end(), [this](auto i) {
             return (i >= 0 && static_cast<size_t>(i) < observables_.size());
         });
@@ -75,8 +73,7 @@ class OpenQasmObsManager {
      * @param key The observable key
      * @return std::shared_ptr<ObservableClassName>
      */
-    [[nodiscard]] auto getObservable(ObsIdType key) -> std::shared_ptr<QasmObs>
-    {
+    [[nodiscard]] auto getObservable(ObsIdType key) -> std::shared_ptr<QasmObs> {
         RT_FAIL_IF(!isValidObservables({key}), "Invalid observable key");
         return std::get<0>(observables_[key]);
     }
@@ -95,11 +92,10 @@ class OpenQasmObsManager {
      * @param wires The vector of wires the observable acts on
      * @return ObsIdType
      */
-    [[nodiscard]] auto createNamedObs(ObsId obsId, const std::vector<size_t> &wires) -> ObsIdType
-    {
+    [[nodiscard]] auto createNamedObs(ObsId obsId, const std::vector<size_t>& wires) -> ObsIdType {
         using namespace Catalyst::Runtime::Simulator::Lightning;
 
-        auto &&obs_str = std::string(
+        auto&& obs_str = std::string(
             lookup_obs<simulator_observable_support_size>(simulator_observable_support, obsId));
 
         observables_.push_back(
@@ -115,9 +111,8 @@ class OpenQasmObsManager {
      * @return ObsIdType
      */
     [[nodiscard]] auto
-    createHermitianObs([[maybe_unused]] const std::vector<std::complex<double>> &matrix,
-                       [[maybe_unused]] const std::vector<size_t> &wires) -> ObsIdType
-    {
+    createHermitianObs([[maybe_unused]] const std::vector<std::complex<double>>& matrix,
+                       [[maybe_unused]] const std::vector<size_t>& wires) -> ObsIdType {
         observables_.push_back(std::make_pair(
             std::make_shared<QasmHermitianObs>(QasmHermitianObs{matrix, wires}), ObsType::Basic));
 
@@ -130,18 +125,17 @@ class OpenQasmObsManager {
      * @param obsKeys The vector of observable keys
      * @return ObsIdType
      */
-    [[nodiscard]] auto createTensorProdObs(const std::vector<ObsIdType> &obsKeys) -> ObsIdType
-    {
+    [[nodiscard]] auto createTensorProdObs(const std::vector<ObsIdType>& obsKeys) -> ObsIdType {
         const auto key_size = obsKeys.size();
         const auto obs_size = observables_.size();
 
         std::vector<std::shared_ptr<QasmObs>> obs_vec;
         obs_vec.reserve(key_size);
 
-        for (const auto &key : obsKeys) {
+        for (const auto& key : obsKeys) {
             RT_FAIL_IF(static_cast<size_t>(key) >= obs_size || key < 0, "Invalid observable key");
 
-            auto &&[obs, type] = observables_[key];
+            auto&& [obs, type] = observables_[key];
 
             RT_FAIL_IF(type != ObsType::Basic, "Invalid basic observable to construct TensorProd; "
                                                "NamedObs and HermitianObs are only supported");
@@ -163,9 +157,8 @@ class OpenQasmObsManager {
      * @param obsKeys The vector of observable keys
      * @return ObsIdType
      */
-    [[nodiscard]] auto createHamiltonianObs(const std::vector<double> &coeffs,
-                                            const std::vector<ObsIdType> &obsKeys) -> ObsIdType
-    {
+    [[nodiscard]] auto createHamiltonianObs(const std::vector<double>& coeffs,
+                                            const std::vector<ObsIdType>& obsKeys) -> ObsIdType {
         const auto key_size = obsKeys.size();
         const auto obs_size = observables_.size();
 
@@ -179,7 +172,7 @@ class OpenQasmObsManager {
         for (auto key : obsKeys) {
             RT_FAIL_IF(static_cast<size_t>(key) >= obs_size || key < 0, "Invalid observable key");
 
-            auto &&[obs, type] = observables_[key];
+            auto&& [obs, type] = observables_[key];
             auto contain_obs = std::find(hamiltonian_valid_obs_types.begin(),
                                          hamiltonian_valid_obs_types.end(), type);
 

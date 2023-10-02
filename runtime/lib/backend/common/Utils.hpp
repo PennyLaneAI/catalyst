@@ -14,6 +14,9 @@
 
 #pragma once
 
+#include "Exception.hpp"
+#include "Types.h"
+
 #include <algorithm>
 #include <array>
 #include <sstream>
@@ -23,20 +26,15 @@
 #include <unordered_map>
 #include <utility>
 
-#include "Exception.hpp"
-#include "Types.h"
-
 #if __has_include("StateVectorLQubitDynamic.hpp")
 #include "Util.hpp"
 #endif
 
 namespace Catalyst::Runtime::Simulator {
-static inline auto parse_kwargs(std::string kwargs) -> std::unordered_map<std::string, std::string>
-{
+static inline auto parse_kwargs(std::string kwargs)
+    -> std::unordered_map<std::string, std::string> {
     // cleaning kwargs
-    if (kwargs.empty()) {
-        return {};
-    }
+    if (kwargs.empty()) { return {}; }
 
     std::unordered_map<std::string, std::string> map;
     size_t s3_pos = kwargs.find("\'s3_destination_folder\'");
@@ -53,13 +51,11 @@ static inline auto parse_kwargs(std::string kwargs) -> std::unordered_map<std::s
     kwargs.erase(std::remove_if(kwargs.begin(), kwargs_end_iter,
                                 [](char c) {
                                     switch (c) {
-                                    case '{':
-                                    case '}':
-                                    case ' ':
-                                    case '\'':
-                                        return true;
-                                    default:
-                                        return false;
+                                        case '{':
+                                        case '}':
+                                        case ' ':
+                                        case '\'': return true;
+                                        default: return false;
                                     }
                                 }),
                  kwargs.end());
@@ -176,38 +172,29 @@ template <size_t size = simulator_gate_info_size>
 using SimulatorGateInfoDataT = std::array<GateInfoTupleT, size>;
 
 template <size_t size = simulator_observable_support_size>
-constexpr auto lookup_obs(const std::array<std::tuple<ObsId, std::string_view, bool>, size> &arr,
-                          const ObsId key) -> std::string_view
-{
+constexpr auto lookup_obs(const std::array<std::tuple<ObsId, std::string_view, bool>, size>& arr,
+                          const ObsId key) -> std::string_view {
     for (size_t idx = 0; idx < size; idx++) {
-        auto &&[op_id, op_str, op_support] = arr[idx];
-        if (op_id == key && op_support) {
-            return op_str;
-        }
+        auto&& [op_id, op_str, op_support] = arr[idx];
+        if (op_id == key && op_support) { return op_str; }
     }
     throw std::range_error("The given observable is not supported by the simulator");
 }
 
 template <size_t size = simulator_gate_info_size>
-constexpr auto lookup_gates(const SimulatorGateInfoDataT<size> &arr, const std::string &key)
-    -> std::pair<size_t, size_t>
-{
+constexpr auto lookup_gates(const SimulatorGateInfoDataT<size>& arr, const std::string& key)
+    -> std::pair<size_t, size_t> {
     for (size_t idx = 0; idx < size; idx++) {
-        auto &&[op, op_str, op_num_wires, op_num_params] = arr[idx];
-        if (op_str == key) {
-            return std::make_pair(op_num_wires, op_num_params);
-        }
+        auto&& [op, op_str, op_num_wires, op_num_params] = arr[idx];
+        if (op_str == key) { return std::make_pair(op_num_wires, op_num_params); }
     }
     throw std::range_error("The given operation is not supported by the simulator");
 }
 
 template <size_t size = simulator_gate_info_size>
-constexpr auto has_gate(const SimulatorGateInfoDataT<size> &arr, const std::string &key) -> bool
-{
+constexpr auto has_gate(const SimulatorGateInfoDataT<size>& arr, const std::string& key) -> bool {
     for (size_t idx = 0; idx < size; idx++) {
-        if (std::get<1>(arr[idx]) == key) {
-            return true;
-        }
+        if (std::get<1>(arr[idx]) == key) { return true; }
     }
     return false;
 }

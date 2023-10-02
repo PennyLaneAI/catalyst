@@ -21,9 +21,9 @@
 namespace catalyst {
 namespace gradient {
 
-void populateBufferizationPatterns(mlir::TypeConverter &, mlir::RewritePatternSet &);
-void populateLoweringPatterns(mlir::RewritePatternSet &);
-void populateConversionPatterns(mlir::LLVMTypeConverter &, mlir::RewritePatternSet &);
+void populateBufferizationPatterns(mlir::TypeConverter&, mlir::RewritePatternSet&);
+void populateLoweringPatterns(mlir::RewritePatternSet&);
+void populateConversionPatterns(mlir::LLVMTypeConverter&, mlir::RewritePatternSet&);
 
 } // namespace gradient
 } // namespace catalyst

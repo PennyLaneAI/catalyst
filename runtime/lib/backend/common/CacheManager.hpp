@@ -14,11 +14,11 @@
 
 #pragma once
 
-#include <string>
-#include <vector>
-
 #include "Types.h"
 #include "Utils.hpp"
+
+#include <string>
+#include <vector>
 
 namespace Catalyst::Runtime::Simulator {
 /**
@@ -48,16 +48,15 @@ class CacheManager {
     CacheManager() = default;
     ~CacheManager() = default;
 
-    CacheManager(const CacheManager &) = delete;
-    CacheManager &operator=(const CacheManager &) = delete;
-    CacheManager(CacheManager &&) = delete;
-    CacheManager &operator=(CacheManager &&) = delete;
+    CacheManager(const CacheManager&) = delete;
+    CacheManager& operator=(const CacheManager&) = delete;
+    CacheManager(CacheManager&&) = delete;
+    CacheManager& operator=(CacheManager&&) = delete;
 
     /**
      * Reset cached gates
      */
-    void Reset()
-    {
+    void Reset() {
         this->ops_names_.clear();
         this->ops_params_.clear();
         this->ops_wires_.clear();
@@ -77,9 +76,8 @@ class CacheManager {
      * @param wires Wires the gate acts on
      * @param inverse If true, inverse of the gate is applied
      */
-    void addOperation(const std::string &name, const std::vector<double> &params,
-                      const std::vector<size_t> &dev_wires, bool inverse)
-    {
+    void addOperation(const std::string& name, const std::vector<double>& params,
+                      const std::vector<size_t>& dev_wires, bool inverse) {
         this->ops_names_.push_back(name);
         this->ops_params_.push_back(params);
 
@@ -101,8 +99,7 @@ class CacheManager {
      * @param callee The measurement operation
      */
     void addObservable(const ObsIdType id,
-                       const Lightning::Measurements &callee = Lightning::Measurements::None)
-    {
+                       const Lightning::Measurements& callee = Lightning::Measurements::None) {
         this->obs_keys_.push_back(id);
         this->obs_callees_.push_back(callee);
     }
@@ -110,47 +107,43 @@ class CacheManager {
     /**
      * @brief Get a reference to observables keys.
      */
-    auto getObservablesKeys() -> const std::vector<ObsIdType> & { return this->obs_keys_; }
+    auto getObservablesKeys() -> const std::vector<ObsIdType>& { return this->obs_keys_; }
 
     /**
      * @brief Get a reference to observables callees.
      */
-    auto getObservablesCallees() -> const std::vector<Lightning::Measurements> &
-    {
+    auto getObservablesCallees() -> const std::vector<Lightning::Measurements>& {
         return this->obs_callees_;
     }
 
     /**
      * @brief Get a reference to operations names.
      */
-    auto getOperationsNames() -> const std::vector<std::string> & { return this->ops_names_; }
+    auto getOperationsNames() -> const std::vector<std::string>& { return this->ops_names_; }
 
     /**
      * @brief Get a a reference to operations parameters.
      */
-    auto getOperationsParameters() -> const std::vector<std::vector<double>> &
-    {
+    auto getOperationsParameters() -> const std::vector<std::vector<double>>& {
         return this->ops_params_;
     }
 
     /**
      * @brief Get a a reference to operations wires.
      */
-    auto getOperationsWires() -> const std::vector<std::vector<size_t>> &
-    {
+    auto getOperationsWires() -> const std::vector<std::vector<size_t>>& {
         return this->ops_wires_;
     }
 
     /**
      * @brief Get a reference to operations inverses.
      */
-    auto getOperationsInverses() -> const std::vector<bool> & { return this->ops_inverses_; }
+    auto getOperationsInverses() -> const std::vector<bool>& { return this->ops_inverses_; }
 
     /**
      * @brief Get total number of cached gates.
      */
-    [[nodiscard]] auto getNumGates() const -> size_t
-    {
+    [[nodiscard]] auto getNumGates() const -> size_t {
         return this->ops_names_.size() + this->obs_keys_.size();
     }
 

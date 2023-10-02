@@ -14,12 +14,11 @@
 
 #pragma once
 
-#include <vector>
-
+#include "Gradient/IR/GradientOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/PatternMatch.h"
 
-#include "Gradient/IR/GradientOps.h"
+#include <vector>
 
 using namespace mlir;
 
@@ -30,11 +29,11 @@ struct FiniteDiffLowering : public OpRewritePattern<GradOp> {
     using OpRewritePattern<GradOp>::OpRewritePattern;
 
     LogicalResult match(GradOp op) const override;
-    void rewrite(GradOp op, PatternRewriter &rewriter) const override;
+    void rewrite(GradOp op, PatternRewriter& rewriter) const override;
 
   private:
-    static void computeFiniteDiff(PatternRewriter &rewriter, Location loc, func::FuncOp gradFn,
-                                  func::FuncOp callee, const std::vector<size_t> &diffArgIndices,
+    static void computeFiniteDiff(PatternRewriter& rewriter, Location loc, func::FuncOp gradFn,
+                                  func::FuncOp callee, const std::vector<size_t>& diffArgIndices,
                                   double hValue);
 };
 

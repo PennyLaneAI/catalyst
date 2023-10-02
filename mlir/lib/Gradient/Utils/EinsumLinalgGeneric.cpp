@@ -12,35 +12,33 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "Gradient/Utils/EinsumLinalgGeneric.h"
+
+#include "llvm/ADT/ArrayRef.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Location.h"
-#include "llvm/ADT/ArrayRef.h"
-
-#include "Gradient/Utils/EinsumLinalgGeneric.h"
 
 using namespace mlir;
 
 namespace catalyst {
 
-Value buildBufferLinalgGeneric(OpBuilder &builder, Location loc, ValueRange operands, Value output,
+Value buildBufferLinalgGeneric(OpBuilder& builder, Location loc, ValueRange operands, Value output,
                                ArrayRef<AffineMap> indexingMaps,
                                ArrayRef<utils::IteratorType> iteratorTypes,
-                               function_ref<void(OpBuilder &, Location, ValueRange)> buildBody)
-{
+                               function_ref<void(OpBuilder&, Location, ValueRange)> buildBody) {
     builder.create<linalg::GenericOp>(loc, operands, output, indexingMaps, iteratorTypes,
                                       buildBody);
     return output;
 }
 
-Value buildTensorLinalgGeneric(OpBuilder &builder, Location loc, ValueRange operands,
+Value buildTensorLinalgGeneric(OpBuilder& builder, Location loc, ValueRange operands,
                                RankedTensorType resultType, ArrayRef<AffineMap> indexingMaps,
                                ArrayRef<utils::IteratorType> iteratorTypes,
-                               function_ref<void(OpBuilder &, Location, ValueRange)> buildBody)
-{
+                               function_ref<void(OpBuilder&, Location, ValueRange)> buildBody) {
     // Initialize the result tensor
     FloatType elementType = cast<FloatType>(resultType.getElementType());
     Value zero = builder.create<arith::ConstantFloatOp>(
@@ -54,10 +52,9 @@ Value buildTensorLinalgGeneric(OpBuilder &builder, Location loc, ValueRange oper
     return genericOp.getResult(0);
 }
 
-void inferIndexingMaps(MLIRContext *ctx, unsigned numDims, ArrayRef<int64_t> axisCodesA,
+void inferIndexingMaps(MLIRContext* ctx, unsigned numDims, ArrayRef<int64_t> axisCodesA,
                        ArrayRef<int64_t> axisCodesB, ArrayRef<int64_t> axisCodesResult,
-                       SmallVectorImpl<AffineMap> &indexingMaps)
-{
+                       SmallVectorImpl<AffineMap>& indexingMaps) {
     for (const auto axis : {axisCodesA, axisCodesB, axisCodesResult}) {
         SmallVector<AffineExpr> aexprs;
         for (const auto a : axis) {
@@ -67,29 +64,26 @@ void inferIndexingMaps(MLIRContext *ctx, unsigned numDims, ArrayRef<int64_t> axi
     };
 }
 
-void inferIteratorTypes(const std::map<int64_t, int64_t> &axisDims,
+void inferIteratorTypes(const std::map<int64_t, int64_t>& axisDims,
                         ArrayRef<int64_t> axisCodesResult,
-                        SmallVectorImpl<utils::IteratorType> &iteratorTypes)
-{
+                        SmallVectorImpl<utils::IteratorType>& iteratorTypes) {
     DenseSet<int64_t> outCodes{axisCodesResult.begin(), axisCodesResult.end()};
-    for (const auto &[code, _size] : axisDims) {
+    for (const auto& [code, _size] : axisDims) {
         iteratorTypes.push_back(outCodes.contains(code) ? utils::IteratorType::reduction
                                                         : utils::IteratorType::parallel);
     }
 }
 
-Value einsumLinalgGeneric(OpBuilder &ob, Location loc, ArrayRef<int64_t> axisCodesA,
+Value einsumLinalgGeneric(OpBuilder& ob, Location loc, ArrayRef<int64_t> axisCodesA,
                           ArrayRef<int64_t> axisCodesB, ArrayRef<int64_t> axisCodesResult, Value a,
-                          Value b, std::optional<Value> bufferOut)
-{
+                          Value b, std::optional<Value> bufferOut) {
     bool useBufferSemantics = bufferOut.has_value();
     if (useBufferSemantics) {
         assert(isa<MemRefType>(a.getType()) && isa<MemRefType>(b.getType()) &&
                isa<MemRefType>(bufferOut->getType()) &&
                "einsumLinalgGeneric with buffer output expects operands and output to have "
                "MemRefType");
-    }
-    else {
+    } else {
         assert(
             isa<RankedTensorType>(a.getType()) && isa<RankedTensorType>(b.getType()) &&
             "einsumLinalgGeneric with no buffer output expects operands to have RankedTensorType");
@@ -113,7 +107,7 @@ Value einsumLinalgGeneric(OpBuilder &ob, Location loc, ArrayRef<int64_t> axisCod
     inferIndexingMaps(ob.getContext(), axisDims.size(), axisCodesA, axisCodesB, axisCodesResult,
                       maps);
     inferIteratorTypes(axisDims, axisCodesResult, iteratorTypes);
-    auto bodyBuilder = [](OpBuilder &builder, Location loc, ValueRange args) {
+    auto bodyBuilder = [](OpBuilder& builder, Location loc, ValueRange args) {
         builder.create<linalg::YieldOp>(
             loc, Value(builder.create<arith::AddFOp>(
                      loc, args[2], builder.create<arith::MulFOp>(loc, args[0], args[1]))));

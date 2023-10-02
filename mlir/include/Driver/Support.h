@@ -14,21 +14,19 @@
 
 #pragma once
 
+#include "CompilerDriver.h"
+#include "llvm/Support/raw_ostream.h"
+#include "mlir/Support/LogicalResult.h"
+
 #include <filesystem>
 #include <string>
-
-#include "mlir/Support/LogicalResult.h"
-#include "llvm/Support/raw_ostream.h"
-
-#include "CompilerDriver.h"
 
 namespace catalyst {
 namespace driver {
 
 template <typename Obj>
-mlir::LogicalResult dumpToFile(const CompilerOptions &options, mlir::StringRef fileName,
-                               const Obj &obj)
-{
+mlir::LogicalResult dumpToFile(const CompilerOptions& options, mlir::StringRef fileName,
+                               const Obj& obj) {
     using std::filesystem::path;
     std::error_code errCode;
     std::string outFileName = path(options.workspace.str()) / path(fileName.str());

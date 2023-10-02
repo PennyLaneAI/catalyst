@@ -14,12 +14,12 @@
 
 #pragma once
 
+#include "DataView.hpp"
+#include "Types.h"
+
 #include <complex>
 #include <memory>
 #include <vector>
-
-#include "DataView.hpp"
-#include "Types.h"
 
 namespace Catalyst::Runtime {
 
@@ -39,10 +39,10 @@ struct QuantumDevice {
     QuantumDevice() = default;          // LCOV_EXCL_LINE
     virtual ~QuantumDevice() = default; // LCOV_EXCL_LINE
 
-    QuantumDevice &operator=(const QuantumDevice &) = delete;
-    QuantumDevice(const QuantumDevice &) = delete;
-    QuantumDevice(QuantumDevice &&) = delete;
-    QuantumDevice &operator=(QuantumDevice &&) = delete;
+    QuantumDevice& operator=(const QuantumDevice&) = delete;
+    QuantumDevice(const QuantumDevice&) = delete;
+    QuantumDevice(QuantumDevice&&) = delete;
+    QuantumDevice& operator=(QuantumDevice&&) = delete;
 
     /**
      * @brief Allocate a qubit.
@@ -131,8 +131,8 @@ struct QuantumDevice {
      * @param wires Wires to apply gate to
      * @param inverse Indicates whether to use inverse of gate
      */
-    virtual void NamedOperation(const std::string &name, const std::vector<double> &params,
-                                const std::vector<QubitIdType> &wires, bool inverse) = 0;
+    virtual void NamedOperation(const std::string& name, const std::vector<double>& params,
+                                const std::vector<QubitIdType>& wires, bool inverse) = 0;
 
     /**
      * @brief Apply a given matrix directly to the state vector of a device.
@@ -141,8 +141,8 @@ struct QuantumDevice {
      * @param wires Wires to apply gate to
      * @param inverse Indicates whether to use inverse of gate
      */
-    virtual void MatrixOperation(const std::vector<std::complex<double>> &matrix,
-                                 const std::vector<QubitIdType> &wires, bool inverse) = 0;
+    virtual void MatrixOperation(const std::vector<std::complex<double>>& matrix,
+                                 const std::vector<QubitIdType>& wires, bool inverse) = 0;
 
     /**
      * @brief Construct a named (Identity, PauliX, PauliY, PauliZ, and Hadamard)
@@ -154,8 +154,8 @@ struct QuantumDevice {
      *
      * @return `ObsIdType` Index of the constructed observable
      */
-    virtual auto Observable(ObsId id, const std::vector<std::complex<double>> &matrix,
-                            const std::vector<QubitIdType> &wires) -> ObsIdType = 0;
+    virtual auto Observable(ObsId id, const std::vector<std::complex<double>>& matrix,
+                            const std::vector<QubitIdType>& wires) -> ObsIdType = 0;
 
     /**
      * @brief Construct a tensor product of observables.
@@ -164,7 +164,7 @@ struct QuantumDevice {
      *
      * @return `ObsIdType` Index of the constructed observable
      */
-    virtual auto TensorObservable(const std::vector<ObsIdType> &obs) -> ObsIdType = 0;
+    virtual auto TensorObservable(const std::vector<ObsIdType>& obs) -> ObsIdType = 0;
 
     /**
      * @brief Construct a Hamiltonian observable.
@@ -174,8 +174,8 @@ struct QuantumDevice {
      *
      * @return `ObsIdType` Index of the constructed observable
      */
-    virtual auto HamiltonianObservable(const std::vector<double> &coeffs,
-                                       const std::vector<ObsIdType> &obs) -> ObsIdType = 0;
+    virtual auto HamiltonianObservable(const std::vector<double>& coeffs,
+                                       const std::vector<ObsIdType>& obs) -> ObsIdType = 0;
 
     /**
      * @brief Compute the expected value of an observable.
@@ -200,14 +200,14 @@ struct QuantumDevice {
      *
      * @param state The pre-allocated `DataView<complex<double>, 1>`
      */
-    virtual void State(DataView<std::complex<double>, 1> &state) = 0;
+    virtual void State(DataView<std::complex<double>, 1>& state) = 0;
 
     /**
      * @brief Compute the probabilities of each computational basis state.
 
      * @param probs The pre-allocated `DataView<double, 1>`
      */
-    virtual void Probs(DataView<double, 1> &probs) = 0;
+    virtual void Probs(DataView<double, 1>& probs) = 0;
 
     /**
      * @brief Compute the probabilities for a subset of the full system.
@@ -215,8 +215,8 @@ struct QuantumDevice {
      * @param probs The pre-allocated `DataView<double, 1>`
      * @param wires Wires will restrict probabilities to a subset of the full system
      */
-    virtual void PartialProbs(DataView<double, 1> &probs,
-                              const std::vector<QubitIdType> &wires) = 0;
+    virtual void PartialProbs(DataView<double, 1>& probs,
+                              const std::vector<QubitIdType>& wires) = 0;
 
     /**
      * @brief Compute samples with the number of shots on the entire wires,
@@ -227,7 +227,7 @@ struct QuantumDevice {
      * iterates over all elements of `samples` row-wise.
      * @param shots The number of shots
      */
-    virtual void Sample(DataView<double, 2> &samples, size_t shots) = 0;
+    virtual void Sample(DataView<double, 2>& samples, size_t shots) = 0;
 
     /**
      * @brief Compute partial samples with the number of shots on `wires`,
@@ -239,7 +239,7 @@ struct QuantumDevice {
      * @param wires Wires to compute samples on
      * @param shots The number of shots
      */
-    virtual void PartialSample(DataView<double, 2> &samples, const std::vector<QubitIdType> &wires,
+    virtual void PartialSample(DataView<double, 2>& samples, const std::vector<QubitIdType>& wires,
                                size_t shots) = 0;
 
     /**
@@ -250,7 +250,7 @@ struct QuantumDevice {
      * @param counts The pre-allocated `DataView<int64_t, 1>`
      * @param shots The number of shots
      */
-    virtual void Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts,
+    virtual void Counts(DataView<double, 1>& eigvals, DataView<int64_t, 1>& counts,
                         size_t shots) = 0;
 
     /**
@@ -262,8 +262,8 @@ struct QuantumDevice {
      * @param wires Wires to compute samples on
      * @param shots The number of shots
      */
-    virtual void PartialCounts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts,
-                               const std::vector<QubitIdType> &wires, size_t shots) = 0;
+    virtual void PartialCounts(DataView<double, 1>& eigvals, DataView<int64_t, 1>& counts,
+                               const std::vector<QubitIdType>& wires, size_t shots) = 0;
 
     /**
      * @brief A general measurement method that acts on a single wire.
@@ -285,7 +285,7 @@ struct QuantumDevice {
      * would be assumed trainable
      *
      */
-    virtual void Gradient(std::vector<DataView<double, 1>> &gradients,
-                          const std::vector<size_t> &trainParams) = 0;
+    virtual void Gradient(std::vector<DataView<double, 1>>& gradients,
+                          const std::vector<size_t>& trainParams) = 0;
 };
 } // namespace Catalyst::Runtime

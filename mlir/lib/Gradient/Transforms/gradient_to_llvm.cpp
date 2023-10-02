@@ -12,6 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "Gradient/IR/GradientDialect.h"
+#include "Gradient/Transforms/Passes.h"
+#include "Gradient/Transforms/Patterns.h"
+#include "Quantum/IR/QuantumDialect.h"
 #include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -21,11 +25,6 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/BuiltinOps.h"
-
-#include "Gradient/IR/GradientDialect.h"
-#include "Gradient/Transforms/Passes.h"
-#include "Gradient/Transforms/Patterns.h"
-#include "Quantum/IR/QuantumDialect.h"
 
 using namespace mlir;
 using namespace catalyst::gradient;
@@ -40,9 +39,8 @@ namespace gradient {
 struct GradientConversionPass : impl::GradientConversionPassBase<GradientConversionPass> {
     using GradientConversionPassBase::GradientConversionPassBase;
 
-    void runOnOperation() final
-    {
-        MLIRContext *context = &getContext();
+    void runOnOperation() final {
+        MLIRContext* context = &getContext();
         LowerToLLVMOptions options(context);
         options.useGenericFunctions = useGenericFunctions;
 
@@ -65,8 +63,7 @@ struct GradientConversionPass : impl::GradientConversionPassBase<GradientConvers
 
 } // namespace gradient
 
-std::unique_ptr<Pass> createGradientConversionPass()
-{
+std::unique_ptr<Pass> createGradientConversionPass() {
     return std::make_unique<gradient::GradientConversionPass>();
 }
 

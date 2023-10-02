@@ -12,6 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "LinearAlgebra.hpp"
+#include "StateVectorLQubitDynamic.hpp"
+#include "TestHelpers.hpp"
+#include "Util.hpp"
+#include "cpu_kernels/GateImplementationsPI.hpp"
+
+#include <StateVectorLQubit.hpp>
+
 #include <algorithm>
 #include <complex>
 #include <iostream>
@@ -21,31 +29,19 @@
 #include <utility>
 #include <vector>
 
-#include "LinearAlgebra.hpp"
-#include "StateVectorLQubitDynamic.hpp"
-#include "Util.hpp"
-#include "cpu_kernels/GateImplementationsPI.hpp"
-#include <StateVectorLQubit.hpp>
-
-#include "TestHelpers.hpp"
-
 using namespace Pennylane::LightningQubit;
 
 TEMPLATE_TEST_CASE("StateVectorLQubitDynamic::StateVectorLQubitDynamic",
-                   "[StateVectorLQubitDynamic]", float, double)
-{
+                   "[StateVectorLQubitDynamic]", float, double) {
     using PrecisionT = TestType;
 
-    SECTION("StateVectorLQubitDynamic")
-    {
+    SECTION("StateVectorLQubitDynamic") {
         CHECK(!std::is_constructible_v<StateVectorLQubitDynamic<>>);
     }
-    SECTION("StateVectorLQubitDynamic<TestType>")
-    {
+    SECTION("StateVectorLQubitDynamic<TestType>") {
         CHECK(!std::is_constructible_v<StateVectorLQubitDynamic<TestType>>);
     }
-    SECTION("StateVectorLQubitDynamic<TestType> {size_t}")
-    {
+    SECTION("StateVectorLQubitDynamic<TestType> {size_t}") {
         CHECK(std::is_constructible_v<StateVectorLQubitDynamic<TestType>, size_t>);
         const size_t num_qubits = 4;
         StateVectorLQubitDynamic<PrecisionT> sv(num_qubits);
@@ -55,16 +51,13 @@ TEMPLATE_TEST_CASE("StateVectorLQubitDynamic::StateVectorLQubitDynamic",
         CHECK(sv.getDataVector().size() == 16);
     }
     SECTION("StateVectorLQubitDynamic<TestType> {const "
-            "StateVectorLQubitDynamic<TestType>&}")
-    {
+            "StateVectorLQubitDynamic<TestType>&}") {
         CHECK(std::is_copy_constructible_v<StateVectorLQubitDynamic<TestType>>);
     }
-    SECTION("StateVectorLQubitDynamic<TestType> {StateVectorLQubitDynamic<TestType>&&}")
-    {
+    SECTION("StateVectorLQubitDynamic<TestType> {StateVectorLQubitDynamic<TestType>&&}") {
         CHECK(std::is_move_constructible_v<StateVectorLQubitDynamic<TestType>>);
     }
-    SECTION("Aligned 256bit statevector")
-    {
+    SECTION("Aligned 256bit statevector") {
         const auto memory_model = CPUMemoryModel::Aligned256;
         StateVectorLQubitDynamic<PrecisionT> sv(4, Threading::SingleThread, memory_model);
         /* Even when we allocate 256 bit aligend memory, it is possible that the
@@ -73,8 +66,7 @@ TEMPLATE_TEST_CASE("StateVectorLQubitDynamic::StateVectorLQubitDynamic",
                (getMemoryModel(sv.getDataVector().data()) == CPUMemoryModel::Aligned512)));
     }
 
-    SECTION("Aligned 512bit statevector")
-    {
+    SECTION("Aligned 512bit statevector") {
         const auto memory_model = CPUMemoryModel::Aligned512;
         StateVectorLQubitDynamic<PrecisionT> sv(4, Threading::SingleThread, memory_model);
         CHECK((getMemoryModel(sv.getDataVector().data()) == CPUMemoryModel::Aligned512));
@@ -82,11 +74,9 @@ TEMPLATE_TEST_CASE("StateVectorLQubitDynamic::StateVectorLQubitDynamic",
 }
 
 TEMPLATE_TEST_CASE("StateVectorLQubitDynamic::applyMatrix with std::vector",
-                   "[StateVectorLQubitDynamic]", float, double)
-{
+                   "[StateVectorLQubitDynamic]", float, double) {
     using PrecisionT = TestType;
-    SECTION("Test wrong matrix size")
-    {
+    SECTION("Test wrong matrix size") {
         std::vector<std::complex<TestType>> m(7, 0.0);
         const size_t num_qubits = 4;
         StateVectorLQubitDynamic<PrecisionT> sv(num_qubits);
@@ -94,8 +84,7 @@ TEMPLATE_TEST_CASE("StateVectorLQubitDynamic::applyMatrix with std::vector",
                             Catch::Contains("The size of matrix does not match with the given"));
     }
 
-    SECTION("Test wrong number of wires")
-    {
+    SECTION("Test wrong number of wires") {
         std::vector<std::complex<TestType>> m(8, 0.0);
         const size_t num_qubits = 4;
         StateVectorLQubitDynamic<PrecisionT> sv(num_qubits);
@@ -105,19 +94,16 @@ TEMPLATE_TEST_CASE("StateVectorLQubitDynamic::applyMatrix with std::vector",
 }
 
 TEMPLATE_TEST_CASE("StateVectorLQubitDynamic::applyMatrix with a pointer",
-                   "[StateVectorLQubitDynamic]", float, double)
-{
+                   "[StateVectorLQubitDynamic]", float, double) {
     using PrecisionT = TestType;
-    SECTION("Test wrong matrix")
-    {
+    SECTION("Test wrong matrix") {
         std::vector<std::complex<TestType>> m(8, 0.0);
         const size_t num_qubits = 4;
         StateVectorLQubitDynamic<PrecisionT> sv(num_qubits);
         REQUIRE_THROWS_WITH(sv.applyMatrix(m.data(), {}), Catch::Contains("must be larger than 0"));
     }
 
-    SECTION("Test with different number of wires")
-    {
+    SECTION("Test with different number of wires") {
         std::default_random_engine re{1337};
         const size_t num_qubits = 5;
         for (size_t num_wires = 1; num_wires < num_qubits; num_wires++) {
@@ -137,14 +123,12 @@ TEMPLATE_TEST_CASE("StateVectorLQubitDynamic::applyMatrix with a pointer",
 }
 
 TEMPLATE_TEST_CASE("StateVectorLQubitDynamic::applyOperations", "[StateVectorLQubitDynamic]", float,
-                   double)
-{
+                   double) {
     using PrecisionT = TestType;
 
     std::mt19937 re{1337};
 
-    SECTION("Test invalid arguments without params")
-    {
+    SECTION("Test invalid arguments without params") {
         const size_t num_qubits = 4;
         StateVectorLQubitDynamic<PrecisionT> sv(num_qubits);
         REQUIRE_THROWS_WITH(sv.applyOperations({"PauliX", "PauliY"}, {{0}}, {false, false}),
@@ -153,8 +137,7 @@ TEMPLATE_TEST_CASE("StateVectorLQubitDynamic::applyOperations", "[StateVectorLQu
                             Catch::Contains("must all be equal")); // invalid inverse
     }
 
-    SECTION("applyOperations without params works as expected")
-    {
+    SECTION("applyOperations without params works as expected") {
         const size_t num_qubits = 3;
         StateVectorLQubitDynamic<PrecisionT> sv1(num_qubits);
 
@@ -169,8 +152,7 @@ TEMPLATE_TEST_CASE("StateVectorLQubitDynamic::applyOperations", "[StateVectorLQu
         CHECK(sv1.getDataVector() == approx(sv2.getDataVector()));
     }
 
-    SECTION("Test invalid arguments with params")
-    {
+    SECTION("Test invalid arguments with params") {
         const size_t num_qubits = 4;
         StateVectorLQubitDynamic<PrecisionT> sv(num_qubits);
         REQUIRE_THROWS_WITH(sv.applyOperations({"RX", "RY"}, {{0}}, {false, false}, {{0.0}, {0.0}}),
@@ -182,8 +164,7 @@ TEMPLATE_TEST_CASE("StateVectorLQubitDynamic::applyOperations", "[StateVectorLQu
                             Catch::Contains("must all be equal")); // invalid params
     }
 
-    SECTION("applyOperations with params works as expected")
-    {
+    SECTION("applyOperations with params works as expected") {
         const size_t num_qubits = 3;
         StateVectorLQubitDynamic<PrecisionT> sv1(num_qubits);
 

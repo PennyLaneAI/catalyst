@@ -17,10 +17,8 @@
 #include "GradMethods/HybridGradient.hpp"
 #include "GradMethods/JVPVJPPatterns.hpp"
 #include "GradMethods/ParameterShift.hpp"
-
-#include "mlir/IR/PatternMatch.h"
-
 #include "Gradient/Transforms/Patterns.h"
+#include "mlir/IR/PatternMatch.h"
 
 using namespace mlir;
 using namespace catalyst::gradient;
@@ -28,8 +26,7 @@ using namespace catalyst::gradient;
 namespace catalyst {
 namespace gradient {
 
-void populateLoweringPatterns(RewritePatternSet &patterns)
-{
+void populateLoweringPatterns(RewritePatternSet& patterns) {
     patterns.add<HybridGradientLowering>(patterns.getContext());
     patterns.add<FiniteDiffLowering>(patterns.getContext(), 1);
     patterns.add<ParameterShiftLowering>(patterns.getContext(), 1);

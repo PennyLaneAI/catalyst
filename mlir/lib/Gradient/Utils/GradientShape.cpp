@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
-
 #include "Gradient/Utils/GradientShape.h"
+
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 
 using namespace mlir;
 
@@ -27,8 +27,8 @@ namespace gradient {
 /// whereas the result signature is the set of shape unions for each combination of differentiable
 /// argument function result.
 ///
-std::vector<Type> computeResultTypes(func::FuncOp callee, const std::vector<size_t> &diffArgIndices)
-{
+std::vector<Type> computeResultTypes(func::FuncOp callee,
+                                     const std::vector<size_t>& diffArgIndices) {
     std::vector<Type> gradResultTypes;
     FunctionType fnType = callee.getFunctionType();
 
@@ -77,8 +77,7 @@ std::vector<Type> computeResultTypes(func::FuncOp callee, const std::vector<size
     return gradResultTypes;
 }
 
-std::vector<Type> computeQGradTypes(func::FuncOp callee)
-{
+std::vector<Type> computeQGradTypes(func::FuncOp callee) {
     std::vector<Type> qGradResTypes;
     qGradResTypes.reserve(callee.getNumResults());
 
@@ -103,8 +102,7 @@ std::vector<Type> computeQGradTypes(func::FuncOp callee)
 /// The non differentiable params are filtered out.
 ///
 std::vector<Type> computeBackpropTypes(func::FuncOp callee,
-                                       const std::vector<size_t> &diffArgIndices)
-{
+                                       const std::vector<size_t>& diffArgIndices) {
     std::vector<Type> backpropResTypes;
     FunctionType fnType = callee.getFunctionType();
 
@@ -122,12 +120,9 @@ std::vector<Type> computeBackpropTypes(func::FuncOp callee,
     return backpropResTypes;
 }
 
-bool isDifferentiable(Type type)
-{
+bool isDifferentiable(Type type) {
     // Only real-numbers are supported for differentiation
-    if (isa<FloatType>(type)) {
-        return true;
-    }
+    if (isa<FloatType>(type)) { return true; }
     if (auto shapedType = dyn_cast<ShapedType>(type)) {
         return isDifferentiable(shapedType.getElementType());
     }
@@ -139,8 +134,7 @@ bool isDifferentiable(Type type)
 /// This is typically based on an attribute attached to gradient operations, but in the
 /// absence thereof it is assumed that the first argument is differentiable.
 ///
-std::vector<size_t> computeDiffArgIndices(std::optional<DenseIntElementsAttr> indices)
-{
+std::vector<size_t> computeDiffArgIndices(std::optional<DenseIntElementsAttr> indices) {
     // By default only the first argument is differentiated, otherwise gather indices.
     std::vector<size_t> diffArgIndices{0};
     if (indices.has_value()) {
@@ -153,9 +147,8 @@ std::vector<size_t> computeDiffArgIndices(std::optional<DenseIntElementsAttr> in
 /// Produce a filtered list of arguments which are differentiable.
 ///
 std::vector<mlir::Value> computeDiffArgs(ValueRange args,
-                                         std::optional<mlir::DenseIntElementsAttr> indices)
-{
-    const std::vector<size_t> &diffArgIndices = computeDiffArgIndices(indices);
+                                         std::optional<mlir::DenseIntElementsAttr> indices) {
+    const std::vector<size_t>& diffArgIndices = computeDiffArgIndices(indices);
 
     std::vector<Value> diffArgs;
     diffArgs.reserve(diffArgIndices.size());

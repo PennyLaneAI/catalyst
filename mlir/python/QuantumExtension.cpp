@@ -18,8 +18,7 @@
 namespace py = pybind11;
 using namespace mlir::python::adaptors;
 
-PYBIND11_MODULE(_quantumDialects, m)
-{
+PYBIND11_MODULE(_quantumDialects, m) {
     //===--------------------------------------------------------------------===//
     // quantum dialect
     //===--------------------------------------------------------------------===//
@@ -30,9 +29,7 @@ PYBIND11_MODULE(_quantumDialects, m)
         [](MlirContext context, bool load) {
             MlirDialectHandle handle = mlirGetDialectHandle__quantum__();
             mlirDialectHandleRegisterDialect(handle, context);
-            if (load) {
-                mlirDialectHandleLoadDialect(handle, context);
-            }
+            if (load) { mlirDialectHandleLoadDialect(handle, context); }
         },
         py::arg("context") = py::none(), py::arg("load") = true);
 
@@ -43,9 +40,7 @@ PYBIND11_MODULE(_quantumDialects, m)
         [](MlirContext context, bool load) {
             MlirDialectHandle handle = mlirGetDialectHandle__gradient__();
             mlirDialectHandleRegisterDialect(handle, context);
-            if (load) {
-                mlirDialectHandleLoadDialect(handle, context);
-            }
+            if (load) { mlirDialectHandleLoadDialect(handle, context); }
         },
         py::arg("context") = py::none(), py::arg("load") = true);
 }

@@ -1,11 +1,10 @@
+#include "Catalyst/IR/CatalystOps.h"
+#include "Catalyst/Transforms/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Transforms/DialectConversion.h"
-
-#include "Catalyst/IR/CatalystOps.h"
-#include "Catalyst/Transforms/Passes.h"
 
 using namespace mlir;
 using namespace catalyst;
@@ -29,13 +28,10 @@ struct ArrayListBuilder {
     Value capacityField;
     Type elementType;
 
-    static FailureOr<ArrayListBuilder> get(Location loc, TypeConverter *typeConverter,
-                                           TypedValue<ArrayListType> list, OpBuilder &b)
-    {
+    static FailureOr<ArrayListBuilder> get(Location loc, TypeConverter* typeConverter,
+                                           TypedValue<ArrayListType> list, OpBuilder& b) {
         SmallVector<Type> resultTypes;
-        if (failed(typeConverter->convertType(list.getType(), resultTypes))) {
-            return failure();
-        }
+        if (failed(typeConverter->convertType(list.getType(), resultTypes))) { return failure(); }
 
         auto unpacked = b.create<UnrealizedConversionCastOp>(loc, resultTypes, list);
         return ArrayListBuilder{.dataField = unpacked.getResult(0),
@@ -44,9 +40,8 @@ struct ArrayListBuilder {
                                 .elementType = list.getType().getElementType()};
     }
 
-    FlatSymbolRefAttr getOrInsertPushFunction(Location loc, ModuleOp moduleOp, OpBuilder &b) const
-    {
-        MLIRContext *ctx = b.getContext();
+    FlatSymbolRefAttr getOrInsertPushFunction(Location loc, ModuleOp moduleOp, OpBuilder& b) const {
+        MLIRContext* ctx = b.getContext();
         std::string funcName = "__catalyst_arraylist_push";
         llvm::raw_string_ostream nameStream{funcName};
         nameStream << elementType;
@@ -64,7 +59,7 @@ struct ArrayListBuilder {
         auto pushFn = b.create<func::FuncOp>(loc, funcName, pushFnType);
         pushFn.setPrivate();
 
-        Block *entryBlock = pushFn.addEntryBlock();
+        Block* entryBlock = pushFn.addEntryBlock();
         b.setInsertionPointToStart(entryBlock);
         BlockArgument elementsField = pushFn.getArgument(0);
         BlockArgument sizeField = pushFn.getArgument(1);
@@ -76,7 +71,7 @@ struct ArrayListBuilder {
 
         Value predicate =
             b.create<arith::CmpIOp>(loc, arith::CmpIPredicate::eq, sizeVal, capacityVal);
-        b.create<scf::IfOp>(loc, predicate, [&](OpBuilder &thenBuilder, Location loc) {
+        b.create<scf::IfOp>(loc, predicate, [&](OpBuilder& thenBuilder, Location loc) {
             Value two = thenBuilder.create<arith::ConstantIndexOp>(loc, 2);
             Value newCapacity = thenBuilder.create<arith::MulIOp>(loc, capacityVal, two);
             Value oldElements = thenBuilder.create<memref::LoadOp>(loc, elementsField);
@@ -100,9 +95,8 @@ struct ArrayListBuilder {
     }
 
     FlatSymbolRefAttr getOrInsertPopFunction(Location loc, ModuleOp moduleOp,
-                                             OpBuilder &builder) const
-    {
-        MLIRContext *ctx = builder.getContext();
+                                             OpBuilder& builder) const {
+        MLIRContext* ctx = builder.getContext();
         std::string funcName = "__catalyst_arraylist_pop";
         llvm::raw_string_ostream nameStream{funcName};
         nameStream << elementType;
@@ -120,7 +114,7 @@ struct ArrayListBuilder {
         auto popFn = builder.create<func::FuncOp>(loc, funcName, popFnType);
         popFn.setPrivate();
 
-        Block *entryBlock = popFn.addEntryBlock();
+        Block* entryBlock = popFn.addEntryBlock();
         builder.setInsertionPointToStart(entryBlock);
 
         Region::BlockArgListType arguments = popFn.getArguments();
@@ -138,14 +132,12 @@ struct ArrayListBuilder {
         return SymbolRefAttr::get(ctx, funcName);
     }
 
-    void emitPush(Location loc, Value value, OpBuilder &b, FlatSymbolRefAttr pushFn) const
-    {
+    void emitPush(Location loc, Value value, OpBuilder& b, FlatSymbolRefAttr pushFn) const {
         b.create<func::CallOp>(loc, pushFn, /*results=*/TypeRange{},
                                /*operands=*/ValueRange{dataField, sizeField, capacityField, value});
     }
 
-    Value emitPop(Location loc, OpBuilder &builder, FlatSymbolRefAttr popFn) const
-    {
+    Value emitPop(Location loc, OpBuilder& builder, FlatSymbolRefAttr popFn) const {
         auto callOp = builder.create<func::CallOp>(
             loc, popFn, /*results=*/elementType,
             /*operands=*/ValueRange{dataField, sizeField, capacityField});
@@ -157,8 +149,7 @@ struct LowerListInit : public OpConversionPattern<ListInitOp> {
     using OpConversionPattern<ListInitOp>::OpConversionPattern;
 
     LogicalResult matchAndRewrite(ListInitOp op, OpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter& rewriter) const override {
         SmallVector<Type> resultTypes;
         if (failed(getTypeConverter()->convertType(op.getType(), resultTypes))) {
             op.emitError() << "Failed to convert type " << op.getType();
@@ -188,14 +179,11 @@ struct LowerListDealloc : public OpConversionPattern<ListDeallocOp> {
     using OpConversionPattern<ListDeallocOp>::OpConversionPattern;
 
     LogicalResult matchAndRewrite(ListDeallocOp op, OpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter& rewriter) const override {
 
         FailureOr<ArrayListBuilder> arraylistBuilder =
             ArrayListBuilder::get(op.getLoc(), getTypeConverter(), op.getList(), rewriter);
-        if (failed(arraylistBuilder)) {
-            return failure();
-        }
+        if (failed(arraylistBuilder)) { return failure(); }
 
         Value data = rewriter.create<memref::LoadOp>(op.getLoc(), arraylistBuilder->dataField);
         rewriter.create<memref::DeallocOp>(op.getLoc(), data);
@@ -211,13 +199,10 @@ struct LowerListPush : public OpConversionPattern<ListPushOp> {
     using OpConversionPattern<ListPushOp>::OpConversionPattern;
 
     LogicalResult matchAndRewrite(ListPushOp op, OpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter& rewriter) const override {
         FailureOr<ArrayListBuilder> arraylistBuilder =
             ArrayListBuilder::get(op.getLoc(), getTypeConverter(), op.getList(), rewriter);
-        if (failed(arraylistBuilder)) {
-            return failure();
-        }
+        if (failed(arraylistBuilder)) { return failure(); }
         auto moduleOp = op->getParentOfType<ModuleOp>();
         FlatSymbolRefAttr pushFn =
             arraylistBuilder.value().getOrInsertPushFunction(op.getLoc(), moduleOp, rewriter);
@@ -231,13 +216,10 @@ struct LowerListPop : public OpConversionPattern<ListPopOp> {
     using OpConversionPattern<ListPopOp>::OpConversionPattern;
 
     LogicalResult matchAndRewrite(ListPopOp op, OpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter& rewriter) const override {
         FailureOr<ArrayListBuilder> arraylistBuilder =
             ArrayListBuilder::get(op.getLoc(), getTypeConverter(), op.getList(), rewriter);
-        if (failed(arraylistBuilder)) {
-            return failure();
-        }
+        if (failed(arraylistBuilder)) { return failure(); }
         auto moduleOp = op->getParentOfType<ModuleOp>();
         FlatSymbolRefAttr popFn =
             arraylistBuilder.value().getOrInsertPopFunction(op.getLoc(), moduleOp, rewriter);
@@ -251,13 +233,10 @@ struct LowerListLoadData : public OpConversionPattern<ListLoadDataOp> {
     using OpConversionPattern<ListLoadDataOp>::OpConversionPattern;
 
     LogicalResult matchAndRewrite(ListLoadDataOp op, OpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter& rewriter) const override {
         FailureOr<ArrayListBuilder> arraylistBuilder =
             ArrayListBuilder::get(op.getLoc(), getTypeConverter(), op.getList(), rewriter);
-        if (failed(arraylistBuilder)) {
-            return failure();
-        }
+        if (failed(arraylistBuilder)) { return failure(); }
 
         // Ensure the result memref has the correct underlying size (which may be different than the
         // list's underlying memref due to the geometric reallocation).
@@ -278,19 +257,16 @@ struct LowerListLoadData : public OpConversionPattern<ListLoadDataOp> {
 struct ArrayListToMemRefPass : catalyst::impl::ArrayListToMemRefPassBase<ArrayListToMemRefPass> {
     using ArrayListToMemRefPassBase::ArrayListToMemRefPassBase;
 
-    void runOnOperation() override
-    {
-        MLIRContext *context = &getContext();
+    void runOnOperation() override {
+        MLIRContext* context = &getContext();
         TypeConverter arraylistTypeConverter;
 
         arraylistTypeConverter.addConversion([](Type type) -> std::optional<Type> {
-            if (MemRefType::isValidElementType(type)) {
-                return type;
-            }
+            if (MemRefType::isValidElementType(type)) { return type; }
             return std::nullopt;
         });
         arraylistTypeConverter.addConversion(
-            [](ArrayListType type, SmallVectorImpl<Type> &resultTypes) {
+            [](ArrayListType type, SmallVectorImpl<Type>& resultTypes) {
                 // Data
                 resultTypes.push_back(MemRefType::get(
                     {}, MemRefType::get({ShapedType::kDynamic}, type.getElementType())));
@@ -322,7 +298,6 @@ struct ArrayListToMemRefPass : catalyst::impl::ArrayListToMemRefPassBase<ArrayLi
 };
 } // namespace
 
-std::unique_ptr<Pass> catalyst::createArrayListToMemRefPass()
-{
+std::unique_ptr<Pass> catalyst::createArrayListToMemRefPass() {
     return std::make_unique<ArrayListToMemRefPass>();
 }

@@ -17,6 +17,7 @@
 #define TYPES_H
 
 #include <cmath>
+
 #include <cstdint>
 #include <limits>
 
@@ -29,7 +30,7 @@ struct QUBIT;
 typedef intptr_t QubitIdType;
 
 typedef bool RESULT;
-typedef RESULT *Result;
+typedef RESULT* Result;
 
 typedef intptr_t ObsIdType;
 
@@ -56,8 +57,8 @@ struct CplxT_double {
 
 // MemRefT<complex<double>, dimension=1> type
 struct MemRefT_CplxT_double_1d {
-    CplxT_double *data_allocated;
-    CplxT_double *data_aligned;
+    CplxT_double* data_allocated;
+    CplxT_double* data_aligned;
     size_t offset;
     size_t sizes[1];
     size_t strides[1];
@@ -65,8 +66,8 @@ struct MemRefT_CplxT_double_1d {
 
 // MemRefT<complex<double>, dimension=2> type
 struct MemRefT_CplxT_double_2d {
-    CplxT_double *data_allocated;
-    CplxT_double *data_aligned;
+    CplxT_double* data_allocated;
+    CplxT_double* data_aligned;
     size_t offset;
     size_t sizes[2];
     size_t strides[2];
@@ -74,8 +75,8 @@ struct MemRefT_CplxT_double_2d {
 
 // MemRefT<double, dimension=1> type
 struct MemRefT_double_1d {
-    double *data_allocated;
-    double *data_aligned;
+    double* data_allocated;
+    double* data_aligned;
     size_t offset;
     size_t sizes[1];
     size_t strides[1];
@@ -83,8 +84,8 @@ struct MemRefT_double_1d {
 
 // MemRefT<double, dimension=2> type
 struct MemRefT_double_2d {
-    double *data_allocated;
-    double *data_aligned;
+    double* data_allocated;
+    double* data_aligned;
     size_t offset;
     size_t sizes[2];
     size_t strides[2];
@@ -92,8 +93,8 @@ struct MemRefT_double_2d {
 
 // MemRefT<int64_t, dimension=1> type
 struct MemRefT_int64_1d {
-    int64_t *data_allocated;
-    int64_t *data_aligned;
+    int64_t* data_allocated;
+    int64_t* data_aligned;
     size_t offset;
     size_t sizes[1];
     size_t strides[1];

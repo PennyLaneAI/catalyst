@@ -12,44 +12,37 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "Gradient/Utils/DifferentialQNode.h"
+
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/SymbolTable.h"
 
-#include "Gradient/Utils/DifferentialQNode.h"
-
 using namespace mlir;
 
-constexpr const char *diffMethodKey = "diff_method";
-constexpr const char *pureQuantumKey = "purequantum";
+constexpr const char* diffMethodKey = "diff_method";
+constexpr const char* pureQuantumKey = "purequantum";
 
-bool catalyst::gradient::isQNode(func::FuncOp funcOp)
-{
+bool catalyst::gradient::isQNode(func::FuncOp funcOp) {
     return funcOp->hasAttrOfType<UnitAttr>("qnode");
 }
 
-StringRef catalyst::gradient::getQNodeDiffMethod(func::FuncOp funcOp)
-{
+StringRef catalyst::gradient::getQNodeDiffMethod(func::FuncOp funcOp) {
     bool hasDiffMethod = isQNode(funcOp) && funcOp->hasAttrOfType<StringAttr>(diffMethodKey);
-    if (hasDiffMethod) {
-        return funcOp->getAttrOfType<StringAttr>(diffMethodKey).strref();
-    }
+    if (hasDiffMethod) { return funcOp->getAttrOfType<StringAttr>(diffMethodKey).strref(); }
     return "";
 }
 
 void catalyst::gradient::setRequiresCustomGradient(func::FuncOp funcOp,
-                                                   FlatSymbolRefAttr pureQuantumFunc)
-{
+                                                   FlatSymbolRefAttr pureQuantumFunc) {
     funcOp->setAttr(pureQuantumKey, pureQuantumFunc);
 }
 
-bool catalyst::gradient::requiresCustomGradient(func::FuncOp funcOp)
-{
+bool catalyst::gradient::requiresCustomGradient(func::FuncOp funcOp) {
     return funcOp->hasAttrOfType<FlatSymbolRefAttr>(pureQuantumKey);
 }
 
-void catalyst::gradient::registerCustomGradient(func::FuncOp qnode, FlatSymbolRefAttr qgradFn)
-{
-    Operation *pureQuantumFunc = SymbolTable::lookupNearestSymbolFrom(
+void catalyst::gradient::registerCustomGradient(func::FuncOp qnode, FlatSymbolRefAttr qgradFn) {
+    Operation* pureQuantumFunc = SymbolTable::lookupNearestSymbolFrom(
         qnode, qnode->getAttrOfType<FlatSymbolRefAttr>(pureQuantumKey));
     pureQuantumFunc->setAttr("gradient.qgrad", qgradFn);
 

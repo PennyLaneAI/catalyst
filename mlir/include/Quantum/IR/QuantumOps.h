@@ -14,6 +14,8 @@
 
 #pragma once
 
+#include "Quantum/IR/QuantumInterfaces.h"
+#include "llvm/ADT/StringRef.h"
 #include "mlir/Dialect/Bufferization/IR/AllocationOpInterface.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
@@ -22,10 +24,8 @@
 #include "mlir/Interfaces/ControlFlowInterfaces.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Support/LogicalResult.h"
-#include "llvm/ADT/StringRef.h"
-#include <optional>
 
-#include "Quantum/IR/QuantumInterfaces.h"
+#include <optional>
 
 //===----------------------------------------------------------------------===//
 // Quantum trait declarations.
@@ -34,12 +34,11 @@
 namespace mlir {
 namespace OpTrait {
 
-template <typename ConcreteType> class UnitaryTrait : public TraitBase<ConcreteType, UnitaryTrait> {
-};
+template <typename ConcreteType>
+class UnitaryTrait : public TraitBase<ConcreteType, UnitaryTrait> {};
 
 template <typename ConcreteType>
-class HermitianTrait : public TraitBase<ConcreteType, HermitianTrait> {
-};
+class HermitianTrait : public TraitBase<ConcreteType, HermitianTrait> {};
 
 } // namespace OpTrait
 } // namespace mlir
@@ -53,6 +52,7 @@ class QuantumMemory : public mlir::SideEffects::Resource::Base<QuantumMemory> {
 //===----------------------------------------------------------------------===//
 
 #include "Quantum/IR/QuantumDialect.h"
+
 #include "Quantum/IR/QuantumEnums.h.inc"
 #define GET_ATTRDEF_CLASSES
 #include "Quantum/IR/QuantumAttributes.h.inc"

@@ -14,13 +14,12 @@
 
 #pragma once
 
+#include "Catalyst/IR/CatalystDialect.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/Interfaces/InferTypeOpInterface.h"
-
-#include "Catalyst/IR/CatalystDialect.h"
 
 #define GET_OP_CLASSES
 #include "Catalyst/IR/CatalystOps.h.inc"

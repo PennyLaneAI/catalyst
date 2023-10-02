@@ -12,19 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "mlir/IR/DialectRegistry.h"
-#include "mlir/InitAllDialects.h"
-#include "mlir/Tools/mlir-lsp-server/MlirLspServerMain.h"
-
 #include "Catalyst/IR/CatalystDialect.h"
 #include "Gradient/IR/GradientDialect.h"
 #include "Quantum/IR/QuantumDialect.h"
-
 #include "mhlo/IR/register.h"
+#include "mlir/IR/DialectRegistry.h"
+#include "mlir/InitAllDialects.h"
+#include "mlir/Tools/mlir-lsp-server/MlirLspServerMain.h"
 #include "stablehlo/dialect/Register.h"
 
-int main(int argc, char **argv)
-{
+int main(int argc, char** argv) {
     mlir::DialectRegistry registry;
     mlir::registerAllDialects(registry);
     registry.insert<catalyst::CatalystDialect>();

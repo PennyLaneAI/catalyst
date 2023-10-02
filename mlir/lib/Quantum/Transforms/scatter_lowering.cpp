@@ -14,18 +14,15 @@
 
 #define DEBUG_TYPE "scatter"
 
-#include <vector>
-
+#include "Quantum/Transforms/Patterns.h"
 #include "llvm/Support/Debug.h"
-
 #include "mhlo/IR/hlo_ops.h"
 #include "mhlo/transforms/passes.h"
-
 #include "mlir/Dialect/Index/IR/IndexDialect.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#include "Quantum/Transforms/Patterns.h"
+#include <vector>
 
 using namespace llvm;
 using namespace mlir;
@@ -40,8 +37,7 @@ namespace quantum {
 struct ScatterLoweringPass : impl::ScatterLoweringPassBase<ScatterLoweringPass> {
     using ScatterLoweringPassBase::ScatterLoweringPassBase;
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         LLVM_DEBUG(dbgs() << "scatter lowering pass"
                           << "\n");
 
@@ -55,8 +51,7 @@ struct ScatterLoweringPass : impl::ScatterLoweringPassBase<ScatterLoweringPass> 
 
 } // namespace quantum
 
-std::unique_ptr<Pass> createScatterLoweringPass()
-{
+std::unique_ptr<Pass> createScatterLoweringPass() {
     return std::make_unique<quantum::ScatterLoweringPass>();
 }
 

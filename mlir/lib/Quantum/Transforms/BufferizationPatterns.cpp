@@ -12,11 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/Transforms/DialectConversion.h"
-
 #include "Quantum/IR/QuantumOps.h"
 #include "Quantum/Transforms/Patterns.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Transforms/DialectConversion.h"
 
 using namespace mlir;
 using namespace catalyst::quantum;
@@ -27,8 +26,7 @@ struct BufferizeQubitUnitaryOp : public OpConversionPattern<QubitUnitaryOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(QubitUnitaryOp op, OpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter& rewriter) const override {
         rewriter.replaceOpWithNewOp<QubitUnitaryOp>(op, op.getResultTypes(), adaptor.getMatrix(),
                                                     adaptor.getInQubits(),
                                                     adaptor.getAdjointAttr());
@@ -40,8 +38,7 @@ struct BufferizeHermitianOp : public OpConversionPattern<HermitianOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(HermitianOp op, OpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter& rewriter) const override {
         rewriter.replaceOpWithNewOp<HermitianOp>(op, op.getType(), adaptor.getMatrix(),
                                                  adaptor.getQubits());
         return success();
@@ -52,8 +49,7 @@ struct BufferizeHamiltonianOp : public OpConversionPattern<HamiltonianOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(HamiltonianOp op, OpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter& rewriter) const override {
         rewriter.replaceOpWithNewOp<HamiltonianOp>(op, op.getType(), adaptor.getCoeffs(),
                                                    adaptor.getTerms());
         return success();
@@ -64,8 +60,7 @@ struct BufferizeSampleOp : public OpConversionPattern<SampleOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(SampleOp op, OpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter& rewriter) const override {
         Type tensorType = op.getType(0);
         MemRefType resultType = getTypeConverter()->convertType(tensorType).cast<MemRefType>();
         Location loc = op.getLoc();
@@ -80,8 +75,7 @@ struct BufferizeStateOp : public OpConversionPattern<StateOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(StateOp op, OpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter& rewriter) const override {
         Type tensorType = op.getType(0);
         MemRefType resultType = getTypeConverter()->convertType(tensorType).cast<MemRefType>();
         Location loc = op.getLoc();
@@ -95,8 +89,7 @@ struct BufferizeProbsOp : public OpConversionPattern<ProbsOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(ProbsOp op, OpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter& rewriter) const override {
         Type tensorType = op.getType(0);
         MemRefType resultType = getTypeConverter()->convertType(tensorType).cast<MemRefType>();
         Location loc = op.getLoc();
@@ -110,8 +103,7 @@ struct BufferizeCountsOp : public OpConversionPattern<CountsOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(CountsOp op, OpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter& rewriter) const override {
         Location loc = op.getLoc();
         Type tensorType0 = op.getType(0);
         Type tensorType1 = op.getType(1);
@@ -131,10 +123,9 @@ struct BufferizeCountsOp : public OpConversionPattern<CountsOp> {
 namespace catalyst {
 namespace quantum {
 
-void populateBufferizationLegality(TypeConverter &typeConverter, ConversionTarget &target)
-{
+void populateBufferizationLegality(TypeConverter& typeConverter, ConversionTarget& target) {
     // Default to operations being legal with the exception of the ones below.
-    target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
+    target.markUnknownOpDynamicallyLegal([](Operation*) { return true; });
     // Quantum ops which return arrays need to be marked illegal when the type is a tensor.
     target.addDynamicallyLegalOp<QubitUnitaryOp>(
         [&](QubitUnitaryOp op) { return typeConverter.isLegal(op.getMatrix().getType()); });
@@ -148,8 +139,7 @@ void populateBufferizationLegality(TypeConverter &typeConverter, ConversionTarge
     target.addDynamicallyLegalOp<CountsOp>([&](CountsOp op) { return op.isBufferized(); });
 }
 
-void populateBufferizationPatterns(TypeConverter &typeConverter, RewritePatternSet &patterns)
-{
+void populateBufferizationPatterns(TypeConverter& typeConverter, RewritePatternSet& patterns) {
     patterns.add<BufferizeQubitUnitaryOp>(typeConverter, patterns.getContext());
     patterns.add<BufferizeHermitianOp>(typeConverter, patterns.getContext());
     patterns.add<BufferizeHamiltonianOp>(typeConverter, patterns.getContext());

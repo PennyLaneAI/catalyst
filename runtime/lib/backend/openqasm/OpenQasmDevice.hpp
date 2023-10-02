@@ -16,23 +16,21 @@
 
 #define __device_openqasm
 
+#include "CacheManager.hpp"
+#include "Exception.hpp"
+#include "OpenQasmBuilder.hpp"
+#include "OpenQasmObsManager.hpp"
+#include "OpenQasmRunner.hpp"
+#include "QuantumDevice.hpp"
+#include "QubitManager.hpp"
+#include "Utils.hpp"
+
 #include <algorithm>
 #include <bitset>
 #include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
-
-#include "Exception.hpp"
-#include "QuantumDevice.hpp"
-
-#include "CacheManager.hpp"
-#include "QubitManager.hpp"
-#include "Utils.hpp"
-
-#include "OpenQasmBuilder.hpp"
-#include "OpenQasmObsManager.hpp"
-#include "OpenQasmRunner.hpp"
 
 namespace Catalyst::Runtime::Device {
 class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {
@@ -55,8 +53,7 @@ class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {
     OpenQasm::BuilderType builder_type;
     std::unordered_map<std::string, std::string> device_kwargs;
 
-    inline auto getDeviceWires(const std::vector<QubitIdType> &wires) -> std::vector<size_t>
-    {
+    inline auto getDeviceWires(const std::vector<QubitIdType>& wires) -> std::vector<size_t> {
         std::vector<size_t> res;
         res.reserve(wires.size());
         std::transform(wires.begin(), wires.end(), std::back_inserter(res),
@@ -64,8 +61,7 @@ class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {
         return res;
     }
 
-    inline auto isValidQubits(const std::vector<QubitIdType> &wires) -> bool
-    {
+    inline auto isValidQubits(const std::vector<QubitIdType>& wires) -> bool {
         return std::all_of(wires.begin(), wires.end(),
                            [this](QubitIdType w) { return qubit_manager.isValidQubitId(w); });
     }
@@ -73,9 +69,8 @@ class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {
   public:
     explicit OpenQasmDevice(
         [[maybe_unused]] bool status = false,
-        const std::string &kwargs = "{device_type : braket.local.qubit, backend : default}")
-        : tape_recording(status)
-    {
+        const std::string& kwargs = "{device_type : braket.local.qubit, backend : default}") :
+        tape_recording(status) {
         device_kwargs = Simulator::parse_kwargs(kwargs);
         device_shots = device_kwargs.contains("shots")
                            ? static_cast<size_t>(std::stoll(device_kwargs["shots"]))
@@ -88,18 +83,13 @@ class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {
                     device_kwargs["device_arn"] =
                         "arn:aws:braket:::device/quantum-simulator/amazon/sv1";
                 }
-            }
-            else if (device_kwargs["device_type"] == "braket.local.qubit") {
+            } else if (device_kwargs["device_type"] == "braket.local.qubit") {
                 builder_type = OpenQasm::BuilderType::BraketLocal;
-                if (!device_kwargs.contains("backend")) {
-                    device_kwargs["backend"] = "default";
-                }
-            }
-            else {
+                if (!device_kwargs.contains("backend")) { device_kwargs["backend"] = "default"; }
+            } else {
                 RT_ASSERT("Invalid OpenQasm device type");
             }
-        }
-        else {
+        } else {
             builder_type = OpenQasm::BuilderType::Common;
             builder = std::make_unique<OpenQasm::OpenQasmBuilder>();
             runner = std::make_unique<OpenQasm::OpenQasmRunner>();
@@ -112,10 +102,10 @@ class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {
     }
     ~OpenQasmDevice() = default;
 
-    OpenQasmDevice(const OpenQasmDevice &) = delete;
-    OpenQasmDevice &operator=(const OpenQasmDevice &) = delete;
-    OpenQasmDevice(OpenQasmDevice &&) = delete;
-    OpenQasmDevice &operator=(OpenQasmDevice &&) = delete;
+    OpenQasmDevice(const OpenQasmDevice&) = delete;
+    OpenQasmDevice& operator=(const OpenQasmDevice&) = delete;
+    OpenQasmDevice(OpenQasmDevice&&) = delete;
+    OpenQasmDevice& operator=(OpenQasmDevice&&) = delete;
 
     // RT
     auto AllocateQubit() -> QubitIdType override;
@@ -135,28 +125,28 @@ class OpenQasmDevice final : public Catalyst::Runtime::QuantumDevice {
     [[nodiscard]] auto Circuit() const -> std::string { return builder->toOpenQasm(); }
 
     // QIS
-    void NamedOperation(const std::string &name, const std::vector<double> &params,
-                        const std::vector<QubitIdType> &wires, bool inverse) override;
-    void MatrixOperation(const std::vector<std::complex<double>> &matrix,
-                         const std::vector<QubitIdType> &wires, bool inverse) override;
-    auto Observable(ObsId id, const std::vector<std::complex<double>> &matrix,
-                    const std::vector<QubitIdType> &wires) -> ObsIdType override;
-    auto TensorObservable(const std::vector<ObsIdType> &obs) -> ObsIdType override;
-    auto HamiltonianObservable(const std::vector<double> &coeffs, const std::vector<ObsIdType> &obs)
+    void NamedOperation(const std::string& name, const std::vector<double>& params,
+                        const std::vector<QubitIdType>& wires, bool inverse) override;
+    void MatrixOperation(const std::vector<std::complex<double>>& matrix,
+                         const std::vector<QubitIdType>& wires, bool inverse) override;
+    auto Observable(ObsId id, const std::vector<std::complex<double>>& matrix,
+                    const std::vector<QubitIdType>& wires) -> ObsIdType override;
+    auto TensorObservable(const std::vector<ObsIdType>& obs) -> ObsIdType override;
+    auto HamiltonianObservable(const std::vector<double>& coeffs, const std::vector<ObsIdType>& obs)
         -> ObsIdType override;
     auto Expval(ObsIdType obsKey) -> double override;
     auto Var(ObsIdType obsKey) -> double override;
-    void State(DataView<std::complex<double>, 1> &state) override;
-    void Probs(DataView<double, 1> &probs) override;
-    void PartialProbs(DataView<double, 1> &probs, const std::vector<QubitIdType> &wires) override;
-    void Sample(DataView<double, 2> &samples, size_t shots) override;
-    void PartialSample(DataView<double, 2> &samples, const std::vector<QubitIdType> &wires,
+    void State(DataView<std::complex<double>, 1>& state) override;
+    void Probs(DataView<double, 1>& probs) override;
+    void PartialProbs(DataView<double, 1>& probs, const std::vector<QubitIdType>& wires) override;
+    void Sample(DataView<double, 2>& samples, size_t shots) override;
+    void PartialSample(DataView<double, 2>& samples, const std::vector<QubitIdType>& wires,
                        size_t shots) override;
-    void Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts, size_t shots) override;
-    void PartialCounts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts,
-                       const std::vector<QubitIdType> &wires, size_t shots) override;
+    void Counts(DataView<double, 1>& eigvals, DataView<int64_t, 1>& counts, size_t shots) override;
+    void PartialCounts(DataView<double, 1>& eigvals, DataView<int64_t, 1>& counts,
+                       const std::vector<QubitIdType>& wires, size_t shots) override;
     auto Measure(QubitIdType wire) -> Result override;
-    void Gradient(std::vector<DataView<double, 1>> &gradients,
-                  const std::vector<size_t> &trainParams) override;
+    void Gradient(std::vector<DataView<double, 1>>& gradients,
+                  const std::vector<size_t>& trainParams) override;
 };
 } // namespace Catalyst::Runtime::Device

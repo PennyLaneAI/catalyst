@@ -14,22 +14,20 @@
 
 #define DEBUG_TYPE "jvpvjp"
 
-#include <algorithm>
-#include <memory>
-#include <vector>
-
-#include "llvm/Support/Debug.h"
-#include "llvm/Support/Errc.h"
-
-#include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/IR/SymbolTable.h"
+#include "JVPVJPPatterns.hpp"
 
 #include "Gradient/Utils/EinsumLinalgGeneric.h"
 #include "Gradient/Utils/GradientShape.h"
 #include "Quantum/IR/QuantumOps.h"
+#include "llvm/Support/Debug.h"
+#include "llvm/Support/Errc.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/IR/SymbolTable.h"
 
-#include "JVPVJPPatterns.hpp"
+#include <algorithm>
+#include <memory>
+#include <vector>
 
 using namespace mlir;
 using namespace catalyst::gradient;
@@ -37,8 +35,8 @@ using llvm::dbgs;
 
 namespace llvm {
 
-template <class T> raw_ostream &operator<<(raw_ostream &oss, const std::vector<T> &v)
-{
+template <class T>
+raw_ostream& operator<<(raw_ostream& oss, const std::vector<T>& v) {
     oss << "[";
     bool first = true;
     for (auto i : v) {
@@ -53,14 +51,13 @@ template <class T> raw_ostream &operator<<(raw_ostream &oss, const std::vector<T
 namespace catalyst {
 namespace gradient {
 
-template <class T> std::vector<int64_t> _tovec(const T &x)
-{
+template <class T>
+std::vector<int64_t> _tovec(const T& x) {
     return std::vector<int64_t>(x.begin(), x.end());
 };
 
-LogicalResult JVPLoweringPattern::matchAndRewrite(JVPOp op, PatternRewriter &rewriter) const
-{
-    MLIRContext *ctx = getContext();
+LogicalResult JVPLoweringPattern::matchAndRewrite(JVPOp op, PatternRewriter& rewriter) const {
+    MLIRContext* ctx = getContext();
 
     Location loc = op.getLoc();
 
@@ -152,8 +149,7 @@ LogicalResult JVPLoweringPattern::matchAndRewrite(JVPOp op, PatternRewriter &rew
 
             if (!acc.has_value()) {
                 acc = res;
-            }
-            else {
+            } else {
                 assert(acc.value().getType() == res.getType());
 
                 auto add_op = rewriter.create<linalg::ElemwiseBinaryOp>(
@@ -175,9 +171,8 @@ LogicalResult JVPLoweringPattern::matchAndRewrite(JVPOp op, PatternRewriter &rew
     return success();
 }
 
-LogicalResult VJPLoweringPattern::matchAndRewrite(VJPOp op, PatternRewriter &rewriter) const
-{
-    MLIRContext *ctx = getContext();
+LogicalResult VJPLoweringPattern::matchAndRewrite(VJPOp op, PatternRewriter& rewriter) const {
+    MLIRContext* ctx = getContext();
 
     Location loc = op.getLoc();
 
@@ -266,8 +261,7 @@ LogicalResult VJPLoweringPattern::matchAndRewrite(VJPOp op, PatternRewriter &rew
 
             if (!acc.has_value()) {
                 acc = res;
-            }
-            else {
+            } else {
                 assert(acc.value().getType() == res.getType());
 
                 auto add_op = rewriter.create<linalg::ElemwiseBinaryOp>(

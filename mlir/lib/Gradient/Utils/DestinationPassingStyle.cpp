@@ -12,31 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "Gradient/Utils/DestinationPassingStyle.h"
+
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 
-#include "Gradient/Utils/DestinationPassingStyle.h"
-
 using namespace mlir;
 
-void catalyst::convertToDestinationPassingStyle(func::FuncOp callee, OpBuilder &builder)
-{
+void catalyst::convertToDestinationPassingStyle(func::FuncOp callee, OpBuilder& builder) {
     if (callee.getNumResults() == 0) {
         // Callee is already in destination-passing style
         return;
     }
 
-    MLIRContext *ctx = callee.getContext();
+    MLIRContext* ctx = callee.getContext();
     SmallVector<Type> memRefReturnTypes;
     SmallVector<unsigned> outputIndices;
     SmallVector<Type> nonMemRefReturns;
 
-    for (const auto &[idx, resultType] : llvm::enumerate(callee.getResultTypes())) {
+    for (const auto& [idx, resultType] : llvm::enumerate(callee.getResultTypes())) {
         if (isa<MemRefType>(resultType)) {
             memRefReturnTypes.push_back(resultType);
             outputIndices.push_back(idx);
-        }
-        else {
+        } else {
             nonMemRefReturns.push_back(resultType);
         }
     }
@@ -76,8 +74,7 @@ void catalyst::convertToDestinationPassingStyle(func::FuncOp callee, OpBuilder &
                 // type information at the LLVM level for Enzyme.
                 builder.create<linalg::CopyOp>(returnOp.getLoc(), operand, output);
                 idx++;
-            }
-            else {
+            } else {
                 nonMemRefReturns.push_back(operand);
             }
         }

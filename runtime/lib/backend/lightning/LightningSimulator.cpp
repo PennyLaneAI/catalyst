@@ -16,17 +16,13 @@
 
 namespace Catalyst::Runtime::Simulator {
 
-auto LightningSimulator::AllocateQubit() -> QubitIdType
-{
+auto LightningSimulator::AllocateQubit() -> QubitIdType {
     size_t sv_id = this->device_sv->allocateWire();
     return this->qubit_manager.Allocate(sv_id);
 }
 
-auto LightningSimulator::AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType>
-{
-    if (num_qubits == 0U) {
-        return {};
-    }
+auto LightningSimulator::AllocateQubits(size_t num_qubits) -> std::vector<QubitIdType> {
+    if (num_qubits == 0U) { return {}; }
 
     // at the first call when num_qubits == 0
     if (this->GetNumQubits() == 0U) {
@@ -39,14 +35,12 @@ auto LightningSimulator::AllocateQubits(size_t num_qubits) -> std::vector<QubitI
     return result;
 }
 
-void LightningSimulator::ReleaseAllQubits()
-{
+void LightningSimulator::ReleaseAllQubits() {
     this->device_sv->clearData();
     this->qubit_manager.ReleaseAll();
 }
 
-void LightningSimulator::ReleaseQubit(QubitIdType q)
-{
+void LightningSimulator::ReleaseQubit(QubitIdType q) {
     if (this->qubit_manager.isValidQubitId(q)) {
         this->device_sv->releaseWire(this->qubit_manager.getDeviceId(q));
     }
@@ -55,22 +49,19 @@ void LightningSimulator::ReleaseQubit(QubitIdType q)
 
 auto LightningSimulator::GetNumQubits() const -> size_t { return this->device_sv->getNumQubits(); }
 
-void LightningSimulator::StartTapeRecording()
-{
+void LightningSimulator::StartTapeRecording() {
     RT_FAIL_IF(this->tape_recording, "Cannot re-activate the cache manager");
     this->tape_recording = true;
     this->cache_manager.Reset();
 }
 
-void LightningSimulator::StopTapeRecording()
-{
+void LightningSimulator::StopTapeRecording() {
     RT_FAIL_IF(!this->tape_recording, "Cannot stop an already stopped cache manager");
     this->tape_recording = false;
 }
 
 auto LightningSimulator::CacheManagerInfo()
-    -> std::tuple<size_t, size_t, size_t, std::vector<std::string>, std::vector<ObsIdType>>
-{
+    -> std::tuple<size_t, size_t, size_t, std::vector<std::string>, std::vector<ObsIdType>> {
     return {this->cache_manager.getNumOperations(), this->cache_manager.getNumObservables(),
             this->cache_manager.getNumParams(), this->cache_manager.getOperationsNames(),
             this->cache_manager.getObservablesKeys()};
@@ -80,8 +71,7 @@ void LightningSimulator::SetDeviceShots(size_t shots) { this->device_shots = sho
 
 auto LightningSimulator::GetDeviceShots() const -> size_t { return this->device_shots; }
 
-void LightningSimulator::PrintState()
-{
+void LightningSimulator::PrintState() {
     using std::cout;
     using std::endl;
 
@@ -90,28 +80,25 @@ void LightningSimulator::PrintState()
     size_t idx = 0;
     cout << "*** State-Vector of Size " << size << " ***" << endl;
     cout << "[";
-    auto &&state = this->device_sv->getDataVector();
+    auto&& state = this->device_sv->getDataVector();
     for (; idx < size - 1; idx++) {
         cout << state[idx] << ", ";
     }
     cout << state[idx] << "]" << endl;
 }
 
-auto LightningSimulator::Zero() const -> Result
-{
+auto LightningSimulator::Zero() const -> Result {
     return const_cast<Result>(&GLOBAL_RESULT_FALSE_CONST);
 }
 
-auto LightningSimulator::One() const -> Result
-{
+auto LightningSimulator::One() const -> Result {
     return const_cast<Result>(&GLOBAL_RESULT_TRUE_CONST);
 }
 
-void LightningSimulator::NamedOperation(const std::string &name, const std::vector<double> &params,
-                                        const std::vector<QubitIdType> &wires, bool inverse)
-{
+void LightningSimulator::NamedOperation(const std::string& name, const std::vector<double>& params,
+                                        const std::vector<QubitIdType>& wires, bool inverse) {
     // First, check if operation `name` is supported by the simulator
-    auto &&[op_num_wires, op_num_params] =
+    auto&& [op_num_wires, op_num_params] =
         Lightning::lookup_gates(Lightning::simulator_gate_info, name);
 
     // Check the validity of number of qubits and parameters
@@ -119,7 +106,7 @@ void LightningSimulator::NamedOperation(const std::string &name, const std::vect
     RT_FAIL_IF(params.size() != op_num_params, "Invalid number of parameters");
 
     // Convert wires to device wires
-    auto &&dev_wires = getDeviceWires(wires);
+    auto&& dev_wires = getDeviceWires(wires);
 
     // Update the state-vector
     this->device_sv->applyOperation(name, dev_wires, inverse, params);
@@ -130,48 +117,41 @@ void LightningSimulator::NamedOperation(const std::string &name, const std::vect
     }
 }
 
-void LightningSimulator::MatrixOperation(const std::vector<std::complex<double>> &matrix,
-                                         const std::vector<QubitIdType> &wires, bool inverse)
-{
+void LightningSimulator::MatrixOperation(const std::vector<std::complex<double>>& matrix,
+                                         const std::vector<QubitIdType>& wires, bool inverse) {
     // Convert wires to device wires
     // with checking validity of wires
-    auto &&dev_wires = getDeviceWires(wires);
+    auto&& dev_wires = getDeviceWires(wires);
 
     // Update the state-vector
     this->device_sv->applyMatrix(matrix.data(), dev_wires, inverse);
 }
 
-auto LightningSimulator::Observable(ObsId id, const std::vector<std::complex<double>> &matrix,
-                                    const std::vector<QubitIdType> &wires) -> ObsIdType
-{
+auto LightningSimulator::Observable(ObsId id, const std::vector<std::complex<double>>& matrix,
+                                    const std::vector<QubitIdType>& wires) -> ObsIdType {
     RT_FAIL_IF(wires.size() > this->GetNumQubits(), "Invalid number of wires");
     RT_FAIL_IF(!isValidQubits(wires), "Invalid given wires");
 
-    auto &&dev_wires = getDeviceWires(wires);
+    auto&& dev_wires = getDeviceWires(wires);
 
-    if (id == ObsId::Hermitian) {
-        return this->obs_manager.createHermitianObs(matrix, dev_wires);
-    }
+    if (id == ObsId::Hermitian) { return this->obs_manager.createHermitianObs(matrix, dev_wires); }
 
     return this->obs_manager.createNamedObs(id, dev_wires);
 }
 
-auto LightningSimulator::TensorObservable(const std::vector<ObsIdType> &obs) -> ObsIdType
-{
+auto LightningSimulator::TensorObservable(const std::vector<ObsIdType>& obs) -> ObsIdType {
     return this->obs_manager.createTensorProdObs(obs);
 }
 
-auto LightningSimulator::HamiltonianObservable(const std::vector<double> &coeffs,
-                                               const std::vector<ObsIdType> &obs) -> ObsIdType
-{
+auto LightningSimulator::HamiltonianObservable(const std::vector<double>& coeffs,
+                                               const std::vector<ObsIdType>& obs) -> ObsIdType {
     return this->obs_manager.createHamiltonianObs(coeffs, obs);
 }
 
-auto LightningSimulator::Expval(ObsIdType obsKey) -> double
-{
+auto LightningSimulator::Expval(ObsIdType obsKey) -> double {
     RT_FAIL_IF(!this->obs_manager.isValidObservables({obsKey}),
                "Invalid key for cached observables");
-    auto &&obs = this->obs_manager.getObservable(obsKey);
+    auto&& obs = this->obs_manager.getObservable(obsKey);
 
     // update tape caching
     if (this->tape_recording) {
@@ -183,11 +163,10 @@ auto LightningSimulator::Expval(ObsIdType obsKey) -> double
     return m.expval(*obs);
 }
 
-auto LightningSimulator::Var(ObsIdType obsKey) -> double
-{
+auto LightningSimulator::Var(ObsIdType obsKey) -> double {
     RT_FAIL_IF(!this->obs_manager.isValidObservables({obsKey}),
                "Invalid key for cached observables");
-    auto &&obs = this->obs_manager.getObservable(obsKey);
+    auto&& obs = this->obs_manager.getObservable(obsKey);
 
     // update tape caching
     if (this->tape_recording) {
@@ -199,27 +178,24 @@ auto LightningSimulator::Var(ObsIdType obsKey) -> double
     return m.var(*obs);
 }
 
-void LightningSimulator::State(DataView<std::complex<double>, 1> &state)
-{
-    auto &&dv_state = this->device_sv->getDataVector();
+void LightningSimulator::State(DataView<std::complex<double>, 1>& state) {
+    auto&& dv_state = this->device_sv->getDataVector();
     RT_FAIL_IF(state.size() != dv_state.size(), "Invalid size for the pre-allocated state vector");
 
     std::move(dv_state.begin(), dv_state.end(), state.begin());
 }
 
-void LightningSimulator::Probs(DataView<double, 1> &probs)
-{
+void LightningSimulator::Probs(DataView<double, 1>& probs) {
     Pennylane::LightningQubit::Measures::Measurements<StateVectorT> m{*(this->device_sv)};
-    auto &&dv_probs = m.probs();
+    auto&& dv_probs = m.probs();
 
     RT_FAIL_IF(probs.size() != dv_probs.size(), "Invalid size for the pre-allocated probabilities");
 
     std::move(dv_probs.begin(), dv_probs.end(), probs.begin());
 }
 
-void LightningSimulator::PartialProbs(DataView<double, 1> &probs,
-                                      const std::vector<QubitIdType> &wires)
-{
+void LightningSimulator::PartialProbs(DataView<double, 1>& probs,
+                                      const std::vector<QubitIdType>& wires) {
     const size_t numWires = wires.size();
     const size_t numQubits = this->GetNumQubits();
 
@@ -228,7 +204,7 @@ void LightningSimulator::PartialProbs(DataView<double, 1> &probs,
 
     auto dev_wires = getDeviceWires(wires);
     Pennylane::LightningQubit::Measures::Measurements<StateVectorT> m{*(this->device_sv)};
-    auto &&dv_probs = m.probs(dev_wires);
+    auto&& dv_probs = m.probs(dev_wires);
 
     RT_FAIL_IF(probs.size() != dv_probs.size(),
                "Invalid size for the pre-allocated partial-probabilities");
@@ -236,8 +212,7 @@ void LightningSimulator::PartialProbs(DataView<double, 1> &probs,
     std::move(dv_probs.begin(), dv_probs.end(), probs.begin());
 }
 
-void LightningSimulator::Sample(DataView<double, 2> &samples, size_t shots)
-{
+void LightningSimulator::Sample(DataView<double, 2>& samples, size_t shots) {
     // generate_samples is a member function of the Measures class.
     Pennylane::LightningQubit::Measures::Measurements<StateVectorT> m{*(this->device_sv)};
 
@@ -246,7 +221,7 @@ void LightningSimulator::Sample(DataView<double, 2> &samples, size_t shots)
     // Given the number of samples, returns 1-D vector of samples
     // in binary, each sample is separated by a stride equal to
     // the number of qubits.
-    auto &&li_samples = m.generate_samples(shots);
+    auto&& li_samples = m.generate_samples(shots);
 
     RT_FAIL_IF(samples.size() != li_samples.size(), "Invalid size for the pre-allocated samples");
 
@@ -264,9 +239,8 @@ void LightningSimulator::Sample(DataView<double, 2> &samples, size_t shots)
     }
 }
 
-void LightningSimulator::PartialSample(DataView<double, 2> &samples,
-                                       const std::vector<QubitIdType> &wires, size_t shots)
-{
+void LightningSimulator::PartialSample(DataView<double, 2>& samples,
+                                       const std::vector<QubitIdType>& wires, size_t shots) {
     const size_t numWires = wires.size();
     const size_t numQubits = this->GetNumQubits();
 
@@ -276,7 +250,7 @@ void LightningSimulator::PartialSample(DataView<double, 2> &samples,
                "Invalid size for the pre-allocated partial-samples");
 
     // get device wires
-    auto &&dev_wires = getDeviceWires(wires);
+    auto&& dev_wires = getDeviceWires(wires);
 
     // generate_samples is a member function of the Measures class.
     Pennylane::LightningQubit::Measures::Measurements<StateVectorT> m{*(this->device_sv)};
@@ -286,7 +260,7 @@ void LightningSimulator::PartialSample(DataView<double, 2> &samples,
     // Given the number of samples, returns 1-D vector of samples
     // in binary, each sample is separated by a stride equal to
     // the number of qubits.
-    auto &&li_samples = m.generate_samples(shots);
+    auto&& li_samples = m.generate_samples(shots);
 
     // The lightning samples are layed out as a single vector of size
     // shots*qubits, where each element represents a single bit. The
@@ -300,9 +274,8 @@ void LightningSimulator::PartialSample(DataView<double, 2> &samples,
     }
 }
 
-void LightningSimulator::Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts,
-                                size_t shots)
-{
+void LightningSimulator::Counts(DataView<double, 1>& eigvals, DataView<int64_t, 1>& counts,
+                                size_t shots) {
     const size_t numQubits = this->GetNumQubits();
     const size_t numElements = 1U << numQubits;
 
@@ -317,7 +290,7 @@ void LightningSimulator::Counts(DataView<double, 1> &eigvals, DataView<int64_t, 
     // Given the number of samples, returns 1-D vector of samples
     // in binary, each sample is separated by a stride equal to
     // the number of qubits.
-    auto &&li_samples = m.generate_samples(shots);
+    auto&& li_samples = m.generate_samples(shots);
 
     // Fill the eigenvalues with the integer representation of the corresponding
     // computational basis bitstring. In the future, eigenvalues can also be
@@ -340,9 +313,8 @@ void LightningSimulator::Counts(DataView<double, 1> &eigvals, DataView<int64_t, 
     }
 }
 
-void LightningSimulator::PartialCounts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts,
-                                       const std::vector<QubitIdType> &wires, size_t shots)
-{
+void LightningSimulator::PartialCounts(DataView<double, 1>& eigvals, DataView<int64_t, 1>& counts,
+                                       const std::vector<QubitIdType>& wires, size_t shots) {
     const size_t numWires = wires.size();
     const size_t numQubits = this->GetNumQubits();
     const size_t numElements = 1U << numWires;
@@ -353,7 +325,7 @@ void LightningSimulator::PartialCounts(DataView<double, 1> &eigvals, DataView<in
                "Invalid size for the pre-allocated partial-counts");
 
     // get device wires
-    auto &&dev_wires = getDeviceWires(wires);
+    auto&& dev_wires = getDeviceWires(wires);
 
     // generate_samples is a member function of the Measures class.
     Pennylane::LightningQubit::Measures::Measurements<StateVectorT> m{*(this->device_sv)};
@@ -363,7 +335,7 @@ void LightningSimulator::PartialCounts(DataView<double, 1> &eigvals, DataView<in
     // Given the number of samples, returns 1-D vector of samples
     // in binary, each sample is separated by a stride equal to
     // the number of qubits.
-    auto &&li_samples = m.generate_samples(shots);
+    auto&& li_samples = m.generate_samples(shots);
 
     // Fill the eigenvalues with the integer representation of the corresponding
     // computational basis bitstring. In the future, eigenvalues can also be
@@ -386,8 +358,7 @@ void LightningSimulator::PartialCounts(DataView<double, 1> &eigvals, DataView<in
     }
 }
 
-auto LightningSimulator::Measure(QubitIdType wire) -> Result
-{
+auto LightningSimulator::Measure(QubitIdType wire) -> Result {
     // get a measurement
     std::vector<QubitIdType> wires = {reinterpret_cast<QubitIdType>(wire)};
 
@@ -403,9 +374,9 @@ auto LightningSimulator::Measure(QubitIdType wire) -> Result
 
     const size_t numQubits = this->GetNumQubits();
 
-    auto &&state = this->device_sv->getDataVector();
+    auto&& state = this->device_sv->getDataVector();
 
-    auto &&dev_wires = this->getDeviceWires(wires);
+    auto&& dev_wires = this->getDeviceWires(wires);
     const auto stride = pow(2, numQubits - (1 + dev_wires[0]));
     const auto vec_size = pow(2, numQubits);
     const auto section_size = vec_size / stride;
@@ -432,48 +403,45 @@ auto LightningSimulator::Measure(QubitIdType wire) -> Result
 
     // normalize the vector
     double norm = std::sqrt(total);
-    std::for_each(state.begin(), state.end(), [norm](auto &elem) { elem /= norm; });
+    std::for_each(state.begin(), state.end(), [norm](auto& elem) { elem /= norm; });
 
     return mres ? this->One() : this->Zero();
 }
 
 // Gradient
-void LightningSimulator::Gradient(std::vector<DataView<double, 1>> &gradients,
-                                  const std::vector<size_t> &trainParams)
-{
+void LightningSimulator::Gradient(std::vector<DataView<double, 1>>& gradients,
+                                  const std::vector<size_t>& trainParams) {
     const bool tp_empty = trainParams.empty();
     const size_t num_observables = this->cache_manager.getNumObservables();
     const size_t num_params = this->cache_manager.getNumParams();
     const size_t num_train_params = tp_empty ? num_params : trainParams.size();
     const size_t jac_size = num_train_params * this->cache_manager.getNumObservables();
 
-    if (!jac_size) {
-        return;
-    }
+    if (!jac_size) { return; }
 
     RT_FAIL_IF(gradients.size() != num_observables, "Invalid number of pre-allocated gradients");
 
-    auto &&obs_callees = this->cache_manager.getObservablesCallees();
+    auto&& obs_callees = this->cache_manager.getObservablesCallees();
     bool is_valid_measurements =
         std::all_of(obs_callees.begin(), obs_callees.end(),
-                    [](const auto &m) { return m == Lightning::Measurements::Expval; });
+                    [](const auto& m) { return m == Lightning::Measurements::Expval; });
     RT_FAIL_IF(!is_valid_measurements,
                "Unsupported measurements to compute gradient; "
                "Adjoint differentiation method only supports expectation return type");
 
-    auto &&state = this->device_sv->getDataVector();
+    auto&& state = this->device_sv->getDataVector();
 
     // create OpsData
-    auto &&ops_names = this->cache_manager.getOperationsNames();
-    auto &&ops_params = this->cache_manager.getOperationsParameters();
-    auto &&ops_wires = this->cache_manager.getOperationsWires();
+    auto&& ops_names = this->cache_manager.getOperationsNames();
+    auto&& ops_params = this->cache_manager.getOperationsParameters();
+    auto&& ops_wires = this->cache_manager.getOperationsWires();
 
-    auto &&ops_inverses = this->cache_manager.getOperationsInverses();
-    const auto &&ops = Pennylane::Algorithms::OpsData<StateVectorT>(ops_names, ops_params,
+    auto&& ops_inverses = this->cache_manager.getOperationsInverses();
+    const auto&& ops = Pennylane::Algorithms::OpsData<StateVectorT>(ops_names, ops_params,
                                                                     ops_wires, ops_inverses);
 
     // create the vector of observables
-    auto &&obs_keys = this->cache_manager.getObservablesKeys();
+    auto&& obs_keys = this->cache_manager.getObservablesKeys();
     std::vector<std::shared_ptr<Pennylane::Observables::Observable<StateVectorT>>> obs_vec;
     obs_vec.reserve(obs_keys.size());
     for (auto idx : obs_keys) {

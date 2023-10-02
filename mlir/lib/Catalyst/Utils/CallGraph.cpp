@@ -11,19 +11,18 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-#include <deque>
-
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+
+#include <deque>
 
 using namespace mlir;
 
 namespace catalyst {
 
-void traverseCallGraph(func::FuncOp start, SymbolTableCollection *symbolTable,
-                       function_ref<void(func::FuncOp)> processFunc)
-{
-    DenseSet<Operation *> visited{start};
-    std::deque<Operation *> frontier{start};
+void traverseCallGraph(func::FuncOp start, SymbolTableCollection* symbolTable,
+                       function_ref<void(func::FuncOp)> processFunc) {
+    DenseSet<Operation*> visited{start};
+    std::deque<Operation*> frontier{start};
 
     while (!frontier.empty()) {
         auto callable = cast<func::FuncOp>(frontier.front());
