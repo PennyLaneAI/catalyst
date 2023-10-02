@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "mlir/IR/DialectImplementation.h" // needed for generated type parser
-#include "llvm/ADT/TypeSwitch.h"           // needed for generated type parser
-
 #include "Quantum/IR/QuantumDialect.h"
+
 #include "Quantum/IR/QuantumOps.h"
+#include "llvm/ADT/TypeSwitch.h"           // needed for generated type parser
+#include "mlir/IR/DialectImplementation.h" // needed for generated type parser
 
 using namespace mlir;
 using namespace catalyst::quantum;
@@ -27,8 +27,7 @@ using namespace catalyst::quantum;
 
 #include "Quantum/IR/QuantumOpsDialect.cpp.inc"
 
-void QuantumDialect::initialize()
-{
+void QuantumDialect::initialize() {
     addTypes<
 #define GET_TYPEDEF_LIST
 #include "Quantum/IR/QuantumOpsTypes.cpp.inc"

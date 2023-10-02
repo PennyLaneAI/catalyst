@@ -14,12 +14,11 @@
 
 #pragma once
 
-#include <utility>
-
+#include "Gradient/IR/GradientOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/PatternMatch.h"
 
-#include "Gradient/IR/GradientOps.h"
+#include <utility>
 
 constexpr double PI = 3.14159265358979323846;
 
@@ -32,14 +31,14 @@ struct ParameterShiftLowering : public OpRewritePattern<func::FuncOp> {
     using OpRewritePattern<func::FuncOp>::OpRewritePattern;
 
     LogicalResult match(func::FuncOp op) const override;
-    void rewrite(func::FuncOp op, PatternRewriter &rewriter) const override;
+    void rewrite(func::FuncOp op, PatternRewriter& rewriter) const override;
 
   private:
     static std::pair<int64_t, int64_t> analyzeFunction(func::FuncOp callee);
-    static func::FuncOp genShiftFunction(PatternRewriter &rewriter, Location loc,
+    static func::FuncOp genShiftFunction(PatternRewriter& rewriter, Location loc,
                                          func::FuncOp callee, const int64_t numShifts,
                                          const int64_t loopDepth);
-    static func::FuncOp genQGradFunction(PatternRewriter &rewriter, Location loc,
+    static func::FuncOp genQGradFunction(PatternRewriter& rewriter, Location loc,
                                          func::FuncOp callee, func::FuncOp shiftedFn,
                                          const int64_t numShifts, const int64_t loopDepth);
 };

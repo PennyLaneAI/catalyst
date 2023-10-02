@@ -14,25 +14,22 @@
 
 #include "ParameterShift.hpp"
 
-#include "mlir/Dialect/SCF/IR/SCF.h"
-
 #include "Gradient/Utils/DifferentialQNode.h"
 #include "Gradient/Utils/GradientShape.h"
 #include "Quantum/IR/QuantumOps.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 
 namespace catalyst {
 namespace gradient {
 
-LogicalResult ParameterShiftLowering::match(func::FuncOp op) const
-{
+LogicalResult ParameterShiftLowering::match(func::FuncOp op) const {
     if (getQNodeDiffMethod(op) == "parameter-shift" && requiresCustomGradient(op)) {
         return success();
     }
     return failure();
 }
 
-void ParameterShiftLowering::rewrite(func::FuncOp op, PatternRewriter &rewriter) const
-{
+void ParameterShiftLowering::rewrite(func::FuncOp op, PatternRewriter& rewriter) const {
     Location loc = op.getLoc();
     rewriter.setInsertionPointAfter(op);
 
@@ -53,24 +50,20 @@ void ParameterShiftLowering::rewrite(func::FuncOp op, PatternRewriter &rewriter)
     registerCustomGradient(op, FlatSymbolRefAttr::get(qGradFn));
 }
 
-std::pair<int64_t, int64_t> ParameterShiftLowering::analyzeFunction(func::FuncOp callee)
-{
+std::pair<int64_t, int64_t> ParameterShiftLowering::analyzeFunction(func::FuncOp callee) {
     int64_t numShifts = 0;
     int64_t loopLevel = 0;
     int64_t maxLoopDepth = 0;
 
-    callee.walk<WalkOrder::PreOrder>([&](Operation *op) {
+    callee.walk<WalkOrder::PreOrder>([&](Operation* op) {
         if (isa<scf::ForOp>(op)) {
             loopLevel++;
-        }
-        else if (auto gate = dyn_cast<quantum::DifferentiableGate>(op)) {
-            if (gate.getDiffParams().empty())
-                return;
+        } else if (auto gate = dyn_cast<quantum::DifferentiableGate>(op)) {
+            if (gate.getDiffParams().empty()) return;
 
             numShifts += gate.getDiffParams().size();
             maxLoopDepth = std::max(loopLevel, maxLoopDepth);
-        }
-        else if (isa<scf::YieldOp>(op) && isa<scf::ForOp>(op->getParentOp())) {
+        } else if (isa<scf::YieldOp>(op) && isa<scf::ForOp>(op->getParentOp())) {
             loopLevel--;
         }
     });

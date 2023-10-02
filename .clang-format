@@ -1,8 +1,62 @@
+# Generic definitions
+Language: Cpp
 BasedOnStyle: LLVM
-UseTab: Never
+PointerAlignment: Left
 IndentWidth: 4
 TabWidth: 4
-AccessModifierOffset: -2
-BreakBeforeBraces: Stroustrup
-FixNamespaceComments: true
+Standard: Latest
+
+# Identify common pointer style, and use throughout.
+DerivePointerAlignment: false
+
+AlignAfterOpenBracket: Align
+
+# Allow single-line definitions and contracted definitions
+AllowShortBlocksOnASingleLine: Always
+AllowShortCaseLabelsOnASingleLine: true
+AllowShortFunctionsOnASingleLine: All
+AllowShortIfStatementsOnASingleLine: WithoutElse
+AllowShortLambdasOnASingleLine: All
+
+# Add appropriate line-breaks and spacing
+AlwaysBreakTemplateDeclarations: true
+BitFieldColonSpacing: Both
+BreakBeforeBraces: Attach
+BreakBeforeConceptDeclarations: true
+BreakConstructorInitializers: AfterColon
+BreakInheritanceList: AfterComma
+BreakStringLiterals: true
+
+# Match Python code column limit
 ColumnLimit: 100
+Cpp11BracedListStyle: true
+FixNamespaceComments: true
+
+# Include structure rules for ordering.
+# System, then user-defined system, then local.
+IncludeBlocks: Regroup
+IncludeCategories:
+  - Regex:           '<[[:alnum:]]+?\.*>'
+    Priority:        3
+  - Regex:           '<[[:alnum:]].+(hpp|hh|h|cuh)>'
+    Priority:        2
+  - Regex:           '\"[[:alnum:]].+(hpp|hh|h|cuh)\"'
+    Priority:        1
+
+IndentCaseLabels: true
+IndentPPDirectives: None
+
+PackConstructorInitializers: NextLine
+
+QualifierAlignment: Left
+ReferenceAlignment: Left
+
+# Sorting rules
+SortIncludes: true
+SortUsingDeclarations: true
+
+SpaceAfterLogicalNot: false
+SpaceBeforeAssignmentOperators: true
+
+UseTab: Never
+

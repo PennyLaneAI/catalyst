@@ -12,12 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "mlir/IR/FunctionInterfaces.h"
-#include "mlir/Target/LLVMIR/Dialect/Builtin/BuiltinToLLVMIRTranslation.h"
-#include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
-#include "mlir/Target/LLVMIR/Export.h"
-#include "mlir/Target/LLVMIR/LLVMTranslationInterface.h"
-#include "mlir/Target/LLVMIR/ModuleTranslation.h"
+#include "Driver/CatalystLLVMTarget.h"
+
+#include "Gradient/IR/GradientDialect.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/MC/TargetRegistry.h"
 #include "llvm/Support/FileSystem.h"
@@ -25,22 +22,23 @@
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetOptions.h"
 #include "llvm/TargetParser/Host.h"
-
-#include "Driver/CatalystLLVMTarget.h"
-#include "Gradient/IR/GradientDialect.h"
+#include "mlir/IR/FunctionInterfaces.h"
+#include "mlir/Target/LLVMIR/Dialect/Builtin/BuiltinToLLVMIRTranslation.h"
+#include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
+#include "mlir/Target/LLVMIR/Export.h"
+#include "mlir/Target/LLVMIR/LLVMTranslationInterface.h"
+#include "mlir/Target/LLVMIR/ModuleTranslation.h"
 
 using namespace mlir;
 
-void catalyst::driver::registerLLVMTranslations(DialectRegistry &registry)
-{
+void catalyst::driver::registerLLVMTranslations(DialectRegistry& registry) {
     registerLLVMDialectTranslation(registry);
     registerBuiltinDialectTranslation(registry);
 }
 
-LogicalResult catalyst::driver::compileObjectFile(const CompilerOptions &options,
+LogicalResult catalyst::driver::compileObjectFile(const CompilerOptions& options,
                                                   std::shared_ptr<llvm::Module> llvmModule,
-                                                  StringRef filename)
-{
+                                                  StringRef filename) {
     using namespace llvm;
 
     std::string targetTriple = sys::getDefaultTargetTriple();
@@ -61,8 +59,8 @@ LogicalResult catalyst::driver::compileObjectFile(const CompilerOptions &options
     }
 
     // Target a generic CPU without any additional features, options, or relocation model
-    const char *cpu = "generic";
-    const char *features = "";
+    const char* cpu = "generic";
+    const char* features = "";
 
     TargetOptions opt;
     auto targetMachine =

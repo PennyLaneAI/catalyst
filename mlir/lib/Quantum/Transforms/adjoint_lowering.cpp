@@ -14,12 +14,11 @@
 
 #define DEBUG_TYPE "adjoint"
 
-#include <memory>
-#include <vector>
-
+#include "Catalyst/IR/CatalystDialect.h"
+#include "Quantum/IR/QuantumOps.h"
+#include "Quantum/Transforms/Patterns.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Errc.h"
-
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Index/IR/IndexDialect.h"
@@ -32,9 +31,8 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#include "Catalyst/IR/CatalystDialect.h"
-#include "Quantum/IR/QuantumOps.h"
-#include "Quantum/Transforms/Patterns.h"
+#include <memory>
+#include <vector>
 
 using namespace llvm;
 using namespace mlir;
@@ -49,8 +47,7 @@ namespace quantum {
 struct AdjointLoweringPass : impl::AdjointLoweringPassBase<AdjointLoweringPass> {
     using AdjointLoweringPassBase::AdjointLoweringPassBase;
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         LLVM_DEBUG(dbgs() << "adjoint lowering pass"
                           << "\n");
 
@@ -64,8 +61,7 @@ struct AdjointLoweringPass : impl::AdjointLoweringPassBase<AdjointLoweringPass> 
 
 } // namespace quantum
 
-std::unique_ptr<Pass> createAdjointLoweringPass()
-{
+std::unique_ptr<Pass> createAdjointLoweringPass() {
     return std::make_unique<quantum::AdjointLoweringPass>();
 }
 

@@ -12,25 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <deque>
-
-#include "llvm/ADT/SmallPtrSet.h"
+#include "Quantum/Utils/RemoveQuantumMeasurements.h"
 
 #include "Quantum/IR/QuantumInterfaces.h"
 #include "Quantum/IR/QuantumOps.h"
-#include "Quantum/Utils/RemoveQuantumMeasurements.h"
+#include "llvm/ADT/SmallPtrSet.h"
+
+#include <deque>
 
 using namespace mlir;
 
 namespace catalyst {
 namespace quantum {
 
-void removeQuantumMeasurements(func::FuncOp &function)
-{
+void removeQuantumMeasurements(func::FuncOp& function) {
     // Delete measurement operations.
-    std::deque<Operation *> opsToDelete;
+    std::deque<Operation*> opsToDelete;
     function.walk([&](MeasurementProcess op) { opsToDelete.push_back(op); });
-    SmallPtrSet<Operation *, 4> visited{opsToDelete.begin(), opsToDelete.end()};
+    SmallPtrSet<Operation*, 4> visited{opsToDelete.begin(), opsToDelete.end()};
 
     // Measurement operations are not allowed inside scf dialects.
     // This means that we can remove them.
@@ -39,10 +38,10 @@ void removeQuantumMeasurements(func::FuncOp &function)
     //
     // This will remove the operation in opsToDelete as long as any other uses.
     while (!opsToDelete.empty()) {
-        Operation *currentOp = opsToDelete.front();
+        Operation* currentOp = opsToDelete.front();
         opsToDelete.pop_front();
         currentOp->dropAllReferences();
-        for (Operation *user : currentOp->getUsers()) {
+        for (Operation* user : currentOp->getUsers()) {
             if (!visited.contains(user)) {
                 visited.insert(user);
                 opsToDelete.push_back(user);
@@ -50,8 +49,7 @@ void removeQuantumMeasurements(func::FuncOp &function)
         }
         if (currentOp->use_empty()) {
             currentOp->erase();
-        }
-        else {
+        } else {
             opsToDelete.push_back(currentOp);
         }
     }

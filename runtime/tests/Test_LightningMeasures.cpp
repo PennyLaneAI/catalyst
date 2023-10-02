@@ -12,23 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "cmath"
-
-#include "RuntimeCAPI.h"
-#include "Types.h"
-
 #include "CacheManager.hpp"
 #include "MemRefUtils.hpp"
 #include "QuantumDevice.hpp"
-#include "Utils.hpp"
-
+#include "RuntimeCAPI.h"
 #include "TestUtils.hpp"
+#include "Types.h"
+#include "Utils.hpp"
+#include "cmath"
 
 using namespace Catalyst::Runtime;
 using namespace Catalyst::Runtime::Simulator;
 
-TEMPLATE_LIST_TEST_CASE("NameObs test with invalid number of wires", "[Measures]", SimTypes)
-{
+TEMPLATE_LIST_TEST_CASE("NameObs test with invalid number of wires", "[Measures]", SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     REQUIRE_THROWS_WITH(sim->Observable(ObsId::PauliX, {}, {1}),
@@ -36,8 +32,7 @@ TEMPLATE_LIST_TEST_CASE("NameObs test with invalid number of wires", "[Measures]
 }
 
 TEMPLATE_LIST_TEST_CASE("NameObs test with invalid given wires for NamedObs", "[Measures]",
-                        SimTypes)
-{
+                        SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     sim->AllocateQubit();
@@ -46,8 +41,7 @@ TEMPLATE_LIST_TEST_CASE("NameObs test with invalid given wires for NamedObs", "[
                         Catch::Contains("Invalid given wires"));
 }
 
-TEMPLATE_LIST_TEST_CASE("HermitianObs test with invalid number of wires", "[Measures]", SimTypes)
-{
+TEMPLATE_LIST_TEST_CASE("HermitianObs test with invalid number of wires", "[Measures]", SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     REQUIRE_THROWS_WITH(sim->Observable(ObsId::Hermitian, {}, {1}),
@@ -55,8 +49,7 @@ TEMPLATE_LIST_TEST_CASE("HermitianObs test with invalid number of wires", "[Meas
 }
 
 TEMPLATE_LIST_TEST_CASE("HermitianObs test with invalid given wires for HermitianObs", "[Measures]",
-                        SimTypes)
-{
+                        SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
     sim->AllocateQubit();
 
@@ -64,15 +57,13 @@ TEMPLATE_LIST_TEST_CASE("HermitianObs test with invalid given wires for Hermitia
                         Catch::Contains("Invalid given wires"));
 }
 
-TEMPLATE_LIST_TEST_CASE("Check an unsupported observable", "[Measures]", SimTypes)
-{
+TEMPLATE_LIST_TEST_CASE("Check an unsupported observable", "[Measures]", SimTypes) {
     REQUIRE_THROWS_WITH(Lightning::lookup_obs<Lightning::simulator_observable_support_size>(
                             Lightning::simulator_observable_support, static_cast<ObsId>(10)),
                         Catch::Contains("The given observable is not supported by the simulator"));
 }
 
-TEMPLATE_LIST_TEST_CASE("Measurement collapse test with 2 wires", "[Measures]", SimTypes)
-{
+TEMPLATE_LIST_TEST_CASE("Measurement collapse test with 2 wires", "[Measures]", SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     constexpr size_t n = 2;
@@ -89,8 +80,7 @@ TEMPLATE_LIST_TEST_CASE("Measurement collapse test with 2 wires", "[Measures]", 
     if (*m) {
         CHECK(pow(std::abs(std::real(state[2])), 2) + pow(std::abs(std::imag(state[2])), 2) ==
               Approx(1.0).margin(1e-5));
-    }
-    else {
+    } else {
         CHECK(pow(std::abs(std::real(state[0])), 2) + pow(std::abs(std::imag(state[0])), 2) ==
               Approx(1.0).margin(1e-5));
     }
@@ -98,8 +88,7 @@ TEMPLATE_LIST_TEST_CASE("Measurement collapse test with 2 wires", "[Measures]", 
 }
 
 TEMPLATE_LIST_TEST_CASE("Measurement collapse concrete logical qubit difference", "[Measures]",
-                        SimTypes)
-{
+                        SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     constexpr size_t n = 1;
@@ -127,8 +116,7 @@ TEMPLATE_LIST_TEST_CASE("Measurement collapse concrete logical qubit difference"
     // LCOV_EXCL_STOP
 }
 
-TEMPLATE_LIST_TEST_CASE("Mid-circuit measurement naive test", "[Measures]", SimTypes)
-{
+TEMPLATE_LIST_TEST_CASE("Mid-circuit measurement naive test", "[Measures]", SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     QubitIdType q;
@@ -143,15 +131,13 @@ TEMPLATE_LIST_TEST_CASE("Mid-circuit measurement naive test", "[Measures]", SimT
 }
 
 TEMPLATE_LIST_TEST_CASE("Expval(ObsT) test with invalid key for cached observables", "[Measures]",
-                        SimTypes)
-{
+                        SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     REQUIRE_THROWS_WITH(sim->Expval(0), Catch::Contains("Invalid key for cached observables"));
 }
 
-TEMPLATE_LIST_TEST_CASE("Expval(NamedObs) test", "[Measures]", SimTypes)
-{
+TEMPLATE_LIST_TEST_CASE("Expval(NamedObs) test", "[Measures]", SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
@@ -176,8 +162,7 @@ TEMPLATE_LIST_TEST_CASE("Expval(NamedObs) test", "[Measures]", SimTypes)
     CHECK(sim->Expval(pz) == Approx(-1.0).margin(1e-5));
 }
 
-TEMPLATE_LIST_TEST_CASE("Expval(HermitianObs) test", "[Measures]", SimTypes)
-{
+TEMPLATE_LIST_TEST_CASE("Expval(HermitianObs) test", "[Measures]", SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
@@ -201,8 +186,7 @@ TEMPLATE_LIST_TEST_CASE("Expval(HermitianObs) test", "[Measures]", SimTypes)
     CHECK(sim->Expval(h2) == Approx(.0).margin(1e-5));
 }
 
-TEMPLATE_LIST_TEST_CASE("Expval(TensorProd(NamedObs)) test", "[Measures]", SimTypes)
-{
+TEMPLATE_LIST_TEST_CASE("Expval(TensorProd(NamedObs)) test", "[Measures]", SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
@@ -230,8 +214,7 @@ TEMPLATE_LIST_TEST_CASE("Expval(TensorProd(NamedObs)) test", "[Measures]", SimTy
     CHECK(sim->Expval(tpz) == Approx(-1.0).margin(1e-5));
 }
 
-TEMPLATE_LIST_TEST_CASE("Expval(TensorProd(NamedObs[])) test", "[Measures]", SimTypes)
-{
+TEMPLATE_LIST_TEST_CASE("Expval(TensorProd(NamedObs[])) test", "[Measures]", SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
@@ -260,8 +243,7 @@ TEMPLATE_LIST_TEST_CASE("Expval(TensorProd(NamedObs[])) test", "[Measures]", Sim
     CHECK(sim->Expval(tpxz) == Approx(-1.0).margin(1e-5));
 }
 
-TEMPLATE_LIST_TEST_CASE("Expval(TensorProd(HermitianObs))", "[Measures]", SimTypes)
-{
+TEMPLATE_LIST_TEST_CASE("Expval(TensorProd(HermitianObs))", "[Measures]", SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
@@ -287,8 +269,7 @@ TEMPLATE_LIST_TEST_CASE("Expval(TensorProd(HermitianObs))", "[Measures]", SimTyp
     CHECK(sim->Expval(tph2) == Approx(.0).margin(1e-5));
 }
 
-TEMPLATE_LIST_TEST_CASE("Expval(TensorProd(HermitianObs[]))", "[Measures]", SimTypes)
-{
+TEMPLATE_LIST_TEST_CASE("Expval(TensorProd(HermitianObs[]))", "[Measures]", SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
@@ -312,8 +293,7 @@ TEMPLATE_LIST_TEST_CASE("Expval(TensorProd(HermitianObs[]))", "[Measures]", SimT
     CHECK(sim->Expval(tp) == Approx(.0).margin(1e-5));
 }
 
-TEMPLATE_LIST_TEST_CASE("Expval(TensorProd(Obs[]))", "[Measures]", SimTypes)
-{
+TEMPLATE_LIST_TEST_CASE("Expval(TensorProd(Obs[]))", "[Measures]", SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
@@ -341,8 +321,7 @@ TEMPLATE_LIST_TEST_CASE("Expval(TensorProd(Obs[]))", "[Measures]", SimTypes)
 }
 
 TEMPLATE_LIST_TEST_CASE("Expval(Tensor(Hamiltonian(NamedObs[]), NamedObs)) test", "[Measures]",
-                        SimTypes)
-{
+                        SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
@@ -367,8 +346,7 @@ TEMPLATE_LIST_TEST_CASE("Expval(Tensor(Hamiltonian(NamedObs[]), NamedObs)) test"
     CHECK(sim->Expval(thz) == Approx(-0.4).margin(1e-5));
 }
 
-TEMPLATE_LIST_TEST_CASE("Expval(Tensor(HermitianObs, Hamiltonian()) test", "[Measures]", SimTypes)
-{
+TEMPLATE_LIST_TEST_CASE("Expval(Tensor(HermitianObs, Hamiltonian()) test", "[Measures]", SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
@@ -390,8 +368,7 @@ TEMPLATE_LIST_TEST_CASE("Expval(Tensor(HermitianObs, Hamiltonian()) test", "[Mea
     CHECK(sim->Expval(ten) == Approx(0.0).margin(1e-5));
 }
 
-TEMPLATE_LIST_TEST_CASE("Expval(Hamiltonian(NamedObs[])) test", "[Measures]", SimTypes)
-{
+TEMPLATE_LIST_TEST_CASE("Expval(Hamiltonian(NamedObs[])) test", "[Measures]", SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
@@ -415,8 +392,7 @@ TEMPLATE_LIST_TEST_CASE("Expval(Hamiltonian(NamedObs[])) test", "[Measures]", Si
     CHECK(sim->Expval(hxyz) == Approx(0.2).margin(1e-5));
 }
 
-TEMPLATE_LIST_TEST_CASE("Expval(Hamiltonian(TensorObs[])) test", "[Measures]", SimTypes)
-{
+TEMPLATE_LIST_TEST_CASE("Expval(Hamiltonian(TensorObs[])) test", "[Measures]", SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
@@ -442,8 +418,7 @@ TEMPLATE_LIST_TEST_CASE("Expval(Hamiltonian(TensorObs[])) test", "[Measures]", S
     CHECK(sim->Expval(hxyz) == Approx(-.6).margin(1e-5));
 }
 
-TEMPLATE_LIST_TEST_CASE("Expval(Hamiltonian(Hermitian[])) test", "[Measures]", SimTypes)
-{
+TEMPLATE_LIST_TEST_CASE("Expval(Hamiltonian(Hermitian[])) test", "[Measures]", SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
@@ -470,8 +445,7 @@ TEMPLATE_LIST_TEST_CASE("Expval(Hamiltonian(Hermitian[])) test", "[Measures]", S
 }
 
 TEMPLATE_LIST_TEST_CASE("Expval(Hamiltonian({TensorProd, Hermitian}[])) test", "[Measures]",
-                        SimTypes)
-{
+                        SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
@@ -499,8 +473,7 @@ TEMPLATE_LIST_TEST_CASE("Expval(Hamiltonian({TensorProd, Hermitian}[])) test", "
 }
 
 TEMPLATE_LIST_TEST_CASE("Expval(Hamiltonian({Hamiltonian, Hermitian}[])) test", "[Measures]",
-                        SimTypes)
-{
+                        SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
@@ -528,8 +501,7 @@ TEMPLATE_LIST_TEST_CASE("Expval(Hamiltonian({Hamiltonian, Hermitian}[])) test", 
 }
 
 TEMPLATE_LIST_TEST_CASE("Expval(Hamiltonian({Hamiltonian(Hamiltonian), Hermitian}[])) test",
-                        "[Measures]", SimTypes)
-{
+                        "[Measures]", SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
@@ -557,8 +529,7 @@ TEMPLATE_LIST_TEST_CASE("Expval(Hamiltonian({Hamiltonian(Hamiltonian), Hermitian
     CHECK(sim->Expval(hhtp) == Approx(0.7).margin(1e-5));
 }
 
-TEMPLATE_LIST_TEST_CASE("Var(NamedObs) test with numWires=4", "[Measures]", SimTypes)
-{
+TEMPLATE_LIST_TEST_CASE("Var(NamedObs) test with numWires=4", "[Measures]", SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
@@ -583,8 +554,7 @@ TEMPLATE_LIST_TEST_CASE("Var(NamedObs) test with numWires=4", "[Measures]", SimT
     CHECK(sim->Var(pz) == Approx(.0).margin(1e-5));
 }
 
-TEMPLATE_LIST_TEST_CASE("Var(HermitianObs) test", "[Measures]", SimTypes)
-{
+TEMPLATE_LIST_TEST_CASE("Var(HermitianObs) test", "[Measures]", SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
@@ -608,8 +578,7 @@ TEMPLATE_LIST_TEST_CASE("Var(HermitianObs) test", "[Measures]", SimTypes)
     CHECK(sim->Var(h2) == Approx(1.0).margin(1e-5));
 }
 
-TEMPLATE_LIST_TEST_CASE("Var(TensorProd(NamedObs)) test", "[Measures]", SimTypes)
-{
+TEMPLATE_LIST_TEST_CASE("Var(TensorProd(NamedObs)) test", "[Measures]", SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
@@ -637,8 +606,7 @@ TEMPLATE_LIST_TEST_CASE("Var(TensorProd(NamedObs)) test", "[Measures]", SimTypes
     CHECK(sim->Var(tpz) == Approx(.0).margin(1e-5));
 }
 
-TEMPLATE_LIST_TEST_CASE("Var(TensorProd(NamedObs[])) test", "[Measures]", SimTypes)
-{
+TEMPLATE_LIST_TEST_CASE("Var(TensorProd(NamedObs[])) test", "[Measures]", SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
@@ -664,8 +632,7 @@ TEMPLATE_LIST_TEST_CASE("Var(TensorProd(NamedObs[])) test", "[Measures]", SimTyp
     CHECK(sim->Var(tpxz) == Approx(0.0).margin(1e-5));
 }
 
-TEMPLATE_LIST_TEST_CASE("Var(TensorProd(HermitianObs)) test", "[Measures]", SimTypes)
-{
+TEMPLATE_LIST_TEST_CASE("Var(TensorProd(HermitianObs)) test", "[Measures]", SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
@@ -691,8 +658,7 @@ TEMPLATE_LIST_TEST_CASE("Var(TensorProd(HermitianObs)) test", "[Measures]", SimT
     CHECK(sim->Var(tph2) == Approx(1.0).margin(1e-5));
 }
 
-TEMPLATE_LIST_TEST_CASE("Var(TensorProd(HermitianObs[])) test", "[Measures]", SimTypes)
-{
+TEMPLATE_LIST_TEST_CASE("Var(TensorProd(HermitianObs[])) test", "[Measures]", SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
@@ -716,8 +682,7 @@ TEMPLATE_LIST_TEST_CASE("Var(TensorProd(HermitianObs[])) test", "[Measures]", Si
     CHECK(sim->Var(tp) == Approx(2.0).margin(1e-5));
 }
 
-TEMPLATE_LIST_TEST_CASE("Var(TensorProd(Obs[])) test", "[Measures]", SimTypes)
-{
+TEMPLATE_LIST_TEST_CASE("Var(TensorProd(Obs[])) test", "[Measures]", SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
@@ -745,8 +710,7 @@ TEMPLATE_LIST_TEST_CASE("Var(TensorProd(Obs[])) test", "[Measures]", SimTypes)
 }
 
 TEMPLATE_LIST_TEST_CASE("Var(Tensor(Hamiltonian(NamedObs[]), NamedObs)) test", "[Measures]",
-                        SimTypes)
-{
+                        SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
@@ -771,8 +735,7 @@ TEMPLATE_LIST_TEST_CASE("Var(Tensor(Hamiltonian(NamedObs[]), NamedObs)) test", "
     CHECK(sim->Var(thz) == Approx(0.64).margin(1e-5));
 }
 
-TEMPLATE_LIST_TEST_CASE("Var(Tensor(HermitianObs, Hamiltonian()) test", "[Measures]", SimTypes)
-{
+TEMPLATE_LIST_TEST_CASE("Var(Tensor(HermitianObs, Hamiltonian()) test", "[Measures]", SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
@@ -793,8 +756,7 @@ TEMPLATE_LIST_TEST_CASE("Var(Tensor(HermitianObs, Hamiltonian()) test", "[Measur
     CHECK(sim->Var(ten) == Approx(0.8).margin(1e-5));
 }
 
-TEMPLATE_LIST_TEST_CASE("Var(Hamiltonian(NamedObs[])) test", "[Measures]", SimTypes)
-{
+TEMPLATE_LIST_TEST_CASE("Var(Hamiltonian(NamedObs[])) test", "[Measures]", SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
@@ -818,8 +780,7 @@ TEMPLATE_LIST_TEST_CASE("Var(Hamiltonian(NamedObs[])) test", "[Measures]", SimTy
     CHECK(sim->Var(hxyz) == Approx(0.64).margin(1e-5));
 }
 
-TEMPLATE_LIST_TEST_CASE("Var(Hamiltonian(TensorObs[])) test", "[Measures]", SimTypes)
-{
+TEMPLATE_LIST_TEST_CASE("Var(Hamiltonian(TensorObs[])) test", "[Measures]", SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
@@ -845,8 +806,7 @@ TEMPLATE_LIST_TEST_CASE("Var(Hamiltonian(TensorObs[])) test", "[Measures]", SimT
     CHECK(sim->Var(hxyz) == Approx(0.04).margin(1e-5));
 }
 
-TEMPLATE_LIST_TEST_CASE("Var(Hamiltonian(Hermitian[])) test", "[Measures]", SimTypes)
-{
+TEMPLATE_LIST_TEST_CASE("Var(Hamiltonian(Hermitian[])) test", "[Measures]", SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
@@ -872,8 +832,8 @@ TEMPLATE_LIST_TEST_CASE("Var(Hamiltonian(Hermitian[])) test", "[Measures]", SimT
     CHECK(sim->Var(hxhz) == Approx(0.36).margin(1e-5));
 }
 
-TEMPLATE_LIST_TEST_CASE("Var(Hamiltonian({TensorProd, Hermitian}[])) test", "[Measures]", SimTypes)
-{
+TEMPLATE_LIST_TEST_CASE("Var(Hamiltonian({TensorProd, Hermitian}[])) test", "[Measures]",
+                        SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
@@ -900,8 +860,8 @@ TEMPLATE_LIST_TEST_CASE("Var(Hamiltonian({TensorProd, Hermitian}[])) test", "[Me
     CHECK(sim->Var(hhtp) == Approx(1.0).margin(1e-5));
 }
 
-TEMPLATE_LIST_TEST_CASE("Var(Hamiltonian({Hamiltonian, Hermitian}[])) test", "[Measures]", SimTypes)
-{
+TEMPLATE_LIST_TEST_CASE("Var(Hamiltonian({Hamiltonian, Hermitian}[])) test", "[Measures]",
+                        SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
@@ -929,8 +889,7 @@ TEMPLATE_LIST_TEST_CASE("Var(Hamiltonian({Hamiltonian, Hermitian}[])) test", "[M
 }
 
 TEMPLATE_LIST_TEST_CASE("Var(Hamiltonian({Hamiltonian(Hamiltonian), Hermitian}[])) test",
-                        "[Measures]", SimTypes)
-{
+                        "[Measures]", SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
@@ -958,8 +917,7 @@ TEMPLATE_LIST_TEST_CASE("Var(Hamiltonian({Hamiltonian(Hamiltonian), Hermitian}[]
     CHECK(sim->Var(hhtp) == Approx(0.36).margin(1e-5));
 }
 
-TEMPLATE_LIST_TEST_CASE("State test with incorrect size", "[Measures]", SimTypes)
-{
+TEMPLATE_LIST_TEST_CASE("State test with incorrect size", "[Measures]", SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
@@ -972,8 +930,7 @@ TEMPLATE_LIST_TEST_CASE("State test with incorrect size", "[Measures]", SimTypes
                         Catch::Contains("Invalid size for the pre-allocated state vector"));
 }
 
-TEMPLATE_LIST_TEST_CASE("State test with numWires=4", "[Measures]", SimTypes)
-{
+TEMPLATE_LIST_TEST_CASE("State test with numWires=4", "[Measures]", SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
@@ -993,8 +950,7 @@ TEMPLATE_LIST_TEST_CASE("State test with numWires=4", "[Measures]", SimTypes)
         if (i == 4 || i == 6 || i == 12 || i == 14) {
             CHECK(std::real(state[i]) == Approx(0.).margin(1e-5));
             CHECK(std::imag(state[i]) == Approx(0.5).margin(1e-5));
-        }
-        else {
+        } else {
             CHECK(std::real(state[i]) == Approx(0.).margin(1e-5));
             CHECK(std::imag(state[i]) == Approx(0.).margin(1e-5));
         }
@@ -1002,8 +958,7 @@ TEMPLATE_LIST_TEST_CASE("State test with numWires=4", "[Measures]", SimTypes)
 }
 
 TEMPLATE_LIST_TEST_CASE("PartialProbs test with incorrect numWires and numAlloc", "[Measures]",
-                        SimTypes)
-{
+                        SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
@@ -1033,8 +988,7 @@ TEMPLATE_LIST_TEST_CASE("PartialProbs test with incorrect numWires and numAlloc"
                         Catch::Contains("Invalid given wires to measure"));
 }
 
-TEMPLATE_LIST_TEST_CASE("Probs and PartialProbs tests with numWires=0-4", "[Measures]", SimTypes)
-{
+TEMPLATE_LIST_TEST_CASE("Probs and PartialProbs tests with numWires=0-4", "[Measures]", SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
@@ -1077,8 +1031,7 @@ TEMPLATE_LIST_TEST_CASE("Probs and PartialProbs tests with numWires=0-4", "[Meas
     for (size_t i = 0; i < 4; i++) {
         if (i == 0 || i == 2) {
             CHECK(probs2[i] == Approx(0.5).margin(1e-5));
-        }
-        else {
+        } else {
             CHECK(probs2[i] == Approx(0.).margin(1e-5));
         }
     }
@@ -1086,8 +1039,7 @@ TEMPLATE_LIST_TEST_CASE("Probs and PartialProbs tests with numWires=0-4", "[Meas
         if (i == 4 || i == 6 || i == 12 || i == 14) {
             CHECK(probs3[i] == Approx(0.25).margin(1e-5));
             CHECK(probs4[i] == Approx(0.25).margin(1e-5));
-        }
-        else {
+        } else {
             CHECK(probs3[i] == Approx(0.).margin(1e-5));
             CHECK(probs4[i] == Approx(0.).margin(1e-5));
         }
@@ -1095,8 +1047,7 @@ TEMPLATE_LIST_TEST_CASE("Probs and PartialProbs tests with numWires=0-4", "[Meas
 }
 
 TEMPLATE_LIST_TEST_CASE("PartialSample test with incorrect numWires and numAlloc", "[Measures]",
-                        SimTypes)
-{
+                        SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
@@ -1128,8 +1079,7 @@ TEMPLATE_LIST_TEST_CASE("PartialSample test with incorrect numWires and numAlloc
 }
 
 TEMPLATE_LIST_TEST_CASE("PartialCounts test with incorrect numWires and numAlloc", "[Measures]",
-                        SimTypes)
-{
+                        SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
@@ -1163,8 +1113,7 @@ TEMPLATE_LIST_TEST_CASE("PartialCounts test with incorrect numWires and numAlloc
 }
 
 TEMPLATE_LIST_TEST_CASE("Sample and PartialSample tests with numWires=0-4 shots=100", "[Measures]",
-                        SimTypes)
-{
+                        SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
@@ -1212,8 +1161,7 @@ TEMPLATE_LIST_TEST_CASE("Sample and PartialSample tests with numWires=0-4 shots=
 }
 
 TEMPLATE_LIST_TEST_CASE("Counts and PartialCounts tests with numWires=0-4 shots=100", "[Measures]",
-                        SimTypes)
-{
+                        SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n

@@ -12,13 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "mlir/IR/Builders.h"
-#include "mlir/IR/OpImplementation.h"
-
-#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "Catalyst/IR/CatalystOps.h"
 
 #include "Catalyst/IR/CatalystDialect.h"
-#include "Catalyst/IR/CatalystOps.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/IR/Builders.h"
+#include "mlir/IR/OpImplementation.h"
 
 using namespace mlir;
 using namespace catalyst;

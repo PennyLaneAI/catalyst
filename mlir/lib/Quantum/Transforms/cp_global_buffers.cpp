@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "Quantum/Transforms/Passes.h"
+#include "Quantum/Transforms/Patterns.h"
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -19,33 +21,25 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#include "Quantum/Transforms/Passes.h"
-#include "Quantum/Transforms/Patterns.h"
-
 using namespace mlir;
 
 namespace {
 
-bool hasCWrapperAttribute(func::FuncOp op)
-{
+bool hasCWrapperAttribute(func::FuncOp op) {
     return (bool)(op->getAttrOfType<UnitAttr>(LLVM::LLVMDialect::getEmitCWrapperAttrName()));
 }
 
-bool hasCopyWrapperAttribute(func::FuncOp op)
-{
+bool hasCopyWrapperAttribute(func::FuncOp op) {
     return (bool)(op->getAttrOfType<UnitAttr>("llvm.copy_memref"));
 }
 
-bool hasCWrapperButNoCopyWrapperAttribute(func::FuncOp op)
-{
+bool hasCWrapperButNoCopyWrapperAttribute(func::FuncOp op) {
     return hasCWrapperAttribute(op) && !hasCopyWrapperAttribute(op);
 }
 
-bool hasMemRefReturnTypes(func::FuncOp op)
-{
+bool hasMemRefReturnTypes(func::FuncOp op) {
     auto types = op.getResultTypes();
-    if (types.empty())
-        return false;
+    if (types.empty()) return false;
 
     bool isMemRefType = false;
     for (auto type : types) {
@@ -55,37 +49,31 @@ bool hasMemRefReturnTypes(func::FuncOp op)
     return isMemRefType;
 }
 
-void setCopyWrapperAttribute(func::FuncOp op, PatternRewriter &rewriter)
-{
+void setCopyWrapperAttribute(func::FuncOp op, PatternRewriter& rewriter) {
     return op->setAttr("llvm.copy_memref", rewriter.getUnitAttr());
 }
 
-llvm::SmallVector<func::ReturnOp> getReturnOps(func::FuncOp op)
-{
+llvm::SmallVector<func::ReturnOp> getReturnOps(func::FuncOp op) {
     llvm::SmallVector<func::ReturnOp> returnOps;
     op.walk([&](func::ReturnOp returnOp) { returnOps.push_back(returnOp); });
     return returnOps;
 }
 
-llvm::SmallVector<Value> getReturnMemRefs(func::ReturnOp op)
-{
+llvm::SmallVector<Value> getReturnMemRefs(func::ReturnOp op) {
     auto values = op.getOperands();
     llvm::SmallVector<Value> memrefs;
     for (auto value : values) {
         Type ty = value.getType();
-        if (!ty.isa<MemRefType>())
-            continue;
+        if (!ty.isa<MemRefType>()) continue;
 
         memrefs.push_back(value);
     }
     return memrefs;
 }
 
-void applyCopyGlobalMemRefToReturnOp(func::ReturnOp op, PatternRewriter &rewriter)
-{
+void applyCopyGlobalMemRefToReturnOp(func::ReturnOp op, PatternRewriter& rewriter) {
     llvm::SmallVector<Value> memrefs = getReturnMemRefs(op);
-    if (memrefs.empty())
-        return;
+    if (memrefs.empty()) return;
 
     llvm::SmallVector<Value> newMemRefs;
 
@@ -109,13 +97,13 @@ void applyCopyGlobalMemRefToReturnOp(func::ReturnOp op, PatternRewriter &rewrite
 
         scf::IfOp ifOp = rewriter.create<scf::IfOp>(
             op->getLoc(), comparison,
-            [&](OpBuilder &builder, Location loc) { // then
+            [&](OpBuilder& builder, Location loc) { // then
                 Value newMemRef =
                     rewriter.create<memref::AllocOp>(op->getLoc(), ty.cast<MemRefType>());
                 rewriter.create<memref::CopyOp>(op->getLoc(), memref, newMemRef);
                 builder.create<scf::YieldOp>(loc, newMemRef);
             },
-            [&](OpBuilder &builder, Location loc) { // else
+            [&](OpBuilder& builder, Location loc) { // else
                 builder.create<scf::YieldOp>(loc, memref);
             });
 
@@ -125,8 +113,7 @@ void applyCopyGlobalMemRefToReturnOp(func::ReturnOp op, PatternRewriter &rewrite
     rewriter.replaceOpWithNewOp<func::ReturnOp>(op, newMemRefs);
 }
 
-void applyCopyGlobalMemRefTransform(func::FuncOp op, PatternRewriter &rewriter)
-{
+void applyCopyGlobalMemRefTransform(func::FuncOp op, PatternRewriter& rewriter) {
     llvm::SmallVector<func::ReturnOp> returnOps = getReturnOps(op);
     for (func::ReturnOp returnOp : returnOps) {
         // The insertion point will be just right before
@@ -140,20 +127,17 @@ struct CopyGlobalMemRefTransform : public OpRewritePattern<func::FuncOp> {
     using OpRewritePattern<func::FuncOp>::OpRewritePattern;
 
     LogicalResult match(func::FuncOp op) const override;
-    void rewrite(func::FuncOp op, PatternRewriter &rewriter) const override;
+    void rewrite(func::FuncOp op, PatternRewriter& rewriter) const override;
 };
 
-LogicalResult CopyGlobalMemRefTransform::match(func::FuncOp op) const
-{
+LogicalResult CopyGlobalMemRefTransform::match(func::FuncOp op) const {
     bool isCandidate = hasCWrapperButNoCopyWrapperAttribute(op);
-    if (!isCandidate)
-        return failure();
+    if (!isCandidate) return failure();
 
     return hasMemRefReturnTypes(op) ? success() : failure();
 }
 
-void CopyGlobalMemRefTransform::rewrite(func::FuncOp op, PatternRewriter &rewriter) const
-{
+void CopyGlobalMemRefTransform::rewrite(func::FuncOp op, PatternRewriter& rewriter) const {
     setCopyWrapperAttribute(op, rewriter);
     applyCopyGlobalMemRefTransform(op, rewriter);
 }
@@ -168,9 +152,8 @@ namespace catalyst {
 struct CopyGlobalMemRefPass : impl::CopyGlobalMemRefPassBase<CopyGlobalMemRefPass> {
     using CopyGlobalMemRefPassBase::CopyGlobalMemRefPassBase;
 
-    void runOnOperation() final
-    {
-        MLIRContext *context = &getContext();
+    void runOnOperation() final {
+        MLIRContext* context = &getContext();
         RewritePatternSet patterns(context);
         patterns.add<CopyGlobalMemRefTransform>(context);
 
@@ -180,8 +163,7 @@ struct CopyGlobalMemRefPass : impl::CopyGlobalMemRefPassBase<CopyGlobalMemRefPas
     }
 };
 
-std::unique_ptr<Pass> createCopyGlobalMemRefPass()
-{
+std::unique_ptr<Pass> createCopyGlobalMemRefPass() {
     return std::make_unique<CopyGlobalMemRefPass>();
 }
 

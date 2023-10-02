@@ -12,16 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "Quantum/IR/QuantumOps.h"
+#include "Quantum/Transforms/Passes.h"
+#include "Quantum/Transforms/Patterns.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Bufferization/Transforms/Bufferize.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
-
-#include "Quantum/IR/QuantumOps.h"
-#include "Quantum/Transforms/Passes.h"
-#include "Quantum/Transforms/Patterns.h"
 
 using namespace mlir;
 using namespace catalyst::quantum;
@@ -35,9 +34,8 @@ namespace quantum {
 struct QuantumBufferizationPass : impl::QuantumBufferizationPassBase<QuantumBufferizationPass> {
     using QuantumBufferizationPassBase::QuantumBufferizationPassBase;
 
-    void runOnOperation() final
-    {
-        MLIRContext *context = &getContext();
+    void runOnOperation() final {
+        MLIRContext* context = &getContext();
         bufferization::BufferizeTypeConverter typeConverter;
 
         RewritePatternSet patterns(context);
@@ -55,8 +53,7 @@ struct QuantumBufferizationPass : impl::QuantumBufferizationPassBase<QuantumBuff
 
 } // namespace quantum
 
-std::unique_ptr<Pass> createQuantumBufferizationPass()
-{
+std::unique_ptr<Pass> createQuantumBufferizationPass() {
     return std::make_unique<quantum::QuantumBufferizationPass>();
 }
 

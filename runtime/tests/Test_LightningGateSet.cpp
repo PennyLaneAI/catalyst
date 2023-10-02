@@ -12,21 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <cmath>
-
 #include "QuantumDevice.hpp"
 #include "RuntimeCAPI.h"
+#include "TestUtils.hpp"
 #include "Utils.hpp"
 
-#include "TestUtils.hpp"
+#include <cmath>
 
 using namespace Pennylane;
 
 using namespace Catalyst::Runtime;
 using namespace Catalyst::Runtime::Simulator;
 
-TEMPLATE_LIST_TEST_CASE("Identity Gate tests", "[GateSet]", SimTypes)
-{
+TEMPLATE_LIST_TEST_CASE("Identity Gate tests", "[GateSet]", SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
@@ -57,8 +55,7 @@ TEMPLATE_LIST_TEST_CASE("Identity Gate tests", "[GateSet]", SimTypes)
     CHECK(sum == std::complex<double>{0, 0});
 }
 
-TEMPLATE_LIST_TEST_CASE("PauliX Gate tests num_qubits=1", "[GateSet]", SimTypes)
-{
+TEMPLATE_LIST_TEST_CASE("PauliX Gate tests num_qubits=1", "[GateSet]", SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
@@ -81,8 +78,7 @@ TEMPLATE_LIST_TEST_CASE("PauliX Gate tests num_qubits=1", "[GateSet]", SimTypes)
 }
 
 // 1-qubit operations
-TEMPLATE_LIST_TEST_CASE("PauliX Gate tests num_qubits=3", "[GateSet]", SimTypes)
-{
+TEMPLATE_LIST_TEST_CASE("PauliX Gate tests num_qubits=3", "[GateSet]", SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
@@ -116,8 +112,7 @@ TEMPLATE_LIST_TEST_CASE("PauliX Gate tests num_qubits=3", "[GateSet]", SimTypes)
     CHECK(sum == std::complex<double>{0, 0});
 }
 
-TEMPLATE_LIST_TEST_CASE("PauliY Gate tests num_qubits=1", "[GateSet]", SimTypes)
-{
+TEMPLATE_LIST_TEST_CASE("PauliY Gate tests num_qubits=1", "[GateSet]", SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
@@ -139,8 +134,7 @@ TEMPLATE_LIST_TEST_CASE("PauliY Gate tests num_qubits=1", "[GateSet]", SimTypes)
     CHECK(state.at(1) == std::complex<double>{0, 1});
 }
 
-TEMPLATE_LIST_TEST_CASE("PauliY Gate tests num_qubits=2", "[GateSet]", SimTypes)
-{
+TEMPLATE_LIST_TEST_CASE("PauliY Gate tests num_qubits=2", "[GateSet]", SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
@@ -165,8 +159,7 @@ TEMPLATE_LIST_TEST_CASE("PauliY Gate tests num_qubits=2", "[GateSet]", SimTypes)
     CHECK(state.at(3) == std::complex<double>{-1, 0});
 }
 
-TEMPLATE_LIST_TEST_CASE("PauliZ Gate tests num_qubits=2", "[GateSet]", SimTypes)
-{
+TEMPLATE_LIST_TEST_CASE("PauliZ Gate tests num_qubits=2", "[GateSet]", SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
@@ -191,8 +184,7 @@ TEMPLATE_LIST_TEST_CASE("PauliZ Gate tests num_qubits=2", "[GateSet]", SimTypes)
     CHECK(state.at(3) == std::complex<double>{0, 0});
 }
 
-TEMPLATE_LIST_TEST_CASE("Hadamard Gate tests num_qubits=2", "[GateSet]", SimTypes)
-{
+TEMPLATE_LIST_TEST_CASE("Hadamard Gate tests num_qubits=2", "[GateSet]", SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
@@ -218,8 +210,7 @@ TEMPLATE_LIST_TEST_CASE("Hadamard Gate tests num_qubits=2", "[GateSet]", SimType
     CHECK(state.at(3) == state.at(0));
 }
 
-TEMPLATE_LIST_TEST_CASE("Hadamard Gate tests num_qubits=3", "[GateSet]", SimTypes)
-{
+TEMPLATE_LIST_TEST_CASE("Hadamard Gate tests num_qubits=3", "[GateSet]", SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
@@ -245,8 +236,7 @@ TEMPLATE_LIST_TEST_CASE("Hadamard Gate tests num_qubits=3", "[GateSet]", SimType
     CHECK(state.at(3) == state.at(0));
 }
 
-TEMPLATE_LIST_TEST_CASE("MIX Gate test R(X,Y,Z) num_qubits=1,4", "[GateSet]", SimTypes)
-{
+TEMPLATE_LIST_TEST_CASE("MIX Gate test R(X,Y,Z) num_qubits=1,4", "[GateSet]", SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubit = n
@@ -293,8 +283,7 @@ TEMPLATE_LIST_TEST_CASE("MIX Gate test R(X,Y,Z) num_qubits=1,4", "[GateSet]", Si
     CHECK(state.at(15) == std::complex<double>{0, 0});
 }
 
-TEMPLATE_LIST_TEST_CASE("test PhaseShift num_qubits=2", "[GateSet]", SimTypes)
-{
+TEMPLATE_LIST_TEST_CASE("test PhaseShift num_qubits=2", "[GateSet]", SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubit = n
@@ -328,8 +317,7 @@ TEMPLATE_LIST_TEST_CASE("test PhaseShift num_qubits=2", "[GateSet]", SimTypes)
 }
 
 // 2-qubit operations
-TEMPLATE_LIST_TEST_CASE("CNOT Gate tests num_qubits=2 [0,1]", "[GateSet]", SimTypes)
-{
+TEMPLATE_LIST_TEST_CASE("CNOT Gate tests num_qubits=2 [0,1]", "[GateSet]", SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
@@ -354,8 +342,7 @@ TEMPLATE_LIST_TEST_CASE("CNOT Gate tests num_qubits=2 [0,1]", "[GateSet]", SimTy
     CHECK(state.at(3) == std::complex<double>{1, 0});
 }
 
-TEMPLATE_LIST_TEST_CASE("CNOT Gate tests num_qubits=2 [1,0]", "[GateSet]", SimTypes)
-{
+TEMPLATE_LIST_TEST_CASE("CNOT Gate tests num_qubits=2 [1,0]", "[GateSet]", SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
@@ -380,8 +367,7 @@ TEMPLATE_LIST_TEST_CASE("CNOT Gate tests num_qubits=2 [1,0]", "[GateSet]", SimTy
     CHECK(state.at(3) == std::complex<double>{0, 0});
 }
 
-TEMPLATE_LIST_TEST_CASE("MIX Gate test CR(X, Y, Z) num_qubits=1,4", "[GateSet]", SimTypes)
-{
+TEMPLATE_LIST_TEST_CASE("MIX Gate test CR(X, Y, Z) num_qubits=1,4", "[GateSet]", SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubit = n
@@ -425,8 +411,7 @@ TEMPLATE_LIST_TEST_CASE("MIX Gate test CR(X, Y, Z) num_qubits=1,4", "[GateSet]",
     CHECK(state.at(15) == std::complex<double>{0, 0});
 }
 
-TEMPLATE_LIST_TEST_CASE("CRot", "[GateSet]", SimTypes)
-{
+TEMPLATE_LIST_TEST_CASE("CRot", "[GateSet]", SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
@@ -454,8 +439,7 @@ TEMPLATE_LIST_TEST_CASE("CRot", "[GateSet]", SimTypes)
     CHECK(state[3].imag() == Approx(-0.4844562109).epsilon(1e-5));
 }
 
-TEMPLATE_LIST_TEST_CASE("CSWAP test", "[GateSet]", SimTypes)
-{
+TEMPLATE_LIST_TEST_CASE("CSWAP test", "[GateSet]", SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
@@ -478,8 +462,7 @@ TEMPLATE_LIST_TEST_CASE("CSWAP test", "[GateSet]", SimTypes)
     CHECK(state[5].imag() == Approx(0).epsilon(1e-5));
 }
 
-TEMPLATE_LIST_TEST_CASE("IsingXY Gate tests num_qubits=2 [1,0]", "[GateSet]", SimTypes)
-{
+TEMPLATE_LIST_TEST_CASE("IsingXY Gate tests num_qubits=2 [1,0]", "[GateSet]", SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
@@ -510,8 +493,7 @@ TEMPLATE_LIST_TEST_CASE("IsingXY Gate tests num_qubits=2 [1,0]", "[GateSet]", Si
     CHECK(state[3].imag() == Approx(0).epsilon(1e-5));
 }
 
-TEMPLATE_LIST_TEST_CASE("Toffoli test", "[GateSet]", SimTypes)
-{
+TEMPLATE_LIST_TEST_CASE("Toffoli test", "[GateSet]", SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
@@ -543,8 +525,7 @@ TEMPLATE_LIST_TEST_CASE("Toffoli test", "[GateSet]", SimTypes)
     CHECK(state[7].imag() == Approx(0).epsilon(1e-5));
 }
 
-TEMPLATE_LIST_TEST_CASE("MultiRZ test", "[GateSet]", SimTypes)
-{
+TEMPLATE_LIST_TEST_CASE("MultiRZ test", "[GateSet]", SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
@@ -570,8 +551,7 @@ TEMPLATE_LIST_TEST_CASE("MultiRZ test", "[GateSet]", SimTypes)
     CHECK(state[2].imag() == Approx(0).epsilon(1e-5));
 }
 
-TEMPLATE_LIST_TEST_CASE("MatrixOperation test with 2-qubit", "[GateSet]", SimTypes)
-{
+TEMPLATE_LIST_TEST_CASE("MatrixOperation test with 2-qubit", "[GateSet]", SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
@@ -612,8 +592,7 @@ TEMPLATE_LIST_TEST_CASE("MatrixOperation test with 2-qubit", "[GateSet]", SimTyp
     CHECK(state[3].imag() == Approx(-0.187075).epsilon(1e-5));
 }
 
-TEMPLATE_LIST_TEST_CASE("MatrixOperation test with 3-qubit", "[GateSet]", SimTypes)
-{
+TEMPLATE_LIST_TEST_CASE("MatrixOperation test with 3-qubit", "[GateSet]", SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
@@ -657,8 +636,7 @@ TEMPLATE_LIST_TEST_CASE("MatrixOperation test with 3-qubit", "[GateSet]", SimTyp
     CHECK(state[6].imag() == Approx(0.162104).epsilon(1e-5));
 }
 
-TEMPLATE_TEST_CASE("MatrixOperation test with 4-qubit", "[GateSet]", LightningSimulator)
-{
+TEMPLATE_TEST_CASE("MatrixOperation test with 4-qubit", "[GateSet]", LightningSimulator) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubit = n

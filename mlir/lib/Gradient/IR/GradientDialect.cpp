@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "mlir/Transforms/InliningUtils.h"
-
 #include "Gradient/IR/GradientDialect.h"
+
 #include "Gradient/IR/GradientOps.h"
+#include "mlir/Transforms/InliningUtils.h"
 
 using namespace mlir;
 using namespace catalyst::gradient;
@@ -31,8 +31,7 @@ struct GradientInlinerInterface : public DialectInlinerInterface {
     using DialectInlinerInterface::DialectInlinerInterface;
 
     /// Operations in Gradient dialect are always legal to inline.
-    bool isLegalToInline(Operation *, Region *, bool, IRMapping &valueMapping) const final
-    {
+    bool isLegalToInline(Operation*, Region*, bool, IRMapping& valueMapping) const final {
         return true;
     }
 };
@@ -42,8 +41,7 @@ struct GradientInlinerInterface : public DialectInlinerInterface {
 // Gradient dialect.
 //===----------------------------------------------------------------------===//
 
-void GradientDialect::initialize()
-{
+void GradientDialect::initialize() {
     addOperations<
 #define GET_OP_LIST
 #include "Gradient/IR/GradientOps.cpp.inc"

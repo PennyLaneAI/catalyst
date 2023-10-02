@@ -13,30 +13,25 @@
 // limitations under the License.
 
 #include "ParameterShift.hpp"
-
-#include <string>
-#include <vector>
-
+#include "Quantum/IR/QuantumOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Index/IR/IndexOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 
-#include "Quantum/IR/QuantumOps.h"
+#include <string>
+#include <vector>
 
 namespace catalyst {
 namespace gradient {
 
-static Value genSelectiveShift(PatternRewriter &rewriter, Location loc, Value param, Value shift,
-                               const std::vector<std::pair<Value, Value>> &selectors)
-{
-    if (selectors.empty()) {
-        return rewriter.create<arith::AddFOp>(loc, shift, param);
-    }
+static Value genSelectiveShift(PatternRewriter& rewriter, Location loc, Value param, Value shift,
+                               const std::vector<std::pair<Value, Value>>& selectors) {
+    if (selectors.empty()) { return rewriter.create<arith::AddFOp>(loc, shift, param); }
 
     // Make sure all active iteration variables match the selectors.
     Value shiftCondition = rewriter.create<arith::ConstantIntOp>(loc, true, 1);
-    for (auto &[iteration, selector] : selectors) {
+    for (auto& [iteration, selector] : selectors) {
         Value iterationMatch =
             rewriter.create<arith::CmpIOp>(loc, arith::CmpIPredicate::eq, iteration, selector);
         shiftCondition = rewriter.create<arith::AndIOp>(loc, shiftCondition, iterationMatch);
@@ -44,21 +39,20 @@ static Value genSelectiveShift(PatternRewriter &rewriter, Location loc, Value pa
 
     scf::IfOp ifOp = rewriter.create<scf::IfOp>(
         loc, shiftCondition,
-        [&](OpBuilder &builder, Location loc) { // then
+        [&](OpBuilder& builder, Location loc) { // then
             Value shiftedParam = builder.create<arith::AddFOp>(loc, shift, param);
             builder.create<scf::YieldOp>(loc, shiftedParam);
         },
-        [&](OpBuilder &builder, Location loc) { // else
+        [&](OpBuilder& builder, Location loc) { // else
             builder.create<scf::YieldOp>(loc, param);
         });
 
     return ifOp.getResult(0);
 }
 
-func::FuncOp ParameterShiftLowering::genShiftFunction(PatternRewriter &rewriter, Location loc,
+func::FuncOp ParameterShiftLowering::genShiftFunction(PatternRewriter& rewriter, Location loc,
                                                       func::FuncOp callee, const int64_t numShifts,
-                                                      const int64_t loopDepth)
-{
+                                                      const int64_t loopDepth) {
     // The shiftVector is a new function argument with 1 element for each gate parameter to be
     // shifted. For gates inside of loops, we additionally use a selector to dynamically
     // choose on which iteration of a loop to shift the gate parameter.
@@ -90,7 +84,7 @@ func::FuncOp ParameterShiftLowering::genShiftFunction(PatternRewriter &rewriter,
         selectors.reserve(loopDepth);
 
         int shiftsProcessed = 0;
-        shiftedFn.walk<WalkOrder::PreOrder>([&](Operation *op) {
+        shiftedFn.walk<WalkOrder::PreOrder>([&](Operation* op) {
             // TODO: Add support for other SCF (and Affine?) loops in the future.
             if (auto forOp = dyn_cast<scf::ForOp>(op)) {
                 // When entering a for loop, we need to remember to compare the appropriate selector
@@ -103,11 +97,8 @@ func::FuncOp ParameterShiftLowering::genShiftFunction(PatternRewriter &rewriter,
                 Value selector = rewriter.create<tensor::ExtractOp>(loc, selectorVector, idx);
                 Value iteration = forOp.getInductionVar();
                 selectors.push_back({iteration, selector});
-            }
-            else if (auto gate = dyn_cast<quantum::DifferentiableGate>(op)) {
-                if (gate.getDiffParams().empty()) {
-                    return;
-                }
+            } else if (auto gate = dyn_cast<quantum::DifferentiableGate>(op)) {
+                if (gate.getDiffParams().empty()) { return; }
 
                 PatternRewriter::InsertionGuard insertGuard(rewriter);
                 rewriter.setInsertionPoint(gate);
@@ -125,8 +116,7 @@ func::FuncOp ParameterShiftLowering::genShiftFunction(PatternRewriter &rewriter,
                 }
 
                 gate->setOperands(gate.getDiffOperandIdx(), shiftedParams.size(), shiftedParams);
-            }
-            else if (isa<scf::YieldOp>(op) && isa<scf::ForOp>(op->getParentOp())) {
+            } else if (isa<scf::YieldOp>(op) && isa<scf::ForOp>(op->getParentOp())) {
                 // When we reach the end of a for loop, remove its iteration variable from the list.
                 selectors.pop_back();
             }

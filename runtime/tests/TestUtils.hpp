@@ -18,13 +18,12 @@
  */
 #pragma once
 
+#include "LightningSimulator.hpp"
+#include "catch2/catch.hpp"
+
 #include <string>
 #include <tuple>
 #include <vector>
-
-#include "catch2/catch.hpp"
-
-#include "LightningSimulator.hpp"
 
 /**
  * A tuple of available backend devices to be tested using TEMPLATE_LIST_TEST_CASE in Catch2
@@ -44,8 +43,7 @@ using SimTypes = std::tuple<Catalyst::Runtime::Simulator::LightningSimulator>;
  *
  * @return `std::vector<std::pair<std::string, std::string>>`
  */
-static inline auto getDevices() -> std::vector<std::pair<std::string, std::string>>
-{
+static inline auto getDevices() -> std::vector<std::pair<std::string, std::string>> {
     std::vector<std::pair<std::string, std::string>> devices{{"backend", "lightning.qubit"}};
 #ifdef __device_lightning_kokkos
     devices.emplace_back("backend", "lightning.kokkos");

@@ -13,11 +13,12 @@
 // limitations under the License.
 
 #include "Catalyst/IR/CatalystDialect.h"
+
 #include "Catalyst/IR/CatalystOps.h"
+#include "llvm/ADT/TypeSwitch.h" // needed for generated type parser
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/DialectImplementation.h" // needed for generated type parser
 #include "mlir/Transforms/InliningUtils.h"
-#include "llvm/ADT/TypeSwitch.h" // needed for generated type parser
 
 using namespace mlir;
 using namespace catalyst;
@@ -28,8 +29,7 @@ using namespace catalyst;
 // Catalyst dialect.
 //===----------------------------------------------------------------------===//
 
-void CatalystDialect::initialize()
-{
+void CatalystDialect::initialize() {
     addTypes<
 #define GET_TYPEDEF_LIST
 #include "Catalyst/IR/CatalystOpsTypes.cpp.inc"

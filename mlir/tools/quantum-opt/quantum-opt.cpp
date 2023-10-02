@@ -12,6 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "Catalyst/IR/CatalystDialect.h"
+#include "Catalyst/Transforms/Passes.h"
+#include "Gradient/IR/GradientDialect.h"
+#include "Gradient/Transforms/Passes.h"
+#include "Quantum/IR/QuantumDialect.h"
+#include "Quantum/Transforms/Passes.h"
+#include "mhlo/IR/hlo_ops.h"
 #include "mhlo/IR/register.h"
 #include "mhlo/transforms/passes.h"
 #include "mlir/Dialect/Func/Extensions/AllExtensions.h"
@@ -22,17 +29,7 @@
 #include "mlir/Tools/mlir-opt/MlirOptMain.h"
 #include "stablehlo/dialect/Register.h"
 
-#include "mhlo/IR/hlo_ops.h"
-
-#include "Catalyst/IR/CatalystDialect.h"
-#include "Catalyst/Transforms/Passes.h"
-#include "Gradient/IR/GradientDialect.h"
-#include "Gradient/Transforms/Passes.h"
-#include "Quantum/IR/QuantumDialect.h"
-#include "Quantum/Transforms/Passes.h"
-
-int main(int argc, char **argv)
-{
+int main(int argc, char** argv) {
     mlir::registerAllPasses();
     catalyst::registerAllCatalystPasses();
     mlir::mhlo::registerAllMhloPasses();

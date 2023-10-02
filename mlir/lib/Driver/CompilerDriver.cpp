@@ -12,13 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <filesystem>
-#include <list>
-#include <memory>
-#include <string>
-#include <unordered_map>
+#include "Driver/CompilerDriver.h"
 
+#include "Catalyst/IR/CatalystDialect.h"
+#include "Catalyst/Transforms/Passes.h"
+#include "Driver/CatalystLLVMTarget.h"
+#include "Driver/Support.h"
+#include "Enzyme.h"
+#include "Gradient/IR/GradientDialect.h"
+#include "Gradient/Transforms/Passes.h"
+#include "Quantum/IR/QuantumDialect.h"
+#include "Quantum/Transforms/Passes.h"
 #include "gml_st/transforms/passes.h"
+#include "llvm/Analysis/CGSCCPassManager.h"
+#include "llvm/Analysis/LoopAnalysisManager.h"
+#include "llvm/IRReader/IRReader.h"
+#include "llvm/Passes/PassBuilder.h"
+#include "llvm/Support/SourceMgr.h"
 #include "mhlo/IR/register.h"
 #include "mhlo/transforms/passes.h"
 #include "mlir/IR/DialectRegistry.h"
@@ -29,23 +39,12 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Target/LLVMIR/Export.h"
 #include "stablehlo/dialect/Register.h"
-#include "llvm/Analysis/CGSCCPassManager.h"
-#include "llvm/Analysis/LoopAnalysisManager.h"
-#include "llvm/IRReader/IRReader.h"
-#include "llvm/Passes/PassBuilder.h"
-#include "llvm/Support/SourceMgr.h"
 
-#include "Catalyst/IR/CatalystDialect.h"
-#include "Catalyst/Transforms/Passes.h"
-#include "Driver/CatalystLLVMTarget.h"
-#include "Driver/CompilerDriver.h"
-#include "Driver/Support.h"
-#include "Gradient/IR/GradientDialect.h"
-#include "Gradient/Transforms/Passes.h"
-#include "Quantum/IR/QuantumDialect.h"
-#include "Quantum/Transforms/Passes.h"
-
-#include "Enzyme.h"
+#include <filesystem>
+#include <list>
+#include <memory>
+#include <string>
+#include <unordered_map>
 
 using namespace mlir;
 using namespace catalyst;
@@ -54,8 +53,7 @@ namespace fs = std::filesystem;
 
 namespace {
 
-std::string joinPasses(const Pipeline::PassList &passes)
-{
+std::string joinPasses(const Pipeline::PassList& passes) {
     std::string joined;
     llvm::raw_string_ostream stream{joined};
     llvm::interleaveComma(passes, stream);
@@ -63,16 +61,14 @@ std::string joinPasses(const Pipeline::PassList &passes)
 }
 
 struct CatalystIRPrinterConfig : public PassManager::IRPrinterConfig {
-    typedef std::function<LogicalResult(Pass *, PrintCallbackFn print)> PrintHandler;
+    typedef std::function<LogicalResult(Pass*, PrintCallbackFn print)> PrintHandler;
     PrintHandler printHandler;
 
-    CatalystIRPrinterConfig(PrintHandler printHandler)
-        : IRPrinterConfig(/*printModuleScope=*/true), printHandler(printHandler)
-    {
-    }
+    CatalystIRPrinterConfig(PrintHandler printHandler) :
+        IRPrinterConfig(/*printModuleScope=*/true), printHandler(printHandler) {}
 
-    void printAfterIfEnabled(Pass *pass, Operation *operation, PrintCallbackFn printCallback) final
-    {
+    void printAfterIfEnabled(Pass* pass, Operation* operation,
+                             PrintCallbackFn printCallback) final {
         if (failed(printHandler(pass, printCallback))) {
             operation->emitError("IR printing failed");
         }
@@ -84,9 +80,8 @@ struct CatalystIRPrinterConfig : public PassManager::IRPrinterConfig {
 namespace {
 /// Parse an MLIR module given in textual ASM representation. Any errors during parsing will be
 /// output to diagnosticStream.
-OwningOpRef<ModuleOp> parseMLIRSource(MLIRContext *ctx, StringRef source, StringRef moduleName,
-                                      raw_ostream &diagnosticStream)
-{
+OwningOpRef<ModuleOp> parseMLIRSource(MLIRContext* ctx, StringRef source, StringRef moduleName,
+                                      raw_ostream& diagnosticStream) {
     auto moduleBuffer = llvm::MemoryBuffer::getMemBufferCopy(source, moduleName);
     auto sourceMgr = std::make_shared<llvm::SourceMgr>();
     sourceMgr->AddNewSourceBuffer(std::move(moduleBuffer), SMLoc());
@@ -100,16 +95,14 @@ OwningOpRef<ModuleOp> parseMLIRSource(MLIRContext *ctx, StringRef source, String
 
 /// Parse an LLVM module given in textual representation. Any parse errors will be output to
 /// the provided SMDiagnostic.
-std::shared_ptr<llvm::Module> parseLLVMSource(llvm::LLVMContext &context, StringRef source,
-                                              StringRef moduleName, llvm::SMDiagnostic &err)
-{
+std::shared_ptr<llvm::Module> parseLLVMSource(llvm::LLVMContext& context, StringRef source,
+                                              StringRef moduleName, llvm::SMDiagnostic& err) {
     auto moduleBuffer = llvm::MemoryBuffer::getMemBufferCopy(source, moduleName);
     return llvm::parseIR(llvm::MemoryBufferRef(*moduleBuffer), err, context);
 }
 
 /// Register all dialects required by the Catalyst compiler.
-void registerAllCatalystDialects(DialectRegistry &registry)
-{
+void registerAllCatalystDialects(DialectRegistry& registry) {
     // MLIR Core dialects
     registerAllDialects(registry);
     registerAllExtensions(registry);
@@ -125,24 +118,20 @@ void registerAllCatalystDialects(DialectRegistry &registry)
 }
 } // namespace
 
-FailureOr<llvm::Function *> getJITFunction(MLIRContext *ctx, llvm::Module &llvmModule)
-{
+FailureOr<llvm::Function*> getJITFunction(MLIRContext* ctx, llvm::Module& llvmModule) {
     Location loc = NameLoc::get(StringAttr::get(ctx, llvmModule.getName()));
-    for (auto &function : llvmModule.functions()) {
+    for (auto& function : llvmModule.functions()) {
         emitRemark(loc) << "Found LLVM function: " << function.getName() << "\n";
-        if (function.getName().starts_with("catalyst.entry_point")) {
-            return &function;
-        }
+        if (function.getName().starts_with("catalyst.entry_point")) { return &function; }
     }
     emitError(loc, "Failed to find JIT function");
     return failure();
 }
 
-LogicalResult inferMLIRReturnTypes(MLIRContext *ctx, llvm::Type *returnType,
+LogicalResult inferMLIRReturnTypes(MLIRContext* ctx, llvm::Type* returnType,
                                    Type assumedElementType,
-                                   SmallVectorImpl<RankedTensorType> &inferredTypes)
-{
-    auto inferSingleMemRef = [&](llvm::StructType *descriptorType) {
+                                   SmallVectorImpl<RankedTensorType>& inferredTypes) {
+    auto inferSingleMemRef = [&](llvm::StructType* descriptorType) {
         SmallVector<int64_t> resultShape;
         assert(descriptorType->getNumElements() >= 3 &&
                "Expected MemRef descriptor struct to have at least 3 entries");
@@ -165,17 +154,15 @@ LogicalResult inferMLIRReturnTypes(MLIRContext *ctx, llvm::Type *returnType,
         // sizes is defined iff strides is defined.
         // strides is defined iff sizes is defined.
         bool hasSizes = 5 == descriptorType->getNumElements();
-        auto *sizes = hasSizes ? cast<llvm::ArrayType>(descriptorType->getTypeAtIndex(3)) : NULL;
+        auto* sizes = hasSizes ? cast<llvm::ArrayType>(descriptorType->getTypeAtIndex(3)) : NULL;
         size_t rank = hasSizes ? sizes->getNumElements() : 0;
         for (size_t i = 0; i < rank; i++) {
             resultShape.push_back(ShapedType::kDynamic);
         }
         return RankedTensorType::get(resultShape, assumedElementType);
     };
-    if (returnType->isVoidTy()) {
-        return failure();
-    }
-    if (auto *structType = dyn_cast<llvm::StructType>(returnType)) {
+    if (returnType->isVoidTy()) { return failure(); }
+    if (auto* structType = dyn_cast<llvm::StructType>(returnType)) {
         // The return type could be a single memref descriptor or a struct of multiple memref
         // descriptors.
         if (isa<llvm::StructType>(structType->getElementType(0))) {
@@ -183,8 +170,7 @@ LogicalResult inferMLIRReturnTypes(MLIRContext *ctx, llvm::Type *returnType,
                 inferredTypes.push_back(
                     inferSingleMemRef(cast<llvm::StructType>(structType->getTypeAtIndex(i))));
             }
-        }
-        else {
+        } else {
             // Assume the function returns a single memref
             inferredTypes.push_back(inferSingleMemRef(structType));
         }
@@ -193,10 +179,9 @@ LogicalResult inferMLIRReturnTypes(MLIRContext *ctx, llvm::Type *returnType,
     return failure();
 }
 
-LogicalResult runLLVMPasses(const CompilerOptions &options,
+LogicalResult runLLVMPasses(const CompilerOptions& options,
                             std::shared_ptr<llvm::Module> llvmModule,
-                            CompilerOutput::PipelineOutputs &outputs)
-{
+                            CompilerOutput::PipelineOutputs& outputs) {
     // opt -O2
     // As seen here:
     // https://llvm.org/docs/NewPassManager.html#just-tell-me-how-to-run-the-default-optimization-pipeline-with-the-new-pass-manager
@@ -228,19 +213,16 @@ LogicalResult runLLVMPasses(const CompilerOptions &options,
     if (options.keepIntermediate) {
         llvm::raw_string_ostream rawStringOstream{outputs["PreEnzymeOpt"]};
         llvmModule->print(rawStringOstream, nullptr);
-        const std::string &outFile = fs::path("1_PreEnzymeOpt.ll");
-        if (failed(dumpToFile(options, outFile, outputs["PreEnzymeOpt"]))) {
-            return failure();
-        }
+        const std::string& outFile = fs::path("1_PreEnzymeOpt.ll");
+        if (failed(dumpToFile(options, outFile, outputs["PreEnzymeOpt"]))) { return failure(); }
     }
 
     return success();
 }
 
-LogicalResult runEnzymePasses(const CompilerOptions &options,
+LogicalResult runEnzymePasses(const CompilerOptions& options,
                               std::shared_ptr<llvm::Module> llvmModule,
-                              CompilerOutput::PipelineOutputs &outputs)
-{
+                              CompilerOutput::PipelineOutputs& outputs) {
     // Create the new pass manager builder.
     // Take a look at the PassBuilder constructor parameters for more
     // customization, e.g. specifying a TargetMachine or various debugging
@@ -274,27 +256,24 @@ LogicalResult runEnzymePasses(const CompilerOptions &options,
     if (options.keepIntermediate) {
         llvm::raw_string_ostream rawStringOstream{outputs["Enzyme"]};
         llvmModule->print(rawStringOstream, nullptr);
-        const std::string &outFile = fs::path("2_Enzyme.ll");
-        if (failed(dumpToFile(options, outFile, outputs["Enzyme"]))) {
-            return failure();
-        }
+        const std::string& outFile = fs::path("2_Enzyme.ll");
+        if (failed(dumpToFile(options, outFile, outputs["Enzyme"]))) { return failure(); }
     }
 
     return success();
 }
 
-LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, ModuleOp moduleOp,
-                          CompilerOutput::PipelineOutputs &outputs)
-{
+LogicalResult runLowering(const CompilerOptions& options, MLIRContext* ctx, ModuleOp moduleOp,
+                          CompilerOutput::PipelineOutputs& outputs) {
     auto pm = PassManager::on<ModuleOp>(ctx, PassManager::Nesting::Implicit);
 
-    std::unordered_map<const Pass *, std::list<Pipeline::Name>> pipelineTailMarkers;
-    for (const auto &pipeline : options.pipelinesCfg) {
+    std::unordered_map<const Pass*, std::list<Pipeline::Name>> pipelineTailMarkers;
+    for (const auto& pipeline : options.pipelinesCfg) {
         if (failed(parsePassPipeline(joinPasses(pipeline.passes), pm, options.diagnosticStream))) {
             return failure();
         }
         PassManager::pass_iterator p = pm.end();
-        const Pass *lastPass = &(*(p - 1));
+        const Pass* lastPass = &(*(p - 1));
         pipelineTailMarkers[lastPass].push_back(pipeline.name);
     }
 
@@ -306,33 +285,27 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
                 llvm::raw_string_ostream s{tmp};
                 s << moduleOp;
             }
-            const std::string &outFile =
+            const std::string& outFile =
                 fs::path(options.moduleName.str()).replace_extension(".mlir");
-            if (failed(dumpToFile(options, outFile, tmp))) {
-                return failure();
-            }
+            if (failed(dumpToFile(options, outFile, tmp))) { return failure(); }
         }
 
         {
             size_t pipelineIdx = 0;
             auto printHandler =
-                [&](Pass *pass, CatalystIRPrinterConfig::PrintCallbackFn print) -> LogicalResult {
+                [&](Pass* pass, CatalystIRPrinterConfig::PrintCallbackFn print) -> LogicalResult {
                 // Do not print if keepIntermediate is not set.
-                if (!options.keepIntermediate) {
-                    return success();
-                }
+                if (!options.keepIntermediate) { return success(); }
                 auto res = pipelineTailMarkers.find(pass);
                 if (res != pipelineTailMarkers.end()) {
-                    for (const auto &pn : res->second) {
+                    for (const auto& pn : res->second) {
                         std::string outFile = fs::path(std::to_string(pipelineIdx++) + "_" + pn)
                                                   .replace_extension(".mlir");
                         {
                             llvm::raw_string_ostream s{outputs[pn]};
                             print(s);
                         }
-                        if (failed(dumpToFile(options, outFile, outputs[pn]))) {
-                            return failure();
-                        }
+                        if (failed(dumpToFile(options, outFile, outputs[pn]))) { return failure(); }
                     }
                 }
                 return success();
@@ -343,20 +316,15 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
         }
     }
 
-    if (failed(pm.run(moduleOp))) {
-        return failure();
-    }
+    if (failed(pm.run(moduleOp))) { return failure(); }
 
     return success();
 }
 
-LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &output)
-{
+LogicalResult QuantumDriverMain(const CompilerOptions& options, CompilerOutput& output) {
     DialectRegistry registry;
     static bool initialized = false;
-    if (!initialized) {
-        registerAllPasses();
-    }
+    if (!initialized) { registerAllPasses(); }
     initialized |= true;
     registerAllCatalystPasses();
     mhlo::registerAllMhloPasses();
@@ -369,7 +337,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     // Let's try to enable multithreading.
     ctx.disableMultithreading();
     ScopedDiagnosticHandler scopedHandler(
-        &ctx, [&](Diagnostic &diag) { diag.print(options.diagnosticStream); });
+        &ctx, [&](Diagnostic& diag) { diag.print(options.diagnosticStream); });
 
     llvm::LLVMContext llvmContext;
     std::shared_ptr<llvm::Module> llvmModule;
@@ -380,27 +348,20 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     OwningOpRef<ModuleOp> op =
         parseMLIRSource(&ctx, options.source, options.moduleName, options.diagnosticStream);
     if (op) {
-        if (failed(runLowering(options, &ctx, *op, output.pipelineOutputs))) {
-            return failure();
-        }
+        if (failed(runLowering(options, &ctx, *op, output.pipelineOutputs))) { return failure(); }
 
         output.outIR.clear();
         outIRStream << *op;
 
         if (options.lowerToLLVM) {
             llvmModule = translateModuleToLLVMIR(*op, llvmContext);
-            if (!llvmModule) {
-                return failure();
-            }
+            if (!llvmModule) { return failure(); }
 
             if (options.keepIntermediate) {
-                if (failed(dumpToFile(options, "llvm_ir.ll", *llvmModule))) {
-                    return failure();
-                }
+                if (failed(dumpToFile(options, "llvm_ir.ll", *llvmModule))) { return failure(); }
             }
         }
-    }
-    else {
+    } else {
         // If parsing as an MLIR module failed, attempt to parse as an LLVM IR module.
         llvm::SMDiagnostic err;
         llvmModule = parseLLVMSource(llvmContext, options.source, options.moduleName, err);
@@ -442,8 +403,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
                 // Inferred return types are only required when compiling from textual IR. This
                 // inference failing is not a problem when compiling from Python.
                 CO_MSG(options, Verbosity::Urgent, "Unable to infer function return type\n");
-            }
-            else {
+            } else {
                 {
                     llvm::raw_string_ostream returnTypeStream(output.inferredAttributes.returnType);
                     llvm::interleaveComma(returnTypes, returnTypeStream,
@@ -453,8 +413,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
                        "Inferred function return type: '" << output.inferredAttributes.returnType
                                                           << "'\n");
             }
-        }
-        else {
+        } else {
             CO_MSG(options, Verbosity::Urgent, "Unable to infer jit_* function attributes\n");
         }
 

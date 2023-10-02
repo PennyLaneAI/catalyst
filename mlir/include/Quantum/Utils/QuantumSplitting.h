@@ -25,46 +25,44 @@ struct QuantumCache {
     /// For every structured control flow op, store the values required for it to execute.
     /// Specifically: store the conditions for scf.if ops, the start/stop/step of scf.for ops, and
     /// the number of iterations for scf.while ops.
-    mlir::DenseMap<mlir::Operation *, mlir::TypedValue<ArrayListType>> controlFlowTapes;
+    mlir::DenseMap<mlir::Operation*, mlir::TypedValue<ArrayListType>> controlFlowTapes;
 
     /// Initialize the quantum cache to traverse and store the necessary parameters for the given
     /// `topLevelRegion`.
-    static QuantumCache initialize(mlir::Region &topLevelRegion, mlir::OpBuilder &builder,
+    static QuantumCache initialize(mlir::Region& topLevelRegion, mlir::OpBuilder& builder,
                                    mlir::Location loc);
 
-    void emitDealloc(mlir::OpBuilder &builder, mlir::Location loc);
+    void emitDealloc(mlir::OpBuilder& builder, mlir::Location loc);
 };
 
 class AugmentedCircuitGenerator {
   public:
-    AugmentedCircuitGenerator(mlir::IRMapping &oldToCloned, QuantumCache &cache)
-        : oldToCloned(oldToCloned), cache(cache)
-    {
-    }
+    AugmentedCircuitGenerator(mlir::IRMapping& oldToCloned, QuantumCache& cache) :
+        oldToCloned(oldToCloned), cache(cache) {}
 
     /// Given a `region` containing classical preprocessing and quantum operations, generate an
     /// augmented version that caches all the parameters required to deterministically re-execute
     /// the circuit (gate params, classical control flow, and dynamic wires).
-    void generate(mlir::Region &region, mlir::OpBuilder &builder);
+    void generate(mlir::Region& region, mlir::OpBuilder& builder);
 
   private:
-    mlir::IRMapping &oldToCloned;
-    QuantumCache &cache;
+    mlir::IRMapping& oldToCloned;
+    QuantumCache& cache;
 
-    void visitOperation(mlir::scf::ForOp forOp, mlir::OpBuilder &builder);
-    void visitOperation(mlir::scf::WhileOp forOp, mlir::OpBuilder &builder);
-    void visitOperation(mlir::scf::IfOp forOp, mlir::OpBuilder &builder);
+    void visitOperation(mlir::scf::ForOp forOp, mlir::OpBuilder& builder);
+    void visitOperation(mlir::scf::WhileOp forOp, mlir::OpBuilder& builder);
+    void visitOperation(mlir::scf::IfOp forOp, mlir::OpBuilder& builder);
 
-    void cloneTerminatorClassicalOperands(mlir::Operation *terminator, mlir::OpBuilder &builder);
+    void cloneTerminatorClassicalOperands(mlir::Operation* terminator, mlir::OpBuilder& builder);
 
     /// Update the internal mapping of the results of `oldOp` to the results of `clonedOp` using the
     /// given result remapping.
-    void mapResults(mlir::Operation *oldOp, mlir::Operation *clonedOp,
-                    const mlir::DenseMap<unsigned, unsigned> &argIdxMapping);
+    void mapResults(mlir::Operation* oldOp, mlir::Operation* clonedOp,
+                    const mlir::DenseMap<unsigned, unsigned>& argIdxMapping);
 
     // Emit an operation to cache a dynamic wire for quantum.insert/extract ops.
-    template <typename IndexingOp> void cacheDynamicWire(IndexingOp op, mlir::OpBuilder &builder)
-    {
+    template <typename IndexingOp>
+    void cacheDynamicWire(IndexingOp op, mlir::OpBuilder& builder) {
         if (!op.getIdxAttr().has_value()) {
             builder.create<ListPushOp>(op.getLoc(), oldToCloned.lookupOrDefault(op.getIdx()),
                                        cache.wireVector);

@@ -13,35 +13,30 @@
 // limitations under the License.
 
 #include "FiniteDifference.hpp"
+
+#include "Gradient/Utils/DifferentialQNode.h"
+#include "Gradient/Utils/GradientShape.h"
 #include "HybridGradient.hpp"
+#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 
 #include <algorithm>
 #include <sstream>
 #include <vector>
 
-#include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
-
-#include "Gradient/Utils/DifferentialQNode.h"
-#include "Gradient/Utils/GradientShape.h"
-
 namespace catalyst {
 namespace gradient {
 
-LogicalResult FiniteDiffLowering::match(GradOp op) const
-{
-    if (op.getMethod() == "fd") {
-        return success();
-    }
+LogicalResult FiniteDiffLowering::match(GradOp op) const {
+    if (op.getMethod() == "fd") { return success(); }
 
     return failure();
 }
 
-void FiniteDiffLowering::rewrite(GradOp op, PatternRewriter &rewriter) const
-{
+void FiniteDiffLowering::rewrite(GradOp op, PatternRewriter& rewriter) const {
     Location loc = op.getLoc();
-    const std::vector<size_t> &diffArgIndices = computeDiffArgIndices(op.getDiffArgIndices());
+    const std::vector<size_t>& diffArgIndices = computeDiffArgIndices(op.getDiffArgIndices());
     std::stringstream uniquer;
     std::copy(diffArgIndices.begin(), diffArgIndices.end(), std::ostream_iterator<int>(uniquer));
     std::string fnName = op.getCallee().str() + ".finitediff" + uniquer.str();
@@ -68,10 +63,10 @@ void FiniteDiffLowering::rewrite(GradOp op, PatternRewriter &rewriter) const
     rewriter.replaceOpWithNewOp<func::CallOp>(op, gradFn, op.getArgOperands());
 }
 
-void FiniteDiffLowering::computeFiniteDiff(PatternRewriter &rewriter, Location loc,
+void FiniteDiffLowering::computeFiniteDiff(PatternRewriter& rewriter, Location loc,
                                            func::FuncOp gradFn, func::FuncOp callee,
-                                           const std::vector<size_t> &diffArgIndices, double hValue)
-{
+                                           const std::vector<size_t>& diffArgIndices,
+                                           double hValue) {
     ValueRange callArgs = gradFn.getArguments();
     TypeRange gradResTypes = gradFn.getResultTypes();
 
@@ -127,8 +122,7 @@ void FiniteDiffLowering::computeFiniteDiff(PatternRewriter &rewriter, Location l
             Value hForResult = rewriter.create<arith::ConstantOp>(loc, shiftForResult);
             if (isGradientTensor && gradientTy.cast<TensorType>().hasStaticShape()) {
                 hForResult = rewriter.create<tensor::SplatOp>(loc, hForResult, gradientTy);
-            }
-            else if (isGradientTensor) {
+            } else if (isGradientTensor) {
                 Value outTensor = rewriter.create<tensor::EmptyOp>(loc, gradientShape, baseResultTy,
                                                                    dynamicDimSizes);
                 hForResult =
@@ -153,9 +147,8 @@ void FiniteDiffLowering::computeFiniteDiff(PatternRewriter &rewriter, Location l
                 Value callResForward = callOpForward.getResult(diffResIdx);
 
                 gradient = rewriter.create<arith::SubFOp>(loc, callResForward, callRes);
-            }
-            else {
-                auto bodyBuilder = [&](OpBuilder &rewriter, Location loc,
+            } else {
+                auto bodyBuilder = [&](OpBuilder& rewriter, Location loc,
                                        ValueRange tensorIndices) -> void {
                     Value diffArgElem = rewriter.create<tensor::ExtractOp>(
                         loc, diffArg, tensorIndices.take_front(operandRank));

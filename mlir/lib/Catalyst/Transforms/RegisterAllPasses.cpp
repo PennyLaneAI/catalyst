@@ -16,8 +16,7 @@
 #include "Gradient/Transforms/Passes.h"
 #include "Quantum/Transforms/Passes.h"
 
-void catalyst::registerAllCatalystPasses()
-{
+void catalyst::registerAllCatalystPasses() {
     mlir::registerPass(catalyst::createArrayListToMemRefPass);
     mlir::registerPass(catalyst::createGradientBufferizationPass);
     mlir::registerPass(catalyst::createGradientLoweringPass);

@@ -12,21 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <numeric>
-
-#include "RuntimeCAPI.h"
-
 #include "QuantumDevice.hpp"
 #include "QubitManager.hpp"
+#include "RuntimeCAPI.h"
 #include "Utils.hpp"
 
 #include <catch2/catch.hpp>
 
+#include <numeric>
+
 using namespace Catalyst::Runtime;
 using namespace Catalyst::Runtime::Simulator;
 
-TEST_CASE("Simple allocation and release of one qubit", "[QubitManager]")
-{
+TEST_CASE("Simple allocation and release of one qubit", "[QubitManager]") {
     QubitManager qm = QubitManager();
     QubitIdType idx = qm.Allocate(0);
     CHECK(qm.isValidQubitId(idx));
@@ -35,8 +33,7 @@ TEST_CASE("Simple allocation and release of one qubit", "[QubitManager]")
     CHECK(!qm.isValidQubitId(idx));
 }
 
-TEST_CASE("Allocation and reallocation of one qubit multiple times", "[QubitManager]")
-{
+TEST_CASE("Allocation and reallocation of one qubit multiple times", "[QubitManager]") {
     QubitManager qm = QubitManager();
 
     QubitIdType q = qm.Allocate(0);
@@ -48,8 +45,7 @@ TEST_CASE("Allocation and reallocation of one qubit multiple times", "[QubitMana
     qm.Release(q0);
 }
 
-TEST_CASE("Allocation and reallocation of two qubit", "[QubitManager]")
-{
+TEST_CASE("Allocation and reallocation of two qubit", "[QubitManager]") {
     QubitManager qm = QubitManager();
     QubitIdType idx0 = qm.Allocate(0);
     QubitIdType idx1 = qm.Allocate(1);
@@ -63,8 +59,7 @@ TEST_CASE("Allocation and reallocation of two qubit", "[QubitManager]")
     REQUIRE_THROWS_WITH(qm.getDeviceId(idx0), Catch::Contains("Invalid device qubit"));
 }
 
-TEST_CASE("multiple release of qubits", "[QubitManager]")
-{
+TEST_CASE("multiple release of qubits", "[QubitManager]") {
     QubitManager qm = QubitManager();
 
     QubitIdType idx0 = qm.Allocate(0);
@@ -97,8 +92,7 @@ TEST_CASE("multiple release of qubits", "[QubitManager]")
     CHECK(qm.getDeviceId(idx6) == 3);
 }
 
-TEST_CASE("Test isFreeQubitId for a vector of wires", "[QubitManager]")
-{
+TEST_CASE("Test isFreeQubitId for a vector of wires", "[QubitManager]") {
     QubitManager qm = QubitManager();
 
     QubitIdType idx0 = qm.Allocate(0);
@@ -125,8 +119,7 @@ TEST_CASE("Test isFreeQubitId for a vector of wires", "[QubitManager]")
     CHECK(!qm.isValidQubitId({idx0, idx5, idx6, idx2}));
 }
 
-TEST_CASE("Test getSimulatorId for a vector of wires", "[QubitManager]")
-{
+TEST_CASE("Test getSimulatorId for a vector of wires", "[QubitManager]") {
     QubitManager qm = QubitManager();
 
     QubitIdType idx0 = qm.Allocate(0);

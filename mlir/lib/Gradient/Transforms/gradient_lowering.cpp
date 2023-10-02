@@ -12,9 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <memory>
-#include <vector>
-
+#include "Catalyst/IR/CatalystDialect.h"
+#include "Gradient/IR/GradientOps.h"
+#include "Gradient/Transforms/Passes.h"
+#include "Gradient/Transforms/Patterns.h"
+#include "Quantum/IR/QuantumOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Index/IR/IndexDialect.h"
@@ -27,11 +29,8 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#include "Catalyst/IR/CatalystDialect.h"
-#include "Gradient/IR/GradientOps.h"
-#include "Gradient/Transforms/Passes.h"
-#include "Gradient/Transforms/Patterns.h"
-#include "Quantum/IR/QuantumOps.h"
+#include <memory>
+#include <vector>
 
 using namespace mlir;
 using namespace catalyst::gradient;
@@ -46,8 +45,7 @@ namespace gradient {
 struct GradientLoweringPass : impl::GradientLoweringPassBase<GradientLoweringPass> {
     using GradientLoweringPassBase::GradientLoweringPassBase;
 
-    void runOnOperation() final
-    {
+    void runOnOperation() final {
         RewritePatternSet gradientPatterns(&getContext());
         populateLoweringPatterns(gradientPatterns);
 
@@ -66,8 +64,7 @@ struct GradientLoweringPass : impl::GradientLoweringPassBase<GradientLoweringPas
 
 } // namespace gradient
 
-std::unique_ptr<Pass> createGradientLoweringPass()
-{
+std::unique_ptr<Pass> createGradientLoweringPass() {
     return std::make_unique<gradient::GradientLoweringPass>();
 }
 

@@ -15,23 +15,20 @@
 #include "CacheManager.hpp"
 #include "QuantumDevice.hpp"
 #include "RuntimeCAPI.h"
-#include "Utils.hpp"
-
 #include "TestUtils.hpp"
+#include "Utils.hpp"
 
 using namespace Catalyst::Runtime;
 using namespace Catalyst::Runtime::Simulator;
 
-TEST_CASE("Test the constructor with a naive example", "[CacheManager]")
-{
+TEST_CASE("Test the constructor with a naive example", "[CacheManager]") {
     CacheManager cm = CacheManager();
 
     CHECK(cm.getNumOperations() == 0);
     CHECK(cm.getNumObservables() == 0);
 }
 
-TEST_CASE("Test addOperation with a naive example", "[CacheManager]")
-{
+TEST_CASE("Test addOperation with a naive example", "[CacheManager]") {
     CacheManager cm = CacheManager();
 
     cm.addOperation("H", {0}, {0}, false);
@@ -40,8 +37,7 @@ TEST_CASE("Test addOperation with a naive example", "[CacheManager]")
     CHECK(cm.getNumObservables() == 0);
 }
 
-TEST_CASE("Test addOperations with a naive example", "[CacheManager]")
-{
+TEST_CASE("Test addOperations with a naive example", "[CacheManager]") {
     CacheManager cm = CacheManager();
 
     cm.addOperation("H", {0}, {0}, false);
@@ -54,8 +50,7 @@ TEST_CASE("Test addOperations with a naive example", "[CacheManager]")
 }
 
 TEMPLATE_LIST_TEST_CASE("Test edge cases of the cache manager in QuantumDevice methods",
-                        "[CacheManager]", SimTypes)
-{
+                        "[CacheManager]", SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     sim->StartTapeRecording();
@@ -68,8 +63,7 @@ TEMPLATE_LIST_TEST_CASE("Test edge cases of the cache manager in QuantumDevice m
 }
 
 TEMPLATE_LIST_TEST_CASE("Test a LightningSimulator circuit with num_qubits=2 ", "[CacheManager]",
-                        SimTypes)
-{
+                        SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
@@ -85,7 +79,7 @@ TEMPLATE_LIST_TEST_CASE("Test a LightningSimulator circuit with num_qubits=2 ", 
     sim->NamedOperation("PauliX", {}, {Qs[0]}, false);
     sim->NamedOperation("CNOT", {}, {Qs[0], Qs[1]}, false);
 
-    auto &&[num_ops, num_obs, num_params, op_names, _] = sim->CacheManagerInfo();
+    auto&& [num_ops, num_obs, num_params, op_names, _] = sim->CacheManagerInfo();
     CHECK((num_ops == 2 && num_obs == 0));
     CHECK(num_params == 0);
     CHECK(op_names[0] == "PauliX");
@@ -93,8 +87,7 @@ TEMPLATE_LIST_TEST_CASE("Test a LightningSimulator circuit with num_qubits=2 ", 
 }
 
 TEMPLATE_LIST_TEST_CASE("Test a LightningSimulator circuit with num_qubits=4", "[CacheManager]",
-                        SimTypes)
-{
+                        SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubit = n
@@ -116,7 +109,7 @@ TEMPLATE_LIST_TEST_CASE("Test a LightningSimulator circuit with num_qubits=4", "
     sim->NamedOperation("CRZ", {0.789}, {Qs[0], Qs[3]}, false);
     sim->StopTapeRecording();
 
-    auto &&[num_ops, num_obs, num_params, op_names, _] = sim->CacheManagerInfo();
+    auto&& [num_ops, num_obs, num_params, op_names, _] = sim->CacheManagerInfo();
     CHECK((num_ops == 4 && num_obs == 0));
     CHECK(num_params == 3);
     CHECK(op_names[0] == "Hadamard");
@@ -126,8 +119,7 @@ TEMPLATE_LIST_TEST_CASE("Test a LightningSimulator circuit with num_qubits=4", "
 }
 
 TEMPLATE_LIST_TEST_CASE("Test a LightningSimulator circuit with num_qubits=4 and observables",
-                        "[CacheManager]", SimTypes)
-{
+                        "[CacheManager]", SimTypes) {
     std::unique_ptr<TestType> sim = std::make_unique<TestType>();
 
     // state-vector with #qubits = n
@@ -153,7 +145,7 @@ TEMPLATE_LIST_TEST_CASE("Test a LightningSimulator circuit with num_qubits=4 and
     sim->Var(px);
     sim->Expval(pz);
 
-    auto &&[num_ops, num_obs, num_params, op_names, obs_keys] = sim->CacheManagerInfo();
+    auto&& [num_ops, num_obs, num_params, op_names, obs_keys] = sim->CacheManagerInfo();
     CHECK(num_ops == 4);
     CHECK(num_params == 0);
     CHECK(op_names[0] == "PauliX");
@@ -167,16 +159,15 @@ TEMPLATE_LIST_TEST_CASE("Test a LightningSimulator circuit with num_qubits=4 and
     CHECK(obs_keys[2] == pz);
 }
 
-TEST_CASE("Test __quantum__qis__ circuit with observables", "[CacheManager]")
-{
+TEST_CASE("Test __quantum__qis__ circuit with observables", "[CacheManager]") {
     __quantum__rt__initialize();
-    for (const auto &[key, val] : getDevices()) {
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
+    for (const auto& [key, val] : getDevices()) {
+        __quantum__rt__device((int8_t*)key.c_str(), (int8_t*)val.c_str());
 
-        QUBIT *target = __quantum__rt__qubit_allocate();              // id = 0
-        QirArray *ctrls_arr = __quantum__rt__qubit_allocate_array(1); // id = 1
+        QUBIT* target = __quantum__rt__qubit_allocate();              // id = 0
+        QirArray* ctrls_arr = __quantum__rt__qubit_allocate_array(1); // id = 1
 
-        QUBIT **ctrls = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
+        QUBIT** ctrls = (QUBIT**)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
 
         // qml.Hadamard(wires=0)
         __quantum__qis__Hadamard(target, false);
@@ -188,10 +179,10 @@ TEST_CASE("Test __quantum__qis__ circuit with observables", "[CacheManager]")
         __quantum__qis__CRX(0.4, target, *ctrls, false);
 
         size_t buffer_len = 4;
-        CplxT_double *buffer = new CplxT_double[buffer_len];
+        CplxT_double* buffer = new CplxT_double[buffer_len];
         MemRefT_CplxT_double_1d result = {buffer, buffer, 0, {buffer_len}, {1}};
         __quantum__qis__State(&result, 0);
-        CplxT_double *state = result.data_allocated;
+        CplxT_double* state = result.data_allocated;
 
         CHECK((state[0].real == Approx(0.70357419).margin(1e-5) &&
                state[0].imag == Approx(0.0).margin(1e-5)));
@@ -202,7 +193,7 @@ TEST_CASE("Test __quantum__qis__ circuit with observables", "[CacheManager]")
         CHECK((state[3].real == Approx(0.0).margin(1e-5) &&
                state[3].imag == Approx(-0.0705929).margin(1e-5)));
         // qml.expval(qml.PauliZ(wires=1))
-        QUBIT **qubit = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
+        QUBIT** qubit = (QUBIT**)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
         auto obs = __quantum__qis__NamedObs(ObsId::PauliZ, *qubit);
 
         CHECK(__quantum__qis__Expval(obs) == Approx(0.9800665778).margin(1e-5));
@@ -215,17 +206,16 @@ TEST_CASE("Test __quantum__qis__ circuit with observables", "[CacheManager]")
 }
 
 TEST_CASE("Test __quantum__qis__ circuit with observables using deactiveCacheManager",
-          "[CacheManager]")
-{
+          "[CacheManager]") {
 
     __quantum__rt__initialize();
-    for (const auto &[key, val] : getDevices()) {
-        __quantum__rt__device((int8_t *)key.c_str(), (int8_t *)val.c_str());
+    for (const auto& [key, val] : getDevices()) {
+        __quantum__rt__device((int8_t*)key.c_str(), (int8_t*)val.c_str());
 
-        QUBIT *target = __quantum__rt__qubit_allocate();              // id = 0
-        QirArray *ctrls_arr = __quantum__rt__qubit_allocate_array(1); // id = 1
+        QUBIT* target = __quantum__rt__qubit_allocate();              // id = 0
+        QirArray* ctrls_arr = __quantum__rt__qubit_allocate_array(1); // id = 1
 
-        QUBIT **ctrls = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
+        QUBIT** ctrls = (QUBIT**)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
 
         __quantum__rt__toggle_recorder(/* activate_cm */ true);
 
@@ -239,10 +229,10 @@ TEST_CASE("Test __quantum__qis__ circuit with observables using deactiveCacheMan
         __quantum__qis__CRX(0.4, target, *ctrls, false);
 
         size_t buffer_len = 4;
-        CplxT_double *buffer = new CplxT_double[buffer_len];
+        CplxT_double* buffer = new CplxT_double[buffer_len];
         MemRefT_CplxT_double_1d result = {buffer, buffer, 0, {buffer_len}, {1}};
         __quantum__qis__State(&result, 0);
-        CplxT_double *state = result.data_allocated;
+        CplxT_double* state = result.data_allocated;
 
         CHECK((state[0].real == Approx(0.70357419).margin(1e-5) &&
                state[0].imag == Approx(0.0).margin(1e-5)));
@@ -253,7 +243,7 @@ TEST_CASE("Test __quantum__qis__ circuit with observables using deactiveCacheMan
         CHECK((state[3].real == Approx(0.0).margin(1e-5) &&
                state[3].imag == Approx(-0.0705929).margin(1e-5)));
         // qml.expval(qml.PauliZ(wires=1))
-        QUBIT **qubit = (QUBIT **)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
+        QUBIT** qubit = (QUBIT**)__quantum__rt__array_get_element_ptr_1d(ctrls_arr, 0);
         auto obs = __quantum__qis__NamedObs(ObsId::PauliZ, *qubit);
 
         CHECK(__quantum__qis__Expval(obs) == Approx(0.9800665778).margin(1e-5));

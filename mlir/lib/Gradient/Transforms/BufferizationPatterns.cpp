@@ -12,26 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iostream"
+#include "Gradient/IR/GradientOps.h"
+#include "Gradient/Transforms/Passes.h"
+#include "Gradient/Utils/GradientShape.h"
 #include "llvm/Support/raw_ostream.h"
-
 #include "mlir/Dialect/Index/IR/IndexOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-#include "Gradient/IR/GradientOps.h"
-#include "Gradient/Transforms/Passes.h"
-#include "Gradient/Utils/GradientShape.h"
+#include "iostream"
 
 using namespace mlir;
 using namespace catalyst::gradient;
 
 namespace {
 
-Value generateAllocation(OpBuilder &builder, Location loc, Value reference)
-{
+Value generateAllocation(OpBuilder& builder, Location loc, Value reference) {
     auto memrefType = cast<MemRefType>(reference.getType());
     // Get dynamic dimension sizes from the provided reference value if necessary.
     SmallVector<Value> dynamicDims;
@@ -51,9 +49,8 @@ Value generateAllocation(OpBuilder &builder, Location loc, Value reference)
 ///
 /// The allocation size and shape is deduced from a list of existing memref values.
 ///
-void generateAllocations(PatternRewriter &rewriter, Location loc,
-                         SmallVectorImpl<Value> &allocations, ValueRange referenceValues)
-{
+void generateAllocations(PatternRewriter& rewriter, Location loc,
+                         SmallVectorImpl<Value>& allocations, ValueRange referenceValues) {
     for (Value memref : referenceValues) {
         allocations.push_back(
             generateAllocation(rewriter, loc, cast<TypedValue<MemRefType>>(memref)));
@@ -65,8 +62,7 @@ class BufferizeAdjointOp : public OpConversionPattern<AdjointOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(AdjointOp op, OpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter& rewriter) const override {
         SmallVector<Type> resTypes;
         if (failed(getTypeConverter()->convertTypes(op.getResultTypes(), resTypes)))
             return failure();
@@ -92,8 +88,7 @@ class BufferizeBackpropOp : public OpConversionPattern<BackpropOp> {
     using OpConversionPattern::OpConversionPattern;
 
     LogicalResult matchAndRewrite(BackpropOp op, OpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter& rewriter) const override {
         Location loc = op.getLoc();
         SmallVector<Value> gradients;
         SmallVector<Value> argShadows;
@@ -105,7 +100,7 @@ class BufferizeBackpropOp : public OpConversionPattern<BackpropOp> {
         SmallVector<Type> scalarReturnTypes;
         std::vector<Value> diffArgs =
             computeDiffArgs(adaptor.getArgs(), op.getDiffArgIndicesAttr());
-        for (const auto &[idx, diffArg] : llvm::enumerate(diffArgs)) {
+        for (const auto& [idx, diffArg] : llvm::enumerate(diffArgs)) {
             // Allocate buffers to place the differentiation results (gradients) into. Enzyme refers
             // to these as shadow arguments. There is one result for each differentiable MemRef
             // argument, with a matching shape and type.
@@ -113,8 +108,7 @@ class BufferizeBackpropOp : public OpConversionPattern<BackpropOp> {
                 Value shadow = generateAllocation(rewriter, loc, diffArg);
                 gradients.push_back(shadow);
                 argShadows.push_back(shadow);
-            }
-            else if (isa<FloatType>(diffArg.getType())) {
+            } else if (isa<FloatType>(diffArg.getType())) {
                 scalarReturnTypes.push_back(diffArg.getType());
                 scalarIndices.push_back(idx);
                 // Put a null placeholder value that will be filled in with the result of the
@@ -134,7 +128,7 @@ class BufferizeBackpropOp : public OpConversionPattern<BackpropOp> {
         // BackpropOps that have the same cotangent tensor due to a CSE effect from one-shot
         // bufferization.
         generateAllocations(rewriter, loc, resShadows, cotangents);
-        for (const auto &[cotangent, resShadow] : llvm::zip(cotangents, resShadows)) {
+        for (const auto& [cotangent, resShadow] : llvm::zip(cotangents, resShadows)) {
             rewriter.create<memref::CopyOp>(loc, cotangent, resShadow);
         }
 
@@ -144,7 +138,7 @@ class BufferizeBackpropOp : public OpConversionPattern<BackpropOp> {
             calleeResults, resShadows, diffArgIndicesAttr);
 
         // Fill in the null placeholders.
-        for (const auto &[idx, scalarResult] : llvm::enumerate(bufferizedBackpropOp.getResults())) {
+        for (const auto& [idx, scalarResult] : llvm::enumerate(bufferizedBackpropOp.getResults())) {
             gradients[scalarIndices[idx]] = scalarResult;
         }
 
@@ -158,8 +152,7 @@ class BufferizeBackpropOp : public OpConversionPattern<BackpropOp> {
 namespace catalyst {
 namespace gradient {
 
-void populateBufferizationPatterns(TypeConverter &typeConverter, RewritePatternSet &patterns)
-{
+void populateBufferizationPatterns(TypeConverter& typeConverter, RewritePatternSet& patterns) {
     patterns.add<BufferizeAdjointOp>(typeConverter, patterns.getContext());
     patterns.add<BufferizeBackpropOp>(typeConverter, patterns.getContext());
 }

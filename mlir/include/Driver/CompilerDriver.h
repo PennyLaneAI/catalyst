@@ -14,14 +14,14 @@
 
 #pragma once
 
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/raw_ostream.h"
+#include "mlir/IR/MLIRContext.h"
+#include "mlir/Support/LogicalResult.h"
+
 #include <filesystem>
 #include <string>
 #include <vector>
-
-#include "mlir/IR/MLIRContext.h"
-#include "mlir/Support/LogicalResult.h"
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/Support/raw_ostream.h"
 
 namespace catalyst {
 namespace driver {
@@ -45,9 +45,7 @@ enum class Verbosity { Silent = 0, Urgent = 1, Debug = 2, All = 3 };
 /// Helper verbose reporting macro.
 #define CO_MSG(opt, level, op)                                                                     \
     do {                                                                                           \
-        if ((opt).verbosity >= (level)) {                                                          \
-            (opt).diagnosticStream << op;                                                          \
-        }                                                                                          \
+        if ((opt).verbosity >= (level)) { (opt).diagnosticStream << op; }                          \
     } while (0)
 
 /// Pipeline descriptor
@@ -67,7 +65,7 @@ struct CompilerOptions {
     /// The name of the module to compile. This is usually the same as the Python function.
     mlir::StringRef moduleName;
     /// The stream to output any error messages from MLIR/LLVM passes and translation.
-    llvm::raw_ostream &diagnosticStream;
+    llvm::raw_ostream& diagnosticStream;
     /// If true, the driver will output the module at intermediate points.
     bool keepIntermediate;
     /// Sets the verbosity level to use when printing messages.
@@ -79,8 +77,7 @@ struct CompilerOptions {
     bool lowerToLLVM;
 
     /// Get the destination of the object file at the end of compilation.
-    std::string getObjectFile() const
-    {
+    std::string getObjectFile() const {
         using path = std::filesystem::path;
         return path(workspace.str()) / path(moduleName.str()).replace_extension(".o");
     }
@@ -99,16 +96,15 @@ struct CompilerOutput {
 }; // namespace catalyst
 
 /// Entry point to the MLIR portion of the compiler.
-mlir::LogicalResult QuantumDriverMain(const catalyst::driver::CompilerOptions &options,
-                                      catalyst::driver::CompilerOutput &output);
+mlir::LogicalResult QuantumDriverMain(const catalyst::driver::CompilerOptions& options,
+                                      catalyst::driver::CompilerOutput& output);
 
 namespace llvm {
 
-inline raw_ostream &operator<<(raw_ostream &oss, const catalyst::driver::Pipeline &p)
-{
+inline raw_ostream& operator<<(raw_ostream& oss, const catalyst::driver::Pipeline& p) {
     oss << "Pipeline('" << p.name << "', [";
     bool first = true;
-    for (const auto &i : p.passes) {
+    for (const auto& i : p.passes) {
         oss << (first ? "" : ", ") << i;
         first = false;
     }

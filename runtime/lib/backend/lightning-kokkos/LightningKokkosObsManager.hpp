@@ -14,15 +14,14 @@
 
 #pragma once
 
+#include "ObservablesKokkos.hpp"
+#include "Types.h"
+#include "Utils.hpp"
+
 #include <array>
 #include <stdexcept>
 #include <tuple>
 #include <utility>
-
-#include "Types.h"
-#include "Utils.hpp"
-
-#include "ObservablesKokkos.hpp"
 
 namespace Catalyst::Runtime::Simulator {
 
@@ -31,7 +30,8 @@ namespace Catalyst::Runtime::Simulator {
  * and maps each one to a const unique index (`int64_t`) in the scope
  * of the global context manager.
  */
-template <typename PrecisionT> class LightningKokkosObsManager {
+template <typename PrecisionT>
+class LightningKokkosObsManager {
   private:
     using VectorStateT = Pennylane::LightningKokkos::StateVectorKokkos<PrecisionT>;
     using ObservableClassName = Pennylane::Observables::Observable<VectorStateT>;
@@ -42,10 +42,10 @@ template <typename PrecisionT> class LightningKokkosObsManager {
     LightningKokkosObsManager() = default;
     ~LightningKokkosObsManager() = default;
 
-    LightningKokkosObsManager(const LightningKokkosObsManager &) = delete;
-    LightningKokkosObsManager &operator=(const LightningKokkosObsManager &) = delete;
-    LightningKokkosObsManager(LightningKokkosObsManager &&) = delete;
-    LightningKokkosObsManager &operator=(LightningKokkosObsManager &&) = delete;
+    LightningKokkosObsManager(const LightningKokkosObsManager&) = delete;
+    LightningKokkosObsManager& operator=(const LightningKokkosObsManager&) = delete;
+    LightningKokkosObsManager(LightningKokkosObsManager&&) = delete;
+    LightningKokkosObsManager& operator=(LightningKokkosObsManager&&) = delete;
 
     /**
      * @brief A helper function to clear constructed observables in the program.
@@ -58,8 +58,7 @@ template <typename PrecisionT> class LightningKokkosObsManager {
      * @param obsKeys The vector of observable keys
      * @return bool
      */
-    [[nodiscard]] auto isValidObservables(const std::vector<ObsIdType> &obsKeys) const -> bool
-    {
+    [[nodiscard]] auto isValidObservables(const std::vector<ObsIdType>& obsKeys) const -> bool {
         return std::all_of(obsKeys.begin(), obsKeys.end(), [this](auto i) {
             return (i >= 0 && static_cast<size_t>(i) < this->observables_.size());
         });
@@ -71,8 +70,7 @@ template <typename PrecisionT> class LightningKokkosObsManager {
      * @param key The observable key
      * @return std::shared_ptr<ObservableClassName>
      */
-    [[nodiscard]] auto getObservable(ObsIdType key) -> std::shared_ptr<ObservableClassName>
-    {
+    [[nodiscard]] auto getObservable(ObsIdType key) -> std::shared_ptr<ObservableClassName> {
         RT_FAIL_IF(!this->isValidObservables({key}), "Invalid observable key");
         return std::get<0>(this->observables_[key]);
     }
@@ -91,9 +89,8 @@ template <typename PrecisionT> class LightningKokkosObsManager {
      * @param wires The vector of wires the observable acts on
      * @return ObsIdType
      */
-    [[nodiscard]] auto createNamedObs(ObsId obsId, const std::vector<size_t> &wires) -> ObsIdType
-    {
-        auto &&obs_str =
+    [[nodiscard]] auto createNamedObs(ObsId obsId, const std::vector<size_t>& wires) -> ObsIdType {
+        auto&& obs_str =
             std::string(Lightning::lookup_obs<Lightning::simulator_observable_support_size>(
                 Lightning::simulator_observable_support, obsId));
 
@@ -111,12 +108,11 @@ template <typename PrecisionT> class LightningKokkosObsManager {
      * @param wires The vector of wires the observable acts on
      * @return ObsIdType
      */
-    [[nodiscard]] auto createHermitianObs(const std::vector<std::complex<PrecisionT>> &matrix,
-                                          const std::vector<size_t> &wires) -> ObsIdType
-    {
+    [[nodiscard]] auto createHermitianObs(const std::vector<std::complex<PrecisionT>>& matrix,
+                                          const std::vector<size_t>& wires) -> ObsIdType {
         std::vector<Kokkos::complex<PrecisionT>> matrix_k;
         matrix_k.reserve(matrix.size());
-        for (const auto &elem : matrix) {
+        for (const auto& elem : matrix) {
             matrix_k.push_back(static_cast<Kokkos::complex<PrecisionT>>(elem));
         }
 
@@ -135,18 +131,17 @@ template <typename PrecisionT> class LightningKokkosObsManager {
      * @param obsKeys The vector of observable keys
      * @return ObsIdType
      */
-    [[nodiscard]] auto createTensorProdObs(const std::vector<ObsIdType> &obsKeys) -> ObsIdType
-    {
+    [[nodiscard]] auto createTensorProdObs(const std::vector<ObsIdType>& obsKeys) -> ObsIdType {
         const auto key_size = obsKeys.size();
         const auto obs_size = this->observables_.size();
 
         std::vector<std::shared_ptr<ObservableClassName>> obs_vec;
         obs_vec.reserve(key_size);
 
-        for (const auto &key : obsKeys) {
+        for (const auto& key : obsKeys) {
             RT_FAIL_IF(static_cast<size_t>(key) >= obs_size || key < 0, "Invalid observable key");
 
-            auto &&[obs, type] = this->observables_[key];
+            auto&& [obs, type] = this->observables_[key];
             obs_vec.push_back(obs);
         }
 
@@ -166,9 +161,8 @@ template <typename PrecisionT> class LightningKokkosObsManager {
      * @param obsKeys The vector of observable keys
      * @return ObsIdType
      */
-    [[nodiscard]] auto createHamiltonianObs(const std::vector<PrecisionT> &coeffs,
-                                            const std::vector<ObsIdType> &obsKeys) -> ObsIdType
-    {
+    [[nodiscard]] auto createHamiltonianObs(const std::vector<PrecisionT>& coeffs,
+                                            const std::vector<ObsIdType>& obsKeys) -> ObsIdType {
         const auto key_size = obsKeys.size();
         const auto obs_size = this->observables_.size();
 
@@ -182,7 +176,7 @@ template <typename PrecisionT> class LightningKokkosObsManager {
         for (auto key : obsKeys) {
             RT_FAIL_IF(static_cast<size_t>(key) >= obs_size || key < 0, "Invalid observable key");
 
-            auto &&[obs, type] = this->observables_[key];
+            auto&& [obs, type] = this->observables_[key];
             obs_vec.push_back(obs);
         }
 

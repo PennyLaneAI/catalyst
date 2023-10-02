@@ -12,13 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iostream"
+#include "Catalyst/Utils/CallGraph.h"
+#include "Gradient/IR/GradientOps.h"
+#include "Gradient/Transforms/Patterns.h"
+#include "Gradient/Utils/DestinationPassingStyle.h"
+#include "Gradient/Utils/EinsumLinalgGeneric.h"
+#include "Gradient/Utils/GradientShape.h"
+#include "Quantum/IR/QuantumOps.h"
+#include "Quantum/Utils/RemoveQuantumMeasurements.h"
 #include "llvm/Support/raw_ostream.h"
-
-#include <deque>
-#include <string>
-#include <vector>
-
 #include "mlir/Conversion/LLVMCommon/MemRefBuilder.h"
 #include "mlir/Conversion/LLVMCommon/Pattern.h"
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
@@ -32,14 +34,10 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/IRMapping.h"
 
-#include "Catalyst/Utils/CallGraph.h"
-#include "Gradient/IR/GradientOps.h"
-#include "Gradient/Transforms/Patterns.h"
-#include "Gradient/Utils/DestinationPassingStyle.h"
-#include "Gradient/Utils/EinsumLinalgGeneric.h"
-#include "Gradient/Utils/GradientShape.h"
-#include "Quantum/IR/QuantumOps.h"
-#include "Quantum/Utils/RemoveQuantumMeasurements.h"
+#include "iostream"
+#include <deque>
+#include <string>
+#include <vector>
 
 using namespace mlir;
 using namespace catalyst::gradient;
@@ -48,10 +46,9 @@ namespace {
 
 constexpr int64_t UNKNOWN = ShapedType::kDynamic;
 
-LLVM::LLVMFuncOp ensureFunctionDeclaration(PatternRewriter &rewriter, Operation *op,
-                                           StringRef fnSymbol, Type fnType)
-{
-    Operation *fnDecl = SymbolTable::lookupNearestSymbolFrom(op, rewriter.getStringAttr(fnSymbol));
+LLVM::LLVMFuncOp ensureFunctionDeclaration(PatternRewriter& rewriter, Operation* op,
+                                           StringRef fnSymbol, Type fnType) {
+    Operation* fnDecl = SymbolTable::lookupNearestSymbolFrom(op, rewriter.getStringAttr(fnSymbol));
 
     if (!fnDecl) {
         PatternRewriter::InsertionGuard insertGuard(rewriter);
@@ -59,8 +56,7 @@ LLVM::LLVMFuncOp ensureFunctionDeclaration(PatternRewriter &rewriter, Operation 
         rewriter.setInsertionPointToStart(mod.getBody());
 
         fnDecl = rewriter.create<LLVM::LLVMFuncOp>(op->getLoc(), fnSymbol, fnType);
-    }
-    else {
+    } else {
         assert(isa<LLVM::LLVMFuncOp>(fnDecl) && "QIR function declaration is not a LLVMFuncOp");
     }
 
@@ -71,11 +67,10 @@ struct AdjointOpPattern : public ConvertOpToLLVMPattern<AdjointOp> {
     using ConvertOpToLLVMPattern::ConvertOpToLLVMPattern;
 
     LogicalResult matchAndRewrite(AdjointOp op, AdjointOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter& rewriter) const override {
         Location loc = op.getLoc();
-        MLIRContext *ctx = getContext();
-        TypeConverter *conv = getTypeConverter();
+        MLIRContext* ctx = getContext();
+        TypeConverter* conv = getTypeConverter();
 
         Type vectorType = conv->convertType(MemRefType::get({UNKNOWN}, Float64Type::get(ctx)));
 
@@ -147,20 +142,19 @@ struct EnzymeMemRefInterfaceOptions {
     bool dupNoNeed = false;
 };
 
-static constexpr const char *enzyme_autodiff_func_name = "__enzyme_autodiff";
-static constexpr const char *enzyme_allocation_key = "__enzyme_allocation_like";
-static constexpr const char *enzyme_custom_gradient_key = "__enzyme_register_gradient_";
-static constexpr const char *enzyme_like_free_key = "__enzyme_function_like_free";
-static constexpr const char *enzyme_const_key = "enzyme_const";
-static constexpr const char *enzyme_dupnoneed_key = "enzyme_dupnoneed";
+static constexpr const char* enzyme_autodiff_func_name = "__enzyme_autodiff";
+static constexpr const char* enzyme_allocation_key = "__enzyme_allocation_like";
+static constexpr const char* enzyme_custom_gradient_key = "__enzyme_register_gradient_";
+static constexpr const char* enzyme_like_free_key = "__enzyme_function_like_free";
+static constexpr const char* enzyme_const_key = "enzyme_const";
+static constexpr const char* enzyme_dupnoneed_key = "enzyme_dupnoneed";
 
 /// Enzyme custom gradients appear to exhibit better stability when they are registered for
 /// functions where MemRefs are passed via wrapped pointers (!llvm.ptr<struct(ptr, ptr, i64, ...)>)
 /// rather than having their fields unpacked. This function automatically transforms MemRef
 /// arguments of a function to wrapped pointers.
-void wrapMemRefArgs(func::FuncOp func, LLVMTypeConverter &typeConverter, PatternRewriter &rewriter,
-                    Location loc, bool volatileArgs = false)
-{
+void wrapMemRefArgs(func::FuncOp func, LLVMTypeConverter& typeConverter, PatternRewriter& rewriter,
+                    Location loc, bool volatileArgs = false) {
     if (llvm::none_of(func.getArgumentTypes(),
                       [](Type argType) { return isa<MemRefType>(argType); })) {
         // The memref arguments are already wrapped
@@ -168,7 +162,7 @@ void wrapMemRefArgs(func::FuncOp func, LLVMTypeConverter &typeConverter, Pattern
     }
 
     ModuleOp moduleOp = func->getParentOfType<ModuleOp>();
-    MLIRContext *ctx = rewriter.getContext();
+    MLIRContext* ctx = rewriter.getContext();
     auto ptrType = LLVM::LLVMPointerType::get(ctx);
     PatternRewriter::InsertionGuard insertionGuard(rewriter);
     rewriter.setInsertionPointToStart(&func.getFunctionBody().front());
@@ -247,10 +241,9 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
     using ConvertOpToLLVMPattern::ConvertOpToLLVMPattern;
 
     LogicalResult matchAndRewrite(BackpropOp op, BackpropOpAdaptor adaptor,
-                                  ConversionPatternRewriter &rewriter) const override
-    {
+                                  ConversionPatternRewriter& rewriter) const override {
         Location loc = op.getLoc();
-        MLIRContext *ctx = getContext();
+        MLIRContext* ctx = getContext();
         ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
         if (llvm::any_of(op.getResultTypes(),
                          [](Type resultType) { return isa<TensorType>(resultType); })) {
@@ -327,7 +320,7 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         calleePtr = castToConvertedType(calleePtr, rewriter, loc);
         SmallVector<Value> callArgs = {calleePtr};
 
-        const std::vector<size_t> &diffArgIndices = computeDiffArgIndices(op.getDiffArgIndices());
+        const std::vector<size_t>& diffArgIndices = computeDiffArgIndices(op.getDiffArgIndices());
         insertGlobalSymbol(rewriter, moduleOp, enzyme_const_key, std::nullopt);
         insertGlobalSymbol(rewriter, moduleOp, enzyme_dupnoneed_key, std::nullopt);
 
@@ -342,20 +335,17 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
                 if (isa<MemRefType>(arg.getType())) {
                     // unpackMemRefAndAppend will handle the appropriate enzyme_const annotations
                     unpackMemRefAndAppend(arg, /*shadow=*/nullptr, callArgs, rewriter, loc);
-                }
-                else {
+                } else {
                     callArgs.push_back(enzymeConst);
                     callArgs.push_back(convArgs[index]);
                 }
-            }
-            else {
+            } else {
                 assert(isDifferentiable(arg.getType()));
                 if (isa<MemRefType>(arg.getType())) {
                     size_t position = std::distance(diffArgIndices.begin(), it);
                     unpackMemRefAndAppend(arg, argShadows[position], callArgs, rewriter, loc,
                                           {.zeroOut = true});
-                }
-                else {
+                } else {
                     callArgs.push_back(arg);
                 }
             }
@@ -376,15 +366,14 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
     }
 
   private:
-    Value castToConvertedType(Value value, OpBuilder &builder, Location loc) const
-    {
+    Value castToConvertedType(Value value, OpBuilder& builder, Location loc) const {
         auto casted = builder.create<UnrealizedConversionCastOp>(
             loc, getTypeConverter()->convertType(value.getType()), value);
         return casted.getResult(0);
     }
 
     void unpackMemRefAndAppend(
-        Value memRefArg, Value shadowMemRef, SmallVectorImpl<Value> &callArgs, OpBuilder &builder,
+        Value memRefArg, Value shadowMemRef, SmallVectorImpl<Value>& callArgs, OpBuilder& builder,
         Location loc, EnzymeMemRefInterfaceOptions options = EnzymeMemRefInterfaceOptions()) const
 
     {
@@ -402,9 +391,7 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
 
         // Aligned pointer is active if a shadow is provided
         if (shadowMemRef) {
-            if (options.dupNoNeed) {
-                callArgs.push_back(enzymeDupNoNeed);
-            }
+            if (options.dupNoNeed) { callArgs.push_back(enzymeDupNoNeed); }
             callArgs.push_back(desc.alignedPtr(builder, loc));
             Value shadowStruct = castToConvertedType(shadowMemRef, builder, loc);
             MemRefDescriptor shadowDesc(shadowStruct);
@@ -418,8 +405,7 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
                                                /*isVolatile=*/false);
             }
             callArgs.push_back(shadowPtr);
-        }
-        else {
+        } else {
             callArgs.push_back(enzymeConst);
             callArgs.push_back(desc.alignedPtr(builder, loc));
         }
@@ -436,31 +422,21 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
 
     /// Determine the return type of the __enzyme_autodiff function based on the expected number of
     /// scalar returns.
-    static Type getEnzymeReturnType(MLIRContext *ctx, TypeRange scalarReturns)
-    {
-        if (scalarReturns.empty()) {
-            return LLVM::LLVMVoidType::get(ctx);
-        }
-        if (scalarReturns.size() == 1) {
-            return scalarReturns.front();
-        }
+    static Type getEnzymeReturnType(MLIRContext* ctx, TypeRange scalarReturns) {
+        if (scalarReturns.empty()) { return LLVM::LLVMVoidType::get(ctx); }
+        if (scalarReturns.size() == 1) { return scalarReturns.front(); }
         return LLVM::LLVMStructType::getLiteral(ctx, SmallVector<Type>(scalarReturns));
     }
 
-    static void unpackScalarResults(LLVM::CallOp enzymeCall, SmallVectorImpl<Value> &results,
-                                    OpBuilder &builder, Location loc)
-    {
-        if (enzymeCall.getNumResults() == 0) {
-            return;
-        }
+    static void unpackScalarResults(LLVM::CallOp enzymeCall, SmallVectorImpl<Value>& results,
+                                    OpBuilder& builder, Location loc) {
+        if (enzymeCall.getNumResults() == 0) { return; }
 
         // LLVM Functions can only return up to one result. If one scalar is being differentiated,
         // it will be the sole result. If there are multiple scalars being differentiated, Enzyme
         // will return a struct of all the derivatives with respect to those scalars.
         Value result = enzymeCall.getResult();
-        if (isa<FloatType>(result.getType())) {
-            results.push_back(result);
-        }
+        if (isa<FloatType>(result.getType())) { results.push_back(result); }
         if (auto structType = dyn_cast<LLVM::LLVMStructType>(result.getType())) {
             size_t numResults = structType.getBody().size();
             for (size_t i = 0; i < numResults; i++) {
@@ -473,15 +449,13 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
     /// This is computed using the formula `element_size * (offset + sizes[0] * strides[0])`.
     /// For example, a rank-3 MemRef with shape [M, N, K] has sizes [M, N, K] and strides [N * K, K,
     /// 1]. The overall number of elements is M * N * K = sizes[0] * strides[0].
-    Value computeMemRefSizeInBytes(MemRefType type, MemRefDescriptor descriptor, OpBuilder &builder,
-                                   Location loc) const
-    {
+    Value computeMemRefSizeInBytes(MemRefType type, MemRefDescriptor descriptor, OpBuilder& builder,
+                                   Location loc) const {
         Value bufferSize;
         Type indexType = getTypeConverter()->getIndexType();
         if (type.getRank() == 0) {
             bufferSize = builder.create<LLVM::ConstantOp>(loc, indexType, builder.getIndexAttr(1));
-        }
-        else {
+        } else {
             bufferSize = builder.create<LLVM::MulOp>(loc, descriptor.size(builder, loc, 0),
                                                      descriptor.stride(builder, loc, 0));
             bufferSize =
@@ -494,8 +468,7 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
     }
 
     void convertCustomGradArgumentTypes(TypeRange argTypes,
-                                        SmallVectorImpl<Type> &llvmArgTypes) const
-    {
+                                        SmallVectorImpl<Type>& llvmArgTypes) const {
         for (Type argType : argTypes) {
             llvmArgTypes.append(2, argType);
         }
@@ -509,16 +482,13 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
     /// Enzyme additionally expects this function to take shadow pointers of forward pass arguments,
     /// which are currently unused. For more detail, see:
     /// https://enzyme.mit.edu/getting_started/CallingConvention#custom-gradients
-    func::FuncOp genAugmentedForward(func::FuncOp qnode, OpBuilder &builder) const
-    {
+    func::FuncOp genAugmentedForward(func::FuncOp qnode, OpBuilder& builder) const {
         std::string augmentedName = (qnode.getName() + ".augfwd").str();
         auto augmentedForward = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
             qnode, builder.getStringAttr(augmentedName));
-        if (augmentedForward) {
-            return augmentedForward;
-        }
+        if (augmentedForward) { return augmentedForward; }
         assert(qnode.getNumResults() == 0 && "Expected QNode to be in destination-passing style");
-        MLIRContext *ctx = builder.getContext();
+        MLIRContext* ctx = builder.getContext();
         OpBuilder::InsertionGuard insertionGuard(builder);
         builder.setInsertionPointAfter(qnode);
         // The tape type is a null pointer because we don't need to pass any data from the forward
@@ -531,7 +501,7 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         augmentedForward.setPrivate();
         Location loc = qnode.getLoc();
 
-        Block *entry = augmentedForward.addEntryBlock();
+        Block* entry = augmentedForward.addEntryBlock();
         builder.setInsertionPointToStart(entry);
 
         // Every other argument is a shadow
@@ -556,17 +526,14 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
     /// gradient of the final output with respect to the gate parameters. This is stored in the
     /// appropriate shadow argument.
     func::FuncOp genCustomQGradient(func::FuncOp qnode, Location loc, func::FuncOp qgradFn,
-                                    OpBuilder &builder) const
-    {
+                                    OpBuilder& builder) const {
         std::string customQGradName = (qnode.getName() + ".customqgrad").str();
         auto customQGrad = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
             qnode, builder.getStringAttr(customQGradName));
-        if (customQGrad) {
-            return customQGrad;
-        }
+        if (customQGrad) { return customQGrad; }
 
         SmallVector<Type> customArgTypes;
-        MLIRContext *ctx = builder.getContext();
+        MLIRContext* ctx = builder.getContext();
         auto tapeType = LLVM::LLVMPointerType::get(ctx);
         SmallVector<Type> argTypes;
         convertCustomGradArgumentTypes(qnode.getArgumentTypes(), argTypes);
@@ -579,7 +546,7 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         auto funcType = FunctionType::get(ctx, argTypes, {});
         customQGrad = builder.create<func::FuncOp>(qnode.getLoc(), customQGradName, funcType);
         customQGrad.setPrivate();
-        Block *block = customQGrad.addEntryBlock();
+        Block* block = customQGrad.addEntryBlock();
         builder.setInsertionPointToStart(block);
 
         SmallVector<Value> primalArgs;
@@ -601,13 +568,12 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
             return unwrapped;
         };
 
-        for (const auto &[unwrappedType, arg, shadow] :
+        for (const auto& [unwrappedType, arg, shadow] :
              llvm::zip(qnodeType.getInputs(), primalArgs, shadowArgs)) {
             if (isa<MemRefType>(unwrappedType)) {
                 unwrappedInputs.push_back(unwrapMemRef(arg, unwrappedType));
                 unwrappedShadows.push_back(unwrapMemRef(shadow, unwrappedType));
-            }
-            else {
+            } else {
                 assert(false && "non memref inputs not yet supported");
                 unwrappedInputs.push_back(arg);
             }
@@ -670,18 +636,16 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
     ///
     /// This functionality is described at:
     /// https://github.com/EnzymeAD/Enzyme/issues/930#issuecomment-1334502012
-    LLVM::GlobalOp insertEnzymeAllocationLike(OpBuilder &builder, ModuleOp moduleOp, Location loc,
-                                              StringRef allocFuncName, StringRef freeFuncName) const
-    {
-        MLIRContext *context = moduleOp.getContext();
+    LLVM::GlobalOp insertEnzymeAllocationLike(OpBuilder& builder, ModuleOp moduleOp, Location loc,
+                                              StringRef allocFuncName,
+                                              StringRef freeFuncName) const {
+        MLIRContext* context = moduleOp.getContext();
         Type indexType = getTypeConverter()->getIndexType();
         OpBuilder::InsertionGuard insertGuard(builder);
         builder.setInsertionPointToStart(moduleOp.getBody());
 
         auto allocationLike = moduleOp.lookupSymbol<LLVM::GlobalOp>(enzyme_allocation_key);
-        if (allocationLike) {
-            return allocationLike;
-        }
+        if (allocationLike) { return allocationLike; }
 
         auto ptrType = LLVM::LLVMPointerType::get(context);
         auto resultType = LLVM::LLVMArrayType::get(ptrType, 4);
@@ -716,10 +680,9 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
     /// (optional).
     ///
     /// It can be used to add Enzyme globals.
-    static void insertGlobalSymbol(PatternRewriter &rewriter, ModuleOp op, StringRef key,
-                                   std::optional<StringRef> value)
-    {
-        auto *context = op.getContext();
+    static void insertGlobalSymbol(PatternRewriter& rewriter, ModuleOp op, StringRef key,
+                                   std::optional<StringRef> value) {
+        auto* context = op.getContext();
         LLVM::GlobalOp glb = op.lookupSymbol<LLVM::GlobalOp>(key);
 
         OpBuilder::InsertionGuard insertGuard(rewriter);
@@ -730,8 +693,7 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
                 rewriter.create<LLVM::GlobalOp>(op.getLoc(), shortTy,
                                                 /*isConstant=*/true, LLVM::Linkage::Linkonce, key,
                                                 IntegerAttr::get(shortTy, 0));
-            }
-            else {
+            } else {
                 rewriter.create<LLVM::GlobalOp>(
                     op.getLoc(), LLVM::LLVMArrayType::get(shortTy, value->size()), true,
                     LLVM::Linkage::Linkonce, key, rewriter.getStringAttr(*value));
@@ -741,27 +703,24 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
 
     /// This functions inserts a llvm global (with a block), it is used to tell Enzyme
     /// how to deal with function with custom definition like mlir allocation and free.
-    static LLVM::GlobalOp insertEnzymeFunctionLike(PatternRewriter &rewriter, ModuleOp op,
+    static LLVM::GlobalOp insertEnzymeFunctionLike(PatternRewriter& rewriter, ModuleOp op,
                                                    StringRef key, StringRef name,
-                                                   StringRef originalName)
-    {
-        auto *context = op.getContext();
+                                                   StringRef originalName) {
+        auto* context = op.getContext();
         PatternRewriter::InsertionGuard insertGuard(rewriter);
         rewriter.setInsertionPointToStart(op.getBody());
 
         LLVM::GlobalOp glb = op.lookupSymbol<LLVM::GlobalOp>(key);
 
         auto ptrType = LLVM::LLVMPointerType::get(context);
-        if (glb) {
-            return glb;
-        }
+        if (glb) { return glb; }
         glb = rewriter.create<LLVM::GlobalOp>(op.getLoc(), LLVM::LLVMArrayType::get(ptrType, 2),
                                               /*isConstant=*/false, LLVM::Linkage::External, key,
                                               nullptr);
 
         // Create the block and push it back in the global
-        auto *contextGlb = glb.getContext();
-        Block *block = new Block();
+        auto* contextGlb = glb.getContext();
+        Block* block = new Block();
         glb.getInitializerRegion().push_back(block);
         rewriter.setInsertionPointToStart(block);
 
@@ -786,20 +745,17 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
         return glb;
     }
 
-    static LLVM::GlobalOp insertEnzymeCustomGradient(OpBuilder &builder, ModuleOp moduleOp,
+    static LLVM::GlobalOp insertEnzymeCustomGradient(OpBuilder& builder, ModuleOp moduleOp,
                                                      Location loc, func::FuncOp originalFunc,
                                                      func::FuncOp augmentedPrimal,
-                                                     func::FuncOp gradient)
-    {
-        MLIRContext *context = moduleOp.getContext();
+                                                     func::FuncOp gradient) {
+        MLIRContext* context = moduleOp.getContext();
         OpBuilder::InsertionGuard insertGuard(builder);
         builder.setInsertionPointToStart(moduleOp.getBody());
 
         std::string key = (enzyme_custom_gradient_key + originalFunc.getName()).str();
         auto customGradient = moduleOp.lookupSymbol<LLVM::GlobalOp>(key);
-        if (customGradient) {
-            return customGradient;
-        }
+        if (customGradient) { return customGradient; }
 
         auto ptrType = LLVM::LLVMPointerType::get(context);
         auto resultType = LLVM::LLVMArrayType::get(ptrType, 3);
@@ -815,7 +771,7 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
             builder.create<func::ConstantOp>(loc, gradient.getFunctionType(), gradient.getName());
         SmallVector<Value> fnPtrs{origFnPtr, augFnPtr, gradFnPtr};
         Value result = builder.create<LLVM::UndefOp>(loc, resultType);
-        for (const auto &[idx, fnPtr] : llvm::enumerate(fnPtrs)) {
+        for (const auto& [idx, fnPtr] : llvm::enumerate(fnPtrs)) {
             Value casted =
                 builder.create<UnrealizedConversionCastOp>(loc, ptrType, fnPtr).getResult(0);
             result = builder.create<LLVM::InsertValueOp>(loc, result, casted, idx);
@@ -832,8 +788,7 @@ struct BackpropOpPattern : public ConvertOpToLLVMPattern<BackpropOp> {
 namespace catalyst {
 namespace gradient {
 
-void populateConversionPatterns(LLVMTypeConverter &typeConverter, RewritePatternSet &patterns)
-{
+void populateConversionPatterns(LLVMTypeConverter& typeConverter, RewritePatternSet& patterns) {
     patterns.add<AdjointOpPattern>(typeConverter);
     patterns.add<BackpropOpPattern>(typeConverter);
 }

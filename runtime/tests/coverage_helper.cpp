@@ -16,9 +16,8 @@
 
 // This is a hack around analyzing CAPI and
 // simulators C++ implementation code by lcov
-#include "RuntimeCAPI.cpp"
-
 #include "LightningSimulator.cpp"
+#include "RuntimeCAPI.cpp"
 
 #ifdef __device_lightning_kokkos
 #include "LightningKokkosSimulator.cpp"

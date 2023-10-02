@@ -19,26 +19,26 @@ throw std::logic_error("StateVectorKokkos.hpp: No such header file");
 
 #define __device_lightning_kokkos
 
-#include <bitset>
+#include "AdjointJacobianKokkos.hpp"
+#include "CacheManager.hpp"
+#include "Exception.hpp"
+#include "LightningKokkosObsManager.hpp"
+#include "LinearAlgebra.hpp"
+#include "MeasurementsKokkos.hpp"
+#include "QuantumDevice.hpp"
+#include "QubitManager.hpp"
+#include "StateVectorKokkos.hpp"
+#include "Utils.hpp"
+
 #include <cmath>
+
+#include <bitset>
 #include <cstdint>
 #include <iostream>
 #include <limits>
 #include <random>
 #include <span>
 #include <stdexcept>
-
-#include "AdjointJacobianKokkos.hpp"
-#include "LinearAlgebra.hpp"
-#include "MeasurementsKokkos.hpp"
-#include "StateVectorKokkos.hpp"
-
-#include "CacheManager.hpp"
-#include "Exception.hpp"
-#include "LightningKokkosObsManager.hpp"
-#include "QuantumDevice.hpp"
-#include "QubitManager.hpp"
-#include "Utils.hpp"
 
 namespace Catalyst::Runtime::Simulator {
 class LightningKokkosSimulator final : public Catalyst::Runtime::QuantumDevice {
@@ -60,25 +60,21 @@ class LightningKokkosSimulator final : public Catalyst::Runtime::QuantumDevice {
     std::unique_ptr<StateVectorT> device_sv = std::make_unique<StateVectorT>(0);
     LightningKokkosObsManager<double> obs_manager{};
 
-    inline auto isValidQubit(QubitIdType wire) -> bool
-    {
+    inline auto isValidQubit(QubitIdType wire) -> bool {
         return this->qubit_manager.isValidQubitId(wire);
     }
 
-    inline auto isValidQubits(const std::vector<QubitIdType> &wires) -> bool
-    {
+    inline auto isValidQubits(const std::vector<QubitIdType>& wires) -> bool {
         return std::all_of(wires.begin(), wires.end(),
                            [this](QubitIdType w) { return this->isValidQubit(w); });
     }
 
-    inline auto isValidQubits(size_t numWires, const QubitIdType *wires) -> bool
-    {
+    inline auto isValidQubits(size_t numWires, const QubitIdType* wires) -> bool {
         return std::all_of(wires, wires + numWires,
                            [this](QubitIdType w) { return this->isValidQubit(w); });
     }
 
-    inline auto getDeviceWires(size_t numWires, const QubitIdType *wires) -> std::vector<size_t>
-    {
+    inline auto getDeviceWires(size_t numWires, const QubitIdType* wires) -> std::vector<size_t> {
         std::vector<size_t> res;
         res.reserve(numWires);
         std::transform(wires, wires + numWires, std::back_inserter(res),
@@ -86,8 +82,7 @@ class LightningKokkosSimulator final : public Catalyst::Runtime::QuantumDevice {
         return res;
     }
 
-    inline auto getDeviceWires(const std::vector<QubitIdType> &wires) -> std::vector<size_t>
-    {
+    inline auto getDeviceWires(const std::vector<QubitIdType>& wires) -> std::vector<size_t> {
         std::vector<size_t> res;
         res.reserve(wires.size());
         std::transform(wires.begin(), wires.end(), std::back_inserter(res),
@@ -96,19 +91,18 @@ class LightningKokkosSimulator final : public Catalyst::Runtime::QuantumDevice {
     }
 
   public:
-    explicit LightningKokkosSimulator(bool status = false, const std::string &kwargs = "{}")
-        : tape_recording(status)
-    {
-        auto &&args = parse_kwargs(kwargs);
+    explicit LightningKokkosSimulator(bool status = false, const std::string& kwargs = "{}") :
+        tape_recording(status) {
+        auto&& args = parse_kwargs(kwargs);
         device_shots = args.contains("shots") ? static_cast<size_t>(std::stoll(args["shots"]))
                                               : default_device_shots;
     }
     ~LightningKokkosSimulator() = default;
 
-    LightningKokkosSimulator(const LightningKokkosSimulator &) = delete;
-    LightningKokkosSimulator &operator=(const LightningKokkosSimulator &) = delete;
-    LightningKokkosSimulator(LightningKokkosSimulator &&) = delete;
-    LightningKokkosSimulator &operator=(LightningKokkosSimulator &&) = delete;
+    LightningKokkosSimulator(const LightningKokkosSimulator&) = delete;
+    LightningKokkosSimulator& operator=(const LightningKokkosSimulator&) = delete;
+    LightningKokkosSimulator(LightningKokkosSimulator&&) = delete;
+    LightningKokkosSimulator& operator=(LightningKokkosSimulator&&) = delete;
 
     // RT
     auto AllocateQubit() -> QubitIdType override;
@@ -128,28 +122,28 @@ class LightningKokkosSimulator final : public Catalyst::Runtime::QuantumDevice {
         -> std::tuple<size_t, size_t, size_t, std::vector<std::string>, std::vector<ObsIdType>>;
 
     // QIS
-    void NamedOperation(const std::string &name, const std::vector<double> &params,
-                        const std::vector<QubitIdType> &wires, bool inverse) override;
-    void MatrixOperation(const std::vector<std::complex<double>> &matrix,
-                         const std::vector<QubitIdType> &wires, bool inverse) override;
-    auto Observable(ObsId id, const std::vector<std::complex<double>> &matrix,
-                    const std::vector<QubitIdType> &wires) -> ObsIdType override;
-    auto TensorObservable(const std::vector<ObsIdType> &obs) -> ObsIdType override;
-    auto HamiltonianObservable(const std::vector<double> &coeffs, const std::vector<ObsIdType> &obs)
+    void NamedOperation(const std::string& name, const std::vector<double>& params,
+                        const std::vector<QubitIdType>& wires, bool inverse) override;
+    void MatrixOperation(const std::vector<std::complex<double>>& matrix,
+                         const std::vector<QubitIdType>& wires, bool inverse) override;
+    auto Observable(ObsId id, const std::vector<std::complex<double>>& matrix,
+                    const std::vector<QubitIdType>& wires) -> ObsIdType override;
+    auto TensorObservable(const std::vector<ObsIdType>& obs) -> ObsIdType override;
+    auto HamiltonianObservable(const std::vector<double>& coeffs, const std::vector<ObsIdType>& obs)
         -> ObsIdType override;
     auto Expval(ObsIdType obsKey) -> double override;
     auto Var(ObsIdType obsKey) -> double override;
-    void State(DataView<std::complex<double>, 1> &state) override;
-    void Probs(DataView<double, 1> &probs) override;
-    void PartialProbs(DataView<double, 1> &probs, const std::vector<QubitIdType> &wires) override;
-    void Sample(DataView<double, 2> &samples, size_t shots) override;
-    void PartialSample(DataView<double, 2> &samples, const std::vector<QubitIdType> &wires,
+    void State(DataView<std::complex<double>, 1>& state) override;
+    void Probs(DataView<double, 1>& probs) override;
+    void PartialProbs(DataView<double, 1>& probs, const std::vector<QubitIdType>& wires) override;
+    void Sample(DataView<double, 2>& samples, size_t shots) override;
+    void PartialSample(DataView<double, 2>& samples, const std::vector<QubitIdType>& wires,
                        size_t shots) override;
-    void Counts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts, size_t shots) override;
-    void PartialCounts(DataView<double, 1> &eigvals, DataView<int64_t, 1> &counts,
-                       const std::vector<QubitIdType> &wires, size_t shots) override;
+    void Counts(DataView<double, 1>& eigvals, DataView<int64_t, 1>& counts, size_t shots) override;
+    void PartialCounts(DataView<double, 1>& eigvals, DataView<int64_t, 1>& counts,
+                       const std::vector<QubitIdType>& wires, size_t shots) override;
     auto Measure(QubitIdType wire) -> Result override;
-    void Gradient(std::vector<DataView<double, 1>> &gradients,
-                  const std::vector<size_t> &trainParams) override;
+    void Gradient(std::vector<DataView<double, 1>>& gradients,
+                  const std::vector<size_t>& trainParams) override;
 };
 } // namespace Catalyst::Runtime::Simulator

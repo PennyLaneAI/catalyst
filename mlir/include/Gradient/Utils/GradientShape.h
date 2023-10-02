@@ -14,10 +14,10 @@
 
 #pragma once
 
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+
 #include <optional>
 #include <vector>
-
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 
 namespace catalyst {
 namespace gradient {
@@ -25,12 +25,12 @@ namespace gradient {
 bool isDifferentiable(mlir::Type type);
 
 std::vector<mlir::Type> computeResultTypes(mlir::func::FuncOp callee,
-                                           const std::vector<size_t> &diffArgIndices);
+                                           const std::vector<size_t>& diffArgIndices);
 
 std::vector<mlir::Type> computeQGradTypes(mlir::func::FuncOp callee);
 
 std::vector<mlir::Type> computeBackpropTypes(mlir::func::FuncOp callee,
-                                             const std::vector<size_t> &diffArgIndices);
+                                             const std::vector<size_t>& diffArgIndices);
 
 std::vector<size_t> computeDiffArgIndices(std::optional<mlir::DenseIntElementsAttr> indices);
 

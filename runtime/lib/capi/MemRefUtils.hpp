@@ -17,16 +17,17 @@
 #include <cstddef>
 
 extern "C" {
-void *_mlir_memref_to_llvm_alloc(size_t size);
-void *_mlir_memref_to_llvm_aligned_alloc(size_t alignment, size_t size);
-bool _mlir_memory_transfer(void *);
-void _mlir_memref_to_llvm_free(void *ptr);
+void* _mlir_memref_to_llvm_alloc(size_t size);
+void* _mlir_memref_to_llvm_aligned_alloc(size_t alignment, size_t size);
+bool _mlir_memory_transfer(void*);
+void _mlir_memref_to_llvm_free(void* ptr);
 }
 
 // MemRef type definition
-template <typename T, size_t R> struct MemRefT {
-    T *data_allocated;
-    T *data_aligned;
+template <typename T, size_t R>
+struct MemRefT {
+    T* data_allocated;
+    T* data_aligned;
     size_t offset;
     size_t sizes[R];
     size_t strides[R];

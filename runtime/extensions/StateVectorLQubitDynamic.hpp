@@ -13,19 +13,17 @@
 // limitations under the License.
 #pragma once
 
-#include <numeric>
-#include <utility>
-#include <vector>
-
 #include "BitUtil.hpp"
+#include "Error.hpp"
 #include "LinearAlgebra.hpp"
 #include "Util.hpp"
-
-#include "Error.hpp"
 
 #include <StateVectorLQubit.hpp>
 
 #include <iostream>
+#include <numeric>
+#include <utility>
+#include <vector>
 
 namespace {
 using Pennylane::Util::AlignedAllocator;
@@ -61,8 +59,7 @@ class StateVectorLQubitDynamic : public StateVectorLQubit<fp_t, StateVectorLQubi
     static constexpr PrecisionT epsilon_ = std::numeric_limits<PrecisionT>::epsilon() * 100;
 
     template <class IIter, class OIter>
-    inline OIter _move_data_elements(IIter first, size_t distance, OIter second)
-    {
+    inline OIter _move_data_elements(IIter first, size_t distance, OIter second) {
         *second++ = std::move(*first);
         for (size_t i = 1; i < distance; i++) {
             *second++ = std::move(*++first);
@@ -71,8 +68,7 @@ class StateVectorLQubitDynamic : public StateVectorLQubit<fp_t, StateVectorLQubi
     }
 
     template <class IIter, class OIter>
-    inline OIter _shallow_move_data_elements(IIter first, size_t distance, OIter second)
-    {
+    inline OIter _shallow_move_data_elements(IIter first, size_t distance, OIter second) {
         for (size_t i = 0; i < distance; i++) {
             *second++ = std::move(*first);
             *first = ZERO<PrecisionT>();
@@ -81,15 +77,13 @@ class StateVectorLQubitDynamic : public StateVectorLQubit<fp_t, StateVectorLQubi
         return second;
     }
 
-    inline void _scalar_mul_data(std::vector<ComplexT, AlignedAllocator<ComplexT>> &data,
-                                 ComplexT scalar)
-    {
+    inline void _scalar_mul_data(std::vector<ComplexT, AlignedAllocator<ComplexT>>& data,
+                                 ComplexT scalar) {
         std::transform(data.begin(), data.end(), data.begin(),
-                       [scalar](const ComplexT &elem) { return elem * scalar; });
+                       [scalar](const ComplexT& elem) { return elem * scalar; });
     }
 
-    inline void _normalize_data(std::vector<ComplexT, AlignedAllocator<ComplexT>> &data)
-    {
+    inline void _normalize_data(std::vector<ComplexT, AlignedAllocator<ComplexT>>& data) {
         _scalar_mul_data(data,
                          ONE<PrecisionT>() / std::sqrt(squaredNorm(data.data(), data.size())));
     }
@@ -104,12 +98,11 @@ class StateVectorLQubitDynamic : public StateVectorLQubit<fp_t, StateVectorLQubi
      */
     explicit StateVectorLQubitDynamic(size_t num_qubits,
                                       Threading threading = Threading::SingleThread,
-                                      CPUMemoryModel memory_model = bestCPUMemoryModel())
-        : BaseType{num_qubits, threading, memory_model},
-          data_{exp2(num_qubits), ZERO<PrecisionT>(),
-                getAllocator<ComplexT>( // LCOV_EXCL_LINE
-                    this->memory_model_)}
-    {
+                                      CPUMemoryModel memory_model = bestCPUMemoryModel()) :
+        BaseType{num_qubits, threading, memory_model},
+        data_{exp2(num_qubits), ZERO<PrecisionT>(),
+              getAllocator<ComplexT>( // LCOV_EXCL_LINE
+                  this->memory_model_)} {
         data_[0] = ONE<PrecisionT>();
     }
 
@@ -121,12 +114,10 @@ class StateVectorLQubitDynamic : public StateVectorLQubit<fp_t, StateVectorLQubi
      * @param other Another statevector to construct the statevector from
      */
     template <class OtherDerived>
-    explicit StateVectorLQubitDynamic(const StateVectorLQubit<PrecisionT, OtherDerived> &other)
-        : BaseType(other.getNumQubits(), other.threading(), other.memoryModel()),
-          data_{other.getData(), other.getData() + other.getLength(),
-                getAllocator<ComplexT>(this->memory_model_)}
-    {
-    }
+    explicit StateVectorLQubitDynamic(const StateVectorLQubit<PrecisionT, OtherDerived>& other) :
+        BaseType(other.getNumQubits(), other.threading(), other.memoryModel()),
+        data_{other.getData(), other.getData() + other.getLength(),
+              getAllocator<ComplexT>(this->memory_model_)} {}
 
     /**
      * @brief Construct a statevector from data pointer
@@ -136,12 +127,11 @@ class StateVectorLQubitDynamic : public StateVectorLQubit<fp_t, StateVectorLQubi
      * @param threading Threading option the statevector to use
      * @param memory_model Memory model the statevector will use
      */
-    StateVectorLQubitDynamic(const ComplexT *other_data, size_t other_size,
+    StateVectorLQubitDynamic(const ComplexT* other_data, size_t other_size,
                              Threading threading = Threading::SingleThread,
-                             CPUMemoryModel memory_model = bestCPUMemoryModel())
-        : BaseType(log2PerfectPower(other_size), threading, memory_model),
-          data_{other_data, other_data + other_size, getAllocator<ComplexT>(this->memory_model_)}
-    {
+                             CPUMemoryModel memory_model = bestCPUMemoryModel()) :
+        BaseType(log2PerfectPower(other_size), threading, memory_model),
+        data_{other_data, other_data + other_size, getAllocator<ComplexT>(this->memory_model_)} {
         PL_ABORT_IF_NOT(isPerfectPowerOf2(other_size),
                         "The size of provided data must be a power of 2.");
     }
@@ -156,18 +146,16 @@ class StateVectorLQubitDynamic : public StateVectorLQubit<fp_t, StateVectorLQubi
      * @param memory_model Memory model the statevector will use
      */
     template <class Alloc>
-    explicit StateVectorLQubitDynamic(const std::vector<std::complex<PrecisionT>, Alloc> &other,
+    explicit StateVectorLQubitDynamic(const std::vector<std::complex<PrecisionT>, Alloc>& other,
                                       Threading threading = Threading::SingleThread,
-                                      CPUMemoryModel memory_model = bestCPUMemoryModel())
-        : StateVectorLQubitDynamic(other.data(), other.size(), threading, memory_model)
-    {
-    }
+                                      CPUMemoryModel memory_model = bestCPUMemoryModel()) :
+        StateVectorLQubitDynamic(other.data(), other.size(), threading, memory_model) {}
 
-    StateVectorLQubitDynamic(const StateVectorLQubitDynamic &rhs) = default;
-    StateVectorLQubitDynamic(StateVectorLQubitDynamic &&) noexcept = default;
+    StateVectorLQubitDynamic(const StateVectorLQubitDynamic& rhs) = default;
+    StateVectorLQubitDynamic(StateVectorLQubitDynamic&&) noexcept = default;
 
-    StateVectorLQubitDynamic &operator=(const StateVectorLQubitDynamic &) = default;
-    StateVectorLQubitDynamic &operator=(StateVectorLQubitDynamic &&) noexcept = default;
+    StateVectorLQubitDynamic& operator=(const StateVectorLQubitDynamic&) = default;
+    StateVectorLQubitDynamic& operator=(StateVectorLQubitDynamic&&) noexcept = default;
 
     ~StateVectorLQubitDynamic() = default;
 
@@ -181,18 +169,17 @@ class StateVectorLQubitDynamic : public StateVectorLQubit<fp_t, StateVectorLQubi
     /**
      * @brief Get underlying C-style data of the state-vector.
      */
-    [[nodiscard]] auto getData() -> ComplexT * { return data_.data(); }
+    [[nodiscard]] auto getData() -> ComplexT* { return data_.data(); }
 
     /**
      * @brief Get underlying C-style data of the state-vector.
      */
-    [[nodiscard]] auto getData() const -> const ComplexT * { return data_.data(); }
+    [[nodiscard]] auto getData() const -> const ComplexT* { return data_.data(); }
 
     /**
      * @brief Get underlying data vector.
      */
-    [[nodiscard]] auto getDataVector() -> std::vector<ComplexT, AlignedAllocator<ComplexT>> &
-    {
+    [[nodiscard]] auto getDataVector() -> std::vector<ComplexT, AlignedAllocator<ComplexT>>& {
         return data_;
     }
 
@@ -200,8 +187,7 @@ class StateVectorLQubitDynamic : public StateVectorLQubit<fp_t, StateVectorLQubi
      * @brief Get underlying data vector.
      */
     [[nodiscard]] auto getDataVector() const
-        -> const std::vector<ComplexT, AlignedAllocator<ComplexT>> &
-    {
+        -> const std::vector<ComplexT, AlignedAllocator<ComplexT>>& {
         return data_;
     }
 
@@ -211,8 +197,7 @@ class StateVectorLQubitDynamic : public StateVectorLQubit<fp_t, StateVectorLQubi
      * @param new_data data pointer to new data.
      * @param new_size size of underlying data storage.
      */
-    void updateData(const ComplexT *new_data, size_t new_size)
-    {
+    void updateData(const ComplexT* new_data, size_t new_size) {
         PL_ASSERT(data_.size() == new_size);
         std::copy(new_data, new_data + new_size, data_.data());
     }
@@ -223,8 +208,8 @@ class StateVectorLQubitDynamic : public StateVectorLQubit<fp_t, StateVectorLQubi
      * @tparam Alloc Allocator type of std::vector to use for updating data.
      * @param new_data std::vector contains data.
      */
-    template <class Alloc> void updateData(const std::vector<ComplexT, Alloc> &new_data)
-    {
+    template <class Alloc>
+    void updateData(const std::vector<ComplexT, Alloc>& new_data) {
         updateData(new_data.data(), new_data.size());
     }
 
@@ -242,8 +227,7 @@ class StateVectorLQubitDynamic : public StateVectorLQubit<fp_t, StateVectorLQubi
      * @param wire Index of the wire.
      * @return ComplexT
      */
-    auto getSubsystemPurity(size_t wire) -> ComplexT
-    {
+    auto getSubsystemPurity(size_t wire) -> ComplexT {
         PL_ABORT_IF_NOT(isValidWire(wire), "Invalid wire: The wire must be in the range of wires");
 
         const size_t sv_size = data_.size();
@@ -288,8 +272,7 @@ class StateVectorLQubitDynamic : public StateVectorLQubit<fp_t, StateVectorLQubi
      * @param eps The comparing precision threshold.
      * @return bool
      */
-    [[nodiscard]] auto checkSubsystemPurity(size_t wire, double eps = epsilon_) -> bool
-    {
+    [[nodiscard]] auto checkSubsystemPurity(size_t wire, double eps = epsilon_) -> bool {
         ComplexT purity = getSubsystemPurity(wire);
         return (std::abs(1.0 - purity.real()) < eps) && (purity.imag() < eps);
     }
@@ -300,8 +283,7 @@ class StateVectorLQubitDynamic : public StateVectorLQubit<fp_t, StateVectorLQubi
      * @return It updates the state-vector and the number of qubits,
      * and returns index of the activated wire.
      */
-    auto allocateWire() -> size_t
-    {
+    auto allocateWire() -> size_t {
         const size_t next_idx = this->getNumQubits();
         const size_t dsize = data_.size();
         data_.resize(dsize << 1UL);
@@ -322,8 +304,7 @@ class StateVectorLQubitDynamic : public StateVectorLQubit<fp_t, StateVectorLQubi
      *
      * @param wire Index of the wire to be released
      */
-    void releaseWire(size_t wire)
-    {
+    void releaseWire(size_t wire) {
         PL_ABORT_IF_NOT(checkSubsystemPurity(wire),
                         "Invalid wire: "
                         "The state-vector must remain pure after releasing a wire")
@@ -336,16 +317,12 @@ class StateVectorLQubitDynamic : public StateVectorLQubit<fp_t, StateVectorLQubi
         bool is_first_half = false;
         for (auto src = dst; src < data_.end(); std::advance(src, 2 * distance)) {
             is_first_half = std::any_of(src, src + static_cast<long long>(distance),
-                                        [](ComplexT &e) { return e != ZERO<PrecisionT>(); });
-            if (is_first_half) {
-                break;
-            }
+                                        [](ComplexT& e) { return e != ZERO<PrecisionT>(); });
+            if (is_first_half) { break; }
         }
 
         auto src = dst;
-        if (!is_first_half) {
-            std::advance(src, distance);
-        }
+        if (!is_first_half) { std::advance(src, distance); }
 
         for (; src < data_.end(); std::advance(src, 2 * distance), std::advance(dst, distance)) {
             _move_data_elements(src, distance, dst);
@@ -360,8 +337,7 @@ class StateVectorLQubitDynamic : public StateVectorLQubit<fp_t, StateVectorLQubi
     /**
      * @brief Update the state-vector to the initial state with 0-qubit.
      */
-    void clearData()
-    {
+    void clearData() {
         data_.clear();
         this->setNumQubits(0);
 

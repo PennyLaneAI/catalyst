@@ -14,16 +14,15 @@
 
 #define DEBUG_TYPE "scatter"
 
-#include <algorithm>
-#include <iostream>
-#include <vector>
-
+#include "mhlo/IR/hlo_ops.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Index/IR/IndexOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 
-#include "mhlo/IR/hlo_ops.h"
+#include <algorithm>
+#include <iostream>
+#include <vector>
 
 using namespace mlir;
 
@@ -33,8 +32,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
     using mlir::OpRewritePattern<mhlo::ScatterOp>::OpRewritePattern;
 
     mlir::LogicalResult matchAndRewrite(mhlo::ScatterOp op,
-                                        mlir::PatternRewriter &rewriter) const override
-    {
+                                        mlir::PatternRewriter& rewriter) const override {
         // Compute operation hash in case they are more than one scatter and they have different
         // update function
         auto opHash = OperationEquivalence::computeHash(op);
@@ -52,10 +50,9 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         }
 
         // Extract the block responsible for update
-        Region &region = op.getUpdateComputation();
+        Region& region = op.getUpdateComputation();
 
-        if (!region.hasOneBlock())
-            return failure();
+        if (!region.hasOneBlock()) return failure();
 
         ModuleOp moduleOp = op->getParentOfType<ModuleOp>();
 
@@ -159,8 +156,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
             Value updatedExtracted;
             if (isa<RankedTensorType>(updated.getType())) {
                 updatedExtracted = rewriter.create<tensor::ExtractOp>(loc, updated);
-            }
-            else {
+            } else {
                 updatedExtracted = updated;
             }
             // Insert the update in the results and replace the previous value
@@ -173,10 +169,9 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         return success();
     }
 
-    FlatSymbolRefAttr getOrInsertUpdateFunction(Location loc, ModuleOp moduleOp, OpBuilder &builder,
-                                                Region &updateRegion, std::string funcName) const
-    {
-        MLIRContext *ctx = builder.getContext();
+    FlatSymbolRefAttr getOrInsertUpdateFunction(Location loc, ModuleOp moduleOp, OpBuilder& builder,
+                                                Region& updateRegion, std::string funcName) const {
+        MLIRContext* ctx = builder.getContext();
 
         if (moduleOp.lookupSymbol<func::FuncOp>(funcName)) {
             return SymbolRefAttr::get(ctx, funcName);
@@ -185,8 +180,8 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         OpBuilder::InsertionGuard guard(builder);
         builder.setInsertionPointToStart(moduleOp.getBody());
 
-        Block *originalBlock = &updateRegion.front();
-        Operation *originalTerminator = originalBlock->getTerminator();
+        Block* originalBlock = &updateRegion.front();
+        Operation* originalTerminator = originalBlock->getTerminator();
         ValueRange originalArguments = originalBlock->getArguments();
 
         // Get the arguments and outputs types from the original block
@@ -199,7 +194,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         updateFn.setPrivate();
 
         // Create the block of the function
-        Block *funcBody = updateFn.addEntryBlock();
+        Block* funcBody = updateFn.addEntryBlock();
 
         auto funcBlockArgs = funcBody->getArguments();
         IRRewriter rewriter(builder);
@@ -215,14 +210,12 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         return SymbolRefAttr::get(ctx, funcName);
     }
 
-    void generateIndicesRecursive(const std::vector<int64_t> &shape,
-                                  std::vector<int64_t> &currentIndex, int64_t dimension,
-                                  std::vector<std::vector<int64_t>> &configurations) const
-    {
+    void generateIndicesRecursive(const std::vector<int64_t>& shape,
+                                  std::vector<int64_t>& currentIndex, int64_t dimension,
+                                  std::vector<std::vector<int64_t>>& configurations) const {
         if (dimension == shape.size()) {
             configurations.push_back(currentIndex);
-        }
-        else {
+        } else {
             for (int i = 0; i < shape[dimension]; i++) {
                 currentIndex.push_back(i);
                 generateIndicesRecursive(shape, currentIndex, dimension + 1, configurations);
@@ -238,8 +231,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
                                          ArrayRef<int64_t> insertedWindowsDims,
                                          Value scatterIndices, int64_t indexVectorDim,
                                          ArrayRef<int64_t> scatterDimsToOperandDims,
-                                         mlir::PatternRewriter &rewriter, Location loc) const
-    {
+                                         mlir::PatternRewriter& rewriter, Location loc) const {
         // Check index vector dim is the last dimension
         // Rank
         auto scatterIndicesTensorType = scatterIndices.getType().cast<RankedTensorType>();
@@ -289,15 +281,13 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
                     Value addValueCasted =
                         rewriter.create<arith::IndexCastOp>(loc, rewriter.getIndexType(), addValue);
                     results.push_back(addValueCasted);
-                }
-                else {
+                } else {
                     Value indexValue = rewriter.create<index::ConstantOp>(loc, indexUpdate);
                     results.push_back(indexValue);
                 }
             }
             return results;
-        }
-        else {
+        } else {
             SmallVector<Value> fullStartIndex;
             for (size_t i = 0; i < inputsShape.size(); ++i) {
                 // Full start indices (use scatter dims op)
@@ -308,8 +298,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
                     auto indexScatter =
                         rewriter.create<tensor::ExtractOp>(loc, scatterIndices, index);
                     fullStartIndex.push_back(indexScatter);
-                }
-                else {
+                } else {
                     TypedAttr indexAttr = rewriter.getI32IntegerAttr(0);
                     Value index = rewriter.create<arith::ConstantOp>(loc, indexAttr);
                     fullStartIndex.push_back(index);
@@ -344,8 +333,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
 namespace catalyst {
 namespace quantum {
 
-void populateScatterPatterns(RewritePatternSet &patterns)
-{
+void populateScatterPatterns(RewritePatternSet& patterns) {
     patterns.add<ScatterOpRewritePattern>(patterns.getContext(), 1);
 }
 

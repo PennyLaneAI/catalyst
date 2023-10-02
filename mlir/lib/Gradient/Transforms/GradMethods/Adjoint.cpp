@@ -14,30 +14,26 @@
 
 #include "Adjoint.hpp"
 
-#include <algorithm>
-#include <sstream>
-#include <vector>
-
-#include "mlir/Dialect/Func/IR/FuncOps.h"
-
 #include "Gradient/IR/GradientOps.h"
 #include "Gradient/Utils/DifferentialQNode.h"
 #include "Gradient/Utils/GradientShape.h"
 #include "Quantum/IR/QuantumOps.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+
+#include <algorithm>
+#include <sstream>
+#include <vector>
 
 namespace catalyst {
 namespace gradient {
 
-LogicalResult AdjointLowering::match(func::FuncOp op) const
-{
-    if (getQNodeDiffMethod(op) == "adjoint" && requiresCustomGradient(op))
-        return success();
+LogicalResult AdjointLowering::match(func::FuncOp op) const {
+    if (getQNodeDiffMethod(op) == "adjoint" && requiresCustomGradient(op)) return success();
 
     return failure();
 }
 
-void AdjointLowering::rewrite(func::FuncOp op, PatternRewriter &rewriter) const
-{
+void AdjointLowering::rewrite(func::FuncOp op, PatternRewriter& rewriter) const {
     Location loc = op.getLoc();
     rewriter.setInsertionPointAfter(op);
 
@@ -49,9 +45,8 @@ void AdjointLowering::rewrite(func::FuncOp op, PatternRewriter &rewriter) const
     registerCustomGradient(op, FlatSymbolRefAttr::get(qGradFn));
 }
 
-func::FuncOp AdjointLowering::discardAndReturnReg(PatternRewriter &rewriter, Location loc,
-                                                  func::FuncOp callee)
-{
+func::FuncOp AdjointLowering::discardAndReturnReg(PatternRewriter& rewriter, Location loc,
+                                                  func::FuncOp callee) {
     SmallVector<quantum::DeallocOp> deallocs;
     for (auto op : callee.getOps<quantum::DeallocOp>()) {
         deallocs.push_back(op);
@@ -100,9 +95,8 @@ func::FuncOp AdjointLowering::discardAndReturnReg(PatternRewriter &rewriter, Loc
     return unallocFn;
 }
 
-func::FuncOp AdjointLowering::genQGradFunction(PatternRewriter &rewriter, Location loc,
-                                               func::FuncOp callee)
-{
+func::FuncOp AdjointLowering::genQGradFunction(PatternRewriter& rewriter, Location loc,
+                                               func::FuncOp callee) {
 
     func::FuncOp unallocFn = discardAndReturnReg(rewriter, loc, callee);
 

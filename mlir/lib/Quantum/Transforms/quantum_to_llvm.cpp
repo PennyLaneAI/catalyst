@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "Quantum/IR/QuantumDialect.h"
+#include "Quantum/Transforms/Passes.h"
+#include "Quantum/Transforms/Patterns.h"
 #include "mlir/Conversion/ControlFlowToLLVM/ControlFlowToLLVM.h"
 #include "mlir/Conversion/FuncToLLVM/ConvertFuncToLLVM.h"
 #include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
@@ -20,10 +23,6 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
-
-#include "Quantum/IR/QuantumDialect.h"
-#include "Quantum/Transforms/Passes.h"
-#include "Quantum/Transforms/Patterns.h"
 
 using namespace mlir;
 using namespace catalyst::quantum;
@@ -36,8 +35,7 @@ namespace quantum {
 
 struct QIRTypeConverter : public LLVMTypeConverter {
 
-    QIRTypeConverter(MLIRContext *ctx) : LLVMTypeConverter(ctx)
-    {
+    QIRTypeConverter(MLIRContext* ctx) : LLVMTypeConverter(ctx) {
         addConversion([&](QubitType type) { return convertQubitType(type); });
         addConversion([&](QuregType type) { return convertQuregType(type); });
         addConversion([&](ObservableType type) { return convertObservableType(type); });
@@ -45,23 +43,19 @@ struct QIRTypeConverter : public LLVMTypeConverter {
     }
 
   private:
-    Type convertQubitType(Type mlirType)
-    {
+    Type convertQubitType(Type mlirType) {
         return LLVM::LLVMPointerType::get(LLVM::LLVMStructType::getOpaque("Qubit", &getContext()));
     }
 
-    Type convertQuregType(Type mlirType)
-    {
+    Type convertQuregType(Type mlirType) {
         return LLVM::LLVMPointerType::get(LLVM::LLVMStructType::getOpaque("Array", &getContext()));
     }
 
-    Type convertObservableType(Type mlirType)
-    {
+    Type convertObservableType(Type mlirType) {
         return this->convertType(IntegerType::get(&getContext(), 64));
     }
 
-    Type convertResultType(Type mlirType)
-    {
+    Type convertResultType(Type mlirType) {
         return LLVM::LLVMPointerType::get(LLVM::LLVMStructType::getOpaque("Result", &getContext()));
     }
 };
@@ -69,9 +63,8 @@ struct QIRTypeConverter : public LLVMTypeConverter {
 struct QuantumConversionPass : impl::QuantumConversionPassBase<QuantumConversionPass> {
     using QuantumConversionPassBase::QuantumConversionPassBase;
 
-    void runOnOperation() final
-    {
-        MLIRContext *context = &getContext();
+    void runOnOperation() final {
+        MLIRContext* context = &getContext();
         QIRTypeConverter typeConverter(context);
 
         RewritePatternSet patterns(context);
@@ -90,8 +83,7 @@ struct QuantumConversionPass : impl::QuantumConversionPassBase<QuantumConversion
 
 } // namespace quantum
 
-std::unique_ptr<Pass> createQuantumConversionPass()
-{
+std::unique_ptr<Pass> createQuantumConversionPass() {
     return std::make_unique<quantum::QuantumConversionPass>();
 }
 

@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "Quantum/Utils/QuantumSplitting.h"
+
+#include "Catalyst/IR/CatalystOps.h"
+#include "Quantum/IR/QuantumOps.h"
 #include "mlir/Dialect/Index/IR/IndexOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/Transforms/DialectConversion.h"
-
-#include "Catalyst/IR/CatalystOps.h"
-#include "Quantum/IR/QuantumOps.h"
-#include "Quantum/Utils/QuantumSplitting.h"
 
 using namespace mlir;
 using namespace catalyst;
@@ -28,13 +28,10 @@ using namespace catalyst;
 namespace {
 bool isQuantumType(Type type) { return isa<quantum::QuantumDialect>(type.getDialect()); }
 
-void populateArgIdxMapping(TypeRange types, DenseMap<unsigned, unsigned> &argIdxMapping)
-{
+void populateArgIdxMapping(TypeRange types, DenseMap<unsigned, unsigned>& argIdxMapping) {
     unsigned newIdx = 0;
-    for (const auto &[oldIdx, type] : llvm::enumerate(types)) {
-        if (!isQuantumType(type)) {
-            argIdxMapping.insert({oldIdx, newIdx++});
-        }
+    for (const auto& [oldIdx, type] : llvm::enumerate(types)) {
+        if (!isQuantumType(type)) { argIdxMapping.insert({oldIdx, newIdx++}); }
     }
 }
 
@@ -43,9 +40,8 @@ void populateArgIdxMapping(TypeRange types, DenseMap<unsigned, unsigned> &argIdx
 namespace catalyst {
 namespace quantum {
 
-QuantumCache QuantumCache::initialize(Region &region, OpBuilder &builder, Location loc)
-{
-    MLIRContext *ctx = builder.getContext();
+QuantumCache QuantumCache::initialize(Region& region, OpBuilder& builder, Location loc) {
+    MLIRContext* ctx = builder.getContext();
     auto paramVectorType = ArrayListType::get(ctx, builder.getF64Type());
     auto wireVectorType = ArrayListType::get(ctx, builder.getI64Type());
     auto controlFlowTapeType = ArrayListType::get(ctx, builder.getIndexType());
@@ -53,8 +49,8 @@ QuantumCache QuantumCache::initialize(Region &region, OpBuilder &builder, Locati
     auto wireVector = builder.create<ListInitOp>(loc, wireVectorType);
 
     // Initialize the tapes that store the structure of control flow.
-    DenseMap<Operation *, TypedValue<ArrayListType>> controlFlowTapes;
-    region.walk([&](Operation *op) {
+    DenseMap<Operation*, TypedValue<ArrayListType>> controlFlowTapes;
+    region.walk([&](Operation* op) {
         if (isa<scf::ForOp, scf::IfOp, scf::WhileOp>(op)) {
             auto tape = builder.create<catalyst::ListInitOp>(loc, controlFlowTapeType);
             controlFlowTapes.insert({op, tape});
@@ -64,32 +60,28 @@ QuantumCache QuantumCache::initialize(Region &region, OpBuilder &builder, Locati
         .paramVector = paramVector, .wireVector = wireVector, .controlFlowTapes = controlFlowTapes};
 }
 
-void QuantumCache::emitDealloc(OpBuilder &builder, Location loc)
-{
+void QuantumCache::emitDealloc(OpBuilder& builder, Location loc) {
     builder.create<ListDeallocOp>(loc, paramVector);
     builder.create<ListDeallocOp>(loc, wireVector);
-    for (const auto &[_key, controlFlowTape] : controlFlowTapes) {
+    for (const auto& [_key, controlFlowTape] : controlFlowTapes) {
         builder.create<ListDeallocOp>(loc, controlFlowTape);
     }
 }
 
-void AugmentedCircuitGenerator::generate(Region &region, OpBuilder &builder)
-{
+void AugmentedCircuitGenerator::generate(Region& region, OpBuilder& builder) {
     assert(region.hasOneBlock() &&
            "Expected only structured control flow (each region should have a single block)");
-    auto isClassicalSCFOp = [](Operation &op) {
+    auto isClassicalSCFOp = [](Operation& op) {
         return isa<scf::SCFDialect>(op.getDialect()) &&
                llvm::none_of(op.getResultTypes(), isQuantumType);
     };
 
-    for (Operation &op : region.front().without_terminator()) {
+    for (Operation& op : region.front().without_terminator()) {
         if (auto insertOp = dyn_cast<quantum::InsertOp>(op)) {
             cacheDynamicWire(insertOp, builder);
-        }
-        else if (auto extractOp = dyn_cast<quantum::ExtractOp>(op)) {
+        } else if (auto extractOp = dyn_cast<quantum::ExtractOp>(op)) {
             cacheDynamicWire(extractOp, builder);
-        }
-        else if (auto gate = dyn_cast<quantum::DifferentiableGate>(op)) {
+        } else if (auto gate = dyn_cast<quantum::DifferentiableGate>(op)) {
             ValueRange diffParams = gate.getDiffParams();
             if (!diffParams.empty()) {
                 for (Value param : diffParams) {
@@ -97,38 +89,31 @@ void AugmentedCircuitGenerator::generate(Region &region, OpBuilder &builder)
                                                cache.paramVector);
                 }
             }
-        }
-        else if (isa<QuantumDialect>(op.getDialect())) {
+        } else if (isa<QuantumDialect>(op.getDialect())) {
             // Any quantum op other than a differentiable gate/insert/extract is ignored.
-        }
-        else if (isClassicalSCFOp(op)) {
+        } else if (isClassicalSCFOp(op)) {
             // Purely classical SCF ops should be treated as any other purely classical op, but
             // quantum SCF ops need to be recursively visited.
             builder.clone(op, oldToCloned);
-        }
-        else if (auto forOp = dyn_cast<scf::ForOp>(op)) {
+        } else if (auto forOp = dyn_cast<scf::ForOp>(op)) {
             visitOperation(forOp, builder);
-        }
-        else if (auto ifOp = dyn_cast<scf::IfOp>(op)) {
+        } else if (auto ifOp = dyn_cast<scf::IfOp>(op)) {
             visitOperation(ifOp, builder);
-        }
-        else if (auto whileOp = dyn_cast<scf::WhileOp>(&op)) {
+        } else if (auto whileOp = dyn_cast<scf::WhileOp>(&op)) {
             visitOperation(whileOp, builder);
-        }
-        else {
+        } else {
             // Purely classical ops are deeply cloned as-is.
             builder.clone(op, oldToCloned);
         }
     }
 }
 
-void AugmentedCircuitGenerator::visitOperation(scf::ForOp forOp, OpBuilder &builder)
-{
+void AugmentedCircuitGenerator::visitOperation(scf::ForOp forOp, OpBuilder& builder) {
     DenseMap<unsigned, unsigned> argIdxMapping;
     SmallVector<Value> classicalInits;
     populateArgIdxMapping(forOp.getResultTypes(), argIdxMapping);
     unsigned newIdx = 0;
-    for (const auto &[oldIdx, initArg] : llvm::enumerate(forOp.getInitArgs())) {
+    for (const auto& [oldIdx, initArg] : llvm::enumerate(forOp.getInitArgs())) {
         if (!isQuantumType(initArg.getType())) {
             argIdxMapping.insert({oldIdx, newIdx++});
             classicalInits.push_back(oldToCloned.lookupOrDefault(initArg));
@@ -145,9 +130,9 @@ void AugmentedCircuitGenerator::visitOperation(scf::ForOp forOp, OpBuilder &buil
         forOp.getLoc(), oldToCloned.lookupOrDefault(forOp.getLowerBound()),
         oldToCloned.lookupOrDefault(forOp.getUpperBound()),
         oldToCloned.lookupOrDefault(forOp.getStep()), classicalInits,
-        [&](OpBuilder &builder, Location loc, Value inductionVar, ValueRange iterArgs) {
+        [&](OpBuilder& builder, Location loc, Value inductionVar, ValueRange iterArgs) {
             oldToCloned.map(forOp.getInductionVar(), inductionVar);
-            for (const auto &[oldIdx, newIdx] : argIdxMapping) {
+            for (const auto& [oldIdx, newIdx] : argIdxMapping) {
                 oldToCloned.map(forOp.getRegionIterArg(oldIdx), iterArgs[newIdx]);
             }
 
@@ -158,14 +143,13 @@ void AugmentedCircuitGenerator::visitOperation(scf::ForOp forOp, OpBuilder &buil
     mapResults(forOp, newForOp, argIdxMapping);
 }
 
-void AugmentedCircuitGenerator::visitOperation(scf::WhileOp whileOp, OpBuilder &builder)
-{
+void AugmentedCircuitGenerator::visitOperation(scf::WhileOp whileOp, OpBuilder& builder) {
     SmallVector<Type> classicalResultTypes;
     SmallVector<Value> classicalInits;
     DenseMap<unsigned, unsigned> argIdxMapping;
     populateArgIdxMapping(whileOp.getResultTypes(), argIdxMapping);
     unsigned newIdx = 0;
-    for (const auto &[oldIdx, init] : llvm::enumerate(whileOp.getInits())) {
+    for (const auto& [oldIdx, init] : llvm::enumerate(whileOp.getInits())) {
         if (!isQuantumType(init.getType())) {
             classicalInits.push_back(oldToCloned.lookupOrDefault(init));
             classicalResultTypes.push_back(init.getType());
@@ -181,9 +165,9 @@ void AugmentedCircuitGenerator::visitOperation(scf::WhileOp whileOp, OpBuilder &
     Value counter = builder.create<memref::AllocaOp>(loc, counterType);
     builder.create<memref::StoreOp>(loc, idx0, counter);
 
-    auto getRegionBuilder = [&](Region &oldRegion, bool incrementCounter) {
-        return [&, incrementCounter](OpBuilder &builder, Location loc, ValueRange newRegionArgs) {
-            for (const auto &[oldIdx, newIdx] : argIdxMapping) {
+    auto getRegionBuilder = [&](Region& oldRegion, bool incrementCounter) {
+        return [&, incrementCounter](OpBuilder& builder, Location loc, ValueRange newRegionArgs) {
+            for (const auto& [oldIdx, newIdx] : argIdxMapping) {
                 oldToCloned.map(oldRegion.getArgument(oldIdx), newRegionArgs[newIdx]);
             }
 
@@ -214,10 +198,9 @@ void AugmentedCircuitGenerator::visitOperation(scf::WhileOp whileOp, OpBuilder &
     builder.create<ListPushOp>(whileOp.getLoc(), numIters, tape);
 }
 
-void AugmentedCircuitGenerator::visitOperation(scf::IfOp ifOp, OpBuilder &builder)
-{
-    auto getRegionBuilder = [&](Region &oldRegion) {
-        return [&](OpBuilder &builder, Location loc) {
+void AugmentedCircuitGenerator::visitOperation(scf::IfOp ifOp, OpBuilder& builder) {
+    auto getRegionBuilder = [&](Region& oldRegion) {
+        return [&](OpBuilder& builder, Location loc) {
             generate(oldRegion, builder);
             cloneTerminatorClassicalOperands(oldRegion.front().getTerminator(), builder);
         };
@@ -239,23 +222,21 @@ void AugmentedCircuitGenerator::visitOperation(scf::IfOp ifOp, OpBuilder &builde
     mapResults(ifOp, newIfOp, argIdxMapping);
 }
 
-void AugmentedCircuitGenerator::cloneTerminatorClassicalOperands(Operation *terminator,
-                                                                 OpBuilder &builder)
-{
+void AugmentedCircuitGenerator::cloneTerminatorClassicalOperands(Operation* terminator,
+                                                                 OpBuilder& builder) {
     SmallVector<Value> newYieldOperands;
     for (Value operand : terminator->getOperands()) {
         if (!isQuantumType(operand.getType())) {
             newYieldOperands.push_back(oldToCloned.lookupOrDefault(operand));
         }
     }
-    Operation *newTerminator = builder.clone(*terminator, oldToCloned);
+    Operation* newTerminator = builder.clone(*terminator, oldToCloned);
     newTerminator->setOperands(newYieldOperands);
 }
 
-void AugmentedCircuitGenerator::mapResults(Operation *oldOp, Operation *clonedOp,
-                                           const DenseMap<unsigned, unsigned> &argIdxMapping)
-{
-    for (const auto &[oldIdx, oldResult] : llvm::enumerate(oldOp->getResults())) {
+void AugmentedCircuitGenerator::mapResults(Operation* oldOp, Operation* clonedOp,
+                                           const DenseMap<unsigned, unsigned>& argIdxMapping) {
+    for (const auto& [oldIdx, oldResult] : llvm::enumerate(oldOp->getResults())) {
         if (argIdxMapping.contains(oldIdx)) {
             unsigned newIdx = argIdxMapping.at(oldIdx);
             oldToCloned.map(oldOp->getResult(oldIdx), clonedOp->getResult(newIdx));

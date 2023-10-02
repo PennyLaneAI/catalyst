@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "Exception.hpp"
+#include "QuantumDevice.hpp"
+
 #include <functional>
 #include <memory>
 #include <string>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
-
-#include "Exception.hpp"
-#include "QuantumDevice.hpp"
 
 #if __has_include("LightningSimulator.hpp")
 // device: lightning.qubit
@@ -35,6 +35,7 @@
 #if __has_include("OpenQasmDevice.hpp")
 // device: openqasm
 #include "OpenQasmDevice.hpp"
+
 #include <pybind11/embed.h>
 #endif
 
@@ -42,30 +43,29 @@ namespace Catalyst::Runtime {
 
 class MemoryManager final {
   private:
-    std::unordered_set<void *> _impl;
+    std::unordered_set<void*> _impl;
 
   public:
     explicit MemoryManager() { _impl.reserve(1024); };
 
-    ~MemoryManager()
-    {
+    ~MemoryManager() {
         for (auto allocation : _impl) {
             free(allocation);
         }
     }
 
-    void insert(void *ptr) { _impl.insert(ptr); }
-    void erase(void *ptr) { _impl.erase(ptr); }
-    bool contains(void *ptr) { return _impl.contains(ptr); }
+    void insert(void* ptr) { _impl.insert(ptr); }
+    void erase(void* ptr) { _impl.erase(ptr); }
+    bool contains(void* ptr) { return _impl.contains(ptr); }
 };
 
 class ExecutionContext final {
   private:
     using DeviceInitializer =
-        std::function<std::unique_ptr<QuantumDevice>(bool, const std::string &)>;
+        std::function<std::unique_ptr<QuantumDevice>(bool, const std::string&)>;
     std::unordered_map<std::string_view, DeviceInitializer> _device_map{
         {"lightning.qubit",
-         [](bool tape_recording, const std::string &device_kwargs) {
+         [](bool tape_recording, const std::string& device_kwargs) {
              return std::make_unique<Simulator::LightningSimulator>(tape_recording, device_kwargs);
          }},
     };
@@ -86,26 +86,24 @@ class ExecutionContext final {
 #endif
 
   public:
-    explicit ExecutionContext(std::string_view default_device = "lightning.qubit")
-        : _device_name(default_device), _tape_recording(false)
-    {
+    explicit ExecutionContext(std::string_view default_device = "lightning.qubit") :
+        _device_name(default_device), _tape_recording(false) {
 #ifdef __device_lightning_kokkos
         _device_map.emplace("lightning.kokkos",
-                            [](bool tape_recording, const std::string &device_kwargs) {
+                            [](bool tape_recording, const std::string& device_kwargs) {
                                 return std::make_unique<Simulator::LightningKokkosSimulator>(
                                     tape_recording, device_kwargs);
                             });
 #endif
 #ifdef __device_openqasm
-        _device_map.emplace("openqasm", [](bool tape_recording, const std::string &device_kwargs) {
+        _device_map.emplace("openqasm", [](bool tape_recording, const std::string& device_kwargs) {
             return std::make_unique<Device::OpenQasmDevice>(tape_recording, device_kwargs);
         });
 #endif
         _driver_mm_ptr = std::make_unique<MemoryManager>();
     };
 
-    ~ExecutionContext()
-    {
+    ~ExecutionContext() {
         _driver_ptr.reset(nullptr);
         _driver_mm_ptr.reset(nullptr);
 
@@ -127,11 +125,8 @@ class ExecutionContext final {
 
     [[nodiscard]] auto getDeviceRecorderStatus() const -> bool { return _tape_recording; }
 
-    [[nodiscard]] bool initDevice(std::string_view name) noexcept
-    {
-        if (name != "default") {
-            _device_name = name;
-        }
+    [[nodiscard]] bool initDevice(std::string_view name) noexcept {
+        if (name != "default") { _device_name = name; }
 
         if (_device_name == "braket.aws.qubit" || _device_name == "braket.local.qubit") {
             _device_kwargs = "device_type : " + _device_name + "," + _device_kwargs;
@@ -156,13 +151,11 @@ class ExecutionContext final {
         return false;
     }
 
-    [[nodiscard]] auto getDevice() const -> const std::unique_ptr<QuantumDevice> &
-    {
+    [[nodiscard]] auto getDevice() const -> const std::unique_ptr<QuantumDevice>& {
         return _driver_ptr;
     }
 
-    [[nodiscard]] auto getMemoryManager() const -> const std::unique_ptr<MemoryManager> &
-    {
+    [[nodiscard]] auto getMemoryManager() const -> const std::unique_ptr<MemoryManager>& {
         return _driver_mm_ptr;
     }
 };

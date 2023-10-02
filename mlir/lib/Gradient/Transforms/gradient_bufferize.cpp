@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "Gradient/IR/GradientOps.h"
+#include "Gradient/Transforms/Passes.h"
+#include "Gradient/Transforms/Patterns.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Bufferization/Transforms/Bufferize.h"
 #include "mlir/Dialect/Index/IR/IndexDialect.h"
@@ -19,10 +22,6 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
-
-#include "Gradient/IR/GradientOps.h"
-#include "Gradient/Transforms/Passes.h"
-#include "Gradient/Transforms/Patterns.h"
 
 using namespace mlir;
 using namespace catalyst::gradient;
@@ -36,9 +35,8 @@ namespace gradient {
 struct GradientBufferizationPass : impl::GradientBufferizationPassBase<GradientBufferizationPass> {
     using GradientBufferizationPassBase::GradientBufferizationPassBase;
 
-    void runOnOperation() final
-    {
-        MLIRContext *context = &getContext();
+    void runOnOperation() final {
+        MLIRContext* context = &getContext();
         bufferization::BufferizeTypeConverter typeConverter;
 
         RewritePatternSet patterns(context);
@@ -47,7 +45,7 @@ struct GradientBufferizationPass : impl::GradientBufferizationPassBase<GradientB
         ConversionTarget target(*context);
         bufferization::populateBufferizeMaterializationLegality(target);
         // Default to operations being legal with the exception of the ones below.
-        target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
+        target.markUnknownOpDynamicallyLegal([](Operation*) { return true; });
         // Gradient ops which return arrays need to be marked illegal when the type is a tensor.
         target.addDynamicallyLegalOp<AdjointOp>(
             [&](AdjointOp op) { return typeConverter.isLegal(op); });
@@ -63,8 +61,7 @@ struct GradientBufferizationPass : impl::GradientBufferizationPassBase<GradientB
 
 } // namespace gradient
 
-std::unique_ptr<Pass> createGradientBufferizationPass()
-{
+std::unique_ptr<Pass> createGradientBufferizationPass() {
     return std::make_unique<gradient::GradientBufferizationPass>();
 }
 
