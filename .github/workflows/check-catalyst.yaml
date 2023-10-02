@@ -17,7 +17,7 @@ jobs:
 
   runtime-on-macos:
     name: Catalyst-Runtime Build (macos)
-    runs-on: macos-13-large
+    runs-on: macos-latest-xlarge
 
     steps:
       - name: Checkout Catalyst repo
@@ -44,583 +44,583 @@ jobs:
             runtime-build/lib/*.so
           retention-days: 1
 
-  runtime:
-    name: Catalyst-Runtime Build
-    runs-on: ubuntu-latest
+  # runtime:
+  #   name: Catalyst-Runtime Build
+  #   runs-on: ubuntu-latest
 
-    steps:
-      - name: Checkout Catalyst repo
-        uses: actions/checkout@v3
+  #   steps:
+  #     - name: Checkout Catalyst repo
+  #       uses: actions/checkout@v3
 
-      - name: Install dependencies
-        run: |
-          sudo apt-get -y -q install ninja-build make cmake clang libomp-dev
+  #     - name: Install dependencies
+  #       run: |
+  #         sudo apt-get -y -q install ninja-build make cmake clang libomp-dev
 
-      - name: Build Catalyst-Runtime
-        run: |
-          COMPILER_LAUNCHER="" \
-          RT_BUILD_DIR="$(pwd)/runtime-build" \
-          ENABLE_LIGHTNING_KOKKOS=ON \
-          CMAKE_ARGS="-DENABLE_SANITIZER=ON" \
-          ENABLE_OPENQASM=ON \
-          make runtime
+  #     - name: Build Catalyst-Runtime
+  #       run: |
+  #         COMPILER_LAUNCHER="" \
+  #         RT_BUILD_DIR="$(pwd)/runtime-build" \
+  #         ENABLE_LIGHTNING_KOKKOS=ON \
+  #         CMAKE_ARGS="-DENABLE_SANITIZER=ON" \
+  #         ENABLE_OPENQASM=ON \
+  #         make runtime
 
-      - name: Upload Catalyst-Runtime Artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: runtime-build
-          path: |
-            runtime-build/lib/*.so
-          retention-days: 1
+  #     - name: Upload Catalyst-Runtime Artifact
+  #       uses: actions/upload-artifact@v3
+  #       with:
+  #         name: runtime-build
+  #         path: |
+  #           runtime-build/lib/*.so
+  #         retention-days: 1
 
-  llvm:
-    name: LLVM Build
-    needs: [constants]
-    runs-on: ubuntu-latest
+  # llvm:
+  #   name: LLVM Build
+  #   needs: [constants]
+  #   runs-on: ubuntu-latest
 
-    steps:
-    - name: Checkout Catalyst repo
-      uses: actions/checkout@v3
+  #   steps:
+  #   - name: Checkout Catalyst repo
+  #     uses: actions/checkout@v3
 
-    # Both the LLVM source and build folder are required for further dialect builds.
-    # Caching is significantly faster than git cloning since LLVM is such a large repository.
+  #   # Both the LLVM source and build folder are required for further dialect builds.
+  #   # Caching is significantly faster than git cloning since LLVM is such a large repository.
 
-    - name: Cache LLVM Build
-      id: cache-llvm-build
-      uses: actions/cache@v3
-      with:
-        path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
+  #   - name: Cache LLVM Build
+  #     id: cache-llvm-build
+  #     uses: actions/cache@v3
+  #     with:
+  #       path: llvm-build
+  #       key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
 
-    - name: Cache LLVM Source
-      id: cache-llvm-source
-      uses: actions/cache@v3
-      with:
-        path: mlir/llvm-project
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-source
-        enableCrossOsArchive: True
+  #   - name: Cache LLVM Source
+  #     id: cache-llvm-source
+  #     uses: actions/cache@v3
+  #     with:
+  #       path: mlir/llvm-project
+  #       key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-source
+  #       enableCrossOsArchive: True
 
-    - name: Clone LLVM Submodule
-      if: steps.cache-llvm-source.outputs.cache-hit != 'true'
-      uses: actions/checkout@v3
-      with:
-        repository: llvm/llvm-project
-        ref: ${{ needs.constants.outputs.llvm_version }}
-        path: mlir/llvm-project
+  #   - name: Clone LLVM Submodule
+  #     if: steps.cache-llvm-source.outputs.cache-hit != 'true'
+  #     uses: actions/checkout@v3
+  #     with:
+  #       repository: llvm/llvm-project
+  #       ref: ${{ needs.constants.outputs.llvm_version }}
+  #       path: mlir/llvm-project
 
-    - name: Install Deps
-      if: steps.cache-llvm-build.outputs.cache-hit != 'true'
-      run: |
-        sudo apt-get install -y python3 python3-pip cmake ninja-build clang lld
-        python3 -m pip install numpy pybind11
+  #   - name: Install Deps
+  #     if: steps.cache-llvm-build.outputs.cache-hit != 'true'
+  #     run: |
+  #       sudo apt-get install -y python3 python3-pip cmake ninja-build clang lld
+  #       python3 -m pip install numpy pybind11
 
-    - name: Build LLVM
-      if: steps.cache-llvm-build.outputs.cache-hit != 'true'
-      # Note: Disable instrumentation for the mlir runtime support library,
-      #       as user programs aren't instrumented.
-      run: |
-        # echo 'target_compile_options(mlir_c_runner_utils PRIVATE "-fno-sanitize=all")' \
-        #       >> mlir/llvm-project/mlir/lib/ExecutionEngine/CMakeLists.txt
-        LLVM_BUILD_DIR="$(pwd)/llvm-build" \
-        COMPILER_LAUNCHER="" \
-        make llvm
+  #   - name: Build LLVM
+  #     if: steps.cache-llvm-build.outputs.cache-hit != 'true'
+  #     # Note: Disable instrumentation for the mlir runtime support library,
+  #     #       as user programs aren't instrumented.
+  #     run: |
+  #       # echo 'target_compile_options(mlir_c_runner_utils PRIVATE "-fno-sanitize=all")' \
+  #       #       >> mlir/llvm-project/mlir/lib/ExecutionEngine/CMakeLists.txt
+  #       LLVM_BUILD_DIR="$(pwd)/llvm-build" \
+  #       COMPILER_LAUNCHER="" \
+  #       make llvm
 
-  mhlo:
-    name: MHLO Dialect Build
-    needs: [constants, llvm]
-    runs-on: ubuntu-latest
+  # mhlo:
+  #   name: MHLO Dialect Build
+  #   needs: [constants, llvm]
+  #   runs-on: ubuntu-latest
 
-    steps:
-    - name: Checkout Catalyst repo
-      uses: actions/checkout@v3
+  #   steps:
+  #   - name: Checkout Catalyst repo
+  #     uses: actions/checkout@v3
     
-    - name: Cache MHLO Source
-      id: cache-mhlo-source
-      uses: actions/cache@v3
-      with:
-        path: mlir/mlir-hlo
-        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-source
-        enableCrossOsArchive: True
+  #   - name: Cache MHLO Source
+  #     id: cache-mhlo-source
+  #     uses: actions/cache@v3
+  #     with:
+  #       path: mlir/mlir-hlo
+  #       key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-source
+  #       enableCrossOsArchive: True
 
-    - name: Cache MHLO Build
-      id: cache-mhlo
-      uses: actions/cache@v3
-      with:
-        path: mhlo-build
-        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-build
+  #   - name: Cache MHLO Build
+  #     id: cache-mhlo
+  #     uses: actions/cache@v3
+  #     with:
+  #       path: mhlo-build
+  #       key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-build
 
-    - name: Get Cached LLVM Source
-      id: cache-llvm-source
-      if: steps.cache-mhlo.outputs.cache-hit != 'true'
-      uses: actions/cache@v3
-      with:
-        path: mlir/llvm-project
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-source
-        enableCrossOsArchive: True
-        fail-on-cache-miss: True
+  #   - name: Get Cached LLVM Source
+  #     id: cache-llvm-source
+  #     if: steps.cache-mhlo.outputs.cache-hit != 'true'
+  #     uses: actions/cache@v3
+  #     with:
+  #       path: mlir/llvm-project
+  #       key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-source
+  #       enableCrossOsArchive: True
+  #       fail-on-cache-miss: True
 
-    - name: Get Cached LLVM Build
-      id: cache-llvm-build
-      if: steps.cache-mhlo.outputs.cache-hit != 'true'
-      uses: actions/cache@v3
-      with:
-        path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
-        fail-on-cache-miss: True
+  #   - name: Get Cached LLVM Build
+  #     id: cache-llvm-build
+  #     if: steps.cache-mhlo.outputs.cache-hit != 'true'
+  #     uses: actions/cache@v3
+  #     with:
+  #       path: llvm-build
+  #       key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
+  #       fail-on-cache-miss: True
 
-    - name: Clone MHLO Submodule
-      if: |
-        steps.cache-mhlo.outputs.cache-hit != 'true' ||
-        steps.cache-mhlo-source.outputs.cache-hit != 'true'
-      uses: actions/checkout@v3
-      with:
-        repository: tensorflow/mlir-hlo
-        ref: ${{ needs.constants.outputs.mhlo_version }}
-        path: mlir/mlir-hlo
+  #   - name: Clone MHLO Submodule
+  #     if: |
+  #       steps.cache-mhlo.outputs.cache-hit != 'true' ||
+  #       steps.cache-mhlo-source.outputs.cache-hit != 'true'
+  #     uses: actions/checkout@v3
+  #     with:
+  #       repository: tensorflow/mlir-hlo
+  #       ref: ${{ needs.constants.outputs.mhlo_version }}
+  #       path: mlir/mlir-hlo
 
-    - name: Install Deps
-      if: steps.cache-mhlo.outputs.cache-hit != 'true'
-      run: |
-        sudo apt-get install -y cmake ninja-build clang lld
+  #   - name: Install Deps
+  #     if: steps.cache-mhlo.outputs.cache-hit != 'true'
+  #     run: |
+  #       sudo apt-get install -y cmake ninja-build clang lld
 
-    - name: Build MHLO Dialect
-      if: steps.cache-mhlo.outputs.cache-hit != 'true'
-      run: |
-        LLVM_BUILD_DIR="$(pwd)/llvm-build" \
-        MHLO_BUILD_DIR="$(pwd)/mhlo-build" \
-        COMPILER_LAUNCHER="" \
-        make mhlo
+  #   - name: Build MHLO Dialect
+  #     if: steps.cache-mhlo.outputs.cache-hit != 'true'
+  #     run: |
+  #       LLVM_BUILD_DIR="$(pwd)/llvm-build" \
+  #       MHLO_BUILD_DIR="$(pwd)/mhlo-build" \
+  #       COMPILER_LAUNCHER="" \
+  #       make mhlo
 
-  enzyme:
-    name: Enzyme Build
-    needs: [constants, llvm]
-    runs-on: ubuntu-latest
+  # enzyme:
+  #   name: Enzyme Build
+  #   needs: [constants, llvm]
+  #   runs-on: ubuntu-latest
 
-    steps:
-    - name: Checkout Catalyst repo
-      uses: actions/checkout@v3
+  #   steps:
+  #   - name: Checkout Catalyst repo
+  #     uses: actions/checkout@v3
 
-    - name: Cache Enzyme Build
-      id: cache-enzyme
-      uses: actions/cache@v3
-      with:
-        path: enzyme-build
-        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-build
+  #   - name: Cache Enzyme Build
+  #     id: cache-enzyme
+  #     uses: actions/cache@v3
+  #     with:
+  #       path: enzyme-build
+  #       key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-build
 
-    - name: Get Cached LLVM Source
-      id: cache-llvm-source
-      if: steps.cache-enzyme.outputs.cache-hit != 'true'
-      uses: actions/cache@v3
-      with:
-        path: mlir/llvm-project
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-source
-        enableCrossOsArchive: True
-        fail-on-cache-miss: True
+  #   - name: Get Cached LLVM Source
+  #     id: cache-llvm-source
+  #     if: steps.cache-enzyme.outputs.cache-hit != 'true'
+  #     uses: actions/cache@v3
+  #     with:
+  #       path: mlir/llvm-project
+  #       key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-source
+  #       enableCrossOsArchive: True
+  #       fail-on-cache-miss: True
 
-    - name: Get Cached LLVM Build
-      id: cache-llvm-build
-      if: steps.cache-enzyme.outputs.cache-hit != 'true'
-      uses: actions/cache@v3
-      with:
-        path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
-        fail-on-cache-miss: True
+  #   - name: Get Cached LLVM Build
+  #     id: cache-llvm-build
+  #     if: steps.cache-enzyme.outputs.cache-hit != 'true'
+  #     uses: actions/cache@v3
+  #     with:
+  #       path: llvm-build
+  #       key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
+  #       fail-on-cache-miss: True
 
-    - name: Clone Enzyme Submodule
-      if: |
-        steps.cache-enzyme.outputs.cache-hit != 'true'
-      uses: actions/checkout@v3
-      with:
-        repository: EnzymeAD/Enzyme
-        ref: ${{ needs.constants.outputs.enzyme_version }}
-        path: mlir/Enzyme
+  #   - name: Clone Enzyme Submodule
+  #     if: |
+  #       steps.cache-enzyme.outputs.cache-hit != 'true'
+  #     uses: actions/checkout@v3
+  #     with:
+  #       repository: EnzymeAD/Enzyme
+  #       ref: ${{ needs.constants.outputs.enzyme_version }}
+  #       path: mlir/Enzyme
 
-    - name: Install Deps
-      if: steps.cache-enzyme.outputs.cache-hit != 'true'
-      run: |
-        sudo apt-get install -y cmake ninja-build clang lld
+  #   - name: Install Deps
+  #     if: steps.cache-enzyme.outputs.cache-hit != 'true'
+  #     run: |
+  #       sudo apt-get install -y cmake ninja-build clang lld
 
-    - name: Build Enzyme
-      if: steps.cache-enzyme.outputs.cache-hit != 'true'
-      run: |
-        LLVM_BUILD_DIR="$(pwd)/llvm-build" \
-        ENZYME_BUILD_DIR="$(pwd)/enzyme-build" \
-        COMPILER_LAUNCHER="" \
-        make enzyme
+  #   - name: Build Enzyme
+  #     if: steps.cache-enzyme.outputs.cache-hit != 'true'
+  #     run: |
+  #       LLVM_BUILD_DIR="$(pwd)/llvm-build" \
+  #       ENZYME_BUILD_DIR="$(pwd)/enzyme-build" \
+  #       COMPILER_LAUNCHER="" \
+  #       make enzyme
 
-  quantum:
-    name: Quantum Dialects Build
-    needs: [constants, mhlo, llvm]
-    runs-on: ubuntu-latest
+  # quantum:
+  #   name: Quantum Dialects Build
+  #   needs: [constants, mhlo, llvm]
+  #   runs-on: ubuntu-latest
 
-    steps:
-    - name: Checkout Catalyst repo
-      uses: actions/checkout@v3
+  #   steps:
+  #   - name: Checkout Catalyst repo
+  #     uses: actions/checkout@v3
 
-    - name: Install Deps
-      run: |
-        sudo apt-get install -y python3 python3-pip cmake ninja-build ccache clang lld
-        python3 -m pip install numpy pybind11
+  #   - name: Install Deps
+  #     run: |
+  #       sudo apt-get install -y python3 python3-pip cmake ninja-build ccache clang lld
+  #       python3 -m pip install numpy pybind11
 
-    - name: Get Cached LLVM Source
-      id: cache-llvm-source
-      uses: actions/cache@v3
-      with:
-        path: mlir/llvm-project
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-source
-        enableCrossOsArchive: True
-        fail-on-cache-miss: True
+  #   - name: Get Cached LLVM Source
+  #     id: cache-llvm-source
+  #     uses: actions/cache@v3
+  #     with:
+  #       path: mlir/llvm-project
+  #       key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-source
+  #       enableCrossOsArchive: True
+  #       fail-on-cache-miss: True
 
-    - name: Get Cached LLVM Build
-      id: cache-llvm-build
-      uses: actions/cache@v3
-      with:
-        path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
-        fail-on-cache-miss: True
+  #   - name: Get Cached LLVM Build
+  #     id: cache-llvm-build
+  #     uses: actions/cache@v3
+  #     with:
+  #       path: llvm-build
+  #       key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
+  #       fail-on-cache-miss: True
     
-    - name: Get Cached MHLO Source
-      id: cache-mhlo-source
-      uses: actions/cache@v3
-      with:
-        path: mlir/mlir-hlo
-        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-source
-        enableCrossOsArchive: True
-        fail-on-cache-miss: True
+  #   - name: Get Cached MHLO Source
+  #     id: cache-mhlo-source
+  #     uses: actions/cache@v3
+  #     with:
+  #       path: mlir/mlir-hlo
+  #       key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-source
+  #       enableCrossOsArchive: True
+  #       fail-on-cache-miss: True
     
-    - name: Get Cached MHLO Build
-      id: cache-mhlo
-      uses: actions/cache@v3
-      with:
-        path: mhlo-build
-        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-build
-        fail-on-cache-miss: True
+  #   - name: Get Cached MHLO Build
+  #     id: cache-mhlo
+  #     uses: actions/cache@v3
+  #     with:
+  #       path: mhlo-build
+  #       key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-build
+  #       fail-on-cache-miss: True
 
-    - name: Cache CCache
-      id: cache-ccache
-      uses: actions/cache@v3
-      with:
-        path: .ccache
-        # TODO: revisit once actions/cache has an update feature
-        #       https://github.com/actions/toolkit/issues/505
-        #       this will load the latest available cache and generate a new one at the end
-        key: ${{ runner.os }}-ccache-${{ github.run_id }}
-        restore-keys: ${{ runner.os }}-ccache-
+  #   - name: Cache CCache
+  #     id: cache-ccache
+  #     uses: actions/cache@v3
+  #     with:
+  #       path: .ccache
+  #       # TODO: revisit once actions/cache has an update feature
+  #       #       https://github.com/actions/toolkit/issues/505
+  #       #       this will load the latest available cache and generate a new one at the end
+  #       key: ${{ runner.os }}-ccache-${{ github.run_id }}
+  #       restore-keys: ${{ runner.os }}-ccache-
 
-    - name: Clone Enzyme Submodule
-      if: |
-        steps.cache-enzyme.outputs.cache-hit != 'true'
-      uses: actions/checkout@v3
-      with:
-        repository: EnzymeAD/Enzyme
-        ref: ${{ needs.constants.outputs.enzyme_version }}
-        path: mlir/Enzyme
+  #   - name: Clone Enzyme Submodule
+  #     if: |
+  #       steps.cache-enzyme.outputs.cache-hit != 'true'
+  #     uses: actions/checkout@v3
+  #     with:
+  #       repository: EnzymeAD/Enzyme
+  #       ref: ${{ needs.constants.outputs.enzyme_version }}
+  #       path: mlir/Enzyme
 
-    - name: Build MLIR Dialects
-      run: |
-        CCACHE_DIR="$(pwd)/.ccache" \
-        LLVM_BUILD_DIR="$(pwd)/llvm-build" \
-        MHLO_BUILD_DIR="$(pwd)/mhlo-build" \
-        ENZYME_SRC_DIR="$(pwd)/Enzyme" \
-        DIALECTS_BUILD_DIR="$(pwd)/quantum-build" \
-        make dialects
+  #   - name: Build MLIR Dialects
+  #     run: |
+  #       CCACHE_DIR="$(pwd)/.ccache" \
+  #       LLVM_BUILD_DIR="$(pwd)/llvm-build" \
+  #       MHLO_BUILD_DIR="$(pwd)/mhlo-build" \
+  #       ENZYME_SRC_DIR="$(pwd)/Enzyme" \
+  #       DIALECTS_BUILD_DIR="$(pwd)/quantum-build" \
+  #       make dialects
 
-    - name: Upload Quantum Build Artifact
-      uses: actions/upload-artifact@v3
-      with:
-        name: quantum-build
-        path: |
-          quantum-build/bin
-          quantum-build/lib/lib*.so*
-          quantum-build/python_packages/*
-        retention-days: 1
+  #   - name: Upload Quantum Build Artifact
+  #     uses: actions/upload-artifact@v3
+  #     with:
+  #       name: quantum-build
+  #       path: |
+  #         quantum-build/bin
+  #         quantum-build/lib/lib*.so*
+  #         quantum-build/python_packages/*
+  #       retention-days: 1
 
-  frontend-tests:
-    name: Frontend Tests
-    needs: [constants, runtime, mhlo, quantum]
-    runs-on: ubuntu-latest
+  # frontend-tests:
+  #   name: Frontend Tests
+  #   needs: [constants, runtime, mhlo, quantum]
+  #   runs-on: ubuntu-latest
 
-    steps:
-    - name: Checkout Catalyst repo
-      uses: actions/checkout@v3
+  #   steps:
+  #   - name: Checkout Catalyst repo
+  #     uses: actions/checkout@v3
 
-    - name: Install Deps
-      run: |
-        sudo apt-get install -y python3 python3-pip libomp-dev
-        python3 -m pip install -r requirements.txt
-        python3 -m pip install .
+  #   - name: Install Deps
+  #     run: |
+  #       sudo apt-get install -y python3 python3-pip libomp-dev
+  #       python3 -m pip install -r requirements.txt
+  #       python3 -m pip install .
 
-    - name: Get Cached LLVM Build
-      id: cache-llvm-build
-      uses: actions/cache@v3
-      with:
-        path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
-        fail-on-cache-miss: True
+  #   - name: Get Cached LLVM Build
+  #     id: cache-llvm-build
+  #     uses: actions/cache@v3
+  #     with:
+  #       path: llvm-build
+  #       key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
+  #       fail-on-cache-miss: True
 
-    - name: Get Cached MHLO Build
-      id: cache-mhlo
-      uses: actions/cache@v3
-      with:
-        path: mhlo-build
-        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-build
-        fail-on-cache-miss: True
+  #   - name: Get Cached MHLO Build
+  #     id: cache-mhlo
+  #     uses: actions/cache@v3
+  #     with:
+  #       path: mhlo-build
+  #       key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-build
+  #       fail-on-cache-miss: True
 
-    - name: Get Cached Enzyme Build
-      id: cache-enzyme
-      uses: actions/cache@v3
-      with:
-        path: enzyme-build
-        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-build
-        fail-on-cache-miss: True
+  #   - name: Get Cached Enzyme Build
+  #     id: cache-enzyme
+  #     uses: actions/cache@v3
+  #     with:
+  #       path: enzyme-build
+  #       key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-build
+  #       fail-on-cache-miss: True
 
-    - name: Download Quantum Build Artifact
-      uses: actions/download-artifact@v3
-      with:
-        name: quantum-build
-        path: quantum-build
+  #   - name: Download Quantum Build Artifact
+  #     uses: actions/download-artifact@v3
+  #     with:
+  #       name: quantum-build
+  #       path: quantum-build
 
-    - name: Download Catalyst-Runtime Artifact
-      uses: actions/download-artifact@v3
-      with:
-        name: runtime-build
-        path: runtime-build/lib
+  #   - name: Download Catalyst-Runtime Artifact
+  #     uses: actions/download-artifact@v3
+  #     with:
+  #       name: runtime-build
+  #       path: runtime-build/lib
 
-    - name: Add Frontend Dependencies to PATH
-      run: |
-        echo "$(pwd)/llvm-build/bin" >> $GITHUB_PATH
-        echo "$(pwd)/mhlo-build/bin" >> $GITHUB_PATH
-        echo "$(pwd)/quantum-build/bin" >> $GITHUB_PATH
-        echo "PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
-        echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
-        echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
-        chmod +x quantum-build/bin/quantum-opt  # artifact upload does not preserve permissions
+  #   - name: Add Frontend Dependencies to PATH
+  #     run: |
+  #       echo "$(pwd)/llvm-build/bin" >> $GITHUB_PATH
+  #       echo "$(pwd)/mhlo-build/bin" >> $GITHUB_PATH
+  #       echo "$(pwd)/quantum-build/bin" >> $GITHUB_PATH
+  #       echo "PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
+  #       echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
+  #       echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
+  #       chmod +x quantum-build/bin/quantum-opt  # artifact upload does not preserve permissions
 
-    - name: Run Python Lit Tests
-      run: |
-        llvm-lit -sv frontend/test/lit -j$(nproc)
+  #   - name: Run Python Lit Tests
+  #     run: |
+  #       llvm-lit -sv frontend/test/lit -j$(nproc)
 
-    - name: Run Python Pytest Tests
-      run: |
-        # export ASAN_OPTIONS=detect_odr_violation=0
-        COVERAGE_REPORT="xml:coverage.xml -p no:warnings" \
-        make coverage-frontend
-        mv coverage.xml coverage-${{ github.job }}.xml
+  #   - name: Run Python Pytest Tests
+  #     run: |
+  #       # export ASAN_OPTIONS=detect_odr_violation=0
+  #       COVERAGE_REPORT="xml:coverage.xml -p no:warnings" \
+  #       make coverage-frontend
+  #       mv coverage.xml coverage-${{ github.job }}.xml
 
-    - name: Upload to Codecov
-      uses: codecov/codecov-action@v3
-      with:
-        fail_ci_if_error: true
-        token: ${{ secrets.CODECOV_TOKEN }}
+  #   - name: Upload to Codecov
+  #     uses: codecov/codecov-action@v3
+  #     with:
+  #       fail_ci_if_error: true
+  #       token: ${{ secrets.CODECOV_TOKEN }}
 
-    - name: Check Catalyst Demos
-      run: |
-        MDD_BENCHMARK_PRECISION=1 \
-        pytest demos --nbmake -n auto
+  #   - name: Check Catalyst Demos
+  #     run: |
+  #       MDD_BENCHMARK_PRECISION=1 \
+  #       pytest demos --nbmake -n auto
 
-  frontend-tests-lightning-kokkos:
-    name: Frontend Tests (backend="lightning.kokkos")
-    needs: [constants, runtime, mhlo, quantum]
-    runs-on: ubuntu-latest
+  # frontend-tests-lightning-kokkos:
+  #   name: Frontend Tests (backend="lightning.kokkos")
+  #   needs: [constants, runtime, mhlo, quantum]
+  #   runs-on: ubuntu-latest
 
-    steps:
-    - name: Checkout Catalyst repo
-      uses: actions/checkout@v3
+  #   steps:
+  #   - name: Checkout Catalyst repo
+  #     uses: actions/checkout@v3
 
-    - name: Install Deps
-      run: |
-        sudo apt-get install -y python3 python3-pip libomp-dev
-        python3 -m pip install -r requirements.txt
-        python3 -m pip install .
+  #   - name: Install Deps
+  #     run: |
+  #       sudo apt-get install -y python3 python3-pip libomp-dev
+  #       python3 -m pip install -r requirements.txt
+  #       python3 -m pip install .
 
-    - name: Get Cached LLVM Build
-      id: cache-llvm-build
-      uses: actions/cache@v3
-      with:
-        path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
-        fail-on-cache-miss: True
+  #   - name: Get Cached LLVM Build
+  #     id: cache-llvm-build
+  #     uses: actions/cache@v3
+  #     with:
+  #       path: llvm-build
+  #       key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
+  #       fail-on-cache-miss: True
 
-    - name: Get Cached MHLO Build
-      id: cache-mhlo
-      uses: actions/cache@v3
-      with:
-        path: mhlo-build
-        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-build
-        fail-on-cache-miss: True
+  #   - name: Get Cached MHLO Build
+  #     id: cache-mhlo
+  #     uses: actions/cache@v3
+  #     with:
+  #       path: mhlo-build
+  #       key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-build
+  #       fail-on-cache-miss: True
 
-    - name: Get Cached Enzyme Build
-      id: cache-enzyme
-      uses: actions/cache@v3
-      with:
-        path: enzyme-build
-        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-build
-        fail-on-cache-miss: True
+  #   - name: Get Cached Enzyme Build
+  #     id: cache-enzyme
+  #     uses: actions/cache@v3
+  #     with:
+  #       path: enzyme-build
+  #       key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-build
+  #       fail-on-cache-miss: True
 
-    - name: Download Quantum Build Artifact
-      uses: actions/download-artifact@v3
-      with:
-        name: quantum-build
-        path: quantum-build
+  #   - name: Download Quantum Build Artifact
+  #     uses: actions/download-artifact@v3
+  #     with:
+  #       name: quantum-build
+  #       path: quantum-build
 
-    - name: Download Catalyst-Runtime Artifact
-      uses: actions/download-artifact@v3
-      with:
-        name: runtime-build
-        path: runtime-build/lib
+  #   - name: Download Catalyst-Runtime Artifact
+  #     uses: actions/download-artifact@v3
+  #     with:
+  #       name: runtime-build
+  #       path: runtime-build/lib
 
-    - name: Add Frontend Dependencies to PATH
-      run: |
-        echo "$(pwd)/llvm-build/bin" >> $GITHUB_PATH
-        echo "$(pwd)/mhlo-build/bin" >> $GITHUB_PATH
-        echo "$(pwd)/quantum-build/bin" >> $GITHUB_PATH
-        echo "PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
-        echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
-        echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
-        chmod +x quantum-build/bin/quantum-opt  # artifact upload does not preserve permissions
+  #   - name: Add Frontend Dependencies to PATH
+  #     run: |
+  #       echo "$(pwd)/llvm-build/bin" >> $GITHUB_PATH
+  #       echo "$(pwd)/mhlo-build/bin" >> $GITHUB_PATH
+  #       echo "$(pwd)/quantum-build/bin" >> $GITHUB_PATH
+  #       echo "PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
+  #       echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
+  #       echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
+  #       chmod +x quantum-build/bin/quantum-opt  # artifact upload does not preserve permissions
 
-    - name: Install lightning.kokkos used in Python tests
-      run: |
-        pip install PennyLane-Lightning-Kokkos
+  #   - name: Install lightning.kokkos used in Python tests
+  #     run: |
+  #       pip install PennyLane-Lightning-Kokkos
 
-    - name: Run Python Pytest Tests (backend=lightning.kokkos)
-      run: |
-        make pytest TEST_BACKEND="lightning.kokkos"
+  #   - name: Run Python Pytest Tests (backend=lightning.kokkos)
+  #     run: |
+  #       make pytest TEST_BACKEND="lightning.kokkos"
 
-  frontend-tests-openqasm-device:
-    name: Frontend Tests (backend="openqasm3")
-    needs: [constants, mhlo, quantum, llvm]
-    runs-on: ubuntu-latest
+  # frontend-tests-openqasm-device:
+  #   name: Frontend Tests (backend="openqasm3")
+  #   needs: [constants, mhlo, quantum, llvm]
+  #   runs-on: ubuntu-latest
 
-    steps:
-    - name: Checkout Catalyst repo
-      uses: actions/checkout@v3
+  #   steps:
+  #   - name: Checkout Catalyst repo
+  #     uses: actions/checkout@v3
 
-    - name: Install Deps
-      run: |
-        sudo apt-get install -y python3 python3-pip libomp-dev ninja-build make cmake clang
-        python3 -m pip install -r requirements.txt
-        python3 -m pip install .
+  #   - name: Install Deps
+  #     run: |
+  #       sudo apt-get install -y python3 python3-pip libomp-dev ninja-build make cmake clang
+  #       python3 -m pip install -r requirements.txt
+  #       python3 -m pip install .
 
-    - name: Get Cached LLVM Build
-      id: cache-llvm-build
-      uses: actions/cache@v3
-      with:
-        path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
-        fail-on-cache-miss: True
+  #   - name: Get Cached LLVM Build
+  #     id: cache-llvm-build
+  #     uses: actions/cache@v3
+  #     with:
+  #       path: llvm-build
+  #       key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
+  #       fail-on-cache-miss: True
 
-    - name: Get Cached MHLO Build
-      id: cache-mhlo
-      uses: actions/cache@v3
-      with:
-        path: mhlo-build
-        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-build
-        fail-on-cache-miss: True
+  #   - name: Get Cached MHLO Build
+  #     id: cache-mhlo
+  #     uses: actions/cache@v3
+  #     with:
+  #       path: mhlo-build
+  #       key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-build
+  #       fail-on-cache-miss: True
 
-    - name: Get Cached Enzyme Build
-      id: cache-enzyme
-      uses: actions/cache@v3
-      with:
-        path: enzyme-build
-        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-build
-        fail-on-cache-miss: True
+  #   - name: Get Cached Enzyme Build
+  #     id: cache-enzyme
+  #     uses: actions/cache@v3
+  #     with:
+  #       path: enzyme-build
+  #       key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-build
+  #       fail-on-cache-miss: True
 
-    - name: Download Quantum Build Artifact
-      uses: actions/download-artifact@v3
-      with:
-        name: quantum-build
-        path: quantum-build
+  #   - name: Download Quantum Build Artifact
+  #     uses: actions/download-artifact@v3
+  #     with:
+  #       name: quantum-build
+  #       path: quantum-build
 
-    - name: Download Catalyst-Runtime Artifact
-      uses: actions/download-artifact@v3
-      with:
-        name: runtime-build
-        path: runtime-build/lib
+  #   - name: Download Catalyst-Runtime Artifact
+  #     uses: actions/download-artifact@v3
+  #     with:
+  #       name: runtime-build
+  #       path: runtime-build/lib
 
-    - name: Install additional dependencies (OpenQasm device)
-      run: |
-        # TODO: Use the latest version of boto3 after fixing the issue with
-        # "Device SV1 does not support quantum circuits" from braket-pl-plugin.
-        pip install numpy amazon-braket-sdk amazon-braket-pennylane-plugin "boto3==1.26"
-        echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
+  #   - name: Install additional dependencies (OpenQasm device)
+  #     run: |
+  #       # TODO: Use the latest version of boto3 after fixing the issue with
+  #       # "Device SV1 does not support quantum circuits" from braket-pl-plugin.
+  #       pip install numpy amazon-braket-sdk amazon-braket-pennylane-plugin "boto3==1.26"
+  #       echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
 
-    - name: Add Frontend Dependencies to PATH
-      run: |
-        echo "$(pwd)/llvm-build/bin" >> $GITHUB_PATH
-        echo "$(pwd)/mhlo-build/bin" >> $GITHUB_PATH
-        echo "$(pwd)/quantum-build/bin" >> $GITHUB_PATH
-        echo "PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
-        echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
-        echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
-        chmod +x quantum-build/bin/quantum-opt  # artifact upload does not preserve permissions
+  #   - name: Add Frontend Dependencies to PATH
+  #     run: |
+  #       echo "$(pwd)/llvm-build/bin" >> $GITHUB_PATH
+  #       echo "$(pwd)/mhlo-build/bin" >> $GITHUB_PATH
+  #       echo "$(pwd)/quantum-build/bin" >> $GITHUB_PATH
+  #       echo "PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
+  #       echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
+  #       echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
+  #       chmod +x quantum-build/bin/quantum-opt  # artifact upload does not preserve permissions
 
-    - name: Run Python Pytest Tests
-      run: |
-        make pytest TEST_BRAKET=LOCAL
+  #   - name: Run Python Pytest Tests
+  #     run: |
+  #       make pytest TEST_BRAKET=LOCAL
 
-  runtime-tests:
-    name: Runtime Tests (Linux)
-    needs: [constants]
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        backend: ${{ fromJson(needs.constants.outputs.rt_backends) }}
+  # runtime-tests:
+  #   name: Runtime Tests (Linux)
+  #   needs: [constants]
+  #   runs-on: ubuntu-latest
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       backend: ${{ fromJson(needs.constants.outputs.rt_backends) }}
 
-    steps:
-      - name: Checkout the repo
-        uses: actions/checkout@v3
+  #   steps:
+  #     - name: Checkout the repo
+  #       uses: actions/checkout@v3
 
-      - name: Install dependencies
-        run: |
-          sudo apt-get -y -q install cmake ninja-build libomp-dev lcov libasan5
+  #     - name: Install dependencies
+  #       run: |
+  #         sudo apt-get -y -q install cmake ninja-build libomp-dev lcov libasan5
 
-      - name: Install additional dependencies (OpenQasm device)
-        if: ${{ matrix.backend == 'openqasm' }}
-        run: |
-          pip install numpy amazon-braket-sdk
-          echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
+  #     - name: Install additional dependencies (OpenQasm device)
+  #       if: ${{ matrix.backend == 'openqasm' }}
+  #       run: |
+  #         pip install numpy amazon-braket-sdk
+  #         echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
 
-      - name: Build Runtime test suite for Lightning simulator
-        if: ${{ matrix.backend == 'lightning' }}
-        run: |
-            C_COMPILER=$(which gcc) \
-            CXX_COMPILER=$(which g++) \
-            COMPILER_LAUNCHER="" \
-            make coverage-runtime
-            mv runtime/build/coverage.info coverage-${{ github.job }}.info
+  #     - name: Build Runtime test suite for Lightning simulator
+  #       if: ${{ matrix.backend == 'lightning' }}
+  #       run: |
+  #           C_COMPILER=$(which gcc) \
+  #           CXX_COMPILER=$(which g++) \
+  #           COMPILER_LAUNCHER="" \
+  #           make coverage-runtime
+  #           mv runtime/build/coverage.info coverage-${{ github.job }}.info
 
-      - name: Build Runtime test suite with both Lightning and Lightning-Kokkos simulators
-        if: ${{ matrix.backend == 'lightning-kokkos' }}
-        run: |
-            C_COMPILER=$(which gcc) \
-            CXX_COMPILER=$(which g++) \
-            COMPILER_LAUNCHER="" \
-            ENABLE_LIGHTNING_KOKKOS=ON \
-            CMAKE_ARGS="-DENABLE_SANITIZER=ON" \
-            make test-runtime
+  #     - name: Build Runtime test suite with both Lightning and Lightning-Kokkos simulators
+  #       if: ${{ matrix.backend == 'lightning-kokkos' }}
+  #       run: |
+  #           C_COMPILER=$(which gcc) \
+  #           CXX_COMPILER=$(which g++) \
+  #           COMPILER_LAUNCHER="" \
+  #           ENABLE_LIGHTNING_KOKKOS=ON \
+  #           CMAKE_ARGS="-DENABLE_SANITIZER=ON" \
+  #           make test-runtime
 
-      - name: Build Runtime test suite for OpenQasm device
-        if: ${{ matrix.backend == 'openqasm' }}
-        run: |
-            C_COMPILER=$(which gcc) \
-            CXX_COMPILER=$(which g++) \
-            COMPILER_LAUNCHER="" \
-            ENABLE_OPENQASM=ON \
-            make test-runtime
+  #     - name: Build Runtime test suite for OpenQasm device
+  #       if: ${{ matrix.backend == 'openqasm' }}
+  #       run: |
+  #           C_COMPILER=$(which gcc) \
+  #           CXX_COMPILER=$(which g++) \
+  #           COMPILER_LAUNCHER="" \
+  #           ENABLE_OPENQASM=ON \
+  #           make test-runtime
 
-      - name: Upload to Codecov
-        if: ${{ matrix.backend == 'lightning' }}
-        uses: codecov/codecov-action@v3
-        with:
-          fail_ci_if_error: true
-          token: ${{ secrets.CODECOV_TOKEN }}
+  #     - name: Upload to Codecov
+  #       if: ${{ matrix.backend == 'lightning' }}
+  #       uses: codecov/codecov-action@v3
+  #       with:
+  #         fail_ci_if_error: true
+  #         token: ${{ secrets.CODECOV_TOKEN }}
 
-      - name: Build examples
-        if: ${{ matrix.backend == 'lightning' }}
-        run: |
-          C_COMPILER=$(which gcc) \
-          CXX_COMPILER=$(which g++) \
-          COMPILER_LAUNCHER="" \
-          make examples-runtime
+  #     - name: Build examples
+  #       if: ${{ matrix.backend == 'lightning' }}
+  #       run: |
+  #         C_COMPILER=$(which gcc) \
+  #         CXX_COMPILER=$(which g++) \
+  #         COMPILER_LAUNCHER="" \
+  #         make examples-runtime
