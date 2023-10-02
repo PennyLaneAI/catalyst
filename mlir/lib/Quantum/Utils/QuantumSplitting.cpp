@@ -14,14 +14,6 @@
 
 #include "Quantum/Utils/QuantumSplitting.h"
 
-#include "Catalyst/IR/CatalystOps.h"
-#include "Quantum/IR/QuantumOps.h"
-#include "mlir/Dialect/Index/IR/IndexOps.h"
-#include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/Dialect/SCF/IR/SCF.h"
-#include "mlir/IR/IRMapping.h"
-#include "mlir/Transforms/DialectConversion.h"
-
 using namespace mlir;
 using namespace catalyst;
 

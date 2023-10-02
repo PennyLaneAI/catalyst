@@ -18,6 +18,8 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/PatternMatch.h"
 
+using namespace mlir;
+
 namespace catalyst {
 namespace gradient {
 
