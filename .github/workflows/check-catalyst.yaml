@@ -23,6 +23,10 @@ jobs:
       - name: Checkout Catalyst repo
         uses: actions/checkout@v3
 
+      - name: Arch
+        run: |
+          uname -a
+
       - name: Install dependencies
         run: |
           sudo apt-get -y -q install ninja-build make cmake clang libomp-dev
