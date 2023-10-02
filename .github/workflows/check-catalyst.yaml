@@ -15,6 +15,35 @@ jobs:
     name: "Set build matrix"
     uses: ./.github/workflows/constants.yaml
 
+  runtime-on-macos:
+    name: Catalyst-Runtime Build (macos)
+    runs-on: macos-13-large
+
+    steps:
+      - name: Checkout Catalyst repo
+        uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get -y -q install ninja-build make cmake clang libomp-dev
+
+      - name: Build Catalyst-Runtime
+        run: |
+          COMPILER_LAUNCHER="" \
+          RT_BUILD_DIR="$(pwd)/runtime-build" \
+          ENABLE_LIGHTNING_KOKKOS=ON \
+          CMAKE_ARGS="-DENABLE_SANITIZER=ON" \
+          ENABLE_OPENQASM=ON \
+          make runtime
+
+      - name: Upload Catalyst-Runtime Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: runtime-build
+          path: |
+            runtime-build/lib/*.so
+          retention-days: 1
+
   runtime:
     name: Catalyst-Runtime Build
     runs-on: ubuntu-latest
