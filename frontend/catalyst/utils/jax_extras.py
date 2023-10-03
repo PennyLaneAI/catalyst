@@ -286,11 +286,7 @@ def jaxpr_to_mlir(func_name, jaxpr, shape):
     """
 
     nrep = jaxpr_replicas(jaxpr)
-    effects = [
-        eff
-        for eff in jaxpr.effects
-        if eff in jax_ordered_effects  # pylint: disable=unsupported-membership-test
-    ]
+    effects = [eff for eff in jaxpr.effects if eff in jax_ordered_effects]
     axis_context = ReplicaAxisContext(xla.AxisEnv(nrep, (), ()))
     name_stack = new_name_stack(wrap_name("ok", "jit"))
     module, context = custom_lower_jaxpr_to_module(
@@ -338,8 +334,7 @@ def custom_lower_jaxpr_to_module(
     platforms_with_donation = ("cuda", "rocm", "tpu")
     assert platform not in platforms_with_donation
     assert all(
-        eff in lowerable_effects  # pylint: disable=unsupported-membership-test
-        for eff in jaxpr.effects
+        eff in lowerable_effects for eff in jaxpr.effects
     ), f"Unloweable effects: {jaxpr.effects}"
 
     # MHLO channels need to start at 1

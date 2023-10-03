@@ -72,7 +72,7 @@ from catalyst.utils.extra_bindings import TensorExtractOp
 #
 # qbit
 #
-class AbstractQbit(AbstractValue):  # pylint: disable=abstract-method
+class AbstractQbit(AbstractValue):
     """Abstract Qbit"""
 
     hash_value = hash("AbstractQubit")
@@ -84,7 +84,7 @@ class AbstractQbit(AbstractValue):  # pylint: disable=abstract-method
         return self.hash_value
 
 
-class ConcreteQbit(AbstractQbit):  # pylint: disable=abstract-method
+class ConcreteQbit(AbstractQbit):
     """Concrete Qbit."""
 
 
@@ -96,7 +96,7 @@ def _qbit_lowering(aval):
 #
 # qreg
 #
-class AbstractQreg(AbstractValue):  # pylint: disable=abstract-method
+class AbstractQreg(AbstractValue):
     """Abstract quantum register."""
 
     hash_value = hash("AbstractQreg")
@@ -108,7 +108,7 @@ class AbstractQreg(AbstractValue):  # pylint: disable=abstract-method
         return self.hash_value
 
 
-class ConcreteQreg(AbstractQreg):  # pylint: disable=abstract-method
+class ConcreteQreg(AbstractQreg):
     """Concrete quantum register."""
 
 
@@ -120,7 +120,7 @@ def _qreg_lowering(aval):
 #
 # observable
 #
-class AbstractObs(AbstractValue):  # pylint: disable=abstract-method
+class AbstractObs(AbstractValue):
     """Abstract observable."""
 
     def __init__(self, num_qubits=None, primitive=None):
@@ -137,7 +137,7 @@ class AbstractObs(AbstractValue):  # pylint: disable=abstract-method
         return hash(self.primitive) + self.num_qubits
 
 
-class ConcreteObs(AbstractObs):  # pylint: disable=abstract-method
+class ConcreteObs(AbstractObs):
     """Concrete observable."""
 
 
