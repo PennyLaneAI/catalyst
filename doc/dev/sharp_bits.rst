@@ -8,10 +8,9 @@ hybrid quantum-classical workflows on accelerator devices.
 
 Similar to JAX, Catalyst does this via the :func:`@qjit <.qjit>` decorator, which captures
 hybrid programs written in Python, PennyLane, and JAX, and compiles them to
-native machine code --- preserving important aspects like conditional
-branches and classical control.
+native machine code --- preserving control flow like conditional branches and loops.
 
-With Catalyst, we aim to try and support as many idiomatic PennyLane and JAX
+With Catalyst, we aim support as many idiomatic PennyLane and JAX
 hybrid workflow programs as possible, however there will be **various
 restrictions and constraints that should be taken into account**.
 
