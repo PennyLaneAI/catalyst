@@ -776,6 +776,7 @@ class JAX_QJIT:
         return self.jaxed_function(*args, **kwargs)
 
 
+# pylint: disable=too-many-arguments
 def qjit(
     fn=None,
     *,
