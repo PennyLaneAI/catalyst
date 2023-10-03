@@ -327,6 +327,7 @@ jobs:
     - name: Install Python dependencies
       run: |
         python${{ matrix.python_version }} -m pip install wheel pytest pytest-xdist
+        python${{ matrix.python_version }} -m pip install tensorflow-cpu # for autograph tests
 
     - name: Install Catalyst
       run: |
