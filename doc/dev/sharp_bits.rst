@@ -446,6 +446,7 @@ there may be cases where there is missing coverage. Known JAX functionality
 that doesn't work with Catalyst includes:
 
 - ``jax.numpy.polyfit``
+- ``jax.numpy.fft``
 - ``jax.debug``
 - ``jax.numpy.ndarray.at[index]`` when ``index`` corresponds to all array
   indices.
