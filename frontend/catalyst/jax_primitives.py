@@ -1262,6 +1262,7 @@ def _qfor_loop_abstract_eval(*args, body_jaxpr, **kwargs):
     return body_jaxpr.out_avals
 
 
+# pylint: disable=too-many-arguments
 @qfor_p.def_impl
 def _qfor_def_impl(
     ctx, lower_bound, upper_bound, step, *iter_args_plus_consts, body_jaxpr, body_nconsts
@@ -1269,7 +1270,7 @@ def _qfor_def_impl(
     raise NotImplementedError()
 
 
-# pylint: disable=too-many-statements
+# pylint: disable=too-many-statements, too-many-arguments
 def _qfor_lowering(
     jax_ctx: mlir.LoweringRuleContext,
     lower_bound: ir.Value,
