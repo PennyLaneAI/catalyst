@@ -29,7 +29,7 @@ class FromElementsOp(ir.OpView):
     _ODS_REGIONS = (0, True)
 
     def __init__(self, result, elements, *, loc=None, ip=None):
-        operands = [get_op_results_or_values(elements)]
+        operands = [elements]
         super().__init__(
             self.build_generic(
                 attributes={},
