@@ -19,6 +19,7 @@ COPY_FLAGS = $(shell python -c "import platform; print('--dereference' if platfo
 help:
 	@echo "Please use \`make <target>' where <target> is one of"
 	@echo "  all                to build and install all Catalyst modules and its MLIR dependencies"
+	@echo "  sanitizer          to build and install all Catalyst modules and its MLIR dependencies with sanitize=address"
 	@echo "  frontend           to install Catalyst Frontend"
 	@echo "  mlir               to build MLIR and custom Catalyst dialects"
 	@echo "  runtime            to build Catalyst Runtime with PennyLane-Lightning"
@@ -33,6 +34,15 @@ help:
 
 .PHONY: all
 all: runtime mlir frontend
+
+.PHONY: sanitizer
+sanitizer:
+	LLVM_CMAKE_ARGS="-DLLVM_USE_SANITIZER=\"Address\"" make llvm
+	LLVM_CMAKE_ARGS="-DLLVM_USE_SANITIZER=\"Address\"" ASAN_OPTIONS=detect_leaks=0 make mhlo
+	LLVM_CMAKE_ARGS="-DLLVM_USE_SANITIZER=\"Address\"" make dialects
+	LLVM_BUILD_DIR=$(MK_DIR)/mlir/llvm-project/build-noasan make llvm enzyme
+	make frontend
+	LD_PRELOAD=$(shell clang -print-file-name=libclang_rt.asan-x86_64.so) make test-frontend
 
 .PHONY: frontend
 frontend:
