@@ -751,7 +751,7 @@ def _qmeasure_lowering(jax_ctx: mlir.LoweringRuleContext, qubit: ir.Value):
     result, new_qubit = MeasureOp(result_type, qubit.type, qubit).results
 
     result_from_elements_op = ir.RankedTensorType.get((), result.type)
-    from_elements_op = FromElementsOp.build_generic([result_from_elements_op], [result])
+    from_elements_op = FromElementsOp(result_from_elements_op, result)
 
     return (
         from_elements_op.results[0],
@@ -994,7 +994,7 @@ def _expval_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: in
 
     mres = ExpvalOp(result_type, obs, shots=shots_attr).result
     result_from_elements_op = ir.RankedTensorType.get((), result_type)
-    from_elements_op = FromElementsOp.build_generic([result_from_elements_op], [mres])
+    from_elements_op = FromElementsOp(result_from_elements_op, mres)
     return from_elements_op.results
 
 
@@ -1026,7 +1026,7 @@ def _var_lowering(jax_ctx: mlir.LoweringRuleContext, obs: ir.Value, shots: int):
 
     mres = VarianceOp(result_type, obs, shots=shots_attr).result
     result_from_elements_op = ir.RankedTensorType.get((), result_type)
-    from_elements_op = FromElementsOp.build_generic([result_from_elements_op], [mres])
+    from_elements_op = FromElementsOp(result_from_elements_op, mres)
     return from_elements_op.results
 
 
@@ -1356,7 +1356,7 @@ def _qfor_lowering(
             body_args[0] = AddIOp(start_val, MulIOp(body_args[0], step_val))
         body_args[0] = IndexCastOp(loop_index_type, body_args[0]).result
         result_from_elements_op = ir.RankedTensorType.get((), loop_index_type)
-        from_elements_op = FromElementsOp.build_generic([result_from_elements_op], [body_args[0]])
+        from_elements_op = FromElementsOp(result_from_elements_op, body_args[0])
         body_args[0] = from_elements_op.result
 
         # recursively generate the mlir for the loop body
