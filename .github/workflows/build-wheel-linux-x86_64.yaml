@@ -302,11 +302,12 @@ jobs:
       matrix:
         os: [ubuntu-latest]
         python_version: ${{ fromJson(needs.constants.outputs.python_versions) }}
-        container: ["quay.io/pypa/manylinux2014_x86_64", "ubuntu-20.04", "ubuntu-22.04"]
+        container_img: ["quay.io/pypa/manylinux2014_x86_64", "ubuntu-20.04", "ubuntu-22.04"]
 
     # To check all wheels for supported python3 versions
     name: Test Wheels (Python ${{ matrix.python_version }}) on ${{ matrix.container }}
     runs-on: ${{ matrix.os }}
+    container: ${{ matrix.container_img }}
 
     steps:
     - name: Checkout Catalyst repo
