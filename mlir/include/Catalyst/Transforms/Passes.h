@@ -14,12 +14,14 @@
 
 #pragma once
 
-#include "mlir/Pass/Pass.h"
-
 #include <memory>
+
+#include "mlir/Pass/Pass.h"
 
 namespace catalyst {
 
 std::unique_ptr<mlir::Pass> createArrayListToMemRefPass();
+
+void registerAllCatalystPasses();
 
 } // namespace catalyst

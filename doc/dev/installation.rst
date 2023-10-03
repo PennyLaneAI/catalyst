@@ -2,9 +2,9 @@ Installation
 ============
 
 
-Catalyst is officially supported on Linux (x86_64) platforms, and pre-built binaries are being
-distributed via the Python Package Index (PyPI) for Python versions 3.8 and higher. To install it,
-simply run the following ``pip`` command:
+Catalyst is officially supported on Linux (x86_64) and macOS (aarch64) platforms, and pre-built binaries
+are being distributed via the Python Package Index (PyPI) for Python versions 3.9 and higher. To install
+it, simply run the following ``pip`` command:
 
 .. code-block:: console
 
@@ -77,7 +77,7 @@ following pre-requisites are installed and available on the path:
   <https://www.gnu.org/software/make/>`_, and `CMake
   <https://cmake.org/download/>`_ (v3.20 or greater) build tools.
 
-- `Python <https://www.python.org/>`_ 3.8 or higher for the Python frontend.
+- `Python <https://www.python.org/>`_ 3.9 or higher for the Python frontend.
 
 - ``pip`` must be version 22.3 or higher.
 
@@ -87,23 +87,26 @@ They can be installed on Debian/Ubuntu via:
 
   sudo apt install clang lld ccache libomp-dev ninja-build make cmake
 
-.. Note::
-  If the CMake version available in your system is too old, you can also install up-to-date
-  versions of it via ``pip install cmake``.
+They can be installed on macOS via:
 
-The runtime leverages the ``stdlib`` Rust package from the `qir-runner
-<https://www.qir-alliance.org/qir-runner>`_ project for standard
-QIR runtime instructions. To build this package from source, a `Rust
-<https://www.rust-lang.org/tools/install>`_ toolchain installed via ``rustup``
-is required. After installing ``rustup``, the ``llvm-tools-preview`` component
-needs to be installed:
+.. code-block:: console
+
+  brew install cmake ninja
+
+If you install Catalyst on a macOS system with ``ARM`` architecture (e.g. Apple M1/M2), you
+additionally need to install `Rust <https://www.rust-lang.org/tools/install>`_ and the
+``llvm-tools-preview`` rustup component:
 
 .. code-block:: console
 
   rustup component add llvm-tools-preview
 
-All additional build and developer depencies are managed via the repository's ``requirements.txt``
-and can be installed as follows:
+.. Note::
+  If the CMake version available in your system is too old, you can also install up-to-date
+  versions of it via ``pip install cmake``.
+
+All additional build and developer dependencies are managed via the repository's
+``requirements.txt`` and can be installed as follows:
 
 .. code-block:: console
 
@@ -134,6 +137,12 @@ following make target from the top level directory:
 
   make all
 
+To build the project on macOS with ``ARM`` architecture (e.g. Apple M1/M2):
+
+.. code-block:: console
+
+  BUILD_QIR_STDLIB_FROM_SRC=ON ENABLE_LLD=OFF make all
+
 To build each component one by one starting from the runtime, you can follow
 the instructions below.
 
@@ -144,8 +153,8 @@ By default, the runtime is backed by `PennyLane-Lightning
 <https://github.com/PennyLaneAI/pennylane-lightning>`_
 requiring the use of C++20 standard library headers, and leverages the `QIR
 standard library <https://github.com/qir-alliance/qir-runner>`_. Assuming
-``libomp-dev`` and the ``llvm-tools-preview`` Rustup component are available,
-you can build ``qir-stdlib`` and the runtime from the top level directory:
+``libomp-dev`` is available, you can build the runtime from the top level
+directory:
 
 .. code-block:: console
 
@@ -206,6 +215,12 @@ To make MLIR libraries discoverable to the compiler:
 .. code-block:: console
 
   export MLIR_LIB_DIR="$PWD/mlir/llvm-project/build/lib"
+
+To make Enzyme libraries discoverable to the compiler:
+
+.. code-block:: console
+
+  export ENZYME_LIB_DIR="$PWD/mlir/Enzyme/build/Enzyme"
 
 To make required tools in ``llvm-project/build``, ``mlir-hlo/build``, and
 ``mlir/build`` discoverable to the compiler:

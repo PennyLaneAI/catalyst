@@ -33,23 +33,10 @@ namespace Catalyst::Runtime::Simulator {
  */
 template <typename PrecisionT> class LightningKokkosObsManager {
   private:
-    using ObservableClassName =
-        Pennylane::Lightning_Kokkos::Simulators::ObservableKokkos<PrecisionT>;
-    using NamedObsClassName = Pennylane::Lightning_Kokkos::Simulators::NamedObsKokkos<PrecisionT>;
-    using HermitianObsClassName =
-        Pennylane::Lightning_Kokkos::Simulators::HermitianObsKokkos<PrecisionT>;
-    using TensorProdObsClassName =
-        Pennylane::Lightning_Kokkos::Simulators::TensorProdObsKokkos<PrecisionT>;
-    using HamiltonianClassName =
-        Pennylane::Lightning_Kokkos::Simulators::HamiltonianKokkos<PrecisionT>;
-
+    using VectorStateT = Pennylane::LightningKokkos::StateVectorKokkos<PrecisionT>;
+    using ObservableClassName = Pennylane::Observables::Observable<VectorStateT>;
     using ObservablePairType = std::pair<std::shared_ptr<ObservableClassName>, ObsType>;
     std::vector<ObservablePairType> observables_{};
-
-    static constexpr std::array<ObsType, 2> hamiltonian_valid_obs_types = {
-        ObsType::Basic,
-        ObsType::TensorProd,
-    };
 
   public:
     LightningKokkosObsManager() = default;
@@ -87,7 +74,7 @@ template <typename PrecisionT> class LightningKokkosObsManager {
     [[nodiscard]] auto getObservable(ObsIdType key) -> std::shared_ptr<ObservableClassName>
     {
         RT_FAIL_IF(!this->isValidObservables({key}), "Invalid observable key");
-        return std::get<0>(this->observables_[reinterpret_cast<int64_t>(key)]);
+        return std::get<0>(this->observables_[key]);
     }
 
     /**
@@ -110,8 +97,10 @@ template <typename PrecisionT> class LightningKokkosObsManager {
             std::string(Lightning::lookup_obs<Lightning::simulator_observable_support_size>(
                 Lightning::simulator_observable_support, obsId));
 
-        this->observables_.push_back(
-            std::make_pair(std::make_shared<NamedObsClassName>(obs_str, wires), ObsType::Basic));
+        this->observables_.push_back(std::make_pair(
+            std::make_shared<Pennylane::LightningKokkos::Observables::NamedObs<VectorStateT>>(
+                obs_str, wires),
+            ObsType::Basic));
         return static_cast<ObsIdType>(this->observables_.size() - 1);
     }
 
@@ -125,8 +114,16 @@ template <typename PrecisionT> class LightningKokkosObsManager {
     [[nodiscard]] auto createHermitianObs(const std::vector<std::complex<PrecisionT>> &matrix,
                                           const std::vector<size_t> &wires) -> ObsIdType
     {
+        std::vector<Kokkos::complex<PrecisionT>> matrix_k;
+        matrix_k.reserve(matrix.size());
+        for (const auto &elem : matrix) {
+            matrix_k.push_back(static_cast<Kokkos::complex<PrecisionT>>(elem));
+        }
+
         this->observables_.push_back(std::make_pair(
-            std::make_shared<HermitianObsClassName>(HermitianObsClassName{matrix, wires}),
+            std::make_shared<Pennylane::LightningKokkos::Observables::HermitianObs<VectorStateT>>(
+                Pennylane::LightningKokkos::Observables::HermitianObs<VectorStateT>{matrix_k,
+                                                                                    wires}),
             ObsType::Basic));
 
         return static_cast<ObsIdType>(this->observables_.size() - 1);
@@ -147,20 +144,16 @@ template <typename PrecisionT> class LightningKokkosObsManager {
         obs_vec.reserve(key_size);
 
         for (const auto &key : obsKeys) {
-            auto key_t = reinterpret_cast<int64_t>(key);
-            RT_FAIL_IF(static_cast<size_t>(key_t) >= obs_size || key_t < 0,
-                       "Invalid observable key");
+            RT_FAIL_IF(static_cast<size_t>(key) >= obs_size || key < 0, "Invalid observable key");
 
-            auto &&[obs, type] = this->observables_[key_t];
-
-            RT_FAIL_IF(type != ObsType::Basic, "Invalid basic observable to construct TensorProd; "
-                                               "NamedObs and HermitianObs are only supported");
-
+            auto &&[obs, type] = this->observables_[key];
             obs_vec.push_back(obs);
         }
 
         this->observables_.push_back(std::make_pair(
-            std::make_shared<TensorProdObsClassName>(TensorProdObsClassName::create(obs_vec)),
+            std::make_shared<Pennylane::LightningKokkos::Observables::TensorProdObs<VectorStateT>>(
+                Pennylane::LightningKokkos::Observables::TensorProdObs<VectorStateT>::create(
+                    obs_vec)),
             ObsType::TensorProd));
 
         return static_cast<ObsIdType>(obs_size);
@@ -187,25 +180,17 @@ template <typename PrecisionT> class LightningKokkosObsManager {
         obs_vec.reserve(key_size);
 
         for (auto key : obsKeys) {
-            auto key_t = reinterpret_cast<int64_t>(key);
-            RT_FAIL_IF(static_cast<size_t>(key_t) >= obs_size || key_t < 0,
-                       "Invalid observable key");
+            RT_FAIL_IF(static_cast<size_t>(key) >= obs_size || key < 0, "Invalid observable key");
 
-            auto &&[obs, type] = this->observables_[key_t];
-            auto contain_obs = std::find(hamiltonian_valid_obs_types.begin(),
-                                         hamiltonian_valid_obs_types.end(), type);
-
-            RT_FAIL_IF(contain_obs == hamiltonian_valid_obs_types.end(),
-                       "Invalid observable to construct Hamiltonian; "
-                       "NamedObs, HermitianObs and TensorProdObs are only supported");
-
+            auto &&[obs, type] = this->observables_[key];
             obs_vec.push_back(obs);
         }
 
-        this->observables_.push_back(
-            std::make_pair(std::make_shared<HamiltonianClassName>(
-                               HamiltonianClassName(coeffs, std::move(obs_vec))),
-                           ObsType::Hamiltonian));
+        this->observables_.push_back(std::make_pair(
+            std::make_shared<Pennylane::LightningKokkos::Observables::Hamiltonian<VectorStateT>>(
+                Pennylane::LightningKokkos::Observables::Hamiltonian<VectorStateT>(
+                    coeffs, std::move(obs_vec))),
+            ObsType::Hamiltonian));
 
         return static_cast<ObsIdType>(obs_size);
     }

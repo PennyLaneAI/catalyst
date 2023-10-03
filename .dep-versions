@@ -1,4 +1,5 @@
-jax=0.4.13
-mhlo=72c2cd05cd9c2f1162890c507b1856afa4b4d699
-llvm=73a0ae021ec6112911b98025055b8a2e881b1376
-enzyme=2d2fdff50efe195af76cedff0c04d4bb6a40a071
+# Update the version check in catalyst.__init__ when changing the JAX version.
+jax=0.4.14
+mhlo=00be4a6ce2c4d464e07d10eae51918a86f8df7b4
+llvm=4706251a3186c34da0ee8fd894f7e6b095da8fdc
+enzyme=8d22ed1b8c424a061ed9d6d0baf0cc0d2d6842e2

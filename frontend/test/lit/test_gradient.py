@@ -14,11 +14,13 @@
 
 # RUN: %PYTHON %s | FileCheck %s
 
+# pylint: disable=line-too-long
+
 import jax
 import numpy as np
 import pennylane as qml
 
-from catalyst import grad, qjit
+from catalyst import grad, jacobian, qjit
 
 
 # CHECK-LABEL: public @jit_grad_default
@@ -29,8 +31,8 @@ def grad_default(x: float):
         qml.RX(x, wires=0)
         return qml.expval(qml.PauliY(0))
 
-    # CHECK: "gradient.grad"({{%[0-9]+}}) {callee = @f, diffArgIndices = dense<0> : tensor<1xi64>, finiteDiffParam = 9.9999999999999995E-8 : f64, method = "fd"} : (tensor<f64>) -> tensor<f64>
-    g = grad(f)
+    # CHECK: gradient.grad "fd" @f({{%[0-9]+}}) {diffArgIndices = dense<0> : tensor<1xi64>, finiteDiffParam = 9.9999999999999995E-8 : f64} : (tensor<f64>) -> tensor<f64>
+    g = grad(f, method="fd")
     return g(jax.numpy.pi)
 
 
@@ -45,9 +47,8 @@ def override_method(x: float):
         qml.RX(x, wires=0)
         return qml.expval(qml.PauliY(0))
 
-    # pylint: disable=line-too-long
-    # CHECK: "gradient.grad"({{%[0-9]+}}) {callee = @f, diffArgIndices = dense<0> : tensor<1xi64>, method = "defer"} : (tensor<f64>) -> tensor<f64>
-    g = grad(f, method="defer")
+    # CHECK: gradient.grad "auto" @f({{%[0-9]+}}) {diffArgIndices = dense<0> : tensor<1xi64>} : (tensor<f64>) -> tensor<f64>
+    g = grad(f, method="auto")
     return g(jax.numpy.pi)
 
 
@@ -62,8 +63,8 @@ def override_h(x: float):
         qml.RX(x, wires=0)
         return qml.expval(qml.PauliY(0))
 
-    # CHECK: "gradient.grad"({{%[0-9]+}}) {callee = @f, diffArgIndices = dense<0> : tensor<1xi64>, finiteDiffParam = 2.000000e+00 : f64, method = "fd"} : (tensor<f64>) -> tensor<f64>
-    g = grad(f, h=2.0)
+    # CHECK: gradient.grad "fd" @f({{%[0-9]+}}) {diffArgIndices = dense<0> : tensor<1xi64>, finiteDiffParam = 2.000000e+00 : f64} : (tensor<f64>) -> tensor<f64>
+    g = grad(f, method="fd", h=2.0)
     return g(jax.numpy.pi)
 
 
@@ -78,7 +79,7 @@ def override_diff_arg(x: float):
         qml.RX(x**y, wires=0)
         return qml.expval(qml.PauliY(0))
 
-    # CHECK: "gradient.grad"({{%[0-9]+}}, {{%[0-9]+}}) {callee = @f, diffArgIndices = dense<1> : tensor<1xi64>, finiteDiffParam = 9.9999999999999995E-8 : f64, method = "fd"} : (tensor<f64>, tensor<f64>) -> tensor<f64>
+    # CHECK: gradient.grad "auto" @f({{%[0-9]+}}, {{%[0-9]+}}) {diffArgIndices = dense<1> : tensor<1xi64>} : (tensor<f64>, tensor<f64>) -> tensor<f64>
     g = grad(f, argnum=1)
     return g(jax.numpy.pi, 2.0)
 
@@ -94,10 +95,10 @@ def second_grad(x: float):
         qml.RX(x, wires=0)
         return qml.expval(qml.PauliY(0))
 
-    # CHECK: "gradient.grad"({{%[0-9]+}}) {callee = @grad.f, diffArgIndices = dense<0> : tensor<1xi64>, finiteDiffParam = 9.9999999999999995E-8 : f64, method = "fd"} : (tensor<f64>) -> tensor<f64>
+    # CHECK: gradient.grad "fd" @grad.f({{%[0-9]+}}) {diffArgIndices = dense<0> : tensor<1xi64>, finiteDiffParam = 9.9999999999999995E-8 : f64} : (tensor<f64>) -> tensor<f64>
     g = grad(f)
     # CHECK-LABEL: private @grad.f
-    h = grad(g)
+    h = grad(g, method="fd")
     return h(jax.numpy.pi)
 
 
@@ -113,8 +114,8 @@ def grad_range_change():
         qml.RY(y, wires=1)
         return qml.expval(qml.PauliX(0)), qml.expval(qml.PauliY(1))
 
-    # CHECK: "gradient.grad"({{%[0-9]+}}, {{%[0-9]+}}) {callee = @f, diffArgIndices = dense<[0, 1]> : tensor<2xi64>, finiteDiffParam = 9.9999999999999995E-8 : f64, method = "fd"} : (tensor<f64>, tensor<f64>) -> (tensor<f64>, tensor<f64>, tensor<f64>, tensor<f64>)
-    g = grad(f, argnum=[0, 1])
+    # CHECK: gradient.grad "auto" @f({{%[0-9]+}}, {{%[0-9]+}}) {diffArgIndices = dense<[0, 1]> : tensor<2xi64>} : (tensor<f64>, tensor<f64>) -> (tensor<f64>, tensor<f64>, tensor<f64>, tensor<f64>)
+    g = jacobian(f, argnum=[0, 1])
     return g(jax.numpy.pi, jax.numpy.pi)
 
 
@@ -133,7 +134,7 @@ def grad_hoist_constant(params: jax.core.ShapedArray([2], float)):
         h_obs = [qml.PauliX(0) @ qml.PauliZ(1), qml.PauliZ(0) @ qml.Hadamard(2)]
         return qml.expval(qml.Hamiltonian(h_coeffs, h_obs))
 
-    # CHECK-NEXT {{%.+}} = "gradient.grad"([[const]], %arg0)
+    # CHECK-NEXT {{%.+}} = gradient.grad "fd" @circuit([[const]], %arg0)
     h = grad(circuit, method="fd", argnum=[0])
     return h(params)
 

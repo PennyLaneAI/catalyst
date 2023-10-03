@@ -73,17 +73,18 @@ class TestReturnValues:
         def order1(params):
             diff = grad(circuit, argnum=0)
             h = diff(params)
-            return h, params
+            return h[0], params
 
         @qjit()
         def order2(params):
             diff = grad(circuit, argnum=0)
             h = diff(params)
-            return params, h
+            return params, h[0]
 
         data_in = jnp.array([1.0, 4.0])
         result1 = order1(data_in)
         result2 = order2(data_in)
+
         assert jnp.allclose(result1[0], result2[1]) and jnp.allclose(result1[1], result2[0])
 
     @pytest.mark.parametrize(

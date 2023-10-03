@@ -15,8 +15,11 @@
 import numpy as np
 import pennylane as qml
 import pytest
+from pennylane.tape import QuantumTape
 
-from catalyst import qjit
+from catalyst import cond, for_loop, qjit, while_loop
+from catalyst.jax_tracer import has_nested_tapes
+from catalyst.pennylane_extensions import Cond, ForLoop, HybridOp, WhileLoop
 
 
 def test_no_parameters(backend):
@@ -72,18 +75,19 @@ def test_no_parameters(backend):
         # and `quantum-opt` doesn't fail to materialize conversion for the result
         qml.CZ(wires=[1, 2])
 
+        qml.MultiControlledX(wires=[0, 1, 2, 3])
+
         # Unsupported:
         # qml.SX(wires=0)
         # qml.ISWAP(wires=[0,1])
         # qml.ECR(wires=[0,1])
         # qml.SISWAP(wires=[0,1])
         # qml.Toffoli(wires=[0,1,2])
-        # qml.MultiControlledX(wires=[0,1,2,3])
 
         return qml.state()
 
-    qjit_fn = qjit()(qml.qnode(qml.device(backend, wires=3))(circuit))
-    qml_fn = qml.qnode(qml.device("default.qubit", wires=3))(circuit)
+    qjit_fn = qjit()(qml.qnode(qml.device(backend, wires=4))(circuit))
+    qml_fn = qml.qnode(qml.device("default.qubit", wires=4))(circuit)
 
     assert np.allclose(qjit_fn(), qml_fn())
 
@@ -140,6 +144,56 @@ def test_param(backend):
     qml_fn = qml.qnode(qml.device("default.qubit", wires=4))(circuit)
 
     assert np.allclose(qjit_fn(3.14, 0.6), qml_fn(3.14, 0.6))
+
+
+def test_hybrid_op_repr(backend):
+    """Test hybrid operation representation"""
+
+    def circuit(n):
+        quantum_tape = QuantumTape()
+        with qml.QueuingManager.stop_recording(), quantum_tape:
+
+            @for_loop(0, 1, 1)
+            def loop0(_):
+                qml.RX(np.pi, wires=0)
+                return ()
+
+            loop0()
+
+            @while_loop(lambda v: v < 1)
+            def loop1(v):
+                qml.RY(np.pi, wires=0)
+                return v + 1
+
+            loop1(0)
+
+            @cond(n == 1)
+            def cond_fn():
+                qml.RZ(np.pi, wires=0)
+                return 0
+
+            @cond_fn.otherwise
+            def cond_fn():
+                qml.RZ(np.pi, wires=0)
+                return 1
+
+            cond_fn()
+
+        for term in ["ForLoop", "WhileLoop", "Cond", "RX", "RY", "RZ"]:
+            assert term in str(quantum_tape.operations)
+        for op in quantum_tape.operations:
+            if isinstance(op, (ForLoop, WhileLoop, Cond)):
+                assert (
+                    isinstance(op, HybridOp)
+                    and len(op.regions) > 0
+                    and any(r.quantum_tape is not None for r in op.regions)
+                )
+                assert has_nested_tapes(op)
+            else:
+                assert not has_nested_tapes(op)
+        return qml.state()
+
+    qjit()(qml.qnode(qml.device(backend, wires=4))(circuit))(1)
 
 
 if __name__ == "__main__":

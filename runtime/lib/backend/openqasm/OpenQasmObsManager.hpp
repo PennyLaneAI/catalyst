@@ -78,7 +78,7 @@ class OpenQasmObsManager {
     [[nodiscard]] auto getObservable(ObsIdType key) -> std::shared_ptr<QasmObs>
     {
         RT_FAIL_IF(!isValidObservables({key}), "Invalid observable key");
-        return std::get<0>(observables_[reinterpret_cast<int64_t>(key)]);
+        return std::get<0>(observables_[key]);
     }
 
     /**
@@ -139,11 +139,9 @@ class OpenQasmObsManager {
         obs_vec.reserve(key_size);
 
         for (const auto &key : obsKeys) {
-            auto key_t = reinterpret_cast<int64_t>(key);
-            RT_FAIL_IF(static_cast<size_t>(key_t) >= obs_size || key_t < 0,
-                       "Invalid observable key");
+            RT_FAIL_IF(static_cast<size_t>(key) >= obs_size || key < 0, "Invalid observable key");
 
-            auto &&[obs, type] = observables_[key_t];
+            auto &&[obs, type] = observables_[key];
 
             RT_FAIL_IF(type != ObsType::Basic, "Invalid basic observable to construct TensorProd; "
                                                "NamedObs and HermitianObs are only supported");
@@ -179,11 +177,9 @@ class OpenQasmObsManager {
         obs_vec.reserve(key_size);
 
         for (auto key : obsKeys) {
-            auto key_t = reinterpret_cast<int64_t>(key);
-            RT_FAIL_IF(static_cast<size_t>(key_t) >= obs_size || key_t < 0,
-                       "Invalid observable key");
+            RT_FAIL_IF(static_cast<size_t>(key) >= obs_size || key < 0, "Invalid observable key");
 
-            auto &&[obs, type] = observables_[key_t];
+            auto &&[obs, type] = observables_[key];
             auto contain_obs = std::find(hamiltonian_valid_obs_types.begin(),
                                          hamiltonian_valid_obs_types.end(), type);
 

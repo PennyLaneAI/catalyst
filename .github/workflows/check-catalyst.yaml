@@ -6,53 +6,20 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  qir-stdlib:
-    name: QIR-stdlib Build
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Cancel previous runs
-        uses: styfle/cancel-workflow-action@0.11.0
-        with:
-          access_token: ${{ github.token }}
-
-      - name: Checkout Catalyst repo
-        uses: actions/checkout@v3
-
-      - name: Cache qir-stdlib Build
-        id: cache-qir-stdlib
-        uses: actions/cache@v3
-        with:
-          path: qir-stdlib-build
-          key: ${{ runner.os }}-qir-stdlib-build
-
-      - name: Install rustup with llvm-tools-preview
-        if: steps.cache-qir-stdlib.outputs.cache-hit != 'true'
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          components: llvm-tools-preview
-
-      - name: Install QIR-stdlib
-        if: steps.cache-qir-stdlib.outputs.cache-hit != 'true'
-        run: |
-            make qir
-            mkdir -p qir-stdlib-build/include
-            cp runtime/qir-stdlib/target/release/libqir_stdlib.a qir-stdlib-build/
-            cp runtime/qir-stdlib/target/release/build/include/* qir-stdlib-build/include/
+  constants:
+    name: "Set build matrix"
+    uses: ./.github/workflows/constants.yaml
 
   runtime:
     name: Catalyst-Runtime Build
-    needs: [qir-stdlib]
     runs-on: ubuntu-latest
 
     steps:
-      - name: Cancel previous runs
-        uses: styfle/cancel-workflow-action@0.11.0
-        with:
-          access_token: ${{ github.token }}
-
       - name: Checkout Catalyst repo
         uses: actions/checkout@v3
 
@@ -60,21 +27,13 @@ jobs:
         run: |
           sudo apt-get -y -q install ninja-build make cmake clang libomp-dev
 
-      - name: Get Cached qir-stdlib Build
-        id: cache-qir-stdlib
-        uses: actions/cache@v3
-        with:
-          path: qir-stdlib-build
-          key: Linux-qir-stdlib-build
-          fail-on-cache-miss: True
-
       - name: Build Catalyst-Runtime
         run: |
           COMPILER_LAUNCHER="" \
           RT_BUILD_DIR="$(pwd)/runtime-build" \
-          QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build" \
-          QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include" \
           ENABLE_LIGHTNING_KOKKOS=ON \
+          CMAKE_ARGS="-DENABLE_SANITIZER=ON" \
+          ENABLE_OPENQASM=ON \
           make runtime
 
       - name: Upload Catalyst-Runtime Artifact
@@ -82,26 +41,17 @@ jobs:
         with:
           name: runtime-build
           path: |
-            runtime-build/lib/capi/*.so
-            runtime-build/lib/backend/*.so
+            runtime-build/lib/*.so
           retention-days: 1
 
   llvm:
     name: LLVM Build
+    needs: [constants]
     runs-on: ubuntu-latest
 
     steps:
-    - name: Cancel previous runs
-      uses: styfle/cancel-workflow-action@0.11.0
-      with:
-        access_token: ${{ github.token }}
-
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
-
-    - name: Get LLVM Version
-      id: llvm-hash
-      run: echo "llvm-hash=$(grep llvm .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
 
     # Both the LLVM source and build folder are required for further dialect builds.
     # Caching is significantly faster than git cloning since LLVM is such a large repository.
@@ -111,14 +61,14 @@ jobs:
       uses: actions/cache@v3
       with:
         path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-build-opt
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
 
     - name: Cache LLVM Source
       id: cache-llvm-source
       uses: actions/cache@v3
       with:
         path: mlir/llvm-project
-        key: Linux-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-source
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-source
         enableCrossOsArchive: True
 
     - name: Clone LLVM Submodule
@@ -126,7 +76,7 @@ jobs:
       uses: actions/checkout@v3
       with:
         repository: llvm/llvm-project
-        ref: ${{ steps.llvm-hash.outputs.llvm-hash }}
+        ref: ${{ needs.constants.outputs.llvm_version }}
         path: mlir/llvm-project
 
     - name: Install Deps
@@ -146,92 +96,29 @@ jobs:
         COMPILER_LAUNCHER="" \
         make llvm
 
-  llvm-sanitize:
-    name: LLVM Build (with ASAN and USAN)
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Cancel previous runs
-      uses: styfle/cancel-workflow-action@0.11.0
-      with:
-        access_token: ${{ github.token }}
-
-    - name: Checkout Catalyst repo
-      uses: actions/checkout@v3
-
-    - name: Get LLVM Version
-      id: llvm-hash
-      run: echo "llvm-hash=$(grep llvm .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
-
-    # Both the LLVM source and build folder are required for further dialect builds.
-    # Caching is significantly faster than git cloning since LLVM is such a large repository.
-
-    - name: Cache LLVM Build
-      id: cache-llvm-build
-      uses: actions/cache@v3
-      with:
-        path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-sanitize-build
-
-    - name: Cache LLVM Source
-      id: cache-llvm-source
-      uses: actions/cache@v3
-      with:
-        path: mlir/llvm-project
-        key: Linux-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-sanitize-source
-        enableCrossOsArchive: True
-
-    - name: Clone LLVM Submodule
-      if: steps.cache-llvm-source.outputs.cache-hit != 'true'
-      uses: actions/checkout@v3
-      with:
-        repository: llvm/llvm-project
-        ref: ${{ steps.llvm-hash.outputs.llvm-hash }}
-        path: mlir/llvm-project
-
-    - name: Install Deps
-      if: steps.cache-llvm-build.outputs.cache-hit != 'true'
-      run: |
-        sudo apt-get install -y python3 python3-pip cmake ninja-build clang lld
-        python3 -m pip install numpy pybind11
-
-    - name: Build LLVM
-      if: steps.cache-llvm-build.outputs.cache-hit != 'true'
-      run: |
-        LLVM_BUILD_DIR="$(pwd)/llvm-build" \
-        COMPILER_LAUNCHER="" \
-        LLVM_CMAKE_ARGS="-DLLVM_USE_SANITIZER=\"Address;Undefined\"" \
-        make llvm
-
   mhlo:
     name: MHLO Dialect Build
-    needs: [llvm]
+    needs: [constants, llvm]
     runs-on: ubuntu-latest
 
     steps:
-    - name: Cancel previous runs
-      uses: styfle/cancel-workflow-action@0.11.0
-      with:
-        access_token: ${{ github.token }}
-
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
-
-    - name: Get MHLO Version
-      id: mhlo-hash
-      run: echo "mhlo-hash=$(grep mhlo .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
+    
+    - name: Cache MHLO Source
+      id: cache-mhlo-source
+      uses: actions/cache@v3
+      with:
+        path: mlir/mlir-hlo
+        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-source
+        enableCrossOsArchive: True
 
     - name: Cache MHLO Build
       id: cache-mhlo
       uses: actions/cache@v3
       with:
         path: mhlo-build
-        key: ${{ runner.os }}-mhlo-${{ steps.mhlo-hash.outputs.mhlo-hash }}-default-build
-
-    - name: Get LLVM Version
-      id: llvm-hash
-      if: steps.cache-mhlo.outputs.cache-hit != 'true'
-      run: echo "llvm-hash=$(grep llvm .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
+        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-build
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
@@ -239,7 +126,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: mlir/llvm-project
-        key: Linux-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-source
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-source
         enableCrossOsArchive: True
         fail-on-cache-miss: True
 
@@ -249,17 +136,17 @@ jobs:
       uses: actions/cache@v3
       with:
         path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-build-opt
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
         fail-on-cache-miss: True
 
     - name: Clone MHLO Submodule
       if: |
-        steps.cache-mhlo.outputs.cache-hit != 'true' &&
+        steps.cache-mhlo.outputs.cache-hit != 'true' ||
         steps.cache-mhlo-source.outputs.cache-hit != 'true'
       uses: actions/checkout@v3
       with:
         repository: tensorflow/mlir-hlo
-        ref: ${{ steps.mhlo-hash.outputs.mhlo-hash }}
+        ref: ${{ needs.constants.outputs.mhlo_version }}
         path: mlir/mlir-hlo
 
     - name: Install Deps
@@ -277,33 +164,19 @@ jobs:
 
   enzyme:
     name: Enzyme Build
-    needs: [llvm]
+    needs: [constants, llvm]
     runs-on: ubuntu-latest
 
     steps:
-    - name: Cancel previous runs
-      uses: styfle/cancel-workflow-action@0.11.0
-      with:
-        access_token: ${{ github.token }}
-
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
-
-    - name: Get Enzyme Version
-      id: enzyme-hash
-      run: echo "enzyme-hash=$(grep enzyme .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
 
     - name: Cache Enzyme Build
       id: cache-enzyme
       uses: actions/cache@v3
       with:
         path: enzyme-build
-        key: ${{ runner.os }}-enzyme-${{ steps.enzyme-hash.outputs.enzyme-hash }}-default-build
-
-    - name: Get LLVM Version
-      id: llvm-hash
-      if: steps.cache-enzyme.outputs.cache-hit != 'true'
-      run: echo "llvm-hash=$(grep llvm .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
+        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-build
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
@@ -311,7 +184,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: mlir/llvm-project
-        key: Linux-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-source
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-source
         enableCrossOsArchive: True
         fail-on-cache-miss: True
 
@@ -321,7 +194,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-build-opt
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
         fail-on-cache-miss: True
 
     - name: Clone Enzyme Submodule
@@ -330,7 +203,7 @@ jobs:
       uses: actions/checkout@v3
       with:
         repository: EnzymeAD/Enzyme
-        ref: ${{ steps.enzyme-hash.outputs.enzyme-hash }}
+        ref: ${{ needs.constants.outputs.enzyme_version }}
         path: mlir/Enzyme
 
     - name: Install Deps
@@ -348,15 +221,10 @@ jobs:
 
   quantum:
     name: Quantum Dialects Build
-    needs: [llvm-sanitize]
+    needs: [constants, mhlo, llvm]
     runs-on: ubuntu-latest
 
     steps:
-    - name: Cancel previous runs
-      uses: styfle/cancel-workflow-action@0.11.0
-      with:
-        access_token: ${{ github.token }}
-
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
@@ -365,16 +233,12 @@ jobs:
         sudo apt-get install -y python3 python3-pip cmake ninja-build ccache clang lld
         python3 -m pip install numpy pybind11
 
-    - name: Get LLVM Version
-      id: llvm-hash
-      run: echo "llvm-hash=$(grep llvm .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
-
     - name: Get Cached LLVM Source
       id: cache-llvm-source
       uses: actions/cache@v3
       with:
         path: mlir/llvm-project
-        key: Linux-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-sanitize-source
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-source
         enableCrossOsArchive: True
         fail-on-cache-miss: True
 
@@ -383,7 +247,24 @@ jobs:
       uses: actions/cache@v3
       with:
         path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-sanitize-build
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
+        fail-on-cache-miss: True
+    
+    - name: Get Cached MHLO Source
+      id: cache-mhlo-source
+      uses: actions/cache@v3
+      with:
+        path: mlir/mlir-hlo
+        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-source
+        enableCrossOsArchive: True
+        fail-on-cache-miss: True
+    
+    - name: Get Cached MHLO Build
+      id: cache-mhlo
+      uses: actions/cache@v3
+      with:
+        path: mhlo-build
+        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-build
         fail-on-cache-miss: True
 
     - name: Cache CCache
@@ -397,13 +278,22 @@ jobs:
         key: ${{ runner.os }}-ccache-${{ github.run_id }}
         restore-keys: ${{ runner.os }}-ccache-
 
+    - name: Clone Enzyme Submodule
+      if: |
+        steps.cache-enzyme.outputs.cache-hit != 'true'
+      uses: actions/checkout@v3
+      with:
+        repository: EnzymeAD/Enzyme
+        ref: ${{ needs.constants.outputs.enzyme_version }}
+        path: mlir/Enzyme
+
     - name: Build MLIR Dialects
       run: |
         CCACHE_DIR="$(pwd)/.ccache" \
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         MHLO_BUILD_DIR="$(pwd)/mhlo-build" \
+        ENZYME_SRC_DIR="$(pwd)/Enzyme" \
         DIALECTS_BUILD_DIR="$(pwd)/quantum-build" \
-        LLVM_CMAKE_ARGS="-DLLVM_USE_SANITIZER=\"Address;Undefined\"" \
         make dialects
 
     - name: Upload Quantum Build Artifact
@@ -418,15 +308,10 @@ jobs:
 
   frontend-tests:
     name: Frontend Tests
-    needs: [runtime, mhlo, quantum, enzyme]
+    needs: [constants, runtime, mhlo, quantum]
     runs-on: ubuntu-latest
 
     steps:
-    - name: Cancel previous runs
-      uses: styfle/cancel-workflow-action@0.11.0
-      with:
-        access_token: ${{ github.token }}
-
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
@@ -436,40 +321,28 @@ jobs:
         python3 -m pip install -r requirements.txt
         python3 -m pip install .
 
-    - name: Get LLVM Version
-      id: llvm-hash
-      run: echo "llvm-hash=$(grep llvm .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
-
     - name: Get Cached LLVM Build
       id: cache-llvm-build
       uses: actions/cache@v3
       with:
         path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-sanitize-build
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
         fail-on-cache-miss: True
-
-    - name: Get MHLO Version
-      id: mhlo-hash
-      run: echo "mhlo-hash=$(grep mhlo .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
 
     - name: Get Cached MHLO Build
       id: cache-mhlo
       uses: actions/cache@v3
       with:
         path: mhlo-build
-        key: ${{ runner.os }}-mhlo-${{ steps.mhlo-hash.outputs.mhlo-hash }}-default-build
+        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-build
         fail-on-cache-miss: True
-    
-    - name: Get Enzyme Version
-      id: enzyme-hash
-      run: echo "enzyme-hash=$(grep enzyme .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
 
     - name: Get Cached Enzyme Build
       id: cache-enzyme
       uses: actions/cache@v3
       with:
         path: enzyme-build
-        key: ${{ runner.os }}-enzyme-${{ steps.enzyme-hash.outputs.enzyme-hash }}-default-build
+        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-build
         fail-on-cache-miss: True
 
     - name: Download Quantum Build Artifact
@@ -492,16 +365,15 @@ jobs:
         echo "PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
         echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
         echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
-        echo "ENZYME_DIR=$(pwd)/enzyme-build/Enzyme" >> $GITHUB_ENV
         chmod +x quantum-build/bin/quantum-opt  # artifact upload does not preserve permissions
 
     - name: Run Python Lit Tests
-      continue-on-error: true
       run: |
         llvm-lit -sv frontend/test/lit -j$(nproc)
 
     - name: Run Python Pytest Tests
       run: |
+        # export ASAN_OPTIONS=detect_odr_violation=0
         COVERAGE_REPORT="xml:coverage.xml -p no:warnings" \
         make coverage-frontend
         mv coverage.xml coverage-${{ github.job }}.xml
@@ -519,15 +391,10 @@ jobs:
 
   frontend-tests-lightning-kokkos:
     name: Frontend Tests (backend="lightning.kokkos")
-    needs: [runtime, mhlo, quantum, enzyme]
+    needs: [constants, runtime, mhlo, quantum]
     runs-on: ubuntu-latest
 
     steps:
-    - name: Cancel previous runs
-      uses: styfle/cancel-workflow-action@0.11.0
-      with:
-        access_token: ${{ github.token }}
-
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
@@ -537,40 +404,28 @@ jobs:
         python3 -m pip install -r requirements.txt
         python3 -m pip install .
 
-    - name: Get LLVM Version
-      id: llvm-hash
-      run: echo "llvm-hash=$(grep llvm .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
-
     - name: Get Cached LLVM Build
       id: cache-llvm-build
       uses: actions/cache@v3
       with:
         path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-build-opt
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
         fail-on-cache-miss: True
-
-    - name: Get MHLO Version
-      id: mhlo-hash
-      run: echo "mhlo-hash=$(grep mhlo .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
 
     - name: Get Cached MHLO Build
       id: cache-mhlo
       uses: actions/cache@v3
       with:
         path: mhlo-build
-        key: ${{ runner.os }}-mhlo-${{ steps.mhlo-hash.outputs.mhlo-hash }}-default-build
+        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-build
         fail-on-cache-miss: True
-
-    - name: Get Enzyme Version
-      id: enzyme-hash
-      run: echo "enzyme-hash=$(grep enzyme .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
 
     - name: Get Cached Enzyme Build
       id: cache-enzyme
       uses: actions/cache@v3
       with:
         path: enzyme-build
-        key: ${{ runner.os }}-enzyme-${{ steps.enzyme-hash.outputs.enzyme-hash }}-default-build
+        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-build
         fail-on-cache-miss: True
 
     - name: Download Quantum Build Artifact
@@ -587,14 +442,12 @@ jobs:
 
     - name: Add Frontend Dependencies to PATH
       run: |
-        echo "$(pwd)/enzyme-build/Enzyme" >> $GITHUB_PATH
         echo "$(pwd)/llvm-build/bin" >> $GITHUB_PATH
         echo "$(pwd)/mhlo-build/bin" >> $GITHUB_PATH
         echo "$(pwd)/quantum-build/bin" >> $GITHUB_PATH
         echo "PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
         echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
         echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
-        echo "ENZYME_DIR=$(pwd)/enzyme-build/Enzyme" >> $GITHUB_ENV
         chmod +x quantum-build/bin/quantum-opt  # artifact upload does not preserve permissions
 
     - name: Install lightning.kokkos used in Python tests
@@ -607,15 +460,10 @@ jobs:
 
   frontend-tests-openqasm-device:
     name: Frontend Tests (backend="openqasm3")
-    needs: [qir-stdlib, mhlo, quantum, enzyme, llvm]
+    needs: [constants, mhlo, quantum, llvm]
     runs-on: ubuntu-latest
 
     steps:
-    - name: Cancel previous runs
-      uses: styfle/cancel-workflow-action@0.11.0
-      with:
-        access_token: ${{ github.token }}
-
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
@@ -625,40 +473,28 @@ jobs:
         python3 -m pip install -r requirements.txt
         python3 -m pip install .
 
-    - name: Get LLVM Version
-      id: llvm-hash
-      run: echo "llvm-hash=$(grep llvm .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
-
     - name: Get Cached LLVM Build
       id: cache-llvm-build
       uses: actions/cache@v3
       with:
         path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ steps.llvm-hash.outputs.llvm-hash }}-default-build-opt
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
         fail-on-cache-miss: True
-
-    - name: Get MHLO Version
-      id: mhlo-hash
-      run: echo "mhlo-hash=$(grep mhlo .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
 
     - name: Get Cached MHLO Build
       id: cache-mhlo
       uses: actions/cache@v3
       with:
         path: mhlo-build
-        key: ${{ runner.os }}-mhlo-${{ steps.mhlo-hash.outputs.mhlo-hash }}-default-build
+        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-build
         fail-on-cache-miss: True
-
-    - name: Get Enzyme Version
-      id: enzyme-hash
-      run: echo "enzyme-hash=$(grep enzyme .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_OUTPUT
 
     - name: Get Cached Enzyme Build
       id: cache-enzyme
       uses: actions/cache@v3
       with:
         path: enzyme-build
-        key: ${{ runner.os }}-enzyme-${{ steps.enzyme-hash.outputs.enzyme-hash }}-default-build
+        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-build
         fail-on-cache-miss: True
 
     - name: Download Quantum Build Artifact
@@ -667,11 +503,11 @@ jobs:
         name: quantum-build
         path: quantum-build
 
-    - name: Install awscli (OpenQasm device)
-      id: install-aws-cli
-      uses: unfor19/install-aws-cli-action@v1
+    - name: Download Catalyst-Runtime Artifact
+      uses: actions/download-artifact@v3
       with:
-        version: 2
+        name: runtime-build
+        path: runtime-build/lib
 
     - name: Install additional dependencies (OpenQasm device)
       run: |
@@ -679,24 +515,6 @@ jobs:
         # "Device SV1 does not support quantum circuits" from braket-pl-plugin.
         pip install numpy amazon-braket-sdk amazon-braket-pennylane-plugin "boto3==1.26"
         echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
-
-    - name: Get Cached qir-stdlib Build
-      id: cache-qir-stdlib
-      uses: actions/cache@v3
-      with:
-        path: qir-stdlib-build
-        key: Linux-qir-stdlib-build
-        fail-on-cache-miss: True
-
-    - name: Build Catalyst-Runtime
-      run: |
-        COMPILER_LAUNCHER="" \
-        ENABLE_OPENQASM=ON \
-        RT_BUILD_DIR="$(pwd)/runtime-build" \
-        QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build" \
-        QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include" \
-        CMAKE_ARGS="-DENABLE_OPENMP=ON" \
-        make runtime
 
     - name: Add Frontend Dependencies to PATH
       run: |
@@ -706,109 +524,75 @@ jobs:
         echo "PYTHONPATH=$PYTHONPATH:$(pwd)/quantum-build/python_packages/quantum" >> $GITHUB_ENV
         echo "RUNTIME_LIB_DIR=$(pwd)/runtime-build/lib" >> $GITHUB_ENV
         echo "MLIR_LIB_DIR=$(pwd)/llvm-build/lib" >> $GITHUB_ENV
-        echo "ENZYME_DIR=$(pwd)/enzyme-build/Enzyme" >> $GITHUB_ENV
         chmod +x quantum-build/bin/quantum-opt  # artifact upload does not preserve permissions
 
     - name: Run Python Pytest Tests
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_BRAKET_DEVICE_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_BRAKET_DEVICE_ACCESS_KEY }}
       run: |
-        make pytest TEST_BRAKET=ON
+        make pytest TEST_BRAKET=LOCAL
 
   runtime-tests:
     name: Runtime Tests (Linux)
-    needs: [qir-stdlib]
+    needs: [constants]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        simulator: ['lightning', 'lightning-kokkos', 'openqasm']
+        backend: ${{ fromJson(needs.constants.outputs.rt_backends) }}
 
     steps:
-      - name: Cancel previous runs
-        uses: styfle/cancel-workflow-action@0.11.0
-        with:
-          access_token: ${{ github.token }}
-
       - name: Checkout the repo
         uses: actions/checkout@v3
 
       - name: Install dependencies
         run: |
-          sudo apt-get -y -q install cmake ninja-build libomp-dev lcov
-
-      - name: Install awscli (OpenQasm device)
-        if: ${{ matrix.simulator == 'openqasm' }}
-        id: install-aws-cli
-        uses: unfor19/install-aws-cli-action@v1
-        with:
-          version: 2
+          sudo apt-get -y -q install cmake ninja-build libomp-dev lcov libasan5
 
       - name: Install additional dependencies (OpenQasm device)
-        if: ${{ matrix.simulator == 'openqasm' }}
+        if: ${{ matrix.backend == 'openqasm' }}
         run: |
           pip install numpy amazon-braket-sdk
           echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
 
-      - name: Get Cached qir-stdlib Build
-        id: cache-qir-stdlib
-        uses: actions/cache@v3
-        with:
-          path: qir-stdlib-build
-          key: Linux-qir-stdlib-build
-          fail-on-cache-miss: True
-
       - name: Build Runtime test suite for Lightning simulator
-        if: ${{ matrix.simulator == 'lightning' }}
+        if: ${{ matrix.backend == 'lightning' }}
         run: |
             C_COMPILER=$(which gcc) \
             CXX_COMPILER=$(which g++) \
             COMPILER_LAUNCHER="" \
-            QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build" \
-            QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include" \
             make coverage-runtime
             mv runtime/build/coverage.info coverage-${{ github.job }}.info
 
-      - name: Build Runtime test suite for Lightning-Kokkos simulator
-        if: ${{ matrix.simulator == 'lightning-kokkos' }}
+      - name: Build Runtime test suite with both Lightning and Lightning-Kokkos simulators
+        if: ${{ matrix.backend == 'lightning-kokkos' }}
         run: |
             C_COMPILER=$(which gcc) \
             CXX_COMPILER=$(which g++) \
             COMPILER_LAUNCHER="" \
-            QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build" \
-            QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include" \
             ENABLE_LIGHTNING_KOKKOS=ON \
-            CMAKE_ARGS="-DKokkos_ENABLE_OPENMP=ON" \
+            CMAKE_ARGS="-DENABLE_SANITIZER=ON" \
             make test-runtime
 
       - name: Build Runtime test suite for OpenQasm device
-        if: ${{ matrix.simulator == 'openqasm' }}
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_BRAKET_DEVICE_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_BRAKET_DEVICE_ACCESS_KEY }}
+        if: ${{ matrix.backend == 'openqasm' }}
         run: |
             C_COMPILER=$(which gcc) \
             CXX_COMPILER=$(which g++) \
             COMPILER_LAUNCHER="" \
             ENABLE_OPENQASM=ON \
-            QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build" \
-            QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include" \
             make test-runtime
 
       - name: Upload to Codecov
-        if: ${{ matrix.simulator == 'lightning' }}
+        if: ${{ matrix.backend == 'lightning' }}
         uses: codecov/codecov-action@v3
         with:
           fail_ci_if_error: true
           token: ${{ secrets.CODECOV_TOKEN }}
 
       - name: Build examples
-        if: ${{ matrix.simulator == 'lightning' }}
+        if: ${{ matrix.backend == 'lightning' }}
         run: |
           C_COMPILER=$(which gcc) \
           CXX_COMPILER=$(which g++) \
           COMPILER_LAUNCHER="" \
-          QIR_STDLIB_DIR="$(pwd)/qir-stdlib-build" \
-          QIR_STDLIB_INCLUDES_DIR="$(pwd)/qir-stdlib-build/include" \
           make examples-runtime
+

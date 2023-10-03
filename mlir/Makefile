@@ -8,7 +8,7 @@ MK_DIR := $(dir $(MK_ABSPATH))
 DIALECTS_BUILD_DIR?=$(MK_DIR)/build
 LLVM_BUILD_DIR?=$(MK_DIR)/llvm-project/build
 MHLO_BUILD_DIR?=$(MK_DIR)/mlir-hlo/build
-ENZYME_BUILD_DIR?=$(MK_DIR)/Enzyme/enzyme/build
+ENZYME_BUILD_DIR?=$(MK_DIR)/Enzyme/build
 RT_BUILD_DIR?=$(MK_DIR)/../runtime/build
 ENABLE_LLD?=ON
 LLVM_CMAKE_ARGS?=""
@@ -54,9 +54,6 @@ llvm:
 
 .PHONY: mhlo
 mhlo:
-	# TODO: We can remove this patch whenever this ticket is solved https://github.com/tensorflow/mlir-hlo/issues/68
-	patch -d mlir-hlo/mhlo/analysis --merge --follow-symlinks < patches/add-lmhlo-dependency.patch
-
 	@echo "build MLIR-HLO"
 	cmake -G Ninja -S mlir-hlo -B $(MHLO_BUILD_DIR) \
 		-DCMAKE_BUILD_TYPE=Release \
@@ -75,6 +72,7 @@ mhlo:
 enzyme:
 	@echo "build enzyme"
 	cmake -G Ninja -S Enzyme/enzyme -B $(ENZYME_BUILD_DIR) \
+		-DENZYME_STATIC_LIB=ON \
 		-DCMAKE_BUILD_TYPE=Release \
 		-DLLVM_DIR=$(LLVM_BUILD_DIR)/lib/cmake/llvm \
 		-DCMAKE_C_COMPILER=$(C_COMPILER) \
@@ -86,13 +84,16 @@ enzyme:
 
 .PHONY: dialects
 dialects:
-	@echo "build custom Catalyst MLIR Dialects"
+
+	@echo "build quantum-lsp compiler_driver and dialects"
 	cmake -G Ninja -S . -B $(DIALECTS_BUILD_DIR) \
 		-DCMAKE_BUILD_TYPE=Release \
 		-DLLVM_ENABLE_ASSERTIONS=ON \
 		-DQUANTUM_ENABLE_BINDINGS_PYTHON=ON \
+		-DENZYME_SRC_DIR=$(MK_DIR)/Enzyme \
 		-DPython3_EXECUTABLE="$(PYTHON)" \
 		-DMLIR_DIR=$(LLVM_BUILD_DIR)/lib/cmake/mlir \
+		-DMHLO_DIR=$(MHLO_BUILD_DIR)/lib/cmake/mlir-hlo \
 		-DMHLO_BINARY_DIR=$(MHLO_BUILD_DIR)/bin \
 		-DRUNTIME_LIB_DIR=$(RT_BUILD_DIR)/lib \
 		-DMLIR_LIB_DIR=$(LLVM_BUILD_DIR)/lib \
@@ -103,12 +104,7 @@ dialects:
 		-DLLVM_ENABLE_LLD=$(ENABLE_LLD) \
 		$(LLVM_CMAKE_ARGS)
 
-	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects quantum-lsp-server
-	patch -d $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum --follow-symlinks < patches/use-ir-from-jax.patch
-	patch -d $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/dialects --follow-symlinks < patches/use-cext-from-jax.patch
-	patch -d $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/dialects --follow-symlinks < patches/do-not-infer-result.patch
-	patch -d $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/dialects --follow-symlinks < patches/remove-gradient-cext-import.patch
-	patch -d $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/dialects --follow-symlinks < patches/remove-quantum-cext-import.patch
+	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects quantum-lsp-server compiler_driver
 
 .PHONY: test
 test:

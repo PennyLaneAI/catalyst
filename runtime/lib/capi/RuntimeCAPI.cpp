@@ -104,8 +104,8 @@ void __quantum__rt__print_state() { Catalyst::Runtime::CTX->getDevice()->PrintSt
 
 void __quantum__rt__toggle_recorder(bool status)
 {
+    Catalyst::Runtime::CTX->setDeviceRecorder(status);
     if (!Catalyst::Runtime::CTX->getDevice()) {
-        Catalyst::Runtime::CTX->setDeviceRecorder(status);
         return;
     }
 

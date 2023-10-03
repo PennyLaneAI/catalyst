@@ -21,8 +21,8 @@ func.func private @foo(%arg0: f64) -> f64
 %0 = arith.constant 1.2 : f64
 
 gradient.grad "fd" @foo(%0) : (f64) -> f64
-gradient.grad "defer" @foo(%0) : (f64) -> f64
-gradient.grad "defer" @foo(%0) : (f64) -> f64
+gradient.grad "auto" @foo(%0) : (f64) -> f64
+gradient.grad "auto" @foo(%0) : (f64) -> f64
 
 // expected-error@+1 {{got invalid differentiation method: none}}
 gradient.grad "none" @foo(%0) : (f64) -> f64
@@ -113,3 +113,44 @@ gradient.grad "fd" @multiple_args_res(%f0, %t0) {diffArgIndices = dense<[0, 1]> 
 // expected-error@+1 {{incorrect number of results in the gradient of the callee, expected 4 results but got 2}}
 gradient.grad "fd" @multiple_args_res(%f0, %t0) {diffArgIndices = dense<[0, 1]> : tensor<2xindex>}
     : (f64, tensor<3xf64>) -> (f64, tensor<2x3xf64>)
+
+// -----
+
+func.func private @foo(%arg0: tensor<f64>)
+
+%f0 = arith.constant 0.7 : f64
+%t0 = tensor.from_elements %f0 : tensor<f64>
+%m0 = memref.alloc() : memref<f64>
+
+// expected-error@+1 {{cannot have both tensor results and memref output arguments}}
+%grad = gradient.backprop @foo(%t0) grad_out(%m0 : memref<f64>) cotangents(%t0: tensor<f64>) : (tensor<f64>) -> tensor<f64>
+
+// -----
+
+func.func private @foo(%arg0: tensor<f64>)
+
+%f0 = arith.constant 0.7 : f64
+%t0 = tensor.from_elements %f0 : tensor<f64>
+%m0 = memref.alloc() : memref<f64>
+
+// expected-error@+1 {{cannot have callee result buffers before bufferization}}
+%grad = gradient.backprop @foo(%t0) callee_out(%m0 : memref<f64>) cotangents(%t0: tensor<f64>) : (tensor<f64>) -> tensor<f64>
+
+// -----
+
+func.func private @foo(%arg0: memref<f64>)
+
+%m0 = memref.alloc() : memref<f64>
+
+// expected-error@+1 {{need as many callee result buffers as there are cotangents, expected 1 but got 0}}
+gradient.backprop @foo(%m0) grad_out(%m0 : memref<f64>) cotangents(%m0: memref<f64>) : (memref<f64>) -> ()
+
+// -----
+
+func.func private @multiple_args(%arg0: tensor<f64>, %arg1: tensor<f64>)
+
+%f0 = arith.constant 0.7 : f64
+%t0 = tensor.from_elements %f0 : tensor<f64>
+
+// expected-error@+1 {{number of gradient results did not match number of differentiable arguments, expected 1 but got 2}}
+%grad:2 = gradient.backprop @multiple_args(%t0, %t0) cotangents(%t0: tensor<f64>) {diffArgIndices = dense<0> : tensor<1xindex>}: (tensor<f64>, tensor<f64>) -> (tensor<f64>, tensor<f64>)

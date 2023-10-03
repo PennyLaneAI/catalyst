@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: quantum-opt --adjoint-lowering --split-input-file %s | FileCheck %s
+// RUN: quantum-opt --adjoint-lowering --split-input-file -verify-diagnostics %s | FileCheck %s
 
 // CHECK-LABEL:      @workflow_plain
 func.func private @workflow_plain() -> tensor<4xcomplex<f64>> attributes {} {
@@ -101,3 +101,16 @@ func.func private @workflow_nested() -> tensor<4xcomplex<f64>> attributes {} {
   return %5 : tensor<4xcomplex<f64>>
 }
 
+// -----
+
+func.func @workflow_unhandled() {
+  %0 = quantum.alloc(1) : !quantum.reg
+  quantum.adjoint (%0) : !quantum.reg {
+  ^bb0(%arg0: !quantum.reg):
+    %qb = quantum.extract %arg0[0] : !quantum.reg -> !quantum.bit
+    // expected-error@+1 {{Unhandled operation in adjoint region}}
+    quantum.measure %qb : i1, !quantum.bit
+    quantum.yield %arg0 : !quantum.reg
+  }
+  return
+}

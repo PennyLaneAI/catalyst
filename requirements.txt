@@ -1,15 +1,21 @@
+# build dependencies
 numpy
 pybind11>=2.8.0
 PyYAML
 
+# formatting/linting
 black[jupyter]
 clang-format==14.*
 clang-tidy==14.*
 pylint
 isort
 
+# testing
 lit
 pytest
 pytest-xdist
 pytest-cov
 nbmake
+
+# optional rt dependencies
+tensorflow-cpu

@@ -22,6 +22,16 @@ using namespace mlir;
 namespace catalyst {
 namespace gradient {
 
+func::FuncOp genParamCountFunction(PatternRewriter &rewriter, Location loc, func::FuncOp callee);
+
+/// Generate a new mlir function that splits out classical preprocessing from any quantum
+/// operations, then calls a modified QNode that explicitly takes the saved parameters. This allows
+/// a classical automatic differentiation tool like Enzyme to process this function without needing
+/// to know how to differentiate any quantum operations, as those derivatives will be handled
+/// separately.
+func::FuncOp genSplitPreprocessed(PatternRewriter &rewriter, Location loc, func::FuncOp qnode,
+                                  func::FuncOp qnodeQuantum);
+
 func::FuncOp genArgMapFunction(PatternRewriter &rewriter, Location loc, func::FuncOp callee);
 
 } // namespace gradient

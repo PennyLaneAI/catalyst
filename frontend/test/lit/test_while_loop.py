@@ -24,19 +24,20 @@ from catalyst import qjit, while_loop
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=1))
 def circuit(n: int):
-    # CHECK:   "scf.while"({{%[a-zA-Z0-9_]+}}, {{%[a-zA-Z0-9_]+}}, {{%[a-zA-Z0-9_]+}})
-    # CHECK:   [[ct:%[a-zA-Z0-9_]+]] = stablehlo.compare  LT, %arg1, %arg2,  SIGNED
-    # CHECK:   [[cond:%[a-zA-Z0-9_]+]] = "tensor.extract"([[ct]])
-    # CHECK:   "scf.condition"([[cond]], %arg1, %arg2, %arg3)
+    # CHECK:   scf.while ([[v0:%.+]] = {{%.+}}, [[array0:%.+]] = {{%.+}})
+    # CHECK:       [[ct:%.+]] = stablehlo.compare LT, [[v0]], %arg0, SIGNED
+    # CHECK:       [[cond:%.+]] = tensor.extract [[ct]]
+    # CHECK:       scf.condition([[cond]]) [[v0]], [[array0]]
+
+    # CHECK:   ^bb0([[v0:%.+]]: tensor<i64>, [[array0:%.+]]: !quantum.reg):
+    # CHECK:       [[v0p:%.+]] = stablehlo.add [[v0]]
+    # CHECK:       [[q0:%.+]] = quantum.extract [[array0]][{{.+}}]
+    # CHECK:       [[q1:%[a-zA-Z0-9_]]] = quantum.custom "PauliX"() [[q0]]
+    # CHECK:       [[array1:%.+]] = quantum.insert [[array0]][{{.+}}], [[q1]]
+    # CHECK:       scf.yield [[v0p]], [[array1]]
     @while_loop(lambda v: v[0] < v[1])
-    # CHECK:   ^bb0([[v0:%[a-zA-Z0-9_]+]]: tensor<i64>, [[v1:%[a-zA-Z0-9_]+]]: tensor<i64>, [[array0:%[a-zA-Z0-9_]+]]: !quantum.reg):
     def loop(v):
-        # CHECK:   [[v0p:%[a-zA-Z0-9_]+]] = stablehlo.add [[v0]]
-        # CHECK:   [[q0:%[a-zA-Z0-9_]+]] = "quantum.extract"(%arg3, {{%[a-zA-Z0-9_]+}})
-        # CHECK:   [[q1:%[a-zA-Z0-9_]]] = "quantum.custom"([[q0]]) {gate_name = "PauliX"
         qml.PauliX(wires=0)
-        # CHECK:   [[array1:%[a-zA-Z0-9_]+]] = "quantum.insert"(%arg3, {{%[a-zA-Z0-9_]+}}, [[q1]])
-        # CHECK:   "scf.yield"([[v0p]], [[v1]], [[array1]])
         return v[0] + 1, v[1]
 
     out = loop((0, n))
@@ -48,27 +49,28 @@ print(circuit.mlir)
 
 # CHECK-NOT: Verification failed
 # CHECK-LABEL: func.func public @jit_circuit_outer_scope_reference
-# CHECK-SAME: ([[c1:%[a-zA-Z0-9_]+]]
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=1))
 def circuit_outer_scope_reference(n: int):
-    # CHECK:   [[array0:%[a-zA-Z0-9_]+]] = "quantum.alloc"
-    # CHECK:   "scf.while"({{%[a-zA-Z0-9_]+}}, {{%[a-zA-Z0-9_]+}})
-    # CHECK:   [[ct:%[a-zA-Z0-9_]+]] = stablehlo.compare  LT, %arg1, [[c1]],  SIGNED
-    # CHECK:   [[cond:%[a-zA-Z0-9_]+]] = "tensor.extract"([[ct]])
-    # CHECK:   "scf.condition"([[cond]], %arg1, %arg2)
+    # CHECK:   [[array0:%.+]] = quantum.alloc
+
+    # CHECK:   scf.while ([[v0:%.+]] = {{%.+}}, [[array_inner:%.+]] = {{%.+}})
+    # CHECK:       [[ct:%.+]] = stablehlo.compare LT, [[v0]], %arg0, SIGNED
+    # CHECK:       [[cond:%.+]] = tensor.extract [[ct]]
+    # CHECK:       scf.condition([[cond]]) [[v0]], [[array_inner]]
+
+    # CHECK:   ^bb0([[v0:%.+]]: tensor<i64>, [[array_inner:%.+]]: !quantum.reg):
+    # CHECK:       [[v0p:%[a-zA-Z0-9_]]] = stablehlo.add [[v0]]
+    # CHECK:       [[q0:%.+]] = quantum.extract [[array_inner]][ 0]
+    # CHECK:       [[q1:%[a-zA-Z0-9_]]] = quantum.custom "PauliX"() [[q0]]
+    # CHECK:       [[array_inner_2:%.+]] = quantum.insert [[array_inner]][ 0], [[q1]]
+    # CHECK:       scf.yield [[v0p]], [[array_inner_2]]
     @while_loop(lambda i: i < n)
-    # CHECK:   ^bb0([[v0:%[a-zA-Z0-9_]+]]: tensor<i64>, [[array_inner:%[a-zA-Z0-9_]+]]: !quantum.reg):
     def loop(i):
-        # CHECK:   [[v0p:%[a-zA-Z0-9_]]] = stablehlo.add [[v0]]
-        # CHECK:   [[q0:%[a-zA-Z0-9_]+]] = "quantum.extract"([[array_inner]], {{%[a-zA-Z0-9_]+}})
-        # CHECK:   [[q1:%[a-zA-Z0-9_]]] = "quantum.custom"([[q0]]) {gate_name = "PauliX"
-        # CHECK:   [[array_inner_2:%[a-zA-Z0-9_]+]] = "quantum.insert"([[array_inner]], {{%[a-zA-Z0-9_]+}}, [[q1]])
         qml.PauliX(wires=0)
-        # CHECK:   "scf.yield"([[v0p]], [[array_inner_2]])
         return i + 1
 
-    # CHECK:   "quantum.dealloc"([[array0]])
+    # CHECK:   quantum.dealloc [[array0]]
     # CHECK:   return
     return loop(0)
 
@@ -81,28 +83,28 @@ print(circuit_outer_scope_reference.mlir)
 @qjit(target="mlir")
 @qml.qnode(qml.device("lightning.qubit", wires=1))
 def circuit_multiple_args(n: int):
-    # CHECK:   [[R0:%.+]] = "quantum.alloc"() {{.+}} -> !quantum.reg
-    # CHECK:   [[C0:%.+]] = stablehlo.constant dense<0> : tensor<i64>
-    # CHECK:   [[C1:%.+]] = stablehlo.constant dense<1> : tensor<i64>
+    # CHECK-DAG:   [[R0:%.+]] = quantum.alloc({{.+}})
+    # CHECK-DAG:   [[C0:%.+]] = stablehlo.constant dense<0> : tensor<i64>
+    # CHECK-DAG:   [[C1:%.+]] = stablehlo.constant dense<1> : tensor<i64>
 
-    # CHECK:   "scf.while"([[C0]], %arg0, [[C1]], [[R0]])
-    # CHECK:       [[LT:%.+]] = stablehlo.compare  LT, %arg1, %arg2,  SIGNED
-    # CHECK:       [[COND:%.+]] = "tensor.extract"([[LT]])
-    # CHECK:       "scf.condition"([[COND]], %arg1, %arg2, %arg3, %arg4)
+    # CHECK:   scf.while ([[w0:%.+]] = [[C0]], [[w3:%.+]] = [[R0]])
+    # CHECK:       [[LT:%.+]] = stablehlo.compare LT, [[w0]], %arg0, SIGNED
+    # CHECK:       [[COND:%.+]] = tensor.extract [[LT]]
+    # CHECK:       scf.condition([[COND]]) [[w0]], [[w3]]
 
-    # CHECK:   ^bb0(%arg1: tensor<i64>, %arg2: tensor<i64>, %arg3: tensor<i64>, %arg4: !quantum.reg):
-    # CHECK:       [[V0p:%.+]] = stablehlo.add %arg1, %arg3
-    # CHECK:       [[Q0:%.+]] = "quantum.extract"(%arg4
-    # CHECK:       [[Q1:%.+]] = "quantum.custom"([[Q0]]) {gate_name = "PauliX"
-    # CHECK:       [[QREGp:%.+]] = "quantum.insert"(%arg4, {{%[a-zA-Z0-9_]+}}, [[Q1]])
-    # CHECK:       "scf.yield"([[V0p]], %arg2, %arg3, [[QREGp]])
+    # CHECK:   ^bb0([[w0:%.+]]: tensor<i64>, [[w3:%.+]]: !quantum.reg):
+    # CHECK:       [[V0p:%.+]] = stablehlo.add [[w0]], [[C1]]
+    # CHECK:       [[Q0:%.+]] = quantum.extract [[w3]][{{.+}}]
+    # CHECK:       [[Q1:%.+]] = quantum.custom "PauliX"() [[Q0]]
+    # CHECK:       [[QREGp:%.+]] = quantum.insert [[w3]][{{.+}}], [[Q1]]
+    # CHECK:       scf.yield [[V0p]], [[QREGp]]
     @while_loop(lambda v, _: v[0] < v[1])
     def loop(v, inc):
         qml.PauliX(wires=0)
         return (v[0] + inc, v[1]), inc
 
     out = loop((0, n), 1)
-    # CHECK:   "quantum.dealloc"([[R0]])
+    # CHECK:   quantum.dealloc [[R0]]
     # CHECK:   return
     return out[0]
 

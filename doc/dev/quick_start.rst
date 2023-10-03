@@ -40,7 +40,8 @@ PennyLane. However, some of PennyLane's features may not be fully supported yet,
 
 .. warning::
 
-    The only supported backend device is currently ``lightning.qubit``, but future plans include the addition of more.
+    The supported backend devices are currently ``lightning.qubit``, ``lightning.kokkos``,
+    ``braket.local.qubit``, and ``braket.aws.qubit`` but future plans include the addition of more.
 
 PennyLane tapes are still used internally by Catalyst and you can express your circuits in the
 way you are used to, as long as you ensure that all operations are added to the main tape.
@@ -89,8 +90,8 @@ Operations
 ----------
 Catalyst allows you to use :doc:`quantum operations <introduction/operations>`
 available in PennyLane either via native support by the runtime or PennyLane's decomposition rules.
-The :func:`qml.adjoint() <pennylane.adjoint>` and :func:`qml.ctrl() <pennylane.ctrl>` functions in PennyLane are also supported via the decomposition mechanism in Catalyst.
-For example,
+The :func:`qml.adjoint() <pennylane.adjoint>` and :func:`qml.ctrl() <pennylane.ctrl>` functions in
+PennyLane are also supported via the decomposition mechanism in Catalyst. For example,
 
 .. code-block:: python
 
@@ -534,6 +535,7 @@ Calculating Quantum Gradients
     :nosignatures:
 
     ~catalyst.grad
+    ~catalyst.jacobian
     ~catalyst.vjp
     ~catalyst.jvp
 
@@ -546,7 +548,7 @@ Calculating Quantum Gradients
 using finite-difference, parameter-shift, or adjoint-jacobian methods. See the documentation for more details.
 
 
-This decorator accepts the function to differentiate, a differentiation strategy, and the argnument indices of the function with which to differentiate:
+This decorator accepts the function to differentiate, a differentiation strategy, and the argument indices of the function with which to differentiate:
 
 .. code-block:: python
 
@@ -566,7 +568,7 @@ array(-3.14159265)
 To specify the differentiation strategy, the ``method`` argument can be passed
 to the ``grad`` function:
 
-- ``method="defer"``: Quantum components of the hybrid function are
+- ``method="auto"``: Quantum components of the hybrid function are
   differentiated according to the corresponding QNode ``diff_method``, while
   the classical computation is differentiated using traditional autodiff.
 
@@ -607,6 +609,28 @@ also feasible.
 
 >>> workflow(jnp.array([2.0, 3.0]))
 array([-2.88051099, -1.92034063])
+
+The :func:`.grad` decorator works for functions that return a scalar value. You can also use the :func:`.jacobian`
+decorator to compute Jacobian matrices of general hybrid functions with multiple or multivariate results.
+
+.. code-block:: python
+
+    @qjit
+    def workflow(x):
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def circuit(x):
+            qml.RX(jnp.pi * x[0], wires=0)
+            qml.RY(x[1], wires=0)
+            return qml.probs()
+
+        g = jacobian(circuit, method="auto")
+        return g(x)
+
+>>> workflow(jnp.array([2.0, 1.0]))
+array([[-1.32116540e-07,  1.33781874e-07],
+       [-4.20735506e-01,  4.20735506e-01]])
+
+This decorator has the same methods and API as `grad`. See the documentation for more details.
 
 Optimizers
 ----------

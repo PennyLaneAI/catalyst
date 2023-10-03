@@ -23,19 +23,17 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 
-#include "Gradient/Utils/CompDiffArgIndices.h"
-#include "Gradient/Utils/GetDiffMethod.h"
+#include "Gradient/Utils/DifferentialQNode.h"
+#include "Gradient/Utils/GradientShape.h"
 
 namespace catalyst {
 namespace gradient {
 
 LogicalResult FiniteDiffLowering::match(GradOp op) const
 {
-    // Assume for now that specifying "fd" on the grad op takes precedence over any "diff_method"
-    // specified on any internal QNodes. Relaxing this assumption depends on further integration
-    // with Enzyme.
-    if (op.getMethod() == "fd" || getQNodeDiffMethod(op) == "finite-diff")
+    if (op.getMethod() == "fd") {
         return success();
+    }
 
     return failure();
 }
@@ -43,7 +41,7 @@ LogicalResult FiniteDiffLowering::match(GradOp op) const
 void FiniteDiffLowering::rewrite(GradOp op, PatternRewriter &rewriter) const
 {
     Location loc = op.getLoc();
-    const std::vector<size_t> &diffArgIndices = compDiffArgIndices(op.getDiffArgIndices());
+    const std::vector<size_t> &diffArgIndices = computeDiffArgIndices(op.getDiffArgIndices());
     std::stringstream uniquer;
     std::copy(diffArgIndices.begin(), diffArgIndices.end(), std::ostream_iterator<int>(uniquer));
     std::string fnName = op.getCallee().str() + ".finitediff" + uniquer.str();

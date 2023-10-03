@@ -4,7 +4,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 include(FetchContent)
 
 set(LIGHTNING_GIT_TAG "master" CACHE STRING "GIT_TAG value to build Lightning")
-set(source_files "StateVectorDynamicCPU.cpp")
+set(source_files "StateVectorLQubitDynamic.cpp")
 FetchContent_Declare(
     pennylane_lightning
     GIT_REPOSITORY https://github.com/PennyLaneAI/pennylane-lightning.git
@@ -12,6 +12,16 @@ FetchContent_Declare(
 )
 set(CMAKE_POSITION_INDEPENDENT_CODE ON) # build with -fPIC
 set(ENABLE_KOKKOS OFF CACHE BOOL "Enable Kokkos")
+
+if(ENABLE_LIGHTNING AND ENABLE_LIGHTNING_KOKKOS)
+    set(PL_BACKEND "lightning_qubit;lightning_kokkos" CACHE STRING "PennyLane Lightning backend")
+elseif(ENABLE_LIGHTNING)
+    set(PL_BACKEND "lightning_qubit" CACHE STRING "PennyLane Lightning backend")
+elseif(ENABLE_LIGHTNING_KOKKOS)
+    set(PL_BACKEND "lightning_kokkos" CACHE STRING "PennyLane Lightning backend")
+endif()
+
+set(ENABLE_PYTHON OFF CACHE BOOL "Enable compilation of the Python module")
 FetchContent_MakeAvailable(pennylane_lightning)
 
 add_library(rt_interfaces INTERFACE)
@@ -21,20 +31,9 @@ target_include_directories(rt_interfaces INTERFACE .)
 
 set(LIGHTNING_KOKKOS_GIT_TAG "main" CACHE STRING "GIT_TAG value to build Lightning-Kokkos")
 
-if(ENABLE_LIGHTNING_KOKKOS)
-    FetchContent_Declare(
-        pennylane_lightning_kokkos
-        GIT_REPOSITORY https://github.com/PennyLaneAI/pennylane-lightning-kokkos.git
-        GIT_TAG        ${LIGHTNING_KOKKOS_GIT_TAG}
-    )
-
-    FetchContent_MakeAvailable(pennylane_lightning_kokkos)
-    
-    target_link_libraries(rt_interfaces INTERFACE pennylane_lightning_kokkos)
-endif()
 
 if(ENABLE_OPENQASM)
-    find_package(pybind11)
+    find_package(pybind11 CONFIG)
 
     if(pybind11_FOUND)
         message(STATUS "Found pybind11")
@@ -47,12 +46,13 @@ if(ENABLE_OPENQASM)
 
         FetchContent_Declare(pybind11
         GIT_REPOSITORY https://github.com/pybind/pybind11.git
-        GIT_TAG        v2.10.4
+        GIT_TAG        v2.10.1
         )
 
         FetchContent_MakeAvailable(pybind11)
     endif()
 
-    target_link_libraries(rt_interfaces INTERFACE pybind11::embed)
+    # To avoid link to libpython, we use pybind11::module interface library.
+    target_link_libraries(rt_interfaces INTERFACE pybind11::module)
 
 endif()

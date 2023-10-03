@@ -132,8 +132,6 @@ struct BraketRunner : public OpenQasmRunner {
 
         py::exec(
             R"(
-            from collections import namedtuple
-
             from braket.aws import AwsDevice
             from braket.devices import LocalSimulator
             from braket.ir.openqasm import Program as OpenQasmProgram
@@ -148,6 +146,7 @@ struct BraketRunner : public OpenQasmRunner {
                         "device must be either 'braket.devices.LocalSimulator' or 'braket.aws.AwsDevice'"
                     )
                 if kwargs != "":
+                    kwargs = kwargs.replace("'", "")
                     kwargs = kwargs[1:-1].split(", ") if kwargs[0] == "(" else kwargs.split(", ")
                     if len(kwargs) != 2:
                         raise ValueError(
@@ -156,12 +155,13 @@ struct BraketRunner : public OpenQasmRunner {
                     result = device.run(
                         OpenQasmProgram(source=circuit),
                         shots=int(shots),
-                        s3_destination_folder=namedtuple(kwargs),
+                        s3_destination_folder=tuple(kwargs),
                     ).result()
                 else:
                     result = device.run(OpenQasmProgram(source=circuit), shots=int(shots)).result()
                 result = str(result)
             except Exception as e:
+                print(f"circuit: {circuit}")
                 msg = str(e)
               )",
             py::globals(), locals);
@@ -187,8 +187,6 @@ struct BraketRunner : public OpenQasmRunner {
 
         py::exec(
             R"(
-            from collections import namedtuple
-
             from braket.aws import AwsDevice
             from braket.devices import LocalSimulator
             from braket.ir.openqasm import Program as OpenQasmProgram
@@ -203,6 +201,7 @@ struct BraketRunner : public OpenQasmRunner {
                         "device must be either 'braket.devices.LocalSimulator' or 'braket.aws.AwsDevice'"
                     )
                 if kwargs != "":
+                    kwargs = kwargs.replace("'", "")
                     kwargs = kwargs[1:-1].split(", ") if kwargs[0] == "(" else kwargs.split(", ")
                     if len(kwargs) != 2:
                         raise ValueError(
@@ -211,7 +210,7 @@ struct BraketRunner : public OpenQasmRunner {
                     result = device.run(
                         OpenQasmProgram(source=circuit),
                         shots=int(shots),
-                        s3_destination_folder=namedtuple(kwargs),
+                        s3_destination_folder=tuple(kwargs),
                     ).result()
                 else:
                     result = device.run(OpenQasmProgram(source=circuit), shots=int(shots)).result()
@@ -220,6 +219,7 @@ struct BraketRunner : public OpenQasmRunner {
                 for i in range(2 ** int(num_qubits)):
                     probs_list.append(probs_dict[i] if i in probs_dict else 0)
             except Exception as e:
+                print(f"circuit: {circuit}")
                 msg = str(e)
               )",
             py::globals(), locals);
@@ -252,8 +252,6 @@ struct BraketRunner : public OpenQasmRunner {
 
         py::exec(
             R"(
-            from collections import namedtuple
-
             import numpy as np
             from braket.aws import AwsDevice
             from braket.devices import LocalSimulator
@@ -269,6 +267,7 @@ struct BraketRunner : public OpenQasmRunner {
                         "device must be either 'braket.devices.LocalSimulator' or 'braket.aws.AwsDevice'"
                     )
                 if kwargs != "":
+                    kwargs = kwargs.replace("'", "")
                     kwargs = kwargs[1:-1].split(", ") if kwargs[0] == "(" else kwargs.split(", ")
                     if len(kwargs) != 2:
                         raise ValueError(
@@ -277,12 +276,13 @@ struct BraketRunner : public OpenQasmRunner {
                     result = device.run(
                         OpenQasmProgram(source=circuit),
                         shots=int(shots),
-                        s3_destination_folder=namedtuple(kwargs),
+                        s3_destination_folder=tuple(kwargs),
                     ).result()
                 else:
                     result = device.run(OpenQasmProgram(source=circuit), shots=int(shots)).result()
                 samples = np.array(result.measurements).flatten()
             except Exception as e:
+                print(f"circuit: {circuit}")
                 msg = str(e)
               )",
             py::globals(), locals);
@@ -314,8 +314,6 @@ struct BraketRunner : public OpenQasmRunner {
 
         py::exec(
             R"(
-            from collections import namedtuple
-
             from braket.aws import AwsDevice
             from braket.devices import LocalSimulator
             from braket.ir.openqasm import Program as OpenQasmProgram
@@ -330,6 +328,7 @@ struct BraketRunner : public OpenQasmRunner {
                         "device must be either 'braket.devices.LocalSimulator' or 'braket.aws.AwsDevice'"
                     )
                 if kwargs != "":
+                    kwargs = kwargs.replace("'", "")
                     kwargs = kwargs[1:-1].split(", ") if kwargs[0] == "(" else kwargs.split(", ")
                     if len(kwargs) != 2:
                         raise ValueError(
@@ -338,12 +337,13 @@ struct BraketRunner : public OpenQasmRunner {
                     result = device.run(
                         OpenQasmProgram(source=circuit),
                         shots=int(shots),
-                        s3_destination_folder=namedtuple(kwargs),
+                        s3_destination_folder=tuple(kwargs),
                     ).result()
                 else:
                     result = device.run(OpenQasmProgram(source=circuit), shots=int(shots)).result()
                 expval = result.values
             except Exception as e:
+                print(f"circuit: {circuit}")
                 msg = str(e)
               )",
             py::globals(), locals);
@@ -369,8 +369,6 @@ struct BraketRunner : public OpenQasmRunner {
 
         py::exec(
             R"(
-            from collections import namedtuple
-
             from braket.aws import AwsDevice
             from braket.devices import LocalSimulator
             from braket.ir.openqasm import Program as OpenQasmProgram
@@ -385,6 +383,7 @@ struct BraketRunner : public OpenQasmRunner {
                         "device must be either 'braket.devices.LocalSimulator' or 'braket.aws.AwsDevice'"
                     )
                 if kwargs != "":
+                    kwargs = kwargs.replace("'", "")
                     kwargs = kwargs[1:-1].split(", ") if kwargs[0] == "(" else kwargs.split(", ")
                     if len(kwargs) != 2:
                         raise ValueError(
@@ -393,12 +392,13 @@ struct BraketRunner : public OpenQasmRunner {
                     result = device.run(
                         OpenQasmProgram(source=circuit),
                         shots=int(shots),
-                        s3_destination_folder=namedtuple(kwargs),
+                        s3_destination_folder=tuple(kwargs),
                     ).result()
                 else:
                     result = device.run(OpenQasmProgram(source=circuit), shots=int(shots)).result()
                 var = result.values
             except Exception as e:
+                print(f"circuit: {circuit}")
                 msg = str(e)
               )",
             py::globals(), locals);

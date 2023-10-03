@@ -21,28 +21,12 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Errc.h"
 
-#include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
-#include "mlir/Dialect/Index/IR/IndexDialect.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/Dialect/SCF/IR/SCF.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/SymbolTable.h"
-#include "mlir/Pass/Pass.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#include "Gradient/IR/GradientOps.h"
-#include "Gradient/Utils/CompDiffArgIndices.h"
 #include "Gradient/Utils/EinsumLinalgGeneric.h"
 #include "Gradient/Utils/GradientShape.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/IR/PatternMatch.h"
-
-#include "Gradient/IR/GradientOps.h"
-#include "Gradient/Transforms/Passes.h"
-#include "Gradient/Transforms/Patterns.h"
 #include "Quantum/IR/QuantumOps.h"
 
 #include "JVPVJPPatterns.hpp"
@@ -80,7 +64,7 @@ LogicalResult JVPLoweringPattern::matchAndRewrite(JVPOp op, PatternRewriter &rew
 
     Location loc = op.getLoc();
 
-    auto func_diff_operand_indices = compDiffArgIndices(op.getDiffArgIndices());
+    auto func_diff_operand_indices = computeDiffArgIndices(op.getDiffArgIndices());
     LLVM_DEBUG(dbgs() << "jvp_num_operands " << op.getOperands().size() << " \n");
     LLVM_DEBUG(dbgs() << "func_diff_operand_indices: " << func_diff_operand_indices << " \n");
     assert(func_diff_operand_indices.size() <= op.getOperands().size() / 2);
@@ -139,17 +123,17 @@ LogicalResult JVPLoweringPattern::matchAndRewrite(JVPOp op, PatternRewriter &rew
             assert(sjac_param == sparam &&
                    "Jacobian shape doesn't contain the parameter shape as a prefix");
 
-            std::vector<size_t> jacAxisNames;
+            std::vector<int64_t> jacAxisNames;
             {
                 for (size_t i = 0; i < sjac.size(); i++)
                     jacAxisNames.push_back(i);
             }
-            std::vector<size_t> tangAxisNames;
+            std::vector<int64_t> tangAxisNames;
             {
                 for (size_t i = 0; i < stang.size(); i++)
                     tangAxisNames.push_back(i);
             }
-            std::vector<size_t> jvpAxisNames;
+            std::vector<int64_t> jvpAxisNames;
             {
                 for (size_t i = 0; i < sjac.size() - sparam.size(); i++)
                     jvpAxisNames.push_back(i + tangAxisNames.size());
@@ -197,7 +181,7 @@ LogicalResult VJPLoweringPattern::matchAndRewrite(VJPOp op, PatternRewriter &rew
 
     Location loc = op.getLoc();
 
-    auto func_diff_operand_indices = compDiffArgIndices(op.getDiffArgIndices());
+    auto func_diff_operand_indices = computeDiffArgIndices(op.getDiffArgIndices());
     LLVM_DEBUG(dbgs() << "vjp_num_operands " << op.getOperands().size() << " \n");
     LLVM_DEBUG(dbgs() << "func_diff_operand_indices: " << func_diff_operand_indices << " \n");
 
@@ -255,17 +239,17 @@ LogicalResult VJPLoweringPattern::matchAndRewrite(VJPOp op, PatternRewriter &rew
             assert(sjac_cotang == scotang &&
                    "Jacobian shape doesn't contain the cotang shape as a suffix");
 
-            std::vector<size_t> jacAxisNames;
+            std::vector<int64_t> jacAxisNames;
             {
                 for (size_t i = 0; i < sjac.size(); i++)
                     jacAxisNames.push_back(i);
             }
-            std::vector<size_t> cotangAxisNames;
+            std::vector<int64_t> cotangAxisNames;
             {
                 for (size_t i = sjac.size() - scotang.size(); i < sjac.size(); i++)
                     cotangAxisNames.push_back(i);
             }
-            std::vector<size_t> vjpAxisNames;
+            std::vector<int64_t> vjpAxisNames;
             {
                 for (size_t i = 0; i < sjac.size() - scotang.size(); i++)
                     vjpAxisNames.push_back(i);

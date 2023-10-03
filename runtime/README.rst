@@ -30,7 +30,7 @@ The directory is structured as follows:
 - `extensions <https://github.com/PennyLaneAI/catalyst/tree/main/runtime/extensions>`_:
     A collection of extensions for backend simulators to fit into the
     `QIR programming model <https://github.com/qir-alliance/qir-spec/blob/main/specification/v0.1/4_Quantum_Runtime.md#qubits>`_.
-    The `StateVectorDynamicCPU <https://github.com/PennyLaneAI/catalyst/tree/main/runtime/extensions/StateVectorDynamicCPU.hpp>`_
+    The `StateVectorLQubitDynamic <https://github.com/PennyLaneAI/catalyst/tree/main/runtime/extensions/StateVectorLQubitDynamic.hpp>`_
     class extends the state-vector class of `Pennylane-Lightning <https://github.com/PennyLaneAI/pennylane-lightning>`_ providing
     dynamic allocation and deallocation of qubits.
 
@@ -98,10 +98,7 @@ Requirements
 ============
 
 To build the runtime from source, it is required to have an up to date version of a C/C++ compiler such as gcc or clang
-with support for the C++20 standard library and the static library of ``stdlib`` from `qir-runner <https://github.com/qir-alliance/qir-runner/tree/main/stdlib>`_.
-
-The runtime leverages the ``stdlib`` Rust package for the QIR standard runtime instructions. To build this package from source,
-the `Rust <https://www.rust-lang.org/tools/install>`_ toolchain installed via ``rustup`` is also required.
+with support for the C++20 standard library and the static library of ``stdlib`` from `qir-runner <https://github.com/qir-alliance/qir-runner>`_.
 
 Installation
 ============
@@ -133,25 +130,14 @@ This device currently offers generators for the `OpenQasm3 <https://openqasm.com
 `Amazon Braket <https://docs.aws.amazon.com/braket/latest/developerguide/braket-openqasm-supported-features.html>`_ assembly extension.
 Moreover, the generated assembly can be executed on Amazon Braket devices leveraging `amazon-braket-sdk-python <https://github.com/aws/amazon-braket-sdk-python>`_.
 
-The runtime uses the QIR standard library for `basic QIR instructions <https://github.com/qir-alliance/qir-runner/blob/main/stdlib/include/qir_stdlib.h>`_.
-Before building ``stdlib``, the ``llvm-tools-preview`` Rustup component needs to be installed:
+The runtime leverages the ``qir-stdlib`` pre-built artifacts from `qir-runner <https://github.com/qir-alliance/qir-runner>`_ by default.
+To build this package from source, a `Rust <https://www.rust-lang.org/tools/install>`_ toolchain installed via ``rustup``
+is required. You can build the runtime with ``BUILD_QIR_STDLIB_FROM_SRC=ON`` after installing the ``llvm-tools-preview`` component:
 
 .. code-block:: console
 
   rustup component add llvm-tools-preview
-
-
-To build the static library of ``stdlib``:
-
-.. code-block:: console
-
-    make qir
-
-And use CMake flags ``-DQIR_STDLIB_LIB`` and ``-DQIR_STDLIB_INCLUDES`` to respectively locate ``libqir_stdlib.a`` and ``qir_stdlib.h``, or run:
-
-.. code-block:: console
-
-    QIR_STDLIB_DIR=$(pwd)/qir-stdlib/target/release QIR_STDLIB_INCLUDES_DIR=$(pwd)/qir-stdlib/target/release/build/include make runtime
+  BUILD_QIR_STDLIB_FROM_SRC=ON make runtime
 
 To check the runtime test suite:
 
