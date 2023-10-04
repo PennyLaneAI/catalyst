@@ -33,6 +33,11 @@ jobs:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
+    - name: Set Ownership in Container
+      run: |
+        # To fix the git issue with the owner of the checkout dir
+        chown -R $(id -u):$(id -g) $PWD
+
     # Build and cache LLVM / MLIR
     - name: Cache LLVM Build
       id: cache-llvm-build
@@ -40,11 +45,6 @@ jobs:
       with:
         path:  llvm-build
         key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-python-${{matrix.python_version}}-generic-build-opt
-
-    - name: Set Ownership in Container
-      run: |
-        # To fix the git issue with the owner of the checkout dir
-        chown -R $(id -u):$(id -g) $PWD
 
     # Cache external project sources
     - name: Cache LLVM Source
