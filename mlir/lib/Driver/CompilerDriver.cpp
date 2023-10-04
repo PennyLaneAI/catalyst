@@ -298,6 +298,7 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
         pipelineTailMarkers[lastPass].push_back(pipeline.name);
     }
 
+    size_t pipelineIdx = 0;
     if (options.keepIntermediate) {
 
         {
@@ -314,7 +315,6 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
         }
 
         {
-            size_t pipelineIdx = 0;
             auto printHandler =
                 [&](Pass *pass, CatalystIRPrinterConfig::PrintCallbackFn print) -> LogicalResult {
                 // Do not print if keepIntermediate is not set.

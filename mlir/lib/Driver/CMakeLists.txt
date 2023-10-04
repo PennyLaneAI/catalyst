@@ -3,8 +3,13 @@
 # along with zstd.
 # TODO: Investigate if we can depend on only one
 set(EXTERNAL_LIB z)
-set(ENZYME_STATIC_LIB ON)
-add_subdirectory(${ENZYME_SRC_DIR}/enzyme ${CMAKE_CURRENT_BINARY_DIR}/enzyme)
+
+find_package(Enzyme REQUIRED CONFIG)
+message(STATUS "Using EnzymeConfig.cmake in: ${Enzyme_DIR}")
+
+# TODO: remove this once Enzyme exports the static library target
+find_library(ENZYME_LIB EnzymeStatic-${LLVM_VERSION_MAJOR} PATHS ${Enzyme_DIR}/Enzyme/)
+message(STATUS "Found Enzyme lib: ${ENZYME_LIB}")
 
 include_directories(${ENZYME_SRC_DIR}/enzyme/Enzyme)
 
@@ -34,6 +39,7 @@ set(LIBS
     MhloRegisterDialects
     StablehloRegister
     ${ALL_MHLO_PASSES}
+    ${ENZYME_LIB}
 )
 
 add_mlir_library(CatalystCompilerDriver
@@ -41,13 +47,6 @@ add_mlir_library(CatalystCompilerDriver
     CatalystLLVMTarget.cpp
 
     LINK_LIBS PRIVATE
-    MhloRegisterDialects
-    StablehloRegister
-    ${ALL_MHLO_PASSES}
     ${EXTERNAL_LIB}
     ${LIBS}
-
-    EnzymeStatic-${LLVM_VERSION_MAJOR}
-    DEPENDS
-    EnzymeStatic-${LLVM_VERSION_MAJOR}
     )
