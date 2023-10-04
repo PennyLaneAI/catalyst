@@ -12,9 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "mlir/Dialect/Complex/IR/Complex.h"
 #include "mlir/Dialect/Index/IR/IndexOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/Transforms/DialectConversion.h"
 
@@ -95,6 +97,38 @@ void AugmentedCircuitGenerator::generate(Region &region, OpBuilder &builder)
                 for (Value param : diffParams) {
                     builder.create<ListPushOp>(gate.getLoc(), oldToCloned.lookupOrDefault(param),
                                                cache.paramVector);
+                }
+            }
+        }
+        else if (auto gate = dyn_cast<quantum::QubitUnitaryOp>(op)) {
+
+            Value matrix = gate.getMatrix();
+            Value matrixCloned = oldToCloned.lookupOrDefault(matrix);
+            Type aType = matrixCloned.getType();
+            // aType must be a tensor<NxNxf64>
+            auto aTensor = aType.cast<RankedTensorType>();
+            ArrayRef<int64_t> shape = aTensor.getShape();
+            assert(shape.size() == 2 && "Unexpected tensor shape in QubitUnitaryOp");
+            assert(shape[0] == shape[1] && "QubitUnitaryOp is not square matrix");
+
+            // TODO:
+            // Make this for loop in MLIR.
+            for (int i = 0; i < shape[0]; i++) {
+                for (int j = 0; j < shape[1]; j++) {
+                    // Note the order. It will be the reverse order
+                    // when you are popping these items from the list.
+                    auto x = builder.create<index::ConstantOp>(gate.getLoc(), i);
+                    auto y = builder.create<index::ConstantOp>(gate.getLoc(), j);
+                    SmallVector<Value> indices = {x, y};
+                    auto element =
+                        builder.create<tensor::ExtractOp>(gate.getLoc(), matrixCloned, indices);
+                    // element is complex!
+                    // So we need to convert into {f64, f64}
+                    auto real = builder.create<complex::ReOp>(gate.getLoc(), element);
+                    auto imag = builder.create<complex::ImOp>(gate.getLoc(), element);
+                    // Again, take note of the order.
+                    builder.create<ListPushOp>(gate.getLoc(), real, cache.paramVector);
+                    builder.create<ListPushOp>(gate.getLoc(), imag, cache.paramVector);
                 }
             }
         }

@@ -62,7 +62,9 @@ def AdjointLoweringPass : Pass<"adjoint-lowering"> {
 
     let dependentDialects = [
         "catalyst::CatalystDialect",
-        "index::IndexDialect"
+        "index::IndexDialect",
+        "tensor::TensorDialect",
+        "complex::ComplexDialect"
     ];
 
     let constructor = "catalyst::createAdjointLoweringPass()";
