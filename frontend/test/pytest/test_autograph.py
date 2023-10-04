@@ -523,6 +523,7 @@ class TestConditionals:
             qjit(autograph=True)(qml.qnode(qml.device(backend, wires=1))(circuit))
 
 
+@pytest.mark.tf
 class TestForLoops:
     """Test that the autograph transformations produce correct results on for loops."""
 
@@ -1076,6 +1077,7 @@ class TestForLoops:
         assert f() == 9
 
 
+@pytest.mark.tf
 class TestMixed:
     """Test a mix of supported autograph conversions and Catalyst control flow."""
 
