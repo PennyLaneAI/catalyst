@@ -17,7 +17,7 @@ functions. The purpose is to convert imperative style code to functional or grap
 
 import functools
 import warnings
-from typing import Any, Callable, Iterator, SupportsIndex, Tuple
+from typing import Any, Callable, Iterator, SupportsIndex, Tuple, Union
 
 import jax
 import jax.numpy as jnp
@@ -208,7 +208,7 @@ def _call_python_for(body_fn, get_state, non_array_iterable):
 
 def for_stmt(
     iteration_target: Any,
-    _extra_test: Callable[[], bool] | None,
+    _extra_test: Union[Callable[[], bool], None],
     body_fn: Callable[[int], None],
     get_state: Callable[[], Tuple],
     set_state: Callable[[Tuple], None],
