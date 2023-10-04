@@ -151,7 +151,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
             }
 
             // Set the arguments for the call op
-            ValueRange args{resultValue, updateValue};
+            std::vector<Value> args{resultValue, updateValue};
 
             // Call the function that computes the update
             Value updated = rewriter.create<func::CallOp>(loc, updateFnOp, args).getResult(0);

@@ -83,7 +83,7 @@ enzyme:
 		-DCMAKE_C_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
 		-DCMAKE_CXX_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER)
 
-	cmake --build $(ENZYME_BUILD_DIR)
+	cmake --build $(ENZYME_BUILD_DIR) --target EnzymeStatic-18
 
 .PHONY: dialects
 dialects:
@@ -93,8 +93,10 @@ dialects:
 		-DCMAKE_BUILD_TYPE=Release \
 		-DLLVM_ENABLE_ASSERTIONS=ON \
 		-DQUANTUM_ENABLE_BINDINGS_PYTHON=ON \
+		-DPython3_EXECUTABLE=$$(which $(PYTHON)) \
+		-DPython3_NumPy_INCLUDE_DIRS=$$($(PYTHON) -c "import numpy as np; print(np.get_include())") \
+		-DEnzyme_DIR=$(ENZYME_BUILD_DIR) \
 		-DENZYME_SRC_DIR=$(MK_DIR)/Enzyme \
-		-DPython3_EXECUTABLE="$(PYTHON)" \
 		-DMLIR_DIR=$(LLVM_BUILD_DIR)/lib/cmake/mlir \
 		-DMHLO_DIR=$(MHLO_BUILD_DIR)/lib/cmake/mlir-hlo \
 		-DMHLO_BINARY_DIR=$(MHLO_BUILD_DIR)/bin \
