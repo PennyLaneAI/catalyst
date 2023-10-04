@@ -303,6 +303,28 @@ module @workflow {
         out = qjit(ir, keep_intermediate=True, verbose=True)
         out(0.1)
 
+    def test_compiler_raises_compiler_error(self):
+        """Test the textual IR compilation."""
+
+        ir = r"""
+module @workflow {
+  func.func public @catalyst.entry_point(%arg0: tensor<f64>) -> tensor<f64> attributes {llvm.emit_c_interface} {
+    %0 = stablehlo.constant dense<0.0> : tensor<f64>
+    return %1 : tensor<f64>
+  }
+  func.func @setup() {
+    quantum.init
+    return
+  }
+  func.func @teardown() {
+    quantum.finalize
+    return
+  }
+}
+"""
+        with pytest.raises(CompileError) as e:
+            out = qjit(ir, keep_intermediate=True, verbose=True)
+            out(0.1)
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])

@@ -361,15 +361,18 @@ class Compiler:
         if self.options.verbose:
             print(f"[LIB] Running compiler driver in {workspace}", file=self.options.logfile)
 
-        compiler_output = run_compiler_driver(
-            ir,
-            workspace,
-            module_name,
-            keep_intermediate=self.options.keep_intermediate,
-            verbose=self.options.verbose,
-            pipelines=pipelines,
-            lower_to_llvm=lower_to_llvm,
-        )
+        try:
+            compiler_output = run_compiler_driver(
+                ir,
+                workspace,
+                module_name,
+                keep_intermediate=self.options.keep_intermediate,
+                verbose=self.options.verbose,
+                pipelines=pipelines,
+                lower_to_llvm=lower_to_llvm,
+            )
+        except RuntimeError as e:
+            raise CompileError(*e.args)
 
         if self.options.verbose:
             for line in compiler_output.get_diagnostic_messages().strip().split("\n"):
