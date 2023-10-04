@@ -483,7 +483,7 @@ class CRange:
     def __iter__(self) -> Iterator[int]:  # pragma: nocover
         return self.py_range.__iter__()
 
-    def __getitem__(self, __key: SupportsIndex | slice) -> int | range:  # pragma: nocover
+    def __getitem__(self, __key: Union[SupportsIndex, slice]) -> Union[int, range]:  # pragma: nocover
         return self.py_range.__getitem__(__key)
 
     def __reversed__(self) -> Iterator[int]:  # pragma: nocover
