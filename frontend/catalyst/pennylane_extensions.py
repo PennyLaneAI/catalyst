@@ -673,9 +673,8 @@ def jacobian(f: DifferentiableLike, *, method=None, h=None, argnum=None):
     )
 
 
-def jvp(
-    f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=None
-):  # pylint: disable=too-many-arguments
+# pylint: disable=too-many-arguments
+def jvp(f: DifferentiableLike, params, tangents, *, method=None, h=None, argnum=None):
     """A :func:`~.qjit` compatible Jacobian-vector product for PennyLane/Catalyst.
 
     This function allows the Jacobian-vector Product of a hybrid quantum-classical function to be
@@ -759,9 +758,8 @@ def jvp(
     return jvp_p.bind(*params, *tangents, jaxpr=jaxpr, fn=fn, grad_params=grad_params)
 
 
-def vjp(
-    f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnum=None
-):  # pylint: disable=too-many-arguments
+# pylint: disable=too-many-arguments
+def vjp(f: DifferentiableLike, params, cotangents, *, method=None, h=None, argnum=None):
     """A :func:`~.qjit` compatible Vector-Jacobian product for PennyLane/Catalyst.
 
     This function allows the Vector-Jacobian Product of a hybrid quantum-classical function to be

@@ -48,9 +48,8 @@ class TensorExtractOp(ir.OpView):
 
     _ODS_REGIONS = (0, True)
 
-    def __init__(
-        self, result, tensor, indices, *, loc=None, ip=None
-    ):  # pylint: disable=too-many-arguments
+    # pylint: disable=too-many-arguments
+    def __init__(self, result, tensor, indices, *, loc=None, ip=None):
         operands = [get_op_result_or_value(tensor)]
         operands.extend(get_op_results_or_values(indices))
         super().__init__(
