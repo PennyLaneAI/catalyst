@@ -23,9 +23,11 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Errc.h"
 
+#include "mlir/Dialect/Complex/IR/Complex.h"
 #include "mlir/Dialect/Index/IR/IndexOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/Verifier.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -129,6 +131,42 @@ class AdjointGenerator {
                     MutableOperandRange(clone, differentiableGate.getDiffOperandIdx(),
                                         diffParams.size())
                         .assign(cachedParams);
+                }
+
+                else if (auto qubitUnitaryGate = dyn_cast<quantum::QubitUnitaryOp>(op)) {
+
+                    OpBuilder::InsertionGuard insertionGuard(builder);
+                    builder.setInsertionPoint(clone);
+                    Value matrix = qubitUnitaryGate.getMatrix();
+                    Type aType = matrix.getType();
+                    // aType must be a tensor<NxNxcomplex<f64>>
+                    auto aTensorType = aType.cast<RankedTensorType>();
+                    ArrayRef<int64_t> shape = aTensorType.getShape();
+                    assert(shape.size() == 2 && "Unexpected tensor shape in QubitUnitaryOp.");
+                    assert(shape[0] == shape[1] && "QubitUnitaryOp is not square matrix.");
+                    assert(shape[0] > 0 && "QubitUnitaryOp has invalid tensor shape.");
+
+                    auto type = aTensorType.getElementType();
+                    std::vector<Value> complexValues;
+                    for (int i = shape[0] - 1; i >= 0; i--) {
+                        for (int j = shape[1] - 1; j >= 0; j--) {
+                            // This is in reverse order...
+                            auto im = builder.create<ListPopOp>(qubitUnitaryGate.getLoc(),
+                                                                cache.paramVector);
+                            auto re = builder.create<ListPopOp>(qubitUnitaryGate.getLoc(),
+                                                                cache.paramVector);
+                            auto comp = builder.create<complex::CreateOp>(qubitUnitaryGate.getLoc(),
+                                                                          type, re, im);
+                            complexValues.push_back(comp);
+                        }
+                    }
+
+                    std::vector<Value> complexValuesReverse(complexValues.rbegin(),
+                                                            complexValues.rend());
+                    Value complexTensor = builder.create<tensor::FromElementsOp>(
+                        qubitUnitaryGate.getLoc(), aTensorType, complexValuesReverse);
+                    std::vector<Value> complexTensors = {complexTensor};
+                    MutableOperandRange(clone, 0, 1).assign(complexTensors);
                 }
 
                 for (const auto &[qubitResult, qubitOperand] :
