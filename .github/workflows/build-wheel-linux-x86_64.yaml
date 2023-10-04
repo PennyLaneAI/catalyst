@@ -15,10 +15,19 @@ jobs:
     uses: ./.github/workflows/constants.yaml
 
   build-dependencies:
-    name: Build Dependencies
     needs: [constants]
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        arch: [x86_64]
+        python_version: ${{ fromJson(needs.constants.outputs.python_versions) }}
+        container_img: ["quay.io/pypa/manylinux2014_x86_64"]
+
+    name: Build Dependencies (Python ${{ matrix.python_version }})
     runs-on: ubuntu-latest
-    container: "quay.io/pypa/manylinux2014_x86_64"
+    container: ${{ matrix.container_img }}
 
     steps:
     - name: Checkout Catalyst repo
