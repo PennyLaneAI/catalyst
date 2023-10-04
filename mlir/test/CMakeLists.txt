@@ -11,6 +11,7 @@ set(DIALECT_TESTS_DEPEND
 )
 
 set(TEST_SUITES
+    Catalyst
     Quantum
     Gradient
 )
