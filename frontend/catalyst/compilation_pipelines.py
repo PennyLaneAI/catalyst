@@ -559,20 +559,24 @@ class QJIT:
         preferred_workspace_dir = (
             pathlib.Path.cwd() if self.compile_options.keep_intermediate else None
         )
-        preferred_workspace_name = self.__name__
+        # If we are compiling from textual ir, just use this as the name of the function.
+        preferred_workspace_name = (
+            "compiled_function" if self.compiling_from_textual_ir else self.__name__
+        )
         self.workspace = WorkspaceManager.get_or_create_workspace(
             preferred_workspace_name, preferred_workspace_dir
         )
 
         if self.compiling_from_textual_ir:
             EvaluationContext.check_is_not_tracing("Cannot compile from IR in tracing context.")
-        else:
-            parameter_types = get_type_annotations(self.user_function)
-            if parameter_types is not None:
-                self.user_typed = True
-                self.mlir_module = self.get_mlir(*parameter_types)
-                if self.compile_options.target == "binary":
-                    self.compiled_function = self.compile()
+            return
+
+        parameter_types = get_type_annotations(self.user_function)
+        if parameter_types is not None:
+            self.user_typed = True
+            self.mlir_module = self.get_mlir(*parameter_types)
+            if self.compile_options.target == "binary":
+                self.compiled_function = self.compile()
 
     def print_stage(self, stage):
         """Print one of the recorded stages.
