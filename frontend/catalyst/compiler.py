@@ -400,11 +400,19 @@ class Compiler:
     def get_output_of(self, workspace, pipeline) -> Optional[str]:
         """Get the output IR of a pipeline.
         Args:
+            workspace (Directory): directory that holds data.
             pipeline (str): name of pass class
 
         Returns
             (Optional[str]): output IR
         """
+        from catalyst.compilation_pipelines import Directory
+
+        assert isinstance(workspace, Directory), "get_output_of expects a Directory type."
+
+        if not self.last_compiler_output:
+            return None
+
         return self.last_compiler_output.get_pipeline_output(pipeline)
 
     def print(self, workspace, pipeline):

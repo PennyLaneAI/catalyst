@@ -29,6 +29,7 @@ import pennylane as qml
 import pytest
 
 from catalyst import qjit
+from catalyst.compilation_pipelines import Directory
 from catalyst.compiler import CompileOptions, Compiler, LinkerDriver
 from catalyst.jax_tracer import trace_to_mlir
 from catalyst.pennylane_extensions import measure, qfunc
@@ -109,11 +110,19 @@ class TestCompilerErrors:
             with pytest.raises(CompileError, match="Unable to link .*"):
                 LinkerDriver.run(invalid_file.name, fallback_compilers=["cc"])
 
-    @pytest.mark.xfail(reason="temp")
+    def test_attempts_to_get_file_on_invalid_dir(self):
+        """Test return value if user request intermediate file on a dir that doesn't exist.
+        Or doesn't make sense.
+        """
+        compiler = Compiler()
+        with pytest.raises(AssertionError, match="expects a Directory type"):
+            result = compiler.get_output_of(None, "inexistent-file")
+
     def test_attempts_to_get_inexistent_intermediate_file(self):
         """Test return value if user request intermediate file that doesn't exist."""
         compiler = Compiler()
-        result = compiler.get_output_of("inexistent-file")
+        with tempfile.TemporaryDirectory() as workspace:
+            result = compiler.get_output_of(Directory(workspace), "inexistent-file")
         assert result is None
 
     def test_runtime_error(self, backend):
