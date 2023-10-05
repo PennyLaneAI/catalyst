@@ -18,6 +18,9 @@ compiling of hybrid quantum-classical functions using Catalyst.
 import ctypes
 import functools
 import inspect
+import os
+import pathlib
+import tempfile
 import typing
 import warnings
 from enum import Enum
@@ -444,6 +447,67 @@ class CompiledFunction:
         return result
 
 
+class Directory:
+    """Abstracts over pathlib and tempfile."""
+
+    def __init__(self, pathlibOrTempfile):
+        self._impl = pathlibOrTempfile
+
+    def __str__(self):
+        if isinstance(self._impl, tempfile.TemporaryDirectory):
+            return self._impl.name
+        if isinstance(self._impl, pathlib.Path):
+            return str(self._impl)
+
+
+class WorkspaceManager:
+    """Singleton object that manages the output files for the IR.
+
+    A good motivation for this is whether or not we are allowed to overwrite
+    folders in the user's directory if they match the preferred name.
+
+    This happens whenever we want to compile a function with the same name
+    multiple times and we have used the user facing option keep_intermediates=True.
+    """
+
+    # Operating System agnostic way of finding out what is the temporary
+    # directory. See https://docs.python.org/3.10/library/tempfile.html#tempfile.gettempdir
+    tempdir = pathlib.Path(tempfile.gettempdir())
+
+    @staticmethod
+    def get_or_create_workspace(name, path=None):
+        path, name = WorkspaceManager._get_preferred_abspath(name, path)
+        return Directory(WorkspaceManager._get_or_create_directory(path, name))
+
+    @staticmethod
+    def _get_preferred_abspath(name, path=None):
+        preferred_path = pathlib.Path(path) if path is not None else WorkspaceManager.tempdir
+        preferred_name = pathlib.Path(name)
+        return preferred_path, preferred_name
+
+    @staticmethod
+    def _get_or_create_directory(path, name):
+        if path == WorkspaceManager.tempdir:
+            # TODO: Once Python 3.12 becomes the least supported version of python, consider
+            # setting the fields: delete and delete_on_close.
+            # This can likely avoid having all the code below.
+            return tempfile.TemporaryDirectory(dir=path.resolve(), prefix=name.name)
+
+        count = 1
+        curr_preferred_abspath = path / name
+        preferred_name = name.name
+
+        # TODO: Maybe just look for the last one?
+        while curr_preferred_abspath.exists():
+            curr_preferred_name_str = preferred_name + "_" + str(count)
+            curr_preferred_name = pathlib.Path(curr_preferred_name_str)
+            curr_preferred_abspath = path / curr_preferred_name
+
+        free_preferred_abspath = pathlib.Path(curr_preferred_abspath)
+        free_preferred_abspath.mkdir()
+        return free_preferred_abspath
+
+
 # pylint: disable=too-many-instance-attributes
 class QJIT:
     """Class representing a just-in-time compiled hybrid quantum-classical function.
@@ -476,13 +540,13 @@ class QJIT:
 
         # QJIT is the owner of workspace.
         # do not move to compiler.
-        self.workspace = None
-
-        if self.compile_options.keep_intermediate:
-            workspace_name = os.path.abspath(os.path.join(os.getcwd(), self.user_function.__name__))
-            self.workspace = tempfile.NamedTemporaryFile(prefix=workspace_name, dir=os.getcwd(), delete=False, delete_on_close=False)
-        else:
-            self.workspace = tempfile.NamedTemporaryFile()
+        preferred_workspace_dir = (
+            pathlib.Path.cwd() if self.compile_options.keep_intermediate else None
+        )
+        preferred_workspace_name = self.original_function.__name__
+        self.workspace = WorkspaceManager.get_or_create_workspace(
+            preferred_workspace_name, preferred_workspace_dir
+        )
 
         functools.update_wrapper(self, fn)
 
@@ -505,7 +569,7 @@ class QJIT:
         Args:
             stage: string corresponding with the name of the stage to be printed
         """
-        self.compiler.print(stage)  # pragma: nocover
+        self.compiler.print(self.workspace, stage)  # pragma: nocover
 
     @property
     def mlir(self):
@@ -550,6 +614,7 @@ class QJIT:
         _, self._mlir, _ = self.compiler.run(
             mlir_module,
             lower_to_llvm=False,
+            workspace=str(self.workspace),
             pipelines=[("pipeline", ["canonicalize"])],
         )
         return mlir_module
@@ -563,7 +628,7 @@ class QJIT:
             # Module name can be anything.
             module_name = "catalyst_module"
             shared_object, llvm_ir, inferred_func_data = self.compiler.run_from_ir(
-                self.user_function, module_name
+                self.user_function, module_name, workspace=self.workspace
             )
             qfunc_name = inferred_func_data[0]
             # Parse back the return types given as a semicolon-separated string
@@ -589,7 +654,7 @@ class QJIT:
             qfunc_name = str(self.mlir_module.body.operations[0].name).replace('"', "")
 
             shared_object, llvm_ir, inferred_func_data = self.compiler.run(
-                self.mlir_module, pipelines=self.compile_options.pipelines
+                self.mlir_module, pipelines=self.compile_options.pipelines, workspace=self.workspace
             )
 
         self._llvmir = llvm_ir

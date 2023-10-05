@@ -310,8 +310,6 @@ class Compiler:
     def __init__(self, options: Optional[CompileOptions] = None):
         self.options = options if options is not None else CompileOptions
         self.last_compiler_output = None
-        self.last_workspace = None
-        self.last_tmpdir = None
 
     def run_from_ir(
         self,
@@ -319,6 +317,7 @@ class Compiler:
         module_name: str,
         pipelines=None,
         lower_to_llvm=True,
+        workspace=None,
     ):
         """Compile a shared object from a textual IR (MLIR or LLVM).
 
@@ -339,25 +338,16 @@ class Compiler:
                func_name (str) Inferred name of the main function
                ret_type_name (str) Inferred main function result type name
         """
-        pipelines = pipelines if pipelines is not None else DEFAULT_PIPELINES
-        if self.options.keep_intermediate:
-            workspace = os.path.abspath(os.path.join(os.getcwd(), module_name))
-            os.makedirs(workspace, exist_ok=True)
-        else:
-            # pylint: disable=consider-using-with
-            if self.last_tmpdir:
-                self.last_tmpdir.cleanup()
-            self.last_tmpdir = tempfile.TemporaryDirectory()
-            workspace = self.last_tmpdir.name
 
-        self.last_workspace = workspace
+        assert workspace
+        pipelines = pipelines if pipelines is not None else DEFAULT_PIPELINES
 
         if self.options.verbose:
             print(f"[LIB] Running compiler driver in {workspace}", file=self.options.logfile)
 
         compiler_output = run_compiler_driver(
             ir,
-            workspace,
+            str(workspace),
             module_name,
             keep_intermediate=self.options.keep_intermediate,
             verbose=self.options.verbose,
@@ -407,7 +397,7 @@ class Compiler:
             **kwargs,
         )
 
-    def get_output_of(self, pipeline) -> Optional[str]:
+    def get_output_of(self, workspace, pipeline) -> Optional[str]:
         """Get the output IR of a pipeline.
         Args:
             pipeline (str): name of pass class
@@ -415,15 +405,11 @@ class Compiler:
         Returns
             (Optional[str]): output IR
         """
-        return (
-            self.last_compiler_output.get_pipeline_output(pipeline)
-            if self.last_compiler_output
-            else None
-        )
+        return self.last_compiler_output.get_pipeline_output(pipeline)
 
-    def print(self, pipeline):
+    def print(self, workspace, pipeline):
         """Print the output IR of pass.
         Args:
             pipeline (str): name of pass class
         """
-        print(self.get_output_of(pipeline))  # pragma: no cover
+        print(self.get_output_of(workspace, pipeline))  # pragma: no cover
