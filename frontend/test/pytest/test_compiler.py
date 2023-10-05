@@ -121,8 +121,8 @@ class TestCompilerErrors:
     def test_attempts_to_get_inexistent_intermediate_file(self):
         """Test return value if user request intermediate file that doesn't exist."""
         compiler = Compiler()
-        with tempfile.TemporaryDirectory() as workspace:
-            result = compiler.get_output_of(Directory(workspace), "inexistent-file")
+        workspace = tempfile.TemporaryDirectory()
+        result = compiler.get_output_of(Directory(workspace), "inexistent-file")
         assert result is None
 
     def test_runtime_error(self, backend):
@@ -184,31 +184,34 @@ void _catalyst_pyface_jit_cpp_exception_test(void*, void*) {
 class TestCompilerState:
     """Test states that the compiler can reach."""
 
-    @pytest.mark.xfail(reason="temp")
     def test_print_stages(self, backend):
         """Test that after compiling the intermediate files exist."""
 
+        @qjit(keep_intermediate=True)
         @qml.qnode(qml.device(backend, wires=1))
         def workflow():
             qml.PauliX(wires=0)
             return qml.state()
 
-        mlir_module, _, _, _ = trace_to_mlir(workflow)
-        compiler = Compiler(CompileOptions(keep_intermediate=True))
-        compiler.run(mlir_module)
-        assert compiler.get_output_of("HLOLoweringPass")
-        assert compiler.get_output_of("QuantumCompilationPass")
-        assert compiler.get_output_of("BufferizationPass")
-        assert compiler.get_output_of("MLIRToLLVMDialect")
-        assert compiler.get_output_of("PreEnzymeOpt")
-        assert compiler.get_output_of("Enzyme")
-        assert compiler.get_output_of("None-existing-pipeline") is None
-        shutil.rmtree(compiler.last_workspace)
+        assert workflow.compiler.get_output_of(workflow.workspace, "HLOLoweringPass")
+        assert workflow.compiler.get_output_of(workflow.workspace, "QuantumCompilationPass")
+        assert workflow.compiler.get_output_of(workflow.workspace, "BufferizationPass")
+        assert workflow.compiler.get_output_of(workflow.workspace, "MLIRToLLVMDialect")
+        assert workflow.compiler.get_output_of(workflow.workspace, "PreEnzymeOpt")
+        assert workflow.compiler.get_output_of(workflow.workspace, "Enzyme")
+        workflow.workspace.cleanup()
 
-        compiler = Compiler(CompileOptions(keep_intermediate=False))
-        compiler.run(mlir_module)
-        assert compiler.get_output_of("MHLOPass") is None
-        assert compiler.get_output_of("None-existing-pipeline") is None
+    def test_print_nonexistent_stages(self, backend):
+        """What happens if we attempt to print something that doesn't exist?"""
+
+        @qjit(keep_intermediate=True)
+        @qml.qnode(qml.device(backend, wires=1))
+        def workflow():
+            qml.PauliX(wires=0)
+            return qml.state()
+
+        assert workflow.compiler.get_output_of(workflow.workspace, "None-existing-pipeline") is None
+        workflow.workspace.cleanup()
 
     def test_workspace(self):
         """Test directory has been modified with folder containing intermediate results"""

@@ -409,6 +409,7 @@ class Compiler:
         from catalyst.compilation_pipelines import Directory
 
         assert isinstance(workspace, Directory), "get_output_of expects a Directory type."
+        assert workspace.is_dir(), "We expect a directory."
 
         if not self.last_compiler_output:
             return None

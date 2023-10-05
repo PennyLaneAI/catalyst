@@ -20,6 +20,7 @@ import functools
 import inspect
 import os
 import pathlib
+import shutil
 import tempfile
 import typing
 import warnings
@@ -456,8 +457,17 @@ class Directory:
     def __str__(self):
         if isinstance(self._impl, tempfile.TemporaryDirectory):
             return self._impl.name
-        if isinstance(self._impl, pathlib.Path):
-            return str(self._impl)
+        return str(self._impl)
+
+    def is_dir(self):
+        if isinstance(self._impl, tempfile.TemporaryDirectory):
+            return True
+        return self._impl.is_dir()
+
+    def cleanup(self):
+        if isinstance(self._impl, tempfile.TemporaryDirectory):
+            self._impl.cleanup()
+        shutil.rmtree(str(self))
 
 
 class WorkspaceManager:
@@ -502,6 +512,7 @@ class WorkspaceManager:
             curr_preferred_name_str = preferred_name + "_" + str(count)
             curr_preferred_name = pathlib.Path(curr_preferred_name_str)
             curr_preferred_abspath = path / curr_preferred_name
+            count += 1
 
         free_preferred_abspath = pathlib.Path(curr_preferred_abspath)
         free_preferred_abspath.mkdir()
