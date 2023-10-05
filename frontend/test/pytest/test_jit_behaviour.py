@@ -903,7 +903,7 @@ class TestAvoidVerification:
 
 
 class TestTwoQJITsOneName:
-    @pytest.mark.skip(reason="temp")
+
     def test_two_qjit(self, backend):
         def foo():
             return 1
@@ -918,7 +918,6 @@ class TestTwoQJITsOneName:
         assert foo_1() == 1
         assert foo_2() == 2
 
-    @pytest.mark.skip(reason="temp")
     def test_two_qjit_keep_intermediate(self, backend):
         def foo():
             return 1
