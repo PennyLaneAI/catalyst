@@ -11,8 +11,8 @@ MHLO_BUILD_DIR?=$(MK_DIR)/mlir-hlo/build
 ENZYME_BUILD_DIR?=$(MK_DIR)/Enzyme/build
 RT_BUILD_DIR?=$(MK_DIR)/../runtime/build
 ENABLE_LLD?=ON
-ENABLE_ZLIB?=OFF
-ENABLE_ZSTD?=OFF
+ENABLE_ZLIB?=ON
+ENABLE_ZSTD?=ON
 
 .PHONY: help
 help:
