@@ -85,7 +85,7 @@ struct CatalystPassInstrumentation : public PassInstrumentation {
 
     CatalystPassInstrumentation(Callback callback) : callback(callback) {}
 
-    virtual void runAfterPassFailed(Pass *pass, Operation *operation) override
+    void runAfterPassFailed(Pass *pass, Operation *operation) override
     {
         this->callback(pass, operation);
     }
@@ -473,7 +473,6 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     }
 
     if (llvmModule) {
-
         if (failed(runLLVMPasses(options, llvmModule, output.pipelineOutputs))) {
             return failure();
         }
