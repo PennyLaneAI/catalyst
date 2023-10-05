@@ -129,7 +129,6 @@ class TestSourceCodeInfo:
 class TestIntegration:
     """Test that the autograph transformations trigger correctly in different settings."""
 
-    @pytest.mark.xfail(reason="temp")
     def test_unsupported_object(self):
         """Check the error produced when attempting to convert an unsupported object (neither of
         QNode, function, or method)."""

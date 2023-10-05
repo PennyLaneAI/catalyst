@@ -538,20 +538,20 @@ class QJIT:
         self._mlir = None
         self._llvmir = None
 
+        functools.update_wrapper(self, fn)
+
+        if compile_options.autograph:
+            self.user_function = run_autograph(fn)
+
         # QJIT is the owner of workspace.
         # do not move to compiler.
         preferred_workspace_dir = (
             pathlib.Path.cwd() if self.compile_options.keep_intermediate else None
         )
-        preferred_workspace_name = self.original_function.__name__
+        preferred_workspace_name = self.__name__
         self.workspace = WorkspaceManager.get_or_create_workspace(
             preferred_workspace_name, preferred_workspace_dir
         )
-
-        functools.update_wrapper(self, fn)
-
-        if compile_options.autograph:
-            self.user_function = run_autograph(fn)
 
         if self.compiling_from_textual_ir:
             EvaluationContext.check_is_not_tracing("Cannot compile from IR in tracing context.")
@@ -621,6 +621,7 @@ class QJIT:
 
     def compile(self):
         """Compile the current MLIR module."""
+
         if self.compiled_function and self.compiled_function.shared_object:
             self.compiled_function.shared_object.close()
 
