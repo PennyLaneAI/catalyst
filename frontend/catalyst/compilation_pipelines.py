@@ -452,6 +452,10 @@ class Directory:
     """Abstracts over pathlib and tempfile."""
 
     def __init__(self, pathlibOrTempfile):
+        is_tempdir = isinstance(pathlibOrTempfile, tempfile.TemporaryDirectory)
+        is_path = isinstance(pathlibOrTempfile, pathlib.Path)
+        is_valid = is_tempdir or is_path
+        assert is_valid, "Invalid initialization of Directory"
         self._impl = pathlibOrTempfile
 
     def __str__(self):
