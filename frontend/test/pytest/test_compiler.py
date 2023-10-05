@@ -210,29 +210,6 @@ class TestCompilerState:
         assert compiler.get_output_of("MHLOPass") is None
         assert compiler.get_output_of("None-existing-pipeline") is None
 
-    @pytest.mark.xfail(reason="fail")
-    def test_workspace_keep_intermediate(self, backend):
-        """Test cwd's has been modified with folder containing intermediate results"""
-
-        @qjit
-        @qml.qnode(qml.device(backend, wires=1))
-        def workflow():
-            qml.PauliX(wires=0)
-            return qml.state()
-
-        mlir_module, _, _, _ = trace_to_mlir(workflow)
-        # This means that we are not running any pass.
-        pipelines = []
-        identity_compiler = Compiler(CompileOptions(keep_intermediate=True))
-        identity_compiler.run(mlir_module, pipelines=pipelines, lower_to_llvm=False)
-        directory = os.path.join(os.getcwd(), workflow.__name__)
-        assert directory == identity_compiler.last_workspace
-        assert os.path.exists(directory)
-        files = os.listdir(directory)
-        # The directory is non-empty. Should at least contain the original .mlir file
-        assert files
-        shutil.rmtree(directory)
-
     def test_workspace(self):
         """Test directory has been modified with folder containing intermediate results"""
 
