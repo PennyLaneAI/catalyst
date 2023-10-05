@@ -378,7 +378,7 @@ class Compiler:
                 lower_to_llvm=lower_to_llvm,
             )
         except RuntimeError as e:
-            raise CompileError(*e.args)
+            raise CompileError(*e.args) from e
 
         if self.options.verbose:
             for line in compiler_output.get_diagnostic_messages().strip().split("\n"):
