@@ -233,22 +233,16 @@ class TestCompilerState:
         assert files
         shutil.rmtree(directory)
 
-    @pytest.mark.xfail(reason="fail")
-    def test_workspace_temporary(self):
-        """Test temporary directory has been modified with folder containing intermediate results"""
+    def test_workspace(self):
+        """Test directory has been modified with folder containing intermediate results"""
 
-        @qjit
+        @qjit(keep_intermediate=True, target="mlir")
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def workflow():
             qml.PauliX(wires=0)
             return qml.state()
 
-        mlir_module, _, _, _ = trace_to_mlir(workflow)
-        # This means that we are not running any pass.
-        identity_compiler = Compiler(CompileOptions(keep_intermediate=True))
-        identity_compiler.run(mlir_module, pipelines=[], lower_to_llvm=False)
         directory = os.path.join(os.getcwd(), workflow.__name__)
-        assert directory == identity_compiler.last_workspace
         files = os.listdir(directory)
         # The directory is non-empty. Should at least contain the original .mlir file
         assert files
