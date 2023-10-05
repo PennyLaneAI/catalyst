@@ -902,5 +902,35 @@ class TestAvoidVerification:
         assert "does not reference a valid function" not in capture_string.err
 
 
+class TestTwoQJITsOneName:
+    def test_two_qjit(self, backend):
+        def foo():
+            return 1
+
+        foo_1 = qjit(foo)
+
+        def foo():
+            return 2
+
+        foo_2 = qjit(foo)
+
+        assert foo_1() == 1
+        assert foo_2() == 2
+
+    def test_two_qjit_keep_intermediate(self, backend):
+        def foo():
+            return 1
+
+        foo_1 = qjit(keep_intermediate=True)(foo)
+
+        def foo():
+            return 2
+
+        foo_2 = qjit(keep_intermediate=True)(foo)
+
+        assert foo_1() == 1
+        assert foo_2() == 2
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])
