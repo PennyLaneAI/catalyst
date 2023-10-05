@@ -79,6 +79,18 @@ struct CatalystIRPrinterConfig : public PassManager::IRPrinterConfig {
     }
 };
 
+struct CatalystPassInstrumentation : public PassInstrumentation {
+    typedef std::function<void(Pass *pass, Operation *operation)> Callback;
+    Callback callback;
+
+    CatalystPassInstrumentation(Callback callback) : callback(callback) {}
+
+    virtual void runAfterPassFailed(Pass *pass, Operation *operation) override
+    {
+        this->callback(pass, operation);
+    }
+};
+
 } // namespace
 
 namespace {
@@ -285,21 +297,50 @@ LogicalResult runEnzymePasses(const CompilerOptions &options,
 
 LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, ModuleOp moduleOp,
                           CompilerOutput::PipelineOutputs &outputs)
+
 {
+    size_t pipelineIdx = 0;
+    auto nextDumpFilename = [&](Pipeline::Name pipelineName) -> std::string {
+        return fs::path(std::to_string(pipelineIdx++) + "_" + pipelineName)
+            .replace_extension(".mlir");
+    };
+
     auto pm = PassManager::on<ModuleOp>(ctx, PassManager::Nesting::Implicit);
 
+    // Maps a pass to one or more pipelines ended by this pass
     std::unordered_map<const Pass *, std::list<Pipeline::Name>> pipelineTailMarkers;
+    // Maps pass to their pipelines
+    std::unordered_map<const Pass *, Pipeline::Name> passPipelineNames;
+    // Pipelines without passes
+    std::vector<Pipeline::Name> emptyPipelines;
+
+    // Fill all the pipe-to-pipeline mappings
     for (const auto &pipeline : options.pipelinesCfg) {
+        size_t existingPasses = pm.size();
         if (failed(parsePassPipeline(joinPasses(pipeline.passes), pm, options.diagnosticStream))) {
             return failure();
         }
-        PassManager::pass_iterator p = pm.end();
-        const Pass *lastPass = &(*(p - 1));
-        pipelineTailMarkers[lastPass].push_back(pipeline.name);
+        if (existingPasses == pm.size()) {
+            emptyPipelines.push_back(pipeline.name);
+        }
+        else {
+            const Pass *pass = nullptr;
+            for (size_t pn = existingPasses; pn < pm.size(); pn++) {
+                pass = &(*(pm.begin() + pn));
+                passPipelineNames[pass] = pipeline.name;
+            }
+            assert(pass != nullptr);
+            for (auto pn : emptyPipelines) {
+                pipelineTailMarkers[pass].push_back(pn);
+            }
+            emptyPipelines.clear();
+            pipelineTailMarkers[pass].push_back(pipeline.name);
+        }
     }
 
     if (options.keepIntermediate) {
 
+        // Dump the IR before running the pipeline
         {
             std::string tmp;
             {
@@ -313,38 +354,58 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
             }
         }
 
+        // For each pipeline-terminating pass, print the IR into the corresponding dump file and
+        // into a diagnostic output buffer. Note that one pass can terminate multiple pipelines.
         {
-            size_t pipelineIdx = 0;
             auto printHandler =
                 [&](Pass *pass, CatalystIRPrinterConfig::PrintCallbackFn print) -> LogicalResult {
-                // Do not print if keepIntermediate is not set.
-                if (!options.keepIntermediate) {
-                    return success();
-                }
                 auto res = pipelineTailMarkers.find(pass);
                 if (res != pipelineTailMarkers.end()) {
-                    for (const auto &pn : res->second) {
-                        std::string outFile = fs::path(std::to_string(pipelineIdx++) + "_" + pn)
-                                                  .replace_extension(".mlir");
+                    for (const auto &pipelineName : res->second) {
                         {
-                            llvm::raw_string_ostream s{outputs[pn]};
+                            llvm::raw_string_ostream s{outputs[pipelineName]};
                             print(s);
                         }
-                        if (failed(dumpToFile(options, outFile, outputs[pn]))) {
+                        if (failed(dumpToFile(options, nextDumpFilename(pipelineName),
+                                              outputs[pipelineName]))) {
                             return failure();
                         }
                     }
                 }
                 return success();
             };
-
             pm.enableIRPrinting(std::unique_ptr<PassManager::IRPrinterConfig>(
                 new CatalystIRPrinterConfig(printHandler)));
         }
     }
 
+    // Output pipeline names on failures
+    pm.addInstrumentation(std::unique_ptr<PassInstrumentation>(
+        new CatalystPassInstrumentation([&](Pass *pass, Operation *op) {
+            auto res = passPipelineNames.find(pass);
+            assert(res != passPipelineNames.end() && "Unexpected pass");
+            options.diagnosticStream << "While processing pipeline: " << res->second << "\n";
+        })));
+
+    // Run the lowering pipelines
     if (failed(pm.run(moduleOp))) {
         return failure();
+    }
+
+    if (options.keepIntermediate) {
+
+        // For completeness, dump the IR into the files that correspond to possible last empty
+        // pipelines.
+        for (auto pipelineName : emptyPipelines) {
+            {
+                llvm::raw_string_ostream s{outputs[pipelineName]};
+                s << *moduleOp;
+            }
+            if (failed(
+                    dumpToFile(options, nextDumpFilename(pipelineName), outputs[pipelineName]))) {
+                return failure();
+            }
+        }
     }
 
     return success();

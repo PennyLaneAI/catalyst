@@ -29,7 +29,7 @@ import pennylane as qml
 import pytest
 
 from catalyst import qjit
-from catalyst.compiler import CompileOptions, Compiler, LinkerDriver
+from catalyst.compiler import DEFAULT_PIPELINES, CompileOptions, Compiler, LinkerDriver
 from catalyst.jax_tracer import trace_to_mlir
 from catalyst.pennylane_extensions import measure, qfunc
 from catalyst.utils.exceptions import CompileError
@@ -179,14 +179,19 @@ class TestCompilerState:
             return qml.state()
 
         mlir_module, _, _, _ = trace_to_mlir(workflow)
-        compiler = Compiler(CompileOptions(keep_intermediate=True))
+        pipelines = [("EmptyPipeline1", [])] + DEFAULT_PIPELINES + [("EmptyPipeline2", [])]
+        compiler = Compiler(
+            CompileOptions(verbose=True, keep_intermediate=True, pipelines=pipelines)
+        )
         compiler.run(mlir_module)
+        assert compiler.get_output_of("EmptyPipeline1")
         assert compiler.get_output_of("HLOLoweringPass")
         assert compiler.get_output_of("QuantumCompilationPass")
         assert compiler.get_output_of("BufferizationPass")
         assert compiler.get_output_of("MLIRToLLVMDialect")
         assert compiler.get_output_of("PreEnzymeOpt")
         assert compiler.get_output_of("Enzyme")
+        assert compiler.get_output_of("EmptyPipeline2")
         assert compiler.get_output_of("None-existing-pipeline") is None
 
         compiler = Compiler(CompileOptions(keep_intermediate=False))
@@ -304,27 +309,18 @@ module @workflow {
         out(0.1)
 
     def test_compiler_raises_compiler_error(self):
-        """Test the textual IR compilation."""
+        """Test the compile message type and contents."""
 
-        ir = r"""
-module @workflow {
-  func.func public @catalyst.entry_point(%arg0: tensor<f64>) -> tensor<f64> attributes {llvm.emit_c_interface} {
-    %0 = stablehlo.constant dense<0.0> : tensor<f64>
-    return %1 : tensor<f64>
-  }
-  func.func @setup() {
-    quantum.init
-    return
-  }
-  func.func @teardown() {
-    quantum.finalize
-    return
-  }
-}
-"""
-        with pytest.raises(CompileError) as e:
-            out = qjit(ir, keep_intermediate=True, verbose=True)
-            out(0.1)
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def circuit():
+            return qml.state()
+
+        test_pipelines = [("PipelineA", ["canonicalize"]), ("PipelineB", ["test"])]
+        with pytest.raises(CompileError, match="While processing pipeline: PipelineB") as e:
+            qjit(circuit, pipelines=test_pipelines)()
+
+        assert "PipelineA" not in e.value.args[0]
+
 
 if __name__ == "__main__":
     pytest.main(["-x", __file__])

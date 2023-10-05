@@ -537,11 +537,7 @@ class QJIT:
         inject_functions(mlir_module, ctx)
         self._jaxpr = jaxpr
 
-        _, self._mlir, _ = self.compiler.run(
-            mlir_module,
-            lower_to_llvm=False,
-            pipelines=[("pipeline", ["canonicalize"])],
-        )
+        self._mlir = self.compiler.canonicalize(mlir_module)
         return mlir_module
 
     def compile(self):
@@ -578,9 +574,7 @@ class QJIT:
             # `replace` method, so we need to get a regular Python string out of it.
             qfunc_name = str(self.mlir_module.body.operations[0].name).replace('"', "")
 
-            shared_object, llvm_ir, inferred_func_data = self.compiler.run(
-                self.mlir_module, pipelines=self.compile_options.pipelines
-            )
+            shared_object, llvm_ir, inferred_func_data = self.compiler.run(self.mlir_module)
 
         self._llvmir = llvm_ir
         compiled_function = CompiledFunction(shared_object, qfunc_name, restype)

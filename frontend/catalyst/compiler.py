@@ -314,7 +314,7 @@ class Compiler:
     """Compiles MLIR modules to shared objects by executing the Catalyst compiler driver library."""
 
     def __init__(self, options: Optional[CompileOptions] = None):
-        self.options = options if options is not None else CompileOptions
+        self.options = options if options is not None else CompileOptions()
         self.last_compiler_output = None
         self.last_workspace = None
         self.last_tmpdir = None
@@ -345,7 +345,13 @@ class Compiler:
                func_name (str) Inferred name of the main function
                ret_type_name (str) Inferred main function result type name
         """
-        pipelines = pipelines if pipelines is not None else DEFAULT_PIPELINES
+        pipelines = (
+            pipelines
+            if pipelines is not None
+            else (
+                self.options.pipelines if self.options.pipelines is not None else DEFAULT_PIPELINES
+            )
+        )
         if self.options.keep_intermediate:
             workspace = os.path.abspath(os.path.join(os.getcwd(), module_name))
             os.makedirs(workspace, exist_ok=True)
@@ -415,6 +421,22 @@ class Compiler:
             module_name=str(mlir_module.operation.attributes["sym_name"]).replace('"', ""),
             **kwargs,
         )
+
+    def canonicalize(self, mlir_module: str) -> str:
+        """Canonicalize the sources
+        Args:
+            mlir_module (str): The MLIR module to be canonicalized
+
+        Returns
+            (str): output MLIR module
+        """
+
+        _, mlir, _ = self.run(
+            mlir_module,
+            lower_to_llvm=False,
+            pipelines=[("pipeline", ["canonicalize"])],
+        )
+        return mlir
 
     def get_output_of(self, pipeline) -> Optional[str]:
         """Get the output IR of a pipeline.
