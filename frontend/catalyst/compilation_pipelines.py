@@ -474,6 +474,16 @@ class QJIT:
         self._mlir = None
         self._llvmir = None
 
+        # QJIT is the owner of workspace.
+        # do not move to compiler.
+        self.workspace = None
+
+        if self.compile_options.keep_intermediate:
+            workspace_name = os.path.abspath(os.path.join(os.getcwd(), self.user_function.__name__))
+            self.workspace = tempfile.NamedTemporaryFile(prefix=workspace_name, dir=os.getcwd(), delete=False, delete_on_close=False)
+        else:
+            self.workspace = tempfile.NamedTemporaryFile()
+
         functools.update_wrapper(self, fn)
 
         if compile_options.autograph:
