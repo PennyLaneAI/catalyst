@@ -309,10 +309,10 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
 
     // Maps a pass to one or more pipelines ended by this pass
     std::unordered_map<const Pass *, std::list<Pipeline::Name>> pipelineTailMarkers;
-    // Maps pass to their pipelines
+    // Maps a pass to its owning pipeline
     std::unordered_map<const Pass *, Pipeline::Name> passPipelineNames;
-    // Pipelines without passes
-    std::vector<Pipeline::Name> emptyPipelines;
+    // Lists pipelines not terminated by any passes
+    std::vector<Pipeline::Name> dunglingPipelines;
 
     // Fill all the pipe-to-pipeline mappings
     for (const auto &pipeline : options.pipelinesCfg) {
@@ -321,7 +321,7 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
             return failure();
         }
         if (existingPasses == pm.size()) {
-            emptyPipelines.push_back(pipeline.name);
+            dunglingPipelines.push_back(pipeline.name);
         }
         else {
             const Pass *pass = nullptr;
@@ -330,10 +330,10 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
                 passPipelineNames[pass] = pipeline.name;
             }
             assert(pass != nullptr);
-            for (auto pn : emptyPipelines) {
+            for (auto pn : dunglingPipelines) {
                 pipelineTailMarkers[pass].push_back(pn);
             }
-            emptyPipelines.clear();
+            dunglingPipelines.clear();
             pipelineTailMarkers[pass].push_back(pipeline.name);
         }
     }
@@ -394,9 +394,9 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
 
     if (options.keepIntermediate) {
 
-        // For completeness, dump the IR into the files that correspond to possible last empty
+        // For completeness, dump the IR into files which correspond to possible last empty
         // pipelines.
-        for (auto pipelineName : emptyPipelines) {
+        for (auto pipelineName : dunglingPipelines) {
             {
                 llvm::raw_string_ostream s{outputs[pipelineName]};
                 s << *moduleOp;
