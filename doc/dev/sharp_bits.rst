@@ -728,7 +728,7 @@ For example:
 
     @qjit
     @qml.qnode(dev)
-    @qml.transforms.merge_rotations
+    @qml.transforms.merge_rotations()
     def circuit(x):
         qml.RX(x, wires=0)
         qml.RX(x ** 2, wires=0)
