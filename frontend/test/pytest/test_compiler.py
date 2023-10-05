@@ -53,7 +53,6 @@ class TestCompilerOptions:
             compilers = LinkerDriver._get_compiler_fallback_order([])
             assert compiler in compilers
 
-    @pytest.mark.skip(reason="temp")
     @pytest.mark.parametrize(
         "logfile,keep_intermediate", [("stdout", True), ("stderr", False), (None, False)]
     )
@@ -77,9 +76,7 @@ class TestCompilerOptions:
         assert ("[SYSTEM]" in capture) if verbose else ("[SYSTEM]" not in capture)
         assert ("[LIB]" in capture) if verbose else ("[LIB]" not in capture)
         assert ("Dumping" in capture) if (verbose and keep_intermediate) else True
-        if keep_intermediate:
-            directory = os.path.join(os.getcwd(), workflow.__name__)
-            shutil.rmtree(directory)
+        workflow.workspace.cleanup()
 
 
 class TestCompilerWarnings:

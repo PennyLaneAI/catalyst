@@ -466,7 +466,9 @@ class Directory:
 
     def cleanup(self):
         if isinstance(self._impl, tempfile.TemporaryDirectory):
-            self._impl.cleanup()
+            # The temporary directory can clean up
+            # after itself...
+            ...
         shutil.rmtree(str(self))
 
 
