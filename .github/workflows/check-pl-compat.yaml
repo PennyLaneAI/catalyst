@@ -28,7 +28,6 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        arch: [x86_64]
         python_version: ${{ fromJson(needs.constants.outputs.python_versions) }}
 
     name: Build Configuration (Python ${{ matrix.python_version }})
