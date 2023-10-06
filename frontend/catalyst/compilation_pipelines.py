@@ -780,7 +780,7 @@ def qjit(
     verbose=False,
     logfile=None,
     pipelines=None,
-):
+):  # pylint: disable=too-many-arguments
     """A just-in-time decorator for PennyLane and JAX programs using Catalyst.
 
     This decorator enables both just-in-time and ahead-of-time compilation,

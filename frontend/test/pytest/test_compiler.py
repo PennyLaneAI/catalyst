@@ -75,6 +75,9 @@ class TestCompilerOptions:
         assert ("[SYSTEM]" in capture) if verbose else ("[SYSTEM]" not in capture)
         assert ("[LIB]" in capture) if verbose else ("[LIB]" not in capture)
         assert ("Dumping" in capture) if (verbose and keep_intermediate) else True
+        if keep_intermediate:
+            directory = os.path.join(os.getcwd(), workflow.__name__)
+            shutil.rmtree(directory)
 
 
 class TestCompilerWarnings:
@@ -195,6 +198,7 @@ class TestCompilerState:
         assert compiler.get_output_of("PreEnzymeOpt")
         assert compiler.get_output_of("Enzyme")
         assert compiler.get_output_of("None-existing-pipeline") is None
+        shutil.rmtree(compiler.last_workspace)
 
         compiler = Compiler(CompileOptions(keep_intermediate=False))
         compiler.run(mlir_module)
@@ -216,6 +220,7 @@ class TestCompilerState:
         identity_compiler = Compiler(CompileOptions(keep_intermediate=True))
         identity_compiler.run(mlir_module, pipelines=pipelines, lower_to_llvm=False)
         directory = os.path.join(os.getcwd(), workflow.__name__)
+        assert directory == identity_compiler.last_workspace
         assert os.path.exists(directory)
         files = os.listdir(directory)
         # The directory is non-empty. Should at least contain the original .mlir file
@@ -235,9 +240,12 @@ class TestCompilerState:
         # This means that we are not running any pass.
         identity_compiler = Compiler(CompileOptions(keep_intermediate=True))
         identity_compiler.run(mlir_module, pipelines=[], lower_to_llvm=False)
-        files = os.listdir(identity_compiler.last_workspace)
+        directory = os.path.join(os.getcwd(), workflow.__name__)
+        assert directory == identity_compiler.last_workspace
+        files = os.listdir(directory)
         # The directory is non-empty. Should at least contain the original .mlir file
         assert files
+        shutil.rmtree(directory)
 
     def test_compiler_driver_with_output_name(self):
         """Test with non-default output name."""
@@ -307,8 +315,8 @@ module @workflow {
   }
 }
 """
-        out = qjit(ir, keep_intermediate=True, verbose=True)
-        out(0.1)
+        compiled_function = qjit(ir)
+        assert compiled_function(0.1) == -1
 
     def test_parsing_errors(self):
         """Test parsing error handling."""

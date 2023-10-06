@@ -74,12 +74,6 @@ def run_writing_command(command: List[str], compile_options: Optional[CompileOpt
     subprocess.run(command, check=True)
 
 
-default_bin_paths = {
-    "llvm": os.path.join(package_root, "../../mlir/llvm-project/build/bin"),
-    "mhlo": os.path.join(package_root, "../../mlir/mlir-hlo/build/bin"),
-    "quantum": os.path.join(package_root, "../../mlir/build/bin"),
-}
-
 default_lib_paths = {
     "llvm": os.path.join(package_root, "../../mlir/llvm-project/build/lib"),
     "runtime": os.path.join(package_root, "../../runtime/build/lib"),

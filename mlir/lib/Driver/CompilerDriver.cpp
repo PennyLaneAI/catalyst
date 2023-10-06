@@ -331,7 +331,6 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
         }
     }
 
-    // Dump IR before running the pipeline
     if (options.keepIntermediate) {
         std::string tmp;
         {
