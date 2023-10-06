@@ -50,6 +50,7 @@ struct TestPass : impl::TestPassBase<TestPass> {
                           << "\n");
 
         getOperation()->emitError() << "TestPass-induced error \n";
+
         return signalPassFailure();
     }
 };

@@ -310,18 +310,43 @@ module @workflow {
         out = qjit(ir, keep_intermediate=True, verbose=True)
         out(0.1)
 
-    def test_compiler_raises_compiler_error(self):
-        """Test the compile message type and contents."""
+    def test_parsing_errors(self):
+        """Test parsing error handling."""
+
+        ir = r"""
+module @workflow {
+  func.func public @catalyst.entry_point(%arg0: tensor<f64>) -> tensor<f64> attributes {llvm.emit_c_interface} {
+    %c = stablehlo.constant dense<4.0> : tensor<i64>
+    return %c : tensor<f64> // Invalid type
+  }
+}
+"""
+        with pytest.raises(CompileError) as e:
+            qjit(ir, keep_intermediate=True)(0.1)
+
+        assert "Failed to parse module as MLIR source" in e.value.args[0]
+        assert "Failed to parse module as LLVM source" in e.value.args[0]
+
+    def test_pipeline_error(self):
+        """Test pipeline error handling."""
 
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def circuit():
             return qml.state()
 
         test_pipelines = [("PipelineA", ["canonicalize"]), ("PipelineB", ["test"])]
-        with pytest.raises(CompileError, match="While processing pipeline: PipelineB") as e:
+        with pytest.raises(CompileError) as e:
             qjit(circuit, pipelines=test_pipelines)()
 
+        assert "Failed to lower MLIR module" in e.value.args[0]
+        assert "While processing pipeline: PipelineB" in e.value.args[0]
         assert "PipelineA" not in e.value.args[0]
+        assert "Trace" not in e.value.args[0]
+
+        with pytest.raises(CompileError) as e:
+            qjit(circuit, pipelines=test_pipelines, verbose=True)()
+
+        assert "Trace" in e.value.args[0]
 
 
 if __name__ == "__main__":

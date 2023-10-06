@@ -104,17 +104,11 @@ struct CatalystPassInstrumentation : public PassInstrumentation {
 namespace {
 /// Parse an MLIR module given in textual ASM representation. Any errors during parsing will be
 /// output to diagnosticStream.
-OwningOpRef<ModuleOp> parseMLIRSource(MLIRContext *ctx, StringRef source, StringRef moduleName,
-                                      raw_ostream &diagnosticStream)
+OwningOpRef<ModuleOp> parseMLIRSource(MLIRContext *ctx, const llvm::SourceMgr &sourceMgr)
 {
-    auto moduleBuffer = llvm::MemoryBuffer::getMemBufferCopy(source, moduleName);
-    auto sourceMgr = std::make_shared<llvm::SourceMgr>();
-    sourceMgr->AddNewSourceBuffer(std::move(moduleBuffer), SMLoc());
-
     FallbackAsmResourceMap fallbackResourceMap;
     ParserConfig parserConfig{ctx, /*verifyAfterParse=*/true, &fallbackResourceMap};
 
-    SourceMgrDiagnosticHandler sourceMgrHandler(*sourceMgr, ctx, diagnosticStream);
     return parseSourceFile<ModuleOp>(sourceMgr, parserConfig);
 }
 
@@ -413,8 +407,10 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     registerAllCatalystDialects(registry);
     registerLLVMTranslations(registry);
     MLIRContext ctx(registry);
+    ctx.printOpOnDiagnostic(true);
+    ctx.printStackTraceOnDiagnostic(options.verbosity >= Verbosity::Debug);
     // TODO: FIXME:
-    // Let's try to enable multithreading.
+    // Let's try to enable multithreading. Do not forget to protect the printing.
     ctx.disableMultithreading();
     ScopedDiagnosticHandler scopedHandler(
         &ctx, [&](Diagnostic &diag) { diag.print(options.diagnosticStream); });
@@ -424,11 +420,16 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
 
     llvm::raw_string_ostream outIRStream(output.outIR);
 
+    auto moduleBuffer = llvm::MemoryBuffer::getMemBufferCopy(options.source, options.moduleName);
+    auto sourceMgr = std::make_shared<llvm::SourceMgr>();
+    sourceMgr->AddNewSourceBuffer(std::move(moduleBuffer), SMLoc());
+    SourceMgrDiagnosticHandler sourceMgrHandler(*sourceMgr, &ctx, options.diagnosticStream);
+
     // First attempt to parse the input as an MLIR module.
-    OwningOpRef<ModuleOp> op =
-        parseMLIRSource(&ctx, options.source, options.moduleName, options.diagnosticStream);
+    OwningOpRef<ModuleOp> op = parseMLIRSource(&ctx, *sourceMgr);
     if (op) {
         if (failed(runLowering(options, &ctx, *op, output))) {
+            CO_MSG(options, Verbosity::Urgent, "Failed to lower MLIR module\n");
             return failure();
         }
 
@@ -438,6 +439,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         if (options.lowerToLLVM) {
             llvmModule = translateModuleToLLVMIR(*op, llvmContext);
             if (!llvmModule) {
+                CO_MSG(options, Verbosity::Urgent, "Failed to translate LLVM module\n");
                 return failure();
             }
 
@@ -447,8 +449,8 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         }
     }
     else {
-        CO_MSG(options, Verbosity::Debug,
-            "Failed to parse module as MLIR source, retrying parsing as LLVM source\n");
+        CO_MSG(options, Verbosity::Urgent,
+               "Failed to parse module as MLIR source, retrying parsing as LLVM source\n");
         llvm::SMDiagnostic err;
         llvmModule = parseLLVMSource(llvmContext, options.source, options.moduleName, err);
         if (!llvmModule) {
