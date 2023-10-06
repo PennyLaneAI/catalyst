@@ -83,7 +83,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-python-${{matrix.python_version}}-default-build-opt
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-default-build-opt
 
     - name: Install Deps
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
@@ -156,7 +156,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-python-${{matrix.python_version}}-default-build-opt
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-default-build-opt
         fail-on-cache-miss: True
 
     - name: Install Deps
@@ -208,7 +208,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: enzyme-build
-        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-build
+        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-${{ needs.constants.outputs.enzyme_version }}-default-build
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
@@ -226,7 +226,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-python-${{matrix.python_version}}-default-build-opt
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-default-build-opt
         fail-on-cache-miss: True
 
     - name: Install Deps
@@ -276,7 +276,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-python-${{matrix.python_version}}-default-build-opt
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-default-build-opt
         fail-on-cache-miss: True
 
     - name: Get Cached MHLO Source
@@ -310,7 +310,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: enzyme-build
-        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-build
+        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-${{ needs.constants.outputs.enzyme_version }}-default-build
         fail-on-cache-miss: True
 
     - name: Cache CCache
@@ -370,7 +370,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-python-${{matrix.python_version}}-default-build-opt
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-default-build-opt
         fail-on-cache-miss: True
 
     - name: Download Quantum Build Artifact
@@ -440,7 +440,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-python-${{matrix.python_version}}-default-build-opt
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-default-build-opt
         fail-on-cache-miss: True
 
     - name: Download Quantum Build Artifact
@@ -496,7 +496,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-python-${{matrix.python_version}}-default-build-opt
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-default-build-opt
         fail-on-cache-miss: True
 
     - name: Download Quantum Build Artifact
