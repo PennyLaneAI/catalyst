@@ -23,9 +23,16 @@ jobs:
     uses: ./.github/workflows/constants.yaml
 
   check-config:
-    name: Build Configuration
     needs: [constants]
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        arch: [x86_64]
+        python_version: ${{ fromJson(needs.constants.outputs.python_versions) }}
+
+    name: Build Configuration (Python ${{ matrix.python_version }})
+    runs-on: ${{ matrix.os }}
 
     steps:
     - name: Checkout Catalyst repo
@@ -56,7 +63,7 @@ jobs:
     - uses: actions/cache@v3
       with:
         path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-build-opt
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-python-${{matrix.python_version}}-default-build-opt
         fail-on-cache-miss: True
     - name: Get Cached MHLO Source
       id: cache-mhlo-source
