@@ -447,12 +447,14 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         }
     }
     else {
-        // If parsing as an MLIR module failed, attempt to parse as an LLVM IR module.
+        CO_MSG(options, Verbosity::Debug,
+            "Failed to parse module as MLIR source, retrying parsing as LLVM source\n");
         llvm::SMDiagnostic err;
         llvmModule = parseLLVMSource(llvmContext, options.source, options.moduleName, err);
         if (!llvmModule) {
             // If both MLIR and LLVM failed to parse, exit.
             err.print(options.moduleName.data(), options.diagnosticStream);
+            CO_MSG(options, Verbosity::Urgent, "Failed to parse module as LLVM source\n");
             return failure();
         }
     }
