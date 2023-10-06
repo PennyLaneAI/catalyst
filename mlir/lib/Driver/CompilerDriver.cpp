@@ -305,7 +305,7 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
     // Lists pipelines not terminated by any passes
     std::unordered_map<const Pass *, std::list<Pipeline::Name>> pipelineTailMarkers;
     std::unordered_map<const Pass *, Pipeline::Name> passPipelineNames;
-    std::vector<Pipeline::Name> dunglingPipelines;
+    std::vector<Pipeline::Name> danglingPipelines;
 
     // Fill all the pipe-to-pipeline mappings
     for (const auto &pipeline : options.pipelinesCfg) {
@@ -314,7 +314,7 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
             return failure();
         }
         if (existingPasses == pm.size()) {
-            dunglingPipelines.push_back(pipeline.name);
+            danglingPipelines.push_back(pipeline.name);
         }
         else {
             const Pass *pass = nullptr;
@@ -323,10 +323,10 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
                 passPipelineNames[pass] = pipeline.name;
             }
             assert(pass != nullptr);
-            for (auto pn : dunglingPipelines) {
+            for (auto pn : danglingPipelines) {
                 pipelineTailMarkers[pass].push_back(pn);
             }
-            dunglingPipelines.clear();
+            danglingPipelines.clear();
             pipelineTailMarkers[pass].push_back(pipeline.name);
         }
     }
@@ -378,7 +378,7 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
     // For completeness, dump the IR into files which correspond to possible last empty
     // pipelines.
     if (options.keepIntermediate) {
-        for (auto pipelineName : dunglingPipelines) {
+        for (auto pipelineName : danglingPipelines) {
             {
                 llvm::raw_string_ostream s{outputs[pipelineName]};
                 s << *moduleOp;
