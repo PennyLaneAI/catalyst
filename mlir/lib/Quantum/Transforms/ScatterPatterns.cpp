@@ -22,6 +22,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Index/IR/IndexOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 
 #include "mhlo/IR/hlo_ops.h"
 
@@ -111,63 +112,73 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         std::vector<std::vector<int64_t>> allUpdatesIndices;
         generateIndicesRecursive(updatesShapeVector, indices, 0, allUpdatesIndices);
 
-        // Replace the results with the updated inputs.
-        for (std::vector<int64_t> updatesIndices : allUpdatesIndices) {
-            // Scatter update
-            std::vector<int64_t> updateScatterIndices;
-            for (int index : updatedScatterDims) {
-                updateScatterIndices.push_back(updatesIndices[index]);
-            }
-            // Windows update
-            std::vector<int64_t> updateWindowsIndices;
-            for (int index : updatedWindowsDims) {
-                updateWindowsIndices.push_back(updatesIndices[index]);
-            }
-            // Get results indices from update indices
-            SmallVector<Value> resultsIndicesValue =
-                getResultsIndices(updatesIndices, updateScatterIndices, updateWindowsIndices,
-                                  inputsShape, insertedWindowsDims, scatterIndices, indexVectorDim,
-                                  scatterDimsToOperandDims, rewriter, loc);
-            // Create Values for indices
-            SmallVector<Value> updatesIndicesValue;
-            for (int64_t index : updatesIndices) {
-                Value value = rewriter.create<index::ConstantOp>(loc, index);
-                updatesIndicesValue.push_back(value);
-            }
-            // Set Args (Value range)
-            Value updateValue =
-                rewriter.create<tensor::ExtractOp>(loc, updatesValue, updatesIndicesValue);
-            Value resultValue =
-                rewriter.create<tensor::ExtractOp>(loc, resultsValue, resultsIndicesValue);
+        ///
 
-            // f64 -> tensor<f64> if necessary
-            if (!isa<RankedTensorType>(updateValue.getType())) {
-                Type resultTy = RankedTensorType::get({}, updateValue.getType());
-                updateValue = rewriter.create<tensor::FromElementsOp>(loc, resultTy, updateValue);
-            }
-            if (!isa<RankedTensorType>(resultValue.getType())) {
-                Type resultTy = RankedTensorType::get({}, resultValue.getType());
-                resultValue = rewriter.create<tensor::FromElementsOp>(loc, resultTy, resultValue);
-            }
+        Value resultValue =
+            builder
+                .create<scf::ForOp>(
+                    loc, 0, allUpdatesIndices.size(), 1, /*iterArgsInit=*/resultsValue,
+                    [&](OpBuilder &builder, Location loc, Value i, Value iterArgs) {
+                        auto updatesIndices = allUpdatesIndices[i];
+                        // Scatter update
+                        std::vector<int64_t> updateScatterIndices;
+                        for (int index : updatedScatterDims) {
+                            updateScatterIndices.push_back(updatesIndices[index]);
+                        }
+                        // Windows update
+                        std::vector<int64_t> updateWindowsIndices;
+                        for (int index : updatedWindowsDims) {
+                            updateWindowsIndices.push_back(updatesIndices[index]);
+                        }
+                        // Get results indices from update indices
+                        SmallVector<Value> resultsIndicesValue = getResultsIndices(
+                            updatesIndices, updateScatterIndices, updateWindowsIndices, inputsShape,
+                            insertedWindowsDims, scatterIndices, indexVectorDim,
+                            scatterDimsToOperandDims, rewriter, loc);
+                        // Create Values for indices
+                        SmallVector<Value> updatesIndicesValue;
+                        for (int64_t index : updatesIndices) {
+                            Value value = rewriter.create<index::ConstantOp>(loc, index);
+                            updatesIndicesValue.push_back(value);
+                        }
+                        // Set Args (Value range)
+                        Value updateValue = rewriter.create<tensor::ExtractOp>(loc, updatesValue,
+                                                                               updatesIndicesValue);
+                        Value resultValue = rewriter.create<tensor::ExtractOp>(loc, resultsValue,
+                                                                               resultsIndicesValue);
 
-            // Set the arguments for the call op
-            std::vector<Value> args{resultValue, updateValue};
+                        // f64 -> tensor<f64> if necessary
+                        if (!isa<RankedTensorType>(updateValue.getType())) {
+                            Type resultTy = RankedTensorType::get({}, updateValue.getType());
+                            updateValue =
+                                rewriter.create<tensor::FromElementsOp>(loc, resultTy, updateValue);
+                        }
+                        if (!isa<RankedTensorType>(resultValue.getType())) {
+                            Type resultTy = RankedTensorType::get({}, resultValue.getType());
+                            resultValue =
+                                rewriter.create<tensor::FromElementsOp>(loc, resultTy, resultValue);
+                        }
 
-            // Call the function that computes the update
-            Value updated = rewriter.create<func::CallOp>(loc, updateFnOp, args).getResult(0);
-            // Make it a scalar if necessary tensor<f64> -> f64
-            Value updatedExtracted;
-            if (isa<RankedTensorType>(updated.getType())) {
-                updatedExtracted = rewriter.create<tensor::ExtractOp>(loc, updated);
-            }
-            else {
-                updatedExtracted = updated;
-            }
-            // Insert the update in the results and replace the previous value
-            Value res = rewriter.create<tensor::InsertOp>(loc, updatedExtracted, resultsValue,
-                                                          resultsIndicesValue);
-            resultsValue = res;
-        }
+                        // Set the arguments for the call op
+                        std::vector<Value> args{resultValue, updateValue};
+
+                        // Call the function that computes the update
+                        Value updated =
+                            rewriter.create<func::CallOp>(loc, updateFnOp, args).getResult(0);
+                        // Make it a scalar if necessary tensor<f64> -> f64
+                        Value updatedExtracted;
+                        if (isa<RankedTensorType>(updated.getType())) {
+                            updatedExtracted = rewriter.create<tensor::ExtractOp>(loc, updated);
+                        }
+                        else {
+                            updatedExtracted = updated;
+                        }
+                        // Insert the update in the results and replace the previous value
+                        Value res = rewriter.create<tensor::InsertOp>(
+                            loc, updatedExtracted, resultsValue, resultsIndicesValue);
+                        builder.create<scf::YieldOp>(loc, res);
+                    })
+                .getResult(0);
         // Replace the results with the updated one
         rewriter.replaceOp(op, resultsValue);
         return success();
