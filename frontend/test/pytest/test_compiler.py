@@ -184,14 +184,16 @@ class TestCompilerState:
             CompileOptions(verbose=True, keep_intermediate=True, pipelines=pipelines)
         )
         compiler.run(mlir_module)
-        assert compiler.get_output_of("EmptyPipeline1")
-        assert compiler.get_output_of("HLOLoweringPass")
+        assert (dump1 := compiler.get_output_of("EmptyPipeline1"))
+        assert (dump2 := compiler.get_output_of("HLOLoweringPass"))
+        assert dump1 == dump2
         assert compiler.get_output_of("QuantumCompilationPass")
         assert compiler.get_output_of("BufferizationPass")
-        assert compiler.get_output_of("MLIRToLLVMDialect")
+        assert (dump1 := compiler.get_output_of("MLIRToLLVMDialect"))
+        assert (dump2 := compiler.get_output_of("EmptyPipeline2"))
+        assert dump1 == dump2
         assert compiler.get_output_of("PreEnzymeOpt")
         assert compiler.get_output_of("Enzyme")
-        assert compiler.get_output_of("EmptyPipeline2")
         assert compiler.get_output_of("None-existing-pipeline") is None
 
         compiler = Compiler(CompileOptions(keep_intermediate=False))

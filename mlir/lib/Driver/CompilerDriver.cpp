@@ -50,7 +50,6 @@
 using namespace mlir;
 using namespace catalyst;
 using namespace catalyst::driver;
-namespace fs = std::filesystem;
 
 namespace {
 
@@ -81,13 +80,22 @@ struct CatalystIRPrinterConfig : public PassManager::IRPrinterConfig {
 
 struct CatalystPassInstrumentation : public PassInstrumentation {
     typedef std::function<void(Pass *pass, Operation *operation)> Callback;
-    Callback callback;
+    Callback afterPassCallback;
+    Callback afterPassFailedCallback;
 
-    CatalystPassInstrumentation(Callback callback) : callback(callback) {}
+    CatalystPassInstrumentation(Callback afterPassCallback, Callback afterPassFailedCallback)
+        : afterPassCallback(afterPassCallback), afterPassFailedCallback(afterPassFailedCallback)
+    {
+    }
+
+    void runAfterPass(Pass *pass, Operation *operation) override
+    {
+        this->afterPassCallback(pass, operation);
+    }
 
     void runAfterPassFailed(Pass *pass, Operation *operation) override
     {
-        this->callback(pass, operation);
+        this->afterPassFailedCallback(pass, operation);
     }
 };
 
@@ -206,13 +214,13 @@ LogicalResult inferMLIRReturnTypes(MLIRContext *ctx, llvm::Type *returnType,
 }
 
 LogicalResult runLLVMPasses(const CompilerOptions &options,
-                            std::shared_ptr<llvm::Module> llvmModule,
-                            CompilerOutput::PipelineOutputs &outputs)
+                            std::shared_ptr<llvm::Module> llvmModule, CompilerOutput &output)
 {
     // opt -O2
     // As seen here:
     // https://llvm.org/docs/NewPassManager.html#just-tell-me-how-to-run-the-default-optimization-pipeline-with-the-new-pass-manager
 
+    auto &outputs = output.pipelineOutputs;
     // Create the analysis managers.
     llvm::LoopAnalysisManager LAM;
     llvm::FunctionAnalysisManager FAM;
@@ -240,19 +248,17 @@ LogicalResult runLLVMPasses(const CompilerOptions &options,
     if (options.keepIntermediate) {
         llvm::raw_string_ostream rawStringOstream{outputs["PreEnzymeOpt"]};
         llvmModule->print(rawStringOstream, nullptr);
-        const std::string &outFile = fs::path("1_PreEnzymeOpt.ll");
-        if (failed(dumpToFile(options, outFile, outputs["PreEnzymeOpt"]))) {
-            return failure();
-        }
+        auto outFile = output.nextPipelineDumpFilename("PreEnzymeOpt", ".ll");
+        dumpToFile(options, outFile, outputs["PreEnzymeOpt"]);
     }
 
     return success();
 }
 
 LogicalResult runEnzymePasses(const CompilerOptions &options,
-                              std::shared_ptr<llvm::Module> llvmModule,
-                              CompilerOutput::PipelineOutputs &outputs)
+                              std::shared_ptr<llvm::Module> llvmModule, CompilerOutput &output)
 {
+    auto &outputs = output.pipelineOutputs;
     // Create the new pass manager builder.
     // Take a look at the PassBuilder constructor parameters for more
     // customization, e.g. specifying a TargetMachine or various debugging
@@ -286,32 +292,25 @@ LogicalResult runEnzymePasses(const CompilerOptions &options,
     if (options.keepIntermediate) {
         llvm::raw_string_ostream rawStringOstream{outputs["Enzyme"]};
         llvmModule->print(rawStringOstream, nullptr);
-        const std::string &outFile = fs::path("2_Enzyme.ll");
-        if (failed(dumpToFile(options, outFile, outputs["Enzyme"]))) {
-            return failure();
-        }
+        auto outFile = output.nextPipelineDumpFilename("Enzyme", ".ll");
+        dumpToFile(options, outFile, outputs["Enzyme"]);
     }
 
     return success();
 }
 
 LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, ModuleOp moduleOp,
-                          CompilerOutput::PipelineOutputs &outputs)
+                          CompilerOutput &output)
 
 {
-    size_t pipelineIdx = 0;
-    auto nextDumpFilename = [&](Pipeline::Name pipelineName) -> std::string {
-        return fs::path(std::to_string(pipelineIdx++) + "_" + pipelineName)
-            .replace_extension(".mlir");
-    };
-
+    auto &outputs = output.pipelineOutputs;
     auto pm = PassManager::on<ModuleOp>(ctx, PassManager::Nesting::Implicit);
 
     // Maps a pass to one or more pipelines ended by this pass
-    std::unordered_map<const Pass *, std::list<Pipeline::Name>> pipelineTailMarkers;
     // Maps a pass to its owning pipeline
-    std::unordered_map<const Pass *, Pipeline::Name> passPipelineNames;
     // Lists pipelines not terminated by any passes
+    std::unordered_map<const Pass *, std::list<Pipeline::Name>> pipelineTailMarkers;
+    std::unordered_map<const Pass *, Pipeline::Name> passPipelineNames;
     std::vector<Pipeline::Name> dunglingPipelines;
 
     // Fill all the pipe-to-pipeline mappings
@@ -338,73 +337,61 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
         }
     }
 
+    // Dump IR before running the pipeline
     if (options.keepIntermediate) {
-
-        // Dump the IR before running the pipeline
+        std::string tmp;
         {
-            std::string tmp;
-            {
-                llvm::raw_string_ostream s{tmp};
-                s << moduleOp;
-            }
-            const std::string &outFile =
-                fs::path(options.moduleName.str()).replace_extension(".mlir");
-            if (failed(dumpToFile(options, outFile, tmp))) {
-                return failure();
-            }
+            llvm::raw_string_ostream s{tmp};
+            s << moduleOp;
         }
-
-        // For each pipeline-terminating pass, print the IR into the corresponding dump file and
-        // into a diagnostic output buffer. Note that one pass can terminate multiple pipelines.
-        {
-            auto printHandler =
-                [&](Pass *pass, CatalystIRPrinterConfig::PrintCallbackFn print) -> LogicalResult {
-                auto res = pipelineTailMarkers.find(pass);
-                if (res != pipelineTailMarkers.end()) {
-                    for (const auto &pipelineName : res->second) {
-                        {
-                            llvm::raw_string_ostream s{outputs[pipelineName]};
-                            print(s);
-                        }
-                        if (failed(dumpToFile(options, nextDumpFilename(pipelineName),
-                                              outputs[pipelineName]))) {
-                            return failure();
-                        }
-                    }
-                }
-                return success();
-            };
-            pm.enableIRPrinting(std::unique_ptr<PassManager::IRPrinterConfig>(
-                new CatalystIRPrinterConfig(printHandler)));
-        }
+        dumpToFile(options, output.nextPipelineDumpFilename(options.moduleName.str(), ".mlir"),
+                   tmp);
     }
+
+    // For each pipeline-terminating pass, print the IR into the corresponding dump file and
+    // into a diagnostic output buffer. Note that one pass can terminate multiple pipelines.
+    auto afterPassCallback = [&](Pass *pass, Operation *op) {
+        if (!options.keepIntermediate)
+            return;
+        auto res = pipelineTailMarkers.find(pass);
+        if (res != pipelineTailMarkers.end()) {
+            for (const auto &pipelineName : res->second) {
+                {
+                    llvm::raw_string_ostream s{outputs[pipelineName]};
+                    s << *op;
+                }
+                dumpToFile(options, output.nextPipelineDumpFilename(pipelineName),
+                           outputs[pipelineName]);
+            }
+        }
+    };
+
+    // For each failed pass, print the owner pipeline name into a diagnostic stream.
+    auto afterPassFailedCallback = [&](Pass *pass, Operation *op) {
+        auto res = passPipelineNames.find(pass);
+        assert(res != passPipelineNames.end() && "Unexpected pass");
+        options.diagnosticStream << "While processing pipeline: " << res->second << "\n";
+    };
 
     // Output pipeline names on failures
     pm.addInstrumentation(std::unique_ptr<PassInstrumentation>(
-        new CatalystPassInstrumentation([&](Pass *pass, Operation *op) {
-            auto res = passPipelineNames.find(pass);
-            assert(res != passPipelineNames.end() && "Unexpected pass");
-            options.diagnosticStream << "While processing pipeline: " << res->second << "\n";
-        })));
+        new CatalystPassInstrumentation(afterPassCallback, afterPassFailedCallback)));
 
     // Run the lowering pipelines
     if (failed(pm.run(moduleOp))) {
         return failure();
     }
 
+    // For completeness, dump the IR into files which correspond to possible last empty
+    // pipelines.
     if (options.keepIntermediate) {
-
-        // For completeness, dump the IR into files which correspond to possible last empty
-        // pipelines.
         for (auto pipelineName : dunglingPipelines) {
             {
                 llvm::raw_string_ostream s{outputs[pipelineName]};
                 s << *moduleOp;
             }
-            if (failed(
-                    dumpToFile(options, nextDumpFilename(pipelineName), outputs[pipelineName]))) {
-                return failure();
-            }
+            dumpToFile(options, output.nextPipelineDumpFilename(pipelineName),
+                       outputs[pipelineName]);
         }
     }
 
@@ -441,7 +428,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     OwningOpRef<ModuleOp> op =
         parseMLIRSource(&ctx, options.source, options.moduleName, options.diagnosticStream);
     if (op) {
-        if (failed(runLowering(options, &ctx, *op, output.pipelineOutputs))) {
+        if (failed(runLowering(options, &ctx, *op, output))) {
             return failure();
         }
 
@@ -455,9 +442,7 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
             }
 
             if (options.keepIntermediate) {
-                if (failed(dumpToFile(options, "llvm_ir.ll", *llvmModule))) {
-                    return failure();
-                }
+                dumpToFile(options, output.nextPipelineDumpFilename("llvm_ir", ".ll"), *llvmModule);
             }
         }
     }
@@ -473,11 +458,11 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     }
 
     if (llvmModule) {
-        if (failed(runLLVMPasses(options, llvmModule, output.pipelineOutputs))) {
+        if (failed(runLLVMPasses(options, llvmModule, output))) {
             return failure();
         }
 
-        if (failed(runEnzymePasses(options, llvmModule, output.pipelineOutputs))) {
+        if (failed(runEnzymePasses(options, llvmModule, output))) {
             return failure();
         }
 
