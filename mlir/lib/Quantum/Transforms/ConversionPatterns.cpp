@@ -246,6 +246,9 @@ struct CustomOpPattern : public OpConversionPattern<CustomOp> {
         Location loc = op.getLoc();
         MLIRContext *ctx = getContext();
 
+        assert(op.getCtrlQubitOperands().size() == 0 &&
+               "lowering controlled operation is not implemented");
+
         SmallVector<Type> argTypes(adaptor.getOperands().getTypes().begin(),
                                    adaptor.getOperands().getTypes().end());
         argTypes.insert(argTypes.end(), IntegerType::get(ctx, 1));
@@ -273,6 +276,9 @@ struct MultiRZOpPattern : public OpConversionPattern<MultiRZOp> {
     {
         Location loc = op.getLoc();
         MLIRContext *ctx = getContext();
+
+        assert(op.getCtrlQubitOperands().size() == 0 &&
+               "lowering controlled operation is not implemented");
 
         std::string qirName = "__quantum__qis__MultiRZ";
         Type qirSignature = LLVM::LLVMFunctionType::get(
@@ -305,6 +311,9 @@ struct QubitUnitaryOpPattern : public OpConversionPattern<QubitUnitaryOp> {
         Location loc = op.getLoc();
         MLIRContext *ctx = getContext();
         TypeConverter *conv = getTypeConverter();
+
+        assert(op.getCtrlQubitOperands().size() == 0 &&
+               "lowering controlled operation is not implemented");
 
         assert(op.getMatrix().getType().isa<MemRefType>() &&
                "unitary must take in memref before lowering");
