@@ -18,7 +18,6 @@ compiling of hybrid quantum-classical functions using Catalyst.
 import ctypes
 import functools
 import inspect
-import os
 import pathlib
 import shutil
 import tempfile
@@ -50,6 +49,7 @@ from catalyst.utils.contexts import EvaluationContext
 from catalyst.utils.gen_mlir import inject_functions
 from catalyst.utils.patching import Patcher
 
+# pylint: disable=too-many-lines
 # Required for JAX tracer objects as PennyLane wires.
 # pylint: disable=unnecessary-lambda
 setattr(jax.interpreters.partial_eval.DynamicJaxprTracer, "__hash__", lambda x: id(x))
@@ -464,11 +464,18 @@ class Directory:
         return str(self._impl)
 
     def is_dir(self):
+        """Returns True if it is a directory.
+
+        Should always return True for both, however, we leave it to the implementation to actually
+        confirm it.
+        """
         if isinstance(self._impl, tempfile.TemporaryDirectory):
             return True
         return self._impl.is_dir()
 
     def cleanup(self):
+        """Remove the contents of the directory.
+        """
         if isinstance(self._impl, tempfile.TemporaryDirectory):
             # The temporary directory can clean up
             # after itself...
@@ -492,6 +499,14 @@ class WorkspaceManager:
 
     @staticmethod
     def get_or_create_workspace(name, path=None):
+        """
+        Args:
+            name (str): Directory name
+            path (Optional(str)): Directory path
+                                If path is None, then it will be a temporary directory
+                                stored in whatever temporary directory is specific to the
+                                operating system.
+        """
         path, name = WorkspaceManager._get_preferred_abspath(name, path)
         return Directory(WorkspaceManager._get_or_create_directory(path, name))
 
