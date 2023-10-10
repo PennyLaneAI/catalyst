@@ -580,12 +580,13 @@ class QJIT:
             pathlib.Path.cwd() if self.compile_options.keep_intermediate else None
         )
         # If we are compiling from textual ir, just use this as the name of the function.
-        preferred_workspace_name = (
-            "compiled_function" if self.compiling_from_textual_ir else self.__name__
-        )
-        self.workspace = WorkspaceManager.get_or_create_workspace(
-            preferred_workspace_name, preferred_workspace_dir
-        )
+        name = "compiled_function"
+        if not self.compiling_from_textual_ir:
+            # pylint: disable=no-member
+            # Guaranteed to exist after functools.update_wrapper AND not compiling from textual IR
+            name = self.__name__
+
+        self.workspace = WorkspaceManager.get_or_create_workspace(name, preferred_workspace_dir)
 
         if self.compiling_from_textual_ir:
             EvaluationContext.check_is_not_tracing("Cannot compile from IR in tracing context.")

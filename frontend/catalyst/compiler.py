@@ -21,7 +21,6 @@ import platform
 import shutil
 import subprocess
 import sys
-import tempfile
 import warnings
 from dataclasses import dataclass
 from io import TextIOWrapper
@@ -311,6 +310,7 @@ class Compiler:
         self.options = options if options is not None else CompileOptions
         self.last_compiler_output = None
 
+    # pylint: disable=too-many-arguments
     def run_from_ir(
         self,
         ir: str,
@@ -406,6 +406,8 @@ class Compiler:
         Returns
             (Optional[str]): output IR
         """
+        # Here to avoid circular dependency
+        # pylint: disable=import-outside-toplevel
         from catalyst.compilation_pipelines import Directory
 
         assert isinstance(workspace, Directory), "get_output_of expects a Directory type."
