@@ -29,9 +29,8 @@ import pennylane as qml
 import pytest
 
 from catalyst import qjit
-from catalyst.compilation_pipelines import Directory
+from catalyst.compilation_pipelines import Directory, WorkspaceManager
 from catalyst.compiler import CompileOptions, Compiler, LinkerDriver
-from catalyst.jax_tracer import trace_to_mlir
 from catalyst.pennylane_extensions import measure, qfunc
 from catalyst.utils.exceptions import CompileError
 
@@ -113,14 +112,15 @@ class TestCompilerErrors:
         """
         compiler = Compiler()
         with pytest.raises(AssertionError, match="expects a Directory type"):
-            result = compiler.get_output_of(None, "inexistent-file")
+            compiler.get_output_of(None, "inexistent-file")
 
     def test_attempts_to_get_inexistent_intermediate_file(self):
         """Test return value if user request intermediate file that doesn't exist."""
         compiler = Compiler()
-        workspace = tempfile.TemporaryDirectory()
-        result = compiler.get_output_of(Directory(workspace), "inexistent-file")
+        workspace = WorkspaceManager.get_or_create_workspace("a-name")
+        result = compiler.get_output_of(workspace, "inexistent-file")
         assert result is None
+        workspace.cleanup()
 
     def test_runtime_error(self, backend):
         """Test with non-default flags."""
