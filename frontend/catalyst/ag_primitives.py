@@ -17,7 +17,7 @@ functions. The purpose is to convert imperative style code to functional or grap
 
 import functools
 import warnings
-from typing import Any, Callable, Iterator, SupportsIndex, Tuple
+from typing import Any, Callable, Iterator, SupportsIndex, Tuple, Union
 
 import jax
 import jax.numpy as jnp
@@ -208,7 +208,7 @@ def _call_python_for(body_fn, get_state, non_array_iterable):
 
 def for_stmt(
     iteration_target: Any,
-    _extra_test: Callable[[], bool] | None,
+    _extra_test: Union[Callable[[], bool], None],
     body_fn: Callable[[int], None],
     get_state: Callable[[], Tuple],
     set_state: Callable[[Tuple], None],
@@ -483,7 +483,9 @@ class CRange:
     def __iter__(self) -> Iterator[int]:  # pragma: nocover
         return self.py_range.__iter__()
 
-    def __getitem__(self, __key: SupportsIndex | slice) -> int | range:  # pragma: nocover
+    def __getitem__(
+        self, __key: Union[SupportsIndex, slice]
+    ) -> Union[int, range]:  # pragma: nocover
         return self.py_range.__getitem__(__key)
 
     def __reversed__(self) -> Iterator[int]:  # pragma: nocover
