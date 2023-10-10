@@ -903,14 +903,19 @@ class TestAvoidVerification:
 
 
 class TestTwoQJITsOneName:
+    def test_two_qjit(self):
+        """Test two qjits with the same name"""
 
-    def test_two_qjit(self, backend):
+        # pylint: disable=disallowed-name
         def foo():
+            """Returns 1"""
             return 1
 
         foo_1 = qjit(foo)
 
+        # pylint: disable=function-redefined
         def foo():
+            """Returns 2"""
             return 2
 
         foo_2 = qjit(foo)
@@ -918,13 +923,19 @@ class TestTwoQJITsOneName:
         assert foo_1() == 1
         assert foo_2() == 2
 
-    def test_two_qjit_keep_intermediate(self, backend):
+    def test_two_qjit_keep_intermediate(self):
+        """Test two qjits with the same name but also keep intermediate=True"""
+
+        # pylint: disable=disallowed-name
         def foo():
+            """Returns 1"""
             return 1
 
         foo_1 = qjit(keep_intermediate=True)(foo)
 
+        # pylint: disable=function-redefined
         def foo():
+            """Returns 2"""
             return 2
 
         foo_2 = qjit(keep_intermediate=True)(foo)

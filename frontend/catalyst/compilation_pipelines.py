@@ -474,8 +474,7 @@ class Directory:
         return self._impl.is_dir()
 
     def cleanup(self):
-        """Remove the contents of the directory.
-        """
+        """Remove the contents of the directory."""
         if isinstance(self._impl, tempfile.TemporaryDirectory):
             # The temporary directory can clean up
             # after itself...
