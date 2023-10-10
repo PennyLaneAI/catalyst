@@ -134,7 +134,6 @@ class AdjointGenerator {
                 }
 
                 else if (auto qubitUnitaryGate = dyn_cast<quantum::QubitUnitaryOp>(op)) {
-
                     OpBuilder::InsertionGuard insertionGuard(builder);
                     builder.setInsertionPoint(clone);
                     Value matrix = qubitUnitaryGate.getMatrix();

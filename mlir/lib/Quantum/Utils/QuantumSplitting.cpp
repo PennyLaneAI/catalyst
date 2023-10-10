@@ -101,7 +101,6 @@ void AugmentedCircuitGenerator::generate(Region &region, OpBuilder &builder)
             }
         }
         else if (auto gate = dyn_cast<quantum::QubitUnitaryOp>(op)) {
-
             Value matrix = gate.getMatrix();
             Value matrixCloned = oldToCloned.lookupOrDefault(matrix);
             Type aType = matrixCloned.getType();
