@@ -19,7 +19,6 @@ Unit tests for LinkerDriver class
 import os
 import pathlib
 import platform
-import shutil
 import subprocess
 import sys
 import tempfile
