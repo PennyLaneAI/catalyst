@@ -944,6 +944,8 @@ class TestTwoQJITsOneName:
 
         assert foo_1() == 1
         assert foo_2() == 2
+        foo_1.workspace.cleanup()
+        foo_2.workspace.cleanup()
 
 
 if __name__ == "__main__":

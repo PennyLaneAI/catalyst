@@ -220,7 +220,7 @@ class TestCompilerState:
         files = os.listdir(directory)
         # The directory is non-empty. Should at least contain the original .mlir file
         assert files
-        shutil.rmtree(directory)
+        workflow.workspace.cleanup()
 
     def test_compiler_driver_with_output_name(self):
         """Test with non-default output name."""
