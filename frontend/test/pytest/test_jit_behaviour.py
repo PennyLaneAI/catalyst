@@ -903,6 +903,8 @@ class TestAvoidVerification:
 
 
 class TestTwoQJITsOneName:
+    """Test two QJITs with the same name."""
+
     def test_two_qjit(self):
         """Test two qjits with the same name"""
 
