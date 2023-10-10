@@ -141,9 +141,6 @@ void _catalyst_pyface_jit_cpp_exception_test(void*, void*) {
         class MockCompiler(Compiler):
             """Mock compiler class"""
 
-            def __init__(self, co):
-                super().__init__(co)
-
             def run_from_ir(self, *_args, **_kwargs):
                 with tempfile.TemporaryDirectory() as workspace:
                     filename = workspace + "a.cpp"
