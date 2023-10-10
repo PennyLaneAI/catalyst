@@ -188,6 +188,10 @@ jobs:
         cat /etc/yum.conf | sed "s/\[main\]/\[main\]\ntimeout=5/g" > /etc/yum.conf
         yum update -y && yum install -y cmake ninja-build openmpi-devel
 
+    - name: Install Dependencies (Python)
+      run: |
+        python${{ matrix.python_version }} -m pip install wheel numpy pybind11 PyYAML
+
     - name: Get Cached LLVM Source
       id: cache-llvm-source
       uses: actions/cache@v3
