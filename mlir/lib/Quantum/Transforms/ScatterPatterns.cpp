@@ -21,8 +21,8 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Index/IR/IndexOps.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 
 #include "mhlo/IR/hlo_ops.h"
 
@@ -109,36 +109,63 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
 
         // Generate all possible indices given the shape of updates
         std::vector<int64_t> indices;
-        std::vector<std::vector<int64_t>> allUpdatesIndices;
-        generateIndicesRecursive(updatesShapeVector, indices, 0, allUpdatesIndices);
+        SmallVector<Value> allUpdatesIndices;
+        generateIndicesRecursive(updatesShapeVector, indices, 0, allUpdatesIndices, rewriter, loc);
 
-        ///
+        // All updates indices -> tensor
+        // get shape and type
+        std::vector<int64_t> totalShape(2);
+        totalShape[0] = allUpdatesIndices.size() / updatesShapeVector.size();
+        totalShape[1] = updatesShapeVector.size();
+
+        Type resultTy = RankedTensorType::get(totalShape, rewriter.getIndexType());
+        auto allUpdatesIndicesTensor =
+            rewriter.create<tensor::FromElementsOp>(loc, resultTy, allUpdatesIndices);
+
+        //
+        Value c0 = rewriter.create<index::ConstantOp>(loc, 0);
+        Value sizeAllUpdatesIndices =
+            rewriter.create<index::ConstantOp>(loc, allUpdatesIndices.size());
+        Value c1 = rewriter.create<index::ConstantOp>(loc, 1);
 
         Value resultValue =
-            builder
+            rewriter
                 .create<scf::ForOp>(
-                    loc, 0, allUpdatesIndices.size(), 1, /*iterArgsInit=*/resultsValue,
-                    [&](OpBuilder &builder, Location loc, Value i, Value iterArgs) {
-                        auto updatesIndices = allUpdatesIndices[i];
+                    loc, c0, sizeAllUpdatesIndices, c1, /*iterArgsInit=*/resultsValue,
+                    [&](OpBuilder &rewriter, Location loc, Value i, ValueRange iterArgs) {
+                        Value updatesIndices =
+                            rewriter.create<tensor::ExtractOp>(loc, allUpdatesIndicesTensor, i);
+
                         // Scatter update
-                        std::vector<int64_t> updateScatterIndices;
-                        for (int index : updatedScatterDims) {
-                            updateScatterIndices.push_back(updatesIndices[index]);
+                        SmallVector<Value> updateScatterIndices;
+                        for (int64_t index : updatedScatterDims) {
+                            Value indexValue = rewriter.create<index::ConstantOp>(loc, index);
+                            Value updateScatterIndex =
+                                rewriter.create<tensor::ExtractOp>(loc, updatesIndices, indexValue);
+                            updateScatterIndices.push_back(updateScatterIndex);
                         }
                         // Windows update
-                        std::vector<int64_t> updateWindowsIndices;
-                        for (int index : updatedWindowsDims) {
-                            updateWindowsIndices.push_back(updatesIndices[index]);
+                        SmallVector<Value> updateWindowsIndices;
+                        for (int64_t index : updatedWindowsDims) {
+                            Value indexValue = rewriter.create<index::ConstantOp>(loc, index);
+                            Value updateWindowsIndex =
+                                rewriter.create<tensor::ExtractOp>(loc, updatesIndices, indexValue);
+                            updateWindowsIndices.push_back(updateWindowsIndex);
                         }
                         // Get results indices from update indices
                         SmallVector<Value> resultsIndicesValue = getResultsIndices(
-                            updatesIndices, updateScatterIndices, updateWindowsIndices, inputsShape,
+                            updateScatterIndices, updateWindowsIndices, inputsShape,
                             insertedWindowsDims, scatterIndices, indexVectorDim,
                             scatterDimsToOperandDims, rewriter, loc);
                         // Create Values for indices
+
+                        // TODO: Tensor to vector
+                        auto updateType = updatesIndices.getType().cast<RankedTensorType>();
                         SmallVector<Value> updatesIndicesValue;
-                        for (int64_t index : updatesIndices) {
-                            Value value = rewriter.create<index::ConstantOp>(loc, index);
+                        for (int64_t index = 0; index <= updateType.getShape().size(); ++index) {
+                            Value indexValue = rewriter.create<index::ConstantOp>(loc, index);
+                            Value value =
+                                rewriter.create<tensor::ExtractOp>(loc, updatesIndices, indexValue);
                             updatesIndicesValue.push_back(value);
                         }
                         // Set Args (Value range)
@@ -176,7 +203,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
                         // Insert the update in the results and replace the previous value
                         Value res = rewriter.create<tensor::InsertOp>(
                             loc, updatedExtracted, resultsValue, resultsIndicesValue);
-                        builder.create<scf::YieldOp>(loc, res);
+                        rewriter.create<scf::YieldOp>(loc, res);
                     })
                 .getResult(0);
         // Replace the results with the updated one
@@ -228,28 +255,34 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
 
     void generateIndicesRecursive(const std::vector<int64_t> &shape,
                                   std::vector<int64_t> &currentIndex, int64_t dimension,
-                                  std::vector<std::vector<int64_t>> &configurations) const
+                                  SmallVector<Value> &configurations,
+                                  mlir::PatternRewriter &rewriter, Location loc) const
     {
         if (dimension == shape.size()) {
-            configurations.push_back(currentIndex);
+            for (auto elem : currentIndex) {
+                // integer to Value
+                auto valueCurrentIndex = rewriter.create<index::ConstantOp>(loc, elem);
+                // Add to configuration
+                configurations.push_back(valueCurrentIndex);
+            }
         }
         else {
             for (int i = 0; i < shape[dimension]; i++) {
                 currentIndex.push_back(i);
-                generateIndicesRecursive(shape, currentIndex, dimension + 1, configurations);
+                generateIndicesRecursive(shape, currentIndex, dimension + 1, configurations,
+                                         rewriter, loc);
                 currentIndex.pop_back();
             }
         }
     }
 
-    SmallVector<Value> getResultsIndices(std::vector<int64_t> updatesIndices,
-                                         std::vector<int64_t> updateScatterIndices,
-                                         std::vector<int64_t> updateWindowsIndices,
+    SmallVector<Value> getResultsIndices(SmallVector<Value> updateScatterIndices,
+                                         SmallVector<Value> updateWindowsIndices,
                                          ArrayRef<int64_t> inputsShape,
                                          ArrayRef<int64_t> insertedWindowsDims,
                                          Value scatterIndices, int64_t indexVectorDim,
                                          ArrayRef<int64_t> scatterDimsToOperandDims,
-                                         mlir::PatternRewriter &rewriter, Location loc) const
+                                         OpBuilder &rewriter, Location loc) const
     {
         // Check index vector dim is the last dimension
         // Rank
@@ -285,7 +318,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
             // Add Scatter in Windows Indices
             SmallVector<Value> results;
             for (size_t i = 0; i < updateWindowsIndices.size(); ++i) {
-                int64_t indexUpdate = updateWindowsIndices[i];
+                auto indexUpdate = updateWindowsIndices[i];
                 auto itScatter =
                     std::find(scatterDimsToOperandDims.begin(), scatterDimsToOperandDims.end(), i);
                 if (itScatter != scatterDimsToOperandDims.end()) {
@@ -293,10 +326,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
                     auto indexScatter =
                         rewriter.create<tensor::ExtractOp>(loc, scatterIndices, index);
 
-                    TypedAttr indexAttr = rewriter.getI32IntegerAttr(indexUpdate);
-                    Value indexValue = rewriter.create<arith::ConstantOp>(loc, indexAttr);
-
-                    Value addValue = rewriter.create<arith::AddIOp>(loc, indexScatter, indexValue);
+                    Value addValue = rewriter.create<arith::AddIOp>(loc, indexScatter, indexUpdate);
                     Value addValueCasted =
                         rewriter.create<arith::IndexCastOp>(loc, rewriter.getIndexType(), addValue);
                     results.push_back(addValueCasted);
@@ -329,18 +359,17 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
             SmallVector<Value> fullWindowIndex;
             // Full windows indices
             for (auto insertedDim : insertedWindowsDims) {
-                updateWindowsIndices.insert(updateWindowsIndices.begin() + insertedDim, 0);
+                auto c0 = rewriter.create<index::ConstantOp>(loc, 0);
+                updateWindowsIndices.insert(updateWindowsIndices.begin() + insertedDim, c0);
             }
             // Add
             SmallVector<Value> results;
             for (size_t i = 0; i < updateWindowsIndices.size(); ++i) {
                 Value indexScatter = fullStartIndex[i];
-                int64_t indexUpdate = updateWindowsIndices[i];
 
-                TypedAttr indexAttr = rewriter.getI32IntegerAttr(indexUpdate);
-                Value indexValue = rewriter.create<arith::ConstantOp>(loc, indexAttr);
+                auto indexUpdate = updateWindowsIndices[i];
 
-                Value addValue = rewriter.create<arith::AddIOp>(loc, indexScatter, indexValue);
+                Value addValue = rewriter.create<arith::AddIOp>(loc, indexScatter, indexUpdate);
                 Value addValueCasted =
                     rewriter.create<arith::IndexCastOp>(loc, rewriter.getIndexType(), addValue);
                 results.push_back(addValueCasted);
