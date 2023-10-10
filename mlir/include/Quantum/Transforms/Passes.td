@@ -73,7 +73,8 @@ def ScatterLoweringPass : Pass<"scatter-lowering"> {
 
     let dependentDialects = [
         "index::IndexDialect",
-        "mhlo::MhloDialect"
+        "mhlo::MhloDialect",
+        "scf::SCFDialect"
     ];
 
     let constructor = "catalyst::createScatterLoweringPass()";
