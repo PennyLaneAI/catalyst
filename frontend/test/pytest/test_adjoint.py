@@ -16,6 +16,7 @@
 
 from functools import partial
 
+import jax
 import jax.numpy as jnp
 import pennylane as qml
 import pennylane.numpy as pnp
@@ -204,6 +205,31 @@ def test_adjoint_qubitunitary(backend):
         )
 
     verify_catalyst_adjoint_against_pennylane(func, qml.device(backend, wires=2))
+
+
+def test_adjoint_qubitunitary_dynamic_variable_loop(backend):
+    """Ensures that catalyst.adjoint supports QubitUnitary oprtations."""
+
+    def func(gate):
+        @for_loop(0, 4, 1)
+        def loop_body(_i, s):
+            # Nonsensical, but good enough
+            gate_modified = gate + s
+            qml.QubitUnitary(gate_modified, wires=[0, 1])
+            return s + 1
+
+        loop_body(1)
+
+    _input = jnp.array(
+        [
+            [0.99500417 - 0.09983342j, 0.0 + 0.0j, 0.0 + 0.0j, 0.0 + 0.0j],
+            [0.0 + 0.0j, 0.99500417 + 0.09983342j, 0.0 + 0.0j, 0.0 + 0.0j],
+            [0.0 + 0.0j, 0.0 + 0.0j, 0.99500417 + 0.09983342j, 0.0 + 0.0j],
+            [0.0 + 0.0j, 0.0 + 0.0j, 0.0 + 0.0j, 0.99500417 - 0.09983342j],
+        ]
+    )
+
+    verify_catalyst_adjoint_against_pennylane(func, qml.device(backend, wires=2), _input)
 
 
 def test_adjoint_multirz(backend):
