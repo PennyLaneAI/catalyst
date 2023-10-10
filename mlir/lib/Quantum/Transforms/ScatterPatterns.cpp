@@ -113,7 +113,6 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         generateIndicesRecursive(updatesShapeVector, indices, 0, allUpdatesIndices, rewriter, loc);
         // All updates indices -> tensor
         // get shape and type
-        std::cout << "before" << std::endl;
         std::vector<int64_t> totalShape;
         if (allUpdatesIndices.size() != 0) {
             totalShape.push_back(allUpdatesIndices.size() / updatesShapeVector.size());
@@ -124,12 +123,12 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         auto allUpdatesIndicesTensor =
             rewriter.create<tensor::FromElementsOp>(loc, resultTy, allUpdatesIndices);
 
-        // Creat the loop values
+        // Create the loop values
         Value c0 = rewriter.create<index::ConstantOp>(loc, 0);
         Value sizeAllUpdatesIndices =
             rewriter.create<index::ConstantOp>(loc, allUpdatesIndices.size());
         Value c1 = rewriter.create<index::ConstantOp>(loc, 1);
-        std::cout << "before loop" << std::endl;
+
         Value resultValue =
             rewriter
                 .create<scf::ForOp>(
@@ -154,38 +153,32 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
                                 rewriter.create<tensor::ExtractOp>(loc, updatesIndices, indexValue);
                             updateWindowsIndices.push_back(updateWindowsIndex);
                         }
-                        std::cout << "before result indices" << std::endl;
                         // Get results indices from update indices
+                        std::cout << updateScatterIndices.empty() << std::endl;
+                        std::cout << updateWindowsIndices.empty() << std::endl;
                         SmallVector<Value> resultsIndicesValue = getResultsIndices(
                             updateScatterIndices, updateWindowsIndices, inputsShape,
                             insertedWindowsDims, scatterIndices, indexVectorDim,
                             scatterDimsToOperandDims, rewriter, loc);
-                        std::cout << "after result indices" << std::endl;
-                        updatesIndices.dump();
 
                         // Tensor to vector rework
                         SmallVector<Value> updatesIndicesValue;
                         if (!isa<RankedTensorType>(updatesIndices.getType())) {
                             RankedTensorType updateType =
                                 updatesIndices.getType().cast<RankedTensorType>();
-                            updateType.dump();
                             for (int64_t index = 0; index <= updateType.getShape().size();
                                  ++index) {
-                                std::cout << "inside loop" << std::endl;
                                 Value indexValue = rewriter.create<index::ConstantOp>(loc, index);
                                 Value value = rewriter.create<tensor::ExtractOp>(
                                     loc, updatesIndices, indexValue);
                                 updatesIndicesValue.push_back(value);
                             }
                         }
-                        std::cout << "after tenosr vec" << std::endl;
                         // Set Args (Value range)
                         Value updateValue = rewriter.create<tensor::ExtractOp>(loc, updatesValue,
                                                                                updatesIndicesValue);
                         Value resultValue = rewriter.create<tensor::ExtractOp>(loc, resultsValue,
                                                                                resultsIndicesValue);
-                        updateValue.dump();
-                        resultValue.dump();
                         // f64 -> tensor<f64> if necessary
                         if (!isa<RankedTensorType>(updateValue.getType())) {
                             Type resultTy = RankedTensorType::get({}, updateValue.getType());
@@ -215,7 +208,6 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
                         // Insert the update in the results and replace the previous value
                         Value res = rewriter.create<tensor::InsertOp>(
                             loc, updatedExtracted, resultsValue, resultsIndicesValue);
-                        std::cout << "after insert op" << std::endl;
                         rewriter.create<scf::YieldOp>(loc, res);
                     })
                 .getResult(0);
@@ -274,7 +266,6 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         if (dimension == shape.size()) {
             for (auto elem : currentIndex) {
                 // integer to Value
-                std::cout << "index" << elem << std::endl;
                 auto valueCurrentIndex = rewriter.create<index::ConstantOp>(loc, elem);
                 // Add to configuration
                 configurations.push_back(valueCurrentIndex);
@@ -380,9 +371,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
             SmallVector<Value> results;
             for (size_t i = 0; i < updateWindowsIndices.size(); ++i) {
                 Value indexScatter = fullStartIndex[i];
-
                 auto indexUpdate = updateWindowsIndices[i];
-
                 Value addValue = rewriter.create<arith::AddIOp>(loc, indexScatter, indexUpdate);
                 Value addValueCasted =
                     rewriter.create<arith::IndexCastOp>(loc, rewriter.getIndexType(), addValue);
