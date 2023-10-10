@@ -29,7 +29,7 @@ import pennylane as qml
 import pytest
 
 from catalyst import qjit
-from catalyst.compilation_pipelines import Directory, WorkspaceManager
+from catalyst.compilation_pipelines import WorkspaceManager
 from catalyst.compiler import CompileOptions, Compiler, LinkerDriver
 from catalyst.pennylane_extensions import measure, qfunc
 from catalyst.utils.exceptions import CompileError
