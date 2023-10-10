@@ -404,6 +404,7 @@ jobs:
         mv coverage.xml coverage-${{ github.job }}.xml
 
     - name: Upload to Codecov
+      if: ${{ matrix.python_version == '3.11' }}
       uses: codecov/codecov-action@v3
       with:
         fail_ci_if_error: true
@@ -580,7 +581,7 @@ jobs:
             make test-runtime
 
       - name: Upload to Codecov
-        if: ${{ matrix.backend == 'lightning' }}
+        if: ${{ matrix.backend == 'lightning' && matrix.python_version == '3.11' }}
         uses: codecov/codecov-action@v3
         with:
           fail_ci_if_error: true
