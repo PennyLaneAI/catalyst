@@ -144,6 +144,27 @@ array(9.)
 Here, both conditional branches are compiled, and only evaluated at runtime
 when the value of ``x`` is known.
 
+Note that, if the Python ``if`` statement depends only on values that are
+static (known at compile time), this is fine --- the ``if`` statement will
+simply be evaluated at compile time rather than runtime:
+
+Let's consider an example where a for loop is evaluated at compile time:
+
+>>> @qjit
+... def f(x):
+...     for i in range(2):
+...         print(i, x)
+...         x = x / 2
+...     return x ** 2
+>>> f(2.)
+0 Traced<ShapedArray(float64[], weak_type=True)>with<DynamicJaxprTrace(level=1/0)>
+1 Traced<ShapedArray(float64[], weak_type=True)>with<DynamicJaxprTrace(level=1/0)>
+array(0.25)
+
+Here, the for loop is evaluated at compile time (notice the multiple tracers
+that have been printed out during program capture --- one for each loop!),
+rather than runtime.
+
 .. note::
 
     AutoGraph is an experimental feature that converts Python control flow
@@ -164,24 +185,6 @@ when the value of ``x`` is known.
 
     For more details, see the AutoGraph guide.
 
-Note that, if the Python ``if`` statement depends only on values that are
-static (known at compile time), this is fine --- the ``if`` statement will
-simply be evaluated at compile time rather than runtime:
-
->>> @qjit
-... def f(x):
-...     for i in range(2):
-...         print(i, x)
-...         x = x / 2
-...     return x ** 2
->>> f(2.)
-0 Traced<ShapedArray(float64[], weak_type=True)>with<DynamicJaxprTrace(level=1/0)>
-1 Traced<ShapedArray(float64[], weak_type=True)>with<DynamicJaxprTrace(level=1/0)>
-array(0.25)
-
-Here, the for loop is evaluated at compile time (notice the multiple tracers
-that have been printed out during program capture --- one for each loop!),
-rather than runtime.
 
 Avoiding recompilation
 ----------------------
