@@ -89,6 +89,7 @@ jobs:
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
       run: |
         sudo apt-get install -y python${{ matrix.python_version }} python3-pip cmake ninja-build clang lld
+        sudo update-alternatives --set python /usr/bin/python${{ matrix.python_version }}
         python3 -m pip install numpy pybind11
 
     - name: Build LLVM
@@ -165,6 +166,7 @@ jobs:
       if: steps.cache-mhlo.outputs.cache-hit != 'true'
       run: |
         sudo apt-get install -y python${{ matrix.python_version }} cmake ninja-build clang lld
+        sudo update-alternatives --set python /usr/bin/python${{ matrix.python_version }}
 
     - name: Build MHLO Dialect
       if: steps.cache-mhlo.outputs.cache-hit != 'true'
@@ -266,6 +268,7 @@ jobs:
     - name: Install Deps
       run: |
         sudo apt-get install -y python${{ matrix.python_version }} python3-pip cmake ninja-build ccache clang lld
+        sudo update-alternatives --set python /usr/bin/python${{ matrix.python_version }}
         python3 -m pip install numpy pybind11
 
     - name: Get Cached LLVM Source
@@ -370,8 +373,9 @@ jobs:
     - name: Install Deps
       run: |
         sudo apt-get install -y python${{ matrix.python_version}} python3-pip libomp-dev
-        python${{ matrix.python_version }} -m pip install -r requirements.txt
-        python${{ matrix.python_version }} -m pip install .
+        sudo update-alternatives --set python /usr/bin/python${{ matrix.python_version }}
+        python3 -m pip install -r requirements.txt
+        python3 -m pip install .
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
@@ -442,8 +446,9 @@ jobs:
     - name: Install Deps
       run: |
         sudo apt-get install -y python${{ matrix.python_version }} python3-pip libomp-dev
-        python${{ matrix.python_version }} -m pip install -r requirements.txt
-        python${{ matrix.python_version }} -m pip install .
+        sudo update-alternatives --set python /usr/bin/python${{ matrix.python_version }}
+        python3 -m pip install -r requirements.txt
+        python3 -m pip install .
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
@@ -499,8 +504,9 @@ jobs:
     - name: Install Deps
       run: |
         sudo apt-get install -y python${{ matrix.python_version }} python3-pip libomp-dev ninja-build make cmake clang
-        python${{ matrix.python_version }} -m pip install -r requirements.txt
-        python${{ matrix.python_version }} -m pip install .
+        sudo update-alternatives --set python /usr/bin/python${{ matrix.python_version }}
+        python3 -m pip install -r requirements.txt
+        python3 -m pip install .
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
@@ -556,11 +562,12 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get -y -q install python${{ needs.constants.outputs.primary_python_version }} python3-pip cmake ninja-build libomp-dev lcov libasan5
+          sudo update-alternatives --set python /usr/bin/python${{ needs.constants.outputs.primary_python_version }}
 
       - name: Install additional dependencies (OpenQasm device)
         if: ${{ matrix.backend == 'openqasm' }}
         run: |
-          python${{ needs.constants.outputs.primary_python_version }} -m pip install numpy amazon-braket-sdk
+          python3 -m pip install numpy amazon-braket-sdk
           echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
 
       - name: Build Runtime test suite for Lightning simulator
