@@ -43,7 +43,7 @@ jobs:
         id: python_versions
         run: |
           echo 'python_versions=["3.9", "3.10", "3.11"]' >> $GITHUB_OUTPUT
-          echo 'primary_python_version="3.11"' >> $GITHUB_OUTPUT
+          echo 'primary_python_version=3.11' >> $GITHUB_OUTPUT
 
       - name: Runtime Backend Devices
         id: rt_backends
