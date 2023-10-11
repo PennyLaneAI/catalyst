@@ -343,7 +343,19 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         if (!updateScatterIndices.empty()) {
             // Offset
             std::vector<int64_t> offsets(rank, 0);
-            std::vector<Value> dynOffsets = {};
+            std::vector<Value> dynOffsets;
+
+            for (int64_t i = 0; i < rank; i++) {
+                if (i != indexVectorDim) {
+                    offsets[i] = ShapedType::kDynamic;
+                    if (i > indexVectorDim) {
+                        dynOffsets.push_back(updateScatterIndices[i - 1]);
+                    }
+                    else {
+                        dynOffsets.push_back(updateScatterIndices[i]);
+                    }
+                }
+            }
 
             // Size
             std::vector<int64_t> sizes(rank, 1);
