@@ -110,24 +110,39 @@ void AugmentedCircuitGenerator::generate(Region &region, OpBuilder &builder)
             assert(shape.size() == 2 && "Unexpected tensor shape in QubitUnitaryOp");
             assert(shape[0] == shape[1] && "QubitUnitaryOp is not square matrix");
 
+            auto loc = gate.getLoc();
+            Value c0 = builder.create<index::ConstantOp>(loc, 0);
+            Value c1 = builder.create<index::ConstantOp>(loc, 1);
+
+            Value lowerBound = c0;
+            Value upperBound = builder.create<index::ConstantOp>(loc, shape[1]);
+            Value step = c1;
+
             // TODO:
             // Make this for loop in MLIR.
             for (int i = 0; i < shape[0]; i++) {
-                for (int j = 0; j < shape[1]; j++) {
-                    // Note the order. It will be the reverse order
-                    // when you are popping these items from the list.
-                    auto x = builder.create<index::ConstantOp>(gate.getLoc(), i);
-                    auto y = builder.create<index::ConstantOp>(gate.getLoc(), j);
-                    SmallVector<Value> indices = {x, y};
-                    auto element =
-                        builder.create<tensor::ExtractOp>(gate.getLoc(), matrixCloned, indices);
+                auto x = builder.create<index::ConstantOp>(loc, i);
+
+                // What values is the loop going to be using?
+                // None... That means we don't need iterargs.
+                // No results needed as pushOp acts on memory.
+                // This is interesting, should we change the list to be value semantics?
+                scf::ForOp innerForLoop =
+                    builder.create<scf::ForOp>(loc, lowerBound, upperBound, step);
+                {
+                    OpBuilder::InsertionGuard afterLoop(builder);
+                    builder.setInsertionPointToStart(innerForLoop.getBody());
+                    Value j_index = innerForLoop.getInductionVar();
+                    Value i_index = x;
+                    SmallVector<Value> indices = {i_index, j_index};
+                    Value element = builder.create<tensor::ExtractOp>(loc, matrixCloned, indices);
                     // element is complex!
                     // So we need to convert into {f64, f64}
-                    auto real = builder.create<complex::ReOp>(gate.getLoc(), element);
-                    auto imag = builder.create<complex::ImOp>(gate.getLoc(), element);
+                    Value real = builder.create<complex::ReOp>(loc, element);
+                    Value imag = builder.create<complex::ImOp>(loc, element);
                     // Again, take note of the order.
-                    builder.create<ListPushOp>(gate.getLoc(), real, cache.paramVector);
-                    builder.create<ListPushOp>(gate.getLoc(), imag, cache.paramVector);
+                    builder.create<ListPushOp>(loc, real, cache.paramVector);
+                    builder.create<ListPushOp>(loc, imag, cache.paramVector);
                 }
             }
         }
