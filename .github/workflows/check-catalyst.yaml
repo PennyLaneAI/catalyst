@@ -83,6 +83,7 @@ jobs:
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
       run: |
         sudo apt-get install -y python3 python3-pip cmake ninja-build clang lld
+        python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install numpy pybind11
 
     - name: Build LLVM
@@ -236,6 +237,7 @@ jobs:
     - name: Install Deps
       run: |
         sudo apt-get install -y python3 python3-pip cmake ninja-build ccache clang lld
+        python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install numpy pybind11
 
     - name: Get Cached LLVM Source
@@ -331,6 +333,7 @@ jobs:
     - name: Install Deps
       run: |
         sudo apt-get install -y python3 python3-pip libomp-dev
+        python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
         python3 -m pip install .
 
@@ -395,6 +398,7 @@ jobs:
     - name: Install Deps
       run: |
         sudo apt-get install -y python3 python3-pip libomp-dev
+        python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
         python3 -m pip install .
 
@@ -444,6 +448,7 @@ jobs:
     - name: Install Deps
       run: |
         sudo apt-get install -y python3 python3-pip libomp-dev ninja-build make cmake clang
+        python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
         python3 -m pip install .
 
