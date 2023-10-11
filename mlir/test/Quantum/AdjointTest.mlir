@@ -150,7 +150,7 @@ func.func private @qubit_unitary_test(%arg0: tensor<4x4xcomplex<f64>>) -> tensor
       // CHECK:     [[complex:%.+]] = complex.create [[real2]], [[imag2]]
       // CHECK:     [[lplus1:%.+]] = index.add [[l]], [[idx1]]
       // CHECK:     [[l_idx:%.+]] = index.sub [[idxN]], [[lplus1]]
-      // CHECK:     [[new_tensor:%.+]] = tensor.insert [[complex]] into [[curr_l]]
+      // CHECK:     [[new_tensor:%.+]] = tensor.insert [[complex]] into [[curr_l]][[[k_idx]], [[l_idx]]]
       // CHECK:     scf.yield [[new_tensor]]
 
       // CHECK:   scf.yield [[last_tensor]]
