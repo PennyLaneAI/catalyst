@@ -89,7 +89,6 @@ jobs:
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
       run: |
         sudo apt-get install -y python${{ matrix.python_version }} python3-pip cmake ninja-build clang lld
-        sudo ln -s /usr/bin/python3 /usr/bin/python${{ matrix.python_version }}
         python3 --version | grep ${{ matrix.python_version }}
         python3 -m pip install numpy pybind11
 
@@ -166,7 +165,6 @@ jobs:
       if: steps.cache-mhlo.outputs.cache-hit != 'true'
       run: |
         sudo apt-get install -y python${{ matrix.python_version }} cmake ninja-build clang lld
-        sudo ln -s /usr/bin/python3 /usr/bin/python${{ matrix.python_version }}
         python3 --version | grep ${{ matrix.python_version }}
 
     - name: Build MHLO Dialect
