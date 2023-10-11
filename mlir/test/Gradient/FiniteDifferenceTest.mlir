@@ -161,12 +161,12 @@ func.func private @funcMultiArg(%arg0: tensor<7xf64>, %arg1: f64) -> tensor<2xf6
     // CHECK:        [[BASE:%.+]] = call @funcMultiArg(%arg0, %arg1)
     // CHECK:        [[DIFF:%.+]] = tensor.generate
     // CHECK-NEXT:   ^bb0(%arg2: index, %arg3: index):
-    // CHECK:            [[VAL:%.+]] = tensor.extract %arg0[%arg2]
+    // CHECK:            [[VAL:%.+]] = tensor.extract %arg0[%arg3]
     // CHECK:            [[ADD:%.+]] = arith.addf [[VAL]]
-    // CHECK:            [[SHIFTED:%.+]] = tensor.insert [[ADD]] into %arg0[%arg2]
+    // CHECK:            [[SHIFTED:%.+]] = tensor.insert [[ADD]] into %arg0[%arg3]
     // CHECK:            [[EVAL:%.+]] = func.call @funcMultiArg([[SHIFTED]], %arg1)
     // CHECK:            [[SUB:%.+]] = arith.subf [[EVAL]], [[BASE]]
-    // CHECK:            [[RES:%.+]] = tensor.extract [[SUB]][%arg3]
+    // CHECK:            [[RES:%.+]] = tensor.extract [[SUB]][%arg2]
     // CHECK:            tensor.yield [[RES]]
     // CHECK:        [[RESULT:%.+]] = arith.divf [[DIFF]]
     // CHECK-NEXT:   return [[RESULT]]
@@ -185,12 +185,12 @@ func.func private @funcMultiArg(%arg0: tensor<7xf64>, %arg1: f64) -> tensor<2xf6
     // CHECK:        [[BASE:%.+]] = call @funcMultiArg(%arg0, %arg1)
     // CHECK:        [[DIFF:%.+]] = tensor.generate
     // CHECK-NEXT:   ^bb0(%arg2: index, %arg3: index):
-    // CHECK:            [[VAL:%.+]] = tensor.extract %arg0[%arg2]
+    // CHECK:            [[VAL:%.+]] = tensor.extract %arg0[%arg3]
     // CHECK:            [[ADD:%.+]] = arith.addf [[VAL]]
-    // CHECK:            [[SHIFTED:%.+]] = tensor.insert [[ADD]] into %arg0[%arg2]
+    // CHECK:            [[SHIFTED:%.+]] = tensor.insert [[ADD]] into %arg0[%arg3]
     // CHECK:            [[EVAL:%.+]] = func.call @funcMultiArg([[SHIFTED]], %arg1)
     // CHECK:            [[SUB:%.+]] = arith.subf [[EVAL]], [[BASE]]
-    // CHECK:            [[RES:%.+]] = tensor.extract [[SUB]][%arg3]
+    // CHECK:            [[RES:%.+]] = tensor.extract [[SUB]][%arg2]
     // CHECK:            tensor.yield [[RES]]
     // CHECK:        [[R0:%.+]] = arith.divf [[DIFF]]
     // CHECK:        [[SHIFTED:%.+]] = arith.addf %arg1
@@ -230,12 +230,12 @@ func.func private @funcMultiRes(%arg0: tensor<7xf64>) -> (f64, tensor<2xf64>) at
     // CHECK:        [[R0:%.+]] = arith.divf [[DIFF]]
     // CHECK:        [[DIFF:%.+]] = tensor.generate
     // CHECK-NEXT:   ^bb0(%arg1: index, %arg2: index):
-    // CHECK:            [[VAL:%.+]] = tensor.extract %arg0[%arg1]
+    // CHECK:            [[VAL:%.+]] = tensor.extract %arg0[%arg2]
     // CHECK:            [[ADD:%.+]] = arith.addf [[VAL]]
-    // CHECK:            [[SHIFTED:%.+]] = tensor.insert [[ADD]] into %arg0[%arg1]
+    // CHECK:            [[SHIFTED:%.+]] = tensor.insert [[ADD]] into %arg0[%arg2]
     // CHECK:            [[EVAL:%.+]]:2 = func.call @funcMultiRes([[SHIFTED]])
     // CHECK:            [[SUB:%.+]] = arith.subf [[EVAL]]#1, [[BASE]]#1
-    // CHECK:            [[RES:%.+]] = tensor.extract [[SUB]][%arg2]
+    // CHECK:            [[RES:%.+]] = tensor.extract [[SUB]][%arg1]
     // CHECK:            tensor.yield [[RES]]
     // CHECK:        [[R1:%.+]] = arith.divf [[DIFF]]
     // CHECK:        return [[R0]], [[R1]]
@@ -259,20 +259,20 @@ func.func private @funcDynamicTensor(%arg0: tensor<?x3xf64>) -> tensor<2x?xf64> 
     // CHECK-DAG:    [[C1:%.+]] = arith.constant 1 : index
     // CHECK-DAG:    [[F64:%.+]] = arith.constant 1.000000e+00 : f64
     // CHECK-DAG:    [[BASE:%.+]] = call @funcDynamicTensor(%arg0)
-
-    // CHECK:        [[DDIM0:%.+]] = tensor.dim %arg0, [[C0]]
-    // CHECK:        [[DDIM1:%.+]] = tensor.dim [[BASE]], [[C1]]
+    
+    // CHECK:        [[DDIM0:%.+]] = tensor.dim [[BASE]], [[C1]]
+    // CHECK:        [[DDIM1:%.+]] = tensor.dim %arg0, [[C0]]
     // CHECK:        [[INIT:%.+]] = tensor.empty([[DDIM0]], [[DDIM1]])
     // CHECK:        [[H:%.+]] = linalg.fill ins([[F64]] : f64) outs([[INIT]] : tensor<2x?x?x3xf64>)
 
     // CHECK:        [[DIFF:%.+]] = tensor.generate [[DDIM0]], [[DDIM1]]
     // CHECK-NEXT:   ^bb0([[i0:%.+]]: index, [[i1:%.+]]: index, [[i2:%.+]]: index, [[i3:%.+]]: index):
-    // CHECK:            [[VAL:%.+]] = tensor.extract %arg0[[[i0]], [[i1]]]
+    // CHECK:            [[VAL:%.+]] = tensor.extract %arg0[[[i2]], [[i3]]]
     // CHECK:            [[ADD:%.+]] = arith.addf [[VAL]], [[F64]]
-    // CHECK:            [[SHIFTED:%.+]] = tensor.insert [[ADD]] into %arg0[[[i0]], [[i1]]]
+    // CHECK:            [[SHIFTED:%.+]] = tensor.insert [[ADD]] into %arg0[[[i2]], [[i3]]]
     // CHECK:            [[EVAL:%.+]] = func.call @funcDynamicTensor([[SHIFTED]])
     // CHECK:            [[SUB:%.+]] = arith.subf [[EVAL]], [[BASE]]
-    // CHECK:            [[RES:%.+]] = tensor.extract [[SUB]][[[i2]], [[i3]]]
+    // CHECK:            [[RES:%.+]] = tensor.extract [[SUB]][[[i0]], [[i1]]]
     // CHECK:            tensor.yield [[RES]]
 
     // CHECK:        [[RESULT:%.+]] = arith.divf [[DIFF]], [[H]]
