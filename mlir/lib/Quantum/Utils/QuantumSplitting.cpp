@@ -104,21 +104,30 @@ void AugmentedCircuitGenerator::generate(Region &region, OpBuilder &builder)
             Value matrix = gate.getMatrix();
             Value matrixCloned = oldToCloned.lookupOrDefault(matrix);
             Type aType = matrixCloned.getType();
+
+            // Invariants, this is developer documentation.
             // aType must be a tensor<NxNxf64>
             auto aTensor = aType.cast<RankedTensorType>();
             ArrayRef<int64_t> shape = aTensor.getShape();
             assert(shape.size() == 2 && "Unexpected tensor shape in QubitUnitaryOp");
             assert(shape[0] == shape[1] && "QubitUnitaryOp is not square matrix");
+            assert(shape[0] > 1 && "QubitUnitaryOp has invalid tensor shape.");
+            int64_t n = shape[0];
+            bool isPowerOfTwo = ((n & (n - 1)) == 0);
+            assert(isPowerOfTwo && "QubitUnitaryOp has invalid tensor shape.");
 
-            auto loc = gate.getLoc();
             // Constants
+            auto loc = gate.getLoc();
             Value c0 = builder.create<index::ConstantOp>(loc, 0);
             Value c1 = builder.create<index::ConstantOp>(loc, 1);
+            // Matrix of size NxN
+            // we can use either shape[0] or shape[1] because matrix is square
+            Value N = builder.create<index::ConstantOp>(loc, shape[0]);
 
             // Renaming constants for legibility.
             // Note: Since this is a square matrix, upperBound for both loops is the same value.
             Value lowerBound = c0;
-            Value upperBound = builder.create<index::ConstantOp>(loc, shape[1]);
+            Value upperBound = N;
             Value step = c1;
 
             scf::ForOp iForLoop = builder.create<scf::ForOp>(loc, lowerBound, upperBound, step);
