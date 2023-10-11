@@ -58,7 +58,7 @@ void verifyTypeIsCacheable(Type ty, Operation &op)
 
     // TODO: Generalize to unranked tensors
     if (!isa<RankedTensorType>(ty)) {
-        op.emitOpError() << "This type cannot be popped.";
+        op.emitOpError() << "Caching only supports tensors complex F64";
     }
 
     auto aTensorType = ty.cast<RankedTensorType>();
@@ -66,17 +66,17 @@ void verifyTypeIsCacheable(Type ty, Operation &op)
 
     // TODO: Generalize to arbitrary dimensions
     if (2 != shape.size()) {
-        op.emitOpError() << "This type cannot be popped.";
+        op.emitOpError() << "Caching only supports tensors complex F64";
     }
     // TODO: Generalize to other types
     Type elementType = aTensorType.getElementType();
     if (!isa<ComplexType>(elementType)) {
-        op.emitOpError() << "This type cannot be popped.";
+        op.emitOpError() << "Caching only supports tensors complex F64";
     }
     // TODO: Generalize to other types
     Type f64 = elementType.cast<ComplexType>().getElementType();
     if (!f64.isF64()) {
-        op.emitOpError() << "This type cannot be popped.";
+        op.emitOpError() << "Caching only supports tensors complex F64";
     }
 }
 
