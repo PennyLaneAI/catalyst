@@ -120,16 +120,18 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         }
 
         Value allUpdatesIndicesTensor;
+        int64_t size = 1;
         if (!allUpdatesIndices.empty()) {
             Type resultTy = RankedTensorType::get(totalShape, rewriter.getIndexType());
             allUpdatesIndicesTensor =
                 rewriter.create<tensor::FromElementsOp>(loc, resultTy, allUpdatesIndices);
+            size = allUpdatesIndices.size();
         }
 
         // Create the loop values
         Value c0 = rewriter.create<index::ConstantOp>(loc, 0);
         Value sizeAllUpdatesIndices =
-            rewriter.create<index::ConstantOp>(loc, allUpdatesIndices.size());
+            rewriter.create<index::ConstantOp>(loc, size);
         Value c1 = rewriter.create<index::ConstantOp>(loc, 1);
 
         // Create a SCF for op
