@@ -45,7 +45,7 @@ jobs:
     - name: Install deps
       run: |
         sudo apt-get install -y cmake ninja-build ccache clang lld libomp-dev
-        python3 -m pip install -r requirements.txt
+        python${{ matrix.python_version }} -m pip install -r requirements.txt
 
     - name: Get Catalyst Build Dependencies (latest)
       uses: actions/cache@v3
@@ -62,7 +62,7 @@ jobs:
     - uses: actions/cache@v3
       with:
         path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-default-build-opt
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{ matrix.python_version }}-default-build-opt
         fail-on-cache-miss: True
     - name: Get Cached MHLO Source
       id: cache-mhlo-source
@@ -80,7 +80,7 @@ jobs:
     - uses: actions/cache@v3
       with:
         path: enzyme-build
-        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-${{ needs.constants.outputs.enzyme_version }}-default-build
+        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ matrix.python_version }}-${{ needs.constants.outputs.enzyme_version }}-default-build
         fail-on-cache-miss: True
     - uses: actions/cache@v3
       with:

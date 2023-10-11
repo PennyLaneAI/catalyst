@@ -88,8 +88,8 @@ jobs:
     - name: Install Deps
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
       run: |
-        sudo apt-get install -y python3 python3-pip cmake ninja-build clang lld
-        python3 -m pip install numpy pybind11
+        sudo apt-get install -y python${{ matrix.python_version }} python3-pip cmake ninja-build clang lld
+        python${{ matrix.python_version }} -m pip install numpy pybind11
 
     - name: Build LLVM
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
@@ -259,8 +259,8 @@ jobs:
 
     - name: Install Deps
       run: |
-        sudo apt-get install -y python3 python3-pip cmake ninja-build ccache clang lld
-        python3 -m pip install numpy pybind11
+        sudo apt-get install -y python${{matrix.python_version}} python3-pip cmake ninja-build ccache clang lld
+        python${{matrix.python_version}} -m pip install numpy pybind11
 
     - name: Get Cached LLVM Source
       id: cache-llvm-source
@@ -361,9 +361,9 @@ jobs:
 
     - name: Install Deps
       run: |
-        sudo apt-get install -y python3 python3-pip libomp-dev
-        python3 -m pip install -r requirements.txt
-        python3 -m pip install .
+        sudo apt-get install -y python${{ matrix.python_version}} python3-pip libomp-dev
+        python${{ matrix.python_version}} -m pip install -r requirements.txt
+        python${{ matrix.python_version}} -m pip install .
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
@@ -404,7 +404,7 @@ jobs:
         mv coverage.xml coverage-${{ github.job }}.xml
 
     - name: Upload to Codecov
-      if: ${{ matrix.python_version == '3.11' }}
+      if: ${{ matrix.python_version == needs.constants.outputs.primary_python_version }}
       uses: codecov/codecov-action@v3
       with:
         fail_ci_if_error: true
@@ -432,9 +432,9 @@ jobs:
 
     - name: Install Deps
       run: |
-        sudo apt-get install -y python3 python3-pip libomp-dev
-        python3 -m pip install -r requirements.txt
-        python3 -m pip install .
+        sudo apt-get install -y python${{ matrix.python_version }} python3-pip libomp-dev
+        python${{ matrix.python_version }} -m pip install -r requirements.txt
+        python${{ matrix.python_version }} -m pip install .
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
@@ -488,9 +488,9 @@ jobs:
 
     - name: Install Deps
       run: |
-        sudo apt-get install -y python3 python3-pip libomp-dev ninja-build make cmake clang
-        python3 -m pip install -r requirements.txt
-        python3 -m pip install .
+        sudo apt-get install -y python${{ matrix.python_version }} python3-pip libomp-dev ninja-build make cmake clang
+        python${{ matrix.python_version }} -m pip install -r requirements.txt
+        python${{ matrix.python_version }} -m pip install .
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
@@ -581,7 +581,7 @@ jobs:
             make test-runtime
 
       - name: Upload to Codecov
-        if: ${{ matrix.backend == 'lightning' && matrix.python_version == '3.11' }}
+        if: ${{ matrix.backend == 'lightning' && matrix.python_version == needs.constants.outputs.primary_python_version }}
         uses: codecov/codecov-action@v3
         with:
           fail_ci_if_error: true
