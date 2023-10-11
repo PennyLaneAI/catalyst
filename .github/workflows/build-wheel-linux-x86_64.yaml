@@ -119,7 +119,9 @@ jobs:
               -DLLVM_TARGETS_TO_BUILD="host" \
               -DLLVM_ENABLE_PROJECTS="lld;mlir" \
               -DLLVM_ENABLE_ASSERTIONS=ON \
-              -DLLVM_INSTALL_UTILS=ON
+              -DLLVM_INSTALL_UTILS=ON \
+              -DLLVM_ENABLE_ZLIB=OFF \
+              -DLLVM_ENABLE_ZSTD=OFF
 
         # TODO: when updating LLVM, test to see if mlir/unittests/Bytecode/BytecodeTest.cpp:55 is passing
         # and remove filter
@@ -134,7 +136,9 @@ jobs:
               -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_ENABLE_ASSERTIONS=ON \
               -DMLIR_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir \
-              -DLLVM_ENABLE_LLD=ON
+              -DLLVM_ENABLE_LLD=ON \
+              -DLLVM_ENABLE_ZLIB=OFF \
+              -DLLVM_ENABLE_ZSTD=OFF
 
         cmake --build mhlo-build --target check-mlir-hlo
 
@@ -239,7 +243,9 @@ jobs:
               -DLIGHTNING_GIT_TAG="master" \
               -DKokkos_ENABLE_SERIAL=ON \
               -DKokkos_ENABLE_OPENMP=ON \
-              -DENABLE_OPENQASM=ON
+              -DENABLE_OPENQASM=ON \
+              -DLLVM_ENABLE_ZLIB=OFF \
+              -DLLVM_ENABLE_ZSTD=OFF
 
         cmake --build runtime-build --target rt_capi
 
@@ -255,7 +261,9 @@ jobs:
               -DLLVM_INSTALL_UTILS=ON \
               -DMLIR_ENABLE_BINDINGS_PYTHON=ON \
               -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
-              -DPython3_NumPy_INCLUDE_DIRS=$(python${{ matrix.python_version }} -c "import numpy as np; print(np.get_include())")
+              -DPython3_NumPy_INCLUDE_DIRS=$(python${{ matrix.python_version }} -c "import numpy as np; print(np.get_include())") \
+              -DLLVM_ENABLE_ZLIB=OFF \
+              -DLLVM_ENABLE_ZSTD=OFF
 
         # TODO: when updating LLVM, test to see if mlir/unittests/Bytecode/BytecodeTest.cpp:55 is passing
         # and remove filter
@@ -274,7 +282,9 @@ jobs:
               -DMHLO_DIR=$GITHUB_WORKSPACE/mhlo-build/lib/cmake/mlir-hlo \
               -DMHLO_BINARY_DIR=$GITHUB_WORKSPACE/mhlo-build/bin \
               -DEnzyme_DIR=$GITHUB_WORKSPACE/enzyme-build \
-              -DENZYME_SRC_DIR=$GITHUB_WORKSPACE/mlir/Enzyme
+              -DENZYME_SRC_DIR=$GITHUB_WORKSPACE/mlir/Enzyme \
+              -DLLVM_ENABLE_ZLIB=OFF \
+              -DLLVM_ENABLE_ZSTD=OFF
 
         cmake --build quantum-build --target check-dialects compiler_driver
 
