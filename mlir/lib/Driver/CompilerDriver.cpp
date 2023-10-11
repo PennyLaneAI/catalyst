@@ -333,10 +333,8 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
 
     if (options.keepIntermediate) {
         std::string tmp;
-        {
-            llvm::raw_string_ostream s{tmp};
-            s << moduleOp;
-        }
+        llvm::raw_string_ostream s{tmp};
+        s << moduleOp;
         dumpToFile(options, output.nextPipelineDumpFilename(options.moduleName.str(), ".mlir"),
                    tmp);
     }
@@ -349,10 +347,8 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
         auto res = pipelineTailMarkers.find(pass);
         if (res != pipelineTailMarkers.end()) {
             for (const auto &pipelineName : res->second) {
-                {
-                    llvm::raw_string_ostream s{outputs[pipelineName]};
-                    s << *op;
-                }
+                llvm::raw_string_ostream s{outputs[pipelineName]};
+                s << *op;
                 dumpToFile(options, output.nextPipelineDumpFilename(pipelineName),
                            outputs[pipelineName]);
             }
@@ -379,10 +375,8 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
     // pipelines.
     if (options.keepIntermediate) {
         for (auto pipelineName : danglingPipelines) {
-            {
-                llvm::raw_string_ostream s{outputs[pipelineName]};
-                s << *moduleOp;
-            }
+            llvm::raw_string_ostream s{outputs[pipelineName]};
+            s << *moduleOp;
             dumpToFile(options, output.nextPipelineDumpFilename(pipelineName),
                        outputs[pipelineName]);
         }
@@ -492,11 +486,9 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
                 CO_MSG(options, Verbosity::Urgent, "Unable to infer function return type\n");
             }
             else {
-                {
-                    llvm::raw_string_ostream returnTypeStream(output.inferredAttributes.returnType);
-                    llvm::interleaveComma(returnTypes, returnTypeStream,
-                                          [&](RankedTensorType t) { t.print(returnTypeStream); });
-                }
+                llvm::raw_string_ostream returnTypeStream(output.inferredAttributes.returnType);
+                llvm::interleaveComma(returnTypes, returnTypeStream,
+                                      [&](RankedTensorType t) { t.print(returnTypeStream); });
                 CO_MSG(options, Verbosity::Debug,
                        "Inferred function return type: '" << output.inferredAttributes.returnType
                                                           << "'\n");
