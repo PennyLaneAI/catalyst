@@ -227,9 +227,6 @@ def CustomOp : Gate_Op<"custom", [NoMemoryEffect, AttrSizedOperandSegments, Diff
         mlir::ValueRange getAllParams() {
             return getParams();
         }
-        size_t getDiffOperandIdx() {
-            return 0;
-        }
     }];
 }
 
@@ -257,9 +254,6 @@ def MultiRZOp : Gate_Op<"multirz", [NoMemoryEffect, DifferentiableGate]> {
     let extraClassDeclaration = extraBaseClassDeclaration # [{
         mlir::ValueRange getAllParams() {
             return getODSOperands(0);
-        }
-        size_t getDiffOperandIdx() {
-            return 0;
         }
     }];
 }
@@ -292,6 +286,10 @@ def QubitUnitaryOp : Gate_Op<"unitary", [NoMemoryEffect, ParametrizedGate]> {
         mlir::ValueRange getAllParams() {
             mlir::ValueRange temp = {getMatrix()};
             return temp;
+        }
+
+        size_t getParamOperandIdx() {
+            return 0;
         }
     }];
 

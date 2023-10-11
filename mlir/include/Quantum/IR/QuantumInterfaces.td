@@ -72,6 +72,11 @@ def ParametrizedGate : OpInterface<"ParametrizedGate", [QuantumGate]> {
             "Return all operands which are considered gate parameters.",
             "mlir::ValueRange", "getAllParams"
         >,
+        InterfaceMethod<
+            "Return the starting index at which to find gate parameter operands.",
+            "size_t", "getParamOperandIdx", (ins), /*methodBody=*/[{}],
+            /*defaultImplementation=*/[{ return 0; }]
+        >,
     ];
 }
 
@@ -96,7 +101,10 @@ def DifferentiableGate : OpInterface<"DifferentiableGate", [ParametrizedGate]> {
             "Return the starting index at which to find differentiable operands in the Operation*."
             "Differentiable gate parameter operands do not need to be stored in a single ODS "
             "argument or be located in a particular position, but are assumed to be contiguous.",
-            "size_t", "getDiffOperandIdx"
+            "size_t", "getDiffOperandIdx", (ins), /*methodBody=*/[{}],
+            /*defaultImplementation=*/[{
+               return $_op.getParamOperandIdx();
+            }]
         >,
     ];
 }

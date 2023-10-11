@@ -118,109 +118,111 @@ class AdjointGenerator {
                 auto clone = cast<QuantumGate>(builder.clone(*gate, remappedValues));
                 clone.setAdjointFlag(!gate.getAdjointFlag());
 
-                // Read cached differentiable parameters from the recorded parameter vector.
-                if (auto differentiableGate = dyn_cast<quantum::DifferentiableGate>(op)) {
+                // Read cached parameters from the recorded parameter vector.
+                if (auto parametrizedGate = dyn_cast<quantum::ParametrizedGate>(op)) {
                     OpBuilder::InsertionGuard insertionGuard(builder);
                     builder.setInsertionPoint(clone);
                     SmallVector<Value> cachedParams;
-                    ValueRange diffParams = differentiableGate.getDiffParams();
-                    for (unsigned i = 0; i < diffParams.size(); i++) {
-                        cachedParams.push_back(builder.create<ListPopOp>(
-                            differentiableGate.getLoc(), cache.paramVector));
-                    }
-                    MutableOperandRange(clone, differentiableGate.getDiffOperandIdx(),
-                                        diffParams.size())
-                        .assign(cachedParams);
-                }
-
-                else if (auto qubitUnitaryGate = dyn_cast<quantum::QubitUnitaryOp>(op)) {
-                    Value matrix = qubitUnitaryGate.getMatrix();
-                    Type aType = matrix.getType();
-                    // aType must be a tensor<NxNxcomplex<f64>>
-                    auto aTensorType = aType.cast<RankedTensorType>();
-                    ArrayRef<int64_t> shape = aTensorType.getShape();
-
-                    // Invariants, this is developer documentation
-                    assert(shape.size() == 2 && "Unexpected tensor shape in QubitUnitaryOp.");
-                    assert(shape[0] == shape[1] && "QubitUnitaryOp is not square matrix.");
-                    assert(shape[0] > 1 && "QubitUnitaryOp has invalid tensor shape.");
-                    int64_t n = shape[0];
-                    bool isPowerOfTwo = ((n & (n - 1)) == 0);
-                    assert(isPowerOfTwo && "QubitUnitaryOp has invalid tensor shape.");
-
-                    OpBuilder::InsertionGuard insertionGuard(builder);
-                    builder.setInsertionPoint(clone);
-
-                    // Constants
-                    auto loc = qubitUnitaryGate.getLoc();
-                    Value c0 = builder.create<index::ConstantOp>(loc, 0);
-                    Value c1 = builder.create<index::ConstantOp>(loc, 1);
-                    // Matrix of size NxN
-                    // we can use either shape[0] or shape[1] because matrix is square
-                    Value N = builder.create<index::ConstantOp>(loc, shape[0]);
-
-                    // Renaming for legibility
-                    // Note: Since this is a square matrix, upperBound for both loops is the same
-                    // value.
-                    Value lowerBound = c0;
-                    Value upperBound = N;
-                    Value step = c1;
-                    Type type = aTensorType.getElementType();
-                    Value beginningTensor = builder.create<tensor::EmptyOp>(loc, shape, type);
-                    // This time, we are in reverse, so we need to start
-                    // with N-1 since MLIR does not allow for loops with negative step sizes.
-                    SmallVector<Value> initialValues = {beginningTensor};
-
-                    scf::ForOp iForLoop = builder.create<scf::ForOp>(loc, lowerBound, upperBound,
-                                                                     step, initialValues);
-                    {
-                        OpBuilder::InsertionGuard afterIForLoop(builder);
-                        builder.setInsertionPointToStart(iForLoop.getBody());
-                        auto iIterArgs = iForLoop.getRegionIterArgs();
-                        assert(iIterArgs.size() == 1 &&
-                               "iForLoop has more induction variables than necessary.");
-                        Value currIthTensor = iIterArgs.front();
-
-                        Value i = iForLoop.getInductionVar();
-                        Value iPlusOne = builder.create<index::AddOp>(loc, i, c1);
-                        Value nMinusIMinusOne = builder.create<index::SubOp>(loc, N, iPlusOne);
-                        // Just for legibility
-                        Value iTensorIndex = nMinusIMinusOne;
-
-                        scf::ForOp jForLoop = builder.create<scf::ForOp>(
-                            loc, lowerBound, upperBound, step, currIthTensor);
-                        {
-                            OpBuilder::InsertionGuard afterJForLoop(builder);
-                            builder.setInsertionPointToStart(jForLoop.getBody());
-                            auto jIterArgs = jForLoop.getRegionIterArgs();
-                            assert(jIterArgs.size() == 1 &&
-                                   "jForLoop has more induction variables than necessary.");
-                            Value currIthJthTensor = jIterArgs.front();
-
-                            Value imag = builder.create<ListPopOp>(loc, cache.paramVector);
-                            Value real = builder.create<ListPopOp>(loc, cache.paramVector);
-                            Value element =
-                                builder.create<complex::CreateOp>(loc, type, real, imag);
-
-                            Value j = jForLoop.getInductionVar();
-                            Value jPlusOne = builder.create<index::AddOp>(loc, j, c1);
-                            Value nMinusJMinusOne = builder.create<index::SubOp>(loc, N, jPlusOne);
-                            // Just for legibility
-                            Value jTensorIndex = nMinusJMinusOne;
-                            ValueRange indices = {iTensorIndex, jTensorIndex};
-
-                            Value updatedIthJthTensor = builder.create<tensor::InsertOp>(
-                                loc, element, currIthJthTensor, indices);
-                            builder.create<scf::YieldOp>(loc, updatedIthJthTensor);
+                    ValueRange params = parametrizedGate.getAllParams();
+                    for (Value param : params) {
+                        Type paramType = param.getType();
+                        if (paramType.isF64()) {
+                            cachedParams.push_back(builder.create<ListPopOp>(
+                                parametrizedGate.getLoc(), cache.paramVector));
+                            continue;
                         }
 
-                        Value ithTensor = jForLoop.getResult(0);
-                        builder.create<scf::YieldOp>(loc, ithTensor);
-                    }
+                        assert(isa<RankedTensorType>(paramType) &&
+                               "Parameter type cannot be handled");
+                        Type aType = paramType;
+                        // aType must be a tensor<NxNxcomplex<f64>>
+                        auto aTensorType = aType.cast<RankedTensorType>();
+                        ArrayRef<int64_t> shape = aTensorType.getShape();
 
-                    Value recreatedTensor = iForLoop.getResult(0);
-                    std::vector<Value> complexTensors = {recreatedTensor};
-                    MutableOperandRange(clone, 0, 1).assign(complexTensors);
+                        // Invariants, this is developer documentation
+                        assert(shape.size() == 2 && "Unexpected tensor shape in QubitUnitaryOp.");
+                        assert(shape[0] == shape[1] && "QubitUnitaryOp is not square matrix.");
+                        assert(shape[0] > 1 && "QubitUnitaryOp has invalid tensor shape.");
+                        int64_t n = shape[0];
+                        bool isPowerOfTwo = ((n & (n - 1)) == 0);
+                        assert(isPowerOfTwo && "QubitUnitaryOp has invalid tensor shape.");
+
+                        OpBuilder::InsertionGuard insertionGuard(builder);
+                        builder.setInsertionPoint(clone);
+
+                        // Constants
+                        auto loc = parametrizedGate.getLoc();
+                        Value c0 = builder.create<index::ConstantOp>(loc, 0);
+                        Value c1 = builder.create<index::ConstantOp>(loc, 1);
+                        // Matrix of size NxN
+                        // we can use either shape[0] or shape[1] because matrix is square
+                        Value N = builder.create<index::ConstantOp>(loc, shape[0]);
+
+                        // Renaming for legibility
+                        // Note: Since this is a square matrix, upperBound for both loops is the
+                        // same value.
+                        Value lowerBound = c0;
+                        Value upperBound = N;
+                        Value step = c1;
+                        Type type = aTensorType.getElementType();
+                        Value beginningTensor = builder.create<tensor::EmptyOp>(loc, shape, type);
+                        // This time, we are in reverse, so we need to start
+                        // with N-1 since MLIR does not allow for loops with negative step sizes.
+                        SmallVector<Value> initialValues = {beginningTensor};
+
+                        scf::ForOp iForLoop = builder.create<scf::ForOp>(
+                            loc, lowerBound, upperBound, step, initialValues);
+                        {
+                            OpBuilder::InsertionGuard afterIForLoop(builder);
+                            builder.setInsertionPointToStart(iForLoop.getBody());
+                            auto iIterArgs = iForLoop.getRegionIterArgs();
+                            assert(iIterArgs.size() == 1 &&
+                                   "iForLoop has more induction variables than necessary.");
+                            Value currIthTensor = iIterArgs.front();
+
+                            Value i = iForLoop.getInductionVar();
+                            Value iPlusOne = builder.create<index::AddOp>(loc, i, c1);
+                            Value nMinusIMinusOne = builder.create<index::SubOp>(loc, N, iPlusOne);
+                            // Just for legibility
+                            Value iTensorIndex = nMinusIMinusOne;
+
+                            scf::ForOp jForLoop = builder.create<scf::ForOp>(
+                                loc, lowerBound, upperBound, step, currIthTensor);
+                            {
+                                OpBuilder::InsertionGuard afterJForLoop(builder);
+                                builder.setInsertionPointToStart(jForLoop.getBody());
+                                auto jIterArgs = jForLoop.getRegionIterArgs();
+                                assert(jIterArgs.size() == 1 &&
+                                       "jForLoop has more induction variables than necessary.");
+                                Value currIthJthTensor = jIterArgs.front();
+
+                                Value imag = builder.create<ListPopOp>(loc, cache.paramVector);
+                                Value real = builder.create<ListPopOp>(loc, cache.paramVector);
+                                Value element =
+                                    builder.create<complex::CreateOp>(loc, type, real, imag);
+
+                                Value j = jForLoop.getInductionVar();
+                                Value jPlusOne = builder.create<index::AddOp>(loc, j, c1);
+                                Value nMinusJMinusOne =
+                                    builder.create<index::SubOp>(loc, N, jPlusOne);
+                                // Just for legibility
+                                Value jTensorIndex = nMinusJMinusOne;
+                                ValueRange indices = {iTensorIndex, jTensorIndex};
+
+                                Value updatedIthJthTensor = builder.create<tensor::InsertOp>(
+                                    loc, element, currIthJthTensor, indices);
+                                builder.create<scf::YieldOp>(loc, updatedIthJthTensor);
+                            }
+
+                            Value ithTensor = jForLoop.getResult(0);
+                            builder.create<scf::YieldOp>(loc, ithTensor);
+                        }
+
+                        Value recreatedTensor = iForLoop.getResult(0);
+                        cachedParams.push_back(recreatedTensor);
+                    }
+                    MutableOperandRange(clone, parametrizedGate.getParamOperandIdx(), params.size())
+                        .assign(cachedParams);
                 }
 
                 for (const auto &[qubitResult, qubitOperand] :
