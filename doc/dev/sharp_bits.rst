@@ -554,7 +554,7 @@ A useful tool for debugging quantum algorithms is the ability to draw them. Curr
 
 - :func:`qml.draw <pennylane.draw>` call must occur outside the :func:`@qjit <.qjit>`
 
-- If used, the :func:`@qjit <.qjit>` decorator must be placed directly on top of the QNode (that is, you cannot draw a hybrid `qjit` compiled function that _contains_ a QNode).
+- The ``qml.draw()`` function will only accept plain QNodes as input, *or* QNodes that have been qjit-compiled. It will not accept arbitrary hybrid functions (that may contain QNodes).
 
 - The :func:`catalyst.measure` function is not supported in drawn QNodes
 
