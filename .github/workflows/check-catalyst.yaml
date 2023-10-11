@@ -83,7 +83,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-default-build-opt
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{ matrix.python_version }}-default-build-opt
 
     - name: Install Deps
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
@@ -98,6 +98,7 @@ jobs:
       run: |
         # echo 'target_compile_options(mlir_c_runner_utils PRIVATE "-fno-sanitize=all")' \
         #       >> mlir/llvm-project/mlir/lib/ExecutionEngine/CMakeLists.txt
+        PYTHON=python${{ matrix.python_version }} \
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         COMPILER_LAUNCHER="" \
         make llvm
@@ -167,6 +168,7 @@ jobs:
     - name: Build MHLO Dialect
       if: steps.cache-mhlo.outputs.cache-hit != 'true'
       run: |
+        PYTHON=python${{ matrix.python_version }} \
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         MHLO_BUILD_DIR="$(pwd)/mhlo-build" \
         COMPILER_LAUNCHER="" \
@@ -237,6 +239,7 @@ jobs:
     - name: Build Enzyme
       if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
       run: |
+        PYTHON=python${{ matrix.python_version }} \
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         ENZYME_BUILD_DIR="$(pwd)/enzyme-build" \
         COMPILER_LAUNCHER="" \
@@ -259,7 +262,7 @@ jobs:
 
     - name: Install Deps
       run: |
-        sudo apt-get install -y python${{matrix.python_version}} python3-pip cmake ninja-build ccache clang lld
+        sudo apt-get install -y python${{ matrix.python_version }} python3-pip cmake ninja-build ccache clang lld
         python${{matrix.python_version}} -m pip install numpy pybind11
 
     - name: Get Cached LLVM Source
@@ -276,7 +279,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: llvm-build
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-default-build-opt
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{ matrix.python_version }}-default-build-opt
         fail-on-cache-miss: True
 
     - name: Get Cached MHLO Source
@@ -310,7 +313,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: enzyme-build
-        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-${{ needs.constants.outputs.enzyme_version }}-default-build
+        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ matrix.python_version }}-${{ needs.constants.outputs.enzyme_version }}-default-build
         fail-on-cache-miss: True
 
     - name: Cache CCache
@@ -326,6 +329,7 @@ jobs:
 
     - name: Build MLIR Dialects
       run: |
+        PYTHON=python${{ matrix.python_version }} \
         CCACHE_DIR="$(pwd)/.ccache" \
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         MHLO_BUILD_DIR="$(pwd)/mhlo-build" \
@@ -362,8 +366,8 @@ jobs:
     - name: Install Deps
       run: |
         sudo apt-get install -y python${{ matrix.python_version}} python3-pip libomp-dev
-        python${{ matrix.python_version}} -m pip install -r requirements.txt
-        python${{ matrix.python_version}} -m pip install .
+        python${{ matrix.python_version }} -m pip install -r requirements.txt
+        python${{ matrix.python_version }} -m pip install .
 
     - name: Get Cached LLVM Build
       id: cache-llvm-build
@@ -413,7 +417,7 @@ jobs:
     - name: Check Catalyst Demos
       run: |
         MDD_BENCHMARK_PRECISION=1 \
-        pytest demos --nbmake -n auto
+        python${{ matrix.python_version }} -m pytest demos --nbmake -n auto
 
   frontend-tests-lightning-kokkos:
     needs: [constants, llvm, runtime, quantum]
@@ -464,11 +468,11 @@ jobs:
 
     - name: Install lightning.kokkos used in Python tests
       run: |
-        pip install PennyLane-Lightning-Kokkos
+         python${{ matrix.python_version }} -m pip install PennyLane-Lightning-Kokkos
 
     - name: Run Python Pytest Tests (backend=lightning.kokkos)
       run: |
-        make pytest TEST_BACKEND="lightning.kokkos"
+        make pytest TEST_BACKEND="lightning.kokkos" PYTHON=python${{ matrix.python_version }}
 
   frontend-tests-openqasm-device:
     needs: [constants, llvm, runtime, quantum]
@@ -516,7 +520,7 @@ jobs:
       run: |
         # TODO: Use the latest version of boto3 after fixing the issue with
         # "Device SV1 does not support quantum circuits" from braket-pl-plugin.
-        pip install numpy amazon-braket-sdk amazon-braket-pennylane-plugin "boto3==1.26"
+        python${{ matrix.python_version }} -m pip install numpy amazon-braket-sdk amazon-braket-pennylane-plugin "boto3==1.26"
         echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
 
     - name: Add Frontend Dependencies to PATH
@@ -527,7 +531,7 @@ jobs:
 
     - name: Run Python Pytest Tests
       run: |
-        make pytest TEST_BRAKET=LOCAL
+        make pytest TEST_BRAKET=LOCAL PYTHON=python${{ matrix.python_version }}
 
   runtime-tests:
     name: Runtime Tests (Linux)
@@ -544,17 +548,18 @@ jobs:
 
       - name: Install dependencies
         run: |
-          sudo apt-get -y -q install cmake ninja-build libomp-dev lcov libasan5
+          sudo apt-get -y -q install python${{ matrix.python_version }} python3-pip cmake ninja-build libomp-dev lcov libasan5
 
       - name: Install additional dependencies (OpenQasm device)
         if: ${{ matrix.backend == 'openqasm' }}
         run: |
-          pip install numpy amazon-braket-sdk
+          python${{ matrix.python_version }} -m pip install numpy amazon-braket-sdk
           echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
 
       - name: Build Runtime test suite for Lightning simulator
         if: ${{ matrix.backend == 'lightning' }}
         run: |
+            PYTHON=python${{ matrix.python_version }} \
             C_COMPILER=$(which gcc) \
             CXX_COMPILER=$(which g++) \
             COMPILER_LAUNCHER="" \
@@ -564,6 +569,7 @@ jobs:
       - name: Build Runtime test suite with both Lightning and Lightning-Kokkos simulators
         if: ${{ matrix.backend == 'lightning-kokkos' }}
         run: |
+            PYTHON=python${{ matrix.python_version }} \
             C_COMPILER=$(which gcc) \
             CXX_COMPILER=$(which g++) \
             COMPILER_LAUNCHER="" \
@@ -574,6 +580,7 @@ jobs:
       - name: Build Runtime test suite for OpenQasm device
         if: ${{ matrix.backend == 'openqasm' }}
         run: |
+            PYTHON=python${{ matrix.python_version }} \
             C_COMPILER=$(which gcc) \
             CXX_COMPILER=$(which g++) \
             COMPILER_LAUNCHER="" \
@@ -590,6 +597,7 @@ jobs:
       - name: Build examples
         if: ${{ matrix.backend == 'lightning' }}
         run: |
+          PYTHON=python${{ matrix.python_version }} \
           C_COMPILER=$(which gcc) \
           CXX_COMPILER=$(which g++) \
           COMPILER_LAUNCHER="" \
