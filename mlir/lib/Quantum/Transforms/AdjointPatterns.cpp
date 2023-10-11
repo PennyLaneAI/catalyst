@@ -126,7 +126,7 @@ class AdjointGenerator {
                     ValueRange params = parametrizedGate.getAllParams();
                     for (Value param : params) {
                         Type paramType = param.getType();
-                        verifyTypeIsCacheable(paramType, op);
+                        verifyTypeIsCacheable(paramType, &op);
                         if (paramType.isF64()) {
                             cachedParams.push_back(builder.create<ListPopOp>(
                                 parametrizedGate.getLoc(), cache.paramVector));

@@ -45,7 +45,7 @@ void populateArgIdxMapping(TypeRange types, DenseMap<unsigned, unsigned> &argIdx
 namespace catalyst {
 namespace quantum {
 
-void verifyTypeIsCacheable(Type ty, Operation &op)
+void verifyTypeIsCacheable(Type ty, mlir::Operation *op)
 {
     // Sanitizing inputs.
     // Technically we know for a fact that none of this will ever issue an
@@ -58,7 +58,7 @@ void verifyTypeIsCacheable(Type ty, Operation &op)
 
     // TODO: Generalize to unranked tensors
     if (!isa<RankedTensorType>(ty)) {
-        op.emitOpError() << "Caching only supports tensors complex F64";
+        op->emitOpError() << "Caching only supports tensors complex F64";
     }
 
     auto aTensorType = ty.cast<RankedTensorType>();
@@ -66,17 +66,17 @@ void verifyTypeIsCacheable(Type ty, Operation &op)
 
     // TODO: Generalize to arbitrary dimensions
     if (2 != shape.size()) {
-        op.emitOpError() << "Caching only supports tensors complex F64";
+        op->emitOpError() << "Caching only supports tensors complex F64";
     }
     // TODO: Generalize to other types
     Type elementType = aTensorType.getElementType();
     if (!isa<ComplexType>(elementType)) {
-        op.emitOpError() << "Caching only supports tensors complex F64";
+        op->emitOpError() << "Caching only supports tensors complex F64";
     }
     // TODO: Generalize to other types
     Type f64 = elementType.cast<ComplexType>().getElementType();
     if (!f64.isF64()) {
-        op.emitOpError() << "Caching only supports tensors complex F64";
+        op->emitOpError() << "Caching only supports tensors complex F64";
     }
 }
 
@@ -133,6 +133,7 @@ void AugmentedCircuitGenerator::generate(Region &region, OpBuilder &builder)
                 Location loc = gate.getLoc();
                 Value clonedParam = oldToCloned.lookupOrDefault(param);
                 Type paramType = clonedParam.getType();
+                verifyTypeIsCacheable(paramType, &op);
 
                 if (paramType.isF64()) {
                     builder.create<ListPushOp>(loc, clonedParam, cache.paramVector);
@@ -150,29 +151,34 @@ void AugmentedCircuitGenerator::generate(Region &region, OpBuilder &builder)
 
                 auto aTensor = paramType.cast<RankedTensorType>();
                 ArrayRef<int64_t> shape = aTensor.getShape();
-
-                // Constants
                 Value c0 = builder.create<index::ConstantOp>(loc, 0);
                 Value c1 = builder.create<index::ConstantOp>(loc, 1);
-                // Matrix of size NxN
-                // we can use either shape[0] or shape[1] because matrix is square
-                Value N = builder.create<index::ConstantOp>(loc, shape[0]);
+                bool isDim0Static = ShapedType::kDynamic != shape[0];
+                bool isDim1Static = ShapedType::kDynamic != shape[1];
+                Value dim0Length = isDim0Static
+                                       ? (Value)builder.create<index::ConstantOp>(loc, shape[0])
+                                       : (Value)builder.create<tensor::DimOp>(loc, param, c0);
+                Value dim1Length = isDim1Static
+                                       ? (Value)builder.create<index::ConstantOp>(loc, shape[1])
+                                       : (Value)builder.create<tensor::DimOp>(loc, param, c1);
 
-                // Renaming constants for legibility.
-                // Note: Since this is a square matrix, upperBound for both loops is the same value.
-                Value lowerBound = c0;
-                Value upperBound = N;
-                Value step = c1;
+                Value lowerBoundDim0 = c0;
+                Value upperBoundDim0 = dim0Length;
+                Value stepDim0 = c1;
+                Value lowerBoundDim1 = c0;
+                Value upperBoundDim1 = dim1Length;
+                Value stepDim1 = c1;
                 Value matrix = clonedParam;
 
-                scf::ForOp iForLoop = builder.create<scf::ForOp>(loc, lowerBound, upperBound, step);
+                scf::ForOp iForLoop =
+                    builder.create<scf::ForOp>(loc, lowerBoundDim0, upperBoundDim0, stepDim0);
                 {
                     OpBuilder::InsertionGuard afterIForLoop(builder);
                     builder.setInsertionPointToStart(iForLoop.getBody());
                     Value i_index = iForLoop.getInductionVar();
 
                     scf::ForOp jForLoop =
-                        builder.create<scf::ForOp>(loc, lowerBound, upperBound, step);
+                        builder.create<scf::ForOp>(loc, lowerBoundDim1, upperBoundDim1, stepDim1);
                     {
                         OpBuilder::InsertionGuard afterJForLoop(builder);
                         builder.setInsertionPointToStart(jForLoop.getBody());
