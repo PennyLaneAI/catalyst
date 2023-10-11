@@ -176,11 +176,15 @@ class AdjointGenerator {
                         auto loc = parametrizedGate.getLoc();
                         Value c0 = builder.create<index::ConstantOp>(loc, 0);
                         Value c1 = builder.create<index::ConstantOp>(loc, 1);
-                        // Matrix of size NxN
-                        // we can use either shape[0] or shape[1] because matrix is square
                         // TODO: Generalize to all possible dimensions
-                        Value dim0Length = builder.create<index::ConstantOp>(loc, shape[0]);
-                        Value dim1Length = builder.create<index::ConstantOp>(loc, shape[1]);
+                        bool isDim0Static = ShapedType::kDynamic != shape[0];
+                        bool isDim1Static = ShapedType::kDynamic != shape[1];
+                        Value dim0Length =
+                            isDim0Static ? (Value)builder.create<index::ConstantOp>(loc, shape[0])
+                                         : (Value)builder.create<tensor::DimOp>(loc, param);
+                        Value dim1Length =
+                            isDim1Static ? (Value)builder.create<index::ConstantOp>(loc, shape[1])
+                                         : (Value)builder.create<tensor::DimOp>(loc, param);
 
                         // Renaming for legibility
                         // Note: Since this is a square matrix, upperBound for both loops is the
@@ -227,6 +231,7 @@ class AdjointGenerator {
                                 Value element =
                                     builder.create<complex::CreateOp>(loc, elementType, real, imag);
 
+                                // TODO: Generalize to types which are not complex
                                 Value j = jForLoop.getInductionVar();
                                 Value jPlusOne = builder.create<index::AddOp>(loc, j, c1);
                                 Value nMinusJMinusOne =
