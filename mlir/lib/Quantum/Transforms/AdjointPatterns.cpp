@@ -146,10 +146,10 @@ class AdjointGenerator {
                         bool isDim1Static = ShapedType::kDynamic != shape[1];
                         Value dim0Length =
                             isDim0Static ? (Value)builder.create<index::ConstantOp>(loc, shape[0])
-                                         : (Value)builder.create<tensor::DimOp>(loc, param);
+                                         : (Value)builder.create<tensor::DimOp>(loc, param, c0);
                         Value dim1Length =
                             isDim1Static ? (Value)builder.create<index::ConstantOp>(loc, shape[1])
-                                         : (Value)builder.create<tensor::DimOp>(loc, param);
+                                         : (Value)builder.create<tensor::DimOp>(loc, param, c1);
 
                         // Renaming for legibility
                         // Note: Since this is a square matrix, upperBound for both loops is the
