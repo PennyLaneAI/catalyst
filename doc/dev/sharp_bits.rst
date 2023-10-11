@@ -87,9 +87,15 @@ and those that happen at **runtime** (step 3).
 
 .. note::
 
-    As a general rule of thumb, for a function that is repeatedly executed
-    with different parameters, we want as much evaluation as possible to
-    happen at compile time.
+    As a general rule of thumb, things that happen at compile-time
+    are slow (or lead to slowdowns), while things that happen at
+    runtime are fast (or lead to speadups).
+
+    However, if the same computation is repeated every time the
+    compiled function is run (where the results are the same no
+    matter the inputs), and it is expensive, then it may be worth
+    doing the computation once in Python and use the results
+    statically in the program.
 
     However, computations at compile time cannot depend on the value of
     dynamic variable, since this is not known yet. It can only depend
@@ -753,7 +759,7 @@ and PennyLane quantum operators.
 
 .. note::
 
-    Catalyst currently doesn't support string arguments to compiled functions.
+    Non-numeric types, such as strings, are generally not supported as arguments to compiled functions.
 
 For example, consider the following, where we pass arbitrarily nested lists or
 dictionaries as input to the compiled function:
