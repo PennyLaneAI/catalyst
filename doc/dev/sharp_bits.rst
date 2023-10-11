@@ -455,16 +455,7 @@ This includes:
   <https://jax.readthedocs.io/en/latest/_autosummary /jax.numpy.ndarray.at.html>`__.
 
 * **Lack of stateful random number generators**: In JAX, random number
-  generators need to be explicitly created within the :func:`@qjit <~.qjit>` function
-  using ``jax.random.PRNGKey(int)``:
-
-  >>> @qjit()
-  ... def f():
-  ...     key = jax.random.PRNGKey(0)
-  ...     a = jax.random.normal(key, shape=(1,))
-  ...     return a
-  >>> f()
-  array([-0.78476578])
+  generators are stateless, and the key state must be explicitly updated each time you want to compute a random number. For more details, see the `JAX documentation <https://jax.readthedocs.io/en/latest/jax-101/05-random-numbers.html>`__.
 
 * **Dynamic-shaped arrays:** Functions that create or return arrays with
   dynamic shape --- that is, arrays where their shape is determined by a
