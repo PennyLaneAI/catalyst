@@ -2,30 +2,9 @@
 
 <h3>New features</h3>
 
-* Add lowering to tensor dialect for MHLO scatter. It unlocks indexing and updating jax arrays.
-  [(#273)](https://github.com/PennyLaneAI/catalyst/pull/273)
-
-  ```python
-  
-  @qjit
-  def add_multiply(l: jax.core.ShapedArray((3,), dtype=float), idx: int):
-      res = l.at[idx].multiply(3)
-      res2 = l.at[idx].add(2)
-      return res + res2
-
-  res = add_multiply(jnp.array([0, 1, 2]), 2)
-  ```
-
-  ```pycon
-  >>> res
-  [0, 2, 10]
-
-* Catalyst users can now use Python for loop statements in their programs without having to
-  explicitly use the functional `catalyst.for_loop` form!
+* The experimental AutoGraph feature, now supports Python `for` loops, allowing
+  native Python loops to be captured and compiled with Catalyst.
   [#258](https://github.com/PennyLaneAI/catalyst/pull/258)
-
-  This feature extends the existing AutoGraph support for Python if statements with Python for
-  loops. The following example is now supported:
 
   ```python
   dev = qml.device("lightning.qubit", wires=n)
@@ -36,16 +15,18 @@
       for i in range(n):
           qml.Hadamard(wires=i)
 
-      ...
-
       return qml.expval(qml.PauliZ(0))
   ```
 
+  This feature extends the existing AutoGraph support for Python `if` statements introduced in v0.3.
+  Note that TensorFlow must be installed for AutoGraph support.
+
 * The quantum control operation can now be used in conjunction with Catalyst control flow, such as
-  loops and conditionals. For this purpose a new instruction, `catalyst.ctrl`, has been added.
+  loops and conditionals, via the new `catalyst.ctrl` function.
   [(#282)](https://github.com/PennyLaneAI/catalyst/pull/282)
 
-  `catalyst.ctrl` can wrap around quantum functions which contain the Catalyst `cond`,
+  Similar in behaviour to the `qml.ctrl` control modifier from PennyLane, `catalyst.ctrl` can
+  additionally wrap around quantum functions which contain control flow, such as the Catalyst `cond`,
   `for_loop`, and `while_loop` primitives.
 
   ```python
@@ -67,12 +48,34 @@
   array(1.)
   ```
 
+* Catalyst now supports JAX's `array.at[index]` notation for array element assignment and updating.
+  [(#273)](https://github.com/PennyLaneAI/catalyst/pull/273)
+
+  ```python
+  @qjit
+  def add_multiply(l: jax.core.ShapedArray((3,), dtype=float), idx: int):
+      res = l.at[idx].multiply(3)
+      res2 = l.at[idx].add(2)
+      return res + res2
+
+  res = add_multiply(jnp.array([0, 1, 2]), 2)
+  ```
+
+  ```pycon
+  >>> res
+  [0, 2, 10]
+  ```
+
+  For more details on available methods, see the
+  [JAX documentation](https://jax.readthedocs.io/en/latest/_autosummary/jax.numpy.ndarray.at.html).
+
 <h3>Improvements</h3>
 
-* Update the Lightning backend device to work with the PL-Lightning monorepo.
+* The Lightning backend device has been updated to work with the new PL-Lightning monorepo.
   [(#259)](https://github.com/PennyLaneAI/catalyst/pull/259)
+  [(#277)](https://github.com/PennyLaneAI/catalyst/pull/277)
 
-* Move to an alternate compiler driver in C++. This improves compile-time performance by
+* A new compiler driver has been implemented in C++. This improves compile-time performance by
   avoiding *round-tripping*, which is when the entire program being compiled is dumped to
   a textual form and re-parsed by another tool.
 
@@ -82,14 +85,9 @@
   approach.
   [(#216)](https://github.com/PennyLaneAI/catalyst/pull/216)
 
-* Build both `"lightning.qubit"` and `"lightning.kokkos"` against the PL-Lightning monorepo.
-  [(#277)](https://github.com/PennyLaneAI/catalyst/pull/277)
-
 * Support the `braket.devices.Devices` enum class and `s3_destination_folder`
-  for AWS Braket remove devices.
+  device options for AWS Braket remote devices.
   [(#278)](https://github.com/PennyLaneAI/catalyst/pull/278)
-
-<h3>Breaking changes</h3>
 
 <h3>Bug fixes</h3>
 
