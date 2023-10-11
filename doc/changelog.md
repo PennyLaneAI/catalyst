@@ -88,6 +88,10 @@
 * Support the `braket.devices.Devices` enum class and `s3_destination_folder`
   device options for AWS Braket remote devices.
   [(#278)](https://github.com/PennyLaneAI/catalyst/pull/278)
+  
+* Improvements have been made to the build process, including avoiding uncessary
+  processes such as removing `opt` and downloading the wheel.
+  [(#298)](https://github.com/PennyLaneAI/catalyst/pull/298)
 
 <h3>Bug fixes</h3>
 
