@@ -93,64 +93,68 @@ void AugmentedCircuitGenerator::generate(Region &region, OpBuilder &builder)
         }
         else if (auto gate = dyn_cast<quantum::ParametrizedGate>(op)) {
             ValueRange params = gate.getAllParams();
-            // TODO: Add capability to cache tensors here
-            // if (!params.empty()) {
-            //     for (Value param : params) {
-            //         builder.create<ListPushOp>(gate.getLoc(), oldToCloned.lookupOrDefault(param),
-            //                                    cache.paramVector);
-            //     }
-            // }
-        }
-        else if (auto gate = dyn_cast<quantum::QubitUnitaryOp>(op)) {
-            Value matrix = gate.getMatrix();
-            Value matrixCloned = oldToCloned.lookupOrDefault(matrix);
-            Type aType = matrixCloned.getType();
+            if (params.empty())
+                continue;
 
-            // Invariants, this is developer documentation.
-            // aType must be a tensor<NxNxf64>
-            auto aTensor = aType.cast<RankedTensorType>();
-            ArrayRef<int64_t> shape = aTensor.getShape();
-            assert(shape.size() == 2 && "Unexpected tensor shape in QubitUnitaryOp");
-            assert(shape[0] == shape[1] && "QubitUnitaryOp is not square matrix");
-            assert(shape[0] > 1 && "QubitUnitaryOp has invalid tensor shape.");
-            int64_t n = shape[0];
-            bool isPowerOfTwo = ((n & (n - 1)) == 0);
-            assert(isPowerOfTwo && "QubitUnitaryOp has invalid tensor shape.");
+            for (Value param : params) {
+                Location loc = gate.getLoc();
+                Value clonedParam = oldToCloned.lookupOrDefault(param);
+                Type paramType = clonedParam.getType();
 
-            // Constants
-            auto loc = gate.getLoc();
-            Value c0 = builder.create<index::ConstantOp>(loc, 0);
-            Value c1 = builder.create<index::ConstantOp>(loc, 1);
-            // Matrix of size NxN
-            // we can use either shape[0] or shape[1] because matrix is square
-            Value N = builder.create<index::ConstantOp>(loc, shape[0]);
+                if (!paramType.dyn_cast<RankedTensorType>()) {
+                    builder.create<ListPushOp>(loc, clonedParam, cache.paramVector);
+                    continue;
+                }
 
-            // Renaming constants for legibility.
-            // Note: Since this is a square matrix, upperBound for both loops is the same value.
-            Value lowerBound = c0;
-            Value upperBound = N;
-            Value step = c1;
+                assert(isa<RankedTensorType>(paramType) && "Parameter type cannot be handled.");
+                Type aType = param.getType();
+                // Invariants, this is developer documentation.
+                // aType must be a tensor<NxNxf64>
+                auto aTensor = aType.cast<RankedTensorType>();
+                ArrayRef<int64_t> shape = aTensor.getShape();
+                assert(shape.size() == 2 && "Unexpected tensor shape in QubitUnitaryOp");
+                assert(shape[0] == shape[1] && "QubitUnitaryOp is not square matrix");
+                assert(shape[0] > 1 && "QubitUnitaryOp has invalid tensor shape.");
+                int64_t n = shape[0];
+                bool isPowerOfTwo = ((n & (n - 1)) == 0);
+                assert(isPowerOfTwo && "QubitUnitaryOp has invalid tensor shape.");
 
-            scf::ForOp iForLoop = builder.create<scf::ForOp>(loc, lowerBound, upperBound, step);
-            {
-                OpBuilder::InsertionGuard afterIForLoop(builder);
-                builder.setInsertionPointToStart(iForLoop.getBody());
-                Value i_index = iForLoop.getInductionVar();
+                // Constants
+                Value c0 = builder.create<index::ConstantOp>(loc, 0);
+                Value c1 = builder.create<index::ConstantOp>(loc, 1);
+                // Matrix of size NxN
+                // we can use either shape[0] or shape[1] because matrix is square
+                Value N = builder.create<index::ConstantOp>(loc, shape[0]);
 
-                scf::ForOp jForLoop = builder.create<scf::ForOp>(loc, lowerBound, upperBound, step);
+                // Renaming constants for legibility.
+                // Note: Since this is a square matrix, upperBound for both loops is the same value.
+                Value lowerBound = c0;
+                Value upperBound = N;
+                Value step = c1;
+                Value matrix = clonedParam;
+
+                scf::ForOp iForLoop = builder.create<scf::ForOp>(loc, lowerBound, upperBound, step);
                 {
-                    OpBuilder::InsertionGuard afterJForLoop(builder);
-                    builder.setInsertionPointToStart(jForLoop.getBody());
-                    Value j_index = jForLoop.getInductionVar();
-                    SmallVector<Value> indices = {i_index, j_index};
-                    Value element = builder.create<tensor::ExtractOp>(loc, matrixCloned, indices);
-                    // element is complex!
-                    // So we need to convert into {f64, f64}
-                    Value real = builder.create<complex::ReOp>(loc, element);
-                    Value imag = builder.create<complex::ImOp>(loc, element);
-                    // Again, take note of the order.
-                    builder.create<ListPushOp>(loc, real, cache.paramVector);
-                    builder.create<ListPushOp>(loc, imag, cache.paramVector);
+                    OpBuilder::InsertionGuard afterIForLoop(builder);
+                    builder.setInsertionPointToStart(iForLoop.getBody());
+                    Value i_index = iForLoop.getInductionVar();
+
+                    scf::ForOp jForLoop =
+                        builder.create<scf::ForOp>(loc, lowerBound, upperBound, step);
+                    {
+                        OpBuilder::InsertionGuard afterJForLoop(builder);
+                        builder.setInsertionPointToStart(jForLoop.getBody());
+                        Value j_index = jForLoop.getInductionVar();
+                        SmallVector<Value> indices = {i_index, j_index};
+                        Value element = builder.create<tensor::ExtractOp>(loc, matrix, indices);
+                        // element is complex!
+                        // So we need to convert into {f64, f64}
+                        Value real = builder.create<complex::ReOp>(loc, element);
+                        Value imag = builder.create<complex::ImOp>(loc, element);
+                        // Again, take note of the order.
+                        builder.create<ListPushOp>(loc, real, cache.paramVector);
+                        builder.create<ListPushOp>(loc, imag, cache.paramVector);
+                    }
                 }
             }
         }
