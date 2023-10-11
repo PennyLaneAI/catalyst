@@ -50,7 +50,7 @@ jobs:
       - name: Primary Python version
         id: primary_python_version
         run: |
-          echo 'primary_python_version=3.11' >> $GITHUB_OUTPUT
+          echo 'primary_python_version=3.10' >> $GITHUB_OUTPUT
 
       - name: Runtime Backend Devices
         id: rt_backends
