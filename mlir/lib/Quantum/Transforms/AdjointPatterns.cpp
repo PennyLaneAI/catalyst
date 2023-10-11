@@ -75,41 +75,6 @@ class AdjointGenerator {
     }
 
   private:
-    static void verifyTypeIsPoppable(Type ty, Operation &op)
-    {
-        // Sanitizing inputs.
-        // Technically we know for a fact that none of this will ever issue an
-        // error. This is because QubitUnitary is guaranteed to have a
-        // tensor<NxNxcomplex<f64>> But this code in the future may be extended to
-        // support other types. Hence the sanitization.
-        if (ty.isF64()) {
-            return;
-        }
-
-        // TODO: Generalize to unranked tensors
-        if (!isa<RankedTensorType>(ty)) {
-            op.emitOpError() << "This type cannot be popped.";
-        }
-
-        auto aTensorType = ty.cast<RankedTensorType>();
-        ArrayRef<int64_t> shape = aTensorType.getShape();
-
-        // TODO: Generalize to arbitrary dimensions
-        if (2 != shape.size()) {
-            op.emitOpError() << "This type cannot be popped.";
-        }
-        // TODO: Generalize to other types
-        Type elementType = aTensorType.getElementType();
-        if (!isa<ComplexType>(elementType)) {
-            op.emitOpError() << "This type cannot be popped.";
-        }
-        // TODO: Generalize to other types
-        Type f64 = elementType.cast<ComplexType>().getElementType();
-        if (!f64.isF64()) {
-            op.emitOpError() << "This type cannot be popped.";
-        }
-    }
-
     void generateImpl(Region &region, OpBuilder &builder)
     {
         assert(region.hasOneBlock() &&
@@ -161,7 +126,7 @@ class AdjointGenerator {
                     ValueRange params = parametrizedGate.getAllParams();
                     for (Value param : params) {
                         Type paramType = param.getType();
-                        verifyTypeIsPoppable(paramType, op);
+                        verifyTypeIsCacheable(paramType, op);
                         if (paramType.isF64()) {
                             cachedParams.push_back(builder.create<ListPopOp>(
                                 parametrizedGate.getLoc(), cache.paramVector));

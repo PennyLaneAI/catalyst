@@ -45,6 +45,41 @@ void populateArgIdxMapping(TypeRange types, DenseMap<unsigned, unsigned> &argIdx
 namespace catalyst {
 namespace quantum {
 
+void verifyTypeIsCacheable(Type ty, Operation &op)
+{
+    // Sanitizing inputs.
+    // Technically we know for a fact that none of this will ever issue an
+    // error. This is because QubitUnitary is guaranteed to have a
+    // tensor<NxNxcomplex<f64>> But this code in the future may be extended to
+    // support other types. Hence the sanitization.
+    if (ty.isF64()) {
+        return;
+    }
+
+    // TODO: Generalize to unranked tensors
+    if (!isa<RankedTensorType>(ty)) {
+        op.emitOpError() << "This type cannot be popped.";
+    }
+
+    auto aTensorType = ty.cast<RankedTensorType>();
+    ArrayRef<int64_t> shape = aTensorType.getShape();
+
+    // TODO: Generalize to arbitrary dimensions
+    if (2 != shape.size()) {
+        op.emitOpError() << "This type cannot be popped.";
+    }
+    // TODO: Generalize to other types
+    Type elementType = aTensorType.getElementType();
+    if (!isa<ComplexType>(elementType)) {
+        op.emitOpError() << "This type cannot be popped.";
+    }
+    // TODO: Generalize to other types
+    Type f64 = elementType.cast<ComplexType>().getElementType();
+    if (!f64.isF64()) {
+        op.emitOpError() << "This type cannot be popped.";
+    }
+}
+
 QuantumCache QuantumCache::initialize(Region &region, OpBuilder &builder, Location loc)
 {
     MLIRContext *ctx = builder.getContext();
@@ -115,29 +150,6 @@ void AugmentedCircuitGenerator::generate(Region &region, OpBuilder &builder)
 
                 auto aTensor = paramType.cast<RankedTensorType>();
                 ArrayRef<int64_t> shape = aTensor.getShape();
-
-                if (2 != shape.size()) {
-                    gate.emitOpError() << "Unexpected tensor shape in QubitUnitaryOp";
-                }
-                if (shape[0] != shape[1]) {
-                    gate.emitOpError() << "QubitUnitaryOp is not square matrix.";
-                }
-                if (shape[0] < 2) {
-                    gate.emitOpError() << "QubitUnitaryOp has invalid tensor shape.";
-                }
-                int64_t n = shape[0];
-                bool isPowerOfTwo = ((n & (n - 1)) == 0);
-                if (!isPowerOfTwo) {
-                    gate.emitOpError() << "QubitUnitaryOp is not of a valid size.";
-                }
-                Type elementType = aTensor.getElementType();
-                if (!isa<ComplexType>(elementType)) {
-                    gate.emitOpError() << "QubitUnitaryOp does not hold complex types.";
-                }
-                Type f64 = elementType.cast<ComplexType>().getElementType();
-                if (!f64.isF64()) {
-                    gate.emitOpError() << "QubitUnitaryOp does not hold complex F64 types.";
-                }
 
                 // Constants
                 Value c0 = builder.create<index::ConstantOp>(loc, 0);

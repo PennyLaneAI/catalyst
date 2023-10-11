@@ -71,5 +71,8 @@ class AugmentedCircuitGenerator {
         }
     }
 };
+
+void verifyTypeIsCacheable(mlir::Type ty, mlir::Operation &op);
+
 } // namespace quantum
 } // namespace catalyst
