@@ -98,6 +98,14 @@
 
 <h3>Bug fixes</h3>
 
+* Add support for applying the `adjoint` operation to `QubitUnitary` gates.
+  `QubitUnitary` was not able to be `adjoint`ed when the variable holding the unitary matrix might
+  change. This can happen, for instance, inside of a for loop.
+  To solve this issue, the unitary matrix gets stored in the array list via push and pops.
+  The unitary matrix is later reconstructed from the array list and `QubitUnitary` can be executed
+  in the `adjoint`ed context.
+  [(#304)](https://github.com/PennyLaneAI/catalyst/pull/304)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
