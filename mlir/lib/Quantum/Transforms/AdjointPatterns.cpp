@@ -75,6 +75,41 @@ class AdjointGenerator {
     }
 
   private:
+    static void verifyTypeIsPoppable(Type ty, Operation &op)
+    {
+        // Sanitizing inputs.
+        // Technically we know for a fact that none of this will ever issue an
+        // error. This is because QubitUnitary is guaranteed to have a
+        // tensor<NxNxcomplex<f64>> But this code in the future may be extended to
+        // support other types. Hence the sanitization.
+        if (ty.isF64()) {
+            return;
+        }
+
+        // TODO: Generalize to unranked tensors
+        if (!isa<RankedTensorType>(ty)) {
+            op.emitOpError() << "This type cannot be popped.";
+        }
+
+        auto aTensorType = ty.cast<RankedTensorType>();
+        ArrayRef<int64_t> shape = aTensorType.getShape();
+
+        // TODO: Generalize to arbitrary dimensions
+        if (2 != shape.size()) {
+            op.emitOpError() << "This type cannot be popped.";
+        }
+        // TODO: Generalize to other types
+        Type elementType = aTensorType.getElementType();
+        if (!isa<ComplexType>(elementType)) {
+            op.emitOpError() << "This type cannot be popped.";
+        }
+        // TODO: Generalize to other types
+        Type f64 = elementType.cast<ComplexType>().getElementType();
+        if (!f64.isF64()) {
+            op.emitOpError() << "This type cannot be popped.";
+        }
+    }
+
     void generateImpl(Region &region, OpBuilder &builder)
     {
         assert(region.hasOneBlock() &&
@@ -126,61 +161,36 @@ class AdjointGenerator {
                     ValueRange params = parametrizedGate.getAllParams();
                     for (Value param : params) {
                         Type paramType = param.getType();
+                        verifyTypeIsPoppable(paramType, op);
                         if (paramType.isF64()) {
                             cachedParams.push_back(builder.create<ListPopOp>(
                                 parametrizedGate.getLoc(), cache.paramVector));
                             continue;
                         }
 
-                        // Sanitizing inputs.
-                        // Technically we know for a fact that none of this will ever issue an
-                        // error. This is because QubitUnitary is guaranteed to have a
-                        // tensor<NxNxcomplex<f64>> But this code in the future may be extended to
-                        // support other types. Hence the sanitization.
-                        if (!isa<RankedTensorType>(paramType)) {
-                            gate.emitOpError() << "Unexpected type.";
-                        }
-
+                        // Guaranteed by verifyTypeIsPoppable above.
                         auto aTensorType = paramType.cast<RankedTensorType>();
                         ArrayRef<int64_t> shape = aTensorType.getShape();
-
-                        if (2 != shape.size()) {
-                            gate.emitOpError() << "Unexpected tensor shape in QubitUnitaryOp";
-                        }
-                        if (shape[0] != shape[1]) {
-                            gate.emitOpError() << "QubitUnitaryOp is not square matrix.";
-                        }
-                        if (shape[0] < 2) {
-                            gate.emitOpError() << "QubitUnitaryOp has invalid tensor shape.";
-                        }
-                        int64_t n = shape[0];
-                        bool isPowerOfTwo = ((n & (n - 1)) == 0);
-                        if (!isPowerOfTwo) {
-                            gate.emitOpError() << "QubitUnitaryOp is not of a valid size.";
-                        }
                         Type elementType = aTensorType.getElementType();
-                        if (!isa<ComplexType>(elementType)) {
-                            gate.emitOpError() << "QubitUnitaryOp does not hold complex types.";
-                        }
-                        Type f64 = elementType.cast<ComplexType>().getElementType();
-                        if (!f64.isF64()) {
-                            gate.emitOpError() << "QubitUnitaryOp does not hold complex F64 types.";
-                        }
-
                         // Constants
                         auto loc = parametrizedGate.getLoc();
                         Value c0 = builder.create<index::ConstantOp>(loc, 0);
                         Value c1 = builder.create<index::ConstantOp>(loc, 1);
                         // Matrix of size NxN
                         // we can use either shape[0] or shape[1] because matrix is square
-                        Value N = builder.create<index::ConstantOp>(loc, shape[0]);
+                        // TODO: Generalize to all possible dimensions
+                        Value dim0Length = builder.create<index::ConstantOp>(loc, shape[0]);
+                        Value dim1Length = builder.create<index::ConstantOp>(loc, shape[1]);
 
                         // Renaming for legibility
                         // Note: Since this is a square matrix, upperBound for both loops is the
                         // same value.
-                        Value lowerBound = c0;
-                        Value upperBound = N;
-                        Value step = c1;
+                        Value lowerBoundDim0 = c0;
+                        Value upperBoundDim0 = dim0Length;
+                        Value stepDim0 = c1;
+                        Value lowerBoundDim1 = c0;
+                        Value upperBoundDim1 = dim1Length;
+                        Value stepDim1 = c1;
                         Value beginningTensor =
                             builder.create<tensor::EmptyOp>(loc, shape, elementType);
                         // This time, we are in reverse, so we need to start
@@ -188,23 +198,22 @@ class AdjointGenerator {
                         SmallVector<Value> initialValues = {beginningTensor};
 
                         scf::ForOp iForLoop = builder.create<scf::ForOp>(
-                            loc, lowerBound, upperBound, step, initialValues);
+                            loc, lowerBoundDim0, upperBoundDim0, stepDim0, initialValues);
                         {
                             OpBuilder::InsertionGuard afterIForLoop(builder);
                             builder.setInsertionPointToStart(iForLoop.getBody());
                             auto iIterArgs = iForLoop.getRegionIterArgs();
-                            assert(iIterArgs.size() == 1 &&
-                                   "iForLoop has more induction variables than necessary.");
                             Value currIthTensor = iIterArgs.front();
 
                             Value i = iForLoop.getInductionVar();
                             Value iPlusOne = builder.create<index::AddOp>(loc, i, c1);
-                            Value nMinusIMinusOne = builder.create<index::SubOp>(loc, N, iPlusOne);
+                            Value nMinusIMinusOne =
+                                builder.create<index::SubOp>(loc, dim0Length, iPlusOne);
                             // Just for legibility
                             Value iTensorIndex = nMinusIMinusOne;
 
                             scf::ForOp jForLoop = builder.create<scf::ForOp>(
-                                loc, lowerBound, upperBound, step, currIthTensor);
+                                loc, lowerBoundDim1, upperBoundDim1, stepDim1, currIthTensor);
                             {
                                 OpBuilder::InsertionGuard afterJForLoop(builder);
                                 builder.setInsertionPointToStart(jForLoop.getBody());
@@ -221,7 +230,7 @@ class AdjointGenerator {
                                 Value j = jForLoop.getInductionVar();
                                 Value jPlusOne = builder.create<index::AddOp>(loc, j, c1);
                                 Value nMinusJMinusOne =
-                                    builder.create<index::SubOp>(loc, N, jPlusOne);
+                                    builder.create<index::SubOp>(loc, dim1Length, jPlusOne);
                                 // Just for legibility
                                 Value jTensorIndex = nMinusJMinusOne;
                                 ValueRange indices = {iTensorIndex, jTensorIndex};
