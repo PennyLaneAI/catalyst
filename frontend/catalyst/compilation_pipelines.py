@@ -478,7 +478,7 @@ class Directory:
         if isinstance(self._impl, tempfile.TemporaryDirectory):
             # The temporary directory can clean up
             # after itself...
-            ...
+            return
         shutil.rmtree(str(self))
 
 
