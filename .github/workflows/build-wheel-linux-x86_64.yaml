@@ -15,10 +15,19 @@ jobs:
     uses: ./.github/workflows/constants.yaml
 
   build-dependencies:
-    name: Build Dependencies
     needs: [constants]
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        arch: [x86_64]
+        python_version: ${{ fromJson(needs.constants.outputs.python_versions) }}
+        container_img: ["quay.io/pypa/manylinux2014_x86_64"]
+
+    name: Build Dependencies (Python ${{ matrix.python_version }})
     runs-on: ubuntu-latest
-    container: "quay.io/pypa/manylinux2014_x86_64"
+    container: ${{ matrix.container_img }}
 
     steps:
     - name: Checkout Catalyst repo
@@ -84,7 +93,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path:  llvm-build
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-generic-build-opt
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-generic-build-opt
 
     - name: Cache MHLO Build
       id: cache-mhlo-build
@@ -98,7 +107,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path:  enzyme-build
-        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-generic-build
+        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ matrix.python_version }}-${{ needs.constants.outputs.enzyme_version }}-generic-build
 
     - name: Install dependencies (CentOS)
       if: |
@@ -109,6 +118,10 @@ jobs:
         # Reduce wait time for repos not responding
         cat /etc/yum.conf | sed "s/\[main\]/\[main\]\ntimeout=5/g" > /etc/yum.conf
         yum update -y && yum install -y cmake ninja-build
+
+    - name: Install Dependencies (Python)
+      run: |
+        python${{ matrix.python_version }} -m pip install wheel numpy pybind11 PyYAML
 
     - name: Build LLVM / MLIR
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
@@ -121,11 +134,15 @@ jobs:
               -DLLVM_ENABLE_ASSERTIONS=ON \
               -DLLVM_INSTALL_UTILS=ON \
               -DLLVM_ENABLE_ZLIB=OFF \
-              -DLLVM_ENABLE_ZSTD=OFF
+              -DLLVM_ENABLE_ZSTD=OFF \
+              -DMLIR_ENABLE_BINDINGS_PYTHON=ON \
+              -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
+              -DPython3_NumPy_INCLUDE_DIRS=$(python${{ matrix.python_version }} -c "import numpy as np; print(np.get_include())")
 
         # TODO: when updating LLVM, test to see if mlir/unittests/Bytecode/BytecodeTest.cpp:55 is passing
         # and remove filter
-        LIT_FILTER_OUT="Bytecode" cmake --build llvm-build --target lld check-mlir opt
+        # This tests fails on CI/CD not locally.
+        LIT_FILTER_OUT="Bytecode" cmake --build llvm-build --target lld check-mlir 
 
     - name: Build MHLO Dialect
       if: steps.cache-mhlo-build.outputs.cache-hit != 'true'
@@ -194,7 +211,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path:  llvm-build
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-generic-build-opt
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-${{matrix.python_version}}-generic-build-opt
         fail-on-cache-miss: True
 
     - name: Get Cached MHLO Source
@@ -214,20 +231,20 @@ jobs:
         key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-generic-build
         fail-on-cache-miss: True
 
-    - name: Get Cached Enzyme Build
-      id: cache-enzyme-build
-      uses: actions/cache@v3
-      with:
-        path:  enzyme-build
-        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-generic-build
-        fail-on-cache-miss: True
-
     - name: Get Cached Enzyme Source
       id: cache-enzyme-source
       uses: actions/cache@v3
       with:
         path:  mlir/Enzyme
         key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-source
+        fail-on-cache-miss: True
+
+    - name: Get Cached Enzyme Build
+      id: cache-enzyme-build
+      uses: actions/cache@v3
+      with:
+        path:  enzyme-build
+        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ matrix.python_version }}-${{ needs.constants.outputs.enzyme_version }}-generic-build
         fail-on-cache-miss: True
 
     # Build Catalyst-Runtime
@@ -243,31 +260,9 @@ jobs:
               -DLIGHTNING_GIT_TAG="master" \
               -DKokkos_ENABLE_SERIAL=ON \
               -DKokkos_ENABLE_OPENMP=ON \
-              -DENABLE_OPENQASM=ON \
-              -DLLVM_ENABLE_ZLIB=OFF \
-              -DLLVM_ENABLE_ZSTD=OFF
+              -DENABLE_OPENQASM=ON
 
         cmake --build runtime-build --target rt_capi
-
-    # Build MLIR Python Bindings
-    - name: Build MLIR Python Bindings
-      run: |
-        cmake -S mlir/llvm-project/llvm -B llvm-build -G Ninja \
-              -DCMAKE_BUILD_TYPE=Release \
-              -DLLVM_BUILD_EXAMPLES=OFF \
-              -DLLVM_TARGETS_TO_BUILD="host" \
-              -DLLVM_ENABLE_PROJECTS="mlir" \
-              -DLLVM_ENABLE_ASSERTIONS=ON \
-              -DLLVM_INSTALL_UTILS=ON \
-              -DMLIR_ENABLE_BINDINGS_PYTHON=ON \
-              -DPython3_EXECUTABLE=$(which python${{ matrix.python_version }}) \
-              -DPython3_NumPy_INCLUDE_DIRS=$(python${{ matrix.python_version }} -c "import numpy as np; print(np.get_include())") \
-              -DLLVM_ENABLE_ZLIB=OFF \
-              -DLLVM_ENABLE_ZSTD=OFF
-
-        # TODO: when updating LLVM, test to see if mlir/unittests/Bytecode/BytecodeTest.cpp:55 is passing
-        # and remove filter
-        LIT_FILTER_OUT="Bytecode" cmake --build llvm-build --target check-mlir opt
 
     # Build Quantum and Gradient Dialects
     - name: Build MLIR Dialects
@@ -334,7 +329,7 @@ jobs:
 
     - name: Install Python dependencies
       run: |
-        python${{ matrix.python_version }} -m pip install wheel pytest pytest-xdist
+        python${{ matrix.python_version }} -m pip install pytest pytest-xdist
         python${{ matrix.python_version }} -m pip install tensorflow-cpu  # for autograph tests
 
     - name: Install Catalyst
