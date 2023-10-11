@@ -1295,7 +1295,7 @@ def cond(pred: DynamicJaxprTracer):
         :href: usage-details
 
         There are various constraints and restrictions that should be kept in mind
-        when working with classical control in Catalyst.
+        when working with conditionals in Catalyst.
 
         The return values of all branches of :func:`~.cond` must be the same type.
         Returning different types, or ommitting a return value in one branch (e.g.,

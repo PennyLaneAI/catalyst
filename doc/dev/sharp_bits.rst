@@ -1,5 +1,5 @@
-Debugging and sharp bits
-========================
+Sharp bits and debugging tips
+=============================
 
 Catalyst is designed to allow you to take the tools and code patterns you are
 familiar with when exploring quantum computing (such as Python, NumPy, JAX,
@@ -10,7 +10,7 @@ Similar to JAX, Catalyst does this via the :func:`@qjit <.qjit>` decorator, whic
 hybrid programs written in Python, PennyLane, and JAX, and compiles them to
 native machine code --- preserving control flow like conditional branches and loops.
 
-With Catalyst, we aim support as many idiomatic PennyLane and JAX
+With Catalyst, we aim to support as many idiomatic PennyLane and JAX
 hybrid workflow programs as possible, however there will be **various
 restrictions and constraints that should be taken into account**.
 
@@ -24,25 +24,6 @@ helpful when using Catalyst.
     :doc:`quick start guide <quick_start>`.
 
 
-Debugging functions
--------------------
-
-Catalyst provides the following functions to help with debugging:
-
-.. raw:: html
-
-    <div class="summary-table">
-
-.. autosummary::
-    :nosignatures:
-
-    ~catalyst.debug.print
-    ~catalyst.autograph_source
-
-.. raw:: html
-
-    </div>
-    <div class="summary-table">
 
 
 Compile-time vs. runtime
@@ -62,7 +43,7 @@ with just-in-time (JIT) compilation.
    unknown value** used as the function arguments
    (the **runtime arguments**).
 
-   These symbolic tracer objects represent **dynamic variable**, and are used
+   These symbolic tracer objects represent **dynamic variables**, and are used
    to determine how the JIT compiled function transforms its inputs to
    outputs.
 
@@ -74,7 +55,7 @@ with just-in-time (JIT) compilation.
 
 Once the function is first compiled, subsequent executions of the function
 will simply re-use the previous compiled binary, allowing steps (1) and (2) to
-be skipped. (Note: some cases, such as if the function argument types change,
+be skipped. (Note: some cases, such as when the function argument types change,
 may trigger re-compilation.)
 
 For example, consider the following, where we print out a variable in the middle of
@@ -97,7 +78,7 @@ then the binary is executed directly to return the function value --- the
 print statement is never invoked with the numerical value of ``x``.
 
 When we execute the function again, steps (1) and (2) are skipped since we
-have already compiled a binary; this is called directly to get the function
+have already compiled a binary; the binary is called directly to get the function
 result, and again the print statement is never hit.
 
 This allows us to distinguish between computations that happen
@@ -431,13 +412,13 @@ optimization to take place within Catalyst:
         return for_loop(0, steps, 1)(update_step)(params, state)[0]
 
 The optimization now takes 574ms ± 43.1ms to complete when using 200 steps.
-Note that, to compute gradients within a qjit-compiled function,
+Note that, to compute hybrid quantum-classical gradients within a qjit-compiled function,
 the :func:`catalyst.grad` function must be used.
 
 JAX support and restrictions
 ----------------------------
 
-Catalyst is utilizes JAX for program capture, which means you are able to
+Catalyst utilizes JAX for program capture, which means you are able to
 leverage the many functions accessible in ``jax`` and ``jax.numpy`` to write
 code that supports :func:`@qjit <~.qjit>` and dynamic variables.
 
@@ -452,7 +433,7 @@ that doesn't work with Catalyst includes:
   indices.
 
 If you come across any other JAX functions that don't work with Catalyst
-(or don't already have a Catalyst equivalents), please let us know by opening
+(and don't already have a Catalyst equivalent), please let us know by opening
 a `GitHub issue <https://github.com/PennyLaneAI/catalyst/issues>`__.
 
 While leveraging ``jax.numpy`` makes it easy to port over NumPy-based
@@ -568,12 +549,12 @@ Inspecting and drawing circuits
 -------------------------------
 
 A useful tool for debugging quantum algorithms is the ability to draw them. Currently,
-:func:`@qjit <~.qjit>` compiled QNodes used as input to
+:func:`@qjit <~.qjit>` compiled QNodes can be used as input to
 :func:`qml.draw <pennylane.draw>`, with the following caveats:
 
 - :func:`qml.draw <pennylane.draw>` call must occur outside the :func:`@qjit <.qjit>`
 
-- The :func:`@qjit <.qjit>` decorator must be placed directly on top of the QNode
+- If used, the :func:`@qjit <.qjit>` decorator must be placed directly on top of the QNode (that is, you cannot draw a hybrid `qjit` compiled function that _contains_ a QNode).
 
 - The :func:`catalyst.measure` function is not supported in drawn QNodes
 
@@ -613,13 +594,13 @@ At the moment, additional PennyLane `circuit inspection functions
 <https://docs.pennylane.ai/en/stable/introduction/inspecting_circuits.html>`__
 are not supported with Catalyst.
 
-Classical control debugging
----------------------------
+Conditional debugging
+---------------------
 
 .. note::
 
-    See our AutoGraph guide for converting native Python control flow
-    to QJIT compatible control.
+    See our AutoGraph guide for seamless conversion of native Python control flow
+    to QJIT compatible control flow.
 
 There are various constraints and restrictions that should be kept in mind
 when working with classical control in Catalyst.
@@ -692,11 +673,11 @@ PennyLane provides a wide variety of
 convert a circuit to one or more circuits.
 
 As a general rule of thumb, transforms that result in a single circuit are
-generally applied before the QNode decorator, while transforms that result in
+generally applied before/outside the QNode decorator, while transforms that result in
 multiple circuits to be executed (**batch transforms**, such as
-:func:`~pennylane.transforms.split_non_commuting`) are applied after the QNode decorator.
+:func:`~pennylane.transforms.split_non_commuting`) are applied after/inside the QNode decorator.
 
-Currently, batch transforms and transforms that apply *after* the QNode decorator will
+Currently, batch transforms and transforms that apply *inside* or *within* the QNode decorator will
 not work with Catalyst:
 
 .. code-block:: python
@@ -773,13 +754,12 @@ inputs can be represented as `Pytrees
 structures built out of Python container objects such as lists, dictionaries,
 and tuples --- where the *values* (leaf nodes) are compatible types.
 
-Compatible types includes booleans, Python numeric types, JAX arrays,
+Compatible types includes Booleans, Python numeric types, JAX arrays,
 and PennyLane quantum operators.
 
 .. note::
 
-    Catalyst currently doesn't support string arguments to compiled functions
-    with the exception of dictionary keys.
+    Catalyst currently doesn't support string arguments to compiled functions.
 
 For example, consider the following, where we pass arbitrarily nested lists or
 dictionaries as input to the compiled function:
