@@ -89,7 +89,8 @@ jobs:
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
       run: |
         sudo apt-get install -y python${{ matrix.python_version }} python3-pip cmake ninja-build clang lld
-        sudo update-alternatives --set python /usr/bin/python${{ matrix.python_version }}
+        sudo ln -s /usr/bin/python3 /usr/bin/python${{ matrix.python_version }}
+        python3 --version | grep ${{ matrix.python_version }}
         python3 -m pip install numpy pybind11
 
     - name: Build LLVM
@@ -99,7 +100,6 @@ jobs:
       run: |
         # echo 'target_compile_options(mlir_c_runner_utils PRIVATE "-fno-sanitize=all")' \
         #       >> mlir/llvm-project/mlir/lib/ExecutionEngine/CMakeLists.txt
-        python3 --version | grep ${{ matrix.python_version }}
         PYTHON=python3 \
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         COMPILER_LAUNCHER="" \
@@ -166,12 +166,12 @@ jobs:
       if: steps.cache-mhlo.outputs.cache-hit != 'true'
       run: |
         sudo apt-get install -y python${{ matrix.python_version }} cmake ninja-build clang lld
-        sudo update-alternatives --set python /usr/bin/python${{ matrix.python_version }}
+        sudo ln -s /usr/bin/python3 /usr/bin/python${{ matrix.python_version }}
+        python3 --version | grep ${{ matrix.python_version }}
 
     - name: Build MHLO Dialect
       if: steps.cache-mhlo.outputs.cache-hit != 'true'
       run: |
-        python3 --version | grep ${{ matrix.python_version }}
         PYTHON=python3 \
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         MHLO_BUILD_DIR="$(pwd)/mhlo-build" \
@@ -239,12 +239,11 @@ jobs:
       if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
       run: |
         sudo apt-get install -y cmake ninja-build clang lld
+        python3 --version | grep ${{ matrix.python_version }}
 
     - name: Build Enzyme
       if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
       run: |
-        python3 --version | grep ${{ matrix.python_version }}
-        PYTHON=python3 \
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
         ENZYME_BUILD_DIR="$(pwd)/enzyme-build" \
         COMPILER_LAUNCHER="" \
@@ -268,7 +267,7 @@ jobs:
     - name: Install Deps
       run: |
         sudo apt-get install -y python${{ matrix.python_version }} python3-pip cmake ninja-build ccache clang lld
-        sudo update-alternatives --set python /usr/bin/python${{ matrix.python_version }}
+        python3 --version | grep ${{ matrix.python_version }}
         python3 -m pip install numpy pybind11
 
     - name: Get Cached LLVM Source
@@ -335,7 +334,6 @@ jobs:
 
     - name: Build MLIR Dialects
       run: |
-        python3 --version | grep ${{ matrix.python_version }}
         PYTHON=python3 \
         CCACHE_DIR="$(pwd)/.ccache" \
         LLVM_BUILD_DIR="$(pwd)/llvm-build" \
@@ -373,7 +371,7 @@ jobs:
     - name: Install Deps
       run: |
         sudo apt-get install -y python${{ matrix.python_version}} python3-pip libomp-dev
-        sudo update-alternatives --set python /usr/bin/python${{ matrix.python_version }}
+        python3 --version | grep ${{ matrix.python_version }}
         python3 -m pip install -r requirements.txt
         python3 -m pip install .
 
@@ -411,9 +409,8 @@ jobs:
     - name: Run Python Pytest Tests
       run: |
         # export ASAN_OPTIONS=detect_odr_violation=0
-        python3 --version | grep ${{ matrix.python_version }}
         COVERAGE_REPORT="xml:coverage.xml -p no:warnings" \
-        make coverage-frontend PYTHON=python3
+        make coverage-frontend
         mv coverage.xml coverage-${{ github.job }}.xml
 
     - name: Upload to Codecov
@@ -426,7 +423,7 @@ jobs:
     - name: Check Catalyst Demos
       run: |
         MDD_BENCHMARK_PRECISION=1 \
-        python${{ matrix.python_version }} -m pytest demos --nbmake -n auto
+        python3 -m pytest demos --nbmake -n auto
 
   frontend-tests-lightning-kokkos:
     needs: [constants, llvm, runtime, quantum]
@@ -446,7 +443,7 @@ jobs:
     - name: Install Deps
       run: |
         sudo apt-get install -y python${{ matrix.python_version }} python3-pip libomp-dev
-        sudo update-alternatives --set python /usr/bin/python${{ matrix.python_version }}
+        python3 --version | grep ${{ matrix.python_version }}
         python3 -m pip install -r requirements.txt
         python3 -m pip install .
 
@@ -482,7 +479,6 @@ jobs:
 
     - name: Run Python Pytest Tests (backend=lightning.kokkos)
       run: |
-        python3 --version | grep ${{ matrix.python_version }}
         make pytest TEST_BACKEND="lightning.kokkos" PYTHON=python3
 
   frontend-tests-openqasm-device:
@@ -504,7 +500,7 @@ jobs:
     - name: Install Deps
       run: |
         sudo apt-get install -y python${{ matrix.python_version }} python3-pip libomp-dev ninja-build make cmake clang
-        sudo update-alternatives --set python /usr/bin/python${{ matrix.python_version }}
+        python3 --version | grep ${{ matrix.python_version }}
         python3 -m pip install -r requirements.txt
         python3 -m pip install .
 
@@ -543,7 +539,6 @@ jobs:
 
     - name: Run Python Pytest Tests
       run: |
-        python3 --version | grep ${{ matrix.python_version }}
         make pytest TEST_BRAKET=LOCAL PYTHON=python3
 
   runtime-tests:
@@ -561,19 +556,18 @@ jobs:
 
       - name: Install dependencies
         run: |
-          sudo apt-get -y -q install python${{ needs.constants.outputs.primary_python_version }} python3-pip cmake ninja-build libomp-dev lcov libasan5
-          sudo update-alternatives --set python /usr/bin/python${{ needs.constants.outputs.primary_python_version }}
+            sudo apt-get -y -q install python${{ needs.constants.outputs.primary_python_version }} python3-pip cmake ninja-build libomp-dev lcov libasan5
+            python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
 
       - name: Install additional dependencies (OpenQasm device)
         if: ${{ matrix.backend == 'openqasm' }}
         run: |
-          python3 -m pip install numpy amazon-braket-sdk
-          echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
+            python3 -m pip install numpy amazon-braket-sdk
+            echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
 
       - name: Build Runtime test suite for Lightning simulator
         if: ${{ matrix.backend == 'lightning' }}
         run: |
-            python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
             PYTHON=python3 \
             C_COMPILER=$(which gcc) \
             CXX_COMPILER=$(which g++) \
@@ -584,7 +578,6 @@ jobs:
       - name: Build Runtime test suite with both Lightning and Lightning-Kokkos simulators
         if: ${{ matrix.backend == 'lightning-kokkos' }}
         run: |
-            python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
             PYTHON=python3 \
             C_COMPILER=$(which gcc) \
             CXX_COMPILER=$(which g++) \
@@ -596,7 +589,6 @@ jobs:
       - name: Build Runtime test suite for OpenQasm device
         if: ${{ matrix.backend == 'openqasm' }}
         run: |
-            python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
             PYTHON=python3 \
             C_COMPILER=$(which gcc) \
             CXX_COMPILER=$(which g++) \
@@ -614,7 +606,6 @@ jobs:
       - name: Build examples
         if: ${{ matrix.backend == 'lightning' }}
         run: |
-            python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
             PYTHON=python3 \
             C_COMPILER=$(which gcc) \
             CXX_COMPILER=$(which g++) \
