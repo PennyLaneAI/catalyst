@@ -404,7 +404,7 @@ jobs:
       run: |
         # export ASAN_OPTIONS=detect_odr_violation=0
         COVERAGE_REPORT="xml:coverage.xml -p no:warnings" \
-        make coverage-frontend
+        make coverage-frontend PYTHON=python${{ matrix.python_version }}
         mv coverage.xml coverage-${{ github.job }}.xml
 
     - name: Upload to Codecov
@@ -548,18 +548,18 @@ jobs:
 
       - name: Install dependencies
         run: |
-          sudo apt-get -y -q install python${{ matrix.python_version }} python3-pip cmake ninja-build libomp-dev lcov libasan5
+          sudo apt-get -y -q install python${{ needs.constants.outputs.primary_python_version }} python3-pip cmake ninja-build libomp-dev lcov libasan5
 
       - name: Install additional dependencies (OpenQasm device)
         if: ${{ matrix.backend == 'openqasm' }}
         run: |
-          python${{ matrix.python_version }} -m pip install numpy amazon-braket-sdk
+          python${{ needs.constants.outputs.primary_python_version }} -m pip install numpy amazon-braket-sdk
           echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
 
       - name: Build Runtime test suite for Lightning simulator
         if: ${{ matrix.backend == 'lightning' }}
         run: |
-            PYTHON=python${{ matrix.python_version }} \
+            PYTHON=python${{ needs.constants.outputs.primary_python_version }} \
             C_COMPILER=$(which gcc) \
             CXX_COMPILER=$(which g++) \
             COMPILER_LAUNCHER="" \
@@ -569,7 +569,7 @@ jobs:
       - name: Build Runtime test suite with both Lightning and Lightning-Kokkos simulators
         if: ${{ matrix.backend == 'lightning-kokkos' }}
         run: |
-            PYTHON=python${{ matrix.python_version }} \
+            PYTHON=python${{ needs.constants.outputs.primary_python_version }} \
             C_COMPILER=$(which gcc) \
             CXX_COMPILER=$(which g++) \
             COMPILER_LAUNCHER="" \
@@ -580,7 +580,7 @@ jobs:
       - name: Build Runtime test suite for OpenQasm device
         if: ${{ matrix.backend == 'openqasm' }}
         run: |
-            PYTHON=python${{ matrix.python_version }} \
+            PYTHON=python${{ needs.constants.outputs.primary_python_version }} \
             C_COMPILER=$(which gcc) \
             CXX_COMPILER=$(which g++) \
             COMPILER_LAUNCHER="" \
@@ -588,7 +588,7 @@ jobs:
             make test-runtime
 
       - name: Upload to Codecov
-        if: ${{ matrix.backend == 'lightning' && matrix.python_version == needs.constants.outputs.primary_python_version }}
+        if: ${{ matrix.backend == 'lightning' }}
         uses: codecov/codecov-action@v3
         with:
           fail_ci_if_error: true
@@ -597,8 +597,8 @@ jobs:
       - name: Build examples
         if: ${{ matrix.backend == 'lightning' }}
         run: |
-          PYTHON=python${{ matrix.python_version }} \
-          C_COMPILER=$(which gcc) \
-          CXX_COMPILER=$(which g++) \
-          COMPILER_LAUNCHER="" \
-          make examples-runtime
+            PYTHON=python${{ needs.constants.outputs.primary_python_version }} \
+            C_COMPILER=$(which gcc) \
+            CXX_COMPILER=$(which g++) \
+            COMPILER_LAUNCHER="" \
+            make examples-runtime
