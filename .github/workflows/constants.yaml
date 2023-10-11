@@ -15,6 +15,9 @@ on:
       python_versions:
         description: "List of Python versions"
         value: ${{ jobs.set-constants.outputs.python_versions }}
+      primary_python_version:
+        description: "Primary Python version for unrelated tests"
+        value: ${{ jobs.set-constants.outputs.primary_python_version }}
       rt_backends:
         description: "List of backends."
         value: ${{ jobs.set-constants.outputs.rt_backends }}
