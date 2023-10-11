@@ -89,6 +89,10 @@
   for AWS Braket remove devices.
   [(#278)](https://github.com/PennyLaneAI/catalyst/pull/278)
 
+* Avoid building `opt` from the build process as it is unnecessary.
+  Avoid downloading the `wheel` Python package as it is unnecessary.
+  [(#298)](https://github.com/PennyLaneAI/catalyst/pull/298)
+
 <h3>Breaking changes</h3>
 
 <h3>Bug fixes</h3>

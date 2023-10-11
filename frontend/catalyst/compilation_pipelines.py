@@ -777,6 +777,7 @@ class JAX_QJIT:
         return self.jaxed_function(*args, **kwargs)
 
 
+# pylint: disable=too-many-arguments
 def qjit(
     fn=None,
     *,
@@ -786,7 +787,7 @@ def qjit(
     verbose=False,
     logfile=None,
     pipelines=None,
-):
+):  # pylint: disable=too-many-arguments
     """A just-in-time decorator for PennyLane and JAX programs using Catalyst.
 
     This decorator enables both just-in-time and ahead-of-time compilation,

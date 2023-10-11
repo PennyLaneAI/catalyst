@@ -23,11 +23,32 @@ from jaxlib.mlir.dialects._ods_common import (
 # pylint: disable=missing-class-docstring
 
 
+class FromElementsOp(ir.OpView):
+    OPERATION_NAME = "tensor.from_elements"
+
+    _ODS_REGIONS = (0, True)
+
+    def __init__(self, result, elements, *, loc=None, ip=None):
+        operands = [elements]
+        super().__init__(
+            self.build_generic(
+                attributes={},
+                results=[result],
+                operands=operands,
+                successors=None,
+                regions=None,
+                loc=loc,
+                ip=ip,
+            )
+        )
+
+
 class TensorExtractOp(ir.OpView):
     OPERATION_NAME = "tensor.extract"
 
     _ODS_REGIONS = (0, True)
 
+    # pylint: disable=too-many-arguments
     def __init__(self, result, tensor, indices, *, loc=None, ip=None):
         operands = [get_op_result_or_value(tensor)]
         operands.extend(get_op_results_or_values(indices))

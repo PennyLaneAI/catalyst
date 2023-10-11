@@ -24,14 +24,12 @@ jobs:
     - name: Checkout Catalyst repo
       uses: actions/checkout@v3
 
-    # Build and cache LLVM / MLIR
-    - name: Cache LLVM Build
-      id: cache-llvm-build
-      uses: actions/cache@v3
-      with:
-        path:  llvm-build
-        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-generic-build-opt
+    - name: Set Ownership in Container
+      run: |
+        # To fix the git issue with the owner of the checkout dir
+        chown -R $(id -u):$(id -g) $PWD
 
+    # Cache external project sources
     - name: Cache LLVM Source
       id: cache-llvm-source
       uses: actions/cache@v3
@@ -40,24 +38,21 @@ jobs:
         key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-default-source
         enableCrossOsArchive: True
 
-    - name: Cache MHLO Build
-      id: cache-mhlo
-      uses: actions/cache@v3
-      with:
-        path:  mhlo-build
-        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-generic-build
-    
     - name: Cache MHLO Source
       id: cache-mhlo-source
       uses: actions/cache@v3
       with:
         path: mlir/mlir-hlo
         key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-default-source
+        enableCrossOsArchive: True
 
-    - name: Set Ownership in Container
-      run: |
-        # To fix the git issue with the owner of the checkout dir
-        chown -R $(id -u):$(id -g) $PWD
+    - name: Cache Enzyme Source
+      id: cache-enzyme-source
+      uses: actions/cache@v3
+      with:
+        path:  mlir/Enzyme
+        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-source
+        enableCrossOsArchive: True
 
     - name: Clone LLVM Submodule
       if: steps.cache-llvm-source.outputs.cache-hit != 'true'
@@ -68,20 +63,48 @@ jobs:
         path: mlir/llvm-project
 
     - name: Clone MHLO Submodule
-      if: |
-        steps.cache-mhlo.outputs.cache-hit != 'true' ||
-        steps.cache-mhlo-source.outputs.cache-hit != 'true'
+      if: steps.cache-mhlo-source.outputs.cache-hit != 'true'
       uses: actions/checkout@v3
       with:
         repository: tensorflow/mlir-hlo
         ref: ${{ needs.constants.outputs.mhlo_version }}
         path: mlir/mlir-hlo
 
+    - name: Clone Enzyme Submodule
+      if: steps.cache-enzyme-source.outputs.cache-hit != 'true'
+      uses: actions/checkout@v3
+      with:
+        repository: EnzymeAD/Enzyme
+        ref: ${{ needs.constants.outputs.enzyme_version }}
+        path: mlir/Enzyme
+
+    # Cache external project builds
+    - name: Cache LLVM Build
+      id: cache-llvm-build
+      uses: actions/cache@v3
+      with:
+        path:  llvm-build
+        key: ${{ runner.os }}-llvm-${{ needs.constants.outputs.llvm_version }}-generic-build-opt
+
+    - name: Cache MHLO Build
+      id: cache-mhlo-build
+      uses: actions/cache@v3
+      with:
+        path:  mhlo-build
+        key: ${{ runner.os }}-mhlo-${{ needs.constants.outputs.mhlo_version }}-generic-build
+
+    - name: Cache Enzyme Build
+      id: cache-enzyme-build
+      uses: actions/cache@v3
+      with:
+        path:  enzyme-build
+        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-generic-build
+
     - name: Install dependencies (CentOS)
       if: |
         steps.cache-llvm-build.outputs.cache-hit != 'true' ||
-        steps.cache-mhlo.outputs.cache-hit != 'true' ||
-        steps.cache-enzyme.outputs.cache-hit != 'true'
+        steps.cache-mhlo-build.outputs.cache-hit != 'true' ||
+        steps.cache-enzyme-build.outputs.cache-hit != 'true'
       run: |
         # Reduce wait time for repos not responding
         cat /etc/yum.conf | sed "s/\[main\]/\[main\]\ntimeout=5/g" > /etc/yum.conf
@@ -100,10 +123,11 @@ jobs:
 
         # TODO: when updating LLVM, test to see if mlir/unittests/Bytecode/BytecodeTest.cpp:55 is passing
         # and remove filter
-        LIT_FILTER_OUT="Bytecode" cmake --build llvm-build --target lld check-mlir opt -j$(nproc)
+        # This tests fails on CI/CD not locally.
+        LIT_FILTER_OUT="Bytecode" cmake --build llvm-build --target lld check-mlir 
 
     - name: Build MHLO Dialect
-      if: steps.cache-mhlo.outputs.cache-hit != 'true'
+      if: steps.cache-mhlo-build.outputs.cache-hit != 'true'
       # building with LLD is a strong requirement for mhlo
       run: |
         export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
@@ -113,43 +137,17 @@ jobs:
               -DMLIR_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir \
               -DLLVM_ENABLE_LLD=ON
 
-        cmake --build mhlo-build --target check-mlir-hlo -j$(nproc)
-
-    # Build and cache Enzyme
-    - name: Cache Enzyme Build
-      id: cache-enzyme
-      uses: actions/cache@v3
-      with:
-        path:  enzyme-build
-        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-generic-build
-
-    - name: Cache Enzyme Source
-      id: cache-enzyme-source
-      uses: actions/cache@v3
-      with:
-        path:  mlir/Enzyme
-        key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-default-source
-
-    - name: Clone Enzyme Submodule
-      if:  |
-        steps.cache-enzyme.outputs.cache-hit != 'true' ||
-        steps.cache-enzyme-source.outputs.cache-hit != 'true'
-      uses: actions/checkout@v3
-      with:
-        repository: EnzymeAD/Enzyme
-        ref: ${{ needs.constants.outputs.enzyme_version }}
-        path: mlir/Enzyme
+        cmake --build mhlo-build --target check-mlir-hlo
 
     - name: Build Enzyme
-      if: steps.cache-enzyme.outputs.cache-hit != 'true'
-
+      if: steps.cache-enzyme-build.outputs.cache-hit != 'true'
       run: |
-        export PATH=$GITHUB_WORKSPACE/llvm-build/bin:$PATH
-
         cmake -S mlir/Enzyme/enzyme -B enzyme-build -G Ninja \
-              -DLLVM_DIR=llvm-build/lib/cmake/llvm
+              -DCMAKE_BUILD_TYPE=Release \
+              -DLLVM_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/llvm \
+              -DENZYME_STATIC_LIB=ON
 
-        cmake --build enzyme-build
+        cmake --build enzyme-build --target EnzymeStatic-18
 
   catalyst-linux-wheels-x86-64:
     needs: [constants, build-dependencies]
@@ -206,7 +204,7 @@ jobs:
         fail-on-cache-miss: True
 
     - name: Get Cached MHLO Build
-      id: cache-mhlo
+      id: cache-mhlo-build
       uses: actions/cache@v3
       with:
         path:  mhlo-build
@@ -214,13 +212,13 @@ jobs:
         fail-on-cache-miss: True
 
     - name: Get Cached Enzyme Build
-      id: cache-enzyme
+      id: cache-enzyme-build
       uses: actions/cache@v3
       with:
         path:  enzyme-build
         key: ${{ runner.os }}-enzyme-${{ needs.constants.outputs.llvm_version }}-${{ needs.constants.outputs.enzyme_version }}-generic-build
         fail-on-cache-miss: True
-    
+
     - name: Get Cached Enzyme Source
       id: cache-enzyme-source
       uses: actions/cache@v3
@@ -244,7 +242,7 @@ jobs:
               -DKokkos_ENABLE_OPENMP=ON \
               -DENABLE_OPENQASM=ON
 
-        cmake --build runtime-build --target rt_capi -j$(nproc)
+        cmake --build runtime-build --target rt_capi
 
     # Build MLIR Python Bindings
     - name: Build MLIR Python Bindings
@@ -262,7 +260,8 @@ jobs:
 
         # TODO: when updating LLVM, test to see if mlir/unittests/Bytecode/BytecodeTest.cpp:55 is passing
         # and remove filter
-        LIT_FILTER_OUT="Bytecode" cmake --build llvm-build --target check-mlir opt -j$(nproc)
+        # This tests fails on CI/CD not locally.
+        LIT_FILTER_OUT="Bytecode" cmake --build llvm-build --target check-mlir
 
     # Build Quantum and Gradient Dialects
     - name: Build MLIR Dialects
@@ -276,9 +275,10 @@ jobs:
               -DMLIR_DIR=$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir \
               -DMHLO_DIR=$GITHUB_WORKSPACE/mhlo-build/lib/cmake/mlir-hlo \
               -DMHLO_BINARY_DIR=$GITHUB_WORKSPACE/mhlo-build/bin \
-              -DENZYME_SRC_DIR=$GITHUB_WORKSPACE/mlir/Enzyme \
+              -DEnzyme_DIR=$GITHUB_WORKSPACE/enzyme-build \
+              -DENZYME_SRC_DIR=$GITHUB_WORKSPACE/mlir/Enzyme
 
-        cmake --build quantum-build --target check-dialects -j$(nproc)
+        cmake --build quantum-build --target check-dialects compiler_driver
 
     - name: Build wheel
       run: |
@@ -302,12 +302,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest]
+        os: [ubuntu-latest, ubuntu-20.04]
         python_version: ${{ fromJson(needs.constants.outputs.python_versions) }}
-        container: ["quay.io/pypa/manylinux2014_x86_64", "ubuntu-20.04", "ubuntu-22.04"]
 
     # To check all wheels for supported python3 versions
-    name: Test Wheels (Python ${{ matrix.python_version }}) on ${{ matrix.container }}
+    name: Test Wheels (Python ${{ matrix.python_version }}) on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -327,7 +326,7 @@ jobs:
 
     - name: Install Python dependencies
       run: |
-        python${{ matrix.python_version }} -m pip install wheel pytest pytest-xdist
+        python${{ matrix.python_version }} -m pip install pytest pytest-xdist
         python${{ matrix.python_version }} -m pip install tensorflow-cpu  # for autograph tests
 
     - name: Install Catalyst

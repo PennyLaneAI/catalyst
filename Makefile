@@ -80,28 +80,21 @@ test-demos:
 
 wheel:
 	echo "INSTALLED = True" > $(MK_DIR)/frontend/catalyst/_configuration.py
-	# Copy bins to frontend/catalyst/bin
-	mkdir -p $(MK_DIR)/frontend/catalyst/bin
-	cp $(LLVM_BUILD_DIR)/bin/llc $(MK_DIR)/frontend/catalyst/bin
-	cp $(LLVM_BUILD_DIR)/bin/opt $(MK_DIR)/frontend/catalyst/bin
-	cp $(LLVM_BUILD_DIR)/bin/mlir-translate $(MK_DIR)/frontend/catalyst/bin
-	cp $(MHLO_BUILD_DIR)/bin/mlir-hlo-opt $(MK_DIR)/frontend/catalyst/bin
-	cp $(DIALECTS_BUILD_DIR)/bin/quantum-opt $(MK_DIR)/frontend/catalyst/bin
+
 	# Copy libs to frontend/catalyst/lib
 	mkdir -p $(MK_DIR)/frontend/catalyst/lib
 	cp $(RT_BUILD_DIR)/lib/librt_backend.* $(MK_DIR)/frontend/catalyst/lib
 	cp $(RT_BUILD_DIR)/lib/librt_capi.* $(MK_DIR)/frontend/catalyst/lib
 	cp $(COPY_FLAGS) $(LLVM_BUILD_DIR)/lib/libmlir_float16_utils.* $(MK_DIR)/frontend/catalyst/lib
 	cp $(COPY_FLAGS) $(LLVM_BUILD_DIR)/lib/libmlir_c_runner_utils.* $(MK_DIR)/frontend/catalyst/lib
-	# Copy enzyme to frontend
-	cp $(COPY_FLAGS) $(ENZYME_BUILD_DIR)/Enzyme/LLVMEnzyme-18.* $(MK_DIR)/frontend/catalyst/lib
-	# Copy mlir bindings to frontend/mlir_quantum
+
+	# Copy mlir bindings & compiler driver to frontend/mlir_quantum
 	mkdir -p $(MK_DIR)/frontend/mlir_quantum/dialects
 	cp -R $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/runtime $(MK_DIR)/frontend/mlir_quantum/runtime
-	cp $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/ir.py $(MK_DIR)/frontend/mlir_quantum/
-	for file in arith tensor scf gradient quantum _ods_common ; do \
+	for file in gradient quantum _ods_common ; do \
 		cp $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/dialects/*$${file}* $(MK_DIR)/frontend/mlir_quantum/dialects ; \
 	done
+	cp $(COPY_FLAGS) $(DIALECTS_BUILD_DIR)/python_packages/quantum/mlir_quantum/compiler_driver.so $(MK_DIR)/frontend/mlir_quantum/
 	find $(MK_DIR)/frontend -type d -name __pycache__ -exec rm -rf {} +
 
 	$(PYTHON) $(MK_DIR)/setup.py bdist_wheel
