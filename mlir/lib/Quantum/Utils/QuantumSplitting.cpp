@@ -93,8 +93,6 @@ void AugmentedCircuitGenerator::generate(Region &region, OpBuilder &builder)
         }
         else if (auto gate = dyn_cast<quantum::ParametrizedGate>(op)) {
             ValueRange params = gate.getAllParams();
-            if (params.empty())
-                continue;
 
             for (Value param : params) {
                 Location loc = gate.getLoc();

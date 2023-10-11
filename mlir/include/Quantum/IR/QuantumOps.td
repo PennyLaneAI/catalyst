@@ -287,10 +287,6 @@ def QubitUnitaryOp : Gate_Op<"unitary", [NoMemoryEffect, ParametrizedGate]> {
             mlir::ValueRange temp = {getMatrix()};
             return temp;
         }
-
-        size_t getParamOperandIdx() {
-            return 0;
-        }
     }];
 
     let hasVerifier = 1;
