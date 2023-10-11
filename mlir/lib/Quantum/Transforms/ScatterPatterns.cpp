@@ -125,13 +125,12 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
             Type resultTy = RankedTensorType::get(totalShape, rewriter.getIndexType());
             allUpdatesIndicesTensor =
                 rewriter.create<tensor::FromElementsOp>(loc, resultTy, allUpdatesIndices);
-            size = allUpdatesIndices.size();
+            size = allUpdatesIndices.size() / updatesShapeVector.size();
         }
 
         // Create the loop values
         Value c0 = rewriter.create<index::ConstantOp>(loc, 0);
-        Value sizeAllUpdatesIndices =
-            rewriter.create<index::ConstantOp>(loc, size);
+        Value sizeAllUpdatesIndices = rewriter.create<index::ConstantOp>(loc, size);
         Value c1 = rewriter.create<index::ConstantOp>(loc, 1);
 
         // Create a SCF for op
@@ -153,7 +152,8 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
                             auto shape = updateType.getShape();
                             // Offset
                             std::vector<int64_t> offsets(rank, 0);
-                            std::vector<Value> dynOffsets = {};
+                            offsets[0] = ShapedType::kDynamic;
+                            std::vector<Value> dynOffsets = {i};
 
                             // Size
                             std::vector<int64_t> sizes = shape;
@@ -172,7 +172,6 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
                             updatesIndices = builder.create<tensor::ExtractSliceOp>(
                                 loc, resultType, allUpdatesIndicesTensor, dynOffsets, dynSizes,
                                 dynStrides, offsets, sizes, strides);
-
                         }
 
                         // Scatter update
@@ -209,9 +208,8 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
                             if (isa<RankedTensorType>(updatesIndices.getType())) {
                                 RankedTensorType updateType =
                                     updatesIndices.getType().cast<RankedTensorType>();
-                                updateType.dump();
-                                for (int64_t index = 0; index < updateType.getShape()[0];
-                                     ++index) {
+
+                                for (int64_t index = 0; index < updateType.getShape()[0]; ++index) {
                                     Value indexValue =
                                         builder.create<index::ConstantOp>(loc, index);
                                     Value value = builder.create<tensor::ExtractOp>(
@@ -385,8 +383,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
                     results.push_back(addValueCasted);
                 }
                 else {
-                    Value indexValue = builder.create<index::ConstantOp>(loc, indexUpdate);
-                    results.push_back(indexValue);
+                    results.push_back(indexUpdate);
                 }
             }
             return results;
