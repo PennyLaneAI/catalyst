@@ -132,23 +132,40 @@ class AdjointGenerator {
                             continue;
                         }
 
-                        assert(isa<RankedTensorType>(paramType) &&
-                               "Parameter type cannot be handled");
-                        Type aType = paramType;
-                        // aType must be a tensor<NxNxcomplex<f64>>
-                        auto aTensorType = aType.cast<RankedTensorType>();
+                        // Sanitizing inputs.
+                        // Technically we know for a fact that none of this will ever issue an
+                        // error. This is because QubitUnitary is guaranteed to have a
+                        // tensor<NxNxcomplex<f64>> But this code in the future may be extended to
+                        // support other types. Hence the sanitization.
+                        if (!isa<RankedTensorType>(paramType)) {
+                            gate.emitOpError() << "Unexpected type.";
+                        }
+
+                        auto aTensorType = paramType.cast<RankedTensorType>();
                         ArrayRef<int64_t> shape = aTensorType.getShape();
 
-                        // Invariants, this is developer documentation
-                        assert(shape.size() == 2 && "Unexpected tensor shape in QubitUnitaryOp.");
-                        assert(shape[0] == shape[1] && "QubitUnitaryOp is not square matrix.");
-                        assert(shape[0] > 1 && "QubitUnitaryOp has invalid tensor shape.");
+                        if (2 != shape.size()) {
+                            gate.emitOpError() << "Unexpected tensor shape in QubitUnitaryOp";
+                        }
+                        if (shape[0] != shape[1]) {
+                            gate.emitOpError() << "QubitUnitaryOp is not square matrix.";
+                        }
+                        if (shape[0] < 2) {
+                            gate.emitOpError() << "QubitUnitaryOp has invalid tensor shape.";
+                        }
                         int64_t n = shape[0];
                         bool isPowerOfTwo = ((n & (n - 1)) == 0);
-                        assert(isPowerOfTwo && "QubitUnitaryOp has invalid tensor shape.");
-
-                        OpBuilder::InsertionGuard insertionGuard(builder);
-                        builder.setInsertionPoint(clone);
+                        if (!isPowerOfTwo) {
+                            gate.emitOpError() << "QubitUnitaryOp is not of a valid size.";
+                        }
+                        Type elementType = aTensorType.getElementType();
+                        if (!isa<ComplexType>(elementType)) {
+                            gate.emitOpError() << "QubitUnitaryOp does not hold complex types.";
+                        }
+                        Type f64 = elementType.cast<ComplexType>().getElementType();
+                        if (!f64.isF64()) {
+                            gate.emitOpError() << "QubitUnitaryOp does not hold complex F64 types.";
+                        }
 
                         // Constants
                         auto loc = parametrizedGate.getLoc();
@@ -164,8 +181,8 @@ class AdjointGenerator {
                         Value lowerBound = c0;
                         Value upperBound = N;
                         Value step = c1;
-                        Type type = aTensorType.getElementType();
-                        Value beginningTensor = builder.create<tensor::EmptyOp>(loc, shape, type);
+                        Value beginningTensor =
+                            builder.create<tensor::EmptyOp>(loc, shape, elementType);
                         // This time, we are in reverse, so we need to start
                         // with N-1 since MLIR does not allow for loops with negative step sizes.
                         SmallVector<Value> initialValues = {beginningTensor};
@@ -199,7 +216,7 @@ class AdjointGenerator {
                                 Value imag = builder.create<ListPopOp>(loc, cache.paramVector);
                                 Value real = builder.create<ListPopOp>(loc, cache.paramVector);
                                 Value element =
-                                    builder.create<complex::CreateOp>(loc, type, real, imag);
+                                    builder.create<complex::CreateOp>(loc, elementType, real, imag);
 
                                 Value j = jForLoop.getInductionVar();
                                 Value jPlusOne = builder.create<index::AddOp>(loc, j, c1);
