@@ -284,8 +284,7 @@ def QubitUnitaryOp : Gate_Op<"unitary", [NoMemoryEffect, ParametrizedGate]> {
 
     let extraClassDeclaration = extraBaseClassDeclaration # [{
         mlir::ValueRange getAllParams() {
-            mlir::ValueRange temp = {getMatrix()};
-            return temp;
+            return getODSOperands(0);
         }
     }];
 
