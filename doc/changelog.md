@@ -98,6 +98,9 @@
 
 <h3>Bug fixes</h3>
 
+* Remove undocumented package dependency on the zlib/zstd compression library.
+  [(#308)](https://github.com/PennyLaneAI/catalyst/pull/308)
+
 * Fix filesystem issue when compiling multiple functions with the same name and
   `keep_intermediate=True`.
   [(#306)](https://github.com/PennyLaneAI/catalyst/pull/306)
