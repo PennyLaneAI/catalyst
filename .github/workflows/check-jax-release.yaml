@@ -10,13 +10,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  constants:
-    name: "Set build matrix"
-    uses: ./.github/workflows/constants.yaml
-
   check-jax:
     name: Build/Test Catalyst against JAX
-    needs: [constants]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
