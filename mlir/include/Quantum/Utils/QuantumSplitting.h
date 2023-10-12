@@ -70,6 +70,11 @@ class AugmentedCircuitGenerator {
                                        cache.wireVector);
         }
     }
+
+    void cacheGate(quantum::ParametrizedGate, mlir::OpBuilder &builder);
 };
+
+void verifyTypeIsCacheable(mlir::Type ty, mlir::Operation *gate);
+
 } // namespace quantum
 } // namespace catalyst
