@@ -23,6 +23,7 @@ import subprocess
 import sys
 import tempfile
 import warnings
+from copy import deepcopy
 from dataclasses import dataclass
 from io import TextIOWrapper
 from typing import Any, List, Optional
@@ -51,6 +52,8 @@ class CompileOptions:
             to a list of MLIR passes.
         autograph (Optional[bool]): flag indicating whether experimental autograph support is to
             be enabled.
+        lower_to_llvm (Optional[bool]): flag indicating whether to attempt the LLVM lowering after
+            the main compilation pipeline is complete. Default is ``True``.
     """
 
     verbose: Optional[bool] = False
@@ -59,6 +62,18 @@ class CompileOptions:
     keep_intermediate: Optional[bool] = False
     pipelines: Optional[List[Any]] = None
     autograph: Optional[bool] = False
+    lower_to_llvm: Optional[bool] = True
+
+    def __deepcopy__(self, memo):
+        """Make a deep copy of all fields of a CompileOptions object except the logfile, which is
+        copied directly"""
+        return CompileOptions(
+            **{
+                k: (deepcopy(v) if k != "logfile" else self.logfile)
+                for k, v in self.__dict__.items()
+                if k != "logfile"
+            }
+        )
 
 
 def run_writing_command(command: List[str], compile_options: Optional[CompileOptions]) -> None:
@@ -317,18 +332,12 @@ class Compiler:
         self,
         ir: str,
         module_name: str,
-        pipelines=None,
-        lower_to_llvm=True,
     ):
         """Compile a shared object from a textual IR (MLIR or LLVM).
 
         Args:
             ir (str): Textual MLIR to be compiled
             module_name (str): Module name to use for naming
-            pipelines (list, optional): Custom compilation pipelines configuration. The default is
-                                        None which means to use the default pipelines config.
-            lower_to_llvm (bool, optional): Whether to lower to LLVM after finishing processing of
-                                            the pipelines. Defaults to True.
 
         Returns:
             output_filename (str): Output file name. For the default pipeline this would be the
@@ -340,11 +349,10 @@ class Compiler:
                ret_type_name (str) Inferred main function result type name
         """
         pipelines = (
-            pipelines
-            if pipelines is not None
-            else (
-                self.options.pipelines if self.options.pipelines is not None else DEFAULT_PIPELINES
-            )
+            self.options.pipelines if self.options.pipelines is not None else DEFAULT_PIPELINES
+        )
+        lower_to_llvm = (
+            self.options.lower_to_llvm if self.options.lower_to_llvm is not None else False
         )
         if self.options.keep_intermediate:
             workspace = os.path.abspath(os.path.join(os.getcwd(), module_name))
@@ -415,22 +423,6 @@ class Compiler:
             module_name=str(mlir_module.operation.attributes["sym_name"]).replace('"', ""),
             **kwargs,
         )
-
-    def canonicalize(self, mlir_module: str) -> str:
-        """Canonicalize the sources
-        Args:
-            mlir_module (str): The MLIR module to be canonicalized
-
-        Returns
-            (str): output MLIR module
-        """
-
-        _, mlir, _ = self.run(
-            mlir_module,
-            lower_to_llvm=False,
-            pipelines=[("pipeline", ["canonicalize"])],
-        )
-        return mlir
 
     def get_output_of(self, pipeline) -> Optional[str]:
         """Get the output IR of a pipeline.

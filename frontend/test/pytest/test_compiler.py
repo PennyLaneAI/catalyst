@@ -217,8 +217,10 @@ class TestCompilerState:
         mlir_module, _, _, _ = trace_to_mlir(workflow)
         # This means that we are not running any pass.
         pipelines = []
-        identity_compiler = Compiler(CompileOptions(keep_intermediate=True))
-        identity_compiler.run(mlir_module, pipelines=pipelines, lower_to_llvm=False)
+        identity_compiler = Compiler(
+            CompileOptions(keep_intermediate=True, pipelines=pipelines, lower_to_llvm=False)
+        )
+        identity_compiler.run(mlir_module)
         directory = os.path.join(os.getcwd(), workflow.__name__)
         assert directory == identity_compiler.last_workspace
         assert os.path.exists(directory)
@@ -238,8 +240,10 @@ class TestCompilerState:
 
         mlir_module, _, _, _ = trace_to_mlir(workflow)
         # This means that we are not running any pass.
-        identity_compiler = Compiler(CompileOptions(keep_intermediate=True))
-        identity_compiler.run(mlir_module, pipelines=[], lower_to_llvm=False)
+        identity_compiler = Compiler(
+            CompileOptions(keep_intermediate=True, pipelines=[], lower_to_llvm=False)
+        )
+        identity_compiler.run(mlir_module)
         directory = os.path.join(os.getcwd(), workflow.__name__)
         assert directory == identity_compiler.last_workspace
         files = os.listdir(directory)

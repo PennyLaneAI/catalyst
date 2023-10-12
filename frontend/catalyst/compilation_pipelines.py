@@ -20,6 +20,7 @@ import functools
 import inspect
 import typing
 import warnings
+from copy import deepcopy
 from enum import Enum
 
 import jax
@@ -537,7 +538,11 @@ class QJIT:
         inject_functions(mlir_module, ctx)
         self._jaxpr = jaxpr
 
-        self._mlir = self.compiler.canonicalize(mlir_module)
+        canonicalizer_options = deepcopy(self.compile_options)
+        canonicalizer_options.pipelines = [("pipeline", ["canonicalize"])]
+        canonicalizer_options.lower_to_llvm = False
+        canonicalizer = Compiler(canonicalizer_options)
+        _, self._mlir, _ = canonicalizer.run(mlir_module)
         return mlir_module
 
     def compile(self):
