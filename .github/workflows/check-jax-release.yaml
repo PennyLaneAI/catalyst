@@ -38,11 +38,17 @@ jobs:
         python3 -m pip install --upgrade jaxlib
         python3 .github/workflows/set_dep_versions.py $(python3 -c "import jaxlib; print(jaxlib.__version__)")
 
+    - name: Re-read versions
+      run: |
+        echo "LLVM_REVISION=$(grep llvm .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_ENV
+        echo "MHLO_REVISION=$(grep mhlo .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_ENV
+        echo "ENZYME_REVISION=$(grep enzyme .dep-versions | awk -F '=' '{ print $2 }')" >> $GITHUB_ENV
+
     - name: Clone LLVM repo
       uses: actions/checkout@v3
       with:
         repository: llvm/llvm-project
-        ref: ${{ needs.constants.outputs.llvm_version }}
+        ref: ${{ env.LLVM_REVISION }}
         path: mlir/llvm-project
 
     - name: Build LLVM
@@ -57,12 +63,23 @@ jobs:
       uses: actions/checkout@v3
       with:
         repository: tensorflow/mlir-hlo
-        ref: ${{ needs.constants.outputs.mhlo_version }}
+        ref: ${{ env.MHLO_REVISION }}
         path: mlir/mlir-hlo
 
     - name: Build MHLO
       run: |
         COMPILER_LAUNCHER="" make mhlo
+
+    - name: Clone Enzyme repo
+      uses: actions/checkout@v3
+      with:
+        repository: EnzymeAD/Enzyme
+        ref: ${{ env.ENZYME_REVISION }}
+        path: mlir/Enzyme
+
+    - name: Build Enzyme
+      run: |
+        COMPILER_LAUNCHER="" make enzyme
 
     - name: Build Frontend
       run: |

@@ -22,6 +22,7 @@ import sys
 import requests
 
 jax_version = sys.argv[1]
+dep_versions_path = os.path.join(os.path.dirname(__file__), "../../.dep-versions")
 
 try:
     url = f"https://raw.githubusercontent.com/google/jax/jaxlib-v{jax_version}/WORKSPACE"
@@ -49,14 +50,17 @@ url = f"https://api.github.com/search/commits?q=repo:tensorflow/mlir-hlo+{piper_
 response = requests.get(url).json()
 hlo_commit = response["items"][0]["sha"]
 
-with open(
-    os.path.join(os.path.dirname(__file__), "../../.dep-versions"), "w", encoding="UTF-8"
-) as f:
+existing_text = open(dep_versions_path).read()
+match = re.search(r'enzyme=([a-zA-Z0-9]*)', existing_text)
+enzyme_commit = match.group(1)
+
+with open(dep_versions_path, "w", encoding="UTF-8") as f:
     f.write(
         f"""\
 # Update the version check in catalyst.__init__ when changing the JAX version.
 jax={jax_version}
 mhlo={hlo_commit}
 llvm={llvm_commit}
+enzyme={enzyme_commit}
 """
     )
