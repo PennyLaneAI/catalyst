@@ -23,10 +23,16 @@ import requests
 
 jax_version = sys.argv[1]
 
-url = f"https://raw.githubusercontent.com/google/jax/jaxlib-v{jax_version}/WORKSPACE"
-response = requests.get(url)
-match = re.search(r'strip_prefix = "xla-([a-zA-Z0-9]*)"', response.text)
-xla_commit = match.group(1)
+try:
+    url = f"https://raw.githubusercontent.com/google/jax/jaxlib-v{jax_version}/WORKSPACE"
+    response = requests.get(url)
+    match = re.search(r'strip_prefix = "xla-([a-zA-Z0-9]*)"', response.text)
+    xla_commit = match.group(1)
+except:
+    url = f"https://raw.githubusercontent.com/google/jax/jaxlib-v{jax_version}/third_party/xla/workspace.bzl"
+    response = requests.get(url)
+    match = re.search(r'XLA_COMMIT = "([a-zA-Z0-9]*)"', response.text)
+    xla_commit = match.group(1)
 
 url = f"https://raw.githubusercontent.com/openxla/xla/{xla_commit}/third_party/llvm/workspace.bzl"
 response = requests.get(url)
