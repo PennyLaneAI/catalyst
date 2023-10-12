@@ -57,7 +57,7 @@ response = requests.get(url).json()
 hlo_commit = response["items"][0]["sha"]
 
 existing_text = open(dep_versions_path, "r", encoding="UTF-8").read()
-match = re.search(r'enzyme=([a-zA-Z0-9]*)', existing_text)
+match = re.search(r"enzyme=([a-zA-Z0-9]*)", existing_text)
 enzyme_commit = match.group(1)
 
 with open(dep_versions_path, "w", encoding="UTF-8") as f:
