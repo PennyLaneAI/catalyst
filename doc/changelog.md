@@ -6,7 +6,7 @@
   [(#273)](https://github.com/PennyLaneAI/catalyst/pull/273)
 
   ```python
-  
+
   @qjit
   def add_multiply(l: jax.core.ShapedArray((3,), dtype=float), idx: int):
       res = l.at[idx].multiply(3)
@@ -97,6 +97,9 @@
 <h3>Breaking changes</h3>
 
 <h3>Bug fixes</h3>
+
+* Remove undocumented package dependency on the zlib/zstd compression library.
+  [(#308)](https://github.com/PennyLaneAI/catalyst/pull/308)
 
 * Add support for applying the `adjoint` operation to `QubitUnitary` gates.
   `QubitUnitary` was not able to be `adjoint`ed when the variable holding the unitary matrix might
