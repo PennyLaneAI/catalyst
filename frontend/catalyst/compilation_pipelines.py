@@ -44,11 +44,10 @@ from catalyst.pennylane_extensions import QFunc
 from catalyst.utils import wrapper  # pylint: disable=no-name-in-module
 from catalyst.utils.c_template import get_template, mlir_type_to_numpy_type
 from catalyst.utils.contexts import EvaluationContext
-from catalyst.utils.filesystem import Directory, WorkspaceManager
+from catalyst.utils.filesystem import WorkspaceManager
 from catalyst.utils.gen_mlir import inject_functions
 from catalyst.utils.patching import Patcher
 
-# pylint: disable=too-many-lines
 # Required for JAX tracer objects as PennyLane wires.
 # pylint: disable=unnecessary-lambda
 setattr(jax.interpreters.partial_eval.DynamicJaxprTracer, "__hash__", lambda x: id(x))
@@ -796,7 +795,6 @@ class JAX_QJIT:
         return self.jaxed_function(*args, **kwargs)
 
 
-# pylint: disable=too-many-arguments
 def qjit(
     fn=None,
     *,
