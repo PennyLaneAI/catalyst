@@ -34,7 +34,6 @@ jobs:
         python3 -m venv _venv
         . _venv/bin/activate
         python3 -m pip install -r requirements.txt
-        python3 -m pip install -e .
 
     - name: Discover JAX dep hashes
       if: matrix.interop
@@ -69,30 +68,35 @@ jobs:
         ref: ${{ env.ENZYME_REVISION }}
         path: mlir/Enzyme
 
+    - name: Build Runtime
+      run: |
+        COMPILER_LAUNCHER="" \
+        make runtime
+
     - name: Build LLVM
       run: |
-        COMPILER_LAUNCHER="" make llvm
+        COMPILER_LAUNCHER="" \
+        make llvm
 
     - name: Build MHLO
       run: |
-        COMPILER_LAUNCHER="" make mhlo
+        COMPILER_LAUNCHER="" \
+        make mhlo
 
     - name: Build Enzyme
       run: |
-        COMPILER_LAUNCHER="" make enzyme
+        COMPILER_LAUNCHER="" \
+        make enzyme
 
     - name: Build MLIR Dialects
       run: |
-        COMPILER_LAUNCHER="" make dialects
+        COMPILER_LAUNCHER="" \
+        make dialects
 
     - name: Build Frontend
       run: |
+        COMPILER_LAUNCHER="" \
         make frontend
-        python3 -m pip install --upgrade jax jaxlib
-
-    - name: Build Runtime
-      run: |
-        make runtime
 
     - name: Run Frontend LIT suite
       run: |
