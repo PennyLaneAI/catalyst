@@ -15,6 +15,9 @@
 This module computes commit hashes for LLVM and MLIR-HLO based on a given JAX version.
 """
 
+# pylint: disable=line-too-long
+# pylint: disable=anomalous-backslash-in-string
+
 import os
 import re
 import sys
@@ -33,7 +36,7 @@ try:
     response = requests.get(url)
     match = re.search(r'strip_prefix = "xla-([a-zA-Z0-9]*)"', response.text)
     xla_commit = match.group(1)
-except:
+except Exception:
     url = f"https://raw.githubusercontent.com/google/jax/jaxlib-v{jax_version}/third_party/xla/workspace.bzl"
     response = requests.get(url)
     match = re.search(r'XLA_COMMIT = "([a-zA-Z0-9]*)"', response.text)
@@ -54,7 +57,7 @@ url = f"https://api.github.com/search/commits?q=repo:tensorflow/mlir-hlo+{piper_
 response = requests.get(url).json()
 hlo_commit = response["items"][0]["sha"]
 
-existing_text = open(dep_versions_path).read()
+existing_text = open(dep_versions_path, "r", encoding="UTF-8").read()
 match = re.search(r'enzyme=([a-zA-Z0-9]*)', existing_text)
 enzyme_commit = match.group(1)
 
