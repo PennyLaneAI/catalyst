@@ -109,6 +109,7 @@
   The unitary matrix is later reconstructed from the array list and `QubitUnitary` can be executed
   in the `adjoint`ed context.
   [(#304)](https://github.com/PennyLaneAI/catalyst/pull/304)
+  [(#310)](https://github.com/PennyLaneAI/catalyst/pull/310)
 
 * Fix linking errors on Linux systems without a Clang installation.
   [(#276)](https://github.com/PennyLaneAI/catalyst/pull/276)
