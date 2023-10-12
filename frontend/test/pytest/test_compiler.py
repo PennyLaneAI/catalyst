@@ -19,7 +19,6 @@ Unit tests for LinkerDriver class
 import os
 import pathlib
 import platform
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -29,8 +28,8 @@ import pennylane as qml
 import pytest
 
 from catalyst import qjit
+from catalyst.compilation_pipelines import WorkspaceManager
 from catalyst.compiler import CompileOptions, Compiler, LinkerDriver
-from catalyst.jax_tracer import trace_to_mlir
 from catalyst.pennylane_extensions import measure, qfunc
 from catalyst.utils.exceptions import CompileError
 
@@ -75,9 +74,7 @@ class TestCompilerOptions:
         assert ("[SYSTEM]" in capture) if verbose else ("[SYSTEM]" not in capture)
         assert ("[LIB]" in capture) if verbose else ("[LIB]" not in capture)
         assert ("Dumping" in capture) if (verbose and keep_intermediate) else True
-        if keep_intermediate:
-            directory = os.path.join(os.getcwd(), workflow.__name__)
-            shutil.rmtree(directory)
+        workflow.workspace.cleanup()
 
 
 class TestCompilerWarnings:
@@ -108,11 +105,21 @@ class TestCompilerErrors:
             with pytest.raises(CompileError, match="Unable to link .*"):
                 LinkerDriver.run(invalid_file.name, fallback_compilers=["cc"])
 
+    def test_attempts_to_get_file_on_invalid_dir(self):
+        """Test return value if user request intermediate file on a dir that doesn't exist.
+        Or doesn't make sense.
+        """
+        compiler = Compiler()
+        with pytest.raises(AssertionError, match="expects a Directory type"):
+            compiler.get_output_of(None, "inexistent-file")
+
     def test_attempts_to_get_inexistent_intermediate_file(self):
         """Test return value if user request intermediate file that doesn't exist."""
         compiler = Compiler()
-        result = compiler.get_output_of("inexistent-file")
+        workspace = WorkspaceManager.get_or_create_workspace("a-name")
+        result = compiler.get_output_of(workspace, "inexistent-file")
         assert result is None
+        workspace.cleanup()
 
     def test_runtime_error(self, backend):
         """Test with non-default flags."""
@@ -132,9 +139,6 @@ void _catalyst_pyface_jit_cpp_exception_test(void*, void*) {
 
         class MockCompiler(Compiler):
             """Mock compiler class"""
-
-            def __init__(self, co):
-                super().__init__(co)
 
             def run_from_ir(self, *_args, **_kwargs):
                 with tempfile.TemporaryDirectory() as workspace:
@@ -176,69 +180,46 @@ class TestCompilerState:
     def test_print_stages(self, backend):
         """Test that after compiling the intermediate files exist."""
 
+        @qjit(keep_intermediate=True)
         @qml.qnode(qml.device(backend, wires=1))
         def workflow():
             qml.PauliX(wires=0)
             return qml.state()
 
-        mlir_module, _, _, _ = trace_to_mlir(workflow)
-        compiler = Compiler(CompileOptions(keep_intermediate=True))
-        compiler.run(mlir_module)
-        assert compiler.get_output_of("HLOLoweringPass")
-        assert compiler.get_output_of("QuantumCompilationPass")
-        assert compiler.get_output_of("BufferizationPass")
-        assert compiler.get_output_of("MLIRToLLVMDialect")
-        assert compiler.get_output_of("PreEnzymeOpt")
-        assert compiler.get_output_of("Enzyme")
-        assert compiler.get_output_of("None-existing-pipeline") is None
-        shutil.rmtree(compiler.last_workspace)
+        assert workflow.compiler.get_output_of(workflow.workspace, "HLOLoweringPass")
+        assert workflow.compiler.get_output_of(workflow.workspace, "QuantumCompilationPass")
+        assert workflow.compiler.get_output_of(workflow.workspace, "BufferizationPass")
+        assert workflow.compiler.get_output_of(workflow.workspace, "MLIRToLLVMDialect")
+        assert workflow.compiler.get_output_of(workflow.workspace, "PreEnzymeOpt")
+        assert workflow.compiler.get_output_of(workflow.workspace, "Enzyme")
+        workflow.workspace.cleanup()
 
-        compiler = Compiler(CompileOptions(keep_intermediate=False))
-        compiler.run(mlir_module)
-        assert compiler.get_output_of("MHLOPass") is None
-        assert compiler.get_output_of("None-existing-pipeline") is None
+    def test_print_nonexistent_stages(self, backend):
+        """What happens if we attempt to print something that doesn't exist?"""
 
-    def test_workspace_keep_intermediate(self, backend):
-        """Test cwd's has been modified with folder containing intermediate results"""
-
-        @qjit
+        @qjit(keep_intermediate=True)
         @qml.qnode(qml.device(backend, wires=1))
         def workflow():
             qml.PauliX(wires=0)
             return qml.state()
 
-        mlir_module, _, _, _ = trace_to_mlir(workflow)
-        # This means that we are not running any pass.
-        pipelines = []
-        identity_compiler = Compiler(CompileOptions(keep_intermediate=True))
-        identity_compiler.run(mlir_module, pipelines=pipelines, lower_to_llvm=False)
-        directory = os.path.join(os.getcwd(), workflow.__name__)
-        assert directory == identity_compiler.last_workspace
-        assert os.path.exists(directory)
-        files = os.listdir(directory)
-        # The directory is non-empty. Should at least contain the original .mlir file
-        assert files
-        shutil.rmtree(directory)
+        assert workflow.compiler.get_output_of(workflow.workspace, "None-existing-pipeline") is None
+        workflow.workspace.cleanup()
 
-    def test_workspace_temporary(self):
-        """Test temporary directory has been modified with folder containing intermediate results"""
+    def test_workspace(self):
+        """Test directory has been modified with folder containing intermediate results"""
 
-        @qjit
+        @qjit(keep_intermediate=True, target="mlir")
         @qml.qnode(qml.device("lightning.qubit", wires=1))
         def workflow():
             qml.PauliX(wires=0)
             return qml.state()
 
-        mlir_module, _, _, _ = trace_to_mlir(workflow)
-        # This means that we are not running any pass.
-        identity_compiler = Compiler(CompileOptions(keep_intermediate=True))
-        identity_compiler.run(mlir_module, pipelines=[], lower_to_llvm=False)
         directory = os.path.join(os.getcwd(), workflow.__name__)
-        assert directory == identity_compiler.last_workspace
         files = os.listdir(directory)
         # The directory is non-empty. Should at least contain the original .mlir file
         assert files
-        shutil.rmtree(directory)
+        workflow.workspace.cleanup()
 
     def test_compiler_driver_with_output_name(self):
         """Test with non-default output name."""

@@ -6,7 +6,7 @@
   [(#273)](https://github.com/PennyLaneAI/catalyst/pull/273)
 
   ```python
-  
+
   @qjit
   def add_multiply(l: jax.core.ShapedArray((3,), dtype=float), idx: int):
       res = l.at[idx].multiply(3)
@@ -98,6 +98,10 @@
 
 <h3>Bug fixes</h3>
 
+* Fix filesystem issue when compiling multiple functions with the same name and
+  `keep_intermediate=True`.
+  [(#306)](https://github.com/PennyLaneAI/catalyst/pull/306)
+
 * Add support for applying the `adjoint` operation to `QubitUnitary` gates.
   `QubitUnitary` was not able to be `adjoint`ed when the variable holding the unitary matrix might
   change. This can happen, for instance, inside of a for loop.
@@ -105,6 +109,9 @@
   The unitary matrix is later reconstructed from the array list and `QubitUnitary` can be executed
   in the `adjoint`ed context.
   [(#304)](https://github.com/PennyLaneAI/catalyst/pull/304)
+
+* Fix linking errors on Linux systems without a Clang installation.
+  [(#276)](https://github.com/PennyLaneAI/catalyst/pull/276)
 
 <h3>Contributors</h3>
 
