@@ -30,6 +30,7 @@ from mlir_quantum.compiler_driver import run_compiler_driver
 
 from catalyst._configuration import INSTALLED
 from catalyst.utils.exceptions import CompileError
+from catalyst.utils.filesystem import Directory
 
 package_root = os.path.dirname(__file__)
 
@@ -406,10 +407,6 @@ class Compiler:
         Returns
             (Optional[str]): output IR
         """
-        # Here to avoid circular dependency
-        # pylint: disable=import-outside-toplevel
-        from catalyst.utils.filesystem import Directory
-
         assert isinstance(workspace, Directory), "get_output_of expects a Directory type."
         assert workspace.is_dir(), "We expect a directory."
 
