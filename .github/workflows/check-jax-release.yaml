@@ -34,6 +34,9 @@ jobs:
         python3 -m venv _venv
         . _venv/bin/activate
         python3 -m pip install -r requirements.txt
+        echo "PATH=${PATH}" >> $GITHUB_ENV
+        echo "VIRTUAL_ENV=${VIRTUAL_ENV}" >> $GITHUB_ENV
+        echo "COMPILER_LAUNCHER=" >> $GITHUB_ENV
 
     - name: Discover JAX dep hashes
       if: matrix.interop
@@ -70,51 +73,36 @@ jobs:
 
     - name: Build Runtime
       run: |
-        . _venv/bin/activate
-        COMPILER_LAUNCHER="" \
         make runtime
 
     - name: Build LLVM
       run: |
-        . _venv/bin/activate
-        COMPILER_LAUNCHER="" \
         make llvm
 
     - name: Build MHLO
       run: |
-        . _venv/bin/activate
-        COMPILER_LAUNCHER="" \
         make mhlo
 
     - name: Build Enzyme
       run: |
-        . _venv/bin/activate
-        COMPILER_LAUNCHER="" \
         make enzyme
 
     - name: Build MLIR Dialects
       run: |
-        . _venv/bin/activate
-        COMPILER_LAUNCHER="" \
         make dialects
 
     - name: Build Frontend
       run: |
-        . _venv/bin/activate
-        COMPILER_LAUNCHER="" \
         make frontend
 
     - name: Run Frontend LIT suite
       run: |
-        . _venv/bin/activate
         make lit
 
     - name: Run Frontend PyTest suite
       run: |
-        . _venv/bin/activate
         make pytest
 
     - name: Run Demos
       run: |
-        . _venv/bin/activate
         make test-demos
