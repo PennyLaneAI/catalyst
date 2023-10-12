@@ -17,6 +17,7 @@ This module computes commit hashes for LLVM and MLIR-HLO based on a given JAX ve
 
 # pylint: disable=line-too-long
 # pylint: disable=anomalous-backslash-in-string
+# pylint: disable=consider-using-with
 
 import os
 import re
