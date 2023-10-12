@@ -32,16 +32,14 @@ catalyst_init_path = os.path.join(os.path.dirname(__file__), "../../frontend/cat
 assert os.path.isfile(dep_versions_path)
 assert os.path.isfile(catalyst_init_path)
 
-try:
-    url = f"https://raw.githubusercontent.com/google/jax/jaxlib-v{jax_version}/WORKSPACE"
-    response = requests.get(url)
-    match = re.search(r'strip_prefix = "xla-([a-zA-Z0-9]*)"', response.text)
-    xla_commit = match.group(1)
-except Exception:
+url = f"https://raw.githubusercontent.com/google/jax/jaxlib-v{jax_version}/WORKSPACE"
+response = requests.get(url)
+match = re.search(r'strip_prefix = "xla-([a-zA-Z0-9]*)"', response.text)
+if not match:
     url = f"https://raw.githubusercontent.com/google/jax/jaxlib-v{jax_version}/third_party/xla/workspace.bzl"
     response = requests.get(url)
     match = re.search(r'XLA_COMMIT = "([a-zA-Z0-9]*)"', response.text)
-    xla_commit = match.group(1)
+xla_commit = match.group(1)
 
 url = f"https://raw.githubusercontent.com/openxla/xla/{xla_commit}/third_party/llvm/workspace.bzl"
 response = requests.get(url)
