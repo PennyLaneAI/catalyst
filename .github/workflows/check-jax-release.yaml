@@ -86,12 +86,6 @@ jobs:
         make frontend
         python3 -m pip install --upgrade jax jaxlib
 
-    - name: Install rustup with llvm-tools-preview
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
-        components: llvm-tools-preview
-
     - name: Build Runtime
       run: |
         make runtime
