@@ -23,6 +23,10 @@ import requests
 
 jax_version = sys.argv[1]
 dep_versions_path = os.path.join(os.path.dirname(__file__), "../../.dep-versions")
+catalyst_init_path = os.path.join(os.path.dirname(__file__), "../../frontend/catalyst/__init__.py")
+
+assert os.path.isfile(dep_versions_path)
+assert os.path.isfile(catalyst_init_path)
 
 try:
     url = f"https://raw.githubusercontent.com/google/jax/jaxlib-v{jax_version}/WORKSPACE"
@@ -57,10 +61,14 @@ enzyme_commit = match.group(1)
 with open(dep_versions_path, "w", encoding="UTF-8") as f:
     f.write(
         f"""\
-# Update the version check in catalyst.__init__ when changing the JAX version.
 jax={jax_version}
 mhlo={hlo_commit}
 llvm={llvm_commit}
 enzyme={enzyme_commit}
 """
     )
+
+quote = '"'
+cmd = f"sed -i 's/_jaxlib_version = {quote}\([0-9.]\+\){quote}/_jaxlib_version = {quote}{jax_version}{quote}/g' {catalyst_init_path}"
+res = os.system(cmd)
+assert res == 0

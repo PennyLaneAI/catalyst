@@ -51,24 +51,12 @@ jobs:
         ref: ${{ env.LLVM_REVISION }}
         path: mlir/llvm-project
 
-    - name: Build LLVM
-      run: |
-        COMPILER_LAUNCHER="" make llvm
-
-    - name: Build MLIR Dialects
-      run: |
-        COMPILER_LAUNCHER="" make dialects
-
     - name: Clone MHLO repo
       uses: actions/checkout@v3
       with:
         repository: tensorflow/mlir-hlo
         ref: ${{ env.MHLO_REVISION }}
         path: mlir/mlir-hlo
-
-    - name: Build MHLO
-      run: |
-        COMPILER_LAUNCHER="" make mhlo
 
     - name: Clone Enzyme repo
       uses: actions/checkout@v3
@@ -77,9 +65,21 @@ jobs:
         ref: ${{ env.ENZYME_REVISION }}
         path: mlir/Enzyme
 
+    - name: Build LLVM
+      run: |
+        COMPILER_LAUNCHER="" make llvm
+
+    - name: Build MHLO
+      run: |
+        COMPILER_LAUNCHER="" make mhlo
+
     - name: Build Enzyme
       run: |
         COMPILER_LAUNCHER="" make enzyme
+
+    - name: Build MLIR Dialects
+      run: |
+        COMPILER_LAUNCHER="" make dialects
 
     - name: Build Frontend
       run: |
