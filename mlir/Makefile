@@ -11,6 +11,8 @@ MHLO_BUILD_DIR?=$(MK_DIR)/mlir-hlo/build
 ENZYME_BUILD_DIR?=$(MK_DIR)/Enzyme/build
 RT_BUILD_DIR?=$(MK_DIR)/../runtime/build
 ENABLE_LLD?=ON
+ENABLE_ZLIB?=ON
+ENABLE_ZSTD?=ON
 
 .PHONY: help
 help:
@@ -26,7 +28,7 @@ help:
 	@echo "  format [version=?] to apply C++ formatter; use with 'version={version}' to run clang-format-{version} instead of clang-format"
 
 .PHONY: all
-all: llvm mhlo dialects enzyme
+all: llvm mhlo enzyme dialects
 
 .PHONY: llvm
 llvm:
@@ -44,7 +46,9 @@ llvm:
 		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \
 		-DCMAKE_C_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
 		-DCMAKE_CXX_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
-		-DLLVM_ENABLE_LLD=$(ENABLE_LLD)
+		-DLLVM_ENABLE_LLD=$(ENABLE_LLD) \
+		-DLLVM_ENABLE_ZLIB=$(ENABLE_ZLIB) \
+		-DLLVM_ENABLE_ZSTD=$(ENABLE_ZSTD)
 
 	# TODO: when updating LLVM, test to see if mlir/unittests/Bytecode/BytecodeTest.cpp:55 is passing
 	# and remove filter
@@ -61,7 +65,9 @@ mhlo:
 		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \
 		-DCMAKE_C_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
 		-DCMAKE_CXX_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
-		-DLLVM_ENABLE_LLD=$(ENABLE_LLD)
+		-DLLVM_ENABLE_LLD=$(ENABLE_LLD) \
+		-DLLVM_ENABLE_ZLIB=$(ENABLE_ZLIB) \
+		-DLLVM_ENABLE_ZSTD=$(ENABLE_ZSTD)
 
 	cmake --build $(MHLO_BUILD_DIR) --target check-mlir-hlo
 
@@ -100,7 +106,9 @@ dialects:
 		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \
 		-DCMAKE_C_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
 		-DCMAKE_CXX_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
-		-DLLVM_ENABLE_LLD=$(ENABLE_LLD)
+		-DLLVM_ENABLE_LLD=$(ENABLE_LLD) \
+		-DLLVM_ENABLE_ZLIB=$(ENABLE_ZLIB) \
+		-DLLVM_ENABLE_ZSTD=$(ENABLE_ZSTD)
 
 	cmake --build $(DIALECTS_BUILD_DIR) --target check-dialects quantum-lsp-server compiler_driver
 

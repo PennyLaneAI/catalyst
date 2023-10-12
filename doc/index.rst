@@ -61,6 +61,7 @@ Catalyst
 
    dev/installation
    dev/quick_start
+   dev/sharp_bits
    dev/release_notes
 
 .. toctree::

@@ -1,9 +1,3 @@
-# Compression library
-# Potentially needed by LLVMSupport.
-# along with zstd.
-# TODO: Investigate if we can depend on only one
-set(EXTERNAL_LIB z)
-
 find_package(Enzyme REQUIRED CONFIG)
 message(STATUS "Using EnzymeConfig.cmake in: ${Enzyme_DIR}")
 
