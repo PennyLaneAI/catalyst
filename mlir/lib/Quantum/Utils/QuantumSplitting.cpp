@@ -12,9 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "mlir/Dialect/Complex/IR/Complex.h"
 #include "mlir/Dialect/Index/IR/IndexOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/Transforms/DialectConversion.h"
 
@@ -42,6 +44,41 @@ void populateArgIdxMapping(TypeRange types, DenseMap<unsigned, unsigned> &argIdx
 
 namespace catalyst {
 namespace quantum {
+
+void verifyTypeIsCacheable(Type ty, mlir::Operation *op)
+{
+    // Sanitizing inputs.
+    // Technically we know for a fact that none of this will ever issue an
+    // error. This is because QubitUnitary is guaranteed to have a
+    // tensor<NxNxcomplex<f64>> But this code in the future may be extended to
+    // support other types. Hence the sanitization.
+    if (ty.isF64()) {
+        return;
+    }
+
+    // TODO: Generalize to unranked tensors
+    if (!isa<RankedTensorType>(ty)) {
+        op->emitOpError() << "Caching only supports tensors complex F64";
+    }
+
+    auto aTensorType = ty.cast<RankedTensorType>();
+    ArrayRef<int64_t> shape = aTensorType.getShape();
+
+    // TODO: Generalize to arbitrary dimensions
+    if (2 != shape.size()) {
+        op->emitOpError() << "Caching only supports tensors complex F64";
+    }
+    // TODO: Generalize to other types
+    Type elementType = aTensorType.getElementType();
+    if (!isa<ComplexType>(elementType)) {
+        op->emitOpError() << "Caching only supports tensors complex F64";
+    }
+    // TODO: Generalize to other types
+    Type f64 = elementType.cast<ComplexType>().getElementType();
+    if (!f64.isF64()) {
+        op->emitOpError() << "Caching only supports tensors complex F64";
+    }
+}
 
 QuantumCache QuantumCache::initialize(Region &region, OpBuilder &builder, Location loc)
 {
@@ -73,6 +110,77 @@ void QuantumCache::emitDealloc(OpBuilder &builder, Location loc)
     }
 }
 
+void AugmentedCircuitGenerator::cacheGate(quantum::ParametrizedGate gate, OpBuilder &builder)
+{
+    ValueRange params = gate.getAllParams();
+
+    for (Value param : params) {
+        Location loc = gate.getLoc();
+        Value clonedParam = oldToCloned.lookupOrDefault(param);
+        Type paramType = clonedParam.getType();
+        mlir::Operation *op = gate;
+        verifyTypeIsCacheable(paramType, op);
+
+        if (paramType.isF64()) {
+            builder.create<ListPushOp>(loc, clonedParam, cache.paramVector);
+            continue;
+        }
+
+        // Sanitizing inputs.
+        // Technically we know for a fact that none of this will ever issue an error.
+        // This is because QubitUnitary is guaranteed to have a tensor<NxNxcomplex<f64>>
+        // But this code in the future may be extended to support other types.
+        // Hence the sanitization.
+        if (!isa<RankedTensorType>(paramType)) {
+            gate.emitOpError() << "Unexpected type.";
+        }
+
+        auto aTensor = paramType.cast<RankedTensorType>();
+        ArrayRef<int64_t> shape = aTensor.getShape();
+        Value c0 = builder.create<index::ConstantOp>(loc, 0);
+        Value c1 = builder.create<index::ConstantOp>(loc, 1);
+        bool isDim0Static = ShapedType::kDynamic != shape[0];
+        bool isDim1Static = ShapedType::kDynamic != shape[1];
+        Value dim0Length = isDim0Static ? (Value)builder.create<index::ConstantOp>(loc, shape[0])
+                                        : (Value)builder.create<tensor::DimOp>(loc, param, c0);
+        Value dim1Length = isDim1Static ? (Value)builder.create<index::ConstantOp>(loc, shape[1])
+                                        : (Value)builder.create<tensor::DimOp>(loc, param, c1);
+
+        Value lowerBoundDim0 = c0;
+        Value upperBoundDim0 = dim0Length;
+        Value stepDim0 = c1;
+        Value lowerBoundDim1 = c0;
+        Value upperBoundDim1 = dim1Length;
+        Value stepDim1 = c1;
+        Value matrix = clonedParam;
+
+        scf::ForOp iForLoop =
+            builder.create<scf::ForOp>(loc, lowerBoundDim0, upperBoundDim0, stepDim0);
+        {
+            OpBuilder::InsertionGuard afterIForLoop(builder);
+            builder.setInsertionPointToStart(iForLoop.getBody());
+            Value i_index = iForLoop.getInductionVar();
+
+            scf::ForOp jForLoop =
+                builder.create<scf::ForOp>(loc, lowerBoundDim1, upperBoundDim1, stepDim1);
+            {
+                OpBuilder::InsertionGuard afterJForLoop(builder);
+                builder.setInsertionPointToStart(jForLoop.getBody());
+                Value j_index = jForLoop.getInductionVar();
+                SmallVector<Value> indices = {i_index, j_index};
+                Value element = builder.create<tensor::ExtractOp>(loc, matrix, indices);
+                // element is complex!
+                // So we need to convert into {f64, f64}
+                Value real = builder.create<complex::ReOp>(loc, element);
+                Value imag = builder.create<complex::ImOp>(loc, element);
+                // Again, take note of the order.
+                builder.create<ListPushOp>(loc, real, cache.paramVector);
+                builder.create<ListPushOp>(loc, imag, cache.paramVector);
+            }
+        }
+    }
+}
+
 void AugmentedCircuitGenerator::generate(Region &region, OpBuilder &builder)
 {
     assert(region.hasOneBlock() &&
@@ -89,17 +197,11 @@ void AugmentedCircuitGenerator::generate(Region &region, OpBuilder &builder)
         else if (auto extractOp = dyn_cast<quantum::ExtractOp>(op)) {
             cacheDynamicWire(extractOp, builder);
         }
-        else if (auto gate = dyn_cast<quantum::DifferentiableGate>(op)) {
-            ValueRange diffParams = gate.getDiffParams();
-            if (!diffParams.empty()) {
-                for (Value param : diffParams) {
-                    builder.create<ListPushOp>(gate.getLoc(), oldToCloned.lookupOrDefault(param),
-                                               cache.paramVector);
-                }
-            }
+        else if (auto gate = dyn_cast<quantum::ParametrizedGate>(op)) {
+            cacheGate(gate, builder);
         }
         else if (isa<QuantumDialect>(op.getDialect())) {
-            // Any quantum op other than a differentiable gate/insert/extract is ignored.
+            // Any quantum op other than a parametrized gate/insert/extract is ignored.
         }
         else if (isClassicalSCFOp(op)) {
             // Purely classical SCF ops should be treated as any other purely classical op, but

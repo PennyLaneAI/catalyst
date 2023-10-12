@@ -2,9 +2,9 @@
 
 <h3>New features</h3>
 
-* The experimental AutoGraph feature, now supports Python `for` loops, allowing
-  native Python loops to be captured and compiled with Catalyst.
-  [#258](https://github.com/PennyLaneAI/catalyst/pull/258)
+* The experimental AutoGraph feature, now supports Python `for` loops, allowing native Python loops
+  to be captured and compiled with Catalyst.
+  [(#258)](https://github.com/PennyLaneAI/catalyst/pull/258)
 
   ```python
   dev = qml.device("lightning.qubit", wires=n)
@@ -26,8 +26,8 @@
   [(#282)](https://github.com/PennyLaneAI/catalyst/pull/282)
 
   Similar in behaviour to the `qml.ctrl` control modifier from PennyLane, `catalyst.ctrl` can
-  additionally wrap around quantum functions which contain control flow, such as the Catalyst `cond`,
-  `for_loop`, and `while_loop` primitives.
+  additionally wrap around quantum functions which contain control flow, such as the Catalyst
+  `cond`, `for_loop`, and `while_loop` primitives.
 
   ```python
   @qjit
@@ -88,12 +88,30 @@
 * Support the `braket.devices.Devices` enum class and `s3_destination_folder`
   device options for AWS Braket remote devices.
   [(#278)](https://github.com/PennyLaneAI/catalyst/pull/278)
-  
-* Improvements have been made to the build process, including avoiding uncessary
-  processes such as removing `opt` and downloading the wheel.
+
+* Improvements have been made to the build process, including avoiding unnecessary processes such
+  as removing `opt` and downloading the wheel.
   [(#298)](https://github.com/PennyLaneAI/catalyst/pull/298)
 
 <h3>Bug fixes</h3>
+
+* Remove undocumented package dependency on the zlib/zstd compression library.
+  [(#308)](https://github.com/PennyLaneAI/catalyst/pull/308)
+
+* Fix filesystem issue when compiling multiple functions with the same name and
+  `keep_intermediate=True`.
+  [(#306)](https://github.com/PennyLaneAI/catalyst/pull/306)
+
+* Add support for applying the `adjoint` operation to `QubitUnitary` gates.
+  `QubitUnitary` was not able to be `adjoint`ed when the variable holding the unitary matrix might
+  change. This can happen, for instance, inside of a for loop.
+  To solve this issue, the unitary matrix gets stored in the array list via push and pops.
+  The unitary matrix is later reconstructed from the array list and `QubitUnitary` can be executed
+  in the `adjoint`ed context.
+  [(#304)](https://github.com/PennyLaneAI/catalyst/pull/304)
+
+* Fix linking errors on Linux systems without a Clang installation.
+  [(#276)](https://github.com/PennyLaneAI/catalyst/pull/276)
 
 <h3>Contributors</h3>
 

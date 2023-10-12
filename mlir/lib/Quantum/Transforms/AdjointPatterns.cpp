@@ -23,9 +23,11 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Errc.h"
 
+#include "mlir/Dialect/Complex/IR/Complex.h"
 #include "mlir/Dialect/Index/IR/IndexOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/Verifier.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -108,33 +110,7 @@ class AdjointGenerator {
                 remappedValues.map(extractOp.getQreg(), insertOp.getResult());
             }
             else if (auto gate = dyn_cast<quantum::QuantumGate>(op)) {
-                for (const auto &[qubitResult, qubitOperand] :
-                     llvm::zip(gate.getQubitResults(), gate.getQubitOperands())) {
-                    remappedValues.map(qubitOperand, remappedValues.lookup(qubitResult));
-                }
-
-                auto clone = cast<QuantumGate>(builder.clone(*gate, remappedValues));
-                clone.setAdjointFlag(!gate.getAdjointFlag());
-
-                // Read cached differentiable parameters from the recorded parameter vector.
-                if (auto differentiableGate = dyn_cast<quantum::DifferentiableGate>(op)) {
-                    OpBuilder::InsertionGuard insertionGuard(builder);
-                    builder.setInsertionPoint(clone);
-                    SmallVector<Value> cachedParams;
-                    ValueRange diffParams = differentiableGate.getDiffParams();
-                    for (unsigned i = 0; i < diffParams.size(); i++) {
-                        cachedParams.push_back(builder.create<ListPopOp>(
-                            differentiableGate.getLoc(), cache.paramVector));
-                    }
-                    MutableOperandRange(clone, differentiableGate.getDiffOperandIdx(),
-                                        diffParams.size())
-                        .assign(cachedParams);
-                }
-
-                for (const auto &[qubitResult, qubitOperand] :
-                     llvm::zip(clone.getQubitResults(), gate.getQubitOperands())) {
-                    remappedValues.map(qubitOperand, qubitResult);
-                }
+                visitOperation(gate, builder);
             }
             else if (auto adjointOp = dyn_cast<quantum::AdjointOp>(&op)) {
                 BlockArgument regionArg = adjointOp.getRegion().getArgument(0);
@@ -168,6 +144,124 @@ class AdjointGenerator {
             }
         }
         return std::nullopt;
+    }
+
+    void visitOperation(quantum::QuantumGate gate, OpBuilder &builder)
+    {
+        for (const auto &[qubitResult, qubitOperand] :
+             llvm::zip(gate.getQubitResults(), gate.getQubitOperands())) {
+            remappedValues.map(qubitOperand, remappedValues.lookup(qubitResult));
+        }
+
+        auto clone = cast<QuantumGate>(builder.clone(*gate, remappedValues));
+        clone.setAdjointFlag(!gate.getAdjointFlag());
+
+        // Read cached parameters from the recorded parameter vector.
+        mlir::Operation *operation = gate;
+        if (auto parametrizedGate = dyn_cast<quantum::ParametrizedGate>(operation)) {
+            OpBuilder::InsertionGuard insertionGuard(builder);
+            builder.setInsertionPoint(clone);
+            SmallVector<Value> cachedParams;
+            ValueRange params = parametrizedGate.getAllParams();
+            for (Value param : params) {
+                Type paramType = param.getType();
+                verifyTypeIsCacheable(paramType, operation);
+                if (paramType.isF64()) {
+                    cachedParams.push_back(
+                        builder.create<ListPopOp>(parametrizedGate.getLoc(), cache.paramVector));
+                    continue;
+                }
+
+                // Guaranteed by verifyTypeIsPoppable above.
+                auto aTensorType = paramType.cast<RankedTensorType>();
+                ArrayRef<int64_t> shape = aTensorType.getShape();
+                Type elementType = aTensorType.getElementType();
+                // Constants
+                auto loc = parametrizedGate.getLoc();
+                Value c0 = builder.create<index::ConstantOp>(loc, 0);
+                Value c1 = builder.create<index::ConstantOp>(loc, 1);
+                // TODO: Generalize to all possible dimensions
+                bool isDim0Static = ShapedType::kDynamic != shape[0];
+                bool isDim1Static = ShapedType::kDynamic != shape[1];
+                Value dim0Length = isDim0Static
+                                       ? (Value)builder.create<index::ConstantOp>(loc, shape[0])
+                                       : (Value)builder.create<tensor::DimOp>(loc, param, c0);
+                Value dim1Length = isDim1Static
+                                       ? (Value)builder.create<index::ConstantOp>(loc, shape[1])
+                                       : (Value)builder.create<tensor::DimOp>(loc, param, c1);
+
+                // Renaming for legibility
+                // Note: Since this is a square matrix, upperBound for both loops is the
+                // same value.
+                Value lowerBoundDim0 = c0;
+                Value upperBoundDim0 = dim0Length;
+                Value stepDim0 = c1;
+                Value lowerBoundDim1 = c0;
+                Value upperBoundDim1 = dim1Length;
+                Value stepDim1 = c1;
+                Value beginningTensor = builder.create<tensor::EmptyOp>(loc, shape, elementType);
+                // This time, we are in reverse, so we need to start
+                // with N-1 since MLIR does not allow for loops with negative step sizes.
+                SmallVector<Value> initialValues = {beginningTensor};
+
+                scf::ForOp iForLoop = builder.create<scf::ForOp>(
+                    loc, lowerBoundDim0, upperBoundDim0, stepDim0, initialValues);
+                {
+                    OpBuilder::InsertionGuard afterIForLoop(builder);
+                    builder.setInsertionPointToStart(iForLoop.getBody());
+                    auto iIterArgs = iForLoop.getRegionIterArgs();
+                    Value currIthTensor = iIterArgs.front();
+
+                    Value i = iForLoop.getInductionVar();
+                    Value iPlusOne = builder.create<index::AddOp>(loc, i, c1);
+                    Value nMinusIMinusOne = builder.create<index::SubOp>(loc, dim0Length, iPlusOne);
+                    // Just for legibility
+                    Value iTensorIndex = nMinusIMinusOne;
+
+                    scf::ForOp jForLoop = builder.create<scf::ForOp>(
+                        loc, lowerBoundDim1, upperBoundDim1, stepDim1, currIthTensor);
+                    {
+                        OpBuilder::InsertionGuard afterJForLoop(builder);
+                        builder.setInsertionPointToStart(jForLoop.getBody());
+                        auto jIterArgs = jForLoop.getRegionIterArgs();
+                        assert(jIterArgs.size() == 1 &&
+                               "jForLoop has more induction variables than necessary.");
+                        Value currIthJthTensor = jIterArgs.front();
+
+                        Value imag = builder.create<ListPopOp>(loc, cache.paramVector);
+                        Value real = builder.create<ListPopOp>(loc, cache.paramVector);
+                        Value element =
+                            builder.create<complex::CreateOp>(loc, elementType, real, imag);
+
+                        // TODO: Generalize to types which are not complex
+                        Value j = jForLoop.getInductionVar();
+                        Value jPlusOne = builder.create<index::AddOp>(loc, j, c1);
+                        Value nMinusJMinusOne =
+                            builder.create<index::SubOp>(loc, dim1Length, jPlusOne);
+                        // Just for legibility
+                        Value jTensorIndex = nMinusJMinusOne;
+                        ValueRange indices = {iTensorIndex, jTensorIndex};
+
+                        Value updatedIthJthTensor = builder.create<tensor::InsertOp>(
+                            loc, element, currIthJthTensor, indices);
+                        builder.create<scf::YieldOp>(loc, updatedIthJthTensor);
+                    }
+
+                    Value ithTensor = jForLoop.getResult(0);
+                    builder.create<scf::YieldOp>(loc, ithTensor);
+                }
+
+                Value recreatedTensor = iForLoop.getResult(0);
+                cachedParams.push_back(recreatedTensor);
+            }
+            MutableOperandRange(clone, parametrizedGate.getParamOperandIdx(), params.size())
+                .assign(cachedParams);
+        }
+
+        for (const auto &[qubitResult, qubitOperand] :
+             llvm::zip(clone.getQubitResults(), gate.getQubitOperands())) {
+            remappedValues.map(qubitOperand, qubitResult);
+        }
     }
 
     void visitOperation(scf::ForOp forOp, OpBuilder &builder)
