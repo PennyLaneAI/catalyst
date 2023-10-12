@@ -22,7 +22,7 @@ import types
 
 import jaxlib as _jaxlib
 
-_jaxlib_version = "0.4.18"
+_jaxlib_version = "0.4.14"
 if _jaxlib.__version__ != _jaxlib_version:
     import warnings
 
