@@ -463,6 +463,7 @@ class QJIT:
 
     def __init__(self, fn, compile_options):
         self.compile_options = compile_options
+        self.compiler = Compiler(compile_options)
         self.compiling_from_textual_ir = isinstance(fn, str)
         self.original_function = fn
         self.user_function = fn
@@ -493,8 +494,7 @@ class QJIT:
             # Guaranteed to exist after functools.update_wrapper AND not compiling from textual IR
             name = self.__name__
 
-        workspace = WorkspaceManager.get_or_create_workspace(name, preferred_workspace_dir)
-        self.compiler = Compiler(workspace, compile_options)
+        self.workspace = WorkspaceManager.get_or_create_workspace(name, preferred_workspace_dir)
 
         if self.compiling_from_textual_ir:
             EvaluationContext.check_is_not_tracing("Cannot compile from IR in tracing context.")
@@ -558,8 +558,8 @@ class QJIT:
         canonicalizer_options = deepcopy(self.compile_options)
         canonicalizer_options.pipelines = [("pipeline", ["canonicalize"])]
         canonicalizer_options.lower_to_llvm = False
-        canonicalizer = Compiler(self.compiler.workspace, canonicalizer_options)
-        _, self._mlir, _ = canonicalizer.run(mlir_module)
+        canonicalizer = Compiler(canonicalizer_options)
+        _, self._mlir, _ = canonicalizer.run(mlir_module, self.workspace)
         return mlir_module
 
     def compile(self):
@@ -572,7 +572,7 @@ class QJIT:
             # Module name can be anything.
             module_name = "catalyst_module"
             shared_object, llvm_ir, inferred_func_data = self.compiler.run_from_ir(
-                self.user_function, module_name
+                self.user_function, module_name, self.workspace
             )
             qfunc_name = inferred_func_data[0]
             # Parse back the return types given as a semicolon-separated string
@@ -597,7 +597,9 @@ class QJIT:
             # `replace` method, so we need to get a regular Python string out of it.
             qfunc_name = str(self.mlir_module.body.operations[0].name).replace('"', "")
 
-            shared_object, llvm_ir, inferred_func_data = self.compiler.run(self.mlir_module)
+            shared_object, llvm_ir, inferred_func_data = self.compiler.run(
+                self.mlir_module, self.workspace
+            )
 
         self._llvmir = llvm_ir
         compiled_function = CompiledFunction(shared_object, qfunc_name, restype)

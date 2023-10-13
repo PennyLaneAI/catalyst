@@ -76,7 +76,7 @@ class TestCompilerOptions:
         assert ("[SYSTEM]" in capture) if verbose else ("[SYSTEM]" not in capture)
         assert ("[LIB]" in capture) if verbose else ("[LIB]" not in capture)
         assert ("Dumping" in capture) if (verbose and keep_intermediate) else True
-        workflow.compiler.workspace.cleanup()
+        workflow.workspace.cleanup()
 
 
 class TestCompilerWarnings:
@@ -111,18 +111,19 @@ class TestCompilerErrors:
         """Test return value if user request intermediate file on a dir that doesn't exist.
         Or doesn't make sense.
         """
+        compiler = Compiler()
         with pytest.raises(AssertionError, match="expects a Directory type"):
-            compiler = Compiler("a-name")
+            compiler.run_from_ir("ir-placeholder", "ir-module-name", "inexistent-file")
         with pytest.raises(AssertionError, match="expects an existing directory"):
-            compiler = Compiler(Directory(pathlib.Path("a-name")))
+            compiler.run_from_ir(
+                "ir-placeholder", "ir-module-name", Directory(pathlib.Path("a-name"))
+            )
 
     def test_attempts_to_get_inexistent_intermediate_file(self):
         """Test return value if user request intermediate file that doesn't exist."""
-        workspace = WorkspaceManager.get_or_create_workspace("a-name")
-        compiler = Compiler(workspace)
+        compiler = Compiler()
         result = compiler.get_output_of("inexistent-file")
         assert result is None
-        workspace.cleanup()
 
     def test_runtime_error(self, backend):
         """Test with non-default flags."""
@@ -165,8 +166,7 @@ void _catalyst_pyface_jit_cpp_exception_test(void*, void*) {
         def cpp_exception_test():
             return None
 
-        workspace = WorkspaceManager.get_or_create_workspace("cpp_exception_test")
-        cpp_exception_test.compiler = MockCompiler(workspace, cpp_exception_test.compiler.options)
+        cpp_exception_test.compiler = MockCompiler(cpp_exception_test.compiler.options)
         compiled_function = cpp_exception_test.compile()
 
         with pytest.raises(RuntimeError, match="Hello world"):
@@ -203,7 +203,7 @@ class TestCompilerState:
         assert compiler.get_output_of("PreEnzymeOpt")
         assert compiler.get_output_of("Enzyme")
         assert compiler.get_output_of("None-existing-pipeline") is None
-        workflow.compiler.workspace.cleanup()
+        workflow.workspace.cleanup()
 
     def test_print_nonexistent_stages(self, backend):
         """What happens if we attempt to print something that doesn't exist?"""
@@ -215,7 +215,7 @@ class TestCompilerState:
             return qml.state()
 
         assert workflow.compiler.get_output_of("None-existing-pipeline") is None
-        workflow.compiler.workspace.cleanup()
+        workflow.workspace.cleanup()
 
     def test_workspace(self):
         """Test directory has been modified with folder containing intermediate results"""
@@ -230,7 +230,7 @@ class TestCompilerState:
         files = os.listdir(directory)
         # The directory is non-empty. Should at least contain the original .mlir file
         assert files
-        workflow.compiler.workspace.cleanup()
+        workflow.workspace.cleanup()
 
     def test_compiler_driver_with_output_name(self):
         """Test with non-default output name."""

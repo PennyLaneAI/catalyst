@@ -326,21 +326,12 @@ class LinkerDriver:
 class Compiler:
     """Compiles MLIR modules to shared objects by executing the Catalyst compiler driver library."""
 
-    def __init__(self, workspace: Directory, options: Optional[CompileOptions] = None):
+    def __init__(self, options: Optional[CompileOptions] = None):
         self.options = options if options is not None else CompileOptions()
         self.last_compiler_output = None
-        assert isinstance(
-            workspace, Directory
-        ), f"Compiler expects a Directory type, got {type(workspace)}."
-        assert workspace.is_dir(), f"Compiler expects an existing directory, got {workspace}."
-        self.workspace = workspace
 
     # pylint: disable=too-many-arguments
-    def run_from_ir(
-        self,
-        ir: str,
-        module_name: str,
-    ):
+    def run_from_ir(self, ir: str, module_name: str, workspace: Directory):
         """Compile a shared object from a textual IR (MLIR or LLVM).
 
         Args:
@@ -356,17 +347,22 @@ class Compiler:
                func_name (str) Inferred name of the main function
                ret_type_name (str) Inferred main function result type name
         """
+        assert isinstance(
+            workspace, Directory
+        ), f"Compiler expects a Directory type, got {type(workspace)}."
+        assert workspace.is_dir(), f"Compiler expects an existing directory, got {workspace}."
+
         lower_to_llvm = (
             self.options.lower_to_llvm if self.options.lower_to_llvm is not None else False
         )
 
         if self.options.verbose:
-            print(f"[LIB] Running compiler driver in {self.workspace}", file=self.options.logfile)
+            print(f"[LIB] Running compiler driver in {workspace}", file=self.options.logfile)
 
         try:
             compiler_output = run_compiler_driver(
                 ir,
-                str(self.workspace),
+                str(workspace),
                 module_name,
                 keep_intermediate=self.options.keep_intermediate,
                 verbose=self.options.verbose,
@@ -413,8 +409,8 @@ class Compiler:
             mlir_module.operation.get_asm(
                 binary=False, print_generic_op_form=False, assume_verified=True
             ),
+            str(mlir_module.operation.attributes["sym_name"]).replace('"', ""),
             *args,
-            module_name=str(mlir_module.operation.attributes["sym_name"]).replace('"', ""),
             **kwargs,
         )
 
