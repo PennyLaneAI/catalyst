@@ -189,7 +189,7 @@ rather than runtime.
     >>> f(6.)
     ... array(9.)
 
-    For more details, see the AutoGraph guide.
+    For more details, see the :doc:`AutoGraph guide <autograph>`.
 
 
 Avoiding recompilation

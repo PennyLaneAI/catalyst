@@ -294,6 +294,8 @@ TypeError: Value 'a' with type <class 'str'> is not a valid JAX type
 For loops
 ---------
 
+* Do not currently support ``break`` and ``continue``.
+
 * for x, y in params: works where params is a JAX array
 * for x in Obj: works, where obj is convertable to an array
   * if ``obj`` is not convertable to an array (e.g., list of strings) it falls back to standard python.
