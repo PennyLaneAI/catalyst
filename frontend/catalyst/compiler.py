@@ -337,6 +337,7 @@ class Compiler:
         Args:
             ir (str): Textual MLIR to be compiled
             module_name (str): Module name to use for naming
+            workspace (Directory): directory that holds output files and/or debug dumps.
 
         Returns:
             output_filename (str): Output file name. For the default pipeline this would be the
