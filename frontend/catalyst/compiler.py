@@ -326,16 +326,20 @@ class LinkerDriver:
 class Compiler:
     """Compiles MLIR modules to shared objects by executing the Catalyst compiler driver library."""
 
-    def __init__(self, options: Optional[CompileOptions] = None):
+    def __init__(self, workspace: Directory, options: Optional[CompileOptions] = None):
         self.options = options if options is not None else CompileOptions()
         self.last_compiler_output = None
+        assert isinstance(
+            workspace, Directory
+        ), f"Compiler expects a Directory type, got {type(workspace)}."
+        assert workspace.is_dir(), f"Compiler expects an existing directory, got {workspace}."
+        self.workspace = workspace
 
     # pylint: disable=too-many-arguments
     def run_from_ir(
         self,
         ir: str,
         module_name: str,
-        workspace=None,
     ):
         """Compile a shared object from a textual IR (MLIR or LLVM).
 
@@ -356,15 +360,13 @@ class Compiler:
             self.options.lower_to_llvm if self.options.lower_to_llvm is not None else False
         )
 
-        assert workspace
-
         if self.options.verbose:
-            print(f"[LIB] Running compiler driver in {workspace}", file=self.options.logfile)
+            print(f"[LIB] Running compiler driver in {self.workspace}", file=self.options.logfile)
 
         try:
             compiler_output = run_compiler_driver(
                 ir,
-                str(workspace),
+                str(self.workspace),
                 module_name,
                 keep_intermediate=self.options.keep_intermediate,
                 verbose=self.options.verbose,
@@ -416,18 +418,14 @@ class Compiler:
             **kwargs,
         )
 
-    def get_output_of(self, workspace, pipeline) -> Optional[str]:
+    def get_output_of(self, pipeline) -> Optional[str]:
         """Get the output IR of a pipeline.
         Args:
-            workspace (Directory): directory that holds data.
             pipeline (str): name of pass class
 
         Returns
             (Optional[str]): output IR
         """
-        assert isinstance(workspace, Directory), "get_output_of expects a Directory type."
-        assert workspace.is_dir(), "We expect a directory."
-
         if len(dict(self.options.get_pipelines()).get(pipeline, [])) == 0:
             warnings.warn("Requesting an output of an empty pipeline")  # pragma: no cover
 
@@ -436,9 +434,9 @@ class Compiler:
 
         return self.last_compiler_output.get_pipeline_output(pipeline)
 
-    def print(self, workspace, pipeline):
+    def print(self, pipeline):
         """Print the output IR of pass.
         Args:
             pipeline (str): name of pass class
         """
-        print(self.get_output_of(workspace, pipeline))  # pragma: no cover
+        print(self.get_output_of(pipeline))  # pragma: no cover

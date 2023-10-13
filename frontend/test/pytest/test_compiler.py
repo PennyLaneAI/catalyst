@@ -33,6 +33,7 @@ from catalyst.compiler import DEFAULT_PIPELINES, CompileOptions, Compiler, Linke
 from catalyst.jax_tracer import trace_to_mlir
 from catalyst.pennylane_extensions import measure, qfunc
 from catalyst.utils.exceptions import CompileError
+from catalyst.utils.filesystem import Directory
 
 # pylint: disable=missing-function-docstring
 
@@ -75,7 +76,7 @@ class TestCompilerOptions:
         assert ("[SYSTEM]" in capture) if verbose else ("[SYSTEM]" not in capture)
         assert ("[LIB]" in capture) if verbose else ("[LIB]" not in capture)
         assert ("Dumping" in capture) if (verbose and keep_intermediate) else True
-        workflow.workspace.cleanup()
+        workflow.compiler.workspace.cleanup()
 
 
 class TestCompilerWarnings:
@@ -110,15 +111,16 @@ class TestCompilerErrors:
         """Test return value if user request intermediate file on a dir that doesn't exist.
         Or doesn't make sense.
         """
-        compiler = Compiler()
         with pytest.raises(AssertionError, match="expects a Directory type"):
-            compiler.get_output_of(None, "inexistent-file")
+            compiler = Compiler("a-name")
+        with pytest.raises(AssertionError, match="expects an existing directory"):
+            compiler = Compiler(Directory(pathlib.Path("a-name")))
 
     def test_attempts_to_get_inexistent_intermediate_file(self):
         """Test return value if user request intermediate file that doesn't exist."""
-        compiler = Compiler()
         workspace = WorkspaceManager.get_or_create_workspace("a-name")
-        result = compiler.get_output_of(workspace, "inexistent-file")
+        compiler = Compiler(workspace)
+        result = compiler.get_output_of("inexistent-file")
         assert result is None
         workspace.cleanup()
 
@@ -163,7 +165,8 @@ void _catalyst_pyface_jit_cpp_exception_test(void*, void*) {
         def cpp_exception_test():
             return None
 
-        cpp_exception_test.compiler = MockCompiler(cpp_exception_test.compiler.options)
+        workspace = WorkspaceManager.get_or_create_workspace("cpp_exception_test")
+        cpp_exception_test.compiler = MockCompiler(workspace, cpp_exception_test.compiler.options)
         compiled_function = cpp_exception_test.compile()
 
         with pytest.raises(RuntimeError, match="Hello world"):
@@ -191,16 +194,16 @@ class TestCompilerState:
             return qml.state()
 
         compiler = workflow.compiler
-        assert compiler.get_output_of(workflow.workspace, "EmptyPipeline1") is None
-        assert compiler.get_output_of(workflow.workspace, "HLOLoweringPass")
-        assert compiler.get_output_of(workflow.workspace, "QuantumCompilationPass")
-        assert compiler.get_output_of(workflow.workspace, "BufferizationPass")
-        assert compiler.get_output_of(workflow.workspace, "MLIRToLLVMDialect")
-        assert compiler.get_output_of(workflow.workspace, "EmptyPipeline2") is None
-        assert compiler.get_output_of(workflow.workspace, "PreEnzymeOpt")
-        assert compiler.get_output_of(workflow.workspace, "Enzyme")
-        assert compiler.get_output_of(workflow.workspace, "None-existing-pipeline") is None
-        workflow.workspace.cleanup()
+        assert compiler.get_output_of("EmptyPipeline1") is None
+        assert compiler.get_output_of("HLOLoweringPass")
+        assert compiler.get_output_of("QuantumCompilationPass")
+        assert compiler.get_output_of("BufferizationPass")
+        assert compiler.get_output_of("MLIRToLLVMDialect")
+        assert compiler.get_output_of("EmptyPipeline2") is None
+        assert compiler.get_output_of("PreEnzymeOpt")
+        assert compiler.get_output_of("Enzyme")
+        assert compiler.get_output_of("None-existing-pipeline") is None
+        workflow.compiler.workspace.cleanup()
 
     def test_print_nonexistent_stages(self, backend):
         """What happens if we attempt to print something that doesn't exist?"""
@@ -211,8 +214,8 @@ class TestCompilerState:
             qml.PauliX(wires=0)
             return qml.state()
 
-        assert workflow.compiler.get_output_of(workflow.workspace, "None-existing-pipeline") is None
-        workflow.workspace.cleanup()
+        assert workflow.compiler.get_output_of("None-existing-pipeline") is None
+        workflow.compiler.workspace.cleanup()
 
     def test_workspace(self):
         """Test directory has been modified with folder containing intermediate results"""
@@ -227,7 +230,7 @@ class TestCompilerState:
         files = os.listdir(directory)
         # The directory is non-empty. Should at least contain the original .mlir file
         assert files
-        workflow.workspace.cleanup()
+        workflow.compiler.workspace.cleanup()
 
     def test_compiler_driver_with_output_name(self):
         """Test with non-default output name."""
