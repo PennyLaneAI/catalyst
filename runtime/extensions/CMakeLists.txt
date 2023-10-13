@@ -4,7 +4,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 include(FetchContent)
 
 set(LIGHTNING_GIT_TAG "master" CACHE STRING "GIT_TAG value to build Lightning")
-set(source_files "StateVectorLQubitDynamic.cpp")
+set(source_files "StateVectorDynamicCPU.cpp")
 FetchContent_Declare(
     pennylane_lightning
     GIT_REPOSITORY https://github.com/PennyLaneAI/pennylane-lightning.git
@@ -29,7 +29,6 @@ if(ENABLE_LIGHTNING_KOKKOS)
         GIT_TAG        ${LIGHTNING_KOKKOS_GIT_TAG}
     )
 
-    set(PL_BACKEND "lightning_qubit")
     set(PLKOKKOS_ENABLE_PYTHON OFF CACHE BOOL "Enable compilation of the Python bindings")
     FetchContent_MakeAvailable(pennylane_lightning_kokkos)
 

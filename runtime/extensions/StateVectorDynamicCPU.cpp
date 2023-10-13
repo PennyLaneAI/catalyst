@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "StateVectorLQubitDynamic.hpp"
+#include "StateVectorDynamicCPU.hpp"
 
 // explicit instantiation
-template class Pennylane::LightningQubit::StateVectorLQubitDynamic<float>;
-template class Pennylane::LightningQubit::StateVectorLQubitDynamic<double>;
+template class Pennylane::StateVectorDynamicCPU<float>;
+template class Pennylane::StateVectorDynamicCPU<double>;

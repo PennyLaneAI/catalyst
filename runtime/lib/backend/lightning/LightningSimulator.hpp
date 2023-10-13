@@ -14,8 +14,8 @@
 
 #pragma once
 
-#if !__has_include("StateVectorLQubitDynamic.hpp")
-throw std::logic_error("StateVectorLQubitDynamic.hpp: No such header file");
+#if !__has_include("StateVectorDynamicCPU.hpp")
+throw std::logic_error("StateVectorDynamicCPU.hpp: No such header file");
 #endif
 
 #define __device_lightning
@@ -29,11 +29,11 @@ throw std::logic_error("StateVectorLQubitDynamic.hpp: No such header file");
 #include <random>
 #include <span>
 
-#include "AdjointJacobianLQubit.hpp"
-#include "JacobianData.hpp"
+#include "AdjointDiff.hpp"
+#include "JacobianTape.hpp"
 #include "LinearAlgebra.hpp"
-#include "MeasurementsLQubit.hpp"
-#include "StateVectorLQubitDynamic.hpp"
+#include "Measures.hpp"
+#include "StateVectorDynamicCPU.hpp"
 
 #include "CacheManager.hpp"
 #include "Exception.hpp"
@@ -44,9 +44,6 @@ throw std::logic_error("StateVectorLQubitDynamic.hpp: No such header file");
 
 namespace Catalyst::Runtime::Simulator {
 class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {
-  private:
-    using StateVectorT = Pennylane::LightningQubit::StateVectorLQubitDynamic<double>;
-
   private:
     // static constants for RESULT values
     static constexpr bool GLOBAL_RESULT_TRUE_CONST = true;
@@ -60,7 +57,8 @@ class LightningSimulator final : public Catalyst::Runtime::QuantumDevice {
 
     size_t device_shots;
 
-    std::unique_ptr<StateVectorT> device_sv = std::make_unique<StateVectorT>(0);
+    std::unique_ptr<Pennylane::StateVectorDynamicCPU<double>> device_sv =
+        std::make_unique<Pennylane::StateVectorDynamicCPU<double>>(0);
     LightningObsManager<double> obs_manager{};
 
     inline auto isValidQubit(QubitIdType wire) -> bool
