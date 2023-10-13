@@ -25,7 +25,7 @@ import warnings
 from copy import deepcopy
 from dataclasses import dataclass
 from io import TextIOWrapper
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Tuple
 
 from mlir_quantum.compiler_driver import run_compiler_driver
 
@@ -74,6 +74,10 @@ class CompileOptions:
                 if k != "logfile"
             }
         )
+
+    def get_pipelines(self) -> List[Tuple[str, List[str]]]:
+        """Get effective pipelines"""
+        return self.pipelines if self.pipelines is not None else DEFAULT_PIPELINES
 
 
 def run_writing_command(command: List[str], compile_options: Optional[CompileOptions]) -> None:
@@ -348,9 +352,6 @@ class Compiler:
                func_name (str) Inferred name of the main function
                ret_type_name (str) Inferred main function result type name
         """
-        pipelines = (
-            self.options.pipelines if self.options.pipelines is not None else DEFAULT_PIPELINES
-        )
         lower_to_llvm = (
             self.options.lower_to_llvm if self.options.lower_to_llvm is not None else False
         )
@@ -367,7 +368,7 @@ class Compiler:
                 module_name,
                 keep_intermediate=self.options.keep_intermediate,
                 verbose=self.options.verbose,
-                pipelines=pipelines,
+                pipelines=self.options.get_pipelines(),
                 lower_to_llvm=lower_to_llvm,
             )
         except RuntimeError as e:
@@ -426,6 +427,9 @@ class Compiler:
         """
         assert isinstance(workspace, Directory), "get_output_of expects a Directory type."
         assert workspace.is_dir(), "We expect a directory."
+
+        if len(dict(self.options.get_pipelines()).get(pipeline, [])) == 0:
+            warnings.warn("Requesting an output of an empty pipeline")  # pragma: no cover
 
         if not self.last_compiler_output:
             return None

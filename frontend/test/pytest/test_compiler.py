@@ -191,14 +191,12 @@ class TestCompilerState:
             return qml.state()
 
         compiler = workflow.compiler
-        assert (dump1 := compiler.get_output_of(workflow.workspace, "EmptyPipeline1"))
-        assert (dump2 := compiler.get_output_of(workflow.workspace, "HLOLoweringPass"))
-        assert dump1 == dump2
+        assert compiler.get_output_of(workflow.workspace, "EmptyPipeline1") is None
+        assert compiler.get_output_of(workflow.workspace, "HLOLoweringPass")
         assert compiler.get_output_of(workflow.workspace, "QuantumCompilationPass")
         assert compiler.get_output_of(workflow.workspace, "BufferizationPass")
-        assert (dump1 := compiler.get_output_of(workflow.workspace, "MLIRToLLVMDialect"))
-        assert (dump2 := compiler.get_output_of(workflow.workspace, "EmptyPipeline2"))
-        assert dump1 == dump2
+        assert compiler.get_output_of(workflow.workspace, "MLIRToLLVMDialect")
+        assert compiler.get_output_of(workflow.workspace, "EmptyPipeline2") is None
         assert compiler.get_output_of(workflow.workspace, "PreEnzymeOpt")
         assert compiler.get_output_of(workflow.workspace, "Enzyme")
         assert compiler.get_output_of(workflow.workspace, "None-existing-pipeline") is None

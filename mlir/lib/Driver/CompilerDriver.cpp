@@ -300,12 +300,10 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
     auto &outputs = output.pipelineOutputs;
     auto pm = PassManager::on<ModuleOp>(ctx, PassManager::Nesting::Implicit);
 
-    // Maps a pass to one or more pipelines ended by this pass
+    // Maps a pass to zero or one pipelines ended by this pass
     // Maps a pass to its owning pipeline
-    // Lists pipelines not terminated by any passes
-    std::unordered_map<const Pass *, std::list<Pipeline::Name>> pipelineTailMarkers;
+    std::unordered_map<const Pass *, Pipeline::Name> pipelineTailMarkers;
     std::unordered_map<const Pass *, Pipeline::Name> passPipelineNames;
-    std::vector<Pipeline::Name> danglingPipelines;
 
     // Fill all the pipe-to-pipeline mappings
     for (const auto &pipeline : options.pipelinesCfg) {
@@ -313,21 +311,14 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
         if (failed(parsePassPipeline(joinPasses(pipeline.passes), pm, options.diagnosticStream))) {
             return failure();
         }
-        if (existingPasses == pm.size()) {
-            danglingPipelines.push_back(pipeline.name);
-        }
-        else {
+        if (existingPasses != pm.size()) {
             const Pass *pass = nullptr;
             for (size_t pn = existingPasses; pn < pm.size(); pn++) {
                 pass = &(*(pm.begin() + pn));
                 passPipelineNames[pass] = pipeline.name;
             }
             assert(pass != nullptr);
-            for (auto pn : danglingPipelines) {
-                pipelineTailMarkers[pass].push_back(pn);
-            }
-            danglingPipelines.clear();
-            pipelineTailMarkers[pass].push_back(pipeline.name);
+            pipelineTailMarkers[pass] = pipeline.name;
         }
     }
 
@@ -346,12 +337,11 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
             return;
         auto res = pipelineTailMarkers.find(pass);
         if (res != pipelineTailMarkers.end()) {
-            for (const auto &pipelineName : res->second) {
-                llvm::raw_string_ostream s{outputs[pipelineName]};
-                s << *op;
-                dumpToFile(options, output.nextPipelineDumpFilename(pipelineName),
-                           outputs[pipelineName]);
-            }
+            auto pipelineName = res->second;
+            llvm::raw_string_ostream s{outputs[pipelineName]};
+            s << *op;
+            dumpToFile(options, output.nextPipelineDumpFilename(pipelineName),
+                       outputs[pipelineName]);
         }
     };
 
@@ -369,17 +359,6 @@ LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, Modu
     // Run the lowering pipelines
     if (failed(pm.run(moduleOp))) {
         return failure();
-    }
-
-    // For completeness, dump the IR into files which correspond to possible last empty
-    // pipelines.
-    if (options.keepIntermediate) {
-        for (auto pipelineName : danglingPipelines) {
-            llvm::raw_string_ostream s{outputs[pipelineName]};
-            s << *moduleOp;
-            dumpToFile(options, output.nextPipelineDumpFilename(pipelineName),
-                       outputs[pipelineName]);
-        }
     }
 
     return success();
