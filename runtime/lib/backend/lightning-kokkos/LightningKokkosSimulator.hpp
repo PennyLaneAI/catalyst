@@ -11,6 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 #pragma once
 
 #if !__has_include("StateVectorKokkos.hpp")
@@ -28,9 +29,8 @@ throw std::logic_error("StateVectorKokkos.hpp: No such header file");
 #include <span>
 #include <stdexcept>
 
-#include "AdjointJacobianKokkos.hpp"
-#include "LinearAlgebra.hpp"
-#include "MeasurementsKokkos.hpp"
+#include "AdjointDiffKokkos.hpp"
+#include "MeasuresKokkos.hpp"
 #include "StateVectorKokkos.hpp"
 
 #include "CacheManager.hpp"
@@ -43,8 +43,6 @@ throw std::logic_error("StateVectorKokkos.hpp: No such header file");
 namespace Catalyst::Runtime::Simulator {
 class LightningKokkosSimulator final : public Catalyst::Runtime::QuantumDevice {
   private:
-    using StateVectorT = Pennylane::LightningKokkos::StateVectorKokkos<double>;
-
     // static constants for RESULT values
     static constexpr bool GLOBAL_RESULT_TRUE_CONST = true;
     static constexpr bool GLOBAL_RESULT_FALSE_CONST = false;
@@ -57,7 +55,8 @@ class LightningKokkosSimulator final : public Catalyst::Runtime::QuantumDevice {
 
     size_t device_shots;
 
-    std::unique_ptr<StateVectorT> device_sv = std::make_unique<StateVectorT>(0);
+    std::unique_ptr<Pennylane::StateVectorKokkos<double>> device_sv =
+        std::make_unique<Pennylane::StateVectorKokkos<double>>(0);
     LightningKokkosObsManager<double> obs_manager{};
 
     inline auto isValidQubit(QubitIdType wire) -> bool
