@@ -70,6 +70,10 @@
 
 <h3>Improvements</h3>
 
+* Improve the compiler driver diagnostic output. The driver now provides more context for error
+  messages and includes a verbose trace if verbose mode is enabled.
+  [(#303)](https://github.com/PennyLaneAI/catalyst/pull/303)
+
 * Update the Lightning backend device to work with the PL-Lightning monorepo.
   [(#259)](https://github.com/PennyLaneAI/catalyst/pull/259)
 

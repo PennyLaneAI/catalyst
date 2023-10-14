@@ -21,6 +21,7 @@ import inspect
 import pathlib
 import typing
 import warnings
+from copy import deepcopy
 from enum import Enum
 
 import jax
@@ -512,7 +513,7 @@ class QJIT:
         Args:
             stage: string corresponding with the name of the stage to be printed
         """
-        self.compiler.print(self.workspace, stage)  # pragma: nocover
+        self.compiler.print(stage)  # pragma: nocover
 
     @property
     def mlir(self):
@@ -554,12 +555,11 @@ class QJIT:
         inject_functions(mlir_module, ctx)
         self._jaxpr = jaxpr
 
-        _, self._mlir, _ = self.compiler.run(
-            mlir_module,
-            lower_to_llvm=False,
-            workspace=str(self.workspace),
-            pipelines=[("pipeline", ["canonicalize"])],
-        )
+        canonicalizer_options = deepcopy(self.compile_options)
+        canonicalizer_options.pipelines = [("pipeline", ["canonicalize"])]
+        canonicalizer_options.lower_to_llvm = False
+        canonicalizer = Compiler(canonicalizer_options)
+        _, self._mlir, _ = canonicalizer.run(mlir_module, self.workspace)
         return mlir_module
 
     def compile(self):
@@ -572,7 +572,7 @@ class QJIT:
             # Module name can be anything.
             module_name = "catalyst_module"
             shared_object, llvm_ir, inferred_func_data = self.compiler.run_from_ir(
-                self.user_function, module_name, workspace=self.workspace
+                self.user_function, module_name, self.workspace
             )
             qfunc_name = inferred_func_data[0]
             # Parse back the return types given as a semicolon-separated string
@@ -598,7 +598,7 @@ class QJIT:
             qfunc_name = str(self.mlir_module.body.operations[0].name).replace('"', "")
 
             shared_object, llvm_ir, inferred_func_data = self.compiler.run(
-                self.mlir_module, pipelines=self.compile_options.pipelines, workspace=self.workspace
+                self.mlir_module, self.workspace
             )
 
         self._llvmir = llvm_ir

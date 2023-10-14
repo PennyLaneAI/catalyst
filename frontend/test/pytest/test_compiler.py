@@ -29,9 +29,11 @@ import pytest
 
 from catalyst import qjit
 from catalyst.compilation_pipelines import WorkspaceManager
-from catalyst.compiler import CompileOptions, Compiler, LinkerDriver
+from catalyst.compiler import DEFAULT_PIPELINES, CompileOptions, Compiler, LinkerDriver
+from catalyst.jax_tracer import trace_to_mlir
 from catalyst.pennylane_extensions import measure, qfunc
 from catalyst.utils.exceptions import CompileError
+from catalyst.utils.filesystem import Directory
 
 # pylint: disable=missing-function-docstring
 
@@ -111,15 +113,17 @@ class TestCompilerErrors:
         """
         compiler = Compiler()
         with pytest.raises(AssertionError, match="expects a Directory type"):
-            compiler.get_output_of(None, "inexistent-file")
+            compiler.run_from_ir("ir-placeholder", "ir-module-name", "inexistent-file")
+        with pytest.raises(AssertionError, match="expects an existing directory"):
+            compiler.run_from_ir(
+                "ir-placeholder", "ir-module-name", Directory(pathlib.Path("a-name"))
+            )
 
     def test_attempts_to_get_inexistent_intermediate_file(self):
         """Test return value if user request intermediate file that doesn't exist."""
         compiler = Compiler()
-        workspace = WorkspaceManager.get_or_create_workspace("a-name")
-        result = compiler.get_output_of(workspace, "inexistent-file")
+        result = compiler.get_output_of("inexistent-file")
         assert result is None
-        workspace.cleanup()
 
     def test_runtime_error(self, backend):
         """Test with non-default flags."""
@@ -180,18 +184,25 @@ class TestCompilerState:
     def test_print_stages(self, backend):
         """Test that after compiling the intermediate files exist."""
 
-        @qjit(keep_intermediate=True)
+        @qjit(
+            keep_intermediate=True,
+            pipelines=[("EmptyPipeline1", [])] + DEFAULT_PIPELINES + [("EmptyPipeline2", [])],
+        )
         @qml.qnode(qml.device(backend, wires=1))
         def workflow():
             qml.PauliX(wires=0)
             return qml.state()
 
-        assert workflow.compiler.get_output_of(workflow.workspace, "HLOLoweringPass")
-        assert workflow.compiler.get_output_of(workflow.workspace, "QuantumCompilationPass")
-        assert workflow.compiler.get_output_of(workflow.workspace, "BufferizationPass")
-        assert workflow.compiler.get_output_of(workflow.workspace, "MLIRToLLVMDialect")
-        assert workflow.compiler.get_output_of(workflow.workspace, "PreEnzymeOpt")
-        assert workflow.compiler.get_output_of(workflow.workspace, "Enzyme")
+        compiler = workflow.compiler
+        assert compiler.get_output_of("EmptyPipeline1") is None
+        assert compiler.get_output_of("HLOLoweringPass")
+        assert compiler.get_output_of("QuantumCompilationPass")
+        assert compiler.get_output_of("BufferizationPass")
+        assert compiler.get_output_of("MLIRToLLVMDialect")
+        assert compiler.get_output_of("EmptyPipeline2") is None
+        assert compiler.get_output_of("PreEnzymeOpt")
+        assert compiler.get_output_of("Enzyme")
+        assert compiler.get_output_of("None-existing-pipeline") is None
         workflow.workspace.cleanup()
 
     def test_print_nonexistent_stages(self, backend):
@@ -203,7 +214,7 @@ class TestCompilerState:
             qml.PauliX(wires=0)
             return qml.state()
 
-        assert workflow.compiler.get_output_of(workflow.workspace, "None-existing-pipeline") is None
+        assert workflow.compiler.get_output_of("None-existing-pipeline") is None
         workflow.workspace.cleanup()
 
     def test_workspace(self):
@@ -291,6 +302,44 @@ module @workflow {
 """
         compiled_function = qjit(ir)
         assert compiled_function(0.1) == -1
+
+    def test_parsing_errors(self):
+        """Test parsing error handling."""
+
+        ir = r"""
+module @workflow {
+  func.func public @catalyst.entry_point(%arg0: tensor<f64>) -> tensor<f64> attributes {llvm.emit_c_interface} {
+    %c = stablehlo.constant dense<4.0> : tensor<i64>
+    return %c : tensor<f64> // Invalid type
+  }
+}
+"""
+        with pytest.raises(CompileError) as e:
+            qjit(ir, keep_intermediate=True)(0.1)
+
+        assert "Failed to parse module as MLIR source" in e.value.args[0]
+        assert "Failed to parse module as LLVM source" in e.value.args[0]
+
+    def test_pipeline_error(self):
+        """Test pipeline error handling."""
+
+        @qml.qnode(qml.device("lightning.qubit", wires=1))
+        def circuit():
+            return qml.state()
+
+        test_pipelines = [("PipelineA", ["canonicalize"]), ("PipelineB", ["test"])]
+        with pytest.raises(CompileError) as e:
+            qjit(circuit, pipelines=test_pipelines)()
+
+        assert "Failed to lower MLIR module" in e.value.args[0]
+        assert "While processing pipeline: PipelineB" in e.value.args[0]
+        assert "PipelineA" not in e.value.args[0]
+        assert "Trace" not in e.value.args[0]
+
+        with pytest.raises(CompileError) as e:
+            qjit(circuit, pipelines=test_pipelines, verbose=True)()
+
+        assert "Trace" in e.value.args[0]
 
 
 if __name__ == "__main__":

@@ -14,6 +14,7 @@ set(LIBS
     gradient-transforms
     MhloRegisterDialects
     StablehloRegister
+    MLIRCatalystTest
     ${ALL_MHLO_PASSES}
 )
 
