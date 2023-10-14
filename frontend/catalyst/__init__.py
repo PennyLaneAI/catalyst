@@ -94,10 +94,9 @@ loop), and will raise a warning informing of the failure.
 ...     for i in range(3):
 ...         qml.RX(float(x[i]), wires=i)
 ...     return qml.expval(qml.PauliZ(0))
-Warning: If you intended for the conversion to happen, make sure that the(now dynamic) loop variable is not used in tracing-incompatible ways,
-for instance by indexing a Python list with it. In that case, the list should be wrapped into an array.
-To understand different types of JAX tracing errors, please refer to the guide at: https://jax.readthedocs.io/en/latest/errors.html
-If you did not intend for the conversion to happen, you may safely ignore this warning.
+Warning: If you intended for the conversion to happen, make sure that the (now dynamic)
+loop variable is not used in tracing-incompatible ways, for instance by indexing a
+Python list with it. In that case, the list should be wrapped into an array.
 
 Setting this variable to ``True`` will suppress warning messages:
 
@@ -148,7 +147,8 @@ to error rather than fallback when conversion fail:
 ...     for x in params:
 ...         qml.RY(int(x) * jnp.pi / 4, wires=0)
 ...     return qml.expval(qml.PauliZ(0))
-AutoGraphError: Could not convert the iteration target ['0', '1', '2'] to array while processing the following with AutoGraph:
+AutoGraphError: Could not convert the iteration target ['0', '1', '2'] to array
+while processing the following with AutoGraph:
   File "<ipython-input-44-dbae11e6d745>", line 7, in f
     for x in params:
 """
