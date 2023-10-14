@@ -173,10 +173,15 @@ If statements
 While most ``if`` statements you may write in Python will be automatically
 converted, there are some important constraints and restrictions to be aware of.
 
-No 'early' returns
-~~~~~~~~~~~~~~~~~~
+Return statements
+~~~~~~~~~~~~~~~~~
 
-The following pattern, where you return from an ``if`` statement early,
+Return statements inside ``if``/``elif``/``else`` statements are not yet
+supported. No error will occur, but the resulting function will not have the
+expected behaviour.
+
+For example, consider the following pattern, where you return from an ``if``
+statement early,
 
 .. code-block:: python
 
@@ -185,7 +190,8 @@ The following pattern, where you return from an ``if`` statement early,
             return x ** 2
         return x ** 3
 
-will not be correctly captured by AutoGraph, and instead will be interpreted as
+This will not be correctly captured by AutoGraph, and instead will be
+interpreted as
 
 .. code-block:: python
 
@@ -194,7 +200,7 @@ will not be correctly captured by AutoGraph, and instead will be interpreted as
             x = x ** 2
         return x ** 3
 
-Instead of utilizing an early return statement, use the following approach instead:
+Instead of utilizing a return statement, use the following approach instead:
 
 .. code-block:: python
 
@@ -260,7 +266,8 @@ does not apply **as long as you don't change the type**:
 >>> f(0.5)
 array(0.4)
 
-If we change the type of the ``y``, however, we will need to include an ``else`` statement to also change the type:
+If we change the type of the ``y``, however, we will need to include an
+``else`` statement to also change the type:
 
 >>> @qjit(autograph=True)
 ... def f(x):
@@ -294,26 +301,207 @@ TypeError: Value 'a' with type <class 'str'> is not a valid JAX type
 For loops
 ---------
 
-* Do not currently support ``break`` and ``continue``.
+Most ``for`` loop constructs will be properly captured and compiled by AutoGraph.
+This includes automatic unpacking and enumeration through JAX arrays:
 
-* for x, y in params: works where params is a JAX array
-* for x in Obj: works, where obj is convertable to an array
-  * if ``obj`` is not convertable to an array (e.g., list of strings) it falls back to standard python.
-* Nested lists also works
-* for in range works
-* for i in range:, with static bounds, works to index an array inside the loop (obj[i])
-  * what if obj is not a JAX array, but an ndarray or a list? You will get an actionable warning, and will falback to python
-  * what if obj is not even convertable to a JAX array? this will fallback to Python with a non-actionable warning.
-* for i in range(n): where n is dynamic works, and can also be used to index an array.
-  * However, it will fail without an aurograph conversion if obj is not a JAX array (even if a convertable list) because you cannot index a Python list with a dynamic variable. AutoGraph will raises a warning before the main failure. Solution is to convert to a JAX array.
+>>> @qjit(autograph=True)
+... def f(weights):
+...     z = 0.
+...     for i, (x, y) in enumerate(weights):
+...         z = i * x + i ** 2 * y
+...     return z
+>>> weights = jnp.array([[0.1, 0.2, 0.3, 0.4], [0.5, 0.6, 0.7, 0.8]]).T
+>>> f(weights)
+array(8.4)
 
-* for in enumerate works
-* enumerate with nested unpacking ``for i, (x1, x2) in enumerate(params):`` also works
-* same restrictions as range above
+This also works when looping through Python containers, **as long as the containers
+can be converted to a JAX array**:
+
+>>> weights = [[0.1, 0.2], [0.3, 0.4], [0.5, 0.6]]
+>>> f(weights)
+array(3.4)
+
+If the container cannot be converted to a JAX array (e.g., a list of strings),
+then AutoGraph will **not** capture the for loop; instead, AutoGraph will
+fallback to Python, and the loop will be unrolled at compile-time:
+
+.. code-block:: python
+
+    dev = qml.device("lightning.qubit", wires=1)
+
+    @qjit(autograph=True)
+    @qml.qnode(dev)
+    def f():
+        params = ["0", "1", "2"]
+        for x in params:
+            qml.RY(int(x) * jnp.pi / 4, wires=0)
+        return qml.expval(qml.PauliZ(0))
+
+>>> f()
+array(-0.70710678)
+
+The Python ``range`` function is also fully supported by AutoGraph, even when
+its input is a **dynamic variable** (e.g., its numeric value is only known at
+compile time):
+
+>>> @qjit(autograph=True)
+... def f(n):
+...     x = - jnp.log(n)
+...     for k in range(1, n + 1):
+...         x = x + 1 / k
+...     return x
+>>> f(100000)
+array(0.57722066)
+
+Indexing within a loop
+~~~~~~~~~~~~~~~~~~~~~~
+
+Indexing arrays within a for loop works, but care must be taken.
+
+For example, using static bounds to index a JAX array inside of a for loop:
+
+>>> dev = qml.device("lightning.qubit", wires=3)
+>>> @qjit(autograph=True)
+... @qml.qnode(dev)
+... def f(x):
+...     for i in range(3):
+...         qml.RX(x[i], wires=i)
+...     return qml.expval(qml.PauliZ(0))
+>>> weights = jnp.array([0.1, 0.2, 0.3])
+>>> f(weights)
+array(0.99500417)
+
+However, indexing within a for loop with AutoGraph requires that the object
+indexed is a JAX array or dynamic runtime variable.
+
+If the array you are indexing within the for loop is not a JAX array
+or dynamic variable, but an object that can be converted to a JAX array
+(such as a NumPy array or a list of floats), then AutoGraph will fail to capture
+the for loop, and will fallback to Python to evaluate the loop at compile-time:
+
+>>> @qjit(autograph=True)
+... @qml.qnode(dev)
+... def f():
+...     x = [0.1, 0.2, 0.3]
+...     for i in range(3):
+...         qml.RX(x[i], wires=i)
+...     return qml.expval(qml.PauliZ(0))
+Warning: If you intended for the conversion to happen, make sure that the(now dynamic) loop variable is not used in tracing-incompatible ways,
+for instance by indexing a Python list with it. In that case, the list should be wrapped into an array.
+To understand different types of JAX tracing errors, please refer to the guide at: https://jax.readthedocs.io/en/latest/errors.html
+If you did not intend for the conversion to happen, you may safely ignore this warning.
+
+The compiled function will still execute, but has been compiled without the for
+loop (the for loop was unrolled at compilation):
+
+>>> f()
+array(0.99500417)
+
+To allow AutoGraph conversion to work in this case, simply convert the list to
+a JAX array:
+
+>>> @qjit(autograph=True)
+... @qml.qnode(dev)
+... def f():
+...     x = jnp.array([0.1, 0.2, 0.3])
+...     for i in range(3):
+...         qml.RX(x[i], wires=i)
+...     return qml.expval(qml.PauliZ(0))
+>>> f()
+array(0.99500417)
+
+
+Note that if the object you are indexing **cannot** be converted to a JAX
+array? In this case, it is not possible for AutoGraph to capture this for
+loop. However, AutoGraph will continue to fallback to Python for interpreting
+the for loop:
+
+>>> @qjit(autograph=True)
+... @qml.qnode(dev)
+... def f():
+...     x = ["0.1", "0.2", "0.3"]
+...     for i in range(3):
+...         qml.RX(float(x[i]), wires=i)
+...     return qml.expval(qml.PauliZ(0))
+Warning: If you intended for the conversion to happen, make sure that the(now dynamic) loop variable is not used in tracing-incompatible ways,
+for instance by indexing a Python list with it. In that case, the list should be wrapped into an array.
+To understand different types of JAX tracing errors, please refer to the guide at: https://jax.readthedocs.io/en/latest/errors.html
+If you did not intend for the conversion to happen, you may safely ignore this warning.
+
+
+.. note::
+
+    If you wish to suppress this warning, or even activate 'strict mode'
+    so that AutoGraph warnings are treated as errors, see the :ref:`debugging`
+    section.
+
+Dynamic indexing
+~~~~~~~~~~~~~~~~
+
+Indexing into arrays where the for loop has **dynamic bounds** (that is, where
+the size of the loop is set by a dynamic runtime variable) will also work, as long
+as the object indexed is a JAX array:
+
+>>> @qjit(autograph=True)
+... @qml.qnode(dev)
+... def f(n):
+...     x = jnp.array([0.0, 1 / 4 * jnp.pi, 2 / 4 * jnp.pi])
+...     for i in range(n):
+...         qml.RY(x[i], wires=0)
+...     return qml.expval(qml.PauliZ(0))
+>>> f(2)
+array(0.70710678)
+>>> f(3)
+array(-0.70710678)
+
+However AutoGraph conversion will fail if the object being indexed by the
+loop with dynamic bounds is **not** a JAX array, because you cannot index
+standard Python objects with dyanmic variables.
+
+In this case, AutoGraph will raise a warning, but the compilation of the function
+will ultimately fail:
+
+>>> @qjit(autograph=True)
+... @qml.qnode(dev)
+... def f(n):
+...     x = [0.0, 1 / 4 * jnp.pi, 2 / 4 * jnp.pi]
+...     for i in range(n):
+...         qml.RY(x[i], wires=0)
+...     return qml.expval(qml.PauliZ(0))
+Warning: If you intended for the conversion to happen, make sure that the(now dynamic) loop variable is not used in tracing-incompatible ways,
+for instance by indexing a Python list with it. In that case, the list should be wrapped into an array.
+To understand different types of JAX tracing errors, please refer to the guide at: https://jax.readthedocs.io/en/latest/errors.html
+If you did not intend for the conversion to happen, you may safely ignore this warning.
+TracerIntegerConversionError: The __index__() method was called on traced array with shape int64[].
+See https://jax.readthedocs.io/en/latest/errors.html#jax.errors.TracerIntegerConversionError
+
+To resolve this, ensure that all objects that are indexed within dynamic for
+loops are JAX arrays.
+
+Break and continue
+~~~~~~~~~~~~~~~~~~
+
+Within a for loop, control flow statements ``break`` and ``continue``
+are not currently supported. Usage will result in an error:
+
+
+>>> @qjit(autograph=True)
+... def f(x):
+...     for i in range(10):
+...         x = x + x ** 2
+...         if x > 5:
+...             break
+...     return x
+SyntaxError: 'break' outside loop
+
+
+
+
 
 * for loop which updates a value each iteration is supported.
 * temporary local variables can be used inside a loop
 
+.. _debugging:
 
 Debugging
 ---------
