@@ -184,4 +184,43 @@ def VJPOp : Gradient_Op<"vjp", [
     let hasVerifier = 1;
 }
 
+def MitigateWithZNEOp : Gradient_Op<"mitigate_with_zne", [DeclareOpInterfaceMethods<CallOpInterface>,
+        DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
+    let summary = "Mitigate the error of a QNode with ZNE.";
+    let description = [{
+        The `quantum.mitigate_with_zne` operation computes the gradient of a function
+        using the finite difference method.
+
+        This operation acts much like the `func.call` operation, taking a
+        symbol reference and arguments to the original functionan as input.
+        However, instead of the function result, the ZNE mitigation is applied.
+
+        Example:
+
+        ```mlir
+        func.func @foo(%arg0: f64) -> f64 {
+            %res = arith.mulf %arg0, %arg0 : f64
+            func.return %res : f64
+        }
+
+        %0 = arith.constant 2.0 : f64
+        %1 = quantum.mitigate_with_zne @foo(%0) {scalarFactors=tensor<f64>}: (f64) -> f64
+        ```
+    }];
+
+    let arguments = (ins
+        FlatSymbolRefAttr:$callee,
+        Variadic<AnyType>:$params,
+        RankedTensorOf<[AnyFloat]>:$scalarFactors
+    );
+    
+    let results = (outs Variadic<AnyTypeOf<[AnyFloat, RankedTensorOf<[AnyFloat]>]>>);
+
+    let hasVerifier = 1;
+
+    let assemblyFormat = [{
+        $callee `(` $params `)` `scalar` `factors` `(` $scalarFactors `:` type($scalarFactors) `)` attr-dict `:` functional-type($params, results)
+    }];
+}
+
 #endif // GRADIENT_OPS
