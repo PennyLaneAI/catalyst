@@ -14,7 +14,7 @@ and this structure is captured and preserved during compilation.
 Catalyst provides various high-level functions, such as :func:`~.cond`,
 :func:`~.for_loop`, and :func:`~.while_loop`, that work with native PennyLane
 quantum operations. However, it can sometimes take a bit of work to rewrite
-existing Python code using these specific control functions. An experimental
+existing Python code using these specific control flow functions. An experimental
 feature of Catalyst, AutoGraph, instead allows Catalyst to work
 with **native Python control flow**, such as if statements and for loops.
 
@@ -113,7 +113,7 @@ flow statements:
 - ``if`` statements (including ``elif`` and ``else``)
 - ``for`` loops
 
-``while`` loops are currently not supported.
+``while`` loops are currently not supported, alongside ``break`` and ``continue`` statements.
 
 Nested functions
 ----------------
@@ -122,6 +122,10 @@ AutoGraph will continue to work even when the qjit-compiled function
 itself calls nested functions. All functions called within the
 qjit-compiled function will also have Python control flow captured
 and converted by AutoGraph.
+
+In addition, built-in functions from ``jax``, ``pennylane``, and ``catalyst``
+are automatically *excluded* from the AutoGraph conversion when called
+within the qjit-compiled function.
 
 .. code-block:: python
 
@@ -147,11 +151,11 @@ program:
 
 >>> g.jaxpr
 { lambda ; a:f64[] b:i64[]. let
-    c:f64[] = qfor[
+    c:f64[] = for[
       apply_reverse_transform=False
       body_jaxpr={ lambda ; d:i64[] e:f64[]. let
           f:bool[] = gt e 5.0
-          g:f64[] = qcond[
+          g:f64[] = cond[
             branch_jaxprs=[
               { lambda ; a:f64[] b_:f64[]. let c:f64[] = integer_pow[y=2] a in (c,) },
               { lambda ; a_:f64[] b:f64[]. let c:f64[] = integer_pow[y=3] b in (c,) }
@@ -254,7 +258,7 @@ be assigned in **all** branches. This means that you **must** include an
 >>> f(0.5)
 AutoGraphError: Some branches did not define a value for variable 'y'
 
-If the variable previous exists before the if statement, however, this restriction
+If the variable exists before the if statement, however, this restriction
 does not apply **as long as you don't change the type**:
 
 >>> @qjit(autograph=True)
@@ -285,7 +289,8 @@ Compatible type assignments
 
 Within an if statement, variable assignments must include JAX compatible
 types (Booleans, Python numeric types, JAX arrays, and PennyLane quantum
-operators). Not compatible types (such as strings) will result in an error:
+operators). Non-compatible types (such as strings) used
+after the if statement will result in an error:
 
 >>> @qjit(autograph=True)
 ... def f(x):
@@ -341,12 +346,12 @@ fallback to Python, and the loop will be unrolled at compile-time:
 array(-0.70710678)
 
 The Python ``range`` function is also fully supported by AutoGraph, even when
-its input is a **dynamic variable** (e.g., its numeric value is only known at
-compile time):
+its input is a **dynamic variable** (i.e., its numeric value is only known at
+runtime):
 
 >>> @qjit(autograph=True)
 ... def f(n):
-...     x = - jnp.log(n)
+...     x = -jnp.log(n)
 ...     for k in range(1, n + 1):
 ...         x = x + 1 / k
 ...     return x
@@ -356,9 +361,9 @@ array(0.57722066)
 Indexing within a loop
 ~~~~~~~~~~~~~~~~~~~~~~
 
-Indexing arrays within a for loop works, but care must be taken.
+Indexing arrays within a for loop will generally work, but care must be taken.
 
-For example, using static bounds to index a JAX array inside of a for loop:
+For example, using a for loop with static bounds to index a JAX array is straightforward:
 
 >>> dev = qml.device("lightning.qubit", wires=3)
 >>> @qjit(autograph=True)
@@ -371,13 +376,13 @@ For example, using static bounds to index a JAX array inside of a for loop:
 >>> f(weights)
 array(0.99500417)
 
-However, indexing within a for loop with AutoGraph requires that the object
-indexed is a JAX array or dynamic runtime variable.
+However, for optimal performance, indexing within a for loop with AutoGraph will require
+that the object indexed is a JAX array or dynamic runtime variable.
 
 If the array you are indexing within the for loop is not a JAX array
 or dynamic variable, but an object that can be converted to a JAX array
-(such as a NumPy array or a list of floats), then AutoGraph will fail to capture
-the for loop, and will fallback to Python to evaluate the loop at compile-time:
+(such as a NumPy array or a list of floats), then AutoGraph will raise a warning,
+and fallback to Python to evaluate the loop at compile-time:
 
 >>> @qjit(autograph=True)
 ... @qml.qnode(dev)
@@ -411,7 +416,7 @@ a JAX array:
 array(0.99500417)
 
 
-Note that if the object you are indexing **cannot** be converted to a JAX
+What if the object you are indexing **cannot** be converted to a JAX
 array? In this case, it is not possible for AutoGraph to capture this for
 loop. However, AutoGraph will continue to fallback to Python for interpreting
 the for loop:
@@ -456,7 +461,7 @@ array(-0.70710678)
 
 However AutoGraph conversion will fail if the object being indexed by the
 loop with dynamic bounds is **not** a JAX array, because you cannot index
-standard Python objects with dyanmic variables.
+standard Python objects with dynamic variables.
 
 In this case, AutoGraph will raise a warning, but the compilation of the function
 will ultimately fail:

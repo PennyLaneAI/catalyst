@@ -78,12 +78,12 @@ from catalyst.utils.exceptions import CompileError
 
 autograph_ignore_fallbacks = False
 """bool: Specify whether AutoGraph should avoid raising
-errors when conversion fails and control flow instead falls back
+warnings when conversion fails and control flow instead falls back
 to being interpreted by Python at compile-time.
 
 **Example**
 
-In certain cases, AutoGraph will fail to convert control flow(for example,
+In certain cases, AutoGraph will fail to convert control flow (for example,
 when an object that can not be converted to a JAX array is indexed in a
 loop), and will raise a warning informing of the failure.
 
@@ -94,7 +94,9 @@ loop), and will raise a warning informing of the failure.
 ...     for i in range(3):
 ...         qml.RX(float(x[i]), wires=i)
 ...     return qml.expval(qml.PauliZ(0))
-Warning: If you intended for the conversion to happen, make sure that the (now dynamic)
+Warning: Tracing of an AutoGraph converted for loop failed with an exception:
+...
+If you intended for the conversion to happen, make sure that the (now dynamic)
 loop variable is not used in tracing-incompatible ways, for instance by indexing a
 Python list with it. In that case, the list should be wrapped into an array.
 
@@ -120,9 +122,9 @@ control flow by Python at compile-time.
 
 **Example**
 
-In certain cases, AutoGraph will fail to convert control flow(for example,
-when an object that can not be converted to a JAX array is indexed in a
-loop), and will automatically fallback to interpreting the control
+In certain cases, AutoGraph will fail to convert control flow (for example,
+when an object that cannot be converted to a JAX array is indexed in a
+loop), and will automatically fallback to interpreting the control flow
 logic at compile-time via Python:
 
 >>> dev = qml.device("lightning.qubit", wires=1)
@@ -137,7 +139,7 @@ logic at compile-time via Python:
 array(-0.70710678)
 
 Setting this variable to ``True`` will cause AutoGraph
-to error rather than fallback when conversion fail:
+to error rather than fallback when conversion fails:
 
 >>> catalyst.autograph_strict_conversion = True
 >>> @qjit(autograph=True)
