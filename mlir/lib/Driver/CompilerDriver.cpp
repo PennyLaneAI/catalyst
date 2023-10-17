@@ -99,9 +99,9 @@ struct CatalystPassInstrumentation : public PassInstrumentation {
     }
 };
 
-
 // Run the callback with stack printing disabled
-void withoutStackTrace(MLIRContext *ctx, std::function<void()> callback) {
+void withoutStackTrace(MLIRContext *ctx, std::function<void()> callback)
+{
     auto old = ctx->shouldPrintStackTraceOnDiagnostic();
     ctx->printStackTraceOnDiagnostic(false);
     callback();
@@ -159,7 +159,8 @@ FailureOr<llvm::Function *> getJITFunction(MLIRContext *ctx, llvm::Module &llvmM
         }
     }
     withoutStackTrace(ctx, [&]() {
-        auto noteStream = emitRemark(loc, "Failed to find entry-point function among the following: ");
+        auto noteStream =
+            emitRemark(loc, "Failed to find entry-point function among the following: ");
         llvm::interleaveComma(visited, noteStream, [&](StringRef t) { noteStream << t; });
     });
 
@@ -488,7 +489,8 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
             }
         }
         else {
-            CO_MSG(options, Verbosity::Urgent, "Unable to infer catalyst.entry_point* function attributes\n");
+            CO_MSG(options, Verbosity::Urgent,
+                   "Unable to infer catalyst.entry_point* function attributes\n");
         }
 
         auto outfile = options.getObjectFile();
