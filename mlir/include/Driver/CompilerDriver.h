@@ -16,6 +16,7 @@
 
 #include <filesystem>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "mlir/IR/MLIRContext.h"
