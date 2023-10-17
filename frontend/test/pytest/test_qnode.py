@@ -72,7 +72,7 @@ def test_variable_capture_multiple_devices(_in, _out, backend):
 def test_unsupported_device():
     """Test unsupported device."""
 
-    @qml.qnode(qml.device("default.qubit", wires=2))
+    @qml.qnode(device=qml.device("default.qubit", wires=2))
     def func():
         return qml.probs()
 

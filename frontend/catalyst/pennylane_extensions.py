@@ -122,9 +122,13 @@ class QFunc:
 
     def __call__(self, *args, **kwargs):
         if isinstance(self, qml.QNode):
-            if self.device.short_name not in QFunc.RUNTIME_DEVICES:
+            if isinstance(self.device, qml.Device):
+                name = self.device.short_name
+            else:
+                name = self.device.name
+            if name not in QFunc.RUNTIME_DEVICES:
                 raise CompileError(
-                    f"The {self.device.short_name} device is not "
+                    f"The {name} device is not "
                     "supported for compilation at the moment."
                 )
 
