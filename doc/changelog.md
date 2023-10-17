@@ -93,7 +93,7 @@
   as removing `opt` and downloading the wheel.
   [(#298)](https://github.com/PennyLaneAI/catalyst/pull/298)
 
-* Remove the duplicate `rpath` warning for the paths to Catalyst libraries in the `INSTALLED` mode.
+* Remove a linker warning about duplicate `rpath`s when Catalyst wheels are installed on macOS.
   [(#314)](https://github.com/PennyLaneAI/catalyst/pull/314)
 
 <h3>Bug fixes</h3>
