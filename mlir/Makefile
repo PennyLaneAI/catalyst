@@ -28,7 +28,7 @@ help:
 	@echo "  format [version=?] to apply C++ formatter; use with 'version={version}' to run clang-format-{version} instead of clang-format"
 
 .PHONY: all
-all: llvm mhlo dialects enzyme
+all: llvm mhlo enzyme dialects
 
 .PHONY: llvm
 llvm:
@@ -120,7 +120,7 @@ test:
 .PHONY: clean
 clean:
 	@echo "clean build files"
-	rm -rf $(DIALECTS_BUILD_DIR) $(LLVM_BUILD_DIR) $(MHLO_BUILD_DIR)
+	rm -rf $(DIALECTS_BUILD_DIR) $(LLVM_BUILD_DIR) $(MHLO_BUILD_DIR) $(ENZYME_BUILD_DIR)
 
 .PHONY: format
 format:

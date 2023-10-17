@@ -15,6 +15,9 @@ on:
       python_versions:
         description: "List of Python versions"
         value: ${{ jobs.set-constants.outputs.python_versions }}
+      primary_python_version:
+        description: "Primary Python version for unrelated tests"
+        value: ${{ jobs.set-constants.outputs.primary_python_version }}
       rt_backends:
         description: "List of backends."
         value: ${{ jobs.set-constants.outputs.rt_backends }}
@@ -41,7 +44,13 @@ jobs:
 
       - name: Python versions
         id: python_versions
-        run: echo 'python_versions=["3.9", "3.10", "3.11"]' >> $GITHUB_OUTPUT
+        run: |
+          echo 'python_versions=["3.9", "3.10", "3.11"]' >> $GITHUB_OUTPUT
+
+      - name: Primary Python version
+        id: primary_python_version
+        run: |
+          echo 'primary_python_version=3.10' >> $GITHUB_OUTPUT
 
       - name: Runtime Backend Devices
         id: rt_backends
@@ -52,4 +61,5 @@ jobs:
       mhlo_version: ${{ steps.mhlo_version.outputs.mhlo_version }}
       enzyme_version: ${{ steps.enzyme_version.outputs.enzyme_version }}
       python_versions: ${{ steps.python_versions.outputs.python_versions }}
+      primary_python_version: ${{ steps.primary_python_version.outputs.primary_python_version }}
       rt_backends: ${{ steps.rt_backends.outputs.rt_backends }}

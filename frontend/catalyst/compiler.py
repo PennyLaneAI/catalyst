@@ -21,16 +21,17 @@ import platform
 import shutil
 import subprocess
 import sys
-import tempfile
 import warnings
+from copy import deepcopy
 from dataclasses import dataclass
 from io import TextIOWrapper
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Tuple
 
 from mlir_quantum.compiler_driver import run_compiler_driver
 
 from catalyst._configuration import INSTALLED
 from catalyst.utils.exceptions import CompileError
+from catalyst.utils.filesystem import Directory
 
 package_root = os.path.dirname(__file__)
 
@@ -51,6 +52,8 @@ class CompileOptions:
             to a list of MLIR passes.
         autograph (Optional[bool]): flag indicating whether experimental autograph support is to
             be enabled.
+        lower_to_llvm (Optional[bool]): flag indicating whether to attempt the LLVM lowering after
+            the main compilation pipeline is complete. Default is ``True``.
     """
 
     verbose: Optional[bool] = False
@@ -59,6 +62,22 @@ class CompileOptions:
     keep_intermediate: Optional[bool] = False
     pipelines: Optional[List[Any]] = None
     autograph: Optional[bool] = False
+    lower_to_llvm: Optional[bool] = True
+
+    def __deepcopy__(self, memo):
+        """Make a deep copy of all fields of a CompileOptions object except the logfile, which is
+        copied directly"""
+        return CompileOptions(
+            **{
+                k: (deepcopy(v) if k != "logfile" else self.logfile)
+                for k, v in self.__dict__.items()
+                if k != "logfile"
+            }
+        )
+
+    def get_pipelines(self) -> List[Tuple[str, List[str]]]:
+        """Get effective pipelines"""
+        return self.pipelines if self.pipelines is not None else DEFAULT_PIPELINES
 
 
 def run_writing_command(command: List[str], compile_options: Optional[CompileOptions]) -> None:
@@ -200,23 +219,36 @@ class LinkerDriver:
         """
         mlir_lib_path = get_lib_path("llvm", "MLIR_LIB_DIR")
         rt_lib_path = get_lib_path("runtime", "RUNTIME_LIB_DIR")
-        error_flag_apple = "-Wl,-arch_errors_fatal"
+
+        lib_path_flags = [
+            f"-Wl,-rpath,{mlir_lib_path}",
+            f"-L{mlir_lib_path}",
+        ]
+
+        if rt_lib_path != mlir_lib_path:
+            lib_path_flags += [
+                f"-Wl,-rpath,{rt_lib_path}",
+                f"-L{rt_lib_path}",
+            ]
+        else:
+            pass  # pragma: nocover
+
+        system_flags = []
+        if platform.system() == "Linux":
+            system_flags += ["-Wl,-no-as-needed"]
+        elif platform.system() == "Darwin":  # pragma: nocover
+            system_flags += ["-Wl,-arch_errors_fatal"]
 
         default_flags = [
             "-shared",
             "-rdynamic",
-            f"-Wl,-rpath,{rt_lib_path}",
-            f"-Wl,-rpath,{mlir_lib_path}",
-            f"-L{mlir_lib_path}",
-            f"-L{rt_lib_path}",
+            *system_flags,
+            *lib_path_flags,
             "-lrt_backend",
             "-lrt_capi",
             "-lpthread",
             "-lmlir_c_runner_utils",  # required for memref.copy
         ]
-
-        if platform.system() == "Darwin":  # pragma: no cover
-            default_flags += [error_flag_apple]
 
         return default_flags
 
@@ -308,27 +340,17 @@ class Compiler:
     """Compiles MLIR modules to shared objects by executing the Catalyst compiler driver library."""
 
     def __init__(self, options: Optional[CompileOptions] = None):
-        self.options = options if options is not None else CompileOptions
+        self.options = options if options is not None else CompileOptions()
         self.last_compiler_output = None
-        self.last_workspace = None
-        self.last_tmpdir = None
 
-    def run_from_ir(
-        self,
-        ir: str,
-        module_name: str,
-        pipelines=None,
-        lower_to_llvm=True,
-    ):
+    # pylint: disable=too-many-arguments
+    def run_from_ir(self, ir: str, module_name: str, workspace: Directory):
         """Compile a shared object from a textual IR (MLIR or LLVM).
 
         Args:
             ir (str): Textual MLIR to be compiled
             module_name (str): Module name to use for naming
-            pipelines (list, optional): Custom compilation pipelines configuration. The default is
-                                        None which means to use the default pipelines config.
-            lower_to_llvm (bool, optional): Whether to lower to LLVM after finishing processing of
-                                            the pipelines. Defaults to True.
+            workspace (Directory): directory that holds output files and/or debug dumps.
 
         Returns:
             output_filename (str): Output file name. For the default pipeline this would be the
@@ -339,31 +361,30 @@ class Compiler:
                func_name (str) Inferred name of the main function
                ret_type_name (str) Inferred main function result type name
         """
-        pipelines = pipelines if pipelines is not None else DEFAULT_PIPELINES
-        if self.options.keep_intermediate:
-            workspace = os.path.abspath(os.path.join(os.getcwd(), module_name))
-            os.makedirs(workspace, exist_ok=True)
-        else:
-            # pylint: disable=consider-using-with
-            if self.last_tmpdir:
-                self.last_tmpdir.cleanup()
-            self.last_tmpdir = tempfile.TemporaryDirectory()
-            workspace = self.last_tmpdir.name
+        assert isinstance(
+            workspace, Directory
+        ), f"Compiler expects a Directory type, got {type(workspace)}."
+        assert workspace.is_dir(), f"Compiler expects an existing directory, got {workspace}."
 
-        self.last_workspace = workspace
+        lower_to_llvm = (
+            self.options.lower_to_llvm if self.options.lower_to_llvm is not None else False
+        )
 
         if self.options.verbose:
             print(f"[LIB] Running compiler driver in {workspace}", file=self.options.logfile)
 
-        compiler_output = run_compiler_driver(
-            ir,
-            workspace,
-            module_name,
-            keep_intermediate=self.options.keep_intermediate,
-            verbose=self.options.verbose,
-            pipelines=pipelines,
-            lower_to_llvm=lower_to_llvm,
-        )
+        try:
+            compiler_output = run_compiler_driver(
+                ir,
+                str(workspace),
+                module_name,
+                keep_intermediate=self.options.keep_intermediate,
+                verbose=self.options.verbose,
+                pipelines=self.options.get_pipelines(),
+                lower_to_llvm=lower_to_llvm,
+            )
+        except RuntimeError as e:
+            raise CompileError(*e.args) from e
 
         if self.options.verbose:
             for line in compiler_output.get_diagnostic_messages().strip().split("\n"):
@@ -402,8 +423,8 @@ class Compiler:
             mlir_module.operation.get_asm(
                 binary=False, print_generic_op_form=False, assume_verified=True
             ),
+            str(mlir_module.operation.attributes["sym_name"]).replace('"', ""),
             *args,
-            module_name=str(mlir_module.operation.attributes["sym_name"]).replace('"', ""),
             **kwargs,
         )
 
@@ -415,11 +436,13 @@ class Compiler:
         Returns
             (Optional[str]): output IR
         """
-        return (
-            self.last_compiler_output.get_pipeline_output(pipeline)
-            if self.last_compiler_output
-            else None
-        )
+        if len(dict(self.options.get_pipelines()).get(pipeline, [])) == 0:
+            warnings.warn("Requesting an output of an empty pipeline")  # pragma: no cover
+
+        if not self.last_compiler_output:
+            return None
+
+        return self.last_compiler_output.get_pipeline_output(pipeline)
 
     def print(self, pipeline):
         """Print the output IR of pass.
