@@ -534,14 +534,14 @@ def trace_quantum_function(
                 # Quantum tape transformations happen at the end of tracing
                 ans = wffa.call_wrapped(*in_classical_tracers)
             
-            ans = tree_unflatten(wffa.stores[0].val, ans)
-            def is_leaf(obj):
-                return isinstance(obj, qml.measurements.MeasurementProcess)
-            ans, out_tree = jax.tree_util.tree_flatten(ans, is_leaf=is_leaf)
+                ans = tree_unflatten(wffa.stores[0].val, ans)
+                def is_leaf(obj):
+                    return isinstance(obj, qml.measurements.MeasurementProcess)
+                ans, out_tree = jax.tree_util.tree_flatten(ans, is_leaf=is_leaf)
 
-            out_classical_tracers_or_measurements = [
-                (trace.full_raise(t) if isinstance(t, DynamicJaxprTracer) else t) for t in ans
-            ]
+                out_classical_tracers_or_measurements = [
+                    (trace.full_raise(t) if isinstance(t, DynamicJaxprTracer) else t) for t in ans
+                ]
 
 
         # (2) - Quantum tracing
