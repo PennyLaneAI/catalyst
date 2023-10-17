@@ -323,7 +323,9 @@ def for_stmt(
     set_state(results)
 
 
-def call_catalyst_while(loop_test, loop_body, get_state, set_state, nonlocals, symbol_names):
+def _call_catalyst_while(loop_test, loop_body, get_state, set_state, _nonlocals, _symbol_names):
+    """Dispatch to a Catalyst implementation of while loops."""
+
     def _test(var):
         old = get_state()
         set_state((var,))
@@ -342,7 +344,9 @@ def call_catalyst_while(loop_test, loop_body, get_state, set_state, nonlocals, s
     return iter_results
 
 
-def call_python_while(loop_test, loop_body, get_state, set_state, nonlocals, symbol_names):
+def _call_python_while(loop_test, loop_body, get_state, _set_state, _nonlocals, _symbol_names):
+    """Fallback to a Python implementation of while loops."""
+
     while loop_test():
         loop_body()
 
@@ -350,11 +354,14 @@ def call_python_while(loop_test, loop_body, get_state, set_state, nonlocals, sym
 
 
 def while_stmt(loop_test, loop_body, get_state, set_state, nonlocals, symbol_names):
+    """An implementation of the AutoGraph 'while .. ..' statement. The interface is defined by
+    AutoGraph, here we merely provide an implementation of it in terms of Catalyst primitives."""
+
     fallback = False
 
     if not fallback:
         try:
-            results = call_catalyst_while(
+            results = _call_catalyst_while(
                 loop_test, loop_body, get_state, set_state, nonlocals, symbol_names
             )
 
