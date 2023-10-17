@@ -67,6 +67,7 @@ endif()
 
 target_sources(runner_tests PRIVATE ${cov_helper_src}
             ${openqasm_tests}
+            Test_LoadingThirdParty.cpp
             Test_QubitManager.cpp
             Test_CacheManager.cpp
             Test_LightningDriver.cpp
