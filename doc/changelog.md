@@ -93,6 +93,9 @@
   as removing `opt` and downloading the wheel.
   [(#298)](https://github.com/PennyLaneAI/catalyst/pull/298)
 
+* Remove a linker warning about duplicate `rpath`s when Catalyst wheels are installed on macOS.
+  [(#314)](https://github.com/PennyLaneAI/catalyst/pull/314)
+
 <h3>Bug fixes</h3>
 
 * Remove undocumented package dependency on the zlib/zstd compression library.

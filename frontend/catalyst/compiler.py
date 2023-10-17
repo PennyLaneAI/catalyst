@@ -202,13 +202,23 @@ class LinkerDriver:
         rt_lib_path = get_lib_path("runtime", "RUNTIME_LIB_DIR")
         error_flag_apple = "-Wl,-arch_errors_fatal"
 
+        lib_path = [
+            f"-Wl,-rpath,{mlir_lib_path}",
+            f"-L{mlir_lib_path}",
+        ]
+
+        if rt_lib_path != mlir_lib_path:
+            lib_path.extend(
+                [
+                    f"-Wl,-rpath,{rt_lib_path}",
+                    f"-L{rt_lib_path}",
+                ]
+            )
+
         default_flags = [
             "-shared",
             "-rdynamic",
-            f"-Wl,-rpath,{rt_lib_path}",
-            f"-Wl,-rpath,{mlir_lib_path}",
-            f"-L{mlir_lib_path}",
-            f"-L{rt_lib_path}",
+            *lib_path,
             "-lrt_backend",
             "-lrt_capi",
             "-lpthread",
