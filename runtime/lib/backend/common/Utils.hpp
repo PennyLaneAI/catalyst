@@ -30,7 +30,7 @@
 #include "UtilKokkos.hpp"
 #endif
 
-#if __has_include("StateVectorDynamicCPU.hpp")
+#if __has_include("StateVectorLQubitDynamic.hpp")
 #include "Util.hpp"
 #endif
 
