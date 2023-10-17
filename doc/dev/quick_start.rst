@@ -419,6 +419,7 @@ Catalyst has support for natively compiled control flow as "first-class" compone
 program, providing a much smaller representation and compilation time for large circuits, and also enabling
 the compilation of arbitrarily parametrized circuits.
 
+
 **Catalyst-provided control flow operations:**
 
 .. raw:: html
@@ -435,6 +436,12 @@ the compilation of arbitrarily parametrized circuits.
 .. raw:: html
 
     </div>
+
+.. note::
+
+    Catalyst supports automatic conversion of native Python control
+    flow to the Catalyst control flow operations. For more details,
+    see the :doc:`AutoGraph guide <autograph>`.
 
 Conditionals
 ------------

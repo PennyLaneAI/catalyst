@@ -821,7 +821,8 @@ def qjit(
         autograph (bool): Experimental support for automatically converting Python control
             flow statements to Catalyst-compatible control flow. Currently supports Python ``if``,
             ``elif``, ``else``, and ``for`` statements. Note that this feature requires an
-            available TensorFlow installation.
+            available TensorFlow installation. For more details, see the
+            :doc:`AutoGraph guide </dev/autograph>`.
         target (str): the compilation target
         keep_intermediate (bool): Whether or not to store the intermediate files throughout the
             compilation. If ``True``, intermediate representations are available via the
@@ -886,10 +887,13 @@ def qjit(
     array([0.75634905-0.52801002j, 0. +0.j,
            0.35962678+0.14074839j, 0. +0.j])
 
+    For more details on compilation and debugging, please see :doc:`/dev/sharp_bits`.
+
     Catalyst also supports capturing imperative Python control flow in compiled programs. You can
     enable this feature via the ``autograph=True`` parameter. Note that it does come with some
-    restrictions, in particular whenever global state is involved. Refer to the documentation page
-    for a complete discussion of the supported and unsupported use-cases.
+    restrictions, in particular whenever global state is involved. Refer to the
+    :doc:`AutoGraph guide </dev/autograph>` for a complete discussion of the
+    supported and unsupported use-cases.
 
     .. code-block:: python
 
