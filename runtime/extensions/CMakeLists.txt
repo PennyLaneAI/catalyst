@@ -12,6 +12,15 @@ FetchContent_Declare(
 )
 set(CMAKE_POSITION_INDEPENDENT_CODE ON) # build with -fPIC
 set(ENABLE_KOKKOS OFF CACHE BOOL "Enable Kokkos")
+
+if(ENABLE_LIGHTNING AND ENABLE_LIGHTNING_KOKKOS)
+    set(PL_BACKEND "lightning_qubit;lightning_kokkos" CACHE STRING "PennyLane Lightning backend")
+elseif(ENABLE_LIGHTNING)
+    set(PL_BACKEND "lightning_qubit" CACHE STRING "PennyLane Lightning backend")
+elseif(ENABLE_LIGHTNING_KOKKOS)
+    set(PL_BACKEND "lightning_kokkos" CACHE STRING "PennyLane Lightning backend")
+endif()
+
 set(ENABLE_PYTHON OFF CACHE BOOL "Enable compilation of the Python module")
 FetchContent_MakeAvailable(pennylane_lightning)
 
@@ -22,19 +31,6 @@ target_include_directories(rt_interfaces INTERFACE .)
 
 set(LIGHTNING_KOKKOS_GIT_TAG "main" CACHE STRING "GIT_TAG value to build Lightning-Kokkos")
 
-if(ENABLE_LIGHTNING_KOKKOS)
-    FetchContent_Declare(
-        pennylane_lightning_kokkos
-        GIT_REPOSITORY https://github.com/PennyLaneAI/pennylane-lightning-kokkos.git
-        GIT_TAG        ${LIGHTNING_KOKKOS_GIT_TAG}
-    )
-
-    set(PL_BACKEND "lightning_qubit")
-    set(PLKOKKOS_ENABLE_PYTHON OFF CACHE BOOL "Enable compilation of the Python bindings")
-    FetchContent_MakeAvailable(pennylane_lightning_kokkos)
-
-    target_link_libraries(rt_interfaces INTERFACE pennylane_lightning_kokkos)
-endif()
 
 if(ENABLE_OPENQASM)
     find_package(pybind11 CONFIG)

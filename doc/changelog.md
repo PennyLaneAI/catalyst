@@ -71,6 +71,10 @@
 
 <h3>Improvements</h3>
 
+* The Lightning backend device has been updated to work with the new PL-Lightning monorepo.
+  [(#259)](https://github.com/PennyLaneAI/catalyst/pull/259)
+  [(#277)](https://github.com/PennyLaneAI/catalyst/pull/277)
+
 * A new compiler driver has been implemented in C++. This improves compile-time performance by
   avoiding *round-tripping*, which is when the entire program being compiled is dumped to
   a textual form and re-parsed by another tool.
