@@ -528,7 +528,7 @@ def trace_quantum_function(
         # (1) - Classical tracing
         quantum_tape = QuantumTape()
         with EvaluationContext.frame_tracing_context(ctx) as trace:
-            wffa, in_avals, _ = deduce_avals(f, args, kwargs)
+            wffa, in_avals, out_tree_promise = deduce_avals(f, args, kwargs)
             in_classical_tracers = _input_type_to_tracers(trace.new_arg, in_avals)
             with QueuingManager.stop_recording(), quantum_tape:
                 # Quantum tape transformations happen at the end of tracing
@@ -541,7 +541,7 @@ def trace_quantum_function(
 
             # 1. Recompute the original return
             with QueuingManager.stop_recording():
-                ans = tree_unflatten(wffa.stores[0].val, ans)
+                ans = tree_unflatten(out_tree_promise(), ans)
 
             def is_leaf(obj):
                 return isinstance(obj, qml.measurements.MeasurementProcess)
