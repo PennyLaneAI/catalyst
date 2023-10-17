@@ -128,8 +128,7 @@ class QFunc:
                 name = self.device.name
             if name not in QFunc.RUNTIME_DEVICES:
                 raise CompileError(
-                    f"The {name} device is not "
-                    "supported for compilation at the moment."
+                    f"The {name} device is not " "supported for compilation at the moment."
                 )
 
             backend_kwargs = {}
