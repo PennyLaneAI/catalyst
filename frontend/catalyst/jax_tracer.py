@@ -533,9 +533,16 @@ def trace_quantum_function(
             with QueuingManager.stop_recording(), quantum_tape:
                 # Quantum tape transformations happen at the end of tracing
                 ans = wffa.call_wrapped(*in_classical_tracers)
+
+            def is_leaf(obj):
+                return isinstance(obj, qml.measurements.MeasurementProcess)
             ans = tree_unflatten(wffa.stores[0].val, ans)
+            print(ans)
+            leaves, tree = jax.tree_util.tree_flatten(ans, is_leaf=is_leaf)
+            print(tree)
+
             out_classical_tracers_or_measurements = [
-                (trace.full_raise(t) if isinstance(t, DynamicJaxprTracer) else t) for t in ans
+                (trace.full_raise(t) if isinstance(t, DynamicJaxprTracer) else t) for t in leaves
             ]
 
 
@@ -545,12 +552,11 @@ def trace_quantum_function(
             qdevice_p.bind(spec="backend", val=device.backend_name)
             qreg_in = qalloc_p.bind(len(device.wires))
             qrp_out = trace_quantum_tape(quantum_tape, device, qreg_in, ctx, trace)
-            a = out_tree_promise()
             out_classical_tracers, out_classical_tree = trace_quantum_measurements(
                 device,
                 qrp_out,
                 out_classical_tracers_or_measurements,
-                a,
+                tree,
             )
             out_quantum_tracers = [qrp_out.actualize()]
             qdealloc_p.bind(qreg_in)
@@ -568,20 +574,7 @@ def trace_quantum_function(
     closed_jaxpr = ClosedJaxpr(jaxpr, consts)
     out_avals, _ = unzip2(out_type)
 
-    def recursive_iterate(iterable):
-        new_iterable = []
-        for item in iterable:
-            if isinstance(item, (MeasurementProcess)):
-                # Add shape here
-                new_iterable.append(1.0)
-            else:
-                new_iterable.append(item)
-                if isinstance(item, (tuple, list, dict)) and len(item) != 0:
-                    recursive_iterate(item)
-        return new_iterable
-    _, out_tree = jax.tree_util.tree_flatten(recursive_iterate(ans))
-    
     abstract_results = tree_unflatten(
-        out_tree, [ShapeDtypeStruct(a.shape, a.dtype, a.named_shape) for a in out_avals]
+        out_classical_tree, [ShapeDtypeStruct(a.shape, a.dtype, a.named_shape) for a in out_avals]
     )
     return closed_jaxpr, abstract_results
