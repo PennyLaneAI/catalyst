@@ -53,6 +53,7 @@ target_include_directories(rt_capi PUBLIC .
                                         ${runtime_includes}
                                         ${capi_utils_includes}
                                         ${backend_includes}
+                                        ${CMAKE_DL_LIBS}
                                         ${extensions_includes})
 
 set_property(TARGET rt_capi PROPERTY POSITION_INDEPENDENT_CODE ON)

@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <dlfcn.h>
 #include <functional>
 #include <memory>
 #include <string>
@@ -59,6 +60,8 @@ class MemoryManager final {
     bool contains(void *ptr) { return _impl.contains(ptr); }
 };
 
+extern "C" Catalyst::Runtime::QuantumDevice *getCustomDevice();
+
 class ExecutionContext final {
   private:
     using DeviceInitializer =
@@ -80,6 +83,7 @@ class ExecutionContext final {
     // ExecutionContext pointers
     std::unique_ptr<QuantumDevice> _driver_ptr{nullptr};
     std::unique_ptr<MemoryManager> _driver_mm_ptr{nullptr};
+    void *_driver_lib_ptr{nullptr};
 
 #ifdef __device_openqasm
     std::unique_ptr<Device::OpenQasm::PythonInterpreterGuard> _py_guard{nullptr};
@@ -127,6 +131,38 @@ class ExecutionContext final {
 
     [[nodiscard]] auto getDeviceRecorderStatus() const -> bool { return _tape_recording; }
 
+    [[nodiscard]] QuantumDevice *loadDevice(std::string filename)
+    {
+
+        if (filename.find(".so") == std::string::npos) {
+            return NULL;
+        }
+        int retval = 0;
+        if (_driver_lib_ptr) {
+            retval = dlclose(_driver_lib_ptr);
+        }
+
+        if (0 != retval) {
+            char *error_msg = dlerror();
+            throw RuntimeException(error_msg);
+        }
+
+        void *handler = dlopen(filename.data(), RTLD_LAZY | RTLD_DEEPBIND);
+        if (!handler) {
+            char *error_msg = dlerror();
+            throw RuntimeException(error_msg);
+        }
+
+        void *f_ptr = dlsym(handler, "getCustomDevice");
+        if (!f_ptr) {
+            char *error_msg = dlerror();
+            throw RuntimeException(error_msg);
+        }
+
+        _driver_lib_ptr = handler;
+        return reinterpret_cast<decltype(getCustomDevice) *>(f_ptr)();
+    }
+
     [[nodiscard]] bool initDevice(std::string_view name) noexcept
     {
         if (name != "default") {
@@ -153,7 +189,13 @@ class ExecutionContext final {
 
             return true;
         }
-        return false;
+
+        QuantumDevice *impl = loadDevice(std::string(name));
+        if (!impl)
+            return false;
+
+        _driver_ptr.reset(impl);
+        return true;
     }
 
     [[nodiscard]] auto getDevice() const -> const std::unique_ptr<QuantumDevice> &
