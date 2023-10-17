@@ -22,6 +22,7 @@ import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
 import pytest
+from numpy.testing import assert_allclose
 
 from catalyst import cond, for_loop, measure, qjit
 from catalyst.ag_utils import AutoGraphError, autograph_source, check_cache
@@ -1075,6 +1076,26 @@ class TestForLoops:
             return acc
 
         assert f() == 9
+
+
+@pytest.mark.tf
+class TestWhileLoops:
+    """Test that the autograph transformations produce correct results on while loops."""
+
+    def test_whileloop_basic(self, monkeypatch):
+        """Test basic while-loop functionality"""
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        @qjit(autograph=True)
+        @qml.qnode(qml.device("lightning.qubit", wires=4))
+        def f(param):
+            i = 0
+            while i < param:
+                i += 3
+            return i
+
+        result = f(3)
+        assert result == 3
 
 
 @pytest.mark.tf
