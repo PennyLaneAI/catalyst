@@ -230,11 +230,13 @@ class LinkerDriver:
                 f"-Wl,-rpath,{rt_lib_path}",
                 f"-L{rt_lib_path}",
             ]
+        else:
+            pass  # pragma: nocover
 
         system_flags = []
         if platform.system() == "Linux":
             system_flags += ["-Wl,-no-as-needed"]
-        elif platform.system() == "Darwin":  # pragma: no cover
+        elif platform.system() == "Darwin":  # pragma: nocover
             system_flags += ["-Wl,-arch_errors_fatal"]
 
         default_flags = [
