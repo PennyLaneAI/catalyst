@@ -12,11 +12,15 @@
 
 <h3>Bug fixes</h3>
 
+* Update the frontend to make it compatible with measurements as PyTrees in PennyLane `0.33.0`.
+  [(#315)](https://github.com/PennyLaneAI/catalyst/pull/315)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
 
-Sergei Mironov.
+Sergei Mironov,
+Romain Moyard.
 
 # Release 0.3.1
 
