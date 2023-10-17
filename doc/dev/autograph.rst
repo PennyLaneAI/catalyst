@@ -89,10 +89,9 @@ AutoGraph, but instead using :func:`~.cond` and :func:`~.for_loop`:
                     qml.RX(x[j], wires=j)
 
                 @trainable_gate.else_if(x[j] < 0)
-                def negative_gate():
+                def trainable_gate():
                     qml.RY(x[j], wires=j)
 
-                trainable_gate.otherwise(lambda: None)
                 trainable_gate()
 
             def cnot_loop(j):
@@ -513,6 +512,10 @@ For loops that update variables can also be converted with AutoGraph:
 >>> f(4)
 array(13)
 
+However, like with conditionals, a similar restriction applies: variables
+which are updated across iterations of the loop must have a JAX compileable
+type (Booleans, Python numeric types, and JAX arrays).
+
 You can also utilize temporary variables within a for loop:
 
 >>> @qjit(autograph=True)
@@ -523,6 +526,9 @@ You can also utilize temporary variables within a for loop:
 ...     return x
 >>> f(4)
 array(22)
+
+Temporary variables used inside a loop --- and that are **not** passed to a
+function within the loop --- do not have any type restrictions.
 
 .. _debugging:
 
