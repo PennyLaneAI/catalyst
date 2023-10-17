@@ -98,6 +98,15 @@
 
 <h3>Bug fixes</h3>
 
+* Fix incompatibilities with GCC on Linux introduced in v0.3.0 when compiling user programs.
+  Due to these, Catalyst v0.3.0 only works when clang is installed in the user environment.
+
+  - Resolve an issue with an empty linker flag, causing `ld` to error.
+    [(#276)](https://github.com/PennyLaneAI/catalyst/pull/276)
+
+  - Resolve an issue with undefined symbols provided the Catalyst runtime.
+    [(#316)](https://github.com/PennyLaneAI/catalyst/pull/316)
+
 * Remove undocumented package dependency on the zlib/zstd compression library.
   [(#308)](https://github.com/PennyLaneAI/catalyst/pull/308)
 
@@ -114,14 +123,12 @@
   [(#304)](https://github.com/PennyLaneAI/catalyst/pull/304)
   [(#310)](https://github.com/PennyLaneAI/catalyst/pull/310)
 
-* Fix linking errors on Linux systems without a Clang installation.
-  [(#276)](https://github.com/PennyLaneAI/catalyst/pull/276)
-
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
 
 Ali Asadi,
+David Ittah,
 Erick Ochoa Lopez,
 Jacob Mai Peng,
 Sergei Mironov,
@@ -511,7 +518,7 @@ Romain Moyard.
   [(#211)](https://github.com/PennyLaneAI/catalyst/pull/211)
 
 * Fixed the incorrect return value data-type with functions returning `qml.counts`.
- [(#221)](https://github.com/PennyLaneAI/catalyst/pull/221)
+  [(#221)](https://github.com/PennyLaneAI/catalyst/pull/221)
 
 * Fix segmentation fault when differentiating a function where a quantum measurement is used
   multiple times by the same operation.
