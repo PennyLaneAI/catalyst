@@ -38,9 +38,8 @@ frontends.**
 
 - Built to be end-to-end differentiable.
 
-- Support for [Lightning](https://github.com/PennyLaneAI/pennylane-lightning) and
-  [Lightning-Kokkos](https://github.com/PennyLaneAI/pennylane-lightning-kokkos)
-  high performance simulators, and [Amazon Braket](https://amazon-braket-pennylane-plugin-python.readthedocs.io)
+- Support for [PennyLane-Lightning](https://github.com/PennyLaneAI/pennylane-lightning) high performance
+  simulators, and [Amazon Braket](https://amazon-braket-pennylane-plugin-python.readthedocs.io)
   devices. Additional hardware support, including QPUs to come.
 
 ## Overview
