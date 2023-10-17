@@ -472,10 +472,6 @@ will ultimately fail:
 ...     for i in range(n):
 ...         qml.RY(x[i], wires=0)
 ...     return qml.expval(qml.PauliZ(0))
-Warning: If you intended for the conversion to happen, make sure that the(now dynamic) loop variable is not used in tracing-incompatible ways,
-for instance by indexing a Python list with it. In that case, the list should be wrapped into an array.
-To understand different types of JAX tracing errors, please refer to the guide at: https://jax.readthedocs.io/en/latest/errors.html
-If you did not intend for the conversion to happen, you may safely ignore this warning.
 TracerIntegerConversionError: The __index__() method was called on traced array with shape int64[].
 See https://jax.readthedocs.io/en/latest/errors.html#jax.errors.TracerIntegerConversionError
 
