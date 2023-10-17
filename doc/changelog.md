@@ -1,3 +1,23 @@
+# Release 0.3.2-dev
+
+<h3>New features</h3>
+
+<h3>Improvements</h3>
+
+* Improve the compiler driver diagnostic output. The driver now provides more context for error
+  messages and includes a verbose trace if verbose mode is enabled.
+  [(#303)](https://github.com/PennyLaneAI/catalyst/pull/303)
+
+<h3>Breaking changes</h3>
+
+<h3>Bug fixes</h3>
+
+<h3>Contributors</h3>
+
+This release contains contributions from (in alphabetical order):
+
+Sergei Mironov.
+
 # Release 0.3.1
 
 <h3>New features</h3>
@@ -1002,7 +1022,6 @@ Sergei Mironov.
 * Allow ``catalyst.grad`` to be used on any traceable function (within a qjit context).
   This means the operation is no longer restricted to acting on ``qml.qnode``s only.
   [#75](https://github.com/PennyLaneAI/catalyst/pull/75)
-
 
 <h3>Improvements</h3>
 
