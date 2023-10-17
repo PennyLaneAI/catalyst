@@ -18,8 +18,10 @@ compiling of hybrid quantum-classical functions using Catalyst.
 import ctypes
 import functools
 import inspect
+import pathlib
 import typing
 import warnings
+from copy import deepcopy
 from enum import Enum
 
 import jax
@@ -43,6 +45,7 @@ from catalyst.pennylane_extensions import QFunc
 from catalyst.utils import wrapper  # pylint: disable=no-name-in-module
 from catalyst.utils.c_template import get_template, mlir_type_to_numpy_type
 from catalyst.utils.contexts import EvaluationContext
+from catalyst.utils.filesystem import WorkspaceManager
 from catalyst.utils.gen_mlir import inject_functions
 from catalyst.utils.patching import Patcher
 
@@ -479,15 +482,30 @@ class QJIT:
         if compile_options.autograph:
             self.user_function = run_autograph(fn)
 
+        # QJIT is the owner of workspace.
+        # do not move to compiler.
+        preferred_workspace_dir = (
+            pathlib.Path.cwd() if self.compile_options.keep_intermediate else None
+        )
+        # If we are compiling from textual ir, just use this as the name of the function.
+        name = "compiled_function"
+        if not self.compiling_from_textual_ir:
+            # pylint: disable=no-member
+            # Guaranteed to exist after functools.update_wrapper AND not compiling from textual IR
+            name = self.__name__
+
+        self.workspace = WorkspaceManager.get_or_create_workspace(name, preferred_workspace_dir)
+
         if self.compiling_from_textual_ir:
             EvaluationContext.check_is_not_tracing("Cannot compile from IR in tracing context.")
-        else:
-            parameter_types = get_type_annotations(self.user_function)
-            if parameter_types is not None:
-                self.user_typed = True
-                self.mlir_module = self.get_mlir(*parameter_types)
-                if self.compile_options.target == "binary":
-                    self.compiled_function = self.compile()
+            return
+
+        parameter_types = get_type_annotations(self.user_function)
+        if parameter_types is not None:
+            self.user_typed = True
+            self.mlir_module = self.get_mlir(*parameter_types)
+            if self.compile_options.target == "binary":
+                self.compiled_function = self.compile()
 
     def print_stage(self, stage):
         """Print one of the recorded stages.
@@ -537,15 +555,16 @@ class QJIT:
         inject_functions(mlir_module, ctx)
         self._jaxpr = jaxpr
 
-        _, self._mlir, _ = self.compiler.run(
-            mlir_module,
-            lower_to_llvm=False,
-            pipelines=[("pipeline", ["canonicalize"])],
-        )
+        canonicalizer_options = deepcopy(self.compile_options)
+        canonicalizer_options.pipelines = [("pipeline", ["canonicalize"])]
+        canonicalizer_options.lower_to_llvm = False
+        canonicalizer = Compiler(canonicalizer_options)
+        _, self._mlir, _ = canonicalizer.run(mlir_module, self.workspace)
         return mlir_module
 
     def compile(self):
         """Compile the current MLIR module."""
+
         if self.compiled_function and self.compiled_function.shared_object:
             self.compiled_function.shared_object.close()
 
@@ -553,7 +572,7 @@ class QJIT:
             # Module name can be anything.
             module_name = "catalyst_module"
             shared_object, llvm_ir, inferred_func_data = self.compiler.run_from_ir(
-                self.user_function, module_name
+                self.user_function, module_name, self.workspace
             )
             qfunc_name = inferred_func_data[0]
             # Parse back the return types given as a semicolon-separated string
@@ -579,7 +598,7 @@ class QJIT:
             qfunc_name = str(self.mlir_module.body.operations[0].name).replace('"', "")
 
             shared_object, llvm_ir, inferred_func_data = self.compiler.run(
-                self.mlir_module, pipelines=self.compile_options.pipelines
+                self.mlir_module, self.workspace
             )
 
         self._llvmir = llvm_ir
@@ -777,7 +796,6 @@ class JAX_QJIT:
         return self.jaxed_function(*args, **kwargs)
 
 
-# pylint: disable=too-many-arguments
 def qjit(
     fn=None,
     *,

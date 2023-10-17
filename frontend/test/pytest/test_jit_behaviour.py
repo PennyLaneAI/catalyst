@@ -902,5 +902,50 @@ class TestAvoidVerification:
         assert "does not reference a valid function" not in capture_string.err
 
 
+class TestTwoQJITsOneName:
+    """Test two QJITs with the same name."""
+
+    # pylint: disable=disallowed-name
+    # pylint: disable=function-redefined
+
+    def test_two_qjit(self):
+        """Test two qjits with the same name"""
+
+        def foo():
+            """Returns 1"""
+            return 1
+
+        foo_1 = qjit(foo)
+
+        def foo():
+            """Returns 2"""
+            return 2
+
+        foo_2 = qjit(foo)
+
+        assert foo_1() == 1
+        assert foo_2() == 2
+
+    def test_two_qjit_keep_intermediate(self):
+        """Test two qjits with the same name but also keep intermediate=True"""
+
+        def foo():
+            """Returns 1"""
+            return 1
+
+        foo_1 = qjit(keep_intermediate=True)(foo)
+
+        def foo():
+            """Returns 2"""
+            return 2
+
+        foo_2 = qjit(keep_intermediate=True)(foo)
+
+        assert foo_1() == 1
+        assert foo_2() == 2
+        foo_1.workspace.cleanup()
+        foo_2.workspace.cleanup()
+
+
 if __name__ == "__main__":
     pytest.main(["-x", __file__])

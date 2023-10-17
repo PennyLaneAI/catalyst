@@ -6,7 +6,7 @@
   [(#273)](https://github.com/PennyLaneAI/catalyst/pull/273)
 
   ```python
-  
+
   @qjit
   def add_multiply(l: jax.core.ShapedArray((3,), dtype=float), idx: int):
       res = l.at[idx].multiply(3)
@@ -19,6 +19,7 @@
   ```pycon
   >>> res
   [0, 2, 10]
+  ```
 
 * Catalyst users can now use Python for loop statements in their programs without having to
   explicitly use the functional `catalyst.for_loop` form!
@@ -69,6 +70,10 @@
 
 <h3>Improvements</h3>
 
+* Improve the compiler driver diagnostic output. The driver now provides more context for error
+  messages and includes a verbose trace if verbose mode is enabled.
+  [(#303)](https://github.com/PennyLaneAI/catalyst/pull/303)
+
 * Update the Lightning backend device to work with the PL-Lightning monorepo.
   [(#259)](https://github.com/PennyLaneAI/catalyst/pull/259)
 
@@ -96,6 +101,24 @@
 <h3>Breaking changes</h3>
 
 <h3>Bug fixes</h3>
+
+* Remove undocumented package dependency on the zlib/zstd compression library.
+  [(#308)](https://github.com/PennyLaneAI/catalyst/pull/308)
+
+* Fix filesystem issue when compiling multiple functions with the same name and
+  `keep_intermediate=True`.
+  [(#306)](https://github.com/PennyLaneAI/catalyst/pull/306)
+
+* Add support for applying the `adjoint` operation to `QubitUnitary` gates.
+  `QubitUnitary` was not able to be `adjoint`ed when the variable holding the unitary matrix might
+  change. This can happen, for instance, inside of a for loop.
+  To solve this issue, the unitary matrix gets stored in the array list via push and pops.
+  The unitary matrix is later reconstructed from the array list and `QubitUnitary` can be executed
+  in the `adjoint`ed context.
+  [(#304)](https://github.com/PennyLaneAI/catalyst/pull/304)
+
+* Fix linking errors on Linux systems without a Clang installation.
+  [(#276)](https://github.com/PennyLaneAI/catalyst/pull/276)
 
 <h3>Contributors</h3>
 

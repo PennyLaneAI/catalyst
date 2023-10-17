@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#define DEBUG_TYPE "adjoint"
+#define DEBUG_TYPE "test"
 
 #include <memory>
 #include <vector>
@@ -22,7 +22,6 @@
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
-#include "mlir/Dialect/Complex/IR/Complex.h"
 #include "mlir/Dialect/Index/IR/IndexDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -33,41 +32,31 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#include "Catalyst/IR/CatalystDialect.h"
-#include "Quantum/IR/QuantumOps.h"
-#include "Quantum/Transforms/Patterns.h"
-
 using namespace llvm;
 using namespace mlir;
-using namespace catalyst::quantum;
 
 namespace catalyst {
-namespace quantum {
+namespace test {
 
-#define GEN_PASS_DEF_ADJOINTLOWERINGPASS
-#include "Quantum/Transforms/Passes.h.inc"
+#define GEN_PASS_DEF_TESTPASS
+#include "Test/Transforms/Passes.h.inc"
 
-struct AdjointLoweringPass : impl::AdjointLoweringPassBase<AdjointLoweringPass> {
-    using AdjointLoweringPassBase::AdjointLoweringPassBase;
+struct TestPass : impl::TestPassBase<TestPass> {
+    using TestPassBase::TestPassBase;
 
     void runOnOperation() final
     {
-        LLVM_DEBUG(dbgs() << "adjoint lowering pass"
+        LLVM_DEBUG(dbgs() << "test pass"
                           << "\n");
 
-        RewritePatternSet patterns(&getContext());
-        populateAdjointPatterns(patterns);
-        if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
-            return signalPassFailure();
-        }
+        getOperation()->emitError() << "TestPass-induced error \n";
+
+        return signalPassFailure();
     }
 };
 
-} // namespace quantum
+} // namespace test
 
-std::unique_ptr<Pass> createAdjointLoweringPass()
-{
-    return std::make_unique<quantum::AdjointLoweringPass>();
-}
+std::unique_ptr<Pass> createTestPass() { return std::make_unique<test::TestPass>(); }
 
 } // namespace catalyst
