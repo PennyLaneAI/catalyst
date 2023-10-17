@@ -528,21 +528,19 @@ def trace_quantum_function(
         # (1) - Classical tracing
         quantum_tape = QuantumTape()
         with EvaluationContext.frame_tracing_context(ctx) as trace:
-            wffa, in_avals, out_tree_promise = deduce_avals(f, args, kwargs)
+            wffa, in_avals, _ = deduce_avals(f, args, kwargs)
             in_classical_tracers = _input_type_to_tracers(trace.new_arg, in_avals)
             with QueuingManager.stop_recording(), quantum_tape:
                 # Quantum tape transformations happen at the end of tracing
                 ans = wffa.call_wrapped(*in_classical_tracers)
-
+            
+            ans = tree_unflatten(wffa.stores[0].val, ans)
             def is_leaf(obj):
                 return isinstance(obj, qml.measurements.MeasurementProcess)
-            ans = tree_unflatten(wffa.stores[0].val, ans)
-            print(ans)
-            leaves, tree = jax.tree_util.tree_flatten(ans, is_leaf=is_leaf)
-            print(tree)
+            ans, out_tree = jax.tree_util.tree_flatten(ans, is_leaf=is_leaf)
 
             out_classical_tracers_or_measurements = [
-                (trace.full_raise(t) if isinstance(t, DynamicJaxprTracer) else t) for t in leaves
+                (trace.full_raise(t) if isinstance(t, DynamicJaxprTracer) else t) for t in ans
             ]
 
 
@@ -556,7 +554,7 @@ def trace_quantum_function(
                 device,
                 qrp_out,
                 out_classical_tracers_or_measurements,
-                tree,
+                out_tree,
             )
             out_quantum_tracers = [qrp_out.actualize()]
             qdealloc_p.bind(qreg_in)
