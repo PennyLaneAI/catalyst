@@ -539,9 +539,9 @@ def trace_quantum_function(
                     return isinstance(obj, qml.measurements.MeasurementProcess)
                 ans, out_tree = jax.tree_util.tree_flatten(ans, is_leaf=is_leaf)
 
-                out_classical_tracers_or_measurements = [
-                    (trace.full_raise(t) if isinstance(t, DynamicJaxprTracer) else t) for t in ans
-                ]
+            out_classical_tracers_or_measurements = [
+                (trace.full_raise(t) if isinstance(t, DynamicJaxprTracer) else t) for t in ans
+            ]
 
 
         # (2) - Quantum tracing
