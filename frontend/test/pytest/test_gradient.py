@@ -41,6 +41,15 @@ class TestGradShape:
         observed_output = infer.calculate_grad_shape(in_signature, [0])
         expected_output = infer.Signature(params, returns)
         assert observed_output == expected_output
+    
+    def test_deduction_float(self):
+        """Test case for non tensor type."""
+        params = [float]
+        returns = [float, float]
+        in_signature = infer.Signature(params, returns)
+        observed_output = infer.calculate_grad_shape(in_signature, [0])
+        expected_output = infer.Signature(params, returns)
+        assert observed_output == expected_output
 
 
 def test_grad_outside_qjit():
