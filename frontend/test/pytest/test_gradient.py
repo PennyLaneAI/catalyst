@@ -47,9 +47,8 @@ class TestGradShape:
         params = [float]
         returns = [float, float]
         in_signature = infer.Signature(params, returns)
-        observed_output = infer.calculate_grad_shape(in_signature, [0])
-        expected_output = infer.Signature(params, returns)
-        assert observed_output == expected_output
+        with pytest.raises(TypeError, match="Inputs and results must be tensor type."):
+            infer.calculate_grad_shape(in_signature, [0])
 
 
 def test_grad_outside_qjit():

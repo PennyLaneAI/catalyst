@@ -64,7 +64,7 @@ class Signature:
         Returns:
             self.ys[i]: Type corresponding to parameter at position i.
         """
-        return self.ys[i]
+        return self.ys[i]  # pragma: no cover
 
     def get_results(self):
         """Get all result values.
@@ -103,22 +103,25 @@ def calculate_grad_shape(signature, indices) -> Signature:
     """
     grad_result_types = []
 
+    results = signature.get_results()
+    inputs = signature.get_inputs()
+
+    if not all([Signature.is_tensor(result) for result in results]) and not all(
+        [Signature.is_tensor(input) for inpute in inputs]
+    ):
+        raise TypeError("Inputs and results must be tensor type.")
+
     for result in signature.get_results():
         result_shape = []
-        if Signature.is_tensor(result):
-            for axis in result.shape:
-                result_shape.append(axis)
-        else:
-            result_shape.append(result)
+        for axis in result.shape:
+            result_shape.append(axis)
         for index in indices:
             diff_arg_type = signature.get_input(index)
+
             grad_res_shape = result_shape.copy()
-            if Signature.is_tensor(diff_arg_type):
-                for axis in diff_arg_type.shape:
-                    grad_res_shape.append(axis)
-                element_type = diff_arg_type.dtype
-            else:
-                grad_res_shape = result_shape.append(diff_arg_type)
+            for axis in diff_arg_type.shape:
+                grad_res_shape.append(axis)
+            element_type = diff_arg_type.dtype
 
             grad_res_type = (
                 ShapedArray(grad_res_shape, element_type) if grad_res_shape else diff_arg_type
