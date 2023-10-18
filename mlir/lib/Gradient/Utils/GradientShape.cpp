@@ -13,7 +13,6 @@
 // limitations under the License.
 
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include <iostream>
 
 #include "Gradient/Utils/GradientShape.h"
 
