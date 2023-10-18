@@ -8,6 +8,9 @@
   messages and includes a verbose trace if verbose mode is enabled.
   [(#303)](https://github.com/PennyLaneAI/catalyst/pull/303)
 
+* The AutoGraph feature, still experimental, now supports native Python `while` loops as well.
+  [(#318)](https://github.com/PennyLaneAI/catalyst/pull/318)
+
 <h3>Breaking changes</h3>
 
 <h3>Bug fixes</h3>
