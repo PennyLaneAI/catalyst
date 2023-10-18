@@ -240,7 +240,7 @@ class AdjointGenerator {
                             builder.create<index::SubOp>(loc, dim1Length, jPlusOne);
                         // Just for legibility
                         Value jTensorIndex = nMinusJMinusOne;
-                        ValueRange indices = {iTensorIndex, jTensorIndex};
+                        SmallVector<Value> indices = {iTensorIndex, jTensorIndex};
 
                         Value updatedIthJthTensor = builder.create<tensor::InsertOp>(
                             loc, element, currIthJthTensor, indices);
