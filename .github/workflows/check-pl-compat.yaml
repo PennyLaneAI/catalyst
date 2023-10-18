@@ -39,6 +39,7 @@ jobs:
     - name: Install deps
       run: |
         sudo apt-get install -y cmake ninja-build ccache clang lld libomp-dev
+        python3 --version | grep ${{ needs.constants.outputs.primary_python_version }}
         python3 -m pip install -r requirements.txt
 
     - name: Get Catalyst Build Dependencies (latest)

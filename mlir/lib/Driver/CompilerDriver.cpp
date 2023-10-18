@@ -50,7 +50,6 @@
 using namespace mlir;
 using namespace catalyst;
 using namespace catalyst::driver;
-namespace fs = std::filesystem;
 
 namespace {
 
@@ -79,22 +78,37 @@ struct CatalystIRPrinterConfig : public PassManager::IRPrinterConfig {
     }
 };
 
+struct CatalystPassInstrumentation : public PassInstrumentation {
+    typedef std::function<void(Pass *pass, Operation *operation)> Callback;
+    Callback afterPassCallback;
+    Callback afterPassFailedCallback;
+
+    CatalystPassInstrumentation(Callback afterPassCallback, Callback afterPassFailedCallback)
+        : afterPassCallback(afterPassCallback), afterPassFailedCallback(afterPassFailedCallback)
+    {
+    }
+
+    void runAfterPass(Pass *pass, Operation *operation) override
+    {
+        this->afterPassCallback(pass, operation);
+    }
+
+    void runAfterPassFailed(Pass *pass, Operation *operation) override
+    {
+        this->afterPassFailedCallback(pass, operation);
+    }
+};
+
 } // namespace
 
 namespace {
 /// Parse an MLIR module given in textual ASM representation. Any errors during parsing will be
 /// output to diagnosticStream.
-OwningOpRef<ModuleOp> parseMLIRSource(MLIRContext *ctx, StringRef source, StringRef moduleName,
-                                      raw_ostream &diagnosticStream)
+OwningOpRef<ModuleOp> parseMLIRSource(MLIRContext *ctx, const llvm::SourceMgr &sourceMgr)
 {
-    auto moduleBuffer = llvm::MemoryBuffer::getMemBufferCopy(source, moduleName);
-    auto sourceMgr = std::make_shared<llvm::SourceMgr>();
-    sourceMgr->AddNewSourceBuffer(std::move(moduleBuffer), SMLoc());
-
     FallbackAsmResourceMap fallbackResourceMap;
     ParserConfig parserConfig{ctx, /*verifyAfterParse=*/true, &fallbackResourceMap};
 
-    SourceMgrDiagnosticHandler sourceMgrHandler(*sourceMgr, ctx, diagnosticStream);
     return parseSourceFile<ModuleOp>(sourceMgr, parserConfig);
 }
 
@@ -194,13 +208,13 @@ LogicalResult inferMLIRReturnTypes(MLIRContext *ctx, llvm::Type *returnType,
 }
 
 LogicalResult runLLVMPasses(const CompilerOptions &options,
-                            std::shared_ptr<llvm::Module> llvmModule,
-                            CompilerOutput::PipelineOutputs &outputs)
+                            std::shared_ptr<llvm::Module> llvmModule, CompilerOutput &output)
 {
     // opt -O2
     // As seen here:
     // https://llvm.org/docs/NewPassManager.html#just-tell-me-how-to-run-the-default-optimization-pipeline-with-the-new-pass-manager
 
+    auto &outputs = output.pipelineOutputs;
     // Create the analysis managers.
     llvm::LoopAnalysisManager LAM;
     llvm::FunctionAnalysisManager FAM;
@@ -228,19 +242,17 @@ LogicalResult runLLVMPasses(const CompilerOptions &options,
     if (options.keepIntermediate) {
         llvm::raw_string_ostream rawStringOstream{outputs["PreEnzymeOpt"]};
         llvmModule->print(rawStringOstream, nullptr);
-        const std::string &outFile = fs::path("1_PreEnzymeOpt.ll");
-        if (failed(dumpToFile(options, outFile, outputs["PreEnzymeOpt"]))) {
-            return failure();
-        }
+        auto outFile = output.nextPipelineDumpFilename("PreEnzymeOpt", ".ll");
+        dumpToFile(options, outFile, outputs["PreEnzymeOpt"]);
     }
 
     return success();
 }
 
 LogicalResult runEnzymePasses(const CompilerOptions &options,
-                              std::shared_ptr<llvm::Module> llvmModule,
-                              CompilerOutput::PipelineOutputs &outputs)
+                              std::shared_ptr<llvm::Module> llvmModule, CompilerOutput &output)
 {
+    auto &outputs = output.pipelineOutputs;
     // Create the new pass manager builder.
     // Take a look at the PassBuilder constructor parameters for more
     // customization, e.g. specifying a TargetMachine or various debugging
@@ -274,75 +286,77 @@ LogicalResult runEnzymePasses(const CompilerOptions &options,
     if (options.keepIntermediate) {
         llvm::raw_string_ostream rawStringOstream{outputs["Enzyme"]};
         llvmModule->print(rawStringOstream, nullptr);
-        const std::string &outFile = fs::path("2_Enzyme.ll");
-        if (failed(dumpToFile(options, outFile, outputs["Enzyme"]))) {
-            return failure();
-        }
+        auto outFile = output.nextPipelineDumpFilename("Enzyme", ".ll");
+        dumpToFile(options, outFile, outputs["Enzyme"]);
     }
 
     return success();
 }
 
 LogicalResult runLowering(const CompilerOptions &options, MLIRContext *ctx, ModuleOp moduleOp,
-                          CompilerOutput::PipelineOutputs &outputs)
+                          CompilerOutput &output)
+
 {
+    auto &outputs = output.pipelineOutputs;
     auto pm = PassManager::on<ModuleOp>(ctx, PassManager::Nesting::Implicit);
 
-    std::unordered_map<const Pass *, std::list<Pipeline::Name>> pipelineTailMarkers;
+    // Maps a pass to zero or one pipelines ended by this pass
+    // Maps a pass to its owning pipeline
+    std::unordered_map<const Pass *, Pipeline::Name> pipelineTailMarkers;
+    std::unordered_map<const Pass *, Pipeline::Name> passPipelineNames;
+
+    // Fill all the pipe-to-pipeline mappings
     for (const auto &pipeline : options.pipelinesCfg) {
+        size_t existingPasses = pm.size();
         if (failed(parsePassPipeline(joinPasses(pipeline.passes), pm, options.diagnosticStream))) {
             return failure();
         }
-        PassManager::pass_iterator p = pm.end();
-        const Pass *lastPass = &(*(p - 1));
-        pipelineTailMarkers[lastPass].push_back(pipeline.name);
+        if (existingPasses != pm.size()) {
+            const Pass *pass = nullptr;
+            for (size_t pn = existingPasses; pn < pm.size(); pn++) {
+                pass = &(*(pm.begin() + pn));
+                passPipelineNames[pass] = pipeline.name;
+            }
+            assert(pass != nullptr);
+            pipelineTailMarkers[pass] = pipeline.name;
+        }
     }
 
     if (options.keepIntermediate) {
-
-        {
-            std::string tmp;
-            {
-                llvm::raw_string_ostream s{tmp};
-                s << moduleOp;
-            }
-            const std::string &outFile =
-                fs::path(options.moduleName.str()).replace_extension(".mlir");
-            if (failed(dumpToFile(options, outFile, tmp))) {
-                return failure();
-            }
-        }
-
-        {
-            size_t pipelineIdx = 0;
-            auto printHandler =
-                [&](Pass *pass, CatalystIRPrinterConfig::PrintCallbackFn print) -> LogicalResult {
-                // Do not print if keepIntermediate is not set.
-                if (!options.keepIntermediate) {
-                    return success();
-                }
-                auto res = pipelineTailMarkers.find(pass);
-                if (res != pipelineTailMarkers.end()) {
-                    for (const auto &pn : res->second) {
-                        std::string outFile = fs::path(std::to_string(pipelineIdx++) + "_" + pn)
-                                                  .replace_extension(".mlir");
-                        {
-                            llvm::raw_string_ostream s{outputs[pn]};
-                            print(s);
-                        }
-                        if (failed(dumpToFile(options, outFile, outputs[pn]))) {
-                            return failure();
-                        }
-                    }
-                }
-                return success();
-            };
-
-            pm.enableIRPrinting(std::unique_ptr<PassManager::IRPrinterConfig>(
-                new CatalystIRPrinterConfig(printHandler)));
-        }
+        std::string tmp;
+        llvm::raw_string_ostream s{tmp};
+        s << moduleOp;
+        dumpToFile(options, output.nextPipelineDumpFilename(options.moduleName.str(), ".mlir"),
+                   tmp);
     }
 
+    // For each pipeline-terminating pass, print the IR into the corresponding dump file and
+    // into a diagnostic output buffer. Note that one pass can terminate multiple pipelines.
+    auto afterPassCallback = [&](Pass *pass, Operation *op) {
+        if (!options.keepIntermediate)
+            return;
+        auto res = pipelineTailMarkers.find(pass);
+        if (res != pipelineTailMarkers.end()) {
+            auto pipelineName = res->second;
+            llvm::raw_string_ostream s{outputs[pipelineName]};
+            s << *op;
+            dumpToFile(options, output.nextPipelineDumpFilename(pipelineName),
+                       outputs[pipelineName]);
+        }
+    };
+
+    // For each failed pass, print the owner pipeline name into a diagnostic stream.
+    auto afterPassFailedCallback = [&](Pass *pass, Operation *op) {
+        auto res = passPipelineNames.find(pass);
+        assert(res != passPipelineNames.end() && "Unexpected pass");
+        options.diagnosticStream << "While processing pipeline: " << res->second << "\n";
+    };
+
+    // Output pipeline names on failures
+    pm.addInstrumentation(std::unique_ptr<PassInstrumentation>(
+        new CatalystPassInstrumentation(afterPassCallback, afterPassFailedCallback)));
+
+    // Run the lowering pipelines
     if (failed(pm.run(moduleOp))) {
         return failure();
     }
@@ -365,8 +379,10 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
     registerAllCatalystDialects(registry);
     registerLLVMTranslations(registry);
     MLIRContext ctx(registry);
+    ctx.printOpOnDiagnostic(true);
+    ctx.printStackTraceOnDiagnostic(options.verbosity >= Verbosity::Debug);
     // TODO: FIXME:
-    // Let's try to enable multithreading.
+    // Let's try to enable multithreading. Do not forget to protect the printing.
     ctx.disableMultithreading();
     ScopedDiagnosticHandler scopedHandler(
         &ctx, [&](Diagnostic &diag) { diag.print(options.diagnosticStream); });
@@ -376,11 +392,16 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
 
     llvm::raw_string_ostream outIRStream(output.outIR);
 
+    auto moduleBuffer = llvm::MemoryBuffer::getMemBufferCopy(options.source, options.moduleName);
+    auto sourceMgr = std::make_shared<llvm::SourceMgr>();
+    sourceMgr->AddNewSourceBuffer(std::move(moduleBuffer), SMLoc());
+    SourceMgrDiagnosticHandler sourceMgrHandler(*sourceMgr, &ctx, options.diagnosticStream);
+
     // First attempt to parse the input as an MLIR module.
-    OwningOpRef<ModuleOp> op =
-        parseMLIRSource(&ctx, options.source, options.moduleName, options.diagnosticStream);
+    OwningOpRef<ModuleOp> op = parseMLIRSource(&ctx, *sourceMgr);
     if (op) {
-        if (failed(runLowering(options, &ctx, *op, output.pipelineOutputs))) {
+        if (failed(runLowering(options, &ctx, *op, output))) {
+            CO_MSG(options, Verbosity::Urgent, "Failed to lower MLIR module\n");
             return failure();
         }
 
@@ -390,34 +411,34 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
         if (options.lowerToLLVM) {
             llvmModule = translateModuleToLLVMIR(*op, llvmContext);
             if (!llvmModule) {
+                CO_MSG(options, Verbosity::Urgent, "Failed to translate LLVM module\n");
                 return failure();
             }
 
             if (options.keepIntermediate) {
-                if (failed(dumpToFile(options, "llvm_ir.ll", *llvmModule))) {
-                    return failure();
-                }
+                dumpToFile(options, output.nextPipelineDumpFilename("llvm_ir", ".ll"), *llvmModule);
             }
         }
     }
     else {
-        // If parsing as an MLIR module failed, attempt to parse as an LLVM IR module.
+        CO_MSG(options, Verbosity::Urgent,
+               "Failed to parse module as MLIR source, retrying parsing as LLVM source\n");
         llvm::SMDiagnostic err;
         llvmModule = parseLLVMSource(llvmContext, options.source, options.moduleName, err);
         if (!llvmModule) {
             // If both MLIR and LLVM failed to parse, exit.
             err.print(options.moduleName.data(), options.diagnosticStream);
+            CO_MSG(options, Verbosity::Urgent, "Failed to parse module as LLVM source\n");
             return failure();
         }
     }
 
     if (llvmModule) {
-
-        if (failed(runLLVMPasses(options, llvmModule, output.pipelineOutputs))) {
+        if (failed(runLLVMPasses(options, llvmModule, output))) {
             return failure();
         }
 
-        if (failed(runEnzymePasses(options, llvmModule, output.pipelineOutputs))) {
+        if (failed(runEnzymePasses(options, llvmModule, output))) {
             return failure();
         }
 
@@ -444,11 +465,9 @@ LogicalResult QuantumDriverMain(const CompilerOptions &options, CompilerOutput &
                 CO_MSG(options, Verbosity::Urgent, "Unable to infer function return type\n");
             }
             else {
-                {
-                    llvm::raw_string_ostream returnTypeStream(output.inferredAttributes.returnType);
-                    llvm::interleaveComma(returnTypes, returnTypeStream,
-                                          [&](RankedTensorType t) { t.print(returnTypeStream); });
-                }
+                llvm::raw_string_ostream returnTypeStream(output.inferredAttributes.returnType);
+                llvm::interleaveComma(returnTypes, returnTypeStream,
+                                      [&](RankedTensorType t) { t.print(returnTypeStream); });
                 CO_MSG(options, Verbosity::Debug,
                        "Inferred function return type: '" << output.inferredAttributes.returnType
                                                           << "'\n");

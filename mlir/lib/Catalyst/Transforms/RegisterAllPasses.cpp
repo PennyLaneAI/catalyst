@@ -15,6 +15,7 @@
 #include "Catalyst/Transforms/Passes.h"
 #include "Gradient/Transforms/Passes.h"
 #include "Quantum/Transforms/Passes.h"
+#include "Test/Transforms/Passes.h"
 
 void catalyst::registerAllCatalystPasses()
 {
@@ -30,4 +31,5 @@ void catalyst::registerAllCatalystPasses()
     mlir::registerPass(catalyst::createEmitCatalystPyInterfacePass);
     mlir::registerPass(catalyst::createCopyGlobalMemRefPass);
     mlir::registerPass(catalyst::createCatalystConversionPass);
+    mlir::registerPass(catalyst::createTestPass);
 }
