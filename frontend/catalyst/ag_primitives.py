@@ -89,26 +89,36 @@ def if_stmt(
     # and want to restore the initial state before entering each branch.
     init_state = get_state()
 
-    @catalyst.cond(pred)
-    def functional_cond():
-        set_state(init_state)
-        true_fn()
-        results = get_state()
-        return assert_results(results, symbol_names)
+    fallback = catalyst.autograph_force_fallbacks
 
-    @functional_cond.otherwise
-    def functional_cond():
-        set_state(init_state)
-        false_fn()
-        results = get_state()
-        return assert_results(results, symbol_names)
+    if fallback:
+        if pred:
+            true_fn()
+        else:
+            false_fn()
 
-    # Sometimes we unpack the results of nested tracing scopes so that the user doesn't have to
-    # manipulate tuples when they don't expect it. Ensure set_state receives a tuple regardless.
-    results = functional_cond()
-    if not isinstance(results, tuple):
-        results = (results,)
-    set_state(results)
+    else:
+
+        @catalyst.cond(pred)
+        def functional_cond():
+            set_state(init_state)
+            true_fn()
+            results = get_state()
+            return assert_results(results, symbol_names)
+
+        @functional_cond.otherwise
+        def functional_cond():
+            set_state(init_state)
+            false_fn()
+            results = get_state()
+            return assert_results(results, symbol_names)
+
+        # Sometimes we unpack the results of nested tracing scopes so that the user doesn't have to
+        # manipulate tuples when they don't expect it. Ensure set_state receives a tuple regardless.
+        results = functional_cond()
+        if not isinstance(results, tuple):
+            results = (results,)
+        set_state(results)
 
 
 def assert_for_loop_inputs(inputs, iterate_names):
@@ -238,7 +248,7 @@ def for_stmt(
     # - an exception is raised during the tracing of the loop body after conversion
     #   -> this will raise a warning to allow users to correct mistakes and allow the conversion
     #      to succeed, for example because they forgot to use a list instead of an array
-    fallback = False
+    fallback = catalyst.autograph_force_fallbacks
     init_state = get_state()
 
     if isinstance(iteration_target, CRange):
@@ -326,21 +336,21 @@ def for_stmt(
 def _call_catalyst_while(loop_test, loop_body, get_state, set_state, _nonlocals, _symbol_names):
     """Dispatch to a Catalyst implementation of while loops."""
 
-    def _test(var):
+    def _test(state):
         old = get_state()
-        set_state((var,))
+        set_state(state)
         res = loop_test()
         set_state(old)
         return res
 
     @catalyst.while_loop(_test)
-    def functional_while(*iter_args):
+    def _functional_while(iter_args):
         set_state(iter_args)
         loop_body()
         return get_state()
 
     iter_inits = get_state()
-    iter_results = functional_while(*iter_inits)
+    iter_results = _functional_while(iter_inits)
     return iter_results
 
 
@@ -357,7 +367,7 @@ def while_stmt(loop_test, loop_body, get_state, set_state, nonlocals, symbol_nam
     """An implementation of the AutoGraph 'while .. ..' statement. The interface is defined by
     AutoGraph, here we merely provide an implementation of it in terms of Catalyst primitives."""
 
-    fallback = False
+    fallback = catalyst.autograph_force_fallbacks
 
     if not fallback:
         try:
@@ -396,11 +406,6 @@ def while_stmt(loop_test, loop_body, get_state, set_state, nonlocals, symbol_nam
         results = _call_python_while(
             loop_test, loop_body, get_state, set_state, nonlocals, symbol_names
         )
-
-    # Sometimes we unpack the results of nested tracing scopes so that the user doesn't have to
-    # manipulate tuples when they don't expect it. Ensure set_state receives a tuple regardless.
-    if not isinstance(results, tuple):
-        results = (results,)
 
     set_state(results)
 

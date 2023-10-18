@@ -76,6 +76,7 @@ from catalyst.pennylane_extensions import (
 )
 from catalyst.utils.exceptions import CompileError
 
+autograph_force_fallbacks = False
 autograph_ignore_fallbacks = False
 autograph_strict_conversion = False
 
