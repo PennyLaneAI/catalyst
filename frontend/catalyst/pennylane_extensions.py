@@ -1728,15 +1728,13 @@ def debug_print(x):
         x: A single jax array whose numeric values are printed at runtime, or any objects whose
            string representation will be treated as a constant and printed at runtime.
     """
-    mode, _ = EvaluationContext.get_evaluation_mode()
-    # Dispatch to Python print outside a qjit context.
-    if mode == EvaluationMode.QUANTUM_COMPILATION:
+    if EvaluationContext.is_tracing():
         if isinstance(x, jax.core.Tracer):
-            prim = print_p.bind(x)
+            print_p.bind(x)
         else:
-            prim = print_p.bind(string=str(x))
-        return prim
+            print_p.bind(string=str(x))
     else:
+        # Dispatch to Python print outside a qjit context.
         print(x)
 
 
