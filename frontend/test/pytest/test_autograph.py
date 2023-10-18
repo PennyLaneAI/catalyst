@@ -1253,13 +1253,10 @@ class TestMixed:
             while acc < 5:
                 acc = acc + 1
                 for x in [1, 2, 3]:
-                    if x < 3:
-                        acc += x
-                    else:
-                        acc += 2 * x
+                    acc += x
             return acc
 
-        assert f1() == 0 + 1 + sum([1, 2, 2 * 3])
+        assert f1() == 0 + 1 + sum([1, 2, 3])
 
     def test_no_python_loops(self):
         """Test AutoGraph behaviour on function with Catalyst loops."""

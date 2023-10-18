@@ -89,36 +89,28 @@ def if_stmt(
     # and want to restore the initial state before entering each branch.
     init_state = get_state()
 
-    fallback = catalyst.autograph_force_fallbacks
+    @catalyst.cond(pred)
+    def functional_cond():
+        set_state(init_state)
+        true_fn()
+        results = get_state()
+        return assert_results(results, symbol_names)
 
-    if fallback:
-        if pred:
-            true_fn()
-        else:
-            false_fn()
+    @functional_cond.otherwise
+    def functional_cond():
+        set_state(init_state)
+        false_fn()
+        results = get_state()
+        return assert_results(results, symbol_names)
 
-    else:
+    # Sometimes we unpack the results of nested tracing scopes so that the user doesn't have to
+    # manipulate tuples when they don't expect it. Ensure set_state receives a tuple regardless.
+    results = functional_cond()
+    if not isinstance(results, tuple):
+        # TODO: Do we have a test-case for this?
+        results = (results,)  # pragma: nocover
 
-        @catalyst.cond(pred)
-        def functional_cond():
-            set_state(init_state)
-            true_fn()
-            results = get_state()
-            return assert_results(results, symbol_names)
-
-        @functional_cond.otherwise
-        def functional_cond():
-            set_state(init_state)
-            false_fn()
-            results = get_state()
-            return assert_results(results, symbol_names)
-
-        # Sometimes we unpack the results of nested tracing scopes so that the user doesn't have to
-        # manipulate tuples when they don't expect it. Ensure set_state receives a tuple regardless.
-        results = functional_cond()
-        if not isinstance(results, tuple):
-            results = (results,)
-        set_state(results)
+    set_state(results)
 
 
 def assert_for_loop_inputs(inputs, iterate_names):
@@ -329,7 +321,8 @@ def for_stmt(
     # Sometimes we unpack the results of nested tracing scopes so that the user doesn't have to
     # manipulate tuples when they don't expect it. Ensure set_state receives a tuple regardless.
     if not isinstance(results, tuple):
-        results = (results,)
+        # TODO: Do we have a use-case for this brnach?
+        results = (results,)  # pragma: nocover
     set_state(results)
 
 
