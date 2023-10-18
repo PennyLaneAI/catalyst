@@ -1203,6 +1203,7 @@ class TestWhileLoops:
 
     def test_whileloop_warning(self, monkeypatch):
         """Test for-loop co-existing with while loop."""
+        # pylint: disable=anomalous-backslash-in-string
 
         monkeypatch.setattr("catalyst.autograph_strict_conversion", False)
 
