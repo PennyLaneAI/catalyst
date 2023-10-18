@@ -4,9 +4,9 @@ Catalyst Runtime
 ################
 
 The Catalyst Runtime is a C++ QIR runtime that enables the execution of Catalyst-compiled
-quantum programs, and is currently backed by state-vector simulators
-`PennyLane-Lightning <https://github.com/PennyLaneAI/pennylane-lightning>`_
-and `Pennylane-Lightning-Kokkos <https://github.com/PennyLaneAI/pennylane-lightning-kokkos>`_.
+quantum programs, and is currently backed by `PennyLane-Lightning <https://docs.pennylane.ai/projects/lightning/en/stable>`_
+state-vector simulators, and `Amazon Braket <https://amazon-braket-pennylane-plugin-python.readthedocs.io>`_
+devices. Additional hardware support, including QPUs to come.
 
 The runtime employs the `QuantumDevice <https://docs.pennylane.ai/projects/catalyst/en/stable/api/structCatalyst_1_1Runtime_1_1QuantumDevice.html#exhale-struct-structcatalyst-1-1runtime-1-1quantumdevice>`_
 public interface to support an extensible list of backend devices. This interface comprises two collections of abstract methods:
@@ -62,8 +62,8 @@ The following table shows the available devices along with supported features:
      - Static allocation/deallocation
      - Static allocation/deallocation
    * - Gate Operations
-     - `Lightning operations <https://github.com/PennyLaneAI/pennylane-lightning/blob/master/pennylane_lightning/src/gates/GateOperation.hpp>`_
-     - `Lightning operations <https://github.com/PennyLaneAI/pennylane-lightning/blob/master/pennylane_lightning/src/gates/GateOperation.hpp>`_
+     - `Lightning operations <https://github.com/PennyLaneAI/pennylane-lightning/blob/master/pennylane_lightning/core/src/gates/GateOperation.hpp>`_
+     - `Lightning operations <https://github.com/PennyLaneAI/pennylane-lightning/blob/master/pennylane_lightning/core/src/gates/GateOperation.hpp>`_
      - `Braket operations <https://github.com/PennyLaneAI/catalyst/blob/e812afbadbd777209862d5c76f394e3f0c43ffb6/runtime/lib/backend/openqasm/OpenQasmBuilder.hpp#L49>`_
    * - Quantum Observables
      - ``Identity``, ``PauliX``, ``PauliY``, ``PauliZ``, ``Hadamard``, ``Hermitian``, ``Hamiltonian``, and Tensor Product of Observables
@@ -103,16 +103,16 @@ with support for the C++20 standard library and the static library of ``stdlib``
 Installation
 ============
 
-By default, the runtime leverages `Pennylane-Lightning <https://github.com/PennyLaneAI/pennylane-lightning>`_ as the backend simulator.
+By default, the runtime leverages `lightning.qubit <https://docs.pennylane.ai/projects/lightning/en/stable/lightning_qubit/device.html>`_ as the backend simulator.
 You can build the runtime with multiple devices from the list of Backend Devices.
-You can use ``ENABLE_LIGHTNING_KOKKOS=ON`` to build the runtime with `Pennylane-Lightning-Kokkos <https://github.com/PennyLaneAI/pennylane-lightning-kokkos>`_:
+You can use ``ENABLE_LIGHTNING_KOKKOS=ON`` to build the runtime with `lightning.kokkos <https://docs.pennylane.ai/projects/lightning/en/stable/lightning_kokkos/device.html>`_:
 
 .. code-block:: console
 
     ENABLE_LIGHTNING_KOKKOS=ON make runtime
 
 Lightning-Kokkos provides support for other Kokkos backends including OpenMP, HIP and CUDA.
-Please refer to `the installation guideline <https://github.com/PennyLaneAI/pennylane-lightning-kokkos#installation>`_ for the requirements.
+Please refer to `the installation guideline <https://docs.pennylane.ai/projects/lightning/en/stable/lightning_kokkos/installation.html>`_ for the requirements.
 You can further use the ``CMAKE_ARGS`` flag to issue any additional compiler arguments or override the preset ones in the make commands.
 To build the runtime with Lightning-Kokkos and the ``Kokkos::OpenMP`` backend execution space:
 
