@@ -1202,7 +1202,7 @@ class TestWhileLoops:
         assert f1() == sum([1, 1, 2, 2])
 
     def test_whileloop_warning(self, monkeypatch):
-        """Test for-loop co-existing with while loop."""
+        """Test while-loop warning if strict conversion is disabled."""
         # pylint: disable=anomalous-backslash-in-string
 
         monkeypatch.setattr("catalyst.autograph_strict_conversion", False)
@@ -1221,6 +1221,21 @@ class TestWhileLoops:
         ):
             with pytest.raises(RuntimeError):
                 qjit(autograph=True)(f1)()
+
+    def test_whileloop_exception(self, monkeypatch):
+        """Test for-loop error if strict-conversion is enabled."""
+        # pylint: disable=anomalous-backslash-in-string
+
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        def f1():
+            acc = 0
+            while acc < 5:
+                raise RuntimeError("Test failure")
+            return acc
+
+        with pytest.raises(RuntimeError):
+            qjit(autograph=True)(f1)()
 
 
 @pytest.mark.tf
