@@ -74,6 +74,7 @@ setup(
     provides=["catalyst"],
     version=version,
     python_requires=">=3.9",
+    entry_points={"pennylane.compilers": ["qjit = catalyst:qjit", "utils = catalyst:utils"]},
     install_requires=requirements,
     packages=find_namespace_packages(
         where="frontend",
