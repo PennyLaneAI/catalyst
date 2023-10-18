@@ -1201,6 +1201,26 @@ class TestWhileLoops:
 
         assert f1() == sum([1, 1, 2, 2])
 
+    def test_whileloop_warning(self, monkeypatch):
+        """Test for-loop co-existing with while loop."""
+
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", False)
+
+        def f1():
+            acc = 0
+            while bool(acc < 5):
+                raise RuntimeError("Test failure")
+            return acc
+
+        with pytest.warns(
+            UserWarning,
+            match=(
+                f'File "{__file__}", line [0-9]+, in {f1.__name__}\\n'
+                f'    while bool\(acc < 5\)'
+        )):
+            with pytest.raises(RuntimeError):
+                qjit(autograph=True)(f1)()
+
 
 @pytest.mark.tf
 class TestMixed:
