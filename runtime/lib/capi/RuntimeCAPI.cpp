@@ -82,7 +82,7 @@ void __quantum__rt__print_string(char *string)
 void __quantum__rt__print_tensor(OpaqueMemRefT *c_memref)
 {
     DynamicMemRefT memref = get_dynamic_memref(*c_memref);
-    std::cerr << memref.in_str.str() << std::endl;
+    std::cout << memref.in_str.str() << std::endl;
 }
 
 void __quantum__rt__fail_cstr(const char *cstr) { RT_FAIL(cstr); }
