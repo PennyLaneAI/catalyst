@@ -1215,9 +1215,9 @@ class TestWhileLoops:
         with pytest.warns(
             UserWarning,
             match=(
-                f'File "{__file__}", line [0-9]+, in {f1.__name__}\\n'
-                f'    while bool\(acc < 5\)'
-        )):
+                f'File "{__file__}", line [0-9]+, in {f1.__name__}\\n' f"    while bool\(acc < 5\)"
+            ),
+        ):
             with pytest.raises(RuntimeError):
                 qjit(autograph=True)(f1)()
 
