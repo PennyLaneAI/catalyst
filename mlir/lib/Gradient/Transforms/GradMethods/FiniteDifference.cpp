@@ -74,21 +74,20 @@ void FiniteDiffLowering::computeFiniteDiff(PatternRewriter &rewriter, Location l
 {
     ValueRange callArgs = gradFn.getArguments();
     TypeRange gradResTypes = gradFn.getResultTypes();
-
     std::vector<Value> gradients;
     gradients.reserve(gradFn.getNumResults());
 
     func::CallOp callOp = rewriter.create<func::CallOp>(loc, callee, callArgs);
-
-    for (size_t diffArgIdxIdx = 0; diffArgIdxIdx < diffArgIndices.size(); ++diffArgIdxIdx) {
-        size_t diffArgIdx = diffArgIndices[diffArgIdxIdx];
-        for (size_t diffResIdx = 0; diffResIdx < callee.getNumResults(); ++diffResIdx) {
+    for (size_t diffResIdx = 0; diffResIdx < callee.getNumResults(); ++diffResIdx) {
+        for (size_t diffArgIdxIdx = 0; diffArgIdxIdx < diffArgIndices.size(); ++diffArgIdxIdx) {
+            size_t diffArgIdx = diffArgIndices[diffArgIdxIdx];
             Value diffArg = callArgs[diffArgIdx];
             Value callRes = callOp.getResult(diffResIdx);
 
             Type operandTy = gradFn.getArgumentTypes()[diffArgIdx];
             Type resultTy = callee.getResultTypes()[diffResIdx];
-            Type gradientTy = gradResTypes[diffArgIdxIdx * callee.getNumResults() + diffResIdx];
+
+            Type gradientTy = gradResTypes[diffArgIdxIdx + diffResIdx * diffArgIndices.size()];
 
             const bool isOperandTensor = operandTy.isa<TensorType>();
             const bool isResultTensor = resultTy.isa<TensorType>();
@@ -112,14 +111,14 @@ void FiniteDiffLowering::computeFiniteDiff(PatternRewriter &rewriter, Location l
                 isResultTensor ? resultTy.cast<TensorType>().getElementType() : resultTy;
 
             std::vector<Value> dynamicDimSizes;
-            for (int64_t i = 0; i < operandRank; i++) {
-                if (operandShape[i] == ShapedType::kDynamic) {
-                    dynamicDimSizes.push_back(rewriter.create<tensor::DimOp>(loc, diffArg, i));
-                }
-            }
             for (int64_t j = 0; j < resultRank; j++) {
                 if (resultShape[j] == ShapedType::kDynamic) {
                     dynamicDimSizes.push_back(rewriter.create<tensor::DimOp>(loc, callRes, j));
+                }
+            }
+            for (int64_t i = 0; i < operandRank; i++) {
+                if (operandShape[i] == ShapedType::kDynamic) {
+                    dynamicDimSizes.push_back(rewriter.create<tensor::DimOp>(loc, diffArg, i));
                 }
             }
 
@@ -158,11 +157,11 @@ void FiniteDiffLowering::computeFiniteDiff(PatternRewriter &rewriter, Location l
                 auto bodyBuilder = [&](OpBuilder &rewriter, Location loc,
                                        ValueRange tensorIndices) -> void {
                     Value diffArgElem = rewriter.create<tensor::ExtractOp>(
-                        loc, diffArg, tensorIndices.take_front(operandRank));
+                        loc, diffArg, tensorIndices.take_back(operandRank));
                     Value diffArgElemShifted =
                         rewriter.create<arith::AddFOp>(loc, diffArgElem, hForOperand);
                     Value diffArgShifted = rewriter.create<tensor::InsertOp>(
-                        loc, diffArgElemShifted, diffArg, tensorIndices.take_front(operandRank));
+                        loc, diffArgElemShifted, diffArg, tensorIndices.take_back(operandRank));
 
                     std::vector<Value> callArgsForward(callArgs.begin(), callArgs.end());
                     callArgsForward[diffArgIdx] = diffArgShifted;
@@ -174,7 +173,7 @@ void FiniteDiffLowering::computeFiniteDiff(PatternRewriter &rewriter, Location l
                     Value result = rewriter.create<arith::SubFOp>(loc, callResForward, callRes);
                     if (isResultTensor) {
                         result = rewriter.create<tensor::ExtractOp>(
-                            loc, result, tensorIndices.take_back(resultRank));
+                            loc, result, tensorIndices.take_front(resultRank));
                     }
 
                     rewriter.create<tensor::YieldOp>(loc, result);

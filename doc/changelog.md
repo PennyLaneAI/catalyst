@@ -10,6 +10,10 @@
 
 <h3>Breaking changes</h3>
 
+* The axis ordering for `catalyst.jacobian` is updated to match `jax.jacobian`. Assume we have parameters of shape 
+  `[a,b]` and results of shape `[c,d]`. The jacobian would get the shape `[c,d,a,b]` instead of `[a,b,c,d]`.
+  [(#283)](https://github.com/PennyLaneAI/catalyst/pull/283)
+
 <h3>Bug fixes</h3>
 
 * Update the frontend to make it compatible with measurements as PyTrees in PennyLane `0.33.0`.
