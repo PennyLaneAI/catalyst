@@ -125,14 +125,14 @@ DEFAULT_PIPELINES = [
     (
         "QuantumCompilationPass",
         [
-            "scatter-lowering",
             "lower-gradients",
             "adjoint-lowering",
         ],
     ),
     (
         "BufferizationPass",
-        [
+        [   
+            "scatter-lowering",
             "one-shot-bufferize{dialect-filter=memref}",
             "inline",
             "gradient-bufferize",

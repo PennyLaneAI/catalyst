@@ -15,7 +15,6 @@
 #define DEBUG_TYPE "scatter"
 
 #include <algorithm>
-#include <iostream>
 #include <vector>
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -28,7 +27,7 @@
 
 using namespace mlir;
 
-namespace {
+namespace catalyst {
 
 struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> {
     using mlir::OpRewritePattern<mhlo::ScatterOp>::OpRewritePattern;
@@ -442,15 +441,10 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
     }
 };
 
-} // namespace
-
-namespace catalyst {
-namespace quantum {
 
 void populateScatterPatterns(RewritePatternSet &patterns)
 {
-    patterns.add<ScatterOpRewritePattern>(patterns.getContext(), 1);
+    patterns.add<catalyst::ScatterOpRewritePattern>(patterns.getContext(), 1);
 }
 
-} // namespace quantum
 } // namespace catalyst

@@ -26,17 +26,15 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#include "Quantum/Transforms/Patterns.h"
+#include "Catalyst/Transforms/Patterns.h"
 
 using namespace llvm;
 using namespace mlir;
-using namespace catalyst::quantum;
+using namespace catalyst;
 
 namespace catalyst {
-namespace quantum {
-
 #define GEN_PASS_DEF_SCATTERLOWERINGPASS
-#include "Quantum/Transforms/Passes.h.inc"
+#include "Catalyst/Transforms/Passes.h.inc"
 
 struct ScatterLoweringPass : impl::ScatterLoweringPassBase<ScatterLoweringPass> {
     using ScatterLoweringPassBase::ScatterLoweringPassBase;
@@ -54,11 +52,10 @@ struct ScatterLoweringPass : impl::ScatterLoweringPassBase<ScatterLoweringPass> 
     }
 };
 
-} // namespace quantum
 
 std::unique_ptr<Pass> createScatterLoweringPass()
 {
-    return std::make_unique<quantum::ScatterLoweringPass>();
+    return std::make_unique<ScatterLoweringPass>();
 }
 
 } // namespace catalyst
