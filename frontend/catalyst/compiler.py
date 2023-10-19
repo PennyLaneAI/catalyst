@@ -131,7 +131,7 @@ DEFAULT_PIPELINES = [
     ),
     (
         "BufferizationPass",
-        [   
+        [
             "scatter-lowering",
             "one-shot-bufferize{dialect-filter=memref}",
             "inline",

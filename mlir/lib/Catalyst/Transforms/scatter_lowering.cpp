@@ -52,7 +52,6 @@ struct ScatterLoweringPass : impl::ScatterLoweringPassBase<ScatterLoweringPass> 
     }
 };
 
-
 std::unique_ptr<Pass> createScatterLoweringPass()
 {
     return std::make_unique<ScatterLoweringPass>();

@@ -441,7 +441,6 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
     }
 };
 
-
 void populateScatterPatterns(RewritePatternSet &patterns)
 {
     patterns.add<catalyst::ScatterOpRewritePattern>(patterns.getContext(), 1);
