@@ -49,7 +49,7 @@ func.func public @scatter_multiply(%arg0: tensor<3xf64>, %arg1: tensor<i64>) -> 
     // CHECK:    [[IDX1:%.+]] = index.constant 1
     // CHECK:    [[CST:%.+]] = arith.constant dense<2.000000e+00> : tensor<f64>
     // CHECK:    [[SCF:%.+]] = scf.for %arg2 = [[IDX0]] to [[IDX1]] step [[IDX1]] iter_args(%arg3 = %arg0) -> (tensor<3xf64>)
-    // CHECK:    [[INDEX:%.+]] = arith.index_cast %6 : i32 to index
+    // CHECK:    [[INDEX:%.+]] = arith.index_cast {{%.*}} : i32 to index
     // CHECK:    [[EXTRACTED:%.+]] = tensor.extract %arg3[[[INDEX]]] : tensor<3xf64>
     // CHECK:    [[FROM:%.+]] = tensor.from_elements [[EXTRACTED]] : tensor<f64>
     // CHECK:    [[CALL:%.+]] = func.call @__catalyst_update_scatter[[NUMBER]]([[FROM]], [[CST]]) : (tensor<f64>, tensor<f64>) -> tensor<f64>
@@ -128,7 +128,7 @@ func.func public @two_scatter(%arg0: tensor<3xf64>, %arg1: tensor<i64>) -> tenso
     // CHECK:    [[CST1:%.+]] = arith.constant dense<3.000000e+00> : tensor<f64>
 
     // CHECK:    [[SCF0:%.+]] = scf.for %arg2 = [[IDX0]] to [[IDX1]] step [[IDX1]] iter_args(%arg3 = %arg0) -> (tensor<3xf64>)
-    // CHECK:    [[INDEX:%.+]] = arith.index_cast %13 : i32 to index
+    // CHECK:    [[INDEX:%.+]] = arith.index_cast {{%.*}} : i32 to index
     // CHECK:    [[EXTRACTED:%.+]] = tensor.extract %arg3[[[INDEX]]] : tensor<3xf64>
     // CHECK:    [[FROM:%.+]] = tensor.from_elements [[EXTRACTED]] : tensor<f64>
     // CHECK:    [[CALL:%.+]] = func.call @__catalyst_update_scatter[[NUMBER0]]([[FROM]], [[CST1]]) : (tensor<f64>, tensor<f64>) -> tensor<f64>
@@ -137,7 +137,7 @@ func.func public @two_scatter(%arg0: tensor<3xf64>, %arg1: tensor<i64>) -> tenso
     // CHECK:    scf.yield [[INSERTED]] : tensor<3xf64>
 
     // CHECK:    [[SCF1:%.+]] = scf.for %arg2 = [[IDX0]] to [[IDX1]] step [[IDX1]] iter_args(%arg3 = %arg0) -> (tensor<3xf64>)
-    // CHECK:    [[INDEX:%.+]] = arith.index_cast %13 : i32 to index
+    // CHECK:    [[INDEX:%.+]] = arith.index_cast {{%.*}} : i32 to index
     // CHECK:    [[EXTRACTED:%.+]] = tensor.extract %arg3[[[INDEX]]] : tensor<3xf64>
     // CHECK:    [[FROM:%.+]] = tensor.from_elements [[EXTRACTED]] : tensor<f64>
     // CHECK:    [[CALL:%.+]] = func.call @__catalyst_update_scatter[[NUMBER1]]([[FROM]], [[CST0]]) : (tensor<f64>, tensor<f64>) -> tensor<f64>
@@ -181,12 +181,12 @@ func.func public @full_example_scatter(%input: tensor<3x4x2xi64>, %update: tenso
     // CHECK:    [[IDX1:%.+]] = index.constant 1
     // CHECK:    [[SCF:%.+]] = scf.for %arg2 = [[IDX0]] to [[IDX24]] step [[IDX1]] iter_args(%arg3 = %arg0) -> (tensor<3x4x2xi64>)
         // CHECK:    [[EXTRACT:%.+]] = tensor.extract_slice [[CST]][%arg2, 0] [1, 4] [1, 1] : tensor<24x4xindex> to tensor<4xindex>
-        // CHECK:    [[EXTRACT0:%.+]] = tensor.extract %arg1[%extracted_1, %extracted_2, %extracted_3, %extracted_4] : tensor<2x3x2x2xi64>
-        // CHECK:    [[EXTRACT1:%.+]] = tensor.extract %arg3[%3, %6, %8] : tensor<3x4x2xi64>
+        // CHECK:    [[EXTRACT0:%.+]] = tensor.extract %arg1[{{%.*}}, {{%.*}}, {{%.*}}, {{%.*}}] : tensor<2x3x2x2xi64>
+        // CHECK:    [[EXTRACT1:%.+]] = tensor.extract %arg3[{{%.*}}, {{%.*}}, {{%.*}}] : tensor<3x4x2xi64>
         // CHECK:    [[FROM0:%.+]] = tensor.from_elements [[EXTRACT0]] : tensor<i64>
         // CHECK:    [[FROM1:%.+]] = tensor.from_elements [[EXTRACT1]] : tensor<i64>
         // CHECK:    [[CALL:%.+]] = func.call @__catalyst_update_scatter[[NUMBER0]]([[FROM1]], [[FROM0]]) : (tensor<i64>, tensor<i64>) -> tensor<i64>
         // CHECK:    [[RES:%.+]] = tensor.extract [[CALL]][] : tensor<i64>
-        // CHECK:    [[INSERTED:%.+]] = tensor.insert [[RES]] into %arg3[%3, %6, %8] : tensor<3x4x2xi64>
+        // CHECK:    [[INSERTED:%.+]] = tensor.insert [[RES]] into %arg3[{{%.*}}, {{%.*}}, {{%.*}}] : tensor<3x4x2xi64>
         // CHECK:    scf.yield [[INSERTED]] : tensor<3x4x2xi64>
     // CHECK:    return [[SCF]] : tensor<3x4x2xi64>

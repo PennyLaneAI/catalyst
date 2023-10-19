@@ -106,12 +106,14 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
                          });
         }
 
-        // Generate all possible indices given the shape of updates
+        // Generate all possible indices for the update given the shape of updates
+        // The indices are in a flat list
         std::vector<int64_t> indices;
         SmallVector<Value> allUpdatesIndices;
         generateIndicesRecursive(updatesShapeVector, indices, 0, allUpdatesIndices, rewriter, loc);
 
-        // The updates indices generated are stored as a tensor (Value)
+        // The updates indices generated are stored as a tensorOp (Value) for the access in the SCF
+        // for loop
         std::vector<int64_t> totalShape;
         if (allUpdatesIndices.size() != 0) {
             totalShape.push_back(allUpdatesIndices.size() / updatesShapeVector.size());
@@ -120,6 +122,8 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
 
         Value allUpdatesIndicesTensor;
         int64_t size = 1;
+        // From the flat list of indices and the shape of the update we create a tensor
+        // with FromElementsOp
         if (!allUpdatesIndices.empty()) {
             Type resultTy = RankedTensorType::get(totalShape, rewriter.getIndexType());
             allUpdatesIndicesTensor =
@@ -127,12 +131,12 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
             size = allUpdatesIndices.size() / updatesShapeVector.size();
         }
 
-        // Create the loop values
+        // Create the loop values (start, end and increment)
         Value c0 = rewriter.create<index::ConstantOp>(loc, 0);
         Value sizeAllUpdatesIndices = rewriter.create<index::ConstantOp>(loc, size);
         Value c1 = rewriter.create<index::ConstantOp>(loc, 1);
 
-        // Create a SCF for op
+        // Create a SCF for op, the initial value for args is the results
         Value resultValue =
             rewriter
                 .create<scf::ForOp>(
@@ -141,36 +145,12 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
                         // Get the results
                         auto results = iterArgs.front();
 
-                        // Extract from the tensor a single configuration
+                        // Extract from the all indices tensor the right configuration
+                        // with the value i as index: allUpdatesIndices[i]
                         Value updatesIndices;
                         if (allUpdatesIndicesTensor) {
-                            RankedTensorType updateType =
-                                allUpdatesIndicesTensor.getType().cast<RankedTensorType>();
-
-                            auto rank = updateType.getRank();
-                            auto shape = updateType.getShape();
-                            // Offset
-                            std::vector<int64_t> offsets(rank, 0);
-                            offsets[0] = ShapedType::kDynamic;
-                            std::vector<Value> dynOffsets = {i};
-
-                            // Size
-                            std::vector<int64_t> sizes = shape;
-                            sizes[0] = 1;
-                            std::vector<Value> dynSizes = {};
-
-                            // Stides
-                            std::vector<int64_t> strides(rank, 1);
-                            std::vector<Value> dynStrides = {};
-
-                            // Deduce result types
-                            auto resultType =
-                                tensor::ExtractSliceOp::inferCanonicalRankReducedResultType(
-                                    rank - 1, updateType, offsets, sizes, strides);
-
-                            updatesIndices = builder.create<tensor::ExtractSliceOp>(
-                                loc, resultType, allUpdatesIndicesTensor, dynOffsets, dynSizes,
-                                dynStrides, offsets, sizes, strides);
+                            updatesIndices =
+                                extractUpdateIndices(allUpdatesIndicesTensor, i, loc, builder);
                         }
 
                         // Scatter update
@@ -301,6 +281,8 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         return SymbolRefAttr::get(ctx, funcName);
     }
 
+    // Given the shape of update, it generates all the possible indices configuration as a single
+    // vector
     void generateIndicesRecursive(const std::vector<int64_t> &shape,
                                   std::vector<int64_t> &currentIndex, int64_t dimension,
                                   SmallVector<Value> &configurations,
@@ -324,6 +306,9 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         }
     }
 
+    // Follow the algorithm from https://github.com/openxla/stablehlo/blob/main/docs/spec.md#scatter
+    // in order to get the results indices, the goal is to get the full start index and the
+    // full window index and add them in order to get the result indices.
     SmallVector<Value> getResultsIndices(SmallVector<Value> updateScatterIndices,
                                          SmallVector<Value> updateWindowsIndices,
                                          ArrayRef<int64_t> inputsShape,
@@ -332,48 +317,15 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
                                          ArrayRef<int64_t> scatterDimsToOperandDims,
                                          OpBuilder &builder, Location loc) const
     {
-        // Check index vector dim is the last dimension
-        // Rank
-        auto scatterIndicesTensorType = scatterIndices.getType().cast<RankedTensorType>();
-        int64_t rank = scatterIndicesTensorType.getRank();
-        auto shape = scatterIndicesTensorType.getShape();
 
-        // Get the scatter indices
+        // Get the scatter indices from the update scatter indices
         if (!updateScatterIndices.empty()) {
-            // Offset
-            std::vector<int64_t> offsets(rank, 0);
-            std::vector<Value> dynOffsets;
-
-            for (int64_t i = 0; i < rank; i++) {
-                if (i != indexVectorDim) {
-                    offsets[i] = ShapedType::kDynamic;
-                    if (i > indexVectorDim) {
-                        dynOffsets.push_back(updateScatterIndices[i - 1]);
-                    }
-                    else {
-                        dynOffsets.push_back(updateScatterIndices[i]);
-                    }
-                }
-            }
-
-            // Size
-            std::vector<int64_t> sizes(rank, 1);
-            sizes[indexVectorDim] = shape[indexVectorDim];
-            std::vector<Value> dynSizes = {};
-
-            // Stides
-            std::vector<int64_t> strides(rank, 1);
-            std::vector<Value> dynStrides = {};
-
-            // Deduce result types
-            auto resultType = tensor::ExtractSliceOp::inferCanonicalRankReducedResultType(
-                1, scatterIndicesTensorType, offsets, sizes, strides);
-
-            scatterIndices = builder.create<tensor::ExtractSliceOp>(
-                loc, resultType, scatterIndices, dynOffsets, dynSizes, dynStrides, offsets, sizes,
-                strides);
+            scatterIndices = extractScatterIndices(updateScatterIndices, scatterIndices,
+                                                   indexVectorDim, loc, builder);
         }
+        // Now add the full start indices and full window indices
 
+        // Case for no inserted windows dim
         if (insertedWindowsDims.empty()) {
             // Add Scatter in Windows Indices
             SmallVector<Value> results;
@@ -417,8 +369,8 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
                     fullStartIndex.push_back(index);
                 }
             }
-            SmallVector<Value> fullWindowIndex;
             // Full windows indices
+            SmallVector<Value> fullWindowIndex;
             for (auto insertedDim : insertedWindowsDims) {
                 auto c0 = builder.create<index::ConstantOp>(loc, 0);
                 updateWindowsIndices.insert(updateWindowsIndices.begin() + insertedDim, c0);
@@ -438,6 +390,80 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
             }
             return results;
         }
+    }
+    // Given a vector of index value (update scatter), it extracts the value from scatterIndices,
+    // The index vector dim indicates the dimension to be extracted.
+    Value extractScatterIndices(SmallVector<Value> updateScatterIndices, Value scatterIndices,
+                                int64_t indexVectorDim, Location loc, OpBuilder builder) const
+    {
+
+        auto scatterIndicesTensorType = scatterIndices.getType().cast<RankedTensorType>();
+        // Get the rank and shape of scatter indices
+        int64_t rank = scatterIndicesTensorType.getRank();
+        auto shape = scatterIndicesTensorType.getShape();
+
+        // Offset
+        std::vector<int64_t> offsets(rank, 0);
+        std::vector<Value> dynOffsets;
+
+        for (int64_t i = 0; i < rank; i++) {
+            if (i != indexVectorDim) {
+                offsets[i] = ShapedType::kDynamic;
+                if (i > indexVectorDim) {
+                    dynOffsets.push_back(updateScatterIndices[i - 1]);
+                }
+                else {
+                    dynOffsets.push_back(updateScatterIndices[i]);
+                }
+            }
+        }
+
+        // Size
+        std::vector<int64_t> sizes(rank, 1);
+        sizes[indexVectorDim] = shape[indexVectorDim];
+        std::vector<Value> dynSizes = {};
+
+        // Stides
+        std::vector<int64_t> strides(rank, 1);
+        std::vector<Value> dynStrides = {};
+
+        // Deduce result types
+        auto resultType = tensor::ExtractSliceOp::inferCanonicalRankReducedResultType(
+            1, scatterIndicesTensorType, offsets, sizes, strides);
+
+        return builder.create<tensor::ExtractSliceOp>(loc, resultType, scatterIndices, dynOffsets,
+                                                      dynSizes, dynStrides, offsets, sizes,
+                                                      strides);
+    }
+    // From a index value i it extracts the update indices from the tensor of values.
+    Value extractUpdateIndices(Value allUpdatesIndicesTensor, Value i, Location loc,
+                               OpBuilder builder) const
+    {
+        RankedTensorType updateType = allUpdatesIndicesTensor.getType().cast<RankedTensorType>();
+
+        auto rank = updateType.getRank();
+        auto shape = updateType.getShape();
+        // Offset
+        std::vector<int64_t> offsets(rank, 0);
+        offsets[0] = ShapedType::kDynamic;
+        std::vector<Value> dynOffsets = {i};
+
+        // Size
+        std::vector<int64_t> sizes = shape;
+        sizes[0] = 1;
+        std::vector<Value> dynSizes = {};
+
+        // Stides
+        std::vector<int64_t> strides(rank, 1);
+        std::vector<Value> dynStrides = {};
+
+        // Deduce result types
+        auto resultType = tensor::ExtractSliceOp::inferCanonicalRankReducedResultType(
+            rank - 1, updateType, offsets, sizes, strides);
+
+        return builder.create<tensor::ExtractSliceOp>(loc, resultType, allUpdatesIndicesTensor,
+                                                      dynOffsets, dynSizes, dynStrides, offsets,
+                                                      sizes, strides);
     }
 };
 
