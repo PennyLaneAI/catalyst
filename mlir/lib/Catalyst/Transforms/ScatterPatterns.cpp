@@ -238,6 +238,7 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         rewriter.replaceOp(op, resultValue);
         return success();
     }
+
     // Take the update block from scatter (bb0) and insert an equivalent function if it does not
     // exist
     FlatSymbolRefAttr getOrInsertUpdateFunction(Location loc, ModuleOp moduleOp, OpBuilder &builder,
