@@ -86,15 +86,15 @@ func.func private @funcTensorTensor(%arg0: tensor<7x3x2x1xf64>) -> tensor<2xf64>
 
 // CHECK-LABEL: @funcTensorTensor.qgrad(%arg0: tensor<7x3x2x1xf64>, %arg1: index) -> tensor<?x2xf64>
 
-// CHECK-LABEL: @funcTensorTensor.fullgrad0(%arg0: tensor<7x3x2x1xf64>, %arg1: index) -> tensor<7x3x2x1x2xf64>
+// CHECK-LABEL: @funcTensorTensor.fullgrad0(%arg0: tensor<7x3x2x1xf64>, %arg1: index) -> tensor<2x7x3x2x1xf64>
 
 // CHECK-LABEL: @gradCallTensorTensor
-func.func @gradCallTensorTensor(%arg0: tensor<7x3x2x1xf64>) -> tensor<7x3x2x1x2xf64> {
+func.func @gradCallTensorTensor(%arg0: tensor<7x3x2x1xf64>) -> tensor<2x7x3x2x1xf64> {
     // CHECK:   [[jac:%.+]] = call @funcTensorTensor.fullgrad0(%arg0
-    %2 = gradient.grad "auto" @funcTensorTensor(%arg0) : (tensor<7x3x2x1xf64>) -> tensor<7x3x2x1x2xf64>
+    %2 = gradient.grad "auto" @funcTensorTensor(%arg0) : (tensor<7x3x2x1xf64>) -> tensor<2x7x3x2x1xf64>
 
     // CHECK:   return [[jac]]
-    func.return %2 : tensor<7x3x2x1x2xf64>
+    func.return %2 : tensor<2x7x3x2x1xf64>
 }
 
 // -----

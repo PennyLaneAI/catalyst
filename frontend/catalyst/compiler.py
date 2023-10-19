@@ -343,7 +343,6 @@ class Compiler:
         self.options = options if options is not None else CompileOptions()
         self.last_compiler_output = None
 
-    # pylint: disable=too-many-arguments
     def run_from_ir(self, ir: str, module_name: str, workspace: Directory):
         """Compile a shared object from a textual IR (MLIR or LLVM).
 
