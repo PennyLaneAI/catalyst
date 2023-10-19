@@ -170,7 +170,6 @@ __all__ = (
     "jvp",
     "adjoint",
     "autograph_source",
-    "autograph_force_fallbacks",
     "autograph_ignore_fallbacks",
     "autograph_strict_conversion",
     "AutoGraphError",
