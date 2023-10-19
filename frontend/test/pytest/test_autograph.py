@@ -16,6 +16,7 @@
 
 import sys
 import traceback
+import warnings
 
 import jax
 import jax.numpy as jnp
@@ -1206,21 +1207,38 @@ class TestWhileLoops:
         # pylint: disable=anomalous-backslash-in-string
 
         monkeypatch.setattr("catalyst.autograph_strict_conversion", False)
+        monkeypatch.setattr("catalyst.autograph_ignore_fallbacks", False)
+        monkeypatch.setattr("catalyst.ag_primitives._emulate_fallback_errors", True)
 
         def f1():
             acc = 0
-            while bool(acc < 5):
-                raise RuntimeError("Test failure")
+            while acc < 5:
+                acc += 1
             return acc
 
         with pytest.warns(
             UserWarning,
-            match=(
-                f'File "{__file__}", line [0-9]+, in {f1.__name__}\\n' f"    while bool\(acc < 5\)"
-            ),
+            match=(f'File "{__file__}", line [0-9]+, in {f1.__name__}\\n    while acc < 5'),
         ):
-            with pytest.raises(RuntimeError):
-                qjit(autograph=True)(f1)()
+            qjit(autograph=True)(f1)()
+
+    def test_whileloop_no_warning(self, monkeypatch):
+        """Test while-loop warning if strict conversion is disabled."""
+        # pylint: disable=anomalous-backslash-in-string
+
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", False)
+        monkeypatch.setattr("catalyst.autograph_ignore_fallbacks", True)
+        monkeypatch.setattr("catalyst.ag_primitives._emulate_fallback_errors", True)
+
+        def f1():
+            acc = 0
+            while acc < 5:
+                acc = acc + 1
+            return acc
+
+        with warnings.catch_warnings() as w:
+            warnings.simplefilter("error")
+            qjit(autograph=True)(f1)()
 
     def test_whileloop_exception(self, monkeypatch):
         """Test for-loop error if strict-conversion is enabled."""
@@ -1245,7 +1263,7 @@ class TestMixed:
     def test_force_python_fallbacks(self, monkeypatch):
         """Test fallback modes of control-flow primitives."""
 
-        monkeypatch.setattr("catalyst.autograph_force_fallbacks", True)
+        monkeypatch.setattr("catalyst.ag_primitives._emulate_fallback_errors", True)
 
         @qjit(autograph=True)
         def f1():

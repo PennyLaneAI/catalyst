@@ -59,6 +59,9 @@ __all__ = [
     "converted_call",
 ]
 
+# For testing: emulate autograph errors during processing of Catalyst control-flow primitives
+_emulate_fallback_errors = False
+
 
 def assert_results(results, var_names):
     """Assert that none of the results are undefined, i.e. have no value."""
@@ -169,6 +172,9 @@ def _call_catalyst_for(
 ):
     """Dispatch to a Catalyst implementation of for loops."""
 
+    if _emulate_fallback_errors:
+        raise AutoGraphError("Emulated autograph fallback errror")
+
     # Ensure iteration arguments are properly initialized. We cannot process uninitialized
     # loop carried values as we need their type information for tracing.
     init_iter_args = get_state()
@@ -240,7 +246,7 @@ def for_stmt(
     # - an exception is raised during the tracing of the loop body after conversion
     #   -> this will raise a warning to allow users to correct mistakes and allow the conversion
     #      to succeed, for example because they forgot to use a list instead of an array
-    fallback = catalyst.autograph_force_fallbacks
+    fallback = False
     init_state = get_state()
 
     if isinstance(iteration_target, CRange):
@@ -329,6 +335,9 @@ def for_stmt(
 def _call_catalyst_while(loop_test, loop_body, get_state, set_state, _nonlocals, _symbol_names):
     """Dispatch to a Catalyst implementation of while loops."""
 
+    if _emulate_fallback_errors:
+        raise AutoGraphError("Emulated autograph fallback errror")
+
     def _test(state):
         old = get_state()
         set_state(state)
@@ -360,7 +369,7 @@ def while_stmt(loop_test, loop_body, get_state, set_state, nonlocals, symbol_nam
     """An implementation of the AutoGraph 'while ..' statement. The interface is defined by
     AutoGraph, here we merely provide an implementation of it in terms of Catalyst primitives."""
 
-    fallback = catalyst.autograph_force_fallbacks
+    fallback = False
 
     if not fallback:
         try:

@@ -76,7 +76,6 @@ from catalyst.pennylane_extensions import (
 )
 from catalyst.utils.exceptions import CompileError
 
-autograph_force_fallbacks = False
 autograph_ignore_fallbacks = False
 """bool: Specify whether AutoGraph should avoid raising
 warnings when conversion fails and control flow instead falls back
