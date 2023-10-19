@@ -172,9 +172,7 @@ def test_jacobian(backend, diff_method):
         return jacobian(postprocess, method="auto")(x)
 
     x = jnp.array([0.5, 0.4, 0.3, 0.2])
-    assert jac_postprocess(x) == pytest.approx(
-        jnp.transpose(jax.jacobian(postprocess)(x), axes=(2, 0, 1))
-    )
+    assert jac_postprocess(x) == pytest.approx(jax.jacobian(postprocess)(x))
 
 
 @pytest.mark.parametrize("diff_method", SUPPORTED_DIFF_METHODS)
@@ -226,8 +224,8 @@ def test_multi_arg_multi_result(backend, diff_method):
         for j, jax_entry in enumerate(row):
             # With multiple arguments and results, the Catalyst jacobians are transposed
             # w.r.t. the JAX jacobian. This is why the i and j are switched.
-            catalyst_entry = catalyst_jacobian[j * len(row) + i]
-            assert catalyst_entry == pytest.approx(jax_entry.T)
+            catalyst_entry = catalyst_jacobian[j + i * len(row)]
+            assert catalyst_entry == pytest.approx(jax_entry)
 
 
 def test_multi_qnode(backend):
