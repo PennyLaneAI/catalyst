@@ -1236,7 +1236,7 @@ class TestWhileLoops:
                 acc = acc + 1
             return acc
 
-        with warnings.catch_warnings() as w:
+        with warnings.catch_warnings():
             warnings.simplefilter("error")
             qjit(autograph=True)(f1)()
 
