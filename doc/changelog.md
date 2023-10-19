@@ -15,6 +15,10 @@
 
 <h3>Bug fixes</h3>
 
+* Fixes the issue with missing `CFP_t` in `StateVectorLQubitDynamic` when building against the master
+  branch of PennyLane-Lightning. This issue introduced in [PR 499](https://github.com/PennyLaneAI/pennylane-lightning/pull/499).
+  [(#322)](https://github.com/PennyLaneAI/catalyst/pull/322)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
