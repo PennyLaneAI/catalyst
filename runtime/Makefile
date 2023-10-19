@@ -13,7 +13,7 @@ ENABLE_LIGHTNING_KOKKOS?=OFF
 ENABLE_OPENQASM?=OFF
 BUILD_QIR_STDLIB_FROM_SRC?=OFF
 # TODO: Update to latest_release after v0.33.0
-LIGHTNING_GIT_TAG_VALUE= "master"
+LIGHTNING_GIT_TAG_VALUE?="0bce777"
 NPROC?=$(shell python -c "import os; print(os.cpu_count())")
 
 coverage: CODE_COVERAGE=ON

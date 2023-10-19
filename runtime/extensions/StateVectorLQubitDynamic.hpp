@@ -52,6 +52,7 @@ class StateVectorLQubitDynamic : public StateVectorLQubit<fp_t, StateVectorLQubi
   public:
     using PrecisionT = fp_t;
     using ComplexT = std::complex<PrecisionT>;
+    using CFP_t = ComplexT;
     using MemoryStorageT = Pennylane::Util::MemoryStorageLocation::Internal;
 
   private:

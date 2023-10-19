@@ -757,8 +757,8 @@ class JAX_QJIT:
     def compute_jvp(self, primals, tangents):
         """Compute the set of results and JVPs for a QJIT function."""
         # Assume we have primals of shape `[a,b]` and results of shape `[c,d]`. Derivatives [2]
-        # would get the shape `[a,b,c,d]` and tangents [1] would have the same shape as primals.
-        # Now, In this function we apply tensordot using the pattern `[a,b,c,d]*[a,b] -> [c,d]`.
+        # would get the shape `[c,d,a,b]` and tangents [1] would have the same shape as primals.
+        # Now, In this function we apply tensordot using the pattern `[c,d,a,b]*[a,b] -> [c,d]`.
 
         # Optimization: Do not compute Jacobians for arguments which do not participate in
         #               differentiation.
@@ -777,9 +777,10 @@ class JAX_QJIT:
             tangent = tangents[arg_idx]  # [1]
             taxis = list(range(tangent.ndim))
             for res_idx in range(len(results_data)):
-                deriv_idx = diff_arg_idx * len(results_data) + res_idx
+                deriv_idx = diff_arg_idx + res_idx * len(argnums)
                 deriv = derivatives_data[deriv_idx]  # [2]
-                jvp = jnp.tensordot(deriv, tangent, axes=(taxis, taxis))
+                daxis = list(range(deriv.ndim - tangent.ndim, deriv.ndim))
+                jvp = jnp.tensordot(deriv, tangent, axes=(daxis, taxis))
                 jvps[res_idx] = jvps[res_idx] + jvp
 
         # jvps must match the type of primals
@@ -821,7 +822,8 @@ def qjit(
         autograph (bool): Experimental support for automatically converting Python control
             flow statements to Catalyst-compatible control flow. Currently supports Python ``if``,
             ``elif``, ``else``, and ``for`` statements. Note that this feature requires an
-            available TensorFlow installation.
+            available TensorFlow installation. For more details, see the
+            :doc:`AutoGraph guide </dev/autograph>`.
         target (str): the compilation target
         keep_intermediate (bool): Whether or not to store the intermediate files throughout the
             compilation. If ``True``, intermediate representations are available via the
@@ -886,10 +888,13 @@ def qjit(
     array([0.75634905-0.52801002j, 0. +0.j,
            0.35962678+0.14074839j, 0. +0.j])
 
+    For more details on compilation and debugging, please see :doc:`/dev/sharp_bits`.
+
     Catalyst also supports capturing imperative Python control flow in compiled programs. You can
     enable this feature via the ``autograph=True`` parameter. Note that it does come with some
-    restrictions, in particular whenever global state is involved. Refer to the documentation page
-    for a complete discussion of the supported and unsupported use-cases.
+    restrictions, in particular whenever global state is involved. Refer to the
+    :doc:`AutoGraph guide </dev/autograph>` for a complete discussion of the
+    supported and unsupported use-cases.
 
     .. code-block:: python
 

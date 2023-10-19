@@ -54,7 +54,7 @@ add_mlir_python_common_capi_library(QuantumPythonCAPI
 add_library(compiler_driver MODULE PyCompilerDriver.cpp)
 set_target_properties(compiler_driver PROPERTIES PREFIX "")
 
-target_link_libraries(compiler_driver PRIVATE pybind11::headers pybind11::module CatalystCompilerDriver)
+target_link_libraries(compiler_driver PRIVATE pybind11::module CatalystCompilerDriver)
 
 set_target_properties(compiler_driver PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${MLIR_BINARY_DIR}/python_packages/quantum/mlir_quantum)
 
