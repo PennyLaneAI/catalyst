@@ -357,7 +357,7 @@ def _call_python_while(loop_test, loop_body, get_state, _set_state, _nonlocals, 
 
 
 def while_stmt(loop_test, loop_body, get_state, set_state, nonlocals, symbol_names):
-    """An implementation of the AutoGraph 'while .. ..' statement. The interface is defined by
+    """An implementation of the AutoGraph 'while ..' statement. The interface is defined by
     AutoGraph, here we merely provide an implementation of it in terms of Catalyst primitives."""
 
     fallback = catalyst.autograph_force_fallbacks
