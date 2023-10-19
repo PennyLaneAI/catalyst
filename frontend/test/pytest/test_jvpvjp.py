@@ -56,7 +56,11 @@ def assert_elements_allclose(a, b, **kwargs):
         assert_allclose(i, j, **kwargs)
 
 
-def test_jvp_against_jax_full_argnum_case_S_SS():
+diff_methods = ["auto", "fd"]
+
+
+@pytest.mark.parametrize("diff_method", diff_methods)
+def test_jvp_against_jax_full_argnum_case_S_SS(diff_method):
     """Numerically tests Catalyst's jvp against the JAX version."""
 
     x, t = (
@@ -67,7 +71,7 @@ def test_jvp_against_jax_full_argnum_case_S_SS():
     @qjit
     def C_workflow():
         f = qml.QNode(circuit_rx, device=qml.device("lightning.qubit", wires=1))
-        return C_jvp(f, x, t, method="fd", argnum=list(range(len(x))))
+        return C_jvp(f, x, t, method=diff_method, argnum=list(range(len(x))))
 
     @jax.jit
     def J_workflow():
@@ -80,7 +84,8 @@ def test_jvp_against_jax_full_argnum_case_S_SS():
     assert_elements_allclose(r1, r2, rtol=1e-6, atol=1e-6)
 
 
-def test_jvp_against_jax_full_argnum_case_T_T():
+@pytest.mark.parametrize("diff_method", diff_methods)
+def test_jvp_against_jax_full_argnum_case_T_T(diff_method):
     """Numerically tests Catalyst's jvp against the JAX version."""
 
     def f(x):
@@ -93,7 +98,7 @@ def test_jvp_against_jax_full_argnum_case_T_T():
 
     @qjit
     def C_workflow():
-        return C_jvp(f, x, t, method="fd", argnum=list(range(len(x))))
+        return C_jvp(f, x, t, method=diff_method, argnum=list(range(len(x))))
 
     @jax.jit
     def J_workflow():
@@ -105,7 +110,8 @@ def test_jvp_against_jax_full_argnum_case_T_T():
     assert_elements_allclose(r1, r2, rtol=1e-6, atol=1e-6)
 
 
-def test_jvp_against_jax_full_argnum_case_TT_T():
+@pytest.mark.parametrize("diff_method", diff_methods)
+def test_jvp_against_jax_full_argnum_case_TT_T(diff_method):
     """Numerically tests Catalyst's jvp against the JAX version."""
 
     def f(x1, x2):
@@ -123,7 +129,7 @@ def test_jvp_against_jax_full_argnum_case_TT_T():
 
     @qjit
     def C_workflow():
-        return C_jvp(f, x, t, method="fd", argnum=list(range(len(x))))
+        return C_jvp(f, x, t, method=diff_method, argnum=list(range(len(x))))
 
     @jax.jit
     def J_workflow():
@@ -135,7 +141,8 @@ def test_jvp_against_jax_full_argnum_case_TT_T():
     assert_elements_allclose(r1, r2, rtol=1e-6, atol=1e-6)
 
 
-def test_jvp_against_jax_full_argnum_case_T_TT():
+@pytest.mark.parametrize("diff_method", diff_methods)
+def test_jvp_against_jax_full_argnum_case_T_TT(diff_method):
     """Numerically tests Catalyst's jvp against the JAX version."""
 
     def f(x):
@@ -148,7 +155,7 @@ def test_jvp_against_jax_full_argnum_case_T_TT():
 
     @qjit
     def C_workflow():
-        return C_jvp(f, x, t, method="fd", argnum=list(range(len(x))))
+        return C_jvp(f, x, t, method=diff_method, argnum=list(range(len(x))))
 
     @jax.jit
     def J_workflow():
@@ -160,7 +167,8 @@ def test_jvp_against_jax_full_argnum_case_T_TT():
     assert_elements_allclose(r1, r2, rtol=1e-6, atol=1e-6)
 
 
-def test_jvp_against_jax_full_argnum_case_TT_TT():
+@pytest.mark.parametrize("diff_method", diff_methods)
+def test_jvp_against_jax_full_argnum_case_TT_TT(diff_method):
     """Numerically tests Catalyst's jvp against the JAX version."""
 
     def f(x1, x2):
@@ -181,7 +189,7 @@ def test_jvp_against_jax_full_argnum_case_TT_TT():
 
     @qjit
     def C_workflow():
-        return C_jvp(f, x, t, method="fd", argnum=list(range(len(x))))
+        return C_jvp(f, x, t, method=diff_method, argnum=list(range(len(x))))
 
     @jax.jit
     def J_workflow():
@@ -193,7 +201,8 @@ def test_jvp_against_jax_full_argnum_case_TT_TT():
     assert_elements_allclose(r1, r2, rtol=1e-6, atol=1e-6)
 
 
-def test_vjp_against_jax_full_argnum_case_S_SS():
+@pytest.mark.parametrize("diff_method", diff_methods)
+def test_vjp_against_jax_full_argnum_case_S_SS(diff_method):
     """Numerically tests Catalyst's jvp against the JAX version."""
 
     x, ct = (
@@ -204,7 +213,7 @@ def test_vjp_against_jax_full_argnum_case_S_SS():
     @qjit
     def C_workflow():
         f = qml.QNode(circuit_rx, device=qml.device("lightning.qubit", wires=1))
-        return C_vjp(f, x, ct, method="fd", argnum=list(range(len(x))))
+        return C_vjp(f, x, ct, method=diff_method, argnum=list(range(len(x))))
 
     @jax.jit
     def J_workflow():
@@ -218,7 +227,8 @@ def test_vjp_against_jax_full_argnum_case_S_SS():
     assert_elements_allclose(r1, r2, rtol=1e-6, atol=1e-6)
 
 
-def test_vjp_against_jax_full_argnum_case_T_T():
+@pytest.mark.parametrize("diff_method", diff_methods)
+def test_vjp_against_jax_full_argnum_case_T_T(diff_method):
     """Numerically tests Catalyst's jvp against the JAX version."""
 
     def f(x):
@@ -231,7 +241,7 @@ def test_vjp_against_jax_full_argnum_case_T_T():
 
     @qjit
     def C_workflow():
-        return C_vjp(f, x, ct, method="fd", argnum=list(range(len(x))))
+        return C_vjp(f, x, ct, method=diff_method, argnum=list(range(len(x))))
 
     @jax.jit
     def J_workflow():
@@ -244,7 +254,8 @@ def test_vjp_against_jax_full_argnum_case_T_T():
     assert_elements_allclose(r1, r2, rtol=1e-6, atol=1e-6)
 
 
-def test_vjp_against_jax_full_argnum_case_TT_T():
+@pytest.mark.parametrize("diff_method", diff_methods)
+def test_vjp_against_jax_full_argnum_case_TT_T(diff_method):
     """Numerically tests Catalyst's jvp against the JAX version."""
 
     def f(x1, x2):
@@ -262,7 +273,7 @@ def test_vjp_against_jax_full_argnum_case_TT_T():
 
     @qjit
     def C_workflow():
-        return C_vjp(f, x, ct, method="fd", argnum=list(range(len(x))))
+        return C_vjp(f, x, ct, method=diff_method, argnum=list(range(len(x))))
 
     @jax.jit
     def J_workflow():
@@ -275,7 +286,8 @@ def test_vjp_against_jax_full_argnum_case_TT_T():
     assert_elements_allclose(r1, r2, rtol=1e-6, atol=1e-6)
 
 
-def test_vjp_against_jax_full_argnum_case_T_TT():
+@pytest.mark.parametrize("diff_method", diff_methods)
+def test_vjp_against_jax_full_argnum_case_T_TT(diff_method):
     """Numerically tests Catalyst's jvp against the JAX version."""
 
     def f(x):
@@ -288,7 +300,7 @@ def test_vjp_against_jax_full_argnum_case_T_TT():
 
     @qjit
     def C_workflow():
-        return C_vjp(f, x, ct, method="fd", argnum=list(range(len(x))))
+        return C_vjp(f, x, ct, method=diff_method, argnum=list(range(len(x))))
 
     @jax.jit
     def J_workflow():
@@ -301,7 +313,8 @@ def test_vjp_against_jax_full_argnum_case_T_TT():
     assert_elements_allclose(r1, r2, rtol=1e-6, atol=1e-6)
 
 
-def test_vjp_against_jax_full_argnum_case_TT_TT():
+@pytest.mark.parametrize("diff_method", diff_methods)
+def test_vjp_against_jax_full_argnum_case_TT_TT(diff_method):
     """Numerically tests Catalyst's jvp against the JAX version."""
 
     def f(x1, x2):
@@ -322,7 +335,7 @@ def test_vjp_against_jax_full_argnum_case_TT_TT():
 
     @qjit
     def C_workflow():
-        return C_vjp(f, x, ct, method="fd", argnum=list(range(len(x))))
+        return C_vjp(f, x, ct, method=diff_method, argnum=list(range(len(x))))
 
     @jax.jit
     def J_workflow():
@@ -336,7 +349,8 @@ def test_vjp_against_jax_full_argnum_case_TT_TT():
     assert_elements_allclose(r1, r2, rtol=1e-6, atol=1e-6)
 
 
-def test_jvpvjp_argument_checks():
+@pytest.mark.parametrize("diff_method", diff_methods)
+def test_jvpvjp_argument_checks(diff_method):
     """Numerically tests Catalyst's jvp against the JAX version."""
 
     def f(x1, x2):
@@ -355,11 +369,11 @@ def test_jvpvjp_argument_checks():
 
     @qjit
     def C_workflow1():
-        return C_jvp(f, x, tuple(t), method="fd", argnum=list(range(len(x))))
+        return C_jvp(f, x, tuple(t), method=diff_method, argnum=list(range(len(x))))
 
     @qjit
     def C_workflow2():
-        return C_jvp(f, tuple(x), t, method="fd", argnum=tuple(range(len(x))))
+        return C_jvp(f, tuple(x), t, method=diff_method, argnum=tuple(range(len(x))))
 
     assert_elements_allclose(C_workflow1(), C_workflow2(), rtol=1e-6, atol=1e-6)
 
@@ -367,22 +381,23 @@ def test_jvpvjp_argument_checks():
 
         @qjit
         def C_workflow_bad1():
-            return C_jvp(f, 33, tuple(t), method="fd", argnum=list(range(len(x))))
+            return C_jvp(f, 33, tuple(t), argnum=list(range(len(x))))
 
     with pytest.raises(ValueError, match="argument must be an iterable"):
 
         @qjit
         def C_workflow_bad2():
-            return C_vjp(f, list(x), 33, method="fd", argnum=list(range(len(x))))
+            return C_vjp(f, list(x), 33, argnum=list(range(len(x))))
 
     with pytest.raises(ValueError, match="argnum should be integer or a list of integers"):
 
         @qjit
         def C_workflow_bad3():
-            return C_vjp(f, x, ct, method="fd", argnum="invalid")
+            return C_vjp(f, x, ct, argnum="invalid")
 
 
-def test_jvp_against_jax_argnum0_case_TT_TT():
+@pytest.mark.parametrize("diff_method", diff_methods)
+def test_jvp_against_jax_argnum0_case_TT_TT(diff_method):
     """Numerically tests Catalyst's jvp against the JAX version, in case of empty or singular
     argnum argument."""
 
@@ -404,11 +419,11 @@ def test_jvp_against_jax_argnum0_case_TT_TT():
 
     @qjit
     def C_workflowA():
-        return C_jvp(f, x, t[0:1], method="fd")
+        return C_jvp(f, x, t[0:1], method=diff_method)
 
     @qjit
     def C_workflowB():
-        return C_jvp(f, x, t[0:1], method="fd", argnum=[0])
+        return C_jvp(f, x, t[0:1], method=diff_method, argnum=[0])
 
     @jax.jit
     def J_workflow():
@@ -426,7 +441,8 @@ def test_jvp_against_jax_argnum0_case_TT_TT():
     assert_elements_allclose(r1a, r2, rtol=1e-6, atol=1e-6)
 
 
-def test_vjp_against_jax_argnum0_case_TT_TT():
+@pytest.mark.parametrize("diff_method", diff_methods)
+def test_vjp_against_jax_argnum0_case_TT_TT(diff_method):
     """Numerically tests Catalyst's vjp against the JAX version, in case of empty or singular
     argnum argument."""
 
@@ -448,11 +464,11 @@ def test_vjp_against_jax_argnum0_case_TT_TT():
 
     @qjit
     def C_workflowA():
-        return C_vjp(f, x, ct, method="fd")
+        return C_vjp(f, x, ct, method=diff_method)
 
     @qjit
     def C_workflowB():
-        return C_vjp(f, x, ct, method="fd", argnum=[0])
+        return C_vjp(f, x, ct, method=diff_method, argnum=[0])
 
     @jax.jit
     def J_workflow():
