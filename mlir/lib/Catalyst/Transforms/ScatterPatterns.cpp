@@ -238,7 +238,8 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
         rewriter.replaceOp(op, resultValue);
         return success();
     }
-
+    // Take the update block from scatter (bb0) and insert an equivalent function if it does not
+    // exist
     FlatSymbolRefAttr getOrInsertUpdateFunction(Location loc, ModuleOp moduleOp, OpBuilder &builder,
                                                 Region &updateRegion, std::string funcName) const
     {
@@ -317,7 +318,6 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
                                          ArrayRef<int64_t> scatterDimsToOperandDims,
                                          OpBuilder &builder, Location loc) const
     {
-
         // Get the scatter indices from the update scatter indices
         if (!updateScatterIndices.empty()) {
             scatterIndices = extractScatterIndices(updateScatterIndices, scatterIndices,
@@ -396,7 +396,6 @@ struct ScatterOpRewritePattern : public mlir::OpRewritePattern<mhlo::ScatterOp> 
     Value extractScatterIndices(SmallVector<Value> updateScatterIndices, Value scatterIndices,
                                 int64_t indexVectorDim, Location loc, OpBuilder builder) const
     {
-
         auto scatterIndicesTensorType = scatterIndices.getType().cast<RankedTensorType>();
         // Get the rank and shape of scatter indices
         int64_t rank = scatterIndicesTensorType.getRank();
