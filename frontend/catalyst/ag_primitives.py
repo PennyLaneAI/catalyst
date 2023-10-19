@@ -371,38 +371,37 @@ def while_stmt(loop_test, loop_body, get_state, set_state, nonlocals, symbol_nam
 
     fallback = False
 
-    if not fallback:
-        try:
-            results = _call_catalyst_while(
-                loop_test, loop_body, get_state, set_state, nonlocals, symbol_names
+    try:
+        results = _call_catalyst_while(
+            loop_test, loop_body, get_state, set_state, nonlocals, symbol_names
+        )
+
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        if catalyst.autograph_strict_conversion:
+            raise e
+
+        # pylint: disable=import-outside-toplevel
+        import inspect
+        import textwrap
+
+        fallback = True
+
+        while_loop_info = get_source_code_info(inspect.stack()[1])
+
+        if not catalyst.autograph_ignore_fallbacks:
+            warnings.warn(
+                f"Tracing of an AutoGraph converted while loop failed with an exception:\n"
+                f"  {type(e).__name__}:{textwrap.indent(str(e), '    ')}\n"
+                f"\n"
+                f"The error ocurred within the body of the following for loop statement:\n"
+                f"{while_loop_info}"
+                f"\n"
+                f"To understand different types of JAX tracing errors, please refer to the "
+                f"guide at: https://jax.readthedocs.io/en/latest/errors.html\n"
+                f"\n"
+                f"If you did not intend for the conversion to happen, you may safely ignore "
+                f"this warning."
             )
-
-        except Exception as e:  # pylint: disable=broad-exception-caught
-            if catalyst.autograph_strict_conversion:
-                raise e
-
-            # pylint: disable=import-outside-toplevel
-            import inspect
-            import textwrap
-
-            fallback = True
-
-            while_loop_info = get_source_code_info(inspect.stack()[1])
-
-            if not catalyst.autograph_ignore_fallbacks:
-                warnings.warn(
-                    f"Tracing of an AutoGraph converted while loop failed with an exception:\n"
-                    f"  {type(e).__name__}:{textwrap.indent(str(e), '    ')}\n"
-                    f"\n"
-                    f"The error ocurred within the body of the following for loop statement:\n"
-                    f"{while_loop_info}"
-                    f"\n"
-                    f"To understand different types of JAX tracing errors, please refer to the "
-                    f"guide at: https://jax.readthedocs.io/en/latest/errors.html\n"
-                    f"\n"
-                    f"If you did not intend for the conversion to happen, you may safely ignore "
-                    f"this warning."
-                )
 
     if fallback:
         results = _call_python_while(
