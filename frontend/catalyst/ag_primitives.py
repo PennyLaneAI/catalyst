@@ -26,6 +26,9 @@ import jax.numpy as jnp
 # as well as various utility objects.
 import pennylane as qml
 import tensorflow.python.autograph.impl.api as tf_autograph_api
+from jax.numpy import logical_and as jax_logical_and
+from jax.numpy import logical_not as jax_logical_not
+from jax.numpy import logical_or as jax_logical_or
 from tensorflow.python.autograph.core import config
 from tensorflow.python.autograph.core.converter import STANDARD_OPTIONS as STD
 from tensorflow.python.autograph.core.converter import ConversionOptions
@@ -57,6 +60,8 @@ __all__ = [
     "for_stmt",
     "while_stmt",
     "converted_call",
+    "and_",
+    "or_",
 ]
 
 # For testing: emulate autograph errors during processing of Catalyst control-flow primitives
@@ -409,6 +414,40 @@ def while_stmt(loop_test, loop_body, get_state, set_state, nonlocals, symbol_nam
         )
 
     set_state(results)
+
+
+def _logical_op(*args, jax_fn, python_fn):
+    fallback = False
+
+    values = [f() for f in args]
+
+    try:
+        if _emulate_fallback_errors:
+            raise AutoGraphError("Emulated autograph fallback errror")
+
+        result = jax_fn(*values)
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        if catalyst.autograph_strict_conversion:
+            raise e
+
+        fallback = True
+
+    if fallback:
+        result = python_fn(values)
+
+    return result
+
+
+def and_(*args):
+    return _logical_op(*args, jax_fn=jax_logical_and, python_fn=all)
+
+
+def or_(expr_left, expr_right):
+    return _logical_op(*args, jax_fn=jax_logical_or, python_fn=any)
+
+
+def not_(expr_left, expr_right):
+    return _logical_op(*args, jax_fn=jax_logical_not, python_fn=lambda x: not x)
 
 
 def get_source_code_info(tb_frame):

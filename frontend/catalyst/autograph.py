@@ -21,7 +21,12 @@ by Catalyst."""
 import inspect
 
 import pennylane as qml
-from tensorflow.python.autograph.converters import call_trees, control_flow, functions
+from tensorflow.python.autograph.converters import (
+    call_trees,
+    control_flow,
+    functions,
+    logical_expressions,
+)
 from tensorflow.python.autograph.core import converter, unsupported_features_checker
 from tensorflow.python.autograph.pyct import transpiler
 
@@ -65,6 +70,9 @@ class CFTransformer(transpiler.PyToPy):
 
         # First transform the top-level function to avoid infinite recursion.
         node = functions.transform(node, ctx)
+
+        # Convert logical expressions
+        node = logical_expressions.transform(node, ctx)
 
         # Convert function calls. This allows us to convert these called functions as well.
         node = call_trees.transform(node, ctx)
