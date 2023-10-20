@@ -120,7 +120,7 @@ test:
 .PHONY: clean
 clean:
 	@echo "clean build files"
-	rm -rf $(DIALECTS_BUILD_DIR) $(LLVM_BUILD_DIR) $(MHLO_BUILD_DIR)
+	rm -rf $(DIALECTS_BUILD_DIR) $(LLVM_BUILD_DIR) $(MHLO_BUILD_DIR) $(ENZYME_BUILD_DIR)
 
 .PHONY: format
 format:
