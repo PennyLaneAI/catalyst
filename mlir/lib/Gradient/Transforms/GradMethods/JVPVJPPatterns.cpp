@@ -104,7 +104,7 @@ LogicalResult JVPLoweringPattern::matchAndRewrite(JVPOp op, PatternRewriter &rew
         std::optional<Value> acc;
         for (size_t nparam = 0; nparam < func_diff_operand_indices.size(); nparam++) {
             LLVM_DEBUG(dbgs() << "iteration: nout " << nout << " nparam " << nparam << "\n");
-            auto jac = gradOp.getResults()[nparam * funcResultTypes.size() + nout];
+            auto jac = gradOp.getResults()[nparam + nout * func_diff_operand_indices.size()];
             auto tang = tangOperands[nparam];
             auto param = calleeOperands[func_diff_operand_indices[nparam]];
 
@@ -112,8 +112,7 @@ LogicalResult JVPLoweringPattern::matchAndRewrite(JVPOp op, PatternRewriter &rew
             auto sparam = _tovec(param.getType().cast<mlir::TensorType>().getShape());
             auto stang = _tovec(tang.getType().cast<mlir::TensorType>().getShape());
 
-            std::vector<int64_t> sjac_param(sjac.begin(),
-                                            sjac.begin() + std::min(sjac.size(), sparam.size()));
+            std::vector<int64_t> sjac_param(sjac.begin() + sjac.size() - sparam.size(), sjac.end());
 
             LLVM_DEBUG(dbgs() << "jac_type " << sjac << "\n");
             LLVM_DEBUG(dbgs() << "param_type " << sparam << "\n");
@@ -121,22 +120,26 @@ LogicalResult JVPLoweringPattern::matchAndRewrite(JVPOp op, PatternRewriter &rew
 
             assert(sparam == stang && "Parameter and tanget shapes don't match");
             assert(sjac_param == sparam &&
-                   "Jacobian shape doesn't contain the parameter shape as a prefix");
+                   "Jacobian shape doesn't contain the parameter shape as a suffix");
 
             std::vector<int64_t> jacAxisNames;
             {
-                for (size_t i = 0; i < sjac.size(); i++)
+                for (size_t i = 0; i < sjac.size(); i++) {
                     jacAxisNames.push_back(i);
+                }
             }
+
             std::vector<int64_t> tangAxisNames;
             {
-                for (size_t i = 0; i < stang.size(); i++)
+                for (size_t i = sjac.size() - sparam.size(); i < sjac.size(); i++) {
                     tangAxisNames.push_back(i);
+                }
             }
             std::vector<int64_t> jvpAxisNames;
             {
-                for (size_t i = 0; i < sjac.size() - sparam.size(); i++)
-                    jvpAxisNames.push_back(i + tangAxisNames.size());
+                for (size_t i = 0; i < sjac.size() - sparam.size(); i++) {
+                    jvpAxisNames.push_back(i);
+                }
             }
 
             LLVM_DEBUG(dbgs() << "jac_axis " << jacAxisNames << "\n");
@@ -222,7 +225,7 @@ LogicalResult VJPLoweringPattern::matchAndRewrite(VJPOp op, PatternRewriter &rew
     for (size_t nparam = 0; nparam < func_diff_operand_indices.size(); nparam++) {
         std::optional<Value> acc;
         for (size_t nout = 0; nout < funcResultTypes.size(); nout++) {
-            auto jac = gradOp.getResults()[nparam * funcResultTypes.size() + nout];
+            auto jac = gradOp.getResults()[nparam + nout * func_diff_operand_indices.size()];
             auto param = calleeOperands[func_diff_operand_indices[nparam]];
             auto cotang = cotang_operands[nout];
 
@@ -230,29 +233,32 @@ LogicalResult VJPLoweringPattern::matchAndRewrite(VJPOp op, PatternRewriter &rew
             auto sparam = _tovec(param.getType().cast<mlir::TensorType>().getShape());
             auto scotang = _tovec(cotang.getType().cast<mlir::TensorType>().getShape());
 
-            std::vector<int64_t> sjac_cotang(sjac.begin() + sparam.size(), sjac.end());
+            std::vector<int64_t> sjac_cotang(sjac.begin(), sjac.end() - sparam.size());
 
             LLVM_DEBUG(dbgs() << "jac_type " << sjac << "\n");
             LLVM_DEBUG(dbgs() << "param_type " << sparam << "\n");
             LLVM_DEBUG(dbgs() << "cotang_type " << scotang << "\n");
 
             assert(sjac_cotang == scotang &&
-                   "Jacobian shape doesn't contain the cotang shape as a suffix");
+                   "Jacobian shape doesn't contain the cotang shape as a prefix");
 
             std::vector<int64_t> jacAxisNames;
             {
-                for (size_t i = 0; i < sjac.size(); i++)
+                for (size_t i = 0; i < sjac.size(); i++) {
                     jacAxisNames.push_back(i);
+                }
             }
             std::vector<int64_t> cotangAxisNames;
             {
-                for (size_t i = sjac.size() - scotang.size(); i < sjac.size(); i++)
+                for (size_t i = 0; i < scotang.size(); i++) {
                     cotangAxisNames.push_back(i);
+                }
             }
             std::vector<int64_t> vjpAxisNames;
             {
-                for (size_t i = 0; i < sjac.size() - scotang.size(); i++)
+                for (size_t i = scotang.size(); i < sjac.size(); i++) {
                     vjpAxisNames.push_back(i);
+                }
             }
 
             LLVM_DEBUG(dbgs() << "jac_axis " << jacAxisNames << "\n");
