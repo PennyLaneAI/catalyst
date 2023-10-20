@@ -26,6 +26,7 @@ def test_custom_device():
 
     class DummyDevice(qml.QubitDevice):
         """Dummy Device"""
+
         name = "Dummy Device"
         short_name = "dummy.device"
         pennylane_requires = "0.32.0"
@@ -64,6 +65,7 @@ def test_custom_device_bad_directory():
 
     class DummyDevice(qml.QubitDevice):
         """Dummy Device"""
+
         name = "Dummy Device"
         short_name = "dummy.device"
         pennylane_requires = "0.32.0"
