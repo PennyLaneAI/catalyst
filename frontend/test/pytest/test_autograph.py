@@ -1324,7 +1324,7 @@ class TestLogicalOps:
         with pytest.raises(AutoGraphError, match="non-scalar"):
             qjit(autograph=True)(f3)(arg)
 
-    def test_logical_stict_conversion_error(self, monkeypatch):
+    def test_logical_strict_conversion_error(self, monkeypatch):
         """Test exception on strict conversion failure."""
 
         monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
