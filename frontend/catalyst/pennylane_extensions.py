@@ -19,9 +19,9 @@ while using :func:`~.qjit`.
 # pylint: disable=too-many-lines
 
 import numbers
+import pathlib
 from functools import update_wrapper
 from typing import Any, Callable, Iterable, List, Optional, Union
-import pathlib
 
 import jax
 import jax.numpy as jnp

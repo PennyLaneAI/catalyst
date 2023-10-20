@@ -13,10 +13,10 @@
 # limitations under the License.
 """Unit test for custom device integration with Catalyst.
 """
+import pennylane as qml
 import pytest
 
-import pennylane as qml
-from catalyst import qjit, measure
+from catalyst import measure, qjit
 from catalyst.compiler import get_lib_path
 from catalyst.utils.exceptions import CompileError
 
