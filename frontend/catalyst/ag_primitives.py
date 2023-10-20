@@ -64,6 +64,7 @@ __all__ = [
     "converted_call",
     "and_",
     "or_",
+    "not_",
 ]
 
 # For testing: emulate autograph errors during processing of Catalyst control-flow primitives
@@ -419,6 +420,8 @@ def while_stmt(loop_test, loop_body, get_state, set_state, nonlocals, symbol_nam
 
 
 def _logical_op(*args, jax_fn, python_fn):
+    fallback = False
+
     values = [f() for f in args]
 
     def _non_scalar_tracer(x) -> bool:
