@@ -1257,6 +1257,86 @@ class TestWhileLoops:
 
 
 @pytest.mark.tf
+class TestLogicalOps:
+    def test_logical_basics(self, monkeypatch):
+        """Test basic logical and behavior."""
+
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        @qjit(autograph=True)
+        def f1(param):
+            return param > 0.0 and param < 1.0 and param <= 2.0
+
+        @qjit(autograph=True)
+        def f2(param):
+            return param > 1.0 or param < 0.0 or param == 0.5
+
+        @qjit(autograph=True)
+        def f3(param):
+            return not param > 1.0
+
+        assert all(f(0.5) for f in [f1, f2, f3])
+
+    def test_logical_fallback(self, monkeypatch):
+        """Test fallback path of logical ops."""
+
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", False)
+        monkeypatch.setattr("catalyst.ag_primitives._emulate_fallback_errors", True)
+
+        a, b, c = 1, 2, 33
+        some_list = [1, 2, 3]
+
+        @qjit(autograph=True)
+        def f1():
+            return (a in some_list) and (b in some_list)
+
+        @qjit(autograph=True)
+        def f2():
+            return (a in some_list) and (b in some_list)
+
+        @qjit(autograph=True)
+        def f3():
+            return c not in some_list
+
+        # TODO: Actually, jax arrays are returned. What is our conversion policy?
+        assert f1() == True
+        assert f2() == True
+        assert f3() == True
+
+    def test_logical_rejects_non_scalars(self, monkeypatch):
+        """Test that we reject using logic with non-scalar tensors"""
+
+        def f1(param):
+            return param > 0.0 and param < 1.0
+
+        def f2(param):
+            return param > 1.0 or param < 0.0 or param == 0.5
+
+        def f3(param):
+            return not param > 1.0
+
+        arg = jnp.array([0.5, 1.0])
+        with pytest.raises(AutoGraphError, match="non-scalar"):
+            qjit(autograph=True)(f1)(arg)
+        with pytest.raises(AutoGraphError, match="non-scalar"):
+            qjit(autograph=True)(f2)(arg)
+        with pytest.raises(AutoGraphError, match="non-scalar"):
+            qjit(autograph=True)(f3)(arg)
+
+    def test_logical_stict_conversion_error(self, monkeypatch):
+        """Test exception on strict conversion failure."""
+
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+        monkeypatch.setattr("catalyst.ag_primitives._emulate_fallback_errors", True)
+
+        def f1(a):
+            return a > 0.0 and a < 1.0
+
+        with pytest.raises(AutoGraphError, match="Emulated"):
+            qjit(autograph=True)(f1)(0.5)
+
+
+@pytest.mark.tf
 class TestMixed:
     """Test a mix of supported autograph conversions and Catalyst control flow."""
 

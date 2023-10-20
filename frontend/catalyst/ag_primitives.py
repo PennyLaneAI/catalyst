@@ -17,6 +17,7 @@ functions. The purpose is to convert imperative style code to functional or grap
 
 import functools
 import warnings
+from functools import reduce
 from typing import Any, Callable, Iterator, SupportsIndex, Tuple, Union
 
 import jax
@@ -46,6 +47,7 @@ from tensorflow.python.autograph.pyct.origin_info import LineLocation
 
 import catalyst
 from catalyst.ag_utils import AutoGraphError
+from catalyst.utils.jax_extras import DynamicJaxprTracer
 from catalyst.utils.patching import Patcher
 
 __all__ = [
@@ -178,7 +180,7 @@ def _call_catalyst_for(
     """Dispatch to a Catalyst implementation of for loops."""
 
     if _emulate_fallback_errors:
-        raise AutoGraphError("Emulated autograph fallback errror")
+        raise AutoGraphError("Emulated autograph fallback error")
 
     # Ensure iteration arguments are properly initialized. We cannot process uninitialized
     # loop carried values as we need their type information for tracing.
@@ -341,7 +343,7 @@ def _call_catalyst_while(loop_test, loop_body, get_state, set_state, _nonlocals,
     """Dispatch to a Catalyst implementation of while loops."""
 
     if _emulate_fallback_errors:
-        raise AutoGraphError("Emulated autograph fallback errror")
+        raise AutoGraphError("Emulated autograph fallback error")
 
     def _test(state):
         old = get_state()
@@ -417,20 +419,31 @@ def while_stmt(loop_test, loop_body, get_state, set_state, nonlocals, symbol_nam
 
 
 def _logical_op(*args, jax_fn, python_fn):
-    fallback = False
-
     values = [f() for f in args]
 
-    try:
-        if _emulate_fallback_errors:
-            raise AutoGraphError("Emulated autograph fallback errror")
+    fallback = False
 
-        result = jax_fn(*values)
-    except Exception as e:  # pylint: disable=broad-exception-caught
-        if catalyst.autograph_strict_conversion:
-            raise e
+    def _non_scalar_tracer(x) -> bool:
+        return isinstance(x, DynamicJaxprTracer) and reduce(lambda a, b: a * b, x.shape, 1) != 1
 
-        fallback = True
+    if any(map(_non_scalar_tracer, values)):
+        raise AutoGraphError(
+            "Using logical operations (and/or/not) with non-scalar tracers is not supported\n"
+            "Consider using `jax.numpy.logical_and/..logical_or/..logical_not` functions.\n"
+            f"arguments provided were: {args}"
+        )
+
+    if not fallback:
+        try:
+            if _emulate_fallback_errors:
+                raise AutoGraphError("Emulated autograph fallback error")
+
+            result = jax_fn(*values)
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            if catalyst.autograph_strict_conversion:
+                raise e
+
+            fallback = True
 
     if fallback:
         result = python_fn(values)
@@ -442,12 +455,12 @@ def and_(*args):
     return _logical_op(*args, jax_fn=jax_logical_and, python_fn=all)
 
 
-def or_(expr_left, expr_right):
+def or_(*args):
     return _logical_op(*args, jax_fn=jax_logical_or, python_fn=any)
 
 
-def not_(expr_left, expr_right):
-    return _logical_op(*args, jax_fn=jax_logical_not, python_fn=lambda x: not x)
+def not_(arg):
+    return _logical_op(lambda: arg, jax_fn=jax_logical_not, python_fn=lambda x: not x)
 
 
 def get_source_code_info(tb_frame):
