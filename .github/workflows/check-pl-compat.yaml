@@ -43,7 +43,9 @@ jobs:
         python3 -m pip install -r requirements.txt
         # TODO: Use the latest version of boto3 after fixing the issue with
         # "Device SV1 does not support quantum circuits" from braket-pl-plugin.
-        pip install amazon-braket-pennylane-plugin "boto3==1.26"
+        pip install "boto3==1.26"
+        # TODO: remove pin after PL v0.33 release
+        pip install git+https://github.com/amazon-braket/amazon-braket-pennylane-plugin-python@main
         echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
 
     - name: Get Catalyst Build Dependencies (latest)
@@ -131,14 +133,9 @@ jobs:
 
     - name: Install PennyLane-Lightning (latest)
       if: ${{ inputs.lightning == 'latest' }}
-      uses: actions/checkout@v3
-      with:
-        repository: PennyLaneAI/pennylane-lightning
-        path: pennylane-lightning
-    - if: ${{ inputs.lightning == 'latest' }}
       run: |
-        pip install --upgrade ./pennylane-lightning
-        PL_BACKEND="lightning_kokkos" pip install --upgrade ./pennylane-lightning
+        pip install --upgrade git+https://github.com/PennyLaneAI/pennylane-lightning@master
+        PL_BACKEND="lightning_kokkos" pip install --upgrade git+https://github.com/PennyLaneAI/pennylane-lightning@master
 
     - name: Install PennyLane-Lightning (stable)
       if: ${{ inputs.lightning == 'stable' }}
@@ -148,13 +145,8 @@ jobs:
 
     - name: Install PennyLane (latest)
       if: ${{ inputs.pennylane == 'latest' }}
-      uses: actions/checkout@v3
-      with:
-        repository: PennyLaneAI/pennylane
-        path: pennylane
-    - if: ${{ inputs.pennylane == 'latest' }}
       run: |
-        pip install --upgrade ./pennylane
+        pip install --upgrade git+https://github.com/PennyLaneAI/pennylane@master
 
     - name: Install PennyLane (stable)
       if: ${{ inputs.pennylane == 'stable' }}
@@ -171,7 +163,13 @@ jobs:
     - name: Run Frontend Tests
       run: |
         make pytest
+
+    - name: Run Frontend Tests (Kokkos)
+      run: |
         make pytest TEST_BACKEND="lightning.kokkos"
+
+    - name: Run Frontend Tests (Braket)
+      run: |
         make pytest TEST_BRAKET=LOCAL
 
     - name: Run Demos
