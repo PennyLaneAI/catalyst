@@ -26,7 +26,6 @@ jobs:
       run: |
         sudo apt-get install -y cmake ninja-build clang lld libomp-dev
         python3 -m pip install -r requirements.txt
-        python3 -m pip install -e .
         echo "COMPILER_LAUNCHER=" >> $GITHUB_ENV
 
     - name: Discover JAX dep hashes
