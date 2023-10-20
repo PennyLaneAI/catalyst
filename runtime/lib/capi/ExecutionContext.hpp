@@ -182,7 +182,7 @@ class ExecutionContext final {
         return f_ptr ? reinterpret_cast<decltype(getCustomDevice) *>(f_ptr)() : NULL;
     }
 
-    [[nodiscard]] bool initDevice(std::string_view name) noexcept
+    [[nodiscard]] bool initDevice(std::string_view name)
     {
         if (name != "default") {
             _device_name = name;
