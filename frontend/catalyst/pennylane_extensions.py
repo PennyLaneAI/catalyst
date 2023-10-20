@@ -128,7 +128,7 @@ class QFunc:
             else:
                 name = self.device.name
 
-            is_known_device = self.device.short_name in QFunc.RUNTIME_DEVICES
+            is_known_device = name in QFunc.RUNTIME_DEVICES
             implements_c_interface = hasattr(self.device, "get_c_interface")
             is_valid_device = is_known_device or implements_c_interface
             if not is_valid_device:
