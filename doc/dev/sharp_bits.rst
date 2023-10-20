@@ -24,7 +24,7 @@ helpful when using Catalyst.
     :doc:`quick start guide <quick_start>`.
 
 
-
+.. _compile_time:
 
 Compile-time vs. runtime
 ------------------------
@@ -112,8 +112,9 @@ and those that happen at **runtime** (step 3).
       :func:`~.cond` and :func:`~.for_loop` will be evaluated at
       runtime, and can accept dynamic variables.
 
-    Note that if AutoGraph is enabled, Catalyst will attempt to convert Python
-    control flow to its Catalyst equivalent to support dynamic variables.
+    Note that if :doc:`AutoGraph <autograph>` is enabled, Catalyst will
+    attempt to convert Python control flow to its Catalyst equivalent to
+    support dynamic variables.
 
 For example, consider the following:
 
@@ -189,7 +190,7 @@ rather than runtime.
     >>> f(6.)
     ... array(9.)
 
-    For more details, see the AutoGraph guide.
+    For more details, see the :doc:`AutoGraph guide <autograph>`.
 
 
 Avoiding recompilation
@@ -599,8 +600,8 @@ Conditional debugging
 
 .. note::
 
-    See our AutoGraph guide for seamless conversion of native Python control flow
-    to QJIT compatible control flow.
+    See our :doc:`AutoGraph guide <autograph>` for seamless conversion of
+    native Python control flow to QJIT compatible control flow.
 
 There are various constraints and restrictions that should be kept in mind
 when working with classical control in Catalyst.
