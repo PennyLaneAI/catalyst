@@ -421,8 +421,6 @@ def while_stmt(loop_test, loop_body, get_state, set_state, nonlocals, symbol_nam
 def _logical_op(*args, jax_fn, python_fn):
     values = [f() for f in args]
 
-    fallback = False
-
     def _non_scalar_tracer(x) -> bool:
         return isinstance(x, DynamicJaxprTracer) and reduce(lambda a, b: a * b, x.shape, 1) != 1
 
@@ -433,17 +431,16 @@ def _logical_op(*args, jax_fn, python_fn):
             f"arguments provided were: {args}"
         )
 
-    if not fallback:
-        try:
-            if _emulate_fallback_errors:
-                raise AutoGraphError("Emulated autograph fallback error")
+    try:
+        if _emulate_fallback_errors:
+            raise AutoGraphError("Emulated autograph fallback error")
 
-            result = jax_fn(*values)
-        except Exception as e:  # pylint: disable=broad-exception-caught
-            if catalyst.autograph_strict_conversion:
-                raise e
+        result = jax_fn(*values)
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        if catalyst.autograph_strict_conversion:
+            raise e
 
-            fallback = True
+        fallback = True
 
     if fallback:
         result = python_fn(values)
@@ -452,14 +449,17 @@ def _logical_op(*args, jax_fn, python_fn):
 
 
 def and_(*args):
+    """An implementation of the AutoGraph '.. and ..' statement."""
     return _logical_op(*args, jax_fn=jax_logical_and, python_fn=all)
 
 
 def or_(*args):
+    """An implementation of the AutoGraph '.. or ..' statement."""
     return _logical_op(*args, jax_fn=jax_logical_or, python_fn=any)
 
 
 def not_(arg):
+    """An implementation of the AutoGraph '.. not ..' statement."""
     return _logical_op(lambda: arg, jax_fn=jax_logical_not, python_fn=lambda x: not x)
 
 
