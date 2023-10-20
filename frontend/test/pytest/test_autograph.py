@@ -1298,7 +1298,8 @@ class TestLogicalOps:
         def f3():
             return c not in some_list
 
-        # TODO: Actually, jax arrays are returned. What is our conversion policy?
+        # TODO: Actually, jax arrays are returned, so `is True` does not work. What is our type
+        # conversion policy?
         assert f1() == True
         assert f2() == True
         assert f3() == True
