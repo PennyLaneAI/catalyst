@@ -14,6 +14,7 @@
 // limitations under the License.
 
 #include "ExecutionContext.hpp"
+#include "QuantumDevice.hpp"
 
 #include "TestUtils.hpp"
 
@@ -32,4 +33,12 @@ TEST_CASE("Test error message function not found", "[Third Party]")
     std::string file("libm.so.6");
     REQUIRE_THROWS_WITH(driver->loadDevice(file),
                         Catch::Contains("undefined symbol: getCustomDevice"));
+}
+
+TEST_CASE("Test success of loading dummy device", "[Third Party]")
+{
+    std::unique_ptr<ExecutionContext> driver = std::make_unique<ExecutionContext>("default");
+    std::string file("libdummy_device.so");
+    QuantumDevice *device = driver->loadDevice(file);
+    CHECK(device);
 }

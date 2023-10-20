@@ -1,0 +1,14 @@
+[build-system]
+requires = ["setuptools>=62", "wheel"]
+build-backend = "setuptools.build_meta"
+[project]
+name = "dummy_device"
+version = "0.0.1"
+authors = [{name = "Dummy", email = "dummy@example.com"}]
+description = "A Catalyst compatible dummy device."
+requires-python = ">=3.9"
+dependencies = ["pennylane"]
+[project.entry-points."pennylane.plugins"]
+"dummy.qubit" = "dummy_device:DummyDevice"
+[tools.setuptools.packages.find]
+where = ["build-lib"]

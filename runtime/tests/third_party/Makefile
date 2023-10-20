@@ -1,0 +1,40 @@
+PYTHON := python3
+C_COMPILER?=clang-12
+CXX_COMPILER?=clang++-12
+COMPILER_LAUNCHER?=ccache
+MK_ABSPATH := $(abspath $(lastword $(MAKEFILE_LIST)))
+MK_DIR := $(dir $(MK_ABSPATH))
+RT_BUILD_DIR?=$(MK_DIR)/build-lib
+CMAKE_ARGS?=""
+CODE_COVERAGE?=OFF
+BUILD_TYPE?=Release
+ENABLE_WARNINGS?=ON
+ENABLE_LIGHTNING_KOKKOS?=OFF
+ENABLE_OPENQASM?=OFF
+BUILD_QIR_STDLIB_FROM_SRC?=OFF
+# TODO: Update to latest_release after v0.33.0
+LIGHTNING_GIT_TAG_VALUE= "master"
+NPROC?=$(shell python -c "import os; print(os.cpu_count())")
+
+coverage: CODE_COVERAGE=ON
+coverage: BUILD_TYPE=Debug
+test: CODE_COVERAGE=OFF
+test: BUILD_TYPE?=Release
+
+.PHONY: dummy_device
+dummy_device:
+	@echo "Configure Catalyst Runtime"
+	cmake -G Ninja -B $(RT_BUILD_DIR) . \
+		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
+		-DLIGHTNING_GIT_TAG=$(LIGHTNING_GIT_TAG_VALUE) \
+		-DENABLE_LIGHTNING_KOKKOS=$(ENABLE_LIGHTNING_KOKKOS) \
+		-DENABLE_OPENQASM=$(ENABLE_OPENQASM) \
+		-DCMAKE_C_COMPILER=$(C_COMPILER) \
+		-DCMAKE_CXX_COMPILER=$(CXX_COMPILER) \
+		-DCMAKE_C_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
+		-DCMAKE_CXX_COMPILER_LAUNCHER=$(COMPILER_LAUNCHER) \
+		-DENABLE_WARNINGS=$(ENABLE_WARNINGS) \
+		$(CMAKE_ARGS)
+
+	cmake --build $(RT_BUILD_DIR) --target dummy_device -j$(NPROC) --verbose
+	cp $(RT_BUILD_DIR)/libdummy_device.so src/dummy_device

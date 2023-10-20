@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.21)
 
 project(lightning_qir_runtime_tests)
 
+add_subdirectory(third_party)
+
 set(CMAKE_CXX_STANDARD 20)
 
 Include(FetchContent)
@@ -22,6 +24,7 @@ include(CTest)
 include(Catch)
 
 add_executable(runner_tests runner_main.cpp)
+add_dependencies(runner_tests dummy_device)
 
 if(ENABLE_OPENQASM)
 find_package(pybind11 CONFIG)
