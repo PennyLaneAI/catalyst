@@ -16,6 +16,10 @@
   branch of PennyLane-Lightning. This issue introduced in [PR 499](https://github.com/PennyLaneAI/pennylane-lightning/pull/499).
   [(#322)](https://github.com/PennyLaneAI/catalyst/pull/322)
 
+* Add a newer pip requirement to the `requirements.txt`. Recent version of pip contains a bug fix
+  allowing us to do editable installations even if system-wide site-packages is read-only.
+  [(#311)](https://github.com/PennyLaneAI/catalyst/pull/311)
+
 <h3>Contributors</h3>
 
 This release contains contributions from (in alphabetical order):
