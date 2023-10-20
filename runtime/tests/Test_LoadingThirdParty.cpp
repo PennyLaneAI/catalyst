@@ -13,6 +13,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "ExecutionContext.hpp"
+
 #include "TestUtils.hpp"
 
-TEST_CASE("Test dummy", "[Third Party]") { CHECK(false); }
+using namespace Catalyst::Runtime;
+
+TEST_CASE("Test dummy", "[Third Party]")
+{
+    std::unique_ptr<ExecutionContext> driver = std::make_unique<ExecutionContext>("default");
+    std::string file("this-file-does-not-exist.so");
+    REQUIRE_THROWS_WITH(driver->loadDevice(file), Catch::Contains("No such file or directory"));
+}
