@@ -21,6 +21,7 @@ while using :func:`~.qjit`.
 import numbers
 from functools import update_wrapper
 from typing import Any, Callable, Iterable, List, Optional, Union
+import pathlib
 
 import jax
 import jax.numpy as jnp
@@ -136,6 +137,10 @@ class QFunc:
                 )
 
             if implements_c_interface:
+                impl = self.device.get_c_interface()
+                if not pathlib.Path(impl).is_file():
+                    raise CompileError(f"Device at {impl} cannot be found!")
+
                 self.device.short_name = self.device.get_c_interface()
 
             backend_kwargs = {}
