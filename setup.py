@@ -28,6 +28,7 @@ with open(".dep-versions") as f:
     jax_version = [line[4:].strip() for line in f.readlines() if "jax=" in line][0]
 
 requirements = [
+    "pip>=22.3", # Due to a bug with `pip install -e .` vs read-only site-packages
     "pennylane>=0.32",
     f"jax=={jax_version}",
     f"jaxlib=={jax_version}",

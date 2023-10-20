@@ -25,12 +25,8 @@ jobs:
     - name: Install deps
       run: |
         sudo apt-get install -y cmake ninja-build clang lld libomp-dev
-        mkdir -pv _venv
-        python3 -m venv _venv
-        . _venv/bin/activate
         python3 -m pip install -r requirements.txt
-        echo "PATH=${PATH}" >> $GITHUB_ENV
-        echo "VIRTUAL_ENV=${VIRTUAL_ENV}" >> $GITHUB_ENV
+        python3 -m pip install -e .
         echo "COMPILER_LAUNCHER=" >> $GITHUB_ENV
 
     - name: Discover JAX dep hashes
