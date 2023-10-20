@@ -60,6 +60,48 @@ class MemoryManager final {
     bool contains(void *ptr) { return _impl.contains(ptr); }
 };
 
+class SharedLibraryManager final {
+  private:
+    void *_handler{NULL};
+
+  public:
+    SharedLibraryManager() {}
+
+    SharedLibraryManager(std::string filename)
+    {
+        if (filename.find(".so") == std::string::npos) {
+            return;
+        }
+        _handler = dlopen(filename.c_str(), RTLD_LAZY | RTLD_DEEPBIND);
+        if (!_handler) {
+            char *error_msg = dlerror();
+            throw RuntimeException(error_msg);
+        }
+    }
+
+    ~SharedLibraryManager()
+    {
+        // dlclose returns non-zero on error
+        // but we cannot throw exceptions in a destructor
+        // TODO: How to handle this case?
+        if (_handler)
+            dlclose(_handler);
+    }
+
+    void *getSymbol(std::string symbol)
+    {
+        if (!_handler)
+            return NULL;
+
+        void *sym = dlsym(_handler, symbol.c_str());
+        if (!sym) {
+            char *error_msg = dlerror();
+            throw RuntimeException(error_msg);
+        }
+        return sym;
+    }
+};
+
 extern "C" Catalyst::Runtime::QuantumDevice *getCustomDevice();
 
 class ExecutionContext final {
@@ -83,7 +125,7 @@ class ExecutionContext final {
     // ExecutionContext pointers
     std::unique_ptr<QuantumDevice> _driver_ptr{nullptr};
     std::unique_ptr<MemoryManager> _driver_mm_ptr{nullptr};
-    void *_driver_lib_ptr{nullptr};
+    std::unique_ptr<SharedLibraryManager> _driver_so_ptr{nullptr};
 
 #ifdef __device_openqasm
     std::unique_ptr<Device::OpenQasm::PythonInterpreterGuard> _py_guard{nullptr};
@@ -106,12 +148,14 @@ class ExecutionContext final {
         });
 #endif
         _driver_mm_ptr = std::make_unique<MemoryManager>();
+        _driver_so_ptr = std::make_unique<SharedLibraryManager>();
     };
 
     ~ExecutionContext()
     {
         _driver_ptr.reset(nullptr);
         _driver_mm_ptr.reset(nullptr);
+        _driver_so_ptr.reset(nullptr);
 
 #ifdef __device_openqasm
         _py_guard.reset(nullptr);
@@ -133,34 +177,9 @@ class ExecutionContext final {
 
     [[nodiscard]] QuantumDevice *loadDevice(std::string filename)
     {
-
-        if (filename.find(".so") == std::string::npos) {
-            return NULL;
-        }
-        int retval = 0;
-        if (_driver_lib_ptr) {
-            retval = dlclose(_driver_lib_ptr);
-        }
-
-        if (0 != retval) {
-            char *error_msg = dlerror();
-            throw RuntimeException(error_msg);
-        }
-
-        void *handler = dlopen(filename.data(), RTLD_LAZY | RTLD_DEEPBIND);
-        if (!handler) {
-            char *error_msg = dlerror();
-            throw RuntimeException(error_msg);
-        }
-
-        void *f_ptr = dlsym(handler, "getCustomDevice");
-        if (!f_ptr) {
-            char *error_msg = dlerror();
-            throw RuntimeException(error_msg);
-        }
-
-        _driver_lib_ptr = handler;
-        return reinterpret_cast<decltype(getCustomDevice) *>(f_ptr)();
+        _driver_so_ptr = std::make_unique<SharedLibraryManager>(filename);
+        void *f_ptr = _driver_so_ptr->getSymbol("getCustomDevice");
+        return f_ptr ? reinterpret_cast<decltype(getCustomDevice) *>(f_ptr)() : NULL;
     }
 
     [[nodiscard]] bool initDevice(std::string_view name) noexcept
