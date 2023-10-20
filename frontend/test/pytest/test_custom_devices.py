@@ -13,7 +13,6 @@
 # limitations under the License.
 """Unit test for custom device integration with Catalyst.
 """
-import os
 import pytest
 
 import pennylane as qml
@@ -26,6 +25,7 @@ def test_custom_device():
     """Test that custom device can run using Catalyst."""
 
     class DummyDevice(qml.QubitDevice):
+        """Dummy Device"""
         name = "Dummy Device"
         short_name = "dummy.device"
         pennylane_requires = "0.32.0"
@@ -40,10 +40,12 @@ def test_custom_device():
             super().__init__(wires=wires, shots=shots)
 
         def apply(self, operations, **kwargs):
+            """Unused"""
             raise RuntimeError("Only C/C++ interface is defined")
 
         @staticmethod
         def get_c_interface():
+            """Location to shared object with C/C++ implementation"""
             return get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so"
 
     @qjit
@@ -61,6 +63,7 @@ def test_custom_device_bad_directory():
     """Test that custom device error."""
 
     class DummyDevice(qml.QubitDevice):
+        """Dummy Device"""
         name = "Dummy Device"
         short_name = "dummy.device"
         pennylane_requires = "0.32.0"
@@ -75,10 +78,12 @@ def test_custom_device_bad_directory():
             super().__init__(wires=wires, shots=shots)
 
         def apply(self, operations, **kwargs):
+            """Unused."""
             raise RuntimeError("Only C/C++ interface is defined")
 
         @staticmethod
         def get_c_interface():
+            """Location to shared object with C/C++ implementation"""
             return "this-file-does-not-exist.so"
 
     with pytest.raises(CompileError, match="Device .* cannot be found"):

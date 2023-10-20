@@ -39,6 +39,5 @@ TEST_CASE("Test success of loading dummy device", "[Third Party]")
 {
     std::unique_ptr<ExecutionContext> driver = std::make_unique<ExecutionContext>("default");
     std::string file("libdummy_device.so");
-    QuantumDevice *device = driver->loadDevice(file);
-    CHECK(device);
+    CHECK(driver->initDevice(file));
 }
