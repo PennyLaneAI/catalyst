@@ -114,6 +114,9 @@ flow statements:
 
 ``while`` loops are currently not supported, alongside ``break`` and ``continue`` statements.
 
+In addition, ``lambda`` functions cannot currently be used with AutoGraph; please
+use standard function definitions instead.
+
 Nested functions
 ----------------
 
