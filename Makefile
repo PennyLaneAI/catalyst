@@ -72,6 +72,7 @@ lit:
 
 pytest:
 	@echo "check the Catalyst PyTest suite"
+	$(MAKE) -C runtime dummy_device
 	$(PYTHON) -m pytest frontend/test/pytest --tb=native --backend=$(TEST_BACKEND) --runbraket=$(TEST_BRAKET) -n auto
 test-demos:
 	@echo "check the Catalyst demos"

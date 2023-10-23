@@ -24,6 +24,8 @@ include(Catch)
 
 add_executable(runner_tests runner_main.cpp)
 
+add_subdirectory(third_party)
+
 if (ENABLE_SANITIZER)
     set(third_party_tests "")
 else()
@@ -34,7 +36,6 @@ else()
     # runtime (see https://github.com/google/sanitizers/issues/611 for
     # details). If you want to run this-file-does-not-exist.so library under
     # sanitizers please remove RTLD_DEEPBIND from dlopen flags.
-    add_subdirectory(third_party)
     add_dependencies(runner_tests dummy_device)
     set(third_party_tests Test_LoadingThirdParty.cpp)
 endif()
