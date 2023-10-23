@@ -111,8 +111,9 @@ flow statements:
 
 - ``if`` statements (including ``elif`` and ``else``)
 - ``for`` loops
+- ``while`` loops
 
-``while`` loops are currently not supported, alongside ``break`` and ``continue`` statements.
+``break`` and ``continue`` statements are not currently supported.
 
 Nested functions
 ----------------
@@ -301,6 +302,23 @@ after the if statement will result in an error:
 >>> f(0.5)
 TypeError: Value 'a' with type <class 'str'> is not a valid JAX type
 
+While loops
+-----------
+
+In most cases, ``while`` loops should be captured without problems:
+
+.. code-block:: python
+
+    @qjit(autograph=True)
+    def f(param):
+        n = 0.
+        while param < 0.5:
+            param *= 1.2
+            n += 1
+        return n
+
+>>> f(0.1)
+array(9.)
 
 For loops
 ---------
