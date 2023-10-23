@@ -11,6 +11,10 @@
 * The AutoGraph feature, still experimental, now supports native Python `while` loops as well.
   [(#318)](https://github.com/PennyLaneAI/catalyst/pull/318)
 
+* The AutoGraph now also supports native Python `and`, `or` and `not` operators in boolean
+  expressions.
+  [(#325)](https://github.com/PennyLaneAI/catalyst/pull/325)
+
 <h3>Breaking changes</h3>
 
 <h3>Bug fixes</h3>
