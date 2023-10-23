@@ -55,8 +55,8 @@ configure:
 		-DBUILD_QIR_STDLIB_FROM_SRC=$(BUILD_QIR_STDLIB_FROM_SRC) \
 		$(CMAKE_ARGS)
 
-$(RT_BUILD_DIR)/lib/backend/librt_backend.so $(RT_BUILD_DIR)/lib/librt_capi.so $(RT_BUILD_DIR)/lib/libdummy_device.so: configure
-	cmake --build $(RT_BUILD_DIR) --target rt_capi dummy_device -j$(NPROC)
+$(RT_BUILD_DIR)/lib/backend/librt_backend.so $(RT_BUILD_DIR)/lib/librt_capi.so: configure
+	cmake --build $(RT_BUILD_DIR) --target rt_capi -j$(NPROC)
 
 .PHONY: runtime
 runtime: $(RT_BUILD_DIR)/lib/backend/librt_backend.so $(RT_BUILD_DIR)/lib/librt_capi.so $(RT_BUILD_DIR)/lib/libdummy_device.so
