@@ -24,6 +24,7 @@ import numpy as np
 import pennylane as qml
 import pytest
 from numpy.testing import assert_allclose
+from pytest import MonkeyPatch
 
 from catalyst import cond, for_loop, measure, qjit
 from catalyst.ag_utils import AutoGraphError, autograph_source, check_cache
@@ -1263,48 +1264,39 @@ class TestLogicalOps:
 
         monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
 
-        @qjit(autograph=True)
         def f1(param):
             return param > 0.0 and param < 1.0 and param <= 2.0
 
-        @qjit(autograph=True)
         def f2(param):
             return param > 1.0 or param < 0.0 or param == 0.5
 
-        @qjit(autograph=True)
         def f3(param):
             return not param > 1.0
 
-        assert all(f(0.5) for f in [f1, f2, f3])
+        assert qjit(autograph=True)(f1)(0.5) == np.array(True)
+        assert qjit(autograph=True)(f2)(0.5) == np.array(True)
+        assert qjit(autograph=True)(f3)(0.5) == np.array(True)
 
-    def test_logical_fallback(self, monkeypatch):
+    # fmt:off
+    @pytest.mark.parametrize("python_object",["string", "", [0, 1, 2], [], {1: 2}, {}, ],)
+    # fmt:on
+    def test_logical_with_python_objects(self, monkeypatch, python_object):
         """Test fallback path of logical ops."""
 
-        monkeypatch.setattr("catalyst.autograph_strict_conversion", False)
-        monkeypatch.setattr("catalyst.ag_primitives._emulate_fallback_errors", True)
+        with pytest.warns(UserWarning):
 
-        a, b, c = 1, 2, 33
-        some_list = [1, 2, 3]
+            @qjit(autograph=True)
+            def f():
+                return (True and python_object), (False or python_object), (not python_object)
 
-        @qjit(autograph=True)
-        def f1():
-            return (a in some_list) and (b in some_list)
+            and_expr, or_expr, not_expr = f()
 
-        @qjit(autograph=True)
-        def f2():
-            return (a in some_list) or (b in some_list)
+        assert and_expr == np.array(True and bool(python_object))
+        assert or_expr == np.array(False or bool(python_object))
+        assert not_expr == np.array(not bool(python_object))
 
-        @qjit(autograph=True)
-        def f3():
-            return c not in some_list
-
-        # TODO: Actually, jax arrays are returned, so `is True` does not work. What is our type
-        # conversion policy?
-        assert f1() == True
-        assert f2() == True
-        assert f3() == True
-
-    def test_logical_rejects_non_scalars(self, monkeypatch):
+    @pytest.mark.parametrize("bad", [jnp.array([]), jnp.array([0.5, 1.0])])
+    def test_logical_rejects_non_scalars(self, monkeypatch, bad):
         """Test that we reject using logic with non-scalar tensors"""
 
         def f1(param):
@@ -1316,16 +1308,49 @@ class TestLogicalOps:
         def f3(param):
             return not param > 1.0
 
-        arg = jnp.array([0.5, 1.0])
         with pytest.raises(AutoGraphError, match="non-scalar"):
-            qjit(autograph=True)(f1)(arg)
+            qjit(autograph=True)(f1)(bad)
         with pytest.raises(AutoGraphError, match="non-scalar"):
-            qjit(autograph=True)(f2)(arg)
+            qjit(autograph=True)(f2)(bad)
         with pytest.raises(AutoGraphError, match="non-scalar"):
-            qjit(autograph=True)(f3)(arg)
+            qjit(autograph=True)(f3)(bad)
+
+    @pytest.mark.parametrize(
+        "static,dynamic", [(True, True), (True, False), (False, True), (False, False)]
+    )
+    def test_logical_mixture_static_dynamic_default(self, monkeypatch, static, dynamic):
+        """Test the useage of a mixture of static and dynamic variables."""
+
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        @qjit(autograph=True)
+        def f(dynamic):
+            return ((static and dynamic), not ((not static) or (not dynamic)))
+
+        assert f(dynamic)[0] == np.array(static and dynamic)
+        assert f(dynamic)[1] == np.array(static and dynamic)
+
+    @pytest.mark.parametrize(
+        "a,b",
+        # fmt:off
+        [ (jnp.array(1.0), True), (1.0, False), (jnp.array(-1.0), True),
+          (-1.0, False), (np.array([1.2]), False), (np.array([-1.2]), False),
+        ],
+        # fmt:on
+    )
+    def test_logical_mixture_type(self, monkeypatch, a, b):
+        """Test non-boolean compatibility."""
+
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        @qjit(autograph=True)
+        def f1(jaxvar, boolvar):
+            return ((jaxvar > 0.0 and boolvar), not ((jaxvar <= 0.0) or (not boolvar)))
+
+        assert f1(a, b)[0] == f1(a, b)[1]
 
     def test_logical_strict_conversion_error(self, monkeypatch):
-        """Test exception on strict conversion failure."""
+        """Test that emulated strict conversion exception really works."""
 
         monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
         monkeypatch.setattr("catalyst.ag_primitives._emulate_fallback_errors", True)
@@ -1408,6 +1433,39 @@ class TestMixed:
 
         assert f(2) == 18
         assert f(3) == 0
+
+    def test_cond_or(self, monkeypatch):
+        """Test Python conditionals in conjunction with and-or statements"""
+
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        @qjit(autograph=True)
+        def f(x):
+            if x <= 0.0 or x >= 1.0:
+                y = 1
+            else:
+                y = 0
+            return y
+
+        assert f(0) == 1
+        assert f(1) == 1
+        assert f(0.5) == 0
+
+    def test_while_and(self, monkeypatch):
+        """Test Python while-loops in conjunction with and-or statements"""
+
+        monkeypatch.setattr("catalyst.autograph_strict_conversion", True)
+
+        @qjit(autograph=True)
+        def f(param):
+            n = 0
+            while param < 0.5 and n < 3:
+                param *= 1.5
+                n += 1
+            return n
+
+        assert f(0.4) == 1
+        assert f(0.1) == 3
 
 
 if __name__ == "__main__":

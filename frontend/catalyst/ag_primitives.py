@@ -443,7 +443,27 @@ def _logical_op(*args, jax_fn, python_fn):
         if catalyst.autograph_strict_conversion:
             raise e
 
+        import inspect
+        import textwrap
+
+        expr_info = get_source_code_info(inspect.stack()[2])
+
         fallback = True
+
+        if not catalyst.autograph_ignore_fallbacks:
+            warnings.warn(
+                f"Tracing of an AutoGraph converted logical expression failed with an exception:\n"
+                f"  {type(e).__name__}:{textwrap.indent(str(e), '    ')}\n"
+                f"\n"
+                f"The error ocurred within the body of the following expression:\n"
+                f"{expr_info}"
+                f"\n"
+                f"To understand different types of JAX tracing errors, please refer to the "
+                f"guide at: https://jax.readthedocs.io/en/latest/errors.html\n"
+                f"\n"
+                f"If you did not intend for the conversion to happen, you may safely ignore "
+                f"this warning."
+            )
 
     if fallback:
         result = python_fn(values)
@@ -463,7 +483,7 @@ def or_(*args):
 
 def not_(arg):
     """An implementation of the AutoGraph '.. not ..' statement."""
-    return _logical_op(lambda: arg, jax_fn=jax_logical_not, python_fn=lambda x: not x)
+    return _logical_op(lambda: arg, jax_fn=jax_logical_not, python_fn=lambda x: not x[0])
 
 
 def get_source_code_info(tb_frame):
