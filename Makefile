@@ -22,6 +22,7 @@ help:
 	@echo "  frontend           to install Catalyst Frontend"
 	@echo "  mlir               to build MLIR and custom Catalyst dialects"
 	@echo "  runtime            to build Catalyst Runtime with PennyLane-Lightning"
+	@echo "  dummy_device       needed for frontend tests"
 	@echo "  test               to run the Catalyst test suites"
 	@echo "  docs               to build the documentation for Catalyst"
 	@echo "  clean              to uninstall Catalyst and delete all temporary and cache files"
@@ -58,6 +59,9 @@ dialects:
 runtime:
 	$(MAKE) -C runtime all
 
+dummy_device:
+	$(MAKE) -C dummy_device
+
 .PHONY: test test-runtime test-frontend lit pytest test-demos
 test: test-runtime test-frontend test-demos
 
@@ -72,7 +76,6 @@ lit:
 
 pytest:
 	@echo "check the Catalyst PyTest suite"
-	$(MAKE) -C runtime dummy_device
 	$(PYTHON) -m pytest frontend/test/pytest --tb=native --backend=$(TEST_BACKEND) --runbraket=$(TEST_BRAKET) -n auto
 test-demos:
 	@echo "check the Catalyst demos"
@@ -121,7 +124,6 @@ coverage: coverage-frontend coverage-runtime
 
 coverage-frontend:
 	@echo "Generating coverage report for the frontend"
-	$(MAKE) -C runtime dummy_device
 	$(PYTHON) -m pytest frontend/test/pytest -n auto --cov=catalyst --tb=native --cov-report=$(COVERAGE_REPORT)
 
 coverage-runtime:
