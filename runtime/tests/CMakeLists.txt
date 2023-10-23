@@ -2,7 +2,6 @@ cmake_minimum_required(VERSION 3.21)
 
 project(lightning_qir_runtime_tests)
 
-add_subdirectory(third_party)
 
 set(CMAKE_CXX_STANDARD 20)
 
@@ -24,7 +23,21 @@ include(CTest)
 include(Catch)
 
 add_executable(runner_tests runner_main.cpp)
-add_dependencies(runner_tests dummy_device)
+
+if (ENABLE_SANITIZER)
+    # Third party tests are incompatible with sanitizers.
+    # They produce the following error message:
+    # You are trying to dlopen a this-file-does-not-exist.so shared
+    # library with RTLD_DEEPBIND flag which is incompatible with sanitizer
+    # runtime (see https://github.com/google/sanitizers/issues/611 for
+    # details). If you want to run this-file-does-not-exist.so library under
+    # sanitizers please remove RTLD_DEEPBIND from dlopen flags.
+    add_subdirectory(third_party)
+    add_dependencies(runner_tests dummy_device)
+    set(third_party_tests Test_LoadingThirdParty.cpp)
+else()
+    set(third_party_tests "")
+endif()
 
 if(ENABLE_OPENQASM)
 find_package(pybind11 CONFIG)
@@ -70,7 +83,7 @@ endif()
 
 target_sources(runner_tests PRIVATE ${cov_helper_src}
             ${openqasm_tests}
-            Test_LoadingThirdParty.cpp
+            ${third_party_tests}
             Test_QubitManager.cpp
             Test_CacheManager.cpp
             Test_LightningDriver.cpp
