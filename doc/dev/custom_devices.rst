@@ -12,7 +12,7 @@ Instead, Catalyst can only interact with devices that implement the `QuantumDevi
 
 In addition to implementing the ``QuantumDevice`` class, one must implement the following method:
 
-.. code-block:: cpp
+.. code-block:: guess
     extern "C" Catalyst::Runtime::QuantumDevice*
     getCustomDevice() { return new CustomDevice(); }
 
