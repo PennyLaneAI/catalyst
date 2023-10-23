@@ -12,7 +12,7 @@ Instead, Catalyst can only interact with devices that implement the `QuantumDevi
 
 In addition to implementing the ``QuantumDevice`` class, one must implement the following method:
 
-.. code-block:: c++
+.. code-block:: cpp
     extern "C" Catalyst::Runtime::QuantumDevice*
     getCustomDevice() { return new CustomDevice(); }
 
@@ -24,14 +24,14 @@ where ``CustomDevice()`` is a constructor for your custom device.
     This interface might change quickly in the near future.
     Please check back regularly for updates and to ensure your device is compatible with a specific version of Catalyst.
 
-I Have Implemented My Own `QuantumDevice  <https://docs.pennylane.ai/projects/catalyst/en/latest/api/file_runtime_include_QuantumDevice.hpp.html>` class. How Do I Compile It?
-==============================================================================================================================================================================
+I Have Implemented My Own QuantumDevice Class. How Do I Compile It?
+===================================================================
 
 There is an example ``CMakeLists.txt`` file and an example third party device in the runtime tests.
 Please take a look there.
 
-How Do I Integrate the ``QuantumDevice`` Class with PennyLane Devices and the Rest of the PennyLane Ecosystem?
-============================================================================================================
+How Do I Integrate My QuantumDevice Class with PennyLane Devices and the Rest of the PennyLane Ecosystem?
+========================================================================================================
 
 If you already have a custom PennyLane device defined in Python and have added a shared object that corresponds to your implementation of the ``QuantumDevice`` class, then all you need to do is to add a ``get_c_interface`` method to your PennyLane device.
 The ``get_c_interface`` method should be a static method that takes no parameters and returns the complete path to your shared library with the ``QuantumDevice`` implementation.
