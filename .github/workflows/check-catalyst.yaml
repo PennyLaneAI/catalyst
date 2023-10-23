@@ -372,6 +372,7 @@ jobs:
       run: |
         # export ASAN_OPTIONS=detect_odr_violation=0
         COVERAGE_REPORT="xml:coverage.xml -p no:warnings" \
+        RT_BUILD_DIR="$(pwd)/runtime-build" \
         make coverage-frontend
         mv coverage.xml coverage-${{ github.job }}.xml
 
@@ -434,6 +435,7 @@ jobs:
 
     - name: Run Python Pytest Tests (backend=lightning.kokkos)
       run: |
+        RT_BUILD_DIR="$(pwd)/runtime-build" \
         make pytest TEST_BACKEND="lightning.kokkos"
 
   frontend-tests-openqasm-device:
@@ -488,6 +490,7 @@ jobs:
 
     - name: Run Python Pytest Tests
       run: |
+        RT_BUILD_DIR="$(pwd)/runtime-build" \
         make pytest TEST_BRAKET=LOCAL
 
   runtime-tests:

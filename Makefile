@@ -121,6 +121,7 @@ coverage: coverage-frontend coverage-runtime
 
 coverage-frontend:
 	@echo "Generating coverage report for the frontend"
+	$(MAKE) -C runtime dummy_device
 	$(PYTHON) -m pytest frontend/test/pytest -n auto --cov=catalyst --tb=native --cov-report=$(COVERAGE_REPORT)
 
 coverage-runtime:
