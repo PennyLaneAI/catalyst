@@ -369,3 +369,20 @@ if_call(0.1)  # needed to generate the source code for nested functions
 
 print_code(nested_call)
 print_code(if_call)
+
+# -----
+
+
+# CHECK-LABEL: def and_or_calls
+@autograph
+def and_or_calls(x: float, y: float):
+    """Check that catalyst can handle ``and``, ``or`` and ``not`` using autograph."""
+    # CHECK: a = ag__.and_
+    a = x >= 0.0 and x <= 1.0
+    # CHECK: b = ag__.not_
+    b = not y >= 1.0
+    # CHECK: return ag__.or_
+    return a or b
+
+
+print_code(and_or_calls)

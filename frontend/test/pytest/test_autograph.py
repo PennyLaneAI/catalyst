@@ -1292,7 +1292,7 @@ class TestLogicalOps:
 
         @qjit(autograph=True)
         def f2():
-            return (a in some_list) and (b in some_list)
+            return (a in some_list) or (b in some_list)
 
         @qjit(autograph=True)
         def f3():
