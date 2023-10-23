@@ -32,6 +32,7 @@ help:
 	@echo "  format [check=1]   to apply C++ and Python formatter; use with 'check=1' to check instead of modify (requires black, pylint and clang-format)"
 	@echo "  format [version=?] to apply C++ and Python formatter; use with 'version={version}' to run clang-format-{version} instead of clang-format"
 
+
 .PHONY: all
 all: runtime mlir frontend
 
@@ -60,7 +61,7 @@ runtime:
 	$(MAKE) -C runtime all
 
 dummy_device:
-	$(MAKE) -C dummy_device
+	$(MAKE) -C runtime dummy_device
 
 .PHONY: test test-runtime test-frontend lit pytest test-demos
 test: test-runtime test-frontend test-demos
@@ -146,11 +147,11 @@ endif
 ifdef check
 	python3 ./bin/format.py --check $(if $(version:-=),--cfversion $(version)) ./frontend/catalyst/utils
 	black --check --verbose .
-	isort --check --diff .
+	isort --check --diff frontend
 else
 	python3 ./bin/format.py $(if $(version:-=),--cfversion $(version)) ./frontend/catalyst/utils
 	black .
-	isort .
+	isort frontend
 endif
 	pylint frontend
 
