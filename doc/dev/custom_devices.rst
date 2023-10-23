@@ -6,9 +6,9 @@ Differences between Devices in PennyLane and Catalyst
 =====================================================
 
 PennyLane and Catalyst treat devices a bit differently.
-In PennyLane, one is able to `define devices <https://docs.pennylane.ai/en/stable/development/plugins.html>` in Python.
+In PennyLane, one is able to `define devices <https://docs.pennylane.ai/en/stable/development/plugins.html>`_ in Python.
 Catalyst cannot interface with Python devices yet.
-Instead, Catalyst can only interact with devices that implement the `QuantumDevice  <https://docs.pennylane.ai/projects/catalyst/en/latest/api/file_runtime_include_QuantumDevice.hpp.html>` class.
+Instead, Catalyst can only interact with devices that implement the `QuantumDevice <https://docs.pennylane.ai/projects/catalyst/en/latest/api/file_runtime_include_QuantumDevice.hpp.html>`_ class.
 
 In addition to implementing the ``QuantumDevice`` class, one must implement the following method:
 
