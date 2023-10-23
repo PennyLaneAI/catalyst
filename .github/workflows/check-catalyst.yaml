@@ -529,6 +529,7 @@ jobs:
             CXX_COMPILER=$(which g++) \
             COMPILER_LAUNCHER="" \
             ENABLE_LIGHTNING_KOKKOS=ON \
+            CMAKE_ARGS="-DENABLE_SANITIZER=ON" \
             make test-runtime
 
       - name: Build Runtime test suite for OpenQasm device
