@@ -13,6 +13,8 @@
 # limitations under the License.
 """Unit test for custom device integration with Catalyst.
 """
+import pathlib
+
 import pennylane as qml
 import pytest
 
@@ -21,6 +23,10 @@ from catalyst.compiler import get_lib_path
 from catalyst.utils.exceptions import CompileError
 
 
+@pytest.mark.skipif(
+    not pathlib.Path(get_lib_path("runtime", "RUNTIME_LIB_DIR") + "/libdummy_device.so").is_file(),
+    reason="lib_dummydevice.so was not found.",
+)
 def test_custom_device():
     """Test that custom device can run using Catalyst."""
 
