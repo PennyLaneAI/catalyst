@@ -21,6 +21,24 @@ from catalyst.ag_utils import AutoGraphError, print_code
 from catalyst.autograph import autograph
 
 
+# CHECK-LABEL: def while_simple
+@autograph
+def while_simple(x: float):
+    """Test a simple while-loop statemnt."""
+
+    # CHECK:   def loop_body
+    # CHECK:   def loop_test
+    # CHECK:   ag__.while_stmt(loop_test, loop_body
+    while x < 1.0:
+        x *= 1.5
+    return x
+
+
+print_code(while_simple)
+
+# -----
+
+
 # CHECK-LABEL: def if_simple
 @autograph
 def if_simple(x: float):
