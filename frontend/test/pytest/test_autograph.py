@@ -1295,6 +1295,26 @@ class TestLogicalOps:
         assert or_expr == np.array(False or bool(python_object))
         assert not_expr == np.array(not bool(python_object))
 
+    def test_logical_with_python_objects_ignore_fallbacks(self, monkeypatch):
+        """Test fallback path of logical ops with the ignore_fallbacks flag set."""
+
+        monkeypatch.setattr("catalyst.autograph_ignore_fallbacks", True)
+
+        python_object = {1: 2}
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+
+            @qjit(autograph=True)
+            def f():
+                return (True and python_object), (False or python_object), (not python_object)
+
+            and_expr, or_expr, not_expr = f()
+
+        assert and_expr == np.array(True and bool(python_object))
+        assert or_expr == np.array(False or bool(python_object))
+        assert not_expr == np.array(not bool(python_object))
+
     @pytest.mark.parametrize("bad", [jnp.array([]), jnp.array([0.5, 1.0])])
     def test_logical_rejects_non_scalars(self, monkeypatch, bad):
         """Test that we reject using logic with non-scalar tensors"""
