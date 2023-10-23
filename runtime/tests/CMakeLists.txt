@@ -25,6 +25,8 @@ include(Catch)
 add_executable(runner_tests runner_main.cpp)
 
 if (ENABLE_SANITIZER)
+    set(third_party_tests "")
+else()
     # Third party tests are incompatible with sanitizers.
     # They produce the following error message:
     # You are trying to dlopen a this-file-does-not-exist.so shared
@@ -35,8 +37,6 @@ if (ENABLE_SANITIZER)
     add_subdirectory(third_party)
     add_dependencies(runner_tests dummy_device)
     set(third_party_tests Test_LoadingThirdParty.cpp)
-else()
-    set(third_party_tests "")
 endif()
 
 if(ENABLE_OPENQASM)
