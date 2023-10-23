@@ -533,6 +533,22 @@ def trace_quantum_function(
             with QueuingManager.stop_recording(), quantum_tape:
                 # Quantum tape transformations happen at the end of tracing
                 ans = wffa.call_wrapped(*in_classical_tracers)
+
+            # Ans contains the leaves of the pytree (empty for measurement without
+            # data https://github.com/PennyLaneAI/pennylane/pull/4607)
+            # Therefore we need to compute the tree with measurements as leaves and it comes
+            # with an extra computational cost
+
+            # 1. Recompute the original return
+            with QueuingManager.stop_recording():
+                ans = tree_unflatten(out_tree_promise(), ans)
+
+            def is_leaf(obj):
+                return isinstance(obj, qml.measurements.MeasurementProcess)
+
+            # 2. Create a new tree that has measurements as leaves
+            ans, out_tree = jax.tree_util.tree_flatten(ans, is_leaf=is_leaf)
+
             out_classical_tracers_or_measurements = [
                 (trace.full_raise(t) if isinstance(t, DynamicJaxprTracer) else t) for t in ans
             ]
@@ -547,7 +563,7 @@ def trace_quantum_function(
                 device,
                 qrp_out,
                 out_classical_tracers_or_measurements,
-                out_tree_promise(),
+                out_tree,
             )
             out_quantum_tracers = [qrp_out.actualize()]
             qdealloc_p.bind(qreg_in)
@@ -564,6 +580,7 @@ def trace_quantum_function(
 
     closed_jaxpr = ClosedJaxpr(jaxpr, consts)
     out_avals, _ = unzip2(out_type)
+
     abstract_results = tree_unflatten(
         out_classical_tree, [ShapeDtypeStruct(a.shape, a.dtype, a.named_shape) for a in out_avals]
     )

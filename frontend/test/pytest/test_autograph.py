@@ -1391,16 +1391,18 @@ class TestMixed:
 
         monkeypatch.setattr("catalyst.ag_primitives._emulate_fallback_errors", True)
 
-        @qjit(autograph=True)
-        def f1():
-            acc = 0
-            while acc < 5:
-                acc = acc + 1
-                for x in [1, 2, 3]:
-                    acc += x
-            return acc
+        with pytest.warns(UserWarning):
 
-        assert f1() == 0 + 1 + sum([1, 2, 3])
+            @qjit(autograph=True)
+            def f1():
+                acc = 0
+                while acc < 5:
+                    acc = acc + 1
+                    for x in [1, 2, 3]:
+                        acc += x
+                return acc
+
+            assert f1() == 0 + 1 + sum([1, 2, 3])
 
     def test_no_python_loops(self):
         """Test AutoGraph behaviour on function with Catalyst loops."""
