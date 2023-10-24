@@ -73,10 +73,7 @@ class SharedLibraryManager final {
         // you will get an error.
         // Please re-compile without sanitizers.
         _handler = dlopen(filename.c_str(), RTLD_LAZY | RTLD_DEEPBIND);
-        if (!_handler) {
-            char *error_msg = dlerror();
-            throw RuntimeException(error_msg);
-        }
+        RT_FAIL_IF(!_handler, dlerror());
     }
 
     ~SharedLibraryManager()
@@ -111,10 +108,7 @@ class SharedLibraryManager final {
     void *getSymbol(std::string symbol)
     {
         void *sym = dlsym(_handler, symbol.c_str());
-        if (!sym) {
-            char *error_msg = dlerror();
-            throw RuntimeException(error_msg);
-        }
+        RT_FAIL_IF(!sym, dlerror());
         return sym;
     }
 };
