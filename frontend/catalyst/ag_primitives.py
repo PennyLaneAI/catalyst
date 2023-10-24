@@ -111,7 +111,7 @@ def if_stmt(
     set_state(results)
 
 
-def assert_for_loop_inputs(inputs, iterate_names):
+def assert_for_loop_inputs(inputs, symbol_names):
     """All loop carried values, variables that are updated each iteration or accessed after the
     loop terminates, need to be initialized prior to entering the loop.
 
@@ -138,7 +138,7 @@ def assert_for_loop_inputs(inputs, iterate_names):
             jax.api_util.shaped_abstractify(inp)
         except TypeError as e:
             raise AutoGraphError(
-                f"The variable '{iterate_names[i]}' was initialized with type {type(inp)}, "
+                f"The variable '{symbol_names[i]}' was initialized with type {type(inp)}, "
                 "which is not compatible with JAX. Typically, this is the case for non-numeric "
                 "values.\n"
                 "You may still use such a variable as a constant inside a loop, but it cannot "
@@ -147,7 +147,7 @@ def assert_for_loop_inputs(inputs, iterate_names):
             ) from e
 
 
-def assert_for_loop_results(inputs, outputs, iterate_names):
+def assert_for_loop_results(inputs, outputs, symbol_names):
     """The results of a for loop should have the identical type as the inputs, since they are
     "passed" as inputs to the next iteration. A mismatch here may indicate that a loop carried
     variable was initialized with wrong type.
@@ -157,20 +157,28 @@ def assert_for_loop_results(inputs, outputs, iterate_names):
         inp_t, out_t = jax.api_util.shaped_abstractify(inp), jax.api_util.shaped_abstractify(out)
         if inp_t.dtype != out_t.dtype or inp_t.shape != out_t.shape:
             raise AutoGraphError(
-                f"The variable '{iterate_names[i]}' was initialized with the wrong type. "
+                f"The variable '{symbol_names[i]}' was initialized with the wrong type. "
                 f"Expected: {out_t}, Got: {inp_t}"
             )
 
 
 def _call_catalyst_for(
-    start, stop, step, body_fn, get_state, set_state, opts, enum_start=None, array_iterable=None
+    start,
+    stop,
+    step,
+    body_fn,
+    get_state,
+    set_state,
+    symbol_names,
+    enum_start=None,
+    array_iterable=None,
 ):
     """Dispatch to a Catalyst implementation of for loops."""
 
     # Ensure iteration arguments are properly initialized. We cannot process uninitialized
     # loop carried values as we need their type information for tracing.
     init_iter_args = get_state()
-    assert_for_loop_inputs(init_iter_args, opts["iterate_names"])
+    assert_for_loop_inputs(init_iter_args, symbol_names)
 
     @catalyst.for_loop(start, stop, step)
     def functional_for(i, *iter_args):
@@ -194,7 +202,7 @@ def _call_catalyst_for(
         return get_state()
 
     final_iter_args = functional_for(*init_iter_args)
-    assert_for_loop_results(init_iter_args, final_iter_args, opts["iterate_names"])
+    assert_for_loop_results(init_iter_args, final_iter_args, symbol_names)
     return final_iter_args
 
 
@@ -213,8 +221,8 @@ def for_stmt(
     body_fn: Callable[[int], None],
     get_state: Callable[[], Tuple],
     set_state: Callable[[Tuple], None],
-    _symbol_names: Tuple[str],
-    opts: dict,
+    symbol_names: Tuple[str],
+    _opts: dict,
 ):
     """An implementation of the AutoGraph 'for .. in ..' statement. The interface is defined by
     AutoGraph, here we merely provide an implementation of it in terms of Catalyst primitives."""
@@ -240,6 +248,7 @@ def for_stmt(
     #      to succeed, for example because they forgot to use a list instead of an array
     fallback = False
     init_state = get_state()
+    assert len(init_state) == len(symbol_names)
 
     if isinstance(iteration_target, CRange):
         start, stop, step = iteration_target.get_raw_range()
@@ -278,7 +287,15 @@ def for_stmt(
         try:
             set_state(init_state)
             results = _call_catalyst_for(
-                start, stop, step, body_fn, get_state, set_state, opts, enum_start, iteration_array
+                start,
+                stop,
+                step,
+                body_fn,
+                get_state,
+                set_state,
+                symbol_names,
+                enum_start,
+                iteration_array,
             )
         except Exception as e:  # pylint: disable=broad-exception-caught
             if catalyst.autograph_strict_conversion:
